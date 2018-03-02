@@ -1,0 +1,14 @@
+[package]
+name = "unistd"
+version = "0.1.0"
+authors = ["Jeremy Soller <jackpot51@gmail.com>"]
+
+[lib]
+name = "unistd"
+crate-type = ["cdylib"]
+
+[build-dependencies]
+cbindgen = "0.5"
+
+[dependencies]
+libc = "0.2"

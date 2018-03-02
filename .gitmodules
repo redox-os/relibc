@@ -1,0 +1,3 @@
+[submodule "openlibm"]
+	path = openlibm
+	url = https://github.com/redox-os/openlibm.git
