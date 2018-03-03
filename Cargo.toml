@@ -8,10 +8,6 @@ name = "c"
 crate-type = ["staticlib"]
 
 [workspace]
-members = [
-    "fcntl",
-    "unistd"
-]
 
 [dependencies]
 fcntl = { path = "fcntl" }
