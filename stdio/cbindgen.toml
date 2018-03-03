@@ -1,0 +1,7 @@
+sys_includes = ["stdarg.h", "stddef.h"]
+include_guard = "_stdio_H"
+trailer = "#include <bits/stdio.h>"
+language = "C"
+
+[enum]
+prefix_with_name = true

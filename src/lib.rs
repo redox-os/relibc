@@ -5,6 +5,7 @@ extern crate compiler_builtins;
 extern crate platform;
 
 extern crate fcntl;
+extern crate stdio;
 extern crate string;
 extern crate unistd;
 
