@@ -4,6 +4,8 @@
 typedef int gid_t;
 typedef int uid_t;
 
+typedef int mode_t;
+
 typedef long off_t;
 
 typedef int pid_t;

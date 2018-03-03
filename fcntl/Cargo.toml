@@ -8,4 +8,4 @@ build = "build.rs"
 cbindgen = { path = "../cbindgen" }
 
 [dependencies]
-common = { path = "../common" }
+platform = { path = "../platform" }

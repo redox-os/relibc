@@ -2,9 +2,9 @@
 
 #![no_std]
 
-extern crate common;
+extern crate platform;
 
-pub use common::*;
+pub use platform::types::*;
 
 pub const NULL: c_int = 0;
 
@@ -28,7 +28,7 @@ pub const STDERR_FILENO: c_int = 2;
 
 #[no_mangle]
 pub extern "C" fn _exit(status: c_int) {
-    unimplemented!();
+    platform::exit(status)
 }
 
 #[no_mangle]
@@ -63,7 +63,7 @@ pub extern "C" fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_in
 
 #[no_mangle]
 pub extern "C" fn close(fildes: c_int) -> c_int {
-    unimplemented!();
+    platform::close(fildes)
 }
 
 #[no_mangle]
@@ -448,7 +448,10 @@ pub extern "C" fn vfork() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn write(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
-    unimplemented!();
+    use core::slice;
+
+    let buf = unsafe { slice::from_raw_parts(buf as *const u8, nbyte as usize) };
+    platform::write(fildes, buf)
 }
 
 /*

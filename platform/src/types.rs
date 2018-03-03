@@ -1,8 +1,3 @@
-//! fcntl implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/fcntl.h.html
-
-#![no_std]
-#![allow(non_camel_case_types)]
-
 // Use repr(u8) as LLVM expects `void*` to be the same as `i8*` to help enable
 // more optimization opportunities around it recognizing things like
 // malloc/free.
