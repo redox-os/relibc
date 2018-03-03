@@ -8,4 +8,4 @@ build = "build.rs"
 cbindgen = "0.5"
 
 [dependencies]
-libc = { version = "0.2", default-features = false }
+common = { path = "../common" }

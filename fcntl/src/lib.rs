@@ -2,9 +2,9 @@
 
 #![no_std]
 
-extern crate libc;
+extern crate common;
 
-use libc::*;
+pub use common::*;
 
 pub const F_DUPFD: c_int = 0;
 pub const F_GETFD: c_int = 1;
