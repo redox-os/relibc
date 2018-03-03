@@ -4,6 +4,16 @@ extern crate libc;
 
 use libc::*;
 
+pub const R_OK: c_int = 1;
+pub const W_OK: c_int = 2;
+pub const X_OK: c_int = 4;
+pub const F_OK: c_int = 8;
+
+#[no_mangle]
+pub extern "C" fn _exit(status: c_int) {
+    unimplemented!();
+}
+
 #[no_mangle]
 pub extern "C" fn access(path: *const c_char, amode: c_int) -> c_int {
     unimplemented!();
@@ -101,11 +111,6 @@ pub extern "C" fn execve(path: *const c_char, argv: *const *mut c_char, envp: *c
 
 #[no_mangle]
 pub extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -> c_int {
-    unimplemented!();
-}
-
-#[no_mangle]
-pub extern "C" fn _exit(status: c_int) {
     unimplemented!();
 }
 
@@ -241,6 +246,191 @@ pub extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn isatty(fildes: c_int) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn lchown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn link(path1: *const c_char, path2: *const c_char) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn nice(incr: c_int) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn pathconf(path: *const c_char, name: c_int) -> c_long {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn pause() -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn pipe(fildes: [c_int; 2]) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn pread(fildes: c_int, buf: *mut c_void, nbyte: size_t, offset: off_t) -> ssize_t {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn pthread_atfork(prepare: extern "C" fn(), parent: extern "C" fn(), child: extern "C" fn()) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn pwrite(fildes: c_int, buf: *const c_void, nbyte: size_t, offset: off_t) -> ssize_t {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn readlink(path: *const c_char, buf: *mut c_char, bufsize: size_t) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn rmdir(path: *const c_char) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn setgid(gid: gid_t) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn setpgrp() -> pid_t {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn setsid() -> pid_t {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn setuid(uid: uid_t) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn swab(src: *const c_void, dest: *mut c_void, nbytes: ssize_t) {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn symlink(path1: *const c_char, path2: *const c_char) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn sync() {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn sysconf(name: c_int) -> c_long {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn tcgetpgrp() -> pid_t {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn tcsetpgrp(fildes: c_int, pgid_id: pid_t) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn truncate(path: *const c_char, length: off_t) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn ttyname(fildes: c_int) -> *mut c_char {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn ualarm(useconds: useconds_t, interval: useconds_t) -> useconds_t {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn unlink(path: *const c_char) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn vfork() -> pid_t {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn write(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
     unimplemented!();
 }
 
