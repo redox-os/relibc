@@ -8,7 +8,9 @@ pub struct group {
     pub gr_mem: *mut *mut libc::c_char,
 }
 impl Clone for group {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 pub extern "C" fn getgrgid(arg1: gid_t) -> *mut group {
     unimplemented!();
@@ -18,15 +20,23 @@ pub extern "C" fn getgrnam(arg1: *const libc::c_char) -> *mut group {
     unimplemented!();
 }
 
-pub extern "C" fn getgrgid_r(arg1: gid_t, arg2: *mut group,
-                      arg3: *mut libc::c_char, arg4: usize,
-                      arg5: *mut *mut group) -> libc::c_int {
+pub extern "C" fn getgrgid_r(
+    arg1: gid_t,
+    arg2: *mut group,
+    arg3: *mut libc::c_char,
+    arg4: usize,
+    arg5: *mut *mut group,
+) -> libc::c_int {
     unimplemented!();
 }
 
-pub extern "C" fn getgrnam_r(arg1: *const libc::c_char, arg2: *mut group,
-                      arg3: *mut libc::c_char, arg4: usize,
-                      arg5: *mut *mut group) -> libc::c_int {
+pub extern "C" fn getgrnam_r(
+    arg1: *const libc::c_char,
+    arg2: *mut group,
+    arg3: *mut libc::c_char,
+    arg4: usize,
+    arg5: *mut *mut group,
+) -> libc::c_int {
     unimplemented!();
 }
 
@@ -41,4 +51,3 @@ pub extern "C" fn endgrent() {
 pub extern "C" fn setgrent() {
     unimplemented!();
 }
-

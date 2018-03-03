@@ -15,10 +15,12 @@ pub extern "C" fn aio_write(__aiocbp: *mut aiocb) -> libc::c_int {
     unimplemented!();
 }
 
-pub extern "C" fn lio_listio(__mode: libc::c_int,
-                      __list: *const *const aiocb,
-                      __nent: libc::c_int, __sig: *mut sigevent)
-     -> libc::c_int {
+pub extern "C" fn lio_listio(
+    __mode: libc::c_int,
+    __list: *const *const aiocb,
+    __nent: libc::c_int,
+    __sig: *mut sigevent,
+) -> libc::c_int {
     unimplemented!();
 }
 
@@ -30,19 +32,18 @@ pub extern "C" fn aio_return(__aiocbp: *mut aiocb) -> __ssize_t {
     unimplemented!();
 }
 
-pub extern "C" fn aio_cancel(__fildes: libc::c_int, __aiocbp: *mut aiocb)
-     -> libc::c_int {
+pub extern "C" fn aio_cancel(__fildes: libc::c_int, __aiocbp: *mut aiocb) -> libc::c_int {
     unimplemented!();
 }
 
-pub extern "C" fn aio_suspend(__list: *const *const aiocb,
-                       __nent: libc::c_int,
-                       __timeout: *const timespec) -> libc::c_int {
+pub extern "C" fn aio_suspend(
+    __list: *const *const aiocb,
+    __nent: libc::c_int,
+    __timeout: *const timespec,
+) -> libc::c_int {
     unimplemented!();
 }
 
-pub extern "C" fn aio_fsync(__operation: libc::c_int, __aiocbp: *mut aiocb)
-     -> libc::c_int {
+pub extern "C" fn aio_fsync(__operation: libc::c_int, __aiocbp: *mut aiocb) -> libc::c_int {
     unimplemented!();
 }
-

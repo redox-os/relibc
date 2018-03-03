@@ -59,4 +59,3 @@ pub extern "C" fn tolower(arg1: libc::c_int) -> libc::c_int {
 pub extern "C" fn toupper(arg1: libc::c_int) -> libc::c_int {
     unimplemented!();
 }
-
