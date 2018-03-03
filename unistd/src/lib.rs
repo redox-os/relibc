@@ -6,8 +6,6 @@ extern crate platform;
 
 pub use platform::types::*;
 
-pub const NULL: c_int = 0;
-
 pub const R_OK: c_int = 1;
 pub const W_OK: c_int = 2;
 pub const X_OK: c_int = 4;
@@ -101,20 +99,20 @@ pub extern "C" fn encrypt(block: [c_char; 64], edflag: c_int) {
     unimplemented!();
 }
 
-#[no_mangle]
-pub extern "C" fn execl(path: *const c_char, arg0: *const c_char /* TODO: , mut args: ... */) -> c_int {
-    unimplemented!();
-}
-
-#[no_mangle]
-pub extern "C" fn execle(path: *const c_char, arg0: *const c_char /* TODO: , mut args: ... */) -> c_int {
-    unimplemented!();
-}
-
-#[no_mangle]
-pub extern "C" fn execlp(file: *const c_char, arg0: *const c_char /* TODO: , mut args: ... */) -> c_int {
-    unimplemented!();
-}
+// #[no_mangle]
+// pub extern "C" fn execl(path: *const c_char, arg0: *const c_char /* TODO: , mut args: ... */) -> c_int {
+//     unimplemented!();
+// }
+//
+// #[no_mangle]
+// pub extern "C" fn execle(path: *const c_char, arg0: *const c_char /* TODO: , mut args: ... */) -> c_int {
+//     unimplemented!();
+// }
+//
+// #[no_mangle]
+// pub extern "C" fn execlp(file: *const c_char, arg0: *const c_char /* TODO: , mut args: ... */) -> c_int {
+//     unimplemented!();
+// }
 
 #[no_mangle]
 pub extern "C" fn execv(path: *const c_char, argv: *const *mut c_char) -> c_int {

@@ -5,10 +5,8 @@ extern crate compiler_builtins;
 extern crate platform;
 
 extern crate fcntl;
+extern crate string;
 extern crate unistd;
-
-pub use fcntl::*;
-pub use unistd::*;
 
 use core::fmt;
 

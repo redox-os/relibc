@@ -1,0 +1,6 @@
+sys_includes = ["stddef.h"]
+include_guard = "_STRING_H"
+language = "C"
+
+[enum]
+prefix_with_name = true

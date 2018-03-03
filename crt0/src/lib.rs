@@ -17,18 +17,37 @@ pub unsafe extern "C" fn _start() {
         :
         :
         :
-        : "intel"
+        : "intel", "volatile"
     );
+}
+
+#[repr(C)]
+pub struct Stack {
+    argc: isize,
+    argv0: *const u8,
+}
+
+impl Stack {
+    fn argc(&self) -> isize {
+        self.argc
+    }
+
+    fn argv(&self) -> *const *const u8 {
+        &self.argv0 as *const *const u8
+    }
 }
 
 #[inline(never)]
 #[no_mangle]
-pub unsafe extern "C" fn _start_rust(sp: usize) -> ! {
+pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
     extern "C" {
-        fn main(argc: c_int, argv: *const *const c_char) -> c_int;
+        fn main(argc: isize, argv: *const *const u8) -> c_int;
     }
 
-    platform::exit(main(0, 0 as *const *const c_char));
+    let argc = sp.argc();
+    let argv = sp.argv();
+
+    platform::exit(main(argc, argv));
 }
 
 #[lang = "panic_fmt"]

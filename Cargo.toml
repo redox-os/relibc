@@ -14,6 +14,7 @@ members = ["crt0"]
 compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins.git", default-features = false, features = ["mem"] }
 platform = { path = "platform" }
 fcntl = { path = "fcntl" }
+string = { path = "string" }
 unistd = { path = "unistd" }
 
 [profile.dev]
