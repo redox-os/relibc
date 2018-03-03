@@ -7,14 +7,17 @@ pub struct aiocb {
     pub aio_sigevent: sigevent,
 }
 
+#[no_mangle]
 pub extern "C" fn aio_read(__aiocbp: *mut aiocb) -> libc::c_int {
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn aio_write(__aiocbp: *mut aiocb) -> libc::c_int {
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn lio_listio(
     __mode: libc::c_int,
     __list: *const *const aiocb,
@@ -24,18 +27,22 @@ pub extern "C" fn lio_listio(
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn aio_error(__aiocbp: *const aiocb) -> libc::c_int {
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn aio_return(__aiocbp: *mut aiocb) -> __ssize_t {
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn aio_cancel(__fildes: libc::c_int, __aiocbp: *mut aiocb) -> libc::c_int {
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn aio_suspend(
     __list: *const *const aiocb,
     __nent: libc::c_int,
@@ -44,6 +51,7 @@ pub extern "C" fn aio_suspend(
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn aio_fsync(__operation: libc::c_int, __aiocbp: *mut aiocb) -> libc::c_int {
     unimplemented!();
 }

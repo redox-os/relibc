@@ -12,14 +12,17 @@ impl Clone for group {
         *self
     }
 }
+#[no_mangle]
 pub extern "C" fn getgrgid(arg1: gid_t) -> *mut group {
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn getgrnam(arg1: *const libc::c_char) -> *mut group {
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn getgrgid_r(
     arg1: gid_t,
     arg2: *mut group,
@@ -30,6 +33,7 @@ pub extern "C" fn getgrgid_r(
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn getgrnam_r(
     arg1: *const libc::c_char,
     arg2: *mut group,
@@ -40,14 +44,17 @@ pub extern "C" fn getgrnam_r(
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn getgrent() -> *mut group {
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn endgrent() {
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn setgrent() {
     unimplemented!();
 }
