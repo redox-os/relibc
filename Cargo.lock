@@ -170,6 +170,21 @@ version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "ralloc"
+version = "1.0.0"
+dependencies = [
+ "ralloc_shim 0.1.1",
+ "unborrow 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "ralloc_shim"
+version = "0.1.1"
+dependencies = [
+ "sc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "rand"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -200,6 +215,7 @@ dependencies = [
  "fcntl 0.1.0",
  "platform 0.1.0",
  "stdio 0.1.0",
+ "stdlib 0.1.0",
  "string 0.1.0",
  "unistd 0.1.0",
 ]
@@ -290,6 +306,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "serde"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -375,6 +396,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "stdlib"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.0",
+ "platform 0.1.0",
+ "ralloc 1.0.0",
+]
+
+[[package]]
 name = "string"
 version = "0.1.0"
 dependencies = [
@@ -453,6 +483,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "unborrow"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "unicode-width"
@@ -542,6 +577,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum rustc-ap-serialize 40.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "43d227b1b3de1ec6d3fb48e10799d08c073c57e45f536766e1d897d46b737e0b"
 "checksum rustc-ap-syntax 40.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9b6e525fc674e8a75eaed08a90a6df7adfa73a66135056577722185dd7ca0771"
 "checksum rustc-ap-syntax_pos 40.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e157f53ad5c4a6cf9ae5b5be15325dd2eeca190c03ab9873cc1460788767e5e9"
+"checksum sc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "4ebbb026ba4a707c25caec2db5ef59ad8b41f7ad77cad06257e06229c891f376"
 "checksum serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)" = "db99f3919e20faa51bb2996057f5031d8685019b5a06139b1ce761da671b8526"
 "checksum serde_derive 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)" = "f4ba7591cfe93755e89eeecdbcc668885624829b020050e6aec99c2a03bd3fd0"
 "checksum serde_derive_internals 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6e03f1c9530c3fb0a0a5c9b826bdd9246a5921ae995d75f512ac917fc4dd55b5"
@@ -560,6 +596,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum termion 1.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "689a3bdfaab439fd92bc87df5c4c78417d3cbe537487274e9b0b2dce76e92096"
 "checksum textwrap 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c0b59b6b4b44d867f1370ef1bd91bfb262bf07bf0ae65c202ea2fbc16153b693"
 "checksum toml 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)" = "a7540f4ffc193e0d3c94121edb19b055670d369f77d5804db11ae053a45b6e7e"
+"checksum unborrow 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "e92e959f029e4f8ee25d70d15ab58d2b46f98a17bc238b9265ff0c26f6f3d67f"
 "checksum unicode-width 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "bf3a113775714a22dcb774d8ea3655c53a32debae63a063acc00a91cc586245f"
 "checksum unicode-xid 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f860d7d29cf02cb2f3f359fd35991af3d30bac52c57d265a3c461074cb4dc"
 "checksum unicode-xid 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc72304796d0818e357ead4e000d19c9c174ab23dc11093ac919054d20a6a7fc"

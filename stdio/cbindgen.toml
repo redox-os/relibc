@@ -1,5 +1,5 @@
 sys_includes = ["stdarg.h", "stddef.h"]
-include_guard = "_stdio_H"
+include_guard = "_STDIO_H"
 trailer = "#include <bits/stdio.h>"
 language = "C"
 

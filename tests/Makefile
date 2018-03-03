@@ -1,4 +1,5 @@
 BINS=\
+	alloc \
 	args \
 	create \
 	write
