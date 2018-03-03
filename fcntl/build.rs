@@ -7,5 +7,5 @@ fn main() {
     fs::create_dir_all("../target/include").expect("failed to create include directory");
     cbindgen::generate(crate_dir)
       .expect("failed to generate bindings")
-      .write_to_file("../target/include/unistd.h");
+      .write_to_file("../target/include/fcntl.h");
 }

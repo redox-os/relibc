@@ -1,3 +1,4 @@
+sys_includes = ["stdint.h", "sys/types.h"]
 include_guard = "_UNISTD_H"
 language = "C"
 
