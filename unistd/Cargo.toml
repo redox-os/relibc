@@ -2,6 +2,7 @@
 name = "unistd"
 version = "0.1.0"
 authors = ["Jeremy Soller <jackpot51@gmail.com>"]
+build = "build.rs"
 
 [build-dependencies]
 cbindgen = "0.5"

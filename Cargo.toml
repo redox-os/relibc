@@ -1,0 +1,18 @@
+[package]
+name = "relibc"
+version = "0.1.0"
+authors = ["Jeremy Soller <jackpot51@gmail.com>"]
+
+[lib]
+name = "c"
+crate-type = ["staticlib"]
+
+[workspace]
+members = [
+    "fcntl",
+    "unistd"
+]
+
+[dependencies]
+fcntl = { path = "fcntl" }
+unistd = { path = "unistd" }
