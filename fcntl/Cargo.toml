@@ -8,4 +8,4 @@ build = "build.rs"
 cbindgen = "0.5"
 
 [dependencies]
-libc = "0.2"
+libc = { version = "0.2", default-features = false }

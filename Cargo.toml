@@ -16,3 +16,13 @@ members = [
 [dependencies]
 fcntl = { path = "fcntl" }
 unistd = { path = "unistd" }
+
+[profile.dev]
+incremental = false
+lto = true
+panic = "abort"
+
+[profile.release]
+incremental = false
+lto = true
+panic = "abort"
