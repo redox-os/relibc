@@ -1,4 +1,6 @@
-/// fcntl implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/fcntl.h.html
+//! fcntl implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/fcntl.h.html
+
+#![no_std]
 
 extern crate libc;
 

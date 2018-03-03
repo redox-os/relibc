@@ -1,4 +1,6 @@
-/// unistd implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/unistd.h.html
+//! unistd implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/unistd.h.html
+
+#![no_std]
 
 extern crate libc;
 
