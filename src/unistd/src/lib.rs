@@ -131,7 +131,7 @@ pub extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -> c_int
 
 #[no_mangle]
 pub extern "C" fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
-    unimplemented!();
+    platform::fchown(fildes, owner, group)
 }
 
 #[no_mangle]

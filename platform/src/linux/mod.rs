@@ -14,7 +14,7 @@ pub fn chdir(path: *const c_char) -> c_int {
     }
 }
 
-pub fn chown(path: *const c_char, owner: usize, group: usize) -> c_int {
+pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     unsafe {
         syscall!(CHOWN, owner as u32, group as u32) as c_int
     }
@@ -43,6 +43,12 @@ pub fn exit(status: c_int) -> ! {
         syscall!(EXIT, status);
     }
     loop {}
+}
+
+pub fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
+    unsafe {
+        syscall!(FCHOWN, owner, group) as c_int
+    }
 }
 
 #[cfg(target_arch = "x86_64")]

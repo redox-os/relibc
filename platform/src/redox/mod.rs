@@ -14,9 +14,9 @@ pub fn chdir(path: *const c_char) -> c_int {
     syscall::chdir(cstr_to_slice(path))? as c_int
 }
 
-pub fn chown(path: *const c_char, owner: usize, group: usize) -> c_int {
+pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     let fd = syscall::open(cstr_to_slice(path));
-    syscall::fchown(fd, owner as u32, group as u32)? as c_int
+    syscall::fchown(fd, owner, group)? as c_int
 
 pub fn close(fd: c_int) -> c_int {
     syscall::close(fd as usize);
@@ -34,6 +34,10 @@ pub fn dup2(fd1: c_int, fd2) -> c_int {
 pub fn exit(status: c_int) -> ! {
     syscall::exit(status as usize);
     loop {}
+}
+
+pub fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> c_int {
+    syscall::fchown(owner, group)? as c_int
 }
 
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
