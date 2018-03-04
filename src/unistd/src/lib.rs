@@ -46,7 +46,7 @@ pub extern "C" fn brk(addr: *mut c_void) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn chdir(path: *const c_char) -> c_int {
-    unimplemented!();
+    platform::chdir(path)
 }
 
 #[no_mangle]
@@ -86,12 +86,12 @@ pub extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn dup(fildes: c_int) -> c_int {
-    unimplemented!();
+    platform::dup(fildes)
 }
 
 #[no_mangle]
 pub extern "C" fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
-    unimplemented!();
+    platform::dup2(fildes, fildes2)
 }
 
 #[no_mangle]

@@ -2,9 +2,27 @@ use types::*;
 
 const AT_FDCWD: c_int = -100;
 
+pub fn chdir(path: *const c_char) -> c_int {
+    unsafe {
+        syscall!(CHDIR, path) as c_int
+    }
+}
+
 pub fn close(fildes: c_int) -> c_int {
     unsafe {
         syscall!(CLOSE, fildes) as c_int
+    }
+}
+
+pub fn dup(fildes: c_int) -> c_int {
+    unsafe {
+        syscall!(DUP, fildes) as c_int
+    }
+}
+
+pub fn dup2(fildes: c_int, fildes2:c_int) -> c_int {
+    unsafe {
+        syscall!(DUP2, fildes, fildes2) as c_int
     }
 }
 
