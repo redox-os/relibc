@@ -15,7 +15,7 @@ static ALLOCATOR: ralloc::Allocator = ralloc::Allocator;
 pub const EXIT_FAILURE: c_int = 1;
 pub const EXIT_SUCCESS: c_int = 0;
 
-static mut ATEXIT_FUNCS: [Option<usize>; 32] = [None; 32];
+static mut ATEXIT_FUNCS: [Option<extern "C" fn>; 32] = [None; 32];
 
 #[no_mangle]
 pub extern "C" fn a64l(s: *const c_char) -> c_long {
@@ -41,8 +41,8 @@ pub extern "C" fn abs(i: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn atexit(func: Option<extern "C" fn()>) -> c_int {
     for i in 0..ATEXIT_FUNCS.len() {
-        if ATEXIT_FUNCS[i] != None {
-            ATEXIT_FUNCS[i] = Some(func.unwrap() as usize);
+        if ATEXIT_FUNCS[i] == None {
+            ATEXIT_FUNCS[i] = func;
             return 0;
         }
     }
