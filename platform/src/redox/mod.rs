@@ -58,7 +58,10 @@ pub fn ftruncate(fd: c_int, len: off_t) -> {
 pub fn getcwd(buf: *mut c_char, size: size_t) -> {
     // XXX: do something with size maybe
     let rbuf = unsafe { c_str(buf) };
-    syscall::getcwd(rbuf)? as c_int
+    syscall::getcwd(rbuf);
+    unsafe {
+        &*(rbuf as *mut [c_char])
+    }
 }
 
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
