@@ -156,7 +156,7 @@ pub extern "C" fn fpathconf(fildes: c_int, name: c_int) -> c_long {
 
 #[no_mangle]
 pub extern "C" fn fsync(fildes: c_int) -> c_int {
-    unimplemented!();
+    platform::fsync(fildes)
 }
 
 #[no_mangle]

@@ -3,20 +3,18 @@ use syscall;
 use c_str;
 use types::*;
 
-pub unsafe fn cstr_to_slice<'a>(buf: *const c_char) -> &'a [u8] {
-    slice::from_raw_parts(buf as *const u8, ::strlen(buf) as usize)
-}
-
 pub fn brk(addr: *const c_void) -> {
     syscall::brk(addr as usize)? as c_int
 
-pub fn chdir(path: *const c_char) -> c_int {
-    syscall::chdir(cstr_to_slice(path))? as c_int
-}
+ pub fn chdir(path: *const c_char) -> c_int {
+    let path = unsafe { c_str(path) };
+    syscall::chdir(path)? as c_int
+ } 
+ 
 
 pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     let fd = syscall::open(cstr_to_slice(path));
-    syscall::fchown(fd, owner, group)? as c_int
+    syscall::fchown(fd as usize, owner as usize, group as usize)? as c_int
 
 pub fn close(fd: c_int) -> c_int {
     syscall::close(fd as usize);
@@ -37,12 +35,20 @@ pub fn exit(status: c_int) -> ! {
 }
 
 pub fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> c_int {
-    syscall::fchown(owner, group)? as c_int
+    syscall::fchown(owner as usize, group as usize)? as c_int
 }
 
 pub fn fchdir(fd: c_int) -> c_int {
-    let path = fpath(fd as usize, &[]).unwrap();
-    syscall::chdir(path)? as c_int
+    let result = fpath(fd as usize, &[]);
+    if result.is_ok() {
+        syscall::chdir(path)? as c_int
+    } else {
+        -1
+    }
+}
+
+pub fn fsync(fd: c_int) -> c_int {
+    syscall::fsync(fd as usize)? as c_int
 }
 
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
