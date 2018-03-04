@@ -13,33 +13,33 @@ impl Clone for group {
     }
 }
 #[no_mangle]
-pub extern "C" fn getgrgid(arg1: gid_t) -> *mut group {
+pub extern "C" fn getgrgid(gid: gid_t) -> *mut group {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn getgrnam(arg1: *const libc::c_char) -> *mut group {
+pub extern "C" fn getgrnam(name: *const libc::c_char) -> *mut group {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn getgrgid_r(
-    arg1: gid_t,
-    arg2: *mut group,
-    arg3: *mut libc::c_char,
-    arg4: usize,
-    arg5: *mut *mut group,
+    gid: gid_t,
+    grp: *mut group,
+    buffer: *mut libc::c_char,
+    bufsize: usize,
+    result: *mut *mut group,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn getgrnam_r(
-    arg1: *const libc::c_char,
-    arg2: *mut group,
-    arg3: *mut libc::c_char,
-    arg4: usize,
-    arg5: *mut *mut group,
+    name: *const libc::c_char,
+    grp: *mut group,
+    buffer: *mut libc::c_char,
+    bufsize: usize,
+    result: *mut *mut group,
 ) -> libc::c_int {
     unimplemented!();
 }

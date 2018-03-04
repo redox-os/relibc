@@ -1,68 +1,68 @@
 #[no_mangle]
-pub extern "C" fn pthread_attr_destroy(arg1: *mut pthread_attr_t) -> libc::c_int {
+pub extern "C" fn pthread_attr_destroy(attr: *mut pthread_attr_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_getdetachstate(
-    arg1: *const pthread_attr_t,
-    arg2: *mut libc::c_int,
+    attr: *const pthread_attr_t,
+    detachstate: *mut libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_getguardsize(
-    arg1: *const pthread_attr_t,
-    arg2: *mut usize,
+    attr: *const pthread_attr_t,
+    guardsize: *mut usize,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_getinheritsched(
-    arg1: *const pthread_attr_t,
-    arg2: *mut libc::c_int,
+    attr: *const pthread_attr_t,
+    inheritsched: *mut libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_getschedparam(
-    arg1: *const pthread_attr_t,
-    arg2: *mut sched_param,
+    attr: *const pthread_attr_t,
+    param: *mut sched_param,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_getschedpolicy(
-    arg1: *const pthread_attr_t,
-    arg2: *mut libc::c_int,
+    attr: *const pthread_attr_t,
+    policy: *mut libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_getscope(
-    arg1: *const pthread_attr_t,
-    arg2: *mut libc::c_int,
+    attr: *const pthread_attr_t,
+    contentionscope: *mut libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_getstackaddr(
-    arg1: *const pthread_attr_t,
-    arg2: *mut *mut libc::c_void,
+    attr: *const pthread_attr_t,
+    stackaddr: *mut *mut libc::c_void,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_getstacksize(
-    arg1: *const pthread_attr_t,
-    arg2: *mut usize,
+    attr: *const pthread_attr_t,
+    stacksize: *mut usize,
 ) -> libc::c_int {
     unimplemented!();
 }
@@ -74,8 +74,8 @@ pub extern "C" fn pthread_attr_init(arg1: *mut pthread_attr_t) -> libc::c_int {
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_setdetachstate(
-    arg1: *mut pthread_attr_t,
-    arg2: libc::c_int,
+    attr: *mut pthread_attr_t,
+    detachstate: libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
@@ -87,152 +87,152 @@ pub extern "C" fn pthread_attr_setguardsize(arg1: *mut pthread_attr_t, arg2: usi
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_setinheritsched(
-    arg1: *mut pthread_attr_t,
-    arg2: libc::c_int,
+    attr: *mut pthread_attr_t,
+    inheritsched: libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_setschedparam(
-    arg1: *mut pthread_attr_t,
-    arg2: *mut sched_param,
+    attr: *mut pthread_attr_t,
+    param: *mut sched_param,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_setschedpolicy(
-    arg1: *mut pthread_attr_t,
-    arg2: libc::c_int,
+    attr: *mut pthread_attr_t,
+    policy: libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_setscope(
-    arg1: *mut pthread_attr_t,
-    arg2: libc::c_int,
+    attr: *mut pthread_attr_t,
+    contentionscope: libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_attr_setstackaddr(
-    arg1: *mut pthread_attr_t,
-    arg2: *mut libc::c_void,
+    attr: *mut pthread_attr_t,
+    stackaddr: *mut libc::c_void,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_attr_setstacksize(arg1: *mut pthread_attr_t, arg2: usize) -> libc::c_int {
+pub extern "C" fn pthread_attr_setstacksize(attr: *mut pthread_attr_t, stacksize: usize) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_cancel(arg1: pthread_t) -> libc::c_int {
+pub extern "C" fn pthread_cancel(thread: pthread_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_cleanup_push(arg1: *mut libc::c_void, arg2: *mut libc::c_void) {
+pub extern "C" fn pthread_cleanup_push(routine: *mut libc::c_void, arg: *mut libc::c_void) {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_cleanup_pop(arg1: libc::c_int) {
+pub extern "C" fn pthread_cleanup_pop(execute: libc::c_int) {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_cond_broadcast(arg1: *mut pthread_cond_t) -> libc::c_int {
+pub extern "C" fn pthread_cond_broadcast(cond: *mut pthread_cond_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_cond_destroy(arg1: *mut pthread_cond_t) -> libc::c_int {
+pub extern "C" fn pthread_cond_destroy(cond: *mut pthread_cond_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_cond_init(
-    arg1: *mut pthread_cond_t,
-    arg2: *const pthread_condattr_t,
+    cond: *mut pthread_cond_t,
+    attr: *const pthread_condattr_t,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_cond_signal(arg1: *mut pthread_cond_t) -> libc::c_int {
+pub extern "C" fn pthread_cond_signal(cond: *mut pthread_cond_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_cond_timedwait(
-    arg1: *mut pthread_cond_t,
-    arg2: *mut pthread_mutex_t,
-    arg3: *const timespec,
+    cond: *mut pthread_cond_t,
+    mutex: *mut pthread_mutex_t,
+    abstime: *const timespec,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_cond_wait(
-    arg1: *mut pthread_cond_t,
-    arg2: *mut pthread_mutex_t,
+    cond: *mut pthread_cond_t,
+    mutex: *mut pthread_mutex_t,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_condattr_destroy(arg1: *mut pthread_condattr_t) -> libc::c_int {
+pub extern "C" fn pthread_condattr_destroy(attr: *mut pthread_condattr_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_condattr_getpshared(
-    arg1: *const pthread_condattr_t,
-    arg2: *mut libc::c_int,
+    attr: *const pthread_condattr_t,
+    pshared: *mut libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_condattr_init(arg1: *mut pthread_condattr_t) -> libc::c_int {
+pub extern "C" fn pthread_condattr_init(attr: *mut pthread_condattr_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_condattr_setpshared(
-    arg1: *mut pthread_condattr_t,
-    arg2: libc::c_int,
+    attr: *mut pthread_condattr_t,
+    pshared: libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_create(
-    arg1: *mut pthread_t,
-    arg2: *const pthread_attr_t,
-    arg3: ::std::option::Option<unsafe extern "C" fn(arg1: *mut libc::c_void) -> *mut libc::c_void>,
-    arg4: *mut libc::c_void,
+    thread: *mut pthread_t,
+    attr: *const pthread_attr_t,
+    start_routine: ::std::option::Option<unsafe extern "C" fn(arg1: *mut libc::c_void) -> *mut libc::c_void>,
+    arg: *mut libc::c_void,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_detach(arg1: pthread_t) -> libc::c_int {
+pub extern "C" fn pthread_detach(thread: pthread_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_equal(arg1: pthread_t, arg2: pthread_t) -> libc::c_int {
+pub extern "C" fn pthread_equal(t1: pthread_t, t2: pthread_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_exit(arg1: *mut libc::c_void) {
+pub extern "C" fn pthread_exit(value_ptr: *mut libc::c_void) {
     unimplemented!();
 }
 
@@ -243,223 +243,223 @@ pub extern "C" fn pthread_getconcurrency() -> libc::c_int {
 
 #[no_mangle]
 pub extern "C" fn pthread_getschedparam(
-    arg1: pthread_t,
-    arg2: *mut libc::c_int,
-    arg3: *mut sched_param,
+    thread: pthread_t,
+    policy: *mut libc::c_int,
+    param: *mut sched_param,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_getspecific(arg1: pthread_key_t) -> *mut libc::c_void {
+pub extern "C" fn pthread_getspecific(key: pthread_key_t) -> *mut libc::c_void {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_join(arg1: pthread_t, arg2: *mut *mut libc::c_void) -> libc::c_int {
+pub extern "C" fn pthread_join(thread: pthread_t, value_ptr: *mut *mut libc::c_void) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_key_create(
-    arg1: *mut pthread_key_t,
-    arg2: ::std::option::Option<unsafe extern "C" fn(arg1: *mut libc::c_void)>,
+    key: *mut pthread_key_t,
+    destructor: ::std::option::Option<unsafe extern "C" fn(arg1: *mut libc::c_void)>,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_key_delete(arg1: pthread_key_t) -> libc::c_int {
+pub extern "C" fn pthread_key_delete(key: pthread_key_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_mutex_destroy(arg1: *mut pthread_mutex_t) -> libc::c_int {
+pub extern "C" fn pthread_mutex_destroy(mutex: *mut pthread_mutex_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_mutex_getprioceiling(
-    arg1: *const pthread_mutex_t,
-    arg2: *mut libc::c_int,
+    mutex: *const pthread_mutex_t,
+    prioceiling: *mut libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_mutex_init(
-    arg1: *mut pthread_mutex_t,
-    arg2: *const pthread_mutexattr_t,
+    mutex: *mut pthread_mutex_t,
+    attr: *const pthread_mutexattr_t,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_mutex_lock(arg1: *mut pthread_mutex_t) -> libc::c_int {
+pub extern "C" fn pthread_mutex_lock(mutex: *mut pthread_mutex_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_mutex_setprioceiling(
-    arg1: *mut pthread_mutex_t,
-    arg2: libc::c_int,
-    arg3: *mut libc::c_int,
+    mutex: *mut pthread_mutex_t,
+    prioceiling: libc::c_int,
+    old_ceiling: *mut libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_mutex_trylock(arg1: *mut pthread_mutex_t) -> libc::c_int {
+pub extern "C" fn pthread_mutex_trylock(mutex: *mut pthread_mutex_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_mutex_unlock(arg1: *mut pthread_mutex_t) -> libc::c_int {
+pub extern "C" fn pthread_mutex_unlock(mutex: *mut pthread_mutex_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_mutexattr_destroy(arg1: *mut pthread_mutexattr_t) -> libc::c_int {
+pub extern "C" fn pthread_mutexattr_destroy(attr: *mut pthread_mutexattr_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_mutexattr_getprioceiling(
-    arg1: *const pthread_mutexattr_t,
-    arg2: *mut libc::c_int,
+    attr: *const pthread_mutexattr_t,
+    prioceiling: *mut libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_mutexattr_getprotocol(
-    arg1: *const pthread_mutexattr_t,
-    arg2: *mut libc::c_int,
+    attr: *const pthread_mutexattr_t,
+    protocol: *mut libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_mutexattr_getpshared(
-    arg1: *const pthread_mutexattr_t,
-    arg2: *mut libc::c_int,
+    attr: *const pthread_mutexattr_t,
+    pshared: *mut libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_mutexattr_gettype(
-    arg1: *const pthread_mutexattr_t,
-    arg2: *mut libc::c_int,
+    attr: *const pthread_mutexattr_t,
+    type_: *mut libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_mutexattr_init(arg1: *mut pthread_mutexattr_t) -> libc::c_int {
+pub extern "C" fn pthread_mutexattr_init(attr: *mut pthread_mutexattr_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_mutexattr_setprioceiling(
-    arg1: *mut pthread_mutexattr_t,
-    arg2: libc::c_int,
+    attr: *mut pthread_mutexattr_t,
+    prioceiling: libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_mutexattr_setprotocol(
-    arg1: *mut pthread_mutexattr_t,
-    arg2: libc::c_int,
+    attr: *mut pthread_mutexattr_t,
+    protocol: libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_mutexattr_setpshared(
-    arg1: *mut pthread_mutexattr_t,
-    arg2: libc::c_int,
+    attr: *mut pthread_mutexattr_t,
+    pshared: libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_mutexattr_settype(
-    arg1: *mut pthread_mutexattr_t,
-    arg2: libc::c_int,
+    attr: *mut pthread_mutexattr_t,
+    type_: libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_once(
-    arg1: *mut pthread_once_t,
-    arg2: ::std::option::Option<unsafe extern "C" fn()>,
+    once_control: *mut pthread_once_t,
+    init_routine: ::std::option::Option<unsafe extern "C" fn()>,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_rwlock_destroy(arg1: *mut pthread_rwlock_t) -> libc::c_int {
+pub extern "C" fn pthread_rwlock_destroy(rwlock: *mut pthread_rwlock_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_rwlock_init(
-    arg1: *mut pthread_rwlock_t,
-    arg2: *const pthread_rwlockattr_t,
+    rwlock: *mut pthread_rwlock_t,
+    attr: *const pthread_rwlockattr_t,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_rwlock_rdlock(arg1: *mut pthread_rwlock_t) -> libc::c_int {
+pub extern "C" fn pthread_rwlock_rdlock(rwlock: *mut pthread_rwlock_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_rwlock_tryrdlock(arg1: *mut pthread_rwlock_t) -> libc::c_int {
+pub extern "C" fn pthread_rwlock_tryrdlock(rwlock: *mut pthread_rwlock_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_rwlock_trywrlock(arg1: *mut pthread_rwlock_t) -> libc::c_int {
+pub extern "C" fn pthread_rwlock_trywrlock(rwlock: *mut pthread_rwlock_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_rwlock_unlock(arg1: *mut pthread_rwlock_t) -> libc::c_int {
+pub extern "C" fn pthread_rwlock_unlock(rwlock: *mut pthread_rwlock_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_rwlock_wrlock(arg1: *mut pthread_rwlock_t) -> libc::c_int {
+pub extern "C" fn pthread_rwlock_wrlock(rwlock: *mut pthread_rwlock_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_rwlockattr_destroy(arg1: *mut pthread_rwlockattr_t) -> libc::c_int {
+pub extern "C" fn pthread_rwlockattr_destroy(rwlock: *mut pthread_rwlockattr_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_rwlockattr_getpshared(
-    arg1: *const pthread_rwlockattr_t,
-    arg2: *mut libc::c_int,
+    rwlock: *const pthread_rwlockattr_t,
+    pshared: *mut libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_rwlockattr_init(arg1: *mut pthread_rwlockattr_t) -> libc::c_int {
+pub extern "C" fn pthread_rwlockattr_init(rwlock: *mut pthread_rwlockattr_t) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_rwlockattr_setpshared(
-    arg1: *mut pthread_rwlockattr_t,
-    arg2: libc::c_int,
+    rwlock: *mut pthread_rwlockattr_t,
+    pshared: libc::c_int,
 ) -> libc::c_int {
     unimplemented!();
 }
@@ -470,33 +470,33 @@ pub extern "C" fn pthread_self() -> pthread_t {
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_setcancelstate(arg1: libc::c_int, arg2: *mut libc::c_int) -> libc::c_int {
+pub extern "C" fn pthread_setcancelstate(state: libc::c_int, oldstate: *mut libc::c_int) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_setcanceltype(arg1: libc::c_int, arg2: *mut libc::c_int) -> libc::c_int {
+pub extern "C" fn pthread_setcanceltype(type_: libc::c_int, oldtype: *mut libc::c_int) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_setconcurrency(arg1: libc::c_int) -> libc::c_int {
+pub extern "C" fn pthread_setconcurrency(new_level: libc::c_int) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_setschedparam(
-    arg1: pthread_t,
-    arg2: libc::c_int,
-    arg3: *mut sched_param,
+    thread: pthread_t,
+    policy: libc::c_int,
+    param: *mut sched_param,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn pthread_setspecific(
-    arg1: pthread_key_t,
-    arg2: *const libc::c_void,
+    key: pthread_key_t,
+    value: *const libc::c_void,
 ) -> libc::c_int {
     unimplemented!();
 }

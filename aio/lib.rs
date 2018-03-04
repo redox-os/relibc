@@ -8,50 +8,50 @@ pub struct aiocb {
 }
 
 #[no_mangle]
-pub extern "C" fn aio_read(__aiocbp: *mut aiocb) -> libc::c_int {
+pub extern "C" fn aio_read(aiocbp: *mut aiocb) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn aio_write(__aiocbp: *mut aiocb) -> libc::c_int {
+pub extern "C" fn aio_write(aiocbp: *mut aiocb) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn lio_listio(
-    __mode: libc::c_int,
-    __list: *const *const aiocb,
-    __nent: libc::c_int,
-    __sig: *mut sigevent,
+    mode: libc::c_int,
+    list: *const *const aiocb,
+    nent: libc::c_int,
+    sig: *mut sigevent,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn aio_error(__aiocbp: *const aiocb) -> libc::c_int {
+pub extern "C" fn aio_error(aiocbp: *const aiocb) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn aio_return(__aiocbp: *mut aiocb) -> __ssize_t {
+pub extern "C" fn aio_return(aiocbp: *mut aiocb) -> usize {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn aio_cancel(__fildes: libc::c_int, __aiocbp: *mut aiocb) -> libc::c_int {
+pub extern "C" fn aio_cancel(fildes: libc::c_int, aiocbp: *mut aiocb) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn aio_suspend(
-    __list: *const *const aiocb,
-    __nent: libc::c_int,
-    __timeout: *const timespec,
+    list: *const *const aiocb,
+    nent: libc::c_int,
+    timeout: *const timespec,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn aio_fsync(__operation: libc::c_int, __aiocbp: *mut aiocb) -> libc::c_int {
+pub extern "C" fn aio_fsync(operation: libc::c_int, aiocbp: *mut aiocb) -> libc::c_int {
     unimplemented!();
 }

@@ -2,176 +2,176 @@
 
 #[no_mangle]
 pub extern "C" fn memccpy(
-    arg1: *mut libc::c_void,
-    arg2: *const libc::c_void,
-    arg3: libc::c_int,
-    arg4: usize,
+    s1: *mut libc::c_void,
+    s2: *const libc::c_void,
+    c: libc::c_int,
+    n: usize,
 ) -> *mut libc::c_void {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn memchr(
-    arg1: *const libc::c_void,
-    arg2: libc::c_int,
-    arg3: usize,
+    s: *const libc::c_void,
+    c: libc::c_int,
+    n: usize,
 ) -> *mut libc::c_void {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn memcmp(
-    arg1: *const libc::c_void,
-    arg2: *const libc::c_void,
-    arg3: usize,
+    s1: *const libc::c_void,
+    s2: *const libc::c_void,
+    n: usize,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn memcpy(
-    arg1: *mut libc::c_void,
-    arg2: *const libc::c_void,
-    arg3: usize,
+    s1: *mut libc::c_void,
+    s2: *const libc::c_void,
+    n: usize,
 ) -> *mut libc::c_void {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn memmove(
-    arg1: *mut libc::c_void,
-    arg2: *const libc::c_void,
-    arg3: usize,
+    s1: *mut libc::c_void,
+    s2: *const libc::c_void,
+    n: usize,
 ) -> *mut libc::c_void {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn memset(
-    arg1: *mut libc::c_void,
-    arg2: libc::c_int,
-    arg3: usize,
+    s: *mut libc::c_void,
+    c: libc::c_int,
+    n: usize,
 ) -> *mut libc::c_void {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strcat(arg1: *mut libc::c_char, arg2: *const libc::c_char) -> *mut libc::c_char {
+pub extern "C" fn strcat(s1: *mut libc::c_char, s2: *const libc::c_char) -> *mut libc::c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strchr(arg1: *const libc::c_char, arg2: libc::c_int) -> *mut libc::c_char {
+pub extern "C" fn strchr(s: *const libc::c_char, c: libc::c_int) -> *mut libc::c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strcmp(arg1: *const libc::c_char, arg2: *const libc::c_char) -> libc::c_int {
+pub extern "C" fn strcmp(s1: *const libc::c_char, s2: *const libc::c_char) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strcoll(arg1: *const libc::c_char, arg2: *const libc::c_char) -> libc::c_int {
+pub extern "C" fn strcoll(s1: *const libc::c_char, s2: *const libc::c_char) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strcpy(arg1: *mut libc::c_char, arg2: *const libc::c_char) -> *mut libc::c_char {
+pub extern "C" fn strcpy(s1: *mut libc::c_char, s2: *const libc::c_char) -> *mut libc::c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strcspn(arg1: *const libc::c_char, arg2: *const libc::c_char) -> libc::c_ulong {
+pub extern "C" fn strcspn(s1: *const libc::c_char, s2: *const libc::c_char) -> libc::c_ulong {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strdup(arg1: *const libc::c_char) -> *mut libc::c_char {
+pub extern "C" fn strdup(s1: *const libc::c_char) -> *mut libc::c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strerror(arg1: libc::c_int) -> *mut libc::c_char {
+pub extern "C" fn strerror(errnum: libc::c_int) -> *mut libc::c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strlen(arg1: *const libc::c_char) -> libc::c_ulong {
+pub extern "C" fn strlen(s: *const libc::c_char) -> libc::c_ulong {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn strncat(
-    arg1: *mut libc::c_char,
-    arg2: *const libc::c_char,
-    arg3: usize,
+    s1: *mut libc::c_char,
+    s2: *const libc::c_char,
+    n: usize,
 ) -> *mut libc::c_char {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn strncmp(
-    arg1: *const libc::c_char,
-    arg2: *const libc::c_char,
-    arg3: usize,
+    s1: *const libc::c_char,
+    s2: *const libc::c_char,
+    n: usize,
 ) -> libc::c_int {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn strncpy(
-    arg1: *mut libc::c_char,
-    arg2: *const libc::c_char,
-    arg3: usize,
+    s1: *mut libc::c_char,
+    s2: *const libc::c_char,
+    n: usize,
 ) -> *mut libc::c_char {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn strpbrk(
-    arg1: *const libc::c_char,
-    arg2: *const libc::c_char,
+    s1: *const libc::c_char,
+    s2: *const libc::c_char,
 ) -> *mut libc::c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strrchr(arg1: *const libc::c_char, arg2: libc::c_int) -> *mut libc::c_char {
+pub extern "C" fn strrchr(s: *const libc::c_char, c: libc::c_int) -> *mut libc::c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strspn(arg1: *const libc::c_char, arg2: *const libc::c_char) -> libc::c_ulong {
+pub extern "C" fn strspn(s1: *const libc::c_char, s2: *const libc::c_char) -> libc::c_ulong {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn strstr(
-    arg1: *const libc::c_char,
-    arg2: *const libc::c_char,
+    s1: *const libc::c_char,
+    s2: *const libc::c_char,
 ) -> *mut libc::c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strtok(arg1: *mut libc::c_char, arg2: *const libc::c_char) -> *mut libc::c_char {
+pub extern "C" fn strtok(s1: *mut libc::c_char, s2: *const libc::c_char) -> *mut libc::c_char {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn strtok_r(
-    arg1: *mut libc::c_char,
-    arg2: *const libc::c_char,
-    arg3: *mut *mut libc::c_char,
+    s: *mut libc::c_char,
+    sep: *const libc::c_char,
+    lasts: *mut *mut libc::c_char,
 ) -> *mut libc::c_char {
     unimplemented!();
 }
 
 #[no_mangle]
 pub extern "C" fn strxfrm(
-    arg1: *mut libc::c_char,
-    arg2: *const libc::c_char,
-    arg3: usize,
+    s1: *mut libc::c_char,
+    s2: *const libc::c_char,
+    n: usize,
 ) -> libc::c_ulong {
     unimplemented!();
 }
