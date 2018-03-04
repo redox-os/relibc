@@ -16,6 +16,7 @@ run: $(BINS)
 
 %: %.c
 	gcc \
+		-fno-stack-protector \
 		-nostdinc \
 		-nostdlib \
 		-I ../include \

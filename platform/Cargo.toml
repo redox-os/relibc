@@ -3,5 +3,8 @@ name = "platform"
 version = "0.1.0"
 authors = ["Jeremy Soller <jackpot51@gmail.com>"]
 
-[dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 sc = "0.2"
+
+[target.'cfg(target_os = "redox")'.dependencies]
+redox_syscall = "0.1"
