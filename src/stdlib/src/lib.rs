@@ -117,7 +117,7 @@ pub unsafe extern "C" fn exit(status: c_int) {
 
     for i in (0..ATEXIT_FUNCS.len()).rev() {
         if ATEXIT_FUNCS[i] != None {
-            let func = mem::transmute::<usize, extern "C" fn()>(ATEXIT_FUNCS[i].unwrap());
+            let func = ATEXIT_FUNCS[i].unwrap();
             (func)();
         }
     }
