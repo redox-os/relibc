@@ -215,7 +215,7 @@ pub extern "C" fn pthread_condattr_setpshared(
 pub extern "C" fn pthread_create(
     thread: *mut pthread_t,
     attr: *const pthread_attr_t,
-    start_routine: ::std::option::Option<unsafe extern "C" fn(arg1: *mut libc::c_void) -> *mut libc::c_void>,
+    start_routine: Option<unsafe extern "C" fn(arg1: *mut libc::c_void) -> *mut libc::c_void>,
     arg: *mut libc::c_void,
 ) -> libc::c_int {
     unimplemented!();
@@ -263,7 +263,7 @@ pub extern "C" fn pthread_join(thread: pthread_t, value_ptr: *mut *mut libc::c_v
 #[no_mangle]
 pub extern "C" fn pthread_key_create(
     key: *mut pthread_key_t,
-    destructor: ::std::option::Option<unsafe extern "C" fn(arg1: *mut libc::c_void)>,
+    destructor: Option<unsafe extern "C" fn(arg1: *mut libc::c_void)>,
 ) -> libc::c_int {
     unimplemented!();
 }
@@ -395,7 +395,7 @@ pub extern "C" fn pthread_mutexattr_settype(
 #[no_mangle]
 pub extern "C" fn pthread_once(
     once_control: *mut pthread_once_t,
-    init_routine: ::std::option::Option<unsafe extern "C" fn()>,
+    init_routine: Option<unsafe extern "C" fn()>,
 ) -> libc::c_int {
     unimplemented!();
 }

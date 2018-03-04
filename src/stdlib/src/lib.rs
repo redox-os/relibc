@@ -39,7 +39,7 @@ pub extern "C" fn abs(i: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn atexit(func: extern "C" fn()) -> c_int {
+pub unsafe extern "C" fn atexit(func: Option<extern "C" fn()>) -> c_int {
     for i in 0..ATEXIT_FUNCS.len() {
         if ATEXIT_FUNCS[i] == 0 {
             ATEXIT_FUNCS[i] = func as usize;
@@ -66,7 +66,7 @@ pub extern "C" fn atol(s: *const c_char) -> c_long {
 }
 
 #[no_mangle]
-pub extern "C" fn bsearch(key: *const c_void, base: *const c_void, nel: size_t, width: size_t, compar: extern "C" fn(*const c_void, *const c_void) -> c_int) -> *mut c_void {
+pub extern "C" fn bsearch(key: *const c_void, base: *const c_void, nel: size_t, width: size_t, compar: Option<extern "C" fn(*const c_void, *const c_void)> -> c_int) -> *mut c_void {
     unimplemented!();
 }
 
@@ -265,7 +265,7 @@ pub extern "C" fn putenv(s: *mut c_char) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn qsort(base: *mut c_void, nel: size_t, width: size_t, compar: extern "C" fn(*const c_void, *const c_void) -> c_int) {
+pub extern "C" fn qsort(base: *mut c_void, nel: size_t, width: size_t, compar: Option<extern "C" fn(*const c_void, *const c_void)> -> c_int) {
     unimplemented!();
 }
 
