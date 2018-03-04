@@ -22,7 +22,7 @@ pub fn dup(fd: c_int) -> c_int {
 
 pub fn dup2(fd1: c_int, fd2) -> c_int {
     syscall::dup2(fd1 as usize, fd2 as usize, &[])? as c_int
-
+}
 
 pub fn exit(status: c_int) -> ! {
     syscall::exit(status as usize);
