@@ -1,5 +1,5 @@
 [package]
-name = "stdio"
+name = "mman"
 version = "0.1.0"
 authors = ["Jeremy Soller <jackpot51@gmail.com>"]
 build = "build.rs"
@@ -9,4 +9,3 @@ cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
 platform = { path = "../../platform" }
-va_list = { path = "../../va_list", features = ["no_std"] }
