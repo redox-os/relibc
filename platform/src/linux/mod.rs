@@ -8,6 +8,12 @@ pub fn chdir(path: *const c_char) -> c_int {
     }
 }
 
+pub fn chown(path: *const c_char, owner: usize, group: usize) -> c_int {
+    unsafe {
+        syscall!(CHOWN, owner as u32, group as u32) as c_int
+    }
+}
+
 pub fn close(fildes: c_int) -> c_int {
     unsafe {
         syscall!(CLOSE, fildes) as c_int

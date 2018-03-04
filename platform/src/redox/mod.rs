@@ -11,6 +11,10 @@ pub fn chdir(path: *const c_char) -> c_int {
     syscall::chdir(cstr_to_slice(path))? as c_int
 }
 
+pub fn chown(path: *const c_char, owner: usize, group: usize) -> c_int {
+    let fd = syscall::open(cstr_to_slice(path));
+    syscall::fchown(fd, owner as u32, group as u32)? as c_int
+
 pub fn close(fd: c_int) -> c_int {
     syscall::close(fd as usize);
     0

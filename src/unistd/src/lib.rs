@@ -56,7 +56,7 @@ pub extern "C" fn chroot(path: *const c_char) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
-    unimplemented!();
+    platform::chown(path, owner, group)
 }
 
 #[no_mangle]
