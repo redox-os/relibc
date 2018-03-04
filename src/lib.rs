@@ -7,6 +7,7 @@ extern crate platform;
 extern crate ctype;
 extern crate fcntl;
 extern crate grp;
+extern crate mman;
 extern crate stdio;
 extern crate stdlib;
 extern crate string;
