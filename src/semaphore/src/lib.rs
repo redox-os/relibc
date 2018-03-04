@@ -25,11 +25,13 @@ pub extern "C" fn sem_destroy(sem: *mut sem_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
-pub extern "C" fn sem_open(name: *const c_char,
-                    oflag: c_int, ...) -> *mut sem_t {
-    unimplemented!();
-}
+/*
+ *#[no_mangle]
+ *pub extern "C" fn sem_open(name: *const c_char,
+ *                    oflag: c_int, ...) -> *mut sem_t {
+ *    unimplemented!();
+ *}
+ */
 
 #[no_mangle]
 pub extern "C" fn sem_close(sem: *mut sem_t) -> c_int {
