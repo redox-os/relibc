@@ -51,6 +51,10 @@ pub fn fsync(fd: c_int) -> c_int {
     syscall::fsync(fd as usize)? as c_int
 }
 
+pub fn ftruncate(fd: c_int, len: off_t) -> {
+    syscall::ftruncate(fd as usize, len as usize)? as c_int
+}
+
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     let path = unsafe { c_str(path) };
     syscall::open(path, (oflag as usize) | (mode as usize)).unwrap() as c_int

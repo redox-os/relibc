@@ -63,6 +63,12 @@ pub fn fsync(fildes: c_int) -> c_int {
     }
 }
 
+pub fn ftruncate(fildes: c_int, length: off_t) -> c_int {
+    unsafe {
+        syscall!(FTRUNCATE, fildes, length) as c_int
+    }
+}
+
 #[cfg(target_arch = "x86_64")]
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     unsafe {

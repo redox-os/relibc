@@ -161,7 +161,7 @@ pub extern "C" fn fsync(fildes: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn ftruncate(fildes: c_int, length: off_t) -> c_int {
-    unimplemented!();
+    platform::ftruncate(fildes, length)
 }
 
 #[no_mangle]
