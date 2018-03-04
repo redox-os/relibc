@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-int main(int argc, char **argv) {
+int main(int argc, char ** argv) {
     write(STDERR_FILENO, "malloc\n", 7);
     char * ptr = (char *)malloc(256);
     write(STDERR_FILENO, "set\n", 4);

@@ -2,6 +2,7 @@ BINS=\
 	alloc \
 	args \
 	create \
+	math \
 	write
 
 all: $(BINS)
@@ -13,4 +14,15 @@ run: $(BINS)
 	for bin in $(BINS); do echo "\\033[1m$${bin}\\033[0m"; ./$${bin} test args; done
 
 %: %.c
-	gcc -nostdinc -nostdlib -I ../include -I ../target/include ../target/debug/libcrt0.a $< ../target/debug/libc.a -o $@
+	gcc \
+		-nostdinc \
+		-nostdlib \
+		-I ../include \
+		-I ../target/include \
+		-I ../openlibm/include \
+		-I ../openlibm/src \
+		../target/debug/libcrt0.a \
+		$< \
+		../target/debug/libc.a \
+		../openlibm/libopenlibm.a \
+		-o $@
