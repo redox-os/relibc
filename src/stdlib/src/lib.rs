@@ -15,7 +15,7 @@ static ALLOCATOR: ralloc::Allocator = ralloc::Allocator;
 pub const EXIT_FAILURE: c_int = 1;
 pub const EXIT_SUCCESS: c_int = 0;
 
-static mut ATEXIT_FUNCS: [Option<extern "C" fn>; 32] = [None; 32];
+static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
 
 #[no_mangle]
 pub extern "C" fn a64l(s: *const c_char) -> c_long {
