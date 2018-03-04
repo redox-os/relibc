@@ -4,6 +4,7 @@
 extern crate compiler_builtins;
 extern crate platform;
 
+extern crate ctype;
 extern crate fcntl;
 extern crate stdio;
 extern crate stdlib;
