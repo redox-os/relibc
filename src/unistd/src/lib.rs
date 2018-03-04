@@ -166,7 +166,7 @@ pub extern "C" fn ftruncate(fildes: c_int, length: off_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
-    unimplemented!();
+    platform::getcwd(buf, size)
 }
 
 #[no_mangle]

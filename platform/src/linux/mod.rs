@@ -69,6 +69,13 @@ pub fn ftruncate(fildes: c_int, length: off_t) -> c_int {
     }
 }
 
+pub fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
+    unsafe {
+        syscall!(GETCWD, buf, size);
+        buf as *mut c_char
+    }
+}
+
 #[cfg(target_arch = "x86_64")]
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     unsafe {
