@@ -13,11 +13,11 @@ members = ["crt0"]
 [dependencies]
 compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins.git", default-features = false, features = ["mem"] }
 platform = { path = "platform" }
-fcntl = { path = "fcntl" }
-stdio = { path = "stdio" }
-stdlib = { path = "stdlib" }
-string = { path = "string" }
-unistd = { path = "unistd" }
+fcntl = { path = "src/fcntl" }
+stdio = { path = "src/stdio" }
+stdlib = { path = "src/stdlib" }
+string = { path = "src/string" }
+unistd = { path = "src/unistd" }
 
 [profile.dev]
 panic = "abort"
