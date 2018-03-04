@@ -50,12 +50,6 @@ pub extern "C" fn sem_wait(sem: *mut sem_t) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn sem_timedwait(sem: *mut sem_t, abstime: *const timespec)
-     -> c_int {
-    unimplemented!();
-}
-
-#[no_mangle]
 pub extern "C" fn sem_trywait(sem: *mut sem_t) -> c_int {
     unimplemented!();
 }
