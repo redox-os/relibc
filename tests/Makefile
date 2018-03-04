@@ -3,6 +3,7 @@ BINS=\
 	args \
 	create \
 	math \
+	printf \
 	write
 
 all: $(BINS)

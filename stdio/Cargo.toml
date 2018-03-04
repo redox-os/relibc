@@ -9,3 +9,4 @@ cbindgen = { path = "../cbindgen" }
 
 [dependencies]
 platform = { path = "../platform" }
+va_list = { version = "0.1", features = ["no_std"] }

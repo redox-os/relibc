@@ -51,6 +51,6 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
 }
 
 #[lang = "panic_fmt"]
-pub extern "C" fn rust_begin_unwind(fmt: ::core::fmt::Arguments, file: &str, line: u32) -> ! {
+pub extern "C" fn rust_begin_unwind(_fmt: ::core::fmt::Arguments, _file: &str, _line: u32) -> ! {
     loop {}
 }
