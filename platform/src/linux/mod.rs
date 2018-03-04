@@ -2,6 +2,12 @@ use types::*;
 
 const AT_FDCWD: c_int = -100;
 
+pub fn brk(addr: *const c_void) -> c_int {
+    unsafe {
+        syscall!(BRK, addr) as c_int
+    }
+}
+
 pub fn chdir(path: *const c_char) -> c_int {
     unsafe {
         syscall!(CHDIR, path) as c_int

@@ -41,7 +41,7 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
 
 #[no_mangle]
 pub extern "C" fn brk(addr: *mut c_void) -> c_int {
-    unimplemented!();
+    platform::brk(addr)
 }
 
 #[no_mangle]

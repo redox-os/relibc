@@ -7,6 +7,9 @@ pub unsafe fn cstr_to_slice<'a>(buf: *const c_char) -> &'a [u8] {
     slice::from_raw_parts(buf as *const u8, ::strlen(buf) as usize)
 }
 
+pub fn brk(addr: *const c_void) -> {
+    syscall::brk(addr as usize)? as c_int
+
 pub fn chdir(path: *const c_char) -> c_int {
     syscall::chdir(cstr_to_slice(path))? as c_int
 }
