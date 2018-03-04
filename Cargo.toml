@@ -16,6 +16,7 @@ platform = { path = "platform" }
 ctype = { path = "src/ctype" }
 fcntl = { path = "src/fcntl" }
 grp = { path = "src/grp" }
+semaphore = { path = "src/semaphore" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }
 string = { path = "src/string" }
