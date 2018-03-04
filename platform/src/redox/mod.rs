@@ -40,6 +40,11 @@ pub fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> c_int {
     syscall::fchown(owner, group)? as c_int
 }
 
+pub fn fchdir(fd: c_int) -> c_int {
+    let path = fpath(fd as usize, &[]).unwrap();
+    syscall::chdir(path)? as c_int
+}
+
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     let path = unsafe { c_str(path) };
     syscall::open(path, (oflag as usize) | (mode as usize)).unwrap() as c_int

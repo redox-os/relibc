@@ -51,6 +51,12 @@ pub fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
     }
 }
 
+pub fn fchdir(fildes: c_int) -> c_int {
+    unsafe {
+        syscall!(FCHDIR, fildes) as c_int
+    }
+}
+
 #[cfg(target_arch = "x86_64")]
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     unsafe {

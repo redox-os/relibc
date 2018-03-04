@@ -136,7 +136,7 @@ pub extern "C" fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn fchdir(fildes: c_int) -> c_int {
-    unimplemented!();
+    platform::fchdir(fildes)
 }
 
 #[no_mangle]
