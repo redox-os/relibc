@@ -310,7 +310,7 @@ pub extern "C" fn pread(fildes: c_int, buf: *mut c_void, nbyte: size_t, offset: 
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_atfork(prepare: extern "C" fn(), parent: extern "C" fn(), child: extern "C" fn()) -> c_int {
+pub extern "C" fn pthread_atfork(prepare: Option<extern "C" fn()>, parent: Option<extern "C" fn()>, child: Option<extern "C" fn()>) -> c_int {
     unimplemented!();
 }
 

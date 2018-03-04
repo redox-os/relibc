@@ -15,7 +15,7 @@ static ALLOCATOR: ralloc::Allocator = ralloc::Allocator;
 pub const EXIT_FAILURE: c_int = 1;
 pub const EXIT_SUCCESS: c_int = 0;
 
-static mut ATEXIT_FUNCS: [usize; 32] = [0; 32];
+static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
 
 #[no_mangle]
 pub extern "C" fn a64l(s: *const c_char) -> c_long {
@@ -39,10 +39,10 @@ pub extern "C" fn abs(i: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn atexit(func: extern "C" fn()) -> c_int {
+pub unsafe extern "C" fn atexit(func: Option<extern "C" fn()>) -> c_int {
     for i in 0..ATEXIT_FUNCS.len() {
-        if ATEXIT_FUNCS[i] == 0 {
-            ATEXIT_FUNCS[i] = func as usize;
+        if ATEXIT_FUNCS[i] == None {
+            ATEXIT_FUNCS[i] = func;
             return 0;
         }
     }
@@ -66,7 +66,7 @@ pub extern "C" fn atol(s: *const c_char) -> c_long {
 }
 
 #[no_mangle]
-pub extern "C" fn bsearch(key: *const c_void, base: *const c_void, nel: size_t, width: size_t, compar: extern "C" fn(*const c_void, *const c_void) -> c_int) -> *mut c_void {
+pub extern "C" fn bsearch(key: *const c_void, base: *const c_void, nel: size_t, width: size_t, compar: Option<extern "C" fn(*const c_void, *const c_void) -> c_int>) -> *mut c_void {
     unimplemented!();
 }
 
@@ -116,8 +116,8 @@ pub unsafe extern "C" fn exit(status: c_int) {
     use core::mem;
 
     for i in (0..ATEXIT_FUNCS.len()).rev() {
-        if ATEXIT_FUNCS[i] != 0 {
-            let func = mem::transmute::<usize, extern "C" fn()>(ATEXIT_FUNCS[i]);
+        if ATEXIT_FUNCS[i] != None {
+            let func = mem::transmute::<usize, extern "C" fn()>(ATEXIT_FUNCS[i].unwrap());
             (func)();
         }
     }
@@ -265,7 +265,7 @@ pub extern "C" fn putenv(s: *mut c_char) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn qsort(base: *mut c_void, nel: size_t, width: size_t, compar: extern "C" fn(*const c_void, *const c_void) -> c_int) {
+pub extern "C" fn qsort(base: *mut c_void, nel: size_t, width: size_t, compar: Option<extern "C" fn(*const c_void, *const c_void) -> c_int>) {
     unimplemented!();
 }
 

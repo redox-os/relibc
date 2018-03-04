@@ -12,12 +12,21 @@ use platform::types::*;
 #[no_mangle]
 #[naked]
 pub unsafe extern "C" fn _start() {
+    #[cfg(target_arch = "x86_64")]
     asm!("mov rdi, rsp
         call _start_rust"
         :
         :
         :
         : "intel", "volatile"
+    );
+    #[cfg(target_arch = "aarch64")]
+    asm!("mov x0, sp
+        bl _start_rust"
+        :
+        :
+        :
+        : "volatile"
     );
 }
 
