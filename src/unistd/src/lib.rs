@@ -75,16 +75,6 @@ pub extern "C" fn crypt(key: *const c_char, salt: *const c_char) -> *mut c_char 
 }
 
 #[no_mangle]
-pub extern "C" fn ctermid(s: *mut c_char) -> *mut c_char {
-    unimplemented!();
-}
-
-#[no_mangle]
-pub extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
-    unimplemented!();
-}
-
-#[no_mangle]
 pub extern "C" fn dup(fildes: c_int) -> c_int {
     platform::dup(fildes)
 }

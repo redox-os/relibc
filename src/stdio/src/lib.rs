@@ -191,13 +191,6 @@ pub extern "C" fn getchar_unlocked() -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn getopt(argc: c_int,
-                  argv: *const *const c_char,
-                  optstring: c_char) -> c_int {
-    unimplemented!();
-}
-
-#[no_mangle]
 pub extern "C" fn gets(s: *mut c_char)
      -> *mut c_char {
     unimplemented!();

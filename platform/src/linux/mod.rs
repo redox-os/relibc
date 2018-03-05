@@ -4,7 +4,11 @@ const AT_FDCWD: c_int = -100;
 
 pub fn brk(addr: *const c_void) -> c_int {
     unsafe {
-        syscall!(BRK, addr) as c_int
+        let newbrk = syscall!(BRK, addr);
+        if newbrk < addr as usize {
+            return -1
+        }
+        0
     }
 }
 

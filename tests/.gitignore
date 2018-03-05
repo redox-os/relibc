@@ -1,7 +1,13 @@
 /alloc
 /args
+/brk
+/chdir
 /create
 /create.out
+/dup
+/dup.out
+/fchdir
+/fsync
 /math
 /printf
 /write
