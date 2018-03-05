@@ -8,6 +8,7 @@ BINS=\
 	fchdir \
 	fsync \
 	ftruncate \
+	getid \
 	math \
 	printf \
 	write

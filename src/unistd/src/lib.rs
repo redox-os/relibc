@@ -166,17 +166,17 @@ pub extern "C" fn getdtablesize() -> c_int {
 
 #[no_mangle]
 pub extern "C" fn getegid() -> gid_t {
-    unimplemented!();
+    platform::getegid()
 }
 
 #[no_mangle]
 pub extern "C" fn geteuid() -> uid_t {
-    unimplemented!();
+    platform::geteuid()
 }
 
 #[no_mangle]
 pub extern "C" fn getgid() -> gid_t {
-    unimplemented!();
+    platform::getgid()
 }
 
 #[no_mangle]
@@ -216,7 +216,7 @@ pub extern "C" fn getpass(prompt: *const c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn getpgid(pid: pid_t) -> pid_t {
-    unimplemented!();
+    platform::getpgid(pid)
 }
 
 #[no_mangle]
@@ -226,12 +226,12 @@ pub extern "C" fn getpgrp() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn getpid() -> pid_t {
-    unimplemented!();
+    platform::getpid()
 }
 
 #[no_mangle]
 pub extern "C" fn getppid() -> pid_t {
-    unimplemented!();
+    platform::getppid()
 }
 
 #[no_mangle]
@@ -241,7 +241,7 @@ pub extern "C" fn getsid(pid: pid_t) -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn getuid() -> uid_t {
-    unimplemented!();
+    platform::getuid()
 }
 
 #[no_mangle]

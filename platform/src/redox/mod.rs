@@ -64,6 +64,34 @@ pub fn getcwd(buf: *mut c_char, size: size_t) -> {
     }
 }
 
+pub fn getegid() -> gid_t {
+    syscall::getegid()? as gid_t
+}
+
+pub fn geteuid() -> uid_t {
+    syscall::geteuid()? as uid_t
+}
+
+pub fn getgid() -> gid_t {
+    syscall::getgid()? as gid_t
+}
+
+pub fn getpgid(pid: pid_t) -> pid_t {
+    syscall::getpgid(pid as usize)? as pid_t
+}
+
+pub fn getpid() -> pid_t {
+    syscall::getpid()? as pid_t
+}
+
+pub fn getppid() -> pid_t {
+    syscall::getppid()? as pid_t
+}
+
+pub fn getuid() -> uid_t {
+    syscall::getuid()? as pid_t
+}
+
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     let path = unsafe { c_str(path) };
     syscall::open(path, (oflag as usize) | (mode as usize)).unwrap() as c_int

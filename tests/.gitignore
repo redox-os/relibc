@@ -10,6 +10,7 @@
 /fsync
 /ftruncate
 /ftruncate.out
+/getid
 /math
 /printf
 /write

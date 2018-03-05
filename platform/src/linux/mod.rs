@@ -80,6 +80,48 @@ pub fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
     }
 }
 
+pub fn getegid() -> gid_t {
+    unsafe {
+        syscall!(GETEGID)
+    }
+}
+
+pub fn geteuid() -> uid_t {
+    unsafe {
+        syscall!(GETEUID)
+    }
+}
+
+pub fn getgid() -> gid_t {
+   unsafe {
+       syscall!(GETGID)
+    }
+}
+
+pub fn getpgid(pid: pid_t) -> pid_t {
+    unsafe {
+        syscall!(GETPGID, pid)
+    }
+}
+
+pub fn getpid() -> pid_t {
+    unsafe {
+        syscall!(GETPID)
+    }
+}
+
+pub fn getppid() -> pid_t {
+    unsafe {
+        syscall!(GETPPID)
+    }
+}
+
+pub fn getuid() -> uid_t {
+    unsafe {
+        syscall!(GETUID)
+    }
+}
+
 #[cfg(target_arch = "x86_64")]
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     unsafe {
