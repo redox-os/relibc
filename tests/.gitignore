@@ -11,6 +11,8 @@
 /ftruncate
 /ftruncate.out
 /getid
+/link
+/link.out
 /math
 /printf
 /write

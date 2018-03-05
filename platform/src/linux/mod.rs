@@ -122,6 +122,12 @@ pub fn getuid() -> uid_t {
     }
 }
 
+pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
+    unsafe {
+        syscall!(LINK, path1, path2) as c_int
+    }
+}
+
 #[cfg(target_arch = "x86_64")]
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     unsafe {

@@ -9,6 +9,7 @@ BINS=\
 	fsync \
 	ftruncate \
 	getid \
+	link \
 	math \
 	printf \
 	write

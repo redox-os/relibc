@@ -92,6 +92,12 @@ pub fn getuid() -> uid_t {
     syscall::getuid()? as pid_t
 }
 
+pub fn link(path1: const c_char, path2: const c_char) -> c_int {
+    let path1 = unsafe { c_str(path1) };
+    let path2 = unsafe { c_str(path2) };
+    syscall::link(path1, path2)? as c_int
+}
+
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     let path = unsafe { c_str(path) };
     syscall::open(path, (oflag as usize) | (mode as usize)).unwrap() as c_int

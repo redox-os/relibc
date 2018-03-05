@@ -261,7 +261,7 @@ pub extern "C" fn lchown(path: *const c_char, owner: uid_t, group: gid_t) -> c_i
 
 #[no_mangle]
 pub extern "C" fn link(path1: *const c_char, path2: *const c_char) -> c_int {
-    unimplemented!();
+    platform::link(path1, path2)
 }
 
 #[no_mangle]
