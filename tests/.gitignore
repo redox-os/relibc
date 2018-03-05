@@ -8,6 +8,8 @@
 /dup.out
 /fchdir
 /fsync
+/ftruncate
+/ftruncate.out
 /math
 /printf
 /write

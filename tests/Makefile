@@ -7,6 +7,7 @@ BINS=\
 	dup \
 	fchdir \
 	fsync \
+	ftruncate \
 	math \
 	printf \
 	write
