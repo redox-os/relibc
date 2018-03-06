@@ -3,6 +3,7 @@
 #![no_std]
 #![allow(non_camel_case_types)]
 
+#[cfg(all(not(feature="no_std"), target_os = "linux"))]
 #[macro_use]
 extern crate sc;
 

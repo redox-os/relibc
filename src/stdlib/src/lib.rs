@@ -76,7 +76,7 @@ pub unsafe extern "C" fn calloc(nelem: size_t, elsize: size_t) -> *mut c_void {
 
     let size = nelem * elsize;
     let ptr = malloc(size);
-    if ! ptr.is_null() {
+    if !ptr.is_null() {
         intrinsics::write_bytes(ptr as *mut u8, 0, size);
     }
     ptr
@@ -209,7 +209,7 @@ pub extern "C" fn lrand48() -> c_long {
 pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
     let align = 8;
     let ptr = ralloc::alloc(size + 16, align);
-    if ! ptr.is_null() {
+    if !ptr.is_null() {
         *(ptr as *mut u64) = (size + 16) as u64;
         *(ptr as *mut u64).offset(1) = align as u64;
         ptr.offset(16) as *mut c_void
@@ -289,7 +289,7 @@ pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void 
     let old_size = *(old_ptr as *mut u64);
     let align = *(old_ptr as *mut u64).offset(1);
     let ptr = ralloc::realloc(old_ptr, old_size as usize, size + 16, align as usize);
-    if ! ptr.is_null() {
+    if !ptr.is_null() {
         *(ptr as *mut u64) = (size + 16) as u64;
         *(ptr as *mut u64).offset(1) = align;
         ptr.offset(16) as *mut c_void
@@ -367,7 +367,7 @@ pub extern "C" fn unlockpt(fildes: c_int) -> c_int {
 pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
     let align = 4096;
     let ptr = ralloc::alloc(size + 16, align);
-    if ! ptr.is_null() {
+    if !ptr.is_null() {
         *(ptr as *mut u64) = (size + 16) as u64;
         *(ptr as *mut u64).offset(1) = align as u64;
         ptr.offset(16) as *mut c_void
