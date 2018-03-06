@@ -41,12 +41,12 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
 
 #[no_mangle]
 pub extern "C" fn brk(addr: *mut c_void) -> c_int {
-    unimplemented!();
+    platform::brk(addr)
 }
 
 #[no_mangle]
 pub extern "C" fn chdir(path: *const c_char) -> c_int {
-    unimplemented!();
+    platform::chdir(path)
 }
 
 #[no_mangle]
@@ -56,7 +56,7 @@ pub extern "C" fn chroot(path: *const c_char) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
-    unimplemented!();
+    platform::chown(path, owner, group)
 }
 
 #[no_mangle]
@@ -75,23 +75,13 @@ pub extern "C" fn crypt(key: *const c_char, salt: *const c_char) -> *mut c_char 
 }
 
 #[no_mangle]
-pub extern "C" fn ctermid(s: *mut c_char) -> *mut c_char {
-    unimplemented!();
-}
-
-#[no_mangle]
-pub extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
-    unimplemented!();
-}
-
-#[no_mangle]
 pub extern "C" fn dup(fildes: c_int) -> c_int {
-    unimplemented!();
+    platform::dup(fildes)
 }
 
 #[no_mangle]
 pub extern "C" fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
-    unimplemented!();
+    platform::dup2(fildes, fildes2)
 }
 
 #[no_mangle]
@@ -131,12 +121,12 @@ pub extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -> c_int
 
 #[no_mangle]
 pub extern "C" fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
-    unimplemented!();
+    platform::fchown(fildes, owner, group)
 }
 
 #[no_mangle]
 pub extern "C" fn fchdir(fildes: c_int) -> c_int {
-    unimplemented!();
+    platform::fchdir(fildes)
 }
 
 #[no_mangle]
@@ -156,17 +146,17 @@ pub extern "C" fn fpathconf(fildes: c_int, name: c_int) -> c_long {
 
 #[no_mangle]
 pub extern "C" fn fsync(fildes: c_int) -> c_int {
-    unimplemented!();
+    platform::fsync(fildes)
 }
 
 #[no_mangle]
 pub extern "C" fn ftruncate(fildes: c_int, length: off_t) -> c_int {
-    unimplemented!();
+    platform::ftruncate(fildes, length)
 }
 
 #[no_mangle]
 pub extern "C" fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
-    unimplemented!();
+    platform::getcwd(buf, size)
 }
 
 #[no_mangle]
@@ -176,17 +166,17 @@ pub extern "C" fn getdtablesize() -> c_int {
 
 #[no_mangle]
 pub extern "C" fn getegid() -> gid_t {
-    unimplemented!();
+    platform::getegid()
 }
 
 #[no_mangle]
 pub extern "C" fn geteuid() -> uid_t {
-    unimplemented!();
+    platform::geteuid()
 }
 
 #[no_mangle]
 pub extern "C" fn getgid() -> gid_t {
-    unimplemented!();
+    platform::getgid()
 }
 
 #[no_mangle]
@@ -226,7 +216,7 @@ pub extern "C" fn getpass(prompt: *const c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn getpgid(pid: pid_t) -> pid_t {
-    unimplemented!();
+    platform::getpgid(pid)
 }
 
 #[no_mangle]
@@ -236,12 +226,12 @@ pub extern "C" fn getpgrp() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn getpid() -> pid_t {
-    unimplemented!();
+    platform::getpid()
 }
 
 #[no_mangle]
 pub extern "C" fn getppid() -> pid_t {
-    unimplemented!();
+    platform::getppid()
 }
 
 #[no_mangle]
@@ -251,7 +241,7 @@ pub extern "C" fn getsid(pid: pid_t) -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn getuid() -> uid_t {
-    unimplemented!();
+    platform::getuid()
 }
 
 #[no_mangle]
@@ -271,7 +261,7 @@ pub extern "C" fn lchown(path: *const c_char, owner: uid_t, group: gid_t) -> c_i
 
 #[no_mangle]
 pub extern "C" fn link(path1: *const c_char, path2: *const c_char) -> c_int {
-    unimplemented!();
+    platform::link(path1, path2)
 }
 
 #[no_mangle]

@@ -1,7 +1,15 @@
 BINS=\
 	alloc \
+	brk \
 	args \
+	chdir \
 	create \
+	dup \
+	fchdir \
+	fsync \
+	ftruncate \
+	getid \
+	link \
 	math \
 	printf \
 	write
