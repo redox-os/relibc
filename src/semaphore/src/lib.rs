@@ -12,11 +12,12 @@ pub union sem_t {
     _bindgen_union_align: [u64; 4usize],
 }
 impl Clone for sem_t {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 #[no_mangle]
-pub extern "C" fn sem_init(sem: *mut sem_t, pshared: c_int,
-                    value: c_uint) -> c_int {
+pub extern "C" fn sem_init(sem: *mut sem_t, pshared: c_int, value: c_uint) -> c_int {
     unimplemented!();
 }
 
@@ -39,8 +40,7 @@ pub extern "C" fn sem_close(sem: *mut sem_t) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn sem_unlink(name: *const c_char)
-     -> c_int {
+pub extern "C" fn sem_unlink(name: *const c_char) -> c_int {
     unimplemented!();
 }
 
@@ -60,8 +60,6 @@ pub extern "C" fn sem_post(sem: *mut sem_t) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn sem_getvalue(sem: *mut sem_t, sval: *mut c_int)
-     -> c_int {
+pub extern "C" fn sem_getvalue(sem: *mut sem_t, sval: *mut c_int) -> c_int {
     unimplemented!();
 }
-

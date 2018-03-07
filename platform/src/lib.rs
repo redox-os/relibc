@@ -3,17 +3,18 @@
 #![no_std]
 #![allow(non_camel_case_types)]
 
+#[cfg(all(not(feature = "no_std"), target_os = "linux"))]
 #[macro_use]
 extern crate sc;
 
 pub use sys::*;
 
-#[cfg(all(not(feature="no_std"), target_os = "linux"))]
-#[path="linux/mod.rs"]
+#[cfg(all(not(feature = "no_std"), target_os = "linux"))]
+#[path = "linux/mod.rs"]
 mod sys;
 
-#[cfg(all(not(feature="no_std"), target_os = "redox"))]
-#[path="redox/mod.rs"]
+#[cfg(all(not(feature = "no_std"), target_os = "redox"))]
+#[path = "redox/mod.rs"]
 mod sys;
 
 pub mod types;

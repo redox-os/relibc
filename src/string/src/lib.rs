@@ -6,23 +6,13 @@ extern crate platform;
 
 use platform::types::*;
 
-
 #[no_mangle]
-pub extern "C" fn memccpy(
-    s1: *mut c_void,
-    s2: *const c_void,
-    c: c_int,
-    n: usize,
-) -> *mut c_void {
+pub extern "C" fn memccpy(s1: *mut c_void, s2: *const c_void, c: c_int, n: usize) -> *mut c_void {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn memchr(
-    s: *const c_void,
-    c: c_int,
-    n: usize,
-) -> *mut c_void {
+pub extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_void {
     unimplemented!();
 }
 
@@ -108,37 +98,22 @@ pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
 }
 
 #[no_mangle]
-pub extern "C" fn strncat(
-    s1: *mut c_char,
-    s2: *const c_char,
-    n: usize,
-) -> *mut c_char {
+pub extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: usize) -> *mut c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strncmp(
-    s1: *const c_char,
-    s2: *const c_char,
-    n: usize,
-) -> c_int {
+pub extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strncpy(
-    s1: *mut c_char,
-    s2: *const c_char,
-    n: usize,
-) -> *mut c_char {
+pub extern "C" fn strncpy(s1: *mut c_char, s2: *const c_char, n: usize) -> *mut c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn strpbrk(
-    s1: *const c_char,
-    s2: *const c_char,
-) -> *mut c_char {
+pub extern "C" fn strpbrk(s1: *const c_char, s2: *const c_char) -> *mut c_char {
     unimplemented!();
 }
 
@@ -153,10 +128,7 @@ pub extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
 }
 
 #[no_mangle]
-pub extern "C" fn strstr(
-    s1: *const c_char,
-    s2: *const c_char,
-) -> *mut c_char {
+pub extern "C" fn strstr(s1: *const c_char, s2: *const c_char) -> *mut c_char {
     unimplemented!();
 }
 
@@ -175,11 +147,7 @@ pub extern "C" fn strtok_r(
 }
 
 #[no_mangle]
-pub extern "C" fn strxfrm(
-    s1: *mut c_char,
-    s2: *const c_char,
-    n: usize,
-) -> c_ulong {
+pub extern "C" fn strxfrm(s1: *mut c_char, s2: *const c_char, n: usize) -> c_ulong {
     unimplemented!();
 }
 
