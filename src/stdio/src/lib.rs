@@ -296,7 +296,12 @@ pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vsnprintf(s: *mut c_char, n: usize, format: *const c_char, ap: va_list) -> c_int {
+pub unsafe extern "C" fn vsnprintf(
+    s: *mut c_char,
+    n: usize,
+    format: *const c_char,
+    ap: va_list,
+) -> c_int {
     printf::printf(platform::StringWriter(s as *mut u8, n as usize), format, ap)
 }
 
