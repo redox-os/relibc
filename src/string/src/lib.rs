@@ -3,9 +3,11 @@
 #![no_std]
 
 extern crate platform;
+extern crate stdlib;
 
 use platform::types::*;
 use core::cmp;
+use core::usize;
 
 #[no_mangle]
 pub extern "C" fn memccpy(s1: *mut c_void, s2: *const c_void, c: c_int, n: usize) -> *mut c_void {
@@ -54,8 +56,8 @@ pub extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_void {
 // }
 
 #[no_mangle]
-pub extern "C" fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
+    strncat(s1, s2, usize::MAX)
 }
 
 #[no_mangle]
@@ -64,8 +66,8 @@ pub extern "C" fn strchr(s: *const c_char, c: c_int) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
-    unimplemented!();
+pub unsafe extern "C" fn strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
+    strncmp(s1, s2, usize::MAX)
 }
 
 #[no_mangle]
@@ -74,8 +76,8 @@ pub extern "C" fn strcoll(s1: *const c_char, s2: *const c_char) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn strcpy(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strcpy(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
+    strncpy(s1, s2, usize::MAX)
 }
 
 #[no_mangle]
@@ -84,8 +86,21 @@ pub extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
 }
 
 #[no_mangle]
-pub extern "C" fn strdup(s1: *const c_char) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strdup(s1: *const c_char) -> *mut c_char {
+    // the "+ 1" is to account for the NUL byte
+    let len = strlen(s1) + 1;
+
+    let buffer = stdlib::malloc(len) as *mut _;
+    if buffer.is_null() {
+        // TODO: set errno
+    } else {
+        //memcpy(buffer, s1, len)
+        for i in 0..len as isize {
+            *buffer.offset(i) = *s1.offset(i);
+        }
+    }
+
+    buffer
 }
 
 #[no_mangle]
