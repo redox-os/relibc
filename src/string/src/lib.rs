@@ -87,8 +87,13 @@ pub extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
 
 #[no_mangle]
 pub unsafe extern "C" fn strdup(s1: *const c_char) -> *mut c_char {
+    strndup(s1, usize::MAX)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn strndup(s1: *const c_char, size: usize) -> *mut c_char {
     // the "+ 1" is to account for the NUL byte
-    let len = strlen(s1) + 1;
+    let len = strnlen(s1, size) + 1;
 
     let buffer = stdlib::malloc(len) as *mut _;
     if buffer.is_null() {
@@ -110,7 +115,12 @@ pub extern "C" fn strerror(errnum: c_int) -> *mut c_char {
 
 #[no_mangle]
 pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
-    platform::c_str(s).len() as size_t
+    strnlen(s, usize::MAX)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn strnlen(s: *const c_char, size: usize) -> size_t {
+    platform::c_str_n(s, size).len() as size_t
 }
 
 #[no_mangle]
