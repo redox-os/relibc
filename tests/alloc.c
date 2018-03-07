@@ -12,7 +12,7 @@ int main(int argc, char ** argv) {
 
     char * ptrc = (char *)calloc(256,1);
     printf("calloc %p\n", ptrc);
-    for(int i = 0; i < 256; i++) {
+    for(i = 0; i < 256; i++) {
         ptrc[i] = (char)i;
     }
     free(ptrc);

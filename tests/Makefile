@@ -20,7 +20,7 @@ clean:
 	rm -f $(BINS) *.out
 
 run: $(BINS)
-	for bin in $(BINS); do echo "\\033[1m$${bin}\\033[0m"; ./$${bin} test args; done
+	for bin in $(BINS); do echo "# $${bin} #"; "./$${bin}" test args; done
 
 GCCHEAD=\
 	-nostdinc \
@@ -36,4 +36,4 @@ GCCTAIL=\
 	../openlibm/libopenlibm.a
 
 %: %.c
-	gcc -fno-stack-protector $(GCCHEAD) $< $(GCCTAIL) -o $@
+	gcc -fno-stack-protector -Wall $(GCCHEAD) "$<" $(GCCTAIL) -o "$@"
