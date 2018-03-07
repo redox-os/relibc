@@ -1,0 +1,7 @@
+language: rust
+cache: cargo
+before_script:
+- rustup component add rustfmt-preview
+script:
+- bash ./fmt.sh -- --write-mode=diff
+- bash ./test.sh
