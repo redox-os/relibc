@@ -46,6 +46,21 @@ pub unsafe fn c_str(s: *const c_char) -> &'static [u8] {
     slice::from_raw_parts(s as *const u8, size as usize)
 }
 
+pub unsafe fn c_str_n(s: *const c_char, n: usize) -> &'static [u8] {
+    use core::slice;
+
+    let mut size = 0;
+
+    for _ in 0..n {
+        if *s.offset(size) == 0 {
+            break;
+        }
+        size += 1;
+    }
+
+    slice::from_raw_parts(s as *const u8, size as usize)
+}
+
 pub struct FileWriter(pub c_int);
 
 impl FileWriter {

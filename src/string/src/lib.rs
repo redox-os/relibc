@@ -5,6 +5,7 @@
 extern crate platform;
 
 use platform::types::*;
+use core::cmp;
 
 #[no_mangle]
 pub extern "C" fn memccpy(s1: *mut c_void, s2: *const c_void, c: c_int, n: usize) -> *mut c_void {
@@ -98,18 +99,55 @@ pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
 }
 
 #[no_mangle]
-pub extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: usize) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: usize) -> *mut c_char {
+    let mut idx = strlen(s1 as *const _) as isize;
+    for i in 0..n as isize {
+        if *s2.offset(i) == 0 {
+            break;
+        }
+
+        *s1.offset(idx) = *s2.offset(i);
+        idx += 1;
+    }
+    *s1.offset(idx) = 0;
+
+    s1
 }
 
 #[no_mangle]
-pub extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> c_int {
-    unimplemented!();
+pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> c_int {
+    let s1 = platform::c_str_n(s1, n);
+    let s2 = platform::c_str_n(s2, n);
+
+    for i in 0..n {
+        let val = s1[i] - s2[i];
+        if val != 0 || s1[i] == 0 {
+            return val as c_int;
+        }
+    }
+
+    0
 }
 
 #[no_mangle]
-pub extern "C" fn strncpy(s1: *mut c_char, s2: *const c_char, n: usize) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strncpy(s1: *mut c_char, s2: *const c_char, n: usize) -> *mut c_char {
+    let s2_slice = platform::c_str_n(s2, n);
+    let s2_len = s2_slice.len();
+
+    //memcpy(s1 as *mut _, s2 as *const _, cmp::min(n, s2_len));
+    let mut idx = 0;
+    for _ in 0..cmp::min(n, s2_len) {
+        *s1.offset(idx as isize) = s2_slice[idx] as c_char;
+        idx += 1;
+    }
+
+    // if length of s2 < n, pad s1 with zeroes
+    for _ in cmp::min(n, s2_len)..n {
+        *s1.offset(idx as isize) = 0;
+        idx += 1;
+    }
+
+    s1
 }
 
 #[no_mangle]
