@@ -110,7 +110,11 @@ pub extern "C" fn execv(path: *const c_char, argv: *const *mut c_char) -> c_int 
 }
 
 #[no_mangle]
-pub extern "C" fn execve(path: *const c_char, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
+pub extern "C" fn execve(
+    path: *const c_char,
+    argv: *const *mut c_char,
+    envp: *const *mut c_char,
+) -> c_int {
     unimplemented!();
 }
 
@@ -300,12 +304,21 @@ pub extern "C" fn pread(fildes: c_int, buf: *mut c_void, nbyte: size_t, offset: 
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_atfork(prepare: Option<extern "C" fn()>, parent: Option<extern "C" fn()>, child: Option<extern "C" fn()>) -> c_int {
+pub extern "C" fn pthread_atfork(
+    prepare: Option<extern "C" fn()>,
+    parent: Option<extern "C" fn()>,
+    child: Option<extern "C" fn()>,
+) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn pwrite(fildes: c_int, buf: *const c_void, nbyte: size_t, offset: off_t) -> ssize_t {
+pub extern "C" fn pwrite(
+    fildes: c_int,
+    buf: *const c_void,
+    nbyte: size_t,
+    offset: off_t,
+) -> ssize_t {
     unimplemented!();
 }
 

@@ -66,7 +66,13 @@ pub extern "C" fn atol(s: *const c_char) -> c_long {
 }
 
 #[no_mangle]
-pub extern "C" fn bsearch(key: *const c_void, base: *const c_void, nel: size_t, width: size_t, compar: Option<extern "C" fn(*const c_void, *const c_void) -> c_int>) -> *mut c_void {
+pub extern "C" fn bsearch(
+    key: *const c_void,
+    base: *const c_void,
+    nel: size_t,
+    width: size_t,
+    compar: Option<extern "C" fn(*const c_void, *const c_void) -> c_int>,
+) -> *mut c_void {
     unimplemented!();
 }
 
@@ -92,7 +98,7 @@ pub struct div_t {
 pub extern "C" fn div(numer: c_int, denom: c_int) -> div_t {
     div_t {
         quot: numer / denom,
-        rem: numer % denom
+        rem: numer % denom,
     }
 }
 
@@ -102,7 +108,12 @@ pub extern "C" fn drand48() -> c_double {
 }
 
 #[no_mangle]
-pub extern "C" fn ecvt(value: c_double, ndigit: c_int, decpt: *mut c_int, sign: *mut c_int) -> *mut c_char {
+pub extern "C" fn ecvt(
+    value: c_double,
+    ndigit: c_int,
+    decpt: *mut c_int,
+    sign: *mut c_int,
+) -> *mut c_char {
     unimplemented!();
 }
 
@@ -125,7 +136,12 @@ pub unsafe extern "C" fn exit(status: c_int) {
 }
 
 #[no_mangle]
-pub extern "C" fn fcvt(value: c_double, ndigit: c_int, decpt: *mut c_int, sign: *mut c_int) -> *mut c_char {
+pub extern "C" fn fcvt(
+    value: c_double,
+    ndigit: c_int,
+    decpt: *mut c_int,
+    sign: *mut c_int,
+) -> *mut c_char {
     unimplemented!();
 }
 
@@ -148,7 +164,11 @@ pub extern "C" fn getenv(name: *const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn getsubopt(optionp: *mut *mut c_char, tokens: *const *mut c_char, valuep: *mut *mut c_char) -> c_int {
+pub extern "C" fn getsubopt(
+    optionp: *mut *mut c_char,
+    tokens: *const *mut c_char,
+    valuep: *mut *mut c_char,
+) -> c_int {
     unimplemented!();
 }
 
@@ -196,7 +216,7 @@ pub struct ldiv_t {
 pub extern "C" fn ldiv(numer: c_long, denom: c_long) -> ldiv_t {
     ldiv_t {
         quot: numer / denom,
-        rem: numer % denom
+        rem: numer % denom,
     }
 }
 
@@ -264,7 +284,12 @@ pub extern "C" fn putenv(s: *mut c_char) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn qsort(base: *mut c_void, nel: size_t, width: size_t, compar: Option<extern "C" fn(*const c_void, *const c_void) -> c_int>) {
+pub extern "C" fn qsort(
+    base: *mut c_void,
+    nel: size_t,
+    width: size_t,
+    compar: Option<extern "C" fn(*const c_void, *const c_void) -> c_int>,
+) {
     unimplemented!();
 }
 

@@ -30,14 +30,12 @@ pub extern "C" fn clearerr(stream: *mut FILE) {
 }
 
 #[no_mangle]
-pub extern "C" fn ctermid(s: *mut c_char)
-     -> *mut c_char {
+pub extern "C" fn ctermid(s: *mut c_char) -> *mut c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn cuserid(s: *mut c_char)
-     -> *mut c_char {
+pub extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
     unimplemented!();
 }
 
@@ -47,8 +45,7 @@ pub extern "C" fn fclose(stream: *mut FILE) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn fdopen(fildes: c_int,
-                  mode: *const c_char) -> *mut FILE {
+pub extern "C" fn fdopen(fildes: c_int, mode: *const c_char) -> *mut FILE {
     unimplemented!();
 }
 
@@ -73,15 +70,12 @@ pub extern "C" fn fgetc(stream: *mut FILE) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn fgetpos(stream: *mut FILE, pos: *mut fpos_t)
-     -> c_int {
+pub extern "C" fn fgetpos(stream: *mut FILE, pos: *mut fpos_t) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn fgets(s: *mut c_char,
-                 n: c_int, stream: *mut FILE)
-     -> *mut c_char {
+pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: *mut FILE) -> *mut c_char {
     unimplemented!();
 }
 
@@ -96,51 +90,46 @@ pub extern "C" fn flockfile(file: *mut FILE) {
 }
 
 #[no_mangle]
-pub extern "C" fn fopen(filename: *const c_char,
-                 mode: *const c_char) -> *mut FILE {
+pub extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FILE {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn fputc(c: c_int, stream: *mut FILE)
-     -> c_int {
+pub extern "C" fn fputc(c: c_int, stream: *mut FILE) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn fputs(s: *const c_char, stream: *mut FILE)
-     -> c_int {
+pub extern "C" fn fputs(s: *const c_char, stream: *mut FILE) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn fread(ptr: *mut c_void, size: usize, nitems: usize,
-                 stream: *mut FILE) -> usize {
+pub extern "C" fn fread(ptr: *mut c_void, size: usize, nitems: usize, stream: *mut FILE) -> usize {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn freopen(filename: *const c_char,
-                   mode: *const c_char, stream: *mut FILE)
-     -> *mut FILE {
+pub extern "C" fn freopen(
+    filename: *const c_char,
+    mode: *const c_char,
+    stream: *mut FILE,
+) -> *mut FILE {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn fseek(stream: *mut FILE, offset: c_long,
-                 whence: c_int) -> c_int {
+pub extern "C" fn fseek(stream: *mut FILE, offset: c_long, whence: c_int) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn fseeko(stream: *mut FILE, offset: off_t, whence: c_int)
-     -> c_int {
+pub extern "C" fn fseeko(stream: *mut FILE, offset: off_t, whence: c_int) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn fsetpos(stream: *mut FILE, pos: *const fpos_t)
-     -> c_int {
+pub extern "C" fn fsetpos(stream: *mut FILE, pos: *const fpos_t) -> c_int {
     unimplemented!();
 }
 
@@ -165,8 +154,12 @@ pub extern "C" fn funlockfile(file: *mut FILE) {
 }
 
 #[no_mangle]
-pub extern "C" fn fwrite(ptr: *const c_void, size: usize,
-                  nitems: usize, stream: *mut FILE) -> usize {
+pub extern "C" fn fwrite(
+    ptr: *const c_void,
+    size: usize,
+    nitems: usize,
+    stream: *mut FILE,
+) -> usize {
     unimplemented!();
 }
 
@@ -191,8 +184,7 @@ pub extern "C" fn getchar_unlocked() -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn gets(s: *mut c_char)
-     -> *mut c_char {
+pub extern "C" fn gets(s: *mut c_char) -> *mut c_char {
     unimplemented!();
 }
 
@@ -212,14 +204,12 @@ pub extern "C" fn perror(s: *const c_char) {
 }
 
 #[no_mangle]
-pub extern "C" fn popen(command: *const c_char,
-                 mode: *const c_char) -> *mut FILE {
+pub extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *mut FILE {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn putc(c: c_int, stream: *mut FILE)
-     -> c_int {
+pub extern "C" fn putc(c: c_int, stream: *mut FILE) -> c_int {
     unimplemented!();
 }
 
@@ -229,14 +219,12 @@ pub extern "C" fn putchar(c: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn putc_unlocked(c: c_int, stream: *mut FILE)
-     -> c_int {
+pub extern "C" fn putc_unlocked(c: c_int, stream: *mut FILE) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn putchar_unlocked(c: c_int)
-     -> c_int {
+pub extern "C" fn putchar_unlocked(c: c_int) -> c_int {
     unimplemented!();
 }
 
@@ -246,21 +234,17 @@ pub extern "C" fn puts(s: *const c_char) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn putw(w: c_int, stream: *mut FILE)
-     -> c_int {
+pub extern "C" fn putw(w: c_int, stream: *mut FILE) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn remove(path: *const c_char)
-     -> c_int {
+pub extern "C" fn remove(path: *const c_char) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn rename(old: *const c_char,
-                  new: *const c_char)
-     -> c_int {
+pub extern "C" fn rename(old: *const c_char, new: *const c_char) -> c_int {
     unimplemented!();
 }
 
@@ -275,16 +259,12 @@ pub extern "C" fn setbuf(stream: *mut FILE, buf: *mut c_char) {
 }
 
 #[no_mangle]
-pub extern "C" fn setvbuf(stream: *mut FILE, buf: *mut c_char,
-                   mode: c_int, size: usize)
-     -> c_int {
+pub extern "C" fn setvbuf(stream: *mut FILE, buf: *mut c_char, mode: c_int, size: usize) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn tempnam(dir: *const c_char,
-                   pfx: *const c_char)
-     -> *mut c_char {
+pub extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut c_char {
     unimplemented!();
 }
 
@@ -294,14 +274,12 @@ pub extern "C" fn tmpfile() -> *mut FILE {
 }
 
 #[no_mangle]
-pub extern "C" fn tmpnam(s: *mut c_char)
-     -> *mut c_char {
+pub extern "C" fn tmpnam(s: *mut c_char) -> *mut c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn ungetc(c: c_int, stream: *mut FILE)
-     -> c_int {
+pub extern "C" fn ungetc(c: c_int, stream: *mut FILE) -> c_int {
     unimplemented!();
 }
 
@@ -316,20 +294,14 @@ pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn vsnprintf(s: *mut c_char, n: usize,
-                     format: *const c_char,
-                     ap: va_list) -> c_int {
+pub extern "C" fn vsnprintf(s: *mut c_char, n: usize, format: *const c_char, ap: va_list) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn vsprintf(s: *mut c_char,
-                    format: *const c_char,
-                    ap: va_list) -> c_int {
+pub extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_list) -> c_int {
     unimplemented!();
 }
-
-
 
 /*
 #[no_mangle]
