@@ -8,5 +8,5 @@ build = "build.rs"
 cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
-platform = { path = "../../platform" }
+platform = { path = "../platform" }
 ralloc = { path = "../../ralloc", default-features = false }

@@ -1,7 +1,7 @@
 set -ex
 
 cargo build
-cargo build --manifest-path crt0/Cargo.toml
+cargo build --manifest-path src/crt0/Cargo.toml
 
 cd openlibm
 make

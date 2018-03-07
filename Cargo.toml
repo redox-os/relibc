@@ -8,11 +8,11 @@ name = "c"
 crate-type = ["staticlib"]
 
 [workspace]
-members = ["crt0"]
+members = ["src/crt0"]
 
 [dependencies]
 compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins.git", default-features = false, features = ["mem"] }
-platform = { path = "platform" }
+platform = { path = "src/platform" }
 ctype = { path = "src/ctype" }
 fcntl = { path = "src/fcntl" }
 grp = { path = "src/grp" }

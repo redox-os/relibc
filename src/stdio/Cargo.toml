@@ -8,5 +8,5 @@ build = "build.rs"
 cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
-platform = { path = "../../platform" }
+platform = { path = "../platform" }
 va_list = { path = "../../va_list", features = ["no_std"] }
