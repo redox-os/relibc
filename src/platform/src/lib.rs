@@ -2,6 +2,7 @@
 
 #![no_std]
 #![allow(non_camel_case_types)]
+#![feature(thread_local)]
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
 #[macro_use]
@@ -26,6 +27,9 @@ pub mod types;
 use core::fmt;
 
 use types::*;
+
+#[thread_local]
+pub static mut errno: c_int = 0;
 
 pub unsafe fn c_str(s: *const c_char) -> &'static [u8] {
     use core::slice;
