@@ -60,3 +60,52 @@ impl fmt::Write for FileWriter {
         Ok(())
     }
 }
+
+pub struct StringWriter(pub *mut u8, pub usize);
+
+impl StringWriter {
+    pub unsafe fn write(&mut self, buf: &[u8]) {
+        for &b in buf.iter() {
+            if self.1 == 0 {
+                break;
+            } else if self.1 == 1 {
+                *self.0 = b'\0';
+            } else {
+                *self.0 = b;
+            }
+
+            self.0 = self.0.offset(1);
+            self.1 -= 1;
+
+            if self.1 > 0 {
+                *self.0 = b'\0';
+            }
+        }
+    }
+}
+
+impl fmt::Write for StringWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        unsafe { self.write(s.as_bytes()) };
+        Ok(())
+    }
+}
+
+pub struct UnsafeStringWriter(pub *mut u8);
+
+impl UnsafeStringWriter {
+    pub unsafe fn write(&mut self, buf: &[u8]) {
+        for &b in buf.iter() {
+            *self.0 = b;
+            self.0 = self.0.offset(1);
+            *self.0 = b'\0';
+        }
+    }
+}
+
+impl fmt::Write for UnsafeStringWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        unsafe { self.write(s.as_bytes()) };
+        Ok(())
+    }
+}

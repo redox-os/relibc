@@ -5,6 +5,8 @@
 extern crate platform;
 extern crate va_list as vl;
 
+use core::slice;
+
 use platform::types::*;
 use vl::VaList as va_list;
 
@@ -210,12 +212,12 @@ pub extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *mut FIL
 
 #[no_mangle]
 pub extern "C" fn putc(c: c_int, stream: *mut FILE) -> c_int {
-    unimplemented!();
+    fputc(c, stream)
 }
 
 #[no_mangle]
-pub extern "C" fn putchar(c: c_int) -> c_int {
-    unimplemented!();
+pub unsafe extern "C" fn putchar(c: c_int) -> c_int {
+    putc(c, stdout)
 }
 
 #[no_mangle]
@@ -224,8 +226,8 @@ pub extern "C" fn putc_unlocked(c: c_int, stream: *mut FILE) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn putchar_unlocked(c: c_int) -> c_int {
-    unimplemented!();
+pub unsafe extern "C" fn putchar_unlocked(c: c_int) -> c_int {
+    putc_unlocked(c, stdout)
 }
 
 #[no_mangle]
@@ -294,13 +296,13 @@ pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn vsnprintf(s: *mut c_char, n: usize, format: *const c_char, ap: va_list) -> c_int {
-    unimplemented!();
+pub unsafe extern "C" fn vsnprintf(s: *mut c_char, n: usize, format: *const c_char, ap: va_list) -> c_int {
+    printf::printf(platform::StringWriter(s as *mut u8, n as usize), format, ap)
 }
 
 #[no_mangle]
-pub extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_list) -> c_int {
-    unimplemented!();
+pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_list) -> c_int {
+    printf::printf(platform::UnsafeStringWriter(s as *mut u8), format, ap)
 }
 
 /*
