@@ -18,7 +18,7 @@ pub fn chdir(path: *const c_char) -> c_int {
 }
 
 pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
-    unsafe { syscall!(CHOWN, owner as u32, group as u32) as c_int }
+    unsafe { syscall!(FCHOWNAT, AT_FDCWD, path, owner as u32, group as u32) as c_int }
 }
 
 pub fn close(fildes: c_int) -> c_int {
@@ -30,7 +30,7 @@ pub fn dup(fildes: c_int) -> c_int {
 }
 
 pub fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
-    unsafe { syscall!(DUP2, fildes, fildes2) as c_int }
+    unsafe { syscall!(DUP3, fildes, fildes2, 0) as c_int }
 }
 
 pub fn exit(status: c_int) -> ! {
@@ -92,15 +92,9 @@ pub fn getuid() -> uid_t {
 }
 
 pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
-    unsafe { syscall!(LINK, path1, path2) as c_int }
+    unsafe { syscall!(LINKAT, AT_FDCWD, path1, path2) as c_int }
 }
 
-#[cfg(target_arch = "x86_64")]
-pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
-    unsafe { syscall!(OPEN, path, oflag, mode) as c_int }
-}
-
-#[cfg(target_arch = "aarch64")]
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     unsafe { syscall!(OPENAT, AT_FDCWD, path, oflag, mode) as c_int }
 }
