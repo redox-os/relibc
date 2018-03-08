@@ -8,17 +8,17 @@ use platform::types::*;
 
 #[no_mangle]
 pub extern "C" fn isalnum(c: c_int) -> c_int {
-    unimplemented!();
+    (isdigit(c) != 0 || isalpha(c) != 0) as c_int
 }
 
 #[no_mangle]
 pub extern "C" fn isalpha(c: c_int) -> c_int {
-    unimplemented!();
+    (islower(c) != 0 || isupper(c) != 0) as c_int
 }
 
 #[no_mangle]
 pub extern "C" fn isascii(c: c_int) -> c_int {
-    unimplemented!();
+    (!(c & !0x7f)) as c_int
 }
 
 #[no_mangle]
@@ -28,7 +28,7 @@ pub extern "C" fn iscntrl(c: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn isdigit(c: c_int) -> c_int {
-    unimplemented!();
+    (((c - 0x30) as c_uint) < 10) as c_int
 }
 
 #[no_mangle]
@@ -38,7 +38,7 @@ pub extern "C" fn isgraph(c: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn islower(c: c_int) -> c_int {
-    unimplemented!();
+    (((c - 0x61) as c_uint) < 26) as c_int
 }
 
 #[no_mangle]
@@ -53,12 +53,12 @@ pub extern "C" fn ispunct(c: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn isspace(c: c_int) -> c_int {
-    unimplemented!();
+    (c == 0x20) as c_int
 }
 
 #[no_mangle]
 pub extern "C" fn isupper(c: c_int) -> c_int {
-    unimplemented!();
+    (((c - 0x41) as c_uint) < 26) as c_int
 }
 
 #[no_mangle]
@@ -73,10 +73,18 @@ pub extern "C" fn toascii(c: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn tolower(c: c_int) -> c_int {
-    unimplemented!();
+    if isupper(c) != 0 {
+        c + 0x20
+    } else {
+        c
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn toupper(c: c_int) -> c_int {
-    unimplemented!();
+    if islower(c) != 0 {
+        c - 0x20
+    } else {
+        c
+    }
 }
