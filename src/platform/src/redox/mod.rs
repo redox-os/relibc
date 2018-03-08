@@ -63,6 +63,10 @@ pub fn fchdir(fd: c_int) -> c_int {
     }
 }
 
+pub fn fork() -> pid_t {
+   e(unsafe { syscall::clone(0) }) as pid_t
+}
+
 pub fn fsync(fd: c_int) -> c_int {
     e(syscall::fsync(fd as usize)) as c_int
 }
@@ -117,6 +121,18 @@ pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     let path = unsafe { c_str(path) };
     e(syscall::open(path, (oflag as usize) | (mode as usize))) as c_int
+}
+
+pub fn pipe(fds: [c_int; 2]) -> c_int {
+    let mut usize_fds: [usize; 2] = [0; 2];
+    let res = e(syscall::pipe2(&mut usize_fds));
+    fds[0] = usize_fds[0] as c_int;
+    fds[1] = usize_fds[1] as c_int;
+    res as c_int
+}
+
+pub fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
+    e(syscall::read(fd as usize, buf)) as ssize_t
 }
 
 pub fn write(fd: c_int, buf: &[u8]) -> ssize_t {
