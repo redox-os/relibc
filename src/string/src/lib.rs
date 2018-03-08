@@ -99,7 +99,7 @@ pub unsafe extern "C" fn strndup(s1: *const c_char, size: usize) -> *mut c_char 
     // the "+ 1" is to account for the NUL byte
     let buffer = stdlib::malloc(len + 1) as *mut c_char;
     if buffer.is_null() {
-        platform::errno = Errno::ENOMEM as c_int;
+        platform::errno = ENOMEM as c_int;
     } else {
         //memcpy(buffer, s1, len)
         for i in 0..len as isize {
@@ -112,8 +112,20 @@ pub unsafe extern "C" fn strndup(s1: *const c_char, size: usize) -> *mut c_char 
 }
 
 #[no_mangle]
-pub extern "C" fn strerror(errnum: c_int) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strerror(errnum: c_int) -> *mut c_char {
+    use core::fmt::Write;
+
+    static mut strerror_buf: [u8; 256] = [0; 256];
+
+    let mut w = platform::StringWriter(strerror_buf.as_mut_ptr(), strerror_buf.len());
+
+    if errnum >= 0 && errnum < STR_ERROR.len() as c_int {
+        w.write_str(STR_ERROR[errnum as usize]);
+    } else {
+        w.write_fmt(format_args!("Unknown error {}", errnum));
+    }
+
+    strerror_buf.as_mut_ptr() as *mut c_char
 }
 
 #[no_mangle]
