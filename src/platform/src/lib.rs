@@ -2,7 +2,7 @@
 
 #![no_std]
 #![allow(non_camel_case_types)]
-#![feature(thread_local)]
+//TODO #![feature(thread_local)]
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
 #[macro_use]
@@ -28,7 +28,7 @@ use core::fmt;
 
 use types::*;
 
-#[thread_local]
+//TODO #[thread_local]
 #[no_mangle]
 pub static mut errno: c_int = 0;
 

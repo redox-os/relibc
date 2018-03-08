@@ -4,6 +4,7 @@
 
 extern crate platform;
 
+#[repr(C)]
 pub enum Errno {
     // Argument list too long
     E2BIG = 1,

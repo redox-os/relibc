@@ -1,4 +1,4 @@
-sys_includes = []
+sys_includes = ["bits/errno.h"]
 include_guard = "_ERRNO_H"
 language = "C"
 
