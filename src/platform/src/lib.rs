@@ -33,18 +33,9 @@ use types::*;
 pub static mut errno: c_int = 0;
 
 pub unsafe fn c_str(s: *const c_char) -> &'static [u8] {
-    use core::slice;
+    use core::usize;
 
-    let mut size = 0;
-
-    loop {
-        if *s.offset(size) == 0 {
-            break;
-        }
-        size += 1;
-    }
-
-    slice::from_raw_parts(s as *const u8, size as usize)
+    c_str_n(s, usize::MAX)
 }
 
 pub unsafe fn c_str_n(s: *const c_char, n: usize) -> &'static [u8] {

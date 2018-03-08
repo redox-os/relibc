@@ -1,1 +1,1 @@
-extern int errno;
+extern __thread int errno;

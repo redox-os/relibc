@@ -76,6 +76,14 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "errno"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.0",
+ "platform 0.1.0",
+]
+
+[[package]]
 name = "fcntl"
 version = "0.1.0"
 dependencies = [
@@ -244,6 +252,7 @@ version = "0.1.0"
 dependencies = [
  "compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins.git)",
  "ctype 0.1.0",
+ "errno 0.1.0",
  "fcntl 0.1.0",
  "grp 0.1.0",
  "mman 0.1.0",
@@ -453,7 +462,9 @@ name = "string"
 version = "0.1.0"
 dependencies = [
  "cbindgen 0.5.0",
+ "errno 0.1.0",
  "platform 0.1.0",
+ "stdlib 0.1.0",
 ]
 
 [[package]]
