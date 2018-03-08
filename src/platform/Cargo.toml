@@ -8,3 +8,6 @@ sc = "0.2"
 
 [target.'cfg(target_os = "redox")'.dependencies]
 redox_syscall = "0.1"
+
+[dependencies]
+alloc-no-stdlib = "1.2"

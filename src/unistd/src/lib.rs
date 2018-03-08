@@ -295,7 +295,7 @@ pub extern "C" fn pause() -> c_int {
 
 #[no_mangle]
 pub extern "C" fn pipe(fildes: [c_int; 2]) -> c_int {
-    unimplemented!();
+    platform::pipe(fildes)
 }
 
 #[no_mangle]
@@ -324,7 +324,9 @@ pub extern "C" fn pwrite(
 
 #[no_mangle]
 pub extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
-    unimplemented!();
+    use core::slice;
+    let buf = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte as usize) };
+    platform::read(fildes, buf)
 }
 
 #[no_mangle]
