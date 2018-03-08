@@ -73,7 +73,7 @@ pub extern "C" fn isblank(c: c_int) -> c_int {
 
 #[no_mangle]
 /// The comment in musl:
-/// `/* nonsense function that should NEVER be used! */`
+/// /* nonsense function that should NEVER be used! */
 pub extern "C" fn toascii(c: c_int) -> c_int {
     c & 0x7f
 }
