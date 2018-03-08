@@ -4,7 +4,6 @@
 
 extern crate platform;
 extern crate va_list as vl;
-extern crate string;
 extern crate errno;
 
 use core::str;
@@ -210,22 +209,14 @@ pub extern "C" fn pclose(stream: *mut FILE) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn perror(s: *const c_char) {
-    let mut buf: [u8; 256] = [0; 256];
-
-    let mut sw = platform::StringWriter(buf.as_mut_ptr(), buf.len());
-
-    if errno >= 0 && errno < STR_ERROR.len() as c_int {
-        sw.write_str(STR_ERROR[errno as usize]);
-    } else {
-        sw.write_fmt(format_args!("Unknown error {}", errno));
-    }
+    let s_str = str::from_utf8_unchecked(c_str(s));
 
     let mut w = platform::FileWriter(2);
-    w.write_fmt(format_args!(
-        "{}: {}\n",
-        str::from_utf8_unchecked(c_str(s)),
-        str::from_utf8_unchecked(c_str(buf.as_mut_ptr() as *mut c_char))
-    ));
+    if errno >= 0 && errno < STR_ERROR.len() as c_int {
+        w.write_fmt(format_args!("{}: {}\n", s_str, STR_ERROR[errno as usize]));
+    } else {
+        w.write_fmt(format_args!("{}: Unknown error {}\n", s_str, errno));
+    }
 }
 
 #[no_mangle]

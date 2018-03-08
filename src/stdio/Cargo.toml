@@ -10,5 +10,4 @@ cbindgen = { path = "../../cbindgen" }
 [dependencies]
 platform = { path = "../platform" }
 va_list = { path = "../../va_list", features = ["no_std"] }
-string = { path = "../string" }
 errno = { path = "../errno"}
