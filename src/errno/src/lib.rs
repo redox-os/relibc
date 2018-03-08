@@ -162,5 +162,5 @@ pub enum Errno {
     // Operation would block (may be the same value as [EAGAIN])
     EWOULDBLOCK,
     // Cross-device link
-    EXDEV
+    EXDEV,
 }

@@ -2,9 +2,9 @@
 
 #![no_std]
 
+extern crate errno;
 extern crate platform;
 extern crate stdlib;
-extern crate errno;
 
 use platform::types::*;
 use errno::*;
@@ -94,10 +94,10 @@ pub unsafe extern "C" fn strdup(s1: *const c_char) -> *mut c_char {
 
 #[no_mangle]
 pub unsafe extern "C" fn strndup(s1: *const c_char, size: usize) -> *mut c_char {
-    // the "+ 1" is to account for the NUL byte
-    let len = strnlen(s1, size) + 1;
+    let len = strnlen(s1, size);
 
-    let buffer = stdlib::malloc(len) as *mut c_char;
+    // the "+ 1" is to account for the NUL byte
+    let buffer = stdlib::malloc(len + 1) as *mut c_char;
     if buffer.is_null() {
         platform::errno = Errno::ENOMEM as c_int;
     } else {
@@ -105,6 +105,7 @@ pub unsafe extern "C" fn strndup(s1: *const c_char, size: usize) -> *mut c_char 
         for i in 0..len as isize {
             *buffer.offset(i) = *s1.offset(i);
         }
+        *buffer.offset(len as isize) = 0;
     }
 
     buffer
