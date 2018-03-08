@@ -3,8 +3,6 @@
 #![no_std]
 #![allow(non_camel_case_types)]
 //TODO #![feature(thread_local)]
-#![feature(alloc)]
-extern crate alloc;
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
 #[macro_use]

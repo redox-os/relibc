@@ -1,8 +1,5 @@
-extern crate alloc;
-
 use core::ptr;
 use core::slice;
-use alloc::Vec;
 use syscall;
 
 use c_str;
@@ -127,11 +124,11 @@ pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
 }
 
 pub fn pipe(fds: [c_int; 2]) -> c_int {
-    let usize_vec = fds.iter().map(|x| *x as usize).collect::<Vec<usize>>();
-    let usize_slice = usize_vec.as_slice();
-    let mut usize_arr: [usize; 2] = Default::default();
-    usize_arr.copy_from_slice(usize_slice);
-    e(syscall::pipe2(&mut usize_arr, 0)) as c_int
+    let mut usize_fds: [usize; 2] = [0; 2];
+    let res = e(syscall::pipe2(&mut usize_fds));
+    fds[0] = usize_fds[0] as c_int;
+    fds[1] = usize_fds[1] as c_int;
+    res as c_int
 }
 
 pub fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
