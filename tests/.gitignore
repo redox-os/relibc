@@ -6,6 +6,7 @@
 /create.out
 /dup
 /dup.out
+/error
 /fchdir
 /fsync
 /ftruncate

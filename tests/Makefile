@@ -5,6 +5,7 @@ BINS=\
 	chdir \
 	create \
 	dup \
+	error \
 	fchdir \
 	fsync \
 	ftruncate \
