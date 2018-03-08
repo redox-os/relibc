@@ -14,6 +14,7 @@ extern crate stdio;
 extern crate stdlib;
 extern crate string;
 extern crate unistd;
+extern crate wctype;
 
 #[lang = "eh_personality"]
 #[no_mangle]
