@@ -1,0 +1,6 @@
+sys_includes = []
+include_guard = "_ERRNO_H"
+language = "C"
+
+[enum]
+prefix_with_name = true

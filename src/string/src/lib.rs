@@ -2,10 +2,14 @@
 
 #![no_std]
 
+extern crate errno;
 extern crate platform;
+extern crate stdlib;
 
 use platform::types::*;
+use errno::*;
 use core::cmp;
+use core::usize;
 
 #[no_mangle]
 pub extern "C" fn memccpy(s1: *mut c_void, s2: *const c_void, c: c_int, n: usize) -> *mut c_void {
@@ -54,8 +58,8 @@ pub extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_void {
 // }
 
 #[no_mangle]
-pub extern "C" fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
+    strncat(s1, s2, usize::MAX)
 }
 
 #[no_mangle]
@@ -64,8 +68,8 @@ pub extern "C" fn strchr(s: *const c_char, c: c_int) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
-    unimplemented!();
+pub unsafe extern "C" fn strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
+    strncmp(s1, s2, usize::MAX)
 }
 
 #[no_mangle]
@@ -74,8 +78,8 @@ pub extern "C" fn strcoll(s1: *const c_char, s2: *const c_char) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn strcpy(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strcpy(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
+    strncpy(s1, s2, usize::MAX)
 }
 
 #[no_mangle]
@@ -84,8 +88,27 @@ pub extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
 }
 
 #[no_mangle]
-pub extern "C" fn strdup(s1: *const c_char) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strdup(s1: *const c_char) -> *mut c_char {
+    strndup(s1, usize::MAX)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn strndup(s1: *const c_char, size: usize) -> *mut c_char {
+    let len = strnlen(s1, size);
+
+    // the "+ 1" is to account for the NUL byte
+    let buffer = stdlib::malloc(len + 1) as *mut c_char;
+    if buffer.is_null() {
+        platform::errno = Errno::ENOMEM as c_int;
+    } else {
+        //memcpy(buffer, s1, len)
+        for i in 0..len as isize {
+            *buffer.offset(i) = *s1.offset(i);
+        }
+        *buffer.offset(len as isize) = 0;
+    }
+
+    buffer
 }
 
 #[no_mangle]
@@ -95,7 +118,12 @@ pub extern "C" fn strerror(errnum: c_int) -> *mut c_char {
 
 #[no_mangle]
 pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
-    platform::c_str(s).len() as size_t
+    strnlen(s, usize::MAX)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn strnlen(s: *const c_char, size: usize) -> size_t {
+    platform::c_str_n(s, size).len() as size_t
 }
 
 #[no_mangle]
