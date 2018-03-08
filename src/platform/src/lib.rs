@@ -29,6 +29,7 @@ use core::fmt;
 use types::*;
 
 #[thread_local]
+#[no_mangle]
 pub static mut errno: c_int = 0;
 
 pub unsafe fn c_str(s: *const c_char) -> &'static [u8] {
