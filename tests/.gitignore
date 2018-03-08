@@ -1,9 +1,11 @@
 /alloc
 /args
+/atoi
 /brk
 /chdir
 /create
 /create.out
+/ctype
 /dup
 /dup.out
 /error
@@ -15,5 +17,6 @@
 /link
 /link.out
 /math
+/pipe
 /printf
 /write

@@ -1,9 +1,11 @@
 BINS=\
 	alloc \
+	atoi \
 	brk \
 	args \
 	chdir \
 	create \
+	ctype \
 	dup \
 	error \
 	fchdir \
@@ -12,6 +14,7 @@ BINS=\
 	getid \
 	link \
 	math \
+	pipe \
 	printf \
 	write
 
