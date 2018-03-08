@@ -4,10 +4,16 @@
 
 extern crate platform;
 extern crate va_list as vl;
+extern crate string;
+extern crate errno;
 
-use core::slice;
+use core::str;
+use core::fmt::Write;
 
 use platform::types::*;
+use platform::c_str;
+use platform::errno;
+use errno::STR_ERROR;
 use vl::VaList as va_list;
 
 mod printf;
@@ -203,8 +209,23 @@ pub extern "C" fn pclose(stream: *mut FILE) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn perror(s: *const c_char) {
-    unimplemented!();
+pub unsafe extern "C" fn perror(s: *const c_char) {
+    let mut buf: [u8; 256] = [0; 256];
+
+    let mut sw = platform::StringWriter(buf.as_mut_ptr(), buf.len());
+
+    if errno >= 0 && errno < STR_ERROR.len() as c_int {
+        sw.write_str(STR_ERROR[errno as usize]);
+    } else {
+        sw.write_fmt(format_args!("Unknown error {}", errno));
+    }
+
+    let mut w = platform::FileWriter(2);
+    w.write_fmt(format_args!(
+        "{}: {}\n",
+        str::from_utf8_unchecked(c_str(s)),
+        str::from_utf8_unchecked(c_str(buf.as_mut_ptr() as *mut c_char))
+    ));
 }
 
 #[no_mangle]
