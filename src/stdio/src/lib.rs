@@ -2,9 +2,9 @@
 
 #![no_std]
 
+extern crate errno;
 extern crate platform;
 extern crate va_list as vl;
-extern crate errno;
 
 use core::str;
 use core::fmt::Write;
