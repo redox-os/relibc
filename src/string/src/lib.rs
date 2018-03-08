@@ -4,8 +4,10 @@
 
 extern crate platform;
 extern crate stdlib;
+extern crate errno;
 
 use platform::types::*;
+use errno::*;
 use core::cmp;
 use core::usize;
 
@@ -95,9 +97,9 @@ pub unsafe extern "C" fn strndup(s1: *const c_char, size: usize) -> *mut c_char 
     // the "+ 1" is to account for the NUL byte
     let len = strnlen(s1, size) + 1;
 
-    let buffer = stdlib::malloc(len) as *mut _;
+    let buffer = stdlib::malloc(len) as *mut c_char;
     if buffer.is_null() {
-        // TODO: set errno
+        platform::errno = Errno::ENOMEM as c_int;
     } else {
         //memcpy(buffer, s1, len)
         for i in 0..len as isize {
