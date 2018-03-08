@@ -14,6 +14,7 @@ BINS=\
 	getid \
 	link \
 	math \
+	pipe \
 	printf \
 	write
 

@@ -62,6 +62,10 @@ pub fn fchdir(fildes: c_int) -> c_int {
     e(unsafe { syscall!(FCHDIR, fildes) }) as c_int
 }
 
+pub fn fork() -> pid_t {
+    e(unsafe {syscall!(FORK) }) as pid_t
+}
+
 pub fn fsync(fildes: c_int) -> c_int {
     e(unsafe { syscall!(FSYNC, fildes) }) as c_int
 }
@@ -112,6 +116,14 @@ pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
 
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     e(unsafe { syscall!(OPENAT, AT_FDCWD, path, oflag, mode) }) as c_int
+}
+
+pub fn pipe(fildes: [c_int; 2]) -> c_int {
+    e(unsafe { syscall!(PIPE2, fildes.as_ptr(), 0) }) as c_int
+}
+
+pub fn read(fildes: c_int, buf: &[u8]) -> ssize_t {
+    e(unsafe { syscall!(READ, fildes, buf.as_ptr(), buf.len()) }) as ssize_t
 }
 
 pub fn write(fildes: c_int, buf: &[u8]) -> ssize_t {

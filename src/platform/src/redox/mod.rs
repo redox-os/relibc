@@ -1,5 +1,8 @@
+extern crate alloc;
+
 use core::ptr;
 use core::slice;
+use alloc::Vec;
 use syscall;
 
 use c_str;
@@ -63,6 +66,10 @@ pub fn fchdir(fd: c_int) -> c_int {
     }
 }
 
+pub fn fork() -> pid_t {
+   e(unsafe { syscall::clone(0) }) as pid_t
+}
+
 pub fn fsync(fd: c_int) -> c_int {
     e(syscall::fsync(fd as usize)) as c_int
 }
@@ -117,6 +124,18 @@ pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     let path = unsafe { c_str(path) };
     e(syscall::open(path, (oflag as usize) | (mode as usize))) as c_int
+}
+
+pub fn pipe(fds: [c_int; 2]) -> c_int {
+    let usize_vec = fds.iter().map(|x| *x as usize).collect::<Vec<usize>>();
+    let usize_slice = usize_vec.as_slice();
+    let mut usize_arr: [usize; 2] = Default::default();
+    usize_arr.copy_from_slice(usize_slice);
+    e(syscall::pipe2(&mut usize_arr, 0)) as c_int
+}
+
+pub fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
+    e(syscall::read(fd as usize, buf)) as ssize_t
 }
 
 pub fn write(fd: c_int, buf: &[u8]) -> ssize_t {
