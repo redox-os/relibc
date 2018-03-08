@@ -1,9 +1,11 @@
 /alloc
 /args
+/atoi
 /brk
 /chdir
 /create
 /create.out
+/ctype
 /dup
 /dup.out
 /error

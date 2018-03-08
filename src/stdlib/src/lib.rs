@@ -4,6 +4,7 @@
 #![feature(core_intrinsics)]
 #![feature(global_allocator)]
 
+extern crate ctype;
 extern crate platform;
 extern crate ralloc;
 
@@ -55,14 +56,52 @@ pub extern "C" fn atof(s: *const c_char) -> c_double {
     unimplemented!();
 }
 
+macro_rules! dec_num_from_ascii {
+    ($s: expr, $t: ty) => {
+        unsafe {
+            let mut s = $s;
+            // Iterate past whitespace
+            while ctype::isspace(*s as c_int) != 0 {
+                s = s.offset(1);
+            }
+
+            // Find out if there is a - sign
+            let neg_sign = match *s {
+                0x2d => {
+                    s = s.offset(1);
+                    true
+                }
+                // '+' increment s and continue parsing
+                0x2b => {
+                    s = s.offset(1);
+                    false
+                }
+                _ => false,
+            };
+
+            let mut n: $t = 0;
+            while ctype::isdigit(*s as c_int) != 0 {
+                n = 10 * n - (*s as $t - 0x30);
+                s = s.offset(1);
+            }
+
+            if neg_sign {
+                n
+            } else {
+                -n
+            }
+        }
+    };
+}
+
 #[no_mangle]
 pub extern "C" fn atoi(s: *const c_char) -> c_int {
-    unimplemented!();
+    dec_num_from_ascii!(s, c_int)
 }
 
 #[no_mangle]
 pub extern "C" fn atol(s: *const c_char) -> c_long {
-    unimplemented!();
+    dec_num_from_ascii!(s, c_long)
 }
 
 #[no_mangle]
@@ -124,8 +163,6 @@ pub extern "C" fn erand(xsubi: [c_ushort; 3]) -> c_double {
 
 #[no_mangle]
 pub unsafe extern "C" fn exit(status: c_int) {
-    use core::mem;
-
     for i in (0..ATEXIT_FUNCS.len()).rev() {
         if let Some(func) = ATEXIT_FUNCS[i] {
             (func)();
