@@ -1,7 +1,7 @@
 [package]
-name = "stdlib"
+name = "wctype"
 version = "0.1.0"
-authors = ["Jeremy Soller <jackpot51@gmail.com>"]
+authors = ["Dan Robertson <danlrobertson89@gmail.com>"]
 build = "build.rs"
 
 [build-dependencies]
@@ -9,5 +9,3 @@ cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
 platform = { path = "../platform" }
-ralloc = { path = "../../ralloc", default-features = false }
-ctype = { path = "../ctype" }

@@ -1,9 +1,11 @@
 BINS=\
 	alloc \
+	atoi \
 	brk \
 	args \
 	chdir \
 	create \
+	ctype \
 	dup \
 	error \
 	fchdir \

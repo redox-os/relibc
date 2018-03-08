@@ -23,9 +23,11 @@ pub type fpos_t = off_t;
 
 pub struct FILE;
 
+#[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut stdout: *mut FILE = 1 as *mut FILE;
 
+#[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut stderr: *mut FILE = 2 as *mut FILE;
 
