@@ -416,7 +416,11 @@ pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strtol(s: *const c_char, endptr: *mut *const c_char, base: c_int) -> c_long {
+pub unsafe extern "C" fn strtol(
+    s: *const c_char,
+    endptr: *mut *const c_char,
+    base: c_int,
+) -> c_long {
     let set_endptr = |idx: isize| {
         if !endptr.is_null() {
             *endptr = s.offset(idx);
@@ -449,21 +453,17 @@ pub unsafe extern "C" fn strtol(s: *const c_char, endptr: *mut *const c_char, ba
         }
         None => {
             invalid_input();
-            return 0
+            return 0;
         }
     };
 
     // convert the string to a number
     let num_str = s.offset(idx);
     let res = match base {
-        0 => {
-            detect_base(num_str).and_then(|(base, i)| {
-                convert_integer(num_str.offset(i), base)
-            })
-        }
+        0 => detect_base(num_str).and_then(|(base, i)| convert_integer(num_str.offset(i), base)),
         8 => convert_octal(num_str),
         16 => convert_hex(num_str),
-        _ => convert_integer(num_str, base)
+        _ => convert_integer(num_str, base),
     };
 
     // check for error parsing octal/hex prefix
@@ -504,7 +504,7 @@ fn is_positive(ch: c_char) -> Option<(bool, isize)> {
         0 => None,
         ch if ch == b'+' as c_char => Some((true, 1)),
         ch if ch == b'-' as c_char => Some((false, 1)),
-        _ => Some((true, 0))
+        _ => Some((true, 0)),
     }
 }
 
@@ -523,9 +523,7 @@ fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
                 Some((8, 0))
             }
         }
-        _ => {
-            Some((10, 0))
-        }
+        _ => Some((10, 0)),
     }
 }
 
@@ -544,12 +542,9 @@ unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
 
 unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     if (*s != 0 && *s == b'0' as c_char)
-            && (*s.offset(1) != 0 && (*s.offset(1) == b'x' as c_char
-                                    || *s.offset(1) == b'X' as c_char))
+        && (*s.offset(1) != 0 && (*s.offset(1) == b'x' as c_char || *s.offset(1) == b'X' as c_char))
     {
-        convert_integer(s.offset(2), 16).map(|(val, idx, overflow)| {
-            (val, idx + 2, overflow)
-        })
+        convert_integer(s.offset(2), 16).map(|(val, idx, overflow)| (val, idx + 2, overflow))
     } else {
         None
     }
@@ -557,6 +552,7 @@ unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
 
 fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, bool)> {
     // -1 means the character is invalid
+    #[cfg_attr(rustfmt, rustfmt_skip)]
     const LOOKUP_TABLE: [c_long; 256] = [
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -581,14 +577,12 @@ fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, boo
     let mut overflowed = false;
 
     loop {
-        let val = unsafe {
-            LOOKUP_TABLE[*s.offset(idx) as usize]
-        };
+        let val = unsafe { LOOKUP_TABLE[*s.offset(idx) as usize] };
         if val == -1 || val as c_int >= base {
             break;
         } else {
             if let Some(res) = num.checked_mul(base as c_ulong)
-                                  .and_then(|num| num.checked_add(val as c_ulong))
+                .and_then(|num| num.checked_add(val as c_ulong))
             {
                 num = res;
             } else {
