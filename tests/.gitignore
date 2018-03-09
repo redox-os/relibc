@@ -1,5 +1,6 @@
 /alloc
 /args
+/atof
 /atoi
 /brk
 /chdir
