@@ -38,7 +38,7 @@ pub extern "C" fn creat(path: *const c_char, mode: mode_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
-    unimplemented!();
+    platform::fcntl(fildes, cmd, arg)
 }
 
 #[no_mangle]
