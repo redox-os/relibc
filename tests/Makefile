@@ -26,15 +26,32 @@ all: $(BINS)
 clean:
 	rm -f $(BINS) *.out
 
-expected: $(BINS)
-	mkdir -p expected
-	for bin in $(BINS); do "./$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr"; done
-
 run: $(BINS)
-	for bin in $(BINS); do echo "# $${bin} #"; "./$${bin}" test args; done
+	for bin in $(BINS); \
+	do
+		echo "# $${bin} #"; \
+		"./$${bin}" test args; \
+	done
 
-test: $(BINS)
-	for bin in $(BINS); do echo "# $${bin} #"; "./$${bin}" test args; done
+expected: $(BINS)
+	rm -rf expected
+	mkdir -p expected
+	for bin in $(BINS); \
+	do \
+		echo "# $${bin} #"; \
+		"./$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr"; \
+	done
+
+verify: $(BINS)
+	rm -rf gen
+	mkdir -p gen
+	for bin in $(BINS); \
+	do \
+		echo "# $${bin} #"; \
+		"./$${bin}" test args > "gen/$${bin}.stdout" 2> "gen/$${bin}.stderr"; \
+		diff -u "gen/$${bin}.stdout" "expected/$${bin}.stdout"; \
+		diff -u "gen/$${bin}.stderr" "expected/$${bin}.stderr"; \
+	done
 
 GCCHEAD=\
 	-nostdinc \
