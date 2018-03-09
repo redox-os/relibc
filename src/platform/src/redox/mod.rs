@@ -139,9 +139,27 @@ pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
 
 pub fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
     unsafe {
-        let rqtp = mem::transmute::<*const timespec, &redox_timespec>(rqtp);
-        let rmtp = mem::transmute::<*mut timespec, &mut redox_timespec>(rmtp);
-        e(syscall::nanosleep(rqtp, rmtp)) as c_int
+        let redox_rqtp = redox_timespec {
+            tv_sec: (*rqtp).tv_sec,
+            tv_nsec: (*rqtp).tv_nsec as i32,
+        };
+        let mut redox_rmtp: redox_timespec;
+        if rmtp.is_null() {
+            redox_rmtp = redox_timespec::default(); 
+        } else {
+            redox_rmtp = redox_timespec {
+                tv_sec: (*rmtp).tv_sec,
+                tv_nsec: (*rmtp).tv_nsec as i32,
+            };
+        }
+        match e(syscall::nanosleep(&redox_rqtp, &mut redox_rmtp)) as c_int {
+            -1 => { -1 }
+            _ => {
+               (*rmtp).tv_sec = redox_rmtp.tv_sec;
+               (*rmtp).tv_nsec = redox_rmtp.tv_nsec as i64;
+               0
+            }
+        }
     }
 }
 
