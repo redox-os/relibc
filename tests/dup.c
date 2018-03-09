@@ -4,7 +4,7 @@
 
 int main(int argc, char** argv) {
     creat("dup.out", 0777);
-    int fd1 = open("dup.out", 0, 0);
+    int fd1 = open("dup.out", 0);
     int fd2 = dup(fd1);
     printf("fd %d duped into fd %d\n", fd1, fd2);
     close(fd1);
