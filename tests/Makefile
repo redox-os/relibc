@@ -40,4 +40,4 @@ GCCTAIL=\
 	../openlibm/libopenlibm.a
 
 %: %.c
-	gcc -no-pie -fno-stack-protector -Wall $(GCCHEAD) "$<" $(GCCTAIL) -o "$@"
+	gcc -fno-stack-protector -Wall $(GCCHEAD) "$<" $(GCCTAIL) -o "$@"

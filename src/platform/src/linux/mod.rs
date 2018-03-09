@@ -118,12 +118,12 @@ pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     e(unsafe { syscall!(OPENAT, AT_FDCWD, path, oflag, mode) }) as c_int
 }
 
-pub fn pipe(fildes: [c_int; 2]) -> c_int {
-    e(unsafe { syscall!(PIPE2, fildes.as_ptr(), 0) }) as c_int
+pub fn pipe(mut fildes: [c_int; 2]) -> c_int {
+    e(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), 0) }) as c_int
 }
 
-pub fn read(fildes: c_int, buf: &[u8]) -> ssize_t {
-    e(unsafe { syscall!(READ, fildes, buf.as_ptr(), buf.len()) }) as ssize_t
+pub fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
+    e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
 }
 
 pub fn write(fildes: c_int, buf: &[u8]) -> ssize_t {
