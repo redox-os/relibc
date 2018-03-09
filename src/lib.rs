@@ -10,6 +10,7 @@ extern crate fcntl;
 extern crate grp;
 extern crate mman;
 extern crate semaphore;
+extern crate stat;
 extern crate stdio;
 extern crate stdlib;
 extern crate string;

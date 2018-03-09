@@ -15,6 +15,7 @@ BINS=\
 	getid \
 	link \
 	math \
+	rmdir \
 	pipe \
 	printf \
 	write
