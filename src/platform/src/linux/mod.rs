@@ -63,7 +63,7 @@ pub fn fchdir(fildes: c_int) -> c_int {
 }
 
 pub fn fork() -> pid_t {
-    e(unsafe {syscall!(FORK) }) as pid_t
+    e(unsafe { syscall!(FORK) }) as pid_t
 }
 
 pub fn fsync(fildes: c_int) -> c_int {

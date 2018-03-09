@@ -64,7 +64,7 @@ pub fn fchdir(fd: c_int) -> c_int {
 }
 
 pub fn fork() -> pid_t {
-   e(unsafe { syscall::clone(0) }) as pid_t
+    e(unsafe { syscall::clone(0) }) as pid_t
 }
 
 pub fn fsync(fd: c_int) -> c_int {
