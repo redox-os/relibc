@@ -23,6 +23,8 @@ stat = { path = "src/stat" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }
 string = { path = "src/string" }
+sys_time = { path = "src/sys_time" }
+time = { path = "src/time" }
 unistd = { path = "src/unistd" }
 wctype = { path = "src/wctype" }
 
