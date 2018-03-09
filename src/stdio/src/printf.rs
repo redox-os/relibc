@@ -34,14 +34,14 @@ pub unsafe fn printf<W: fmt::Write>(mut w: W, format: *const c_char, mut ap: VaL
                     w.write_fmt(format_args!("{}", a));
 
                     found_percent = false;
-                },
+                }
                 'f' | 'F' => {
                     let a: f64 = mem::transmute(ap.get::<u64>());
 
                     w.write_fmt(format_args!("{}", a));
 
                     found_percent = false;
-                },
+                }
                 'n' => {
                     let _a = ap.get::<c_int>();
 
