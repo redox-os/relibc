@@ -16,11 +16,13 @@ BINS=\
 	getid \
 	link \
 	math \
-	rmdir \
 	pipe \
-	printf \
+	printf \ 
+	rmdir \
+	setid \
 	sleep \
-	stdlib/strtol \
+  stdlib/strtol \
+	unlink \
 	write
 
 all: $(BINS)

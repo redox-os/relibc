@@ -226,7 +226,7 @@ pub extern "C" fn getpgid(pid: pid_t) -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn getpgrp() -> pid_t {
-    unimplemented!();
+    platform::getpgid(platform::getpid())
 }
 
 #[no_mangle]
@@ -352,7 +352,7 @@ pub extern "C" fn setgid(gid: gid_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
-    unimplemented!();
+    platform::setpgid(pid, pgid)
 }
 
 #[no_mangle]
@@ -362,12 +362,12 @@ pub extern "C" fn setpgrp() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
-    unimplemented!();
+    platform::setregid(rgid, egid)
 }
 
 #[no_mangle]
 pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
-    unimplemented!();
+    platform::setreuid(ruid, euid)
 }
 
 #[no_mangle]
@@ -443,7 +443,7 @@ pub extern "C" fn ualarm(useconds: useconds_t, interval: useconds_t) -> useconds
 
 #[no_mangle]
 pub extern "C" fn unlink(path: *const c_char) -> c_int {
-    unimplemented!();
+    platform::unlink(path)
 }
 
 #[no_mangle]

@@ -116,7 +116,7 @@ pub fn getuid() -> uid_t {
 }
 
 pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
-    e(unsafe { syscall!(LINKAT, AT_FDCWD, path1, path2) }) as c_int
+    e(unsafe { syscall!(LINKAT, AT_FDCWD, path1, AT_FDCWD, path2, 0) }) as c_int
 }
 
 pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
@@ -141,6 +141,22 @@ pub fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
 
 pub fn rmdir(path: *const c_char) -> c_int {
     e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, AT_REMOVEDIR) }) as c_int
+}
+
+pub fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
+    e(unsafe { syscall!(SETPGID, pid, pgid) }) as c_int
+}
+
+pub fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
+    e(unsafe { syscall!(SETREGID, rgid, egid) }) as c_int
+}
+
+pub fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
+    e(unsafe { syscall!(SETREUID, ruid, euid) }) as c_int
+}
+
+pub fn unlink(path: *const c_char) -> c_int {
+    e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, 0) }) as c_int
 }
 
 pub fn write(fildes: c_int, buf: &[u8]) -> ssize_t {
