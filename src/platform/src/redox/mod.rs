@@ -63,6 +63,10 @@ pub fn fchdir(fd: c_int) -> c_int {
     }
 }
 
+pub fn fcntl(fd: c_int, cmd: c_int, args: c_int) -> c_int {
+    e(syscall::fcntl(fd, cmd, args)) as c_int
+}
+
 pub fn fork() -> pid_t {
     e(unsafe { syscall::clone(0) }) as pid_t
 }

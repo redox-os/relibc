@@ -62,6 +62,10 @@ pub fn fchdir(fildes: c_int) -> c_int {
     e(unsafe { syscall!(FCHDIR, fildes) }) as c_int
 }
 
+pub fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
+    e(unsafe { syscall!(FCNTL, fildes, cmd, arg) }) as c_int
+}
+
 pub fn fork() -> pid_t {
     e(unsafe { syscall!(FORK) }) as pid_t
 }
