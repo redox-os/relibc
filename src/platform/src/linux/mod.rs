@@ -4,6 +4,7 @@ use errno;
 use types::*;
 
 const AT_FDCWD: c_int = -100;
+const AT_REMOVEDIR: c_int = 0x200;
 
 pub fn e(sys: usize) -> usize {
     if (sys as isize) < 0 && (sys as isize) >= -256 {
@@ -67,7 +68,7 @@ pub fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
 }
 
 pub fn fork() -> pid_t {
-    e(unsafe { syscall!(FORK) }) as pid_t
+    e(unsafe { syscall!(CLONE, 17, 0) }) as pid_t
 }
 
 pub fn fsync(fildes: c_int) -> c_int {
@@ -115,7 +116,11 @@ pub fn getuid() -> uid_t {
 }
 
 pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
-    e(unsafe { syscall!(LINKAT, AT_FDCWD, path1, path2) }) as c_int
+    e(unsafe { syscall!(LINKAT, AT_FDCWD, path1, AT_FDCWD, path2, 0) }) as c_int
+}
+
+pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
+    e(unsafe { syscall!(MKDIRAT, AT_FDCWD, path, mode) }) as c_int
 }
 
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
@@ -128,6 +133,26 @@ pub fn pipe(mut fildes: [c_int; 2]) -> c_int {
 
 pub fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
     e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
+}
+
+pub fn rmdir(path: *const c_char) -> c_int {
+    e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, AT_REMOVEDIR) }) as c_int
+}
+
+pub fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
+    e(unsafe { syscall!(SETPGID, pid, pgid) }) as c_int
+}
+
+pub fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
+    e(unsafe { syscall!(SETREGID, rgid, egid) }) as c_int
+}
+
+pub fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
+    e(unsafe { syscall!(SETREUID, ruid, euid) }) as c_int
+}
+
+pub fn unlink(path: *const c_char) -> c_int {
+    e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, 0) }) as c_int
 }
 
 pub fn write(fildes: c_int, buf: &[u8]) -> ssize_t {

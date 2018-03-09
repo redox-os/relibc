@@ -1,6 +1,7 @@
 use core::ptr;
 use core::slice;
 use syscall;
+use syscall::flag::*;
 
 use c_str;
 use errno;
@@ -122,6 +123,18 @@ pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     e(unsafe { syscall::link(path1.as_ptr(), path2.as_ptr()) }) as c_int
 }
 
+pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
+    let flags = O_CREAT | O_EXCL | O_CLOEXEC | O_DIRECTORY | mode as usize & 0o777;
+    let path = unsafe { c_str(path) };
+    match syscall::open(path, flags) {
+        Ok(fd) => {
+            syscall::close(fd);
+            0
+        }
+        Err(err) => e(Err(err)) as c_int,
+    }
+}
+
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     let path = unsafe { c_str(path) };
     e(syscall::open(path, (oflag as usize) | (mode as usize))) as c_int
@@ -137,6 +150,28 @@ pub fn pipe(mut fds: [c_int; 2]) -> c_int {
 
 pub fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
     e(syscall::read(fd as usize, buf)) as ssize_t
+}
+
+pub fn rmdir(path: *const c_char) -> c_int {
+    let path = unsafe { c_str(path) };
+    e(syscall::rmdir(path)) as c_int
+}
+
+pub fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
+    e(syscall::setpgid(pid as usize, pgid as usize)) as c_int
+}
+
+pub fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
+    e(syscall::setregid(rgid as usize, egid as usize)) as c_int
+}
+
+pub fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
+    e(syscall::setreuid(ruid as usize, euid as usize)) as c_int
+}
+
+pub fn unlink(path: *const c_char) -> c_int {
+    let path = unsafe { c_str(path) };
+    e(syscall::unlink(path)) as c_int
 }
 
 pub fn write(fd: c_int, buf: &[u8]) -> ssize_t {

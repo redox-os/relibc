@@ -1,5 +1,7 @@
+/gen/
 /alloc
 /args
+/atof
 /atoi
 /brk
 /chdir
@@ -10,6 +12,7 @@
 /dup.out
 /error
 /fchdir
+/fcntl
 /fsync
 /ftruncate
 /ftruncate.out
@@ -19,4 +22,8 @@
 /math
 /pipe
 /printf
+/rmdir
+/setid
+/unlink
+/stdlib/strtol
 /write

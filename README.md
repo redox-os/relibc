@@ -5,3 +5,13 @@ The motivation for this project is twofold: Reduce issues the redox crew was hav
 
 ## Contributing
 Just search for any invocation of the `unimplemented` macro, and hop in! The ci server checks builds for linux and redox, checks formatting (via rustfmt), and runs the test suite. Run `ci.sh` locally to check that your changes will pass travis. Use `fmt.sh` to format your code and `test.sh` to run the C test suite.
+
+## Supported OSes
+
+ - RedoxOS
+ - Linux
+
+## Supported architectures
+
+ - x86\_64
+ - Aarch64

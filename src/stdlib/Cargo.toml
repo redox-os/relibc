@@ -11,3 +11,4 @@ cbindgen = { path = "../../cbindgen" }
 platform = { path = "../platform" }
 ralloc = { path = "../../ralloc", default-features = false }
 ctype = { path = "../ctype" }
+errno = { path = "../errno" }
