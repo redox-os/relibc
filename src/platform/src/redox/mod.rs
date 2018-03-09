@@ -1,7 +1,9 @@
 use core::ptr;
 use core::slice;
+use core::mem;
 use syscall;
 use syscall::flag::*;
+use syscall::data::TimeSpec as redox_timespec;
 
 use c_str;
 use errno;
@@ -132,6 +134,14 @@ pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
             0
         }
         Err(err) => e(Err(err)) as c_int,
+    }
+}
+
+pub fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
+    unsafe {
+        let rqtp = mem::transmute::<*const timespec, &redox_timespec>(rqtp);
+        let rmtp = mem::transmute::<*mut timespec, &mut redox_timespec>(rmtp);
+        e(syscall::nanosleep(rqtp, rmtp)) as c_int
     }
 }
 

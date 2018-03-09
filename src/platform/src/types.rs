@@ -63,3 +63,9 @@ pub type suseconds_t = i64;
 pub type clock_t = i64;
 pub type clockid_t = i32;
 pub type timer_t = c_void;
+
+#[repr(C)]
+pub struct timespec {
+    pub tv_sec: time_t,
+    pub tv_nsec: c_long,
+}

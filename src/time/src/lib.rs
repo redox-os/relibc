@@ -6,11 +6,13 @@ extern crate platform;
 
 use platform::types::*;
 
-#[repr(C)]
-pub struct timespec {
-    pub tv_sec: time_t,
-    pub tv_nsec: c_long,
-}
+/*
+ *#[repr(C)]
+ *pub struct timespec {
+ *    pub tv_sec: time_t,
+ *    pub tv_nsec: c_long,
+ *}
+ */
 
 #[repr(C)]
 pub struct tm {
@@ -112,7 +114,7 @@ pub extern "C" fn mktime(timeptr: *mut tm) -> time_t {
 
 #[no_mangle]
 pub extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
-    unimplemented!();
+    platform::nanosleep(rqtp, rmtp)
 }
 
 #[no_mangle]
