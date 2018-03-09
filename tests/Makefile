@@ -28,7 +28,7 @@ clean:
 
 run: $(BINS)
 	for bin in $(BINS); \
-	do
+	do \
 		echo "# $${bin} #"; \
 		"./$${bin}" test args; \
 	done
