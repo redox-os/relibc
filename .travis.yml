@@ -5,6 +5,7 @@ cache: cargo
 before_script:
   - rustup component add rustfmt-preview
   - rustup target add x86_64-unknown-redox
+  - rustup target add aarch64-unknown-linux-gnu
 script:
   - bash ./ci.sh
 notifications:
