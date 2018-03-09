@@ -32,11 +32,7 @@ pub unsafe extern "C" fn abort() {
 
 #[no_mangle]
 pub extern "C" fn abs(i: c_int) -> c_int {
-    if i < 0 {
-        -i
-    } else {
-        i
-    }
+    if i < 0 { -i } else { i }
 }
 
 #[no_mangle]
@@ -231,11 +227,7 @@ pub extern "C" fn l64a(value: c_long) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn labs(i: c_long) -> c_long {
-    if i < 0 {
-        -i
-    } else {
-        i
-    }
+    if i < 0 { -i } else { i }
 }
 
 #[no_mangle]

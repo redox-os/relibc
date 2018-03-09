@@ -55,7 +55,7 @@ pub type uid_t = usize;
 pub type dev_t = usize;
 pub type ino_t = usize;
 pub type nlink_t = usize;
-pub type blksize_t = isize; 
+pub type blksize_t = isize;
 
 pub type useconds_t = i32;
 pub type suseconds_t = i64;

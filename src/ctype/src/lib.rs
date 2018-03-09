@@ -80,18 +80,10 @@ pub extern "C" fn toascii(c: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn tolower(c: c_int) -> c_int {
-    if isupper(c) != 0 {
-        c + 0x20
-    } else {
-        c
-    }
+    if isupper(c) != 0 { c + 0x20 } else { c }
 }
 
 #[no_mangle]
 pub extern "C" fn toupper(c: c_int) -> c_int {
-    if islower(c) != 0 {
-        c - 0x20
-    } else {
-        c
-    }
+    if islower(c) != 0 { c - 0x20 } else { c }
 }
