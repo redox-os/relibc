@@ -85,6 +85,13 @@ pub unsafe fn printf<W: fmt::Write>(mut w: W, format: *const c_char, mut ap: VaL
 
                     found_percent = false;
                 }
+                'o' => {
+                    let a = ap.get::<c_uint>();
+
+                    w.write_fmt(format_args!("{:o}", a));
+
+                    found_percent = false;
+                }
                 '-' => {}
                 '+' => {}
                 ' ' => {}
