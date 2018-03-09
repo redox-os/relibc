@@ -118,6 +118,10 @@ pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     e(unsafe { syscall!(LINKAT, AT_FDCWD, path1, path2) }) as c_int
 }
 
+pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
+    e(unsafe { syscall!(MKDIRAT, AT_FDCWD, path, mode) }) as c_int
+}
+
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     e(unsafe { syscall!(OPENAT, AT_FDCWD, path, oflag, mode) }) as c_int
 }
@@ -128,6 +132,10 @@ pub fn pipe(mut fildes: [c_int; 2]) -> c_int {
 
 pub fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
     e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
+}
+
+pub fn rmdir(path: *const c_char) -> c_int {
+    e(unsafe { syscall!(RMDIR, path) }) as c_int
 }
 
 pub fn write(fildes: c_int, buf: &[u8]) -> ssize_t {
