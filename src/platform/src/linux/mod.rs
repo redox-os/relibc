@@ -144,7 +144,7 @@ pub fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
 }
 
 pub fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
-    e(unsafe { syscall!(SETREGID, rgid, egid) }) as c_int 
+    e(unsafe { syscall!(SETREGID, rgid, egid) }) as c_int
 }
 
 pub fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
