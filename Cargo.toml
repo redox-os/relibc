@@ -19,6 +19,7 @@ fcntl = { path = "src/fcntl" }
 grp = { path = "src/grp" }
 semaphore = { path = "src/semaphore" }
 mman = { path = "src/mman" }
+stat = { path = "src/stat" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }
 string = { path = "src/string" }

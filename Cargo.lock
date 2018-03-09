@@ -258,6 +258,7 @@ dependencies = [
  "mman 0.1.0",
  "platform 0.1.0",
  "semaphore 0.1.0",
+ "stat 0.1.0",
  "stdio 0.1.0",
  "stdlib 0.1.0",
  "string 0.1.0",
@@ -438,6 +439,14 @@ dependencies = [
  "standalone-proc-macro2 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "standalone-quote 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicode-xid 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "stat"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.0",
+ "platform 0.1.0",
 ]
 
 [[package]]

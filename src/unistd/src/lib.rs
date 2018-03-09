@@ -336,7 +336,7 @@ pub extern "C" fn readlink(path: *const c_char, buf: *mut c_char, bufsize: size_
 
 #[no_mangle]
 pub extern "C" fn rmdir(path: *const c_char) -> c_int {
-    unimplemented!();
+    platform::rmdir(path)
 }
 
 #[no_mangle]
