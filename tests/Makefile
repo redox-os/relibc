@@ -10,6 +10,7 @@ BINS=\
 	dup \
 	error \
 	fchdir \
+	fcntl \
 	fsync \
 	ftruncate \
 	getid \
