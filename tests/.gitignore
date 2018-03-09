@@ -23,5 +23,7 @@
 /pipe
 /printf
 /rmdir
+/setid
+/unlink
 /stdlib/strtol
 /write

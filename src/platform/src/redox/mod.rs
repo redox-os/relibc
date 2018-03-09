@@ -157,6 +157,23 @@ pub fn rmdir(path: *const c_char) -> c_int {
     e(syscall::rmdir(path)) as c_int
 }
 
+pub fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
+    e(syscall::setpgid(pid as usize, pgid as usize)) as c_int
+}
+
+pub fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
+    e(syscall::setregid(rgid as usize, egid as usize)) as c_int
+}
+
+pub fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
+    e(syscall::setreuid(ruid as usize, euid as usize)) as c_int
+}
+
+pub fn unlink(path: *const c_char) -> c_int {
+    let path = unsafe { c_str(path) };
+    e(syscall::unlink(path)) as c_int
+}
+
 pub fn write(fd: c_int, buf: &[u8]) -> ssize_t {
     e(syscall::write(fd as usize, buf)) as ssize_t
 }

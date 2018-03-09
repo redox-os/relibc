@@ -16,9 +16,11 @@ BINS=\
 	getid \
 	link \
 	math \
-	rmdir \
 	pipe \
-	printf \
+	printf \ 
+	rmdir \
+	setid \
+	unlink \
 	stdlib/strtol \
 	write
 
