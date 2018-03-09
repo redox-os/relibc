@@ -20,7 +20,10 @@
 /link
 /link.out
 /math
+/setid
+/sleep
 /pipe
 /printf
 /rmdir
+/unlink
 /write

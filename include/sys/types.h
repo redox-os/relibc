@@ -24,4 +24,12 @@ typedef long time_t;
 
 typedef int useconds_t;
 
+typedef long suseconds_t;
+
+typedef long clock_t;
+
+typedef int clockid_t;
+
+typedef void* timer_t;
+
 #endif /* _SYS_TYPES_H */
