@@ -4,6 +4,7 @@ use errno;
 use types::*;
 
 const AT_FDCWD: c_int = -100;
+const AT_REMOVEDIR: c_int = 0x200;
 
 pub fn e(sys: usize) -> usize {
     if (sys as isize) < 0 && (sys as isize) >= -256 {
@@ -67,7 +68,7 @@ pub fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
 }
 
 pub fn fork() -> pid_t {
-    e(unsafe { syscall!(FORK) }) as pid_t
+    e(unsafe { syscall!(CLONE, 17, 0) }) as pid_t
 }
 
 pub fn fsync(fildes: c_int) -> c_int {
@@ -135,7 +136,7 @@ pub fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
 }
 
 pub fn rmdir(path: *const c_char) -> c_int {
-    e(unsafe { syscall!(RMDIR, path) }) as c_int
+    e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, AT_REMOVEDIR) }) as c_int
 }
 
 pub fn write(fildes: c_int, buf: &[u8]) -> ssize_t {
