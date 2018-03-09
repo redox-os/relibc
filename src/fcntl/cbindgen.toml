@@ -1,5 +1,6 @@
-sys_includes = ["sys/types.h"]
+sys_includes = ["stdarg.h", "sys/types.h"]
 include_guard = "_FCNTL_H"
+trailer = "#include <bits/fcntl.h>"
 language = "C"
 
 [enum]
