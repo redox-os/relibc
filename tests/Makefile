@@ -26,7 +26,14 @@ all: $(BINS)
 clean:
 	rm -f $(BINS) *.out
 
+expected: $(BINS)
+	mkdir -p expected
+	for bin in $(BINS); do "./$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr"; done
+
 run: $(BINS)
+	for bin in $(BINS); do echo "# $${bin} #"; "./$${bin}" test args; done
+
+test: $(BINS)
 	for bin in $(BINS); do echo "# $${bin} #"; "./$${bin}" test args; done
 
 GCCHEAD=\

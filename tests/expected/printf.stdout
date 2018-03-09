@@ -1,0 +1,8 @@
+percent: %
+string: String
+char: c
+int: -16
+uint: 32
+hex: beef
+HEX: C0FFEE
+string: end
