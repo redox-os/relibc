@@ -19,6 +19,7 @@ BINS=\
 	rmdir \
 	pipe \
 	printf \
+	stdlib/strtol \
 	write
 
 all: $(BINS)
