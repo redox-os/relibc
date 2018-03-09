@@ -54,11 +54,7 @@ pub extern "C" fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
 
 
 #[no_mangle]
-pub extern "C" fn mknod(
-    path: *const c_char,
-    mode: mode_t,
-    dev: dev_t,
-) -> c_int {
+pub extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
     unimplemented!();
 }
 

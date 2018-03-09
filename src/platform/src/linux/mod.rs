@@ -19,11 +19,7 @@ pub fn e(sys: usize) -> usize {
 pub fn brk(addr: *const c_void) -> c_int {
     unsafe {
         let newbrk = syscall!(BRK, addr);
-        if newbrk < addr as usize {
-            -1
-        } else {
-            0
-        }
+        if newbrk < addr as usize { -1 } else { 0 }
     }
 }
 
@@ -32,7 +28,9 @@ pub fn chdir(path: *const c_char) -> c_int {
 }
 
 pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
-    e(unsafe { syscall!(FCHOWNAT, AT_FDCWD, path, owner as u32, group as u32) }) as c_int
+    e(unsafe {
+        syscall!(FCHOWNAT, AT_FDCWD, path, owner as u32, group as u32)
+    }) as c_int
 }
 
 pub fn close(fildes: c_int) -> c_int {
@@ -127,7 +125,9 @@ pub fn pipe(mut fildes: [c_int; 2]) -> c_int {
 }
 
 pub fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
-    e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
+    e(unsafe {
+        syscall!(READ, fildes, buf.as_mut_ptr(), buf.len())
+    }) as ssize_t
 }
 
 pub fn rmdir(path: *const c_char) -> c_int {
@@ -137,5 +137,3 @@ pub fn rmdir(path: *const c_char) -> c_int {
 pub fn write(fildes: c_int, buf: &[u8]) -> ssize_t {
     e(unsafe { syscall!(WRITE, fildes, buf.as_ptr(), buf.len()) }) as ssize_t
 }
-
-
