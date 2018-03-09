@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 int main(int argc, char* argv[]) {
-    double d = atof("1.0");
+    double d = atof("-3.14");
     printf("%f\n", d);
     return 0;
 }
