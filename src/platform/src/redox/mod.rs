@@ -145,7 +145,7 @@ pub fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
         };
         let mut redox_rmtp: redox_timespec;
         if rmtp.is_null() {
-            redox_rmtp = redox_timespec::default(); 
+            redox_rmtp = redox_timespec::default();
         } else {
             redox_rmtp = redox_timespec {
                 tv_sec: (*rmtp).tv_sec,
@@ -153,11 +153,11 @@ pub fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
             };
         }
         match e(syscall::nanosleep(&redox_rqtp, &mut redox_rmtp)) as c_int {
-            -1 => { -1 }
+            -1 => -1,
             _ => {
-               (*rmtp).tv_sec = redox_rmtp.tv_sec;
-               (*rmtp).tv_nsec = redox_rmtp.tv_nsec as i64;
-               0
+                (*rmtp).tv_sec = redox_rmtp.tv_sec;
+                (*rmtp).tv_nsec = redox_rmtp.tv_nsec as i64;
+                0
             }
         }
     }
