@@ -122,12 +122,13 @@ pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
 pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     let flags = O_CREAT | O_EXCL | O_CLOEXEC | O_DIRECTORY | mode as usize & 0o777;
     let path = unsafe { c_str(path) };
-    let fd = e(syscall::open(path, flags)) as c_int;
-    match fd {
-        -1 => -1,
-        _ => {
-            syscall::close(fd as usize);
+    match syscall::open(path, flags) {
+        Ok(fd) => {
+            syscall::close(fd);
             0
+        },
+        Err(err) => {
+            e(Err(err)) as c_int
         }
     }
 }
