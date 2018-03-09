@@ -64,7 +64,7 @@ pub fn fchdir(fd: c_int) -> c_int {
 }
 
 pub fn fcntl(fd: c_int, cmd: c_int, args: c_int) -> c_int {
-    e(syscall::fcntl(fd, cmd, args)) as c_int
+    e(syscall::fcntl(fd as usize, cmd as usize, args as usize)) as c_int
 }
 
 pub fn fork() -> pid_t {
