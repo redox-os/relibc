@@ -17,10 +17,11 @@ BINS=\
 	link \
 	math \
 	pipe \
-	printf \
+	printf \ 
 	rmdir \
 	setid \
 	unlink \
+	stdlib/strtol \
 	write
 
 all: $(BINS)
@@ -41,6 +42,7 @@ expected: $(BINS)
 	for bin in $(BINS); \
 	do \
 		echo "# $${bin} #"; \
+		mkdir -p expected/`dirname $${bin}`; \
 		"./$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr"; \
 	done
 
@@ -50,6 +52,7 @@ verify: $(BINS)
 	for bin in $(BINS); \
 	do \
 		echo "# $${bin} #"; \
+		mkdir -p gen/`dirname $${bin}`; \
 		"./$${bin}" test args > "gen/$${bin}.stdout" 2> "gen/$${bin}.stderr"; \
 		diff -u "gen/$${bin}.stdout" "expected/$${bin}.stdout"; \
 		diff -u "gen/$${bin}.stderr" "expected/$${bin}.stderr"; \
