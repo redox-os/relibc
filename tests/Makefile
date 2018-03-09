@@ -17,7 +17,7 @@ BINS=\
 	link \
 	math \
 	pipe \
-	printf \ 
+	printf \
 	rmdir \
 	setid \
 	unlink \
