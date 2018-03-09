@@ -154,7 +154,6 @@ pub extern "C" fn tzset() {
     unimplemented!();
 }
 
-
 #[no_mangle]
 pub extern "C" fn timer_settime(
     timerid: timer_t,
