@@ -1,13 +1,9 @@
-use core::fmt;
+use core::{fmt, mem, slice, str};
 
 use platform::types::*;
 use vl::VaList;
 
 pub unsafe fn printf<W: fmt::Write>(mut w: W, format: *const c_char, mut ap: VaList) -> c_int {
-    use core::fmt::Write;
-    use core::slice;
-    use core::str;
-
     extern "C" {
         fn strlen(s: *const c_char) -> size_t;
     }
@@ -34,6 +30,13 @@ pub unsafe fn printf<W: fmt::Write>(mut w: W, format: *const c_char, mut ap: VaL
                 }
                 'd' | 'i' => {
                     let a = ap.get::<c_int>();
+
+                    w.write_fmt(format_args!("{}", a));
+
+                    found_percent = false;
+                }
+                'f' | 'F' => {
+                    let a = ap.get::<f64>();
 
                     w.write_fmt(format_args!("{}", a));
 

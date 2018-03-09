@@ -1,5 +1,6 @@
 BINS=\
 	alloc \
+	atof \
 	atoi \
 	brk \
 	args \

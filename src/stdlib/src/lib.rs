@@ -5,9 +5,13 @@
 #![feature(global_allocator)]
 
 extern crate ctype;
+extern crate errno;
 extern crate platform;
 extern crate ralloc;
 
+use core::{ptr, str};
+
+use errno::*;
 use platform::types::*;
 
 #[global_allocator]
@@ -52,8 +56,8 @@ pub unsafe extern "C" fn atexit(func: Option<extern "C" fn()>) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn atof(s: *const c_char) -> c_double {
-    unimplemented!();
+pub unsafe extern "C" fn atof(s: *const c_char) -> c_double {
+    strtod(s, ptr::null_mut())
 }
 
 macro_rules! dec_num_from_ascii {
@@ -396,8 +400,19 @@ pub extern "C" fn srandom(seed: c_uint) {
 }
 
 #[no_mangle]
-pub extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c_double {
-    unimplemented!();
+pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c_double {
+    //TODO: endptr
+
+    use core::str::FromStr;
+
+    let s_str = str::from_utf8_unchecked(platform::c_str(s));
+    match f64::from_str(s_str) {
+        Ok(ok) => ok as c_double,
+        Err(_err) => {
+            platform::errno = EINVAL;
+            0.0
+        }
+    }
 }
 
 #[no_mangle]
