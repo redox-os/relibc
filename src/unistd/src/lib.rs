@@ -386,7 +386,7 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
         tv_sec: seconds as i64,
         tv_nsec: 0,
     };
-    let rmtp = ptr::null_mut(); 
+    let rmtp = ptr::null_mut();
     platform::nanosleep(&rqtp, rmtp);
     0
 }
@@ -452,7 +452,7 @@ pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
         tv_sec: 0,
         tv_nsec: (useconds * 1000).into(),
     };
-    let rmtp = ptr::null_mut(); 
+    let rmtp = ptr::null_mut();
     platform::nanosleep(&rqtp, rmtp)
 }
 
