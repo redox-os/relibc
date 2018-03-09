@@ -159,14 +159,22 @@ pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: usize)
     let s1 = platform::c_str_n(s1, n);
     let s2 = platform::c_str_n(s2, n);
 
-    for i in 0..n {
+    let min_len = n.min(s1.len()).min(s2.len());
+    for i in 0..min_len {
         let val = s1[i] - s2[i];
-        if val != 0 || s1[i] == 0 {
+        if val != 0 {
             return val as c_int;
         }
     }
 
-    0
+    // we can't just check for the NUL byte in the loop as c_str_n() removes it
+    if s1.len() > s2.len() {
+        s1[min_len] as c_int
+    } else if s1.len() < s2.len() {
+        -(s2[min_len] as c_int)
+    } else {
+        0
+    }
 }
 
 #[no_mangle]
