@@ -23,4 +23,5 @@
 /pipe
 /printf
 /rmdir
+/stdlib/strtol
 /write
