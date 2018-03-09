@@ -33,16 +33,16 @@ pub const F_UNLCK: c_int = 2;
 
 #[no_mangle]
 pub extern "C" fn creat(path: *const c_char, mode: mode_t) -> c_int {
-    open(path, O_WRONLY | O_CREAT | O_TRUNC, mode)
+    sys_open(path, O_WRONLY | O_CREAT | O_TRUNC, mode)
 }
 
 #[no_mangle]
 pub extern "C" fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
-    unimplemented!();
+    platform::fcntl(fildes, cmd, arg)
 }
 
 #[no_mangle]
-pub extern "C" fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
+pub extern "C" fn sys_open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     platform::open(path, oflag, mode)
 }
 

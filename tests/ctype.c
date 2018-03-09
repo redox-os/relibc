@@ -6,17 +6,28 @@ struct test_case {
     int isalnum;
     int isalpha;
     int isascii;
+    int isblank;
+    int iscntrl;
     int isdigit;
+    int isgraph;
     int islower;
+    int isprint;
+    int ispunct;
     int isspace;
     int isupper;
+    int isxdigit;
 } test_cases[] = {
-    { 'A', 1, 1, 1, 0, 0, 0, 1},
-    { 'z', 1, 1, 1, 0, 1, 0, 0},
-    { ' ', 0, 0, 1, 0, 0, 1, 0},
-    { '1', 1, 0, 1, 1, 0, 0, 0},
-    { '9', 1, 0, 1, 1, 0, 0, 0},
-    {0x80, 0, 0, 0, 0, 0, 0, 0}
+    //     a  a  a  b  c  d  g  l  p  p  s  u  x
+    //     l  l  s  l  n  i  r  o  r  u  p  p  d
+    //     n  p  c  a  t  g  a  w  i  n  a  p  i
+    //     u  h  i  n  r  i  p  e  n  c  c  e  g
+    //     m  a  i  k  l  t  h  r  t  t  e  r  i
+    { 'A', 1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1},
+    { 'z', 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0},
+    { ' ', 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0},
+    { '1', 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1},
+    { '9', 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1},
+    {0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 size_t num_test_cases = sizeof(test_cases)/sizeof(struct test_case);
 

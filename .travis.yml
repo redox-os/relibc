@@ -6,8 +6,6 @@ before_script:
   - rustup component add rustfmt-preview
   - rustup target add x86_64-unknown-redox
 script:
-  - bash ./fmt.sh -- --write-mode=diff
-  - bash ./test.sh
-  - cargo build --target=x86_64-unknown-redox
+  - bash ./ci.sh
 notifications:
   email: false
