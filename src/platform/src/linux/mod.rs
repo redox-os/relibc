@@ -116,7 +116,7 @@ pub fn getuid() -> uid_t {
 }
 
 pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
-    e(unsafe { syscall!(LINKAT, AT_FDCWD, path1, path2) }) as c_int
+    e(unsafe { syscall!(LINKAT, AT_FDCWD, path1, AT_FDCWD, path2, 0) }) as c_int
 }
 
 pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {

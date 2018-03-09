@@ -225,7 +225,7 @@ pub extern "C" fn getpgid(pid: pid_t) -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn getpgrp() -> pid_t {
-    unimplemented!();
+    platform::getpgid(platform::getpid())
 }
 
 #[no_mangle]

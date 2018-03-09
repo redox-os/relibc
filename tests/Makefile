@@ -16,9 +16,11 @@ BINS=\
 	getid \
 	link \
 	math \
-	rmdir \
 	pipe \
 	printf \
+	rmdir \
+	setid \
+	unlink \
 	write
 
 all: $(BINS)
@@ -28,7 +30,7 @@ clean:
 
 run: $(BINS)
 	for bin in $(BINS); \
-	do
+	do \
 		echo "# $${bin} #"; \
 		"./$${bin}" test args; \
 	done
