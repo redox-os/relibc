@@ -416,8 +416,192 @@ pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c
 }
 
 #[no_mangle]
-pub extern "C" fn strtol(s: *const c_char, endptr: *mut *mut c_char, base: c_int) -> c_long {
-    unimplemented!();
+pub unsafe extern "C" fn strtol(
+    s: *const c_char,
+    endptr: *mut *const c_char,
+    base: c_int,
+) -> c_long {
+    let set_endptr = |idx: isize| {
+        if !endptr.is_null() {
+            *endptr = s.offset(idx);
+        }
+    };
+
+    let invalid_input = || {
+        platform::errno = EINVAL;
+        set_endptr(0);
+    };
+
+    // only valid bases are 2 through 36
+    if base != 0 && (base < 2 || base > 36) {
+        invalid_input();
+        return 0;
+    }
+
+    let mut idx = 0;
+
+    // skip any whitespace at the beginning of the string
+    while ctype::isspace(*s.offset(idx) as c_int) != 0 {
+        idx += 1;
+    }
+
+    // check for +/-
+    let positive = match is_positive(*s.offset(idx)) {
+        Some((pos, i)) => {
+            idx += i;
+            pos
+        }
+        None => {
+            invalid_input();
+            return 0;
+        }
+    };
+
+    // convert the string to a number
+    let num_str = s.offset(idx);
+    let res = match base {
+        0 => detect_base(num_str).and_then(|(base, i)| convert_integer(num_str.offset(i), base)),
+        8 => convert_octal(num_str),
+        16 => convert_hex(num_str),
+        _ => convert_integer(num_str, base),
+    };
+
+    // check for error parsing octal/hex prefix
+    // also check to ensure a number was indeed parsed
+    let (num, i, _) = match res {
+        Some(res) => res,
+        None => {
+            invalid_input();
+            return 0;
+        }
+    };
+    idx += i;
+
+    // account for the sign
+    let mut num = num as c_long;
+    num = if num.is_negative() {
+        platform::errno = ERANGE;
+        if positive {
+            c_long::max_value()
+        } else {
+            c_long::min_value()
+        }
+    } else {
+        if positive {
+            num
+        } else {
+            -num
+        }
+    };
+
+    set_endptr(idx);
+
+    num
+}
+
+fn is_positive(ch: c_char) -> Option<(bool, isize)> {
+    match ch {
+        0 => None,
+        ch if ch == b'+' as c_char => Some((true, 1)),
+        ch if ch == b'-' as c_char => Some((false, 1)),
+        _ => Some((true, 0)),
+    }
+}
+
+fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
+    let first = unsafe { *s } as u8;
+    match first {
+        0 => None,
+        b'0' => {
+            let second = unsafe { *s.offset(1) } as u8;
+            if second == b'X' || second == b'x' {
+                Some((16, 2))
+            } else if second >= b'0' && second <= b'7' {
+                Some((8, 1))
+            } else {
+                // in this case, the prefix (0) is going to be the number
+                Some((8, 0))
+            }
+        }
+        _ => Some((10, 0)),
+    }
+}
+
+unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
+    if *s != 0 && *s == b'0' as c_char {
+        if let Some((val, idx, overflow)) = convert_integer(s.offset(1), 8) {
+            Some((val, idx + 1, overflow))
+        } else {
+            // in case the prefix is not actually a prefix
+            Some((0, 1, false))
+        }
+    } else {
+        None
+    }
+}
+
+unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
+    if (*s != 0 && *s == b'0' as c_char)
+        && (*s.offset(1) != 0 && (*s.offset(1) == b'x' as c_char || *s.offset(1) == b'X' as c_char))
+    {
+        convert_integer(s.offset(2), 16).map(|(val, idx, overflow)| (val, idx + 2, overflow))
+    } else {
+        None
+    }
+}
+
+fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, bool)> {
+    // -1 means the character is invalid
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    const LOOKUP_TABLE: [c_long; 256] = [
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+         0,  1,  2,  3,  4,  5,  6,  7,  8,  9, -1, -1, -1, -1, -1, -1,
+        -1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, -1, -1, -1, -1, -1,
+        -1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    ];
+
+    let mut num: c_ulong = 0;
+    let mut idx = 0;
+    let mut overflowed = false;
+
+    loop {
+        let val = unsafe { LOOKUP_TABLE[*s.offset(idx) as usize] };
+        if val == -1 || val as c_int >= base {
+            break;
+        } else {
+            if let Some(res) = num.checked_mul(base as c_ulong)
+                .and_then(|num| num.checked_add(val as c_ulong))
+            {
+                num = res;
+            } else {
+                unsafe {
+                    platform::errno = ERANGE;
+                }
+                num = c_ulong::max_value();
+                overflowed = true;
+            }
+
+            idx += 1;
+        }
+    }
+
+    if idx > 0 {
+        Some((num, idx, overflowed))
+    } else {
+        None
+    }
 }
 
 #[no_mangle]

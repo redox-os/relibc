@@ -26,4 +26,5 @@
 /printf
 /rmdir
 /unlink
+/stdlib/strtol
 /write
