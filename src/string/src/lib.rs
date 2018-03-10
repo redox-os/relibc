@@ -30,7 +30,7 @@ pub unsafe extern "C" fn memccpy(
     let src = src as *mut u8;
     let dist = ((to as usize) - (src as usize)) / mem::size_of::<u8>();
     if memcpy(dest, src, dist) as usize > 0 {
-        return dest.offset(dist as isize) as *mut c_void;
+        return dest.offset(dist as isize + 1) as *mut c_void;
     }
     0usize as *mut c_void
 }
