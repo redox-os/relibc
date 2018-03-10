@@ -32,4 +32,11 @@ typedef int clockid_t;
 
 typedef void* timer_t;
 
+#ifdef __linux__
+#define _SC_PAGE_SIZE 30
+#endif
+#ifdef __redox__
+#define _SC_PAGE_SIZE 8
+#endif
+
 #endif /* _SYS_TYPES_H */
