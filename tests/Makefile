@@ -25,6 +25,7 @@ BINS=\
 	sprintf \
 	stdlib/strtol \
 	string/strncmp \
+	string/strrchr \
 	unlink \
 	write
 

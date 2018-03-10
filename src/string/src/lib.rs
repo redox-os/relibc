@@ -223,8 +223,17 @@ pub extern "C" fn strpbrk(s1: *const c_char, s2: *const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
+    let len = strlen(s) as isize;
+    let c = c as i8;
+    let mut i = len - 1;
+    while *s.offset(i) != 0 && i >= 0 {
+        if *s.offset(i) == c {
+            return s.offset(i) as *mut c_char;
+        }
+        i -= 1;
+    }
+    ptr::null_mut()
 }
 
 #[no_mangle]
