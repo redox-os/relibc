@@ -259,7 +259,7 @@ pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
     let len = strlen(s) as isize;
     let c = c as i8;
     let mut i = len - 1;
-    while *s.offset(i) != 0 && i >= 0 {
+    while i >= 0 {
         if *s.offset(i) == c {
             return s.offset(i) as *mut c_char;
         }
