@@ -21,6 +21,7 @@ BINS=\
 	rmdir \
 	setid \
 	sleep \
+	sprintf \
 	stdlib/strtol \
 	string/strncmp \
 	unlink \
