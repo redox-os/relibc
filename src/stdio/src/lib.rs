@@ -105,7 +105,9 @@ pub extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FI
 
 #[no_mangle]
 pub extern "C" fn fputc(c: c_int, stream: *mut FILE) -> c_int {
-    platform::FileWriter(stream as c_int).write_char(c as u8 as char).map_err(|_| return -1);
+    platform::FileWriter(stream as c_int)
+        .write_char(c as u8 as char)
+        .map_err(|_| return -1);
     c
 }
 
@@ -114,12 +116,14 @@ pub unsafe extern "C" fn fputs(s: *const c_char, stream: *mut FILE) -> c_int {
     extern "C" {
         fn strlen(s: *const c_char) -> size_t;
     }
-    use core::{ str, slice };
+    use core::{slice, str};
     let len = strlen(s);
-    platform::FileWriter(stream as c_int).write_str(str::from_utf8_unchecked(slice::from_raw_parts(
-                        s as *const u8,
-                        len,
-                    ))).map_err(|_| return -1);
+    platform::FileWriter(stream as c_int)
+        .write_str(str::from_utf8_unchecked(slice::from_raw_parts(
+            s as *const u8,
+            len,
+        )))
+        .map_err(|_| return -1);
     len as i32
 }
 
