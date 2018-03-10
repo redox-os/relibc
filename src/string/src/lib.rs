@@ -39,7 +39,6 @@ pub unsafe extern "C" fn memccpy(
 pub unsafe extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_void {
     let s = s as *mut u8;
     let c = c as u8;
-    let mut i = 0;
     for i in 0..n {
         if *s.offset(i as isize) == c {
             return s.offset(i as isize) as *mut c_void;
@@ -90,8 +89,16 @@ pub unsafe extern "C" fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_ch
 }
 
 #[no_mangle]
-pub extern "C" fn strchr(s: *const c_char, c: c_int) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strchr(s: *const c_char, c: c_int) -> *mut c_char {
+    let c = c as i8;
+    let mut i = 0;
+    while *s.offset(i) != 0 {
+        if *s.offset(i) == c {
+            return s.offset(i) as *mut c_char;
+        }
+        i += 1;
+    }
+    ptr::null_mut()
 }
 
 #[no_mangle]
@@ -110,8 +117,33 @@ pub unsafe extern "C" fn strcpy(s1: *mut c_char, s2: *const c_char) -> *mut c_ch
 }
 
 #[no_mangle]
-pub extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
-    unimplemented!();
+pub unsafe extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
+    use core::mem;
+
+    let s1 = s1 as *const u8;
+    let s2 = s2 as *const u8;
+
+    // The below logic is effectively ripped from the musl implementation
+
+    let mut byteset = [0u8; 32 / mem::size_of::<usize>()];
+
+    let mut i = 0;
+    while *s2.offset(i) != 0 {
+        byteset[(*s2.offset(i) as usize) / (8 * mem::size_of::<usize>())] |=
+            1 << (*s2.offset(i) as usize % (8 * mem::size_of::<usize>()));
+        i += 1;
+    }
+
+    i = 0; // reset
+    while *s2.offset(i) != 0 {
+        if byteset[(*s2.offset(i) as usize) / (8 * mem::size_of::<usize>())]
+            & 1 << (*s2.offset(i) as usize % (8 * mem::size_of::<usize>())) > 0
+        {
+            break;
+        }
+        i += 1;
+    }
+    i as u64
 }
 
 #[no_mangle]
@@ -237,8 +269,33 @@ pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
-    unimplemented!();
+pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
+    use core::mem;
+
+    let s1 = s1 as *const u8;
+    let s2 = s2 as *const u8;
+
+    // The below logic is effectively ripped from the musl implementation
+
+    let mut byteset = [0u8; 32 / mem::size_of::<usize>()];
+
+    let mut i = 0;
+    while *s2.offset(i) != 0 {
+        byteset[(*s2.offset(i) as usize) / (8 * mem::size_of::<usize>())] |=
+            1 << (*s2.offset(i) as usize % (8 * mem::size_of::<usize>()));
+        i += 1;
+    }
+
+    i = 0; // reset
+    while *s2.offset(i) != 0 {
+        if byteset[(*s2.offset(i) as usize) / (8 * mem::size_of::<usize>())]
+            & 1 << (*s2.offset(i) as usize % (8 * mem::size_of::<usize>())) < 1
+        {
+            break;
+        }
+        i += 1;
+    }
+    i as u64
 }
 
 #[no_mangle]
