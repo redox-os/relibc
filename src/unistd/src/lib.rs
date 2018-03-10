@@ -5,6 +5,7 @@
 extern crate platform;
 
 pub use platform::types::*;
+use core::ptr;
 
 pub const R_OK: c_int = 1;
 pub const W_OK: c_int = 2;
@@ -381,7 +382,13 @@ pub extern "C" fn setuid(uid: uid_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
-    unimplemented!();
+    let rqtp = timespec {
+        tv_sec: seconds as i64,
+        tv_nsec: 0,
+    };
+    let rmtp = ptr::null_mut();
+    platform::nanosleep(&rqtp, rmtp);
+    0
 }
 
 #[no_mangle]
@@ -441,7 +448,12 @@ pub extern "C" fn unlink(path: *const c_char) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
-    unimplemented!();
+    let rqtp = timespec {
+        tv_sec: 0,
+        tv_nsec: (useconds * 1000).into(),
+    };
+    let rmtp = ptr::null_mut();
+    platform::nanosleep(&rqtp, rmtp)
 }
 
 #[no_mangle]

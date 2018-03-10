@@ -14,6 +14,8 @@ extern crate stat;
 extern crate stdio;
 extern crate stdlib;
 extern crate string;
+extern crate sys_time;
+extern crate time;
 extern crate unistd;
 extern crate wctype;
 

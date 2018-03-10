@@ -20,8 +20,9 @@ BINS=\
 	printf \
 	rmdir \
 	setid \
+	sleep \
+  	stdlib/strtol \
 	unlink \
-	stdlib/strtol \
 	write
 
 all: $(BINS)

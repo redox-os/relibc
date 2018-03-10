@@ -123,6 +123,10 @@ pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     e(unsafe { syscall!(MKDIRAT, AT_FDCWD, path, mode) }) as c_int
 }
 
+pub fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
+    e(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }) as c_int
+}
+
 pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     e(unsafe { syscall!(OPENAT, AT_FDCWD, path, oflag, mode) }) as c_int
 }

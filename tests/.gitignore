@@ -20,10 +20,12 @@
 /link
 /link.out
 /math
+/setid
+/sleep
 /pipe
 /printf
 /rmdir
 /setid
-/unlink
 /stdlib/strtol
+/unlink
 /write
