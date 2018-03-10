@@ -29,10 +29,10 @@ pub unsafe extern "C" fn memccpy(
     }
     let src = src as *mut u8;
     let dist = (to as usize) - (src as usize);
-    if memcpy(dest, src, dist) as usize > 0 {
-        return dest.offset(dist as isize + 1) as *mut c_void;
+    if memcpy(dest, src, dist).is_null() {
+        return ptr::null_mut();
     }
-    ptr::null_mut()
+    dest.offset(dist as isize + 1) as *mut c_void
 }
 
 #[no_mangle]
