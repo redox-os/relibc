@@ -50,6 +50,7 @@ pub type off_t = i64;
 pub type mode_t = u16;
 pub type time_t = i64;
 pub type pid_t = usize;
+pub type id_t = usize;
 pub type gid_t = usize;
 pub type uid_t = usize;
 pub type dev_t = usize;

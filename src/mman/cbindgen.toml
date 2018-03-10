@@ -1,5 +1,5 @@
-sys_includes = []
-include_guard = "_MMAN_H"
+sys_includes = ["sys/types.h"]
+include_guard = "_SYS_MMAN_H"
 language = "C"
 
 [enum]
