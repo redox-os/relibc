@@ -90,8 +90,19 @@ pub unsafe extern "C" fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_ch
 }
 
 #[no_mangle]
-pub extern "C" fn strchr(s: *const c_char, c: c_int) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strchr(s: *const c_char, c: c_int) -> *mut c_char {
+    let c = c as i8;
+    let mut i = 0;
+    loop {
+        let cur = *s.offset(i);
+        if cur == c {
+            return s.offset(i) as *mut c_char;
+        }
+        if cur == 0 {
+            return ptr::null_mut();
+        }
+        i += 1;
+    }
 }
 
 #[no_mangle]
@@ -110,8 +121,30 @@ pub unsafe extern "C" fn strcpy(s1: *mut c_char, s2: *const c_char) -> *mut c_ch
 }
 
 #[no_mangle]
-pub extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
-    unimplemented!();
+pub unsafe extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
+    use core::mem;
+
+    let s1 = s1 as *const u8;
+    let s2 = s2 as *const u8;
+    
+    // The below logic is effectively ripped from the musl implementation
+
+    let mut byteset = [0u8; 32/mem::size_of::<usize>()]; 
+
+    let mut i = 0;
+    while *s2.offset(i) != 0 {
+        byteset[(*s2.offset(i) as usize)/(8*mem::size_of::<usize>())] |= 1 << (*s2.offset(i) as usize % (8*mem::size_of::<usize>()));
+        i += 1;
+    }
+
+    i = 0; // reset
+    while *s2.offset(i) != 0 {
+        if byteset[(*s2.offset(i) as usize)/(8*mem::size_of::<usize>())] & 1 << (*s2.offset(i) as usize % (8*mem::size_of::<usize>())) > 0 {
+            break;
+        }
+        i += 1;
+    }
+    i as u64
 }
 
 #[no_mangle]
@@ -228,8 +261,30 @@ pub extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
-    unimplemented!();
+pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
+    use core::mem;
+
+    let s1 = s1 as *const u8;
+    let s2 = s2 as *const u8;
+    
+    // The below logic is effectively ripped from the musl implementation
+
+    let mut byteset = [0u8; 32/mem::size_of::<usize>()]; 
+
+    let mut i = 0;
+    while *s2.offset(i) != 0 {
+        byteset[(*s2.offset(i) as usize)/(8*mem::size_of::<usize>())] |= 1 << (*s2.offset(i) as usize % (8*mem::size_of::<usize>()));
+        i += 1;
+    }
+
+    i = 0; // reset
+    while *s2.offset(i) != 0 {
+        if byteset[(*s2.offset(i) as usize)/(8*mem::size_of::<usize>())] & 1 << (*s2.offset(i) as usize % (8*mem::size_of::<usize>())) < 1 {
+            break;
+        }
+        i += 1;
+    }
+    i as u64
 }
 
 #[no_mangle]
