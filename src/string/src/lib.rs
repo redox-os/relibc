@@ -161,7 +161,7 @@ pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: usize)
 
     for (&a, &b) in s1.iter().zip(s2.iter()) {
         let val = (a as c_int) - (b as c_int);
-        if val != 0 || a == 0 {
+        if a != b || a == 0 {
             return val;
         }
     }

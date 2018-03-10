@@ -9,7 +9,5 @@ int main(int argc, char* argv[]) {
     printf("%d\n", strncmp("a", "c", 1));
     printf("%d\n", strncmp("a", "a", 2));
 
-    puts("test");
-
     return 0;
 }
