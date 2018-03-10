@@ -16,6 +16,7 @@ BINS=\
 	getid \
 	link \
 	math \
+	mem \
 	pipe \
 	printf \
 	rmdir \

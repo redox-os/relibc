@@ -1,7 +1,9 @@
 //! string implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/string.h.html
 
+#![feature(compiler_builtins_lib)]
 #![no_std]
 
+extern crate compiler_builtins;
 extern crate errno;
 extern crate platform;
 extern crate stdlib;
@@ -12,13 +14,41 @@ use core::cmp;
 use core::usize;
 
 #[no_mangle]
-pub extern "C" fn memccpy(s1: *mut c_void, s2: *const c_void, c: c_int, n: usize) -> *mut c_void {
-    unimplemented!();
+pub unsafe extern "C" fn memccpy(
+    dest: *mut c_void,
+    src: *const c_void,
+    c: c_int,
+    n: usize,
+) -> *mut c_void {
+    use compiler_builtins::mem::memcpy;
+    use core::mem;
+    let dest = dest as *mut u8;
+    let to = memchr(src, c, n);
+    if to as usize == 0 {
+        return to;
+    }
+    let src = src as *mut u8;
+    let dist = ((to as usize) - (src as usize)) / mem::size_of::<u8>();
+    if memcpy(dest, src, dist) as usize > 0 {
+        return dest.offset(dist as isize) as *mut c_void;
+    }
+    0usize as *mut c_void
 }
 
 #[no_mangle]
-pub extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_void {
-    unimplemented!();
+pub unsafe extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_void {
+    let s = s as *mut u8;
+    let c = c as u8;
+    let mut i = 0;
+    loop {
+        if *s.offset(i as isize) == c {
+            return s.offset(i as isize) as *mut c_void;
+        }
+        i += 1;
+        if i == n {
+            return 0usize as *mut c_void;
+        }
+    }
 }
 
 // #[no_mangle]
