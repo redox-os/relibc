@@ -16,6 +16,7 @@ ctype = { path = "src/ctype" }
 errno = { path = "src/errno" }
 fcntl = { path = "src/fcntl" }
 fenv = { path = "src/fenv" }
+float = { path = "src/float" }
 grp = { path = "src/grp" }
 semaphore = { path = "src/semaphore" }
 mman = { path = "src/mman" }
