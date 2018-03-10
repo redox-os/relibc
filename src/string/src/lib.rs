@@ -92,16 +92,13 @@ pub unsafe extern "C" fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_ch
 pub unsafe extern "C" fn strchr(s: *const c_char, c: c_int) -> *mut c_char {
     let c = c as i8;
     let mut i = 0;
-    loop {
-        let cur = *s.offset(i);
-        if cur == c {
+    while *s.offset(i) != 0 {
+        if *s.offset(i) == c {
             return s.offset(i) as *mut c_char;
-        }
-        if cur == 0 {
-            return ptr::null_mut();
         }
         i += 1;
     }
+    ptr::null_mut()
 }
 
 #[no_mangle]
