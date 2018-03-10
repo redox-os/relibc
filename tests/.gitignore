@@ -27,5 +27,6 @@
 /rmdir
 /setid
 /stdlib/strtol
+/string/strncmp
 /unlink
 /write
