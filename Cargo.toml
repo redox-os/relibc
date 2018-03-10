@@ -27,6 +27,7 @@ string = { path = "src/string" }
 sys_time = { path = "src/sys_time" }
 time = { path = "src/time" }
 unistd = { path = "src/unistd" }
+wait = { path = "src/wait" }
 wctype = { path = "src/wctype" }
 
 [profile.dev]
