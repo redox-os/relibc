@@ -15,6 +15,7 @@ compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-built
 ctype = { path = "src/ctype" }
 errno = { path = "src/errno" }
 fcntl = { path = "src/fcntl" }
+fenv = { path = "src/fenv" }
 grp = { path = "src/grp" }
 semaphore = { path = "src/semaphore" }
 mman = { path = "src/mman" }
