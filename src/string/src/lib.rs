@@ -156,25 +156,17 @@ pub unsafe extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: usize) -
 
 #[no_mangle]
 pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> c_int {
-    let s1 = platform::c_str_n(s1, n);
-    let s2 = platform::c_str_n(s2, n);
+    let s1 = core::slice::from_raw_parts(s1 as *const c_uchar, n);
+    let s2 = core::slice::from_raw_parts(s2 as *const c_uchar, n);
 
-    let min_len = n.min(s1.len()).min(s2.len());
-    for i in 0..min_len {
-        let val = s1[i] - s2[i];
-        if val != 0 {
-            return val as c_int;
+    for (&a, &b) in s1.iter().zip(s2.iter()) {
+        let val = (a as c_int) - (b as c_int);
+        if a != b || a == 0 {
+            return val;
         }
     }
 
-    // we can't just check for the NUL byte in the loop as c_str_n() removes it
-    if s1.len() > s2.len() {
-        s1[min_len] as c_int
-    } else if s1.len() < s2.len() {
-        -(s2[min_len] as c_int)
-    } else {
-        0
-    }
+    0
 }
 
 #[no_mangle]

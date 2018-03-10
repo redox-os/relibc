@@ -28,5 +28,6 @@
 /setid
 /sprintf
 /stdlib/strtol
+/string/strncmp
 /unlink
 /write

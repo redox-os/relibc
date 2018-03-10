@@ -22,7 +22,8 @@ BINS=\
 	setid \
 	sleep \
 	sprintf \
-  	stdlib/strtol \
+	stdlib/strtol \
+	string/strncmp \
 	unlink \
 	write
 
