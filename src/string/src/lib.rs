@@ -39,7 +39,6 @@ pub unsafe extern "C" fn memccpy(
 pub unsafe extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_void {
     let s = s as *mut u8;
     let c = c as u8;
-    let mut i = 0;
     for i in 0..n {
         if *s.offset(i as isize) == c {
             return s.offset(i as isize) as *mut c_void;
