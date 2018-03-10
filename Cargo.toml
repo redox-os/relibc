@@ -22,6 +22,7 @@ semaphore = { path = "src/semaphore" }
 mman = { path = "src/mman" }
 platform = { path = "src/platform" }
 resource = { path = "src/resource" }
+signal = { path = "src/signal" }
 stat = { path = "src/stat" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }

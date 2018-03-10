@@ -278,6 +278,7 @@ dependencies = [
  "platform 0.1.0",
  "resource 0.1.0",
  "semaphore 0.1.0",
+ "signal 0.1.0",
  "stat 0.1.0",
  "stdio 0.1.0",
  "stdlib 0.1.0",
@@ -432,6 +433,14 @@ dependencies = [
  "itoa 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "signal"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.0",
+ "platform 0.1.0",
 ]
 
 [[package]]
