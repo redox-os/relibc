@@ -12,6 +12,7 @@ use platform::types::*;
 use errno::*;
 use core::cmp;
 use core::usize;
+use core::ptr;
 
 #[no_mangle]
 pub unsafe extern "C" fn memccpy(
@@ -21,18 +22,17 @@ pub unsafe extern "C" fn memccpy(
     n: usize,
 ) -> *mut c_void {
     use compiler_builtins::mem::memcpy;
-    use core::mem;
     let dest = dest as *mut u8;
     let to = memchr(src, c, n);
-    if to as usize == 0 {
+    if to.is_null() {
         return to;
     }
     let src = src as *mut u8;
-    let dist = ((to as usize) - (src as usize)) / mem::size_of::<u8>();
+    let dist = (to as usize) - (src as usize);
     if memcpy(dest, src, dist) as usize > 0 {
         return dest.offset(dist as isize + 1) as *mut c_void;
     }
-    0usize as *mut c_void
+    ptr::null_mut()
 }
 
 #[no_mangle]
@@ -40,15 +40,12 @@ pub unsafe extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_
     let s = s as *mut u8;
     let c = c as u8;
     let mut i = 0;
-    loop {
+    for i in 0..n {
         if *s.offset(i as isize) == c {
             return s.offset(i as isize) as *mut c_void;
         }
-        i += 1;
-        if i == n {
-            return 0usize as *mut c_void;
-        }
     }
+    ptr::null_mut()
 }
 
 // #[no_mangle]
