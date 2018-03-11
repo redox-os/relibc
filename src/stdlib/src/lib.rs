@@ -24,12 +24,13 @@ static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
 
 #[no_mangle]
 pub unsafe extern "C" fn a64l(s: *const c_char) -> c_long {
-    if s as isize == 0 {
+    if s.is_null() {
         return 0;
     }
     let mut l: c_long = 0;
-    for x in 0..7 {
-        let c = *((s as isize + x) as *const c_char);
+    // a64l does not support more than 6 characters at once
+    for x in 0..6 {
+        let c = *s.offset(x);
         if c == 0 {
             // string is null terminated
             return l;
