@@ -159,6 +159,10 @@ pub fn unlink(path: *const c_char) -> c_int {
     e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, 0) }) as c_int
 }
 
+pub fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
+    e(unsafe { syscall!(WAIT4, pid, stat_loc, options) }) as pid_t
+}
+
 pub fn write(fildes: c_int, buf: &[u8]) -> ssize_t {
     e(unsafe { syscall!(WRITE, fildes, buf.as_ptr(), buf.len()) }) as ssize_t
 }
