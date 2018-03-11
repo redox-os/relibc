@@ -2,7 +2,6 @@
 
 #![no_std]
 #![feature(core_intrinsics)]
-#![feature(global_allocator)]
 
 extern crate ctype;
 extern crate errno;
@@ -15,9 +14,6 @@ use rand::{Rng, SeedableRng, XorShiftRng};
 
 use errno::*;
 use platform::types::*;
-
-#[global_allocator]
-static ALLOCATOR: ralloc::Allocator = ralloc::Allocator;
 
 pub const EXIT_FAILURE: c_int = 1;
 pub const EXIT_SUCCESS: c_int = 0;

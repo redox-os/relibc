@@ -1,6 +1,7 @@
 use core::ptr;
 use core::slice;
 use core::mem;
+use alloc::Vec;
 use syscall;
 use syscall::flag::*;
 use syscall::data::TimeSpec as redox_timespec;
@@ -46,6 +47,58 @@ pub fn dup(fd: c_int) -> c_int {
 
 pub fn dup2(fd1: c_int, fd2: c_int) -> c_int {
     e(syscall::dup2(fd1 as usize, fd2 as usize, &[])) as c_int
+}
+
+pub fn execve(path: *const c_char, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
+    unsafe {
+        let mut env = envp;
+        while !(*env).is_null() {
+            let slice = c_str(*env);
+            // Should always contain a =, but worth checking
+            if let Some(sep) = slice.iter().position(|&c| c == b'=') {
+                // If the environment variable has no name, do not attempt
+                // to add it to the env.
+                if sep > 0 {
+                    let mut path = b"env:".to_vec();
+                    path.extend_from_slice(&slice[..sep]);
+                    match syscall::open(&path, O_WRONLY | O_CREAT) {
+                        Ok(fd) => {
+                            // If the environment variable has no value, there
+                            // is no need to write anything to the env scheme.
+                            if sep + 1 < slice.len() {
+                                let n = match syscall::write(fd, &slice[sep + 1..]) {
+                                    Ok(n) => n,
+                                    err => {
+                                        return e(err) as c_int;
+                                    }
+                                };
+                            }
+                            // Cleanup after adding the variable.
+                            match syscall::close(fd) {
+                                Ok(_) => (),
+                                err => {
+                                    return e(err) as c_int;
+                                }
+                            }
+                        }
+                        err => {
+                            return e(err) as c_int;
+                        }
+                    }
+                }
+            }
+            env = env.offset(1);
+        }
+
+        let mut args: Vec<[usize; 2]> = Vec::new();
+        let mut arg = argv;
+        while !(*arg).is_null() {
+            args.push([*arg as usize, c_str(*arg).len()]);
+            arg = arg.offset(1);
+        }
+
+        e(syscall::execve(c_str(path), &args)) as c_int
+    }
 }
 
 pub fn exit(status: c_int) -> ! {

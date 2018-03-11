@@ -10,6 +10,7 @@
 /ctype
 /dup
 /error
+/exec
 /fchdir
 /fcntl
 /fsync

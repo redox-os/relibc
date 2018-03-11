@@ -2,6 +2,8 @@
 
 #![no_std]
 #![allow(non_camel_case_types)]
+#![feature(alloc)]
+#![feature(global_allocator)]
 //TODO #![feature(thread_local)]
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
@@ -22,12 +24,17 @@ mod sys;
 #[path = "redox/mod.rs"]
 mod sys;
 
+extern crate alloc;
+extern crate ralloc;
+
 pub mod types;
 
 use core::fmt;
 
 use types::*;
 
+#[global_allocator]
+static ALLOCATOR: ralloc::Allocator = ralloc::Allocator;
 //TODO #[thread_local]
 #[allow(non_upper_case_globals)]
 #[no_mangle]
@@ -52,6 +59,10 @@ pub unsafe fn c_str_n(s: *const c_char, n: usize) -> &'static [u8] {
     }
 
     slice::from_raw_parts(s as *const u8, size as usize)
+}
+
+pub unsafe fn cstr_from_bytes_with_nul_unchecked(bytes: &[u8]) -> *const c_char {
+    &*(bytes as *const [u8] as *const c_char)
 }
 
 pub struct FileWriter(pub c_int);
