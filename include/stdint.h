@@ -49,4 +49,6 @@ typedef int64_t intmax_t;
 #define UINTMAX_MAX UINT64_MAX
 typedef uint64_t uintmax_t;
 
+#define SIZE_MAX UINT64_MAX
+
 #endif /* _STDINT_H */
