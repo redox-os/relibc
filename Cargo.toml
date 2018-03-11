@@ -12,13 +12,16 @@ members = ["src/crt0"]
 
 [dependencies]
 compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins.git", default-features = false, features = ["mem"] }
-platform = { path = "src/platform" }
 ctype = { path = "src/ctype" }
 errno = { path = "src/errno" }
 fcntl = { path = "src/fcntl" }
+fenv = { path = "src/fenv" }
+float = { path = "src/float" }
 grp = { path = "src/grp" }
 semaphore = { path = "src/semaphore" }
 mman = { path = "src/mman" }
+platform = { path = "src/platform" }
+resource = { path = "src/resource" }
 stat = { path = "src/stat" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }
@@ -26,6 +29,7 @@ string = { path = "src/string" }
 sys_time = { path = "src/sys_time" }
 time = { path = "src/time" }
 unistd = { path = "src/unistd" }
+wait = { path = "src/wait" }
 wctype = { path = "src/wctype" }
 
 [profile.dev]

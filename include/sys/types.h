@@ -8,6 +8,7 @@ typedef long dev_t;
 typedef unsigned long ino_t;
 
 typedef int gid_t;
+
 typedef int uid_t;
 
 typedef int mode_t;
@@ -17,6 +18,8 @@ typedef unsigned long nlink_t;
 typedef long off_t;
 
 typedef int pid_t;
+
+typedef unsigned id_t;
 
 typedef long ssize_t;
 

@@ -1,0 +1,6 @@
+sys_includes = ["sys/types.h", "bits/float.h"]
+include_guard = "_FLOAT_H"
+language = "C"
+
+[enum]
+prefix_with_name = true
