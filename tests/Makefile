@@ -24,6 +24,7 @@ BINS=\
 	sleep \
 	sprintf \
 	stdlib/strtol \
+	stdlib/a64l \
 	string/strncmp \
 	string/strcspn \
 	string/strchr \
