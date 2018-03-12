@@ -250,8 +250,15 @@ pub unsafe extern "C" fn strncpy(s1: *mut c_char, s2: *const c_char, n: usize) -
 }
 
 #[no_mangle]
-pub extern "C" fn strpbrk(s1: *const c_char, s2: *const c_char) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strpbrk(s1: *const c_char, s2: *const c_char) -> *mut c_char {
+    let mut i = 0;
+    while *s1.offset(i) != 0 {
+        if !strchr(s2, *s1.offset(i) as i32).is_null() {
+            return s1.offset(i) as *mut c_char;
+        }
+        i += 1;
+    }
+    ptr::null_mut()
 }
 
 #[no_mangle]
