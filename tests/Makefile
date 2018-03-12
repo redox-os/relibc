@@ -28,6 +28,7 @@ EXPECT_BINS=\
 	string/strrchr \
 	string/strspn \
 	unlink \
+	waitpid \
 	write
 
 # Binaries that may generate varied output

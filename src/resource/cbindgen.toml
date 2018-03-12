@@ -1,7 +1,7 @@
-sys_includes = ["sys/types.h", "sys/time.h"]
+sys_includes = ["sys/types.h", "stdint.h", "sys/time.h"]
 include_guard = "_SYS_RESOURCE_H"
 language = "C"
-style = "Tag"
+style = "Both"
 
 [enum]
 prefix_with_name = true
