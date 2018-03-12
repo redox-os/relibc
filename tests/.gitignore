@@ -1,3 +1,4 @@
+/*.out
 /gen/
 /alloc
 /args
@@ -6,19 +7,15 @@
 /brk
 /chdir
 /create
-/create.out
 /ctype
 /dup
-/dup.out
 /error
 /fchdir
 /fcntl
 /fsync
 /ftruncate
-/ftruncate.out
 /getid
 /link
-/link.out
 /math
 /mem
 /setid
@@ -37,3 +34,4 @@
 /string/strspn
 /unlink
 /write
+

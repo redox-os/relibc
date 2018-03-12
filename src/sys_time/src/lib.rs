@@ -23,10 +23,12 @@ pub struct fd_set {
     pub fds_bits: [c_long; 16usize],
 }
 
+#[no_mangle]
 pub extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn setitimer(
     which: c_int,
     value: *const itimerval,
@@ -35,10 +37,12 @@ pub extern "C" fn setitimer(
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn gettimeofday(tp: *mut timeval, tzp: *const c_void) -> c_int {
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn select(
     nfds: c_int,
     readfds: *mut fd_set,
@@ -49,6 +53,7 @@ pub extern "C" fn select(
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn utimes(path: *const c_char, times: [timeval; 2]) -> c_int {
     unimplemented!();
 }
