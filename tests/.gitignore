@@ -36,4 +36,5 @@
 /string/strrchr
 /string/strspn
 /unlink
+/unlink.out
 /write
