@@ -27,6 +27,7 @@ EXPECT_BINS=\
 	string/strchr \
 	string/strrchr \
 	string/strspn \
+	string/strstr \
 	unlink \
 	write
 

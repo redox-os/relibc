@@ -299,8 +299,22 @@ pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong
 }
 
 #[no_mangle]
-pub extern "C" fn strstr(s1: *const c_char, s2: *const c_char) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strstr(s1: *const c_char, s2: *const c_char) -> *mut c_char {
+    let mut i = 0;
+    while *s1.offset(i) != 0 {
+        let mut j = 0;
+        while *s2.offset(j) != 0 && *s1.offset(j + i) != 0 {
+            if *s2.offset(j) != *s1.offset(j + i) {
+                break;
+            }
+            j += 1;
+            if *s2.offset(j) == 0 {
+                return s1.offset(i) as *mut c_char;
+            }
+        }
+        i += 1;
+    }
+    ptr::null_mut()
 }
 
 #[no_mangle]
