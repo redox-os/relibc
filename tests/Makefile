@@ -47,7 +47,7 @@ run: $(BINS)
 	for bin in $^; \
 	do \
 		echo "# $${bin} #"; \
-		"./$${bin}" test args; \
+		"./$${bin}" test args || exit $$?; \
 	done
 
 expected: $(EXPECT_BINS)
@@ -57,7 +57,7 @@ expected: $(EXPECT_BINS)
 	do \
 		echo "# $${bin} #"; \
 		mkdir -p expected/`dirname $${bin}`; \
-		"./$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr"; \
+		"./$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr" || exit $$?; \
 	done
 
 verify: $(EXPECT_BINS)
@@ -67,9 +67,9 @@ verify: $(EXPECT_BINS)
 	do \
 		echo "# $${bin} #"; \
 		mkdir -p gen/`dirname $${bin}`; \
-		"./$${bin}" test args > "gen/$${bin}.stdout" 2> "gen/$${bin}.stderr"; \
-		diff -u "gen/$${bin}.stdout" "expected/$${bin}.stdout"; \
-		diff -u "gen/$${bin}.stderr" "expected/$${bin}.stderr"; \
+		"./$${bin}" test args > "gen/$${bin}.stdout" 2> "gen/$${bin}.stderr" || exit $$?; \
+		diff -u "gen/$${bin}.stdout" "expected/$${bin}.stdout" || exit $$?; \
+		diff -u "gen/$${bin}.stderr" "expected/$${bin}.stderr" || exit $$?; \
 	done
 
 GCCHEAD=\
