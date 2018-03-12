@@ -1,5 +1,5 @@
-BINS=\
-	alloc \
+# Binaries that should generate the same output every time
+EXPECT_BINS=\
 	atof \
 	atoi \
 	brk \
@@ -13,14 +13,12 @@ BINS=\
 	fcntl \
 	fsync \
 	ftruncate \
-	getid \
 	link \
 	math \
 	mem \
 	pipe \
 	printf \
 	rmdir \
-	setid \
 	sleep \
 	sprintf \
 	stdlib/strtol \
@@ -33,32 +31,39 @@ BINS=\
 	unlink \
 	write
 
+# Binaries that may generate varied output
+BINS=\
+	$(EXPECT_BINS) \
+	alloc \
+	getid \
+	setid
+
 all: $(BINS)
 
 clean:
 	rm -f $(BINS) *.out
 
 run: $(BINS)
-	for bin in $(BINS); \
+	for bin in $^; \
 	do \
 		echo "# $${bin} #"; \
 		"./$${bin}" test args; \
 	done
 
-expected: $(BINS)
+expected: $(EXPECT_BINS)
 	rm -rf expected
 	mkdir -p expected
-	for bin in $(BINS); \
+	for bin in $^; \
 	do \
 		echo "# $${bin} #"; \
 		mkdir -p expected/`dirname $${bin}`; \
 		"./$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr"; \
 	done
 
-verify: $(BINS)
+verify: $(EXPECT_BINS)
 	rm -rf gen
 	mkdir -p gen
-	for bin in $(BINS); \
+	for bin in $^; \
 	do \
 		echo "# $${bin} #"; \
 		mkdir -p gen/`dirname $${bin}`; \
