@@ -4,7 +4,6 @@ EXPECT_BINS=\
 	atoi \
 	brk \
 	args \
-	chdir \
 	create \
 	ctype \
 	dup \
@@ -35,6 +34,7 @@ EXPECT_BINS=\
 BINS=\
 	$(EXPECT_BINS) \
 	alloc \
+	chdir \
 	getid \
 	setid
 

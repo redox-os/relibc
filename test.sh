@@ -4,10 +4,7 @@ set -ex
 cargo build
 cargo build --manifest-path src/crt0/Cargo.toml
 
-cd openlibm
-make
-cd ..
+CFLAGS=-fno-stack-protector make -C openlibm
 
-cd tests
-make clean
-make run
+make -C tests clean
+make -C tests run
