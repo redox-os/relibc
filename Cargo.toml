@@ -18,10 +18,10 @@ fcntl = { path = "src/fcntl" }
 fenv = { path = "src/fenv" }
 float = { path = "src/float" }
 grp = { path = "src/grp" }
-semaphore = { path = "src/semaphore" }
 mman = { path = "src/mman" }
 platform = { path = "src/platform" }
 resource = { path = "src/resource" }
+semaphore = { path = "src/semaphore" }
 stat = { path = "src/stat" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }

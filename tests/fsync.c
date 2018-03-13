@@ -8,4 +8,5 @@ int main (int argc, char** argv) {
     status = fsync(fd);
     printf("fsync exited with status code %d\n", status);
     close(fd);
+    return 0;
 }

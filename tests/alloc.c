@@ -16,5 +16,5 @@ int main(int argc, char ** argv) {
         ptrc[i] = (char)i;
     }
     free(ptrc);
-
+    return 0;
 }

@@ -10,4 +10,5 @@ int main() {
     printf("fd %d duped into fd %d\n", newfd, newfd2);
     close(newfd);
     close(newfd2);
+    return 0;
 }

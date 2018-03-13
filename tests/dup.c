@@ -13,4 +13,5 @@ int main(int argc, char** argv) {
     dup2(fd3, 1);
     printf("hello fd %d", fd3);
     close(fd3);
+    return 0;
 }

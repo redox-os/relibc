@@ -23,4 +23,5 @@ int main( void )
         perror( "setreuid" );
     }
     printf("%d has euid %d and uid %d\n", getpid(), geteuid(), getuid());
+    return 0;
   }
