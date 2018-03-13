@@ -8,4 +8,5 @@ int main (int argc, char** argv) {
     status = fchdir(fd);
     printf("fchdir exited with status code %d\n", status);
     close(fd);
+    return 0;
 }

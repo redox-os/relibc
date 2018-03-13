@@ -11,4 +11,5 @@ int main(int argc, char** argv) {
     uid_t uid = getuid();
     printf("egid: %d, euid: %d, gid: %d, pgid: %d, pid: %d, ppid %d, uid %d\n",
             egid, euid, gid, pgid, pid, ppid, uid);
+    return 0;
 }
