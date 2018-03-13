@@ -30,4 +30,5 @@ int main()
         /* close read end */
         close(pip[0]);
     }
+    return 0;
 }
