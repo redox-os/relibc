@@ -11,7 +11,7 @@ use resource::rusage;
 
 #[no_mangle]
 pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {
-    waitpid(0 - 1, stat_loc, 0)
+    waitpid(!0, stat_loc, 0)
 }
 
 #[no_mangle]
