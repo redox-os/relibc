@@ -11,6 +11,7 @@ use fenv::{fegetround, FE_TONEAREST};
 
 pub const FLT_RADIX: c_int = 2;
 
+#[no_mangle]
 pub unsafe extern "C" fn flt_rounds() -> c_int {
     match fegetround() {
         FE_TONEAREST => 1,
