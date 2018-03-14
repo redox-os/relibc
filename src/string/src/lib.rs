@@ -8,8 +8,6 @@ extern crate errno;
 extern crate platform;
 extern crate stdlib;
 
-pub use compiler_builtins::mem::*;
-
 use platform::types::*;
 use errno::*;
 use core::cmp;
