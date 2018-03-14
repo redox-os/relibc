@@ -125,7 +125,7 @@ pub unsafe extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulon
 
     // The below logic is effectively ripped from the musl implementation
 
-    let mut byteset = [0u8; 32 / mem::size_of::<usize>()];
+    let mut byteset = [0usize; 32 / mem::size_of::<usize>()];
 
     let mut i = 0;
     while *s2.offset(i) != 0 {
@@ -135,9 +135,9 @@ pub unsafe extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulon
     }
 
     i = 0; // reset
-    while *s2.offset(i) != 0 {
-        if byteset[(*s2.offset(i) as usize) / (8 * byteset.len())]
-            & 1 << (*s2.offset(i) as usize % (8 * byteset.len())) > 0
+    while *s1.offset(i) != 0 {
+        if byteset[(*s1.offset(i) as usize) / (8 * byteset.len())]
+            & 1 << (*s1.offset(i) as usize % (8 * byteset.len())) > 0
         {
             break;
         }
@@ -282,7 +282,7 @@ pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong
 
     // The below logic is effectively ripped from the musl implementation
 
-    let mut byteset = [0u8; 32 / mem::size_of::<usize>()];
+    let mut byteset = [0usize; 32 / mem::size_of::<usize>()];
 
     let mut i = 0;
     while *s2.offset(i) != 0 {
@@ -292,9 +292,9 @@ pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong
     }
 
     i = 0; // reset
-    while *s2.offset(i) != 0 {
-        if byteset[(*s2.offset(i) as usize) / (8 * byteset.len())]
-            & 1 << (*s2.offset(i) as usize % (8 * byteset.len())) < 1
+    while *s1.offset(i) != 0 {
+        if byteset[(*s1.offset(i) as usize) / (8 * byteset.len())]
+            & 1 << (*s1.offset(i) as usize % (8 * byteset.len())) < 1
         {
             break;
         }
