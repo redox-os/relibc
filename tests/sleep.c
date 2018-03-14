@@ -10,4 +10,5 @@ int main(int argc, char** argv) {
     timespec tm = {0, 10000};
     nanosleep(&tm, NULL);
     perror("nanosleep");
+    return 0;
 }

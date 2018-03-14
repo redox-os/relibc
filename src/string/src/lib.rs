@@ -127,7 +127,7 @@ pub unsafe extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulon
 
     // The below logic is effectively ripped from the musl implementation
 
-    let mut byteset = [0u8; 32 / mem::size_of::<usize>()];
+    let mut byteset = [0usize; 32 / mem::size_of::<usize>()];
 
     let mut i = 0;
     while *s2.offset(i) != 0 {
@@ -279,7 +279,7 @@ pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong
 
     // The below logic is effectively ripped from the musl implementation
 
-    let mut byteset = [0u8; 32 / mem::size_of::<usize>()];
+    let mut byteset = [0usize; 32 / mem::size_of::<usize>()];
 
     let mut i = 0;
     while *s2.offset(i) != 0 {

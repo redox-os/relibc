@@ -1,5 +1,9 @@
 #include <math.h>
+#include <stdio.h>
 
 int main(int argc, char ** argv) {
-    float c = cos(3.14);
+    double pi = 3.14;
+    float c = cos(pi);
+    printf("cos(%f) = %f\n", pi, c);
+    return 0;
 }

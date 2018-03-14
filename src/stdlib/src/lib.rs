@@ -23,8 +23,30 @@ pub const EXIT_SUCCESS: c_int = 0;
 static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
 
 #[no_mangle]
-pub extern "C" fn a64l(s: *const c_char) -> c_long {
-    unimplemented!();
+pub unsafe extern "C" fn a64l(s: *const c_char) -> c_long {
+    if s.is_null() {
+        return 0;
+    }
+    let mut l: c_long = 0;
+    // a64l does not support more than 6 characters at once
+    for x in 0..6 {
+        let c = *s.offset(x);
+        if c == 0 {
+            // string is null terminated
+            return l;
+        }
+        // ASCII to base64 conversion:
+        let mut bits: c_long = if c < 58 {
+            (c - 46) as c_long // ./0123456789
+        } else if c < 91 {
+            (c - 53) as c_long // A-Z
+        } else {
+            (c - 59) as c_long // a-z
+        };
+        bits <<= 6 * x;
+        l |= bits;
+    }
+    return l;
 }
 
 #[no_mangle]
