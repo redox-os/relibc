@@ -204,9 +204,11 @@ pub fn unlink(path: *const c_char) -> c_int {
 
 pub fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
     unsafe {
-        let mut temp: usize = *stat_loc as usize;
-        let res = e(syscall::waitpid(pid as usize, &mut temp, options as usize));
-        *stat_loc = temp as c_int;
+        let mut temp: usize = 0;
+        let mut res = e(syscall::waitpid(pid as usize, &mut temp, options as usize));
+        if !stat_loc.is_null()  {
+            *stat_loc = temp as c_int;
+        }
         res
     }
 }
