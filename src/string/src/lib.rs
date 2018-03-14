@@ -8,6 +8,8 @@ extern crate errno;
 extern crate platform;
 extern crate stdlib;
 
+pub use compiler_builtins::mem::*;
+
 use platform::types::*;
 use errno::*;
 use core::cmp;
@@ -135,9 +137,9 @@ pub unsafe extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulon
     }
 
     i = 0; // reset
-    while *s2.offset(i) != 0 {
-        if byteset[(*s2.offset(i) as usize) / (8 * byteset.len())]
-            & 1 << (*s2.offset(i) as usize % (8 * byteset.len())) > 0
+    while *s1.offset(i) != 0 {
+        if byteset[(*s1.offset(i) as usize) / (8 * byteset.len())]
+            & 1 << (*s1.offset(i) as usize % (8 * byteset.len())) > 0
         {
             break;
         }
@@ -287,9 +289,9 @@ pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong
     }
 
     i = 0; // reset
-    while *s2.offset(i) != 0 {
-        if byteset[(*s2.offset(i) as usize) / (8 * byteset.len())]
-            & 1 << (*s2.offset(i) as usize % (8 * byteset.len())) < 1
+    while *s1.offset(i) != 0 {
+        if byteset[(*s1.offset(i) as usize) / (8 * byteset.len())]
+            & 1 << (*s1.offset(i) as usize % (8 * byteset.len())) < 1
         {
             break;
         }
