@@ -3,5 +3,9 @@ include_guard = "_FCNTL_H"
 trailer = "#include <bits/fcntl.h>"
 language = "C"
 
+[defines]
+"target_os = linux" = "__linux__"
+"target_os = redox" = "__redox__"
+
 [enum]
 prefix_with_name = true

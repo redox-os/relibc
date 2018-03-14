@@ -6,15 +6,55 @@ extern crate platform;
 
 use platform::types::*;
 
-pub use sys::*;
-
 #[cfg(target_os = "linux")]
-#[path = "linux.rs"]
-pub mod sys;
+pub const O_RDONLY: c_int = 0x0000;
+#[cfg(target_os = "linux")]
+pub const O_WRONLY: c_int = 0x0001;
+#[cfg(target_os = "linux")]
+pub const O_RDWR: c_int = 0x0002;
+#[cfg(target_os = "linux")]
+pub const O_CREAT: c_int = 0x0040;
+#[cfg(target_os = "linux")]
+pub const O_TRUNC: c_int = 0x0200;
+#[cfg(target_os = "linux")]
+pub const O_ACCMODE: c_int = O_RDONLY | O_WRONLY | O_RDWR;
 
 #[cfg(target_os = "redox")]
-#[path = "redox.rs"]
-pub mod sys;
+pub const O_RDONLY: c_int = 0x0001_0000;
+#[cfg(target_os = "redox")]
+pub const O_WRONLY: c_int = 0x0002_0000;
+#[cfg(target_os = "redox")]
+pub const O_RDWR: c_int = 0x0003_0000;
+#[cfg(target_os = "redox")]
+pub const O_NONBLOCK: c_int = 0x0004_0000;
+#[cfg(target_os = "redox")]
+pub const O_APPEND: c_int = 0x0008_0000;
+#[cfg(target_os = "redox")]
+pub const O_SHLOCK: c_int = 0x0010_0000;
+#[cfg(target_os = "redox")]
+pub const O_EXLOCK: c_int = 0x0020_0000;
+#[cfg(target_os = "redox")]
+pub const O_ASYNC: c_int = 0x0040_0000;
+#[cfg(target_os = "redox")]
+pub const O_FSYNC: c_int = 0x0080_0000;
+#[cfg(target_os = "redox")]
+pub const O_CLOEXEC: c_int = 0x0100_0000;
+#[cfg(target_os = "redox")]
+pub const O_CREAT: c_int = 0x0200_0000;
+#[cfg(target_os = "redox")]
+pub const O_TRUNC: c_int = 0x0400_0000;
+#[cfg(target_os = "redox")]
+pub const O_EXCL: c_int = 0x0800_0000;
+#[cfg(target_os = "redox")]
+pub const O_DIRECTORY: c_int = 0x1000_0000;
+#[cfg(target_os = "redox")]
+pub const O_STAT: c_int = 0x2000_0000;
+#[cfg(target_os = "redox")]
+pub const O_SYMLINK: c_int = 0x4000_0000;
+#[cfg(target_os = "redox")]
+pub const O_NOFOLLOW: c_int = 0x8000_0000;
+#[cfg(target_os = "redox")]
+pub const O_ACCMODE: c_int = O_RDONLY | O_WRONLY | O_RDWR;
 
 pub const F_DUPFD: c_int = 0;
 pub const F_GETFD: c_int = 1;
