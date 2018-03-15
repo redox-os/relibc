@@ -1,6 +1,6 @@
 sys_includes = ["sys/types.h"]
 include_guard = "_SIGNAL_H"
-trailer = "#include <bits/signal.h>"
+style = "Tag"
 language = "C"
 
 [defines]
