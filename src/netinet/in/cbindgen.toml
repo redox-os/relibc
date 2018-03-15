@@ -1,0 +1,10 @@
+sys_includes = ["sys/types.h", "sys/socket.h"]
+include_guard = "_NETINET_IN_H"
+style = "Tag"
+language = "C"
+
+[export]
+include = ["sockaddr_in6", "sockaddr_in", "ipv6_mreq"]
+
+[enum]
+prefix_with_name = true

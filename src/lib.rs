@@ -11,6 +11,7 @@ extern crate fenv;
 extern crate float;
 extern crate grp;
 extern crate mman;
+extern crate netinet;
 extern crate resource;
 extern crate semaphore;
 extern crate socket;

@@ -1,0 +1,7 @@
+[package]
+name = "netinet"
+version = "0.1.0"
+authors = ["Dan Robertson <danlrobertson89@gmail.com>"]
+
+[dependencies]
+in_h = { path = "in" }
