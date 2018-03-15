@@ -125,7 +125,7 @@ pub unsafe extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulon
 
     // The below logic is effectively ripped from the musl implementation
 
-    let mut byteset = [0u8; 32 / mem::size_of::<usize>()];
+    let mut byteset = [0usize; 32 / mem::size_of::<usize>()];
 
     let mut i = 0;
     while *s2.offset(i) != 0 {
@@ -135,9 +135,9 @@ pub unsafe extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulon
     }
 
     i = 0; // reset
-    while *s2.offset(i) != 0 {
-        if byteset[(*s2.offset(i) as usize) / (8 * byteset.len())]
-            & 1 << (*s2.offset(i) as usize % (8 * byteset.len())) > 0
+    while *s1.offset(i) != 0 {
+        if byteset[(*s1.offset(i) as usize) / (8 * byteset.len())]
+            & 1 << (*s1.offset(i) as usize % (8 * byteset.len())) > 0
         {
             break;
         }
@@ -250,8 +250,13 @@ pub unsafe extern "C" fn strncpy(s1: *mut c_char, s2: *const c_char, n: usize) -
 }
 
 #[no_mangle]
-pub extern "C" fn strpbrk(s1: *const c_char, s2: *const c_char) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strpbrk(s1: *const c_char, s2: *const c_char) -> *mut c_char {
+    let p = s1.offset(strcspn(s1, s2) as isize);
+    if *p != 0 {
+        p as *mut c_char
+    } else {
+        ptr::null_mut()
+    }
 }
 
 #[no_mangle]
@@ -277,7 +282,7 @@ pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong
 
     // The below logic is effectively ripped from the musl implementation
 
-    let mut byteset = [0u8; 32 / mem::size_of::<usize>()];
+    let mut byteset = [0usize; 32 / mem::size_of::<usize>()];
 
     let mut i = 0;
     while *s2.offset(i) != 0 {
@@ -287,9 +292,9 @@ pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong
     }
 
     i = 0; // reset
-    while *s2.offset(i) != 0 {
-        if byteset[(*s2.offset(i) as usize) / (8 * byteset.len())]
-            & 1 << (*s2.offset(i) as usize % (8 * byteset.len())) < 1
+    while *s1.offset(i) != 0 {
+        if byteset[(*s1.offset(i) as usize) / (8 * byteset.len())]
+            & 1 << (*s1.offset(i) as usize % (8 * byteset.len())) < 1
         {
             break;
         }
@@ -299,8 +304,22 @@ pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong
 }
 
 #[no_mangle]
-pub extern "C" fn strstr(s1: *const c_char, s2: *const c_char) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn strstr(s1: *const c_char, s2: *const c_char) -> *mut c_char {
+    let mut i = 0;
+    while *s1.offset(i) != 0 {
+        let mut j = 0;
+        while *s2.offset(j) != 0 && *s1.offset(j + i) != 0 {
+            if *s2.offset(j) != *s1.offset(j + i) {
+                break;
+            }
+            j += 1;
+            if *s2.offset(j) == 0 {
+                return s1.offset(i) as *mut c_char;
+            }
+        }
+        i += 1;
+    }
+    ptr::null_mut()
 }
 
 #[no_mangle]
