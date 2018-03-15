@@ -142,6 +142,12 @@ pub unsafe fn ftello(stream: *mut FILE) -> off_t {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn stdio_seek(stream: *mut FILE, off: off_t, whence: c_int) -> off_t {
     unsafe { platform::lseek((*stream).fd, off, whence) }
+}
+
+#[cfg(target_os = "redox")]
+pub fn stdio_seek(stream: *mut FILE, off: off_t, whence: c_int) -> off_t {
+    unsafe { platform::lseek((*stream).fd, off as isize, whence as usize) as off_t }
 }
