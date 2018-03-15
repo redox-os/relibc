@@ -1,6 +1,6 @@
-sys_includes = ["stdarg.h", "sys/types.h"]
-include_guard = "_FCNTL_H"
-trailer = "#include <bits/fcntl.h>"
+sys_includes = ["sys/types.h"]
+include_guard = "_SIGNAL_H"
+style = "Tag"
 language = "C"
 
 [defines]
