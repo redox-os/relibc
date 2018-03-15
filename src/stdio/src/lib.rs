@@ -80,7 +80,7 @@ pub unsafe extern "C" fn fclose(stream: *mut FILE) -> c_int {
     use stdlib::free;
     flockfile(stream);
     let r = helpers::fflush_unlocked(stream) | platform::close((*stream).fd);
-    if (*stream).flags & constants::F_PERM == 0 { 
+    if (*stream).flags & constants::F_PERM == 0 {
         // Not one of stdin, stdout or stderr
         free(stream as *mut _);
     }
@@ -234,7 +234,7 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
         fcntl::sys_fcntl(fd, fcntl::F_SETFD, fcntl::FD_CLOEXEC);
     }
 
-    let f = helpers::_fdopen(fd, mode); 
+    let f = helpers::_fdopen(fd, mode);
     if f.is_null() {
         platform::close(fd);
         return ptr::null_mut();
@@ -292,8 +292,7 @@ pub unsafe extern "C" fn fread(
         } else {
             if let Some(f) = (*stream).read {
                 (*f)(stream, dest, l as usize)
-            }
-            else {
+            } else {
                 0
             }
         };
@@ -662,9 +661,7 @@ pub unsafe extern "C" fn ungetc(c: c_int, stream: *mut FILE) -> c_int {
         if (*stream).rpos.is_null() {
             internal::to_read(stream);
         }
-        if (*stream).rpos.is_null()
-            || (*stream).rpos <= (*stream).buf.sub((*stream).unget)
-        {
+        if (*stream).rpos.is_null() || (*stream).rpos <= (*stream).buf.sub((*stream).unget) {
             funlockfile(stream);
             return -1;
         }

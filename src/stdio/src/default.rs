@@ -1,6 +1,6 @@
 use core::sync::atomic::AtomicBool;
 use core::ptr;
-use super::{internal, BUFSIZ, FILE, UNGET, constants};
+use super::{constants, internal, BUFSIZ, FILE, UNGET};
 
 #[allow(non_upper_case_globals)]
 static mut default_stdin_buf: [u8; BUFSIZ as usize + UNGET] = [0; BUFSIZ as usize + UNGET];

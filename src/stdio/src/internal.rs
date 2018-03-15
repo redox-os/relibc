@@ -1,4 +1,4 @@
-use super::{FILE, constants};
+use super::{constants, FILE};
 use platform;
 use platform::types::*;
 use core::{mem, ptr, slice};
@@ -16,7 +16,11 @@ pub fn stdio_read(stream: *mut FILE, buf: *mut u8, size: usize) -> usize {
         mem::forget(buff);
         mem::forget(file_buf);
         if count <= 0 {
-            (*stream).flags |= if count == 0 { constants::F_EOF } else { constants::F_ERR };
+            (*stream).flags |= if count == 0 {
+                constants::F_EOF
+            } else {
+                constants::F_ERR
+            };
             return 0;
         }
         if count as usize <= size {
@@ -46,7 +50,7 @@ pub fn stdio_write(stream: *mut FILE, buf: *const u8, size: usize) -> usize {
                 file.write(&f_buf[advance..]) + file.write(buff)
             };
             if count == rem as isize {
-                (*stream).wend = (*stream).buf.add((*stream).buf_size -1);
+                (*stream).wend = (*stream).buf.add((*stream).buf_size - 1);
                 (*stream).wpos = (*stream).buf;
                 (*stream).wbase = (*stream).buf;
                 return size;
@@ -89,8 +93,8 @@ pub unsafe fn to_read(stream: *mut FILE) -> bool {
         (*stream).flags |= constants::F_ERR;
         return true;
     }
-    (*stream).rpos = (*stream).buf.offset((*stream).buf_size as isize -1);
-    (*stream).rend = (*stream).buf.offset((*stream).buf_size as isize -1);
+    (*stream).rpos = (*stream).buf.offset((*stream).buf_size as isize - 1);
+    (*stream).rend = (*stream).buf.offset((*stream).buf_size as isize - 1);
     if (*stream).flags & constants::F_EOF > 0 {
         true
     } else {
@@ -113,7 +117,7 @@ pub unsafe fn to_write(stream: *mut FILE) -> bool {
     (*stream).rend = ptr::null_mut();
     (*stream).wpos = (*stream).buf;
     (*stream).wbase = (*stream).buf;
-    (*stream).wend = (*stream).buf.offset((*stream).buf_size as isize -1);
+    (*stream).wend = (*stream).buf.offset((*stream).buf_size as isize - 1);
     return true;
 }
 
