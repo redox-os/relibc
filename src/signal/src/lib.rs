@@ -23,6 +23,8 @@ pub struct sigaction {
     pub sa_flags: usize,
 }
 
+pub type sigset_t = sys_sigset_t;
+
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
     unimplemented!();

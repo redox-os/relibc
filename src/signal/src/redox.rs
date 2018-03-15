@@ -1,5 +1,5 @@
 #[repr(C)]
-pub struct sigset_t {
+pub struct sys_sigset_t {
     pub bits: [u64; 2],
 }
 
