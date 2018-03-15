@@ -263,6 +263,7 @@ dependencies = [
  "resource 0.1.0",
  "semaphore 0.1.0",
  "signal 0.1.0",
+ "socket 0.1.0",
  "stat 0.1.0",
  "stdio 0.1.0",
  "stdlib 0.1.0",
@@ -345,6 +346,14 @@ dependencies = [
 
 [[package]]
 name = "signal"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "platform 0.1.0",
+]
+
+[[package]]
+name = "socket"
 version = "0.1.0"
 dependencies = [
  "cbindgen 0.5.2",

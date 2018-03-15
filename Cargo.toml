@@ -23,6 +23,7 @@ platform = { path = "src/platform" }
 resource = { path = "src/resource" }
 semaphore = { path = "src/semaphore" }
 signal = { path = "src/signal" }
+socket = { path = "src/socket" }
 stat = { path = "src/stat" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }

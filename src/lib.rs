@@ -13,6 +13,7 @@ extern crate grp;
 extern crate mman;
 extern crate resource;
 extern crate semaphore;
+extern crate socket;
 extern crate stat;
 extern crate stdio;
 extern crate stdlib;
