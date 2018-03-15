@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
     exit(0);
 } else {
     // parent
-    int* stat_loc;
-    waitpid(pid, stat_loc, 0);
+    int stat_loc;
+    waitpid(pid, &stat_loc, 0);
     }
 }
