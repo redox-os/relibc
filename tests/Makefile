@@ -12,6 +12,8 @@ EXPECT_BINS=\
 	fcntl \
 	fsync \
 	ftruncate \
+	getid \
+	getc_unget \
 	link \
 	math \
 	mem \
@@ -20,6 +22,8 @@ EXPECT_BINS=\
 	rmdir \
 	sleep \
 	sprintf \
+	stdio/fwrite \
+	stdio/all \
 	stdlib/strtol \
 	stdlib/a64l \
 	string/strncmp \
