@@ -20,6 +20,7 @@ extern crate string;
 extern crate sys_time;
 extern crate time;
 extern crate unistd;
+extern crate wait;
 extern crate wctype;
 
 #[lang = "eh_personality"]

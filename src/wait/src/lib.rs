@@ -11,7 +11,7 @@ use resource::rusage;
 
 #[no_mangle]
 pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {
-    unimplemented!();
+    waitpid(!0, stat_loc, 0)
 }
 
 #[no_mangle]
@@ -39,5 +39,5 @@ pub unsafe extern "C" fn wait3(
 
 #[no_mangle]
 pub unsafe extern "C" fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
-    unimplemented!();
+    platform::waitpid(pid, stat_loc, options)
 }
