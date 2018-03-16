@@ -30,6 +30,7 @@ EXPECT_BINS=\
 	string/strstr \
 	string/strpbrk \
 	unlink \
+	waitpid \
 	write
 
 # Binaries that may generate varied output
