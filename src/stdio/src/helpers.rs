@@ -78,9 +78,9 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> *mut FILE {
         buf_char: -1,
         unget: UNGET,
         lock: AtomicBool::new(false),
-        write: Some(&internal::stdio_write),
-        read: Some(&internal::stdio_read),
-        seek: Some(&internal::stdio_seek),
+        write: Some(internal::stdio_write),
+        read: Some(internal::stdio_read),
+        seek: Some(internal::stdio_seek),
     };
     file
 }
@@ -97,7 +97,7 @@ pub unsafe fn fwritex(buf: *const u8, l: size_t, stream: *mut FILE) -> size_t {
         }
         if l > (*stream).wend as usize - (*stream).wpos as usize {
             // We can't fit all of buf in the buffer
-            return (*stream_write)(stream, buf, l);
+            return stream_write(stream, buf, l);
         }
 
         let i = if (*stream).buf_char >= 0 {
@@ -106,7 +106,7 @@ pub unsafe fn fwritex(buf: *const u8, l: size_t, stream: *mut FILE) -> size_t {
                 i -= 1;
             }
             if i > 0 {
-                let n = (*stream_write)(stream, buf, i);
+                let n = stream_write(stream, buf, i);
                 if n < i {
                     return n;
                 }
@@ -131,7 +131,7 @@ pub unsafe fn fwritex(buf: *const u8, l: size_t, stream: *mut FILE) -> size_t {
 pub unsafe fn fflush_unlocked(stream: *mut FILE) -> c_int {
     if (*stream).wpos > (*stream).wbase {
         if let Some(f) = (*stream).write {
-            (*f)(stream, ptr::null(), 0);
+            f(stream, ptr::null(), 0);
             if (*stream).wpos.is_null() {
                 return -1;
             }
@@ -142,7 +142,7 @@ pub unsafe fn fflush_unlocked(stream: *mut FILE) -> c_int {
 
     if (*stream).rpos < (*stream).rend {
         if let Some(s) = (*stream).seek {
-            (*s)(
+            s(
                 stream,
                 (*stream).rpos as i64 - (*stream).rend as i64,
                 SEEK_CUR,

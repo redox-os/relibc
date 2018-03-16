@@ -20,7 +20,7 @@ static mut default_stdin: FILE = FILE {
     unget: UNGET,
     lock: AtomicBool::new(false),
     write: None,
-    read: Some(&internal::stdio_read),
+    read: Some(internal::stdio_read),
     seek: None,
 };
 
@@ -41,7 +41,7 @@ static mut default_stdout: FILE = FILE {
     buf_char: b'\n' as i8,
     unget: 0,
     lock: AtomicBool::new(false),
-    write: Some(&internal::stdio_write),
+    write: Some(internal::stdio_write),
     read: None,
     seek: None,
 };
@@ -63,7 +63,7 @@ static mut default_stderr: FILE = FILE {
     buf_char: -1,
     unget: 0,
     lock: AtomicBool::new(false),
-    write: Some(&internal::stdio_write),
+    write: Some(internal::stdio_write),
     read: None,
     seek: None,
 };

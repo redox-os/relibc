@@ -50,9 +50,9 @@ pub struct FILE {
     buf_char: i8,
     lock: AtomicBool,
     unget: size_t,
-    write: Option<*const (Fn(*mut FILE, *const u8, usize) -> size_t)>,
-    read: Option<*const (Fn(*mut FILE, *mut u8, usize) -> size_t)>,
-    seek: Option<*const (Fn(*mut FILE, off_t, c_int) -> off_t)>,
+    write: Option<(fn(*mut FILE, *const u8, usize) -> size_t)>,
+    read: Option<(fn(*mut FILE, *mut u8, usize) -> size_t)>,
+    seek: Option<(fn(*mut FILE, off_t, c_int) -> off_t)>,
 }
 
 /// Clears EOF and ERR indicators on a stream
@@ -291,7 +291,7 @@ pub unsafe extern "C" fn fread(
             0
         } else {
             if let Some(f) = (*stream).read {
-                (*f)(stream, dest, l as usize)
+                f(stream, dest, l as usize)
             } else {
                 0
             }
@@ -378,7 +378,7 @@ pub unsafe extern "C" fn fseeko(stream: *mut FILE, offset: off_t, whence: c_int)
     }
     if (*stream).wpos > (*stream).wbase {
         if let Some(f) = (*stream).write {
-            (*f)(stream, ptr::null(), 0);
+            f(stream, ptr::null(), 0);
             if (*stream).wpos.is_null() {
                 return -1;
             }
@@ -388,7 +388,7 @@ pub unsafe extern "C" fn fseeko(stream: *mut FILE, offset: off_t, whence: c_int)
     (*stream).wend = ptr::null_mut();
     (*stream).wbase = ptr::null_mut();
     if let Some(s) = (*stream).seek {
-        if (*s)(stream, off, whence) < 0 {
+        if s(stream, off, whence) < 0 {
             return -1;
         }
     } else {
@@ -481,7 +481,7 @@ pub unsafe extern "C" fn getc_unlocked(stream: *mut FILE) -> c_int {
     } else {
         if let Some(read) = (*stream).read {
             let mut c = 0u8;
-            if !internal::to_read(stream) && (*read)(stream, &mut c, 1) == 1 {
+            if !internal::to_read(stream) && read(stream, &mut c, 1) == 1 {
                 c as c_int
             } else {
                 -1
@@ -575,7 +575,7 @@ pub unsafe extern "C" fn putc_unlocked(c: c_int, stream: *mut FILE) -> c_int {
                 *(*stream).wpos = c as u8;
                 (*stream).wpos = (*stream).wpos.add(1);
                 c
-            } else if (*write)(stream, &c as *const i32 as *const _, 1) != 1 {
+            } else if write(stream, &c as *const i32 as *const _, 1) != 1 {
                 -1
             } else {
                 c

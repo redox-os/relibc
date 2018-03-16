@@ -83,7 +83,7 @@ pub unsafe fn to_read(stream: *mut FILE) -> bool {
 
     if (*stream).wpos > (*stream).wbase {
         if let Some(f) = (*stream).write {
-            (*f)(stream, ptr::null(), 0);
+            f(stream, ptr::null(), 0);
         }
     }
     (*stream).wpos = ptr::null_mut();
@@ -123,7 +123,7 @@ pub unsafe fn to_write(stream: *mut FILE) -> bool {
 
 pub unsafe fn ftello(stream: *mut FILE) -> off_t {
     if let Some(s) = (*stream).seek {
-        let pos = (*s)(
+        let pos = s(
             stream,
             0,
             if ((*stream).flags & constants::F_APP > 0) && (*stream).wpos > (*stream).wbase {
