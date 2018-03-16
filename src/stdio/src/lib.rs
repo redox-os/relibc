@@ -320,7 +320,8 @@ pub unsafe extern "C" fn freopen(
     flockfile(stream);
 
     helpers::fflush_unlocked(stream);
-    if filename.is_null() { // Reopen stream in new mode
+    if filename.is_null() {
+        // Reopen stream in new mode
         if flags & fcntl::O_CLOEXEC > 0 {
             fcntl::sys_fcntl((*stream).fd, fcntl::F_SETFD, fcntl::FD_CLOEXEC);
         }
@@ -339,7 +340,9 @@ pub unsafe extern "C" fn freopen(
         }
         if (*new).fd == (*stream).fd {
             (*new).fd = -1;
-        } else if platform::dup2((*new).fd, (*stream).fd) < 0 || fcntl::sys_fcntl((*stream).fd, fcntl::F_SETFL, flags&fcntl::O_CLOEXEC) < 0 {
+        } else if platform::dup2((*new).fd, (*stream).fd) < 0
+            || fcntl::sys_fcntl((*stream).fd, fcntl::F_SETFL, flags & fcntl::O_CLOEXEC) < 0
+        {
             fclose(new);
             funlockfile(stream);
             fclose(stream);
