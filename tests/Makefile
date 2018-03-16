@@ -24,6 +24,7 @@ EXPECT_BINS=\
 	sprintf \
 	stdio/fwrite \
 	stdio/all \
+	stdio/freopen \
 	stdlib/strtol \
 	stdlib/a64l \
 	string/strncmp \

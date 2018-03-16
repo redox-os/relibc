@@ -30,6 +30,7 @@
 /stdlib/a64l
 /stdio/fwrite
 /stdio/all
+/stdio/freopen
 /string/strncmp
 /string/strcspn
 /string/strchr

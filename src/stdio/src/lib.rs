@@ -311,12 +311,48 @@ pub unsafe extern "C" fn fread(
 }
 
 #[no_mangle]
-pub extern "C" fn freopen(
+pub unsafe extern "C" fn freopen(
     filename: *const c_char,
     mode: *const c_char,
     stream: *mut FILE,
 ) -> *mut FILE {
-    unimplemented!();
+    let mut flags = helpers::parse_mode_flags(mode);
+    flockfile(stream);
+
+    helpers::fflush_unlocked(stream);
+    if filename.is_null() { // Reopen stream in new mode
+        if flags & fcntl::O_CLOEXEC > 0 {
+            fcntl::sys_fcntl((*stream).fd, fcntl::F_SETFD, fcntl::FD_CLOEXEC);
+        }
+        flags &= !(fcntl::O_CREAT | fcntl::O_EXCL | fcntl::O_CLOEXEC);
+        if fcntl::sys_fcntl((*stream).fd, fcntl::F_SETFL, flags) < 0 {
+            funlockfile(stream);
+            fclose(stream);
+            return ptr::null_mut();
+        }
+    } else {
+        let new = fopen(filename, mode);
+        if new.is_null() {
+            funlockfile(stream);
+            fclose(stream);
+            return ptr::null_mut();
+        }
+        if (*new).fd == (*stream).fd {
+            (*new).fd = -1;
+        } else if platform::dup2((*new).fd, (*stream).fd) < 0 || fcntl::sys_fcntl((*stream).fd, fcntl::F_SETFL, flags&fcntl::O_CLOEXEC) < 0 {
+            fclose(new);
+            funlockfile(stream);
+            fclose(stream);
+            return ptr::null_mut();
+        }
+        (*stream).flags = ((*stream).flags & constants::F_PERM) | (*new).flags;
+        (*stream).read = (*new).read;
+        (*stream).write = (*new).write;
+        (*stream).seek = (*new).seek;
+        fclose(new);
+    }
+    funlockfile(stream);
+    stream
 }
 
 /// Seek to an offset `offset` from `whence`
