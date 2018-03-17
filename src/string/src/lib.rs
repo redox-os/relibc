@@ -352,17 +352,46 @@ pub extern "C" fn strtok(s1: *mut c_char, delimiter: *const c_char) -> *mut c_ch
 
         return token;
     }
-
-    ptr::null_mut()
 }
 
 #[no_mangle]
 pub extern "C" fn strtok_r(
     s: *mut c_char,
-    sep: *const c_char,
+    delimiter: *const c_char,
     lasts: *mut *mut c_char,
 ) -> *mut c_char {
-    unimplemented!();
+    // Loosely based on GLIBC implementation
+    unsafe {
+        let mut haystack = s;
+        if haystack.is_null() {
+            if (*lasts).is_null() {
+                return ptr::null_mut();
+            }
+            haystack = *lasts;
+        }
+
+        // Skip past any extra delimiter left over from previous call
+        haystack = haystack.add(strspn(haystack, delimiter));
+        if *haystack == 0 {
+            haystack = ptr::null_mut();
+            *lasts = ptr::null_mut();
+            return ptr::null_mut();
+        }
+
+        // Build token by injecting null byte into delimiter
+        let token = haystack;
+        haystack = strpbrk(token, delimiter);
+        if !haystack.is_null() {
+            haystack.write(0);
+            haystack = haystack.add(1);
+            *lasts = haystack;
+        } else {
+            haystack = ptr::null_mut();
+            *lasts = ptr::null_mut();
+        }
+
+        return token;
+    }
 }
 
 #[no_mangle]
