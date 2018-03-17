@@ -373,7 +373,6 @@ pub extern "C" fn strtok_r(
         // Skip past any extra delimiter left over from previous call
         haystack = haystack.add(strspn(haystack, delimiter));
         if *haystack == 0 {
-            haystack = ptr::null_mut();
             *lasts = ptr::null_mut();
             return ptr::null_mut();
         }
@@ -386,7 +385,6 @@ pub extern "C" fn strtok_r(
             haystack = haystack.add(1);
             *lasts = haystack;
         } else {
-            haystack = ptr::null_mut();
             *lasts = ptr::null_mut();
         }
 
