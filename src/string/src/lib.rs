@@ -117,7 +117,7 @@ pub unsafe extern "C" fn strcpy(s1: *mut c_char, s2: *const c_char) -> *mut c_ch
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
+pub unsafe extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> size_t {
     use core::mem;
 
     let s1 = s1 as *const u8;
@@ -143,7 +143,7 @@ pub unsafe extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> c_ulon
         }
         i += 1;
     }
-    i as u64
+    i as size_t
 }
 
 #[no_mangle]
@@ -274,7 +274,7 @@ pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong {
+pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> size_t {
     use core::mem;
 
     let s1 = s1 as *const u8;
@@ -300,7 +300,7 @@ pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> c_ulong
         }
         i += 1;
     }
-    i as u64
+    i as size_t
 }
 
 #[no_mangle]
@@ -337,7 +337,7 @@ pub extern "C" fn strtok_r(
 }
 
 #[no_mangle]
-pub extern "C" fn strxfrm(s1: *mut c_char, s2: *const c_char, n: usize) -> c_ulong {
+pub extern "C" fn strxfrm(s1: *mut c_char, s2: *const c_char, n: usize) -> size_t {
     unimplemented!();
 }
 
