@@ -29,6 +29,7 @@ EXPECT_BINS=\
 	string/strspn \
 	string/strstr \
 	string/strpbrk \
+	string/strtok \
 	unlink \
 	waitpid \
 	write
