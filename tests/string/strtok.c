@@ -7,8 +7,10 @@ int main(int argc, char* argv[]) {
 
     char* token = strtok(source, " ");
     while (token) {
-        printf("%s_", token);
-        token = strtok(NULL, " ");
+        printf("%s", token);
+        if (token = strtok(NULL, " ")) {
+            printf("_");
+        }
     }
 
     return 0;

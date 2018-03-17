@@ -344,7 +344,7 @@ pub extern "C" fn strtok(s1: *mut c_char, delimiter: *const c_char) -> *mut c_ch
         let token = HAYSTACK;
         HAYSTACK = strpbrk(token, delimiter);
         if !HAYSTACK.is_null() {
-            HAYSTACK.write(0 as c_char);
+            HAYSTACK.write(0);
             HAYSTACK = HAYSTACK.add(1);
         } else {
             HAYSTACK = ptr::null_mut();
