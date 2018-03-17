@@ -1,5 +1,4 @@
 use super::{internal, BUFSIZ, FILE, UNGET};
-use compiler_builtins::mem::memset;
 use stdlib::calloc;
 use core::{mem, ptr};
 use core::sync::atomic::AtomicBool;
@@ -78,82 +77,71 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> *mut FILE {
         buf_char: -1,
         unget: UNGET,
         lock: AtomicBool::new(false),
-        write: Some(internal::stdio_write),
-        read: Some(internal::stdio_read),
-        seek: Some(internal::stdio_seek),
     };
     file
 }
 
 /// Write buffer `buf` of length `l` into `stream`
-pub unsafe fn fwritex(buf: *const u8, l: size_t, stream: *mut FILE) -> size_t {
-    use compiler_builtins::mem::memcpy;
-    let mut buf = buf;
+pub fn fwritex(buf: *const u8, l: size_t, stream: &mut FILE) -> size_t {
+    use core::ptr::copy_nonoverlapping;
+    use core::slice;
+
+    let buf: &'static [u8] = unsafe { slice::from_raw_parts(buf, l) };
     let mut l = l;
-    if let Some(stream_write) = (*stream).write {
-        if (*stream).wend.is_null() && !internal::to_write(stream) {
-            // We can't write to this stream
-            return 0;
-        }
-        if l > (*stream).wend as usize - (*stream).wpos as usize {
-            // We can't fit all of buf in the buffer
-            return stream_write(stream, buf, l);
-        }
+    let mut advance = 0;
 
-        let i = if (*stream).buf_char >= 0 {
-            let mut i = l;
-            while i > 0 && *buf.offset(i as isize - 1) != b'\n' {
-                i -= 1;
-            }
-            if i > 0 {
-                let n = stream_write(stream, buf, i);
-                if n < i {
-                    return n;
-                }
-                buf = buf.add(i);
-                l -= i;
-            }
-            i
-        } else {
-            0
-        };
-
-        memcpy((*stream).wpos, buf, l);
-        (*stream).wpos = (*stream).wpos.add(l);
-        l + i
-    } else {
+    if stream.wend.is_null() && !stream.can_write() {
         // We can't write to this stream
-        0
+        return 0;
     }
+    if l > stream.wend as usize - stream.wpos as usize {
+        // We can't fit all of buf in the buffer
+        return stream.write(buf);
+    }
+
+    let i = if stream.buf_char >= 0 {
+        let mut i = l;
+        while i > 0 && buf[i - 1] != b'\n' {
+            i -= 1;
+        }
+        if i > 0 {
+            let n = stream.write(buf);
+            if n < i {
+                return n;
+            }
+            advance += i;
+            l -= i;
+        }
+        i
+    } else {
+        0
+    };
+
+    unsafe {
+        // Copy and reposition
+        copy_nonoverlapping(&buf[advance..] as *const _ as *const u8, stream.wpos, l);
+        stream.wpos = stream.wpos.add(l);
+    }
+    l + i
 }
 
 /// Flush `stream` without locking it.
-pub unsafe fn fflush_unlocked(stream: *mut FILE) -> c_int {
-    if (*stream).wpos > (*stream).wbase {
-        if let Some(f) = (*stream).write {
-            f(stream, ptr::null(), 0);
-            if (*stream).wpos.is_null() {
-                return -1;
-            }
-        } else {
+pub fn fflush_unlocked(stream: &mut FILE) -> c_int {
+    if stream.wpos > stream.wbase {
+        stream.write(&[]);
+        if stream.wpos.is_null() {
             return -1;
         }
     }
 
-    if (*stream).rpos < (*stream).rend {
-        if let Some(s) = (*stream).seek {
-            s(
-                stream,
-                (*stream).rpos as i64 - (*stream).rend as i64,
-                SEEK_CUR,
-            );
-        }
+    if stream.rpos < stream.rend {
+        stream.seek(stream.rpos as i64 - stream.rend as i64, SEEK_CUR);
     }
 
-    (*stream).wpos = ptr::null_mut();
-    (*stream).wend = ptr::null_mut();
-    (*stream).wbase = ptr::null_mut();
-    (*stream).rpos = ptr::null_mut();
-    (*stream).rend = ptr::null_mut();
+    stream.wpos = ptr::null_mut();
+    stream.wend = ptr::null_mut();
+    stream.wbase = ptr::null_mut();
+    stream.rpos = ptr::null_mut();
+    stream.rend = ptr::null_mut();
     0
 }

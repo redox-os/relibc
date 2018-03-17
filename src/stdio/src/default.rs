@@ -19,9 +19,6 @@ static mut default_stdin: FILE = FILE {
     buf_char: -1,
     unget: UNGET,
     lock: AtomicBool::new(false),
-    write: None,
-    read: Some(internal::stdio_read),
-    seek: None,
 };
 
 #[allow(non_upper_case_globals)]
@@ -41,9 +38,6 @@ static mut default_stdout: FILE = FILE {
     buf_char: b'\n' as i8,
     unget: 0,
     lock: AtomicBool::new(false),
-    write: Some(internal::stdio_write),
-    read: None,
-    seek: None,
 };
 
 #[allow(non_upper_case_globals)]
@@ -63,9 +57,6 @@ static mut default_stderr: FILE = FILE {
     buf_char: -1,
     unget: 0,
     lock: AtomicBool::new(false),
-    write: Some(internal::stdio_write),
-    read: None,
-    seek: None,
 };
 
 // Don't ask me how the casting below works, I have no idea
