@@ -10,7 +10,8 @@ int int_cmp(const void* a, const void* b) {
     void* res = bsearch((const void*) &key, (void*) arr, len, sizeof(int), int_cmp); \
     if (res != expect) { \
       printf("FAIL bsearch for %d in [", key); \
-      for (size_t i = 0; i < len; ++i) printf("%d,", arr[i]); \
+      size_t i = 0; \
+      for (; i < len; ++i) printf("%d,", arr[i]); \
       printf("] expected %p but got %p\n", (void*) expect, res); \
       return 1; \
     } \
