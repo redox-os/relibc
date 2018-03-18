@@ -19,10 +19,12 @@ fenv = { path = "src/fenv" }
 float = { path = "src/float" }
 grp = { path = "src/grp" }
 mman = { path = "src/mman" }
+netinet = { path = "src/netinet" }
 platform = { path = "src/platform" }
 resource = { path = "src/resource" }
 semaphore = { path = "src/semaphore" }
 signal = { path = "src/signal" }
+socket = { path = "src/socket" }
 stat = { path = "src/stat" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }
