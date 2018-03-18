@@ -20,6 +20,7 @@ EXPECT_BINS=\
 	rmdir \
 	sleep \
 	sprintf \
+	stdlib/bsearch \
 	stdlib/strtol \
 	stdlib/a64l \
 	string/strncmp \
