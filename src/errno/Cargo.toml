@@ -2,10 +2,6 @@
 name = "errno"
 version = "0.1.0"
 authors = ["Alex Lyon <arcterus@mail.com>"]
-build = "build.rs"
-
-[build-dependencies]
-cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
 platform = { path = "../platform" }

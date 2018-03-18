@@ -1,6 +1,0 @@
-sys_includes = []
-include_guard = "_TEMPLATE_H"
-language = "C"
-
-[enum]
-prefix_with_name = true

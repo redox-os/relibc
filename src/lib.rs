@@ -7,8 +7,6 @@ extern crate platform;
 extern crate ctype;
 extern crate errno;
 extern crate fcntl;
-extern crate fenv;
-extern crate float;
 extern crate grp;
 extern crate mman;
 extern crate netinet;
@@ -24,6 +22,9 @@ extern crate time;
 extern crate unistd;
 extern crate wait;
 extern crate wctype;
+
+pub mod fenv;
+pub mod float;
 
 #[lang = "eh_personality"]
 #[no_mangle]

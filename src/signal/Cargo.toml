@@ -2,10 +2,6 @@
 name = "signal"
 version = "0.1.0"
 authors = ["Dan Robertson <danlrobertson89@gmail.com>"]
-build = "build.rs"
-
-[build-dependencies]
-cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
 platform = { path = "../platform" }

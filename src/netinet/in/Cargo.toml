@@ -2,11 +2,7 @@
 name = "in_h"
 version = "0.1.0"
 authors = ["Dan Robertson <danlrobertson89@gmail.com>"]
-build = "build.rs"
-
-[build-dependencies]
-cbindgen = { path = "../../../cbindgen" }
 
 [dependencies]
 platform = { path = "../../platform" }
-socket = { path = "../../socket" }
+socket = { path = "../../sys/socket" }

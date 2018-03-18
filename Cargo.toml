@@ -2,6 +2,7 @@
 name = "relibc"
 version = "0.1.0"
 authors = ["Jeremy Soller <jackpot51@gmail.com>"]
+build = "build.rs"
 
 [lib]
 name = "c"
@@ -10,29 +11,30 @@ crate-type = ["staticlib"]
 [workspace]
 members = ["src/crt0"]
 
+[build-dependencies]
+cbindgen = { path = "cbindgen" }
+
 [dependencies]
 compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins.git", default-features = false, features = ["mem"] }
 ctype = { path = "src/ctype" }
 errno = { path = "src/errno" }
 fcntl = { path = "src/fcntl" }
-fenv = { path = "src/fenv" }
-float = { path = "src/float" }
 grp = { path = "src/grp" }
-mman = { path = "src/mman" }
 netinet = { path = "src/netinet" }
+mman = { path = "src/sys/mman" }
 platform = { path = "src/platform" }
-resource = { path = "src/resource" }
+resource = { path = "src/sys/resource" }
 semaphore = { path = "src/semaphore" }
 signal = { path = "src/signal" }
-socket = { path = "src/socket" }
-stat = { path = "src/stat" }
+socket = { path = "src/sys/socket" }
+stat = { path = "src/sys/stat" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }
 string = { path = "src/string" }
-sys_time = { path = "src/sys_time" }
+sys_time = { path = "src/sys/time" }
 time = { path = "src/time" }
 unistd = { path = "src/unistd" }
-wait = { path = "src/wait" }
+wait = { path = "src/sys/wait" }
 wctype = { path = "src/wctype" }
 
 [profile.dev]
