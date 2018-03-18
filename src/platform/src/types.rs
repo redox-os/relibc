@@ -1,3 +1,5 @@
+#[cfg(target_os = "redox")]
+use syscall::data::TimeSpec as redox_timespec;
 // Use repr(u8) as LLVM expects `void*` to be the same as `i8*` to help enable
 // more optimization opportunities around it recognizing things like
 // malloc/free.
@@ -69,4 +71,14 @@ pub type timer_t = c_void;
 pub struct timespec {
     pub tv_sec: time_t,
     pub tv_nsec: c_long,
+}
+
+#[cfg(target_os = "redox")]
+impl<'a> From<&'a timespec> for redox_timespec {
+    fn from(tp: &timespec) -> redox_timespec {
+        redox_timespec {
+            tv_sec: tp.tv_sec,
+            tv_nsec: tp.tv_nsec as i32,
+        }
+    }
 }
