@@ -130,15 +130,33 @@ pub extern "C" fn atol(s: *const c_char) -> c_long {
     dec_num_from_ascii!(s, c_long)
 }
 
+unsafe extern "C" fn void_cmp(a: *const c_void, b: *const c_void) -> c_int {
+    return *(a as *const i32) - *(b as *const i32) as c_int;
+}
+
 #[no_mangle]
-pub extern "C" fn bsearch(
+pub unsafe extern "C" fn bsearch(
     key: *const c_void,
     base: *const c_void,
     nel: size_t,
     width: size_t,
-    compar: Option<extern "C" fn(*const c_void, *const c_void) -> c_int>,
+    compar: Option<unsafe extern "C" fn(*const c_void, *const c_void) -> c_int>,
 ) -> *mut c_void {
-    unimplemented!();
+    let mut start = base;
+    let mut len = nel;
+    let cmp_fn = compar.unwrap_or(void_cmp);
+    while len > 0 {
+        let med = (start as size_t + (len >> 1) * width) as *const c_void;
+        let diff = cmp_fn(key, med);
+        if diff == 0 {
+            return med as *mut c_void;
+        } else if diff > 0 {
+            start = (med as usize + width) as *const c_void;
+            len -= 1;
+        }
+        len >>= 1;
+    }
+    ptr::null_mut()
 }
 
 #[no_mangle]
