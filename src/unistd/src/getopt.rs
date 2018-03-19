@@ -30,12 +30,12 @@ pub unsafe extern "C" fn getopt(
     argv: *const *mut c_char,
     optstring: *const c_char,
 ) -> c_int {
-    if CURRENT_OPT == ptr::null_mut() || *CURRENT_OPT == 0 {
+    if CURRENT_OPT.is_null() || *CURRENT_OPT == 0 {
         if optind >= argc {
             -1
         } else {
             let current_arg = *argv.offset(optind as isize);
-            if current_arg == ptr::null_mut() || *current_arg != b'-' as c_char
+            if current_arg.is_null() || *current_arg != b'-' as c_char
                 || string::strcmp(current_arg, b"-\0".as_ptr() as _) == 0
             {
                 -1
