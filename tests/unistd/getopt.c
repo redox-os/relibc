@@ -11,7 +11,7 @@
         printf("result: %d\n", runner(sizeof(args_arr) / sizeof(args_arr[0]), args_arr)); \
     }
 
-int runner(int argc, const char *argv[]) {
+int runner(int argc, char *argv[]) {
     int c;
     int bflg = 0, aflg = 0, errflg = 0;
     char *ifile = "";
@@ -65,4 +65,5 @@ int main(int argc, const char *argv[]) {
     RUN("test", "-a", "-o", "arg", "--", "path", "path");
     RUN("test", "-a", "-oarg", "path", "path");
     RUN("test", "-aoarg", "path", "path");
+    RUN("test");
 }

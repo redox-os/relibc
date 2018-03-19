@@ -34,3 +34,9 @@ errflg: 0
 ifile: 
 ofile: arg
 result: 0
+bflg: 0
+aflg: 0
+errflg: 0
+ifile: 
+ofile: 
+result: 0

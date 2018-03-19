@@ -6,19 +6,23 @@ use super::stdio;
 use super::string;
 use core::ptr;
 
+#[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut optarg: *mut c_char = ptr::null_mut();
 
+#[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut optind: c_int = 1;
 
+#[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut opterr: c_int = 1;
 
+#[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut optopt: c_int = -1;
 
-static mut current_opt: *mut c_char = ptr::null_mut();
+static mut CURRENT_OPT: *mut c_char = ptr::null_mut();
 
 #[no_mangle]
 pub unsafe extern "C" fn getopt(
@@ -26,24 +30,27 @@ pub unsafe extern "C" fn getopt(
     argv: *const *mut c_char,
     optstring: *const c_char,
 ) -> c_int {
-    if current_opt == ptr::null_mut() || *current_opt == 0 {
-        let current_arg = *argv.offset(optind as isize);
-        // XXX: is argc check needed?
-        if optind > argc || current_arg == ptr::null_mut() || *current_arg != b'-' as c_char
-            || string::strcmp(current_arg, b"-\0".as_ptr() as _) == 0
-        {
-            -1
-        } else if string::strcmp(current_arg, b"--\0".as_ptr() as _) == 0 {
-            optind += 1;
+    if CURRENT_OPT == ptr::null_mut() || *CURRENT_OPT == 0 {
+        if optind >= argc {
             -1
         } else {
-            // remove the '-'
-            let current_arg = current_arg.offset(1);
+            let current_arg = *argv.offset(optind as isize);
+            if current_arg == ptr::null_mut() || *current_arg != b'-' as c_char
+                || string::strcmp(current_arg, b"-\0".as_ptr() as _) == 0
+            {
+                -1
+            } else if string::strcmp(current_arg, b"--\0".as_ptr() as _) == 0 {
+                optind += 1;
+                -1
+            } else {
+                // remove the '-'
+                let current_arg = current_arg.offset(1);
 
-            parse_arg(argc, argv, current_arg, optstring)
+                parse_arg(argc, argv, current_arg, optstring)
+            }
         }
     } else {
-        parse_arg(argc, argv, current_opt, optstring)
+        parse_arg(argc, argv, CURRENT_OPT, optstring)
     }
 }
 
@@ -54,8 +61,8 @@ unsafe fn parse_arg(
     optstring: *const c_char,
 ) -> c_int {
     let update_current_opt = || {
-        current_opt = current_arg.offset(1);
-        if *current_opt == 0 {
+        CURRENT_OPT = current_arg.offset(1);
+        if *CURRENT_OPT == 0 {
             optind += 1;
         }
     };
@@ -75,11 +82,11 @@ unsafe fn parse_arg(
             *current_arg as c_int
         }
         Some(GetoptOption::OptArg) => {
-            current_opt = b"\0".as_ptr() as _;
+            CURRENT_OPT = b"\0".as_ptr() as _;
             if *current_arg.offset(1) == 0 {
                 optind += 2;
                 if optind > argc {
-                    current_opt = ptr::null_mut();
+                    CURRENT_OPT = ptr::null_mut();
 
                     optopt = *current_arg as c_int;
                     let errch = if *optstring == b':' as c_char {
