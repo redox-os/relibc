@@ -1,12 +1,17 @@
 language: rust
+env:
+  -
+  - TARGET=aarch64-unknown-linux-gnu
+  - TARGET=x86_64-unknown-redox
 rust:
   - nightly
 cache: cargo
 before_script:
   - rustup component add rustfmt-preview
-  - rustup target add x86_64-unknown-redox
-  - rustup target add aarch64-unknown-linux-gnu
+  - if [ -n "$TARGET" ]; then rustup target add $TARGET; fi
 script:
-  - bash ./ci.sh
+  - ./fmt.sh -- --write-mode=diff
+  - cargo build $([ -n "$TARGET" ] && echo --target="$TARGET")
+  - if [ -z "$TARGET" ]; then ./test.sh; fi
 notifications:
   email: false

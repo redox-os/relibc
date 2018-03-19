@@ -26,6 +26,7 @@
 /rmdir
 /setid
 /sprintf
+/stdlib/bsearch
 /stdlib/strtol
 /stdlib/a64l
 /stdio/fwrite
