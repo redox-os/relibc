@@ -180,7 +180,7 @@ impl Write for FILE {
 /// Clears EOF and ERR indicators on a stream
 #[no_mangle]
 pub extern "C" fn clearerr(stream: &mut FILE) {
-    stream.flags &= !(F_EOF & F_ERR);
+    stream.flags &= !(F_EOF | F_ERR);
 }
 
 #[no_mangle]
