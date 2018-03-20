@@ -1,0 +1,11 @@
+sys_includes = ["sys/types.h"]
+include_guard = "_SYS_SOCKET_H"
+style = "Tag"
+language = "C"
+
+[defines]
+"target_os=linux" = "__linux__"
+"target_os=redox" = "__redox__"
+
+[enum]
+prefix_with_name = true

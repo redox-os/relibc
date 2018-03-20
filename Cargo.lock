@@ -140,6 +140,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "in_h"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "platform 0.1.0",
+]
+
+[[package]]
 name = "itoa"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -180,6 +188,13 @@ version = "0.1.0"
 dependencies = [
  "cbindgen 0.5.2",
  "platform 0.1.0",
+]
+
+[[package]]
+name = "netinet"
+version = "0.1.0"
+dependencies = [
+ "in_h 0.1.0",
 ]
 
 [[package]]
@@ -259,10 +274,12 @@ dependencies = [
  "float 0.1.0",
  "grp 0.1.0",
  "mman 0.1.0",
+ "netinet 0.1.0",
  "platform 0.1.0",
  "resource 0.1.0",
  "semaphore 0.1.0",
  "signal 0.1.0",
+ "socket 0.1.0",
  "stat 0.1.0",
  "stdio 0.1.0",
  "stdlib 0.1.0",
@@ -345,6 +362,14 @@ dependencies = [
 
 [[package]]
 name = "signal"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "platform 0.1.0",
+]
+
+[[package]]
+name = "socket"
 version = "0.1.0"
 dependencies = [
  "cbindgen 0.5.2",
