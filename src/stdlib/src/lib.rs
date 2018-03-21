@@ -2,9 +2,7 @@
 #![feature(core_intrinsics)]
 #![feature(global_allocator)]
 
-
 ///! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
-
 extern crate ctype;
 extern crate errno;
 extern crate platform;
@@ -12,7 +10,7 @@ extern crate ralloc;
 extern crate rand;
 
 use core::{ptr, str};
-use rand::{Rng, XorShiftRng, SeedableRng};
+use rand::{Rng, SeedableRng, XorShiftRng};
 
 use errno::*;
 use platform::types::*;
@@ -382,15 +380,13 @@ pub extern "C" fn qsort(
 #[no_mangle]
 pub unsafe extern "C" fn rand() -> c_int {
     match RNG {
-        Some(ref mut rng) => {
-            rng.gen_range::<c_int>(0, RAND_MAX)
-        },
+        Some(ref mut rng) => rng.gen_range::<c_int>(0, RAND_MAX),
         None => {
             let mut rng = XorShiftRng::from_seed([1; 16]);
             let ret = rng.gen_range::<c_int>(0, RAND_MAX);
             RNG = Some(rng);
             ret
-        },
+        }
     }
 }
 
