@@ -1,15 +1,18 @@
-//! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
-
 #![no_std]
 #![feature(core_intrinsics)]
 #![feature(global_allocator)]
+
+
+///! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 
 extern crate ctype;
 extern crate errno;
 extern crate platform;
 extern crate ralloc;
+extern crate rand;
 
 use core::{ptr, str};
+use rand::{Rng, XorShiftRng, SeedableRng};
 
 use errno::*;
 use platform::types::*;
@@ -19,8 +22,10 @@ static ALLOCATOR: ralloc::Allocator = ralloc::Allocator;
 
 pub const EXIT_FAILURE: c_int = 1;
 pub const EXIT_SUCCESS: c_int = 0;
+pub const RAND_MAX: c_int = 2147483647;
 
 static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
+static mut RNG: Option<XorShiftRng> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn a64l(s: *const c_char) -> c_long {
@@ -375,8 +380,18 @@ pub extern "C" fn qsort(
 }
 
 #[no_mangle]
-pub extern "C" fn rand() -> c_int {
-    unimplemented!();
+pub unsafe extern "C" fn rand() -> c_int {
+    match RNG {
+        Some(ref mut rng) => {
+            rng.gen_range::<c_int>(0, RAND_MAX)
+        },
+        None => {
+            let mut rng = XorShiftRng::from_seed([1; 16]);
+            let ret = rng.gen_range::<c_int>(0, RAND_MAX);
+            RNG = Some(rng);
+            ret
+        },
+    }
 }
 
 #[no_mangle]
@@ -425,8 +440,8 @@ pub extern "C" fn setstate(state: *const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn srand(seed: c_uint) {
-    unimplemented!();
+pub unsafe extern "C" fn srand(seed: c_uint) {
+    RNG = Some(XorShiftRng::from_seed([seed as u8; 16]));
 }
 
 #[no_mangle]
