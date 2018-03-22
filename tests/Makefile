@@ -28,6 +28,7 @@ EXPECT_BINS=\
 	stdlib/bsearch \
 	stdlib/strtol \
 	stdlib/a64l \
+	stdlib/rand \
 	string/strncmp \
 	string/strcspn \
 	string/strchr \
