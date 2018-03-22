@@ -9,3 +9,5 @@ cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
 platform = { path = "../platform" }
+stdio = { path = "../stdio" }
+string = { path = "../string" }
