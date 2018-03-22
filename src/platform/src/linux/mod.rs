@@ -119,6 +119,10 @@ pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     e(unsafe { syscall!(LINKAT, AT_FDCWD, path1, AT_FDCWD, path2, 0) }) as c_int
 }
 
+pub fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
+    e(unsafe { syscall!(LSEEK, fildes, offset, whence) }) as off_t
+}
+
 pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     e(unsafe { syscall!(MKDIRAT, AT_FDCWD, path, mode) }) as c_int
 }

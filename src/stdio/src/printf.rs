@@ -1,4 +1,4 @@
-use core::{fmt, mem, slice, str};
+use core::{fmt, slice, str};
 
 use platform::types::*;
 use vl::VaList;

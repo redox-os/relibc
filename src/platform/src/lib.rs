@@ -57,8 +57,8 @@ pub unsafe fn c_str_n(s: *const c_char, n: usize) -> &'static [u8] {
 pub struct FileWriter(pub c_int);
 
 impl FileWriter {
-    pub fn write(&mut self, buf: &[u8]) {
-        write(self.0, buf);
+    pub fn write(&mut self, buf: &[u8]) -> isize {
+        write(self.0, buf)
     }
 }
 
@@ -66,6 +66,14 @@ impl fmt::Write for FileWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write(s.as_bytes());
         Ok(())
+    }
+}
+
+pub struct FileReader(pub c_int);
+
+impl FileReader {
+    pub fn read(&mut self, buf: &mut [u8]) -> isize {
+        read(self.0, buf)
     }
 }
 

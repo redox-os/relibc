@@ -5,3 +5,6 @@ language = "C"
 
 [enum]
 prefix_with_name = true
+
+[export.rename]
+"AtomicBool" = "volatile char"

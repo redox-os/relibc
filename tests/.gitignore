@@ -15,6 +15,7 @@
 /fsync
 /ftruncate
 /getid
+/getc_unget
 /link
 /math
 /mem
@@ -29,6 +30,10 @@
 /stdlib/bsearch
 /stdlib/rand
 /stdlib/strtol
+/stdlib/a64l
+/stdio/fwrite
+/stdio/all
+/stdio/freopen
 /string/strchr
 /string/strcspn
 /string/strncmp

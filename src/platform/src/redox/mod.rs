@@ -125,6 +125,14 @@ pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     e(unsafe { syscall::link(path1.as_ptr(), path2.as_ptr()) }) as c_int
 }
 
+pub fn lseek(fd: c_int, offset: off_t, whence: c_int) -> off_t {
+    e(syscall::lseek(
+        fd as usize,
+        offset as isize,
+        whence as usize,
+    )) as off_t
+}
+
 pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     let flags = O_CREAT | O_EXCL | O_CLOEXEC | O_DIRECTORY | mode as usize & 0o777;
     let path = unsafe { c_str(path) };
