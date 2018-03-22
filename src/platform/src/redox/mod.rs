@@ -220,3 +220,17 @@ pub fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
 pub fn write(fd: c_int, buf: &[u8]) -> ssize_t {
     e(syscall::write(fd as usize, buf)) as ssize_t
 }
+
+pub fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int {
+    let mut redox_tp = unsafe { redox_timespec::from(&*tp) };
+    match e(syscall::clock_gettime(clk_id as usize, &mut redox_tp)) as c_int {
+        -1 => -1,
+        _ => {
+            unsafe {
+                (*tp).tv_sec = redox_tp.tv_sec;
+                (*tp).tv_nsec = redox_tp.tv_nsec as i64;
+            };
+            0
+        }
+    }
+}

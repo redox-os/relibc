@@ -41,7 +41,8 @@ EXPECT_BINS=\
 	unistd/getopt \
 	unlink \
 	waitpid \
-	write
+	write \
+	time
 
 # Binaries that may generate varied output
 BINS=\
