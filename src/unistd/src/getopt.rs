@@ -69,10 +69,10 @@ unsafe fn parse_arg(
 
     let print_error = |desc: &[u8]| {
         // NOTE: we don't use fprintf to get around the usage of va_list
-        stdio::fputs(*argv as _, stdio::stderr);
-        stdio::fputs(desc.as_ptr() as _, stdio::stderr);
-        stdio::fputc(*current_arg as _, stdio::stderr);
-        stdio::fputc(b'\n' as _, stdio::stderr);
+        stdio::fputs(*argv as _, &mut *stdio::stderr);
+        stdio::fputs(desc.as_ptr() as _, &mut *stdio::stderr);
+        stdio::fputc(*current_arg as _, &mut *stdio::stderr);
+        stdio::fputc(b'\n' as _, &mut *stdio::stderr);
     };
 
     match find_option(*current_arg, optstring) {
