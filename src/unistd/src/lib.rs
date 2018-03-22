@@ -3,9 +3,14 @@
 #![no_std]
 
 extern crate platform;
+extern crate stdio;
+extern crate string;
 
 pub use platform::types::*;
+pub use getopt::*;
 use core::ptr;
+
+mod getopt;
 
 pub const R_OK: c_int = 1;
 pub const W_OK: c_int = 2;
@@ -201,11 +206,6 @@ pub extern "C" fn getlogin() -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn getlogin_r(name: *mut c_char, namesize: size_t) -> c_int {
-    unimplemented!();
-}
-
-#[no_mangle]
-pub extern "C" fn getopt(argc: c_int, argv: *const *mut c_char, opstring: *const c_char) -> c_int {
     unimplemented!();
 }
 

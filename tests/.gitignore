@@ -33,6 +33,7 @@
 /string/strchr
 /string/strrchr
 /string/strspn
+/unistd/getopt
 /unlink
 /waitpid
 /write
