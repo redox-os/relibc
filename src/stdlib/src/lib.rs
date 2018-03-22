@@ -1,8 +1,9 @@
+//! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
+
 #![no_std]
 #![feature(core_intrinsics)]
 #![feature(global_allocator)]
 
-///! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 extern crate ctype;
 extern crate errno;
 extern crate platform;
