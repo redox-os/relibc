@@ -27,6 +27,7 @@
 /sprintf
 /stdlib/a64l
 /stdlib/bsearch
+/stdlib/rand
 /stdlib/strtol
 /string/strchr
 /string/strcspn
