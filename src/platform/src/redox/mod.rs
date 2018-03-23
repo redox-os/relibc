@@ -35,7 +35,11 @@ pub fn chmod(path: *const c_char, mode: mode_t) -> c_int {
     let path = unsafe { c_str(path) };
     match syscall::open(path, O_WRONLY) {
         Err(err) => e(Err(err)) as c_int,
-        Ok(fd) => e(syscall::fchmod(fd as usize, mode)) as c_int,
+        Ok(fd) => {
+            let res = syscall::fchmod(fd as usize, mode);
+            let _ = syscall::close(fd);
+            e(res) as c_int
+        }
     }
 }
 
@@ -43,7 +47,11 @@ pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     let path = unsafe { c_str(path) };
     match syscall::open(path, O_WRONLY) {
         Err(err) => e(Err(err)) as c_int,
-        Ok(fd) => e(syscall::fchown(fd as usize, owner as u32, group as u32)) as c_int,
+        Ok(fd) => {
+           let res = syscall::fchown(fd as usize, owner as u32, group as u32);
+           let _ = syscall::close(fd);
+           e(res) as c_int
+        }
     }
 }
 
@@ -60,7 +68,7 @@ pub fn dup2(fd1: c_int, fd2: c_int) -> c_int {
 }
 
 pub fn exit(status: c_int) -> ! {
-    syscall::exit(status as usize);
+    let _ = syscall::exit(status as usize);
     loop {}
 }
 
@@ -171,7 +179,11 @@ pub fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = unsafe { c_str(path) };
     match syscall::open(path, O_RDONLY | O_NOFOLLOW) {
         Err(err) => e(Err(err)) as c_int,
-        Ok(fd) => fstat(fd as i32, buf), 
+        Ok(fd) => {
+            let res = fstat(fd as i32, buf);
+            let _ = syscall::close(fd);
+            res
+        }
     }
 }
 
@@ -180,7 +192,7 @@ pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     let path = unsafe { c_str(path) };
     match syscall::open(path, flags) {
         Ok(fd) => {
-            syscall::close(fd);
+            let _ = syscall::close(fd);
             0
         }
         Err(err) => e(Err(err)) as c_int,
@@ -247,7 +259,11 @@ pub fn stat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = unsafe { c_str(path) };
     match syscall::open(path, O_RDONLY) {
         Err(err) => e(Err(err)) as c_int,
-        Ok(fd) => fstat(fd as i32, buf), 
+        Ok(fd) => {
+            let res = fstat(fd as i32, buf);
+            let _ = syscall::close(fd);
+            res
+        }
     }
 }
 
