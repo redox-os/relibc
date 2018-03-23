@@ -32,6 +32,10 @@ pub fn chdir(path: *const c_char) -> c_int {
     e(unsafe { syscall!(CHDIR, path) }) as c_int
 }
 
+pub fn chmod(path: *const c_char, mode: mode_t) -> c_int {
+    e(unsafe { syscall!(FCHMODAT, AT_FDCWD, path, mode, 0) }) as c_int
+}
+
 pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     e(unsafe { syscall!(FCHOWNAT, AT_FDCWD, path, owner as u32, group as u32) }) as c_int
 }
@@ -55,12 +59,16 @@ pub fn exit(status: c_int) -> ! {
     loop {}
 }
 
-pub fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
-    e(unsafe { syscall!(FCHOWN, fildes, owner, group) }) as c_int
-}
-
 pub fn fchdir(fildes: c_int) -> c_int {
     e(unsafe { syscall!(FCHDIR, fildes) }) as c_int
+}
+
+pub fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
+    e(unsafe { syscall!(FCHMOD, fildes, mode) }) as c_int
+}
+
+pub fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
+    e(unsafe { syscall!(FCHOWN, fildes, owner, group) }) as c_int
 }
 
 pub fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {

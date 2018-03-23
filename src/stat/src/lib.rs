@@ -24,12 +24,12 @@ pub struct stat {
 
 #[no_mangle]
 pub extern "C" fn chmod(path: *const c_char, mode: mode_t) -> c_int {
-    unimplemented!();
+    platform::chmod(path, mode)
 }
 
 #[no_mangle]
 pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
-    unimplemented!();
+    platform::fchmod(fildes, mode)
 }
 
 #[no_mangle]

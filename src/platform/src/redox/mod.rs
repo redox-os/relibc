@@ -30,10 +30,22 @@ pub fn chdir(path: *const c_char) -> c_int {
     e(syscall::chdir(path)) as c_int
 }
 
+pub fn chmod(path: *const c_char, mode: mode_t) -> c_int {
+    let path = unsafe { c_str(path) };
+    let result = syscall::open(path, 0x0001);
+    match result {
+        Err(err) => e(Err(err)) as c_int,
+        Ok(fd) => e(syscall::fchmod(fd as usize, mode)) as c_int,
+    }
+}
+
 pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     let path = unsafe { c_str(path) };
-    let fd = syscall::open(path, 0x0001).unwrap();
-    e(syscall::fchown(fd as usize, owner as u32, group as u32)) as c_int
+    let result = syscall::open(path, 0x0001);
+    match result {
+        Err(err) => e(Err(err)) as c_int,
+        Ok(fd) => e(syscall::fchown(fd as usize, owner as u32, group as u32)) as c_int,
+    }
 }
 
 pub fn close(fd: c_int) -> c_int {
@@ -53,10 +65,6 @@ pub fn exit(status: c_int) -> ! {
     loop {}
 }
 
-pub fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> c_int {
-    e(syscall::fchown(fd as usize, owner as u32, group as u32)) as c_int
-}
-
 pub fn fchdir(fd: c_int) -> c_int {
     let path: &mut [u8] = &mut [0; 4096];
     if e(syscall::fpath(fd as usize, path)) == !0 {
@@ -64,6 +72,14 @@ pub fn fchdir(fd: c_int) -> c_int {
     } else {
         e(syscall::chdir(path)) as c_int
     }
+}
+
+pub fn fchmod(fd: c_int, mode: mode_t) -> c_int {
+    e(syscall::fchmod(fd as usize, mode)) as c_int
+}
+
+pub fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> c_int {
+    e(syscall::fchown(fd as usize, owner as u32, group as u32)) as c_int
 }
 
 pub fn fcntl(fd: c_int, cmd: c_int, args: c_int) -> c_int {
