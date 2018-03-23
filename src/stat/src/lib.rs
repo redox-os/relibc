@@ -34,12 +34,12 @@ pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
-    unimplemented!();
+    platform::fstat(fildes, buf)
 }
 
 #[no_mangle]
 pub extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
-    unimplemented!();
+    platform::lstat(path, buf)
 }
 
 #[no_mangle]
@@ -59,7 +59,7 @@ pub extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int 
 
 #[no_mangle]
 pub extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
-    unimplemented!();
+    platform::stat(file, buf)
 }
 
 #[no_mangle]

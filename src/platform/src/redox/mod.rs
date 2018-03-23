@@ -4,6 +4,7 @@ use core::mem;
 use syscall;
 use syscall::flag::*;
 use syscall::data::TimeSpec as redox_timespec;
+use syscall::data::Stat as redox_stat;
 
 use c_str;
 use errno;
@@ -32,8 +33,7 @@ pub fn chdir(path: *const c_char) -> c_int {
 
 pub fn chmod(path: *const c_char, mode: mode_t) -> c_int {
     let path = unsafe { c_str(path) };
-    let result = syscall::open(path, 0x0001);
-    match result {
+    match syscall::open(path, O_WRONLY) {
         Err(err) => e(Err(err)) as c_int,
         Ok(fd) => e(syscall::fchmod(fd as usize, mode)) as c_int,
     }
@@ -41,8 +41,7 @@ pub fn chmod(path: *const c_char, mode: mode_t) -> c_int {
 
 pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     let path = unsafe { c_str(path) };
-    let result = syscall::open(path, 0x0001);
-    match result {
+    match syscall::open(path, O_WRONLY) {
         Err(err) => e(Err(err)) as c_int,
         Ok(fd) => e(syscall::fchown(fd as usize, owner as u32, group as u32)) as c_int,
     }
@@ -88,6 +87,33 @@ pub fn fcntl(fd: c_int, cmd: c_int, args: c_int) -> c_int {
 
 pub fn fork() -> pid_t {
     e(unsafe { syscall::clone(0) }) as pid_t
+}
+
+pub fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
+    let mut redox_buf: redox_stat = redox_stat::default(); 
+    match e(syscall::fstat(fildes as usize, &mut redox_buf)) {
+       0 => {
+                unsafe {
+                    if !buf.is_null() {
+                        (*buf).st_dev = redox_buf.st_dev as dev_t;
+                        (*buf).st_ino = redox_buf.st_ino as ino_t;
+                        (*buf).st_nlink = redox_buf.st_nlink as nlink_t;
+                        (*buf).st_mode = redox_buf.st_mode;
+                        (*buf).st_uid = redox_buf.st_uid as uid_t;
+                        (*buf).st_gid = redox_buf.st_gid as gid_t;
+                        // TODO st_rdev
+                        (*buf).st_rdev = 0;
+                        (*buf).st_size = redox_buf.st_size as off_t;
+                        (*buf).st_blksize = redox_buf.st_blksize as blksize_t;
+                        (*buf).st_atim = redox_buf.st_atime as time_t;
+                        (*buf).st_mtim = redox_buf.st_mtime as time_t;
+                        (*buf).st_ctim = redox_buf.st_ctime as time_t;
+                    }
+                }
+                0
+            },
+        _ => -1,
+    }
 }
 
 pub fn fsync(fd: c_int) -> c_int {
@@ -139,6 +165,14 @@ pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     let path1 = unsafe { c_str(path1) };
     let path2 = unsafe { c_str(path2) };
     e(unsafe { syscall::link(path1.as_ptr(), path2.as_ptr()) }) as c_int
+}
+
+pub fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
+    let path = unsafe { c_str(path) };
+    match syscall::open(path, O_RDONLY | O_NOFOLLOW) {
+        Err(err) => e(Err(err)) as c_int,
+        Ok(fd) => fstat(fd as i32, buf), 
+    }
 }
 
 pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
@@ -207,6 +241,14 @@ pub fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
 
 pub fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
     e(syscall::setreuid(ruid as usize, euid as usize)) as c_int
+}
+
+pub fn stat(path: *const c_char, buf: *mut stat) -> c_int {
+    let path = unsafe { c_str(path) };
+    match syscall::open(path, O_RDONLY) {
+        Err(err) => e(Err(err)) as c_int,
+        Ok(fd) => fstat(fd as i32, buf), 
+    }
 }
 
 pub fn unlink(path: *const c_char) -> c_int {
