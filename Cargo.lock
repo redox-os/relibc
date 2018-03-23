@@ -75,7 +75,6 @@ dependencies = [
 name = "ctype"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
 ]
 
@@ -88,7 +87,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "errno"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
 ]
 
@@ -96,24 +94,6 @@ dependencies = [
 name = "fcntl"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
- "platform 0.1.0",
-]
-
-[[package]]
-name = "fenv"
-version = "0.1.0"
-dependencies = [
- "cbindgen 0.5.2",
- "platform 0.1.0",
-]
-
-[[package]]
-name = "float"
-version = "0.1.0"
-dependencies = [
- "cbindgen 0.5.2",
- "fenv 0.1.0",
  "platform 0.1.0",
 ]
 
@@ -135,7 +115,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "grp"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
 ]
 
@@ -143,7 +122,6 @@ dependencies = [
 name = "in_h"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
  "socket 0.1.0",
 ]
@@ -178,7 +156,6 @@ dependencies = [
 name = "mman"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
 ]
 
@@ -258,12 +235,11 @@ dependencies = [
 name = "relibc"
 version = "0.1.0"
 dependencies = [
+ "cbindgen 0.5.2",
  "compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins.git)",
  "ctype 0.1.0",
  "errno 0.1.0",
  "fcntl 0.1.0",
- "fenv 0.1.0",
- "float 0.1.0",
  "grp 0.1.0",
  "mman 0.1.0",
  "netinet 0.1.0",
@@ -295,7 +271,6 @@ dependencies = [
 name = "resource"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
  "sys_time 0.1.0",
 ]
@@ -309,7 +284,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "semaphore"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
 ]
 
@@ -355,7 +329,6 @@ dependencies = [
 name = "signal"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
 ]
 
@@ -363,7 +336,6 @@ dependencies = [
 name = "socket"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
 ]
 
@@ -389,7 +361,6 @@ dependencies = [
 name = "stat"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
 ]
 
@@ -397,7 +368,6 @@ dependencies = [
 name = "stdio"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "errno 0.1.0",
  "platform 0.1.0",
  "va_list 0.1.0",
@@ -407,7 +377,6 @@ dependencies = [
 name = "stdlib"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "ctype 0.1.0",
  "errno 0.1.0",
  "platform 0.1.0",
@@ -418,7 +387,6 @@ dependencies = [
 name = "string"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins.git)",
  "errno 0.1.0",
  "platform 0.1.0",
@@ -452,7 +420,6 @@ dependencies = [
 name = "sys_time"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
 ]
 
@@ -487,7 +454,6 @@ dependencies = [
 name = "time"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
 ]
 
@@ -523,7 +489,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "unistd"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
  "stdio 0.1.0",
  "string 0.1.0",
@@ -552,7 +517,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "wait"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
  "resource 0.1.0",
 ]
@@ -561,7 +525,6 @@ dependencies = [
 name = "wctype"
 version = "0.1.0"
 dependencies = [
- "cbindgen 0.5.2",
  "platform 0.1.0",
 ]
 

@@ -1,7 +1,8 @@
 [package]
-name = "wctype"
+name = "resource"
 version = "0.1.0"
 authors = ["Dan Robertson <danlrobertson89@gmail.com>"]
 
 [dependencies]
-platform = { path = "../platform" }
+platform = { path = "../../platform" }
+sys_time = { path = "../time" }
