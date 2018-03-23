@@ -170,3 +170,7 @@ pub fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
 pub fn write(fildes: c_int, buf: &[u8]) -> ssize_t {
     e(unsafe { syscall!(WRITE, fildes, buf.as_ptr(), buf.len()) }) as ssize_t
 }
+
+pub fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int {
+    e(unsafe { syscall!(CLOCK_GETTIME, clk_id, tp) }) as c_int
+}
