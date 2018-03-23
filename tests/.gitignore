@@ -22,6 +22,7 @@
 /pipe
 /printf
 /rmdir
+/rename
 /setid
 /setid
 /sleep

@@ -184,6 +184,18 @@ pub fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
     e(syscall::read(fd as usize, buf)) as ssize_t
 }
 
+pub fn rename(old: *const c_char, new: *const c_char) -> c_int {
+    let (old_path, new_path) = unsafe { (c_str(old), c_str(new)) };
+    match syscall::open(old_path, O_WRONLY) {
+        Ok(fd) => {
+            let retval = syscall::frename(fd, new_path);
+            let _ = syscall::close(fd);
+            e(retval) as c_int
+        }
+        err => e(err) as c_int,
+    }
+}
+
 pub fn rmdir(path: *const c_char) -> c_int {
     let path = unsafe { c_str(path) };
     e(syscall::rmdir(path)) as c_int
