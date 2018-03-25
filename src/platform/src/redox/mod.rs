@@ -119,6 +119,14 @@ pub fn getuid() -> uid_t {
     e(syscall::getuid()) as pid_t
 }
 
+pub fn kill(pid: pid_t, sig: c_int) -> c_int {
+    e(syscall::kill(pid, sig as usize)) as c_int
+}
+
+pub fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
+    e(syscall::kill(-(pgrp as isize) as pid_t, sig as usize)) as c_int
+}
+
 pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     let path1 = unsafe { c_str(path1) };
     let path2 = unsafe { c_str(path2) };
