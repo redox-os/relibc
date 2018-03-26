@@ -130,8 +130,20 @@ pub fn getuid() -> uid_t {
     e(unsafe { syscall!(GETUID) })
 }
 
+pub fn kill(pid: pid_t, sig: c_int) -> c_int {
+    e(unsafe { syscall!(KILL, pid, sig) }) as c_int
+}
+
+pub fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
+    e(unsafe { syscall!(KILL, -(pgrp as isize) as pid_t, sig) }) as c_int
+}
+
 pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     e(unsafe { syscall!(LINKAT, AT_FDCWD, path1, AT_FDCWD, path2, 0) }) as c_int
+}
+
+pub fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
+    e(unsafe { syscall!(LSEEK, fildes, offset, whence) }) as off_t
 }
 
 pub fn lstat(file: *const c_char, buf: *mut stat) -> c_int {
@@ -192,4 +204,8 @@ pub fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
 
 pub fn write(fildes: c_int, buf: &[u8]) -> ssize_t {
     e(unsafe { syscall!(WRITE, fildes, buf.as_ptr(), buf.len()) }) as ssize_t
+}
+
+pub fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int {
+    e(unsafe { syscall!(CLOCK_GETTIME, clk_id, tp) }) as c_int
 }

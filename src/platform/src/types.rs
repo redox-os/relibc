@@ -68,6 +68,7 @@ pub type clockid_t = i32;
 pub type timer_t = c_void;
 
 #[repr(C)]
+#[derive(Default)]
 pub struct timespec {
     pub tv_sec: time_t,
     pub tv_nsec: c_long,
