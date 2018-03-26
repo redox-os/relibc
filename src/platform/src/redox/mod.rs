@@ -169,10 +169,26 @@ pub fn getuid() -> uid_t {
     e(syscall::getuid()) as pid_t
 }
 
+pub fn kill(pid: pid_t, sig: c_int) -> c_int {
+    e(syscall::kill(pid, sig as usize)) as c_int
+}
+
+pub fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
+    e(syscall::kill(-(pgrp as isize) as pid_t, sig as usize)) as c_int
+}
+
 pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     let path1 = unsafe { c_str(path1) };
     let path2 = unsafe { c_str(path2) };
     e(unsafe { syscall::link(path1.as_ptr(), path2.as_ptr()) }) as c_int
+}
+
+pub fn lseek(fd: c_int, offset: off_t, whence: c_int) -> off_t {
+    e(syscall::lseek(
+        fd as usize,
+        offset as isize,
+        whence as usize,
+    )) as off_t
 }
 
 pub fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
@@ -185,7 +201,6 @@ pub fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
             res
         }
     }
-}
 
 pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     let flags = O_CREAT | O_EXCL | O_CLOEXEC | O_DIRECTORY | mode as usize & 0o777;
@@ -285,4 +300,18 @@ pub fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
 
 pub fn write(fd: c_int, buf: &[u8]) -> ssize_t {
     e(syscall::write(fd as usize, buf)) as ssize_t
+}
+
+pub fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int {
+    let mut redox_tp = unsafe { redox_timespec::from(&*tp) };
+    match e(syscall::clock_gettime(clk_id as usize, &mut redox_tp)) as c_int {
+        -1 => -1,
+        _ => {
+            unsafe {
+                (*tp).tv_sec = redox_tp.tv_sec;
+                (*tp).tv_nsec = redox_tp.tv_nsec as i64;
+            };
+            0
+        }
+    }
 }

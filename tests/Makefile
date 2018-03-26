@@ -12,6 +12,8 @@ EXPECT_BINS=\
 	fcntl \
 	fsync \
 	ftruncate \
+	getid \
+	getc_unget \
 	link \
 	math \
 	mem \
@@ -20,9 +22,13 @@ EXPECT_BINS=\
 	rmdir \
 	sleep \
 	sprintf \
+	stdio/fwrite \
+	stdio/all \
+	stdio/freopen \
 	stdlib/bsearch \
 	stdlib/strtol \
 	stdlib/a64l \
+	stdlib/rand \
 	string/strncmp \
 	string/strcspn \
 	string/strchr \
@@ -32,9 +38,11 @@ EXPECT_BINS=\
 	string/strpbrk \
 	string/strtok \
 	string/strtok_r \
+	unistd/getopt \
 	unlink \
 	waitpid \
-	write
+	write \
+	time
 
 # Binaries that may generate varied output
 BINS=\

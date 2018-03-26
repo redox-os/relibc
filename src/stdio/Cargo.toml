@@ -8,6 +8,10 @@ build = "build.rs"
 cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
+compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins.git", default-features = false, features = ["mem"] }
 platform = { path = "../platform" }
 va_list = { path = "../../va_list", features = ["no_std"] }
+fcntl = { path = "../fcntl" }
+string = { path = "../string" }
+stdlib = { path = "../stdlib" }
 errno = { path = "../errno"}

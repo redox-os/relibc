@@ -6,6 +6,33 @@ extern crate platform;
 
 use platform::types::*;
 
+#[cfg(target_os = "redox")]
+pub const CLOCK_REALTIME: c_int = 1;
+#[cfg(target_os = "redox")]
+pub const CLOCK_MONOTONIC: c_int = 4;
+#[cfg(target_os = "linux")]
+pub const CLOCK_REALTIME: c_int = 0;
+#[cfg(target_os = "linux")]
+pub const CLOCK_MONOTONIC: c_int = 1;
+#[cfg(target_os = "linux")]
+pub const CLOCK_PROCESS_CPUTIME_ID: c_int = 2;
+#[cfg(target_os = "linux")]
+pub const CLOCK_THREAD_CPUTIME_ID: c_int = 3;
+#[cfg(target_os = "linux")]
+pub const CLOCK_MONOTONIC_RAW: c_int = 4;
+#[cfg(target_os = "linux")]
+pub const CLOCK_REALTIME_COARSE: c_int = 5;
+#[cfg(target_os = "linux")]
+pub const CLOCK_MONOTONIC_COARSE: c_int = 6;
+#[cfg(target_os = "linux")]
+pub const CLOCK_BOOTTIME: c_int = 7;
+#[cfg(target_os = "linux")]
+pub const CLOCK_REALTIME_ALARM: c_int = 8;
+#[cfg(target_os = "linux")]
+pub const CLOCK_BOOTTIME_ALARM: c_int = 9;
+#[cfg(target_os = "linux")]
+pub const CLOCK_TAI: c_int = 11;
+
 /*
  *#[repr(C)]
  *pub struct timespec {
@@ -59,7 +86,7 @@ pub extern "C" fn clock_getres(clock_id: clockid_t, res: *mut timespec) -> c_int
 
 #[no_mangle]
 pub extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -> c_int {
-    unimplemented!();
+    platform::clock_gettime(clock_id, tp)
 }
 
 #[no_mangle]
@@ -134,7 +161,14 @@ pub extern "C" fn strptime(buf: *const c_char, format: *const c_char, tm: *mut t
 
 #[no_mangle]
 pub extern "C" fn time(tloc: *mut time_t) -> time_t {
-    unimplemented!();
+    let mut ts: timespec = Default::default();
+    platform::clock_gettime(CLOCK_REALTIME, &mut ts);
+    unsafe {
+        if !tloc.is_null() {
+            *tloc = ts.tv_sec
+        };
+    }
+    ts.tv_sec
 }
 
 #[no_mangle]
