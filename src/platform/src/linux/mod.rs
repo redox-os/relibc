@@ -154,8 +154,8 @@ pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     e(unsafe { syscall!(MKDIRAT, AT_FDCWD, path, mode) }) as c_int
 }
 
-pub fn mkfifo(path: *const c_char mode: mode_t) -> c_int {
-    e(unsafe { syscall!(MKNODAT, AT_FDCWD, path, mode, 0) })
+pub fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
+    e(unsafe { syscall!(MKNODAT, AT_FDCWD, path, mode, 0) }) as c_int
 }
 
 pub fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {

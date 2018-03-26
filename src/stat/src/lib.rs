@@ -6,13 +6,13 @@ extern crate platform;
 
 use platform::types::*;
 
-pub const S_IFMT: c_int =   00170000;
-pub const S_IFBLK: c_int =   0060000;
-pub const S_IFCHR: c_int =   0020000;
-pub const S_IFIFO: c_int =   0010000;
-pub const S_IFREG: c_int =   0100000;
-pub const S_IFDIR: c_int =   0040000;
-pub const S_IFLNK: c_int =   0120000;
+pub const S_IFMT: c_int = 00170000;
+pub const S_IFBLK: c_int = 0060000;
+pub const S_IFCHR: c_int = 0020000;
+pub const S_IFIFO: c_int = 0010000;
+pub const S_IFREG: c_int = 0100000;
+pub const S_IFDIR: c_int = 0040000;
+pub const S_IFLNK: c_int = 0120000;
 
 pub const S_IRWXU: c_int = 00700;
 pub const S_IRUSR: c_int = 00400;
@@ -46,6 +46,7 @@ pub struct stat {
     pub st_atim: time_t,
     pub st_mtim: time_t,
     pub st_ctim: time_t,
+    pub st_blocks: blkcnt_t,
 }
 
 #[no_mangle]
@@ -59,12 +60,12 @@ pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
+pub extern "C" fn fstat(fildes: c_int, buf: *mut platform::types::stat) -> c_int {
     platform::fstat(fildes, buf)
 }
 
 #[no_mangle]
-pub extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
+pub extern "C" fn lstat(path: *const c_char, buf: *mut platform::types::stat) -> c_int {
     platform::lstat(path, buf)
 }
 
@@ -84,7 +85,7 @@ pub extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int 
 }
 
 #[no_mangle]
-pub extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
+pub extern "C" fn stat(file: *const c_char, buf: *mut platform::types::stat) -> c_int {
     platform::stat(file, buf)
 }
 

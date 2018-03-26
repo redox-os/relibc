@@ -59,6 +59,7 @@ pub type dev_t = usize;
 pub type ino_t = usize;
 pub type nlink_t = usize;
 pub type blksize_t = isize;
+pub type blkcnt_t = u64;
 
 pub type useconds_t = i32;
 pub type suseconds_t = i64;
@@ -98,4 +99,5 @@ pub struct stat {
     pub st_atim: time_t,
     pub st_mtim: time_t,
     pub st_ctim: time_t,
+    pub st_blocks: blkcnt_t,
 }
