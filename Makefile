@@ -61,6 +61,7 @@ $(BUILD)/release/crt0.o: $(SRC)
 
 $(BUILD)/openlibm: openlibm
 	rm -rf $@ $@.partial
+	mkdir -p $(BUILD)
 	cp -r $< $@.partial
 	mv $@.partial $@
 
