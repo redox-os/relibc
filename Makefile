@@ -1,24 +1,36 @@
+TARGET?=
+
+BUILD=target/debug
+ifneq ($(TARGET),)
+	BUILD=target/$(TARGET)/debug
+	CARGOFLAGS+="--target=$(TARGET)"
+	CC=$(TARGET)-gcc
+endif
+
 .PHONY: all clean fmt test
 
-all: openlibm/libopenlibm.a target/debug/libc.a target/debug/libcrt0.a
-	cargo build
+all: $(BUILD)/libc.a $(BUILD)/libcrt0.a $(BUILD)/openlibm/libopenlibm.a
 
 clean:
 	cargo clean
-	make -C openlibm clean
 	make -C tests clean
 
 fmt:
 	./fmt.sh
 
-test: openlibm/libopenlibm.a
+test: all
 	make -C tests run
 
-target/debug/libc.a:
-	cargo build
+$(BUILD)/libc.a:
+	cargo build $(CARGOFLAGS)
 
-target/debug/libcrt0.a:
-	cargo build --manifest-path src/crt0/Cargo.toml
+$(BUILD)/libcrt0.a:
+	cargo build --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS)
 
-openlibm/libopenlibm.a:
-	CFLAGS=-fno-stack-protector make -C openlibm libopenlibm.a
+$(BUILD)/openlibm: openlibm
+	rm -rf $@ $@.partial
+	cp -r $< $@.partial
+	mv $@.partial $@
+
+$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm
+	CC=$(CC) CFLAGS=-fno-stack-protector make -C $< libopenlibm.a
