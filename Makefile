@@ -31,7 +31,7 @@ clean:
 fmt:
 	./fmt.sh
 
-libc: $(BUILD)/debug/libc.a $(BUILD)/debug/libcrt0.a
+libc: $(BUILD)/debug/libc.a $(BUILD)/debug/crt0.o
 
 libm: $(BUILD)/openlibm/libopenlibm.a
 
@@ -41,14 +41,14 @@ test: all
 $(BUILD)/debug/libc.a: $(SRC)
 	cargo build $(CARGOFLAGS)
 
-$(BUILD)/debug/libcrt0.a: $(SRC)
-	cargo build --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS)
+$(BUILD)/debug/crt0.o: $(SRC)
+	cargo rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 
 $(BUILD)/release/libc.a: $(SRC)
 	cargo build --release $(CARGOFLAGS)
 
-$(BUILD)/release/libcrt0.a: $(SRC)
-	cargo build --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS)
+$(BUILD)/release/crt0.o: $(SRC)
+	cargo rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 
 $(BUILD)/openlibm: openlibm
 	rm -rf $@ $@.partial

@@ -96,7 +96,7 @@ CFLAGS=\
 	-I ../target/openlibm/src \
 
 HEADLIBS=\
-	../target/debug/libcrt0.a
+	../target/debug/crt0.o
 
 TAILLIBS=\
 	../target/debug/libc.a \
