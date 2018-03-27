@@ -200,6 +200,7 @@ pub fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
             res
         }
     }
+}
 
 pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     let flags = O_CREAT | O_EXCL | O_CLOEXEC | O_DIRECTORY | mode as usize & 0o777;
