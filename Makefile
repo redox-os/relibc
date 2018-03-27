@@ -20,7 +20,7 @@ SRC=\
 	src/*/*/* \
 	src/*/*/*/*
 
-.PHONY: all clean fmt libc test
+.PHONY: all clean fmt libc libm test
 
 all: libc libm
 
