@@ -5,7 +5,6 @@ env:
   - TARGET=x86_64-unknown-redox
 rust:
   - nightly
-cache: cargo
 before_script:
   - rustup component add rustfmt-preview
   - if [ -n "$TARGET" ]; then rustup target add $TARGET; fi
