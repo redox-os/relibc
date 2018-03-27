@@ -47,9 +47,9 @@ pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     match syscall::open(path, O_WRONLY) {
         Err(err) => e(Err(err)) as c_int,
         Ok(fd) => {
-           let res = syscall::fchown(fd as usize, owner as u32, group as u32);
-           let _ = syscall::close(fd);
-           e(res) as c_int
+            let res = syscall::fchown(fd as usize, owner as u32, group as u32);
+            let _ = syscall::close(fd);
+            e(res) as c_int
         }
     }
 }
@@ -97,28 +97,28 @@ pub fn fork() -> pid_t {
 }
 
 pub fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
-    let mut redox_buf: redox_stat = redox_stat::default(); 
+    let mut redox_buf: redox_stat = redox_stat::default();
     match e(syscall::fstat(fildes as usize, &mut redox_buf)) {
-       0 => {
-                unsafe {
-                    if !buf.is_null() {
-                        (*buf).st_dev = redox_buf.st_dev as dev_t;
-                        (*buf).st_ino = redox_buf.st_ino as ino_t;
-                        (*buf).st_nlink = redox_buf.st_nlink as nlink_t;
-                        (*buf).st_mode = redox_buf.st_mode;
-                        (*buf).st_uid = redox_buf.st_uid as uid_t;
-                        (*buf).st_gid = redox_buf.st_gid as gid_t;
-                        // TODO st_rdev
-                        (*buf).st_rdev = 0;
-                        (*buf).st_size = redox_buf.st_size as off_t;
-                        (*buf).st_blksize = redox_buf.st_blksize as blksize_t;
-                        (*buf).st_atim = redox_buf.st_atime as time_t;
-                        (*buf).st_mtim = redox_buf.st_mtime as time_t;
-                        (*buf).st_ctim = redox_buf.st_ctime as time_t;
-                    }
+        0 => {
+            unsafe {
+                if !buf.is_null() {
+                    (*buf).st_dev = redox_buf.st_dev as dev_t;
+                    (*buf).st_ino = redox_buf.st_ino as ino_t;
+                    (*buf).st_nlink = redox_buf.st_nlink as nlink_t;
+                    (*buf).st_mode = redox_buf.st_mode;
+                    (*buf).st_uid = redox_buf.st_uid as uid_t;
+                    (*buf).st_gid = redox_buf.st_gid as gid_t;
+                    // TODO st_rdev
+                    (*buf).st_rdev = 0;
+                    (*buf).st_size = redox_buf.st_size as off_t;
+                    (*buf).st_blksize = redox_buf.st_blksize as blksize_t;
+                    (*buf).st_atim = redox_buf.st_atime as time_t;
+                    (*buf).st_mtim = redox_buf.st_mtime as time_t;
+                    (*buf).st_ctim = redox_buf.st_ctime as time_t;
                 }
-                0
-            },
+            }
+            0
+        }
         _ => -1,
     }
 }
