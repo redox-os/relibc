@@ -215,7 +215,7 @@ pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
 }
 
 pub fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
-    let flags = O_CREAT | MODE_FIFO | mode as usize & 0o777;
+    let flags = O_CREAT | MODE_FIFO as usize | mode as usize & 0o777;
     let path = unsafe { c_str(path) };
     match syscall::open(path, flags) {
         Ok(fd) => {
