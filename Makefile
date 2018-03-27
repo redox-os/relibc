@@ -14,9 +14,9 @@ ifeq ($(TARGET),x86_64-unknown-redox)
 	CC="x86_64-unknown-redox-gcc"
 endif
 
-.PHONY: all clean fmt test
+.PHONY: all clean fmt libc test
 
-all: $(BUILD)/debug/libc.a $(BUILD)/debug/libcrt0.a $(BUILD)/openlibm/libopenlibm.a
+all: libc libm
 
 clean:
 	cargo clean
@@ -24,6 +24,10 @@ clean:
 
 fmt:
 	./fmt.sh
+
+libc: $(BUILD)/debug/libc.a $(BUILD)/debug/libcrt0.a 
+
+libm: $(BUILD)/openlibm/libopenlibm.a
 
 test: all
 	make -C tests run
