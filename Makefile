@@ -20,7 +20,7 @@ SRC=\
 	src/*/*/* \
 	src/*/*/*/*
 
-.PHONY: all clean fmt libc libm test
+.PHONY: all clean fmt install libc libm test
 
 all: libc libm
 
@@ -30,6 +30,15 @@ clean:
 
 fmt:
 	./fmt.sh
+
+install: all
+	mkdir -pv "$(DESTDIR)/lib"
+	mkdir -pv "$(DESTDIR)/include"
+	cp -rv "include"/* "$(DESTDIR)/include"
+	cp -rv "target/include"/* "$(DESTDIR)/include"
+	cp -v "$(BUILD)/debug/libc.a" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/debug/crt0.o" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 
 libc: $(BUILD)/debug/libc.a $(BUILD)/debug/crt0.o
 
