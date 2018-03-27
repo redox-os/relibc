@@ -19,6 +19,7 @@ EXPECT_BINS=\
 	mem \
 	pipe \
 	printf \
+	rename \
 	rmdir \
 	sleep \
 	sprintf \

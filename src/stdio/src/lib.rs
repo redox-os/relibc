@@ -753,8 +753,7 @@ pub extern "C" fn remove(path: *const c_char) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn rename(old: *const c_char, new: *const c_char) -> c_int {
-    // This function requires a rename syscall, which currently is not in platform.
-    unimplemented!();
+    platform::rename(old, new)
 }
 
 /// Rewind `stream` back to the beginning of it

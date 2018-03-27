@@ -151,6 +151,10 @@ pub fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
     e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
 }
 
+pub fn rename(old: *const c_char, new: *const c_char) -> c_int {
+    e(unsafe { syscall!(RENAMEAT, AT_FDCWD, old, AT_FDCWD, new) }) as c_int
+}
+
 pub fn rmdir(path: *const c_char) -> c_int {
     e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, AT_REMOVEDIR) }) as c_int
 }
