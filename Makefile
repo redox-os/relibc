@@ -1,15 +1,22 @@
 TARGET?=
 
-BUILD=target/debug
+BUILD=target
 ifneq ($(TARGET),)
-	BUILD=target/$(TARGET)/debug
+	BUILD="target/$(TARGET)"
 	CARGOFLAGS+="--target=$(TARGET)"
-	CC=$(TARGET)-gcc
+endif
+
+ifeq ($(TARGET),aarch64-unknown-linux-gnu)
+	CC="aarch64-linux-gnu-gcc"
+endif
+
+ifeq ($(TARGET),x86_64-unknown-redox)
+	CC="x86_64-unknown-redox-gcc"
 endif
 
 .PHONY: all clean fmt test
 
-all: $(BUILD)/libc.a $(BUILD)/libcrt0.a $(BUILD)/openlibm/libopenlibm.a
+all: $(BUILD)/debug/libc.a $(BUILD)/debug/libcrt0.a $(BUILD)/openlibm/libopenlibm.a
 
 clean:
 	cargo clean
@@ -21,11 +28,17 @@ fmt:
 test: all
 	make -C tests run
 
-$(BUILD)/libc.a:
+$(BUILD)/debug/libc.a: src/* src/*/* src/*/*/* src/*/*/*/*
 	cargo build $(CARGOFLAGS)
 
-$(BUILD)/libcrt0.a:
+$(BUILD)/debug/libcrt0.a: $(BUILD)/debug/libc.a
 	cargo build --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS)
+
+$(BUILD)/release/libc.a: src/* src/*/* src/*/*/* src/*/*/*/*
+	cargo build --release $(CARGOFLAGS)
+
+$(BUILD)/release/libcrt0.a: $(BUILD)/release/libc.a
+	cargo build --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS)
 
 $(BUILD)/openlibm: openlibm
 	rm -rf $@ $@.partial
@@ -33,4 +46,4 @@ $(BUILD)/openlibm: openlibm
 	mv $@.partial $@
 
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm
-	CC=$(CC) CFLAGS=-fno-stack-protector make -C $< libopenlibm.a
+	make CC=$(CC) CFLAGS=-fno-stack-protector -C $< libopenlibm.a

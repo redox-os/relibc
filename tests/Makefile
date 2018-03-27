@@ -87,18 +87,20 @@ verify: $(EXPECT_BINS)
 		diff -u "gen/$${bin}.stderr" "expected/$${bin}.stderr" || exit $$?; \
 	done
 
-GCCHEAD=\
+CFLAGS=\
 	-nostdinc \
 	-nostdlib \
 	-I ../include \
 	-I ../target/include \
-	-I ../openlibm/include \
-	-I ../openlibm/src \
+	-I ../target/openlibm/include \
+	-I ../target/openlibm/src \
+
+HEADLIBS=\
 	../target/debug/libcrt0.a
 
-GCCTAIL=\
+TAILLIBS=\
 	../target/debug/libc.a \
-	../openlibm/libopenlibm.a
+	../target/openlibm/libopenlibm.a
 
-%: %.c
-	gcc -fno-stack-protector -Wall $(GCCHEAD) "$<" $(GCCTAIL) -o "$@"
+%: %.c $(HEADLIBS) $(TAILLIBS)
+	gcc -fno-stack-protector -Wall $(CFLAGS) $(HEADLIBS) "$<" $(TAILLIBS) -o "$@"

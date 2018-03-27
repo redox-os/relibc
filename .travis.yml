@@ -10,8 +10,6 @@ before_script:
   - rustup component add rustfmt-preview
   - if [ -n "$TARGET" ]; then rustup target add $TARGET; fi
 script:
-  - ./fmt.sh -- --write-mode=diff
-  - cargo build $([ -n "$TARGET" ] && echo --target="$TARGET")
-  - if [ -z "$TARGET" ]; then ./test.sh; fi
+  - ./ci.sh
 notifications:
   email: false
