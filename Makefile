@@ -14,6 +14,12 @@ ifeq ($(TARGET),x86_64-unknown-redox)
 	CC="x86_64-unknown-redox-gcc"
 endif
 
+SRC=\
+	src/* \
+	src/*/* \
+	src/*/*/* \
+	src/*/*/*/*
+
 .PHONY: all clean fmt libc test
 
 all: libc libm
@@ -25,23 +31,23 @@ clean:
 fmt:
 	./fmt.sh
 
-libc: $(BUILD)/debug/libc.a $(BUILD)/debug/libcrt0.a 
+libc: $(BUILD)/debug/libc.a $(BUILD)/debug/libcrt0.a
 
 libm: $(BUILD)/openlibm/libopenlibm.a
 
 test: all
 	make -C tests run
 
-$(BUILD)/debug/libc.a: src/* src/*/* src/*/*/* src/*/*/*/*
+$(BUILD)/debug/libc.a: $(SRC)
 	cargo build $(CARGOFLAGS)
 
-$(BUILD)/debug/libcrt0.a: $(BUILD)/debug/libc.a
+$(BUILD)/debug/libcrt0.a: $(SRC)
 	cargo build --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS)
 
-$(BUILD)/release/libc.a: src/* src/*/* src/*/*/* src/*/*/*/*
+$(BUILD)/release/libc.a: $(SRC)
 	cargo build --release $(CARGOFLAGS)
 
-$(BUILD)/release/libcrt0.a: $(BUILD)/release/libc.a
+$(BUILD)/release/libcrt0.a: $(SRC)
 	cargo build --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS)
 
 $(BUILD)/openlibm: openlibm
