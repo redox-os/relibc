@@ -10,6 +10,9 @@ crate-type = ["staticlib"]
 [workspace]
 members = ["src/crt0"]
 
+[build-dependencies]
+cc = "1.0"
+
 [dependencies]
 compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins.git", default-features = false, features = ["mem"] }
 ctype = { path = "src/ctype" }

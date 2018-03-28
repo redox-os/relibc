@@ -263,6 +263,7 @@ dependencies = [
 name = "relibc"
 version = "0.1.0"
 dependencies = [
+ "cc 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins.git)",
  "ctype 0.1.0",
  "errno 0.1.0",
