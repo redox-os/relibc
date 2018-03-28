@@ -1,6 +1,5 @@
 sys_includes = ["stddef.h", "stdint.h"]
 include_guard = "_STRING_H"
-trailer = "#include <bits/string.h>"
 language = "C"
 
 [enum]

@@ -11,4 +11,3 @@ cbindgen = { path = "../../cbindgen" }
 platform = { path = "../platform" }
 stdlib = { path = "../stdlib" }
 errno = { path = "../errno" }
-compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins.git", default-features = false, features = ["mem"] }

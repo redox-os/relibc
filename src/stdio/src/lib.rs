@@ -1,9 +1,7 @@
 //! stdio implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdio.h.html
 
-#![feature(compiler_builtins_lib)]
 #![no_std]
 
-extern crate compiler_builtins;
 extern crate errno;
 extern crate fcntl;
 extern crate platform;

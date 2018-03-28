@@ -379,7 +379,6 @@ name = "stdio"
 version = "0.1.0"
 dependencies = [
  "cbindgen 0.5.2",
- "compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins.git)",
  "errno 0.1.0",
  "fcntl 0.1.0",
  "platform 0.1.0",
@@ -405,7 +404,6 @@ name = "string"
 version = "0.1.0"
 dependencies = [
  "cbindgen 0.5.2",
- "compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins.git)",
  "errno 0.1.0",
  "platform 0.1.0",
  "stdlib 0.1.0",

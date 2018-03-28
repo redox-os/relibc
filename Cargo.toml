@@ -14,7 +14,7 @@ members = ["src/crt0"]
 cc = "1.0"
 
 [dependencies]
-compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins.git", default-features = false, features = ["mem"] }
+compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins.git", default-features = false }
 ctype = { path = "src/ctype" }
 errno = { path = "src/errno" }
 fcntl = { path = "src/fcntl" }
