@@ -1,5 +1,5 @@
 [package]
-name = "stat"
+name = "sys_mman"
 version = "0.1.0"
 authors = ["Jeremy Soller <jackpot51@gmail.com>"]
 build = "build.rs"

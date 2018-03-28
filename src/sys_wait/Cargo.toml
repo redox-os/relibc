@@ -1,5 +1,5 @@
 [package]
-name = "resource"
+name = "sys_wait"
 version = "0.1.0"
 authors = ["Dan Robertson <danlrobertson89@gmail.com>"]
 
@@ -8,4 +8,4 @@ cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
 platform = { path = "../platform" }
-sys_time = { path = "../sys_time" }
+sys_resource = { path = "../sys_resource" }

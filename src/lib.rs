@@ -4,26 +4,26 @@
 extern crate compiler_builtins;
 extern crate platform;
 
-extern crate ctype;
-extern crate errno;
-extern crate fcntl;
-extern crate fenv;
-extern crate float;
-extern crate grp;
-extern crate mman;
-extern crate netinet;
-extern crate resource;
-extern crate semaphore;
-extern crate socket;
-extern crate stat;
-extern crate stdio;
-extern crate stdlib;
-extern crate string;
-extern crate sys_time;
-extern crate time;
-extern crate unistd;
-extern crate wait;
-extern crate wctype;
+pub extern crate ctype;
+pub extern crate errno;
+pub extern crate fcntl;
+pub extern crate fenv;
+pub extern crate float;
+pub extern crate grp;
+pub extern crate netinet;
+pub extern crate semaphore;
+pub extern crate stdio;
+pub extern crate stdlib;
+pub extern crate string;
+pub extern crate sys_mman;
+pub extern crate sys_resource;
+pub extern crate sys_socket;
+pub extern crate sys_stat;
+pub extern crate sys_time;
+pub extern crate sys_wait;
+pub extern crate time;
+pub extern crate unistd;
+pub extern crate wctype;
 
 #[lang = "eh_personality"]
 #[no_mangle]

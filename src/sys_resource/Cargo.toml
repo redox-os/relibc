@@ -1,11 +1,11 @@
 [package]
-name = "mman"
+name = "sys_resource"
 version = "0.1.0"
-authors = ["Jeremy Soller <jackpot51@gmail.com>"]
-build = "build.rs"
+authors = ["Dan Robertson <danlrobertson89@gmail.com>"]
 
 [build-dependencies]
 cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
 platform = { path = "../platform" }
+sys_time = { path = "../sys_time" }

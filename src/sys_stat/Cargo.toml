@@ -1,11 +1,11 @@
 [package]
-name = "wait"
+name = "sys_stat"
 version = "0.1.0"
-authors = ["Dan Robertson <danlrobertson89@gmail.com>"]
+authors = ["Jeremy Soller <jackpot51@gmail.com>"]
+build = "build.rs"
 
 [build-dependencies]
 cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
 platform = { path = "../platform" }
-resource = { path = "../resource" }

@@ -4,6 +4,16 @@ extern crate platform;
 
 use platform::types::*;
 
+pub use sys::*;
+
+#[cfg(target_os = "linux")]
+#[path = "linux.rs"]
+pub mod sys;
+
+#[cfg(target_os = "redox")]
+#[path = "redox.rs"]
+pub mod sys;
+
 #[no_mangle]
 pub extern "C" fn mlock(addr: *const c_void, len: usize) -> c_int {
     unimplemented!();

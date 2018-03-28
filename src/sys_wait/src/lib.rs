@@ -4,10 +4,10 @@
 #![no_std]
 
 extern crate platform;
-extern crate resource;
+extern crate sys_resource;
 
 use platform::types::*;
-use resource::rusage;
+use sys_resource::rusage;
 
 #[no_mangle]
 pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {

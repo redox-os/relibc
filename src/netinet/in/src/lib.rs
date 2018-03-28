@@ -3,10 +3,10 @@
 #![allow(non_camel_case_types)]
 
 extern crate platform;
-extern crate socket;
+extern crate sys_socket;
 
 use platform::types::*;
-use socket::sa_family_t;
+use sys_socket::sa_family_t;
 
 pub type in_addr_t = u32;
 pub type in_port_t = u16;

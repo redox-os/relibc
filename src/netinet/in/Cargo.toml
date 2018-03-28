@@ -9,4 +9,4 @@ cbindgen = { path = "../../../cbindgen" }
 
 [dependencies]
 platform = { path = "../../platform" }
-socket = { path = "../../socket" }
+sys_socket = { path = "../../sys_socket" }

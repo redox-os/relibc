@@ -18,21 +18,21 @@ fcntl = { path = "src/fcntl" }
 fenv = { path = "src/fenv" }
 float = { path = "src/float" }
 grp = { path = "src/grp" }
-mman = { path = "src/mman" }
 netinet = { path = "src/netinet" }
 platform = { path = "src/platform" }
-resource = { path = "src/resource" }
 semaphore = { path = "src/semaphore" }
 signal = { path = "src/signal" }
-socket = { path = "src/socket" }
-stat = { path = "src/stat" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }
 string = { path = "src/string" }
+sys_mman = { path = "src/sys_mman" }
+sys_resource = { path = "src/sys_resource" }
+sys_socket = { path = "src/sys_socket" }
+sys_stat = { path = "src/sys_stat" }
 sys_time = { path = "src/sys_time" }
+sys_wait = { path = "src/sys_wait" }
 time = { path = "src/time" }
 unistd = { path = "src/unistd" }
-wait = { path = "src/wait" }
 wctype = { path = "src/wctype" }
 
 [profile.dev]
