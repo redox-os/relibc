@@ -49,21 +49,26 @@ test: all
 
 $(BUILD)/debug/libc.a: $(SRC)
 	cargo build $(CARGOFLAGS)
+	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
 	cargo rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	touch $@
 
 $(BUILD)/release/libc.a: $(SRC)
 	cargo build --release $(CARGOFLAGS)
+	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
 	cargo rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	touch $@
 
 $(BUILD)/openlibm: openlibm
 	rm -rf $@ $@.partial
 	mkdir -p $(BUILD)
 	cp -r $< $@.partial
 	mv $@.partial $@
+	touch $@
 
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm
 	make CC=$(CC) CFLAGS=-fno-stack-protector -C $< libopenlibm.a
