@@ -4,34 +4,12 @@
 
 extern crate platform;
 
-use platform::types::*;
+pub mod constants;
+mod helpers;
 
-#[cfg(target_os = "redox")]
-pub const CLOCK_REALTIME: c_int = 1;
-#[cfg(target_os = "redox")]
-pub const CLOCK_MONOTONIC: c_int = 4;
-#[cfg(target_os = "linux")]
-pub const CLOCK_REALTIME: c_int = 0;
-#[cfg(target_os = "linux")]
-pub const CLOCK_MONOTONIC: c_int = 1;
-#[cfg(target_os = "linux")]
-pub const CLOCK_PROCESS_CPUTIME_ID: c_int = 2;
-#[cfg(target_os = "linux")]
-pub const CLOCK_THREAD_CPUTIME_ID: c_int = 3;
-#[cfg(target_os = "linux")]
-pub const CLOCK_MONOTONIC_RAW: c_int = 4;
-#[cfg(target_os = "linux")]
-pub const CLOCK_REALTIME_COARSE: c_int = 5;
-#[cfg(target_os = "linux")]
-pub const CLOCK_MONOTONIC_COARSE: c_int = 6;
-#[cfg(target_os = "linux")]
-pub const CLOCK_BOOTTIME: c_int = 7;
-#[cfg(target_os = "linux")]
-pub const CLOCK_REALTIME_ALARM: c_int = 8;
-#[cfg(target_os = "linux")]
-pub const CLOCK_BOOTTIME_ALARM: c_int = 9;
-#[cfg(target_os = "linux")]
-pub const CLOCK_TAI: c_int = 11;
+use platform::types::*;
+use constants::*;
+use helpers::*;
 
 /*
  *#[repr(C)]
@@ -54,6 +32,24 @@ pub struct tm {
     pub tm_isdst: c_int,
     pub tm_gmtoff: c_long,
     pub tm_zone: *const c_char,
+}
+
+impl Default for tm {
+    fn default() -> tm {
+        tm {
+            tm_sec: 0,
+            tm_min: 0,
+            tm_hour: 0,
+            tm_mday: 0,
+            tm_mon: 0,
+            tm_year: 0,
+            tm_wday: 0,
+            tm_yday: 0,
+            tm_isdst: 0,
+            tm_gmtoff: 0,
+            tm_zone: UTC,
+        }
+    }
 }
 
 #[repr(C)]
@@ -105,8 +101,8 @@ pub extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut c_char
 }
 
 #[no_mangle]
-pub extern "C" fn difftime(time1: time_t, time0: time_t) -> f64 {
-    unimplemented!();
+pub extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {
+    (time1 - time0) as c_double
 }
 
 #[no_mangle]
@@ -116,12 +112,47 @@ pub extern "C" fn getdate(string: *const c_char) -> tm {
 
 #[no_mangle]
 pub extern "C" fn gmtime(timer: *const time_t) -> *mut tm {
-    unimplemented!();
+    let mut result: tm = Default::default();
+    return gmtime_r(timer, &mut result);
 }
 
 #[no_mangle]
 pub extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut tm {
-    unimplemented!();
+    let (mut days, mut rem): (c_long, c_long);
+    let mut weekday: c_int;
+    let lcltime = unsafe { *clock };
+
+    days = lcltime / SECSPERDAY + EPOCH_ADJUSTMENT_DAYS;
+    rem = lcltime % SECSPERDAY;
+    if rem < 0 {
+        rem += SECSPERDAY;
+        days -= 1;
+    }
+    unsafe {
+        (*result).tm_hour = (rem / SECSPERHOUR) as c_int;
+        rem %= SECSPERHOUR;
+        (*result).tm_min = (rem / SECSPERMIN) as c_int;
+        (*result).tm_sec = (rem % SECSPERMIN) as c_int;
+    }
+
+    weekday = ((ADJUSTED_EPOCH_WDAY + days) % DAYSPERWEEK as c_long) as c_int;
+    if weekday < 0 {
+        weekday += DAYSPERWEEK;
+    }
+    unsafe { (*result).tm_wday = weekday };
+
+    let (year, month, day, yearday) = civil_from_days(days);
+    unsafe {
+        (*result).tm_yday = yearday;
+        (*result).tm_year = year - YEAR_BASE;
+        (*result).tm_mon = month;
+        (*result).tm_mday = day;
+
+        (*result).tm_isdst = 0;
+        (*result).tm_gmtoff = 0;
+        (*result).tm_zone = UTC;
+    }
+    result
 }
 
 #[no_mangle]

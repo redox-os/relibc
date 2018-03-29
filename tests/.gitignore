@@ -49,3 +49,4 @@
 /waitpid
 /write
 /time
+/gmtime
