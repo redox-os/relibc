@@ -310,27 +310,10 @@ pub extern "C" fn lrand48() -> c_long {
     unimplemented!();
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
-    let align = 8;
-    let ptr = ralloc::alloc(size + 16, align);
-    if !ptr.is_null() {
-        *(ptr as *mut u64) = (size + 16) as u64;
-        *(ptr as *mut u64).offset(1) = align as u64;
-        ptr.offset(16) as *mut c_void
-    } else {
-        ptr as *mut c_void
-    }
-}
+unsafe fn malloc_inner(size: usize, offset: usize, align: usize) -> *mut c_void {
+    assert!(offset >= 16);
+    assert!(align >= 8);
 
-#[no_mangle]
-pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_void {
-    let mut align = 16;
-    while align <= alignment {
-        align *= 2;
-    }
-
-    let offset = align/2;
     let ptr = ralloc::alloc(size + offset, align);
     if !ptr.is_null() {
         *(ptr as *mut u64) = (size + offset) as u64;
@@ -339,6 +322,21 @@ pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_voi
     } else {
         ptr as *mut c_void
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
+    malloc_inner(size, 16, 8)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_void {
+    let mut align = 16;
+    while align <= alignment as usize {
+        align *= 2;
+    }
+
+    malloc_inner(size, align/2, align)
 }
 
 #[no_mangle]
