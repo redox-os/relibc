@@ -7,8 +7,9 @@ fn main() {
 
     cc::Build::new()
         .flag("-nostdinc")
-    	.flag("-nostdlib")
-        .flag("-I").flag(&format!("{}/include", crate_dir))
+        .flag("-nostdlib")
+        .flag("-I")
+        .flag(&format!("{}/include", crate_dir))
         .flag("-fno-stack-protector")
         .file("src/c/fcntl.c")
         .file("src/c/stdio.c")

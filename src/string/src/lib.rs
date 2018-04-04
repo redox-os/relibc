@@ -43,11 +43,7 @@ pub unsafe extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn memcmp(
-    s1: *const c_void,
-    s2: *const c_void,
-    n: usize,
-) -> c_int {
+pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> c_int {
     let mut i = 0;
     while i < n {
         let a = *(s1 as *const u8).offset(i as isize);
@@ -61,11 +57,7 @@ pub unsafe extern "C" fn memcmp(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn memcpy(
-    s1: *mut c_void,
-    s2: *const c_void,
-    n: usize,
-) -> *mut c_void {
+pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: usize) -> *mut c_void {
     let mut i = 0;
     while i < n {
         *(s1 as *mut u8).offset(i as isize) = *(s2 as *const u8).offset(i as isize);
@@ -75,11 +67,7 @@ pub unsafe extern "C" fn memcpy(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn memmove(
-    s1: *mut c_void,
-    s2: *const c_void,
-    n: usize,
-) -> *mut c_void {
+pub unsafe extern "C" fn memmove(s1: *mut c_void, s2: *const c_void, n: usize) -> *mut c_void {
     if s2 < s1 as *const c_void {
         // copy from end
         let mut i = n;
@@ -99,11 +87,7 @@ pub unsafe extern "C" fn memmove(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn memset(
-    s: *mut c_void,
-    c: c_int,
-    n: usize,
-) -> *mut c_void {
+pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: usize) -> *mut c_void {
     let mut i = 0;
     while i < n {
         *(s as *mut u8).offset(i as isize) = c as u8;
