@@ -324,6 +324,24 @@ pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_void {
+    let mut align = 16;
+    while align <= alignment {
+        align *= 2;
+    }
+
+    let offset = align/2;
+    let ptr = ralloc::alloc(size + offset, align);
+    if !ptr.is_null() {
+        *(ptr as *mut u64) = (size + offset) as u64;
+        *(ptr as *mut u64).offset(1) = align as u64;
+        ptr.offset(offset as isize) as *mut c_void
+    } else {
+        ptr as *mut c_void
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn mblen(s: *const c_char, n: size_t) -> c_int {
     unimplemented!();
 }

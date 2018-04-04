@@ -10,11 +10,19 @@ int main(int argc, char ** argv) {
     }
     free(ptr);
 
-    char * ptrc = (char *)calloc(256,1);
+    char * ptrc = (char *)calloc(256, 1);
     printf("calloc %p\n", ptrc);
     for(i = 0; i < 256; i++) {
         ptrc[i] = (char)i;
     }
     free(ptrc);
+
+    char * ptra = (char *)memalign(256, 256);
+    printf("memalign %p\n", ptra);
+    for(i = 0; i < 256; i++) {
+        ptra[i] = (char)i;
+    }
+    free(ptra);
+
     return 0;
 }
