@@ -331,7 +331,7 @@ pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
 
 #[no_mangle]
 pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_void {
-    let mut align = 16;
+    let mut align = 32;
     while align <= alignment as usize {
         align *= 2;
     }
