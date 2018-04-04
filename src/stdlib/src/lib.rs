@@ -311,9 +311,6 @@ pub extern "C" fn lrand48() -> c_long {
 }
 
 unsafe fn malloc_inner(size: usize, offset: usize, align: usize) -> *mut c_void {
-    assert!(offset >= 16);
-    assert!(align >= 8);
-
     let ptr = ralloc::alloc(size + offset, align);
     if !ptr.is_null() {
         *(ptr as *mut u64) = (size + offset) as u64;
