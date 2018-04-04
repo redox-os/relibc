@@ -333,7 +333,7 @@ pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_voi
         align *= 2;
     }
 
-    malloc_inner(size, align/2, align)
+    malloc_inner(size, align / 2, align)
 }
 
 #[no_mangle]
