@@ -1,0 +1,10 @@
+[package]
+name = "crti"
+version = "0.1.0"
+authors = ["Angelo Bulfone <mbulfone@gmail.com>"]
+
+[lib]
+name = "crti"
+crate-type = ["staticlib"]
+
+[dependencies]
