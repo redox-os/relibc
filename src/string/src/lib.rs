@@ -11,6 +11,7 @@ use errno::*;
 use core::cmp;
 use core::usize;
 use core::ptr;
+use core::mem;
 
 #[no_mangle]
 pub unsafe extern "C" fn memccpy(
@@ -32,12 +33,42 @@ pub unsafe extern "C" fn memccpy(
 
 #[no_mangle]
 pub unsafe extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_void {
-    let s = s as *mut u8;
+    let mut s = s as *const u8;
     let c = c as u8;
-    for i in 0..n {
-        if *s.offset(i as isize) == c {
-            return s.offset(i as isize) as *mut c_void;
+    let mut n = n;
+    // read one byte at a time until s is aligned
+    while s as usize % mem::size_of::<usize>() != 0 {
+        if n == 0 {
+            return ptr::null_mut();
         }
+        if *s == c {
+            return s as *mut c_void;
+        }
+        n -= 1;
+        s = s.offset(1);
+    }
+    let mut s = s as *const usize;
+    let lowbits = !0 as usize / 255;
+    let highbits = lowbits * 0x80;
+    let repeated_c = lowbits * c as usize;
+    while n >= mem::size_of::<usize>() {
+        // read multiple bytes at a time
+        // turn the requested byte into 8 zero bits
+        let m = *s ^ repeated_c;
+        // subtracting one from zero flips high bit from 0 to 1
+        if (m.wrapping_sub(lowbits) & !m & highbits) != 0 {
+            break;
+        }
+        n -= mem::size_of::<usize>();
+        s = s.offset(1);
+    }
+    let mut s = s as *const u8;
+    while n > 0 {
+        if *s == c {
+            return s as *mut c_void;
+        }
+        n -= 1;
+        s = s.offset(1);
     }
     ptr::null_mut()
 }
@@ -131,8 +162,6 @@ pub unsafe extern "C" fn strcpy(s1: *mut c_char, s2: *const c_char) -> *mut c_ch
 
 #[no_mangle]
 pub unsafe extern "C" fn strcspn(s1: *const c_char, s2: *const c_char) -> size_t {
-    use core::mem;
-
     let s1 = s1 as *const u8;
     let s2 = s2 as *const u8;
 
@@ -288,8 +317,6 @@ pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
 
 #[no_mangle]
 pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> size_t {
-    use core::mem;
-
     let s1 = s1 as *const u8;
     let s2 = s2 as *const u8;
 
