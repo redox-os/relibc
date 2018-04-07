@@ -53,47 +53,52 @@ BINS=\
 	getid \
 	setid
 
+FORCE:
+.PHONY: all clean run gen_expected verify FORCE
+
 all: $(BINS)
 
 clean:
-	rm -f $(BINS) *.out
+	@$(RM) -v $(BINS) *.out
+	@$(RM) -rv gen/
+run: $(BINS:%=%.run)
+%.run: % FORCE # ignore *.run files that might exist
+	@echo "# $* ($<) #"
+	@./$* test args || $$?
 
-run: $(BINS)
-	for bin in $^; \
-	do \
-		echo "# $${bin} #"; \
-		"./$${bin}" test args || exit $$?; \
-	done
+# Generates files in expected/ directory (if needed)
+gen_expected: $(EXPECT_BINS:%=expected/%.stdout) $(EXPECT_BINS:%=expected/%.stderr)
+expected/%.stdout epected/%.stderr:
+	@mkdir -p $(@D)
+	@echo "# $* #"
+	@./$* test args > expected/$*.stdout 2> expected/$*.stderr || exit $$?
 
-expected: $(EXPECT_BINS)
-	rm -rf expected
-	mkdir -p expected
-	for bin in $^; \
-	do \
-		echo "# $${bin} #"; \
-		mkdir -p expected/`dirname $${bin}`; \
-		"./$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr" || exit $$?; \
-	done
+# Generates files in gen/ directory (if needed) and checks verifies them
+# To regenerate those files use `make -B` or `make clean && make verify`
+verify: $(EXPECT_BINS:%=gen/%.stdout) $(EXPECT_BINS:%=gen/%.stderr)
+gen/%.stdout gen/%.stderr: expected/%.stdout expected/%.stderr
+	@mkdir -p $(@D)
+	@echo "# $* #"
+	@./$* test args > gen/$*.stdout 2> gen/$*.stderr || exit $$?
+	@diff -u "gen/$*.stdout" "expected/$*.stdout" || exit $$?
+	@diff -u "gen/$*.stderr" "expected/$*.stderr" || exit $$?
 
-verify: $(EXPECT_BINS)
-	rm -rf gen
-	mkdir -p gen
-	for bin in $^; \
-	do \
-		echo "# $${bin} #"; \
-		mkdir -p gen/`dirname $${bin}`; \
-		"./$${bin}" test args > "gen/$${bin}.stdout" 2> "gen/$${bin}.stderr" || exit $$?; \
-		diff -u "gen/$${bin}.stdout" "expected/$${bin}.stdout" || exit $$?; \
-		diff -u "gen/$${bin}.stderr" "expected/$${bin}.stderr" || exit $$?; \
-	done
+
+CC=gcc
+
+CPPFLAGS=\
+	-nostdinc \
+	-isystem ../include \
+	-isystem ../target/include \
+	-isystem ../target/openlibm/include \
+	-isystem ../target/openlibm/src
 
 CFLAGS=\
-	-nostdinc \
-	-nostdlib \
-	-I ../include \
-	-I ../target/include \
-	-I ../target/openlibm/include \
-	-I ../target/openlibm/src \
+	-Wall \
+	-fno-stack-protector
+
+LDFLAGS=\
+	-nostdlib
 
 HEADLIBS=\
 	../target/debug/crt0.o
@@ -102,5 +107,8 @@ TAILLIBS=\
 	../target/debug/libc.a \
 	../target/openlibm/libopenlibm.a
 
-%: %.c $(HEADLIBS) $(TAILLIBS)
-	gcc -fno-stack-protector -Wall $(CFLAGS) $(HEADLIBS) "$<" $(TAILLIBS) -o "$@"
+%: $(HEADLIBS) %.c $(TAILLIBS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $^ -o $@
+
+# Disable all implicit suffix rules, since we don't want nor need them
+.SUFFIXES:
