@@ -62,7 +62,7 @@ pub unsafe fn c_str_n(s: *const c_char, n: usize) -> &'static [u8] {
 }
 
 pub unsafe fn cstr_from_bytes_with_nul_unchecked(bytes: &[u8]) -> *const c_char {
-    &*(bytes as *const [u8] as *const c_char)
+    bytes.as_ptr() as *const c_char)
 }
 
 pub struct FileWriter(pub c_int);
