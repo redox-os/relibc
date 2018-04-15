@@ -1,6 +1,7 @@
 //! time implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/time.h.html
 
 #![no_std]
+#![feature(const_fn)]
 
 extern crate platform;
 
@@ -34,23 +35,22 @@ pub struct tm {
     pub tm_zone: *const c_char,
 }
 
-impl Default for tm {
-    fn default() -> tm {
-        tm {
-            tm_sec: 0,
-            tm_min: 0,
-            tm_hour: 0,
-            tm_mday: 0,
-            tm_mon: 0,
-            tm_year: 0,
-            tm_wday: 0,
-            tm_yday: 0,
-            tm_isdst: 0,
-            tm_gmtoff: 0,
-            tm_zone: UTC,
-        }
-    }
-}
+unsafe impl Sync for tm {}
+
+// The C Standard says that localtime and gmtime return the same pointer.
+static mut TM: tm = tm {
+    tm_sec: 0,
+    tm_min: 0,
+    tm_hour: 0,
+    tm_mday: 0,
+    tm_mon: 0,
+    tm_year: 0,
+    tm_wday: 0,
+    tm_yday: 0,
+    tm_isdst: 0,
+    tm_gmtoff: 0,
+    tm_zone: UTC,
+};
 
 #[repr(C)]
 pub struct itimerspec {
@@ -112,8 +112,7 @@ pub extern "C" fn getdate(string: *const c_char) -> tm {
 
 #[no_mangle]
 pub extern "C" fn gmtime(timer: *const time_t) -> *mut tm {
-    let mut result: tm = Default::default();
-    return gmtime_r(timer, &mut result);
+    unsafe { gmtime_r(timer, &mut TM) }
 }
 
 #[no_mangle]
