@@ -43,7 +43,8 @@ EXPECT_BINS=\
 	unlink \
 	waitpid \
 	write \
-	time
+	time \
+	gmtime
 
 # Binaries that may generate varied output
 BINS=\
