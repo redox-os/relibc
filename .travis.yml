@@ -1,12 +1,14 @@
 language: rust
+dist: trusty
 env:
   -
   - TARGET=aarch64-unknown-linux-gnu
   - TARGET=x86_64-unknown-redox
 rust:
   - nightly
-install:
-  - if [ $TARGET == "aarch64-unknown-linux-gnu" ]; then sudo apt-get install gcc-aarch64-linux-gnu; fi
+before_install:
+  - sudo apt-get -qq update && sudo apt-get -qq upgrade
+  - if [ "$TARGET" == "aarch64-unknown-linux-gnu" ]; then sudo apt-get install gcc-aarch64-linux-gnu; fi
 before_script:
   - rustup component add rustfmt-preview
   - if [ -n "$TARGET" ]; then rustup target add $TARGET; fi

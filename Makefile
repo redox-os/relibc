@@ -45,7 +45,7 @@ libc: $(BUILD)/debug/libc.a $(BUILD)/debug/crt0.o
 libm: $(BUILD)/openlibm/libopenlibm.a
 
 test: all
-	make -C tests run
+	make -C tests all run
 
 $(BUILD)/debug/libc.a: $(SRC)
 	cargo build $(CARGOFLAGS)
