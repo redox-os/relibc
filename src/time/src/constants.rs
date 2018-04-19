@@ -37,3 +37,8 @@ pub(crate) const DAYSPERWEEK: c_int = 7;
 pub(crate) const YEAR_BASE: c_int = 1900;
 
 pub(crate) const UTC: *const c_char = b"UTC\0" as *const u8 as *const c_char;
+
+pub(crate) const DAY_NAMES: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+pub(crate) const MON_NAMES: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+];

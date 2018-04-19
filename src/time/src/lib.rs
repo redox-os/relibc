@@ -3,6 +3,7 @@
 #![no_std]
 #![feature(const_fn)]
 
+extern crate errno;
 extern crate platform;
 
 pub mod constants;
@@ -11,6 +12,9 @@ mod helpers;
 use platform::types::*;
 use constants::*;
 use helpers::*;
+use core::fmt::write;
+use core::mem::transmute;
+use errno::EIO;
 
 /*
  *#[repr(C)]
@@ -52,6 +56,9 @@ static mut TM: tm = tm {
     tm_zone: UTC,
 };
 
+// The C Standard says that ctime and asctime return the same pointer.
+static mut ASCTIME: [c_char; 26] = [0; 26];
+
 #[repr(C)]
 pub struct itimerspec {
     pub it_interval: timespec,
@@ -62,12 +69,32 @@ pub struct sigevent;
 
 #[no_mangle]
 pub extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
-    unimplemented!();
+    unsafe { asctime_r(timeptr, transmute::<&mut _, *mut c_char>(&mut ASCTIME)) }
 }
 
 #[no_mangle]
 pub extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_char {
-    unimplemented!();
+    let tm = unsafe { &*tm };
+    let result = core::fmt::write(
+        &mut platform::UnsafeStringWriter(buf as *mut u8),
+        format_args!(
+            "{:.3} {:.3}{:3} {:02}:{:02}:{:02} {}\n",
+            DAY_NAMES[tm.tm_wday as usize],
+            MON_NAMES[tm.tm_mon as usize],
+            tm.tm_mday as usize,
+            tm.tm_hour as usize,
+            tm.tm_min as usize,
+            tm.tm_sec as usize,
+            (1900 + tm.tm_year)
+        ),
+    );
+    match result {
+        Ok(_) => buf,
+        Err(_) => {
+            unsafe { platform::errno = EIO };
+            core::ptr::null_mut()
+        }
+    }
 }
 
 #[no_mangle]
