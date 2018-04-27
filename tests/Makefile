@@ -44,7 +44,8 @@ EXPECT_BINS=\
 	waitpid \
 	write \
 	time \
-	gmtime
+	gmtime \
+	asctime
 
 # Binaries that may generate varied output
 BINS=\
