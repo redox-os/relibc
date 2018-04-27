@@ -4,7 +4,9 @@ use errno;
 use types::*;
 
 const AT_FDCWD: c_int = -100;
+const AT_EMPTY_PATH: c_int = 0x1000;
 const AT_REMOVEDIR: c_int = 0x200;
+const AT_SYMLINK_NOFOLLOW: c_int = 0x100;
 
 pub fn e(sys: usize) -> usize {
     if (sys as isize) < 0 && (sys as isize) >= -256 {
@@ -32,6 +34,10 @@ pub fn chdir(path: *const c_char) -> c_int {
     e(unsafe { syscall!(CHDIR, path) }) as c_int
 }
 
+pub fn chmod(path: *const c_char, mode: mode_t) -> c_int {
+    e(unsafe { syscall!(FCHMODAT, AT_FDCWD, path, mode, 0) }) as c_int
+}
+
 pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     e(unsafe { syscall!(FCHOWNAT, AT_FDCWD, path, owner as u32, group as u32) }) as c_int
 }
@@ -55,12 +61,21 @@ pub fn exit(status: c_int) -> ! {
     loop {}
 }
 
+pub fn fchdir(fildes: c_int) -> c_int {
+    e(unsafe { syscall!(FCHDIR, fildes) }) as c_int
+}
+
+pub fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
+    e(unsafe { syscall!(FCHMOD, fildes, mode) }) as c_int
+}
+
 pub fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
     e(unsafe { syscall!(FCHOWN, fildes, owner, group) }) as c_int
 }
 
-pub fn fchdir(fildes: c_int) -> c_int {
-    e(unsafe { syscall!(FCHDIR, fildes) }) as c_int
+pub fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
+    let empty_cstr: *const c_char = unsafe { ::cstr_from_bytes_with_nul_unchecked(b"\0") };
+    e(unsafe { syscall!(NEWFSTATAT, fildes, empty_cstr, buf, AT_EMPTY_PATH) }) as c_int
 }
 
 pub fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
@@ -131,8 +146,16 @@ pub fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
     e(unsafe { syscall!(LSEEK, fildes, offset, whence) }) as off_t
 }
 
+pub fn lstat(file: *const c_char, buf: *mut stat) -> c_int {
+    e(unsafe { syscall!(NEWFSTATAT, AT_FDCWD, file, buf, AT_SYMLINK_NOFOLLOW) }) as c_int
+}
+
 pub fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     e(unsafe { syscall!(MKDIRAT, AT_FDCWD, path, mode) }) as c_int
+}
+
+pub fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
+    e(unsafe { syscall!(MKNODAT, AT_FDCWD, path, mode, 0) }) as c_int
 }
 
 pub fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
@@ -169,6 +192,10 @@ pub fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
 
 pub fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
     e(unsafe { syscall!(SETREUID, ruid, euid) }) as c_int
+}
+
+pub fn stat(file: *const c_char, buf: *mut stat) -> c_int {
+    e(unsafe { syscall!(NEWFSTATAT, AT_FDCWD, file, buf, 0) }) as c_int
 }
 
 pub fn unlink(path: *const c_char) -> c_int {

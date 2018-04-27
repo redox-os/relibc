@@ -35,6 +35,8 @@ typedef int clockid_t;
 
 typedef void* timer_t;
 
+typedef unsigned long int blkcnt_t;
+
 #ifdef __linux__
 #define _SC_PAGE_SIZE 30
 #endif

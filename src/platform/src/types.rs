@@ -59,6 +59,7 @@ pub type dev_t = usize;
 pub type ino_t = usize;
 pub type nlink_t = usize;
 pub type blksize_t = isize;
+pub type blkcnt_t = u64;
 
 pub type useconds_t = i32;
 pub type suseconds_t = i64;
@@ -82,4 +83,21 @@ impl<'a> From<&'a timespec> for redox_timespec {
             tv_nsec: tp.tv_nsec as i32,
         }
     }
+}
+
+#[repr(C)]
+pub struct stat {
+    pub st_dev: dev_t,
+    pub st_ino: ino_t,
+    pub st_nlink: nlink_t,
+    pub st_mode: mode_t,
+    pub st_uid: uid_t,
+    pub st_gid: gid_t,
+    pub st_rdev: dev_t,
+    pub st_size: off_t,
+    pub st_blksize: blksize_t,
+    pub st_atim: time_t,
+    pub st_mtim: time_t,
+    pub st_ctim: time_t,
+    pub st_blocks: blkcnt_t,
 }
