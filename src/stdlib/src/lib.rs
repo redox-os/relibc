@@ -62,7 +62,11 @@ pub unsafe extern "C" fn abort() {
 
 #[no_mangle]
 pub extern "C" fn abs(i: c_int) -> c_int {
-    if i < 0 { -i } else { i }
+    if i < 0 {
+        -i
+    } else {
+        i
+    }
 }
 
 #[no_mangle]
@@ -135,14 +139,13 @@ unsafe extern "C" fn void_cmp(a: *const c_void, b: *const c_void) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn bsearch(key: *const c_void,
-                                 base: *const c_void,
-                                 nel: size_t,
-                                 width: size_t,
-                                 compar: Option<unsafe extern "C" fn(*const c_void,
-                                                                     *const c_void)
-                                                                     -> c_int>)
-                                 -> *mut c_void {
+pub unsafe extern "C" fn bsearch(
+    key: *const c_void,
+    base: *const c_void,
+    nel: size_t,
+    width: size_t,
+    compar: Option<unsafe extern "C" fn(*const c_void, *const c_void) -> c_int>,
+) -> *mut c_void {
     let mut start = base;
     let mut len = nel;
     let cmp_fn = compar.unwrap_or(void_cmp);
@@ -192,11 +195,12 @@ pub extern "C" fn drand48() -> c_double {
 }
 
 #[no_mangle]
-pub extern "C" fn ecvt(value: c_double,
-                       ndigit: c_int,
-                       decpt: *mut c_int,
-                       sign: *mut c_int)
-                       -> *mut c_char {
+pub extern "C" fn ecvt(
+    value: c_double,
+    ndigit: c_int,
+    decpt: *mut c_int,
+    sign: *mut c_int,
+) -> *mut c_char {
     unimplemented!();
 }
 
@@ -217,11 +221,12 @@ pub unsafe extern "C" fn exit(status: c_int) {
 }
 
 #[no_mangle]
-pub extern "C" fn fcvt(value: c_double,
-                       ndigit: c_int,
-                       decpt: *mut c_int,
-                       sign: *mut c_int)
-                       -> *mut c_char {
+pub extern "C" fn fcvt(
+    value: c_double,
+    ndigit: c_int,
+    decpt: *mut c_int,
+    sign: *mut c_int,
+) -> *mut c_char {
     unimplemented!();
 }
 
@@ -244,10 +249,11 @@ pub extern "C" fn getenv(name: *const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn getsubopt(optionp: *mut *mut c_char,
-                            tokens: *const *mut c_char,
-                            valuep: *mut *mut c_char)
-                            -> c_int {
+pub extern "C" fn getsubopt(
+    optionp: *mut *mut c_char,
+    tokens: *const *mut c_char,
+    valuep: *mut *mut c_char,
+) -> c_int {
     unimplemented!();
 }
 
@@ -273,7 +279,11 @@ pub extern "C" fn l64a(value: c_long) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn labs(i: c_long) -> c_long {
-    if i < 0 { -i } else { i }
+    if i < 0 {
+        -i
+    } else {
+        i
+    }
 }
 
 #[no_mangle]
@@ -372,11 +382,13 @@ pub extern "C" fn putenv(s: *mut c_char) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn qsort(base: *mut c_void,
-                        nel: size_t,
-                        width: size_t,
-                        compar: Option<extern "C" fn(*const c_void, *const c_void) -> c_int>) {
-    unimplemented!();
+pub extern "C" fn qsort(
+    base: *mut c_void,
+    nel: size_t,
+    width: size_t,
+    compar: Option<extern "C" fn(*const c_void, *const c_void) -> c_int>,
+) {
+    unimplemented!()
 }
 
 #[no_mangle]
@@ -510,8 +522,8 @@ unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
 }
 
 unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
-    if (*s != 0 && *s == b'0' as c_char) &&
-       (*s.offset(1) != 0 && (*s.offset(1) == b'x' as c_char || *s.offset(1) == b'X' as c_char))
+    if (*s != 0 && *s == b'0' as c_char)
+        && (*s.offset(1) != 0 && (*s.offset(1) == b'x' as c_char || *s.offset(1) == b'X' as c_char))
     {
         convert_integer(s.offset(2), 16).map(|(val, idx, overflow)| (val, idx + 2, overflow))
     } else {
@@ -677,16 +689,20 @@ macro_rules! strto_impl {
     }
 }
 
-strto_impl!(strtoul,
-            c_ulong,
-            false,
-            c_ulong::max_value(),
-            c_ulong::min_value());
-strto_impl!(strtol,
-            c_long,
-            true,
-            c_long::max_value(),
-            c_long::min_value());
+strto_impl!(
+    strtoul,
+    c_ulong,
+    false,
+    c_ulong::max_value(),
+    c_ulong::min_value()
+);
+strto_impl!(
+    strtol,
+    c_long,
+    true,
+    c_long::max_value(),
+    c_long::min_value()
+);
 
 #[no_mangle]
 pub extern "C" fn system(command: *const c_char) -> c_int {
@@ -725,9 +741,3 @@ pub extern "C" fn wcstombs(s: *mut c_char, pwcs: *const wchar_t, n: size_t) -> s
 pub extern "C" fn wctomb(s: *mut c_char, wchar: wchar_t) -> c_int {
     unimplemented!();
 }
-
-// #[no_mangle]
-// pub extern "C" fn func(args) -> c_int {
-// unimplemented!();
-// }
-//
