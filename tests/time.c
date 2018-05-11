@@ -7,5 +7,7 @@ int main(int argc, char** argv) {
     perror("clock_gettime");
     time(NULL);
     perror("time");
+    clock_t c = clock();
+    perror("clock");
     return 0;
 }
