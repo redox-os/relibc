@@ -98,11 +98,7 @@ pub extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn clock() -> clock_t {
-    let mut ts: timespec;
-
-    unsafe {
-        ts = core::mem::uninitialized();
-    }
+    let mut ts: timespec = unsafe { core::mem::uninitialized() };
 
     if clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &mut ts) != 0 {
         return -1;
