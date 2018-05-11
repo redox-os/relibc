@@ -62,11 +62,7 @@ pub unsafe extern "C" fn abort() {
 
 #[no_mangle]
 pub extern "C" fn abs(i: c_int) -> c_int {
-    if i < 0 {
-        -i
-    } else {
-        i
-    }
+    if i < 0 { -i } else { i }
 }
 
 #[no_mangle]
@@ -139,13 +135,14 @@ unsafe extern "C" fn void_cmp(a: *const c_void, b: *const c_void) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn bsearch(
-    key: *const c_void,
-    base: *const c_void,
-    nel: size_t,
-    width: size_t,
-    compar: Option<unsafe extern "C" fn(*const c_void, *const c_void) -> c_int>,
-) -> *mut c_void {
+pub unsafe extern "C" fn bsearch(key: *const c_void,
+                                 base: *const c_void,
+                                 nel: size_t,
+                                 width: size_t,
+                                 compar: Option<unsafe extern "C" fn(*const c_void,
+                                                                     *const c_void)
+                                                                     -> c_int>)
+                                 -> *mut c_void {
     let mut start = base;
     let mut len = nel;
     let cmp_fn = compar.unwrap_or(void_cmp);
@@ -195,12 +192,11 @@ pub extern "C" fn drand48() -> c_double {
 }
 
 #[no_mangle]
-pub extern "C" fn ecvt(
-    value: c_double,
-    ndigit: c_int,
-    decpt: *mut c_int,
-    sign: *mut c_int,
-) -> *mut c_char {
+pub extern "C" fn ecvt(value: c_double,
+                       ndigit: c_int,
+                       decpt: *mut c_int,
+                       sign: *mut c_int)
+                       -> *mut c_char {
     unimplemented!();
 }
 
@@ -221,12 +217,11 @@ pub unsafe extern "C" fn exit(status: c_int) {
 }
 
 #[no_mangle]
-pub extern "C" fn fcvt(
-    value: c_double,
-    ndigit: c_int,
-    decpt: *mut c_int,
-    sign: *mut c_int,
-) -> *mut c_char {
+pub extern "C" fn fcvt(value: c_double,
+                       ndigit: c_int,
+                       decpt: *mut c_int,
+                       sign: *mut c_int)
+                       -> *mut c_char {
     unimplemented!();
 }
 
@@ -249,11 +244,10 @@ pub extern "C" fn getenv(name: *const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn getsubopt(
-    optionp: *mut *mut c_char,
-    tokens: *const *mut c_char,
-    valuep: *mut *mut c_char,
-) -> c_int {
+pub extern "C" fn getsubopt(optionp: *mut *mut c_char,
+                            tokens: *const *mut c_char,
+                            valuep: *mut *mut c_char)
+                            -> c_int {
     unimplemented!();
 }
 
@@ -279,11 +273,7 @@ pub extern "C" fn l64a(value: c_long) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn labs(i: c_long) -> c_long {
-    if i < 0 {
-        -i
-    } else {
-        i
-    }
+    if i < 0 { -i } else { i }
 }
 
 #[no_mangle]
@@ -382,12 +372,10 @@ pub extern "C" fn putenv(s: *mut c_char) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn qsort(
-    base: *mut c_void,
-    nel: size_t,
-    width: size_t,
-    compar: Option<extern "C" fn(*const c_void, *const c_void) -> c_int>,
-) {
+pub extern "C" fn qsort(base: *mut c_void,
+                        nel: size_t,
+                        width: size_t,
+                        compar: Option<extern "C" fn(*const c_void, *const c_void) -> c_int>) {
     unimplemented!();
 }
 
@@ -466,7 +454,7 @@ pub extern "C" fn srandom(seed: c_uint) {
 
 #[no_mangle]
 pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c_double {
-    //TODO: endptr
+    // TODO: endptr
 
     use core::str::FromStr;
 
@@ -478,90 +466,6 @@ pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c
             0.0
         }
     }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn strtol(
-    s: *const c_char,
-    endptr: *mut *const c_char,
-    base: c_int,
-) -> c_long {
-    let set_endptr = |idx: isize| {
-        if !endptr.is_null() {
-            *endptr = s.offset(idx);
-        }
-    };
-
-    let invalid_input = || {
-        platform::errno = EINVAL;
-        set_endptr(0);
-    };
-
-    // only valid bases are 2 through 36
-    if base != 0 && (base < 2 || base > 36) {
-        invalid_input();
-        return 0;
-    }
-
-    let mut idx = 0;
-
-    // skip any whitespace at the beginning of the string
-    while ctype::isspace(*s.offset(idx) as c_int) != 0 {
-        idx += 1;
-    }
-
-    // check for +/-
-    let positive = match is_positive(*s.offset(idx)) {
-        Some((pos, i)) => {
-            idx += i;
-            pos
-        }
-        None => {
-            invalid_input();
-            return 0;
-        }
-    };
-
-    // convert the string to a number
-    let num_str = s.offset(idx);
-    let res = match base {
-        0 => detect_base(num_str).and_then(|(base, i)| convert_integer(num_str.offset(i), base)),
-        8 => convert_octal(num_str),
-        16 => convert_hex(num_str),
-        _ => convert_integer(num_str, base),
-    };
-
-    // check for error parsing octal/hex prefix
-    // also check to ensure a number was indeed parsed
-    let (num, i, _) = match res {
-        Some(res) => res,
-        None => {
-            invalid_input();
-            return 0;
-        }
-    };
-    idx += i;
-
-    // account for the sign
-    let mut num = num as c_long;
-    num = if num.is_negative() {
-        platform::errno = ERANGE;
-        if positive {
-            c_long::max_value()
-        } else {
-            c_long::min_value()
-        }
-    } else {
-        if positive {
-            num
-        } else {
-            -num
-        }
-    };
-
-    set_endptr(idx);
-
-    num
 }
 
 fn is_positive(ch: c_char) -> Option<(bool, isize)> {
@@ -606,8 +510,8 @@ unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
 }
 
 unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
-    if (*s != 0 && *s == b'0' as c_char)
-        && (*s.offset(1) != 0 && (*s.offset(1) == b'x' as c_char || *s.offset(1) == b'X' as c_char))
+    if (*s != 0 && *s == b'0' as c_char) &&
+       (*s.offset(1) != 0 && (*s.offset(1) == b'x' as c_char || *s.offset(1) == b'X' as c_char))
     {
         convert_integer(s.offset(2), 16).map(|(val, idx, overflow)| (val, idx + 2, overflow))
     } else {
@@ -669,10 +573,120 @@ fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, boo
     }
 }
 
-#[no_mangle]
-pub extern "C" fn strtoul(s: *const c_char, endptr: *mut *mut c_char, base: c_int) -> c_ulong {
-    unimplemented!();
+macro_rules! strto_impl {
+    ($funcname:ident, $rettype:ty, $signed:expr, $maxval:expr, $minval:expr) => {
+        #[no_mangle]
+        pub unsafe extern "C" fn $funcname(s: *const c_char,
+                                           endptr: *mut *const c_char,
+                                           base: c_int)
+                                           -> $rettype {
+            // ensure these are constants
+            const CHECK_SIGN: bool = $signed;
+            const MAX_VAL: $rettype = $maxval;
+            const MIN_VAL: $rettype = $minval;
+
+            let set_endptr = |idx: isize| {
+                if !endptr.is_null() {
+                    *endptr = s.offset(idx);
+                }
+            };
+
+            let invalid_input = || {
+                platform::errno = EINVAL;
+                set_endptr(0);
+            };
+
+            // only valid bases are 2 through 36
+            if base != 0 && (base < 2 || base > 36) {
+                invalid_input();
+                return 0;
+            }
+
+            let mut idx = 0;
+
+            // skip any whitespace at the beginning of the string
+            while ctype::isspace(*s.offset(idx) as c_int) != 0 {
+                idx += 1;
+            }
+
+            // check for +/-
+            let positive = match is_positive(*s.offset(idx)) {
+                Some((pos, i)) => {
+                    idx += i;
+                    pos
+                }
+                None => {
+                    invalid_input();
+                    return 0;
+                }
+            };
+
+            // convert the string to a number
+            let num_str = s.offset(idx);
+            let res = match base {
+                0 => detect_base(num_str).and_then(|(base, i)| {
+                    convert_integer(num_str.offset(i), base)
+                }),
+                8 => convert_octal(num_str),
+                16 => convert_hex(num_str),
+                _ => convert_integer(num_str, base),
+            };
+
+            // check for error parsing octal/hex prefix
+            // also check to ensure a number was indeed parsed
+            let (num, i, overflow) = match res {
+                Some(res) => res,
+                None => {
+                    invalid_input();
+                    return 0;
+                }
+            };
+            idx += i;
+
+            let overflow = if CHECK_SIGN {
+                overflow || (num as c_long).is_negative()
+            } else {
+                overflow
+            };
+            // account for the sign
+            let num = num as $rettype;
+            let num = if overflow {
+                platform::errno = ERANGE;
+                if CHECK_SIGN {
+                    if positive {
+                        MAX_VAL
+                    } else {
+                        MIN_VAL
+                    }
+                } else {
+                    MAX_VAL
+                }
+            } else {
+                if positive {
+                    num
+                } else {
+                    // not using -num to keep the compiler happy
+                    num.overflowing_neg().0
+                }
+            };
+
+            set_endptr(idx);
+
+            num
+        }
+    }
 }
+
+strto_impl!(strtoul,
+            c_ulong,
+            false,
+            c_ulong::max_value(),
+            c_ulong::min_value());
+strto_impl!(strtol,
+            c_long,
+            true,
+            c_long::max_value(),
+            c_long::min_value());
 
 #[no_mangle]
 pub extern "C" fn system(command: *const c_char) -> c_int {
@@ -712,9 +726,8 @@ pub extern "C" fn wctomb(s: *mut c_char, wchar: wchar_t) -> c_int {
     unimplemented!();
 }
 
-/*
-#[no_mangle]
-pub extern "C" fn func(args) -> c_int {
-    unimplemented!();
-}
-*/
+// #[no_mangle]
+// pub extern "C" fn func(args) -> c_int {
+// unimplemented!();
+// }
+//
