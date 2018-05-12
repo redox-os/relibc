@@ -28,6 +28,7 @@ EXPECT_BINS=\
 	stdio/freopen \
 	stdlib/bsearch \
 	stdlib/strtol \
+	stdlib/strtoul \
 	stdlib/a64l \
 	stdlib/rand \
 	string/strncmp \
