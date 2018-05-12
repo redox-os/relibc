@@ -11,11 +11,12 @@ extern crate va_list as vl;
 
 use core::str;
 use core::ptr;
-use core::fmt::{Error, Result, Write};
+use core::fmt::{self, Error, Result};
+use core::fmt::Write as WriteFmt;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use platform::types::*;
-use platform::{c_str, errno};
+use platform::{c_str, errno, Write};
 use errno::STR_ERROR;
 use vl::VaList as va_list;
 
@@ -164,10 +165,19 @@ impl FILE {
         unsafe { platform::lseek(self.fd, off, whence) }
     }
 }
-impl Write for FILE {
+impl fmt::Write for FILE {
     fn write_str(&mut self, s: &str) -> Result {
         let s = s.as_bytes();
         if self.write(s) != s.len() {
+            Err(Error)
+        } else {
+            Ok(())
+        }
+    }
+}
+impl Write for FILE {
+    fn write_u8(&mut self, byte: u8) -> Result {
+        if self.write(&[byte]) != 1 {
             Err(Error)
         } else {
             Ok(())
@@ -872,10 +882,3 @@ pub unsafe extern "C" fn vsnprintf(
 pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_list) -> c_int {
     printf::printf(&mut platform::UnsafeStringWriter(s as *mut u8), format, ap)
 }
-
-/*
-#[no_mangle]
-pub extern "C" fn func(args) -> c_int {
-    unimplemented!();
-}
-*/

@@ -58,6 +58,30 @@ pub unsafe fn cstr_from_bytes_with_nul_unchecked(bytes: &[u8]) -> *const c_char 
     &*(bytes as *const [u8] as *const c_char)
 }
 
+// NOTE: defined here rather than in string because memcpy() is useful in multiple crates
+pub unsafe fn memcpy(s1: *mut c_void, s2: *const c_void, n: usize) -> *mut c_void {
+    let mut i = 0;
+    while i + 7 < n {
+        *(s1.offset(i as isize) as *mut u64) = *(s2.offset(i as isize) as *const u64);
+        i += 8;
+    }
+    while i < n {
+        *(s1 as *mut u8).offset(i as isize) = *(s2 as *const u8).offset(i as isize);
+        i += 1;
+    }
+    s1
+}
+
+pub trait Write: fmt::Write {
+    fn write_u8(&mut self, byte: u8) -> fmt::Result;
+}
+
+impl<'a, W: Write> Write for &'a mut W {
+    fn write_u8(&mut self, byte: u8) -> fmt::Result {
+        (**self).write_u8(byte)
+    }
+}
+
 pub struct FileWriter(pub c_int);
 
 impl FileWriter {
@@ -69,6 +93,13 @@ impl FileWriter {
 impl fmt::Write for FileWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write(s.as_bytes());
+        Ok(())
+    }
+}
+
+impl Write for FileWriter {
+    fn write_u8(&mut self, byte: u8) -> fmt::Result {
+        self.write(&[byte]);
         Ok(())
     }
 }
@@ -85,21 +116,19 @@ pub struct StringWriter(pub *mut u8, pub usize);
 
 impl StringWriter {
     pub unsafe fn write(&mut self, buf: &[u8]) {
-        for &b in buf.iter() {
-            if self.1 == 0 {
-                break;
-            } else if self.1 == 1 {
-                *self.0 = b'\0';
-            } else {
-                *self.0 = b;
-            }
+        if self.1 > 0 {
+            let copy_size = buf.len().min(self.1 - 1);
+            memcpy(
+                self.0 as *mut c_void,
+                buf.as_ptr() as *const c_void,
+                copy_size,
+            );
+            *self.0.offset(copy_size as isize) = b'\0';
 
-            self.0 = self.0.offset(1);
-            self.1 -= 1;
-
-            if self.1 > 0 {
-                *self.0 = b'\0';
-            }
+            // XXX: i believe this correctly mimics the behavior from before, but it seems
+            //      incorrect (the next write will write after the NUL)
+            self.0 = self.0.offset(copy_size as isize + 1);
+            self.1 -= copy_size + 1;
         }
     }
 }
@@ -111,21 +140,37 @@ impl fmt::Write for StringWriter {
     }
 }
 
+impl Write for StringWriter {
+    fn write_u8(&mut self, byte: u8) -> fmt::Result {
+        unsafe { self.write(&[byte]) };
+        Ok(())
+    }
+}
+
 pub struct UnsafeStringWriter(pub *mut u8);
 
 impl UnsafeStringWriter {
     pub unsafe fn write(&mut self, buf: &[u8]) {
-        for &b in buf.iter() {
-            *self.0 = b;
-            self.0 = self.0.offset(1);
-            *self.0 = b'\0';
-        }
+        memcpy(
+            self.0 as *mut c_void,
+            buf.as_ptr() as *const c_void,
+            buf.len(),
+        );
+        *self.0.offset(buf.len() as isize) = b'\0';
+        self.0 = self.0.offset(buf.len() as isize);
     }
 }
 
 impl fmt::Write for UnsafeStringWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         unsafe { self.write(s.as_bytes()) };
+        Ok(())
+    }
+}
+
+impl Write for UnsafeStringWriter {
+    fn write_u8(&mut self, byte: u8) -> fmt::Result {
+        unsafe { self.write(&[byte]) };
         Ok(())
     }
 }

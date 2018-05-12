@@ -58,12 +58,7 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) 
 
 #[no_mangle]
 pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: usize) -> *mut c_void {
-    let mut i = 0;
-    while i < n {
-        *(s1 as *mut u8).offset(i as isize) = *(s2 as *const u8).offset(i as isize);
-        i += 1;
-    }
-    s1
+    platform::memcpy(s1, s2, n)
 }
 
 #[no_mangle]
@@ -385,10 +380,3 @@ pub extern "C" fn strtok_r(
 pub extern "C" fn strxfrm(s1: *mut c_char, s2: *const c_char, n: usize) -> size_t {
     unimplemented!();
 }
-
-/*
-#[no_mangle]
-pub extern "C" fn func(args) -> c_int {
-    unimplemented!();
-}
-*/

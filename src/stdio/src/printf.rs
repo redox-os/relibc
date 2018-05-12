@@ -1,19 +1,18 @@
 use core::{fmt, slice, str};
 
+use platform::{self, Write};
 use platform::types::*;
 use vl::VaList;
 
-pub unsafe fn printf<W: fmt::Write>(mut w: W, format: *const c_char, mut ap: VaList) -> c_int {
-    extern "C" {
-        fn strlen(s: *const c_char) -> size_t;
-    }
+pub unsafe fn printf<W: Write>(mut w: W, format: *const c_char, mut ap: VaList) -> c_int {
+    let format = unsafe { slice::from_raw_parts(format as *const u8, usize::max_value()) };
 
-    let format = slice::from_raw_parts(format as *const u8, strlen(format));
-
-    let mut i = 0;
     let mut found_percent = false;
-    while i < format.len() {
-        let b = format[i];
+    for &b in format.iter() {
+        // check for NUL
+        if b == 0 {
+            break;
+        }
 
         if found_percent {
             match b as char {
@@ -24,7 +23,7 @@ pub unsafe fn printf<W: fmt::Write>(mut w: W, format: *const c_char, mut ap: VaL
                 'c' => {
                     let a = ap.get::<u32>();
 
-                    w.write_char(a as u8 as char);
+                    w.write_u8(a as u8);
 
                     found_percent = false;
                 }
@@ -57,9 +56,8 @@ pub unsafe fn printf<W: fmt::Write>(mut w: W, format: *const c_char, mut ap: VaL
                 's' => {
                     let a = ap.get::<usize>();
 
-                    w.write_str(str::from_utf8_unchecked(slice::from_raw_parts(
-                        a as *const u8,
-                        strlen(a as *const c_char),
+                    w.write_str(str::from_utf8_unchecked(platform::c_str(
+                        a as *const c_char,
                     )));
 
                     found_percent = false;
@@ -102,10 +100,8 @@ pub unsafe fn printf<W: fmt::Write>(mut w: W, format: *const c_char, mut ap: VaL
         } else if b == b'%' {
             found_percent = true;
         } else {
-            w.write_char(b as char);
+            w.write_u8(b);
         }
-
-        i += 1;
     }
 
     0
