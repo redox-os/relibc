@@ -105,12 +105,12 @@ pub extern "C" fn clock() -> clock_t {
     }
 
     if ts.tv_sec > time_t::max_value() / CLOCKS_PER_SEC
-        || ts.tv_nsec / 1000 > time_t::max_value() - CLOCKS_PER_SEC * ts.tv_sec
+        || ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC) > time_t::max_value() - CLOCKS_PER_SEC * ts.tv_sec
     {
         return -1;
     }
 
-    return ts.tv_sec * CLOCKS_PER_SEC + ts.tv_nsec / 1000;
+    return ts.tv_sec * CLOCKS_PER_SEC + ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC);
 }
 
 #[no_mangle]
