@@ -25,24 +25,32 @@ fn log2(num: size_t) -> size_t {
 }
 
 fn introsort_helper(
-    base: *mut c_char,
-    nel: size_t,
+    mut base: *mut c_char,
+    mut nel: size_t,
     width: size_t,
-    maxdepth: size_t,
+    mut maxdepth: size_t,
     comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
 ) {
     const THRESHOLD: size_t = 8;
 
-    if nel < THRESHOLD {
-        insertion_sort(base, nel, width, comp);
-    } else if nel > 1 {
-        if maxdepth == 0 {
-            heapsort(base, nel, width, comp);
-        } else {
-            let (left, right) = partition(base, nel, width, comp);
-            introsort_helper(base, left, width, maxdepth, comp);
-            let right_base = unsafe { base.add((right + 1) * width) };
-            introsort_helper(right_base, nel - (right + 1), width, maxdepth - 1, comp);
+    // this loop is a trick to save stack space because TCO is not a thing in Rustland
+    // basically, we just change the arguments and loop rather than recursing for the second call
+    // to introsort_helper()
+    loop {
+        if nel < THRESHOLD {
+            insertion_sort(base, nel, width, comp);
+            break;
+        } else if nel > 1 {
+            if maxdepth == 0 {
+                heapsort(base, nel, width, comp);
+                break;
+            } else {
+                let (left, right) = partition(base, nel, width, comp);
+                introsort_helper(base, left, width, maxdepth, comp);
+                base = unsafe { base.add((right + 1) * width) };
+                nel -= right + 1;
+                maxdepth -= 1;
+            }
         }
     }
 }
