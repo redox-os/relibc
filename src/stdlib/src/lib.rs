@@ -16,6 +16,8 @@ use rand::{Rng, SeedableRng, XorShiftRng};
 use errno::*;
 use platform::types::*;
 
+mod sort;
+
 #[global_allocator]
 static ALLOCATOR: ralloc::Allocator = ralloc::Allocator;
 
@@ -388,7 +390,14 @@ pub extern "C" fn qsort(
     width: size_t,
     compar: Option<extern "C" fn(*const c_void, *const c_void) -> c_int>,
 ) {
-    unimplemented!()
+    if let Some(comp) = compar {
+        // XXX: check width too?  not specified
+        if nel > 0 {
+            // XXX: maybe try to do mergesort/timsort first and fallback to introsort if memory
+            //      allocation fails?  not sure what is ideal
+            sort::introsort(base as *mut c_char, nel, width, comp);
+        }
+    }
 }
 
 #[no_mangle]

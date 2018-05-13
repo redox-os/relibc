@@ -5,7 +5,7 @@ use platform::types::*;
 use vl::VaList;
 
 pub unsafe fn printf<W: Write>(mut w: W, format: *const c_char, mut ap: VaList) -> c_int {
-    let format = unsafe { slice::from_raw_parts(format as *const u8, usize::max_value()) };
+    let format = slice::from_raw_parts(format as *const u8, usize::max_value());
 
     let mut found_percent = false;
     for &b in format.iter() {
