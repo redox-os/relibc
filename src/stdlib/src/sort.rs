@@ -34,18 +34,7 @@ fn introsort_helper(
     const THRESHOLD: size_t = 8;
 
     if nel < THRESHOLD {
-        // use an insertion sort instead of an introsort on small arrays
-        for i in 0..nel {
-            for j in (0..i).rev() {
-                let current = unsafe { base.add(j * width) };
-                let prev = unsafe { base.add((j + 1) * width) };
-                if comp(current as *const c_void, prev as *const c_void) > 0 {
-                    swap(current, prev, width);
-                } else {
-                    break;
-                }
-            }
-        }
+        insertion_sort(base, nel, width, comp);
     } else if nel > 1 {
         if maxdepth == 0 {
             heapsort(base, nel, width, comp);
@@ -54,6 +43,25 @@ fn introsort_helper(
             introsort_helper(base, left, width, maxdepth, comp);
             let right_base = unsafe { base.add((right + 1) * width) };
             introsort_helper(right_base, nel - (right + 1), width, maxdepth - 1, comp);
+        }
+    }
+}
+
+fn insertion_sort(
+    base: *mut c_char,
+    nel: size_t,
+    width: size_t,
+    comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
+) {
+    for i in 0..nel {
+        for j in (0..i).rev() {
+            let current = unsafe { base.add(j * width) };
+            let prev = unsafe { base.add((j + 1) * width) };
+            if comp(current as *const c_void, prev as *const c_void) > 0 {
+                swap(current, prev, width);
+            } else {
+                break;
+            }
         }
     }
 }
