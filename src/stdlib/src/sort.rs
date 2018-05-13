@@ -46,10 +46,17 @@ fn introsort_helper(
                 break;
             } else {
                 let (left, right) = partition(base, nel, width, comp);
-                introsort_helper(base, left, width, maxdepth, comp);
-                base = unsafe { base.add((right + 1) * width) };
-                nel -= right + 1;
+                let right_base = unsafe { base.add((right + 1) * width) };
+                let right_nel = nel - (right + 1);
                 maxdepth -= 1;
+                if left < nel - right {
+                    introsort_helper(base, left, width, maxdepth, comp);
+                    base = right_base;
+                    nel = right_nel;
+                } else {
+                    introsort_helper(right_base, right_nel, width, maxdepth, comp);
+                    nel = left;
+                }
             }
         }
     }
