@@ -42,3 +42,10 @@ pub(crate) const DAY_NAMES: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri
 pub(crate) const MON_NAMES: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
+
+pub(crate) const CLOCK_REALTIME: clockid_t = 0;
+pub(crate) const CLOCK_MONOTONIC: clockid_t = 1;
+pub(crate) const CLOCK_PROCESS_CPUTIME_ID: clockid_t = 2;
+pub(crate) const CLOCK_THREAD_CPUTIME_ID: clockid_t = 3;
+
+pub(crate) const CLOCKS_PER_SEC: time_t = 1_000_000;

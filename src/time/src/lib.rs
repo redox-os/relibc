@@ -12,7 +12,6 @@ mod helpers;
 use platform::types::*;
 use constants::*;
 use helpers::*;
-use core::fmt::write;
 use core::mem::transmute;
 use errno::EIO;
 
@@ -99,7 +98,20 @@ pub extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn clock() -> clock_t {
-    unimplemented!();
+    let mut ts: timespec = unsafe { core::mem::uninitialized() };
+
+    if clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &mut ts) != 0 {
+        return -1;
+    }
+
+    if ts.tv_sec > time_t::max_value() / CLOCKS_PER_SEC
+        || ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC)
+            > time_t::max_value() - CLOCKS_PER_SEC * ts.tv_sec
+    {
+        return -1;
+    }
+
+    return ts.tv_sec * CLOCKS_PER_SEC + ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC);
 }
 
 #[no_mangle]
