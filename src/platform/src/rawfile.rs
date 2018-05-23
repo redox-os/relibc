@@ -25,6 +25,10 @@ impl RawFile {
     pub fn into_raw_fd(self) -> usize {
         self.0
     }
+
+    pub fn from_raw_fd(fd: usize) -> Self {
+        RawFile(fd)
+    }
 }
 
 impl Drop for RawFile {
