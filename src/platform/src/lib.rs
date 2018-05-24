@@ -33,13 +33,13 @@ use types::*;
 #[no_mangle]
 pub static mut errno: c_int = 0;
 
-pub unsafe fn c_str(s: *const c_char) -> &'static [u8] {
+pub unsafe fn c_str<'a>(s: *const c_char) -> &'a [u8] {
     use core::usize;
 
     c_str_n(s, usize::MAX)
 }
 
-pub unsafe fn c_str_n(s: *const c_char, n: usize) -> &'static [u8] {
+pub unsafe fn c_str_n<'a>(s: *const c_char, n: usize) -> &'a [u8] {
     use core::slice;
 
     let mut size = 0;
