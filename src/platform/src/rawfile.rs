@@ -1,11 +1,6 @@
 use core::ops::Deref;
 use super::{open, dup, close, types::*};
 
-trait Into<c_char> {
-    into(self) -> c_char;
-}
-
-
 pub struct RawFile(c_int);
 
 impl RawFile {
