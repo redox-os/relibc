@@ -1,32 +1,37 @@
 use core::ops::Deref;
-use super::{open, dup, close};
+use super::{open, dup, close, types::*};
 
-pub struct RawFile(usize);
+trait Into<c_char> {
+    into(self) -> c_char;
+}
+
+
+pub struct RawFile(c_int);
 
 impl RawFile {
-    pub fn open<T: AsRef<[u8]>>(path: T, flags: usize, mode: usize) -> Result<RawFile, ()> {
-        match open(path.as_ref()[0] as *const i8, flags as i32, mode as u16) {
+    pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> Result<RawFile, ()> {
+        match open(path, oflag, mode) {
             -1 => Err(()),
-            n => Ok(RawFile(n as usize))
+            n => Ok(RawFile(n))
         }
     }
 
     pub fn dup(&self, _buf: &[u8]) -> Result<RawFile, ()> {
-        match dup(self.0 as i32) {
+        match dup(self.0) {
             -1 => Err(()),
-            n => Ok(RawFile(n as usize))
+            n => Ok(RawFile(n))
         }
     }
 
-    pub fn as_raw_fd(&self) -> usize {
+    pub fn as_raw_fd(&self) -> c_int {
         self.0
     }
 
-    pub fn into_raw_fd(self) -> usize {
+    pub fn into_raw_fd(self) -> c_int {
         self.0
     }
 
-    pub fn from_raw_fd(fd: usize) -> Self {
+    pub fn from_raw_fd(fd: c_int) -> Self {
         RawFile(fd)
     }
 }
