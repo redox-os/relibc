@@ -6,14 +6,14 @@ pub struct RawFile(usize);
 impl RawFile {
     pub fn open<T: AsRef<[u8]>>(path: T, flags: usize, mode: usize) -> Result<RawFile, ()> {
         match open(path.as_ref()[0] as *const i8, flags as i32, mode as u16) {
-            0 => Err(()),
+            -1 => Err(()),
             n => Ok(RawFile(n as usize))
         }
     }
 
     pub fn dup(&self, _buf: &[u8]) -> Result<RawFile, ()> {
         match dup(self.0 as i32) {
-            0 => Err(()),
+            -1 => Err(()),
             n => Ok(RawFile(n as usize))
         }
     }
