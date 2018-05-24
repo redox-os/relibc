@@ -8,7 +8,7 @@ Just search for any invocation of the `unimplemented` macro, and hop in! The ci 
 
 ## Supported OSes
 
- - RedoxOS
+ - Redox OS
  - Linux
 
 ## Supported architectures
