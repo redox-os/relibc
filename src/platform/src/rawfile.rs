@@ -1,5 +1,5 @@
 use core::ops::Deref;
-use sys::{open, dup, close};
+use super::{open, dup, close};
 
 pub struct RawFile(usize);
 
