@@ -33,7 +33,7 @@ impl RawFile {
 
 impl Drop for RawFile {
     fn drop(&mut self) {
-        let _ = close(self.0 as i32);
+        let _ = close(self.0);
     }
 }
 
