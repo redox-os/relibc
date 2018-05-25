@@ -43,40 +43,23 @@ pub fn WCOREDUMP(status: c_int) -> c_int {
 
 #[inline]
 pub fn WIFEXITED(status: c_int) -> c_int {
-    let term_status = WTERMSIG(status);
     // This is simulate the Not operator when used for regular integers in C
-    if term_status == 0 {
-        1
-    } else {
-        0
-    }
+    (WTERMSIG(status) & core::i32::MAX == 0) as c_int
 }
 
 #[inline]
 pub fn WIFSTOPPED(status: c_int) -> c_int {
-    if ((((status & 0xffff) * 0x10001) >> 8) as c_short) > 0x7f00 {
-        1
-    } else {
-        0
-    }
+    (((((status & 0xffff) * 0x10001) >> 8) as c_short) > 0x7f00) as c_int
 }
 
 #[inline]
 pub fn WIFSIGNALED(status: c_int) -> c_int {
-    if (status & 0xffff) - (1 as c_uint) < 0xffu {
-        1
-    } else {
-        0
-    }
+    ((status & 0xffff) - (1 as c_uint) < 0xffu) as c_int
 }
 
 #[inline]
 pub fn WIFSIGNALED(status: c_int) -> c_int {
-    if status == 0xffff {
-        1
-    } else {
-        0
-    }
+    (status == 0xffff) as c_int
 }
 
 #[no_mangle]
