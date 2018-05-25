@@ -54,7 +54,7 @@ pub fn WIFEXITED(status: c_int) -> c_int {
 
 #[inline]
 pub fn WIFSTOPPED(status: c_int) -> c_int {
-    ((((status & 0xffff) * 0x10001) >> 8) as c_short) > 0x7f00 {
+    if ((((status & 0xffff) * 0x10001) >> 8) as c_short) > 0x7f00 {
         1
     } else {
         0
