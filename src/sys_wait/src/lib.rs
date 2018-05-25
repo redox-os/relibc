@@ -44,7 +44,7 @@ pub fn WCOREDUMP(status: c_int) -> c_int {
 #[inline]
 pub fn WIFEXITED(status: c_int) -> c_int {
     // This is simulate the Not operator when used for regular integers in C
-    (WTERMSIG(status) & core::i32::MAX == 0) as c_int
+    (WTERMSIG(status) == 0) as c_int
 }
 
 #[inline]
