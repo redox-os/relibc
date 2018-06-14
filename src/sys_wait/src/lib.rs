@@ -13,13 +13,13 @@ pub const WNOHANG: c_int = 1;
 pub const WUNTRACED: c_int = 2;
 
 pub const WSTOPPED: c_int = 2;
-pub const WEXITED: c_int = 4
-pub const WCONTINUED: c_int = 8
-pub const WNOWAIT: c_int = 0x1000000
+pub const WEXITED: c_int = 4;
+pub const WCONTINUED: c_int = 8;
+pub const WNOWAIT: c_int = 0x1000000;
 
-pub const __WNOTHREAD: c_int = 0x20000000
-pub const __WALL: c_int = 0x40000000
-pub const __WCLONE: c_int = 0x80000000
+pub const __WNOTHREAD: c_int = 0x20000000;
+pub const __WALL: c_int = 0x40000000;
+pub const __WCLONE: c_int = 0x80000000;
 
 #[inline]
 pub fn WEXITSTATUS(status: c_int) -> c_int {
@@ -54,11 +54,11 @@ pub fn WIFSTOPPED(status: c_int) -> c_int {
 
 #[inline]
 pub fn WIFSIGNALED(status: c_int) -> c_int {
-    ((status & 0xffff) - (1 as c_uint) < 0xffu) as c_int
+    ((status & 0xffff) - (1 as c_int) < 0xff) as c_int
 }
 
 #[inline]
-pub fn WIFSIGNALED(status: c_int) -> c_int {
+pub fn WIFCONTINUED(status: c_int) -> c_int {
     (status == 0xffff) as c_int
 }
 
