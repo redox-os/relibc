@@ -595,123 +595,143 @@ fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, boo
 }
 
 macro_rules! strto_impl {
-    ($funcname:ident, $rettype:ty, $signed:expr, $maxval:expr, $minval:expr) => {
-        #[no_mangle]
-        pub unsafe extern "C" fn $funcname(s: *const c_char,
-                                           endptr: *mut *const c_char,
-                                           base: c_int)
-                                           -> $rettype {
-            // ensure these are constants
-            const CHECK_SIGN: bool = $signed;
-            const MAX_VAL: $rettype = $maxval;
-            const MIN_VAL: $rettype = $minval;
+    (
+        $rettype:ty,
+        $signed:expr,
+        $maxval:expr,
+        $minval:expr,
+        $s:ident,
+        $endptr:ident,
+        $base:ident
+    ) => {{
+        // ensure these are constants
+        const CHECK_SIGN: bool = $signed;
+        const MAX_VAL: $rettype = $maxval;
+        const MIN_VAL: $rettype = $minval;
 
-            let set_endptr = |idx: isize| {
-                if !endptr.is_null() {
-                    *endptr = s.offset(idx);
-                }
-            };
+        let set_endptr = |idx: isize| {
+            if !$endptr.is_null() {
+                *$endptr = $s.offset(idx);
+            }
+        };
 
-            let invalid_input = || {
-                platform::errno = EINVAL;
-                set_endptr(0);
-            };
+        let invalid_input = || {
+            platform::errno = EINVAL;
+            set_endptr(0);
+        };
 
-            // only valid bases are 2 through 36
-            if base != 0 && (base < 2 || base > 36) {
+        // only valid bases are 2 through 36
+        if $base != 0 && ($base < 2 || $base > 36) {
+            invalid_input();
+            return 0;
+        }
+
+        let mut idx = 0;
+
+        // skip any whitespace at the beginning of the string
+        while ctype::isspace(*$s.offset(idx) as c_int) != 0 {
+            idx += 1;
+        }
+
+        // check for +/-
+        let positive = match is_positive(*$s.offset(idx)) {
+            Some((pos, i)) => {
+                idx += i;
+                pos
+            }
+            None => {
                 invalid_input();
                 return 0;
             }
+        };
 
-            let mut idx = 0;
+        // convert the string to a number
+        let num_str = $s.offset(idx);
+        let res = match $base {
+            0 => detect_base(num_str).and_then(|($base, i)| {
+                convert_integer(num_str.offset(i), $base)
+            }),
+            8 => convert_octal(num_str),
+            16 => convert_hex(num_str),
+            _ => convert_integer(num_str, $base),
+        };
 
-            // skip any whitespace at the beginning of the string
-            while ctype::isspace(*s.offset(idx) as c_int) != 0 {
-                idx += 1;
+        // check for error parsing octal/hex prefix
+        // also check to ensure a number was indeed parsed
+        let (num, i, overflow) = match res {
+            Some(res) => res,
+            None => {
+                invalid_input();
+                return 0;
             }
+        };
+        idx += i;
 
-            // check for +/-
-            let positive = match is_positive(*s.offset(idx)) {
-                Some((pos, i)) => {
-                    idx += i;
-                    pos
-                }
-                None => {
-                    invalid_input();
-                    return 0;
-                }
-            };
-
-            // convert the string to a number
-            let num_str = s.offset(idx);
-            let res = match base {
-                0 => detect_base(num_str).and_then(|(base, i)| {
-                    convert_integer(num_str.offset(i), base)
-                }),
-                8 => convert_octal(num_str),
-                16 => convert_hex(num_str),
-                _ => convert_integer(num_str, base),
-            };
-
-            // check for error parsing octal/hex prefix
-            // also check to ensure a number was indeed parsed
-            let (num, i, overflow) = match res {
-                Some(res) => res,
-                None => {
-                    invalid_input();
-                    return 0;
-                }
-            };
-            idx += i;
-
-            let overflow = if CHECK_SIGN {
-                overflow || (num as c_long).is_negative()
-            } else {
-                overflow
-            };
-            // account for the sign
-            let num = num as $rettype;
-            let num = if overflow {
-                platform::errno = ERANGE;
-                if CHECK_SIGN {
-                    if positive {
-                        MAX_VAL
-                    } else {
-                        MIN_VAL
-                    }
-                } else {
-                    MAX_VAL
-                }
-            } else {
+        let overflow = if CHECK_SIGN {
+            overflow || (num as c_long).is_negative()
+        } else {
+            overflow
+        };
+        // account for the sign
+        let num = num as $rettype;
+        let num = if overflow {
+            platform::errno = ERANGE;
+            if CHECK_SIGN {
                 if positive {
-                    num
+                    MAX_VAL
                 } else {
-                    // not using -num to keep the compiler happy
-                    num.overflowing_neg().0
+                    MIN_VAL
                 }
-            };
+            } else {
+                MAX_VAL
+            }
+        } else {
+            if positive {
+                num
+            } else {
+                // not using -num to keep the compiler happy
+                num.overflowing_neg().0
+            }
+        };
 
-            set_endptr(idx);
+        set_endptr(idx);
 
-            num
-        }
-    }
+        num
+    }}
 }
 
-strto_impl!(
-    strtoul,
-    c_ulong,
-    false,
-    c_ulong::max_value(),
-    c_ulong::min_value()
-);
-strto_impl!(
-    strtol,
-    c_long,
-    true,
-    c_long::max_value(),
-    c_long::min_value()
-);
+
+#[no_mangle]
+pub unsafe extern "C" fn strtoul(s: *const c_char,
+                                 endptr: *mut *const c_char,
+                                 base: c_int)
+                                 -> c_ulong {
+    strto_impl!(
+        c_ulong,
+        false,
+        c_ulong::max_value(),
+        c_ulong::min_value(),
+        s,
+        endptr,
+        base
+    )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn strtol(s: *const c_char,
+                                endptr: *mut *const c_char,
+                                base: c_int)
+                                -> c_long {
+    strto_impl!(
+        c_long,
+        true,
+        c_long::max_value(),
+        c_long::min_value(),
+        s,
+        endptr,
+        base
+    )
+}
 
 #[no_mangle]
 pub extern "C" fn system(command: *const c_char) -> c_int {
