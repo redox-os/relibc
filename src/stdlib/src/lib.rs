@@ -72,6 +72,15 @@ pub extern "C" fn abs(i: c_int) -> c_int {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void {
+    if size % alignment != 0 {
+        return ptr::null_mut();
+    }
+
+    memalign(alignment, size)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn atexit(func: Option<extern "C" fn()>) -> c_int {
     for i in 0..ATEXIT_FUNCS.len() {
         if ATEXIT_FUNCS[i] == None {
