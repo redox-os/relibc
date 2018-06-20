@@ -354,12 +354,12 @@ pub extern "C" fn mbtowc(pwc: *mut wchar_t, s: *const c_char, n: size_t) -> c_in
 }
 
 #[no_mangle]
-pub extern "C" fn mktemp(template: *mut c_char) -> *mut c_char {
+pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn mkstemp(template: *mut c_char) -> c_int {
+pub extern "C" fn mkstemp(name: *mut c_char) -> c_int {
     unimplemented!();
 }
 

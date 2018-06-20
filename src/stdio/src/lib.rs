@@ -760,8 +760,8 @@ pub extern "C" fn remove(path: *const c_char) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn rename(old: *const c_char, new: *const c_char) -> c_int {
-    platform::rename(old, new)
+pub extern "C" fn rename(oldpath: *const c_char, newpath: *const c_char) -> c_int {
+    platform::rename(oldpath, newpath)
 }
 
 /// Rewind `stream` back to the beginning of it
