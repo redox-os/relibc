@@ -8,9 +8,11 @@ build = "build.rs"
 cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
-platform = { path = "../platform" }
-va_list = { path = "../../va_list", features = ["no_std"] }
+errno = { path = "../errno"}
 fcntl = { path = "../fcntl" }
+lazy_static = "*"
+platform = { path = "../platform" }
+ralloc = { path = "../../ralloc" }
 string = { path = "../string" }
 stdlib = { path = "../stdlib" }
-errno = { path = "../errno"}
+va_list = { path = "../../va_list", features = ["no_std"] }
