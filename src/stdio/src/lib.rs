@@ -1,6 +1,7 @@
 //! stdio implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdio.h.html
 
 #![no_std]
+// For Vec
 #![feature(alloc)]
 #![feature(const_fn)]
 
