@@ -1,4 +1,4 @@
-use core::{fmt, slice, str};
+use core::{slice, str};
 
 use platform::{self, Write};
 use platform::types::*;
@@ -17,90 +17,91 @@ pub unsafe fn printf<W: Write>(mut w: W, format: *const c_char, mut ap: VaList) 
         if found_percent {
             match b as char {
                 '%' => {
-                    w.write_char('%');
                     found_percent = false;
+                    w.write_char('%')
                 }
                 'c' => {
                     let a = ap.get::<u32>();
 
-                    w.write_u8(a as u8);
-
                     found_percent = false;
+
+                    w.write_u8(a as u8)
                 }
                 'd' | 'i' => {
                     let a = ap.get::<c_int>();
 
-                    w.write_fmt(format_args!("{}", a));
-
                     found_percent = false;
+
+                    w.write_fmt(format_args!("{}", a))
                 }
                 'f' | 'F' => {
                     let a = ap.get::<f64>();
 
-                    w.write_fmt(format_args!("{}", a));
-
                     found_percent = false;
+
+                    w.write_fmt(format_args!("{}", a))
                 }
                 'n' => {
                     let _a = ap.get::<c_int>();
 
                     found_percent = false;
+                    Ok(())
                 }
                 'p' => {
                     let a = ap.get::<usize>();
 
-                    w.write_fmt(format_args!("0x{:x}", a));
-
                     found_percent = false;
+
+                    w.write_fmt(format_args!("0x{:x}", a))
                 }
                 's' => {
                     let a = ap.get::<usize>();
 
+                    found_percent = false;
+
                     w.write_str(str::from_utf8_unchecked(platform::c_str(
                         a as *const c_char,
-                    )));
-
-                    found_percent = false;
+                    )))
                 }
                 'u' => {
                     let a = ap.get::<c_uint>();
 
-                    w.write_fmt(format_args!("{}", a));
-
                     found_percent = false;
+
+                    w.write_fmt(format_args!("{}", a))
                 }
                 'x' => {
                     let a = ap.get::<c_uint>();
 
-                    w.write_fmt(format_args!("{:x}", a));
-
                     found_percent = false;
+
+                    w.write_fmt(format_args!("{:x}", a))
                 }
                 'X' => {
                     let a = ap.get::<c_uint>();
 
-                    w.write_fmt(format_args!("{:X}", a));
-
                     found_percent = false;
+
+                    w.write_fmt(format_args!("{:X}", a))
                 }
                 'o' => {
                     let a = ap.get::<c_uint>();
 
-                    w.write_fmt(format_args!("{:o}", a));
-
                     found_percent = false;
+
+                    w.write_fmt(format_args!("{:o}", a))
                 }
-                '-' => {}
-                '+' => {}
-                ' ' => {}
-                '#' => {}
-                '0'...'9' => {}
-                _ => {}
-            }
+                '-' => Ok(()),
+                '+' => Ok(()),
+                ' ' => Ok(()),
+                '#' => Ok(()),
+                '0'...'9' => Ok(()),
+                _ => Ok(()),
+            }.expect("Error writing!")
         } else if b == b'%' {
             found_percent = true;
         } else {
-            w.write_u8(b);
+            w.write_u8(b).expect("Error writing char!");
         }
     }
 
