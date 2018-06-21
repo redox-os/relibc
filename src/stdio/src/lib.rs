@@ -46,14 +46,14 @@ mod internal;
 /// This struct gets exposed to the C API.
 ///
 pub struct FILE {
-    flags: i32,
-    read: Option<(usize, usize)>,
-    write: Option<(usize, usize, usize)>,
-    fd: c_int,
-    buf: Vec<u8>,
+    flags:    i32,
+    read:     Option<(usize, usize)>,
+    write:    Option<(usize, usize, usize)>,
+    fd:       c_int,
+    buf:      Vec<u8>,
     buf_char: i8,
-    lock: AtomicBool,
-    unget: usize,
+    lock:     AtomicBool,
+    unget:    usize,
 }
 
 impl FILE {
@@ -215,6 +215,8 @@ pub extern "C" fn fclose(stream: &mut FILE) -> c_int {
         unsafe {
             free(stream as *mut _ as *mut _);
         }
+    } else {
+        funlockfile(stream);
     }
     r
 }
@@ -223,8 +225,8 @@ pub extern "C" fn fclose(stream: &mut FILE) -> c_int {
 #[no_mangle]
 pub extern "C" fn fdopen(fildes: c_int, mode: *const c_char) -> *mut FILE {
     use core::ptr;
-    if let Some(mut f) = unsafe { helpers::_fdopen(fildes, mode) } {
-        &mut f
+    if let Some(f) = unsafe { helpers::_fdopen(fildes, mode) } {
+        f
     } else {
         ptr::null_mut()
     }
@@ -272,15 +274,17 @@ pub extern "C" fn fgetc(stream: &mut FILE) -> c_int {
 
 /// Get the position of the stream and store it in pos
 #[no_mangle]
-pub extern "C" fn fgetpos(stream: &mut FILE, pos: *mut fpos_t) -> c_int {
+pub extern "C" fn fgetpos(stream: &mut FILE, pos: Option<&mut fpos_t>) -> c_int {
     let off = internal::ftello(stream);
     if off < 0 {
         return -1;
     }
-    unsafe {
-        (*pos) = off;
+    if let Some(pos) = pos {
+        *pos = off;
+        0
+    } else {
+        -1
     }
-    0
 }
 
 /// Get a string from the stream
@@ -366,12 +370,11 @@ pub extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FI
         fcntl::sys_fcntl(fd, fcntl::F_SETFD, fcntl::FD_CLOEXEC);
     }
 
-    let f = unsafe { helpers::_fdopen(fd, mode) };
-    if let Some(mut fi) = f {
-        &mut fi
+    if let Some(f) = unsafe { helpers::_fdopen(fd, mode) } {
+        f
     } else {
         platform::close(fd);
-        return ptr::null_mut();
+        ptr::null_mut()
     }
 }
 
@@ -534,8 +537,8 @@ pub extern "C" fn fseeko(stream: &mut FILE, offset: off_t, whence: c_int) -> c_i
 
 /// Seek to a position `pos` in the file from the beginning of the file
 #[no_mangle]
-pub unsafe extern "C" fn fsetpos(stream: &mut FILE, pos: *const fpos_t) -> c_int {
-    fseek(stream, *pos as off_t, SEEK_SET)
+pub unsafe extern "C" fn fsetpos(stream: &mut FILE, pos: Option<&fpos_t>) -> c_int {
+    fseek(stream, *pos.expect("You must specify a valid position"), SEEK_SET)
 }
 
 /// Get the current position of the cursor in the file
