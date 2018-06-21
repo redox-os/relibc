@@ -23,6 +23,7 @@
 /printf
 /rmdir
 /rename
+/scanf
 /setid
 /setid
 /sleep
