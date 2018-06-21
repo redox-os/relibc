@@ -36,8 +36,10 @@ pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
 }
 
 /// Open a file with the file descriptor `fd` in the mode `mode`
-pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<FILE> {
+pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
     use string::strchr;
+    use stdlib::malloc;
+    use core::mem::size_of;
     if *mode != b'r' as i8 && *mode != b'w' as i8 && *mode != b'a' as i8 {
         platform::errno = errno::EINVAL;
         return None;
@@ -61,16 +63,20 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<FILE> {
     }
 
     // Allocate the file
-    Some(FILE {
-        flags: flags,
-        read: None,
-        write: None,
-        fd: fd,
-        buf: vec![0u8; BUFSIZ + UNGET],
-        buf_char: -1,
-        unget: UNGET,
-        lock: AtomicBool::new(false),
-    })
+    let f = malloc(size_of::<FILE>()) as *mut FILE;
+    if f.is_null() {
+        None
+    } else {
+        (*f).flags = flags;
+        (*f).read = None;
+        (*f).write = None;
+        (*f).fd = fd;
+        (*f).buf = vec![0u8; BUFSIZ + UNGET];
+        (*f).buf_char = -1;
+        (*f).unget = UNGET;
+        (*f).lock = AtomicBool::new(false);
+        Some(f)
+    }
 }
 
 /// Write buffer `buf` of length `l` into `stream`
