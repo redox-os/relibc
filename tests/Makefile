@@ -21,6 +21,7 @@ EXPECT_BINS=\
 	printf \
 	rename \
 	rmdir \
+	scanf \
 	sleep \
 	sprintf \
 	stdio/fwrite \

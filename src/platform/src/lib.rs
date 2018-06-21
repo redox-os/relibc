@@ -82,6 +82,16 @@ impl<'a, W: Write> Write for &'a mut W {
     }
 }
 
+pub trait Read {
+    fn read_u8(&mut self, byte: &mut u8) -> bool;
+}
+
+impl<'a, R: Read> Read for &'a mut R {
+    fn read_u8(&mut self, byte: &mut u8) -> bool {
+        (**self).read_u8(byte)
+    }
+}
+
 pub struct FileWriter(pub c_int);
 
 impl FileWriter {
@@ -109,6 +119,15 @@ pub struct FileReader(pub c_int);
 impl FileReader {
     pub fn read(&mut self, buf: &mut [u8]) -> isize {
         read(self.0, buf)
+    }
+}
+
+impl Read for FileReader {
+    fn read_u8(&mut self, byte: &mut u8) -> bool {
+        let mut buf = [*byte];
+        let n = self.read(&mut buf);
+        *byte = buf[0];
+        n > 0
     }
 }
 
@@ -172,5 +191,35 @@ impl Write for UnsafeStringWriter {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
         unsafe { self.write(&[byte]) };
         Ok(())
+    }
+}
+
+pub struct StringReader<'a>(pub &'a [u8]);
+
+impl<'a> Read for StringReader<'a> {
+    fn read_u8(&mut self, byte: &mut u8) -> bool {
+        if self.0.is_empty() {
+            false
+        } else {
+            *byte = self.0[0];
+            self.0 = &self.0[1..];
+            true
+        }
+    }
+}
+
+pub struct UnsafeStringReader(pub *const u8);
+
+impl Read for UnsafeStringReader {
+    fn read_u8(&mut self, byte: &mut u8) -> bool {
+        unsafe {
+            if *self.0 == 0 {
+                false
+            } else {
+                *byte = *self.0;
+                self.0 = self.0.offset(1);
+                true
+            }
+        }
     }
 }

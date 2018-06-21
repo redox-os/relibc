@@ -46,3 +46,36 @@ int sprintf(char *s, const char * fmt, ...) {
     va_end(ap);
     return ret;
 }
+
+int vfscanf(FILE * stream, const char * fmt, va_list ap);
+
+int fscanf(FILE * stream, const char * fmt, ...) {
+    int ret;
+    va_list ap;
+    va_start(ap, fmt);
+    ret = vfscanf(stream, fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+int vscanf(const char * fmt, va_list ap);
+
+int scanf(const char * fmt, ...) {
+    int ret;
+    va_list ap;
+    va_start(ap, fmt);
+    ret = vscanf(fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+int vsscanf(const char * input, const char * fmt, va_list ap);
+
+int sscanf(const char * input, const char * fmt, ...) {
+    int ret;
+    va_list ap;
+    va_start(ap, fmt);
+    ret = vsscanf(input, fmt, ap);
+    va_end(ap);
+    return ret;
+}

@@ -1,7 +1,10 @@
 //! stdio implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdio.h.html
 
 #![no_std]
+#![feature(alloc)]
+#![feature(global_allocator)]
 
+extern crate alloc;
 extern crate errno;
 extern crate fcntl;
 extern crate platform;
@@ -16,10 +19,11 @@ use core::fmt::Write as WriteFmt;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use platform::types::*;
-use platform::{c_str, errno, Write};
+use platform::{c_str, errno, Read, Write};
 use errno::STR_ERROR;
 use vl::VaList as va_list;
 
+mod scanf;
 mod printf;
 
 mod default;
@@ -182,6 +186,14 @@ impl Write for FILE {
         } else {
             Ok(())
         }
+    }
+}
+impl Read for FILE {
+    fn read_u8(&mut self, byte: &mut u8) -> bool {
+        let mut buf = [*byte];
+        let n = self.read(&mut buf);
+        *byte = buf[0];
+        n > 0
     }
 }
 
@@ -881,4 +893,19 @@ pub unsafe extern "C" fn vsnprintf(
 #[no_mangle]
 pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_list) -> c_int {
     printf::printf(&mut platform::UnsafeStringWriter(s as *mut u8), format, ap)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn vfscanf(file: &mut FILE, format: *const c_char, ap: va_list) -> c_int {
+    scanf::scanf(file, format, ap)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
+    vfscanf(&mut *stdin, format, ap)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
+    scanf::scanf(&mut platform::UnsafeStringReader(s as *const u8), format, ap)
 }
