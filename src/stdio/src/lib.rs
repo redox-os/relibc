@@ -2,6 +2,7 @@
 
 #![no_std]
 #![feature(alloc)]
+#![feature(const_fn)]
 
 extern crate alloc;
 extern crate errno;
@@ -619,7 +620,7 @@ pub extern "C" fn getc(stream: &mut FILE) -> c_int {
 /// Get a single char from `stdin`
 #[no_mangle]
 pub unsafe extern "C" fn getchar() -> c_int {
-    fgetc(&mut *stdin)
+    fgetc(&mut *__stdin())
 }
 
 /// Get a char from a stream without locking the stream
@@ -644,14 +645,14 @@ pub extern "C" fn getc_unlocked(stream: &mut FILE) -> c_int {
 /// Get a char from `stdin` without locking `stdin`
 #[no_mangle]
 pub unsafe extern "C" fn getchar_unlocked() -> c_int {
-    getc_unlocked(&mut *stdin)
+    getc_unlocked(&mut *__stdin())
 }
 
 /// Get a string from `stdin`
 #[no_mangle]
 pub unsafe extern "C" fn gets(s: *mut c_char) -> *mut c_char {
     use core::i32;
-    fgets(s, i32::MAX, &mut *stdin)
+    fgets(s, i32::MAX, &mut *__stdin())
 }
 
 /// Get an integer from `stream`
@@ -706,7 +707,7 @@ pub extern "C" fn putc(c: c_int, stream: &mut FILE) -> c_int {
 /// Put a character `c` into `stdout`
 #[no_mangle]
 pub unsafe extern "C" fn putchar(c: c_int) -> c_int {
-    fputc(c, &mut *stdout)
+    fputc(c, &mut *__stdout())
 }
 
 /// Put a character `c` into `stream` without locking `stream`
@@ -738,13 +739,13 @@ pub extern "C" fn putc_unlocked(c: c_int, stream: &mut FILE) -> c_int {
 /// Put a character `c` into `stdout` without locking `stdout`
 #[no_mangle]
 pub unsafe extern "C" fn putchar_unlocked(c: c_int) -> c_int {
-    putc_unlocked(c, &mut *stdout)
+    putc_unlocked(c, &mut *__stdout())
 }
 
 /// Put a string `s` into `stdout`
 #[no_mangle]
 pub unsafe extern "C" fn puts(s: *const c_char) -> c_int {
-    let ret = (fputs(s, &mut *stdout) > 0) || (putchar_unlocked(b'\n' as c_int) > 0);
+    let ret = (fputs(s, &mut *__stdout()) > 0) || (putchar_unlocked(b'\n' as c_int) > 0);
     if ret {
         0
     } else {
@@ -872,7 +873,7 @@ pub unsafe extern "C" fn vfprintf(file: &mut FILE, format: *const c_char, ap: va
 
 #[no_mangle]
 pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
-    vfprintf(&mut *stdout, format, ap)
+    vfprintf(&mut *__stdout(), format, ap)
 }
 
 #[no_mangle]
@@ -901,7 +902,7 @@ pub unsafe extern "C" fn vfscanf(file: &mut FILE, format: *const c_char, ap: va_
 
 #[no_mangle]
 pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
-    vfscanf(&mut *stdin, format, ap)
+    vfscanf(&mut *__stdin(), format, ap)
 }
 
 #[no_mangle]
