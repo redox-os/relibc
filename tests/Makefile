@@ -15,6 +15,7 @@ EXPECT_BINS=\
 	getid \
 	getc_unget \
 	link \
+	locale \
 	math \
 	mem \
 	pipe \

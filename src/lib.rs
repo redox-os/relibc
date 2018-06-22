@@ -10,6 +10,7 @@ pub extern crate fcntl;
 pub extern crate fenv;
 pub extern crate float;
 pub extern crate grp;
+pub extern crate locale;
 pub extern crate netinet;
 pub extern crate semaphore;
 pub extern crate stdio;

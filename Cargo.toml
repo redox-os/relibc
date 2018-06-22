@@ -21,6 +21,7 @@ fcntl = { path = "src/fcntl" }
 fenv = { path = "src/fenv" }
 float = { path = "src/float" }
 grp = { path = "src/grp" }
+locale = { path = "src/locale" }
 netinet = { path = "src/netinet" }
 platform = { path = "src/platform" }
 semaphore = { path = "src/semaphore" }

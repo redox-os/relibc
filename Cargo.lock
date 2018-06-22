@@ -159,6 +159,14 @@ version = "0.2.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "locale"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "platform 0.1.0",
+]
+
+[[package]]
 name = "log"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -271,6 +279,7 @@ dependencies = [
  "fenv 0.1.0",
  "float 0.1.0",
  "grp 0.1.0",
+ "locale 0.1.0",
  "netinet 0.1.0",
  "platform 0.1.0",
  "semaphore 0.1.0",
