@@ -4,7 +4,7 @@
 
 int main() {
     // TODO: Implement locale properly and test it here
-    const char* val = setlocale(LC_ALL, NULL);
+    char* val = setlocale(LC_ALL, NULL);
     if (strcmp(val, "C") == 0) {
         puts("success!");
     } else {
