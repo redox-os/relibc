@@ -17,6 +17,7 @@
 /getid
 /getc_unget
 /link
+/locale
 /math
 /mem
 /pipe

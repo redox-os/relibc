@@ -2,7 +2,6 @@
 
 #![no_std]
 #![feature(alloc)]
-#![feature(global_allocator)]
 
 extern crate alloc;
 extern crate errno;
