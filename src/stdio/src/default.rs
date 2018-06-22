@@ -1,12 +1,25 @@
+use core::cell::UnsafeCell;
 use core::sync::atomic::AtomicBool;
 use core::ptr;
 use super::{constants, internal, BUFSIZ, FILE, UNGET};
+
+struct GlobalFile(UnsafeCell<FILE>);
+impl GlobalFile {
+    const fn new(file: FILE) -> Self {
+        GlobalFile(UnsafeCell::new(file))
+    }
+    fn get(&self) -> *mut FILE {
+        self.0.get()
+    }
+}
+// statics need to be Sync
+unsafe impl Sync for GlobalFile {}
 
 #[allow(non_upper_case_globals)]
 static mut default_stdin_buf: [u8; BUFSIZ as usize + UNGET] = [0; BUFSIZ as usize + UNGET];
 
 #[allow(non_upper_case_globals)]
-static mut default_stdin: FILE = FILE {
+static mut default_stdin: GlobalFile = GlobalFile::new(FILE {
     flags: constants::F_PERM | constants::F_NOWR | constants::F_BADJ,
     rpos: ptr::null_mut(),
     rend: ptr::null_mut(),
@@ -19,13 +32,13 @@ static mut default_stdin: FILE = FILE {
     buf_char: -1,
     unget: UNGET,
     lock: AtomicBool::new(false),
-};
+});
 
 #[allow(non_upper_case_globals)]
 static mut default_stdout_buf: [u8; BUFSIZ as usize] = [0; BUFSIZ as usize];
 
 #[allow(non_upper_case_globals)]
-static mut default_stdout: FILE = FILE {
+static mut default_stdout: GlobalFile = GlobalFile::new(FILE {
     flags: constants::F_PERM | constants::F_NORD | constants::F_BADJ,
     rpos: ptr::null_mut(),
     rend: ptr::null_mut(),
@@ -38,13 +51,13 @@ static mut default_stdout: FILE = FILE {
     buf_char: b'\n' as i8,
     unget: 0,
     lock: AtomicBool::new(false),
-};
+});
 
 #[allow(non_upper_case_globals)]
 static mut default_stderr_buf: [u8; BUFSIZ as usize] = [0; BUFSIZ as usize];
 
 #[allow(non_upper_case_globals)]
-static mut default_stderr: FILE = FILE {
+static mut default_stderr: GlobalFile = GlobalFile::new(FILE {
     flags: constants::F_PERM | constants::F_NORD | constants::F_BADJ,
     rpos: ptr::null_mut(),
     rend: ptr::null_mut(),
@@ -57,20 +70,19 @@ static mut default_stderr: FILE = FILE {
     buf_char: -1,
     unget: 0,
     lock: AtomicBool::new(false),
-};
+});
 
-// Don't ask me how the casting below works, I have no idea
-// " as *const FILE as *mut FILE" rust pls
-//
-// -- Tommoa
-#[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static mut stdin: *mut FILE = unsafe { &default_stdin } as *const FILE as *mut FILE;
+pub extern "C" fn __stdin() -> *mut FILE {
+    unsafe { default_stdin.get() }
+}
 
-#[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static mut stdout: *mut FILE = unsafe { &default_stdout } as *const FILE as *mut FILE;
+pub extern "C" fn __stdout() -> *mut FILE {
+    unsafe { default_stdout.get() }
+}
 
-#[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static mut stderr: *mut FILE = unsafe { &default_stderr } as *const FILE as *mut FILE;
+pub extern "C" fn __stderr() -> *mut FILE {
+    unsafe { default_stderr.get() }
+}
