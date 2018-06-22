@@ -9,6 +9,7 @@ use core::ptr;
 use platform::types::*;
 
 const EMPTY_PTR: *const c_char = "\0" as *const _ as *const c_char;
+// Can't use &str because of the mutability
 static mut C_LOCALE: [c_char; 2] = [b'C' as c_char, 0];
 
 #[repr(C)]
@@ -64,7 +65,6 @@ pub extern "C" fn localeconv() -> *const lconv {
 #[no_mangle]
 pub unsafe extern "C" fn setlocale(_option: c_int, val: *const c_char) -> *mut c_char {
     if val.is_null() {
-        // Can't use string``
         return C_LOCALE.as_mut_ptr() as *mut c_char;
     }
     // TODO actually implement
