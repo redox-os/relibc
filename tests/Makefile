@@ -23,6 +23,7 @@ EXPECT_BINS=\
 	rename \
 	rmdir \
 	scanf \
+	setjmp \
 	sleep \
 	sprintf \
 	stdio/fwrite \

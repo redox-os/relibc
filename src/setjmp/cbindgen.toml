@@ -1,0 +1,6 @@
+include_guard = "_SETJMP_H"
+trailer = "#include <bits/setjmp.h>"
+language = "C"
+
+[enum]
+prefix_with_name = true

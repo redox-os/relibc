@@ -412,10 +412,10 @@ pub extern "C" fn qsort(
 #[no_mangle]
 pub unsafe extern "C" fn rand() -> c_int {
     match RNG {
-        Some(ref mut rng) => rng.gen_range::<c_int>(0, RAND_MAX),
+        Some(ref mut rng) => rng.gen_range(0, RAND_MAX),
         None => {
             let mut rng = XorShiftRng::from_seed([1; 16]);
-            let ret = rng.gen_range::<c_int>(0, RAND_MAX);
+            let ret = rng.gen_range(0, RAND_MAX);
             RNG = Some(rng);
             ret
         }

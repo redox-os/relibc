@@ -13,6 +13,7 @@ pub extern crate grp;
 pub extern crate locale;
 pub extern crate netinet;
 pub extern crate semaphore;
+pub extern crate setjmp;
 pub extern crate stdio;
 pub extern crate stdlib;
 pub extern crate string;

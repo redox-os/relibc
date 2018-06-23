@@ -24,6 +24,7 @@ grp = { path = "src/grp" }
 locale = { path = "src/locale" }
 netinet = { path = "src/netinet" }
 platform = { path = "src/platform" }
+setjmp = { path = "src/setjmp" }
 semaphore = { path = "src/semaphore" }
 signal = { path = "src/signal" }
 stdio = { path = "src/stdio" }
