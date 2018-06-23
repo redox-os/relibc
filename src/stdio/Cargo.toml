@@ -10,7 +10,7 @@ cbindgen = { path = "../../cbindgen" }
 [dependencies]
 errno = { path = "../errno"}
 fcntl = { path = "../fcntl" }
-lazy_static = "*"
+lazy_static = { version = "*", features = ["nightly", "spin_no_std"] }
 platform = { path = "../platform" }
 ralloc = { path = "../../ralloc" }
 string = { path = "../string" }
