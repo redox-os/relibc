@@ -283,6 +283,7 @@ dependencies = [
  "netinet 0.1.0",
  "platform 0.1.0",
  "semaphore 0.1.0",
+ "setjmp 0.1.0",
  "signal 0.1.0",
  "stdio 0.1.0",
  "stdlib 0.1.0",
@@ -355,6 +356,14 @@ dependencies = [
  "itoa 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.36 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "setjmp"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "platform 0.1.0",
 ]
 
 [[package]]

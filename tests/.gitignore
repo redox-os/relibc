@@ -26,7 +26,7 @@
 /rename
 /scanf
 /setid
-/setid
+/setjmp
 /sleep
 /sprintf
 /stdlib/a64l
