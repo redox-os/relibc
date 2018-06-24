@@ -38,7 +38,8 @@ install: all
 	cp -rv "target/include"/* "$(DESTDIR)/include"
 	cp -v "$(BUILD)/debug/libc.a" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/debug/crt0.o" "$(DESTDIR)/lib"
-	$(MAKE) -C openlibm install
+	cp -rv "openlibm/include"/* "$(DESTDIR)/include"
+	cp -rv "openlibm/src"/*.h "$(DESTDIR)/include"
 
 libc: $(BUILD)/debug/libc.a $(BUILD)/debug/crt0.o
 
