@@ -2,6 +2,7 @@
 
 #![no_std]
 #![feature(asm)]
+#![feature(linkage)]
 #![feature(naked_functions)]
 #![feature(panic_implementation)]
 
@@ -60,8 +61,9 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
 }
 
 #[panic_implementation]
+#[linkage = "weak"]
 #[no_mangle]
-pub extern "C" fn _start_panic(pi: &::core::panic::PanicInfo) -> ! {
+pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
     use core::fmt::Write;
 
     let mut w = platform::FileWriter(2);
