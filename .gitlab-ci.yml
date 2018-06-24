@@ -1,7 +1,6 @@
 image: "rust:latest"
 
 before_script:
-    - 
     - rustup toolchain add nightly
     - rustup target add x86_64-unknown-redox --toolchain nightly
     - rustup show      # Print version info for debugging
