@@ -6,40 +6,104 @@
 #define INT8_MAX 0x7F
 typedef signed char int8_t;
 
+#define INT_LEAST8_MIN -0x80
+#define INT_LEAST8_MAX 0x7F
+typedef signed char int_least8_t;
+
+#define INT_FAST8_MIN -0x80
+#define INT_FAST8_MAX 0x7F
+typedef signed char int_fast8_t;
+
 #define UINT8_C(value) ((uint8_t) value ## U)
 #define UINT8_MIN 0x00
 #define UINT8_MAX 0xFF
 typedef unsigned char uint8_t;
+
+#define UINT_LEAST8_MIN 0x00
+#define UINT_LEAST8_MAX 0xFF
+typedef unsigned char uint_least8_t;
+
+#define UINT_FAST8_MIN 0x00
+#define UINT_FAST8_MAX 0xFF
+typedef unsigned char uint_fast8_t;
 
 #define INT16_C(value) value
 #define INT16_MIN -0x8000
 #define INT16_MAX 0x7FFF
 typedef signed short int16_t;
 
+#define INT_LEAST16_MIN -0x8000
+#define INT_LEAST16_MAX 0x7FFF
+typedef signed short int_least16_t;
+
+#define INT_FAST16_MIN -0x8000
+#define INT_FAST16_MAX 0x7FFF
+typedef signed short int_fast16_t;
+
 #define UINT16_C(value) value ## U
 #define UINT16_MIN 0x0000
 #define UINT16_MAX 0xFFFF
 typedef unsigned short uint16_t;
+
+#define UINT_LEAST16_MIN 0x0000
+#define UINT_LEAST16_MAX 0xFFFF
+typedef unsigned short uint_least16_t;
+
+#define UINT_FAST16_MIN 0x0000
+#define UINT_FAST16_MAX 0xFFFF
+typedef unsigned short uint_fast16_t;
 
 #define INT32_C(value) value ## L
 #define INT32_MIN -0x80000000
 #define INT32_MAX 0x7FFFFFFF
 typedef signed long int32_t;
 
+#define INT_LEAST32_MIN -0x80000000
+#define INT_LEAST32_MAX 0x7FFFFFFF
+typedef signed long int_least32_t;
+
+#define INT_FAST32_MIN -0x80000000
+#define INT_FAST32_MAX 0x7FFFFFFF
+typedef signed long int_fast32_t;
+
 #define UINT32_C(value) value ## UL
 #define UINT32_MIN 0x00000000
 #define UINT32_MAX 0xFFFFFFFF
 typedef unsigned long uint32_t;
+
+#define UINT_LEAST32_MIN 0x00000000
+#define UINT_LEAST32_MAX 0xFFFFFFFF
+typedef unsigned long uint_least32_t;
+
+#define UINT_FAST32_MIN 0x00000000
+#define UINT_FAST32_MAX 0xFFFFFFFF
+typedef unsigned long uint_fast32_t;
 
 #define INT64_C(value) value ## LL
 #define INT64_MIN -0x8000000000000000
 #define INT64_MAX 0x7FFFFFFFFFFFFFFF
 typedef signed long long int64_t;
 
+#define INT_LEAST64_MIN -0x8000000000000000
+#define INT_LEAST64_MAX 0x7FFFFFFFFFFFFFFF
+typedef signed long long int_least64_t;
+
+#define INT_FAST64_MIN -0x8000000000000000
+#define INT_FAST64_MAX 0x7FFFFFFFFFFFFFFF
+typedef signed long long int_fast64_t;
+
 #define UINT64_C(value) value ## ULL
 #define UINT64_MIN 0x0000000000000000
 #define UINT64_MAX 0xFFFFFFFFFFFFFFFF
 typedef unsigned long long uint64_t;
+
+#define UINT_LEAST64_MIN 0x0000000000000000
+#define UINT_LEAST64_MAX 0xFFFFFFFFFFFFFFFF
+typedef unsigned long long uint_least64_t;
+
+#define UINT_FAST64_MIN 0x0000000000000000
+#define UINT_FAST64_MAX 0xFFFFFFFFFFFFFFFF
+typedef unsigned long long uint_fast64_t;
 
 #define INTMAX_C(value) value ## LL
 #define INTMAX_MIN INT64_MIN
@@ -60,5 +124,7 @@ typedef int64_t intptr_t;
 typedef uint64_t uintptr_t;
 
 #define SIZE_MAX UINT64_MAX
+
+typedef int sig_atomic_t;
 
 #endif /* _STDINT_H */

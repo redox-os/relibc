@@ -36,11 +36,9 @@ install: all
 	mkdir -pv "$(DESTDIR)/include"
 	cp -rv "include"/* "$(DESTDIR)/include"
 	cp -rv "target/include"/* "$(DESTDIR)/include"
-	cp -rv "target/openlibm/include"/* "$(DESTDIR)/include"
-	cp -rv "target/openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "$(BUILD)/debug/libc.a" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/debug/crt0.o" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
+	$(MAKE) -C openlibm install
 
 libc: $(BUILD)/debug/libc.a $(BUILD)/debug/crt0.o
 
