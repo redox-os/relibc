@@ -52,7 +52,7 @@ $(BUILD)/debug/libc.a: $(SRC)
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
-	cargo rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 cargo --verbose --verbose rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 	touch $@
 
 $(BUILD)/release/libc.a: $(SRC)
@@ -60,7 +60,7 @@ $(BUILD)/release/libc.a: $(SRC)
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
-	cargo rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 cargo rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 	touch $@
 
 $(BUILD)/openlibm: openlibm

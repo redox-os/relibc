@@ -2,8 +2,8 @@
 
 #![no_std]
 #![feature(asm)]
-#![feature(lang_items)]
 #![feature(naked_functions)]
+#![feature(panic_implementation)]
 
 extern crate platform;
 
@@ -59,7 +59,13 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
     platform::exit(main(argc, argv));
 }
 
-#[lang = "panic_fmt"]
-pub extern "C" fn rust_begin_unwind(_fmt: ::core::fmt::Arguments, _file: &str, _line: u32) -> ! {
-    loop {}
+#[panic_implementation]
+#[no_mangle]
+pub extern "C" fn _start_panic(pi: &::core::panic::PanicInfo) -> ! {
+    use core::fmt::Write;
+
+    let mut w = platform::FileWriter(2);
+    let _ = w.write_fmt(format_args!("RELIBC CRT0 PANIC: {}\n", pi));
+
+    platform::exit(1);
 }

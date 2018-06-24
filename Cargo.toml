@@ -11,10 +11,9 @@ crate-type = ["staticlib"]
 members = ["src/crt0"]
 
 [build-dependencies]
-cc = "1.0"
+cc = "1.0.17"
 
 [dependencies]
-compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins.git", default-features = false }
 ctype = { path = "src/ctype" }
 errno = { path = "src/errno" }
 fcntl = { path = "src/fcntl" }
@@ -39,6 +38,11 @@ sys_wait = { path = "src/sys_wait" }
 time = { path = "src/time" }
 unistd = { path = "src/unistd" }
 wctype = { path = "src/wctype" }
+
+[dependencies.compiler_builtins]
+git = "https://github.com/rust-lang-nursery/compiler-builtins.git"
+default-features = false
+features = ["no-lang-items"]
 
 [profile.dev]
 panic = "abort"

@@ -1,7 +1,8 @@
 #![no_std]
 #![feature(lang_items)]
+#![feature(panic_implementation)]
 
-extern crate compiler_builtins;
+//extern crate compiler_builtins;
 extern crate platform;
 
 pub extern crate ctype;
@@ -27,28 +28,24 @@ pub extern crate time;
 pub extern crate unistd;
 pub extern crate wctype;
 
-#[lang = "eh_personality"]
+#[panic_implementation]
 #[no_mangle]
-pub extern "C" fn rust_eh_personality() {}
-
-#[lang = "panic_fmt"]
-#[no_mangle]
-pub extern "C" fn rust_begin_unwind(fmt: ::core::fmt::Arguments, file: &str, line: u32) -> ! {
+pub extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {
     use core::fmt::Write;
 
     let mut w = platform::FileWriter(2);
-    let _ = w.write_fmt(format_args!("{}:{}: {}\n", file, line, fmt));
+    let _ = w.write_fmt(format_args!("RELIBC PANIC: {}\n", pi));
 
     platform::exit(1);
 }
 
-#[allow(non_snake_case)]
+#[lang = "oom"]
 #[no_mangle]
-pub extern "C" fn _Unwind_Resume() -> ! {
+pub extern fn relibc_oom(layout: ::core::alloc::Layout) -> ! {
     use core::fmt::Write;
 
     let mut w = platform::FileWriter(2);
-    let _ = w.write_str("_Unwind_Resume\n");
+    let _ = w.write_fmt(format_args!("RELIBC OOM: {} bytes aligned to {} bytes\n", layout.size(), layout.align()));
 
     platform::exit(1);
 }
