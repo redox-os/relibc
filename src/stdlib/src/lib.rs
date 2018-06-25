@@ -620,7 +620,11 @@ macro_rules! strto_impl {
 
         let set_endptr = |idx: isize| {
             if !$endptr.is_null() {
-                *$endptr = $s.offset(idx);
+                // This is stupid, but apparently strto* functions want
+                // const input but mut output, yet the man page says
+                // "stores the address of the first invalid character in *endptr"
+                // so obviously it doesn't want us to clone it.
+                *$endptr = $s.offset(idx) as *mut _;
             }
         };
 
@@ -712,7 +716,7 @@ macro_rules! strto_impl {
 
 #[no_mangle]
 pub unsafe extern "C" fn strtoul(s: *const c_char,
-                                 endptr: *mut *const c_char,
+                                 endptr: *mut *mut c_char,
                                  base: c_int)
                                  -> c_ulong {
     strto_impl!(
@@ -728,7 +732,7 @@ pub unsafe extern "C" fn strtoul(s: *const c_char,
 
 #[no_mangle]
 pub unsafe extern "C" fn strtol(s: *const c_char,
-                                endptr: *mut *const c_char,
+                                endptr: *mut *mut c_char,
                                 base: c_int)
                                 -> c_long {
     strto_impl!(

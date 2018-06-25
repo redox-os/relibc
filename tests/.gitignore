@@ -1,6 +1,7 @@
 /*.out
 /gen/
 /alloc
+/assert
 /args
 /atof
 /atoi

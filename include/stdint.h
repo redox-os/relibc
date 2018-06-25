@@ -56,54 +56,54 @@ typedef unsigned short uint_fast16_t;
 #define INT32_C(value) value ## L
 #define INT32_MIN -0x80000000
 #define INT32_MAX 0x7FFFFFFF
-typedef signed long int32_t;
+typedef signed int int32_t;
 
 #define INT_LEAST32_MIN -0x80000000
 #define INT_LEAST32_MAX 0x7FFFFFFF
-typedef signed long int_least32_t;
+typedef signed int int_least32_t;
 
 #define INT_FAST32_MIN -0x80000000
 #define INT_FAST32_MAX 0x7FFFFFFF
-typedef signed long int_fast32_t;
+typedef signed int int_fast32_t;
 
 #define UINT32_C(value) value ## UL
 #define UINT32_MIN 0x00000000
 #define UINT32_MAX 0xFFFFFFFF
-typedef unsigned long uint32_t;
+typedef unsigned int uint32_t;
 
 #define UINT_LEAST32_MIN 0x00000000
 #define UINT_LEAST32_MAX 0xFFFFFFFF
-typedef unsigned long uint_least32_t;
+typedef unsigned int uint_least32_t;
 
 #define UINT_FAST32_MIN 0x00000000
 #define UINT_FAST32_MAX 0xFFFFFFFF
-typedef unsigned long uint_fast32_t;
+typedef unsigned int uint_fast32_t;
 
 #define INT64_C(value) value ## LL
 #define INT64_MIN -0x8000000000000000
 #define INT64_MAX 0x7FFFFFFFFFFFFFFF
-typedef signed long long int64_t;
+typedef signed long int64_t;
 
 #define INT_LEAST64_MIN -0x8000000000000000
 #define INT_LEAST64_MAX 0x7FFFFFFFFFFFFFFF
-typedef signed long long int_least64_t;
+typedef signed long int_least64_t;
 
 #define INT_FAST64_MIN -0x8000000000000000
 #define INT_FAST64_MAX 0x7FFFFFFFFFFFFFFF
-typedef signed long long int_fast64_t;
+typedef signed long int_fast64_t;
 
 #define UINT64_C(value) value ## ULL
 #define UINT64_MIN 0x0000000000000000
 #define UINT64_MAX 0xFFFFFFFFFFFFFFFF
-typedef unsigned long long uint64_t;
+typedef unsigned long uint64_t;
 
 #define UINT_LEAST64_MIN 0x0000000000000000
 #define UINT_LEAST64_MAX 0xFFFFFFFFFFFFFFFF
-typedef unsigned long long uint_least64_t;
+typedef unsigned long uint_least64_t;
 
 #define UINT_FAST64_MIN 0x0000000000000000
 #define UINT_FAST64_MAX 0xFFFFFFFFFFFFFFFF
-typedef unsigned long long uint_fast64_t;
+typedef unsigned long uint_fast64_t;
 
 #define INTMAX_C(value) value ## LL
 #define INTMAX_MIN INT64_MIN
