@@ -6,6 +6,3 @@ build = "build.rs"
 
 [build-dependencies]
 cbindgen = { path = "../../cbindgen" }
-
-[dependencies]
-platform = { path = "../platform" }

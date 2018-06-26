@@ -20,6 +20,7 @@ fcntl = { path = "src/fcntl" }
 fenv = { path = "src/fenv" }
 float = { path = "src/float" }
 grp = { path = "src/grp" }
+inttypes = { path = "src/inttypes" }
 locale = { path = "src/locale" }
 netinet = { path = "src/netinet" }
 platform = { path = "src/platform" }
