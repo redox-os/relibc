@@ -3,10 +3,10 @@
 
 #define NULL 0
 
-typedef signed long ptrdiff_t;
+typedef signed long long ptrdiff_t;
 
 typedef unsigned char wchar_t;
 
-typedef unsigned long size_t;
+typedef unsigned long long size_t;
 
 #endif /* _STDDEF_H */
