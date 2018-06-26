@@ -15,8 +15,9 @@
 /fcntl
 /fsync
 /ftruncate
-/getid
 /getc_unget
+/gethostname
+/getid
 /link
 /locale
 /math

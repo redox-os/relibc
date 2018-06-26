@@ -10,7 +10,7 @@ extern crate sc;
 
 #[cfg(all(not(feature = "no_std"), target_os = "redox"))]
 #[macro_use]
-extern crate syscall;
+pub extern crate syscall;
 
 pub use sys::*;
 

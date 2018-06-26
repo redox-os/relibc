@@ -57,6 +57,7 @@ BINS=\
 	$(EXPECT_BINS) \
 	alloc \
 	chdir \
+	gethostname \
 	getid \
 	setid
 
