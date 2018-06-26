@@ -1,6 +1,6 @@
 sys_includes = ["sys/types.h"]
 include_guard = "_SYS_STAT_H"
-trailer = "#include <bits/stat.h>"
+trailer = "#include <bits/sys/stat.h>"
 language = "C"
 style = "Tag"
 
