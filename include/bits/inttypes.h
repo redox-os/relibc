@@ -1,3 +1,6 @@
+#ifndef _BITS_INTTYPE_H
+#define _BITS_INTTYPE_H
+
 #define PRId8  "i"
 #define PRId16 "i"
 #define PRId32 "i"
@@ -188,3 +191,5 @@
 #define SCNoPTR "to"
 #define SCNuPTR "tu"
 #define SCNxPTR "tx"
+
+#endif
