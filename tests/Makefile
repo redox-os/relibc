@@ -13,9 +13,7 @@ EXPECT_BINS=\
 	fcntl \
 	fsync \
 	ftruncate \
-	getid \
 	getc_unget \
-	link \
 	locale \
 	math \
 	mem \
@@ -30,12 +28,10 @@ EXPECT_BINS=\
 	stdio/fwrite \
 	stdio/all \
 	stdio/freopen \
-	stdlib/bsearch \
 	stdlib/strtol \
 	stdlib/strtoul \
 	stdlib/a64l \
 	stdlib/rand \
-	stdlib/mktemp \
 	string/strncmp \
 	string/strcspn \
 	string/strchr \
@@ -46,7 +42,6 @@ EXPECT_BINS=\
 	string/strtok \
 	string/strtok_r \
 	unistd/getopt \
-	unlink \
 	waitpid \
 	write \
 	time \
@@ -60,7 +55,11 @@ BINS=\
 	chdir \
 	gethostname \
 	getid \
-	setid
+	link \
+	setid \
+	stdlib/bsearch \
+	stdlib/mktemp \
+	unlink
 
 all: $(BINS)
 
