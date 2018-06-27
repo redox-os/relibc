@@ -11,3 +11,4 @@ cbindgen = { path = "../../cbindgen" }
 platform = { path = "../platform" }
 stdio = { path = "../stdio" }
 string = { path = "../string" }
+sys_utsname = { path = "../sys_utsname" }

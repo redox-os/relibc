@@ -1,6 +1,7 @@
 /*.out
 /gen/
 /alloc
+/assert
 /args
 /atof
 /atoi
@@ -14,8 +15,9 @@
 /fcntl
 /fsync
 /ftruncate
-/getid
 /getc_unget
+/gethostname
+/getid
 /link
 /locale
 /math

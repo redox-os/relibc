@@ -198,6 +198,10 @@ pub fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     e(unsafe { syscall!(NEWFSTATAT, AT_FDCWD, file, buf, 0) }) as c_int
 }
 
+pub fn uname(utsname: usize) -> c_int {
+    e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
+}
+
 pub fn unlink(path: *const c_char) -> c_int {
     e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, 0) }) as c_int
 }

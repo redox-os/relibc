@@ -553,7 +553,7 @@ pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c
     }
 }
 
-fn is_positive(ch: c_char) -> Option<(bool, isize)> {
+pub fn is_positive(ch: c_char) -> Option<(bool, isize)> {
     match ch {
         0 => None,
         ch if ch == b'+' as c_char => Some((true, 1)),
@@ -562,7 +562,7 @@ fn is_positive(ch: c_char) -> Option<(bool, isize)> {
     }
 }
 
-fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
+pub fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
     let first = unsafe { *s } as u8;
     match first {
         0 => None,
@@ -581,7 +581,7 @@ fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
     }
 }
 
-unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
+pub unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     if *s != 0 && *s == b'0' as c_char {
         if let Some((val, idx, overflow)) = convert_integer(s.offset(1), 8) {
             Some((val, idx + 1, overflow))
@@ -594,7 +594,7 @@ unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     }
 }
 
-unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
+pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     if (*s != 0 && *s == b'0' as c_char)
         && (*s.offset(1) != 0 && (*s.offset(1) == b'x' as c_char || *s.offset(1) == b'X' as c_char))
     {
@@ -604,7 +604,7 @@ unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     }
 }
 
-fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, bool)> {
+pub fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, bool)> {
     // -1 means the character is invalid
     #[cfg_attr(rustfmt, rustfmt_skip)]
     const LOOKUP_TABLE: [c_long; 256] = [
@@ -658,6 +658,7 @@ fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, boo
     }
 }
 
+#[macro_export]
 macro_rules! strto_impl {
     (
         $rettype:ty,
@@ -675,7 +676,11 @@ macro_rules! strto_impl {
 
         let set_endptr = |idx: isize| {
             if !$endptr.is_null() {
-                *$endptr = $s.offset(idx);
+                // This is stupid, but apparently strto* functions want
+                // const input but mut output, yet the man page says
+                // "stores the address of the first invalid character in *endptr"
+                // so obviously it doesn't want us to clone it.
+                *$endptr = $s.offset(idx) as *mut _;
             }
         };
 
@@ -767,7 +772,7 @@ macro_rules! strto_impl {
 
 #[no_mangle]
 pub unsafe extern "C" fn strtoul(s: *const c_char,
-                                 endptr: *mut *const c_char,
+                                 endptr: *mut *mut c_char,
                                  base: c_int)
                                  -> c_ulong {
     strto_impl!(
@@ -783,7 +788,7 @@ pub unsafe extern "C" fn strtoul(s: *const c_char,
 
 #[no_mangle]
 pub unsafe extern "C" fn strtol(s: *const c_char,
-                                endptr: *mut *const c_char,
+                                endptr: *mut *mut c_char,
                                 base: c_int)
                                 -> c_long {
     strto_impl!(

@@ -12,6 +12,10 @@ pub mod sys;
 #[path = "redox.rs"]
 pub mod sys;
 
+pub const SIG_BLOCK:   c_int = 0;
+pub const SIG_UNBLOCK: c_int = 1;
+pub const SIG_SETMASK: c_int = 2;
+
 pub use sys::*;
 
 use platform::types::*;

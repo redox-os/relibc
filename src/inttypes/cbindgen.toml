@@ -1,0 +1,7 @@
+sys_includes = ["stdint.h"]
+include_guard = "_INTTYPES_H"
+trailer = "#include <bits/inttypes.h>"
+language = "C"
+
+[enum]
+prefix_with_name = true

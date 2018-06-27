@@ -125,6 +125,6 @@ typedef uint64_t uintptr_t;
 
 #define SIZE_MAX UINT64_MAX
 
-typedef int sig_atomic_t;
+typedef long sig_atomic_t;
 
 #endif /* _STDINT_H */

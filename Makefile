@@ -40,6 +40,7 @@ install: all
 	cp -v "$(BUILD)/debug/crt0.o" "$(DESTDIR)/lib"
 	cp -rv "openlibm/include"/* "$(DESTDIR)/include"
 	cp -rv "openlibm/src"/*.h "$(DESTDIR)/include"
+	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 
 libc: $(BUILD)/debug/libc.a $(BUILD)/debug/crt0.o
 

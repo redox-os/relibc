@@ -5,6 +5,7 @@
 extern crate platform;
 extern crate stdio;
 extern crate string;
+extern crate sys_utsname;
 
 pub use platform::types::*;
 pub use getopt::*;
@@ -197,6 +198,54 @@ pub extern "C" fn getgroups(gidsetsize: c_int, grouplist: *mut gid_t) -> c_int {
 #[no_mangle]
 pub extern "C" fn gethostid() -> c_long {
     unimplemented!();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
+    #[cfg(target_os = "linux")] {
+        use core::mem;
+
+        // len only needs to be mutable on linux
+        let mut len = len;
+
+        let mut uts: sys_utsname::utsname = mem::uninitialized();
+        let err = sys_utsname::uname(&mut uts);
+        if err < 0 {
+            mem::forget(uts);
+            return err;
+        }
+        for c in uts.nodename.iter() {
+            if len == 0 { break; }
+            len -= 1;
+
+            *name = *c;
+
+            if *name == 0 {
+                // We do want to copy the zero also, so we check this after the copying.
+                break;
+            }
+
+            name = name.offset(1);
+        }
+        0
+    }
+    #[cfg(target_os = "redox")] {
+        use platform::{FileReader, Read};
+        use platform::syscall::flag::*;
+
+        let fd = platform::open("/etc/hostname\0",as_ptr(), 0, O_RDONLY);
+        if fd < 0 {
+            return fd;
+        }
+        let reader = FileReader(fd);
+        for _ in 0..len {
+            if !reader.read_u8(&mut *name) {
+                *name = 0;
+                break;
+            }
+            name = name.offset(1);
+        }
+    }
 }
 
 #[no_mangle]

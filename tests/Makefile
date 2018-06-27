@@ -1,5 +1,6 @@
 # Binaries that should generate the same output every time
 EXPECT_BINS=\
+	assert \
 	atof \
 	atoi \
 	brk \
@@ -57,6 +58,7 @@ BINS=\
 	$(EXPECT_BINS) \
 	alloc \
 	chdir \
+	gethostname \
 	getid \
 	setid
 
