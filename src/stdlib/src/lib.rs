@@ -9,9 +9,13 @@ extern crate errno;
 extern crate platform;
 extern crate ralloc;
 extern crate rand;
+extern crate time;
 
 use core::{ptr, str};
-use rand::{Rng, SeedableRng, XorShiftRng};
+use rand::{Rng, SeedableRng}; 
+use rand::rngs::JitterRng;
+use rand::prng::XorShiftRng;
+use rand::distributions::Alphanumeric;
 
 use errno::*;
 use platform::types::*;
@@ -364,8 +368,59 @@ pub extern "C" fn mbtowc(pwc: *mut wchar_t, s: *const c_char, n: size_t) -> c_in
 
 #[no_mangle]
 pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
-    unimplemented!();
+    use core::slice;
+    use core::iter;
+    use core::mem;
+    extern "C" {
+        fn strlen(s: *const c_char) -> size_t;
+    }
+    let len = unsafe { strlen(name) };
+    let mut retries = 100;
+    let name_buf = unsafe { slice::from_raw_parts(name as *const u8, len as usize) }; 
+    let name_str = str::from_utf8(name_buf).unwrap_or("");
+    if len < 6 || !name_str.ends_with("XXXXXX") {
+        unsafe { platform::errno = errno::EINVAL };
+        unsafe { *name = 0 };
+        return name; 
+    } 
+
+    let mut rng = JitterRng::new_with_timer(get_nstime);
+    rng.test_timer();
+
+    loop {
+        let mut char_iter = iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .take(6); 
+        unsafe {
+            for (i,c) in char_iter.enumerate() {
+                *name.offset(len as isize-i as isize) = c as c_char
+            }
+        }
+
+        unsafe {
+            let mut st: stat = mem::uninitialized(); 
+            if platform::stat(name, &mut st) != 0 {
+                if platform::errno != ENOENT { *name = 0; }
+                return name;
+            }
+            mem::forget(st);
+        }
+        retries = retries -1;
+        if retries == 0 { break; }
+    }
+    unsafe { platform::errno = EEXIST };
+    unsafe { *name = 0 };
+    name
 }
+
+fn get_nstime() -> u64 {
+    use core::mem;
+    use time::constants::CLOCK_MONOTONIC;
+    let mut ts: timespec = unsafe { mem::uninitialized() };
+    platform::clock_gettime(CLOCK_MONOTONIC, &mut ts); 
+    unsafe { ts.tv_nsec as u64 }
+}
+
 
 #[no_mangle]
 pub extern "C" fn mkstemp(name: *mut c_char) -> c_int {

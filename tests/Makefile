@@ -34,6 +34,7 @@ EXPECT_BINS=\
 	stdlib/strtoul \
 	stdlib/a64l \
 	stdlib/rand \
+	stdlib/mktemp \
 	string/strncmp \
 	string/strcspn \
 	string/strchr \
