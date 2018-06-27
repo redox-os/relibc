@@ -1,6 +1,7 @@
 percent: %
 string: String
 char: c
+char: ş
 int: -16
 uint: 32
 hex: beef
