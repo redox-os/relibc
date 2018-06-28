@@ -375,30 +375,35 @@ pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
         fn strlen(s: *const c_char) -> size_t;
     }
     let len = unsafe { strlen(name) };
-    let mut retries = 100;
-    let name_buf = unsafe { slice::from_raw_parts(name as *const u8, len as usize) }; 
-    let name_str = str::from_utf8(name_buf).unwrap_or("");
-    if len < 6 || !name_str.ends_with("XXXXXX") {
+    if len < 6 {
         unsafe { platform::errno = errno::EINVAL };
         unsafe { *name = 0 };
-        return name; 
-    } 
+        return name;
+    }
+    for i in len-6..len {
+        if unsafe { *name.offset(i as isize) } != b'X' as c_char {
+            unsafe { platform::errno = errno::EINVAL };
+            unsafe { *name = 0 };
+            return name;
+        }
+    }
 
     let mut rng = JitterRng::new_with_timer(get_nstime);
     rng.test_timer();
 
+    let mut retries = 100;
     loop {
         let mut char_iter = iter::repeat(())
         .map(|()| rng.sample(Alphanumeric))
-        .take(6); 
+        .take(6);
         unsafe {
             for (i,c) in char_iter.enumerate() {
-                *name.offset(len as isize-i as isize) = c as c_char
+                *name.offset(len as isize - i as isize - 1) = c as c_char
             }
         }
 
         unsafe {
-            let mut st: stat = mem::uninitialized(); 
+            let mut st: stat = mem::uninitialized();
             if platform::stat(name, &mut st) != 0 {
                 if platform::errno != ENOENT { *name = 0; }
                 return name;
