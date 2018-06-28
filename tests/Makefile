@@ -9,6 +9,7 @@ EXPECT_BINS=\
 	ctype \
 	dup \
 	error \
+	exec \
 	fchdir \
 	fcntl \
 	fsync \
