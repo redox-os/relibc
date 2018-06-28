@@ -1,7 +1,6 @@
 //! getopt implementation for Redox, following http://pubs.opengroup.org/onlinepubs/009695399/functions/getopt.html
 
 use super::platform::types::*;
-use super::platform;
 use super::stdio;
 use super::string;
 use core::ptr;

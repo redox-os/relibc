@@ -2,7 +2,6 @@
 
 #![no_std]
 #![feature(core_intrinsics)]
-#![feature(global_allocator)]
 
 extern crate ctype;
 extern crate errno;

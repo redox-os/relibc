@@ -9,6 +9,7 @@ extern crate sys_utsname;
 
 pub use platform::types::*;
 pub use getopt::*;
+
 use core::ptr;
 
 mod getopt;
@@ -30,6 +31,9 @@ pub const F_TEST: c_int = 3;
 pub const STDIN_FILENO: c_int = 0;
 pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
+
+#[no_mangle]
+pub static mut environ: *const *mut c_char = 0 as *const *mut c_char;
 
 #[no_mangle]
 pub extern "C" fn _exit(status: c_int) {
@@ -97,23 +101,27 @@ pub extern "C" fn encrypt(block: [c_char; 64], edflag: c_int) {
 }
 
 // #[no_mangle]
-// pub extern "C" fn execl(path: *const c_char, arg0: *const c_char /* TODO: , mut args: ... */) -> c_int {
+// pub extern "C" fn execl(path: *const c_char, args: *const *mut c_char) -> c_int {
 //     unimplemented!();
 // }
-//
+
 // #[no_mangle]
-// pub extern "C" fn execle(path: *const c_char, arg0: *const c_char /* TODO: , mut args: ... */) -> c_int {
+// pub extern "C" fn execle(
+//   path: *const c_char,
+//   args: *const *mut c_char,
+//   envp: *const *mut c_char,
+// ) -> c_int {
 //     unimplemented!();
 // }
-//
+
 // #[no_mangle]
-// pub extern "C" fn execlp(file: *const c_char, arg0: *const c_char /* TODO: , mut args: ... */) -> c_int {
+// pub extern "C" fn execlp(file: *const c_char, args: *const *mut c_char) -> c_int {
 //     unimplemented!();
 // }
 
 #[no_mangle]
 pub extern "C" fn execv(path: *const c_char, argv: *const *mut c_char) -> c_int {
-    unimplemented!();
+    unsafe { execve(path, argv, environ) }
 }
 
 #[no_mangle]
@@ -122,7 +130,7 @@ pub extern "C" fn execve(
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    unimplemented!();
+    platform::execve(path, argv, envp)
 }
 
 #[no_mangle]
@@ -396,7 +404,7 @@ pub extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
 
 #[no_mangle]
 pub extern "C" fn setgid(gid: gid_t) -> c_int {
-    unimplemented!();
+    platform::setregid(gid, gid)
 }
 
 #[no_mangle]
@@ -426,7 +434,7 @@ pub extern "C" fn setsid() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn setuid(uid: uid_t) -> c_int {
-    unimplemented!();
+    platform::setreuid(uid, uid)
 }
 
 #[no_mangle]
