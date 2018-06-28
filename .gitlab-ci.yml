@@ -1,6 +1,7 @@
 image: "rust:latest"
 
 before_script:
+    - git submodule update --init --recursive
     - rustup toolchain add nightly
     - rustup target add x86_64-unknown-redox --toolchain nightly
     - rustup show      # Print version info for debugging
@@ -19,7 +20,8 @@ test:linux:
 
 fmt:
     script:
-        - ./fmt.sh -- --write-mode=diff
+        - rustup component add rustfmt-preview
+        - ./fmt.sh -- --check
 
 # TODO: Set up a docker image with a redox vm that would allow to
 #   run things like tests under redox
