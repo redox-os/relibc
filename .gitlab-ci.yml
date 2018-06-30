@@ -1,27 +1,37 @@
-image: "rust:latest"
+image: "rustlang/rust:nightly"
+
+stages:
+    - build
+    - test
 
 before_script:
     - git submodule update --init --recursive
-    - rustup toolchain add nightly
     - rustup target add x86_64-unknown-redox --toolchain nightly
     - rustup show      # Print version info for debugging
 
+cache:
+    untracked: true
+
 build:linux:
+    stage: build
     script:
         - make all
 
 #build:redox:
+#    stage: build
 #    script:
 #        - make all
 
 test:linux:
+    stage: test
+    dependencies:
+        - build:linux
     script:
         - make test
 
 fmt:
+    stage: test
     script:
         - rustup component add rustfmt-preview
         - ./fmt.sh -- --check
-
-# TODO: Set up a docker image with a redox vm that would allow to
-#   run things like tests under redox
+    allow_failure: true
