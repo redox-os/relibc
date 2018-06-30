@@ -2,6 +2,7 @@
 #define _BITS_STDIO_H
 
 #define EOF (-1)
+#define BUFSIZ 1024
 #define stdin __stdin()
 #define stdout __stdout()
 #define stderr __stderr()

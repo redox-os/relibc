@@ -11,19 +11,20 @@ crate-type = ["staticlib"]
 members = ["src/crt0"]
 
 [build-dependencies]
-cc = "1.0"
+cc = "1.0.17"
 
 [dependencies]
-compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins.git", default-features = false }
 ctype = { path = "src/ctype" }
 errno = { path = "src/errno" }
 fcntl = { path = "src/fcntl" }
 fenv = { path = "src/fenv" }
 float = { path = "src/float" }
 grp = { path = "src/grp" }
+inttypes = { path = "src/inttypes" }
 locale = { path = "src/locale" }
 netinet = { path = "src/netinet" }
 platform = { path = "src/platform" }
+setjmp = { path = "src/setjmp" }
 semaphore = { path = "src/semaphore" }
 signal = { path = "src/signal" }
 stdio = { path = "src/stdio" }
@@ -34,10 +35,16 @@ sys_resource = { path = "src/sys_resource" }
 sys_socket = { path = "src/sys_socket" }
 sys_stat = { path = "src/sys_stat" }
 sys_time = { path = "src/sys_time" }
+sys_utsname = { path = "src/sys_utsname" }
 sys_wait = { path = "src/sys_wait" }
 time = { path = "src/time" }
 unistd = { path = "src/unistd" }
 wctype = { path = "src/wctype" }
+
+[dependencies.compiler_builtins]
+git = "https://github.com/rust-lang-nursery/compiler-builtins.git"
+default-features = false
+features = ["no-lang-items", "mangled-names"]
 
 [profile.dev]
 panic = "abort"

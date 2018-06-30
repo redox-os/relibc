@@ -12,4 +12,5 @@ platform = { path = "../platform" }
 ralloc = { path = "../../ralloc", default-features = false }
 ctype = { path = "../ctype" }
 errno = { path = "../errno" }
-rand = { git = "https://github.com/rust-lang-nursery/rand/", default-features = false }
+rand = { version = "0.5.2", default-features = false }
+time = { path = "../time" }

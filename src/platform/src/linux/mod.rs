@@ -54,6 +54,10 @@ pub fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
     e(unsafe { syscall!(DUP3, fildes, fildes2, 0) }) as c_int
 }
 
+pub fn execve(path: *const c_char, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
+    e(unsafe { syscall!(EXECVE, path, argv, envp) }) as c_int
+}
+
 pub fn exit(status: c_int) -> ! {
     unsafe {
         syscall!(EXIT, status);
@@ -196,6 +200,10 @@ pub fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
 
 pub fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     e(unsafe { syscall!(NEWFSTATAT, AT_FDCWD, file, buf, 0) }) as c_int
+}
+
+pub fn uname(utsname: usize) -> c_int {
+    e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
 }
 
 pub fn unlink(path: *const c_char) -> c_int {

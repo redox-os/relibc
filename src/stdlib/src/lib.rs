@@ -2,16 +2,19 @@
 
 #![no_std]
 #![feature(core_intrinsics)]
-#![feature(global_allocator)]
 
 extern crate ctype;
 extern crate errno;
 extern crate platform;
 extern crate ralloc;
 extern crate rand;
+extern crate time;
 
 use core::{ptr, str};
-use rand::{Rng, SeedableRng, XorShiftRng};
+use rand::{Rng, SeedableRng}; 
+use rand::rngs::JitterRng;
+use rand::prng::XorShiftRng;
+use rand::distributions::Alphanumeric;
 
 use errno::*;
 use platform::types::*;
@@ -364,8 +367,64 @@ pub extern "C" fn mbtowc(pwc: *mut wchar_t, s: *const c_char, n: size_t) -> c_in
 
 #[no_mangle]
 pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
-    unimplemented!();
+    use core::slice;
+    use core::iter;
+    use core::mem;
+    extern "C" {
+        fn strlen(s: *const c_char) -> size_t;
+    }
+    let len = unsafe { strlen(name) };
+    if len < 6 {
+        unsafe { platform::errno = errno::EINVAL };
+        unsafe { *name = 0 };
+        return name;
+    }
+    for i in len-6..len {
+        if unsafe { *name.offset(i as isize) } != b'X' as c_char {
+            unsafe { platform::errno = errno::EINVAL };
+            unsafe { *name = 0 };
+            return name;
+        }
+    }
+
+    let mut rng = JitterRng::new_with_timer(get_nstime);
+    rng.test_timer();
+
+    let mut retries = 100;
+    loop {
+        let mut char_iter = iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .take(6);
+        unsafe {
+            for (i,c) in char_iter.enumerate() {
+                *name.offset(len as isize - i as isize - 1) = c as c_char
+            }
+        }
+
+        unsafe {
+            let mut st: stat = mem::uninitialized();
+            if platform::stat(name, &mut st) != 0 {
+                if platform::errno != ENOENT { *name = 0; }
+                return name;
+            }
+            mem::forget(st);
+        }
+        retries = retries -1;
+        if retries == 0 { break; }
+    }
+    unsafe { platform::errno = EEXIST };
+    unsafe { *name = 0 };
+    name
 }
+
+fn get_nstime() -> u64 {
+    use core::mem;
+    use time::constants::CLOCK_MONOTONIC;
+    let mut ts: timespec = unsafe { mem::uninitialized() };
+    platform::clock_gettime(CLOCK_MONOTONIC, &mut ts); 
+    unsafe { ts.tv_nsec as u64 }
+}
+
 
 #[no_mangle]
 pub extern "C" fn mkstemp(name: *mut c_char) -> c_int {
@@ -412,10 +471,10 @@ pub extern "C" fn qsort(
 #[no_mangle]
 pub unsafe extern "C" fn rand() -> c_int {
     match RNG {
-        Some(ref mut rng) => rng.gen_range::<c_int>(0, RAND_MAX),
+        Some(ref mut rng) => rng.gen_range(0, RAND_MAX),
         None => {
             let mut rng = XorShiftRng::from_seed([1; 16]);
-            let ret = rng.gen_range::<c_int>(0, RAND_MAX);
+            let ret = rng.gen_range(0, RAND_MAX);
             RNG = Some(rng);
             ret
         }
@@ -498,7 +557,7 @@ pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c
     }
 }
 
-fn is_positive(ch: c_char) -> Option<(bool, isize)> {
+pub fn is_positive(ch: c_char) -> Option<(bool, isize)> {
     match ch {
         0 => None,
         ch if ch == b'+' as c_char => Some((true, 1)),
@@ -507,7 +566,7 @@ fn is_positive(ch: c_char) -> Option<(bool, isize)> {
     }
 }
 
-fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
+pub fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
     let first = unsafe { *s } as u8;
     match first {
         0 => None,
@@ -526,7 +585,7 @@ fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
     }
 }
 
-unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
+pub unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     if *s != 0 && *s == b'0' as c_char {
         if let Some((val, idx, overflow)) = convert_integer(s.offset(1), 8) {
             Some((val, idx + 1, overflow))
@@ -539,7 +598,7 @@ unsafe fn convert_octal(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     }
 }
 
-unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
+pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     if (*s != 0 && *s == b'0' as c_char)
         && (*s.offset(1) != 0 && (*s.offset(1) == b'x' as c_char || *s.offset(1) == b'X' as c_char))
     {
@@ -549,7 +608,7 @@ unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     }
 }
 
-fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, bool)> {
+pub fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, bool)> {
     // -1 means the character is invalid
     #[cfg_attr(rustfmt, rustfmt_skip)]
     const LOOKUP_TABLE: [c_long; 256] = [
@@ -603,6 +662,7 @@ fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, boo
     }
 }
 
+#[macro_export]
 macro_rules! strto_impl {
     (
         $rettype:ty,
@@ -620,7 +680,11 @@ macro_rules! strto_impl {
 
         let set_endptr = |idx: isize| {
             if !$endptr.is_null() {
-                *$endptr = $s.offset(idx);
+                // This is stupid, but apparently strto* functions want
+                // const input but mut output, yet the man page says
+                // "stores the address of the first invalid character in *endptr"
+                // so obviously it doesn't want us to clone it.
+                *$endptr = $s.offset(idx) as *mut _;
             }
         };
 
@@ -712,7 +776,7 @@ macro_rules! strto_impl {
 
 #[no_mangle]
 pub unsafe extern "C" fn strtoul(s: *const c_char,
-                                 endptr: *mut *const c_char,
+                                 endptr: *mut *mut c_char,
                                  base: c_int)
                                  -> c_ulong {
     strto_impl!(
@@ -728,7 +792,7 @@ pub unsafe extern "C" fn strtoul(s: *const c_char,
 
 #[no_mangle]
 pub unsafe extern "C" fn strtol(s: *const c_char,
-                                endptr: *mut *const c_char,
+                                endptr: *mut *mut c_char,
                                 base: c_int)
                                 -> c_long {
     strto_impl!(

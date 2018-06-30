@@ -1,0 +1,14 @@
+[package]
+name = "inttypes"
+version = "0.1.0"
+authors = ["jD91mZM2 <me@krake.one>"]
+build = "build.rs"
+
+[build-dependencies]
+cbindgen = { path = "../../cbindgen" }
+
+[dependencies]
+ctype = { path = "../ctype" }
+errno = { path = "../errno" }
+platform = { path = "../platform" }
+stdlib = { path = "../stdlib" }

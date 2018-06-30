@@ -5,9 +5,11 @@
 extern crate platform;
 extern crate stdio;
 extern crate string;
+extern crate sys_utsname;
 
 pub use platform::types::*;
 pub use getopt::*;
+
 use core::ptr;
 
 mod getopt;
@@ -29,6 +31,9 @@ pub const F_TEST: c_int = 3;
 pub const STDIN_FILENO: c_int = 0;
 pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
+
+#[no_mangle]
+pub static mut environ: *const *mut c_char = 0 as *const *mut c_char;
 
 #[no_mangle]
 pub extern "C" fn _exit(status: c_int) {
@@ -96,23 +101,27 @@ pub extern "C" fn encrypt(block: [c_char; 64], edflag: c_int) {
 }
 
 // #[no_mangle]
-// pub extern "C" fn execl(path: *const c_char, arg0: *const c_char /* TODO: , mut args: ... */) -> c_int {
+// pub extern "C" fn execl(path: *const c_char, args: *const *mut c_char) -> c_int {
 //     unimplemented!();
 // }
-//
+
 // #[no_mangle]
-// pub extern "C" fn execle(path: *const c_char, arg0: *const c_char /* TODO: , mut args: ... */) -> c_int {
+// pub extern "C" fn execle(
+//   path: *const c_char,
+//   args: *const *mut c_char,
+//   envp: *const *mut c_char,
+// ) -> c_int {
 //     unimplemented!();
 // }
-//
+
 // #[no_mangle]
-// pub extern "C" fn execlp(file: *const c_char, arg0: *const c_char /* TODO: , mut args: ... */) -> c_int {
+// pub extern "C" fn execlp(file: *const c_char, args: *const *mut c_char) -> c_int {
 //     unimplemented!();
 // }
 
 #[no_mangle]
 pub extern "C" fn execv(path: *const c_char, argv: *const *mut c_char) -> c_int {
-    unimplemented!();
+    unsafe { execve(path, argv, environ) }
 }
 
 #[no_mangle]
@@ -121,7 +130,7 @@ pub extern "C" fn execve(
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    unimplemented!();
+    platform::execve(path, argv, envp)
 }
 
 #[no_mangle]
@@ -197,6 +206,54 @@ pub extern "C" fn getgroups(gidsetsize: c_int, grouplist: *mut gid_t) -> c_int {
 #[no_mangle]
 pub extern "C" fn gethostid() -> c_long {
     unimplemented!();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
+    #[cfg(target_os = "linux")] {
+        use core::mem;
+
+        // len only needs to be mutable on linux
+        let mut len = len;
+
+        let mut uts: sys_utsname::utsname = mem::uninitialized();
+        let err = sys_utsname::uname(&mut uts);
+        if err < 0 {
+            mem::forget(uts);
+            return err;
+        }
+        for c in uts.nodename.iter() {
+            if len == 0 { break; }
+            len -= 1;
+
+            *name = *c;
+
+            if *name == 0 {
+                // We do want to copy the zero also, so we check this after the copying.
+                break;
+            }
+
+            name = name.offset(1);
+        }
+        0
+    }
+    #[cfg(target_os = "redox")] {
+        use platform::{FileReader, Read};
+        use platform::syscall::flag::*;
+
+        let fd = platform::open("/etc/hostname\0",as_ptr(), 0, O_RDONLY);
+        if fd < 0 {
+            return fd;
+        }
+        let reader = FileReader(fd);
+        for _ in 0..len {
+            if !reader.read_u8(&mut *name) {
+                *name = 0;
+                break;
+            }
+            name = name.offset(1);
+        }
+    }
 }
 
 #[no_mangle]
@@ -347,7 +404,7 @@ pub extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
 
 #[no_mangle]
 pub extern "C" fn setgid(gid: gid_t) -> c_int {
-    unimplemented!();
+    platform::setregid(gid, gid)
 }
 
 #[no_mangle]
@@ -377,7 +434,7 @@ pub extern "C" fn setsid() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn setuid(uid: uid_t) -> c_int {
-    unimplemented!();
+    platform::setreuid(uid, uid)
 }
 
 #[no_mangle]

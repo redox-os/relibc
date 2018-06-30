@@ -1,6 +1,7 @@
 /*.out
 /gen/
 /alloc
+/assert
 /args
 /atof
 /atoi
@@ -10,12 +11,14 @@
 /ctype
 /dup
 /error
+/exec
 /fchdir
 /fcntl
 /fsync
 /ftruncate
-/getid
 /getc_unget
+/gethostname
+/getid
 /link
 /locale
 /math
@@ -26,11 +29,12 @@
 /rename
 /scanf
 /setid
-/setid
+/setjmp
 /sleep
 /sprintf
 /stdlib/a64l
 /stdlib/bsearch
+/stdlib/mktemp
 /stdlib/rand
 /stdlib/strtol
 /stdlib/strtoul

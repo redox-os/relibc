@@ -38,6 +38,8 @@ install: all
 	cp -rv "target/include"/* "$(DESTDIR)/include"
 	cp -v "$(BUILD)/debug/libc.a" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/debug/crt0.o" "$(DESTDIR)/lib"
+	cp -rv "openlibm/include"/* "$(DESTDIR)/include"
+	cp -rv "openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 
 libc: $(BUILD)/debug/libc.a $(BUILD)/debug/crt0.o
@@ -52,7 +54,7 @@ $(BUILD)/debug/libc.a: $(SRC)
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
-	cargo rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 cargo --verbose --verbose rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 	touch $@
 
 $(BUILD)/release/libc.a: $(SRC)
@@ -60,7 +62,7 @@ $(BUILD)/release/libc.a: $(SRC)
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
-	cargo rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 cargo rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 	touch $@
 
 $(BUILD)/openlibm: openlibm

@@ -1,5 +1,6 @@
 # Binaries that should generate the same output every time
 EXPECT_BINS=\
+	assert \
 	atof \
 	atoi \
 	brk \
@@ -8,13 +9,12 @@ EXPECT_BINS=\
 	ctype \
 	dup \
 	error \
+	exec \
 	fchdir \
 	fcntl \
 	fsync \
 	ftruncate \
-	getid \
 	getc_unget \
-	link \
 	locale \
 	math \
 	mem \
@@ -23,12 +23,12 @@ EXPECT_BINS=\
 	rename \
 	rmdir \
 	scanf \
+	setjmp \
 	sleep \
 	sprintf \
 	stdio/fwrite \
 	stdio/all \
 	stdio/freopen \
-	stdlib/bsearch \
 	stdlib/strtol \
 	stdlib/strtoul \
 	stdlib/a64l \
@@ -43,7 +43,6 @@ EXPECT_BINS=\
 	string/strtok \
 	string/strtok_r \
 	unistd/getopt \
-	unlink \
 	waitpid \
 	write \
 	time \
@@ -55,8 +54,13 @@ BINS=\
 	$(EXPECT_BINS) \
 	alloc \
 	chdir \
+	gethostname \
 	getid \
-	setid
+	link \
+	setid \
+	stdlib/bsearch \
+	stdlib/mktemp \
+	unlink
 
 all: $(BINS)
 
