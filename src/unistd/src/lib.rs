@@ -173,7 +173,15 @@ pub unsafe extern "C" fn execve(
             env = env.offset(1);
         }
 
-        let mut args: Vec<[usize; 2]> = Vec::new();
+        let mut len = 0;
+        for i in 0.. {
+            if (*arg.offset(i)).is_null() {
+                len = i;
+                break;
+            }
+        }
+
+        let mut args: Vec<[usize; 2]> = Vec::with_capacity(len);
         let mut arg = argv;
         while !(*arg).is_null() {
             args.push([*arg as usize, c_str(*arg).len()]);
