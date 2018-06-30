@@ -640,14 +640,14 @@ pub extern "C" fn getc_unlocked(stream: &mut FILE) -> c_int {
 /// Get a char from `stdin` without locking `stdin`
 #[no_mangle]
 pub extern "C" fn getchar_unlocked() -> c_int {
-    getc_unlocked(&mut *__stdin())
+    getc_unlocked(unsafe { &mut *__stdin() })
 }
 
 /// Get a string from `stdin`
 #[no_mangle]
 pub extern "C" fn gets(s: *mut c_char) -> *mut c_char {
     use core::i32;
-    fgets(s, i32::MAX, &mut *__stdin())
+    fgets(s, i32::MAX, unsafe { &mut *__stdin() })
 }
 
 /// Get an integer from `stream`
@@ -863,7 +863,7 @@ pub unsafe extern "C" fn vfprintf(file: &mut FILE, format: *const c_char, ap: va
 
 #[no_mangle]
 pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
-    vfprintf(&mut *__stdout(), format, ap)
+    vfprintf(unsafe { &mut *__stdout() }, format, ap)
 }
 
 #[no_mangle]
@@ -892,7 +892,7 @@ pub unsafe extern "C" fn vfscanf(file: &mut FILE, format: *const c_char, ap: va_
 
 #[no_mangle]
 pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
-    vfscanf(&mut *__stdin(), format, ap)
+    vfscanf(unsafe { &mut *__stdin() }, format, ap)
 }
 
 #[no_mangle]
