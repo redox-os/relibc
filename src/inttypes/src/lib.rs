@@ -1,3 +1,5 @@
+#![no_std]
+
 #[macro_use] extern crate stdlib;
 extern crate ctype;
 extern crate errno;
