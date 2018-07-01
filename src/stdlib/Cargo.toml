@@ -14,3 +14,5 @@ ctype = { path = "../ctype" }
 errno = { path = "../errno" }
 rand = { version = "0.5.2", default-features = false }
 time = { path = "../time" }
+wchar = { path = "../wchar" }
+string = { path = "../string" }

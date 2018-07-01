@@ -12,5 +12,5 @@ platform = { path = "../platform" }
 va_list = { path = "../../va_list", features = ["no_std"] }
 fcntl = { path = "../fcntl" }
 string = { path = "../string" }
-stdlib = { path = "../stdlib" }
+ralloc = { path = "../../ralloc", default-features = false }
 errno = { path = "../errno"}

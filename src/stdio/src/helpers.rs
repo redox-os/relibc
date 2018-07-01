@@ -1,5 +1,5 @@
 use super::{internal, BUFSIZ, FILE, UNGET};
-use stdlib::calloc;
+use ralloc;
 use core::{mem, ptr};
 use core::sync::atomic::AtomicBool;
 use platform::types::*;
@@ -62,7 +62,7 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> *mut FILE {
         flags |= F_APP;
     }
 
-    let file = calloc(mem::size_of::<FILE>() + BUFSIZ + UNGET, 1) as *mut FILE;
+    let file = ralloc::alloc(mem::size_of::<FILE>() + BUFSIZ + UNGET, 1) as *mut FILE;
     // Allocate the file
     (*file) = FILE {
         flags: flags,

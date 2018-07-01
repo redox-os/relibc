@@ -8,12 +8,11 @@ extern crate alloc;
 extern crate errno;
 extern crate fcntl;
 extern crate platform;
-extern crate stdlib;
+extern crate ralloc;
 extern crate string;
 extern crate va_list as vl;
 
-use core::str;
-use core::ptr;
+use core::{str,ptr,mem};
 use core::fmt::{self, Error, Result};
 use core::fmt::Write as WriteFmt;
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -23,8 +22,8 @@ use platform::{c_str, errno, Read, Write};
 use errno::STR_ERROR;
 use vl::VaList as va_list;
 
-mod scanf;
 mod printf;
+mod scanf;
 
 mod default;
 pub use default::*;
@@ -219,13 +218,16 @@ pub extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
 /// prior to using this function.
 #[no_mangle]
 pub extern "C" fn fclose(stream: &mut FILE) -> c_int {
-    use stdlib::free;
+    use ralloc::free;
     flockfile(stream);
     let r = helpers::fflush_unlocked(stream) | platform::close(stream.fd);
     if stream.flags & constants::F_PERM == 0 {
         // Not one of stdin, stdout or stderr
         unsafe {
-            free(stream as *mut _ as *mut _);
+            free(
+                stream as *mut _ as *mut _,
+                mem::size_of::<FILE>() + BUFSIZ + UNGET,
+            );
         }
     }
     r
@@ -720,7 +722,7 @@ pub extern "C" fn putc_unlocked(c: c_int, stream: &mut FILE) -> c_int {
             c
         }
     } else {
-        if stream.wend.is_null() && stream.can_write() {
+        if stream.wend.is_null() && !stream.can_write() {
             -1
         } else if c as i8 != stream.buf_char && stream.wpos < stream.wend {
             unsafe {
@@ -808,10 +810,10 @@ pub unsafe extern "C" fn setvbuf(
     size: usize,
 ) -> c_int {
     // TODO: Check correctness
-    use stdlib::calloc;
+    use ralloc::alloc;
     let mut buf = buf;
     if buf.is_null() && mode != _IONBF {
-        buf = calloc(size, 1) as *mut c_char;
+        buf = alloc(size, 1) as *mut c_char;
     }
     (*stream).buf_size = size;
     (*stream).buf_char = -1;
@@ -907,5 +909,9 @@ pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
-    scanf::scanf(&mut platform::UnsafeStringReader(s as *const u8), format, ap)
+    scanf::scanf(
+        &mut platform::UnsafeStringReader(s as *const u8),
+        format,
+        ap,
+    )
 }

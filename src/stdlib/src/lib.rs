@@ -9,12 +9,16 @@ extern crate platform;
 extern crate ralloc;
 extern crate rand;
 extern crate time;
+extern crate wchar;
+extern crate string;
 
 use core::{ptr, str};
-use rand::{Rng, SeedableRng}; 
+use rand::{Rng, SeedableRng};
 use rand::rngs::JitterRng;
 use rand::prng::XorShiftRng;
 use rand::distributions::Alphanumeric;
+use wchar::*;
+use string::*;
 
 use errno::*;
 use platform::types::*;
@@ -27,6 +31,11 @@ static ALLOCATOR: ralloc::Allocator = ralloc::Allocator;
 pub const EXIT_FAILURE: c_int = 1;
 pub const EXIT_SUCCESS: c_int = 0;
 pub const RAND_MAX: c_int = 2147483647;
+
+//Maximum number of bytes in a multibyte character for the current locale
+pub const MB_CUR_MAX: c_int = 4;
+//Maximum number of bytes in a multibyte characters for any locale
+pub const MB_LEN_MAX: c_int = 4;
 
 static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
 static mut RNG: Option<XorShiftRng> = None;
@@ -101,7 +110,7 @@ pub unsafe extern "C" fn atof(s: *const c_char) -> c_double {
 }
 
 macro_rules! dec_num_from_ascii {
-    ($s: expr, $t: ty) => {
+    ($s:expr, $t:ty) => {
         unsafe {
             let mut s = $s;
             // Iterate past whitespace
@@ -351,8 +360,19 @@ pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_voi
 }
 
 #[no_mangle]
-pub extern "C" fn mblen(s: *const c_char, n: size_t) -> c_int {
-    unimplemented!();
+pub unsafe extern "C" fn mblen(s: *const c_char, n: size_t) -> c_int {
+    let mut wc : wchar_t = 0;
+    let mut state : mbstate_t = mbstate_t { };
+	let result : usize = mbrtowc(&mut wc, s, n, &mut state);
+
+	if result == -1isize as usize {
+        return -1;
+    }
+	if result == -2isize as usize {
+        return -1;
+    }
+		
+	result as i32
 }
 
 #[no_mangle]
@@ -370,16 +390,13 @@ pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
     use core::slice;
     use core::iter;
     use core::mem;
-    extern "C" {
-        fn strlen(s: *const c_char) -> size_t;
-    }
     let len = unsafe { strlen(name) };
     if len < 6 {
         unsafe { platform::errno = errno::EINVAL };
         unsafe { *name = 0 };
         return name;
     }
-    for i in len-6..len {
+    for i in len - 6..len {
         if unsafe { *name.offset(i as isize) } != b'X' as c_char {
             unsafe { platform::errno = errno::EINVAL };
             unsafe { *name = 0 };
@@ -392,11 +409,9 @@ pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
 
     let mut retries = 100;
     loop {
-        let mut char_iter = iter::repeat(())
-        .map(|()| rng.sample(Alphanumeric))
-        .take(6);
+        let mut char_iter = iter::repeat(()).map(|()| rng.sample(Alphanumeric)).take(6);
         unsafe {
-            for (i,c) in char_iter.enumerate() {
+            for (i, c) in char_iter.enumerate() {
                 *name.offset(len as isize - i as isize - 1) = c as c_char
             }
         }
@@ -404,13 +419,17 @@ pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
         unsafe {
             let mut st: stat = mem::uninitialized();
             if platform::stat(name, &mut st) != 0 {
-                if platform::errno != ENOENT { *name = 0; }
+                if platform::errno != ENOENT {
+                    *name = 0;
+                }
                 return name;
             }
             mem::forget(st);
         }
-        retries = retries -1;
-        if retries == 0 { break; }
+        retries = retries - 1;
+        if retries == 0 {
+            break;
+        }
     }
     unsafe { platform::errno = EEXIST };
     unsafe { *name = 0 };
@@ -421,10 +440,9 @@ fn get_nstime() -> u64 {
     use core::mem;
     use time::constants::CLOCK_MONOTONIC;
     let mut ts: timespec = unsafe { mem::uninitialized() };
-    platform::clock_gettime(CLOCK_MONOTONIC, &mut ts); 
+    platform::clock_gettime(CLOCK_MONOTONIC, &mut ts);
     unsafe { ts.tv_nsec as u64 }
 }
-
 
 #[no_mangle]
 pub extern "C" fn mkstemp(name: *mut c_char) -> c_int {
@@ -639,7 +657,8 @@ pub fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize,
         if val == -1 || val as c_int >= base {
             break;
         } else {
-            if let Some(res) = num.checked_mul(base as c_ulong)
+            if let Some(res) = num
+                .checked_mul(base as c_ulong)
                 .and_then(|num| num.checked_add(val as c_ulong))
             {
                 num = res;
@@ -665,13 +684,7 @@ pub fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize,
 #[macro_export]
 macro_rules! strto_impl {
     (
-        $rettype:ty,
-        $signed:expr,
-        $maxval:expr,
-        $minval:expr,
-        $s:ident,
-        $endptr:ident,
-        $base:ident
+        $rettype:ty, $signed:expr, $maxval:expr, $minval:expr, $s:ident, $endptr:ident, $base:ident
     ) => {{
         // ensure these are constants
         const CHECK_SIGN: bool = $signed;
@@ -721,9 +734,8 @@ macro_rules! strto_impl {
         // convert the string to a number
         let num_str = $s.offset(idx);
         let res = match $base {
-            0 => detect_base(num_str).and_then(|($base, i)| {
-                convert_integer(num_str.offset(i), $base)
-            }),
+            0 => detect_base(num_str)
+                .and_then(|($base, i)| convert_integer(num_str.offset(i), $base)),
             8 => convert_octal(num_str),
             16 => convert_hex(num_str),
             _ => convert_integer(num_str, $base),
@@ -770,15 +782,15 @@ macro_rules! strto_impl {
         set_endptr(idx);
 
         num
-    }}
+    }};
 }
 
-
 #[no_mangle]
-pub unsafe extern "C" fn strtoul(s: *const c_char,
-                                 endptr: *mut *mut c_char,
-                                 base: c_int)
-                                 -> c_ulong {
+pub unsafe extern "C" fn strtoul(
+    s: *const c_char,
+    endptr: *mut *mut c_char,
+    base: c_int,
+) -> c_ulong {
     strto_impl!(
         c_ulong,
         false,
@@ -791,10 +803,7 @@ pub unsafe extern "C" fn strtoul(s: *const c_char,
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strtol(s: *const c_char,
-                                endptr: *mut *mut c_char,
-                                base: c_int)
-                                -> c_long {
+pub unsafe extern "C" fn strtol(s: *const c_char, endptr: *mut *mut c_char, base: c_int) -> c_long {
     strto_impl!(
         c_long,
         true,
@@ -835,11 +844,22 @@ pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
 }
 
 #[no_mangle]
-pub extern "C" fn wcstombs(s: *mut c_char, pwcs: *const wchar_t, n: size_t) -> size_t {
-    unimplemented!();
+pub extern "C" fn wcstombs(s: *mut c_char, pwcs: *mut *const wchar_t, n: size_t) -> size_t {
+    let mut state: mbstate_t = mbstate_t {};
+    wcsrtombs(s, pwcs, n, &mut state)
 }
 
 #[no_mangle]
-pub extern "C" fn wctomb(s: *mut c_char, wchar: wchar_t) -> c_int {
-    unimplemented!();
+pub unsafe extern "C" fn wctomb(s: *mut c_char, wc: wchar_t) -> c_int {
+    let mut state : mbstate_t = mbstate_t {};
+    let result: usize = wcrtomb(s, wc, &mut state);
+
+    if result == -1isize as usize {
+        return -1;
+    }
+    if result == -2isize as usize {
+        return -1;
+    }
+
+    result as c_int
 }

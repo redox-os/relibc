@@ -1,0 +1,2 @@
+Processing 11 UTF-8 code units: [ 7a c3 9f e6 b0 b4 f0 9f 8d 8c 0 ]
+into 5 wchar_t units: [ 7a df 6c34 1f34c 0 ]

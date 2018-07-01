@@ -1,53 +1,82 @@
-//! wchar implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/string.h.html
+//! wchar implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/wchar.h.html
 
 #![no_std]
+#![feature(str_internals)]
 
 extern crate errno;
 extern crate platform;
-extern crate stdlib;
-extern crate string;
+extern crate stdio;
 extern crate time;
+extern crate va_list as vl;
 
 use platform::types::*;
-use errno::*;
 use time::*;
-use core::cmp;
 use core::usize;
 use core::ptr;
-use core::mem;
-use string::*;
+use stdio::*;
+use vl::VaList as va_list;
 
-pub type wint_t = i32;
+mod utf8;
+
+const WEOF: wint_t = 0xFFFFFFFFu32;
+
+//Maximum number of bytes in a multibyte character for the current locale
+const MB_CUR_MAX: c_int = 4;
+//Maximum number of bytes in a multibyte characters for any locale
+const MB_LEN_MAX: c_int = 4;
 
 #[repr(C)]
-pub struct mbstate_t {
-    pub mbs_count: c_int,
-    pub mbs_length: c_int,
-    pub mbs_wch: wint_t,
-}
+#[derive(Clone, Copy)]
+pub struct mbstate_t {}
 
 #[no_mangle]
 pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
     //Check for EOF
-    if c == -1 {
-        return -1;
+    if c as wint_t == WEOF {
+        return WEOF;
     }
 
     let uc = c as u8;
     let c = uc as c_char;
-    let mut ps: mbstate_t = mbstate_t {
-        mbs_count: 0,
-        mbs_length: 0,
-        mbs_wch: 0,
-    };
+    let mut ps: mbstate_t = mbstate_t {};
     let mut wc: wchar_t = 0;
     let saved_errno = platform::errno;
     let status = mbrtowc(&mut wc, &c as (*const c_char), 1, &mut ps);
     if status == usize::max_value() || status == usize::max_value() - 1 {
         platform::errno = saved_errno;
-        return platform::errno;
+        return WEOF;
     }
     return wc as wint_t;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fputwc(wc: wchar_t, stream: *mut FILE) -> wint_t {
+    //Convert wchar_t to multibytes first
+    static mut INTERNAL: mbstate_t = mbstate_t {};
+    let mut bytes: [c_char; MB_CUR_MAX as usize] = [0; MB_CUR_MAX as usize];
+
+    let amount = wcrtomb(bytes.as_mut_ptr(), wc, &mut INTERNAL);
+
+    for i in 0..amount {
+        fputc(bytes[i] as c_int, &mut *stream);
+    }
+
+    wc as wint_t
+}
+
+#[no_mangle]
+pub extern "C" fn fputws(ws: *const wchar_t, stream: *mut FILE) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn fwide(stream: *mut FILE, mode: c_int) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn getwc(stream: *mut FILE) -> wint_t {
+    unimplemented!();
 }
 
 #[no_mangle]
@@ -57,24 +86,21 @@ pub extern "C" fn getwchar() -> wint_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn mbsinit(ps: *const mbstate_t) -> c_int {
-    if ps.is_null() || (*ps).mbs_count == 0 {
-        return 1;
+    //Add a check for the state maybe
+    if ps.is_null() {
+        1
     } else {
-        return 0;
+        0
     }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn mbrlen(s: *const c_char, n: usize, ps: *mut mbstate_t) -> usize {
-    static mut internal: mbstate_t = mbstate_t {
-        mbs_count: 0,
-        mbs_length: 0,
-        mbs_wch: 0,
-    };
-    return mbrtowc(ptr::null_mut(), s, n, &mut internal);
+    static mut INTERNAL: mbstate_t = mbstate_t {};
+    mbrtowc(ptr::null_mut(), s, n, &mut INTERNAL)
 }
 
-//Only works for utf8!
+//Only works for UTF8 at the moment
 #[no_mangle]
 pub unsafe extern "C" fn mbrtowc(
     pwc: *mut wchar_t,
@@ -82,123 +108,85 @@ pub unsafe extern "C" fn mbrtowc(
     n: usize,
     ps: *mut mbstate_t,
 ) -> usize {
-    static mut internal: mbstate_t = mbstate_t {
-        mbs_count: 0,
-        mbs_length: 0,
-        mbs_wch: 0,
-    };
+    static mut INTERNAL: mbstate_t = mbstate_t {};
 
     if ps.is_null() {
-        let ps = &mut internal;
+        let ps = &mut INTERNAL;
     }
     if s.is_null() {
         let xs: [c_char; 1] = [0];
-        utf8_mbrtowc(pwc, &xs[0] as *const c_char, 1, ps);
+        return utf8::mbrtowc(pwc, &xs[0] as *const c_char, 1, ps);
+    } else {
+        return utf8::mbrtowc(pwc, s, n, ps);
     }
-
-    return utf8_mbrtowc(pwc, s, n, ps);
 }
 
+//Convert a multibyte string to a wide string with a limited amount of bytes
+//Required for in POSIX.1-2008
 #[no_mangle]
-unsafe extern "C" fn utf8_mbrtowc(
-    pwc: *mut wchar_t,
-    s: *const c_char,
-    n: usize,
+pub unsafe extern "C" fn mbsnrtowcs(
+    dst_ptr: *mut wchar_t,
+    src_ptr: *mut *const c_char,
+    src_len: usize,
+    dst_len: usize,
     ps: *mut mbstate_t,
 ) -> usize {
-    let mut i: usize = 0;
+    static mut INTERNAL: mbstate_t = mbstate_t {};
 
-    while !(i > 0 && (*ps).mbs_count == 0) {
-        if (n <= i) {
-            return -2isize as usize;
-        }
-        let c = s.offset(i as isize);
-        let uc = c as u8;
+    if ps.is_null() {
+        let ps = &mut INTERNAL;
+    }
 
-        if (*ps).mbs_count == 0 {
-            //1 byte sequence - 00–7F
-            if (uc & 0b10000000) == 0b00000000 {
-                (*ps).mbs_count = 0;
-                (*ps).mbs_length = 1;
-                (*ps).mbs_wch = (uc as wchar_t & 0b1111111) as wint_t;
-            }
-            //2 byte sequence - C2–DF
-            else if (uc & 0b11100000) == 0b11000000 {
-                (*ps).mbs_count = 1;
-                (*ps).mbs_length = 2;
-                (*ps).mbs_wch = (uc as wchar_t & 0b11111) as wint_t;
-            }
-            //3 byte sequence - E0–EF
-            else if (uc & 0b11110000) == 0b11100000 {
-                (*ps).mbs_count = 2;
-                (*ps).mbs_length = 3;
-                (*ps).mbs_wch = (uc as wchar_t & 0b1111) as wint_t;
-            }
-            //4 byte sequence - F0–F4
-            else if (uc & 0b11111000) == 0b11110000 {
-                (*ps).mbs_count = 3;
-                (*ps).mbs_length = 4;
-                (*ps).mbs_wch = (uc as wchar_t & 0b111) as wint_t;
-            } else {
-                platform::errno = errno::EILSEQ;
-                return -1isize as usize;
-            }
-        } else {
-            if (uc & 0b11000000) != 0b10000000 {
-                platform::errno = errno::EILSEQ;
-                return -1isize as usize;
-            }
+    let mut src = *src_ptr;
 
-            (*ps).mbs_wch = (*ps).mbs_wch << 6 | (uc & 0b00111111) as wint_t;
-            (*ps).mbs_count -= 1;
+    let mut dst_offset: usize = 0;
+    let mut src_offset: usize = 0;
+
+    while (dst_ptr.is_null() || dst_offset < dst_len) && src_offset < src_len {
+        let ps_copy = *ps;
+        let mut wc: wchar_t = 0;
+        let amount = mbrtowc(
+            &mut wc,
+            src.offset(src_offset as isize),
+            src_len - src_offset,
+            ps,
+        );
+
+        // Stop in the event a decoding error occured.
+        if amount == -1isize as usize {
+            *src_ptr = src.offset(src_offset as isize);
+            return 1isize as usize;
         }
 
-        i += 1;
+        // Stop decoding early in the event we encountered a partial character.
+        if amount == -2isize as usize {
+            *ps = ps_copy;
+            break;
+        }
+
+        // Store the decoded wide character in the destination buffer.
+        if !dst_ptr.is_null() {
+            *dst_ptr.offset(dst_offset as isize) = wc;
+        }
+
+        // Stop decoding after decoding a null character and return a NULL
+        // source pointer to the caller, not including the null character in the
+        // number of characters stored in the destination buffer.
+        if wc == 0 {
+            src = ptr::null();
+            src_offset = 0;
+            break;
+        }
+
+        dst_offset += 1;
+        src_offset += amount;
     }
 
-    // Reject the character if it was produced with an overly long sequence.
-    if (*ps).mbs_length == 1 && 1 << 7 <= (*ps).mbs_wch {
-        platform::errno = errno::EILSEQ;
-        return -1isize as usize;
-    }
-    if (*ps).mbs_length == 2 && 1 << (5 + 1 * 6) <= (*ps).mbs_wch {
-        platform::errno = errno::EILSEQ;
-        return -1isize as usize;
-    }
-    if (*ps).mbs_length == 3 && 1 << (5 + 2 * 6) <= (*ps).mbs_wch {
-        platform::errno = errno::EILSEQ;
-        return -1isize as usize;
-    }
-    if (*ps).mbs_length == 4 && 1 << (5 + 3 * 6) <= (*ps).mbs_wch {
-        platform::errno = errno::EILSEQ;
-        return -1isize as usize;
-    }
-
-    // The definition of UTF-8 prohibits encoding character numbers between
-    // U+D800 and U+DFFF, which are reserved for use with the UTF-16 encoding
-    // form (as surrogate pairs) and do not directly represent characters.
-    if 0xD800 <= (*ps).mbs_wch && (*ps).mbs_wch <= 0xDFFF {
-        platform::errno = errno::EILSEQ;
-        return -1isize as usize;
-    }
-    // RFC 3629 limits UTF-8 to 0x0 through 0x10FFFF.
-    if 0x10FFFF <= (*ps).mbs_wch {
-        platform::errno = errno::EILSEQ;
-        return -1isize as usize;
-    }
-
-    let result: wchar_t = (*ps).mbs_wch as wchar_t;
-
-    if !pwc.is_null() {
-        *pwc = result;
-    }
-
-    (*ps).mbs_length = 0;
-    (*ps).mbs_wch = 0;
-
-    return if result != 0 { i } else { 0 };
+    *src_ptr = src.offset(src_offset as isize);
+    return dst_offset;
 }
 
+//Convert a multibyte string to a wide string
 #[no_mangle]
 pub extern "C" fn mbsrtowcs(
     dst: *mut wchar_t,
@@ -206,11 +194,31 @@ pub extern "C" fn mbsrtowcs(
     len: usize,
     ps: *mut mbstate_t,
 ) -> usize {
+    unsafe { mbsnrtowcs(dst, src, usize::max_value(), len, ps) }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn putwc(wc: wchar_t, stream: *mut FILE) -> wint_t {
+    fputwc(wc, &mut *stream)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn putwchar(wc: wchar_t) -> wint_t {
+    fputwc(wc, &mut *__stdout())
+}
+
+#[no_mangle]
+pub extern "C" fn swprintf(
+    s: *mut wchar_t,
+    n: usize,
+    format: *const wchar_t,
+    mut ap: va_list,
+) -> c_int {
     unimplemented!();
 }
 
 #[no_mangle]
-pub extern "C" fn putwchar(wc: wchar_t) -> wint_t {
+pub extern "C" fn swscanf(s: *const wchar_t, format: *const wchar_t, mut ap: va_list) -> c_int {
     unimplemented!();
 }
 
@@ -225,8 +233,43 @@ pub extern "C" fn towupper(wc: wint_t) -> wint_t {
 }
 
 #[no_mangle]
-pub extern "C" fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t) -> usize {
+pub extern "C" fn ungetwc(wc: wint_t, stream: *mut FILE) -> wint_t {
     unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn vfwprintf(stream: *mut FILE, format: *const wchar_t, arg: va_list) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn vwprintf(format: *const wchar_t, arg: va_list) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn vswprintf(
+    s: *mut wchar_t,
+    n: usize,
+    format: *const wchar_t,
+    arg: va_list,
+) -> c_int {
+    unimplemented!();
+}
+
+//widechar to multibyte
+#[no_mangle]
+pub extern "C" fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t) -> usize {
+    let mut buffer: [c_char; MB_CUR_MAX as usize] = [0; MB_CUR_MAX as usize];
+    let mut wc_cpy = wc;
+    let mut s_cpy = s;
+
+    if s.is_null() {
+        wc_cpy = 0;
+        s_cpy = buffer.as_mut_ptr();
+    }
+
+    unsafe { utf8::wcrtomb(s_cpy, wc_cpy, ps) }
 }
 
 #[no_mangle]
@@ -390,5 +433,15 @@ pub extern "C" fn wmemmove(ws1: *mut wchar_t, ws2: *const wchar_t, n: usize) -> 
 
 #[no_mangle]
 pub extern "C" fn wmemset(ws1: *mut wchar_t, ws2: wchar_t, n: usize) -> *mut wchar_t {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn wprintf(format: *const wchar_t, mut ap: va_list) -> c_int {
+    unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn wscanf(format: *const wchar_t, mut ap: va_list) -> c_int {
     unimplemented!();
 }
