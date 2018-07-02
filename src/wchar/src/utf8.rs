@@ -1,8 +1,6 @@
 //UTF implementation parts for wchar.h.
 //Partially ported from the Sortix libc
 
-#![no_std]
-
 extern crate errno;
 extern crate platform;
 

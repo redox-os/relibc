@@ -27,7 +27,7 @@ const MB_LEN_MAX: c_int = 4;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct mbstate_t {}
+pub struct mbstate_t;
 
 #[no_mangle]
 pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
@@ -38,7 +38,7 @@ pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
 
     let uc = c as u8;
     let c = uc as c_char;
-    let mut ps: mbstate_t = mbstate_t {};
+    let mut ps: mbstate_t = mbstate_t;
     let mut wc: wchar_t = 0;
     let saved_errno = platform::errno;
     let status = mbrtowc(&mut wc, &c as (*const c_char), 1, &mut ps);
@@ -52,7 +52,7 @@ pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
 #[no_mangle]
 pub unsafe extern "C" fn fputwc(wc: wchar_t, stream: *mut FILE) -> wint_t {
     //Convert wchar_t to multibytes first
-    static mut INTERNAL: mbstate_t = mbstate_t {};
+    static mut INTERNAL: mbstate_t = mbstate_t;
     let mut bytes: [c_char; MB_CUR_MAX as usize] = [0; MB_CUR_MAX as usize];
 
     let amount = wcrtomb(bytes.as_mut_ptr(), wc, &mut INTERNAL);
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn mbsinit(ps: *const mbstate_t) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn mbrlen(s: *const c_char, n: usize, ps: *mut mbstate_t) -> usize {
-    static mut INTERNAL: mbstate_t = mbstate_t {};
+    static mut INTERNAL: mbstate_t = mbstate_t;
     mbrtowc(ptr::null_mut(), s, n, &mut INTERNAL)
 }
 
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn mbrtowc(
     n: usize,
     ps: *mut mbstate_t,
 ) -> usize {
-    static mut INTERNAL: mbstate_t = mbstate_t {};
+    static mut INTERNAL: mbstate_t = mbstate_t;
 
     if ps.is_null() {
         let ps = &mut INTERNAL;
@@ -131,7 +131,7 @@ pub unsafe extern "C" fn mbsnrtowcs(
     dst_len: usize,
     ps: *mut mbstate_t,
 ) -> usize {
-    static mut INTERNAL: mbstate_t = mbstate_t {};
+    static mut INTERNAL: mbstate_t = mbstate_t;
 
     if ps.is_null() {
         let ps = &mut INTERNAL;

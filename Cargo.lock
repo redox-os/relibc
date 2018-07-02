@@ -419,6 +419,7 @@ dependencies = [
  "platform 0.1.0",
  "ralloc 1.0.0",
  "rand 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "string 0.1.0",
  "time 0.1.0",
  "wchar 0.1.0",
 ]
