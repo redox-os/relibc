@@ -32,7 +32,7 @@ pub extern crate unistd;
 pub extern crate wchar;
 pub extern crate wctype;
 
-#[cfg(not(any(test, target_os = "redox")))]
+#[cfg(not(test))]
 #[panic_implementation]
 #[linkage = "weak"]
 #[no_mangle]
@@ -51,7 +51,7 @@ pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
 #[linkage = "weak"]
 pub extern "C" fn rust_eh_personality() {}
 
-#[cfg(not(any(test, target_os = "redox")))]
+#[cfg(not(test))]
 #[lang = "oom"]
 #[linkage = "weak"]
 #[no_mangle]
