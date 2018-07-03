@@ -54,7 +54,7 @@ $(BUILD)/debug/libc.a: $(SRC)
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
-	CARGO_INCREMENTAL=0 cargo --verbose --verbose rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 cargo rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 	touch $@
 
 $(BUILD)/release/libc.a: $(SRC)
