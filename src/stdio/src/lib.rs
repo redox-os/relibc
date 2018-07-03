@@ -203,6 +203,15 @@ impl Read for FILE {
     }
 }
 
+impl Drop for FILE {
+    fn drop(&mut self) {
+        // Flush
+        if let Some(_) = self.write {
+            self.write(&[]);
+        }
+    }
+}
+
 /// Clears EOF and ERR indicators on a stream
 #[no_mangle]
 pub extern "C" fn clearerr(stream: &mut FILE) {
