@@ -64,6 +64,9 @@ impl FILE {
         }
         */
 
+        if let Some(_) = self.read {
+            return true;
+        }
         if let Some(_) = self.write {
             self.write(&[]);
         }
@@ -93,6 +96,9 @@ impl FILE {
             return false;
         }
         // Buffer repositioning
+        if let Some(_) = self.write {
+            return true;
+        }
         self.read = None;
         self.write = Some((self.unget, self.unget, self.buf.len() - 1));
         return true;
