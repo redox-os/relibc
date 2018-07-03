@@ -351,10 +351,10 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
     if let Some((rpos, rend)) = stream.read {
         for _ in (0..(n-1) as usize).take_while(|x| rpos + x < rend) {
             st[diff] = stream.buf[rpos + diff] as i8;
-            if st[diff] == b'\n' as i8 || st[diff] == stream.buf_char {
+            diff += 1;
+            if st[diff-1] == b'\n' as i8 || st[diff-1] == stream.buf_char {
                 break;
             }
-            diff += 1;
         }
         stream.read = Some((rpos+diff, rend));
         for i in diff..(n-1) as usize {
