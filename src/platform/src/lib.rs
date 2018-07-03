@@ -33,6 +33,26 @@ use types::*;
 #[no_mangle]
 pub static mut errno: c_int = 0;
 
+pub unsafe fn c_str_mut<'a>(s: *mut c_char) -> &'a mut [u8] {
+    use core::usize;
+
+    c_str_n_mut(s, usize::MAX)
+}
+
+pub unsafe fn c_str_n_mut<'a>(s: *mut c_char, n: usize) -> &'a mut [u8] {
+    use core::slice;
+
+    let mut size = 0;
+
+    for _ in 0..n {
+        if *s.offset(size) == 0 {
+            break;
+        }
+        size += 1;
+    }
+
+    slice::from_raw_parts_mut(s as *mut u8, size as usize)
+}
 pub unsafe fn c_str<'a>(s: *const c_char) -> &'a [u8] {
     use core::usize;
 

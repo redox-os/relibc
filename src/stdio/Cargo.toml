@@ -8,9 +8,10 @@ build = "build.rs"
 cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
-platform = { path = "../platform" }
-va_list = { path = "../../va_list", features = ["no_std"] }
-fcntl = { path = "../fcntl" }
-string = { path = "../string" }
-ralloc = { path = "../../ralloc", default-features = false }
 errno = { path = "../errno"}
+fcntl = { path = "../fcntl" }
+lazy_static = { version = "*", features = ["nightly", "spin_no_std"] }
+platform = { path = "../platform" }
+ralloc = { path = "../../ralloc", default-features = false }
+string = { path = "../string" }
+va_list = { path = "../../va_list", features = ["no_std"] }
