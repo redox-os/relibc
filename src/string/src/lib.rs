@@ -5,12 +5,12 @@ extern crate errno;
 extern crate platform;
 extern crate ralloc;
 
-use platform::types::*;
-use errno::*;
 use core::cmp;
-use core::usize;
-use core::ptr;
 use core::mem;
+use core::ptr;
+use core::usize;
+use errno::*;
+use platform::types::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn memccpy(

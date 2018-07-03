@@ -1,10 +1,10 @@
+use core::mem;
 use core::ptr;
 use core::slice;
-use core::mem;
 use syscall;
-use syscall::flag::*;
-use syscall::data::TimeSpec as redox_timespec;
 use syscall::data::Stat as redox_stat;
+use syscall::data::TimeSpec as redox_timespec;
+use syscall::flag::*;
 
 use c_str;
 use errno;

@@ -55,11 +55,15 @@ pub extern "C" fn rust_eh_personality() {}
 #[lang = "oom"]
 #[linkage = "weak"]
 #[no_mangle]
-pub extern fn rust_oom(layout: ::core::alloc::Layout) -> ! {
+pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
     use core::fmt::Write;
 
     let mut w = platform::FileWriter(2);
-    let _ = w.write_fmt(format_args!("RELIBC OOM: {} bytes aligned to {} bytes\n", layout.size(), layout.align()));
+    let _ = w.write_fmt(format_args!(
+        "RELIBC OOM: {} bytes aligned to {} bytes\n",
+        layout.size(),
+        layout.align()
+    ));
 
     platform::exit(1);
 }

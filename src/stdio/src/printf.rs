@@ -1,7 +1,7 @@
 use core::{slice, str};
 
-use platform::{self, Write};
 use platform::types::*;
+use platform::{self, Write};
 use vl::VaList;
 
 pub unsafe fn printf<W: Write>(mut w: W, format: *const c_char, mut ap: VaList) -> c_int {
@@ -97,7 +97,8 @@ pub unsafe fn printf<W: Write>(mut w: W, format: *const c_char, mut ap: VaList) 
                 '#' => Ok(()),
                 '0'...'9' => Ok(()),
                 _ => Ok(()),
-            }.is_err() {
+            }.is_err()
+            {
                 return -1;
             }
         } else if b == b'%' {

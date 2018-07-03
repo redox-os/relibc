@@ -6,8 +6,8 @@
 mod inner {
     extern crate platform;
 
-    use core::ptr;
     use self::platform::types::*;
+    use core::ptr;
 
     const LENGTH: usize = 65;
 
@@ -15,12 +15,12 @@ mod inner {
     #[no_mangle]
     #[repr(C)]
     pub struct utsname {
-        pub sysname:    [c_char; LENGTH],
-        pub nodename:   [c_char; LENGTH],
-        pub release:    [c_char; LENGTH],
-        pub version:    [c_char; LENGTH],
-        pub machine:    [c_char; LENGTH],
-        pub domainname: [c_char; LENGTH]
+        pub sysname: [c_char; LENGTH],
+        pub nodename: [c_char; LENGTH],
+        pub release: [c_char; LENGTH],
+        pub version: [c_char; LENGTH],
+        pub machine: [c_char; LENGTH],
+        pub domainname: [c_char; LENGTH],
     }
 
     #[no_mangle]

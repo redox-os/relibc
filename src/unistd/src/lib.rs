@@ -3,14 +3,15 @@
 #![no_std]
 #![cfg_attr(target_os = "redox", feature(alloc))]
 
-#[cfg(target_os = "redox")] extern crate alloc;
+#[cfg(target_os = "redox")]
+extern crate alloc;
 extern crate platform;
 extern crate stdio;
 extern crate string;
 extern crate sys_utsname;
 
-pub use platform::types::*;
 pub use getopt::*;
+pub use platform::types::*;
 
 use core::ptr;
 
@@ -132,13 +133,15 @@ pub unsafe extern "C" fn execve(
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    #[cfg(target_os = "linux")] {
+    #[cfg(target_os = "linux")]
+    {
         platform::execve(path, argv, envp)
     }
-    #[cfg(target_os = "redox")] {
+    #[cfg(target_os = "redox")]
+    {
         use alloc::Vec;
-        use platform::{c_str, e};
         use platform::syscall::flag::*;
+        use platform::{c_str, e};
 
         let mut env = envp;
         while !(*env).is_null() {
@@ -275,7 +278,8 @@ pub extern "C" fn gethostid() -> c_long {
 
 #[no_mangle]
 pub unsafe extern "C" fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
-    #[cfg(target_os = "linux")] {
+    #[cfg(target_os = "linux")]
+    {
         use core::mem;
 
         // len only needs to be mutable on linux
@@ -288,7 +292,9 @@ pub unsafe extern "C" fn gethostname(mut name: *mut c_char, len: size_t) -> c_in
             return err;
         }
         for c in uts.nodename.iter() {
-            if len == 0 { break; }
+            if len == 0 {
+                break;
+            }
             len -= 1;
 
             *name = *c;
@@ -301,9 +307,10 @@ pub unsafe extern "C" fn gethostname(mut name: *mut c_char, len: size_t) -> c_in
             name = name.offset(1);
         }
     }
-    #[cfg(target_os = "redox")] {
-        use platform::{e, FileReader, Read};
+    #[cfg(target_os = "redox")]
+    {
         use platform::syscall::flag::*;
+        use platform::{e, FileReader, Read};
 
         let fd = e(platform::syscall::open("/etc/hostname", O_RDONLY)) as i32;
         if fd < 0 {

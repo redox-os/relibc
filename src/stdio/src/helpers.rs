@@ -1,12 +1,12 @@
-use super::{internal, BUFSIZ, FILE, UNGET};
-use ralloc;
-use core::{mem, ptr};
-use core::sync::atomic::AtomicBool;
-use platform::types::*;
 use super::constants::*;
+use super::{internal, BUFSIZ, FILE, UNGET};
+use core::sync::atomic::AtomicBool;
+use core::{mem, ptr};
+use errno;
 use fcntl::*;
 use platform;
-use errno;
+use platform::types::*;
+use ralloc;
 
 /// Parse mode flags as a string and output a mode flags integer
 pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
@@ -39,8 +39,8 @@ pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
 
 /// Open a file with the file descriptor `fd` in the mode `mode`
 pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
-    use string::strchr;
     use core::mem::size_of;
+    use string::strchr;
     if *mode != b'r' as i8 && *mode != b'w' as i8 && *mode != b'a' as i8 {
         platform::errno = errno::EINVAL;
         return None;

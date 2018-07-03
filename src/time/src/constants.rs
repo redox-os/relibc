@@ -6,8 +6,8 @@ pub mod sys;
 #[path = "redox.rs"]
 pub mod sys;
 
-pub use sys::*;
 use platform::types::*;
+pub use sys::*;
 
 // Move epoch from 01.01.1970 to 01.03.0000 (yes, Year 0) - this is the first
 // day of a 400-year long "era", right after additional day of leap year.
@@ -40,7 +40,7 @@ pub(crate) const UTC: *const c_char = b"UTC\0" as *const u8 as *const c_char;
 
 pub(crate) const DAY_NAMES: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 pub(crate) const MON_NAMES: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
 pub(crate) const CLOCK_REALTIME: clockid_t = 0;

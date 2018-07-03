@@ -16,15 +16,15 @@ extern crate ralloc;
 extern crate string;
 extern crate va_list as vl;
 
-use core::{str,ptr,mem};
-use core::fmt::{self, Error, Result};
 use core::fmt::Write as WriteFmt;
+use core::fmt::{self, Error, Result};
 use core::sync::atomic::{AtomicBool, Ordering};
+use core::{mem, ptr, str};
 
+use alloc::vec::Vec;
 use errno::STR_ERROR;
 use platform::types::*;
 use platform::{c_str, errno, Read, Write};
-use alloc::vec::Vec;
 use vl::VaList as va_list;
 
 mod printf;
@@ -44,14 +44,14 @@ mod internal;
 /// This struct gets exposed to the C API.
 ///
 pub struct FILE {
-    flags:    i32,
-    read:     Option<(usize, usize)>,
-    write:    Option<(usize, usize, usize)>,
-    fd:       c_int,
-    buf:      Vec<u8>,
+    flags: i32,
+    read: Option<(usize, usize)>,
+    write: Option<(usize, usize, usize)>,
+    fd: c_int,
+    buf: Vec<u8>,
     buf_char: i8,
-    lock:     AtomicBool,
-    unget:    usize,
+    lock: AtomicBool,
+    unget: usize,
 }
 
 impl FILE {
@@ -142,11 +142,7 @@ impl FILE {
         unreachable!()
     }
     pub fn read(&mut self, buf: &mut [u8]) -> usize {
-        let adj = if self.buf.len() > 0 {
-            0
-        } else {
-            1
-        };
+        let adj = if self.buf.len() > 0 { 0 } else { 1 };
         let mut file_buf = &mut self.buf[self.unget..];
         let count = if buf.len() <= 1 + adj {
             platform::read(self.fd, &mut file_buf)
@@ -357,7 +353,7 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
     'outer: while stream.read(&mut []) == 0 && stream.flags & F_ERR == 0 {
         if let Some((rpos, rend)) = stream.read {
             let mut idiff = 0usize;
-            for _ in (0..(len-1) as usize).take_while(|x| rpos + x < rend) {
+            for _ in (0..(len - 1) as usize).take_while(|x| rpos + x < rend) {
                 let pos = (n - len) as usize;
                 st[pos] = stream.buf[rpos + idiff] as i8;
                 idiff += 1;
@@ -366,7 +362,7 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
                     break 'outer;
                 }
             }
-            stream.read = Some((rpos+idiff, rend));
+            stream.read = Some((rpos + idiff, rend));
             if len <= 1 {
                 break;
             }
@@ -586,7 +582,11 @@ pub extern "C" fn fseeko(stream: &mut FILE, offset: off_t, whence: c_int) -> c_i
 /// Seek to a position `pos` in the file from the beginning of the file
 #[no_mangle]
 pub unsafe extern "C" fn fsetpos(stream: &mut FILE, pos: Option<&fpos_t>) -> c_int {
-    fseek(stream, *pos.expect("You must specify a valid position"), SEEK_SET)
+    fseek(
+        stream,
+        *pos.expect("You must specify a valid position"),
+        SEEK_SET,
+    )
 }
 
 /// Get the current position of the cursor in the file

@@ -9,7 +9,6 @@ fn_single_line = false
 where_single_line = false
 imports_indent = "Visual"
 imports_layout = "Mixed"
-reorder_imports = false
 fn_args_density = "Tall"
 brace_style = "SameLineWhere"
 trailing_comma = "Vertical"

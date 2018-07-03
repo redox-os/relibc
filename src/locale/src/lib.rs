@@ -54,7 +54,7 @@ static CURRENT_LOCALE: lconv = lconv {
     p_cs_precedes: c_char::max_value(),
     p_sep_by_space: c_char::max_value(),
     p_sign_posn: c_char::max_value(),
-    thousands_sep: EMPTY_PTR
+    thousands_sep: EMPTY_PTR,
 };
 
 #[no_mangle]

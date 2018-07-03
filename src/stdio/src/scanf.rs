@@ -14,7 +14,7 @@ enum IntKind {
     LongLong,
     IntMax,
     PtrDiff,
-    Size
+    Size,
 }
 
 /// Helper function for progressing a C string
@@ -28,7 +28,11 @@ unsafe fn next_byte(string: &mut *const c_char) -> Result<u8, c_int> {
     }
 }
 
-unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaList) -> Result<c_int, c_int> {
+unsafe fn inner_scanf<R: Read>(
+    mut r: R,
+    mut format: *const c_char,
+    mut ap: VaList,
+) -> Result<c_int, c_int> {
     let mut matched = 0;
     let mut byte = 0;
     let mut skip_read = false;
@@ -37,9 +41,11 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
     macro_rules! read {
         () => {{
             let n = r.read_u8(&mut byte);
-            if n { count += 1; }
+            if n {
+                count += 1;
+            }
             n
-        }}
+        }};
     }
 
     macro_rules! maybe_read {
@@ -100,7 +106,7 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
             } else {
                 match width.parse::<usize>() {
                     Ok(n) => Some(n),
-                    Err(_) => return Err(-1)
+                    Err(_) => return Err(-1),
                 }
             };
 
@@ -117,7 +123,7 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
                     b'q' | b'L' => IntKind::LongLong,
                     b't' => IntKind::PtrDiff,
                     b'z' => IntKind::Size,
-                    _ => break
+                    _ => break,
                 };
 
                 c = next_byte(&mut format)?;
@@ -139,8 +145,9 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
                     } else if !read!() {
                         return Ok(matched);
                     }
-                },
-                b'd' | b'i' | b'o' | b'u' | b'x' | b'X' | b'f' | b'e' | b'g' | b'E' | b'a' | b'p' => {
+                }
+                b'd' | b'i' | b'o' | b'u' | b'x' | b'X' | b'f' | b'e' | b'g' | b'E' | b'a'
+                | b'p' => {
                     while (byte as char).is_whitespace() {
                         if !read!() {
                             return Ok(matched);
@@ -162,13 +169,18 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
                     let mut dot = false;
 
                     while width.map(|w| w > 0).unwrap_or(true)
-                            && ((byte >= b'0' && byte <= b'7')
-                                || (radix >= 10 && (byte >= b'8' && byte <= b'9'))
-                                || (float && !dot && byte == b'.')
-                                || (radix == 16 && ((byte >= b'a' && byte <= b'f')
-                                    || (byte >= b'A' && byte <= b'F')))) {
-                        if auto && n.is_empty() && byte == b'0'
-                                && width.map(|w| w > 0).unwrap_or(true) {
+                        && ((byte >= b'0' && byte <= b'7')
+                            || (radix >= 10 && (byte >= b'8' && byte <= b'9'))
+                            || (float && !dot && byte == b'.')
+                            || (radix == 16
+                                && ((byte >= b'a' && byte <= b'f')
+                                    || (byte >= b'A' && byte <= b'F'))))
+                    {
+                        if auto
+                            && n.is_empty()
+                            && byte == b'0'
+                            && width.map(|w| w > 0).unwrap_or(true)
+                        {
                             if !pointer {
                                 radix = 8;
                             }
@@ -176,7 +188,9 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
                             if !read!() {
                                 break;
                             }
-                            if width.map(|w| w > 0).unwrap_or(true) && (byte == b'x' || byte == b'X') {
+                            if width.map(|w| w > 0).unwrap_or(true)
+                                && (byte == b'x' || byte == b'X')
+                            {
                                 radix = 16;
                                 width = width.map(|w| w - 1);
                                 if width.map(|w| w > 0).unwrap_or(true) {
@@ -201,33 +215,37 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
                     }
 
                     macro_rules! parse_type {
-                        (noformat $type:ident) => {
-                            {
-                                let n = if n.is_empty() { 0 as $type } else {
-                                    n.parse::<$type>()
-                                        .map_err(|_| 0)?
-                                };
-                                if !ignore {
-                                    *ap.get::<*mut $type>() = n;
-                                    matched += 1;
-                                }
+                        (noformat $type:ident) => {{
+                            let n = if n.is_empty() {
+                                0 as $type
+                            } else {
+                                n.parse::<$type>().map_err(|_| 0)?
+                            };
+                            if !ignore {
+                                *ap.get::<*mut $type>() = n;
+                                matched += 1;
                             }
+                        }};
+                        (c_double) => {
+                            parse_type!(noformat c_double);
                         };
-                        (c_double) => { parse_type!(noformat c_double); };
-                        (c_float) => { parse_type!(noformat c_float); };
-                        ($type:ident) => { parse_type!($type, $type); };
-                        ($type:ident, $final:ty) => {
-                            {
-                                let n = if n.is_empty() { 0 as $type } else {
-                                    $type::from_str_radix(&n, radix)
-                                        .map_err(|_| 0)?
-                                };
-                                if !ignore {
-                                    *ap.get::<*mut $final>() = n as $final;
-                                    matched += 1;
-                                }
+                        (c_float) => {
+                            parse_type!(noformat c_float);
+                        };
+                        ($type:ident) => {
+                            parse_type!($type, $type);
+                        };
+                        ($type:ident, $final:ty) => {{
+                            let n = if n.is_empty() {
+                                0 as $type
+                            } else {
+                                $type::from_str_radix(&n, radix).map_err(|_| 0)?
+                            };
+                            if !ignore {
+                                *ap.get::<*mut $final>() = n as $final;
+                                matched += 1;
                             }
-                        }
+                        }};
                     }
 
                     if float {
@@ -277,10 +295,10 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
                                 parse_type!(size_t)
                             } else {
                                 parse_type!(ssize_t)
-                            }
+                            },
                         }
                     }
-                },
+                }
                 b's' => {
                     while (byte as char).is_whitespace() {
                         if !read!() {
@@ -307,7 +325,7 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
                         *ptr = 0;
                         matched += 1;
                     }
-                },
+                }
                 b'c' => {
                     let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.get()) };
 
@@ -326,7 +344,7 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
                     if ptr.is_some() {
                         matched += 1;
                     }
-                },
+                }
                 b'[' => {
                     c = next_byte(&mut format)?;
 
@@ -363,7 +381,8 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
 
                     let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.get()) };
 
-                    while width.map(|w| w > 0).unwrap_or(true) && !invert == matches.contains(&byte) {
+                    while width.map(|w| w > 0).unwrap_or(true) && !invert == matches.contains(&byte)
+                    {
                         if let Some(ref mut ptr) = ptr {
                             **ptr = byte as c_char;
                             *ptr = ptr.offset(1);
@@ -380,13 +399,13 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
                         *ptr = 0;
                         matched += 1;
                     }
-                },
+                }
                 b'n' => {
                     if !ignore {
                         *ap.get::<*mut c_int>() = count as c_int;
                     }
-                },
-                _ => return Err(-1)
+                }
+                _ => return Err(-1),
             }
 
             if width != Some(0) && c != b'n' {
@@ -401,7 +420,7 @@ unsafe fn inner_scanf<R: Read>(mut r: R, mut format: *const c_char, mut ap: VaLi
 pub unsafe fn scanf<R: Read>(r: R, format: *const c_char, ap: VaList) -> c_int {
     match inner_scanf(r, format, ap) {
         Ok(n) => n,
-        Err(n) => n
+        Err(n) => n,
     }
 }
 
@@ -420,7 +439,19 @@ macro_rules! va_primitives {
     }
 }
 #[cfg(test)]
-va_primitives!(c_uchar, c_ushort, c_uint, c_ulong, c_char, c_short, c_int, c_long, c_float, c_double, *mut c_void);
+va_primitives!(
+    c_uchar,
+    c_ushort,
+    c_uint,
+    c_ulong,
+    c_char,
+    c_short,
+    c_int,
+    c_long,
+    c_float,
+    c_double,
+    *mut c_void
+);
 
 #[cfg(test)]
 trait FromVoidPtr {
@@ -437,21 +468,31 @@ macro_rules! from_void_ptr {
     }
 }
 #[cfg(test)]
-from_void_ptr!(c_uchar, c_ushort, c_uint, c_ulong, c_char, c_short, c_int, c_long, c_float, c_double,
-               size_t, ssize_t, *mut c_void);
+from_void_ptr!(
+    c_uchar,
+    c_ushort,
+    c_uint,
+    c_ulong,
+    c_char,
+    c_short,
+    c_int,
+    c_long,
+    c_float,
+    c_double,
+    size_t,
+    ssize_t,
+    *mut c_void
+);
 
 #[cfg(test)]
 pub struct VaList<'a> {
     args: &'a mut [&'a mut VaPrimitive],
-    i: usize
+    i: usize,
 }
 #[cfg(test)]
 impl<'a> VaList<'a> {
     pub fn new(args: &'a mut [&'a mut VaPrimitive]) -> VaList<'a> {
-        VaList {
-            args: args,
-            i: 0
-        }
+        VaList { args: args, i: 0 }
     }
     pub fn get<T: FromVoidPtr>(&mut self) -> T {
         let ptr = T::from_void_ptr(self.args[self.i].as_mut_ptr());
@@ -462,17 +503,20 @@ impl<'a> VaList<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use core::ptr;
     use platform::StringReader;
-    use super::*;
 
     fn scanf<'a>(format: &str, args: &'a mut [&'a mut VaPrimitive], input: &str) -> c_int {
         unsafe {
             let mut format = format.to_string();
             let format = format.as_bytes_mut();
             let format = format.as_mut_ptr();
-            let out = super::inner_scanf(StringReader(input.as_bytes()), format as *mut c_char, VaList::new(args))
-                .expect("running test scanf failed");
+            let out = super::inner_scanf(
+                StringReader(input.as_bytes()),
+                format as *mut c_char,
+                VaList::new(args),
+            ).expect("running test scanf failed");
             out
         }
     }
@@ -490,7 +534,10 @@ mod tests {
         let mut a: c_uint = 0;
         let mut b: c_int = 0;
         let mut c: c_int = 0;
-        assert_eq!(scanf("%x %i %i\0", &mut [&mut a, &mut b, &mut c], "12 0x345 010"), 3);
+        assert_eq!(
+            scanf("%x %i %i\0", &mut [&mut a, &mut b, &mut c], "12 0x345 010"),
+            3
+        );
         assert_eq!(a, 0x12);
         assert_eq!(b, 0x345);
         assert_eq!(c, 0o10);
@@ -535,7 +582,10 @@ mod tests {
     fn count() {
         let mut a: c_int = 0;
         let mut b: c_int = 0;
-        assert_eq!(scanf("test: %2i%n\0", &mut [&mut a, &mut b], "test: 0xFF"), 1);
+        assert_eq!(
+            scanf("test: %2i%n\0", &mut [&mut a, &mut b], "test: 0xFF"),
+            1
+        );
         assert_eq!(a, 0);
         assert_eq!(b, 8);
     }

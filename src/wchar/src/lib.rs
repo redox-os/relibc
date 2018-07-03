@@ -9,11 +9,11 @@ extern crate stdio;
 extern crate time;
 extern crate va_list as vl;
 
-use platform::types::*;
-use time::*;
-use core::usize;
 use core::ptr;
+use core::usize;
+use platform::types::*;
 use stdio::*;
+use time::*;
 use vl::VaList as va_list;
 
 mod utf8;

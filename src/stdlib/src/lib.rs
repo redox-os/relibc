@@ -8,17 +8,17 @@ extern crate errno;
 extern crate platform;
 extern crate ralloc;
 extern crate rand;
+extern crate string;
 extern crate time;
 extern crate wchar;
-extern crate string;
 
 use core::{ptr, str};
-use rand::{Rng, SeedableRng};
-use rand::rngs::JitterRng;
-use rand::prng::XorShiftRng;
 use rand::distributions::Alphanumeric;
-use wchar::*;
+use rand::prng::XorShiftRng;
+use rand::rngs::JitterRng;
+use rand::{Rng, SeedableRng};
 use string::*;
+use wchar::*;
 
 use errno::*;
 use platform::types::*;
@@ -361,18 +361,18 @@ pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_voi
 
 #[no_mangle]
 pub unsafe extern "C" fn mblen(s: *const c_char, n: size_t) -> c_int {
-    let mut wc : wchar_t = 0;
-    let mut state : mbstate_t = mbstate_t { };
-	let result : usize = mbrtowc(&mut wc, s, n, &mut state);
+    let mut wc: wchar_t = 0;
+    let mut state: mbstate_t = mbstate_t {};
+    let result: usize = mbrtowc(&mut wc, s, n, &mut state);
 
-	if result == -1isize as usize {
+    if result == -1isize as usize {
         return -1;
     }
-	if result == -2isize as usize {
+    if result == -2isize as usize {
         return -1;
     }
-		
-	result as i32
+
+    result as i32
 }
 
 #[no_mangle]
@@ -387,9 +387,9 @@ pub extern "C" fn mbtowc(pwc: *mut wchar_t, s: *const c_char, n: size_t) -> c_in
 
 #[no_mangle]
 pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
-    use core::slice;
     use core::iter;
     use core::mem;
+    use core::slice;
     let len = unsafe { strlen(name) };
     if len < 6 {
         unsafe { platform::errno = errno::EINVAL };
@@ -851,7 +851,7 @@ pub extern "C" fn wcstombs(s: *mut c_char, pwcs: *mut *const wchar_t, n: size_t)
 
 #[no_mangle]
 pub unsafe extern "C" fn wctomb(s: *mut c_char, wc: wchar_t) -> c_int {
-    let mut state : mbstate_t = mbstate_t {};
+    let mut state: mbstate_t = mbstate_t {};
     let result: usize = wcrtomb(s, wc, &mut state);
 
     if result == -1isize as usize {

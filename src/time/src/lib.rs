@@ -9,11 +9,11 @@ extern crate platform;
 pub mod constants;
 mod helpers;
 
-use platform::types::*;
 use constants::*;
-use helpers::*;
 use core::mem::transmute;
 use errno::EIO;
+use helpers::*;
+use platform::types::*;
 
 /*
  *#[repr(C)]

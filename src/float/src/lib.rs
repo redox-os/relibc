@@ -6,8 +6,8 @@
 extern crate fenv;
 extern crate platform;
 
-use platform::types::*;
 use fenv::{fegetround, FE_TONEAREST};
+use platform::types::*;
 
 pub const FLT_RADIX: c_int = 2;
 

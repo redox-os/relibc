@@ -34,7 +34,8 @@ pub unsafe extern "C" fn getopt(
             -1
         } else {
             let current_arg = *argv.offset(optind as isize);
-            if current_arg.is_null() || *current_arg != b'-' as c_char
+            if current_arg.is_null()
+                || *current_arg != b'-' as c_char
                 || string::strcmp(current_arg, b"-\0".as_ptr() as _) == 0
             {
                 -1

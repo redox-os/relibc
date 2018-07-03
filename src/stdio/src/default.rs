@@ -1,6 +1,6 @@
-use core::sync::atomic::AtomicBool;
-use core::cell::UnsafeCell;
 use super::{constants, BUFSIZ, FILE, UNGET};
+use core::cell::UnsafeCell;
+use core::sync::atomic::AtomicBool;
 
 struct GlobalFile(UnsafeCell<FILE>);
 impl GlobalFile {
