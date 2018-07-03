@@ -165,8 +165,12 @@ impl FILE {
             return count as usize;
         }
         // Adjust pointers
-        self.read = Some((self.unget + 1, self.unget + (count as usize)));
-        buf[buf.len() - 1] = file_buf[0];
+        if buf.len() > 0 {
+            self.read = Some((self.unget + 1, self.unget + (count as usize)));
+            buf[buf.len() - 1] = file_buf[0];
+        } else {
+            self.read = Some((self.unget, self.unget + (count as usize)));
+        }
         buf.len()
     }
     pub fn seek(&self, off: off_t, whence: c_int) -> off_t {
@@ -328,6 +332,8 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
     flockfile(stream);
     let st = unsafe { slice::from_raw_parts_mut(s, n as usize) };
 
+    let mut len = n;
+
     // We can only fit one or less chars in
     if n <= 1 {
         funlockfile(stream);
@@ -347,38 +353,30 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
         }
     }
 
-    let mut diff = 0;
-    if let Some((rpos, rend)) = stream.read {
-        for _ in (0..(n-1) as usize).take_while(|x| rpos + x < rend) {
-            st[diff] = stream.buf[rpos + diff] as i8;
-            diff += 1;
-            if st[diff-1] == b'\n' as i8 || st[diff-1] == stream.buf_char {
-                break;
-            }
-        }
-        stream.read = Some((rpos+diff, rend));
-        for i in diff..(n-1) as usize {
-            let mut c = [0u8];
-            let d = stream.read(&mut c);
-            if d != 1 {
-                if diff == 0 {
-                    return ptr::null_mut();
-                } else {
-                    break;
+    // TODO: Look at this later to determine correctness and efficiency
+    'outer: while stream.read(&mut []) == 0 && stream.flags & F_ERR == 0 {
+        if let Some((rpos, rend)) = stream.read {
+            let mut idiff = 0usize;
+            for _ in (0..(len-1) as usize).take_while(|x| rpos + x < rend) {
+                let pos = (n - len) as usize;
+                st[pos] = stream.buf[rpos + idiff] as i8;
+                idiff += 1;
+                len -= 1;
+                if st[pos] == b'\n' as i8 || st[pos] == stream.buf_char {
+                    break 'outer;
                 }
             }
-            if c[0] as i8 == -1 {
-                break;
-            }
-            st[i] = c[0] as i8;
-            diff += 1;
-            if c[0] == b'\n' || c[0] as i8 == stream.buf_char {
+            stream.read = Some((rpos+idiff, rend));
+            if len <= 1 {
                 break;
             }
         }
+        // We can read, there's been no errors. We should have stream.read setbuf
+        //            -- Tommoa (3/7/2018)
+        unreachable!()
     }
 
-    st[diff] = 0;
+    st[(n - len) as usize] = 0;
     funlockfile(stream);
     s
 }
