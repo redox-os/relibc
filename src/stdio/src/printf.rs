@@ -97,11 +97,11 @@ pub unsafe fn printf<W: Write>(mut w: W, format: *const c_char, mut ap: VaList) 
                 '#' => Ok(()),
                 '0'...'9' => Ok(()),
                 _ => Ok(()),
-            }.expect("Error writing!")
+            }.map_err(|_| return -1).unwrap()
         } else if b == b'%' {
             found_percent = true;
         } else {
-            w.write_u8(b).expect("Error writing char!");
+            w.write_u8(b).map_err(|_| return -1).unwrap()
         }
     }
 
