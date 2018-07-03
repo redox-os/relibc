@@ -44,6 +44,10 @@ EXPECT_BINS=\
 	string/strtok_r \
 	unistd/getopt \
 	waitpid \
+	wchar/mbrtowc \
+	wchar/mbsrtowcs \
+	wchar/putwchar \
+	wchar/wcrtomb \
 	write \
 	time \
 	gmtime \
@@ -112,4 +116,4 @@ TAILLIBS=\
 	../target/openlibm/libopenlibm.a
 
 %: %.c $(HEADLIBS) $(TAILLIBS)
-	gcc -fno-stack-protector -Wall $(CFLAGS) $(HEADLIBS) "$<" $(TAILLIBS) -o "$@"
+	gcc -fno-stack-protector -Wall -g $(CFLAGS) $(HEADLIBS) "$<" $(TAILLIBS) -o "$@"

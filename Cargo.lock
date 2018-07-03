@@ -304,6 +304,7 @@ dependencies = [
  "sys_wait 0.1.0",
  "time 0.1.0",
  "unistd 0.1.0",
+ "wchar 0.1.0",
  "wctype 0.1.0",
 ]
 
@@ -403,7 +404,7 @@ dependencies = [
  "errno 0.1.0",
  "fcntl 0.1.0",
  "platform 0.1.0",
- "stdlib 0.1.0",
+ "ralloc 1.0.0",
  "string 0.1.0",
  "va_list 0.1.0",
 ]
@@ -418,7 +419,9 @@ dependencies = [
  "platform 0.1.0",
  "ralloc 1.0.0",
  "rand 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "string 0.1.0",
  "time 0.1.0",
+ "wchar 0.1.0",
 ]
 
 [[package]]
@@ -428,7 +431,7 @@ dependencies = [
  "cbindgen 0.5.2",
  "errno 0.1.0",
  "platform 0.1.0",
- "stdlib 0.1.0",
+ "ralloc 1.0.0",
 ]
 
 [[package]]
@@ -605,6 +608,18 @@ dependencies = [
 name = "vec_map"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "wchar"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "errno 0.1.0",
+ "platform 0.1.0",
+ "stdio 0.1.0",
+ "time 0.1.0",
+ "va_list 0.1.0",
+]
 
 [[package]]
 name = "wctype"

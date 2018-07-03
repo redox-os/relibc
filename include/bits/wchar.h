@@ -1,7 +1,10 @@
 #ifndef _BITS_WCHAR_H
 #define _BITS_WCHAR_H
+#include <stdint.h>
 
-typedef signed short wchar_t;
-typedef signed int wint_t;
+#define WEOF (0xFFFFFFFFu)
+
+typedef int32_t wchar_t;
+typedef uint32_t wint_t;
 
 #endif /* _BITS_WCHAR_H */

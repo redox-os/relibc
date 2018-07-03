@@ -12,12 +12,11 @@ extern crate fcntl;
 #[macro_use]
 extern crate lazy_static;
 extern crate platform;
-extern crate stdlib;
+extern crate ralloc;
 extern crate string;
 extern crate va_list as vl;
 
-use core::str;
-use core::ptr;
+use core::{str,ptr,mem};
 use core::fmt::{self, Error, Result};
 use core::fmt::Write as WriteFmt;
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -28,8 +27,8 @@ use platform::{c_str, errno, Read, Write};
 use alloc::vec::Vec;
 use vl::VaList as va_list;
 
-mod scanf;
 mod printf;
+mod scanf;
 
 mod default;
 pub use default::*;
@@ -214,13 +213,16 @@ pub extern "C" fn cuserid(_s: *mut c_char) -> *mut c_char {
 /// prior to using this function.
 #[no_mangle]
 pub extern "C" fn fclose(stream: &mut FILE) -> c_int {
-    use stdlib::free;
+    use ralloc::free;
     flockfile(stream);
     let r = helpers::fflush_unlocked(stream) | platform::close(stream.fd);
     if stream.flags & constants::F_PERM == 0 {
         // Not one of stdin, stdout or stderr
         unsafe {
-            free(stream as *mut _ as *mut _);
+            free(
+                stream as *mut _ as *mut _,
+                mem::size_of::<FILE>() + BUFSIZ + UNGET,
+            );
         }
     } else {
         funlockfile(stream);
@@ -897,5 +899,9 @@ pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
-    scanf::scanf(&mut platform::UnsafeStringReader(s as *const u8), format, ap)
+    scanf::scanf(
+        &mut platform::UnsafeStringReader(s as *const u8),
+        format,
+        ap,
+    )
 }

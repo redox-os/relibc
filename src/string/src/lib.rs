@@ -1,10 +1,9 @@
 //! string implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/string.h.html
-
 #![no_std]
 
 extern crate errno;
 extern crate platform;
-extern crate stdlib;
+extern crate ralloc;
 
 use platform::types::*;
 use errno::*;
@@ -193,7 +192,7 @@ pub unsafe extern "C" fn strndup(s1: *const c_char, size: usize) -> *mut c_char 
     let len = strnlen(s1, size);
 
     // the "+ 1" is to account for the NUL byte
-    let buffer = stdlib::malloc(len + 1) as *mut c_char;
+    let buffer = ralloc::alloc(len + 1, 1) as *mut c_char;
     if buffer.is_null() {
         platform::errno = ENOMEM as c_int;
     } else {

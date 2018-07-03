@@ -9,5 +9,5 @@ cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
 platform = { path = "../platform" }
-stdlib = { path = "../stdlib" }
+ralloc = { path = "../../ralloc", default-features = false }
 errno = { path = "../errno" }

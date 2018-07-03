@@ -1,27 +1,51 @@
-image: "rust:latest"
+image: "rustlang/rust:nightly"
+
+stages:
+    - build
+    - test
 
 before_script:
     - git submodule update --init --recursive
-    - rustup toolchain add nightly
-    - rustup target add x86_64-unknown-redox --toolchain nightly
+    - rustup toolchain add "$(cat rust-toolchain)"
+    - rustup target add x86_64-unknown-redox --toolchain "$(cat rust-toolchain)"
     - rustup show      # Print version info for debugging
 
+cache:
+    untracked: true
+
 build:linux:
+    stage: build
     script:
         - make all
 
-#build:redox:
-#    script:
-#        - make all
+build:redox:
+    stage: build
+    variables:
+        TARGET: x86_64-unknown-redox
+    script:
+        # Install x86_64-unknown-redox-gcc
+        # This can't be in before_script because that overrides
+        # the global before_script.
+        - apt-get update -qq
+        - apt-get install -qq apt-transport-https build-essential curl git gnupg software-properties-common
+        - apt-key adv --keyserver keyserver.ubuntu.com --recv-keys AA12E97F0881517F
+        - add-apt-repository 'deb https://static.redox-os.org/toolchain/apt /'
+        - apt-get update -qq && apt-get install -qq x86-64-unknown-redox-gcc
+
+        # Main script
+        - make all
 
 test:linux:
+    stage: test
+    dependencies:
+        - build:linux
     script:
         - make test
+        - cd tests && make verify
 
 fmt:
+    stage: test
     script:
         - rustup component add rustfmt-preview
         - ./fmt.sh -- --check
-
-# TODO: Set up a docker image with a redox vm that would allow to
-#   run things like tests under redox
+    allow_failure: true

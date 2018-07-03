@@ -39,6 +39,7 @@ sys_utsname = { path = "src/sys_utsname" }
 sys_wait = { path = "src/sys_wait" }
 time = { path = "src/time" }
 unistd = { path = "src/unistd" }
+wchar = { path = "src/wchar" }
 wctype = { path = "src/wctype" }
 
 [dependencies.compiler_builtins]

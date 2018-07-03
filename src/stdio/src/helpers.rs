@@ -1,4 +1,6 @@
-use super::{BUFSIZ, FILE, UNGET};
+use super::{internal, BUFSIZ, FILE, UNGET};
+use ralloc;
+use core::{mem, ptr};
 use core::sync::atomic::AtomicBool;
 use platform::types::*;
 use super::constants::*;
@@ -62,8 +64,8 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
         flags |= F_APP;
     }
 
+    let f = ralloc::alloc(mem::size_of::<FILE>(), 1) as *mut FILE;
     // Allocate the file
-    let f = malloc(size_of::<FILE>()) as *mut FILE;
     if f.is_null() {
         None
     } else {

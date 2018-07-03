@@ -1,5 +1,7 @@
-#ifndef _BITS_EXEC_H
-#define _BITS_EXEC_H
+#include <stdarg.h>
+#include <stddef.h>
+
+int execv(const char *path, char *const *argv);
 
 int execl(const char *path, const char* argv0, ...)
 {
@@ -21,6 +23,8 @@ int execl(const char *path, const char* argv0, ...)
 		return execv(path, argv);
 	}
 }
+
+int execve(const char *path, char *const *argv, char *const *envp);
 
 int execle(const char *path, const char* argv0, ...)
 {

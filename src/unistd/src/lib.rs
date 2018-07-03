@@ -1,7 +1,9 @@
 //! unistd implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/unistd.h.html
 
 #![no_std]
+#![cfg_attr(target_os = "redox", feature(alloc))]
 
+#[cfg(target_os = "redox")] extern crate alloc;
 extern crate platform;
 extern crate stdio;
 extern crate string;
@@ -33,7 +35,7 @@ pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
 
 #[no_mangle]
-pub static mut environ: *const *mut c_char = 0 as *const *mut c_char;
+pub static mut environ: *const *mut c_char = ptr::null();
 
 #[no_mangle]
 pub extern "C" fn _exit(status: c_int) {
@@ -120,17 +122,80 @@ pub extern "C" fn encrypt(block: [c_char; 64], edflag: c_int) {
 // }
 
 #[no_mangle]
-pub extern "C" fn execv(path: *const c_char, argv: *const *mut c_char) -> c_int {
-    unsafe { execve(path, argv, environ) }
+pub unsafe extern "C" fn execv(path: *const c_char, argv: *const *mut c_char) -> c_int {
+    execve(path, argv, environ)
 }
 
 #[no_mangle]
-pub extern "C" fn execve(
+pub unsafe extern "C" fn execve(
     path: *const c_char,
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    platform::execve(path, argv, envp)
+    #[cfg(target_os = "linux")] {
+        platform::execve(path, argv, envp)
+    }
+    #[cfg(target_os = "redox")] {
+        use alloc::Vec;
+        use platform::{c_str, e};
+        use platform::syscall::flag::*;
+
+        let mut env = envp;
+        while !(*env).is_null() {
+            let slice = c_str(*env);
+            // Should always contain a =, but worth checking
+            if let Some(sep) = slice.iter().position(|&c| c == b'=') {
+                // If the environment variable has no name, do not attempt
+                // to add it to the env.
+                if sep > 0 {
+                    let mut path = b"env:".to_vec();
+                    path.extend_from_slice(&slice[..sep]);
+                    match platform::syscall::open(&path, O_WRONLY | O_CREAT) {
+                        Ok(fd) => {
+                            // If the environment variable has no value, there
+                            // is no need to write anything to the env scheme.
+                            if sep + 1 < slice.len() {
+                                let n = match platform::syscall::write(fd, &slice[sep + 1..]) {
+                                    Ok(n) => n,
+                                    err => {
+                                        return e(err) as c_int;
+                                    }
+                                };
+                            }
+                            // Cleanup after adding the variable.
+                            match platform::syscall::close(fd) {
+                                Ok(_) => (),
+                                err => {
+                                    return e(err) as c_int;
+                                }
+                            }
+                        }
+                        err => {
+                            return e(err) as c_int;
+                        }
+                    }
+                }
+            }
+            env = env.offset(1);
+        }
+
+        let mut len = 0;
+        for i in 0.. {
+            if (*argv.offset(i)).is_null() {
+                len = i;
+                break;
+            }
+        }
+
+        let mut args: Vec<[usize; 2]> = Vec::with_capacity(len as usize);
+        let mut arg = argv;
+        while !(*arg).is_null() {
+            args.push([*arg as usize, c_str(*arg).len()]);
+            arg = arg.offset(1);
+        }
+
+        e(platform::syscall::execve(c_str(path), &args)) as c_int
+    }
 }
 
 #[no_mangle]
@@ -235,25 +300,25 @@ pub unsafe extern "C" fn gethostname(mut name: *mut c_char, len: size_t) -> c_in
 
             name = name.offset(1);
         }
-        0
     }
     #[cfg(target_os = "redox")] {
-        use platform::{FileReader, Read};
+        use platform::{e, FileReader, Read};
         use platform::syscall::flag::*;
 
-        let fd = platform::open("/etc/hostname\0",as_ptr(), 0, O_RDONLY);
+        let fd = e(platform::syscall::open("/etc/hostname", O_RDONLY)) as i32;
         if fd < 0 {
             return fd;
         }
-        let reader = FileReader(fd);
+        let mut reader = FileReader(fd);
         for _ in 0..len {
-            if !reader.read_u8(&mut *name) {
+            if !reader.read_u8(&mut *(name as *mut u8)) {
                 *name = 0;
                 break;
             }
             name = name.offset(1);
         }
     }
+    0
 }
 
 #[no_mangle]

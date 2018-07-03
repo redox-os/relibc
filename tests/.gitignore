@@ -54,6 +54,10 @@
 /unistd/getopt
 /unlink
 /waitpid
+/wchar/mbrtowc
+/wchar/mbsrtowcs
+/wchar/putwchar
+/wchar/wcrtomb
 /write
 /time
 /gmtime
