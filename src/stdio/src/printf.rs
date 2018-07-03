@@ -15,7 +15,7 @@ pub unsafe fn printf<W: Write>(mut w: W, format: *const c_char, mut ap: VaList) 
         }
 
         if found_percent {
-            match b as char {
+            if match b as char {
                 '%' => {
                     found_percent = false;
                     w.write_char('%')
@@ -97,11 +97,15 @@ pub unsafe fn printf<W: Write>(mut w: W, format: *const c_char, mut ap: VaList) 
                 '#' => Ok(()),
                 '0'...'9' => Ok(()),
                 _ => Ok(()),
-            }.map_err(|_| return -1).unwrap()
+            }.is_err() {
+                return -1;
+            }
         } else if b == b'%' {
             found_percent = true;
         } else {
-            w.write_u8(b).map_err(|_| return -1).unwrap()
+            if w.write_u8(b).is_err() {
+                return -1;
+            }
         }
     }
 
