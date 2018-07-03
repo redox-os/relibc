@@ -73,4 +73,4 @@ $(BUILD)/openlibm: openlibm
 	touch $@
 
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm
-	make CC=$(CC) CFLAGS=-fno-stack-protector -C $< libopenlibm.a
+	make CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/target/include" -C $< libopenlibm.a
