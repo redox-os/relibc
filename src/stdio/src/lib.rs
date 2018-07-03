@@ -165,6 +165,9 @@ impl FILE {
 }
 impl fmt::Write for FILE {
     fn write_str(&mut self, s: &str) -> Result {
+        if !self.can_write() {
+            return Err(Error);
+        }
         let s = s.as_bytes();
         if self.write(s) != s.len() {
             Err(Error)
@@ -175,6 +178,9 @@ impl fmt::Write for FILE {
 }
 impl Write for FILE {
     fn write_u8(&mut self, byte: u8) -> Result {
+        if !self.can_write() {
+            return Err(Error);
+        }
         if self.write(&[byte]) != 1 {
             Err(Error)
         } else {
