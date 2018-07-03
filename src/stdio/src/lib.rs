@@ -142,7 +142,11 @@ impl FILE {
         unreachable!()
     }
     pub fn read(&mut self, buf: &mut [u8]) -> usize {
-        let adj = !(self.buf.len() == 0) as usize;
+        let adj = if self.buf.len() > 0 {
+            0
+        } else {
+            1
+        };
         let mut file_buf = &mut self.buf[self.unget..];
         let count = if buf.len() <= 1 + adj {
             platform::read(self.fd, &mut file_buf)
@@ -320,15 +324,14 @@ pub extern "C" fn fgetpos(stream: &mut FILE, pos: Option<&mut fpos_t>) -> c_int 
 /// Get a string from the stream
 #[no_mangle]
 pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_char {
-    use platform::c_str_n_mut;
-
+    use core::slice;
     flockfile(stream);
-    let st = unsafe { c_str_n_mut(s, n as usize) };
+    let st = unsafe { slice::from_raw_parts_mut(s, n as usize) };
 
     // We can only fit one or less chars in
     if n <= 1 {
         funlockfile(stream);
-        if n == 0 {
+        if n <= 0 {
             return ptr::null_mut();
         }
         unsafe {
@@ -344,21 +347,35 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
         }
     }
 
+    let mut diff = 0;
     if let Some((rpos, rend)) = stream.read {
-        let mut diff = 0;
-        for (_, mut c) in stream.buf[rpos..rend]
-            .iter()
-            .enumerate()
-            .take_while(|&(i, c)| *c != b'\n' && i < n as usize)
-        {
-            st[diff] = *c;
+        for _ in (0..(n-1) as usize).take_while(|x| rpos + x < rend) {
+            st[diff] = stream.buf[rpos + diff] as i8;
             diff += 1;
         }
-        stream.read = Some((rpos + diff, rend));
-    } else {
-        return ptr::null_mut();
+        stream.read = Some((rpos+diff, rend));
+        for i in diff..(n-1) as usize {
+            let mut c = [0u8];
+            let d = stream.read(&mut c);
+            if d != 1 {
+                if diff == 0 {
+                    return ptr::null_mut();
+                } else {
+                    break;
+                }
+            }
+            if c[0] as i8 == -1 {
+                break;
+            }
+            st[i] = c[0] as i8;
+            diff += 1;
+            if c[0] == b'\n' || c[0] as i8 == stream.buf_char {
+                break;
+            }
+        }
     }
 
+    st[diff] = 0;
     funlockfile(stream);
     s
 }
