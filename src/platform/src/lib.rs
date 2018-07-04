@@ -97,7 +97,7 @@ pub unsafe fn memcpy(s1: *mut c_void, s2: *const c_void, n: usize) -> *mut c_voi
     s1
 }
 
-pub unsafe fn alloc(size: usize, offset: usize, align: usize) -> *mut c_void {
+unsafe fn alloc_inner(size: usize, offset: usize, align: usize) -> *mut c_void {
     let ptr = ralloc::alloc(size + offset, align);
     if !ptr.is_null() {
         *(ptr as *mut u64) = (size + offset) as u64;
@@ -106,6 +106,19 @@ pub unsafe fn alloc(size: usize, offset: usize, align: usize) -> *mut c_void {
     } else {
         ptr as *mut c_void
     }
+}
+
+pub unsafe fn alloc(size: usize) -> *mut c_void {
+    alloc_inner(size, 16, 8)
+}
+
+pub unsafe fn alloc_align(size: usize, alignment: usize) -> *mut c_void {
+    let mut align = 32;
+    while align <= alignment {
+        align *= 2;
+    }
+
+    alloc_inner(size, align/2, align)
 }
 
 pub unsafe fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {

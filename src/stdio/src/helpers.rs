@@ -62,7 +62,7 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
         flags |= F_APP;
     }
 
-    let f = platform::alloc(mem::size_of::<FILE>(), 16, 8) as *mut FILE;
+    let f = platform::alloc(mem::size_of::<FILE>()) as *mut FILE;
     // Allocate the file
     if f.is_null() {
         None

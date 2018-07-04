@@ -328,17 +328,12 @@ pub extern "C" fn lrand48() -> c_long {
 
 #[no_mangle]
 pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
-    platform::alloc(size, 16, 8)
+    platform::alloc(size)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_void {
-    let mut align = 32;
-    while align <= alignment as usize {
-        align *= 2;
-    }
-
-    platform::alloc(size, align / 2, align)
+    platform::alloc_align(size, alignment)
 }
 
 #[no_mangle]
