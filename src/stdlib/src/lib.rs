@@ -6,7 +6,6 @@
 extern crate ctype;
 extern crate errno;
 extern crate platform;
-extern crate ralloc;
 extern crate rand;
 extern crate string;
 extern crate time;
@@ -24,9 +23,6 @@ use errno::*;
 use platform::types::*;
 
 mod sort;
-
-#[global_allocator]
-static ALLOCATOR: ralloc::Allocator = ralloc::Allocator;
 
 pub const EXIT_FAILURE: c_int = 1;
 pub const EXIT_SUCCESS: c_int = 0;
@@ -233,7 +229,7 @@ pub extern "C" fn erand(xsubi: [c_ushort; 3]) -> c_double {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn exit(status: c_int) {
+pub unsafe extern "C" fn exit(status: c_int) -> ! {
     for i in (0..ATEXIT_FUNCS.len()).rev() {
         if let Some(func) = ATEXIT_FUNCS[i] {
             (func)();
@@ -255,10 +251,7 @@ pub extern "C" fn fcvt(
 
 #[no_mangle]
 pub unsafe extern "C" fn free(ptr: *mut c_void) {
-    let ptr = (ptr as *mut u8).offset(-16);
-    let size = *(ptr as *mut u64);
-    let _align = *(ptr as *mut u64).offset(1);
-    ralloc::free(ptr, size as usize);
+    platform::free(ptr);
 }
 
 #[no_mangle]
@@ -333,20 +326,9 @@ pub extern "C" fn lrand48() -> c_long {
     unimplemented!();
 }
 
-unsafe fn malloc_inner(size: usize, offset: usize, align: usize) -> *mut c_void {
-    let ptr = ralloc::alloc(size + offset, align);
-    if !ptr.is_null() {
-        *(ptr as *mut u64) = (size + offset) as u64;
-        *(ptr as *mut u64).offset(1) = align as u64;
-        ptr.offset(offset as isize) as *mut c_void
-    } else {
-        ptr as *mut c_void
-    }
-}
-
 #[no_mangle]
 pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
-    malloc_inner(size, 16, 8)
+    platform::alloc(size, 16, 8)
 }
 
 #[no_mangle]
@@ -356,7 +338,7 @@ pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_voi
         align *= 2;
     }
 
-    malloc_inner(size, align / 2, align)
+    platform::alloc(size, align / 2, align)
 }
 
 #[no_mangle]
@@ -511,17 +493,7 @@ pub extern "C" fn random() -> c_long {
 
 #[no_mangle]
 pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {
-    let old_ptr = (ptr as *mut u8).offset(-16);
-    let old_size = *(old_ptr as *mut u64);
-    let align = *(old_ptr as *mut u64).offset(1);
-    let ptr = ralloc::realloc(old_ptr, old_size as usize, size + 16, align as usize);
-    if !ptr.is_null() {
-        *(ptr as *mut u64) = (size + 16) as u64;
-        *(ptr as *mut u64).offset(1) = align;
-        ptr.offset(16) as *mut c_void
-    } else {
-        ptr as *mut c_void
-    }
+    platform::realloc(ptr, size)
 }
 
 #[no_mangle]
@@ -832,15 +804,7 @@ pub extern "C" fn unlockpt(fildes: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
-    let align = 4096;
-    let ptr = ralloc::alloc(size + 16, align);
-    if !ptr.is_null() {
-        *(ptr as *mut u64) = (size + 16) as u64;
-        *(ptr as *mut u64).offset(1) = align as u64;
-        ptr.offset(16) as *mut c_void
-    } else {
-        ptr as *mut c_void
-    }
+    memalign(4096, size)
 }
 
 #[no_mangle]

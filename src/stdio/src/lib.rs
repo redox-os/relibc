@@ -12,7 +12,6 @@ extern crate fcntl;
 #[macro_use]
 extern crate lazy_static;
 extern crate platform;
-extern crate ralloc;
 extern crate string;
 extern crate va_list as vl;
 
@@ -238,15 +237,13 @@ pub extern "C" fn cuserid(_s: *mut c_char) -> *mut c_char {
 /// prior to using this function.
 #[no_mangle]
 pub extern "C" fn fclose(stream: &mut FILE) -> c_int {
-    use ralloc::free;
     flockfile(stream);
     let r = helpers::fflush_unlocked(stream) | platform::close(stream.fd);
     if stream.flags & constants::F_PERM == 0 {
         // Not one of stdin, stdout or stderr
         unsafe {
-            free(
-                stream as *mut _ as *mut _,
-                mem::size_of::<FILE>() + BUFSIZ + UNGET,
+            platform::free(
+                stream as *mut FILE as *mut c_void
             );
         }
     } else {

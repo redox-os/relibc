@@ -51,6 +51,8 @@ impl Stack {
 #[inline(never)]
 #[no_mangle]
 pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
+    use core::fmt::Write;
+
     extern "C" {
         fn main(argc: isize, argv: *const *const u8) -> c_int;
     }
