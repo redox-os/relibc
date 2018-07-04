@@ -23,7 +23,7 @@ pub fn e(sys: Result<usize, syscall::Error>) -> usize {
 }
 
 pub fn brk(addr: *mut c_void) -> *mut c_void {
-    unsafe { syscall::brk(addr as usize) } as *mut c_void
+    unsafe { syscall::brk(addr as usize).unwrap_or(0) as *mut c_void }
 }
 
 pub fn chdir(path: *const c_char) -> c_int {

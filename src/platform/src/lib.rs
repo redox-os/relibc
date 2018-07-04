@@ -1,7 +1,10 @@
 #![no_std]
 #![allow(non_camel_case_types)]
+#![feature(alloc)]
 #![feature(allocator_api)]
 //TODO #![feature(thread_local)]
+
+extern crate alloc;
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
 #[macro_use]
@@ -11,15 +14,15 @@ extern crate sc;
 #[macro_use]
 pub extern crate syscall;
 
-pub use alloc::*;
+pub use allocator::*;
 
 #[cfg(not(feature = "ralloc"))]
-#[path = "alloc/dlmalloc.rs"]
-mod alloc;
+#[path = "allocator/dlmalloc.rs"]
+mod allocator;
 
 #[cfg(feature = "ralloc")]
-#[path = "alloc/ralloc.rs"]
-mod alloc;
+#[path = "allocator/ralloc.rs"]
+mod allocator;
 
 pub use sys::*;
 
