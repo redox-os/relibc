@@ -5,16 +5,19 @@
 
 #[cfg(target_os = "redox")]
 extern crate alloc;
+extern crate errno;
 extern crate platform;
 extern crate stdio;
 extern crate string;
 extern crate sys_utsname;
 
+pub use brk::*;
 pub use getopt::*;
 pub use platform::types::*;
 
 use core::ptr;
 
+mod brk;
 mod getopt;
 
 pub const R_OK: c_int = 1;
@@ -51,11 +54,6 @@ pub extern "C" fn access(path: *const c_char, amode: c_int) -> c_int {
 #[no_mangle]
 pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
     unimplemented!();
-}
-
-#[no_mangle]
-pub extern "C" fn brk(addr: *mut c_void) -> c_int {
-    platform::brk(addr)
 }
 
 #[no_mangle]
@@ -467,11 +465,6 @@ pub extern "C" fn readlink(path: *const c_char, buf: *mut c_char, bufsize: size_
 #[no_mangle]
 pub extern "C" fn rmdir(path: *const c_char) -> c_int {
     platform::rmdir(path)
-}
-
-#[no_mangle]
-pub extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
-    unimplemented!();
 }
 
 #[no_mangle]

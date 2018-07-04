@@ -11,6 +11,7 @@ fn main() {
         .flag("-I")
         .flag(&format!("{}/include", crate_dir))
         .flag("-fno-stack-protector")
+        .file("src/c/dlmalloc.c")
         .file("src/c/fcntl.c")
         .file("src/c/stdio.c")
         .compile("relibc_c");

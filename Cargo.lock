@@ -596,6 +596,7 @@ name = "unistd"
 version = "0.1.0"
 dependencies = [
  "cbindgen 0.5.2",
+ "errno 0.1.0",
  "platform 0.1.0",
  "stdio 0.1.0",
  "string 0.1.0",

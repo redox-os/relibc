@@ -6,6 +6,7 @@ authors = ["Jeremy Soller <jackpot51@gmail.com>"]
 [dependencies.ralloc]
 path = "../../ralloc"
 default-features = false
+optional = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 sc = "0.2"

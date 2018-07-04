@@ -19,15 +19,8 @@ pub fn e(sys: usize) -> usize {
     }
 }
 
-pub fn brk(addr: *const c_void) -> c_int {
-    unsafe {
-        let newbrk = syscall!(BRK, addr);
-        if newbrk < addr as usize {
-            -1
-        } else {
-            0
-        }
-    }
+pub fn brk(addr: *mut c_void) -> *mut c_void {
+    unsafe { syscall!(BRK, addr) as *mut c_void }
 }
 
 pub fn chdir(path: *const c_char) -> c_int {

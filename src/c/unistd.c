@@ -47,5 +47,3 @@ int execle(const char *path, const char* argv0, ...)
 		return execve(path, argv, envp);
 	}
 }
-
-#endif
