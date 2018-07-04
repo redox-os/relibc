@@ -2,9 +2,11 @@
 
 #![no_std]
 #![allow(non_camel_case_types)]
+#![feature(alloc)]
 //TODO #![feature(thread_local)]
 
 extern crate ralloc;
+extern crate alloc;
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
 #[macro_use]

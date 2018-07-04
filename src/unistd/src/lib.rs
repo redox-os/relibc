@@ -133,72 +133,7 @@ pub unsafe extern "C" fn execve(
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    #[cfg(target_os = "linux")]
-    {
-        platform::execve(path, argv, envp)
-    }
-    #[cfg(target_os = "redox")]
-    {
-        use alloc::Vec;
-        use platform::syscall::flag::*;
-        use platform::{c_str, e};
-
-        let mut env = envp;
-        while !(*env).is_null() {
-            let slice = c_str(*env);
-            // Should always contain a =, but worth checking
-            if let Some(sep) = slice.iter().position(|&c| c == b'=') {
-                // If the environment variable has no name, do not attempt
-                // to add it to the env.
-                if sep > 0 {
-                    let mut path = b"env:".to_vec();
-                    path.extend_from_slice(&slice[..sep]);
-                    match platform::syscall::open(&path, O_WRONLY | O_CREAT) {
-                        Ok(fd) => {
-                            // If the environment variable has no value, there
-                            // is no need to write anything to the env scheme.
-                            if sep + 1 < slice.len() {
-                                let n = match platform::syscall::write(fd, &slice[sep + 1..]) {
-                                    Ok(n) => n,
-                                    err => {
-                                        return e(err) as c_int;
-                                    }
-                                };
-                            }
-                            // Cleanup after adding the variable.
-                            match platform::syscall::close(fd) {
-                                Ok(_) => (),
-                                err => {
-                                    return e(err) as c_int;
-                                }
-                            }
-                        }
-                        err => {
-                            return e(err) as c_int;
-                        }
-                    }
-                }
-            }
-            env = env.offset(1);
-        }
-
-        let mut len = 0;
-        for i in 0.. {
-            if (*argv.offset(i)).is_null() {
-                len = i;
-                break;
-            }
-        }
-
-        let mut args: Vec<[usize; 2]> = Vec::with_capacity(len as usize);
-        let mut arg = argv;
-        while !(*arg).is_null() {
-            args.push([*arg as usize, c_str(*arg).len()]);
-            arg = arg.offset(1);
-        }
-
-        e(platform::syscall::execve(c_str(path), &args)) as c_int
-    }
+    platform::execve(path, argv, envp)
 }
 
 #[no_mangle]

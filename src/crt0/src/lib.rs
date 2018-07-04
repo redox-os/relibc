@@ -5,6 +5,7 @@
 #![feature(linkage)]
 #![feature(naked_functions)]
 #![feature(panic_implementation)]
+#![feature(lang_items)]
 
 extern crate platform;
 
@@ -71,6 +72,22 @@ pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
 
     let mut w = platform::FileWriter(2);
     let _ = w.write_fmt(format_args!("RELIBC CRT0 PANIC: {}\n", pi));
+
+    platform::exit(1);
+}
+
+#[lang = "oom"]
+#[linkage = "weak"]
+#[no_mangle]
+pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
+    use core::fmt::Write;
+
+    let mut w = platform::FileWriter(2);
+    let _ = w.write_fmt(format_args!(
+        "RELIBC OOM: {} bytes aligned to {} bytes\n",
+        layout.size(),
+        layout.align()
+    ));
 
     platform::exit(1);
 }
