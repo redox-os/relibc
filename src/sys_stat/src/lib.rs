@@ -65,6 +65,11 @@ pub extern "C" fn fstat(fildes: c_int, buf: *mut platform::types::stat) -> c_int
 }
 
 #[no_mangle]
+pub extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut platform::types::stat) -> c_int {
+    fstat(fildes, buf)
+}
+
+#[no_mangle]
 pub extern "C" fn lstat(path: *const c_char, buf: *mut platform::types::stat) -> c_int {
     platform::lstat(path, buf)
 }
