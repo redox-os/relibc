@@ -2,6 +2,10 @@ sys_includes = ["sys/types.h", "bits/timespec.h", "stdint.h"]
 include_guard = "_TIME_H"
 language = "C"
 
+# WORKAROUND:
+# Tm is used by another header, and cbindgen doesn't prefix that with `struct` :|
+style = "Both"
+
 [enum]
 prefix_with_name = true
 

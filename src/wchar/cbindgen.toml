@@ -2,6 +2,7 @@ sys_includes = ["stddef.h", "stdint.h", "time.h", "stdio.h" ]
 include_guard = "_WCHAR_H"
 header = "#include <bits/wchar.h>"
 language = "C"
+style = "Type"
 
 [enum]
 prefix_with_name = true

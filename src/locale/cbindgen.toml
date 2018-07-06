@@ -1,6 +1,7 @@
 include_guard = "_LOCALE_H"
 trailer = "#include <bits/locale.h>"
 language = "C"
+style = "Tag"
 
 [enum]
 prefix_with_name = true

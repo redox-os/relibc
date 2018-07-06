@@ -1,6 +1,9 @@
 sys_includes = ["sys/types.h", "stdint.h", "sys/time.h"]
 include_guard = "_SYS_RESOURCE_H"
 language = "C"
+
+# WORKAROUND:
+# Rusage is used by another header, and cbindgen does not prefix that usage with `struct` :|
 style = "Both"
 
 [enum]

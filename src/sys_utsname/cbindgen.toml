@@ -1,5 +1,6 @@
 include_guard = "_SYS_UTSNAME_H"
 language = "C"
+style = "Tag"
 
 [enum]
 prefix_with_name = true
