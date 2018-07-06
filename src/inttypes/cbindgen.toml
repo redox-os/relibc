@@ -1,7 +1,8 @@
-sys_includes = ["stdint.h"]
+sys_includes = ["stdint.h", "wchar.h"]
 include_guard = "_INTTYPES_H"
 trailer = "#include <bits/inttypes.h>"
 language = "C"
+style = "Type"
 
 [enum]
 prefix_with_name = true

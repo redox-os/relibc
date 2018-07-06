@@ -3,17 +3,17 @@
 
 #define PRId8  "hhd"
 #define PRId16 "hd"
-#define PRId32 "ld"
+#define PRId32 "d"
 #define PRId64 "Ld"
 
 #define PRIdLEAST8  "hhd"
 #define PRIdLEAST16 "hd"
-#define PRIdLEAST32 "ld"
+#define PRIdLEAST32 "d"
 #define PRIdLEAST64 "Ld"
 
 #define PRIdFAST8  "hhd"
 #define PRIdFAST16 "hd"
-#define PRIdFAST32 "ld"
+#define PRIdFAST32 "d"
 #define PRIdFAST64 "Ld"
 
 #define PRIi8  "hhi"
@@ -107,17 +107,17 @@
 
 #define SCNd8  "hhd"
 #define SCNd16 "hd"
-#define SCNd32 "ld"
+#define SCNd32 "d"
 #define SCNd64 "Ld"
 
 #define SCNdLEAST8  "hhd"
 #define SCNdLEAST16 "hd"
-#define SCNdLEAST32 "ld"
+#define SCNdLEAST32 "d"
 #define SCNdLEAST64 "Ld"
 
 #define SCNdFAST8  "hhd"
 #define SCNdFAST16 "hd"
-#define SCNdFAST32 "ld"
+#define SCNdFAST32 "d"
 #define SCNdFAST64 "Ld"
 
 #define SCNi8  "hhi"
