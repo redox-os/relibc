@@ -2,6 +2,7 @@ sys_includes = ["stdarg.h", "sys/types.h"]
 include_guard = "_FCNTL_H"
 trailer = "#include <bits/fcntl.h>"
 language = "C"
+style = "Tag"
 
 [defines]
 "target_os=linux" = "__linux__"

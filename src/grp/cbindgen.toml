@@ -1,6 +1,7 @@
 sys_includes = []
 include_guard = "_GRP_H"
 language = "C"
+style = "Tag"
 
 [enum]
 prefix_with_name = true

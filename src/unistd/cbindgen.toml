@@ -2,6 +2,7 @@ sys_includes = ["stddef.h", "stdint.h", "sys/types.h"]
 include_guard = "_UNISTD_H"
 trailer = "#include <bits/fcntl.h>\n#include <bits/unistd.h>"
 language = "C"
+style = "Tag"
 
 [enum]
 prefix_with_name = true
