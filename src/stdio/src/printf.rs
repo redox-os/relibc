@@ -55,13 +55,11 @@ pub unsafe fn printf<W: Write>(mut w: W, format: *const c_char, mut ap: VaList) 
                     w.write_fmt(format_args!("0x{:x}", a))
                 }
                 's' => {
-                    let a = ap.get::<usize>();
+                    let a = ap.get::<*const c_char>();
 
                     found_percent = false;
 
-                    w.write_str(str::from_utf8_unchecked(platform::c_str(
-                        a as *const c_char,
-                    )))
+                    w.write_str(str::from_utf8_unchecked(platform::c_str(a)))
                 }
                 'u' => {
                     let a = ap.get::<c_uint>();

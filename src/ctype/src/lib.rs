@@ -18,7 +18,7 @@ pub extern "C" fn isalpha(c: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn isascii(c: c_int) -> c_int {
-    (!(c & !0x7f)) as c_int
+    ((c & !0x7f) == 0) as c_int
 }
 
 #[no_mangle]

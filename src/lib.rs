@@ -20,6 +20,7 @@ pub extern crate signal;
 pub extern crate stdio;
 pub extern crate stdlib;
 pub extern crate string;
+pub extern crate strings;
 pub extern crate sys_mman;
 pub extern crate sys_resource;
 pub extern crate sys_socket;

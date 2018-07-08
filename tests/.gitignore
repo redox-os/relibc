@@ -32,6 +32,7 @@
 /setjmp
 /sleep
 /sprintf
+/strings
 /stdlib/a64l
 /stdlib/bsearch
 /stdlib/mktemp

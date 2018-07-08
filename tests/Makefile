@@ -26,6 +26,7 @@ EXPECT_BINS=\
 	setjmp \
 	sleep \
 	sprintf \
+	strings \
 	stdio/fwrite \
 	stdio/all \
 	stdio/freopen \
@@ -116,4 +117,4 @@ TAILLIBS=\
 	../target/openlibm/libopenlibm.a
 
 %: %.c $(HEADLIBS) $(TAILLIBS)
-	gcc -fno-stack-protector -Wall -g $(CFLAGS) $(HEADLIBS) "$<" $(TAILLIBS) -o "$@"
+	gcc -fno-builtin -fno-stack-protector -Wall -g $(CFLAGS) $(HEADLIBS) "$<" $(TAILLIBS) -o "$@"

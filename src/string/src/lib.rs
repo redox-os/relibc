@@ -126,14 +126,13 @@ pub unsafe extern "C" fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_ch
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strchr(s: *const c_char, c: c_int) -> *mut c_char {
-    let c = c as i8;
-    let mut i = 0;
-    while *s.offset(i) != 0 {
-        if *s.offset(i) == c {
-            return s.offset(i) as *mut c_char;
+pub unsafe extern "C" fn strchr(mut s: *const c_char, c: c_int) -> *mut c_char {
+    let c = c as c_char;
+    while *s != 0 {
+        if *s == c {
+            return s as *mut c_char;
         }
-        i += 1;
+        s = s.offset(1);
     }
     ptr::null_mut()
 }
@@ -276,7 +275,7 @@ pub unsafe extern "C" fn strncpy(s1: *mut c_char, s2: *const c_char, n: usize) -
     }
 
     // if length of s2 < n, pad s1 with zeroes
-    for _ in cmp::min(n, s2_len)..n {
+    while idx < s2_len {
         *s1.offset(idx as isize) = 0;
         idx += 1;
     }

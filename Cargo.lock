@@ -304,6 +304,7 @@ dependencies = [
  "stdio 0.1.0",
  "stdlib 0.1.0",
  "string 0.1.0",
+ "strings 0.1.0",
  "sys_mman 0.1.0",
  "sys_resource 0.1.0",
  "sys_socket 0.1.0",
@@ -443,6 +444,14 @@ version = "0.1.0"
 dependencies = [
  "cbindgen 0.5.2",
  "errno 0.1.0",
+ "platform 0.1.0",
+]
+
+[[package]]
+name = "strings"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
  "platform 0.1.0",
 ]
 

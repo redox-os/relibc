@@ -1,3 +1,4 @@
+use alloc;
 use core::mem;
 use core::ptr;
 use core::slice;
@@ -6,9 +7,15 @@ use syscall::data::Stat as redox_stat;
 use syscall::data::TimeSpec as redox_timespec;
 use syscall::flag::*;
 
-use c_str;
-use errno;
+use ::*;
 use types::*;
+
+#[repr(C)]
+struct SockData {
+    port: in_port_t,
+    addr: in_addr_t,
+    _pad: [c_char; 8]
+}
 
 pub fn e(sys: Result<usize, syscall::Error>) -> usize {
     match sys {
@@ -20,6 +27,45 @@ pub fn e(sys: Result<usize, syscall::Error>) -> usize {
             !0
         }
     }
+}
+
+macro_rules! bind_or_connect {
+    (bind $path:expr) => {
+        concat!("/", $path)
+    };
+    (connect $path:expr) => {
+        $path
+    };
+    ($mode:ident $socket:expr, $address:expr, $address_len:expr) => {{
+        if (*$address).sa_family as c_int != AF_INET {
+            errno = syscall::EAFNOSUPPORT;
+            return -1;
+        }
+        if ($address_len as usize) < mem::size_of::<sockaddr>() {
+            errno = syscall::EINVAL;
+            return -1;
+        }
+        let data: &SockData = mem::transmute(&(*$address).data);
+        let addr = &data.addr;
+        let port = in_port_t::from_be(data.port); // This is transmuted from bytes in BigEndian order
+        let path = format!(bind_or_connect!($mode "{}.{}.{}.{}:{}"), addr[0], addr[1], addr[2], addr[3], port);
+
+        // Duplicate the socket, and then duplicate the copy back to the original fd
+        let fd = e(syscall::dup($socket as usize, path.as_bytes()));
+        if (fd as c_int) < 0 {
+            return -1;
+        }
+        let result = syscall::dup2(fd, $socket as usize, &[]);
+        let _ = syscall::close(fd);
+        if (e(result) as c_int) < 0 {
+            return -1;
+        }
+        0
+    }}
+}
+
+pub unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
+    bind_or_connect!(bind socket, address, address_len)
 }
 
 pub fn brk(addr: *mut c_void) -> *mut c_void {
@@ -57,6 +103,10 @@ pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
 
 pub fn close(fd: c_int) -> c_int {
     e(syscall::close(fd as usize)) as c_int
+}
+
+pub unsafe fn connect(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
+    bind_or_connect!(connect socket, address, address_len)
 }
 
 pub fn dup(fd: c_int) -> c_int {
@@ -331,6 +381,24 @@ pub fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
     e(syscall::read(fd as usize, buf)) as ssize_t
 }
 
+pub unsafe fn recvfrom(socket: c_int, buf: *mut c_void, len: size_t, flags: c_int,
+        address: *mut sockaddr, address_len: *mut socklen_t) -> ssize_t {
+    if flags != 0 {
+        errno = syscall::EOPNOTSUPP;
+        return -1;
+    }
+    let data = slice::from_raw_parts_mut(
+        &mut (*address).data as *mut _ as *mut u8,
+        (*address).data.len()
+    );
+    let pathlen = e(syscall::fpath(socket as usize, data));
+    if pathlen < 0 {
+        return -1;
+    }
+    *address_len = pathlen as socklen_t;
+    read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
+}
+
 pub fn rename(oldpath: *const c_char, newpath: *const c_char) -> c_int {
     let (oldpath, newpath) = unsafe { (c_str(oldpath), c_str(newpath)) };
     match syscall::open(oldpath, O_WRONLY) {
@@ -346,6 +414,16 @@ pub fn rename(oldpath: *const c_char, newpath: *const c_char) -> c_int {
 pub fn rmdir(path: *const c_char) -> c_int {
     let path = unsafe { c_str(path) };
     e(syscall::rmdir(path)) as c_int
+}
+
+pub unsafe fn sendto(socket: c_int, buf: *const c_void, len: size_t, flags: c_int,
+        _dest_addr: *const sockaddr, _dest_len: socklen_t) -> ssize_t {
+    // TODO: Use dest_addr and dest_len
+    if flags != 0 {
+        errno = syscall::EOPNOTSUPP;
+        return -1;
+    }
+    write(socket, slice::from_raw_parts(buf as *const u8, len))
 }
 
 pub fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
@@ -368,6 +446,38 @@ pub fn stat(path: *const c_char, buf: *mut stat) -> c_int {
             let res = fstat(fd as i32, buf);
             let _ = syscall::close(fd);
             res
+        }
+    }
+}
+
+pub unsafe fn socket(domain: c_int, mut kind: c_int, protocol: c_int) -> c_int {
+    if domain != AF_INET {
+        errno = syscall::EAFNOSUPPORT;
+        return -1;
+    }
+    if protocol != 0 {
+        errno = syscall::EPROTONOSUPPORT;
+        return -1;
+    }
+
+    let mut flags = O_RDWR;
+    if kind & SOCK_NONBLOCK == SOCK_NONBLOCK {
+        kind &= !SOCK_NONBLOCK;
+        flags |= O_NONBLOCK;
+    }
+    if kind & SOCK_CLOEXEC == SOCK_CLOEXEC {
+        kind &= !SOCK_CLOEXEC;
+        flags |= O_CLOEXEC;
+    }
+
+    // The tcp: and udp: schemes allow using no path,
+    // and later specifying one using `dup`.
+    match kind {
+        SOCK_STREAM => e(syscall::open("tcp:", flags)) as c_int,
+        SOCK_DGRAM  => e(syscall::open("udp:", flags)) as c_int,
+        _ => {
+            errno = syscall::EPROTOTYPE;
+            -1
         }
     }
 }

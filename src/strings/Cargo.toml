@@ -1,0 +1,11 @@
+[package]
+name = "strings"
+version = "0.1.0"
+authors = ["jD91mZM2 <me@krake.one>"]
+build = "build.rs"
+
+[build-dependencies]
+cbindgen = { path = "../../cbindgen" }
+
+[dependencies]
+platform = { path = "../platform" }

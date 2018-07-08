@@ -4,6 +4,7 @@
 #![feature(allocator_api)]
 //TODO #![feature(thread_local)]
 
+#[cfg_attr(target_os = "redox", macro_use)]
 extern crate alloc;
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
@@ -42,6 +43,22 @@ use types::*;
 
 #[global_allocator]
 static ALLOCATOR: Allocator = Allocator;
+
+pub const AF_INET: c_int = 2;
+pub const SOCK_STREAM: c_int = 1;
+pub const SOCK_DGRAM: c_int = 2;
+pub const SOCK_NONBLOCK: c_int = 0o4000;
+pub const SOCK_CLOEXEC: c_int = 0o2000000;
+
+pub type in_addr_t = [u8; 4];
+pub type in_port_t = u16;
+pub type sa_family_t = u16;
+pub type socklen_t = u32;
+
+pub struct sockaddr {
+    pub sa_family: sa_family_t,
+    pub data: [c_char; 14]
+}
 
 //TODO #[thread_local]
 #[allow(non_upper_case_globals)]

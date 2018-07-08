@@ -1,6 +1,6 @@
 use core::ptr;
 
-use errno;
+use ::*;
 use types::*;
 
 const AT_FDCWD: c_int = -100;
@@ -17,6 +17,10 @@ pub fn e(sys: usize) -> usize {
     } else {
         sys
     }
+}
+
+pub unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
+    e(syscall!(BIND, socket, address, address_len)) as c_int
 }
 
 pub fn brk(addr: *mut c_void) -> *mut c_void {
@@ -37,6 +41,10 @@ pub fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
 
 pub fn close(fildes: c_int) -> c_int {
     e(unsafe { syscall!(CLOSE, fildes) }) as c_int
+}
+
+pub unsafe fn connect(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
+    e(syscall!(CONNECT, socket, address, address_len)) as c_int
 }
 
 pub fn dup(fildes: c_int) -> c_int {
@@ -171,12 +179,22 @@ pub fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
     e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
 }
 
+pub unsafe fn recvfrom(socket: c_int, buf: *mut c_void, len: size_t, flags: c_int,
+        address: *mut sockaddr, address_len: *mut socklen_t) -> ssize_t {
+    e(syscall!(RECVFROM, socket, buf, len, flags, address, address_len)) as ssize_t
+}
+
 pub fn rename(old: *const c_char, new: *const c_char) -> c_int {
     e(unsafe { syscall!(RENAMEAT, AT_FDCWD, old, AT_FDCWD, new) }) as c_int
 }
 
 pub fn rmdir(path: *const c_char) -> c_int {
     e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, AT_REMOVEDIR) }) as c_int
+}
+
+pub unsafe fn sendto(socket: c_int, buf: *const c_void, len: size_t, flags: c_int,
+        dest_addr: *const sockaddr, dest_len: socklen_t) -> ssize_t {
+    e(syscall!(SENDTO, socket, buf, len, flags, dest_addr, dest_len)) as ssize_t
 }
 
 pub fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
@@ -193,6 +211,10 @@ pub fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
 
 pub fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     e(unsafe { syscall!(NEWFSTATAT, AT_FDCWD, file, buf, 0) }) as c_int
+}
+
+pub fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
+    e(unsafe { syscall!(SOCKET, domain, kind, protocol) }) as c_int
 }
 
 pub fn uname(utsname: usize) -> c_int {
