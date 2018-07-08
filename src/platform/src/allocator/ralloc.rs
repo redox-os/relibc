@@ -23,7 +23,7 @@ pub unsafe fn alloc_align(size: usize, alignment: usize) -> *mut c_void {
         align *= 2;
     }
 
-    alloc_inner(size, align/2, align)
+    alloc_inner(size, align / 2, align)
 }
 
 pub unsafe fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {

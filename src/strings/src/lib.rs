@@ -10,7 +10,11 @@ use core::ptr;
 use platform::types::*;
 
 #[no_mangle]
-pub unsafe extern "C" fn bcmp(mut first: *const c_void, mut second: *const c_void, n: size_t) -> c_int {
+pub unsafe extern "C" fn bcmp(
+    mut first: *const c_void,
+    mut second: *const c_void,
+    n: size_t,
+) -> c_int {
     let first = first as *const c_char;
     let second = second as *const c_char;
 
@@ -111,7 +115,11 @@ pub unsafe extern "C" fn strcasecmp(mut first: *const c_char, mut second: *const
     (*first == *second) as c_int
 }
 #[no_mangle]
-pub unsafe extern "C" fn strncasecmp(mut first: *const c_char, mut second: *const c_char, mut n: size_t) -> c_int {
+pub unsafe extern "C" fn strncasecmp(
+    mut first: *const c_char,
+    mut second: *const c_char,
+    mut n: size_t,
+) -> c_int {
     while *first != 0 && *second != 0 && n > 0 {
         let mut i = *first;
         let mut j = *second;

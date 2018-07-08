@@ -33,7 +33,7 @@ pub unsafe extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
 
         if BRK < addr {
             platform::errno = ENOMEM;
-            return -1isize as *mut c_void
+            return -1isize as *mut c_void;
         }
     }
 

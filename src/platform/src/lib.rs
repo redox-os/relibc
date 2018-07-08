@@ -57,7 +57,7 @@ pub type socklen_t = u32;
 
 pub struct sockaddr {
     pub sa_family: sa_family_t,
-    pub data: [c_char; 14]
+    pub data: [c_char; 14],
 }
 
 //TODO #[thread_local]

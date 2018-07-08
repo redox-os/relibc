@@ -242,9 +242,7 @@ pub extern "C" fn fclose(stream: &mut FILE) -> c_int {
     if stream.flags & constants::F_PERM == 0 {
         // Not one of stdin, stdout or stderr
         unsafe {
-            platform::free(
-                stream as *mut FILE as *mut c_void
-            );
+            platform::free(stream as *mut FILE as *mut c_void);
         }
     } else {
         funlockfile(stream);

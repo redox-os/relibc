@@ -16,7 +16,7 @@ pub type socklen_t = u32;
 #[repr(C)]
 pub struct sockaddr {
     pub sa_family: sa_family_t,
-    data: [c_char; 14]
+    data: [c_char; 14],
 }
 
 pub const AF_INET: c_int = 2;
@@ -93,7 +93,14 @@ pub unsafe extern "C" fn recv(
     length: size_t,
     flags: c_int,
 ) -> ssize_t {
-    recvfrom(socket, buffer, length, flags, ptr::null_mut(), ptr::null_mut())
+    recvfrom(
+        socket,
+        buffer,
+        length,
+        flags,
+        ptr::null_mut(),
+        ptr::null_mut(),
+    )
 }
 
 #[no_mangle]
@@ -105,7 +112,14 @@ pub unsafe extern "C" fn recvfrom(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> ssize_t {
-    platform::recvfrom(socket, buffer, length, flags, address as *mut platform::sockaddr, address_len)
+    platform::recvfrom(
+        socket,
+        buffer,
+        length,
+        flags,
+        address as *mut platform::sockaddr,
+        address_len,
+    )
 }
 
 #[no_mangle]
@@ -127,7 +141,14 @@ pub unsafe extern "C" fn sendto(
     dest_addr: *const sockaddr,
     dest_len: socklen_t,
 ) -> ssize_t {
-    platform::sendto(socket, message, length, flags, dest_addr as *const platform::sockaddr, dest_len)
+    platform::sendto(
+        socket,
+        message,
+        length,
+        flags,
+        dest_addr as *const platform::sockaddr,
+        dest_len,
+    )
 }
 
 #[no_mangle]

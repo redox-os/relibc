@@ -1,7 +1,7 @@
 use core::ptr;
 
-use ::*;
 use types::*;
+use *;
 
 const AT_FDCWD: c_int = -100;
 const AT_EMPTY_PATH: c_int = 0x1000;
@@ -179,9 +179,23 @@ pub fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
     e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
 }
 
-pub unsafe fn recvfrom(socket: c_int, buf: *mut c_void, len: size_t, flags: c_int,
-        address: *mut sockaddr, address_len: *mut socklen_t) -> ssize_t {
-    e(syscall!(RECVFROM, socket, buf, len, flags, address, address_len)) as ssize_t
+pub unsafe fn recvfrom(
+    socket: c_int,
+    buf: *mut c_void,
+    len: size_t,
+    flags: c_int,
+    address: *mut sockaddr,
+    address_len: *mut socklen_t,
+) -> ssize_t {
+    e(syscall!(
+        RECVFROM,
+        socket,
+        buf,
+        len,
+        flags,
+        address,
+        address_len
+    )) as ssize_t
 }
 
 pub fn rename(old: *const c_char, new: *const c_char) -> c_int {
@@ -192,9 +206,17 @@ pub fn rmdir(path: *const c_char) -> c_int {
     e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, AT_REMOVEDIR) }) as c_int
 }
 
-pub unsafe fn sendto(socket: c_int, buf: *const c_void, len: size_t, flags: c_int,
-        dest_addr: *const sockaddr, dest_len: socklen_t) -> ssize_t {
-    e(syscall!(SENDTO, socket, buf, len, flags, dest_addr, dest_len)) as ssize_t
+pub unsafe fn sendto(
+    socket: c_int,
+    buf: *const c_void,
+    len: size_t,
+    flags: c_int,
+    dest_addr: *const sockaddr,
+    dest_len: socklen_t,
+) -> ssize_t {
+    e(syscall!(
+        SENDTO, socket, buf, len, flags, dest_addr, dest_len
+    )) as ssize_t
 }
 
 pub fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {

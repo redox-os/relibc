@@ -7,14 +7,14 @@ use syscall::data::Stat as redox_stat;
 use syscall::data::TimeSpec as redox_timespec;
 use syscall::flag::*;
 
-use ::*;
 use types::*;
+use *;
 
 #[repr(C)]
 struct SockData {
     port: in_port_t,
     addr: in_addr_t,
-    _pad: [c_char; 8]
+    _pad: [c_char; 8],
 }
 
 pub fn e(sys: Result<usize, syscall::Error>) -> usize {
@@ -381,15 +381,21 @@ pub fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
     e(syscall::read(fd as usize, buf)) as ssize_t
 }
 
-pub unsafe fn recvfrom(socket: c_int, buf: *mut c_void, len: size_t, flags: c_int,
-        address: *mut sockaddr, address_len: *mut socklen_t) -> ssize_t {
+pub unsafe fn recvfrom(
+    socket: c_int,
+    buf: *mut c_void,
+    len: size_t,
+    flags: c_int,
+    address: *mut sockaddr,
+    address_len: *mut socklen_t,
+) -> ssize_t {
     if flags != 0 {
         errno = syscall::EOPNOTSUPP;
         return -1;
     }
     let data = slice::from_raw_parts_mut(
         &mut (*address).data as *mut _ as *mut u8,
-        (*address).data.len()
+        (*address).data.len(),
     );
     let pathlen = e(syscall::fpath(socket as usize, data));
     if pathlen < 0 {
@@ -416,8 +422,14 @@ pub fn rmdir(path: *const c_char) -> c_int {
     e(syscall::rmdir(path)) as c_int
 }
 
-pub unsafe fn sendto(socket: c_int, buf: *const c_void, len: size_t, flags: c_int,
-        _dest_addr: *const sockaddr, _dest_len: socklen_t) -> ssize_t {
+pub unsafe fn sendto(
+    socket: c_int,
+    buf: *const c_void,
+    len: size_t,
+    flags: c_int,
+    _dest_addr: *const sockaddr,
+    _dest_len: socklen_t,
+) -> ssize_t {
     // TODO: Use dest_addr and dest_len
     if flags != 0 {
         errno = syscall::EOPNOTSUPP;
@@ -474,7 +486,7 @@ pub unsafe fn socket(domain: c_int, mut kind: c_int, protocol: c_int) -> c_int {
     // and later specifying one using `dup`.
     match kind {
         SOCK_STREAM => e(syscall::open("tcp:", flags)) as c_int,
-        SOCK_DGRAM  => e(syscall::open("udp:", flags)) as c_int,
+        SOCK_DGRAM => e(syscall::open("udp:", flags)) as c_int,
         _ => {
             errno = syscall::EPROTOTYPE;
             -1
