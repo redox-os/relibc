@@ -4,10 +4,10 @@ use core::fmt::Write;
 use core::mem;
 use core::ptr;
 use core::slice;
-use syscall::{self, Result};
 use syscall::data::Stat as redox_stat;
 use syscall::data::TimeSpec as redox_timespec;
 use syscall::flag::*;
+use syscall::{self, Result};
 
 use types::*;
 use *;
@@ -71,8 +71,10 @@ pub unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut so
     if stream < 0 {
         return -1;
     }
-    if address != ptr::null_mut() && address_len != ptr::null_mut()
-            && getpeername(stream, address, address_len) < 0 {
+    if address != ptr::null_mut()
+        && address_len != ptr::null_mut()
+        && getpeername(stream, address, address_len) < 0
+    {
         return -1;
     }
     stream
@@ -282,8 +284,12 @@ pub fn getgid() -> gid_t {
     e(syscall::getgid()) as gid_t
 }
 
-unsafe fn inner_get_name(local: bool, socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t)
-        -> Result<usize> {
+unsafe fn inner_get_name(
+    local: bool,
+    socket: c_int,
+    address: *mut sockaddr,
+    address_len: *mut socklen_t,
+) -> Result<usize> {
     // 32 should probably be large enough.
     // Format: tcp:remote/local
     // and since we only yet support IPv4 (I think)...
@@ -302,7 +308,7 @@ unsafe fn inner_get_name(local: bool, socket: c_int, address: *mut sockaddr, add
 
     let data = slice::from_raw_parts_mut(
         &mut (*address).data as *mut _ as *mut u8,
-        (*address).data.len()
+        (*address).data.len(),
     );
 
     let len = data.len().min(part.len());
@@ -312,7 +318,11 @@ unsafe fn inner_get_name(local: bool, socket: c_int, address: *mut sockaddr, add
     Ok(0)
 }
 
-pub unsafe fn getpeername(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
+pub unsafe fn getpeername(
+    socket: c_int,
+    address: *mut sockaddr,
+    address_len: *mut socklen_t,
+) -> c_int {
     e(inner_get_name(false, socket, address, address_len)) as c_int
 }
 
@@ -328,7 +338,11 @@ pub fn getppid() -> pid_t {
     e(syscall::getppid()) as pid_t
 }
 
-pub unsafe fn getsockname(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
+pub unsafe fn getsockname(
+    socket: c_int,
+    address: *mut sockaddr,
+    address_len: *mut socklen_t,
+) -> c_int {
     e(inner_get_name(true, socket, address, address_len)) as c_int
 }
 
@@ -339,8 +353,15 @@ pub fn getsockopt(
     option_value: *mut c_void,
     option_len: *mut socklen_t,
 ) -> c_int {
-    let _ = write!(::FileWriter(2), "unimplemented: getsockopt({}, {}, {}, {:p}, {:p})",
-        socket, level, option_name, option_value, option_len);
+    let _ = write!(
+        ::FileWriter(2),
+        "unimplemented: getsockopt({}, {}, {}, {:p}, {:p})",
+        socket,
+        level,
+        option_name,
+        option_value,
+        option_len
+    );
     -1
 }
 
@@ -462,8 +483,10 @@ pub unsafe fn recvfrom(
         errno = syscall::EOPNOTSUPP;
         return -1;
     }
-    if address != ptr::null_mut() && address_len != ptr::null_mut()
-            && getpeername(socket, address, address_len) < 0 {
+    if address != ptr::null_mut()
+        && address_len != ptr::null_mut()
+        && getpeername(socket, address, address_len) < 0
+    {
         return -1;
     }
     read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
@@ -524,13 +547,25 @@ pub fn setsockopt(
     option_value: *const c_void,
     option_len: socklen_t,
 ) -> c_int {
-    let _ = write!(::FileWriter(2), "unimplemented: setsockopt({}, {}, {}, {:p}, {})",
-        socket, level, option_name, option_value, option_len);
+    let _ = write!(
+        ::FileWriter(2),
+        "unimplemented: setsockopt({}, {}, {}, {:p}, {})",
+        socket,
+        level,
+        option_name,
+        option_value,
+        option_len
+    );
     -1
 }
 
 pub fn shutdown(socket: c_int, how: c_int) -> c_int {
-    let _ = write!(::FileWriter(2), "unimplemented: shutdown({}, {})", socket, how);
+    let _ = write!(
+        ::FileWriter(2),
+        "unimplemented: shutdown({}, {})",
+        socket,
+        how
+    );
     -1
 }
 
@@ -578,14 +613,15 @@ pub unsafe fn socket(domain: c_int, mut kind: c_int, protocol: c_int) -> c_int {
     }
 }
 
-pub fn socketpair(
-    domain: c_int,
-    kind: c_int,
-    protocol: c_int,
-    socket_vector: *mut c_int,
-) -> c_int {
-    let _ = write!(::FileWriter(2), "unimplemented: socketpair({}, {}, {}, {:p})",
-        domain, kind, protocol, socket_vector);
+pub fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *mut c_int) -> c_int {
+    let _ = write!(
+        ::FileWriter(2),
+        "unimplemented: socketpair({}, {}, {}, {:p})",
+        domain,
+        kind,
+        protocol,
+        socket_vector
+    );
     -1
 }
 

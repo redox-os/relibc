@@ -123,7 +123,11 @@ pub fn getgid() -> gid_t {
     e(unsafe { syscall!(GETGID) })
 }
 
-pub unsafe fn getpeername(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
+pub unsafe fn getpeername(
+    socket: c_int,
+    address: *mut sockaddr,
+    address_len: *mut socklen_t,
+) -> c_int {
     e(syscall!(GETPEERNAME, socket, address, address_len)) as c_int
 }
 
@@ -139,7 +143,11 @@ pub fn getppid() -> pid_t {
     e(unsafe { syscall!(GETPPID) })
 }
 
-pub unsafe fn getsockname(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
+pub unsafe fn getsockname(
+    socket: c_int,
+    address: *mut sockaddr,
+    address_len: *mut socklen_t,
+) -> c_int {
     e(syscall!(GETSOCKNAME, socket, address, address_len)) as c_int
 }
 
@@ -150,7 +158,16 @@ pub fn getsockopt(
     option_value: *mut c_void,
     option_len: *mut socklen_t,
 ) -> c_int {
-    e(unsafe { syscall!(GETSOCKOPT, socket, level, option_name, option_value, option_len) }) as c_int
+    e(unsafe {
+        syscall!(
+            GETSOCKOPT,
+            socket,
+            level,
+            option_name,
+            option_value,
+            option_len
+        )
+    }) as c_int
 }
 
 pub fn getuid() -> uid_t {
@@ -264,7 +281,16 @@ pub fn setsockopt(
     option_value: *const c_void,
     option_len: socklen_t,
 ) -> c_int {
-    e(unsafe { syscall!(SETSOCKOPT, socket, level, option_name, option_value, option_len) }) as c_int
+    e(unsafe {
+        syscall!(
+            SETSOCKOPT,
+            socket,
+            level,
+            option_name,
+            option_value,
+            option_len
+        )
+    }) as c_int
 }
 
 pub fn shutdown(socket: c_int, how: c_int) -> c_int {
@@ -279,12 +305,7 @@ pub fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
     e(unsafe { syscall!(SOCKET, domain, kind, protocol) }) as c_int
 }
 
-pub fn socketpair(
-    domain: c_int,
-    kind: c_int,
-    protocol: c_int,
-    socket_vector: *mut c_int,
-) -> c_int {
+pub fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *mut c_int) -> c_int {
     e(unsafe { syscall!(SOCKETPAIR, domain, kind, protocol, socket_vector) }) as c_int
 }
 
