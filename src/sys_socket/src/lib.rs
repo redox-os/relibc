@@ -8,6 +8,9 @@ extern crate platform;
 use core::ptr;
 use platform::types::*;
 
+mod constants;
+use constants::*;
+
 pub type in_addr_t = [u8; 4];
 pub type in_port_t = u16;
 pub type sa_family_t = u16;
@@ -19,19 +22,13 @@ pub struct sockaddr {
     data: [c_char; 14],
 }
 
-pub const AF_INET: c_int = 2;
-pub const SOCK_STREAM: c_int = 1;
-pub const SOCK_DGRAM: c_int = 2;
-pub const SOCK_NONBLOCK: c_int = 0o4000;
-pub const SOCK_CLOEXEC: c_int = 0o2000000;
-
 #[no_mangle]
 pub unsafe extern "C" fn accept(
     socket: c_int,
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    unimplemented!();
+    platform::accept(socket, address as *mut platform::sockaddr, address_len)
 }
 
 #[no_mangle]
@@ -55,10 +52,10 @@ pub unsafe extern "C" fn connect(
 #[no_mangle]
 pub unsafe extern "C" fn getpeername(
     socket: c_int,
-    address: *const sockaddr,
-    address_len: socklen_t,
+    address: *mut sockaddr,
+    address_len: *mut socklen_t,
 ) -> c_int {
-    unimplemented!();
+    platform::getpeername(socket, address as *mut platform::sockaddr, address_len)
 }
 
 #[no_mangle]
@@ -67,7 +64,7 @@ pub unsafe extern "C" fn getsockname(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    unimplemented!();
+    platform::getsockname(socket, address as *mut platform::sockaddr, address_len)
 }
 
 #[no_mangle]

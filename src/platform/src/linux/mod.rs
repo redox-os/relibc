@@ -19,6 +19,10 @@ pub fn e(sys: usize) -> usize {
     }
 }
 
+pub unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
+    e(syscall!(ACCEPT, socket, address, address_len)) as c_int
+}
+
 pub unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
     e(syscall!(BIND, socket, address, address_len)) as c_int
 }
@@ -119,6 +123,10 @@ pub fn getgid() -> gid_t {
     e(unsafe { syscall!(GETGID) })
 }
 
+pub unsafe fn getpeername(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
+    e(unsafe { syscall!(GETPEERNAME, socket, address, address_len) }) as c_int
+}
+
 pub fn getpgid(pid: pid_t) -> pid_t {
     e(unsafe { syscall!(GETPGID, pid) })
 }
@@ -129,6 +137,10 @@ pub fn getpid() -> pid_t {
 
 pub fn getppid() -> pid_t {
     e(unsafe { syscall!(GETPPID) })
+}
+
+pub unsafe fn getsockname(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
+    e(unsafe { syscall!(GETSOCKNAME, socket, address, address_len) }) as c_int
 }
 
 pub fn getuid() -> uid_t {

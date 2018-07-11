@@ -1,8 +1,9 @@
-use alloc;
+//! sys/socket implementation, following http://pubs.opengroup.org/onlinepubs/009696699/basedefs/sys/socket.h.html
+
 use core::mem;
 use core::ptr;
 use core::slice;
-use syscall;
+use syscall::{self, Result};
 use syscall::data::Stat as redox_stat;
 use syscall::data::TimeSpec as redox_timespec;
 use syscall::flag::*;
@@ -17,7 +18,7 @@ struct SockData {
     _pad: [c_char; 8],
 }
 
-pub fn e(sys: Result<usize, syscall::Error>) -> usize {
+pub fn e(sys: Result<usize>) -> usize {
     match sys {
         Ok(ok) => ok,
         Err(err) => {
@@ -62,6 +63,18 @@ macro_rules! bind_or_connect {
         }
         0
     }}
+}
+
+pub unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
+    let stream = e(syscall::dup(socket as usize, b"listen")) as c_int;
+    if stream < 0 {
+        return -1;
+    }
+    if address != ptr::null_mut() && address_len != ptr::null_mut()
+            && getpeername(stream, address, address_len) < 0 {
+        return -1;
+    }
+    stream
 }
 
 pub unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
@@ -268,6 +281,40 @@ pub fn getgid() -> gid_t {
     e(syscall::getgid()) as gid_t
 }
 
+unsafe fn inner_get_name(local: bool, socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t)
+        -> Result<usize> {
+    // 32 should probably be large enough.
+    // Format: tcp:remote/local
+    // and since we only yet support IPv4 (I think)...
+    let mut buf = [0; 32];
+    let len = syscall::fpath(socket as usize, &mut buf)?;
+    let buf = &buf[..len];
+    assert!(&buf[..4] == b"tcp:" || &buf[..4] == b"udp:");
+    let buf = &buf[4..];
+
+    let mut parts = buf.split(|c| *c == b'/');
+    if local {
+        // Skip the remote part
+        parts.next();
+    }
+    let part = parts.next().expect("Invalid reply from netstack");
+
+    let data = slice::from_raw_parts_mut(
+        &mut (*address).data as *mut _ as *mut u8,
+        (*address).data.len()
+    );
+
+    let len = data.len().min(part.len());
+    data[..len].copy_from_slice(&part[..len]);
+
+    *address_len = len as socklen_t;
+    Ok(0)
+}
+
+pub unsafe fn getpeername(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
+    e(inner_get_name(false, socket, address, address_len)) as c_int
+}
+
 pub fn getpgid(pid: pid_t) -> pid_t {
     e(syscall::getpgid(pid as usize)) as pid_t
 }
@@ -278,6 +325,10 @@ pub fn getpid() -> pid_t {
 
 pub fn getppid() -> pid_t {
     e(syscall::getppid()) as pid_t
+}
+
+pub unsafe fn getsockname(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
+    e(inner_get_name(true, socket, address, address_len)) as c_int
 }
 
 pub fn getuid() -> uid_t {
@@ -393,15 +444,10 @@ pub unsafe fn recvfrom(
         errno = syscall::EOPNOTSUPP;
         return -1;
     }
-    let data = slice::from_raw_parts_mut(
-        &mut (*address).data as *mut _ as *mut u8,
-        (*address).data.len(),
-    );
-    let pathlen = e(syscall::fpath(socket as usize, data));
-    if pathlen < 0 {
+    if address != ptr::null_mut() && address_len != ptr::null_mut()
+            && getpeername(socket, address, address_len) < 0 {
         return -1;
     }
-    *address_len = pathlen as socklen_t;
     read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
 }
 
@@ -427,10 +473,13 @@ pub unsafe fn sendto(
     buf: *const c_void,
     len: size_t,
     flags: c_int,
-    _dest_addr: *const sockaddr,
-    _dest_len: socklen_t,
+    dest_addr: *const sockaddr,
+    dest_len: socklen_t,
 ) -> ssize_t {
-    // TODO: Use dest_addr and dest_len
+    if dest_addr != ptr::null() || dest_len != 0 {
+        errno = syscall::EISCONN;
+        return -1;
+    }
     if flags != 0 {
         errno = syscall::EOPNOTSUPP;
         return -1;
