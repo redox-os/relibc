@@ -75,12 +75,12 @@ pub unsafe extern "C" fn getsockopt(
     option_value: *mut c_void,
     option_len: *mut socklen_t,
 ) -> c_int {
-    unimplemented!();
+    platform::getsockopt(socket, level, option_name, option_value, option_len)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn listen(socket: c_int, backlog: c_int) -> c_int {
-    unimplemented!();
+    platform::listen(socket, backlog)
 }
 
 #[no_mangle]
@@ -156,12 +156,12 @@ pub unsafe extern "C" fn setsockopt(
     option_value: *const c_void,
     option_len: socklen_t,
 ) -> c_int {
-    unimplemented!();
+    platform::setsockopt(socket, level, option_name, option_value, option_len)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {
-    unimplemented!();
+    platform::shutdown(socket, how)
 }
 
 #[no_mangle]
@@ -172,9 +172,9 @@ pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> 
 #[no_mangle]
 pub unsafe extern "C" fn socketpair(
     domain: c_int,
-    _type: c_int,
+    kind: c_int,
     protocol: c_int,
-    socket_vector: [c_int; 2],
+    socket_vector: *mut c_int,
 ) -> c_int {
-    unimplemented!();
+    platform::socketpair(domain, kind, protocol, socket_vector)
 }

@@ -124,7 +124,7 @@ pub fn getgid() -> gid_t {
 }
 
 pub unsafe fn getpeername(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
-    e(unsafe { syscall!(GETPEERNAME, socket, address, address_len) }) as c_int
+    e(syscall!(GETPEERNAME, socket, address, address_len)) as c_int
 }
 
 pub fn getpgid(pid: pid_t) -> pid_t {
@@ -140,7 +140,17 @@ pub fn getppid() -> pid_t {
 }
 
 pub unsafe fn getsockname(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
-    e(unsafe { syscall!(GETSOCKNAME, socket, address, address_len) }) as c_int
+    e(syscall!(GETSOCKNAME, socket, address, address_len)) as c_int
+}
+
+pub fn getsockopt(
+    socket: c_int,
+    level: c_int,
+    option_name: c_int,
+    option_value: *mut c_void,
+    option_len: *mut socklen_t,
+) -> c_int {
+    e(unsafe { syscall!(GETSOCKOPT, socket, level, option_name, option_value, option_len) }) as c_int
 }
 
 pub fn getuid() -> uid_t {
@@ -157,6 +167,10 @@ pub fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
 
 pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     e(unsafe { syscall!(LINKAT, AT_FDCWD, path1, AT_FDCWD, path2, 0) }) as c_int
+}
+
+pub fn listen(socket: c_int, backlog: c_int) -> c_int {
+    e(unsafe { syscall!(LISTEN, socket, backlog) }) as c_int
 }
 
 pub fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
@@ -243,12 +257,35 @@ pub fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
     e(unsafe { syscall!(SETREUID, ruid, euid) }) as c_int
 }
 
+pub fn setsockopt(
+    socket: c_int,
+    level: c_int,
+    option_name: c_int,
+    option_value: *const c_void,
+    option_len: socklen_t,
+) -> c_int {
+    e(unsafe { syscall!(SETSOCKOPT, socket, level, option_name, option_value, option_len) }) as c_int
+}
+
+pub fn shutdown(socket: c_int, how: c_int) -> c_int {
+    e(unsafe { syscall!(SHUTDOWN, socket, how) }) as c_int
+}
+
 pub fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     e(unsafe { syscall!(NEWFSTATAT, AT_FDCWD, file, buf, 0) }) as c_int
 }
 
 pub fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
     e(unsafe { syscall!(SOCKET, domain, kind, protocol) }) as c_int
+}
+
+pub fn socketpair(
+    domain: c_int,
+    kind: c_int,
+    protocol: c_int,
+    socket_vector: *mut c_int,
+) -> c_int {
+    e(unsafe { syscall!(SOCKETPAIR, domain, kind, protocol, socket_vector) }) as c_int
 }
 
 pub fn uname(utsname: usize) -> c_int {

@@ -1,5 +1,6 @@
 //! sys/socket implementation, following http://pubs.opengroup.org/onlinepubs/009696699/basedefs/sys/socket.h.html
 
+use core::fmt::Write;
 use core::mem;
 use core::ptr;
 use core::slice;
@@ -331,6 +332,18 @@ pub unsafe fn getsockname(socket: c_int, address: *mut sockaddr, address_len: *m
     e(inner_get_name(true, socket, address, address_len)) as c_int
 }
 
+pub fn getsockopt(
+    socket: c_int,
+    level: c_int,
+    option_name: c_int,
+    option_value: *mut c_void,
+    option_len: *mut socklen_t,
+) -> c_int {
+    let _ = write!(::FileWriter(2), "unimplemented: getsockopt({}, {}, {}, {:p}, {:p})",
+        socket, level, option_name, option_value, option_len);
+    -1
+}
+
 pub fn getuid() -> uid_t {
     e(syscall::getuid()) as pid_t
 }
@@ -347,6 +360,11 @@ pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     let path1 = unsafe { c_str(path1) };
     let path2 = unsafe { c_str(path2) };
     e(unsafe { syscall::link(path1.as_ptr(), path2.as_ptr()) }) as c_int
+}
+
+pub fn listen(socket: c_int, backlog: c_int) -> c_int {
+    // TODO
+    0
 }
 
 pub fn lseek(fd: c_int, offset: off_t, whence: c_int) -> off_t {
@@ -499,6 +517,23 @@ pub fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
     e(syscall::setreuid(ruid as usize, euid as usize)) as c_int
 }
 
+pub fn setsockopt(
+    socket: c_int,
+    level: c_int,
+    option_name: c_int,
+    option_value: *const c_void,
+    option_len: socklen_t,
+) -> c_int {
+    let _ = write!(::FileWriter(2), "unimplemented: setsockopt({}, {}, {}, {:p}, {})",
+        socket, level, option_name, option_value, option_len);
+    -1
+}
+
+pub fn shutdown(socket: c_int, how: c_int) -> c_int {
+    let _ = write!(::FileWriter(2), "unimplemented: shutdown({}, {})", socket, how);
+    -1
+}
+
 pub fn stat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = unsafe { c_str(path) };
     match syscall::open(path, O_RDONLY) {
@@ -541,6 +576,17 @@ pub unsafe fn socket(domain: c_int, mut kind: c_int, protocol: c_int) -> c_int {
             -1
         }
     }
+}
+
+pub fn socketpair(
+    domain: c_int,
+    kind: c_int,
+    protocol: c_int,
+    socket_vector: *mut c_int,
+) -> c_int {
+    let _ = write!(::FileWriter(2), "unimplemented: socketpair({}, {}, {}, {:p})",
+        domain, kind, protocol, socket_vector);
+    -1
 }
 
 pub fn unlink(path: *const c_char) -> c_int {
