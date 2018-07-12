@@ -13,7 +13,9 @@ fn main() {
         .flag("-fno-stack-protector")
         .file("src/c/dlmalloc.c")
         .file("src/c/fcntl.c")
+        .file("src/c/stack_chk.c")
         .file("src/c/stdio.c")
+        .file("src/c/unistd.c")
         .compile("relibc_c");
 
     println!("cargo:rustc-link-lib=static=relibc_c");
