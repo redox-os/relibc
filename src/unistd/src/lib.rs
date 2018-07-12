@@ -11,14 +11,17 @@ extern crate stdio;
 extern crate string;
 extern crate sys_utsname;
 
+use core::ptr;
+
+use platform::types::*;
+
 pub use brk::*;
 pub use getopt::*;
-pub use platform::types::*;
-
-use core::ptr;
+pub use pathconf::*;
 
 mod brk;
 mod getopt;
+mod pathconf;
 
 pub const R_OK: c_int = 1;
 pub const W_OK: c_int = 2;
@@ -39,7 +42,7 @@ pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
 
 #[no_mangle]
-pub static mut environ: *const *mut c_char = ptr::null();
+pub static mut environ: *mut *mut c_char = ptr::null();
 
 #[no_mangle]
 pub extern "C" fn _exit(status: c_int) {
@@ -157,11 +160,6 @@ pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
 #[no_mangle]
 pub extern "C" fn fork() -> pid_t {
     platform::fork()
-}
-
-#[no_mangle]
-pub extern "C" fn fpathconf(fildes: c_int, name: c_int) -> c_long {
-    unimplemented!();
 }
 
 #[no_mangle]
@@ -343,11 +341,6 @@ pub extern "C" fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
 
 #[no_mangle]
 pub extern "C" fn nice(incr: c_int) -> c_int {
-    unimplemented!();
-}
-
-#[no_mangle]
-pub extern "C" fn pathconf(path: *const c_char, name: c_int) -> c_long {
     unimplemented!();
 }
 

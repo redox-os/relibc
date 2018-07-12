@@ -23,3 +23,5 @@
 #define ULONG_MAX ((1 << 64) - 1)
 #define USHRT_MAX ((1 << 16) - 1)
 #define WORD_BIT 32
+
+#define PATH_MAX 4096

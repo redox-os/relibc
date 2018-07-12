@@ -1,9 +1,10 @@
 //! getopt implementation for Redox, following http://pubs.opengroup.org/onlinepubs/009695399/functions/getopt.html
 
-use super::platform::types::*;
-use super::stdio;
-use super::string;
 use core::ptr;
+
+use platform::types::*;
+use stdio;
+use string;
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
