@@ -114,7 +114,7 @@ pub extern "C" fn clock() -> clock_t {
     return ts.tv_sec * CLOCKS_PER_SEC + ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC);
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn clock_getres(clock_id: clockid_t, res: *mut timespec) -> c_int {
     unimplemented!();
 }
@@ -124,17 +124,17 @@ pub extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -> c_int
     platform::clock_gettime(clock_id, tp)
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn clock_settime(clock_id: clockid_t, tp: *const timespec) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn ctime(clock: *const time_t) -> *mut c_char {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut c_char {
     unimplemented!();
 }
@@ -144,7 +144,7 @@ pub extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {
     (time1 - time0) as c_double
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn getdate(string: *const c_char) -> tm {
     unimplemented!();
 }
@@ -193,17 +193,17 @@ pub extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut tm {
     result
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn localtime(timer: *const time_t) -> *mut tm {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn localtime_r(clock: *const time_t, result: *mut tm) -> *mut tm {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     unimplemented!();
 }
@@ -213,7 +213,7 @@ pub extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int
     platform::nanosleep(rqtp, rmtp)
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn strftime(
     s: *mut c_char,
     maxsize: usize,
@@ -223,7 +223,7 @@ pub extern "C" fn strftime(
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn strptime(buf: *const c_char, format: *const c_char, tm: *mut tm) -> *mut c_char {
     unimplemented!();
 }
@@ -240,7 +240,7 @@ pub extern "C" fn time(tloc: *mut time_t) -> time_t {
     ts.tv_sec
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn timer_create(
     clock_id: clockid_t,
     evp: *mut sigevent,
@@ -249,17 +249,17 @@ pub extern "C" fn timer_create(
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn timer_delete(timerid: timer_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn tzset() {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn timer_settime(
     timerid: timer_t,
     flags: c_int,
@@ -269,12 +269,12 @@ pub extern "C" fn timer_settime(
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
     unimplemented!();
 }

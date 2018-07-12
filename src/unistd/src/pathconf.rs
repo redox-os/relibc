@@ -22,12 +22,12 @@ pub const _PC_ALLOC_SIZE_MIN: c_int = 18;
 pub const _PC_SYMLINK_MAX: c_int = 19;
 pub const _PC_2_SYMLINKS: c_int = 20;
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn fpathconf(fildes: c_int, name: c_int) -> c_long {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn pathconf(path: *const c_char, name: c_int) -> c_long {
     unimplemented!();
 }

@@ -16,12 +16,12 @@ impl Clone for sem_t {
         *self
     }
 }
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sem_init(sem: *mut sem_t, pshared: c_int, value: c_uint) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sem_destroy(sem: *mut sem_t) -> c_int {
     unimplemented!();
 }
@@ -34,32 +34,32 @@ pub extern "C" fn sem_destroy(sem: *mut sem_t) -> c_int {
  *}
  */
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sem_close(sem: *mut sem_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sem_unlink(name: *const c_char) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sem_wait(sem: *mut sem_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sem_trywait(sem: *mut sem_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sem_post(sem: *mut sem_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sem_getvalue(sem: *mut sem_t, sval: *mut c_int) -> c_int {
     unimplemented!();
 }

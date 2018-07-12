@@ -84,7 +84,7 @@ pub extern "C" fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
     platform::mkfifo(path, mode)
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
     unimplemented!();
 }
@@ -94,7 +94,7 @@ pub extern "C" fn stat(file: *const c_char, buf: *mut platform::types::stat) -> 
     platform::stat(file, buf)
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn umask(mask: mode_t) -> mode_t {
     unimplemented!();
 }

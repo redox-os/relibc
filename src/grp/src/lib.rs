@@ -14,17 +14,17 @@ pub struct group {
     pub gr_mem: *mut *mut c_char,
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn getgrgid(gid: gid_t) -> *mut group {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn getgrnam(name: *const c_char) -> *mut group {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn getgrgid_r(
     gid: gid_t,
     grp: *mut group,
@@ -35,7 +35,7 @@ pub extern "C" fn getgrgid_r(
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn getgrnam_r(
     name: *const c_char,
     grp: *mut group,
@@ -46,17 +46,17 @@ pub extern "C" fn getgrnam_r(
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn getgrent() -> *mut group {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn endgrent() {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn setgrent() {
     unimplemented!();
 }

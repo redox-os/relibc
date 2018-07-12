@@ -66,7 +66,7 @@ pub unsafe extern "C" fn strtoumax(
 }
 
 #[allow(unused)]
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn wcstoimax(
     nptr: *const wchar_t,
     endptr: *mut *mut wchar_t,
@@ -74,8 +74,9 @@ pub extern "C" fn wcstoimax(
 ) -> intmax_t {
     unimplemented!();
 }
+
 #[allow(unused)]
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn wcstoumax(
     nptr: *const wchar_t,
     endptr: *mut *mut wchar_t,

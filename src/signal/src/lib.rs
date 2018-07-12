@@ -39,92 +39,92 @@ pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
     platform::killpg(pgrp, sig)
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn raise(sig: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigaction(sig: c_int, act: *const sigaction, oact: *const sigaction) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sighold(sig: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigignore(sig: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn signal(sig: c_int, func: fn(c_int)) -> fn(c_int) {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigpause(sig: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigrelse(sig: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigset(sig: c_int, func: fn(c_int)) -> fn(c_int) {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int {
     unimplemented!();
 }

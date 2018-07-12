@@ -26,7 +26,7 @@ pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {
     waitpid(!0, stat_loc, 0)
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub unsafe extern "C" fn wait3(
     stat_loc: *mut c_int,
     options: c_int,
