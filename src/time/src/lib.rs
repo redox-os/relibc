@@ -218,11 +218,7 @@ pub unsafe extern "C" fn localtime_r(clock: *const time_t, r: *mut tm) -> *mut t
     (*r).tm_year = 1970;
 
     loop {
-        let days_in_year = if leap_year((*r).tm_year) {
-            366
-        } else {
-            365
-        };
+        let days_in_year = if leap_year((*r).tm_year) { 366 } else { 365 };
 
         if days < days_in_year {
             break;
@@ -240,9 +236,9 @@ pub unsafe extern "C" fn localtime_r(clock: *const time_t, r: *mut tm) -> *mut t
 
     const MONTH_DAYS: [[c_int; 12]; 2] = [
         // Non-leap years:
-        [ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ],
+        [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
         // Leap years:
-        [ 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ],
+        [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
     ];
 
     let leap = if leap_year((*r).tm_year) { 1 } else { 0 };
