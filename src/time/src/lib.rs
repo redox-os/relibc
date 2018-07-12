@@ -129,9 +129,9 @@ pub extern "C" fn clock_settime(clock_id: clockid_t, tp: *const timespec) -> c_i
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn ctime(clock: *const time_t) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn ctime(clock: *const time_t) -> *mut c_char {
+    asctime(localtime(clock))
 }
 
 // #[no_mangle]
@@ -193,14 +193,74 @@ pub extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut tm {
     result
 }
 
-// #[no_mangle]
-pub extern "C" fn localtime(timer: *const time_t) -> *mut tm {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn localtime(clock: *const time_t) -> *mut tm {
+    localtime_r(clock, &mut TM)
 }
 
-// #[no_mangle]
-pub extern "C" fn localtime_r(clock: *const time_t, result: *mut tm) -> *mut tm {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn localtime_r(clock: *const time_t, r: *mut tm) -> *mut tm {
+    fn leap_year(year: c_int) -> bool {
+        year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+    }
+    let mut clock = *clock;
+
+    if clock < 0 {
+        unimplemented!("localtime_r with a negative time is to be implemented");
+    }
+
+    let mut days = (clock / (60 * 60 * 24)) as c_int;
+
+    // Epoch, Jan 1 1970, was on a thursday.
+    // Jan 5th was a monday.
+    (*r).tm_wday = (days + 4) % 7;
+
+    (*r).tm_year = 1970;
+
+    loop {
+        let days_in_year = if leap_year((*r).tm_year) {
+            366
+        } else {
+            365
+        };
+
+        if days < days_in_year {
+            break;
+        }
+
+        days -= days_in_year;
+        (*r).tm_year += 1;
+    }
+
+    (*r).tm_yday = days;
+
+    (*r).tm_sec = (clock % 60) as c_int;
+    (*r).tm_min = ((clock % (60 * 60)) / 60) as c_int;
+    (*r).tm_hour = (clock / (60 * 60)) as c_int;
+
+    const MONTH_DAYS: [[c_int; 12]; 2] = [
+        // Non-leap years:
+        [ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ],
+        // Leap years:
+        [ 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ],
+    ];
+
+    let leap = if leap_year((*r).tm_year) { 1 } else { 0 };
+
+    loop {
+        let days_in_month = MONTH_DAYS[leap][(*r).tm_mon as usize];
+
+        if days < (*r).tm_mon {
+            break;
+        }
+
+        days -= days_in_month;
+        (*r).tm_mon += 1;
+    }
+    (*r).tm_mday = days as c_int;
+    (*r).tm_isdst = 0;
+
+    r
 }
 
 // #[no_mangle]
