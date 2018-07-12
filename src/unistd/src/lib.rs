@@ -42,7 +42,7 @@ pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
 
 #[no_mangle]
-pub static mut environ: *mut *mut c_char = ptr::null();
+pub static mut environ: *mut *mut c_char = ptr::null_mut();
 
 #[no_mangle]
 pub extern "C" fn _exit(status: c_int) {
