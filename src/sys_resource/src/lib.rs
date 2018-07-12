@@ -9,10 +9,11 @@ extern crate sys_time;
 use platform::types::*;
 use sys_time::timeval;
 
-pub const RUSAGE_SELF: c_int = 0;
-pub const RUSAGE_CHILDREN: c_int = -1;
-pub const RUSAGE_BOTH: c_int = -2;
-pub const RUSAGE_THREAD: c_int = 1;
+// Exported in bits file
+const RUSAGE_SELF: c_int = 0;
+const RUSAGE_CHILDREN: c_int = -1;
+const RUSAGE_BOTH: c_int = -2;
+const RUSAGE_THREAD: c_int = 1;
 
 type rlim_t = u64;
 

@@ -1,5 +1,6 @@
 sys_includes = ["sys/types.h", "stdint.h", "sys/time.h"]
 include_guard = "_SYS_RESOURCE_H"
+trailer = "#include <bits/sys/resource.h>"
 language = "C"
 
 # WORKAROUND:
