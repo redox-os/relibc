@@ -353,14 +353,16 @@ pub unsafe extern "C" fn mblen(s: *const c_char, n: size_t) -> c_int {
     result as i32
 }
 
-// #[no_mangle]
-pub extern "C" fn mbstowcs(pwcs: *mut wchar_t, s: *const c_char, n: size_t) -> size_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn mbstowcs(pwcs: *mut wchar_t, mut s: *const c_char, n: size_t) -> size_t {
+    let mut state: mbstate_t = mbstate_t {};
+    mbsrtowcs(pwcs, &mut s, n, &mut state)
 }
 
-// #[no_mangle]
-pub extern "C" fn mbtowc(pwc: *mut wchar_t, s: *const c_char, n: size_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn mbtowc(pwc: *mut wchar_t, s: *const c_char, n: size_t) -> c_int {
+    let mut state: mbstate_t = mbstate_t {};
+    mbrtowc(pwc, s, n, &mut state) as c_int
 }
 
 #[no_mangle]

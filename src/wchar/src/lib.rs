@@ -10,7 +10,6 @@ extern crate time;
 extern crate va_list as vl;
 
 use core::ptr;
-use core::usize;
 use platform::types::*;
 use stdio::*;
 use time::*;
@@ -95,7 +94,7 @@ pub unsafe extern "C" fn mbsinit(ps: *const mbstate_t) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mbrlen(s: *const c_char, n: usize, ps: *mut mbstate_t) -> usize {
+pub unsafe extern "C" fn mbrlen(s: *const c_char, n: size_t, ps: *mut mbstate_t) -> size_t {
     static mut INTERNAL: mbstate_t = mbstate_t;
     mbrtowc(ptr::null_mut(), s, n, &mut INTERNAL)
 }
@@ -105,9 +104,9 @@ pub unsafe extern "C" fn mbrlen(s: *const c_char, n: usize, ps: *mut mbstate_t) 
 pub unsafe extern "C" fn mbrtowc(
     pwc: *mut wchar_t,
     s: *const c_char,
-    n: usize,
+    n: size_t,
     ps: *mut mbstate_t,
-) -> usize {
+) -> size_t {
     static mut INTERNAL: mbstate_t = mbstate_t;
 
     if ps.is_null() {
@@ -127,10 +126,10 @@ pub unsafe extern "C" fn mbrtowc(
 pub unsafe extern "C" fn mbsnrtowcs(
     dst_ptr: *mut wchar_t,
     src_ptr: *mut *const c_char,
-    src_len: usize,
-    dst_len: usize,
+    src_len: size_t,
+    dst_len: size_t,
     ps: *mut mbstate_t,
-) -> usize {
+) -> size_t {
     static mut INTERNAL: mbstate_t = mbstate_t;
 
     if ps.is_null() {
@@ -191,10 +190,10 @@ pub unsafe extern "C" fn mbsnrtowcs(
 pub extern "C" fn mbsrtowcs(
     dst: *mut wchar_t,
     src: *mut *const c_char,
-    len: usize,
+    len: size_t,
     ps: *mut mbstate_t,
-) -> usize {
-    unsafe { mbsnrtowcs(dst, src, usize::max_value(), len, ps) }
+) -> size_t {
+    unsafe { mbsnrtowcs(dst, src, size_t::max_value(), len, ps) }
 }
 
 #[no_mangle]
@@ -210,7 +209,7 @@ pub unsafe extern "C" fn putwchar(wc: wchar_t) -> wint_t {
 // #[no_mangle]
 pub extern "C" fn swprintf(
     s: *mut wchar_t,
-    n: usize,
+    n: size_t,
     format: *const wchar_t,
     mut ap: va_list,
 ) -> c_int {
@@ -250,7 +249,7 @@ pub extern "C" fn vwprintf(format: *const wchar_t, arg: va_list) -> c_int {
 // #[no_mangle]
 pub extern "C" fn vswprintf(
     s: *mut wchar_t,
-    n: usize,
+    n: size_t,
     format: *const wchar_t,
     arg: va_list,
 ) -> c_int {
@@ -259,7 +258,7 @@ pub extern "C" fn vswprintf(
 
 //widechar to multibyte
 #[no_mangle]
-pub extern "C" fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t) -> usize {
+pub extern "C" fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t) -> size_t {
     let mut buffer: [c_char; MB_CUR_MAX as usize] = [0; MB_CUR_MAX as usize];
     let mut wc_cpy = wc;
     let mut s_cpy = s;
@@ -298,17 +297,17 @@ pub extern "C" fn wcscpy(ws1: *mut wchar_t, ws2: *const wchar_t) -> *mut wchar_t
 }
 
 // #[no_mangle]
-pub extern "C" fn wcscspn(ws1: *const wchar_t, ws2: *const wchar_t) -> usize {
+pub extern "C" fn wcscspn(ws1: *const wchar_t, ws2: *const wchar_t) -> size_t {
     unimplemented!();
 }
 
 // #[no_mangle]
 pub extern "C" fn wcsftime(
     wcs: *mut wchar_t,
-    maxsize: usize,
+    maxsize: size_t,
     format: *const wchar_t,
     timptr: *mut tm,
-) -> usize {
+) -> size_t {
     unimplemented!();
 }
 
@@ -318,17 +317,17 @@ pub extern "C" fn wcslen(ws: *const wchar_t) -> c_ulong {
 }
 
 // #[no_mangle]
-pub extern "C" fn wcsncat(ws1: *mut wchar_t, ws2: *const wchar_t, n: usize) -> *mut wchar_t {
+pub extern "C" fn wcsncat(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
     unimplemented!();
 }
 
 // #[no_mangle]
-pub extern "C" fn wcsncmp(ws1: *const wchar_t, ws2: *const wchar_t, n: usize) -> c_int {
+pub extern "C" fn wcsncmp(ws1: *const wchar_t, ws2: *const wchar_t, n: size_t) -> c_int {
     unimplemented!();
 }
 
 // #[no_mangle]
-pub extern "C" fn wcsncpy(ws1: *mut wchar_t, ws2: *const wchar_t, n: usize) -> *mut wchar_t {
+pub extern "C" fn wcsncpy(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
     unimplemented!();
 }
 
@@ -346,14 +345,14 @@ pub extern "C" fn wcsrchr(ws1: *const wchar_t, ws2: wchar_t) -> *mut wchar_t {
 pub extern "C" fn wcsrtombs(
     dst: *mut c_char,
     src: *mut *const wchar_t,
-    len: usize,
+    len: size_t,
     ps: *mut mbstate_t,
-) -> usize {
+) -> size_t {
     unimplemented!();
 }
 
 // #[no_mangle]
-pub extern "C" fn wcsspn(ws1: *const wchar_t, ws2: *const wchar_t) -> usize {
+pub extern "C" fn wcsspn(ws1: *const wchar_t, ws2: *const wchar_t) -> size_t {
     unimplemented!();
 }
 
@@ -392,12 +391,12 @@ pub extern "C" fn wcswcs(ws1: *const wchar_t, ws2: *const wchar_t) -> *mut wchar
 }
 
 // #[no_mangle]
-pub extern "C" fn wcswidth(pwcs: *const wchar_t, n: usize) -> c_int {
+pub extern "C" fn wcswidth(pwcs: *const wchar_t, n: size_t) -> c_int {
     unimplemented!();
 }
 
 // #[no_mangle]
-pub extern "C" fn wcsxfrm(ws1: *mut wchar_t, ws2: *const wchar_t, n: usize) -> usize {
+pub extern "C" fn wcsxfrm(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> size_t {
     unimplemented!();
 }
 
@@ -412,27 +411,27 @@ pub extern "C" fn wcwidth(wc: wchar_t) -> c_int {
 }
 
 // #[no_mangle]
-pub extern "C" fn wmemchr(ws: *const wchar_t, wc: wchar_t, n: usize) -> *mut c_int {
+pub extern "C" fn wmemchr(ws: *const wchar_t, wc: wchar_t, n: size_t) -> *mut c_int {
     unimplemented!();
 }
 
 // #[no_mangle]
-pub extern "C" fn wmemcmp(ws1: *const wchar_t, ws2: *const wchar_t, n: usize) -> c_int {
+pub extern "C" fn wmemcmp(ws1: *const wchar_t, ws2: *const wchar_t, n: size_t) -> c_int {
     unimplemented!();
 }
 
 // #[no_mangle]
-pub extern "C" fn wmemcpy(ws1: *mut wchar_t, ws2: *const wchar_t, n: usize) -> *mut wchar_t {
+pub extern "C" fn wmemcpy(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
     unimplemented!();
 }
 
 // #[no_mangle]
-pub extern "C" fn wmemmove(ws1: *mut wchar_t, ws2: *const wchar_t, n: usize) -> *mut wchar_t {
+pub extern "C" fn wmemmove(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
     unimplemented!();
 }
 
 // #[no_mangle]
-pub extern "C" fn wmemset(ws1: *mut wchar_t, ws2: wchar_t, n: usize) -> *mut wchar_t {
+pub extern "C" fn wmemset(ws1: *mut wchar_t, ws2: wchar_t, n: size_t) -> *mut wchar_t {
     unimplemented!();
 }
 

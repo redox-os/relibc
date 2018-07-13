@@ -198,70 +198,132 @@ pub unsafe extern "C" fn localtime(clock: *const time_t) -> *mut tm {
     localtime_r(clock, &mut TM)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn localtime_r(clock: *const time_t, r: *mut tm) -> *mut tm {
-    fn leap_year(year: c_int) -> bool {
-        year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
-    }
-    let mut clock = *clock;
+const MONTH_DAYS: [[c_int; 12]; 2] = [
+    // Non-leap years:
+    [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+    // Leap years:
+    [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+];
 
-    if clock < 0 {
-        unimplemented!("localtime_r with a negative time is to be implemented");
-    }
-
-    let mut days = (clock / (60 * 60 * 24)) as c_int;
-
-    // Epoch, Jan 1 1970, was on a thursday.
-    // Jan 5th was a monday.
-    (*r).tm_wday = (days + 4) % 7;
-
-    (*r).tm_year = 1970;
-
-    loop {
-        let days_in_year = if leap_year((*r).tm_year) { 366 } else { 365 };
-
-        if days < days_in_year {
-            break;
-        }
-
-        days -= days_in_year;
-        (*r).tm_year += 1;
-    }
-
-    (*r).tm_yday = days;
-
-    (*r).tm_sec = (clock % 60) as c_int;
-    (*r).tm_min = ((clock % (60 * 60)) / 60) as c_int;
-    (*r).tm_hour = (clock / (60 * 60)) as c_int;
-
-    const MONTH_DAYS: [[c_int; 12]; 2] = [
-        // Non-leap years:
-        [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
-        // Leap years:
-        [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
-    ];
-
-    let leap = if leap_year((*r).tm_year) { 1 } else { 0 };
-
-    loop {
-        let days_in_month = MONTH_DAYS[leap][(*r).tm_mon as usize];
-
-        if days < (*r).tm_mon {
-            break;
-        }
-
-        days -= days_in_month;
-        (*r).tm_mon += 1;
-    }
-    (*r).tm_mday = days as c_int;
-    (*r).tm_isdst = 0;
-
-    r
+fn leap_year(year: c_int) -> bool {
+    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 }
 
-// #[no_mangle]
-pub extern "C" fn mktime(timeptr: *mut tm) -> time_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
+    let clock = *clock;
+
+    let mut day = (clock / (60 * 60 * 24)) as c_int;
+    if clock < 0 && clock % (60 * 60 * 24) != 0 {
+        // -1 because for negative values round upwards
+        // -0.3 == 0, but we want -1
+        day -= 1;
+    }
+
+    (*t).tm_sec = (clock % 60) as c_int;
+    (*t).tm_min = ((clock / 60) % 60) as c_int;
+    (*t).tm_hour = ((clock / (60 * 60)) % 24) as c_int;
+
+    while (*t).tm_sec < 0 {
+        (*t).tm_sec += 60;
+        (*t).tm_min -= 1;
+    }
+    while (*t).tm_min < 0 {
+        (*t).tm_min += 60;
+        (*t).tm_hour -= 1;
+    }
+    while (*t).tm_hour < 0 {
+        (*t).tm_hour += 24;
+    }
+
+    // Jan 1th was a thursday, 4th of a zero-indexed week.
+    (*t).tm_wday = (day + 4) % 7;
+    if (*t).tm_wday < 0 {
+        (*t).tm_wday += 7;
+    }
+
+    let mut year = 1970;
+    if day < 0 {
+        while day < 0 {
+            let days_in_year = if leap_year(year) { 366 } else { 365 };
+
+            day += days_in_year;
+            year -= 1;
+        }
+        (*t).tm_year = year - 1900;
+        (*t).tm_yday = day + 1;
+    } else {
+        loop {
+            let days_in_year = if leap_year(year) { 366 } else { 365 };
+
+            if day < days_in_year {
+                break;
+            }
+
+            day -= days_in_year;
+            year += 1;
+        }
+        (*t).tm_year = year - 1900;
+        (*t).tm_yday = day;
+    }
+
+    let leap = if leap_year(year) { 1 } else { 0 };
+    (*t).tm_mon = 0;
+    loop {
+        let days_in_month = MONTH_DAYS[leap][(*t).tm_mon as usize];
+
+        if day < days_in_month {
+            break;
+        }
+
+        day -= days_in_month;
+        (*t).tm_mon += 1;
+    }
+    (*t).tm_mday = 1 + day as c_int;
+    (*t).tm_isdst = 0;
+
+    t
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
+    let mut year = (*t).tm_year + 1900;
+    let mut month = (*t).tm_mon;
+    let mut day = (*t).tm_mday as i64 - 1;
+
+    let leap = if leap_year(year) { 1 } else { 0 };
+
+    if year < 1970 {
+        day = MONTH_DAYS[if leap_year(year) { 1 } else { 0 }][(*t).tm_mon as usize] as i64 - day;
+
+        while year < 1969 {
+            year += 1;
+            day += if leap_year(year) { 366 } else { 365 };
+        }
+
+        while month < 11 {
+            month += 1;
+            day += MONTH_DAYS[leap][month as usize] as i64;
+        }
+
+        -(day * (60 * 60 * 24)
+            - (((*t).tm_hour as i64) * (60 * 60) + ((*t).tm_min as i64) * 60 + (*t).tm_sec as i64))
+    } else {
+        while year > 1970 {
+            year -= 1;
+            day += if leap_year(year) { 366 } else { 365 };
+        }
+
+        while month > 0 {
+            month -= 1;
+            day += MONTH_DAYS[leap][month as usize] as i64;
+        }
+
+        (day * (60 * 60 * 24)
+            + ((*t).tm_hour as i64) * (60 * 60)
+            + ((*t).tm_min as i64) * 60
+            + (*t).tm_sec as i64)
+    }
 }
 
 #[no_mangle]
