@@ -291,6 +291,8 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
     let mut month = (*t).tm_mon;
     let mut day = (*t).tm_mday as i64 - 1;
 
+    let leap = if leap_year(year) { 1 } else { 0 };
+
     if year < 1970 {
         day = MONTH_DAYS[if leap_year(year) { 1 } else { 0 }][(*t).tm_mon as usize] as i64 - day;
 
@@ -298,8 +300,6 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
             year += 1;
             day += if leap_year(year) { 366 } else { 365 };
         }
-
-        let leap = if leap_year(year) { 1 } else { 0 };
 
         while month < 11 {
             month += 1;
@@ -312,15 +312,13 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
                 + (*t).tm_sec as i64))
     } else {
         while year > 1970 {
-            day += if leap_year(year) { 366 } else { 365 };
             year -= 1;
+            day += if leap_year(year) { 366 } else { 365 };
         }
 
-        let leap = if leap_year(year) { 1 } else { 0 };
-
         while month > 0 {
-            day += MONTH_DAYS[leap][month as usize] as i64;
             month -= 1;
+            day += MONTH_DAYS[leap][month as usize] as i64;
         }
 
         (day * (60 * 60 * 24)
