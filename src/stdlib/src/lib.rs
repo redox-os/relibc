@@ -800,7 +800,7 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
             "sh\0".as_ptr(),
             "-c\0".as_ptr(),
             command_nonnull,
-            ptr::null()
+            ptr::null(),
         ];
 
         unistd::execv(shell as *const c_char, args.as_ptr() as *const *mut c_char);

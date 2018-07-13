@@ -1,7 +1,7 @@
 use super::constants::*;
 use super::{BUFSIZ, FILE, UNGET};
-use core::sync::atomic::AtomicBool;
 use core::mem;
+use core::sync::atomic::AtomicBool;
 use errno;
 use fcntl::*;
 use platform;
