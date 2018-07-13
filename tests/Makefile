@@ -16,8 +16,10 @@ EXPECT_BINS=\
 	ftruncate \
 	getc_unget \
 	locale \
+	localtime \
 	math \
 	mem \
+	mktime \
 	pipe \
 	printf \
 	rename \

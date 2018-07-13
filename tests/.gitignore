@@ -21,8 +21,10 @@
 /getid
 /link
 /locale
+/localtime
 /math
 /mem
+/mktime
 /pipe
 /printf
 /rmdir
