@@ -307,9 +307,7 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
         }
 
         -(day * (60 * 60 * 24)
-            - (((*t).tm_hour as i64) * (60 * 60)
-                + ((*t).tm_min as i64) * 60
-                + (*t).tm_sec as i64))
+            - (((*t).tm_hour as i64) * (60 * 60) + ((*t).tm_min as i64) * 60 + (*t).tm_sec as i64))
     } else {
         while year > 1970 {
             year -= 1;
