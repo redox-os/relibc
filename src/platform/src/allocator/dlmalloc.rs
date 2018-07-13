@@ -16,7 +16,7 @@ unsafe impl<'a> GlobalAlloc for Allocator {
         dlmemalign(layout.align(), layout.size()) as *mut u8
     }
 
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+    unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
         dlfree(ptr as *mut c_void)
     }
 }

@@ -16,17 +16,17 @@ unsafe impl Sync for GlobalFile {}
 
 #[no_mangle]
 pub extern "C" fn __stdin() -> *mut FILE {
-    unsafe { default_stdin.get() }
+    default_stdin.get()
 }
 
 #[no_mangle]
 pub extern "C" fn __stdout() -> *mut FILE {
-    unsafe { default_stdout.get() }
+    default_stdout.get()
 }
 
 #[no_mangle]
 pub extern "C" fn __stderr() -> *mut FILE {
-    unsafe { default_stderr.get() }
+    default_stderr.get()
 }
 
 lazy_static! {

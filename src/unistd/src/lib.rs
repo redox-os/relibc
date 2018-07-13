@@ -309,9 +309,9 @@ pub extern "C" fn getuid() -> uid_t {
     platform::getuid()
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
-    unimplemented!();
+    getcwd(path_name, 4096 /* PATH_MAX */)
 }
 
 // #[no_mangle]
@@ -334,9 +334,9 @@ pub extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
-    unimplemented!();
+    platform::lseek(fildes, offset, whence)
 }
 
 // #[no_mangle]

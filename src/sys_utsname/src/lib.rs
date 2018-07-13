@@ -7,11 +7,9 @@ mod inner {
     extern crate platform;
 
     use self::platform::types::*;
-    use core::ptr;
 
     const LENGTH: usize = 65;
 
-    #[allow(non_camel_case)]
     #[no_mangle]
     #[repr(C)]
     pub struct utsname {

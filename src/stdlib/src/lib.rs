@@ -369,7 +369,6 @@ pub unsafe extern "C" fn mbtowc(pwc: *mut wchar_t, s: *const c_char, n: size_t) 
 pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
     use core::iter;
     use core::mem;
-    use core::slice;
     let len = unsafe { strlen(name) };
     if len < 6 {
         unsafe { platform::errno = errno::EINVAL };
@@ -389,7 +388,7 @@ pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
 
     let mut retries = 100;
     loop {
-        let mut char_iter = iter::repeat(()).map(|()| rng.sample(Alphanumeric)).take(6);
+        let char_iter = iter::repeat(()).map(|()| rng.sample(Alphanumeric)).take(6);
         unsafe {
             for (i, c) in char_iter.enumerate() {
                 *name.offset(len as isize - i as isize - 1) = c as c_char
@@ -421,7 +420,7 @@ fn get_nstime() -> u64 {
     use time::constants::CLOCK_MONOTONIC;
     let mut ts: timespec = unsafe { mem::uninitialized() };
     platform::clock_gettime(CLOCK_MONOTONIC, &mut ts);
-    unsafe { ts.tv_nsec as u64 }
+    ts.tv_nsec as u64
 }
 
 // #[no_mangle]
@@ -811,7 +810,7 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
         unreachable!();
     } else {
         let mut wstatus = 0;
-        if platform::waitpid(child_pid, &mut wstatus, 0) < 0 {
+        if platform::waitpid(child_pid, &mut wstatus, 0) == !0 {
             return -1;
         }
 

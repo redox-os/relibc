@@ -899,7 +899,7 @@ pub unsafe extern "C" fn vfprintf(file: &mut FILE, format: *const c_char, ap: va
 
 #[no_mangle]
 pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
-    vfprintf(unsafe { &mut *__stdout() }, format, ap)
+    vfprintf(&mut *__stdout(), format, ap)
 }
 
 #[no_mangle]
@@ -928,7 +928,7 @@ pub unsafe extern "C" fn vfscanf(file: &mut FILE, format: *const c_char, ap: va_
 
 #[no_mangle]
 pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
-    vfscanf(unsafe { &mut *__stdin() }, format, ap)
+    vfscanf(&mut *__stdin(), format, ap)
 }
 
 #[no_mangle]
