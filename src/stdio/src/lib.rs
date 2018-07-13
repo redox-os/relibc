@@ -221,12 +221,12 @@ pub extern "C" fn clearerr(stream: &mut FILE) {
     stream.flags &= !(F_EOF | F_ERR);
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn ctermid(_s: *mut c_char) -> *mut c_char {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn cuserid(_s: *mut c_char) -> *mut c_char {
     unimplemented!();
 }
@@ -704,7 +704,7 @@ pub extern "C" fn getw(stream: &mut FILE) -> c_int {
     }
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn pclose(_stream: &mut FILE) -> c_int {
     unimplemented!();
 }
@@ -723,7 +723,7 @@ pub unsafe extern "C" fn perror(s: *const c_char) {
     }
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn popen(_command: *const c_char, _mode: *const c_char) -> *mut FILE {
     unimplemented!();
 }
@@ -850,17 +850,17 @@ pub extern "C" fn setvbuf(stream: &mut FILE, buf: *mut c_char, mode: c_int, size
     0
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn tempnam(_dir: *const c_char, _pfx: *const c_char) -> *mut c_char {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn tmpfile() -> *mut FILE {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn tmpnam(_s: *mut c_char) -> *mut c_char {
     unimplemented!();
 }

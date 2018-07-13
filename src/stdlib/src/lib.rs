@@ -209,12 +209,12 @@ pub extern "C" fn div(numer: c_int, denom: c_int) -> div_t {
     }
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn drand48() -> c_double {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn ecvt(
     value: c_double,
     ndigit: c_int,
@@ -224,7 +224,7 @@ pub extern "C" fn ecvt(
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn erand(xsubi: [c_ushort; 3]) -> c_double {
     unimplemented!();
 }
@@ -240,7 +240,7 @@ pub unsafe extern "C" fn exit(status: c_int) {
     platform::exit(status);
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn fcvt(
     value: c_double,
     ndigit: c_int,
@@ -255,17 +255,17 @@ pub unsafe extern "C" fn free(ptr: *mut c_void) {
     platform::free(ptr);
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn gcvt(value: c_double, ndigit: c_int, buf: *mut c_char) -> *mut c_char {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn getenv(name: *const c_char) -> *mut c_char {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn getsubopt(
     optionp: *mut *mut c_char,
     tokens: *const *mut c_char,
@@ -274,22 +274,22 @@ pub extern "C" fn getsubopt(
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn grantpt(fildes: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn initstate(seec: c_uint, state: *mut c_char, size: size_t) -> *mut c_char {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn jrand48(xsubi: [c_ushort; 3]) -> c_long {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn l64a(value: c_long) -> *mut c_char {
     unimplemented!();
 }
@@ -303,7 +303,7 @@ pub extern "C" fn labs(i: c_long) -> c_long {
     }
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn lcong48(param: [c_ushort; 7]) {
     unimplemented!();
 }
@@ -322,7 +322,7 @@ pub extern "C" fn ldiv(numer: c_long, denom: c_long) -> ldiv_t {
     }
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn lrand48() -> c_long {
     unimplemented!();
 }
@@ -353,12 +353,12 @@ pub unsafe extern "C" fn mblen(s: *const c_char, n: size_t) -> c_int {
     result as i32
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn mbstowcs(pwcs: *mut wchar_t, s: *const c_char, n: size_t) -> size_t {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn mbtowc(pwc: *mut wchar_t, s: *const c_char, n: size_t) -> c_int {
     unimplemented!();
 }
@@ -422,27 +422,27 @@ fn get_nstime() -> u64 {
     unsafe { ts.tv_nsec as u64 }
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn mkstemp(name: *mut c_char) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn mrand48() -> c_long {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn nrand48(xsubi: [c_ushort; 3]) -> c_long {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn ptsname(fildes: c_int) -> *mut c_char {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn putenv(s: *mut c_char) -> c_int {
     unimplemented!();
 }
@@ -477,12 +477,12 @@ pub unsafe extern "C" fn rand() -> c_int {
     }
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn rand_r(seed: *mut c_uint) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn random() -> c_long {
     unimplemented!();
 }
@@ -492,22 +492,22 @@ pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void 
     platform::realloc(ptr, size)
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn realpath(file_name: *const c_char, resolved_name: *mut c_char) -> *mut c_char {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn seed48(seed16v: [c_ushort; 3]) -> c_ushort {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn setkey(key: *const c_char) {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn setstate(state: *const c_char) -> *mut c_char {
     unimplemented!();
 }
@@ -517,12 +517,12 @@ pub unsafe extern "C" fn srand(seed: c_uint) {
     RNG = Some(XorShiftRng::from_seed([seed as u8; 16]));
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn srand48(seed: c_long) {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn srandom(seed: c_uint) {
     unimplemented!();
 }
@@ -817,12 +817,12 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
     }
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn ttyslot() -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn unlockpt(fildes: c_int) -> c_int {
     unimplemented!();
 }

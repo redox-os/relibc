@@ -142,7 +142,7 @@ pub unsafe extern "C" fn strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
     strncmp(s1, s2, usize::MAX)
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn strcoll(s1: *const c_char, s2: *const c_char) -> c_int {
     unimplemented!();
 }
@@ -400,7 +400,7 @@ pub extern "C" fn strtok_r(
     }
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn strxfrm(s1: *mut c_char, s2: *const c_char, n: usize) -> size_t {
     unimplemented!();
 }

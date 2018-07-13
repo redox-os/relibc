@@ -29,27 +29,27 @@ pub struct rusage {
     pub ru_stime: timeval,
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub unsafe extern "C" fn setpriority(which: c_int, who: id_t, nice: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int {
     unimplemented!();
 }
