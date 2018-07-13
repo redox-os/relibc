@@ -9,6 +9,7 @@ extern crate platform;
 extern crate rand;
 extern crate string;
 extern crate time;
+extern crate unistd;
 extern crate wchar;
 
 use core::{ptr, str};
@@ -783,8 +784,37 @@ pub unsafe extern "C" fn strtol(s: *const c_char, endptr: *mut *mut c_char, base
 }
 
 #[no_mangle]
-pub extern "C" fn system(command: *const c_char) -> c_int {
-    unimplemented!();
+pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
+    let child_pid = unistd::fork();
+    if child_pid == 0 {
+        let command_nonnull = if command.is_null() {
+            "exit 0\0".as_ptr()
+        } else {
+            command as *const u8
+        };
+
+        let shell = "/bin/sh\0".as_ptr();
+
+        let args = [
+            "sh\0".as_ptr(),
+            "-c\0".as_ptr(),
+            command_nonnull,
+            ptr::null()
+        ];
+
+        unistd::execv(shell as *const c_char, args.as_ptr() as *const *mut c_char);
+
+        exit(127);
+
+        unreachable!();
+    } else {
+        let mut wstatus = 0;
+        if platform::waitpid(child_pid, &mut wstatus, 0) < 0 {
+            return -1;
+        }
+
+        wstatus
+    }
 }
 
 #[no_mangle]

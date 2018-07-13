@@ -435,6 +435,7 @@ dependencies = [
  "rand 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "string 0.1.0",
  "time 0.1.0",
+ "unistd 0.1.0",
  "wchar 0.1.0",
 ]
 
