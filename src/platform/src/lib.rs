@@ -1,7 +1,6 @@
 #![no_std]
 #![allow(non_camel_case_types)]
-#![feature(alloc)]
-#![feature(allocator_api)]
+#![feature(alloc, allocator_api, const_vec_new)]
 //TODO #![feature(thread_local)]
 
 #[cfg_attr(target_os = "redox", macro_use)]
@@ -36,7 +35,8 @@ mod sys;
 
 pub mod types;
 
-use core::fmt;
+use alloc::Vec;
+use core::{fmt, ptr};
 
 use types::*;
 
@@ -63,6 +63,12 @@ pub struct sockaddr {
 #[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut errno: c_int = 0;
+
+#[allow(non_upper_case_globals)]
+#[no_mangle]
+pub static mut environ: *mut *mut c_char = ptr::null_mut();
+#[allow(non_upper_case_globals)]
+pub static mut inner_environ: Vec<*mut c_char> = Vec::new();
 
 pub unsafe fn c_str_mut<'a>(s: *mut c_char) -> &'a mut [u8] {
     use core::usize;

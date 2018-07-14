@@ -8,6 +8,7 @@ EXPECT_BINS=\
 	create \
 	ctype \
 	dup \
+	env \
 	error \
 	exec \
 	fchdir \

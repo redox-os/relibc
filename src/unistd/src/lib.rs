@@ -42,9 +42,6 @@ pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
 
 #[no_mangle]
-pub static mut environ: *mut *mut c_char = ptr::null_mut();
-
-#[no_mangle]
 pub extern "C" fn _exit(status: c_int) {
     platform::exit(status)
 }
@@ -125,7 +122,7 @@ pub extern "C" fn encrypt(block: [c_char; 64], edflag: c_int) {
 
 #[no_mangle]
 pub unsafe extern "C" fn execv(path: *const c_char, argv: *const *mut c_char) -> c_int {
-    execve(path, argv, environ)
+    execve(path, argv, platform::environ)
 }
 
 #[no_mangle]

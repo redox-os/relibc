@@ -260,9 +260,38 @@ pub extern "C" fn gcvt(value: c_double, ndigit: c_int, buf: *mut c_char) -> *mut
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn getenv(name: *const c_char) -> *mut c_char {
-    unimplemented!();
+unsafe fn find_env(name: *const c_char) -> Option<(usize, *mut c_char)> {
+    for (i, item) in platform::inner_environ.iter().enumerate() {
+        let mut item = *item;
+        if item == ptr::null_mut() {
+            assert_eq!(i, platform::inner_environ.len() - 1, "an early null pointer in environ vector");
+            break;
+        }
+        let mut name = name;
+        loop {
+            let end_of_name = *name == 0 || *name == b'=' as c_char;
+            if *item == 0 || *item == b'=' as c_char || end_of_name {
+                if *item == b'=' as c_char || end_of_name {
+                    return Some((i, item.offset(1)));
+                } else {
+                    break;
+                }
+            }
+
+            if *item != *name {
+                break;
+            }
+
+            item = item.offset(1);
+            name = name.offset(1);
+        }
+    }
+    None
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn getenv(name: *const c_char) -> *mut c_char {
+    find_env(name).map(|val| val.1).unwrap_or(ptr::null_mut())
 }
 
 // #[no_mangle]
@@ -443,9 +472,42 @@ pub extern "C" fn ptsname(fildes: c_int) -> *mut c_char {
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn putenv(s: *mut c_char) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn putenv(s: *mut c_char) -> c_int {
+    let mut s_len = 0;
+    while *s.offset(s_len) != 0 {
+        s_len += 1;
+    }
+
+    let ptr;
+
+    if let Some((i, _)) = find_env(s) {
+        let mut item = platform::inner_environ[i];
+        let mut item_len = 0;
+        while *item.offset(item_len) != 0 {
+            item_len += 1;
+        }
+
+        if item_len > s_len {
+            ptr = item;
+        } else {
+            platform::free(item as *mut c_void);
+            ptr = platform::alloc(s_len as usize + 1) as *mut c_char;
+            platform::inner_environ[i] = ptr;
+        }
+    } else {
+        ptr = platform::alloc(s_len as usize + 1) as *mut c_char;
+        let i = platform::inner_environ.len() - 1;
+        assert_eq!(platform::inner_environ[i], ptr::null_mut(), "last element in environ vector was not null");
+        platform::inner_environ[i] = ptr;
+        platform::inner_environ.push(ptr::null_mut());
+
+        platform::environ = platform::inner_environ.as_mut_ptr();
+    }
+    for i in 0..=s_len {
+        *ptr.offset(i) = *s.offset(i);
+    }
+    0
 }
 
 #[no_mangle]
