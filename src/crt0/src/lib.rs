@@ -61,7 +61,7 @@ impl Stack {
 #[no_mangle]
 pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
     extern "C" {
-        fn main(argc: isize, argv: *const *const u8) -> c_int;
+        fn main(argc: isize, argv: *const *const c_char, envp: *const *const c_char) -> c_int;
     }
 
     let argc = sp.argc();
@@ -89,7 +89,7 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
     platform::inner_environ.push(ptr::null_mut());
     platform::environ = platform::inner_environ.as_mut_ptr();
 
-    platform::exit(main(argc, argv));
+    platform::exit(main(argc, argv as *const *const c_char, envp as *const *const c_char));
 }
 
 #[panic_implementation]
