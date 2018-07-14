@@ -214,7 +214,7 @@ pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     e(unsafe { syscall!(OPENAT, AT_FDCWD, path, oflag, mode) }) as c_int
 }
 
-pub fn pipe(mut fildes: [c_int; 2]) -> c_int {
+pub fn pipe(fildes: &mut [c_int]) -> c_int {
     e(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), 0) }) as c_int
 }
 

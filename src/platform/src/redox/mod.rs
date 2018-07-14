@@ -459,7 +459,7 @@ pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     e(syscall::open(path, (oflag as usize) | (mode as usize))) as c_int
 }
 
-pub fn pipe(mut fds: [c_int; 2]) -> c_int {
+pub fn pipe(fds: &mut [c_int]) -> c_int {
     let mut usize_fds: [usize; 2] = [0; 2];
     let res = e(syscall::pipe2(&mut usize_fds, 0));
     fds[0] = usize_fds[0] as c_int;

@@ -11,7 +11,7 @@ extern crate stdio;
 extern crate string;
 extern crate sys_utsname;
 
-use core::ptr;
+use core::{ptr, slice};
 
 use platform::types::*;
 
@@ -347,8 +347,8 @@ pub extern "C" fn pause() -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn pipe(fildes: [c_int; 2]) -> c_int {
-    platform::pipe(fildes)
+pub unsafe extern "C" fn pipe(fildes: *mut c_int) -> c_int {
+    platform::pipe(slice::from_raw_parts_mut(fildes, 2))
 }
 
 // #[no_mangle]
