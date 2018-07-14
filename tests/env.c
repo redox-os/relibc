@@ -2,10 +2,10 @@
 #include <stdlib.h>
 
 int main() {
-    puts(getenv("SHELL"));
-    puts(getenv("CC"));
+    //puts(getenv("SHELL"));
+    //puts(getenv("CC"));
 
-    putenv("KEK=lol");
+    putenv("TEST=It's working!!");
 
-    puts(getenv("KEK"));
+    puts(getenv("TEST"));
 }
