@@ -89,7 +89,11 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
     platform::inner_environ.push(ptr::null_mut());
     platform::environ = platform::inner_environ.as_mut_ptr();
 
-    platform::exit(main(argc, argv as *const *const c_char, envp as *const *const c_char));
+    platform::exit(main(
+        argc,
+        argv as *const *const c_char,
+        envp as *const *const c_char,
+    ));
 }
 
 #[panic_implementation]

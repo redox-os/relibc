@@ -341,7 +341,13 @@ pub unsafe extern "C" fn strftime(
     format: *const c_char,
     timeptr: *const tm,
 ) -> size_t {
-    strftime::strftime(true, &mut platform::UnsafeStringWriter(s as *mut u8), maxsize, format, timeptr)
+    strftime::strftime(
+        true,
+        &mut platform::UnsafeStringWriter(s as *mut u8),
+        maxsize,
+        format,
+        timeptr,
+    )
 }
 
 // #[no_mangle]

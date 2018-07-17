@@ -264,7 +264,11 @@ unsafe fn find_env(name: *const c_char) -> Option<(usize, *mut c_char)> {
     for (i, item) in platform::inner_environ.iter().enumerate() {
         let mut item = *item;
         if item == ptr::null_mut() {
-            assert_eq!(i, platform::inner_environ.len() - 1, "an early null pointer in environ vector");
+            assert_eq!(
+                i,
+                platform::inner_environ.len() - 1,
+                "an early null pointer in environ vector"
+            );
             break;
         }
         let mut name = name;
@@ -498,7 +502,11 @@ pub unsafe extern "C" fn putenv(s: *mut c_char) -> c_int {
     } else {
         ptr = platform::alloc(s_len as usize + 1) as *mut c_char;
         let i = platform::inner_environ.len() - 1;
-        assert_eq!(platform::inner_environ[i], ptr::null_mut(), "last element in environ vector was not null");
+        assert_eq!(
+            platform::inner_environ[i],
+            ptr::null_mut(),
+            "last element in environ vector was not null"
+        );
         platform::inner_environ[i] = ptr;
         platform::inner_environ.push(ptr::null_mut());
 

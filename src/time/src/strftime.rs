@@ -1,9 +1,15 @@
 use alloc::string::String;
-use platform::Write;
 use platform::types::*;
+use platform::Write;
 use tm;
 
-pub unsafe fn strftime<W: Write>(toplevel: bool, mut w: &mut W, maxsize: usize, mut format: *const c_char, t: *const tm) -> size_t {
+pub unsafe fn strftime<W: Write>(
+    toplevel: bool,
+    mut w: &mut W,
+    maxsize: usize,
+    mut format: *const c_char,
+    t: *const tm,
+) -> size_t {
     let mut written = 0;
     if toplevel {
         // Reserve nul byte
@@ -52,7 +58,7 @@ pub unsafe fn strftime<W: Write>(toplevel: bool, mut w: &mut W, maxsize: usize, 
         "Wednesday",
         "Thursday",
         "Friday",
-        "Saturday"
+        "Saturday",
     ];
     const MONTHS: [&'static str; 12] = [
         "January",
@@ -66,12 +72,12 @@ pub unsafe fn strftime<W: Write>(toplevel: bool, mut w: &mut W, maxsize: usize, 
         "September",
         "October",
         "November",
-        "December"
+        "December",
     ];
 
     while *format != 0 {
         if *format as u8 != b'%' {
-            w!(byte *format as u8);
+            w!(byte(*format as u8));
             format = format.offset(1);
             continue;
         }
@@ -98,7 +104,7 @@ pub unsafe fn strftime<W: Write>(toplevel: bool, mut w: &mut W, maxsize: usize, 
                     year += 1;
                 }
                 w!("{:02}", year + 19);
-            },
+            }
             b'd' => w!("{:02}", (*t).tm_mday),
             b'D' => w!(recurse "%m/%d/%y"),
             b'e' => w!("{:2}", (*t).tm_mday),
@@ -129,9 +135,9 @@ pub unsafe fn strftime<W: Write>(toplevel: bool, mut w: &mut W, maxsize: usize, 
             b'y' => w!("{:02}", (*t).tm_year % 100),
             b'Y' => w!("{}", (*t).tm_year + 1900),
             b'z' => w!("+0000"), // TODO
-            b'Z' => w!("UTC"), // TODO
+            b'Z' => w!("UTC"),   // TODO
             b'+' => w!(recurse "%a %b %d %T %Z %Y"),
-            _ => return 0
+            _ => return 0,
         }
 
         format = format.offset(1);
