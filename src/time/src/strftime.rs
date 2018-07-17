@@ -84,7 +84,7 @@ pub unsafe fn strftime<W: Write>(
 
         format = format.offset(1);
 
-        if *format == b'E' || *format == b'O' {
+        if *format as u8 == b'E' || *format as u8 == b'O' {
             // Ignore because these do nothing without locale
             format = format.offset(1);
         }
