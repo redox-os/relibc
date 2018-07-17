@@ -56,6 +56,7 @@ string/strspn
 string/strstr
 string/strtok
 string/strtok_r
+strftime
 strings
 system
 time

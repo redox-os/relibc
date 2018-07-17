@@ -1,13 +1,16 @@
 //! time implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/time.h.html
 
 #![no_std]
-#![feature(const_fn)]
+#![feature(alloc, const_fn)]
 
+#[macro_use]
+extern crate alloc;
 extern crate errno;
 extern crate platform;
 
 pub mod constants;
 mod helpers;
+mod strftime;
 
 use constants::*;
 use core::mem::transmute;
@@ -286,7 +289,7 @@ pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut t
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
+pub unsafe extern "C" fn mktime(t: *const tm) -> time_t {
     let mut year = (*t).tm_year + 1900;
     let mut month = (*t).tm_mon;
     let mut day = (*t).tm_mday as i64 - 1;
@@ -331,14 +334,14 @@ pub extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int
     platform::nanosleep(rqtp, rmtp)
 }
 
-// #[no_mangle]
-pub extern "C" fn strftime(
+#[no_mangle]
+pub unsafe extern "C" fn strftime(
     s: *mut c_char,
     maxsize: usize,
     format: *const c_char,
-    timptr: *const tm,
-) -> usize {
-    unimplemented!();
+    timeptr: *const tm,
+) -> size_t {
+    strftime::strftime(true, &mut platform::UnsafeStringWriter(s as *mut u8), maxsize, format, timeptr)
 }
 
 // #[no_mangle]

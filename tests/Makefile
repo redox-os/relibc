@@ -29,6 +29,7 @@ EXPECT_BINS=\
 	setjmp \
 	sleep \
 	sprintf \
+	strftime \
 	strings \
 	stdio/fwrite \
 	stdio/all \
