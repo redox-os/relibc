@@ -142,7 +142,7 @@ pub unsafe extern "C" fn strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
     strncmp(s1, s2, usize::MAX)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn strcoll(s1: *const c_char, s2: *const c_char) -> c_int {
     // relibc has no locale stuff (yet)
     strcmp(s1, s2)
