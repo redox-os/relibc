@@ -205,55 +205,8 @@ pub extern "C" fn gethostid() -> c_long {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
-    #[cfg(target_os = "linux")]
-    {
-        use core::mem;
-
-        // len only needs to be mutable on linux
-        let mut len = len;
-
-        let mut uts: sys_utsname::utsname = mem::uninitialized();
-        let err = sys_utsname::uname(&mut uts);
-        if err < 0 {
-            mem::forget(uts);
-            return err;
-        }
-        for c in uts.nodename.iter() {
-            if len == 0 {
-                break;
-            }
-            len -= 1;
-
-            *name = *c;
-
-            if *name == 0 {
-                // We do want to copy the zero also, so we check this after the copying.
-                break;
-            }
-
-            name = name.offset(1);
-        }
-    }
-    #[cfg(target_os = "redox")]
-    {
-        use platform::syscall::flag::*;
-        use platform::{e, FileReader, Read};
-
-        let fd = e(platform::syscall::open("/etc/hostname", O_RDONLY)) as i32;
-        if fd < 0 {
-            return fd;
-        }
-        let mut reader = FileReader(fd);
-        for _ in 0..len {
-            if !reader.read_u8(&mut *(name as *mut u8)) {
-                *name = 0;
-                break;
-            }
-            name = name.offset(1);
-        }
-    }
-    0
+pub unsafe extern "C" fn gethostname(name: *mut c_char, len: size_t) -> c_int {
+    platform::gethostname(name, len)
 }
 
 // #[no_mangle]

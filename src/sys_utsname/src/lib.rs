@@ -23,7 +23,7 @@ mod inner {
 
     #[no_mangle]
     pub unsafe extern "C" fn uname(uts: *mut utsname) -> c_int {
-        platform::uname(uts as usize)
+        platform::uname(uts as *mut platform::utsname)
     }
 }
 #[cfg(target_os = "linux")]

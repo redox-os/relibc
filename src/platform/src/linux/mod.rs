@@ -1,4 +1,4 @@
-use core::ptr;
+use core::{mem, ptr};
 
 use types::*;
 use *;
@@ -7,6 +7,19 @@ const AT_FDCWD: c_int = -100;
 const AT_EMPTY_PATH: c_int = 0x1000;
 const AT_REMOVEDIR: c_int = 0x200;
 const AT_SYMLINK_NOFOLLOW: c_int = 0x100;
+
+// Also in sys_utsname. Has to be both because cbindgen
+const UTSLENGTH: usize = 65;
+
+#[repr(C)]
+pub struct utsname {
+    pub sysname: [c_char; UTSLENGTH],
+    pub nodename: [c_char; UTSLENGTH],
+    pub release: [c_char; UTSLENGTH],
+    pub version: [c_char; UTSLENGTH],
+    pub machine: [c_char; UTSLENGTH],
+    pub domainname: [c_char; UTSLENGTH],
+}
 
 pub fn e(sys: usize) -> usize {
     if (sys as isize) < 0 && (sys as isize) >= -256 {
@@ -121,6 +134,34 @@ pub fn geteuid() -> uid_t {
 
 pub fn getgid() -> gid_t {
     e(unsafe { syscall!(GETGID) })
+}
+
+pub unsafe fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
+    // len only needs to be mutable on linux
+    let mut len = len;
+
+    let mut uts = mem::uninitialized();
+    let err = uname(&mut uts);
+    if err < 0 {
+        mem::forget(uts);
+        return err;
+    }
+    for c in uts.nodename.iter() {
+        if len == 0 {
+            break;
+        }
+        len -= 1;
+
+        *name = *c;
+
+        if *name == 0 {
+            // We do want to copy the zero also, so we check this after the copying.
+            break;
+        }
+
+        name = name.offset(1);
+    }
+    0
 }
 
 pub unsafe fn getpeername(
@@ -309,7 +350,7 @@ pub fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *m
     e(unsafe { syscall!(SOCKETPAIR, domain, kind, protocol, socket_vector) }) as c_int
 }
 
-pub fn uname(utsname: usize) -> c_int {
+pub fn uname(utsname: *mut utsname) -> c_int {
     e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
 }
 

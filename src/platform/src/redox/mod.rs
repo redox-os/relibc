@@ -284,6 +284,22 @@ pub fn getgid() -> gid_t {
     e(syscall::getgid()) as gid_t
 }
 
+pub unsafe fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
+    let fd = e(syscall::open("/etc/hostname", O_RDONLY)) as i32;
+    if fd < 0 {
+        return fd;
+    }
+    let mut reader = FileReader(fd);
+    for _ in 0..len {
+        if !reader.read_u8(&mut *(name as *mut u8)) {
+            *name = 0;
+            break;
+        }
+        name = name.offset(1);
+    }
+    0
+}
+
 unsafe fn inner_get_name(
     local: bool,
     socket: c_int,
