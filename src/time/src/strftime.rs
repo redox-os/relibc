@@ -124,11 +124,6 @@ pub unsafe fn strftime<W: Write>(
             b'S' => w!("{:02}", (*t).tm_sec),
             b'T' => w!(recurse "%H:%M:%S"),
             b'u' => w!("{}", ((*t).tm_wday + 7 - 1) % 7 + 1),
-            // I'm kinda confused. This is the musl code. For me this returns
-            // week 28 even though it's week 29. In fact, how *would* this even
-            // work if it's restricted by tm_yday and tm_wday (see the man
-            // page), considering years can start at different days of the
-            // week???
             b'U' => w!("{}", ((*t).tm_yday + 7 - (*t).tm_wday) / 7),
             b'w' => w!("{}", (*t).tm_wday),
             b'W' => w!("{}", ((*t).tm_yday + 7 - ((*t).tm_wday + 6) % 7) / 7),
