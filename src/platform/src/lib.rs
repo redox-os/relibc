@@ -11,7 +11,7 @@ extern crate alloc;
 extern crate sc;
 
 #[cfg(all(not(feature = "no_std"), target_os = "redox"))]
-pub extern crate syscall;
+extern crate syscall;
 
 pub use allocator::*;
 

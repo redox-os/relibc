@@ -21,7 +21,7 @@ pub struct utsname {
     pub domainname: [c_char; UTSLENGTH],
 }
 
-pub fn e(sys: usize) -> usize {
+fn e(sys: usize) -> usize {
     if (sys as isize) < 0 && (sys as isize) >= -256 {
         unsafe {
             errno = -(sys as isize) as c_int;

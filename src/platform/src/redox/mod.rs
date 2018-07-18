@@ -19,7 +19,7 @@ struct SockData {
     _pad: [c_char; 8],
 }
 
-pub fn e(sys: Result<usize>) -> usize {
+fn e(sys: Result<usize>) -> usize {
     match sys {
         Ok(ok) => ok,
         Err(err) => {
