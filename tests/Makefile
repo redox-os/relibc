@@ -1,5 +1,6 @@
 # Binaries that should generate the same output every time
 EXPECT_BINS=\
+	arpainet \
 	assert \
 	atof \
 	atoi \

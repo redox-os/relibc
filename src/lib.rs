@@ -6,6 +6,7 @@
 //extern crate compiler_builtins;
 extern crate platform;
 
+pub extern crate arpainet;
 pub extern crate ctype;
 pub extern crate errno;
 pub extern crate fcntl;

@@ -1,0 +1,14 @@
+[package]
+name = "arpainet"
+version = "0.1.0"
+authors = ["Jeremy Soller <jackpot51@gmail.com>"]
+build = "build.rs"
+
+[build-dependencies]
+cbindgen = { path = "../../cbindgen" }
+
+[dependencies]
+platform = { path = "../platform" }
+errno = { path = "../errno" }
+sys_socket = { path = "../sys_socket" }
+netinet = { path = "../netinet" }

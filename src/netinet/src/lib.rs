@@ -1,3 +1,3 @@
 #![no_std]
 
-extern crate in_h;
+pub extern crate in_h;
