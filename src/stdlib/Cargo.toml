@@ -16,3 +16,4 @@ string = { path = "../string" }
 time = { path = "../time" }
 unistd = { path = "../unistd" }
 wchar = { path = "../wchar" }
+fcntl = { path = "../fcntl" }

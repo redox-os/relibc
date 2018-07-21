@@ -5,6 +5,7 @@
 
 extern crate ctype;
 extern crate errno;
+extern crate fcntl;
 extern crate platform;
 extern crate rand;
 extern crate string;
@@ -12,7 +13,7 @@ extern crate time;
 extern crate unistd;
 extern crate wchar;
 
-use core::{ptr, str};
+use core::{ptr, slice, str};
 use rand::distributions::Alphanumeric;
 use rand::prng::XorShiftRng;
 use rand::rngs::JitterRng;
@@ -21,6 +22,7 @@ use string::*;
 use wchar::*;
 
 use errno::*;
+use fcntl::*;
 use platform::types::*;
 
 mod sort;
@@ -456,9 +458,57 @@ fn get_nstime() -> u64 {
     ts.tv_nsec as u64
 }
 
-// #[no_mangle]
+#[no_mangle]
+pub extern "C" fn mkostemps(name: *mut c_char, suffix_len: c_int, mut flags: c_int) -> c_int {
+    use core::iter;
+    let len = unsafe { strlen(name) } as c_int;
+
+    if len < 6 || suffix_len > len - 6 {
+        unsafe { platform::errno = errno::EINVAL };
+        return -1;
+    }
+
+    for i in (len - suffix_len - 6)..(len - suffix_len) {
+        if unsafe { *name.offset(i as isize) } != b'X' as c_char {
+            unsafe { platform::errno = errno::EINVAL };
+            return -1;
+        }
+    }
+
+    flags -= flags & O_ACCMODE;
+
+    let mut rng = JitterRng::new_with_timer(get_nstime);
+    rng.test_timer();
+
+    for _retries in 0..100 {
+        let char_iter = iter::repeat(()).map(|()| rng.sample(Alphanumeric)).take(6).enumerate();
+        unsafe {
+            for (i, c) in char_iter {
+                *name.offset((len as isize) - (suffix_len as isize) - (i as isize) - 1) = c as c_char
+            }
+        }
+
+        let fd = platform::open(name, flags | O_RDWR | O_CREAT | O_EXCL, 0600);
+
+        if fd >= 0 {
+            return fd;
+        }
+
+        unsafe { platform::errno = errno::EEXIST };
+    }
+
+    unsafe {
+        for i in 0..6 {
+            *name.offset((len as isize) - (suffix_len as isize) - (i as isize) - 1) = b'X' as c_char;
+        }
+    }
+
+    -1
+}
+
+#[no_mangle]
 pub extern "C" fn mkstemp(name: *mut c_char) -> c_int {
-    unimplemented!();
+    mkostemps(name, 0, 0)
 }
 
 // #[no_mangle]
