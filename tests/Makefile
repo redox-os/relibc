@@ -22,6 +22,7 @@ EXPECT_BINS=\
 	math \
 	mem \
 	mktime \
+	mkostemps \
 	pipe \
 	printf \
 	rename \
