@@ -1,78 +1,78 @@
 # Binaries that should generate the same output every time
 EXPECT_BINS=\
+	args \
 	arpainet \
 	assert \
-	atof \
-	atoi \
-	brk \
-	args \
-	create \
 	ctype \
-	dup \
-	env \
 	error \
-	exec \
-	fchdir \
-	fcntl \
-	fsync \
-	ftruncate \
-	getc_unget \
+	fcntl/create \
+	fcntl/fcntl \
 	locale \
-	localtime \
 	math \
-	mem \
-	mktime \
-	mkostemps \
-	pipe \
-	printf \
-	rename \
-	rmdir \
-	scanf \
 	setjmp \
-	sleep \
-	sprintf \
-	strftime \
-	strings \
-	stdio/fwrite \
 	stdio/all \
 	stdio/freopen \
+	stdio/fwrite \
+	stdio/getc_unget \
+	stdio/printf \
+	stdio/rename \
+	stdio/scanf \
+	stdio/sprintf \
+	stdlib/a64l \
+	stdlib/atof \
+	stdlib/atoi \
+	stdlib/env \
+	stdlib/mkostemps \
+	stdlib/rand \
 	stdlib/strtol \
 	stdlib/strtoul \
-	stdlib/a64l \
-	stdlib/rand \
-	string/strncmp \
-	string/strcspn \
+	stdlib/system \
+	string/mem \
 	string/strchr \
+	string/strcspn \
+	string/strncmp \
+	string/strpbrk \
 	string/strrchr \
 	string/strspn \
 	string/strstr \
-	string/strpbrk \
 	string/strtok \
 	string/strtok_r \
-	system \
+	strings \
+	time/asctime \
+	time/gmtime \
+	time/localtime \
+	time/mktime \
+	time/strftime \
+	time/time \
+	unistd/brk \
+	unistd/dup \
+	unistd/exec \
+	unistd/fchdir \
+	unistd/fsync \
+	unistd/ftruncate \
 	unistd/getopt \
+	unistd/pipe \
+	unistd/rmdir \
+	unistd/sleep \
+	unistd/write \
 	waitpid \
 	wchar/mbrtowc \
 	wchar/mbsrtowcs \
 	wchar/putwchar \
-	wchar/wcrtomb \
-	write \
-	time \
-	gmtime \
-	asctime
+	wchar/wcrtomb
 
 # Binaries that may generate varied output
 BINS=\
 	$(EXPECT_BINS) \
-	alloc \
-	chdir \
-	gethostname \
-	getid \
-	link \
-	setid \
+	stdlib/alloc \
 	stdlib/bsearch \
 	stdlib/mktemp \
-	unlink
+	unistd/chdir \
+	unistd/gethostname \
+	unistd/getid \
+	unistd/link \
+	unistd/setid \
+	unistd/unlink
 
 all: $(BINS)
 
