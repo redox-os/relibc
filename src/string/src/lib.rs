@@ -3,6 +3,7 @@
 
 extern crate errno;
 extern crate platform;
+extern crate utils;
 
 use core::cmp;
 use core::mem;
@@ -87,7 +88,7 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) 
 
 #[no_mangle]
 pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: usize) -> *mut c_void {
-    platform::memcpy(s1, s2, n)
+    utils::memcpy(s1, s2, n)
 }
 
 #[no_mangle]
@@ -211,7 +212,7 @@ pub unsafe extern "C" fn strerror(errnum: c_int) -> *mut c_char {
 
     static mut strerror_buf: [u8; 256] = [0; 256];
 
-    let mut w = platform::StringWriter(strerror_buf.as_mut_ptr(), strerror_buf.len());
+    let mut w = utils::StringWriter(strerror_buf.as_mut_ptr(), strerror_buf.len());
 
     if errnum >= 0 && errnum < STR_ERROR.len() as c_int {
         w.write_str(STR_ERROR[errnum as usize]);
@@ -229,7 +230,7 @@ pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn strnlen(s: *const c_char, size: usize) -> size_t {
-    platform::c_str_n(s, size).len() as size_t
+    utils::c_str_n(s, size).len() as size_t
 }
 
 #[no_mangle]
@@ -265,7 +266,7 @@ pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: usize)
 
 #[no_mangle]
 pub unsafe extern "C" fn strncpy(s1: *mut c_char, s2: *const c_char, n: usize) -> *mut c_char {
-    let s2_slice = platform::c_str_n(s2, n);
+    let s2_slice = utils::c_str_n(s2, n);
     let s2_len = s2_slice.len();
 
     //memcpy(s1 as *mut _, s2 as *const _, cmp::min(n, s2_len));

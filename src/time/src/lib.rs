@@ -7,6 +7,7 @@
 extern crate alloc;
 extern crate errno;
 extern crate platform;
+extern crate utils;
 
 pub mod constants;
 mod helpers;
@@ -78,7 +79,7 @@ pub extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
 pub extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_char {
     let tm = unsafe { &*tm };
     let result = core::fmt::write(
-        &mut platform::UnsafeStringWriter(buf as *mut u8),
+        &mut utils::UnsafeStringWriter(buf as *mut u8),
         format_args!(
             "{:.3} {:.3}{:3} {:02}:{:02}:{:02} {}\n",
             DAY_NAMES[tm.tm_wday as usize],
@@ -343,7 +344,7 @@ pub unsafe extern "C" fn strftime(
 ) -> size_t {
     strftime::strftime(
         true,
-        &mut platform::UnsafeStringWriter(s as *mut u8),
+        &mut utils::UnsafeStringWriter(s as *mut u8),
         maxsize,
         format,
         timeptr,

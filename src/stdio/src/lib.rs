@@ -12,18 +12,20 @@ extern crate fcntl;
 #[macro_use]
 extern crate lazy_static;
 extern crate platform;
+extern crate utils;
 extern crate string;
 extern crate va_list as vl;
 
 use core::fmt::Write as WriteFmt;
 use core::fmt::{self, Error, Result};
 use core::sync::atomic::{AtomicBool, Ordering};
-use core::{mem, ptr, str};
+use core::{ptr, str};
 
 use alloc::vec::Vec;
 use errno::STR_ERROR;
 use platform::types::*;
-use platform::{c_str, errno, Read, Write};
+use platform::errno;
+use utils::{c_str, Read, Write};
 use vl::VaList as va_list;
 
 mod printf;
@@ -713,7 +715,7 @@ pub extern "C" fn pclose(_stream: &mut FILE) -> c_int {
 pub unsafe extern "C" fn perror(s: *const c_char) {
     let s_str = str::from_utf8_unchecked(c_str(s));
 
-    let mut w = platform::FileWriter(2);
+    let mut w = utils::FileWriter(2);
     if errno >= 0 && errno < STR_ERROR.len() as c_int {
         w.write_fmt(format_args!("{}: {}\n", s_str, STR_ERROR[errno as usize]))
             .unwrap();
@@ -910,7 +912,7 @@ pub unsafe extern "C" fn vsnprintf(
     ap: va_list,
 ) -> c_int {
     printf::printf(
-        &mut platform::StringWriter(s as *mut u8, n as usize),
+        &mut utils::StringWriter(s as *mut u8, n as usize),
         format,
         ap,
     )
@@ -918,7 +920,7 @@ pub unsafe extern "C" fn vsnprintf(
 
 #[no_mangle]
 pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_list) -> c_int {
-    printf::printf(&mut platform::UnsafeStringWriter(s as *mut u8), format, ap)
+    printf::printf(&mut utils::UnsafeStringWriter(s as *mut u8), format, ap)
 }
 
 #[no_mangle]
@@ -934,7 +936,7 @@ pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
     scanf::scanf(
-        &mut platform::UnsafeStringReader(s as *const u8),
+        &mut utils::UnsafeStringReader(s as *const u8),
         format,
         ap,
     )

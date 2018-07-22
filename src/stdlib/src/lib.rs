@@ -7,6 +7,7 @@ extern crate ctype;
 extern crate errno;
 extern crate fcntl;
 extern crate platform;
+extern crate utils;
 extern crate rand;
 extern crate string;
 extern crate time;
@@ -643,7 +644,7 @@ pub unsafe extern "C" fn strtod(s: *const c_char, endptr: *mut *mut c_char) -> c
 
     use core::str::FromStr;
 
-    let s_str = str::from_utf8_unchecked(platform::c_str(s));
+    let s_str = str::from_utf8_unchecked(utils::c_str(s));
     match f64::from_str(s_str) {
         Ok(ok) => ok as c_double,
         Err(_err) => {

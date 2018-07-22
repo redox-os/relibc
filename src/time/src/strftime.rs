@@ -1,6 +1,6 @@
 use alloc::string::String;
 use platform::types::*;
-use platform::Write;
+use utils::Write;
 use tm;
 
 pub unsafe fn strftime<W: Write>(

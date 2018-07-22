@@ -9,4 +9,5 @@ cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
 platform = { path = "../platform" }
+utils = { path = "../utils" }
 errno = { path = "../errno" }

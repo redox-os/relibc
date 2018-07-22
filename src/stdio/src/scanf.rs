@@ -1,7 +1,7 @@
 use alloc::String;
 use alloc::Vec;
 use platform::types::*;
-use platform::Read;
+use utils::Read;
 #[cfg(not(test))]
 use vl::VaList;
 

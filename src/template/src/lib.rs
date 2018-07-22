@@ -3,6 +3,7 @@
 #![no_std]
 
 extern crate platform;
+extern crate utils;
 
 use platform::types::*;
 

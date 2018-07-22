@@ -1,7 +1,8 @@
 use core::{slice, str};
 
 use platform::types::*;
-use platform::{self, Write};
+use utils;
+use utils::Write;
 use vl::VaList;
 
 pub unsafe fn printf<W: Write>(mut w: W, format: *const c_char, mut ap: VaList) -> c_int {
@@ -59,7 +60,7 @@ pub unsafe fn printf<W: Write>(mut w: W, format: *const c_char, mut ap: VaList) 
 
                     found_percent = false;
 
-                    w.write_str(str::from_utf8_unchecked(platform::c_str(a)))
+                    w.write_str(str::from_utf8_unchecked(utils::c_str(a)))
                 }
                 'u' => {
                     let a = ap.get::<c_uint>();

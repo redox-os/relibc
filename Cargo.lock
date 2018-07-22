@@ -15,6 +15,7 @@ dependencies = [
  "netinet 0.1.0",
  "platform 0.1.0",
  "sys_socket 0.1.0",
+ "utils 0.1.0",
 ]
 
 [[package]]
@@ -80,6 +81,7 @@ name = "crt0"
 version = "0.1.0"
 dependencies = [
  "platform 0.1.0",
+ "utils 0.1.0",
 ]
 
 [[package]]
@@ -326,6 +328,7 @@ dependencies = [
  "sys_wait 0.1.0",
  "time 0.1.0",
  "unistd 0.1.0",
+ "utils 0.1.0",
  "wchar 0.1.0",
  "wctype 0.1.0",
 ]
@@ -433,6 +436,7 @@ dependencies = [
  "lazy_static 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "platform 0.1.0",
  "string 0.1.0",
+ "utils 0.1.0",
  "va_list 0.1.0",
 ]
 
@@ -449,6 +453,7 @@ dependencies = [
  "string 0.1.0",
  "time 0.1.0",
  "unistd 0.1.0",
+ "utils 0.1.0",
  "wchar 0.1.0",
 ]
 
@@ -459,6 +464,7 @@ dependencies = [
  "cbindgen 0.5.2",
  "errno 0.1.0",
  "platform 0.1.0",
+ "utils 0.1.0",
 ]
 
 [[package]]
@@ -584,6 +590,7 @@ dependencies = [
  "cbindgen 0.5.2",
  "errno 0.1.0",
  "platform 0.1.0",
+ "utils 0.1.0",
 ]
 
 [[package]]
@@ -624,6 +631,13 @@ dependencies = [
  "stdio 0.1.0",
  "string 0.1.0",
  "sys_utsname 0.1.0",
+]
+
+[[package]]
+name = "utils"
+version = "0.1.0"
+dependencies = [
+ "platform 0.1.0",
 ]
 
 [[package]]

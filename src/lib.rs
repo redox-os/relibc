@@ -5,6 +5,7 @@
 
 //extern crate compiler_builtins;
 extern crate platform;
+extern crate utils;
 
 pub extern crate arpainet;
 pub extern crate ctype;
@@ -41,7 +42,7 @@ pub extern crate wctype;
 pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
     use core::fmt::Write;
 
-    let mut w = platform::FileWriter(2);
+    let mut w = utils::FileWriter(2);
     let _ = w.write_fmt(format_args!("RELIBC PANIC: {}\n", pi));
 
     platform::exit(1);
@@ -60,7 +61,7 @@ pub extern "C" fn rust_eh_personality() {}
 pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
     use core::fmt::Write;
 
-    let mut w = platform::FileWriter(2);
+    let mut w = utils::FileWriter(2);
     let _ = w.write_fmt(format_args!(
         "RELIBC OOM: {} bytes aligned to {} bytes\n",
         layout.size(),
@@ -77,7 +78,7 @@ pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
 pub extern "C" fn _Unwind_Resume() -> ! {
     use core::fmt::Write;
 
-    let mut w = platform::FileWriter(2);
+    let mut w = utils::FileWriter(2);
     let _ = w.write_str("_Unwind_Resume\n");
 
     platform::exit(1);

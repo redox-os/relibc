@@ -9,6 +9,7 @@ cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
 platform = { path = "../platform" }
+utils = { path = "../utils" }
 errno = { path = "../errno" }
 sys_socket = { path = "../sys_socket" }
 netinet = { path = "../netinet" }

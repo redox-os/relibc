@@ -12,5 +12,6 @@ errno = { path = "../errno"}
 fcntl = { path = "../fcntl" }
 lazy_static = { version = "*", features = ["nightly", "spin_no_std"] }
 platform = { path = "../platform" }
+utils = { path = "../utils" }
 string = { path = "../string" }
 va_list = { path = "../../va_list", features = ["no_std"] }

@@ -10,6 +10,7 @@
 
 extern crate alloc;
 extern crate platform;
+extern crate utils;
 
 use alloc::Vec;
 use core::ptr;
@@ -102,7 +103,7 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
 pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
     use core::fmt::Write;
 
-    let mut w = platform::FileWriter(2);
+    let mut w = utils::FileWriter(2);
     let _ = w.write_fmt(format_args!("RELIBC CRT0 PANIC: {}\n", pi));
 
     platform::exit(1);
@@ -114,7 +115,7 @@ pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
 pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
     use core::fmt::Write;
 
-    let mut w = platform::FileWriter(2);
+    let mut w = utils::FileWriter(2);
     let _ = w.write_fmt(format_args!(
         "RELIBC OOM: {} bytes aligned to {} bytes\n",
         layout.size(),
