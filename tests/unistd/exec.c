@@ -2,8 +2,8 @@
 #include <stdio.h>
 
 int main(int argc, char** argv) {
-    char *const args[1] = {"arg"};
-    execv("write", args);
+    char* args[] = {"sh", "-c", "echo 'exec works :D'", NULL};
+    execv("/bin/sh", args);
     perror("execv");
     return 0;
 }
