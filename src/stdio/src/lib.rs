@@ -12,8 +12,8 @@ extern crate fcntl;
 #[macro_use]
 extern crate lazy_static;
 extern crate platform;
-extern crate utils;
 extern crate string;
+extern crate utils;
 extern crate va_list as vl;
 
 use core::fmt::Write as WriteFmt;
@@ -23,8 +23,8 @@ use core::{ptr, str};
 
 use alloc::vec::Vec;
 use errno::STR_ERROR;
-use platform::types::*;
 use platform::errno;
+use platform::types::*;
 use utils::{c_str, Read, Write};
 use vl::VaList as va_list;
 
@@ -935,9 +935,5 @@ pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
-    scanf::scanf(
-        &mut utils::UnsafeStringReader(s as *const u8),
-        format,
-        ap,
-    )
+    scanf::scanf(&mut utils::UnsafeStringReader(s as *const u8), format, ap)
 }

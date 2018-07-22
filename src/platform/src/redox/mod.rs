@@ -613,14 +613,14 @@ pub unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction)
         Some(syscall::SigAction {
             sa_handler: sig_handler,
             sa_mask: [m[0] as u64, 0],
-            sa_flags: (*act).sa_flags as usize
+            sa_flags: (*act).sa_flags as usize,
         })
     };
     let mut old = syscall::SigAction::default();
     let ret = e(syscall::sigaction(
         sig as usize,
         act.as_ref(),
-        if oact.is_null() { None } else { Some(&mut old) }
+        if oact.is_null() { None } else { Some(&mut old) },
     )) as c_int;
     if !oact.is_null() {
         let m = old.sa_mask;

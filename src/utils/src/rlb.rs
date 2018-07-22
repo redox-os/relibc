@@ -1,6 +1,6 @@
-use core::{mem, str, ptr};
-use platform::read;
 use alloc::boxed::Box;
+use core::{mem, ptr, str};
+use platform::read;
 
 /// Implements an `Iterator` which returns on either newline or EOF.
 #[derive(Clone, Copy)]
@@ -37,9 +37,9 @@ impl Iterator for RawLineBuffer {
     type Item = Box<str>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.cur != 0 && self.read != 0 {
-            if let Some(mut pos) = self.buf[self.cur..self.read].iter().position(
-                |&x| x == b'\n',
-            )
+            if let Some(mut pos) = self.buf[self.cur..self.read]
+                .iter()
+                .position(|&x| x == b'\n')
             {
                 pos += self.cur + 1;
                 let line = unsafe { str::from_utf8_unchecked(&self.buf[self.cur..pos]) };

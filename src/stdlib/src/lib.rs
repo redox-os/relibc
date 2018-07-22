@@ -7,11 +7,11 @@ extern crate ctype;
 extern crate errno;
 extern crate fcntl;
 extern crate platform;
-extern crate utils;
 extern crate rand;
 extern crate string;
 extern crate time;
 extern crate unistd;
+extern crate utils;
 extern crate wchar;
 
 use core::{iter, mem, ptr, slice, str};

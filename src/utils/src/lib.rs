@@ -1,7 +1,6 @@
-//! A set of commonly used functions to be used throughout relibc 
+//! A set of commonly used functions to be used throughout relibc
 
 #![no_std]
-
 #![feature(alloc)]
 extern crate alloc;
 

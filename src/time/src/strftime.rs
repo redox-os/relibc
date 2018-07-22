@@ -1,7 +1,7 @@
 use alloc::string::String;
 use platform::types::*;
-use utils::Write;
 use tm;
+use utils::Write;
 
 pub unsafe fn strftime<W: Write>(
     toplevel: bool,

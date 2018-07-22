@@ -27,7 +27,7 @@ pub struct sigaction {
     pub sa_handler: extern "C" fn(c_int),
     pub sa_flags: c_ulong,
     pub sa_restorer: unsafe extern "C" fn(),
-    pub sa_mask: sigset_t
+    pub sa_mask: sigset_t,
 }
 
 const NSIG: usize = 64;
@@ -35,8 +35,8 @@ const NSIG: usize = 64;
 pub use sys::*;
 
 use core::{mem, ptr};
-use platform::types::*;
 use platform::sigset_t;
+use platform::types::*;
 
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
@@ -54,7 +54,11 @@ pub extern "C" fn raise(sig: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {
+pub unsafe extern "C" fn sigaction(
+    sig: c_int,
+    act: *const sigaction,
+    oact: *mut sigaction,
+) -> c_int {
     let mut _sigaction = None;
     let ptr = if !act.is_null() {
         _sigaction = Some((*act).clone());
@@ -120,7 +124,7 @@ pub extern "C" fn signal(sig: c_int, func: extern "C" fn(c_int)) -> extern "C" f
         sa_handler: func,
         sa_flags: SA_RESTART as c_ulong,
         sa_restorer: __restore_rt,
-        sa_mask: sigset_t::default()
+        sa_mask: sigset_t::default(),
     };
     let mut old_sa = unsafe { mem::uninitialized() };
     if unsafe { sigaction(sig, &sa, &mut old_sa) } < 0 {

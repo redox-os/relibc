@@ -69,7 +69,7 @@ pub struct sigaction {
     pub sa_handler: extern "C" fn(c_int),
     pub sa_flags: c_ulong,
     pub sa_restorer: unsafe extern "C" fn(),
-    pub sa_mask: sigset_t
+    pub sa_mask: sigset_t,
 }
 
 const NSIG: usize = 64;

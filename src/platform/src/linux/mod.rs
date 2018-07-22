@@ -350,7 +350,13 @@ pub fn shutdown(socket: c_int, how: c_int) -> c_int {
 }
 
 pub unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {
-    e(syscall!(RT_SIGACTION, sig, act, oact, mem::size_of::<sigset_t>())) as c_int
+    e(syscall!(
+        RT_SIGACTION,
+        sig,
+        act,
+        oact,
+        mem::size_of::<sigset_t>()
+    )) as c_int
 }
 
 pub fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
