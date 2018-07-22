@@ -259,6 +259,17 @@ pub fn pipe(fildes: &mut [c_int]) -> c_int {
     e(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), 0) }) as c_int
 }
 
+pub fn raise(sig: c_int) -> c_int {
+    let tid = e(unsafe { syscall!(GETTID) }) as pid_t;
+    let ret = if tid == !0 {
+        -1
+    } else {
+        e(unsafe { syscall!(TKILL, tid, sig) }) as c_int
+    };
+
+    ret
+}
+
 pub fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
     e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
 }
@@ -336,6 +347,14 @@ pub fn setsockopt(
 
 pub fn shutdown(socket: c_int, how: c_int) -> c_int {
     e(unsafe { syscall!(SHUTDOWN, socket, how) }) as c_int
+}
+
+pub unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {
+    e(syscall!(RT_SIGACTION, sig, act, oact, mem::size_of::<sigset_t>())) as c_int
+}
+
+pub fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
+    e(unsafe { syscall!(RT_SIGPROCMASK, how, set, oset, mem::size_of::<sigset_t>()) }) as c_int
 }
 
 pub fn stat(file: *const c_char, buf: *mut stat) -> c_int {

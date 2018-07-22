@@ -61,8 +61,8 @@ pub type nlink_t = usize;
 pub type blksize_t = isize;
 pub type blkcnt_t = u64;
 
-pub type useconds_t = i32;
-pub type suseconds_t = i64;
+pub type useconds_t = c_uint;
+pub type suseconds_t = c_int;
 
 pub type clock_t = i64;
 pub type clockid_t = i32;

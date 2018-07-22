@@ -10,6 +10,7 @@ EXPECT_BINS=\
 	locale \
 	math \
 	setjmp \
+	signal \
 	stdio/all \
 	stdio/freopen \
 	stdio/fwrite \

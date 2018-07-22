@@ -11,6 +11,7 @@ fcntl/fcntl
 locale
 math
 setjmp
+signal
 stdio/all
 stdio/freopen
 stdio/fwrite

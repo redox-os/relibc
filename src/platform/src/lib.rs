@@ -1,7 +1,7 @@
 #![no_std]
 #![allow(non_camel_case_types)]
 #![feature(alloc, allocator_api, const_vec_new)]
-//TODO #![feature(thread_local)]
+#![cfg_attr(target_os = "redox", feature(thread_local))]
 
 #[cfg_attr(target_os = "redox", macro_use)]
 extern crate alloc;
@@ -36,7 +36,7 @@ mod sys;
 pub mod types;
 
 use alloc::Vec;
-use core::{fmt, ptr};
+use core::{fmt, mem, ptr};
 
 use types::*;
 
@@ -49,15 +49,32 @@ pub const SOCK_DGRAM: c_int = 2;
 pub const SOCK_NONBLOCK: c_int = 0o4000;
 pub const SOCK_CLOEXEC: c_int = 0o2000000;
 
+pub const SIG_BLOCK: c_int = 0;
+pub const SIG_UNBLOCK: c_int = 1;
+pub const SIG_SETMASK: c_int = 2;
+
 pub type in_addr_t = [u8; 4];
 pub type in_port_t = u16;
 pub type sa_family_t = u16;
 pub type socklen_t = u32;
 
+#[repr(C)]
 pub struct sockaddr {
     pub sa_family: sa_family_t,
     pub data: [c_char; 14],
 }
+
+#[repr(C)]
+pub struct sigaction {
+    pub sa_handler: extern "C" fn(c_int),
+    pub sa_flags: c_ulong,
+    pub sa_restorer: unsafe extern "C" fn(),
+    pub sa_mask: sigset_t
+}
+
+const NSIG: usize = 64;
+
+pub type sigset_t = [c_ulong; NSIG / (8 * mem::size_of::<c_ulong>())];
 
 //TODO #[thread_local]
 #[allow(non_upper_case_globals)]

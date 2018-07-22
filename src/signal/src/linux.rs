@@ -1,7 +1,18 @@
-#[repr(C)]
-pub struct sys_sigset_t {
-    pub bits: [u64; 16],
-}
+// Needs to be defined in assembly because it can't have a function prologue
+#[cfg(target_arch = "x86_64")]
+global_asm!("
+    .global __restore_rt
+    __restore_rt:
+        mov $15, %rax # <- rax is register, 15 is RT_SIGRETURN
+        syscall
+");
+#[cfg(target_arch = "aarch64")]
+global_asm!("
+    .global __restore_rt
+    __restore_rt:
+        mov x8, #139 # <- x8 is register, 139 is RT_SIGRETURN
+        svc 0
+");
 
 pub const SIGHUP: usize = 1;
 pub const SIGINT: usize = 2;

@@ -12,6 +12,15 @@ use syscall::{self, Result};
 use types::*;
 use *;
 
+#[thread_local]
+static mut SIG_HANDLER: Option<extern "C" fn(c_int)> = None;
+
+extern "C" fn sig_handler(sig: usize) {
+    if let Some(ref callback) = unsafe { SIG_HANDLER } {
+        callback(sig as c_int);
+    }
+}
+
 #[repr(C)]
 struct SockData {
     port: in_port_t,
@@ -483,6 +492,10 @@ pub fn pipe(fds: &mut [c_int]) -> c_int {
     res as c_int
 }
 
+pub fn raise(sig: c_int) -> c_int {
+    kill(getpid(), sig)
+}
+
 pub fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
     e(syscall::read(fd as usize, buf)) as ssize_t
 }
@@ -581,6 +594,49 @@ pub fn shutdown(socket: c_int, how: c_int) -> c_int {
         "unimplemented: shutdown({}, {})",
         socket,
         how
+    );
+    -1
+}
+
+pub unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {
+    if !oact.is_null() {
+        // Assumes the last sigaction() call was made by relibc and not a different one
+        if let Some(callback) = SIG_HANDLER {
+            (*oact).sa_handler = callback;
+        }
+    }
+    let act = if act.is_null() {
+        None
+    } else {
+        SIG_HANDLER = Some((*act).sa_handler);
+        let m = (*act).sa_mask;
+        Some(syscall::SigAction {
+            sa_handler: sig_handler,
+            sa_mask: [m[0] as u64, 0],
+            sa_flags: (*act).sa_flags as usize
+        })
+    };
+    let mut old = syscall::SigAction::default();
+    let ret = e(syscall::sigaction(
+        sig as usize,
+        act.as_ref(),
+        if oact.is_null() { None } else { Some(&mut old) }
+    )) as c_int;
+    if !oact.is_null() {
+        let m = old.sa_mask;
+        (*oact).sa_mask = [m[0] as c_ulong];
+        (*oact).sa_flags = old.sa_flags as c_ulong;
+    }
+    ret
+}
+
+pub fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
+    let _ = write!(
+        ::FileWriter(2),
+        "unimplemented: sigprocmask({}, {:p}, {:p})",
+        how,
+        set,
+        oset
     );
     -1
 }

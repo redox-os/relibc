@@ -449,8 +449,8 @@ pub extern "C" fn unlink(path: *const c_char) -> c_int {
 #[no_mangle]
 pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
     let rqtp = timespec {
-        tv_sec: 0,
-        tv_nsec: (useconds * 1000).into(),
+        tv_sec: (useconds / 1_000_000) as i64,
+        tv_nsec: ((useconds % 1000) * 1000) as i64,
     };
     let rmtp = ptr::null_mut();
     platform::nanosleep(&rqtp, rmtp)

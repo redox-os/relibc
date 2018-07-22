@@ -25,9 +25,9 @@ typedef long ssize_t;
 
 typedef long time_t;
 
-typedef int useconds_t;
+typedef unsigned int useconds_t;
 
-typedef long suseconds_t;
+typedef int suseconds_t;
 
 typedef long clock_t;
 
