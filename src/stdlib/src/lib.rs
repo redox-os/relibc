@@ -401,7 +401,8 @@ pub unsafe extern "C" fn mbtowc(pwc: *mut wchar_t, s: *const c_char, n: size_t) 
 }
 
 fn inner_mktemp<T, F>(name: *mut c_char, suffix_len: c_int, mut attempt: F) -> Option<T>
-    where F: FnMut() -> Option<T>
+where
+    F: FnMut() -> Option<T>,
 {
     let len = unsafe { strlen(name) } as c_int;
 
@@ -421,10 +422,14 @@ fn inner_mktemp<T, F>(name: *mut c_char, suffix_len: c_int, mut attempt: F) -> O
     rng.test_timer();
 
     for _ in 0..100 {
-        let char_iter = iter::repeat(()).map(|()| rng.sample(Alphanumeric)).take(6).enumerate();
+        let char_iter = iter::repeat(())
+            .map(|()| rng.sample(Alphanumeric))
+            .take(6)
+            .enumerate();
         unsafe {
             for (i, c) in char_iter {
-                *name.offset((len as isize) - (suffix_len as isize) - (i as isize) - 1) = c as c_char
+                *name.offset((len as isize) - (suffix_len as isize) - (i as isize) - 1) =
+                    c as c_char
             }
         }
 
@@ -433,27 +438,24 @@ fn inner_mktemp<T, F>(name: *mut c_char, suffix_len: c_int, mut attempt: F) -> O
         }
     }
 
-    unsafe {
-        platform::errno = errno::EEXIST
-    }
+    unsafe { platform::errno = errno::EEXIST }
 
     None
 }
 
 #[no_mangle]
 pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
-    if inner_mktemp(name, 0, || {
-        unsafe {
-            let mut st: stat = mem::uninitialized();
-            let ret = if platform::stat(name, &mut st) != 0 && platform::errno == ENOENT {
-                Some(())
-            } else {
-                None
-            };
-            mem::forget(st);
-            ret
-        }
-    }).is_none() {
+    if inner_mktemp(name, 0, || unsafe {
+        let mut st: stat = mem::uninitialized();
+        let ret = if platform::stat(name, &mut st) != 0 && platform::errno == ENOENT {
+            Some(())
+        } else {
+            None
+        };
+        mem::forget(st);
+        ret
+    }).is_none()
+    {
         unsafe {
             *name = 0;
         }
