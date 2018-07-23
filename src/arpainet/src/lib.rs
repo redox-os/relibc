@@ -14,9 +14,9 @@ extern crate sys_socket;
 use core::str::FromStr;
 use core::{mem, ptr, slice, str};
 use errno::*;
-pub use netinet::in_h::*;
+use netinet::in_h::in_addr;
 use platform::types::*;
-use platform::{c_str, socklen_t, AF_INET};
+use platform::c_str;
 
 #[no_mangle]
 pub extern "C" fn htonl(hostlong: u32) -> u32 {

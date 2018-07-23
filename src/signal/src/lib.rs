@@ -36,7 +36,6 @@ pub use sys::*;
 
 use core::{mem, ptr};
 use platform::types::*;
-use platform::sigset_t;
 
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
@@ -59,11 +58,11 @@ pub unsafe extern "C" fn sigaction(sig: c_int, act: *const sigaction, oact: *mut
     let ptr = if !act.is_null() {
         _sigaction = Some((*act).clone());
         _sigaction.as_mut().unwrap().sa_flags |= SA_RESTORER as c_ulong;
-        _sigaction.as_mut().unwrap() as *mut _ as *mut platform::sigaction
+        _sigaction.as_mut().unwrap() as *mut _ as *mut platform::types::sigaction
     } else {
         ptr::null_mut()
     };
-    platform::sigaction(sig, ptr, oact as *mut platform::sigaction)
+    platform::sigaction(sig, ptr, oact as *mut platform::types::sigaction)
 }
 
 // #[no_mangle]

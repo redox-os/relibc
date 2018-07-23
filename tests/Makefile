@@ -55,6 +55,7 @@ EXPECT_BINS=\
 	unistd/pipe \
 	unistd/rmdir \
 	unistd/sleep \
+	unistd/stat \
 	unistd/write \
 	waitpid \
 	wchar/mbrtowc \
@@ -72,8 +73,7 @@ BINS=\
 	unistd/gethostname \
 	unistd/getid \
 	unistd/link \
-	unistd/setid \
-	unistd/unlink
+	unistd/setid
 
 all: $(BINS)
 

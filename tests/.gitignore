@@ -56,6 +56,7 @@ unistd/getopt
 unistd/pipe
 unistd/rmdir
 unistd/sleep
+unistd/stat
 unistd/write
 waitpid
 wchar/mbrtowc
@@ -70,4 +71,3 @@ unistd/gethostname
 unistd/getid
 unistd/link
 unistd/setid
-unistd/unlink

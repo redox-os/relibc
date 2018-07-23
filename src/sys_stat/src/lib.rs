@@ -6,7 +6,7 @@ extern crate platform;
 
 use platform::types::*;
 
-pub const S_IFMT: c_int = 0o0170000;
+pub const S_IFMT:  c_int = 0o0170000;
 pub const S_IFBLK: c_int = 0o060000;
 pub const S_IFCHR: c_int = 0o020000;
 pub const S_IFIFO: c_int = 0o010000;
@@ -43,10 +43,16 @@ pub struct stat {
     pub st_rdev: dev_t,
     pub st_size: off_t,
     pub st_blksize: blksize_t,
-    pub st_atime: time_t,
-    pub st_mtime: time_t,
-    pub st_ctime: time_t,
     pub st_blocks: blkcnt_t,
+
+    pub st_atim: time_t,
+    pub st_mtim: time_t,
+    pub st_ctim: time_t,
+
+    // Compared to glibc, our struct is for some reason 48 bytes too small.
+    // Accessing atime works, so clearly the struct isn't incorrect...
+    // This works.
+    pub _pad: [u8; 48]
 }
 
 #[no_mangle]

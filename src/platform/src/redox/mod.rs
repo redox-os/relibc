@@ -10,7 +10,6 @@ use syscall::flag::*;
 use syscall::{self, Result};
 
 use types::*;
-use *;
 
 #[thread_local]
 static mut SIG_HANDLER: Option<extern "C" fn(c_int)> = None;

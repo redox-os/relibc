@@ -1,3 +1,5 @@
+use core::mem;
+
 #[cfg(target_os = "redox")]
 use syscall::data::TimeSpec as redox_timespec;
 // Use repr(u8) as LLVM expects `void*` to be the same as `i8*` to help enable
@@ -96,8 +98,59 @@ pub struct stat {
     pub st_rdev: dev_t,
     pub st_size: off_t,
     pub st_blksize: blksize_t,
+    pub st_blocks: blkcnt_t,
+
     pub st_atim: time_t,
     pub st_mtim: time_t,
     pub st_ctim: time_t,
-    pub st_blocks: blkcnt_t,
+
+    // Compared to glibc, our struct is for some reason 48 bytes too small.
+    // Accessing atime works, so clearly the struct isn't incorrect...
+    // This works.
+    pub _pad: [u8; 48]
+}
+
+pub const AF_INET: c_int = 2;
+pub const SOCK_STREAM: c_int = 1;
+pub const SOCK_DGRAM: c_int = 2;
+pub const SOCK_NONBLOCK: c_int = 0o4000;
+pub const SOCK_CLOEXEC: c_int = 0o2000000;
+
+pub const SIG_BLOCK: c_int = 0;
+pub const SIG_UNBLOCK: c_int = 1;
+pub const SIG_SETMASK: c_int = 2;
+
+pub type in_addr_t = [u8; 4];
+pub type in_port_t = u16;
+pub type sa_family_t = u16;
+pub type socklen_t = u32;
+
+#[repr(C)]
+pub struct sockaddr {
+    pub sa_family: sa_family_t,
+    pub data: [c_char; 14],
+}
+
+#[repr(C)]
+pub struct sigaction {
+    pub sa_handler: extern "C" fn(c_int),
+    pub sa_flags: c_ulong,
+    pub sa_restorer: unsafe extern "C" fn(),
+    pub sa_mask: sigset_t
+}
+
+const NSIG: usize = 64;
+
+pub type sigset_t = [c_ulong; NSIG / (8 * mem::size_of::<c_ulong>())];
+
+const UTSLENGTH: usize = 65;
+
+#[repr(C)]
+pub struct utsname {
+    pub sysname: [c_char; UTSLENGTH],
+    pub nodename: [c_char; UTSLENGTH],
+    pub release: [c_char; UTSLENGTH],
+    pub version: [c_char; UTSLENGTH],
+    pub machine: [c_char; UTSLENGTH],
+    pub domainname: [c_char; UTSLENGTH],
 }

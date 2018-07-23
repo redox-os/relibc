@@ -8,22 +8,22 @@ mod inner {
 
     use self::platform::types::*;
 
-    const LENGTH: usize = 65;
+    const UTSLENGTH: usize = 65;
 
     #[no_mangle]
     #[repr(C)]
     pub struct utsname {
-        pub sysname: [c_char; LENGTH],
-        pub nodename: [c_char; LENGTH],
-        pub release: [c_char; LENGTH],
-        pub version: [c_char; LENGTH],
-        pub machine: [c_char; LENGTH],
-        pub domainname: [c_char; LENGTH],
+        pub sysname: [c_char; UTSLENGTH],
+        pub nodename: [c_char; UTSLENGTH],
+        pub release: [c_char; UTSLENGTH],
+        pub version: [c_char; UTSLENGTH],
+        pub machine: [c_char; UTSLENGTH],
+        pub domainname: [c_char; UTSLENGTH],
     }
 
     #[no_mangle]
     pub unsafe extern "C" fn uname(uts: *mut utsname) -> c_int {
-        platform::uname(uts as *mut platform::utsname)
+        platform::uname(uts as *mut platform::types::utsname)
     }
 }
 #[cfg(target_os = "linux")]

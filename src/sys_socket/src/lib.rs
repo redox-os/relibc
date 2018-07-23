@@ -28,7 +28,7 @@ pub unsafe extern "C" fn accept(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    platform::accept(socket, address as *mut platform::sockaddr, address_len)
+    platform::accept(socket, address as *mut platform::types::sockaddr, address_len)
 }
 
 #[no_mangle]
@@ -37,7 +37,7 @@ pub unsafe extern "C" fn bind(
     address: *const sockaddr,
     address_len: socklen_t,
 ) -> c_int {
-    platform::bind(socket, address as *const platform::sockaddr, address_len)
+    platform::bind(socket, address as *const platform::types::sockaddr, address_len)
 }
 
 #[no_mangle]
@@ -46,7 +46,7 @@ pub unsafe extern "C" fn connect(
     address: *const sockaddr,
     address_len: socklen_t,
 ) -> c_int {
-    platform::connect(socket, address as *const platform::sockaddr, address_len)
+    platform::connect(socket, address as *const platform::types::sockaddr, address_len)
 }
 
 #[no_mangle]
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn getpeername(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    platform::getpeername(socket, address as *mut platform::sockaddr, address_len)
+    platform::getpeername(socket, address as *mut platform::types::sockaddr, address_len)
 }
 
 #[no_mangle]
@@ -64,7 +64,7 @@ pub unsafe extern "C" fn getsockname(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    platform::getsockname(socket, address as *mut platform::sockaddr, address_len)
+    platform::getsockname(socket, address as *mut platform::types::sockaddr, address_len)
 }
 
 #[no_mangle]
@@ -114,7 +114,7 @@ pub unsafe extern "C" fn recvfrom(
         buffer,
         length,
         flags,
-        address as *mut platform::sockaddr,
+        address as *mut platform::types::sockaddr,
         address_len,
     )
 }
@@ -143,7 +143,7 @@ pub unsafe extern "C" fn sendto(
         message,
         length,
         flags,
-        dest_addr as *const platform::sockaddr,
+        dest_addr as *const platform::types::sockaddr,
         dest_len,
     )
 }
