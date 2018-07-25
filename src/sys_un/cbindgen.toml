@@ -1,0 +1,10 @@
+sys_includes = ["sys/socket.h"]
+include_guard = "_SYS_UN_H"
+language = "C"
+style = "Tag"
+
+[export]
+include = ["sockaddr_un"]
+
+[enum]
+prefix_with_name = true

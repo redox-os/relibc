@@ -21,13 +21,6 @@ extern "C" fn sig_handler(sig: usize) {
     }
 }
 
-#[repr(C)]
-struct SockData {
-    port: in_port_t,
-    addr: in_addr_t,
-    _pad: [c_char; 8],
-}
-
 fn e(sys: Result<usize>) -> usize {
     match sys {
         Ok(ok) => ok,
@@ -56,9 +49,9 @@ macro_rules! bind_or_connect {
             errno = syscall::EINVAL;
             return -1;
         }
-        let data: &SockData = mem::transmute(&(*$address).data);
-        let addr = &data.addr;
-        let port = in_port_t::from_be(data.port); // This is transmuted from bytes in BigEndian order
+        let data = &*($address as *const sockaddr_in);
+        let addr = &data.sin_addr.s_addr;
+        let port = in_port_t::from_be(data.sin_port); // This is transmuted from bytes in BigEndian order
         let path = format!(bind_or_connect!($mode "{}.{}.{}.{}:{}"), addr[0], addr[1], addr[2], addr[3], port);
 
         // Duplicate the socket, and then duplicate the copy back to the original fd

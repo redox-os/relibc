@@ -6,13 +6,13 @@ extern crate platform;
 extern crate sys_socket;
 
 use platform::types::*;
-use sys_socket::sa_family_t;
+use sys_socket::{sa_family_t, sockaddr};
 
 pub type in_addr_t = u32;
 pub type in_port_t = u16;
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct in_addr {
     pub s_addr: in_addr_t
 }
@@ -24,7 +24,7 @@ pub struct in6_addr {
 
 #[repr(C)]
 pub struct sockaddr_in {
-    pub sa_family: sa_family_t,
+    pub sin_family: sa_family_t,
     pub sin_port: in_port_t,
     pub sin_addr: in_addr
 }
@@ -56,3 +56,13 @@ pub const IPPROTO_UDP: u8 = 0x11;
 pub const IPPROTO_IPV6: u8 = 0x29;
 pub const IPPROTO_RAW: u8 = 0xff;
 pub const IPPROTO_MAX: u8 = 0xff;
+
+pub const INADDR_ANY: u32 = 0; // Can't use in_addr_t alias because cbindgen :(
+pub const INADDR_BROADCAST: u32 = 0xFFFFFFFF; // Can't use core::u32::MAX because cbindgen :(
+pub const INADDR_NONE: u32 = 0xFFFFFFFF;
+pub const INADDR_LOOPBACK: u32 = 0x7F000001;
+
+pub const INADDR_UNSPEC_GROUP: u32 = 0xE0000000;
+pub const INADDR_ALLHOSTS_GROUP: u32 = 0xE0000001;
+pub const INADDR_ALLRTRS_GROUP: u32 = 0xE0000002;
+pub const INADDR_MAX_LOCAL_GROUP: u32 = 0xE00000FF;

@@ -25,8 +25,8 @@ inttypes = { path = "src/inttypes" }
 locale = { path = "src/locale" }
 netinet = { path = "src/netinet" }
 platform = { path = "src/platform" }
-setjmp = { path = "src/setjmp" }
 semaphore = { path = "src/semaphore" }
+setjmp = { path = "src/setjmp" }
 signal = { path = "src/signal" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }
@@ -37,6 +37,7 @@ sys_resource = { path = "src/sys_resource" }
 sys_socket = { path = "src/sys_socket" }
 sys_stat = { path = "src/sys_stat" }
 sys_time = { path = "src/sys_time" }
+sys_un = { path = "src/sys_un" }
 sys_utsname = { path = "src/sys_utsname" }
 sys_wait = { path = "src/sys_wait" }
 time = { path = "src/time" }

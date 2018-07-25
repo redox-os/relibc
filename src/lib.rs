@@ -27,6 +27,7 @@ pub extern crate sys_resource;
 pub extern crate sys_socket;
 pub extern crate sys_stat;
 pub extern crate sys_time;
+pub extern crate sys_un;
 pub extern crate sys_utsname;
 pub extern crate sys_wait;
 pub extern crate time;
