@@ -9,3 +9,4 @@ crate-type = ["staticlib"]
 
 [dependencies]
 platform = { path = "../platform" }
+stdio = { path = "../stdio" }

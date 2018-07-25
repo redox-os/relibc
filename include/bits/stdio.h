@@ -3,9 +3,6 @@
 
 #define EOF (-1)
 #define BUFSIZ 1024
-#define stdin __stdin()
-#define stdout __stdout()
-#define stderr __stderr()
 
 int fprintf(FILE * stream, const char * fmt, ...);
 int printf(const char * fmt, ...);

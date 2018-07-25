@@ -1,37 +1,23 @@
 use super::{constants, BUFSIZ, FILE, UNGET};
 use core::cell::UnsafeCell;
+use core::ptr;
 use core::sync::atomic::AtomicBool;
 
-struct GlobalFile(UnsafeCell<FILE>);
+pub struct GlobalFile(UnsafeCell<FILE>);
 impl GlobalFile {
     const fn new(file: FILE) -> Self {
         GlobalFile(UnsafeCell::new(file))
     }
-    fn get(&self) -> *mut FILE {
+    pub fn get(&self) -> *mut FILE {
         self.0.get()
     }
 }
 // statics need to be Sync
 unsafe impl Sync for GlobalFile {}
 
-#[no_mangle]
-pub extern "C" fn __stdin() -> *mut FILE {
-    default_stdin.get()
-}
-
-#[no_mangle]
-pub extern "C" fn __stdout() -> *mut FILE {
-    default_stdout.get()
-}
-
-#[no_mangle]
-pub extern "C" fn __stderr() -> *mut FILE {
-    default_stderr.get()
-}
-
 lazy_static! {
     #[allow(non_upper_case_globals)]
-    static ref default_stdin: GlobalFile = GlobalFile::new(FILE {
+    pub static ref default_stdin: GlobalFile = GlobalFile::new(FILE {
         flags: constants::F_PERM | constants::F_NOWR,
         read: None,
         write: None,
@@ -43,7 +29,7 @@ lazy_static! {
     });
 
     #[allow(non_upper_case_globals)]
-    static ref default_stdout: GlobalFile = GlobalFile::new(FILE {
+    pub static ref default_stdout: GlobalFile = GlobalFile::new(FILE {
         flags: constants::F_PERM | constants::F_NORD,
         read: None,
         write: None,
@@ -55,7 +41,7 @@ lazy_static! {
     });
 
     #[allow(non_upper_case_globals)]
-    static ref default_stderr: GlobalFile = GlobalFile::new(FILE {
+    pub static ref default_stderr: GlobalFile = GlobalFile::new(FILE {
         flags: constants::F_PERM | constants::F_NORD,
         read: None,
         write: None,
@@ -66,3 +52,10 @@ lazy_static! {
         lock: AtomicBool::new(false),
     });
 }
+
+#[no_mangle]
+pub static mut stdin: *mut FILE = ptr::null_mut();
+#[no_mangle]
+pub static mut stdout: *mut FILE = ptr::null_mut();
+#[no_mangle]
+pub static mut stderr: *mut FILE = ptr::null_mut();

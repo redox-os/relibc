@@ -80,6 +80,7 @@ name = "crt0"
 version = "0.1.0"
 dependencies = [
  "platform 0.1.0",
+ "stdio 0.1.0",
 ]
 
 [[package]]

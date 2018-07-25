@@ -203,7 +203,7 @@ pub unsafe extern "C" fn putwc(wc: wchar_t, stream: *mut FILE) -> wint_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn putwchar(wc: wchar_t) -> wint_t {
-    fputwc(wc, &mut *__stdout())
+    fputwc(wc, &mut *stdout)
 }
 
 // #[no_mangle]

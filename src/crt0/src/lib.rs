@@ -10,6 +10,7 @@
 
 extern crate alloc;
 extern crate platform;
+extern crate stdio;
 
 use alloc::Vec;
 use core::ptr;
@@ -88,6 +89,11 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
     }
     platform::inner_environ.push(ptr::null_mut());
     platform::environ = platform::inner_environ.as_mut_ptr();
+
+    // Initialize stdin/stdout/stderr, see https://github.com/rust-lang/rust/issues/51718
+    stdio::stdin = stdio::default_stdin.get();
+    stdio::stdout = stdio::default_stdout.get();
+    stdio::stderr = stdio::default_stderr.get();
 
     platform::exit(main(
         argc,
