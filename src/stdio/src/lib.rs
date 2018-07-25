@@ -855,9 +855,28 @@ pub extern "C" fn tempnam(_dir: *const c_char, _pfx: *const c_char) -> *mut c_ch
     unimplemented!();
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn tmpfile() -> *mut FILE {
-    unimplemented!();
+    extern "C" {
+        fn mkstemp(name: *mut c_char) -> c_int;
+    }
+
+    let mut file_name = *b"/tmp/tmpfileXXXXXX";
+    let file_name = file_name.as_mut_ptr() as *mut c_char;
+    let fd = unsafe { mkstemp(file_name) };
+
+    if fd < 0 {
+        return ptr::null_mut();
+    }
+
+    let fp = fdopen(fd, b"w+".as_ptr() as *const i8);
+    platform::unlink(file_name);
+
+    if fp == ptr::null_mut() {
+        platform::close(fd);
+    }
+
+    fp
 }
 
 // #[no_mangle]
