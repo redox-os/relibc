@@ -862,7 +862,7 @@ pub extern "C" fn tmpfile() -> *mut FILE {
     }
 
     let mut file_name = *b"/tmp/tmpfileXXXXXX";
-    let file_name = (&mut file_name).as_mut_ptr() as *mut c_char;
+    let file_name = file_name.as_mut_ptr() as *mut c_char;
     let fd = unsafe { mkstemp(file_name) };
 
     if fd < 0 {
