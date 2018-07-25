@@ -132,6 +132,19 @@ pub struct sockaddr {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct in_addr {
+    pub s_addr: in_addr_t
+}
+
+#[repr(C)]
+pub struct sockaddr_in {
+    pub sin_family: sa_family_t,
+    pub sin_port: in_port_t,
+    pub sin_addr: in_addr
+}
+
+#[repr(C)]
 pub struct sigaction {
     pub sa_handler: extern "C" fn(c_int),
     pub sa_flags: c_ulong,
