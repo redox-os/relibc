@@ -214,6 +214,10 @@ pub fn getuid() -> uid_t {
     e(unsafe { syscall!(GETUID) })
 }
 
+pub fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
+    e(unsafe { syscall!(IOCTL, fd, request, out) }) as c_int
+}
+
 pub fn kill(pid: pid_t, sig: c_int) -> c_int {
     e(unsafe { syscall!(KILL, pid, sig) }) as c_int
 }

@@ -1,4 +1,4 @@
-//! sys/utsname implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysutsname.h.html
+//! sys/utsname implementation for linux, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysutsname.h.html
 
 #![no_std]
 
@@ -10,7 +10,6 @@ mod inner {
 
     const UTSLENGTH: usize = 65;
 
-    #[no_mangle]
     #[repr(C)]
     pub struct utsname {
         pub sysname: [c_char; UTSLENGTH],

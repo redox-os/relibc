@@ -52,6 +52,7 @@ EXPECT_BINS=\
 	unistd/fsync \
 	unistd/ftruncate \
 	unistd/getopt \
+	unistd/isatty \
 	unistd/pipe \
 	unistd/rmdir \
 	unistd/sleep \

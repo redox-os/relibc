@@ -331,6 +331,7 @@ dependencies = [
  "stdlib 0.1.0",
  "string 0.1.0",
  "strings 0.1.0",
+ "sys_ioctl 0.1.0",
  "sys_mman 0.1.0",
  "sys_resource 0.1.0",
  "sys_socket 0.1.0",
@@ -508,6 +509,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sys_ioctl"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "platform 0.1.0",
+]
+
+[[package]]
 name = "sys_mman"
 version = "0.1.0"
 dependencies = [
@@ -647,7 +656,7 @@ dependencies = [
  "platform 0.1.0",
  "stdio 0.1.0",
  "string 0.1.0",
- "sys_utsname 0.1.0",
+ "sys_ioctl 0.1.0",
 ]
 
 [[package]]

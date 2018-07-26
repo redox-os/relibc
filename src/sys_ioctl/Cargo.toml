@@ -1,8 +1,7 @@
 [package]
-name = "sys_utsname"
+name = "sys_ioctl"
 version = "0.1.0"
 authors = ["jD91mZM2 <me@krake.one>"]
-build = "build.rs"
 
 [build-dependencies]
 cbindgen = { path = "../../cbindgen" }

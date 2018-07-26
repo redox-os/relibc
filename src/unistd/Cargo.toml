@@ -12,4 +12,4 @@ errno = { path = "../errno" }
 platform = { path = "../platform" }
 stdio = { path = "../stdio" }
 string = { path = "../string" }
-sys_utsname = { path = "../sys_utsname" }
+sys_ioctl = { path = "../sys_ioctl" }

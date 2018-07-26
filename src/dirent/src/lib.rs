@@ -1,6 +1,7 @@
+//! dirent implementation following http://pubs.opengroup.org/onlinepubs/009695399/basedefs/dirent.h.html
+
 #![no_std]
 #![feature(alloc)]
-///! dirent implementation following http://pubs.opengroup.org/onlinepubs/009695399/basedefs/dirent.h.html
 
 extern crate alloc;
 extern crate errno;
