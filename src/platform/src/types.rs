@@ -188,3 +188,12 @@ pub struct dirent {
     pub d_type: c_uchar,
     pub d_name: [c_char; 256]
 }
+
+#[repr(C)]
+#[derive(Default)]
+pub struct winsize {
+    ws_row: c_ushort,
+    ws_col: c_ushort,
+    ws_xpixel: c_ushort,
+    ws_ypixel: c_ushort
+}

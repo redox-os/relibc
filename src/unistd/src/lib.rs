@@ -6,12 +6,10 @@ extern crate errno;
 extern crate platform;
 extern crate stdio;
 extern crate string;
-extern crate sys_ioctl;
 
 use core::{ptr, slice};
 
 use platform::types::*;
-use sys_ioctl::{ioctl, winsize};
 
 pub use brk::*;
 pub use getopt::*;
@@ -264,8 +262,7 @@ pub extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn isatty(fd: c_int) -> c_int {
-    let mut winsize = winsize::default();
-    (ioctl(fd, sys_ioctl::TIOCGWINSZ as c_ulong, &mut winsize as *mut _ as *mut c_void) == 0) as c_int
+    platform::isatty(fd)
 }
 
 // #[no_mangle]

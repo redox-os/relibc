@@ -9,7 +9,6 @@ pub mod inner {
     use self::platform::types::*;
 
     #[repr(C)]
-    #[derive(Default)]
     pub struct winsize {
         ws_row: c_ushort,
         ws_col: c_ushort,

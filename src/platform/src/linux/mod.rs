@@ -3,6 +3,8 @@ use core::{mem, ptr};
 use errno;
 use types::*;
 
+const TIOCGWINSZ: u32 = 0x5413;
+
 const AT_FDCWD: c_int = -100;
 const AT_EMPTY_PATH: c_int = 0x1000;
 const AT_REMOVEDIR: c_int = 0x200;
@@ -215,7 +217,13 @@ pub fn getuid() -> uid_t {
 }
 
 pub fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
+    // TODO: Somehow support varargs to syscall??
     e(unsafe { syscall!(IOCTL, fd, request, out) }) as c_int
+}
+
+pub fn isatty(fd: c_int) -> c_int {
+    let mut winsize = winsize::default();
+    (ioctl(fd, TIOCGWINSZ as c_ulong, &mut winsize as *mut _ as *mut c_void) == 0) as c_int
 }
 
 pub fn kill(pid: pid_t, sig: c_int) -> c_int {

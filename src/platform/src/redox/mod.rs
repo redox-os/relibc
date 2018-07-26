@@ -470,6 +470,15 @@ pub fn getuid() -> uid_t {
     e(syscall::getuid()) as pid_t
 }
 
+pub fn isatty(fd: c_int) -> c_int {
+    syscall::dup(fd as usize, b"termios")
+        .map(|fd| {
+            let _ = syscall::close(fd);
+            1
+        })
+        .unwrap_or(0)
+}
+
 pub fn kill(pid: pid_t, sig: c_int) -> c_int {
     e(syscall::kill(pid, sig as usize)) as c_int
 }
