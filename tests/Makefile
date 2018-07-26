@@ -69,6 +69,7 @@ BINS=\
 	stdlib/alloc \
 	stdlib/bsearch \
 	stdlib/mktemp \
+	time/gettimeofday \
 	unistd/chdir \
 	unistd/gethostname \
 	unistd/getid \

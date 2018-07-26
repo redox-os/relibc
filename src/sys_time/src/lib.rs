@@ -11,6 +11,11 @@ pub struct timeval {
     pub tv_sec: time_t,
     pub tv_usec: suseconds_t,
 }
+#[repr(C)]
+pub struct timezone {
+    pub tz_minuteswest: c_int,
+    pub tz_dsttime: c_int,
+}
 
 #[repr(C)]
 pub struct itimerval {
@@ -37,9 +42,9 @@ pub extern "C" fn setitimer(
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn gettimeofday(tp: *mut timeval, tzp: *const c_void) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
+    platform::gettimeofday(tp as *mut platform::types::timeval, tzp as *mut platform::types::timezone)
 }
 
 // #[no_mangle]

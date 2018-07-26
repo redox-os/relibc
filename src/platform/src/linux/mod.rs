@@ -202,6 +202,10 @@ pub fn getsockopt(
     }) as c_int
 }
 
+pub fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
+    e(unsafe { syscall!(GETTIMEOFDAY, tp, tzp) }) as c_int
+}
+
 pub fn getuid() -> uid_t {
     e(unsafe { syscall!(GETUID) })
 }

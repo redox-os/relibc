@@ -77,6 +77,18 @@ pub struct timespec {
     pub tv_nsec: c_long,
 }
 
+#[repr(C)]
+pub struct timeval {
+    pub tv_sec: time_t,
+    pub tv_usec: suseconds_t,
+}
+#[repr(C)]
+#[derive(Default)]
+pub struct timezone {
+    pub tz_minuteswest: c_int,
+    pub tz_dsttime: c_int,
+}
+
 #[cfg(target_os = "redox")]
 impl<'a> From<&'a timespec> for redox_timespec {
     fn from(tp: &timespec) -> redox_timespec {

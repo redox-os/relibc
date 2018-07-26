@@ -431,6 +431,24 @@ pub fn getsockopt(
     -1
 }
 
+pub fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
+    let mut redox_tp = redox_timespec::default();
+    let err = e(syscall::clock_gettime(syscall::CLOCK_REALTIME, &mut redox_tp)) as c_int;
+    if err < 0 {
+        return err;
+    }
+    unsafe {
+        (*tp).tv_sec = redox_tp.tv_sec as time_t;
+        (*tp).tv_usec = (redox_tp.tv_nsec / 1000) as suseconds_t;
+
+        if !tzp.is_null() {
+            (*tzp).tz_minuteswest = 0;
+            (*tzp).tz_dsttime = 0;
+        }
+    }
+    0
+}
+
 pub fn getuid() -> uid_t {
     e(syscall::getuid()) as pid_t
 }

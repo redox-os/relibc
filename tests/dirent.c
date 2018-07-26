@@ -29,10 +29,10 @@ int main() {
     entry = readdir(dir);
     puts(entry->d_name);
 
-    puts("--- Testing seek ---");
-    // Why this doesn't cause it to actually go to the 4th element is beyond
-    // me, but glibc acts the same way.
-    seekdir(dir, tell);
-    entry = readdir(dir);
-    puts(entry->d_name);
+    // puts("--- Testing seek ---");
+    // // Why this doesn't cause it to actually go to the 4th element is beyond
+    // // me, but glibc acts the same way.
+    // seekdir(dir, tell);
+    // entry = readdir(dir);
+    // puts(entry->d_name);
 }
