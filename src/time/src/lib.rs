@@ -18,13 +18,11 @@ use errno::EIO;
 use helpers::*;
 use platform::types::*;
 
-/*
- *#[repr(C)]
- *pub struct timespec {
- *    pub tv_sec: time_t,
- *    pub tv_nsec: c_long,
- *}
- */
+#[repr(C)]
+pub struct timespec {
+    pub tv_sec: time_t,
+    pub tv_nsec: c_long,
+}
 
 #[repr(C)]
 pub struct tm {
@@ -124,7 +122,7 @@ pub extern "C" fn clock_getres(clock_id: clockid_t, res: *mut timespec) -> c_int
 
 #[no_mangle]
 pub extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -> c_int {
-    platform::clock_gettime(clock_id, tp)
+    platform::clock_gettime(clock_id, tp as *mut platform::types::timespec)
 }
 
 // #[no_mangle]
@@ -331,7 +329,7 @@ pub unsafe extern "C" fn mktime(t: *const tm) -> time_t {
 
 #[no_mangle]
 pub extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
-    platform::nanosleep(rqtp, rmtp)
+    platform::nanosleep(rqtp as *const platform::types::timespec, rmtp as *mut platform::types::timespec)
 }
 
 #[no_mangle]
@@ -357,7 +355,7 @@ pub extern "C" fn strptime(buf: *const c_char, format: *const c_char, tm: *mut t
 
 #[no_mangle]
 pub extern "C" fn time(tloc: *mut time_t) -> time_t {
-    let mut ts: timespec = Default::default();
+    let mut ts: platform::types::timespec = Default::default();
     platform::clock_gettime(CLOCK_REALTIME, &mut ts);
     unsafe {
         if !tloc.is_null() {

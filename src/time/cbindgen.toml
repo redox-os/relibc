@@ -1,4 +1,4 @@
-sys_includes = ["sys/types.h", "bits/timespec.h", "stdint.h", "stddef.h"]
+sys_includes = ["sys/types.h", "stdint.h", "stddef.h"]
 include_guard = "_TIME_H"
 language = "C"
 

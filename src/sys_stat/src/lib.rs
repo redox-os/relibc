@@ -45,14 +45,14 @@ pub struct stat {
     pub st_blksize: blksize_t,
     pub st_blocks: blkcnt_t,
 
-    pub st_atim: time_t,
-    pub st_mtim: time_t,
-    pub st_ctim: time_t,
+    pub st_atim: timespec,
+    pub st_mtim: timespec,
+    pub st_ctim: timespec,
 
-    // Compared to glibc, our struct is for some reason 48 bytes too small.
+    // Compared to glibc, our struct is for some reason 24 bytes too small.
     // Accessing atime works, so clearly the struct isn't incorrect...
     // This works.
-    pub _pad: [c_char; 48]
+    pub _pad: [c_char; 24]
 }
 
 #[no_mangle]
@@ -73,6 +73,11 @@ pub extern "C" fn fstat(fildes: c_int, buf: *mut platform::types::stat) -> c_int
 #[no_mangle]
 pub extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut platform::types::stat) -> c_int {
     fstat(fildes, buf)
+}
+
+#[no_mangle]
+pub extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
+    platform::futimens(fd, times)
 }
 
 #[no_mangle]

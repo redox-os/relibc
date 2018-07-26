@@ -103,6 +103,10 @@ pub fn ftruncate(fildes: c_int, length: off_t) -> c_int {
     e(unsafe { syscall!(FTRUNCATE, fildes, length) }) as c_int
 }
 
+pub fn futimens(fd: c_int, times: *const timespec) -> c_int {
+    e(unsafe { syscall!(UTIMENSAT, fd, ptr::null::<c_char>(), times, 0) }) as c_int
+}
+
 pub fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
     if e(unsafe { syscall!(GETCWD, buf, size) }) == !0 {
         ptr::null_mut()

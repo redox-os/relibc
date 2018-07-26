@@ -112,14 +112,14 @@ pub struct stat {
     pub st_blksize: blksize_t,
     pub st_blocks: blkcnt_t,
 
-    pub st_atim: time_t,
-    pub st_mtim: time_t,
-    pub st_ctim: time_t,
+    pub st_atim: timespec,
+    pub st_mtim: timespec,
+    pub st_ctim: timespec,
 
-    // Compared to glibc, our struct is for some reason 48 bytes too small.
+    // Compared to glibc, our struct is for some reason 24 bytes too small.
     // Accessing atime works, so clearly the struct isn't incorrect...
     // This works.
-    pub _pad: [c_char; 48]
+    pub _pad: [c_char; 24]
 }
 
 pub const AF_INET: c_int = 2;

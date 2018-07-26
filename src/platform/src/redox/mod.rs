@@ -246,9 +246,18 @@ pub fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
                     (*buf).st_rdev = 0;
                     (*buf).st_size = redox_buf.st_size as off_t;
                     (*buf).st_blksize = redox_buf.st_blksize as blksize_t;
-                    (*buf).st_atim = redox_buf.st_atime as time_t;
-                    (*buf).st_mtim = redox_buf.st_mtime as time_t;
-                    (*buf).st_ctim = redox_buf.st_ctime as time_t;
+                    (*buf).st_atim = timespec {
+                        tv_sec: redox_buf.st_atime as time_t,
+                        tv_nsec: 0
+                    };
+                    (*buf).st_mtim = timespec {
+                        tv_sec: redox_buf.st_mtime as time_t,
+                        tv_nsec: 0
+                    };
+                    (*buf).st_ctim = timespec {
+                        tv_sec: redox_buf.st_ctime as time_t,
+                        tv_nsec: 0
+                    };
                 }
             }
             0
@@ -263,6 +272,14 @@ pub fn fsync(fd: c_int) -> c_int {
 
 pub fn ftruncate(fd: c_int, len: off_t) -> c_int {
     e(syscall::ftruncate(fd as usize, len as usize)) as c_int
+}
+
+pub fn futimens(fd: c_int, times: *const timespec) -> c_int {
+    let times = [
+        unsafe { redox_timespec::from(&*times) },
+        unsafe { redox_timespec::from(&*times.offset(1)) }
+    ];
+    e(syscall::futimens(fd as usize, &times)) as c_int
 }
 
 pub fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {

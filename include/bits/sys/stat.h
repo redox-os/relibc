@@ -8,4 +8,7 @@
 #define S_ISIFO(mode) mode & S_IFMT == S_IFIFO
 #define S_ISLNK(mode) mode & S_IFMT == S_IFLNK
 
+#define st_atime st_atim.tv_sec
+#define st_mtime st_mtim.tv_sec
+
 #endif
