@@ -52,7 +52,7 @@ pub struct stat {
     // Compared to glibc, our struct is for some reason 48 bytes too small.
     // Accessing atime works, so clearly the struct isn't incorrect...
     // This works.
-    pub _pad: [u8; 48]
+    pub _pad: [c_char; 48]
 }
 
 #[no_mangle]

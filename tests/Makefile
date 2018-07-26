@@ -65,6 +65,7 @@ EXPECT_BINS=\
 # Binaries that may generate varied output
 BINS=\
 	$(EXPECT_BINS) \
+	dirent \
 	stdlib/alloc \
 	stdlib/bsearch \
 	stdlib/mktemp \

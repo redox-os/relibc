@@ -111,6 +111,10 @@ pub fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
     }
 }
 
+pub fn getdents(fd: c_int, dirents: *mut dirent, bytes: usize) -> c_int {
+    unsafe { syscall!(GETDENTS64, fd, dirents, bytes) as c_int }
+}
+
 pub fn getegid() -> gid_t {
     e(unsafe { syscall!(GETEGID) })
 }

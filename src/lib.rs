@@ -8,6 +8,7 @@ extern crate platform;
 
 pub extern crate arpainet;
 pub extern crate ctype;
+pub extern crate dirent;
 pub extern crate errno;
 pub extern crate fcntl;
 pub extern crate fenv;

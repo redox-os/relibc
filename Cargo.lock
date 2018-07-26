@@ -92,6 +92,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "dirent"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "errno 0.1.0",
+ "fcntl 0.1.0",
+ "platform 0.1.0",
+ "stdio 0.1.0",
+ "unistd 0.1.0",
+]
+
+[[package]]
 name = "dtoa"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -302,6 +314,7 @@ dependencies = [
  "cc 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "compiler_builtins 0.1.0 (git+https://github.com/rust-lang-nursery/compiler-builtins.git)",
  "ctype 0.1.0",
+ "dirent 0.1.0",
  "errno 0.1.0",
  "fcntl 0.1.0",
  "fenv 0.1.0",

@@ -107,7 +107,7 @@ pub struct stat {
     // Compared to glibc, our struct is for some reason 48 bytes too small.
     // Accessing atime works, so clearly the struct isn't incorrect...
     // This works.
-    pub _pad: [u8; 48]
+    pub _pad: [c_char; 48]
 }
 
 pub const AF_INET: c_int = 2;
@@ -166,4 +166,13 @@ pub struct utsname {
     pub version: [c_char; UTSLENGTH],
     pub machine: [c_char; UTSLENGTH],
     pub domainname: [c_char; UTSLENGTH],
+}
+
+#[repr(C)]
+pub struct dirent {
+    pub d_ino: ino_t,
+    pub d_off: off_t,
+    pub d_reclen: c_ushort,
+    pub d_type: c_uchar,
+    pub d_name: [c_char; 256]
 }

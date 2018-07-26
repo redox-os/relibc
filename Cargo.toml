@@ -16,6 +16,7 @@ cc = "1.0.17"
 [dependencies]
 arpainet = { path = "src/arpainet" }
 ctype = { path = "src/ctype" }
+dirent = { path = "src/dirent" }
 errno = { path = "src/errno" }
 fcntl = { path = "src/fcntl" }
 fenv = { path = "src/fenv" }

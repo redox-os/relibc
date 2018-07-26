@@ -56,13 +56,13 @@ unistd/getopt
 unistd/pipe
 unistd/rmdir
 unistd/sleep
-unistd/stat
 unistd/write
 waitpid
 wchar/mbrtowc
 wchar/mbsrtowcs
 wchar/putwchar
 wchar/wcrtomb
+dirent
 stdlib/alloc
 stdlib/bsearch
 stdlib/mktemp
@@ -71,3 +71,4 @@ unistd/gethostname
 unistd/getid
 unistd/link
 unistd/setid
+unistd/stat

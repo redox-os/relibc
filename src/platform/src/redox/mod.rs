@@ -163,12 +163,12 @@ pub unsafe extern "C" fn execve(
                         // If the environment variable has no value, there
                         // is no need to write anything to the env scheme.
                         if sep + 1 < slice.len() {
-                            let n = match syscall::write(fd, &slice[sep + 1..]) {
-                                Ok(n) => n,
+                            match syscall::write(fd, &slice[sep + 1..]) {
+                                Ok(_) => (),
                                 err => {
                                     return e(err) as c_int;
                                 }
-                            };
+                            }
                         }
                         // Cleanup after adding the variable.
                         match syscall::close(fd) {
@@ -271,6 +271,54 @@ pub fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
         ptr::null_mut()
     } else {
         buf
+    }
+}
+
+pub fn getdents(fd: c_int, mut dirents: *mut dirent, mut bytes: usize) -> c_int {
+    let mut amount = 0;
+
+    let mut buf = [0; 1024];
+    let mut bindex = 0;
+    let mut blen = 0;
+
+    let mut name = [0; 256];
+    let mut nindex = 0;
+
+    loop {
+        if bindex >= blen {
+            bindex = 0;
+            blen = match syscall::read(fd as usize, &mut buf) {
+                Ok(0) => return amount,
+                Ok(n) => n,
+                Err(err) => return -err.errno
+            };
+        }
+
+        if buf[bindex] == b'\n' {
+            // Put a NUL byte either at the end, or if it's too big, at where it's truncated.
+            name[nindex.min(name.len() - 1)] = 0;
+            unsafe {
+                *dirents = dirent {
+                    d_ino: 0,
+                    d_off: 0,
+                    d_reclen: mem::size_of::<dirent>() as c_ushort,
+                    d_type: 0,
+                    d_name: name
+                };
+                dirents = dirents.offset(1);
+            }
+            amount += 1;
+            if bytes <= mem::size_of::<dirent>() {
+                return amount;
+            }
+            bytes -= mem::size_of::<dirent>();
+        } else {
+            if nindex < name.len() {
+                name[nindex] = buf[bindex] as c_char;
+            }
+            nindex += 1;
+            bindex += 1;
+        }
     }
 }
 
@@ -401,7 +449,7 @@ pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     e(unsafe { syscall::link(path1.as_ptr(), path2.as_ptr()) }) as c_int
 }
 
-pub fn listen(socket: c_int, backlog: c_int) -> c_int {
+pub fn listen(_socket: c_int, _backlog: c_int) -> c_int {
     // TODO
     0
 }

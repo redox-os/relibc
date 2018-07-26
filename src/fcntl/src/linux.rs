@@ -8,4 +8,5 @@ pub const O_TRUNC: c_int = 0x0200;
 pub const O_ACCMODE: c_int = O_RDONLY | O_WRONLY | O_RDWR;
 pub const O_APPEND: c_int = 0o2000;
 pub const O_CLOEXEC: c_int = 0o2_000_000;
+pub const O_DIRECTORY: c_int = 0o200_000;
 pub const O_EXCL: c_int = 0o200;
