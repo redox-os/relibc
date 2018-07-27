@@ -78,6 +78,7 @@ pub struct timespec {
 }
 
 #[repr(C)]
+#[derive(Default)]
 pub struct timeval {
     pub tv_sec: time_t,
     pub tv_usec: suseconds_t,
@@ -87,6 +88,13 @@ pub struct timeval {
 pub struct timezone {
     pub tz_minuteswest: c_int,
     pub tz_dsttime: c_int,
+}
+
+#[repr(C)]
+#[derive(Default)]
+pub struct itimerval {
+    pub it_interval: timeval,
+    pub it_value: timeval,
 }
 
 #[cfg(target_os = "redox")]

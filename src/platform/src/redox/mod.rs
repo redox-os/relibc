@@ -401,6 +401,20 @@ unsafe fn inner_get_name(
     Ok(0)
 }
 
+pub fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
+    let _ = write!(
+        ::FileWriter(2),
+        "unimplemented: getitimer({}, {:p})",
+        which,
+        out
+    );
+
+    unsafe {
+        *out = itimerval::default();
+    }
+    0
+}
+
 pub unsafe fn getpeername(
     socket: c_int,
     address: *mut sockaddr,
@@ -640,6 +654,21 @@ pub unsafe fn sendto(
         return -1;
     }
     write(socket, slice::from_raw_parts(buf as *const u8, len))
+}
+
+pub fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
+    let _ = write!(
+        ::FileWriter(2),
+        "unimplemented: setitimer({}, {:p}, {:p})",
+        which,
+        new,
+        old
+    );
+
+    unsafe {
+        *old = itimerval::default();
+    }
+    0
 }
 
 pub fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {

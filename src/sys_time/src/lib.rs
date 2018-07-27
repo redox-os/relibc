@@ -6,7 +6,12 @@ extern crate platform;
 
 use platform::types::*;
 
+pub const ITIMER_REAL: c_int = 0;
+pub const ITIMER_VIRTUAL: c_int = 1;
+pub const ITIMER_PROF: c_int = 2;
+
 #[repr(C)]
+#[derive(Default)]
 pub struct timeval {
     pub tv_sec: time_t,
     pub tv_usec: suseconds_t,
@@ -18,6 +23,7 @@ pub struct timezone {
 }
 
 #[repr(C)]
+#[derive(Default)]
 pub struct itimerval {
     pub it_interval: timeval,
     pub it_value: timeval,
@@ -28,18 +34,22 @@ pub struct fd_set {
     pub fds_bits: [c_long; 16usize],
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
-    unimplemented!();
+    platform::getitimer(which, value as *mut platform::types::itimerval)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn setitimer(
     which: c_int,
     value: *const itimerval,
     ovalue: *mut itimerval,
 ) -> c_int {
-    unimplemented!();
+    platform::setitimer(
+        which,
+        value as *const platform::types::itimerval,
+        ovalue as *mut platform::types::itimerval
+    )
 }
 
 #[no_mangle]

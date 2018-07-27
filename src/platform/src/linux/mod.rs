@@ -3,7 +3,7 @@ use core::{mem, ptr};
 use errno;
 use types::*;
 
-const TIOCGWINSZ: u32 = 0x5413;
+const TIOCGWINSZ: c_ulong = 0x5413;
 
 const AT_FDCWD: c_int = -100;
 const AT_EMPTY_PATH: c_int = 0x1000;
@@ -161,6 +161,10 @@ pub unsafe fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
     0
 }
 
+pub fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
+    e(unsafe { syscall!(GETITIMER, which, out) }) as c_int
+}
+
 pub unsafe fn getpeername(
     socket: c_int,
     address: *mut sockaddr,
@@ -223,7 +227,7 @@ pub fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
 
 pub fn isatty(fd: c_int) -> c_int {
     let mut winsize = winsize::default();
-    (ioctl(fd, TIOCGWINSZ as c_ulong, &mut winsize as *mut _ as *mut c_void) == 0) as c_int
+    (ioctl(fd, TIOCGWINSZ, &mut winsize as *mut _ as *mut c_void) == 0) as c_int
 }
 
 pub fn kill(pid: pid_t, sig: c_int) -> c_int {
@@ -323,6 +327,10 @@ pub unsafe fn sendto(
     e(syscall!(
         SENDTO, socket, buf, len, flags, dest_addr, dest_len
     )) as ssize_t
+}
+
+pub fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
+    e(unsafe { syscall!(SETITIMER, which, new, old) }) as c_int
 }
 
 pub fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
