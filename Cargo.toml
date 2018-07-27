@@ -26,6 +26,7 @@ inttypes = { path = "src/inttypes" }
 locale = { path = "src/locale" }
 netinet = { path = "src/netinet" }
 platform = { path = "src/platform" }
+pwd = { path = "src/pwd" }
 semaphore = { path = "src/semaphore" }
 setjmp = { path = "src/setjmp" }
 signal = { path = "src/signal" }

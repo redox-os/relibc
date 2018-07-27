@@ -16,6 +16,7 @@ pub extern crate float;
 pub extern crate grp;
 pub extern crate locale;
 pub extern crate netinet;
+pub extern crate pwd;
 pub extern crate semaphore;
 pub extern crate setjmp;
 pub extern crate signal;

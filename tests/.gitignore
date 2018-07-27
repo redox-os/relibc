@@ -64,6 +64,7 @@ wchar/mbsrtowcs
 wchar/putwchar
 wchar/wcrtomb
 dirent
+pwd
 stdlib/alloc
 stdlib/bsearch
 stdlib/mktemp

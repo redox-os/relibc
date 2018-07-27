@@ -122,15 +122,15 @@ pub fn getdents(fd: c_int, dirents: *mut dirent, bytes: usize) -> c_int {
 }
 
 pub fn getegid() -> gid_t {
-    e(unsafe { syscall!(GETEGID) })
+    e(unsafe { syscall!(GETEGID) }) as gid_t
 }
 
 pub fn geteuid() -> uid_t {
-    e(unsafe { syscall!(GETEUID) })
+    e(unsafe { syscall!(GETEUID) }) as uid_t
 }
 
 pub fn getgid() -> gid_t {
-    e(unsafe { syscall!(GETGID) })
+    e(unsafe { syscall!(GETGID) }) as gid_t
 }
 
 pub unsafe fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
@@ -174,15 +174,15 @@ pub unsafe fn getpeername(
 }
 
 pub fn getpgid(pid: pid_t) -> pid_t {
-    e(unsafe { syscall!(GETPGID, pid) })
+    e(unsafe { syscall!(GETPGID, pid) }) as pid_t
 }
 
 pub fn getpid() -> pid_t {
-    e(unsafe { syscall!(GETPID) })
+    e(unsafe { syscall!(GETPID) }) as pid_t
 }
 
 pub fn getppid() -> pid_t {
-    e(unsafe { syscall!(GETPPID) })
+    e(unsafe { syscall!(GETPPID) }) as pid_t
 }
 
 pub unsafe fn getsockname(
@@ -217,7 +217,7 @@ pub fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
 }
 
 pub fn getuid() -> uid_t {
-    e(unsafe { syscall!(GETUID) })
+    e(unsafe { syscall!(GETUID) }) as uid_t
 }
 
 pub fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {

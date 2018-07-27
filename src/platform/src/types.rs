@@ -50,25 +50,25 @@ pub type wchar_t = i32;
 pub type wint_t = u32;
 pub type wctype_t = i64;
 
-pub type off_t = i64;
-pub type mode_t = u16;
-pub type time_t = i64;
-pub type pid_t = usize;
-pub type id_t = usize;
-pub type gid_t = usize;
-pub type uid_t = usize;
-pub type dev_t = usize;
-pub type ino_t = usize;
-pub type nlink_t = usize;
-pub type blksize_t = isize;
-pub type blkcnt_t = u64;
+pub type off_t = c_long;
+pub type mode_t = c_int;
+pub type time_t = c_long;
+pub type pid_t = c_int;
+pub type id_t = c_uint;
+pub type gid_t = c_int;
+pub type uid_t = c_int;
+pub type dev_t = c_long;
+pub type ino_t = c_ulong;
+pub type nlink_t = c_ulong;
+pub type blksize_t = c_long;
+pub type blkcnt_t = c_ulong;
 
 pub type useconds_t = c_uint;
 pub type suseconds_t = c_int;
 
-pub type clock_t = i64;
-pub type clockid_t = i32;
-pub type timer_t = c_void;
+pub type clock_t = c_long;
+pub type clockid_t = c_int;
+pub type timer_t = *mut c_void;
 
 #[repr(C)]
 #[derive(Default)]

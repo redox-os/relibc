@@ -250,6 +250,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pwd"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "errno 0.1.0",
+ "fcntl 0.1.0",
+ "platform 0.1.0",
+]
+
+[[package]]
 name = "quote"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -324,6 +334,7 @@ dependencies = [
  "locale 0.1.0",
  "netinet 0.1.0",
  "platform 0.1.0",
+ "pwd 0.1.0",
  "semaphore 0.1.0",
  "setjmp 0.1.0",
  "signal 0.1.0",

@@ -1,0 +1,12 @@
+[package]
+name = "pwd"
+version = "0.1.0"
+authors = ["jD91mZM2 <me@krake.one>"]
+
+[build-dependencies]
+cbindgen = { path = "../../cbindgen" }
+
+[dependencies]
+errno = { path = "../errno" }
+fcntl = { path = "../fcntl" }
+platform = { path = "../platform" }

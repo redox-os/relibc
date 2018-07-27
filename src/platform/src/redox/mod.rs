@@ -100,7 +100,7 @@ pub fn chmod(path: *const c_char, mode: mode_t) -> c_int {
     match syscall::open(path, O_WRONLY) {
         Err(err) => e(Err(err)) as c_int,
         Ok(fd) => {
-            let res = syscall::fchmod(fd as usize, mode);
+            let res = syscall::fchmod(fd as usize, mode as u16);
             let _ = syscall::close(fd);
             e(res) as c_int
         }
@@ -215,7 +215,7 @@ pub fn fchdir(fd: c_int) -> c_int {
 }
 
 pub fn fchmod(fd: c_int, mode: mode_t) -> c_int {
-    e(syscall::fchmod(fd as usize, mode)) as c_int
+    e(syscall::fchmod(fd as usize, mode as u16)) as c_int
 }
 
 pub fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> c_int {
@@ -239,7 +239,7 @@ pub fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
                     (*buf).st_dev = redox_buf.st_dev as dev_t;
                     (*buf).st_ino = redox_buf.st_ino as ino_t;
                     (*buf).st_nlink = redox_buf.st_nlink as nlink_t;
-                    (*buf).st_mode = redox_buf.st_mode;
+                    (*buf).st_mode = redox_buf.st_mode as mode_t;
                     (*buf).st_uid = redox_buf.st_uid as uid_t;
                     (*buf).st_gid = redox_buf.st_gid as gid_t;
                     // TODO st_rdev
@@ -494,11 +494,11 @@ pub fn isatty(fd: c_int) -> c_int {
 }
 
 pub fn kill(pid: pid_t, sig: c_int) -> c_int {
-    e(syscall::kill(pid, sig as usize)) as c_int
+    e(syscall::kill(pid as usize, sig as usize)) as c_int
 }
 
 pub fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-    e(syscall::kill(-(pgrp as isize) as pid_t, sig as usize)) as c_int
+    e(syscall::kill(-(pgrp as isize) as usize, sig as usize)) as c_int
 }
 
 pub fn link(path1: *const c_char, path2: *const c_char) -> c_int {
@@ -823,7 +823,7 @@ pub fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
         if !stat_loc.is_null() {
             *stat_loc = temp as c_int;
         }
-        res
+        res as pid_t
     }
 }
 
