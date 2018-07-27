@@ -68,6 +68,7 @@ BINS=\
 	$(EXPECT_BINS) \
 	dirent \
 	pwd \
+	resource/getrusage \
 	stdlib/alloc \
 	stdlib/bsearch \
 	stdlib/mktemp \

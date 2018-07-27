@@ -27,6 +27,20 @@ pub struct rlimit {
 pub struct rusage {
     pub ru_utime: timeval,
     pub ru_stime: timeval,
+    pub ru_maxrss: c_long,
+    pub ru_ixrss: c_long,
+    pub ru_idrss: c_long,
+    pub ru_isrss: c_long,
+    pub ru_minflt: c_long,
+    pub ru_majflt: c_long,
+    pub ru_nswap: c_long,
+    pub ru_inblock: c_long,
+    pub ru_oublock: c_long,
+    pub ru_msgsnd: c_long,
+    pub ru_msgrcv: c_long,
+    pub ru_nsignals: c_long,
+    pub ru_nvcsw: c_long,
+    pub ru_nivcsw: c_long
 }
 
 // #[no_mangle]
@@ -39,9 +53,9 @@ pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-    unimplemented!();
+    platform::getrusage(who, r_usage as *mut platform::types::rusage)
 }
 
 // #[no_mangle]

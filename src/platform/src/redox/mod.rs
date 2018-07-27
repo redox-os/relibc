@@ -351,6 +351,16 @@ pub fn getgid() -> gid_t {
     e(syscall::getgid()) as gid_t
 }
 
+pub fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
+    let _ = write!(
+        ::FileWriter(2),
+        "unimplemented: getrusage({}, {:p})",
+        who,
+        r_usage
+    );
+    -1
+}
+
 pub unsafe fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
     let fd = e(syscall::open("/etc/hostname", O_RDONLY)) as i32;
     if fd < 0 {

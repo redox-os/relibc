@@ -133,6 +133,10 @@ pub fn getgid() -> gid_t {
     e(unsafe { syscall!(GETGID) }) as gid_t
 }
 
+pub fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
+    e(unsafe { syscall!(GETRUSAGE, who, r_usage) }) as c_int
+}
+
 pub unsafe fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
     // len only needs to be mutable on linux
     let mut len = len;
