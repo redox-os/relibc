@@ -22,7 +22,7 @@ SRC=\
 
 .PHONY: all clean fmt install libc libm test
 
-all: libc libm
+all: | libc libm
 
 clean:
 	cargo clean
