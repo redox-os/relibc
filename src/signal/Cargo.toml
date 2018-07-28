@@ -8,4 +8,5 @@ build = "build.rs"
 cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
+errno = { path = "../errno" }
 platform = { path = "../platform" }

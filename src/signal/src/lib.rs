@@ -3,7 +3,7 @@
 #![no_std]
 #![feature(asm, const_fn, core_intrinsics, global_asm)]
 
-#[macro_use]
+extern crate errno;
 extern crate platform;
 
 #[cfg(target_os = "linux")]
@@ -29,8 +29,6 @@ pub struct sigaction {
     pub sa_restorer: unsafe extern "C" fn(),
     pub sa_mask: sigset_t
 }
-
-const NSIG: usize = 64;
 
 pub use sys::*;
 
@@ -65,9 +63,18 @@ pub unsafe extern "C" fn sigaction(sig: c_int, act: *const sigaction, oact: *mut
     platform::sigaction(sig, ptr, oact as *mut platform::types::sigaction)
 }
 
-// #[no_mangle]
-pub extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn sigaddset(set: *mut sigset_t, mut signo: c_int) -> c_int {
+    if signo <= 0 || signo as usize > NSIG {
+        platform::errno = errno::EINVAL;
+        return -1;
+    }
+
+    let signo = signo as usize - 1; // 0-indexed usize, please!
+
+    let bits_each = 8 * mem::size_of::<sigset_t>();
+    (unsafe { *set })[signo / bits_each] = 1 << (signo & (bits_each - 1));
+    0
 }
 
 // #[no_mangle]
@@ -75,9 +82,12 @@ pub extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
-    unimplemented!();
+    for i in unsafe { &mut (*set) } {
+        *i = 0;
+    }
+    0
 }
 
 #[no_mangle]
