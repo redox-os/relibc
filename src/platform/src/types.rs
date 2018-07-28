@@ -172,8 +172,7 @@ pub struct sigaction {
     pub sa_mask: sigset_t
 }
 
-pub const NSIG: usize = 64;
-pub type sigset_t = [c_ulong; NSIG / (8 * mem::size_of::<c_ulong>())];
+pub type sigset_t = c_ulong;
 
 const UTSLENGTH: usize = 65;
 

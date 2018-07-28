@@ -1,6 +1,3 @@
-#define SIG_ERR -1ULL
-
-#define NSIG 64
-
-// darn cbindgen
-typedef unsigned long sigset_t[NSIG / (8 * sizeof(unsigned long))];
+#define SIG_ERR ((void (*)(int)) -1)
+#define SIG_DFL ((void (*)(int)) 0)
+#define SIG_IGN ((void (*)(int)) 1)

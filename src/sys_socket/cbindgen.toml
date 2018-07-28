@@ -1,4 +1,4 @@
-sys_includes = ["sys/types.h"]
+sys_includes = ["stddef.h", "sys/types.h"]
 include_guard = "_SYS_SOCKET_H"
 style = "Tag"
 language = "C"

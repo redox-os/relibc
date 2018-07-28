@@ -736,7 +736,7 @@ pub unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction)
         let m = (*act).sa_mask;
         Some(syscall::SigAction {
             sa_handler: sig_handler,
-            sa_mask: [m[0] as u64, 0],
+            sa_mask: [0, m as u64],
             sa_flags: (*act).sa_flags as usize
         })
     };
@@ -748,7 +748,7 @@ pub unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction)
     )) as c_int;
     if !oact.is_null() {
         let m = old.sa_mask;
-        (*oact).sa_mask = [m[0] as c_ulong];
+        (*oact).sa_mask = m[1] as c_ulong;
         (*oact).sa_flags = old.sa_flags as c_ulong;
     }
     ret
