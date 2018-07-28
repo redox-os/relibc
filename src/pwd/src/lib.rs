@@ -83,15 +83,16 @@ fn pwd_lookup<F>(out: *mut passwd, alloc: Option<(*mut c_char, size_t)>, mut cal
             }
 
             let read = platform::read(*file, &mut buf[len..]);
+
+            unsafe {
+                buf.set_len(len + read as usize);
+            }
+
             if read == 0 {
                 return OptionPasswd::NotFound;
             }
             if read < 0 {
                 return OptionPasswd::Error;
-            }
-
-            unsafe {
-                buf.set_len(len + read as usize);
             }
         }
 
@@ -262,6 +263,9 @@ pub extern "C" fn getpwuid(uid: uid_t) -> *mut passwd {
         OptionPasswd::Error => ptr::null_mut(),
         OptionPasswd::NotFound => ptr::null_mut(),
         OptionPasswd::Found(buf) => unsafe {
+            if PASSWD_BUF != ptr::null_mut() {
+                platform::free(PASSWD_BUF as *mut c_void);
+            }
             PASSWD_BUF = buf;
             &mut PASSWD
         }
