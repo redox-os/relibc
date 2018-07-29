@@ -324,6 +324,16 @@ pub fn rmdir(path: *const c_char) -> c_int {
     e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, AT_REMOVEDIR) }) as c_int
 }
 
+pub fn select(
+    nfds: c_int,
+    readfds: *mut fd_set,
+    writefds: *mut fd_set,
+    exceptfds: *mut fd_set,
+    timeout: *mut timeval,
+) -> c_int {
+    e(unsafe { syscall!(SELECT, nfds, readfds, writefds, exceptfds, timeout) }) as c_int
+}
+
 pub unsafe fn sendto(
     socket: c_int,
     buf: *const c_void,

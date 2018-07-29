@@ -8,7 +8,7 @@ void handler(int sig) {
 }
 
 int main() {
-    if (((size_t) signal(SIGUSR1, &handler)) == SIG_ERR) {
+    if (signal(SIGUSR1, &handler) == SIG_ERR) {
         puts("Signal error!");
         printf("%d\n", errno);
         return 1;

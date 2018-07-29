@@ -14,17 +14,13 @@ use alloc::boxed::Box;
 use core::{mem, ptr};
 use platform::types::*;
 
-// This is here because cbindgen doesn't understand size_of calls.
-// We set this constant inside C too, from bits/dirent.h
-const _DIRENT_SIZE: usize = mem::size_of::<dirent>();
-
-const _DIR_BUF_SIZE: usize = _DIRENT_SIZE * 3;
+const DIR_BUF_SIZE: usize = mem::size_of::<dirent>() * 3;
 
 // No repr(C) needed, C won't see the content
 // TODO: ***THREAD SAFETY***
 pub struct DIR {
     fd: c_int,
-    buf: [c_char; _DIR_BUF_SIZE],
+    buf: [c_char; DIR_BUF_SIZE],
     // index & len are specified in bytes
     index: usize,
     len: usize,
@@ -57,7 +53,7 @@ pub extern "C" fn opendir(path: *const c_char) -> *mut DIR {
 
     Box::into_raw(Box::new(DIR {
         fd,
-        buf: [0; _DIR_BUF_SIZE],
+        buf: [0; DIR_BUF_SIZE],
         index: 0,
         len: 0,
         offset: 0,
@@ -97,7 +93,7 @@ pub unsafe extern "C" fn readdir(dir: *mut DIR) -> *mut dirent {
         if (*dir).index != 0 || (*dir).offset != 0 {
             // This should happen every time but the first, making the offset
             // point to the current element and not the next
-            (*dir).offset += _DIRENT_SIZE;
+            (*dir).offset += mem::size_of::<dirent>();
         }
         (*ptr).d_off = (*dir).offset as off_t;
     }

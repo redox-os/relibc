@@ -14,14 +14,14 @@ int main() {
 
     struct dirent* entry;
 
-    int tell = 0;
+    //int tell = 0;
 
     for (char counter = 0; (entry = readdir(dir)); counter += 1) {
         puts(entry->d_name);
 
-        if (counter == 4) {
-            tell = telldir(dir);
-        }
+        //if (counter == 4) {
+        //    tell = telldir(dir);
+        //}
     }
 
     puts("--- Testing rewind ---");

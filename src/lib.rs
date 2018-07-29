@@ -28,6 +28,7 @@ pub extern crate strings;
 pub extern crate sys_ioctl;
 pub extern crate sys_mman;
 pub extern crate sys_resource;
+pub extern crate sys_select;
 pub extern crate sys_socket;
 pub extern crate sys_stat;
 pub extern crate sys_time;

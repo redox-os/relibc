@@ -38,6 +38,7 @@ strings = { path = "src/strings" }
 sys_ioctl = { path = "src/sys_ioctl" }
 sys_mman = { path = "src/sys_mman" }
 sys_resource = { path = "src/sys_resource" }
+sys_select = { path = "src/sys_select" }
 sys_socket = { path = "src/sys_socket" }
 sys_stat = { path = "src/sys_stat" }
 sys_time = { path = "src/sys_time" }

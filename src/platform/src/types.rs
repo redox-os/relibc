@@ -229,3 +229,9 @@ pub struct tms {
     tms_cutime: clock_t,
     tms_cstime: clock_t,
 }
+
+pub const FD_SETSIZE: usize = 1024;
+#[repr(C)]
+pub struct fd_set {
+    pub fds_bits: [c_ulong; FD_SETSIZE / (8 * mem::size_of::<c_ulong>())],
+}

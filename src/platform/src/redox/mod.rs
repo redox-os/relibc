@@ -364,7 +364,7 @@ pub fn getgid() -> gid_t {
 
 pub fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
     let _ = write!(
-        ::FileWriter(2),
+        FileWriter(2),
         "unimplemented: getrusage({}, {:p})",
         who,
         r_usage
@@ -424,7 +424,7 @@ unsafe fn inner_get_name(
 
 pub fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
     let _ = write!(
-        ::FileWriter(2),
+        FileWriter(2),
         "unimplemented: getitimer({}, {:p})",
         which,
         out
@@ -472,7 +472,7 @@ pub fn getsockopt(
     option_len: *mut socklen_t,
 ) -> c_int {
     let _ = write!(
-        ::FileWriter(2),
+        FileWriter(2),
         "unimplemented: getsockopt({}, {}, {}, {:p}, {:p})",
         socket,
         level,
@@ -661,6 +661,111 @@ pub fn rmdir(path: *const c_char) -> c_int {
     e(syscall::rmdir(path)) as c_int
 }
 
+pub fn select(
+    nfds: c_int,
+    readfds: *mut fd_set,
+    writefds: *mut fd_set,
+    exceptfds: *mut fd_set,
+    timeout: *mut timeval,
+) -> c_int {
+    fn isset(set: *mut fd_set, fd: usize) -> bool {
+        if set.is_null() {
+            return false;
+        }
+
+        let mask = 1 << (fd & (8 * mem::size_of::<c_ulong>() - 1));
+        unsafe { (*set).fds_bits[fd / (8 * mem::size_of::<c_ulong>())] & mask == mask }
+    }
+
+    let event_file = match RawFile::open("event:\0".as_ptr() as *const c_char, 0, 0) {
+        Ok(file) => file,
+        Err(_) => return -1,
+    };
+
+    let mut total = 0;
+
+    for fd in 0..nfds as usize {
+        macro_rules! register {
+            ($fd:expr, $flags:expr) => {
+                if write(
+                    *event_file,
+                    &syscall::Event {
+                        id: $fd,
+                        flags: $flags,
+                        data: 0,
+                    },
+                ) < 0
+                {
+                    return -1;
+                }
+            };
+        }
+        if isset(readfds, fd) {
+            register!(fd, syscall::EVENT_READ);
+            total += 1;
+        }
+        if isset(writefds, fd) {
+            register!(fd, syscall::EVENT_WRITE);
+            total += 1;
+        }
+        if isset(exceptfds, fd) {
+            total += 1;
+        }
+    }
+
+    const TIMEOUT_TOKEN: usize = 1;
+
+    let timeout_file = if timeout.is_null() {
+        None
+    } else {
+        let timeout_file = match RawFile::open(
+            format!("time:{}\0", syscall::CLOCK_MONOTONIC).as_ptr() as *const c_char,
+            0,
+            0,
+        ) {
+            Ok(file) => file,
+            Err(_) => return -1,
+        };
+        let timeout = unsafe { &*timeout };
+        if write(
+            *timeout_file,
+            &syscall::TimeSpec {
+                tv_sec: timeout.tv_sec,
+                tv_nsec: timeout.tv_usec * 1000,
+            },
+        ) < 0
+        {
+            return -1;
+        }
+        if write(
+            *event_file,
+            &syscall::Event {
+                id: *timeout_file as usize,
+                flags: syscall::EVENT_READ,
+                data: TIMEOUT_TOKEN,
+            },
+        ) < 0
+        {
+            return -1;
+        }
+
+        Some(timeout_file)
+    };
+
+    let mut event = syscall::Event::default();
+    if read(*event_file, &mut event) < 0 {
+        return -1;
+    }
+
+    if timeout_file.is_some() && event.data == TIMEOUT_TOKEN {
+        return 0;
+    }
+
+    // I really don't get why, but select wants me to return the total number
+    // of file descriptors that was inputted. I'm confused.
+    total
+}
+
 pub unsafe fn sendto(
     socket: c_int,
     buf: *const c_void,
@@ -682,7 +787,7 @@ pub unsafe fn sendto(
 
 pub fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
     let _ = write!(
-        ::FileWriter(2),
+        FileWriter(2),
         "unimplemented: setitimer({}, {:p}, {:p})",
         which,
         new,
@@ -715,7 +820,7 @@ pub fn setsockopt(
     option_len: socklen_t,
 ) -> c_int {
     let _ = write!(
-        ::FileWriter(2),
+        FileWriter(2),
         "unimplemented: setsockopt({}, {}, {}, {:p}, {})",
         socket,
         level,
@@ -728,7 +833,7 @@ pub fn setsockopt(
 
 pub fn shutdown(socket: c_int, how: c_int) -> c_int {
     let _ = write!(
-        ::FileWriter(2),
+        FileWriter(2),
         "unimplemented: shutdown({}, {})",
         socket,
         how
@@ -770,7 +875,7 @@ pub unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction)
 
 pub fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
     let _ = write!(
-        ::FileWriter(2),
+        FileWriter(2),
         "unimplemented: sigprocmask({}, {:p}, {:p})",
         how,
         set,
@@ -825,7 +930,7 @@ pub unsafe fn socket(domain: c_int, mut kind: c_int, protocol: c_int) -> c_int {
 
 pub fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *mut c_int) -> c_int {
     let _ = write!(
-        ::FileWriter(2),
+        FileWriter(2),
         "unimplemented: socketpair({}, {}, {}, {:p})",
         domain,
         kind,
@@ -836,7 +941,7 @@ pub fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *m
 }
 
 pub fn times(out: *mut tms) -> clock_t {
-    let _ = write!(::FileWriter(2), "unimplemented: times({:p})", out);
+    let _ = write!(FileWriter(2), "unimplemented: times({:p})", out);
     !0
 }
 
