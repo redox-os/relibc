@@ -65,6 +65,7 @@ wchar/putwchar
 wchar/wcrtomb
 dirent
 pwd
+resource/getrusage
 stdlib/alloc
 stdlib/bsearch
 stdlib/mktemp
