@@ -392,6 +392,10 @@ pub fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *m
     e(unsafe { syscall!(SOCKETPAIR, domain, kind, protocol, socket_vector) }) as c_int
 }
 
+pub fn times(out: *mut tms) -> clock_t {
+    unsafe { syscall!(TIMES, out) as clock_t }
+}
+
 pub fn uname(utsname: *mut utsname) -> c_int {
     e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
 }

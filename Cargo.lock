@@ -349,6 +349,7 @@ dependencies = [
  "sys_socket 0.1.0",
  "sys_stat 0.1.0",
  "sys_time 0.1.0",
+ "sys_times 0.1.0",
  "sys_un 0.1.0",
  "sys_utsname 0.1.0",
  "sys_wait 0.1.0",
@@ -573,6 +574,14 @@ dependencies = [
 
 [[package]]
 name = "sys_time"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "platform 0.1.0",
+]
+
+[[package]]
+name = "sys_times"
 version = "0.1.0"
 dependencies = [
  "cbindgen 0.5.2",

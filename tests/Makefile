@@ -73,6 +73,7 @@ BINS=\
 	stdlib/bsearch \
 	stdlib/mktemp \
 	time/gettimeofday \
+	time/times \
 	unistd/chdir \
 	unistd/gethostname \
 	unistd/getid \

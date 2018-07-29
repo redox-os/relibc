@@ -41,6 +41,7 @@ sys_resource = { path = "src/sys_resource" }
 sys_socket = { path = "src/sys_socket" }
 sys_stat = { path = "src/sys_stat" }
 sys_time = { path = "src/sys_time" }
+sys_times = { path = "src/sys_times" }
 sys_un = { path = "src/sys_un" }
 sys_utsname = { path = "src/sys_utsname" }
 sys_wait = { path = "src/sys_wait" }

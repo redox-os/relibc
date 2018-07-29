@@ -821,6 +821,15 @@ pub fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *m
     -1
 }
 
+pub fn times(out: *mut tms) -> clock_t {
+    let _ = write!(
+        ::FileWriter(2),
+        "unimplemented: times({:p})",
+        out
+    );
+    !0
+}
+
 pub fn unlink(path: *const c_char) -> c_int {
     let path = unsafe { c_str(path) };
     e(syscall::unlink(path)) as c_int
