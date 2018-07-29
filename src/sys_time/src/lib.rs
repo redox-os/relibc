@@ -48,13 +48,16 @@ pub extern "C" fn setitimer(
     platform::setitimer(
         which,
         value as *const platform::types::itimerval,
-        ovalue as *mut platform::types::itimerval
+        ovalue as *mut platform::types::itimerval,
     )
 }
 
 #[no_mangle]
 pub extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
-    platform::gettimeofday(tp as *mut platform::types::timeval, tzp as *mut platform::types::timezone)
+    platform::gettimeofday(
+        tp as *mut platform::types::timeval,
+        tzp as *mut platform::types::timezone,
+    )
 }
 
 // #[no_mangle]
@@ -68,9 +71,19 @@ pub extern "C" fn select(
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn utimes(path: *const c_char, times: [timeval; 2]) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c_int {
+    let times_spec = [
+        timespec {
+            tv_sec: (*times.offset(0)).tv_sec,
+            tv_nsec: ((*times.offset(0)).tv_usec as i64) * 1000,
+        },
+        timespec {
+            tv_sec: (*times.offset(1)).tv_sec,
+            tv_nsec: ((*times.offset(1)).tv_usec as i64) * 1000,
+        },
+    ];
+    platform::utimens(path, times_spec.as_ptr())
 }
 
 /*

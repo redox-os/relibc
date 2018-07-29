@@ -37,6 +37,7 @@ pub extern crate sys_utsname;
 pub extern crate sys_wait;
 pub extern crate time;
 pub extern crate unistd;
+pub extern crate utime;
 pub extern crate wchar;
 pub extern crate wctype;
 

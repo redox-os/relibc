@@ -15,8 +15,8 @@ use core::str::FromStr;
 use core::{mem, ptr, slice, str};
 use errno::*;
 use netinet::in_h::in_addr;
-use platform::types::*;
 use platform::c_str;
+use platform::types::*;
 
 #[no_mangle]
 pub extern "C" fn htonl(hostlong: u32) -> u32 {

@@ -1,5 +1,3 @@
-use core::mem;
-
 #[cfg(target_os = "redox")]
 use syscall::data::TimeSpec as redox_timespec;
 // Use repr(u8) as LLVM expects `void*` to be the same as `i8*` to help enable
@@ -127,7 +125,7 @@ pub struct stat {
     // Compared to glibc, our struct is for some reason 24 bytes too small.
     // Accessing atime works, so clearly the struct isn't incorrect...
     // This works.
-    pub _pad: [c_char; 24]
+    pub _pad: [c_char; 24],
 }
 
 pub const AF_INET: c_int = 2;
@@ -154,14 +152,14 @@ pub struct sockaddr {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct in_addr {
-    pub s_addr: in_addr_t
+    pub s_addr: in_addr_t,
 }
 
 #[repr(C)]
 pub struct sockaddr_in {
     pub sin_family: sa_family_t,
     pub sin_port: in_port_t,
-    pub sin_addr: in_addr
+    pub sin_addr: in_addr,
 }
 
 #[repr(C)]
@@ -169,7 +167,7 @@ pub struct sigaction {
     pub sa_handler: extern "C" fn(c_int),
     pub sa_flags: c_ulong,
     pub sa_restorer: unsafe extern "C" fn(),
-    pub sa_mask: sigset_t
+    pub sa_mask: sigset_t,
 }
 
 pub type sigset_t = c_ulong;
@@ -192,7 +190,7 @@ pub struct dirent {
     pub d_off: off_t,
     pub d_reclen: c_ushort,
     pub d_type: c_uchar,
-    pub d_name: [c_char; 256]
+    pub d_name: [c_char; 256],
 }
 
 #[repr(C)]
@@ -201,7 +199,7 @@ pub struct winsize {
     ws_row: c_ushort,
     ws_col: c_ushort,
     ws_xpixel: c_ushort,
-    ws_ypixel: c_ushort
+    ws_ypixel: c_ushort,
 }
 
 #[repr(C)]
@@ -221,7 +219,7 @@ pub struct rusage {
     pub ru_msgrcv: c_long,
     pub ru_nsignals: c_long,
     pub ru_nvcsw: c_long,
-    pub ru_nivcsw: c_long
+    pub ru_nivcsw: c_long,
 }
 
 #[repr(C)]
@@ -229,5 +227,5 @@ pub struct tms {
     tms_utime: clock_t,
     tms_stime: clock_t,
     tms_cutime: clock_t,
-    tms_cstime: clock_t
+    tms_cstime: clock_t,
 }

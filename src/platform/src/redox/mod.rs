@@ -248,15 +248,15 @@ pub fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
                     (*buf).st_blksize = redox_buf.st_blksize as blksize_t;
                     (*buf).st_atim = timespec {
                         tv_sec: redox_buf.st_atime as time_t,
-                        tv_nsec: 0
+                        tv_nsec: 0,
                     };
                     (*buf).st_mtim = timespec {
                         tv_sec: redox_buf.st_mtime as time_t,
-                        tv_nsec: 0
+                        tv_nsec: 0,
                     };
                     (*buf).st_ctim = timespec {
                         tv_sec: redox_buf.st_ctime as time_t,
-                        tv_nsec: 0
+                        tv_nsec: 0,
                     };
                 }
             }
@@ -275,11 +275,22 @@ pub fn ftruncate(fd: c_int, len: off_t) -> c_int {
 }
 
 pub fn futimens(fd: c_int, times: *const timespec) -> c_int {
-    let times = [
-        unsafe { redox_timespec::from(&*times) },
-        unsafe { redox_timespec::from(&*times.offset(1)) }
-    ];
+    let times = [unsafe { redox_timespec::from(&*times) }, unsafe {
+        redox_timespec::from(&*times.offset(1))
+    }];
     e(syscall::futimens(fd as usize, &times)) as c_int
+}
+
+pub fn utimens(path: *const c_char, times: *const timespec) -> c_int {
+    let path = unsafe { c_str(path) };
+    match syscall::open(path, O_STAT) {
+        Err(err) => e(Err(err)) as c_int,
+        Ok(fd) => {
+            let res = futimens(fd, times);
+            let _ = syscall::close(fd);
+            res
+        }
+    }
 }
 
 pub fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
@@ -307,7 +318,7 @@ pub fn getdents(fd: c_int, mut dirents: *mut dirent, mut bytes: usize) -> c_int 
             blen = match syscall::read(fd as usize, &mut buf) {
                 Ok(0) => return amount,
                 Ok(n) => n,
-                Err(err) => return -err.errno
+                Err(err) => return -err.errno,
             };
         }
 
@@ -320,7 +331,7 @@ pub fn getdents(fd: c_int, mut dirents: *mut dirent, mut bytes: usize) -> c_int 
                     d_off: 0,
                     d_reclen: mem::size_of::<dirent>() as c_ushort,
                     d_type: 0,
-                    d_name: name
+                    d_name: name,
                 };
                 dirents = dirents.offset(1);
             }
@@ -474,7 +485,10 @@ pub fn getsockopt(
 
 pub fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
     let mut redox_tp = redox_timespec::default();
-    let err = e(syscall::clock_gettime(syscall::CLOCK_REALTIME, &mut redox_tp)) as c_int;
+    let err = e(syscall::clock_gettime(
+        syscall::CLOCK_REALTIME,
+        &mut redox_tp,
+    )) as c_int;
     if err < 0 {
         return err;
     }
@@ -532,7 +546,7 @@ pub fn lseek(fd: c_int, offset: off_t, whence: c_int) -> off_t {
 
 pub fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = unsafe { c_str(path) };
-    match syscall::open(path, O_RDONLY | O_NOFOLLOW) {
+    match syscall::open(path, O_STAT | O_NOFOLLOW) {
         Err(err) => e(Err(err)) as c_int,
         Ok(fd) => {
             let res = fstat(fd as i32, buf);
@@ -737,14 +751,14 @@ pub unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction)
         Some(syscall::SigAction {
             sa_handler: sig_handler,
             sa_mask: [0, m as u64],
-            sa_flags: (*act).sa_flags as usize
+            sa_flags: (*act).sa_flags as usize,
         })
     };
     let mut old = syscall::SigAction::default();
     let ret = e(syscall::sigaction(
         sig as usize,
         act.as_ref(),
-        if oact.is_null() { None } else { Some(&mut old) }
+        if oact.is_null() { None } else { Some(&mut old) },
     )) as c_int;
     if !oact.is_null() {
         let m = old.sa_mask;
@@ -767,7 +781,7 @@ pub fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_i
 
 pub fn stat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = unsafe { c_str(path) };
-    match syscall::open(path, O_RDONLY) {
+    match syscall::open(path, O_STAT) {
         Err(err) => e(Err(err)) as c_int,
         Ok(fd) => {
             let res = fstat(fd as i32, buf);
@@ -822,11 +836,7 @@ pub fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *m
 }
 
 pub fn times(out: *mut tms) -> clock_t {
-    let _ = write!(
-        ::FileWriter(2),
-        "unimplemented: times({:p})",
-        out
-    );
+    let _ = write!(::FileWriter(2), "unimplemented: times({:p})", out);
     !0
 }
 

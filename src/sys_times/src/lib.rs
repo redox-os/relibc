@@ -11,7 +11,7 @@ pub struct tms {
     tms_utime: clock_t,
     tms_stime: clock_t,
     tms_cutime: clock_t,
-    tms_cstime: clock_t
+    tms_cstime: clock_t,
 }
 
 #[no_mangle]

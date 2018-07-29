@@ -13,19 +13,19 @@ pub struct sgttyb {
     sg_ospeed: c_char,
     sg_erase: c_char,
     sg_kill: c_char,
-    sg_flags: c_ushort
+    sg_flags: c_ushort,
 }
 
 #[cfg(target_os = "linux")]
 pub mod inner {
-    use ::*;
+    use *;
 
     #[repr(C)]
     pub struct winsize {
         ws_row: c_ushort,
         ws_col: c_ushort,
         ws_xpixel: c_ushort,
-        ws_ypixel: c_ushort
+        ws_ypixel: c_ushort,
     }
 
     #[no_mangle]

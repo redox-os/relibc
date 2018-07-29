@@ -355,6 +355,7 @@ dependencies = [
  "sys_wait 0.1.0",
  "time 0.1.0",
  "unistd 0.1.0",
+ "utime 0.1.0",
  "wchar 0.1.0",
  "wctype 0.1.0",
 ]
@@ -688,6 +689,14 @@ dependencies = [
  "stdio 0.1.0",
  "string 0.1.0",
  "sys_time 0.1.0",
+]
+
+[[package]]
+name = "utime"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "platform 0.1.0",
 ]
 
 [[package]]

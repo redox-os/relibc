@@ -53,7 +53,7 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
     let mut timer = sys_time::itimerval {
         it_value: sys_time::timeval {
             tv_sec: seconds as time_t,
-            tv_usec: 0
+            tv_usec: 0,
         },
         ..Default::default()
     };
@@ -455,12 +455,12 @@ pub extern "C" fn ualarm(value: useconds_t, interval: useconds_t) -> useconds_t 
     let mut timer = sys_time::itimerval {
         it_value: sys_time::timeval {
             tv_sec: 0,
-            tv_usec: value as suseconds_t
+            tv_usec: value as suseconds_t,
         },
         it_interval: sys_time::timeval {
             tv_sec: 0,
-            tv_usec: interval as suseconds_t
-        }
+            tv_usec: interval as suseconds_t,
+        },
     };
     let errno_backup = unsafe { platform::errno };
     let usecs = if sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) < 0 {

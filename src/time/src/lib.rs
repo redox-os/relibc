@@ -329,7 +329,10 @@ pub unsafe extern "C" fn mktime(t: *const tm) -> time_t {
 
 #[no_mangle]
 pub extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
-    platform::nanosleep(rqtp as *const platform::types::timespec, rmtp as *mut platform::types::timespec)
+    platform::nanosleep(
+        rqtp as *const platform::types::timespec,
+        rmtp as *mut platform::types::timespec,
+    )
 }
 
 #[no_mangle]

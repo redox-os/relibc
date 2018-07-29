@@ -40,7 +40,7 @@ pub struct rusage {
     pub ru_msgrcv: c_long,
     pub ru_nsignals: c_long,
     pub ru_nvcsw: c_long,
-    pub ru_nivcsw: c_long
+    pub ru_nivcsw: c_long,
 }
 
 // #[no_mangle]

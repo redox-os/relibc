@@ -109,6 +109,10 @@ pub fn futimens(fd: c_int, times: *const timespec) -> c_int {
     e(unsafe { syscall!(UTIMENSAT, fd, ptr::null::<c_char>(), times, 0) }) as c_int
 }
 
+pub fn utimens(path: *const c_char, times: *const timespec) -> c_int {
+    e(unsafe { syscall!(UTIMENSAT, AT_FDCWD, path, times, 0) }) as c_int
+}
+
 pub fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
     if e(unsafe { syscall!(GETCWD, buf, size) }) == !0 {
         ptr::null_mut()
@@ -373,7 +377,13 @@ pub fn shutdown(socket: c_int, how: c_int) -> c_int {
 }
 
 pub unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {
-    e(syscall!(RT_SIGACTION, sig, act, oact, mem::size_of::<sigset_t>())) as c_int
+    e(syscall!(
+        RT_SIGACTION,
+        sig,
+        act,
+        oact,
+        mem::size_of::<sigset_t>()
+    )) as c_int
 }
 
 pub fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
