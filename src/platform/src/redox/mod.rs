@@ -286,7 +286,7 @@ pub fn utimens(path: *const c_char, times: *const timespec) -> c_int {
     match syscall::open(path, O_STAT) {
         Err(err) => e(Err(err)) as c_int,
         Ok(fd) => {
-            let res = futimens(fd, times);
+            let res = futimens(fd as c_int, times);
             let _ = syscall::close(fd);
             res
         }
