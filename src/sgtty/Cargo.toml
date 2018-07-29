@@ -1,5 +1,5 @@
 [package]
-name = "sys_ioctl"
+name = "sgtty"
 version = "0.1.0"
 authors = ["jD91mZM2 <me@krake.one>"]
 
@@ -8,3 +8,4 @@ cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
 platform = { path = "../platform" }
+sys_ioctl = { path = "../sys_ioctl" }

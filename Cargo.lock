@@ -337,6 +337,7 @@ dependencies = [
  "pwd 0.1.0",
  "semaphore 0.1.0",
  "setjmp 0.1.0",
+ "sgtty 0.1.0",
  "signal 0.1.0",
  "stdio 0.1.0",
  "stdlib 0.1.0",
@@ -418,6 +419,15 @@ dependencies = [
 [[package]]
 name = "setjmp"
 version = "0.1.0"
+
+[[package]]
+name = "sgtty"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "platform 0.1.0",
+ "sys_ioctl 0.1.0",
+]
 
 [[package]]
 name = "signal"

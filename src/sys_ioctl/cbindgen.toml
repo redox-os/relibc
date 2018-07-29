@@ -1,7 +1,13 @@
 sys_includes = []
 include_guard = "_IOCTL_H"
 language = "C"
-style = "Tag"
+
+# WORKAROUND:
+# sgtty is used by another header, and cbindgen doesn't prefix that with `struct` :|
+style = "Both"
 
 [enum]
 prefix_with_name = true
+
+[export]
+include = ["sgttyb", "winsize"]

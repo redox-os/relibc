@@ -29,6 +29,7 @@ platform = { path = "src/platform" }
 pwd = { path = "src/pwd" }
 semaphore = { path = "src/semaphore" }
 setjmp = { path = "src/setjmp" }
+sgtty = { path = "src/sgtty" }
 signal = { path = "src/signal" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }

@@ -19,6 +19,7 @@ pub extern crate netinet;
 pub extern crate pwd;
 pub extern crate semaphore;
 pub extern crate setjmp;
+pub extern crate sgtty;
 pub extern crate signal;
 pub extern crate stdio;
 pub extern crate stdlib;

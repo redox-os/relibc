@@ -1,6 +1,6 @@
 sys_includes = ["sys/types.h", "sys/resource.h"]
 include_guard = "_SYS_WAIT_H"
-style = "Tag"
+style = "Type"
 trailer = "#include <bits/sys/wait.h>"
 language = "C"
 
