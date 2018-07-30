@@ -46,6 +46,7 @@ EXPECT_BINS=\
 	time/mktime \
 	time/strftime \
 	time/time \
+	unistd/access \
 	unistd/brk \
 	unistd/dup \
 	unistd/exec \

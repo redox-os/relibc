@@ -20,10 +20,10 @@ mod brk;
 mod getopt;
 mod pathconf;
 
-pub const R_OK: c_int = 1;
+pub const F_OK: c_int = 0;
+pub const R_OK: c_int = 4;
 pub const W_OK: c_int = 2;
-pub const X_OK: c_int = 4;
-pub const F_OK: c_int = 8;
+pub const X_OK: c_int = 1;
 
 pub const SEEK_SET: c_int = 0;
 pub const SEEK_CUR: c_int = 1;
@@ -43,9 +43,9 @@ pub extern "C" fn _exit(status: c_int) {
     platform::exit(status)
 }
 
-// #[no_mangle]
-pub extern "C" fn access(path: *const c_char, amode: c_int) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
+    platform::access(path, mode)
 }
 
 #[no_mangle]

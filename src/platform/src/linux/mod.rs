@@ -25,6 +25,10 @@ pub unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut so
     e(syscall!(ACCEPT, socket, address, address_len)) as c_int
 }
 
+pub fn access(path: *const c_char, mode: c_int) -> c_int {
+    e(unsafe { syscall!(ACCESS, path, mode) }) as c_int
+}
+
 pub unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
     e(syscall!(BIND, socket, address, address_len)) as c_int
 }

@@ -236,3 +236,8 @@ pub const FD_SETSIZE: usize = 1024;
 pub struct fd_set {
     pub fds_bits: [c_ulong; FD_SETSIZE / (8 * mem::size_of::<c_ulong>())],
 }
+
+pub const F_OK: c_int = 0;
+pub const R_OK: c_int = 4;
+pub const W_OK: c_int = 2;
+pub const X_OK: c_int = 1;

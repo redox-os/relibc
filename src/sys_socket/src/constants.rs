@@ -43,13 +43,13 @@ pub const SO_DOMAIN: c_int = 39;
 
 pub const SOMAXCONN: c_int = 128;
 
-pub const MSG_CTRUNC: c_int = 1 << 3;
-pub const MSG_DONTROUTE: c_int = 1 << 2;
-pub const MSG_EOR: c_int = 1 << 7;
+pub const MSG_CTRUNC: c_int = 8;
+pub const MSG_DONTROUTE: c_int = 4;
+pub const MSG_EOR: c_int = 128;
 pub const MSG_OOB: c_int = 1;
-pub const MSG_PEEK: c_int = 1 << 1;
-pub const MSG_TRUNC: c_int = 1 << 5;
-pub const MSG_WAITALL: c_int = 1 << 8;
+pub const MSG_PEEK: c_int = 2;
+pub const MSG_TRUNC: c_int = 32;
+pub const MSG_WAITALL: c_int = 256;
 
 pub const AF_INET6: c_int = 10;
 pub const AF_UNIX: c_int = 1;

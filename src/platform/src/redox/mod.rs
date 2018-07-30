@@ -12,6 +12,8 @@ use syscall::{self, Result};
 use types::*;
 use *;
 
+const EINVAL: c_int = 22;
+
 #[thread_local]
 static mut SIG_HANDLER: Option<extern "C" fn(c_int)> = None;
 
@@ -80,6 +82,51 @@ pub unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut so
         return -1;
     }
     stream
+}
+
+pub fn access(path: *const c_char, mode: c_int) -> c_int {
+    let fd = match RawFile::open(path, 0, 0) {
+        Ok(fd) => fd,
+        Err(_) => return -1
+    };
+    if mode == F_OK {
+        return 0;
+    }
+
+    let mut stat = syscall::Stat::default();
+
+    if e(syscall::fstat(*fd as usize, &mut stat)) == !0 {
+        return -1;
+    }
+
+    let uid = e(syscall::getuid());
+    if uid == !0 {
+        return -1;
+    }
+    let gid = e(syscall::getgid());
+    if gid == !0 {
+        return -1;
+    }
+
+    let perms = if stat.st_uid as usize == uid {
+        // octal has max 7 characters, binary has max two. And we're interested
+        // in the 3rd digit
+        stat.st_mode >> ((7 / 2) * 2 & 0o7)
+    } else if stat.st_gid as usize == gid {
+        stat.st_mode >> ((7 / 2) & 0o7)
+    } else {
+        stat.st_mode & 0o7
+    };
+    if (mode & R_OK == R_OK && perms & 0o4 != 0o4)
+            || (mode & W_OK == W_OK && perms & 0o2 != 0o2)
+            || (mode & X_OK == X_OK && perms & 0o1 != 0o1) {
+        unsafe {
+            errno = EINVAL;
+        }
+        return -1;
+    }
+
+    0
 }
 
 pub unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
@@ -253,15 +300,15 @@ pub fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
                     (*buf).st_blksize = redox_buf.st_blksize as blksize_t;
                     (*buf).st_atim = timespec {
                         tv_sec: redox_buf.st_atime as time_t,
-                        tv_nsec: 0,
+                        tv_nsec: redox_buf.st_atime_nsec as c_long,
                     };
                     (*buf).st_mtim = timespec {
                         tv_sec: redox_buf.st_mtime as time_t,
-                        tv_nsec: 0,
+                        tv_nsec: redox_buf.st_mtime_nsec as c_long,
                     };
                     (*buf).st_ctim = timespec {
                         tv_sec: redox_buf.st_ctime as time_t,
-                        tv_nsec: 0,
+                        tv_nsec: redox_buf.st_ctime_nsec as c_long,
                     };
                 }
             }
