@@ -1,3 +1,4 @@
+use core::mem;
 #[cfg(target_os = "redox")]
 use syscall::data::TimeSpec as redox_timespec;
 // Use repr(u8) as LLVM expects `void*` to be the same as `i8*` to help enable

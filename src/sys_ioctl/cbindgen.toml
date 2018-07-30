@@ -1,5 +1,4 @@
-sys_includes = []
-include_guard = "_IOCTL_H"
+include_guard = "_SYS_IOCTL_H"
 language = "C"
 
 # WORKAROUND:

@@ -226,6 +226,11 @@ pub fn fcntl(fd: c_int, cmd: c_int, args: c_int) -> c_int {
     e(syscall::fcntl(fd as usize, cmd as usize, args as usize)) as c_int
 }
 
+pub fn flock(_fd: c_int, _operation: c_int) -> c_int {
+    // TODO: Redox does not have file locking yet
+    0
+}
+
 pub fn fork() -> pid_t {
     e(unsafe { syscall::clone(0) }) as pid_t
 }
