@@ -11,8 +11,8 @@ int main() {
     bcopy("hi", new, 3); // include nul byte
 
     assert(!strcasecmp("hi", new));
-    assert(!strcasecmp("hi", "HI"));
-    assert(!strncasecmp("hi", "HIHI", 2));
+    assert(!strcasecmp("hello", "HEllO"));
+    assert(!strncasecmp("hello", "Hello World", 5));
 
     bzero(new, 1);
     assert(*new == 0);
