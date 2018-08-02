@@ -29,7 +29,6 @@ platform = { path = "src/platform" }
 pwd = { path = "src/pwd" }
 semaphore = { path = "src/semaphore" }
 setjmp = { path = "src/setjmp" }
-sgtty = { path = "src/sgtty" }
 signal = { path = "src/signal" }
 stdio = { path = "src/stdio" }
 stdlib = { path = "src/stdlib" }
@@ -46,6 +45,7 @@ sys_times = { path = "src/sys_times" }
 sys_un = { path = "src/sys_un" }
 sys_utsname = { path = "src/sys_utsname" }
 sys_wait = { path = "src/sys_wait" }
+termios = { path = "src/termios" }
 time = { path = "src/time" }
 unistd = { path = "src/unistd" }
 utime = { path = "src/utime" }

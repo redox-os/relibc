@@ -3,6 +3,10 @@ use core::{mem, ptr};
 use errno;
 use types::*;
 
+const EINVAL: c_int = 22;
+
+const TCGETS: c_ulong = 0x5401;
+const TCSETS: c_ulong = 0x5402;
 const TIOCGWINSZ: c_ulong = 0x5413;
 
 const AT_FDCWD: c_int = -100;
@@ -418,6 +422,21 @@ pub fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
 
 pub fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *mut c_int) -> c_int {
     e(unsafe { syscall!(SOCKETPAIR, domain, kind, protocol, socket_vector) }) as c_int
+}
+
+pub fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
+    ioctl(fd, TCGETS, out as *mut c_void)
+}
+
+pub fn tcsetattr(fd: c_int, act: c_int, value: *const termios) -> c_int {
+    if act < 0 || act > 2 {
+        unsafe {
+            errno = EINVAL;
+        }
+        return -1;
+    }
+    // This is safe because ioctl shouldn't modify the value
+    ioctl(fd, TCSETS + act as c_ulong, value as *mut c_void)
 }
 
 pub fn times(out: *mut tms) -> clock_t {

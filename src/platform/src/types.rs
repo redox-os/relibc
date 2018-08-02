@@ -241,3 +241,21 @@ pub const F_OK: c_int = 0;
 pub const R_OK: c_int = 4;
 pub const W_OK: c_int = 2;
 pub const X_OK: c_int = 1;
+
+pub type cc_t = u8;
+pub type speed_t = u32;
+pub type tcflag_t = u32;
+
+pub const NCCS: usize = 32;
+
+#[repr(C)]
+pub struct termios {
+    c_iflag: tcflag_t,
+    c_oflag: tcflag_t,
+    c_cflag: tcflag_t,
+    c_lflag: tcflag_t,
+    c_line: cc_t,
+    c_cc: [cc_t; NCCS],
+    __c_ispeed: speed_t,
+    __c_ospeed: speed_t
+}

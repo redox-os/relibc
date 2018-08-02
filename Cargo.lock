@@ -337,7 +337,6 @@ dependencies = [
  "pwd 0.1.0",
  "semaphore 0.1.0",
  "setjmp 0.1.0",
- "sgtty 0.1.0",
  "signal 0.1.0",
  "stdio 0.1.0",
  "stdlib 0.1.0",
@@ -354,6 +353,7 @@ dependencies = [
  "sys_un 0.1.0",
  "sys_utsname 0.1.0",
  "sys_wait 0.1.0",
+ "termios 0.1.0",
  "time 0.1.0",
  "unistd 0.1.0",
  "utime 0.1.0",
@@ -422,15 +422,6 @@ dependencies = [
 [[package]]
 name = "setjmp"
 version = "0.1.0"
-
-[[package]]
-name = "sgtty"
-version = "0.1.0"
-dependencies = [
- "cbindgen 0.5.2",
- "platform 0.1.0",
- "sys_ioctl 0.1.0",
-]
 
 [[package]]
 name = "signal"
@@ -641,6 +632,14 @@ dependencies = [
  "libc 0.2.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_termios 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "termios"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "platform 0.1.0",
 ]
 
 [[package]]

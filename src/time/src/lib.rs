@@ -287,7 +287,7 @@ pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut t
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mktime(t: *const tm) -> time_t {
+pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
     let mut year = (*t).tm_year + 1900;
     let mut month = (*t).tm_mon;
     let mut day = (*t).tm_mday as i64 - 1;

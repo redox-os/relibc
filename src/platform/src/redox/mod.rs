@@ -992,6 +992,42 @@ pub fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *m
     -1
 }
 
+pub fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
+    let dup = e(syscall::dup(fd as usize, b"termios"));
+    if dup == !0 {
+        return -1;
+    }
+
+    let read = e(syscall::read(dup, unsafe { slice::from_raw_parts_mut(
+        out as *mut u8,
+        mem::size_of::<termios>()
+    ) }));
+    let _ = syscall::close(dup);
+
+    if read == !0 {
+        return -1;
+    }
+    0
+}
+
+pub fn tcsetattr(fd: c_int, _act: c_int, value: *const termios) -> c_int {
+    let dup = e(syscall::dup(fd as usize, b"termios"));
+    if dup == !0 {
+        return -1;
+    }
+
+    let write = e(syscall::write(dup, unsafe { slice::from_raw_parts(
+        value as *const u8,
+        mem::size_of::<termios>()
+    ) }));
+    let _ = syscall::close(dup);
+
+    if write == !0 {
+        return -1;
+    }
+    0
+}
+
 pub fn times(out: *mut tms) -> clock_t {
     let _ = write!(FileWriter(2), "unimplemented: times({:p})", out);
     !0
