@@ -53,7 +53,7 @@ where
     let file = match RawFile::open(
         "/etc/passwd\0".as_ptr() as *const c_char,
         fcntl::O_RDONLY,
-        0o644,
+        0,
     ) {
         Ok(file) => file,
         Err(_) => return OptionPasswd::Error,

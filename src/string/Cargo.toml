@@ -8,5 +8,6 @@ build = "build.rs"
 cbindgen = { path = "../../cbindgen" }
 
 [dependencies]
-platform = { path = "../platform" }
 errno = { path = "../errno" }
+platform = { path = "../platform" }
+signal = { path = "../signal" }

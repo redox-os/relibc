@@ -29,9 +29,14 @@ pub const SIG_SETMASK: c_int = 2;
 #[repr(C)]
 #[derive(Clone)]
 pub struct sigaction {
-    pub sa_handler: extern "C" fn(c_int),
+    // I don't actually want these to be optional. They can have more than just
+    // one invalid value. But because of rust's non-null optimization, this
+    // causes Some(sigaction) with a null sa_handler to become None.  Maybe
+    // these should be usizes and transmuted when needed... However, then I
+    // couldn't let cbindgen do its job.
+    pub sa_handler: Option<extern "C" fn(c_int)>,
     pub sa_flags: c_ulong,
-    pub sa_restorer: unsafe extern "C" fn(),
+    pub sa_restorer: Option<unsafe extern "C" fn()>,
     pub sa_mask: sigset_t,
 }
 
@@ -86,9 +91,20 @@ pub extern "C" fn sigaddset(set: *mut sigset_t, mut signo: c_int) -> c_int {
     0
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
-    unimplemented!();
+    if signo <= 0 || signo as usize > NSIG {
+        unsafe {
+            platform::errno = errno::EINVAL;
+        }
+        return -1;
+    }
+
+    let signo = signo as usize - 1; // 0-indexed usize, please!
+    unsafe {
+        *set &= !(1 << (signo & (8 * mem::size_of::<sigset_t>() - 1)));
+    }
+    0
 }
 
 #[no_mangle]
@@ -133,11 +149,11 @@ extern "C" {
 }
 
 #[no_mangle]
-pub extern "C" fn signal(sig: c_int, func: extern "C" fn(c_int)) -> extern "C" fn(c_int) {
+pub extern "C" fn signal(sig: c_int, func: Option<extern "C" fn(c_int)>) -> Option<extern "C" fn(c_int)> {
     let sa = sigaction {
         sa_handler: func,
         sa_flags: SA_RESTART as c_ulong,
-        sa_restorer: __restore_rt,
+        sa_restorer: Some(__restore_rt),
         sa_mask: sigset_t::default(),
     };
     let mut old_sa = unsafe { mem::uninitialized() };
@@ -182,3 +198,38 @@ pub extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
 pub extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int {
     unimplemented!();
 }
+
+pub const _signal_strings: [&'static str; 32] = [
+    "Unknown signal\0",
+    "Hangup\0",
+    "Interrupt\0",
+    "Quit\0",
+    "Illegal instruction\0",
+    "Trace/breakpoint trap\0",
+    "Aborted\0",
+    "Bus error\0",
+    "Arithmetic exception\0",
+    "Killed\0",
+    "User defined signal 1\0",
+    "Segmentation fault\0",
+    "User defined signal 2\0",
+    "Broken pipe\0",
+    "Alarm clock\0",
+    "Terminated\0",
+    "Stack fault\0",
+    "Child process status\0",
+    "Continued\0",
+    "Stopped (signal)\0",
+    "Stopped\0",
+    "Stopped (tty input)\0",
+    "Stopped (tty output)\0",
+    "Urgent I/O condition\0",
+    "CPU time limit exceeded\0",
+    "File size limit exceeded\0",
+    "Virtual timer expired\0",
+    "Profiling timer expired\0",
+    "Window changed\0",
+    "I/O possible\0",
+    "Power failure\0",
+    "Bad system call\0"
+];

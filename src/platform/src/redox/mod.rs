@@ -415,7 +415,7 @@ pub fn getgid() -> gid_t {
 }
 
 pub fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-    let _ = write!(
+    let _ = writeln!(
         FileWriter(2),
         "unimplemented: getrusage({}, {:p})",
         who,
@@ -475,7 +475,7 @@ unsafe fn inner_get_name(
 }
 
 pub fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
-    let _ = write!(
+    let _ = writeln!(
         FileWriter(2),
         "unimplemented: getitimer({}, {:p})",
         which,
@@ -523,7 +523,7 @@ pub fn getsockopt(
     option_value: *mut c_void,
     option_len: *mut socklen_t,
 ) -> c_int {
-    let _ = write!(
+    let _ = writeln!(
         FileWriter(2),
         "unimplemented: getsockopt({}, {}, {}, {:p}, {:p})",
         socket,
@@ -838,7 +838,7 @@ pub unsafe fn sendto(
 }
 
 pub fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
-    let _ = write!(
+    let _ = writeln!(
         FileWriter(2),
         "unimplemented: setitimer({}, {:p}, {:p})",
         which,
@@ -871,7 +871,7 @@ pub fn setsockopt(
     option_value: *const c_void,
     option_len: socklen_t,
 ) -> c_int {
-    let _ = write!(
+    let _ = writeln!(
         FileWriter(2),
         "unimplemented: setsockopt({}, {}, {}, {:p}, {})",
         socket,
@@ -884,7 +884,7 @@ pub fn setsockopt(
 }
 
 pub fn shutdown(socket: c_int, how: c_int) -> c_int {
-    let _ = write!(
+    let _ = writeln!(
         FileWriter(2),
         "unimplemented: shutdown({}, {})",
         socket,
@@ -896,14 +896,14 @@ pub fn shutdown(socket: c_int, how: c_int) -> c_int {
 pub unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {
     if !oact.is_null() {
         // Assumes the last sigaction() call was made by relibc and not a different one
-        if let Some(callback) = SIG_HANDLER {
-            (*oact).sa_handler = callback;
+        if SIG_HANDLER.is_some() {
+            (*oact).sa_handler = SIG_HANDLER;
         }
     }
     let act = if act.is_null() {
         None
     } else {
-        SIG_HANDLER = Some((*act).sa_handler);
+        SIG_HANDLER = (*act).sa_handler;
         let m = (*act).sa_mask;
         Some(syscall::SigAction {
             sa_handler: sig_handler,
@@ -926,7 +926,7 @@ pub unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction)
 }
 
 pub fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
-    let _ = write!(
+    let _ = writeln!(
         FileWriter(2),
         "unimplemented: sigprocmask({}, {:p}, {:p})",
         how,
@@ -981,7 +981,7 @@ pub unsafe fn socket(domain: c_int, mut kind: c_int, protocol: c_int) -> c_int {
 }
 
 pub fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *mut c_int) -> c_int {
-    let _ = write!(
+    let _ = writeln!(
         FileWriter(2),
         "unimplemented: socketpair({}, {}, {}, {:p})",
         domain,
@@ -1029,8 +1029,13 @@ pub fn tcsetattr(fd: c_int, _act: c_int, value: *const termios) -> c_int {
 }
 
 pub fn times(out: *mut tms) -> clock_t {
-    let _ = write!(FileWriter(2), "unimplemented: times({:p})", out);
+    let _ = writeln!(FileWriter(2), "unimplemented: times({:p})", out);
     !0
+}
+
+pub fn umask(mask: mode_t) -> mode_t {
+    let _ = writeln!(FileWriter(2), "unimplemented: umask({})", mask);
+    0
 }
 
 pub fn unlink(path: *const c_char) -> c_int {

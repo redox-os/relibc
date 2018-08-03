@@ -44,7 +44,7 @@ pub extern "C" fn opendir(path: *const c_char) -> *mut DIR {
     let fd = platform::open(
         path,
         fcntl::O_RDONLY | fcntl::O_DIRECTORY | fcntl::O_CLOEXEC,
-        0o755,
+        0,
     );
 
     if fd < 0 {

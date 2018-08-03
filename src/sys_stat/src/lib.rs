@@ -105,9 +105,9 @@ pub extern "C" fn stat(file: *const c_char, buf: *mut platform::types::stat) -> 
     platform::stat(file, buf)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn umask(mask: mode_t) -> mode_t {
-    unimplemented!();
+    platform::umask(mask)
 }
 
 /*

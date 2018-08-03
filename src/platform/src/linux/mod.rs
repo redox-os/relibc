@@ -443,6 +443,10 @@ pub fn times(out: *mut tms) -> clock_t {
     unsafe { syscall!(TIMES, out) as clock_t }
 }
 
+pub fn umask(mask: mode_t) -> mode_t {
+    unsafe { syscall!(UMASK, mask) as mode_t }
+}
+
 pub fn uname(utsname: *mut utsname) -> c_int {
     e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
 }

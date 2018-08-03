@@ -165,9 +165,9 @@ pub struct sockaddr_in {
 
 #[repr(C)]
 pub struct sigaction {
-    pub sa_handler: extern "C" fn(c_int),
+    pub sa_handler: Option<extern "C" fn(c_int)>,
     pub sa_flags: c_ulong,
-    pub sa_restorer: unsafe extern "C" fn(),
+    pub sa_restorer: Option<unsafe extern "C" fn()>,
     pub sa_mask: sigset_t,
 }
 
