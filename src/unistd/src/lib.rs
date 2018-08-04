@@ -38,6 +38,8 @@ pub const STDIN_FILENO: c_int = 0;
 pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
 
+const PATH_MAX: usize = 4096;
+
 #[no_mangle]
 pub extern "C" fn _exit(status: c_int) {
     platform::exit(status)
@@ -184,8 +186,31 @@ pub extern "C" fn ftruncate(fildes: c_int, length: off_t) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
-    platform::getcwd(buf, size)
+pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char {
+    let alloc = buf.is_null();
+    let mut stack_buf = [0; PATH_MAX];
+    if alloc {
+        buf = stack_buf.as_mut_ptr();
+        size = stack_buf.len();
+    }
+
+    let ret = platform::getcwd(buf, size);
+    if ret == ptr::null_mut() {
+        return ptr::null_mut();
+    }
+
+    if alloc {
+        let mut len = stack_buf.iter().position(|b| *b == 0).expect("no nul-byte in getcwd string") + 1;
+        let mut heap_buf = unsafe { platform::alloc(len) as *mut c_char };
+        for i in 0..len {
+            unsafe {
+                *heap_buf.offset(i as isize) = stack_buf[i];
+            }
+        }
+        heap_buf
+    } else {
+        ret
+    }
 }
 
 // #[no_mangle]
@@ -275,7 +300,7 @@ pub extern "C" fn getuid() -> uid_t {
 
 #[no_mangle]
 pub extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
-    getcwd(path_name, 4096 /* PATH_MAX */)
+    getcwd(path_name, PATH_MAX)
 }
 
 #[no_mangle]

@@ -77,6 +77,7 @@ BINS=\
 	time/gettimeofday \
 	time/times \
 	unistd/chdir \
+	unistd/getcwd \
 	unistd/gethostname \
 	unistd/getid \
 	unistd/link \

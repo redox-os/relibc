@@ -346,10 +346,14 @@ pub fn utimens(path: *const c_char, times: *const timespec) -> c_int {
 }
 
 pub fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
-    let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize) };
-    if e(syscall::getcwd(buf_slice)) == !0 {
+    let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize - 1) };
+    let read = e(syscall::getcwd(buf_slice));
+    if read == !0 {
         ptr::null_mut()
     } else {
+        unsafe {
+            *buf.offset(read as isize + 1) = 0;
+        }
         buf
     }
 }
