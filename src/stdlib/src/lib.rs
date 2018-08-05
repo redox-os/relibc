@@ -894,6 +894,20 @@ pub unsafe extern "C" fn strtol(s: *const c_char, endptr: *mut *mut c_char, base
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn strtoull(
+    s: *const c_char,
+    endptr: *mut *mut c_char,
+    base: c_int,
+) -> c_ulong {
+    strtoul(s, endptr, base)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn strtoll(s: *const c_char, endptr: *mut *mut c_char, base: c_int) -> c_long {
+    strtol(s, endptr, base)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
     let child_pid = unistd::fork();
     if child_pid == 0 {

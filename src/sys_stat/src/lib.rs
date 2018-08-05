@@ -7,12 +7,14 @@ extern crate platform;
 use platform::types::*;
 
 pub const S_IFMT: c_int = 0o0170000;
-pub const S_IFBLK: c_int = 0o060000;
-pub const S_IFCHR: c_int = 0o020000;
-pub const S_IFIFO: c_int = 0o010000;
-pub const S_IFREG: c_int = 0o100000;
+
 pub const S_IFDIR: c_int = 0o040000;
+pub const S_IFCHR: c_int = 0o020000;
+pub const S_IFBLK: c_int = 0o060000;
+pub const S_IFREG: c_int = 0o100000;
+pub const S_IFIFO: c_int = 0o010000;
 pub const S_IFLNK: c_int = 0o120000;
+pub const S_IFSOCK: c_int = 0o140000;
 
 pub const S_IRWXU: c_int = 0o0700;
 pub const S_IRUSR: c_int = 0o0400;
