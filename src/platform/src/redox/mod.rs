@@ -235,11 +235,9 @@ pub unsafe extern "C" fn execve(
     }
 
     let mut len = 0;
-    for i in 0.. {
-        if (*argv.offset(i)).is_null() {
-            len = i;
-            break;
-        }
+    while !(*argv.offset(len)).is_null() {
+        len += 1;
+        break;
     }
 
     let mut args: Vec<[usize; 2]> = Vec::with_capacity(len as usize);
