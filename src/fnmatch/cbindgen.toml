@@ -1,0 +1,6 @@
+include_guard = "_FNMATCH_H"
+language = "C"
+style = "Tag"
+
+[enum]
+prefix_with_name = true

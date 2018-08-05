@@ -21,6 +21,7 @@ errno = { path = "src/errno" }
 fcntl = { path = "src/fcntl" }
 fenv = { path = "src/fenv" }
 float = { path = "src/float" }
+fnmatch = { path = "src/fnmatch" }
 grp = { path = "src/grp" }
 inttypes = { path = "src/inttypes" }
 locale = { path = "src/locale" }

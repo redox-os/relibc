@@ -24,11 +24,15 @@ pub unsafe fn strftime<W: Write>(
         }};
         (byte $b:expr) => {{
             w!(reserve 1);
-            w.write_u8($b);
+            if w.write_u8($b).is_err() {
+                return !0;
+            }
         }};
         (char $chr:expr) => {{
             w!(reserve $chr.len_utf8());
-            w.write_char($chr);
+            if w.write_char($chr).is_err() {
+                return !0;
+            }
         }};
         (recurse $fmt:expr) => {{
             let mut fmt = String::with_capacity($fmt.len() + 1);
@@ -44,7 +48,9 @@ pub unsafe fn strftime<W: Write>(
         }};
         ($str:expr) => {{
             w!(reserve $str.len());
-            w.write_str($str);
+            if w.write_str($str).is_err() {
+                return !0;
+            }
         }};
         ($fmt:expr, $($args:expr),+) => {{
             // Would use write!() if I could get the length written
@@ -140,7 +146,9 @@ pub unsafe fn strftime<W: Write>(
     }
     if toplevel {
         // nul byte is already counted in written
-        w.write_u8(0);
+        if w.write_u8(0).is_err() {
+            return !0;
+        }
     }
     written
 }

@@ -1,3 +1,4 @@
+sys_includes = ["sys/types.h"]
 include_guard = "_SYS_TIMES_H"
 language = "C"
 style = "Tag"

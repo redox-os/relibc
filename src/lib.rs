@@ -13,6 +13,7 @@ pub extern crate errno;
 pub extern crate fcntl;
 pub extern crate fenv;
 pub extern crate float;
+pub extern crate fnmatch;
 pub extern crate grp;
 pub extern crate locale;
 pub extern crate netinet;

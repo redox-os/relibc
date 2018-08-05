@@ -7,6 +7,7 @@ EXPECT_BINS=\
 	error \
 	fcntl/create \
 	fcntl/fcntl \
+	fnmatch \
 	locale \
 	math \
 	select \

@@ -2,7 +2,6 @@ use alloc::String;
 use alloc::Vec;
 use platform::types::*;
 use platform::Read;
-#[cfg(not(test))]
 use vl::VaList;
 
 #[derive(PartialEq, Eq)]

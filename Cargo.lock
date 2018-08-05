@@ -142,6 +142,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "fnmatch"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.5.2",
+ "platform 0.1.0",
+]
+
+[[package]]
 name = "fuchsia-zircon"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -329,6 +337,7 @@ dependencies = [
  "fcntl 0.1.0",
  "fenv 0.1.0",
  "float 0.1.0",
+ "fnmatch 0.1.0",
  "grp 0.1.0",
  "inttypes 0.1.0",
  "locale 0.1.0",
