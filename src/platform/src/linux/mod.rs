@@ -5,6 +5,8 @@ use types::*;
 
 const EINVAL: c_int = 22;
 
+const SIGCHLD: usize = 17;
+
 const TCGETS: c_ulong = 0x5401;
 const TCSETS: c_ulong = 0x5402;
 const TIOCGWINSZ: c_ulong = 0x5413;
@@ -106,7 +108,7 @@ pub fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
 }
 
 pub fn fork() -> pid_t {
-    e(unsafe { syscall!(CLONE, 17, 0) }) as pid_t
+    e(unsafe { syscall!(CLONE, SIGCHLD, 0) }) as pid_t
 }
 
 pub fn fsync(fildes: c_int) -> c_int {
