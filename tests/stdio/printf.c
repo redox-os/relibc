@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 int main(int argc, char ** argv) {
-    printf(
+    int len = printf(
         "percent: %%\nstring: %s\nchar: %c\nchar: %c\nint: %d\nuint: %u\nhex: %x\nHEX: %X\nstring: %s\n",
         "String",
         'c',
@@ -12,5 +12,6 @@ int main(int argc, char ** argv) {
         0xC0FFEE,
         "end"
     );
+    printf("len of previous write: %d\n", len);
     return 0;
 }

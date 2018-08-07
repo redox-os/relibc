@@ -181,19 +181,17 @@ pub struct StringWriter(pub *mut u8, pub usize);
 
 impl StringWriter {
     pub unsafe fn write(&mut self, buf: &[u8]) {
-        if self.1 > 0 {
+        if self.1 > 1 {
             let copy_size = buf.len().min(self.1 - 1);
             memcpy(
                 self.0 as *mut c_void,
                 buf.as_ptr() as *const c_void,
                 copy_size,
             );
-            *self.0.offset(copy_size as isize) = b'\0';
+            self.1 -= copy_size;
 
-            // XXX: i believe this correctly mimics the behavior from before, but it seems
-            //      incorrect (the next write will write after the NUL)
-            self.0 = self.0.offset(copy_size as isize + 1);
-            self.1 -= copy_size + 1;
+            self.0 = self.0.offset(copy_size as isize);
+            *self.0 = 0;
         }
     }
 }
@@ -267,5 +265,30 @@ impl Read for UnsafeStringReader {
                 true
             }
         }
+    }
+}
+
+pub struct CountingWriter<T> {
+    pub inner: T,
+    pub written: usize
+}
+impl<T> CountingWriter<T> {
+    pub /* const */ fn new(writer: T) -> Self {
+        Self {
+            inner: writer,
+            written: 0
+        }
+    }
+}
+impl<T: fmt::Write> fmt::Write for CountingWriter<T> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.written += s.len();
+        self.inner.write_str(s)
+    }
+}
+impl<T: Write> Write for CountingWriter<T> {
+    fn write_u8(&mut self, byte: u8) -> fmt::Result {
+        self.written += 1;
+        self.inner.write_u8(byte)
     }
 }

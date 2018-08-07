@@ -17,4 +17,5 @@ int main() {
     print(1531839600, "%H %s %u");
     print(1531839600, "%j %U");
     print(1531839600, "%+");
+    print(1533669431, "%+%+%+%+%+"); // will overflow 50 characters
 }

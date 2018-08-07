@@ -3,7 +3,6 @@
 #![no_std]
 #![feature(alloc, const_fn)]
 
-#[macro_use]
 extern crate alloc;
 extern crate errno;
 extern crate platform;
@@ -338,17 +337,20 @@ pub extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int
 #[no_mangle]
 pub unsafe extern "C" fn strftime(
     s: *mut c_char,
-    maxsize: usize,
+    maxsize: size_t,
     format: *const c_char,
     timeptr: *const tm,
 ) -> size_t {
-    strftime::strftime(
-        true,
-        &mut platform::UnsafeStringWriter(s as *mut u8),
-        maxsize,
+    let ret = strftime::strftime(
+        &mut platform::StringWriter(s as *mut u8, maxsize),
         format,
         timeptr,
-    )
+    );
+    if ret < maxsize {
+        return ret;
+    } else {
+        return 0;
+    }
 }
 
 // #[no_mangle]

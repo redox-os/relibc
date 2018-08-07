@@ -18,7 +18,7 @@ extern crate va_list as vl;
 use core::fmt::Write as WriteFmt;
 use core::fmt::{self, Error, Result};
 use core::sync::atomic::{AtomicBool, Ordering};
-use core::{mem, ptr, str};
+use core::{ptr, str};
 
 use alloc::vec::Vec;
 use errno::STR_ERROR;
