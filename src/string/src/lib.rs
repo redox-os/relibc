@@ -150,8 +150,21 @@ pub unsafe extern "C" fn strcoll(s1: *const c_char, s2: *const c_char) -> c_int 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strcpy(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
-    strncpy(s1, s2, usize::MAX)
+pub unsafe extern "C" fn strcpy(dst: *mut c_char, src: *const c_char) -> *mut c_char {
+    let mut i = 0;
+
+    loop {
+        let byte = *src.offset(i);
+        *dst.offset(i) = byte;
+
+        if byte == 0 {
+            break;
+        }
+
+        i += 1;
+    }
+
+    dst
 }
 
 pub unsafe fn inner_strspn(s1: *const c_char, s2: *const c_char, cmp: bool) -> size_t {
@@ -270,24 +283,19 @@ pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: usize)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strncpy(s1: *mut c_char, s2: *const c_char, n: usize) -> *mut c_char {
-    let s2_slice = platform::c_str_n(s2, n);
-    let s2_len = s2_slice.len();
+pub unsafe extern "C" fn strncpy(dst: *mut c_char, src: *const c_char, n: usize) -> *mut c_char {
+    let mut i = 0;
 
-    //memcpy(s1 as *mut _, s2 as *const _, cmp::min(n, s2_len));
-    let mut idx = 0;
-    for _ in 0..cmp::min(n, s2_len) {
-        *s1.offset(idx as isize) = s2_slice[idx] as c_char;
-        idx += 1;
+    while *src.offset(i) != 0 && (i as usize) < n {
+        *dst.offset(i) = *src.offset(i);
+        i += 1;
     }
 
-    // if length of s2 < n, pad s1 with zeroes
-    while idx < s2_len {
-        *s1.offset(idx as isize) = 0;
-        idx += 1;
+    for i in i..n as isize {
+        *dst.offset(i) = 0;
     }
 
-    s1
+    dst
 }
 
 #[no_mangle]

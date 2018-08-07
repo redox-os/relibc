@@ -32,6 +32,7 @@ EXPECT_BINS=\
 	stdlib/system \
 	string/mem \
 	string/strchr \
+	string/strcpy \
 	string/strcspn \
 	string/strncmp \
 	string/strpbrk \
