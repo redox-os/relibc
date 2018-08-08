@@ -63,10 +63,7 @@ impl Stack {
 #[no_mangle]
 pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
     extern "C" {
-        #[cfg(not(target_os = "redox"))]
         fn main(argc: isize, argv: *const *const c_char, envp: *const *const c_char) -> c_int;
-        #[cfg(target_os = "redox")]
-        fn main(argc: isize, argv: *const *const c_char) -> c_int;
     }
 
     let argc = sp.argc();
@@ -119,6 +116,7 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
     platform::exit(main(
         argc,
         argv as *const *const c_char,
+        platform::environ as *const *const c_char
     ));
 }
 
