@@ -99,7 +99,11 @@ impl FILE {
             return true;
         }
         self.read = None;
-        self.write = Some((self.unget, self.unget, self.buf.len() - 1));
+        self.write = if self.buf.len() == 0 {
+            Some((0, 0, 0))
+        } else {
+            Some((self.unget, self.unget, self.buf.len() - 1))
+        };
         return true;
     }
     pub fn write(&mut self, to_write: &[u8]) -> usize {
