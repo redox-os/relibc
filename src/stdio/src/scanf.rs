@@ -39,11 +39,15 @@ unsafe fn inner_scanf<R: Read>(
 
     macro_rules! read {
         () => {{
-            let n = r.read_u8(&mut byte);
-            if n {
-                count += 1;
+            match r.read_u8() {
+                Ok(Some(b)) => {
+                    byte = b;
+                    count += 1;
+                    true
+                },
+                Ok(None) => false,
+                Err(()) => return Err(-1)
             }
-            n
         }};
     }
 

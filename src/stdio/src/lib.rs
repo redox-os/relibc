@@ -16,7 +16,7 @@ extern crate string;
 extern crate va_list as vl;
 
 use core::fmt::Write as WriteFmt;
-use core::fmt::{self, Error, Result};
+use core::fmt::{self, Error};
 use core::sync::atomic::{AtomicBool, Ordering};
 use core::{ptr, str};
 
@@ -171,38 +171,52 @@ impl FILE {
     pub fn seek(&self, off: off_t, whence: c_int) -> off_t {
         platform::lseek(self.fd, off, whence)
     }
+
+    pub fn lock(&mut self) -> LockGuard {
+        flockfile(self);
+        LockGuard(self)
+    }
 }
-impl fmt::Write for FILE {
-    fn write_str(&mut self, s: &str) -> Result {
-        if !self.can_write() {
+
+pub struct LockGuard<'a>(&'a mut FILE);
+impl<'a> Drop for LockGuard<'a> {
+    fn drop(&mut self) {
+        funlockfile(self.0);
+    }
+}
+
+impl<'a> fmt::Write for LockGuard<'a> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        if !self.0.can_write() {
             return Err(Error);
         }
         let s = s.as_bytes();
-        if self.write(s) != s.len() {
+        if self.0.write(s) != s.len() {
             Err(Error)
         } else {
             Ok(())
         }
     }
 }
-impl Write for FILE {
-    fn write_u8(&mut self, byte: u8) -> Result {
-        if !self.can_write() {
+impl<'a> Write for LockGuard<'a> {
+    fn write_u8(&mut self, byte: u8) -> fmt::Result {
+        if !self.0.can_write() {
             return Err(Error);
         }
-        if self.write(&[byte]) != 1 {
+        if self.0.write(&[byte]) != 1 {
             Err(Error)
         } else {
             Ok(())
         }
     }
 }
-impl Read for FILE {
-    fn read_u8(&mut self, byte: &mut u8) -> bool {
-        let mut buf = [*byte];
-        let n = self.read(&mut buf);
-        *byte = buf[0];
-        n > 0
+impl<'a> Read for LockGuard<'a> {
+    fn read_u8(&mut self) -> Result<Option<u8>, ()> {
+        let mut buf = [0];
+        match self.0.read(&mut buf) {
+            0 => Ok(None),
+            _ => Ok(Some(buf[0]))
+        }
     }
 }
 
@@ -913,7 +927,7 @@ pub extern "C" fn ungetc(c: c_int, stream: &mut FILE) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn vfprintf(file: &mut FILE, format: *const c_char, ap: va_list) -> c_int {
-    printf::printf(file, format, ap)
+    printf::printf(file.lock(), format, ap)
 }
 
 #[no_mangle]
@@ -942,7 +956,7 @@ pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_
 
 #[no_mangle]
 pub unsafe extern "C" fn vfscanf(file: &mut FILE, format: *const c_char, ap: va_list) -> c_int {
-    scanf::scanf(file, format, ap)
+    scanf::scanf(file.lock(), format, ap)
 }
 
 #[no_mangle]
