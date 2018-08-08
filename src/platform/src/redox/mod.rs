@@ -433,11 +433,17 @@ pub unsafe fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
     }
     let mut reader = FileReader(fd);
     for _ in 0..len {
-        if !reader.read_u8(&mut *(name as *mut u8)) {
-            *name = 0;
-            break;
+        match reader.read_u8() {
+            Ok(Some(b)) => {
+                *name = b as c_char;
+                name = name.offset(1);
+            },
+            Ok(None) => {
+                *name = 0;
+                break;
+            },
+            Err(()) => return -1
         }
-        name = name.offset(1);
     }
     0
 }
