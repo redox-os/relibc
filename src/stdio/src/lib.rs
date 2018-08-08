@@ -120,7 +120,11 @@ impl FILE {
                     platform::write(self.fd, &f_buf[advance..]) + platform::write(self.fd, to_write)
                 };
                 if count == rem as isize {
-                    self.write = Some((self.unget, self.unget, self.buf.len() - 1));
+                    self.write = if self.buf.len() == 0 {
+                        Some((0, 0, 0))
+                    } else {
+                        Some((self.unget, self.unget, self.buf.len() - 1))
+                    };
                     return to_write.len();
                 }
                 if count < 0 {
@@ -852,6 +856,11 @@ pub extern "C" fn setvbuf(stream: &mut FILE, buf: *mut c_char, mode: c_int, size
         if mode != _IONBF {
             vec![0u8; 1]
         } else {
+            if let Some(_) = stream.write {
+                stream.write = Some((0, 0, 0));
+            } else if let Some(_) = stream.read {
+                stream.read = Some((0, 0));
+            }
             Vec::new()
         }
     } else {
