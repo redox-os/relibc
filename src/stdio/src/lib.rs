@@ -155,7 +155,7 @@ impl FILE {
     pub fn read(&mut self, buf: &mut [u8]) -> usize {
         let adj = if self.buf.len() > 0 { 0 } else { 1 };
         let mut file_buf = &mut self.buf[self.unget..];
-        let count = if buf.len() <= 1 + adj {
+        let count = if buf.len() <= 1 - adj {
             platform::read(self.fd, &mut file_buf)
         } else {
             platform::read(self.fd, buf) + platform::read(self.fd, &mut file_buf)
@@ -172,7 +172,9 @@ impl FILE {
             return count as usize;
         }
         // Adjust pointers
-        if buf.len() > 0 {
+        if file_buf.len() == 0 {
+            self.read = Some((0, 0));
+        } else if buf.len() > 0 {
             self.read = Some((self.unget + 1, self.unget + (count as usize)));
             buf[buf.len() - 1] = file_buf[0];
         } else {
@@ -385,7 +387,7 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
             }
             stream.read = Some((rpos + idiff, rend));
             if rend - rpos == 0 {
-                len -= stream.read(&mut st[(len as usize)..]) as i32;
+                len -= stream.read(&mut st[((n - len) as usize)..]) as i32;
                 break;
             }
             if len <= 1 {
