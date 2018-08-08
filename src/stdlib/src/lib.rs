@@ -728,8 +728,9 @@ pub fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize,
     let mut overflowed = false;
 
     loop {
-        // `-1 as usize` is -1
-        // `-1 as u8 as usize` is 255
+        // `-1 as usize` is usize::MAX
+        // `-1 as u8 as usize` is u8::MAX
+        // It extends by the sign bit unless we cast it to unsigned first.
         let val = unsafe { LOOKUP_TABLE[*s.offset(idx) as u8 as usize] };
         if val == -1 || val as c_int >= base {
             break;
