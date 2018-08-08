@@ -74,7 +74,11 @@ impl FILE {
             self.flags |= constants::F_ERR;
             return false;
         }
-        self.read = Some((self.buf.len() - 1, self.buf.len() - 1));
+        self.read = if self.buf.len() == 0 {
+            Some((0, 0))
+        } else {
+            Some((self.buf.len() - 1, self.buf.len() - 1))
+        };
         if self.flags & constants::F_EOF > 0 {
             false
         } else {
@@ -343,7 +347,7 @@ pub extern "C" fn fgetpos(stream: &mut FILE, pos: Option<&mut fpos_t>) -> c_int 
 pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_char {
     use core::slice;
     flockfile(stream);
-    let st = unsafe { slice::from_raw_parts_mut(s, n as usize) };
+    let st = unsafe { slice::from_raw_parts_mut(s as *mut u8, n as usize) };
 
     let mut len = n;
 
@@ -372,14 +376,18 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
             let mut idiff = 0usize;
             for _ in (0..(len - 1) as usize).take_while(|x| rpos + x < rend) {
                 let pos = (n - len) as usize;
-                st[pos] = stream.buf[rpos + idiff] as i8;
+                st[pos] = stream.buf[rpos + idiff];
                 idiff += 1;
                 len -= 1;
-                if st[pos] == b'\n' as i8 || st[pos] == stream.buf_char {
+                if st[pos] == b'\n' || st[pos] as i8 == stream.buf_char {
                     break 'outer;
                 }
             }
             stream.read = Some((rpos + idiff, rend));
+            if rend - rpos == 0 {
+                len -= stream.read(&mut st[(len as usize)..]) as i32;
+                break;
+            }
             if len <= 1 {
                 break;
             }
@@ -856,6 +864,7 @@ pub extern "C" fn setvbuf(stream: &mut FILE, buf: *mut c_char, mode: c_int, size
         if mode != _IONBF {
             vec![0u8; 1]
         } else {
+            stream.unget = 0;
             if let Some(_) = stream.write {
                 stream.write = Some((0, 0, 0));
             } else if let Some(_) = stream.read {
