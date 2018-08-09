@@ -28,6 +28,7 @@ EXPECT_BINS=\
 	stdlib/env \
 	stdlib/mkostemps \
 	stdlib/rand \
+	stdlib/strtod \
 	stdlib/strtol \
 	stdlib/strtoul \
 	stdlib/system \
