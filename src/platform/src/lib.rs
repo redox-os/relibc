@@ -6,12 +6,15 @@
 #[cfg_attr(target_os = "redox", macro_use)]
 extern crate alloc;
 
-#[cfg(all(not(feature = "no_std"), target_os = "linux"))]
+#[cfg(target_os = "linux")]
 #[macro_use]
 extern crate sc;
 
-#[cfg(all(not(feature = "no_std"), target_os = "redox"))]
+#[cfg(target_os = "redox")]
 extern crate syscall;
+
+#[cfg(target_os = "redox")]
+extern crate spin;
 
 pub use allocator::*;
 
@@ -38,7 +41,7 @@ pub mod types;
 
 pub use rawfile::RawFile;
 
-use alloc::Vec;
+use alloc::vec::Vec;
 use core::{fmt, ptr};
 
 use types::*;

@@ -247,6 +247,7 @@ dependencies = [
  "ralloc 1.0.0",
  "redox_syscall 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
  "sc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

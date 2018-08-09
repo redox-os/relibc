@@ -13,3 +13,4 @@ sc = "0.2"
 
 [target.'cfg(target_os = "redox")'.dependencies]
 redox_syscall = "0.1"
+spin = "0.4"

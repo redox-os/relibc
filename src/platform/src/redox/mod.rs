@@ -1,9 +1,9 @@
 //! sys/socket implementation, following http://pubs.opengroup.org/onlinepubs/009696699/basedefs/sys/socket.h.html
 
+use alloc::btree_map::BTreeMap;
 use core::fmt::Write;
-use core::mem;
-use core::ptr;
-use core::slice;
+use core::{mem, ptr, slice};
+use spin::{Once, Mutex, MutexGuard};
 use syscall::data::Stat as redox_stat;
 use syscall::data::TimeSpec as redox_timespec;
 use syscall::flag::*;
@@ -13,9 +13,16 @@ use types::*;
 use *;
 
 const EINVAL: c_int = 22;
+const MAP_ANON: c_int = 1;
 
 #[thread_local]
 static mut SIG_HANDLER: Option<extern "C" fn(c_int)> = None;
+
+static ANONYMOUS_MAPS: Once<Mutex<BTreeMap<usize, usize>>> = Once::new();
+
+fn anonymous_maps() -> MutexGuard<'static, BTreeMap<usize, usize>> {
+    ANONYMOUS_MAPS.call_once(|| Mutex::new(BTreeMap::new())).lock()
+}
 
 extern "C" fn sig_handler(sig: usize) {
     if let Some(ref callback) = unsafe { SIG_HANDLER } {
@@ -638,6 +645,43 @@ pub fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
         }
         Err(err) => e(Err(err)) as c_int,
     }
+}
+
+pub unsafe fn mmap(
+    _addr: *mut c_void,
+    len: usize,
+    _prot: c_int,
+    flags: c_int,
+    fildes: c_int,
+    off: off_t,
+) -> *mut c_void {
+    if flags & MAP_ANON == MAP_ANON {
+        let fd = e(syscall::open("memory:", 0)); // flags don't matter currently
+        if fd == !0 {
+            return !0 as *mut c_void;
+        }
+
+        let addr = e(syscall::fmap(fd, off as usize, len as usize));
+        if addr == !0 {
+            let _ = syscall::close(fd);
+            return !0 as *mut c_void;
+        }
+
+        anonymous_maps().insert(addr as usize, fd);
+        addr as *mut c_void
+    } else {
+        e(syscall::fmap(fildes as usize, off as usize, len as usize)) as *mut c_void
+    }
+}
+
+pub unsafe fn munmap(addr: *mut c_void, _len: usize) -> c_int {
+    if e(syscall::funmap(addr as usize)) == !0 {
+        return !0;
+    }
+    if let Some(fd) = anonymous_maps().remove(&(addr as usize)) {
+        let _ = syscall::close(fd);
+    }
+    0
 }
 
 pub fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {

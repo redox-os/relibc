@@ -24,8 +24,8 @@ pub extern "C" fn mlockall(flags: c_int) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn mmap(
+#[no_mangle]
+pub unsafe extern "C" fn mmap(
     addr: *mut c_void,
     len: usize,
     prot: c_int,
@@ -33,7 +33,7 @@ pub extern "C" fn mmap(
     fildes: c_int,
     off: off_t,
 ) -> *mut c_void {
-    unimplemented!();
+    platform::mmap(addr, len, prot, flags, fildes, off)
 }
 
 // #[no_mangle]
@@ -56,9 +56,9 @@ pub extern "C" fn munlockall() -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn munmap(addr: *mut c_void, len: usize) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn munmap(addr: *mut c_void, len: usize) -> c_int {
+    platform::munmap(addr, len)
 }
 
 // #[no_mangle]

@@ -10,3 +10,4 @@ pub const O_APPEND: c_int = 0o2000;
 pub const O_CLOEXEC: c_int = 0o2_000_000;
 pub const O_DIRECTORY: c_int = 0o200_000;
 pub const O_EXCL: c_int = 0o200;
+pub const O_NONBLOCK: c_int = 0o4000;

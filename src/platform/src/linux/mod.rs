@@ -284,6 +284,21 @@ pub fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
     e(unsafe { syscall!(MKNODAT, AT_FDCWD, path, mode, 0) }) as c_int
 }
 
+pub unsafe fn mmap(
+    addr: *mut c_void,
+    len: usize,
+    prot: c_int,
+    flags: c_int,
+    fildes: c_int,
+    off: off_t,
+) -> *mut c_void {
+    e(syscall!(MMAP, addr, len, prot, flags, fildes, off)) as *mut c_void
+}
+
+pub unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
+    e(syscall!(MUNMAP, addr, len)) as c_int
+}
+
 pub fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
     e(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }) as c_int
 }

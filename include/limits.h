@@ -1,7 +1,11 @@
 #define MB_LEN_MAX 4 // unicode
 
 #define CHAR_BIT __CHAR_BIT__
-#define CHAR_MAX __CHAR_MAX__
+#ifdef __CHAR_MAX__
+# define CHAR_MAX __CHAR_MAX__
+#else
+# define CHAR_MAX 0xFF
+#endif
 #define CHAR_MIN 0
 #define INT_MAX __INT_MAX__
 #define INT_MIN (-INT_MAX - 1)
