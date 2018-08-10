@@ -23,6 +23,7 @@ pub const SIGINT: usize = 2;
 pub const SIGQUIT: usize = 3;
 pub const SIGILL: usize = 4;
 pub const SIGTRAP: usize = 5;
+pub const SIGABRT: usize = 6;
 pub const SIGBUS: usize = 7;
 pub const SIGFPE: usize = 8;
 pub const SIGKILL: usize = 9;
