@@ -54,7 +54,7 @@ impl Stack {
     }
 
     fn envp(&self) -> *const *const u8 {
-        unsafe { self.argv().offset(self.argc() + 1) }
+        unsafe { self.argv().offset(self.argc()) }
     }
 }
 
