@@ -525,6 +525,7 @@ pub unsafe extern "C" fn putenv(insert: *mut c_char) -> c_int {
         assert_eq!(platform::inner_environ[i], ptr::null_mut(), "environ did not end with null");
         platform::inner_environ[i] = insert;
         platform::inner_environ.push(ptr::null_mut());
+        platform::environ = platform::inner_environ.as_mut_ptr();
     }
     0
 }
@@ -618,6 +619,7 @@ pub unsafe extern "C" fn setenv(mut key: *const c_char, mut value: *const c_char
         let i = platform::inner_environ.len() - 1;
         assert_eq!(platform::inner_environ[i], ptr::null_mut(), "environ did not end with null");
         platform::inner_environ.push(ptr::null_mut());
+        platform::environ = platform::inner_environ.as_mut_ptr();
         i
     };
 

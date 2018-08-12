@@ -196,65 +196,51 @@ pub fn exit(status: c_int) -> ! {
 
 pub unsafe extern "C" fn execve(
     path: *const c_char,
-    argv: *const *mut c_char,
-    envp: *const *mut c_char,
+    mut argv: *const *mut c_char,
+    mut envp: *const *mut c_char,
 ) -> c_int {
     use alloc::Vec;
-    use syscall::flag::*;
 
-    let mut env = envp;
-    while !(*env).is_null() {
-        let slice = c_str(*env);
-        // Should always contain a =, but worth checking
-        if let Some(sep) = slice.iter().position(|&c| c == b'=') {
-            // If the environment variable has no name, do not attempt
-            // to add it to the env.
-            if sep > 0 {
-                let mut path = b"env:".to_vec();
-                path.extend_from_slice(&slice[..sep]);
-                match syscall::open(&path, O_WRONLY | O_CREAT) {
-                    Ok(fd) => {
-                        // If the environment variable has no value, there
-                        // is no need to write anything to the env scheme.
-                        if sep + 1 < slice.len() {
-                            match syscall::write(fd, &slice[sep + 1..]) {
-                                Ok(_) => (),
-                                err => {
-                                    return e(err) as c_int;
-                                }
-                            }
-                        }
-                        // Cleanup after adding the variable.
-                        match syscall::close(fd) {
-                            Ok(_) => (),
-                            err => {
-                                return e(err) as c_int;
-                            }
-                        }
-                    }
-                    err => {
-                        return e(err) as c_int;
-                    }
-                }
-            }
-        }
-        env = env.offset(1);
-    }
+    let fd = match RawFile::open(path, 0, 0) {
+        Ok(fd) => fd,
+        Err(_) => return -1
+    };
 
     let mut len = 0;
     while !(*argv.offset(len)).is_null() {
         len += 1;
-        break;
     }
 
     let mut args: Vec<[usize; 2]> = Vec::with_capacity(len as usize);
-    let mut arg = argv;
-    while !(*arg).is_null() {
-        args.push([*arg as usize, c_str(*arg).len()]);
-        arg = arg.offset(1);
+    while !(*argv).is_null() {
+        let arg = *argv;
+
+        let mut len = 0;
+        while *arg.offset(len) != 0 {
+            len += 1;
+        }
+        args.push([*arg as usize, len as usize]);
+        argv = argv.offset(1);
     }
 
-    e(syscall::execve(c_str(path), &args)) as c_int
+    let mut len = 0;
+    while !(*envp.offset(len)).is_null() {
+        len += 1;
+    }
+
+    let mut envs: Vec<[usize; 2]> = Vec::with_capacity(len as usize);
+    while !(*envp).is_null() {
+        let env = *envp;
+
+        let mut len = 0;
+        while *env.offset(len) != 0 {
+            len += 1;
+        }
+        envs.push([*env as usize, len as usize]);
+        envp = envp.offset(1);
+    }
+
+    e(syscall::fexec(*fd as usize, &args, &envs)) as c_int
 }
 
 pub fn fchdir(fd: c_int) -> c_int {

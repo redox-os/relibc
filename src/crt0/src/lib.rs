@@ -53,7 +53,6 @@ impl Stack {
         &self.argv0 as *const *const u8
     }
 
-    #[cfg(not(target_os = "redox"))]
     fn envp(&self) -> *const *const u8 {
         unsafe { self.argv().offset(self.argc() + 1) }
     }
@@ -69,34 +68,24 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
     let argc = sp.argc();
     let argv = sp.argv();
 
-    #[cfg(target_os = "redox")]
-    {
-        // TODO: Redox will support environ like on linux, eventually.
-        // We could implement it using the env: scheme here, but eh.
-        platform::inner_environ = Vec::with_capacity(1);
-    }
-    #[cfg(not(target_os = "redox"))]
     let envp = sp.envp();
-    #[cfg(not(target_os = "redox"))]
-    {
+    let mut len = 0;
+    while *envp.offset(len) != ptr::null() {
+        len += 1;
+    }
+    platform::inner_environ = Vec::with_capacity(len as usize + 1);
+    for i in 0..len {
+        let mut item = *envp.offset(i);
         let mut len = 0;
-        while *envp.offset(len) != ptr::null() {
+        while *item.offset(len) != 0 {
             len += 1;
         }
-        platform::inner_environ = Vec::with_capacity(len as usize + 1);
-        for i in 0..len {
-            let mut item = *envp.offset(i);
-            let mut len = 0;
-            while *item.offset(len) != 0 {
-                len += 1;
-            }
 
-            let buf = platform::alloc(len as usize + 1) as *mut c_char;
-            for i in 0..=len {
-                *buf.offset(i) = *item.offset(i) as c_char;
-            }
-            platform::inner_environ.push(buf);
+        let buf = platform::alloc(len as usize + 1) as *mut c_char;
+        for i in 0..=len {
+            *buf.offset(i) = *item.offset(i) as c_char;
         }
+        platform::inner_environ.push(buf);
     }
     platform::inner_environ.push(ptr::null_mut());
     platform::environ = platform::inner_environ.as_mut_ptr();
@@ -106,17 +95,10 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
     stdio::stdout = stdio::default_stdout.get();
     stdio::stderr = stdio::default_stderr.get();
 
-    #[cfg(not(target_os = "redox"))]
     platform::exit(main(
         argc,
         argv as *const *const c_char,
         envp as *const *const c_char,
-    ));
-    #[cfg(target_os = "redox")]
-    platform::exit(main(
-        argc,
-        argv as *const *const c_char,
-        platform::environ as *const *const c_char
     ));
 }
 
