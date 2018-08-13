@@ -98,7 +98,9 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
     platform::exit(main(
         argc,
         argv,
-        envp
+        // not envp, because programs like bash try to modify this *const*
+        // pointer :|
+        platform::environ as *const *const c_char
     ));
 }
 

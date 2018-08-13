@@ -219,7 +219,7 @@ pub unsafe extern "C" fn execve(
         while *arg.offset(len) != 0 {
             len += 1;
         }
-        args.push([*arg as usize, len as usize]);
+        args.push([arg as usize, len as usize]);
         argv = argv.offset(1);
     }
 
@@ -236,7 +236,7 @@ pub unsafe extern "C" fn execve(
         while *env.offset(len) != 0 {
             len += 1;
         }
-        envs.push([*env as usize, len as usize]);
+        envs.push([env as usize, len as usize]);
         envp = envp.offset(1);
     }
 
