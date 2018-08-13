@@ -41,7 +41,7 @@ pub unsafe extern "C" fn _start() {
 #[repr(C)]
 pub struct Stack {
     argc: isize,
-    argv0: *const u8,
+    argv0: *const c_char,
 }
 
 impl Stack {
@@ -49,12 +49,12 @@ impl Stack {
         self.argc
     }
 
-    fn argv(&self) -> *const *const u8 {
-        &self.argv0 as *const *const u8
+    fn argv(&self) -> *const *const c_char {
+        &self.argv0 as *const _
     }
 
-    fn envp(&self) -> *const *const u8 {
-        unsafe { self.argv().offset(self.argc()) }
+    fn envp(&self) -> *const *const c_char {
+        unsafe { self.argv().offset(self.argc() + 1) }
     }
 }
 
@@ -83,7 +83,7 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
 
         let buf = platform::alloc(len as usize + 1) as *mut c_char;
         for i in 0..=len {
-            *buf.offset(i) = *item.offset(i) as c_char;
+            *buf.offset(i) = *item.offset(i);
         }
         platform::inner_environ.push(buf);
     }
@@ -97,8 +97,8 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
 
     platform::exit(main(
         argc,
-        argv as *const *const c_char,
-        envp as *const *const c_char,
+        argv,
+        envp
     ));
 }
 

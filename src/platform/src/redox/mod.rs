@@ -201,7 +201,7 @@ pub unsafe extern "C" fn execve(
 ) -> c_int {
     use alloc::Vec;
 
-    let fd = match RawFile::open(path, 0, 0) {
+    let fd = match RawFile::open(path, O_RDONLY as c_int, 0) {
         Ok(fd) => fd,
         Err(_) => return -1
     };
