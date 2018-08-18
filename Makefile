@@ -36,13 +36,13 @@ install: all
 	mkdir -pv "$(DESTDIR)/include"
 	cp -rv "include"/* "$(DESTDIR)/include"
 	cp -rv "target/include"/* "$(DESTDIR)/include"
-	cp -v "$(BUILD)/debug/libc.a" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/debug/crt0.o" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/release/libc.a" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/release/crt0.o" "$(DESTDIR)/lib"
 	cp -rv "openlibm/include"/* "$(DESTDIR)/include"
 	cp -rv "openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 
-libc: $(BUILD)/debug/libc.a $(BUILD)/debug/crt0.o
+libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o
 
 libm: $(BUILD)/openlibm/libopenlibm.a
 
