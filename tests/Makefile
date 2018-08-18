@@ -131,10 +131,10 @@ CFLAGS=\
 	-I ../target/openlibm/src \
 
 HEADLIBS=\
-	../target/debug/crt0.o
+	../target/release/crt0.o
 
 TAILLIBS=\
-	../target/debug/libc.a \
+	../target/release/libc.a \
 	../target/openlibm/libopenlibm.a
 
 %: %.c $(HEADLIBS) $(TAILLIBS)
