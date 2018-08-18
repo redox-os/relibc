@@ -1023,7 +1023,7 @@ pub extern "C" fn unlockpt(fildes: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn unsetenv(key: *mut c_char) -> c_int {
+pub unsafe extern "C" fn unsetenv(key: *const c_char) -> c_int {
     if let Some((i, _)) = find_env(key) {
         // No need to worry about updating the pointer, this does not
         // reallocate in any way. And the final null is already shifted back.
