@@ -454,18 +454,6 @@ impl Pal for Sys {
         )) as off_t
     }
 
-    fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
-        let path = unsafe { c_str(path) };
-        match syscall::open(path, O_STAT | O_NOFOLLOW) {
-            Err(err) => e(Err(err)) as c_int,
-            Ok(fd) => {
-                let res = Self::fstat(fd as i32, buf);
-                let _ = syscall::close(fd);
-                res
-            }
-        }
-    }
-
     fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
         let flags = O_CREAT | O_EXCL | O_CLOEXEC | O_DIRECTORY | mode as usize & 0o777;
         let path = unsafe { c_str(path) };
@@ -698,18 +686,6 @@ impl Pal for Sys {
 
     fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
         e(syscall::setreuid(ruid as usize, euid as usize)) as c_int
-    }
-
-    fn stat(path: *const c_char, buf: *mut stat) -> c_int {
-        let path = unsafe { c_str(path) };
-        match syscall::open(path, O_STAT) {
-            Err(err) => e(Err(err)) as c_int,
-            Ok(fd) => {
-                let res = Self::fstat(fd as i32, buf);
-                let _ = syscall::close(fd);
-                res
-            }
-        }
     }
 
     fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {

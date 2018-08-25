@@ -233,10 +233,6 @@ impl Pal for Sys {
         e(unsafe { syscall!(LSEEK, fildes, offset, whence) }) as off_t
     }
 
-    fn lstat(file: *const c_char, buf: *mut stat) -> c_int {
-        e(unsafe { syscall!(NEWFSTATAT, AT_FDCWD, file, buf, AT_SYMLINK_NOFOLLOW) }) as c_int
-    }
-
     fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
         e(unsafe { syscall!(MKDIRAT, AT_FDCWD, path, mode) }) as c_int
     }
@@ -308,10 +304,6 @@ impl Pal for Sys {
 
     fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
         e(unsafe { syscall!(SETREUID, ruid, euid) }) as c_int
-    }
-
-    fn stat(file: *const c_char, buf: *mut stat) -> c_int {
-        e(unsafe { syscall!(NEWFSTATAT, AT_FDCWD, file, buf, 0) }) as c_int
     }
 
     fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {

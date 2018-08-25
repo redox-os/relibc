@@ -164,10 +164,6 @@ pub trait Pal {
         Self::no_pal("lseek") as off_t
     }
 
-    fn lstat(file: *const c_char, buf: *mut stat) -> c_int {
-        Self::no_pal("lstat")
-    }
-
     fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
         Self::no_pal("mkdir")
     }
@@ -239,10 +235,6 @@ pub trait Pal {
 
     fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
         Self::no_pal("setreuid")
-    }
-
-    fn stat(file: *const c_char, buf: *mut stat) -> c_int {
-        Self::no_pal("stat")
     }
 
     fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {

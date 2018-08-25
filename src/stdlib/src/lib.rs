@@ -447,7 +447,7 @@ where
 pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
     if inner_mktemp(name, 0, || unsafe {
         let mut st: stat = mem::uninitialized();
-        let ret = if Sys::stat(name, &mut st) != 0 && platform::errno == ENOENT {
+        let ret = if Sys::access(name, 0) != 0 && platform::errno == ENOENT {
             Some(())
         } else {
             None

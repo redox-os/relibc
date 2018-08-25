@@ -2,8 +2,10 @@
 
 #![no_std]
 
+extern crate fcntl;
 extern crate platform;
 
+use fcntl::{O_PATH, O_NOFOLLOW};
 use platform::{Pal, Sys};
 use platform::types::*;
 
@@ -85,7 +87,16 @@ pub extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn lstat(path: *const c_char, buf: *mut platform::types::stat) -> c_int {
-    Sys::lstat(path, buf)
+    let fd = Sys::open(path, O_PATH | O_NOFOLLOW, 0);
+    if fd < 0 {
+        return -1;
+    }
+
+    let res = Sys::fstat(fd, buf);
+
+    Sys::close(fd);
+
+    res
 }
 
 #[no_mangle]
@@ -105,7 +116,16 @@ pub extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int 
 
 #[no_mangle]
 pub extern "C" fn stat(file: *const c_char, buf: *mut platform::types::stat) -> c_int {
-    Sys::stat(file, buf)
+    let fd = Sys::open(file, O_PATH, 0);
+    if fd < 0 {
+        return -1;
+    }
+
+    let res = Sys::fstat(fd, buf);
+
+    Sys::close(fd);
+
+    res
 }
 
 #[no_mangle]

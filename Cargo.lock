@@ -586,6 +586,7 @@ name = "sys_stat"
 version = "0.1.0"
 dependencies = [
  "cbindgen 0.5.2",
+ "fcntl 0.1.0",
  "platform 0.1.0",
 ]
 
