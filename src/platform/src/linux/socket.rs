@@ -109,8 +109,8 @@ impl PalSocket for Sys {
         e(unsafe { syscall!(SHUTDOWN, socket, how) }) as c_int
     }
 
-    fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
-        e(unsafe { syscall!(SOCKET, domain, kind, protocol) }) as c_int
+    unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
+        e(syscall!(SOCKET, domain, kind, protocol)) as c_int
     }
 
     fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *mut c_int) -> c_int {

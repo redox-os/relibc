@@ -19,19 +19,10 @@ const EINVAL: c_int = 22;
 const ENOSYS: c_int = 38;
 const MAP_ANON: c_int = 1;
 
-#[thread_local]
-static mut SIG_HANDLER: Option<extern "C" fn(c_int)> = None;
-
 static ANONYMOUS_MAPS: Once<Mutex<BTreeMap<usize, usize>>> = Once::new();
 
 fn anonymous_maps() -> MutexGuard<'static, BTreeMap<usize, usize>> {
     ANONYMOUS_MAPS.call_once(|| Mutex::new(BTreeMap::new())).lock()
-}
-
-extern "C" fn sig_handler(sig: usize) {
-    if let Some(ref callback) = unsafe { SIG_HANDLER } {
-        callback(sig as c_int);
-    }
 }
 
 fn e(sys: Result<usize>) -> usize {

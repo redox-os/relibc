@@ -72,7 +72,7 @@ pub trait PalSocket: Pal {
         Self::no_pal("shutdown")
     }
 
-    fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
+    unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
         Self::no_pal("socket")
     }
 

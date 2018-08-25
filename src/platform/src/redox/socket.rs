@@ -1,3 +1,11 @@
+use core::{mem, ptr, slice};
+use syscall::{self, Result};
+use syscall::flag::*;
+
+use super::{e, Sys};
+use {errno, Pal, PalSocket};
+use types::*;
+
 macro_rules! bind_or_connect {
     (bind $path:expr) => {
         concat!("/", $path)
@@ -75,7 +83,7 @@ impl PalSocket for Sys {
         }
         if address != ptr::null_mut()
             && address_len != ptr::null_mut()
-            && getpeername(stream, address, address_len) < 0
+            && Self::getpeername(stream, address, address_len) < 0
         {
             return -1;
         }
@@ -120,11 +128,11 @@ impl PalSocket for Sys {
         }
         if address != ptr::null_mut()
             && address_len != ptr::null_mut()
-            && getpeername(socket, address, address_len) < 0
+            && Self::getpeername(socket, address, address_len) < 0
         {
             return -1;
         }
-        read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
+        Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
     }
 
     unsafe fn sendto(
@@ -143,7 +151,7 @@ impl PalSocket for Sys {
             errno = syscall::EOPNOTSUPP;
             return -1;
         }
-        write(socket, slice::from_raw_parts(buf as *const u8, len))
+        Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
     }
 
     unsafe fn socket(domain: c_int, mut kind: c_int, protocol: c_int) -> c_int {

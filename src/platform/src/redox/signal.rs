@@ -1,3 +1,18 @@
+use syscall;
+
+use super::{e, Sys};
+use {Pal, PalSignal};
+use types::*;
+
+#[thread_local]
+static mut SIG_HANDLER: Option<extern "C" fn(c_int)> = None;
+
+extern "C" fn sig_handler(sig: usize) {
+    if let Some(ref callback) = unsafe { SIG_HANDLER } {
+        callback(sig as c_int);
+    }
+}
+
 impl PalSignal for Sys {
     fn kill(pid: pid_t, sig: c_int) -> c_int {
         e(syscall::kill(pid as usize, sig as usize)) as c_int
@@ -8,7 +23,7 @@ impl PalSignal for Sys {
     }
 
     fn raise(sig: c_int) -> c_int {
-        kill(getpid(), sig)
+        Self::kill(Self::getpid(), sig)
     }
 
     unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {
