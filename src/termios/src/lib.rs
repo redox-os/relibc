@@ -3,6 +3,7 @@
 
 extern crate platform;
 
+use platform::{Pal, Sys};
 use platform::types::*;
 
 pub type cc_t = u8;
@@ -25,12 +26,12 @@ pub struct termios {
 
 #[no_mangle]
 pub extern "C" fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
-    platform::tcgetattr(fd, out as *mut platform::types::termios)
+    Sys::tcgetattr(fd, out as *mut platform::types::termios)
 }
 
 #[no_mangle]
 pub extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *mut termios) -> c_int {
-    platform::tcsetattr(fd, act, value as *mut platform::types::termios)
+    Sys::tcsetattr(fd, act, value as *mut platform::types::termios)
 }
 
 pub const VINTR: usize = 0;

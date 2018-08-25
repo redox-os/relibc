@@ -4,6 +4,7 @@
 
 extern crate platform;
 
+use platform::{Pal, Sys};
 use platform::types::*;
 
 #[repr(C)]
@@ -25,5 +26,5 @@ pub unsafe extern "C" fn utime(filename: *const c_char, times: *const utimbuf) -
             tv_nsec: 0,
         },
     ];
-    platform::utimens(filename, times_spec.as_ptr())
+    Sys::utimens(filename, times_spec.as_ptr())
 }

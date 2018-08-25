@@ -43,6 +43,8 @@ pub extern crate utime;
 pub extern crate wchar;
 pub extern crate wctype;
 
+use platform::{Pal, Sys};
+
 #[cfg(not(test))]
 #[panic_implementation]
 #[linkage = "weak"]
@@ -53,7 +55,7 @@ pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
     let mut w = platform::FileWriter(2);
     let _ = w.write_fmt(format_args!("RELIBC PANIC: {}\n", pi));
 
-    platform::exit(1);
+    Sys::exit(1);
 }
 
 #[cfg(not(test))]
@@ -76,7 +78,7 @@ pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
         layout.align()
     ));
 
-    platform::exit(1);
+    Sys::exit(1);
 }
 
 #[cfg(not(test))]
@@ -89,5 +91,5 @@ pub extern "C" fn _Unwind_Resume() -> ! {
     let mut w = platform::FileWriter(2);
     let _ = w.write_str("_Unwind_Resume\n");
 
-    platform::exit(1);
+    Sys::exit(1);
 }

@@ -23,6 +23,7 @@ use wchar::*;
 
 use errno::*;
 use fcntl::*;
+use platform::{Pal, Sys};
 use platform::types::*;
 
 mod sort;
@@ -235,7 +236,7 @@ pub unsafe extern "C" fn exit(status: c_int) {
         }
     }
 
-    platform::exit(status);
+    Sys::exit(status);
 }
 
 // #[no_mangle]
@@ -446,7 +447,7 @@ where
 pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
     if inner_mktemp(name, 0, || unsafe {
         let mut st: stat = mem::uninitialized();
-        let ret = if platform::stat(name, &mut st) != 0 && platform::errno == ENOENT {
+        let ret = if Sys::stat(name, &mut st) != 0 && platform::errno == ENOENT {
             Some(())
         } else {
             None
@@ -466,7 +467,7 @@ fn get_nstime() -> u64 {
     use core::mem;
     use time::constants::CLOCK_MONOTONIC;
     let mut ts: timespec = unsafe { mem::uninitialized() };
-    platform::clock_gettime(CLOCK_MONOTONIC, &mut ts);
+    Sys::clock_gettime(CLOCK_MONOTONIC, &mut ts);
     ts.tv_nsec as u64
 }
 
@@ -476,7 +477,7 @@ pub extern "C" fn mkostemps(name: *mut c_char, suffix_len: c_int, mut flags: c_i
     flags |= O_RDWR | O_CREAT | O_EXCL;
 
     inner_mktemp(name, suffix_len, || {
-        let fd = platform::open(name, flags, 0600);
+        let fd = Sys::open(name, flags, 0600);
 
         if fd >= 0 {
             Some(fd)
@@ -1004,7 +1005,7 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
         unreachable!();
     } else {
         let mut wstatus = 0;
-        if platform::waitpid(child_pid, &mut wstatus, 0) == !0 {
+        if Sys::waitpid(child_pid, &mut wstatus, 0) == !0 {
             return -1;
         }
 

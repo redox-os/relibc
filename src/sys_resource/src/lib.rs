@@ -6,6 +6,7 @@
 extern crate platform;
 extern crate sys_time;
 
+use platform::{Pal, Sys};
 use platform::types::*;
 use sys_time::timeval;
 
@@ -55,7 +56,7 @@ pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
 
 //#[no_mangle]
 pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-    platform::getrusage(who, r_usage as *mut platform::types::rusage)
+    Sys::getrusage(who, r_usage as *mut platform::types::rusage)
 }
 
 // #[no_mangle]

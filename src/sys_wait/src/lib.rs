@@ -6,6 +6,7 @@
 extern crate platform;
 extern crate sys_resource;
 
+use platform::{Pal, Sys};
 use platform::types::*;
 use sys_resource::rusage;
 
@@ -51,5 +52,5 @@ pub unsafe extern "C" fn wait3(
 
 #[no_mangle]
 pub unsafe extern "C" fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
-    platform::waitpid(pid, stat_loc, options)
+    Sys::waitpid(pid, stat_loc, options)
 }

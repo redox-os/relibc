@@ -6,6 +6,7 @@
 extern crate platform;
 
 use core::ptr;
+use platform::{PalSocket, Sys};
 use platform::types::*;
 
 mod constants;
@@ -28,7 +29,7 @@ pub unsafe extern "C" fn accept(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    platform::accept(
+    Sys::accept(
         socket,
         address as *mut platform::types::sockaddr,
         address_len,
@@ -41,7 +42,7 @@ pub unsafe extern "C" fn bind(
     address: *const sockaddr,
     address_len: socklen_t,
 ) -> c_int {
-    platform::bind(
+    Sys::bind(
         socket,
         address as *const platform::types::sockaddr,
         address_len,
@@ -54,7 +55,7 @@ pub unsafe extern "C" fn connect(
     address: *const sockaddr,
     address_len: socklen_t,
 ) -> c_int {
-    platform::connect(
+    Sys::connect(
         socket,
         address as *const platform::types::sockaddr,
         address_len,
@@ -67,7 +68,7 @@ pub unsafe extern "C" fn getpeername(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    platform::getpeername(
+    Sys::getpeername(
         socket,
         address as *mut platform::types::sockaddr,
         address_len,
@@ -80,7 +81,7 @@ pub unsafe extern "C" fn getsockname(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    platform::getsockname(
+    Sys::getsockname(
         socket,
         address as *mut platform::types::sockaddr,
         address_len,
@@ -95,12 +96,12 @@ pub unsafe extern "C" fn getsockopt(
     option_value: *mut c_void,
     option_len: *mut socklen_t,
 ) -> c_int {
-    platform::getsockopt(socket, level, option_name, option_value, option_len)
+    Sys::getsockopt(socket, level, option_name, option_value, option_len)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn listen(socket: c_int, backlog: c_int) -> c_int {
-    platform::listen(socket, backlog)
+    Sys::listen(socket, backlog)
 }
 
 #[no_mangle]
@@ -129,7 +130,7 @@ pub unsafe extern "C" fn recvfrom(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> ssize_t {
-    platform::recvfrom(
+    Sys::recvfrom(
         socket,
         buffer,
         length,
@@ -158,7 +159,7 @@ pub unsafe extern "C" fn sendto(
     dest_addr: *const sockaddr,
     dest_len: socklen_t,
 ) -> ssize_t {
-    platform::sendto(
+    Sys::sendto(
         socket,
         message,
         length,
@@ -176,17 +177,17 @@ pub unsafe extern "C" fn setsockopt(
     option_value: *const c_void,
     option_len: socklen_t,
 ) -> c_int {
-    platform::setsockopt(socket, level, option_name, option_value, option_len)
+    Sys::setsockopt(socket, level, option_name, option_value, option_len)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {
-    platform::shutdown(socket, how)
+    Sys::shutdown(socket, how)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
-    platform::socket(domain, kind, protocol)
+    Sys::socket(domain, kind, protocol)
 }
 
 #[no_mangle]
@@ -196,5 +197,5 @@ pub unsafe extern "C" fn socketpair(
     protocol: c_int,
     socket_vector: *mut c_int,
 ) -> c_int {
-    platform::socketpair(domain, kind, protocol, socket_vector)
+    Sys::socketpair(domain, kind, protocol, socket_vector)
 }

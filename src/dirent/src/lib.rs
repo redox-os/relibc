@@ -12,6 +12,7 @@ extern crate unistd;
 
 use alloc::boxed::Box;
 use core::{mem, ptr};
+use platform::{Pal, Sys};
 use platform::types::*;
 
 const DIR_BUF_SIZE: usize = mem::size_of::<dirent>() * 3;
@@ -41,7 +42,7 @@ pub struct dirent {
 
 #[no_mangle]
 pub extern "C" fn opendir(path: *const c_char) -> *mut DIR {
-    let fd = platform::open(
+    let fd = Sys::open(
         path,
         fcntl::O_RDONLY | fcntl::O_DIRECTORY | fcntl::O_CLOEXEC,
         0,
@@ -62,7 +63,7 @@ pub extern "C" fn opendir(path: *const c_char) -> *mut DIR {
 
 #[no_mangle]
 pub unsafe extern "C" fn closedir(dir: *mut DIR) -> c_int {
-    let ret = platform::close((*dir).fd);
+    let ret = Sys::close((*dir).fd);
     Box::from_raw(dir);
     ret
 }
@@ -70,7 +71,7 @@ pub unsafe extern "C" fn closedir(dir: *mut DIR) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn readdir(dir: *mut DIR) -> *mut dirent {
     if (*dir).index >= (*dir).len {
-        let read = platform::getdents(
+        let read = Sys::getdents(
             (*dir).fd,
             (*dir).buf.as_mut_ptr() as *mut platform::types::dirent,
             (*dir).buf.len(),

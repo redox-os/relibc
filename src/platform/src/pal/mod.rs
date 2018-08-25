@@ -1,23 +1,21 @@
+use core::ptr;
+
 use types::*;
 
-pub trait Pal {
-    fn no_pal<T>(name: &str) -> T;
+pub use self::signal::PalSignal;
+mod signal;
 
-    unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
-        Self::no_pal("accept")
-    }
+pub use self::socket::PalSocket;
+mod socket;
+
+pub trait Pal {
+    fn no_pal(name: &str) -> c_int;
 
     fn access(path: *const c_char, mode: c_int) -> c_int {
         Self::no_pal("access")
     }
 
-    unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
-        Self::no_pal("bind")
-    }
-
-    fn brk(addr: *mut c_void) -> *mut c_void {
-        Self::no_pal("brk")
-    }
+    fn brk(addr: *mut c_void) -> *mut c_void;
 
     fn chdir(path: *const c_char) -> c_int {
         Self::no_pal("chdir")
@@ -37,10 +35,6 @@ pub trait Pal {
 
     fn close(fildes: c_int) -> c_int {
         Self::no_pal("close")
-    }
-
-    unsafe fn connect(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
-        Self::no_pal("connect")
     }
 
     fn dup(fildes: c_int) -> c_int {
@@ -102,7 +96,8 @@ pub trait Pal {
     }
 
     fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
-        Self::no_pal("getcwd")
+        Self::no_pal("getcwd");
+        ptr::null_mut()
     }
 
     fn getdents(fd: c_int, dirents: *mut dirent, bytes: usize) -> c_int {
@@ -133,10 +128,6 @@ pub trait Pal {
         Self::no_pal("getitimer")
     }
 
-    unsafe fn getpeername(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
-        Self::no_pal("getpeername")
-    }
-
     fn getpgid(pid: pid_t) -> pid_t {
         Self::no_pal("getpgid")
     }
@@ -147,20 +138,6 @@ pub trait Pal {
 
     fn getppid() -> pid_t {
         Self::no_pal("getppid")
-    }
-
-    unsafe fn getsockname(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
-        Self::no_pal("getsockname")
-    }
-
-    fn getsockopt(
-        socket: c_int,
-        level: c_int,
-        option_name: c_int,
-        option_value: *mut c_void,
-        option_len: *mut socklen_t,
-    ) -> c_int {
-        Self::no_pal("getsockopt")
     }
 
     fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
@@ -179,24 +156,12 @@ pub trait Pal {
         Self::no_pal("isatty")
     }
 
-    fn kill(pid: pid_t, sig: c_int) -> c_int {
-        Self::no_pal("kill")
-    }
-
-    fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-        Self::no_pal("killpg")
-    }
-
     fn link(path1: *const c_char, path2: *const c_char) -> c_int {
         Self::no_pal("link")
     }
 
-    fn listen(socket: c_int, backlog: c_int) -> c_int {
-        Self::no_pal("listen")
-    }
-
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
-        Self::no_pal("lseek")
+        Self::no_pal("lseek") as off_t
     }
 
     fn lstat(file: *const c_char, buf: *mut stat) -> c_int {
@@ -219,7 +184,7 @@ pub trait Pal {
         fildes: c_int,
         off: off_t,
     ) -> *mut c_void {
-        Self::no_pal("mmap")
+        Self::no_pal("mmap") as *mut c_void
     }
 
     unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
@@ -238,23 +203,8 @@ pub trait Pal {
         Self::no_pal("pipe")
     }
 
-    fn raise(sig: c_int) -> c_int {
-        Self::no_pal("raise")
-    }
-
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
-        Self::no_pal("read")
-    }
-
-    unsafe fn recvfrom(
-        socket: c_int,
-        buf: *mut c_void,
-        len: size_t,
-        flags: c_int,
-        address: *mut sockaddr,
-        address_len: *mut socklen_t,
-    ) -> ssize_t {
-        Self::no_pal("recvfrom")
+        Self::no_pal("read") as ssize_t
     }
 
     fn rename(old: *const c_char, new: *const c_char) -> c_int {
@@ -275,17 +225,6 @@ pub trait Pal {
         Self::no_pal("select")
     }
 
-    unsafe fn sendto(
-        socket: c_int,
-        buf: *const c_void,
-        len: size_t,
-        flags: c_int,
-        dest_addr: *const sockaddr,
-        dest_len: socklen_t,
-    ) -> ssize_t {
-        Self::no_pal("sendto")
-    }
-
     fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
         Self::no_pal("setitimer")
     }
@@ -302,38 +241,8 @@ pub trait Pal {
         Self::no_pal("setreuid")
     }
 
-    fn setsockopt(
-        socket: c_int,
-        level: c_int,
-        option_name: c_int,
-        option_value: *const c_void,
-        option_len: socklen_t,
-    ) -> c_int {
-        Self::no_pal("setsockopt")
-    }
-
-    fn shutdown(socket: c_int, how: c_int) -> c_int {
-        Self::no_pal("shutdown")
-    }
-
-    unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {
-        Self::no_pal("sigaction")
-    }
-
-    fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
-        Self::no_pal("sigprocmask")
-    }
-
     fn stat(file: *const c_char, buf: *mut stat) -> c_int {
         Self::no_pal("stat")
-    }
-
-    fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
-        Self::no_pal("socket")
-    }
-
-    fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *mut c_int) -> c_int {
-        Self::no_pal("socketpair")
     }
 
     fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
@@ -345,11 +254,12 @@ pub trait Pal {
     }
 
     fn times(out: *mut tms) -> clock_t {
-        Self::no_pal("times")
+        Self::no_pal("times") as clock_t
     }
 
     fn umask(mask: mode_t) -> mode_t {
-        Self::no_pal("umask")
+        Self::no_pal("umask");
+        0
     }
 
     fn uname(utsname: *mut utsname) -> c_int {
@@ -365,6 +275,6 @@ pub trait Pal {
     }
 
     fn write(fildes: c_int, buf: &[u8]) -> ssize_t {
-        Self::no_pal("write")
+        Self::no_pal("write") as ssize_t
     }
 }

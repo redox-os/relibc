@@ -14,6 +14,7 @@ extern crate stdio;
 
 use alloc::Vec;
 use core::ptr;
+use platform::{Pal, Sys};
 use platform::types::*;
 
 #[no_mangle]
@@ -95,7 +96,7 @@ pub unsafe extern "C" fn _start_rust(sp: &'static Stack) -> ! {
     stdio::stdout = stdio::default_stdout.get();
     stdio::stderr = stdio::default_stderr.get();
 
-    platform::exit(main(
+    Sys::exit(main(
         argc,
         argv,
         // not envp, because programs like bash try to modify this *const*
@@ -113,7 +114,7 @@ pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
     let mut w = platform::FileWriter(2);
     let _ = w.write_fmt(format_args!("RELIBC CRT0 PANIC: {}\n", pi));
 
-    platform::exit(1);
+    Sys::exit(1);
 }
 
 #[lang = "oom"]
@@ -129,5 +130,5 @@ pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
         layout.align()
     ));
 
-    platform::exit(1);
+    Sys::exit(1);
 }

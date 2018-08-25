@@ -22,6 +22,7 @@ use core::{ptr, str};
 
 use alloc::vec::Vec;
 use errno::STR_ERROR;
+use platform::{Pal, Sys};
 use platform::types::*;
 use platform::{c_str, errno, Read, Write};
 use vl::VaList as va_list;
@@ -110,6 +111,7 @@ impl FILE {
         };
         return true;
     }
+
     pub fn write(&mut self, to_write: &[u8]) -> usize {
         if let Some((wbase, wpos, _)) = self.write {
             let len = wpos - wbase;
@@ -119,9 +121,9 @@ impl FILE {
             let mut rem = f_buf.len() + to_write.len();
             loop {
                 let mut count = if f_filled {
-                    platform::write(self.fd, &f_buf[advance..])
+                    Sys::write(self.fd, &f_buf[advance..])
                 } else {
-                    platform::write(self.fd, &f_buf[advance..]) + platform::write(self.fd, to_write)
+                    Sys::write(self.fd, &f_buf[advance..]) + Sys::write(self.fd, to_write)
                 };
                 if count == rem as isize {
                     self.write = if self.buf.len() == 0 {
@@ -152,13 +154,14 @@ impl FILE {
         //            -- Tommoa (20/6/2018)
         unreachable!()
     }
+
     pub fn read(&mut self, buf: &mut [u8]) -> usize {
         let adj = if self.buf.len() > 0 { 0 } else { 1 };
         let mut file_buf = &mut self.buf[self.unget..];
         let count = if buf.len() <= 1 - adj {
-            platform::read(self.fd, &mut file_buf)
+            Sys::read(self.fd, &mut file_buf)
         } else {
-            platform::read(self.fd, buf) + platform::read(self.fd, &mut file_buf)
+            Sys::read(self.fd, buf) + Sys::read(self.fd, &mut file_buf)
         };
         if count <= 0 {
             self.flags |= if count == 0 {
@@ -182,8 +185,9 @@ impl FILE {
         }
         buf.len()
     }
+
     pub fn seek(&self, off: off_t, whence: c_int) -> off_t {
-        platform::lseek(self.fd, off, whence)
+        Sys::lseek(self.fd, off, whence)
     }
 
     pub fn lock(&mut self) -> LockGuard {
@@ -266,7 +270,7 @@ pub extern "C" fn cuserid(_s: *mut c_char) -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn fclose(stream: &mut FILE) -> c_int {
     flockfile(stream);
-    let r = helpers::fflush_unlocked(stream) | platform::close(stream.fd);
+    let r = helpers::fflush_unlocked(stream) | Sys::close(stream.fd);
     if stream.flags & constants::F_PERM == 0 {
         // Not one of stdin, stdout or stderr
         unsafe {
@@ -444,7 +448,7 @@ pub extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FI
     if let Some(f) = unsafe { helpers::_fdopen(fd, mode) } {
         f
     } else {
-        platform::close(fd);
+        Sys::close(fd);
         ptr::null_mut()
     }
 }
@@ -555,7 +559,7 @@ pub extern "C" fn freopen(
         let new = unsafe { &mut *new }; // Should be safe, new is not null
         if new.fd == stream.fd {
             new.fd = -1;
-        } else if platform::dup2(new.fd, stream.fd) < 0
+        } else if Sys::dup2(new.fd, stream.fd) < 0
             || fcntl::sys_fcntl(stream.fd, fcntl::F_SETFL, flags & fcntl::O_CLOEXEC) < 0
         {
             fclose(new);
@@ -824,9 +828,9 @@ pub extern "C" fn putw(w: c_int, stream: &mut FILE) -> c_int {
 /// Delete file or directory `path`
 #[no_mangle]
 pub extern "C" fn remove(path: *const c_char) -> c_int {
-    let r = platform::unlink(path);
+    let r = Sys::unlink(path);
     if r == -errno::EISDIR {
-        platform::rmdir(path)
+        Sys::rmdir(path)
     } else {
         r
     }
@@ -834,7 +838,7 @@ pub extern "C" fn remove(path: *const c_char) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn rename(oldpath: *const c_char, newpath: *const c_char) -> c_int {
-    platform::rename(oldpath, newpath)
+    Sys::rename(oldpath, newpath)
 }
 
 /// Rewind `stream` back to the beginning of it
@@ -908,10 +912,10 @@ pub extern "C" fn tmpfile() -> *mut FILE {
     }
 
     let fp = fdopen(fd, b"w+".as_ptr() as *const i8);
-    platform::unlink(file_name);
+    Sys::unlink(file_name);
 
     if fp == ptr::null_mut() {
-        platform::close(fd);
+        Sys::close(fd);
     }
 
     fp

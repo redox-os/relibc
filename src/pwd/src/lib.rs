@@ -10,6 +10,7 @@ extern crate platform;
 
 use alloc::vec::Vec;
 use core::ptr;
+use platform::{Pal, Sys};
 use platform::types::*;
 use platform::RawFile;
 
@@ -90,7 +91,7 @@ where
                 buf.set_len(capacity);
             }
 
-            let read = platform::read(*file, &mut buf[len..]);
+            let read = Sys::read(*file, &mut buf[len..]);
 
             unsafe {
                 buf.set_len(len + read as usize);

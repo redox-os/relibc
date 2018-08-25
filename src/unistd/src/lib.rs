@@ -10,6 +10,7 @@ extern crate sys_time;
 
 use core::{ptr, slice};
 
+use platform::{Pal, Sys};
 use platform::types::*;
 
 pub use brk::*;
@@ -42,12 +43,12 @@ const PATH_MAX: usize = 4096;
 
 #[no_mangle]
 pub extern "C" fn _exit(status: c_int) {
-    platform::exit(status)
+    Sys::exit(status)
 }
 
 #[no_mangle]
 pub extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
-    platform::access(path, mode)
+    Sys::access(path, mode)
 }
 
 #[no_mangle]
@@ -74,7 +75,7 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
 
 #[no_mangle]
 pub extern "C" fn chdir(path: *const c_char) -> c_int {
-    platform::chdir(path)
+    Sys::chdir(path)
 }
 
 // #[no_mangle]
@@ -84,12 +85,12 @@ pub extern "C" fn chroot(path: *const c_char) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
-    platform::chown(path, owner, group)
+    Sys::chown(path, owner, group)
 }
 
 #[no_mangle]
 pub extern "C" fn close(fildes: c_int) -> c_int {
-    platform::close(fildes)
+    Sys::close(fildes)
 }
 
 // #[no_mangle]
@@ -104,12 +105,12 @@ pub extern "C" fn crypt(key: *const c_char, salt: *const c_char) -> *mut c_char 
 
 #[no_mangle]
 pub extern "C" fn dup(fildes: c_int) -> c_int {
-    platform::dup(fildes)
+    Sys::dup(fildes)
 }
 
 #[no_mangle]
 pub extern "C" fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
-    platform::dup2(fildes, fildes2)
+    Sys::dup2(fildes, fildes2)
 }
 
 // #[no_mangle]
@@ -147,7 +148,7 @@ pub unsafe extern "C" fn execve(
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    platform::execve(path, argv, envp)
+    Sys::execve(path, argv, envp)
 }
 
 // #[no_mangle]
@@ -157,12 +158,12 @@ pub extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -> c_int
 
 #[no_mangle]
 pub extern "C" fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
-    platform::fchown(fildes, owner, group)
+    Sys::fchown(fildes, owner, group)
 }
 
 #[no_mangle]
 pub extern "C" fn fchdir(fildes: c_int) -> c_int {
-    platform::fchdir(fildes)
+    Sys::fchdir(fildes)
 }
 
 // #[no_mangle]
@@ -172,17 +173,17 @@ pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn fork() -> pid_t {
-    platform::fork()
+    Sys::fork()
 }
 
 #[no_mangle]
 pub extern "C" fn fsync(fildes: c_int) -> c_int {
-    platform::fsync(fildes)
+    Sys::fsync(fildes)
 }
 
 #[no_mangle]
 pub extern "C" fn ftruncate(fildes: c_int, length: off_t) -> c_int {
-    platform::ftruncate(fildes, length)
+    Sys::ftruncate(fildes, length)
 }
 
 #[no_mangle]
@@ -194,7 +195,7 @@ pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char 
         size = stack_buf.len();
     }
 
-    let ret = platform::getcwd(buf, size);
+    let ret = Sys::getcwd(buf, size);
     if ret == ptr::null_mut() {
         return ptr::null_mut();
     }
@@ -220,17 +221,17 @@ pub extern "C" fn getdtablesize() -> c_int {
 
 #[no_mangle]
 pub extern "C" fn getegid() -> gid_t {
-    platform::getegid()
+    Sys::getegid()
 }
 
 #[no_mangle]
 pub extern "C" fn geteuid() -> uid_t {
-    platform::geteuid()
+    Sys::geteuid()
 }
 
 #[no_mangle]
 pub extern "C" fn getgid() -> gid_t {
-    platform::getgid()
+    Sys::getgid()
 }
 
 // #[no_mangle]
@@ -245,7 +246,7 @@ pub extern "C" fn gethostid() -> c_long {
 
 #[no_mangle]
 pub unsafe extern "C" fn gethostname(name: *mut c_char, len: size_t) -> c_int {
-    platform::gethostname(name, len)
+    Sys::gethostname(name, len)
 }
 
 // #[no_mangle]
@@ -270,22 +271,22 @@ pub extern "C" fn getpass(prompt: *const c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn getpgid(pid: pid_t) -> pid_t {
-    platform::getpgid(pid)
+    Sys::getpgid(pid)
 }
 
 #[no_mangle]
 pub extern "C" fn getpgrp() -> pid_t {
-    platform::getpgid(platform::getpid())
+    Sys::getpgid(Sys::getpid())
 }
 
 #[no_mangle]
 pub extern "C" fn getpid() -> pid_t {
-    platform::getpid()
+    Sys::getpid()
 }
 
 #[no_mangle]
 pub extern "C" fn getppid() -> pid_t {
-    platform::getppid()
+    Sys::getppid()
 }
 
 // #[no_mangle]
@@ -295,7 +296,7 @@ pub extern "C" fn getsid(pid: pid_t) -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn getuid() -> uid_t {
-    platform::getuid()
+    Sys::getuid()
 }
 
 #[no_mangle]
@@ -305,7 +306,7 @@ pub extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn isatty(fd: c_int) -> c_int {
-    platform::isatty(fd)
+    Sys::isatty(fd)
 }
 
 // #[no_mangle]
@@ -315,7 +316,7 @@ pub extern "C" fn lchown(path: *const c_char, owner: uid_t, group: gid_t) -> c_i
 
 #[no_mangle]
 pub extern "C" fn link(path1: *const c_char, path2: *const c_char) -> c_int {
-    platform::link(path1, path2)
+    Sys::link(path1, path2)
 }
 
 // #[no_mangle]
@@ -325,7 +326,7 @@ pub extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
-    platform::lseek(fildes, offset, whence)
+    Sys::lseek(fildes, offset, whence)
 }
 
 // #[no_mangle]
@@ -340,7 +341,7 @@ pub extern "C" fn pause() -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn pipe(fildes: *mut c_int) -> c_int {
-    platform::pipe(slice::from_raw_parts_mut(fildes, 2))
+    Sys::pipe(slice::from_raw_parts_mut(fildes, 2))
 }
 
 // #[no_mangle]
@@ -371,7 +372,7 @@ pub extern "C" fn pwrite(
 pub extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
     use core::slice;
     let buf = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte as usize) };
-    platform::read(fildes, buf)
+    Sys::read(fildes, buf)
 }
 
 // #[no_mangle]
@@ -381,17 +382,17 @@ pub extern "C" fn readlink(path: *const c_char, buf: *mut c_char, bufsize: size_
 
 #[no_mangle]
 pub extern "C" fn rmdir(path: *const c_char) -> c_int {
-    platform::rmdir(path)
+    Sys::rmdir(path)
 }
 
 #[no_mangle]
 pub extern "C" fn setgid(gid: gid_t) -> c_int {
-    platform::setregid(gid, gid)
+    Sys::setregid(gid, gid)
 }
 
 #[no_mangle]
 pub extern "C" fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
-    platform::setpgid(pid, pgid)
+    Sys::setpgid(pid, pgid)
 }
 
 // #[no_mangle]
@@ -401,12 +402,12 @@ pub extern "C" fn setpgrp() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
-    platform::setregid(rgid, egid)
+    Sys::setregid(rgid, egid)
 }
 
 #[no_mangle]
 pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
-    platform::setreuid(ruid, euid)
+    Sys::setreuid(ruid, euid)
 }
 
 // #[no_mangle]
@@ -416,7 +417,7 @@ pub extern "C" fn setsid() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn setuid(uid: uid_t) -> c_int {
-    platform::setreuid(uid, uid)
+    Sys::setreuid(uid, uid)
 }
 
 #[no_mangle]
@@ -426,7 +427,7 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
         tv_nsec: 0,
     };
     let rmtp = ptr::null_mut();
-    platform::nanosleep(&rqtp, rmtp);
+    Sys::nanosleep(&rqtp, rmtp);
     0
 }
 
@@ -502,7 +503,7 @@ pub extern "C" fn ualarm(value: useconds_t, interval: useconds_t) -> useconds_t 
 
 #[no_mangle]
 pub extern "C" fn unlink(path: *const c_char) -> c_int {
-    platform::unlink(path)
+    Sys::unlink(path)
 }
 
 #[no_mangle]
@@ -512,7 +513,7 @@ pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
         tv_nsec: ((useconds % 1000) * 1000) as i64,
     };
     let rmtp = ptr::null_mut();
-    platform::nanosleep(&rqtp, rmtp)
+    Sys::nanosleep(&rqtp, rmtp)
 }
 
 // #[no_mangle]
@@ -525,7 +526,7 @@ pub extern "C" fn write(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssi
     use core::slice;
 
     let buf = unsafe { slice::from_raw_parts(buf as *const u8, nbyte as usize) };
-    platform::write(fildes, buf)
+    Sys::write(fildes, buf)
 }
 
 /*

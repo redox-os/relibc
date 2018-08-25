@@ -26,11 +26,11 @@ mod allocator;
 #[path = "allocator/ralloc.rs"]
 mod allocator;
 
-pub use pal::Pal;
+pub use pal::{Pal, PalSignal, PalSocket};
 
 mod pal;
 
-pub use sys::*;
+pub use sys::Sys;
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
 #[path = "linux/mod.rs"]
@@ -149,7 +149,7 @@ pub struct FileWriter(pub c_int);
 
 impl FileWriter {
     pub fn write(&mut self, buf: &[u8]) -> isize {
-        write(self.0, buf)
+        Sys::write(self.0, buf)
     }
 }
 
@@ -171,7 +171,7 @@ pub struct FileReader(pub c_int);
 
 impl FileReader {
     pub fn read(&mut self, buf: &mut [u8]) -> isize {
-        read(self.0, buf)
+        Sys::read(self.0, buf)
     }
 }
 

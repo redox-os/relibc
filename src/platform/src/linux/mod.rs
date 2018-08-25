@@ -1,10 +1,16 @@
 use core::{mem, ptr};
+use core::fmt::Write;
 
+use FileWriter;
 use Pal;
 use errno;
 use types::*;
 
+mod signal;
+mod socket;
+
 const EINVAL: c_int = 22;
+const ENOSYS: c_int = 38;
 
 const SIGCHLD: usize = 17;
 
@@ -31,16 +37,16 @@ fn e(sys: usize) -> usize {
 pub struct Sys;
 
 impl Pal for Sys {
-    unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
-        e(syscall!(ACCEPT, socket, address, address_len)) as c_int
+    fn no_pal(name: &str) -> c_int {
+        let _ = writeln!(FileWriter(2), "relibc: no_pal: {}", name);
+        unsafe {
+            errno = ENOSYS;
+        }
+        -1
     }
 
     fn access(path: *const c_char, mode: c_int) -> c_int {
         e(unsafe { syscall!(ACCESS, path, mode) }) as c_int
-    }
-
-    unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
-        e(syscall!(BIND, socket, address, address_len)) as c_int
     }
 
     fn brk(addr: *mut c_void) -> *mut c_void {
@@ -65,10 +71,6 @@ impl Pal for Sys {
 
     fn close(fildes: c_int) -> c_int {
         e(unsafe { syscall!(CLOSE, fildes) }) as c_int
-    }
-
-    unsafe fn connect(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
-        e(syscall!(CONNECT, socket, address, address_len)) as c_int
     }
 
     fn dup(fildes: c_int) -> c_int {
@@ -168,7 +170,7 @@ impl Pal for Sys {
         let mut len = len;
 
         let mut uts = mem::uninitialized();
-        let err = uname(&mut uts);
+        let err = Sys::uname(&mut uts);
         if err < 0 {
             mem::forget(uts);
             return err;
@@ -195,14 +197,6 @@ impl Pal for Sys {
         e(unsafe { syscall!(GETITIMER, which, out) }) as c_int
     }
 
-    unsafe fn getpeername(
-        socket: c_int,
-        address: *mut sockaddr,
-        address_len: *mut socklen_t,
-    ) -> c_int {
-        e(syscall!(GETPEERNAME, socket, address, address_len)) as c_int
-    }
-
     fn getpgid(pid: pid_t) -> pid_t {
         e(unsafe { syscall!(GETPGID, pid) }) as pid_t
     }
@@ -213,33 +207,6 @@ impl Pal for Sys {
 
     fn getppid() -> pid_t {
         e(unsafe { syscall!(GETPPID) }) as pid_t
-    }
-
-    unsafe fn getsockname(
-        socket: c_int,
-        address: *mut sockaddr,
-        address_len: *mut socklen_t,
-    ) -> c_int {
-        e(syscall!(GETSOCKNAME, socket, address, address_len)) as c_int
-    }
-
-    fn getsockopt(
-        socket: c_int,
-        level: c_int,
-        option_name: c_int,
-        option_value: *mut c_void,
-        option_len: *mut socklen_t,
-    ) -> c_int {
-        e(unsafe {
-            syscall!(
-                GETSOCKOPT,
-                socket,
-                level,
-                option_name,
-                option_value,
-                option_len
-            )
-        }) as c_int
     }
 
     fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
@@ -260,20 +227,8 @@ impl Pal for Sys {
         (Self::ioctl(fd, TIOCGWINSZ, &mut winsize as *mut _ as *mut c_void) == 0) as c_int
     }
 
-    fn kill(pid: pid_t, sig: c_int) -> c_int {
-        e(unsafe { syscall!(KILL, pid, sig) }) as c_int
-    }
-
-    fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-        e(unsafe { syscall!(KILL, -(pgrp as isize) as pid_t, sig) }) as c_int
-    }
-
     fn link(path1: *const c_char, path2: *const c_char) -> c_int {
         e(unsafe { syscall!(LINKAT, AT_FDCWD, path1, AT_FDCWD, path2, 0) }) as c_int
-    }
-
-    fn listen(socket: c_int, backlog: c_int) -> c_int {
-        e(unsafe { syscall!(LISTEN, socket, backlog) }) as c_int
     }
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
@@ -319,38 +274,8 @@ impl Pal for Sys {
         e(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), 0) }) as c_int
     }
 
-    fn raise(sig: c_int) -> c_int {
-        let tid = e(unsafe { syscall!(GETTID) }) as pid_t;
-        let ret = if tid == !0 {
-            -1
-        } else {
-            e(unsafe { syscall!(TKILL, tid, sig) }) as c_int
-        };
-
-        ret
-    }
-
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
         e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
-    }
-
-    unsafe fn recvfrom(
-        socket: c_int,
-        buf: *mut c_void,
-        len: size_t,
-        flags: c_int,
-        address: *mut sockaddr,
-        address_len: *mut socklen_t,
-    ) -> ssize_t {
-        e(syscall!(
-            RECVFROM,
-            socket,
-            buf,
-            len,
-            flags,
-            address,
-            address_len
-        )) as ssize_t
     }
 
     fn rename(old: *const c_char, new: *const c_char) -> c_int {
@@ -371,19 +296,6 @@ impl Pal for Sys {
         e(unsafe { syscall!(SELECT, nfds, readfds, writefds, exceptfds, timeout) }) as c_int
     }
 
-    unsafe fn sendto(
-        socket: c_int,
-        buf: *const c_void,
-        len: size_t,
-        flags: c_int,
-        dest_addr: *const sockaddr,
-        dest_len: socklen_t,
-    ) -> ssize_t {
-        e(syscall!(
-            SENDTO, socket, buf, len, flags, dest_addr, dest_len
-        )) as ssize_t
-    }
-
     fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
         e(unsafe { syscall!(SETITIMER, which, new, old) }) as c_int
     }
@@ -400,53 +312,8 @@ impl Pal for Sys {
         e(unsafe { syscall!(SETREUID, ruid, euid) }) as c_int
     }
 
-    fn setsockopt(
-        socket: c_int,
-        level: c_int,
-        option_name: c_int,
-        option_value: *const c_void,
-        option_len: socklen_t,
-    ) -> c_int {
-        e(unsafe {
-            syscall!(
-                SETSOCKOPT,
-                socket,
-                level,
-                option_name,
-                option_value,
-                option_len
-            )
-        }) as c_int
-    }
-
-    fn shutdown(socket: c_int, how: c_int) -> c_int {
-        e(unsafe { syscall!(SHUTDOWN, socket, how) }) as c_int
-    }
-
-    unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {
-        e(syscall!(
-            RT_SIGACTION,
-            sig,
-            act,
-            oact,
-            mem::size_of::<sigset_t>()
-        )) as c_int
-    }
-
-    fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
-        e(unsafe { syscall!(RT_SIGPROCMASK, how, set, oset, mem::size_of::<sigset_t>()) }) as c_int
-    }
-
     fn stat(file: *const c_char, buf: *mut stat) -> c_int {
         e(unsafe { syscall!(NEWFSTATAT, AT_FDCWD, file, buf, 0) }) as c_int
-    }
-
-    fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
-        e(unsafe { syscall!(SOCKET, domain, kind, protocol) }) as c_int
-    }
-
-    fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *mut c_int) -> c_int {
-        e(unsafe { syscall!(SOCKETPAIR, domain, kind, protocol, socket_vector) }) as c_int
     }
 
     fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {

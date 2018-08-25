@@ -2,13 +2,14 @@ use core::ptr;
 
 use errno::ENOMEM;
 use platform;
+use platform::{Pal, Sys};
 use platform::types::*;
 
 static mut BRK: *mut c_void = ptr::null_mut();
 
 #[no_mangle]
 pub unsafe extern "C" fn brk(addr: *mut c_void) -> c_int {
-    BRK = platform::brk(addr);
+    BRK = Sys::brk(addr);
 
     if BRK < addr {
         platform::errno = ENOMEM;
@@ -21,7 +22,7 @@ pub unsafe extern "C" fn brk(addr: *mut c_void) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
     if BRK == ptr::null_mut() {
-        BRK = platform::brk(ptr::null_mut());
+        BRK = Sys::brk(ptr::null_mut());
     }
 
     let old_brk = BRK;
@@ -29,7 +30,7 @@ pub unsafe extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
     if incr != 0 {
         let addr = old_brk.offset(incr);
 
-        BRK = platform::brk(addr);
+        BRK = Sys::brk(addr);
 
         if BRK < addr {
             platform::errno = ENOMEM;

@@ -17,6 +17,7 @@ pub mod sys;
 pub use sys::*;
 
 use core::{mem, ptr};
+use platform::{PalSignal, Sys};
 use platform::types::*;
 
 const SIG_ERR: usize = !0;
@@ -45,17 +46,17 @@ pub type sigset_t = c_ulong;
 
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
-    platform::kill(pid, sig)
+    Sys::kill(pid, sig)
 }
 
 #[no_mangle]
 pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-    platform::killpg(pgrp, sig)
+    Sys::killpg(pgrp, sig)
 }
 
 #[no_mangle]
 pub extern "C" fn raise(sig: c_int) -> c_int {
-    platform::raise(sig)
+    Sys::raise(sig)
 }
 
 #[no_mangle]
@@ -72,7 +73,7 @@ pub unsafe extern "C" fn sigaction(
     } else {
         ptr::null_mut()
     };
-    platform::sigaction(sig, ptr, oact as *mut platform::types::sigaction)
+    Sys::sigaction(sig, ptr, oact as *mut platform::types::sigaction)
 }
 
 #[no_mangle]
@@ -176,7 +177,7 @@ pub extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
-    platform::sigprocmask(how, set, oset)
+    Sys::sigprocmask(how, set, oset)
 }
 
 // #[no_mangle]

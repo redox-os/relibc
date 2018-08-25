@@ -1,18 +1,19 @@
-use super::{close, dup, open, types::*};
 use core::ops::Deref;
+
+use {Pal, Sys, types::*};
 
 pub struct RawFile(c_int);
 
 impl RawFile {
     pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> Result<RawFile, ()> {
-        match open(path, oflag, mode) {
+        match Sys::open(path, oflag, mode) {
             -1 => Err(()),
             n => Ok(RawFile(n)),
         }
     }
 
     pub fn dup(&self) -> Result<RawFile, ()> {
-        match dup(self.0) {
+        match Sys::dup(self.0) {
             -1 => Err(()),
             n => Ok(RawFile(n)),
         }
@@ -33,7 +34,7 @@ impl RawFile {
 
 impl Drop for RawFile {
     fn drop(&mut self) {
-        let _ = close(self.0);
+        let _ = Sys::close(self.0);
     }
 }
 

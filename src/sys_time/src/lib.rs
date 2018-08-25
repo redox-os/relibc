@@ -4,6 +4,7 @@
 
 extern crate platform;
 
+use platform::{Pal, Sys};
 use platform::types::*;
 
 pub const ITIMER_REAL: c_int = 0;
@@ -36,7 +37,7 @@ pub struct fd_set {
 
 #[no_mangle]
 pub extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
-    platform::getitimer(which, value as *mut platform::types::itimerval)
+    Sys::getitimer(which, value as *mut platform::types::itimerval)
 }
 
 #[no_mangle]
@@ -45,7 +46,7 @@ pub extern "C" fn setitimer(
     value: *const itimerval,
     ovalue: *mut itimerval,
 ) -> c_int {
-    platform::setitimer(
+    Sys::setitimer(
         which,
         value as *const platform::types::itimerval,
         ovalue as *mut platform::types::itimerval,
@@ -54,7 +55,7 @@ pub extern "C" fn setitimer(
 
 #[no_mangle]
 pub extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
-    platform::gettimeofday(
+    Sys::gettimeofday(
         tp as *mut platform::types::timeval,
         tzp as *mut platform::types::timezone,
     )
@@ -83,7 +84,7 @@ pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c
             tv_nsec: ((*times.offset(1)).tv_usec as i64) * 1000,
         },
     ];
-    platform::utimens(path, times_spec.as_ptr())
+    Sys::utimens(path, times_spec.as_ptr())
 }
 
 /*

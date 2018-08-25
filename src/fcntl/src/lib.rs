@@ -4,6 +4,7 @@
 
 extern crate platform;
 
+use platform::{Pal, Sys};
 use platform::types::*;
 
 pub use sys::*;
@@ -38,17 +39,10 @@ pub extern "C" fn creat(path: *const c_char, mode: mode_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn sys_fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
-    platform::fcntl(fildes, cmd, arg)
+    Sys::fcntl(fildes, cmd, arg)
 }
 
 #[no_mangle]
 pub extern "C" fn sys_open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
-    platform::open(path, oflag, mode)
+    Sys::open(path, oflag, mode)
 }
-
-/*
-#[no_mangle]
-pub extern "C" fn func(args) -> c_int {
-    unimplemented!();
-}
-*/

@@ -28,6 +28,9 @@ clean:
 	cargo clean
 	make -C tests clean
 
+check:
+	cargo check
+
 fmt:
 	./fmt.sh
 

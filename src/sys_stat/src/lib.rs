@@ -4,6 +4,7 @@
 
 extern crate platform;
 
+use platform::{Pal, Sys};
 use platform::types::*;
 
 pub const S_IFMT: c_int = 0o0170000;
@@ -59,17 +60,17 @@ pub struct stat {
 
 #[no_mangle]
 pub extern "C" fn chmod(path: *const c_char, mode: mode_t) -> c_int {
-    platform::chmod(path, mode)
+    Sys::chmod(path, mode)
 }
 
 #[no_mangle]
 pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
-    platform::fchmod(fildes, mode)
+    Sys::fchmod(fildes, mode)
 }
 
 #[no_mangle]
 pub extern "C" fn fstat(fildes: c_int, buf: *mut platform::types::stat) -> c_int {
-    platform::fstat(fildes, buf)
+    Sys::fstat(fildes, buf)
 }
 
 #[no_mangle]
@@ -79,22 +80,22 @@ pub extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut platform::types
 
 #[no_mangle]
 pub extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
-    platform::futimens(fd, times)
+    Sys::futimens(fd, times)
 }
 
 #[no_mangle]
 pub extern "C" fn lstat(path: *const c_char, buf: *mut platform::types::stat) -> c_int {
-    platform::lstat(path, buf)
+    Sys::lstat(path, buf)
 }
 
 #[no_mangle]
 pub extern "C" fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
-    platform::mkdir(path, mode)
+    Sys::mkdir(path, mode)
 }
 
 #[no_mangle]
 pub extern "C" fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
-    platform::mkfifo(path, mode)
+    Sys::mkfifo(path, mode)
 }
 
 // #[no_mangle]
@@ -104,12 +105,12 @@ pub extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int 
 
 #[no_mangle]
 pub extern "C" fn stat(file: *const c_char, buf: *mut platform::types::stat) -> c_int {
-    platform::stat(file, buf)
+    Sys::stat(file, buf)
 }
 
 #[no_mangle]
 pub extern "C" fn umask(mask: mode_t) -> mode_t {
-    platform::umask(mask)
+    Sys::umask(mask)
 }
 
 /*

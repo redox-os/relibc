@@ -4,6 +4,7 @@
 extern crate platform;
 
 use core::mem;
+use platform::{Pal, Sys};
 use platform::types::*;
 
 // fd_set is defined in C because cbindgen is incompatible with mem::size_of booo
@@ -16,5 +17,5 @@ pub extern "C" fn select(
     exceptfds: *mut fd_set,
     timeout: *mut timeval,
 ) -> c_int {
-    platform::select(nfds, readfds, writefds, exceptfds, timeout)
+    Sys::select(nfds, readfds, writefds, exceptfds, timeout)
 }

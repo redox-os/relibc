@@ -4,6 +4,7 @@
 
 extern crate platform;
 
+use platform::{Pal, Sys};
 use platform::types::*;
 
 #[repr(C)]
@@ -16,5 +17,5 @@ pub struct tms {
 
 //#[no_mangle]
 pub extern "C" fn times(out: *mut tms) -> clock_t {
-    platform::times(out as *mut platform::types::tms)
+    Sys::times(out as *mut platform::types::tms)
 }

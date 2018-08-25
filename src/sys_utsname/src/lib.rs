@@ -6,6 +6,7 @@
 mod inner {
     extern crate platform;
 
+    use self::platform::{Pal, Sys};
     use self::platform::types::*;
 
     const UTSLENGTH: usize = 65;
@@ -22,7 +23,7 @@ mod inner {
 
     #[no_mangle]
     pub unsafe extern "C" fn uname(uts: *mut utsname) -> c_int {
-        platform::uname(uts as *mut platform::types::utsname)
+        Sys::uname(uts as *mut platform::types::utsname)
     }
 }
 #[cfg(target_os = "linux")]

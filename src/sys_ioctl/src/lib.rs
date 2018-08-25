@@ -4,6 +4,7 @@
 
 extern crate platform;
 
+use platform::{Pal, Sys};
 use platform::types::*;
 
 // This is used from sgtty
@@ -31,7 +32,7 @@ pub mod inner {
     #[no_mangle]
     pub extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
         // TODO: Somehow support varargs to syscall??
-        platform::ioctl(fd, request, out)
+        Sys::ioctl(fd, request, out)
     }
 
     pub const TCGETS: c_ulong = 0x5401;

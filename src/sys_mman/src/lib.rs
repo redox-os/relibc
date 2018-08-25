@@ -2,6 +2,7 @@
 
 extern crate platform;
 
+use platform::{Pal, Sys};
 use platform::types::*;
 
 pub use sys::*;
@@ -33,7 +34,7 @@ pub unsafe extern "C" fn mmap(
     fildes: c_int,
     off: off_t,
 ) -> *mut c_void {
-    platform::mmap(addr, len, prot, flags, fildes, off)
+    Sys::mmap(addr, len, prot, flags, fildes, off)
 }
 
 // #[no_mangle]
@@ -58,7 +59,7 @@ pub extern "C" fn munlockall() -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn munmap(addr: *mut c_void, len: usize) -> c_int {
-    platform::munmap(addr, len)
+    Sys::munmap(addr, len)
 }
 
 // #[no_mangle]
