@@ -45,7 +45,7 @@ pub trait Pal {
         Self::no_pal("dup2")
     }
 
-    fn execve(path: *const c_char, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
+    unsafe fn execve(path: *const c_char, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
         Self::no_pal("execve")
     }
 
