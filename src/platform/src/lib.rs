@@ -26,6 +26,10 @@ mod allocator;
 #[path = "allocator/ralloc.rs"]
 mod allocator;
 
+pub use pal::Pal;
+
+mod pal;
+
 pub use sys::*;
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
