@@ -12,6 +12,9 @@ use syscall::{self, Result};
 use {c_str, errno, FileReader, FileWriter, Pal, RawFile, Read};
 use types::*;
 
+mod signal;
+mod socket;
+
 const EINVAL: c_int = 22;
 const ENOSYS: c_int = 38;
 const MAP_ANON: c_int = 1;
