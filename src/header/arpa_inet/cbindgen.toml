@@ -1,0 +1,7 @@
+sys_includes = ["stddef.h", "sys/socket.h", "netinet/in.h"]
+include_guard = "_ARPA_INET_H"
+language = "C"
+style = "Tag"
+
+[enum]
+prefix_with_name = true

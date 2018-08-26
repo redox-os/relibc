@@ -45,6 +45,11 @@ install: all
 	cp -rv "openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 
+header:
+	mkdir -p header
+	./header.sh
+	touch header
+
 libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o
 
 libm: $(BUILD)/openlibm/libopenlibm.a

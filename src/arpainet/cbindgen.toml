@@ -1,7 +1,0 @@
-sys_includes = ["stddef.h", "sys/socket.h", "netinet/in.h"]
-include_guard = "_ARPAINET_H"
-language = "C"
-style = "Tag"
-
-[enum]
-prefix_with_name = true

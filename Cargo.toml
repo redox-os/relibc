@@ -8,55 +8,32 @@ name = "c"
 crate-type = ["staticlib"]
 
 [workspace]
-members = ["src/crt0"]
+members = ["src/crt0", "cbindgen"]
 
 [build-dependencies]
 cc = "1.0.17"
 
 [dependencies]
-arpainet = { path = "src/arpainet" }
-ctype = { path = "src/ctype" }
-dirent = { path = "src/dirent" }
-errno = { path = "src/errno" }
-fcntl = { path = "src/fcntl" }
-fenv = { path = "src/fenv" }
-float = { path = "src/float" }
-fnmatch = { path = "src/fnmatch" }
-grp = { path = "src/grp" }
-inttypes = { path = "src/inttypes" }
-locale = { path = "src/locale" }
-netinet = { path = "src/netinet" }
-platform = { path = "src/platform" }
-pwd = { path = "src/pwd" }
-semaphore = { path = "src/semaphore" }
-setjmp = { path = "src/setjmp" }
-signal = { path = "src/signal" }
-stdio = { path = "src/stdio" }
-stdlib = { path = "src/stdlib" }
-string = { path = "src/string" }
-strings = { path = "src/strings" }
-sys_ioctl = { path = "src/sys_ioctl" }
-sys_mman = { path = "src/sys_mman" }
-sys_resource = { path = "src/sys_resource" }
-sys_select = { path = "src/sys_select" }
-sys_socket = { path = "src/sys_socket" }
-sys_stat = { path = "src/sys_stat" }
-sys_time = { path = "src/sys_time" }
-sys_times = { path = "src/sys_times" }
-sys_un = { path = "src/sys_un" }
-sys_utsname = { path = "src/sys_utsname" }
-sys_wait = { path = "src/sys_wait" }
-termios = { path = "src/termios" }
-time = { path = "src/time" }
-unistd = { path = "src/unistd" }
-utime = { path = "src/utime" }
-wchar = { path = "src/wchar" }
-wctype = { path = "src/wctype" }
+lazy_static = { version = "*", features = ["nightly", "spin_no_std"] }
+rand = { version = "0.5.2", default-features = false }
+va_list = { path = "va_list", features = ["no_std"] }
 
 [dependencies.compiler_builtins]
 git = "https://github.com/rust-lang-nursery/compiler-builtins.git"
 default-features = false
 features = ["no-lang-items", "mangled-names"]
+
+[dependencies.ralloc]
+path = "ralloc"
+default-features = false
+optional = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+sc = "0.2"
+
+[target.'cfg(target_os = "redox")'.dependencies]
+redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall.git", branch = "relibc" }
+spin = "0.4"
 
 [profile.dev]
 panic = "abort"

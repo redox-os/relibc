@@ -9,8 +9,10 @@
 #![feature(lang_items)]
 
 extern crate alloc;
-extern crate platform;
-extern crate stdio;
+extern crate relibc;
+
+use relibc::platform;
+use relibc::header::stdio;
 
 use alloc::Vec;
 use core::ptr;
