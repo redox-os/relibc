@@ -24,4 +24,4 @@ mod inner {
     }
 }
 #[cfg(target_os = "linux")]
-pub use inner::*;
+pub use self::inner::*;

@@ -1,6 +1,6 @@
 use core::alloc::{GlobalAlloc, Layout};
 
-use types::*;
+use super::types::*;
 
 extern "C" {
     fn dlmalloc(bytes: size_t) -> *mut c_void;

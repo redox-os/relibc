@@ -4,6 +4,7 @@ use alloc::boxed::Box;
 use core::{mem, ptr};
 
 use header::{errno, fcntl, stdio, unistd};
+use platform;
 use platform::{Pal, Sys};
 use platform::types::*;
 

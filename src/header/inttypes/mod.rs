@@ -1,5 +1,6 @@
 use header::{ctype, stdlib};
 use header::errno::*;
+use header::stdlib::*;
 use platform;
 use platform::types::*;
 
@@ -29,7 +30,6 @@ pub unsafe extern "C" fn strtoimax(
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> intmax_t {
-    use stdlib::*;
     strto_impl!(
         intmax_t,
         false,
@@ -47,7 +47,6 @@ pub unsafe extern "C" fn strtoumax(
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> uintmax_t {
-    use stdlib::*;
     strto_impl!(
         uintmax_t,
         false,

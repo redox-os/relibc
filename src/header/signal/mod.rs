@@ -1,5 +1,14 @@
 //! signal implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/signal.h.html
 
+use core::{mem, ptr};
+
+use header::errno;
+use platform;
+use platform::{PalSignal, Sys};
+use platform::types::*;
+
+pub use self::sys::*;
+
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
 pub mod sys;
@@ -7,15 +16,6 @@ pub mod sys;
 #[cfg(target_os = "redox")]
 #[path = "redox.rs"]
 pub mod sys;
-
-pub use sys::*;
-
-use core::{mem, ptr};
-
-use header::errno;
-use platform;
-use platform::{PalSignal, Sys};
-use platform::types::*;
 
 const SIG_ERR: usize = !0;
 

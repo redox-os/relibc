@@ -1,7 +1,9 @@
 use alloc::string::String;
-use platform::types::*;
+
 use platform::{self, Write};
-use tm;
+use platform::types::*;
+
+use super::tm;
 
 pub unsafe fn strftime<W: Write>(
     w: &mut W,
@@ -115,7 +117,7 @@ pub unsafe fn strftime<W: Write>(
                 b'r' => w!(recurse "%I:%M:%S %p"),
                 b'R' => w!(recurse "%H:%M"),
                 // Nothing is modified in mktime, but the C standard of course requires a mutable pointer ._.
-                b's' => w!("{}", ::mktime(t as *mut tm)),
+                b's' => w!("{}", super::mktime(t as *mut tm)),
                 b'S' => w!("{:02}", (*t).tm_sec),
                 b'T' => w!(recurse "%H:%M:%S"),
                 b'u' => w!("{}", ((*t).tm_wday + 7 - 1) % 7 + 1),

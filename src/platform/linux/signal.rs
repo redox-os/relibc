@@ -1,8 +1,8 @@
 use core::mem;
 
 use super::{e, Sys};
-use PalSignal;
-use types::*;
+use super::super::PalSignal;
+use super::super::types::*;
 
 impl PalSignal for Sys {
     fn kill(pid: pid_t, sig: c_int) -> c_int {

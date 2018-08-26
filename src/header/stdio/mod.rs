@@ -17,11 +17,11 @@ use platform::{c_str, errno, Read, Write};
 mod printf;
 mod scanf;
 
+pub use self::default::*;
 mod default;
-pub use default::*;
 
+pub use self::constants::*;
 mod constants;
-pub use constants::*;
 
 mod helpers;
 

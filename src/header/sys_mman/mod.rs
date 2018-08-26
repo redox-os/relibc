@@ -2,7 +2,7 @@ use platform;
 use platform::{Pal, Sys};
 use platform::types::*;
 
-pub use sys::*;
+pub use self::sys::*;
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]

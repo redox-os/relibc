@@ -1,5 +1,6 @@
-use constants::*;
 use platform::types::*;
+
+use super::constants::*;
 
 // compute year, month, day & day of year
 // for description of this algorithm see

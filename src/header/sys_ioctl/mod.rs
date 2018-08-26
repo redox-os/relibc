@@ -16,7 +16,7 @@ pub struct sgttyb {
 
 #[cfg(target_os = "linux")]
 pub mod inner {
-    use *;
+    use super::*;
 
     #[repr(C)]
     pub struct winsize {
@@ -222,4 +222,4 @@ pub mod inner {
 }
 
 #[cfg(target_os = "linux")]
-pub use inner::*;
+pub use self::inner::*;

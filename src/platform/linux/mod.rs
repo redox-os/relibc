@@ -1,8 +1,8 @@
 use core::{mem, ptr};
 use core::fmt::Write;
 
-use {errno, FileWriter, Pal};
-use types::*;
+use super::{errno, FileWriter, Pal};
+use super::types::*;
 
 mod signal;
 mod socket;
@@ -107,7 +107,7 @@ impl Pal for Sys {
     }
 
     fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
-        let empty_cstr: *const c_char = unsafe { ::cstr_from_bytes_with_nul_unchecked(b"\0") };
+        let empty_cstr: *const c_char = unsafe { super::cstr_from_bytes_with_nul_unchecked(b"\0") };
         e(unsafe { syscall!(NEWFSTATAT, fildes, empty_cstr, buf, AT_EMPTY_PATH) }) as c_int
     }
 

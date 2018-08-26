@@ -3,8 +3,8 @@ use syscall::{self, Result};
 use syscall::flag::*;
 
 use super::{e, Sys};
-use {errno, Pal, PalSocket};
-use types::*;
+use super::super::{errno, Pal, PalSocket};
+use super::super::types::*;
 
 macro_rules! bind_or_connect {
     (bind $path:expr) => {

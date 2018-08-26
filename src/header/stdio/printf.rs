@@ -3,7 +3,7 @@ use core::{slice, str};
 
 use platform::types::*;
 use platform::{self, Write};
-use vl::VaList;
+use va_list::VaList;
 
 pub unsafe fn printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) -> c_int {
     let mut w = platform::CountingWriter::new(w);

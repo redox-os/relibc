@@ -1,6 +1,6 @@
 use core::ptr;
 
-use errno::ENOMEM;
+use header::errno::ENOMEM;
 use platform;
 use platform::{Pal, Sys};
 use platform::types::*;

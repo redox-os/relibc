@@ -1,5 +1,5 @@
-use Pal;
-use types::*;
+use super::super::Pal;
+use super::super::types::*;
 
 pub trait PalSignal: Pal {
     fn kill(pid: pid_t, sig: c_int) -> c_int {

@@ -1,15 +1,17 @@
-use super::constants::*;
-use super::{BUFSIZ, FILE, UNGET};
 use core::mem;
 use core::sync::atomic::AtomicBool;
-use errno;
-use fcntl::*;
+
+use header::errno;
+use header::fcntl::*;
+use header::string::strchr;
 use platform;
 use platform::types::*;
 
+use super::constants::*;
+use super::{BUFSIZ, FILE, UNGET};
+
 /// Parse mode flags as a string and output a mode flags integer
 pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
-    use string::strchr;
     let mut flags = if !strchr(mode_str, b'+' as i32).is_null() {
         O_RDWR
     } else if (*mode_str) == b'r' as i8 {
@@ -38,7 +40,6 @@ pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
 
 /// Open a file with the file descriptor `fd` in the mode `mode`
 pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
-    use string::strchr;
     if *mode != b'r' as i8 && *mode != b'w' as i8 && *mode != b'a' as i8 {
         platform::errno = errno::EINVAL;
         return None;

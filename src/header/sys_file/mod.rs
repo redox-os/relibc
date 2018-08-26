@@ -1,6 +1,6 @@
 //! sys/file.h implementation
 
-use platform;
+use platform::{Pal, Sys};
 use platform::types::*;
 
 pub const LOCK_SH: usize = 1;
@@ -14,5 +14,5 @@ pub const L_XTND: usize = 2;
 
 #[no_mangle]
 pub extern "C" fn flock(fd: c_int, operation: c_int) -> c_int {
-    platform::flock(fd, operation)
+    Sys::flock(fd, operation)
 }

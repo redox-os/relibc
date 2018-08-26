@@ -1,6 +1,6 @@
 use super::{e, Sys};
-use PalSocket;
-use types::*;
+use super::super::PalSocket;
+use super::super::types::*;
 
 impl PalSocket for Sys {
     unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {

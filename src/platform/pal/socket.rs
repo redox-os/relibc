@@ -1,5 +1,5 @@
-use Pal;
-use types::*;
+use super::super::Pal;
+use super::super::types::*;
 
 pub trait PalSocket: Pal {
     unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {

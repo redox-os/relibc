@@ -7,7 +7,7 @@ use header::errno;
 use platform;
 use platform::types::*;
 
-use mbstate_t;
+use super::mbstate_t;
 
 //It's guaranteed that we don't have any nullpointers here
 pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, ps: *mut mbstate_t) -> usize {

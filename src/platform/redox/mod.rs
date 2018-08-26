@@ -9,8 +9,8 @@ use syscall::data::TimeSpec as redox_timespec;
 use syscall::flag::*;
 use syscall::{self, Result};
 
-use {c_str, errno, FileReader, FileWriter, Pal, RawFile, Read};
-use types::*;
+use super::{c_str, errno, FileReader, FileWriter, Pal, RawFile, Read};
+use super::types::*;
 
 mod signal;
 mod socket;

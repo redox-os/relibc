@@ -6,8 +6,8 @@ use platform;
 use platform::{PalSocket, Sys};
 use platform::types::*;
 
+use self::constants::*;
 mod constants;
-use constants::*;
 
 pub type in_addr_t = [u8; 4];
 pub type in_port_t = u16;

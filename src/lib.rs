@@ -2,11 +2,15 @@
 #![allow(non_camel_case_types)]
 #![feature(alloc)]
 #![feature(allocator_api)]
+#![feature(const_fn)]
 #![feature(const_vec_new)]
+#![feature(core_intrinsics)]
+#![feature(extern_prelude)]
 #![feature(global_asm)]
 #![feature(lang_items)]
 #![feature(linkage)]
 #![feature(panic_implementation)]
+#![feature(str_internals)]
 #![feature(thread_local)]
 
 #[macro_use]
@@ -26,10 +30,15 @@ extern crate syscall;
 #[cfg(target_os = "redox")]
 extern crate spin;
 
+#[macro_use]
+mod macros;
 pub mod header;
 pub mod platform;
 
-use platform::{Pal, Sys};
+use platform::{Allocator, Pal, Sys};
+
+#[global_allocator]
+static ALLOCATOR: Allocator = Allocator;
 
 #[cfg(not(test))]
 #[panic_implementation]

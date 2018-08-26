@@ -1,6 +1,6 @@
 use core::ops::Deref;
 
-use {Pal, Sys, types::*};
+use super::{Pal, Sys, types::*};
 
 pub struct RawFile(c_int);
 

@@ -1,4 +1,7 @@
-pub use allocator::*;
+use alloc::vec::Vec;
+use core::{fmt, ptr};
+
+pub use self::allocator::*;
 
 #[cfg(not(feature = "ralloc"))]
 #[path = "allocator/dlmalloc.rs"]
@@ -8,11 +11,11 @@ mod allocator;
 #[path = "allocator/ralloc.rs"]
 mod allocator;
 
-pub use pal::{Pal, PalSignal, PalSocket};
+pub use self::pal::{Pal, PalSignal, PalSocket};
 
 mod pal;
 
-pub use sys::Sys;
+pub use self::sys::Sys;
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
 #[path = "linux/mod.rs"]
@@ -22,18 +25,12 @@ mod sys;
 #[path = "redox/mod.rs"]
 mod sys;
 
+pub use self::rawfile::RawFile;
+
 pub mod rawfile;
+
+use self::types::*;
 pub mod types;
-
-pub use rawfile::RawFile;
-
-use alloc::vec::Vec;
-use core::{fmt, ptr};
-
-use types::*;
-
-#[global_allocator]
-static ALLOCATOR: Allocator = Allocator;
 
 //TODO #[thread_local]
 #[allow(non_upper_case_globals)]

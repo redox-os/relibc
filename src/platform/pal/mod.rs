@@ -1,6 +1,6 @@
 use core::ptr;
 
-use types::*;
+use super::types::*;
 
 pub use self::signal::PalSignal;
 mod signal;

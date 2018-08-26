@@ -7,9 +7,9 @@ use platform;
 use platform::{Pal, Sys};
 use platform::types::*;
 
-pub use brk::*;
-pub use getopt::*;
-pub use pathconf::*;
+pub use self::brk::*;
+pub use self::getopt::*;
+pub use self::pathconf::*;
 
 mod brk;
 mod getopt;

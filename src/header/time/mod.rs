@@ -8,8 +8,8 @@ use platform;
 use platform::{Pal, Sys};
 use platform::types::*;
 
-use constants::*;
-use helpers::*;
+use self::constants::*;
+use self::helpers::*;
 
 pub mod constants;
 mod helpers;

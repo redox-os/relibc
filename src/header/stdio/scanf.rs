@@ -2,7 +2,7 @@ use alloc::String;
 use alloc::Vec;
 use platform::types::*;
 use platform::Read;
-use vl::VaList;
+use va_list::VaList;
 
 #[derive(PartialEq, Eq)]
 enum IntKind {
