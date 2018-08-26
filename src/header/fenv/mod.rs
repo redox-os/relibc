@@ -1,7 +1,6 @@
 //! fenv.h implementation for Redox, following
 //! http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/fenv.h.html
 
-use platform;
 use platform::types::*;
 
 pub const FE_ALL_EXCEPT: c_int = 0;

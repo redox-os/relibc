@@ -2,7 +2,6 @@
 
 use alloc::vec::Vec;
 
-use platform;
 use platform::types::*;
 
 pub const FNM_NOMATCH: c_int = 1;

@@ -1,6 +1,5 @@
 //! string implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/string.h.html
 
-use core::cmp;
 use core::mem;
 use core::ptr;
 use core::usize;

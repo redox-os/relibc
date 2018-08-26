@@ -3,7 +3,6 @@
 use core::ptr;
 use va_list::VaList as va_list;
 
-use header::errno;
 use header::stdio::*;
 use header::time::*;
 use platform;

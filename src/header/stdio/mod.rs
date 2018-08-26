@@ -8,7 +8,7 @@ use core::{ptr, str};
 use va_list::VaList as va_list;
 
 use header::errno::{self, STR_ERROR};
-use header::{fcntl, string};
+use header::fcntl;
 use platform;
 use platform::{Pal, Sys};
 use platform::types::*;

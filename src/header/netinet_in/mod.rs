@@ -1,7 +1,6 @@
 #![allow(non_camel_case_types)]
 
-use header::sys_socket::{self, sa_family_t, sockaddr};
-use platform;
+use header::sys_socket::sa_family_t;
 use platform::types::*;
 
 pub type in_addr_t = u32;

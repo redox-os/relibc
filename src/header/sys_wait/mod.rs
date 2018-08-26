@@ -2,7 +2,6 @@
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/syswait.h.html
 
 use header::sys_resource::rusage;
-use platform;
 use platform::{Pal, Sys};
 use platform::types::*;
 

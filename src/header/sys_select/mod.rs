@@ -1,8 +1,5 @@
 //! sys/select.h implementation
 
-use core::mem;
-
-use platform;
 use platform::{Pal, Sys};
 use platform::types::*;
 

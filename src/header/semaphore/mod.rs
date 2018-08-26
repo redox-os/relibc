@@ -1,4 +1,3 @@
-use platform;
 use platform::types::*;
 
 #[repr(C)]

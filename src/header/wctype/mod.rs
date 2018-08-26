@@ -1,6 +1,5 @@
 //! wctype implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/wctype.h.html
 
-use platform;
 use platform::types::*;
 
 // #[no_mangle]

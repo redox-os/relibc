@@ -1,11 +1,10 @@
 //! arpa/inet implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/arpainet.h.html
 
 use core::str::FromStr;
-use core::{mem, ptr, slice, str};
+use core::{ptr, slice, str};
 
 use header::errno::*;
 use header::netinet_in::in_addr;
-use header::sys_socket;
 use platform;
 use platform::c_str;
 use platform::types::*;

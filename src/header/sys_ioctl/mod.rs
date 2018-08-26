@@ -1,6 +1,5 @@
 //! ioctl implementation for linux
 
-use platform;
 use platform::{Pal, Sys};
 use platform::types::*;
 

@@ -1,12 +1,12 @@
 //! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 
-use core::{intrinsics, iter, mem, ptr, slice, str};
+use core::{intrinsics, iter, mem, ptr};
 use rand::distributions::Alphanumeric;
 use rand::prng::XorShiftRng;
 use rand::rngs::JitterRng;
 use rand::{Rng, SeedableRng};
 
-use header::{ctype, errno, time, unistd, wchar};
+use header::{ctype, errno, unistd};
 use header::errno::*;
 use header::fcntl::*;
 use header::string::*;

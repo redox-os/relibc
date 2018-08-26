@@ -1,4 +1,4 @@
-use header::{ctype, stdlib};
+use header::ctype;
 use header::errno::*;
 use header::stdlib::*;
 use platform;

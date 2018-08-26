@@ -2,7 +2,6 @@
 
 use core::mem::transmute;
 
-use header::errno;
 use header::errno::EIO;
 use platform;
 use platform::{Pal, Sys};

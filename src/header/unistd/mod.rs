@@ -2,7 +2,7 @@
 
 use core::{ptr, slice};
 
-use header::{errno, stdio, string, sys_time};
+use header::sys_time;
 use platform;
 use platform::{Pal, Sys};
 use platform::types::*;

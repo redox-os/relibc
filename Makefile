@@ -45,18 +45,12 @@ install: all
 	cp -rv "openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 
-libc: $(BUILD)/include $(BUILD)/release/libc.a $(BUILD)/release/crt0.o
+libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o $(BUILD)/include
 
 libm: $(BUILD)/openlibm/libopenlibm.a
 
 test: all
 	make -C tests run
-
-$(BUILD)/include: $(SRC)
-	rm -rf $@ $@.partial
-	mkdir -p $@.partial
-	./include.sh $@.partial
-	mv $@.partial $@
 
 $(BUILD)/debug/libc.a: $(SRC)
 	cargo build $(CARGOFLAGS)
@@ -73,6 +67,12 @@ $(BUILD)/release/libc.a: $(SRC)
 $(BUILD)/release/crt0.o: $(SRC)
 	CARGO_INCREMENTAL=0 cargo rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 	touch $@
+
+$(BUILD)/include: $(SRC)
+	rm -rf $@ $@.partial
+	mkdir -p $@.partial
+	./include.sh $@.partial
+	mv $@.partial $@
 
 $(BUILD)/openlibm: openlibm
 	rm -rf $@ $@.partial

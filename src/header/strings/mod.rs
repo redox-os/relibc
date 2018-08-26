@@ -3,7 +3,6 @@
 use alloc::Vec;
 use core::ptr;
 
-use platform;
 use platform::types::*;
 
 #[no_mangle]
