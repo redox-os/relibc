@@ -2,7 +2,7 @@
 
 set -ex
 
-header="$(realpath header)"
+include="$(realpath "$1")"
 cbindgen="$(realpath cbindgen)"
 
 for config in src/header/*/cbindgen.toml
@@ -11,6 +11,6 @@ do
     name="$(basename "$dir")"
     pushd "$dir"
     cargo run --release --manifest-path "$cbindgen/Cargo.toml" -- \
-        -c cbindgen.toml -o "$header/$name.h" mod.rs
+        -c cbindgen.toml -o "$include/$name.h" mod.rs
     popd
 done

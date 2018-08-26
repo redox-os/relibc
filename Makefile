@@ -20,7 +20,7 @@ SRC=\
 	src/*/*/* \
 	src/*/*/*/*
 
-.PHONY: all clean fmt install libc libm test
+.PHONY: all clean fmt include install libc libm test
 
 all: | libc libm
 
@@ -45,17 +45,18 @@ install: all
 	cp -rv "openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 
-header:
-	mkdir -p header
-	./header.sh
-	touch header
-
-libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o
+libc: $(BUILD)/include $(BUILD)/release/libc.a $(BUILD)/release/crt0.o
 
 libm: $(BUILD)/openlibm/libopenlibm.a
 
 test: all
 	make -C tests run
+
+$(BUILD)/include: $(SRC)
+	rm -rf $@ $@.partial
+	mkdir -p $@.partial
+	./include.sh $@.partial
+	mv $@.partial $@
 
 $(BUILD)/debug/libc.a: $(SRC)
 	cargo build $(CARGOFLAGS)
@@ -80,5 +81,5 @@ $(BUILD)/openlibm: openlibm
 	mv $@.partial $@
 	touch $@
 
-$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm
+$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/include
 	make CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/target/include" -C $< libopenlibm.a
