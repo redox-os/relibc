@@ -12,6 +12,7 @@ pub mod locale;
 pub mod netinet_in;
 pub mod pwd;
 pub mod semaphore;
+pub mod setjmp;
 pub mod sgtty;
 pub mod signal;
 pub mod stdio;

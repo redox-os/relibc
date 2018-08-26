@@ -34,6 +34,7 @@ extern crate spin;
 mod macros;
 pub mod header;
 pub mod platform;
+pub mod start;
 
 use platform::{Allocator, Pal, Sys};
 
