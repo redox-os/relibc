@@ -1,5 +1,6 @@
 //! stat implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysstat.h.html
 
+use c_str::CStr;
 use header::fcntl::{O_NOFOLLOW, O_PATH};
 use platform;
 use platform::types::*;
@@ -58,6 +59,7 @@ pub struct stat {
 
 #[no_mangle]
 pub extern "C" fn chmod(path: *const c_char, mode: mode_t) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
     Sys::chmod(path, mode)
 }
 
@@ -83,6 +85,7 @@ pub extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn lstat(path: *const c_char, buf: *mut platform::types::stat) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
     let fd = Sys::open(path, O_PATH | O_NOFOLLOW, 0);
     if fd < 0 {
         return -1;
@@ -97,11 +100,13 @@ pub extern "C" fn lstat(path: *const c_char, buf: *mut platform::types::stat) ->
 
 #[no_mangle]
 pub extern "C" fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
     Sys::mkdir(path, mode)
 }
 
 #[no_mangle]
 pub extern "C" fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
     Sys::mkfifo(path, mode)
 }
 
@@ -112,6 +117,7 @@ pub extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int 
 
 #[no_mangle]
 pub extern "C" fn stat(file: *const c_char, buf: *mut platform::types::stat) -> c_int {
+    let file = unsafe { CStr::from_ptr(file) };
     let fd = Sys::open(file, O_PATH, 0);
     if fd < 0 {
         return -1;
@@ -128,10 +134,3 @@ pub extern "C" fn stat(file: *const c_char, buf: *mut platform::types::stat) -> 
 pub extern "C" fn umask(mask: mode_t) -> mode_t {
     Sys::umask(mask)
 }
-
-/*
-#[no_mangle]
-pub extern "C" fn func(args) -> c_int {
-    unimplemented!();
-}
-*/

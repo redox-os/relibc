@@ -1,6 +1,7 @@
 use core::fmt::Write;
 use core::{mem, ptr};
 
+use c_str::CStr;
 use super::types::*;
 use super::{errno, FileWriter, Pal};
 
@@ -42,24 +43,24 @@ impl Pal for Sys {
         -1
     }
 
-    fn access(path: *const c_char, mode: c_int) -> c_int {
-        e(unsafe { syscall!(ACCESS, path, mode) }) as c_int
+    fn access(path: &CStr, mode: c_int) -> c_int {
+        e(unsafe { syscall!(ACCESS, path.as_ptr(), mode) }) as c_int
     }
 
     fn brk(addr: *mut c_void) -> *mut c_void {
         unsafe { syscall!(BRK, addr) as *mut c_void }
     }
 
-    fn chdir(path: *const c_char) -> c_int {
-        e(unsafe { syscall!(CHDIR, path) }) as c_int
+    fn chdir(path: &CStr) -> c_int {
+        e(unsafe { syscall!(CHDIR, path.as_ptr()) }) as c_int
     }
 
-    fn chmod(path: *const c_char, mode: mode_t) -> c_int {
-        e(unsafe { syscall!(FCHMODAT, AT_FDCWD, path, mode, 0) }) as c_int
+    fn chmod(path: &CStr, mode: mode_t) -> c_int {
+        e(unsafe { syscall!(FCHMODAT, AT_FDCWD, path.as_ptr(), mode, 0) }) as c_int
     }
 
-    fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
-        e(unsafe { syscall!(FCHOWNAT, AT_FDCWD, path, owner as u32, group as u32) }) as c_int
+    fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
+        e(unsafe { syscall!(FCHOWNAT, AT_FDCWD, path.as_ptr(), owner as u32, group as u32) }) as c_int
     }
 
     fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int {
@@ -79,11 +80,11 @@ impl Pal for Sys {
     }
 
     unsafe fn execve(
-        path: *const c_char,
+        path: &CStr,
         argv: *const *mut c_char,
         envp: *const *mut c_char,
     ) -> c_int {
-        e(syscall!(EXECVE, path, argv, envp)) as c_int
+        e(syscall!(EXECVE, path.as_ptr(), argv, envp)) as c_int
     }
 
     fn exit(status: c_int) -> ! {
@@ -134,8 +135,8 @@ impl Pal for Sys {
         e(unsafe { syscall!(UTIMENSAT, fd, ptr::null::<c_char>(), times, 0) }) as c_int
     }
 
-    fn utimens(path: *const c_char, times: *const timespec) -> c_int {
-        e(unsafe { syscall!(UTIMENSAT, AT_FDCWD, path, times, 0) }) as c_int
+    fn utimens(path: &CStr, times: *const timespec) -> c_int {
+        e(unsafe { syscall!(UTIMENSAT, AT_FDCWD, path.as_ptr(), times, 0) }) as c_int
     }
 
     fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
@@ -228,20 +229,20 @@ impl Pal for Sys {
         (Self::ioctl(fd, TIOCGWINSZ, &mut winsize as *mut _ as *mut c_void) == 0) as c_int
     }
 
-    fn link(path1: *const c_char, path2: *const c_char) -> c_int {
-        e(unsafe { syscall!(LINKAT, AT_FDCWD, path1, AT_FDCWD, path2, 0) }) as c_int
+    fn link(path1: &CStr, path2: &CStr) -> c_int {
+        e(unsafe { syscall!(LINKAT, AT_FDCWD, path1.as_ptr(), AT_FDCWD, path2.as_ptr(), 0) }) as c_int
     }
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
         e(unsafe { syscall!(LSEEK, fildes, offset, whence) }) as off_t
     }
 
-    fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
-        e(unsafe { syscall!(MKDIRAT, AT_FDCWD, path, mode) }) as c_int
+    fn mkdir(path: &CStr, mode: mode_t) -> c_int {
+        e(unsafe { syscall!(MKDIRAT, AT_FDCWD, path.as_ptr(), mode) }) as c_int
     }
 
-    fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
-        e(unsafe { syscall!(MKNODAT, AT_FDCWD, path, mode, 0) }) as c_int
+    fn mkfifo(path: &CStr, mode: mode_t) -> c_int {
+        e(unsafe { syscall!(MKNODAT, AT_FDCWD, path.as_ptr(), mode, 0) }) as c_int
     }
 
     unsafe fn mmap(
@@ -263,8 +264,8 @@ impl Pal for Sys {
         e(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }) as c_int
     }
 
-    fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
-        e(unsafe { syscall!(OPENAT, AT_FDCWD, path, oflag, mode) }) as c_int
+    fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
+        e(unsafe { syscall!(OPENAT, AT_FDCWD, path.as_ptr(), oflag, mode) }) as c_int
     }
 
     fn pipe(fildes: &mut [c_int]) -> c_int {
@@ -275,12 +276,12 @@ impl Pal for Sys {
         e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
     }
 
-    fn rename(old: *const c_char, new: *const c_char) -> c_int {
-        e(unsafe { syscall!(RENAMEAT, AT_FDCWD, old, AT_FDCWD, new) }) as c_int
+    fn rename(old: &CStr, new: &CStr) -> c_int {
+        e(unsafe { syscall!(RENAMEAT, AT_FDCWD, old.as_ptr(), AT_FDCWD, new.as_ptr()) }) as c_int
     }
 
-    fn rmdir(path: *const c_char) -> c_int {
-        e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, AT_REMOVEDIR) }) as c_int
+    fn rmdir(path: &CStr) -> c_int {
+        e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), AT_REMOVEDIR) }) as c_int
     }
 
     fn select(
@@ -336,8 +337,8 @@ impl Pal for Sys {
         e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
     }
 
-    fn unlink(path: *const c_char) -> c_int {
-        e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path, 0) }) as c_int
+    fn unlink(path: &CStr) -> c_int {
+        e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), 0) }) as c_int
     }
 
     fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {

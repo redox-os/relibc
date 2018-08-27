@@ -1,5 +1,6 @@
 //! sys/time implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/systime.h.html
 
+use c_str::CStr;
 use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
@@ -71,6 +72,7 @@ pub extern "C" fn select(
 
 #[no_mangle]
 pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c_int {
+    let path = CStr::from_ptr(path);
     let times_spec = [
         timespec {
             tv_sec: (*times.offset(0)).tv_sec,

@@ -3,6 +3,7 @@
 use alloc::boxed::Box;
 use core::{mem, ptr};
 
+use c_str::CStr;
 use header::{errno, fcntl, unistd};
 use platform;
 use platform::types::*;
@@ -35,6 +36,7 @@ pub struct dirent {
 
 #[no_mangle]
 pub extern "C" fn opendir(path: *const c_char) -> *mut DIR {
+    let path = unsafe { CStr::from_ptr(path) };
     let fd = Sys::open(
         path,
         fcntl::O_RDONLY | fcntl::O_DIRECTORY | fcntl::O_CLOEXEC,

@@ -6,6 +6,7 @@ use rand::prng::XorShiftRng;
 use rand::rngs::JitterRng;
 use rand::{Rng, SeedableRng};
 
+use c_str::CStr;
 use header::errno::*;
 use header::fcntl::*;
 use header::string::*;
@@ -390,7 +391,7 @@ fn inner_mktemp<T, F>(name: *mut c_char, suffix_len: c_int, mut attempt: F) -> O
 where
     F: FnMut() -> Option<T>,
 {
-    let len = unsafe { strlen(name) } as c_int;
+    let len = unsafe { strlen(name) as c_int };
 
     if len < 6 || suffix_len > len - 6 {
         unsafe { platform::errno = errno::EINVAL };
@@ -432,6 +433,7 @@ where
 #[no_mangle]
 pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
     if inner_mktemp(name, 0, || unsafe {
+        let name = unsafe { CStr::from_ptr(name) };
         let ret = if Sys::access(name, 0) != 0 && platform::errno == ENOENT {
             Some(())
         } else {
@@ -459,6 +461,7 @@ pub extern "C" fn mkostemps(name: *mut c_char, suffix_len: c_int, mut flags: c_i
     flags |= O_RDWR | O_CREAT | O_EXCL;
 
     inner_mktemp(name, suffix_len, || {
+        let name = unsafe { CStr::from_ptr(name) };
         let fd = Sys::open(name, flags, 0600);
 
         if fd >= 0 {

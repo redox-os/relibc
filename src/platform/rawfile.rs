@@ -1,11 +1,12 @@
 use core::ops::Deref;
 
+use c_str::CStr;
 use super::{types::*, Pal, Sys};
 
 pub struct RawFile(c_int);
 
 impl RawFile {
-    pub fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> Result<RawFile, ()> {
+    pub fn open(path: &CStr, oflag: c_int, mode: mode_t) -> Result<RawFile, ()> {
         match Sys::open(path, oflag, mode) {
             -1 => Err(()),
             n => Ok(RawFile(n)),

@@ -50,7 +50,7 @@ impl Pal for Sys {
         -1
     }
 
-    fn access(path: *const c_char, mode: c_int) -> c_int {
+    fn access(path: &CStr, mode: c_int) -> c_int {
         let fd = match RawFile::open(path, 0, 0) {
             Ok(fd) => fd,
             Err(_) => return -1,
@@ -100,12 +100,12 @@ impl Pal for Sys {
         unsafe { syscall::brk(addr as usize).unwrap_or(0) as *mut c_void }
     }
 
-    fn chdir(path: *const c_char) -> c_int {
+    fn chdir(path: &CStr) -> c_int {
         let path = unsafe { c_str(path) };
         e(syscall::chdir(path)) as c_int
     }
 
-    fn chmod(path: *const c_char, mode: mode_t) -> c_int {
+    fn chmod(path: &CStr, mode: mode_t) -> c_int {
         let path = unsafe { c_str(path) };
         match syscall::open(path, O_WRONLY) {
             Err(err) => e(Err(err)) as c_int,
@@ -117,7 +117,7 @@ impl Pal for Sys {
         }
     }
 
-    fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
+    fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
         let path = unsafe { c_str(path) };
         match syscall::open(path, O_WRONLY) {
             Err(err) => e(Err(err)) as c_int,
@@ -161,7 +161,7 @@ impl Pal for Sys {
     }
 
     unsafe fn execve(
-        path: *const c_char,
+        path: &CStr,
         mut argv: *const *mut c_char,
         mut envp: *const *mut c_char,
     ) -> c_int {
@@ -290,7 +290,7 @@ impl Pal for Sys {
         e(syscall::futimens(fd as usize, &times)) as c_int
     }
 
-    fn utimens(path: *const c_char, times: *const timespec) -> c_int {
+    fn utimens(path: &CStr, times: *const timespec) -> c_int {
         let path = unsafe { c_str(path) };
         match syscall::open(path, O_STAT) {
             Err(err) => e(Err(err)) as c_int,
@@ -443,7 +443,7 @@ impl Pal for Sys {
             .unwrap_or(0)
     }
 
-    fn link(path1: *const c_char, path2: *const c_char) -> c_int {
+    fn link(path1: &CStr, path2: &CStr) -> c_int {
         let path1 = unsafe { c_str(path1) };
         let path2 = unsafe { c_str(path2) };
         e(unsafe { syscall::link(path1.as_ptr(), path2.as_ptr()) }) as c_int
@@ -457,7 +457,7 @@ impl Pal for Sys {
         )) as off_t
     }
 
-    fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
+    fn mkdir(path: &CStr, mode: mode_t) -> c_int {
         let flags = O_CREAT | O_EXCL | O_CLOEXEC | O_DIRECTORY | mode as usize & 0o777;
         let path = unsafe { c_str(path) };
         match syscall::open(path, flags) {
@@ -469,7 +469,7 @@ impl Pal for Sys {
         }
     }
 
-    fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
+    fn mkfifo(path: &CStr, mode: mode_t) -> c_int {
         let flags = O_CREAT | MODE_FIFO as usize | mode as usize & 0o777;
         let path = unsafe { c_str(path) };
         match syscall::open(path, flags) {
@@ -540,7 +540,7 @@ impl Pal for Sys {
         }
     }
 
-    fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
+    fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
         let path = unsafe { c_str(path) };
         e(syscall::open(path, (oflag as usize) | (mode as usize))) as c_int
     }
@@ -557,7 +557,7 @@ impl Pal for Sys {
         e(syscall::read(fd as usize, buf)) as ssize_t
     }
 
-    fn rename(oldpath: *const c_char, newpath: *const c_char) -> c_int {
+    fn rename(oldpath: &CStr, newpath: &CStr) -> c_int {
         let (oldpath, newpath) = unsafe { (c_str(oldpath), c_str(newpath)) };
         match syscall::open(oldpath, O_WRONLY) {
             Ok(fd) => {
@@ -569,7 +569,7 @@ impl Pal for Sys {
         }
     }
 
-    fn rmdir(path: *const c_char) -> c_int {
+    fn rmdir(path: &CStr) -> c_int {
         let path = unsafe { c_str(path) };
         e(syscall::rmdir(path)) as c_int
     }
@@ -590,7 +590,7 @@ impl Pal for Sys {
             unsafe { (*set).fds_bits[fd / (8 * mem::size_of::<c_ulong>())] & mask == mask }
         }
 
-        let event_file = match RawFile::open("event:\0".as_ptr() as *const c_char, 0, 0) {
+        let event_file = match RawFile::open("event:\0".as_ptr() as &CStr, 0, 0) {
             Ok(file) => file,
             Err(_) => return -1,
         };
@@ -632,7 +632,7 @@ impl Pal for Sys {
             None
         } else {
             let timeout_file = match RawFile::open(
-                format!("time:{}\0", syscall::CLOCK_MONOTONIC).as_ptr() as *const c_char,
+                format!("time:{}\0", syscall::CLOCK_MONOTONIC).as_ptr() as &CStr,
                 0,
                 0,
             ) {
@@ -725,7 +725,7 @@ impl Pal for Sys {
         0
     }
 
-    fn unlink(path: *const c_char) -> c_int {
+    fn unlink(path: &CStr) -> c_int {
         let path = unsafe { c_str(path) };
         e(syscall::unlink(path)) as c_int
     }

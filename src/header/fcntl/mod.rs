@@ -1,5 +1,6 @@
 //! fcntl implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/fcntl.h.html
 
+use c_str::CStr;
 use platform::types::*;
 use platform::{Pal, Sys};
 
@@ -40,5 +41,6 @@ pub extern "C" fn sys_fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn sys_open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
     Sys::open(path, oflag, mode)
 }

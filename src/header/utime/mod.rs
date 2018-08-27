@@ -1,5 +1,6 @@
 //! utime implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/utime.h.html
 
+use c_str::CStr;
 use platform::types::*;
 use platform::{Pal, Sys};
 
@@ -12,6 +13,7 @@ pub struct utimbuf {
 
 #[no_mangle]
 pub unsafe extern "C" fn utime(filename: *const c_char, times: *const utimbuf) -> c_int {
+    let filename = CStr::from_ptr(filename);
     let times_spec = [
         timespec {
             tv_sec: (*times).actime,

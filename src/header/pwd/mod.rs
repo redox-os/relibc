@@ -3,6 +3,7 @@
 use alloc::vec::Vec;
 use core::ptr;
 
+use c_str::CStr;
 use header::{errno, fcntl};
 use platform;
 use platform::types::*;
@@ -47,7 +48,7 @@ where
     F: FnMut(&[&[u8]]) -> bool,
 {
     let file = match RawFile::open(
-        "/etc/passwd\0".as_ptr() as *const c_char,
+        CStr::from_bytes_with_nul(b"/etc/passwd\0").unwrap(),
         fcntl::O_RDONLY,
         0,
     ) {

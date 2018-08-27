@@ -1,5 +1,6 @@
 use core::ptr;
 
+use c_str::CStr;
 use super::types::*;
 
 pub use self::signal::PalSignal;
@@ -11,21 +12,21 @@ mod socket;
 pub trait Pal {
     fn no_pal(name: &str) -> c_int;
 
-    fn access(path: *const c_char, mode: c_int) -> c_int {
+    fn access(path: &CStr, mode: c_int) -> c_int {
         Self::no_pal("access")
     }
 
     fn brk(addr: *mut c_void) -> *mut c_void;
 
-    fn chdir(path: *const c_char) -> c_int {
+    fn chdir(path: &CStr) -> c_int {
         Self::no_pal("chdir")
     }
 
-    fn chmod(path: *const c_char, mode: mode_t) -> c_int {
+    fn chmod(path: &CStr, mode: mode_t) -> c_int {
         Self::no_pal("chmod")
     }
 
-    fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
+    fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
         Self::no_pal("chown")
     }
 
@@ -46,7 +47,7 @@ pub trait Pal {
     }
 
     unsafe fn execve(
-        path: *const c_char,
+        path: &CStr,
         argv: *const *mut c_char,
         envp: *const *mut c_char,
     ) -> c_int {
@@ -95,7 +96,7 @@ pub trait Pal {
         Self::no_pal("futimens")
     }
 
-    fn utimens(path: *const c_char, times: *const timespec) -> c_int {
+    fn utimens(path: &CStr, times: *const timespec) -> c_int {
         Self::no_pal("utimens")
     }
 
@@ -160,7 +161,7 @@ pub trait Pal {
         Self::no_pal("isatty")
     }
 
-    fn link(path1: *const c_char, path2: *const c_char) -> c_int {
+    fn link(path1: &CStr, path2: &CStr) -> c_int {
         Self::no_pal("link")
     }
 
@@ -168,11 +169,11 @@ pub trait Pal {
         Self::no_pal("lseek") as off_t
     }
 
-    fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
+    fn mkdir(path: &CStr, mode: mode_t) -> c_int {
         Self::no_pal("mkdir")
     }
 
-    fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
+    fn mkfifo(path: &CStr, mode: mode_t) -> c_int {
         Self::no_pal("mkfifo")
     }
 
@@ -195,7 +196,7 @@ pub trait Pal {
         Self::no_pal("nanosleep")
     }
 
-    fn open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
+    fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
         Self::no_pal("open")
     }
 
@@ -207,11 +208,11 @@ pub trait Pal {
         Self::no_pal("read") as ssize_t
     }
 
-    fn rename(old: *const c_char, new: *const c_char) -> c_int {
+    fn rename(old: &CStr, new: &CStr) -> c_int {
         Self::no_pal("rename")
     }
 
-    fn rmdir(path: *const c_char) -> c_int {
+    fn rmdir(path: &CStr) -> c_int {
         Self::no_pal("rmdir")
     }
 
@@ -262,7 +263,7 @@ pub trait Pal {
         Self::no_pal("uname")
     }
 
-    fn unlink(path: *const c_char) -> c_int {
+    fn unlink(path: &CStr) -> c_int {
         Self::no_pal("unlink")
     }
 

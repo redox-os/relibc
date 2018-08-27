@@ -7,6 +7,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use core::{ptr, str};
 use va_list::VaList as va_list;
 
+use c_str::CStr;
 use header::errno::{self, STR_ERROR};
 use header::fcntl;
 use header::stdlib::mkstemp;
@@ -814,6 +815,7 @@ pub extern "C" fn putw(w: c_int, stream: &mut FILE) -> c_int {
 /// Delete file or directory `path`
 #[no_mangle]
 pub extern "C" fn remove(path: *const c_char) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
     let r = Sys::unlink(path);
     if r == -errno::EISDIR {
         Sys::rmdir(path)
@@ -824,6 +826,8 @@ pub extern "C" fn remove(path: *const c_char) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn rename(oldpath: *const c_char, newpath: *const c_char) -> c_int {
+    let oldpath = unsafe { CStr::from_ptr(oldpath) };
+    let newpath = unsafe { CStr::from_ptr(newpath) };
     Sys::rename(oldpath, newpath)
 }
 
@@ -894,7 +898,10 @@ pub extern "C" fn tmpfile() -> *mut FILE {
     }
 
     let fp = fdopen(fd, b"w+".as_ptr() as *const i8);
-    Sys::unlink(file_name);
+    {
+        let file_name = unsafe { CStr::from_ptr(file_name) };
+        Sys::unlink(file_name);
+    }
 
     if fp == ptr::null_mut() {
         Sys::close(fd);

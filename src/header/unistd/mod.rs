@@ -2,6 +2,7 @@
 
 use core::{ptr, slice};
 
+use c_str::CStr;
 use header::sys_time;
 use platform;
 use platform::types::*;
@@ -42,6 +43,7 @@ pub extern "C" fn _exit(status: c_int) {
 
 #[no_mangle]
 pub extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
     Sys::access(path, mode)
 }
 
@@ -69,6 +71,7 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
 
 #[no_mangle]
 pub extern "C" fn chdir(path: *const c_char) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
     Sys::chdir(path)
 }
 
@@ -79,6 +82,7 @@ pub extern "C" fn chroot(path: *const c_char) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
     Sys::chown(path, owner, group)
 }
 
@@ -142,6 +146,7 @@ pub unsafe extern "C" fn execve(
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
     Sys::execve(path, argv, envp)
 }
 
@@ -313,6 +318,8 @@ pub extern "C" fn lchown(path: *const c_char, owner: uid_t, group: gid_t) -> c_i
 
 #[no_mangle]
 pub extern "C" fn link(path1: *const c_char, path2: *const c_char) -> c_int {
+    let path1 = unsafe { CStr::from_ptr(path1) };
+    let path2 = unsafe { CStr::from_ptr(path2) };
     Sys::link(path1, path2)
 }
 
@@ -379,6 +386,7 @@ pub extern "C" fn readlink(path: *const c_char, buf: *mut c_char, bufsize: size_
 
 #[no_mangle]
 pub extern "C" fn rmdir(path: *const c_char) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
     Sys::rmdir(path)
 }
 
@@ -500,6 +508,7 @@ pub extern "C" fn ualarm(value: useconds_t, interval: useconds_t) -> useconds_t 
 
 #[no_mangle]
 pub extern "C" fn unlink(path: *const c_char) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
     Sys::unlink(path)
 }
 
