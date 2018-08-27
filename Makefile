@@ -20,13 +20,16 @@ SRC=\
 	src/*/*/* \
 	src/*/*/*/*
 
-.PHONY: all clean fmt install libc libm test
+.PHONY: all clean fmt include install libc libm test
 
 all: | libc libm
 
 clean:
 	cargo clean
 	make -C tests clean
+
+check:
+	cargo check
 
 fmt:
 	./fmt.sh
@@ -35,14 +38,14 @@ install: all
 	mkdir -pv "$(DESTDIR)/lib"
 	mkdir -pv "$(DESTDIR)/include"
 	cp -rv "include"/* "$(DESTDIR)/include"
-	cp -rv "target/include"/* "$(DESTDIR)/include"
+	cp -rv "$(BUILD)/include"/* "$(DESTDIR)/include"
 	cp -v "$(BUILD)/release/libc.a" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crt0.o" "$(DESTDIR)/lib"
 	cp -rv "openlibm/include"/* "$(DESTDIR)/include"
 	cp -rv "openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 
-libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o
+libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o $(BUILD)/include
 
 libm: $(BUILD)/openlibm/libopenlibm.a
 
@@ -65,6 +68,12 @@ $(BUILD)/release/crt0.o: $(SRC)
 	CARGO_INCREMENTAL=0 cargo rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 	touch $@
 
+$(BUILD)/include: $(SRC)
+	rm -rf $@ $@.partial
+	mkdir -p $@.partial
+	./include.sh $@.partial
+	mv $@.partial $@
+
 $(BUILD)/openlibm: openlibm
 	rm -rf $@ $@.partial
 	mkdir -p $(BUILD)
@@ -72,5 +81,5 @@ $(BUILD)/openlibm: openlibm
 	mv $@.partial $@
 	touch $@
 
-$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm
-	make CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/target/include" -C $< libopenlibm.a
+$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/include
+	make CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libopenlibm.a

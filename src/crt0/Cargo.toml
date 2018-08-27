@@ -8,5 +8,4 @@ name = "crt0"
 crate-type = ["staticlib"]
 
 [dependencies]
-platform = { path = "../platform" }
-stdio = { path = "../stdio" }
+relibc = { path = "../.." }

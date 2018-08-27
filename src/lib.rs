@@ -1,47 +1,48 @@
 #![no_std]
+#![allow(non_camel_case_types)]
+#![allow(non_upper_case_globals)]
+#![allow(unused_variables)]
+#![feature(alloc)]
+#![feature(allocator_api)]
+#![feature(const_fn)]
+#![feature(const_vec_new)]
+#![feature(core_intrinsics)]
+#![feature(extern_prelude)]
+#![feature(global_asm)]
 #![feature(lang_items)]
 #![feature(linkage)]
 #![feature(panic_implementation)]
+#![feature(str_internals)]
+#![feature(thread_local)]
 
-//extern crate compiler_builtins;
-extern crate platform;
+#[macro_use]
+extern crate alloc;
+#[macro_use]
+extern crate lazy_static;
+extern crate rand;
+extern crate va_list;
 
-pub extern crate arpainet;
-pub extern crate ctype;
-pub extern crate dirent;
-pub extern crate errno;
-pub extern crate fcntl;
-pub extern crate fenv;
-pub extern crate float;
-pub extern crate fnmatch;
-pub extern crate grp;
-pub extern crate locale;
-pub extern crate netinet;
-pub extern crate pwd;
-pub extern crate semaphore;
-pub extern crate setjmp;
-pub extern crate signal;
-pub extern crate stdio;
-pub extern crate stdlib;
-pub extern crate string;
-pub extern crate strings;
-pub extern crate sys_ioctl;
-pub extern crate sys_mman;
-pub extern crate sys_resource;
-pub extern crate sys_select;
-pub extern crate sys_socket;
-pub extern crate sys_stat;
-pub extern crate sys_time;
-pub extern crate sys_times;
-pub extern crate sys_un;
-pub extern crate sys_utsname;
-pub extern crate sys_wait;
-pub extern crate termios;
-pub extern crate time;
-pub extern crate unistd;
-pub extern crate utime;
-pub extern crate wchar;
-pub extern crate wctype;
+#[cfg(target_os = "linux")]
+#[macro_use]
+extern crate sc;
+
+#[cfg(target_os = "redox")]
+extern crate syscall;
+
+#[cfg(target_os = "redox")]
+extern crate spin;
+
+#[macro_use]
+mod macros;
+pub mod c_str;
+pub mod header;
+pub mod platform;
+pub mod start;
+
+use platform::{Allocator, Pal, Sys};
+
+#[global_allocator]
+static ALLOCATOR: Allocator = Allocator;
 
 #[cfg(not(test))]
 #[panic_implementation]
@@ -53,7 +54,7 @@ pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
     let mut w = platform::FileWriter(2);
     let _ = w.write_fmt(format_args!("RELIBC PANIC: {}\n", pi));
 
-    platform::exit(1);
+    Sys::exit(1);
 }
 
 #[cfg(not(test))]
@@ -76,7 +77,7 @@ pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
         layout.align()
     ));
 
-    platform::exit(1);
+    Sys::exit(1);
 }
 
 #[cfg(not(test))]
@@ -89,5 +90,5 @@ pub extern "C" fn _Unwind_Resume() -> ! {
     let mut w = platform::FileWriter(2);
     let _ = w.write_str("_Unwind_Resume\n");
 
-    platform::exit(1);
+    Sys::exit(1);
 }
