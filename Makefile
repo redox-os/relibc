@@ -38,7 +38,7 @@ install: all
 	mkdir -pv "$(DESTDIR)/lib"
 	mkdir -pv "$(DESTDIR)/include"
 	cp -rv "include"/* "$(DESTDIR)/include"
-	cp -rv "target/include"/* "$(DESTDIR)/include"
+	cp -rv "$(BUILD)/include"/* "$(DESTDIR)/include"
 	cp -v "$(BUILD)/release/libc.a" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crt0.o" "$(DESTDIR)/lib"
 	cp -rv "openlibm/include"/* "$(DESTDIR)/include"
@@ -82,4 +82,4 @@ $(BUILD)/openlibm: openlibm
 	touch $@
 
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/include
-	make CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/target/include" -C $< libopenlibm.a
+	make CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libopenlibm.a
