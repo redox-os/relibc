@@ -1,16 +1,16 @@
 //! sys/socket implementation, following http://pubs.opengroup.org/onlinepubs/009696699/basedefs/sys/socket.h.html
 
 use alloc::btree_map::BTreeMap;
-use core::{mem, ptr, slice};
 use core::fmt::Write;
-use spin::{Once, Mutex, MutexGuard};
+use core::{mem, ptr, slice};
+use spin::{Mutex, MutexGuard, Once};
 use syscall::data::Stat as redox_stat;
 use syscall::data::TimeSpec as redox_timespec;
 use syscall::flag::*;
 use syscall::{self, Result};
 
-use super::{c_str, errno, FileReader, FileWriter, Pal, RawFile, Read};
 use super::types::*;
+use super::{c_str, errno, FileReader, FileWriter, Pal, RawFile, Read};
 
 mod signal;
 mod socket;
@@ -22,7 +22,9 @@ const MAP_ANON: c_int = 1;
 static ANONYMOUS_MAPS: Once<Mutex<BTreeMap<usize, usize>>> = Once::new();
 
 fn anonymous_maps() -> MutexGuard<'static, BTreeMap<usize, usize>> {
-    ANONYMOUS_MAPS.call_once(|| Mutex::new(BTreeMap::new())).lock()
+    ANONYMOUS_MAPS
+        .call_once(|| Mutex::new(BTreeMap::new()))
+        .lock()
 }
 
 fn e(sys: Result<usize>) -> usize {
@@ -51,7 +53,7 @@ impl Pal for Sys {
     fn access(path: *const c_char, mode: c_int) -> c_int {
         let fd = match RawFile::open(path, 0, 0) {
             Ok(fd) => fd,
-            Err(_) => return -1
+            Err(_) => return -1,
         };
         if mode == F_OK {
             return 0;
@@ -82,8 +84,9 @@ impl Pal for Sys {
             stat.st_mode & 0o7
         };
         if (mode & R_OK == R_OK && perms & 0o4 != 0o4)
-                || (mode & W_OK == W_OK && perms & 0o2 != 0o2)
-                || (mode & X_OK == X_OK && perms & 0o1 != 0o1) {
+            || (mode & W_OK == W_OK && perms & 0o2 != 0o2)
+            || (mode & X_OK == X_OK && perms & 0o1 != 0o1)
+        {
             unsafe {
                 errno = EINVAL;
             }
@@ -166,7 +169,7 @@ impl Pal for Sys {
 
         let fd = match RawFile::open(path, O_RDONLY as c_int, 0) {
             Ok(fd) => fd,
-            Err(_) => return -1
+            Err(_) => return -1,
         };
 
         let mut len = 0;
@@ -383,12 +386,12 @@ impl Pal for Sys {
                 Ok(Some(b)) => {
                     *name = b as c_char;
                     name = name.offset(1);
-                },
+                }
                 Ok(None) => {
                     *name = 0;
                     break;
-                },
-                Err(()) => return -1
+                }
+                Err(()) => return -1,
             }
         }
         0
@@ -694,10 +697,9 @@ impl Pal for Sys {
             return -1;
         }
 
-        let read = e(syscall::read(dup, unsafe { slice::from_raw_parts_mut(
-            out as *mut u8,
-            mem::size_of::<termios>()
-        ) }));
+        let read = e(syscall::read(dup, unsafe {
+            slice::from_raw_parts_mut(out as *mut u8, mem::size_of::<termios>())
+        }));
         let _ = syscall::close(dup);
 
         if read == !0 {
@@ -712,10 +714,9 @@ impl Pal for Sys {
             return -1;
         }
 
-        let write = e(syscall::write(dup, unsafe { slice::from_raw_parts(
-            value as *const u8,
-            mem::size_of::<termios>()
-        ) }));
+        let write = e(syscall::write(dup, unsafe {
+            slice::from_raw_parts(value as *const u8, mem::size_of::<termios>())
+        }));
         let _ = syscall::close(dup);
 
         if write == !0 {

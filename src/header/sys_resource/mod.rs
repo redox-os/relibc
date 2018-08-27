@@ -3,8 +3,8 @@
 
 use header::sys_time::timeval;
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 // Exported in bits file
 const RUSAGE_SELF: c_int = 0;

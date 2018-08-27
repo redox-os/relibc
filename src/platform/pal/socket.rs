@@ -1,5 +1,5 @@
-use super::super::Pal;
 use super::super::types::*;
+use super::super::Pal;
 
 pub trait PalSocket: Pal {
     unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
@@ -14,11 +14,19 @@ pub trait PalSocket: Pal {
         Self::no_pal("connect")
     }
 
-    unsafe fn getpeername(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
+    unsafe fn getpeername(
+        socket: c_int,
+        address: *mut sockaddr,
+        address_len: *mut socklen_t,
+    ) -> c_int {
         Self::no_pal("getpeername")
     }
 
-    unsafe fn getsockname(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
+    unsafe fn getsockname(
+        socket: c_int,
+        address: *mut sockaddr,
+        address_len: *mut socklen_t,
+    ) -> c_int {
         Self::no_pal("getsockname")
     }
 

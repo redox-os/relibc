@@ -8,7 +8,7 @@ pub const FNM_NOMATCH: c_int = 1;
 
 pub const FNM_NOESCAPE: c_int = 1;
 pub const FNM_PATHNAME: c_int = 2;
-pub const FNM_PERIOD:   c_int = 4;
+pub const FNM_PERIOD: c_int = 4;
 pub const FNM_CASEFOLD: c_int = 8;
 
 #[derive(Debug)]
@@ -39,7 +39,7 @@ unsafe fn next_token(pattern: &mut *const c_char, flags: c_int) -> Option<Token>
             }
             *pattern = pattern.offset(1);
             Token::Char(c)
-        },
+        }
         b'?' => Token::Any,
         b'*' => Token::Wildcard,
         b'[' => {
@@ -47,7 +47,9 @@ unsafe fn next_token(pattern: &mut *const c_char, flags: c_int) -> Option<Token>
             let invert = if **pattern as u8 == b'!' {
                 *pattern = pattern.offset(1);
                 true
-            } else { false };
+            } else {
+                false
+            };
 
             loop {
                 let mut c = **pattern as u8;
@@ -64,8 +66,8 @@ unsafe fn next_token(pattern: &mut *const c_char, flags: c_int) -> Option<Token>
                             // Trailing backslash. Maybe error?
                             break;
                         }
-                    },
-                    _ => ()
+                    }
+                    _ => (),
                 }
                 if matches.len() >= 2 && matches[matches.len() - 1] == b'-' {
                     let len = matches.len();
@@ -81,13 +83,17 @@ unsafe fn next_token(pattern: &mut *const c_char, flags: c_int) -> Option<Token>
             // Otherwise, there was no closing ]. Maybe error?
 
             Token::Match(invert, matches)
-        },
-        c => Token::Char(c)
+        }
+        c => Token::Char(c),
     })
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fnmatch(mut pattern: *const c_char, mut input: *const c_char, flags: c_int) -> c_int {
+pub unsafe extern "C" fn fnmatch(
+    mut pattern: *const c_char,
+    mut input: *const c_char,
+    flags: c_int,
+) -> c_int {
     let pathname = flags & FNM_PATHNAME == FNM_PATHNAME;
     let casefold = flags & FNM_CASEFOLD == FNM_CASEFOLD;
 
@@ -109,7 +115,7 @@ pub unsafe extern "C" fn fnmatch(mut pattern: *const c_char, mut input: *const c
                     return FNM_NOMATCH;
                 }
                 input = input.offset(1);
-            },
+            }
             Some(Token::Char(c)) => {
                 let mut a = *input as u8;
                 if casefold && a >= b'a' && a <= b'z' {
@@ -126,14 +132,15 @@ pub unsafe extern "C" fn fnmatch(mut pattern: *const c_char, mut input: *const c
                     leading = true;
                 }
                 input = input.offset(1);
-            },
+            }
             Some(Token::Match(invert, matches)) => {
-                if (pathname && *input as u8 == b'/') || matches.contains(&(*input as u8)) == invert {
+                if (pathname && *input as u8 == b'/') || matches.contains(&(*input as u8)) == invert
+                {
                     // Found it, but it's inverted! Or vise versa.
                     return FNM_NOMATCH;
                 }
                 input = input.offset(1);
-            },
+            }
             Some(Token::Wildcard) => {
                 loop {
                     let c = *input as u8;
@@ -155,8 +162,8 @@ pub unsafe extern "C" fn fnmatch(mut pattern: *const c_char, mut input: *const c
                     }
                 }
                 unreachable!("nothing should be able to break out of the loop");
-            },
-            None => return FNM_NOMATCH // Pattern ended but there's still some input
+            }
+            None => return FNM_NOMATCH, // Pattern ended but there's still some input
         }
     }
 }

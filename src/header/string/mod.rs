@@ -4,8 +4,8 @@ use core::mem;
 use core::ptr;
 use core::usize;
 
-use header::signal;
 use header::errno::*;
+use header::signal;
 use platform;
 use platform::types::*;
 
@@ -179,14 +179,15 @@ pub unsafe fn inner_strspn(s1: *const c_char, s2: *const c_char, cmp: bool) -> s
     let mut i = 0;
     while *s2.offset(i) != 0 {
         byteset[(*s2.offset(i) as usize) / BITSIZE] |=
-            1 << (*s2.offset(i) as usize & (BITSIZE-1));
+            1 << (*s2.offset(i) as usize & (BITSIZE - 1));
         i += 1;
     }
 
     i = 0; // reset
-    while *s1.offset(i) != 0 &&
-            (byteset[(*s1.offset(i) as usize) / BITSIZE] &
-            1 << (*s1.offset(i) as usize & (BITSIZE-1)) != 0) == cmp {
+    while *s1.offset(i) != 0
+        && (byteset[(*s1.offset(i) as usize) / BITSIZE]
+            & 1 << (*s1.offset(i) as usize & (BITSIZE - 1)) != 0) == cmp
+    {
         i += 1;
     }
     i as size_t

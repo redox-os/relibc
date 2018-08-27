@@ -1,15 +1,11 @@
 use alloc::string::String;
 
-use platform::{self, Write};
 use platform::types::*;
+use platform::{self, Write};
 
 use super::tm;
 
-pub unsafe fn strftime<W: Write>(
-    w: &mut W,
-    format: *const c_char,
-    t: *const tm,
-) -> size_t {
+pub unsafe fn strftime<W: Write>(w: &mut W, format: *const c_char, t: *const tm) -> size_t {
     pub unsafe fn inner_strftime<W: Write>(
         mut w: &mut W,
         mut format: *const c_char,
@@ -73,7 +69,7 @@ pub unsafe fn strftime<W: Write>(
 
         while *format != 0 {
             if *format as u8 != b'%' {
-                w!(byte *format as u8);
+                w!(byte * format as u8);
                 format = format.offset(1);
                 continue;
             }

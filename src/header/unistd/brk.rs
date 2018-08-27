@@ -2,8 +2,8 @@ use core::ptr;
 
 use header::errno::ENOMEM;
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 static mut BRK: *mut c_void = ptr::null_mut();
 

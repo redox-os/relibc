@@ -1,8 +1,8 @@
 use syscall;
 
-use super::{e, Sys};
-use super::super::{Pal, PalSignal};
 use super::super::types::*;
+use super::super::{Pal, PalSignal};
+use super::{e, Sys};
 
 #[thread_local]
 static mut SIG_HANDLER: Option<extern "C" fn(c_int)> = None;

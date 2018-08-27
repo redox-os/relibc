@@ -1,7 +1,7 @@
 //! sys/select.h implementation
 
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 // fd_set is defined in C because cbindgen is incompatible with mem::size_of booo
 

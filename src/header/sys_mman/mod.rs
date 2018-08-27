@@ -1,5 +1,5 @@
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 pub use self::sys::*;
 

@@ -9,10 +9,12 @@ use va_list::VaList as va_list;
 
 use header::errno::{self, STR_ERROR};
 use header::fcntl;
+use header::stdlib::mkstemp;
+use header::string::strlen;
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
 use platform::{c_str, errno, Read, Write};
+use platform::{Pal, Sys};
 
 mod printf;
 mod scanf;
@@ -220,7 +222,7 @@ impl<'a> Read for LockGuard<'a> {
         let mut buf = [0];
         match self.0.read(&mut buf) {
             0 => Ok(None),
-            _ => Ok(Some(buf[0]))
+            _ => Ok(Some(buf[0])),
         }
     }
 }
@@ -452,9 +454,6 @@ pub extern "C" fn fputc(c: c_int, stream: &mut FILE) -> c_int {
 /// Insert a string into a stream
 #[no_mangle]
 pub extern "C" fn fputs(s: *const c_char, stream: &mut FILE) -> c_int {
-    extern "C" {
-        fn strlen(s: *const c_char) -> size_t;
-    }
     let len = unsafe { strlen(s) };
     (fwrite(s as *const c_void, 1, len, stream) == len) as c_int - 1
 }
@@ -886,10 +885,6 @@ pub extern "C" fn tempnam(_dir: *const c_char, _pfx: *const c_char) -> *mut c_ch
 
 #[no_mangle]
 pub extern "C" fn tmpfile() -> *mut FILE {
-    extern "C" {
-        fn mkstemp(name: *mut c_char) -> c_int;
-    }
-
     let mut file_name = *b"/tmp/tmpfileXXXXXX";
     let file_name = file_name.as_mut_ptr() as *mut c_char;
     let fd = unsafe { mkstemp(file_name) };

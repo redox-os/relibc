@@ -3,8 +3,8 @@
 #[cfg(target_os = "linux")]
 mod inner {
     use platform;
-    use platform::{Pal, Sys};
     use platform::types::*;
+    use platform::{Pal, Sys};
 
     const UTSLENGTH: usize = 65;
 

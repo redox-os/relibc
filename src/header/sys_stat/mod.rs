@@ -1,9 +1,9 @@
 //! stat implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysstat.h.html
 
-use header::fcntl::{O_PATH, O_NOFOLLOW};
+use header::fcntl::{O_NOFOLLOW, O_PATH};
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 pub const S_IFMT: c_int = 0o0170000;
 

@@ -37,7 +37,5 @@ pub extern "C" fn rust_begin_unwind(_pi: &::core::panic::PanicInfo) -> ! {
         fn exit(status: i32) -> !;
     }
 
-    unsafe {
-        exit(1)
-    }
+    unsafe { exit(1) }
 }

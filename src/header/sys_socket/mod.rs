@@ -3,8 +3,8 @@
 use core::ptr;
 
 use platform;
-use platform::{PalSocket, Sys};
 use platform::types::*;
+use platform::{PalSocket, Sys};
 
 mod constants;
 

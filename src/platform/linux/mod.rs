@@ -1,8 +1,8 @@
-use core::{mem, ptr};
 use core::fmt::Write;
+use core::{mem, ptr};
 
-use super::{errno, FileWriter, Pal};
 use super::types::*;
+use super::{errno, FileWriter, Pal};
 
 mod signal;
 mod socket;
@@ -79,7 +79,11 @@ impl Pal for Sys {
         e(unsafe { syscall!(DUP3, fildes, fildes2, 0) }) as c_int
     }
 
-    unsafe fn execve(path: *const c_char, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
+    unsafe fn execve(
+        path: *const c_char,
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
+    ) -> c_int {
         e(syscall!(EXECVE, path, argv, envp)) as c_int
     }
 

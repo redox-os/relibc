@@ -1,8 +1,8 @@
 //! termios implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/termios.h.html
 
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 pub type cc_t = u8;
 pub type speed_t = u32;
@@ -19,7 +19,7 @@ pub struct termios {
     c_line: cc_t,
     c_cc: [cc_t; NCCS],
     __c_ispeed: speed_t,
-    __c_ospeed: speed_t
+    __c_ospeed: speed_t,
 }
 
 #[no_mangle]

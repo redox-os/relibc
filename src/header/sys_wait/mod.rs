@@ -2,8 +2,8 @@
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/syswait.h.html
 
 use header::sys_resource::rusage;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 pub const WNOHANG: c_int = 1;
 pub const WUNTRACED: c_int = 2;

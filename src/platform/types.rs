@@ -257,5 +257,5 @@ pub struct termios {
     c_line: cc_t,
     c_cc: [cc_t; NCCS],
     __c_ispeed: speed_t,
-    __c_ospeed: speed_t
+    __c_ospeed: speed_t,
 }

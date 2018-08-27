@@ -1,7 +1,7 @@
 //! utime implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/utime.h.html
 
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 #[repr(C)]
 #[derive(Clone)]

@@ -3,8 +3,8 @@ use core::ptr;
 
 use header::stdio;
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 #[repr(C)]
 pub struct Stack {
@@ -68,6 +68,6 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         argv,
         // not envp, because programs like bash try to modify this *const*
         // pointer :|
-        platform::environ as *const *const c_char
+        platform::environ as *const *const c_char,
     ));
 }

@@ -5,8 +5,8 @@ use core::{mem, ptr};
 
 use header::{errno, fcntl, unistd};
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 const DIR_BUF_SIZE: usize = mem::size_of::<dirent>() * 3;
 

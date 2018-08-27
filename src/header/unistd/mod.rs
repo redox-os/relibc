@@ -4,8 +4,8 @@ use core::{ptr, slice};
 
 use header::sys_time;
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 pub use self::brk::*;
 pub use self::getopt::*;
@@ -195,7 +195,10 @@ pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char 
     }
 
     if alloc {
-        let mut len = stack_buf.iter().position(|b| *b == 0).expect("no nul-byte in getcwd string") + 1;
+        let mut len = stack_buf
+            .iter()
+            .position(|b| *b == 0)
+            .expect("no nul-byte in getcwd string") + 1;
         let mut heap_buf = unsafe { platform::alloc(len) as *mut c_char };
         for i in 0..len {
             unsafe {

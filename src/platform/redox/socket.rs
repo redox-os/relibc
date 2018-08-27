@@ -1,10 +1,10 @@
 use core::{mem, ptr, slice};
-use syscall::{self, Result};
 use syscall::flag::*;
+use syscall::{self, Result};
 
-use super::{e, Sys};
-use super::super::{errno, Pal, PalSocket};
 use super::super::types::*;
+use super::super::{errno, Pal, PalSocket};
+use super::{e, Sys};
 
 macro_rules! bind_or_connect {
     (bind $path:expr) => {

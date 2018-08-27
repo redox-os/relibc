@@ -5,9 +5,9 @@ use core::ptr;
 
 use header::{errno, fcntl};
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
 use platform::RawFile;
+use platform::{Pal, Sys};
 
 #[repr(C)]
 pub struct passwd {

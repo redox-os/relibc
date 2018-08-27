@@ -1,3 +1,4 @@
+pub mod aio;
 pub mod arpa_inet;
 pub mod ctype;
 pub mod dirent;
@@ -10,6 +11,7 @@ pub mod grp;
 pub mod inttypes;
 pub mod locale;
 pub mod netinet_in;
+//pub mod pthread;
 pub mod pwd;
 pub mod semaphore;
 pub mod setjmp;

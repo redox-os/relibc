@@ -6,15 +6,15 @@ use rand::prng::XorShiftRng;
 use rand::rngs::JitterRng;
 use rand::{Rng, SeedableRng};
 
-use header::{ctype, errno, unistd};
 use header::errno::*;
 use header::fcntl::*;
 use header::string::*;
 use header::time::constants::CLOCK_MONOTONIC;
 use header::wchar::*;
+use header::{ctype, errno, unistd};
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 mod sort;
 
@@ -507,7 +507,11 @@ pub unsafe extern "C" fn putenv(insert: *mut c_char) -> c_int {
         platform::inner_environ[i] = insert;
     } else {
         let i = platform::inner_environ.len() - 1;
-        assert_eq!(platform::inner_environ[i], ptr::null_mut(), "environ did not end with null");
+        assert_eq!(
+            platform::inner_environ[i],
+            ptr::null_mut(),
+            "environ did not end with null"
+        );
         platform::inner_environ[i] = insert;
         platform::inner_environ.push(ptr::null_mut());
         platform::environ = platform::inner_environ.as_mut_ptr();
@@ -571,7 +575,11 @@ pub extern "C" fn seed48(seed16v: [c_ushort; 3]) -> c_ushort {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn setenv(mut key: *const c_char, mut value: *const c_char, overwrite: c_int) -> c_int {
+pub unsafe extern "C" fn setenv(
+    mut key: *const c_char,
+    mut value: *const c_char,
+    overwrite: c_int,
+) -> c_int {
     let mut key_len = 0;
     while *key.offset(key_len) != 0 {
         key_len += 1;
@@ -602,7 +610,11 @@ pub unsafe extern "C" fn setenv(mut key: *const c_char, mut value: *const c_char
         }
     } else {
         let i = platform::inner_environ.len() - 1;
-        assert_eq!(platform::inner_environ[i], ptr::null_mut(), "environ did not end with null");
+        assert_eq!(
+            platform::inner_environ[i],
+            ptr::null_mut(),
+            "environ did not end with null"
+        );
         platform::inner_environ.push(ptr::null_mut());
         platform::environ = platform::inner_environ.as_mut_ptr();
         i
@@ -664,9 +676,15 @@ pub unsafe extern "C" fn strtod(mut s: *const c_char, endptr: *mut *mut c_char) 
     let mut radix = 10;
 
     let negative = match *s as u8 {
-        b'-' => { s = s.offset(1); true },
-        b'+' => { s = s.offset(1); false },
-        _ => false
+        b'-' => {
+            s = s.offset(1);
+            true
+        }
+        b'+' => {
+            s = s.offset(1);
+            false
+        }
+        _ => false,
     };
 
     if *s as u8 == b'0' && *s.offset(1) as u8 == b'x' {
@@ -855,7 +873,11 @@ pub unsafe extern "C" fn strtoull(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strtoll(s: *const c_char, endptr: *mut *mut c_char, base: c_int) -> c_long {
+pub unsafe extern "C" fn strtoll(
+    s: *const c_char,
+    endptr: *mut *mut c_char,
+    base: c_int,
+) -> c_long {
     strtol(s, endptr, base)
 }
 

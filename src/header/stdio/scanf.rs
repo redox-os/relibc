@@ -44,9 +44,9 @@ unsafe fn inner_scanf<R: Read>(
                     byte = b;
                     count += 1;
                     true
-                },
+                }
                 Ok(None) => false,
-                Err(()) => return Err(-1)
+                Err(()) => return Err(-1),
             }
         }};
     }

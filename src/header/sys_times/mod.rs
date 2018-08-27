@@ -1,8 +1,8 @@
 //! sys/times.h implementation
 
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 #[repr(C)]
 pub struct tms {

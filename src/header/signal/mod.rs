@@ -4,8 +4,8 @@ use core::{mem, ptr};
 
 use header::errno;
 use platform;
-use platform::{PalSignal, Sys};
 use platform::types::*;
+use platform::{PalSignal, Sys};
 
 pub use self::sys::*;
 
@@ -147,7 +147,10 @@ extern "C" {
 }
 
 #[no_mangle]
-pub extern "C" fn signal(sig: c_int, func: Option<extern "C" fn(c_int)>) -> Option<extern "C" fn(c_int)> {
+pub extern "C" fn signal(
+    sig: c_int,
+    func: Option<extern "C" fn(c_int)>,
+) -> Option<extern "C" fn(c_int)> {
     let sa = sigaction {
         sa_handler: func,
         sa_flags: SA_RESTART as c_ulong,
@@ -229,5 +232,5 @@ pub const _signal_strings: [&'static str; 32] = [
     "Window changed\0",
     "I/O possible\0",
     "Power failure\0",
-    "Bad system call\0"
+    "Bad system call\0",
 ];

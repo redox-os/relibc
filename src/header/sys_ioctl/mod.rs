@@ -1,6 +1,5 @@
 //! ioctl implementation for linux
 
-use platform::{Pal, Sys};
 use platform::types::*;
 
 // This is used from sgtty
@@ -15,7 +14,8 @@ pub struct sgttyb {
 
 #[cfg(target_os = "linux")]
 pub mod inner {
-    use super::*;
+    use platform::types::*;
+    use platform::{Pal, Sys};
 
     #[repr(C)]
     pub struct winsize {

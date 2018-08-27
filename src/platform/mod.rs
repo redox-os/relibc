@@ -160,7 +160,7 @@ impl Read for FileReader {
         match self.read(&mut buf) {
             0 => Ok(None),
             n if n < 0 => Err(()),
-            _ => Ok(Some(buf[0]))
+            _ => Ok(Some(buf[0])),
         }
     }
 }
@@ -258,13 +258,13 @@ impl Read for UnsafeStringReader {
 
 pub struct CountingWriter<T> {
     pub inner: T,
-    pub written: usize
+    pub written: usize,
 }
 impl<T> CountingWriter<T> {
-    pub /* const */ fn new(writer: T) -> Self {
+    pub fn new(writer: T) -> Self {
         Self {
             inner: writer,
-            written: 0
+            written: 0,
         }
     }
 }

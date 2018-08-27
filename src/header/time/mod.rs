@@ -4,8 +4,8 @@ use core::mem::transmute;
 
 use header::errno::EIO;
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 use self::constants::*;
 use self::helpers::*;
