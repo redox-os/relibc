@@ -1,9 +1,9 @@
 use core::fmt::Write;
 use core::{mem, ptr};
 
-use c_str::CStr;
 use super::types::*;
 use super::{errno, FileWriter, Pal};
+use c_str::CStr;
 
 mod signal;
 mod socket;
@@ -60,7 +60,15 @@ impl Pal for Sys {
     }
 
     fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
-        e(unsafe { syscall!(FCHOWNAT, AT_FDCWD, path.as_ptr(), owner as u32, group as u32) }) as c_int
+        e(unsafe {
+            syscall!(
+                FCHOWNAT,
+                AT_FDCWD,
+                path.as_ptr(),
+                owner as u32,
+                group as u32
+            )
+        }) as c_int
     }
 
     fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int {
@@ -79,11 +87,7 @@ impl Pal for Sys {
         e(unsafe { syscall!(DUP3, fildes, fildes2, 0) }) as c_int
     }
 
-    unsafe fn execve(
-        path: &CStr,
-        argv: *const *mut c_char,
-        envp: *const *mut c_char,
-    ) -> c_int {
+    unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
         e(syscall!(EXECVE, path.as_ptr(), argv, envp)) as c_int
     }
 
@@ -230,7 +234,16 @@ impl Pal for Sys {
     }
 
     fn link(path1: &CStr, path2: &CStr) -> c_int {
-        e(unsafe { syscall!(LINKAT, AT_FDCWD, path1.as_ptr(), AT_FDCWD, path2.as_ptr(), 0) }) as c_int
+        e(unsafe {
+            syscall!(
+                LINKAT,
+                AT_FDCWD,
+                path1.as_ptr(),
+                AT_FDCWD,
+                path2.as_ptr(),
+                0
+            )
+        }) as c_int
     }
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {

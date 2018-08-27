@@ -48,7 +48,7 @@ where
     F: FnMut(&[&[u8]]) -> bool,
 {
     let file = match RawFile::open(
-        CStr::from_bytes_with_nul(b"/etc/passwd\0").unwrap(),
+        unsafe { CStr::from_bytes_with_nul_unchecked(b"/etc/passwd\0") },
         fcntl::O_RDONLY,
         0,
     ) {

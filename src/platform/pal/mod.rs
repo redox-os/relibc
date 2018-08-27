@@ -1,7 +1,7 @@
 use core::ptr;
 
-use c_str::CStr;
 use super::types::*;
+use c_str::CStr;
 
 pub use self::signal::PalSignal;
 mod signal;
@@ -46,11 +46,7 @@ pub trait Pal {
         Self::no_pal("dup2")
     }
 
-    unsafe fn execve(
-        path: &CStr,
-        argv: *const *mut c_char,
-        envp: *const *mut c_char,
-    ) -> c_int {
+    unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
         Self::no_pal("execve")
     }
 

@@ -10,7 +10,8 @@ use syscall::flag::*;
 use syscall::{self, Result};
 
 use super::types::*;
-use super::{c_str, errno, FileReader, FileWriter, Pal, RawFile, Read};
+use super::{errno, FileReader, FileWriter, Pal, RawFile, Read};
+use c_str::{CStr, CString};
 
 mod signal;
 mod socket;
@@ -101,13 +102,11 @@ impl Pal for Sys {
     }
 
     fn chdir(path: &CStr) -> c_int {
-        let path = unsafe { c_str(path) };
-        e(syscall::chdir(path)) as c_int
+        e(syscall::chdir(path.to_bytes())) as c_int
     }
 
     fn chmod(path: &CStr, mode: mode_t) -> c_int {
-        let path = unsafe { c_str(path) };
-        match syscall::open(path, O_WRONLY) {
+        match syscall::open(path.to_bytes(), O_WRONLY) {
             Err(err) => e(Err(err)) as c_int,
             Ok(fd) => {
                 let res = syscall::fchmod(fd as usize, mode as u16);
@@ -118,8 +117,7 @@ impl Pal for Sys {
     }
 
     fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
-        let path = unsafe { c_str(path) };
-        match syscall::open(path, O_WRONLY) {
+        match syscall::open(path.to_bytes(), O_WRONLY) {
             Err(err) => e(Err(err)) as c_int,
             Ok(fd) => {
                 let res = syscall::fchown(fd as usize, owner as u32, group as u32);
@@ -291,8 +289,7 @@ impl Pal for Sys {
     }
 
     fn utimens(path: &CStr, times: *const timespec) -> c_int {
-        let path = unsafe { c_str(path) };
-        match syscall::open(path, O_STAT) {
+        match syscall::open(path.to_bytes(), O_STAT) {
             Err(err) => e(Err(err)) as c_int,
             Ok(fd) => {
                 let res = Self::futimens(fd as c_int, times);
@@ -444,9 +441,8 @@ impl Pal for Sys {
     }
 
     fn link(path1: &CStr, path2: &CStr) -> c_int {
-        let path1 = unsafe { c_str(path1) };
-        let path2 = unsafe { c_str(path2) };
-        e(unsafe { syscall::link(path1.as_ptr(), path2.as_ptr()) }) as c_int
+        e(unsafe { syscall::link(path1.as_ptr() as *const u8, path2.as_ptr() as *const u8) })
+            as c_int
     }
 
     fn lseek(fd: c_int, offset: off_t, whence: c_int) -> off_t {
@@ -459,8 +455,7 @@ impl Pal for Sys {
 
     fn mkdir(path: &CStr, mode: mode_t) -> c_int {
         let flags = O_CREAT | O_EXCL | O_CLOEXEC | O_DIRECTORY | mode as usize & 0o777;
-        let path = unsafe { c_str(path) };
-        match syscall::open(path, flags) {
+        match syscall::open(path.to_bytes(), flags) {
             Ok(fd) => {
                 let _ = syscall::close(fd);
                 0
@@ -471,8 +466,7 @@ impl Pal for Sys {
 
     fn mkfifo(path: &CStr, mode: mode_t) -> c_int {
         let flags = O_CREAT | MODE_FIFO as usize | mode as usize & 0o777;
-        let path = unsafe { c_str(path) };
-        match syscall::open(path, flags) {
+        match syscall::open(path.to_bytes(), flags) {
             Ok(fd) => {
                 let _ = syscall::close(fd);
                 0
@@ -541,8 +535,10 @@ impl Pal for Sys {
     }
 
     fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
-        let path = unsafe { c_str(path) };
-        e(syscall::open(path, (oflag as usize) | (mode as usize))) as c_int
+        e(syscall::open(
+            path.to_bytes(),
+            (oflag as usize) | (mode as usize),
+        )) as c_int
     }
 
     fn pipe(fds: &mut [c_int]) -> c_int {
@@ -558,10 +554,9 @@ impl Pal for Sys {
     }
 
     fn rename(oldpath: &CStr, newpath: &CStr) -> c_int {
-        let (oldpath, newpath) = unsafe { (c_str(oldpath), c_str(newpath)) };
-        match syscall::open(oldpath, O_WRONLY) {
+        match syscall::open(oldpath.to_bytes(), O_WRONLY) {
             Ok(fd) => {
-                let retval = syscall::frename(fd, newpath);
+                let retval = syscall::frename(fd, newpath.to_bytes());
                 let _ = syscall::close(fd);
                 e(retval) as c_int
             }
@@ -570,8 +565,7 @@ impl Pal for Sys {
     }
 
     fn rmdir(path: &CStr) -> c_int {
-        let path = unsafe { c_str(path) };
-        e(syscall::rmdir(path)) as c_int
+        e(syscall::rmdir(path.to_bytes())) as c_int
     }
 
     fn select(
@@ -590,7 +584,8 @@ impl Pal for Sys {
             unsafe { (*set).fds_bits[fd / (8 * mem::size_of::<c_ulong>())] & mask == mask }
         }
 
-        let event_file = match RawFile::open("event:\0".as_ptr() as &CStr, 0, 0) {
+        let event_path = unsafe { CStr::from_bytes_with_nul_unchecked(b"event:\0") };
+        let event_file = match RawFile::open(event_path, 0, 0) {
             Ok(file) => file,
             Err(_) => return -1,
         };
@@ -632,7 +627,11 @@ impl Pal for Sys {
             None
         } else {
             let timeout_file = match RawFile::open(
-                format!("time:{}\0", syscall::CLOCK_MONOTONIC).as_ptr() as &CStr,
+                &unsafe {
+                    CString::from_vec_unchecked(
+                        format!("time:{}", syscall::CLOCK_MONOTONIC).into_bytes(),
+                    )
+                },
                 0,
                 0,
             ) {
@@ -726,8 +725,7 @@ impl Pal for Sys {
     }
 
     fn unlink(path: &CStr) -> c_int {
-        let path = unsafe { c_str(path) };
-        e(syscall::unlink(path)) as c_int
+        e(syscall::unlink(path.to_bytes())) as c_int
     }
 
     fn waitpid(mut pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {

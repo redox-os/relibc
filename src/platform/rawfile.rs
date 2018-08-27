@@ -1,7 +1,7 @@
 use core::ops::Deref;
 
-use c_str::CStr;
 use super::{types::*, Pal, Sys};
+use c_str::CStr;
 
 pub struct RawFile(c_int);
 
