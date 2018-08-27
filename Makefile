@@ -49,6 +49,13 @@ libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o $(BUILD)/include
 
 libm: $(BUILD)/openlibm/libopenlibm.a
 
+sysroot:
+	rm -rf $@.partial
+	mkdir -p $@.partial
+	make install DESTDIR=$@.partial
+	mv $@.partial $@
+	touch $@
+
 test: all
 	make -C tests run
 
@@ -73,6 +80,7 @@ $(BUILD)/include: $(SRC)
 	mkdir -p $@.partial
 	./include.sh $@.partial
 	mv $@.partial $@
+	touch $@
 
 $(BUILD)/openlibm: openlibm
 	rm -rf $@ $@.partial

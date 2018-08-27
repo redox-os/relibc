@@ -1,92 +1,92 @@
 # Binaries that should generate the same output every time
 EXPECT_BINS=\
-	args \
-	arpainet \
-	assert \
-	ctype \
-	error \
-	fcntl/create \
-	fcntl/fcntl \
-	fnmatch \
-	locale \
-	math \
-	select \
-	setjmp \
-	signal \
-	stdio/all \
-	stdio/setvbuf \
-	stdio/freopen \
-	stdio/fwrite \
-	stdio/getc_unget \
-	stdio/printf \
-	stdio/rename \
-	stdio/scanf \
-	stdio/sprintf \
-	stdlib/a64l \
-	stdlib/atof \
-	stdlib/atoi \
-	stdlib/env \
-	stdlib/mkostemps \
-	stdlib/rand \
-	stdlib/strtod \
-	stdlib/strtol \
-	stdlib/strtoul \
-	stdlib/system \
-	string/mem \
-	string/strchr \
-	string/strcpy \
-	string/strcspn \
-	string/strncmp \
-	string/strpbrk \
-	string/strrchr \
-	string/strspn \
-	string/strstr \
-	string/strtok \
-	string/strtok_r \
-	strings \
-	time/asctime \
-	time/gmtime \
-	time/localtime \
-	time/mktime \
-	time/strftime \
-	time/time \
-	unistd/access \
-	unistd/brk \
-	unistd/dup \
-	unistd/exec \
-	unistd/fchdir \
-	unistd/fsync \
-	unistd/ftruncate \
-	unistd/getopt \
-	unistd/isatty \
-	unistd/pipe \
-	unistd/rmdir \
-	unistd/sleep \
-	unistd/write \
-	waitpid \
-	wchar/mbrtowc \
-	wchar/mbsrtowcs \
-	wchar/putwchar \
-	wchar/wcrtomb
+	bins/args \
+	bins/arpainet \
+	bins/assert \
+	bins/ctype \
+	bins/error \
+	bins/fcntl/create \
+	bins/fcntl/fcntl \
+	bins/fnmatch \
+	bins/locale \
+	bins/math \
+	bins/select \
+	bins/setjmp \
+	bins/signal \
+	bins/stdio/all \
+	bins/stdio/setvbuf \
+	bins/stdio/freopen \
+	bins/stdio/fwrite \
+	bins/stdio/getc_unget \
+	bins/stdio/printf \
+	bins/stdio/rename \
+	bins/stdio/scanf \
+	bins/stdio/sprintf \
+	bins/stdlib/a64l \
+	bins/stdlib/atof \
+	bins/stdlib/atoi \
+	bins/stdlib/env \
+	bins/stdlib/mkostemps \
+	bins/stdlib/rand \
+	bins/stdlib/strtod \
+	bins/stdlib/strtol \
+	bins/stdlib/strtoul \
+	bins/stdlib/system \
+	bins/string/mem \
+	bins/string/strchr \
+	bins/string/strcpy \
+	bins/string/strcspn \
+	bins/string/strncmp \
+	bins/string/strpbrk \
+	bins/string/strrchr \
+	bins/string/strspn \
+	bins/string/strstr \
+	bins/string/strtok \
+	bins/string/strtok_r \
+	bins/strings \
+	bins/time/asctime \
+	bins/time/gmtime \
+	bins/time/localtime \
+	bins/time/mktime \
+	bins/time/strftime \
+	bins/time/time \
+	bins/unistd/access \
+	bins/unistd/brk \
+	bins/unistd/dup \
+	bins/unistd/exec \
+	bins/unistd/fchdir \
+	bins/unistd/fsync \
+	bins/unistd/ftruncate \
+	bins/unistd/getopt \
+	bins/unistd/isatty \
+	bins/unistd/pipe \
+	bins/unistd/rmdir \
+	bins/unistd/sleep \
+	bins/unistd/write \
+	bins/waitpid \
+	bins/wchar/mbrtowc \
+	bins/wchar/mbsrtowcs \
+	bins/wchar/putwchar \
+	bins/wchar/wcrtomb
 
 # Binaries that may generate varied output
 BINS=\
 	$(EXPECT_BINS) \
-	dirent \
-	pwd \
-	resource/getrusage \
-	stdlib/alloc \
-	stdlib/bsearch \
-	stdlib/mktemp \
-	time/gettimeofday \
-	time/times \
-	unistd/chdir \
-	unistd/getcwd \
-	unistd/gethostname \
-	unistd/getid \
-	unistd/link \
-	unistd/setid \
-	unistd/stat
+	bins/dirent \
+	bins/pwd \
+	bins/resource/getrusage \
+	bins/stdlib/alloc \
+	bins/stdlib/bsearch \
+	bins/stdlib/mktemp \
+	bins/time/gettimeofday \
+	bins/time/times \
+	bins/unistd/chdir \
+	bins/unistd/getcwd \
+	bins/unistd/gethostname \
+	bins/unistd/getid \
+	bins/unistd/link \
+	bins/unistd/setid \
+	bins/unistd/stat
 
 all: $(BINS)
 
@@ -97,7 +97,7 @@ run: $(BINS)
 	for bin in $^; \
 	do \
 		echo "# $${bin} #"; \
-		"bins/$${bin}" test args || exit $$?; \
+		"$${bin}" test args || exit $$?; \
 	done
 
 expected: $(EXPECT_BINS)
@@ -107,7 +107,7 @@ expected: $(EXPECT_BINS)
 	do \
 		echo "# $${bin} #"; \
 		mkdir -p expected/`dirname $${bin}`; \
-		"bins/$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr" || exit $$?; \
+		"$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr" || exit $$?; \
 	done
 
 verify: $(EXPECT_BINS)
@@ -117,26 +117,30 @@ verify: $(EXPECT_BINS)
 	do \
 		echo "# $${bin} #"; \
 		mkdir -p gen/`dirname $${bin}`; \
-		"bins/$${bin}" test args > "gen/$${bin}.stdout" 2> "gen/$${bin}.stderr" || exit $$?; \
+		"$${bin}" test args > "gen/$${bin}.stdout" 2> "gen/$${bin}.stderr" || exit $$?; \
 		diff -u "gen/$${bin}.stdout" "expected/$${bin}.stdout" || exit $$?; \
 		diff -u "gen/$${bin}.stderr" "expected/$${bin}.stderr" || exit $$?; \
 	done
 
 CFLAGS=\
+	-fno-builtin \
+	-fno-stack-protector \
+	-Wall \
+	-g \
 	-nostdinc \
 	-nostdlib \
-	-I ../include \
-	-I ../target/include \
-	-I ../target/openlibm/include \
-	-I ../target/openlibm/src \
+	-I ../sysroot/include
 
 HEADLIBS=\
-	../target/release/crt0.o
+	../sysroot/lib/crt0.o
 
 TAILLIBS=\
-	../target/release/libc.a \
-	../target/openlibm/libopenlibm.a
+	../sysroot/lib/libc.a \
+	../sysroot/lib/libm.a
 
-%: %.c $(HEADLIBS) $(TAILLIBS)
-	mkdir -p "bins/$$(dirname "$@")"
-	gcc -fno-builtin -fno-stack-protector -Wall -g $(CFLAGS) $(HEADLIBS) "$<" $(TAILLIBS) -o "bins/$@"
+../sysroot:
+	make -C .. sysroot
+
+bins/%: %.c ../sysroot
+	mkdir -p "$$(dirname "$@")"
+	gcc $(CFLAGS) $(HEADLIBS) "$<" $(TAILLIBS) -o "$@"
