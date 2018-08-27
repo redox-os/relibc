@@ -88,11 +88,11 @@ BINS=\
 	unistd/setid \
 	unistd/stat
 
-.PHONY: $(BINS) all clean run expected verify
-
-$(BINS): %: bins/%
+.PHONY: all $(BINS) clean run expected verify
 
 all: $(BINS)
+
+$(BINS): %: bins/%
 
 clean:
 	rm -rf bins gen *.out
@@ -147,4 +147,4 @@ TAILLIBS=\
 
 bins/%: %.c ../sysroot
 	mkdir -p "$$(dirname "$@")"
-	gcc $(CFLAGS) $(HEADLIBS) "$<" $(TAILLIBS) -o "$@"
+	$(CC) $(CFLAGS) $(HEADLIBS) "$<" $(TAILLIBS) -o "$@"
