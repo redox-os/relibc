@@ -74,7 +74,7 @@ pub unsafe extern "C" fn sigaction(
 }
 
 #[no_mangle]
-pub extern "C" fn sigaddset(set: *mut sigset_t, mut signo: c_int) -> c_int {
+pub extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG {
         unsafe {
             platform::errno = errno::EINVAL;

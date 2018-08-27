@@ -1,8 +1,5 @@
 //! setjmp implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/setjmp.h.html
 
-#![no_std]
-#![feature(global_asm)]
-
 macro_rules! platform_specific {
     ($($arch:expr,$ext:expr;)+) => {
         $(

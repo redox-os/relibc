@@ -11,7 +11,7 @@ use super::mbstate_t;
 
 //It's guaranteed that we don't have any nullpointers here
 pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, ps: *mut mbstate_t) -> usize {
-    let mut size = str::utf8_char_width(*s as u8);
+    let size = str::utf8_char_width(*s as u8);
     if size > n {
         platform::errno = errno::EILSEQ;
         return -2isize as usize;
@@ -50,7 +50,7 @@ pub unsafe fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t) -> usize 
 
     let c = dc.unwrap();
     let size = c.len_utf8();
-    let mut slice = slice::from_raw_parts_mut(s as *mut u8, size);
+    let slice = slice::from_raw_parts_mut(s as *mut u8, size);
 
     c.encode_utf8(slice);
 

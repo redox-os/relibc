@@ -15,6 +15,7 @@ pub const WNOWAIT: c_int = 0x1000000;
 
 pub const __WNOTHREAD: c_int = 0x20000000;
 pub const __WALL: c_int = 0x40000000;
+#[allow(overflowing_literals)]
 pub const __WCLONE: c_int = 0x80000000;
 
 #[no_mangle]

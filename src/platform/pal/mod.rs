@@ -124,7 +124,7 @@ pub trait Pal {
         Self::no_pal("getrusage")
     }
 
-    unsafe fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
+    unsafe fn gethostname(name: *mut c_char, len: size_t) -> c_int {
         Self::no_pal("gethostname")
     }
 

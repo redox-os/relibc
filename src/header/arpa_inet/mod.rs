@@ -29,8 +29,6 @@ pub extern "C" fn ntohs(netshort: u16) -> u16 {
     u16::from_be(netshort)
 }
 
-static mut NTOA_ADDR: [c_char; 16] = [0; 16];
-
 #[no_mangle]
 pub unsafe extern "C" fn inet_aton(cp: *const c_char, inp: *mut in_addr) -> c_int {
     // TODO: octal/hex
@@ -39,6 +37,8 @@ pub unsafe extern "C" fn inet_aton(cp: *const c_char, inp: *mut in_addr) -> c_in
 
 #[no_mangle]
 pub unsafe extern "C" fn inet_ntoa(addr: in_addr) -> *const c_char {
+    static mut NTOA_ADDR: [c_char; 16] = [0; 16];
+
     inet_ntop(
         AF_INET,
         &addr as *const in_addr as *const c_void,
@@ -53,7 +53,7 @@ pub unsafe extern "C" fn inet_pton(domain: c_int, src: *const c_char, dest: *mut
         platform::errno = EAFNOSUPPORT;
         -1
     } else {
-        let mut s_addr = slice::from_raw_parts_mut(
+        let s_addr = slice::from_raw_parts_mut(
             &mut (*(dest as *mut in_addr)).s_addr as *mut _ as *mut u8,
             4,
         );
@@ -97,27 +97,27 @@ pub unsafe extern "C" fn inet_ntop(
     }
 }
 
-#[no_mangle]
+//#[no_mangle]
 pub extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
     unimplemented!();
 }
 
-#[no_mangle]
+//#[no_mangle]
 pub extern "C" fn inet_lnaof(_in: in_addr) -> in_addr_t {
     unimplemented!();
 }
 
-#[no_mangle]
+//#[no_mangle]
 pub extern "C" fn inet_makeaddr(net: in_addr_t, lna: in_addr_t) -> in_addr {
     unimplemented!();
 }
 
-#[no_mangle]
+//#[no_mangle]
 pub extern "C" fn inet_netof(_in: in_addr) -> in_addr_t {
     unimplemented!();
 }
 
-#[no_mangle]
+//#[no_mangle]
 pub extern "C" fn inet_network(cp: *const c_char) -> in_addr_t {
     unimplemented!();
 }

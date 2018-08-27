@@ -161,7 +161,6 @@ pub unsafe extern "C" fn fnmatch(
                         return FNM_NOMATCH;
                     }
                 }
-                unreachable!("nothing should be able to break out of the loop");
             }
             None => return FNM_NOMATCH, // Pattern ended but there's still some input
         }

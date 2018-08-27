@@ -7,7 +7,7 @@ use super::tm;
 
 pub unsafe fn strftime<W: Write>(w: &mut W, format: *const c_char, t: *const tm) -> size_t {
     pub unsafe fn inner_strftime<W: Write>(
-        mut w: &mut W,
+        w: &mut W,
         mut format: *const c_char,
         t: *const tm,
     ) -> bool {

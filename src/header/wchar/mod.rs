@@ -4,6 +4,7 @@ use core::ptr;
 use va_list::VaList as va_list;
 
 use header::stdio::*;
+use header::stdlib::MB_CUR_MAX;
 use header::time::*;
 use platform;
 use platform::types::*;
@@ -11,11 +12,6 @@ use platform::types::*;
 mod utf8;
 
 const WEOF: wint_t = 0xFFFFFFFFu32;
-
-//Maximum number of bytes in a multibyte character for the current locale
-const MB_CUR_MAX: c_int = 4;
-//Maximum number of bytes in a multibyte characters for any locale
-const MB_LEN_MAX: c_int = 4;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -204,13 +200,13 @@ pub extern "C" fn swprintf(
     s: *mut wchar_t,
     n: size_t,
     format: *const wchar_t,
-    mut ap: va_list,
+    ap: va_list,
 ) -> c_int {
     unimplemented!();
 }
 
 // #[no_mangle]
-pub extern "C" fn swscanf(s: *const wchar_t, format: *const wchar_t, mut ap: va_list) -> c_int {
+pub extern "C" fn swscanf(s: *const wchar_t, format: *const wchar_t, ap: va_list) -> c_int {
     unimplemented!();
 }
 
@@ -429,11 +425,11 @@ pub extern "C" fn wmemset(ws1: *mut wchar_t, ws2: wchar_t, n: size_t) -> *mut wc
 }
 
 // #[no_mangle]
-pub extern "C" fn wprintf(format: *const wchar_t, mut ap: va_list) -> c_int {
+pub extern "C" fn wprintf(format: *const wchar_t, ap: va_list) -> c_int {
     unimplemented!();
 }
 
 // #[no_mangle]
-pub extern "C" fn wscanf(format: *const wchar_t, mut ap: va_list) -> c_int {
+pub extern "C" fn wscanf(format: *const wchar_t, ap: va_list) -> c_int {
     unimplemented!();
 }

@@ -848,10 +848,6 @@ impl NulError {
     pub fn into_vec(self) -> Vec<u8> {
         self.1
     }
-
-    fn description(&self) -> &str {
-        "nul byte found in data"
-    }
 }
 
 impl fmt::Display for NulError {

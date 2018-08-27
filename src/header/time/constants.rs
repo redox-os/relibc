@@ -47,7 +47,6 @@ pub(crate) const MON_NAMES: [&str; 12] = [
 pub(crate) const CLOCK_REALTIME: clockid_t = 0;
 pub const CLOCK_MONOTONIC: clockid_t = 1;
 pub(crate) const CLOCK_PROCESS_CPUTIME_ID: clockid_t = 2;
-pub(crate) const CLOCK_THREAD_CPUTIME_ID: clockid_t = 3;
 
 // Can't be time_t because cbindgen UGH
 pub(crate) const CLOCKS_PER_SEC: c_long = 1_000_000;

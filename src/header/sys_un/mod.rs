@@ -1,5 +1,3 @@
-#![no_std]
-
 use header::sys_socket::sa_family_t;
 use platform::types::*;
 

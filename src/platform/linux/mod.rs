@@ -19,7 +19,6 @@ const TIOCGWINSZ: c_ulong = 0x5413;
 const AT_FDCWD: c_int = -100;
 const AT_EMPTY_PATH: c_int = 0x1000;
 const AT_REMOVEDIR: c_int = 0x200;
-const AT_SYMLINK_NOFOLLOW: c_int = 0x100;
 
 fn e(sys: usize) -> usize {
     if (sys as isize) < 0 && (sys as isize) >= -256 {

@@ -7,8 +7,8 @@ use platform::types::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn bcmp(
-    mut first: *const c_void,
-    mut second: *const c_void,
+    first: *const c_void,
+    second: *const c_void,
     n: size_t,
 ) -> c_int {
     let first = first as *const c_char;

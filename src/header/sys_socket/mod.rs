@@ -6,7 +6,7 @@ use platform;
 use platform::types::*;
 use platform::{PalSocket, Sys};
 
-mod constants;
+pub mod constants;
 
 pub type in_addr_t = [u8; 4];
 pub type in_port_t = u16;

@@ -432,13 +432,11 @@ where
 #[no_mangle]
 pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
     if inner_mktemp(name, 0, || unsafe {
-        let mut st: stat = mem::uninitialized();
         let ret = if Sys::access(name, 0) != 0 && platform::errno == ENOENT {
             Some(())
         } else {
             None
         };
-        mem::forget(st);
         ret
     }).is_none()
     {
