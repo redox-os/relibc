@@ -44,7 +44,7 @@ pub(crate) const MON_NAMES: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
-pub(crate) const CLOCK_REALTIME: clockid_t = 0;
+pub const CLOCK_REALTIME: clockid_t = 0;
 pub const CLOCK_MONOTONIC: clockid_t = 1;
 pub(crate) const CLOCK_PROCESS_CPUTIME_ID: clockid_t = 2;
 

@@ -109,6 +109,7 @@ pub unsafe extern "C" fn strcasecmp(mut first: *const c_char, mut second: *const
     }
     0
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn strncasecmp(
     mut first: *const c_char,

@@ -107,6 +107,7 @@ impl<'a> From<&'a timespec> for redox_timespec {
 }
 
 #[repr(C)]
+#[derive(Default)]
 pub struct stat {
     pub st_dev: dev_t,
     pub st_ino: ino_t,
