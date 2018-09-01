@@ -10,6 +10,7 @@ pub mod fnmatch;
 pub mod grp;
 pub mod inttypes;
 pub mod locale;
+pub mod netdb;
 pub mod netinet_in;
 //pub mod pthread;
 pub mod pwd;

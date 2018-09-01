@@ -1,6 +1,6 @@
 sys_includes = ["stddef.h", "stdint.h", "sys/types.h"]
 include_guard = "_SYS_SOCKET_H"
-style = "Tag"
+style = "Both"
 language = "C"
 
 [defines]

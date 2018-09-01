@@ -7,7 +7,7 @@ pub type in_addr_t = u32;
 pub type in_port_t = u16;
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct in_addr {
     pub s_addr: in_addr_t,
 }
@@ -18,10 +18,12 @@ pub struct in6_addr {
 }
 
 #[repr(C)]
+#[derive(Debug, Default)]
 pub struct sockaddr_in {
     pub sin_family: sa_family_t,
     pub sin_port: in_port_t,
     pub sin_addr: in_addr,
+    pub _pad: [c_char; 8],
 }
 
 #[repr(C)]

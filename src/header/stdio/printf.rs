@@ -1,5 +1,5 @@
 use core::fmt::Write as CoreWrite;
-use core::{slice, str};
+use core::{slice, str, ptr};
 
 use platform::types::*;
 use platform::{self, Write};
@@ -61,8 +61,11 @@ pub unsafe fn printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) -> c
                     let a = ap.get::<*const c_char>();
 
                     found_percent = false;
-
-                    w.write_str(str::from_utf8_unchecked(platform::c_str(a)))
+                    if a != ptr::null() {
+                        w.write_str(str::from_utf8_unchecked(platform::c_str(a)))
+                    } else {
+                        w.write_str("NULL")
+                    }
                 }
                 'u' => {
                     let a = ap.get::<c_uint>();

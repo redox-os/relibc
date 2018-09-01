@@ -14,6 +14,7 @@ pub type sa_family_t = u16;
 pub type socklen_t = u32;
 
 #[repr(C)]
+#[derive(Default)]
 pub struct sockaddr {
     pub sa_family: sa_family_t,
     data: [c_char; 14],

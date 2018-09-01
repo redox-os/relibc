@@ -10,17 +10,18 @@ EXPECT_BINS=\
 	fnmatch \
 	locale \
 	math \
+	netdb \
 	select \
 	setjmp \
 	signal \
 	stdio/all \
-	stdio/setvbuf \
 	stdio/freopen \
 	stdio/fwrite \
 	stdio/getc_unget \
 	stdio/printf \
 	stdio/rename \
 	stdio/scanf \
+	stdio/setvbuf \
 	stdio/sprintf \
 	stdlib/a64l \
 	stdlib/atof \

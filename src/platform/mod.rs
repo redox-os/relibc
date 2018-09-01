@@ -29,6 +29,9 @@ pub use self::rawfile::RawFile;
 
 pub mod rawfile;
 
+pub use self::rlb::{Line, RawLineBuffer};
+pub mod rlb;
+
 use self::types::*;
 pub mod types;
 
