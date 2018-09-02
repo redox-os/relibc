@@ -21,10 +21,10 @@ use header::sys_times::tms;
 use header::sys_utsname::utsname;
 use header::termios::termios;
 use header::time::timespec;
-use header::unistd::{F_OK, R_OK, W_OK, X_OK};
+use header::unistd::{F_OK, R_OK, W_OK, X_OK, SEEK_SET};
 
 use super::types::*;
-use super::{errno, FileReader, FileWriter, Pal, RawFile, Read};
+use super::{errno, FileReader, FileWriter, Line, Pal, RawFile, RawLineBuffer, Read};
 
 mod signal;
 mod socket;
@@ -179,12 +179,58 @@ impl Pal for Sys {
             Err(_) => return -1,
         };
 
+        // Count arguments
         let mut len = 0;
         while !(*argv.offset(len)).is_null() {
             len += 1;
         }
 
         let mut args: Vec<[usize; 2]> = Vec::with_capacity(len as usize);
+
+        // Read shebang (for example #!/bin/sh)
+        let mut shebang = [0; 2];
+        let mut read = 0;
+
+        while read < 2 {
+            match Self::read(*fd, &mut shebang) {
+                0 => break,
+                i if i < 0 => return -1,
+                i => read += i
+            }
+        }
+
+        let mut _interpreter_path = None;
+        let mut _interpreter_file = None;
+        let mut interpreter_fd = *fd;
+
+        if &shebang == b"#!" {
+            match RawLineBuffer::new(*fd).next() {
+                Line::Error => return -1,
+                Line::EOF => (),
+                Line::Some(line) => {
+                    let mut path = match CString::new(line) {
+                        Ok(path) => path,
+                        Err(_) => return -1
+                    };
+                    match RawFile::open(&path, O_RDONLY as c_int, 0) {
+                        Ok(file) => {
+                            interpreter_fd = *file;
+                            _interpreter_path = Some(path);
+                            _interpreter_file = Some(file);
+
+                            let path_ref = _interpreter_path.as_ref().unwrap();
+                            args.push([path_ref.as_ptr() as usize, path_ref.to_bytes().len()]);
+                        },
+                        Err(_) => return -1
+                    }
+                }
+            }
+        }
+        if Self::lseek(*fd, 0, SEEK_SET) < 0 {
+            return -1;
+        }
+
+        // Arguments
         while !(*argv).is_null() {
             let arg = *argv;
 
@@ -196,6 +242,7 @@ impl Pal for Sys {
             argv = argv.offset(1);
         }
 
+        // Environment variables
         let mut len = 0;
         while !(*envp.offset(len)).is_null() {
             len += 1;
@@ -213,7 +260,7 @@ impl Pal for Sys {
             envp = envp.offset(1);
         }
 
-        e(syscall::fexec(*fd as usize, &args, &envs)) as c_int
+        e(syscall::fexec(interpreter_fd as usize, &args, &envs)) as c_int
     }
 
     fn fchdir(fd: c_int) -> c_int {
