@@ -1,6 +1,6 @@
-use header::signal::{sigaction, sigset_t};
 use super::super::types::*;
 use super::super::Pal;
+use header::signal::{sigaction, sigset_t};
 
 pub trait PalSignal: Pal {
     fn kill(pid: pid_t, sig: c_int) -> c_int {

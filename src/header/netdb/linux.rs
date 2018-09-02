@@ -1,13 +1,13 @@
 use alloc::string::String;
-use platform::rawfile::RawFile;
-use platform::Line;
-use platform::rlb::RawLineBuffer;
 use c_str::CString;
+use platform::rawfile::RawFile;
+use platform::rlb::RawLineBuffer;
+use platform::Line;
 
 pub fn get_dns_server() -> String {
     let fd = match RawFile::open(&CString::new("/etc/resolv.conf").unwrap(), 0, 0) {
         Ok(fd) => fd,
-        Err(_) => return String::new() // TODO: better error handling
+        Err(_) => return String::new(), // TODO: better error handling
     };
 
     let mut rlb = RawLineBuffer::new(*fd);

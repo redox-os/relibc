@@ -23,11 +23,7 @@ pub unsafe extern "C" fn accept(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    Sys::accept(
-        socket,
-        address,
-        address_len,
-    )
+    Sys::accept(socket, address, address_len)
 }
 
 #[no_mangle]
@@ -36,11 +32,7 @@ pub unsafe extern "C" fn bind(
     address: *const sockaddr,
     address_len: socklen_t,
 ) -> c_int {
-    Sys::bind(
-        socket,
-        address,
-        address_len,
-    )
+    Sys::bind(socket, address, address_len)
 }
 
 #[no_mangle]
@@ -49,11 +41,7 @@ pub unsafe extern "C" fn connect(
     address: *const sockaddr,
     address_len: socklen_t,
 ) -> c_int {
-    Sys::connect(
-        socket,
-        address,
-        address_len,
-    )
+    Sys::connect(socket, address, address_len)
 }
 
 #[no_mangle]
@@ -62,11 +50,7 @@ pub unsafe extern "C" fn getpeername(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    Sys::getpeername(
-        socket,
-        address,
-        address_len,
-    )
+    Sys::getpeername(socket, address, address_len)
 }
 
 #[no_mangle]
@@ -75,11 +59,7 @@ pub unsafe extern "C" fn getsockname(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    Sys::getsockname(
-        socket,
-        address,
-        address_len,
-    )
+    Sys::getsockname(socket, address, address_len)
 }
 
 #[no_mangle]
@@ -124,14 +104,7 @@ pub unsafe extern "C" fn recvfrom(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> ssize_t {
-    Sys::recvfrom(
-        socket,
-        buffer,
-        length,
-        flags,
-        address,
-        address_len,
-    )
+    Sys::recvfrom(socket, buffer, length, flags, address, address_len)
 }
 
 #[no_mangle]
@@ -153,14 +126,7 @@ pub unsafe extern "C" fn sendto(
     dest_addr: *const sockaddr,
     dest_len: socklen_t,
 ) -> ssize_t {
-    Sys::sendto(
-        socket,
-        message,
-        length,
-        flags,
-        dest_addr,
-        dest_len,
-    )
+    Sys::sendto(socket, message, length, flags, dest_addr, dest_len)
 }
 
 #[no_mangle]

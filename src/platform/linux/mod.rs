@@ -7,13 +7,13 @@ use c_str::CStr;
 use header::dirent::dirent;
 use header::errno::{EINVAL, ENOSYS};
 use header::signal::SIGCHLD;
+use header::sys_ioctl::{winsize, TCGETS, TCSETS, TIOCGWINSZ};
 use header::sys_resource::rusage;
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
 use header::sys_time::{itimerval, timeval, timezone};
 use header::sys_times::tms;
 use header::sys_utsname::utsname;
-use header::sys_ioctl::{winsize, TCGETS, TCSETS, TIOCGWINSZ};
 use header::termios::termios;
 use header::time::timespec;
 

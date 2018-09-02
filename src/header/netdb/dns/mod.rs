@@ -11,10 +11,10 @@
 pub use self::answer::DnsAnswer;
 pub use self::query::DnsQuery;
 
-use core::slice;
-use core::u16;
 use alloc::String;
 use alloc::Vec;
+use core::slice;
+use core::u16;
 
 mod answer;
 mod query;
@@ -23,7 +23,7 @@ mod query;
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(packed)]
 pub struct n16 {
-    inner: u16
+    inner: u16,
 }
 
 impl n16 {
@@ -33,7 +33,9 @@ impl n16 {
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
         n16 {
-            inner: unsafe { slice::from_raw_parts(bytes.as_ptr() as *const u16, bytes.len()/2)[0] }
+            inner: unsafe {
+                slice::from_raw_parts(bytes.as_ptr() as *const u16, bytes.len() / 2)[0]
+            },
         }
     }
 }
@@ -41,7 +43,7 @@ impl n16 {
 impl From<u16> for n16 {
     fn from(value: u16) -> Self {
         n16 {
-            inner: value.to_be()
+            inner: value.to_be(),
         }
     }
 }
@@ -57,7 +59,7 @@ pub struct Dns {
     pub transaction_id: u16,
     pub flags: u16,
     pub queries: Vec<DnsQuery>,
-    pub answers: Vec<DnsAnswer>
+    pub answers: Vec<DnsAnswer>,
 }
 
 impl Dns {
@@ -100,75 +102,67 @@ impl Dns {
         let mut i = 0;
 
         macro_rules! pop_u8 {
-            () => {
-                {
-                    i += 1;
-                    if i > data.len() {
-                        return Err(format!("{}: {}: pop_u8", file!(), line!()));
-                    }
-                    data[i - 1]
+            () => {{
+                i += 1;
+                if i > data.len() {
+                    return Err(format!("{}: {}: pop_u8", file!(), line!()));
                 }
-            };
+                data[i - 1]
+            }};
         };
 
         macro_rules! pop_n16 {
-            () => {
-                {
-                    i += 2;
-                    if i > data.len() {
-                        return Err(format!("{}: {}: pop_n16", file!(), line!()));
-                    }
-                    u16::from(n16::from_bytes(&data[i - 2 .. i]))
+            () => {{
+                i += 2;
+                if i > data.len() {
+                    return Err(format!("{}: {}: pop_n16", file!(), line!()));
                 }
-            };
+                u16::from(n16::from_bytes(&data[i - 2..i]))
+            }};
         };
 
         macro_rules! pop_data {
-            () => {
-                {
-                    let mut data = Vec::new();
+            () => {{
+                let mut data = Vec::new();
 
-                    let data_len = pop_n16!();
-                    for _data_i in 0..data_len {
-                        data.push(pop_u8!());
-                    }
-
-                    data
+                let data_len = pop_n16!();
+                for _data_i in 0..data_len {
+                    data.push(pop_u8!());
                 }
-            };
+
+                data
+            }};
         };
 
         macro_rules! pop_name {
-            () => {
-                {
-                    let mut name = String::new();
-                    let old_i = i;
+            () => {{
+                let mut name = String::new();
+                let old_i = i;
 
-                    loop {
-                        let name_len = pop_u8!();
-                        if name_len & name_ind == name_ind {
-                            i -= 1;
-                            i = (pop_n16!() - ((name_ind as u16) << 8)) as usize;
-                            continue;
-                        }
-                        if name_len == 0 {
-                            break;
-                        }
-                        if ! name.is_empty() {
-                            name.push('.');
-                        }
-                        for _name_i in 0..name_len {
-                            name.push(pop_u8!() as char);
-                        }
+                loop {
+                    let name_len = pop_u8!();
+                    if name_len & name_ind == name_ind {
+                        i -= 1;
+                        i = (pop_n16!() - ((name_ind as u16) << 8)) as usize;
+                        continue;
                     }
-
-                    if i <= old_i {
-                        i = old_i + 2;
+                    if name_len == 0 {
+                        break;
                     }
-
-                    name
+                    if !name.is_empty() {
+                        name.push('.');
+                    }
+                    for _name_i in 0..name_len {
+                        name.push(pop_u8!() as char);
+                    }
                 }
-            };
+
+                if i <= old_i {
+                    i = old_i + 2;
+                }
+
+                name
+            }};
         };
 
         let transaction_id = pop_n16!();
@@ -183,7 +177,7 @@ impl Dns {
             queries.push(DnsQuery {
                 name: pop_name!(),
                 q_type: pop_n16!(),
-                q_class: pop_n16!()
+                q_class: pop_n16!(),
             });
         }
 
@@ -195,7 +189,7 @@ impl Dns {
                 a_class: pop_n16!(),
                 ttl_a: pop_n16!(),
                 ttl_b: pop_n16!(),
-                data: pop_data!()
+                data: pop_data!(),
             });
         }
 

@@ -1,9 +1,9 @@
 //! sys/time implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/systime.h.html
 
 use c_str::CStr;
+use header::time::timespec;
 use platform::types::*;
 use platform::{Pal, Sys};
-use header::time::timespec;
 
 pub const ITIMER_REAL: c_int = 0;
 pub const ITIMER_VIRTUAL: c_int = 1;
@@ -44,19 +44,12 @@ pub extern "C" fn setitimer(
     value: *const itimerval,
     ovalue: *mut itimerval,
 ) -> c_int {
-    Sys::setitimer(
-        which,
-        value,
-        ovalue,
-    )
+    Sys::setitimer(which, value, ovalue)
 }
 
 #[no_mangle]
 pub extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
-    Sys::gettimeofday(
-        tp,
-        tzp,
-    )
+    Sys::gettimeofday(tp, tzp)
 }
 
 // #[no_mangle]

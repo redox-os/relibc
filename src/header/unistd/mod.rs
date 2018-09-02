@@ -4,10 +4,10 @@ use core::{ptr, slice};
 
 use c_str::CStr;
 use header::sys_time;
+use header::time::timespec;
 use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
-use header::time::timespec;
 
 pub use self::brk::*;
 pub use self::getopt::*;

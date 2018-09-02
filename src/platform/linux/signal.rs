@@ -1,9 +1,9 @@
 use core::mem;
 
-use header::signal::{sigaction, sigset_t};
 use super::super::types::*;
 use super::super::PalSignal;
 use super::{e, Sys};
+use header::signal::{sigaction, sigset_t};
 
 impl PalSignal for Sys {
     fn kill(pid: pid_t, sig: c_int) -> c_int {

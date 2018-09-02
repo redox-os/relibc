@@ -69,11 +69,15 @@ pub fn file_read_all(path: &CStr) -> Result<Vec<u8>, ()> {
         len += read as usize;
 
         if read == 0 {
-            unsafe { buf.set_len(len); }
+            unsafe {
+                buf.set_len(len);
+            }
             return Ok(buf);
         }
         if read < 0 {
-            unsafe { buf.set_len(len); }
+            unsafe {
+                buf.set_len(len);
+            }
             return Err(());
         }
     }

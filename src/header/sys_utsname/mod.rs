@@ -16,8 +16,8 @@ pub struct utsname {
 
 #[cfg(target_os = "linux")]
 mod inner {
-    use platform::{Pal, Sys};
     use super::*;
+    use platform::{Pal, Sys};
 
     #[no_mangle]
     pub unsafe extern "C" fn uname(uts: *mut utsname) -> c_int {

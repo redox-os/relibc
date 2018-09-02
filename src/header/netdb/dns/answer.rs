@@ -18,5 +18,5 @@ pub struct DnsAnswer {
     pub a_class: u16,
     pub ttl_a: u16,
     pub ttl_b: u16,
-    pub data: Vec<u8>
+    pub data: Vec<u8>,
 }

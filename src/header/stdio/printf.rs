@@ -1,5 +1,5 @@
 use core::fmt::Write as CoreWrite;
-use core::{slice, str, ptr};
+use core::{ptr, slice, str};
 
 use platform::types::*;
 use platform::{self, Write};

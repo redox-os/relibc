@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 use header::unistd::{lseek, SEEK_SET};
 /// Implements an `Iterator` which returns on either newline or EOF.
@@ -10,14 +10,14 @@ pub struct RawLineBuffer {
     pub fd: c_int,
     buf: Vec<u8>,
     newline: Option<usize>,
-    read: usize
+    read: usize,
 }
 
 #[derive(PartialEq)]
 pub enum Line<'a> {
     Error,
     EOF,
-    Some(&'a [u8])
+    Some(&'a [u8]),
 }
 
 impl RawLineBuffer {
@@ -26,7 +26,7 @@ impl RawLineBuffer {
             fd: fd,
             buf: Vec::new(),
             newline: None,
-            read: 0
+            read: 0,
         }
     }
 

@@ -6,8 +6,8 @@ use c_str::CStr;
 use header::{errno, fcntl};
 use platform;
 use platform::types::*;
-use platform::{Line, RawFile, RawLineBuffer};
 use platform::Sys;
+use platform::{Line, RawFile, RawLineBuffer};
 
 #[repr(C)]
 pub struct passwd {
@@ -61,7 +61,7 @@ where
         let line = match rlb.next() {
             Line::Error => return OptionPasswd::Error,
             Line::EOF => return OptionPasswd::NotFound,
-            Line::Some(line) => line
+            Line::Some(line) => line,
         };
 
         // Parse into passwd

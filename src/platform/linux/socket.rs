@@ -1,7 +1,7 @@
-use header::sys_socket::{sockaddr, socklen_t};
 use super::super::types::*;
 use super::super::PalSocket;
 use super::{e, Sys};
+use header::sys_socket::{sockaddr, socklen_t};
 
 impl PalSocket for Sys {
     unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {

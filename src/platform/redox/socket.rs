@@ -2,12 +2,12 @@ use core::{mem, ptr, slice};
 use syscall::flag::*;
 use syscall::{self, Result};
 
-use header::netinet_in::{in_addr_t, in_port_t, sockaddr_in};
-use header::sys_socket::constants::*;
-use header::sys_socket::{sockaddr, socklen_t};
 use super::super::types::*;
 use super::super::{errno, Pal, PalSocket};
 use super::{e, Sys};
+use header::netinet_in::{in_addr_t, in_port_t, sockaddr_in};
+use header::sys_socket::constants::*;
+use header::sys_socket::{sockaddr, socklen_t};
 
 macro_rules! bind_or_connect {
     (bind $path:expr) => {
@@ -30,9 +30,9 @@ macro_rules! bind_or_connect {
         let port = data.sin_port;
         let path = format!(
             bind_or_connect!($mode "{}.{}.{}.{}:{}"),
-            addr >> 8*3,
-            addr >> 8*2 & 0xFF,
-            addr >> 8   & 0xFF,
+            addr >> 8 * 3,
+            addr >> 8 * 2 & 0xFF,
+            addr >> 8 & 0xFF,
             addr & 0xFF,
             port
         );
@@ -48,7 +48,7 @@ macro_rules! bind_or_connect {
             return -1;
         }
         0
-    }}
+    }};
 }
 
 unsafe fn inner_get_name(

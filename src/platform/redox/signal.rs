@@ -1,9 +1,9 @@
 use syscall;
 
-use header::signal::{sigaction, sigset_t};
 use super::super::types::*;
 use super::super::{Pal, PalSignal};
 use super::{e, Sys};
+use header::signal::{sigaction, sigset_t};
 
 #[thread_local]
 static mut SIG_HANDLER: Option<extern "C" fn(c_int)> = None;

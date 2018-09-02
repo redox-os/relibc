@@ -336,10 +336,7 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
 
 #[no_mangle]
 pub extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
-    Sys::nanosleep(
-        rqtp,
-        rmtp,
-    )
+    Sys::nanosleep(rqtp, rmtp)
 }
 
 #[no_mangle]
