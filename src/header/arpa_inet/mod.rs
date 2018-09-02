@@ -4,50 +4,10 @@ use core::str::FromStr;
 use core::{ptr, slice, str};
 
 use header::errno::*;
-use header::netinet_in::{in_addr, in_addr_t};
-use header::ctype::{isdigit, isxdigit, tolower, isspace};
+use header::netinet_in::{in_addr, in_addr_t, INADDR_NONE};
 use platform;
 use platform::c_str;
 use platform::types::*;
-
-
-const IN_CLASSA_NET: u32 = 0xff000000;
-const IN_CLASSA_NSHIFT: u32 = 24;
-const IN_CLASSA_MAX: u32 = 128;
-const IN_CLASSB_NET: u32 = 0xffff0000;
-const IN_CLASSB_NSHIFT: u32 = 16;
-const IN_CLASSB_MAX: u32 = 65536;
-const IN_CLASSC_NET: u32 = 0xffffff00;
-const IN_CLASSC_NSHIFT: u32 = 8;
-const INADDR_NONE: u32 = 0xffffffff;
-
-fn IN_CLASSA(a: in_addr_t) -> bool {
-    a & 0x80000000 == 0
-}
-
-fn IN_CLASSB(a: in_addr_t) -> bool {
-    a & 0xc0000000 == 0x80000000
-}
-
-fn IN_CLASSC(a: in_addr_t) -> bool {
-    a & 0xe0000000 == 0xc0000000
-}
-
-fn IN_CLASSD(a: in_addr_t) -> bool {
-    a & 0xf0000000 == 0xe0000000
-}
-
-fn IN_CLASSA_HOST() -> u32 {
-    0xffffffff & !IN_CLASSA_NET
-}
-
-fn IN_CLASSB_HOST() -> u32 {
-    0xffffffff & !IN_CLASSB_NET
-}
-
-fn IN_CLASSC_HOST() -> u32 {
-    0xffffffff & !IN_CLASSC_NET
-}
 
 
 #[no_mangle]
@@ -144,55 +104,50 @@ pub extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
         s_addr: 0,
     };
 
-    if unsafe { inet_aton(cp, &mut val) } {
-        return val.s_addr;
+    if unsafe { inet_aton(cp, &mut val) } > 0 {
+        val.s_addr
+    } else {
+        INADDR_NONE
     }
 
-    INADDR_NONE
 }
 
 #[no_mangle]
-pub extern "C" fn inet_lnaof(_in: in_addr) -> in_addr_t {
-    let i: u32 = ntohl(_in.s_addr);
-
-    if IN_CLASSA(i) {
-        i & IN_CLASSA_HOST()
-    } else if IN_CLASSB(i) {
-        i & IN_CLASSB_HOST()
+pub extern "C" fn inet_lnaof(input: in_addr) -> in_addr_t {
+    if input.s_addr>>24 < 128 {
+        input.s_addr & 0xffffff
+    } else if input.s_addr>>24 < 192 {
+        input.s_addr & 0xffff
     } else {
-        i & IN_CLASSC_HOST()
+        input.s_addr & 0xff
     }
 }
 
 #[no_mangle]
 pub extern "C" fn inet_makeaddr(net: in_addr_t, host: in_addr_t) -> in_addr {
-    let mut input: in_addr = in_addr {
+    let mut output: in_addr = in_addr {
         s_addr: 0,
     };
 
-    if net < 128 {
-        input.s_addr = (net << IN_CLASSA_NSHIFT) | (host & IN_CLASSA_HOST());
+    if net < 256 {
+        output.s_addr = host | net<<24;
     } else if net < 65536 {
-        input.s_addr = (net << IN_CLASSB_NSHIFT) | (host & IN_CLASSB_HOST());
-    } else if net < 16777216 {
-        input.s_addr = (net << IN_CLASSC_NSHIFT) | (host & IN_CLASSC_HOST());
+        output.s_addr = host | net<<16;
     } else {
-        input.s_addr = net | host;
+        output.s_addr = host | net<<8;
     }
 
-    input.s_addr = htonl(input.s_addr);
-    return input;
+    output
 }
 
 #[no_mangle]
-pub extern "C" fn inet_netof(_in: in_addr) -> in_addr_t {
-    let i: u32 = ntohl(_in.s_addr);
-    if IN_CLASSA(i) {
-        ( i & IN_CLASSA_NET ) >> IN_CLASSA_NSHIFT
-    } else if IN_CLASSB(i) {
-        ( i & IN_CLASSB_NET ) >> IN_CLASSB_NSHIFT
+pub extern "C" fn inet_netof(input: in_addr) -> in_addr_t {
+    if input.s_addr>>24 < 128 {
+        input.s_addr & 0xffffff
+    } else if input.s_addr>>24 < 192 {
+        input.s_addr & 0xffff
     } else {
-        ( i & IN_CLASSC_NET ) >> IN_CLASSC_NSHIFT
+        input.s_addr & 0xff
     }
 }
 
@@ -200,103 +155,5 @@ pub extern "C" fn inet_netof(_in: in_addr) -> in_addr_t {
 
 #[no_mangle]
 pub extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
-    let mut val: u32;
-    let mut base: u32;
-    let mut n: u32;
-    let i: u32;
-    let c: char;
-    let mut parts: [u32; 4];
-    let mut pp: *mut u32 = parts.as_mut_ptr();
-    let mut digit: i32;
-
-    #[derive(PartialEq)]
-    enum Loop {
-        Continue,
-        Stop,
-    }
-
-    let mut loop_state: Loop = Loop::Stop;
-
-
-
-
-    while loop_state == Loop::Continue {
-        val = 0;
-        base = 10;
-        digit = 0;
-
-        if unsafe  { *cp == 0 } {
-            digit = 1;
-            base = 8;
-            unsafe { cp.offset(1) };
-        }
-
-        if unsafe { *cp as u8 as char == 'x' || *cp as u8 as char == 'X' } {
-            digit = 0;
-            base = 16;
-            unsafe { cp.offset(1) };
-        }
-
-
-        while (c = unsafe { *cp }) != 0 {
-            if isdigit(c) {
-                if base == 8 && (c == '8' || c == '9') {
-                    return INADDR_NONE;
-                }
-                val = (val * base) + (c - '0');
-                unsafe { cp.offset(1) };
-                digit = 1;
-                continue;
-            }
-
-            if base == 16 && isxdigit(c) {
-                val = (val << 4) + (tolower (c) + 10 - 'a');
-                unsafe { cp.offset(1) };
-                digit = 1;
-                continue;
-            }
-            break;
-        }
-
-        if !digit {
-            return INADDR_NONE;
-        }
-
-        if pp >= parts + 4 || val > 0xff {
-            return INADDR_NONE;
-        }
-
-        if unsafe { *cp as u8 as char } == '.' {
-            pp = unsafe { pp.offset(1) };
-            unsafe { *pp = val };
-            unsafe { cp.offset(1) };
-            loop_state = Loop::Continue;
-        } else {
-            loop_state = Loop::Stop;
-        }
-
-        while isspace(unsafe { *cp as i32 }) {
-            unsafe { cp.offset(1) };
-        }
-
-        if unsafe { *cp } {
-            return INADDR_NONE;
-        }
-
-        if pp >= parts + 4 || val > 0xff {
-            return INADDR_NONE;
-        }
-
-
-        pp = unsafe { pp.offset(1) };
-        unsafe { *pp = val };
-
-        n = pp - parts;
-
-        for (mut val, i) in i < n {
-            val <<= 8;
-            val |= parts[i] & 0xff;
-        }
-    }
-    val
+    ntohl(inet_addr(cp))
 }
