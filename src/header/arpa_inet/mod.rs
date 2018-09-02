@@ -5,6 +5,7 @@ use core::{ptr, slice, str};
 
 use header::errno::*;
 use header::netinet_in::in_addr;
+use header::ctype::{isdigit, isxdigit};
 use platform;
 use platform::c_str;
 use platform::types::*;
@@ -20,37 +21,30 @@ const IN_CLASSC_NET: i32 = 0xffffff00;
 const IN_CLASSC_NSHIFT: i32 = 8;
 const INADDR_NONE: i32 = 0xffffffff;
 
-#[inline]
 fn IN_CLASSA(a: in_addr_t) -> bool {
     a & 0x80000000 == 0
 }
 
-#[inline]
 fn IN_CLASSB(a: in_addr_t) -> bool {
     a & 0xc0000000 == 0x80000000
 }
 
-#[inline]
 fn IN_CLASSC(a: in_addr_t) -> bool {
     a & 0xe0000000 == 0xc0000000
 }
 
-#[inline]
 fn IN_CLASSD(a: in_addr_t) -> bool {
     a & 0xf0000000 == 0xe0000000
 }
 
-#[inline]
 fn IN_CLASSA_HOST() -> i32 {
     0xffffffff & !IN_CLASSA_NET
 }
 
-#[inline]
 fn IN_CLASSB_HOST() -> i32 {
     0xffffffff & !IN_CLASSB_NET
 }
 
-#[inline]
 fn IN_CLASSC_HOST() -> i32 {
     0xffffffff & !IN_CLASSC_NET
 }
@@ -146,7 +140,7 @@ pub unsafe extern "C" fn inet_ntop(
 
 #[no_mangle]
 pub extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
-    if __inet_aton(cp, &val) {
+    if unsafe { inet_aton(cp, &val) } {
         val.s_addr
     }
 
@@ -201,7 +195,7 @@ pub extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
     let (mut val, mut base, mut n, i): u32;
     let c: char;
     let mut parts: [u32; 4];
-    let pp: *mut u32 = parts.as_mut_ptr();
+    let mut pp: *mut u32 = parts.as_mut_ptr();
     let mut digit: i32;
 
     enum Loop {
@@ -261,7 +255,9 @@ pub extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
         }
 
         if unsafe { *cp } == '.' {
-            unsafe { *pp.offset(1) } = val, unsafe { cp.offset(1) };
+            pp = unsafe { pp.offset(1) };
+            unsafe { *pp = val };
+            unsafe { cp.offset(1) };
             loop_state = Loop::Continue;
         } else {
             loop_state = Loop::Stop;
@@ -280,7 +276,8 @@ pub extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
         }
 
 
-        unsafe { *pp.offset(1) } = val;
+        pp = unsafe { pp.offset(1) };
+        unsafe { *pp = val };
 
         n = pp - parts;
 
