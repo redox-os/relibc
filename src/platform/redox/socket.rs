@@ -2,6 +2,9 @@ use core::{mem, ptr, slice};
 use syscall::flag::*;
 use syscall::{self, Result};
 
+use header::netinet_in::{in_addr_t, in_port_t, sockaddr_in};
+use header::sys_socket::constants::*;
+use header::sys_socket::{sockaddr, socklen_t};
 use super::super::types::*;
 use super::super::{errno, Pal, PalSocket};
 use super::{e, Sys};
@@ -23,9 +26,16 @@ macro_rules! bind_or_connect {
             return -1;
         }
         let data = &*($address as *const sockaddr_in);
-        let addr = &data.sin_addr.s_addr;
-        let port = in_port_t::from_be(data.sin_port); // This is transmuted from bytes in BigEndian order
-        let path = format!(bind_or_connect!($mode "{}.{}.{}.{}:{}"), addr[0], addr[1], addr[2], addr[3], port);
+        let addr = data.sin_addr.s_addr;
+        let port = data.sin_port;
+        let path = format!(
+            bind_or_connect!($mode "{}.{}.{}.{}:{}"),
+            addr >> 8*3,
+            addr >> 8*2 & 0xFF,
+            addr >> 8   & 0xFF,
+            addr & 0xFF,
+            port
+        );
 
         // Duplicate the socket, and then duplicate the copy back to the original fd
         let fd = e(syscall::dup($socket as usize, path.as_bytes()));

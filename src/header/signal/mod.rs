@@ -23,7 +23,6 @@ pub const SIG_BLOCK: c_int = 0;
 pub const SIG_UNBLOCK: c_int = 1;
 pub const SIG_SETMASK: c_int = 2;
 
-// Need both here and in platform because cbindgen :(
 #[repr(C)]
 #[derive(Clone)]
 pub struct sigaction {
@@ -66,11 +65,11 @@ pub unsafe extern "C" fn sigaction(
     let ptr = if !act.is_null() {
         _sigaction = Some((*act).clone());
         _sigaction.as_mut().unwrap().sa_flags |= SA_RESTORER as c_ulong;
-        _sigaction.as_mut().unwrap() as *mut _ as *mut platform::types::sigaction
+        _sigaction.as_mut().unwrap() as *mut _
     } else {
         ptr::null_mut()
     };
-    Sys::sigaction(sig, ptr, oact as *mut platform::types::sigaction)
+    Sys::sigaction(sig, ptr, oact)
 }
 
 #[no_mangle]

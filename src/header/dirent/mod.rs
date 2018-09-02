@@ -68,7 +68,7 @@ pub unsafe extern "C" fn readdir(dir: *mut DIR) -> *mut dirent {
     if (*dir).index >= (*dir).len {
         let read = Sys::getdents(
             (*dir).fd,
-            (*dir).buf.as_mut_ptr() as *mut platform::types::dirent,
+            (*dir).buf.as_mut_ptr() as *mut dirent,
             (*dir).buf.len(),
         );
         if read <= 0 {

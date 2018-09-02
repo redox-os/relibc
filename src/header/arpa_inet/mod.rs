@@ -4,10 +4,12 @@ use core::str::FromStr;
 use core::{ptr, slice, str};
 
 use header::errno::*;
-use header::netinet_in::in_addr;
-use platform;
+use header::netinet_in::{in_addr, in_addr_t};
+use header::sys_socket::constants::*;
+use header::sys_socket::socklen_t;
 use platform::c_str;
 use platform::types::*;
+use platform;
 
 #[no_mangle]
 pub extern "C" fn htonl(hostlong: u32) -> u32 {

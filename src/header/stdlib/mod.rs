@@ -11,6 +11,7 @@ use header::errno::*;
 use header::fcntl::*;
 use header::string::*;
 use header::time::constants::CLOCK_MONOTONIC;
+use header::time::timespec;
 use header::wchar::*;
 use header::{ctype, errno, unistd};
 use platform;

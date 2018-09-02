@@ -7,6 +7,7 @@ use header::sys_time;
 use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
+use header::time::timespec;
 
 pub use self::brk::*;
 pub use self::getopt::*;

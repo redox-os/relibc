@@ -1,5 +1,6 @@
 use core::mem;
 
+use header::signal::{sigaction, sigset_t};
 use super::super::types::*;
 use super::super::PalSignal;
 use super::{e, Sys};

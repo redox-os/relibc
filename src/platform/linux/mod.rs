@@ -4,18 +4,21 @@ use core::{mem, ptr};
 use super::types::*;
 use super::{errno, FileWriter, Pal};
 use c_str::CStr;
+use header::dirent::dirent;
+use header::errno::{EINVAL, ENOSYS};
+use header::signal::SIGCHLD;
+use header::sys_resource::rusage;
+use header::sys_select::fd_set;
+use header::sys_stat::stat;
+use header::sys_time::{itimerval, timeval, timezone};
+use header::sys_times::tms;
+use header::sys_utsname::utsname;
+use header::sys_ioctl::{winsize, TCGETS, TCSETS, TIOCGWINSZ};
+use header::termios::termios;
+use header::time::timespec;
 
 mod signal;
 mod socket;
-
-const EINVAL: c_int = 22;
-const ENOSYS: c_int = 38;
-
-const SIGCHLD: usize = 17;
-
-const TCGETS: c_ulong = 0x5401;
-const TCSETS: c_ulong = 0x5402;
-const TIOCGWINSZ: c_ulong = 0x5413;
 
 const AT_FDCWD: c_int = -100;
 const AT_EMPTY_PATH: c_int = 0x1000;

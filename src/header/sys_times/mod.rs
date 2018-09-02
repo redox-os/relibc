@@ -14,5 +14,5 @@ pub struct tms {
 
 #[no_mangle]
 pub extern "C" fn times(out: *mut tms) -> clock_t {
-    Sys::times(out as *mut platform::types::tms)
+    Sys::times(out)
 }

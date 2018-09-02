@@ -21,15 +21,16 @@ use platform::c_str;
 
 use self::dns::{Dns, DnsQuery};
 
-use header::arpa_inet::{htons, ntohs, inet_aton};
+use header::arpa_inet::{htons, inet_aton};
 use header::errno::*;
 use header::fcntl::O_RDONLY;
 use header::netinet_in::{in_addr, IPPROTO_UDP, sockaddr_in};
 use header::stdlib::atoi;
 use header::strings::strcasecmp;
-use header::sys_socket;
-use header::sys_socket::{sockaddr, socklen_t};
 use header::sys_socket::constants::{SOCK_DGRAM, AF_INET};
+use header::sys_socket::{sockaddr, socklen_t};
+use header::sys_socket;
+use header::time::timespec;
 use header::time;
 use header::unistd::SEEK_SET;
 

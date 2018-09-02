@@ -15,9 +15,20 @@ mod helpers;
 mod strftime;
 
 #[repr(C)]
+#[derive(Default)]
 pub struct timespec {
     pub tv_sec: time_t,
     pub tv_nsec: c_long,
+}
+
+#[cfg(target_os = "redox")]
+impl<'a> From<&'a timespec> for syscall::TimeSpec {
+    fn from(tp: &timespec) -> Self {
+        Self {
+            tv_sec: tp.tv_sec,
+            tv_nsec: tp.tv_nsec as i32,
+        }
+    }
 }
 
 #[repr(C)]
@@ -118,7 +129,7 @@ pub extern "C" fn clock_getres(clock_id: clockid_t, res: *mut timespec) -> c_int
 
 #[no_mangle]
 pub extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -> c_int {
-    Sys::clock_gettime(clock_id, tp as *mut platform::types::timespec)
+    Sys::clock_gettime(clock_id, tp)
 }
 
 // #[no_mangle]
@@ -326,8 +337,8 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
 #[no_mangle]
 pub extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
     Sys::nanosleep(
-        rqtp as *const platform::types::timespec,
-        rmtp as *mut platform::types::timespec,
+        rqtp,
+        rmtp,
     )
 }
 
@@ -357,7 +368,7 @@ pub extern "C" fn strptime(buf: *const c_char, format: *const c_char, tm: *mut t
 
 #[no_mangle]
 pub extern "C" fn time(tloc: *mut time_t) -> time_t {
-    let mut ts: platform::types::timespec = Default::default();
+    let mut ts = timespec::default();
     Sys::clock_gettime(CLOCK_REALTIME, &mut ts);
     unsafe {
         if !tloc.is_null() {

@@ -1,3 +1,4 @@
+use header::signal::{sigaction, sigset_t};
 use super::super::types::*;
 use super::super::Pal;
 

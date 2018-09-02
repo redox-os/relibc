@@ -9,16 +9,25 @@ use syscall::data::TimeSpec as redox_timespec;
 use syscall::flag::*;
 use syscall::{self, Result};
 
+use c_str::{CStr, CString};
+use header::dirent::dirent;
+use header::errno::{EINVAL, ENOSYS};
+use header::sys_mman::MAP_ANON;
+use header::sys_resource::rusage;
+use header::sys_select::fd_set;
+use header::sys_stat::stat;
+use header::sys_time::{itimerval, timeval, timezone};
+use header::sys_times::tms;
+use header::sys_utsname::utsname;
+use header::termios::termios;
+use header::time::timespec;
+use header::unistd::{F_OK, R_OK, W_OK, X_OK};
+
 use super::types::*;
 use super::{errno, FileReader, FileWriter, Pal, RawFile, Read};
-use c_str::{CStr, CString};
 
 mod signal;
 mod socket;
-
-const EINVAL: c_int = 22;
-const ENOSYS: c_int = 38;
-const MAP_ANON: c_int = 1;
 
 static ANONYMOUS_MAPS: Once<Mutex<BTreeMap<usize, usize>>> = Once::new();
 

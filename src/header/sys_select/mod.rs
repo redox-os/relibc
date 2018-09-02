@@ -1,9 +1,18 @@
 //! sys/select.h implementation
 
+use core::mem;
+use header::sys_time::timeval;
 use platform::types::*;
 use platform::{Pal, Sys};
 
-// fd_set is defined in C because cbindgen is incompatible with mem::size_of booo
+// fd_set is also defined in C because cbindgen is incompatible with mem::size_of booo
+
+pub const FD_SETSIZE: usize = 1024;
+
+#[repr(C)]
+pub struct fd_set {
+    pub fds_bits: [c_ulong; FD_SETSIZE / (8 * mem::size_of::<c_ulong>())],
+}
 
 #[no_mangle]
 pub extern "C" fn select(

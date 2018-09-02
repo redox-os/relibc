@@ -1,6 +1,5 @@
 //! termios implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/termios.h.html
 
-use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
 
@@ -24,12 +23,12 @@ pub struct termios {
 
 #[no_mangle]
 pub extern "C" fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
-    Sys::tcgetattr(fd, out as *mut platform::types::termios)
+    Sys::tcgetattr(fd, out)
 }
 
 #[no_mangle]
 pub extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *mut termios) -> c_int {
-    Sys::tcsetattr(fd, act, value as *mut platform::types::termios)
+    Sys::tcsetattr(fd, act, value)
 }
 
 pub const VINTR: usize = 0;

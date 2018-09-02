@@ -1,6 +1,5 @@
 //! pwd implementation for relibc
 
-use alloc::vec::Vec;
 use core::ptr;
 
 use c_str::CStr;
@@ -8,7 +7,7 @@ use header::{errno, fcntl};
 use platform;
 use platform::types::*;
 use platform::{Line, RawFile, RawLineBuffer};
-use platform::{Pal, Sys};
+use platform::Sys;
 
 #[repr(C)]
 pub struct passwd {

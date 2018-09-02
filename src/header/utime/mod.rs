@@ -1,6 +1,7 @@
 //! utime implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/utime.h.html
 
 use c_str::CStr;
+use header::time::timespec;
 use platform::types::*;
 use platform::{Pal, Sys};
 

@@ -1,4 +1,4 @@
-use header::time::sigevent;
+use header::time::{timespec, sigevent};
 use platform::types::*;
 
 pub struct aiocb {

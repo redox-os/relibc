@@ -2,14 +2,11 @@
 
 use core::ptr;
 
-use platform;
 use platform::types::*;
 use platform::{PalSocket, Sys};
 
 pub mod constants;
 
-pub type in_addr_t = [u8; 4];
-pub type in_port_t = u16;
 pub type sa_family_t = u16;
 pub type socklen_t = u32;
 
@@ -17,7 +14,7 @@ pub type socklen_t = u32;
 #[derive(Default)]
 pub struct sockaddr {
     pub sa_family: sa_family_t,
-    data: [c_char; 14],
+    pub data: [c_char; 14],
 }
 
 #[no_mangle]
@@ -28,7 +25,7 @@ pub unsafe extern "C" fn accept(
 ) -> c_int {
     Sys::accept(
         socket,
-        address as *mut platform::types::sockaddr,
+        address,
         address_len,
     )
 }
@@ -41,7 +38,7 @@ pub unsafe extern "C" fn bind(
 ) -> c_int {
     Sys::bind(
         socket,
-        address as *const platform::types::sockaddr,
+        address,
         address_len,
     )
 }
@@ -54,7 +51,7 @@ pub unsafe extern "C" fn connect(
 ) -> c_int {
     Sys::connect(
         socket,
-        address as *const platform::types::sockaddr,
+        address,
         address_len,
     )
 }
@@ -67,7 +64,7 @@ pub unsafe extern "C" fn getpeername(
 ) -> c_int {
     Sys::getpeername(
         socket,
-        address as *mut platform::types::sockaddr,
+        address,
         address_len,
     )
 }
@@ -80,7 +77,7 @@ pub unsafe extern "C" fn getsockname(
 ) -> c_int {
     Sys::getsockname(
         socket,
-        address as *mut platform::types::sockaddr,
+        address,
         address_len,
     )
 }
@@ -132,7 +129,7 @@ pub unsafe extern "C" fn recvfrom(
         buffer,
         length,
         flags,
-        address as *mut platform::types::sockaddr,
+        address,
         address_len,
     )
 }
@@ -161,7 +158,7 @@ pub unsafe extern "C" fn sendto(
         message,
         length,
         flags,
-        dest_addr as *const platform::types::sockaddr,
+        dest_addr,
         dest_len,
     )
 }

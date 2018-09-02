@@ -52,7 +52,7 @@ pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-    Sys::getrusage(who, r_usage as *mut platform::types::rusage)
+    Sys::getrusage(who, r_usage)
 }
 
 // #[no_mangle]

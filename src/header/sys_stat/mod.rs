@@ -2,6 +2,7 @@
 
 use c_str::CStr;
 use header::fcntl::{O_NOFOLLOW, O_PATH};
+use header::time::timespec;
 use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
@@ -35,6 +36,7 @@ pub const S_ISGID: c_int = 0o2000;
 pub const S_ISVTX: c_int = 0o1000;
 
 #[repr(C)]
+#[derive(Default)]
 pub struct stat {
     pub st_dev: dev_t,
     pub st_ino: ino_t,
@@ -69,12 +71,12 @@ pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn fstat(fildes: c_int, buf: *mut platform::types::stat) -> c_int {
+pub extern "C" fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
     Sys::fstat(fildes, buf)
 }
 
 #[no_mangle]
-pub extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut platform::types::stat) -> c_int {
+pub extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut stat) -> c_int {
     fstat(fildes, buf)
 }
 
@@ -84,7 +86,7 @@ pub extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn lstat(path: *const c_char, buf: *mut platform::types::stat) -> c_int {
+pub extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = unsafe { CStr::from_ptr(path) };
     let fd = Sys::open(path, O_PATH | O_NOFOLLOW, 0);
     if fd < 0 {
@@ -116,7 +118,7 @@ pub extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int 
 }
 
 #[no_mangle]
-pub extern "C" fn stat(file: *const c_char, buf: *mut platform::types::stat) -> c_int {
+pub extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     let file = unsafe { CStr::from_ptr(file) };
     let fd = Sys::open(file, O_PATH, 0);
     if fd < 0 {
