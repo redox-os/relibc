@@ -27,7 +27,7 @@ macro_rules! bind_or_connect {
         }
         let data = &*($address as *const sockaddr_in);
         let addr = data.sin_addr.s_addr;
-        let port = data.sin_port;
+        let port = in_port_t::from_be(data.sin_port);
         let path = format!(
             bind_or_connect!($mode "{}.{}.{}.{}:{}"),
             addr >> 8 * 3,
