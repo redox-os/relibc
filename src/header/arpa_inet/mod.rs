@@ -4,22 +4,22 @@ use core::str::FromStr;
 use core::{ptr, slice, str};
 
 use header::errno::*;
-use header::netinet_in::in_addr;
-use header::ctype::{isdigit, isxdigit};
+use header::netinet_in::{in_addr, in_addr_t};
+use header::ctype::{isdigit, isxdigit, tolower, isspace};
 use platform;
 use platform::c_str;
 use platform::types::*;
 
 
-const IN_CLASSA_NET: i32 = 0xff000000;
-const IN_CLASSA_NSHIFT: i32 = 24;
-const IN_CLASSA_MAX: i32 = 128;
-const IN_CLASSB_NET: i32 = 0xffff0000;
-const IN_CLASSB_NSHIFT: i32 = 16;
-const IN_CLASSB_MAX: i32 = 65536;
-const IN_CLASSC_NET: i32 = 0xffffff00;
-const IN_CLASSC_NSHIFT: i32 = 8;
-const INADDR_NONE: i32 = 0xffffffff;
+const IN_CLASSA_NET: u32 = 0xff000000;
+const IN_CLASSA_NSHIFT: u32 = 24;
+const IN_CLASSA_MAX: u32 = 128;
+const IN_CLASSB_NET: u32 = 0xffff0000;
+const IN_CLASSB_NSHIFT: u32 = 16;
+const IN_CLASSB_MAX: u32 = 65536;
+const IN_CLASSC_NET: u32 = 0xffffff00;
+const IN_CLASSC_NSHIFT: u32 = 8;
+const INADDR_NONE: u32 = 0xffffffff;
 
 fn IN_CLASSA(a: in_addr_t) -> bool {
     a & 0x80000000 == 0
@@ -37,15 +37,15 @@ fn IN_CLASSD(a: in_addr_t) -> bool {
     a & 0xf0000000 == 0xe0000000
 }
 
-fn IN_CLASSA_HOST() -> i32 {
+fn IN_CLASSA_HOST() -> u32 {
     0xffffffff & !IN_CLASSA_NET
 }
 
-fn IN_CLASSB_HOST() -> i32 {
+fn IN_CLASSB_HOST() -> u32 {
     0xffffffff & !IN_CLASSB_NET
 }
 
-fn IN_CLASSC_HOST() -> i32 {
+fn IN_CLASSC_HOST() -> u32 {
     0xffffffff & !IN_CLASSC_NET
 }
 
@@ -140,8 +140,12 @@ pub unsafe extern "C" fn inet_ntop(
 
 #[no_mangle]
 pub extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
-    if unsafe { inet_aton(cp, &val) } {
-        val.s_addr
+    let mut val: in_addr = in_addr {
+        s_addr: 0,
+    };
+
+    if unsafe { inet_aton(cp, &mut val) } {
+        return val.s_addr;
     }
 
     INADDR_NONE
@@ -152,39 +156,43 @@ pub extern "C" fn inet_lnaof(_in: in_addr) -> in_addr_t {
     let i: u32 = ntohl(_in.s_addr);
 
     if IN_CLASSA(i) {
-        (i)&IN_CLASSA_HOST
+        i & IN_CLASSA_HOST()
     } else if IN_CLASSB(i) {
-        ((i)&IN_CLASSB_HOST)
+        i & IN_CLASSB_HOST()
     } else {
-        (i)&IN_CLASSC_HOST
+        i & IN_CLASSC_HOST()
     }
 }
 
 #[no_mangle]
-pub extern "C" fn inet_makeaddr(net: in_addr_t, lna: in_addr_t) -> in_addr {
+pub extern "C" fn inet_makeaddr(net: in_addr_t, host: in_addr_t) -> in_addr {
+    let mut input: in_addr = in_addr {
+        s_addr: 0,
+    };
+
     if net < 128 {
-        in_addr.s_addr = (net << IN_CLASSA_NSHIFT) | (host & IN_CLASSA_HOST);
+        input.s_addr = (net << IN_CLASSA_NSHIFT) | (host & IN_CLASSA_HOST());
     } else if net < 65536 {
-        in_addr.s_addr = (net << IN_CLASSB_NSHIFT) | (host & IN_CLASSB_HOST);
+        input.s_addr = (net << IN_CLASSB_NSHIFT) | (host & IN_CLASSB_HOST());
     } else if net < 16777216 {
-        in_addr.s_addr = (net << IN_CLASSC_NSHIFT) | (host & IN_CLASSC_HOST);
+        input.s_addr = (net << IN_CLASSC_NSHIFT) | (host & IN_CLASSC_HOST());
     } else {
-        in_addr.s_addr = net | host;
+        input.s_addr = net | host;
     }
 
-    in_addr.s_addr = htonl(in_addr.s_addr);
-    return in_addr;
+    input.s_addr = htonl(input.s_addr);
+    return input;
 }
 
 #[no_mangle]
 pub extern "C" fn inet_netof(_in: in_addr) -> in_addr_t {
     let i: u32 = ntohl(_in.s_addr);
     if IN_CLASSA(i) {
-        ((i)&IN_CLASSA_NET) >> IN_CLASSA_NSHIFT
+        ( i & IN_CLASSA_NET ) >> IN_CLASSA_NSHIFT
     } else if IN_CLASSB(i) {
-        ((i)&IN_CLASSB_NET) >> IN_CLASSB_NSHIFT
+        ( i & IN_CLASSB_NET ) >> IN_CLASSB_NSHIFT
     } else {
-        ((i)&IN_CLASSC_NET) >> IN_CLASSC_NSHIFT
+        ( i & IN_CLASSC_NET ) >> IN_CLASSC_NSHIFT
     }
 }
 
@@ -192,12 +200,16 @@ pub extern "C" fn inet_netof(_in: in_addr) -> in_addr_t {
 
 #[no_mangle]
 pub extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
-    let (mut val, mut base, mut n, i): u32;
+    let mut val: u32;
+    let mut base: u32;
+    let mut n: u32;
+    let i: u32;
     let c: char;
     let mut parts: [u32; 4];
     let mut pp: *mut u32 = parts.as_mut_ptr();
     let mut digit: i32;
 
+    #[derive(PartialEq)]
     enum Loop {
         Continue,
         Stop,
@@ -213,13 +225,13 @@ pub extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
         base = 10;
         digit = 0;
 
-        if unsafe  { *cp == '0' } {
+        if unsafe  { *cp == 0 } {
             digit = 1;
             base = 8;
             unsafe { cp.offset(1) };
         }
 
-        if unsafe { *cp == 'x' || *cp == 'X' } {
+        if unsafe { *cp as u8 as char == 'x' || *cp as u8 as char == 'X' } {
             digit = 0;
             base = 16;
             unsafe { cp.offset(1) };
@@ -229,7 +241,7 @@ pub extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
         while (c = unsafe { *cp }) != 0 {
             if isdigit(c) {
                 if base == 8 && (c == '8' || c == '9') {
-                    INADDR_NONE
+                    return INADDR_NONE;
                 }
                 val = (val * base) + (c - '0');
                 unsafe { cp.offset(1) };
@@ -247,14 +259,14 @@ pub extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
         }
 
         if !digit {
-            INADDR_NONE
+            return INADDR_NONE;
         }
 
         if pp >= parts + 4 || val > 0xff {
-            INADDR_NONE
+            return INADDR_NONE;
         }
 
-        if unsafe { *cp } == '.' {
+        if unsafe { *cp as u8 as char } == '.' {
             pp = unsafe { pp.offset(1) };
             unsafe { *pp = val };
             unsafe { cp.offset(1) };
@@ -263,16 +275,16 @@ pub extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
             loop_state = Loop::Stop;
         }
 
-        while isspace(unsafe { *cp }) {
+        while isspace(unsafe { *cp as i32 }) {
             unsafe { cp.offset(1) };
         }
 
         if unsafe { *cp } {
-            INADDR_NONE
+            return INADDR_NONE;
         }
 
         if pp >= parts + 4 || val > 0xff {
-            INADDR_NONE
+            return INADDR_NONE;
         }
 
 
@@ -285,9 +297,6 @@ pub extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
             val <<= 8;
             val |= parts[i] & 0xff;
         }
-
-        val
     }
-
-
+    val
 }
