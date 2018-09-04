@@ -10,8 +10,9 @@ before_script:
     - rustup target add x86_64-unknown-redox --toolchain "$(cat rust-toolchain)"
     - rustup show      # Print version info for debugging
 
-cache:
-    untracked: true
+# Cache caused some issues with a header not being generated:
+# cache:
+#     untracked: true
 
 build:linux:
     stage: build

@@ -21,7 +21,7 @@ use header::sys_times::tms;
 use header::sys_utsname::utsname;
 use header::termios::termios;
 use header::time::timespec;
-use header::unistd::{F_OK, R_OK, W_OK, X_OK, SEEK_SET};
+use header::unistd::{F_OK, R_OK, SEEK_SET, W_OK, X_OK};
 
 use super::types::*;
 use super::{errno, FileReader, FileWriter, Line, Pal, RawFile, RawLineBuffer, Read};
@@ -195,7 +195,7 @@ impl Pal for Sys {
             match Self::read(*fd, &mut shebang) {
                 0 => break,
                 i if i < 0 => return -1,
-                i => read += i
+                i => read += i,
             }
         }
 
@@ -210,7 +210,7 @@ impl Pal for Sys {
                 Line::Some(line) => {
                     let mut path = match CString::new(line) {
                         Ok(path) => path,
-                        Err(_) => return -1
+                        Err(_) => return -1,
                     };
                     match RawFile::open(&path, O_RDONLY as c_int, 0) {
                         Ok(file) => {
@@ -220,8 +220,8 @@ impl Pal for Sys {
 
                             let path_ref = _interpreter_path.as_ref().unwrap();
                             args.push([path_ref.as_ptr() as usize, path_ref.to_bytes().len()]);
-                        },
-                        Err(_) => return -1
+                        }
+                        Err(_) => return -1,
                     }
                 }
             }

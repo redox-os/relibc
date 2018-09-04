@@ -101,23 +101,20 @@ pub unsafe extern "C" fn inet_ntop(
 
 #[no_mangle]
 pub extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
-    let mut val: in_addr = in_addr {
-        s_addr: 0,
-    };
+    let mut val: in_addr = in_addr { s_addr: 0 };
 
     if unsafe { inet_aton(cp, &mut val) } > 0 {
         val.s_addr
     } else {
         INADDR_NONE
     }
-
 }
 
 #[no_mangle]
 pub extern "C" fn inet_lnaof(input: in_addr) -> in_addr_t {
-    if input.s_addr>>24 < 128 {
+    if input.s_addr >> 24 < 128 {
         input.s_addr & 0xffffff
-    } else if input.s_addr>>24 < 192 {
+    } else if input.s_addr >> 24 < 192 {
         input.s_addr & 0xffff
     } else {
         input.s_addr & 0xff
@@ -126,16 +123,14 @@ pub extern "C" fn inet_lnaof(input: in_addr) -> in_addr_t {
 
 #[no_mangle]
 pub extern "C" fn inet_makeaddr(net: in_addr_t, host: in_addr_t) -> in_addr {
-    let mut output: in_addr = in_addr {
-        s_addr: 0,
-    };
+    let mut output: in_addr = in_addr { s_addr: 0 };
 
     if net < 256 {
-        output.s_addr = host | net<<24;
+        output.s_addr = host | net << 24;
     } else if net < 65536 {
-        output.s_addr = host | net<<16;
+        output.s_addr = host | net << 16;
     } else {
-        output.s_addr = host | net<<8;
+        output.s_addr = host | net << 8;
     }
 
     output
@@ -143,16 +138,14 @@ pub extern "C" fn inet_makeaddr(net: in_addr_t, host: in_addr_t) -> in_addr {
 
 #[no_mangle]
 pub extern "C" fn inet_netof(input: in_addr) -> in_addr_t {
-    if input.s_addr>>24 < 128 {
+    if input.s_addr >> 24 < 128 {
         input.s_addr & 0xffffff
-    } else if input.s_addr>>24 < 192 {
+    } else if input.s_addr >> 24 < 192 {
         input.s_addr & 0xffff
     } else {
         input.s_addr & 0xff
     }
 }
-
-
 
 #[no_mangle]
 pub extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
