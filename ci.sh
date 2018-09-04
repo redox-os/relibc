@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
 
-./fmt.sh -- --write-mode=diff
+./fmt.sh -- --check
 if [ -z "$TARGET" ]
 then
     make all
