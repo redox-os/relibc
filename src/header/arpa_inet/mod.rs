@@ -1,10 +1,10 @@
-//! arpa/inet implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/arpainet.h.html
+//! arpa/inet implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xns/arpainet.h.html
 
 use core::str::FromStr;
 use core::{ptr, slice, str};
 
 use header::errno::*;
-use header::netinet_in::{in_addr, in_addr_t};
+use header::netinet_in::{in_addr, in_addr_t, INADDR_NONE};
 use header::sys_socket::constants::*;
 use header::sys_socket::socklen_t;
 use platform;
@@ -99,27 +99,62 @@ pub unsafe extern "C" fn inet_ntop(
     }
 }
 
-//#[no_mangle]
+#[no_mangle]
 pub extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
-    unimplemented!();
+    let mut val: in_addr = in_addr {
+        s_addr: 0,
+    };
+
+    if unsafe { inet_aton(cp, &mut val) } > 0 {
+        val.s_addr
+    } else {
+        INADDR_NONE
+    }
+
 }
 
-//#[no_mangle]
-pub extern "C" fn inet_lnaof(_in: in_addr) -> in_addr_t {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn inet_lnaof(input: in_addr) -> in_addr_t {
+    if input.s_addr>>24 < 128 {
+        input.s_addr & 0xffffff
+    } else if input.s_addr>>24 < 192 {
+        input.s_addr & 0xffff
+    } else {
+        input.s_addr & 0xff
+    }
 }
 
-//#[no_mangle]
-pub extern "C" fn inet_makeaddr(net: in_addr_t, lna: in_addr_t) -> in_addr {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn inet_makeaddr(net: in_addr_t, host: in_addr_t) -> in_addr {
+    let mut output: in_addr = in_addr {
+        s_addr: 0,
+    };
+
+    if net < 256 {
+        output.s_addr = host | net<<24;
+    } else if net < 65536 {
+        output.s_addr = host | net<<16;
+    } else {
+        output.s_addr = host | net<<8;
+    }
+
+    output
 }
 
-//#[no_mangle]
-pub extern "C" fn inet_netof(_in: in_addr) -> in_addr_t {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn inet_netof(input: in_addr) -> in_addr_t {
+    if input.s_addr>>24 < 128 {
+        input.s_addr & 0xffffff
+    } else if input.s_addr>>24 < 192 {
+        input.s_addr & 0xffff
+    } else {
+        input.s_addr & 0xff
+    }
 }
 
-//#[no_mangle]
-pub extern "C" fn inet_network(cp: *const c_char) -> in_addr_t {
-    unimplemented!();
+
+
+#[no_mangle]
+pub extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
+    ntohl(inet_addr(cp))
 }
