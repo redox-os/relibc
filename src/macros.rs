@@ -101,3 +101,13 @@ macro_rules! strto_impl {
         num
     }};
 }
+
+#[macro_export]
+macro_rules! println {
+    ($($args:tt),*) => {
+        {
+            use core::fmt::Write as _Trait;
+            writeln!(::platform::FileWriter(1) $(, $args)*).expect("writing a debug message failed");
+        }
+    }
+}

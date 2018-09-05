@@ -317,7 +317,6 @@ fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
         };
 
         let packet_data = packet.compile();
-        use core::fmt::Write;
         let packet_data_len = packet_data.len();
         let packet_data_box = packet_data.into_boxed_slice();
         let packet_data_ptr = Box::into_raw(packet_data_box) as *mut _ as *mut c_void;
@@ -866,10 +865,11 @@ pub unsafe extern "C" fn getservent() -> *const servent {
     rlb.next();
     S_POS = rlb.line_pos();
 
-    let mut iter: SplitWhitespace = r.split_whitespace();
-    let mut serv_name: Vec<u8> = iter.next().unwrap().as_bytes().to_vec();
+    let comment = r.find('#').unwrap_or(r.len());
+    let space = r[..comment].trim_right().rfind(char::is_whitespace).unwrap();
+    let mut serv_name = r[..space].trim().as_bytes().to_vec();
     serv_name.push(b'\0');
-    let port_proto = iter.next().unwrap();
+    let port_proto = &r[space..comment].trim();
     let mut split = port_proto.split("/");
     let mut port = split.next().unwrap().as_bytes().to_vec();
     port.push(b'\0');
