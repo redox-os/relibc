@@ -850,8 +850,9 @@ pub unsafe extern "C" fn getservent() -> *const servent {
     rlb.seek(S_POS);
 
     let mut r: Box<str> = Box::default();
-    while r.is_empty() || r.split_whitespace().next() == None || r.starts_with("#") {
-        r = match rlb.next() {
+
+    loop {
+        let mut r = match rlb.next() {
             Line::Some(s) => bytes_to_box_str(s),
             _ => {
                 if SERV_STAYOPEN == 0 {
@@ -860,58 +861,69 @@ pub unsafe extern "C" fn getservent() -> *const servent {
                 return ptr::null();
             }
         };
+
+        let mut iter = r.split_whitespace();
+        let mut serv_name = match iter.next() {
+            Some(serv_name) => serv_name.as_bytes().to_vec(),
+            None => continue
+        };
+        serv_name.push(b'\0');
+        let port_proto = match iter.next() {
+            Some(port_proto) => port_proto,
+            None => continue
+        };
+        let mut split = port_proto.split("/");
+        let mut port = match split.next() {
+            Some(port) => port.as_bytes().to_vec(),
+            None => continue
+        };
+        port.push(b'\0');
+        SERV_PORT = Some(htons(atoi(port.as_mut_slice().as_mut_ptr() as *mut i8) as u16) as u32 as i32);
+        let mut proto = match split.next() {
+            Some(proto) => proto.as_bytes().to_vec(),
+            None => continue
+        };
+        proto.push(b'\0');
+
+        rlb.next();
+        S_POS = rlb.line_pos();
+
+        /*
+         *let mut _serv_aliases: Vec<Vec<u8>> = Vec::new();
+         *loop {
+         *    let mut alias = match iter.next() {
+         *        Some(s) => s.as_bytes().to_vec(),
+         *        _ => break
+         *    };
+         *    alias.push(b'\0');
+         *    _serv_aliases.push(alias);
+         *}
+         *let mut serv_aliases: Vec<*mut i8> = _serv_aliases.iter_mut().map(|x| x.as_mut_ptr() as *mut i8).collect();
+         *serv_aliases.push(ptr::null_mut());
+         *
+         */
+        let mut _serv_aliases: Vec<Vec<u8>> = Vec::new();
+        _serv_aliases.push(vec![b'\0']);
+        let mut serv_aliases: Vec<*mut i8> = Vec::new();
+        serv_aliases.push(ptr::null_mut());
+        serv_aliases.push(ptr::null_mut());
+
+        SERV_ALIASES = Some(_serv_aliases);
+        SERV_NAME = Some(serv_name);
+        SERV_PROTO = Some(proto);
+
+        SERV_ENTRY = servent {
+            s_name: SERV_NAME.as_mut().unwrap().as_mut_slice().as_mut_ptr() as *mut c_char,
+            s_aliases: serv_aliases.as_mut_slice().as_mut_ptr() as *mut *mut i8,
+            s_port: SERV_PORT.unwrap(),
+            s_proto: SERV_PROTO.as_mut().unwrap().as_mut_slice().as_mut_ptr() as *mut c_char,
+        };
+
+        if SERV_STAYOPEN == 0 {
+            endservent();
+        }
+        break &SERV_ENTRY as *const servent
     }
-
-    rlb.next();
-    S_POS = rlb.line_pos();
-
-    let comment = r.find('#').unwrap_or(r.len());
-    let space = r[..comment].trim_right().rfind(char::is_whitespace).unwrap();
-    let mut serv_name = r[..space].trim().as_bytes().to_vec();
-    serv_name.push(b'\0');
-    let port_proto = &r[space..comment].trim();
-    let mut split = port_proto.split("/");
-    let mut port = split.next().unwrap().as_bytes().to_vec();
-    port.push(b'\0');
-    SERV_PORT = Some(htons(atoi(port.as_mut_slice().as_mut_ptr() as *mut i8) as u16) as u32 as i32);
-    let mut proto = split.next().unwrap().as_bytes().to_vec();
-    proto.push(b'\0');
-
-    /*
-     *let mut _serv_aliases: Vec<Vec<u8>> = Vec::new();
-     *loop {
-     *    let mut alias = match iter.next() {
-     *        Some(s) => s.as_bytes().to_vec(),
-     *        _ => break
-     *    };
-     *    alias.push(b'\0');
-     *    _serv_aliases.push(alias);
-     *}
-     *let mut serv_aliases: Vec<*mut i8> = _serv_aliases.iter_mut().map(|x| x.as_mut_ptr() as *mut i8).collect();
-     *serv_aliases.push(ptr::null_mut());
-     *
-     */
-    let mut _serv_aliases: Vec<Vec<u8>> = Vec::new();
-    _serv_aliases.push(vec![b'\0']);
-    let mut serv_aliases: Vec<*mut i8> = Vec::new();
-    serv_aliases.push(ptr::null_mut());
-    serv_aliases.push(ptr::null_mut());
-
-    SERV_ALIASES = Some(_serv_aliases);
-    SERV_NAME = Some(serv_name);
-    SERV_PROTO = Some(proto);
-
-    SERV_ENTRY = servent {
-        s_name: SERV_NAME.as_mut().unwrap().as_mut_slice().as_mut_ptr() as *mut c_char,
-        s_aliases: serv_aliases.as_mut_slice().as_mut_ptr() as *mut *mut i8,
-        s_port: SERV_PORT.unwrap(),
-        s_proto: SERV_PROTO.as_mut().unwrap().as_mut_slice().as_mut_ptr() as *mut c_char,
-    };
-
-    if SERV_STAYOPEN == 0 {
-        endservent();
-    }
-    &SERV_ENTRY as *const servent
 }
 
 #[no_mangle]
