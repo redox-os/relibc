@@ -3,8 +3,8 @@
 
 int main() {
     int day = 60 * 60 * 24;
-    time_t inputs[] = { -(day * 33), -day, -500, 0, 1531454950 };
-    for (int i = 0; i < 5; i += 1) {
+    time_t inputs[] = { -(day * 33), -day, -1, -500, 0, 1, 1531454950 };
+    for (int i = 0; i < (sizeof(inputs) / sizeof(time_t)); i += 1) {
         struct tm* t = localtime(&inputs[i]);
 
         printf(

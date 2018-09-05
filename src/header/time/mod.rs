@@ -8,10 +8,8 @@ use platform::types::*;
 use platform::{Pal, Sys};
 
 use self::constants::*;
-use self::helpers::*;
 
 pub mod constants;
-mod helpers;
 mod strftime;
 
 #[repr(C)]
@@ -158,52 +156,8 @@ pub extern "C" fn getdate(string: *const c_char) -> tm {
 }
 
 #[no_mangle]
-pub extern "C" fn gmtime(timer: *const time_t) -> *mut tm {
+pub unsafe extern "C" fn gmtime(timer: *const time_t) -> *mut tm {
     unsafe { gmtime_r(timer, &mut TM) }
-}
-
-#[no_mangle]
-pub extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut tm {
-    let (mut days, mut rem): (c_long, c_long);
-    let mut weekday: c_int;
-    let lcltime = unsafe { *clock };
-
-    days = lcltime / SECSPERDAY + EPOCH_ADJUSTMENT_DAYS;
-    rem = lcltime % SECSPERDAY;
-    if rem < 0 {
-        rem += SECSPERDAY;
-        days -= 1;
-    }
-    unsafe {
-        (*result).tm_hour = (rem / SECSPERHOUR) as c_int;
-        rem %= SECSPERHOUR;
-        (*result).tm_min = (rem / SECSPERMIN) as c_int;
-        (*result).tm_sec = (rem % SECSPERMIN) as c_int;
-    }
-
-    weekday = ((ADJUSTED_EPOCH_WDAY + days) % DAYSPERWEEK as c_long) as c_int;
-    if weekday < 0 {
-        weekday += DAYSPERWEEK;
-    }
-    unsafe { (*result).tm_wday = weekday };
-
-    let (year, month, day, yearday) = civil_from_days(days);
-    unsafe {
-        (*result).tm_yday = yearday;
-        (*result).tm_year = year - YEAR_BASE;
-        (*result).tm_mon = month;
-        (*result).tm_mday = day;
-
-        (*result).tm_isdst = 0;
-        (*result).tm_gmtoff = 0;
-        (*result).tm_zone = UTC;
-    }
-    result
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn localtime(clock: *const time_t) -> *mut tm {
-    localtime_r(clock, &mut TM)
 }
 
 const MONTH_DAYS: [[c_int; 12]; 2] = [
@@ -213,12 +167,13 @@ const MONTH_DAYS: [[c_int; 12]; 2] = [
     [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
 ];
 
+#[inline(always)]
 fn leap_year(year: c_int) -> bool {
     year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
+pub unsafe extern "C" fn gmtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
     let clock = *clock;
 
     let mut day = (clock / (60 * 60 * 24)) as c_int;
@@ -288,9 +243,23 @@ pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut t
         (*t).tm_mon += 1;
     }
     (*t).tm_mday = 1 + day as c_int;
+
     (*t).tm_isdst = 0;
+    (*t).tm_gmtoff = 0;
+    (*t).tm_zone = UTC;
 
     t
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn localtime(clock: *const time_t) -> *mut tm {
+    localtime_r(clock, &mut TM)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
+    // TODO: Change tm_isdst, tm_gmtoff, tm_zone
+    gmtime_r(clock, t)
 }
 
 #[no_mangle]
