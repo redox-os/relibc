@@ -5,6 +5,12 @@ use super::super::PalSignal;
 use super::{e, Sys};
 use header::signal::{sigaction, sigset_t};
 
+impl Sys {
+    fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
+        e(unsafe { syscall!(RT_SIGPROCMASK, how, set, oset, mem::size_of::<sigset_t>()) }) as c_int
+    }
+}
+
 impl PalSignal for Sys {
     fn kill(pid: pid_t, sig: c_int) -> c_int {
         e(unsafe { syscall!(KILL, pid, sig) }) as c_int
@@ -33,9 +39,5 @@ impl PalSignal for Sys {
             oact,
             mem::size_of::<sigset_t>()
         )) as c_int
-    }
-
-    fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
-        e(unsafe { syscall!(RT_SIGPROCMASK, how, set, oset, mem::size_of::<sigset_t>()) }) as c_int
     }
 }

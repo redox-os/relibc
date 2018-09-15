@@ -1,7 +1,7 @@
 //! sys/wait.h implementation for Redox, following
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/syswait.h.html
 
-use header::sys_resource::rusage;
+//use header::sys_resource::rusage;
 use platform::types::*;
 use platform::{Pal, Sys};
 
@@ -24,13 +24,13 @@ pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {
 }
 
 // #[no_mangle]
-pub unsafe extern "C" fn wait3(
-    stat_loc: *mut c_int,
-    options: c_int,
-    resource_usage: *mut rusage,
-) -> pid_t {
-    unimplemented!();
-}
+// pub unsafe extern "C" fn wait3(
+//     stat_loc: *mut c_int,
+//     options: c_int,
+//     resource_usage: *mut rusage,
+// ) -> pid_t {
+//     unimplemented!();
+// }
 
 /*
  * TODO: implement idtype_t, id_t, and siginfo_t

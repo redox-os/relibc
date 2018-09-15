@@ -174,10 +174,10 @@ pub extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
-pub extern "C" fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
-    Sys::sigprocmask(how, set, oset)
-}
+// #[no_mangle]
+// pub extern "C" fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
+//     Sys::sigprocmask(how, set, oset)
+// }
 
 // #[no_mangle]
 pub extern "C" fn sigrelse(sig: c_int) -> c_int {

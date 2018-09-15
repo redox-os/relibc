@@ -12,12 +12,13 @@ use syscall::{self, Result};
 use c_str::{CStr, CString};
 use header::dirent::dirent;
 use header::errno::{EINVAL, ENOSYS};
-use header::sys_mman::MAP_ANON;
-use header::sys_resource::rusage;
+const MAP_ANON: c_int = 1;
+//use header::sys_mman::MAP_ANON;
+//use header::sys_resource::rusage;
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
 use header::sys_time::{itimerval, timeval, timezone};
-use header::sys_times::tms;
+//use header::sys_times::tms;
 use header::sys_utsname::utsname;
 use header::termios::termios;
 use header::time::timespec;
@@ -52,14 +53,6 @@ fn e(sys: Result<usize>) -> usize {
 pub struct Sys;
 
 impl Pal for Sys {
-    fn no_pal(name: &str) -> c_int {
-        let _ = writeln!(FileWriter(2), "relibc: no_pal: {}", name);
-        unsafe {
-            errno = ENOSYS;
-        }
-        -1
-    }
-
     fn access(path: &CStr, mode: c_int) -> c_int {
         let fd = match RawFile::open(path, 0, 0) {
             Ok(fd) => fd,

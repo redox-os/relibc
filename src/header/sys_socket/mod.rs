@@ -62,21 +62,21 @@ pub unsafe extern "C" fn getsockname(
     Sys::getsockname(socket, address, address_len)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn getsockopt(
-    socket: c_int,
-    level: c_int,
-    option_name: c_int,
-    option_value: *mut c_void,
-    option_len: *mut socklen_t,
-) -> c_int {
-    Sys::getsockopt(socket, level, option_name, option_value, option_len)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn listen(socket: c_int, backlog: c_int) -> c_int {
-    Sys::listen(socket, backlog)
-}
+// #[no_mangle]
+// pub unsafe extern "C" fn getsockopt(
+//     socket: c_int,
+//     level: c_int,
+//     option_name: c_int,
+//     option_value: *mut c_void,
+//     option_len: *mut socklen_t,
+// ) -> c_int {
+//     Sys::getsockopt(socket, level, option_name, option_value, option_len)
+// }
+//
+// #[no_mangle]
+// pub unsafe extern "C" fn listen(socket: c_int, backlog: c_int) -> c_int {
+//     Sys::listen(socket, backlog)
+// }
 
 #[no_mangle]
 pub unsafe extern "C" fn recv(
@@ -129,33 +129,33 @@ pub unsafe extern "C" fn sendto(
     Sys::sendto(socket, message, length, flags, dest_addr, dest_len)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn setsockopt(
-    socket: c_int,
-    level: c_int,
-    option_name: c_int,
-    option_value: *const c_void,
-    option_len: socklen_t,
-) -> c_int {
-    Sys::setsockopt(socket, level, option_name, option_value, option_len)
-}
+// #[no_mangle]
+// pub unsafe extern "C" fn setsockopt(
+//     socket: c_int,
+//     level: c_int,
+//     option_name: c_int,
+//     option_value: *const c_void,
+//     option_len: socklen_t,
+// ) -> c_int {
+//     Sys::setsockopt(socket, level, option_name, option_value, option_len)
+// }
 
-#[no_mangle]
-pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {
-    Sys::shutdown(socket, how)
-}
+// #[no_mangle]
+// pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {
+//     Sys::shutdown(socket, how)
+// }
 
 #[no_mangle]
 pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
     Sys::socket(domain, kind, protocol)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn socketpair(
-    domain: c_int,
-    kind: c_int,
-    protocol: c_int,
-    socket_vector: *mut c_int,
-) -> c_int {
-    Sys::socketpair(domain, kind, protocol, socket_vector)
-}
+// #[no_mangle]
+// pub unsafe extern "C" fn socketpair(
+//     domain: c_int,
+//     kind: c_int,
+//     protocol: c_int,
+//     socket_vector: *mut c_int,
+// ) -> c_int {
+//     Sys::socketpair(domain, kind, protocol, socket_vector)
+// }

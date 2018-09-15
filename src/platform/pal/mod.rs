@@ -3,11 +3,11 @@ use core::ptr;
 use super::types::*;
 use c_str::CStr;
 use header::dirent::dirent;
-use header::sys_resource::rusage;
+//use header::sys_resource::rusage;
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
 use header::sys_time::{itimerval, timeval, timezone};
-use header::sys_times::tms;
+//use header::sys_times::tms;
 use header::sys_utsname::utsname;
 use header::termios::termios;
 use header::time::timespec;
@@ -19,168 +19,81 @@ pub use self::socket::PalSocket;
 mod socket;
 
 pub trait Pal {
-    fn no_pal(name: &str) -> c_int;
-
-    fn access(path: &CStr, mode: c_int) -> c_int {
-        Self::no_pal("access")
-    }
+    fn access(path: &CStr, mode: c_int) -> c_int;
 
     fn brk(addr: *mut c_void) -> *mut c_void;
 
-    fn chdir(path: &CStr) -> c_int {
-        Self::no_pal("chdir")
-    }
+    fn chdir(path: &CStr) -> c_int;
 
-    fn chmod(path: &CStr, mode: mode_t) -> c_int {
-        Self::no_pal("chmod")
-    }
+    fn chmod(path: &CStr, mode: mode_t) -> c_int;
 
-    fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
-        Self::no_pal("chown")
-    }
+    fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int;
 
-    fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int {
-        Self::no_pal("clock_gettime")
-    }
+    fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int;
 
-    fn close(fildes: c_int) -> c_int {
-        Self::no_pal("close")
-    }
+    fn close(fildes: c_int) -> c_int;
 
-    fn dup(fildes: c_int) -> c_int {
-        Self::no_pal("dup")
-    }
+    fn dup(fildes: c_int) -> c_int;
 
-    fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
-        Self::no_pal("dup2")
-    }
+    fn dup2(fildes: c_int, fildes2: c_int) -> c_int;
 
-    unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
-        Self::no_pal("execve")
-    }
+    unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int;
 
     fn exit(status: c_int) -> !;
 
-    fn fchdir(fildes: c_int) -> c_int {
-        Self::no_pal("fchdir")
-    }
+    fn fchdir(fildes: c_int) -> c_int;
 
-    fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
-        Self::no_pal("fchmod")
-    }
+    fn fchmod(fildes: c_int, mode: mode_t) -> c_int;
 
-    fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
-        Self::no_pal("fchown")
-    }
+    fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int;
 
-    fn flock(fd: c_int, operation: c_int) -> c_int {
-        Self::no_pal("flock")
-    }
+    fn flock(fd: c_int, operation: c_int) -> c_int;
 
-    fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
-        Self::no_pal("fstat")
-    }
+    fn fstat(fildes: c_int, buf: *mut stat) -> c_int;
 
-    fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
-        Self::no_pal("fcntl")
-    }
+    fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int;
 
-    fn fork() -> pid_t {
-        Self::no_pal("fork")
-    }
+    fn fork() -> pid_t;
 
-    fn fsync(fildes: c_int) -> c_int {
-        Self::no_pal("fsync")
-    }
+    fn fsync(fildes: c_int) -> c_int;
 
-    fn ftruncate(fildes: c_int, length: off_t) -> c_int {
-        Self::no_pal("ftruncate")
-    }
+    fn ftruncate(fildes: c_int, length: off_t) -> c_int;
 
-    fn futimens(fd: c_int, times: *const timespec) -> c_int {
-        Self::no_pal("futimens")
-    }
+    fn futimens(fd: c_int, times: *const timespec) -> c_int;
 
-    fn utimens(path: &CStr, times: *const timespec) -> c_int {
-        Self::no_pal("utimens")
-    }
+    fn utimens(path: &CStr, times: *const timespec) -> c_int;
 
-    fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
-        Self::no_pal("getcwd");
-        ptr::null_mut()
-    }
+    fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char;
 
-    fn getdents(fd: c_int, dirents: *mut dirent, bytes: usize) -> c_int {
-        Self::no_pal("getdents")
-    }
+    fn getdents(fd: c_int, dirents: *mut dirent, bytes: usize) -> c_int;
 
-    fn getegid() -> gid_t {
-        Self::no_pal("getegid")
-    }
+    fn getegid() -> gid_t;
 
-    fn geteuid() -> uid_t {
-        Self::no_pal("geteuid")
-    }
+    fn geteuid() -> uid_t;
 
-    fn getgid() -> gid_t {
-        Self::no_pal("getgid")
-    }
+    fn getgid() -> gid_t;
 
-    fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-        Self::no_pal("getrusage")
-    }
+    unsafe fn gethostname(name: *mut c_char, len: size_t) -> c_int;
 
-    unsafe fn gethostname(name: *mut c_char, len: size_t) -> c_int {
-        Self::no_pal("gethostname")
-    }
+    fn getpgid(pid: pid_t) -> pid_t;
 
-    fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
-        Self::no_pal("getitimer")
-    }
+    fn getpid() -> pid_t;
 
-    fn getpgid(pid: pid_t) -> pid_t {
-        Self::no_pal("getpgid")
-    }
+    fn getppid() -> pid_t;
 
-    fn getpid() -> pid_t {
-        Self::no_pal("getpid")
-    }
+    fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int;
 
-    fn getppid() -> pid_t {
-        Self::no_pal("getppid")
-    }
+    fn getuid() -> uid_t;
 
-    fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
-        Self::no_pal("gettimeofday")
-    }
+    fn isatty(fd: c_int) -> c_int;
 
-    fn getuid() -> uid_t {
-        Self::no_pal("getuid")
-    }
+    fn link(path1: &CStr, path2: &CStr) -> c_int;
 
-    fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
-        Self::no_pal("ioctl")
-    }
+    fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t;
 
-    fn isatty(fd: c_int) -> c_int {
-        Self::no_pal("isatty")
-    }
+    fn mkdir(path: &CStr, mode: mode_t) -> c_int;
 
-    fn link(path1: &CStr, path2: &CStr) -> c_int {
-        Self::no_pal("link")
-    }
-
-    fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
-        Self::no_pal("lseek") as off_t
-    }
-
-    fn mkdir(path: &CStr, mode: mode_t) -> c_int {
-        Self::no_pal("mkdir")
-    }
-
-    fn mkfifo(path: &CStr, mode: mode_t) -> c_int {
-        Self::no_pal("mkfifo")
-    }
+    fn mkfifo(path: &CStr, mode: mode_t) -> c_int;
 
     unsafe fn mmap(
         addr: *mut c_void,
@@ -189,37 +102,21 @@ pub trait Pal {
         flags: c_int,
         fildes: c_int,
         off: off_t,
-    ) -> *mut c_void {
-        Self::no_pal("mmap") as *mut c_void
-    }
+    ) -> *mut c_void;
 
-    unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
-        Self::no_pal("munmap")
-    }
+    unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int;
 
-    fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
-        Self::no_pal("nanosleep")
-    }
+    fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int;
 
-    fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
-        Self::no_pal("open")
-    }
+    fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int;
 
-    fn pipe(fildes: &mut [c_int]) -> c_int {
-        Self::no_pal("pipe")
-    }
+    fn pipe(fildes: &mut [c_int]) -> c_int;
 
-    fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
-        Self::no_pal("read") as ssize_t
-    }
+    fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
 
-    fn rename(old: &CStr, new: &CStr) -> c_int {
-        Self::no_pal("rename")
-    }
+    fn rename(old: &CStr, new: &CStr) -> c_int;
 
-    fn rmdir(path: &CStr) -> c_int {
-        Self::no_pal("rmdir")
-    }
+    fn rmdir(path: &CStr) -> c_int;
 
     fn select(
         nfds: c_int,
@@ -227,56 +124,21 @@ pub trait Pal {
         writefds: *mut fd_set,
         exceptfds: *mut fd_set,
         timeout: *mut timeval,
-    ) -> c_int {
-        Self::no_pal("select")
-    }
+    ) -> c_int;
 
-    fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
-        Self::no_pal("setitimer")
-    }
+    fn setpgid(pid: pid_t, pgid: pid_t) -> c_int;
 
-    fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
-        Self::no_pal("setpgid")
-    }
+    fn setregid(rgid: gid_t, egid: gid_t) -> c_int;
 
-    fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
-        Self::no_pal("setregid")
-    }
+    fn setreuid(ruid: uid_t, euid: uid_t) -> c_int;
 
-    fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
-        Self::no_pal("setreuid")
-    }
+    fn tcgetattr(fd: c_int, out: *mut termios) -> c_int;
 
-    fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
-        Self::no_pal("tcgetattr")
-    }
+    fn tcsetattr(fd: c_int, act: c_int, value: *const termios) -> c_int;
 
-    fn tcsetattr(fd: c_int, act: c_int, value: *const termios) -> c_int {
-        Self::no_pal("tcsetattr")
-    }
+    fn unlink(path: &CStr) -> c_int;
 
-    fn times(out: *mut tms) -> clock_t {
-        Self::no_pal("times") as clock_t
-    }
+    fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t;
 
-    fn umask(mask: mode_t) -> mode_t {
-        Self::no_pal("umask");
-        0
-    }
-
-    fn uname(utsname: *mut utsname) -> c_int {
-        Self::no_pal("uname")
-    }
-
-    fn unlink(path: &CStr) -> c_int {
-        Self::no_pal("unlink")
-    }
-
-    fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
-        Self::no_pal("waitpid")
-    }
-
-    fn write(fildes: c_int, buf: &[u8]) -> ssize_t {
-        Self::no_pal("write") as ssize_t
-    }
+    fn write(fildes: c_int, buf: &[u8]) -> ssize_t;
 }

@@ -132,7 +132,7 @@ pub extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     res
 }
 
-#[no_mangle]
-pub extern "C" fn umask(mask: mode_t) -> mode_t {
-    Sys::umask(mask)
-}
+// #[no_mangle]
+// pub extern "C" fn umask(mask: mode_t) -> mode_t {
+//     Sys::umask(mask)
+// }

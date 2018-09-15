@@ -33,19 +33,19 @@ pub struct fd_set {
     pub fds_bits: [c_long; 16usize],
 }
 
-#[no_mangle]
-pub extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
-    Sys::getitimer(which, value)
-}
+// #[no_mangle]
+// pub extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
+//     Sys::getitimer(which, value)
+// }
 
-#[no_mangle]
-pub extern "C" fn setitimer(
-    which: c_int,
-    value: *const itimerval,
-    ovalue: *mut itimerval,
-) -> c_int {
-    Sys::setitimer(which, value, ovalue)
-}
+// #[no_mangle]
+// pub extern "C" fn setitimer(
+//     which: c_int,
+//     value: *const itimerval,
+//     ovalue: *mut itimerval,
+// ) -> c_int {
+//     Sys::setitimer(which, value, ovalue)
+// }
 
 #[no_mangle]
 pub extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {

@@ -37,15 +37,38 @@ fn e(sys: usize) -> usize {
 
 pub struct Sys;
 
-impl Pal for Sys {
-    fn no_pal(name: &str) -> c_int {
-        let _ = writeln!(FileWriter(2), "relibc: no_pal: {}", name);
-        unsafe {
-            errno = ENOSYS;
-        }
-        -1
+impl Sys {
+    fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
+        e(unsafe { syscall!(GETITIMER, which, out) }) as c_int
     }
 
+    fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
+        e(unsafe { syscall!(GETRUSAGE, who, r_usage) }) as c_int
+    }
+
+    fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
+        // TODO: Somehow support varargs to syscall??
+        e(unsafe { syscall!(IOCTL, fd, request, out) }) as c_int
+    }
+
+    fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
+        e(unsafe { syscall!(SETITIMER, which, new, old) }) as c_int
+    }
+
+    fn times(out: *mut tms) -> clock_t {
+        unsafe { syscall!(TIMES, out) as clock_t }
+    }
+
+    fn umask(mask: mode_t) -> mode_t {
+        unsafe { syscall!(UMASK, mask) as mode_t }
+    }
+
+    fn uname(utsname: *mut utsname) -> c_int {
+        e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
+    }
+}
+
+impl Pal for Sys {
     fn access(path: &CStr, mode: c_int) -> c_int {
         e(unsafe { syscall!(ACCESS, path.as_ptr(), mode) }) as c_int
     }
@@ -170,10 +193,6 @@ impl Pal for Sys {
         e(unsafe { syscall!(GETGID) }) as gid_t
     }
 
-    fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-        e(unsafe { syscall!(GETRUSAGE, who, r_usage) }) as c_int
-    }
-
     unsafe fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
         // len only needs to be mutable on linux
         let mut len = len;
@@ -202,10 +221,6 @@ impl Pal for Sys {
         0
     }
 
-    fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
-        e(unsafe { syscall!(GETITIMER, which, out) }) as c_int
-    }
-
     fn getpgid(pid: pid_t) -> pid_t {
         e(unsafe { syscall!(GETPGID, pid) }) as pid_t
     }
@@ -224,11 +239,6 @@ impl Pal for Sys {
 
     fn getuid() -> uid_t {
         e(unsafe { syscall!(GETUID) }) as uid_t
-    }
-
-    fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
-        // TODO: Somehow support varargs to syscall??
-        e(unsafe { syscall!(IOCTL, fd, request, out) }) as c_int
     }
 
     fn isatty(fd: c_int) -> c_int {
@@ -310,10 +320,6 @@ impl Pal for Sys {
         e(unsafe { syscall!(SELECT, nfds, readfds, writefds, exceptfds, timeout) }) as c_int
     }
 
-    fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
-        e(unsafe { syscall!(SETITIMER, which, new, old) }) as c_int
-    }
-
     fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
         e(unsafe { syscall!(SETPGID, pid, pgid) }) as c_int
     }
@@ -339,18 +345,6 @@ impl Pal for Sys {
         }
         // This is safe because ioctl shouldn't modify the value
         Self::ioctl(fd, TCSETS + act as c_ulong, value as *mut c_void)
-    }
-
-    fn times(out: *mut tms) -> clock_t {
-        unsafe { syscall!(TIMES, out) as clock_t }
-    }
-
-    fn umask(mask: mode_t) -> mode_t {
-        unsafe { syscall!(UMASK, mask) as mode_t }
-    }
-
-    fn uname(utsname: *mut utsname) -> c_int {
-        e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
     }
 
     fn unlink(path: &CStr) -> c_int {
