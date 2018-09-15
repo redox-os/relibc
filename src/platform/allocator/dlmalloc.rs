@@ -13,11 +13,11 @@ pub struct Allocator;
 
 unsafe impl<'a> GlobalAlloc for Allocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        dlmemalign(layout.align(), layout.size()) as *mut u8
+        alloc_align(layout.size(), layout.align()) as *mut u8
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
-        dlfree(ptr as *mut c_void)
+        free(ptr as *mut c_void)
     }
 }
 
