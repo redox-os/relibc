@@ -1,7 +1,7 @@
 use alloc::Vec;
 use core::ptr;
 
-use header::stdio;
+use header::{stdio, stdlib};
 use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
@@ -30,6 +30,7 @@ impl Stack {
 #[no_mangle]
 pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     extern "C" {
+        fn _init();
         fn main(argc: isize, argv: *const *const c_char, envp: *const *const c_char) -> c_int;
     }
 
@@ -63,11 +64,15 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     stdio::stdout = stdio::default_stdout.get();
     stdio::stderr = stdio::default_stderr.get();
 
-    Sys::exit(main(
+    _init();
+
+    stdlib::exit(main(
         argc,
         argv,
         // not envp, because programs like bash try to modify this *const*
         // pointer :|
         platform::environ as *const *const c_char,
     ));
+
+    unreachable!();
 }

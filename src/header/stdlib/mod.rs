@@ -218,11 +218,17 @@ pub extern "C" fn erand(xsubi: [c_ushort; 3]) -> c_double {
 
 #[no_mangle]
 pub unsafe extern "C" fn exit(status: c_int) {
+    extern "C" {
+        fn _fini();
+    }
+
     for i in (0..ATEXIT_FUNCS.len()).rev() {
         if let Some(func) = ATEXIT_FUNCS[i] {
             (func)();
         }
     }
+
+    _fini();
 
     Sys::exit(status);
 }
