@@ -1,4 +1,4 @@
-use core::mem;
+use core::{mem, ptr};
 use core::sync::atomic::AtomicBool;
 
 use header::errno;
@@ -67,14 +67,16 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
     if f.is_null() {
         None
     } else {
-        (*f).flags = flags;
-        (*f).read = None;
-        (*f).write = None;
-        (*f).fd = fd;
-        (*f).buf = vec![0u8; BUFSIZ + UNGET];
-        (*f).buf_char = -1;
-        (*f).unget = UNGET;
-        (*f).lock = AtomicBool::new(false);
+        ptr::write(f, FILE {
+            flags: flags,
+            read: None,
+            write: None,
+            fd: fd,
+            buf: vec![0u8; BUFSIZ + UNGET],
+            buf_char: -1,
+            unget: UNGET,
+            lock: AtomicBool::new(false)
+        });
         Some(f)
     }
 }
