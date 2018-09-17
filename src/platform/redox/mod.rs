@@ -675,29 +675,18 @@ impl Pal for Sys {
         let timeout_file = if timeout.is_null() {
             None
         } else {
-            let timeout_file = match RawFile::open(
-                &unsafe {
-                    CString::from_vec_unchecked(
-                        format!("time:{}", syscall::CLOCK_MONOTONIC).into_bytes(),
-                    )
-                },
-                0,
-                0,
-            ) {
+            let timeout = unsafe { &*timeout };
+
+            let timeout_path = unsafe {
+                CString::from_vec_unchecked(
+                    format!("time:{}\0", syscall::CLOCK_MONOTONIC).into_bytes(),
+                )
+            };
+            let timeout_file = match RawFile::open(&timeout_path, 0, 0) {
                 Ok(file) => file,
                 Err(_) => return -1,
             };
-            let timeout = unsafe { &*timeout };
-            if Self::write(
-                *timeout_file,
-                &syscall::TimeSpec {
-                    tv_sec: timeout.tv_sec,
-                    tv_nsec: timeout.tv_usec * 1000,
-                },
-            ) < 0
-            {
-                return -1;
-            }
+
             if Self::write(
                 *event_file,
                 &syscall::Event {
@@ -707,6 +696,22 @@ impl Pal for Sys {
                 },
             ) < 0
             {
+                return -1;
+            }
+
+            let mut time = syscall::TimeSpec::default();
+            if Self::read(*timeout_file, &mut time) < 0 {
+                return -1;
+            }
+
+            time.tv_sec += timeout.tv_sec;
+            time.tv_nsec += timeout.tv_usec * 1000;
+            while time.tv_nsec >= 1000000000 {
+                time.tv_sec += 1;
+                time.tv_nsec -= 1000000000;
+            }
+
+            if Self::write(*timeout_file, &time) < 0 {
                 return -1;
             }
 
