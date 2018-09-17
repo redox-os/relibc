@@ -12,6 +12,7 @@ use syscall::{self, Result};
 use c_str::{CStr, CString};
 use header::dirent::dirent;
 use header::errno::{EINVAL, ENOSYS};
+use header::fcntl;
 const MAP_ANON: c_int = 1;
 //use header::sys_mman::MAP_ANON;
 //use header::sys_resource::rusage;
@@ -54,7 +55,7 @@ pub struct Sys;
 
 impl Pal for Sys {
     fn access(path: &CStr, mode: c_int) -> c_int {
-        let fd = match RawFile::open(path, 0, 0) {
+        let fd = match RawFile::open(path, fcntl::O_PATH, 0) {
             Ok(fd) => fd,
             Err(_) => return -1,
         };
@@ -167,7 +168,7 @@ impl Pal for Sys {
     ) -> c_int {
         use alloc::Vec;
 
-        let fd = match RawFile::open(path, O_RDONLY as c_int, 0) {
+        let fd = match RawFile::open(path, fcntl::O_RDONLY, 0) {
             Ok(fd) => fd,
             Err(_) => return -1,
         };
@@ -205,7 +206,7 @@ impl Pal for Sys {
                         Ok(path) => path,
                         Err(_) => return -1,
                     };
-                    match RawFile::open(&path, O_RDONLY as c_int, 0) {
+                    match RawFile::open(&path, fcntl::O_RDONLY, 0) {
                         Ok(file) => {
                             interpreter_fd = *file;
                             _interpreter_path = Some(path);
@@ -634,7 +635,7 @@ impl Pal for Sys {
         }
 
         let event_path = unsafe { CStr::from_bytes_with_nul_unchecked(b"event:\0") };
-        let event_file = match RawFile::open(event_path, 0, 0) {
+        let event_file = match RawFile::open(event_path, fcntl::O_RDWR, 0) {
             Ok(file) => file,
             Err(_) => return -1,
         };
@@ -682,7 +683,7 @@ impl Pal for Sys {
                     format!("time:{}\0", syscall::CLOCK_MONOTONIC).into_bytes(),
                 )
             };
-            let timeout_file = match RawFile::open(&timeout_path, 0, 0) {
+            let timeout_file = match RawFile::open(&timeout_path, fcntl::O_RDWR, 0) {
                 Ok(file) => file,
                 Err(_) => return -1,
             };

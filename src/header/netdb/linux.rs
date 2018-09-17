@@ -1,11 +1,16 @@
 use alloc::string::String;
 use c_str::CString;
+use header::fcntl;
 use platform::rawfile::RawFile;
 use platform::rlb::RawLineBuffer;
 use platform::Line;
 
 pub fn get_dns_server() -> String {
-    let fd = match RawFile::open(&CString::new("/etc/resolv.conf").unwrap(), 0, 0) {
+    let fd = match RawFile::open(
+        &CString::new("/etc/resolv.conf").unwrap(),
+        fcntl::O_RDONLY,
+        0,
+    ) {
         Ok(fd) => fd,
         Err(_) => return String::new(), // TODO: better error handling
     };

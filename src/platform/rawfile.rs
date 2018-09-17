@@ -3,6 +3,7 @@ use core::ops::Deref;
 
 use super::{types::*, Pal, Sys};
 use c_str::CStr;
+use header::fcntl;
 
 pub struct RawFile(c_int);
 
@@ -49,7 +50,7 @@ impl Deref for RawFile {
 }
 
 pub fn file_read_all(path: &CStr) -> Result<Vec<u8>, ()> {
-    let file = RawFile::open(path, 0, 0o644)?;
+    let file = RawFile::open(path, fcntl::O_RDONLY, 0)?;
 
     let mut buf = Vec::new();
     let mut len = 0;
