@@ -680,7 +680,7 @@ impl Pal for Sys {
 
             let timeout_path = unsafe {
                 CString::from_vec_unchecked(
-                    format!("time:{}\0", syscall::CLOCK_MONOTONIC).into_bytes(),
+                    format!("time:{}", syscall::CLOCK_MONOTONIC).into_bytes(),
                 )
             };
             let timeout_file = match RawFile::open(&timeout_path, fcntl::O_RDWR, 0) {
