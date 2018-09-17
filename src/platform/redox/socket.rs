@@ -169,10 +169,10 @@ impl PalSocket for Sys {
             errno = syscall::EAFNOSUPPORT;
             return -1;
         }
-        if protocol != 0 {
-            errno = syscall::EPROTONOSUPPORT;
-            return -1;
-        }
+        // if protocol != 0 {
+        //     errno = syscall::EPROTONOSUPPORT;
+        //     return -1;
+        // }
 
         let mut flags = O_RDWR;
         if kind & SOCK_NONBLOCK == SOCK_NONBLOCK {
