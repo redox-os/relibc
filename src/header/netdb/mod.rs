@@ -865,23 +865,24 @@ pub unsafe extern "C" fn getservent() -> *const servent {
         let mut iter = r.split_whitespace();
         let mut serv_name = match iter.next() {
             Some(serv_name) => serv_name.as_bytes().to_vec(),
-            None => continue
+            None => continue,
         };
         serv_name.push(b'\0');
         let port_proto = match iter.next() {
             Some(port_proto) => port_proto,
-            None => continue
+            None => continue,
         };
         let mut split = port_proto.split("/");
         let mut port = match split.next() {
             Some(port) => port.as_bytes().to_vec(),
-            None => continue
+            None => continue,
         };
         port.push(b'\0');
-        SERV_PORT = Some(htons(atoi(port.as_mut_slice().as_mut_ptr() as *mut i8) as u16) as u32 as i32);
+        SERV_PORT =
+            Some(htons(atoi(port.as_mut_slice().as_mut_ptr() as *mut i8) as u16) as u32 as i32);
         let mut proto = match split.next() {
             Some(proto) => proto.as_bytes().to_vec(),
-            None => continue
+            None => continue,
         };
         proto.push(b'\0');
 
@@ -922,7 +923,7 @@ pub unsafe extern "C" fn getservent() -> *const servent {
         if SERV_STAYOPEN == 0 {
             endservent();
         }
-        break &SERV_ENTRY as *const servent
+        break &SERV_ENTRY as *const servent;
     }
 }
 

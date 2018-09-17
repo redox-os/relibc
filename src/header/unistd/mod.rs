@@ -50,24 +50,24 @@ pub extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
-//     let mut timer = sys_time::itimerval {
-//         it_value: sys_time::timeval {
-//             tv_sec: seconds as time_t,
-//             tv_usec: 0,
-//         },
-//         ..Default::default()
-//     };
-//     let errno_backup = unsafe { platform::errno };
-//     let secs = if sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) < 0 {
-//         0
-//     } else {
-//         timer.it_value.tv_sec as c_uint + if timer.it_value.tv_usec > 0 { 1 } else { 0 }
-//     };
-//     unsafe {
-//         platform::errno = errno_backup;
-//     }
-//
-//     secs
+    //     let mut timer = sys_time::itimerval {
+    //         it_value: sys_time::timeval {
+    //             tv_sec: seconds as time_t,
+    //             tv_usec: 0,
+    //         },
+    //         ..Default::default()
+    //     };
+    //     let errno_backup = unsafe { platform::errno };
+    //     let secs = if sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) < 0 {
+    //         0
+    //     } else {
+    //         timer.it_value.tv_sec as c_uint + if timer.it_value.tv_usec > 0 { 1 } else { 0 }
+    //     };
+    //     unsafe {
+    //         platform::errno = errno_backup;
+    //     }
+    //
+    //     secs
     0
 }
 

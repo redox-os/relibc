@@ -1,5 +1,5 @@
-use core::{mem, ptr};
 use core::sync::atomic::AtomicBool;
+use core::{mem, ptr};
 
 use header::errno;
 use header::fcntl::*;
@@ -67,16 +67,19 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
     if f.is_null() {
         None
     } else {
-        ptr::write(f, FILE {
-            flags: flags,
-            read: None,
-            write: None,
-            fd: fd,
-            buf: vec![0u8; BUFSIZ + UNGET],
-            buf_char: -1,
-            unget: UNGET,
-            lock: AtomicBool::new(false)
-        });
+        ptr::write(
+            f,
+            FILE {
+                flags: flags,
+                read: None,
+                write: None,
+                fd: fd,
+                buf: vec![0u8; BUFSIZ + UNGET],
+                buf_char: -1,
+                unget: UNGET,
+                lock: AtomicBool::new(false),
+            },
+        );
         Some(f)
     }
 }
