@@ -67,11 +67,25 @@ pub fn trace_error() -> (isize, &'static str) {
 macro_rules! trace_expr {
     ($expr:expr, $($arg:tt)*) => ({
         trace!("{}", format_args!($($arg)*));
-        unsafe {
-            ::platform::errno = 0;
-        }
+
+        let old_errno = unsafe { ::platform::errno };
+        unsafe { ::platform::errno = 0; }
+
         let ret = $expr;
-        trace!("{} = {} {:?}", format_args!($($arg)*), ret, $crate::macros::trace_error());
+
+        let errno = unsafe { ::platform::errno } as isize;
+        if errno == 0 {
+            unsafe { ::platform::errno = old_errno; }
+        }
+
+        let strerror = if errno >= 0 && errno < ::header::errno::STR_ERROR.len() as isize {
+            ::header::errno::STR_ERROR[errno as usize]
+        } else {
+            "Unknown error"
+        };
+
+        trace!("{} = {} ({}, {})", format_args!($($arg)*), ret, errno, strerror);
+
         ret
     });
 }
