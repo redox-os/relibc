@@ -49,7 +49,7 @@ libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o $(BUILD)/include
 
 libm: $(BUILD)/openlibm/libopenlibm.a
 
-sysroot:
+sysroot: all
 	rm -rf $@.partial
 	mkdir -p $@.partial
 	make install DESTDIR=$@.partial
