@@ -23,7 +23,11 @@ pub unsafe extern "C" fn accept(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    Sys::accept(socket, address, address_len)
+    trace_expr!(
+        Sys::accept(socket, address, address_len),
+        "accept({}, {:p}, {:p})",
+        socket, address, address_len
+    )
 }
 
 #[no_mangle]
@@ -32,7 +36,11 @@ pub unsafe extern "C" fn bind(
     address: *const sockaddr,
     address_len: socklen_t,
 ) -> c_int {
-    Sys::bind(socket, address, address_len)
+    trace_expr!(
+        Sys::bind(socket, address, address_len),
+        "bind({}, {:p}, {})",
+        socket, address, address_len
+    )
 }
 
 #[no_mangle]
@@ -41,7 +49,11 @@ pub unsafe extern "C" fn connect(
     address: *const sockaddr,
     address_len: socklen_t,
 ) -> c_int {
-    Sys::connect(socket, address, address_len)
+    trace_expr!(
+        Sys::connect(socket, address, address_len),
+        "connect({}, {:p}, {})",
+        socket, address, address_len
+    )
 }
 
 #[no_mangle]
@@ -50,7 +62,11 @@ pub unsafe extern "C" fn getpeername(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    Sys::getpeername(socket, address, address_len)
+    trace_expr!(
+        Sys::getpeername(socket, address, address_len),
+        "getpeername({}, {:p}, {:p})",
+        socket, address, address_len
+    )
 }
 
 #[no_mangle]
@@ -59,7 +75,11 @@ pub unsafe extern "C" fn getsockname(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> c_int {
-    Sys::getsockname(socket, address, address_len)
+    trace_expr!(
+        Sys::getsockname(socket, address, address_len),
+        "getsockname({}, {:p}, {:p})",
+        socket, address, address_len
+    )
 }
 
 // #[no_mangle]
@@ -104,7 +124,11 @@ pub unsafe extern "C" fn recvfrom(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> ssize_t {
-    Sys::recvfrom(socket, buffer, length, flags, address, address_len)
+    trace_expr!(
+        Sys::recvfrom(socket, buffer, length, flags, address, address_len),
+        "recvfrom({}, {:p}, {}, {:#x}, {:p}, {:p})",
+        socket, buffer, length, flags, address, address_len
+    )
 }
 
 #[no_mangle]
@@ -126,7 +150,11 @@ pub unsafe extern "C" fn sendto(
     dest_addr: *const sockaddr,
     dest_len: socklen_t,
 ) -> ssize_t {
-    Sys::sendto(socket, message, length, flags, dest_addr, dest_len)
+    trace_expr!(
+        Sys::sendto(socket, message, length, flags, dest_addr, dest_len),
+        "sendto({}, {:p}, {}, {:#x}, {:p}, {})",
+        socket, message, length, flags, dest_addr, dest_len
+    )
 }
 
 // #[no_mangle]
@@ -147,7 +175,11 @@ pub unsafe extern "C" fn sendto(
 
 #[no_mangle]
 pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
-    Sys::socket(domain, kind, protocol)
+    trace_expr!(
+        Sys::socket(domain, kind, protocol),
+        "socket({}, {}, {})",
+        domain, kind, protocol,
+    )
 }
 
 // #[no_mangle]

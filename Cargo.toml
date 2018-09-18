@@ -35,6 +35,10 @@ sc = "0.2"
 redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall.git", branch = "relibc" }
 spin = "0.4"
 
+[features]
+default = ["trace"]
+trace = []
+
 [profile.dev]
 panic = "abort"
 

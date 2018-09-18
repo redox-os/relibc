@@ -136,13 +136,30 @@ impl PalSocket for Sys {
             errno = syscall::EOPNOTSUPP;
             return -1;
         }
-        if address != ptr::null_mut()
-            && address_len != ptr::null_mut()
-            && Self::getpeername(socket, address, address_len) < 0
-        {
-            return -1;
+        if address == ptr::null_mut() || address_len == ptr::null_mut() {
+            Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
+        } else {
+            let fd = e(syscall::dup(socket as usize, b"listen"));
+            if fd < 0 {
+                return -1;
+            }
+
+            let mut path = [0; 4096];
+            let path_len = e(syscall::fpath(fd, &mut path));
+            if path_len < 0 {
+                let _ = syscall::close(fd);
+                return -1;
+            }
+
+            // XXX process path and write to address
+            println!("listen path: {}", ::core::str::from_utf8_unchecked(&path[..path_len]));
+
+            let ret = Self::read(fd as i32, slice::from_raw_parts_mut(buf as *mut u8, len));
+
+            let _ = syscall::close(fd);
+
+            ret
         }
-        Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
     }
 
     unsafe fn sendto(
@@ -153,15 +170,39 @@ impl PalSocket for Sys {
         dest_addr: *const sockaddr,
         dest_len: socklen_t,
     ) -> ssize_t {
-        if dest_addr != ptr::null() || dest_len != 0 {
-            errno = syscall::EISCONN;
-            return -1;
-        }
         if flags != 0 {
             errno = syscall::EOPNOTSUPP;
             return -1;
         }
-        Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
+        if dest_addr == ptr::null() || dest_len == 0 {
+            Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
+        } else if (*dest_addr).sa_family as i32 == AF_INET && dest_len >= mem::size_of::<sockaddr_in>() as u32 {
+            let data = &*(dest_addr as *const sockaddr_in);
+            let addr = data.sin_addr.s_addr;
+            let port = in_port_t::from_be(data.sin_port);
+            let path = format!(
+                "{}.{}.{}.{}:{}",
+                addr >> 8 * 3,
+                addr >> 8 * 2 & 0xFF,
+                addr >> 8 & 0xFF,
+                addr & 0xFF,
+                port
+            );
+
+            let fd = e(syscall::dup(socket as usize, path.as_bytes()));
+            if fd < 0 {
+                return -1;
+            }
+
+            let ret = Self::write(fd as i32, slice::from_raw_parts(buf as *const u8, len));
+
+            let _ = syscall::close(fd);
+
+            ret
+        } else {
+            errno = syscall::EINVAL;
+            -1
+        }
     }
 
     unsafe fn socket(domain: c_int, mut kind: c_int, protocol: c_int) -> c_int {

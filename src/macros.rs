@@ -33,6 +33,49 @@ macro_rules! eprintln {
 }
 
 #[macro_export]
+#[cfg(not(feature = "trace"))]
+macro_rules! trace {
+    ($($arg:tt)*) => ();
+}
+
+#[macro_export]
+#[cfg(feature = "trace")]
+macro_rules! trace {
+    ($($arg:tt)*) => (eprintln!($($arg)*));
+}
+
+#[macro_export]
+#[cfg(not(feature = "trace"))]
+macro_rules! trace_expr {
+    ($expr:expr, $($arg:tt)*) => ($expr);
+}
+
+#[cfg(feature = "trace")]
+pub fn trace_error() -> (isize, &'static str) {
+    use header::errno::STR_ERROR;
+    use platform;
+    use platform::types::c_int;
+
+    let errno = unsafe { platform::errno } as isize;
+    if errno >= 0 && errno < STR_ERROR.len() as isize {
+        (errno, STR_ERROR[errno as usize])
+    } else {
+        (errno, "Unknown error")
+    }
+}
+
+#[macro_export]
+#[cfg(feature = "trace")]
+macro_rules! trace_expr {
+    ($expr:expr, $($arg:tt)*) => ({
+        trace!("{} {:?}", format_args!($($arg)*), $crate::macros::trace_error());
+        let ret = $expr;
+        trace!("{} = {} {:?}", format_args!($($arg)*), ret, $crate::macros::trace_error());
+        ret
+    });
+}
+
+#[macro_export]
 macro_rules! strto_impl {
     (
         $rettype:ty, $signed:expr, $maxval:expr, $minval:expr, $s:ident, $endptr:ident, $base:ident
