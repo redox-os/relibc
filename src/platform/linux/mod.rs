@@ -8,11 +8,11 @@ use header::dirent::dirent;
 use header::errno::{EINVAL, ENOSYS};
 use header::signal::SIGCHLD;
 use header::sys_ioctl::{winsize, TCGETS, TCSETS, TIOCGWINSZ};
-use header::sys_resource::rusage;
+// use header::sys_resource::rusage;
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
 use header::sys_time::{itimerval, timeval, timezone};
-use header::sys_times::tms;
+// use header::sys_times::tms;
 use header::sys_utsname::utsname;
 use header::termios::termios;
 use header::time::timespec;
@@ -42,11 +42,11 @@ impl Sys {
         e(unsafe { syscall!(GETITIMER, which, out) }) as c_int
     }
 
-    fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-        e(unsafe { syscall!(GETRUSAGE, who, r_usage) }) as c_int
-    }
+    // fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
+    //     e(unsafe { syscall!(GETRUSAGE, who, r_usage) }) as c_int
+    // }
 
-    fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
+    pub fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
         // TODO: Somehow support varargs to syscall??
         e(unsafe { syscall!(IOCTL, fd, request, out) }) as c_int
     }
@@ -55,15 +55,15 @@ impl Sys {
         e(unsafe { syscall!(SETITIMER, which, new, old) }) as c_int
     }
 
-    fn times(out: *mut tms) -> clock_t {
-        unsafe { syscall!(TIMES, out) as clock_t }
-    }
+    // fn times(out: *mut tms) -> clock_t {
+    //     unsafe { syscall!(TIMES, out) as clock_t }
+    // }
 
     fn umask(mask: mode_t) -> mode_t {
         unsafe { syscall!(UMASK, mask) as mode_t }
     }
 
-    fn uname(utsname: *mut utsname) -> c_int {
+    pub fn uname(utsname: *mut utsname) -> c_int {
         e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
     }
 }
