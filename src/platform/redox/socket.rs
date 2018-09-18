@@ -78,7 +78,7 @@ unsafe fn inner_get_name(
     }
     let part = parts.next().expect("Invalid reply from netstack");
 
-    println!("path: {}", ::core::str::from_utf8_unchecked(&part));
+    trace!("path: {}", ::core::str::from_utf8_unchecked(&part));
 
     let data = slice::from_raw_parts_mut(
         &mut (*address).data as *mut _ as *mut u8,
