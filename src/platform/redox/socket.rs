@@ -36,16 +36,12 @@ macro_rules! bind_or_connect {
             return -1;
         }
         let data = &*($address as *const sockaddr_in);
-        let addr = data.sin_addr.s_addr;
-        let port = in_port_t::from_be(data.sin_port);
-        let path = format!(
-            bind_or_connect!($mode "{}.{}.{}.{}:{}"),
-            addr >> 8 * 3,
-            addr >> 8 * 2 & 0xFF,
-            addr >> 8 & 0xFF,
-            addr & 0xFF,
-            port
+        let addr = slice::from_raw_parts(
+            &data.sin_addr.s_addr as *const _ as *const u8,
+            mem::size_of_val(&data.sin_addr.s_addr)
         );
+        let port = in_port_t::from_be(data.sin_port);
+        let path = format!(bind_or_connect!($mode "{}.{}.{}.{}:{}"), addr[0], addr[1], addr[2], addr[3], port);
 
         // Duplicate the socket, and then duplicate the copy back to the original fd
         let fd = e(syscall::dup($socket as usize, path.as_bytes()));

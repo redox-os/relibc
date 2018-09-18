@@ -204,23 +204,25 @@ fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
         let packet_data_box = packet_data.into_boxed_slice();
         let packet_data_ptr = Box::into_raw(packet_data_box) as *mut _ as *mut c_void;
 
-        let sock = unsafe { sys_socket::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP as i32) };
-
-        let mut dest = sockaddr_in {
+        let dest = sockaddr_in {
             sin_family: AF_INET as u16,
             sin_port: htons(53),
             sin_addr: in_addr { s_addr: dns_addr },
             ..Default::default()
         };
+        let dest_ptr = &dest as *const _ as *const sockaddr;
 
-        let dest_ptr = &mut dest as *mut _ as *mut sockaddr;
-
-        unsafe {
-            if sys_socket::sendto(sock, packet_data_ptr, packet_data_len, 0, dest_ptr, 16) < 0 {
+        let sock = unsafe {
+            let sock = sys_socket::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP as i32);
+            if sys_socket::connect(sock, dest_ptr, mem::size_of_val(&dest) as socklen_t) < 0 {
+                return Err(EIO);
+            }
+            if sys_socket::send(sock, packet_data_ptr, packet_data_len, 0) < 0 {
                 Box::from_raw(packet_data_ptr);
                 return Err(EIO);
             }
-        }
+            sock
+        };
 
         unsafe {
             Box::from_raw(packet_data_ptr);
@@ -232,12 +234,8 @@ fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
 
         let mut count = -1;
 
-        let mut from: sockaddr = Default::default();
-        let from_ptr = &mut from as *mut sockaddr;
-
         unsafe {
-            count =
-                sys_socket::recvfrom(sock, buf_ptr, 65536, 0, from_ptr, &mut i as *mut socklen_t);
+            count = sys_socket::recv(sock, buf_ptr, 65536, 0);
         }
         if count < 0 {
             return Err(EIO);
@@ -321,9 +319,7 @@ fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
         let packet_data_box = packet_data.into_boxed_slice();
         let packet_data_ptr = Box::into_raw(packet_data_box) as *mut _ as *mut c_void;
 
-        let sock = unsafe { sys_socket::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP as i32) };
-
-        let mut dest = sockaddr_in {
+        let dest = sockaddr_in {
             sin_family: AF_INET as u16,
             sin_port: htons(53),
             sin_addr: in_addr {
@@ -332,10 +328,18 @@ fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
             ..Default::default()
         };
 
-        let dest_ptr = &mut dest as *mut _ as *mut sockaddr;
+        let dest_ptr = &dest as *const _ as *const sockaddr;
+
+        let sock = unsafe {
+            let sock = sys_socket::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP as i32);
+            if sys_socket::connect(sock, dest_ptr, mem::size_of_val(&dest) as socklen_t) < 0 {
+                return Err(EIO);
+            }
+            sock
+        };
 
         unsafe {
-            if sys_socket::sendto(sock, packet_data_ptr, packet_data_len, 0, dest_ptr, 16) < 0 {
+            if sys_socket::send(sock, packet_data_ptr, packet_data_len, 0) < 0 {
                 return Err(EIO);
             }
         }
@@ -351,8 +355,7 @@ fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
         let mut count = -1;
 
         unsafe {
-            count =
-                sys_socket::recvfrom(sock, buf_ptr, 65536, 0, dest_ptr, &mut i as *mut socklen_t);
+            count = sys_socket::recv(sock, buf_ptr, 65536, 0);
         }
         if count < 0 {
             return Err(EIO);
