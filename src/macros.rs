@@ -41,7 +41,11 @@ macro_rules! trace {
 #[macro_export]
 #[cfg(feature = "trace")]
 macro_rules! trace {
-    ($($arg:tt)*) => (eprintln!($($arg)*));
+    ($($arg:tt)*) => ({
+        use $crate::{Pal, Sys};
+        eprintln!($($arg)*);
+        Sys::fsync(2);
+    });
 }
 
 #[macro_export]
@@ -50,36 +54,27 @@ macro_rules! trace_expr {
     ($expr:expr, $($arg:tt)*) => ($expr);
 }
 
-#[cfg(feature = "trace")]
-pub fn trace_error() -> (isize, &'static str) {
-    use header::errno::STR_ERROR;
-
-    let errno = unsafe { ::platform::errno } as isize;
-    if errno >= 0 && errno < STR_ERROR.len() as isize {
-        (errno, STR_ERROR[errno as usize])
-    } else {
-        (errno, "Unknown error")
-    }
-}
-
 #[macro_export]
 #[cfg(feature = "trace")]
 macro_rules! trace_expr {
     ($expr:expr, $($arg:tt)*) => ({
+        use $crate::header::errno::STR_ERROR;
+        use $crate::platform;
+
         trace!("{}", format_args!($($arg)*));
 
-        let old_errno = unsafe { ::platform::errno };
-        unsafe { ::platform::errno = 0; }
+        let old_errno = unsafe { platform::errno };
+        unsafe { platform::errno = 0; }
 
         let ret = $expr;
 
-        let errno = unsafe { ::platform::errno } as isize;
+        let errno = unsafe { platform::errno } as isize;
         if errno == 0 {
-            unsafe { ::platform::errno = old_errno; }
+            unsafe { platform::errno = old_errno; }
         }
 
-        let strerror = if errno >= 0 && errno < ::header::errno::STR_ERROR.len() as isize {
-            ::header::errno::STR_ERROR[errno as usize]
+        let strerror = if errno >= 0 && errno < STR_ERROR.len() as isize {
+            STR_ERROR[errno as usize]
         } else {
             "Unknown error"
         };
