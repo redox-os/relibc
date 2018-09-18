@@ -16,7 +16,17 @@ macro_rules! bind_or_connect {
     (connect $path:expr) => {
         $path
     };
-    ($mode:ident $socket:expr, $address:expr, $address_len:expr) => {{
+    ($mode:ident into, $socket:expr, $address:expr, $address_len:expr) => {{
+        let fd = bind_or_connect!($mode copy, $socket, $address, $address_len);
+
+        let result = syscall::dup2(fd, $socket as usize, &[]);
+        let _ = syscall::close(fd);
+        if (e(result) as c_int) < 0 {
+            return -1;
+        }
+        0
+    }};
+    ($mode:ident copy, $socket:expr, $address:expr, $address_len:expr) => {{
         if (*$address).sa_family as c_int != AF_INET {
             errno = syscall::EAFNOSUPPORT;
             return -1;
@@ -42,12 +52,7 @@ macro_rules! bind_or_connect {
         if (fd as c_int) < 0 {
             return -1;
         }
-        let result = syscall::dup2(fd, $socket as usize, &[]);
-        let _ = syscall::close(fd);
-        if (e(result) as c_int) < 0 {
-            return -1;
-        }
-        0
+        fd
     }};
 }
 
@@ -72,6 +77,8 @@ unsafe fn inner_get_name(
         parts.next();
     }
     let part = parts.next().expect("Invalid reply from netstack");
+
+    println!("path: {}", ::core::str::from_utf8_unchecked(&part));
 
     let data = slice::from_raw_parts_mut(
         &mut (*address).data as *mut _ as *mut u8,
@@ -101,11 +108,11 @@ impl PalSocket for Sys {
     }
 
     unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
-        bind_or_connect!(bind socket, address, address_len)
+        bind_or_connect!(bind into, socket, address, address_len)
     }
 
     unsafe fn connect(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
-        bind_or_connect!(connect socket, address, address_len)
+        bind_or_connect!(connect into, socket, address, address_len)
     }
 
     unsafe fn getpeername(
@@ -140,24 +147,16 @@ impl PalSocket for Sys {
             Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
         } else {
             let fd = e(syscall::dup(socket as usize, b"listen"));
-            if fd < 0 {
+            if fd == !0 {
                 return -1;
             }
-
-            let mut path = [0; 4096];
-            let path_len = e(syscall::fpath(fd, &mut path));
-            if path_len < 0 {
+            if Self::getpeername(fd as c_int, address, address_len) < 0 {
                 let _ = syscall::close(fd);
                 return -1;
             }
 
-            // XXX process path and write to address
-            println!("listen path: {}", ::core::str::from_utf8_unchecked(&path[..path_len]));
-
-            let ret = Self::read(fd as i32, slice::from_raw_parts_mut(buf as *mut u8, len));
-
+            let ret = Self::read(fd as c_int, slice::from_raw_parts_mut(buf as *mut u8, len));
             let _ = syscall::close(fd);
-
             ret
         }
     }
@@ -176,32 +175,11 @@ impl PalSocket for Sys {
         }
         if dest_addr == ptr::null() || dest_len == 0 {
             Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
-        } else if (*dest_addr).sa_family as i32 == AF_INET && dest_len >= mem::size_of::<sockaddr_in>() as u32 {
-            let data = &*(dest_addr as *const sockaddr_in);
-            let addr = data.sin_addr.s_addr;
-            let port = in_port_t::from_be(data.sin_port);
-            let path = format!(
-                "{}.{}.{}.{}:{}",
-                addr >> 8 * 3,
-                addr >> 8 * 2 & 0xFF,
-                addr >> 8 & 0xFF,
-                addr & 0xFF,
-                port
-            );
-
-            let fd = e(syscall::dup(socket as usize, path.as_bytes()));
-            if fd < 0 {
-                return -1;
-            }
-
-            let ret = Self::write(fd as i32, slice::from_raw_parts(buf as *const u8, len));
-
-            let _ = syscall::close(fd);
-
-            ret
         } else {
-            errno = syscall::EINVAL;
-            -1
+            let fd = bind_or_connect!(connect copy, socket, dest_addr, dest_len);
+            let ret = Self::write(fd as c_int, slice::from_raw_parts(buf as *const u8, len));
+            let _ = syscall::close(fd);
+            ret
         }
     }
 

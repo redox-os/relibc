@@ -1,7 +1,5 @@
 use platform::types::*;
 
-// These constants also exist in platform. They need to match.
-// Reason they are not just re-exported is cbindgen.
 pub const SOCK_STREAM: c_int = 1;
 pub const SOCK_DGRAM: c_int = 2;
 pub const SOCK_NONBLOCK: c_int = 0o4000;

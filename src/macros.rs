@@ -53,10 +53,8 @@ macro_rules! trace_expr {
 #[cfg(feature = "trace")]
 pub fn trace_error() -> (isize, &'static str) {
     use header::errno::STR_ERROR;
-    use platform;
-    use platform::types::c_int;
 
-    let errno = unsafe { platform::errno } as isize;
+    let errno = unsafe { ::platform::errno } as isize;
     if errno >= 0 && errno < STR_ERROR.len() as isize {
         (errno, STR_ERROR[errno as usize])
     } else {
@@ -68,7 +66,10 @@ pub fn trace_error() -> (isize, &'static str) {
 #[cfg(feature = "trace")]
 macro_rules! trace_expr {
     ($expr:expr, $($arg:tt)*) => ({
-        trace!("{} {:?}", format_args!($($arg)*), $crate::macros::trace_error());
+        trace!("{}", format_args!($($arg)*));
+        unsafe {
+            ::platform::errno = 0;
+        }
         let ret = $expr;
         trace!("{} = {} {:?}", format_args!($($arg)*), ret, $crate::macros::trace_error());
         ret
