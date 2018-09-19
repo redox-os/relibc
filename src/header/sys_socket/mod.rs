@@ -26,7 +26,9 @@ pub unsafe extern "C" fn accept(
     trace_expr!(
         Sys::accept(socket, address, address_len),
         "accept({}, {:p}, {:p})",
-        socket, address, address_len
+        socket,
+        address,
+        address_len
     )
 }
 
@@ -39,7 +41,9 @@ pub unsafe extern "C" fn bind(
     trace_expr!(
         Sys::bind(socket, address, address_len),
         "bind({}, {:p}, {})",
-        socket, address, address_len
+        socket,
+        address,
+        address_len
     )
 }
 
@@ -52,7 +56,9 @@ pub unsafe extern "C" fn connect(
     trace_expr!(
         Sys::connect(socket, address, address_len),
         "connect({}, {:p}, {})",
-        socket, address, address_len
+        socket,
+        address,
+        address_len
     )
 }
 
@@ -65,7 +71,9 @@ pub unsafe extern "C" fn getpeername(
     trace_expr!(
         Sys::getpeername(socket, address, address_len),
         "getpeername({}, {:p}, {:p})",
-        socket, address, address_len
+        socket,
+        address,
+        address_len
     )
 }
 
@@ -78,7 +86,9 @@ pub unsafe extern "C" fn getsockname(
     trace_expr!(
         Sys::getsockname(socket, address, address_len),
         "getsockname({}, {:p}, {:p})",
-        socket, address, address_len
+        socket,
+        address,
+        address_len
     )
 }
 
@@ -127,7 +137,12 @@ pub unsafe extern "C" fn recvfrom(
     trace_expr!(
         Sys::recvfrom(socket, buffer, length, flags, address, address_len),
         "recvfrom({}, {:p}, {}, {:#x}, {:p}, {:p})",
-        socket, buffer, length, flags, address, address_len
+        socket,
+        buffer,
+        length,
+        flags,
+        address,
+        address_len
     )
 }
 
@@ -153,7 +168,12 @@ pub unsafe extern "C" fn sendto(
     trace_expr!(
         Sys::sendto(socket, message, length, flags, dest_addr, dest_len),
         "sendto({}, {:p}, {}, {:#x}, {:p}, {})",
-        socket, message, length, flags, dest_addr, dest_len
+        socket,
+        message,
+        length,
+        flags,
+        dest_addr,
+        dest_len
     )
 }
 
@@ -178,7 +198,9 @@ pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> 
     trace_expr!(
         Sys::socket(domain, kind, protocol),
         "socket({}, {}, {})",
-        domain, kind, protocol,
+        domain,
+        kind,
+        protocol,
     )
 }
 

@@ -55,7 +55,7 @@ pub struct Sys;
 
 impl Pal for Sys {
     fn access(path: &CStr, mode: c_int) -> c_int {
-        let fd = match RawFile::open(path, fcntl::O_PATH, 0) {
+        let fd = match RawFile::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC, 0) {
             Ok(fd) => fd,
             Err(_) => return -1,
         };
@@ -109,7 +109,7 @@ impl Pal for Sys {
     }
 
     fn chmod(path: &CStr, mode: mode_t) -> c_int {
-        match syscall::open(path.to_bytes(), O_WRONLY) {
+        match syscall::open(path.to_bytes(), O_WRONLY | O_CLOEXEC) {
             Err(err) => e(Err(err)) as c_int,
             Ok(fd) => {
                 let res = syscall::fchmod(fd as usize, mode as u16);
@@ -120,7 +120,7 @@ impl Pal for Sys {
     }
 
     fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
-        match syscall::open(path.to_bytes(), O_WRONLY) {
+        match syscall::open(path.to_bytes(), O_WRONLY | O_CLOEXEC) {
             Err(err) => e(Err(err)) as c_int,
             Ok(fd) => {
                 let res = syscall::fchown(fd as usize, owner as u32, group as u32);
@@ -168,7 +168,7 @@ impl Pal for Sys {
     ) -> c_int {
         use alloc::Vec;
 
-        let fd = match RawFile::open(path, fcntl::O_RDONLY, 0) {
+        let fd = match RawFile::open(path, fcntl::O_RDONLY | fcntl::O_CLOEXEC, 0) {
             Ok(fd) => fd,
             Err(_) => return -1,
         };
@@ -206,7 +206,7 @@ impl Pal for Sys {
                         Ok(path) => path,
                         Err(_) => return -1,
                     };
-                    match RawFile::open(&path, fcntl::O_RDONLY, 0) {
+                    match RawFile::open(&path, fcntl::O_RDONLY | fcntl::O_CLOEXEC, 0) {
                         Ok(file) => {
                             interpreter_fd = *file;
                             _interpreter_path = Some(path);
@@ -339,7 +339,7 @@ impl Pal for Sys {
     }
 
     fn utimens(path: &CStr, times: *const timespec) -> c_int {
-        match syscall::open(path.to_bytes(), O_STAT) {
+        match syscall::open(path.to_bytes(), O_STAT | O_CLOEXEC) {
             Err(err) => e(Err(err)) as c_int,
             Ok(fd) => {
                 let res = Self::futimens(fd as c_int, times);
@@ -423,11 +423,16 @@ impl Pal for Sys {
     }
 
     unsafe fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
-        let fd = e(syscall::open("/etc/hostname", O_RDONLY)) as i32;
-        if fd < 0 {
-            return fd;
-        }
-        let mut reader = FileReader(fd);
+        let fd = match RawFile::open(
+            &CString::new("/etc/hostname").unwrap(),
+            fcntl::O_RDONLY | fcntl::O_CLOEXEC,
+            0,
+        ) {
+            Ok(fd) => fd,
+            Err(_) => return -1,
+        };
+
+        let mut reader = FileReader(*fd);
         for _ in 0..len {
             match reader.read_u8() {
                 Ok(Some(b)) => {
@@ -515,7 +520,7 @@ impl Pal for Sys {
     }
 
     fn mkfifo(path: &CStr, mode: mode_t) -> c_int {
-        let flags = O_CREAT | MODE_FIFO as usize | mode as usize & 0o777;
+        let flags = O_CREAT | O_CLOEXEC | MODE_FIFO as usize | mode as usize & 0o777;
         match syscall::open(path.to_bytes(), flags) {
             Ok(fd) => {
                 let _ = syscall::close(fd);
@@ -534,7 +539,7 @@ impl Pal for Sys {
         off: off_t,
     ) -> *mut c_void {
         if flags & MAP_ANON == MAP_ANON {
-            let fd = e(syscall::open("memory:", 0)); // flags don't matter currently
+            let fd = e(syscall::open("memory:", O_STAT | O_CLOEXEC)); // flags don't matter currently
             if fd == !0 {
                 return !0 as *mut c_void;
             }
@@ -604,7 +609,7 @@ impl Pal for Sys {
     }
 
     fn rename(oldpath: &CStr, newpath: &CStr) -> c_int {
-        match syscall::open(oldpath.to_bytes(), O_WRONLY) {
+        match syscall::open(oldpath.to_bytes(), O_WRONLY | O_CLOEXEC) {
             Ok(fd) => {
                 let retval = syscall::frename(fd, newpath.to_bytes());
                 let _ = syscall::close(fd);
@@ -635,7 +640,7 @@ impl Pal for Sys {
         }
 
         let event_path = unsafe { CStr::from_bytes_with_nul_unchecked(b"event:\0") };
-        let event_file = match RawFile::open(event_path, fcntl::O_RDWR, 0) {
+        let event_file = match RawFile::open(event_path, fcntl::O_RDWR | fcntl::O_CLOEXEC, 0) {
             Ok(file) => file,
             Err(_) => return -1,
         };
@@ -683,10 +688,11 @@ impl Pal for Sys {
                     format!("time:{}", syscall::CLOCK_MONOTONIC).into_bytes(),
                 )
             };
-            let timeout_file = match RawFile::open(&timeout_path, fcntl::O_RDWR, 0) {
-                Ok(file) => file,
-                Err(_) => return -1,
-            };
+            let timeout_file =
+                match RawFile::open(&timeout_path, fcntl::O_RDWR | fcntl::O_CLOEXEC, 0) {
+                    Ok(file) => file,
+                    Err(_) => return -1,
+                };
 
             if Self::write(
                 *event_file,

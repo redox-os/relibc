@@ -35,7 +35,7 @@ macro_rules! eprintln {
 #[macro_export]
 #[cfg(not(feature = "trace"))]
 macro_rules! trace {
-    ($($arg:tt)*) => ();
+    ($($arg:tt)*) => {};
 }
 
 #[macro_export]
@@ -51,7 +51,9 @@ macro_rules! trace {
 #[macro_export]
 #[cfg(not(feature = "trace"))]
 macro_rules! trace_expr {
-    ($expr:expr, $($arg:tt)*) => ($expr);
+    ($expr:expr, $($arg:tt)*) => {
+        $expr
+    };
 }
 
 #[macro_export]
