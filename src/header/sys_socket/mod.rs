@@ -92,17 +92,25 @@ pub unsafe extern "C" fn getsockname(
     )
 }
 
-// #[no_mangle]
-// pub unsafe extern "C" fn getsockopt(
-//     socket: c_int,
-//     level: c_int,
-//     option_name: c_int,
-//     option_value: *mut c_void,
-//     option_len: *mut socklen_t,
-// ) -> c_int {
-//     Sys::getsockopt(socket, level, option_name, option_value, option_len)
-// }
-//
+#[no_mangle]
+pub unsafe extern "C" fn getsockopt(
+    socket: c_int,
+    level: c_int,
+    option_name: c_int,
+    option_value: *mut c_void,
+    option_len: *mut socklen_t,
+) -> c_int {
+    trace_expr!(
+        Sys::getsockopt(socket, level, option_name, option_value, option_len),
+        "getsockopt({}, {}, {}, {:p}, {:p})",
+        socket,
+        level,
+        option_name,
+        option_value,
+        option_len
+    )
+}
+
 // #[no_mangle]
 // pub unsafe extern "C" fn listen(socket: c_int, backlog: c_int) -> c_int {
 //     Sys::listen(socket, backlog)
@@ -177,16 +185,24 @@ pub unsafe extern "C" fn sendto(
     )
 }
 
-// #[no_mangle]
-// pub unsafe extern "C" fn setsockopt(
-//     socket: c_int,
-//     level: c_int,
-//     option_name: c_int,
-//     option_value: *const c_void,
-//     option_len: socklen_t,
-// ) -> c_int {
-//     Sys::setsockopt(socket, level, option_name, option_value, option_len)
-// }
+#[no_mangle]
+pub unsafe extern "C" fn setsockopt(
+    socket: c_int,
+    level: c_int,
+    option_name: c_int,
+    option_value: *const c_void,
+    option_len: socklen_t,
+) -> c_int {
+    trace_expr!(
+        Sys::setsockopt(socket, level, option_name, option_value, option_len),
+        "setsockopt({}, {}, {}, {:p}, {})",
+        socket,
+        level,
+        option_name,
+        option_value,
+        option_len
+    )
+}
 
 // #[no_mangle]
 // pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {

@@ -134,6 +134,16 @@ impl PalSocket for Sys {
         e(inner_get_name(true, socket, address, address_len)) as c_int
     }
 
+    fn getsockopt(
+        socket: c_int,
+        level: c_int,
+        option_name: c_int,
+        option_value: *mut c_void,
+        option_len: *mut socklen_t,
+    ) -> c_int {
+        e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
+    }
+
     unsafe fn recvfrom(
         socket: c_int,
         buf: *mut c_void,
@@ -184,6 +194,16 @@ impl PalSocket for Sys {
             let _ = syscall::close(fd);
             ret
         }
+    }
+
+    fn setsockopt(
+        socket: c_int,
+        level: c_int,
+        option_name: c_int,
+        option_value: *const c_void,
+        option_len: socklen_t,
+    ) -> c_int {
+        e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
     }
 
     unsafe fn socket(domain: c_int, mut kind: c_int, protocol: c_int) -> c_int {

@@ -4,46 +4,8 @@ use super::{e, Sys};
 use header::sys_socket::{sockaddr, socklen_t};
 
 impl Sys {
-    fn getsockopt(
-        socket: c_int,
-        level: c_int,
-        option_name: c_int,
-        option_value: *mut c_void,
-        option_len: *mut socklen_t,
-    ) -> c_int {
-        e(unsafe {
-            syscall!(
-                GETSOCKOPT,
-                socket,
-                level,
-                option_name,
-                option_value,
-                option_len
-            )
-        }) as c_int
-    }
-
     fn listen(socket: c_int, backlog: c_int) -> c_int {
         e(unsafe { syscall!(LISTEN, socket, backlog) }) as c_int
-    }
-
-    fn setsockopt(
-        socket: c_int,
-        level: c_int,
-        option_name: c_int,
-        option_value: *const c_void,
-        option_len: socklen_t,
-    ) -> c_int {
-        e(unsafe {
-            syscall!(
-                SETSOCKOPT,
-                socket,
-                level,
-                option_name,
-                option_value,
-                option_len
-            )
-        }) as c_int
     }
 
     fn shutdown(socket: c_int, how: c_int) -> c_int {
@@ -84,6 +46,25 @@ impl PalSocket for Sys {
         e(syscall!(GETSOCKNAME, socket, address, address_len)) as c_int
     }
 
+    fn getsockopt(
+        socket: c_int,
+        level: c_int,
+        option_name: c_int,
+        option_value: *mut c_void,
+        option_len: *mut socklen_t,
+    ) -> c_int {
+        e(unsafe {
+            syscall!(
+                GETSOCKOPT,
+                socket,
+                level,
+                option_name,
+                option_value,
+                option_len
+            )
+        }) as c_int
+    }
+
     unsafe fn recvfrom(
         socket: c_int,
         buf: *mut c_void,
@@ -114,6 +95,25 @@ impl PalSocket for Sys {
         e(syscall!(
             SENDTO, socket, buf, len, flags, dest_addr, dest_len
         )) as ssize_t
+    }
+
+    fn setsockopt(
+        socket: c_int,
+        level: c_int,
+        option_name: c_int,
+        option_value: *const c_void,
+        option_len: socklen_t,
+    ) -> c_int {
+        e(unsafe {
+            syscall!(
+                SETSOCKOPT,
+                socket,
+                level,
+                option_name,
+                option_value,
+                option_len
+            )
+        }) as c_int
     }
 
     unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {

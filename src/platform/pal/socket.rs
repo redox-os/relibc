@@ -21,6 +21,14 @@ pub trait PalSocket: Pal {
         address_len: *mut socklen_t,
     ) -> c_int;
 
+    fn getsockopt(
+        socket: c_int,
+        level: c_int,
+        option_name: c_int,
+        option_value: *mut c_void,
+        option_len: *mut socklen_t,
+    ) -> c_int;
+
     unsafe fn recvfrom(
         socket: c_int,
         buf: *mut c_void,
@@ -38,6 +46,14 @@ pub trait PalSocket: Pal {
         dest_addr: *const sockaddr,
         dest_len: socklen_t,
     ) -> ssize_t;
+
+    fn setsockopt(
+        socket: c_int,
+        level: c_int,
+        option_name: c_int,
+        option_value: *const c_void,
+        option_len: socklen_t,
+    ) -> c_int;
 
     unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int;
 }
