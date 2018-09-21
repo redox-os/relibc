@@ -8,11 +8,15 @@ use platform;
 use platform::types::*;
 use platform::{Line, RawFile, RawLineBuffer};
 
-#[cfg(target_os = "linux")] mod linux;
-#[cfg(target_os = "redox")] mod redox;
+#[cfg(target_os = "linux")]
+mod linux;
+#[cfg(target_os = "redox")]
+mod redox;
 
-#[cfg(target_os = "linux")] use self::linux as sys;
-#[cfg(target_os = "redox")] use self::redox as sys;
+#[cfg(target_os = "linux")]
+use self::linux as sys;
+#[cfg(target_os = "redox")]
+use self::redox as sys;
 
 #[repr(C)]
 pub struct passwd {
