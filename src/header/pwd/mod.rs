@@ -6,8 +6,13 @@ use c_str::CStr;
 use header::{errno, fcntl};
 use platform;
 use platform::types::*;
-use platform::Sys;
 use platform::{Line, RawFile, RawLineBuffer};
+
+#[cfg(target_os = "linux")] mod linux;
+#[cfg(target_os = "redox")] mod redox;
+
+#[cfg(target_os = "linux")] use self::linux as sys;
+#[cfg(target_os = "redox")] use self::redox as sys;
 
 #[repr(C)]
 pub struct passwd {
@@ -65,14 +70,9 @@ where
         };
 
         // Parse into passwd
-        let mut parts: [&[u8]; 7] = [&[]; 7];
-        for (i, part) in line.splitn(7, |b| *b == b':').enumerate() {
-            parts[i] = part;
-        }
+        let mut parts: [&[u8]; 7] = sys::split(line);
 
         if !callback(&parts) {
-            // TODO when nll becomes a thing:
-            // buf.drain(..newline + 1);
             continue;
         }
 
