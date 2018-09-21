@@ -15,6 +15,7 @@ EXPECT_BINS=\
 	setjmp \
 	signal \
 	stdio/all \
+	stdio/buffer \
 	stdio/freopen \
 	stdio/fwrite \
 	stdio/getc_unget \

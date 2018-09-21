@@ -97,7 +97,7 @@ pub fn fwritex(buf: *const u8, l: size_t, stream: &mut FILE) -> size_t {
         // We can't write to this stream
         return 0;
     }
-    if let Some((wbase, wpos, wend)) = stream.write {
+    if let Some((wbase, mut wpos, wend)) = stream.write {
         if l > wend - wpos {
             // We can't fit all of buf in the buffer
             return stream.write(buf);
@@ -110,6 +110,11 @@ pub fn fwritex(buf: *const u8, l: size_t, stream: &mut FILE) -> size_t {
             }
             if i > 0 {
                 let n = stream.write(buf);
+                match stream.write {
+                    Some((_, new_wpos, _)) => wpos = new_wpos,
+                    None => unreachable!("stream.write should never be None after a write call")
+                }
+
                 if n < i {
                     return n;
                 }
