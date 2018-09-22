@@ -4,6 +4,8 @@ use core::mem;
 use core::ptr;
 use core::usize;
 
+use cbitset::BitSet256;
+
 use header::errno::*;
 use header::signal;
 use platform;
@@ -165,32 +167,30 @@ pub unsafe extern "C" fn strcpy(dst: *mut c_char, src: *const c_char) -> *mut c_
 }
 
 pub unsafe fn inner_strspn(s1: *const c_char, s2: *const c_char, cmp: bool) -> size_t {
-    let s1 = s1 as *const u8;
-    let s2 = s2 as *const u8;
+    let mut s1 = s1 as *const u8;
+    let mut s2 = s2 as *const u8;
 
     // The below logic is effectively ripped from the musl implementation. It
     // works by placing each byte as it's own bit in an array of numbers. Each
     // number can hold up to 8 * mem::size_of::<usize>() bits. We need 256 bits
     // in total, to fit one byte.
 
-    const BITSIZE: usize = 8 * mem::size_of::<usize>();
-    let mut byteset = [0usize; 256 / BITSIZE];
+    let mut set = BitSet256::new();
+
+    while *s2 != 0 {
+        set.insert(*s2 as usize);
+        s2 = s2.offset(1);
+    }
 
     let mut i = 0;
-    while *s2.offset(i) != 0 {
-        byteset[(*s2.offset(i) as usize) / BITSIZE] |=
-            1 << (*s2.offset(i) as usize & (BITSIZE - 1));
+    while *s1 != 0 {
+        if set.contains(*s1 as usize) != cmp {
+            break;
+        }
         i += 1;
+        s1 = s1.offset(1);
     }
-
-    i = 0; // reset
-    while *s1.offset(i) != 0
-        && (byteset[(*s1.offset(i) as usize) / BITSIZE]
-            & 1 << (*s1.offset(i) as usize & (BITSIZE - 1)) != 0) == cmp
-    {
-        i += 1;
-    }
-    i as size_t
+    i
 }
 
 #[no_mangle]

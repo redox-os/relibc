@@ -14,6 +14,7 @@ members = ["src/crt0", "cbindgen"]
 cc = "1.0.17"
 
 [dependencies]
+cbitset = "0.1.0"
 lazy_static = { version = "*", features = ["nightly", "spin_no_std"] }
 rand = { version = "0.5.2", default-features = false }
 va_list = { path = "va_list", features = ["no_std"] }

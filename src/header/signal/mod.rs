@@ -2,6 +2,8 @@
 
 use core::{mem, ptr};
 
+use cbitset::BitSet;
+
 use header::errno;
 use platform;
 use platform::types::*;
@@ -16,6 +18,8 @@ pub mod sys;
 #[cfg(target_os = "redox")]
 #[path = "redox.rs"]
 pub mod sys;
+
+type SigSet = BitSet<[c_ulong; 1]>;
 
 const SIG_ERR: usize = !0;
 
@@ -81,9 +85,8 @@ pub extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
         return -1;
     }
 
-    let signo = signo as usize - 1; // 0-indexed usize, please!
-    unsafe {
-        *set |= 1 << (signo & (8 * mem::size_of::<sigset_t>() - 1));
+    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
+        set.insert(signo as usize - 1); // 0-indexed usize, please!
     }
     0
 }
@@ -97,25 +100,24 @@ pub extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
         return -1;
     }
 
-    let signo = signo as usize - 1; // 0-indexed usize, please!
-    unsafe {
-        *set &= !(1 << (signo & (8 * mem::size_of::<sigset_t>() - 1)));
+    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
+        set.remove(signo as usize - 1); // 0-indexed usize, please!
     }
     0
 }
 
 #[no_mangle]
 pub extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
-    unsafe {
-        *set = 0;
+    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
+        set.clear();
     }
     0
 }
 
 #[no_mangle]
 pub extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
-    unsafe {
-        *set = c_ulong::max_value();
+    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
+        set.fill(.., true);
     }
     0
 }

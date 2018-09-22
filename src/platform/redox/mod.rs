@@ -1,6 +1,7 @@
 //! sys/socket implementation, following http://pubs.opengroup.org/onlinepubs/009696699/basedefs/sys/socket.h.html
 
 use alloc::btree_map::BTreeMap;
+use cbitset::BitSet;
 use core::fmt::Write;
 use core::{mem, ptr, slice};
 use spin::{Mutex, MutexGuard, Once};
@@ -630,31 +631,9 @@ impl Pal for Sys {
         exceptfds: *mut fd_set,
         timeout: *mut timeval,
     ) -> c_int {
-        fn isset(set: *mut fd_set, fd: usize) -> bool {
-            if set.is_null() {
-                return false;
-            }
-
-            let mask = 1 << (fd & 8 * mem::size_of::<c_ulong>() - 1);
-            unsafe { (*set).fds_bits[fd / (8 * mem::size_of::<c_ulong>())] & mask == mask }
-        }
-        fn clearset(set: *mut fd_set) {
-            if set.is_null() {
-                return;
-            }
-
-            for i in unsafe { &mut (*set).fds_bits } {
-                *i = 0;
-            }
-        }
-        fn set(set: *mut fd_set, fd: usize) {
-            if set.is_null() {
-                return;
-            }
-
-            let mask = 1 << (fd & 8 * mem::size_of::<c_ulong>() - 1);
-            unsafe { (*set).fds_bits[fd / (8 * mem::size_of::<c_ulong>())] |= mask; }
-        }
+        let mut readfds = unsafe { readfds.as_mut() }.map(|s| BitSet::from_ref(&mut s.fds_bits));
+        let mut writefds = unsafe { writefds.as_mut() }.map(|s| BitSet::from_ref(&mut s.fds_bits));
+        let mut exceptfds = unsafe { exceptfds.as_mut() }.map(|s| BitSet::from_ref(&mut s.fds_bits));
 
         let event_path = unsafe { CStr::from_bytes_with_nul_unchecked(b"event:\0") };
         let event_file = match RawFile::open(event_path, fcntl::O_RDWR | fcntl::O_CLOEXEC, 0) {
@@ -678,10 +657,10 @@ impl Pal for Sys {
                     }
                 };
             }
-            if isset(readfds, fd) {
+            if readfds.as_mut().map(|s| s.contains(fd)).unwrap_or(false) {
                 register!(fd, syscall::EVENT_READ);
             }
-            if isset(writefds, fd) {
+            if writefds.as_mut().map(|s| s.contains(fd)).unwrap_or(false) {
                 register!(fd, syscall::EVENT_WRITE);
             }
         }
@@ -750,9 +729,9 @@ impl Pal for Sys {
 
         let mut total = 0;
 
-        clearset(readfds);
-        clearset(writefds);
-        clearset(exceptfds);
+        if let Some(ref mut set) = readfds { set.clear(); }
+        if let Some(ref mut set) = writefds { set.clear(); }
+        if let Some(ref mut set) = exceptfds { set.clear(); }
 
         for event in &events[..read] {
             if event.data == TIMEOUT_TOKEN {
@@ -760,11 +739,15 @@ impl Pal for Sys {
             }
 
             if event.flags & syscall::EVENT_READ == syscall::EVENT_READ {
-                set(readfds, event.id);
+                if let Some(ref mut set) = readfds {
+                    set.insert(event.id);
+                }
                 total += 1;
             }
             if event.flags & syscall::EVENT_WRITE == syscall::EVENT_WRITE {
-                set(writefds, event.id);
+                if let Some(ref mut set) = writefds {
+                    set.insert(event.id);
+                }
                 total += 1;
             }
         }
