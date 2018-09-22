@@ -635,8 +635,25 @@ impl Pal for Sys {
                 return false;
             }
 
-            let mask = 1 << (fd & (8 * mem::size_of::<c_ulong>() - 1));
+            let mask = 1 << (fd & 8 * mem::size_of::<c_ulong>() - 1);
             unsafe { (*set).fds_bits[fd / (8 * mem::size_of::<c_ulong>())] & mask == mask }
+        }
+        fn clearset(set: *mut fd_set) {
+            if set.is_null() {
+                return;
+            }
+
+            for i in unsafe { &mut (*set).fds_bits } {
+                *i = 0;
+            }
+        }
+        fn set(set: *mut fd_set, fd: usize) {
+            if set.is_null() {
+                return;
+            }
+
+            let mask = 1 << (fd & 8 * mem::size_of::<c_ulong>() - 1);
+            unsafe { (*set).fds_bits[fd / (8 * mem::size_of::<c_ulong>())] |= mask; }
         }
 
         let event_path = unsafe { CStr::from_bytes_with_nul_unchecked(b"event:\0") };
@@ -644,8 +661,6 @@ impl Pal for Sys {
             Ok(file) => file,
             Err(_) => return -1,
         };
-
-        let mut total = 0;
 
         for fd in 0..nfds as usize {
             macro_rules! register {
@@ -665,14 +680,9 @@ impl Pal for Sys {
             }
             if isset(readfds, fd) {
                 register!(fd, syscall::EVENT_READ);
-                total += 1;
             }
             if isset(writefds, fd) {
                 register!(fd, syscall::EVENT_WRITE);
-                total += 1;
-            }
-            if isset(exceptfds, fd) {
-                total += 1;
             }
         }
 
@@ -725,17 +735,40 @@ impl Pal for Sys {
             Some(timeout_file)
         };
 
-        let mut event = syscall::Event::default();
-        if Self::read(*event_file, &mut event) < 0 {
-            return -1;
+        let mut events = [syscall::Event::default(); 32];
+        let read = {
+            let mut events = unsafe { slice::from_raw_parts_mut(
+                &mut events as *mut _ as *mut u8,
+                mem::size_of::<syscall::Event>() * events.len()
+            ) };
+            let read = Self::read(*event_file, &mut events);
+            if read < 0 {
+                return -1;
+            }
+            read as usize / mem::size_of::<syscall::Event>()
+        };
+
+        let mut total = 0;
+
+        clearset(readfds);
+        clearset(writefds);
+        clearset(exceptfds);
+
+        for event in &events[..read] {
+            if event.data == TIMEOUT_TOKEN {
+                continue;
+            }
+
+            if event.flags & syscall::EVENT_READ == syscall::EVENT_READ {
+                set(readfds, event.id);
+                total += 1;
+            }
+            if event.flags & syscall::EVENT_WRITE == syscall::EVENT_WRITE {
+                set(writefds, event.id);
+                total += 1;
+            }
         }
 
-        if timeout_file.is_some() && event.data == TIMEOUT_TOKEN {
-            return 0;
-        }
-
-        // I really don't get why, but select wants me to return the total number
-        // of file descriptors that was inputted. I'm confused.
         total
     }
 
