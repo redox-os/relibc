@@ -8,7 +8,7 @@ name = "c"
 crate-type = ["staticlib"]
 
 [workspace]
-members = ["src/crt0", "cbindgen"]
+members = ["src/crt0", "src/crti", "src/crtn", "cbindgen"]
 
 [build-dependencies]
 cc = "1.0.17"

@@ -1,0 +1,10 @@
+[package]
+name = "crti"
+version = "0.1.0"
+authors = ["jD91mZM2 <me@krake.one>"]
+
+[lib]
+name = "crti"
+crate-type = ["staticlib"]
+
+[dependencies]

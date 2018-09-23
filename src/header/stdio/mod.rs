@@ -542,12 +542,14 @@ pub extern "C" fn freopen(
         }
         flags &= !(fcntl::O_CREAT | fcntl::O_EXCL | fcntl::O_CLOEXEC);
         if fcntl::sys_fcntl(stream.fd, fcntl::F_SETFL, flags) < 0 {
+            funlockfile(stream);
             fclose(stream);
             return ptr::null_mut();
         }
     } else {
         let new = fopen(filename, mode);
         if new.is_null() {
+            funlockfile(stream);
             fclose(stream);
             return ptr::null_mut();
         }
@@ -557,6 +559,7 @@ pub extern "C" fn freopen(
         } else if Sys::dup2(new.fd, stream.fd) < 0
             || fcntl::sys_fcntl(stream.fd, fcntl::F_SETFL, flags & fcntl::O_CLOEXEC) < 0
         {
+            funlockfile(stream);
             fclose(new);
             fclose(stream);
             return ptr::null_mut();
@@ -564,6 +567,7 @@ pub extern "C" fn freopen(
         stream.flags = (stream.flags & constants::F_PERM) | new.flags;
         fclose(new);
     }
+    funlockfile(stream);
     stream
 }
 

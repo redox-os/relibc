@@ -93,33 +93,34 @@ BINS=\
 .PHONY: all $(BINS) clean run expected verify
 
 all: $(BINS)
+expect: $(EXPECT_BINS)
 
 $(BINS): %: bins/%
 
 clean:
 	rm -rf bins gen *.out
 
-run: $(BINS)
-	for bin in $^; \
+run: | ../sysroot all
+	for bin in $(BINS); \
 	do \
 		echo "# $${bin} #"; \
 		"bins/$${bin}" test args || exit $$?; \
 	done
 
-expected: $(EXPECT_BINS)
+expected: | ../sysroot expect
 	rm -rf expected
 	mkdir -p expected
-	for bin in $^; \
+	for bin in $(EXPECT_BINS); \
 	do \
 		echo "# $${bin} #"; \
 		mkdir -p expected/`dirname $${bin}`; \
 		"bins/$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr" || exit $$?; \
 	done
 
-verify: $(EXPECT_BINS)
+verify: | ../sysroot expect
 	rm -rf gen
 	mkdir -p gen
-	for bin in $^; \
+	for bin in $(EXPECT_BINS); \
 	do \
 		echo "# $${bin} #"; \
 		mkdir -p gen/`dirname $${bin}`; \
@@ -138,9 +139,11 @@ CFLAGS=\
 	-isystem ../sysroot/include
 
 HEADLIBS=\
-	../sysroot/lib/crt0.o
+	../sysroot/lib/crt0.o \
+	../sysroot/lib/crti.o
 
 TAILLIBS=\
+	../sysroot/lib/crtn.o \
 	../sysroot/lib/libc.a \
 	../sysroot/lib/libm.a
 

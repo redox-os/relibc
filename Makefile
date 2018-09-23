@@ -41,11 +41,13 @@ install: all
 	cp -rv "$(BUILD)/include"/* "$(DESTDIR)/include"
 	cp -v "$(BUILD)/release/libc.a" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crt0.o" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/release/crti.o" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
 	cp -rv "openlibm/include"/* "$(DESTDIR)/include"
 	cp -rv "openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 
-libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o $(BUILD)/include
+libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o $(BUILD)/release/crti.o $(BUILD)/release/crtn.o $(BUILD)/include
 
 libm: $(BUILD)/openlibm/libopenlibm.a
 
@@ -56,7 +58,7 @@ sysroot: all
 	mv $@.partial $@
 	touch $@
 
-test: all
+test: sysroot
 	make -C tests run
 
 $(BUILD)/debug/libc.a: $(SRC)
@@ -73,6 +75,14 @@ $(BUILD)/release/libc.a: $(SRC)
 
 $(BUILD)/release/crt0.o: $(SRC)
 	CARGO_INCREMENTAL=0 cargo rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	touch $@
+
+$(BUILD)/release/crti.o: $(SRC)
+	CARGO_INCREMENTAL=0 cargo rustc --release --manifest-path src/crti/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	touch $@
+
+$(BUILD)/release/crtn.o: $(SRC)
+	CARGO_INCREMENTAL=0 cargo rustc --release --manifest-path src/crtn/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 	touch $@
 
 $(BUILD)/include: $(SRC)
