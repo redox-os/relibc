@@ -3,7 +3,8 @@
 use alloc::vec::Vec;
 use core::fmt::Write as WriteFmt;
 use core::fmt::{self, Error};
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::ops::{Deref, DerefMut};
+use core::sync::atomic::{self, AtomicBool, Ordering};
 use core::{ptr, str};
 use va_list::VaList as va_list;
 
@@ -187,6 +188,18 @@ impl FILE {
 }
 
 pub struct LockGuard<'a>(&'a mut FILE);
+impl<'a> Deref for LockGuard<'a> {
+    type Target = &'a mut FILE;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<'a> DerefMut for LockGuard<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 impl<'a> Drop for LockGuard<'a> {
     fn drop(&mut self) {
         funlockfile(self.0);
@@ -286,19 +299,15 @@ pub extern "C" fn fdopen(fildes: c_int, mode: *const c_char) -> *mut FILE {
 /// Check for EOF
 #[no_mangle]
 pub extern "C" fn feof(stream: &mut FILE) -> c_int {
-    flockfile(stream);
-    let ret = stream.flags & F_EOF;
-    funlockfile(stream);
-    ret
+    let stream = stream.lock();
+    stream.flags & F_EOF
 }
 
 /// Check for ERR
 #[no_mangle]
 pub extern "C" fn ferror(stream: &mut FILE) -> c_int {
-    flockfile(stream);
-    let ret = stream.flags & F_ERR;
-    funlockfile(stream);
-    ret
+    let stream = stream.lock();
+    stream.flags & F_ERR
 }
 
 /// Flush output to stream, or sync read position
@@ -306,19 +315,15 @@ pub extern "C" fn ferror(stream: &mut FILE) -> c_int {
 /// itself.
 #[no_mangle]
 pub unsafe extern "C" fn fflush(stream: &mut FILE) -> c_int {
-    flockfile(stream);
-    let ret = helpers::fflush_unlocked(stream);
-    funlockfile(stream);
-    ret
+    let mut stream = stream.lock();
+    helpers::fflush_unlocked(&mut stream)
 }
 
 /// Get a single char from a stream
 #[no_mangle]
 pub extern "C" fn fgetc(stream: &mut FILE) -> c_int {
-    flockfile(stream);
-    let c = getc_unlocked(stream);
-    funlockfile(stream);
-    c
+    let mut stream = stream.lock();
+    getc_unlocked(&mut stream)
 }
 
 /// Get the position of the stream and store it in pos
@@ -340,14 +345,13 @@ pub extern "C" fn fgetpos(stream: &mut FILE, pos: Option<&mut fpos_t>) -> c_int 
 #[no_mangle]
 pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_char {
     use core::slice;
-    flockfile(stream);
+    let mut stream = stream.lock();
     let st = unsafe { slice::from_raw_parts_mut(s as *mut u8, n as usize) };
 
     let mut len = n;
 
     // We can only fit one or less chars in
     if n <= 1 {
-        funlockfile(stream);
         if n <= 0 {
             return ptr::null_mut();
         }
@@ -360,7 +364,6 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
     {
         // We can't read from this stream
         if !stream.can_read() {
-            funlockfile(stream);
             return ptr::null_mut();
         }
     }
@@ -399,17 +402,14 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
     }
 
     st[(n - len) as usize] = 0;
-    funlockfile(stream);
     s
 }
 
 /// Get the underlying file descriptor
 #[no_mangle]
 pub extern "C" fn fileno(stream: &mut FILE) -> c_int {
-    flockfile(stream);
-    let fd = stream.fd;
-    funlockfile(stream);
-    fd
+    let stream = stream.lock();
+    stream.fd
 }
 
 /// Lock the file
@@ -417,7 +417,9 @@ pub extern "C" fn fileno(stream: &mut FILE) -> c_int {
 /// locked
 #[no_mangle]
 pub extern "C" fn flockfile(file: &mut FILE) {
-    while ftrylockfile(file) != 0 {}
+    while ftrylockfile(file) != 0 {
+        atomic::spin_loop_hint();
+    }
 }
 
 /// Open the file in mode `mode`
@@ -458,10 +460,8 @@ pub extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FI
 /// Insert a character into the stream
 #[no_mangle]
 pub extern "C" fn fputc(c: c_int, stream: &mut FILE) -> c_int {
-    flockfile(stream);
-    let c = putc_unlocked(c, stream);
-    funlockfile(stream);
-    c
+    let mut stream = stream.lock();
+    putc_unlocked(c, &mut stream)
 }
 
 /// Insert a string into a stream
@@ -480,10 +480,9 @@ pub extern "C" fn fread(ptr: *mut c_void, size: usize, nitems: usize, stream: &m
     let len = size * nitems;
     let mut l = len as isize;
 
-    flockfile(stream);
+    let mut stream = stream.lock();
 
     if !stream.can_read() {
-        funlockfile(stream);
         return 0;
     }
 
@@ -510,7 +509,6 @@ pub extern "C" fn fread(ptr: *mut c_void, size: usize, nitems: usize, stream: &m
             };
 
             if k == 0 {
-                funlockfile(stream);
                 return (len - l as usize) / 2;
             }
 
@@ -521,7 +519,6 @@ pub extern "C" fn fread(ptr: *mut c_void, size: usize, nitems: usize, stream: &m
             }
         }
 
-        funlockfile(stream);
         nitems
     } else {
         unreachable!()
@@ -545,14 +542,12 @@ pub extern "C" fn freopen(
         }
         flags &= !(fcntl::O_CREAT | fcntl::O_EXCL | fcntl::O_CLOEXEC);
         if fcntl::sys_fcntl(stream.fd, fcntl::F_SETFL, flags) < 0 {
-            funlockfile(stream);
             fclose(stream);
             return ptr::null_mut();
         }
     } else {
         let new = fopen(filename, mode);
         if new.is_null() {
-            funlockfile(stream);
             fclose(stream);
             return ptr::null_mut();
         }
@@ -563,14 +558,12 @@ pub extern "C" fn freopen(
             || fcntl::sys_fcntl(stream.fd, fcntl::F_SETFL, flags & fcntl::O_CLOEXEC) < 0
         {
             fclose(new);
-            funlockfile(stream);
             fclose(stream);
             return ptr::null_mut();
         }
         stream.flags = (stream.flags & constants::F_PERM) | new.flags;
         fclose(new);
     }
-    funlockfile(stream);
     stream
 }
 
@@ -587,7 +580,8 @@ pub extern "C" fn fseek(stream: &mut FILE, offset: c_long, whence: c_int) -> c_i
 #[no_mangle]
 pub extern "C" fn fseeko(stream: &mut FILE, offset: off_t, whence: c_int) -> c_int {
     let mut off = offset;
-    flockfile(stream);
+    let mut stream = stream.lock();
+
     // Adjust for what is currently in the buffer
     let rdiff = if let Some((rpos, rend)) = stream.read {
         rend - rpos
@@ -602,12 +596,10 @@ pub extern "C" fn fseeko(stream: &mut FILE, offset: off_t, whence: c_int) -> c_i
     }
     stream.write = None;
     if stream.seek(off, whence) < 0 {
-        funlockfile(stream);
         return -1;
     }
     stream.read = None;
     stream.flags &= !F_EOF;
-    funlockfile(stream);
     0
 }
 
@@ -630,10 +622,8 @@ pub extern "C" fn ftell(stream: &mut FILE) -> c_long {
 /// Get the current position of the cursor in the file
 #[no_mangle]
 pub extern "C" fn ftello(stream: &mut FILE) -> off_t {
-    flockfile(stream);
-    let pos = internal::ftello(stream);
-    funlockfile(stream);
-    pos
+    let mut stream = stream.lock();
+    internal::ftello(&mut stream)
 }
 
 /// Try to lock the file. Returns 0 for success, 1 for failure
@@ -658,9 +648,8 @@ pub extern "C" fn fwrite(
 ) -> usize {
     let l = size * nitems;
     let nitems = if size == 0 { 0 } else { nitems };
-    flockfile(stream);
-    let k = helpers::fwritex(ptr as *const u8, l, stream);
-    funlockfile(stream);
+    let mut stream = stream.lock();
+    let k = helpers::fwritex(ptr as *const u8, l, &mut stream);
     if k == l {
         nitems
     } else {
@@ -671,10 +660,8 @@ pub extern "C" fn fwrite(
 /// Get a single char from a stream
 #[no_mangle]
 pub extern "C" fn getc(stream: &mut FILE) -> c_int {
-    flockfile(stream);
-    let c = getc_unlocked(stream);
-    funlockfile(stream);
-    c
+    let mut stream = stream.lock();
+    getc_unlocked(&mut stream)
 }
 
 /// Get a single char from `stdin`
@@ -768,10 +755,8 @@ pub extern "C" fn popen(_command: *const c_char, _mode: *const c_char) -> *mut F
 /// Put a character `c` into `stream`
 #[no_mangle]
 pub extern "C" fn putc(c: c_int, stream: &mut FILE) -> c_int {
-    flockfile(stream);
-    let ret = putc_unlocked(c, stream);
-    funlockfile(stream);
-    ret
+    let mut stream = stream.lock();
+    putc_unlocked(c, &mut stream)
 }
 
 /// Put a character `c` into `stdout`
@@ -849,9 +834,8 @@ pub extern "C" fn rename(oldpath: *const c_char, newpath: *const c_char) -> c_in
 #[no_mangle]
 pub extern "C" fn rewind(stream: &mut FILE) {
     fseeko(stream, 0, SEEK_SET);
-    flockfile(stream);
+    let mut stream = stream.lock();
     stream.flags &= !F_ERR;
-    funlockfile(stream);
 }
 
 /// Reset `stream` to use buffer `buf`. Buffer must be `BUFSIZ` in length
@@ -935,22 +919,20 @@ pub extern "C" fn ungetc(c: c_int, stream: &mut FILE) -> c_int {
     if c < 0 {
         c
     } else {
-        flockfile(stream);
+        let mut stream = stream.lock();
+
         if stream.read.is_none() {
             stream.can_read();
         }
         if let Some((rpos, rend)) = stream.read {
             if rpos == 0 {
-                funlockfile(stream);
                 return -1;
             }
             stream.read = Some((rpos - 1, rend));
             stream.buf[rpos - 1] = c as u8;
             stream.flags &= !F_EOF;
-            funlockfile(stream);
             c
         } else {
-            funlockfile(stream);
             -1
         }
     }
