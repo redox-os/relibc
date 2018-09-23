@@ -307,9 +307,7 @@ pub extern "C" fn ferror(stream: &mut FILE) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn fflush(stream: &mut FILE) -> c_int {
     flockfile(stream);
-
     let ret = helpers::fflush_unlocked(stream);
-
     funlockfile(stream);
     ret
 }
@@ -362,6 +360,7 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
     {
         // We can't read from this stream
         if !stream.can_read() {
+            funlockfile(stream);
             return ptr::null_mut();
         }
     }
@@ -408,8 +407,9 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
 #[no_mangle]
 pub extern "C" fn fileno(stream: &mut FILE) -> c_int {
     flockfile(stream);
+    let fd = stream.fd;
     funlockfile(stream);
-    stream.fd
+    fd
 }
 
 /// Lock the file
@@ -483,6 +483,7 @@ pub extern "C" fn fread(ptr: *mut c_void, size: usize, nitems: usize, stream: &m
     flockfile(stream);
 
     if !stream.can_read() {
+        funlockfile(stream);
         return 0;
     }
 
@@ -601,6 +602,7 @@ pub extern "C" fn fseeko(stream: &mut FILE, offset: off_t, whence: c_int) -> c_i
     }
     stream.write = None;
     if stream.seek(off, whence) < 0 {
+        funlockfile(stream);
         return -1;
     }
     stream.read = None;
