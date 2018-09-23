@@ -376,13 +376,19 @@ pub extern "C" fn fgets(s: *mut c_char, n: c_int, stream: &mut FILE) -> *mut c_c
                 idiff += 1;
                 len -= 1;
                 if st[pos] == b'\n' || st[pos] as i8 == stream.buf_char {
+                    stream.read = Some((rpos + idiff, rend));
                     break 'outer;
                 }
             }
             stream.read = Some((rpos + idiff, rend));
             if rend - rpos == 0 {
-                len -= stream.read(&mut st[((n - len) as usize)..]) as i32;
-                break;
+                match stream.read(&mut st[((n - len) as usize)..]) as i32 {
+                    0 if idiff == 0 => return ptr::null_mut(),
+                    n => {
+                        len -= n.max(0);
+                        break;
+                    }
+                }
             }
             if len <= 1 {
                 break;
@@ -426,7 +432,13 @@ pub extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FI
 
     let flags = unsafe { helpers::parse_mode_flags(mode) };
 
-    let fd = fcntl::sys_open(filename, flags, 0o666);
+    let new_mode = if flags & fcntl::O_CREAT == fcntl::O_CREAT {
+        0o666
+    } else {
+        0
+    };
+
+    let fd = fcntl::sys_open(filename, flags, new_mode);
     if fd < 0 {
         return ptr::null_mut();
     }

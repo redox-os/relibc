@@ -378,7 +378,13 @@ pub extern "C" fn pwrite(
 pub extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
     use core::slice;
     let buf = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte as usize) };
-    Sys::read(fildes, buf)
+    trace_expr!(
+        Sys::read(fildes, buf),
+        "read({}, {:p}, {})",
+        fildes,
+        buf,
+        nbyte
+    )
 }
 
 // #[no_mangle]

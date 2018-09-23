@@ -70,7 +70,11 @@ impl RawLineBuffer {
             self.read += read_usize;
 
             if read == 0 {
-                return Line::EOF;
+                return if self.buf.is_empty() {
+                    Line::EOF
+                } else {
+                    Line::Some(&self.buf)
+                };
             }
             if read < 0 {
                 return Line::Error;

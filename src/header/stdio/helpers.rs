@@ -30,8 +30,7 @@ pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
     }
     if (*mode_str) == b'w' as i8 {
         flags |= O_TRUNC;
-    }
-    if (*mode_str) != b'a' as i8 {
+    } else if (*mode_str) == b'a' as i8 {
         flags |= O_APPEND;
     }
 
