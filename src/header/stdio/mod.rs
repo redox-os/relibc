@@ -15,7 +15,7 @@ use header::stdlib::mkstemp;
 use header::string::strlen;
 use platform;
 use platform::types::*;
-use platform::{c_str, errno, ReadByte, WriteByte};
+use platform::{errno, ReadByte, WriteByte};
 use platform::{Pal, Sys};
 
 mod printf;
@@ -739,7 +739,8 @@ pub extern "C" fn pclose(_stream: &mut FILE) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn perror(s: *const c_char) {
-    let s_str = str::from_utf8_unchecked(c_str(s));
+    let s_cstr = CStr::from_ptr(s);
+    let s_str = str::from_utf8_unchecked(s_cstr.to_bytes());
 
     let mut w = platform::FileWriter(2);
     if errno >= 0 && errno < STR_ERROR.len() as c_int {

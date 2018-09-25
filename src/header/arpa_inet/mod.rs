@@ -3,12 +3,12 @@
 use core::str::FromStr;
 use core::{ptr, slice, str};
 
+use c_str::CStr;
 use header::errno::*;
 use header::netinet_in::{in_addr, in_addr_t, INADDR_NONE};
 use header::sys_socket::constants::*;
 use header::sys_socket::socklen_t;
 use platform;
-use platform::c_str;
 use platform::types::*;
 
 #[no_mangle]
@@ -59,7 +59,8 @@ pub unsafe extern "C" fn inet_pton(domain: c_int, src: *const c_char, dest: *mut
             &mut (*(dest as *mut in_addr)).s_addr as *mut _ as *mut u8,
             4,
         );
-        let mut octets = str::from_utf8_unchecked(c_str(src)).split('.');
+        let src_cstr = CStr::from_ptr(src);
+        let mut octets = str::from_utf8_unchecked(src_cstr.to_bytes()).split('.');
         for i in 0..4 {
             if let Some(n) = octets.next().and_then(|x| u8::from_str(x).ok()) {
                 s_addr[i] = n;

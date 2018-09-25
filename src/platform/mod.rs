@@ -46,53 +46,6 @@ pub static mut environ: *mut *mut c_char = ptr::null_mut();
 #[allow(non_upper_case_globals)]
 pub static mut inner_environ: Vec<*mut c_char> = Vec::new();
 
-pub unsafe fn c_str_mut<'a>(s: *mut c_char) -> &'a mut [u8] {
-    use core::usize;
-
-    c_str_n_mut(s, usize::MAX)
-}
-
-pub unsafe fn c_str_n_mut<'a>(s: *mut c_char, n: usize) -> &'a mut [u8] {
-    assert!(s != ptr::null_mut());
-    use core::slice;
-
-    let mut size = 0;
-
-    for _ in 0..n {
-        if *s.offset(size) == 0 {
-            break;
-        }
-        size += 1;
-    }
-
-    slice::from_raw_parts_mut(s as *mut u8, size as usize)
-}
-pub unsafe fn c_str<'a>(s: *const c_char) -> &'a [u8] {
-    use core::usize;
-
-    c_str_n(s, usize::MAX)
-}
-
-pub unsafe fn c_str_n<'a>(s: *const c_char, n: usize) -> &'a [u8] {
-    assert!(s != ptr::null());
-    use core::slice;
-
-    let mut size = 0;
-
-    for _ in 0..n {
-        if *s.offset(size) == 0 {
-            break;
-        }
-        size += 1;
-    }
-
-    slice::from_raw_parts(s as *const u8, size as usize)
-}
-
-pub unsafe fn cstr_from_bytes_with_nul_unchecked(bytes: &[u8]) -> *const c_char {
-    bytes.as_ptr() as *const c_char
-}
-
 // NOTE: defined here rather than in string because memcpy() is useful in multiple crates
 pub unsafe fn memcpy(s1: *mut c_void, s2: *const c_void, n: usize) -> *mut c_void {
     let mut i = 0;

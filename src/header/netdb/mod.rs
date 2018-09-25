@@ -11,10 +11,9 @@ use alloc::string::ToString;
 use alloc::vec::IntoIter;
 use alloc::{String, Vec};
 
-use c_str::CString;
+use c_str::{CStr, CString};
 
 use platform;
-use platform::c_str;
 use platform::rlb::{Line, RawLineBuffer};
 use platform::types::*;
 use platform::{Pal, Sys};
@@ -490,7 +489,8 @@ pub unsafe extern "C" fn gethostbyaddr(
 #[no_mangle]
 pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *const hostent {
     // check if some idiot gave us an address instead of a name
-    let mut octets = str::from_utf8_unchecked(c_str(name)).split('.');
+    let name_cstr = CStr::from_ptr(name);
+    let mut octets = str::from_utf8_unchecked(name_cstr.to_bytes()).split('.');
     let mut s_addr = [0u8; 4];
     let mut is_addr = true;
     for i in 0..4 {
@@ -538,7 +538,9 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *const hostent {
         }
     }
 
-    let mut host = match lookup_host(str::from_utf8_unchecked(c_str(name))) {
+    let name_cstr = CStr::from_ptr(name);
+
+    let mut host = match lookup_host(str::from_utf8_unchecked(name_cstr.to_bytes())) {
         Ok(lookuphost) => lookuphost,
         Err(e) => {
             platform::errno = e;
@@ -553,7 +555,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *const hostent {
         }
     };
 
-    let host_name: Vec<u8> = c_str(name).to_vec();
+    let host_name: Vec<u8> = name_cstr.to_bytes().to_vec();
     HOST_NAME = Some(host_name);
     _HOST_ADDR_LIST = mem::transmute::<u32, [u8; 4]>(host_addr.s_addr);
     HOST_ADDR_LIST = [_HOST_ADDR_LIST.as_mut_ptr() as *mut c_char, ptr::null_mut()];

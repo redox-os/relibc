@@ -141,8 +141,9 @@ impl Pal for Sys {
     }
 
     fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
-        let empty_cstr: *const c_char = unsafe { super::cstr_from_bytes_with_nul_unchecked(b"\0") };
-        e(unsafe { syscall!(NEWFSTATAT, fildes, empty_cstr, buf, AT_EMPTY_PATH) }) as c_int
+        let empty = b"\0";
+        let empty_ptr = empty.as_ptr() as *const c_char;
+        e(unsafe { syscall!(NEWFSTATAT, fildes, empty_ptr, buf, AT_EMPTY_PATH) }) as c_int
     }
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {

@@ -1,6 +1,7 @@
 use core::fmt::Write as CoreWrite;
 use core::{ptr, slice, str};
 
+use c_str::CStr;
 use platform::types::*;
 use platform::{self, WriteByte};
 use va_list::VaList;
@@ -62,7 +63,8 @@ pub unsafe fn printf<W: WriteByte>(w: W, format: *const c_char, mut ap: VaList) 
 
                     found_percent = false;
                     if a != ptr::null() {
-                        w.write_str(str::from_utf8_unchecked(platform::c_str(a)))
+                        let a_cstr = CStr::from_ptr(a);
+                        w.write_str(str::from_utf8_unchecked(a_cstr.to_bytes()))
                     } else {
                         w.write_str("NULL")
                     }

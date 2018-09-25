@@ -76,12 +76,10 @@ BINS=\
 	$(EXPECT_BINS) \
 	dirent \
 	pwd \
-	resource/getrusage \
 	stdlib/alloc \
 	stdlib/bsearch \
 	stdlib/mktemp \
 	time/gettimeofday \
-	time/times \
 	unistd/chdir \
 	unistd/getcwd \
 	unistd/gethostname \
@@ -89,6 +87,8 @@ BINS=\
 	unistd/link \
 	unistd/setid \
 	unistd/stat
+#	resource/getrusage
+#	time/times
 
 .PHONY: all $(BINS) clean run expected verify
 

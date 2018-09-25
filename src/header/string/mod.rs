@@ -246,7 +246,14 @@ pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn strnlen(s: *const c_char, size: usize) -> size_t {
-    platform::c_str_n(s, size).len() as size_t
+    let mut i = 0;
+    while i < size {
+        if *s.offset(i as isize) == 0 {
+            break;
+        }
+        i += 1;
+    }
+    i as size_t
 }
 
 #[no_mangle]
