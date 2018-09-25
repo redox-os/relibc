@@ -9,7 +9,7 @@ crate-type = ["staticlib"]
 
 [workspace]
 members = ["src/crt0", "src/crti", "src/crtn", "cbindgen"]
-exclude = ["core_io"]
+exclude = ["core_io", "ralloc"]
 
 [build-dependencies]
 cc = "1.0.17"

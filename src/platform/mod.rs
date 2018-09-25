@@ -107,21 +107,21 @@ pub unsafe fn memcpy(s1: *mut c_void, s2: *const c_void, n: usize) -> *mut c_voi
     s1
 }
 
-pub trait Write: fmt::Write {
+pub trait WriteByte: fmt::Write {
     fn write_u8(&mut self, byte: u8) -> fmt::Result;
 }
 
-impl<'a, W: Write> Write for &'a mut W {
+impl<'a, W: WriteByte> WriteByte for &'a mut W {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
         (**self).write_u8(byte)
     }
 }
 
-pub trait Read {
+pub trait ReadByte {
     fn read_u8(&mut self) -> Result<Option<u8>, ()>;
 }
 
-impl<'a, R: Read> Read for &'a mut R {
+impl<'a, R: ReadByte> ReadByte for &'a mut R {
     fn read_u8(&mut self) -> Result<Option<u8>, ()> {
         (**self).read_u8()
     }
@@ -142,7 +142,7 @@ impl fmt::Write for FileWriter {
     }
 }
 
-impl Write for FileWriter {
+impl WriteByte for FileWriter {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
         self.write(&[byte]);
         Ok(())
@@ -157,7 +157,7 @@ impl FileReader {
     }
 }
 
-impl Read for FileReader {
+impl ReadByte for FileReader {
     fn read_u8(&mut self) -> Result<Option<u8>, ()> {
         let mut buf = [0];
         match self.read(&mut buf) {
@@ -194,7 +194,7 @@ impl fmt::Write for StringWriter {
     }
 }
 
-impl Write for StringWriter {
+impl WriteByte for StringWriter {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
         unsafe { self.write(&[byte]) };
         Ok(())
@@ -222,7 +222,7 @@ impl fmt::Write for UnsafeStringWriter {
     }
 }
 
-impl Write for UnsafeStringWriter {
+impl WriteByte for UnsafeStringWriter {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
         unsafe { self.write(&[byte]) };
         Ok(())
@@ -231,7 +231,7 @@ impl Write for UnsafeStringWriter {
 
 pub struct StringReader<'a>(pub &'a [u8]);
 
-impl<'a> Read for StringReader<'a> {
+impl<'a> ReadByte for StringReader<'a> {
     fn read_u8(&mut self) -> Result<Option<u8>, ()> {
         if self.0.is_empty() {
             Ok(None)
@@ -245,7 +245,7 @@ impl<'a> Read for StringReader<'a> {
 
 pub struct UnsafeStringReader(pub *const u8);
 
-impl Read for UnsafeStringReader {
+impl ReadByte for UnsafeStringReader {
     fn read_u8(&mut self) -> Result<Option<u8>, ()> {
         unsafe {
             if *self.0 == 0 {
@@ -277,7 +277,7 @@ impl<T: fmt::Write> fmt::Write for CountingWriter<T> {
         self.inner.write_str(s)
     }
 }
-impl<T: Write> Write for CountingWriter<T> {
+impl<T: WriteByte> WriteByte for CountingWriter<T> {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
         self.written += 1;
         self.inner.write_u8(byte)

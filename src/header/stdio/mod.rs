@@ -15,7 +15,7 @@ use header::stdlib::mkstemp;
 use header::string::strlen;
 use platform;
 use platform::types::*;
-use platform::{c_str, errno, Read, Write};
+use platform::{c_str, errno, ReadByte, WriteByte};
 use platform::{Pal, Sys};
 
 mod printf;
@@ -219,7 +219,7 @@ impl<'a> fmt::Write for LockGuard<'a> {
         }
     }
 }
-impl<'a> Write for LockGuard<'a> {
+impl<'a> WriteByte for LockGuard<'a> {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
         if !self.0.can_write() {
             return Err(Error);
@@ -231,7 +231,7 @@ impl<'a> Write for LockGuard<'a> {
         }
     }
 }
-impl<'a> Read for LockGuard<'a> {
+impl<'a> ReadByte for LockGuard<'a> {
     fn read_u8(&mut self) -> Result<Option<u8>, ()> {
         let mut buf = [0];
         match self.0.read(&mut buf) {

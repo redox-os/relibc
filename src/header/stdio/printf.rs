@@ -2,10 +2,10 @@ use core::fmt::Write as CoreWrite;
 use core::{ptr, slice, str};
 
 use platform::types::*;
-use platform::{self, Write};
+use platform::{self, WriteByte};
 use va_list::VaList;
 
-pub unsafe fn printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) -> c_int {
+pub unsafe fn printf<W: WriteByte>(w: W, format: *const c_char, mut ap: VaList) -> c_int {
     let mut w = platform::CountingWriter::new(w);
 
     let format = slice::from_raw_parts(format as *const u8, usize::max_value());

@@ -1,5 +1,3 @@
-use core::ptr;
-
 use super::types::*;
 use c_str::CStr;
 use header::dirent::dirent;

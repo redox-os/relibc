@@ -1,7 +1,7 @@
 use alloc::String;
 use alloc::Vec;
 use platform::types::*;
-use platform::Read;
+use platform::ReadByte;
 use va_list::VaList;
 
 #[derive(PartialEq, Eq)]
@@ -27,7 +27,7 @@ unsafe fn next_byte(string: &mut *const c_char) -> Result<u8, c_int> {
     }
 }
 
-unsafe fn inner_scanf<R: Read>(
+unsafe fn inner_scanf<R: ReadByte>(
     mut r: R,
     mut format: *const c_char,
     mut ap: VaList,
@@ -420,7 +420,7 @@ unsafe fn inner_scanf<R: Read>(
     }
     Ok(matched)
 }
-pub unsafe fn scanf<R: Read>(r: R, format: *const c_char, ap: VaList) -> c_int {
+pub unsafe fn scanf<R: ReadByte>(r: R, format: *const c_char, ap: VaList) -> c_int {
     match inner_scanf(r, format, ap) {
         Ok(n) => n,
         Err(n) => n,

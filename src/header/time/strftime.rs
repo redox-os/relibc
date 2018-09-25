@@ -1,12 +1,12 @@
 use alloc::string::String;
 
 use platform::types::*;
-use platform::{self, Write};
+use platform::{self, WriteByte};
 
 use super::tm;
 
-pub unsafe fn strftime<W: Write>(w: &mut W, format: *const c_char, t: *const tm) -> size_t {
-    pub unsafe fn inner_strftime<W: Write>(
+pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const tm) -> size_t {
+    pub unsafe fn inner_strftime<W: WriteByte>(
         w: &mut W,
         mut format: *const c_char,
         t: *const tm,
