@@ -37,7 +37,9 @@ extern crate spin;
 #[macro_use]
 mod macros;
 pub mod c_str;
+pub mod fs;
 pub mod header;
+pub mod io;
 pub mod platform;
 pub mod start;
 
