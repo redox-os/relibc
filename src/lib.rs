@@ -18,6 +18,7 @@
 #[macro_use]
 extern crate alloc;
 extern crate cbitset;
+extern crate core_io;
 #[macro_use]
 extern crate lazy_static;
 extern crate rand;

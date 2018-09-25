@@ -15,6 +15,7 @@ ifeq ($(TARGET),x86_64-unknown-redox)
 endif
 
 SRC=\
+	Cargo.* \
 	src/* \
 	src/*/* \
 	src/*/*/* \
