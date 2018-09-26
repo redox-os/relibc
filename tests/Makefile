@@ -18,6 +18,7 @@ EXPECT_BINS=\
 	stdio/buffer \
 	stdio/fgets \
 	stdio/freopen \
+	stdio/fseek \
 	stdio/fwrite \
 	stdio/getc_unget \
 	stdio/printf \

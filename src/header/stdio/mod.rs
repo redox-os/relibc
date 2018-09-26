@@ -16,7 +16,7 @@ use header::errno::{self, STR_ERROR};
 use header::fcntl;
 use header::stdlib::mkstemp;
 use header::string::strlen;
-use io::{self, BufRead, LineWriter, Read, Write};
+use io::{self, BufRead, LineWriter, SeekFrom, Read, Write};
 use platform::types::*;
 use platform::{Pal, Sys};
 use platform::{errno, WriteByte};
@@ -32,8 +32,6 @@ pub use self::constants::*;
 mod constants;
 
 mod helpers;
-
-mod internal;
 
 enum Buffer<'a> {
     Borrowed(&'a mut [u8]),
@@ -233,19 +231,16 @@ pub extern "C" fn fgetc(stream: *mut FILE) -> c_int {
 }
 
 /// Get the position of the stream and store it in pos
-// #[no_mangle]
-pub extern "C" fn fgetpos(stream: *mut FILE, pos: Option<&mut fpos_t>) -> c_int {
-    unimplemented!()
-    //let off = internal::ftello(stream);
-    //if off < 0 {
-    //    return -1;
-    //}
-    //if let Some(pos) = pos {
-    //    *pos = off;
-    //    0
-    //} else {
-    //    -1
-    //}
+#[no_mangle]
+pub extern "C" fn fgetpos(stream: *mut FILE, pos: *mut fpos_t) -> c_int {
+    let off = ftello(stream);
+    if off < 0 {
+        return -1;
+    }
+    unsafe {
+        *pos = off;
+    }
+    0
 }
 
 /// Get a string from the stream
@@ -489,18 +484,21 @@ pub unsafe extern "C" fn fsetpos(stream: *mut FILE, pos: *const fpos_t) -> c_int
 }
 
 /// Get the current position of the cursor in the file
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn ftell(stream: *mut FILE) -> c_long {
-    unimplemented!();
-    // ftello(stream) as c_long
+    ftello(stream) as c_long
 }
 
 /// Get the current position of the cursor in the file
-// #[no_mangle]
-pub extern "C" fn ftello(stream: &mut FILE) -> off_t {
-    unimplemented!();
-    // let mut stream = stream.lock();
-    // internal::ftello(&mut stream)
+#[no_mangle]
+pub extern "C" fn ftello(stream: *mut FILE) -> off_t {
+    let mut stream = unsafe { &mut *stream }.lock();
+    let pos = Sys::lseek(*stream.file, 0, SEEK_CUR);
+    if pos < 0 {
+        return -1;
+    }
+
+    pos - (stream.read_size - stream.read_pos) as off_t
 }
 
 /// Try to lock the file. Returns 0 for success, 1 for failure
