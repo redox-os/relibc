@@ -1,5 +1,6 @@
 use platform::types::*;
 
+pub const EOF: c_int = -1;
 pub const BUFSIZ: size_t = 1024;
 
 pub const UNGET: size_t = 8;

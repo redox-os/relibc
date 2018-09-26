@@ -16,6 +16,7 @@ EXPECT_BINS=\
 	signal \
 	stdio/all \
 	stdio/buffer \
+	stdio/fgets \
 	stdio/freopen \
 	stdio/fwrite \
 	stdio/getc_unget \
