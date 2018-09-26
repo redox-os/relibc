@@ -1,12 +1,28 @@
-use super::{constants, BUFSIZ, FILE, UNGET};
+use super::{constants, Buffer, BUFSIZ, FILE, UNGET};
 use core::cell::UnsafeCell;
 use core::ptr;
 use core::sync::atomic::AtomicBool;
 
+use fs::File;
+use io::LineWriter;
+use platform::types::*;
+
 pub struct GlobalFile(UnsafeCell<FILE>);
 impl GlobalFile {
-    const fn new(file: FILE) -> Self {
-        GlobalFile(UnsafeCell::new(file))
+    fn new(file: c_int, flags: c_int) -> Self {
+        let file = File::new(file);
+        let writer = LineWriter::new(unsafe { file.get_ref() });
+        GlobalFile(UnsafeCell::new(FILE {
+            lock: AtomicBool::new(false),
+
+            file,
+            flags: constants::F_PERM | flags,
+            read_buf: Buffer::Owned(vec![0; BUFSIZ as usize]),
+            read_pos: 0,
+            read_size: 0,
+            unget: None,
+            writer
+        }))
     }
     pub fn get(&self) -> *mut FILE {
         self.0.get()
@@ -17,40 +33,13 @@ unsafe impl Sync for GlobalFile {}
 
 lazy_static! {
     #[allow(non_upper_case_globals)]
-    pub static ref default_stdin: GlobalFile = GlobalFile::new(FILE {
-        flags: constants::F_PERM | constants::F_NOWR,
-        read: None,
-        write: None,
-        fd: 0,
-        buf: vec![0u8;(BUFSIZ + UNGET) as usize],
-        buf_char: -1,
-        unget: UNGET,
-        lock: AtomicBool::new(false),
-    });
+    pub static ref default_stdin: GlobalFile = GlobalFile::new(0, constants::F_NOWR);
 
     #[allow(non_upper_case_globals)]
-    pub static ref default_stdout: GlobalFile = GlobalFile::new(FILE {
-        flags: constants::F_PERM | constants::F_NORD,
-        read: None,
-        write: None,
-        fd: 1,
-        buf: vec![0u8;(BUFSIZ + UNGET) as usize],
-        buf_char: b'\n' as i8,
-        unget: 0,
-        lock: AtomicBool::new(false),
-    });
+    pub static ref default_stdout: GlobalFile = GlobalFile::new(1, constants::F_NORD);
 
     #[allow(non_upper_case_globals)]
-    pub static ref default_stderr: GlobalFile = GlobalFile::new(FILE {
-        flags: constants::F_PERM | constants::F_NORD,
-        read: None,
-        write: None,
-        fd: 2,
-        buf: vec![0u8;(BUFSIZ + UNGET) as usize],
-        buf_char: -1,
-        unget: 0,
-        lock: AtomicBool::new(false),
-    });
+    pub static ref default_stderr: GlobalFile = GlobalFile::new(2, constants::F_NORD);
 }
 
 #[no_mangle]

@@ -11,8 +11,10 @@ use syscall::flag::*;
 use syscall::{self, Result};
 
 use c_str::{CStr, CString};
+use fs::File;
+use io;
 use header::dirent::dirent;
-use header::errno::{EINVAL, ENOSYS};
+use header::errno::{EIO, EINVAL, ENOSYS};
 use header::fcntl;
 const MAP_ANON: c_int = 1;
 //use header::sys_mman::MAP_ANON;
@@ -423,31 +425,30 @@ impl Pal for Sys {
         e(syscall::getgid()) as gid_t
     }
 
-    unsafe fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
-        let fd = match RawFile::open(
-            &CString::new("/etc/hostname").unwrap(),
-            fcntl::O_RDONLY | fcntl::O_CLOEXEC,
-            0,
-        ) {
-            Ok(fd) => fd,
-            Err(_) => return -1,
-        };
+    fn gethostname(name: *mut c_char, len: size_t) -> c_int {
+        fn inner(name: &mut [u8]) -> io::Result<()> {
+            let mut file = File::open(
+                &CString::new("/etc/hostname").unwrap(),
+                fcntl::O_RDONLY | fcntl::O_CLOEXEC
+            )?;
 
-        let mut reader = FileReader(*fd);
-        for _ in 0..len {
-            match reader.read_u8() {
-                Ok(Some(b)) => {
-                    *name = b as c_char;
-                    name = name.offset(1);
+            let mut read = 0;
+            loop {
+                match file.read(&mut name[read..])? {
+                    0 => break,
+                    n => read += n
                 }
-                Ok(None) => {
-                    *name = 0;
-                    break;
-                }
-                Err(()) => return -1,
+            }
+            Ok(())
+        }
+
+        match inner(unsafe { slice::from_raw_parts_mut(name as *mut u8, len as usize) }) {
+            Ok(()) => 0,
+            Err(_) => unsafe {
+                errno = EIO;
+                -1
             }
         }
-        0
     }
 
     fn getpgid(pid: pid_t) -> pid_t {

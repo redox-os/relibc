@@ -194,32 +194,31 @@ impl Pal for Sys {
         e(unsafe { syscall!(GETGID) }) as gid_t
     }
 
-    unsafe fn gethostname(mut name: *mut c_char, len: size_t) -> c_int {
-        // len only needs to be mutable on linux
-        let mut len = len;
-
-        let mut uts = mem::uninitialized();
-        let err = Sys::uname(&mut uts);
-        if err < 0 {
-            mem::forget(uts);
-            return err;
-        }
-        for c in uts.nodename.iter() {
-            if len == 0 {
-                break;
+    fn gethostname(mut name: *mut c_char, mut len: size_t) -> c_int {
+        unsafe {
+            let mut uts = mem::uninitialized();
+            let err = Sys::uname(&mut uts);
+            if err < 0 {
+                mem::forget(uts);
+                return err;
             }
-            len -= 1;
+            for c in uts.nodename.iter() {
+                if len == 0 {
+                    break;
+                }
+                len -= 1;
 
-            *name = *c;
+                *name = *c;
 
-            if *name == 0 {
-                // We do want to copy the zero also, so we check this after the copying.
-                break;
+                if *name == 0 {
+                    // We do want to copy the zero also, so we check this after the copying.
+                    break;
+                }
+
+                name = name.offset(1);
             }
-
-            name = name.offset(1);
+            0
         }
-        0
     }
 
     fn getpgid(pid: pid_t) -> pid_t {

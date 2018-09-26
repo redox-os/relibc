@@ -1,9 +1,6 @@
 #ifndef _BITS_STDIO_H
 #define _BITS_STDIO_H
 
-#define EOF (-1)
-#define BUFSIZ 1024
-
 typedef struct FILE FILE;
 
 int fprintf(FILE * stream, const char * fmt, ...);

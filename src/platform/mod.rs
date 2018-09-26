@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use core::{fmt, ptr};
+use io::{self, Read};
 
 pub use self::allocator::*;
 
@@ -70,16 +71,6 @@ impl<'a, W: WriteByte> WriteByte for &'a mut W {
     }
 }
 
-pub trait ReadByte {
-    fn read_u8(&mut self) -> Result<Option<u8>, ()>;
-}
-
-impl<'a, R: ReadByte> ReadByte for &'a mut R {
-    fn read_u8(&mut self) -> Result<Option<u8>, ()> {
-        (**self).read_u8()
-    }
-}
-
 pub struct FileWriter(pub c_int);
 
 impl FileWriter {
@@ -110,13 +101,13 @@ impl FileReader {
     }
 }
 
-impl ReadByte for FileReader {
-    fn read_u8(&mut self) -> Result<Option<u8>, ()> {
-        let mut buf = [0];
-        match self.read(&mut buf) {
-            0 => Ok(None),
-            n if n < 0 => Err(()),
-            _ => Ok(Some(buf[0])),
+impl Read for FileReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let i = Sys::read(self.0, buf);
+        if i >= 0 {
+            Ok(i as usize)
+        } else {
+            Err(io::Error::from_raw_os_error(-i as i32))
         }
     }
 }
@@ -182,32 +173,20 @@ impl WriteByte for UnsafeStringWriter {
     }
 }
 
-pub struct StringReader<'a>(pub &'a [u8]);
-
-impl<'a> ReadByte for StringReader<'a> {
-    fn read_u8(&mut self) -> Result<Option<u8>, ()> {
-        if self.0.is_empty() {
-            Ok(None)
-        } else {
-            let byte = self.0[0];
-            self.0 = &self.0[1..];
-            Ok(Some(byte))
-        }
-    }
-}
-
 pub struct UnsafeStringReader(pub *const u8);
 
-impl ReadByte for UnsafeStringReader {
-    fn read_u8(&mut self) -> Result<Option<u8>, ()> {
+impl Read for UnsafeStringReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         unsafe {
-            if *self.0 == 0 {
-                Ok(None)
-            } else {
-                let byte = *self.0;
+            for i in 0..buf.len() {
+                if *self.0 == 0 {
+                    return Ok(i);
+                }
+
+                buf[i] = *self.0;
                 self.0 = self.0.offset(1);
-                Ok(Some(byte))
             }
+            Ok(buf.len())
         }
     }
 }
