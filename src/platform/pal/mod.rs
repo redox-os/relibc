@@ -71,7 +71,7 @@ pub trait Pal {
 
     fn getgid() -> gid_t;
 
-    unsafe fn gethostname(name: *mut c_char, len: size_t) -> c_int;
+    fn gethostname(name: *mut c_char, len: size_t) -> c_int;
 
     fn getpgid(pid: pid_t) -> pid_t;
 
