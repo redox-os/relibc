@@ -709,7 +709,7 @@ pub extern "C" fn setvbuf(stream: *mut FILE, buf: *mut c_char, mode: c_int, mut 
     // Set a buffer of size `size` if no buffer is given
     stream.read_buf = if buf.is_null() || size == 0 {
         if size == 0 {
-            size = BUFSIZ;
+            size = BUFSIZ as usize;
         }
         // TODO: Make it unbuffered if _IONBF
         // if mode == _IONBF {

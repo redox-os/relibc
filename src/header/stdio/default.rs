@@ -17,7 +17,7 @@ impl GlobalFile {
 
             file,
             flags: constants::F_PERM | flags,
-            read_buf: Buffer::Owned(vec![0; BUFSIZ]),
+            read_buf: Buffer::Owned(vec![0; BUFSIZ as usize]),
             read_pos: 0,
             read_size: 0,
             unget: None,
