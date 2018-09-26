@@ -271,12 +271,7 @@ pub extern "C" fn fgets(original: *mut c_char, max: c_int, stream: *mut FILE) ->
         let (read, exit) = {
             let mut buf = match stream.fill_buf() {
                 Ok(buf) => buf,
-                Err(err) => {
-                    unsafe {
-                        platform::errno = errno::EIO;
-                    }
-                    return ptr::null_mut();
-                }
+                Err(_) => return ptr::null_mut()
             };
             if buf.is_empty() {
                 break;
@@ -393,12 +388,7 @@ pub extern "C" fn fread(ptr: *mut c_void, size: size_t, count: size_t, stream: *
     ) };
     match stream.read(buf) {
         Ok(bytes) => (bytes as usize / size as usize) as size_t,
-        Err(err) => {
-            unsafe {
-                platform::errno = errno::EIO;
-            }
-            0
-        }
+        Err(_) => 0
     }
 }
 
@@ -523,12 +513,7 @@ pub extern "C" fn fwrite(ptr: *const c_void, size: usize, count: usize, stream: 
     ) };
     match stream.write(buf) {
         Ok(bytes) => (bytes as usize / size as usize) as size_t,
-        Err(err) => {
-            unsafe {
-                platform::errno = errno::EIO;
-            }
-            0
-        }
+        Err(_) => 0
     }
 }
 
@@ -551,12 +536,8 @@ pub extern "C" fn getc_unlocked(stream: *mut FILE) -> c_int {
     let mut buf = [0];
 
     match unsafe { &mut *stream }.read(&mut buf) {
-        Ok(0) => EOF,
-        Ok(_) => buf[0] as c_int,
-        Err(err) => unsafe {
-            platform::errno = errno::EIO;
-            EOF
-        }
+        Ok(0) | Err(_) => EOF,
+        Ok(_) => buf[0] as c_int
     }
 }
 
@@ -632,12 +613,8 @@ pub extern "C" fn putchar(c: c_int) -> c_int {
 #[no_mangle]
 pub extern "C" fn putc_unlocked(c: c_int, stream: *mut FILE) -> c_int {
     match unsafe { &mut *stream }.write(&[c as u8]) {
-        Ok(0) => EOF,
+        Ok(0) | Err(_) => EOF,
         Ok(_) => c,
-        Err(_) => unsafe {
-            platform::errno = errno::EIO;
-            EOF
-        }
     }
 }
 

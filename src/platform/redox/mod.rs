@@ -2,7 +2,7 @@
 
 use alloc::btree_map::BTreeMap;
 use cbitset::BitSet;
-use core::fmt::Write;
+use core::fmt::Write as WriteFmt;
 use core::{mem, ptr, slice};
 use spin::{Mutex, MutexGuard, Once};
 use syscall::data::Stat as redox_stat;
@@ -12,7 +12,8 @@ use syscall::{self, Result};
 
 use c_str::{CStr, CString};
 use fs::File;
-use io;
+use io::{self, BufReader, SeekFrom};
+use io::prelude::*;
 use header::dirent::dirent;
 use header::errno::{EIO, EINVAL, ENOSYS};
 use header::fcntl;
@@ -29,7 +30,7 @@ use header::time::timespec;
 use header::unistd::{F_OK, R_OK, SEEK_SET, W_OK, X_OK};
 
 use super::types::*;
-use super::{errno, FileReader, FileWriter, Line, Pal, RawFile, RawLineBuffer, Read};
+use super::{errno, FileReader, FileWriter, Line, Pal, Read};
 
 mod signal;
 mod socket;
@@ -58,9 +59,12 @@ pub struct Sys;
 
 impl Pal for Sys {
     fn access(path: &CStr, mode: c_int) -> c_int {
-        let fd = match RawFile::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC, 0) {
+        let fd = match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
             Ok(fd) => fd,
-            Err(_) => return -1,
+            Err(_) => unsafe {
+                errno = EIO;
+                return -1;
+            }
         };
         if mode == F_OK {
             return 0;
@@ -171,10 +175,11 @@ impl Pal for Sys {
     ) -> c_int {
         use alloc::Vec;
 
-        let fd = match RawFile::open(path, fcntl::O_RDONLY | fcntl::O_CLOEXEC, 0) {
-            Ok(fd) => fd,
-            Err(_) => return -1,
+        let file = match File::open(path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
+            Ok(file) => file,
+            Err(_) => return -1
         };
+        let mut file = BufReader::new(file);
 
         // Count arguments
         let mut len = 0;
@@ -189,27 +194,28 @@ impl Pal for Sys {
         let mut read = 0;
 
         while read < 2 {
-            match Self::read(*fd, &mut shebang) {
-                0 => break,
-                i if i < 0 => return -1,
-                i => read += i,
+            match file.read(&mut shebang) {
+                Ok(0) => break,
+                Ok(i) => read += i,
+                Err(_) => return -1
             }
         }
 
         let mut _interpreter_path = None;
         let mut _interpreter_file = None;
-        let mut interpreter_fd = *fd;
+        let mut interpreter_fd = **file.get_ref();
 
         if &shebang == b"#!" {
-            match RawLineBuffer::new(*fd).next() {
-                Line::Error => return -1,
-                Line::EOF => (),
-                Line::Some(line) => {
+            let mut line = Vec::new();
+            match file.read_until(b'\n', &mut line) {
+                Err(_) => return -1,
+                Ok(0) => (),
+                Ok(_) => {
                     let mut path = match CString::new(line) {
                         Ok(path) => path,
                         Err(_) => return -1,
                     };
-                    match RawFile::open(&path, fcntl::O_RDONLY | fcntl::O_CLOEXEC, 0) {
+                    match File::open(&path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
                         Ok(file) => {
                             interpreter_fd = *file;
                             _interpreter_path = Some(path);
@@ -217,13 +223,13 @@ impl Pal for Sys {
 
                             let path_ref = _interpreter_path.as_ref().unwrap();
                             args.push([path_ref.as_ptr() as usize, path_ref.to_bytes().len()]);
-                        }
+                        },
                         Err(_) => return -1,
                     }
-                }
+                },
             }
         }
-        if Self::lseek(*fd, 0, SEEK_SET) < 0 {
+        if file.seek(SeekFrom::Start(0)).is_err() {
             return -1;
         }
 
@@ -637,7 +643,7 @@ impl Pal for Sys {
         let mut exceptfds = unsafe { exceptfds.as_mut() }.map(|s| BitSet::from_ref(&mut s.fds_bits));
 
         let event_path = unsafe { CStr::from_bytes_with_nul_unchecked(b"event:\0") };
-        let event_file = match RawFile::open(event_path, fcntl::O_RDWR | fcntl::O_CLOEXEC, 0) {
+        let mut event_file = match File::open(event_path, fcntl::O_RDWR | fcntl::O_CLOEXEC) {
             Ok(file) => file,
             Err(_) => return -1,
         };
@@ -645,15 +651,7 @@ impl Pal for Sys {
         for fd in 0..nfds as usize {
             macro_rules! register {
                 ($fd:expr, $flags:expr) => {
-                    if Self::write(
-                        *event_file,
-                        &syscall::Event {
-                            id: $fd,
-                            flags: $flags,
-                            data: 0,
-                        },
-                    ) < 0
-                    {
+                    if event_file.write(&syscall::Event { id: $fd, flags: $flags, data: 0, }).is_err() {
                         return -1;
                     }
                 };
@@ -678,26 +676,21 @@ impl Pal for Sys {
                     format!("time:{}", syscall::CLOCK_MONOTONIC).into_bytes(),
                 )
             };
-            let timeout_file =
-                match RawFile::open(&timeout_path, fcntl::O_RDWR | fcntl::O_CLOEXEC, 0) {
-                    Ok(file) => file,
-                    Err(_) => return -1,
-                };
+            let mut timeout_file = match File::open(&timeout_path, fcntl::O_RDWR | fcntl::O_CLOEXEC) {
+                Ok(file) => file,
+                Err(_) => return -1,
+            };
 
-            if Self::write(
-                *event_file,
-                &syscall::Event {
-                    id: *timeout_file as usize,
-                    flags: syscall::EVENT_READ,
-                    data: TIMEOUT_TOKEN,
-                },
-            ) < 0
-            {
+            if event_file.write(&syscall::Event {
+                id: *timeout_file as usize,
+                flags: syscall::EVENT_READ,
+                data: TIMEOUT_TOKEN,
+            }).is_err() {
                 return -1;
             }
 
             let mut time = syscall::TimeSpec::default();
-            if Self::read(*timeout_file, &mut time) < 0 {
+            if timeout_file.read(&mut time).is_err() {
                 return -1;
             }
 
@@ -708,7 +701,7 @@ impl Pal for Sys {
                 time.tv_nsec -= 1000000000;
             }
 
-            if Self::write(*timeout_file, &time) < 0 {
+            if timeout_file.write(&time).is_err() {
                 return -1;
             }
 
@@ -721,11 +714,10 @@ impl Pal for Sys {
                 &mut events as *mut _ as *mut u8,
                 mem::size_of::<syscall::Event>() * events.len()
             ) };
-            let read = Self::read(*event_file, &mut events);
-            if read < 0 {
-                return -1;
+            match event_file.read(&mut events) {
+                Ok(i) => i / mem::size_of::<syscall::Event>(),
+                Err(_) => return -1
             }
-            read as usize / mem::size_of::<syscall::Event>()
         };
 
         let mut total = 0;

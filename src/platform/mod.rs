@@ -26,10 +26,6 @@ mod sys;
 #[path = "redox/mod.rs"]
 mod sys;
 
-pub use self::rawfile::RawFile;
-
-pub mod rawfile;
-
 pub use self::rlb::{Line, RawLineBuffer};
 pub mod rlb;
 

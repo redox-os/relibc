@@ -3,10 +3,11 @@
 use core::ptr;
 
 use c_str::CStr;
+use fs::File;
 use header::{errno, fcntl};
-use platform;
+use io::{BufRead, BufReader};
 use platform::types::*;
-use platform::{Line, RawFile, RawLineBuffer};
+use platform;
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -55,26 +56,27 @@ where
     // TODO F: FnMut(impl Iterator<Item = &[u8]>) -> bool
     F: FnMut(&[&[u8]]) -> bool,
 {
-    let file = match RawFile::open(
+    let file = match File::open(
         unsafe { CStr::from_bytes_with_nul_unchecked(b"/etc/passwd\0") },
-        fcntl::O_RDONLY,
-        0,
+        fcntl::O_RDONLY
     ) {
         Ok(file) => file,
         Err(_) => return OptionPasswd::Error,
     };
 
-    let mut rlb = RawLineBuffer::new(*file);
+    let file = BufReader::new(file);
 
-    loop {
-        let line = match rlb.next() {
-            Line::Error => return OptionPasswd::Error,
-            Line::EOF => return OptionPasswd::NotFound,
-            Line::Some(line) => line,
+    for line in file.split(b'\n') {
+        let line = match line {
+            Ok(line) => line,
+            Err(err) => unsafe {
+                platform::errno = errno::EIO;
+                return OptionPasswd::Error;
+            }
         };
 
         // Parse into passwd
-        let mut parts: [&[u8]; 7] = sys::split(line);
+        let mut parts: [&[u8]; 7] = sys::split(&line);
 
         if !callback(&parts) {
             continue;
@@ -145,6 +147,7 @@ where
 
         return OptionPasswd::Found(alloc);
     }
+    OptionPasswd::NotFound
 }
 
 #[no_mangle]

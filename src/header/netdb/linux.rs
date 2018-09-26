@@ -1,24 +1,27 @@
 use alloc::string::String;
 use c_str::CString;
 use header::fcntl;
-use platform::rawfile::RawFile;
-use platform::rlb::RawLineBuffer;
-use platform::Line;
+use fs::File;
+use io::{BufRead, BufReader};
 
 pub fn get_dns_server() -> String {
-    let fd = match RawFile::open(
+    let file = match File::open(
         &CString::new("/etc/resolv.conf").unwrap(),
-        fcntl::O_RDONLY,
-        0,
+        fcntl::O_RDONLY
     ) {
-        Ok(fd) => fd,
+        Ok(file) => file,
         Err(_) => return String::new(), // TODO: better error handling
     };
+    let mut file = BufReader::new(file);
 
-    let mut rlb = RawLineBuffer::new(*fd);
-    while let Line::Some(line) = rlb.next() {
+    for line in file.split(b'\n') {
+        let mut line = match line {
+            Ok(line) => line,
+            Err(_) => return String::new() // TODO: pls handle errors
+        };
         if line.starts_with(b"nameserver ") {
-            return String::from_utf8(line[11..].to_vec()).unwrap_or_default();
+            line.drain(..11);
+            return String::from_utf8(line).unwrap_or_default();
         }
     }
 
