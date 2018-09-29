@@ -1,5 +1,7 @@
 //! termios implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/termios.h.html
 
+use header::errno;
+use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
 
@@ -29,6 +31,44 @@ pub extern "C" fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
 #[no_mangle]
 pub extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *mut termios) -> c_int {
     Sys::tcsetattr(fd, act, value)
+}
+
+#[no_mangle]
+pub extern "C" fn cfgetispeed(termios_p: *const termios) -> speed_t {
+    unsafe { (*termios_p).__c_ispeed }
+}
+
+#[no_mangle]
+pub extern "C" fn cfgetospeed(termios_p: *const termios) -> speed_t {
+    unsafe { (*termios_p).__c_ospeed }
+}
+
+#[no_mangle]
+pub extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) -> c_int {
+    match speed as usize {
+        B0..=B38400 | B57600..=B4000000 => {
+            unsafe { (*termios_p).__c_ispeed = speed };
+            0
+        }
+        _ => {
+            unsafe { platform::errno = errno::EINVAL };
+            -1
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) -> c_int {
+    match speed as usize {
+        B0..=B38400 | B57600..=B4000000 => {
+            unsafe { (*termios_p).__c_ospeed = speed };
+            0
+        }
+        _ => {
+            unsafe { platform::errno = errno::EINVAL };
+            -1
+        }
+    }
 }
 
 pub const VINTR: usize = 0;
