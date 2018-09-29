@@ -17,6 +17,7 @@ EXPECT_BINS=\
 	stdio/all \
 	stdio/buffer \
 	stdio/fgets \
+	stdio/fread \
 	stdio/freopen \
 	stdio/fseek \
 	stdio/fwrite \

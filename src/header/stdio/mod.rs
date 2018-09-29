@@ -71,20 +71,21 @@ pub struct FILE {
 }
 
 impl Read for FILE {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if !buf.is_empty() {
+    fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
+        if !out.is_empty() {
             if let Some(c) = self.unget.take() {
-                buf[0] = c;
+                out[0] = c;
                 return Ok(1);
             }
         }
 
-        if self.read_pos == self.read_size {
-            self.fill_buf()?;
-        }
+        let len = {
+            let buf = self.fill_buf()?;
+            let len = buf.len().min(out.len());
 
-        let len = buf.len().min(self.read_size);
-        buf[..len].copy_from_slice(&mut self.read_buf[..len]);
+            out[..len].copy_from_slice(&buf[..len]);
+            len
+        };
         self.consume(len);
         Ok(len)
     }
