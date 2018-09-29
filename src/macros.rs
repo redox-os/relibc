@@ -190,3 +190,65 @@ macro_rules! strto_impl {
         num
     }};
 }
+#[macro_export]
+macro_rules! strto_float_impl {
+    ($type:ident, $s:expr, $endptr:expr) => {{
+        let mut s = $s;
+        let endptr = $endptr;
+
+        while ctype::isspace(*s as c_int) != 0 {
+            s = s.offset(1);
+        }
+
+        let mut result: $type = 0.0;
+        let mut radix = 10;
+
+        let negative = match *s as u8 {
+            b'-' => {
+                s = s.offset(1);
+                true
+            }
+            b'+' => {
+                s = s.offset(1);
+                false
+            }
+            _ => false,
+        };
+
+        if *s as u8 == b'0' && *s.offset(1) as u8 == b'x' {
+            s = s.offset(2);
+            radix = 16;
+        }
+
+        while let Some(digit) = (*s as u8 as char).to_digit(radix) {
+            result *= radix as $type;
+            result += digit as $type;
+            s = s.offset(1);
+        }
+
+        if *s as u8 == b'.' {
+            s = s.offset(1);
+
+            let mut i = 1.0;
+            while let Some(digit) = (*s as u8 as char).to_digit(radix) {
+                i *= radix as $type;
+                result += digit as $type / i;
+                s = s.offset(1);
+            }
+        }
+
+        if !endptr.is_null() {
+            // This is stupid, but apparently strto* functions want
+            // const input but mut output, yet the man page says
+            // "stores the address of the first invalid character in *endptr"
+            // so obviously it doesn't want us to clone it.
+            *endptr = s as *mut _;
+        }
+
+        if negative {
+            -result
+        } else {
+            result
+        }
+    }}
+}
