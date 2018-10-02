@@ -387,10 +387,14 @@ pub extern "C" fn fread(ptr: *mut c_void, size: size_t, count: size_t, stream: *
         ptr as *mut u8,
         size as usize * count as usize
     ) };
-    match stream.read(buf) {
-        Ok(bytes) => (bytes as usize / size as usize) as size_t,
-        Err(_) => 0
+    let mut read = 0;
+    while read < buf.len() {
+        match stream.read(&mut buf[read..]) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => read += n
+        }
     }
+    (read / size as usize) as size_t
 }
 
 #[no_mangle]
@@ -512,10 +516,14 @@ pub extern "C" fn fwrite(ptr: *const c_void, size: usize, count: usize, stream: 
         ptr as *mut u8,
         size as usize * count as usize
     ) };
-    match stream.write(buf) {
-        Ok(bytes) => (bytes as usize / size as usize) as size_t,
-        Err(_) => 0
+    let mut written = 0;
+    while written < buf.len() {
+        match stream.write(&mut buf[written..]) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => written += n
+        }
     }
+    (written / size as usize) as size_t
 }
 
 /// Get a single char from a stream
