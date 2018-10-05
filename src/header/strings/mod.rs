@@ -20,38 +20,20 @@ pub unsafe extern "C" fn bcmp(first: *const c_void, second: *const c_void, n: si
 
 #[no_mangle]
 pub unsafe extern "C" fn bcopy(src: *const c_void, dst: *mut c_void, n: size_t) {
-    let src = src as *mut c_char;
-    let dst = dst as *mut c_char;
-
-    let mut tmp = Vec::with_capacity(n);
-    for i in 0..n as isize {
-        tmp.push(*src.offset(i));
-    }
-    for (i, val) in tmp.into_iter().enumerate() {
-        *dst.offset(i as isize) = val;
-    }
+    ptr::copy(src as *const u8, dst as *mut u8, n);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn bzero(src: *mut c_void, n: size_t) {
-    let src = src as *mut c_char;
-
-    for i in 0..n as isize {
-        *src.offset(i) = 0;
-    }
+pub unsafe extern "C" fn bzero(dst: *mut c_void, n: size_t) {
+    ptr::write_bytes(dst as *mut u8, 0, n);
 }
 
 #[no_mangle]
-pub extern "C" fn ffs(mut i: c_int) -> c_int {
+pub extern "C" fn ffs(i: c_int) -> c_int {
     if i == 0 {
         return 0;
     }
-    let mut n = 1;
-    while i & 1 == 0 {
-        i >>= 1;
-        n += 1;
-    }
-    n
+    1 + i.trailing_zeros() as c_int
 }
 
 #[no_mangle]
@@ -89,14 +71,7 @@ pub unsafe extern "C" fn strcasecmp(mut first: *const c_char, mut second: *const
         let mut i = *first;
         let mut j = *second;
 
-        if i >= b'A' as c_char && i <= b'Z' as c_char {
-            i += (b'a' - b'A') as c_char;
-        }
-        if j >= b'A' as c_char && j <= b'Z' as c_char {
-            j += (b'a' - b'A') as c_char;
-        }
-
-        if i != j {
+        if i & !32 != j & !32 {
             return -1;
         }
 
@@ -120,14 +95,7 @@ pub unsafe extern "C" fn strncasecmp(
         let mut i = *first;
         let mut j = *second;
 
-        if i >= b'A' as c_char && i <= b'Z' as c_char {
-            i += (b'a' - b'A') as c_char;
-        }
-        if j >= b'A' as c_char && j <= b'Z' as c_char {
-            j += (b'a' - b'A') as c_char;
-        }
-
-        if i != j {
+        if i & !32 != j & !32 {
             return -1;
         }
 
@@ -136,7 +104,7 @@ pub unsafe extern "C" fn strncasecmp(
         n -= 1;
     }
     // Both strings didn't end with NUL bytes (unless we reached the limit)
-    if n != 0 && *first != *second {
+    if n > 0 && *first != *second {
         return -1;
     }
     0

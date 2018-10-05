@@ -43,20 +43,6 @@ pub static mut environ: *mut *mut c_char = ptr::null_mut();
 #[allow(non_upper_case_globals)]
 pub static mut inner_environ: Vec<*mut c_char> = Vec::new();
 
-// NOTE: defined here rather than in string because memcpy() is useful in multiple crates
-pub unsafe fn memcpy(s1: *mut c_void, s2: *const c_void, n: usize) -> *mut c_void {
-    let mut i = 0;
-    while i + 7 < n {
-        *(s1.offset(i as isize) as *mut u64) = *(s2.offset(i as isize) as *const u64);
-        i += 8;
-    }
-    while i < n {
-        *(s1 as *mut u8).offset(i as isize) = *(s2 as *const u8).offset(i as isize);
-        i += 1;
-    }
-    s1
-}
-
 pub trait WriteByte: fmt::Write {
     fn write_u8(&mut self, byte: u8) -> fmt::Result;
 }
@@ -114,10 +100,10 @@ impl StringWriter {
     pub unsafe fn write(&mut self, buf: &[u8]) {
         if self.1 > 1 {
             let copy_size = buf.len().min(self.1 - 1);
-            memcpy(
-                self.0 as *mut c_void,
-                buf.as_ptr() as *const c_void,
-                copy_size,
+            ptr::copy_nonoverlapping(
+                buf.as_ptr(),
+                self.0,
+                copy_size
             );
             self.1 -= copy_size;
 
@@ -145,10 +131,10 @@ pub struct UnsafeStringWriter(pub *mut u8);
 
 impl UnsafeStringWriter {
     pub unsafe fn write(&mut self, buf: &[u8]) {
-        memcpy(
-            self.0 as *mut c_void,
-            buf.as_ptr() as *const c_void,
-            buf.len(),
+        ptr::copy_nonoverlapping(
+            buf.as_ptr(),
+            self.0,
+            buf.len()
         );
         *self.0.offset(buf.len() as isize) = b'\0';
         self.0 = self.0.offset(buf.len() as isize);

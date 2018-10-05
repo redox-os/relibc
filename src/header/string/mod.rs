@@ -87,7 +87,16 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) 
 
 #[no_mangle]
 pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: usize) -> *mut c_void {
-    platform::memcpy(s1, s2, n)
+    let mut i = 0;
+    while i + 7 < n {
+        *(s1.offset(i as isize) as *mut u64) = *(s2.offset(i as isize) as *const u64);
+        i += 8;
+    }
+    while i < n {
+        *(s1 as *mut u8).offset(i as isize) = *(s2 as *const u8).offset(i as isize);
+        i += 1;
+    }
+    s1
 }
 
 #[no_mangle]
