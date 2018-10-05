@@ -1,0 +1,7 @@
+sys_includes = ["sys/types.h"]
+include_guard = "_TEMPLATE_H"
+language = "C"
+style = "Type"
+
+[enum]
+prefix_with_name = true

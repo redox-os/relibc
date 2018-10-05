@@ -14,6 +14,7 @@ pub mod netdb;
 pub mod netinet_in;
 //pub mod pthread;
 pub mod pwd;
+pub mod regex;
 pub mod semaphore;
 pub mod setjmp;
 pub mod sgtty;

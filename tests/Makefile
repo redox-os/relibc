@@ -11,6 +11,7 @@ EXPECT_BINS=\
 	locale \
 	math \
 	netdb \
+	regex \
 	select \
 	setjmp \
 	signal \

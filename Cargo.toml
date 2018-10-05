@@ -18,6 +18,7 @@ cc = "1.0.17"
 cbitset = "0.1.0"
 core_io = { path = "core_io", features = ["collections"] }
 lazy_static = { version = "*", features = ["nightly", "spin_no_std"] }
+posix-regex = { version = "0.1", features = ["no_std"] }
 rand = { version = "0.5.2", default-features = false }
 va_list = { path = "va_list", features = ["no_std"] }
 

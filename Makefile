@@ -53,6 +53,7 @@ libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o $(BUILD)/release/crti.o $(
 libm: $(BUILD)/openlibm/libopenlibm.a
 
 sysroot: all
+	rm -rf $@
 	rm -rf $@.partial
 	mkdir -p $@.partial
 	make install DESTDIR=$@.partial

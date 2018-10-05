@@ -46,6 +46,7 @@ pub type wchar_t = i32;
 pub type wint_t = u32;
 pub type wctype_t = i64;
 
+pub type regoff_t = size_t;
 pub type off_t = c_long;
 pub type mode_t = c_int;
 pub type time_t = c_long;

@@ -21,6 +21,7 @@ extern crate cbitset;
 extern crate core_io;
 #[macro_use]
 extern crate lazy_static;
+extern crate posix_regex;
 extern crate rand;
 extern crate va_list;
 
