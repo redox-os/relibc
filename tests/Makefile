@@ -53,6 +53,7 @@ EXPECT_BINS=\
 	time/asctime \
 	time/gmtime \
 	time/localtime \
+	time/macros \
 	time/mktime \
 	time/strftime \
 	time/time \
@@ -64,6 +65,7 @@ EXPECT_BINS=\
 	unistd/fsync \
 	unistd/ftruncate \
 	unistd/getopt \
+	unistd/getopt_long \
 	unistd/isatty \
 	unistd/pipe \
 	unistd/rmdir \

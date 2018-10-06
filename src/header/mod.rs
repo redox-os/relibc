@@ -7,6 +7,7 @@ pub mod fcntl;
 pub mod fenv;
 pub mod float;
 pub mod fnmatch;
+pub mod getopt;
 pub mod grp;
 pub mod inttypes;
 pub mod locale;
