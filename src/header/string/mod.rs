@@ -348,23 +348,33 @@ pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> size_t 
     inner_strspn(s1, s2, true)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn strstr(s1: *const c_char, s2: *const c_char) -> *mut c_char {
-    let mut i = 0;
-    while *s1.offset(i) != 0 {
-        let mut j = 0;
-        while *s2.offset(j) != 0 && *s1.offset(j + i) != 0 {
-            if *s2.offset(j) != *s1.offset(j + i) {
+unsafe fn inner_strstr(mut haystack: *const c_char, mut needle: *const c_char, mask: c_char) -> *mut c_char {
+    while *haystack != 0 {
+        let mut i = 0;
+        loop {
+            if *needle.offset(i) == 0 {
+                // We reached the end of the needle, everything matches this far
+                return haystack as *mut c_char;
+            }
+            if *haystack.offset(i) & mask != *needle.offset(i) & mask {
                 break;
             }
-            j += 1;
-            if *s2.offset(j) == 0 {
-                return s1.offset(i) as *mut c_char;
-            }
+
+            i += 1;
         }
-        i += 1;
+
+        haystack = haystack.offset(1);
     }
     ptr::null_mut()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn strstr(haystack: *const c_char, needle: *const c_char) -> *mut c_char {
+    inner_strstr(haystack, needle, !0)
+}
+#[no_mangle]
+pub unsafe extern "C" fn strcasestr(haystack: *const c_char, needle: *const c_char) -> *mut c_char {
+    inner_strstr(haystack, needle, !32)
 }
 
 #[no_mangle]
