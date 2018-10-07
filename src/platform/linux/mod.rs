@@ -324,8 +324,8 @@ impl Pal for Sys {
         write!(proc_path, "{}", *file).unwrap();
         proc_path.push(0);
 
-        let len = out.len() - 1;
-        let read = readlink(CStr::from_bytes_with_nul(&proc_path).unwrap(), &mut out[..len]);
+        let len = out.len();
+        let read = readlink(CStr::from_bytes_with_nul(&proc_path).unwrap(), &mut out[..len-1]);
         if read < 0 {
             return -1;
         }

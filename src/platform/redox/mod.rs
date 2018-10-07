@@ -622,7 +622,18 @@ impl Pal for Sys {
             Err(_) => return -1
         };
 
-        e(syscall::fpath(*file as usize, out)) as c_int
+        if out.is_empty() {
+            return 0;
+        }
+
+        let len = out.len();
+        let read = e(syscall::fpath(*file as usize, &mut out[..len-1]));
+        if (read as c_int) < 0 {
+            return -1;
+        }
+        out[read as usize] = 0;
+
+        0
     }
 
     fn rename(oldpath: &CStr, newpath: &CStr) -> c_int {
