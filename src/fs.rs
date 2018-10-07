@@ -68,7 +68,7 @@ impl File {
     pub unsafe fn get_ref(&self) -> Self {
         Self {
             fd: self.fd,
-            reference: false
+            reference: true
         }
     }
 }
