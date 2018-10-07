@@ -1,0 +1,7 @@
+sys_includes = ["bits/assert.h"]
+include_guard = "_ASSERT_H"
+language = "C"
+style = "Tag"
+
+[enum]
+prefix_with_name = true

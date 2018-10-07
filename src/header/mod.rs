@@ -1,5 +1,6 @@
 pub mod aio;
 pub mod arpa_inet;
+pub mod assert;
 pub mod ctype;
 pub mod dirent;
 pub mod errno;
