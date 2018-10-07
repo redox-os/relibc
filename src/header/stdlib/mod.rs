@@ -1,6 +1,6 @@
 //! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 
-use core::{intrinsics, iter, mem, ptr};
+use core::{intrinsics, iter, mem, ptr, slice};
 use rand::distributions::Alphanumeric;
 use rand::prng::XorShiftRng;
 use rand::rngs::JitterRng;
@@ -12,6 +12,7 @@ use header::fcntl::*;
 use header::string::*;
 use header::time::constants::CLOCK_MONOTONIC;
 use header::time::timespec;
+use header::limits;
 use header::wchar::*;
 use header::{ctype, errno, unistd};
 use platform;
@@ -572,9 +573,24 @@ pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void 
     platform::realloc(ptr, size)
 }
 
-// #[no_mangle]
-pub extern "C" fn realpath(file_name: *const c_char, resolved_name: *mut c_char) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char) -> *mut c_char {
+    let mut path = [0; limits::PATH_MAX];
+    {
+        let slice = if resolved.is_null() {
+            &mut path
+        } else {
+            slice::from_raw_parts_mut(resolved as *mut u8, 4096)
+        };
+        if Sys::realpath(CStr::from_ptr(pathname), slice) < 0 {
+            return ptr::null_mut();
+        }
+    }
+    if !resolved.is_null() {
+        resolved
+    } else {
+        strdup(path.as_ptr() as *const i8)
+    }
 }
 
 // #[no_mangle]

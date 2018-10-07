@@ -85,6 +85,7 @@ BINS=\
 	stdlib/alloc \
 	stdlib/bsearch \
 	stdlib/mktemp \
+	stdlib/realpath \
 	time/gettimeofday \
 	unistd/chdir \
 	unistd/getcwd \

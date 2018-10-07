@@ -1,11 +1,15 @@
-use core::fmt::Write;
+use alloc::vec::Vec;
+use core::fmt::Write as _WriteFmt;
 use core::{mem, ptr};
+use core_io::Write;
 
 use super::types::*;
 use super::{errno, FileWriter, Pal};
 use c_str::CStr;
+use fs::File;
 use header::dirent::dirent;
 use header::errno::{EINVAL, ENOSYS};
+use header::fcntl;
 use header::signal::SIGCHLD;
 use header::sys_ioctl::{winsize, TCGETS, TCSETS, TIOCGWINSZ};
 // use header::sys_resource::rusage;
@@ -300,6 +304,39 @@ impl Pal for Sys {
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
         e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
+    }
+
+    fn realpath(pathname: &CStr, out: &mut [u8]) -> c_int {
+        fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t {
+            e(unsafe { syscall!(READLINKAT, AT_FDCWD, pathname.as_ptr(), out.as_mut_ptr(), out.len()) }) as ssize_t
+        }
+
+        let file = match File::open(pathname, fcntl::O_PATH) {
+            Ok(file) => file,
+            Err(_) => return -1
+        };
+
+        if out.is_empty() {
+            return 0;
+        }
+
+        let mut proc_path = b"/proc/self/fd/".to_vec();
+        write!(proc_path, "{}", *file).unwrap();
+        proc_path.push(0);
+
+        let len = out.len() - 1;
+        let read = readlink(CStr::from_bytes_with_nul(&proc_path).unwrap(), &mut out[..len]);
+        if read < 0 {
+            return -1;
+        }
+        out[read as usize] = 0;
+
+        // TODO: Should these checks from musl be ported?
+        // https://gitlab.com/bminor/musl/blob/master/src/misc/realpath.c#L33-38
+        // I'm not exactly sure what they're checking...
+        // Seems to be a sanity check whether or not it's still the same file?
+
+        0
     }
 
     fn rename(old: &CStr, new: &CStr) -> c_int {

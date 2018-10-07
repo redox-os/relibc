@@ -616,6 +616,15 @@ impl Pal for Sys {
         e(syscall::read(fd as usize, buf)) as ssize_t
     }
 
+    fn realpath(pathname: &CStr, out: &mut [u8]) -> c_int {
+        let file = match File::open(pathname, fcntl::O_PATH) {
+            Ok(fd) => fd,
+            Err(_) => return -1
+        };
+
+        e(syscall::fpath(*file as usize, out)) as c_int
+    }
+
     fn rename(oldpath: &CStr, newpath: &CStr) -> c_int {
         match syscall::open(oldpath.to_bytes(), O_WRONLY | O_CLOEXEC) {
             Ok(fd) => {

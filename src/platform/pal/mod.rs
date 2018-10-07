@@ -112,6 +112,10 @@ pub trait Pal {
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
 
+    //fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t;
+
+    fn realpath(pathname: &CStr, out: &mut [u8]) -> c_int;
+
     fn rename(old: &CStr, new: &CStr) -> c_int;
 
     fn rmdir(path: &CStr) -> c_int;

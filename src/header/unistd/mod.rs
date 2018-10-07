@@ -3,7 +3,7 @@
 use core::{ptr, slice};
 
 use c_str::CStr;
-use header::sys_time;
+use header::{limits, sys_time};
 use header::time::timespec;
 use platform;
 use platform::types::*;
@@ -34,8 +34,6 @@ pub const F_TEST: c_int = 3;
 pub const STDIN_FILENO: c_int = 0;
 pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
-
-const PATH_MAX: usize = 4096;
 
 #[no_mangle]
 pub extern "C" fn _exit(status: c_int) {
@@ -190,7 +188,7 @@ pub extern "C" fn ftruncate(fildes: c_int, length: off_t) -> c_int {
 #[no_mangle]
 pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char {
     let alloc = buf.is_null();
-    let mut stack_buf = [0; PATH_MAX];
+    let mut stack_buf = [0; limits::PATH_MAX];
     if alloc {
         buf = stack_buf.as_mut_ptr();
         size = stack_buf.len();
@@ -305,7 +303,7 @@ pub extern "C" fn getuid() -> uid_t {
 
 #[no_mangle]
 pub extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
-    getcwd(path_name, PATH_MAX)
+    getcwd(path_name, limits::PATH_MAX)
 }
 
 #[no_mangle]

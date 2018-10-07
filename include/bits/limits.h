@@ -1,3 +1,6 @@
+#ifndef _BITS_LIMIT_H
+#define _BITS_LIMIT_H
+
 #define MB_LEN_MAX 4 // unicode
 
 #define CHAR_BIT __CHAR_BIT__
@@ -28,4 +31,4 @@
 #define USHRT_MAX ((1 << 16) - 1)
 #define WORD_BIT 32
 
-#define PATH_MAX 4096
+#endif

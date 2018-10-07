@@ -1,0 +1,8 @@
+sys_includes = []
+include_guard = "_LIMITS_H"
+language = "C"
+style = "Tag"
+trailer = "#include <bits/limits.h>"
+
+[enum]
+prefix_with_name = true
