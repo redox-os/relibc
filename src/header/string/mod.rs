@@ -82,7 +82,7 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) 
                 let c = *(a as *const u8).offset(i as isize);
                 let d = *(b as *const u8).offset(i as isize);
                 if c != d {
-                    return c as i32 - d as i32;
+                    return c as c_int - d as c_int;
                 }
             }
             unreachable!()
@@ -95,7 +95,7 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) 
     let mut b = b as *const u8;
     for _ in 0..rem {
         if *a != *b {
-            return a as i32 - b as i32;
+            return a as c_int - b as c_int;
         }
         a = a.offset(1);
         b = b.offset(1);
