@@ -4,6 +4,7 @@ EXPECT_BINS=\
 	arpainet \
 	assert \
 	ctype \
+	dirent/scandir \
 	error \
 	fcntl/create \
 	fcntl/fcntl \
@@ -80,7 +81,7 @@ EXPECT_BINS=\
 # Binaries that may generate varied output
 BINS=\
 	$(EXPECT_BINS) \
-	dirent \
+	dirent/main \
 	pwd \
 	stdlib/alloc \
 	stdlib/bsearch \
