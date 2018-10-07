@@ -67,22 +67,7 @@ pub unsafe extern "C" fn rindex(mut s: *const c_char, c: c_int) -> *mut c_char {
 
 #[no_mangle]
 pub unsafe extern "C" fn strcasecmp(mut first: *const c_char, mut second: *const c_char) -> c_int {
-    while *first != 0 && *second != 0 {
-        let mut i = *first;
-        let mut j = *second;
-
-        if i & !32 != j & !32 {
-            return -1;
-        }
-
-        first = first.offset(1);
-        second = second.offset(1);
-    }
-    // Both strings didn't end with NUL bytes
-    if *first != *second {
-        return -1;
-    }
-    0
+    strncasecmp(first, second, size_t::max_value())
 }
 
 #[no_mangle]
@@ -91,21 +76,14 @@ pub unsafe extern "C" fn strncasecmp(
     mut second: *const c_char,
     mut n: size_t,
 ) -> c_int {
-    while *first != 0 && *second != 0 && n > 0 {
-        let mut i = *first;
-        let mut j = *second;
-
-        if i & !32 != j & !32 {
-            return -1;
+    while *first & !32 == *second & !32 {
+        if n == 0 || *first == 0 && *second == 0 {
+            return 0;
         }
 
         first = first.offset(1);
         second = second.offset(1);
         n -= 1;
     }
-    // Both strings didn't end with NUL bytes (unless we reached the limit)
-    if n > 0 && *first != *second {
-        return -1;
-    }
-    0
+    -1
 }
