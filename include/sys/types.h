@@ -20,7 +20,6 @@ typedef long clock_t;
 typedef int clockid_t;
 typedef void* timer_t;
 typedef unsigned long int blkcnt_t;
-typedef size_t regoff_t;
 
 typedef unsigned char u_char, uchar;
 typedef unsigned short u_short, ushort;

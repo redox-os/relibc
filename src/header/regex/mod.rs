@@ -9,6 +9,8 @@ use platform::types::*;
 use posix_regex::{PosixRegexBuilder, PosixRegex};
 use posix_regex::compile::{Error as CompileError, Token, Range};
 
+pub type regoff_t = size_t;
+
 #[repr(C)]
 pub struct regex_t {
     // Can't be a normal Vec<T> because then the struct size won't be known
