@@ -73,14 +73,32 @@ pub unsafe extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_
 
 #[no_mangle]
 pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> c_int {
-    let mut i = 0;
-    while i < n {
-        let a = *(s1 as *const u8).offset(i as isize);
-        let b = *(s2 as *const u8).offset(i as isize);
-        if a != b {
-            return a as i32 - b as i32;
+    let (div, rem) = (n / mem::size_of::<usize>(), n % mem::size_of::<usize>());
+    let mut a = s1 as *const usize;
+    let mut b = s2 as *const usize;
+    for _ in 0..div {
+        if *a != *b {
+            for i in 0..mem::size_of::<usize>() {
+                let c = *(a as *const u8).offset(i as isize);
+                let d = *(b as *const u8).offset(i as isize);
+                if c != d {
+                    return c as c_int - d as c_int;
+                }
+            }
+            unreachable!()
         }
-        i += 1;
+        a = a.offset(1);
+        b = b.offset(1);
+    }
+
+    let mut a = a as *const u8;
+    let mut b = b as *const u8;
+    for _ in 0..rem {
+        if *a != *b {
+            return a as c_int - b as c_int;
+        }
+        a = a.offset(1);
+        b = b.offset(1);
     }
     0
 }
