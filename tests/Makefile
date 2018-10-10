@@ -3,7 +3,9 @@ EXPECT_BINS=\
 	args \
 	arpainet \
 	assert \
+	constructor \
 	ctype \
+	destructor \
 	dirent/scandir \
 	error \
 	fcntl/create \
