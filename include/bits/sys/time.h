@@ -2,7 +2,7 @@
 #define _BITS_SYS_TIME
 
 #define timeradd(x,y,res) (void) (\
-        (res)->tv_sec = (x)->tv_sec + (y)->tv_sec + ((x)->tv_usec + (y)->tv_usec / 1000000), \
+        (res)->tv_sec = (x)->tv_sec + (y)->tv_sec + (((x)->tv_usec + (y)->tv_usec) / 1000000), \
         (res)->tv_usec = ((x)->tv_usec + (y)->tv_usec) % 1000000 \
     )
 #define timersub(x,y,res) (void) ( \
