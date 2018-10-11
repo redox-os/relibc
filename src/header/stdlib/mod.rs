@@ -220,6 +220,9 @@ pub extern "C" fn erand(xsubi: [c_ushort; 3]) -> c_double {
 #[no_mangle]
 pub unsafe extern "C" fn exit(status: c_int) {
     extern "C" {
+        static __fini_array_start: extern "C" fn();
+        static __fini_array_end: extern "C" fn();
+
         fn _fini();
     }
 
@@ -227,6 +230,13 @@ pub unsafe extern "C" fn exit(status: c_int) {
         if let Some(func) = ATEXIT_FUNCS[i] {
             (func)();
         }
+    }
+
+    // Look for the neighbor functions in memory until the end
+    let mut f = &__fini_array_end as *const _;
+    while f > &__fini_array_start {
+        f = f.offset(-1);
+        (*f)();
     }
 
     _fini();

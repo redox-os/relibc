@@ -30,6 +30,11 @@ impl Stack {
 #[no_mangle]
 pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     extern "C" {
+        static __preinit_array_start: extern "C" fn();
+        static __preinit_array_end:   extern "C" fn();
+        static __init_array_start:    extern "C" fn();
+        static __init_array_end:      extern "C" fn();
+
         fn _init();
         fn main(argc: isize, argv: *const *const c_char, envp: *const *const c_char) -> c_int;
     }
@@ -65,6 +70,18 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     stdio::stderr = stdio::default_stderr.get();
 
     _init();
+
+    // Look for the neighbor functions in memory until the end
+    let mut f = &__preinit_array_start as *const _;
+    while f < &__preinit_array_end {
+        (*f)();
+        f = f.offset(1);
+    }
+    f = &__init_array_start as *const _;
+    while f < &__init_array_end {
+        (*f)();
+        f = f.offset(1);
+    }
 
     stdlib::exit(main(
         argc,
