@@ -120,6 +120,7 @@ static mut HOST_ENTRY: hostent = hostent {
 };
 static mut HOST_NAME: Option<Vec<u8>> = None;
 static mut HOST_ALIASES: Option<Vec<Vec<u8>>> = None;
+static mut _HOST_ALIASES: Option<Vec<*mut i8>> = None;
 static mut HOST_ADDR: Option<in_addr> = None;
 static mut HOST_ADDR_LIST: [*mut c_char; 2] = [ptr::null_mut(); 2];
 static mut _HOST_ADDR_LIST: [u8; 4] = [0u8; 4];
@@ -649,6 +650,7 @@ pub unsafe extern "C" fn gethostent() -> *const hostent {
         h_length: 4,
         h_addr_list: HOST_ADDR_LIST.as_mut_ptr(),
     };
+    _HOST_ALIASES = Some(host_aliases);
     if HOST_STAYOPEN == 0 {
         endhostent();
     }
