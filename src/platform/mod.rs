@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use core::{fmt, ptr};
-use io::{self, Read};
+use io::{self, Read, Write};
 
 pub use self::allocator::*;
 
@@ -95,68 +95,88 @@ impl Read for FileReader {
 }
 
 pub struct StringWriter(pub *mut u8, pub usize);
-
-impl StringWriter {
-    pub unsafe fn write(&mut self, buf: &[u8]) {
+impl Write for StringWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.1 > 1 {
             let copy_size = buf.len().min(self.1 - 1);
-            ptr::copy_nonoverlapping(
-                buf.as_ptr(),
-                self.0,
-                copy_size
-            );
-            self.1 -= copy_size;
+            unsafe {
+                ptr::copy_nonoverlapping(
+                    buf.as_ptr(),
+                    self.0,
+                    copy_size
+                );
+                self.1 -= copy_size;
 
-            self.0 = self.0.offset(copy_size as isize);
-            *self.0 = 0;
+                self.0 = self.0.offset(copy_size as isize);
+                *self.0 = 0;
+            }
+
+            Ok(copy_size)
+        } else {
+            Ok(0)
         }
     }
-}
-
-impl fmt::Write for StringWriter {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        unsafe { self.write(s.as_bytes()) };
+    fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
 }
-
+impl fmt::Write for StringWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        unsafe {
+            // can't fail
+            self.write(s.as_bytes()).unwrap();
+        };
+        Ok(())
+    }
+}
 impl WriteByte for StringWriter {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
-        unsafe { self.write(&[byte]) };
+        unsafe {
+            // can't fail
+            self.write(&[byte]).unwrap();
+        }
         Ok(())
     }
 }
 
 pub struct UnsafeStringWriter(pub *mut u8);
-
-impl UnsafeStringWriter {
-    pub unsafe fn write(&mut self, buf: &[u8]) {
-        ptr::copy_nonoverlapping(
-            buf.as_ptr(),
-            self.0,
-            buf.len()
-        );
-        *self.0.offset(buf.len() as isize) = b'\0';
-        self.0 = self.0.offset(buf.len() as isize);
+impl Write for UnsafeStringWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        unsafe {
+            ptr::copy_nonoverlapping(
+                buf.as_ptr(),
+                self.0,
+                buf.len()
+            );
+            *self.0.offset(buf.len() as isize) = b'\0';
+            self.0 = self.0.offset(buf.len() as isize);
+        }
+        Ok(buf.len())
     }
-}
-
-impl fmt::Write for UnsafeStringWriter {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        unsafe { self.write(s.as_bytes()) };
+    fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
 }
-
+impl fmt::Write for UnsafeStringWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        unsafe {
+            // can't fail
+            self.write(s.as_bytes()).unwrap();
+        }
+        Ok(())
+    }
+}
 impl WriteByte for UnsafeStringWriter {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
-        unsafe { self.write(&[byte]) };
+        unsafe {
+            // can't fail
+            self.write(&[byte]).unwrap();
+        }
         Ok(())
     }
 }
 
 pub struct UnsafeStringReader(pub *const u8);
-
 impl Read for UnsafeStringReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         unsafe {
@@ -195,5 +215,26 @@ impl<T: WriteByte> WriteByte for CountingWriter<T> {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
         self.written += 1;
         self.inner.write_u8(byte)
+    }
+}
+impl<T: Write> Write for CountingWriter<T> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let res = self.inner.write(buf);
+        if let Ok(written) = res {
+            self.written += written;
+        }
+        res
+    }
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        match self.inner.write_all(&buf) {
+            Ok(()) => (),
+            Err(ref err) if err.kind() == io::ErrorKind::WriteZero => (),
+            Err(err) => return Err(err)
+        }
+        self.written += buf.len();
+        Ok(())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
     }
 }

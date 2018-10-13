@@ -39,7 +39,7 @@ unsafe fn inner_scanf<R: Read>(
 
     macro_rules! read {
         () => {{
-            let mut buf = &mut [byte];
+            let buf = &mut [byte];
             match r.read(buf) {
                 Ok(0) => false,
                 Ok(_) => {
@@ -117,13 +117,17 @@ unsafe fn inner_scanf<R: Read>(
             let mut kind = IntKind::Int;
             loop {
                 kind = match c {
-                    b'h' => if kind == IntKind::Short {
+                    b'h' => if kind == IntKind::Short || kind == IntKind::Byte {
                         IntKind::Byte
                     } else {
                         IntKind::Short
                     },
                     b'j' => IntKind::IntMax,
-                    b'l' => IntKind::Long,
+                    b'l' => if kind == IntKind::Long || kind == IntKind::LongLong {
+                        IntKind::LongLong
+                    } else {
+                        IntKind::Long
+                    },
                     b'q' | b'L' => IntKind::LongLong,
                     b't' => IntKind::PtrDiff,
                     b'z' => IntKind::Size,
