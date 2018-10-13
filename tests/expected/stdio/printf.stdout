@@ -7,4 +7,36 @@ uint: 32
 hex: beef
 HEX: C0FFEE
 string: end
-len of previous write: 94
+%n returned 51, total len of write: 94
+
+Padding madness:
+ 001   +2
+   c
+ 0x00000ff
+ 001
+0 0x1
+ 1
+(00123) (  123)
+(-0123) ( -123)
+(             )
+0xabcdef
+(nil)
+
+Positional madness:
+4 3 2
+00002
+|Fiz     |Buz     |     Fiz|     Tot|
+
+Float madness:
+        1.234568e+02
+        1.000000E-05
+          123.456789
+            0.000010
+       -1.234568e+02
+-00000001.234568e+02
+100000
+1e+06
+1.000000e+06
+0.0001
+1E-05
+1.000000E-05
