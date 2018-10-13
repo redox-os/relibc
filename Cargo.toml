@@ -40,7 +40,7 @@ redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall.git", bran
 spin = "0.4"
 
 [features]
-default = ["trace"]
+#default = ["trace"]
 trace = []
 
 [profile.dev]

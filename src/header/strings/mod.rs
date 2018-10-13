@@ -76,14 +76,14 @@ pub unsafe extern "C" fn strncasecmp(
     mut second: *const c_char,
     mut n: size_t,
 ) -> c_int {
-    while *first & !32 == *second & !32 {
-        if n == 0 || *first == 0 && *second == 0 {
-            return 0;
+    while n > 0 && (*first != 0 || *second != 0) {
+        if *first & !32 != *second & !32 {
+            return -1;
         }
 
         first = first.offset(1);
         second = second.offset(1);
         n -= 1;
     }
-    -1
+    0
 }
