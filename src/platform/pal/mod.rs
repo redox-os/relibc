@@ -57,6 +57,8 @@ pub trait Pal {
 
     fn ftruncate(fildes: c_int, length: off_t) -> c_int;
 
+    fn futex(addr: *mut c_int, op: c_int, val: c_int) -> c_int;
+
     fn futimens(fd: c_int, times: *const timespec) -> c_int;
 
     fn utimens(path: &CStr, times: *const timespec) -> c_int;

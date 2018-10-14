@@ -7,6 +7,7 @@ use header::errno;
 use header::fcntl::*;
 use header::string::strchr;
 use io::LineWriter;
+use mutex::Mutex;
 use platform::types::*;
 use platform;
 
@@ -68,7 +69,7 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
     let writer = LineWriter::new(file.get_ref());
 
     Some(Box::into_raw(Box::new(FILE {
-        lock: AtomicBool::new(false),
+        lock: Mutex::new(()),
 
         file,
         flags,

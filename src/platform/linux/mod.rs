@@ -166,6 +166,10 @@ impl Pal for Sys {
         e(unsafe { syscall!(FTRUNCATE, fildes, length) }) as c_int
     }
 
+    fn futex(addr: *mut c_int, op: c_int, val: c_int) -> c_int {
+        unsafe { syscall!(FUTEX, addr, op, val, 0, 0, 0) as c_int }
+    }
+
     fn futimens(fd: c_int, times: *const timespec) -> c_int {
         e(unsafe { syscall!(UTIMENSAT, fd, ptr::null::<c_char>(), times, 0) }) as c_int
     }

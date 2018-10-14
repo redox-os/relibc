@@ -340,6 +340,13 @@ impl Pal for Sys {
         e(syscall::ftruncate(fd as usize, len as usize)) as c_int
     }
 
+    fn futex(addr: *mut c_int, op: c_int, val: c_int) -> c_int {
+        match unsafe { syscall::futex(addr as *mut i32, op as usize, val as i32, 0, ptr::null_mut()) } {
+            Ok(success) => success as c_int,
+            Err(err) => -(err.errno as c_int)
+        }
+    }
+
     fn futimens(fd: c_int, times: *const timespec) -> c_int {
         let times = [unsafe { redox_timespec::from(&*times) }, unsafe {
             redox_timespec::from(&*times.offset(1))

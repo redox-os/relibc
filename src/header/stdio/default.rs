@@ -5,6 +5,7 @@ use core::sync::atomic::AtomicBool;
 
 use fs::File;
 use io::LineWriter;
+use mutex::Mutex;
 use platform::types::*;
 
 pub struct GlobalFile(UnsafeCell<FILE>);
@@ -13,7 +14,7 @@ impl GlobalFile {
         let file = File::new(file);
         let writer = LineWriter::new(unsafe { file.get_ref() });
         GlobalFile(UnsafeCell::new(FILE {
-            lock: AtomicBool::new(false),
+            lock: Mutex::new(()),
 
             file,
             flags: constants::F_PERM | flags,

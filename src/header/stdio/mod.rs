@@ -17,6 +17,7 @@ use header::fcntl;
 use header::stdlib::mkstemp;
 use header::string::strlen;
 use io::{self, BufRead, LineWriter, SeekFrom, Read, Write};
+use mutex::Mutex;
 use platform::types::*;
 use platform::{Pal, Sys};
 use platform::{errno, WriteByte};
@@ -59,7 +60,7 @@ impl<'a> DerefMut for Buffer<'a> {
 /// This struct gets exposed to the C API.
 pub struct FILE {
     // Can't use spin crate because *_unlocked functions are things in C :(
-    lock: AtomicBool,
+    lock: Mutex<()>,
 
     file: File,
     flags: c_int,
@@ -148,7 +149,9 @@ impl WriteByte for FILE {
 }
 impl FILE {
     pub fn lock(&mut self) -> LockGuard {
-        flockfile(self);
+        unsafe {
+            flockfile(self);
+        }
         LockGuard(self)
     }
 }
@@ -168,7 +171,9 @@ impl<'a> DerefMut for LockGuard<'a> {
 }
 impl<'a> Drop for LockGuard<'a> {
     fn drop(&mut self) {
-        funlockfile(self.0);
+        unsafe {
+            funlockfile(self.0);
+        }
     }
 }
 
@@ -196,7 +201,7 @@ pub extern "C" fn cuserid(_s: *mut c_char) -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn fclose(stream: *mut FILE) -> c_int {
     let stream = unsafe { &mut *stream };
-    flockfile(stream);
+    unsafe { flockfile(stream); }
 
     let mut r = stream.flush().is_err();
     let close = Sys::close(*stream.file) < 0;
@@ -208,7 +213,7 @@ pub extern "C" fn fclose(stream: *mut FILE) -> c_int {
         // Reference files aren't closed on drop, so pretend to be a reference
         stream.file.reference = true;
     } else {
-        funlockfile(stream);
+        unsafe { funlockfile(stream); }
     }
 
     r as c_int
@@ -347,10 +352,8 @@ pub extern "C" fn fileno(stream: *mut FILE) -> c_int {
 /// Do not call any functions other than those with the `_unlocked` postfix while the file is
 /// locked
 #[no_mangle]
-pub extern "C" fn flockfile(file: *mut FILE) {
-    while ftrylockfile(file) != 0 {
-        atomic::spin_loop_hint();
-    }
+pub unsafe extern "C" fn flockfile(file: *mut FILE) {
+    (*file).lock.manual_lock();
 }
 
 /// Open the file in mode `mode`
@@ -427,7 +430,7 @@ pub extern "C" fn freopen(
     stream: &mut FILE,
 ) -> *mut FILE {
     let mut flags = unsafe { helpers::parse_mode_flags(mode) };
-    flockfile(stream);
+    unsafe { flockfile(stream); }
 
     let _ = stream.flush();
     if filename.is_null() {
@@ -437,14 +440,14 @@ pub extern "C" fn freopen(
         }
         flags &= !(fcntl::O_CREAT | fcntl::O_EXCL | fcntl::O_CLOEXEC);
         if fcntl::sys_fcntl(*stream.file, fcntl::F_SETFL, flags) < 0 {
-            funlockfile(stream);
+            unsafe { funlockfile(stream); }
             fclose(stream);
             return ptr::null_mut();
         }
     } else {
         let new = fopen(filename, mode);
         if new.is_null() {
-            funlockfile(stream);
+            unsafe { funlockfile(stream); }
             fclose(stream);
             return ptr::null_mut();
         }
@@ -454,7 +457,7 @@ pub extern "C" fn freopen(
         } else if Sys::dup2(*new.file, *stream.file) < 0
             || fcntl::sys_fcntl(*stream.file, fcntl::F_SETFL, flags & fcntl::O_CLOEXEC) < 0
         {
-            funlockfile(stream);
+            unsafe { funlockfile(stream); }
             fclose(new);
             fclose(stream);
             return ptr::null_mut();
@@ -462,7 +465,7 @@ pub extern "C" fn freopen(
         stream.flags = (stream.flags & constants::F_PERM) | new.flags;
         fclose(new);
     }
-    funlockfile(stream);
+    unsafe { funlockfile(stream); }
     stream
 }
 
@@ -521,14 +524,14 @@ pub extern "C" fn ftello(stream: *mut FILE) -> off_t {
 
 /// Try to lock the file. Returns 0 for success, 1 for failure
 #[no_mangle]
-pub extern "C" fn ftrylockfile(file: *mut FILE) -> c_int {
-    unsafe { &mut *file }.lock.compare_and_swap(false, true, Ordering::Acquire) as c_int
+pub unsafe extern "C" fn ftrylockfile(file: *mut FILE) -> c_int {
+    if (*file).lock.manual_try_lock().is_ok() { 0 } else { 1 }
 }
 
 /// Unlock the file
 #[no_mangle]
-pub extern "C" fn funlockfile(file: *mut FILE) {
-    unsafe { &mut *file }.lock.store(false, Ordering::Release);
+pub unsafe extern "C" fn funlockfile(file: *mut FILE) {
+    (*file).lock.manual_unlock();
 }
 
 /// Write `nitems` of size `size` from `ptr` to `stream`

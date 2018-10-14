@@ -41,6 +41,7 @@ pub mod c_str;
 pub mod fs;
 pub mod header;
 pub mod io;
+pub mod mutex;
 pub mod platform;
 pub mod start;
 
