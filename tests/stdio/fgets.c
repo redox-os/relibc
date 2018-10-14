@@ -10,6 +10,10 @@ int main() {
             fputs(line, stdout);
         } else {
             puts("EOF");
+            if (!feof(f)) {
+                puts("feof() not updated!");
+                return -1;
+            }
             break;
         }
     }

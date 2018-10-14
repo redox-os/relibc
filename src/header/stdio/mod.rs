@@ -93,7 +93,17 @@ impl Read for FILE {
 impl BufRead for FILE {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         if self.read_pos == self.read_size {
-            self.read_size = self.file.read(&mut self.read_buf)?;
+            self.read_size = match self.file.read(&mut self.read_buf) {
+                Ok(0) => {
+                    self.flags |= F_EOF;
+                    0
+                },
+                Ok(n) => n,
+                Err(err) => {
+                    self.flags |= F_ERR;
+                    return Err(err);
+                }
+            };
             self.read_pos = 0;
         }
         Ok(&self.read_buf[self.read_pos..self.read_size])
@@ -104,10 +114,22 @@ impl BufRead for FILE {
 }
 impl Write for FILE {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.writer.write(buf)
+        match self.writer.write(buf) {
+            Ok(n) => Ok(n),
+            Err(err) => {
+                self.flags |= F_ERR;
+                Err(err)
+            }
+        }
     }
     fn flush(&mut self) -> io::Result<()> {
-        self.writer.flush()
+        match self.writer.flush() {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                self.flags |= F_ERR;
+                Err(err)
+            }
+        }
     }
 }
 impl WriteFmt for FILE {
@@ -152,7 +174,8 @@ impl<'a> Drop for LockGuard<'a> {
 
 /// Clears EOF and ERR indicators on a stream
 #[no_mangle]
-pub extern "C" fn clearerr(stream: &mut FILE) {
+pub extern "C" fn clearerr(stream: *mut FILE) {
+    let mut stream = unsafe { &mut *stream }.lock();
     stream.flags &= !(F_EOF | F_ERR);
 }
 
@@ -465,7 +488,7 @@ pub extern "C" fn fseeko(stream: *mut FILE, mut off: off_t, whence: c_int) -> c_
         return err as c_int;
     }
 
-    stream.flags &= !F_EOF;
+    stream.flags &= !(F_EOF | F_ERR);
     stream.read_pos = 0;
     stream.read_size = 0;
     stream.unget = None;
