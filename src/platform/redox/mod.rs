@@ -15,7 +15,7 @@ use fs::File;
 use io::{self, BufReader, SeekFrom};
 use io::prelude::*;
 use header::dirent::dirent;
-use header::errno::{EIO, EINVAL, ENOSYS};
+use header::errno::{EPERM, EIO, EINVAL, ENOSYS};
 use header::fcntl;
 const MAP_ANON: c_int = 1;
 //use header::sys_mman::MAP_ANON;
@@ -86,11 +86,9 @@ impl Pal for Sys {
         }
 
         let perms = if stat.st_uid as usize == uid {
-            // octal has max 7 characters, binary has max two. And we're interested
-            // in the 3rd digit
-            stat.st_mode >> ((7 / 2) * 2 & 0o7)
+            stat.st_mode >> (3*2 & 0o7)
         } else if stat.st_gid as usize == gid {
-            stat.st_mode >> ((7 / 2) & 0o7)
+            stat.st_mode >> (3*1 & 0o7)
         } else {
             stat.st_mode & 0o7
         };
@@ -175,11 +173,11 @@ impl Pal for Sys {
     ) -> c_int {
         use alloc::Vec;
 
-        let file = match File::open(path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
+        let mut file = match File::open(path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
             Ok(file) => file,
             Err(_) => return -1
         };
-        let mut file = BufReader::new(file);
+        let fd = *file as usize;
 
         // Count arguments
         let mut len = 0;
@@ -190,47 +188,89 @@ impl Pal for Sys {
         let mut args: Vec<[usize; 2]> = Vec::with_capacity(len as usize);
 
         // Read shebang (for example #!/bin/sh)
-        let mut shebang = [0; 2];
-        let mut read = 0;
+        let interpreter = {
+            let mut reader = BufReader::new(&mut file);
 
-        while read < 2 {
-            match file.read(&mut shebang) {
-                Ok(0) => break,
-                Ok(i) => read += i,
-                Err(_) => return -1
+            let mut shebang = [0; 2];
+            let mut read = 0;
+
+            while read < 2 {
+                match reader.read(&mut shebang) {
+                    Ok(0) => break,
+                    Ok(i) => read += i,
+                    Err(_) => return -1
+                }
             }
-        }
 
+            if &shebang == b"#!" {
+                // So, this file is interpreted.
+                // That means the actual file descriptor passed to `fexec` won't be this file.
+                // So we need to check ourselves that this file is actually be executable.
+
+                let mut stat = redox_stat::default();
+                if e(syscall::fstat(fd, &mut stat)) == !0 {
+                    return -1;
+                }
+                let uid = e(syscall::getuid());
+                if uid == !0 {
+                    return -1;
+                }
+                let gid = e(syscall::getuid());
+                if gid == !0 {
+                    return -1;
+                }
+
+                let mode = if uid == stat.st_uid as usize {
+                    (stat.st_mode >> 3*2) & 0o7
+                } else if gid == stat.st_gid as usize {
+                    (stat.st_mode >> 3*1) & 0o7
+                } else {
+                    stat.st_mode & 0o7
+                };
+
+                if mode & 0o1 == 0o0 {
+                    errno = EPERM;
+                    return -1;
+                }
+
+                // Then, read the actual interpreter:
+                let mut interpreter = Vec::new();
+                match reader.read_until(b'\n', &mut interpreter) {
+                    Err(_) => return -1,
+                    Ok(_) => {
+                        if interpreter.ends_with(&[b'\n']) {
+                            interpreter.pop().unwrap();
+                        }
+                        // TODO: Returning the interpreter here is actually a
+                        // hack. Preferrably we should reassign `file =`
+                        // directly from here. Just wait until NLL comes
+                        // around...
+                        Some(interpreter)
+                    },
+                }
+            } else {
+                None
+            }
+        };
         let mut _interpreter_path = None;
-        let mut _interpreter_file = None;
-        let mut interpreter_fd = **file.get_ref();
-
-        if &shebang == b"#!" {
-            let mut line = Vec::new();
-            match file.read_until(b'\n', &mut line) {
+        if let Some(interpreter) = interpreter {
+            let mut cstring = match CString::new(interpreter) {
+                Ok(cstring) => cstring,
                 Err(_) => return -1,
-                Ok(0) => (),
-                Ok(_) => {
-                    let mut path = match CString::new(line) {
-                        Ok(path) => path,
-                        Err(_) => return -1,
-                    };
-                    match File::open(&path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
-                        Ok(file) => {
-                            interpreter_fd = *file;
-                            _interpreter_path = Some(path);
-                            _interpreter_file = Some(file);
+            };
+            file = match File::open(&cstring, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
+                Ok(file) => file,
+                Err(_) => return -1,
+            };
 
-                            let path_ref = _interpreter_path.as_ref().unwrap();
-                            args.push([path_ref.as_ptr() as usize, path_ref.to_bytes().len()]);
-                        },
-                        Err(_) => return -1,
-                    }
-                },
+            // Make sure path is kept alive long enough, and push it to the arguments
+            _interpreter_path = Some(cstring);
+            let path_ref = _interpreter_path.as_ref().unwrap();
+            args.push([path_ref.as_ptr() as usize, path_ref.to_bytes().len()]);
+        } else {
+            if file.seek(SeekFrom::Start(0)).is_err() {
+                return -1;
             }
-        }
-        if file.seek(SeekFrom::Start(0)).is_err() {
-            return -1;
         }
 
         // Arguments
@@ -263,7 +303,7 @@ impl Pal for Sys {
             envp = envp.offset(1);
         }
 
-        e(syscall::fexec(interpreter_fd as usize, &args, &envs)) as c_int
+        e(syscall::fexec(*file as usize, &args, &envs)) as c_int
     }
 
     fn fchdir(fd: c_int) -> c_int {
