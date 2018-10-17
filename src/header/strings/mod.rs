@@ -77,8 +77,9 @@ pub unsafe extern "C" fn strncasecmp(
     mut n: size_t,
 ) -> c_int {
     while n > 0 && (*first != 0 || *second != 0) {
-        if *first & !32 != *second & !32 {
-            return -1;
+        let cmp = (*first & !32) as c_int - (*second & !32) as c_int;
+        if cmp != 0 {
+            return cmp;
         }
 
         first = first.offset(1);
