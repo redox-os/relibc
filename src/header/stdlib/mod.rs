@@ -756,7 +756,7 @@ pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     {
         convert_integer(s.offset(2), 16).map(|(val, idx, overflow)| (val, idx + 2, overflow))
     } else {
-        None
+        convert_integer(s, 16).map(|(val, idx, overflow)| (val, idx, overflow))
     }
 }
 

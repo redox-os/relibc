@@ -13,6 +13,7 @@ int main(int argc, char* argv[]) {
 
     printf("%lx\n", strtol("  0x38Acfg", NULL, 0));
     printf("%lx\n", strtol("0Xabcdef12", NULL, 16));
+    printf("%lx\n", strtol("cafebeef", NULL, 16));
 
     printf("%lo\n", strtol("  073189", NULL, 0));
     printf("%lo\n", strtol("     073189", NULL, 8));
