@@ -2,11 +2,10 @@
 #define _BITS_ASSERT_H
 
 #ifdef NDEBUG
-# define assert(cond)
+# define assert(cond) (void) 0
 #else
-# define assert(cond) if (!(cond)) { \
-    __assert(__func__, __FILE__, __LINE__, #cond); \
-  }
+# define assert(cond) \
+  ((void)((cond) || (__assert(__func__, __FILE__, __LINE__, #cond), 0)))
 #endif
 
 #endif
