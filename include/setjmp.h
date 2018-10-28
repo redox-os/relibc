@@ -61,7 +61,15 @@ typedef unsigned long long jmp_buf[8];
 typedef unsigned long jmp_buf[8];
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int setjmp(jmp_buf buf);
 void longjmp(jmp_buf buf, int value);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif /* _SETJMP_H */
