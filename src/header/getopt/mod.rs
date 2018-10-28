@@ -30,6 +30,12 @@ pub unsafe extern "C" fn getopt_long(
     // if optarg is not set, we still don't want the previous value leaking
     optarg = ptr::null_mut();
 
+    // handle reinitialization request
+    if optind == 0 {
+        optind = 1;
+        CURRENT_OPT = ptr::null_mut();
+    }
+
     if CURRENT_OPT.is_null() || *CURRENT_OPT == 0 {
         if optind >= argc {
             -1
