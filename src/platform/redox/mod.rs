@@ -418,50 +418,93 @@ impl Pal for Sys {
         }
     }
 
-    fn getdents(fd: c_int, mut dirents: *mut dirent, mut bytes: usize) -> c_int {
-        let mut amount = 0;
+    fn getdents(fd: c_int, mut dirents: *mut dirent, max_bytes: usize) -> c_int {
+        // Get initial reading position
+        let mut read = match syscall::lseek(fd as usize, 0, SEEK_CUR) {
+            Ok(pos) => pos as isize,
+            Err(err) => return -err.errno
+        };
 
+        let mut written = 0;
         let mut buf = [0; 1024];
-        let mut bindex = 0;
-        let mut blen = 0;
 
         let mut name = [0; 256];
-        let mut nindex = 0;
+        let mut i = 0;
+
+        let mut flush = |written: &mut usize, i: &mut usize, name: &mut [c_char; 256]| {
+            if *i < name.len() {
+                // Set NUL byte
+                name[*i] = 0;
+            }
+            // Get size: full size - unused bytes
+            let size = mem::size_of::<dirent>() - name.len().saturating_sub(*i + 1);
+            if *written + size > max_bytes {
+                // Seek back to after last read entry and return
+                match syscall::lseek(fd as usize, read, SEEK_SET as usize) {
+                    Ok(_) => return Some(*written as c_int),
+                    Err(err) => return Some(-err.errno)
+                }
+            }
+            unsafe {
+                *dirents = dirent {
+                    d_ino: 0,
+                    d_off: read as off_t,
+                    d_reclen: size as c_ushort,
+                    d_type: 0,
+                    d_name: *name
+                };
+                dirents = (dirents as *mut u8).offset(size as isize) as *mut dirent;
+            }
+            read += *i as isize + /* newline */ 1;
+            *written += size;
+            *i = 0;
+            None
+        };
 
         loop {
-            if bindex >= blen {
-                bindex = 0;
-                blen = match syscall::read(fd as usize, &mut buf) {
-                    Ok(0) => return amount,
-                    Ok(n) => n,
-                    Err(err) => return -err.errno,
-                };
-            }
+            // Read a chunk from the directory
+            let len = match syscall::read(fd as usize, &mut buf) {
+                Ok(0) => {
+                    if i > 0 {
+                        if let Some(value) = flush(&mut written, &mut i, &mut name) {
+                            return value;
+                        }
+                    }
+                    return written as c_int;
+                },
+                Ok(n) => n,
+                Err(err) => return -err.errno
+            };
 
-            if buf[bindex] == b'\n' {
-                // Put a NUL byte either at the end, or if it's too big, at where it's truncated.
-                name[nindex.min(name.len() - 1)] = 0;
-                unsafe {
-                    *dirents = dirent {
-                        d_ino: 0,
-                        d_off: 0,
-                        d_reclen: mem::size_of::<dirent>() as c_ushort,
-                        d_type: 0,
-                        d_name: name,
+            // Handle everything
+            let mut start = 0;
+            while start < len {
+                let buf = &buf[start..len];
+
+                // Copy everything up until a newline
+                let newline = buf.iter().position(|&c| c == b'\n');
+                let pre_len = newline.unwrap_or(buf.len());
+                let post_len = newline.map(|i| i + 1).unwrap_or(buf.len());
+                if i < pre_len {
+                    // Reserve space for NUL byte
+                    let name_len = name.len()-1;
+                    let name = &mut name[i..name_len];
+                    let copy = pre_len.min(name.len());
+                    let buf = unsafe {
+                        slice::from_raw_parts(buf.as_ptr() as *const c_char, copy)
                     };
-                    dirents = dirents.offset(1);
+                    name[..copy].copy_from_slice(buf);
                 }
-                amount += 1;
-                if bytes <= mem::size_of::<dirent>() {
-                    return amount;
+
+                i += pre_len;
+                start += post_len;
+
+                // Write the directory entry
+                if newline.is_some() {
+                    if let Some(value) = flush(&mut written, &mut i, &mut name) {
+                        return value;
+                    }
                 }
-                bytes -= mem::size_of::<dirent>();
-            } else {
-                if nindex < name.len() {
-                    name[nindex] = buf[bindex] as c_char;
-                }
-                nindex += 1;
-                bindex += 1;
             }
         }
     }

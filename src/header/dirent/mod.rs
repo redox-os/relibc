@@ -21,9 +21,8 @@ pub struct DIR {
     index: usize,
     len: usize,
 
-    // Offset is like the total index, never erased It is used as an
-    // alternative to dirent's d_off, but works on redox too.
-    offset: usize,
+    // The last value of d_off, used by telldir
+    offset: usize
 }
 
 #[repr(C)]
@@ -89,20 +88,7 @@ pub unsafe extern "C" fn readdir(dir: *mut DIR) -> *mut dirent {
 
     let ptr = (*dir).buf.as_mut_ptr().offset((*dir).index as isize) as *mut dirent;
 
-    #[cfg(target_os = "redox")]
-    {
-        if (*dir).index != 0 || (*dir).offset != 0 {
-            // This should happen every time but the first, making the offset
-            // point to the current element and not the next
-            (*dir).offset += mem::size_of::<dirent>();
-        }
-        (*ptr).d_off = (*dir).offset as off_t;
-    }
-    #[cfg(not(target_os = "redox"))]
-    {
-        (*dir).offset = (*ptr).d_off as usize;
-    }
-
+    (*dir).offset = (*ptr).d_off as usize;
     (*dir).index += (*ptr).d_reclen as usize;
     ptr
 }
