@@ -11,6 +11,7 @@ EXPECT_BINS=\
 	fcntl/create \
 	fcntl/fcntl \
 	fnmatch \
+	libgen \
 	locale \
 	math \
 	netdb \

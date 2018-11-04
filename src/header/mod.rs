@@ -12,6 +12,7 @@ pub mod getopt;
 pub mod grp;
 pub mod inttypes;
 pub mod limits;
+pub mod libgen;
 pub mod locale;
 pub mod netdb;
 pub mod netinet_in;
