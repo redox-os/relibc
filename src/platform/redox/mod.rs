@@ -1,6 +1,6 @@
 //! sys/socket implementation, following http://pubs.opengroup.org/onlinepubs/009696699/basedefs/sys/socket.h.html
 
-use alloc::btree_map::BTreeMap;
+use alloc::collections::BTreeMap;
 use cbitset::BitSet;
 use core::fmt::Write as WriteFmt;
 use core::{mem, ptr, slice};
