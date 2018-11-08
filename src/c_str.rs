@@ -8,11 +8,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use alloc::arc::Arc;
 use alloc::borrow::{Borrow, Cow, ToOwned};
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::ascii;
 use core::cmp::Ordering;

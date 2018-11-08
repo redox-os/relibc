@@ -11,7 +11,6 @@
 #![feature(global_asm)]
 #![feature(lang_items)]
 #![feature(linkage)]
-#![feature(panic_implementation)]
 #![feature(str_internals)]
 #![feature(thread_local)]
 
@@ -51,7 +50,7 @@ use platform::{Allocator, Pal, Sys};
 static ALLOCATOR: Allocator = Allocator;
 
 #[cfg(not(test))]
-#[panic_implementation]
+#[panic_handler]
 #[linkage = "weak"]
 #[no_mangle]
 pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {

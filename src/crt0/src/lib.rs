@@ -5,7 +5,6 @@
 #![feature(lang_items)]
 #![feature(linkage)]
 #![feature(naked_functions)]
-#![feature(panic_implementation)]
 
 #[no_mangle]
 #[naked]
@@ -29,7 +28,7 @@ pub unsafe extern "C" fn _start() {
     );
 }
 
-#[panic_implementation]
+#[panic_handler]
 #[linkage = "weak"]
 #[no_mangle]
 pub extern "C" fn rust_begin_unwind(_pi: &::core::panic::PanicInfo) -> ! {

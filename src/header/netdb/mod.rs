@@ -7,9 +7,8 @@ use core::{mem, ptr, str};
 
 use alloc::boxed::Box;
 use alloc::str::SplitWhitespace;
-use alloc::string::ToString;
-use alloc::vec::IntoIter;
-use alloc::{String, Vec};
+use alloc::string::{String, ToString};
+use alloc::vec::{IntoIter, Vec};
 
 use c_str::{CStr, CString};
 

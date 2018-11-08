@@ -12,14 +12,14 @@ members = ["src/crt0", "src/crti", "src/crtn", "cbindgen"]
 exclude = ["core_io", "ralloc"]
 
 [build-dependencies]
-cc = "1.0.17"
+cc = "1.0.25"
 
 [dependencies]
 cbitset = "0.1.0"
 core_io = { path = "core_io", features = ["collections"] }
-lazy_static = { version = "*", features = ["nightly", "spin_no_std"] }
-posix-regex = { version = "0.1", features = ["no_std"] }
-rand = { version = "0.5.2", default-features = false }
+lazy_static = { version = "1.2.0", features = ["nightly", "spin_no_std"] }
+posix-regex = { path = "posix-regex", features = ["no_std"] }
+rand = { version = "0.5.5", default-features = false }
 va_list = { path = "va_list", features = ["no_std"] }
 
 [dependencies.compiler_builtins]
@@ -33,11 +33,11 @@ default-features = false
 optional = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
-sc = "0.2"
+sc = "0.2.2"
 
 [target.'cfg(target_os = "redox")'.dependencies]
 redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall.git", branch = "relibc" }
-spin = "0.4"
+spin = "0.4.10"
 
 [features]
 #default = ["trace"]

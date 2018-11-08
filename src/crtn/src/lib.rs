@@ -3,7 +3,6 @@
 #![no_std]
 #![feature(global_asm)]
 #![feature(linkage)]
-#![feature(panic_implementation)]
 
 // https://wiki.osdev.org/Creating_a_C_Library#crtbegin.o.2C_crtend.o.2C_crti.o.2C_and_crtn.o
 #[cfg(target_arch = "x86_64")]
@@ -36,7 +35,7 @@ global_asm!(r#"
         ret
 "#);
 
-#[panic_implementation]
+#[panic_handler]
 #[linkage = "weak"]
 #[no_mangle]
 pub extern "C" fn rust_begin_unwind(_pi: &::core::panic::PanicInfo) -> ! {

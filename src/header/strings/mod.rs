@@ -1,6 +1,6 @@
 //! strings implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/strings.h.html
 
-use alloc::Vec;
+use alloc::vec::Vec;
 use core::ptr;
 
 use platform::types::*;

@@ -11,8 +11,8 @@
 pub use self::answer::DnsAnswer;
 pub use self::query::DnsQuery;
 
-use alloc::String;
-use alloc::Vec;
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::slice;
 use core::u16;
 

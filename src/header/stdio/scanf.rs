@@ -1,5 +1,5 @@
-use alloc::String;
-use alloc::Vec;
+use alloc::string::String;
+use alloc::vec::Vec;
 use io::Read;
 use platform::types::*;
 use va_list::VaList;

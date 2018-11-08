@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use alloc::String;
+use alloc::string::String;
 
 #[derive(Clone, Debug)]
 pub struct DnsQuery {
