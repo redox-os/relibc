@@ -5,7 +5,7 @@ use syscall::{self, Result};
 use super::super::types::*;
 use super::super::{errno, Pal, PalSocket};
 use super::{e, Sys};
-use header::netinet_in::{in_addr_t, in_port_t, sockaddr_in};
+use header::netinet_in::{in_port_t, sockaddr_in};
 use header::sys_socket::constants::*;
 use header::sys_socket::{sockaddr, socklen_t};
 

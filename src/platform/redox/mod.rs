@@ -2,7 +2,6 @@
 
 use alloc::collections::BTreeMap;
 use cbitset::BitSet;
-use core::fmt::Write as WriteFmt;
 use core::{mem, ptr, slice};
 use spin::{Mutex, MutexGuard, Once};
 use syscall::data::Stat as redox_stat;
@@ -15,22 +14,18 @@ use fs::File;
 use io::{self, BufReader, SeekFrom};
 use io::prelude::*;
 use header::dirent::dirent;
-use header::errno::{EPERM, EIO, EINVAL, ENOSYS};
+use header::errno::{EPERM, EIO, EINVAL};
 use header::fcntl;
 const MAP_ANON: c_int = 1;
-//use header::sys_mman::MAP_ANON;
-//use header::sys_resource::rusage;
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
-use header::sys_time::{itimerval, timeval, timezone};
-//use header::sys_times::tms;
-use header::sys_utsname::utsname;
+use header::sys_time::{timeval, timezone};
 use header::termios::termios;
 use header::time::timespec;
 use header::unistd::{F_OK, R_OK, SEEK_SET, W_OK, X_OK};
 
 use super::types::*;
-use super::{errno, FileReader, FileWriter, Line, Pal, Read};
+use super::{errno, Pal, Read};
 
 mod signal;
 mod socket;
