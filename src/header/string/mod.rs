@@ -366,7 +366,7 @@ pub unsafe extern "C" fn strspn(s1: *const c_char, s2: *const c_char) -> size_t 
     inner_strspn(s1, s2, true)
 }
 
-unsafe fn inner_strstr(mut haystack: *const c_char, mut needle: *const c_char, mask: c_char) -> *mut c_char {
+unsafe fn inner_strstr(mut haystack: *const c_char, needle: *const c_char, mask: c_char) -> *mut c_char {
     while *haystack != 0 {
         let mut i = 0;
         loop {

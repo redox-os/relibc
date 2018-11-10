@@ -1,14 +1,12 @@
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
-use core::fmt::Write as CoreWrite;
 use core::ops::Range;
-use core::{fmt, ptr, slice, str};
+use core::{fmt, slice};
 
-use c_str::CStr;
 use io::{self, Write};
+use platform;
 use platform::types::*;
-use platform::{self, WriteByte};
 use va_list::{VaList, VaPrimitive};
 
 #[derive(PartialEq, Eq)]
@@ -221,7 +219,7 @@ fn fmt_float_exp<W: Write>(
     }
 
     let string = float_string(float, precision, trim);
-    let mut len = string.len() + 2 + 2.max(exp_len);
+    let len = string.len() + 2 + 2.max(exp_len);
 
     pad(w, !left, b' ', len..pad_space)?;
     let bytes = if string.starts_with('-') {
@@ -261,8 +259,8 @@ fn fmt_float_normal<W: Write>(
 
     Ok(string.len())
 }
-unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) -> io::Result<c_int> {
-    let mut w = &mut platform::CountingWriter::new(w);
+unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io::Result<c_int> {
+    let w = &mut platform::CountingWriter::new(w);
     let mut ap = BufferedVaList::new(ap);
     let mut format = format as *const u8;
 

@@ -12,7 +12,7 @@ pub fn get_dns_server() -> String {
         Ok(file) => file,
         Err(_) => return String::new(), // TODO: better error handling
     };
-    let mut file = BufReader::new(file);
+    let file = BufReader::new(file);
 
     for line in file.split(b'\n') {
         let mut line = match line {

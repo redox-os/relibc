@@ -4,7 +4,6 @@ use core::ptr;
 use header::{stdio, stdlib};
 use platform;
 use platform::types::*;
-use platform::{Pal, Sys};
 
 #[repr(C)]
 pub struct Stack {

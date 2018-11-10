@@ -3,7 +3,6 @@
 use c_str::CStr;
 use header::fcntl::{O_NOFOLLOW, O_PATH};
 use header::time::timespec;
-use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
 

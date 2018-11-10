@@ -1,6 +1,4 @@
 use alloc::boxed::Box;
-use core::sync::atomic::AtomicBool;
-use core::{mem, ptr};
 
 use fs::File;
 use header::errno;

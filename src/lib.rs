@@ -7,7 +7,6 @@
 #![feature(const_fn)]
 #![feature(const_vec_new)]
 #![feature(core_intrinsics)]
-#![feature(extern_prelude)]
 #![feature(global_asm)]
 #![feature(lang_items)]
 #![feature(linkage)]

@@ -1,14 +1,12 @@
-use alloc::vec::Vec;
-use core::fmt::Write as _WriteFmt;
 use core::{mem, ptr};
 use core_io::Write;
 
 use super::types::*;
-use super::{errno, FileWriter, Pal};
+use super::{errno, Pal};
 use c_str::CStr;
 use fs::File;
 use header::dirent::dirent;
-use header::errno::{EINVAL, ENOSYS};
+use header::errno::EINVAL;
 use header::fcntl;
 use header::signal::SIGCHLD;
 use header::sys_ioctl::{winsize, TCGETS, TCSETS, TIOCGWINSZ};

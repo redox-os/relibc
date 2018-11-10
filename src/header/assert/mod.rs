@@ -3,7 +3,6 @@
 use c_str::CStr;
 use core::fmt::Write;
 use header::{stdio, stdlib};
-use platform;
 use platform::types::*;
 
 #[no_mangle]

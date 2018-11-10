@@ -2,7 +2,7 @@
 
 use core::ptr;
 
-use header::{getopt, stdio, string};
+use header::getopt;
 use platform::types::*;
 
 #[allow(non_upper_case_globals)]

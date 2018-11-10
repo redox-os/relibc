@@ -1,6 +1,5 @@
 //! strings implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/strings.h.html
 
-use alloc::vec::Vec;
 use core::ptr;
 
 use platform::types::*;
@@ -66,7 +65,7 @@ pub unsafe extern "C" fn rindex(mut s: *const c_char, c: c_int) -> *mut c_char {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strcasecmp(mut first: *const c_char, mut second: *const c_char) -> c_int {
+pub unsafe extern "C" fn strcasecmp(first: *const c_char, second: *const c_char) -> c_int {
     strncasecmp(first, second, size_t::max_value())
 }
 

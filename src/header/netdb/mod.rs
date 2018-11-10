@@ -227,15 +227,11 @@ fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
             Box::from_raw(packet_data_ptr);
         }
 
-        let mut i = 0 as socklen_t;
+        let i = 0 as socklen_t;
         let mut buf = [0u8; 65536];
         let buf_ptr = buf.as_mut_ptr() as *mut c_void;
 
-        let mut count = -1;
-
-        unsafe {
-            count = sys_socket::recv(sock, buf_ptr, 65536, 0);
-        }
+        let count = unsafe { sys_socket::recv(sock, buf_ptr, 65536, 0) };
         if count < 0 {
             return Err(EIO);
         }
@@ -347,15 +343,11 @@ fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
             Box::from_raw(packet_data_ptr);
         }
 
-        let mut i = mem::size_of::<sockaddr_in>() as socklen_t;
+        let i = mem::size_of::<sockaddr_in>() as socklen_t;
         let mut buf = [0u8; 65536];
         let buf_ptr = buf.as_mut_ptr() as *mut c_void;
 
-        let mut count = -1;
-
-        unsafe {
-            count = sys_socket::recv(sock, buf_ptr, 65536, 0);
-        }
+        let count = unsafe { sys_socket::recv(sock, buf_ptr, 65536, 0) };
         if count < 0 {
             return Err(EIO);
         }
@@ -385,11 +377,10 @@ fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
 
 fn parse_revdns_answer(data: Vec<u8>) -> Vec<u8> {
     let mut cursor = 0;
-    let mut offset = 0;
     let mut index = 0;
     let mut output = data.clone();
     while index < data.len() - 1 {
-        offset = data[index] as usize;
+        let offset = data[index] as usize;
         index = cursor + offset + 1;
         output[index] = '.' as u8;
         cursor = index;
@@ -855,10 +846,10 @@ pub unsafe extern "C" fn getservent() -> *const servent {
     let mut rlb = RawLineBuffer::new(SERVDB);
     rlb.seek(S_POS);
 
-    let mut r: Box<str> = Box::default();
+    let r: Box<str> = Box::default();
 
     loop {
-        let mut r = match rlb.next() {
+        let r = match rlb.next() {
             Line::Some(s) => bytes_to_box_str(s),
             _ => {
                 if SERV_STAYOPEN == 0 {

@@ -3,7 +3,7 @@
 use core::{ptr, slice};
 
 use c_str::CStr;
-use header::{limits, sys_time};
+use header::limits;
 use header::time::timespec;
 use platform;
 use platform::types::*;

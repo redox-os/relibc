@@ -3,10 +3,9 @@
 use alloc::borrow::{Borrow, BorrowMut};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use core::fmt;
 use core::fmt::Write as WriteFmt;
-use core::fmt::{self, Error};
 use core::ops::{Deref, DerefMut};
-use core::sync::atomic::{self, AtomicBool, Ordering};
 use core::{ptr, str, slice};
 use va_list::VaList as va_list;
 
@@ -16,7 +15,7 @@ use header::errno::{self, STR_ERROR};
 use header::fcntl;
 use header::stdlib::mkstemp;
 use header::string::strlen;
-use io::{self, BufRead, LineWriter, SeekFrom, Read, Write};
+use io::{self, BufRead, LineWriter, Read, Write};
 use mutex::Mutex;
 use platform::types::*;
 use platform::{Pal, Sys};
@@ -513,7 +512,7 @@ pub extern "C" fn ftell(stream: *mut FILE) -> c_long {
 /// Get the current position of the cursor in the file
 #[no_mangle]
 pub extern "C" fn ftello(stream: *mut FILE) -> off_t {
-    let mut stream = unsafe { &mut *stream }.lock();
+    let stream = unsafe { &mut *stream }.lock();
     let pos = Sys::lseek(*stream.file, 0, SEEK_CUR);
     if pos < 0 {
         return -1;

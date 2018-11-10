@@ -1,12 +1,9 @@
 use super::types::*;
 use c_str::CStr;
 use header::dirent::dirent;
-//use header::sys_resource::rusage;
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
-use header::sys_time::{itimerval, timeval, timezone};
-//use header::sys_times::tms;
-use header::sys_utsname::utsname;
+use header::sys_time::{timeval, timezone};
 use header::termios::termios;
 use header::time::timespec;
 

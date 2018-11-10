@@ -1,7 +1,6 @@
 //! regex.h implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/regex.h.html
 
 use alloc::borrow::Cow;
-use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::{mem, slice, ptr};
 use header::string::strlen;
@@ -116,7 +115,7 @@ pub extern "C" fn regexec(regex: *const regex_t, input: *const c_char,
 
     // Allow specifying a compiler argument to the executor and vise versa
     // because why not?
-    let mut flags = regex.cflags | eflags;
+    let flags = regex.cflags | eflags;
 
     let input = unsafe { slice::from_raw_parts(input as *const u8, strlen(input)) };
 

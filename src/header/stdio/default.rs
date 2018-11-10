@@ -1,7 +1,6 @@
-use super::{constants, Buffer, BUFSIZ, FILE, UNGET};
+use super::{constants, Buffer, BUFSIZ, FILE};
 use core::cell::UnsafeCell;
 use core::ptr;
-use core::sync::atomic::AtomicBool;
 
 use fs::File;
 use io::LineWriter;
