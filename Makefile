@@ -6,12 +6,14 @@ ifneq ($(TARGET),)
 	CARGOFLAGS+="--target=$(TARGET)"
 endif
 
+CARGO?=cargo
+
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
-	CC=aarch64-linux-gnu-gcc
+	CC?=aarch64-linux-gnu-gcc
 endif
 
 ifeq ($(TARGET),x86_64-unknown-redox)
-	CC=x86_64-unknown-redox-gcc
+	CC?=x86_64-unknown-redox-gcc
 endif
 
 SRC=\
@@ -26,11 +28,11 @@ SRC=\
 all: | libc libm
 
 clean:
-	cargo clean
+	$(CARGO) clean
 	make -C tests clean
 
 check:
-	cargo check
+	$(CARGO) check
 
 fmt:
 	./fmt.sh
@@ -64,27 +66,27 @@ test: sysroot
 	make -C tests run
 
 $(BUILD)/debug/libc.a: $(SRC)
-	cargo build $(CARGOFLAGS)
+	$(CARGO) build $(CARGOFLAGS)
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
-	CARGO_INCREMENTAL=0 cargo rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 	touch $@
 
 $(BUILD)/release/libc.a: $(SRC)
-	cargo build --release $(CARGOFLAGS)
+	$(CARGO) build --release $(CARGOFLAGS)
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
-	CARGO_INCREMENTAL=0 cargo rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 	touch $@
 
 $(BUILD)/release/crti.o: $(SRC)
-	CARGO_INCREMENTAL=0 cargo rustc --release --manifest-path src/crti/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/crti/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 	touch $@
 
 $(BUILD)/release/crtn.o: $(SRC)
-	CARGO_INCREMENTAL=0 cargo rustc --release --manifest-path src/crtn/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/crtn/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
 	touch $@
 
 $(BUILD)/include: $(SRC)
