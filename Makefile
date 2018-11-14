@@ -1,12 +1,13 @@
 TARGET?=
 
+CARGO?=cargo
+CARGOFLAGS?=
+
 BUILD=target
 ifneq ($(TARGET),)
 	BUILD="target/$(TARGET)"
 	CARGOFLAGS+="--target=$(TARGET)"
 endif
-
-CARGO?=cargo
 
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
 	CC?=aarch64-linux-gnu-gcc
