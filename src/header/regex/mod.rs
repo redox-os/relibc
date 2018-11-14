@@ -49,18 +49,6 @@ pub const REG_ERANGE:   c_int = 12;
 pub const REG_ESPACE:   c_int = 13;
 pub const REG_BADRPT:   c_int = 14;
 
-fn count_groups(branches: &[Vec<(Token, Range)>]) -> usize {
-    let mut count = 0;
-    for branch in branches {
-        for (token, _) in branch {
-            if let Token::Group(ref inner) = token {
-                count += 1 + count_groups(inner);
-            }
-        }
-    }
-    count
-}
-
 #[no_mangle]
 pub extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: c_int) -> c_int {
     if cflags & REG_EXTENDED == REG_EXTENDED {
@@ -74,7 +62,7 @@ pub extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: c_int) 
 
     match res {
         Ok(mut branches) => unsafe {
-            let re_nsub = count_groups(&branches);
+            let re_nsub = PosixRegex::new(Cow::Borrowed(&branches)).count_groups();
             *out = regex_t {
                 ptr: branches.as_mut_ptr() as *mut c_void,
                 length: branches.len(),
@@ -118,7 +106,6 @@ pub extern "C" fn regexec(regex: *const regex_t, input: *const c_char,
     let flags = regex.cflags | eflags;
 
     let input = unsafe { slice::from_raw_parts(input as *const u8, strlen(input)) };
-
     let branches = unsafe { slice::from_raw_parts(regex.ptr as *const Vec<(Token, Range)>, regex.length) };
 
     let matches = PosixRegex::new(Cow::Borrowed(&branches))
@@ -134,21 +121,12 @@ pub extern "C" fn regexec(regex: *const regex_t, input: *const c_char,
             && nmatch > 0 {
         let first = &matches[0];
 
-        let len = first.len().min(nmatch as usize);
-        for i in 0..len {
-            let (start, end) = first[i];
+        for i in 0..nmatch as usize {
+            let (start, end) = first.get(i).and_then(|&range| range).unwrap_or((!0, !0));
             unsafe {
                 *pmatch.offset(i as isize) = regmatch_t {
                     rm_so: start,
                     rm_eo: end
-                };
-            }
-        }
-        for i in len as isize..nmatch as isize {
-            unsafe {
-                *pmatch.offset(i) = regmatch_t {
-                    rm_so: !0,
-                    rm_eo: !0
                 };
             }
         }
