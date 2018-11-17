@@ -137,6 +137,8 @@ pub trait Pal {
 
     fn tcsetattr(fd: c_int, act: c_int, value: *const termios) -> c_int;
 
+    fn umask(mask: mode_t) -> mode_t;
+
     fn unlink(path: &CStr) -> c_int;
 
     fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t;

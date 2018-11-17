@@ -61,10 +61,6 @@ impl Sys {
     //     unsafe { syscall!(TIMES, out) as clock_t }
     // }
 
-    fn umask(mask: mode_t) -> mode_t {
-        unsafe { syscall!(UMASK, mask) as mode_t }
-    }
-
     pub fn uname(utsname: *mut utsname) -> c_int {
         e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
     }
@@ -384,6 +380,10 @@ impl Pal for Sys {
         }
         // This is safe because ioctl shouldn't modify the value
         Self::ioctl(fd, TCSETS + act as c_ulong, value as *mut c_void)
+    }
+
+    fn umask(mask: mode_t) -> mode_t {
+        unsafe { syscall!(UMASK, mask) as mode_t }
     }
 
     fn unlink(path: &CStr) -> c_int {

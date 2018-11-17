@@ -899,6 +899,10 @@ impl Pal for Sys {
         0
     }
 
+    fn umask(mask: mode_t) -> mode_t {
+        e(syscall::umask(mask as usize)) as mode_t
+    }
+
     fn unlink(path: &CStr) -> c_int {
         e(syscall::unlink(path.to_bytes())) as c_int
     }
