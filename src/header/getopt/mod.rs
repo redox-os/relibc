@@ -88,7 +88,7 @@ pub unsafe extern "C" fn getopt_long(
                                         stdio::fputs(*argv as _, &mut *stdio::stderr);
                                         stdio::fputs(": option '--\0".as_ptr() as _, &mut *stdio::stderr);
                                         stdio::fputs(current_arg, &mut *stdio::stderr);
-                                        stdio::fputs("' requires an argument\n".as_ptr() as _, &mut *stdio::stderr);
+                                        stdio::fputs("' requires an argument\n\0".as_ptr() as _, &mut *stdio::stderr);
                                         return b'?' as c_int;
                                     }
                                 }
