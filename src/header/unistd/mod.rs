@@ -172,6 +172,7 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
             let path_env = CStr::from_ptr(path_env);
             for mut path in path_env.to_bytes().split(|&b| b == PATH_SEPARATOR) {
                 let mut program = path.to_vec();
+                program.push(b'/');
                 program.extend_from_slice(file.to_bytes());
                 program.push(b'0');
 
