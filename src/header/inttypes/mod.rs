@@ -11,14 +11,14 @@ pub extern "C" fn imaxabs(i: intmax_t) -> intmax_t {
 
 #[no_mangle]
 #[repr(C)]
-pub struct intmaxdiv_t {
+pub struct imaxdiv_t {
     quot: intmax_t,
     rem: intmax_t,
 }
 
 #[no_mangle]
-pub extern "C" fn imaxdiv(i: intmax_t, j: intmax_t) -> intmaxdiv_t {
-    intmaxdiv_t {
+pub extern "C" fn imaxdiv(i: intmax_t, j: intmax_t) -> imaxdiv_t {
+    imaxdiv_t {
         quot: i / j,
         rem: i % j,
     }
