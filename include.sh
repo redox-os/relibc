@@ -11,7 +11,7 @@ do
     name="$(basename "$dir")"
     if [ "${name:0:1}" != "_" ]
     then
-        header="$include/${name/_/\/}.h"
+        header="$include/${name/_//}.h"
         pushd "$dir"
         cargo run --release --manifest-path "$cbindgen/Cargo.toml" -- \
             -c cbindgen.toml -o "$header" mod.rs
