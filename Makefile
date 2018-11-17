@@ -10,11 +10,11 @@ ifneq ($(TARGET),)
 endif
 
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
-	CC?=aarch64-linux-gnu-gcc
+	export CC=aarch64-linux-gnu-gcc
 endif
 
 ifeq ($(TARGET),x86_64-unknown-redox)
-	CC?=x86_64-unknown-redox-gcc
+	export CC=x86_64-unknown-redox-gcc
 endif
 
 SRC=\
