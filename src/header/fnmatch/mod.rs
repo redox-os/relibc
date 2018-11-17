@@ -118,6 +118,7 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Vec<(Token, Range)> 
 }
 
 #[no_mangle]
+#[linkage = "weak"] // often redefined in GNU programs
 pub unsafe extern "C" fn fnmatch(pattern: *const c_char, input: *const c_char, flags: c_int) -> c_int {
     let mut len = 0;
     while *input.offset(len) != 0 {

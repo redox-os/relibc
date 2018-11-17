@@ -7,21 +7,26 @@ use platform::types::*;
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
+#[linkage = "weak"] // often redefined in GNU programs
 pub static mut optarg: *mut c_char = ptr::null_mut();
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
+#[linkage = "weak"] // often redefined in GNU programs
 pub static mut optind: c_int = 1;
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
+#[linkage = "weak"] // often redefined in GNU programs
 pub static mut opterr: c_int = 1;
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
+#[linkage = "weak"] // often redefined in GNU programs
 pub static mut optopt: c_int = -1;
 
 #[no_mangle]
+#[linkage = "weak"] // often redefined in GNU programs
 pub unsafe extern "C" fn getopt(
     argc: c_int,
     argv: *const *mut c_char,
