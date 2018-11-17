@@ -2,6 +2,7 @@
 
 use core::ptr;
 
+use header::ctype;
 use platform::types::*;
 
 #[no_mangle]
@@ -76,7 +77,7 @@ pub unsafe extern "C" fn strncasecmp(
     mut n: size_t,
 ) -> c_int {
     while n > 0 && (*first != 0 || *second != 0) {
-        let cmp = (*first & !32) as c_int - (*second & !32) as c_int;
+        let cmp = ctype::tolower(*first as c_int) - ctype::tolower(*second as c_int);
         if cmp != 0 {
             return cmp;
         }

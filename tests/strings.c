@@ -22,6 +22,9 @@ int main() {
     assert(strncasecmp("FLOOR0_1", "FLOOR0_1FLOOR4_1", 8) == 0);
     assert(strncasecmp("FL00RO_1", "FLOOR0_1FLOOR4_1", 8) < 0);
 
+    // Ensure we aren't relying on the 5th (lowercase) bit on non-alpha characters
+    assert(strcasecmp("{[", "[{") > 0);
+
     bzero(new, 1);
     assert(*new == 0);
     assert(*(new+1) == 'i');
