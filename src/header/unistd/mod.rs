@@ -174,7 +174,7 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
                 let mut program = path.to_vec();
                 program.push(b'/');
                 program.extend_from_slice(file.to_bytes());
-                program.push(b'0');
+                program.push(b'\0');
 
                 let program_c = CStr::from_bytes_with_nul(&program).unwrap();
                 execv(program_c.as_ptr(), argv);
