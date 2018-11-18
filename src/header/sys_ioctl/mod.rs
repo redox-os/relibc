@@ -12,19 +12,19 @@ pub struct sgttyb {
     sg_flags: c_ushort,
 }
 
-#[repr(C)]
-#[derive(Default)]
-pub struct winsize {
-    ws_row: c_ushort,
-    ws_col: c_ushort,
-    ws_xpixel: c_ushort,
-    ws_ypixel: c_ushort,
-}
-
 #[cfg(target_os = "linux")]
 pub mod inner {
     use platform::types::*;
     use platform::Sys;
+
+    #[repr(C)]
+    #[derive(Default)]
+    pub struct winsize {
+        ws_row: c_ushort,
+        ws_col: c_ushort,
+        ws_xpixel: c_ushort,
+        ws_ypixel: c_ushort,
+    }
 
     #[no_mangle]
     pub extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {

@@ -5,6 +5,10 @@ language = "C"
 # sgtty is used by another header, and cbindgen doesn't prefix that with `struct` :|
 style = "Both"
 
+[defines]
+"target_os=linux" = "__linux__"
+"target_os=redox" = "__redox__"
+
 [enum]
 prefix_with_name = true
 
