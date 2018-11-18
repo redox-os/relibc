@@ -4,6 +4,7 @@ use header::dirent::dirent;
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
 use header::sys_time::{timeval, timezone};
+use header::sys_utsname::utsname;
 use header::termios::termios;
 use header::time::timespec;
 
@@ -138,6 +139,8 @@ pub trait Pal {
     fn tcsetattr(fd: c_int, act: c_int, value: *const termios) -> c_int;
 
     fn umask(mask: mode_t) -> mode_t;
+
+    fn uname(utsname: *mut utsname) -> c_int;
 
     fn unlink(path: &CStr) -> c_int;
 
