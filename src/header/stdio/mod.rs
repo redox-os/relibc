@@ -22,16 +22,16 @@ use platform::{Pal, Sys};
 use platform::{errno, WriteByte};
 use platform;
 
-mod printf;
-mod scanf;
+pub use self::constants::*;
+mod constants;
 
 pub use self::default::*;
 mod default;
 
-pub use self::constants::*;
-mod constants;
-
+mod ext;
 mod helpers;
+mod printf;
+mod scanf;
 
 enum Buffer<'a> {
     Borrowed(&'a mut [u8]),
@@ -62,12 +62,12 @@ pub struct FILE {
     lock: Mutex<()>,
 
     file: File,
-    flags: c_int,
+    pub(crate) /* stdio_ext */ flags: c_int,
     read_buf: Buffer<'static>,
     read_pos: usize,
     read_size: usize,
     unget: Option<u8>,
-    writer: LineWriter<File>
+    pub(crate) /* stdio_ext */ writer: LineWriter<File>
 }
 
 impl Read for FILE {
@@ -388,13 +388,6 @@ pub extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FI
         Sys::close(fd);
         ptr::null_mut()
     }
-}
-
-#[no_mangle]
-pub extern "C" fn __fpending(stream: *mut FILE) -> size_t {
-    let mut stream = unsafe { &mut *stream }.lock();
-
-    stream.writer.inner.buf.len() as size_t
 }
 
 /// Insert a character into the stream
