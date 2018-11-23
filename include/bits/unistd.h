@@ -9,6 +9,7 @@ extern "C" {
 
 int execl(const char *path, const char* argv0, ...);
 int execle(const char *path, const char* argv0, ...);
+int execlp(const char *file, const char* argv0, ...);
 
 #ifdef __cplusplus
 } // extern "C"
