@@ -2,6 +2,13 @@ use header::stdio::{FILE, F_NORD, F_NOWR};
 use platform::types::*;
 
 #[no_mangle]
+pub extern "C" fn __fpending(stream: *mut FILE) -> size_t {
+    let mut stream = unsafe { &mut *stream }.lock();
+
+    stream.writer.inner.buf.len() as size_t
+}
+
+#[no_mangle]
 pub extern "C" fn __freadable(stream: *mut FILE) -> c_int {
     let mut stream = unsafe { &mut *stream }.lock();
 
@@ -15,9 +22,18 @@ pub extern "C" fn __fwritable(stream: *mut FILE) -> c_int {
     (stream.flags & F_NOWR == 0) as c_int
 }
 
+//TODO: Check last operation when read-write
 #[no_mangle]
-pub extern "C" fn __fpending(stream: *mut FILE) -> size_t {
+pub extern "C" fn __freading(stream: *mut FILE) -> c_int {
     let mut stream = unsafe { &mut *stream }.lock();
 
-    stream.writer.inner.buf.len() as size_t
+    (stream.flags & F_NORD == 0) as c_int
+}
+
+//TODO: Check last operation when read-write
+#[no_mangle]
+pub extern "C" fn __fwriting(stream: *mut FILE) -> c_int {
+    let mut stream = unsafe { &mut *stream }.lock();
+
+    (stream.flags & F_NOWR == 0) as c_int
 }
