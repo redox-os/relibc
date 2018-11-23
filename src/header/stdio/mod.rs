@@ -390,6 +390,13 @@ pub extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FI
     }
 }
 
+#[no_mangle]
+pub extern "C" fn __fpending(stream: *mut FILE) -> size_t {
+    let mut stream = unsafe { &mut *stream }.lock();
+
+    stream.writer.inner.buf.len() as size_t
+}
+
 /// Insert a character into the stream
 #[no_mangle]
 pub extern "C" fn fputc(c: c_int, stream: *mut FILE) -> c_int {
