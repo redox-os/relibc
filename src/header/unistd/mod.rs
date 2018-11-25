@@ -417,14 +417,30 @@ pub extern "C" fn pthread_atfork(
     unimplemented!();
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn pwrite(
     fildes: c_int,
     buf: *const c_void,
     nbyte: size_t,
     offset: off_t,
 ) -> ssize_t {
-    unimplemented!();
+    //TODO: better pwrite using system calls
+
+    let previous = lseek(fildes, offset, SEEK_SET);
+    if previous == -1 {
+        return -1;
+    }
+
+    let res = write(fildes, buf, nbyte);
+    if res < 0 {
+        return res;
+    }
+
+    if lseek(fildes, previous, SEEK_SET) == -1 {
+        return -1;
+    }
+
+    res
 }
 
 #[no_mangle]
