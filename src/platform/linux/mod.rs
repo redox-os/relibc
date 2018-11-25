@@ -8,6 +8,7 @@ use fs::File;
 use header::dirent::dirent;
 use header::errno::EINVAL;
 use header::fcntl;
+use header::poll::{nfds_t, pollfd};
 use header::signal::SIGCHLD;
 use header::sys_ioctl::{winsize, TCGETS, TCSETS, TIOCGWINSZ};
 // use header::sys_resource::rusage;
@@ -294,6 +295,10 @@ impl Pal for Sys {
 
     fn pipe(fildes: &mut [c_int]) -> c_int {
         e(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), 0) }) as c_int
+    }
+
+    fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
+        e(unsafe { syscall!(POLL, fds, nfds, timeout) }) as c_int
     }
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {

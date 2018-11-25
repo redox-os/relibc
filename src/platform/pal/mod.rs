@@ -1,6 +1,7 @@
 use super::types::*;
 use c_str::CStr;
 use header::dirent::dirent;
+use header::poll::{nfds_t, pollfd};
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
 use header::sys_time::{timeval, timezone};
@@ -110,6 +111,8 @@ pub trait Pal {
 
     fn pipe(fildes: &mut [c_int]) -> c_int;
 
+    fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int;
+
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
 
     //fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t;
@@ -120,6 +123,7 @@ pub trait Pal {
 
     fn rmdir(path: &CStr) -> c_int;
 
+    //TODO: Deprecate in favor of poll
     fn select(
         nfds: c_int,
         readfds: *mut fd_set,

@@ -10,6 +10,7 @@
 #![feature(global_asm)]
 #![feature(lang_items)]
 #![feature(linkage)]
+#![feature(stmt_expr_attributes)]
 #![feature(str_internals)]
 #![feature(thread_local)]
 

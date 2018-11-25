@@ -2,7 +2,6 @@
 
 use core::ptr;
 
-use c_str::CStr;
 use fs::File;
 use header::{errno, fcntl};
 use io::{BufRead, BufReader};
@@ -56,10 +55,7 @@ where
     // TODO F: FnMut(impl Iterator<Item = &[u8]>) -> bool
     F: FnMut(&[&[u8]]) -> bool,
 {
-    let file = match File::open(
-        unsafe { CStr::from_bytes_with_nul_unchecked(b"/etc/passwd\0") },
-        fcntl::O_RDONLY,
-    ) {
+    let file = match File::open(c_str!("/etc/passwd"), fcntl::O_RDONLY) {
         Ok(file) => file,
         Err(_) => return OptionPasswd::Error,
     };
