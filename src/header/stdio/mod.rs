@@ -61,11 +61,13 @@ pub struct FILE {
     lock: Mutex<()>,
 
     file: File,
+    // pub for stdio_ext
     pub(crate) flags: c_int,
     read_buf: Buffer<'static>,
     read_pos: usize,
     read_size: usize,
     unget: Option<u8>,
+    // pub for stdio_ext
     pub(crate) writer: LineWriter<File>,
 
     // Optional pid for use with popen/pclose
