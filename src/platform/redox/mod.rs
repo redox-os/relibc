@@ -730,11 +730,14 @@ impl Pal for Sys {
             fd.revents = 0;
 
             if fd.fd >= 0 && flags > 0 {
-                if event_file.write(&syscall::Event {
-                    id: fd.fd as usize,
-                    flags: flags,
-                    data: 0,
-                }).is_err() {
+                if event_file
+                    .write(&syscall::Event {
+                        id: fd.fd as usize,
+                        flags: flags,
+                        data: 0,
+                    })
+                    .is_err()
+                {
                     return -1;
                 }
             }

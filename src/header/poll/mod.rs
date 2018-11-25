@@ -10,7 +10,6 @@ pub const POLLERR: c_short = 0x008;
 pub const POLLHUP: c_short = 0x010;
 pub const POLLNVAL: c_short = 0x020;
 
-
 pub type nfds_t = c_ulong;
 
 #[repr(C)]
