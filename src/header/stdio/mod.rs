@@ -12,8 +12,7 @@ use va_list::VaList as va_list;
 use c_str::CStr;
 use fs::File;
 use header::errno::{self, STR_ERROR};
-use header::fcntl;
-use header::stdlib::mkstemp;
+use header::{fcntl, stdlib, unistd};
 use header::string::strlen;
 use io::{self, BufRead, LineWriter, Read, Write};
 use mutex::Mutex;
@@ -67,7 +66,10 @@ pub struct FILE {
     read_pos: usize,
     read_size: usize,
     unget: Option<u8>,
-    pub(crate) /* stdio_ext */ writer: LineWriter<File>
+    pub(crate) /* stdio_ext */ writer: LineWriter<File>,
+
+    // Optional pid for use with popen/pclose
+    pid: Option<c_int>,
 }
 
 impl Read for FILE {
@@ -247,8 +249,9 @@ pub extern "C" fn ferror(stream: *mut FILE) -> c_int {
 /// Ensure the file is unlocked before calling this function, as it will attempt to lock the file
 /// itself.
 #[no_mangle]
-pub unsafe extern "C" fn fflush(stream: *mut FILE) -> c_int {
-    unsafe { &mut *stream }.lock().flush().is_err() as c_int
+pub extern "C" fn fflush(stream: *mut FILE) -> c_int {
+    let mut stream = unsafe { &mut *stream }.lock();
+    stream.flush().is_err() as c_int
 }
 
 /// Get a single char from a stream
@@ -605,9 +608,27 @@ pub extern "C" fn getw(stream: *mut FILE) -> c_int {
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn pclose(_stream: *mut FILE) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn pclose(stream: *mut FILE) -> c_int {
+    let pid = {
+        let mut stream = unsafe { &mut *stream }.lock();
+
+        if let Some(pid) = stream.pid.take() {
+            pid
+        } else {
+            unsafe { errno = errno::ECHILD };
+            return -1;
+        }
+    };
+
+    fclose(stream);
+
+    let mut wstatus = 0;
+    if Sys::waitpid(pid, &mut wstatus, 0) < 0 {
+        return -1;
+    }
+
+    wstatus
 }
 
 #[no_mangle]
@@ -625,9 +646,100 @@ pub unsafe extern "C" fn perror(s: *const c_char) {
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn popen(_command: *const c_char, _mode: *const c_char) -> *mut FILE {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *mut FILE {
+    //TODO: share code with system
+
+    let mode = CStr::from_ptr(mode);
+
+    let mut cloexec = false;
+    let mut write_opt = None;
+    for b in mode.to_bytes().iter() {
+        match b {
+            b'e' => cloexec = true,
+            b'r' if write_opt.is_none() => write_opt = Some(false),
+            b'w' if write_opt.is_none() => write_opt = Some(true),
+            _ => {
+                errno = errno::EINVAL;
+                return ptr::null_mut();
+            }
+        }
+    }
+
+    let write = match write_opt {
+        Some(some) => some,
+        None => {
+            errno = errno::EINVAL;
+            return ptr::null_mut();
+        }
+    };
+
+    let mut pipes = [-1, -1];
+    if unistd::pipe(pipes.as_mut_ptr()) != 0 {
+        return ptr::null_mut();
+    }
+
+    let child_pid = unistd::fork();
+    if child_pid == 0 {
+        let command_nonnull = if command.is_null() {
+            "exit 0\0".as_ptr()
+        } else {
+            command as *const u8
+        };
+
+        let shell = "/bin/sh\0".as_ptr();
+
+        let args = [
+            "sh\0".as_ptr(),
+            "-c\0".as_ptr(),
+            command_nonnull,
+            ptr::null(),
+        ];
+
+        // Setup up stdin or stdout
+        //TODO: dup errors are ignored, should they be?
+        {
+            if write {
+                unistd::dup2(0, pipes[0]);
+            } else {
+                unistd::dup2(1, pipes[1]);
+            }
+
+            unistd::close(pipes[0]);
+            unistd::close(pipes[1]);
+        }
+
+        unistd::execv(shell as *const c_char, args.as_ptr() as *const *mut c_char);
+
+        stdlib::exit(127);
+
+        unreachable!();
+    } else if child_pid > 0 {
+        let (fd, fd_mode) = if write {
+            unistd::close(pipes[0]);
+            (pipes[1], if cloexec {
+                c_str!("we")
+            } else {
+                c_str!("w")
+            })
+        } else {
+            unistd::close(pipes[1]);
+            (pipes[0], if cloexec {
+                c_str!("re")
+            } else {
+                c_str!("r")
+            })
+        };
+
+        if let Some(f) = helpers::_fdopen(fd, fd_mode.as_ptr()) {
+            (*f).pid = Some(child_pid);
+            f
+        } else {
+            ptr::null_mut()
+        }
+    } else {
+        ptr::null_mut()
+    }
 }
 
 /// Put a character `c` into `stream`
@@ -748,7 +860,7 @@ pub extern "C" fn tempnam(_dir: *const c_char, _pfx: *const c_char) -> *mut c_ch
 pub extern "C" fn tmpfile() -> *mut FILE {
     let mut file_name = *b"/tmp/tmpfileXXXXXX";
     let file_name = file_name.as_mut_ptr() as *mut c_char;
-    let fd = mkstemp(file_name);
+    let fd = stdlib::mkstemp(file_name);
 
     if fd < 0 {
         return ptr::null_mut();

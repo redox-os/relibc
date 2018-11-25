@@ -21,7 +21,9 @@ impl GlobalFile {
             read_pos: 0,
             read_size: 0,
             unget: None,
-            writer
+            writer,
+
+            pid: None,
         }))
     }
     pub fn get(&self) -> *mut FILE {

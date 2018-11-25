@@ -29,6 +29,7 @@ EXPECT_BINS=\
 	stdio/fwrite \
 	stdio/getc_unget \
 	stdio/mutex \
+	stdio/popen \
 	stdio/printf \
 	stdio/rename \
 	stdio/scanf \
