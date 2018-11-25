@@ -1,5 +1,6 @@
 # Binaries that should generate the same output every time
 EXPECT_BINS=\
+	alloca \
 	args \
 	arpainet \
 	assert \
