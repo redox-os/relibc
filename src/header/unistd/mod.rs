@@ -387,9 +387,25 @@ pub unsafe extern "C" fn pipe(fildes: *mut c_int) -> c_int {
     Sys::pipe(slice::from_raw_parts_mut(fildes, 2))
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn pread(fildes: c_int, buf: *mut c_void, nbyte: size_t, offset: off_t) -> ssize_t {
-    unimplemented!();
+    //TODO: better pread using system calls
+
+    let previous = lseek(fildes, offset, SEEK_SET);
+    if previous == -1 {
+        return -1;
+    }
+
+    let res = read(fildes, buf, nbyte);
+    if res < 0 {
+        return res;
+    }
+
+    if lseek(fildes, previous, SEEK_SET) == -1 {
+        return -1;
+    }
+
+    res
 }
 
 // #[no_mangle]

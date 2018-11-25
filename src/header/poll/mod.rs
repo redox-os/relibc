@@ -6,6 +6,10 @@ use platform::{Pal, Sys};
 pub const POLLIN: c_short = 0x001;
 pub const POLLPRI: c_short = 0x002;
 pub const POLLOUT: c_short = 0x004;
+pub const POLLERR: c_short = 0x008;
+pub const POLLHUP: c_short = 0x010;
+pub const POLLNVAL: c_short = 0x020;
+
 
 pub type nfds_t = c_ulong;
 
