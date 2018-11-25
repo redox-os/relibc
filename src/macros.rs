@@ -1,6 +1,7 @@
 #[macro_export]
 macro_rules! c_str {
     ($lit:expr) => {
+        #[allow(unused_unsafe)]
         unsafe {
             $crate::c_str::CStr::from_ptr(concat!($lit, "\0").as_ptr()
                 as *const $crate::platform::types::c_char)

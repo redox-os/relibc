@@ -157,7 +157,7 @@ pub extern "C" fn getdate(string: *const c_char) -> tm {
 
 #[no_mangle]
 pub unsafe extern "C" fn gmtime(timer: *const time_t) -> *mut tm {
-    unsafe { gmtime_r(timer, &mut TM) }
+    gmtime_r(timer, &mut TM)
 }
 
 const MONTH_DAYS: [[c_int; 12]; 2] = [

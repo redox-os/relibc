@@ -148,7 +148,7 @@ pub unsafe extern "C" fn execve(
     argv: *const *mut c_char,
     envp: *const *mut c_char,
 ) -> c_int {
-    let path = unsafe { CStr::from_ptr(path) };
+    let path = CStr::from_ptr(path);
     Sys::execve(path, argv, envp)
 }
 

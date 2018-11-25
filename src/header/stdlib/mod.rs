@@ -451,7 +451,7 @@ where
 #[no_mangle]
 pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
     if inner_mktemp(name, 0, || unsafe {
-        let name = unsafe { CStr::from_ptr(name) };
+        let name = CStr::from_ptr(name);
         let ret = if Sys::access(name, 0) != 0 && platform::errno == ENOENT {
             Some(())
         } else {
@@ -868,6 +868,8 @@ pub unsafe extern "C" fn strtoll(
 
 #[no_mangle]
 pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
+    //TODO: share code with popen
+
     let child_pid = unistd::fork();
     if child_pid == 0 {
         let command_nonnull = if command.is_null() {
@@ -890,13 +892,15 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
         exit(127);
 
         unreachable!();
-    } else {
+    } else if child_pid > 0 {
         let mut wstatus = 0;
         if Sys::waitpid(child_pid, &mut wstatus, 0) == !0 {
             return -1;
         }
 
         wstatus
+    } else {
+        -1
     }
 }
 

@@ -122,19 +122,15 @@ impl Write for StringWriter {
 }
 impl fmt::Write for StringWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        unsafe {
-            // can't fail
-            self.write(s.as_bytes()).unwrap();
-        };
+        // can't fail
+        self.write(s.as_bytes()).unwrap();
         Ok(())
     }
 }
 impl WriteByte for StringWriter {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
-        unsafe {
-            // can't fail
-            self.write(&[byte]).unwrap();
-        }
+        // can't fail
+        self.write(&[byte]).unwrap();
         Ok(())
     }
 }
@@ -159,19 +155,15 @@ impl Write for UnsafeStringWriter {
 }
 impl fmt::Write for UnsafeStringWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        unsafe {
-            // can't fail
-            self.write(s.as_bytes()).unwrap();
-        }
+        // can't fail
+        self.write(s.as_bytes()).unwrap();
         Ok(())
     }
 }
 impl WriteByte for UnsafeStringWriter {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
-        unsafe {
-            // can't fail
-            self.write(&[byte]).unwrap();
-        }
+        // can't fail
+        self.write(&[byte]).unwrap();
         Ok(())
     }
 }
