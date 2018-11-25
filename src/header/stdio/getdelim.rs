@@ -7,12 +7,21 @@ use io::BufRead;
 use platform::types::*;
 
 #[no_mangle]
-pub extern "C" fn __getline(lineptr: *mut *mut c_char, n: *mut size_t, stream: *mut FILE) -> ssize_t {
+pub extern "C" fn __getline(
+    lineptr: *mut *mut c_char,
+    n: *mut size_t,
+    stream: *mut FILE,
+) -> ssize_t {
     __getdelim(lineptr, n, b'\n' as c_int, stream)
 }
 
 #[no_mangle]
-pub extern "C" fn __getdelim(lineptr: *mut *mut c_char, n: *mut size_t, delim: c_int, stream: *mut FILE) -> ssize_t {
+pub extern "C" fn __getdelim(
+    lineptr: *mut *mut c_char,
+    n: *mut size_t,
+    delim: c_int,
+    stream: *mut FILE,
+) -> ssize_t {
     let lineptr = unsafe { &mut *lineptr };
     let n = unsafe { &mut *n };
     let delim = delim as u8;
