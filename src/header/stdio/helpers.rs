@@ -6,8 +6,8 @@ use header::fcntl::*;
 use header::string::strchr;
 use io::LineWriter;
 use mutex::Mutex;
-use platform::types::*;
 use platform;
+use platform::types::*;
 
 use super::constants::*;
 use super::{Buffer, FILE};

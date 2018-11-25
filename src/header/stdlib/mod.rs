@@ -9,10 +9,10 @@ use rand::{Rng, SeedableRng};
 use c_str::CStr;
 use header::errno::*;
 use header::fcntl::*;
+use header::limits;
 use header::string::*;
 use header::time::constants::CLOCK_MONOTONIC;
 use header::time::timespec;
-use header::limits;
 use header::wchar::*;
 use header::{ctype, errno, unistd};
 use platform;
@@ -458,7 +458,8 @@ pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
             None
         };
         ret
-    }).is_none()
+    })
+    .is_none()
     {
         unsafe {
             *name = 0;
@@ -487,7 +488,8 @@ pub extern "C" fn mkostemps(name: *mut c_char, suffix_len: c_int, mut flags: c_i
         } else {
             None
         }
-    }).unwrap_or(-1)
+    })
+    .unwrap_or(-1)
 }
 
 #[no_mangle]

@@ -6,20 +6,20 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::fmt::Write as WriteFmt;
 use core::ops::{Deref, DerefMut};
-use core::{ptr, str, slice};
+use core::{ptr, slice, str};
 use va_list::VaList as va_list;
 
 use c_str::CStr;
 use fs::File;
 use header::errno::{self, STR_ERROR};
-use header::{fcntl, stdlib, unistd};
 use header::string::strlen;
+use header::{fcntl, stdlib, unistd};
 use io::{self, BufRead, LineWriter, Read, Write};
 use mutex::Mutex;
-use platform::types::*;
-use platform::{Pal, Sys};
-use platform::{errno, WriteByte};
 use platform;
+use platform::types::*;
+use platform::{errno, WriteByte};
+use platform::{Pal, Sys};
 
 pub use self::constants::*;
 mod constants;
@@ -34,7 +34,7 @@ mod scanf;
 
 enum Buffer<'a> {
     Borrowed(&'a mut [u8]),
-    Owned(Vec<u8>)
+    Owned(Vec<u8>),
 }
 impl<'a> Deref for Buffer<'a> {
     type Target = [u8];
@@ -42,7 +42,7 @@ impl<'a> Deref for Buffer<'a> {
     fn deref(&self) -> &Self::Target {
         match self {
             Buffer::Borrowed(inner) => inner,
-            Buffer::Owned(inner) => inner.borrow()
+            Buffer::Owned(inner) => inner.borrow(),
         }
     }
 }
@@ -50,7 +50,7 @@ impl<'a> DerefMut for Buffer<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         match self {
             Buffer::Borrowed(inner) => inner,
-            Buffer::Owned(inner) => inner.borrow_mut()
+            Buffer::Owned(inner) => inner.borrow_mut(),
         }
     }
 }
@@ -61,12 +61,12 @@ pub struct FILE {
     lock: Mutex<()>,
 
     file: File,
-    pub(crate) /* stdio_ext */ flags: c_int,
+    pub(crate) flags: c_int,
     read_buf: Buffer<'static>,
     read_pos: usize,
     read_size: usize,
     unget: Option<u8>,
-    pub(crate) /* stdio_ext */ writer: LineWriter<File>,
+    pub(crate) writer: LineWriter<File>,
 
     // Optional pid for use with popen/pclose
     pid: Option<c_int>,
@@ -99,7 +99,7 @@ impl BufRead for FILE {
                 Ok(0) => {
                     self.flags |= F_EOF;
                     0
-                },
+                }
                 Ok(n) => n,
                 Err(err) => {
                     self.flags |= F_ERR;
@@ -143,9 +143,7 @@ impl WriteFmt for FILE {
 }
 impl WriteByte for FILE {
     fn write_u8(&mut self, c: u8) -> fmt::Result {
-        self.write_all(&[c])
-            .map(|_| ())
-            .map_err(|_| fmt::Error)
+        self.write_all(&[c]).map(|_| ()).map_err(|_| fmt::Error)
     }
 }
 impl FILE {
@@ -202,7 +200,9 @@ pub extern "C" fn cuserid(_s: *mut c_char) -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn fclose(stream: *mut FILE) -> c_int {
     let stream = unsafe { &mut *stream };
-    unsafe { flockfile(stream); }
+    unsafe {
+        flockfile(stream);
+    }
 
     let mut r = stream.flush().is_err();
     let close = Sys::close(*stream.file) < 0;
@@ -214,7 +214,9 @@ pub extern "C" fn fclose(stream: *mut FILE) -> c_int {
         // Reference files aren't closed on drop, so pretend to be a reference
         stream.file.reference = true;
     } else {
-        unsafe { funlockfile(stream); }
+        unsafe {
+            funlockfile(stream);
+        }
     }
 
     r as c_int
@@ -302,7 +304,7 @@ pub extern "C" fn fgets(original: *mut c_char, max: c_int, stream: *mut FILE) ->
         let (read, exit) = {
             let mut buf = match stream.fill_buf() {
                 Ok(buf) => buf,
-                Err(_) => return ptr::null_mut()
+                Err(_) => return ptr::null_mut(),
             };
             if buf.is_empty() {
                 break;
@@ -409,17 +411,19 @@ pub extern "C" fn fputs(s: *const c_char, stream: *mut FILE) -> c_int {
 
 /// Read `nitems` of size `size` into `ptr` from `stream`
 #[no_mangle]
-pub extern "C" fn fread(ptr: *mut c_void, size: size_t, count: size_t, stream: *mut FILE) -> size_t {
+pub extern "C" fn fread(
+    ptr: *mut c_void,
+    size: size_t,
+    count: size_t,
+    stream: *mut FILE,
+) -> size_t {
     let mut stream = unsafe { &mut *stream }.lock();
-    let buf = unsafe { slice::from_raw_parts_mut(
-        ptr as *mut u8,
-        size as usize * count as usize
-    ) };
+    let buf = unsafe { slice::from_raw_parts_mut(ptr as *mut u8, size as usize * count as usize) };
     let mut read = 0;
     while read < buf.len() {
         match stream.read(&mut buf[read..]) {
             Ok(0) | Err(_) => break,
-            Ok(n) => read += n
+            Ok(n) => read += n,
         }
     }
     (read / size as usize) as size_t
@@ -432,7 +436,9 @@ pub extern "C" fn freopen(
     stream: &mut FILE,
 ) -> *mut FILE {
     let mut flags = unsafe { helpers::parse_mode_flags(mode) };
-    unsafe { flockfile(stream); }
+    unsafe {
+        flockfile(stream);
+    }
 
     let _ = stream.flush();
     if filename.is_null() {
@@ -442,14 +448,18 @@ pub extern "C" fn freopen(
         }
         flags &= !(fcntl::O_CREAT | fcntl::O_EXCL | fcntl::O_CLOEXEC);
         if fcntl::sys_fcntl(*stream.file, fcntl::F_SETFL, flags) < 0 {
-            unsafe { funlockfile(stream); }
+            unsafe {
+                funlockfile(stream);
+            }
             fclose(stream);
             return ptr::null_mut();
         }
     } else {
         let new = fopen(filename, mode);
         if new.is_null() {
-            unsafe { funlockfile(stream); }
+            unsafe {
+                funlockfile(stream);
+            }
             fclose(stream);
             return ptr::null_mut();
         }
@@ -459,7 +469,9 @@ pub extern "C" fn freopen(
         } else if Sys::dup2(*new.file, *stream.file) < 0
             || fcntl::sys_fcntl(*stream.file, fcntl::F_SETFL, flags & fcntl::O_CLOEXEC) < 0
         {
-            unsafe { funlockfile(stream); }
+            unsafe {
+                funlockfile(stream);
+            }
             fclose(new);
             fclose(stream);
             return ptr::null_mut();
@@ -467,7 +479,9 @@ pub extern "C" fn freopen(
         stream.flags = (stream.flags & constants::F_PERM) | new.flags;
         fclose(new);
     }
-    unsafe { funlockfile(stream); }
+    unsafe {
+        funlockfile(stream);
+    }
     stream
 }
 
@@ -527,7 +541,11 @@ pub extern "C" fn ftello(stream: *mut FILE) -> off_t {
 /// Try to lock the file. Returns 0 for success, 1 for failure
 #[no_mangle]
 pub unsafe extern "C" fn ftrylockfile(file: *mut FILE) -> c_int {
-    if (*file).lock.manual_try_lock().is_ok() { 0 } else { 1 }
+    if (*file).lock.manual_try_lock().is_ok() {
+        0
+    } else {
+        1
+    }
 }
 
 /// Unlock the file
@@ -538,17 +556,19 @@ pub unsafe extern "C" fn funlockfile(file: *mut FILE) {
 
 /// Write `nitems` of size `size` from `ptr` to `stream`
 #[no_mangle]
-pub extern "C" fn fwrite(ptr: *const c_void, size: usize, count: usize, stream: *mut FILE) -> usize {
+pub extern "C" fn fwrite(
+    ptr: *const c_void,
+    size: usize,
+    count: usize,
+    stream: *mut FILE,
+) -> usize {
     let mut stream = unsafe { &mut *stream }.lock();
-    let buf = unsafe { slice::from_raw_parts_mut(
-        ptr as *mut u8,
-        size as usize * count as usize
-    ) };
+    let buf = unsafe { slice::from_raw_parts_mut(ptr as *mut u8, size as usize * count as usize) };
     let mut written = 0;
     while written < buf.len() {
         match stream.write(&mut buf[written..]) {
             Ok(0) | Err(_) => break,
-            Ok(n) => written += n
+            Ok(n) => written += n,
         }
     }
     (written / size as usize) as size_t
@@ -574,7 +594,7 @@ pub extern "C" fn getc_unlocked(stream: *mut FILE) -> c_int {
 
     match unsafe { &mut *stream }.read(&mut buf) {
         Ok(0) | Err(_) => EOF,
-        Ok(_) => buf[0] as c_int
+        Ok(_) => buf[0] as c_int,
     }
 }
 
@@ -599,7 +619,7 @@ pub extern "C" fn getw(stream: *mut FILE) -> c_int {
         &mut ret as *mut _ as *mut c_void,
         mem::size_of_val(&ret),
         1,
-        stream
+        stream,
     ) > 0
     {
         ret
@@ -717,18 +737,10 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
     } else if child_pid > 0 {
         let (fd, fd_mode) = if write {
             unistd::close(pipes[0]);
-            (pipes[1], if cloexec {
-                c_str!("we")
-            } else {
-                c_str!("w")
-            })
+            (pipes[1], if cloexec { c_str!("we") } else { c_str!("w") })
         } else {
             unistd::close(pipes[1]);
-            (pipes[0], if cloexec {
-                c_str!("re")
-            } else {
-                c_str!("r")
-            })
+            (pipes[0], if cloexec { c_str!("re") } else { c_str!("r") })
         };
 
         if let Some(f) = helpers::_fdopen(fd, fd_mode.as_ptr()) {
@@ -827,7 +839,12 @@ pub extern "C" fn setbuf(stream: *mut FILE, buf: *mut c_char) {
 /// Reset `stream` to use buffer `buf` of size `size`
 /// If this isn't the meaning of unsafe, idk what is
 #[no_mangle]
-pub extern "C" fn setvbuf(stream: *mut FILE, buf: *mut c_char, mode: c_int, mut size: size_t) -> c_int {
+pub extern "C" fn setvbuf(
+    stream: *mut FILE,
+    buf: *mut c_char,
+    mode: c_int,
+    mut size: size_t,
+) -> c_int {
     let mut stream = unsafe { &mut *stream }.lock();
     // Set a buffer of size `size` if no buffer is given
     stream.read_buf = if buf.is_null() || size == 0 {
@@ -838,14 +855,9 @@ pub extern "C" fn setvbuf(stream: *mut FILE, buf: *mut c_char, mode: c_int, mut 
         // if mode == _IONBF {
         // } else {
         Buffer::Owned(vec![0; size as usize])
-        // }
+    // }
     } else {
-        unsafe {
-            Buffer::Borrowed(slice::from_raw_parts_mut(
-                buf as *mut u8,
-                size
-            ))
-        }
+        unsafe { Buffer::Borrowed(slice::from_raw_parts_mut(buf as *mut u8, size)) }
     };
     stream.flags |= F_SVB;
     0

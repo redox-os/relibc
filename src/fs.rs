@@ -1,11 +1,11 @@
 use c_str::CStr;
 use core::ops::Deref;
 use header::fcntl::O_CREAT;
-use header::unistd::{SEEK_SET, SEEK_CUR, SEEK_END};
+use header::unistd::{SEEK_CUR, SEEK_END, SEEK_SET};
 use io;
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 fn last_os_error() -> io::Error {
     let errno = unsafe { platform::errno };
@@ -16,14 +16,14 @@ pub struct File {
     pub fd: c_int,
     /// To avoid self referential FILE struct that needs both a reader and a writer,
     /// make "reference" files that share fd but don't close on drop.
-    pub reference: bool
+    pub reference: bool,
 }
 
 impl File {
     pub fn new(fd: c_int) -> Self {
         Self {
             fd,
-            reference: false
+            reference: false,
         }
     }
 
@@ -68,7 +68,7 @@ impl File {
     pub unsafe fn get_ref(&self) -> Self {
         Self {
             fd: self.fd,
-            reference: true
+            reference: true,
         }
     }
 }

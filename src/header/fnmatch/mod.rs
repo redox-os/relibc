@@ -5,8 +5,8 @@ use alloc::vec::Vec;
 use core::slice;
 
 use platform::types::*;
+use posix_regex::compile::{Collation, Range, Token};
 use posix_regex::PosixRegex;
-use posix_regex::compile::{Collation, Token, Range};
 
 const ONCE: Range = Range(1, Some(1));
 
@@ -57,7 +57,7 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Vec<(Token, Range)> 
                 pattern = pattern.offset(1);
                 leading = is_leading(flags, c);
                 (Token::Char(c), ONCE)
-            },
+            }
             b'?' => (any(was_leading, flags), ONCE),
             b'*' => (any(was_leading, flags), Range(0, None)),
             b'[' => {
@@ -103,10 +103,7 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Vec<(Token, Range)> 
                 }
                 // Otherwise, there was no closing ]. Maybe error?
 
-                (Token::OneOf {
-                    invert,
-                    list
-                }, ONCE)
+                (Token::OneOf { invert, list }, ONCE)
             }
             c => {
                 leading = is_leading(flags, c);
@@ -119,7 +116,11 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Vec<(Token, Range)> 
 
 #[no_mangle]
 #[linkage = "weak"] // often redefined in GNU programs
-pub unsafe extern "C" fn fnmatch(pattern: *const c_char, input: *const c_char, flags: c_int) -> c_int {
+pub unsafe extern "C" fn fnmatch(
+    pattern: *const c_char,
+    input: *const c_char,
+    flags: c_int,
+) -> c_int {
     let mut len = 0;
     while *input.offset(len) != 0 {
         len += 1;
@@ -131,7 +132,9 @@ pub unsafe extern "C" fn fnmatch(pattern: *const c_char, input: *const c_char, f
 
     if PosixRegex::new(Cow::Owned(vec![tokens]))
         .case_insensitive(flags & FNM_CASEFOLD == FNM_CASEFOLD)
-            .matches_exact(input).is_some() {
+        .matches_exact(input)
+        .is_some()
+    {
         0
     } else {
         FNM_NOMATCH

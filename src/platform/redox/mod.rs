@@ -2,8 +2,8 @@
 
 use alloc::collections::BTreeMap;
 use cbitset::BitSet;
-use core::{mem, ptr, slice};
 use core::result::Result as CoreResult;
+use core::{mem, ptr, slice};
 use spin::{Mutex, MutexGuard, Once};
 use syscall::data::Stat as redox_stat;
 use syscall::data::TimeSpec as redox_timespec;
@@ -12,11 +12,11 @@ use syscall::{self, Result};
 
 use c_str::{CStr, CString};
 use fs::File;
-use io::{self, BufReader, SeekFrom};
-use io::prelude::*;
 use header::dirent::dirent;
-use header::errno::{EPERM, EIO, EINVAL};
+use header::errno::{EINVAL, EIO, EPERM};
 use header::fcntl;
+use io::prelude::*;
+use io::{self, BufReader, SeekFrom};
 const MAP_ANON: c_int = 1;
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
@@ -61,7 +61,7 @@ impl Pal for Sys {
             Err(_) => unsafe {
                 errno = EIO;
                 return -1;
-            }
+            },
         };
         if mode == F_OK {
             return 0;
@@ -83,9 +83,9 @@ impl Pal for Sys {
         }
 
         let perms = if stat.st_uid as usize == uid {
-            stat.st_mode >> (3*2 & 0o7)
+            stat.st_mode >> (3 * 2 & 0o7)
         } else if stat.st_gid as usize == gid {
-            stat.st_mode >> (3*1 & 0o7)
+            stat.st_mode >> (3 * 1 & 0o7)
         } else {
             stat.st_mode & 0o7
         };
@@ -172,7 +172,7 @@ impl Pal for Sys {
 
         let mut file = match File::open(path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
             Ok(file) => file,
-            Err(_) => return -1
+            Err(_) => return -1,
         };
         let fd = *file as usize;
 
@@ -195,7 +195,7 @@ impl Pal for Sys {
                 match reader.read(&mut shebang) {
                     Ok(0) => break,
                     Ok(i) => read += i,
-                    Err(_) => return -1
+                    Err(_) => return -1,
                 }
             }
 
@@ -218,9 +218,9 @@ impl Pal for Sys {
                 }
 
                 let mode = if uid == stat.st_uid as usize {
-                    (stat.st_mode >> 3*2) & 0o7
+                    (stat.st_mode >> 3 * 2) & 0o7
                 } else if gid == stat.st_gid as usize {
-                    (stat.st_mode >> 3*1) & 0o7
+                    (stat.st_mode >> 3 * 1) & 0o7
                 } else {
                     stat.st_mode & 0o7
                 };
@@ -243,7 +243,7 @@ impl Pal for Sys {
                         // directly from here. Just wait until NLL comes
                         // around...
                         Some(interpreter)
-                    },
+                    }
                 }
             } else {
                 None
@@ -378,9 +378,17 @@ impl Pal for Sys {
     }
 
     fn futex(addr: *mut c_int, op: c_int, val: c_int) -> c_int {
-        match unsafe { syscall::futex(addr as *mut i32, op as usize, val as i32, 0, ptr::null_mut()) } {
+        match unsafe {
+            syscall::futex(
+                addr as *mut i32,
+                op as usize,
+                val as i32,
+                0,
+                ptr::null_mut(),
+            )
+        } {
             Ok(success) => success as c_int,
-            Err(err) => -(err.errno as c_int)
+            Err(err) => -(err.errno as c_int),
         }
     }
 
@@ -419,7 +427,7 @@ impl Pal for Sys {
         // Get initial reading position
         let mut read = match syscall::lseek(fd as usize, 0, SEEK_CUR) {
             Ok(pos) => pos as isize,
-            Err(err) => return -err.errno
+            Err(err) => return -err.errno,
         };
 
         let mut written = 0;
@@ -439,7 +447,7 @@ impl Pal for Sys {
                 // Seek back to after last read entry and return
                 match syscall::lseek(fd as usize, read, SEEK_SET as usize) {
                     Ok(_) => return Some(*written as c_int),
-                    Err(err) => return Some(-err.errno)
+                    Err(err) => return Some(-err.errno),
                 }
             }
             unsafe {
@@ -448,7 +456,7 @@ impl Pal for Sys {
                     d_off: read as off_t,
                     d_reclen: size as c_ushort,
                     d_type: 0,
-                    d_name: *name
+                    d_name: *name,
                 };
                 dirents = (dirents as *mut u8).offset(size as isize) as *mut dirent;
             }
@@ -468,9 +476,9 @@ impl Pal for Sys {
                         }
                     }
                     return written as c_int;
-                },
+                }
                 Ok(n) => n,
-                Err(err) => return -err.errno
+                Err(err) => return -err.errno,
             };
 
             // Handle everything
@@ -484,12 +492,10 @@ impl Pal for Sys {
                 let post_len = newline.map(|i| i + 1).unwrap_or(buf.len());
                 if i < pre_len {
                     // Reserve space for NUL byte
-                    let name_len = name.len()-1;
+                    let name_len = name.len() - 1;
                     let name = &mut name[i..name_len];
                     let copy = pre_len.min(name.len());
-                    let buf = unsafe {
-                        slice::from_raw_parts(buf.as_ptr() as *const c_char, copy)
-                    };
+                    let buf = unsafe { slice::from_raw_parts(buf.as_ptr() as *const c_char, copy) };
                     name[..copy].copy_from_slice(buf);
                 }
 
@@ -522,14 +528,14 @@ impl Pal for Sys {
         fn inner(name: &mut [u8]) -> io::Result<()> {
             let mut file = File::open(
                 &CString::new("/etc/hostname").unwrap(),
-                fcntl::O_RDONLY | fcntl::O_CLOEXEC
+                fcntl::O_RDONLY | fcntl::O_CLOEXEC,
             )?;
 
             let mut read = 0;
             loop {
                 match file.read(&mut name[read..])? {
                     0 => break,
-                    n => read += n
+                    n => read += n,
                 }
             }
             Ok(())
@@ -540,7 +546,7 @@ impl Pal for Sys {
             Err(_) => unsafe {
                 errno = EIO;
                 -1
-            }
+            },
         }
     }
 
@@ -706,7 +712,7 @@ impl Pal for Sys {
     fn realpath(pathname: &CStr, out: &mut [u8]) -> c_int {
         let file = match File::open(pathname, fcntl::O_PATH) {
             Ok(fd) => fd,
-            Err(_) => return -1
+            Err(_) => return -1,
         };
 
         if out.is_empty() {
@@ -714,7 +720,7 @@ impl Pal for Sys {
         }
 
         let len = out.len();
-        let read = e(syscall::fpath(*file as usize, &mut out[..len-1]));
+        let read = e(syscall::fpath(*file as usize, &mut out[..len - 1]));
         if (read as c_int) < 0 {
             return -1;
         }
@@ -747,7 +753,8 @@ impl Pal for Sys {
     ) -> c_int {
         let mut readfds = unsafe { readfds.as_mut() }.map(|s| BitSet::from_ref(&mut s.fds_bits));
         let mut writefds = unsafe { writefds.as_mut() }.map(|s| BitSet::from_ref(&mut s.fds_bits));
-        let mut exceptfds = unsafe { exceptfds.as_mut() }.map(|s| BitSet::from_ref(&mut s.fds_bits));
+        let mut exceptfds =
+            unsafe { exceptfds.as_mut() }.map(|s| BitSet::from_ref(&mut s.fds_bits));
 
         let event_path = unsafe { CStr::from_bytes_with_nul_unchecked(b"event:\0") };
         let mut event_file = match File::open(event_path, fcntl::O_RDWR | fcntl::O_CLOEXEC) {
@@ -758,7 +765,14 @@ impl Pal for Sys {
         for fd in 0..nfds as usize {
             macro_rules! register {
                 ($fd:expr, $flags:expr) => {
-                    if event_file.write(&syscall::Event { id: $fd, flags: $flags, data: 0, }).is_err() {
+                    if event_file
+                        .write(&syscall::Event {
+                            id: $fd,
+                            flags: $flags,
+                            data: 0,
+                        })
+                        .is_err()
+                    {
                         return -1;
                     }
                 };
@@ -783,16 +797,20 @@ impl Pal for Sys {
                     format!("time:{}", syscall::CLOCK_MONOTONIC).into_bytes(),
                 )
             };
-            let mut timeout_file = match File::open(&timeout_path, fcntl::O_RDWR | fcntl::O_CLOEXEC) {
+            let mut timeout_file = match File::open(&timeout_path, fcntl::O_RDWR | fcntl::O_CLOEXEC)
+            {
                 Ok(file) => file,
                 Err(_) => return -1,
             };
 
-            if event_file.write(&syscall::Event {
-                id: *timeout_file as usize,
-                flags: syscall::EVENT_READ,
-                data: TIMEOUT_TOKEN,
-            }).is_err() {
+            if event_file
+                .write(&syscall::Event {
+                    id: *timeout_file as usize,
+                    flags: syscall::EVENT_READ,
+                    data: TIMEOUT_TOKEN,
+                })
+                .is_err()
+            {
                 return -1;
             }
 
@@ -817,21 +835,29 @@ impl Pal for Sys {
 
         let mut events = [syscall::Event::default(); 32];
         let read = {
-            let mut events = unsafe { slice::from_raw_parts_mut(
-                &mut events as *mut _ as *mut u8,
-                mem::size_of::<syscall::Event>() * events.len()
-            ) };
+            let mut events = unsafe {
+                slice::from_raw_parts_mut(
+                    &mut events as *mut _ as *mut u8,
+                    mem::size_of::<syscall::Event>() * events.len(),
+                )
+            };
             match event_file.read(&mut events) {
                 Ok(i) => i / mem::size_of::<syscall::Event>(),
-                Err(_) => return -1
+                Err(_) => return -1,
             }
         };
 
         let mut total = 0;
 
-        if let Some(ref mut set) = readfds { set.clear(); }
-        if let Some(ref mut set) = writefds { set.clear(); }
-        if let Some(ref mut set) = exceptfds { set.clear(); }
+        if let Some(ref mut set) = readfds {
+            set.clear();
+        }
+        if let Some(ref mut set) = writefds {
+            set.clear();
+        }
+        if let Some(ref mut set) = exceptfds {
+            set.clear();
+        }
 
         for event in &events[..read] {
             if event.data == TIMEOUT_TOKEN {
@@ -916,18 +942,14 @@ impl Pal for Sys {
 
             let mut read_line = |dst: &mut [c_char]| {
                 let line = match lines.next() {
-                    Some(Ok(l)) => {
-                        match CString::new(l) {
-                            Ok(l) => l,
-                            Err(_) => return Err(EIO),
-                        }
+                    Some(Ok(l)) => match CString::new(l) {
+                        Ok(l) => l,
+                        Err(_) => return Err(EIO),
                     },
                     None | Some(Err(_)) => return Err(EIO),
                 };
 
-                let line_slice: &[c_char] = unsafe {
-                    mem::transmute(line.as_bytes_with_nul())
-                };
+                let line_slice: &[c_char] = unsafe { mem::transmute(line.as_bytes_with_nul()) };
 
                 if line_slice.len() <= UTSLENGTH {
                     dst[..line_slice.len()].copy_from_slice(line_slice);
@@ -956,7 +978,7 @@ impl Pal for Sys {
             Err(err) => unsafe {
                 errno = err;
                 -1
-            }
+            },
         }
     }
 

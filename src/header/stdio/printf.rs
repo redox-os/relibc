@@ -81,14 +81,14 @@ impl IntoUsize for f64 {
 struct BufferedVaList {
     list: VaList,
     buf: Vec<usize>,
-    i: usize
+    i: usize,
 }
 impl BufferedVaList {
     fn new(list: VaList) -> Self {
         Self {
             list,
             buf: Vec::new(),
-            i: 0
+            i: 0,
         }
     }
     unsafe fn get<T: VaPrimitive + IntoUsize>(&mut self, i: Option<usize>) -> T {
@@ -143,7 +143,7 @@ unsafe fn pop_int(format: &mut *const u8, ap: &mut BufferedVaList) -> Option<usi
         if let Some(i) = pop_int_raw(&mut format2) {
             if *format2 == b'$' {
                 *format = format2.offset(1);
-                return Some(ap.index::<usize>(i))
+                return Some(ap.index::<usize>(i));
             }
         }
 
@@ -153,17 +153,23 @@ unsafe fn pop_int(format: &mut *const u8, ap: &mut BufferedVaList) -> Option<usi
     }
 }
 unsafe fn fmt_int<I>(fmt: u8, i: I) -> String
-    where I: fmt::Display + fmt::Octal + fmt::LowerHex + fmt::UpperHex
+where
+    I: fmt::Display + fmt::Octal + fmt::LowerHex + fmt::UpperHex,
 {
     match fmt {
         b'o' => format!("{:o}", i),
         b'u' => i.to_string(),
         b'x' => format!("{:x}", i),
         b'X' => format!("{:X}", i),
-        _ => panic!("fmt_int should never be called with the fmt {}", fmt)
+        _ => panic!("fmt_int should never be called with the fmt {}", fmt),
     }
 }
-fn pad<W: Write>(w: &mut W, current_side: bool, pad_char: u8, range: Range<usize>) -> io::Result<()> {
+fn pad<W: Write>(
+    w: &mut W,
+    current_side: bool,
+    pad_char: u8,
+    range: Range<usize>,
+) -> io::Result<()> {
     if current_side {
         for _ in range {
             w.write_all(&[pad_char])?;
@@ -207,7 +213,10 @@ fn fmt_float_exp<W: Write>(
         exp -= 1;
     }
 
-    if range.map(|(start, end)| exp >= start && exp < end).unwrap_or(false) {
+    if range
+        .map(|(start, end)| exp >= start && exp < end)
+        .unwrap_or(false)
+    {
         return Ok(false);
     }
 
@@ -294,7 +303,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                     b'-' => left = true,
                     b' ' => sign_reserve = true,
                     b'+' => sign_always = true,
-                    _ => break
+                    _ => break,
                 }
                 format = format.offset(1);
             }
@@ -304,31 +313,35 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
             let precision = if *format == b'.' {
                 format = format.offset(1);
                 match pop_int(&mut format, &mut ap) {
-                    int@Some(_) => int,
-                    None => return Ok(-1)
+                    int @ Some(_) => int,
+                    None => return Ok(-1),
                 }
             } else {
                 None
             };
 
             let pad_space = if zero { 0 } else { min_width };
-            let pad_zero  = if zero { min_width } else { 0 };
+            let pad_zero = if zero { min_width } else { 0 };
 
             // Integer size:
             let mut kind = IntKind::Int;
             loop {
                 kind = match *format {
-                    b'h' => if kind == IntKind::Short || kind == IntKind::Byte {
-                        IntKind::Byte
-                    } else {
-                        IntKind::Short
-                    },
+                    b'h' => {
+                        if kind == IntKind::Short || kind == IntKind::Byte {
+                            IntKind::Byte
+                        } else {
+                            IntKind::Short
+                        }
+                    }
                     b'j' => IntKind::IntMax,
-                    b'l' => if kind == IntKind::Long || kind == IntKind::LongLong {
-                        IntKind::LongLong
-                    } else {
-                        IntKind::Long
-                    },
+                    b'l' => {
+                        if kind == IntKind::Long || kind == IntKind::LongLong {
+                            IntKind::LongLong
+                        } else {
+                            IntKind::Long
+                        }
+                    }
                     b'q' | b'L' => IntKind::LongLong,
                     b't' => IntKind::PtrDiff,
                     b'z' => IntKind::Size,
@@ -346,14 +359,14 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                         // VaList does not seem to support these two:
                         //   IntKind::Byte     => ap.get::<c_char>(index).to_string(),
                         //   IntKind::Short    => ap.get::<c_short>(index).to_string(),
-                        IntKind::Byte     => (ap.get::<c_int>(index) as c_char).to_string(),
-                        IntKind::Short    => (ap.get::<c_int>(index) as c_short).to_string(),
-                        IntKind::Int      => ap.get::<c_int>(index).to_string(),
-                        IntKind::Long     => ap.get::<c_long>(index).to_string(),
+                        IntKind::Byte => (ap.get::<c_int>(index) as c_char).to_string(),
+                        IntKind::Short => (ap.get::<c_int>(index) as c_short).to_string(),
+                        IntKind::Int => ap.get::<c_int>(index).to_string(),
+                        IntKind::Long => ap.get::<c_long>(index).to_string(),
                         IntKind::LongLong => ap.get::<c_longlong>(index).to_string(),
-                        IntKind::PtrDiff  => ap.get::<ptrdiff_t>(index).to_string(),
-                        IntKind::Size     => ap.get::<ssize_t>(index).to_string(),
-                        IntKind::IntMax   => ap.get::<intmax_t>(index).to_string(),
+                        IntKind::PtrDiff => ap.get::<ptrdiff_t>(index).to_string(),
+                        IntKind::Size => ap.get::<ssize_t>(index).to_string(),
+                        IntKind::IntMax => ap.get::<intmax_t>(index).to_string(),
                     };
                     let positive = !string.starts_with('-');
                     let zero = precision == Some(0) && string == "0";
@@ -388,21 +401,21 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                     }
 
                     pad(w, left, b' ', final_len..pad_space)?;
-                },
+                }
                 b'o' | b'u' | b'x' | b'X' => {
                     let fmt = *format;
                     let string = match kind {
                         // VaList does not seem to support these two:
                         //   IntKind::Byte     => fmt_int(kind ap.get::<c_char>(index)),
                         //   IntKind::Short     => fmt_int(kind ap.get::<c_short>(index)),
-                        IntKind::Byte     => fmt_int(fmt, ap.get::<c_uint>(index) as c_uchar),
-                        IntKind::Short    => fmt_int(fmt, ap.get::<c_uint>(index) as c_ushort),
-                        IntKind::Int      => fmt_int(fmt, ap.get::<c_uint>(index)),
-                        IntKind::Long     => fmt_int(fmt, ap.get::<c_ulong>(index)),
+                        IntKind::Byte => fmt_int(fmt, ap.get::<c_uint>(index) as c_uchar),
+                        IntKind::Short => fmt_int(fmt, ap.get::<c_uint>(index) as c_ushort),
+                        IntKind::Int => fmt_int(fmt, ap.get::<c_uint>(index)),
+                        IntKind::Long => fmt_int(fmt, ap.get::<c_ulong>(index)),
                         IntKind::LongLong => fmt_int(fmt, ap.get::<c_ulonglong>(index)),
-                        IntKind::PtrDiff  => fmt_int(fmt, ap.get::<ptrdiff_t>(index)),
-                        IntKind::Size     => fmt_int(fmt, ap.get::<size_t>(index)),
-                        IntKind::IntMax   => fmt_int(fmt, ap.get::<uintmax_t>(index)),
+                        IntKind::PtrDiff => fmt_int(fmt, ap.get::<ptrdiff_t>(index)),
+                        IntKind::Size => fmt_int(fmt, ap.get::<size_t>(index)),
+                        IntKind::IntMax => fmt_int(fmt, ap.get::<uintmax_t>(index)),
                     };
                     let zero = precision == Some(0) && string == "0";
 
@@ -411,15 +424,16 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                     let no_precision = precision.map(|pad| pad < string.len()).unwrap_or(true);
 
                     let mut len = string.len();
-                    let mut final_len = string.len().max(precision.unwrap_or(0)) +
-                        if alternate && string != "0" {
+                    let mut final_len = string.len().max(precision.unwrap_or(0))
+                        + if alternate && string != "0" {
                             match fmt {
                                 b'o' if no_precision => 1,
-                                b'x' |
-                                b'X' => 2,
-                                _ => 0
+                                b'x' | b'X' => 2,
+                                _ => 0,
                             }
-                        } else { 0 };
+                        } else {
+                            0
+                        };
 
                     if zero {
                         len = 0;
@@ -433,7 +447,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                             b'o' if no_precision => w.write_all(&[b'0'])?,
                             b'x' => w.write_all(&[b'0', b'x'])?,
                             b'X' => w.write_all(&[b'0', b'X'])?,
-                            _ => ()
+                            _ => (),
                         }
                     }
                     pad(w, true, b'0', len..precision.unwrap_or(pad_zero))?;
@@ -443,27 +457,38 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                     }
 
                     pad(w, left, b' ', final_len..pad_space)?;
-                },
+                }
                 b'e' | b'E' => {
                     let exp_fmt = *format;
                     let mut float = ap.get::<c_double>(index);
                     let precision = precision.unwrap_or(6);
 
-                    fmt_float_exp(w, exp_fmt, None, false, precision, float, left, pad_space, pad_zero)?;
-                },
+                    fmt_float_exp(
+                        w, exp_fmt, None, false, precision, float, left, pad_space, pad_zero,
+                    )?;
+                }
                 b'f' | b'F' => {
                     let mut float = ap.get::<c_double>(index);
                     let precision = precision.unwrap_or(6);
 
                     fmt_float_normal(w, false, precision, float, left, pad_space, pad_zero)?;
-                },
+                }
                 b'g' | b'G' => {
                     let exp_fmt = b'E' | (*format & 32);
                     let mut float = ap.get::<c_double>(index);
                     let precision = precision.unwrap_or(6);
 
-                    if !fmt_float_exp(w, exp_fmt, Some((-4, precision as isize)), true,
-                            precision, float, left, pad_space, pad_zero)? {
+                    if !fmt_float_exp(
+                        w,
+                        exp_fmt,
+                        Some((-4, precision as isize)),
+                        true,
+                        precision,
+                        float,
+                        left,
+                        pad_space,
+                        pad_zero,
+                    )? {
                         fmt_float_normal(w, true, precision, float, left, pad_space, pad_zero)?;
                     }
                 }
@@ -486,7 +511,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                         w.write_all(slice::from_raw_parts(ptr as *const u8, len))?;
                         pad(w, left, b' ', len..pad_space)?;
                     }
-                },
+                }
                 b'c' => {
                     // if kind == IntKind::Long || kind == IntKind::LongLong, handle wint_t
 
@@ -495,7 +520,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                     pad(w, !left, b' ', 1..pad_space)?;
                     w.write_all(&[c as u8])?;
                     pad(w, left, b' ', 1..pad_space)?;
-                },
+                }
                 b'p' => {
                     let ptr = ap.get::<*const c_void>(index);
 
@@ -517,12 +542,12 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                         write!(w, "0x{:x}", ptr as usize)?;
                     }
                     pad(w, left, b' ', len..pad_space)?;
-                },
+                }
                 b'n' => {
                     let ptr = ap.get::<*mut c_int>(index);
                     *ptr = w.written as c_int;
-                },
-                _ => return Ok(-1)
+                }
+                _ => return Ok(-1),
             }
         }
         format = format.offset(1);

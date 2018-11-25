@@ -7,9 +7,9 @@ use c_str::CStr;
 use fs::File;
 use header::{errno, fcntl, stdlib, string};
 use io::{Seek, SeekFrom};
+use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
-use platform;
 
 const DIR_BUF_SIZE: usize = mem::size_of::<dirent>() * 3;
 
@@ -22,7 +22,7 @@ pub struct DIR {
     len: usize,
 
     // The last value of d_off, used by telldir
-    offset: usize
+    offset: usize,
 }
 
 #[repr(C)]
@@ -40,10 +40,10 @@ pub extern "C" fn opendir(path: *const c_char) -> *mut DIR {
     let path = unsafe { CStr::from_ptr(path) };
     let file = match File::open(
         path,
-        fcntl::O_RDONLY | fcntl::O_DIRECTORY | fcntl::O_CLOEXEC
+        fcntl::O_RDONLY | fcntl::O_DIRECTORY | fcntl::O_CLOEXEC,
     ) {
         Ok(file) => file,
-        Err(_) => return ptr::null_mut()
+        Err(_) => return ptr::null_mut(),
     };
 
     Box::into_raw(Box::new(DIR {
@@ -118,10 +118,7 @@ pub unsafe extern "C" fn rewinddir(dir: *mut DIR) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn alphasort(
-    first: *mut *const dirent,
-    second: *mut *const dirent
-) -> c_int {
+pub unsafe extern "C" fn alphasort(first: *mut *const dirent, second: *mut *const dirent) -> c_int {
     string::strcoll((**first).d_name.as_ptr(), (**second).d_name.as_ptr())
 }
 
@@ -130,7 +127,7 @@ pub unsafe extern "C" fn scandir(
     dirp: *const c_char,
     namelist: *mut *mut *mut dirent,
     filter: Option<extern "C" fn(_: *const dirent) -> c_int>,
-    compare: Option<extern "C" fn(_: *mut *const dirent, _: *mut *const dirent) -> c_int>
+    compare: Option<extern "C" fn(_: *mut *const dirent, _: *mut *const dirent) -> c_int>,
 ) -> c_int {
     let dir = opendir(dirp);
     if dir.is_null() {
@@ -160,7 +157,7 @@ pub unsafe extern "C" fn scandir(
             cap *= 2;
             *namelist = platform::realloc(
                 *namelist as *mut c_void,
-                cap as usize * mem::size_of::<*mut dirent>()
+                cap as usize * mem::size_of::<*mut dirent>(),
             ) as *mut *mut dirent;
         }
 
@@ -181,7 +178,12 @@ pub unsafe extern "C" fn scandir(
         -1
     } else {
         platform::errno = old_errno;
-        stdlib::qsort(*namelist as *mut c_void, len as size_t, mem::size_of::<*mut dirent>(), mem::transmute(compare));
+        stdlib::qsort(
+            *namelist as *mut c_void,
+            len as size_t,
+            mem::size_of::<*mut dirent>(),
+            mem::transmute(compare),
+        );
         len as c_int
     }
 }

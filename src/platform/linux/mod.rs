@@ -302,12 +302,20 @@ impl Pal for Sys {
 
     fn realpath(pathname: &CStr, out: &mut [u8]) -> c_int {
         fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t {
-            e(unsafe { syscall!(READLINKAT, AT_FDCWD, pathname.as_ptr(), out.as_mut_ptr(), out.len()) }) as ssize_t
+            e(unsafe {
+                syscall!(
+                    READLINKAT,
+                    AT_FDCWD,
+                    pathname.as_ptr(),
+                    out.as_mut_ptr(),
+                    out.len()
+                )
+            }) as ssize_t
         }
 
         let file = match File::open(pathname, fcntl::O_PATH) {
             Ok(file) => file,
-            Err(_) => return -1
+            Err(_) => return -1,
         };
 
         if out.is_empty() {
@@ -319,7 +327,10 @@ impl Pal for Sys {
         proc_path.push(0);
 
         let len = out.len();
-        let read = readlink(CStr::from_bytes_with_nul(&proc_path).unwrap(), &mut out[..len-1]);
+        let read = readlink(
+            CStr::from_bytes_with_nul(&proc_path).unwrap(),
+            &mut out[..len - 1],
+        );
         if read < 0 {
             return -1;
         }

@@ -2,15 +2,15 @@ use core::cell::UnsafeCell;
 use core::intrinsics;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 pub const FUTEX_WAIT: c_int = 0;
 pub const FUTEX_WAKE: c_int = 1;
 
 pub struct Mutex<T> {
     lock: UnsafeCell<c_int>,
-    content: UnsafeCell<T>
+    content: UnsafeCell<T>,
 }
 unsafe impl<T: Send> Send for Mutex<T> {}
 unsafe impl<T: Send> Sync for Mutex<T> {}
@@ -19,7 +19,7 @@ impl<T> Mutex<T> {
     pub fn new(content: T) -> Self {
         Self {
             lock: UnsafeCell::new(0),
-            content: UnsafeCell::new(content)
+            content: UnsafeCell::new(content),
         }
     }
 
@@ -45,7 +45,7 @@ impl<T> Mutex<T> {
             atomic::spin_loop_hint();
             last = match self.manual_try_lock() {
                 Ok(content) => return content,
-                Err(value) => value
+                Err(value) => value,
             };
         }
 
@@ -62,7 +62,7 @@ impl<T> Mutex<T> {
 
             last = match self.manual_try_lock() {
                 Ok(content) => return content,
-                Err(value) => value
+                Err(value) => value,
             };
         }
     }
@@ -80,7 +80,7 @@ impl<T> Mutex<T> {
         unsafe {
             self.manual_try_lock().ok().map(|content| MutexGuard {
                 mutex: self,
-                content
+                content,
             })
         }
     }
@@ -89,14 +89,14 @@ impl<T> Mutex<T> {
     pub fn lock(&self) -> MutexGuard<T> {
         MutexGuard {
             mutex: self,
-            content: unsafe { self.manual_lock() }
+            content: unsafe { self.manual_lock() },
         }
     }
 }
 
 pub struct MutexGuard<'a, T: 'a> {
     mutex: &'a Mutex<T>,
-    content: &'a mut T
+    content: &'a mut T,
 }
 impl<'a, T> Deref for MutexGuard<'a, T> {
     type Target = T;

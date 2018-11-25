@@ -117,17 +117,21 @@ unsafe fn inner_scanf<R: Read>(
             let mut kind = IntKind::Int;
             loop {
                 kind = match c {
-                    b'h' => if kind == IntKind::Short || kind == IntKind::Byte {
-                        IntKind::Byte
-                    } else {
-                        IntKind::Short
-                    },
+                    b'h' => {
+                        if kind == IntKind::Short || kind == IntKind::Byte {
+                            IntKind::Byte
+                        } else {
+                            IntKind::Short
+                        }
+                    }
                     b'j' => IntKind::IntMax,
-                    b'l' => if kind == IntKind::Long || kind == IntKind::LongLong {
-                        IntKind::LongLong
-                    } else {
-                        IntKind::Long
-                    },
+                    b'l' => {
+                        if kind == IntKind::Long || kind == IntKind::LongLong {
+                            IntKind::LongLong
+                        } else {
+                            IntKind::Long
+                        }
+                    }
                     b'q' | b'L' => IntKind::LongLong,
                     b't' => IntKind::PtrDiff,
                     b'z' => IntKind::Size,
@@ -268,42 +272,56 @@ unsafe fn inner_scanf<R: Read>(
                         let unsigned = c == b'o' || c == b'u' || c == b'x' || c == b'X';
 
                         match kind {
-                            IntKind::Byte => if unsigned {
-                                parse_type!(c_uchar);
-                            } else {
-                                parse_type!(c_char);
-                            },
-                            IntKind::Short => if unsigned {
-                                parse_type!(c_ushort)
-                            } else {
-                                parse_type!(c_short)
-                            },
-                            IntKind::Int => if unsigned {
-                                parse_type!(c_uint)
-                            } else {
-                                parse_type!(c_int)
-                            },
-                            IntKind::Long => if unsigned {
-                                parse_type!(c_ulong)
-                            } else {
-                                parse_type!(c_long)
-                            },
-                            IntKind::LongLong => if unsigned {
-                                parse_type!(c_ulonglong)
-                            } else {
-                                parse_type!(c_longlong)
-                            },
-                            IntKind::IntMax => if unsigned {
-                                parse_type!(uintmax_t)
-                            } else {
-                                parse_type!(intmax_t)
-                            },
+                            IntKind::Byte => {
+                                if unsigned {
+                                    parse_type!(c_uchar);
+                                } else {
+                                    parse_type!(c_char);
+                                }
+                            }
+                            IntKind::Short => {
+                                if unsigned {
+                                    parse_type!(c_ushort)
+                                } else {
+                                    parse_type!(c_short)
+                                }
+                            }
+                            IntKind::Int => {
+                                if unsigned {
+                                    parse_type!(c_uint)
+                                } else {
+                                    parse_type!(c_int)
+                                }
+                            }
+                            IntKind::Long => {
+                                if unsigned {
+                                    parse_type!(c_ulong)
+                                } else {
+                                    parse_type!(c_long)
+                                }
+                            }
+                            IntKind::LongLong => {
+                                if unsigned {
+                                    parse_type!(c_ulonglong)
+                                } else {
+                                    parse_type!(c_longlong)
+                                }
+                            }
+                            IntKind::IntMax => {
+                                if unsigned {
+                                    parse_type!(uintmax_t)
+                                } else {
+                                    parse_type!(intmax_t)
+                                }
+                            }
                             IntKind::PtrDiff => parse_type!(ptrdiff_t),
-                            IntKind::Size => if unsigned {
-                                parse_type!(size_t)
-                            } else {
-                                parse_type!(ssize_t)
-                            },
+                            IntKind::Size => {
+                                if unsigned {
+                                    parse_type!(size_t)
+                                } else {
+                                    parse_type!(ssize_t)
+                                }
+                            }
                         }
                     }
                 }

@@ -6,8 +6,8 @@ use c_str::CStr;
 use fs::File;
 use header::{errno, fcntl};
 use io::{BufRead, BufReader};
-use platform::types::*;
 use platform;
+use platform::types::*;
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -58,7 +58,7 @@ where
 {
     let file = match File::open(
         unsafe { CStr::from_bytes_with_nul_unchecked(b"/etc/passwd\0") },
-        fcntl::O_RDONLY
+        fcntl::O_RDONLY,
     ) {
         Ok(file) => file,
         Err(_) => return OptionPasswd::Error,
@@ -72,7 +72,7 @@ where
             Err(err) => unsafe {
                 platform::errno = errno::EIO;
                 return OptionPasswd::Error;
-            }
+            },
         };
 
         // Parse into passwd

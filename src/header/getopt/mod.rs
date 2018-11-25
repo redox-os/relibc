@@ -1,13 +1,13 @@
 //! getopt implementation for relibc
 
 use core::ptr;
+use header::unistd::{optarg, opterr, optind, optopt};
 use header::{stdio, string};
-use header::unistd::{optarg, optind, opterr, optopt};
 use platform::types::*;
 
 static mut CURRENT_OPT: *mut c_char = ptr::null_mut();
 
-pub const no_argument:       c_int = 0;
+pub const no_argument: c_int = 0;
 pub const required_argument: c_int = 1;
 pub const optional_argument: c_int = 2;
 
@@ -16,7 +16,7 @@ pub struct option {
     name: *const c_char,
     has_arg: c_int,
     flag: *mut c_int,
-    val: c_int
+    val: c_int,
 }
 
 #[no_mangle]
@@ -26,7 +26,7 @@ pub unsafe extern "C" fn getopt_long(
     argv: *const *mut c_char,
     optstring: *const c_char,
     longopts: *const option,
-    longindex: *mut c_int
+    longindex: *mut c_int,
 ) -> c_int {
     // if optarg is not set, we still don't want the previous value leaking
     optarg = ptr::null_mut();
@@ -64,7 +64,10 @@ pub unsafe extern "C" fn getopt_long(
                         }
 
                         let mut end = 0;
-                        while { let c = *current_arg.offset(end); c != 0 && c != b'=' as c_char } {
+                        while {
+                            let c = *current_arg.offset(end);
+                            c != 0 && c != b'=' as c_char
+                        } {
                             end += 1;
                         }
 
@@ -87,9 +90,15 @@ pub unsafe extern "C" fn getopt_long(
                                         return b':' as c_int;
                                     } else {
                                         stdio::fputs(*argv as _, &mut *stdio::stderr);
-                                        stdio::fputs(": option '--\0".as_ptr() as _, &mut *stdio::stderr);
+                                        stdio::fputs(
+                                            ": option '--\0".as_ptr() as _,
+                                            &mut *stdio::stderr,
+                                        );
                                         stdio::fputs(current_arg, &mut *stdio::stderr);
-                                        stdio::fputs("' requires an argument\n\0".as_ptr() as _, &mut *stdio::stderr);
+                                        stdio::fputs(
+                                            "' requires an argument\n\0".as_ptr() as _,
+                                            &mut *stdio::stderr,
+                                        );
                                         return b'?' as c_int;
                                     }
                                 }
@@ -117,7 +126,7 @@ unsafe fn parse_arg(
     argc: c_int,
     argv: *const *mut c_char,
     current_arg: *mut c_char,
-    optstring: *const c_char
+    optstring: *const c_char,
 ) -> c_int {
     let update_current_opt = || {
         CURRENT_OPT = current_arg.offset(1);

@@ -162,13 +162,15 @@ const PATH_SEPARATOR: u8 = b';';
 pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -> c_int {
     let file = CStr::from_ptr(file);
 
-    if file.to_bytes().contains(&b'/') || (cfg!(target_os = "redox") && file.to_bytes().contains(&b':')) {
+    if file.to_bytes().contains(&b'/')
+        || (cfg!(target_os = "redox") && file.to_bytes().contains(&b':'))
+    {
         execv(file.as_ptr(), argv)
     } else {
         let mut error = errno::ENOENT;
 
         let path_env = getenv(c_str!("PATH\0").as_ptr());
-        if ! path_env.is_null() {
+        if !path_env.is_null() {
             let path_env = CStr::from_ptr(path_env);
             for mut path in path_env.to_bytes().split(|&b| b == PATH_SEPARATOR) {
                 let mut program = path.to_vec();
@@ -239,7 +241,8 @@ pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char 
         let len = stack_buf
             .iter()
             .position(|b| *b == 0)
-            .expect("no nul-byte in getcwd string") + 1;
+            .expect("no nul-byte in getcwd string")
+            + 1;
         let heap_buf = unsafe { platform::alloc(len) as *mut c_char };
         for i in 0..len {
             unsafe {

@@ -100,11 +100,7 @@ impl Write for StringWriter {
         if self.1 > 1 {
             let copy_size = buf.len().min(self.1 - 1);
             unsafe {
-                ptr::copy_nonoverlapping(
-                    buf.as_ptr(),
-                    self.0,
-                    copy_size
-                );
+                ptr::copy_nonoverlapping(buf.as_ptr(), self.0, copy_size);
                 self.1 -= copy_size;
 
                 self.0 = self.0.offset(copy_size as isize);
@@ -139,11 +135,7 @@ pub struct UnsafeStringWriter(pub *mut u8);
 impl Write for UnsafeStringWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         unsafe {
-            ptr::copy_nonoverlapping(
-                buf.as_ptr(),
-                self.0,
-                buf.len()
-            );
+            ptr::copy_nonoverlapping(buf.as_ptr(), self.0, buf.len());
             *self.0.offset(buf.len() as isize) = b'\0';
             self.0 = self.0.offset(buf.len() as isize);
         }
@@ -221,7 +213,7 @@ impl<T: Write> Write for CountingWriter<T> {
         match self.inner.write_all(&buf) {
             Ok(()) => (),
             Err(ref err) if err.kind() == io::ErrorKind::WriteZero => (),
-            Err(err) => return Err(err)
+            Err(err) => return Err(err),
         }
         self.written += buf.len();
         Ok(())
