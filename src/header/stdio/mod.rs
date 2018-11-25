@@ -27,6 +27,9 @@ mod constants;
 pub use self::default::*;
 mod default;
 
+pub use self::getdelim::*;
+mod getdelim;
+
 mod ext;
 mod helpers;
 mod printf;
