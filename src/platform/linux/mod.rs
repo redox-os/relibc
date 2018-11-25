@@ -60,10 +60,6 @@ impl Sys {
     // fn times(out: *mut tms) -> clock_t {
     //     unsafe { syscall!(TIMES, out) as clock_t }
     // }
-
-    pub fn uname(utsname: *mut utsname) -> c_int {
-        e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
-    }
 }
 
 impl Pal for Sys {
@@ -384,6 +380,10 @@ impl Pal for Sys {
 
     fn umask(mask: mode_t) -> mode_t {
         unsafe { syscall!(UMASK, mask) as mode_t }
+    }
+
+    fn uname(utsname: *mut utsname) -> c_int {
+        e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
     }
 
     fn unlink(path: &CStr) -> c_int {

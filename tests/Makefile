@@ -92,6 +92,7 @@ BINS=\
 	stdlib/bsearch \
 	stdlib/mktemp \
 	stdlib/realpath \
+	sys_utsname/uname \
 	time/gettimeofday \
 	unistd/chdir \
 	unistd/getcwd \

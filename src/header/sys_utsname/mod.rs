@@ -1,5 +1,6 @@
-//! sys/utsname implementation for linux, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysutsname.h.html
+//! sys/utsname implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysutsname.h.html
 
+use platform::{Pal, Sys};
 use platform::types::*;
 
 pub const UTSLENGTH: usize = 65;
@@ -14,15 +15,7 @@ pub struct utsname {
     pub domainname: [c_char; UTSLENGTH],
 }
 
-#[cfg(target_os = "linux")]
-mod inner {
-    use super::*;
-    use platform::Sys;
-
-    #[no_mangle]
-    pub unsafe extern "C" fn uname(uts: *mut utsname) -> c_int {
-        Sys::uname(uts)
-    }
+#[no_mangle]
+pub unsafe extern "C" fn uname(uts: *mut utsname) -> c_int {
+    Sys::uname(uts)
 }
-#[cfg(target_os = "linux")]
-pub use self::inner::*;

@@ -3,6 +3,7 @@
 use alloc::collections::BTreeMap;
 use cbitset::BitSet;
 use core::{mem, ptr, slice};
+use core::result::Result as CoreResult;
 use spin::{Mutex, MutexGuard, Once};
 use syscall::data::Stat as redox_stat;
 use syscall::data::TimeSpec as redox_timespec;
@@ -20,6 +21,7 @@ const MAP_ANON: c_int = 1;
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
 use header::sys_time::{timeval, timezone};
+use header::sys_utsname::{utsname, UTSLENGTH};
 use header::termios::termios;
 use header::time::timespec;
 use header::unistd::{F_OK, R_OK, SEEK_SET, W_OK, X_OK};
@@ -901,6 +903,61 @@ impl Pal for Sys {
 
     fn umask(mask: mode_t) -> mode_t {
         e(syscall::umask(mask as usize)) as mode_t
+    }
+
+    fn uname(utsname: *mut utsname) -> c_int {
+        fn inner(utsname: *mut utsname) -> CoreResult<(), i32> {
+            let file_path = unsafe { CStr::from_bytes_with_nul_unchecked(b"sys:uname\0") };
+            let mut file = match File::open(file_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
+                Ok(file) => file,
+                Err(_) => return Err(EIO),
+            };
+            let mut lines = BufReader::new(&mut file).lines();
+
+            let mut read_line = |dst: &mut [c_char]| {
+                let line = match lines.next() {
+                    Some(Ok(l)) => {
+                        match CString::new(l) {
+                            Ok(l) => l,
+                            Err(_) => return Err(EIO),
+                        }
+                    },
+                    None | Some(Err(_)) => return Err(EIO),
+                };
+
+                let line_slice: &[c_char] = unsafe {
+                    mem::transmute(line.as_bytes_with_nul())
+                };
+
+                if line_slice.len() <= UTSLENGTH {
+                    dst[..line_slice.len()].copy_from_slice(line_slice);
+                    Ok(())
+                } else {
+                    Err(EIO)
+                }
+            };
+
+            unsafe {
+                read_line(&mut (*utsname).sysname)?;
+                read_line(&mut (*utsname).nodename)?;
+                read_line(&mut (*utsname).release)?;
+                read_line(&mut (*utsname).version)?;
+                read_line(&mut (*utsname).machine)?;
+
+                // Redox doesn't provide domainname in sys:uname
+                //read_line(&mut (*utsname).domainname)?;
+                ptr::write_bytes((*utsname).domainname.as_mut_ptr(), 0, UTSLENGTH);
+            }
+            Ok(())
+        }
+
+        match inner(utsname) {
+            Ok(()) => 0,
+            Err(err) => unsafe {
+                errno = err;
+                -1
+            }
+        }
     }
 
     fn unlink(path: &CStr) -> c_int {
