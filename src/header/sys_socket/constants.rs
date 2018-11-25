@@ -4,7 +4,6 @@ pub const SOCK_STREAM: c_int = 1;
 pub const SOCK_DGRAM: c_int = 2;
 pub const SOCK_NONBLOCK: c_int = 0o4000;
 pub const SOCK_CLOEXEC: c_int = 0o2000000;
-pub const AF_INET: c_int = 2;
 
 // Other constants
 pub const SOCK_SEQPACKET: c_int = 5;
@@ -49,9 +48,15 @@ pub const MSG_PEEK: c_int = 2;
 pub const MSG_TRUNC: c_int = 32;
 pub const MSG_WAITALL: c_int = 256;
 
+pub const AF_INET: c_int = 2;
 pub const AF_INET6: c_int = 10;
 pub const AF_UNIX: c_int = 1;
 pub const AF_UNSPEC: c_int = 0;
+
+pub const PF_INET: c_int = AF_INET;
+pub const PF_INET6: c_int = AF_INET6;
+pub const PF_UNIX: c_int = AF_UNIX;
+pub const PF_UNSPEC: c_int = AF_UNSPEC;
 
 pub const SHUT_RD: c_int = 0;
 pub const SHUT_RDWR: c_int = 2;
