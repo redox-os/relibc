@@ -115,7 +115,7 @@ pub trait Pal {
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
 
-    //fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t;
+    fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t;
 
     fn realpath(pathname: &CStr, out: &mut [u8]) -> c_int;
 
@@ -137,6 +137,8 @@ pub trait Pal {
     fn setregid(rgid: gid_t, egid: gid_t) -> c_int;
 
     fn setreuid(ruid: uid_t, euid: uid_t) -> c_int;
+
+    fn symlink(path1: &CStr, path2: &CStr) -> c_int;
 
     fn tcgetattr(fd: c_int, out: *mut termios) -> c_int;
 

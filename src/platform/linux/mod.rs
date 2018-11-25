@@ -305,19 +305,19 @@ impl Pal for Sys {
         e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
     }
 
-    fn realpath(pathname: &CStr, out: &mut [u8]) -> c_int {
-        fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t {
-            e(unsafe {
-                syscall!(
-                    READLINKAT,
-                    AT_FDCWD,
-                    pathname.as_ptr(),
-                    out.as_mut_ptr(),
-                    out.len()
-                )
-            }) as ssize_t
-        }
+    fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t {
+        e(unsafe {
+            syscall!(
+                READLINKAT,
+                AT_FDCWD,
+                pathname.as_ptr(),
+                out.as_mut_ptr(),
+                out.len()
+            )
+        }) as ssize_t
+    }
 
+    fn realpath(pathname: &CStr, out: &mut [u8]) -> c_int {
         let file = match File::open(pathname, fcntl::O_PATH) {
             Ok(file) => file,
             Err(_) => return -1,
@@ -332,7 +332,7 @@ impl Pal for Sys {
         proc_path.push(0);
 
         let len = out.len();
-        let read = readlink(
+        let read = Self::readlink(
             CStr::from_bytes_with_nul(&proc_path).unwrap(),
             &mut out[..len - 1],
         );
@@ -377,6 +377,10 @@ impl Pal for Sys {
 
     fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
         e(unsafe { syscall!(SETREUID, ruid, euid) }) as c_int
+    }
+
+    fn symlink(path1: &CStr, path2: &CStr) -> c_int {
+        e(unsafe { syscall!(SYMLINKAT, path1.as_ptr(), AT_FDCWD, path2.as_ptr()) }) as c_int
     }
 
     fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {

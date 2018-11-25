@@ -445,7 +445,6 @@ pub extern "C" fn pwrite(
 
 #[no_mangle]
 pub extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
-    use core::slice;
     let buf = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte as usize) };
     trace_expr!(
         Sys::read(fildes, buf),
@@ -456,9 +455,11 @@ pub extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssiz
     )
 }
 
-// #[no_mangle]
-pub extern "C" fn readlink(path: *const c_char, buf: *mut c_char, bufsize: size_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn readlink(path: *const c_char, buf: *mut c_char, bufsize: size_t) -> ssize_t {
+    let path = unsafe { CStr::from_ptr(path) };
+    let buf = unsafe { slice::from_raw_parts_mut(buf as *mut u8, bufsize as usize) };
+    Sys::readlink(path, buf)
 }
 
 #[no_mangle]
@@ -518,9 +519,11 @@ pub extern "C" fn swab(src: *const c_void, dest: *mut c_void, nbytes: ssize_t) {
     unimplemented!();
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn symlink(path1: *const c_char, path2: *const c_char) -> c_int {
-    unimplemented!();
+    let path1 = unsafe { CStr::from_ptr(path1) };
+    let path2 = unsafe { CStr::from_ptr(path2) };
+    Sys::symlink(path1, path2)
 }
 
 // #[no_mangle]

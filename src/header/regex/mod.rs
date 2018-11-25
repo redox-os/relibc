@@ -50,6 +50,7 @@ pub const REG_ESPACE: c_int = 13;
 pub const REG_BADRPT: c_int = 14;
 
 #[no_mangle]
+#[linkage = "weak"] // redefined in GIT
 pub extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: c_int) -> c_int {
     if cflags & REG_EXTENDED == REG_EXTENDED {
         return REG_ENOSYS;
@@ -84,7 +85,9 @@ pub extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: c_int) 
         Err(_) => REG_BADPAT,
     }
 }
+
 #[no_mangle]
+#[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regfree(regex: *mut regex_t) {
     Vec::from_raw_parts(
         (*regex).ptr as *mut Vec<(Token, Range)>,
@@ -92,7 +95,9 @@ pub unsafe extern "C" fn regfree(regex: *mut regex_t) {
         (*regex).capacity,
     );
 }
+
 #[no_mangle]
+#[linkage = "weak"] // redefined in GIT
 pub extern "C" fn regexec(
     regex: *const regex_t,
     input: *const c_char,
@@ -143,6 +148,7 @@ pub extern "C" fn regexec(
 }
 
 #[no_mangle]
+#[linkage = "weak"] // redefined in GIT
 pub extern "C" fn regerror(code: c_int, _regex: *const regex_t, out: *mut c_char, max: c_int) {
     let string = match code {
         0 => "No error\0",
