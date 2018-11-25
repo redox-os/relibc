@@ -53,10 +53,10 @@ pub const AF_INET6: c_int = 10;
 pub const AF_UNIX: c_int = 1;
 pub const AF_UNSPEC: c_int = 0;
 
-pub const PF_INET: c_int = AF_INET;
-pub const PF_INET6: c_int = AF_INET6;
-pub const PF_UNIX: c_int = AF_UNIX;
-pub const PF_UNSPEC: c_int = AF_UNSPEC;
+pub const PF_INET: c_int = 2;
+pub const PF_INET6: c_int = 10;
+pub const PF_UNIX: c_int = 1;
+pub const PF_UNSPEC: c_int = 0;
 
 pub const SHUT_RD: c_int = 0;
 pub const SHUT_RDWR: c_int = 2;
