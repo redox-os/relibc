@@ -149,7 +149,7 @@ pub extern "C" fn regexec(
 
 #[no_mangle]
 #[linkage = "weak"] // redefined in GIT
-pub extern "C" fn regerror(code: c_int, _regex: *const regex_t, out: *mut c_char, max: c_int) {
+pub extern "C" fn regerror(code: c_int, _regex: *const regex_t, out: *mut c_char, max: size_t) {
     let string = match code {
         0 => "No error\0",
         REG_NOMATCH => "No match\0",

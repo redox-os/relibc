@@ -24,7 +24,7 @@ pub extern "C" fn mlockall(flags: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn mmap(
     addr: *mut c_void,
-    len: usize,
+    len: size_t,
     prot: c_int,
     flags: c_int,
     fildes: c_int,
@@ -54,7 +54,7 @@ pub extern "C" fn munlockall() -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn munmap(addr: *mut c_void, len: usize) -> c_int {
+pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
     Sys::munmap(addr, len)
 }
 
