@@ -855,7 +855,7 @@ pub unsafe extern "C" fn strtoull(
     s: *const c_char,
     endptr: *mut *mut c_char,
     base: c_int,
-) -> c_ulong {
+) -> c_ulonglong {
     strtoul(s, endptr, base)
 }
 
@@ -864,7 +864,7 @@ pub unsafe extern "C" fn strtoll(
     s: *const c_char,
     endptr: *mut *mut c_char,
     base: c_int,
-) -> c_long {
+) -> c_longlong {
     strtol(s, endptr, base)
 }
 
