@@ -1,19 +1,21 @@
 // Needs to be defined in assembly because it can't have a function prologue
+// rax is register, 119 is SIGRETURN
 #[cfg(target_arch = "x86_64")]
 global_asm!(
     "
     .global __restore_rt
     __restore_rt:
-        mov $119, %rax # <- rax is register, 119 is SIGRETURN
+        mov $119, %rax
         int $0x80
 "
 );
+// x8 is register, 119 is SIGRETURN
 #[cfg(target_arch = "aarch64")]
 global_asm!(
     "
     .global __restore_rt
     __restore_rt:
-        mov x8, #119 # <- x8 is register, 119 is SIGRETURN
+        mov x8, #119
         svc 0
 "
 );
