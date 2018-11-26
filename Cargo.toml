@@ -23,7 +23,7 @@ rand = { version = "0.5.5", default-features = false }
 va_list = { path = "va_list", features = ["no_std"] }
 
 [dependencies.compiler_builtins]
-version = "0.1.2"
+git = "https://github.com/rust-lang-nursery/compiler-builtins.git"
 default-features = false
 features = ["no-lang-items", "mangled-names"]
 
