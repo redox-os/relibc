@@ -16,7 +16,7 @@ pub unsafe extern "C" fn memccpy(
     dest: *mut c_void,
     src: *const c_void,
     c: c_int,
-    n: usize,
+    n: size_t,
 ) -> *mut c_void {
     let to = memchr(src, c, n);
     if to.is_null() {
@@ -30,7 +30,7 @@ pub unsafe extern "C" fn memccpy(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_void {
+pub unsafe extern "C" fn memchr(s: *const c_void, c: c_int, n: size_t) -> *mut c_void {
     let mut s = s as *const u8;
     let c = c as u8;
     let mut n = n;
@@ -72,7 +72,7 @@ pub unsafe extern "C" fn memchr(s: *const c_void, c: c_int, n: usize) -> *mut c_
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> c_int {
+pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t) -> c_int {
     let (div, rem) = (n / mem::size_of::<usize>(), n % mem::size_of::<usize>());
     let mut a = s1 as *const usize;
     let mut b = s2 as *const usize;
@@ -104,7 +104,7 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: usize) -> *mut c_void {
+pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -> *mut c_void {
     let mut i = 0;
     while i + 7 < n {
         *(s1.offset(i as isize) as *mut u64) = *(s2.offset(i as isize) as *const u64);
@@ -118,7 +118,7 @@ pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: usize) ->
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn memmove(s1: *mut c_void, s2: *const c_void, n: usize) -> *mut c_void {
+pub unsafe extern "C" fn memmove(s1: *mut c_void, s2: *const c_void, n: size_t) -> *mut c_void {
     if s2 < s1 as *const c_void {
         // copy from end
         let mut i = n;
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn memmove(s1: *mut c_void, s2: *const c_void, n: usize) -
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: usize) -> *mut c_void {
+pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_void {
     let mut i = 0;
     while i < n {
         *(s as *mut u8).offset(i as isize) = c as u8;
@@ -231,7 +231,7 @@ pub unsafe extern "C" fn strdup(s1: *const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strndup(s1: *const c_char, size: usize) -> *mut c_char {
+pub unsafe extern "C" fn strndup(s1: *const c_char, size: size_t) -> *mut c_char {
     let len = strnlen(s1, size);
 
     // the "+ 1" is to account for the NUL byte
@@ -272,7 +272,7 @@ pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strnlen(s: *const c_char, size: usize) -> size_t {
+pub unsafe extern "C" fn strnlen(s: *const c_char, size: size_t) -> size_t {
     let mut i = 0;
     while i < size {
         if *s.offset(i as isize) == 0 {
@@ -284,7 +284,7 @@ pub unsafe extern "C" fn strnlen(s: *const c_char, size: usize) -> size_t {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: usize) -> *mut c_char {
+pub unsafe extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: size_t) -> *mut c_char {
     let mut idx = strlen(s1 as *const _) as isize;
     for i in 0..n as isize {
         if *s2.offset(i) == 0 {
@@ -300,7 +300,7 @@ pub unsafe extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: usize) -
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> c_int {
+pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: size_t) -> c_int {
     let s1 = core::slice::from_raw_parts(s1 as *const c_uchar, n);
     let s2 = core::slice::from_raw_parts(s2 as *const c_uchar, n);
 
@@ -315,7 +315,7 @@ pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: usize)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strncpy(dst: *mut c_char, src: *const c_char, n: usize) -> *mut c_char {
+pub unsafe extern "C" fn strncpy(dst: *mut c_char, src: *const c_char, n: size_t) -> *mut c_char {
     let mut i = 0;
 
     while *src.offset(i) != 0 && (i as usize) < n {
@@ -446,7 +446,7 @@ pub extern "C" fn strtok_r(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strxfrm(s1: *mut c_char, s2: *const c_char, n: usize) -> size_t {
+pub unsafe extern "C" fn strxfrm(s1: *mut c_char, s2: *const c_char, n: size_t) -> size_t {
     // relibc has no locale stuff (yet)
     let len = strlen(s2);
     if len < n {
