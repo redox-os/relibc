@@ -695,7 +695,7 @@ impl Pal for Sys {
     fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
         e(syscall::open(
             path.to_bytes(),
-            (oflag as usize) | (mode as usize),
+            ((oflag as usize) << 16) | (mode as usize),
         )) as c_int
     }
 
