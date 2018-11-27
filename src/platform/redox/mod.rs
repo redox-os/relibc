@@ -7,7 +7,6 @@ use core::{mem, ptr, slice};
 use spin::{Mutex, MutexGuard, Once};
 use syscall::data::Stat as redox_stat;
 use syscall::data::TimeSpec as redox_timespec;
-use syscall::flag::*;
 use syscall::{self, Result};
 
 use c_str::{CStr, CString};
@@ -22,7 +21,7 @@ use header::sys_time::{timeval, timezone};
 use header::sys_utsname::{utsname, UTSLENGTH};
 use header::termios::termios;
 use header::time::timespec;
-use header::unistd::{F_OK, R_OK, SEEK_SET, W_OK, X_OK};
+use header::unistd::{F_OK, R_OK, W_OK, X_OK};
 use io::prelude::*;
 use io::{self, BufReader, SeekFrom};
 
@@ -113,24 +112,16 @@ impl Pal for Sys {
     }
 
     fn chmod(path: &CStr, mode: mode_t) -> c_int {
-        match syscall::open(path.to_bytes(), O_WRONLY | O_CLOEXEC) {
-            Err(err) => e(Err(err)) as c_int,
-            Ok(fd) => {
-                let res = syscall::fchmod(fd as usize, mode as u16);
-                let _ = syscall::close(fd);
-                e(res) as c_int
-            }
+        match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
+            Ok(file) => Self::fchmod(*file, mode),
+            Err(_) => -1,
         }
     }
 
     fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
-        match syscall::open(path.to_bytes(), O_WRONLY | O_CLOEXEC) {
-            Err(err) => e(Err(err)) as c_int,
-            Ok(fd) => {
-                let res = syscall::fchown(fd as usize, owner as u32, group as u32);
-                let _ = syscall::close(fd);
-                e(res) as c_int
-            }
+        match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
+            Ok(file) => Self::fchown(*file, owner, group),
+            Err(_) => -1,
         }
     }
 
@@ -402,13 +393,9 @@ impl Pal for Sys {
     }
 
     fn utimens(path: &CStr, times: *const timespec) -> c_int {
-        match syscall::open(path.to_bytes(), O_STAT | O_CLOEXEC) {
-            Err(err) => e(Err(err)) as c_int,
-            Ok(fd) => {
-                let res = Self::futimens(fd as c_int, times);
-                let _ = syscall::close(fd);
-                res
-            }
+        match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
+            Ok(file) => Self::futimens(*file, times),
+            Err(_) => -1,
         }
     }
 
@@ -427,7 +414,7 @@ impl Pal for Sys {
 
     fn getdents(fd: c_int, mut dirents: *mut dirent, max_bytes: usize) -> c_int {
         // Get initial reading position
-        let mut read = match syscall::lseek(fd as usize, 0, SEEK_CUR) {
+        let mut read = match syscall::lseek(fd as usize, 0, syscall::SEEK_CUR) {
             Ok(pos) => pos as isize,
             Err(err) => return -err.errno,
         };
@@ -447,7 +434,7 @@ impl Pal for Sys {
             let size = mem::size_of::<dirent>() - name.len().saturating_sub(*i + 1);
             if *written + size > max_bytes {
                 // Seek back to after last read entry and return
-                match syscall::lseek(fd as usize, read, SEEK_SET as usize) {
+                match syscall::lseek(fd as usize, read, syscall::SEEK_SET) {
                     Ok(_) => return Some(*written as c_int),
                     Err(err) => return Some(-err.errno),
                 }
@@ -612,24 +599,16 @@ impl Pal for Sys {
     }
 
     fn mkdir(path: &CStr, mode: mode_t) -> c_int {
-        let flags = O_CREAT | O_EXCL | O_CLOEXEC | O_DIRECTORY | mode as usize & 0o777;
-        match syscall::open(path.to_bytes(), flags) {
-            Ok(fd) => {
-                let _ = syscall::close(fd);
-                0
-            }
-            Err(err) => e(Err(err)) as c_int,
+        match File::create(path, fcntl::O_DIRECTORY | fcntl::O_EXCL | fcntl::O_CLOEXEC, 0o777) {
+            Ok(_fd) => 0,
+            Err(_) => -1,
         }
     }
 
     fn mkfifo(path: &CStr, mode: mode_t) -> c_int {
-        let flags = O_CREAT | O_CLOEXEC | MODE_FIFO as usize | mode as usize & 0o777;
-        match syscall::open(path.to_bytes(), flags) {
-            Ok(fd) => {
-                let _ = syscall::close(fd);
-                0
-            }
-            Err(err) => e(Err(err)) as c_int,
+        match File::create(path, fcntl::O_CREAT | fcntl::O_CLOEXEC, syscall::MODE_FIFO as mode_t | (mode & 0o777)) {
+            Ok(fd) => 0,
+            Err(_) => -1,
         }
     }
 
@@ -642,7 +621,7 @@ impl Pal for Sys {
         off: off_t,
     ) -> *mut c_void {
         if flags & MAP_ANON == MAP_ANON {
-            let fd = e(syscall::open("memory:", O_STAT | O_CLOEXEC)); // flags don't matter currently
+            let fd = e(syscall::open("memory:", syscall::O_STAT | syscall::O_CLOEXEC)); // flags don't matter currently
             if fd == !0 {
                 return !0 as *mut c_void;
             }
@@ -695,7 +674,7 @@ impl Pal for Sys {
     fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
         e(syscall::open(
             path.to_bytes(),
-            ((oflag as usize) << 16) | (mode as usize),
+            ((oflag as usize) << 16) | ((mode as usize) & 0xFFFF),
         )) as c_int
     }
 
@@ -836,8 +815,8 @@ impl Pal for Sys {
     }
 
     fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t {
-        let file = match File::open(pathname, fcntl::O_PATH | fcntl::O_SYMLINK) {
-            Ok(fd) => fd,
+        let file = match File::open(pathname, fcntl::O_PATH | fcntl::O_SYMLINK | fcntl::O_CLOEXEC) {
+            Ok(ok) => ok,
             Err(_) => return -1,
         };
 
@@ -856,8 +835,8 @@ impl Pal for Sys {
     }
 
     fn realpath(pathname: &CStr, out: &mut [u8]) -> c_int {
-        let file = match File::open(pathname, fcntl::O_PATH) {
-            Ok(fd) => fd,
+        let file = match File::open(pathname, fcntl::O_PATH | fcntl::O_CLOEXEC) {
+            Ok(ok) => ok,
             Err(_) => return -1,
         };
 
@@ -876,13 +855,9 @@ impl Pal for Sys {
     }
 
     fn rename(oldpath: &CStr, newpath: &CStr) -> c_int {
-        match syscall::open(oldpath.to_bytes(), O_WRONLY | O_CLOEXEC) {
-            Ok(fd) => {
-                let retval = syscall::frename(fd, newpath.to_bytes());
-                let _ = syscall::close(fd);
-                e(retval) as c_int
-            }
-            err => e(err) as c_int,
+        match File::open(oldpath, fcntl::O_WRONLY | fcntl::O_CLOEXEC) {
+            Ok(file) => e(syscall::frename(*file as usize, newpath.to_bytes())) as c_int,
+            Err(_) => -1,
         }
     }
 
@@ -1040,11 +1015,12 @@ impl Pal for Sys {
     }
 
     fn symlink(path1: &CStr, path2: &CStr) -> c_int {
-        let mut file = match File::open(
+        let mut file = match File::create(
             path2,
-            fcntl::O_CREAT | fcntl::O_WRONLY | fcntl::O_SYMLINK | 0o777,
+            fcntl::O_WRONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
+            0o777,
         ) {
-            Ok(fd) => fd,
+            Ok(ok) => ok,
             Err(_) => return -1,
         };
 
@@ -1095,9 +1071,9 @@ impl Pal for Sys {
 
     fn uname(utsname: *mut utsname) -> c_int {
         fn inner(utsname: *mut utsname) -> CoreResult<(), i32> {
-            let file_path = c_str!("sys:uname\0");
+            let file_path = c_str!("sys:uname");
             let mut file = match File::open(file_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
-                Ok(file) => file,
+                Ok(ok) => ok,
                 Err(_) => return Err(EIO),
             };
             let mut lines = BufReader::new(&mut file).lines();
