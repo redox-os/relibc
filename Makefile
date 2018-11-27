@@ -13,6 +13,10 @@ ifeq ($(TARGET),aarch64-unknown-linux-gnu)
 	export CC=aarch64-linux-gnu-gcc
 endif
 
+ifeq ($(TARGET),aarch64-unknown-redox)
+	export CC=aarch64-unknown-redox-gcc
+endif
+
 ifeq ($(TARGET),x86_64-unknown-redox)
 	export CC=x86_64-unknown-redox-gcc
 endif
