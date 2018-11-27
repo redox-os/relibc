@@ -7,7 +7,7 @@ int main(int argc, char** argv) {
     perror("sleep");
     usleep(1000);
     perror("usleep");
-    timespec tm = {0, 10000};
+    struct timespec tm = {0, 10000};
     nanosleep(&tm, NULL);
     perror("nanosleep");
     return 0;

@@ -14,6 +14,6 @@ int main() {
         printf("release: '%s'\n", system_info.release);
         printf("version: '%s'\n", system_info.version);
         printf("machine: '%s'\n", system_info.machine);
-        printf("domainname: '%s'\n", system_info.domainname);
+        //printf("domainname: '%s'\n", system_info.domainname);
     }
 }

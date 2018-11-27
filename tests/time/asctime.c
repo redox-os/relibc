@@ -5,7 +5,7 @@
 
 int main(int argc, char** argv) {
     time_t a = 0;
-    tm *time_info = gmtime(&a);
+    struct tm *time_info = gmtime(&a);
 
     char *time_string = asctime(time_info);
 

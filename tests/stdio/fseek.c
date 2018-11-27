@@ -8,5 +8,5 @@ int main() {
     }
     char buffer[256];
     printf("%s", fgets(buffer, 256, f));
-    printf("ftell: %d\n", ftello(f));
+    printf("ftell: %ld\n", ftello(f));
 }

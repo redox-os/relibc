@@ -6,3 +6,6 @@ style = "Tag"
 
 [enum]
 prefix_with_name = true
+
+[export.rename]
+"timespec" = "struct timespec"
