@@ -563,10 +563,10 @@ pub unsafe extern "C" fn funlockfile(file: *mut FILE) {
 #[no_mangle]
 pub extern "C" fn fwrite(
     ptr: *const c_void,
-    size: usize,
-    count: usize,
+    size: size_t,
+    count: size_t,
     stream: *mut FILE,
-) -> usize {
+) -> size_t {
     let mut stream = unsafe { &mut *stream }.lock();
     let buf = unsafe { slice::from_raw_parts_mut(ptr as *mut u8, size as usize * count as usize) };
     let mut written = 0;
@@ -929,7 +929,7 @@ pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn vsnprintf(
     s: *mut c_char,
-    n: usize,
+    n: size_t,
     format: *const c_char,
     ap: va_list,
 ) -> c_int {
