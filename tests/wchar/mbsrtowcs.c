@@ -1,6 +1,7 @@
 #include <stdio.h>
+#include <string.h>
 #include <wchar.h>
- 
+
 void print_as_wide(const char* mbstr)
 {
     mbstate_t state;
@@ -10,12 +11,12 @@ void print_as_wide(const char* mbstr)
     mbsrtowcs(&wstr[0], &mbstr, len, &state);
 
     //Should be 5
-    printf("The length, including '\\0': %i \n",len);
+    printf("The length, including '\\0': %li \n",len);
 
     //missing wprintf to print this wide string
     //wprintf(L"The wide string: %ls \n", &wstr[0]);
 }
- 
+
 int main()
 {
     const char* mbstr = u8"z\u00df\u6c34\U0001f34c"; // or u8"zß水🍌"

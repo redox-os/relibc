@@ -1,9 +1,6 @@
 include_guard = "_SYS_IOCTL_H"
 language = "C"
-
-# WORKAROUND:
-# sgtty is used by another header, and cbindgen doesn't prefix that with `struct` :|
-style = "Both"
+style = "Tag"
 
 [defines]
 "target_os=linux" = "__linux__"

@@ -32,7 +32,7 @@ int main()
             perror("pipe write");
             return 1;
         } else if (bytes != strlen(outstring)) {
-            fprintf(stderr, "pipe write: %d != %d\n", bytes, strlen(outstring));
+            fprintf(stderr, "pipe write: %d != %ld\n", bytes, strlen(outstring));
             return 1;
         }
 
@@ -57,7 +57,7 @@ int main()
             perror("pipe read");
             return 1;
         } else if (bytes != strlen(outstring)) {
-            fprintf(stderr, "pipe read: %d != %d\n", bytes, strlen(outstring));
+            fprintf(stderr, "pipe read: %d != %ld\n", bytes, strlen(outstring));
             return 1;
         } else if (memcmp(instring, outstring, sizeof(outstring)) != 0) {
             fprintf(stderr, "pipe read does not match pipe write\n");

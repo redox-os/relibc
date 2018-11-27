@@ -8,5 +8,7 @@ prefix_with_name = true
 
 [export]
 # fd_set is also defined in C because cbindgen is incompatible with mem::size_of booo
-
 exclude = ["FD_SETSIZE", "fd_set"]
+
+[export.rename]
+"timeval" = "struct timeval"

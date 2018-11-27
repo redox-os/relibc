@@ -1,7 +1,7 @@
 sys_includes = ["sys/types.h", "sys/socket.h"]
 include_guard = "_NETINET_IN_H"
-style = "Both"
 language = "C"
+style = "Tag"
 
 [export]
 include = ["sockaddr_in6", "sockaddr_in", "ipv6_mreq"]

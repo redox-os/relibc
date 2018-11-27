@@ -1,7 +1,7 @@
 sys_includes = ["stddef.h", "stdint.h", "sys/types.h"]
 include_guard = "_SYS_SOCKET_H"
-style = "Both"
 language = "C"
+style = "Tag"
 
 [defines]
 "target_os=linux" = "__linux__"

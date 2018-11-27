@@ -2,10 +2,10 @@ sys_includes = ["sys/types.h", "stdint.h", "sys/time.h"]
 include_guard = "_SYS_RESOURCE_H"
 trailer = "#include <bits/sys/resource.h>"
 language = "C"
-
-# WORKAROUND:
-# Rusage is used by another header, and cbindgen does not prefix that usage with `struct` :|
-style = "Both"
+style = "Tag"
 
 [enum]
 prefix_with_name = true
+
+[export.rename]
+"timeval" = "struct timeval"
