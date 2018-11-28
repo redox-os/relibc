@@ -54,7 +54,12 @@ pub extern "C" fn ispunct(c: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn isspace(c: c_int) -> c_int {
-    (c == 0x20) as c_int
+    (c == ' ' as c_int
+        || c == '\t' as c_int
+        || c == '\n' as c_int
+        || c == '\r' as c_int
+        || c == 0x0b
+        || c == 0x0c) as c_int
 }
 
 #[no_mangle]
