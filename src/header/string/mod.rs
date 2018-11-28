@@ -355,10 +355,8 @@ pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strsignal(sig: c_int) -> *mut c_char {
-    // Mutating this is undefined behavior I believe. But I just can't create a
-    // &'static mut str. Alternative is allocating everything on the heap...
-    signal::_signal_strings[sig as usize].as_ptr() as *const c_char as *mut c_char
+pub unsafe extern "C" fn strsignal(sig: c_int) -> *const c_char {
+    signal::_signal_strings[sig as usize].as_ptr() as *const c_char
 }
 
 #[no_mangle]
