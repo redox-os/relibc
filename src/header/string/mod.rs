@@ -148,11 +148,6 @@ pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_v
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
-    strncat(s1, s2, usize::MAX)
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn strchr(mut s: *const c_char, c: c_int) -> *mut c_char {
     let c = c as c_char;
     while *s != 0 {
@@ -284,17 +279,24 @@ pub unsafe extern "C" fn strnlen(s: *const c_char, size: size_t) -> size_t {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
+    strncat(s1, s2, usize::MAX)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: size_t) -> *mut c_char {
-    let mut idx = strlen(s1 as *const _) as isize;
-    for i in 0..n as isize {
-        if *s2.offset(i) == 0 {
+    let len = strlen(s1 as *const c_char);
+    let mut i = 0;
+    while i < n {
+        let b = *s2.offset(i as isize);
+        if b == 0 {
             break;
         }
 
-        *s1.offset(idx) = *s2.offset(i);
-        idx += 1;
+        *s1.offset((len + i) as isize) = b;
+        i += 1;
     }
-    *s1.offset(idx) = 0;
+    *s1.offset((len + i) as isize) = 0;
 
     s1
 }

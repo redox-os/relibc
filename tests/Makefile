@@ -46,6 +46,7 @@ EXPECT_BINS=\
 	stdlib/strtoul \
 	stdlib/system \
 	string/mem \
+	string/strcat \
 	string/strchr \
 	string/strcpy \
 	string/strcspn \
