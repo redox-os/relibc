@@ -521,7 +521,7 @@ pub extern "C" fn ptsname(fildes: c_int) -> *mut c_char {
 pub unsafe extern "C" fn putenv(insert: *mut c_char) -> c_int {
     assert_ne!(insert, ptr::null_mut(), "putenv(NULL)");
     if let Some((i, _)) = find_env(insert) {
-        platform::free(platform::inner_environ[i] as *mut c_void);
+        //TODO: find out why this crashes: platform::free(platform::inner_environ[i] as *mut c_void);
         platform::inner_environ[i] = insert;
     } else {
         let i = platform::inner_environ.len() - 1;
