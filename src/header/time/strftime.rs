@@ -43,7 +43,7 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
                 }
             }};
         }
-        const WDAYS: [&'static str; 7] = [
+        const WDAYS: [&str; 7] = [
             "Sunday",
             "Monday",
             "Tuesday",
@@ -52,7 +52,7 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
             "Friday",
             "Saturday",
         ];
-        const MONTHS: [&'static str; 12] = [
+        const MONTHS: [&str; 12] = [
             "January",
             "Febuary",
             "March",

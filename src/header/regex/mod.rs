@@ -51,18 +51,18 @@ pub const REG_BADRPT: c_int = 14;
 
 #[no_mangle]
 #[linkage = "weak"] // redefined in GIT
-pub extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: c_int) -> c_int {
+pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: c_int) -> c_int {
     if cflags & REG_EXTENDED == REG_EXTENDED {
         return REG_ENOSYS;
     }
 
-    let pat = unsafe { slice::from_raw_parts(pat as *const u8, strlen(pat)) };
+    let pat = slice::from_raw_parts(pat as *const u8, strlen(pat));
     let res = PosixRegexBuilder::new(pat)
         .with_default_classes()
         .compile_tokens();
 
     match res {
-        Ok(mut branches) => unsafe {
+        Ok(mut branches) => {
             let re_nsub = PosixRegex::new(Cow::Borrowed(&branches)).count_groups();
             *out = regex_t {
                 ptr: branches.as_mut_ptr() as *mut c_void,
@@ -98,7 +98,7 @@ pub unsafe extern "C" fn regfree(regex: *mut regex_t) {
 
 #[no_mangle]
 #[linkage = "weak"] // redefined in GIT
-pub extern "C" fn regexec(
+pub unsafe extern "C" fn regexec(
     regex: *const regex_t,
     input: *const c_char,
     nmatch: size_t,
@@ -109,15 +109,14 @@ pub extern "C" fn regexec(
         return REG_ENOSYS;
     }
 
-    let regex = unsafe { &(*regex) };
+    let regex = &*regex;
 
     // Allow specifying a compiler argument to the executor and vise versa
     // because why not?
     let flags = regex.cflags | eflags;
 
-    let input = unsafe { slice::from_raw_parts(input as *const u8, strlen(input)) };
-    let branches =
-        unsafe { slice::from_raw_parts(regex.ptr as *const Vec<(Token, Range)>, regex.length) };
+    let input = slice::from_raw_parts(input as *const u8, strlen(input));
+    let branches = slice::from_raw_parts(regex.ptr as *const Vec<(Token, Range)>, regex.length);
 
     let matches = PosixRegex::new(Cow::Borrowed(&branches))
         .case_insensitive(flags & REG_ICASE == REG_ICASE)
@@ -129,14 +128,12 @@ pub extern "C" fn regexec(
     if !matches.is_empty() && eflags & REG_NOSUB != REG_NOSUB && !pmatch.is_null() && nmatch > 0 {
         let first = &matches[0];
 
-        for i in 0..nmatch as usize {
+        for i in 0..nmatch {
             let (start, end) = first.get(i).and_then(|&range| range).unwrap_or((!0, !0));
-            unsafe {
-                *pmatch.offset(i as isize) = regmatch_t {
-                    rm_so: start,
-                    rm_eo: end,
-                };
-            }
+            *pmatch.add(i) = regmatch_t {
+                rm_so: start,
+                rm_eo: end,
+            };
         }
     }
 

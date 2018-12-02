@@ -36,8 +36,8 @@ pub struct dirent {
 }
 
 #[no_mangle]
-pub extern "C" fn opendir(path: *const c_char) -> *mut DIR {
-    let path = unsafe { CStr::from_ptr(path) };
+pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
+    let path = CStr::from_ptr(path);
     let file = match File::open(
         path,
         fcntl::O_RDONLY | fcntl::O_DIRECTORY | fcntl::O_CLOEXEC,
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn readdir(dir: *mut DIR) -> *mut dirent {
         (*dir).len = read as usize;
     }
 
-    let ptr = (*dir).buf.as_mut_ptr().offset((*dir).index as isize) as *mut dirent;
+    let ptr = (*dir).buf.as_mut_ptr().add((*dir).index) as *mut dirent;
 
     (*dir).offset = (*ptr).d_off as usize;
     (*dir).index += (*ptr).d_reclen as usize;

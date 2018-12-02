@@ -26,7 +26,7 @@ pub unsafe extern "C" fn memccpy(
     if memcpy(dest, src, dist).is_null() {
         return ptr::null_mut();
     }
-    (dest as *mut u8).offset(dist as isize + 1) as *mut c_void
+    (dest as *mut u8).add(dist + 1) as *mut c_void
 }
 
 #[no_mangle]
@@ -79,8 +79,8 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t)
     for _ in 0..div {
         if *a != *b {
             for i in 0..mem::size_of::<usize>() {
-                let c = *(a as *const u8).offset(i as isize);
-                let d = *(b as *const u8).offset(i as isize);
+                let c = *(a as *const u8).add(i);
+                let d = *(b as *const u8).add(i);
                 if c != d {
                     return c as c_int - d as c_int;
                 }
@@ -107,11 +107,11 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t)
 pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -> *mut c_void {
     let mut i = 0;
     while i + 7 < n {
-        *(s1.offset(i as isize) as *mut u64) = *(s2.offset(i as isize) as *const u64);
+        *(s1.add(i) as *mut u64) = *(s2.add(i) as *const u64);
         i += 8;
     }
     while i < n {
-        *(s1 as *mut u8).offset(i as isize) = *(s2 as *const u8).offset(i as isize);
+        *(s1 as *mut u8).add(i) = *(s2 as *const u8).add(i);
         i += 1;
     }
     s1
@@ -124,13 +124,13 @@ pub unsafe extern "C" fn memmove(s1: *mut c_void, s2: *const c_void, n: size_t) 
         let mut i = n;
         while i != 0 {
             i -= 1;
-            *(s1 as *mut u8).offset(i as isize) = *(s2 as *const u8).offset(i as isize);
+            *(s1 as *mut u8).add(i) = *(s2 as *const u8).add(i);
         }
     } else {
         // copy from beginning
         let mut i = 0;
         while i < n {
-            *(s1 as *mut u8).offset(i as isize) = *(s2 as *const u8).offset(i as isize);
+            *(s1 as *mut u8).add(i) = *(s2 as *const u8).add(i);
             i += 1;
         }
     }
@@ -141,7 +141,7 @@ pub unsafe extern "C" fn memmove(s1: *mut c_void, s2: *const c_void, n: size_t) 
 pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_void {
     let mut i = 0;
     while i < n {
-        *(s as *mut u8).offset(i as isize) = c as u8;
+        *(s as *mut u8).add(i) = c as u8;
         i += 1;
     }
     s
@@ -235,10 +235,12 @@ pub unsafe extern "C" fn strndup(s1: *const c_char, size: size_t) -> *mut c_char
         platform::errno = ENOMEM as c_int;
     } else {
         //memcpy(buffer, s1, len)
-        for i in 0..len as isize {
-            *buffer.offset(i) = *s1.offset(i);
+        let mut i = 0;
+        while i < len {
+            *buffer.add(i) = *s1.add(i);
+            i += 1;
         }
-        *buffer.offset(len as isize) = 0;
+        *buffer.add(len) = 0;
     }
 
     buffer
@@ -270,7 +272,7 @@ pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
 pub unsafe extern "C" fn strnlen(s: *const c_char, size: size_t) -> size_t {
     let mut i = 0;
     while i < size {
-        if *s.offset(i as isize) == 0 {
+        if *s.add(i) == 0 {
             break;
         }
         i += 1;
@@ -288,15 +290,15 @@ pub unsafe extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: size_t) 
     let len = strlen(s1 as *const c_char);
     let mut i = 0;
     while i < n {
-        let b = *s2.offset(i as isize);
+        let b = *s2.add(i);
         if b == 0 {
             break;
         }
 
-        *s1.offset((len + i) as isize) = b;
+        *s1.add(len + i) = b;
         i += 1;
     }
-    *s1.offset((len + i) as isize) = 0;
+    *s1.add(len + i) = 0;
 
     s1
 }
@@ -334,7 +336,7 @@ pub unsafe extern "C" fn strncpy(dst: *mut c_char, src: *const c_char, n: size_t
 
 #[no_mangle]
 pub unsafe extern "C" fn strpbrk(s1: *const c_char, s2: *const c_char) -> *mut c_char {
-    let p = s1.offset(strcspn(s1, s2) as isize);
+    let p = s1.add(strcspn(s1, s2));
     if *p != 0 {
         p as *mut c_char
     } else {
@@ -400,49 +402,45 @@ pub unsafe extern "C" fn strcasestr(haystack: *const c_char, needle: *const c_ch
 }
 
 #[no_mangle]
-pub extern "C" fn strtok(s1: *mut c_char, delimiter: *const c_char) -> *mut c_char {
+pub unsafe extern "C" fn strtok(s1: *mut c_char, delimiter: *const c_char) -> *mut c_char {
     static mut HAYSTACK: *mut c_char = ptr::null_mut();
-    unsafe {
-        return strtok_r(s1, delimiter, &mut HAYSTACK);
-    }
+    strtok_r(s1, delimiter, &mut HAYSTACK)
 }
 
 #[no_mangle]
-pub extern "C" fn strtok_r(
+pub unsafe extern "C" fn strtok_r(
     s: *mut c_char,
     delimiter: *const c_char,
     lasts: *mut *mut c_char,
 ) -> *mut c_char {
     // Loosely based on GLIBC implementation
-    unsafe {
-        let mut haystack = s;
-        if haystack.is_null() {
-            if (*lasts).is_null() {
-                return ptr::null_mut();
-            }
-            haystack = *lasts;
-        }
-
-        // Skip past any extra delimiter left over from previous call
-        haystack = haystack.add(strspn(haystack, delimiter));
-        if *haystack == 0 {
-            *lasts = ptr::null_mut();
+    let mut haystack = s;
+    if haystack.is_null() {
+        if (*lasts).is_null() {
             return ptr::null_mut();
         }
-
-        // Build token by injecting null byte into delimiter
-        let token = haystack;
-        haystack = strpbrk(token, delimiter);
-        if !haystack.is_null() {
-            haystack.write(0);
-            haystack = haystack.add(1);
-            *lasts = haystack;
-        } else {
-            *lasts = ptr::null_mut();
-        }
-
-        return token;
+        haystack = *lasts;
     }
+
+    // Skip past any extra delimiter left over from previous call
+    haystack = haystack.add(strspn(haystack, delimiter));
+    if *haystack == 0 {
+        *lasts = ptr::null_mut();
+        return ptr::null_mut();
+    }
+
+    // Build token by injecting null byte into delimiter
+    let token = haystack;
+    haystack = strpbrk(token, delimiter);
+    if !haystack.is_null() {
+        haystack.write(0);
+        haystack = haystack.add(1);
+        *lasts = haystack;
+    } else {
+        *lasts = ptr::null_mut();
+    }
+
+    token
 }
 
 #[no_mangle]

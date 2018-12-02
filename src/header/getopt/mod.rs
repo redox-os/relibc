@@ -47,7 +47,7 @@ pub unsafe extern "C" fn getopt_long(
                 || *current_arg.offset(1) == 0
             {
                 -1
-            } else if string::strcmp(current_arg, b"--\0".as_ptr() as _) == 0 {
+            } else if string::strcmp(current_arg, c_str!("--").as_ptr()) == 0 {
                 optind += 1;
                 -1
             } else {
@@ -85,22 +85,20 @@ pub unsafe extern "C" fn getopt_long(
                                 } else if optind < argc {
                                     optarg = *argv.offset(optind as isize);
                                     optind += 1;
+                                } else if *optstring == b':' as c_char {
+                                    return b':' as c_int;
                                 } else {
-                                    if *optstring == b':' as c_char {
-                                        return b':' as c_int;
-                                    } else {
-                                        stdio::fputs(*argv as _, &mut *stdio::stderr);
-                                        stdio::fputs(
-                                            ": option '--\0".as_ptr() as _,
-                                            &mut *stdio::stderr,
-                                        );
-                                        stdio::fputs(current_arg, &mut *stdio::stderr);
-                                        stdio::fputs(
-                                            "' requires an argument\n\0".as_ptr() as _,
-                                            &mut *stdio::stderr,
-                                        );
-                                        return b'?' as c_int;
-                                    }
+                                    stdio::fputs(*argv as _, &mut *stdio::stderr);
+                                    stdio::fputs(
+                                        ": option '--\0".as_ptr() as _,
+                                        &mut *stdio::stderr,
+                                    );
+                                    stdio::fputs(current_arg, &mut *stdio::stderr);
+                                    stdio::fputs(
+                                        "' requires an argument\n\0".as_ptr() as _,
+                                        &mut *stdio::stderr,
+                                    );
+                                    return b'?' as c_int;
                                 }
                             }
 

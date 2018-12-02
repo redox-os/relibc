@@ -6,33 +6,33 @@ use header::time::timespec;
 use platform::types::*;
 use platform::{Pal, Sys};
 
-pub const S_IFMT: c_int = 0o0170000;
+pub const S_IFMT: c_int = 0o0_170_000;
 
-pub const S_IFDIR: c_int = 0o040000;
-pub const S_IFCHR: c_int = 0o020000;
-pub const S_IFBLK: c_int = 0o060000;
-pub const S_IFREG: c_int = 0o100000;
-pub const S_IFIFO: c_int = 0o010000;
-pub const S_IFLNK: c_int = 0o120000;
-pub const S_IFSOCK: c_int = 0o140000;
+pub const S_IFDIR: c_int = 0o040_000;
+pub const S_IFCHR: c_int = 0o020_000;
+pub const S_IFBLK: c_int = 0o060_000;
+pub const S_IFREG: c_int = 0o100_000;
+pub const S_IFIFO: c_int = 0o010_000;
+pub const S_IFLNK: c_int = 0o120_000;
+pub const S_IFSOCK: c_int = 0o140_000;
 
-pub const S_IRWXU: c_int = 0o0700;
-pub const S_IRUSR: c_int = 0o0400;
-pub const S_IWUSR: c_int = 0o0200;
-pub const S_IXUSR: c_int = 0o0100;
+pub const S_IRWXU: c_int = 0o0_700;
+pub const S_IRUSR: c_int = 0o0_400;
+pub const S_IWUSR: c_int = 0o0_200;
+pub const S_IXUSR: c_int = 0o0_100;
 
-pub const S_IRWXG: c_int = 0o0070;
-pub const S_IRGRP: c_int = 0o0040;
-pub const S_IWGRP: c_int = 0o0020;
-pub const S_IXGRP: c_int = 0o0010;
+pub const S_IRWXG: c_int = 0o0_070;
+pub const S_IRGRP: c_int = 0o0_040;
+pub const S_IWGRP: c_int = 0o0_020;
+pub const S_IXGRP: c_int = 0o0_010;
 
-pub const S_IRWXO: c_int = 0o0007;
-pub const S_IROTH: c_int = 0o0004;
-pub const S_IWOTH: c_int = 0o0002;
-pub const S_IXOTH: c_int = 0o0001;
-pub const S_ISUID: c_int = 0o4000;
-pub const S_ISGID: c_int = 0o2000;
-pub const S_ISVTX: c_int = 0o1000;
+pub const S_IRWXO: c_int = 0o0_007;
+pub const S_IROTH: c_int = 0o0_004;
+pub const S_IWOTH: c_int = 0o0_002;
+pub const S_IXOTH: c_int = 0o0_001;
+pub const S_ISUID: c_int = 0o4_000;
+pub const S_ISGID: c_int = 0o2_000;
+pub const S_ISVTX: c_int = 0o1_000;
 
 #[repr(C)]
 #[derive(Default)]
@@ -59,8 +59,8 @@ pub struct stat {
 }
 
 #[no_mangle]
-pub extern "C" fn chmod(path: *const c_char, mode: mode_t) -> c_int {
-    let path = unsafe { CStr::from_ptr(path) };
+pub unsafe extern "C" fn chmod(path: *const c_char, mode: mode_t) -> c_int {
+    let path = CStr::from_ptr(path);
     Sys::chmod(path, mode)
 }
 
@@ -85,8 +85,8 @@ pub extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
-    let path = unsafe { CStr::from_ptr(path) };
+pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
+    let path = CStr::from_ptr(path);
     let fd = Sys::open(path, O_PATH | O_NOFOLLOW, 0);
     if fd < 0 {
         return -1;
@@ -100,14 +100,14 @@ pub extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
-    let path = unsafe { CStr::from_ptr(path) };
+pub unsafe extern "C" fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
+    let path = CStr::from_ptr(path);
     Sys::mkdir(path, mode)
 }
 
 #[no_mangle]
-pub extern "C" fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
-    let path = unsafe { CStr::from_ptr(path) };
+pub unsafe extern "C" fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
+    let path = CStr::from_ptr(path);
     Sys::mkfifo(path, mode)
 }
 
@@ -117,8 +117,8 @@ pub extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int 
 }
 
 #[no_mangle]
-pub extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
-    let file = unsafe { CStr::from_ptr(file) };
+pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
+    let file = CStr::from_ptr(file);
     let fd = Sys::open(file, O_PATH, 0);
     if fd < 0 {
         return -1;

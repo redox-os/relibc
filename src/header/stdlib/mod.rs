@@ -23,7 +23,7 @@ mod sort;
 
 pub const EXIT_FAILURE: c_int = 1;
 pub const EXIT_SUCCESS: c_int = 0;
-pub const RAND_MAX: c_int = 2147483647;
+pub const RAND_MAX: c_int = 2_147_483_647;
 
 //Maximum number of bytes in a multibyte character for the current locale
 pub const MB_CUR_MAX: c_int = 4;
@@ -57,7 +57,7 @@ pub unsafe extern "C" fn a64l(s: *const c_char) -> c_long {
         bits <<= 6 * x;
         l |= bits;
     }
-    return l;
+    l
 }
 
 #[no_mangle]
@@ -145,7 +145,7 @@ pub extern "C" fn atol(s: *const c_char) -> c_long {
 }
 
 unsafe extern "C" fn void_cmp(a: *const c_void, b: *const c_void) -> c_int {
-    return *(a as *const i32) - *(b as *const i32) as c_int;
+    *(a as *const i32) - *(b as *const i32) as c_int
 }
 
 #[no_mangle]
@@ -267,7 +267,7 @@ pub extern "C" fn gcvt(value: c_double, ndigit: c_int, buf: *mut c_char) -> *mut
 unsafe fn find_env(search: *const c_char) -> Option<(usize, *mut c_char)> {
     for (i, item) in platform::inner_environ.iter().enumerate() {
         let mut item = *item;
-        if item == ptr::null_mut() {
+        if item.is_null() {
             assert_eq!(
                 i,
                 platform::inner_environ.len() - 1,
@@ -449,21 +449,18 @@ where
 }
 
 #[no_mangle]
-pub extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
-    if inner_mktemp(name, 0, || unsafe {
+pub unsafe extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
+    if inner_mktemp(name, 0, || {
         let name = CStr::from_ptr(name);
-        let ret = if Sys::access(name, 0) != 0 && platform::errno == ENOENT {
+        if Sys::access(name, 0) != 0 && platform::errno == ENOENT {
             Some(())
         } else {
             None
-        };
-        ret
+        }
     })
     .is_none()
     {
-        unsafe {
-            *name = 0;
-        }
+        *name = 0;
     }
     name
 }
@@ -481,7 +478,7 @@ pub extern "C" fn mkostemps(name: *mut c_char, suffix_len: c_int, mut flags: c_i
 
     inner_mktemp(name, suffix_len, || {
         let name = unsafe { CStr::from_ptr(name) };
-        let fd = Sys::open(name, flags, 0600);
+        let fd = Sys::open(name, flags, 0o600);
 
         if fd >= 0 {
             Some(fd)
@@ -720,12 +717,12 @@ pub fn is_positive(ch: c_char) -> Option<(bool, isize)> {
     }
 }
 
-pub fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
-    let first = unsafe { *s } as u8;
+pub unsafe fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
+    let first = *s as u8;
     match first {
         0 => None,
         b'0' => {
-            let second = unsafe { *s.offset(1) } as u8;
+            let second = *s.offset(1) as u8;
             if second == b'X' || second == b'x' {
                 Some((16, 2))
             } else if second >= b'0' && second <= b'7' {
@@ -762,7 +759,7 @@ pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
     }
 }
 
-pub fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, bool)> {
+pub unsafe fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, bool)> {
     // -1 means the character is invalid
     #[cfg_attr(rustfmt, rustfmt_skip)]
     const LOOKUP_TABLE: [c_long; 256] = [
@@ -792,7 +789,7 @@ pub fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize,
         // `-1 as usize` is usize::MAX
         // `-1 as u8 as usize` is u8::MAX
         // It extends by the sign bit unless we cast it to unsigned first.
-        let val = unsafe { LOOKUP_TABLE[*s.offset(idx) as u8 as usize] };
+        let val = LOOKUP_TABLE[*s.offset(idx) as u8 as usize];
         if val == -1 || val as c_int >= base {
             break;
         } else {
@@ -802,9 +799,7 @@ pub fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize,
             {
                 num = res;
             } else {
-                unsafe {
-                    platform::errno = ERANGE;
-                }
+                platform::errno = ERANGE;
                 num = c_ulong::max_value();
                 overflowed = true;
             }

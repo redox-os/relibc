@@ -16,9 +16,9 @@ pub unsafe extern "C" fn __assert(
     let file = CStr::from_ptr(file).to_str().unwrap();
     let cond = CStr::from_ptr(cond).to_str().unwrap();
 
-    write!(
+    writeln!(
         *stdio::stderr,
-        "{}: {}:{}: Assertion `{}` failed.\n",
+        "{}: {}:{}: Assertion `{}` failed.",
         func,
         file,
         line,

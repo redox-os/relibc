@@ -103,7 +103,7 @@ impl Write for StringWriter {
                 ptr::copy_nonoverlapping(buf.as_ptr(), self.0, copy_size);
                 self.1 -= copy_size;
 
-                self.0 = self.0.offset(copy_size as isize);
+                self.0 = self.0.add(copy_size);
                 *self.0 = 0;
             }
 
@@ -136,8 +136,8 @@ impl Write for UnsafeStringWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         unsafe {
             ptr::copy_nonoverlapping(buf.as_ptr(), self.0, buf.len());
-            *self.0.offset(buf.len() as isize) = b'\0';
-            self.0 = self.0.offset(buf.len() as isize);
+            self.0 = self.0.add(buf.len());
+            *self.0 = b'\0';
         }
         Ok(buf.len())
     }

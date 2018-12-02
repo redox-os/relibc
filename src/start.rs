@@ -43,20 +43,20 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
 
     let envp = sp.envp();
     let mut len = 0;
-    while *envp.offset(len) != ptr::null() {
+    while ! (*envp.add(len)).is_null() {
         len += 1;
     }
-    platform::inner_environ = Vec::with_capacity(len as usize + 1);
+    platform::inner_environ = Vec::with_capacity(len + 1);
     for i in 0..len {
-        let mut item = *envp.offset(i);
+        let mut item = *envp.add(i);
         let mut len = 0;
-        while *item.offset(len) != 0 {
+        while *item.add(len) != 0 {
             len += 1;
         }
 
-        let buf = platform::alloc(len as usize + 1) as *mut c_char;
+        let buf = platform::alloc(len + 1) as *mut c_char;
         for i in 0..=len {
-            *buf.offset(i) = *item.offset(i);
+            *buf.add(i) = *item.add(i);
         }
         platform::inner_environ.push(buf);
     }

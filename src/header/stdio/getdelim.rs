@@ -7,7 +7,7 @@ use io::BufRead;
 use platform::types::*;
 
 #[no_mangle]
-pub extern "C" fn __getline(
+pub unsafe extern "C" fn __getline(
     lineptr: *mut *mut c_char,
     n: *mut size_t,
     stream: *mut FILE,
@@ -16,20 +16,20 @@ pub extern "C" fn __getline(
 }
 
 #[no_mangle]
-pub extern "C" fn __getdelim(
+pub unsafe extern "C" fn __getdelim(
     lineptr: *mut *mut c_char,
     n: *mut size_t,
     delim: c_int,
     stream: *mut FILE,
 ) -> ssize_t {
-    let lineptr = unsafe { &mut *lineptr };
-    let n = unsafe { &mut *n };
+    let lineptr = &mut *lineptr;
+    let n = &mut *n;
     let delim = delim as u8;
 
     //TODO: More efficient algorithm using lineptr and n instead of this vec
     let mut buf = Vec::new();
     let count = {
-        let mut stream = unsafe { &mut *stream }.lock();
+        let mut stream = (*stream).lock();
         match stream.read_until(delim, &mut buf) {
             Ok(ok) => ok,
             Err(err) => return -1,
@@ -37,7 +37,7 @@ pub extern "C" fn __getdelim(
     };
 
     //TODO: Check errors and improve safety
-    unsafe {
+    {
         // Allocate lineptr to size of buf and set n to size of lineptr
         *n = count + 1;
         *lineptr = stdlib::realloc(*lineptr as *mut c_void, *n) as *mut c_char;

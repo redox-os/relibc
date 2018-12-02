@@ -95,10 +95,8 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Vec<(Token, Range)> 
                                 list.push(Collation::Char(c));
                             }
                         }
-                    } else {
-                        if can_push(was_leading, flags, c) {
-                            list.push(Collation::Char(c));
-                        }
+                    } else if can_push(was_leading, flags, c) {
+                        list.push(Collation::Char(c));
                     }
                 }
                 // Otherwise, there was no closing ]. Maybe error?

@@ -14,6 +14,12 @@
 #![feature(str_internals)]
 #![feature(thread_local)]
 
+#![allow(clippy::cast_lossless)]
+#![allow(clippy::cast_ptr_alignment)]
+#![allow(clippy::derive_hash_xor_eq)]
+#![allow(clippy::eval_order_dependence)]
+#![allow(clippy::mut_from_ref)]
+
 #[macro_use]
 extern crate alloc;
 extern crate cbitset;

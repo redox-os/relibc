@@ -22,13 +22,11 @@ impl PalSignal for Sys {
 
     fn raise(sig: c_int) -> c_int {
         let tid = e(unsafe { syscall!(GETTID) }) as pid_t;
-        let ret = if tid == !0 {
+        if tid == !0 {
             -1
         } else {
             e(unsafe { syscall!(TKILL, tid, sig) }) as c_int
-        };
-
-        ret
+        }
     }
 
     unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {

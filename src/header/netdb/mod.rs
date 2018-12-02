@@ -269,7 +269,7 @@ fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
 
     let dns_vec: Vec<u8> = dns_string
         .trim()
-        .split(".")
+        .split('.')
         .map(|octet| octet.parse::<u8>().unwrap_or(0))
         .collect();
 
@@ -362,7 +362,7 @@ fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
                         // subsection of the domain.
                         // We need to parse this to insert periods where
                         // they belong (ie at the end of each string)
-                        let data = parse_revdns_answer(answer.data.clone());
+                        let data = parse_revdns_answer(&answer.data);
                         names.push(data);
                     }
                 }
@@ -375,14 +375,14 @@ fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
     }
 }
 
-fn parse_revdns_answer(data: Vec<u8>) -> Vec<u8> {
+fn parse_revdns_answer(data: &[u8]) -> Vec<u8> {
     let mut cursor = 0;
     let mut index = 0;
-    let mut output = data.clone();
+    let mut output = data.to_vec();
     while index < data.len() - 1 {
         let offset = data[index] as usize;
         index = cursor + offset + 1;
-        output[index] = '.' as u8;
+        output[index] = b'.';
         cursor = index;
     }
     //we don't want an extra period at the end
@@ -427,7 +427,7 @@ pub unsafe extern "C" fn gethostbyaddr(
     sethostent(HOST_STAYOPEN);
     while {
         p = gethostent();
-        p != ptr::null()
+        !p.is_null()
     } {
         let mut cp = (*p).h_addr_list;
         loop {
@@ -472,7 +472,7 @@ pub unsafe extern "C" fn gethostbyaddr(
         }
         Err(e) => {
             platform::errno = e;
-            return ptr::null();
+            ptr::null()
         }
     }
 }
@@ -484,9 +484,9 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *const hostent {
     let mut octets = str::from_utf8_unchecked(name_cstr.to_bytes()).split('.');
     let mut s_addr = [0u8; 4];
     let mut is_addr = true;
-    for i in 0..4 {
+    for item in &mut s_addr {
         if let Some(n) = octets.next().and_then(|x| u8::from_str(x).ok()) {
-            s_addr[i] = n;
+            *item = n;
         } else {
             is_addr = false;
         }
@@ -495,7 +495,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *const hostent {
         is_addr = false;
     }
 
-    if is_addr == true {
+    if is_addr {
         let addr = in_addr {
             s_addr: mem::transmute::<[u8; 4], u32>(s_addr),
         };
@@ -507,7 +507,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *const hostent {
     sethostent(HOST_STAYOPEN);
     while {
         p = gethostent();
-        p != ptr::null()
+        !p.is_null()
     } {
         if strcasecmp((*p).h_name, name) == 0 {
             sethostent(HOST_STAYOPEN);
@@ -580,7 +580,7 @@ pub unsafe extern "C" fn gethostent() -> *const hostent {
     rlb.seek(H_POS);
 
     let mut r: Box<str> = Box::default();
-    while r.is_empty() || r.split_whitespace().next() == None || r.starts_with("#") {
+    while r.is_empty() || r.split_whitespace().next() == None || r.starts_with('#') {
         r = match rlb.next() {
             Line::Some(s) => bytes_to_box_str(s),
             _ => {
@@ -612,11 +612,8 @@ pub unsafe extern "C" fn gethostent() -> *const hostent {
 
     let mut _host_aliases: Vec<Vec<u8>> = Vec::new();
 
-    loop {
-        let mut alias = match iter.next() {
-            Some(s) => s.as_bytes().to_vec(),
-            _ => break,
-        };
+    while let Some(s) = iter.next() {
+        let mut alias = s.as_bytes().to_vec();
         alias.push(b'\0');
         _host_aliases.push(alias);
     }
@@ -665,7 +662,7 @@ pub unsafe extern "C" fn getprotobyname(name: *const c_char) -> *const protoent 
     setprotoent(PROTO_STAYOPEN);
     while {
         p = getprotoent();
-        p != ptr::null()
+        !p.is_null()
     } {
         if strcasecmp((*p).p_name, name) == 0 {
             setprotoent(PROTO_STAYOPEN);
@@ -674,11 +671,11 @@ pub unsafe extern "C" fn getprotobyname(name: *const c_char) -> *const protoent 
 
         let mut cp = (*p).p_aliases;
         loop {
-            if cp == ptr::null_mut() {
+            if cp.is_null() {
                 setprotoent(PROTO_STAYOPEN);
                 break;
             }
-            if (*cp) == ptr::null_mut() {
+            if (*cp).is_null() {
                 setprotoent(PROTO_STAYOPEN);
                 break;
             }
@@ -701,7 +698,7 @@ pub unsafe extern "C" fn getprotobynumber(number: c_int) -> *const protoent {
     let mut p: *const protoent;
     while {
         p = getprotoent();
-        p != ptr::null()
+        !p.is_null()
     } {
         if (*p).p_proto == number {
             setprotoent(PROTO_STAYOPEN);
@@ -723,7 +720,7 @@ pub unsafe extern "C" fn getprotoent() -> *const protoent {
     rlb.seek(P_POS);
 
     let mut r: Box<str> = Box::default();
-    while r.is_empty() || r.split_whitespace().next() == None || r.starts_with("#") {
+    while r.is_empty() || r.split_whitespace().next() == None || r.starts_with('#') {
         r = match rlb.next() {
             Line::Some(s) => bytes_to_box_str(s),
             _ => {
@@ -747,11 +744,8 @@ pub unsafe extern "C" fn getprotoent() -> *const protoent {
     PROTO_NUM = Some(atoi(num.as_mut_slice().as_mut_ptr() as *mut i8));
 
     let mut _proto_aliases: Vec<Vec<u8>> = Vec::new();
-    loop {
-        let mut alias = match iter.next() {
-            Some(s) => s.as_bytes().to_vec(),
-            None => break,
-        };
+    while let Some(s) = iter.next() {
+        let mut alias = s.as_bytes().to_vec();
         alias.push(b'\0');
         _proto_aliases.push(alias);
     }
@@ -785,7 +779,7 @@ pub unsafe extern "C" fn getservbyname(
     if proto.is_null() {
         while {
             p = getservent();
-            p != ptr::null()
+            !p.is_null()
         } {
             if strcasecmp((*p).s_name, name) == 0 {
                 setservent(SERV_STAYOPEN);
@@ -795,7 +789,7 @@ pub unsafe extern "C" fn getservbyname(
     } else {
         while {
             p = getservent();
-            p != ptr::null()
+            !p.is_null()
         } {
             if strcasecmp((*p).s_name, name) == 0 && strcasecmp((*p).s_proto, proto) == 0 {
                 setservent(SERV_STAYOPEN);
@@ -815,7 +809,7 @@ pub unsafe extern "C" fn getservbyport(port: c_int, proto: *const c_char) -> *co
     if proto.is_null() {
         while {
             p = getservent();
-            p != ptr::null()
+            !p.is_null()
         } {
             if (*p).s_port == port {
                 setservent(SERV_STAYOPEN);
@@ -825,7 +819,7 @@ pub unsafe extern "C" fn getservbyport(port: c_int, proto: *const c_char) -> *co
     } else {
         while {
             p = getservent();
-            p != ptr::null()
+            !p.is_null()
         } {
             if (*p).s_port == port && strcasecmp((*p).s_proto, proto) == 0 {
                 setservent(SERV_STAYOPEN);
@@ -869,7 +863,7 @@ pub unsafe extern "C" fn getservent() -> *const servent {
             Some(port_proto) => port_proto,
             None => continue,
         };
-        let mut split = port_proto.split("/");
+        let mut split = port_proto.split('/');
         let mut port = match split.next() {
             Some(port) => port.as_bytes().to_vec(),
             None => continue,

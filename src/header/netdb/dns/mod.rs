@@ -98,7 +98,7 @@ impl Dns {
     }
 
     pub fn parse(data: &[u8]) -> Result<Self, String> {
-        let name_ind = 0b11000000;
+        let name_ind = 0b1100_0000;
         let mut i = 0;
 
         macro_rules! pop_u8 {
@@ -194,10 +194,10 @@ impl Dns {
         }
 
         Ok(Dns {
-            transaction_id: transaction_id,
-            flags: flags,
-            queries: queries,
-            answers: answers,
+            transaction_id,
+            flags,
+            queries,
+            answers,
         })
     }
 }

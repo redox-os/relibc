@@ -73,13 +73,13 @@ pub struct itimerspec {
 pub struct sigevent;
 
 #[no_mangle]
-pub extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
-    unsafe { asctime_r(timeptr, transmute::<&mut _, *mut c_char>(&mut ASCTIME)) }
+pub unsafe extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
+    asctime_r(timeptr, transmute::<&mut _, *mut c_char>(&mut ASCTIME))
 }
 
 #[no_mangle]
-pub extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_char {
-    let tm = unsafe { &*tm };
+pub unsafe extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_char {
+    let tm = &*tm;
     let result = core::fmt::write(
         &mut platform::UnsafeStringWriter(buf as *mut u8),
         format_args!(
@@ -96,7 +96,7 @@ pub extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_char {
     match result {
         Ok(_) => buf,
         Err(_) => {
-            unsafe { platform::errno = EIO };
+            platform::errno = EIO;
             core::ptr::null_mut()
         }
     }
@@ -117,7 +117,7 @@ pub extern "C" fn clock() -> clock_t {
         return -1;
     }
 
-    return ts.tv_sec * CLOCKS_PER_SEC + ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC);
+    ts.tv_sec * CLOCKS_PER_SEC + ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC)
 }
 
 // #[no_mangle]
@@ -321,9 +321,9 @@ pub unsafe extern "C" fn strftime(
         timeptr,
     );
     if ret < maxsize {
-        return ret;
+        ret
     } else {
-        return 0;
+        0
     }
 }
 
@@ -333,14 +333,12 @@ pub extern "C" fn strptime(buf: *const c_char, format: *const c_char, tm: *mut t
 }
 
 #[no_mangle]
-pub extern "C" fn time(tloc: *mut time_t) -> time_t {
+pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
     let mut ts = timespec::default();
     Sys::clock_gettime(CLOCK_REALTIME, &mut ts);
-    unsafe {
-        if !tloc.is_null() {
-            *tloc = ts.tv_sec
-        };
-    }
+    if !tloc.is_null() {
+        *tloc = ts.tv_sec
+    };
     ts.tv_sec
 }
 

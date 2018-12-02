@@ -75,18 +75,18 @@ pub mod inner {
     pub const TIOCGSID: c_ulong = 0x5429;
     pub const TIOCGRS485: c_ulong = 0x542E;
     pub const TIOCSRS485: c_ulong = 0x542F;
-    pub const TIOCGPTN: c_ulong = 0x80045430;
-    pub const TIOCSPTLCK: c_ulong = 0x40045431;
-    pub const TIOCGDEV: c_ulong = 0x80045432;
+    pub const TIOCGPTN: c_ulong = 0x8004_5430;
+    pub const TIOCSPTLCK: c_ulong = 0x4004_5431;
+    pub const TIOCGDEV: c_ulong = 0x8004_5432;
     pub const TCGETX: c_ulong = 0x5432;
     pub const TCSETX: c_ulong = 0x5433;
     pub const TCSETXF: c_ulong = 0x5434;
     pub const TCSETXW: c_ulong = 0x5435;
-    pub const TIOCSIG: c_ulong = 0x40045436;
+    pub const TIOCSIG: c_ulong = 0x4004_5436;
     pub const TIOCVHANGUP: c_ulong = 0x5437;
-    pub const TIOCGPKT: c_ulong = 0x80045438;
-    pub const TIOCGPTLCK: c_ulong = 0x80045439;
-    pub const TIOCGEXCL: c_ulong = 0x80045440;
+    pub const TIOCGPKT: c_ulong = 0x8004_5438;
+    pub const TIOCGPTLCK: c_ulong = 0x8004_5439;
+    pub const TIOCGEXCL: c_ulong = 0x8004_5440;
     pub const TIOCGPTPEER: c_ulong = 0x5441;
 
     pub const FIONCLEX: c_ulong = 0x5450;

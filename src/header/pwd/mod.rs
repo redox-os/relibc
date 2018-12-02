@@ -101,7 +101,7 @@ where
         // in the macro that is never read
         let mut _off = 0;
 
-        let mut parts = parts.into_iter();
+        let mut parts = parts.iter();
 
         macro_rules! copy_into {
             ($entry:expr) => {
@@ -112,11 +112,11 @@ where
 
                 for (i, c) in src.iter().enumerate() {
                     unsafe {
-                        *dst.offset(i as isize) = *c as c_char;
+                        *dst.add(i) = *c as c_char;
                     }
                 }
                 unsafe {
-                    *dst.offset(src.len() as isize) = 0;
+                    *dst.add(src.len()) = 0;
 
                     $entry = dst;
                 }
@@ -147,7 +147,7 @@ where
 }
 
 #[no_mangle]
-pub extern "C" fn getpwnam_r(
+pub unsafe extern "C" fn getpwnam_r(
     name: *const c_char,
     out: *mut passwd,
     buf: *mut c_char,
@@ -160,21 +160,21 @@ pub extern "C" fn getpwnam_r(
             // /etc/passwd should not contain any NUL bytes in the middle
             // of entries, but if this happens, it can't possibly match the
             // search query since it's NUL terminated.
-            if *c == 0 || unsafe { *name.offset(i as isize) } != *c as c_char {
+            if *c == 0 || *name.add(i) != *c as c_char {
                 return false;
             }
         }
         true
     }) {
-        OptionPasswd::Error => unsafe {
+        OptionPasswd::Error => {
             *result = ptr::null_mut();
             -1
         },
-        OptionPasswd::NotFound => unsafe {
+        OptionPasswd::NotFound => {
             *result = ptr::null_mut();
             0
         },
-        OptionPasswd::Found(_) => unsafe {
+        OptionPasswd::Found(_) => {
             *result = out;
             0
         },
@@ -182,7 +182,7 @@ pub extern "C" fn getpwnam_r(
 }
 
 #[no_mangle]
-pub extern "C" fn getpwuid_r(
+pub unsafe extern "C" fn getpwuid_r(
     uid: uid_t,
     out: *mut passwd,
     buf: *mut c_char,
@@ -196,15 +196,15 @@ pub extern "C" fn getpwuid_r(
             .and_then(|part| part.parse().ok());
         part == Some(uid)
     }) {
-        OptionPasswd::Error => unsafe {
+        OptionPasswd::Error => {
             *result = ptr::null_mut();
             -1
         },
-        OptionPasswd::NotFound => unsafe {
+        OptionPasswd::NotFound => {
             *result = ptr::null_mut();
             0
         },
-        OptionPasswd::Found(_) => unsafe {
+        OptionPasswd::Found(_) => {
             *result = out;
             0
         },
@@ -219,7 +219,7 @@ pub extern "C" fn getpwnam(name: *const c_char) -> *mut passwd {
             // /etc/passwd should not contain any NUL bytes in the middle
             // of entries, but if this happens, it can't possibly match the
             // search query since it's NUL terminated.
-            if *c == 0 || unsafe { *name.offset(i as isize) } != *c as c_char {
+            if *c == 0 || unsafe { *name.add(i) } != *c as c_char {
                 return false;
             }
         }
@@ -246,7 +246,7 @@ pub extern "C" fn getpwuid(uid: uid_t) -> *mut passwd {
         OptionPasswd::Error => ptr::null_mut(),
         OptionPasswd::NotFound => ptr::null_mut(),
         OptionPasswd::Found(buf) => unsafe {
-            if PASSWD_BUF != ptr::null_mut() {
+            if !PASSWD_BUF.is_null() {
                 platform::free(PASSWD_BUF as *mut c_void);
             }
             PASSWD_BUF = buf;

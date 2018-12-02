@@ -23,7 +23,7 @@ pub enum Line<'a> {
 impl RawLineBuffer {
     pub const fn new(fd: c_int) -> Self {
         Self {
-            fd: fd,
+            fd,
             buf: Vec::new(),
             newline: None,
             read: 0,

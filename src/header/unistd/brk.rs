@@ -21,7 +21,7 @@ pub unsafe extern "C" fn brk(addr: *mut c_void) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
-    if BRK == ptr::null_mut() {
+    if BRK.is_null() {
         BRK = Sys::brk(ptr::null_mut());
     }
 

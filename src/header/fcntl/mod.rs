@@ -30,7 +30,7 @@ pub const F_WRLCK: c_int = 1;
 pub const F_UNLCK: c_int = 2;
 
 #[no_mangle]
-pub extern "C" fn creat(path: *const c_char, mode: mode_t) -> c_int {
+pub unsafe extern "C" fn creat(path: *const c_char, mode: mode_t) -> c_int {
     sys_open(path, O_WRONLY | O_CREAT | O_TRUNC, mode)
 }
 
@@ -40,7 +40,7 @@ pub extern "C" fn sys_fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn sys_open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
-    let path = unsafe { CStr::from_ptr(path) };
+pub unsafe extern "C" fn sys_open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
+    let path = CStr::from_ptr(path);
     Sys::open(path, oflag, mode)
 }

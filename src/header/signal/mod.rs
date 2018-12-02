@@ -201,7 +201,7 @@ pub extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int {
     unimplemented!();
 }
 
-pub const _signal_strings: [&'static str; 32] = [
+pub const _signal_strings: [&str; 32] = [
     "Unknown signal\0",
     "Hangup\0",
     "Interrupt\0",
