@@ -484,6 +484,11 @@ pub unsafe extern "C" fn fseeko(stream: *mut FILE, mut off: off_t, whence: c_int
         off -= (stream.read_size - stream.read_pos) as off_t;
     }
 
+    // Flush write buffer before seek
+    if stream.flush().is_err() {
+        return -1;
+    }
+
     let err = Sys::lseek(*stream.file, off, whence);
     if err < 0 {
         return err as c_int;
