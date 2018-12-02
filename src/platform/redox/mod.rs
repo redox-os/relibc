@@ -59,11 +59,9 @@ impl Pal for Sys {
     fn access(path: &CStr, mode: c_int) -> c_int {
         let fd = match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
             Ok(fd) => fd,
-            Err(_) => unsafe {
-                errno = EIO;
-                return -1;
-            },
+            Err(_) => return -1,
         };
+
         if mode == F_OK {
             return 0;
         }
