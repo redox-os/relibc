@@ -9,7 +9,7 @@ pub mod fenv;
 pub mod float;
 pub mod fnmatch;
 pub mod getopt;
-pub mod _grp;
+pub mod grp;
 pub mod inttypes;
 pub mod libgen;
 pub mod limits;
