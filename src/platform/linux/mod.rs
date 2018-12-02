@@ -1,4 +1,4 @@
-use core::{mem, ptr};
+use core::ptr;
 use core_io::Write;
 
 use super::types::*;
@@ -191,33 +191,6 @@ impl Pal for Sys {
 
     fn getgid() -> gid_t {
         e(unsafe { syscall!(GETGID) }) as gid_t
-    }
-
-    fn gethostname(mut name: *mut c_char, mut len: size_t) -> c_int {
-        unsafe {
-            let mut uts = mem::uninitialized();
-            let err = Sys::uname(&mut uts);
-            if err < 0 {
-                mem::forget(uts);
-                return err;
-            }
-            for c in uts.nodename.iter() {
-                if len == 0 {
-                    break;
-                }
-                len -= 1;
-
-                *name = *c;
-
-                if *name == 0 {
-                    // We do want to copy the zero also, so we check this after the copying.
-                    break;
-                }
-
-                name = name.offset(1);
-            }
-            0
-        }
     }
 
     fn getpgid(pid: pid_t) -> pid_t {

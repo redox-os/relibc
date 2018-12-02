@@ -513,32 +513,6 @@ impl Pal for Sys {
         e(syscall::getgid()) as gid_t
     }
 
-    fn gethostname(name: *mut c_char, len: size_t) -> c_int {
-        fn inner(name: &mut [u8]) -> io::Result<()> {
-            let mut file = File::open(
-                &CString::new("/etc/hostname").unwrap(),
-                fcntl::O_RDONLY | fcntl::O_CLOEXEC,
-            )?;
-
-            let mut read = 0;
-            loop {
-                match file.read(&mut name[read..])? {
-                    0 => break,
-                    n => read += n,
-                }
-            }
-            Ok(())
-        }
-
-        match inner(unsafe { slice::from_raw_parts_mut(name as *mut u8, len as usize) }) {
-            Ok(()) => 0,
-            Err(_) => unsafe {
-                errno = EIO;
-                -1
-            },
-        }
-    }
-
     fn getpgid(pid: pid_t) -> pid_t {
         e(syscall::getpgid(pid as usize)) as pid_t
     }
@@ -1070,7 +1044,39 @@ impl Pal for Sys {
     }
 
     fn uname(utsname: *mut utsname) -> c_int {
+        fn gethostname(name: &mut [u8]) -> io::Result<()> {
+            if name.is_empty() {
+                return Ok(())
+            }
+
+            let mut file = File::open(
+                &CString::new("/etc/hostname").unwrap(),
+                fcntl::O_RDONLY | fcntl::O_CLOEXEC,
+            )?;
+
+            let mut read = 0;
+            let name_len = name.len();
+            loop {
+                match file.read(&mut name[read..name_len - 1])? {
+                    0 => break,
+                    n => read += n,
+                }
+            }
+            name[read] = 0;
+            Ok(())
+        }
+
         fn inner(utsname: *mut utsname) -> CoreResult<(), i32> {
+            match gethostname(unsafe {
+                slice::from_raw_parts_mut(
+                    (*utsname).nodename.as_mut_ptr() as *mut u8,
+                    (*utsname).nodename.len()
+                )
+            }) {
+                Ok(_) => (),
+                Err(_) => return Err(EIO),
+            }
+
             let file_path = c_str!("sys:uname");
             let mut file = match File::open(file_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
                 Ok(ok) => ok,
@@ -1099,15 +1105,17 @@ impl Pal for Sys {
 
             unsafe {
                 read_line(&mut (*utsname).sysname)?;
-                read_line(&mut (*utsname).nodename)?;
                 read_line(&mut (*utsname).release)?;
-                read_line(&mut (*utsname).version)?;
                 read_line(&mut (*utsname).machine)?;
+
+                // Version is not provided
+                ptr::write_bytes((*utsname).version.as_mut_ptr(), 0, UTSLENGTH);
 
                 // Redox doesn't provide domainname in sys:uname
                 //read_line(&mut (*utsname).domainname)?;
                 ptr::write_bytes((*utsname).domainname.as_mut_ptr(), 0, UTSLENGTH);
             }
+
             Ok(())
         }
 

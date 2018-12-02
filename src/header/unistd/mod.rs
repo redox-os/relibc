@@ -1,6 +1,6 @@
 //! unistd implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/unistd.h.html
 
-use core::{ptr, slice};
+use core::{mem, ptr, slice};
 
 use c_str::CStr;
 use header::errno;
@@ -286,8 +286,29 @@ pub extern "C" fn gethostid() -> c_long {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gethostname(name: *mut c_char, len: size_t) -> c_int {
-    Sys::gethostname(name, len)
+pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> c_int {
+    let mut uts = mem::uninitialized();
+    let err = Sys::uname(&mut uts);
+    if err < 0 {
+        mem::forget(uts);
+        return err;
+    }
+    for c in uts.nodename.iter() {
+        if len == 0 {
+            break;
+        }
+        len -= 1;
+
+        *name = *c;
+
+        if *name == 0 {
+            // We do want to copy the zero also, so we check this after the copying.
+            break;
+        }
+
+        name = name.offset(1);
+    }
+    0
 }
 
 // #[no_mangle]
