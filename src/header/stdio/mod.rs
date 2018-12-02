@@ -251,8 +251,24 @@ pub unsafe extern "C" fn ferror(stream: *mut FILE) -> c_int {
 /// itself.
 #[no_mangle]
 pub unsafe extern "C" fn fflush(stream: *mut FILE) -> c_int {
-    let mut stream = (*stream).lock();
-    stream.flush().is_err() as c_int
+    if stream.is_null() {
+        //TODO: flush all files!
+
+        if fflush(stdout) != 0 {
+            return EOF;
+        }
+
+        if fflush(stderr) != 0 {
+            return EOF;
+        }
+    } else {
+        let mut stream = (*stream).lock();
+        if stream.flush().is_err() {
+            return EOF;
+        }
+    }
+
+    0
 }
 
 /// Get a single char from a stream
