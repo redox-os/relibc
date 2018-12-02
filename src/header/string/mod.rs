@@ -322,13 +322,13 @@ pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: size_t
 pub unsafe extern "C" fn strncpy(dst: *mut c_char, src: *const c_char, n: size_t) -> *mut c_char {
     let mut i = 0;
 
-    while *src.offset(i) != 0 && (i as usize) < n {
-        *dst.offset(i) = *src.offset(i);
+    while *src.add(i) != 0 && i < n {
+        *dst.add(i) = *src.add(i);
         i += 1;
     }
 
-    for i in i..n as isize {
-        *dst.offset(i) = 0;
+    for i in i..n {
+        *dst.add(i) = 0;
     }
 
     dst
