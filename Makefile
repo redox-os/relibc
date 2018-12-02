@@ -2,6 +2,7 @@ TARGET?=
 
 CARGO?=cargo
 CARGOFLAGS=
+RUSTCFLAGS=
 
 BUILD=target
 ifneq ($(TARGET),)
@@ -72,27 +73,27 @@ test: sysroot
 	make -C tests run
 
 $(BUILD)/debug/libc.a: $(SRC)
-	$(CARGO) build $(CARGOFLAGS)
+	$(CARGO) rustc $(CARGOFLAGS) -- $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
-	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/libc.a: $(SRC)
-	$(CARGO) build --release $(CARGOFLAGS)
+	$(CARGO) rustc --release $(CARGOFLAGS) -- $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
-	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/crti.o: $(SRC)
-	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/crti/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/crti/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/crtn.o: $(SRC)
-	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/crtn/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/crtn/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/include: $(SRC)
