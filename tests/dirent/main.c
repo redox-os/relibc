@@ -35,4 +35,8 @@ int main() {
     // seekdir(dir, tell);
     // entry = readdir(dir);
     // puts(entry->d_name);
+
+    closedir(dir);
+
+    return 0;
 }
