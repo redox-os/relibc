@@ -57,20 +57,12 @@ pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
 
 #[no_mangle]
 pub unsafe extern "C" fn closedir(dir: *mut DIR) -> c_int {
+    let mut dir = Box::from_raw(dir);
 
-    let ret = {
-        let mut dir = Box::from_raw(dir);
+    let ret = Sys::close(*dir.file);
 
-        let ret = Sys::close(*dir.file);
-
-        // Reference files aren't closed when dropped
-        dir.file.reference = true;
-
-        //TODO: find out why dropping dir can crash
-        mem::forget(dir);
-
-        ret
-    };
+    // Reference files aren't closed when dropped
+    dir.file.reference = true;
 
     ret
 }
