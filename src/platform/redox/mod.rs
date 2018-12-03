@@ -411,6 +411,9 @@ impl Pal for Sys {
     }
 
     fn getdents(fd: c_int, mut dirents: *mut dirent, max_bytes: usize) -> c_int {
+        //TODO: rewrite this code. Originally the *dirents = dirent { ... } stuff below caused
+        // massive issues. This has been hacked around, but it still isn't perfect
+
         // Get initial reading position
         let mut read = match syscall::lseek(fd as usize, 0, syscall::SEEK_CUR) {
             Ok(pos) => pos as isize,
@@ -429,15 +432,16 @@ impl Pal for Sys {
                 name[*i] = 0;
             }
             // Get size: full size - unused bytes
-            let size = mem::size_of::<dirent>() - name.len().saturating_sub(*i + 1);
-            if *written + size > max_bytes {
+            if *written + mem::size_of::<dirent>() > max_bytes {
                 // Seek back to after last read entry and return
                 match syscall::lseek(fd as usize, read, syscall::SEEK_SET) {
                     Ok(_) => return Some(*written as c_int),
                     Err(err) => return Some(-err.errno),
                 }
             }
+            let size = mem::size_of::<dirent>() - name.len().saturating_sub(*i + 1);
             unsafe {
+                //This is the offending code mentioned above
                 *dirents = dirent {
                     d_ino: 0,
                     d_off: read as off_t,
