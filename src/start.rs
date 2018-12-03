@@ -25,6 +25,25 @@ impl Stack {
     }
 }
 
+unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut c_char> {
+    let mut vec = Vec::with_capacity(len + 1);
+    for i in 0..len {
+        let mut item = *array.add(i);
+        let mut len = 0;
+        while *item.add(len) != 0 {
+            len += 1;
+        }
+
+        let buf = platform::alloc(len + 1) as *mut c_char;
+        for i in 0..=len {
+            *buf.add(i) = *item.add(i);
+        }
+        vec.push(buf);
+    }
+    vec.push(ptr::null_mut());
+    vec
+}
+
 #[inline(never)]
 #[no_mangle]
 pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
@@ -35,32 +54,21 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         static __init_array_end: extern "C" fn();
 
         fn _init();
-        fn main(argc: isize, argv: *const *const c_char, envp: *const *const c_char) -> c_int;
+        fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
     }
 
     let argc = sp.argc();
     let argv = sp.argv();
+
+    platform::inner_argv = copy_string_array(argv, argc as usize);
+    platform::argv = platform::inner_argv.as_mut_ptr();
 
     let envp = sp.envp();
     let mut len = 0;
     while ! (*envp.add(len)).is_null() {
         len += 1;
     }
-    platform::inner_environ = Vec::with_capacity(len + 1);
-    for i in 0..len {
-        let mut item = *envp.add(i);
-        let mut len = 0;
-        while *item.add(len) != 0 {
-            len += 1;
-        }
-
-        let buf = platform::alloc(len + 1) as *mut c_char;
-        for i in 0..=len {
-            *buf.add(i) = *item.add(i);
-        }
-        platform::inner_environ.push(buf);
-    }
-    platform::inner_environ.push(ptr::null_mut());
+    platform::inner_environ = copy_string_array(envp, len);
     platform::environ = platform::inner_environ.as_mut_ptr();
 
     // Initialize stdin/stdout/stderr, see https://github.com/rust-lang/rust/issues/51718
@@ -82,12 +90,11 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         f = f.offset(1);
     }
 
+    // not argv or envp, because programs like bash try to modify this *const* pointer :|
     stdlib::exit(main(
         argc,
-        argv,
-        // not envp, because programs like bash try to modify this *const*
-        // pointer :|
-        platform::environ as *const *const c_char,
+        platform::argv,
+        platform::environ,
     ));
 
     unreachable!();
