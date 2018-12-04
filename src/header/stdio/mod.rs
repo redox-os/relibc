@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 use core::fmt::Write as WriteFmt;
 use core::ops::{Deref, DerefMut};
 use core::{fmt, mem, ptr, slice, str};
-use va_list::VaList as va_list;
+use core::ffi::VaList as va_list;
 
 use c_str::CStr;
 use fs::File;

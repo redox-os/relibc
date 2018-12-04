@@ -278,7 +278,6 @@ dependencies = [
  "redox_syscall 0.1.54 (registry+https://github.com/rust-lang/crates.io-index)",
  "sc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "va_list 0.1.0",
 ]
 
 [[package]]
@@ -499,20 +498,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "unicode-xid"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "va_list"
-version = "0.1.0"
-dependencies = [
- "va_list-helper 0.0.2",
-]
-
-[[package]]
-name = "va_list-helper"
-version = "0.0.2"
-dependencies = [
- "cc 1.0.35 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "vec_map"

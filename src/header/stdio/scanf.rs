@@ -2,7 +2,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use io::Read;
 use platform::types::*;
-use va_list::VaList;
+use core::ffi::VaList as va_list;
 
 #[derive(PartialEq, Eq)]
 enum IntKind {
@@ -30,7 +30,7 @@ unsafe fn next_byte(string: &mut *const c_char) -> Result<u8, c_int> {
 unsafe fn inner_scanf<R: Read>(
     mut r: R,
     mut format: *const c_char,
-    mut ap: VaList,
+    mut ap: va_list,
 ) -> Result<c_int, c_int> {
     let mut matched = 0;
     let mut byte = 0;
@@ -231,7 +231,7 @@ unsafe fn inner_scanf<R: Read>(
                                 n.parse::<$type>().map_err(|_| 0)?
                             };
                             if !ignore {
-                                *ap.get::<*mut $type>() = n;
+                                *ap.arg::<*mut $type>() = n;
                                 matched += 1;
                             }
                         }};
@@ -251,7 +251,7 @@ unsafe fn inner_scanf<R: Read>(
                                 $type::from_str_radix(&n, radix).map_err(|_| 0)?
                             };
                             if !ignore {
-                                *ap.get::<*mut $final>() = n as $final;
+                                *ap.arg::<*mut $final>() = n as $final;
                                 matched += 1;
                             }
                         }};
@@ -329,7 +329,7 @@ unsafe fn inner_scanf<R: Read>(
                         }
                     }
 
-                    let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.get()) };
+                    let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
 
                     while width.map(|w| w > 0).unwrap_or(true) && !(byte as char).is_whitespace() {
                         if let Some(ref mut ptr) = ptr {
@@ -349,7 +349,7 @@ unsafe fn inner_scanf<R: Read>(
                     }
                 }
                 b'c' => {
-                    let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.get()) };
+                    let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
 
                     for i in 0..width.unwrap_or(1) {
                         if let Some(ptr) = ptr {
@@ -400,7 +400,7 @@ unsafe fn inner_scanf<R: Read>(
                         }
                     }
 
-                    let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.get()) };
+                    let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
 
                     // While we haven't used up all the width, and it matches
                     while width.map(|w| w > 0).unwrap_or(true) && !invert == matches.contains(&byte) {
@@ -425,7 +425,7 @@ unsafe fn inner_scanf<R: Read>(
                 },
                 b'n' => {
                     if !ignore {
-                        *ap.get::<*mut c_int>() = count as c_int;
+                        *ap.arg::<*mut c_int>() = count as c_int;
                     }
                 }
                 _ => return Err(-1),
@@ -444,7 +444,7 @@ unsafe fn inner_scanf<R: Read>(
     }
     Ok(matched)
 }
-pub unsafe fn scanf<R: Read>(r: R, format: *const c_char, ap: VaList) -> c_int {
+pub unsafe fn scanf<R: Read>(r: R, format: *const c_char, ap: va_list) -> c_int {
     match inner_scanf(r, format, ap) {
         Ok(n) => n,
         Err(n) => n,

@@ -5,6 +5,7 @@
 #![feature(alloc)]
 #![feature(allocator_api)]
 #![feature(asm)]
+#![feature(c_variadic)]
 #![feature(const_fn)]
 #![feature(const_raw_ptr_deref)]
 #![feature(const_str_as_bytes)]
@@ -33,7 +34,6 @@ extern crate lazy_static;
 extern crate memoffset;
 extern crate posix_regex;
 extern crate rand;
-extern crate va_list;
 
 #[cfg(target_os = "linux")]
 #[macro_use]

@@ -3,11 +3,11 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::ops::Range;
 use core::{fmt, slice};
-
+use core::ffi::VaList as va_list;
 use io::{self, Write};
+
 use platform;
 use platform::types::*;
-use va_list::{VaList, VaPrimitive};
 
 #[derive(PartialEq, Eq)]
 enum IntKind {
@@ -21,104 +21,108 @@ enum IntKind {
     Size,
 }
 
-trait IntoUsize {
-    fn into_usize(self) -> usize;
-    fn from_usize(i: usize) -> Self;
-}
-macro_rules! impl_intousize {
-    ($($kind:tt;)*) => {
-        $(impl IntoUsize for $kind {
-            fn into_usize(self) -> usize {
-                self as usize
-            }
-            fn from_usize(i: usize) -> Self {
-                i as Self
-            }
-        })*
-    }
-}
-impl_intousize! {
-    i32;
-    u32;
-    i64;
-    u64;
-    isize;
-    usize;
-}
-impl<T> IntoUsize for *const T {
-    fn into_usize(self) -> usize {
-        self as usize
-    }
-    fn from_usize(i: usize) -> Self {
-        i as Self
-    }
-}
-impl<T> IntoUsize for *mut T {
-    fn into_usize(self) -> usize {
-        self as usize
-    }
-    fn from_usize(i: usize) -> Self {
-        i as Self
-    }
-}
-impl IntoUsize for f32 {
-    fn into_usize(self) -> usize {
-        self.to_bits() as usize
-    }
-    fn from_usize(i: usize) -> Self {
-        Self::from_bits(i as u32)
-    }
-}
-impl IntoUsize for f64 {
-    fn into_usize(self) -> usize {
-        self.to_bits() as usize
-    }
-    fn from_usize(i: usize) -> Self {
-        Self::from_bits(i as u64)
-    }
+enum ArgType {
+    Byte,
+    Short,
+    Int,
+    Long,
+    LongLong,
+    PtrDiff,
+    Size,
+    IntMax,
+    Double,
+    CharPtr,
+    VoidPtr,
+    IntPtr,
+    ArgDefault
 }
 
-struct BufferedVaList {
-    list: VaList,
-    buf: Vec<usize>,
+#[derive(Clone, Copy)]
+union VaArg {
+    byte: c_char,
+    short: c_short,
+    int: c_int,
+    long: c_long,
+    longlong: c_longlong,
+    ptrdiff: ptrdiff_t,
+    size: ssize_t,
+    intmax: intmax_t,
+    double: c_double,
+    char_ptr: *const c_char,
+    void_ptr: *const c_void,
+    int_ptr: *mut c_int,
+    arg_default: usize
+}
+
+struct BufferedVaList<'a> {
+    list: va_list<'a>,
+    buf: Vec<VaArg>,
     i: usize,
 }
-impl BufferedVaList {
-    fn new(list: VaList) -> Self {
+
+impl<'a> BufferedVaList<'a> {
+    fn new(list: va_list<'a>) -> Self {
         Self {
             list,
             buf: Vec::new(),
             i: 0,
         }
     }
-    unsafe fn get<T: VaPrimitive + IntoUsize>(&mut self, i: Option<usize>) -> T {
-        match i {
-            None => self.next(),
-            Some(i) => self.index(i),
+
+    unsafe fn get_arg(&mut self, ty: ArgType) -> VaArg {
+        match ty {
+            ArgType::Byte => VaArg { byte: self.list.arg::<c_char>() },
+            ArgType::Short => VaArg { short: self.list.arg::<c_short>() },
+            ArgType::Int => VaArg { int: self.list.arg::<c_int>() },
+            ArgType::Long => VaArg { long: self.list.arg::<c_long>() },
+            ArgType::LongLong => VaArg { longlong: self.list.arg::<c_longlong>() },
+            ArgType::PtrDiff => VaArg { ptrdiff: self.list.arg::<ptrdiff_t>() },
+            ArgType::Size => VaArg { size: self.list.arg::<ssize_t>() },
+            ArgType::IntMax => VaArg { intmax: self.list.arg::<intmax_t>() },
+            ArgType::Double => VaArg { double: self.list.arg::<c_double>() },
+            ArgType::CharPtr => VaArg { char_ptr: self.list.arg::<*const c_char>() },
+            ArgType::VoidPtr => VaArg { void_ptr: self.list.arg::<*const c_void>() },
+            ArgType::IntPtr => VaArg { int_ptr: self.list.arg::<*mut c_int>() },
+            ArgType::ArgDefault => VaArg { arg_default: self.list.arg::<usize>() }
         }
     }
-    unsafe fn next<T: VaPrimitive + IntoUsize>(&mut self) -> T {
-        if self.i >= self.buf.len() {
-            self.buf.push(self.list.get::<T>().into_usize());
+
+    unsafe fn get(&mut self, ty: ArgType, i: Option<usize>) -> VaArg {
+        match i {
+            None => self.next(ty),
+            Some(i) => self.index(ty, i),
         }
-        let arg = T::from_usize(self.buf[self.i]);
+    }
+
+    unsafe fn next(&mut self, ty: ArgType) -> VaArg {
+        if self.i >= self.buf.len() {
+            let arg = self.get_arg(ty);
+            self.buf.push(arg);
+        }
+        let arg = self.buf[self.i];
         self.i += 1;
         arg
     }
-    unsafe fn index<T: VaPrimitive + IntoUsize>(&mut self, i: usize) -> T {
-        while self.buf.len() < i {
-            // Getting a usize here most definitely isn't sane, however,
-            // there's no way to know the type!
-            // Just take this for example:
-            //
-            // printf("%*4$d\n", "hi", 0, "hello", 10);
-            //
-            // This chooses the width 10. How does it know the type of 0 and "hello"?
-            // It clearly can't.
 
-            self.buf.push(self.list.get::<usize>());
+    unsafe fn index(&mut self, ty: ArgType, i: usize) -> VaArg {
+        if self.i >= self.buf.len() {
+            while self.buf.len() < (i - 1) {
+                // Getting a usize here most definitely isn't sane, however,
+                // there's no way to know the type!
+                // Just take this for example:
+                //
+                // printf("%*4$d\n", "hi", 0, "hello", 10);
+                //
+                // This chooses the width 10. How does it know the type of 0 and "hello"?
+                // It clearly can't.
+
+                let arg = self.get_arg(ArgType::ArgDefault);
+                self.buf.push(arg);
+            }
+            let arg = self.get_arg(ty);
+            self.buf.push(arg);
         }
-        T::from_usize(self.buf[i - 1])
+        self.buf[i - 1]
     }
 }
 
@@ -134,6 +138,7 @@ unsafe fn pop_int_raw(format: &mut *const u8) -> Option<usize> {
     }
     int
 }
+
 unsafe fn pop_int(format: &mut *const u8, ap: &mut BufferedVaList) -> Option<usize> {
     if **format == b'*' {
         *format = format.offset(1);
@@ -143,15 +148,16 @@ unsafe fn pop_int(format: &mut *const u8, ap: &mut BufferedVaList) -> Option<usi
         if let Some(i) = pop_int_raw(&mut format2) {
             if *format2 == b'$' {
                 *format = format2.offset(1);
-                return Some(ap.index::<usize>(i));
+                return Some(ap.index(ArgType::ArgDefault, i).arg_default);
             }
         }
 
-        Some(ap.next::<usize>())
+        Some(ap.next(ArgType::ArgDefault).arg_default)
     } else {
         pop_int_raw(format)
     }
 }
+
 unsafe fn fmt_int<I>(fmt: u8, i: I) -> String
 where
     I: fmt::Display + fmt::Octal + fmt::LowerHex + fmt::UpperHex,
@@ -164,6 +170,7 @@ where
         _ => panic!("fmt_int should never be called with the fmt {}", fmt),
     }
 }
+
 fn pad<W: Write>(
     w: &mut W,
     current_side: bool,
@@ -177,6 +184,7 @@ fn pad<W: Write>(
     }
     Ok(())
 }
+
 fn float_string(float: c_double, precision: usize, trim: bool) -> String {
     let mut string = format!("{:.p$}", float, p = precision);
     if trim {
@@ -192,6 +200,7 @@ fn float_string(float: c_double, precision: usize, trim: bool) -> String {
     }
     string
 }
+
 fn fmt_float_exp<W: Write>(
     w: &mut W,
     exp_fmt: u8,
@@ -244,6 +253,7 @@ fn fmt_float_exp<W: Write>(
 
     Ok(true)
 }
+
 fn fmt_float_normal<W: Write>(
     w: &mut W,
     trim: bool,
@@ -268,7 +278,8 @@ fn fmt_float_normal<W: Write>(
 
     Ok(string.len())
 }
-unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io::Result<c_int> {
+
+unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: va_list) -> io::Result<c_int> {
     let w = &mut platform::CountingWriter::new(w);
     let mut ap = BufferedVaList::new(ap);
     let mut format = format as *const u8;
@@ -356,17 +367,21 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                 b'%' => w.write_all(&[b'%'])?,
                 b'd' | b'i' => {
                     let string = match kind {
-                        // VaList does not seem to support these two:
-                        //   IntKind::Byte     => ap.get::<c_char>(index).to_string(),
-                        //   IntKind::Short    => ap.get::<c_short>(index).to_string(),
-                        IntKind::Byte => (ap.get::<c_int>(index) as c_char).to_string(),
-                        IntKind::Short => (ap.get::<c_int>(index) as c_short).to_string(),
-                        IntKind::Int => ap.get::<c_int>(index).to_string(),
-                        IntKind::Long => ap.get::<c_long>(index).to_string(),
-                        IntKind::LongLong => ap.get::<c_longlong>(index).to_string(),
-                        IntKind::PtrDiff => ap.get::<ptrdiff_t>(index).to_string(),
-                        IntKind::Size => ap.get::<ssize_t>(index).to_string(),
-                        IntKind::IntMax => ap.get::<intmax_t>(index).to_string(),
+                        // Per the C standard using va_arg with a type with a size
+                        // less than that of an int for integers and double for floats
+                        // is invalid. As a result any arguments smaller than an int or
+                        // double passed to a function will be promoted to the smallest
+                        // possible size. The va_list::arg function will handle this
+                        // automagically.
+                        IntKind::Byte => ap.get(ArgType::Byte, index).byte.to_string(),
+                        IntKind::Short => ap.get(ArgType::Short, index).short.to_string(),
+                        // Types that will not be promoted
+                        IntKind::Int => ap.get(ArgType::Int, index).int.to_string(),
+                        IntKind::Long => ap.get(ArgType::Long, index).long.to_string(),
+                        IntKind::LongLong => ap.get(ArgType::LongLong, index).longlong.to_string(),
+                        IntKind::PtrDiff => ap.get(ArgType::PtrDiff, index).ptrdiff.to_string(),
+                        IntKind::Size => ap.get(ArgType::Size, index).size.to_string(),
+                        IntKind::IntMax => ap.get(ArgType::IntMax, index).intmax.to_string(),
                     };
                     let positive = !string.starts_with('-');
                     let zero = precision == Some(0) && string == "0";
@@ -405,17 +420,15 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                 b'o' | b'u' | b'x' | b'X' => {
                     let fmt = *format;
                     let string = match kind {
-                        // VaList does not seem to support these two:
-                        //   IntKind::Byte     => fmt_int(kind ap.get::<c_char>(index)),
-                        //   IntKind::Short     => fmt_int(kind ap.get::<c_short>(index)),
-                        IntKind::Byte => fmt_int(fmt, ap.get::<c_uint>(index) as c_uchar),
-                        IntKind::Short => fmt_int(fmt, ap.get::<c_uint>(index) as c_ushort),
-                        IntKind::Int => fmt_int(fmt, ap.get::<c_uint>(index)),
-                        IntKind::Long => fmt_int(fmt, ap.get::<c_ulong>(index)),
-                        IntKind::LongLong => fmt_int(fmt, ap.get::<c_ulonglong>(index)),
-                        IntKind::PtrDiff => fmt_int(fmt, ap.get::<ptrdiff_t>(index)),
-                        IntKind::Size => fmt_int(fmt, ap.get::<size_t>(index)),
-                        IntKind::IntMax => fmt_int(fmt, ap.get::<uintmax_t>(index)),
+                        // va_list will promote the following two to a c_int
+                        IntKind::Byte => fmt_int(fmt, ap.get(ArgType::Byte, index).byte),
+                        IntKind::Short => fmt_int(fmt, ap.get(ArgType::Short, index).short),
+                        IntKind::Int => fmt_int(fmt, ap.get(ArgType::Int, index).int),
+                        IntKind::Long => fmt_int(fmt, ap.get(ArgType::Long, index).long),
+                        IntKind::LongLong => fmt_int(fmt, ap.get(ArgType::LongLong, index).longlong),
+                        IntKind::PtrDiff => fmt_int(fmt, ap.get(ArgType::PtrDiff, index).ptrdiff),
+                        IntKind::Size => fmt_int(fmt, ap.get(ArgType::Size, index).size),
+                        IntKind::IntMax => fmt_int(fmt, ap.get(ArgType::IntMax, index).intmax),
                     };
                     let zero = precision == Some(0) && string == "0";
 
@@ -460,7 +473,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                 }
                 b'e' | b'E' => {
                     let exp_fmt = *format;
-                    let mut float = ap.get::<c_double>(index);
+                    let mut float = ap.get(ArgType::Double, index).double;
                     let precision = precision.unwrap_or(6);
 
                     fmt_float_exp(
@@ -468,14 +481,14 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                     )?;
                 }
                 b'f' | b'F' => {
-                    let mut float = ap.get::<c_double>(index);
+                    let mut float = ap.get(ArgType::Double, index).double;
                     let precision = precision.unwrap_or(6);
 
                     fmt_float_normal(w, false, precision, float, left, pad_space, pad_zero)?;
                 }
                 b'g' | b'G' => {
                     let exp_fmt = b'E' | (*format & 32);
-                    let mut float = ap.get::<c_double>(index);
+                    let mut float = ap.get(ArgType::Double, index).double;
                     let precision = precision.unwrap_or(6);
 
                     if !fmt_float_exp(
@@ -495,7 +508,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                 b's' => {
                     // if kind == IntKind::Long || kind == IntKind::LongLong, handle *const wchar_t
 
-                    let ptr = ap.get::<*const c_char>(index);
+                    let ptr = ap.get(ArgType::CharPtr, index).char_ptr;
 
                     if ptr.is_null() {
                         w.write_all(b"(null)")?;
@@ -515,14 +528,14 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                 b'c' => {
                     // if kind == IntKind::Long || kind == IntKind::LongLong, handle wint_t
 
-                    let c = ap.get::<c_int>(index) as c_char;
+                    let c = ap.get(ArgType::Byte, index).byte;
 
                     pad(w, !left, b' ', 1..pad_space)?;
                     w.write_all(&[c as u8])?;
                     pad(w, left, b' ', 1..pad_space)?;
                 }
                 b'p' => {
-                    let ptr = ap.get::<*const c_void>(index);
+                    let ptr = ap.get(ArgType::VoidPtr, index).int_ptr;
 
                     let mut len = 1;
                     if ptr.is_null() {
@@ -544,7 +557,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
                     pad(w, left, b' ', len..pad_space)?;
                 }
                 b'n' => {
-                    let ptr = ap.get::<*mut c_int>(index);
+                    let ptr = ap.get(ArgType::IntPtr, index).int_ptr;
                     *ptr = w.written as c_int;
                 }
                 _ => return Ok(-1),
@@ -554,6 +567,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> io:
     }
     Ok(w.written as c_int)
 }
-pub unsafe fn printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> c_int {
+
+pub unsafe fn printf<W: Write>(w: W, format: *const c_char, ap: va_list) -> c_int {
     inner_printf(w, format, ap).unwrap_or(-1)
 }
