@@ -135,8 +135,17 @@ pub unsafe extern "C" fn pte_osThreadWaitForEnd(handle: pte_osThreadHandle) -> p
 }
 
 // pte_osResult pte_osThreadCancel(pte_osThreadHandle threadHandle)
+#[no_mangle]
+pub unsafe extern "C" fn pte_osThreadCancel(handle: pte_osThreadHandle) -> pte_osResult {
+    //TODO: allow cancel of thread
+    PTE_OS_OK
+}
 
 // pte_osResult pte_osThreadCheckCancel(pte_osThreadHandle threadHandle)
+#[no_mangle]
+pub unsafe extern "C" fn pte_osThreadCheckCancel(handle: pte_osThreadHandle) -> pte_osResult {
+    PTE_OS_OK
+}
 
 //void pte_osThreadSleep(unsigned int msecs)
 #[no_mangle]
@@ -286,6 +295,12 @@ pub unsafe extern "C" fn pte_osSemaphorePend(handle: pte_osSemaphoreHandle, pTim
         let _ = syscall::futex(handle, syscall::FUTEX_WAIT, *handle, 0, ptr::null_mut());
     }
     PTE_OS_OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pte_osSemaphoreCancellablePend(handle: pte_osSemaphoreHandle, pTimeout: *mut c_uint) -> pte_osResult {
+    //TODO
+    pte_osSemaphorePend(handle, pTimeout)
 }
 
 /*

@@ -57,12 +57,13 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
     }
 
+    // Set up argc and argv
     let argc = sp.argc();
     let argv = sp.argv();
-
     platform::inner_argv = copy_string_array(argv, argc as usize);
     platform::argv = platform::inner_argv.as_mut_ptr();
 
+    // Set up envp
     let envp = sp.envp();
     let mut len = 0;
     while ! (*envp.add(len)).is_null() {
@@ -76,6 +77,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     stdio::stdout = stdio::default_stdout.get();
     stdio::stderr = stdio::default_stderr.get();
 
+    // Call init section
     _init();
 
     // Look for the neighbor functions in memory until the end
