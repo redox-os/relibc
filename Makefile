@@ -50,12 +50,14 @@ install: all
 	cp -rv "$(BUILD)/include"/* "$(DESTDIR)/include"
 	cp -v "openlibm/include"/*.h "$(DESTDIR)/include"
 	cp -v "openlibm/src"/*.h "$(DESTDIR)/include"
+	cp -v "pthreads-emb/"*.h "$(DESTDIR)/include"
 	mkdir -pv "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/libc.a" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crt0.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
+	cp -v "$(BUILD)/pthreads-emb/libpthread.a" "$(DESTDIR)/lib/libpthread.a"
 
 libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o $(BUILD)/release/crti.o $(BUILD)/release/crtn.o $(BUILD)/include
 
