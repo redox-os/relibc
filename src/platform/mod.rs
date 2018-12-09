@@ -99,6 +99,47 @@ impl Read for FileReader {
     }
 }
 
+pub struct AllocStringWriter(pub *mut u8, pub usize);
+impl Write for AllocStringWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let ptr = unsafe {
+            realloc(self.0 as *mut c_void, self.1 + buf.len() + 1) as *mut u8
+        };
+        if ptr.is_null() {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "AllocStringWriter::write failed to allocate"
+            ));
+        }
+        self.0 = ptr;
+
+        unsafe {
+            ptr::copy_nonoverlapping(buf.as_ptr(), self.0.add(self.1), buf.len());
+            self.1 += buf.len();
+            *self.0.add(self.1) = 0;
+        }
+
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+impl fmt::Write for AllocStringWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        // can't fail
+        self.write(s.as_bytes()).unwrap();
+        Ok(())
+    }
+}
+impl WriteByte for AllocStringWriter {
+    fn write_u8(&mut self, byte: u8) -> fmt::Result {
+        // can't fail
+        self.write(&[byte]).unwrap();
+        Ok(())
+    }
+}
+
 pub struct StringWriter(pub *mut u8, pub usize);
 impl Write for StringWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {

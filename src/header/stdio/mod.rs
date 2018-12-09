@@ -921,6 +921,14 @@ pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn vasprintf(strp: *mut *mut c_char, format: *const c_char, ap: va_list) -> c_int {
+    let mut alloc_writer = platform::AllocStringWriter(ptr::null_mut(), 0);
+    let ret = printf::printf(&mut alloc_writer, format, ap);
+    *strp = alloc_writer.0 as *mut c_char;
+    ret
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn vsnprintf(
     s: *mut c_char,
     n: size_t,

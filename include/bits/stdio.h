@@ -9,6 +9,7 @@ typedef struct FILE FILE;
 extern "C" {
 #endif
 
+int asprintf(char **strp, const char * fmt, ...);
 int fprintf(FILE * stream, const char * fmt, ...);
 int printf(const char * fmt, ...);
 int snprintf(char *s, size_t n, const char * fmt, ...);
