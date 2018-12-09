@@ -16,6 +16,7 @@ pub struct timeval {
     pub tv_usec: suseconds_t,
 }
 #[repr(C)]
+#[derive(Default)]
 pub struct timezone {
     pub tz_minuteswest: c_int,
     pub tz_dsttime: c_int,

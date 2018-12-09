@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#define ENOTSUP EOPNOTSUPP
+
 //TODO extern __thread int errno;
 extern int errno;
 

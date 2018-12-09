@@ -36,6 +36,7 @@ pub mod sys_select;
 pub mod sys_socket;
 pub mod sys_stat;
 pub mod sys_time;
+pub mod sys_timeb;
 //pub mod sys_times;
 pub mod sys_un;
 pub mod sys_utsname;

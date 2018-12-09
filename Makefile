@@ -31,7 +31,7 @@ SRC=\
 
 .PHONY: all clean fmt include install libc libm test
 
-all: | libc libm
+all: | libc libm libpthread
 
 clean:
 	$(CARGO) clean
@@ -60,6 +60,8 @@ install: all
 libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o $(BUILD)/release/crti.o $(BUILD)/release/crtn.o $(BUILD)/include
 
 libm: $(BUILD)/openlibm/libopenlibm.a
+
+libpthread: $(BUILD)/pthreads-emb/libpthread.a
 
 sysroot: all
 	rm -rf $@
@@ -112,3 +114,13 @@ $(BUILD)/openlibm: openlibm
 
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/include
 	make CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libopenlibm.a
+
+$(BUILD)/pthreads-emb: pthreads-emb
+	rm -rf $@ $@.partial
+	mkdir -p $(BUILD)
+	cp -r $< $@.partial
+	mv $@.partial $@
+	touch $@
+
+$(BUILD)/pthreads-emb/libpthread.a: $(BUILD)/pthreads-emb $(BUILD)/include
+	make CC=$(CC) CFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libpthread.a

@@ -16,3 +16,6 @@
 [submodule "posix-regex"]
 	path = posix-regex
 	url = https://gitlab.redox-os.org/redox-os/posix-regex.git
+[submodule "pthreads-emb"]
+	path = pthreads-emb
+	url = https://gitlab.redox-os.org/redox-os/pthreads-emb.git
