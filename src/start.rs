@@ -44,6 +44,13 @@ unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut
     vec
 }
 
+// In the case that pthread is not linked, pthread_init can be replaced
+#[linkage = "weak"]
+#[no_mangle]
+extern "C" fn pthread_init() -> c_int {
+    0
+}
+
 #[inline(never)]
 #[no_mangle]
 pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
@@ -53,6 +60,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         static __init_array_start: extern "C" fn();
         static __init_array_end: extern "C" fn();
 
+        fn pthread_init() -> c_int;
         fn _init();
         fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
     }
@@ -76,6 +84,9 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     stdio::stdin = stdio::default_stdin.get();
     stdio::stdout = stdio::default_stdout.get();
     stdio::stderr = stdio::default_stderr.get();
+
+    // Initialize pthreads
+    pthread_init();
 
     // Call init section
     _init();
