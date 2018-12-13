@@ -21,7 +21,7 @@ pub struct mbstate_t;
 #[no_mangle]
 pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
     //Check for EOF
-    if c as wint_t == WEOF {
+    if c == EOF {
         return WEOF;
     }
 
@@ -39,6 +39,31 @@ pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
+    //TODO: Real multibyte
+    btowc(fgetc(stream))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fgetws(ws: *mut wchar_t, n: c_int, stream: *mut FILE) -> *mut wchar_t {
+    //TODO: lock
+    let mut i = 0;
+    while ((i + 1) as c_int) < n {
+        let wc = fgetwc(stream);
+        if wc == WEOF {
+            return ptr::null_mut();
+        }
+        *ws.add(i) = wc as wchar_t;
+        i += 1;
+    }
+    while (i as c_int) < n {
+        *ws.add(i) = 0;
+        i += 1;
+    }
+    ws
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn fputwc(wc: wchar_t, stream: *mut FILE) -> wint_t {
     //Convert wchar_t to multibytes first
     static mut INTERNAL: mbstate_t = mbstate_t;
@@ -53,9 +78,19 @@ pub unsafe extern "C" fn fputwc(wc: wchar_t, stream: *mut FILE) -> wint_t {
     wc as wint_t
 }
 
-// #[no_mangle]
-pub extern "C" fn fputws(ws: *const wchar_t, stream: *mut FILE) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn fputws(ws: *const wchar_t, stream: *mut FILE) -> c_int {
+    let mut i = 0;
+    loop {
+        let wc = *ws.add(i);
+        if wc == 0 {
+            return 0;
+        }
+        if fputwc(wc, stream) == WEOF {
+            return -1;
+        }
+        i += 1;
+    }
 }
 
 // #[no_mangle]
@@ -63,14 +98,14 @@ pub extern "C" fn fwide(stream: *mut FILE, mode: c_int) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn getwc(stream: *mut FILE) -> wint_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn getwc(stream: *mut FILE) -> wint_t {
+    fgetwc(stream)
 }
 
-// #[no_mangle]
-pub extern "C" fn getwchar() -> wint_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn getwchar() -> wint_t {
+    fgetwc(stdin)
 }
 
 #[no_mangle]
@@ -259,9 +294,9 @@ pub unsafe extern "C" fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t
     utf8::wcrtomb(s_cpy, wc_cpy, ps)
 }
 
-// #[no_mangle]
-pub extern "C" fn wcscat(ws1: *mut wchar_t, ws2: *const wchar_t) -> *mut wchar_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcscat(ws1: *mut wchar_t, ws2: *const wchar_t) -> *mut wchar_t {
+    wcsncat(ws1, ws2, usize::MAX)
 }
 
 #[no_mangle]
@@ -282,9 +317,10 @@ pub unsafe extern "C" fn wcscmp(ws1: *const wchar_t, ws2: *const wchar_t) -> c_i
     wcsncmp(ws1, ws2, usize::MAX)
 }
 
-// #[no_mangle]
-pub extern "C" fn wcscoll(ws1: *const wchar_t, ws2: *const wchar_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcscoll(ws1: *const wchar_t, ws2: *const wchar_t) -> c_int {
+    //TODO: locale comparison
+    wcscmp(ws1, ws2)
 }
 
 #[no_mangle]
@@ -326,9 +362,21 @@ pub unsafe extern "C" fn wcslen(ws: *const wchar_t) -> c_ulong {
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn wcsncat(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcsncat(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
+    let len = wcslen(ws1);
+    let dest = ws1.add(len as usize);
+    let mut i = 0;
+    while i < n {
+        let wc = *ws2.add(i);
+        if wc == 0 {
+            break;
+        }
+        *dest.add(i) = wc;
+        i += 1;
+    }
+    *dest.add(i) = 0;
+    ws1
 }
 
 #[no_mangle]
@@ -434,9 +482,13 @@ pub extern "C" fn wcsxfrm(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> 
     unimplemented!();
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn wctob(c: wint_t) -> c_int {
-    unimplemented!();
+    if c <= 0x7F {
+        c as c_int
+    } else {
+        EOF
+    }
 }
 
 // #[no_mangle]
