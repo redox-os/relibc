@@ -28,6 +28,7 @@ use io::{self, BufReader, SeekFrom};
 use super::types::*;
 use super::{errno, Pal, Read};
 
+mod extra;
 mod pte;
 mod signal;
 mod socket;
