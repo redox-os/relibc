@@ -1,7 +1,7 @@
 //! float.h implementation for Redox, following
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/float.h.html
 
-use header::fenv::{fegetround, FE_TONEAREST};
+use header::_fenv::{fegetround, FE_TONEAREST};
 use platform::types::*;
 
 pub const FLT_RADIX: c_int = 2;
