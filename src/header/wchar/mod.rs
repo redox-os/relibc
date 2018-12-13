@@ -1,10 +1,11 @@
 //! wchar implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/wchar.h.html
 
-use core::ptr;
+use core::{mem, ptr, usize};
 use va_list::VaList as va_list;
 
 use header::stdio::*;
 use header::stdlib::MB_CUR_MAX;
+use header::string;
 use header::time::*;
 use platform;
 use platform::types::*;
@@ -263,14 +264,22 @@ pub extern "C" fn wcscat(ws1: *mut wchar_t, ws2: *const wchar_t) -> *mut wchar_t
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn wcschr(ws1: *const wchar_t, ws2: wchar_t) -> *mut c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcschr(ws: *const wchar_t, wc: wchar_t) -> *mut c_int {
+    let mut i = 0;
+    loop {
+        if *ws.add(i) == wc {
+            return ws.add(i) as *mut wchar_t;
+        } else if *ws.add(i) == 0 {
+            return 0 as *mut wchar_t;
+        }
+        i += 1;
+    }
 }
 
-// #[no_mangle]
-pub extern "C" fn wcscmp(ws1: *const wchar_t, ws2: *const wchar_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcscmp(ws1: *const wchar_t, ws2: *const wchar_t) -> c_int {
+    wcsncmp(ws1, ws2, usize::MAX)
 }
 
 // #[no_mangle]
@@ -278,9 +287,17 @@ pub extern "C" fn wcscoll(ws1: *const wchar_t, ws2: *const wchar_t) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn wcscpy(ws1: *mut wchar_t, ws2: *const wchar_t) -> *mut wchar_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcscpy(ws1: *mut wchar_t, ws2: *const wchar_t) -> *mut wchar_t {
+    let mut i = 0;
+    loop {
+        let wc = *ws2.add(i);
+        *ws1.add(i) = wc;
+        i += 1;
+        if wc == 0 {
+            return ws1;
+        }
+    }
 }
 
 // #[no_mangle]
@@ -298,9 +315,15 @@ pub extern "C" fn wcsftime(
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn wcslen(ws: *const wchar_t) -> c_ulong {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcslen(ws: *const wchar_t) -> c_ulong {
+    let mut i = 0;
+    loop {
+        if *ws.add(i) == 0 {
+            return i as c_ulong;
+        }
+        i += 1;
+    }
 }
 
 // #[no_mangle]
@@ -308,14 +331,38 @@ pub extern "C" fn wcsncat(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> 
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn wcsncmp(ws1: *const wchar_t, ws2: *const wchar_t, n: size_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcsncmp(ws1: *const wchar_t, ws2: *const wchar_t, n: size_t) -> c_int {
+    let mut i = 0;
+    while i < n {
+        let wc1 = *ws1.add(i);
+        let wc2 = *ws2.add(i);
+        if wc1 != wc2 {
+            return wc1 - wc2;
+        } else if wc1 == 0 {
+            break;
+        }
+        i += 1;
+    }
+    0
 }
 
-// #[no_mangle]
-pub extern "C" fn wcsncpy(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcsncpy(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
+    let mut i = 0;
+    while i < n {
+        let wc = *ws2.add(i);
+        *ws1.add(i) = wc;
+        i += 1;
+        if wc == 0 {
+            break;
+        }
+    }
+    while i < n {
+        *ws1.add(i) = 0;
+        i += 1;
+    }
+    ws1
 }
 
 // #[no_mangle]
@@ -397,29 +444,50 @@ pub extern "C" fn wcwidth(wc: wchar_t) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn wmemchr(ws: *const wchar_t, wc: wchar_t, n: size_t) -> *mut c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wmemchr(ws: *const wchar_t, wc: wchar_t, n: size_t) -> *mut wchar_t {
+    let mut i = 0;
+    while i < n {
+        if *ws.add(i) == wc {
+            return ws.add(i) as *mut wchar_t;
+        }
+        i += 1;
+    }
+    0 as *mut wchar_t
 }
 
-// #[no_mangle]
-pub extern "C" fn wmemcmp(ws1: *const wchar_t, ws2: *const wchar_t, n: size_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wmemcmp(ws1: *const wchar_t, ws2: *const wchar_t, n: size_t) -> c_int {
+    let mut i = 0;
+    while i < n {
+        let wc1 = *ws1.add(i);
+        let wc2 = *ws2.add(i);
+        if wc1 != wc2 {
+            return wc1 - wc2;
+        }
+        i += 1;
+    }
+    0
 }
 
-// #[no_mangle]
-pub extern "C" fn wmemcpy(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wmemcpy(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
+    string::memcpy(ws1 as *mut c_void, ws2 as *const c_void, n * mem::size_of::<wchar_t>()) as *mut wchar_t
 }
 
-// #[no_mangle]
-pub extern "C" fn wmemmove(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wmemmove(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
+    string::memmove(ws1 as *mut c_void, ws2 as *const c_void, n * mem::size_of::<wchar_t>()) as *mut wchar_t
 }
 
-// #[no_mangle]
-pub extern "C" fn wmemset(ws1: *mut wchar_t, ws2: wchar_t, n: size_t) -> *mut wchar_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wmemset(ws: *mut wchar_t, wc: wchar_t, n: size_t) -> *mut wchar_t {
+    let mut i = 0;
+    while i < n {
+        *ws.add(i) = wc;
+        i += 1;
+    }
+    ws
 }
 
 // #[no_mangle]
