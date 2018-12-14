@@ -357,14 +357,28 @@ pub extern "C" fn ldiv(numer: c_long, denom: c_long) -> ldiv_t {
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn lrand48() -> c_long {
-    unimplemented!();
-}
-
 #[no_mangle]
 pub extern "C" fn llabs(i: c_longlong) -> c_longlong {
     i.abs()
+}
+
+#[repr(C)]
+pub struct lldiv_t {
+    quot: c_longlong,
+    rem: c_longlong,
+}
+
+#[no_mangle]
+pub extern "C" fn lldiv(numer: c_longlong, denom: c_longlong) -> lldiv_t {
+    lldiv_t {
+        quot: numer / denom,
+        rem: numer % denom,
+    }
+}
+
+// #[no_mangle]
+pub extern "C" fn lrand48() -> c_long {
+    unimplemented!();
 }
 
 #[no_mangle]
