@@ -35,6 +35,7 @@ pub mod sys_mman;
 pub mod sys_select;
 pub mod sys_socket;
 pub mod sys_stat;
+pub mod sys_statvfs;
 pub mod sys_time;
 pub mod sys_timeb;
 //pub mod sys_times;

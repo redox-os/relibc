@@ -21,6 +21,9 @@ typedef int clockid_t;
 typedef void* timer_t;
 typedef unsigned long int blkcnt_t;
 
+typedef unsigned long int fsblkcnt_t;
+typedef unsigned long int fsfilcnt_t;
+
 typedef unsigned char u_char, uchar;
 typedef unsigned short u_short, ushort;
 typedef unsigned int u_int, uint;

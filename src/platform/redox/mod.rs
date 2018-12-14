@@ -6,6 +6,7 @@ use core::result::Result as CoreResult;
 use core::{mem, ptr, slice};
 use spin::{Mutex, MutexGuard, Once};
 use syscall::data::Stat as redox_stat;
+use syscall::data::StatVfs as redox_statvfs;
 use syscall::data::TimeSpec as redox_timespec;
 use syscall::{self, Result};
 
@@ -17,6 +18,7 @@ use header::fcntl;
 use header::poll::{self, nfds_t, pollfd};
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
+use header::sys_statvfs::statvfs;
 use header::sys_time::{timeval, timezone};
 use header::sys_utsname::{utsname, UTSLENGTH};
 use header::termios::termios;
@@ -354,6 +356,32 @@ impl Pal for Sys {
                             tv_sec: redox_buf.st_ctime as time_t,
                             tv_nsec: redox_buf.st_ctime_nsec as c_long,
                         };
+                    }
+                }
+                0
+            }
+            _ => -1,
+        }
+    }
+
+    fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
+        let mut kbuf: redox_statvfs = redox_statvfs::default();
+        match e(syscall::fstatvfs(fildes as usize, &mut kbuf)) {
+            0 => {
+                unsafe {
+                    if !buf.is_null() {
+                        (*buf).f_bsize = kbuf.f_bsize as c_ulong;
+                        (*buf).f_frsize = kbuf.f_bsize as c_ulong;
+                        (*buf).f_blocks = kbuf.f_blocks;
+                        (*buf).f_bfree = kbuf.f_bfree;
+                        (*buf).f_bavail = kbuf.f_bavail;
+                        //TODO
+                        (*buf).f_files = 0;
+                        (*buf).f_ffree = 0;
+                        (*buf).f_favail = 0;
+                        (*buf).f_fsid = 0;
+                        (*buf).f_flag = 0;
+                        (*buf).f_namemax = 0;
                     }
                 }
                 0

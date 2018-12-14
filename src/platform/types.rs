@@ -60,6 +60,9 @@ pub type nlink_t = c_ulong;
 pub type blksize_t = c_long;
 pub type blkcnt_t = c_ulong;
 
+pub type fsblkcnt_t = c_ulong;
+pub type fsfilcnt_t = c_ulong;
+
 pub type useconds_t = c_uint;
 pub type suseconds_t = c_int;
 

@@ -16,6 +16,7 @@ fn main() {
         .file("src/c/fcntl.c")
         .file("src/c/stack_chk.c")
         .file("src/c/stdio.c")
+        .file("src/c/stdlib.c")
         .file("src/c/unistd.c")
         .compile("relibc_c");
 

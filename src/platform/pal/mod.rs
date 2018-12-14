@@ -4,6 +4,7 @@ use header::dirent::dirent;
 use header::poll::{nfds_t, pollfd};
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
+use header::sys_statvfs::statvfs;
 use header::sys_time::{timeval, timezone};
 use header::sys_utsname::utsname;
 use header::termios::termios;
@@ -47,6 +48,8 @@ pub trait Pal {
     fn flock(fd: c_int, operation: c_int) -> c_int;
 
     fn fstat(fildes: c_int, buf: *mut stat) -> c_int;
+
+    fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int;
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int;
 

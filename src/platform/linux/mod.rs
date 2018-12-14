@@ -14,6 +14,7 @@ use header::sys_ioctl::{winsize, TCGETS, TCSETS, TIOCGWINSZ};
 // use header::sys_resource::rusage;
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
+use header::sys_statvfs::statvfs;
 use header::sys_time::{itimerval, timeval, timezone};
 // use header::sys_times::tms;
 use header::sys_utsname::utsname;
@@ -26,6 +27,23 @@ mod socket;
 const AT_FDCWD: c_int = -100;
 const AT_EMPTY_PATH: c_int = 0x1000;
 const AT_REMOVEDIR: c_int = 0x200;
+
+#[repr(C)]
+#[derive(Default)]
+struct linux_statfs {
+    f_type: c_long, /* type of file system (see below) */
+    f_bsize: c_long, /* optimal transfer block size */
+    f_blocks: fsblkcnt_t, /* total data blocks in file system */
+    f_bfree: fsblkcnt_t, /* free blocks in fs */
+    f_bavail: fsblkcnt_t, /* free blocks available to unprivileged user */
+    f_files: fsfilcnt_t, /* total file nodes in file system */
+    f_ffree: fsfilcnt_t, /* free file nodes in fs */
+    f_fsid: c_long, /* file system id */
+    f_namelen: c_long, /* maximum length of filenames */
+    f_frsize: c_long, /* fragment size (since Linux 2.6) */
+    f_flags: c_long,
+    f_spare: [c_long; 4],
+}
 
 fn e(sys: usize) -> usize {
     if (sys as isize) < 0 && (sys as isize) >= -256 {
@@ -139,6 +157,34 @@ impl Pal for Sys {
         let empty = b"\0";
         let empty_ptr = empty.as_ptr() as *const c_char;
         e(unsafe { syscall!(NEWFSTATAT, fildes, empty_ptr, buf, AT_EMPTY_PATH) }) as c_int
+    }
+
+    fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
+        let mut kbuf = linux_statfs::default();
+        let kbuf_ptr = &mut kbuf as *mut linux_statfs;
+        let res = e(unsafe { syscall!(FSTATFS, fildes, kbuf_ptr) }) as c_int;
+        if res == 0 {
+            unsafe {
+                if ! buf.is_null() {
+                    (*buf).f_bsize = kbuf.f_bsize as c_ulong;
+                    (*buf).f_frsize = if kbuf.f_frsize != 0 {
+                        kbuf.f_frsize
+                    } else {
+                        kbuf.f_bsize
+                    } as c_ulong;
+                    (*buf).f_blocks = kbuf.f_blocks;
+                    (*buf).f_bfree = kbuf.f_bfree;
+                    (*buf).f_bavail = kbuf.f_bavail;
+                    (*buf).f_files = kbuf.f_files;
+                    (*buf).f_ffree = kbuf.f_ffree;
+                    (*buf).f_favail = kbuf.f_ffree;
+                    (*buf).f_fsid = kbuf.f_fsid as c_ulong;
+                    (*buf).f_flag = kbuf.f_flags as c_ulong;
+                    (*buf).f_namemax = kbuf.f_namelen as c_ulong;
+                }
+            }
+        }
+        res
     }
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
