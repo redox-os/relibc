@@ -34,6 +34,11 @@ static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
 static mut RNG: Option<XorShiftRng> = None;
 
 #[no_mangle]
+pub extern "C" fn _Exit(status: c_int) {
+    unistd::_exit(status);
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn a64l(s: *const c_char) -> c_long {
     if s.is_null() {
         return 0;
@@ -142,6 +147,11 @@ pub extern "C" fn atoi(s: *const c_char) -> c_int {
 #[no_mangle]
 pub extern "C" fn atol(s: *const c_char) -> c_long {
     dec_num_from_ascii!(s, c_long)
+}
+
+#[no_mangle]
+pub extern "C" fn atoll(s: *const c_char) -> c_longlong {
+    dec_num_from_ascii!(s, c_longlong)
 }
 
 unsafe extern "C" fn void_cmp(a: *const c_void, b: *const c_void) -> c_int {

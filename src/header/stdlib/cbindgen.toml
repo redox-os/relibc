@@ -2,7 +2,7 @@ sys_includes = ["stddef.h", "alloca.h"]
 include_guard = "_STDLIB_H"
 trailer = "#include <bits/stdlib.h>"
 language = "C"
-style = "Tag"
+style = "Type"
 
 [enum]
 prefix_with_name = true

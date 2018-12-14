@@ -38,6 +38,7 @@ EXPECT_BINS=\
 	stdlib/a64l \
 	stdlib/atof \
 	stdlib/atoi \
+	stdlib/div \
 	stdlib/env \
 	stdlib/mkostemps \
 	stdlib/rand \
