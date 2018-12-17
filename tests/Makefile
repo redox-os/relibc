@@ -23,6 +23,7 @@ EXPECT_BINS=\
 	stdio/all \
 	stdio/buffer \
 	stdio/fgets \
+	stdio/fputs \
 	stdio/fread \
 	stdio/freopen \
 	stdio/fseek \
