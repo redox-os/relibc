@@ -4,8 +4,21 @@
 
 int main(int argc, char ** argv) {
 	FILE *f = fopen("stdio/fwrite.out", "w");
-	char *in = "Hello World!";
-	fputs(in, f); // calls fwrite, helpers::fwritex, internal::to_write and internal::stdio_write
+	const char ptr[] = "Hello World!";
+
+	if (fwrite(ptr, 0, 17, f)) {
+		return -1;
+	}
+
+	if (fwrite(ptr, 7, 0, f)) {
+		return -1;
+	}
+
+	if (fwrite(ptr, 0, 0, f)) {
+		return -1;
+	}
+
+	fwrite(ptr, sizeof(ptr), 1, f);
 	fclose(f);
 	return 0;
 }
