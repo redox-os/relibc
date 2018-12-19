@@ -1,4 +1,4 @@
-//! netdb implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/netdb.h.html
+//! netdb implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xns/netdb.h.html
 
 mod dns;
 
@@ -419,11 +419,11 @@ pub unsafe extern "C" fn gethostbyaddr(
     v: *const c_void,
     length: socklen_t,
     format: c_int,
-) -> *const hostent {
+) -> *mut hostent {
     let addr: in_addr = *(v as *mut in_addr);
 
     // check the hosts file first
-    let mut p: *const hostent;
+    let mut p: *mut hostent;
     sethostent(HOST_STAYOPEN);
     while {
         p = gethostent();
@@ -468,17 +468,17 @@ pub unsafe extern "C" fn gethostbyaddr(
                 h_length: length as i32,
                 h_addr_list: HOST_ADDR_LIST.as_mut_ptr(),
             };
-            &HOST_ENTRY
+            &mut HOST_ENTRY
         }
         Err(e) => {
             platform::errno = e;
-            ptr::null()
+            ptr::null_mut()
         }
     }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *const hostent {
+pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     // check if some idiot gave us an address instead of a name
     let name_cstr = CStr::from_ptr(name);
     let mut octets = str::from_utf8_unchecked(name_cstr.to_bytes()).split('.');
@@ -503,7 +503,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *const hostent {
     }
 
     // check the hosts file first
-    let mut p: *const hostent;
+    let mut p: *mut hostent;
     sethostent(HOST_STAYOPEN);
     while {
         p = gethostent();
@@ -535,14 +535,14 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *const hostent {
         Ok(lookuphost) => lookuphost,
         Err(e) => {
             platform::errno = e;
-            return ptr::null();
+            return ptr::null_mut();
         }
     };
     let host_addr = match host.next() {
         Some(result) => result,
         None => {
             platform::errno = ENOENT;
-            return ptr::null();
+            return ptr::null_mut();
         }
     };
 
@@ -568,11 +568,11 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *const hostent {
         h_addr_list: HOST_ADDR_LIST.as_mut_ptr(),
     };
     sethostent(HOST_STAYOPEN);
-    &HOST_ENTRY as *const hostent
+    &mut HOST_ENTRY as *mut hostent
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gethostent() -> *const hostent {
+pub unsafe extern "C" fn gethostent() -> *mut hostent {
     if HOSTDB == 0 {
         HOSTDB = Sys::open(&CString::new("/etc/hosts").unwrap(), O_RDONLY, 0);
     }
@@ -587,7 +587,7 @@ pub unsafe extern "C" fn gethostent() -> *const hostent {
                 if HOST_STAYOPEN == 0 {
                     endhostent();
                 }
-                return ptr::null();
+                return ptr::null_mut();
             }
         };
     }
@@ -641,24 +641,24 @@ pub unsafe extern "C" fn gethostent() -> *const hostent {
     if HOST_STAYOPEN == 0 {
         endhostent();
     }
-    &HOST_ENTRY as *const hostent
+    &mut HOST_ENTRY as *mut hostent
 }
 
-pub unsafe extern "C" fn getnetbyaddr(net: u32, net_type: c_int) -> *const netent {
+pub unsafe extern "C" fn getnetbyaddr(net: u32, net_type: c_int) -> *mut netent {
     unimplemented!();
 }
 
-pub unsafe extern "C" fn getnetbyname(name: *const c_char) -> *const netent {
+pub unsafe extern "C" fn getnetbyname(name: *const c_char) -> *mut netent {
     unimplemented!();
 }
 
-pub unsafe extern "C" fn getnetent() -> *const netent {
+pub unsafe extern "C" fn getnetent() -> *mut netent {
     unimplemented!();
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn getprotobyname(name: *const c_char) -> *const protoent {
-    let mut p: *const protoent;
+pub unsafe extern "C" fn getprotobyname(name: *const c_char) -> *mut protoent {
+    let mut p: *mut protoent;
     setprotoent(PROTO_STAYOPEN);
     while {
         p = getprotoent();
@@ -689,13 +689,13 @@ pub unsafe extern "C" fn getprotobyname(name: *const c_char) -> *const protoent 
     setprotoent(PROTO_STAYOPEN);
 
     platform::errno = ENOENT;
-    ptr::null() as *const protoent
+    ptr::null_mut() as *mut protoent
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn getprotobynumber(number: c_int) -> *const protoent {
+pub unsafe extern "C" fn getprotobynumber(number: c_int) -> *mut protoent {
     setprotoent(PROTO_STAYOPEN);
-    let mut p: *const protoent;
+    let mut p: *mut protoent;
     while {
         p = getprotoent();
         !p.is_null()
@@ -707,11 +707,11 @@ pub unsafe extern "C" fn getprotobynumber(number: c_int) -> *const protoent {
     }
     setprotoent(PROTO_STAYOPEN);
     platform::errno = ENOENT;
-    ptr::null() as *const protoent
+    ptr::null_mut() as *mut protoent
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn getprotoent() -> *const protoent {
+pub unsafe extern "C" fn getprotoent() -> *mut protoent {
     if PROTODB == 0 {
         PROTODB = Sys::open(&CString::new("/etc/protocols").unwrap(), O_RDONLY, 0);
     }
@@ -727,7 +727,7 @@ pub unsafe extern "C" fn getprotoent() -> *const protoent {
                 if PROTO_STAYOPEN == 0 {
                     endprotoent();
                 }
-                return ptr::null();
+                return ptr::null_mut();
             }
         };
     }
@@ -766,16 +766,16 @@ pub unsafe extern "C" fn getprotoent() -> *const protoent {
     if PROTO_STAYOPEN == 0 {
         endprotoent();
     }
-    &PROTO_ENTRY as *const protoent
+    &mut PROTO_ENTRY as *mut protoent
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn getservbyname(
     name: *const c_char,
     proto: *const c_char,
-) -> *const servent {
+) -> *mut servent {
     setservent(SERV_STAYOPEN);
-    let mut p: *const servent;
+    let mut p: *mut servent;
     if proto.is_null() {
         while {
             p = getservent();
@@ -799,13 +799,13 @@ pub unsafe extern "C" fn getservbyname(
     }
     setservent(SERV_STAYOPEN);
     platform::errno = ENOENT;
-    ptr::null() as *const servent
+    ptr::null_mut() as *mut servent
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn getservbyport(port: c_int, proto: *const c_char) -> *const servent {
+pub unsafe extern "C" fn getservbyport(port: c_int, proto: *const c_char) -> *mut servent {
     setservent(SERV_STAYOPEN);
-    let mut p: *const servent;
+    let mut p: *mut servent;
     if proto.is_null() {
         while {
             p = getservent();
@@ -829,11 +829,11 @@ pub unsafe extern "C" fn getservbyport(port: c_int, proto: *const c_char) -> *co
     }
     setservent(SERV_STAYOPEN);
     platform::errno = ENOENT;
-    ptr::null()
+    ptr::null_mut()
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn getservent() -> *const servent {
+pub unsafe extern "C" fn getservent() -> *mut servent {
     if SERVDB == 0 {
         SERVDB = Sys::open(&CString::new("/etc/services").unwrap(), O_RDONLY, 0);
     }
@@ -849,7 +849,7 @@ pub unsafe extern "C" fn getservent() -> *const servent {
                 if SERV_STAYOPEN == 0 {
                     endservent();
                 }
-                return ptr::null();
+                return ptr::null_mut();
             }
         };
 
@@ -914,7 +914,7 @@ pub unsafe extern "C" fn getservent() -> *const servent {
         if SERV_STAYOPEN == 0 {
             endservent();
         }
-        break &SERV_ENTRY as *const servent;
+        break &mut SERV_ENTRY as *mut servent;
     }
 }
 
