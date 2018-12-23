@@ -1,7 +1,7 @@
 #ifndef _SETJMP_H
 #define _SETJMP_H
 
-#ifdef __arch64__
+#ifdef __aarch64__
 typedef unsigned long jmp_buf[22];
 #endif
 
