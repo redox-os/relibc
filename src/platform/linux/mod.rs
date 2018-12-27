@@ -240,7 +240,8 @@ impl Pal for Sys {
     }
 
     fn getpagesize() -> c_int {
-        e(unsafe { syscall!(GETPAGESIZE) }) as c_int
+        //TODO
+        4096
     }
 
     fn getpgid(pid: pid_t) -> pid_t {
