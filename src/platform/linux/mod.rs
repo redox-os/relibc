@@ -239,6 +239,10 @@ impl Pal for Sys {
         e(unsafe { syscall!(GETGID) }) as gid_t
     }
 
+    fn getpagesize() -> c_int {
+        e(unsafe { syscall!(GETPAGESIZE) }) as c_int
+    }
+
     fn getpgid(pid: pid_t) -> pid_t {
         e(unsafe { syscall!(GETPGID, pid) }) as pid_t
     }

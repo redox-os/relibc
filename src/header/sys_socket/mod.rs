@@ -111,10 +111,10 @@ pub unsafe extern "C" fn getsockopt(
     )
 }
 
-// #[no_mangle]
-// pub unsafe extern "C" fn listen(socket: c_int, backlog: c_int) -> c_int {
-//     Sys::listen(socket, backlog)
-// }
+#[no_mangle]
+pub unsafe extern "C" fn listen(socket: c_int, backlog: c_int) -> c_int {
+    Sys::listen(socket, backlog)
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn recv(
@@ -204,10 +204,10 @@ pub unsafe extern "C" fn setsockopt(
     )
 }
 
-// #[no_mangle]
-// pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {
-//     Sys::shutdown(socket, how)
-// }
+#[no_mangle]
+pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {
+    Sys::shutdown(socket, how)
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {

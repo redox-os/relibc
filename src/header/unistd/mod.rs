@@ -321,9 +321,9 @@ pub extern "C" fn getlogin_r(name: *mut c_char, namesize: size_t) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn getpagesize() -> c_int {
-    unimplemented!();
+    Sys::getpagesize()
 }
 
 // #[no_mangle]

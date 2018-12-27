@@ -75,6 +75,8 @@ pub trait Pal {
 
     fn getgid() -> gid_t;
 
+    fn getpagesize() -> c_int;
+
     fn getpgid(pid: pid_t) -> pid_t;
 
     fn getpid() -> pid_t;

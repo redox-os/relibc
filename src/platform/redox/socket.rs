@@ -144,6 +144,11 @@ impl PalSocket for Sys {
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
     }
 
+    fn listen(socket: c_int, backlog: c_int) -> c_int {
+        // Redox has no need to listen
+        0
+    }
+
     unsafe fn recvfrom(
         socket: c_int,
         buf: *mut c_void,
@@ -203,6 +208,10 @@ impl PalSocket for Sys {
         option_value: *const c_void,
         option_len: socklen_t,
     ) -> c_int {
+        e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
+    }
+
+    fn shutdown(socket: c_int, how: c_int) -> c_int {
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
     }
 

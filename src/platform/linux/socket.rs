@@ -4,14 +4,6 @@ use super::{e, Sys};
 use header::sys_socket::{sockaddr, socklen_t};
 
 impl Sys {
-    fn listen(socket: c_int, backlog: c_int) -> c_int {
-        e(unsafe { syscall!(LISTEN, socket, backlog) }) as c_int
-    }
-
-    fn shutdown(socket: c_int, how: c_int) -> c_int {
-        e(unsafe { syscall!(SHUTDOWN, socket, how) }) as c_int
-    }
-
     fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *mut c_int) -> c_int {
         e(unsafe { syscall!(SOCKETPAIR, domain, kind, protocol, socket_vector) }) as c_int
     }
@@ -65,6 +57,10 @@ impl PalSocket for Sys {
         }) as c_int
     }
 
+    fn listen(socket: c_int, backlog: c_int) -> c_int {
+        e(unsafe { syscall!(LISTEN, socket, backlog) }) as c_int
+    }
+
     unsafe fn recvfrom(
         socket: c_int,
         buf: *mut c_void,
@@ -114,6 +110,10 @@ impl PalSocket for Sys {
                 option_len
             )
         }) as c_int
+    }
+
+    fn shutdown(socket: c_int, how: c_int) -> c_int {
+        e(unsafe { syscall!(SHUTDOWN, socket, how) }) as c_int
     }
 
     unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
