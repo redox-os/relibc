@@ -1,10 +1,9 @@
 //! sys/socket implementation, following http://pubs.opengroup.org/onlinepubs/009696699/basedefs/sys/socket.h.html
 
-use alloc::collections::BTreeMap;
 use cbitset::BitSet;
 use core::result::Result as CoreResult;
 use core::{mem, ptr, slice};
-use spin::{Mutex, MutexGuard, Once};
+use syscall::data::Map;
 use syscall::data::Stat as redox_stat;
 use syscall::data::StatVfs as redox_statvfs;
 use syscall::data::TimeSpec as redox_timespec;
@@ -16,6 +15,7 @@ use header::dirent::dirent;
 use header::errno::{EINVAL, EIO, EPERM};
 use header::fcntl;
 use header::poll::{self, nfds_t, pollfd};
+use header::sys_mman::MAP_ANON;
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
 use header::sys_statvfs::statvfs;
@@ -34,16 +34,6 @@ mod extra;
 mod pte;
 mod signal;
 mod socket;
-
-const MAP_ANON: c_int = 1;
-
-static ANONYMOUS_MAPS: Once<Mutex<BTreeMap<usize, usize>>> = Once::new();
-
-fn anonymous_maps() -> MutexGuard<'static, BTreeMap<usize, usize>> {
-    ANONYMOUS_MAPS
-        .call_once(|| Mutex::new(BTreeMap::new()))
-        .lock()
-}
 
 fn e(sys: Result<usize>) -> usize {
     match sys {
@@ -625,36 +615,36 @@ impl Pal for Sys {
     unsafe fn mmap(
         _addr: *mut c_void,
         len: usize,
-        _prot: c_int,
+        prot: c_int,
         flags: c_int,
         fildes: c_int,
         off: off_t,
     ) -> *mut c_void {
+        let map = Map {
+            offset: off as usize,
+            size: len,
+            flags: ((prot as usize) << 16) | ((flags as usize) & 0xFFFF)
+        };
+
         if flags & MAP_ANON == MAP_ANON {
             let fd = e(syscall::open("memory:", syscall::O_STAT | syscall::O_CLOEXEC)); // flags don't matter currently
             if fd == !0 {
                 return !0 as *mut c_void;
             }
 
-            let addr = e(syscall::fmap(fd, off as usize, len as usize));
-            if addr == !0 {
-                let _ = syscall::close(fd);
-                return !0 as *mut c_void;
-            }
+            let addr = e(syscall::fmap(fd, &map)) as *mut c_void;
 
-            anonymous_maps().insert(addr as usize, fd);
-            addr as *mut c_void
+            let _ = syscall::close(fd);
+
+            addr
         } else {
-            e(syscall::fmap(fildes as usize, off as usize, len as usize)) as *mut c_void
+            e(syscall::fmap(fildes as usize, &map)) as *mut c_void
         }
     }
 
     unsafe fn munmap(addr: *mut c_void, _len: usize) -> c_int {
         if e(syscall::funmap(addr as usize)) == !0 {
             return !0;
-        }
-        if let Some(fd) = anonymous_maps().remove(&(addr as usize)) {
-            let _ = syscall::close(fd);
         }
         0
     }
