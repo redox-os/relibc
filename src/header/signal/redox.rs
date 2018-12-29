@@ -51,6 +51,7 @@ pub const SIGWINCH: usize = 28;
 pub const SIGIO: usize = 29;
 pub const SIGPWR: usize = 30;
 pub const SIGSYS: usize = 31;
+pub const NSIG: usize = 32;
 
 pub const SA_NOCLDSTOP: usize = 0x00000001;
 pub const SA_NOCLDWAIT: usize = 0x00000002;

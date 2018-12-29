@@ -53,17 +53,6 @@ pub extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
     Sys::gettimeofday(tp, tzp)
 }
 
-// #[no_mangle]
-pub extern "C" fn select(
-    nfds: c_int,
-    readfds: *mut fd_set,
-    writefds: *mut fd_set,
-    errorfds: *mut fd_set,
-    timeout: *mut timeval,
-) -> c_int {
-    unimplemented!();
-}
-
 #[no_mangle]
 pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c_int {
     let path = CStr::from_ptr(path);
@@ -79,10 +68,3 @@ pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c
     ];
     Sys::utimens(path, times_spec.as_ptr())
 }
-
-/*
-#[no_mangle]
-pub extern "C" fn func(args) -> c_int {
-    unimplemented!();
-}
-*/

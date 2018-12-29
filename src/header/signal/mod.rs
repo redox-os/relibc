@@ -36,7 +36,6 @@ pub struct sigaction {
     pub sa_mask: sigset_t,
 }
 
-pub const NSIG: usize = 64;
 pub type sigset_t = c_ulong;
 
 #[no_mangle]

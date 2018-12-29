@@ -7,7 +7,7 @@ use super::super::{Pal, PalSignal};
 use super::{e, Sys};
 use header::errno::EINVAL;
 use header::signal::{sigaction, sigset_t};
-use header::sys_time::itimerval;
+use header::sys_time::{ITIMER_REAL, itimerval};
 
 impl PalSignal for Sys {
     fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
@@ -20,7 +20,7 @@ impl PalSignal for Sys {
         };
 
         let fd = e(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC));
-        if fd < 0 {
+        if fd == !0 {
             return -1;
         }
 
@@ -29,7 +29,7 @@ impl PalSignal for Sys {
 
         let _ = syscall::close(fd);
 
-        if count < 0 {
+        if count == !0 {
             return -1;
         }
 
@@ -65,7 +65,7 @@ impl PalSignal for Sys {
         };
 
         let fd = e(syscall::open(path, syscall::O_RDWR | syscall::O_CLOEXEC));
-        if fd < 0 {
+        if fd == !0 {
             return -1;
         }
 
@@ -73,7 +73,7 @@ impl PalSignal for Sys {
 
         let mut count = e(syscall::read(fd, &mut spec));
 
-        if count >= 0 {
+        if count != !0 {
             unsafe {
                 if ! old.is_null() {
                     (*old).it_interval.tv_sec = spec.it_interval.tv_sec;
@@ -93,7 +93,7 @@ impl PalSignal for Sys {
 
         let _ = syscall::close(fd);
 
-        if count < 0 {
+        if count == !0 {
             return -1;
         }
 
