@@ -425,7 +425,7 @@ pub unsafe extern "C" fn fread(
     nitems: size_t,
     stream: *mut FILE,
 ) -> size_t {
-    if size == 0 || count == 0 {
+    if size == 0 || nitems == 0 {
         return 0;
     }
 
