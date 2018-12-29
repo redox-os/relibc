@@ -422,11 +422,15 @@ pub unsafe extern "C" fn fputs(s: *const c_char, stream: *mut FILE) -> c_int {
 pub unsafe extern "C" fn fread(
     ptr: *mut c_void,
     size: size_t,
-    count: size_t,
+    nitems: size_t,
     stream: *mut FILE,
 ) -> size_t {
+    if size == 0 || count == 0 {
+        return 0;
+    }
+
     let mut stream = (*stream).lock();
-    let buf = slice::from_raw_parts_mut(ptr as *mut u8, size as usize * count as usize);
+    let buf = slice::from_raw_parts_mut(ptr as *mut u8, size as usize * nitems as usize);
     let mut read = 0;
     while read < buf.len() {
         match stream.read(&mut buf[read..]) {
