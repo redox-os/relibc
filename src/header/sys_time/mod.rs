@@ -3,7 +3,7 @@
 use c_str::CStr;
 use header::time::timespec;
 use platform::types::*;
-use platform::{Pal, Sys};
+use platform::{Pal, PalSignal, Sys};
 
 pub const ITIMER_REAL: c_int = 0;
 pub const ITIMER_VIRTUAL: c_int = 1;
@@ -34,19 +34,19 @@ pub struct fd_set {
     pub fds_bits: [c_long; 16usize],
 }
 
-// #[no_mangle]
-// pub extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
-//     Sys::getitimer(which, value)
-// }
+#[no_mangle]
+pub extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
+    Sys::getitimer(which, value)
+}
 
-// #[no_mangle]
-// pub extern "C" fn setitimer(
-//     which: c_int,
-//     value: *const itimerval,
-//     ovalue: *mut itimerval,
-// ) -> c_int {
-//     Sys::setitimer(which, value, ovalue)
-// }
+#[no_mangle]
+pub extern "C" fn setitimer(
+    which: c_int,
+    value: *const itimerval,
+    ovalue: *mut itimerval,
+) -> c_int {
+    Sys::setitimer(which, value, ovalue)
+}
 
 #[no_mangle]
 pub extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {

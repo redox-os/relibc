@@ -30,14 +30,9 @@ pub const SIG_SETMASK: c_int = 2;
 #[repr(C)]
 #[derive(Clone)]
 pub struct sigaction {
-    // I don't actually want these to be optional. They can have more than just
-    // one invalid value. But because of rust's non-null optimization, this
-    // causes Some(sigaction) with a null sa_handler to become None.  Maybe
-    // these should be usizes and transmuted when needed... However, then I
-    // couldn't let cbindgen do its job.
-    pub sa_handler: Option<extern "C" fn(c_int)>,
+    pub sa_handler: extern "C" fn(c_int),
     pub sa_flags: c_ulong,
-    pub sa_restorer: Option<unsafe extern "C" fn()>,
+    pub sa_restorer: unsafe extern "C" fn(),
     pub sa_mask: sigset_t,
 }
 
@@ -150,12 +145,12 @@ extern "C" {
 #[no_mangle]
 pub extern "C" fn signal(
     sig: c_int,
-    func: Option<extern "C" fn(c_int)>,
-) -> Option<extern "C" fn(c_int)> {
+    func: extern "C" fn(c_int),
+) -> extern "C" fn(c_int) {
     let sa = sigaction {
         sa_handler: func,
         sa_flags: SA_RESTART as c_ulong,
-        sa_restorer: Some(__restore_rt),
+        sa_restorer: __restore_rt,
         sa_mask: sigset_t::default(),
     };
     let mut old_sa = unsafe { mem::uninitialized() };
@@ -176,10 +171,10 @@ pub extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
-// pub extern "C" fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
-//     Sys::sigprocmask(how, set, oset)
-// }
+#[no_mangle]
+pub extern "C" fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
+    Sys::sigprocmask(how, set, oset)
+}
 
 // #[no_mangle]
 pub extern "C" fn sigrelse(sig: c_int) -> c_int {
