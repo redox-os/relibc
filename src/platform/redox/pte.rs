@@ -6,9 +6,14 @@ use syscall;
 
 use platform::types::{c_int, c_uint, c_void};
 
+pub struct Semaphore {
+    lock: i32,
+    count: i32,
+}
+
 type pte_osThreadHandle = usize;
 type pte_osMutexHandle = *mut i32;
-type pte_osSemaphoreHandle = *mut i32;
+type pte_osSemaphoreHandle = *mut Semaphore;
 type pte_osThreadEntryPoint = unsafe extern "C" fn(params: *mut c_void) -> c_int;
 
 #[repr(C)]
@@ -151,7 +156,7 @@ pub unsafe extern "C" fn pte_osThreadCheckCancel(handle: pte_osThreadHandle) -> 
 pub unsafe extern "C" fn pte_osThreadSleep(msecs: c_uint) {
     let tm = syscall::TimeSpec {
         tv_sec: msecs as i64 / 1000,
-        tv_nsec: (msecs as i32 % 1000) * 1000,
+        tv_nsec: (msecs % 1000) as i32 * 1000000,
     };
     let mut rmtp = mem::uninitialized();
     let _ = syscall::nanosleep(&tm, &mut rmtp);
@@ -265,7 +270,10 @@ pte_osResult pte_osSemaphoreCancellablePend(pte_osSemaphoreHandle semHandle, uns
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osSemaphoreCreate(initialValue: c_int, pHandle: *mut pte_osSemaphoreHandle) -> pte_osResult {
-    *pHandle = Box::into_raw(Box::new(initialValue));
+    *pHandle = Box::into_raw(Box::new(Semaphore {
+        lock: 0,
+        count: initialValue,
+    }));
     PTE_OS_OK
 }
 
@@ -277,21 +285,26 @@ pub unsafe extern "C" fn pte_osSemaphoreDelete(handle: pte_osSemaphoreHandle) ->
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osSemaphorePost(handle: pte_osSemaphoreHandle, count: c_int) -> pte_osResult {
-    if intrinsics::atomic_xadd(handle, 1) <= 0 {
-        while match syscall::futex(handle, syscall::FUTEX_WAKE, 1, 0, ptr::null_mut()) {
-            Ok(waiters) => waiters < 1,
-            Err(err) => return PTE_OS_GENERAL_FAILURE,
-        } {
-            syscall::sched_yield();
-        }
-    }
+    let semaphore = &mut *handle;
+    pte_osMutexLock(&mut semaphore.lock);
+    intrinsics::atomic_xadd(&mut semaphore.count, 1);
+    pte_osMutexUnlock(&mut semaphore.lock);
     PTE_OS_OK
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osSemaphorePend(handle: pte_osSemaphoreHandle, pTimeout: *mut c_uint) -> pte_osResult {
-    if intrinsics::atomic_xsub(handle, 1) < 0 {
-        let _ = syscall::futex(handle, syscall::FUTEX_WAIT, *handle, 0, ptr::null_mut());
+    //TODO: pTimeout
+    let semaphore = &mut *handle;
+    let mut acquired = false;
+    while ! acquired {
+        pte_osMutexLock(&mut semaphore.lock);
+        if intrinsics::atomic_load(&mut semaphore.count) > 0 {
+            intrinsics::atomic_xsub(&mut semaphore.count, 1);
+            acquired = true;
+        }
+        pte_osMutexUnlock(&mut semaphore.lock);
+        let _ = syscall::sched_yield();
     }
     PTE_OS_OK
 }
