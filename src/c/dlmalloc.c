@@ -526,6 +526,7 @@ MAX_RELEASE_CHECK_RATE   default: 4095 unless not HAVE_MMAP
 #define HAVE_MMAP 0
 #define LACKS_ERRNO_H
 #define LACKS_FCNTL_H
+#define LACKS_SCHED_H
 #define LACKS_STDLIB_H
 #define LACKS_STRING_H
 #define LACKS_SYS_MMAN_H
@@ -533,6 +534,8 @@ MAX_RELEASE_CHECK_RATE   default: 4095 unless not HAVE_MMAP
 #define LACKS_UNISTD_H
 #define NO_MALLOC_STATS 1
 #define USE_DL_PREFIX 1
+#define USE_LOCKS 1
+#define USE_SPIN_LOCKS 1
 
 #define malloc_getpagesize ((size_t)4096U)
 
