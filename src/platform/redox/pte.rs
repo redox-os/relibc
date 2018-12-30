@@ -63,7 +63,6 @@ pub unsafe extern "C" fn pte_osThreadCreate(entryPoint: pte_osThreadEntryPoint,
     let id = syscall::clone(syscall::CLONE_VM | syscall::CLONE_FS | syscall::CLONE_FILES).unwrap();
 
     let mutex = Box::into_raw(Box::new(0));
-    pte_osMutexLock(mutex);
 
     if id == 0 {
         // Wait until pte_osThreadStart
