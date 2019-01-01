@@ -642,6 +642,10 @@ impl Pal for Sys {
         }
     }
 
+    unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
+        e(syscall::mprotect(addr as usize, len, (prot as usize) << 16)) as c_int
+    }
+
     unsafe fn munmap(addr: *mut c_void, _len: usize) -> c_int {
         if e(syscall::funmap(addr as usize)) == !0 {
             return !0;

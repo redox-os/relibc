@@ -298,6 +298,10 @@ impl Pal for Sys {
         e(syscall!(MMAP, addr, len, prot, flags, fildes, off)) as *mut c_void
     }
 
+    unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
+        e(syscall!(MPROTECT, addr, len, prot)) as c_int
+    }
+
     unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
         e(syscall!(MUNMAP, addr, len)) as c_int
     }

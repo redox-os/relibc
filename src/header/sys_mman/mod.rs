@@ -33,9 +33,9 @@ pub unsafe extern "C" fn mmap(
     Sys::mmap(addr, len, prot, flags, fildes, off)
 }
 
-// #[no_mangle]
-pub extern "C" fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
+    Sys::mprotect(addr, len, prot)
 }
 
 // #[no_mangle]

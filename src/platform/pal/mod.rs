@@ -106,6 +106,8 @@ pub trait Pal {
         off: off_t,
     ) -> *mut c_void;
 
+    unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int;
+
     unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int;
 
     fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int;
