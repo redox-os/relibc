@@ -1,19 +1,17 @@
 #ifndef __MACHINE_ENDIAN_H__
 
+/* TODO: Forcing little endian, if you need a big endian system, fix this { */
 #ifndef BIG_ENDIAN
-    #define BIG_ENDIAN 4321
+#define BIG_ENDIAN 4321
 #endif
 
 #ifndef LITTLE_ENDIAN
-    #define LITTLE_ENDIAN 1234
+#define LITTLE_ENDIAN 1234
 #endif
 
 #ifndef BYTE_ORDER
-    #if defined(__IEEE_LITTLE_ENDIAN) || defined(__IEEE_BYTES_LITTLE_ENDIAN)
-        #define BYTE_ORDER LITTLE_ENDIAN
-    #else
-        #define BYTE_ORDER BIG_ENDIAN
-    #endif
+#define BYTE_ORDER LITTLE_ENDIAN
 #endif
+/* } */
 
 #endif /* __MACHINE_ENDIAN_H__ */
