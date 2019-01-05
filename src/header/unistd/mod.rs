@@ -311,14 +311,21 @@ pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> 
     0
 }
 
-// #[no_mangle]
-pub extern "C" fn getlogin() -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn getlogin() -> *mut c_char {
+    static mut LOGIN: [c_char; 256] = [0; 256];
+    if getlogin_r(LOGIN.as_mut_ptr(), LOGIN.len()) == 0 {
+        LOGIN.as_mut_ptr()
+    } else {
+        ptr::null_mut()
+    }
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn getlogin_r(name: *mut c_char, namesize: size_t) -> c_int {
-    unimplemented!();
+    //TODO: Determine correct getlogin result on Redox
+    unsafe { platform::errno = errno::ENOENT };
+    -1
 }
 
 #[no_mangle]
