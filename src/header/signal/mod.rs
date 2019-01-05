@@ -131,9 +131,21 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
-    unimplemented!();
+    if signo <= 0 || signo as usize > NSIG {
+        unsafe {
+            platform::errno = errno::EINVAL;
+        }
+        return -1;
+    }
+
+    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
+        if set.contains(signo as usize - 1) {
+            return 1;
+        }
+    }
+    0
 }
 
 extern "C" {
