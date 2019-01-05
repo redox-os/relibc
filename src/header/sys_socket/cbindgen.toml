@@ -1,5 +1,6 @@
 sys_includes = ["stddef.h", "stdint.h", "sys/types.h"]
 include_guard = "_SYS_SOCKET_H"
+trailer = "#include <bits/sys/socket.h>"
 language = "C"
 style = "Tag"
 

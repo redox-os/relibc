@@ -39,6 +39,7 @@ pub mod sys_statvfs;
 pub mod sys_time;
 pub mod sys_timeb;
 //pub mod sys_times;
+pub mod sys_uio;
 pub mod sys_un;
 pub mod sys_utsname;
 pub mod sys_wait;
