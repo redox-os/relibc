@@ -1,5 +1,6 @@
 sys_includes = ["sys/types.h", "sys/socket.h"]
 include_guard = "_NETINET_IN_H"
+trailer = "#include <bits/netinet/in.h>"
 language = "C"
 style = "Tag"
 

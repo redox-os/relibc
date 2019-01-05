@@ -23,7 +23,7 @@ pub struct sockaddr_in {
     pub sin_family: sa_family_t,
     pub sin_port: in_port_t,
     pub sin_addr: in_addr,
-    pub _pad: [c_char; 8],
+    pub sin_zero: [c_char; 8],
 }
 
 #[repr(C)]
@@ -63,3 +63,11 @@ pub const INADDR_UNSPEC_GROUP: u32 = 0xE000_0000;
 pub const INADDR_ALLHOSTS_GROUP: u32 = 0xE000_0001;
 pub const INADDR_ALLRTRS_GROUP: u32 = 0xE000_0002;
 pub const INADDR_MAX_LOCAL_GROUP: u32 = 0xE000_00FF;
+
+pub static in6addr_any: in6_addr = in6_addr {
+    s6_addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+};
+
+pub static in6addr_loopback: in6_addr = in6_addr {
+    s6_addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+};
