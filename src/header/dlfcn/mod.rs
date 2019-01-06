@@ -10,6 +10,23 @@ pub const RTLD_NOW: c_int = 0x0002;
 pub const RTLD_GLOBAL: c_int = 0x0100;
 pub const RTLD_LOCAL: c_int = 0x0000;
 
+#[repr(C)]
+pub struct Dl_info {
+    dli_fname: *const c_char,
+    dli_fbase: *mut c_void,
+    dli_sname: *const c_char,
+    dli_saddr: *mut c_void,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dladdr(addr: *mut c_void, info: *mut Dl_info) -> c_int {
+    (*info).dli_fname = ptr::null();
+    (*info).dli_fbase = ptr::null_mut();
+    (*info).dli_sname = ptr::null();
+    (*info).dli_saddr = ptr::null_mut();
+    0
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void {
     let filename_cstr = CStr::from_ptr(filename);
