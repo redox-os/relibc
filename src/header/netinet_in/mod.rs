@@ -64,10 +64,12 @@ pub const INADDR_ALLHOSTS_GROUP: u32 = 0xE000_0001;
 pub const INADDR_ALLRTRS_GROUP: u32 = 0xE000_0002;
 pub const INADDR_MAX_LOCAL_GROUP: u32 = 0xE000_00FF;
 
+#[no_mangle]
 pub static in6addr_any: in6_addr = in6_addr {
     s6_addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 };
 
+#[no_mangle]
 pub static in6addr_loopback: in6_addr = in6_addr {
     s6_addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
 };

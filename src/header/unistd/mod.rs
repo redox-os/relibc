@@ -590,11 +590,11 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
 }
 
 #[no_mangle]
-pub extern "C" fn ualarm(value: useconds_t, interval: useconds_t) -> useconds_t {
+pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t {
     let mut timer = sys_time::itimerval {
         it_value: sys_time::timeval {
             tv_sec: 0,
-            tv_usec: value as suseconds_t,
+            tv_usec: usecs as suseconds_t,
         },
         it_interval: sys_time::timeval {
             tv_sec: 0,
@@ -602,7 +602,7 @@ pub extern "C" fn ualarm(value: useconds_t, interval: useconds_t) -> useconds_t 
         },
     };
     let errno_backup = unsafe { platform::errno };
-    let usecs = if sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) < 0 {
+    let ret = if sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) < 0 {
         0
     } else {
         timer.it_value.tv_sec as useconds_t * 1_000_000 + timer.it_value.tv_usec as useconds_t
@@ -611,7 +611,7 @@ pub extern "C" fn ualarm(value: useconds_t, interval: useconds_t) -> useconds_t 
         platform::errno = errno_backup;
     }
 
-    usecs
+    ret
 }
 
 #[no_mangle]

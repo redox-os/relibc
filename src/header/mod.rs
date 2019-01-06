@@ -3,6 +3,7 @@ pub mod arpa_inet;
 pub mod assert;
 pub mod ctype;
 pub mod dirent;
+pub mod dlfcn;
 pub mod errno;
 pub mod fcntl;
 pub mod _fenv;
