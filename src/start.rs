@@ -53,6 +53,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         static __init_array_start: extern "C" fn();
         static __init_array_end: extern "C" fn();
 
+        fn pthread_init();
         fn _init();
         fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
     }
@@ -76,6 +77,8 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     stdio::stdin = stdio::default_stdin.get();
     stdio::stdout = stdio::default_stdout.get();
     stdio::stderr = stdio::default_stderr.get();
+
+    pthread_init();
 
     // Run preinit array
     {

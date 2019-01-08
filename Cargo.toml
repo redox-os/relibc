@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Jeremy Soller <jackpot51@gmail.com>"]
 
 [lib]
-name = "c"
+name = "relibc"
 crate-type = ["staticlib"]
 
 [workspace]

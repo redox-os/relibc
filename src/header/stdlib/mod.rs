@@ -233,6 +233,7 @@ pub unsafe extern "C" fn exit(status: c_int) {
         static __fini_array_start: extern "C" fn();
         static __fini_array_end: extern "C" fn();
 
+        fn pthread_terminate();
         fn _fini();
     }
 
@@ -250,6 +251,8 @@ pub unsafe extern "C" fn exit(status: c_int) {
     }
 
     _fini();
+
+    pthread_terminate();
 
     Sys::exit(status);
 }

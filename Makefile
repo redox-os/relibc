@@ -76,7 +76,16 @@ sysroot: all
 test: sysroot
 	make -C tests run
 
-$(BUILD)/debug/libc.a: $(SRC)
+$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
+	echo "create $@" > "$@.mri"
+	for lib in $^; do\
+		echo "addlib $$lib" >> "$@.mri"; \
+	done
+	echo "save" >> "$@.mri"
+	echo "end" >> "$@.mri"
+	ar -M < "$@.mri"
+
+$(BUILD)/debug/librelibc.a: $(SRC)
 	$(CARGO) rustc $(CARGOFLAGS) -- $(RUSTCFLAGS)
 	touch $@
 
@@ -84,7 +93,15 @@ $(BUILD)/debug/crt0.o: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ $(RUSTCFLAGS)
 	touch $@
 
-$(BUILD)/release/libc.a: $(SRC)
+$(BUILD)/debug/crti.o: $(SRC)
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/crti/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ $(RUSTCFLAGS)
+	touch $@
+
+$(BUILD)/debug/crtn.o: $(SRC)
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/crtn/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ $(RUSTCFLAGS)
+	touch $@
+
+$(BUILD)/release/librelibc.a: $(SRC)
 	$(CARGO) rustc --release $(CARGOFLAGS) -- $(RUSTCFLAGS)
 	touch $@
 
