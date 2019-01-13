@@ -83,6 +83,8 @@ pub trait Pal {
 
     fn getppid() -> pid_t;
 
+    fn gettid() -> pid_t;
+
     fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int;
 
     fn getuid() -> uid_t;
@@ -118,6 +120,8 @@ pub trait Pal {
 
     fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int;
 
+    fn pte_clone() -> pid_t;
+
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
 
     fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t;
@@ -127,6 +131,8 @@ pub trait Pal {
     fn rename(old: &CStr, new: &CStr) -> c_int;
 
     fn rmdir(path: &CStr) -> c_int;
+
+    fn sched_yield() -> c_int;
 
     //TODO: Deprecate in favor of poll
     fn select(

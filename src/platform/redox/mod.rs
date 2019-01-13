@@ -31,7 +31,6 @@ use super::types::*;
 use super::{errno, Pal, Read};
 
 mod extra;
-mod pte;
 mod signal;
 mod socket;
 
@@ -551,6 +550,11 @@ impl Pal for Sys {
         e(syscall::getppid()) as pid_t
     }
 
+    fn gettid() -> pid_t {
+        //TODO
+        getpid()
+    }
+
     fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
         let mut redox_tp = redox_timespec::default();
         let err = e(syscall::clock_gettime(
@@ -814,6 +818,10 @@ impl Pal for Sys {
         total
     }
 
+    fn pte_clone() -> pid_t {
+        e(syscall::clone(syscall::CLONE_VM | syscall::CLONE_FS | syscall::CLONE_FILES | syscall::CLONE_SIGHAND)) as pid_t
+    }
+
     fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
         e(syscall::read(fd as usize, buf)) as ssize_t
     }
@@ -867,6 +875,10 @@ impl Pal for Sys {
 
     fn rmdir(path: &CStr) -> c_int {
         e(syscall::rmdir(path.to_bytes())) as c_int
+    }
+
+    fn sched_yield() -> c_int {
+        e(syscall::sched_yield()) as c_int
     }
 
     fn select(

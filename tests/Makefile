@@ -104,7 +104,8 @@ BINS=\
 	unistd/getid \
 	unistd/link \
 	unistd/setid \
-	unistd/stat
+	unistd/stat \
+	unistd/sysconf
 #	resource/getrusage
 #	time/times
 

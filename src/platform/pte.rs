@@ -1,22 +1,25 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
-use core::{mem, intrinsics, ptr};
+use core::{intrinsics, ptr};
 use core::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
-use syscall;
 
-use platform::types::{c_int, c_uint, c_void};
+use header::time::timespec;
+use mutex::{FUTEX_WAIT, FUTEX_WAKE};
+use platform::{Pal, Sys};
+use platform::types::{c_int, c_uint, c_void, pid_t};
 
 pub struct Semaphore {
     lock: i32,
     count: i32,
 }
 
-type pte_osThreadHandle = usize;
+type pte_osThreadHandle = pid_t;
 type pte_osMutexHandle = *mut i32;
 type pte_osSemaphoreHandle = *mut Semaphore;
 type pte_osThreadEntryPoint = unsafe extern "C" fn(params: *mut c_void) -> c_int;
 
 #[repr(C)]
+#[derive(Eq, PartialEq)]
 pub enum pte_osResult {
     PTE_OS_OK = 0,
     PTE_OS_NO_RESOURCES,
@@ -49,14 +52,6 @@ pub unsafe extern "C" fn pte_osInit() -> pte_osResult {
     PTE_OS_OK
 }
 
-/*
-pte_osResult pte_osThreadCreate(pte_osThreadEntryPoint entryPoint,
-                                int stackSize,
-                                int initialPriority,
-                                void *argv,
-                                pte_osThreadHandle* ppte_osThreadHandle)
-*/
-
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadCreate(entryPoint: pte_osThreadEntryPoint,
                                    _stackSize: c_int,
@@ -65,7 +60,10 @@ pub unsafe extern "C" fn pte_osThreadCreate(entryPoint: pte_osThreadEntryPoint,
                                    ppte_osThreadHandle: *mut pte_osThreadHandle
                                    ) -> pte_osResult {
     // XXX error handling
-    let id = syscall::clone(syscall::CLONE_VM | syscall::CLONE_FS | syscall::CLONE_FILES).unwrap();
+    let id = Sys::pte_clone();
+    if id < 0 {
+        return PTE_OS_GENERAL_FAILURE;
+    }
 
     let mutex = Box::into_raw(Box::new(0));
 
@@ -73,7 +71,7 @@ pub unsafe extern "C" fn pte_osThreadCreate(entryPoint: pte_osThreadEntryPoint,
         // Wait until pte_osThreadStart
         pte_osMutexLock(mutex);
         entryPoint(argv);
-        let _ = syscall::exit(0);
+        pte_osThreadExit();
     } else {
         pte_osMutexLock(&mut pid_mutexes_lock);
         if pid_mutexes.is_none() {
@@ -86,7 +84,6 @@ pub unsafe extern "C" fn pte_osThreadCreate(entryPoint: pte_osThreadEntryPoint,
     PTE_OS_OK
 }
 
-// pte_osResult pte_osThreadStart(pte_osThreadHandle osThreadHandle)
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadStart(handle: pte_osThreadHandle) -> pte_osResult {
     let mut ret = PTE_OS_GENERAL_FAILURE;
@@ -101,20 +98,18 @@ pub unsafe extern "C" fn pte_osThreadStart(handle: pte_osThreadHandle) -> pte_os
     ret
 }
 
-/*
-void pte_osThreadExit()
-pte_osResult pte_osThreadExitAndDelete(pte_osThreadHandle handle)
-pte_osResult pte_osThreadDelete(pte_osThreadHandle handle)
-*/
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadExit() {
-    syscall::exit(0);
+    Sys::exit(0);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadExitAndDelete(handle: pte_osThreadHandle) -> pte_osResult {
-    pte_osThreadDelete(handle);
-    syscall::exit(0);
+    let res = pte_osThreadDelete(handle);
+    if res != PTE_OS_OK {
+        return res;
+    }
+    pte_osThreadExit();
     PTE_OS_OK
 }
 
@@ -130,51 +125,37 @@ pub unsafe extern "C" fn pte_osThreadDelete(handle: pte_osThreadHandle) -> pte_o
     PTE_OS_OK
 }
 
-// pte_osResult pte_osThreadWaitForEnd(pte_osThreadHandle threadHandle)
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadWaitForEnd(handle: pte_osThreadHandle) -> pte_osResult {
     let mut status = 0;
-    syscall::waitpid(handle, &mut status, 0);
+    Sys::waitpid(handle, &mut status, 0);
     PTE_OS_OK
 }
 
-// pte_osResult pte_osThreadCancel(pte_osThreadHandle threadHandle)
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadCancel(handle: pte_osThreadHandle) -> pte_osResult {
     //TODO: allow cancel of thread
     PTE_OS_OK
 }
 
-// pte_osResult pte_osThreadCheckCancel(pte_osThreadHandle threadHandle)
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadCheckCancel(handle: pte_osThreadHandle) -> pte_osResult {
     PTE_OS_OK
 }
 
-//void pte_osThreadSleep(unsigned int msecs)
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadSleep(msecs: c_uint) {
-    let tm = syscall::TimeSpec {
+    let tm = timespec {
         tv_sec: msecs as i64 / 1000,
-        tv_nsec: (msecs % 1000) as i32 * 1000000,
+        tv_nsec: (msecs % 1000) as i64 * 1000000,
     };
-    let mut rmtp = mem::uninitialized();
-    let _ = syscall::nanosleep(&tm, &mut rmtp);
+    Sys::nanosleep(&tm, ptr::null_mut());
 }
 
-// pte_osThreadHandle pte_osThreadGetHandle(void)
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadGetHandle() -> pte_osThreadHandle {
-    syscall::getpid().unwrap()
+    Sys::gettid()
 }
-
-/*
-int pte_osThreadGetPriority(pte_osThreadHandle threadHandle)
-pte_osResult pte_osThreadSetPriority(pte_osThreadHandle threadHandle, int newPriority)
-int pte_osThreadGetMinPriority()
-int pte_osThreadGetMaxPriority()
-int pte_osThreadGetDefaultPriority()
-*/
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadGetPriority(threadHandle: pte_osThreadHandle) -> c_int {
@@ -202,13 +183,6 @@ pub unsafe extern "C" fn pte_osThreadGetDefaultPriority() -> c_int {
     1
 }
 
-/*
-pte_osResult pte_osMutexCreate(pte_osMutexHandle *pHandle)
-pte_osResult pte_osMutexDelete(pte_osMutexHandle handle)
-pte_osResult pte_osMutexLock(pte_osMutexHandle handle)
-pte_osResult pte_osMutexUnlock(pte_osMutexHandle handle)
-*/
-
 #[no_mangle]
 pub unsafe extern "C" fn pte_osMutexCreate(pHandle: *mut pte_osMutexHandle) -> pte_osResult {
     *pHandle = Box::into_raw(Box::new(0));
@@ -234,7 +208,7 @@ pub unsafe extern "C" fn pte_osMutexLock(handle: pte_osMutexHandle) -> pte_osRes
         c = intrinsics::atomic_xchg(handle, 2);
     }
     while c != 0 {
-        let _ = syscall::futex(handle, syscall::FUTEX_WAIT, 2, 0, ptr::null_mut());
+        Sys::futex(handle, FUTEX_WAIT, 2);
         c = intrinsics::atomic_xchg(handle, 2);
     }
 
@@ -255,18 +229,10 @@ pub unsafe extern "C" fn pte_osMutexUnlock(handle: pte_osMutexHandle) -> pte_osR
             }
         }
     }
-    let _ = syscall::futex(handle, syscall::FUTEX_WAKE, 1, 0, ptr::null_mut());
+    Sys::futex(handle, FUTEX_WAKE, 1);
 
     PTE_OS_OK
 }
-
-/*
-pte_osResult pte_osSemaphoreCreate(int initialValue, pte_osSemaphoreHandle *pHandle)
-pte_osResult pte_osSemaphoreDelete(pte_osSemaphoreHandle handle)
-pte_osResult pte_osSemaphorePost(pte_osSemaphoreHandle handle, int count)
-pte_osResult pte_osSemaphorePend(pte_osSemaphoreHandle handle, unsigned int *pTimeoutMsecs)
-pte_osResult pte_osSemaphoreCancellablePend(pte_osSemaphoreHandle semHandle, unsigned int *pTimeout)
-*/
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osSemaphoreCreate(initialValue: c_int, pHandle: *mut pte_osSemaphoreHandle) -> pte_osResult {
@@ -304,7 +270,7 @@ pub unsafe extern "C" fn pte_osSemaphorePend(handle: pte_osSemaphoreHandle, pTim
             acquired = true;
         }
         pte_osMutexUnlock(&mut semaphore.lock);
-        let _ = syscall::sched_yield();
+        Sys::sched_yield();
     }
     PTE_OS_OK
 }
@@ -314,14 +280,6 @@ pub unsafe extern "C" fn pte_osSemaphoreCancellablePend(handle: pte_osSemaphoreH
     //TODO
     pte_osSemaphorePend(handle, pTimeout)
 }
-
-/*
-int pte_osAtomicExchange(int *ptarg, int val)
-int pte_osAtomicCompareExchange(int *pdest, int exchange, int comp)
-int pte_osAtomicExchangeAdd(int volatile* pAddend, int value)
-int pte_osAtomicDecrement(int *pdest)
-int pte_osAtomicIncrement(int *pdest)
-*/
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osAtomicExchange(ptarg: *mut c_int, val: c_int) -> c_int {
@@ -347,13 +305,6 @@ pub unsafe extern "C" fn pte_osAtomicDecrement(pdest: *mut c_int) -> c_int {
 pub unsafe extern "C" fn pte_osAtomicIncrement(pdest: *mut c_int) -> c_int {
     intrinsics::atomic_xadd(pdest, 1) + 1
 }
-
-/*
-pte_osResult pte_osTlsSetValue(unsigned int index, void * value)
-void * pte_osTlsGetValue(unsigned int index)
-pte_osResult pte_osTlsAlloc(unsigned int *pKey)
-pte_osResult pte_osTlsFree(unsigned int index)
-*/
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osTlsSetValue(index: c_uint, value: *mut c_void) -> pte_osResult {

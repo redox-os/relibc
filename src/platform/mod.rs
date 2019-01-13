@@ -26,6 +26,8 @@ mod sys;
 #[path = "redox/mod.rs"]
 mod sys;
 
+mod pte;
+
 pub use self::rlb::{Line, RawLineBuffer};
 pub mod rlb;
 

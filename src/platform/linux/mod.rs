@@ -28,6 +28,11 @@ const AT_FDCWD: c_int = -100;
 const AT_EMPTY_PATH: c_int = 0x1000;
 const AT_REMOVEDIR: c_int = 0x200;
 
+const CLONE_VM: usize = 0x0100;
+const CLONE_FS: usize = 0x0200;
+const CLONE_FILES: usize = 0x0400;
+const CLONE_SIGHAND: usize = 0x0800;
+
 #[repr(C)]
 #[derive(Default)]
 struct linux_statfs {
@@ -185,7 +190,7 @@ impl Pal for Sys {
     }
 
     fn fork() -> pid_t {
-        e(unsafe { syscall!(CLONE, SIGCHLD, 0) }) as pid_t
+        e(unsafe { syscall!(CLONE, SIGCHLD, 0, 0, 0, 0) }) as pid_t
     }
 
     fn fsync(fildes: c_int) -> c_int {
@@ -247,6 +252,10 @@ impl Pal for Sys {
 
     fn getppid() -> pid_t {
         e(unsafe { syscall!(GETPPID) }) as pid_t
+    }
+
+    fn gettid() -> pid_t {
+        e(unsafe { syscall!(GETTID) }) as pid_t
     }
 
     fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
@@ -322,6 +331,10 @@ impl Pal for Sys {
         e(unsafe { syscall!(POLL, fds, nfds, timeout) }) as c_int
     }
 
+    fn pte_clone() -> pid_t {
+        e(unsafe { syscall!(CLONE, CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND, 0, 0, 0, 0) }) as pid_t
+    }
+
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
         e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
     }
@@ -376,6 +389,10 @@ impl Pal for Sys {
 
     fn rmdir(path: &CStr) -> c_int {
         e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), AT_REMOVEDIR) }) as c_int
+    }
+
+    fn sched_yield() -> c_int {
+        e(unsafe { syscall!(SCHED_YIELD) }) as c_int
     }
 
     fn select(
