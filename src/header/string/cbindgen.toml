@@ -1,4 +1,4 @@
-sys_includes = ["stddef.h", "stdint.h"]
+sys_includes = ["stddef.h", "stdint.h", "strings.h"]
 include_guard = "_STRING_H"
 language = "C"
 style = "Tag"
