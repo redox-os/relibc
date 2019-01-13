@@ -1,3 +1,5 @@
+use c_str::{CStr, CString};
+use header::{fcntl, unistd};
 use platform::types::*;
 use platform::{Pal, Sys};
 
@@ -10,6 +12,13 @@ pub mod sys;
 #[cfg(target_os = "redox")]
 #[path = "redox.rs"]
 pub mod sys;
+
+pub const MAP_SHARED: c_int = 0x0001;
+pub const MAP_PRIVATE: c_int = 0x0002;
+pub const MAP_TYPE: c_int = 0x000F;
+pub const MAP_FIXED: c_int = 0x0010;
+pub const MAP_ANON: c_int = 0x0020;
+pub const MAP_ANONYMOUS: c_int = MAP_ANON;
 
 // #[no_mangle]
 pub extern "C" fn mlock(addr: *const c_void, len: usize) -> c_int {
@@ -58,12 +67,40 @@ pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
     Sys::munmap(addr, len)
 }
 
-// #[no_mangle]
-pub extern "C" fn shm_open(name: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
-    unimplemented!();
+#[cfg(target_os = "linux")]
+static SHM_PATH: &'static [u8] = b"/dev/shm/";
+
+#[cfg(target_os = "redox")]
+static SHM_PATH: &'static [u8] = b"shm:";
+
+unsafe fn shm_path(name: *const c_char) -> CString {
+    let name_c = CStr::from_ptr(name);
+
+    let mut path = SHM_PATH.to_vec();
+
+    let mut skip_slash = true;
+    for &b in name_c.to_bytes() {
+        if skip_slash {
+            if b == b'/' {
+                continue;
+            } else {
+                skip_slash = false;
+            }
+        }
+        path.push(b);
+    }
+
+    CString::from_vec_unchecked(path)
 }
 
-// #[no_mangle]
-pub extern "C" fn shm_unlink(name: *const c_char) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn shm_open(name: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
+    let path = shm_path(name);
+    fcntl::sys_open(path.as_ptr(), oflag, mode)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn shm_unlink(name: *const c_char) -> c_int {
+    let path = shm_path(name);
+    unistd::unlink(path.as_ptr())
 }
