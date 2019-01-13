@@ -31,11 +31,4 @@ typedef unsigned long u_long, ulong;
 typedef long long quad_t;
 typedef unsigned long long u_quad_t;
 
-#ifdef __linux__
-#define _SC_PAGE_SIZE 30
-#endif
-#ifdef __redox__
-#define _SC_PAGE_SIZE 8
-#endif
-
 #endif /* _SYS_TYPES_H */

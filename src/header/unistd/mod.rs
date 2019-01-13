@@ -15,10 +15,12 @@ use platform::{Pal, Sys};
 pub use self::brk::*;
 pub use self::getopt::*;
 pub use self::pathconf::*;
+pub use self::sysconf::*;
 
 mod brk;
 mod getopt;
 mod pathconf;
+mod sysconf;
 
 pub const F_OK: c_int = 0;
 pub const R_OK: c_int = 4;
@@ -556,11 +558,6 @@ pub unsafe extern "C" fn symlink(path1: *const c_char, path2: *const c_char) -> 
 
 // #[no_mangle]
 pub extern "C" fn sync() {
-    unimplemented!();
-}
-
-// #[no_mangle]
-pub extern "C" fn sysconf(name: c_int) -> c_long {
     unimplemented!();
 }
 
