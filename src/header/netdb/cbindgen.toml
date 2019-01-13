@@ -4,5 +4,8 @@ trailer = "#include <bits/netdb.h>"
 language = "C"
 style = "Tag"
 
+[export.rename]
+"sockaddr" = "struct sockaddr"
+
 [enum]
 prefix_with_name = true
