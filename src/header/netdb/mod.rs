@@ -1014,6 +1014,21 @@ pub extern "C" fn freeaddrinfo(res: *mut addrinfo) {
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn gai_strerror(errcode: c_int) -> *const c_char {
-    unimplemented!();
+    match errcode {
+        EAI_BADFLAGS => c_str!("Invalid flags"),
+        EAI_NONAME => c_str!("Name does not resolve"),
+        EAI_AGAIN => c_str!("Try again"),
+        EAI_FAIL => c_str!("Non-recoverable error"),
+        EAI_NODATA => c_str!("Unknown error"),
+        EAI_FAMILY => c_str!("Unrecognized address family or invalid length"),
+        EAI_SOCKTYPE => c_str!("Unrecognized socket type"),
+        EAI_SERVICE => c_str!("Unrecognized service"),
+        EAI_ADDRFAMILY => c_str!("Address family for name not supported"),
+        EAI_MEMORY => c_str!("Out of memory"),
+        EAI_SYSTEM => c_str!("System error"),
+        EAI_OVERFLOW => c_str!("Overflow"),
+        _ => c_str!("Unknown error"),
+    }.as_ptr()
 }
