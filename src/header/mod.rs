@@ -18,7 +18,6 @@ pub mod locale;
 pub mod netdb;
 pub mod netinet_in;
 pub mod poll;
-//pub mod pthread;
 pub mod pwd;
 pub mod regex;
 pub mod semaphore;
