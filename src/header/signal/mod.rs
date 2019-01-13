@@ -49,6 +49,17 @@ pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
 }
 
 #[no_mangle]
+pub extern "C" fn pthread_sigmask(how: c_int, set: *const sigset_t, oldset: *mut sigset_t) -> c_int {
+    // On Linux and Redox, pthread_sigmask and sigprocmask are equivalent
+    if sigprocmask(how, set, oldset) == 0 {
+        0
+    } else {
+        //TODO: Fix race
+        unsafe { platform::errno }
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn raise(sig: c_int) -> c_int {
     Sys::raise(sig)
 }
