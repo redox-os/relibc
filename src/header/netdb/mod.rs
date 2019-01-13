@@ -117,6 +117,9 @@ pub const EAI_MEMORY: c_int = -10;
 pub const EAI_SYSTEM: c_int = -11;
 pub const EAI_OVERFLOW: c_int = -12;
 
+pub const NI_MAXHOST: c_int = 1025;
+pub const NI_MAXSERV: c_int = 32;
+
 pub const NI_NUMERICHOST: c_int = 0x0001;
 pub const NI_NUMERICSERV: c_int = 0x0002;
 pub const NI_NOFQDN: c_int = 0x0004;
