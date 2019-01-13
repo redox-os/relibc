@@ -552,7 +552,7 @@ impl Pal for Sys {
 
     fn gettid() -> pid_t {
         //TODO
-        getpid()
+        Self::getpid()
     }
 
     fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
@@ -819,7 +819,7 @@ impl Pal for Sys {
     }
 
     fn pte_clone() -> pid_t {
-        e(syscall::clone(syscall::CLONE_VM | syscall::CLONE_FS | syscall::CLONE_FILES | syscall::CLONE_SIGHAND)) as pid_t
+        e(unsafe { syscall::clone(syscall::CLONE_VM | syscall::CLONE_FS | syscall::CLONE_FILES | syscall::CLONE_SIGHAND) }) as pid_t
     }
 
     fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
