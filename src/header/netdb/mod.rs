@@ -992,13 +992,33 @@ pub unsafe extern "C" fn setservent(stayopen: c_int) {
     }
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn getaddrinfo(
     node: *const c_char,
     service: *const c_char,
     hints: *const addrinfo,
     res: *mut *mut addrinfo,
 ) -> c_int {
-    unimplemented!();
+    //TODO: getaddrinfo
+    let node_c = if node.is_null() {
+        None
+    } else {
+        Some(CStr::from_ptr(node))
+    };
+    let service_c = if service.is_null() {
+        None
+    } else {
+        Some(CStr::from_ptr(service))
+    };
+
+    eprintln!(
+        "getaddrinfo({:?}, {:?})",
+        node_c.map(|c| str::from_utf8_unchecked(c.to_bytes())),
+        service_c.map(|c| str::from_utf8_unchecked(c.to_bytes()))
+    );
+
+    platform::errno = ENOSYS;
+    EAI_SYSTEM
 }
 
 pub unsafe extern "C" fn getnameinfo(
@@ -1013,8 +1033,9 @@ pub unsafe extern "C" fn getnameinfo(
     unimplemented!();
 }
 
+#[no_mangle]
 pub extern "C" fn freeaddrinfo(res: *mut addrinfo) {
-    unimplemented!();
+
 }
 
 #[no_mangle]
