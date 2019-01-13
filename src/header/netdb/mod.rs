@@ -117,6 +117,12 @@ pub const EAI_MEMORY: c_int = -10;
 pub const EAI_SYSTEM: c_int = -11;
 pub const EAI_OVERFLOW: c_int = -12;
 
+pub const NI_NUMERICHOST: c_int = 0x0001;
+pub const NI_NUMERICSERV: c_int = 0x0002;
+pub const NI_NOFQDN: c_int = 0x0004;
+pub const NI_NAMEREQD: c_int = 0x0008;
+pub const NI_DGRAM: c_int = 0x0010;
+
 static mut NETDB: c_int = 0;
 static mut NET_ENTRY: netent = netent {
     n_name: ptr::null_mut(),
