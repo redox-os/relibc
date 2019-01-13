@@ -7,6 +7,8 @@ use header::{errno, unistd};
 use platform;
 use platform::types::*;
 
+pub const IOV_MAX: c_int = 1024;
+
 #[repr(C)]
 pub struct iovec {
     iov_base: *mut c_void,
@@ -41,7 +43,7 @@ unsafe fn scatter(iovs: &[iovec], vec: Vec<u8>) {
 
 #[no_mangle]
 pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> ssize_t {
-    if iovcnt < 0 {
+    if iovcnt < 0 || iovcnt > IOV_MAX {
         platform::errno = errno::EINVAL;
         return -1;
     }
@@ -58,7 +60,7 @@ pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> s
 
 #[no_mangle]
 pub unsafe extern "C" fn writev(fd: c_int, iov: *const iovec, iovcnt: c_int) -> ssize_t {
-    if iovcnt < 0 {
+    if iovcnt < 0 || iovcnt > IOV_MAX {
         platform::errno = errno::EINVAL;
         return -1;
     }
