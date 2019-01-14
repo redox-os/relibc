@@ -332,7 +332,7 @@ pub extern "C" fn getlogin_r(name: *mut c_char, namesize: size_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn getpagesize() -> c_int {
-    Sys::getpagesize()
+    sysconf(_SC_PAGESIZE) as c_int
 }
 
 // #[no_mangle]
