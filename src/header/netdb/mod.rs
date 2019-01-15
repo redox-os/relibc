@@ -3,7 +3,7 @@
 mod dns;
 
 use core::str::FromStr;
-use core::{mem, ptr, str};
+use core::{mem, ptr, slice, str};
 
 use alloc::boxed::Box;
 use alloc::str::SplitWhitespace;
@@ -1000,27 +1000,35 @@ pub unsafe extern "C" fn getaddrinfo(
     res: *mut *mut addrinfo,
 ) -> c_int {
     //TODO: getaddrinfo
-    let node_c = if node.is_null() {
+    let node_opt = if node.is_null() {
         None
     } else {
         Some(CStr::from_ptr(node))
     };
-    let service_c = if service.is_null() {
+
+    let service_opt = if service.is_null() {
         None
     } else {
         Some(CStr::from_ptr(service))
     };
 
+    let hints_opt = if hints.is_null() {
+        None
+    } else {
+        Some(&*hints)
+    };
+
     eprintln!(
         "getaddrinfo({:?}, {:?})",
-        node_c.map(|c| str::from_utf8_unchecked(c.to_bytes())),
-        service_c.map(|c| str::from_utf8_unchecked(c.to_bytes()))
+        node_opt.map(|c| str::from_utf8_unchecked(c.to_bytes())),
+        service_opt.map(|c| str::from_utf8_unchecked(c.to_bytes()))
     );
 
     platform::errno = ENOSYS;
     EAI_SYSTEM
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn getnameinfo(
     addr: *const sockaddr,
     addrlen: socklen_t,
@@ -1030,12 +1038,38 @@ pub unsafe extern "C" fn getnameinfo(
     servlen: socklen_t,
     flags: c_int,
 ) -> c_int {
-    unimplemented!();
+    if addrlen as usize != mem::size_of::<sockaddr_in>() {
+        return EAI_FAMILY;
+    }
+
+    let addr = &*(addr as *const sockaddr_in);
+
+    let host_opt = if host.is_null() {
+        None
+    } else {
+        Some(slice::from_raw_parts_mut(host, hostlen as usize))
+    };
+
+    let serv_opt = if serv.is_null() {
+        None
+    } else {
+        Some(slice::from_raw_parts_mut(serv, servlen as usize))
+    };
+
+    eprintln!("getnameinfo({:p}, {}, {:#x})", addr, addrlen, flags);
+
+    platform::errno = ENOSYS;
+    EAI_SYSTEM
 }
 
 #[no_mangle]
-pub extern "C" fn freeaddrinfo(res: *mut addrinfo) {
-
+pub unsafe extern "C" fn freeaddrinfo(res: *mut addrinfo) {
+    let mut ai = res;
+    while !ai.is_null() {
+        let bai = Box::from_raw(ai);
+        ai = (*ai).ai_next;
+        drop(bai);
+    }
 }
 
 #[no_mangle]
