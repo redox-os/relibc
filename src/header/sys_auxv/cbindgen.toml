@@ -1,0 +1,6 @@
+include_guard = "_SYS_AUXV_H"
+language = "C"
+style = "Tag"
+
+[enum]
+prefix_with_name = true
