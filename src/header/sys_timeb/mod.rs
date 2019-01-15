@@ -21,7 +21,7 @@ pub unsafe extern "C" fn ftime(tp: *mut timeb) -> c_int {
     }
 
     (*tp).time = tv.tv_sec;
-    (*tp).millitm = (tv.tv_usec/1000) as c_ushort;
+    (*tp).millitm = (tv.tv_usec / 1000) as c_ushort;
     (*tp).timezone = tz.tz_minuteswest as c_short;
     (*tp).dstflag = tz.tz_dsttime as c_short;
 

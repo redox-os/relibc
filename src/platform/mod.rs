@@ -104,13 +104,11 @@ impl Read for FileReader {
 pub struct AllocStringWriter(pub *mut u8, pub usize);
 impl Write for AllocStringWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let ptr = unsafe {
-            realloc(self.0 as *mut c_void, self.1 + buf.len() + 1) as *mut u8
-        };
+        let ptr = unsafe { realloc(self.0 as *mut c_void, self.1 + buf.len() + 1) as *mut u8 };
         if ptr.is_null() {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
-                "AllocStringWriter::write failed to allocate"
+                "AllocStringWriter::write failed to allocate",
             ));
         }
         self.0 = ptr;

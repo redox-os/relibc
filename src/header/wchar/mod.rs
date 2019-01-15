@@ -169,12 +169,7 @@ pub unsafe extern "C" fn mbsnrtowcs(
     while (dst_ptr.is_null() || dst_offset < dst_len) && src_offset < src_len {
         let ps_copy = *ps;
         let mut wc: wchar_t = 0;
-        let amount = mbrtowc(
-            &mut wc,
-            src.add(src_offset),
-            src_len - src_offset,
-            ps,
-        );
+        let amount = mbrtowc(&mut wc, src.add(src_offset), src_len - src_offset, ps);
 
         // Stop in the event a decoding error occured.
         if amount == -1isize as usize {
@@ -363,7 +358,11 @@ pub unsafe extern "C" fn wcslen(ws: *const wchar_t) -> c_ulong {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wcsncat(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
+pub unsafe extern "C" fn wcsncat(
+    ws1: *mut wchar_t,
+    ws2: *const wchar_t,
+    n: size_t,
+) -> *mut wchar_t {
     let len = wcslen(ws1);
     let dest = ws1.add(len as usize);
     let mut i = 0;
@@ -396,7 +395,11 @@ pub unsafe extern "C" fn wcsncmp(ws1: *const wchar_t, ws2: *const wchar_t, n: si
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wcsncpy(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
+pub unsafe extern "C" fn wcsncpy(
+    ws1: *mut wchar_t,
+    ws2: *const wchar_t,
+    n: size_t,
+) -> *mut wchar_t {
     let mut i = 0;
     while i < n {
         let wc = *ws2.add(i);
@@ -523,13 +526,29 @@ pub unsafe extern "C" fn wmemcmp(ws1: *const wchar_t, ws2: *const wchar_t, n: si
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wmemcpy(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
-    string::memcpy(ws1 as *mut c_void, ws2 as *const c_void, n * mem::size_of::<wchar_t>()) as *mut wchar_t
+pub unsafe extern "C" fn wmemcpy(
+    ws1: *mut wchar_t,
+    ws2: *const wchar_t,
+    n: size_t,
+) -> *mut wchar_t {
+    string::memcpy(
+        ws1 as *mut c_void,
+        ws2 as *const c_void,
+        n * mem::size_of::<wchar_t>(),
+    ) as *mut wchar_t
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wmemmove(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> *mut wchar_t {
-    string::memmove(ws1 as *mut c_void, ws2 as *const c_void, n * mem::size_of::<wchar_t>()) as *mut wchar_t
+pub unsafe extern "C" fn wmemmove(
+    ws1: *mut wchar_t,
+    ws2: *const wchar_t,
+    n: size_t,
+) -> *mut wchar_t {
+    string::memmove(
+        ws1 as *mut c_void,
+        ws2 as *const c_void,
+        n * mem::size_of::<wchar_t>(),
+    ) as *mut wchar_t
 }
 
 #[no_mangle]

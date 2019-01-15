@@ -169,15 +169,15 @@ pub unsafe extern "C" fn getpwnam_r(
         OptionPasswd::Error => {
             *result = ptr::null_mut();
             -1
-        },
+        }
         OptionPasswd::NotFound => {
             *result = ptr::null_mut();
             0
-        },
+        }
         OptionPasswd::Found(_) => {
             *result = out;
             0
-        },
+        }
     }
 }
 
@@ -199,15 +199,15 @@ pub unsafe extern "C" fn getpwuid_r(
         OptionPasswd::Error => {
             *result = ptr::null_mut();
             -1
-        },
+        }
         OptionPasswd::NotFound => {
             *result = ptr::null_mut();
             0
-        },
+        }
         OptionPasswd::Found(_) => {
             *result = out;
             0
-        },
+        }
     }
 }
 

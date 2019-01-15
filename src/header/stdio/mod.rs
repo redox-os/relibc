@@ -3,9 +3,9 @@
 use alloc::borrow::{Borrow, BorrowMut};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use core::{fmt, mem, ptr, slice, str};
 use core::fmt::Write as WriteFmt;
 use core::ops::{Deref, DerefMut};
+use core::{fmt, mem, ptr, slice, str};
 use va_list::VaList as va_list;
 
 use c_str::CStr;
@@ -291,7 +291,11 @@ pub unsafe extern "C" fn fgetpos(stream: *mut FILE, pos: *mut fpos_t) -> c_int {
 
 /// Get a string from the stream
 #[no_mangle]
-pub unsafe extern "C" fn fgets(original: *mut c_char, max: c_int, stream: *mut FILE) -> *mut c_char {
+pub unsafe extern "C" fn fgets(
+    original: *mut c_char,
+    max: c_int,
+    stream: *mut FILE,
+) -> *mut c_char {
     let mut stream = (*stream).lock();
     let mut out = original;
     let max = max as usize;
@@ -343,9 +347,7 @@ pub unsafe extern "C" fn fgets(original: *mut c_char, max: c_int, stream: *mut F
 
     if max >= 1 {
         // Write the NUL byte
-        unsafe {
-            *out = 0;
-        }
+        *out = 0;
     }
     if wrote {
         original
@@ -570,7 +572,7 @@ pub unsafe extern "C" fn fwrite(
     stream: *mut FILE,
 ) -> size_t {
     if size == 0 || nitems == 0 {
-        return 0
+        return 0;
     }
     let mut stream = (*stream).lock();
     let buf = slice::from_raw_parts_mut(ptr as *mut u8, size as usize * nitems as usize);
@@ -865,7 +867,7 @@ pub unsafe extern "C" fn setvbuf(
         Buffer::Owned(vec![0; size as usize])
     // }
     } else {
-        unsafe { Buffer::Borrowed(slice::from_raw_parts_mut(buf as *mut u8, size)) }
+        Buffer::Borrowed(slice::from_raw_parts_mut(buf as *mut u8, size))
     };
     stream.flags |= F_SVB;
     0
@@ -928,7 +930,11 @@ pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vasprintf(strp: *mut *mut c_char, format: *const c_char, ap: va_list) -> c_int {
+pub unsafe extern "C" fn vasprintf(
+    strp: *mut *mut c_char,
+    format: *const c_char,
+    ap: va_list,
+) -> c_int {
     let mut alloc_writer = platform::AllocStringWriter(ptr::null_mut(), 0);
     let ret = printf::printf(&mut alloc_writer, format, ap);
     *strp = alloc_writer.0 as *mut c_char;

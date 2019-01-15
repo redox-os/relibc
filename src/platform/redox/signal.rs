@@ -1,13 +1,13 @@
 use core::mem;
 use syscall;
 
-use platform::errno;
 use super::super::types::*;
 use super::super::{Pal, PalSignal};
 use super::{e, Sys};
 use header::errno::EINVAL;
 use header::signal::{sigaction, sigset_t};
-use header::sys_time::{ITIMER_REAL, itimerval};
+use header::sys_time::{itimerval, ITIMER_REAL};
+use platform::errno;
 
 impl PalSignal for Sys {
     fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
@@ -16,7 +16,7 @@ impl PalSignal for Sys {
             _ => unsafe {
                 errno = EINVAL;
                 return -1;
-            }
+            },
         };
 
         let fd = e(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC));
@@ -35,9 +35,9 @@ impl PalSignal for Sys {
 
         unsafe {
             (*out).it_interval.tv_sec = spec.it_interval.tv_sec;
-            (*out).it_interval.tv_usec = spec.it_interval.tv_nsec/1000;
+            (*out).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
             (*out).it_value.tv_sec = spec.it_value.tv_sec;
-            (*out).it_value.tv_usec = spec.it_value.tv_nsec/1000;
+            (*out).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
         }
 
         0
@@ -61,7 +61,7 @@ impl PalSignal for Sys {
             _ => unsafe {
                 errno = EINVAL;
                 return -1;
-            }
+            },
         };
 
         let fd = e(syscall::open(path, syscall::O_RDWR | syscall::O_CLOEXEC));
@@ -75,11 +75,11 @@ impl PalSignal for Sys {
 
         if count != !0 {
             unsafe {
-                if ! old.is_null() {
+                if !old.is_null() {
                     (*old).it_interval.tv_sec = spec.it_interval.tv_sec;
-                    (*old).it_interval.tv_usec = spec.it_interval.tv_nsec/1000;
+                    (*old).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
                     (*old).it_value.tv_sec = spec.it_value.tv_sec;
-                    (*old).it_value.tv_usec = spec.it_value.tv_nsec/1000;
+                    (*old).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
                 }
 
                 spec.it_interval.tv_sec = (*new).it_interval.tv_sec;
@@ -136,11 +136,7 @@ impl PalSignal for Sys {
         } else {
             Some([unsafe { *set as u64 }, 0])
         };
-        let mut old_opt = if oset.is_null() {
-            None
-        } else {
-            Some([0, 0])
-        };
+        let mut old_opt = if oset.is_null() { None } else { Some([0, 0]) };
         let ret = e(syscall::sigprocmask(
             how as usize,
             new_opt.as_ref(),

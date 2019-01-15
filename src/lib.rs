@@ -15,7 +15,6 @@
 #![feature(stmt_expr_attributes)]
 #![feature(str_internals)]
 #![feature(thread_local)]
-
 #![allow(clippy::cast_lossless)]
 #![allow(clippy::cast_ptr_alignment)]
 #![allow(clippy::derive_hash_xor_eq)]

@@ -74,7 +74,7 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
             };
             mem::forget(branches);
             0
-        },
+        }
         Err(CompileError::EmptyRepetition)
         | Err(CompileError::IntegerOverflow)
         | Err(CompileError::IllegalRange) => REG_BADBR,
@@ -146,7 +146,12 @@ pub unsafe extern "C" fn regexec(
 
 #[no_mangle]
 #[linkage = "weak"] // redefined in GIT
-pub extern "C" fn regerror(code: c_int, _regex: *const regex_t, out: *mut c_char, max: size_t) -> size_t {
+pub extern "C" fn regerror(
+    code: c_int,
+    _regex: *const regex_t,
+    out: *mut c_char,
+    max: size_t,
+) -> size_t {
     let string = match code {
         0 => "No error\0",
         REG_NOMATCH => "No match\0",

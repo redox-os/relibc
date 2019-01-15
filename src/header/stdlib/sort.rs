@@ -137,9 +137,7 @@ fn heap_sift_down(
             swap_idx = child;
             swap_ptr = first_child_ptr;
         }
-        if child < end
-            && comp(swap_ptr as *const c_void, second_child_ptr as *const c_void) < 0
-        {
+        if child < end && comp(swap_ptr as *const c_void, second_child_ptr as *const c_void) < 0 {
             swap_idx = child + 1;
             swap_ptr = second_child_ptr;
         }

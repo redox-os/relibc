@@ -36,16 +36,16 @@ const CLONE_SIGHAND: usize = 0x0800;
 #[repr(C)]
 #[derive(Default)]
 struct linux_statfs {
-    f_type: c_long, /* type of file system (see below) */
-    f_bsize: c_long, /* optimal transfer block size */
+    f_type: c_long,       /* type of file system (see below) */
+    f_bsize: c_long,      /* optimal transfer block size */
     f_blocks: fsblkcnt_t, /* total data blocks in file system */
-    f_bfree: fsblkcnt_t, /* free blocks in fs */
+    f_bfree: fsblkcnt_t,  /* free blocks in fs */
     f_bavail: fsblkcnt_t, /* free blocks available to unprivileged user */
-    f_files: fsfilcnt_t, /* total file nodes in file system */
-    f_ffree: fsfilcnt_t, /* free file nodes in fs */
-    f_fsid: c_long, /* file system id */
-    f_namelen: c_long, /* maximum length of filenames */
-    f_frsize: c_long, /* fragment size (since Linux 2.6) */
+    f_files: fsfilcnt_t,  /* total file nodes in file system */
+    f_ffree: fsfilcnt_t,  /* free file nodes in fs */
+    f_fsid: c_long,       /* file system id */
+    f_namelen: c_long,    /* maximum length of filenames */
+    f_frsize: c_long,     /* fragment size (since Linux 2.6) */
     f_flags: c_long,
     f_spare: [c_long; 4],
 }
@@ -64,7 +64,6 @@ fn e(sys: usize) -> usize {
 pub struct Sys;
 
 impl Sys {
-
     // fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
     //     e(unsafe { syscall!(GETRUSAGE, who, r_usage) }) as c_int
     // }
@@ -163,7 +162,7 @@ impl Pal for Sys {
         let res = e(unsafe { syscall!(FSTATFS, fildes, kbuf_ptr) }) as c_int;
         if res == 0 {
             unsafe {
-                if ! buf.is_null() {
+                if !buf.is_null() {
                     (*buf).f_bsize = kbuf.f_bsize as c_ulong;
                     (*buf).f_frsize = if kbuf.f_frsize != 0 {
                         kbuf.f_frsize
@@ -327,7 +326,16 @@ impl Pal for Sys {
     }
 
     fn pte_clone() -> pid_t {
-        e(unsafe { syscall!(CLONE, CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND, 0, 0, 0, 0) }) as pid_t
+        e(unsafe {
+            syscall!(
+                CLONE,
+                CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND,
+                0,
+                0,
+                0,
+                0
+            )
+        }) as pid_t
     }
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {

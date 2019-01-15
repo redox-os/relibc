@@ -67,7 +67,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     // Set up envp
     let envp = sp.envp();
     let mut len = 0;
-    while ! (*envp.add(len)).is_null() {
+    while !(*envp.add(len)).is_null() {
         len += 1;
     }
     platform::inner_environ = copy_string_array(envp, len);
@@ -102,11 +102,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     }
 
     // not argv or envp, because programs like bash try to modify this *const* pointer :|
-    stdlib::exit(main(
-        argc,
-        platform::argv,
-        platform::environ,
-    ));
+    stdlib::exit(main(argc, platform::argv, platform::environ));
 
     unreachable!();
 }

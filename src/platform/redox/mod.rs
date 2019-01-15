@@ -599,14 +599,22 @@ impl Pal for Sys {
     }
 
     fn mkdir(path: &CStr, mode: mode_t) -> c_int {
-        match File::create(path, fcntl::O_DIRECTORY | fcntl::O_EXCL | fcntl::O_CLOEXEC, 0o777) {
+        match File::create(
+            path,
+            fcntl::O_DIRECTORY | fcntl::O_EXCL | fcntl::O_CLOEXEC,
+            0o777,
+        ) {
             Ok(_fd) => 0,
             Err(_) => -1,
         }
     }
 
     fn mkfifo(path: &CStr, mode: mode_t) -> c_int {
-        match File::create(path, fcntl::O_CREAT | fcntl::O_CLOEXEC, syscall::MODE_FIFO as mode_t | (mode & 0o777)) {
+        match File::create(
+            path,
+            fcntl::O_CREAT | fcntl::O_CLOEXEC,
+            syscall::MODE_FIFO as mode_t | (mode & 0o777),
+        ) {
             Ok(fd) => 0,
             Err(_) => -1,
         }
@@ -623,11 +631,14 @@ impl Pal for Sys {
         let map = Map {
             offset: off as usize,
             size: len,
-            flags: ((prot as usize) << 16) | ((flags as usize) & 0xFFFF)
+            flags: ((prot as usize) << 16) | ((flags as usize) & 0xFFFF),
         };
 
         if flags & MAP_ANON == MAP_ANON {
-            let fd = e(syscall::open("memory:", syscall::O_STAT | syscall::O_CLOEXEC)); // flags don't matter currently
+            let fd = e(syscall::open(
+                "memory:",
+                syscall::O_STAT | syscall::O_CLOEXEC,
+            )); // flags don't matter currently
             if fd == !0 {
                 return !0 as *mut c_void;
             }
@@ -815,7 +826,14 @@ impl Pal for Sys {
     }
 
     fn pte_clone() -> pid_t {
-        e(unsafe { syscall::clone(syscall::CLONE_VM | syscall::CLONE_FS | syscall::CLONE_FILES | syscall::CLONE_SIGHAND) }) as pid_t
+        e(unsafe {
+            syscall::clone(
+                syscall::CLONE_VM
+                    | syscall::CLONE_FS
+                    | syscall::CLONE_FILES
+                    | syscall::CLONE_SIGHAND,
+            )
+        }) as pid_t
     }
 
     fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
@@ -823,7 +841,10 @@ impl Pal for Sys {
     }
 
     fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t {
-        let file = match File::open(pathname, fcntl::O_PATH | fcntl::O_SYMLINK | fcntl::O_CLOEXEC) {
+        let file = match File::open(
+            pathname,
+            fcntl::O_PATH | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
+        ) {
             Ok(ok) => ok,
             Err(_) => return -1,
         };
@@ -1084,7 +1105,7 @@ impl Pal for Sys {
     fn uname(utsname: *mut utsname) -> c_int {
         fn gethostname(name: &mut [u8]) -> io::Result<()> {
             if name.is_empty() {
-                return Ok(())
+                return Ok(());
             }
 
             let mut file = File::open(
@@ -1108,7 +1129,7 @@ impl Pal for Sys {
             match gethostname(unsafe {
                 slice::from_raw_parts_mut(
                     (*utsname).nodename.as_mut_ptr() as *mut u8,
-                    (*utsname).nodename.len()
+                    (*utsname).nodename.len(),
                 )
             }) {
                 Ok(_) => (),

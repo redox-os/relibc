@@ -49,7 +49,11 @@ pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_sigmask(how: c_int, set: *const sigset_t, oldset: *mut sigset_t) -> c_int {
+pub extern "C" fn pthread_sigmask(
+    how: c_int,
+    set: *const sigset_t,
+    oldset: *mut sigset_t,
+) -> c_int {
     // On Linux and Redox, pthread_sigmask and sigprocmask are equivalent
     if sigprocmask(how, set, oldset) == 0 {
         0
@@ -165,10 +169,7 @@ extern "C" {
 }
 
 #[no_mangle]
-pub extern "C" fn signal(
-    sig: c_int,
-    func: extern "C" fn(c_int),
-) -> extern "C" fn(c_int) {
+pub extern "C" fn signal(sig: c_int, func: extern "C" fn(c_int)) -> extern "C" fn(c_int) {
     let sa = sigaction {
         sa_handler: func,
         sa_flags: SA_RESTART as c_ulong,

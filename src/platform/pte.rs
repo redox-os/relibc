@@ -2,13 +2,13 @@
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
+use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use core::{intrinsics, ptr};
-use core::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 
 use header::time::timespec;
 use mutex::{FUTEX_WAIT, FUTEX_WAKE};
-use platform::{Pal, Sys};
 use platform::types::{c_int, c_uint, c_void, pid_t};
+use platform::{Pal, Sys};
 
 pub struct Semaphore {
     lock: i32,
@@ -28,7 +28,7 @@ pub enum pte_osResult {
     PTE_OS_GENERAL_FAILURE,
     PTE_OS_TIMEOUT,
     PTE_OS_INTERRUPTED,
-    PTE_OS_INVALID_PARAM
+    PTE_OS_INVALID_PARAM,
 }
 
 use self::pte_osResult::*;
@@ -55,12 +55,13 @@ pub unsafe extern "C" fn pte_osInit() -> pte_osResult {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pte_osThreadCreate(entryPoint: pte_osThreadEntryPoint,
-                                   _stackSize: c_int,
-                                   _initialPriority: c_int,
-                                   argv: *mut c_void,
-                                   ppte_osThreadHandle: *mut pte_osThreadHandle
-                                   ) -> pte_osResult {
+pub unsafe extern "C" fn pte_osThreadCreate(
+    entryPoint: pte_osThreadEntryPoint,
+    _stackSize: c_int,
+    _initialPriority: c_int,
+    argv: *mut c_void,
+    ppte_osThreadHandle: *mut pte_osThreadHandle,
+) -> pte_osResult {
     // XXX error handling
     let id = Sys::pte_clone();
     if id < 0 {
@@ -166,7 +167,10 @@ pub unsafe extern "C" fn pte_osThreadGetPriority(threadHandle: pte_osThreadHandl
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pte_osThreadSetPriority(threadHandle: pte_osThreadHandle, newPriority: c_int) -> pte_osResult {
+pub unsafe extern "C" fn pte_osThreadSetPriority(
+    threadHandle: pte_osThreadHandle,
+    newPriority: c_int,
+) -> pte_osResult {
     PTE_OS_OK
 }
 
@@ -237,7 +241,10 @@ pub unsafe extern "C" fn pte_osMutexUnlock(handle: pte_osMutexHandle) -> pte_osR
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pte_osSemaphoreCreate(initialValue: c_int, pHandle: *mut pte_osSemaphoreHandle) -> pte_osResult {
+pub unsafe extern "C" fn pte_osSemaphoreCreate(
+    initialValue: c_int,
+    pHandle: *mut pte_osSemaphoreHandle,
+) -> pte_osResult {
     *pHandle = Box::into_raw(Box::new(Semaphore {
         lock: 0,
         count: initialValue,
@@ -252,7 +259,10 @@ pub unsafe extern "C" fn pte_osSemaphoreDelete(handle: pte_osSemaphoreHandle) ->
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pte_osSemaphorePost(handle: pte_osSemaphoreHandle, count: c_int) -> pte_osResult {
+pub unsafe extern "C" fn pte_osSemaphorePost(
+    handle: pte_osSemaphoreHandle,
+    count: c_int,
+) -> pte_osResult {
     let semaphore = &mut *handle;
     pte_osMutexLock(&mut semaphore.lock);
     intrinsics::atomic_xadd(&mut semaphore.count, 1);
@@ -261,11 +271,14 @@ pub unsafe extern "C" fn pte_osSemaphorePost(handle: pte_osSemaphoreHandle, coun
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pte_osSemaphorePend(handle: pte_osSemaphoreHandle, pTimeout: *mut c_uint) -> pte_osResult {
+pub unsafe extern "C" fn pte_osSemaphorePend(
+    handle: pte_osSemaphoreHandle,
+    pTimeout: *mut c_uint,
+) -> pte_osResult {
     //TODO: pTimeout
     let semaphore = &mut *handle;
     let mut acquired = false;
-    while ! acquired {
+    while !acquired {
         pte_osMutexLock(&mut semaphore.lock);
         if intrinsics::atomic_load(&mut semaphore.count) > 0 {
             intrinsics::atomic_xsub(&mut semaphore.count, 1);
@@ -278,7 +291,10 @@ pub unsafe extern "C" fn pte_osSemaphorePend(handle: pte_osSemaphoreHandle, pTim
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pte_osSemaphoreCancellablePend(handle: pte_osSemaphoreHandle, pTimeout: *mut c_uint) -> pte_osResult {
+pub unsafe extern "C" fn pte_osSemaphoreCancellablePend(
+    handle: pte_osSemaphoreHandle,
+    pTimeout: *mut c_uint,
+) -> pte_osResult {
     //TODO
     pte_osSemaphorePend(handle, pTimeout)
 }
@@ -289,7 +305,11 @@ pub unsafe extern "C" fn pte_osAtomicExchange(ptarg: *mut c_int, val: c_int) -> 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pte_osAtomicCompareExchange(pdest: *mut c_int, exchange: c_int, comp: c_int) -> c_int {
+pub unsafe extern "C" fn pte_osAtomicCompareExchange(
+    pdest: *mut c_int,
+    exchange: c_int,
+    comp: c_int,
+) -> c_int {
     intrinsics::atomic_cxchg(pdest, comp, exchange).0
 }
 
@@ -316,7 +336,10 @@ pub unsafe extern "C" fn pte_osTlsSetValue(index: c_uint, value: *mut c_void) ->
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osTlsGetValue(index: c_uint) -> *mut c_void {
-    locals().get_mut(&index).map(|x| *x).unwrap_or(ptr::null_mut())
+    locals()
+        .get_mut(&index)
+        .map(|x| *x)
+        .unwrap_or(ptr::null_mut())
 }
 
 #[no_mangle]

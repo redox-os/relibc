@@ -1,7 +1,7 @@
 //! dlfcn implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/dlfcn.h.html
 
+use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use core::{ptr, str};
-use core::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 
 use c_str::CStr;
 use platform::types::*;
@@ -38,7 +38,9 @@ pub unsafe extern "C" fn dlopen(filename: *const c_char, flags: c_int) -> *mut c
     let filename_opt = if filename.is_null() {
         None
     } else {
-        Some(str::from_utf8_unchecked(CStr::from_ptr(filename).to_bytes()))
+        Some(str::from_utf8_unchecked(
+            CStr::from_ptr(filename).to_bytes(),
+        ))
     };
 
     eprintln!("dlopen({:?}, {:#>04x})", filename_opt, flags);

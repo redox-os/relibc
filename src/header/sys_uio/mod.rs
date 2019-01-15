@@ -17,10 +17,7 @@ pub struct iovec {
 
 impl iovec {
     unsafe fn to_slice(&self) -> &mut [u8] {
-        slice::from_raw_parts_mut(
-            self.iov_base as *mut u8,
-            self.iov_len as usize
-        )
+        slice::from_raw_parts_mut(self.iov_base as *mut u8, self.iov_len as usize)
     }
 }
 

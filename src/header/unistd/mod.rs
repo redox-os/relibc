@@ -486,7 +486,11 @@ pub extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssiz
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn readlink(path: *const c_char, buf: *mut c_char, bufsize: size_t) -> ssize_t {
+pub unsafe extern "C" fn readlink(
+    path: *const c_char,
+    buf: *mut c_char,
+    bufsize: size_t,
+) -> ssize_t {
     let path = CStr::from_ptr(path);
     let buf = slice::from_raw_parts_mut(buf as *mut u8, bufsize as usize);
     Sys::readlink(path, buf)

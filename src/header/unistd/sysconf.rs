@@ -44,7 +44,9 @@ pub extern "C" fn sysconf(name: c_int) -> c_long {
         _SC_SYMLOOP_MAX => -1,
         _SC_HOST_NAME_MAX => 64,
         _ => {
-            unsafe { platform::errno = errno::EINVAL; }
+            unsafe {
+                platform::errno = errno::EINVAL;
+            }
             -1
         }
     }
