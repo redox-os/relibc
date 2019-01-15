@@ -77,13 +77,17 @@ macro_rules! trace_expr {
 
         trace!("{}", format_args!($($arg)*));
 
+        #[allow(unused_unsafe)]
         let old_errno = unsafe { platform::errno };
+        #[allow(unused_unsafe)]
         unsafe { platform::errno = 0; }
 
         let ret = $expr;
 
+        #[allow(unused_unsafe)]
         let errno = unsafe { platform::errno } as isize;
         if errno == 0 {
+            #[allow(unused_unsafe)]
             unsafe { platform::errno = old_errno; }
         }
 

@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use core::{intrinsics, ptr};
