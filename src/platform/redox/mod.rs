@@ -34,7 +34,7 @@ mod extra;
 mod signal;
 mod socket;
 
-fn e(sys: Result<usize>) -> usize {
+pub fn e(sys: Result<usize>) -> usize {
     match sys {
         Ok(ok) => ok,
         Err(err) => {

@@ -6,6 +6,7 @@ use c_str::CStr;
 use header::errno;
 use header::limits;
 use header::stdlib::getenv;
+use header::sys_ioctl;
 use header::sys_time;
 use header::time::timespec;
 use platform;
@@ -565,14 +566,21 @@ pub extern "C" fn sync() {
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn tcgetpgrp() -> pid_t {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn tcgetpgrp(fd: c_int) -> pid_t {
+    let mut pgrp = 0;
+    if unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCGPGRP, &mut pgrp as *mut pid_t as _) } < 0 {
+        return -1;
+    }
+    pgrp
 }
 
-// #[no_mangle]
-pub extern "C" fn tcsetpgrp(fildes: c_int, pgid_id: pid_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn tcsetpgrp(fd: c_int, pgrp: pid_t) -> c_int {
+    if unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCSPGRP, &pgrp as *const pid_t as _) } < 0 {
+        return -1;
+    }
+    pgrp
 }
 
 // #[no_mangle]
@@ -643,10 +651,3 @@ pub extern "C" fn write(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssi
     let buf = unsafe { slice::from_raw_parts(buf as *const u8, nbyte as usize) };
     Sys::write(fildes, buf)
 }
-
-/*
-#[no_mangle]
-pub extern "C" fn func(args) -> c_int {
-    unimplemented!();
-}
-*/

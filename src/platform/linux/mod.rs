@@ -50,7 +50,7 @@ struct linux_statfs {
     f_spare: [c_long; 4],
 }
 
-fn e(sys: usize) -> usize {
+pub fn e(sys: usize) -> usize {
     if (sys as isize) < 0 && (sys as isize) >= -256 {
         unsafe {
             errno = -(sys as isize) as c_int;
