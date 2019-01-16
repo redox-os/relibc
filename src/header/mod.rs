@@ -17,6 +17,8 @@ pub mod limits;
 pub mod locale;
 pub mod netdb;
 pub mod netinet_in;
+pub mod netinet_ip;
+pub mod netinet_tcp;
 pub mod poll;
 pub mod pwd;
 pub mod regex;
