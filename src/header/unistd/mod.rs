@@ -513,9 +513,9 @@ pub extern "C" fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
     Sys::setpgid(pid, pgid)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn setpgrp() -> pid_t {
-    unimplemented!();
+    setpgid(0, 0)
 }
 
 #[no_mangle]
