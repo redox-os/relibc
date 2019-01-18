@@ -21,7 +21,6 @@ use header::sys_stat::stat;
 use header::sys_statvfs::statvfs;
 use header::sys_time::{timeval, timezone};
 use header::sys_utsname::{utsname, UTSLENGTH};
-use header::termios::termios;
 use header::time::timespec;
 use header::unistd::{F_OK, R_OK, W_OK, X_OK};
 use io::prelude::*;
@@ -576,15 +575,6 @@ impl Pal for Sys {
         e(syscall::getuid()) as pid_t
     }
 
-    fn isatty(fd: c_int) -> c_int {
-        syscall::dup(fd as usize, b"termios")
-            .map(|fd| {
-                let _ = syscall::close(fd);
-                1
-            })
-            .unwrap_or(0)
-    }
-
     fn link(path1: &CStr, path2: &CStr) -> c_int {
         e(unsafe { syscall::link(path1.as_ptr() as *const u8, path2.as_ptr() as *const u8) })
             as c_int
@@ -1061,40 +1051,6 @@ impl Pal for Sys {
             return -1;
         }
 
-        0
-    }
-
-    fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
-        let dup = e(syscall::dup(fd as usize, b"termios"));
-        if dup == !0 {
-            return -1;
-        }
-
-        let read = e(syscall::read(dup, unsafe {
-            slice::from_raw_parts_mut(out as *mut u8, mem::size_of::<termios>())
-        }));
-        let _ = syscall::close(dup);
-
-        if read == !0 {
-            return -1;
-        }
-        0
-    }
-
-    fn tcsetattr(fd: c_int, _act: c_int, value: *const termios) -> c_int {
-        let dup = e(syscall::dup(fd as usize, b"termios"));
-        if dup == !0 {
-            return -1;
-        }
-
-        let write = e(syscall::write(dup, unsafe {
-            slice::from_raw_parts(value as *const u8, mem::size_of::<termios>())
-        }));
-        let _ = syscall::close(dup);
-
-        if write == !0 {
-            return -1;
-        }
         0
     }
 

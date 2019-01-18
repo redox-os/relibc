@@ -8,6 +8,7 @@ use header::limits;
 use header::stdlib::getenv;
 use header::sys_ioctl;
 use header::sys_time;
+use header::termios;
 use header::time::timespec;
 use platform;
 use platform::types::*;
@@ -378,7 +379,12 @@ pub extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn isatty(fd: c_int) -> c_int {
-    Sys::isatty(fd)
+    let mut t = termios::termios::default();
+    if unsafe { termios::tcgetattr(fd, &mut t as *mut termios::termios) == 0 } {
+        1
+    } else {
+        0
+    }
 }
 
 // #[no_mangle]

@@ -7,7 +7,6 @@ use header::sys_stat::stat;
 use header::sys_statvfs::statvfs;
 use header::sys_time::{timeval, timezone};
 use header::sys_utsname::utsname;
-use header::termios::termios;
 use header::time::timespec;
 
 pub use self::signal::PalSignal;
@@ -87,8 +86,6 @@ pub trait Pal {
 
     fn getuid() -> uid_t;
 
-    fn isatty(fd: c_int) -> c_int;
-
     fn link(path1: &CStr, path2: &CStr) -> c_int;
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t;
@@ -148,10 +145,6 @@ pub trait Pal {
     fn setreuid(ruid: uid_t, euid: uid_t) -> c_int;
 
     fn symlink(path1: &CStr, path2: &CStr) -> c_int;
-
-    fn tcgetattr(fd: c_int, out: *mut termios) -> c_int;
-
-    fn tcsetattr(fd: c_int, act: c_int, value: *const termios) -> c_int;
 
     fn umask(mask: mode_t) -> mode_t;
 

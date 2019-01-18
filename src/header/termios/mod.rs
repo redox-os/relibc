@@ -1,9 +1,9 @@
 //! termios implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/termios.h.html
 
 use header::errno;
+use header::sys_ioctl;
 use platform;
 use platform::types::*;
-use platform::{Pal, Sys};
 
 pub type cc_t = u8;
 pub type speed_t = u32;
@@ -12,6 +12,7 @@ pub type tcflag_t = u32;
 pub const NCCS: usize = 32;
 
 #[repr(C)]
+#[derive(Default)]
 pub struct termios {
     c_iflag: tcflag_t,
     c_oflag: tcflag_t,
@@ -24,13 +25,18 @@ pub struct termios {
 }
 
 #[no_mangle]
-pub extern "C" fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
-    Sys::tcgetattr(fd, out)
+pub unsafe extern "C" fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
+    sys_ioctl::ioctl(fd, sys_ioctl::TCGETS, out as *mut c_void)
 }
 
 #[no_mangle]
-pub extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *mut termios) -> c_int {
-    Sys::tcsetattr(fd, act, value)
+pub unsafe extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *mut termios) -> c_int {
+    if act < 0 || act > 2 {
+        platform::errno = errno::EINVAL;
+        return -1;
+    }
+    // This is safe because ioctl shouldn't modify the value
+    sys_ioctl::ioctl(fd, sys_ioctl::TCSETS + act as c_ulong, value as *mut c_void)
 }
 
 #[no_mangle]

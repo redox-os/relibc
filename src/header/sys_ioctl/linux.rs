@@ -2,7 +2,7 @@ use platform::types::*;
 use platform::Sys;
 
 #[no_mangle]
-pub extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
+pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
     // TODO: Somehow support varargs to syscall??
     Sys::ioctl(fd, request, out)
 }

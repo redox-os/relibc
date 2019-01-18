@@ -6,11 +6,9 @@ use super::{errno, Pal};
 use c_str::CStr;
 use fs::File;
 use header::dirent::dirent;
-use header::errno::EINVAL;
 use header::fcntl;
 use header::poll::{nfds_t, pollfd};
 use header::signal::SIGCHLD;
-use header::sys_ioctl::{winsize, TCGETS, TCSETS, TIOCGWINSZ};
 // use header::sys_resource::rusage;
 use header::sys_select::fd_set;
 use header::sys_stat::stat;
@@ -18,7 +16,6 @@ use header::sys_statvfs::statvfs;
 use header::sys_time::{timeval, timezone};
 // use header::sys_times::tms;
 use header::sys_utsname::utsname;
-use header::termios::termios;
 use header::time::timespec;
 
 mod signal;
@@ -68,9 +65,9 @@ impl Sys {
     //     e(unsafe { syscall!(GETRUSAGE, who, r_usage) }) as c_int
     // }
 
-    pub fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
+    pub unsafe fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
         // TODO: Somehow support varargs to syscall??
-        e(unsafe { syscall!(IOCTL, fd, request, out) }) as c_int
+        e(syscall!(IOCTL, fd, request, out)) as c_int
     }
 
     // fn times(out: *mut tms) -> clock_t {
@@ -260,11 +257,6 @@ impl Pal for Sys {
         e(unsafe { syscall!(GETUID) }) as uid_t
     }
 
-    fn isatty(fd: c_int) -> c_int {
-        let mut winsize = winsize::default();
-        (Self::ioctl(fd, TIOCGWINSZ, &mut winsize as *mut _ as *mut c_void) == 0) as c_int
-    }
-
     fn link(path1: &CStr, path2: &CStr) -> c_int {
         e(unsafe {
             syscall!(
@@ -422,21 +414,6 @@ impl Pal for Sys {
 
     fn symlink(path1: &CStr, path2: &CStr) -> c_int {
         e(unsafe { syscall!(SYMLINKAT, path1.as_ptr(), AT_FDCWD, path2.as_ptr()) }) as c_int
-    }
-
-    fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
-        Self::ioctl(fd, TCGETS, out as *mut c_void)
-    }
-
-    fn tcsetattr(fd: c_int, act: c_int, value: *const termios) -> c_int {
-        if act < 0 || act > 2 {
-            unsafe {
-                errno = EINVAL;
-            }
-            return -1;
-        }
-        // This is safe because ioctl shouldn't modify the value
-        Self::ioctl(fd, TCSETS + act as c_ulong, value as *mut c_void)
     }
 
     fn umask(mask: mode_t) -> mode_t {
