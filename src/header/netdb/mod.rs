@@ -10,12 +10,6 @@ use alloc::str::SplitWhitespace;
 use alloc::vec::Vec;
 
 use c_str::{CStr, CString};
-
-use platform;
-use platform::rlb::{Line, RawLineBuffer};
-use platform::types::*;
-use platform::{Pal, Sys};
-
 use header::arpa_inet::{htons, inet_aton};
 use header::errno::*;
 use header::fcntl::O_RDONLY;
@@ -25,6 +19,10 @@ use header::strings::strcasecmp;
 use header::sys_socket::constants::AF_INET;
 use header::sys_socket::{sockaddr, socklen_t};
 use header::unistd::SEEK_SET;
+use platform;
+use platform::rlb::{Line, RawLineBuffer};
+use platform::types::*;
+use platform::{Pal, Sys};
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
@@ -33,9 +31,6 @@ pub mod sys;
 #[cfg(target_os = "redox")]
 #[path = "redox.rs"]
 pub mod sys;
-
-//TODO: use self::db::Db;
-pub mod db;
 
 use self::lookup::{lookup_addr, lookup_host};
 pub mod lookup;

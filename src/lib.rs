@@ -45,6 +45,7 @@ extern crate spin;
 mod macros;
 pub mod c_str;
 pub mod cxa;
+pub mod db;
 pub mod fs;
 pub mod header;
 pub mod io;
