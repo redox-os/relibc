@@ -2,6 +2,7 @@ use core::{mem, slice};
 use syscall;
 
 use header::errno;
+use header::termios;
 use platform;
 use platform::e;
 use platform::types::*;
@@ -18,7 +19,7 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
             }
 
             let count = e(syscall::read(dup, unsafe {
-                slice::from_raw_parts_mut(out as *mut u8, mem::size_of::<termios>())
+                slice::from_raw_parts_mut(out as *mut u8, mem::size_of::<termios::termios>())
             }));
             let _ = syscall::close(dup);
 
@@ -35,7 +36,7 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
             }
 
             let count = e(syscall::write(dup, unsafe {
-                slice::from_raw_parts(out as *const u8, mem::size_of::<termios>())
+                slice::from_raw_parts(out as *const u8, mem::size_of::<termios::termios>())
             }));
             let _ = syscall::close(dup);
 
