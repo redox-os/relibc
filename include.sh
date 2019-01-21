@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 
-set -ex
+set -e
 
 include="$(realpath "$1")"
-cbindgen="$(realpath cbindgen)"
 
+cargo build --release --manifest-path cbindgen/Cargo.toml
+cbindgen="$(realpath target/release/cbindgen)"
+
+jobs=()
 for config in src/header/*/cbindgen.toml
 do
     dir="$(dirname "$config")"
@@ -13,8 +16,13 @@ do
     then
         header="$include/${name/_//}.h"
         pushd "$dir"
-        cargo run --release --manifest-path "$cbindgen/Cargo.toml" -- \
-            -c cbindgen.toml -o "$header" mod.rs
+        "$cbindgen" -c cbindgen.toml -o "$header" mod.rs &
+        jobs+=($!)
         popd
     fi
+done
+
+for job in "${jobs[@]}"
+do
+    wait "$job"
 done
