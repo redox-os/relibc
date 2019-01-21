@@ -16,7 +16,7 @@ use header::fcntl::O_RDONLY;
 use header::netinet_in::{in_addr, sockaddr_in};
 use header::stdlib::atoi;
 use header::strings::strcasecmp;
-use header::sys_socket::constants::AF_INET;
+use header::sys_socket::constants::{AF_UNSPEC, AF_INET};
 use header::sys_socket::{sockaddr, socklen_t};
 use header::unistd::SEEK_SET;
 use platform;
@@ -74,6 +74,7 @@ pub struct servent {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct addrinfo {
     ai_flags: c_int,           /* AI_PASSIVE, AI_CANONNAME, AI_NUMERICHOST */
     ai_family: c_int,          /* PF_xxx */
@@ -670,9 +671,10 @@ pub unsafe extern "C" fn getaddrinfo(
     let hints_opt = if hints.is_null() { None } else { Some(&*hints) };
 
     eprintln!(
-        "getaddrinfo({:?}, {:?})",
+        "getaddrinfo({:?}, {:?}, {:?})",
         node_opt.map(|c| str::from_utf8_unchecked(c.to_bytes())),
-        service_opt.map(|c| str::from_utf8_unchecked(c.to_bytes()))
+        service_opt.map(|c| str::from_utf8_unchecked(c.to_bytes())),
+        hints_opt
     );
 
     platform::errno = ENOSYS;
