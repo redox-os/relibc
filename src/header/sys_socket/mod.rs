@@ -14,7 +14,7 @@ pub type socklen_t = u32;
 #[derive(Default)]
 pub struct sockaddr {
     pub sa_family: sa_family_t,
-    pub data: [c_char; 14],
+    pub sa_data: [c_char; 14],
 }
 
 #[no_mangle]

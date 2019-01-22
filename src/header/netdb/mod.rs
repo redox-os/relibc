@@ -5,6 +5,7 @@ mod dns;
 use core::str::FromStr;
 use core::{mem, ptr, slice, str};
 
+use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
 use alloc::str::SplitWhitespace;
 use alloc::vec::Vec;
@@ -13,11 +14,11 @@ use c_str::{CStr, CString};
 use header::arpa_inet::htons;
 use header::errno::*;
 use header::fcntl::O_RDONLY;
-use header::netinet_in::{in_addr, sockaddr_in};
+use header::netinet_in::{in_addr, sockaddr_in, sockaddr_in6};
 use header::stdlib::atoi;
 use header::strings::strcasecmp;
 use header::sys_socket::constants::{AF_UNSPEC, AF_INET};
-use header::sys_socket::{sockaddr, socklen_t};
+use header::sys_socket::{sa_family_t, sockaddr, socklen_t};
 use header::unistd::SEEK_SET;
 use platform;
 use platform::rlb::{Line, RawLineBuffer};
@@ -670,15 +671,72 @@ pub unsafe extern "C" fn getaddrinfo(
 
     let hints_opt = if hints.is_null() { None } else { Some(&*hints) };
 
-    eprintln!(
+    trace!(
         "getaddrinfo({:?}, {:?}, {:?})",
         node_opt.map(|c| str::from_utf8_unchecked(c.to_bytes())),
         service_opt.map(|c| str::from_utf8_unchecked(c.to_bytes())),
         hints_opt
     );
 
-    platform::errno = ENOSYS;
-    EAI_SYSTEM
+    //TODO: Use hints
+    let mut ai_flags = hints_opt.map_or(0, |hints| hints.ai_flags);
+    let mut ai_family = hints_opt.map_or(AF_UNSPEC, |hints| hints.ai_family);
+    let mut ai_socktype = hints_opt.map_or(0, |hints| hints.ai_socktype);
+    let mut ai_protocol = hints_opt.map_or(0, |hints| hints.ai_protocol);
+
+    *res = ptr::null_mut();
+
+    //TODO: Check hosts file
+    if let Some(node) = node_opt {
+        let lookuphost = match lookup_host(str::from_utf8_unchecked(node.to_bytes())) {
+            Ok(lookuphost) => lookuphost,
+            Err(e) => {
+                platform::errno = e;
+                return EAI_SYSTEM;
+            }
+        };
+
+        for in_addr in lookuphost {
+            ai_family = AF_INET;
+            ai_socktype = AF_UNSPEC;
+            ai_protocol = 0;
+
+            let ai_addr = Box::into_raw(Box::new(sockaddr_in {
+                sin_family: AF_INET as sa_family_t,
+                sin_port: 0,
+                sin_addr: in_addr,
+                sin_zero: [0; 8]
+            })) as *mut sockaddr;
+
+            let ai_addrlen = mem::size_of::<sockaddr_in>();
+
+            let ai_canonname = if ai_flags & AI_CANONNAME > 0 {
+                ai_flags &= !AI_CANONNAME;
+                node.to_owned().into_raw()
+            } else {
+                ptr::null_mut()
+            };
+
+            let addrinfo = Box::new(addrinfo {
+                ai_flags: 0,
+                ai_family,
+                ai_socktype,
+                ai_protocol,
+                ai_addrlen,
+                ai_canonname,
+                ai_addr,
+                ai_next: ptr::null_mut(),
+            });
+
+            let mut indirect = res;
+            while !(*indirect).is_null() {
+                indirect=&mut (**indirect).ai_next;
+            }
+            *indirect = Box::into_raw(addrinfo);
+        }
+    }
+
+    0
 }
 
 #[no_mangle]
@@ -721,8 +779,19 @@ pub unsafe extern "C" fn freeaddrinfo(res: *mut addrinfo) {
     let mut ai = res;
     while !ai.is_null() {
         let bai = Box::from_raw(ai);
-        ai = (*ai).ai_next;
-        drop(bai);
+        if !bai.ai_canonname.is_null() {
+            CString::from_raw(bai.ai_canonname);
+        }
+        if !bai.ai_addr.is_null() {
+            if bai.ai_addrlen == mem::size_of::<sockaddr_in>() {
+                Box::from_raw(bai.ai_addr as *mut sockaddr_in);
+            } else if bai.ai_addrlen == mem::size_of::<sockaddr_in6>() {
+                Box::from_raw(bai.ai_addr as *mut sockaddr_in6);
+            } else {
+                eprintln!("freeaddrinfo: unknown ai_addrlen {}", bai.ai_addrlen);
+            }
+        }
+        ai = bai.ai_next;
     }
 }
 

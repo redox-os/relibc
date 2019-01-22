@@ -41,7 +41,7 @@ redox_syscall = "0.1"
 spin = "0.4.10"
 
 [features]
-#default = ["trace"]
+default = []
 trace = []
 
 [profile.dev]

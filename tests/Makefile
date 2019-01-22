@@ -15,7 +15,8 @@ EXPECT_BINS=\
 	libgen \
 	locale \
 	math \
-	netdb \
+	netdb/netdb \
+	netdb/getaddrinfo \
 	regex \
 	select \
 	setjmp \
@@ -112,7 +113,6 @@ BINS=\
 .PHONY: all $(BINS) clean run expected verify
 
 all: $(BINS)
-expect: $(EXPECT_BINS)
 
 $(BINS): %: bins/%
 
@@ -126,7 +126,7 @@ run: | ../sysroot all
 		"bins/$${bin}" test args || exit $$?; \
 	done
 
-expected: | ../sysroot expect
+expected: | ../sysroot $(EXPECT_BINS)
 	rm -rf expected
 	mkdir -p expected
 	for bin in $(EXPECT_BINS); \
@@ -136,7 +136,7 @@ expected: | ../sysroot expect
 		"bins/$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr" || exit $$?; \
 	done
 
-verify: | ../sysroot expect
+verify: | ../sysroot $(EXPECT_BINS)
 	rm -rf gen
 	mkdir -p gen
 	for bin in $(EXPECT_BINS); \
@@ -151,6 +151,7 @@ verify: | ../sysroot expect
 CFLAGS=\
 	-fno-builtin \
 	-fno-stack-protector \
+	-static \
 	-Wall \
 	-g \
 	-nostdinc \
