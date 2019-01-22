@@ -84,8 +84,8 @@ unsafe fn inner_get_name(
     trace!("path: {}", ::core::str::from_utf8_unchecked(&part));
 
     let data = slice::from_raw_parts_mut(
-        &mut (*address).data as *mut _ as *mut u8,
-        (*address).data.len(),
+        &mut (*address).sa_data as *mut _ as *mut u8,
+        (*address).sa_data.len(),
     );
 
     let len = data.len().min(part.len());
