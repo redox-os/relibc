@@ -435,4 +435,9 @@ impl Pal for Sys {
     fn write(fildes: c_int, buf: &[u8]) -> ssize_t {
         e(unsafe { syscall!(WRITE, fildes, buf.as_ptr(), buf.len()) }) as ssize_t
     }
+
+    fn verify() -> bool {
+        // GETPID on Linux is 39, which does not exist on Redox
+        e(unsafe { sc::syscall5(sc::nr::GETPID, !0, !0, !0, !0, !0) }) != !0
+    }
 }

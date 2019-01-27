@@ -1,8 +1,9 @@
 use alloc::vec::Vec;
-use core::ptr;
+use core::{intrinsics, ptr};
 
 use header::{stdio, stdlib};
 use platform;
+use platform::{Pal, Sys};
 use platform::types::*;
 
 #[repr(C)]
@@ -44,6 +45,15 @@ unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut
     vec
 }
 
+// Since Redox and Linux are so similar, it is easy to accidentally run a binary from one on the
+// other. This will test that the current system is compatible with the current binary
+#[no_mangle]
+pub unsafe fn relibc_verify_host() {
+    if ! Sys::verify() {
+        intrinsics::abort();
+    }
+}
+
 #[inline(never)]
 #[no_mangle]
 pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
@@ -57,6 +67,9 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         fn _init();
         fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
     }
+
+    // Ensure correct host system before executing more system calls
+    relibc_verify_host();
 
     // Set up argc and argv
     let argc = sp.argc();

@@ -155,4 +155,6 @@ pub trait Pal {
     fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t;
 
     fn write(fildes: c_int, buf: &[u8]) -> ssize_t;
+
+    fn verify() -> bool;
 }

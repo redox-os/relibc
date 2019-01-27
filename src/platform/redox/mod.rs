@@ -1164,4 +1164,9 @@ impl Pal for Sys {
     fn write(fd: c_int, buf: &[u8]) -> ssize_t {
         e(syscall::write(fd as usize, buf)) as ssize_t
     }
+
+    fn verify() -> bool {
+        // GETPID on Redox is 20, which is WRITEV on Linux
+        e(unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) }) != !0
+    }
 }
