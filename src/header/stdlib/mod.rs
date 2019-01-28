@@ -618,7 +618,7 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
         resolved
     };
 
-    let mut out = slice::from_raw_parts_mut(ptr as *mut u8, limits::PATH_MAX);
+    let out = slice::from_raw_parts_mut(ptr as *mut u8, limits::PATH_MAX);
     {
         let file = match File::open(&CStr::from_ptr(pathname), O_PATH | O_CLOEXEC) {
             Ok(file) => file,

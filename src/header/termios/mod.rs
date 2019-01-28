@@ -11,72 +11,6 @@ pub type tcflag_t = u32;
 
 pub const NCCS: usize = 32;
 
-#[repr(C)]
-#[derive(Default)]
-pub struct termios {
-    c_iflag: tcflag_t,
-    c_oflag: tcflag_t,
-    c_cflag: tcflag_t,
-    c_lflag: tcflag_t,
-    c_line: cc_t,
-    c_cc: [cc_t; NCCS],
-    __c_ispeed: speed_t,
-    __c_ospeed: speed_t,
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
-    sys_ioctl::ioctl(fd, sys_ioctl::TCGETS, out as *mut c_void)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *mut termios) -> c_int {
-    if act < 0 || act > 2 {
-        platform::errno = errno::EINVAL;
-        return -1;
-    }
-    // This is safe because ioctl shouldn't modify the value
-    sys_ioctl::ioctl(fd, sys_ioctl::TCSETS + act as c_ulong, value as *mut c_void)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn cfgetispeed(termios_p: *const termios) -> speed_t {
-    (*termios_p).__c_ispeed
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn cfgetospeed(termios_p: *const termios) -> speed_t {
-    (*termios_p).__c_ospeed
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) -> c_int {
-    match speed as usize {
-        B0..=B38400 | B57600..=B4000000 => {
-            (*termios_p).__c_ispeed = speed;
-            0
-        }
-        _ => {
-            platform::errno = errno::EINVAL;
-            -1
-        }
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) -> c_int {
-    match speed as usize {
-        B0..=B38400 | B57600..=B4000000 => {
-            (*termios_p).__c_ospeed = speed;
-            0
-        }
-        _ => {
-            platform::errno = errno::EINVAL;
-            -1
-        }
-    }
-}
-
 pub const VINTR: usize = 0;
 pub const VQUIT: usize = 1;
 pub const VERASE: usize = 2;
@@ -191,3 +125,74 @@ pub const TCIOFLUSH: usize = 2;
 pub const TCSANOW: usize = 0;
 pub const TCSADRAIN: usize = 1;
 pub const TCSAFLUSH: usize = 2;
+
+#[repr(C)]
+#[derive(Default)]
+pub struct termios {
+    c_iflag: tcflag_t,
+    c_oflag: tcflag_t,
+    c_cflag: tcflag_t,
+    c_lflag: tcflag_t,
+    c_line: cc_t,
+    c_cc: [cc_t; NCCS],
+    __c_ispeed: speed_t,
+    __c_ospeed: speed_t,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
+    sys_ioctl::ioctl(fd, sys_ioctl::TCGETS, out as *mut c_void)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *mut termios) -> c_int {
+    if act < 0 || act > 2 {
+        platform::errno = errno::EINVAL;
+        return -1;
+    }
+    // This is safe because ioctl shouldn't modify the value
+    sys_ioctl::ioctl(fd, sys_ioctl::TCSETS + act as c_ulong, value as *mut c_void)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn cfgetispeed(termios_p: *const termios) -> speed_t {
+    (*termios_p).__c_ispeed
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn cfgetospeed(termios_p: *const termios) -> speed_t {
+    (*termios_p).__c_ospeed
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) -> c_int {
+    match speed as usize {
+        B0..=B38400 | B57600..=B4000000 => {
+            (*termios_p).__c_ispeed = speed;
+            0
+        }
+        _ => {
+            platform::errno = errno::EINVAL;
+            -1
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) -> c_int {
+    match speed as usize {
+        B0..=B38400 | B57600..=B4000000 => {
+            (*termios_p).__c_ospeed = speed;
+            0
+        }
+        _ => {
+            platform::errno = errno::EINVAL;
+            -1
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn tcflush(fd: c_int, queue: c_int) -> c_int {
+    sys_ioctl::ioctl(fd, sys_ioctl::TCFLSH, queue as *mut c_void)
+}
