@@ -1,3 +1,5 @@
+use header::errno;
+use platform;
 use platform::types::*;
 
 pub const _PC_LINK_MAX: c_int = 0;
@@ -22,12 +24,43 @@ pub const _PC_ALLOC_SIZE_MIN: c_int = 18;
 pub const _PC_SYMLINK_MAX: c_int = 19;
 pub const _PC_2_SYMLINKS: c_int = 20;
 
-// #[no_mangle]
-pub extern "C" fn fpathconf(fildes: c_int, name: c_int) -> c_long {
-    unimplemented!();
+fn pc(name: c_int) -> c_long {
+    // Settings from musl, some adjusted
+    match name {
+        _PC_LINK_MAX => 127,
+        _PC_MAX_CANON => 255,
+        _PC_MAX_INPUT => 255,
+        _PC_NAME_MAX => 255,
+        _PC_PATH_MAX => 4096,
+        _PC_PIPE_BUF => 4096,
+        _PC_CHOWN_RESTRICTED => 1,
+        _PC_NO_TRUNC => 1,
+        _PC_VDISABLE => 0,
+        _PC_SYNC_IO => 1,
+        _PC_ASYNC_IO => -1,
+        _PC_PRIO_IO => -1,
+        _PC_SOCK_MAXBUF => -1,
+        _PC_FILESIZEBITS => 64,
+        _PC_REC_INCR_XFER_SIZE => -1,
+        _PC_REC_MAX_XFER_SIZE => -1,
+        _PC_REC_MIN_XFER_SIZE => 4096,
+        _PC_REC_XFER_ALIGN => 4096,
+        _PC_ALLOC_SIZE_MIN => 4096,
+        _PC_SYMLINK_MAX => -1,
+        _PC_2_SYMLINKS => 1,
+        _ => {
+            unsafe { platform::errno = errno::EINVAL; }
+            -1
+        }
+    }
 }
 
-// #[no_mangle]
-pub extern "C" fn pathconf(path: *const c_char, name: c_int) -> c_long {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn fpathconf(_fildes: c_int, name: c_int) -> c_long {
+    pc(name)
+}
+
+#[no_mangle]
+pub extern "C" fn pathconf(_path: *const c_char, name: c_int) -> c_long {
+    pc(name)
 }

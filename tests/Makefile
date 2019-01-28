@@ -104,6 +104,7 @@ BINS=\
 	unistd/gethostname \
 	unistd/getid \
 	unistd/link \
+	unistd/pathconf \
 	unistd/setid \
 	unistd/stat \
 	unistd/sysconf
