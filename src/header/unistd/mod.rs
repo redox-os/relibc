@@ -594,14 +594,30 @@ pub extern "C" fn truncate(path: *const c_char, length: off_t) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn ttyname(fildes: c_int) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn ttyname(fildes: c_int) -> *mut c_char {
+    static mut TTYNAME: [c_char; 4096] = [0; 4096];
+    if ttyname_r(fildes, TTYNAME.as_mut_ptr(), TTYNAME.len()) == 0 {
+        TTYNAME.as_mut_ptr()
+    } else {
+        ptr::null_mut()
+    }
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) -> c_int {
-    unimplemented!();
+    let name = unsafe { slice::from_raw_parts_mut(name as *mut u8, namesize) };
+    if name.is_empty() {
+        return errno::ERANGE;
+    }
+
+    let len = Sys::fpath(fildes, &mut name[..namesize - 1]);
+    if len < 0 {
+        return unsafe { -platform::errno };
+    }
+    name[len as usize] = 0;
+
+    0
 }
 
 #[no_mangle]

@@ -54,6 +54,8 @@ pub trait Pal {
 
     fn fork() -> pid_t;
 
+    fn fpath(fildes: c_int, out: &mut [u8]) -> ssize_t;
+
     fn fsync(fildes: c_int) -> c_int;
 
     fn ftruncate(fildes: c_int, length: off_t) -> c_int;
@@ -120,8 +122,6 @@ pub trait Pal {
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
 
     fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t;
-
-    fn realpath(pathname: &CStr, out: &mut [u8]) -> c_int;
 
     fn rename(old: &CStr, new: &CStr) -> c_int;
 

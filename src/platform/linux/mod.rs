@@ -4,9 +4,7 @@ use core_io::Write;
 use super::types::*;
 use super::{errno, Pal};
 use c_str::CStr;
-use fs::File;
 use header::dirent::dirent;
-use header::fcntl;
 use header::poll::{nfds_t, pollfd};
 use header::signal::SIGCHLD;
 // use header::sys_resource::rusage;
@@ -189,6 +187,17 @@ impl Pal for Sys {
         e(unsafe { syscall!(CLONE, SIGCHLD, 0, 0, 0, 0) }) as pid_t
     }
 
+    fn fpath(fildes: c_int, out: &mut [u8]) -> ssize_t {
+        let mut proc_path = b"/proc/self/fd/".to_vec();
+        write!(proc_path, "{}", fildes).unwrap();
+        proc_path.push(0);
+
+        Self::readlink(
+            CStr::from_bytes_with_nul(&proc_path).unwrap(),
+            out
+        )
+    }
+
     fn fsync(fildes: c_int) -> c_int {
         e(unsafe { syscall!(FSYNC, fildes) }) as c_int
     }
@@ -344,38 +353,6 @@ impl Pal for Sys {
                 out.len()
             )
         }) as ssize_t
-    }
-
-    fn realpath(pathname: &CStr, out: &mut [u8]) -> c_int {
-        let file = match File::open(pathname, fcntl::O_PATH) {
-            Ok(file) => file,
-            Err(_) => return -1,
-        };
-
-        if out.is_empty() {
-            return 0;
-        }
-
-        let mut proc_path = b"/proc/self/fd/".to_vec();
-        write!(proc_path, "{}", *file).unwrap();
-        proc_path.push(0);
-
-        let len = out.len();
-        let read = Self::readlink(
-            CStr::from_bytes_with_nul(&proc_path).unwrap(),
-            &mut out[..len - 1],
-        );
-        if read < 0 {
-            return -1;
-        }
-        out[read as usize] = 0;
-
-        // TODO: Should these checks from musl be ported?
-        // https://gitlab.com/bminor/musl/blob/master/src/misc/realpath.c#L33-38
-        // I'm not exactly sure what they're checking...
-        // Seems to be a sanity check whether or not it's still the same file?
-
-        0
     }
 
     fn rename(old: &CStr, new: &CStr) -> c_int {

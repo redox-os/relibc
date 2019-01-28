@@ -7,6 +7,7 @@ use rand::rngs::JitterRng;
 use rand::{Rng, SeedableRng};
 
 use c_str::CStr;
+use fs::File;
 use header::errno::*;
 use header::fcntl::*;
 use header::limits;
@@ -611,22 +612,31 @@ pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void 
 
 #[no_mangle]
 pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char) -> *mut c_char {
-    let mut path = [0; limits::PATH_MAX];
+    let ptr = if resolved.is_null() {
+        malloc(limits::PATH_MAX) as *mut c_char
+    } else {
+        resolved
+    };
+
+    let mut out = slice::from_raw_parts_mut(ptr as *mut u8, limits::PATH_MAX);
     {
-        let slice = if resolved.is_null() {
-            &mut path
-        } else {
-            slice::from_raw_parts_mut(resolved as *mut u8, 4096)
+        let file = match File::open(&CStr::from_ptr(pathname), O_PATH | O_CLOEXEC) {
+            Ok(file) => file,
+            Err(_) => return ptr::null_mut(),
         };
-        if Sys::realpath(CStr::from_ptr(pathname), slice) < 0 {
+
+        let len = out.len();
+        let read = Sys::fpath(
+            *file,
+            &mut out[..len - 1],
+        );
+        if read < 0 {
             return ptr::null_mut();
         }
+        out[read as usize] = 0;
     }
-    if !resolved.is_null() {
-        resolved
-    } else {
-        strdup(path.as_ptr() as *const i8)
-    }
+
+    ptr
 }
 
 // #[no_mangle]
