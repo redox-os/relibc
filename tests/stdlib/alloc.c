@@ -18,6 +18,10 @@ int main(int argc, char ** argv) {
     }
     free(ptrc);
 
+    char * ptrco = (char *)calloc(SIZE_MAX, SIZE_MAX);
+    printf("calloc (overflowing) %p\n", ptrco);
+    free(ptrco); /* clean up correctly even if overflow is not handled */
+
     char * ptra = (char *)memalign(256, 256);
     printf("memalign %p\n", ptra);
     for(i = 0; i < 256; i++) {
