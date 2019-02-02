@@ -1,6 +1,7 @@
 #include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h> /* for SIZE_MAX */
 
 int main(int argc, char ** argv) {
     char * ptr = (char *)malloc(256);
