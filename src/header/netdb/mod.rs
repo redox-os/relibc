@@ -686,8 +686,18 @@ pub unsafe extern "C" fn getaddrinfo(
 
     *res = ptr::null_mut();
 
+    let mut port = 0;
+    if let Some(service) = service_opt {
+        //TODO: Support other service definitions as well as AI_NUMERICSERV
+        match str::from_utf8_unchecked(service.to_bytes()).parse::<u16>() {
+            Ok(ok) => port = ok,
+            Err(_err) => ()
+        }
+    }
+
     //TODO: Check hosts file
     if let Some(node) = node_opt {
+        //TODO: Support AI_NUMERICHOST
         let lookuphost = match lookup_host(str::from_utf8_unchecked(node.to_bytes())) {
             Ok(lookuphost) => lookuphost,
             Err(e) => {
@@ -703,7 +713,7 @@ pub unsafe extern "C" fn getaddrinfo(
 
             let ai_addr = Box::into_raw(Box::new(sockaddr_in {
                 sin_family: AF_INET as sa_family_t,
-                sin_port: 0,
+                sin_port: htons(port),
                 sin_addr: in_addr,
                 sin_zero: [0; 8]
             })) as *mut sockaddr;
