@@ -186,12 +186,18 @@ pub unsafe extern "C" fn bsearch(
 
 #[no_mangle]
 pub unsafe extern "C" fn calloc(nelem: size_t, elsize: size_t) -> *mut c_void {
-    let size = nelem * elsize;
-    let ptr = malloc(size);
-    if !ptr.is_null() {
-        intrinsics::write_bytes(ptr as *mut u8, 0, size);
+    //Handle possible integer overflow in size calculation
+    let size_result = nelem.checked_mul(elsize);
+    match size_result {
+        Some(size) => {
+            let ptr = malloc(size);
+            if !ptr.is_null() {
+                intrinsics::write_bytes(ptr as *mut u8, 0, size);
+            }
+            ptr
+        },
+        None => core::ptr::null_mut()
     }
-    ptr
 }
 
 #[repr(C)]
