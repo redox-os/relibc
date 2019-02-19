@@ -24,7 +24,7 @@ pub extern "C" fn isblank(c: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn iscntrl(c: c_int) -> c_int {
-    (c < 0x20 || c == 0x7f) as c_int
+    ((c >= 0x00 && c <= 0x1f) || c == 0x7f) as c_int
 }
 
 #[no_mangle]
@@ -34,7 +34,7 @@ pub extern "C" fn isdigit(c: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn isgraph(c: c_int) -> c_int {
-    (c >= 0x21 && c < 0x7e) as c_int
+    (c >= 0x21 && c <= 0x7e) as c_int
 }
 
 #[no_mangle]
@@ -49,7 +49,10 @@ pub extern "C" fn isprint(c: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn ispunct(c: c_int) -> c_int {
-    (isgraph(c) != 0 && !isalnum(c) != 0) as c_int
+    ((c >= b'!' as c_int && c <= b'/' as c_int)
+        || (c >= b':' as c_int && c <= b'@' as c_int)
+        || (c >= b'[' as c_int && c <= b'`' as c_int)
+        || (c >= b'{' as c_int && c <= b'~' as c_int)) as c_int
 }
 
 #[no_mangle]
