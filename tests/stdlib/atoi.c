@@ -8,5 +8,4 @@ int main(void) {
     printf("%ld\n", atol("         -42"));
     printf("%ld\n", atol(" +555"));
     printf("%ld\n", atol("   1234567890    "));
-    return EXIT_SUCCESS;
 }

@@ -24,5 +24,4 @@ int main(void) {
         info->tm_gmtoff != expected.tm_gmtoff || strcmp(info->tm_zone, expected.tm_zone) != 0) {
             return EXIT_FAILURE;
     }
-    return EXIT_SUCCESS;
 }

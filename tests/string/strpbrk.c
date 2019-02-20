@@ -1,6 +1,5 @@
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 int main(void) {
     char* source = "The quick drawn fix jumps over the lazy bug";
@@ -15,7 +14,5 @@ int main(void) {
 
     // should be "NULL"
     char* res3 = strpbrk(source, "404");
-    printf("%s\n", (res3) ? res3 : "NULL"); 
-
-    return EXIT_SUCCESS;
+    printf("%s\n", (res3) ? res3 : "NULL");
 }

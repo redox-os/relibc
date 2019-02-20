@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <stdlib.h>
 
 int main(void) {
     if( setpgid( getpid(), 0 ) == -1 ) {
@@ -22,5 +21,4 @@ int main(void) {
         perror( "setreuid" );
     }
     printf("%d has euid %d and uid %d\n", getpid(), geteuid(), getuid());
-    return EXIT_SUCCESS;
 }

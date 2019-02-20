@@ -53,5 +53,4 @@ int main(void) {
   BSEARCH_TEST_INT(x, big, 7, NULL);
 
   printf("PASS bsearch\n");
-  return EXIT_SUCCESS;
 }

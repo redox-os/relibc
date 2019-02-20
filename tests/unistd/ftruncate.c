@@ -1,7 +1,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 int main(void) {
     int fd = creat("ftruncate.out", 0777);
@@ -9,5 +8,4 @@ int main(void) {
     status = ftruncate(fd, 100);
     printf("ftruncate exited with status code %d\n", status);
     close(fd);
-    return EXIT_SUCCESS;
 }

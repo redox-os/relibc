@@ -38,5 +38,4 @@ int main(void) {
         return EXIT_FAILURE;
     }
     puts("Correct memcmp");
-    return EXIT_SUCCESS;
 }

@@ -1,6 +1,5 @@
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 int main(void) {
     char source[] = "I'd just like to interject for a moment.  What you're referring to as Linux, "
@@ -13,6 +12,4 @@ int main(void) {
             printf("_");
         }
     }
-
-    return EXIT_SUCCESS;
 }

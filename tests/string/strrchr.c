@@ -18,5 +18,4 @@ int main(void) {
     return EXIT_FAILURE;
   }
   printf("strrch PASS, exiting with status code %d\n", 0);
-  return EXIT_SUCCESS;
 }

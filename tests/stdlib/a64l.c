@@ -18,5 +18,4 @@ int main(void) {
         return EXIT_FAILURE;
     }
     printf("Correct a64l: %s = %ld\n", s, l);
-    return EXIT_SUCCESS;
 }

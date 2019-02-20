@@ -9,5 +9,4 @@ int main(void) {
 	printf("%s\n", fgets(in, 30, f));
 	setvbuf(stdout, 0, _IONBF, 0);
 	printf("Hello\n");
-	return EXIT_SUCCESS;
 }

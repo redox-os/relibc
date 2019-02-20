@@ -1,6 +1,5 @@
 #include <unistd.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 int main(void) {
     gid_t egid = getegid();
@@ -12,5 +11,4 @@ int main(void) {
     uid_t uid = getuid();
     printf("egid: %d, euid: %d, gid: %d, pgid: %d, pid: %d, ppid %d, uid %d\n",
             egid, euid, gid, pgid, pid, ppid, uid);
-    return EXIT_SUCCESS;
 }

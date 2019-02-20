@@ -25,6 +25,4 @@ int main(void) {
     } else {
         printf("status %x\n", status);
     }
-
-    return EXIT_SUCCESS;
 }

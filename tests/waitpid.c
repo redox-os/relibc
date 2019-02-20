@@ -13,5 +13,4 @@ int main(void) {
         int stat_loc;
         waitpid(pid, &stat_loc, 0);
     }
-    return EXIT_SUCCESS;
 }

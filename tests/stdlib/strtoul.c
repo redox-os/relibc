@@ -25,6 +25,4 @@ int main(void) {
     if(errno != 0) {
         printf("errno is not 0 (%d), something went wrong\n", errno);
     }
-
-    return EXIT_SUCCESS;
 }

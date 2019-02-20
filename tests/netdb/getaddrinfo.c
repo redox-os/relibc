@@ -45,6 +45,4 @@ int main(void) {
 
         res = res->ai_next;
     }
-
-    return EXIT_SUCCESS;
 }

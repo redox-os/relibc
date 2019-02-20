@@ -17,6 +17,4 @@ int main(void) {
     }
 
     fclose(fp);
-
-    return EXIT_SUCCESS;
 }

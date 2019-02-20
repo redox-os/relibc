@@ -38,6 +38,4 @@ int main(void) {
     // puts(entry->d_name);
 
     closedir(dir);
-
-    return EXIT_SUCCESS;
 }

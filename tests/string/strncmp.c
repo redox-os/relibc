@@ -1,6 +1,5 @@
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 int main(void) {
     printf("%d\n", strncmp("a", "aa", 2));
@@ -9,6 +8,4 @@ int main(void) {
     printf("%d\n", strncmp("", "\xFF", 1));
     printf("%d\n", strncmp("a", "c", 1));
     printf("%d\n", strncmp("a", "a", 2));
-
-    return EXIT_SUCCESS;
 }

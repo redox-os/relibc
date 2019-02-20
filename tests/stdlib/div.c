@@ -16,8 +16,5 @@ int main(void) {
          ll = mydivt.rem;
          ll = atoll("10");
          _Exit(0);
-
-  ;
-  return EXIT_SUCCESS;
 }
 

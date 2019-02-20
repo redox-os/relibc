@@ -20,5 +20,4 @@ int main(void) {
 
 	fwrite(ptr, sizeof(ptr), 1, f);
 	fclose(f);
-	return EXIT_SUCCESS;
 }

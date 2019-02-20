@@ -10,5 +10,4 @@ int main(void) {
 	char *in = malloc(30);
 	printf("%s\n", fgets(in, 30, f));
 	printf("Hello\n");
-	return EXIT_SUCCESS;
 }

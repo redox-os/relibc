@@ -24,6 +24,4 @@ int main(void) {
         ptra[i] = (char)i;
     }
     free(ptra);
-
-    return EXIT_SUCCESS;
 }

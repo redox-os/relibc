@@ -22,6 +22,4 @@ int main(void) {
         perror("clock");
         return EXIT_FAILURE;
     }
-
-    return EXIT_SUCCESS;
 }

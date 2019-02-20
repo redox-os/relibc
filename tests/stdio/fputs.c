@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <errno.h>
 
 int main(void) {
@@ -7,5 +6,4 @@ int main(void) {
 	char *in = "Hello World!";
 	fputs(in, f); // calls fwrite, helpers::fwritex, internal::to_write and internal::stdio_write
 	fclose(f);
-	return EXIT_SUCCESS;
 }
