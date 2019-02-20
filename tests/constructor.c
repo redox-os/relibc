@@ -11,10 +11,10 @@ void constructor_no_priority(void) {
         puts("constructor ("#__priority")");       \
     }
 
-TEST(101);
-TEST(102);
-TEST(103);
-TEST(104);
+TEST(101)
+TEST(102)
+TEST(103)
+TEST(104)
 
 int main(int argc, char *argv[]) {
     puts("main");

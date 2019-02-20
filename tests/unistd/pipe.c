@@ -59,7 +59,7 @@ int main()
         } else if (bytes != strlen(outstring)) {
             fprintf(stderr, "pipe read: %d != %ld\n", bytes, strlen(outstring));
             return 1;
-        } else if (memcmp(instring, outstring, sizeof(outstring)) != 0) {
+        } else if (memcmp(instring, outstring, strlen(outstring)) != 0) {
             fprintf(stderr, "pipe read does not match pipe write\n");
             return 1;
         } else {

@@ -26,4 +26,4 @@ int main( void )
     printf("into %zu UTF-8 code units: [ ", out_sz);
     for(size_t x = 0; x < out_sz; ++x) printf("%#x ", +(unsigned char)out[x]);
     puts("]");
-} 
+}

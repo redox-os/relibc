@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
     char* token = strtok_r(source, " ", &sp);
     while (token) {
         printf("%s", token);
-        if (token = strtok_r(NULL, " ", &sp)) {
+        if ((token = strtok_r(NULL, " ", &sp))) {
             printf("_");
         }
     }
