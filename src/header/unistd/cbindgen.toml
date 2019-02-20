@@ -6,3 +6,7 @@ style = "Tag"
 
 [enum]
 prefix_with_name = true
+
+[defines]
+"target_os = linux" = "__linux__"
+"target_os = redox" = "__redox__"
