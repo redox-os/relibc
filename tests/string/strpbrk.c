@@ -1,7 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 
-int main(int argc, char* argv[]) {
+int main(void) {
     char* source = "The quick drawn fix jumps over the lazy bug";
 
     // should be "The quick drawn fix jumps over the lazy bug"
@@ -14,7 +14,5 @@ int main(int argc, char* argv[]) {
 
     // should be "NULL"
     char* res3 = strpbrk(source, "404");
-    printf("%s\n", (res3) ? res3 : "NULL"); 
-
-    return 0;
+    printf("%s\n", (res3) ? res3 : "NULL");
 }

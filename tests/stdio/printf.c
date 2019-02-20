@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int main(int argc, char ** argv) {
+int main(void) {
     int sofar = 0;
     int len = printf(
         "percent: %%\nstring: %s\nchar: %c\nchar: %c\nint: %d\n%nuint: %u\nhex: %x\nHEX: %X\nstring: %s\n",
@@ -48,5 +48,4 @@ int main(int argc, char ** argv) {
     printf("%G\n", 0.0001);
     printf("%G\n", 0.00001);
     printf("%E\n", 0.00001);
-    return 0;
 }

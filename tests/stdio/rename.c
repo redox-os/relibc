@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -8,7 +9,7 @@ static char newpath[] = "new-name.out";
 static char str[] = "Hello, World!";
 int str_len = 13;
 
-int main() {
+int main(void) {
     char buf[14];
     buf[13] = 0x00;
     int fd = creat(oldpath, 0777);
@@ -20,8 +21,8 @@ int main() {
     close(fd);
     remove(newpath);
     if (strcmp(str, buf) == 0) {
-        return 0;
+        return EXIT_SUCCESS;
     } else {
-        return -1;
+        return EXIT_FAILURE;
     }
 }

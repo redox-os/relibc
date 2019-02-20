@@ -18,7 +18,7 @@ char * get_mutable_string(char *str) {
   return copy;
 }
 
-void test_basename() {
+void test_basename(void) {
   test_case test_cases[] =
   { {"/usr/lib", "lib"},
     {"//usr//lib//", "lib"},
@@ -44,7 +44,7 @@ void test_basename() {
   return;
 }
 
-void test_dirname() {
+void test_dirname(void) {
   test_case test_cases[] =
   { {"/usr/lib", "/usr"},
     {"//usr//lib//", "//usr"},
@@ -73,9 +73,8 @@ void test_dirname() {
   return;
 }
 
-int main() {
+int main(void) {
   printf("Testing libgen.h\n");
   test_basename();
   test_dirname();
-  return 0;
 }

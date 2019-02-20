@@ -3,8 +3,7 @@
 #include <wchar.h>
 #include <stdlib.h>
 
-int main(void)
-{
+int main(void) {
     wchar_t *wcs = L"zß水🍌";
 
     int i;
@@ -13,9 +12,7 @@ int main(void)
         if (0xFFFFFFFFu == putwchar(wcs[i]))
         {
             printf("Unable to putwchar() the wide character.\n");
-            exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
     }
-
-    return 0;
 }

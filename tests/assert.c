@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int main() {
+int main(void) {
     assert(1 == 1);
     assert(1 + 1 == 2);
     puts("yay!");

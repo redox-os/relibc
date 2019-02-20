@@ -1,6 +1,7 @@
 #include <stdio.h>
+#include <stdlib.h>
 
-int main() {
+int main(void) {
     FILE* f = fopen("stdio/stdio.in", "r");
 
     flockfile(f);
@@ -10,17 +11,17 @@ int main() {
 
     if (!ftrylockfile(f)) {
         puts("Mutex unlocked but it shouldn't be");
-        return -1;
+        return EXIT_FAILURE;
     }
     funlockfile(f);
 
     if (ftrylockfile(f)) {
         puts("Mutex locked but it shouldn't be");
-        return -1;
+        return EXIT_FAILURE;
     }
     if (!ftrylockfile(f)) {
         puts("Mutex unlocked but it shouldn't be");
-        return -1;
+        return EXIT_FAILURE;
     }
     funlockfile(f);
 }

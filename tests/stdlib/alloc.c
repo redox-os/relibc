@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(int argc, char ** argv) {
+int main(void) {
     char * ptr = (char *)malloc(256);
     printf("malloc %p\n", ptr);
     int i;
@@ -24,6 +24,4 @@ int main(int argc, char ** argv) {
         ptra[i] = (char)i;
     }
     free(ptra);
-
-    return 0;
 }

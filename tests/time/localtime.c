@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <time.h>
 
-int main() {
+int main(void) {
     int day = 60 * 60 * 24;
     time_t inputs[] = { -(day * 33), -day, -1, -500, 0, 1, 1531454950 };
     for (int i = 0; i < (sizeof(inputs) / sizeof(time_t)); i += 1) {

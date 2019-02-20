@@ -16,6 +16,6 @@ TEST(102)
 TEST(103)
 TEST(104)
 
-int main(int argc, char *argv[]) {
+int main(void) {
     puts("main");
 }

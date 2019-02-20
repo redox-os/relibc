@@ -14,11 +14,12 @@ int check(time_t input) {
             t->tm_year, t->tm_yday, t->tm_mon, t->tm_mday, t->tm_wday, t->tm_hour, t->tm_min, t->tm_sec
         );
         puts("Failed!");
-        return -1;
+        return EXIT_FAILURE;
     }
-    return 0;
+    return EXIT_SUCCESS;
 }
-int main() {
+
+int main(void) {
     struct tm t = { 0 };
 
     t.tm_year = 71;
@@ -30,7 +31,7 @@ int main() {
     time_t inputs[] = { -(day * 33), -day, -500, 0, 1531454950 };
     for (int i = 0; i < 5; i += 1) {
         if (check(inputs[i])) {
-            return -1;
+            return EXIT_FAILURE;
         }
     }
 

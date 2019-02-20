@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-int main() {
+int main(void) {
     // 1 is stdout
     if (isatty(1)) {
         puts("'Tis a tty :D");

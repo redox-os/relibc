@@ -1,12 +1,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int main(int argc, char* argv[]) {
+int main(void) {
     char * s = "azAZ9."; // test boundaries
     long l = a64l(s);
     if (l != 194301926) {
         printf("Invalid result: a64l(%s) = %ld\n", s, l);
-        return 1;
+        return EXIT_FAILURE;
     }
     printf("Correct a64l: %s = %ld\n", s, l);
 
@@ -15,8 +15,7 @@ int main(int argc, char* argv[]) {
     l = a64l(s);
     if (l != 53222) {
         printf("Invalid result: a64l(%s) = %ld\n", s, l);
-        return 1;
+        return EXIT_FAILURE;
     }
     printf("Correct a64l: %s = %ld\n", s, l);
-    return 0;
 }

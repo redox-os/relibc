@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int main() {
+int main(void) {
     //puts(getenv("SHELL"));
     //puts(getenv("CC"));
 
@@ -34,7 +34,7 @@ int main() {
     if (env) {
         puts("This should be null, but isn't");
         puts(env);
-        return 1;
+        return EXIT_FAILURE;
     } else {
         puts("Value deleted successfully!");
     }

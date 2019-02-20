@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 struct test_case {
     int c;
@@ -289,12 +290,12 @@ size_t num_test_cases = sizeof(test_cases) / sizeof(struct test_case);
 
 #define CHECK_TEST(tc, fn, retval) \
     if (fn(tc.c) != tc.fn) { \
-        retval = -1; \
+        retval = EXIT_FAILURE; \
         printf("Unexpected result: " #fn "('%c') != %d // Char value: %d\n", tc.c, tc.fn, tc.c); \
     }
 
-int main(int argc, char* argv[]) {
-    int retval = 0;
+int main(void) {
+    int retval = EXIT_SUCCESS;
 
     for(int i = 0; i < num_test_cases; ++i) {
         struct test_case tc = test_cases[i];
@@ -316,7 +317,7 @@ int main(int argc, char* argv[]) {
         CHECK_TEST(tc, toupper, retval);
     }
 
-    if (!retval) {
+    if (retval == EXIT_SUCCESS) {
         printf("Success: %d\n", retval);
     } else {
         printf("Failure: %d\n", retval);

@@ -3,7 +3,7 @@
 #include <sys/select.h>
 #include <unistd.h>
 
-int main() {
+int main(void) {
     int fd = open("select.c", 0, 0);
 
     fd_set read;

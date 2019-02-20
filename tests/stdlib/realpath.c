@@ -4,11 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-int main() {
+int main(void) {
     char* path = realpath("stdlib/realpath.c", NULL);
     if (!path) {
         perror("realpath");
-        return -1;
+        return EXIT_FAILURE;
     }
     puts(path);
 
@@ -21,7 +21,7 @@ int main() {
     if (!path) {
         perror("realpath");
         free(path);
-        return -1;
+        return EXIT_FAILURE;
     }
     puts(path);
 

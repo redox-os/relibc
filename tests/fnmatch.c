@@ -9,7 +9,7 @@ void test(char* pattern, char* input, int flags) {
     }
 }
 
-int main() {
+int main(void) {
     puts("Should succeed:");
     test("*World", "Hello World", 0);
     test("*World", "World", 0);

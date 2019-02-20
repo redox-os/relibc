@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-int main(int argc, char** argv) {
+int main(void) {
     uint32_t hl = 0xBADFACED;
     uint32_t nl = htonl(hl);
     assert(nl == 0xEDACDFBA);

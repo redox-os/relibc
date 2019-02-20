@@ -2,8 +2,7 @@
 #include <string.h>
 #include <wchar.h>
  
-int main(void)
-{
+int main(void) {
     mbstate_t state;
     memset(&state, 0, sizeof state);
     char in[] = u8"z\u00df\u6c34\U0001F34C"; // or u8"zß水🍌"

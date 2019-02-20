@@ -4,7 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 
-int main() {
+int main(void) {
     char first[PATH_MAX];
     getcwd(first, PATH_MAX);
     puts(first);
@@ -15,7 +15,7 @@ int main() {
     if (strcmp(first, second)) {
         puts("Not matching");
         free(second);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     free(second);

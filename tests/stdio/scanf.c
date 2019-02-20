@@ -25,7 +25,7 @@ void test(char* fmt_in, char* input, struct params *p, ...) {
     );
 }
 
-int main(int argc, char ** argv) {
+int main(void) {
     struct params p = { .c = 'a' };
 
     test("%hhd %d", "12 345", &p, &p.sa, &p.ia);

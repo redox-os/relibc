@@ -8,7 +8,8 @@ void print(time_t timestamp, char* fmt) {
     printf("%zu: %s\n", n, out);
     free(out);
 }
-int main() {
+
+int main(void) {
     print(1531808742, "%a %A %b %B");
     print(1531808742, "The %Cst century");
     print(1531808742, "%I:%M:%S %p");
