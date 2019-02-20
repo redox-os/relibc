@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-int main(int argc, char ** argv) {
+int main(void) {
     system("echo test of system");
     return 0;
 }

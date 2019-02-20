@@ -18,7 +18,8 @@ int check(time_t input) {
     }
     return 0;
 }
-int main() {
+
+int main(void) {
     struct tm t = { 0 };
 
     t.tm_year = 71;

@@ -2,7 +2,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-int main(int argc, char** argv) {
+int main(void) {
     creat("dup.out", 0777);
     int fd1 = open("dup.out", 0);
     int fd2 = dup(fd1);

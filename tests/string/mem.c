@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int main(int argc, char ** argv) {
+int main(void) {
     puts("# mem #");
     char arr[100];
     memset(arr, 0, 100); // Compiler builtin, should work

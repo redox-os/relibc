@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int main(int argc, char ** argv) {
+int main(void) {
 	freopen("stdio/stdio.in", "r", stdin);
 	char in[6];
 	fgets(in, 6, stdin);

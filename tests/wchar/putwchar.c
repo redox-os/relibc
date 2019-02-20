@@ -3,8 +3,7 @@
 #include <wchar.h>
 #include <stdlib.h>
 
-int main(void)
-{
+int main(void) {
     wchar_t *wcs = L"zß水🍌";
 
     int i;

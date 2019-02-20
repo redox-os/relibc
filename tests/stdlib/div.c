@@ -3,10 +3,9 @@
          volatile long double ld;
          volatile unsigned long long ll;
          lldiv_t mydivt;
-int
-main ()
-{
-char* tmp;
+
+int main(void) {
+         char* tmp;
          f = strtof("gnu", &tmp);
          ld = strtold("gnu", &tmp);
          ll = strtoll("gnu", &tmp, 10);

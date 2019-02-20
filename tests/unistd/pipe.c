@@ -3,9 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 
-int main()
-{
-
+int main(void) {
     int pid, pip[2];
     char instring[20];
     char * outstring = "Hello World!";

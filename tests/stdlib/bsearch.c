@@ -19,7 +19,7 @@ int int_cmp(const void* a, const void* b) {
 
 
 
-int main(int argc, char* argv[]) {
+int main(void) {
   int x = 0;
   int y = 1024;
 

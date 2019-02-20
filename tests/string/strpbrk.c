@@ -1,7 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 
-int main(int argc, char* argv[]) {
+int main(void) {
     char* source = "The quick drawn fix jumps over the lazy bug";
 
     // should be "The quick drawn fix jumps over the lazy bug"

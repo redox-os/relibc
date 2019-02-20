@@ -8,7 +8,7 @@ static char newpath[] = "new-name.out";
 static char str[] = "Hello, World!";
 int str_len = 13;
 
-int main() {
+int main(void) {
     char buf[14];
     buf[13] = 0x00;
     int fd = creat(oldpath, 0777);

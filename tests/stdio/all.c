@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(int argc, char ** argv) {
+int main(void) {
 	FILE *f = fopen("stdio/stdio.in", "r");
 	printf("%c\n", fgetc(f));
 	ungetc('H', f);

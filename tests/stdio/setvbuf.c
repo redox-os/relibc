@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(int argc, char ** argv) {
+int main(void) {
 	setvbuf(stdout, 0, _IONBF, 0);
 	FILE *f = fopen("stdio/stdio.in", "r");
 	setvbuf(f, 0, _IONBF, 0);

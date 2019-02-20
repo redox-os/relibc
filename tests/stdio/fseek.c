@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int main() {
+int main(void) {
 	FILE *f = fopen("stdio/stdio.in", "r");
     if (fseek(f, 14, SEEK_CUR) < 0) {
         puts("fseek error");

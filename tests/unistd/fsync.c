@@ -2,7 +2,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-int main (int argc, char** argv) {
+int main(void) {
     int fd = open(".", 0, 0);
     int status;
     status = fsync(fd);

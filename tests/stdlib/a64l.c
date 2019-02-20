@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int main(int argc, char* argv[]) {
+int main(void) {
     char * s = "azAZ9."; // test boundaries
     long l = a64l(s);
     if (l != 194301926) {

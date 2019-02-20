@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int main(int argc, char* argv[]) {
+int main(void) {
     printf("%d\n", atoi("         -42"));
     printf("%d\n", atoi(" +555"));
     printf("%d\n", atoi("   1234567890    "));

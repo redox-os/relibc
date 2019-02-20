@@ -1,7 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 
-int main(int argc, char* argv[]) {
+int main(void) {
 	char *hello = "hello";
 	char *world = "world";
 	char *banana = "banana";

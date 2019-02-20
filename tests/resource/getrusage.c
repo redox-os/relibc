@@ -6,7 +6,7 @@ void ptimeval(struct timeval* val) {
     printf("{ tv_sec: %ld, tv_usec: %ld }\n", val->tv_sec, val->tv_usec);
 }
 
-int main() {
+int main(void) {
     struct rusage r_usage;
     if (getrusage(RUSAGE_SELF, &r_usage) < 0) {
         perror("getrusage");

@@ -1,8 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 
-
-int main(int argc, char* argv[]) {
+int main(void) {
   char s0[] = "hello, world";
   char* ptr = strrchr(s0, 'l');
   if (ptr != &s0[10]) {

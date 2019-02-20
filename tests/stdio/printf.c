@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int main(int argc, char ** argv) {
+int main(void) {
     int sofar = 0;
     int len = printf(
         "percent: %%\nstring: %s\nchar: %c\nchar: %c\nint: %d\n%nuint: %u\nhex: %x\nHEX: %X\nstring: %s\n",

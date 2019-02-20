@@ -3,7 +3,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-int main(int argc, char** argv) {
+int main(void) {
     printf("%ld\n", sizeof(struct stat));
 
     struct stat buf;

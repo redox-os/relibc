@@ -1,7 +1,7 @@
 #include <unistd.h>
 #include <stdio.h>
 
-int main(int argc, char** argv) {
+int main(void) {
     char* args[] = {"sh", "-c", "echo 'exec works :D'", NULL};
     execv("/bin/sh", args);
     perror("execv");

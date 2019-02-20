@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int main(int argc, char ** argv) {
+int main(void) {
 	ungetc('h', stdin);
 	char c;
 	if ((c = getchar()) == 'h') {

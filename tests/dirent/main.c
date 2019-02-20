@@ -2,7 +2,7 @@
 #include <errno.h>
 #include <stdio.h>
 
-int main() {
+int main(void) {
     printf("%lu\n", sizeof(struct dirent));
 
     DIR* dir = opendir("example_dir/");

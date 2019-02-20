@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int main() {
+int main(void) {
     //FILE *f = fopen("/etc/ssl/certs/ca-certificates.crt", "r");
     FILE *f = fopen("stdio/stdio.in", "r");
     char line[256];

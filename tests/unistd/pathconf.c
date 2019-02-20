@@ -7,7 +7,7 @@
 	printf("%s (%d): %ld (%d)\n", #N, _PC_ ## N, fpathconf(0, _PC_ ## N), errno); \
 }
 
-int main(){
+int main(void) {
 	PC(LINK_MAX);
 	PC(MAX_CANON);
 	PC(MAX_INPUT);

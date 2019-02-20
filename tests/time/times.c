@@ -2,7 +2,7 @@
 #include <sys/times.h>
 #include <unistd.h>
 
-int main() {
+int main(void) {
     struct tms tms;
     printf("return: %ld\n", times(&tms));
 

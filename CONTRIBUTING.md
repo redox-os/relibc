@@ -88,14 +88,14 @@ just in case, it'd be a good idea to map inputs to variables.
 #include "string.h"
 #include "stdio.h"
 
-int main() {
-	// Don't do this
-	printf("%d\n", strcspn("Hello", "Hi"));
+int main(void) {
+    // Don't do this
+    printf("%d\n", strcspn("Hello", "Hi"));
 
-	// Do this
-	char *first = "Hello";
-	char *second = "Hi";
-	printf("%d\n", strcspn(first, second));
+    // Do this
+    char *first = "Hello";
+    char *second = "Hi";
+    printf("%d\n", strcspn(first, second));
 }
 ```
 

@@ -1,7 +1,7 @@
 #include <unistd.h>
 #include <stdio.h>
 
-int main(int argc, char** argv) {
+int main(void) {
     gid_t egid = getegid();
     uid_t euid = geteuid();
     gid_t gid = getgid();

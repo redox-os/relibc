@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int main(int argc, char** argv) {
+int main(void) {
     time_t a = 0;
     struct tm expected = { .tm_sec = 0, .tm_min = 0, .tm_hour = 0, .tm_mday = 1, .tm_year = 70,
                     .tm_wday = 4, .tm_yday = 0, .tm_isdst = 0, .tm_gmtoff = 0, .tm_zone = "UTC" };

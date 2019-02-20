@@ -1,6 +1,6 @@
 #include <unistd.h>
 
-int main(int argc, char ** argv) {
+int main(void) {
     write(STDOUT_FILENO, "Hello World!\n", 13);
     return 0;
 }

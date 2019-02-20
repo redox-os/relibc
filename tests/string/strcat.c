@@ -1,7 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 
-int main(int argc, char* argv[]) {
+int main(void) {
     char dest1[12] = "hello";
 	  printf("%s\n", strcat(dest1, " world")); // should be hello world
 

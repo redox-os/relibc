@@ -7,7 +7,7 @@ void handler(int sig) {
     puts("Signal handler called!");
 }
 
-int main() {
+int main(void) {
     if (signal(SIGUSR1, &handler) == SIG_ERR) {
         puts("Signal error!");
         printf("%d\n", errno);

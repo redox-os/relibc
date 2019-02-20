@@ -13,7 +13,7 @@ void print(struct passwd *pwd) {
     printf("pw_shell: %s\n", pwd->pw_shell);
 }
 
-int main() {
+int main(void) {
     puts("--- Checking getpwuid ---");
     errno = 0;
     struct passwd *pwd = getpwuid(0);

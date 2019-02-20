@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-int main(int argc, char** argv) {
+int main(void) {
     pid_t pid = fork();
     if (pid == 0) {
         // child

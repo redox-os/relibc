@@ -1,7 +1,7 @@
 #include <time.h>
 #include <stdio.h>
 
-int main(int argc, char** argv) {
+int main(void) {
     struct timespec tm = {0, 0};
 
     int cgt = clock_gettime(CLOCK_REALTIME, &tm);

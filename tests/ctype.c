@@ -293,7 +293,7 @@ size_t num_test_cases = sizeof(test_cases) / sizeof(struct test_case);
         printf("Unexpected result: " #fn "('%c') != %d // Char value: %d\n", tc.c, tc.fn, tc.c); \
     }
 
-int main(int argc, char* argv[]) {
+int main(void) {
     int retval = 0;
 
     for(int i = 0; i < num_test_cases; ++i) {

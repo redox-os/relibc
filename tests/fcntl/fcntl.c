@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-int main() {
+int main(void) {
     //Lose our fd and pull it again
     creat("fcntl.out", 0777);
     int newfd = open("fcntl.out", 0);

@@ -4,7 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 
-int main() {
+int main(void) {
     char first[PATH_MAX];
     getcwd(first, PATH_MAX);
     puts(first);

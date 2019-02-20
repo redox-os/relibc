@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int main(int argc, char **argv) {
+int main(void) {
     FILE *fp;
     int status;
     char path[256];

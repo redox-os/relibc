@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int main() {
+int main(void) {
     char* path = realpath("stdlib/realpath.c", NULL);
     if (!path) {
         perror("realpath");

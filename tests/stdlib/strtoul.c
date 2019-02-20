@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int main(int argc, char* argv[]) {
+int main(void) {
     printf("%ld\n", strtoul("         -42", NULL, 0));
     printf("%ld\n", strtoul(" +555", NULL, 0));
     printf("%ld\n", strtoul("   1234567890    ", NULL, 0));

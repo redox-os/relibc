@@ -1,7 +1,7 @@
 #include <errno.h>
 #include <stdio.h>
 
-int main(int argc, char *argv[]) {
+int main(void) {
     FILE *fp = fopen("stdio/fread.in", "rb");
 
     char buf[33] = { 0 };

@@ -2,7 +2,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-int main (int argc, char** argv) {
+int main(void) {
     int fd = creat("ftruncate.out", 0777);
     int status;
     status = ftruncate(fd, 100);

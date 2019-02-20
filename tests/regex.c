@@ -1,7 +1,7 @@
 #include <regex.h>
 #include <stdio.h>
 
-int main() {
+int main(void) {
     regex_t regex;
     char error_buf[256];
 
