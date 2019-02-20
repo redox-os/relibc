@@ -13,7 +13,7 @@ int main() {
         return -1;
     }
 
-    regmatch_t matches[3] = { 0 };
+    regmatch_t matches[3] = {{0}};
 
     error = regexec(&regex, "Hey, how are you? Hello? Hallo Wurld??", 3, matches, 0);
 

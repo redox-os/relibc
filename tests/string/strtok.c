@@ -8,7 +8,7 @@ int main(int argc, char* argv[]) {
     char* token = strtok(source, " ");
     while (token) {
         printf("%s", token);
-        if (token = strtok(NULL, " ")) {
+        if ((token = strtok(NULL, " "))) {
             printf("_");
         }
     }

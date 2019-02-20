@@ -19,7 +19,7 @@ int check(time_t input) {
     return 0;
 }
 int main() {
-    struct tm t = {};
+    struct tm t = { 0 };
 
     t.tm_year = 71;
     t.tm_mday = 1;

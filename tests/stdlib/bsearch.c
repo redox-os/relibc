@@ -22,8 +22,10 @@ int int_cmp(const void* a, const void* b) {
 int main(int argc, char* argv[]) {
   int x = 0;
   int y = 1024;
-  int empty[] = {};
-  BSEARCH_TEST_INT(x, empty, 0, NULL);
+
+  // TODO: Zero sized arrays are a non-standard GNU extension
+  //int empty[] = {};
+  //BSEARCH_TEST_INT(x, empty, 0, NULL);
 
   int singleton[] = {42};
   printf("%p\n%p\n", singleton, &singleton[1]);

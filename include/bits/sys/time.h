@@ -14,10 +14,10 @@
         (t)->tv_sec = 0, \
         (t)->tv_usec = 0 \
     )
-#define timerisset(t) (t)->tv_sec || (t)->tv_usec
-#define timercmp(x,y,op) (x)->tv_sec == (y)->tv_sec ? \
+#define timerisset(t) ((t)->tv_sec || (t)->tv_usec)
+#define timercmp(x,y,op) ((x)->tv_sec == (y)->tv_sec ? \
     (x)->tv_usec op (y)->tv_usec \
     : \
-    (x)->tv_sec op (y)->tv_sec
+    (x)->tv_sec op (y)->tv_sec)
 
 #endif
