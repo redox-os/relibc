@@ -34,7 +34,7 @@ int main(void) {
     if (env) {
         puts("This should be null, but isn't");
         puts(env);
-        return 1;
+        return EXIT_FAILURE;
     } else {
         puts("Value deleted successfully!");
     }

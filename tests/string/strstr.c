@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
     printf("%s\n", strstr("In relibc we trust", "rust"));
@@ -8,5 +9,5 @@ int main(void) {
     printf("%s\n", strstr("IN RELIBC WE TRUST", "rust"));
     printf("%s\n", strcasestr("IN RELIBC WE TRUST", "rust"));
 
-    return 0;
+    return EXIT_SUCCESS;
 }

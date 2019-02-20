@@ -2,5 +2,5 @@
 
 int main(void) {
     system("echo test of system");
-    return 0;
+    return EXIT_SUCCESS;
 }

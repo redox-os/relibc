@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
     int sofar = 0;
@@ -48,5 +49,5 @@ int main(void) {
     printf("%G\n", 0.0001);
     printf("%G\n", 0.00001);
     printf("%E\n", 0.00001);
-    return 0;
+    return EXIT_SUCCESS;
 }

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -20,8 +21,8 @@ int main(void) {
     close(fd);
     remove(newpath);
     if (strcmp(str, buf) == 0) {
-        return 0;
+        return EXIT_SUCCESS;
     } else {
-        return -1;
+        return EXIT_FAILURE;
     }
 }

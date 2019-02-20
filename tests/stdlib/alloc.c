@@ -25,5 +25,5 @@ int main(void) {
     }
     free(ptra);
 
-    return 0;
+    return EXIT_SUCCESS;
 }

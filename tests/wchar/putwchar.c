@@ -12,9 +12,9 @@ int main(void) {
         if (0xFFFFFFFFu == putwchar(wcs[i]))
         {
             printf("Unable to putwchar() the wide character.\n");
-            exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }

@@ -1,6 +1,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
     sleep(2);
@@ -10,5 +11,5 @@ int main(void) {
     struct timespec tm = {0, 10000};
     nanosleep(&tm, NULL);
     perror("nanosleep");
-    return 0;
+    return EXIT_SUCCESS;
 }

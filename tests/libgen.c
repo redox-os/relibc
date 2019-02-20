@@ -77,5 +77,5 @@ int main(void) {
   printf("Testing libgen.h\n");
   test_basename();
   test_dirname();
-  return 0;
+  return EXIT_SUCCESS;
 }

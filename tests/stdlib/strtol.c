@@ -27,5 +27,5 @@ int main(void) {
         printf("errno is not 0 (%d), something went wrong\n", errno);
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }

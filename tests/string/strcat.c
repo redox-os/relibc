@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
     char dest1[12] = "hello";
@@ -8,5 +9,5 @@ int main(void) {
     char dest2[12] = "hello";
   	printf("%s\n", strncat(dest2, " world foobar", 6)); // should be hello world
 
-    return 0;
+    return EXIT_SUCCESS;
 }

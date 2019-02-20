@@ -1,5 +1,6 @@
 #include <regex.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
     regex_t regex;
@@ -10,7 +11,7 @@ int main(void) {
         regerror(error, &regex, error_buf, 255);
         error_buf[255] = 0;
         printf("regcomp error: %d = %s\n", error, error_buf);
-        return -1;
+        return EXIT_FAILURE;
     }
 
     regmatch_t matches[3] = {{0}};
@@ -22,7 +23,7 @@ int main(void) {
     if (error) {
         regerror(error, &regex, error_buf, 255);
         printf("regexec error: %d = %s\n", error, error_buf);
-        return -1;
+        return EXIT_FAILURE;
     }
 
     for (int group = 0; group < 3; group += 1) {

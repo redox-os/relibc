@@ -23,5 +23,5 @@ int main(void) {
     }
     fclose(fp);
     remove(file_name);
-    return 0;
+    return EXIT_SUCCESS;
 }

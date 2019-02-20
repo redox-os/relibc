@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #define SC(N) { \
@@ -22,5 +23,5 @@ int main(void) {
 	SC(TTY_NAME_MAX);
 	SC(SYMLOOP_MAX);
 	SC(HOST_NAME_MAX);
-	return 0;
+	return EXIT_SUCCESS;
 }

@@ -7,11 +7,11 @@ int main(void) {
     if (pid == 0) {
         // child
         sleep(1);
-        exit(0);
+        return EXIT_SUCCESS;
     } else {
         // parent
         int stat_loc;
         waitpid(pid, &stat_loc, 0);
     }
-    return 0;
+    return EXIT_SUCCESS;
 }

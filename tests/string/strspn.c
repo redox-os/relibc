@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
 	char *hello = "hello";
@@ -9,5 +10,5 @@ int main(void) {
 	printf("%lu\n", strspn(world, "wendy")); // should be 1
 	printf("%lu\n", strspn(banana, "apple")); // should be 0
 
-    return 0;
+    return EXIT_SUCCESS;
 }

@@ -10,7 +10,7 @@ int main(void) {
     struct rusage r_usage;
     if (getrusage(RUSAGE_SELF, &r_usage) < 0) {
         perror("getrusage");
-        return 1;
+        return EXIT_FAILURE;
     }
     printf("ru_utime:");
     ptimeval(&r_usage.ru_utime);

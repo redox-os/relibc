@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -11,7 +12,7 @@ int main(void) {
     // Stat for the inode
     if (stat("unistd/link.c", &buf)) {
         perror("stat");
-        return 1;
+        return EXIT_FAILURE;
     }
     unsigned long inode = buf.st_ino;
     printf("%ld\n", inode);
@@ -19,7 +20,7 @@ int main(void) {
     // Create the link
     if (link("unistd/link.c", "link.out")) {
         perror("link");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     // Make sure inodes match
@@ -37,10 +38,10 @@ int main(void) {
     // Remove link
     if (unlink("link.out")) {
         perror("unlink");
-        return 1;
+        return EXIT_FAILURE;
     }
     if (!stat("link.out", &buf) || errno != ENOENT) {
         perror("stat");
-        return 1;
+        return EXIT_FAILURE;
     }
 }

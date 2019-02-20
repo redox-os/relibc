@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
     creat("dup.out", 0777);
@@ -13,5 +14,5 @@ int main(void) {
     dup2(fd3, 1);
     printf("hello fd %d", fd3);
     close(fd3);
-    return 0;
+    return EXIT_SUCCESS;
 }

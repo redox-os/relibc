@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 int main(void) {
@@ -11,7 +12,7 @@ int main(void) {
     );
     if (ret != 68) {
         printf("Failed! Return value was %d\n", ret);
-        return -1;
+        return EXIT_FAILURE;
     }
 
     memset(buffer, 0, sizeof(buffer));
@@ -24,7 +25,7 @@ int main(void) {
     );
     if (ret != 86) {
         printf("Failed! Return value was %d\n", ret);
-        return -1;
+        return EXIT_FAILURE;
     }
 
     puts(buffer);

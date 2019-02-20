@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
     //FILE *f = fopen("/etc/ssl/certs/ca-certificates.crt", "r");
@@ -12,7 +13,7 @@ int main(void) {
             puts("EOF");
             if (!feof(f)) {
                 puts("feof() not updated!");
-                return -1;
+                return EXIT_FAILURE;
             }
             break;
         }

@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -8,5 +9,5 @@ int main(int argc, char *argv[]) {
         write(STDOUT_FILENO, " ", 1);
     }
     write(STDOUT_FILENO, "\n", 1);
-    return 0;
+    return EXIT_SUCCESS;
 }

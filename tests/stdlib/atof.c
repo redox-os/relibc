@@ -4,5 +4,5 @@
 int main(void) {
     double d = atof("-3.14");
     printf("%f\n", d);
-    return 0;
+    return EXIT_SUCCESS;
 }

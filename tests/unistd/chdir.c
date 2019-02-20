@@ -12,5 +12,5 @@ int main(void) {
     getcwd(cwd2, 4096);
     printf("final cwd: %s\n", cwd2);
     free(cwd2);
-    return 0;
+    return EXIT_SUCCESS;
 }

@@ -13,7 +13,7 @@ int int_cmp(const void* a, const void* b) {
       size_t i = 0; \
       for (; i < len; ++i) printf("%d,", arr[i]); \
       printf("] expected %p but got %p\n", (void*) expect, res); \
-      return 1; \
+      return EXIT_FAILURE; \
     } \
   } while (0);
 
@@ -53,5 +53,5 @@ int main(void) {
   BSEARCH_TEST_INT(x, big, 7, NULL);
 
   printf("PASS bsearch\n");
-  return 0;
+  return EXIT_SUCCESS;
 }

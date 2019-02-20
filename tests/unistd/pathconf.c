@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #define PC(N) { \
@@ -29,5 +30,5 @@ int main(void) {
 	PC(ALLOC_SIZE_MIN);
 	PC(SYMLINK_MAX);
 	PC(2_SYMLINKS);
-	return 0;
+	return EXIT_SUCCESS;
 }

@@ -8,5 +8,5 @@ int main(void) {
     mktemp(string);
     printf("%s\n",string);
     free(string);
-    return 0;
+    return EXIT_SUCCESS;
 }

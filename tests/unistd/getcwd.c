@@ -15,7 +15,7 @@ int main(void) {
     if (strcmp(first, second)) {
         puts("Not matching");
         free(second);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     free(second);

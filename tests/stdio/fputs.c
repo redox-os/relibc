@@ -7,5 +7,5 @@ int main(void) {
 	char *in = "Hello World!";
 	fputs(in, f); // calls fwrite, helpers::fwritex, internal::to_write and internal::stdio_write
 	fclose(f);
-	return 0;
+	return EXIT_SUCCESS;
 }

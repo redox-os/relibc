@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 int main(void) {
@@ -6,9 +7,9 @@ int main(void) {
     if (fd >= 0) {
         write(fd, "Hello World!\n", 13);
         close(fd);
-        return 0;
+        return EXIT_SUCCESS;
     } else {
         write(STDERR_FILENO, "creat failed\n", 13);
-        return 1;
+        return EXIT_FAILURE;
     }
 }

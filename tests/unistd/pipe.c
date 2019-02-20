@@ -1,5 +1,6 @@
 //http://www2.cs.uregina.ca/~hamilton/courses/330/notes/unix/pipes/pipes.html
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -10,7 +11,7 @@ int main(void) {
 
     if (pipe(pip) < 0) {
         perror("pipe");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     pid = fork();
@@ -28,13 +29,13 @@ int main(void) {
         /* check result */
         if (bytes < 0) {
             perror("pipe write");
-            return 1;
+            return EXIT_FAILURE;
         } else if (bytes != strlen(outstring)) {
             fprintf(stderr, "pipe write: %d != %ld\n", bytes, strlen(outstring));
-            return 1;
+            return EXIT_FAILURE;
         }
 
-        return 0;
+        return EXIT_SUCCESS;
     }
     else			/* parent : receives message from child */
     {
@@ -53,18 +54,18 @@ int main(void) {
         /* check result */
         if (bytes < 0) {
             perror("pipe read");
-            return 1;
+            return EXIT_FAILURE;
         } else if (bytes != strlen(outstring)) {
             fprintf(stderr, "pipe read: %d != %ld\n", bytes, strlen(outstring));
-            return 1;
+            return EXIT_FAILURE;
         } else if (memcmp(instring, outstring, strlen(outstring)) != 0) {
             fprintf(stderr, "pipe read does not match pipe write\n");
-            return 1;
+            return EXIT_FAILURE;
         } else {
             printf("%s\n", instring);
         }
 
-        return 0;
+        return EXIT_SUCCESS;
     }
-    return 0;
+    return EXIT_SUCCESS;
 }

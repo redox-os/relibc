@@ -14,7 +14,7 @@ int main(void) {
         info->tm_year != expected.tm_year || info->tm_wday != expected.tm_wday ||
         info->tm_yday != expected.tm_yday || info->tm_isdst != expected.tm_isdst ||
         info->tm_gmtoff != expected.tm_gmtoff || strcmp(info->tm_zone, expected.tm_zone) != 0) {
-            exit(1);
+            return EXIT_FAILURE;
     }
 
     if (info->tm_sec != expected.tm_sec || info->tm_min != expected.tm_min ||
@@ -22,7 +22,7 @@ int main(void) {
         info->tm_year != expected.tm_year || info->tm_wday != expected.tm_wday ||
         info->tm_yday != expected.tm_yday || info->tm_isdst != expected.tm_isdst ||
         info->tm_gmtoff != expected.tm_gmtoff || strcmp(info->tm_zone, expected.tm_zone) != 0) {
-            exit(1);
+            return EXIT_FAILURE;
     }
-    return 0;
+    return EXIT_SUCCESS;
 }

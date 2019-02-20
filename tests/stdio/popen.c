@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
     FILE *fp;
@@ -9,7 +10,7 @@ int main(void) {
     fp = popen("ls -1 example_dir", "r");
     if (fp == NULL) {
         perror("popen");
-        return -1;
+        return EXIT_FAILURE;
     }
 
     while (fgets(path, 256, fp) != NULL) {
@@ -20,10 +21,10 @@ int main(void) {
     status = pclose(fp);
     if (status == -1) {
         perror("pclose");
-        return -1;
+        return EXIT_FAILURE;
     } else {
         printf("status %x\n", status);
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }

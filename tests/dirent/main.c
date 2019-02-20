@@ -1,6 +1,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
     printf("%lu\n", sizeof(struct dirent));
@@ -9,7 +10,7 @@ int main(void) {
 
     if (dir == NULL) {
         perror("opendir");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     struct dirent* entry;
@@ -38,5 +39,5 @@ int main(void) {
 
     closedir(dir);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
