@@ -12,7 +12,7 @@ int main(void) {
     int len = scandir("example_dir/", &array, filter, alphasort);
     if (len < 0) {
         perror("scandir");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     for(int i = 0; i < len; i += 1) {

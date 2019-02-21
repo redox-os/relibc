@@ -9,7 +9,7 @@ int main(void) {
     for (int i = 1; i <= 32; ++i) {
         if (fread(buf, 1, i, fp) < 0) {
             perror("fread");
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
         buf[i] = 0;
 

@@ -13,7 +13,7 @@ int int_cmp(const void* a, const void* b) {
       size_t i = 0; \
       for (; i < len; ++i) printf("%d,", arr[i]); \
       printf("] expected %p but got %p\n", (void*) expect, res); \
-      return EXIT_FAILURE; \
+      exit(EXIT_FAILURE); \
     } \
   } while (0);
 

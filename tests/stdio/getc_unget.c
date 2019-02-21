@@ -6,8 +6,8 @@ int main(void) {
 	char c;
 	if ((c = getchar()) == 'h') {
 		printf("Worked!\n");
-		return EXIT_SUCCESS;
+		exit(EXIT_SUCCESS);
 	}
 	printf("failed :( %c\n", c);
-	return EXIT_FAILURE;
+	exit(EXIT_FAILURE);
 }

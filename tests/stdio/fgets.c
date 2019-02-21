@@ -13,7 +13,7 @@ int main(void) {
             puts("EOF");
             if (!feof(f)) {
                 puts("feof() not updated!");
-                return EXIT_FAILURE;
+                exit(EXIT_FAILURE);
             }
             break;
         }

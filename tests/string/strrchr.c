@@ -8,14 +8,14 @@ int main(void) {
   if (ptr != &s0[10]) {
     printf("%p != %p\n", ptr, &s0[10]);
     printf("strrchr FAIL , exit with status code %d\n", 1);
-    return EXIT_FAILURE;
+    exit(EXIT_FAILURE);
   }
   char s1[] = "";
   ptr = strrchr(s1, 'a');
   if (ptr != NULL) {
     printf("%p != 0\n", ptr);
     printf("strrchr FAIL, exit with status code %d\n", 1);
-    return EXIT_FAILURE;
+    exit(EXIT_FAILURE);
   }
   printf("strrch PASS, exiting with status code %d\n", 0);
 }

@@ -14,9 +14,9 @@ int check(time_t input) {
             t->tm_year, t->tm_yday, t->tm_mon, t->tm_mday, t->tm_wday, t->tm_hour, t->tm_min, t->tm_sec
         );
         puts("Failed!");
-        return EXIT_FAILURE;
+        return 1;
     }
-    return EXIT_SUCCESS;
+    return 0;
 }
 
 int main(void) {
@@ -31,7 +31,7 @@ int main(void) {
     time_t inputs[] = { -(day * 33), -day, -500, 0, 1531454950 };
     for (int i = 0; i < 5; i += 1) {
         if (check(inputs[i])) {
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
     }
 

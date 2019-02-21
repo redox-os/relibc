@@ -11,7 +11,7 @@ int main(void) {
 
     if (stat("unistd/stat.c", &buf)) {
         perror("stat");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     printf("st_size: %lu\n", buf.st_size);

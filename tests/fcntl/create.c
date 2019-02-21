@@ -7,9 +7,9 @@ int main(void) {
     if (fd >= 0) {
         write(fd, "Hello World!\n", 13);
         close(fd);
-        return EXIT_SUCCESS;
+        exit(EXIT_SUCCESS);
     } else {
         write(STDERR_FILENO, "creat failed\n", 13);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 }

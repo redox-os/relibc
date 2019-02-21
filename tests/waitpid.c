@@ -7,7 +7,7 @@ int main(void) {
     if (pid == 0) {
         // child
         sleep(1);
-        return EXIT_SUCCESS;
+        exit(EXIT_SUCCESS);
     } else {
         // parent
         int stat_loc;

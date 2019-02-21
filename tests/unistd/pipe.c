@@ -11,7 +11,7 @@ int main(void) {
 
     if (pipe(pip) < 0) {
         perror("pipe");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     pid = fork();
@@ -29,13 +29,13 @@ int main(void) {
         /* check result */
         if (bytes < 0) {
             perror("pipe write");
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         } else if (bytes != strlen(outstring)) {
             fprintf(stderr, "pipe write: %d != %ld\n", bytes, strlen(outstring));
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
 
-        return EXIT_SUCCESS;
+        exit(EXIT_SUCCESS);
     }
     else			/* parent : receives message from child */
     {
@@ -54,17 +54,17 @@ int main(void) {
         /* check result */
         if (bytes < 0) {
             perror("pipe read");
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         } else if (bytes != strlen(outstring)) {
             fprintf(stderr, "pipe read: %d != %ld\n", bytes, strlen(outstring));
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         } else if (memcmp(instring, outstring, strlen(outstring)) != 0) {
             fprintf(stderr, "pipe read does not match pipe write\n");
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         } else {
             printf("%s\n", instring);
         }
 
-        return EXIT_SUCCESS;
+        exit(EXIT_SUCCESS);
     }
 }

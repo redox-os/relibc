@@ -10,7 +10,7 @@ int main(void) {
 
     if (dir == NULL) {
         perror("opendir");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     struct dirent* entry;

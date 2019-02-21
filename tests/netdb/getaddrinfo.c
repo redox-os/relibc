@@ -22,7 +22,7 @@ int main(void) {
     errcode = getaddrinfo("www.redox-os.org", NULL, &hints, &res);
     if (errcode != 0) {
         perror("getaddrinfo");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     while (res) {

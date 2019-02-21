@@ -11,17 +11,17 @@ int main(void) {
 
     if (!ftrylockfile(f)) {
         puts("Mutex unlocked but it shouldn't be");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     funlockfile(f);
 
     if (ftrylockfile(f)) {
         puts("Mutex locked but it shouldn't be");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if (!ftrylockfile(f)) {
         puts("Mutex unlocked but it shouldn't be");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     funlockfile(f);
 }

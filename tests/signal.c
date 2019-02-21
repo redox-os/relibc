@@ -12,14 +12,14 @@ int main(void) {
     if (signal(SIGUSR1, &handler) == SIG_ERR) {
         puts("Signal error!");
         printf("%d\n", errno);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     puts("Raising...");
     if (raise(SIGUSR1)) {
         puts("Raise error!");
         printf("%d\n", errno);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     puts("Raised.");
 }

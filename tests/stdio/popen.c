@@ -10,7 +10,7 @@ int main(void) {
     fp = popen("ls -1 example_dir", "r");
     if (fp == NULL) {
         perror("popen");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     while (fgets(path, 256, fp) != NULL) {
@@ -21,7 +21,7 @@ int main(void) {
     status = pclose(fp);
     if (status == -1) {
         perror("pclose");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     } else {
         printf("status %x\n", status);
     }

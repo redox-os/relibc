@@ -21,8 +21,8 @@ int main(void) {
     close(fd);
     remove(newpath);
     if (strcmp(str, buf) == 0) {
-        return EXIT_SUCCESS;
+        exit(EXIT_SUCCESS);
     } else {
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 }
