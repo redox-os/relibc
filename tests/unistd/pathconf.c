@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "test_helpers.h"
+
 #define PC(N) { \
 	errno = 0; \
 	printf("%s (%d): %ld (%d)\n", #N, _PC_ ## N, fpathconf(0, _PC_ ## N), errno); \

@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "test_helpers.h"
+
 void handler(int sig) {
     puts("Signal handler called!");
 }

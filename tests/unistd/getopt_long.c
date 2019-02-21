@@ -1,6 +1,8 @@
 #include <getopt.h>
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 #define RUN(...) { \
         optind = 1; \
         optarg = NULL; \

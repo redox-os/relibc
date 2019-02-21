@@ -3,6 +3,8 @@
 #include <sys/select.h>
 #include <unistd.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     int fd = open("select.c", 0, 0);
 

@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 int main(void) {
 	freopen("stdio/stdio.in", "r", stdin);
 	char in[6];

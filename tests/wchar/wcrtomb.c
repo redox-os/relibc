@@ -3,6 +3,8 @@
 #include <wchar.h> 
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     mbstate_t state;
     memset(&state, 0, sizeof state);

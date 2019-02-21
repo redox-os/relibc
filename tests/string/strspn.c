@@ -1,6 +1,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 int main(void) {
 	char *hello = "hello";
 	char *world = "world";

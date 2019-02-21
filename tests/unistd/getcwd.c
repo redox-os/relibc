@@ -4,6 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     char first[PATH_MAX] = { 0 };
     getcwd(first, PATH_MAX);

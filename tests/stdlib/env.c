@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     //puts(getenv("SHELL"));
     //puts(getenv("CC"));

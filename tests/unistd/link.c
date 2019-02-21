@@ -4,6 +4,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     printf("%ld\n", sizeof(struct stat));
 

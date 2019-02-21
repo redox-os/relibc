@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include "test_helpers.h"
+
 int check(time_t input) {
     struct tm* t = localtime(&input);
 

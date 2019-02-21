@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "test_helpers.h"
 
 __attribute__((destructor))
 void destructor_no_priority(void) {

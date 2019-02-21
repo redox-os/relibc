@@ -2,6 +2,8 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     sleep(2);
     perror("sleep");

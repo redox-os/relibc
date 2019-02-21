@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 void print(struct passwd *pwd) {
     printf("pw_name: %s\n", pwd->pw_name);
     printf("pw_password: %s\n", pwd->pw_passwd);

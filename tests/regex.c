@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     regex_t regex;
     char error_buf[256];

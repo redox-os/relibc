@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 int main(void) {
   char s0[] = "hello, world";
   char* ptr = strrchr(s0, 'l');

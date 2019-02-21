@@ -1,6 +1,8 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     gid_t egid = getegid();
     uid_t euid = geteuid();

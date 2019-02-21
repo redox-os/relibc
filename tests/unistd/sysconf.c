@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "test_helpers.h"
+
 #define SC(N) { \
 	errno = 0; \
 	printf("%s (%d): %ld (%d)\n", #N, _SC_ ## N, sysconf(_SC_ ## N), errno); \

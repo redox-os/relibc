@@ -4,6 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "test_helpers.h"
+
 static char oldpath[] = "old-name.out";
 static char newpath[] = "new-name.out";
 static char str[] = "Hello, World!";

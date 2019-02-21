@@ -1,6 +1,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 struct params {
     short sa;
     int ia;

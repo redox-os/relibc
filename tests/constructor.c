@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "test_helpers.h"
 
 __attribute__((constructor))
 void constructor_no_priority(void) {

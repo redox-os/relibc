@@ -2,6 +2,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     pid_t pid = fork();
     if (pid == 0) {

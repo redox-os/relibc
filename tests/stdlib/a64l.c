@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     char * s = "azAZ9."; // test boundaries
     long l = a64l(s);

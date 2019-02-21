@@ -4,15 +4,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "test_helpers.h"
+
 int main(void) {
-    printf("%ld\n", sizeof(struct stat));
+    printf("sizeof(struct stat): %ld\n", sizeof(struct stat));
 
     struct stat buf;
 
-    if (stat("unistd/stat.c", &buf)) {
-        perror("stat");
-        exit(EXIT_FAILURE);
-    }
+    int stat_status = stat("unistd/stat.c", &buf);
+    ERROR_IF(stat, stat_status, == -1);
+    UNEXP_IF(stat, stat_status, != 0);
 
     printf("st_size: %lu\n", buf.st_size);
     printf("st_blksize: %lu\n", buf.st_blksize);

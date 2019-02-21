@@ -4,6 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     int pid, pip[2];
     char instring[20];

@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <sys/resource.h>
 
+#include "test_helpers.h"
+
 void ptimeval(struct timeval* val) {
     printf("{ tv_sec: %ld, tv_usec: %ld }\n", val->tv_sec, val->tv_usec);
 }
@@ -10,10 +12,9 @@ void ptimeval(struct timeval* val) {
 int main(void) {
     struct rusage r_usage;
 
-    if (getrusage(RUSAGE_SELF, &r_usage) == -1) {
-        perror("getrusage");
-        exit(EXIT_FAILURE);
-    }
+    int status = getrusage(RUSAGE_SELF, &r_usage);
+    ERROR_IF(getrusage, status, == -1);
+    UNEXP_IF(getrusage, status, != 0);
 
     printf("ru_utime:");
     ptimeval(&r_usage.ru_utime);

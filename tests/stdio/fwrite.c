@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <errno.h>
 
+#include "test_helpers.h"
+
 int main(void) {
 	FILE *f = fopen("stdio/fwrite.out", "w");
 	const char ptr[] = "Hello World!";

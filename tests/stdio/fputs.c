@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <errno.h>
 
+#include "test_helpers.h"
+
 int main(void) {
 	FILE *f = fopen("stdio/fputs.out", "w");
 	char *in = "Hello World!";

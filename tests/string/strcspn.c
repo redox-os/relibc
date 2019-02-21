@@ -1,6 +1,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 int main(void) {
 	char *world = "world";
 	printf("%ld\n", strcspn("hello", world)); // should be 2

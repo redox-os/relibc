@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     int status = isatty(STDOUT_FILENO);
 

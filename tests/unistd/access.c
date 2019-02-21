@@ -2,6 +2,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     if (access("example_dir/1-never-gonna-give-you-up", R_OK | W_OK)) {
         perror("access");

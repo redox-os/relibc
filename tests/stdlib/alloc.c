@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     char * ptr = (char *)malloc(256);
     printf("malloc %p\n", ptr);

@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 typedef struct {
   char * in;
   char * expected_out;

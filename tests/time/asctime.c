@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     time_t a = 0;
     struct tm *time_info = gmtime(&a);

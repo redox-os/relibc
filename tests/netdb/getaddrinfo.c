@@ -8,6 +8,8 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     struct addrinfo hints, *res;
     int errcode;

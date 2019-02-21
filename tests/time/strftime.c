@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <time.h>
 
+#include "test_helpers.h"
+
 void print(time_t timestamp, char* fmt) {
     char* out = malloc(50);
     size_t n = strftime(out, 50, fmt, localtime(&timestamp));
