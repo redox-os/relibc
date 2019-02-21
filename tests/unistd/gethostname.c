@@ -3,10 +3,16 @@
 #include <unistd.h>
 
 int main(void) {
-    char* hostname = malloc(256);
-    if (gethostname(hostname, 256) == 0) {
+    char hostname[256] = { 0 };
+
+    int status = gethostname(hostname, 256);
+    if (status == 0) {
         printf("Hostname: %s\n", hostname);
+    } else if (status == -1) {
+        perror("gethostname");
+        exit(EXIT_FAILURE);
     } else {
-        puts("error getting hostname");
+        printf("gethostname returned %d, unexpected result\n", status);
+        exit(EXIT_FAILURE);
     }
 }

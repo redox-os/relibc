@@ -5,7 +5,7 @@
 #include <unistd.h>
 
 int main(void) {
-    char first[PATH_MAX];
+    char first[PATH_MAX] = { 0 };
     getcwd(first, PATH_MAX);
     puts(first);
 

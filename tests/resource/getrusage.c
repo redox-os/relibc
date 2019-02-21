@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/resource.h>
 
 void ptimeval(struct timeval* val) {
@@ -8,14 +9,18 @@ void ptimeval(struct timeval* val) {
 
 int main(void) {
     struct rusage r_usage;
-    if (getrusage(RUSAGE_SELF, &r_usage) < 0) {
+
+    if (getrusage(RUSAGE_SELF, &r_usage) == -1) {
         perror("getrusage");
         exit(EXIT_FAILURE);
     }
+
     printf("ru_utime:");
     ptimeval(&r_usage.ru_utime);
+
     printf("ru_stime:");
     ptimeval(&r_usage.ru_utime);
+
     printf("ru_maxrss: %ld\n", r_usage.ru_maxrss);
     printf("ru_ixrss: %ld\n", r_usage.ru_ixrss);
     printf("ru_idrss: %ld\n", r_usage.ru_idrss);
