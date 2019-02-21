@@ -2,14 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     int status = brk((void*)100);
-
-    if (status == -1) {
-        perror("brk");
-        exit(EXIT_FAILURE);
-    } else if (status != 0) {
-        printf("brk returned %d, unexpected result\n", status);
-        exit(EXIT_FAILURE);
-    }
+    ERROR_IF(brk, status, == -1);
+    UNEXP_IF(brk, status, != 0);
 }
