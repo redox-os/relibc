@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <sys/time.h>
 
-int main() {
+int main(void) {
     struct timeval x = { .tv_usec = 15 };
     struct timeval y = { 0 };
     struct timeval z = { 0 };

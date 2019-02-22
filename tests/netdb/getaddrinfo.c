@@ -22,7 +22,7 @@ int main(void) {
     errcode = getaddrinfo("www.redox-os.org", NULL, &hints, &res);
     if (errcode != 0) {
         perror("getaddrinfo");
-        return -1;
+        return EXIT_FAILURE;
     }
 
     while (res) {
@@ -45,6 +45,4 @@ int main(void) {
 
         res = res->ai_next;
     }
-
-    return 0;
 }

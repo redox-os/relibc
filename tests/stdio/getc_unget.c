@@ -1,12 +1,13 @@
 #include <stdio.h>
+#include <stdlib.h>
 
-int main(int argc, char ** argv) {
+int main(void) {
 	ungetc('h', stdin);
 	char c;
 	if ((c = getchar()) == 'h') {
 		printf("Worked!\n");
-		return 0;
+		return EXIT_SUCCESS;
 	}
 	printf("failed :( %c\n", c);
-	return 0;
+	return EXIT_FAILURE;
 }

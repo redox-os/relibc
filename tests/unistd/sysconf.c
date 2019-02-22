@@ -7,7 +7,7 @@
 	printf("%s (%d): %ld (%d)\n", #N, _SC_ ## N, sysconf(_SC_ ## N), errno); \
 }
 
-int main(){
+int main(void) {
 	SC(ARG_MAX);
 	SC(CHILD_MAX);
 	SC(CLK_TCK);
@@ -22,5 +22,4 @@ int main(){
 	SC(TTY_NAME_MAX);
 	SC(SYMLOOP_MAX);
 	SC(HOST_NAME_MAX);
-	return 0;
 }

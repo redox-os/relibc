@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int main(int argc, char** argv) {
+int main(void) {
     char* file_name = (char*) calloc(18, sizeof(char));
     strcpy(file_name, "tempXXXXXX.suffix");
     int fd = mkostemps(file_name, 7, 0);
@@ -23,5 +23,4 @@ int main(int argc, char** argv) {
     }
     fclose(fp);
     remove(file_name);
-    return 0;
 }

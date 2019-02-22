@@ -1,16 +1,17 @@
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-int main() {
+int main(void) {
     printf("%ld\n", sizeof(struct stat));
 
     struct stat buf;
 
     if (stat("unistd/stat.c", &buf)) {
         perror("stat");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     printf("st_size: %lu\n", buf.st_size);

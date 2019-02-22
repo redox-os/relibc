@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <strings.h>
 
-int main() {
+int main(void) {
     assert(!bcmp("hello", "hehe", 2));
     assert(bcmp("hello", "haha", 2));
 

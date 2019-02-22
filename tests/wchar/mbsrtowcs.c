@@ -17,8 +17,7 @@ void print_as_wide(const char* mbstr)
     //wprintf(L"The wide string: %ls \n", &wstr[0]);
 }
 
-int main()
-{
+int main(void) {
     const char* mbstr = u8"z\u00df\u6c34\U0001f34c"; // or u8"zß水🍌"
     print_as_wide(mbstr);
 }

@@ -2,9 +2,8 @@
 #include <stdio.h>  
 #include <wchar.h> 
 #include <stdlib.h>
-  
-int main( void )  
-{  
+
+int main(void) {
     mbstate_t state;
     memset(&state, 0, sizeof state);
     wchar_t in[] = L"zß水🍌"; // or "z\u00df\u6c34\U0001F34C"
@@ -26,4 +25,4 @@ int main( void )
     printf("into %zu UTF-8 code units: [ ", out_sz);
     for(size_t x = 0; x < out_sz; ++x) printf("%#x ", +(unsigned char)out[x]);
     puts("]");
-} 
+}

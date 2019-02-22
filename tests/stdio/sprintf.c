@@ -1,7 +1,8 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-int main(int argc, char ** argv) {
+int main(void) {
     char buffer[72];
 
     int ret = sprintf(
@@ -11,7 +12,7 @@ int main(int argc, char ** argv) {
     );
     if (ret != 68) {
         printf("Failed! Return value was %d\n", ret);
-        return -1;
+        return EXIT_FAILURE;
     }
 
     memset(buffer, 0, sizeof(buffer));
@@ -24,7 +25,7 @@ int main(int argc, char ** argv) {
     );
     if (ret != 86) {
         printf("Failed! Return value was %d\n", ret);
-        return -1;
+        return EXIT_FAILURE;
     }
 
     puts(buffer);

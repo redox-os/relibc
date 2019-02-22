@@ -225,6 +225,6 @@ do_test (void)
   return (error_count != 0);
 }
 
-int main() {
+int main(void) {
     do_test();
 }

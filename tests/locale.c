@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int main() {
+int main(void) {
     // TODO: Implement locale properly and test it here
     char* val = setlocale(LC_ALL, NULL);
     if (strcmp(val, "C") == 0) {

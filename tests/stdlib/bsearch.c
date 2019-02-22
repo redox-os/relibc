@@ -13,17 +13,19 @@ int int_cmp(const void* a, const void* b) {
       size_t i = 0; \
       for (; i < len; ++i) printf("%d,", arr[i]); \
       printf("] expected %p but got %p\n", (void*) expect, res); \
-      return 1; \
+      return EXIT_FAILURE; \
     } \
   } while (0);
 
 
 
-int main(int argc, char* argv[]) {
+int main(void) {
   int x = 0;
   int y = 1024;
-  int empty[] = {};
-  BSEARCH_TEST_INT(x, empty, 0, NULL);
+
+  // TODO: Zero sized arrays are a non-standard GNU extension
+  //int empty[] = {};
+  //BSEARCH_TEST_INT(x, empty, 0, NULL);
 
   int singleton[] = {42};
   printf("%p\n%p\n", singleton, &singleton[1]);
@@ -51,5 +53,4 @@ int main(int argc, char* argv[]) {
   BSEARCH_TEST_INT(x, big, 7, NULL);
 
   printf("PASS bsearch\n");
-  return 0;
 }

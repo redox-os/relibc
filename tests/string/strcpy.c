@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int main() {
+int main(void) {
     char dst[20];
 
     strcpy(dst, "strcpy works!");

@@ -150,10 +150,12 @@ verify: | ../sysroot $(EXPECT_BINS)
 	done
 
 CFLAGS=\
+	-std=c11 \
 	-fno-builtin \
 	-fno-stack-protector \
 	-static \
 	-Wall \
+	-pedantic \
 	-g \
 	-nostdinc \
 	-nostdlib \
