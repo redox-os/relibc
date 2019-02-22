@@ -21,5 +21,11 @@ pub struct pollfd {
 
 #[no_mangle]
 pub extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
-    Sys::poll(fds, nfds, timeout)
+    trace_expr!(
+        Sys::poll(fds, nfds, timeout),
+        "poll({:p}, {}, {})",
+        fds,
+        nfds,
+        timeout
+    )
 }

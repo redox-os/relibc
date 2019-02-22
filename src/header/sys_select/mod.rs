@@ -22,5 +22,13 @@ pub extern "C" fn select(
     exceptfds: *mut fd_set,
     timeout: *mut timeval,
 ) -> c_int {
-    Sys::select(nfds, readfds, writefds, exceptfds, timeout)
+    trace_expr!(
+        Sys::select(nfds, readfds, writefds, exceptfds, timeout),
+        "select({}, {:p}, {:p}, {:p}, {:p})",
+        nfds,
+        readfds,
+        writefds,
+        exceptfds,
+        timeout
+    )
 }
