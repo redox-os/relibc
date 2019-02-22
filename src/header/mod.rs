@@ -30,6 +30,7 @@ pub mod stdio;
 pub mod stdlib;
 pub mod string;
 pub mod strings;
+pub mod sys_epoll;
 pub mod sys_file;
 pub mod sys_ioctl;
 pub mod sys_mman;
