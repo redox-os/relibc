@@ -11,17 +11,13 @@ void handler(int sig) {
 }
 
 int main(void) {
-    if (signal(SIGUSR1, &handler) == SIG_ERR) {
-        puts("Signal error!");
-        printf("%d\n", errno);
-        exit(EXIT_FAILURE);
-    }
+    void (*signal_status)(int) = signal(SIGUSR1, &handler);
+    ERROR_IF(signal, signal_status, == SIG_ERR);
 
     puts("Raising...");
-    if (raise(SIGUSR1)) {
-        puts("Raise error!");
-        printf("%d\n", errno);
-        exit(EXIT_FAILURE);
-    }
+
+    int raise_status = raise(SIGUSR1);
+    ERROR_IF(raise, raise_status, < 0);
+
     puts("Raised.");
 }

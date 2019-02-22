@@ -4,8 +4,9 @@
 #include "test_helpers.h"
 
 int main(void) {
-    //FILE *f = fopen("/etc/ssl/certs/ca-certificates.crt", "r");
     FILE *f = fopen("stdio/stdio.in", "r");
+    ERROR_IF(fopen, f, == NULL);
+
     char line[256];
 
     while (1) {

@@ -4,7 +4,8 @@
 #include "test_helpers.h"
 
 int main(void) {
-    FILE* f = fopen("stdio/stdio.in", "r");
+    FILE *f = fopen("stdio/stdio.in", "r");
+    ERROR_IF(fopen, f, == NULL);
 
     flockfile(f);
 

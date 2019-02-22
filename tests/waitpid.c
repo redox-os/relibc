@@ -6,6 +6,8 @@
 
 int main(void) {
     pid_t pid = fork();
+    ERROR_IF(fork, pid, == -1);
+
     if (pid == 0) {
         // child
         sleep(1);
@@ -13,6 +15,7 @@ int main(void) {
     } else {
         // parent
         int stat_loc;
-        waitpid(pid, &stat_loc, 0);
+        pid_t wid = waitpid(pid, &stat_loc, 0);
+        ERROR_IF(waitpid, wid, == -1);
     }
 }

@@ -6,6 +6,7 @@
 
 int main(void) {
     FILE *fp = fopen("stdio/fread.in", "rb");
+    ERROR_IF(fopen, fp, == NULL);
 
     char buf[33] = { 0 };
     for (int i = 1; i <= 32; ++i) {
