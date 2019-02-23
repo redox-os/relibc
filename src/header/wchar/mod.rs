@@ -295,7 +295,7 @@ pub unsafe extern "C" fn wcscat(ws1: *mut wchar_t, ws2: *const wchar_t) -> *mut 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wcschr(ws: *const wchar_t, wc: wchar_t) -> *mut c_int {
+pub unsafe extern "C" fn wcschr(ws: *const wchar_t, wc: wchar_t) -> *mut wchar_t {
     let mut i = 0;
     loop {
         if *ws.add(i) == wc {
@@ -331,9 +331,18 @@ pub unsafe extern "C" fn wcscpy(ws1: *mut wchar_t, ws2: *const wchar_t) -> *mut 
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn wcscspn(ws1: *const wchar_t, ws2: *const wchar_t) -> size_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcscspn(ws1: *const wchar_t, ws2: *const wchar_t) -> size_t {
+    let mut i = 0;
+    loop {
+        let wc = *ws1.add(i);
+
+        if wc == 0 || wcschr(ws2, wc) != 0 as *mut wchar_t {
+            return i;
+        }
+
+        i += 1;
+    }
 }
 
 // #[no_mangle]
