@@ -7,11 +7,14 @@ int main(void) {
     FILE *f = fopen("stdio/stdio.in", "r");
     ERROR_IF(fopen, f, == NULL);
 
-    if (fseek(f, 14, SEEK_CUR) < 0) {
-        puts("fseek error");
-        exit(EXIT_FAILURE);
-    }
+    int status = fseek(f, 14, SEEK_CUR);
+    ERROR_IF(fseek, status, == -1);
+    UNEXP_IF(fseek, status, != 0);
+
     char buffer[256];
     printf("%s", fgets(buffer, 256, f));
-    printf("ftell: %ld\n", ftello(f));
+
+    off_t pos = ftello(f);
+    ERROR_IF(ftello, pos, == -1);
+    printf("ftell: %ld\n", pos);
 }

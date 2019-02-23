@@ -9,6 +9,10 @@ int main(void) {
     ERROR_IF(creat, fd, == -1);
     UNEXP_IF(creat, fd, < 0);
 
-    write(fd, "Hello World!\n", 13);
-    close(fd);
+    int written = write(fd, "Hello World!\n", 13);
+    ERROR_IF(write, written, == -1);
+
+    int c = close(fd);
+    ERROR_IF(close, c, == -1);
+    UNEXP_IF(close, c, != 0);
 }

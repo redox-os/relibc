@@ -21,6 +21,11 @@ int main(void) {
 
     printf("fd %d duped into fd %d\n", newfd, newfd2);
 
-    close(newfd);
-    close(newfd2);
+    int c1 = close(newfd);
+    ERROR_IF(close, c1, == -1);
+    UNEXP_IF(close, c1, != 0);
+
+    int c2 = close(newfd2);
+    ERROR_IF(close, c2, == -1);
+    UNEXP_IF(close, c2, != 0);
 }

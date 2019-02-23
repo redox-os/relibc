@@ -7,7 +7,7 @@
 #include "test_helpers.h"
 
 int main(void) {
-    printf("%ld\n", sizeof(struct stat));
+    printf("sizeof(struct stat): %ld\n", sizeof(struct stat));
 
     struct stat buf;
 

@@ -5,7 +5,7 @@
 
 int main(void) {
     FILE *fp = popen("ls -1 example_dir", "r");
-    ERROR_IF(fopen, fp, == NULL);
+    ERROR_IF(popen, fp, == NULL);
 
     char path[256] = { 0 };
     while (fgets(path, 256, fp) != NULL) {

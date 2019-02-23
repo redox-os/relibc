@@ -39,7 +39,7 @@
 //
 #define ERROR_IF(func, status, condition) { \
     if (status condition) { \
-        fprintf(stderr, "%s:%s:%d: '%s' returned an error: %s (%d)\n", \
+        fprintf(stderr, "%s:%s:%d: '%s' failed: %s (%d)\n", \
             __FILE__, __func__, __LINE__, #func, strerror(errno), errno); \
         _exit(EXIT_FAILURE); \
     } \
@@ -64,8 +64,14 @@
 //
 #define UNEXP_IF(func, status, condition) { \
     if (status condition) { \
-        fprintf(stderr, "%s:%s:%d: '%s' returned a non-standard value: %d\n", \
-            __FILE__, __func__, __LINE__, #func, status); \
+        fprintf(stderr, "%s:%s:%d: '%s' returned a non-standard value: ", \
+            __FILE__, __func__, __LINE__, #func); \
+        fprintf(stderr, _Generic((status), \
+            char *: "char*(%p) = \"%1$s\"", \
+            void *: "void*(%p)", \
+            default: "%i" \
+        ), status); \
+        fprintf(stderr, "\n"); \
         _exit(EXIT_FAILURE); \
     } \
 }
