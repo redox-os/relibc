@@ -49,9 +49,8 @@ int main(void) {
     UNEXP_IF(remove, rm_status, != 0);
 
     // Compare file contents
-    if (strcmp(str, buf) == 0) {
-        exit(EXIT_SUCCESS);
-    } else {
+    if (strcmp(str, buf) != 0) {
+        puts("Comparison failed!");
         exit(EXIT_FAILURE);
     }
 }

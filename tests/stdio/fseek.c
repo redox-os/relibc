@@ -16,5 +16,5 @@ int main(void) {
 
     off_t pos = ftello(f);
     ERROR_IF(ftello, pos, == -1);
-    printf("ftell: %ld\n", pos);
+    printf("ftello: %ld\n", pos);
 }
