@@ -430,9 +430,19 @@ pub extern "C" fn wcspbrk(ws1: *const wchar_t, ws2: *const wchar_t) -> *mut wcha
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn wcsrchr(ws1: *const wchar_t, ws2: wchar_t) -> *mut wchar_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcsrchr(ws1: *const wchar_t, wc: wchar_t) -> *mut wchar_t {
+    let mut last_matching_wc = 0 as *const wchar_t;
+    let mut i = 0;
+
+    while *ws1.add(i) != 0 {
+        if *ws1.add(i) == wc {
+            last_matching_wc = ws1.add(i);
+        }
+        i += 1;
+    }
+
+    last_matching_wc as *mut wchar_t
 }
 
 // #[no_mangle]

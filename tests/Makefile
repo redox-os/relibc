@@ -87,7 +87,8 @@ EXPECT_BINS=\
 	wchar/mbsrtowcs \
 	wchar/putwchar \
 	wchar/wcrtomb \
-	wchar/wcscspn
+	wchar/wcscspn \
+	wchar/wcsrchr
 
 # Binaries that may generate varied output
 BINS=\
