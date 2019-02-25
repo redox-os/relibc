@@ -4,14 +4,14 @@
 #include "test_helpers.h"
 
 #define RUN(...) \
-    { \
+    do { \
         optind = 1; \
         optarg = NULL; \
         opterr = 1; \
         optopt = -1; \
         char *args_arr[] = { __VA_ARGS__ }; \
         printf("result: %d\n", runner(sizeof(args_arr) / sizeof(args_arr[0]), args_arr)); \
-    }
+    } while (0)
 
 int runner(int argc, char *argv[]) {
     int c;

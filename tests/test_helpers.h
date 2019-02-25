@@ -37,13 +37,14 @@
 // ERROR_IF(fgetc, c, == EOF);  // OK
 // printf("result: %c\n", c);   // OK
 //
-#define ERROR_IF(func, status, condition) { \
-    if (status condition) { \
-        fprintf(stderr, "%s:%s:%d: '%s' failed: %s (%d)\n", \
-            __FILE__, __func__, __LINE__, #func, strerror(errno), errno); \
-        _exit(EXIT_FAILURE); \
-    } \
-}
+#define ERROR_IF(func, status, condition) \
+    do { \
+        if (status condition) { \
+            fprintf(stderr, "%s:%s:%d: '%s' failed: %s (%d)\n", \
+                __FILE__, __func__, __LINE__, #func, strerror(errno), errno); \
+            _exit(EXIT_FAILURE); \
+        } \
+    } while(0)
 
 // Throws errors on API return values not defined by the standards.
 //
@@ -62,27 +63,29 @@
 // UNEXP_IF(fgetc, c, < 0);
 // UNEXP_IF(fgetc, c, > 255);
 //
-#define UNEXP_IF(func, status, condition) { \
-    if (status condition) { \
-        fprintf(stderr, "%s:%s:%d: '%s' returned a non-standard value: ", \
-            __FILE__, __func__, __LINE__, #func); \
-        fprintf(stderr, _Generic((status), \
-            char *: "char*(%p) = \"%1$s\"", \
-            void *: "void*(%p)", \
-            default: "%i" \
-        ), status); \
-        fprintf(stderr, "\n"); \
-        _exit(EXIT_FAILURE); \
-    } \
-}
+#define UNEXP_IF(func, status, condition) \
+    do { \
+        if (status condition) { \
+            fprintf(stderr, "%s:%s:%d: '%s' returned a non-standard value: ", \
+                __FILE__, __func__, __LINE__, #func); \
+            fprintf(stderr, _Generic((status), \
+                char *: "char*(%p) = \"%1$s\"", \
+                void *: "void*(%p)", \
+                default: "%i" \
+            ), status); \
+            fprintf(stderr, "\n"); \
+            _exit(EXIT_FAILURE); \
+        } \
+    } while (0)
 
 // A convenience macro to show where the test fail.
-#define exit(code) { \
-    if (code != EXIT_SUCCESS) { \
-        fprintf(stderr, "%s:%s:%d: Test failed with exit(%s)\n", \
-            __FILE__, __func__, __LINE__, #code); \
-    } \
-    _exit(code); \
-}
+#define exit(code) \
+    do { \
+        if (code != EXIT_SUCCESS) { \
+            fprintf(stderr, "%s:%s:%d: Test failed with exit(%s)\n", \
+                __FILE__, __func__, __LINE__, #code); \
+        } \
+        _exit(code); \
+    } while(0)
 
 #endif /* _TEST_HELPERS */

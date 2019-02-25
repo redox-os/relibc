@@ -291,10 +291,12 @@ struct test_case {
 size_t num_test_cases = sizeof(test_cases) / sizeof(struct test_case);
 
 #define CHECK_TEST(tc, fn, retval) \
-    if (fn(tc.c) != tc.fn) { \
-        retval = EXIT_FAILURE; \
-        printf("Unexpected result: " #fn "('%c') != %d // Char value: %d\n", tc.c, tc.fn, tc.c); \
-    }
+    do { \
+        if (fn(tc.c) != tc.fn) { \
+            retval = EXIT_FAILURE; \
+            printf("Unexpected result: " #fn "('%c') != %d // Char value: %d\n", tc.c, tc.fn, tc.c); \
+        } \
+    } while (0)
 
 int main(void) {
     int retval = EXIT_SUCCESS;

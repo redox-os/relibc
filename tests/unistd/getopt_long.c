@@ -3,14 +3,15 @@
 
 #include "test_helpers.h"
 
-#define RUN(...) { \
+#define RUN(...) \
+    do { \
         optind = 1; \
         optarg = NULL; \
         opterr = 1; \
         optopt = -1; \
         char *args_arr[] = { __VA_ARGS__ }; \
         runner(sizeof(args_arr) / sizeof(char*), args_arr); \
-    }
+    } while (0)
 
 void runner(int argc, char *argv[]) {
     printf("--- Running:");
