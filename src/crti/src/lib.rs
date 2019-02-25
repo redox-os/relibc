@@ -30,7 +30,7 @@ global_asm!(r#"
     .global _init
     .type _init,%function
     _init:
-        stp x29,x30,[sp,-16]
+        stp x29,x30,[sp,-16]!
         mov x29,sp
         // stp: "stores two doublewords from the first and second argument to memory addressed by addr"
         // Body will be filled in by gcc and ended by crtn.o
@@ -39,7 +39,7 @@ global_asm!(r#"
     .global _fini
     .type _fini,%function
     _fini:
-        stp x29,x30,[sp,-16]
+        stp x29,x30,[sp,-16]!
         mov x29,sp
         // stp: "stores two doublewords from the first and second argument to memory addressed by addr"
         // Body will be filled in by gcc and ended by crtn.o
