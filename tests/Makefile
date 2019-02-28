@@ -81,6 +81,7 @@ EXPECT_BINS=\
 	unistd/pipe \
 	unistd/rmdir \
 	unistd/sleep \
+	unistd/swab \
 	unistd/write \
 	waitpid \
 	wchar/mbrtowc \

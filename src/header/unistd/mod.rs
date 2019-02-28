@@ -555,9 +555,20 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
     0
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn swab(src: *const c_void, dest: *mut c_void, nbytes: ssize_t) {
-    unimplemented!();
+    if nbytes <= 0 {
+        return
+    }
+    let number_of_swaps = nbytes / 2;
+    let mut offset = 0;
+    for i in 0..number_of_swaps {
+        unsafe {
+            src.offset(offset).copy_to(dest.offset(offset + 1), 1);
+            src.offset(offset + 1).copy_to(dest.offset(offset), 1);
+        }
+        offset += 2;
+    }
 }
 
 #[no_mangle]
