@@ -14,7 +14,7 @@
 #define INT_MIN (-INT_MAX - 1)
 #define LLONG_MAX __LONG_LONG_MAX__
 #define LLONG_MIN (-LLONG_MAX - 1)
-#define LONG_BIT __LONG_BIT__
+#define LONG_BIT __LONG_WIDTH__
 #define LONG_MAX __LONG_MAX__
 #define LONG_MIN (-LONG_MAX - 1)
 #define SCHAR_MAX __SCHAR_MAX__
