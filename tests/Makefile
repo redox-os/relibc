@@ -162,7 +162,8 @@ CFLAGS=\
 	-g \
 	-nostdinc \
 	-nostdlib \
-	-isystem ../sysroot/include
+	-isystem ../sysroot/include \
+	-I .
 
 HEADLIBS=\
 	../sysroot/lib/crt0.o \

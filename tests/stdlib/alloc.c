@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <stdint.h> /* for SIZE_MAX */
 
+#include "test_helpers.h"
+
 int main(void) {
     char * ptr = (char *)malloc(256);
     printf("malloc %p\n", ptr);

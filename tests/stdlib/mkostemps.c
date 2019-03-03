@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     char* file_name = (char*) calloc(18, sizeof(char));
     strcpy(file_name, "tempXXXXXX.suffix");

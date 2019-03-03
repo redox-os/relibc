@@ -8,6 +8,8 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     struct addrinfo hints, *res;
     int errcode;
@@ -22,7 +24,7 @@ int main(void) {
     errcode = getaddrinfo("www.redox-os.org", NULL, &hints, &res);
     if (errcode != 0) {
         perror("getaddrinfo");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     while (res) {

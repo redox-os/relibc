@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     char *str = (char *) alloca(17);
 

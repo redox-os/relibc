@@ -1,6 +1,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     char dest1[12] = "hello";
 	  printf("%s\n", strcat(dest1, " world")); // should be hello world

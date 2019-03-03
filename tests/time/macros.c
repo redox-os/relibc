@@ -1,6 +1,8 @@
 #include <assert.h>
 #include <sys/time.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     struct timeval x = { .tv_usec = 15 };
     struct timeval y = { 0 };

@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <strings.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     assert(!bcmp("hello", "hehe", 2));
     assert(bcmp("hello", "haha", 2));

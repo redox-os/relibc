@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 void print(struct passwd *pwd) {
     printf("pw_name: %s\n", pwd->pw_name);
     printf("pw_password: %s\n", pwd->pw_passwd);
@@ -19,7 +21,7 @@ int main(void) {
     struct passwd *pwd = getpwuid(0);
     if (errno != 0) {
         perror("getpwuid");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if (pwd != NULL) {
         print(pwd);
@@ -30,7 +32,7 @@ int main(void) {
     pwd = getpwnam("nobody");
     if (errno != 0) {
         perror("getpwnam");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if (pwd != NULL) {
         print(pwd);
@@ -43,12 +45,12 @@ int main(void) {
     if (getpwuid_r(0, &pwd2, buf, 100, &result) < 0) {
         perror("getpwuid_r");
         free(buf);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if (result != NULL) {
         if (result != &pwd2) {
             free(buf);
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
         print(&pwd2);
     }
@@ -57,12 +59,12 @@ int main(void) {
     if (getpwnam_r("nobody", &pwd2, buf, 100, &result) < 0) {
         perror("getpwuid_r");
         free(buf);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if (result != NULL) {
         if (result != &pwd2) {
             free(buf);
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
         print(&pwd2);
     }
@@ -72,11 +74,11 @@ int main(void) {
     char buf2[1];
     if (getpwuid_r(0, &pwd2, buf2, 1, &result) == 0) {
         puts("This shouldn't have succeeded, but did!");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if (errno != ERANGE) {
         perror("getpwuid_r");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     puts("Returned ERANGE because the buffer was too small 👍");
 }

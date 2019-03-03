@@ -35,6 +35,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "test_helpers.h"
+
 int error_count;
 static void
 output_servent (const char *call, struct servent *sptr)

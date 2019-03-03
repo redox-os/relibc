@@ -1,28 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 int main(void) {
-    FILE *fp;
-    int status;
-    char path[256];
+    FILE *fp = popen("ls -1 example_dir", "r");
+    ERROR_IF(popen, fp, == NULL);
 
-
-    fp = popen("ls -1 example_dir", "r");
-    if (fp == NULL) {
-        perror("popen");
-        return EXIT_FAILURE;
-    }
-
+    char path[256] = { 0 };
     while (fgets(path, 256, fp) != NULL) {
         printf("%s", path);
     }
 
-
-    status = pclose(fp);
-    if (status == -1) {
-        perror("pclose");
-        return EXIT_FAILURE;
-    } else {
-        printf("status %x\n", status);
-    }
+    int status = pclose(fp);
+    ERROR_IF(pclose, status, == -1);
 }

@@ -1,6 +1,8 @@
 #include <fnmatch.h>
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 void test(char* pattern, char* input, int flags) {
     if (!fnmatch(pattern, input, flags)) {
         printf("\"%s\" matches \"%s\"\n", pattern, input);

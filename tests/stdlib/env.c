@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     //puts(getenv("SHELL"));
     //puts(getenv("CC"));
@@ -34,7 +36,7 @@ int main(void) {
     if (env) {
         puts("This should be null, but isn't");
         puts(env);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     } else {
         puts("Value deleted successfully!");
     }

@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     puts("# mem #");
     char arr[100];
@@ -9,7 +11,7 @@ int main(void) {
     arr[50] = 1;
     if ((size_t)memchr((void *)arr, 1, 100) - (size_t)arr != 50) {
         puts("Incorrect memchr");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     puts("Correct memchr");
     char arr2[51];
@@ -17,25 +19,25 @@ int main(void) {
     memccpy((void *)arr2, (void *)arr, 1, 100);
     if (arr[50] != 1) {
         puts("Incorrect memccpy");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     puts("Correct memccpy");
     int res;
     if ((res = memcmp("hello world", "hello world", 11))) {
         printf("Incorrect memcmp (1), expected 0 found %d\n", res);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if ((res = memcmp("hello world", "hello worlt", 11)) >= 0) {
         printf("Incorrect memcmp (2), expected -, found %d\n", res);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if ((res = memcmp("hello world", "hallo world", 5)) <= 0) {
         printf("Incorrect memcmp (3), expected +, found %d\n", res);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if ((res = memcmp("hello world", "henlo world", 5)) >= 0) {
         printf("Incorrect memcmp (4), expected -, found %d\n", res);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     puts("Correct memcmp");
 }

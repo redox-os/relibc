@@ -1,15 +1,27 @@
+#include <limits.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 int main(void) {
-    char* cwd1 = malloc(4096*sizeof(char));//(char*) calloc(4096 + 1, sizeof(char));
-    getcwd(cwd1, 4096);
-    printf("initial cwd: %s\n", cwd1);
-    free(cwd1);
-    chdir("..");
-    char* cwd2 = malloc(4096*sizeof(char));//(char*) calloc(4096 + 1, sizeof(char));
-    getcwd(cwd2, 4096);
-    printf("final cwd: %s\n", cwd2);
-    free(cwd2);
+    char cwd[PATH_MAX] = { 0 };
+    char *cwd_result = NULL;
+
+    cwd_result = getcwd(cwd, PATH_MAX);
+    ERROR_IF(getcwd, cwd_result, == NULL);
+    UNEXP_IF(getcwd, cwd_result, != cwd);
+
+    printf("getcwd before chdir: %s\n", cwd);
+
+    int status = chdir("..");
+    ERROR_IF(chdir, status, == -1);
+    UNEXP_IF(chdir, status, != 0);
+
+    cwd_result = getcwd(cwd, PATH_MAX);
+    ERROR_IF(getcwd, cwd_result, == NULL);
+    UNEXP_IF(getcwd, cwd_result, != cwd);
+
+    printf("getcwd after chdir: %s\n", cwd);
 }

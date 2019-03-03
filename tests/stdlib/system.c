@@ -1,5 +1,8 @@
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 int main(void) {
-    system("echo test of system");
+    int status = system("echo test of system");
+    ERROR_IF(system, status, == -1);
 }

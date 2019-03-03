@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     char buffer[72];
 
@@ -12,7 +14,7 @@ int main(void) {
     );
     if (ret != 68) {
         printf("Failed! Return value was %d\n", ret);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     memset(buffer, 0, sizeof(buffer));
@@ -25,7 +27,7 @@ int main(void) {
     );
     if (ret != 86) {
         printf("Failed! Return value was %d\n", ret);
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     puts(buffer);

@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     printf("%ld\n", strtoul("         -42", NULL, 0));
     printf("%ld\n", strtoul(" +555", NULL, 0));

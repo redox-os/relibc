@@ -4,15 +4,17 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "test_helpers.h"
+
 int main(void) {
-    printf("%ld\n", sizeof(struct stat));
+    printf("sizeof(struct stat): %ld\n", sizeof(struct stat));
 
     struct stat buf;
 
     // Stat for the inode
     if (stat("unistd/link.c", &buf)) {
         perror("stat");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     unsigned long inode = buf.st_ino;
     printf("%ld\n", inode);
@@ -20,7 +22,7 @@ int main(void) {
     // Create the link
     if (link("unistd/link.c", "link.out")) {
         perror("link");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     // Make sure inodes match
@@ -38,10 +40,10 @@ int main(void) {
     // Remove link
     if (unlink("link.out")) {
         perror("unlink");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if (!stat("link.out", &buf) || errno != ENOENT) {
         perror("stat");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 }

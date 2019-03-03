@@ -3,6 +3,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     uint32_t hl = 0xBADFACED;
     uint32_t nl = htonl(hl);
@@ -20,5 +22,4 @@ int main(void) {
     struct in_addr* addr = malloc(sizeof addr);
     inet_aton(addr_str, addr);
     assert(strcmp(inet_ntoa(*addr), addr_str) == 0);
-
 }

@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <time.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     int day = 60 * 60 * 24;
     time_t inputs[] = { -(day * 33), -day, -1, -500, 0, 1, 1531454950 };

@@ -4,26 +4,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "test_helpers.h"
+
 int main(void) {
-    char* path = realpath("stdlib/realpath.c", NULL);
-    if (!path) {
-        perror("realpath");
-        return EXIT_FAILURE;
-    }
-    puts(path);
+    char *path_res = realpath("stdlib/realpath.c", NULL);
+    ERROR_IF(realpath, path_res, == NULL);
+    puts(path_res);
+    free(path_res);
 
-    free(path);
-
-    path = malloc(PATH_MAX);
-    memset(path, 0, PATH_MAX);
-
-    realpath("stdlib/realpath.c", path);
-    if (!path) {
-        perror("realpath");
-        free(path);
-        return EXIT_FAILURE;
-    }
-    puts(path);
-
-    free(path);
+    char path_arg[PATH_MAX] = { 0 };
+    char *res = realpath("stdlib/realpath.c", path_arg);
+    ERROR_IF(realpath, res, == NULL);
+    puts(path_arg);
+    free(path_arg);
 }

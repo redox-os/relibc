@@ -2,6 +2,8 @@
 #include <string.h>
 #include <wchar.h>
 
+#include "test_helpers.h"
+
 void print_as_wide(const char* mbstr)
 {
     mbstate_t state;

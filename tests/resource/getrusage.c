@@ -1,6 +1,9 @@
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/resource.h>
+
+#include "test_helpers.h"
 
 void ptimeval(struct timeval* val) {
     printf("{ tv_sec: %ld, tv_usec: %ld }\n", val->tv_sec, val->tv_usec);
@@ -8,14 +11,17 @@ void ptimeval(struct timeval* val) {
 
 int main(void) {
     struct rusage r_usage;
-    if (getrusage(RUSAGE_SELF, &r_usage) < 0) {
-        perror("getrusage");
-        return EXIT_FAILURE;
-    }
+
+    int status = getrusage(RUSAGE_SELF, &r_usage);
+    ERROR_IF(getrusage, status, == -1);
+    UNEXP_IF(getrusage, status, != 0);
+
     printf("ru_utime:");
     ptimeval(&r_usage.ru_utime);
+
     printf("ru_stime:");
     ptimeval(&r_usage.ru_utime);
+
     printf("ru_maxrss: %ld\n", r_usage.ru_maxrss);
     printf("ru_ixrss: %ld\n", r_usage.ru_ixrss);
     printf("ru_idrss: %ld\n", r_usage.ru_idrss);

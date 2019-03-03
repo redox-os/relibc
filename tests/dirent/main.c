@@ -3,15 +3,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "test_helpers.h"
+
 int main(void) {
     printf("%lu\n", sizeof(struct dirent));
 
     DIR* dir = opendir("example_dir/");
-
-    if (dir == NULL) {
-        perror("opendir");
-        return EXIT_FAILURE;
-    }
+    ERROR_IF(opendir, dir, == NULL);
 
     struct dirent* entry;
 
@@ -37,5 +35,7 @@ int main(void) {
     // entry = readdir(dir);
     // puts(entry->d_name);
 
-    closedir(dir);
+    int c = closedir(dir);
+    ERROR_IF(closedir, c, == -1);
+    UNEXP_IF(closedir, c, != 0);
 }

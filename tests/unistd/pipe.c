@@ -4,67 +4,73 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "test_helpers.h"
+
 int main(void) {
-    int pid, pip[2];
+    int pip[2];
     char instring[20];
-    char * outstring = "Hello World!";
+    char *outstring = "Hello World!";
 
-    if (pipe(pip) < 0) {
-        perror("pipe");
-        return EXIT_FAILURE;
-    }
+    int pipe_status = pipe(pip);
+    ERROR_IF(pipe, pipe_status, == -1);
+    UNEXP_IF(pipe, pipe_status, != 0);
 
-    pid = fork();
-    if (pid == 0)           /* child : sends message to parent*/
-    {
-        /* close read end */
-        close(pip[0]);
+    int pid = fork();
+    ERROR_IF(fork, pid, == -1);
 
-        /* send 7 characters in the string, including end-of-string */
+    if (pid == 0) {
+        // child: sends message to parent
+        // close read end
+        int cr = close(pip[0]);
+        ERROR_IF(close, cr, == -1);
+        UNEXP_IF(close, cr, != 0);
+
+        // send 7 characters in the string, including end-of-string
         int bytes = write(pip[1], outstring, strlen(outstring));
+        ERROR_IF(write, bytes, == -1);
 
-        /* close write end */
-        close(pip[1]);
-
-        /* check result */
-        if (bytes < 0) {
-            perror("pipe write");
-            return EXIT_FAILURE;
-        } else if (bytes != strlen(outstring)) {
+        // check result
+        if (bytes != strlen(outstring)) {
             fprintf(stderr, "pipe write: %d != %ld\n", bytes, strlen(outstring));
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
 
-        return EXIT_SUCCESS;
-    }
-    else			/* parent : receives message from child */
-    {
-        /* close write end */
-        close(pip[1]);
+        // close write end
+        int cw = close(pip[1]);
+        ERROR_IF(close, cw, == -1);
+        UNEXP_IF(close, cw, != 0);
 
-        /* clear memory */
+        exit(EXIT_SUCCESS);
+    } else {
+        // parent: receives message from child
+        // close write end
+        int cw = close(pip[1]);
+        ERROR_IF(close, cw, == -1);
+        UNEXP_IF(close, cw, != 0);
+
+        // clear memory
         memset(instring, 0, sizeof(instring));
 
-        /* read from the pipe */
+        // read from the pipe
         int bytes = read(pip[0], instring, sizeof(instring) - 1);
+        ERROR_IF(read, bytes, == -1);
 
-        /* close read end */
-        close(pip[0]);
-
-        /* check result */
-        if (bytes < 0) {
-            perror("pipe read");
-            return EXIT_FAILURE;
-        } else if (bytes != strlen(outstring)) {
+        // check result
+        if (bytes != strlen(outstring)) {
             fprintf(stderr, "pipe read: %d != %ld\n", bytes, strlen(outstring));
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         } else if (memcmp(instring, outstring, strlen(outstring)) != 0) {
             fprintf(stderr, "pipe read does not match pipe write\n");
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         } else {
             printf("%s\n", instring);
         }
 
-        return EXIT_SUCCESS;
+        // close read end
+        int cr = close(pip[0]);
+        ERROR_IF(close, cr, == -1);
+        UNEXP_IF(close, cr, != 0);
+
+        exit(EXIT_SUCCESS);
     }
 }
