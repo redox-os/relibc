@@ -7,6 +7,7 @@
 typedef signed long long ptrdiff_t;
 
 typedef int32_t wchar_t;
+typedef int32_t wint_t;
 
 typedef unsigned long long size_t;
 
