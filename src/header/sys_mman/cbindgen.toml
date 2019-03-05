@@ -4,5 +4,9 @@ trailer = "#include <bits/sys/mman.h>"
 language = "C"
 style = "Tag"
 
+[defines]
+"target_os=linux" = "__linux__"
+"target_os=redox" = "__redox__"
+
 [enum]
 prefix_with_name = true
