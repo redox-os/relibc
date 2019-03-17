@@ -27,9 +27,11 @@ build:redox:
         # Install x86_64-unknown-redox-gcc
         # This can't be in before_script because that overrides
         # the global before_script.
+        - apt-get update -qq
+        - apt-get install -qq tar
         - rm -rf prefix
         - mkdir prefix
-        - wget -O - https://static.redox-os.org/toolchain/x86_64-unknown-redox/gcc-install.tar.gz | \
+        - wget -O - https://static.redox-os.org/toolchain/x86_64-unknown-redox/gcc-install.tar.gz |
           tar --extract --gzip --directory prefix
 
         # Main script
