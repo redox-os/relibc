@@ -35,7 +35,7 @@ all: | libc libm libpthread
 
 clean:
 	$(CARGO) clean
-	make -C tests clean
+	$(MAKE) -C tests clean
 	rm -rf sysroot
 
 check:
@@ -69,12 +69,12 @@ sysroot: all
 	rm -rf $@
 	rm -rf $@.partial
 	mkdir -p $@.partial
-	make install DESTDIR=$@.partial
+	$(MAKE) install DESTDIR=$@.partial
 	mv $@.partial $@
 	touch $@
 
 test: sysroot
-	make -C tests run
+	$(MAKE) -C tests run
 
 $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
 	echo "create $@" > "$@.mri"
@@ -132,7 +132,7 @@ $(BUILD)/openlibm: openlibm
 	touch $@
 
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/include
-	make CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libopenlibm.a
+	$(MAKE) CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libopenlibm.a
 
 $(BUILD)/pthreads-emb: pthreads-emb
 	rm -rf $@ $@.partial
@@ -142,4 +142,4 @@ $(BUILD)/pthreads-emb: pthreads-emb
 	touch $@
 
 $(BUILD)/pthreads-emb/libpthread.a: $(BUILD)/pthreads-emb $(BUILD)/include
-	make CC=$(CC) CFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libpthread.a
+	$(MAKE) CC=$(CC) CFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libpthread.a
