@@ -76,26 +76,26 @@ macro_rules! trace_expr {
         trace!("{}", format_args!($($arg)*));
 
         #[allow(unused_unsafe)]
-        let old_errno = unsafe { platform::errno };
+        let trace_old_errno = unsafe { platform::errno };
         #[allow(unused_unsafe)]
         unsafe { platform::errno = 0; }
 
         let ret = $expr;
 
         #[allow(unused_unsafe)]
-        let errno = unsafe { platform::errno } as isize;
-        if errno == 0 {
+        let trace_errno = unsafe { platform::errno } as isize;
+        if trace_errno == 0 {
             #[allow(unused_unsafe)]
-            unsafe { platform::errno = old_errno; }
+            unsafe { platform::errno = trace_old_errno; }
         }
 
-        let strerror = if errno >= 0 && errno < STR_ERROR.len() as isize {
-            STR_ERROR[errno as usize]
+        let trace_strerror = if trace_errno >= 0 && trace_errno < STR_ERROR.len() as isize {
+            STR_ERROR[trace_errno as usize]
         } else {
             "Unknown error"
         };
 
-        trace!("{} = {} ({}, {})", format_args!($($arg)*), ret, errno, strerror);
+        trace!("{} = {} ({}, {})", format_args!($($arg)*), ret, trace_errno, trace_strerror);
 
         ret
     });
