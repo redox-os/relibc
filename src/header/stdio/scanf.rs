@@ -111,6 +111,10 @@ unsafe fn inner_scanf<R: Read>(
                 }
             };
 
+            // When an EOF occurs, eof is set, stuff is marked matched
+            // as usual, and finally it is returned
+            let mut eof = false;
+
             let mut kind = IntKind::Int;
             loop {
                 kind = match c {
@@ -195,7 +199,7 @@ unsafe fn inner_scanf<R: Read>(
                             }
                             width = width.map(|w| w - 1);
                             if !read!() {
-                                break;
+                                return Ok(matched);
                             }
                             if width.map(|w| w > 0).unwrap_or(true)
                                 && (byte == b'x' || byte == b'X')
@@ -203,7 +207,7 @@ unsafe fn inner_scanf<R: Read>(
                                 radix = 16;
                                 width = width.map(|w| w - 1);
                                 if width.map(|w| w > 0).unwrap_or(true) && !read!() {
-                                    break;
+                                    return Ok(matched);
                                 }
                             }
                             continue;
@@ -215,7 +219,7 @@ unsafe fn inner_scanf<R: Read>(
                         n.push(byte as char);
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
-                            break;
+                            return Ok(matched);
                         }
                     }
 
@@ -334,6 +338,7 @@ unsafe fn inner_scanf<R: Read>(
                         }
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
+                            eof = true;
                             break;
                         }
                     }
@@ -352,6 +357,7 @@ unsafe fn inner_scanf<R: Read>(
                         }
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
+                            eof = true;
                             break;
                         }
                     }
@@ -396,14 +402,18 @@ unsafe fn inner_scanf<R: Read>(
 
                     let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.get()) };
 
-                    while width.map(|w| w > 0).unwrap_or(true) && !invert == matches.contains(&byte)
-                    {
+                    // While we haven't used up all the width, and it matches
+                    while width.map(|w| w > 0).unwrap_or(true) && !invert == matches.contains(&byte) {
                         if let Some(ref mut ptr) = ptr {
                             **ptr = byte as c_char;
                             *ptr = ptr.offset(1);
                         }
+                        // Decrease the width, and read a new character unless the width is 0
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
+                            // Reading a new character has failed, return after
+                            // actually marking this as matched
+                            eof = true;
                             break;
                         }
                     }
@@ -412,13 +422,17 @@ unsafe fn inner_scanf<R: Read>(
                         *ptr = 0;
                         matched += 1;
                     }
-                }
+                },
                 b'n' => {
                     if !ignore {
                         *ap.get::<*mut c_int>() = count as c_int;
                     }
                 }
                 _ => return Err(-1),
+            }
+
+            if eof {
+                return Ok(matched);
             }
 
             if width != Some(0) && c != b'n' {
