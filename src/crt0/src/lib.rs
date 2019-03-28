@@ -2,7 +2,7 @@
 
 #![no_std]
 #![feature(asm)]
-#![feature(lang_items)]
+#![feature(core_intrinsics)]
 #![feature(linkage)]
 #![feature(naked_functions)]
 
@@ -29,12 +29,6 @@ pub unsafe extern "C" fn _start() {
 }
 
 #[panic_handler]
-#[linkage = "weak"]
-#[no_mangle]
-pub extern "C" fn rust_begin_unwind(_pi: &::core::panic::PanicInfo) -> ! {
-    extern "C" {
-        fn exit(status: i32) -> !;
-    }
-
-    unsafe { exit(1) }
+unsafe fn panic(_pi: &::core::panic::PanicInfo) -> ! {
+    ::core::intrinsics::abort();
 }
