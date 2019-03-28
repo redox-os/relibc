@@ -74,15 +74,14 @@ pub unsafe extern "C" fn sigaction(
     act: *const sigaction,
     oact: *mut sigaction,
 ) -> c_int {
-    let mut _sigaction = None;
-    let ptr = if !act.is_null() {
-        _sigaction = Some((*act).clone());
-        _sigaction.as_mut().unwrap().sa_flags |= SA_RESTORER as c_ulong;
-        _sigaction.as_mut().unwrap() as *mut _
+    let act_opt = if !act.is_null() {
+        let mut act_clone = (*act).clone();
+        act_clone.sa_flags |= SA_RESTORER as c_ulong;
+        Some(act_clone)
     } else {
-        ptr::null_mut()
+        None
     };
-    Sys::sigaction(sig, ptr, oact)
+    Sys::sigaction(sig, act_opt.map_or(ptr::null_mut(), |x| &x), oact)
 }
 
 #[no_mangle]
