@@ -40,7 +40,7 @@ int main(void) {
 
         printf(
             "IPv%d address: %s (%s)\n",
-            res->ai_family == PF_INET6 ? 6 : 4,
+            res->ai_family == AF_INET6 ? 6 : 4,
             addrstr,
             res->ai_canonname
         );
