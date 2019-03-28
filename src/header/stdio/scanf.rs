@@ -71,8 +71,7 @@ unsafe fn inner_scanf<R: Read>(
     }
 
     while *format != 0 {
-        let mut c = *format as u8;
-        format = format.offset(1);
+        let mut c = next_byte(&mut format)?;
 
         if c == b' ' {
             maybe_read!(noreset);
