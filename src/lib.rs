@@ -58,17 +58,22 @@ use platform::{Allocator, Pal, Sys};
 #[global_allocator]
 static ALLOCATOR: Allocator = Allocator;
 
-#[cfg(not(test))]
-#[panic_handler]
-#[linkage = "weak"]
 #[no_mangle]
-pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
+pub extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {
     use core::fmt::Write;
 
     let mut w = platform::FileWriter(2);
     let _ = w.write_fmt(format_args!("RELIBC PANIC: {}\n", pi));
 
     Sys::exit(1);
+}
+
+#[cfg(not(test))]
+#[panic_handler]
+#[linkage = "weak"]
+#[no_mangle]
+pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
+    relibc_panic(pi)
 }
 
 #[cfg(not(test))]

@@ -1,7 +1,6 @@
 //! crti
 
 #![no_std]
-#![feature(core_intrinsics)]
 #![feature(global_asm)]
 #![feature(linkage)]
 
@@ -37,6 +36,11 @@ global_asm!(r#"
 "#);
 
 #[panic_handler]
-unsafe fn panic(_pi: &::core::panic::PanicInfo) -> ! {
-    ::core::intrinsics::abort();
+#[linkage = "weak"]
+#[no_mangle]
+pub unsafe extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
+    extern "C" {
+        fn relibc_panic(pi: &::core::panic::PanicInfo) -> !;
+    }
+    relibc_panic(pi)
 }
