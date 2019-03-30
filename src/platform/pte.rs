@@ -63,27 +63,31 @@ pub unsafe extern "C" fn pte_osThreadCreate(
     ppte_osThreadHandle: *mut pte_osThreadHandle,
 ) -> pte_osResult {
     // XXX error handling
-    let id = Sys::pte_clone();
-    if id < 0 {
-        return PTE_OS_GENERAL_FAILURE;
-    }
 
-    let mutex = Box::into_raw(Box::new(0));
-
-    if id == 0 {
-        // Wait until pte_osThreadStart
-        pte_osMutexLock(mutex);
-        entryPoint(argv);
-        pte_osThreadExit();
-    } else {
-        pte_osMutexLock(&mut pid_mutexes_lock);
-        if pid_mutexes.is_none() {
-            pid_mutexes = Some(BTreeMap::new());
+    // Create a locked mutex, unlocked by pte_osThreadStart
+    let mutex = Box::into_raw(Box::new(2));
+    {
+        let id = Sys::pte_clone();
+        if id < 0 {
+            return PTE_OS_GENERAL_FAILURE;
         }
-        pid_mutexes.as_mut().unwrap().insert(id, mutex);
-        pte_osMutexUnlock(&mut pid_mutexes_lock);
-        *ppte_osThreadHandle = id;
+
+        if id == 0 {
+            // Wait until pte_osThreadStart
+            pte_osMutexLock(mutex);
+            entryPoint(argv);
+            pte_osThreadExit();
+        } else {
+            pte_osMutexLock(&mut pid_mutexes_lock);
+            if pid_mutexes.is_none() {
+                pid_mutexes = Some(BTreeMap::new());
+            }
+            pid_mutexes.as_mut().unwrap().insert(id, mutex);
+            pte_osMutexUnlock(&mut pid_mutexes_lock);
+            *ppte_osThreadHandle = id;
+        }
     }
+
     PTE_OS_OK
 }
 
