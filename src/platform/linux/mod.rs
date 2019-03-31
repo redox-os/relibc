@@ -23,6 +23,7 @@ const AT_FDCWD: c_int = -100;
 const AT_EMPTY_PATH: c_int = 0x1000;
 const AT_REMOVEDIR: c_int = 0x200;
 
+const SYS_CLONE: usize = 56;
 const CLONE_VM: usize = 0x0100;
 const CLONE_FS: usize = 0x0200;
 const CLONE_FILES: usize = 0x0400;
@@ -326,17 +327,45 @@ impl Pal for Sys {
         e(unsafe { syscall!(POLL, fds, nfds, timeout) }) as c_int
     }
 
-    fn pte_clone() -> pid_t {
-        e(unsafe {
-            syscall!(
-                CLONE,
-                CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND,
-                0,
-                0,
-                0,
-                0
-            )
-        }) as pid_t
+    #[cfg(target_arch = "x86_64")]
+    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
+        let flags =
+            CLONE_VM |
+            CLONE_FS |
+            CLONE_FILES |
+            CLONE_SIGHAND;
+        let pid;
+        asm!("
+            # Call clone syscall
+            syscall
+
+            # Check if child or parent
+            test rax, rax
+            jnz .parent
+
+            # Call entry point
+            pop rdi
+            pop rax
+            call rax
+
+            # Exit
+            mov rax, 60
+            xor rdi, rdi
+            syscall
+
+            # Invalid instruction on failure to exit
+            ud2
+
+            # Return PID if parent
+            .parent:
+            "
+            : "={rax}"(pid)
+            : "{rax}"(SYS_CLONE), "{rdi}"(flags), "{rsi}"(stack), "{rdx}"(0), "{rcx}"(0), "{r8}"(0)
+            : "memory", "rbx", "rcx", "rdx", "rsi", "rdi", "r8",
+              "r9", "r10", "r11", "r12", "r13", "r14", "r15"
+            : "intel", "volatile"
+        );
+        e(pid) as pid_t
     }
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {

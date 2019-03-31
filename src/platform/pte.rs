@@ -5,9 +5,10 @@ use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use core::{intrinsics, ptr};
 
+use header::sys_mman;
 use header::time::timespec;
 use mutex::{FUTEX_WAIT, FUTEX_WAKE};
-use platform::types::{c_int, c_uint, c_void, pid_t};
+use platform::types::{c_int, c_uint, c_void, pid_t, size_t};
 use platform::{Pal, Sys};
 
 pub struct Semaphore {
@@ -36,6 +37,9 @@ use self::pte_osResult::*;
 static mut pid_mutexes: Option<BTreeMap<pte_osThreadHandle, pte_osMutexHandle>> = None;
 static mut pid_mutexes_lock: i32 = 0;
 
+static mut pid_stacks: Option<BTreeMap<pte_osThreadHandle, (*mut c_void, size_t)>> = None;
+static mut pid_stacks_lock: i32 = 0;
+
 #[thread_local]
 static mut LOCALS: *mut BTreeMap<c_uint, *mut c_void> = ptr::null_mut();
 
@@ -57,17 +61,41 @@ pub unsafe extern "C" fn pte_osInit() -> pte_osResult {
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadCreate(
     entryPoint: pte_osThreadEntryPoint,
-    _stackSize: c_int,
+    stackSize: c_int,
     _initialPriority: c_int,
     argv: *mut c_void,
     ppte_osThreadHandle: *mut pte_osThreadHandle,
 ) -> pte_osResult {
-    // XXX error handling
+    let stack_size = if stackSize == 0 {
+        1024 * 1024
+    } else {
+        stackSize as usize
+    };
+    let stack_base = sys_mman::mmap(
+        ptr::null_mut(),
+        stack_size,
+        sys_mman::PROT_READ | sys_mman::PROT_WRITE,
+        sys_mman::MAP_SHARED | sys_mman::MAP_ANONYMOUS,
+        -1,
+        0
+    );
+    if stack_base as isize == -1 {
+        return PTE_OS_GENERAL_FAILURE;
+    }
+    let stack_end = stack_base.add(stack_size);
+    let mut stack = stack_end as *mut usize;
+    {
+        stack = stack.offset(-1);
+        *stack = entryPoint as usize;
+
+        stack = stack.offset(-1);
+        *stack = argv as usize;
+    }
 
     // Create a locked mutex, unlocked by pte_osThreadStart
     let mutex = Box::into_raw(Box::new(2));
     {
-        let id = Sys::pte_clone();
+        let id = Sys::pte_clone(stack);
         if id < 0 {
             return PTE_OS_GENERAL_FAILURE;
         }
@@ -84,6 +112,14 @@ pub unsafe extern "C" fn pte_osThreadCreate(
             }
             pid_mutexes.as_mut().unwrap().insert(id, mutex);
             pte_osMutexUnlock(&mut pid_mutexes_lock);
+
+            pte_osMutexLock(&mut pid_stacks_lock);
+            if pid_stacks.is_none() {
+                pid_stacks = Some(BTreeMap::new());
+            }
+            pid_stacks.as_mut().unwrap().insert(id, (stack_base, stack_size));
+            pte_osMutexUnlock(&mut pid_stacks_lock);
+
             *ppte_osThreadHandle = id;
         }
     }
@@ -129,6 +165,15 @@ pub unsafe extern "C" fn pte_osThreadDelete(handle: pte_osThreadHandle) -> pte_o
         }
     }
     pte_osMutexUnlock(&mut pid_mutexes_lock);
+
+    pte_osMutexLock(&mut pid_stacks_lock);
+    if let Some(ref mut stacks) = pid_stacks {
+        if let Some((stack_base, stack_size)) = stacks.remove(&handle) {
+            sys_mman::munmap(stack_base, stack_size);
+        }
+    }
+    pte_osMutexUnlock(&mut pid_stacks_lock);
+
     PTE_OS_OK
 }
 

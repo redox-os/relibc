@@ -4,6 +4,7 @@
 #![allow(unused_variables)]
 #![feature(alloc)]
 #![feature(allocator_api)]
+#![feature(asm)]
 #![feature(const_fn)]
 #![feature(const_raw_ptr_deref)]
 #![feature(const_str_as_bytes)]

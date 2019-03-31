@@ -117,7 +117,7 @@ pub trait Pal {
 
     fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int;
 
-    fn pte_clone() -> pid_t;
+    unsafe fn pte_clone(stack: *mut usize) -> pid_t;
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
 

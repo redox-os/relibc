@@ -815,15 +815,46 @@ impl Pal for Sys {
         total
     }
 
-    fn pte_clone() -> pid_t {
-        e(unsafe {
-            syscall::clone(
-                syscall::CLONE_VM
-                    | syscall::CLONE_FS
-                    | syscall::CLONE_FILES
-                    | syscall::CLONE_SIGHAND,
-            )
-        }) as pid_t
+    #[cfg(target_arch = "x86_64")]
+    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
+        let flags =
+            syscall::CLONE_VM |
+            syscall::CLONE_FS |
+            syscall::CLONE_FILES |
+            syscall::CLONE_SIGHAND |
+            syscall::CLONE_STACK;
+        let pid;
+        asm!("
+            # Call clone syscall
+            syscall
+
+            # Check if child or parent
+            test rax, rax
+            jnz .parent
+
+            # Call entry point
+            pop rdi
+            pop rax
+            call rax
+
+            # Exit
+            mov rax, 1
+            xor rdi, rdi
+            syscall
+
+            # Invalid instruction on failure to exit
+            ud2
+
+            # Return PID if parent
+            .parent:
+            "
+            : "={rax}"(pid)
+            : "{rax}"(syscall::SYS_CLONE), "{rdi}"(flags), "{rsi}"(stack)
+            : "memory", "rbx", "rcx", "rdx", "rsi", "rdi", "r8",
+              "r9", "r10", "r11", "r12", "r13", "r14", "r15"
+            : "intel", "volatile"
+        );
+        e(syscall::Error::demux(pid)) as pid_t
     }
 
     fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {

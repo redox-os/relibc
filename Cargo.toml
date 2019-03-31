@@ -37,7 +37,7 @@ optional = true
 sc = "0.2.2"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-redox_syscall = "0.1"
+redox_syscall = "0.1.52"
 spin = "0.4.10"
 
 [features]
