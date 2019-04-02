@@ -241,7 +241,7 @@ impl PalSocket for Sys {
             SOCK_STREAM => e(syscall::open("tcp:", flags)) as c_int,
             SOCK_DGRAM => e(syscall::open("udp:", flags)) as c_int,
             _ => {
-                errno = syscall::EPROTOTYPE;
+                errno = syscall::EPROTONOSUPPORT;
                 -1
             }
         }
