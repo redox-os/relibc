@@ -708,11 +708,10 @@ pub unsafe extern "C" fn getaddrinfo(
 
         for in_addr in lookuphost {
             ai_family = AF_INET;
-            ai_socktype = AF_UNSPEC;
             ai_protocol = 0;
 
             let ai_addr = Box::into_raw(Box::new(sockaddr_in {
-                sin_family: AF_INET as sa_family_t,
+                sin_family: ai_family as sa_family_t,
                 sin_port: htons(port),
                 sin_addr: in_addr,
                 sin_zero: [0; 8]
