@@ -889,7 +889,7 @@ impl Pal for Sys {
     }
 
     fn rename(oldpath: &CStr, newpath: &CStr) -> c_int {
-        match File::open(oldpath, fcntl::O_WRONLY | fcntl::O_CLOEXEC) {
+        match File::open(oldpath, fcntl::O_PATH | fcntl::O_CLOEXEC) {
             Ok(file) => e(syscall::frename(*file as usize, newpath.to_bytes())) as c_int,
             Err(_) => -1,
         }
