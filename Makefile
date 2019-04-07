@@ -29,7 +29,7 @@ SRC=\
 	src/*/*/* \
 	src/*/*/*/*
 
-.PHONY: all clean fmt include install libc libm test
+.PHONY: all clean fmt headers install install-headers libc libm test
 
 all: | libc libm libpthread
 
@@ -44,13 +44,17 @@ check:
 fmt:
 	./fmt.sh
 
-install: all
+headers: $(BUILD)/include
+
+install-headers: headers
 	mkdir -pv "$(DESTDIR)/include"
 	cp -rv "include"/* "$(DESTDIR)/include"
 	cp -rv "$(BUILD)/include"/* "$(DESTDIR)/include"
 	cp -v "openlibm/include"/*.h "$(DESTDIR)/include"
 	cp -v "openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "pthreads-emb/"*.h "$(DESTDIR)/include"
+
+install-libs: all
 	mkdir -pv "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/libc.a" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crt0.o" "$(DESTDIR)/lib"
@@ -58,6 +62,8 @@ install: all
 	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 	cp -v "$(BUILD)/pthreads-emb/libpthread.a" "$(DESTDIR)/lib/libpthread.a"
+
+install: install-headers install-libs
 
 libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o $(BUILD)/release/crti.o $(BUILD)/release/crtn.o $(BUILD)/include
 

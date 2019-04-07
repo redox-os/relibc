@@ -17,4 +17,6 @@ pub const O_EXCL: c_int = 0x0800_0000;
 pub const O_DIRECTORY: c_int = 0x1000_0000;
 pub const O_PATH: c_int = 0x2000_0000;
 pub const O_SYMLINK: c_int = 0x4000_0000;
-pub const O_NOFOLLOW: c_int = 0x8000_0000;
+// Negative to allow it to be used as int
+// TODO: Fix negative values missing from includes
+pub const O_NOFOLLOW: c_int = -0x8000_0000;
