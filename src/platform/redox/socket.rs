@@ -83,6 +83,8 @@ unsafe fn inner_get_name(
 
     trace!("path: {}", ::core::str::from_utf8_unchecked(&part));
 
+    (*address).sa_family = AF_INET;
+
     let data = slice::from_raw_parts_mut(
         &mut (*address).sa_data as *mut _ as *mut u8,
         (*address).sa_data.len(),
