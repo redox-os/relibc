@@ -89,7 +89,7 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libp
 	ar -M < "$@.mri"
 
 $(BUILD)/release/libc.so: $(BUILD)/release/librelibc.patched.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
-	$(CC) -shared -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
+	$(CC) -nostdlib -shared -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
 
 $(BUILD)/debug/librelibc.a: $(SRC)
 	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
