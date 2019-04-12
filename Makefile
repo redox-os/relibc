@@ -140,6 +140,9 @@ $(BUILD)/openlibm: openlibm
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/include
 	$(MAKE) CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libopenlibm.a
 
+$(BUILD)/openlibm/libopenlibm.so: $(BUILD)/openlibm $(BUILD)/include
+	$(MAKE) CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libopenlibm.so.2.5
+
 $(BUILD)/pthreads-emb: pthreads-emb
 	rm -rf $@ $@.partial
 	mkdir -p $(BUILD)
@@ -149,3 +152,6 @@ $(BUILD)/pthreads-emb: pthreads-emb
 
 $(BUILD)/pthreads-emb/libpthread.a: $(BUILD)/pthreads-emb $(BUILD)/include
 	$(MAKE) CC=$(CC) CFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libpthread.a
+
+$(BUILD)/pthreads-emb/libpthread.so: $(BUILD)/pthreads-emb $(BUILD)/include
+	$(MAKE) CC=$(CC) CFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libpthread.so
