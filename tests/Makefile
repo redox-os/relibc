@@ -170,9 +170,8 @@ HEADLIBS=\
 	../sysroot/lib/crti.o
 
 TAILLIBS=\
-	../sysroot/lib/crtn.o \
 	../sysroot/lib/libc.a \
-	../sysroot/lib/libm.a
+	../sysroot/lib/crtn.o
 
 ../sysroot:
 	make -C .. sysroot

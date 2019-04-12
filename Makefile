@@ -29,9 +29,9 @@ SRC=\
 	src/*/*/* \
 	src/*/*/*/*
 
-.PHONY: all clean fmt headers install install-headers libc libm test
+.PHONY: all clean fmt headers install install-headers libs test
 
-all: | libc libm libpthread
+all: | headers libs
 
 clean:
 	$(CARGO) clean
@@ -54,9 +54,12 @@ install-headers: headers
 	cp -v "openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "pthreads-emb/"*.h "$(DESTDIR)/include"
 
-install-libs: all
+libs: $(BUILD)/release/libc.a $(BUILD)/release/libc.so $(BUILD)/release/crt0.o $(BUILD)/release/crti.o $(BUILD)/release/crtn.o
+
+install-libs: libs
 	mkdir -pv "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/libc.a" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/release/libc.so" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crt0.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
@@ -64,12 +67,6 @@ install-libs: all
 	cp -v "$(BUILD)/pthreads-emb/libpthread.a" "$(DESTDIR)/lib/libpthread.a"
 
 install: install-headers install-libs
-
-libc: $(BUILD)/release/libc.a $(BUILD)/release/crt0.o $(BUILD)/release/crti.o $(BUILD)/release/crtn.o $(BUILD)/include
-
-libm: $(BUILD)/openlibm/libopenlibm.a
-
-libpthread: $(BUILD)/pthreads-emb/libpthread.a
 
 sysroot: all
 	rm -rf $@
@@ -91,8 +88,11 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libp
 	echo "end" >> "$@.mri"
 	ar -M < "$@.mri"
 
+$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.patched.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
+	$(CC) -shared -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
+
 $(BUILD)/debug/librelibc.a: $(SRC)
-	$(CARGO) rustc $(CARGOFLAGS) -- $(RUSTCFLAGS)
+	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
@@ -108,8 +108,13 @@ $(BUILD)/debug/crtn.o: $(SRC)
 	touch $@
 
 $(BUILD)/release/librelibc.a: $(SRC)
-	$(CARGO) rustc --release $(CARGOFLAGS) -- $(RUSTCFLAGS)
+	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
 	touch $@
+
+$(BUILD)/release/librelibc.patched.a: $(BUILD)/release/librelibc.a
+	# Patch out clzsi2.o from libgcc
+	cp $< $@
+	ar d $@ clzsi2.o
 
 $(BUILD)/release/crt0.o: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
@@ -140,9 +145,6 @@ $(BUILD)/openlibm: openlibm
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/include
 	$(MAKE) CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libopenlibm.a
 
-$(BUILD)/openlibm/libopenlibm.so: $(BUILD)/openlibm $(BUILD)/include
-	$(MAKE) CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libopenlibm.so.2.5
-
 $(BUILD)/pthreads-emb: pthreads-emb
 	rm -rf $@ $@.partial
 	mkdir -p $(BUILD)
@@ -152,6 +154,3 @@ $(BUILD)/pthreads-emb: pthreads-emb
 
 $(BUILD)/pthreads-emb/libpthread.a: $(BUILD)/pthreads-emb $(BUILD)/include
 	$(MAKE) CC=$(CC) CFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libpthread.a
-
-$(BUILD)/pthreads-emb/libpthread.so: $(BUILD)/pthreads-emb $(BUILD)/include
-	$(MAKE) CC=$(CC) CFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libpthread.so

@@ -22,12 +22,6 @@ posix-regex = { path = "posix-regex", features = ["no_std"] }
 rand = { version = "0.5.5", default-features = false }
 va_list = { path = "va_list", features = ["no_std"] }
 
-[dependencies.compiler_builtins]
-git = "https://github.com/rust-lang-nursery/compiler-builtins.git"
-rev = "fe74674f6e4be76d47b66f67d529ebf4186f4eb1"
-default-features = false
-features = ["no-lang-items", "mangled-names"]
-
 [dependencies.ralloc]
 path = "ralloc"
 default-features = false
