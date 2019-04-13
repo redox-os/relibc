@@ -79,7 +79,9 @@ sysroot: all
 test: sysroot
 	$(MAKE) -C tests run
 
-$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
+# Debug targets
+
+$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -88,12 +90,17 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libp
 	echo "end" >> "$@.mri"
 	ar -M < "$@.mri"
 
-$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.patched.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.patched.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
 	$(CC) -nostdlib -shared -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
 
 $(BUILD)/debug/librelibc.a: $(SRC)
 	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
 	touch $@
+
+$(BUILD)/debug/librelibc.patched.a: $(BUILD)/debug/librelibc.a
+	# Patch out clzsi2.o from libgcc
+	cp $< $@
+	ar d $@ clzsi2.o
 
 $(BUILD)/debug/crt0.o: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
@@ -106,6 +113,27 @@ $(BUILD)/debug/crti.o: $(SRC)
 $(BUILD)/debug/crtn.o: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/crtn/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
+
+$(BUILD)/debug/ld_so.o: $(SRC)
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+	touch $@
+
+$(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debug/libc.a $(BUILD)/debug/crtn.o
+	$(LD) $^ -o $@
+
+# Release targets
+
+$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
+	echo "create $@" > "$@.mri"
+	for lib in $^; do\
+		echo "addlib $$lib" >> "$@.mri"; \
+	done
+	echo "save" >> "$@.mri"
+	echo "end" >> "$@.mri"
+	ar -M < "$@.mri"
+
+$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.patched.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
+	$(CC) -nostdlib -shared -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
 
 $(BUILD)/release/librelibc.a: $(SRC)
 	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
@@ -127,6 +155,15 @@ $(BUILD)/release/crti.o: $(SRC)
 $(BUILD)/release/crtn.o: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/crtn/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
+
+$(BUILD)/release/ld_so.o: $(SRC)
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+	touch $@
+
+$(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD)/release/libc.a $(BUILD)/release/crtn.o
+	$(LD) $^ -o $@
+
+# Other targets
 
 $(BUILD)/include: $(SRC)
 	rm -rf $@ $@.partial

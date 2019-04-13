@@ -679,8 +679,6 @@ pub extern "C" fn vfork() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn write(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
-    use core::slice;
-
     let buf = unsafe { slice::from_raw_parts(buf as *const u8, nbyte as usize) };
     Sys::write(fildes, buf)
 }

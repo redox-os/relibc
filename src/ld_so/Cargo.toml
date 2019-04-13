@@ -1,0 +1,8 @@
+[package]
+name = "ld_so"
+version = "0.1.0"
+authors = ["Jeremy Soller <jackpot51@gmail.com>"]
+
+[lib]
+name = "ld_so"
+crate-type = ["staticlib"]

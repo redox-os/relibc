@@ -26,6 +26,7 @@
 extern crate alloc;
 extern crate cbitset;
 extern crate core_io;
+extern crate goblin;
 #[macro_use]
 extern crate lazy_static;
 extern crate posix_regex;
@@ -50,6 +51,7 @@ pub mod db;
 pub mod fs;
 pub mod header;
 pub mod io;
+pub mod ld_so;
 pub mod mutex;
 pub mod platform;
 pub mod start;
