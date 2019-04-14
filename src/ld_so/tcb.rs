@@ -172,11 +172,11 @@ impl Tcb {
     #[cfg(target_os = "redox")]
     unsafe fn os_new(size: usize) -> Result<(&'static mut [u8], &'static mut [u8])> {
         let tls = Self::map(size)?;
-        Ok(
+        Ok((
             tls,
             //TODO: Consider allocating TCB as part of TLS
             slice::from_raw_parts_mut(0xB000_0000 as *mut u8, PAGE_SIZE)
-        )
+        ))
     }
 
     /// Architecture specific code to read a usize from the TCB - x86_64
