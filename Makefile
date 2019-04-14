@@ -54,7 +54,7 @@ install-headers: headers
 	cp -v "openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "pthreads-emb/"*.h "$(DESTDIR)/include"
 
-libs: $(BUILD)/release/libc.a $(BUILD)/release/libc.so $(BUILD)/release/crt0.o $(BUILD)/release/crti.o $(BUILD)/release/crtn.o
+libs: $(BUILD)/release/libc.a $(BUILD)/release/libc.so $(BUILD)/release/crt0.o $(BUILD)/release/crti.o $(BUILD)/release/crtn.o $(BUILD)/release/ld_so
 
 install-libs: libs
 	mkdir -pv "$(DESTDIR)/lib"
@@ -63,6 +63,7 @@ install-libs: libs
 	cp -v "$(BUILD)/release/crt0.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/release/ld_so" "$(DESTDIR)/lib/ld64.so.1"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 	cp -v "$(BUILD)/pthreads-emb/libpthread.a" "$(DESTDIR)/lib/libpthread.a"
 
