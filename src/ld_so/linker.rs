@@ -316,6 +316,12 @@ impl Linker {
                         mmap_data.copy_from_slice(obj_data);
                     },
                     program_header::PT_TLS => {
+                        let valign = if ph.p_align > 0 {
+                            ((ph.p_memsz + (ph.p_align - 1))/ph.p_align) * ph.p_align
+                        } else {
+                            ph.p_memsz
+                        } as usize;
+
                         let obj_data = {
                             let range = ph.file_range();
                             match object.get(range.clone()) {
@@ -328,11 +334,12 @@ impl Linker {
 
                         let tls_data = {
                             let (index, start) = if *elf_name == primary {
-                                (0, tls.len() - tls_primary)
+                                (0, tls.len() - valign)
                             } else {
-                                tls_offset += obj_data.len();
+                                let start = tls.len() - (tls_offset + valign);
+                                tls_offset += vsize;
                                 tls_index += 1;
-                                (tls_index, tls.len() - tls_offset)
+                                (tls_index, start)
                             };
                             let range = start..start + obj_data.len();
                             match tls.get_mut(range.clone()) {
