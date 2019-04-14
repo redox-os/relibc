@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use core::{ptr, slice};
+use core::{mem, ptr, slice};
 use goblin::elf::{Elf, program_header, reloc, sym};
 use goblin::error::{Error, Result};
 
@@ -19,6 +19,61 @@ const PATH_SEP: char = ';';
 
 #[cfg(target_os = "linux")]
 const PATH_SEP: char = ':';
+
+// On Linux, a new TCB is required
+#[cfg(target_os = "linux")]
+unsafe fn allocate_tls(size: usize) -> Result<&'static mut [u8]> {
+    let ptr = sys_mman::mmap(
+        ptr::null_mut(),
+        size + PAGE_SIZE /* TLS and TCB */,
+        sys_mman::PROT_READ | sys_mman::PROT_WRITE,
+        sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
+        -1,
+        0
+    );
+    if ptr as usize == !0 /* MAP_FAILED */ {
+        return Err(Error::Malformed(
+            format!("failed to map tls")
+        ));
+    }
+
+    let mut tls = slice::from_raw_parts_mut(ptr as *mut u8, size);
+    let mut tcb = slice::from_raw_parts_mut((ptr as *mut u8).add(size), PAGE_SIZE);
+    *(tcb.as_mut_ptr() as *mut *mut u8) = tcb.as_mut_ptr();
+
+    #[cfg(target_arch = "x86_64")]
+    {
+        const ARCH_SET_FS: usize = 0x1002;
+        syscall!(ARCH_PRCTL, ARCH_SET_FS, tcb.as_mut_ptr());
+    }
+
+    Ok(tls)
+}
+
+// On Redox, reuse the current TCB
+// TODO: Consider adopting Linux behavior
+#[cfg(target_os = "redox")]
+unsafe fn allocate_tls(size: usize) -> Result<&'static [u8]> {
+    let ptr = sys_mman::mmap(
+        ptr::null_mut(),
+        size,
+        sys_mman::PROT_READ | sys_mman::PROT_WRITE,
+        sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
+        -1,
+        0
+    );
+    if ptr as usize == !0 /* MAP_FAILED */ {
+        return Err(Error::Malformed(
+            format!("failed to map tls")
+        ));
+    }
+
+    let mut tls = slice::from_raw_parts_mut(ptr as *mut u8, size);
+    let mut tcb = slice::from_raw_parts_mut(0xB000_0000 as *mut u8, PAGE_SIZE);
+    *(tcb.as_mut_ptr() as *mut *mut u8) = tcb.as_mut_ptr();
+
+    Ok(tls)
+}
 
 pub struct Linker {
     library_path: String,
@@ -119,10 +174,12 @@ impl Linker {
         };
 
         // Load all ELF files into memory and find all globals
+        let mut tls_primary = 0;
+        let mut tls_size = 0;
         let mut mmaps = BTreeMap::new();
         let mut globals = BTreeMap::new();
         for (elf_name, elf) in elfs.iter() {
-            println!("load {}", elf_name);
+            println!("map {}", elf_name);
 
             let object = match self.objects.get(*elf_name) {
                 Some(some) => some,
@@ -133,12 +190,12 @@ impl Linker {
             let bounds = {
                 let mut bounds_opt: Option<(usize, usize)> = None;
                 for ph in elf.program_headers.iter() {
+                    let voff = ph.p_vaddr as usize % PAGE_SIZE;
+                    let vaddr = ph.p_vaddr as usize - voff;
+                    let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
+
                     match ph.p_type {
                         program_header::PT_LOAD => {
-                            let voff = ph.p_vaddr as usize % PAGE_SIZE;
-                            let vaddr = ph.p_vaddr as usize - voff;
-                            let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
-
                             println!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
 
                             if let Some(ref mut bounds) = bounds_opt {
@@ -150,6 +207,13 @@ impl Linker {
                                 }
                             } else {
                                 bounds_opt = Some((vaddr, vaddr + vsize));
+                            }
+                        },
+                        program_header::PT_TLS => {
+                            println!("  load tls {:#x}: {:x?}", vsize, ph);
+                            tls_size += vsize;
+                            if *elf_name == primary {
+                                tls_primary += vsize;
                             }
                         },
                         _ => ()
@@ -189,21 +253,44 @@ impl Linker {
                     if let Some(name_res) = elf.dynstrtab.get(sym.st_name) {
                         let name = name_res?;
                         let value = mmap.as_ptr() as usize + sym.st_value as usize;
-                        println!("  global {}: {:x?} = {:#x}", name, sym, value);
+                        //println!("  global {}: {:x?} = {:#x}", name, sym, value);
                         globals.insert(name, value);
                     }
                 }
             }
 
+            mmaps.insert(elf_name, mmap);
+        }
+
+        // Allocate TLS
+        let mut tls = unsafe { allocate_tls(tls_size)? };
+        println!("tls {:p}, {:#x}", tls.as_mut_ptr(), tls.len());
+
+        // Copy data
+        let mut tls_offset = tls_primary;
+        let mut tls_index = 0;
+        let mut tls_ranges = BTreeMap::new();
+        for (elf_name, elf) in elfs.iter() {
+            let object = match self.objects.get(*elf_name) {
+                Some(some) => some,
+                None => continue,
+            };
+
+            let mmap = match mmaps.get_mut(elf_name) {
+                Some(some) => some,
+                None => continue
+            };
+
+            println!("load {}", elf_name);
+
             // Copy data
             for ph in elf.program_headers.iter() {
+                let voff = ph.p_vaddr as usize % PAGE_SIZE;
+                let vaddr = ph.p_vaddr as usize - voff;
+                let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
+
                 match ph.p_type {
                     program_header::PT_LOAD => {
-                        let voff = ph.p_vaddr as usize % PAGE_SIZE;
-                        let vaddr = ph.p_vaddr as usize - voff;
-                        let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
-
-                        // Copy data
                         let obj_data = {
                             let range = ph.file_range();
                             match object.get(range.clone()) {
@@ -228,15 +315,47 @@ impl Linker {
 
                         mmap_data.copy_from_slice(obj_data);
                     },
+                    program_header::PT_TLS => {
+                        let obj_data = {
+                            let range = ph.file_range();
+                            match object.get(range.clone()) {
+                                Some(some) => some,
+                                None => return Err(Error::Malformed(
+                                    format!("failed to read {:?}", range)
+                                )),
+                            }
+                        };
+
+                        let tls_data = {
+                            let (index, start) = if *elf_name == primary {
+                                (0, tls.len() - tls_primary)
+                            } else {
+                                tls_offset += obj_data.len();
+                                tls_index += 1;
+                                (tls_index, tls.len() - tls_offset)
+                            };
+                            let range = start..start + obj_data.len();
+                            match tls.get_mut(range.clone()) {
+                                Some(some) => {
+                                    tls_ranges.insert(elf_name, (index, range));
+                                    some
+                                },
+                                None => return Err(Error::Malformed(
+                                    format!("failed to write tls {:?}", range)
+                                )),
+                            }
+                        };
+
+                        println!("  copy tls {:#x}, {:#x}: {:#x}, {:#x}", vaddr, vsize, voff, obj_data.len());
+
+                        tls_data.copy_from_slice(obj_data);
+                    },
                     _ => ()
                 }
             }
-
-            mmaps.insert(elf_name, mmap);
         }
 
-        // Perform relocations and protect pages
-        let mut entry_opt = None;
+        // Perform relocations, and protect pages
         for (elf_name, elf) in elfs.iter() {
             let mmap = match mmaps.get_mut(elf_name) {
                 Some(some) => some,
@@ -245,20 +364,16 @@ impl Linker {
 
             println!("link {}", elf_name);
 
-            if *elf_name == primary {
-                entry_opt = Some(mmap.as_mut_ptr() as usize + elf.header.e_entry as usize);
-            }
-
             // Relocate
             for rel in elf.dynrelas.iter().chain(elf.dynrels.iter()).chain(elf.pltrelocs.iter()) {
-                println!("  rel {}: {:x?}",
-                    reloc::r_to_str(rel.r_type, elf.header.e_machine),
-                    rel
-                );
+                // println!("  rel {}: {:x?}",
+                //     reloc::r_to_str(rel.r_type, elf.header.e_machine),
+                //     rel
+                // );
 
                 let a = rel.r_addend.unwrap_or(0) as usize;
 
-                let b = mmap.as_ptr() as usize;
+                let b = mmap.as_mut_ptr() as usize;
 
                 let s = if rel.r_sym > 0 {
                     let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(
@@ -270,12 +385,18 @@ impl Linker {
                     ))??;
 
                     if let Some(value) = globals.get(name) {
-                        println!("    sym {}: {:x?} = {:#x}", name, sym, value);
+                        // println!("    sym {}: {:x?} = {:#x}", name, sym, value);
                         *value
                     } else {
-                        println!("    sym {}: {:x?} = undefined", name, sym);
+                        // println!("    sym {}: {:x?} = undefined", name, sym);
                         0
                     }
+                } else {
+                    0
+                };
+
+                let t = if let Some((tls_index, tls_range)) = tls_ranges.get(elf_name) {
+                    tls_range.start
                 } else {
                     0
                 };
@@ -285,7 +406,7 @@ impl Linker {
                 };
 
                 let set_u64 = |value| {
-                    println!("    set_u64 {:#x}", value);
+                    //println!("    set_u64 {:#x}", value);
                     unsafe { *(ptr as *mut u64) = value; }
                 };
 
@@ -299,9 +420,100 @@ impl Linker {
                     reloc::R_X86_64_RELATIVE => {
                         set_u64((b + a) as u64);
                     },
+                    reloc::R_X86_64_TPOFF64 => {
+                        set_u64((s + a).wrapping_sub(t) as u64);
+                    },
+                    reloc::R_X86_64_IRELATIVE => (), // Handled below
                     _ => {
-                        println!("    unsupported");
+                        println!("    {} unsupported", reloc::r_to_str(rel.r_type, elf.header.e_machine));
                     }
+                }
+            }
+
+            // Protect pages
+            for ph in elf.program_headers.iter() {
+                match ph.p_type {
+                    program_header::PT_LOAD => {
+                        let voff = ph.p_vaddr as usize % PAGE_SIZE;
+                        let vaddr = ph.p_vaddr as usize - voff;
+                        let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
+
+                        let mut prot = 0;
+
+                        if ph.p_flags & program_header::PF_R == program_header::PF_R {
+                            prot |= sys_mman::PROT_READ;
+                        }
+
+                        // W ^ X. If it is executable, do not allow it to be writable, even if requested
+                        if ph.p_flags & program_header::PF_X == program_header::PF_X {
+                            prot |= sys_mman::PROT_EXEC;
+                        } else if ph.p_flags & program_header::PF_W == program_header::PF_W {
+                            prot |= sys_mman::PROT_WRITE;
+                        }
+
+                        let res = unsafe {
+                            let ptr = mmap.as_mut_ptr().add(vaddr);
+                            println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
+
+                            sys_mman::mprotect(
+                                ptr as *mut c_void,
+                                vsize,
+                                prot
+                            )
+                        };
+
+                        if res < 0 {
+                            return Err(Error::Malformed(
+                                format!("failed to mprotect {}", elf_name)
+                            ));
+                        }
+                    },
+                    _ => ()
+                }
+            }
+        }
+
+        // Perform indirect relocations (necessary evil), gather entry point
+        let mut entry_opt = None;
+        for (elf_name, elf) in elfs.iter() {
+            let mmap = match mmaps.get_mut(elf_name) {
+                Some(some) => some,
+                None => continue
+            };
+
+            println!("entry {}", elf_name);
+
+            let is_primary = *elf_name == primary;
+            if is_primary {
+                entry_opt = Some(mmap.as_mut_ptr() as usize + elf.header.e_entry as usize);
+            }
+
+            // Relocate
+            for rel in elf.dynrelas.iter().chain(elf.dynrels.iter()).chain(elf.pltrelocs.iter()) {
+                // println!("  rel {}: {:x?}",
+                //     reloc::r_to_str(rel.r_type, elf.header.e_machine),
+                //     rel
+                // );
+
+                let a = rel.r_addend.unwrap_or(0) as usize;
+
+                let b = mmap.as_mut_ptr() as usize;
+
+                let ptr = unsafe {
+                    mmap.as_mut_ptr().add(rel.r_offset as usize)
+                };
+
+                let set_u64 = |value| {
+                    // println!("    set_u64 {:#x}", value);
+                    unsafe { *(ptr as *mut u64) = value; }
+                };
+
+                match rel.r_type {
+                    reloc::R_X86_64_IRELATIVE => unsafe {
+                        let f: unsafe extern "C" fn () -> u64 = mem::transmute(b + a);
+                        set_u64(f());
+                    },
+                    _ => ()
                 }
             }
 
