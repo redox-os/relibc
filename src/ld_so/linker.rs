@@ -53,7 +53,7 @@ unsafe fn allocate_tls(size: usize) -> Result<&'static mut [u8]> {
 // On Redox, reuse the current TCB
 // TODO: Consider adopting Linux behavior
 #[cfg(target_os = "redox")]
-unsafe fn allocate_tls(size: usize) -> Result<&'static [u8]> {
+unsafe fn allocate_tls(size: usize) -> Result<&'static mut [u8]> {
     let ptr = sys_mman::mmap(
         ptr::null_mut(),
         size,
