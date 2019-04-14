@@ -39,7 +39,7 @@ unsafe fn allocate_tls(size: usize) -> Result<&'static mut [u8]> {
 
     let mut tls = slice::from_raw_parts_mut(ptr as *mut u8, size);
     let mut tcb = slice::from_raw_parts_mut((ptr as *mut u8).add(size), PAGE_SIZE);
-    *(tcb.as_mut_ptr() as *mut *mut u8) = tcb.as_mut_ptr();
+    *(tcb.as_mut_ptr() as *mut *mut u8) = tls.as_mut_ptr().add(size);
 
     #[cfg(target_arch = "x86_64")]
     {
@@ -70,7 +70,7 @@ unsafe fn allocate_tls(size: usize) -> Result<&'static mut [u8]> {
 
     let mut tls = slice::from_raw_parts_mut(ptr as *mut u8, size);
     let mut tcb = slice::from_raw_parts_mut(0xB000_0000 as *mut u8, PAGE_SIZE);
-    *(tcb.as_mut_ptr() as *mut *mut u8) = tcb.as_mut_ptr();
+    *(tcb.as_mut_ptr() as *mut *mut u8) = tls.as_mut_ptr().add(size);
 
     Ok(tls)
 }
