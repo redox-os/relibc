@@ -20,19 +20,77 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
         loop {}
     }
 
+    // Some variables that will be overridden by environment and auxiliary vectors
+    let mut library_path = "/lib";
+    let mut page_size = 4096;
+
     // Pop the first argument (path to ld_so), and get the path of the program
-    // TODO: Also retrieve LD_LIBRARY_PATH this way
     let path_c = unsafe {
-        let mut argv = &mut sp.argv0 as *mut *const c_char;
+        let mut argv = &mut sp.argv0 as *mut *const c_char as *mut usize;
+
+        // Move arguments
         loop {
             let next_argv = argv.add(1);
             let arg = *next_argv;
             *argv = arg;
             argv = next_argv;
-            if arg.is_null() {
+            if arg == 0 {
                 break;
             }
+
+            if let Ok(arg_str) = CStr::from_ptr(arg as *const c_char).to_str() {
+                println!("  arg: '{}'", arg_str);
+            }
         }
+
+        // Move environment
+        loop {
+            let next_argv = argv.add(1);
+            let arg = *next_argv;
+            *argv = arg;
+            argv = next_argv;
+            if arg == 0 {
+                break;
+            }
+
+            if let Ok(arg_str) = CStr::from_ptr(arg as *const c_char).to_str() {
+                println!("  env: '{}'", arg_str);
+
+                let mut parts = arg_str.splitn(2, '=');
+                if let Some(key) = parts.next() {
+                    if let Some(value) = parts.next() {
+                        match key {
+                            "LD_LIBRARY_PATH" => library_path = value,
+                            _ => ()
+                        }
+                    }
+                }
+            }
+        }
+
+        // Move auxiliary vectors
+        loop {
+            let next_argv = argv.add(1);
+            let kind = *next_argv;
+            *argv = kind;
+            argv = next_argv;
+
+            let next_argv = argv.add(1);
+            let value = *next_argv;
+            *argv = value;
+            argv = next_argv;
+
+            if kind == 0 {
+                break;
+            }
+
+            println!("  aux: {}={:#x}", kind, value);
+            match kind {
+                6 => page_size = value,
+                _ => (),
+            }
+        }
+
         sp.argc -= 1;
 
         CStr::from_ptr(sp.argv0)
@@ -47,7 +105,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
         }
     };
 
-    let mut linker = Linker::new("/usr/local/lib:/lib/x86_64-linux-gnu");
+    let mut linker = Linker::new(library_path);
     match linker.load(&path, &path) {
         Ok(()) => (),
         Err(err) => {
@@ -58,7 +116,11 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
     }
 
     match linker.link(&path) {
-        Ok(entry) => entry,
+        Ok(entry) => {
+            eprintln!("ld.so: entry '{}': {:#x}", path, entry);
+            //unistd::_exit(0);
+            entry
+        },
         Err(err) => {
             eprintln!("ld.so: failed to link '{}': {}", path, err);
             unistd::_exit(1);
