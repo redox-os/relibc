@@ -94,7 +94,7 @@ $(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.patched.a $(BUILD)/pthreads-emb
 	$(CC) -nostdlib -shared -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
 
 $(BUILD)/debug/librelibc.a: $(SRC)
-	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
+	CARGO_INCREMENTAL=0 $(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/debug/librelibc.patched.a: $(BUILD)/debug/librelibc.a
@@ -119,7 +119,7 @@ $(BUILD)/debug/ld_so.o: $(SRC)
 	touch $@
 
 $(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debug/libc.a $(BUILD)/debug/crtn.o
-	$(LD) $^ -o $@
+	$(LD) --gc-sections $^ -o $@
 
 # Release targets
 
@@ -136,7 +136,7 @@ $(BUILD)/release/libc.so: $(BUILD)/release/librelibc.patched.a $(BUILD)/pthreads
 	$(CC) -nostdlib -shared -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
 
 $(BUILD)/release/librelibc.a: $(SRC)
-	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/librelibc.patched.a: $(BUILD)/release/librelibc.a
@@ -161,7 +161,7 @@ $(BUILD)/release/ld_so.o: $(SRC)
 	touch $@
 
 $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD)/release/libc.a $(BUILD)/release/crtn.o
-	$(LD) $^ -o $@
+	$(LD) --gc-sections $^ -o $@
 
 # Other targets
 
