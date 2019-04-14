@@ -29,6 +29,8 @@ extern crate core_io;
 extern crate goblin;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate memoffset;
 extern crate posix_regex;
 extern crate rand;
 extern crate va_list;

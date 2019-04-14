@@ -12,68 +12,14 @@ use header::{fcntl, sys_mman, unistd};
 use io::Read;
 use platform::types::c_void;
 
-const PAGE_SIZE: usize = 4096;
+use super::PAGE_SIZE;
+use super::tcb::{Tcb, Master};
 
 #[cfg(target_os = "redox")]
 const PATH_SEP: char = ';';
 
 #[cfg(target_os = "linux")]
 const PATH_SEP: char = ':';
-
-// On Linux, a new TCB is required
-#[cfg(target_os = "linux")]
-unsafe fn allocate_tls(size: usize) -> Result<&'static mut [u8]> {
-    let ptr = sys_mman::mmap(
-        ptr::null_mut(),
-        size + PAGE_SIZE /* TLS and TCB */,
-        sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-        sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
-        -1,
-        0
-    );
-    if ptr as usize == !0 /* MAP_FAILED */ {
-        return Err(Error::Malformed(
-            format!("failed to map tls")
-        ));
-    }
-
-    let mut tls = slice::from_raw_parts_mut(ptr as *mut u8, size);
-    let mut tcb = slice::from_raw_parts_mut((ptr as *mut u8).add(size), PAGE_SIZE);
-    *(tcb.as_mut_ptr() as *mut *mut u8) = tls.as_mut_ptr().add(size);
-
-    #[cfg(target_arch = "x86_64")]
-    {
-        const ARCH_SET_FS: usize = 0x1002;
-        syscall!(ARCH_PRCTL, ARCH_SET_FS, tcb.as_mut_ptr());
-    }
-
-    Ok(tls)
-}
-
-// On Redox, reuse the current TCB
-// TODO: Consider adopting Linux behavior
-#[cfg(target_os = "redox")]
-unsafe fn allocate_tls(size: usize) -> Result<&'static mut [u8]> {
-    let ptr = sys_mman::mmap(
-        ptr::null_mut(),
-        size,
-        sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-        sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
-        -1,
-        0
-    );
-    if ptr as usize == !0 /* MAP_FAILED */ {
-        return Err(Error::Malformed(
-            format!("failed to map tls")
-        ));
-    }
-
-    let mut tls = slice::from_raw_parts_mut(ptr as *mut u8, size);
-    let mut tcb = slice::from_raw_parts_mut(0xB000_0000 as *mut u8, PAGE_SIZE);
-    *(tcb.as_mut_ptr() as *mut *mut u8) = tls.as_mut_ptr().add(size);
-
-    Ok(tls)
-}
 
 pub struct Linker {
     library_path: String,
@@ -263,11 +209,12 @@ impl Linker {
         }
 
         // Allocate TLS
-        let mut tls = unsafe { allocate_tls(tls_size)? };
-        println!("tls {:p}, {:#x}", tls.as_mut_ptr(), tls.len());
+        let mut tcb = unsafe { Tcb::new(tls_size)? };
+        println!("tcb {:x?}", tcb);
 
         // Copy data
         let mut tls_offset = tls_primary;
+        let mut tcb_masters = Vec::new();
         let mut tls_index = 0;
         let mut tls_ranges = BTreeMap::new();
         for (elf_name, elf) in elfs.iter() {
@@ -322,44 +269,40 @@ impl Linker {
                             ph.p_memsz
                         } as usize;
 
-                        let obj_data = {
-                            let range = ph.file_range();
-                            match object.get(range.clone()) {
-                                Some(some) => some,
-                                None => return Err(Error::Malformed(
-                                    format!("failed to read {:?}", range)
-                                )),
-                            }
+                        let mut tcb_master = Master {
+                            ptr: unsafe { mmap.as_ptr().add(ph.p_vaddr as usize) },
+                            len: ph.p_filesz as usize,
+                            offset: tls_size - valign,
                         };
 
-                        let tls_data = {
-                            let (index, start) = if *elf_name == primary {
-                                (0, tls.len() - valign)
-                            } else {
-                                let start = tls.len() - (tls_offset + valign);
-                                tls_offset += vsize;
-                                tls_index += 1;
-                                (tls_index, start)
-                            };
-                            let range = start..start + obj_data.len();
-                            match tls.get_mut(range.clone()) {
-                                Some(some) => {
-                                    tls_ranges.insert(elf_name, (index, range));
-                                    some
-                                },
-                                None => return Err(Error::Malformed(
-                                    format!("failed to write tls {:?}", range)
-                                )),
-                            }
-                        };
+                        println!(
+                            "  tls master {:p}, {:#x}: {:#x}, {:#x}",
+                            tcb_master.ptr,
+                            tcb_master.len,
+                            tcb_master.offset,
+                            valign,
+                        );
 
-                        println!("  copy tls {:#x}, {:#x}: {:#x}, {:#x}", vaddr, vsize, voff, obj_data.len());
-
-                        tls_data.copy_from_slice(obj_data);
+                        if *elf_name == primary {
+                            tls_ranges.insert(elf_name, (0, tcb_master.range()));
+                            tcb_masters.insert(0, tcb_master);
+                        } else {
+                            tcb_master.offset -= tls_offset;
+                            tls_offset += vsize;
+                            tls_index += 1;
+                            tls_ranges.insert(elf_name, (tls_index, tcb_master.range()));
+                            tcb_masters.push(tcb_master);
+                        }
                     },
                     _ => ()
                 }
             }
+        }
+
+        // Set master images for TLS and copy TLS data
+        unsafe {
+            tcb.set_masters(tcb_masters.into_boxed_slice());
+            tcb.copy_masters()?;
         }
 
         // Perform relocations, and protect pages
@@ -402,10 +345,10 @@ impl Linker {
                     0
                 };
 
-                let t = if let Some((tls_index, tls_range)) = tls_ranges.get(elf_name) {
-                    tls_range.start
+                let (tm, t) = if let Some((tls_index, tls_range)) = tls_ranges.get(elf_name) {
+                    (*tls_index, tls_range.start)
                 } else {
-                    0
+                    (0, 0)
                 };
 
                 let ptr = unsafe {
@@ -480,6 +423,11 @@ impl Linker {
             }
         }
 
+        // Activate TLS
+        unsafe {
+            tcb.activate();
+        }
+
         // Perform indirect relocations (necessary evil), gather entry point
         let mut entry_opt = None;
         for (elf_name, elf) in elfs.iter() {
@@ -490,8 +438,7 @@ impl Linker {
 
             println!("entry {}", elf_name);
 
-            let is_primary = *elf_name == primary;
-            if is_primary {
+            if *elf_name == primary {
                 entry_opt = Some(mmap.as_mut_ptr() as usize + elf.header.e_entry as usize);
             }
 
