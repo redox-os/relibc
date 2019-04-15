@@ -199,7 +199,7 @@ impl Linker {
                     if let Some(name_res) = elf.dynstrtab.get(sym.st_name) {
                         let name = name_res?;
                         let value = mmap.as_ptr() as usize + sym.st_value as usize;
-                        //println!("  global {}: {:x?} = {:#x}", name, sym, value);
+                        // println!("  global {}: {:x?} = {:#x}", name, sym, value);
                         globals.insert(name, value);
                     }
                 }
@@ -356,7 +356,7 @@ impl Linker {
                 };
 
                 let set_u64 = |value| {
-                    //println!("    set_u64 {:#x}", value);
+                    // println!("    set_u64 {:#x}", value);
                     unsafe { *(ptr as *mut u64) = value; }
                 };
 

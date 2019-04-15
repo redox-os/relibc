@@ -343,9 +343,16 @@ impl Pal for Sys {
             test rax, rax
             jnz .parent
 
-            # Call entry point
-            pop rdi
+            # Load registers
             pop rax
+            pop rdi
+            pop rsi
+            pop rdx
+            pop rcx
+            pop r8
+            pop r9
+
+            # Call entry point
             call rax
 
             # Exit

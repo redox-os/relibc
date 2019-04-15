@@ -1,5 +1,6 @@
 //! dl-tls implementation for Redox
 
+use ld_so::tcb::Tcb;
 use platform::types::*;
 
 #[repr(C)]

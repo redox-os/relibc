@@ -7,6 +7,7 @@ use core::{intrinsics, ptr};
 
 use header::sys_mman;
 use header::time::timespec;
+use ld_so::tcb::{Tcb, Master};
 use mutex::{FUTEX_WAIT, FUTEX_WAKE};
 use platform::types::{c_int, c_uint, c_void, pid_t, size_t};
 use platform::{Pal, Sys};
@@ -58,6 +59,27 @@ pub unsafe extern "C" fn pte_osInit() -> pte_osResult {
     PTE_OS_OK
 }
 
+/// A shim to wrap thread entry points in logic to set up TLS, for example
+unsafe extern "C" fn pte_osThreadShim(
+    entryPoint: pte_osThreadEntryPoint,
+    argv: *mut c_void,
+    mutex: pte_osMutexHandle,
+    tls_size: usize,
+    tls_masters_ptr: *mut Master,
+    tls_masters_len: usize
+) {
+    let mut tcb = Tcb::new(tls_size).unwrap();
+    tcb.masters_ptr = tls_masters_ptr;
+    tcb.masters_len = tls_masters_len;
+    tcb.copy_masters().unwrap();
+    tcb.activate();
+
+    // Wait until pte_osThreadStart
+    pte_osMutexLock(mutex);
+    entryPoint(argv);
+    pte_osThreadExit();
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadCreate(
     entryPoint: pte_osThreadEntryPoint,
@@ -66,6 +88,9 @@ pub unsafe extern "C" fn pte_osThreadCreate(
     argv: *mut c_void,
     ppte_osThreadHandle: *mut pte_osThreadHandle,
 ) -> pte_osResult {
+    // Create a locked mutex, unlocked by pte_osThreadStart
+    let mutex: pte_osMutexHandle = Box::into_raw(Box::new(2));
+
     let stack_size = if stackSize == 0 {
         1024 * 1024
     } else {
@@ -85,44 +110,49 @@ pub unsafe extern "C" fn pte_osThreadCreate(
     let stack_end = stack_base.add(stack_size);
     let mut stack = stack_end as *mut usize;
     {
-        stack = stack.offset(-1);
-        *stack = entryPoint as usize;
+        let mut push = |value: usize| {
+            stack = stack.offset(-1);
+            *stack = value;
+        };
 
-        stack = stack.offset(-1);
-        *stack = argv as usize;
-    }
-
-    // Create a locked mutex, unlocked by pte_osThreadStart
-    let mutex = Box::into_raw(Box::new(2));
-    {
-        let id = Sys::pte_clone(stack);
-        if id < 0 {
-            return PTE_OS_GENERAL_FAILURE;
-        }
-
-        if id == 0 {
-            // Wait until pte_osThreadStart
-            pte_osMutexLock(mutex);
-            entryPoint(argv);
-            pte_osThreadExit();
+        if let Some(tcb) = Tcb::current() {
+            push(tcb.masters_len);
+            push(tcb.masters_ptr as usize);
+            push(tcb.tls_len);
         } else {
-            pte_osMutexLock(&mut pid_mutexes_lock);
-            if pid_mutexes.is_none() {
-                pid_mutexes = Some(BTreeMap::new());
-            }
-            pid_mutexes.as_mut().unwrap().insert(id, mutex);
-            pte_osMutexUnlock(&mut pid_mutexes_lock);
-
-            pte_osMutexLock(&mut pid_stacks_lock);
-            if pid_stacks.is_none() {
-                pid_stacks = Some(BTreeMap::new());
-            }
-            pid_stacks.as_mut().unwrap().insert(id, (stack_base, stack_size));
-            pte_osMutexUnlock(&mut pid_stacks_lock);
-
-            *ppte_osThreadHandle = id;
+            push(0);
+            push(0);
+            push(0);
         }
+
+        push(mutex as usize);
+
+        push(argv as usize);
+        push(entryPoint as usize);
+
+        push(pte_osThreadShim as usize);
     }
+
+    let id = Sys::pte_clone(stack);
+    if id < 0 {
+        return PTE_OS_GENERAL_FAILURE;
+    }
+
+    pte_osMutexLock(&mut pid_mutexes_lock);
+    if pid_mutexes.is_none() {
+        pid_mutexes = Some(BTreeMap::new());
+    }
+    pid_mutexes.as_mut().unwrap().insert(id, mutex);
+    pte_osMutexUnlock(&mut pid_mutexes_lock);
+
+    pte_osMutexLock(&mut pid_stacks_lock);
+    if pid_stacks.is_none() {
+        pid_stacks = Some(BTreeMap::new());
+    }
+    pid_stacks.as_mut().unwrap().insert(id, (stack_base, stack_size));
+    pte_osMutexUnlock(&mut pid_stacks_lock);
+
+    *ppte_osThreadHandle = id;
 
     PTE_OS_OK
 }

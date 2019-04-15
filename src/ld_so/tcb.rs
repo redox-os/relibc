@@ -3,7 +3,7 @@ use core::{mem, ptr, slice};
 use core::ops::Range;
 use goblin::error::{Error, Result};
 
-use header::sys_mman;
+use header::{sys_mman, unistd};
 
 use super::PAGE_SIZE;
 
@@ -36,17 +36,17 @@ impl Master {
 #[repr(C)]
 pub struct Tcb {
     /// Pointer to the end of static TLS. Must be the first member
-    tls_end: *mut u8,
+    pub tls_end: *mut u8,
     /// Size of the memory allocated for the static TLS in bytes (multiple of PAGE_SIZE)
-    tls_len: usize,
+    pub tls_len: usize,
     /// Pointer to this structure
-    tcb_ptr: *mut Tcb,
+    pub tcb_ptr: *mut Tcb,
     /// Size of the memory allocated for this structure in bytes (should be PAGE_SIZE)
-    tcb_len: usize,
+    pub tcb_len: usize,
     /// Pointer to a list of initial TLS data
-    masters_ptr: *mut Master,
+    pub masters_ptr: *mut Master,
     /// Size of the masters list in bytes (multiple of mem::size_of::<Master>())
-    masters_len: usize,
+    pub masters_len: usize,
 }
 
 impl Tcb {
@@ -55,7 +55,7 @@ impl Tcb {
         let (tls, tcb_page) = Self::os_new(size)?;
 
         let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
-        ptr::write(tcb_ptr, Tcb {
+        ptr::write(tcb_ptr, Self {
             tls_end: tls.as_mut_ptr().add(tls.len()),
             tls_len: tls.len(),
             tcb_ptr: tcb_ptr,
@@ -171,11 +171,14 @@ impl Tcb {
     /// OS specific code to create a new TLS and TCB - Redox
     #[cfg(target_os = "redox")]
     unsafe fn os_new(size: usize) -> Result<(&'static mut [u8], &'static mut [u8])> {
+        //TODO: better method of finding fs offset
+        let pid = unistd::getpid();
+        let tcb_addr = 0xB000_0000 + pid as usize * PAGE_SIZE;
         let tls = Self::map(size)?;
         Ok((
             tls,
             //TODO: Consider allocating TCB as part of TLS
-            slice::from_raw_parts_mut(0xB000_0000 as *mut u8, PAGE_SIZE)
+            slice::from_raw_parts_mut(tcb_addr as *mut u8, PAGE_SIZE)
         ))
     }
 
@@ -185,10 +188,10 @@ impl Tcb {
     unsafe fn arch_read(offset: usize) -> usize {
         let value;
         asm!("
-            mov rax, [fs:rdi]
+            mov rax, fs:[rdi]
             "
             : "={rax}"(value)
-            : "{rax}"(offset)
+            : "{rdi}"(offset)
             :
             : "intel"
         );
