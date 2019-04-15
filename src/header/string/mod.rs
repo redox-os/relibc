@@ -139,10 +139,8 @@ pub unsafe extern "C" fn memmove(s1: *mut c_void, s2: *const c_void, n: size_t) 
 
 #[no_mangle]
 pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_void {
-    let mut i = 0;
-    while i < n {
+    for i in 0..n {
         *(s as *mut u8).add(i) = c as u8;
-        i += 1;
     }
     s
 }
@@ -235,10 +233,8 @@ pub unsafe extern "C" fn strndup(s1: *const c_char, size: size_t) -> *mut c_char
         platform::errno = ENOMEM as c_int;
     } else {
         //memcpy(buffer, s1, len)
-        let mut i = 0;
-        while i < len {
+        for i in 0..len {
             *buffer.add(i) = *s1.add(i);
-            i += 1;
         }
         *buffer.add(len) = 0;
     }
