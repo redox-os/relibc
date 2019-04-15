@@ -10,7 +10,18 @@ pub struct dl_tls_index {
 }
 
 #[no_mangle]
-pub extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
-    //TODO: Figure out how to implement this
-    unimplemented!();
+pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
+    trace!("__tls_get_addr({:p}: {:#x}, {:#x})", ti, (*ti).ti_module, (*ti).ti_offset);
+    if let Some(tcb) = Tcb::current() {
+        if let Some(tls) = tcb.tls() {
+            if let Some(masters) = tcb.masters() {
+                if let Some(master) = masters.get((*ti).ti_module as usize) {
+                    let addr = tls.as_mut_ptr().add(master.offset + (*ti).ti_offset as usize);
+                    trace!("__tls_get_addr({:p}: {:#x}, {:#x}) = {:p}", ti, (*ti).ti_module, (*ti).ti_offset, addr);
+                    return addr as *mut c_void;
+                }
+            }
+        }
+    }
+    panic!("__tls_get_addr({:p}: {:#x}, {:#x}) failed", ti, (*ti).ti_module, (*ti).ti_offset);
 }
