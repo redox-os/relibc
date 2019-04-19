@@ -7,6 +7,16 @@
 
 int main(void) {
     chdir("nonexistent");
-    printf("errno: %d = %s\n", errno, strerror(errno));
+    int err = errno;
+
+    printf("errno: %d = %s\n", err, strerror(errno));
     perror("perror");
+
+    char buf1[256];
+    int ret1 = strerror_r(err, buf1, 256);
+    printf("errno: %d = %s, return: %d\n", err, buf1, ret1);
+
+    char buf2[3];
+    int ret2 = strerror_r(err, buf2, 3);
+    printf("errno: %d = %s, return: %d\n", err, buf2, ret2);
 }
