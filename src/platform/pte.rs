@@ -68,11 +68,15 @@ unsafe extern "C" fn pte_osThreadShim(
     tls_masters_ptr: *mut Master,
     tls_masters_len: usize
 ) {
-    let mut tcb = Tcb::new(tls_size).unwrap();
-    tcb.masters_ptr = tls_masters_ptr;
-    tcb.masters_len = tls_masters_len;
-    tcb.copy_masters().unwrap();
-    tcb.activate();
+    // The kernel allocated TLS does not have masters set, so do not attempt to copy it.
+    // It will be copied by the kernel.
+    if ! tls_masters_ptr.is_null() {
+        let mut tcb = Tcb::new(tls_size).unwrap();
+        tcb.masters_ptr = tls_masters_ptr;
+        tcb.masters_len = tls_masters_len;
+        tcb.copy_masters().unwrap();
+        tcb.activate();
+    }
 
     // Wait until pte_osThreadStart
     pte_osMutexLock(mutex);

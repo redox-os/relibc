@@ -55,6 +55,7 @@ impl Tcb {
         let (tls, tcb_page) = Self::os_new(size)?;
 
         let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
+        // println!("New TCB: {:p}", tcb_ptr);
         ptr::write(tcb_ptr, Self {
             tls_end: tls.as_mut_ptr().add(tls.len()),
             tls_len: tls.len(),
@@ -111,12 +112,12 @@ impl Tcb {
                     let range = master.range();
                     let data = master.data();
                     if let Some(tls_data) = tls.get_mut(range) {
-                        println!(
-                            "tls master {}: {:p}, {:#x}: {:p}, {:#x}",
-                            i,
-                            data.as_ptr(), data.len(),
-                            tls_data.as_mut_ptr(), tls_data.len()
-                        );
+                        // println!(
+                        //     "tls master {}: {:p}, {:#x}: {:p}, {:#x}",
+                        //     i,
+                        //     data.as_ptr(), data.len(),
+                        //     tls_data.as_mut_ptr(), tls_data.len()
+                        // );
 
                         tls_data.copy_from_slice(data);
                     } else {
