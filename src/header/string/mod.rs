@@ -260,6 +260,25 @@ pub unsafe extern "C" fn strerror(errnum: c_int) -> *mut c_char {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn strerror_r(
+    errnum: c_int,
+    buf: *mut c_char,
+    buflen: size_t,
+) -> c_int {
+    let msg = strerror(errnum);
+    let len = strlen(msg);
+
+    if len >= buflen {
+        memcpy(buf as *mut c_void, msg as *const c_void, buflen - 1);
+        *buf.add(buflen - 1) = 0;
+        return ERANGE as c_int;
+    }
+    memcpy(buf as *mut c_void, msg as *const c_void, len + 1);
+
+    0
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
     strnlen(s, usize::MAX)
 }
