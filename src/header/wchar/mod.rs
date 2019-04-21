@@ -389,8 +389,7 @@ pub unsafe extern "C" fn wcsncat(
 
 #[no_mangle]
 pub unsafe extern "C" fn wcsncmp(ws1: *const wchar_t, ws2: *const wchar_t, n: size_t) -> c_int {
-    let mut i = 0;
-    while i < n {
+    for i in 0..n {
         let wc1 = *ws1.add(i);
         let wc2 = *ws2.add(i);
         if wc1 != wc2 {
@@ -398,7 +397,6 @@ pub unsafe extern "C" fn wcsncmp(ws1: *const wchar_t, ws2: *const wchar_t, n: si
         } else if wc1 == 0 {
             break;
         }
-        i += 1;
     }
     0
 }
@@ -520,26 +518,22 @@ pub extern "C" fn wcwidth(wc: wchar_t) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn wmemchr(ws: *const wchar_t, wc: wchar_t, n: size_t) -> *mut wchar_t {
-    let mut i = 0;
-    while i < n {
+    for i in 0..n {
         if *ws.add(i) == wc {
             return ws.add(i) as *mut wchar_t;
         }
-        i += 1;
     }
     0 as *mut wchar_t
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn wmemcmp(ws1: *const wchar_t, ws2: *const wchar_t, n: size_t) -> c_int {
-    let mut i = 0;
-    while i < n {
+    for i in 0..n {
         let wc1 = *ws1.add(i);
         let wc2 = *ws2.add(i);
         if wc1 != wc2 {
             return wc1 - wc2;
         }
-        i += 1;
     }
     0
 }
@@ -572,10 +566,8 @@ pub unsafe extern "C" fn wmemmove(
 
 #[no_mangle]
 pub unsafe extern "C" fn wmemset(ws: *mut wchar_t, wc: wchar_t, n: size_t) -> *mut wchar_t {
-    let mut i = 0;
-    while i < n {
+    for i in 0..n {
         *ws.add(i) = wc;
-        i += 1;
     }
     ws
 }
