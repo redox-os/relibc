@@ -1,8 +1,6 @@
 //! string implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/string.h.html
 
-use core::mem;
-use core::ptr;
-use core::usize;
+use core::{mem, ptr, slice, usize};
 
 use cbitset::BitSet256;
 
@@ -30,45 +28,13 @@ pub unsafe extern "C" fn memccpy(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn memchr(s: *const c_void, c: c_int, n: size_t) -> *mut c_void {
-    let mut s = s as *const u8;
-    let c = c as u8;
-    let mut n = n;
-    // read one byte at a time until s is aligned
-    while s as usize % mem::size_of::<usize>() != 0 {
-        if n == 0 {
-            return ptr::null_mut();
-        }
-        if *s == c {
-            return s as *mut c_void;
-        }
-        n -= 1;
-        s = s.offset(1);
+pub unsafe extern "C" fn memchr(haystack: *const c_void, needle: c_int, len: size_t) -> *mut c_void {
+    let haystack = slice::from_raw_parts(haystack as *const u8, len as usize);
+
+    match memchr::memchr(needle as u8, haystack) {
+        Some(index) => haystack[index..].as_ptr() as *mut c_void,
+        None => ptr::null_mut()
     }
-    let mut s = s as *const usize;
-    let lowbits = !0 as usize / 255;
-    let highbits = lowbits * 0x80;
-    let repeated_c = lowbits * c as usize;
-    while n >= mem::size_of::<usize>() {
-        // read multiple bytes at a time
-        // turn the requested byte into 8 zero bits
-        let m = *s ^ repeated_c;
-        // subtracting one from zero flips high bit from 0 to 1
-        if (m.wrapping_sub(lowbits) & !m & highbits) != 0 {
-            break;
-        }
-        n -= mem::size_of::<usize>();
-        s = s.offset(1);
-    }
-    let mut s = s as *const u8;
-    while n > 0 {
-        if *s == c {
-            return s as *mut c_void;
-        }
-        n -= 1;
-        s = s.offset(1);
-    }
-    ptr::null_mut()
 }
 
 #[no_mangle]

@@ -30,6 +30,7 @@ extern crate core_io;
 extern crate goblin;
 #[macro_use]
 extern crate lazy_static;
+extern crate memchr;
 #[macro_use]
 extern crate memoffset;
 extern crate posix_regex;

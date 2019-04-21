@@ -2,20 +2,12 @@
 
 use core::ptr;
 
-use header::ctype;
+use header::{ctype, string};
 use platform::types::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn bcmp(first: *const c_void, second: *const c_void, n: size_t) -> c_int {
-    let first = first as *const c_char;
-    let second = second as *const c_char;
-
-    for i in 0..n as isize {
-        if *first.offset(i) != *second.offset(i) {
-            return -1;
-        }
-    }
-    0
+    string::memcmp(first, second, n)
 }
 
 #[no_mangle]
@@ -38,31 +30,12 @@ pub extern "C" fn ffs(i: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn index(mut s: *const c_char, c: c_int) -> *mut c_char {
-    while *s != 0 {
-        if *s == c as c_char {
-            // Input is const but output is mutable. WHY C, WHY DO THIS?
-            return s as *mut c_char;
-        }
-        s = s.offset(1);
-    }
-    ptr::null_mut()
+    string::strchr(s, c)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn rindex(mut s: *const c_char, c: c_int) -> *mut c_char {
-    let original = s;
-    while *s != 0 {
-        s = s.offset(1);
-    }
-
-    while s != original {
-        s = s.offset(-1);
-        if *s == c as c_char {
-            // Input is const but output is mutable. WHY C, WHY DO THIS?
-            return s as *mut c_char;
-        }
-    }
-    ptr::null_mut()
+    string::strrchr(s, c)
 }
 
 #[no_mangle]
