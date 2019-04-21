@@ -172,6 +172,7 @@ impl Tcb {
     /// OS specific code to create a new TLS and TCB - Redox
     #[cfg(target_os = "redox")]
     unsafe fn os_new(size: usize) -> Result<(&'static mut [u8], &'static mut [u8])> {
+        use header::unistd;
         //TODO: better method of finding fs offset
         let pid = unistd::getpid();
         let tcb_addr = 0xB000_0000 + pid as usize * PAGE_SIZE;
