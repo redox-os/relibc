@@ -16,5 +16,4 @@ int main(void) {
     char *res = realpath("stdlib/realpath.c", path_arg);
     ERROR_IF(realpath, res, == NULL);
     puts(path_arg);
-    free(path_arg);
 }

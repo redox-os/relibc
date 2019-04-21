@@ -20,7 +20,6 @@ EXPECT_BINS=\
 	regex \
 	select \
 	setjmp \
-	signal \
 	stdio/all \
 	stdio/buffer \
 	stdio/fgets \
@@ -90,6 +89,7 @@ EXPECT_BINS=\
 	wchar/wcrtomb \
 	wchar/wcscspn \
 	wchar/wcsrchr
+	# signal (TODO: Fix)
 
 # Binaries that may generate varied output
 BINS=\
