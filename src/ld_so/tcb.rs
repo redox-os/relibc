@@ -3,7 +3,7 @@ use core::{mem, ptr, slice};
 use core::ops::Range;
 use goblin::error::{Error, Result};
 
-use header::{sys_mman, unistd};
+use header::sys_mman;
 
 use super::PAGE_SIZE;
 

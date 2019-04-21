@@ -22,7 +22,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
 
     // Some variables that will be overridden by environment and auxiliary vectors
     let mut library_path = "/lib";
-    let mut page_size = 4096;
+    //let mut page_size = 4096;
 
     // Pop the first argument (path to ld_so), and get the path of the program
     let path_c = unsafe {
@@ -85,10 +85,10 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
             }
 
             println!("  aux: {}={:#x}", kind, value);
-            match kind {
-                6 => page_size = value,
-                _ => (),
-            }
+            //match kind {
+            //    6 => page_size = value,
+            //    _ => (),
+            //}
         }
 
         sp.argc -= 1;

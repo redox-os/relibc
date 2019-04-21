@@ -217,9 +217,9 @@ pub unsafe extern "C" fn strerror(errnum: c_int) -> *mut c_char {
     let mut w = platform::StringWriter(strerror_buf.as_mut_ptr(), strerror_buf.len());
 
     if errnum >= 0 && errnum < STR_ERROR.len() as c_int {
-        w.write_str(STR_ERROR[errnum as usize]);
+        let _ = w.write_str(STR_ERROR[errnum as usize]);
     } else {
-        w.write_fmt(format_args!("Unknown error {}", errnum));
+        let _ = w.write_fmt(format_args!("Unknown error {}", errnum));
     }
 
     strerror_buf.as_mut_ptr() as *mut c_char

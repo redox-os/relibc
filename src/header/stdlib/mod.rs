@@ -458,7 +458,7 @@ where
     }
 
     let mut rng = JitterRng::new_with_timer(get_nstime);
-    rng.test_timer();
+    let _ = rng.test_timer();
 
     for _ in 0..100 {
         let char_iter = iter::repeat(())

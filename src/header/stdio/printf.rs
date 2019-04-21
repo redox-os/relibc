@@ -189,7 +189,7 @@ fn float_string(float: c_double, precision: usize, trim: bool) -> String {
     let mut string = format!("{:.p$}", float, p = precision);
     if trim {
         let truncate = {
-            let mut slice = string.trim_right_matches('0');
+            let mut slice = string.trim_end_matches('0');
             if slice.ends_with('.') {
                 slice.len() - 1
             } else {

@@ -17,7 +17,7 @@ use header::fcntl::O_RDONLY;
 use header::netinet_in::{in_addr, sockaddr_in, sockaddr_in6};
 use header::stdlib::atoi;
 use header::strings::strcasecmp;
-use header::sys_socket::constants::{AF_UNSPEC, AF_INET};
+use header::sys_socket::constants::{AF_INET};
 use header::sys_socket::{sa_family_t, sockaddr, socklen_t};
 use header::unistd::SEEK_SET;
 use platform;
@@ -38,9 +38,6 @@ pub mod host;
 
 pub use self::lookup::*;
 pub mod lookup;
-
-const MAXADDRS: usize = 35;
-const MAXALIASES: usize = 35;
 
 #[repr(C)]
 pub struct hostent {
@@ -118,15 +115,6 @@ pub const NI_NAMEREQD: c_int = 0x0008;
 pub const NI_DGRAM: c_int = 0x0010;
 
 static mut NETDB: c_int = 0;
-static mut NET_ENTRY: netent = netent {
-    n_name: ptr::null_mut(),
-    n_aliases: ptr::null_mut(),
-    n_addrtype: 0,
-    n_net: 0,
-};
-static mut NET_NAME: Option<Vec<u8>> = None;
-static mut NET_ALIASES: [*const c_char; MAXALIASES] = [ptr::null(); MAXALIASES];
-static mut NET_NUM: Option<u64> = None;
 static mut N_POS: usize = 0;
 static mut NET_STAYOPEN: c_int = 0;
 
@@ -163,8 +151,6 @@ static mut SERV_PORT: Option<c_int> = None;
 static mut SERV_PROTO: Option<Vec<u8>> = None;
 static mut S_POS: usize = 0;
 static mut SERV_STAYOPEN: c_int = 0;
-
-const NULL_ALIASES: [*mut c_char; 2] = [ptr::null_mut(); 2];
 
 fn bytes_to_box_str(bytes: &[u8]) -> Box<str> {
     Box::from(core::str::from_utf8(bytes).unwrap_or(""))
@@ -680,9 +666,9 @@ pub unsafe extern "C" fn getaddrinfo(
 
     //TODO: Use hints
     let mut ai_flags = hints_opt.map_or(0, |hints| hints.ai_flags);
-    let mut ai_family = hints_opt.map_or(AF_UNSPEC, |hints| hints.ai_family);
-    let mut ai_socktype = hints_opt.map_or(0, |hints| hints.ai_socktype);
-    let mut ai_protocol = hints_opt.map_or(0, |hints| hints.ai_protocol);
+    let mut ai_family;// = hints_opt.map_or(AF_UNSPEC, |hints| hints.ai_family);
+    let ai_socktype = hints_opt.map_or(0, |hints| hints.ai_socktype);
+    let mut ai_protocol;// = hints_opt.map_or(0, |hints| hints.ai_protocol);
 
     *res = ptr::null_mut();
 

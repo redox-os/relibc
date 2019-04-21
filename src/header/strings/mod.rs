@@ -29,12 +29,12 @@ pub extern "C" fn ffs(i: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn index(mut s: *const c_char, c: c_int) -> *mut c_char {
+pub unsafe extern "C" fn index(s: *const c_char, c: c_int) -> *mut c_char {
     string::strchr(s, c)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rindex(mut s: *const c_char, c: c_int) -> *mut c_char {
+pub unsafe extern "C" fn rindex(s: *const c_char, c: c_int) -> *mut c_char {
     string::strrchr(s, c)
 }
 

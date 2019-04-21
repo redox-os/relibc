@@ -2,7 +2,7 @@
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
-use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use core::sync::atomic::{AtomicUsize, Ordering};
 use core::{intrinsics, ptr};
 
 use header::sys_mman;
@@ -24,6 +24,7 @@ type pte_osThreadEntryPoint = unsafe extern "C" fn(params: *mut c_void) -> c_int
 
 #[repr(C)]
 #[derive(Eq, PartialEq)]
+#[allow(dead_code)]
 pub enum pte_osResult {
     PTE_OS_OK = 0,
     PTE_OS_NO_RESOURCES,
@@ -44,7 +45,7 @@ static mut pid_stacks_lock: i32 = 0;
 #[thread_local]
 static mut LOCALS: *mut BTreeMap<c_uint, *mut c_void> = ptr::null_mut();
 
-static NEXT_KEY: AtomicUsize = ATOMIC_USIZE_INIT;
+static NEXT_KEY: AtomicUsize = AtomicUsize::new(0);
 
 unsafe fn locals() -> &'static mut BTreeMap<c_uint, *mut c_void> {
     if LOCALS == ptr::null_mut() {
@@ -71,7 +72,7 @@ unsafe extern "C" fn pte_osThreadShim(
     // The kernel allocated TLS does not have masters set, so do not attempt to copy it.
     // It will be copied by the kernel.
     if ! tls_masters_ptr.is_null() {
-        let mut tcb = Tcb::new(tls_size).unwrap();
+        let tcb = Tcb::new(tls_size).unwrap();
         tcb.masters_ptr = tls_masters_ptr;
         tcb.masters_len = tls_masters_len;
         tcb.copy_masters().unwrap();

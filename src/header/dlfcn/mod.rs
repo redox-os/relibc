@@ -1,6 +1,6 @@
 //! dlfcn implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/dlfcn.h.html
 
-use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use core::sync::atomic::{AtomicUsize, Ordering};
 use core::{ptr, str};
 
 use c_str::CStr;
@@ -14,7 +14,7 @@ pub const RTLD_LOCAL: c_int = 0x0000;
 static ERROR_NOT_SUPPORTED: &'static CStr = c_str!("dlfcn not supported");
 
 #[thread_local]
-static ERROR: AtomicUsize = ATOMIC_USIZE_INIT;
+static ERROR: AtomicUsize = AtomicUsize::new(0);
 
 #[repr(C)]
 pub struct Dl_info {

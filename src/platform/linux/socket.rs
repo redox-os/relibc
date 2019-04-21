@@ -3,11 +3,11 @@ use super::super::PalSocket;
 use super::{e, Sys};
 use header::sys_socket::{sockaddr, socklen_t};
 
-impl Sys {
-    fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *mut c_int) -> c_int {
-        e(unsafe { syscall!(SOCKETPAIR, domain, kind, protocol, socket_vector) }) as c_int
-    }
-}
+//impl Sys {
+//    fn socketpair(domain: c_int, kind: c_int, protocol: c_int, socket_vector: *mut c_int) -> c_int {
+//        e(unsafe { syscall!(SOCKETPAIR, domain, kind, protocol, socket_vector) }) as c_int
+//    }
+//}
 
 impl PalSocket for Sys {
     unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {

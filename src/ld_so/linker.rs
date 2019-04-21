@@ -209,7 +209,7 @@ impl Linker {
         }
 
         // Allocate TLS
-        let mut tcb = unsafe { Tcb::new(tls_size)? };
+        let tcb = unsafe { Tcb::new(tls_size)? };
         println!("tcb {:x?}", tcb);
 
         // Copy data
