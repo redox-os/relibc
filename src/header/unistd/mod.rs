@@ -558,7 +558,7 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
 #[no_mangle]
 pub extern "C" fn swab(src: *const c_void, dest: *mut c_void, nbytes: ssize_t) {
     if nbytes <= 0 {
-        return
+        return;
     }
     let number_of_swaps = nbytes / 2;
     let mut offset = 0;

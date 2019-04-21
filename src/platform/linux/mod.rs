@@ -193,10 +193,7 @@ impl Pal for Sys {
         write!(proc_path, "{}", fildes).unwrap();
         proc_path.push(0);
 
-        Self::readlink(
-            CStr::from_bytes_with_nul(&proc_path).unwrap(),
-            out
-        )
+        Self::readlink(CStr::from_bytes_with_nul(&proc_path).unwrap(), out)
     }
 
     fn fsync(fildes: c_int) -> c_int {
@@ -329,11 +326,7 @@ impl Pal for Sys {
 
     #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        let flags =
-            CLONE_VM |
-            CLONE_FS |
-            CLONE_FILES |
-            CLONE_SIGHAND;
+        let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND;
         let pid;
         asm!("
             # Call clone syscall

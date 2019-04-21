@@ -765,6 +765,11 @@ impl Pal for Sys {
                 time.tv_nsec -= 1000000000;
             }
 
+            // Teehee
+            if timeout == 0 {
+                time.tv_sec += 1;
+            }
+
             if timeout_file.write(&time).is_err() {
                 return -1;
             }
@@ -817,12 +822,11 @@ impl Pal for Sys {
 
     #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        let flags =
-            syscall::CLONE_VM |
-            syscall::CLONE_FS |
-            syscall::CLONE_FILES |
-            syscall::CLONE_SIGHAND |
-            syscall::CLONE_STACK;
+        let flags = syscall::CLONE_VM
+            | syscall::CLONE_FS
+            | syscall::CLONE_FILES
+            | syscall::CLONE_SIGHAND
+            | syscall::CLONE_STACK;
         let pid;
         asm!("
             # Call clone syscall

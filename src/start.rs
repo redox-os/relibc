@@ -3,8 +3,8 @@ use core::{intrinsics, ptr};
 
 use header::{stdio, stdlib};
 use platform;
-use platform::{Pal, Sys};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 #[repr(C)]
 pub struct Stack {
@@ -49,7 +49,7 @@ unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut
 // other. This will test that the current system is compatible with the current binary
 #[no_mangle]
 pub unsafe fn relibc_verify_host() {
-    if ! Sys::verify() {
+    if !Sys::verify() {
         intrinsics::abort();
     }
 }

@@ -1,9 +1,9 @@
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
+use core::ffi::VaList as va_list;
 use core::ops::Range;
 use core::{fmt, slice};
-use core::ffi::VaList as va_list;
 use io::{self, Write};
 
 use platform;
@@ -34,7 +34,7 @@ enum ArgType {
     CharPtr,
     VoidPtr,
     IntPtr,
-    ArgDefault
+    ArgDefault,
 }
 
 #[derive(Clone, Copy)]
@@ -51,7 +51,7 @@ union VaArg {
     char_ptr: *const c_char,
     void_ptr: *const c_void,
     int_ptr: *mut c_int,
-    arg_default: usize
+    arg_default: usize,
 }
 
 struct BufferedVaList<'a> {
@@ -71,19 +71,45 @@ impl<'a> BufferedVaList<'a> {
 
     unsafe fn get_arg(&mut self, ty: ArgType) -> VaArg {
         match ty {
-            ArgType::Byte => VaArg { byte: self.list.arg::<c_char>() },
-            ArgType::Short => VaArg { short: self.list.arg::<c_short>() },
-            ArgType::Int => VaArg { int: self.list.arg::<c_int>() },
-            ArgType::Long => VaArg { long: self.list.arg::<c_long>() },
-            ArgType::LongLong => VaArg { longlong: self.list.arg::<c_longlong>() },
-            ArgType::PtrDiff => VaArg { ptrdiff: self.list.arg::<ptrdiff_t>() },
-            ArgType::Size => VaArg { size: self.list.arg::<ssize_t>() },
-            ArgType::IntMax => VaArg { intmax: self.list.arg::<intmax_t>() },
-            ArgType::Double => VaArg { double: self.list.arg::<c_double>() },
-            ArgType::CharPtr => VaArg { char_ptr: self.list.arg::<*const c_char>() },
-            ArgType::VoidPtr => VaArg { void_ptr: self.list.arg::<*const c_void>() },
-            ArgType::IntPtr => VaArg { int_ptr: self.list.arg::<*mut c_int>() },
-            ArgType::ArgDefault => VaArg { arg_default: self.list.arg::<usize>() }
+            ArgType::Byte => VaArg {
+                byte: self.list.arg::<c_char>(),
+            },
+            ArgType::Short => VaArg {
+                short: self.list.arg::<c_short>(),
+            },
+            ArgType::Int => VaArg {
+                int: self.list.arg::<c_int>(),
+            },
+            ArgType::Long => VaArg {
+                long: self.list.arg::<c_long>(),
+            },
+            ArgType::LongLong => VaArg {
+                longlong: self.list.arg::<c_longlong>(),
+            },
+            ArgType::PtrDiff => VaArg {
+                ptrdiff: self.list.arg::<ptrdiff_t>(),
+            },
+            ArgType::Size => VaArg {
+                size: self.list.arg::<ssize_t>(),
+            },
+            ArgType::IntMax => VaArg {
+                intmax: self.list.arg::<intmax_t>(),
+            },
+            ArgType::Double => VaArg {
+                double: self.list.arg::<c_double>(),
+            },
+            ArgType::CharPtr => VaArg {
+                char_ptr: self.list.arg::<*const c_char>(),
+            },
+            ArgType::VoidPtr => VaArg {
+                void_ptr: self.list.arg::<*const c_void>(),
+            },
+            ArgType::IntPtr => VaArg {
+                int_ptr: self.list.arg::<*mut c_int>(),
+            },
+            ArgType::ArgDefault => VaArg {
+                arg_default: self.list.arg::<usize>(),
+            },
         }
     }
 
@@ -425,7 +451,9 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, ap: va_list) -> io
                         IntKind::Short => fmt_int(fmt, ap.get(ArgType::Short, index).short),
                         IntKind::Int => fmt_int(fmt, ap.get(ArgType::Int, index).int),
                         IntKind::Long => fmt_int(fmt, ap.get(ArgType::Long, index).long),
-                        IntKind::LongLong => fmt_int(fmt, ap.get(ArgType::LongLong, index).longlong),
+                        IntKind::LongLong => {
+                            fmt_int(fmt, ap.get(ArgType::LongLong, index).longlong)
+                        }
                         IntKind::PtrDiff => fmt_int(fmt, ap.get(ArgType::PtrDiff, index).ptrdiff),
                         IntKind::Size => fmt_int(fmt, ap.get(ArgType::Size, index).size),
                         IntKind::IntMax => fmt_int(fmt, ap.get(ArgType::IntMax, index).intmax),

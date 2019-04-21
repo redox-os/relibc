@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
-use core::{mem, ptr, slice};
 use core::ops::Range;
+use core::{mem, ptr, slice};
 use goblin::error::{Error, Result};
 
 use header::sys_mman;
@@ -20,10 +20,7 @@ pub struct Master {
 impl Master {
     /// The initial data for this TLS region
     pub unsafe fn data(&self) -> &'static [u8] {
-        slice::from_raw_parts(
-            self.ptr,
-            self.len
-        )
+        slice::from_raw_parts(self.ptr, self.len)
     }
 
     /// The region of TLS that the master will initialize
@@ -56,14 +53,17 @@ impl Tcb {
 
         let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
         // println!("New TCB: {:p}", tcb_ptr);
-        ptr::write(tcb_ptr, Self {
-            tls_end: tls.as_mut_ptr().add(tls.len()),
-            tls_len: tls.len(),
-            tcb_ptr: tcb_ptr,
-            tcb_len: tcb_page.len(),
-            masters_ptr: ptr::null_mut(),
-            masters_len: 0,
-        });
+        ptr::write(
+            tcb_ptr,
+            Self {
+                tls_end: tls.as_mut_ptr().add(tls.len()),
+                tls_len: tls.len(),
+                tcb_ptr: tcb_ptr,
+                tcb_len: tcb_page.len(),
+                masters_ptr: ptr::null_mut(),
+                masters_len: 0,
+            },
+        );
 
         Ok(&mut *tcb_ptr)
     }
@@ -86,7 +86,7 @@ impl Tcb {
         } else {
             Some(slice::from_raw_parts_mut(
                 self.tls_end.offset(-(self.tls_len as isize)),
-                self.tls_len
+                self.tls_len,
             ))
         }
     }
@@ -98,7 +98,7 @@ impl Tcb {
         } else {
             Some(slice::from_raw_parts_mut(
                 self.masters_ptr,
-                self.masters_len / mem::size_of::<Master>()
+                self.masters_len / mem::size_of::<Master>(),
             ))
         }
     }
@@ -121,9 +121,7 @@ impl Tcb {
 
                         tls_data.copy_from_slice(data);
                     } else {
-                        return Err(Error::Malformed(
-                            format!("failed to copy tls master {}", i)
-                        ));
+                        return Err(Error::Malformed(format!("failed to copy tls master {}", i)));
                     }
                 }
             }
@@ -152,12 +150,12 @@ impl Tcb {
             sys_mman::PROT_READ | sys_mman::PROT_WRITE,
             sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
             -1,
-            0
+            0,
         );
-        if ptr as usize == !0 /* MAP_FAILED */ {
-            return Err(Error::Malformed(
-                format!("failed to map tls")
-            ));
+        if ptr as usize == !0
+        /* MAP_FAILED */
+        {
+            return Err(Error::Malformed(format!("failed to map tls")));
         }
         Ok(slice::from_raw_parts_mut(ptr as *mut u8, size))
     }
@@ -180,7 +178,7 @@ impl Tcb {
         Ok((
             tls,
             //TODO: Consider allocating TCB as part of TLS
-            slice::from_raw_parts_mut(tcb_addr as *mut u8, PAGE_SIZE)
+            slice::from_raw_parts_mut(tcb_addr as *mut u8, PAGE_SIZE),
         ))
     }
 

@@ -1,7 +1,7 @@
 //! wchar implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/wchar.h.html
 
-use core::{mem, ptr, usize};
 use core::ffi::VaList as va_list;
+use core::{mem, ptr, usize};
 
 use header::stdio::*;
 use header::stdlib::MB_CUR_MAX;

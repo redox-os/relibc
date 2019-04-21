@@ -18,10 +18,7 @@ pub struct Db<R: BufRead> {
 
 impl<R: BufRead> Db<R> {
     pub fn new(reader: R, separator: Separator) -> Self {
-        Db {
-            reader,
-            separator
-        }
+        Db { reader, separator }
     }
 
     pub fn read(&mut self) -> io::Result<Option<Vec<String>>> {
@@ -48,9 +45,6 @@ pub type FileDb = Db<BufReader<File>>;
 impl FileDb {
     pub fn open(path: &CStr, separator: Separator) -> io::Result<Self> {
         let file = File::open(path, fcntl::O_RDONLY | fcntl::O_CLOEXEC)?;
-        Ok(Db::new(
-            BufReader::new(file),
-            separator
-        ))
+        Ok(Db::new(BufReader::new(file), separator))
     }
 }

@@ -195,8 +195,8 @@ pub unsafe extern "C" fn calloc(nelem: size_t, elsize: size_t) -> *mut c_void {
                 intrinsics::write_bytes(ptr as *mut u8, 0, size);
             }
             ptr
-        },
-        None => core::ptr::null_mut()
+        }
+        None => core::ptr::null_mut(),
     }
 }
 
@@ -632,10 +632,7 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
         };
 
         let len = out.len();
-        let read = Sys::fpath(
-            *file,
-            &mut out[..len - 1],
-        );
+        let read = Sys::fpath(*file, &mut out[..len - 1]);
         if read < 0 {
             return ptr::null_mut();
         }

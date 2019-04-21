@@ -28,12 +28,16 @@ pub unsafe extern "C" fn memccpy(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn memchr(haystack: *const c_void, needle: c_int, len: size_t) -> *mut c_void {
+pub unsafe extern "C" fn memchr(
+    haystack: *const c_void,
+    needle: c_int,
+    len: size_t,
+) -> *mut c_void {
     let haystack = slice::from_raw_parts(haystack as *const u8, len as usize);
 
     match memchr::memchr(needle as u8, haystack) {
         Some(index) => haystack[index..].as_ptr() as *mut c_void,
-        None => ptr::null_mut()
+        None => ptr::null_mut(),
     }
 }
 
@@ -226,11 +230,7 @@ pub unsafe extern "C" fn strerror(errnum: c_int) -> *mut c_char {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strerror_r(
-    errnum: c_int,
-    buf: *mut c_char,
-    buflen: size_t,
-) -> c_int {
+pub unsafe extern "C" fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
     let msg = strerror(errnum);
     let len = strlen(msg);
 

@@ -61,7 +61,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
                     if let Some(value) = parts.next() {
                         match key {
                             "LD_LIBRARY_PATH" => library_path = value,
-                            _ => ()
+                            _ => (),
                         }
                     }
                 }
@@ -120,7 +120,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
             eprintln!("ld.so: entry '{}': {:#x}", path, entry);
             //unistd::_exit(0);
             entry
-        },
+        }
         Err(err) => {
             eprintln!("ld.so: failed to link '{}': {}", path, err);
             unistd::_exit(1);

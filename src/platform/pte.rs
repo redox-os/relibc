@@ -7,7 +7,7 @@ use core::{intrinsics, ptr};
 
 use header::sys_mman;
 use header::time::timespec;
-use ld_so::tcb::{Tcb, Master};
+use ld_so::tcb::{Master, Tcb};
 use mutex::{FUTEX_WAIT, FUTEX_WAKE};
 use platform::types::{c_int, c_uint, c_void, pid_t, size_t};
 use platform::{Pal, Sys};
@@ -67,11 +67,11 @@ unsafe extern "C" fn pte_osThreadShim(
     mutex: pte_osMutexHandle,
     tls_size: usize,
     tls_masters_ptr: *mut Master,
-    tls_masters_len: usize
+    tls_masters_len: usize,
 ) {
     // The kernel allocated TLS does not have masters set, so do not attempt to copy it.
     // It will be copied by the kernel.
-    if ! tls_masters_ptr.is_null() {
+    if !tls_masters_ptr.is_null() {
         let tcb = Tcb::new(tls_size).unwrap();
         tcb.masters_ptr = tls_masters_ptr;
         tcb.masters_len = tls_masters_len;
@@ -107,7 +107,7 @@ pub unsafe extern "C" fn pte_osThreadCreate(
         sys_mman::PROT_READ | sys_mman::PROT_WRITE,
         sys_mman::MAP_SHARED | sys_mman::MAP_ANONYMOUS,
         -1,
-        0
+        0,
     );
     if stack_base as isize == -1 {
         return PTE_OS_GENERAL_FAILURE;
@@ -154,7 +154,10 @@ pub unsafe extern "C" fn pte_osThreadCreate(
     if pid_stacks.is_none() {
         pid_stacks = Some(BTreeMap::new());
     }
-    pid_stacks.as_mut().unwrap().insert(id, (stack_base, stack_size));
+    pid_stacks
+        .as_mut()
+        .unwrap()
+        .insert(id, (stack_base, stack_size));
     pte_osMutexUnlock(&mut pid_stacks_lock);
 
     *ppte_osThreadHandle = id;

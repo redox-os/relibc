@@ -9,9 +9,9 @@ use header::fcntl::O_RDONLY;
 use header::netinet_in::in_addr;
 use header::sys_socket::constants::AF_INET;
 use header::unistd::SEEK_SET;
-use platform::{Pal, Sys};
 use platform::rlb::{Line, RawLineBuffer};
 use platform::types::*;
+use platform::{Pal, Sys};
 
 use super::{bytes_to_box_str, hostent};
 

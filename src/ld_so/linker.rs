@@ -3,7 +3,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::{mem, ptr, slice};
-use goblin::elf::{Elf, program_header, reloc, sym};
+use goblin::elf::{program_header, reloc, sym, Elf};
 use goblin::error::{Error, Result};
 
 use c_str::CString;
@@ -12,8 +12,8 @@ use header::{fcntl, sys_mman, unistd};
 use io::Read;
 use platform::types::c_void;
 
+use super::tcb::{Master, Tcb};
 use super::PAGE_SIZE;
-use super::tcb::{Tcb, Master};
 
 #[cfg(target_os = "redox")]
 const PATH_SEP: char = ';';
@@ -23,7 +23,7 @@ const PATH_SEP: char = ':';
 
 pub struct Linker {
     library_path: String,
-    objects: BTreeMap<String, Box<[u8]>>
+    objects: BTreeMap<String, Box<[u8]>>,
 }
 
 impl Linker {
@@ -39,19 +39,16 @@ impl Linker {
 
         let mut data = Vec::new();
 
-        let path_c = CString::new(path).map_err(|err| Error::Malformed(
-            format!("invalid path '{}': {}", path, err)
-        ))?;
+        let path_c = CString::new(path)
+            .map_err(|err| Error::Malformed(format!("invalid path '{}': {}", path, err)))?;
 
         {
             let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
-            let mut file = File::open(&path_c, flags).map_err(|err| Error::Malformed(
-                format!("failed to open '{}': {}", path, err)
-            ))?;
+            let mut file = File::open(&path_c, flags)
+                .map_err(|err| Error::Malformed(format!("failed to open '{}': {}", path, err)))?;
 
-            file.read_to_end(&mut data).map_err(|err| Error::Malformed(
-                format!("failed to read '{}': {}", path, err)
-            ))?;
+            file.read_to_end(&mut data)
+                .map_err(|err| Error::Malformed(format!("failed to read '{}': {}", path, err)))?;
         }
 
         self.load_data(name, data.into_boxed_slice())
@@ -64,7 +61,7 @@ impl Linker {
             //println!("{:#?}", elf);
 
             for library in elf.libraries.iter() {
-                if ! self.objects.contains_key(&library.to_string()) {
+                if !self.objects.contains_key(&library.to_string()) {
                     self.load_library(library)?;
                 }
             }
@@ -90,9 +87,9 @@ impl Linker {
                 println!("check {}", path);
 
                 let access = unsafe {
-                    let path_c = CString::new(path.as_bytes()).map_err(|err| Error::Malformed(
-                        format!("invalid path '{}': {}", path, err)
-                    ))?;
+                    let path_c = CString::new(path.as_bytes()).map_err(|err| {
+                        Error::Malformed(format!("invalid path '{}': {}", path, err))
+                    })?;
 
                     // TODO: Use R_OK | X_OK
                     unistd::access(path_c.as_ptr(), unistd::F_OK) == 0
@@ -104,9 +101,7 @@ impl Linker {
                 }
             }
 
-            Err(Error::Malformed(
-                format!("failed to locate '{}'", name)
-            ))
+            Err(Error::Malformed(format!("failed to locate '{}'", name)))
         }
     }
 
@@ -138,7 +133,8 @@ impl Linker {
                 for ph in elf.program_headers.iter() {
                     let voff = ph.p_vaddr as usize % PAGE_SIZE;
                     let vaddr = ph.p_vaddr as usize - voff;
-                    let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
+                    let vsize =
+                        ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
 
                     match ph.p_type {
                         program_header::PT_LOAD => {
@@ -154,15 +150,15 @@ impl Linker {
                             } else {
                                 bounds_opt = Some((vaddr, vaddr + vsize));
                             }
-                        },
+                        }
                         program_header::PT_TLS => {
                             println!("  load tls {:#x}: {:x?}", vsize, ph);
                             tls_size += vsize;
                             if *elf_name == primary {
                                 tls_primary += vsize;
                             }
-                        },
-                        _ => ()
+                        }
+                        _ => (),
                     }
                 }
                 match bounds_opt {
@@ -182,12 +178,12 @@ impl Linker {
                     sys_mman::PROT_READ | sys_mman::PROT_WRITE,
                     sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
                     -1,
-                    0
+                    0,
                 );
-                if ptr as usize == !0 /* MAP_FAILED */ {
-                    return Err(Error::Malformed(
-                        format!("failed to map {}", elf_name)
-                    ));
+                if ptr as usize == !0
+                /* MAP_FAILED */
+                {
+                    return Err(Error::Malformed(format!("failed to map {}", elf_name)));
                 }
                 slice::from_raw_parts_mut(ptr as *mut u8, size)
             };
@@ -225,7 +221,7 @@ impl Linker {
 
             let mmap = match mmaps.get_mut(elf_name) {
                 Some(some) => some,
-                None => continue
+                None => continue,
             };
 
             println!("load {}", elf_name);
@@ -242,9 +238,12 @@ impl Linker {
                             let range = ph.file_range();
                             match object.get(range.clone()) {
                                 Some(some) => some,
-                                None => return Err(Error::Malformed(
-                                    format!("failed to read {:?}", range)
-                                )),
+                                None => {
+                                    return Err(Error::Malformed(format!(
+                                        "failed to read {:?}",
+                                        range
+                                    )))
+                                }
                             }
                         };
 
@@ -252,19 +251,28 @@ impl Linker {
                             let range = ph.p_vaddr as usize..ph.p_vaddr as usize + obj_data.len();
                             match mmap.get_mut(range.clone()) {
                                 Some(some) => some,
-                                None => return Err(Error::Malformed(
-                                    format!("failed to write {:?}", range)
-                                )),
+                                None => {
+                                    return Err(Error::Malformed(format!(
+                                        "failed to write {:?}",
+                                        range
+                                    )))
+                                }
                             }
                         };
 
-                        println!("  copy {:#x}, {:#x}: {:#x}, {:#x}", vaddr, vsize, voff, obj_data.len());
+                        println!(
+                            "  copy {:#x}, {:#x}: {:#x}, {:#x}",
+                            vaddr,
+                            vsize,
+                            voff,
+                            obj_data.len()
+                        );
 
                         mmap_data.copy_from_slice(obj_data);
-                    },
+                    }
                     program_header::PT_TLS => {
                         let valign = if ph.p_align > 0 {
-                            ((ph.p_memsz + (ph.p_align - 1))/ph.p_align) * ph.p_align
+                            ((ph.p_memsz + (ph.p_align - 1)) / ph.p_align) * ph.p_align
                         } else {
                             ph.p_memsz
                         } as usize;
@@ -277,10 +285,7 @@ impl Linker {
 
                         println!(
                             "  tls master {:p}, {:#x}: {:#x}, {:#x}",
-                            tcb_master.ptr,
-                            tcb_master.len,
-                            tcb_master.offset,
-                            valign,
+                            tcb_master.ptr, tcb_master.len, tcb_master.offset, valign,
                         );
 
                         if *elf_name == primary {
@@ -293,8 +298,8 @@ impl Linker {
                             tls_ranges.insert(elf_name, (tls_index, tcb_master.range()));
                             tcb_masters.push(tcb_master);
                         }
-                    },
-                    _ => ()
+                    }
+                    _ => (),
                 }
             }
         }
@@ -309,13 +314,18 @@ impl Linker {
         for (elf_name, elf) in elfs.iter() {
             let mmap = match mmaps.get_mut(elf_name) {
                 Some(some) => some,
-                None => continue
+                None => continue,
             };
 
             println!("link {}", elf_name);
 
             // Relocate
-            for rel in elf.dynrelas.iter().chain(elf.dynrels.iter()).chain(elf.pltrelocs.iter()) {
+            for rel in elf
+                .dynrelas
+                .iter()
+                .chain(elf.dynrels.iter())
+                .chain(elf.pltrelocs.iter())
+            {
                 // println!("  rel {}: {:x?}",
                 //     reloc::r_to_str(rel.r_type, elf.header.e_machine),
                 //     rel
@@ -326,13 +336,18 @@ impl Linker {
                 let b = mmap.as_mut_ptr() as usize;
 
                 let s = if rel.r_sym > 0 {
-                    let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(
-                        format!("missing symbol for relocation {:?}", rel)
-                    ))?;
+                    let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(format!(
+                        "missing symbol for relocation {:?}",
+                        rel
+                    )))?;
 
-                    let name = elf.dynstrtab.get(sym.st_name).ok_or(Error::Malformed(
-                        format!("missing name for symbol {:?}", sym)
-                    ))??;
+                    let name =
+                        elf.dynstrtab
+                            .get(sym.st_name)
+                            .ok_or(Error::Malformed(format!(
+                                "missing name for symbol {:?}",
+                                sym
+                            )))??;
 
                     if let Some(value) = globals.get(name) {
                         // println!("    sym {}: {:x?} = {:#x}", name, sym, value);
@@ -351,34 +366,37 @@ impl Linker {
                     (0, 0)
                 };
 
-                let ptr = unsafe {
-                    mmap.as_mut_ptr().add(rel.r_offset as usize)
-                };
+                let ptr = unsafe { mmap.as_mut_ptr().add(rel.r_offset as usize) };
 
                 let set_u64 = |value| {
                     // println!("    set_u64 {:#x}", value);
-                    unsafe { *(ptr as *mut u64) = value; }
+                    unsafe {
+                        *(ptr as *mut u64) = value;
+                    }
                 };
 
                 match rel.r_type {
                     reloc::R_X86_64_64 => {
                         set_u64((s + a) as u64);
-                    },
+                    }
                     reloc::R_X86_64_DTPMOD64 => {
                         set_u64(tm as u64);
-                    },
+                    }
                     reloc::R_X86_64_GLOB_DAT | reloc::R_X86_64_JUMP_SLOT => {
                         set_u64(s as u64);
-                    },
+                    }
                     reloc::R_X86_64_RELATIVE => {
                         set_u64((b + a) as u64);
-                    },
+                    }
                     reloc::R_X86_64_TPOFF64 => {
                         set_u64((s + a).wrapping_sub(t) as u64);
-                    },
+                    }
                     reloc::R_X86_64_IRELATIVE => (), // Handled below
                     _ => {
-                        println!("    {} unsupported", reloc::r_to_str(rel.r_type, elf.header.e_machine));
+                        println!(
+                            "    {} unsupported",
+                            reloc::r_to_str(rel.r_type, elf.header.e_machine)
+                        );
                     }
                 }
             }
@@ -389,7 +407,8 @@ impl Linker {
                     program_header::PT_LOAD => {
                         let voff = ph.p_vaddr as usize % PAGE_SIZE;
                         let vaddr = ph.p_vaddr as usize - voff;
-                        let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
+                        let vsize =
+                            ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
 
                         let mut prot = 0;
 
@@ -408,20 +427,17 @@ impl Linker {
                             let ptr = mmap.as_mut_ptr().add(vaddr);
                             println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
 
-                            sys_mman::mprotect(
-                                ptr as *mut c_void,
-                                vsize,
-                                prot
-                            )
+                            sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
                         };
 
                         if res < 0 {
-                            return Err(Error::Malformed(
-                                format!("failed to mprotect {}", elf_name)
-                            ));
+                            return Err(Error::Malformed(format!(
+                                "failed to mprotect {}",
+                                elf_name
+                            )));
                         }
-                    },
-                    _ => ()
+                    }
+                    _ => (),
                 }
             }
         }
@@ -436,7 +452,7 @@ impl Linker {
         for (elf_name, elf) in elfs.iter() {
             let mmap = match mmaps.get_mut(elf_name) {
                 Some(some) => some,
-                None => continue
+                None => continue,
             };
 
             println!("entry {}", elf_name);
@@ -446,7 +462,12 @@ impl Linker {
             }
 
             // Relocate
-            for rel in elf.dynrelas.iter().chain(elf.dynrels.iter()).chain(elf.pltrelocs.iter()) {
+            for rel in elf
+                .dynrelas
+                .iter()
+                .chain(elf.dynrels.iter())
+                .chain(elf.pltrelocs.iter())
+            {
                 // println!("  rel {}: {:x?}",
                 //     reloc::r_to_str(rel.r_type, elf.header.e_machine),
                 //     rel
@@ -456,21 +477,21 @@ impl Linker {
 
                 let b = mmap.as_mut_ptr() as usize;
 
-                let ptr = unsafe {
-                    mmap.as_mut_ptr().add(rel.r_offset as usize)
-                };
+                let ptr = unsafe { mmap.as_mut_ptr().add(rel.r_offset as usize) };
 
                 let set_u64 = |value| {
                     // println!("    set_u64 {:#x}", value);
-                    unsafe { *(ptr as *mut u64) = value; }
+                    unsafe {
+                        *(ptr as *mut u64) = value;
+                    }
                 };
 
                 match rel.r_type {
                     reloc::R_X86_64_IRELATIVE => unsafe {
-                        let f: unsafe extern "C" fn () -> u64 = mem::transmute(b + a);
+                        let f: unsafe extern "C" fn() -> u64 = mem::transmute(b + a);
                         set_u64(f());
                     },
-                    _ => ()
+                    _ => (),
                 }
             }
 
@@ -480,7 +501,8 @@ impl Linker {
                     program_header::PT_LOAD => {
                         let voff = ph.p_vaddr as usize % PAGE_SIZE;
                         let vaddr = ph.p_vaddr as usize - voff;
-                        let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
+                        let vsize =
+                            ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
 
                         let mut prot = 0;
 
@@ -499,26 +521,21 @@ impl Linker {
                             let ptr = mmap.as_mut_ptr().add(vaddr);
                             println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
 
-                            sys_mman::mprotect(
-                                ptr as *mut c_void,
-                                vsize,
-                                prot
-                            )
+                            sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
                         };
 
                         if res < 0 {
-                            return Err(Error::Malformed(
-                                format!("failed to mprotect {}", elf_name)
-                            ));
+                            return Err(Error::Malformed(format!(
+                                "failed to mprotect {}",
+                                elf_name
+                            )));
                         }
-                    },
-                    _ => ()
+                    }
+                    _ => (),
                 }
             }
         }
 
-        entry_opt.ok_or(Error::Malformed(
-            format!("missing entry for {}", primary)
-        ))
+        entry_opt.ok_or(Error::Malformed(format!("missing entry for {}", primary)))
     }
 }

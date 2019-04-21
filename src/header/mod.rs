@@ -4,9 +4,9 @@ pub mod arpa_inet;
 pub mod assert;
 pub mod ctype;
 pub mod dirent;
-pub mod dlfcn;
 #[path = "dl-tls/mod.rs"]
 pub mod dl_tls;
+pub mod dlfcn;
 pub mod errno;
 pub mod fcntl;
 pub mod float;

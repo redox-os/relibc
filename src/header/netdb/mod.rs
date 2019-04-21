@@ -17,7 +17,7 @@ use header::fcntl::O_RDONLY;
 use header::netinet_in::{in_addr, sockaddr_in, sockaddr_in6};
 use header::stdlib::atoi;
 use header::strings::strcasecmp;
-use header::sys_socket::constants::{AF_INET};
+use header::sys_socket::constants::AF_INET;
 use header::sys_socket::{sa_family_t, sockaddr, socklen_t};
 use header::unistd::SEEK_SET;
 use platform;
@@ -666,9 +666,9 @@ pub unsafe extern "C" fn getaddrinfo(
 
     //TODO: Use hints
     let mut ai_flags = hints_opt.map_or(0, |hints| hints.ai_flags);
-    let mut ai_family;// = hints_opt.map_or(AF_UNSPEC, |hints| hints.ai_family);
+    let mut ai_family; // = hints_opt.map_or(AF_UNSPEC, |hints| hints.ai_family);
     let ai_socktype = hints_opt.map_or(0, |hints| hints.ai_socktype);
-    let mut ai_protocol;// = hints_opt.map_or(0, |hints| hints.ai_protocol);
+    let mut ai_protocol; // = hints_opt.map_or(0, |hints| hints.ai_protocol);
 
     *res = ptr::null_mut();
 
@@ -677,7 +677,7 @@ pub unsafe extern "C" fn getaddrinfo(
         //TODO: Support other service definitions as well as AI_NUMERICSERV
         match str::from_utf8_unchecked(service.to_bytes()).parse::<u16>() {
             Ok(ok) => port = ok,
-            Err(_err) => ()
+            Err(_err) => (),
         }
     }
 
@@ -700,7 +700,7 @@ pub unsafe extern "C" fn getaddrinfo(
                 sin_family: ai_family as sa_family_t,
                 sin_port: htons(port),
                 sin_addr: in_addr,
-                sin_zero: [0; 8]
+                sin_zero: [0; 8],
             })) as *mut sockaddr;
 
             let ai_addrlen = mem::size_of::<sockaddr_in>();
@@ -725,7 +725,7 @@ pub unsafe extern "C" fn getaddrinfo(
 
             let mut indirect = res;
             while !(*indirect).is_null() {
-                indirect=&mut (**indirect).ai_next;
+                indirect = &mut (**indirect).ai_next;
             }
             *indirect = Box::into_raw(addrinfo);
         }

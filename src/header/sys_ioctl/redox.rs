@@ -31,7 +31,7 @@ fn dup_read<T>(fd: c_int, name: &str, t: &mut T) -> syscall::Result<usize> {
 
     let _ = syscall::close(dup);
 
-    res.map(|bytes| bytes/size)
+    res.map(|bytes| bytes / size)
 }
 
 fn dup_write<T>(fd: c_int, name: &str, t: &T) -> syscall::Result<usize> {
@@ -45,7 +45,7 @@ fn dup_write<T>(fd: c_int, name: &str, t: &T) -> syscall::Result<usize> {
 
     let _ = syscall::close(dup);
 
-    res.map(|bytes| bytes/size)
+    res.map(|bytes| bytes / size)
 }
 
 #[no_mangle]
@@ -67,7 +67,7 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
             } else {
                 0
             }
-        },
+        }
         TCFLSH => {
             let queue = out as c_int;
             if e(dup_write(fd, "flush", &queue)) == !0 {
@@ -75,7 +75,7 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
             } else {
                 0
             }
-        },
+        }
         TIOCGPGRP => {
             let pgrp = &mut *(out as *mut pid_t);
             if e(dup_read(fd, "pgrp", pgrp)) == !0 {
@@ -83,7 +83,7 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
             } else {
                 0
             }
-        },
+        }
         TIOCSPGRP => {
             let pgrp = &*(out as *const pid_t);
             if e(dup_write(fd, "pgrp", pgrp)) == !0 {
@@ -91,7 +91,7 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
             } else {
                 0
             }
-        },
+        }
         TIOCGWINSZ => {
             let winsize = &mut *(out as *mut winsize);
             if e(dup_read(fd, "winsize", winsize)) == !0 {
@@ -99,7 +99,7 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
             } else {
                 0
             }
-        },
+        }
         TIOCSWINSZ => {
             let winsize = &*(out as *const winsize);
             if e(dup_write(fd, "winsize", winsize)) == !0 {
@@ -107,7 +107,7 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
             } else {
                 0
             }
-        },
+        }
         _ => {
             platform::errno = errno::EINVAL;
             -1

@@ -1,8 +1,8 @@
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::ffi::VaList as va_list;
 use io::Read;
 use platform::types::*;
-use core::ffi::VaList as va_list;
 
 #[derive(PartialEq, Eq)]
 enum IntKind {
@@ -403,7 +403,8 @@ unsafe fn inner_scanf<R: Read>(
                     let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
 
                     // While we haven't used up all the width, and it matches
-                    while width.map(|w| w > 0).unwrap_or(true) && !invert == matches.contains(&byte) {
+                    while width.map(|w| w > 0).unwrap_or(true) && !invert == matches.contains(&byte)
+                    {
                         if let Some(ref mut ptr) = ptr {
                             **ptr = byte as c_char;
                             *ptr = ptr.offset(1);
@@ -422,7 +423,7 @@ unsafe fn inner_scanf<R: Read>(
                         *ptr = 0;
                         matched += 1;
                     }
-                },
+                }
                 b'n' => {
                     if !ignore {
                         *ap.arg::<*mut c_int>() = count as c_int;
