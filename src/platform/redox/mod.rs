@@ -151,8 +151,6 @@ impl Pal for Sys {
         mut argv: *const *mut c_char,
         mut envp: *const *mut c_char,
     ) -> c_int {
-        use alloc::vec::Vec;
-
         let mut file = match File::open(path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
             Ok(file) => file,
             Err(_) => return -1,
