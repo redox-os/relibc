@@ -78,11 +78,15 @@ pub extern "C" fn abs(i: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void {
-    if size % alignment != 0 {
-        return ptr::null_mut();
+    if size % alignment == 0 {
+        /* The size-is-multiple-of-alignment requirement is the only
+         * difference between aligned_alloc() and memalign(). */
+        memalign(alignment, size)
     }
-
-    memalign(alignment, size)
+    else {
+        platform::errno = errno::EINVAL;
+        ptr::null_mut()
+    }
 }
 
 #[no_mangle]
@@ -190,13 +194,19 @@ pub unsafe extern "C" fn calloc(nelem: size_t, elsize: size_t) -> *mut c_void {
     let size_result = nelem.checked_mul(elsize);
     match size_result {
         Some(size) => {
+            /* If allocation fails here, errno setting will be handled
+             * by malloc() */
             let ptr = malloc(size);
             if !ptr.is_null() {
                 intrinsics::write_bytes(ptr as *mut u8, 0, size);
             }
             ptr
+        },
+        None => {
+            // For overflowing multiplication, we have to set errno here
+            platform::errno = errno::ENOMEM;
+            ptr::null_mut()
         }
-        None => core::ptr::null_mut(),
     }
 }
 
@@ -403,12 +413,29 @@ pub extern "C" fn lrand48() -> c_long {
 
 #[no_mangle]
 pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
-    platform::alloc(size)
+    let ptr = platform::alloc(size);
+    if ptr.is_null() {
+        platform::errno = errno::ENOMEM;
+    }
+    ptr
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_void {
-    platform::alloc_align(size, alignment)
+    /* Check if alignment is a (positive) power of two. The second
+     * expression will never underflow, due to Rust's lazy boolean
+     * operators. */
+    if alignment > 0 && (alignment & (alignment - 1)) == 0 {
+        let ptr = platform::alloc_align(size, alignment);
+        if ptr.is_null() {
+            platform::errno = errno::ENOMEM;
+        }
+        ptr
+    }
+    else {
+        platform::errno = errno::EINVAL;
+        ptr::null_mut()
+    }
 }
 
 #[no_mangle]
@@ -613,7 +640,11 @@ pub extern "C" fn random() -> c_long {
 
 #[no_mangle]
 pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {
-    platform::realloc(ptr, size)
+    let ptr = platform::realloc(ptr, size);
+    if ptr.is_null() {
+        platform::errno = errno::ENOMEM;
+    }
+    ptr
 }
 
 #[no_mangle]
