@@ -126,6 +126,67 @@ impl VaArg {
                 => VaArg::pointer(ap.arg::<*const c_void>()),
         }
     }
+    unsafe fn transmute(&self, arg: &PrintfArg) -> VaArg {
+        // At this point, there are conflicting printf arguments. An
+        // example of this is:
+        // ```c
+        // printf("%1$d %1$lf\n", 5, 0.1);
+        // ```
+        // We handle it just like glibc: We read it from the VaList
+        // using the *last* argument type, but we transmute it when we
+        // try to access the other ones.
+        union Untyped {
+            c_char: c_char,
+            c_double: c_double,
+            c_int: c_int,
+            c_long: c_long,
+            c_longlong: c_longlong,
+            c_short: c_short,
+            intmax_t: intmax_t,
+            pointer: *const c_void,
+            ptrdiff_t: ptrdiff_t,
+            ssize_t: ssize_t
+        }
+        let untyped = match *self {
+            VaArg::c_char(i) => Untyped { c_char: i },
+            VaArg::c_double(i) => Untyped { c_double: i },
+            VaArg::c_int(i) => Untyped { c_int: i },
+            VaArg::c_long(i) => Untyped { c_long: i },
+            VaArg::c_longlong(i) => Untyped { c_longlong: i },
+            VaArg::c_short(i) => Untyped { c_short: i },
+            VaArg::intmax_t(i) => Untyped { intmax_t: i },
+            VaArg::pointer(i) => Untyped { pointer: i },
+            VaArg::ptrdiff_t(i) => Untyped { ptrdiff_t: i },
+            VaArg::ssize_t(i) => Untyped { ssize_t: i }
+        };
+        match (arg.fmtkind, arg.intkind) {
+            (FmtKind::Percent, _) => panic!("Can't call transmute on %"),
+
+            (FmtKind::Char, _) |
+            (FmtKind::Unsigned, IntKind::Byte) |
+            (FmtKind::Signed, IntKind::Byte) => VaArg::c_char(untyped.c_char),
+            (FmtKind::Unsigned, IntKind::Short) |
+            (FmtKind::Signed, IntKind::Short) => VaArg::c_short(untyped.c_short),
+            (FmtKind::Unsigned, IntKind::Int) |
+            (FmtKind::Signed, IntKind::Int) => VaArg::c_int(untyped.c_int),
+            (FmtKind::Unsigned, IntKind::Long) |
+            (FmtKind::Signed, IntKind::Long) => VaArg::c_long(untyped.c_long),
+            (FmtKind::Unsigned, IntKind::LongLong) |
+            (FmtKind::Signed, IntKind::LongLong) => VaArg::c_longlong(untyped.c_longlong),
+            (FmtKind::Unsigned, IntKind::IntMax) |
+            (FmtKind::Signed, IntKind::IntMax) => VaArg::intmax_t(untyped.intmax_t),
+            (FmtKind::Unsigned, IntKind::PtrDiff) |
+            (FmtKind::Signed, IntKind::PtrDiff) => VaArg::ptrdiff_t(untyped.ptrdiff_t),
+            (FmtKind::Unsigned, IntKind::Size) |
+            (FmtKind::Signed, IntKind::Size) => VaArg::ssize_t(untyped.ssize_t),
+
+            (FmtKind::AnyNotation, _) | (FmtKind::Decimal, _) | (FmtKind::Scientific, _)
+                => VaArg::c_double(untyped.c_double),
+
+            (FmtKind::GetWritten, _) | (FmtKind::Pointer, _) | (FmtKind::String, _)
+                => VaArg::pointer(untyped.pointer),
+        }
+    }
 }
 #[derive(Default)]
 struct VaListCache {
@@ -133,8 +194,12 @@ struct VaListCache {
     i: usize
 }
 impl VaListCache {
-    unsafe fn get(&mut self, i: usize, ap: &mut VaList, arg: Option<&PrintfArg>) -> VaArg {
+    unsafe fn get(&mut self, i: usize, ap: &mut VaList, default: Option<&PrintfArg>) -> VaArg {
         if let Some(&arg) = self.args.get(i) {
+            let mut arg = arg;
+            if let Some(default) = default {
+                arg = arg.transmute(default);
+            }
             return arg;
         }
         while self.args.len() < i {
@@ -144,8 +209,8 @@ impl VaListCache {
             // defaulting to c_int.
             self.args.push(VaArg::c_int(ap.arg::<c_int>()))
         }
-        self.args.push(match arg {
-            Some(arg) => VaArg::arg_from(arg, ap),
+        self.args.push(match default {
+            Some(default) => VaArg::arg_from(default, ap),
             None => VaArg::c_int(ap.arg::<c_int>())
         });
         self.args[i]

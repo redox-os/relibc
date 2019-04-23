@@ -26,6 +26,9 @@ Positional madness:
 4 3 2
 00002
 |Fiz     |Buz     |     Fiz|     Tot|
+int:          5 double: 0.100000 0.200000 0.300000 0.400000
+-1717986918 0.100000
+-1717986918 0.200000
 
 Float madness:
         1.234568e+02

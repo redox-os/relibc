@@ -33,6 +33,10 @@ int main(void) {
     printf("%3$d %2$d %1$d\n", 2, 3, 4);
     printf("%.*3$d\n", 2, 0, 5);
     printf("|%-*6$.*5$s|%-*6$.*5$s|%*6$.*5$s|%*6$.*5$s|\n", "Fizz", "Buzz", "FizzBuzz", "TotalBuzz", 3, 8);
+    printf("int: %*6$d double: %lf %lf %lf %lf\n", 5, 0.1, 0.2, 0.3, 0.4, 10);
+    printf("%1$d %1$lf\n", 5, 0.1);
+    printf("%1$d %lf\n", 5, 0.2);
+    //printf("int: %*6$d no info on middle types\n", 5, 0.1, 0.2, 0.3, 0.4, 10);
 
     puts("\nFloat madness:");
     printf("%20e\n", 123.456789123);
