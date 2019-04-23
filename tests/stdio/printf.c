@@ -1,7 +1,5 @@
 #include <stdio.h>
 
-#include "test_helpers.h"
-
 int main(void) {
     int sofar = 0;
     int len = printf(
