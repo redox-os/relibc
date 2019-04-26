@@ -628,9 +628,21 @@ pub unsafe extern "C" fn rand() -> c_int {
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn rand_r(seed: *mut c_uint) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn rand_r(seed: *mut c_uint) -> c_int {
+    if seed.is_null() {
+        errno::EINVAL
+    } else {
+        // set the type explicitly so this will fail if the array size for XorShiftRng changes
+        let seed_arr: [u8; 16] = mem::transmute([*seed; 16 / mem::size_of::<c_uint>()]);
+
+        let mut rng = XorShiftRng::from_seed(seed_arr);
+        let ret = rng.gen_range(0, RAND_MAX);
+
+        *seed = ret as _;
+
+        ret
+    }
 }
 
 // #[no_mangle]
