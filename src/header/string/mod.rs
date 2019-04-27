@@ -264,6 +264,15 @@ pub unsafe extern "C" fn strnlen(s: *const c_char, size: size_t) -> size_t {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn strnlen_s(s: *const c_char, size: size_t) -> size_t {
+    if s.is_null() {
+        0
+    } else {
+        strnlen(s, size)
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
     strncat(s1, s2, usize::MAX)
 }
