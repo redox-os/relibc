@@ -1,6 +1,9 @@
 #ifndef _BITS_STDIO_H
 #define _BITS_STDIO_H
 
+// XXX: this is only here because cbindgen can't handle string constants
+#define P_tmpdir "/tmp"
+
 #define EOF (-1)
 
 typedef struct FILE FILE;

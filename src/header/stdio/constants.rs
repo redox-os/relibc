@@ -24,5 +24,14 @@ pub const _IOFBF: c_int = 0;
 pub const _IOLBF: c_int = 1;
 pub const _IONBF: c_int = 2;
 
+// form of name is /XXXXXX, so 7
+pub const L_tmpnam: c_int = 7;
+// 36^6 (26 letters + 10 digits) is larger than i32::MAX, so just set to that
+// for now
+pub const TMP_MAX: int32_t = 2_147_483_647;
+// XXX: defined manually in bits/stdio.h as well because cbindgen can't handle
+//      string constants in any form AFAICT
+pub const P_tmpdir: &'static [u8; 5] = b"/tmp\0";
+
 #[allow(non_camel_case_types)]
 pub type fpos_t = off_t;

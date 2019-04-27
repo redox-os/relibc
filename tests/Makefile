@@ -52,6 +52,7 @@ EXPECT_BINS=\
 	string/strchr \
 	string/strcpy \
 	string/strcspn \
+	string/strlen \
 	string/strncmp \
 	string/strpbrk \
 	string/strrchr \
@@ -96,6 +97,8 @@ BINS=\
 	$(EXPECT_BINS) \
 	dirent/main \
 	pwd \
+	stdio/tempnam \
+	stdio/tmpnam \
 	stdlib/alloc \
 	stdlib/bsearch \
 	stdlib/mktemp \
