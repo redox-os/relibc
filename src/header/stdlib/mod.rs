@@ -86,8 +86,7 @@ pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut 
         /* The size-is-multiple-of-alignment requirement is the only
          * difference between aligned_alloc() and memalign(). */
         memalign(alignment, size)
-    }
-    else {
+    } else {
         platform::errno = errno::EINVAL;
         ptr::null_mut()
     }
@@ -205,7 +204,7 @@ pub unsafe extern "C" fn calloc(nelem: size_t, elsize: size_t) -> *mut c_void {
                 intrinsics::write_bytes(ptr as *mut u8, 0, size);
             }
             ptr
-        },
+        }
         None => {
             // For overflowing multiplication, we have to set errno here
             platform::errno = errno::ENOMEM;
@@ -435,8 +434,7 @@ pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_voi
             platform::errno = errno::ENOMEM;
         }
         ptr
-    }
-    else {
+    } else {
         platform::errno = errno::EINVAL;
         ptr::null_mut()
     }

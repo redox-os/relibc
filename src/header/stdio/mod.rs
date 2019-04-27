@@ -880,7 +880,7 @@ pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut
     unsafe fn is_appropriate(pos_dir: *const c_char) -> bool {
         !pos_dir.is_null() && unistd::access(pos_dir, unistd::W_OK) == 0
     }
-   
+
     // directory search order is env!(TMPDIR), dir, P_tmpdir, "/tmp"
     let dirname = {
         let tmpdir = stdlib::getenv(b"TMPDIR\0".as_ptr() as _);
@@ -896,13 +896,16 @@ pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut
     let prefix_len = string::strnlen_s(pfx, 5);
 
     // allocate enough for dirname "/" prefix "XXXXXX\0"
-    let mut out_buf = platform::alloc(dirname_len + 1 + prefix_len + L_tmpnam as usize + 1) as *mut c_char;
-    
+    let mut out_buf =
+        platform::alloc(dirname_len + 1 + prefix_len + L_tmpnam as usize + 1) as *mut c_char;
+
     if !out_buf.is_null() {
         // copy the directory name and prefix into the allocated buffer
         out_buf.copy_from_nonoverlapping(dirname, dirname_len);
         *out_buf.add(dirname_len) = b'/' as _;
-        out_buf.add(dirname_len + 1).copy_from_nonoverlapping(pfx, prefix_len);
+        out_buf
+            .add(dirname_len + 1)
+            .copy_from_nonoverlapping(pfx, prefix_len);
 
         // use the same mechanism as tmpnam to get the file name
         if tmpnam_inner(out_buf, dirname_len + 1 + prefix_len).is_null() {
@@ -953,7 +956,8 @@ pub unsafe extern "C" fn tmpnam(s: *mut c_char) -> *mut c_char {
 unsafe extern "C" fn tmpnam_inner(buf: *mut c_char, offset: usize) -> *mut c_char {
     const TEMPLATE: &[u8] = b"XXXXXX\0";
 
-    buf.add(offset).copy_from_nonoverlapping(TEMPLATE.as_ptr() as _, TEMPLATE.len());
+    buf.add(offset)
+        .copy_from_nonoverlapping(TEMPLATE.as_ptr() as _, TEMPLATE.len());
 
     let err = platform::errno;
     stdlib::mktemp(buf);
