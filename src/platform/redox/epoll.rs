@@ -2,7 +2,6 @@ use super::super::types::*;
 use super::super::{Pal, PalEpoll};
 use super::Sys;
 
-use c_str::CStr;
 use core::{mem, slice};
 use fs::File;
 use header::errno::*;
@@ -10,13 +9,14 @@ use header::fcntl::*;
 use header::signal::sigset_t;
 use header::sys_epoll::*;
 use io::prelude::*;
+use platform;
 use syscall::data::{Event, TimeSpec};
 use syscall::flag::EVENT_READ;
 
 impl PalEpoll for Sys {
     fn epoll_create1(flags: c_int) -> c_int {
         Sys::open(
-            CStr::from_bytes_with_nul(b"event:\0").unwrap(),
+            c_str!("event:"),
             O_RDWR | flags,
             0,
         )
@@ -48,7 +48,7 @@ impl PalEpoll for Sys {
                 ) as c_int
             },
             _ => {
-                platform::errno = errno::EINVAL;
+                unsafe { platform::errno = EINVAL };
                 return -1;
             }
         }
@@ -65,7 +65,7 @@ impl PalEpoll for Sys {
         assert_eq!(mem::size_of::<epoll_event>(), mem::size_of::<Event>());
 
         let timer_opt = if timeout != -1 {
-            match File::open(CStr::from_bytes_with_nul(b"time:\0").unwrap(), O_RDWR) {
+            match File::open(c_str!("time:4"), O_RDWR) {
                 Err(_) => return -1,
                 Ok(mut timer) => {
                     let mut time = TimeSpec::default();
