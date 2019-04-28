@@ -80,6 +80,7 @@ pub fn select_epoll(
                     data: epoll_data {
                         fd: fd,
                     },
+                    ..Default::default()
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
                     return -1;
@@ -93,6 +94,7 @@ pub fn select_epoll(
                     data: epoll_data {
                         fd: fd,
                     },
+                    ..Default::default()
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
                     return -1;
@@ -106,6 +108,7 @@ pub fn select_epoll(
                     data: epoll_data {
                         fd: fd,
                     },
+                    ..Default::default()
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
                     return -1;
