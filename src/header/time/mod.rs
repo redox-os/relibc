@@ -343,13 +343,13 @@ pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn timelocal(tm: *mut struct tm) -> time_t {
+pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
     //TODO: timezone
     timegm(tm)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn timegm(tm: *mut struct tm) -> time_t {
+pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
     let mut y = (*tm).tm_year as time_t + 1900;
     let mut m = (*tm).tm_mon as time_t + 1;
     if m <= 2 {
