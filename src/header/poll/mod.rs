@@ -54,6 +54,7 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
             data: epoll_data {
                 u64: i as u64,
             },
+            ..Default::default()
         };
 
         for (p, ep) in event_map.iter() {

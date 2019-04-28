@@ -82,6 +82,7 @@ pub fn select_epoll(
                     data: epoll_data {
                         fd: fd,
                     },
+                    ..Default::default()
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
                     if unsafe { platform::errno == errno::EPERM } {
@@ -101,6 +102,7 @@ pub fn select_epoll(
                     data: epoll_data {
                         fd: fd,
                     },
+                    ..Default::default()
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
                     if unsafe { platform::errno == errno::EPERM } {
@@ -120,6 +122,7 @@ pub fn select_epoll(
                     data: epoll_data {
                         fd: fd,
                     },
+                    ..Default::default()
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
                     if unsafe { platform::errno == errno::EPERM } {
