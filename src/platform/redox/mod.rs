@@ -1,6 +1,5 @@
 //! sys/socket implementation, following http://pubs.opengroup.org/onlinepubs/009696699/basedefs/sys/socket.h.html
 
-use cbitset::BitSet;
 use core::result::Result as CoreResult;
 use core::{mem, ptr, slice};
 use syscall::data::Map;
@@ -27,6 +26,7 @@ use io::{self, BufReader, SeekFrom};
 use super::types::*;
 use super::{errno, Pal, Read};
 
+mod epoll;
 mod extra;
 mod signal;
 mod socket;
