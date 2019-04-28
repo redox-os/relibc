@@ -105,13 +105,15 @@ impl PalEpoll for Sys {
         }
         let read = bytes_read as usize / mem::size_of::<epoll_event>();
 
+        let mut count = 0;
         for i in 0..read {
             unsafe {
                 let event_ptr = events.add(i);
                 let event = *(event_ptr as *mut Event);
                 if let Some(ref timer) = timer_opt {
                     if event.id as c_int == timer.fd {
-                        return EINTR;
+                        // Do not count timer event
+                        continue;
                     }
                 }
                 *event_ptr = epoll_event {
@@ -119,9 +121,10 @@ impl PalEpoll for Sys {
                     data: mem::transmute(event.data),
                     ..Default::default()
                 };
+                count += 1;
             }
         }
 
-        read as c_int
+        count as c_int
     }
 }
