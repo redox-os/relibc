@@ -68,15 +68,6 @@ impl PalEpoll for Sys {
             match File::open(c_str!("time:4"), O_RDWR) {
                 Err(_) => return -1,
                 Ok(mut timer) => {
-                    let mut time = TimeSpec::default();
-                    if let Err(err) = timer.read(&mut time) {
-                        return -1;
-                    }
-                    time.tv_nsec += timeout;
-                    if let Err(err) = timer.write(&time) {
-                        return -1;
-                    }
-
                     if Sys::write(
                         epfd,
                         &Event {
@@ -86,6 +77,16 @@ impl PalEpoll for Sys {
                         },
                     ) == -1
                     {
+                        return -1;
+                    }
+
+                    let mut time = TimeSpec::default();
+                    if let Err(err) = timer.read(&mut time) {
+                        return -1;
+                    }
+                    time.tv_sec += (timeout as i64) / 1000;
+                    time.tv_nsec += (timeout % 1000) * 1000000;
+                    if let Err(err) = timer.write(&time) {
                         return -1;
                     }
 
