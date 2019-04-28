@@ -25,7 +25,6 @@ impl PalEpoll for Sys {
     fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> c_int {
         match op {
             EPOLL_CTL_ADD => {
-                println!("Add {}, {}, {}", fd, unsafe { (*event).events }, unsafe { (*event).data.u64 });
                 Sys::write(
                     epfd,
                     &Event {
