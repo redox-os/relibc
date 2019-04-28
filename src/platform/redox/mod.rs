@@ -1,6 +1,5 @@
 //! sys/socket implementation, following http://pubs.opengroup.org/onlinepubs/009696699/basedefs/sys/socket.h.html
 
-use cbitset::BitSet;
 use core::result::Result as CoreResult;
 use core::{mem, ptr, slice};
 use syscall::data::Map;
@@ -27,6 +26,7 @@ use io::{self, BufReader, SeekFrom};
 use super::types::*;
 use super::{errno, Pal, Read};
 
+mod epoll;
 mod extra;
 mod signal;
 mod socket;
@@ -679,141 +679,12 @@ impl Pal for Sys {
         )) as c_int
     }
 
-    fn pipe(fds: &mut [c_int], flags: c_int) -> c_int {
+    fn pipe2(fds: &mut [c_int], flags: c_int) -> c_int {
         let mut usize_fds: [usize; 2] = [0; 2];
         let res = e(syscall::pipe2(&mut usize_fds, flags as usize));
         fds[0] = usize_fds[0] as c_int;
         fds[1] = usize_fds[1] as c_int;
         res as c_int
-    }
-
-    fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
-        let fds = unsafe { slice::from_raw_parts_mut(fds, nfds as usize) };
-
-        let event_path = c_str!("event:");
-        let mut event_file = match File::open(event_path, fcntl::O_RDWR | fcntl::O_CLOEXEC) {
-            Ok(file) => file,
-            Err(_) => return -1,
-        };
-
-        for fd in fds.iter_mut() {
-            let mut flags = 0;
-
-            if fd.events & poll::POLLIN > 0 {
-                flags |= syscall::EVENT_READ;
-            }
-
-            if fd.events & poll::POLLOUT > 0 {
-                flags |= syscall::EVENT_WRITE;
-            }
-
-            fd.revents = 0;
-
-            if fd.fd >= 0 && flags > 0 {
-                if event_file
-                    .write(&syscall::Event {
-                        id: fd.fd as usize,
-                        flags: flags,
-                        data: 0,
-                    })
-                    .is_err()
-                {
-                    return -1;
-                }
-            }
-        }
-
-        const TIMEOUT_TOKEN: usize = 1;
-
-        let timeout_file = if timeout < 0 {
-            None
-        } else {
-            let timeout_path = unsafe {
-                CString::from_vec_unchecked(
-                    format!("time:{}", syscall::CLOCK_MONOTONIC).into_bytes(),
-                )
-            };
-            let mut timeout_file = match File::open(&timeout_path, fcntl::O_RDWR | fcntl::O_CLOEXEC)
-            {
-                Ok(file) => file,
-                Err(_) => return -1,
-            };
-
-            if event_file
-                .write(&syscall::Event {
-                    id: *timeout_file as usize,
-                    flags: syscall::EVENT_READ,
-                    data: TIMEOUT_TOKEN,
-                })
-                .is_err()
-            {
-                return -1;
-            }
-
-            let mut time = syscall::TimeSpec::default();
-            if timeout_file.read(&mut time).is_err() {
-                return -1;
-            }
-
-            time.tv_nsec += timeout * 1000000;
-            while time.tv_nsec >= 1000000000 {
-                time.tv_sec += 1;
-                time.tv_nsec -= 1000000000;
-            }
-
-            // Teehee
-            if timeout == 0 {
-                time.tv_sec += 1;
-            }
-
-            if timeout_file.write(&time).is_err() {
-                return -1;
-            }
-
-            Some(timeout_file)
-        };
-
-        let mut events = [syscall::Event::default(); 32];
-        let read = {
-            let mut events = unsafe {
-                slice::from_raw_parts_mut(
-                    &mut events as *mut _ as *mut u8,
-                    mem::size_of::<syscall::Event>() * events.len(),
-                )
-            };
-            match event_file.read(&mut events) {
-                Ok(i) => i / mem::size_of::<syscall::Event>(),
-                Err(_) => return -1,
-            }
-        };
-
-        for event in &events[..read] {
-            if event.data == TIMEOUT_TOKEN {
-                continue;
-            }
-
-            for fd in fds.iter_mut() {
-                if event.id == fd.fd as usize {
-                    if event.flags & syscall::EVENT_READ > 0 {
-                        fd.revents |= poll::POLLIN;
-                    }
-
-                    if event.flags & syscall::EVENT_WRITE > 0 {
-                        fd.revents |= poll::POLLOUT;
-                    }
-                }
-            }
-        }
-
-        let mut total = 0;
-
-        for fd in fds.iter_mut() {
-            if fd.revents > 0 {
-                total += 1;
-            }
-        }
-
-        total
     }
 
     #[cfg(target_arch = "x86_64")]

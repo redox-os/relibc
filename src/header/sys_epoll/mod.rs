@@ -20,31 +20,32 @@ pub const EPOLL_CTL_ADD: c_int = 1;
 pub const EPOLL_CTL_DEL: c_int = 2;
 pub const EPOLL_CTL_MOD: c_int = 3;
 
-pub const EPOLLIN: u32 =     0x0001;
-pub const EPOLLPRI: u32 =    0x0002;
-pub const EPOLLOUT: u32 =    0x0004;
-pub const EPOLLERR: u32 =    0x0008;
-pub const EPOLLHUP: u32 =    0x0010;
-pub const EPOLLNVAL: u32 =   0x0020;
-pub const EPOLLRDNORM: u32 = 0x0040;
-pub const EPOLLRDBAND: u32 = 0x0080;
-pub const EPOLLWRNORM: u32 = 0x0100;
-pub const EPOLLWRBAND: u32 = 0x0200;
-pub const EPOLLMSG: u32 =    0x0400;
-pub const EPOLLRDHUP: u32 =  0x2000;
-
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub union epoll_data {
     pub ptr: *mut c_void,
     pub fd: c_int,
     pub u32: u32,
     pub u64: u64,
 }
+impl Default for epoll_data {
+    fn default() -> Self {
+        Self { u64: 0 }
+    }
+}
 
 #[repr(C)]
+#[derive(Clone, Copy, Default)]
+// This will match in size with syscall::Event (24 bytes on 64-bit
+// systems) on redox. The `Default` trait is here so we don't need to
+// worry about the padding when using this type.
 pub struct epoll_event {
-    pub events: u32,
-    pub data: epoll_data,
+    pub events: u32, // 4 bytes
+    // 4 automatic alignment bytes
+    pub data: epoll_data, // 8 bytes
+
+    #[cfg(target_os = "redox")]
+    pub _pad: u64, // 8 bytes
 }
 
 #[no_mangle]
