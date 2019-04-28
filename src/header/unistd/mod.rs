@@ -2,6 +2,7 @@
 
 use core::{mem, ptr, slice};
 
+use alloc::collections::LinkedList;
 use c_str::CStr;
 use header::errno;
 use header::limits;
@@ -10,9 +11,9 @@ use header::sys_ioctl;
 use header::sys_time;
 use header::termios;
 use header::time::timespec;
-use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
+use platform;
 
 pub use self::brk::*;
 pub use self::getopt::*;
@@ -41,6 +42,17 @@ pub const F_TEST: c_int = 3;
 pub const STDIN_FILENO: c_int = 0;
 pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
+
+#[thread_local]
+pub static mut fork_hooks_static: Option<[LinkedList<extern "C" fn()>; 3]> = None;
+
+unsafe fn init_fork_hooks<'a>() -> &'a mut [LinkedList<extern "C" fn()>; 3] {
+    // Transmute the lifetime so we can return here. Should be safe as
+    // long as one does not access the original fork_hooks.
+    mem::transmute(fork_hooks_static.get_or_insert_with(|| {
+        [LinkedList::new(), LinkedList::new(), LinkedList::new()]
+    }))
+}
 
 #[no_mangle]
 pub extern "C" fn _exit(status: c_int) {
@@ -214,7 +226,21 @@ pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn fork() -> pid_t {
-    Sys::fork()
+    let fork_hooks = unsafe { init_fork_hooks() };
+    for prepare in &fork_hooks[0] {
+        prepare();
+    }
+    let pid = Sys::fork();
+    if pid == 0 {
+        for child in &fork_hooks[2] {
+            child();
+        }
+    } else if pid != -1 {
+        for parent in &fork_hooks[1] {
+            parent();
+        }
+    }
+    pid
 }
 
 #[no_mangle]
@@ -456,9 +482,16 @@ pub extern "C" fn pthread_atfork(
     parent: Option<extern "C" fn()>,
     child: Option<extern "C" fn()>,
 ) -> c_int {
-    // TODO: WIP implementation available in "atfork" branch. It's
-    // segfaulting at the thread-local stuff, both in Unix and Redox.
-    // unimplemented!();
+    let fork_hooks = unsafe { init_fork_hooks() };
+    if let Some(prepare) = prepare {
+        fork_hooks[0].push_back(prepare);
+    }
+    if let Some(parent) = parent {
+        fork_hooks[1].push_back(parent);
+    }
+    if let Some(child) = child {
+        fork_hooks[2].push_back(child);
+    }
     0
 }
 
