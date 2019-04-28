@@ -23,18 +23,18 @@ impl PalEpoll for Sys {
     }
 
     fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> c_int {
-        let flags = unsafe { (*event).events };
         Sys::write(epfd, &Event {
             id: fd as usize,
-            flags: flags as usize,
-            data: event as usize
+            flags: unsafe { (*event).events as usize },
+
+            // NOTE: Danger when using non 64-bit systems. If this is
+            // needed, use a box or something
+            data: unsafe { mem::transmute((*event).data) }
         }) as c_int
     }
 
     fn epoll_pwait(epfd: c_int, mut events: *mut epoll_event, maxevents: c_int, timeout: c_int, _sigset: *const sigset_t) -> c_int {
         // TODO: sigset
-
-        let mut redox_events = vec![Event::default(); maxevents as usize];
 
         let _timer;
         if timeout != -1 {
@@ -63,20 +63,25 @@ impl PalEpoll for Sys {
         }
 
         let bytes_read = Sys::read(epfd, unsafe { slice::from_raw_parts_mut(
-            redox_events.as_mut_ptr() as *mut u8,
-            redox_events.len() * mem::size_of::<Event>()
+            events as *mut u8,
+            maxevents as usize
         ) });
         if bytes_read == -1 {
             return -1;
         }
         let read = bytes_read as usize / mem::size_of::<Event>();
 
-        for event in &redox_events {
-            if event.data == 0 {
-                return EINTR;
-            }
+        for i in 0..maxevents {
             unsafe {
-                *events = *(event.data as *mut epoll_event);
+                let event = *(events as *mut Event);
+                if event.data == 0 {
+                    return EINTR;
+                }
+                *events = epoll_event {
+                    events: event.flags as _,
+                    data: mem::transmute(event.data),
+                    ..Default::default()
+                };
                 events = events.add(mem::size_of::<epoll_event>());
             }
         }
