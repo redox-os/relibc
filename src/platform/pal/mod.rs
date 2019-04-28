@@ -114,7 +114,7 @@ pub trait Pal {
 
     fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int;
 
-    fn pipe(fildes: &mut [c_int]) -> c_int;
+    fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int;
 
     unsafe fn pte_clone(stack: *mut usize) -> pid_t;
 

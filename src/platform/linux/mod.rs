@@ -315,8 +315,8 @@ impl Pal for Sys {
         e(unsafe { syscall!(OPENAT, AT_FDCWD, path.as_ptr(), oflag, mode) }) as c_int
     }
 
-    fn pipe(fildes: &mut [c_int]) -> c_int {
-        e(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), 0) }) as c_int
+    fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int {
+        e(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), flags) }) as c_int
     }
 
     #[cfg(target_arch = "x86_64")]
