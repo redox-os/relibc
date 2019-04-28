@@ -1,6 +1,6 @@
+use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::string::ToString;
-use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::ffi::VaList;
 use core::ops::Range;
@@ -16,7 +16,6 @@ use platform::types::*;
 // | |_) | (_) | | |  __/ |  | |_) | | (_| | ||  __/_
 // |____/ \___/|_|_|\___|_|  | .__/|_|\__,_|\__\___(_)
 //                           |_|
-
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum IntKind {
@@ -43,19 +42,19 @@ enum FmtKind {
     String,
     Char,
     Pointer,
-    GetWritten
+    GetWritten,
 }
 #[derive(Clone, Copy, Debug)]
 enum Number {
     Static(usize),
     Index(usize),
-    Next
+    Next,
 }
 impl Number {
     unsafe fn resolve(&self, varargs: &mut VaListCache, ap: &mut VaList) -> usize {
         let arg = match *self {
             Number::Static(num) => return num,
-            Number::Index(i) => varargs.get(i-1, ap, None),
+            Number::Index(i) => varargs.get(i - 1, ap, None),
             Number::Next => {
                 let i = varargs.i;
                 varargs.i += 1;
@@ -72,7 +71,7 @@ impl Number {
             VaArg::intmax_t(i) => i as usize,
             VaArg::pointer(i) => i as usize,
             VaArg::ptrdiff_t(i) => i as usize,
-            VaArg::ssize_t(i) => i as usize
+            VaArg::ssize_t(i) => i as usize,
         }
     }
 }
@@ -87,7 +86,7 @@ enum VaArg {
     intmax_t(intmax_t),
     pointer(*const c_void),
     ptrdiff_t(ptrdiff_t),
-    ssize_t(ssize_t)
+    ssize_t(ssize_t),
 }
 impl VaArg {
     unsafe fn arg_from(arg: &PrintfArg, ap: &mut VaList) -> VaArg {
@@ -101,29 +100,38 @@ impl VaArg {
         match (arg.fmtkind, arg.intkind) {
             (FmtKind::Percent, _) => panic!("Can't call arg_from on %"),
 
-            (FmtKind::Char, _) |
-            (FmtKind::Unsigned, IntKind::Byte) |
-            (FmtKind::Signed, IntKind::Byte) => VaArg::c_char(ap.arg::<c_char>()),
-            (FmtKind::Unsigned, IntKind::Short) |
-            (FmtKind::Signed, IntKind::Short) => VaArg::c_short(ap.arg::<c_short>()),
-            (FmtKind::Unsigned, IntKind::Int) |
-            (FmtKind::Signed, IntKind::Int) => VaArg::c_int(ap.arg::<c_int>()),
-            (FmtKind::Unsigned, IntKind::Long) |
-            (FmtKind::Signed, IntKind::Long) => VaArg::c_long(ap.arg::<c_long>()),
-            (FmtKind::Unsigned, IntKind::LongLong) |
-            (FmtKind::Signed, IntKind::LongLong) => VaArg::c_longlong(ap.arg::<c_longlong>()),
-            (FmtKind::Unsigned, IntKind::IntMax) |
-            (FmtKind::Signed, IntKind::IntMax) => VaArg::intmax_t(ap.arg::<intmax_t>()),
-            (FmtKind::Unsigned, IntKind::PtrDiff) |
-            (FmtKind::Signed, IntKind::PtrDiff) => VaArg::ptrdiff_t(ap.arg::<ptrdiff_t>()),
-            (FmtKind::Unsigned, IntKind::Size) |
-            (FmtKind::Signed, IntKind::Size) => VaArg::ssize_t(ap.arg::<ssize_t>()),
+            (FmtKind::Char, _)
+            | (FmtKind::Unsigned, IntKind::Byte)
+            | (FmtKind::Signed, IntKind::Byte) => VaArg::c_char(ap.arg::<c_char>()),
+            (FmtKind::Unsigned, IntKind::Short) | (FmtKind::Signed, IntKind::Short) => {
+                VaArg::c_short(ap.arg::<c_short>())
+            }
+            (FmtKind::Unsigned, IntKind::Int) | (FmtKind::Signed, IntKind::Int) => {
+                VaArg::c_int(ap.arg::<c_int>())
+            }
+            (FmtKind::Unsigned, IntKind::Long) | (FmtKind::Signed, IntKind::Long) => {
+                VaArg::c_long(ap.arg::<c_long>())
+            }
+            (FmtKind::Unsigned, IntKind::LongLong) | (FmtKind::Signed, IntKind::LongLong) => {
+                VaArg::c_longlong(ap.arg::<c_longlong>())
+            }
+            (FmtKind::Unsigned, IntKind::IntMax) | (FmtKind::Signed, IntKind::IntMax) => {
+                VaArg::intmax_t(ap.arg::<intmax_t>())
+            }
+            (FmtKind::Unsigned, IntKind::PtrDiff) | (FmtKind::Signed, IntKind::PtrDiff) => {
+                VaArg::ptrdiff_t(ap.arg::<ptrdiff_t>())
+            }
+            (FmtKind::Unsigned, IntKind::Size) | (FmtKind::Signed, IntKind::Size) => {
+                VaArg::ssize_t(ap.arg::<ssize_t>())
+            }
 
-            (FmtKind::AnyNotation, _) | (FmtKind::Decimal, _) | (FmtKind::Scientific, _)
-                => VaArg::c_double(ap.arg::<c_double>()),
+            (FmtKind::AnyNotation, _) | (FmtKind::Decimal, _) | (FmtKind::Scientific, _) => {
+                VaArg::c_double(ap.arg::<c_double>())
+            }
 
-            (FmtKind::GetWritten, _) | (FmtKind::Pointer, _) | (FmtKind::String, _)
-                => VaArg::pointer(ap.arg::<*const c_void>()),
+            (FmtKind::GetWritten, _) | (FmtKind::Pointer, _) | (FmtKind::String, _) => {
+                VaArg::pointer(ap.arg::<*const c_void>())
+            }
         }
     }
     unsafe fn transmute(&self, arg: &PrintfArg) -> VaArg {
@@ -145,7 +153,7 @@ impl VaArg {
             intmax_t: intmax_t,
             pointer: *const c_void,
             ptrdiff_t: ptrdiff_t,
-            ssize_t: ssize_t
+            ssize_t: ssize_t,
         }
         let untyped = match *self {
             VaArg::c_char(i) => Untyped { c_char: i },
@@ -157,41 +165,50 @@ impl VaArg {
             VaArg::intmax_t(i) => Untyped { intmax_t: i },
             VaArg::pointer(i) => Untyped { pointer: i },
             VaArg::ptrdiff_t(i) => Untyped { ptrdiff_t: i },
-            VaArg::ssize_t(i) => Untyped { ssize_t: i }
+            VaArg::ssize_t(i) => Untyped { ssize_t: i },
         };
         match (arg.fmtkind, arg.intkind) {
             (FmtKind::Percent, _) => panic!("Can't call transmute on %"),
 
-            (FmtKind::Char, _) |
-            (FmtKind::Unsigned, IntKind::Byte) |
-            (FmtKind::Signed, IntKind::Byte) => VaArg::c_char(untyped.c_char),
-            (FmtKind::Unsigned, IntKind::Short) |
-            (FmtKind::Signed, IntKind::Short) => VaArg::c_short(untyped.c_short),
-            (FmtKind::Unsigned, IntKind::Int) |
-            (FmtKind::Signed, IntKind::Int) => VaArg::c_int(untyped.c_int),
-            (FmtKind::Unsigned, IntKind::Long) |
-            (FmtKind::Signed, IntKind::Long) => VaArg::c_long(untyped.c_long),
-            (FmtKind::Unsigned, IntKind::LongLong) |
-            (FmtKind::Signed, IntKind::LongLong) => VaArg::c_longlong(untyped.c_longlong),
-            (FmtKind::Unsigned, IntKind::IntMax) |
-            (FmtKind::Signed, IntKind::IntMax) => VaArg::intmax_t(untyped.intmax_t),
-            (FmtKind::Unsigned, IntKind::PtrDiff) |
-            (FmtKind::Signed, IntKind::PtrDiff) => VaArg::ptrdiff_t(untyped.ptrdiff_t),
-            (FmtKind::Unsigned, IntKind::Size) |
-            (FmtKind::Signed, IntKind::Size) => VaArg::ssize_t(untyped.ssize_t),
+            (FmtKind::Char, _)
+            | (FmtKind::Unsigned, IntKind::Byte)
+            | (FmtKind::Signed, IntKind::Byte) => VaArg::c_char(untyped.c_char),
+            (FmtKind::Unsigned, IntKind::Short) | (FmtKind::Signed, IntKind::Short) => {
+                VaArg::c_short(untyped.c_short)
+            }
+            (FmtKind::Unsigned, IntKind::Int) | (FmtKind::Signed, IntKind::Int) => {
+                VaArg::c_int(untyped.c_int)
+            }
+            (FmtKind::Unsigned, IntKind::Long) | (FmtKind::Signed, IntKind::Long) => {
+                VaArg::c_long(untyped.c_long)
+            }
+            (FmtKind::Unsigned, IntKind::LongLong) | (FmtKind::Signed, IntKind::LongLong) => {
+                VaArg::c_longlong(untyped.c_longlong)
+            }
+            (FmtKind::Unsigned, IntKind::IntMax) | (FmtKind::Signed, IntKind::IntMax) => {
+                VaArg::intmax_t(untyped.intmax_t)
+            }
+            (FmtKind::Unsigned, IntKind::PtrDiff) | (FmtKind::Signed, IntKind::PtrDiff) => {
+                VaArg::ptrdiff_t(untyped.ptrdiff_t)
+            }
+            (FmtKind::Unsigned, IntKind::Size) | (FmtKind::Signed, IntKind::Size) => {
+                VaArg::ssize_t(untyped.ssize_t)
+            }
 
-            (FmtKind::AnyNotation, _) | (FmtKind::Decimal, _) | (FmtKind::Scientific, _)
-                => VaArg::c_double(untyped.c_double),
+            (FmtKind::AnyNotation, _) | (FmtKind::Decimal, _) | (FmtKind::Scientific, _) => {
+                VaArg::c_double(untyped.c_double)
+            }
 
-            (FmtKind::GetWritten, _) | (FmtKind::Pointer, _) | (FmtKind::String, _)
-                => VaArg::pointer(untyped.pointer),
+            (FmtKind::GetWritten, _) | (FmtKind::Pointer, _) | (FmtKind::String, _) => {
+                VaArg::pointer(untyped.pointer)
+            }
         }
     }
 }
 #[derive(Default)]
 struct VaListCache {
     args: Vec<VaArg>,
-    i: usize
+    i: usize,
 }
 impl VaListCache {
     unsafe fn get(&mut self, i: usize, ap: &mut VaList, default: Option<&PrintfArg>) -> VaArg {
@@ -211,7 +228,7 @@ impl VaListCache {
         }
         self.args.push(match default {
             Some(default) => VaArg::arg_from(default, ap),
-            None => VaArg::c_int(ap.arg::<c_int>())
+            None => VaArg::c_int(ap.arg::<c_int>()),
         });
         self.args[i]
     }
@@ -223,7 +240,6 @@ impl VaListCache {
 //  | || | | | | | |_) | |  __/ | | | | |  __/ | | | || (_| | |_| | (_) | | | |_
 // |___|_| |_| |_| .__/|_|\___|_| |_| |_|\___|_| |_|\__\__,_|\__|_|\___/|_| |_(_)
 //               |_|
-
 
 unsafe fn pop_int_raw(format: &mut *const u8) -> Option<usize> {
     let mut int = None;
@@ -251,11 +267,7 @@ unsafe fn pop_index(format: &mut *const u8) -> Option<usize> {
 unsafe fn pop_int(format: &mut *const u8) -> Option<Number> {
     if **format == b'*' {
         *format = format.add(1);
-        Some(
-            pop_index(format)
-                .map(Number::Index)
-                .unwrap_or(Number::Next)
-        )
+        Some(pop_index(format).map(Number::Index).unwrap_or(Number::Next))
     } else {
         pop_int_raw(format).map(Number::Static)
     }
@@ -270,7 +282,10 @@ where
         b'u' => i.to_string(),
         b'x' => format!("{:x}", i),
         b'X' => format!("{:X}", i),
-        _ => panic!("fmt_int should never be called with the fmt {:?}", fmt as char),
+        _ => panic!(
+            "fmt_int should never be called with the fmt {:?}",
+            fmt as char
+        ),
     }
 }
 
@@ -384,7 +399,7 @@ fn fmt_float_normal<W: Write>(
 
 #[derive(Clone, Copy)]
 struct PrintfIter {
-    format: *const u8
+    format: *const u8,
 }
 #[derive(Clone, Copy)]
 struct PrintfArg {
@@ -400,11 +415,11 @@ struct PrintfArg {
     pad_zero: Number,
     intkind: IntKind,
     fmt: u8,
-    fmtkind: FmtKind
+    fmtkind: FmtKind,
 }
 enum PrintfFmt {
     Plain(&'static [u8]),
-    Arg(PrintfArg)
+    Arg(PrintfArg),
 }
 impl Iterator for PrintfIter {
     type Item = Result<PrintfFmt, ()>;
@@ -429,11 +444,10 @@ impl Iterator for PrintfIter {
             self.format = self.format.add(1);
 
             let mut peekahead = self.format;
-            let index = pop_index(&mut peekahead)
-                .map(|i| {
-                    self.format = peekahead;
-                    i
-                });
+            let index = pop_index(&mut peekahead).map(|i| {
+                self.format = peekahead;
+                i
+            });
 
             // Flags:
             let mut alternate = false;
@@ -525,18 +539,17 @@ impl Iterator for PrintfIter {
                 pad_zero,
                 intkind,
                 fmt,
-                fmtkind
+                fmtkind,
             })))
         }
     }
 }
 
-
 unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) -> io::Result<c_int> {
     let w = &mut platform::CountingWriter::new(w);
 
     let iterator = PrintfIter {
-        format: format as *const u8
+        format: format as *const u8,
     };
 
     // Pre-fetch vararg types
@@ -548,13 +561,13 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
         let arg = match section {
             Ok(PrintfFmt::Plain(text)) => continue,
             Ok(PrintfFmt::Arg(arg)) => arg,
-            Err(()) => return Ok(-1)
+            Err(()) => return Ok(-1),
         };
         if arg.fmtkind == FmtKind::Percent {
             continue;
         }
         if let Some(i) = arg.index {
-            positional.insert(i-1, arg);
+            positional.insert(i - 1, arg);
         } else {
             varargs.args.push(VaArg::arg_from(&arg, &mut ap));
         }
@@ -570,9 +583,9 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
             Ok(PrintfFmt::Plain(text)) => {
                 w.write_all(text)?;
                 continue;
-            },
+            }
             Ok(PrintfFmt::Arg(arg)) => arg,
-            Err(()) => return Ok(-1)
+            Err(()) => return Ok(-1),
         };
         let alternate = arg.alternate;
         let zero = arg.zero;
@@ -587,15 +600,15 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
         let fmt = arg.fmt;
         let fmtkind = arg.fmtkind;
 
-        let index = arg.index
-            .map(|i| i-1)
-            .unwrap_or_else(|| if fmtkind == FmtKind::Percent {
+        let index = arg.index.map(|i| i - 1).unwrap_or_else(|| {
+            if fmtkind == FmtKind::Percent {
                 0
             } else {
                 let i = varargs.i;
                 varargs.i += 1;
                 i
-            });
+            }
+        });
 
         match fmtkind {
             FmtKind::Percent => w.write_all(&[b'%'])?,
@@ -610,7 +623,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     VaArg::intmax_t(i) => i.to_string(),
                     VaArg::pointer(i) => (i as usize).to_string(),
                     VaArg::ptrdiff_t(i) => i.to_string(),
-                    VaArg::ssize_t(i) => i.to_string()
+                    VaArg::ssize_t(i) => i.to_string(),
                 };
                 let positive = !string.starts_with('-');
                 let zero = precision == Some(0) && string == "0";
@@ -645,7 +658,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 }
 
                 pad(w, left, b' ', final_len..pad_space)?;
-            },
+            }
             FmtKind::Unsigned => {
                 let string = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::c_char(i) => fmt_int(fmt, i as c_uchar),
@@ -657,7 +670,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     VaArg::intmax_t(i) => fmt_int(fmt, i as uintmax_t),
                     VaArg::pointer(i) => fmt_int(fmt, i as usize),
                     VaArg::ptrdiff_t(i) => fmt_int(fmt, i as size_t),
-                    VaArg::ssize_t(i) => fmt_int(fmt, i as size_t)
+                    VaArg::ssize_t(i) => fmt_int(fmt, i as size_t),
                 };
                 let zero = precision == Some(0) && string == "0";
 
@@ -699,29 +712,31 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 }
 
                 pad(w, left, b' ', final_len..pad_space)?;
-            },
+            }
             FmtKind::Scientific => {
                 let mut float = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::c_double(i) => i,
-                    _ => panic!("this should not be possible")
+                    _ => panic!("this should not be possible"),
                 };
                 let precision = precision.unwrap_or(6);
 
-                fmt_float_exp(w, fmt, None, false, precision, float, left, pad_space, pad_zero)?;
-            },
+                fmt_float_exp(
+                    w, fmt, None, false, precision, float, left, pad_space, pad_zero,
+                )?;
+            }
             FmtKind::Decimal => {
                 let mut float = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::c_double(i) => i,
-                    _ => panic!("this should not be possible")
+                    _ => panic!("this should not be possible"),
                 };
                 let precision = precision.unwrap_or(6);
 
                 fmt_float_normal(w, false, precision, float, left, pad_space, pad_zero)?;
-            },
+            }
             FmtKind::AnyNotation => {
                 let mut float = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::c_double(i) => i,
-                    _ => panic!("this should not be possible")
+                    _ => panic!("this should not be possible"),
                 };
                 let exp_fmt = b'E' | (fmt & 32);
                 let precision = precision.unwrap_or(6);
@@ -739,13 +754,13 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 )? {
                     fmt_float_normal(w, true, precision, float, left, pad_space, pad_zero)?;
                 }
-            },
+            }
             FmtKind::String => {
                 // if intkind == IntKind::Long || intkind == IntKind::LongLong, handle *const wchar_t
 
                 let mut ptr = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::pointer(p) => p,
-                    _ => panic!("this should not be possible")
+                    _ => panic!("this should not be possible"),
                 } as *const c_char;
 
                 if ptr.is_null() {
@@ -761,23 +776,23 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     w.write_all(slice::from_raw_parts(ptr as *const u8, len))?;
                     pad(w, left, b' ', len..pad_space)?;
                 }
-            },
+            }
             FmtKind::Char => {
                 // if intkind == IntKind::Long || intkind == IntKind::LongLong, handle wint_t
 
                 let c = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::c_char(c) => c,
-                    _ => panic!("this should not be possible")
+                    _ => panic!("this should not be possible"),
                 };
 
                 pad(w, !left, b' ', 1..pad_space)?;
                 w.write_all(&[c as u8])?;
                 pad(w, left, b' ', 1..pad_space)?;
-            },
+            }
             FmtKind::Pointer => {
                 let mut ptr = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::pointer(p) => p,
-                    _ => panic!("this should not be possible")
+                    _ => panic!("this should not be possible"),
                 };
 
                 let mut len = 1;
@@ -798,11 +813,11 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     write!(w, "0x{:x}", ptr as usize)?;
                 }
                 pad(w, left, b' ', len..pad_space)?;
-            },
+            }
             FmtKind::GetWritten => {
                 let mut ptr = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::pointer(p) => p,
-                    _ => panic!("this should not be possible")
+                    _ => panic!("this should not be possible"),
                 };
 
                 match intkind {
@@ -813,7 +828,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     IntKind::LongLong => *(ptr as *mut c_longlong) = w.written as c_longlong,
                     IntKind::IntMax => *(ptr as *mut intmax_t) = w.written as intmax_t,
                     IntKind::PtrDiff => *(ptr as *mut ptrdiff_t) = w.written as ptrdiff_t,
-                    IntKind::Size => *(ptr as *mut size_t) = w.written as size_t
+                    IntKind::Size => *(ptr as *mut size_t) = w.written as size_t,
                 }
             }
         }

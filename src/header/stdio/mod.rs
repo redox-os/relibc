@@ -11,7 +11,7 @@ use core::{fmt, mem, ptr, slice, str};
 use c_str::CStr;
 use fs::File;
 use header::errno::{self, STR_ERROR};
-use header::string::strlen;
+use header::string::{self, strlen};
 use header::{fcntl, stdlib, unistd};
 use io::{self, BufRead, LineWriter, Read, Write};
 use mutex::Mutex;
@@ -33,6 +33,8 @@ mod ext;
 mod helpers;
 mod printf;
 mod scanf;
+
+static mut TMPNAM_BUF: [c_char; L_tmpnam as usize + 1] = [0; L_tmpnam as usize + 1];
 
 enum Buffer<'a> {
     Borrowed(&'a mut [u8]),
@@ -873,9 +875,47 @@ pub unsafe extern "C" fn setvbuf(
     0
 }
 
-// #[no_mangle]
-pub extern "C" fn tempnam(_dir: *const c_char, _pfx: *const c_char) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut c_char {
+    unsafe fn is_appropriate(pos_dir: *const c_char) -> bool {
+        !pos_dir.is_null() && unistd::access(pos_dir, unistd::W_OK) == 0
+    }
+
+    // directory search order is env!(TMPDIR), dir, P_tmpdir, "/tmp"
+    let dirname = {
+        let tmpdir = stdlib::getenv(b"TMPDIR\0".as_ptr() as _);
+        [tmpdir, dir, P_tmpdir.as_ptr() as _]
+            .into_iter()
+            .map(|&d| d)
+            .skip_while(|&d| !is_appropriate(d))
+            .next()
+            .unwrap_or(b"/tmp\0".as_ptr() as _)
+    };
+    let dirname_len = string::strlen(dirname);
+
+    let prefix_len = string::strnlen_s(pfx, 5);
+
+    // allocate enough for dirname "/" prefix "XXXXXX\0"
+    let mut out_buf =
+        platform::alloc(dirname_len + 1 + prefix_len + L_tmpnam as usize + 1) as *mut c_char;
+
+    if !out_buf.is_null() {
+        // copy the directory name and prefix into the allocated buffer
+        out_buf.copy_from_nonoverlapping(dirname, dirname_len);
+        *out_buf.add(dirname_len) = b'/' as _;
+        out_buf
+            .add(dirname_len + 1)
+            .copy_from_nonoverlapping(pfx, prefix_len);
+
+        // use the same mechanism as tmpnam to get the file name
+        if tmpnam_inner(out_buf, dirname_len + 1 + prefix_len).is_null() {
+            // failed to find a valid file name, so we need to free the buffer
+            platform::free(out_buf as _);
+            out_buf = ptr::null_mut();
+        }
+    }
+
+    out_buf
 }
 
 #[no_mangle]
@@ -901,9 +941,33 @@ pub unsafe extern "C" fn tmpfile() -> *mut FILE {
     fp
 }
 
-// #[no_mangle]
-pub extern "C" fn tmpnam(_s: *mut c_char) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn tmpnam(s: *mut c_char) -> *mut c_char {
+    let buf = if s.is_null() {
+        TMPNAM_BUF.as_mut_ptr()
+    } else {
+        s
+    };
+
+    *buf = b'/' as _;
+    tmpnam_inner(buf, 1)
+}
+
+unsafe extern "C" fn tmpnam_inner(buf: *mut c_char, offset: usize) -> *mut c_char {
+    const TEMPLATE: &[u8] = b"XXXXXX\0";
+
+    buf.add(offset)
+        .copy_from_nonoverlapping(TEMPLATE.as_ptr() as _, TEMPLATE.len());
+
+    let err = platform::errno;
+    stdlib::mktemp(buf);
+    platform::errno = err;
+
+    if *buf == 0 {
+        ptr::null_mut()
+    } else {
+        buf
+    }
 }
 
 /// Push character `c` back onto `stream` so it'll be read next

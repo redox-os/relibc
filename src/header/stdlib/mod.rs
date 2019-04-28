@@ -1,7 +1,7 @@
 //! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 
 use core::{intrinsics, iter, mem, ptr, slice};
-use rand::distributions::Alphanumeric;
+use rand::distributions::{Alphanumeric, Distribution, Uniform};
 use rand::prng::XorShiftRng;
 use rand::rngs::JitterRng;
 use rand::{Rng, SeedableRng};
@@ -33,6 +33,10 @@ pub const MB_LEN_MAX: c_int = 4;
 
 static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
 static mut RNG: Option<XorShiftRng> = None;
+
+lazy_static! {
+    static ref RNG_SAMPLER: Uniform<c_int> = Uniform::new_inclusive(0, RAND_MAX);
+}
 
 #[no_mangle]
 pub extern "C" fn _Exit(status: c_int) {
@@ -82,8 +86,7 @@ pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut 
         /* The size-is-multiple-of-alignment requirement is the only
          * difference between aligned_alloc() and memalign(). */
         memalign(alignment, size)
-    }
-    else {
+    } else {
         platform::errno = errno::EINVAL;
         ptr::null_mut()
     }
@@ -201,7 +204,7 @@ pub unsafe extern "C" fn calloc(nelem: size_t, elsize: size_t) -> *mut c_void {
                 intrinsics::write_bytes(ptr as *mut u8, 0, size);
             }
             ptr
-        },
+        }
         None => {
             // For overflowing multiplication, we have to set errno here
             platform::errno = errno::ENOMEM;
@@ -431,8 +434,7 @@ pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_voi
             platform::errno = errno::ENOMEM;
         }
         ptr
-    }
-    else {
+    } else {
         platform::errno = errno::EINVAL;
         ptr::null_mut()
     }
@@ -618,19 +620,31 @@ pub extern "C" fn qsort(
 #[no_mangle]
 pub unsafe extern "C" fn rand() -> c_int {
     match RNG {
-        Some(ref mut rng) => rng.gen_range(0, RAND_MAX),
+        Some(ref mut rng) => RNG_SAMPLER.sample(rng),
         None => {
             let mut rng = XorShiftRng::from_seed([1; 16]);
-            let ret = rng.gen_range(0, RAND_MAX);
+            let ret = RNG_SAMPLER.sample(&mut rng);
             RNG = Some(rng);
             ret
         }
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn rand_r(seed: *mut c_uint) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn rand_r(seed: *mut c_uint) -> c_int {
+    if seed.is_null() {
+        errno::EINVAL
+    } else {
+        // set the type explicitly so this will fail if the array size for XorShiftRng changes
+        let seed_arr: [u8; 16] = mem::transmute([*seed; 16 / mem::size_of::<c_uint>()]);
+
+        let mut rng = XorShiftRng::from_seed(seed_arr);
+        let ret = RNG_SAMPLER.sample(&mut rng);
+
+        *seed = ret as _;
+
+        ret
+    }
 }
 
 // #[no_mangle]
