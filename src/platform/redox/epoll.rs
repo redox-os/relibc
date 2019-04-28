@@ -23,32 +23,37 @@ impl PalEpoll for Sys {
     }
 
     fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> c_int {
-        Sys::write(
-            epfd,
-            &Event {
-                id: fd as usize,
-                flags: unsafe { (*event).events as usize },
+        match op {
+            EPOLL_CTL_ADD => {
+                println!("Add {}, {}, {}", fd, unsafe { (*event).events }, unsafe { (*event).data.u64 });
+                Sys::write(
+                    epfd,
+                    &Event {
+                        id: fd as usize,
+                        flags: unsafe { (*event).events as usize },
 
-                // NOTE: Danger when using non 64-bit systems. If this is
-                // needed, use a box or something
-                data: unsafe { mem::transmute((*event).data) },
+                        // NOTE: Danger when using non 64-bit systems. If this is
+                        // needed, use a box or something
+                        data: unsafe { mem::transmute((*event).data) },
+                    },
+                ) as c_int
             },
-        ) as c_int
+            _ => unimplemented!()
+        }
     }
 
     fn epoll_pwait(
         epfd: c_int,
-        mut events: *mut epoll_event,
+        events: *mut epoll_event,
         maxevents: c_int,
         timeout: c_int,
         _sigset: *const sigset_t,
     ) -> c_int {
         // TODO: sigset
+        assert_eq!(mem::size_of::<epoll_event>(), mem::size_of::<Event>());
 
-        let _timer;
-        if timeout != -1 {
-            _timer = File::open(CStr::from_bytes_with_nul(b"time:\0").unwrap(), O_RDWR);
-            match _timer {
+        let timer_opt = if timeout != -1 {
+            match File::open(CStr::from_bytes_with_nul(b"time:\0").unwrap(), O_RDWR) {
                 Err(_) => return -1,
                 Ok(mut timer) => {
                     let mut time = TimeSpec::default();
@@ -71,9 +76,13 @@ impl PalEpoll for Sys {
                     {
                         return -1;
                     }
+
+                    Some(timer)
                 }
             }
-        }
+        } else {
+            None
+        };
 
         let bytes_read = Sys::read(epfd, unsafe {
             slice::from_raw_parts_mut(events as *mut u8, maxevents as usize)
@@ -81,20 +90,22 @@ impl PalEpoll for Sys {
         if bytes_read == -1 {
             return -1;
         }
-        let read = bytes_read as usize / mem::size_of::<Event>();
+        let read = bytes_read as usize / mem::size_of::<epoll_event>();
 
-        for i in 0..maxevents {
+        for i in 0..read {
             unsafe {
-                let event = *(events as *mut Event);
-                if event.data == 0 {
-                    return EINTR;
+                let event_ptr = events.add(i);
+                let event = *(event_ptr as *mut Event);
+                if let Some(ref timer) = timer_opt {
+                    if event.id as c_int == timer.fd {
+                        return EINTR;
+                    }
                 }
-                *events = epoll_event {
+                *event_ptr = epoll_event {
                     events: event.flags as _,
                     data: mem::transmute(event.data),
                     ..Default::default()
                 };
-                events = events.add(mem::size_of::<epoll_event>());
             }
         }
 
