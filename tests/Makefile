@@ -1,5 +1,3 @@
-SYSROOT?=../sysroot
-
 # Binaries that should generate the same output every time
 EXPECT_NAMES=\
 	alloca \
@@ -130,14 +128,14 @@ all: $(BINS)
 clean:
 	rm -rf bins gen *.out
 
-run: | $(SYSROOT) $(BINS)
+run: | $(BINS)
 	for name in $(NAMES); \
 	do \
 		echo "# $${name} #"; \
 		"bins/$${name}" test args || exit $$?; \
 	done
 
-expected: | $(SYSROOT) $(EXPECT_BINS)
+expected: | $(EXPECT_BINS)
 	rm -rf expected
 	mkdir -p expected
 	for name in $(EXPECT_NAMES); \
@@ -147,7 +145,7 @@ expected: | $(SYSROOT) $(EXPECT_BINS)
 		"bins/$${name}" test args > "expected/$${name}.stdout" 2> "expected/$${name}.stderr" || exit $$?; \
 	done
 
-verify: | $(SYSROOT) $(EXPECT_BINS)
+verify: | $(EXPECT_BINS)
 	rm -rf gen
 	mkdir -p gen
 	for name in $(EXPECT_NAMES); \
@@ -167,22 +165,31 @@ CFLAGS=\
 	-Wall \
 	-pedantic \
 	-g \
-	-nostdinc \
-	-nostdlib \
-	-isystem $(SYSROOT)/include \
 	-I .
 
-HEADLIBS=\
-	$(SYSROOT)/lib/crt0.o \
-	$(SYSROOT)/lib/crti.o
+LIBS=
 
-TAILLIBS=\
-	$(SYSROOT)/lib/libc.a \
-	$(SYSROOT)/lib/crtn.o
+NATIVE_RELIBC?=0
+ifeq ($(NATIVE_RELIBC),0)
+CFLAGS+=\
+	-nostdinc \
+	-nostdlib \
+	-isystem ../sysroot/include \
+	../sysroot/lib/crt0.o \
+	../sysroot/lib/crti.o
+
+LIBS=\
+	../sysroot/lib/libc.a \
+	../sysroot/lib/crtn.o
 
 ../sysroot:
 	$(MAKE) -C .. sysroot
 
-bins/%: %.c $(SYSROOT)
+bins/%: %.c ../sysroot
 	mkdir -p "$$(dirname "$@")"
-	$(CC) $(CFLAGS) $(HEADLIBS) "$<" $(TAILLIBS) -o "$@"
+	$(CC) $(CFLAGS) "$<" $(LIBS) -o "$@"
+else
+bins/%: %.c
+	mkdir -p "$$(dirname "$@")"
+	$(CC) $(CFLAGS) "$<" $(LIBS) -o "$@"
+endif
