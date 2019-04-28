@@ -24,20 +24,33 @@ impl PalEpoll for Sys {
 
     fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> c_int {
         match op {
-            EPOLL_CTL_ADD => {
+            EPOLL_CTL_ADD | EPOLL_CTL_MOD => {
                 Sys::write(
                     epfd,
                     &Event {
                         id: fd as usize,
                         flags: unsafe { (*event).events as usize },
-
                         // NOTE: Danger when using non 64-bit systems. If this is
                         // needed, use a box or something
                         data: unsafe { mem::transmute((*event).data) },
                     },
                 ) as c_int
             },
-            _ => unimplemented!()
+            EPOLL_CTL_DEL => {
+                Sys::write(
+                    epfd,
+                    &Event {
+                        id: fd as usize,
+                        flags: 0,
+                        //TODO: Is data required?
+                        data: 0,
+                    },
+                ) as c_int
+            },
+            _ => {
+                platform::errno = errno::EINVAL;
+                return -1;
+            }
         }
     }
 
