@@ -72,8 +72,10 @@ pub fn select_epoll(
         File::new(epfd)
     };
 
+    // Keep track of the number of file descriptors that do not support epoll
+    let mut not_epoll = 0;
     for fd in 0..nfds {
-        if let Some(ref fd_set) = readfds {
+        if let Some(ref mut fd_set) = readfds {
             if fd_set.isset(fd) {
                 let mut event = epoll_event {
                     events: EPOLLIN,
@@ -82,11 +84,17 @@ pub fn select_epoll(
                     },
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
-                    return -1;
+                    if unsafe { platform::errno == errno::EPERM } {
+                        not_epoll += 1;
+                    } else {
+                        return -1;
+                    }
+                } else {
+                    fd_set.clr(fd);
                 }
             }
         }
-        if let Some(ref fd_set) = writefds {
+        if let Some(ref mut fd_set) = writefds {
             if fd_set.isset(fd) {
                 let mut event = epoll_event {
                     events: EPOLLOUT,
@@ -95,11 +103,17 @@ pub fn select_epoll(
                     },
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
-                    return -1;
+                    if unsafe { platform::errno == errno::EPERM } {
+                        not_epoll += 1;
+                    } else {
+                        return -1;
+                    }
+                } else {
+                    fd_set.clr(fd);
                 }
             }
         }
-        if let Some(ref fd_set) = exceptfds {
+        if let Some(ref mut fd_set) = exceptfds {
             if fd_set.isset(fd) {
                 let mut event = epoll_event {
                     events: EPOLLERR,
@@ -108,17 +122,23 @@ pub fn select_epoll(
                     },
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
-                    return -1;
+                    if unsafe { platform::errno == errno::EPERM } {
+                        not_epoll += 1;
+                    } else {
+                        return -1;
+                    }
+                } else {
+                    fd_set.clr(fd);
                 }
             }
         }
     }
 
     let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
-    let res = epoll_wait(
-        *ep,
-        events.as_mut_ptr(),
-        events.len() as c_int,
+    let epoll_timeout = if not_epoll > 0 {
+        // Do not wait if any non-epoll file descriptors were found
+        0
+    } else {
         match timeout {
             Some(timeout) => {
                 //TODO: Check for overflow
@@ -127,22 +147,18 @@ pub fn select_epoll(
             },
             None => -1
         }
+    };
+    let res = epoll_wait(
+        *ep,
+        events.as_mut_ptr(),
+        events.len() as c_int,
+        epoll_timeout
     );
     if res < 0 {
         return -1;
     }
 
-    if let Some(ref mut fd_set) = readfds {
-        fd_set.zero();
-    }
-    if let Some(ref mut fd_set) = writefds {
-        fd_set.zero();
-    }
-    if let Some(ref mut fd_set) = exceptfds {
-        fd_set.zero();
-    }
-
-    let mut count = 0;
+    let mut count = not_epoll;
     for i in 0..res as usize {
         let event = &events[i];
         let fd = unsafe { event.data.fd };
