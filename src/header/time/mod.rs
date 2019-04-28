@@ -342,6 +342,28 @@ pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
     ts.tv_sec
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn timelocal(tm: *mut struct tm) -> time_t {
+    //TODO: timezone
+    timegm(tm)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn timegm(tm: *mut struct tm) -> time_t {
+    let mut y = (*tm).tm_year as time_t + 1900;
+    let mut m = (*tm).tm_mon as time_t + 1;
+    if m <= 2 {
+        y -= 1;
+        m += 12;
+    }
+    let d = (*tm).tm_mday as time_t;
+    let h = (*tm).tm_hour as time_t;
+    let mi = (*tm).tm_min as time_t;
+    let s = (*tm).tm_sec as time_t;
+    (365*y + y/4 - y/100 + y/400 + 3*(m+1)/5 + 30*m + d - 719561)
+        * 86400 + 3600 * h + 60 * mi + s
+}
+
 // #[no_mangle]
 pub extern "C" fn timer_create(
     clock_id: clockid_t,
