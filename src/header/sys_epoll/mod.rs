@@ -3,8 +3,8 @@
 use core::ptr;
 
 use header::signal::sigset_t;
-use platform::{PalEpoll, Sys};
 use platform::types::*;
+use platform::{PalEpoll, Sys};
 
 pub use self::sys::*;
 
@@ -55,11 +55,7 @@ pub extern "C" fn epoll_create(_size: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn epoll_create1(flags: c_int) -> c_int {
-    trace_expr!(
-        Sys::epoll_create1(flags),
-        "epoll_create1({:#x})",
-        flags
-    )
+    trace_expr!(Sys::epoll_create1(flags), "epoll_create1({:#x})", flags)
 }
 
 #[no_mangle]
@@ -75,12 +71,23 @@ pub extern "C" fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll
 }
 
 #[no_mangle]
-pub extern "C" fn epoll_wait(epfd: c_int, events: *mut epoll_event, maxevents: c_int, timeout: c_int) -> c_int {
+pub extern "C" fn epoll_wait(
+    epfd: c_int,
+    events: *mut epoll_event,
+    maxevents: c_int,
+    timeout: c_int,
+) -> c_int {
     epoll_pwait(epfd, events, maxevents, timeout, ptr::null())
 }
 
 #[no_mangle]
-pub extern "C" fn epoll_pwait(epfd: c_int, events: *mut epoll_event, maxevents: c_int, timeout: c_int, sigmask: *const sigset_t) -> c_int {
+pub extern "C" fn epoll_pwait(
+    epfd: c_int,
+    events: *mut epoll_event,
+    maxevents: c_int,
+    timeout: c_int,
+    sigmask: *const sigset_t,
+) -> c_int {
     trace_expr!(
         Sys::epoll_pwait(epfd, events, maxevents, timeout, sigmask),
         "epoll_pwait({}, {:p}, {}, {}, {:p})",

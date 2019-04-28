@@ -3,13 +3,9 @@
 use core::{mem, slice};
 
 use fs::File;
-use header::sys_epoll::{
-    epoll_create1, EPOLL_CLOEXEC,
-    epoll_ctl, EPOLL_CTL_ADD,
-    epoll_wait,
-    EPOLLIN, EPOLLPRI, EPOLLOUT, EPOLLERR, EPOLLHUP, EPOLLNVAL,
-    epoll_data, epoll_event
-};
+use header::sys_epoll::{epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR,
+                        EPOLLHUP, EPOLLIN, EPOLLNVAL, EPOLLOUT, EPOLLPRI, EPOLL_CLOEXEC,
+                        EPOLL_CTL_ADD};
 use platform::types::*;
 
 pub const POLLIN: c_short = 0x001;
@@ -35,7 +31,7 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
         (POLLOUT, EPOLLOUT),
         (POLLERR, EPOLLERR),
         (POLLHUP, EPOLLHUP),
-        (POLLNVAL, EPOLLNVAL)
+        (POLLNVAL, EPOLLNVAL),
     ];
 
     let ep = {
@@ -51,9 +47,7 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
 
         let mut event = epoll_event {
             events: 0,
-            data: epoll_data {
-                u64: i as u64,
-            },
+            data: epoll_data { u64: i as u64 },
             ..Default::default()
         };
 
@@ -71,12 +65,7 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
     }
 
     let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
-    let res = epoll_wait(
-        *ep,
-        events.as_mut_ptr(),
-        events.len() as c_int,
-        timeout
-    );
+    let res = epoll_wait(*ep, events.as_mut_ptr(), events.len() as c_int, timeout);
     if res < 0 {
         return -1;
     }
@@ -106,10 +95,7 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
     trace_expr!(
-        poll_epoll(
-            slice::from_raw_parts_mut(fds, nfds as usize),
-            timeout
-        ),
+        poll_epoll(slice::from_raw_parts_mut(fds, nfds as usize), timeout),
         "poll({:p}, {}, {})",
         fds,
         nfds,

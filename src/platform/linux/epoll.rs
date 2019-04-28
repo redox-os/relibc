@@ -13,7 +13,22 @@ impl PalEpoll for Sys {
         unsafe { e(syscall!(EPOLL_CTL, epfd, op, fd, event)) as c_int }
     }
 
-    fn epoll_pwait(epfd: c_int, events: *mut epoll_event, maxevents: c_int, timeout: c_int, sigmask: *const sigset_t) -> c_int {
-        unsafe { e(syscall!(EPOLL_PWAIT, epfd, events, maxevents, timeout, sigmask)) as c_int }
+    fn epoll_pwait(
+        epfd: c_int,
+        events: *mut epoll_event,
+        maxevents: c_int,
+        timeout: c_int,
+        sigmask: *const sigset_t,
+    ) -> c_int {
+        unsafe {
+            e(syscall!(
+                EPOLL_PWAIT,
+                epfd,
+                events,
+                maxevents,
+                timeout,
+                sigmask
+            )) as c_int
+        }
     }
 }

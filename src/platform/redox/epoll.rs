@@ -5,11 +5,11 @@ use super::Sys;
 use c_str::CStr;
 use core::{mem, slice};
 use fs::File;
-use io::prelude::*;
 use header::errno::*;
 use header::fcntl::*;
 use header::signal::sigset_t;
 use header::sys_epoll::*;
+use io::prelude::*;
 use syscall::data::{Event, TimeSpec};
 use syscall::flag::EVENT_READ;
 
@@ -18,22 +18,31 @@ impl PalEpoll for Sys {
         Sys::open(
             CStr::from_bytes_with_nul(b"event:\0").unwrap(),
             O_RDWR | flags,
-            0
+            0,
         )
     }
 
     fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> c_int {
-        Sys::write(epfd, &Event {
-            id: fd as usize,
-            flags: unsafe { (*event).events as usize },
+        Sys::write(
+            epfd,
+            &Event {
+                id: fd as usize,
+                flags: unsafe { (*event).events as usize },
 
-            // NOTE: Danger when using non 64-bit systems. If this is
-            // needed, use a box or something
-            data: unsafe { mem::transmute((*event).data) }
-        }) as c_int
+                // NOTE: Danger when using non 64-bit systems. If this is
+                // needed, use a box or something
+                data: unsafe { mem::transmute((*event).data) },
+            },
+        ) as c_int
     }
 
-    fn epoll_pwait(epfd: c_int, mut events: *mut epoll_event, maxevents: c_int, timeout: c_int, _sigset: *const sigset_t) -> c_int {
+    fn epoll_pwait(
+        epfd: c_int,
+        mut events: *mut epoll_event,
+        maxevents: c_int,
+        timeout: c_int,
+        _sigset: *const sigset_t,
+    ) -> c_int {
         // TODO: sigset
 
         let _timer;
@@ -51,21 +60,24 @@ impl PalEpoll for Sys {
                         return -1;
                     }
 
-                    if Sys::write(epfd, &Event {
-                        id: timer.fd as usize,
-                        flags: EVENT_READ,
-                        data: 0
-                    }) == -1 {
+                    if Sys::write(
+                        epfd,
+                        &Event {
+                            id: timer.fd as usize,
+                            flags: EVENT_READ,
+                            data: 0,
+                        },
+                    ) == -1
+                    {
                         return -1;
                     }
                 }
             }
         }
 
-        let bytes_read = Sys::read(epfd, unsafe { slice::from_raw_parts_mut(
-            events as *mut u8,
-            maxevents as usize
-        ) });
+        let bytes_read = Sys::read(epfd, unsafe {
+            slice::from_raw_parts_mut(events as *mut u8, maxevents as usize)
+        });
         if bytes_read == -1 {
             return -1;
         }

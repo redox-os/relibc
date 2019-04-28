@@ -4,13 +4,8 @@ use core::mem;
 
 use fs::File;
 use header::errno;
-use header::sys_epoll::{
-    epoll_create1, EPOLL_CLOEXEC,
-    epoll_ctl, EPOLL_CTL_ADD,
-    epoll_wait,
-    EPOLLIN, EPOLLOUT, EPOLLERR,
-    epoll_data, epoll_event
-};
+use header::sys_epoll::{epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR,
+                        EPOLLIN, EPOLLOUT, EPOLL_CLOEXEC, EPOLL_CTL_ADD};
 use header::sys_time::timeval;
 use platform;
 use platform::types::*;
@@ -57,7 +52,7 @@ pub fn select_epoll(
     mut readfds: Option<&mut fd_set>,
     mut writefds: Option<&mut fd_set>,
     mut exceptfds: Option<&mut fd_set>,
-    timeout: Option<&mut timeval>
+    timeout: Option<&mut timeval>,
 ) -> c_int {
     if nfds < 0 || nfds > FD_SETSIZE as i32 {
         unsafe { platform::errno = errno::EINVAL };
@@ -79,9 +74,7 @@ pub fn select_epoll(
             if fd_set.isset(fd) {
                 let mut event = epoll_event {
                     events: EPOLLIN,
-                    data: epoll_data {
-                        fd: fd,
-                    },
+                    data: epoll_data { fd: fd },
                     ..Default::default()
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
@@ -99,9 +92,7 @@ pub fn select_epoll(
             if fd_set.isset(fd) {
                 let mut event = epoll_event {
                     events: EPOLLOUT,
-                    data: epoll_data {
-                        fd: fd,
-                    },
+                    data: epoll_data { fd: fd },
                     ..Default::default()
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
@@ -119,9 +110,7 @@ pub fn select_epoll(
             if fd_set.isset(fd) {
                 let mut event = epoll_event {
                     events: EPOLLERR,
-                    data: epoll_data {
-                        fd: fd,
-                    },
+                    data: epoll_data { fd: fd },
                     ..Default::default()
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
@@ -145,17 +134,16 @@ pub fn select_epoll(
         match timeout {
             Some(timeout) => {
                 //TODO: Check for overflow
-                ((timeout.tv_sec as c_int) * 1000) +
-                ((timeout.tv_usec as c_int) / 1000)
-            },
-            None => -1
+                ((timeout.tv_sec as c_int) * 1000) + ((timeout.tv_usec as c_int) / 1000)
+            }
+            None => -1,
         }
     };
     let res = epoll_wait(
         *ep,
         events.as_mut_ptr(),
         events.len() as c_int,
-        epoll_timeout
+        epoll_timeout,
     );
     if res < 0 {
         return -1;
