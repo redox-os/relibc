@@ -1,4 +1,4 @@
-sys_includes = []
+sys_includes = ["signal.h"]
 include_guard = "_SYS_EPOLL_H"
 language = "C"
 style = "Tag"

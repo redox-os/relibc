@@ -61,6 +61,7 @@ EXPECT_BINS=\
 	string/strtok \
 	string/strtok_r \
 	strings \
+	sys_epoll/epoll \
 	time/asctime \
 	time/gmtime \
 	time/localtime \
