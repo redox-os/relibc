@@ -1,5 +1,7 @@
+SYSROOT?=../sysroot
+
 # Binaries that should generate the same output every time
-EXPECT_BINS=\
+EXPECT_NAMES=\
 	alloca \
 	args \
 	arpainet \
@@ -94,8 +96,8 @@ EXPECT_BINS=\
 	# signal (TODO: Fix)
 
 # Binaries that may generate varied output
-BINS=\
-	$(EXPECT_BINS) \
+NAMES=\
+	$(EXPECT_NAMES) \
 	dirent/main \
 	pwd \
 	stdio/tempnam \
@@ -118,42 +120,43 @@ BINS=\
 #	resource/getrusage
 #	time/times
 
-.PHONY: all $(BINS) clean run expected verify
+BINS=$(patsubst %,bins/%,$(NAMES))
+EXPECT_BINS=$(patsubst %,bins/%,$(EXPECT_NAMES))
+
+.PHONY: all clean run expected verify
 
 all: $(BINS)
-
-$(BINS): %: bins/%
 
 clean:
 	rm -rf bins gen *.out
 
-run: | ../sysroot all
-	for bin in $(BINS); \
+run: | $(SYSROOT) $(BINS)
+	for name in $(NAMES); \
 	do \
-		echo "# $${bin} #"; \
-		"bins/$${bin}" test args || exit $$?; \
+		echo "# $${name} #"; \
+		"bins/$${name}" test args || exit $$?; \
 	done
 
-expected: | ../sysroot $(EXPECT_BINS)
+expected: | $(SYSROOT) $(EXPECT_BINS)
 	rm -rf expected
 	mkdir -p expected
-	for bin in $(EXPECT_BINS); \
+	for name in $(EXPECT_NAMES); \
 	do \
-		echo "# $${bin} #"; \
-		mkdir -p expected/`dirname $${bin}`; \
-		"bins/$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr" || exit $$?; \
+		echo "# $${name} #"; \
+		mkdir -p expected/`dirname $${name}`; \
+		"bins/$${name}" test args > "expected/$${name}.stdout" 2> "expected/$${name}.stderr" || exit $$?; \
 	done
 
-verify: | ../sysroot $(EXPECT_BINS)
+verify: | $(SYSROOT) $(EXPECT_BINS)
 	rm -rf gen
 	mkdir -p gen
-	for bin in $(EXPECT_BINS); \
+	for name in $(EXPECT_NAMES); \
 	do \
-		echo "# $${bin} #"; \
-		mkdir -p gen/`dirname $${bin}`; \
-		"bins/$${bin}" test args > "gen/$${bin}.stdout" 2> "gen/$${bin}.stderr" || exit $$?; \
-		diff -u "gen/$${bin}.stdout" "expected/$${bin}.stdout" || exit $$?; \
-		diff -u "gen/$${bin}.stderr" "expected/$${bin}.stderr" || exit $$?; \
+		echo "# $${name} #"; \
+		mkdir -p gen/`dirname $${name}`; \
+		"bins/$${name}" test args > "gen/$${name}.stdout" 2> "gen/$${name}.stderr" || exit $$?; \
+		diff -u "gen/$${name}.stdout" "expected/$${name}.stdout" || exit $$?; \
+		diff -u "gen/$${name}.stderr" "expected/$${name}.stderr" || exit $$?; \
 	done
 
 CFLAGS=\
@@ -166,20 +169,20 @@ CFLAGS=\
 	-g \
 	-nostdinc \
 	-nostdlib \
-	-isystem ../sysroot/include \
+	-isystem $(SYSROOT)/include \
 	-I .
 
 HEADLIBS=\
-	../sysroot/lib/crt0.o \
-	../sysroot/lib/crti.o
+	$(SYSROOT)/lib/crt0.o \
+	$(SYSROOT)/lib/crti.o
 
 TAILLIBS=\
-	../sysroot/lib/libc.a \
-	../sysroot/lib/crtn.o
+	$(SYSROOT)/lib/libc.a \
+	$(SYSROOT)/lib/crtn.o
 
 ../sysroot:
-	make -C .. sysroot
+	$(MAKE) -C .. sysroot
 
-bins/%: %.c ../sysroot
+bins/%: %.c $(SYSROOT)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) $(CFLAGS) $(HEADLIBS) "$<" $(TAILLIBS) -o "$@"
