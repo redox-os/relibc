@@ -13,3 +13,5 @@ pub const O_DIRECTORY: c_int = 0x1_0000;
 pub const O_NOFOLLOW: c_int = 0x2_0000;
 pub const O_CLOEXEC: c_int = 0x8_0000;
 pub const O_PATH: c_int = 0x20_0000;
+
+pub const FD_CLOEXEC: c_int = 0x8_0000;

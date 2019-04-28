@@ -1,7 +1,16 @@
 //! poll implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/poll.h.html
 
+use core::{mem, slice};
+
+use fs::File;
+use header::sys_epoll::{
+    epoll_create1, EPOLL_CLOEXEC,
+    epoll_ctl, EPOLL_CTL_ADD,
+    epoll_wait,
+    EPOLLIN, EPOLLPRI, EPOLLOUT, EPOLLERR, EPOLLHUP, EPOLLNVAL,
+    epoll_data, epoll_event
+};
 use platform::types::*;
-use platform::{Pal, Sys};
 
 pub const POLLIN: c_short = 0x001;
 pub const POLLPRI: c_short = 0x002;
@@ -19,10 +28,87 @@ pub struct pollfd {
     pub revents: c_short,
 }
 
+pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
+    let event_map = [
+        (POLLIN, EPOLLIN),
+        (POLLPRI, EPOLLPRI),
+        (POLLOUT, EPOLLOUT),
+        (POLLERR, EPOLLERR),
+        (POLLHUP, EPOLLHUP),
+        (POLLNVAL, EPOLLNVAL)
+    ];
+
+    let ep = {
+        let epfd = epoll_create1(EPOLL_CLOEXEC);
+        if epfd < 0 {
+            return -1;
+        }
+        File::new(epfd)
+    };
+
+    for i in 0..fds.len() {
+        let mut pfd = &mut fds[i];
+
+        let mut event = epoll_event {
+            events: 0,
+            data: epoll_data {
+                u64: i as u64,
+            },
+        };
+
+        for (p, ep) in event_map.iter() {
+            if pfd.events & p > 0 {
+                event.events |= ep;
+            }
+        }
+
+        pfd.revents = 0;
+
+        if epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &mut event) < 0 {
+            return -1;
+        }
+    }
+
+    let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
+    let res = epoll_wait(
+        *ep,
+        events.as_mut_ptr(),
+        events.len() as c_int,
+        timeout
+    );
+    if res < 0 {
+        return -1;
+    }
+
+    for i in 0..res as usize {
+        let event = &events[i];
+        let pi = unsafe { event.data.u64 as usize };
+        // TODO: Error status when fd does not match?
+        if let Some(pfd) = fds.get_mut(pi) {
+            for (p, ep) in event_map.iter() {
+                if event.events & ep > 0 {
+                    pfd.revents |= p;
+                }
+            }
+        }
+    }
+
+    let mut count = 0;
+    for pfd in fds.iter() {
+        if pfd.revents > 0 {
+            count += 1;
+        }
+    }
+    count
+}
+
 #[no_mangle]
-pub extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
+pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
     trace_expr!(
-        Sys::poll(fds, nfds, timeout),
+        poll_epoll(
+            slice::from_raw_parts_mut(fds, nfds as usize),
+            timeout
+        ),
         "poll({:p}, {}, {})",
         fds,
         nfds,

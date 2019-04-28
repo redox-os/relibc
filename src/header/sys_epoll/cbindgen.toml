@@ -1,0 +1,11 @@
+sys_includes = []
+include_guard = "_SYS_EPOLL_H"
+language = "C"
+style = "Tag"
+
+[defines]
+"target_os=linux" = "__linux__"
+"target_os=redox" = "__redox__"
+
+[enum]
+prefix_with_name = true

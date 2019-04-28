@@ -1,13 +1,14 @@
 use super::types::*;
 use c_str::CStr;
 use header::dirent::dirent;
-use header::poll::{nfds_t, pollfd};
-use header::sys_select::fd_set;
 use header::sys_stat::stat;
 use header::sys_statvfs::statvfs;
 use header::sys_time::{timeval, timezone};
 use header::sys_utsname::utsname;
 use header::time::timespec;
+
+pub use self::epoll::PalEpoll;
+mod epoll;
 
 pub use self::signal::PalSignal;
 mod signal;
@@ -115,8 +116,6 @@ pub trait Pal {
 
     fn pipe(fildes: &mut [c_int]) -> c_int;
 
-    fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int;
-
     unsafe fn pte_clone(stack: *mut usize) -> pid_t;
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
@@ -128,15 +127,6 @@ pub trait Pal {
     fn rmdir(path: &CStr) -> c_int;
 
     fn sched_yield() -> c_int;
-
-    //TODO: Deprecate in favor of poll
-    fn select(
-        nfds: c_int,
-        readfds: *mut fd_set,
-        writefds: *mut fd_set,
-        exceptfds: *mut fd_set,
-        timeout: *mut timeval,
-    ) -> c_int;
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> c_int;
 

@@ -5,10 +5,8 @@ use super::types::*;
 use super::{errno, Pal};
 use c_str::CStr;
 use header::dirent::dirent;
-use header::poll::{nfds_t, pollfd};
 use header::signal::SIGCHLD;
 // use header::sys_resource::rusage;
-use header::sys_select::fd_set;
 use header::sys_stat::stat;
 use header::sys_statvfs::statvfs;
 use header::sys_time::{timeval, timezone};
@@ -16,6 +14,7 @@ use header::sys_time::{timeval, timezone};
 use header::sys_utsname::utsname;
 use header::time::timespec;
 
+mod epoll;
 mod signal;
 mod socket;
 
@@ -320,10 +319,6 @@ impl Pal for Sys {
         e(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), 0) }) as c_int
     }
 
-    fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
-        e(unsafe { syscall!(POLL, fds, nfds, timeout) }) as c_int
-    }
-
     #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND;
@@ -394,16 +389,6 @@ impl Pal for Sys {
 
     fn sched_yield() -> c_int {
         e(unsafe { syscall!(SCHED_YIELD) }) as c_int
-    }
-
-    fn select(
-        nfds: c_int,
-        readfds: *mut fd_set,
-        writefds: *mut fd_set,
-        exceptfds: *mut fd_set,
-        timeout: *mut timeval,
-    ) -> c_int {
-        e(unsafe { syscall!(SELECT, nfds, readfds, writefds, exceptfds, timeout) }) as c_int
     }
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
