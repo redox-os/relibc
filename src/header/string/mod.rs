@@ -235,8 +235,10 @@ pub unsafe extern "C" fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: siz
     let len = strlen(msg);
 
     if len >= buflen {
-        memcpy(buf as *mut c_void, msg as *const c_void, buflen - 1);
-        *buf.add(buflen - 1) = 0;
+        if buflen != 0 {
+            memcpy(buf as *mut c_void, msg as *const c_void, buflen - 1);
+            *buf.add(buflen - 1) = 0;
+        }
         return ERANGE as c_int;
     }
     memcpy(buf as *mut c_void, msg as *const c_void, len + 1);
