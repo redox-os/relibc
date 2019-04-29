@@ -60,4 +60,6 @@ pub trait PalSocket: Pal {
     fn shutdown(socket: c_int, how: c_int) -> c_int;
 
     unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int;
+
+    fn socketpair(domain: c_int, kind: c_int, protocol: c_int, sv: &mut [c_int; 2]) -> c_int;
 }

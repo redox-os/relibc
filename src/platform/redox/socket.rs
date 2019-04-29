@@ -248,4 +248,9 @@ impl PalSocket for Sys {
             }
         }
     }
+
+    fn socketpair(domain: c_int, kind: c_int, protocol: c_int, sv: &mut [c_int; 2]) -> c_int {
+        unsafe { errno = syscall::ENOSYS };
+        return -1;
+    }
 }

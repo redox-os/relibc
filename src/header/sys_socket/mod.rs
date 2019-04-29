@@ -220,12 +220,19 @@ pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> 
     )
 }
 
-// #[no_mangle]
-// pub unsafe extern "C" fn socketpair(
-//     domain: c_int,
-//     kind: c_int,
-//     protocol: c_int,
-//     socket_vector: *mut c_int,
-// ) -> c_int {
-//     Sys::socketpair(domain, kind, protocol, socket_vector)
-// }
+#[no_mangle]
+pub unsafe extern "C" fn socketpair(
+    domain: c_int,
+    kind: c_int,
+    protocol: c_int,
+    sv: *mut c_int,
+) -> c_int {
+    trace_expr!(
+        Sys::socketpair(domain, kind, protocol, &mut *(sv as *mut [c_int; 2])),
+        "socketpair({}, {}, {}, {:p})",
+        domain,
+        kind,
+        protocol,
+        sv
+    )
+}
