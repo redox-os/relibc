@@ -8,17 +8,17 @@ use core::{intrinsics, ptr};
 use header::sys_mman;
 use header::time::timespec;
 use ld_so::tcb::{Master, Tcb};
-use mutex::{FUTEX_WAIT, FUTEX_WAKE};
+use mutex::Mutex;
 use platform::types::{c_int, c_uint, c_void, pid_t, size_t};
 use platform::{Pal, Sys};
 
 pub struct Semaphore {
-    lock: i32,
+    lock: Mutex<()>,
     count: i32,
 }
 
 type pte_osThreadHandle = pid_t;
-type pte_osMutexHandle = *mut i32;
+type pte_osMutexHandle = *mut Mutex<()>;
 type pte_osSemaphoreHandle = *mut Semaphore;
 type pte_osThreadEntryPoint = unsafe extern "C" fn(params: *mut c_void) -> c_int;
 
@@ -37,10 +37,10 @@ pub enum pte_osResult {
 use self::pte_osResult::*;
 
 static mut pid_mutexes: Option<BTreeMap<pte_osThreadHandle, pte_osMutexHandle>> = None;
-static mut pid_mutexes_lock: i32 = 0;
+static mut pid_mutexes_lock: Mutex<()> = Mutex::new(());
 
 static mut pid_stacks: Option<BTreeMap<pte_osThreadHandle, (*mut c_void, size_t)>> = None;
-static mut pid_stacks_lock: i32 = 0;
+static mut pid_stacks_lock: Mutex<()> = Mutex::new(());
 
 #[thread_local]
 static mut LOCALS: *mut BTreeMap<c_uint, *mut c_void> = ptr::null_mut();
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn pte_osThreadCreate(
     ppte_osThreadHandle: *mut pte_osThreadHandle,
 ) -> pte_osResult {
     // Create a locked mutex, unlocked by pte_osThreadStart
-    let mutex: pte_osMutexHandle = Box::into_raw(Box::new(2));
+    let mutex: pte_osMutexHandle = Box::into_raw(Box::new(Mutex::locked(())));
 
     let stack_size = if stackSize == 0 {
         1024 * 1024
@@ -278,7 +278,7 @@ pub unsafe extern "C" fn pte_osThreadGetDefaultPriority() -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osMutexCreate(pHandle: *mut pte_osMutexHandle) -> pte_osResult {
-    *pHandle = Box::into_raw(Box::new(0));
+    *pHandle = Box::into_raw(Box::new(Mutex::new(())));
     PTE_OS_OK
 }
 
@@ -290,38 +290,13 @@ pub unsafe extern "C" fn pte_osMutexDelete(handle: pte_osMutexHandle) -> pte_osR
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osMutexLock(handle: pte_osMutexHandle) -> pte_osResult {
-    let mut c = 0;
-    for _i in 0..100 {
-        c = intrinsics::atomic_cxchg(handle, 0, 1).0;
-        if c == 0 {
-            break;
-        }
-    }
-    if c == 1 {
-        c = intrinsics::atomic_xchg(handle, 2);
-    }
-    while c != 0 {
-        Sys::futex(handle, FUTEX_WAIT, 2);
-        c = intrinsics::atomic_xchg(handle, 2);
-    }
-
+    (*handle).manual_lock();
     PTE_OS_OK
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osMutexUnlock(handle: pte_osMutexHandle) -> pte_osResult {
-    if *handle == 2 {
-        *handle = 0;
-    } else if intrinsics::atomic_xchg(handle, 0) == 1 {
-        return PTE_OS_OK;
-    }
-    for _i in 0..100 {
-        if *handle != 0 && intrinsics::atomic_cxchg(handle, 1, 2).0 != 0 {
-            return PTE_OS_OK;
-        }
-    }
-    Sys::futex(handle, FUTEX_WAKE, 1);
-
+    (*handle).manual_unlock();
     PTE_OS_OK
 }
 
@@ -331,7 +306,7 @@ pub unsafe extern "C" fn pte_osSemaphoreCreate(
     pHandle: *mut pte_osSemaphoreHandle,
 ) -> pte_osResult {
     *pHandle = Box::into_raw(Box::new(Semaphore {
-        lock: 0,
+        lock: Mutex::new(()),
         count: initialValue,
     }));
     PTE_OS_OK
@@ -349,9 +324,8 @@ pub unsafe extern "C" fn pte_osSemaphorePost(
     count: c_int,
 ) -> pte_osResult {
     let semaphore = &mut *handle;
-    pte_osMutexLock(&mut semaphore.lock);
+    let _guard = semaphore.lock.lock();
     intrinsics::atomic_xadd(&mut semaphore.count, 1);
-    pte_osMutexUnlock(&mut semaphore.lock);
     PTE_OS_OK
 }
 
@@ -364,12 +338,11 @@ pub unsafe extern "C" fn pte_osSemaphorePend(
     let semaphore = &mut *handle;
     let mut acquired = false;
     while !acquired {
-        pte_osMutexLock(&mut semaphore.lock);
+        let _guard = semaphore.lock.lock();
         if intrinsics::atomic_load(&semaphore.count) > 0 {
             intrinsics::atomic_xsub(&mut semaphore.count, 1);
             acquired = true;
         }
-        pte_osMutexUnlock(&mut semaphore.lock);
         Sys::sched_yield();
     }
     PTE_OS_OK
