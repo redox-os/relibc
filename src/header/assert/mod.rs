@@ -6,7 +6,7 @@ use header::{stdio, stdlib};
 use platform::types::*;
 
 #[no_mangle]
-pub unsafe extern "C" fn __assert(
+pub unsafe extern "C" fn __assert_fail(
     func: *const c_char,
     file: *const c_char,
     line: c_int,
