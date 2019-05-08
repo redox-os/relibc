@@ -10,9 +10,12 @@ before_script:
     - rustup target add x86_64-unknown-redox --toolchain "$(cat rust-toolchain)"
     - rustup show      # Print version info for debugging
 
-# Cache caused some issues with a header not being generated:
-# cache:
-#     untracked: true
+cache:
+    paths:
+        - target/
+        # Redox only:
+        - prefix/
+        - rust/
 
 build:linux:
     stage: build
@@ -24,18 +27,25 @@ build:redox:
     variables:
         TARGET: x86_64-unknown-redox
     script:
-        # Install x86_64-unknown-redox-gcc
-        # This can't be in before_script because that overrides
-        # the global before_script.
+        # Install the Redox OS toolchain
+        ## (This can't be in before_script because that overrides
+        ## the global before_script.)
         - apt-get update -qq
         - apt-get install -qq tar
-        - rm -rf prefix
-        - mkdir prefix
-        - wget -O - https://static.redox-os.org/toolchain/x86_64-unknown-redox/gcc-install.tar.gz |
-          tar --extract --gzip --directory prefix
+        - '[ -e "prefix" ] || (mkdir prefix && wget -O - https://static.redox-os.org/toolchain/x86_64-unknown-redox/gcc-install.tar.gz |
+          tar --extract --gzip --directory prefix)'
+        - export PATH="$PWD/prefix/bin:$PATH"
+        - export RUSTUP_TOOLCHAIN="$PWD/prefix"
+
+        # Prepare xargo
+        - cargo install xargo
+        - '[ -e "rust" ] || git clone -b redox-2019-04-06 "https://gitlab.redox-os.org/redox-os/rust" --recursive'
+        - export CARGO=xargo
+        - export XARGO_HOME="$PWD/build/xargo"
+        - export XARGO_RUST_SRC="$PWD/rust/src"
 
         # Main script
-        - env PATH="${PWD}/prefix/bin:$PATH" make all
+        - make -j `nproc` all
 
 test:linux:
     stage: test
