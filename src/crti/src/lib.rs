@@ -6,7 +6,8 @@
 
 // https://wiki.osdev.org/Creating_a_C_Library#crtbegin.o.2C_crtend.o.2C_crti.o.2C_and_crtn.o
 #[cfg(target_arch = "x86_64")]
-global_asm!(r#"
+global_asm!(
+    r#"
     .section .init
     .global _init
     _init:
@@ -22,7 +23,8 @@ global_asm!(r#"
         movq %rsp, %rbp
         // Created a new stack frame and updated the stack pointer
         // Body will be filled in by gcc and ended by crtn.o
-"#);
+"#
+);
 // https://git.musl-libc.org/cgit/musl/tree/crt/aarch64/crti.s
 #[cfg(target_arch = "aarch64")]
 global_asm!(r#"
