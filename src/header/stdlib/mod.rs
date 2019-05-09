@@ -1013,7 +1013,15 @@ pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
     /* _SC_PAGESIZE is a c_long and may in principle not convert
      * correctly to a size_t. */
     match size_t::try_from(sysconf(_SC_PAGESIZE)) {
-        Ok(page_size) => memalign(page_size, size),
+        Ok(page_size) => {
+            /* valloc() is not supposed to be able to set errno to
+             * EINVAL, hence no call to memalign(). */
+            let ptr = platform::alloc_align(size, page_size);
+            if ptr.is_null() {
+                platform::errno = errno::ENOMEM;
+            }
+            ptr
+        }
         Err(_) => {
             // A corner case. No errno setting.
             ptr::null_mut()
