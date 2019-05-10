@@ -48,7 +48,7 @@ static mut LOCALS: *mut BTreeMap<c_uint, *mut c_void> = ptr::null_mut();
 static NEXT_KEY: AtomicUsize = AtomicUsize::new(0);
 
 unsafe fn locals() -> &'static mut BTreeMap<c_uint, *mut c_void> {
-    if LOCALS == ptr::null_mut() {
+    if LOCALS.is_null() {
         LOCALS = Box::into_raw(Box::new(BTreeMap::new()));
     }
     &mut *LOCALS
@@ -316,10 +316,8 @@ pub unsafe extern "C" fn pte_osMutexUnlock(handle: pte_osMutexHandle) -> pte_osR
         return PTE_OS_OK;
     }
     for _i in 0..100 {
-        if *handle != 0 {
-            if intrinsics::atomic_cxchg(handle, 1, 2).0 != 0 {
-                return PTE_OS_OK;
-            }
+        if *handle != 0 && intrinsics::atomic_cxchg(handle, 1, 2).0 != 0 {
+            return PTE_OS_OK;
         }
     }
     Sys::futex(handle, FUTEX_WAKE, 1);
@@ -367,7 +365,7 @@ pub unsafe extern "C" fn pte_osSemaphorePend(
     let mut acquired = false;
     while !acquired {
         pte_osMutexLock(&mut semaphore.lock);
-        if intrinsics::atomic_load(&mut semaphore.count) > 0 {
+        if intrinsics::atomic_load(&semaphore.count) > 0 {
             intrinsics::atomic_xsub(&mut semaphore.count, 1);
             acquired = true;
         }
@@ -423,10 +421,7 @@ pub unsafe extern "C" fn pte_osTlsSetValue(index: c_uint, value: *mut c_void) ->
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osTlsGetValue(index: c_uint) -> *mut c_void {
-    locals()
-        .get_mut(&index)
-        .map(|x| *x)
-        .unwrap_or(ptr::null_mut())
+    locals().get_mut(&index).copied().unwrap_or(ptr::null_mut())
 }
 
 #[no_mangle]

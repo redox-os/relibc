@@ -301,7 +301,7 @@ pub unsafe extern "C" fn wcschr(ws: *const wchar_t, wc: wchar_t) -> *mut wchar_t
         if *ws.add(i) == wc {
             return ws.add(i) as *mut wchar_t;
         } else if *ws.add(i) == 0 {
-            return 0 as *mut wchar_t;
+            return ptr::null_mut();
         }
         i += 1;
     }
@@ -523,7 +523,7 @@ pub unsafe extern "C" fn wmemchr(ws: *const wchar_t, wc: wchar_t, n: size_t) -> 
             return ws.add(i) as *mut wchar_t;
         }
     }
-    0 as *mut wchar_t
+    ptr::null_mut()
 }
 
 #[no_mangle]

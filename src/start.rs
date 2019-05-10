@@ -29,7 +29,7 @@ impl Stack {
 unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut c_char> {
     let mut vec = Vec::with_capacity(len + 1);
     for i in 0..len {
-        let mut item = *array.add(i);
+        let item = *array.add(i);
         let mut len = 0;
         while *item.add(len) != 0 {
             len += 1;
@@ -96,6 +96,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     // Run preinit array
     {
         let mut f = &__preinit_array_start as *const _;
+        #[allow(clippy::op_ref)]
         while f < &__preinit_array_end {
             (*f)();
             f = f.offset(1);
@@ -108,6 +109,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     // Run init array
     {
         let mut f = &__init_array_start as *const _;
+        #[allow(clippy::op_ref)]
         while f < &__init_array_end {
             (*f)();
             f = f.offset(1);

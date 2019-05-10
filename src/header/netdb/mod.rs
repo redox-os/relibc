@@ -219,7 +219,7 @@ pub unsafe extern "C" fn gethostbyaddr(
         Ok(s) => {
             _HOST_ADDR_LIST = mem::transmute::<u32, [u8; 4]>(addr.s_addr);
             HOST_ADDR_LIST = [_HOST_ADDR_LIST.as_mut_ptr() as *mut c_char, ptr::null_mut()];
-            let mut host_name = s[0].to_vec();
+            let host_name = s[0].to_vec();
             HOST_NAME = Some(host_name);
             HOST_ENTRY = hostent {
                 h_name: HOST_NAME.as_mut().unwrap().as_mut_ptr() as *mut c_char,
@@ -431,7 +431,7 @@ pub unsafe extern "C" fn getprotoent() -> *mut protoent {
     PROTO_NUM = Some(atoi(num.as_mut_slice().as_mut_ptr() as *mut i8));
 
     let mut _proto_aliases: Vec<Vec<u8>> = Vec::new();
-    while let Some(s) = iter.next() {
+    for s in iter {
         let mut alias = s.as_bytes().to_vec();
         alias.push(b'\0');
         _proto_aliases.push(alias);

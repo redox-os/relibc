@@ -74,7 +74,7 @@ pub fn select_epoll(
             if fd_set.isset(fd) {
                 let mut event = epoll_event {
                     events: EPOLLIN,
-                    data: epoll_data { fd: fd },
+                    data: epoll_data { fd },
                     ..Default::default()
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
@@ -92,7 +92,7 @@ pub fn select_epoll(
             if fd_set.isset(fd) {
                 let mut event = epoll_event {
                     events: EPOLLOUT,
-                    data: epoll_data { fd: fd },
+                    data: epoll_data { fd },
                     ..Default::default()
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
@@ -110,7 +110,7 @@ pub fn select_epoll(
             if fd_set.isset(fd) {
                 let mut event = epoll_event {
                     events: EPOLLERR,
-                    data: epoll_data { fd: fd },
+                    data: epoll_data { fd },
                     ..Default::default()
                 };
                 if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {

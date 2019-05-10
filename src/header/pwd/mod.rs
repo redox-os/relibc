@@ -72,7 +72,7 @@ where
         };
 
         // Parse into passwd
-        let mut parts: [&[u8]; 7] = sys::split(&line);
+        let parts: [&[u8]; 7] = sys::split(&line);
 
         if !callback(&parts) {
             continue;

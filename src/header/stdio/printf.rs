@@ -307,7 +307,7 @@ fn float_string(float: c_double, precision: usize, trim: bool) -> String {
     let mut string = format!("{:.p$}", float, p = precision);
     if trim {
         let truncate = {
-            let mut slice = string.trim_end_matches('0');
+            let slice = string.trim_end_matches('0');
             if slice.ends_with('.') {
                 slice.len() - 1
             } else {
@@ -678,22 +678,23 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 // add an extra zero if octal.
                 let no_precision = precision.map(|pad| pad < string.len()).unwrap_or(true);
 
-                let mut len = string.len();
-                let mut final_len = string.len().max(precision.unwrap_or(0))
-                    + if alternate && string != "0" {
-                        match fmt {
-                            b'o' if no_precision => 1,
-                            b'x' | b'X' => 2,
-                            _ => 0,
-                        }
-                    } else {
-                        0
-                    };
-
-                if zero {
+                let len;
+                let final_len = if zero {
                     len = 0;
-                    final_len = 0;
-                }
+                    0
+                } else {
+                    len = string.len();
+                    len.max(precision.unwrap_or(0))
+                        + if alternate && string != "0" {
+                            match fmt {
+                                b'o' if no_precision => 1,
+                                b'x' | b'X' => 2,
+                                _ => 0,
+                            }
+                        } else {
+                            0
+                        }
+                };
 
                 pad(w, !left, b' ', final_len..pad_space)?;
 
@@ -714,7 +715,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 pad(w, left, b' ', final_len..pad_space)?;
             }
             FmtKind::Scientific => {
-                let mut float = match varargs.get(index, &mut ap, Some(&arg)) {
+                let float = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::c_double(i) => i,
                     _ => panic!("this should not be possible"),
                 };
@@ -725,7 +726,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 )?;
             }
             FmtKind::Decimal => {
-                let mut float = match varargs.get(index, &mut ap, Some(&arg)) {
+                let float = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::c_double(i) => i,
                     _ => panic!("this should not be possible"),
                 };
@@ -734,7 +735,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 fmt_float_normal(w, false, precision, float, left, pad_space, pad_zero)?;
             }
             FmtKind::AnyNotation => {
-                let mut float = match varargs.get(index, &mut ap, Some(&arg)) {
+                let float = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::c_double(i) => i,
                     _ => panic!("this should not be possible"),
                 };
@@ -758,7 +759,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
             FmtKind::String => {
                 // if intkind == IntKind::Long || intkind == IntKind::LongLong, handle *const wchar_t
 
-                let mut ptr = match varargs.get(index, &mut ap, Some(&arg)) {
+                let ptr = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::pointer(p) => p,
                     _ => panic!("this should not be possible"),
                 } as *const c_char;
@@ -790,7 +791,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 pad(w, left, b' ', 1..pad_space)?;
             }
             FmtKind::Pointer => {
-                let mut ptr = match varargs.get(index, &mut ap, Some(&arg)) {
+                let ptr = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::pointer(p) => p,
                     _ => panic!("this should not be possible"),
                 };
@@ -815,7 +816,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 pad(w, left, b' ', len..pad_space)?;
             }
             FmtKind::GetWritten => {
-                let mut ptr = match varargs.get(index, &mut ap, Some(&arg)) {
+                let ptr = match varargs.get(index, &mut ap, Some(&arg)) {
                     VaArg::pointer(p) => p,
                     _ => panic!("this should not be possible"),
                 };

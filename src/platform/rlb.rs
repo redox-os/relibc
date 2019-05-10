@@ -35,7 +35,7 @@ impl RawLineBuffer {
     pub fn next(&mut self) -> Line {
         // Remove last line
         if let Some(newline) = self.newline {
-            self.buf.drain(..newline + 1);
+            self.buf.drain(..=newline);
         }
 
         loop {

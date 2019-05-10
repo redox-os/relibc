@@ -319,7 +319,7 @@ pub unsafe extern "C" fn fgets(
 
         // TODO: When NLL is a thing, this block can be flattened out
         let (read, exit) = {
-            let mut buf = match stream.fill_buf() {
+            let buf = match stream.fill_buf() {
                 Ok(buf) => buf,
                 Err(_) => return ptr::null_mut(),
             };
@@ -580,7 +580,7 @@ pub unsafe extern "C" fn fwrite(
     let buf = slice::from_raw_parts_mut(ptr as *mut u8, size as usize * nitems as usize);
     let mut written = 0;
     while written < buf.len() {
-        match stream.write(&mut buf[written..]) {
+        match stream.write(&buf[written..]) {
             Ok(0) | Err(_) => break,
             Ok(n) => written += n,
         }
@@ -885,8 +885,8 @@ pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut
     let dirname = {
         let tmpdir = stdlib::getenv(b"TMPDIR\0".as_ptr() as _);
         [tmpdir, dir, P_tmpdir.as_ptr() as _]
-            .into_iter()
-            .map(|&d| d)
+            .iter()
+            .copied()
             .skip_while(|&d| !is_appropriate(d))
             .next()
             .unwrap_or(b"/tmp\0".as_ptr() as _)
@@ -934,7 +934,7 @@ pub unsafe extern "C" fn tmpfile() -> *mut FILE {
         Sys::unlink(file_name);
     }
 
-    if fp == ptr::null_mut() {
+    if fp.is_null() {
         Sys::close(fd);
     }
 

@@ -59,9 +59,8 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
                 let mut parts = arg_str.splitn(2, '=');
                 if let Some(key) = parts.next() {
                     if let Some(value) = parts.next() {
-                        match key {
-                            "LD_LIBRARY_PATH" => library_path = value,
-                            _ => (),
+                        if let "LD_LIBRARY_PATH" = key {
+                            library_path = value
                         }
                     }
                 }
