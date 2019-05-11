@@ -1010,8 +1010,8 @@ pub unsafe extern "C" fn unsetenv(key: *const c_char) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
-    /* _SC_PAGESIZE is a c_long and may in principle not convert
-     * correctly to a size_t. */
+    /* sysconf(_SC_PAGESIZE) is a c_long and may in principle not
+     * convert correctly to a size_t. */
     match size_t::try_from(sysconf(_SC_PAGESIZE)) {
         Ok(page_size) => {
             /* valloc() is not supposed to be able to set errno to
