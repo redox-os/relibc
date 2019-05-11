@@ -45,6 +45,8 @@ build:redox:
         - export XARGO_RUST_SRC="$PWD/rust/src"
 
         # Main script
+        - make -j `nproc` headers
+        - make -j `nproc` install-headers DESTDIR="$PWD/prefix/$TARGET"
         - make -j `nproc` all
 
 test:linux:

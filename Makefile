@@ -27,12 +27,11 @@ SRC=\
 	src/* \
 	src/*/* \
 	src/*/*/* \
-	src/*/*/*/* \
-	headers # Used by compiler-builtins
+	src/*/*/*/*
 
 .PHONY: all clean fmt headers install install-headers libs test
 
-all: headers libs
+all: | headers libs
 
 clean:
 	$(CARGO) clean
@@ -180,7 +179,7 @@ $(BUILD)/include: $(SRC)
 	mv $@.partial $@
 	touch $@
 
-$(BUILD)/openlibm: openlibm headers
+$(BUILD)/openlibm: openlibm
 	rm -rf $@ $@.partial
 	mkdir -p $(BUILD)
 	cp -r $< $@.partial
@@ -190,7 +189,7 @@ $(BUILD)/openlibm: openlibm headers
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/include
 	$(MAKE) CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libopenlibm.a
 
-$(BUILD)/pthreads-emb: pthreads-emb headers
+$(BUILD)/pthreads-emb: pthreads-emb
 	rm -rf $@ $@.partial
 	mkdir -p $(BUILD)
 	cp -r $< $@.partial
