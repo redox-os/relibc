@@ -97,17 +97,12 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/pthreads-emb/libpthre
 	echo "end" >> "$@.mri"
 	ar -M < "$@.mri"
 
-$(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.patched.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
 	$(CC) -nostdlib -shared -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
 
 $(BUILD)/debug/librelibc.a: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
 	touch $@
-
-$(BUILD)/debug/librelibc.patched.a: $(BUILD)/debug/librelibc.a
-	# Patch out clzsi2.o from libgcc
-	cp $< $@
-	ar d $@ clzsi2.o
 
 $(BUILD)/debug/crt0.o: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
@@ -139,17 +134,12 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libp
 	echo "end" >> "$@.mri"
 	ar -M < "$@.mri"
 
-$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.patched.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
 	$(CC) -nostdlib -shared -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
 
 $(BUILD)/release/librelibc.a: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
 	touch $@
-
-$(BUILD)/release/librelibc.patched.a: $(BUILD)/release/librelibc.a
-	# Patch out clzsi2.o from libgcc
-	cp $< $@
-	ar d $@ clzsi2.o
 
 $(BUILD)/release/crt0.o: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
