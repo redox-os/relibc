@@ -32,7 +32,7 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
 
     let dns_vec: Vec<u8> = dns_string
         .trim()
-        .split(".")
+        .split('.')
         .map(|octet| octet.parse::<u8>().unwrap_or(0))
         .collect();
 

@@ -31,7 +31,7 @@ pub const L_tmpnam: c_int = 7;
 pub const TMP_MAX: int32_t = 2_147_483_647;
 // XXX: defined manually in bits/stdio.h as well because cbindgen can't handle
 //      string constants in any form AFAICT
-pub const P_tmpdir: &'static [u8; 5] = b"/tmp\0";
+pub const P_tmpdir: &[u8; 5] = b"/tmp\0";
 
 #[allow(non_camel_case_types)]
 pub type fpos_t = off_t;

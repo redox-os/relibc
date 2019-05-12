@@ -265,6 +265,7 @@ pub unsafe extern "C" fn exit(status: c_int) {
 
     // Look for the neighbor functions in memory until the end
     let mut f = &__fini_array_end as *const _;
+    #[allow(clippy::op_ref)]
     while f > &__fini_array_start {
         f = f.offset(-1);
         (*f)();
@@ -846,7 +847,7 @@ pub unsafe fn convert_hex(s: *const c_char) -> Option<(c_ulong, isize, bool)> {
 
 pub unsafe fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong, isize, bool)> {
     // -1 means the character is invalid
-    #[cfg_attr(rustfmt, rustfmt_skip)]
+    #[rustfmt::skip]
     const LOOKUP_TABLE: [c_long; 256] = [
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,

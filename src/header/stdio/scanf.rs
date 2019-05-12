@@ -349,7 +349,7 @@ unsafe fn inner_scanf<R: Read>(
                     }
                 }
                 b'c' => {
-                    let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
+                    let ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
 
                     for i in 0..width.unwrap_or(1) {
                         if let Some(ptr) = ptr {
@@ -370,11 +370,12 @@ unsafe fn inner_scanf<R: Read>(
                     c = next_byte(&mut format)?;
 
                     let mut matches = Vec::new();
-                    let mut invert = false;
-                    if c == b'^' {
+                    let invert = if c == b'^' {
                         c = next_byte(&mut format)?;
-                        invert = true;
-                    }
+                        true
+                    } else {
+                        false
+                    };
 
                     let mut prev;
                     loop {

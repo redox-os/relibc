@@ -12,6 +12,8 @@
 #![feature(const_vec_new)]
 #![feature(core_intrinsics)]
 #![feature(global_asm)]
+// FIXME: Stable on nightly, remove once redox fork is updated
+#![feature(iter_copied)]
 #![feature(lang_items)]
 #![feature(linkage)]
 #![feature(stmt_expr_attributes)]

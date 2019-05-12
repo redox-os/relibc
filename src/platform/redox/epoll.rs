@@ -15,11 +15,7 @@ use syscall::flag::EVENT_READ;
 
 impl PalEpoll for Sys {
     fn epoll_create1(flags: c_int) -> c_int {
-        Sys::open(
-            c_str!("event:"),
-            O_RDWR | flags,
-            0,
-        )
+        Sys::open(c_str!("event:"), O_RDWR | flags, 0)
     }
 
     fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> c_int {
@@ -35,7 +31,7 @@ impl PalEpoll for Sys {
                         data: unsafe { mem::transmute((*event).data) },
                     },
                 ) as c_int
-            },
+            }
             EPOLL_CTL_DEL => {
                 Sys::write(
                     epfd,
@@ -46,7 +42,7 @@ impl PalEpoll for Sys {
                         data: 0,
                     },
                 ) as c_int
-            },
+            }
             _ => {
                 unsafe { platform::errno = EINVAL };
                 return -1;

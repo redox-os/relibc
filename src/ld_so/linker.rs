@@ -403,41 +403,35 @@ impl Linker {
 
             // Protect pages
             for ph in elf.program_headers.iter() {
-                match ph.p_type {
-                    program_header::PT_LOAD => {
-                        let voff = ph.p_vaddr as usize % PAGE_SIZE;
-                        let vaddr = ph.p_vaddr as usize - voff;
-                        let vsize =
-                            ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
+                if ph.p_type == program_header::PT_LOAD {
+                    let voff = ph.p_vaddr as usize % PAGE_SIZE;
+                    let vaddr = ph.p_vaddr as usize - voff;
+                    let vsize =
+                        ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
 
-                        let mut prot = 0;
+                    let mut prot = 0;
 
-                        if ph.p_flags & program_header::PF_R == program_header::PF_R {
-                            prot |= sys_mman::PROT_READ;
-                        }
-
-                        // W ^ X. If it is executable, do not allow it to be writable, even if requested
-                        if ph.p_flags & program_header::PF_X == program_header::PF_X {
-                            prot |= sys_mman::PROT_EXEC;
-                        } else if ph.p_flags & program_header::PF_W == program_header::PF_W {
-                            prot |= sys_mman::PROT_WRITE;
-                        }
-
-                        let res = unsafe {
-                            let ptr = mmap.as_mut_ptr().add(vaddr);
-                            println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
-
-                            sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
-                        };
-
-                        if res < 0 {
-                            return Err(Error::Malformed(format!(
-                                "failed to mprotect {}",
-                                elf_name
-                            )));
-                        }
+                    if ph.p_flags & program_header::PF_R == program_header::PF_R {
+                        prot |= sys_mman::PROT_READ;
                     }
-                    _ => (),
+
+                    // W ^ X. If it is executable, do not allow it to be writable, even if requested
+                    if ph.p_flags & program_header::PF_X == program_header::PF_X {
+                        prot |= sys_mman::PROT_EXEC;
+                    } else if ph.p_flags & program_header::PF_W == program_header::PF_W {
+                        prot |= sys_mman::PROT_WRITE;
+                    }
+
+                    let res = unsafe {
+                        let ptr = mmap.as_mut_ptr().add(vaddr);
+                        println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
+
+                        sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
+                    };
+
+                    if res < 0 {
+                        return Err(Error::Malformed(format!("failed to mprotect {}", elf_name)));
+                    }
                 }
             }
         }
@@ -497,41 +491,35 @@ impl Linker {
 
             // Protect pages
             for ph in elf.program_headers.iter() {
-                match ph.p_type {
-                    program_header::PT_LOAD => {
-                        let voff = ph.p_vaddr as usize % PAGE_SIZE;
-                        let vaddr = ph.p_vaddr as usize - voff;
-                        let vsize =
-                            ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
+                if let program_header::PT_LOAD = ph.p_type {
+                    let voff = ph.p_vaddr as usize % PAGE_SIZE;
+                    let vaddr = ph.p_vaddr as usize - voff;
+                    let vsize =
+                        ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
 
-                        let mut prot = 0;
+                    let mut prot = 0;
 
-                        if ph.p_flags & program_header::PF_R == program_header::PF_R {
-                            prot |= sys_mman::PROT_READ;
-                        }
-
-                        // W ^ X. If it is executable, do not allow it to be writable, even if requested
-                        if ph.p_flags & program_header::PF_X == program_header::PF_X {
-                            prot |= sys_mman::PROT_EXEC;
-                        } else if ph.p_flags & program_header::PF_W == program_header::PF_W {
-                            prot |= sys_mman::PROT_WRITE;
-                        }
-
-                        let res = unsafe {
-                            let ptr = mmap.as_mut_ptr().add(vaddr);
-                            println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
-
-                            sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
-                        };
-
-                        if res < 0 {
-                            return Err(Error::Malformed(format!(
-                                "failed to mprotect {}",
-                                elf_name
-                            )));
-                        }
+                    if ph.p_flags & program_header::PF_R == program_header::PF_R {
+                        prot |= sys_mman::PROT_READ;
                     }
-                    _ => (),
+
+                    // W ^ X. If it is executable, do not allow it to be writable, even if requested
+                    if ph.p_flags & program_header::PF_X == program_header::PF_X {
+                        prot |= sys_mman::PROT_EXEC;
+                    } else if ph.p_flags & program_header::PF_W == program_header::PF_W {
+                        prot |= sys_mman::PROT_WRITE;
+                    }
+
+                    let res = unsafe {
+                        let ptr = mmap.as_mut_ptr().add(vaddr);
+                        println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
+
+                        sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
+                    };
+
+                    if res < 0 {
+                        return Err(Error::Malformed(format!("failed to mprotect {}", elf_name)));
+                    }
                 }
             }
         }

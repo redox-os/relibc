@@ -58,7 +58,7 @@ impl Tcb {
             Self {
                 tls_end: tls.as_mut_ptr().add(tls.len()),
                 tls_len: tls.len(),
-                tcb_ptr: tcb_ptr,
+                tcb_ptr,
                 tcb_len: tcb_page.len(),
                 masters_ptr: ptr::null_mut(),
                 masters_len: 0,

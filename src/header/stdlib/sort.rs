@@ -107,7 +107,7 @@ fn heapify(
     // we start at the last parent in the heap (the parent of the last child)
     let last_parent = (nel - 2) / 2;
 
-    for start in (0..last_parent + 1).rev() {
+    for start in (0..=last_parent).rev() {
         heap_sift_down(base, start, nel - 1, width, comp);
     }
 }

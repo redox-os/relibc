@@ -92,7 +92,7 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
 
     let mut _host_aliases: Vec<Vec<u8>> = Vec::new();
 
-    while let Some(s) = iter.next() {
+    for s in iter {
         let mut alias = s.as_bytes().to_vec();
         alias.push(b'\0');
         _host_aliases.push(alias);
