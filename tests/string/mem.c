@@ -14,6 +14,11 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
     puts("Correct memchr");
+    if ((size_t)memrchr((void *)arr, 1, 100) - (size_t)arr != 50) {
+        puts("Incorrect memrchr");
+        exit(EXIT_FAILURE);
+    }
+    puts("Correct memrchr");
     char arr2[51];
     memset(arr2, 0, 51); // Compiler builtin, should work
     memccpy((void *)arr2, (void *)arr, 1, 100);
