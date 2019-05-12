@@ -20,6 +20,7 @@ use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
 
+mod lcg48;
 mod sort;
 
 pub const EXIT_FAILURE: c_int = 1;
@@ -227,9 +228,10 @@ pub extern "C" fn div(numer: c_int, denom: c_int) -> div_t {
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn drand48() -> c_double {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn drand48() -> c_double {
+    lcg48::generator_step();
+    lcg48::x_to_float64(lcg48::XI)
 }
 
 // #[no_mangle]
@@ -410,9 +412,10 @@ pub extern "C" fn lldiv(numer: c_longlong, denom: c_longlong) -> lldiv_t {
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn lrand48() -> c_long {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn lrand48() -> c_long {
+    lcg48::generator_step();
+    lcg48::x_to_uint31(lcg48::XI)
 }
 
 #[no_mangle]
@@ -566,9 +569,10 @@ pub extern "C" fn mkstemps(name: *mut c_char, suffix_len: c_int) -> c_int {
     mkostemps(name, suffix_len, 0)
 }
 
-// #[no_mangle]
-pub extern "C" fn mrand48() -> c_long {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn mrand48() -> c_long {
+    lcg48::generator_step();
+    lcg48::x_to_int32(lcg48::XI)
 }
 
 // #[no_mangle]
@@ -775,9 +779,12 @@ pub unsafe extern "C" fn srand(seed: c_uint) {
     RNG = Some(XorShiftRng::from_seed([seed as u8; 16]));
 }
 
-// #[no_mangle]
-pub extern "C" fn srand48(seed: c_long) {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn srand48(seedval: c_long) {
+    /* Set the high 32 bits of the 48-bit X_i value to the lower 32 bits
+     * of the input argument, and the lower 16 bits to 0x330e, as
+     * specified in POSIX. */
+    lcg48::XI = (((seedval & 0xffff_ffff) as u64) << 16) | 0x330e_u64;
 }
 
 // #[no_mangle]
