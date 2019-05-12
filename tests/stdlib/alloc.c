@@ -126,4 +126,17 @@ int main(void) {
         ptr_aligned_alloc_badsize, aligned_alloc_badsize_errno,
         strerror(aligned_alloc_badsize_errno));
     free(ptr_aligned_alloc_badsize);
+    
+    errno = 0;
+    char * ptr_valloc = (char *)valloc(sample_alloc_size);
+    int valloc_errno = errno;
+    printf("valloc                : %p, errno: %d = %s\n",
+        ptr_valloc, valloc_errno, strerror(valloc_errno));
+    
+    errno = 0;
+    char * ptr_valloc_maxsize = (char *)valloc(max_size);
+    int valloc_maxsize_errno = errno;
+    printf("valloc (SIZE_MAX)     : %p, errno: %d = %s\n",
+        ptr_valloc_maxsize, valloc_maxsize_errno,
+        strerror(valloc_maxsize_errno));
 }

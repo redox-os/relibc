@@ -1,6 +1,7 @@
 //! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 
 use core::{intrinsics, iter, mem, ptr, slice};
+use core::convert::TryFrom;
 use rand::distributions::{Alphanumeric, Distribution, Uniform};
 use rand::prng::XorShiftRng;
 use rand::rngs::JitterRng;
@@ -14,6 +15,7 @@ use header::limits;
 use header::string::*;
 use header::time::constants::CLOCK_MONOTONIC;
 use header::time::timespec;
+use header::unistd::{sysconf, _SC_PAGESIZE};
 use header::wchar::*;
 use header::{ctype, errno, unistd};
 use platform;
@@ -1016,7 +1018,23 @@ pub unsafe extern "C" fn unsetenv(key: *const c_char) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
-    memalign(4096, size)
+    /* sysconf(_SC_PAGESIZE) is a c_long and may in principle not
+     * convert correctly to a size_t. */
+    match size_t::try_from(sysconf(_SC_PAGESIZE)) {
+        Ok(page_size) => {
+            /* valloc() is not supposed to be able to set errno to
+             * EINVAL, hence no call to memalign(). */
+            let ptr = platform::alloc_align(size, page_size);
+            if ptr.is_null() {
+                platform::errno = errno::ENOMEM;
+            }
+            ptr
+        }
+        Err(_) => {
+            // A corner case. No errno setting.
+            ptr::null_mut()
+        }
+    }
 }
 
 #[no_mangle]
