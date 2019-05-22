@@ -232,7 +232,7 @@ pub extern "C" fn div(numer: c_int, denom: c_int) -> div_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn drand48() -> c_double {
-    lcg48::generator_step();
+    lcg48::XI = lcg48::next_x(lcg48::XI);
     lcg48::x_to_float64(lcg48::XI)
 }
 
@@ -246,9 +246,12 @@ pub extern "C" fn ecvt(
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn erand(xsubi: [c_ushort; 3]) -> c_double {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn erand48(xsubi: *mut c_ushort) -> c_double {
+    let old_xi = lcg48::ushort_arr3_to_uint48(xsubi);
+    let new_xi = lcg48::next_x(old_xi);
+    lcg48::set_ushort_arr3_from_uint48(xsubi, new_xi);
+    lcg48::x_to_float64(new_xi)
 }
 
 #[no_mangle]
@@ -361,9 +364,12 @@ pub extern "C" fn initstate(seec: c_uint, state: *mut c_char, size: size_t) -> *
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn jrand48(xsubi: [c_ushort; 3]) -> c_long {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn jrand48(xsubi: *mut c_ushort) -> c_long {
+    let old_xi = lcg48::ushort_arr3_to_uint48(xsubi);
+    let new_xi = lcg48::next_x(old_xi);
+    lcg48::set_ushort_arr3_from_uint48(xsubi, new_xi);
+    lcg48::x_to_int32(new_xi)
 }
 
 // #[no_mangle]
@@ -416,7 +422,7 @@ pub extern "C" fn lldiv(numer: c_longlong, denom: c_longlong) -> lldiv_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn lrand48() -> c_long {
-    lcg48::generator_step();
+    lcg48::XI = lcg48::next_x(lcg48::XI);
     lcg48::x_to_uint31(lcg48::XI)
 }
 
@@ -573,13 +579,16 @@ pub extern "C" fn mkstemps(name: *mut c_char, suffix_len: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn mrand48() -> c_long {
-    lcg48::generator_step();
+    lcg48::XI = lcg48::next_x(lcg48::XI);
     lcg48::x_to_int32(lcg48::XI)
 }
 
-// #[no_mangle]
-pub extern "C" fn nrand48(xsubi: [c_ushort; 3]) -> c_long {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn nrand48(xsubi: *mut c_ushort) -> c_long {
+    let old_xi = lcg48::ushort_arr3_to_uint48(xsubi);
+    let new_xi = lcg48::next_x(old_xi);
+    lcg48::set_ushort_arr3_from_uint48(xsubi, new_xi);
+    lcg48::x_to_uint31(new_xi)
 }
 
 // #[no_mangle]
