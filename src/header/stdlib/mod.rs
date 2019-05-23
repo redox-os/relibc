@@ -232,8 +232,8 @@ pub extern "C" fn div(numer: c_int, denom: c_int) -> div_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn drand48() -> c_double {
-    lcg48::XI = lcg48::next_x(lcg48::XI);
-    lcg48::x_to_float64(lcg48::XI)
+    let new_xi = lcg48::generator_step(lcg48::DEFAULT_XI.as_mut_ptr());
+    lcg48::x_to_float64(new_xi)
 }
 
 // #[no_mangle]
@@ -248,9 +248,7 @@ pub extern "C" fn ecvt(
 
 #[no_mangle]
 pub unsafe extern "C" fn erand48(xsubi: *mut c_ushort) -> c_double {
-    let old_xi = lcg48::ushort_arr3_to_uint48(xsubi);
-    let new_xi = lcg48::next_x(old_xi);
-    lcg48::set_ushort_arr3_from_uint48(xsubi, new_xi);
+    let new_xi = lcg48::generator_step(xsubi);
     lcg48::x_to_float64(new_xi)
 }
 
@@ -366,9 +364,7 @@ pub extern "C" fn initstate(seec: c_uint, state: *mut c_char, size: size_t) -> *
 
 #[no_mangle]
 pub unsafe extern "C" fn jrand48(xsubi: *mut c_ushort) -> c_long {
-    let old_xi = lcg48::ushort_arr3_to_uint48(xsubi);
-    let new_xi = lcg48::next_x(old_xi);
-    lcg48::set_ushort_arr3_from_uint48(xsubi, new_xi);
+    let new_xi = lcg48::generator_step(xsubi);
     lcg48::x_to_int32(new_xi)
 }
 
@@ -385,7 +381,11 @@ pub extern "C" fn labs(i: c_long) -> c_long {
 #[no_mangle]
 pub unsafe extern "C" fn lcong48(param: *mut c_ushort) {
     // Input should be a size-7 array.
-    lcg48::XI = lcg48::ushort_arr3_to_uint48(param.offset(0));
+    
+    /* Go through this ptr -> u64 -> ptr conversion to ensure we only
+     * get the lower 16 bits of each element. */
+    let new_xi = lcg48::ushort_arr3_to_uint48(param.offset(0));
+    lcg48::set_ushort_arr3_from_uint48(lcg48::DEFAULT_XI.as_mut_ptr(), new_xi);
     lcg48::A = lcg48::ushort_arr3_to_uint48(param.offset(3));
     lcg48::C = *param.offset(6) as u16; // c_ushort may be more than 16 bits
 }
@@ -425,8 +425,8 @@ pub extern "C" fn lldiv(numer: c_longlong, denom: c_longlong) -> lldiv_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn lrand48() -> c_long {
-    lcg48::XI = lcg48::next_x(lcg48::XI);
-    lcg48::x_to_uint31(lcg48::XI)
+    let new_xi = lcg48::generator_step(lcg48::DEFAULT_XI.as_mut_ptr());
+    lcg48::x_to_uint31(new_xi)
 }
 
 #[no_mangle]
@@ -582,15 +582,13 @@ pub extern "C" fn mkstemps(name: *mut c_char, suffix_len: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn mrand48() -> c_long {
-    lcg48::XI = lcg48::next_x(lcg48::XI);
-    lcg48::x_to_int32(lcg48::XI)
+    let new_xi = lcg48::generator_step(lcg48::DEFAULT_XI.as_mut_ptr());
+    lcg48::x_to_int32(new_xi)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn nrand48(xsubi: *mut c_ushort) -> c_long {
-    let old_xi = lcg48::ushort_arr3_to_uint48(xsubi);
-    let new_xi = lcg48::next_x(old_xi);
-    lcg48::set_ushort_arr3_from_uint48(xsubi, new_xi);
+    let new_xi = lcg48::generator_step(xsubi);
     lcg48::x_to_uint31(new_xi)
 }
 
@@ -710,12 +708,11 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
 pub unsafe extern "C" fn seed48(seed16v: *mut c_ushort) -> *mut c_ushort {
     lcg48::reset_a_and_c();
     
-    //lcg48::STASHED_XI = lcg48::XI;
-    //lcg48::set_ushort_arr3_from_uint48(&mut lcg48::STASHED_XI[0] as *mut c_ushort, lcg48::XI);
-    lcg48::set_ushort_arr3_from_uint48(lcg48::STASHED_XI.as_mut_ptr(), lcg48::XI);
-    lcg48::XI = lcg48::ushort_arr3_to_uint48(seed16v);
+    lcg48::STASHED_XI = lcg48::DEFAULT_XI;
     
-    //&mut lcg48::STASHED_XI[0]
+    let new_xi = lcg48::ushort_arr3_to_uint48(seed16v);
+    lcg48::set_ushort_arr3_from_uint48(lcg48::DEFAULT_XI.as_mut_ptr(), new_xi);
+    
     lcg48::STASHED_XI.as_mut_ptr()
 }
 
@@ -808,7 +805,8 @@ pub unsafe extern "C" fn srand48(seedval: c_long) {
     /* Set the high 32 bits of the 48-bit X_i value to the lower 32 bits
      * of the input argument, and the lower 16 bits to 0x330e, as
      * specified in POSIX. */
-    lcg48::XI = (((seedval as u32) as u64) << 16) | 0x330e_u64;
+    let new_xi = (((seedval as u32) as u64) << 16) | 0x330e_u64;
+    lcg48::set_ushort_arr3_from_uint48(lcg48::DEFAULT_XI.as_mut_ptr(), new_xi);
 }
 
 // #[no_mangle]
