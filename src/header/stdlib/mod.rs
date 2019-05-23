@@ -382,9 +382,12 @@ pub extern "C" fn labs(i: c_long) -> c_long {
     i.abs()
 }
 
-// #[no_mangle]
-pub extern "C" fn lcong48(param: [c_ushort; 7]) {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn lcong48(param: *mut c_ushort) {
+    // Input should be a size-7 array.
+    lcg48::XI = lcg48::ushort_arr3_to_uint48(param.offset(0));
+    lcg48::A = lcg48::ushort_arr3_to_uint48(param.offset(3));
+    lcg48::C = *param.offset(6) as u16; // c_ushort may be more than 16 bits
 }
 
 #[repr(C)]
@@ -703,9 +706,17 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
     ptr
 }
 
-// #[no_mangle]
-pub extern "C" fn seed48(seed16v: [c_ushort; 3]) -> c_ushort {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn seed48(seed16v: *mut c_ushort) -> *mut c_ushort {
+    lcg48::reset_a_and_c();
+    
+    //lcg48::STASHED_XI = lcg48::XI;
+    //lcg48::set_ushort_arr3_from_uint48(&mut lcg48::STASHED_XI[0] as *mut c_ushort, lcg48::XI);
+    lcg48::set_ushort_arr3_from_uint48(lcg48::STASHED_XI.as_mut_ptr(), lcg48::XI);
+    lcg48::XI = lcg48::ushort_arr3_to_uint48(seed16v);
+    
+    //&mut lcg48::STASHED_XI[0]
+    lcg48::STASHED_XI.as_mut_ptr()
 }
 
 #[no_mangle]
@@ -792,10 +803,12 @@ pub unsafe extern "C" fn srand(seed: c_uint) {
 
 #[no_mangle]
 pub unsafe extern "C" fn srand48(seedval: c_long) {
+    lcg48::reset_a_and_c();
+    
     /* Set the high 32 bits of the 48-bit X_i value to the lower 32 bits
      * of the input argument, and the lower 16 bits to 0x330e, as
      * specified in POSIX. */
-    lcg48::XI = (((seedval & 0xffff_ffff) as u64) << 16) | 0x330e_u64;
+    lcg48::XI = (((seedval as u32) as u64) << 16) | 0x330e_u64;
 }
 
 // #[no_mangle]

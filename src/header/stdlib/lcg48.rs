@@ -7,10 +7,16 @@ use platform::types::*;
  * set. */
 pub static mut XI: u64 = 0;
 
+// Used by seed48() (returns a pointer to this array).
+pub static mut STASHED_XI: [c_ushort; 3] = [0; 3];
+
 /* Multiplier and addend, which may be set through lcong48(). Default values as
  * specified in POSIX. */
-pub static mut A: u64 = 0x5deece66d;
-pub static mut C: u16 = 0xb;
+const A_DEFAULT: u64 = 0x5deece66d;
+const C_DEFAULT: u16 = 0xb;
+
+pub static mut A: u64 = A_DEFAULT;
+pub static mut C: u16 = C_DEFAULT;
 
 /// Gets the next element in the linear congruential generator's
 /// sequence.
@@ -60,4 +66,10 @@ pub unsafe fn set_ushort_arr3_from_uint48(arr_ptr: *mut c_ushort, value: u64) {
     *arr_ptr.offset(0) = c_ushort::from(value as u16);
     *arr_ptr.offset(1) = c_ushort::from((value >> 16) as u16);
     *arr_ptr.offset(2) = c_ushort::from((value >> 32) as u16);
+}
+
+/// Used by `srand48()` and `seed48()`.
+pub unsafe fn reset_a_and_c() {
+    A = A_DEFAULT;
+    C = C_DEFAULT;
 }
