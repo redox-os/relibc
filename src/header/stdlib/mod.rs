@@ -233,7 +233,7 @@ pub extern "C" fn div(numer: c_int, denom: c_int) -> div_t {
 #[no_mangle]
 pub unsafe extern "C" fn drand48() -> c_double {
     let new_xi = lcg48::generator_step(lcg48::DEFAULT_XI.as_mut_ptr());
-    lcg48::x_to_float64(new_xi)
+    lcg48::float64_from_x(new_xi)
 }
 
 // #[no_mangle]
@@ -249,7 +249,7 @@ pub extern "C" fn ecvt(
 #[no_mangle]
 pub unsafe extern "C" fn erand48(xsubi: *mut c_ushort) -> c_double {
     let new_xi = lcg48::generator_step(xsubi);
-    lcg48::x_to_float64(new_xi)
+    lcg48::float64_from_x(new_xi)
 }
 
 #[no_mangle]
@@ -365,7 +365,7 @@ pub extern "C" fn initstate(seec: c_uint, state: *mut c_char, size: size_t) -> *
 #[no_mangle]
 pub unsafe extern "C" fn jrand48(xsubi: *mut c_ushort) -> c_long {
     let new_xi = lcg48::generator_step(xsubi);
-    lcg48::x_to_int32(new_xi)
+    lcg48::int32_from_x(new_xi)
 }
 
 // #[no_mangle]
@@ -384,9 +384,9 @@ pub unsafe extern "C" fn lcong48(param: *mut c_ushort) {
     
     /* Go through this ptr -> u64 -> ptr conversion to ensure we only
      * get the lower 16 bits of each element. */
-    let new_xi = lcg48::ushort_arr3_to_uint48(param.offset(0));
+    let new_xi = lcg48::uint48_from_ushort_arr3(param.offset(0));
     lcg48::set_ushort_arr3_from_uint48(lcg48::DEFAULT_XI.as_mut_ptr(), new_xi);
-    lcg48::A = lcg48::ushort_arr3_to_uint48(param.offset(3));
+    lcg48::A = lcg48::uint48_from_ushort_arr3(param.offset(3));
     lcg48::C = *param.offset(6) as u16; // c_ushort may be more than 16 bits
 }
 
@@ -426,7 +426,7 @@ pub extern "C" fn lldiv(numer: c_longlong, denom: c_longlong) -> lldiv_t {
 #[no_mangle]
 pub unsafe extern "C" fn lrand48() -> c_long {
     let new_xi = lcg48::generator_step(lcg48::DEFAULT_XI.as_mut_ptr());
-    lcg48::x_to_uint31(new_xi)
+    lcg48::uint31_from_x(new_xi)
 }
 
 #[no_mangle]
@@ -583,13 +583,13 @@ pub extern "C" fn mkstemps(name: *mut c_char, suffix_len: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn mrand48() -> c_long {
     let new_xi = lcg48::generator_step(lcg48::DEFAULT_XI.as_mut_ptr());
-    lcg48::x_to_int32(new_xi)
+    lcg48::int32_from_x(new_xi)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn nrand48(xsubi: *mut c_ushort) -> c_long {
     let new_xi = lcg48::generator_step(xsubi);
-    lcg48::x_to_uint31(new_xi)
+    lcg48::uint31_from_x(new_xi)
 }
 
 // #[no_mangle]
@@ -710,7 +710,7 @@ pub unsafe extern "C" fn seed48(seed16v: *mut c_ushort) -> *mut c_ushort {
     
     lcg48::STASHED_XI = lcg48::DEFAULT_XI;
     
-    let new_xi = lcg48::ushort_arr3_to_uint48(seed16v);
+    let new_xi = lcg48::uint48_from_ushort_arr3(seed16v);
     lcg48::set_ushort_arr3_from_uint48(lcg48::DEFAULT_XI.as_mut_ptr(), new_xi);
     
     lcg48::STASHED_XI.as_mut_ptr()

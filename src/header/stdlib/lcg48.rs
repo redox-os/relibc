@@ -30,7 +30,7 @@ pub unsafe fn reset_a_and_c() {
 /// Takes a pointer argument due to the inappropriate C function
 /// signatures generated from Rust's sized arrays, see
 /// https://github.com/eqrion/cbindgen/issues/171
-pub unsafe fn ushort_arr3_to_uint48(arr_ptr: *const c_ushort) -> u64 {
+pub unsafe fn uint48_from_ushort_arr3(arr_ptr: *const c_ushort) -> u64 {
     let arr = [*arr_ptr.offset(0), *arr_ptr.offset(1), *arr_ptr.offset(2)];
     
     /* Cast via u16 to ensure we get only the lower 16 bits of each
@@ -51,7 +51,7 @@ pub unsafe fn set_ushort_arr3_from_uint48(arr_ptr: *mut c_ushort, value: u64) {
 /// Modifies the passed argument in-place and returns the new value as a
 /// u64. The input argument must be a size-3 array.
 pub unsafe fn generator_step(xi_arr_ptr: *mut c_ushort) -> u64 {
-    let old_xi: u64 = ushort_arr3_to_uint48(xi_arr_ptr);
+    let old_xi: u64 = uint48_from_ushort_arr3(xi_arr_ptr);
     
     /* The recurrence relation of the linear congruential generator,
      * X_(n+1) = (a * X_n + c) % m,
@@ -65,7 +65,7 @@ pub unsafe fn generator_step(xi_arr_ptr: *mut c_ushort) -> u64 {
 
 /// Get a C `double` from a 48-bit integer (for `drand48()` and
 /// `erand48()`).
-pub fn x_to_float64(x: u64) -> c_double {
+pub fn float64_from_x(x: u64) -> c_double {
     /* We set the exponent to 0, and the 48-bit integer is copied into the high
      * 48 of the 52 significand bits. The value then lies in the range
      * [1.0, 2.0), from which we simply subtract 1.0. */
@@ -74,13 +74,13 @@ pub fn x_to_float64(x: u64) -> c_double {
 
 /// Get the high 31 bits of a 48-bit integer (for `lrand48()` and
 /// `nrand48()`).
-pub fn x_to_uint31(x: u64) -> c_long {
+pub fn uint31_from_x(x: u64) -> c_long {
     (x >> 17) as c_long
 }
 
 /// Get the high 32 bits, signed, of a 48-bit integer (for `mrand48()`
 /// and `jrand48()`).
-pub fn x_to_int32(x: u64) -> c_long {
+pub fn int32_from_x(x: u64) -> c_long {
     // Cast via i32 to ensure we get the sign correct
     c_long::from((x >> 16) as i32)
 }
