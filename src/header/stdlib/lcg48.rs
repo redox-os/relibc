@@ -26,13 +26,13 @@ pub unsafe fn reset_a_and_c() {
 }
 
 /// Build a 48-bit integer from a size-3 array of unsigned short.
-/// 
+///
 /// Takes a pointer argument due to the inappropriate C function
 /// signatures generated from Rust's sized arrays, see
 /// https://github.com/eqrion/cbindgen/issues/171
 pub unsafe fn uint48_from_ushort_arr3(arr_ptr: *const c_ushort) -> u64 {
     let arr = [*arr_ptr.offset(0), *arr_ptr.offset(1), *arr_ptr.offset(2)];
-    
+
     /* Cast via u16 to ensure we get only the lower 16 bits of each
      * element, as specified by POSIX. */
     u64::from(arr[0] as u16) | (u64::from(arr[1] as u16) << 16) | (u64::from(arr[2] as u16) << 32)
@@ -47,18 +47,18 @@ pub unsafe fn set_ushort_arr3_from_uint48(arr_ptr: *mut c_ushort, value: u64) {
 
 /// Advances the buffer from the input argument to the next element in
 /// the linear congruential generator's sequence.
-/// 
+///
 /// Modifies the passed argument in-place and returns the new value as a
 /// u64. The input argument must be a size-3 array.
 pub unsafe fn generator_step(xi_arr_ptr: *mut c_ushort) -> u64 {
     let old_xi: u64 = uint48_from_ushort_arr3(xi_arr_ptr);
-    
+
     /* The recurrence relation of the linear congruential generator,
      * X_(n+1) = (a * X_n + c) % m,
      * with m = 2**48. The multiplication and addition can overflow a
      * u64, but we just let it wrap since we take mod 2**48 anyway. */
     let new_xi: u64 = A.wrapping_mul(old_xi).wrapping_add(u64::from(C)) & 0xffff_ffff_ffff;
-    
+
     set_ushort_arr3_from_uint48(xi_arr_ptr, new_xi);
     new_xi
 }
