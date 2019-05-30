@@ -1,7 +1,7 @@
 //! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 
-use core::{intrinsics, iter, mem, ptr, slice};
 use core::convert::TryFrom;
+use core::{intrinsics, iter, mem, ptr, slice};
 use rand::distributions::{Alphanumeric, Distribution, Uniform};
 use rand::prng::XorShiftRng;
 use rand::rngs::JitterRng;
@@ -583,14 +583,18 @@ pub extern "C" fn nrand48(xsubi: [c_ushort; 3]) -> c_long {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn posix_memalign(memptr: *mut *mut c_void, alignment: size_t, size: size_t) -> c_int {
+pub unsafe extern "C" fn posix_memalign(
+    memptr: *mut *mut c_void,
+    alignment: size_t,
+    size: size_t,
+) -> c_int {
     const void_ptr_size: usize = mem::size_of::<*mut c_void>();
-    
+
     /* Check that alignment is:
      * a) a multiple of sizeof(void *)
      * b) a power-of-two multiple of sizeof(void *). Integer division as
      *    below gives the correct result once a) is ensured. */
-    if alignment % void_ptr_size == 0 && (alignment/void_ptr_size).is_power_of_two() {
+    if alignment % void_ptr_size == 0 && (alignment / void_ptr_size).is_power_of_two() {
         let ptr = platform::alloc_align(size, alignment);
         if !ptr.is_null() {
             *memptr = ptr;
