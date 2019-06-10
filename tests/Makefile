@@ -61,6 +61,7 @@ EXPECT_NAMES=\
 	string/strstr \
 	string/strtok \
 	string/strtok_r \
+	string/strsignal \
 	strings \
 	sys_epoll/epoll \
 	time/asctime \
