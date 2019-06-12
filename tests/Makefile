@@ -37,6 +37,7 @@ EXPECT_NAMES=\
 	stdio/setvbuf \
 	stdio/sprintf \
 	stdlib/a64l \
+	stdlib/alloc \
 	stdlib/atof \
 	stdlib/atoi \
 	stdlib/div \
