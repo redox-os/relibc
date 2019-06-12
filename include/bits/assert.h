@@ -5,7 +5,7 @@
 # define assert(cond) (void) 0
 #else
 # define assert(cond) \
-  ((void)((cond) || (__assert(__func__, __FILE__, __LINE__, #cond), 0)))
+  ((void)((cond) || (__assert_fail(__func__, __FILE__, __LINE__, #cond), 0)))
 #endif
 
 #endif
