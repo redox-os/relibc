@@ -2,6 +2,8 @@
 
 use core::mem;
 
+use cbitset::BitSet;
+
 use fs::File;
 use header::errno;
 use header::sys_epoll::{epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR,
@@ -13,45 +15,18 @@ use platform::types::*;
 // fd_set is also defined in C because cbindgen is incompatible with mem::size_of booo
 
 pub const FD_SETSIZE: usize = 1024;
+type bitset = BitSet<[c_ulong; FD_SETSIZE / (8 * mem::size_of::<c_ulong>())]>;
 
 #[repr(C)]
 pub struct fd_set {
-    pub fds_bits: [c_ulong; FD_SETSIZE / (8 * mem::size_of::<c_ulong>())],
-}
-
-impl fd_set {
-    fn index(fd: c_int) -> usize {
-        (fd as usize) / (8 * mem::size_of::<c_ulong>())
-    }
-
-    fn bitmask(fd: c_int) -> c_ulong {
-        1 << ((fd as usize) & (8 * mem::size_of::<c_ulong>() - 1)) as c_ulong
-    }
-
-    fn zero(&mut self) {
-        for i in 0..self.fds_bits.len() {
-            self.fds_bits[i] = 0;
-        }
-    }
-
-    fn set(&mut self, fd: c_int) {
-        self.fds_bits[Self::index(fd)] |= Self::bitmask(fd);
-    }
-
-    fn clr(&mut self, fd: c_int) {
-        self.fds_bits[Self::index(fd)] &= !Self::bitmask(fd);
-    }
-
-    fn isset(&self, fd: c_int) -> bool {
-        self.fds_bits[Self::index(fd)] & Self::bitmask(fd) > 0
-    }
+    pub fds_bits: bitset,
 }
 
 pub fn select_epoll(
     nfds: c_int,
-    mut readfds: Option<&mut fd_set>,
-    mut writefds: Option<&mut fd_set>,
-    mut exceptfds: Option<&mut fd_set>,
+    readfds: Option<&mut fd_set>,
+    writefds: Option<&mut fd_set>,
+    exceptfds: Option<&mut fd_set>,
     timeout: Option<&mut timeval>,
 ) -> c_int {
     if nfds < 0 || nfds > FD_SETSIZE as i32 {
@@ -67,11 +42,15 @@ pub fn select_epoll(
         File::new(epfd)
     };
 
+    let mut read_bitset : Option<&mut bitset> = readfds.map(|fd_set| &mut fd_set.fds_bits);
+    let mut write_bitset : Option<&mut bitset> = writefds.map(|fd_set| &mut fd_set.fds_bits);
+    let mut except_bitset : Option<&mut bitset> = exceptfds.map(|fd_set| &mut fd_set.fds_bits);
+
     // Keep track of the number of file descriptors that do not support epoll
     let mut not_epoll = 0;
     for fd in 0..nfds {
-        if let Some(ref mut fd_set) = readfds {
-            if fd_set.isset(fd) {
+        if let Some(ref mut fd_set) = read_bitset {
+            if fd_set.contains(fd as usize) {
                 let mut event = epoll_event {
                     events: EPOLLIN,
                     data: epoll_data { fd },
@@ -84,12 +63,12 @@ pub fn select_epoll(
                         return -1;
                     }
                 } else {
-                    fd_set.clr(fd);
+                    fd_set.remove(fd as usize);
                 }
             }
         }
-        if let Some(ref mut fd_set) = writefds {
-            if fd_set.isset(fd) {
+        if let Some(ref mut fd_set) = write_bitset {
+            if fd_set.contains(fd as usize) {
                 let mut event = epoll_event {
                     events: EPOLLOUT,
                     data: epoll_data { fd },
@@ -102,12 +81,12 @@ pub fn select_epoll(
                         return -1;
                     }
                 } else {
-                    fd_set.clr(fd);
+                    fd_set.remove(fd as usize);
                 }
             }
         }
-        if let Some(ref mut fd_set) = exceptfds {
-            if fd_set.isset(fd) {
+        if let Some(ref mut fd_set) = except_bitset {
+            if fd_set.contains(fd as usize) {
                 let mut event = epoll_event {
                     events: EPOLLERR,
                     data: epoll_data { fd },
@@ -120,7 +99,7 @@ pub fn select_epoll(
                         return -1;
                     }
                 } else {
-                    fd_set.clr(fd);
+                    fd_set.remove(fd as usize);
                 }
             }
         }
@@ -154,22 +133,22 @@ pub fn select_epoll(
         let event = &events[i];
         let fd = unsafe { event.data.fd };
         // TODO: Error status when fd does not match?
-        if fd >= 0 && fd <= FD_SETSIZE as c_int {
+        if fd >= 0 && fd < FD_SETSIZE as c_int {
             if event.events & EPOLLIN > 0 {
-                if let Some(ref mut fd_set) = readfds {
-                    fd_set.set(fd);
+                if let Some(ref mut fd_set) = read_bitset {
+                    fd_set.insert(fd as usize);
                     count += 1;
                 }
             }
             if event.events & EPOLLOUT > 0 {
-                if let Some(ref mut fd_set) = writefds {
-                    fd_set.set(fd);
+                if let Some(ref mut fd_set) = write_bitset {
+                    fd_set.insert(fd as usize);
                     count += 1;
                 }
             }
             if event.events & EPOLLERR > 0 {
-                if let Some(ref mut fd_set) = exceptfds {
-                    fd_set.set(fd);
+                if let Some(ref mut fd_set) = except_bitset {
+                    fd_set.insert(fd as usize);
                     count += 1;
                 }
             }
