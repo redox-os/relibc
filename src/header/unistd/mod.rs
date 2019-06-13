@@ -340,11 +340,11 @@ pub extern "C" fn getpagesize() -> c_int {
         Err(_) => {
             /* Behavior not specified by POSIX for this case. The -1
              * value mimics sysconf()'s behavior, though.
-             * 
+             *
              * As specified for the limits.h header, the minimum
              * acceptable value for {PAGESIZE} is 1. The -1 value thus
              * cannot be mistaken for an acceptable value.
-             * 
+             *
              * POSIX does not specify any possible errors for this
              * function, hence no errno setting. */
             -1
