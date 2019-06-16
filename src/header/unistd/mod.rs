@@ -450,13 +450,16 @@ pub extern "C" fn pread(fildes: c_int, buf: *mut c_void, nbyte: size_t, offset: 
     res
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn pthread_atfork(
     prepare: Option<extern "C" fn()>,
     parent: Option<extern "C" fn()>,
     child: Option<extern "C" fn()>,
 ) -> c_int {
-    unimplemented!();
+    // TODO: WIP implementation available in "atfork" branch. It's
+    // segfaulting at the thread-local stuff, both in Unix and Redox.
+    // unimplemented!();
+    0
 }
 
 #[no_mangle]
