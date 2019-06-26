@@ -42,6 +42,25 @@ macro_rules! eprintln {
     ($fmt:expr, $($arg:tt)*) => (eprint!(concat!($fmt, "\n"), $($arg)*));
 }
 
+/// Lifted from libstd
+#[macro_export]
+macro_rules! dbg {
+    () => {
+        eprintln!("[{}:{}]", file!(), line!());
+    };
+    ($val:expr) => {
+        // Use of `match` here is intentional because it affects the lifetimes
+        // of temporaries - https://stackoverflow.com/a/48732525/1063961
+        match $val {
+            tmp => {
+                eprintln!("[{}:{}] {} = {:#?}",
+                    file!(), line!(), stringify!($val), &tmp);
+                tmp
+            }
+        }
+    }
+}
+
 #[macro_export]
 #[cfg(not(feature = "trace"))]
 macro_rules! trace {

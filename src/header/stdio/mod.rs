@@ -61,7 +61,6 @@ impl<'a> DerefMut for Buffer<'a> {
 
 /// This struct gets exposed to the C API.
 pub struct FILE {
-    // Can't use spin crate because *_unlocked functions are things in C :(
     lock: Mutex<()>,
 
     file: File,
@@ -417,8 +416,10 @@ pub unsafe extern "C" fn fputc(c: c_int, stream: *mut FILE) -> c_int {
 /// Insert a string into a stream
 #[no_mangle]
 pub unsafe extern "C" fn fputs(s: *const c_char, stream: *mut FILE) -> c_int {
-    let len = strlen(s);
-    (fwrite(s as *const c_void, 1, len, stream) == len) as c_int - 1
+    let mut stream = (*stream).lock();
+    let buf = slice::from_raw_parts(s as *mut u8, strlen(s));
+
+    if stream.write_all(&buf).is_ok() { 0 } else { -1 }
 }
 
 /// Read `nitems` of size `size` into `ptr` from `stream`
@@ -577,7 +578,7 @@ pub unsafe extern "C" fn fwrite(
         return 0;
     }
     let mut stream = (*stream).lock();
-    let buf = slice::from_raw_parts_mut(ptr as *mut u8, size as usize * nitems as usize);
+    let buf = slice::from_raw_parts(ptr as *const u8, size as usize * nitems as usize);
     let mut written = 0;
     while written < buf.len() {
         match stream.write(&buf[written..]) {
@@ -798,12 +799,16 @@ pub unsafe extern "C" fn putchar_unlocked(c: c_int) -> c_int {
 /// Put a string `s` into `stdout`
 #[no_mangle]
 pub unsafe extern "C" fn puts(s: *const c_char) -> c_int {
-    let ret = (fputs(s, stdout) > 0) || (putchar_unlocked(b'\n' as c_int) > 0);
-    if ret {
-        0
-    } else {
-        -1
+    let mut stream = (&mut *stdout).lock();
+    let buf = slice::from_raw_parts(s as *mut u8, strlen(s));
+
+    if stream.write_all(&buf).is_err() {
+        return -1;
     }
+    if stream.write(&[b'\n']).is_err() {
+        return -1;
+    }
+    0
 }
 
 /// Put an integer `w` into `stream`
