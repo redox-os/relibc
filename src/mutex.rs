@@ -70,7 +70,7 @@ impl<T> Mutex<T> {
             //
             // - Skip the atomic operation if the last value was 2, since it most likely hasn't changed.
             // - Skip the futex wait if the atomic operation says the mutex is unlocked.
-            if last == 2 || self.atomic().compare_exchange(1, 2, SeqCst, SeqCst).unwrap_or_else(|err| err) == 2 {
+            if last == 2 || self.atomic().compare_exchange(1, 2, SeqCst, SeqCst).unwrap_or_else(|err| err) != 0 {
                 Sys::futex(self.atomic().get_mut(), FUTEX_WAIT, 2);
             }
 
