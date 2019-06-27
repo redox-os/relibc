@@ -2,7 +2,7 @@
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicU32, Ordering};
 use core::{intrinsics, ptr};
 
 use header::sys_mman;
@@ -20,7 +20,7 @@ pub struct Semaphore {
 type pte_osThreadHandle = pid_t;
 type pte_osMutexHandle = *mut i32;
 type pte_osSemaphoreHandle = *mut Semaphore;
-type pte_osThreadEntryPoint = unsafe extern "C" fn(params: *mut c_void) -> c_int;
+type pte_osThreadEntryPoint = unsafe extern "C" fn(params: *mut c_void) -> *mut c_void;
 
 #[repr(C)]
 #[derive(Eq, PartialEq)]
@@ -45,7 +45,7 @@ static mut pid_stacks_lock: i32 = 0;
 #[thread_local]
 static mut LOCALS: *mut BTreeMap<c_uint, *mut c_void> = ptr::null_mut();
 
-static NEXT_KEY: AtomicUsize = AtomicUsize::new(0);
+static NEXT_KEY: AtomicU32 = AtomicU32::new(0);
 
 unsafe fn locals() -> &'static mut BTreeMap<c_uint, *mut c_void> {
     if LOCALS.is_null() {
@@ -426,7 +426,7 @@ pub unsafe extern "C" fn pte_osTlsGetValue(index: c_uint) -> *mut c_void {
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osTlsAlloc(pKey: *mut c_uint) -> pte_osResult {
-    NEXT_KEY.fetch_add(1, Ordering::SeqCst);
+    *pKey = NEXT_KEY.fetch_add(1, Ordering::SeqCst);
     PTE_OS_OK
 }
 
