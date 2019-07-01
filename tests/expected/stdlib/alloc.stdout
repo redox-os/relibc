@@ -1,0 +1,24 @@
+malloc (size 0): (OK)
+malloc: pointer: (not NULL), error value: 0 = Success
+malloc (SIZE_MAX): pointer: (nil), error value: 12 = Out of memory
+calloc (size 0): (OK)
+calloc: pointer: (not NULL), error value: 0 = Success
+calloc (overflowing): pointer: (nil), error value: 12 = Out of memory
+realloc (size 0): (OK)
+realloc: pointer: (not NULL), error value: 0 = Success
+realloc (SIZE_MAX): pointer: (nil), error value: 12 = Out of memory
+memalign (size 0): (OK)
+memalign: pointer: (alignment OK), error value: 0 = Success
+memalign (SIZE_MAX): pointer: (nil), error value: 12 = Out of memory
+memalign (alignment 0): pointer: (nil), error value: 22 = Invalid argument
+memalign (alignment 3): pointer: (nil), error value: 22 = Invalid argument
+aligned_alloc (size % alignment == 0): pointer: (alignment OK), error value: 0 = Success
+aligned_alloc (size % alignment != 0): pointer: (nil), error value: 22 = Invalid argument
+valloc (size 0): (OK)
+valloc: pointer: (alignment OK), error value: 0 = Success
+valloc (SIZE_MAX): pointer: (nil), error value: 12 = Out of memory
+posix_memalign: pointer: (alignment OK), error value: 0 = Success
+posix_memalign (alignment 0): pointer: (nil), error value: 22 = Invalid argument
+posix_memalign (non-power-of-two multiple of sizeof(void *)): pointer: (nil), error value: 22 = Invalid argument
+posix_memalign (size 0): (OK)
+posix_memalign (SIZE_MAX): pointer: (nil), error value: 12 = Out of memory
