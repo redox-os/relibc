@@ -92,7 +92,7 @@ pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut 
          * difference between aligned_alloc() and memalign(). */
         memalign(alignment, size)
     } else {
-        platform::errno = errno::EINVAL;
+        platform::errno = EINVAL;
         ptr::null_mut()
     }
 }
@@ -199,8 +199,7 @@ pub unsafe extern "C" fn bsearch(
 #[no_mangle]
 pub unsafe extern "C" fn calloc(nelem: size_t, elsize: size_t) -> *mut c_void {
     //Handle possible integer overflow in size calculation
-    let size_result = nelem.checked_mul(elsize);
-    match size_result {
+    match nelem.checked_mul(elsize) {
         Some(size) => {
             /* If allocation fails here, errno setting will be handled
              * by malloc() */
@@ -212,7 +211,7 @@ pub unsafe extern "C" fn calloc(nelem: size_t, elsize: size_t) -> *mut c_void {
         }
         None => {
             // For overflowing multiplication, we have to set errno here
-            platform::errno = errno::ENOMEM;
+            platform::errno = ENOMEM;
             ptr::null_mut()
         }
     }
@@ -463,24 +462,21 @@ pub unsafe extern "C" fn lrand48() -> c_long {
 pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
     let ptr = platform::alloc(size);
     if ptr.is_null() {
-        platform::errno = errno::ENOMEM;
+        platform::errno = ENOMEM;
     }
     ptr
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_void {
-    /* Check if alignment is a (positive) power of two. The second
-     * expression will never underflow, due to Rust's lazy boolean
-     * operators. */
-    if alignment > 0 && (alignment & (alignment - 1)) == 0 {
+    if alignment.is_power_of_two() {
         let ptr = platform::alloc_align(size, alignment);
         if ptr.is_null() {
-            platform::errno = errno::ENOMEM;
+            platform::errno = ENOMEM;
         }
         ptr
     } else {
-        platform::errno = errno::EINVAL;
+        platform::errno = EINVAL;
         ptr::null_mut()
     }
 }
@@ -726,11 +722,11 @@ pub extern "C" fn random() -> c_long {
 
 #[no_mangle]
 pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {
-    let ptr = platform::realloc(ptr, size);
-    if ptr.is_null() {
-        platform::errno = errno::ENOMEM;
+    let new_ptr = platform::realloc(ptr, size);
+    if new_ptr.is_null() {
+        platform::errno = ENOMEM;
     }
-    ptr
+    new_ptr
 }
 
 #[no_mangle]
@@ -1101,7 +1097,7 @@ pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
              * EINVAL, hence no call to memalign(). */
             let ptr = platform::alloc_align(size, page_size);
             if ptr.is_null() {
-                platform::errno = errno::ENOMEM;
+                platform::errno = ENOMEM;
             }
             ptr
         }

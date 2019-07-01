@@ -12,7 +12,7 @@ int main(void) {
     size_t sample_realloc_size = sample_alloc_size + 1;
     
     /* ensure values are mapped to variables */
-    size_t zero = 0;
+    size_t zero_size = 0;
     size_t max_size = SIZE_MAX;
     size_t aligned_alloc_alignment = 128;
     size_t aligned_alloc_goodsize = 256;
@@ -21,6 +21,14 @@ int main(void) {
     size_t pow2_mul_voidptr_size = 4*sizeof(void *);
     
     int i;
+    
+    errno = 0;
+    char * ptr_zerosize_malloc = (char *)malloc(zero_size);
+    int malloc_zerosize_errno = errno;
+    printf("malloc (size 0)       : %p, errno: %d = %s\n",
+        ptr_zerosize_malloc, malloc_zerosize_errno,
+        strerror(malloc_zerosize_errno));
+    free(ptr_zerosize_malloc);
     
     errno = 0;
     char * ptr_malloc = (char *)malloc(sample_alloc_size);
@@ -41,6 +49,14 @@ int main(void) {
     free(ptr_malloc_maxsize);
     
     errno = 0;
+    char * ptr_zerosize_calloc = (char *)calloc(zero_size, 1);
+    int calloc_zerosize_errno = errno;
+    printf("calloc (size 0)       : %p, errno: %d = %s\n",
+        ptr_zerosize_calloc,
+        calloc_zerosize_errno, strerror(calloc_zerosize_errno));
+    free(ptr_zerosize_calloc);
+    
+    errno = 0;
     char * ptr_calloc = (char *)calloc(sample_alloc_size, 1);
     int calloc_errno = errno;
     printf("calloc                : %p, errno: %d = %s\n", ptr_calloc,
@@ -57,6 +73,15 @@ int main(void) {
         ptr_calloc_overflow, calloc_overflow_errno,
         strerror(calloc_overflow_errno));
     free(ptr_calloc_overflow); /* clean up correctly even if overflow is not handled */
+    
+    char * ptr_realloc_size0 = (char *)malloc(sample_alloc_size);
+    errno = 0;
+    ptr_realloc_size0 = (char *)realloc(ptr_realloc_size0, zero_size);
+    int realloc_size0_errno = errno;
+    printf("realloc (size 0)      : %p, errno: %d = %s\n",
+        ptr_realloc_size0, realloc_size0_errno,
+        strerror(realloc_size0_errno));
+    free(ptr_realloc_size0);
     
     char * ptr_realloc = (char *)malloc(sample_alloc_size);
     errno = 0;
@@ -77,6 +102,14 @@ int main(void) {
         ptr_realloc_maxsize, realloc_maxsize_errno,
         strerror(realloc_maxsize_errno));
     free(ptr_realloc_maxsize);
+    
+    errno = 0;
+    char * ptr_memalign_size0 = (char *)memalign(256, zero_size);
+    int memalign_size0_errno = errno;
+    printf("memalign (size 0)     : %p, errno: %d = %s\n",
+        ptr_memalign_size0, memalign_size0_errno,
+        strerror(memalign_size0_errno));
+    free(ptr_memalign_size0);
     
     errno = 0;
     char * ptr_memalign = (char *)memalign(256, sample_alloc_size);
@@ -131,10 +164,19 @@ int main(void) {
     free(ptr_aligned_alloc_badsize);
     
     errno = 0;
+    char * ptr_valloc_size0 = (char *)valloc(zero_size);
+    int valloc_size0_errno = errno;
+    printf("valloc (size 0)       : %p, errno: %d = %s\n",
+        ptr_valloc_size0, valloc_size0_errno,
+        strerror(valloc_size0_errno));
+    free(ptr_valloc_size0);
+    
+    errno = 0;
     char * ptr_valloc = (char *)valloc(sample_alloc_size);
     int valloc_errno = errno;
     printf("valloc                : %p, errno: %d = %s\n",
         ptr_valloc, valloc_errno, strerror(valloc_errno));
+    free(ptr_valloc);
     
     errno = 0;
     char * ptr_valloc_maxsize = (char *)valloc(max_size);
@@ -142,6 +184,7 @@ int main(void) {
     printf("valloc (SIZE_MAX)     : %p, errno: %d = %s\n",
         ptr_valloc_maxsize, valloc_maxsize_errno,
         strerror(valloc_maxsize_errno));
+    free(ptr_valloc_maxsize);
     
     errno = 0;
     void * ptr_posix_memalign = NULL;
@@ -156,20 +199,21 @@ int main(void) {
     printf("                        errno: %d = %s\n",
         posix_memalign_errno,
         strerror(posix_memalign_errno));
+    free(ptr_posix_memalign);
     
     errno = 0;
     void * ptr_posix_memalign_align0 = NULL;
-    int posix_memalign_align0_return = posix_memalign(&ptr_posix_memalign_align0, zero, sample_alloc_size);
+    int posix_memalign_align0_return = posix_memalign(&ptr_posix_memalign_align0, zero_size, sample_alloc_size);
     int posix_memalign_align0_errno = errno;
     printf("posix_memalign (alignment 0):\n");
     printf("                        %p, return value: %d = %s,\n",
         ptr_posix_memalign_align0,
         posix_memalign_align0_return,
         strerror(posix_memalign_align0_return));
-    
     printf("                        errno: %d = %s\n",
         posix_memalign_align0_errno,
         strerror(posix_memalign_align0_errno));
+    free(ptr_posix_memalign_align0);
     
     errno = 0;
     void * ptr_posix_memalign_nonpow2mul = NULL;
@@ -180,24 +224,24 @@ int main(void) {
         ptr_posix_memalign_nonpow2mul,
         posix_memalign_nonpow2mul_return,
         strerror(posix_memalign_nonpow2mul_return));
-    
     printf("                        errno: %d = %s\n",
         posix_memalign_nonpow2mul_errno,
         strerror(posix_memalign_nonpow2mul_errno));
+    free(ptr_posix_memalign_nonpow2mul);
     
     errno = 0;
     void * ptr_posix_memalign_size0 = NULL;
-    int posix_memalign_size0_return = posix_memalign(&ptr_posix_memalign_size0, pow2_mul_voidptr_size, zero);
+    int posix_memalign_size0_return = posix_memalign(&ptr_posix_memalign_size0, pow2_mul_voidptr_size, zero_size);
     int posix_memalign_size0_errno = errno;
     printf("posix_memalign (size 0):\n");
     printf("                        %p, return value: %d = %s,\n",
         ptr_posix_memalign_size0,
         posix_memalign_size0_return,
         strerror(posix_memalign_size0_return));
-    
     printf("                        errno: %d = %s\n",
         posix_memalign_size0_errno,
         strerror(posix_memalign_size0_errno));
+    free(ptr_posix_memalign_size0);
     
     errno = 0;
     void * ptr_posix_memalign_maxsize = NULL;
@@ -208,8 +252,8 @@ int main(void) {
         ptr_posix_memalign_maxsize,
         posix_memalign_maxsize_return,
         strerror(posix_memalign_maxsize_return));
-    
     printf("                        errno: %d = %s\n",
         posix_memalign_maxsize_errno,
         strerror(posix_memalign_maxsize_errno));
+    free(ptr_posix_memalign_maxsize);
 }
