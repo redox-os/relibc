@@ -71,6 +71,7 @@ EXPECT_NAMES=\
 	time/mktime \
 	time/strftime \
 	time/time \
+	tls \
 	unistd/access \
 	unistd/brk \
 	unistd/dup \
