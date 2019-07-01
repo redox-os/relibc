@@ -8,21 +8,27 @@ use platform::{Pal, Sys};
 
 #[repr(C)]
 pub struct Stack {
-    argc: isize,
-    argv0: *const c_char,
+    pub argc: isize,
+    pub argv0: *const c_char,
 }
 
 impl Stack {
-    fn argc(&self) -> isize {
-        self.argc
-    }
-
-    fn argv(&self) -> *const *const c_char {
+    pub fn argv(&self) -> *const *const c_char {
         &self.argv0 as *const _
     }
 
-    fn envp(&self) -> *const *const c_char {
-        unsafe { self.argv().offset(self.argc() + 1) }
+    pub fn envp(&self) -> *const *const c_char {
+        unsafe { self.argv().offset(self.argc + 1) }
+    }
+
+    pub fn auxv(&self) -> *const (usize, usize) {
+        unsafe {
+            let mut envp = self.envp();
+            while !(*envp).is_null() {
+                envp = envp.add(1);
+            }
+            envp.add(1) as *const (usize, usize)
+        }
     }
 }
 
@@ -72,7 +78,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     relibc_verify_host();
 
     // Set up argc and argv
-    let argc = sp.argc();
+    let argc = sp.argc;
     let argv = sp.argv();
     platform::inner_argv = copy_string_array(argv, argc as usize);
     platform::argv = platform::inner_argv.as_mut_ptr();

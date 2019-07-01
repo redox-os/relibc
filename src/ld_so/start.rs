@@ -4,13 +4,8 @@ use c_str::CStr;
 use header::unistd;
 use platform::types::c_char;
 
+use crate::start::Stack;
 use super::linker::Linker;
-
-#[repr(C)]
-pub struct Stack {
-    argc: isize,
-    argv0: *const c_char,
-}
 
 #[no_mangle]
 pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
@@ -26,7 +21,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
 
     // Pop the first argument (path to ld_so), and get the path of the program
     let path_c = unsafe {
-        let mut argv = &mut sp.argv0 as *mut *const c_char as *mut usize;
+        let mut argv = sp.argv() as *mut usize;
 
         // Move arguments
         loop {
