@@ -7,8 +7,7 @@ extern "C" {
 
 #define ENOTSUP EOPNOTSUPP
 
-//TODO extern __thread int errno;
-extern int errno;
+extern __thread int errno;
 
 #ifdef __cplusplus
 } // extern "C"

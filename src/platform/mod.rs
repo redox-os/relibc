@@ -34,7 +34,7 @@ pub mod rlb;
 use self::types::*;
 pub mod types;
 
-//TODO #[thread_local]
+#[thread_local]
 #[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut errno: c_int = 0;
