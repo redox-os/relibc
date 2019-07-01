@@ -114,6 +114,7 @@ NAMES=\
 	unistd/getcwd \
 	unistd/gethostname \
 	unistd/getid \
+	unistd/getpagesize \
 	unistd/link \
 	unistd/pathconf \
 	unistd/setid \

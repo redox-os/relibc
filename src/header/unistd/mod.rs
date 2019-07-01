@@ -1,5 +1,6 @@
 //! unistd implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/unistd.h.html
 
+use core::convert::TryFrom;
 use core::{mem, ptr, slice};
 
 use alloc::collections::LinkedList;
@@ -360,7 +361,21 @@ pub extern "C" fn getlogin_r(name: *mut c_char, namesize: size_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn getpagesize() -> c_int {
-    sysconf(_SC_PAGESIZE) as c_int
+    match c_int::try_from(sysconf(_SC_PAGESIZE)) {
+        Ok(page_size) => page_size,
+        Err(_) => {
+            /* Behavior not specified by POSIX for this case. The -1
+             * value mimics sysconf()'s behavior, though.
+             *
+             * As specified for the limits.h header, the minimum
+             * acceptable value for {PAGESIZE} is 1. The -1 value thus
+             * cannot be mistaken for an acceptable value.
+             *
+             * POSIX does not specify any possible errors for this
+             * function, hence no errno setting. */
+            -1
+        }
+    }
 }
 
 // #[no_mangle]
