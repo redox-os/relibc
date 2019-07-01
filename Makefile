@@ -158,7 +158,7 @@ $(BUILD)/release/ld_so.o: $(SRC)
 	touch $@
 
 $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD)/release/libc.a $(BUILD)/release/crtn.o
-	$(LD) --allow-multiple-definition --gc-sections $^ -o $@
+	$(LD) --gc-sections $^ -o $@
 
 # Other targets
 
