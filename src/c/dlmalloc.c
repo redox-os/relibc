@@ -544,7 +544,7 @@ MAX_RELEASE_CHECK_RATE   default: 4095 unless not HAVE_MMAP
 #define ENOMEM 12
 #define EINVAL 22
 
-extern int errno;
+extern __thread int errno;
 
 void abort(void);
 void *memcpy(void *dest, const void *src, size_t n);
