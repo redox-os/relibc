@@ -37,6 +37,7 @@ EXPECT_NAMES=\
 	stdio/setvbuf \
 	stdio/sprintf \
 	stdlib/a64l \
+	stdlib/alloc \
 	stdlib/atof \
 	stdlib/atoi \
 	stdlib/div \
@@ -104,7 +105,6 @@ NAMES=\
 	pwd \
 	stdio/tempnam \
 	stdio/tmpnam \
-	stdlib/alloc \
 	stdlib/bsearch \
 	stdlib/mktemp \
 	stdlib/realpath \
