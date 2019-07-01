@@ -1,53 +1,34 @@
-image: "rustlang/rust:nightly"
+image: "redoxos/redoxer:latest"
 
 stages:
     - build
     - test
 
 before_script:
+    - apt-get update -qq
+    - apt-get install -qq git
     - git submodule update --init --recursive
-    - rustup toolchain add "$(cat rust-toolchain)"
-    - rustup target add x86_64-unknown-redox --toolchain "$(cat rust-toolchain)"
-    - rustup show      # Print version info for debugging
 
 cache:
     paths:
         - target/
-        # Redox only:
-        - prefix/
-        - rust/
 
 build:linux:
     stage: build
     script:
-        - make all
+        - rustup toolchain add "$(cat rust-toolchain)"
+        - rustup show      # Print version info for debugging
+        - make -j "$(nproc)" all
 
 build:redox:
     stage: build
     variables:
         TARGET: x86_64-unknown-redox
     script:
-        # Install the Redox OS toolchain
-        ## (This can't be in before_script because that overrides
-        ## the global before_script.)
-        - apt-get update -qq
-        - apt-get install -qq tar
-        - '[ -e "prefix" ] || (mkdir prefix && wget -O - https://static.redox-os.org/toolchain/x86_64-unknown-redox/gcc-install.tar.gz |
-          tar --extract --gzip --directory prefix)'
-        - export PATH="$PWD/prefix/bin:$PATH"
-        - export RUSTUP_TOOLCHAIN="$PWD/prefix"
-
-        # Prepare xargo
-        - cargo install xargo
-        - '[ -e "rust" ] || git clone -b redox-2019-04-06 "https://gitlab.redox-os.org/redox-os/rust" --recursive'
-        - export CARGO=xargo
-        - export XARGO_HOME="$PWD/build/xargo"
-        - export XARGO_RUST_SRC="$PWD/rust/src"
-
-        # Main script
-        - make -j `nproc` headers
-        - make -j `nproc` install-headers DESTDIR="$PWD/prefix/$TARGET"
-        - make -j `nproc` all
+        - export RUSTUP_TOOLCHAIN="$HOME/.redoxer/toolchain"
+        - export PATH="$RUSTUP_TOOLCHAIN/bin:$PATH"
+        - rustup show      # Print version info for debugging
+        - make -j "$(nproc)" all
 
 test:linux:
     stage: test
