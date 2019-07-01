@@ -5,6 +5,7 @@ use header::{stdio, stdlib};
 use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
+use ld_so;
 
 #[repr(C)]
 pub struct Stack {
@@ -76,6 +77,8 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
 
     // Ensure correct host system before executing more system calls
     relibc_verify_host();
+
+    ld_so::init(sp);
 
     // Set up argc and argv
     let argc = sp.argc;
