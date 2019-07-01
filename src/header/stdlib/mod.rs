@@ -35,6 +35,7 @@ pub const MB_CUR_MAX: c_int = 4;
 pub const MB_LEN_MAX: c_int = 4;
 
 static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
+static mut L64A_BUFFER: [c_char; 7] = [0; 7]; // up to 6 digits plus null terminator
 static mut RNG: Option<XorShiftRng> = None;
 
 lazy_static! {
@@ -51,26 +52,27 @@ pub unsafe extern "C" fn a64l(s: *const c_char) -> c_long {
     if s.is_null() {
         return 0;
     }
-    let mut l: c_long = 0;
+    // POSIX says only the low-order 32 bits are used.
+    let mut l: i32 = 0;
     // a64l does not support more than 6 characters at once
     for x in 0..6 {
         let c = *s.offset(x);
         if c == 0 {
             // string is null terminated
-            return l;
+            return c_long::from(l);
         }
         // ASCII to base64 conversion:
-        let mut bits: c_long = if c < 58 {
-            (c - 46) as c_long // ./0123456789
+        let mut bits: i32 = if c < 58 {
+            (c - 46) as i32 // ./0123456789
         } else if c < 91 {
-            (c - 53) as c_long // A-Z
+            (c - 53) as i32 // A-Z
         } else {
-            (c - 59) as c_long // a-z
+            (c - 59) as i32 // a-z
         };
         bits <<= 6 * x;
         l |= bits;
     }
-    l
+    c_long::from(l)
 }
 
 #[no_mangle]
@@ -368,9 +370,37 @@ pub unsafe extern "C" fn jrand48(xsubi: *mut c_ushort) -> c_long {
     lcg48::int32_from_x(new_xi)
 }
 
-// #[no_mangle]
-pub extern "C" fn l64a(value: c_long) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn l64a(value: c_long) -> *mut c_char {
+    // POSIX says we should only consider the lower 32 bits of value.
+    let value_as_i32 = value as i32;
+
+    /* If we pretend to extend the 32-bit value with 4 binary zeros, we
+     * would get a 36-bit integer. The number of base-64 digits to be
+     * left unused can then be found by taking the number of leading
+     * zeros, dividing by 6 and rounding down (i.e. using integer
+     * division). */
+    let num_output_digits = 6 - (value_as_i32.leading_zeros() + 4) / 6;
+
+    // Reset buffer (and have null terminator in place for any result)
+    L64A_BUFFER = [0; 7];
+
+    for i in 0..num_output_digits as usize {
+        let digit_value = ((value_as_i32 >> 6 * i) & 63) as c_char;
+
+        if digit_value < 12 {
+            // ./0123456789 for values 0 to 11. b'.' == 46
+            L64A_BUFFER[i] = 46 + digit_value;
+        } else if digit_value < 38 {
+            // A-Z for values 12 to 37. b'A' == 65, 65-12 == 53
+            L64A_BUFFER[i] = 53 + digit_value;
+        } else {
+            // a-z for values 38 to 63. b'a' == 97, 97-38 == 59
+            L64A_BUFFER[i] = 59 + digit_value;
+        }
+    }
+
+    L64A_BUFFER.as_mut_ptr()
 }
 
 #[no_mangle]
