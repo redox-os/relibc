@@ -3,14 +3,15 @@
 use platform;
 use platform::types::*;
 
+//TODO: Consider removing, provided for compatibility with newlib
 #[no_mangle]
 pub unsafe extern "C" fn __errno() -> *mut c_int {
-    &mut platform::errno
+    __errno_location()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn __errno_location() -> *mut c_int {
-    __errno()
+    &mut platform::errno
 }
 
 pub const EPERM: c_int = 1; /* Operation not permitted */

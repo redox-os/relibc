@@ -7,7 +7,7 @@ extern "C" {
 
 #define ENOTSUP EOPNOTSUPP
 
-extern __thread int errno;
+#define errno (*__errno_location())
 
 #ifdef __cplusplus
 } // extern "C"
