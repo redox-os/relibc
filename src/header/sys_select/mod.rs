@@ -42,9 +42,9 @@ pub fn select_epoll(
         File::new(epfd)
     };
 
-    let mut read_bitset : Option<&mut bitset> = readfds.map(|fd_set| &mut fd_set.fds_bits);
-    let mut write_bitset : Option<&mut bitset> = writefds.map(|fd_set| &mut fd_set.fds_bits);
-    let mut except_bitset : Option<&mut bitset> = exceptfds.map(|fd_set| &mut fd_set.fds_bits);
+    let mut read_bitset: Option<&mut bitset> = readfds.map(|fd_set| &mut fd_set.fds_bits);
+    let mut write_bitset: Option<&mut bitset> = writefds.map(|fd_set| &mut fd_set.fds_bits);
+    let mut except_bitset: Option<&mut bitset> = exceptfds.map(|fd_set| &mut fd_set.fds_bits);
 
     // Keep track of the number of file descriptors that do not support epoll
     let mut not_epoll = 0;
@@ -129,8 +129,7 @@ pub fn select_epoll(
     }
 
     let mut count = not_epoll;
-    for i in 0..res as usize {
-        let event = &events[i];
+    for event in events.iter().take(res as usize) {
         let fd = unsafe { event.data.fd };
         // TODO: Error status when fd does not match?
         if fd >= 0 && fd < FD_SETSIZE as c_int {

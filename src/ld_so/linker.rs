@@ -480,12 +480,11 @@ impl Linker {
                     }
                 };
 
-                match rel.r_type {
-                    reloc::R_X86_64_IRELATIVE => unsafe {
+                if rel.r_type == reloc::R_X86_64_IRELATIVE {
+                    unsafe {
                         let f: unsafe extern "C" fn() -> u64 = mem::transmute(b + a);
                         set_u64(f());
-                    },
-                    _ => (),
+                    }
                 }
             }
 

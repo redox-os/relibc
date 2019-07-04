@@ -32,6 +32,7 @@ impl RawLineBuffer {
 
     // Can't use iterators because we want to return a reference.
     // See https://stackoverflow.com/a/30422716/5069285
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Line {
         // Remove last line
         if let Some(newline) = self.newline {

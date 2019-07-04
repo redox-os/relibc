@@ -70,8 +70,7 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
         return -1;
     }
 
-    for i in 0..res as usize {
-        let event = &events[i];
+    for event in events.iter().take(res as usize) {
         let pi = unsafe { event.data.u64 as usize };
         // TODO: Error status when fd does not match?
         if let Some(pfd) = fds.get_mut(pi) {
