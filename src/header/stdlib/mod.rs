@@ -1,6 +1,9 @@
 //! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 
 use core::convert::TryFrom;
+use core::cmp::{min, max};
+use core::num::FpCategory;
+use core::str::FromStr;
 use core::{intrinsics, iter, mem, ptr, slice};
 use rand::distributions::{Alphanumeric, Distribution, Uniform};
 use rand::prng::XorShiftRng;
@@ -34,7 +37,10 @@ pub const MB_CUR_MAX: c_int = 4;
 //Maximum number of bytes in a multibyte characters for any locale
 pub const MB_LEN_MAX: c_int = 4;
 
+const ECVT_BUFFER_SIZE: usize = 18; // including null terminator
+
 static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
+static mut ECVT_BUFFER: [c_char; ECVT_BUFFER_SIZE] = [0; ECVT_BUFFER_SIZE];
 static mut L64A_BUFFER: [c_char; 7] = [0; 7]; // up to 6 digits plus null terminator
 static mut RNG: Option<XorShiftRng> = None;
 
@@ -237,14 +243,92 @@ pub unsafe extern "C" fn drand48() -> c_double {
     lcg48::float64_from_x(new_xi)
 }
 
-// #[no_mangle]
-pub extern "C" fn ecvt(
+#[no_mangle]
+pub unsafe extern "C" fn ecvt(
     value: c_double,
     ndigit: c_int,
     decpt: *mut c_int,
     sign: *mut c_int,
 ) -> *mut c_char {
-    unimplemented!();
+    *sign = if value.is_sign_negative() {
+        1
+    } else {
+        0
+    };
+    
+    // Reset buffer and have null terminator in place
+    ECVT_BUFFER = [0; ECVT_BUFFER_SIZE];
+    
+    /* Avoid buffer overflows by clamping to ECVT_BUFFER_SIZE-1 above,
+     * and any other conversion shenanigans by clamping to 0 below. */
+    let clamped_ndigit: usize = min(max(0, ndigit) as usize, ECVT_BUFFER_SIZE-1);
+    
+    match value.classify() {
+        FpCategory::Zero | FpCategory::Subnormal | FpCategory::Normal => {
+            /* Formatting floating point correctly is hard, so we defer
+             * to the format! macro and pick apart the result.
+             * 
+             * We need at least 0 digits after the decimal point for the
+             * format string... and also need to obtain the exponent,
+             * even if we don't put anything in the digits buffer. */
+            let value_str = format!("{:.p$e}", value, p = max(1, clamped_ndigit)-1);
+            
+            /* Use the 'e' to split the str into a mantissa and exponent
+             * part. */
+            let mut value_str_e_split = value_str.split('e');
+            let mantissa_str = value_str_e_split.next().unwrap();
+            let exponent_str = value_str_e_split.next().unwrap();
+            
+            /* C's int type can hold at least the range [-32767, 32767],
+             * while a finite IEEE 754 double has an exponent in the
+             * range [-324, 308], including subnormal numbers. */
+            let exponent = c_int::from_str(&exponent_str).unwrap();
+            
+            /* Split the mantissa into a (signed) integer part and a
+             * fractional part. The fractional part will be missing for
+             * ndigit == 1. */
+            let mut mantissa_str_dec_sep_split = mantissa_str.split('.');
+            let mantissa_str_int_part = mantissa_str_dec_sep_split.next().unwrap();
+            let mantissa_str_frac_part = mantissa_str_dec_sep_split.next().unwrap_or("");
+            
+            /* Iterating backwards in the integer part, we will
+             * consistently get one digit. (The integer part may start
+             * with a sign.) */
+            let mantissa_str_uint_char = mantissa_str_int_part.chars().next_back().unwrap();
+            
+            /* The sign- and point-less mantissa digits, ready to be
+             * copied to the buffer. */
+            let mut mantissa_str_no_dec_sep_iter = iter::once(mantissa_str_uint_char).chain(mantissa_str_frac_part.chars());
+            
+            // Copy to buffer
+            for i in 0..clamped_ndigit {
+                match mantissa_str_no_dec_sep_iter.next() {
+                    Some(digit_char) => {
+                        ECVT_BUFFER[i] = digit_char as c_char;
+                    },
+                    None => break // Shouldn't happen
+                }
+            }
+            
+            *decpt = exponent + 1;
+        }
+        FpCategory::Infinite => {
+            for (i, c) in b"inf".iter().enumerate() {
+                ECVT_BUFFER[i] = *c as c_char;
+            }
+            
+            *decpt = 0;
+        }
+        FpCategory::Nan => {
+            for (i, c) in b"nan".iter().enumerate() {
+                ECVT_BUFFER[i] = *c as c_char;
+            }
+            
+            *decpt = 0;
+        }
+    }
+    
+    ECVT_BUFFER.as_mut_ptr()
 }
 
 #[no_mangle]

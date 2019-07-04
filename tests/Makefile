@@ -40,6 +40,7 @@ EXPECT_NAMES=\
 	stdlib/alloc \
 	stdlib/atof \
 	stdlib/atoi \
+	stdlib/cvt \
 	stdlib/div \
 	stdlib/env \
 	stdlib/lcg48 \
