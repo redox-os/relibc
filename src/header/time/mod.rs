@@ -1,7 +1,5 @@
 //! time implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/time.h.html
 
-use core::mem::transmute;
-
 use header::errno::EIO;
 use platform;
 use platform::types::*;
@@ -74,7 +72,7 @@ pub struct sigevent;
 
 #[no_mangle]
 pub unsafe extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
-    asctime_r(timeptr, transmute::<&mut _, *mut c_char>(&mut ASCTIME))
+    asctime_r(timeptr, &mut ASCTIME as *mut [i8; 26] as *mut i8)
 }
 
 #[no_mangle]
