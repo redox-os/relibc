@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+char *gcvt(double value, int ndigit, char *buf);
 long double strtold(const char *nptr, char **endptr);
 
 #ifdef __cplusplus

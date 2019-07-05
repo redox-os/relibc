@@ -422,11 +422,6 @@ pub unsafe extern "C" fn free(ptr: *mut c_void) {
     platform::free(ptr);
 }
 
-// #[no_mangle]
-pub extern "C" fn gcvt(value: c_double, ndigit: c_int, buf: *mut c_char) -> *mut c_char {
-    unimplemented!();
-}
-
 unsafe fn find_env(search: *const c_char) -> Option<(usize, *mut c_char)> {
     for (i, item) in platform::inner_environ.iter().enumerate() {
         let mut item = *item;
