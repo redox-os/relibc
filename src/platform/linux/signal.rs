@@ -3,7 +3,7 @@ use core::mem;
 use super::super::types::*;
 use super::super::PalSignal;
 use super::{e, Sys};
-use header::signal::{sigaction, sigset_t};
+use header::signal::{sigaction, sigset_t, stack_t};
 use header::sys_time::itimerval;
 
 impl PalSignal for Sys {
@@ -40,6 +40,10 @@ impl PalSignal for Sys {
             oact,
             mem::size_of::<sigset_t>()
         )) as c_int
+    }
+
+    fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
+        e(unsafe { syscall!(SIGALTSTACK, ss, old_ss) }) as c_int
     }
 
     fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {

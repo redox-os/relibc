@@ -1,6 +1,6 @@
 use super::super::types::*;
 use super::super::Pal;
-use header::signal::{sigaction, sigset_t};
+use header::signal::{sigaction, sigset_t, stack_t};
 use header::sys_time::itimerval;
 
 pub trait PalSignal: Pal {
@@ -15,6 +15,8 @@ pub trait PalSignal: Pal {
     fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int;
 
     unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int;
+
+    fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int;
 
     fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int;
 }

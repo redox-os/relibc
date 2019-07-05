@@ -36,6 +36,14 @@ pub struct sigaction {
     pub sa_mask: sigset_t,
 }
 
+#[repr(C)]
+#[derive(Clone)]
+pub struct stack_t {
+    pub ss_sp: *mut c_void,
+    pub ss_flags: c_int,
+    pub ss_size: c_uint,
+}
+
 pub type sigset_t = c_ulong;
 
 #[no_mangle]
@@ -97,6 +105,20 @@ pub extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
         set.insert(signo as usize - 1); // 0-indexed usize, please!
     }
     0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
+    if !ss.is_null() {
+        if (*ss).ss_flags != SS_DISABLE as c_int {
+            return errno::EINVAL;
+        }
+        if (*ss).ss_size < MINSIGSTKSZ as c_uint {
+            return errno::ENOMEM;
+        }
+    }
+
+    Sys::sigaltstack(ss, old_ss)
 }
 
 #[no_mangle]
