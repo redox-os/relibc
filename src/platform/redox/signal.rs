@@ -5,7 +5,7 @@ use super::super::types::*;
 use super::super::{Pal, PalSignal};
 use super::{e, Sys};
 use header::errno::EINVAL;
-use header::signal::{sigaction, sigset_t};
+use header::signal::{sigaction, sigset_t, stack_t};
 use header::sys_time::{itimerval, ITIMER_REAL};
 use platform::errno;
 
@@ -128,6 +128,10 @@ impl PalSignal for Sys {
             (*oact).sa_flags = old.sa_flags as c_ulong;
         }
         ret
+    }
+
+    fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
+        unimplemented!()
     }
 
     fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {

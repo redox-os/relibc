@@ -64,3 +64,8 @@ pub const SA_RESTART: usize = 0x1000_0000;
 pub const SA_NODEFER: usize = 0x4000_0000;
 pub const SA_RESETHAND: usize = 0x8000_0000;
 pub const SA_RESTORER: usize = 0x0400_0000;
+
+pub const SS_ONSTACK: usize = 1;
+pub const SS_DISABLE: usize = 2;
+
+pub const MINSIGSTKSZ: usize = 2048;
