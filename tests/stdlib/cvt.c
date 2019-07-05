@@ -43,4 +43,25 @@ int main(void) {
             printf(" returned: %s\n", ecvt_return);
         }
     }
+    
+    for (size_t i = 0; i < sizeof(test_values)/sizeof(double); i++) {
+        for (size_t j = 0; j < sizeof(test_ndigit_values)/sizeof(int); j++) {
+            double value = test_values[i];
+            int ndigit = test_ndigit_values[j];
+            
+            int decpt = 0;
+            int sign = 0;
+            
+            char *fcvt_return = NULL;
+            
+            //printf("fcvt (value = %le, ndigit = %d): ", value, ndigit);
+            printf("fcvt (ndigit = %d):", ndigit);
+            
+            fcvt_return = fcvt(value, ndigit, &decpt, &sign);
+            
+            printf(" decpt: %d,", decpt);
+            printf(" sign: %d,", sign);
+            printf(" returned: %s\n", fcvt_return);
+        }
+    }
 }

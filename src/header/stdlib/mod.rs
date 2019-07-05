@@ -368,14 +368,50 @@ pub unsafe extern "C" fn exit(status: c_int) {
     Sys::exit(status);
 }
 
-// #[no_mangle]
-pub extern "C" fn fcvt(
+#[no_mangle]
+pub unsafe extern "C" fn fcvt(
     value: c_double,
     ndigit: c_int,
     decpt: *mut c_int,
     sign: *mut c_int,
 ) -> *mut c_char {
-    unimplemented!();
+    if value.is_finite() {
+        /* To determine the length of a str with the given number of
+         * digits after the decimal point, we first generate the full-
+         * length str using the format! macro, count the characters,
+         * then use that result to call ecvt(). POSIX says the output
+         * string is "restricted to an unspecified limit as determined
+         * by the precision of a double", and ecvt() already truncates
+         * to the maximum meaningful significant digits. */
+        
+        /* First, we convert the ndigit value to a usize using a
+         * clamping conversion. */
+        let clamped_ndigit: usize = usize::try_from(max(0, ndigit)).unwrap_or(usize::max_value());
+        
+        // Avoid a leading sign so that it is easier to count digits.
+        let value_str = if value.is_sign_positive() {
+            format!("{:.p$}", value, p = clamped_ndigit)
+        } else {
+            format!("{:.p$}", -value, p = clamped_ndigit)
+        };
+        
+        /* Split the string at the decimal point if possible. There will
+         * not be a decimal point for ndigit == 0. */
+        let mut value_str_dec_sep_split = value_str.split('.');
+        let int_part_str = value_str_dec_sep_split.next().unwrap();
+        let frac_part_str = value_str_dec_sep_split.next().unwrap_or("");
+        
+        /* Compute the number of significant digits from the lengths of
+         * the integer and fractional parts, and again perform a
+         * clamping type conversion. */
+        let ecvt_ndigit_usize = int_part_str.chars().chain(frac_part_str.chars()).count();
+        let ecvt_ndigit_int = c_int::try_from(ecvt_ndigit_usize).unwrap_or(c_int::max_value());
+        
+        ecvt(value, ecvt_ndigit_int, decpt, sign)
+    } else {
+        // For infinity and NaN, rely on ecvt()'s defaults.
+        ecvt(value, ndigit, decpt, sign)
+    }
 }
 
 #[no_mangle]
