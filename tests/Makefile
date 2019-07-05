@@ -15,6 +15,7 @@ EXPECT_NAMES=\
 	libgen \
 	locale \
 	math \
+    ptrace \
 	regex \
 	select \
 	setjmp \

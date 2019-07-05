@@ -10,6 +10,9 @@ use header::time::timespec;
 pub use self::epoll::PalEpoll;
 mod epoll;
 
+pub use self::ptrace::PalPtrace;
+mod ptrace;
+
 pub use self::signal::PalSignal;
 mod signal;
 

@@ -28,6 +28,7 @@ use super::{errno, Pal, Read};
 
 mod epoll;
 mod extra;
+mod ptrace;
 mod signal;
 mod socket;
 

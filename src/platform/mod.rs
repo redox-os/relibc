@@ -12,7 +12,7 @@ mod allocator;
 #[path = "allocator/ralloc.rs"]
 mod allocator;
 
-pub use self::pal::{Pal, PalEpoll, PalSignal, PalSocket};
+pub use self::pal::{Pal, PalEpoll, PalPtrace, PalSignal, PalSocket};
 
 mod pal;
 

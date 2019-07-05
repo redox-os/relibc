@@ -15,6 +15,7 @@ use header::sys_utsname::utsname;
 use header::time::timespec;
 
 mod epoll;
+mod ptrace;
 mod signal;
 mod socket;
 

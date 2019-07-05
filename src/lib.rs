@@ -2,7 +2,6 @@
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
 #![allow(unused_variables)]
-#![feature(alloc)]
 #![feature(allocator_api)]
 #![feature(asm)]
 #![feature(c_variadic)]
@@ -13,6 +12,7 @@
 #![feature(core_intrinsics)]
 #![feature(global_asm)]
 // FIXME: Stable on nightly, remove once redox fork is updated
+#![feature(alloc)]
 #![feature(iter_copied)]
 #![feature(lang_items)]
 #![feature(linkage)]
