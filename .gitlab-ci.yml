@@ -35,8 +35,18 @@ test:linux:
     dependencies:
         - build:linux
     script:
-        - make test
-        - cd tests && make verify
+        - make -C tests verify
+
+test:redox:
+    stage: test
+    dependencies:
+        - build:redox
+    variables:
+        TARGET: x86_64-unknown-redox
+    script:
+        - export RUSTUP_TOOLCHAIN="$HOME/.redoxer/toolchain"
+        - export PATH="$RUSTUP_TOOLCHAIN/bin:$PATH"
+        - make -C tests all
 
 fmt:
     stage: test
