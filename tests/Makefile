@@ -126,6 +126,8 @@ NAMES=\
 BINS=$(patsubst %,bins/%,$(NAMES))
 EXPECT_BINS=$(patsubst %,bins/%,$(EXPECT_NAMES))
 
+TEST_RUNNER?=sh --
+
 .PHONY: all clean run expected verify
 
 all: $(BINS)
@@ -151,16 +153,7 @@ expected: | $(EXPECT_BINS)
 	done
 
 verify: | $(EXPECT_BINS)
-	rm -rf gen
-	mkdir -p gen
-	for name in $(EXPECT_NAMES); \
-	do \
-		echo "# $${name} #"; \
-		mkdir -p gen/`dirname $${name}`; \
-		"bins/$${name}" test args > "gen/$${name}.stdout" 2> "gen/$${name}.stderr" || exit $$?; \
-		diff -u "gen/$${name}.stdout" "expected/$${name}.stdout" || exit $$?; \
-		diff -u "gen/$${name}.stderr" "expected/$${name}.stderr" || exit $$?; \
-	done
+	$(TEST_RUNNER) ./verify.sh $(EXPECT_NAMES)
 
 CFLAGS=\
 	-std=c11 \

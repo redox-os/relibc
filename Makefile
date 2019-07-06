@@ -12,14 +12,17 @@ endif
 
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
 	export CC=aarch64-linux-gnu-gcc
+	export LD=aarch64-linux-gnu-ld
 endif
 
 ifeq ($(TARGET),aarch64-unknown-redox)
 	export CC=aarch64-unknown-redox-gcc
+	export LD=aarch64-unknown-redox-ld
 endif
 
 ifeq ($(TARGET),x86_64-unknown-redox)
 	export CC=x86_64-unknown-redox-gcc
+	export LD=x86_64-unknown-redox-ld
 endif
 
 SRC=\
@@ -84,7 +87,7 @@ sysroot: all
 	touch $@
 
 test: sysroot
-	$(MAKE) -C tests run
+	$(MAKE) -C tests verify
 
 # Debug targets
 
