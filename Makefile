@@ -98,7 +98,7 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/pthreads-emb/libpthre
 	ar -M < "$@.mri"
 
 $(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
-	$(CC) -nostdlib -shared -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
+	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
 
 $(BUILD)/debug/librelibc.a: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
@@ -121,7 +121,7 @@ $(BUILD)/debug/ld_so.o: $(SRC)
 	touch $@
 
 $(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debug/libc.a $(BUILD)/debug/crtn.o
-	$(LD) --gc-sections $^ -o $@
+	$(LD) --allow-multiple-definition --gc-sections $^ -o $@
 
 # Release targets
 
@@ -135,7 +135,7 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libp
 	ar -M < "$@.mri"
 
 $(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
-	$(CC) -nostdlib -shared -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
+	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
 
 $(BUILD)/release/librelibc.a: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
@@ -158,7 +158,7 @@ $(BUILD)/release/ld_so.o: $(SRC)
 	touch $@
 
 $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD)/release/libc.a $(BUILD)/release/crtn.o
-	$(LD) --gc-sections $^ -o $@
+	$(LD) --allow-multiple-definition --gc-sections $^ -o $@
 
 # Other targets
 
