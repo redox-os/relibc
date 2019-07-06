@@ -1,16 +1,15 @@
+use super::{AtomicLock, AttemptStatus};
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
-use core::sync::atomic;
-use core::sync::atomic::AtomicI32 as AtomicInt;
 use core::sync::atomic::Ordering::SeqCst;
 use platform::types::*;
-use platform::{Pal, Sys};
 
-pub const FUTEX_WAIT: c_int = 0;
-pub const FUTEX_WAKE: c_int = 1;
+const UNLOCKED: c_int = 0;
+const LOCKED:   c_int = 1;
+const WAITING:  c_int = 2;
 
 pub struct Mutex<T> {
-    lock: UnsafeCell<AtomicInt>,
+    lock: AtomicLock,
     content: UnsafeCell<T>,
 }
 unsafe impl<T: Send> Send for Mutex<T> {}
@@ -19,7 +18,7 @@ impl<T> Mutex<T> {
     /// Create a new mutex
     pub const fn new(content: T) -> Self {
         Self {
-            lock: UnsafeCell::new(AtomicInt::new(0)),
+            lock: AtomicLock::new(UNLOCKED),
             content: UnsafeCell::new(content),
         }
     }
@@ -31,13 +30,9 @@ impl<T> Mutex<T> {
     /// ```
     pub unsafe fn locked(content: T) -> Self {
         Self {
-            lock: UnsafeCell::new(AtomicInt::new(1)),
+            lock: AtomicLock::new(LOCKED),
             content: UnsafeCell::new(content),
         }
-    }
-
-    unsafe fn atomic(&self) -> &mut AtomicInt {
-        &mut *self.lock.get()
     }
 
     /// Tries to lock the mutex, fails if it's already locked. Manual means
@@ -45,53 +40,35 @@ impl<T> Mutex<T> {
     /// on failure. You should probably not worry about this, it's used for
     /// internal optimizations.
     pub unsafe fn manual_try_lock(&self) -> Result<&mut T, c_int> {
-        self.atomic()
-            .compare_exchange(0, 1, SeqCst, SeqCst)
+        self.lock.compare_exchange(UNLOCKED, LOCKED, SeqCst, SeqCst)
             .map(|_| &mut *self.content.get())
     }
     /// Lock the mutex, returning the inner content. After doing this, it's
     /// your responsibility to unlock it after usage. Mostly useful for FFI:
     /// Prefer normal .lock() where possible.
     pub unsafe fn manual_lock(&self) -> &mut T {
-        let mut last = 0;
-
-        // First, try spinning for really short durations:
-        for _ in 0..100 {
-            atomic::spin_loop_hint();
-            last = match self.manual_try_lock() {
-                Ok(content) => return content,
-                Err(value) => value,
-            };
-        }
-
-        // We're waiting for a longer duration, so let's employ a futex.
-        loop {
-            // If the value is 1, set it to 2 to signify that we're waiting for
-            // it to to send a FUTEX_WAKE on unlock.
-            //
-            // - Skip the atomic operation if the last value was 2, since it most likely hasn't changed.
-            // - Skip the futex wait if the atomic operation says the mutex is unlocked.
-            if last == 2
-                || self
-                    .atomic()
-                    .compare_exchange(1, 2, SeqCst, SeqCst)
-                    .unwrap_or_else(|err| err)
-                    != 0
-            {
-                Sys::futex(self.atomic().get_mut(), FUTEX_WAIT, 2);
-            }
-
-            last = match self.manual_try_lock() {
-                Ok(content) => return content,
-                Err(value) => value,
-            };
-        }
+        self.lock.wait_until(
+            |lock| {
+                lock.compare_exchange_weak(UNLOCKED, LOCKED, SeqCst, SeqCst)
+                    .map(|_| AttemptStatus::Desired)
+                    .unwrap_or_else(|e| match e {
+                        WAITING => AttemptStatus::Waiting,
+                        _ => AttemptStatus::Other
+                    })
+            },
+            |lock| match lock.compare_exchange_weak(LOCKED, WAITING, SeqCst, SeqCst).unwrap_or_else(|e| e) {
+                UNLOCKED => AttemptStatus::Desired,
+                WAITING => AttemptStatus::Waiting,
+                _ => AttemptStatus::Other
+            },
+            WAITING
+        );
+        &mut *self.content.get()
     }
     /// Unlock the mutex, if it's locked.
     pub unsafe fn manual_unlock(&self) {
-        if self.atomic().swap(0, SeqCst) == 2 {
-            // At least one futex is up, so let's notify it
-            Sys::futex(self.atomic().get_mut(), FUTEX_WAKE, 1);
+        if self.lock.swap(UNLOCKED, SeqCst) == WAITING {
+            self.lock.notify_one();
         }
     }
 

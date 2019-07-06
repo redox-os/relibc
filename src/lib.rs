@@ -11,11 +11,13 @@
 #![feature(const_vec_new)]
 #![feature(core_intrinsics)]
 #![feature(global_asm)]
-// FIXME: Stable on nightly, remove once redox fork is updated
+// FIXME: Add #![feature(maybe_uninit_extra)]
+// FIXME: The following are stable on nightly, remove once redox fork is updated
 #![feature(alloc)]
 #![feature(iter_copied)]
 #![feature(lang_items)]
 #![feature(linkage)]
+#![feature(maybe_uninit)]
 #![feature(stmt_expr_attributes)]
 #![feature(str_internals)]
 #![feature(thread_local)]
@@ -58,9 +60,9 @@ pub mod fs;
 pub mod header;
 pub mod io;
 pub mod ld_so;
-pub mod mutex;
 pub mod platform;
 pub mod start;
+pub mod sync;
 
 use platform::{Allocator, Pal, Sys};
 

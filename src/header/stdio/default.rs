@@ -4,8 +4,8 @@ use core::ptr;
 
 use fs::File;
 use io::LineWriter;
-use mutex::Mutex;
 use platform::types::*;
+use sync::Mutex;
 
 pub struct GlobalFile(UnsafeCell<FILE>);
 impl GlobalFile {

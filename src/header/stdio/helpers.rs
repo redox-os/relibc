@@ -5,9 +5,9 @@ use header::errno;
 use header::fcntl::*;
 use header::string::strchr;
 use io::LineWriter;
-use mutex::Mutex;
-use platform;
 use platform::types::*;
+use platform;
+use sync::Mutex;
 
 use super::constants::*;
 use super::{Buffer, FILE};

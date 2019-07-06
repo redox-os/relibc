@@ -8,9 +8,9 @@ use core::{intrinsics, ptr};
 use header::sys_mman;
 use header::time::timespec;
 use ld_so::tcb::{Master, Tcb};
-use mutex::Mutex;
 use platform::types::{c_int, c_uint, c_void, pid_t, size_t};
 use platform::{Pal, Sys};
+use sync::Mutex;
 
 pub struct Semaphore {
     lock: Mutex<()>,
