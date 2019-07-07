@@ -64,7 +64,6 @@ EXPECT_NAMES=\
 	string/strtok_r \
 	string/strsignal \
 	strings \
-	sys_epoll/epoll \
 	time/asctime \
 	time/gmtime \
 	time/localtime \
@@ -108,6 +107,7 @@ NAMES=\
 	stdlib/bsearch \
 	stdlib/mktemp \
 	stdlib/realpath \
+	sys_epoll/epoll \
 	sys_utsname/uname \
 	time/gettimeofday \
 	unistd/chdir \
