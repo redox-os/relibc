@@ -1,9 +1,7 @@
 #!/bin/sh
 
-set -e
-
-rm -rf gen
-mkdir -p gen
+rm -rf gen || exit 1
+mkdir -p gen || exit 1
 
 while [ "$#" -gt 0 ]
 do
@@ -11,28 +9,30 @@ do
     shift
 
 	echo "# ${name} #"
-	mkdir -p "gen/$(dirname ${name})"
+	mkdir -p "gen/$(dirname ${name})" || exit 1
+
 	"bins/${name}" test args > "gen/${name}.stdout" 2> "gen/${name}.stderr"
+    status="$?"
+
     for output in stdout stderr
     do
-        if [ "$(uname)" = "Redox" ]
+        gen="$(sha256sum "gen/${name}.${output}" | cut -d " " -f 1)"
+        expected="$(sha256sum "expected/${name}.${output}" | cut -d " " -f 1)"
+        if [ "${gen}" != "${expected}" ]
         then
-            gen="$(sha256sum "gen/${name}.${output}" | cut -d " " -f 1)"
-            expected="$(sha256sum "expected/${name}.${output}" | cut -d " " -f 1)"
-            if [ "$gen" != "$expected" ]
-            then
-                echo "# $output: $gen != $expected #"
+            echo "# ${name}: ${output}: expected #"
+            cat "expected/${name}.${output}"
 
-                echo "# $output generated #"
-                cat "gen/${name}.${output}"
+            echo "# ${name}: ${output}: generated #"
+            cat "gen/${name}.${output}"
 
-                echo "# $output expected #"
-                cat "expected/${name}.${output}"
-
-                exit 1
-            fi
-        else
-        	diff -u "gen/${name}.${output}" "expected/${name}.${output}"
+            status="${status}, ${output} mismatch"
         fi
     done
+
+    if [ "${status}" != "0" ]
+    then
+        echo "# ${name}: failed with status ${status} #"
+        exit 1
+    fi
 done
