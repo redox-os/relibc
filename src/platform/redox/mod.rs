@@ -283,11 +283,12 @@ impl Pal for Sys {
     }
 
     fn fchdir(fd: c_int) -> c_int {
-        let path: &mut [u8] = &mut [0; 4096];
-        if e(syscall::fpath(fd as usize, path)) == !0 {
+        let mut buf = [0; 4096];
+        let res = e(syscall::fpath(fd as usize, &mut buf));
+        if res == !0 {
             !0
         } else {
-            e(syscall::chdir(path)) as c_int
+            e(syscall::chdir(&buf[..res])) as c_int
         }
     }
 
