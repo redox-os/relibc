@@ -17,7 +17,14 @@ int main(void) {
     UNEXP_IF(scandir, len, < 0);
 
     for(int i = 0; i < len; i += 1) {
-        puts(array[i]->d_name);
+        // TODO: Redox does not yet provide . or .. - so filter them out
+        // in order to make output match on all systems
+        if (
+            strcmp(array[i]->d_name, ".") != 0 &&
+            strcmp(array[i]->d_name, "..") != 0
+        ) {
+            puts(array[i]->d_name);
+        }
         free(array[i]);
     }
     free(array);
