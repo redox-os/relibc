@@ -5,8 +5,8 @@ use header::errno;
 use header::fcntl::*;
 use header::string::strchr;
 use io::LineWriter;
-use platform::types::*;
 use platform;
+use platform::types::*;
 use sync::Mutex;
 
 use super::constants::*;

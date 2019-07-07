@@ -5,8 +5,8 @@ use core::sync::atomic::Ordering::SeqCst;
 use platform::types::*;
 
 const UNLOCKED: c_int = 0;
-const LOCKED:   c_int = 1;
-const WAITING:  c_int = 2;
+const LOCKED: c_int = 1;
+const WAITING: c_int = 2;
 
 pub struct Mutex<T> {
     lock: AtomicLock,
@@ -40,7 +40,8 @@ impl<T> Mutex<T> {
     /// on failure. You should probably not worry about this, it's used for
     /// internal optimizations.
     pub unsafe fn manual_try_lock(&self) -> Result<&mut T, c_int> {
-        self.lock.compare_exchange(UNLOCKED, LOCKED, SeqCst, SeqCst)
+        self.lock
+            .compare_exchange(UNLOCKED, LOCKED, SeqCst, SeqCst)
             .map(|_| &mut *self.content.get())
     }
     /// Lock the mutex, returning the inner content. After doing this, it's
@@ -53,15 +54,18 @@ impl<T> Mutex<T> {
                     .map(|_| AttemptStatus::Desired)
                     .unwrap_or_else(|e| match e {
                         WAITING => AttemptStatus::Waiting,
-                        _ => AttemptStatus::Other
+                        _ => AttemptStatus::Other,
                     })
             },
-            |lock| match lock.compare_exchange_weak(LOCKED, WAITING, SeqCst, SeqCst).unwrap_or_else(|e| e) {
+            |lock| match lock
+                .compare_exchange_weak(LOCKED, WAITING, SeqCst, SeqCst)
+                .unwrap_or_else(|e| e)
+            {
                 UNLOCKED => AttemptStatus::Desired,
                 WAITING => AttemptStatus::Waiting,
-                _ => AttemptStatus::Other
+                _ => AttemptStatus::Other,
             },
-            WAITING
+            WAITING,
         );
         &mut *self.content.get()
     }

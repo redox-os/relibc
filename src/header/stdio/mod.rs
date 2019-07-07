@@ -14,10 +14,10 @@ use header::errno::{self, STR_ERROR};
 use header::string::{self, strlen};
 use header::{fcntl, stdlib, unistd};
 use io::{self, BufRead, LineWriter, Read, Write};
-use platform::types::*;
-use platform::{Pal, Sys};
-use platform::{errno, WriteByte};
 use platform;
+use platform::types::*;
+use platform::{errno, WriteByte};
+use platform::{Pal, Sys};
 use sync::Mutex;
 
 pub use self::constants::*;

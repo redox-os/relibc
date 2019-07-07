@@ -11,9 +11,7 @@ use crate::sync::{Mutex, Once};
 use alloc::collections::BTreeMap;
 
 #[derive(Default)]
-struct State {
-
-}
+struct State {}
 
 static STATE: Once<Mutex<State>> = Once::new();
 

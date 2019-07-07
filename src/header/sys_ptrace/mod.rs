@@ -1,7 +1,7 @@
 //! ptrace compatibility layer for Redox OS
 
 use platform::types::*;
-use platform::{Sys, PalPtrace};
+use platform::{PalPtrace, Sys};
 
 pub const PTRACE_PEEKTEXT: c_int = 1;
 pub const PTRACE_PEEKDATA: c_int = 2;
