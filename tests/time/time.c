@@ -13,6 +13,7 @@ int main(void) {
     time_t t = time(NULL);
     ERROR_IF(time, t, == (time_t)-1);
 
-    clock_t c = clock();
-    ERROR_IF(clock, c, == (clock_t)-1);
+    // TODO: Support clock() on Redox
+    // clock_t c = clock();
+    // ERROR_IF(clock, c, == (clock_t)-1);
 }
