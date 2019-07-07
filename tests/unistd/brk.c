@@ -5,7 +5,10 @@
 #include "test_helpers.h"
 
 int main(void) {
-    int status = brk((void*)100);
+    void * current = sbrk(0);
+    ERROR_IF(sbrk, current, == (void *)-1);
+
+    int status = brk(current + 4096);
     ERROR_IF(brk, status, == -1);
     UNEXP_IF(brk, status, != 0);
 }
