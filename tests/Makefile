@@ -82,7 +82,6 @@ EXPECT_NAMES=\
 	unistd/ftruncate \
 	unistd/getopt \
 	unistd/getopt_long \
-	unistd/isatty \
 	unistd/pipe \
 	unistd/rmdir \
 	unistd/sleep \
@@ -115,6 +114,7 @@ NAMES=\
 	unistd/gethostname \
 	unistd/getid \
 	unistd/getpagesize \
+	unistd/isatty \
 	unistd/link \
 	unistd/pathconf \
 	unistd/setid \
