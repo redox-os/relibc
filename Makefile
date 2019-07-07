@@ -27,10 +27,7 @@ endif
 
 SRC=\
 	Cargo.* \
-	src/* \
-	src/*/* \
-	src/*/*/* \
-	src/*/*/*/*
+	$(shell find src -type f)
 
 .PHONY: all clean fmt headers install install-headers libs test
 

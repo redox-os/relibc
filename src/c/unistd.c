@@ -1,6 +1,8 @@
 #include <stdarg.h>
 #include <stddef.h>
 
+// TODO: Can be implemented in rust when cbindgen supports "..." syntax
+
 int execv(const char *path, char *const *argv);
 
 int execl(const char *path, const char* argv0, ...)

@@ -1,6 +1,8 @@
 #include <stdarg.h>
 #include <sys/types.h>
 
+// TODO: Can be implemented in rust when cbindgen supports "..." syntax
+
 int sys_open(const char* filename, int flags, mode_t mode);
 
 int open(const char* filename, int flags, ...) {

@@ -3,6 +3,8 @@
 
 typedef struct FILE FILE;
 
+// TODO: Can be implemented in rust when cbindgen supports "..." syntax
+
 int vasprintf(char ** strp, const char * fmt, va_list ap);
 
 int asprintf(char ** strp, const char * fmt, ...) {
