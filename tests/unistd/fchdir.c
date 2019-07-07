@@ -6,7 +6,7 @@
 #include "test_helpers.h"
 
 int main(void) {
-    int fd = open("..", 0, 0);
+    int fd = open("..", O_DIRECTORY);
     ERROR_IF(open, fd, == -1);
     UNEXP_IF(open, fd, < 0);
 
