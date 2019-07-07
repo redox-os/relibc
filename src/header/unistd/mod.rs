@@ -12,9 +12,9 @@ use header::sys_ioctl;
 use header::sys_time;
 use header::termios;
 use header::time::timespec;
+use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
-use platform;
 
 pub use self::brk::*;
 pub use self::getopt::*;
@@ -50,9 +50,10 @@ pub static mut fork_hooks_static: Option<[LinkedList<extern "C" fn()>; 3]> = Non
 unsafe fn init_fork_hooks<'a>() -> &'a mut [LinkedList<extern "C" fn()>; 3] {
     // Transmute the lifetime so we can return here. Should be safe as
     // long as one does not access the original fork_hooks.
-    mem::transmute(fork_hooks_static.get_or_insert_with(|| {
-        [LinkedList::new(), LinkedList::new(), LinkedList::new()]
-    }))
+    mem::transmute(
+        fork_hooks_static
+            .get_or_insert_with(|| [LinkedList::new(), LinkedList::new(), LinkedList::new()]),
+    )
 }
 
 #[no_mangle]

@@ -1,8 +1,8 @@
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
+use core::sync::atomic;
 use core::sync::atomic::AtomicI32 as AtomicInt;
 use core::sync::atomic::Ordering::SeqCst;
-use core::sync::atomic;
 use platform::types::*;
 use platform::{Pal, Sys};
 
@@ -45,7 +45,8 @@ impl<T> Mutex<T> {
     /// on failure. You should probably not worry about this, it's used for
     /// internal optimizations.
     pub unsafe fn manual_try_lock(&self) -> Result<&mut T, c_int> {
-        self.atomic().compare_exchange(0, 1, SeqCst, SeqCst)
+        self.atomic()
+            .compare_exchange(0, 1, SeqCst, SeqCst)
             .map(|_| &mut *self.content.get())
     }
     /// Lock the mutex, returning the inner content. After doing this, it's
@@ -70,7 +71,13 @@ impl<T> Mutex<T> {
             //
             // - Skip the atomic operation if the last value was 2, since it most likely hasn't changed.
             // - Skip the futex wait if the atomic operation says the mutex is unlocked.
-            if last == 2 || self.atomic().compare_exchange(1, 2, SeqCst, SeqCst).unwrap_or_else(|err| err) != 0 {
+            if last == 2
+                || self
+                    .atomic()
+                    .compare_exchange(1, 2, SeqCst, SeqCst)
+                    .unwrap_or_else(|err| err)
+                    != 0
+            {
                 Sys::futex(self.atomic().get_mut(), FUTEX_WAIT, 2);
             }
 

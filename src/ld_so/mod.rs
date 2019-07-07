@@ -1,7 +1,7 @@
 use goblin::elf::program_header::{self, program_header32, program_header64, ProgramHeader};
 
+use self::tcb::{Master, Tcb};
 use crate::start::Stack;
-use self::tcb::{Tcb, Master};
 
 pub const PAGE_SIZE: usize = 4096;
 
@@ -22,10 +22,10 @@ pub fn static_init(sp: &'static Stack) {
         }
 
         match kind {
-           3 => phdr_opt = Some(value),
-           4 => phent_opt = Some(value),
-           5 => phnum_opt = Some(value),
-           _ => (),
+            3 => phdr_opt = Some(value),
+            4 => phent_opt = Some(value),
+            5 => phnum_opt = Some(value),
+            _ => (),
         }
 
         auxv = unsafe { auxv.add(1) };
@@ -40,10 +40,10 @@ pub fn static_init(sp: &'static Stack) {
         let ph: ProgramHeader = match phent {
             program_header32::SIZEOF_PHDR => {
                 unsafe { *(ph_addr as *const program_header32::ProgramHeader) }.into()
-            },
+            }
             program_header64::SIZEOF_PHDR => {
                 unsafe { *(ph_addr as *const program_header64::ProgramHeader) }.into()
-            },
+            }
             _ => panic!("unknown AT_PHENT size {}", phent),
         };
 

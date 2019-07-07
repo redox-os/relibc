@@ -53,12 +53,17 @@ macro_rules! dbg {
         // of temporaries - https://stackoverflow.com/a/48732525/1063961
         match $val {
             tmp => {
-                eprintln!("[{}:{}] {} = {:#?}",
-                    file!(), line!(), stringify!($val), &tmp);
+                eprintln!(
+                    "[{}:{}] {} = {:#?}",
+                    file!(),
+                    line!(),
+                    stringify!($val),
+                    &tmp
+                );
                 tmp
             }
         }
-    }
+    };
 }
 
 #[macro_export]

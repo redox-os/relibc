@@ -2,10 +2,10 @@ use alloc::vec::Vec;
 use core::{intrinsics, ptr};
 
 use header::{stdio, stdlib};
+use ld_so;
 use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
-use ld_so;
 
 #[repr(C)]
 pub struct Stack {

@@ -4,8 +4,8 @@ use c_str::CStr;
 use header::unistd;
 use platform::types::c_char;
 
-use crate::start::Stack;
 use super::linker::Linker;
+use crate::start::Stack;
 
 #[no_mangle]
 pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {

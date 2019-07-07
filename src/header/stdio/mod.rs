@@ -419,7 +419,11 @@ pub unsafe extern "C" fn fputs(s: *const c_char, stream: *mut FILE) -> c_int {
     let mut stream = (*stream).lock();
     let buf = slice::from_raw_parts(s as *mut u8, strlen(s));
 
-    if stream.write_all(&buf).is_ok() { 0 } else { -1 }
+    if stream.write_all(&buf).is_ok() {
+        0
+    } else {
+        -1
+    }
 }
 
 /// Read `nitems` of size `size` into `ptr` from `stream`
