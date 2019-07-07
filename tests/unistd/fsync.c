@@ -6,7 +6,7 @@
 #include "test_helpers.h"
 
 int main(void) {
-    int fd = open(".", 0, 0);
+    int fd = open("example_dir/1-never-gonna-give-you-up", O_RDWR);
     ERROR_IF(open, fd, == -1);
     UNEXP_IF(open, fd, < 0);
 
