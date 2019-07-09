@@ -1,7 +1,7 @@
 //! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 
+use core::cmp::{max, min};
 use core::convert::TryFrom;
-use core::cmp::{min, max};
 use core::num::FpCategory;
 use core::str::FromStr;
 use core::{intrinsics, iter, mem, ptr, slice};
@@ -251,84 +251,84 @@ pub unsafe extern "C" fn ecvt(
     sign: *mut c_int,
 ) -> *mut c_char {
     // Set sign output
-    *sign = if value.is_sign_negative() {
-        1
-    } else {
-        0
-    };
-    
+    *sign = if value.is_sign_negative() { 1 } else { 0 };
+
     // Reset buffer and have null terminator in place
     ECVT_BUFFER = [0; ECVT_BUFFER_SIZE];
-    
+
     match value.classify() {
         FpCategory::Zero | FpCategory::Subnormal | FpCategory::Normal => {
             /* We rely on output of the format! macro and pick apart the
              * result. */
-             
-             /* Avoid buffer overflows by clamping to ECVT_BUFFER_SIZE-1 above,
-              * and any other conversion trouble by clamping to 0 below. */
-            let clamped_ndigit: usize = min(usize::try_from(max(0, ndigit)).unwrap_or(usize::max_value()), ECVT_BUFFER_SIZE-1);
-            
+
+            /* Avoid buffer overflows by clamping to ECVT_BUFFER_SIZE-1 above,
+             * and any other conversion trouble by clamping to 0 below. */
+            let clamped_ndigit: usize = min(
+                usize::try_from(max(0, ndigit)).unwrap_or(usize::max_value()),
+                ECVT_BUFFER_SIZE - 1,
+            );
+
             /* We need at least 0 digits after the decimal point for the
              * format string... and also need to obtain the exponent,
              * even if we don't put anything in the digits buffer. */
-            let value_str = format!("{:.p$e}", value, p = max(1, clamped_ndigit)-1);
-            
+            let value_str = format!("{:.p$e}", value, p = max(1, clamped_ndigit) - 1);
+
             /* Use the 'e' to split the str into a significand and
              * exponent part. */
             let mut value_str_e_split = value_str.split('e');
             let significand_str = value_str_e_split.next().unwrap();
             let exponent_str = value_str_e_split.next().unwrap();
-            
+
             /* C's int type can hold at least the range [-32767, 32767],
              * while a finite IEEE 754 double has an exponent in the
              * range [-324, 308], including subnormal numbers. */
             let exponent = c_int::from_str(&exponent_str).unwrap();
-            
+
             /* Split the significand into a (signed) integer part and a
              * fractional part. The fractional part will be missing for
              * ndigit == 1. */
             let mut significand_str_dec_sep_split = significand_str.split('.');
             let significand_str_int_part = significand_str_dec_sep_split.next().unwrap();
             let significand_str_frac_part = significand_str_dec_sep_split.next().unwrap_or("");
-            
+
             /* Iterating backwards in the integer part, we will
              * consistently get one digit. (The integer part may start
              * with a sign.) */
             let significand_str_uint_char = significand_str_int_part.chars().next_back().unwrap();
-            
+
             /* The sign- and point-less significand digits, ready to be
              * copied to the buffer. */
-            let mut significand_str_no_dec_sep_iter = iter::once(significand_str_uint_char).chain(significand_str_frac_part.chars());
-            
+            let mut significand_str_no_dec_sep_iter =
+                iter::once(significand_str_uint_char).chain(significand_str_frac_part.chars());
+
             // Copy to buffer
             for i in 0..clamped_ndigit {
                 match significand_str_no_dec_sep_iter.next() {
                     Some(digit_char) => {
                         ECVT_BUFFER[i] = digit_char as c_char;
-                    },
-                    None => break // Shouldn't happen
+                    }
+                    None => break, // Shouldn't happen
                 }
             }
-            
+
             *decpt = exponent + 1;
         }
         FpCategory::Infinite => {
             for (i, c) in b"inf".iter().enumerate() {
                 ECVT_BUFFER[i] = *c as c_char;
             }
-            
+
             *decpt = 0;
         }
         FpCategory::Nan => {
             for (i, c) in b"nan".iter().enumerate() {
                 ECVT_BUFFER[i] = *c as c_char;
             }
-            
+
             *decpt = 0;
         }
     }
-    
+
     ECVT_BUFFER.as_mut_ptr()
 }
 
@@ -384,30 +384,30 @@ pub unsafe extern "C" fn fcvt(
          * string is "restricted to an unspecified limit as determined
          * by the precision of a double", and ecvt() already truncates
          * to the maximum meaningful significant digits. */
-        
+
         /* First, we convert the ndigit value to a usize using a
          * clamping conversion. */
         let clamped_ndigit: usize = usize::try_from(max(0, ndigit)).unwrap_or(usize::max_value());
-        
+
         // Avoid a leading sign so that it is easier to count digits.
         let value_str = if value.is_sign_positive() {
             format!("{:.p$}", value, p = clamped_ndigit)
         } else {
             format!("{:.p$}", -value, p = clamped_ndigit)
         };
-        
+
         /* Split the string at the decimal point if possible. There will
          * not be a decimal point for ndigit == 0. */
         let mut value_str_dec_sep_split = value_str.split('.');
         let int_part_str = value_str_dec_sep_split.next().unwrap();
         let frac_part_str = value_str_dec_sep_split.next().unwrap_or("");
-        
+
         /* Compute the number of significant digits from the lengths of
          * the integer and fractional parts, and again perform a
          * clamping type conversion. */
         let ecvt_ndigit_usize = int_part_str.chars().chain(frac_part_str.chars()).count();
         let ecvt_ndigit_int = c_int::try_from(ecvt_ndigit_usize).unwrap_or(c_int::max_value());
-        
+
         ecvt(value, ecvt_ndigit_int, decpt, sign)
     } else {
         // For infinity and NaN, rely on ecvt()'s defaults.
