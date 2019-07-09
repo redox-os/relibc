@@ -260,16 +260,16 @@ pub unsafe extern "C" fn ecvt(
     // Reset buffer and have null terminator in place
     ECVT_BUFFER = [0; ECVT_BUFFER_SIZE];
     
-    /* Avoid buffer overflows by clamping to ECVT_BUFFER_SIZE-1 above,
-     * and any other conversion trouble by clamping to 0 below. */
-    let clamped_ndigit: usize = min(usize::try_from(max(0, ndigit)).unwrap_or(usize::max_value()), ECVT_BUFFER_SIZE-1);
-    
     match value.classify() {
         FpCategory::Zero | FpCategory::Subnormal | FpCategory::Normal => {
             /* We rely on output of the format! macro and pick apart the
-             * result.
-             * 
-             * We need at least 0 digits after the decimal point for the
+             * result. */
+             
+             /* Avoid buffer overflows by clamping to ECVT_BUFFER_SIZE-1 above,
+              * and any other conversion trouble by clamping to 0 below. */
+            let clamped_ndigit: usize = min(usize::try_from(max(0, ndigit)).unwrap_or(usize::max_value()), ECVT_BUFFER_SIZE-1);
+            
+            /* We need at least 0 digits after the decimal point for the
              * format string... and also need to obtain the exponent,
              * even if we don't put anything in the digits buffer. */
             let value_str = format!("{:.p$e}", value, p = max(1, clamped_ndigit)-1);
