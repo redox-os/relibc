@@ -250,6 +250,7 @@ pub unsafe extern "C" fn ecvt(
     decpt: *mut c_int,
     sign: *mut c_int,
 ) -> *mut c_char {
+    // Set sign output
     *sign = if value.is_sign_negative() {
         1
     } else {
@@ -265,18 +266,18 @@ pub unsafe extern "C" fn ecvt(
     
     match value.classify() {
         FpCategory::Zero | FpCategory::Subnormal | FpCategory::Normal => {
-            /* Formatting floating point correctly is hard, so we defer
-             * to the format! macro and pick apart the result.
+            /* We rely on output of the format! macro and pick apart the
+             * result.
              * 
              * We need at least 0 digits after the decimal point for the
              * format string... and also need to obtain the exponent,
              * even if we don't put anything in the digits buffer. */
             let value_str = format!("{:.p$e}", value, p = max(1, clamped_ndigit)-1);
             
-            /* Use the 'e' to split the str into a mantissa and exponent
-             * part. */
+            /* Use the 'e' to split the str into a significand and
+             * exponent part. */
             let mut value_str_e_split = value_str.split('e');
-            let mantissa_str = value_str_e_split.next().unwrap();
+            let significand_str = value_str_e_split.next().unwrap();
             let exponent_str = value_str_e_split.next().unwrap();
             
             /* C's int type can hold at least the range [-32767, 32767],
@@ -284,25 +285,25 @@ pub unsafe extern "C" fn ecvt(
              * range [-324, 308], including subnormal numbers. */
             let exponent = c_int::from_str(&exponent_str).unwrap();
             
-            /* Split the mantissa into a (signed) integer part and a
+            /* Split the significand into a (signed) integer part and a
              * fractional part. The fractional part will be missing for
              * ndigit == 1. */
-            let mut mantissa_str_dec_sep_split = mantissa_str.split('.');
-            let mantissa_str_int_part = mantissa_str_dec_sep_split.next().unwrap();
-            let mantissa_str_frac_part = mantissa_str_dec_sep_split.next().unwrap_or("");
+            let mut significand_str_dec_sep_split = significand_str.split('.');
+            let significand_str_int_part = significand_str_dec_sep_split.next().unwrap();
+            let significand_str_frac_part = significand_str_dec_sep_split.next().unwrap_or("");
             
             /* Iterating backwards in the integer part, we will
              * consistently get one digit. (The integer part may start
              * with a sign.) */
-            let mantissa_str_uint_char = mantissa_str_int_part.chars().next_back().unwrap();
+            let significand_str_uint_char = significand_str_int_part.chars().next_back().unwrap();
             
-            /* The sign- and point-less mantissa digits, ready to be
+            /* The sign- and point-less significand digits, ready to be
              * copied to the buffer. */
-            let mut mantissa_str_no_dec_sep_iter = iter::once(mantissa_str_uint_char).chain(mantissa_str_frac_part.chars());
+            let mut significand_str_no_dec_sep_iter = iter::once(significand_str_uint_char).chain(significand_str_frac_part.chars());
             
             // Copy to buffer
             for i in 0..clamped_ndigit {
-                match mantissa_str_no_dec_sep_iter.next() {
+                match significand_str_no_dec_sep_iter.next() {
                     Some(digit_char) => {
                         ECVT_BUFFER[i] = digit_char as c_char;
                     },
