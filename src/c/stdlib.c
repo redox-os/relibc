@@ -1,4 +1,5 @@
-#include <stdio.h>
+#include <stddef.h>
+#include <bits/stdio.h>
 
 double strtod(const char *nptr, char **endptr);
 
