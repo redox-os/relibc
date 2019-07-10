@@ -68,4 +68,6 @@ pub const SA_RESTORER: usize = 0x0400_0000;
 pub const SS_ONSTACK: usize = 1;
 pub const SS_DISABLE: usize = 2;
 
+// Those two should be updated from kernel headers
 pub const MINSIGSTKSZ: usize = 2048;
+pub const SIGSTKSZ: usize = 8096;

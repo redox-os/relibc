@@ -38,13 +38,15 @@ pub struct sigaction {
 
 #[repr(C)]
 #[derive(Clone)]
-pub struct stack_t {
+pub struct sigaltstack {
     pub ss_sp: *mut c_void,
     pub ss_flags: c_int,
-    pub ss_size: c_uint,
+    pub ss_size: size_t,
 }
 
 pub type sigset_t = c_ulong;
+
+pub type stack_t = sigaltstack;
 
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
@@ -113,7 +115,7 @@ pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -
         if (*ss).ss_flags != SS_DISABLE as c_int {
             return errno::EINVAL;
         }
-        if (*ss).ss_size < MINSIGSTKSZ as c_uint {
+        if (*ss).ss_size < MINSIGSTKSZ {
             return errno::ENOMEM;
         }
     }
