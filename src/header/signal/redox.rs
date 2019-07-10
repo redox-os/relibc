@@ -65,4 +65,6 @@ pub const SA_RESETHAND: usize = 0x80000000;
 pub const SS_ONSTACK: usize = 0x00000001;
 pub const SS_DISABLE: usize = 0x00000002;
 
+// TODO: It's just a guess based on Linux
 pub const MINSIGSTKSZ: usize = 2048;
+pub const SIGSTKSZ: usize = 8096;
