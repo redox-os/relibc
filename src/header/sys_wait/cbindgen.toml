@@ -3,6 +3,8 @@ include_guard = "_SYS_WAIT_H"
 trailer = "#include <bits/sys/wait.h>"
 language = "C"
 style = "Tag"
+no_includes = true
+cpp_compat = true
 
 [enum]
 prefix_with_name = true

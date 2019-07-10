@@ -7,7 +7,7 @@ set -e
 include="$(realpath "$1")"
 
 cargo build --release --manifest-path cbindgen/Cargo.toml
-cbindgen="$(realpath target/release/cbindgen)"
+cbindgen="$(realpath cbindgen/target/release/cbindgen)"
 
 if [ "$SUPRESS_ALL_THE_ERRORS" = "yes" ]; then
     echo -e "\e[91mNote: Warnings by cbindgen are suppressed in include.sh.\e[0m"

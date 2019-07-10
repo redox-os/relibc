@@ -3,6 +3,8 @@ include_guard = "_FCNTL_H"
 trailer = "#include <bits/fcntl.h>"
 language = "C"
 style = "Tag"
+no_includes = true
+cpp_compat = true
 
 [defines]
 "target_os=linux" = "__linux__"

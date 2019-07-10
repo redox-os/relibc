@@ -3,6 +3,8 @@ include_guard = "_INTTYPES_H"
 trailer = "#include <bits/inttypes.h>"
 language = "C"
 style = "Type"
+no_includes = true
+cpp_compat = true
 
 [enum]
 prefix_with_name = true

@@ -2,6 +2,8 @@ sys_includes = ["sys/ioctl.h"]
 include_guard = "_SGTTY_H"
 language = "C"
 style = "Tag"
+no_includes = true
+cpp_compat = true
 
 [enum]
 prefix_with_name = true

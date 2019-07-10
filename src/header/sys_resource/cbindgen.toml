@@ -3,6 +3,8 @@ include_guard = "_SYS_RESOURCE_H"
 trailer = "#include <bits/sys/resource.h>"
 language = "C"
 style = "Tag"
+no_includes = true
+cpp_compat = true
 
 [enum]
 prefix_with_name = true
