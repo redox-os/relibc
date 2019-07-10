@@ -19,6 +19,8 @@ pub const PTRACE_SETFPREGS: c_int = 15;
 pub const PTRACE_ATTACH: c_int = 16;
 pub const PTRACE_DETACH: c_int = 17;
 pub const PTRACE_SYSCALL: c_int = 24;
+pub const PTRACE_SYSEMU: c_int = 31;
+pub const PTRACE_SYSEMU_SINGLESTEP: c_int = 32;
 
 // Can't use "params: ..." syntax, because... guess what? Cbingen again :(
 #[no_mangle]

@@ -67,7 +67,7 @@ impl File {
     }
 }
 
-impl io::Read for File {
+impl io::Read for &File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match Sys::read(self.fd, buf) {
             -1 => Err(io::last_os_error()),
@@ -76,7 +76,7 @@ impl io::Read for File {
     }
 }
 
-impl io::Write for File {
+impl io::Write for &File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match Sys::write(self.fd, buf) {
             -1 => Err(io::last_os_error()),
@@ -89,7 +89,7 @@ impl io::Write for File {
     }
 }
 
-impl io::Seek for File {
+impl io::Seek for &File {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         let (offset, whence) = match pos {
             io::SeekFrom::Start(start) => (start as off_t, SEEK_SET),
@@ -101,6 +101,28 @@ impl io::Seek for File {
             -1 => Err(io::last_os_error()),
             ok => Ok(ok as u64),
         }
+    }
+}
+
+impl io::Read for File {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        (&mut &*self).read(buf)
+    }
+}
+
+impl io::Write for File {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        (&mut &*self).write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        (&mut &*self).flush()
+    }
+}
+
+impl io::Seek for File {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        (&mut &*self).seek(pos)
     }
 }
 

@@ -1,5 +1,3 @@
-//! sys/socket implementation, following http://pubs.opengroup.org/onlinepubs/009696699/basedefs/sys/socket.h.html
-
 use core::result::Result as CoreResult;
 use core::{mem, ptr, slice};
 use syscall::data::Map;
@@ -17,6 +15,7 @@ use header::sys_mman::MAP_ANON;
 use header::sys_stat::stat;
 use header::sys_statvfs::statvfs;
 use header::sys_time::{timeval, timezone};
+use header::sys_wait;
 use header::sys_utsname::{utsname, UTSLENGTH};
 use header::time::timespec;
 use header::unistd::{F_OK, R_OK, W_OK, X_OK};
@@ -922,14 +921,34 @@ impl Pal for Sys {
         if pid == !0 {
             pid = 0;
         }
-        unsafe {
-            let mut temp: usize = 0;
-            let res = e(syscall::waitpid(pid as usize, &mut temp, options as usize));
-            if !stat_loc.is_null() {
-                *stat_loc = temp as c_int;
+        let mut res = None;
+        let mut status = 0;
+
+        // First, allow ptrace to handle waitpid
+        let state = ptrace::init_state();
+        let sessions = state.sessions.lock();
+        if let Some(session) = sessions.get(&pid) {
+            if options & sys_wait::WNOHANG != sys_wait::WNOHANG {
+                let _ = (&mut &session.tracer).write(&[syscall::PTRACE_WAIT]);
+                res = Some(e(syscall::waitpid(pid as usize, &mut status, (options | sys_wait::WNOHANG) as usize)));
+                if res == Some(0) {
+                    // WNOHANG, just pretend ptrace SIGSTOP:ped this
+                    status = (syscall::SIGSTOP << 8) | 0x7f;
+                    res = Some(pid as usize);
+                }
             }
-            res as pid_t
         }
+
+        // If ptrace didn't impact this waitpid, proceed as normal
+        let res = res.unwrap_or_else(|| e(syscall::waitpid(pid as usize, &mut status, options as usize)));
+
+        // If stat_loc is non-null, set that and the return
+        unsafe {
+            if !stat_loc.is_null() {
+                *stat_loc = status as c_int;
+            }
+        }
+        res as pid_t
     }
 
     fn write(fd: c_int, buf: &[u8]) -> ssize_t {
