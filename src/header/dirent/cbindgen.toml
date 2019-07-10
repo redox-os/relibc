@@ -3,6 +3,8 @@ include_guard = "_DIRENT_H"
 language = "C"
 style = "Both"
 trailer = "#include <bits/dirent.h>"
+no_includes = true
+cpp_compat = true
 
 [enum]
 prefix_with_name = true

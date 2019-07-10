@@ -8,8 +8,8 @@ name = "relibc"
 crate-type = ["staticlib"]
 
 [workspace]
-members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so", "cbindgen"]
-exclude = ["core_io", "ralloc"]
+members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so"]
+exclude = ["cbindgen", "core_io", "ralloc"]
 
 [build-dependencies]
 cc = "1.0.25"

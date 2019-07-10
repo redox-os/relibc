@@ -2,6 +2,7 @@ sys_includes = []
 include_guard = "_AIO_H"
 language = "C"
 style = "Tag"
+no_default_includes = true
 
 [enum]
 prefix_with_name = true

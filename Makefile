@@ -38,6 +38,7 @@ all: | headers libs
 
 clean:
 	$(CARGO) clean
+	$(CARGO) clean --manifest-path cbindgen/Cargo.toml
 	$(MAKE) -C tests clean
 	rm -rf sysroot
 

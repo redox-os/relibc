@@ -3,6 +3,8 @@ include_guard = "_SYS_STAT_H"
 trailer = "#include <bits/sys/stat.h>"
 language = "C"
 style = "Tag"
+no_includes = true
+cpp_compat = true
 
 [enum]
 prefix_with_name = true

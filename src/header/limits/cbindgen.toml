@@ -3,6 +3,8 @@ include_guard = "_LIMITS_H"
 trailer = "#include <bits/limits.h>"
 language = "C"
 style = "Tag"
+no_includes = true
+cpp_compat = true
 
 [enum]
 prefix_with_name = true
