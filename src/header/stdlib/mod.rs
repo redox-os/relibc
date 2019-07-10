@@ -37,7 +37,9 @@ pub const MB_CUR_MAX: c_int = 4;
 //Maximum number of bytes in a multibyte characters for any locale
 pub const MB_LEN_MAX: c_int = 4;
 
-const ECVT_BUFFER_SIZE: usize = 18; // including null terminator
+/* A double may have up to 17 decimal digits of precision. Also, one
+ * byte for the null terminator. */
+const ECVT_BUFFER_SIZE: usize = 18;
 
 static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
 static mut ECVT_BUFFER: [c_char; ECVT_BUFFER_SIZE] = [0; ECVT_BUFFER_SIZE];
