@@ -315,11 +315,14 @@ fn abs(float: c_double) -> c_double {
 fn float_string(float: c_double, precision: usize, trim: bool) -> String {
     let mut string = format!("{:.p$}", float, p = precision);
     if trim && string.contains('.') {
-        let slice = string.trim_end_matches('0');
-        let mut truncate = slice.len();
-        if slice.ends_with('.') {
-            truncate -= 1;
-        }
+        let truncate = {
+            let slice = string.trim_end_matches('0');
+            let mut truncate = slice.len();
+            if slice.ends_with('.') {
+                truncate -= 1;
+            }
+            truncate
+        };
         string.truncate(truncate);
     }
     string

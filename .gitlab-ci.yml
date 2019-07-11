@@ -7,6 +7,7 @@ stages:
 before_script:
     - apt-get update -qq
     - apt-get install -qq git
+    - git submodule sync --recursive
     - git submodule update --init --recursive
 
 cache:
