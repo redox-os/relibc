@@ -26,6 +26,9 @@ do
             echo "# ${name}: ${output}: generated #"
             cat "gen/${name}.${output}"
 
+            echo "# ${name}: ${output}: diff #"
+            diff --color -u "expected/${name}.${output}" "gen/${name}.${output}"
+
             status="${status}, ${output} mismatch"
         fi
     done

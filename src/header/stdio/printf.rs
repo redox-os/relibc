@@ -4,7 +4,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::ffi::VaList;
 use core::ops::Range;
-use core::{fmt, slice};
+use core::{cmp, f64, fmt, slice};
 use io::{self, Write};
 
 use platform;
@@ -75,7 +75,7 @@ impl Number {
         }
     }
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum VaArg {
     c_char(c_char),
     c_double(c_double),
@@ -89,7 +89,7 @@ enum VaArg {
     ssize_t(ssize_t),
 }
 impl VaArg {
-    unsafe fn arg_from(arg: &PrintfArg, ap: &mut VaList) -> VaArg {
+    unsafe fn arg_from(fmtkind: FmtKind, intkind: IntKind, ap: &mut VaList) -> VaArg {
         // Per the C standard using va_arg with a type with a size
         // less than that of an int for integers and double for floats
         // is invalid. As a result any arguments smaller than an int or
@@ -97,7 +97,7 @@ impl VaArg {
         // possible size. The VaList::arg function will handle this
         // automagically.
 
-        match (arg.fmtkind, arg.intkind) {
+        match (fmtkind, intkind) {
             (FmtKind::Percent, _) => panic!("Can't call arg_from on %"),
 
             (FmtKind::Char, _)
@@ -134,7 +134,7 @@ impl VaArg {
             }
         }
     }
-    unsafe fn transmute(&self, arg: &PrintfArg) -> VaArg {
+    unsafe fn transmute(&self, fmtkind: FmtKind, intkind: IntKind) -> VaArg {
         // At this point, there are conflicting printf arguments. An
         // example of this is:
         // ```c
@@ -167,7 +167,7 @@ impl VaArg {
             VaArg::ptrdiff_t(i) => Untyped { ptrdiff_t: i },
             VaArg::ssize_t(i) => Untyped { ssize_t: i },
         };
-        match (arg.fmtkind, arg.intkind) {
+        match (fmtkind, intkind) {
             (FmtKind::Percent, _) => panic!("Can't call transmute on %"),
 
             (FmtKind::Char, _)
@@ -211,11 +211,11 @@ struct VaListCache {
     i: usize,
 }
 impl VaListCache {
-    unsafe fn get(&mut self, i: usize, ap: &mut VaList, default: Option<&PrintfArg>) -> VaArg {
+    unsafe fn get(&mut self, i: usize, ap: &mut VaList, default: Option<(FmtKind, IntKind)>) -> VaArg {
         if let Some(&arg) = self.args.get(i) {
             let mut arg = arg;
-            if let Some(default) = default {
-                arg = arg.transmute(default);
+            if let Some((fmtkind, intkind)) = default {
+                arg = arg.transmute(fmtkind, intkind);
             }
             return arg;
         }
@@ -227,7 +227,7 @@ impl VaListCache {
             self.args.push(VaArg::c_int(ap.arg::<c_int>()))
         }
         self.args.push(match default {
-            Some(default) => VaArg::arg_from(default, ap),
+            Some((fmtkind, intkind)) => VaArg::arg_from(fmtkind, intkind, ap),
             None => VaArg::c_int(ap.arg::<c_int>()),
         });
         self.args[i]
@@ -303,50 +303,52 @@ fn pad<W: Write>(
     Ok(())
 }
 
+fn abs(float: c_double) -> c_double {
+    // Don't ask me whe float.abs() seems absent...
+    if float.is_sign_negative() {
+        -float
+    } else {
+        float
+    }
+}
+
 fn float_string(float: c_double, precision: usize, trim: bool) -> String {
     let mut string = format!("{:.p$}", float, p = precision);
-    if trim {
-        let truncate = {
-            let slice = string.trim_end_matches('0');
-            if slice.ends_with('.') {
-                slice.len() - 1
-            } else {
-                slice.len()
-            }
-        };
+    if trim && string.contains('.') {
+        let slice = string.trim_end_matches('0');
+        let mut truncate = slice.len();
+        if slice.ends_with('.') {
+            truncate -= 1;
+        }
         string.truncate(truncate);
     }
     string
 }
 
-fn fmt_float_exp<W: Write>(
-    w: &mut W,
-    exp_fmt: u8,
-    range: Option<(isize, isize)>,
-    trim: bool,
-    precision: usize,
-    mut float: c_double,
-    left: bool,
-    pad_space: usize,
-    pad_zero: usize,
-) -> io::Result<bool> {
+fn float_exp(mut float: c_double) -> (c_double, isize) {
     let mut exp: isize = 0;
-    while float >= 10.0 || float <= -10.0 {
+    while abs(float) >= 10.0 {
         float /= 10.0;
         exp += 1;
     }
-    while (float > 0.0 && float < 1.0) || (float > -1.0 && float < 0.0) {
+    while f64::EPSILON < abs(float) && abs(float) < 1.0 {
         float *= 10.0;
         exp -= 1;
     }
+    (float, exp)
+}
 
-    if range
-        .map(|(start, end)| exp >= start && exp < end)
-        .unwrap_or(false)
-    {
-        return Ok(false);
-    }
-
+fn fmt_float_exp<W: Write>(
+    w: &mut W,
+    exp_fmt: u8,
+    trim: bool,
+    precision: usize,
+    float: c_double,
+    exp: isize,
+    left: bool,
+    pad_space: usize,
+    pad_zero: usize,
+) -> io::Result<()> {
     let mut exp2 = exp;
     let mut exp_len = 1;
     while exp2 >= 10 {
@@ -369,7 +371,7 @@ fn fmt_float_exp<W: Write>(
     write!(w, "{}{:+03}", exp_fmt as char, exp)?;
     pad(w, left, b' ', len..pad_space)?;
 
-    Ok(true)
+    Ok(())
 }
 
 fn fmt_float_normal<W: Write>(
@@ -566,15 +568,21 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
         if arg.fmtkind == FmtKind::Percent {
             continue;
         }
-        if let Some(i) = arg.index {
-            positional.insert(i - 1, arg);
-        } else {
-            varargs.args.push(VaArg::arg_from(&arg, &mut ap));
+        for num in &[arg.min_width, arg.precision.unwrap_or(Number::Static(0))] {
+            match num {
+                Number::Next => varargs.args.push(VaArg::c_int(ap.arg::<c_int>())),
+                Number::Index(i) => { positional.insert(i - 1, (FmtKind::Signed, IntKind::Int)); },
+                Number::Static(_) => ()
+            }
+        }
+        match arg.index {
+            Some(i) => { positional.insert(i - 1, (arg.fmtkind, arg.intkind)); },
+            None => varargs.args.push(VaArg::arg_from(arg.fmtkind, arg.intkind, &mut ap)),
         }
     }
     // Make sure, in order, the positional arguments exist with the specified type
     for (i, arg) in positional {
-        varargs.get(i, &mut ap, Some(&arg));
+        varargs.get(i, &mut ap, Some(arg));
     }
 
     // Main loop
@@ -613,7 +621,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
         match fmtkind {
             FmtKind::Percent => w.write_all(&[b'%'])?,
             FmtKind::Signed => {
-                let string = match varargs.get(index, &mut ap, Some(&arg)) {
+                let string = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::c_char(i) => i.to_string(),
                     VaArg::c_double(i) => panic!("this should not be possible"),
                     VaArg::c_int(i) => i.to_string(),
@@ -660,7 +668,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 pad(w, left, b' ', final_len..pad_space)?;
             }
             FmtKind::Unsigned => {
-                let string = match varargs.get(index, &mut ap, Some(&arg)) {
+                let string = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::c_char(i) => fmt_int(fmt, i as c_uchar),
                     VaArg::c_double(i) => panic!("this should not be possible"),
                     VaArg::c_int(i) => fmt_int(fmt, i as c_uint),
@@ -715,18 +723,19 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 pad(w, left, b' ', final_len..pad_space)?;
             }
             FmtKind::Scientific => {
-                let float = match varargs.get(index, &mut ap, Some(&arg)) {
+                let float = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::c_double(i) => i,
                     _ => panic!("this should not be possible"),
                 };
+                let (float, exp) = float_exp(float);
                 let precision = precision.unwrap_or(6);
 
                 fmt_float_exp(
-                    w, fmt, None, false, precision, float, left, pad_space, pad_zero,
+                    w, fmt, false, precision, float, exp, left, pad_space, pad_zero,
                 )?;
             }
             FmtKind::Decimal => {
-                let float = match varargs.get(index, &mut ap, Some(&arg)) {
+                let float = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::c_double(i) => i,
                     _ => panic!("this should not be possible"),
                 };
@@ -735,31 +744,44 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 fmt_float_normal(w, false, precision, float, left, pad_space, pad_zero)?;
             }
             FmtKind::AnyNotation => {
-                let float = match varargs.get(index, &mut ap, Some(&arg)) {
+                let float = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::c_double(i) => i,
                     _ => panic!("this should not be possible"),
                 };
+                let (log, exp) = float_exp(float);
                 let exp_fmt = b'E' | (fmt & 32);
                 let precision = precision.unwrap_or(6);
+                let use_exp_format = exp < -4 || exp >= precision as isize;
 
-                if !fmt_float_exp(
-                    w,
-                    exp_fmt,
-                    Some((-4, precision as isize)),
-                    true,
-                    precision,
-                    float,
-                    left,
-                    pad_space,
-                    pad_zero,
-                )? {
+                if use_exp_format {
+                    // Length of integral part will always be 1 here,
+                    // because that's how x/floor(log10(x)) works
+                    let precision = precision.saturating_sub(1);
+                    fmt_float_exp(
+                        w,
+                        exp_fmt,
+                        true,
+                        precision,
+                        log,
+                        exp,
+                        left,
+                        pad_space,
+                        pad_zero,
+                    )?;
+                } else {
+                    // Length of integral part will be the exponent of
+                    // the unused logarithm, unless the exponent is
+                    // negative which in case the integral part must
+                    // of course be 0, 1 in length
+                    let len = 1 + cmp::max(0, exp) as usize;
+                    let precision = precision.saturating_sub(len);
                     fmt_float_normal(w, true, precision, float, left, pad_space, pad_zero)?;
                 }
             }
             FmtKind::String => {
                 // if intkind == IntKind::Long || intkind == IntKind::LongLong, handle *const wchar_t
 
-                let ptr = match varargs.get(index, &mut ap, Some(&arg)) {
+                let ptr = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::pointer(p) => p,
                     _ => panic!("this should not be possible"),
                 } as *const c_char;
@@ -781,7 +803,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
             FmtKind::Char => {
                 // if intkind == IntKind::Long || intkind == IntKind::LongLong, handle wint_t
 
-                let c = match varargs.get(index, &mut ap, Some(&arg)) {
+                let c = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::c_char(c) => c,
                     _ => panic!("this should not be possible"),
                 };
@@ -791,7 +813,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 pad(w, left, b' ', 1..pad_space)?;
             }
             FmtKind::Pointer => {
-                let ptr = match varargs.get(index, &mut ap, Some(&arg)) {
+                let ptr = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::pointer(p) => p,
                     _ => panic!("this should not be possible"),
                 };
@@ -816,7 +838,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 pad(w, left, b' ', len..pad_space)?;
             }
             FmtKind::GetWritten => {
-                let ptr = match varargs.get(index, &mut ap, Some(&arg)) {
+                let ptr = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::pointer(p) => p,
                     _ => panic!("this should not be possible"),
                 };
