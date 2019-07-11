@@ -211,7 +211,12 @@ struct VaListCache {
     i: usize,
 }
 impl VaListCache {
-    unsafe fn get(&mut self, i: usize, ap: &mut VaList, default: Option<(FmtKind, IntKind)>) -> VaArg {
+    unsafe fn get(
+        &mut self,
+        i: usize,
+        ap: &mut VaList,
+        default: Option<(FmtKind, IntKind)>,
+    ) -> VaArg {
         if let Some(&arg) = self.args.get(i) {
             let mut arg = arg;
             if let Some((fmtkind, intkind)) = default {
@@ -574,13 +579,19 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
         for num in &[arg.min_width, arg.precision.unwrap_or(Number::Static(0))] {
             match num {
                 Number::Next => varargs.args.push(VaArg::c_int(ap.arg::<c_int>())),
-                Number::Index(i) => { positional.insert(i - 1, (FmtKind::Signed, IntKind::Int)); },
-                Number::Static(_) => ()
+                Number::Index(i) => {
+                    positional.insert(i - 1, (FmtKind::Signed, IntKind::Int));
+                }
+                Number::Static(_) => (),
             }
         }
         match arg.index {
-            Some(i) => { positional.insert(i - 1, (arg.fmtkind, arg.intkind)); },
-            None => varargs.args.push(VaArg::arg_from(arg.fmtkind, arg.intkind, &mut ap)),
+            Some(i) => {
+                positional.insert(i - 1, (arg.fmtkind, arg.intkind));
+            }
+            None => varargs
+                .args
+                .push(VaArg::arg_from(arg.fmtkind, arg.intkind, &mut ap)),
         }
     }
     // Make sure, in order, the positional arguments exist with the specified type
@@ -761,15 +772,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     // because that's how x/floor(log10(x)) works
                     let precision = precision.saturating_sub(1);
                     fmt_float_exp(
-                        w,
-                        exp_fmt,
-                        true,
-                        precision,
-                        log,
-                        exp,
-                        left,
-                        pad_space,
-                        pad_zero,
+                        w, exp_fmt, true, precision, log, exp, left, pad_space, pad_zero,
                     )?;
                 } else {
                     // Length of integral part will be the exponent of
