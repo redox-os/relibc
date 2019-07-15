@@ -8,11 +8,26 @@
 
 #include "test_helpers.h"
 
+#ifdef __linux__
+
+const int SYS_write = 1;
+
+#endif
+#ifdef __redox__
+
+const int SYS_write = 0x21000004;
+
+#endif
+
 int main() {
     int pid = fork();
     ERROR_IF(fork, pid, == -1);
 
     if (pid == 0) {
+        // Test behavior on Redox when TRACEME hasn't been activated
+        // before waitpid is invoked!
+        sleep(1);
+
         int result = ptrace(PTRACE_TRACEME, 0, NULL, NULL);
         ERROR_IF(ptrace, result, == -1);
         UNEXP_IF(ptrace, result, != 0);
@@ -28,7 +43,7 @@ int main() {
         puts("Big surprise, right!");
     } else {
         // Wait for child process to be ready
-        int result = waitpid(pid, NULL, WUNTRACED);
+        int result = waitpid(pid, NULL, 0);
         ERROR_IF(waitpid, result, == -1);
 
         int status;
@@ -45,7 +60,7 @@ int main() {
             result = ptrace(PTRACE_GETREGS, pid, NULL, &regs);
             ERROR_IF(ptrace, result, == -1);
 
-            if (regs.orig_rax == 1 || regs.orig_rax == 0x21000004) { // SYS_write on Redox and Linux
+            if (regs.orig_rax == SYS_write || regs.orig_rax == SYS_write) {
                 regs.rdi = 2;
                 result = ptrace(PTRACE_SETREGS, pid, NULL, &regs);
                 ERROR_IF(ptrace, result, == -1);

@@ -14,6 +14,7 @@ use crate::io::{self, prelude::*};
 use crate::sync::{Mutex, Once};
 use alloc::collections::BTreeMap;
 use alloc::collections::btree_map::Entry;
+use core::mem;
 use syscall;
 
 pub struct Session {
@@ -38,34 +39,51 @@ static STATE: Once<State> = Once::new();
 pub fn init_state() -> &'static State {
     STATE.call_once(|| State::new())
 }
+pub fn is_traceme(pid: pid_t) -> bool {
+    File::open(&CString::new(format!("chan:ptrace-relibc/{}/traceme", pid)).unwrap(), fcntl::O_PATH).is_ok()
+}
+pub fn get_session(sessions: &mut BTreeMap<pid_t, Session>, pid: pid_t) -> io::Result<&Session> {
+    const NEW_FLAGS: c_int = fcntl::O_RDWR | fcntl::O_CLOEXEC;
+
+    match sessions.entry(pid) {
+        Entry::Vacant(entry) => if is_traceme(pid) {
+            Ok(entry.insert(Session {
+                tracer: File::open(&CString::new(format!("proc:{}/trace", pid)).unwrap(), NEW_FLAGS | fcntl::O_NONBLOCK)?,
+                mem: File::open(&CString::new(format!("proc:{}/mem", pid)).unwrap(), NEW_FLAGS)?,
+                regs: File::open(&CString::new(format!("proc:{}/regs/int", pid)).unwrap(), NEW_FLAGS)?,
+                fpregs: File::open(&CString::new(format!("proc:{}/regs/float", pid)).unwrap(), NEW_FLAGS)?,
+            }))
+        } else {
+            unsafe { errno = errnoh::ESRCH; }
+            Err(io::last_os_error())
+        },
+        Entry::Occupied(entry) => Ok(entry.into_mut())
+    }
+}
 
 fn inner_ptrace(request: c_int, pid: pid_t, addr: *mut c_void, data: *mut c_void) -> io::Result<c_int> {
     let state = init_state();
 
     if request == sys_ptrace::PTRACE_TRACEME {
-        // let pid = Sys::getpid();
-        // todo: only auto-open session on host if this happens
+        // Mark this child as traced, parent will check for this marker file
+        let pid = Sys::getpid();
+        mem::forget(File::open(
+            &CString::new(format!("chan:ptrace-relibc/{}/traceme", pid)).unwrap(),
+            fcntl::O_CREAT | fcntl::O_PATH | fcntl::O_EXCL
+        )?);
         return Ok(0);
     }
 
-    const NEW_FLAGS: c_int = fcntl::O_RDWR | fcntl::O_CLOEXEC;
-
     let mut sessions = state.sessions.lock();
-    let session = match sessions.entry(pid) {
-        Entry::Vacant(entry) => entry.insert(Session {
-            tracer: File::open(&CString::new(format!("proc:{}/trace", pid)).unwrap(), NEW_FLAGS | fcntl::O_NONBLOCK)?,
-            mem: File::open(&CString::new(format!("proc:{}/mem", pid)).unwrap(), NEW_FLAGS)?,
-            regs: File::open(&CString::new(format!("proc:{}/regs/int", pid)).unwrap(), NEW_FLAGS)?,
-            fpregs: File::open(&CString::new(format!("proc:{}/regs/float", pid)).unwrap(), NEW_FLAGS)?,
-        }),
-        Entry::Occupied(entry) => entry.into_mut()
-    };
+    let session = get_session(&mut sessions, pid)?;
+
     match request {
         sys_ptrace::PTRACE_CONT | sys_ptrace::PTRACE_SINGLESTEP |
         sys_ptrace::PTRACE_SYSCALL | sys_ptrace::PTRACE_SYSEMU |
         sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => {
             Sys::kill(pid, signal::SIGCONT as _);
 
+            // TODO: Translate errors
             (&mut &session.tracer).write(&[match request {
                 sys_ptrace::PTRACE_CONT => syscall::PTRACE_CONT,
                 sys_ptrace::PTRACE_SINGLESTEP => syscall::PTRACE_SINGLESTEP,

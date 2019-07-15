@@ -925,22 +925,38 @@ impl Pal for Sys {
         let mut status = 0;
 
         // First, allow ptrace to handle waitpid
+        // TODO: Handle special PIDs here (such as -1)
         let state = ptrace::init_state();
-        let sessions = state.sessions.lock();
-        if let Some(session) = sessions.get(&pid) {
+        let mut sessions = state.sessions.lock();
+        if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
             if options & sys_wait::WNOHANG != sys_wait::WNOHANG {
                 let _ = (&mut &session.tracer).write(&[syscall::PTRACE_WAIT]);
-                res = Some(e(syscall::waitpid(pid as usize, &mut status, (options | sys_wait::WNOHANG) as usize)));
+                res = Some(e(syscall::waitpid(
+                    pid as usize, &mut status,
+                    (options | sys_wait::WNOHANG | sys_wait::WUNTRACED) as usize
+                )));
                 if res == Some(0) {
                     // WNOHANG, just pretend ptrace SIGSTOP:ped this
                     status = (syscall::SIGSTOP << 8) | 0x7f;
+                    assert!(syscall::wifstopped(status));
+                    assert_eq!(syscall::wstopsig(status), syscall::SIGSTOP);
                     res = Some(pid as usize);
                 }
             }
         }
 
-        // If ptrace didn't impact this waitpid, proceed as normal
-        let res = res.unwrap_or_else(|| e(syscall::waitpid(pid as usize, &mut status, options as usize)));
+        // If ptrace didn't impact this waitpid, proceed *almost* as
+        // normal: We still need to add WUNTRACED, but we only return
+        // it if (and only if) a ptrace traceme was activated during
+        // the wait.
+        let res = res.unwrap_or_else(|| loop {
+            let res = e(syscall::waitpid(pid as usize, &mut status, (options | sys_wait::WUNTRACED) as usize));
+
+            // TODO: Also handle special PIDs here
+            if !syscall::wifstopped(res) || ptrace::is_traceme(pid) {
+                break res;
+            }
+        });
 
         // If stat_loc is non-null, set that and the return
         unsafe {
