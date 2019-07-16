@@ -65,9 +65,7 @@ int main(void) {
         }
     }
     
-    /* TODO: uncomment once sprintf supports the "%.*g" format as used
-     * in gcvt's implementation. */
-    /* double value = 3.14;
+    double value = 3.14;
     int ndigit = 4;
     char *gcvt_buf = calloc(30, sizeof(char));
             
@@ -76,5 +74,5 @@ int main(void) {
     char *gcvt_return = gcvt(value, ndigit, gcvt_buf);
     
     printf(" buf: %s,", gcvt_buf);
-    printf(" returned: %s\n", gcvt_return); */
+    printf(" returned: %s\n", gcvt_return);
 }

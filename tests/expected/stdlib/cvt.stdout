@@ -586,3 +586,4 @@ fcvt (ndigit = 17): decpt: 0, sign: 1, returned: nan
 fcvt (ndigit = 18): decpt: 0, sign: 1, returned: nan
 fcvt (ndigit = 19): decpt: 0, sign: 1, returned: nan
 fcvt (ndigit = 100): decpt: 0, sign: 1, returned: nan
+gcvt (value = 3.140000, ndigit = 4): buf: 3.14, returned: 3.14
