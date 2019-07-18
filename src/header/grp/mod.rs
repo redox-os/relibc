@@ -1,6 +1,7 @@
 //! grp implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/grp.h.html
 
 use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 #[repr(C)]
 pub struct group {
@@ -55,6 +56,11 @@ pub extern "C" fn endgrent() {
 // #[no_mangle]
 pub extern "C" fn setgrent() {
     unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn setgroups(gidsetsize: c_int, grouplist: *mut gid_t) -> c_int {
+    Sys::setgroups(gidsetsize, grouplist)
 }
 
 /*

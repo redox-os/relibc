@@ -84,6 +84,8 @@ pub trait Pal {
 
     fn getgid() -> gid_t;
 
+    fn getgroups(gidsetsize: c_int, grouplist: *mut gid_t) -> c_int;
+
     fn getpgid(pid: pid_t) -> pid_t;
 
     fn getpid() -> pid_t;
@@ -134,6 +136,8 @@ pub trait Pal {
     fn rmdir(path: &CStr) -> c_int;
 
     fn sched_yield() -> c_int;
+
+    fn setgroups(gidsetsize: c_int, grouplist: *mut gid_t) -> c_int;
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> c_int;
 

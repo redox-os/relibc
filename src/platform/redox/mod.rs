@@ -544,6 +544,10 @@ impl Pal for Sys {
         e(syscall::getgid()) as gid_t
     }
 
+    fn getgroups(gidsetsize: c_int, grouplist: *mut gid_t) -> c_int {
+        unimplemented!()
+    }
+
     fn getpgid(pid: pid_t) -> pid_t {
         e(syscall::getpgid(pid as usize)) as pid_t
     }
@@ -801,6 +805,10 @@ impl Pal for Sys {
 
     fn sched_yield() -> c_int {
         e(syscall::sched_yield()) as c_int
+    }
+
+    fn setgroups(gidsetsize: c_int, grouplist: *mut gid_t) -> c_int {
+        unimplemented!()
     }
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {

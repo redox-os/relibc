@@ -297,9 +297,9 @@ pub extern "C" fn getgid() -> gid_t {
     Sys::getgid()
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn getgroups(gidsetsize: c_int, grouplist: *mut gid_t) -> c_int {
-    unimplemented!();
+    Sys::getgroups(gidsetsize, grouplist)
 }
 
 // #[no_mangle]
