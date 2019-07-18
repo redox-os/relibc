@@ -48,7 +48,7 @@ pub unsafe extern "C" fn _start() {
 
 #[naked]
 #[no_mangle]
-pub unsafe extern "C" fn main(argc: isize, argv: *const *const i8) -> usize {
+pub unsafe extern "C" fn main(_argc: isize, _argv: *const *const i8) -> usize {
     // LD
     0x1D
 }

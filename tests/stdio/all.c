@@ -21,7 +21,7 @@ int main(void) {
     ERROR_IF(fgets, s, == NULL);
     printf("%s\n", in);
 
-    int vb = setvbuf(stdout, 0, _IONBF, 0);
+    __attribute__((unused)) int vb = setvbuf(stdout, 0, _IONBF, 0);
     //ERROR_IF(setvbuf, vb, > 0); // TODO: Cannot use this, doesn't set errno
     //UNEXP_IF(setvbuf, vb, != 0);
 
