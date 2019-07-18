@@ -1,4 +1,4 @@
-sys_includes = ["stdint.h", "sys/types.h", "bits/signal.h"]
+sys_includes = ["stdint.h", "sys/types.h"]
 include_guard = "_SIGNAL_H"
 language = "C"
 style = "Tag"

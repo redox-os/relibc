@@ -5,8 +5,6 @@
 
 // Shamelessly copy pasted from musl:
 
-#define FLT_RADIX 2
-
 #define FLT_TRUE_MIN 1.40129846432481707092e-45F
 #define FLT_MIN 1.17549435082228750797e-38F
 #define FLT_MAX 3.40282346638528859812e+38F

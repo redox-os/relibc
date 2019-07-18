@@ -1,8 +1,6 @@
 #ifndef _BITS_LIMIT_H
 #define _BITS_LIMIT_H
 
-#define MB_LEN_MAX 4 // unicode
-
 #define CHAR_BIT __CHAR_BIT__
 #ifdef __CHAR_MAX__
 # define CHAR_MAX __CHAR_MAX__

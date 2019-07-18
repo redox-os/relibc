@@ -1,10 +1,6 @@
 #ifndef _BITS_FCNTL_H
 #define _BITS_FCNTL_H
 
-#if (defined(__redox__))
-#define O_NOFOLLOW 0x80000000
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
