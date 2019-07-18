@@ -404,8 +404,7 @@ unsafe fn inner_scanf<R: Read>(
                     let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
 
                     // While we haven't used up all the width, and it matches
-                    while width.map(|w| w > 0).unwrap_or(true) && !invert == matches.contains(&byte)
-                    {
+                    while width.map(|w| w > 0).unwrap_or(true) && !invert == matches.contains(&byte) {
                         if let Some(ref mut ptr) = ptr {
                             **ptr = byte as c_char;
                             *ptr = ptr.offset(1);

@@ -4,12 +4,13 @@ use alloc::boxed::Box;
 use core::{mem, ptr};
 
 use c_str::CStr;
+use c_vec::CVec;
 use fs::File;
 use header::{errno, fcntl, stdlib, string};
 use io::{Seek, SeekFrom};
-use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
+use platform;
 
 const DIR_BUF_SIZE: usize = mem::size_of::<dirent>() * 3;
 
@@ -134,15 +135,16 @@ pub unsafe extern "C" fn scandir(
         return -1;
     }
 
-    let old_errno = platform::errno;
+    let mut vec = match CVec::with_capacity(4) {
+        Ok(vec) => vec,
+        Err(err) => return -1
+    };
 
-    let mut len: isize = 0;
-    let mut cap: isize = 4;
-    *namelist = platform::alloc(cap as usize * mem::size_of::<*mut dirent>()) as *mut *mut dirent;
+    let old_errno = platform::errno;
+    platform::errno = 0;
 
     loop {
-        platform::errno = 0;
-        let entry = readdir(dir);
+        let entry: *mut dirent = readdir(dir);
         if entry.is_null() {
             break;
         }
@@ -153,30 +155,31 @@ pub unsafe extern "C" fn scandir(
             }
         }
 
-        if len >= cap {
-            cap *= 2;
-            *namelist = platform::realloc(
-                *namelist as *mut c_void,
-                cap as usize * mem::size_of::<*mut dirent>(),
-            ) as *mut *mut dirent;
-        }
-
         let copy = platform::alloc(mem::size_of::<dirent>()) as *mut dirent;
-        *copy = (*entry).clone();
-        *(*namelist).offset(len) = copy;
-        len += 1;
+        if copy.is_null() {
+            break;
+        }
+        ptr::write(copy, (*entry).clone());
+        if let Err(_) = vec.push(copy) {
+            break;
+        }
     }
 
     closedir(dir);
 
+    let len = vec.len();
+    if let Err(_) = vec.shrink_to_fit() {
+        return -1;
+    }
+
     if platform::errno != 0 {
-        while len > 0 {
-            len -= 1;
-            platform::free(*(*namelist).offset(len) as *mut c_void);
+        for ptr in &mut vec {
+            platform::free(*ptr as *mut c_void);
         }
-        platform::free(*namelist as *mut c_void);
         -1
     } else {
+        *namelist = vec.leak();
+
         platform::errno = old_errno;
         stdlib::qsort(
             *namelist as *mut c_void,
@@ -184,6 +187,7 @@ pub unsafe extern "C" fn scandir(
             mem::size_of::<*mut dirent>(),
             mem::transmute(compare),
         );
+
         len as c_int
     }
 }

@@ -54,10 +54,28 @@ int main(void) {
     char hostbuf[100];
     char pathbuf[100];
 
+    // don't push NUL, make sure scanf does that
+    memset(protobuf, 97, 16);
+    memset(slashbuf, 97, 4);
+    memset(hostbuf, 97, 100);
+    memset(pathbuf, 97, 100);
+
     int ret = sscanf(
         "https://redox-os.org", "%15[^\n/:]:%3[/]%[^\n/?#]%[^\n]",
         &protobuf, &slashbuf, &hostbuf, &pathbuf
     );
+    if (ret < 4) {
+        *pathbuf = 0;
+    }
+    if (ret < 3) {
+        *hostbuf = 0;
+    }
+    if (ret < 2) {
+        *slashbuf = 0;
+    }
+    if (ret < 1) {
+        *protobuf = 0;
+    }
 
     printf("%d \"%s\" \"%s\" \"%s\" \"%s\"\n", ret, &protobuf, &slashbuf, &hostbuf, &pathbuf);
 }
