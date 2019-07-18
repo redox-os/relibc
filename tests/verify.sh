@@ -26,8 +26,12 @@ do
             echo "# ${name}: ${output}: generated #"
             cat "gen/${name}.${output}"
 
-            echo "# ${name}: ${output}: diff #"
-            diff --color -u "expected/${name}.${output}" "gen/${name}.${output}"
+            # FIXME: Make diff available on Redox
+            if [ $(uname) != "Redox" ]
+            then
+                echo "# ${name}: ${output}: diff #"
+                diff --color -u "expected/${name}.${output}" "gen/${name}.${output}"
+            fi
 
             status="${status}, ${output} mismatch"
         fi
