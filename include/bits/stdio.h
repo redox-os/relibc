@@ -4,8 +4,6 @@
 // XXX: this is only here because cbindgen can't handle string constants
 #define P_tmpdir "/tmp"
 
-#define EOF (-1)
-
 typedef struct FILE FILE;
 
 #ifdef __cplusplus
