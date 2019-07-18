@@ -107,7 +107,8 @@ impl<T> CVec<T> {
     pub fn truncate(&mut self, len: usize) {
         if len < self.len {
             unsafe {
-                self.drop_range(len, self.len);
+                let old_len = self.len;
+                self.drop_range(len, old_len);
             }
             self.len = len;
         }
@@ -115,7 +116,8 @@ impl<T> CVec<T> {
     pub fn shrink_to_fit(&mut self) -> Result<(), AllocError> {
         if self.len < self.cap {
             unsafe {
-                self.resize(self.len)?;
+                let new_cap = self.len;
+                self.resize(new_cap)?;
             }
         }
         Ok(())
@@ -155,7 +157,8 @@ impl<T> DerefMut for CVec<T> {
 impl<T> Drop for CVec<T> {
     fn drop(&mut self) {
         unsafe {
-            self.drop_range(0, self.len);
+            let len = self.len;
+            self.drop_range(0, len);
         }
     }
 }

@@ -1,8 +1,10 @@
 //! wchar implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/wchar.h.html
 
 use core::ffi::VaList as va_list;
-use core::{mem, ptr, usize};
+use core::{char, mem, ptr, usize};
 
+use header::ctype::isspace;
+use header::errno::ERANGE;
 use header::stdio::*;
 use header::stdlib::MB_CUR_MAX;
 use header::string;
@@ -470,9 +472,52 @@ pub extern "C" fn wcsstr(ws1: *const wchar_t, ws2: *const wchar_t) -> *mut wchar
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn wcstod(nptr: *const wchar_t, endptr: *mut *mut wchar_t) -> f64 {
-    unimplemented!();
+macro_rules! skipws {
+    ($ptr:expr) => {
+        while isspace(*$ptr) != 0 {
+            $ptr = $ptr.add(1);
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wcstod(mut ptr: *const wchar_t, end: *mut *mut wchar_t) -> c_double {
+    const RADIX: u32 = 10;
+
+    skipws!(ptr);
+    let negative = *ptr == '-' as wchar_t;
+    if negative {
+        ptr = ptr.add(1);
+    }
+
+    let mut result: c_double = 0.0;
+    while let Some(digit) = char::from_u32(*ptr as _).and_then(|c| c.to_digit(RADIX)) {
+        result *= 10.0;
+        if negative {
+            result -= digit as c_double;
+        } else {
+            result += digit as c_double;
+        }
+        ptr = ptr.add(1);
+    }
+    if *ptr == '.' as wchar_t {
+        ptr = ptr.add(1);
+
+        let mut scale = 1.0;
+        while let Some(digit) = char::from_u32(*ptr as _).and_then(|c| c.to_digit(RADIX)) {
+            scale /= 10.0;
+            if negative {
+                result -= digit as c_double * scale;
+            } else {
+                result += digit as c_double * scale;
+            }
+            ptr = ptr.add(1);
+        }
+    }
+    if !end.is_null() {
+        *end = ptr as *mut _;
+    }
+    result
 }
 
 #[no_mangle]
@@ -510,14 +555,64 @@ pub unsafe extern "C" fn wcstok(
     wcs
 }
 
-// #[no_mangle]
-pub extern "C" fn wcstol(nptr: *const wchar_t, endptr: *mut *mut wchar_t, base: c_int) -> c_long {
-    unimplemented!();
+macro_rules! strtou_impl {
+    ($type:ident, $ptr:expr, $base:expr) => {
+        strtou_impl!($type, $ptr, $base, false)
+    };
+    ($type:ident, $ptr:expr, $base:expr, $negative:expr) => {{
+        if $base == 16 && *$ptr == '0' as wchar_t && *$ptr.add(1) | 0x20 == 'x' as wchar_t {
+            $ptr = $ptr.add(2);
+        }
+
+        let mut result: $type = 0;
+        while let Some(digit) = char::from_u32(*$ptr as u32).and_then(|c| c.to_digit($base as u32)) {
+            let new = result.checked_mul($base as $type)
+                .and_then(|result| if $negative {
+                    result.checked_sub(digit as $type)
+                } else {
+                    result.checked_add(digit as $type)
+                });
+            result = match new {
+                Some(new) => new,
+                None => {
+                    platform::errno = ERANGE;
+                    return !0;
+                }
+            };
+
+            $ptr = $ptr.add(1);
+        }
+        result
+    }}
+}
+macro_rules! strto_impl {
+    ($type:ident, $ptr:expr, $base:expr) => {{
+        let negative = *$ptr == '-' as wchar_t;
+        if negative {
+            $ptr = $ptr.add(1);
+        }
+        strtou_impl!($type, $ptr, $base, negative)
+    }}
 }
 
-// #[no_mangle]
-pub extern "C" fn wcstoul(nptr: *const wchar_t, endptr: *mut *mut wchar_t, base: c_int) -> c_ulong {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcstol(mut ptr: *const wchar_t, end: *mut *mut wchar_t, base: c_int) -> c_long {
+    skipws!(ptr);
+    let result = strto_impl!(c_long, ptr, base);
+    if !end.is_null() {
+        *end = ptr as *mut _;
+    }
+    result
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wcstoul(mut ptr: *const wchar_t, end: *mut *mut wchar_t, base: c_int) -> c_ulong {
+    skipws!(ptr);
+    let result = strtou_impl!(c_ulong, ptr, base);
+    if !end.is_null() {
+        *end = ptr as *mut _;
+    }
+    result
 }
 
 // #[no_mangle]

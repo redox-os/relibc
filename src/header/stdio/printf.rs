@@ -4,11 +4,12 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::ffi::VaList;
 use core::ops::Range;
-use core::{cmp, f64, fmt, slice};
+use core::{char, cmp, f64, fmt, slice};
 use io::{self, Write};
 
-use platform;
-use platform::types::*;
+use crate::header::errno::EILSEQ;
+use crate::platform::types::*;
+use crate::platform;
 
 //  ____        _ _                 _       _
 // | __ )  ___ (_) | ___ _ __ _ __ | | __ _| |_ ___ _
@@ -72,6 +73,7 @@ impl Number {
             VaArg::pointer(i) => i as usize,
             VaArg::ptrdiff_t(i) => i as usize,
             VaArg::ssize_t(i) => i as usize,
+            VaArg::wint_t(i) => i as usize,
         }
     }
 }
@@ -87,6 +89,7 @@ enum VaArg {
     pointer(*const c_void),
     ptrdiff_t(ptrdiff_t),
     ssize_t(ssize_t),
+    wint_t(wint_t),
 }
 impl VaArg {
     unsafe fn arg_from(fmtkind: FmtKind, intkind: IntKind, ap: &mut VaList) -> VaArg {
@@ -99,6 +102,9 @@ impl VaArg {
 
         match (fmtkind, intkind) {
             (FmtKind::Percent, _) => panic!("Can't call arg_from on %"),
+
+            (FmtKind::Char, IntKind::Long)
+            | (FmtKind::Char, IntKind::LongLong) => VaArg::wint_t(ap.arg::<wint_t>()),
 
             (FmtKind::Char, _)
             | (FmtKind::Unsigned, IntKind::Byte)
@@ -154,6 +160,7 @@ impl VaArg {
             pointer: *const c_void,
             ptrdiff_t: ptrdiff_t,
             ssize_t: ssize_t,
+            wint_t: wint_t,
         }
         let untyped = match *self {
             VaArg::c_char(i) => Untyped { c_char: i },
@@ -166,9 +173,13 @@ impl VaArg {
             VaArg::pointer(i) => Untyped { pointer: i },
             VaArg::ptrdiff_t(i) => Untyped { ptrdiff_t: i },
             VaArg::ssize_t(i) => Untyped { ssize_t: i },
+            VaArg::wint_t(i) => Untyped { wint_t: i },
         };
         match (fmtkind, intkind) {
             (FmtKind::Percent, _) => panic!("Can't call transmute on %"),
+
+            (FmtKind::Char, IntKind::Long)
+            | (FmtKind::Char, IntKind::LongLong) => VaArg::wint_t(untyped.wint_t),
 
             (FmtKind::Char, _)
             | (FmtKind::Unsigned, IntKind::Byte)
@@ -646,6 +657,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     VaArg::pointer(i) => (i as usize).to_string(),
                     VaArg::ptrdiff_t(i) => i.to_string(),
                     VaArg::ssize_t(i) => i.to_string(),
+                    VaArg::wint_t(_) => unreachable!("this should not be possible"),
                 };
                 let positive = !string.starts_with('-');
                 let zero = precision == Some(0) && string == "0";
@@ -693,6 +705,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     VaArg::pointer(i) => fmt_int(fmt, i as usize),
                     VaArg::ptrdiff_t(i) => fmt_int(fmt, i as size_t),
                     VaArg::ssize_t(i) => fmt_int(fmt, i as size_t),
+                    VaArg::wint_t(_) => unreachable!("this should not be possible"),
                 };
                 let zero = precision == Some(0) && string == "0";
 
@@ -785,8 +798,6 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 }
             }
             FmtKind::String => {
-                // if intkind == IntKind::Long || intkind == IntKind::LongLong, handle *const wchar_t
-
                 let ptr = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::pointer(p) => p,
                     _ => panic!("this should not be possible"),
@@ -796,27 +807,65 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     w.write_all(b"(null)")?;
                 } else {
                     let max = precision.unwrap_or(::core::usize::MAX);
-                    let mut len = 0;
-                    while *ptr.add(len) != 0 && len < max {
-                        len += 1;
-                    }
 
-                    pad(w, !left, b' ', len..pad_space)?;
-                    w.write_all(slice::from_raw_parts(ptr as *const u8, len))?;
-                    pad(w, left, b' ', len..pad_space)?;
+                    if intkind == IntKind::Long || intkind == IntKind::LongLong {
+                        // Handle wchar_t
+                        let mut ptr = ptr as *const wchar_t;
+                        let mut string = String::new();
+
+                        while *ptr != 0 {
+                            let c = match char::from_u32(*ptr as _) {
+                                Some(c) => c,
+                                None => {
+                                    platform::errno = EILSEQ;
+                                    return Err(io::last_os_error());
+                                }
+                            };
+                            if string.len() + c.len_utf8() >= max {
+                                break;
+                            }
+                            string.push(c);
+                            ptr = ptr.add(1);
+                        }
+
+                        pad(w, !left, b' ', string.len()..pad_space)?;
+                        w.write_all(string.as_bytes())?;
+                        pad(w, left, b' ', string.len()..pad_space)?;
+                    } else {
+                        let mut len = 0;
+                        while *ptr.add(len) != 0 && len < max {
+                            len += 1;
+                        }
+
+                        pad(w, !left, b' ', len..pad_space)?;
+                        w.write_all(slice::from_raw_parts(ptr as *const u8, len))?;
+                        pad(w, left, b' ', len..pad_space)?;
+                    }
                 }
             }
             FmtKind::Char => {
-                // if intkind == IntKind::Long || intkind == IntKind::LongLong, handle wint_t
+                match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
+                    VaArg::c_char(c) => {
+                        pad(w, !left, b' ', 1..pad_space)?;
+                        w.write_all(&[c as u8])?;
+                        pad(w, left, b' ', 1..pad_space)?;
+                    },
+                    VaArg::wint_t(c) => {
+                        let c = match char::from_u32(c as _) {
+                            Some(c) => c,
+                            None => {
+                                platform::errno = EILSEQ;
+                                return Err(io::last_os_error());
+                            }
+                        };
+                        let mut buf = [0; 4];
 
-                let c = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
-                    VaArg::c_char(c) => c,
-                    _ => panic!("this should not be possible"),
-                };
-
-                pad(w, !left, b' ', 1..pad_space)?;
-                w.write_all(&[c as u8])?;
-                pad(w, left, b' ', 1..pad_space)?;
+                        pad(w, !left, b' ', 1..pad_space)?;
+                        w.write_all(c.encode_utf8(&mut buf).as_bytes())?;
+                        pad(w, left, b' ', 1..pad_space)?;
+                    },
+                    _ => unreachable!("this should not be possible"),
+                }
             }
             FmtKind::Pointer => {
                 let ptr = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {

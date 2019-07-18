@@ -3,14 +3,8 @@ use core::ops::Deref;
 use header::fcntl::O_CREAT;
 use header::unistd::{SEEK_CUR, SEEK_END, SEEK_SET};
 use io;
-use platform;
 use platform::types::*;
 use platform::{Pal, Sys};
-
-fn last_os_error() -> io::Error {
-    let errno = unsafe { platform::errno };
-    io::Error::from_raw_os_error(errno)
-}
 
 pub struct File {
     pub fd: c_int,
@@ -29,35 +23,35 @@ impl File {
 
     pub fn open(path: &CStr, oflag: c_int) -> io::Result<Self> {
         match Sys::open(path, oflag, 0) {
-            -1 => Err(last_os_error()),
+            -1 => Err(io::last_os_error()),
             ok => Ok(Self::new(ok)),
         }
     }
 
     pub fn create(path: &CStr, oflag: c_int, mode: mode_t) -> io::Result<Self> {
         match Sys::open(path, oflag | O_CREAT, mode) {
-            -1 => Err(last_os_error()),
+            -1 => Err(io::last_os_error()),
             ok => Ok(Self::new(ok)),
         }
     }
 
     pub fn sync_all(&self) -> io::Result<()> {
         match Sys::fsync(self.fd) {
-            -1 => Err(last_os_error()),
+            -1 => Err(io::last_os_error()),
             _ok => Ok(()),
         }
     }
 
     pub fn set_len(&self, size: u64) -> io::Result<()> {
         match Sys::ftruncate(self.fd, size as off_t) {
-            -1 => Err(last_os_error()),
+            -1 => Err(io::last_os_error()),
             _ok => Ok(()),
         }
     }
 
     pub fn try_clone(&self) -> io::Result<Self> {
         match Sys::dup(self.fd) {
-            -1 => Err(last_os_error()),
+            -1 => Err(io::last_os_error()),
             ok => Ok(Self::new(ok)),
         }
     }
@@ -76,7 +70,7 @@ impl File {
 impl io::Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match Sys::read(self.fd, buf) {
-            -1 => Err(last_os_error()),
+            -1 => Err(io::last_os_error()),
             ok => Ok(ok as usize),
         }
     }
@@ -85,7 +79,7 @@ impl io::Read for File {
 impl io::Write for File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match Sys::write(self.fd, buf) {
-            -1 => Err(last_os_error()),
+            -1 => Err(io::last_os_error()),
             ok => Ok(ok as usize),
         }
     }
@@ -104,7 +98,7 @@ impl io::Seek for File {
         };
 
         match Sys::lseek(self.fd, offset, whence) {
-            -1 => Err(last_os_error()),
+            -1 => Err(io::last_os_error()),
             ok => Ok(ok as u64),
         }
     }

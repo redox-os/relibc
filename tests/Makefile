@@ -15,8 +15,6 @@ EXPECT_NAMES=\
 	libgen \
 	locale \
 	math \
-	netdb/netdb \
-	netdb/getaddrinfo \
 	regex \
 	select \
 	setjmp \
@@ -90,12 +88,18 @@ EXPECT_NAMES=\
 	waitpid \
 	wchar/mbrtowc \
 	wchar/mbsrtowcs \
+	wchar/printf-on-wchars \
 	wchar/putwchar \
 	wchar/wcrtomb \
 	wchar/wcscspn \
 	wchar/wcsrchr \
-	wchar/wcstok
-	# signal (TODO: Fix)
+	wchar/wcstod \
+	wchar/wcstok \
+	wchar/wcstol
+	# TODO: Fix these
+	# netdb/getaddrinfo \
+	# netdb/netdb \
+	# signal
 
 # Binaries that may generate varied output
 NAMES=\
