@@ -331,18 +331,18 @@ pub unsafe extern "C" fn wcscpy(ws1: *mut wchar_t, ws2: *const wchar_t) -> *mut 
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn wcscspn(ws1: *const wchar_t, ws2: *const wchar_t) -> size_t {
-    let mut i = 0;
-    loop {
-        let wc = *ws1.add(i);
-
-        if wc == 0 || wcschr(ws2, wc) != 0 as *mut wchar_t {
-            return i;
-        }
-
-        i += 1;
+unsafe fn inner_wcsspn(mut wcs: *const wchar_t, set: *const wchar_t, reject: bool) -> size_t {
+    let mut count = 0;
+    while (*wcs) != 0 && wcschr(set, *wcs).is_null() == reject {
+        wcs = wcs.add(1);
+        count += 1;
     }
+    count
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wcscspn(wcs: *const wchar_t, set: *const wchar_t) -> size_t {
+    inner_wcsspn(wcs, set, true)
 }
 
 // #[no_mangle]
@@ -423,9 +423,16 @@ pub unsafe extern "C" fn wcsncpy(
     ws1
 }
 
-// #[no_mangle]
-pub extern "C" fn wcspbrk(ws1: *const wchar_t, ws2: *const wchar_t) -> *mut wchar_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcspbrk(mut wcs: *const wchar_t, set: *const wchar_t) -> *mut wchar_t {
+    wcs = wcs.add(wcscspn(wcs, set));
+    if *wcs == 0 {
+        ptr::null_mut()
+    } else {
+        // Once again, C wants us to transmute a const pointer to a
+        // mutable one...
+        wcs as *mut _
+    }
 }
 
 #[no_mangle]
@@ -453,9 +460,9 @@ pub extern "C" fn wcsrtombs(
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn wcsspn(ws1: *const wchar_t, ws2: *const wchar_t) -> size_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcsspn(wcs: *const wchar_t, set: *const wchar_t) -> size_t {
+    inner_wcsspn(wcs, set, false)
 }
 
 // #[no_mangle]
@@ -468,13 +475,39 @@ pub extern "C" fn wcstod(nptr: *const wchar_t, endptr: *mut *mut wchar_t) -> f64
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn wcstok(
-    ws1: *mut wchar_t,
-    ws2: *const wchar_t,
-    ptr: *mut *mut wchar_t,
+#[no_mangle]
+pub unsafe extern "C" fn wcstok(
+    mut wcs: *mut wchar_t,
+    delim: *const wchar_t,
+    state: *mut *mut wchar_t,
 ) -> *mut wchar_t {
-    unimplemented!();
+    // Choose starting position
+    if wcs.is_null() {
+        if (*state).is_null() {
+            // There was no next token
+            return ptr::null_mut();
+        }
+        wcs = *state;
+    }
+
+    // Advance past any delimiters
+    wcs = wcs.add(wcsspn(wcs, delim));
+
+    // Check end
+    if *wcs == 0 {
+        *state = ptr::null_mut();
+        return ptr::null_mut();
+    }
+
+    // Advance *to* any delimiters
+    let end = wcspbrk(wcs, delim);
+    if end.is_null() {
+        *state = ptr::null_mut();
+    } else {
+        *end = 0;
+        *state = end.add(1);
+    }
+    wcs
 }
 
 // #[no_mangle]

@@ -93,7 +93,8 @@ EXPECT_NAMES=\
 	wchar/putwchar \
 	wchar/wcrtomb \
 	wchar/wcscspn \
-	wchar/wcsrchr
+	wchar/wcsrchr \
+	wchar/wcstok
 	# signal (TODO: Fix)
 
 # Binaries that may generate varied output
