@@ -11,7 +11,7 @@ use syscall::{self, Result};
 use c_str::{CStr, CString};
 use fs::File;
 use header::dirent::dirent;
-use header::errno::{EINVAL, EIO, EPERM};
+use header::errno::{EINVAL, EIO, EPERM, ERANGE};
 use header::fcntl;
 use header::sys_mman::MAP_ANON;
 use header::sys_stat::stat;
@@ -413,15 +413,28 @@ impl Pal for Sys {
     }
 
     fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
-        let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize - 1) };
-        let read = e(syscall::getcwd(buf_slice));
-        if read == !0 {
-            ptr::null_mut()
+        let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize) };
+        if ! buf_slice.is_empty() {
+            let nonnull_size = buf_slice.len() - 1;
+            let read = e(syscall::getcwd(&mut buf_slice[..nonnull_size]));
+            if read == !0 {
+                ptr::null_mut()
+            } else if read == nonnull_size {
+                unsafe {
+                    errno = ERANGE;
+                }
+                ptr::null_mut()
+            } else {
+                for b in &mut buf_slice[read..] {
+                    *b = 0;
+                }
+                buf
+            }
         } else {
             unsafe {
-                *buf.offset(read as isize + 1) = 0;
+                errno = EINVAL;
             }
-            buf
+            ptr::null_mut()
         }
     }
 
