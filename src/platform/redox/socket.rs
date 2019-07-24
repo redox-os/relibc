@@ -8,6 +8,7 @@ use super::{e, Sys};
 use header::netinet_in::{in_port_t, sockaddr_in};
 use header::sys_socket::constants::*;
 use header::sys_socket::{sockaddr, socklen_t};
+use header::sys_time::timeval;
 
 macro_rules! bind_or_connect {
     (bind $path:expr) => {
@@ -143,6 +144,14 @@ impl PalSocket for Sys {
         option_value: *mut c_void,
         option_len: *mut socklen_t,
     ) -> c_int {
+        eprintln!(
+            "getsockopt({}, {}, {}, {:p}, {:p})",
+            socket,
+            level,
+            option_name,
+            option_value,
+            option_len
+        );
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
     }
 
@@ -210,10 +219,60 @@ impl PalSocket for Sys {
         option_value: *const c_void,
         option_len: socklen_t,
     ) -> c_int {
+        let set_timeout = |timeout_name: &[u8]| -> c_int {
+            if option_value.is_null() {
+                return e(Err(syscall::Error::new(syscall::EFAULT))) as c_int;
+            }
+
+            if (option_len as usize) < mem::size_of::<timeval>() {
+                return e(Err(syscall::Error::new(syscall::EINVAL))) as c_int;
+            }
+
+            let timeval = unsafe { &*(option_value as *const timeval) };
+
+            let fd = e(syscall::dup(socket as usize, timeout_name));
+            if fd == !0 {
+                return -1;
+            }
+
+            let timespec = syscall::TimeSpec {
+                tv_sec: timeval.tv_sec,
+                tv_nsec: timeval.tv_usec * 1000,
+            };
+
+            let ret = Self::write(fd as c_int, &timespec);
+
+            let _ = syscall::close(fd);
+
+            if ret >= 0 { 0 } else { -1 }
+        };
+
+        match level {
+            SOL_SOCKET => match option_name {
+                SO_RCVTIMEO => return set_timeout(b"read_timeout"),
+                SO_SNDTIMEO => return set_timeout(b"write_timeout"),
+                _ => (),
+            },
+            _ => ()
+        }
+
+        eprintln!(
+            "setsockopt({}, {}, {}, {:p}, {})",
+            socket,
+            level,
+            option_name,
+            option_value,
+            option_len
+        );
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
     }
 
     fn shutdown(socket: c_int, how: c_int) -> c_int {
+        eprintln!(
+            "shutdown({}, {})",
+            socket,
+            how
+        );
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
     }
 
@@ -250,6 +309,13 @@ impl PalSocket for Sys {
     }
 
     fn socketpair(domain: c_int, kind: c_int, protocol: c_int, sv: &mut [c_int; 2]) -> c_int {
+        eprintln!(
+            "socketpair({}, {}, {}, {:p})",
+            domain,
+            kind,
+            protocol,
+            sv.as_mut_ptr()
+        );
         unsafe { errno = syscall::ENOSYS };
         return -1;
     }
