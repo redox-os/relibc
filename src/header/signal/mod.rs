@@ -21,7 +21,9 @@ pub mod sys;
 
 type SigSet = BitSet<[c_ulong; 1]>;
 
-const SIG_ERR: usize = !0;
+pub const SIG_DFL: usize = 0;
+pub const SIG_IGN: usize = 1;
+pub const SIG_ERR: usize = !0;
 
 pub const SIG_BLOCK: c_int = 0;
 pub const SIG_UNBLOCK: c_int = 1;

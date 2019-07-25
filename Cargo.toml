@@ -18,7 +18,7 @@ cc = "1.0.25"
 cbitset = "0.1.0"
 core_io = { path = "core_io", features = ["collections"] }
 lazy_static = { version = "1.2.0", features = ["nightly", "spin_no_std"] }
-memoffset = "0.4.0"
+memoffset = "0.5.1"
 posix-regex = { path = "posix-regex", features = ["no_std"] }
 rand = { version = "0.5.5", default-features = false }
 memchr = { version = "2.2.0", default-features = false }
