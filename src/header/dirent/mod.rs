@@ -3,14 +3,14 @@
 use alloc::boxed::Box;
 use core::{mem, ptr};
 
-use c_str::CStr;
-use c_vec::CVec;
-use fs::File;
-use header::{errno, fcntl, stdlib, string};
-use io::{Seek, SeekFrom};
-use platform::types::*;
-use platform::{Pal, Sys};
-use platform;
+use crate::c_str::CStr;
+use crate::c_vec::CVec;
+use crate::fs::File;
+use crate::header::{errno, fcntl, stdlib, string};
+use crate::io::{Seek, SeekFrom};
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
+use crate::platform;
 
 const DIR_BUF_SIZE: usize = mem::size_of::<dirent>() * 3;
 

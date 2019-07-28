@@ -1,6 +1,6 @@
 //! ctype implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/ctype.h.html
 
-use platform::types::*;
+use crate::platform::types::*;
 
 #[no_mangle]
 pub extern "C" fn isalnum(c: c_int) -> c_int {

@@ -8,8 +8,8 @@ use core::cell::UnsafeCell;
 use core::ops::Deref;
 use core::sync::atomic;
 use core::sync::atomic::AtomicI32 as AtomicInt;
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 const FUTEX_WAIT: c_int = 0;
 const FUTEX_WAKE: c_int = 1;

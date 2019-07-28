@@ -3,14 +3,14 @@
 use core::ffi::VaList as va_list;
 use core::{char, mem, ptr, usize};
 
-use header::ctype::isspace;
-use header::errno::ERANGE;
-use header::stdio::*;
-use header::stdlib::MB_CUR_MAX;
-use header::string;
-use header::time::*;
-use platform;
-use platform::types::*;
+use crate::header::ctype::isspace;
+use crate::header::errno::ERANGE;
+use crate::header::stdio::*;
+use crate::header::stdlib::MB_CUR_MAX;
+use crate::header::string;
+use crate::header::time::*;
+use crate::platform;
+use crate::platform::types::*;
 
 mod utf8;
 

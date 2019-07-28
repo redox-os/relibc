@@ -1,4 +1,4 @@
-use platform::types::*;
+use crate::platform::types::*;
 
 pub const PROT_NONE: c_int = 0x0000;
 pub const PROT_EXEC: c_int = 0x0001;

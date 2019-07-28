@@ -3,13 +3,13 @@ use super::super::{Pal, PalEpoll};
 use super::Sys;
 
 use core::{mem, slice};
-use fs::File;
-use header::errno::*;
-use header::fcntl::*;
-use header::signal::sigset_t;
-use header::sys_epoll::*;
-use io::prelude::*;
-use platform;
+use crate::fs::File;
+use crate::header::errno::*;
+use crate::header::fcntl::*;
+use crate::header::signal::sigset_t;
+use crate::header::sys_epoll::*;
+use crate::io::prelude::*;
+use crate::platform;
 use syscall::data::{Event, TimeSpec};
 use syscall::flag::EVENT_READ;
 

@@ -5,10 +5,10 @@ use syscall::{self, Result};
 use super::super::types::*;
 use super::super::{errno, Pal, PalSocket};
 use super::{e, Sys};
-use header::netinet_in::{in_port_t, sockaddr_in};
-use header::sys_socket::constants::*;
-use header::sys_socket::{sockaddr, socklen_t};
-use header::sys_time::timeval;
+use crate::header::netinet_in::{in_port_t, sockaddr_in};
+use crate::header::sys_socket::constants::*;
+use crate::header::sys_socket::{sockaddr, socklen_t};
+use crate::header::sys_time::timeval;
 
 macro_rules! bind_or_connect {
     (bind $path:expr) => {

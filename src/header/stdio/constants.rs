@@ -1,4 +1,4 @@
-use platform::types::*;
+use crate::platform::types::*;
 
 pub const EOF: c_int = -1;
 pub const BUFSIZ: c_int = 1024;

@@ -3,13 +3,13 @@
 use core::str::FromStr;
 use core::{ptr, slice, str};
 
-use c_str::CStr;
-use header::errno::*;
-use header::netinet_in::{in_addr, in_addr_t, INADDR_NONE};
-use header::sys_socket::constants::*;
-use header::sys_socket::socklen_t;
-use platform;
-use platform::types::*;
+use crate::c_str::CStr;
+use crate::header::errno::*;
+use crate::header::netinet_in::{in_addr, in_addr_t, INADDR_NONE};
+use crate::header::sys_socket::constants::*;
+use crate::header::sys_socket::socklen_t;
+use crate::platform;
+use crate::platform::types::*;
 
 #[no_mangle]
 pub extern "C" fn htonl(hostlong: u32) -> u32 {

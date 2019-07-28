@@ -6,21 +6,21 @@ use syscall::data::StatVfs as redox_statvfs;
 use syscall::data::TimeSpec as redox_timespec;
 use syscall::{self, Result};
 
-use c_str::{CStr, CString};
-use fs::File;
-use header::dirent::dirent;
-use header::errno::{EINVAL, EIO, EPERM, ERANGE};
-use header::fcntl;
-use header::sys_mman::MAP_ANON;
-use header::sys_stat::stat;
-use header::sys_statvfs::statvfs;
-use header::sys_time::{timeval, timezone};
-use header::sys_wait;
-use header::sys_utsname::{utsname, UTSLENGTH};
-use header::time::timespec;
-use header::unistd::{F_OK, R_OK, W_OK, X_OK};
-use io::prelude::*;
-use io::{self, BufReader, SeekFrom};
+use crate::c_str::{CStr, CString};
+use crate::fs::File;
+use crate::header::dirent::dirent;
+use crate::header::errno::{EINVAL, EIO, EPERM, ERANGE};
+use crate::header::fcntl;
+use crate::header::sys_mman::MAP_ANON;
+use crate::header::sys_stat::stat;
+use crate::header::sys_statvfs::statvfs;
+use crate::header::sys_time::{timeval, timezone};
+use crate::header::sys_wait;
+use crate::header::sys_utsname::{utsname, UTSLENGTH};
+use crate::header::time::timespec;
+use crate::header::unistd::{F_OK, R_OK, W_OK, X_OK};
+use crate::io::prelude::*;
+use crate::io::{self, BufReader, SeekFrom};
 
 use super::types::*;
 use super::{errno, Pal, Read};
@@ -230,7 +230,7 @@ impl Pal for Sys {
         };
         let mut _interpreter_path = None;
         if let Some(interpreter) = interpreter {
-            let mut cstring = match CString::new(interpreter) {
+            let cstring = match CString::new(interpreter) {
                 Ok(cstring) => cstring,
                 Err(_) => return -1,
             };

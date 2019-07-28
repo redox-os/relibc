@@ -1,11 +1,11 @@
 use alloc::vec::Vec;
 use core::{intrinsics, ptr};
 
-use header::{stdio, stdlib};
-use ld_so;
-use platform;
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::header::{stdio, stdlib};
+use crate::ld_so;
+use crate::platform;
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 #[repr(C)]
 pub struct Stack {

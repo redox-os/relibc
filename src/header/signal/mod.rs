@@ -4,10 +4,10 @@ use core::{mem, ptr};
 
 use cbitset::BitSet;
 
-use header::errno;
-use platform;
-use platform::types::*;
-use platform::{PalSignal, Sys};
+use crate::header::errno;
+use crate::platform;
+use crate::platform::types::*;
+use crate::platform::{PalSignal, Sys};
 
 pub use self::sys::*;
 

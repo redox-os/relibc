@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use core::{fmt, ptr};
-use io::{self, Read, Write};
+use crate::io::{self, Read, Write};
 
 pub use self::allocator::*;
 

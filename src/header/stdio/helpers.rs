@@ -1,13 +1,13 @@
 use alloc::boxed::Box;
 
-use fs::File;
-use header::errno;
-use header::fcntl::*;
-use header::string::strchr;
-use io::LineWriter;
-use platform;
-use platform::types::*;
-use sync::Mutex;
+use crate::fs::File;
+use crate::header::errno;
+use crate::header::fcntl::*;
+use crate::header::string::strchr;
+use crate::io::LineWriter;
+use crate::platform;
+use crate::platform::types::*;
+use crate::sync::Mutex;
 
 use super::constants::*;
 use super::{Buffer, FILE};

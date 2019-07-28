@@ -6,11 +6,11 @@ use core::{mem, ptr, slice};
 use goblin::elf::{program_header, reloc, sym, Elf};
 use goblin::error::{Error, Result};
 
-use c_str::CString;
-use fs::File;
-use header::{fcntl, sys_mman, unistd};
-use io::Read;
-use platform::types::c_void;
+use crate::c_str::CString;
+use crate::fs::File;
+use crate::header::{fcntl, sys_mman, unistd};
+use crate::io::Read;
+use crate::platform::types::c_void;
 
 use super::tcb::{Master, Tcb};
 use super::PAGE_SIZE;

@@ -3,8 +3,8 @@ use core::mem;
 use super::super::types::*;
 use super::super::PalSignal;
 use super::{e, Sys};
-use header::signal::{sigaction, sigset_t, stack_t};
-use header::sys_time::itimerval;
+use crate::header::signal::{sigaction, sigset_t, stack_t};
+use crate::header::sys_time::itimerval;
 
 impl PalSignal for Sys {
     fn getitimer(which: c_int, out: *mut itimerval) -> c_int {

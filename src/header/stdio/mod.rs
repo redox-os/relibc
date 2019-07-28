@@ -8,17 +8,17 @@ use core::fmt::Write as WriteFmt;
 use core::ops::{Deref, DerefMut};
 use core::{fmt, mem, ptr, slice, str};
 
-use c_str::CStr;
-use fs::File;
-use header::errno::{self, STR_ERROR};
-use header::string::{self, strlen};
-use header::{fcntl, stdlib, unistd};
-use io::{self, BufRead, LineWriter, Read, Write};
-use platform;
-use platform::types::*;
-use platform::{errno, WriteByte};
-use platform::{Pal, Sys};
-use sync::Mutex;
+use crate::c_str::CStr;
+use crate::fs::File;
+use crate::header::errno::{self, STR_ERROR};
+use crate::header::string::{self, strlen};
+use crate::header::{fcntl, stdlib, unistd};
+use crate::io::{self, BufRead, LineWriter, Read, Write};
+use crate::platform;
+use crate::platform::types::*;
+use crate::platform::{errno, WriteByte};
+use crate::platform::{Pal, Sys};
+use crate::sync::Mutex;
 
 pub use self::constants::*;
 mod constants;

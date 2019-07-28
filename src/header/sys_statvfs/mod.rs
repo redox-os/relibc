@@ -1,9 +1,9 @@
 //! statvfs implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysstatvfs.h.html
 
-use c_str::CStr;
-use header::fcntl::O_PATH;
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::c_str::CStr;
+use crate::header::fcntl::O_PATH;
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 //pub const ST_RDONLY
 //pub const ST_NOSUID

@@ -4,10 +4,10 @@ use core::{mem, ptr, slice, usize};
 
 use cbitset::BitSet256;
 
-use header::errno::*;
-use header::signal;
-use platform;
-use platform::types::*;
+use crate::header::errno::*;
+use crate::header::signal;
+use crate::platform;
+use crate::platform::types::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn memccpy(

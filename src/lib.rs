@@ -64,7 +64,7 @@ pub mod platform;
 pub mod start;
 pub mod sync;
 
-use platform::{Allocator, Pal, Sys};
+use crate::platform::{Allocator, Pal, Sys};
 
 #[global_allocator]
 static ALLOCATOR: Allocator = Allocator;

@@ -1,4 +1,4 @@
-use platform::types::*;
+use crate::platform::types::*;
 
 pub use self::sys::*;
 

@@ -1,9 +1,9 @@
 //! getopt implementation for relibc
 
 use core::ptr;
-use header::unistd::{optarg, opterr, optind, optopt};
-use header::{stdio, string};
-use platform::types::*;
+use crate::header::unistd::{optarg, opterr, optind, optopt};
+use crate::header::{stdio, string};
+use crate::platform::types::*;
 
 static mut CURRENT_OPT: *mut c_char = ptr::null_mut();
 

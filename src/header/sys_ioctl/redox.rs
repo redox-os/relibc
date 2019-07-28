@@ -1,11 +1,11 @@
 use core::{mem, slice};
 use syscall;
 
-use header::errno;
-use header::termios;
-use platform;
-use platform::e;
-use platform::types::*;
+use crate::header::errno;
+use crate::header::termios;
+use crate::platform;
+use crate::platform::e;
+use crate::platform::types::*;
 
 use super::winsize;
 

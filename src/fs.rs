@@ -1,10 +1,10 @@
-use c_str::CStr;
+use crate::c_str::CStr;
 use core::ops::Deref;
-use header::fcntl::O_CREAT;
-use header::unistd::{SEEK_CUR, SEEK_END, SEEK_SET};
-use io;
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::header::fcntl::O_CREAT;
+use crate::header::unistd::{SEEK_CUR, SEEK_END, SEEK_SET};
+use crate::io;
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 pub struct File {
     pub fd: c_int,

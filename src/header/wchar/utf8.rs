@@ -3,9 +3,9 @@
 
 use core::{char, slice, str, usize};
 
-use header::errno;
-use platform;
-use platform::types::*;
+use crate::header::errno;
+use crate::platform;
+use crate::platform::types::*;
 
 use super::mbstate_t;
 

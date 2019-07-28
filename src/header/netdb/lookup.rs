@@ -3,17 +3,17 @@ use alloc::string::{String, ToString};
 use alloc::vec::{IntoIter, Vec};
 use core::mem;
 
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
-use header::arpa_inet::htons;
-use header::errno::*;
-use header::netinet_in::{in_addr, sockaddr_in, IPPROTO_UDP};
-use header::sys_socket;
-use header::sys_socket::constants::{AF_INET, SOCK_DGRAM};
-use header::sys_socket::{sockaddr, socklen_t};
-use header::time;
-use header::time::timespec;
+use crate::header::arpa_inet::htons;
+use crate::header::errno::*;
+use crate::header::netinet_in::{in_addr, sockaddr_in, IPPROTO_UDP};
+use crate::header::sys_socket;
+use crate::header::sys_socket::constants::{AF_INET, SOCK_DGRAM};
+use crate::header::sys_socket::{sockaddr, socklen_t};
+use crate::header::time;
+use crate::header::time::timespec;
 
 use super::dns::{Dns, DnsQuery};
 use super::sys::get_dns_server;

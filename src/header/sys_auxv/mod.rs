@@ -1,6 +1,6 @@
 //! sys/auxv.h implementation
 
-use platform::types::*;
+use crate::platform::types::*;
 
 pub const AT_HWCAP: usize = 16;
 

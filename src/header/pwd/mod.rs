@@ -2,11 +2,11 @@
 
 use core::ptr;
 
-use fs::File;
-use header::{errno, fcntl};
-use io::{BufRead, BufReader};
-use platform;
-use platform::types::*;
+use crate::fs::File;
+use crate::header::{errno, fcntl};
+use crate::io::{BufRead, BufReader};
+use crate::platform;
+use crate::platform::types::*;
 
 #[cfg(target_os = "linux")]
 mod linux;

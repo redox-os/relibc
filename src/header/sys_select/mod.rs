@@ -4,13 +4,13 @@ use core::mem;
 
 use cbitset::BitSet;
 
-use fs::File;
-use header::errno;
-use header::sys_epoll::{epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR,
+use crate::fs::File;
+use crate::header::errno;
+use crate::header::sys_epoll::{epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR,
                         EPOLLIN, EPOLLOUT, EPOLL_CLOEXEC, EPOLL_CTL_ADD};
-use header::sys_time::timeval;
-use platform;
-use platform::types::*;
+use crate::header::sys_time::timeval;
+use crate::platform;
+use crate::platform::types::*;
 
 // fd_set is also defined in C because cbindgen is incompatible with mem::size_of booo
 

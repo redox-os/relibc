@@ -1,6 +1,6 @@
 //! Helper functions for pseudorandom number generation using LCG, see https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/functions/drand48.html
 
-use platform::types::*;
+use crate::platform::types::*;
 
 /* The default element buffer for the linear congruential generator's
  * sequence. Implemented using a c_ushort array for consistency between

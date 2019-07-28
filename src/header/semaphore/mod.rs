@@ -1,4 +1,4 @@
-use platform::types::*;
+use crate::platform::types::*;
 
 #[repr(C)]
 #[derive(Copy)]

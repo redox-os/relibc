@@ -1,4 +1,4 @@
-use platform::types::*;
+use crate::platform::types::*;
 
 // TODO: Implement cxa_finalize and uncomment this
 

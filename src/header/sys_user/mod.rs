@@ -1,6 +1,6 @@
 //! A part of the ptrace compatibility for Redox OS
 
-use platform::types::*;
+use crate::platform::types::*;
 
 #[repr(C)]
 pub struct user_fpregs_struct {

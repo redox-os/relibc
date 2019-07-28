@@ -1,9 +1,9 @@
 use alloc::vec::Vec;
 
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
-use header::unistd::{lseek, SEEK_SET};
+use crate::header::unistd::{lseek, SEEK_SET};
 /// Implements an `Iterator` which returns on either newline or EOF.
 #[derive(Clone)]
 pub struct RawLineBuffer {

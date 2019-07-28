@@ -1,4 +1,4 @@
-use platform::types::*;
+use crate::platform::types::*;
 
 pub fn introsort(
     base: *mut c_char,

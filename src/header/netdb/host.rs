@@ -3,15 +3,15 @@ use alloc::str::SplitWhitespace;
 use alloc::vec::Vec;
 use core::{mem, ptr};
 
-use c_str::CString;
-use header::arpa_inet::inet_aton;
-use header::fcntl::O_RDONLY;
-use header::netinet_in::in_addr;
-use header::sys_socket::constants::AF_INET;
-use header::unistd::SEEK_SET;
-use platform::rlb::{Line, RawLineBuffer};
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::c_str::CString;
+use crate::header::arpa_inet::inet_aton;
+use crate::header::fcntl::O_RDONLY;
+use crate::header::netinet_in::in_addr;
+use crate::header::sys_socket::constants::AF_INET;
+use crate::header::unistd::SEEK_SET;
+use crate::platform::rlb::{Line, RawLineBuffer};
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 use super::{bytes_to_box_str, hostent};
 

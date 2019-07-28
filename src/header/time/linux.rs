@@ -1,4 +1,4 @@
-use platform::types::*;
+use crate::platform::types::*;
 
 pub const CLOCK_REALTIME: c_int = 0;
 pub const CLOCK_MONOTONIC: c_int = 1;

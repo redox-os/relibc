@@ -1,9 +1,9 @@
 //! termios implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/termios.h.html
 
-use header::errno;
-use header::sys_ioctl;
-use platform;
-use platform::types::*;
+use crate::header::errno;
+use crate::header::sys_ioctl;
+use crate::platform;
+use crate::platform::types::*;
 
 pub type cc_t = u8;
 pub type speed_t = u32;

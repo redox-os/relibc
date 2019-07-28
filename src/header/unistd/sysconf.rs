@@ -1,6 +1,6 @@
-use header::errno;
-use platform;
-use platform::types::*;
+use crate::header::errno;
+use crate::platform;
+use crate::platform::types::*;
 
 // POSIX.1 {
 pub const _SC_ARG_MAX: c_int = 0;

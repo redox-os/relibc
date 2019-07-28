@@ -1,8 +1,8 @@
 // Start code adapted from https://gitlab.redox-os.org/redox-os/relibc/blob/master/src/start.rs
 
-use c_str::CStr;
-use header::unistd;
-use platform::types::c_char;
+use crate::c_str::CStr;
+use crate::header::unistd;
+use crate::platform::types::c_char;
 
 use super::linker::Linker;
 use crate::start::Stack;

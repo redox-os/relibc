@@ -5,12 +5,12 @@ use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicU32, Ordering};
 use core::{intrinsics, ptr};
 
-use header::sys_mman;
-use header::time::timespec;
-use ld_so::tcb::{Master, Tcb};
-use platform::types::{c_int, c_uint, c_void, pid_t, size_t};
-use platform::{Pal, Sys};
-use sync::Mutex;
+use crate::header::sys_mman;
+use crate::header::time::timespec;
+use crate::ld_so::tcb::{Master, Tcb};
+use crate::platform::types::{c_int, c_uint, c_void, pid_t, size_t};
+use crate::platform::{Pal, Sys};
+use crate::sync::Mutex;
 
 pub struct Semaphore {
     lock: Mutex<()>,

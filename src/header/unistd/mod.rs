@@ -4,17 +4,17 @@ use core::convert::TryFrom;
 use core::{mem, ptr, slice};
 
 use alloc::collections::LinkedList;
-use c_str::CStr;
-use header::errno;
-use header::limits;
-use header::stdlib::getenv;
-use header::sys_ioctl;
-use header::sys_time;
-use header::termios;
-use header::time::timespec;
-use platform;
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::c_str::CStr;
+use crate::header::errno;
+use crate::header::limits;
+use crate::header::stdlib::getenv;
+use crate::header::sys_ioctl;
+use crate::header::sys_time;
+use crate::header::termios;
+use crate::header::time::timespec;
+use crate::platform;
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 pub use self::brk::*;
 pub use self::getopt::*;

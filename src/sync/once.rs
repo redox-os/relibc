@@ -2,7 +2,7 @@ use super::{AtomicLock, AttemptStatus};
 use core::cell::UnsafeCell;
 use core::mem::MaybeUninit;
 use core::sync::atomic::Ordering::SeqCst;
-use platform::types::*;
+use crate::platform::types::*;
 
 const UNINITIALIZED: c_int = 0;
 const INITIALIZING: c_int = 1;

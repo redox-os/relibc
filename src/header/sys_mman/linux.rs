@@ -1,4 +1,4 @@
-use platform::types::*;
+use crate::platform::types::*;
 
 pub const PROT_READ: c_int = 0x0001;
 pub const PROT_WRITE: c_int = 0x0002;

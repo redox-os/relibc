@@ -1,9 +1,9 @@
 //! time implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/time.h.html
 
-use header::errno::EIO;
-use platform;
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::header::errno::EIO;
+use crate::platform;
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 use self::constants::*;
 

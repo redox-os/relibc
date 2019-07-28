@@ -1,8 +1,8 @@
-use header::ctype;
-use header::errno::*;
-use header::stdlib::*;
-use platform;
-use platform::types::*;
+use crate::header::ctype;
+use crate::header::errno::*;
+use crate::header::stdlib::*;
+use crate::platform;
+use crate::platform::types::*;
 
 #[no_mangle]
 pub extern "C" fn imaxabs(i: intmax_t) -> intmax_t {

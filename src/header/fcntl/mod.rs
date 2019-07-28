@@ -1,8 +1,8 @@
 //! fcntl implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/fcntl.h.html
 
-use c_str::CStr;
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::c_str::CStr;
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 pub use self::sys::*;
 

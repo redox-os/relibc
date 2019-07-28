@@ -3,8 +3,8 @@
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::{ptr, str};
 
-use c_str::CStr;
-use platform::types::*;
+use crate::c_str::CStr;
+use crate::platform::types::*;
 
 pub const RTLD_LAZY: c_int = 0x0001;
 pub const RTLD_NOW: c_int = 0x0002;

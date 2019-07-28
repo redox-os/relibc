@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::ffi::VaList;
 use core::ops::Range;
 use core::{char, cmp, f64, fmt, slice};
-use io::{self, Write};
+use crate::io::{self, Write};
 
 use crate::header::errno::EILSEQ;
 use crate::platform::types::*;

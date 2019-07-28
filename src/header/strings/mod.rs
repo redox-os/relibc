@@ -2,8 +2,8 @@
 
 use core::ptr;
 
-use header::{ctype, string};
-use platform::types::*;
+use crate::header::{ctype, string};
+use crate::platform::types::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn bcmp(first: *const c_void, second: *const c_void, n: size_t) -> c_int {

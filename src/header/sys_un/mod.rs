@@ -1,5 +1,5 @@
-use header::sys_socket::sa_family_t;
-use platform::types::*;
+use crate::header::sys_socket::sa_family_t;
+use crate::platform::types::*;
 
 #[repr(C)]
 pub struct sockaddr_un {

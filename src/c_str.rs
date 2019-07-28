@@ -23,11 +23,11 @@ use core::ptr;
 use core::slice;
 use core::str::{self, Utf8Error};
 
-use header::string::strlen;
-use platform::types::*;
+use crate::header::string::strlen;
+use crate::platform::types::*;
 
 pub fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
-    use header::string;
+    use crate::header::string;
 
     let p = unsafe {
         string::memchr(

@@ -4,7 +4,7 @@ use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use core::slice;
 
-use platform::types::*;
+use crate::platform::types::*;
 use posix_regex::compile::{Collation, Range, Token};
 use posix_regex::PosixRegex;
 

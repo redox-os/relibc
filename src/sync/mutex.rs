@@ -2,7 +2,7 @@ use super::{AtomicLock, AttemptStatus};
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::Ordering::SeqCst;
-use platform::types::*;
+use crate::platform::types::*;
 
 const UNLOCKED: c_int = 0;
 const LOCKED: c_int = 1;

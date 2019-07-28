@@ -1,7 +1,7 @@
 use core::{ptr, slice};
 
-use platform::sys::e;
-use platform::types::*;
+use crate::platform::sys::e;
+use crate::platform::types::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_fpath(fd: c_int, buf: *mut c_void, count: size_t) -> ssize_t {

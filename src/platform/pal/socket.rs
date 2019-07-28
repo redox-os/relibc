@@ -1,6 +1,6 @@
 use super::super::types::*;
 use super::super::Pal;
-use header::sys_socket::{sockaddr, socklen_t};
+use crate::header::sys_socket::{sockaddr, socklen_t};
 
 pub trait PalSocket: Pal {
     unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int;

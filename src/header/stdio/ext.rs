@@ -1,5 +1,5 @@
-use header::stdio::{FILE, F_NORD, F_NOWR};
-use platform::types::*;
+use crate::header::stdio::{FILE, F_NORD, F_NOWR};
+use crate::platform::types::*;
 
 #[no_mangle]
 pub extern "C" fn __fpending(stream: *mut FILE) -> size_t {

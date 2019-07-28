@@ -3,8 +3,8 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use core::{mem, ptr, slice};
-use header::string::strlen;
-use platform::types::*;
+use crate::header::string::strlen;
+use crate::platform::types::*;
 use posix_regex::compile::{Error as CompileError, Range, Token};
 use posix_regex::{PosixRegex, PosixRegexBuilder};
 

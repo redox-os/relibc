@@ -1,5 +1,5 @@
-use platform::types::*;
-use platform::Sys;
+use crate::platform::types::*;
+use crate::platform::Sys;
 
 #[no_mangle]
 pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {

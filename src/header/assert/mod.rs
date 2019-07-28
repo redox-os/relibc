@@ -1,9 +1,9 @@
 //! assert implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/assert.h.html
 
-use c_str::CStr;
+use crate::c_str::CStr;
 use core::fmt::Write;
-use header::{stdio, stdlib};
-use platform::types::*;
+use crate::header::{stdio, stdlib};
+use crate::platform::types::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn __assert_fail(

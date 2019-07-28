@@ -1,7 +1,7 @@
 //! sys/utsname implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysutsname.h.html
 
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 pub const UTSLENGTH: usize = 65;
 

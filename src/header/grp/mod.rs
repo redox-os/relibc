@@ -1,6 +1,6 @@
 //! grp implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/grp.h.html
 
-use platform::types::*;
+use crate::platform::types::*;
 
 #[repr(C)]
 pub struct group {

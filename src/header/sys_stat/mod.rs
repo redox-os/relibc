@@ -1,10 +1,10 @@
 //! stat implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysstat.h.html
 
-use c_str::CStr;
-use header::fcntl::{O_NOFOLLOW, O_PATH};
-use header::time::timespec;
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::c_str::CStr;
+use crate::header::fcntl::{O_NOFOLLOW, O_PATH};
+use crate::header::time::timespec;
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 pub const S_IFMT: c_int = 0o0_170_000;
 

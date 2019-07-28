@@ -1,8 +1,8 @@
 //! libgen implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/libgen.h.html
 
-use platform::types::c_char;
+use crate::platform::types::c_char;
 
-use header::string::strlen;
+use crate::header::string::strlen;
 
 #[no_mangle]
 pub unsafe extern "C" fn basename(str: *mut c_char) -> *mut c_char {

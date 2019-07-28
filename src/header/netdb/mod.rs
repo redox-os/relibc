@@ -10,20 +10,20 @@ use alloc::boxed::Box;
 use alloc::str::SplitWhitespace;
 use alloc::vec::Vec;
 
-use c_str::{CStr, CString};
-use header::arpa_inet::htons;
-use header::errno::*;
-use header::fcntl::O_RDONLY;
-use header::netinet_in::{in_addr, sockaddr_in, sockaddr_in6};
-use header::stdlib::atoi;
-use header::strings::strcasecmp;
-use header::sys_socket::constants::AF_INET;
-use header::sys_socket::{sa_family_t, sockaddr, socklen_t};
-use header::unistd::SEEK_SET;
-use platform;
-use platform::rlb::{Line, RawLineBuffer};
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::c_str::{CStr, CString};
+use crate::header::arpa_inet::htons;
+use crate::header::errno::*;
+use crate::header::fcntl::O_RDONLY;
+use crate::header::netinet_in::{in_addr, sockaddr_in, sockaddr_in6};
+use crate::header::stdlib::atoi;
+use crate::header::strings::strcasecmp;
+use crate::header::sys_socket::constants::AF_INET;
+use crate::header::sys_socket::{sa_family_t, sockaddr, socklen_t};
+use crate::header::unistd::SEEK_SET;
+use crate::platform;
+use crate::platform::rlb::{Line, RawLineBuffer};
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]

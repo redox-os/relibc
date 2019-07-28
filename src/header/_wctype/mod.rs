@@ -1,6 +1,6 @@
 //! wctype implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/wctype.h.html
 
-use platform::types::*;
+use crate::platform::types::*;
 
 // #[no_mangle]
 pub extern "C" fn iswalnum(wc: wint_t) -> c_int {

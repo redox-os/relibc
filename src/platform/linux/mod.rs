@@ -3,16 +3,16 @@ use core_io::Write;
 
 use super::types::*;
 use super::{errno, Pal};
-use c_str::CStr;
-use header::dirent::dirent;
-use header::signal::SIGCHLD;
+use crate::c_str::CStr;
+use crate::header::dirent::dirent;
+use crate::header::signal::SIGCHLD;
 // use header::sys_resource::rusage;
-use header::sys_stat::stat;
-use header::sys_statvfs::statvfs;
-use header::sys_time::{timeval, timezone};
+use crate::header::sys_stat::stat;
+use crate::header::sys_statvfs::statvfs;
+use crate::header::sys_time::{timeval, timezone};
 // use header::sys_times::tms;
-use header::sys_utsname::utsname;
-use header::time::timespec;
+use crate::header::sys_utsname::utsname;
+use crate::header::time::timespec;
 
 mod epoll;
 mod ptrace;

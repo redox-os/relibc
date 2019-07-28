@@ -1,9 +1,9 @@
 //! utime implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/utime.h.html
 
-use c_str::CStr;
-use header::time::timespec;
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::c_str::CStr;
+use crate::header::time::timespec;
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 #[repr(C)]
 #[derive(Clone)]

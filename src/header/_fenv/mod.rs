@@ -1,7 +1,7 @@
 //! fenv.h implementation for Redox, following
 //! http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/fenv.h.html
 
-use platform::types::*;
+use crate::platform::types::*;
 
 pub const FE_ALL_EXCEPT: c_int = 0;
 pub const FE_TONEAREST: c_int = 0;

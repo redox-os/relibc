@@ -1,8 +1,8 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::ffi::VaList as va_list;
-use io::Read;
-use platform::types::*;
+use crate::io::Read;
+use crate::platform::types::*;
 
 #[derive(PartialEq, Eq)]
 enum IntKind {
