@@ -25,7 +25,7 @@ impl PalEpoll for Sys {
                     epfd,
                     &Event {
                         id: fd as usize,
-                        flags: unsafe { (*event).events as usize },
+                        flags: syscall::EventFlags::from_bits(unsafe { (*event).events as usize }).expect("epoll: invalid bit pattern"),
                         // NOTE: Danger when using non 64-bit systems. If this is
                         // needed, use a box or something
                         data: unsafe { mem::transmute((*event).data) },
@@ -37,7 +37,7 @@ impl PalEpoll for Sys {
                     epfd,
                     &Event {
                         id: fd as usize,
-                        flags: 0,
+                        flags: syscall::EventFlags::empty(),
                         //TODO: Is data required?
                         data: 0,
                     },
@@ -113,7 +113,7 @@ impl PalEpoll for Sys {
                     }
                 }
                 *event_ptr = epoll_event {
-                    events: event.flags as _,
+                    events: event.flags.bits() as _,
                     data: mem::transmute(event.data),
                     ..Default::default()
                 };

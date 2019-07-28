@@ -35,7 +35,7 @@ pub unsafe extern "C" fn redox_physmap(
     let res = e(syscall::physmap(
         physical_address as usize,
         size,
-        flags as usize,
+        syscall::PhysmapFlags::from_bits(flags as usize).expect("physmap: invalid bit pattern"),
     ));
     if res == !0 {
         return ptr::null_mut();

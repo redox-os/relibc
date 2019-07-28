@@ -84,14 +84,15 @@ fn inner_ptrace(request: c_int, pid: pid_t, addr: *mut c_void, data: *mut c_void
             Sys::kill(pid, signal::SIGCONT as _);
 
             // TODO: Translate errors
-            (&mut &session.tracer).write(&[match request {
-                sys_ptrace::PTRACE_CONT => syscall::PTRACE_CONT,
-                sys_ptrace::PTRACE_SINGLESTEP => syscall::PTRACE_SINGLESTEP,
-                sys_ptrace::PTRACE_SYSCALL => syscall::PTRACE_SYSCALL,
-                sys_ptrace::PTRACE_SYSEMU => syscall::PTRACE_SYSEMU | syscall::PTRACE_SYSCALL,
-                sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => syscall::PTRACE_SYSEMU | syscall::PTRACE_SINGLESTEP,
+            let syscall = syscall::PTRACE_STOP_PRE_SYSCALL.bits() | syscall::PTRACE_STOP_POST_SYSCALL.bits();
+            (&mut &session.tracer).write(&match request {
+                sys_ptrace::PTRACE_CONT => 0,
+                sys_ptrace::PTRACE_SINGLESTEP => syscall::PTRACE_STOP_SINGLESTEP.bits(),
+                sys_ptrace::PTRACE_SYSCALL => syscall,
+                sys_ptrace::PTRACE_SYSEMU => syscall::PTRACE_FLAG_SYSEMU.bits() | syscall,
+                sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => syscall::PTRACE_FLAG_SYSEMU.bits() | syscall::PTRACE_STOP_SINGLESTEP.bits(),
                 _ => unreachable!("unhandled ptrace request type {}", request)
-            }])?;
+            }.to_ne_bytes())?;
             Ok(0)
         },
         sys_ptrace::PTRACE_GETREGS => {

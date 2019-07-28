@@ -310,7 +310,7 @@ impl Pal for Sys {
     }
 
     fn fork() -> pid_t {
-        e(unsafe { syscall::clone(0) }) as pid_t
+        e(unsafe { syscall::clone(syscall::CloneFlags::empty()) }) as pid_t
     }
 
     fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
@@ -631,7 +631,7 @@ impl Pal for Sys {
         let map = Map {
             offset: off as usize,
             size: len,
-            flags: ((prot as usize) << 16) | ((flags as usize) & 0xFFFF),
+            flags: syscall::MapFlags::from_bits_truncate(((prot as usize) << 16) | ((flags as usize) & 0xFFFF)),
         };
 
         if flags & MAP_ANON == MAP_ANON {
@@ -654,7 +654,11 @@ impl Pal for Sys {
     }
 
     unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
-        e(syscall::mprotect(addr as usize, len, (prot as usize) << 16)) as c_int
+        e(syscall::mprotect(
+            addr as usize,
+            len,
+            syscall::MapFlags::from_bits((prot as usize) << 16).expect("mprotect: invalid bit pattern")
+        )) as c_int
     }
 
     unsafe fn munmap(addr: *mut c_void, _len: usize) -> c_int {
@@ -924,17 +928,20 @@ impl Pal for Sys {
         let mut res = None;
         let mut status = 0;
 
+        let inner = |status: &mut usize, flags| syscall::waitpid(
+            pid as usize,
+            status,
+            syscall::WaitFlags::from_bits(flags as usize).expect("waitpid: invalid bit pattern")
+        );
+
         // First, allow ptrace to handle waitpid
         // TODO: Handle special PIDs here (such as -1)
         let state = ptrace::init_state();
         let mut sessions = state.sessions.lock();
         if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
             if options & sys_wait::WNOHANG != sys_wait::WNOHANG {
-                let _ = (&mut &session.tracer).write(&[syscall::PTRACE_WAIT]);
-                res = Some(e(syscall::waitpid(
-                    pid as usize, &mut status,
-                    (options | sys_wait::WNOHANG | sys_wait::WUNTRACED) as usize
-                )));
+                let _ = (&mut &session.tracer).write(&syscall::PTRACE_FLAG_WAIT.bits().to_ne_bytes());
+                res = Some(e(inner(&mut status, options | sys_wait::WNOHANG | sys_wait::WUNTRACED)));
                 if res == Some(0) {
                     // WNOHANG, just pretend ptrace SIGSTOP:ped this
                     status = (syscall::SIGSTOP << 8) | 0x7f;
@@ -950,7 +957,7 @@ impl Pal for Sys {
         // it if (and only if) a ptrace traceme was activated during
         // the wait.
         let res = res.unwrap_or_else(|| loop {
-            let res = e(syscall::waitpid(pid as usize, &mut status, (options | sys_wait::WUNTRACED) as usize));
+            let res = e(inner(&mut status, options | sys_wait::WUNTRACED));
 
             // TODO: Also handle special PIDs here
             if !syscall::wifstopped(res) || ptrace::is_traceme(pid) {

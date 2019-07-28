@@ -108,7 +108,8 @@ impl PalSignal for Sys {
             Some(syscall::SigAction {
                 sa_handler: mem::transmute((*act).sa_handler),
                 sa_mask: [m as u64, 0],
-                sa_flags: (*act).sa_flags as usize,
+                sa_flags: syscall::SigActionFlags::from_bits((*act).sa_flags as usize)
+                    .expect("sigaction: invalid bit pattern"),
             })
         };
         let mut old_opt = if oact.is_null() {
@@ -125,7 +126,7 @@ impl PalSignal for Sys {
             (*oact).sa_handler = mem::transmute(old.sa_handler);
             let m = old.sa_mask;
             (*oact).sa_mask = m[0] as c_ulong;
-            (*oact).sa_flags = old.sa_flags as c_ulong;
+            (*oact).sa_flags = old.sa_flags.bits() as c_ulong;
         }
         ret
     }
