@@ -1,12 +1,13 @@
 //! fnmatch implementation
 
-use alloc::borrow::Cow;
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::slice;
 
 use crate::platform::types::*;
-use posix_regex::compile::{Collation, Range, Token};
-use posix_regex::PosixRegex;
+use posix_regex::{
+    compile::{Collation, Range, Token},
+    PosixRegex,
+};
 
 const ONCE: Range = Range(1, Some(1));
 

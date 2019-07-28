@@ -1,5 +1,4 @@
-use super::super::types::*;
-use super::super::Pal;
+use super::super::{types::*, Pal};
 use crate::header::sys_socket::{sockaddr, socklen_t};
 
 pub trait PalSocket: Pal {

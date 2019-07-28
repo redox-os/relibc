@@ -1,7 +1,6 @@
 use alloc::vec::Vec;
 
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
+use crate::platform::{types::*, Pal, Sys};
 
 use crate::header::unistd::{lseek, SEEK_SET};
 /// Implements an `Iterator` which returns on either newline or EOF.

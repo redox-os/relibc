@@ -1,7 +1,5 @@
-use super::super::types::*;
-use super::super::Pal;
-use crate::header::signal::sigset_t;
-use crate::header::sys_epoll::epoll_event;
+use super::super::{types::*, Pal};
+use crate::header::{signal::sigset_t, sys_epoll::epoll_event};
 
 pub trait PalEpoll: Pal {
     fn epoll_create1(flags: c_int) -> c_int;

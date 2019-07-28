@@ -2,9 +2,10 @@
 
 use core::ptr;
 
-use crate::header::signal::sigset_t;
-use crate::platform::types::*;
-use crate::platform::{PalEpoll, Sys};
+use crate::{
+    header::signal::sigset_t,
+    platform::{types::*, PalEpoll, Sys},
+};
 
 pub use self::sys::*;
 

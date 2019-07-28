@@ -1,24 +1,31 @@
 //! stdio implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdio.h.html
 
-use alloc::borrow::{Borrow, BorrowMut};
-use alloc::boxed::Box;
-use alloc::vec::Vec;
-use core::ffi::VaList as va_list;
-use core::fmt::Write as WriteFmt;
-use core::ops::{Deref, DerefMut};
-use core::{fmt, mem, ptr, slice, str};
+use alloc::{
+    borrow::{Borrow, BorrowMut},
+    boxed::Box,
+    vec::Vec,
+};
+use core::{
+    ffi::VaList as va_list,
+    fmt::{self, Write as WriteFmt},
+    mem,
+    ops::{Deref, DerefMut},
+    ptr, slice, str,
+};
 
-use crate::c_str::CStr;
-use crate::fs::File;
-use crate::header::errno::{self, STR_ERROR};
-use crate::header::string::{self, strlen};
-use crate::header::{fcntl, stdlib, unistd};
-use crate::io::{self, BufRead, LineWriter, Read, Write};
-use crate::platform;
-use crate::platform::types::*;
-use crate::platform::{errno, WriteByte};
-use crate::platform::{Pal, Sys};
-use crate::sync::Mutex;
+use crate::{
+    c_str::CStr,
+    fs::File,
+    header::{
+        errno::{self, STR_ERROR},
+        fcntl, stdlib,
+        string::{self, strlen},
+        unistd,
+    },
+    io::{self, BufRead, LineWriter, Read, Write},
+    platform::{self, errno, types::*, Pal, Sys, WriteByte},
+    sync::Mutex,
+};
 
 pub use self::constants::*;
 mod constants;

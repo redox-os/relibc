@@ -11,9 +11,11 @@ fn main() {
         .include(&format!("{}/include", crate_dir))
         .flag("-fno-stack-protector")
         .flag("-Wno-expansion-to-defined")
-        .files(fs::read_dir("src/c")
-               .expect("src/c directory missing")
-               .map(|res| res.expect("read_dir error").path()))
+        .files(
+            fs::read_dir("src/c")
+                .expect("src/c directory missing")
+                .map(|res| res.expect("read_dir error").path()),
+        )
         .compile("relibc_c");
 
     println!("cargo:rustc-link-lib=static=relibc_c");

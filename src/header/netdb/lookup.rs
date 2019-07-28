@@ -1,22 +1,28 @@
-use alloc::boxed::Box;
-use alloc::string::{String, ToString};
-use alloc::vec::{IntoIter, Vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::{IntoIter, Vec},
+};
 use core::mem;
 
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
+use crate::platform::{types::*, Pal, Sys};
 
-use crate::header::arpa_inet::htons;
-use crate::header::errno::*;
-use crate::header::netinet_in::{in_addr, sockaddr_in, IPPROTO_UDP};
-use crate::header::sys_socket;
-use crate::header::sys_socket::constants::{AF_INET, SOCK_DGRAM};
-use crate::header::sys_socket::{sockaddr, socklen_t};
-use crate::header::time;
-use crate::header::time::timespec;
+use crate::header::{
+    arpa_inet::htons,
+    errno::*,
+    netinet_in::{in_addr, sockaddr_in, IPPROTO_UDP},
+    sys_socket::{
+        self,
+        constants::{AF_INET, SOCK_DGRAM},
+        sockaddr, socklen_t,
+    },
+    time::{self, timespec},
+};
 
-use super::dns::{Dns, DnsQuery};
-use super::sys::get_dns_server;
+use super::{
+    dns::{Dns, DnsQuery},
+    sys::get_dns_server,
+};
 
 pub struct LookupHost(IntoIter<in_addr>);
 

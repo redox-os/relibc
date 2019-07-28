@@ -2,11 +2,14 @@
 
 use core::{mem, slice};
 
-use crate::fs::File;
-use crate::header::sys_epoll::{epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR,
-                        EPOLLHUP, EPOLLIN, EPOLLNVAL, EPOLLOUT, EPOLLPRI, EPOLL_CLOEXEC,
-                        EPOLL_CTL_ADD};
-use crate::platform::types::*;
+use crate::{
+    fs::File,
+    header::sys_epoll::{
+        epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR, EPOLLHUP, EPOLLIN,
+        EPOLLNVAL, EPOLLOUT, EPOLLPRI, EPOLL_CLOEXEC, EPOLL_CTL_ADD,
+    },
+    platform::types::*,
+};
 
 pub const POLLIN: c_short = 0x001;
 pub const POLLPRI: c_short = 0x002;

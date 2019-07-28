@@ -1,15 +1,19 @@
 //! arpa/inet implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xns/arpainet.h.html
 
-use core::str::FromStr;
-use core::{ptr, slice, str};
+use core::{
+    ptr, slice,
+    str::{self, FromStr},
+};
 
-use crate::c_str::CStr;
-use crate::header::errno::*;
-use crate::header::netinet_in::{in_addr, in_addr_t, INADDR_NONE};
-use crate::header::sys_socket::constants::*;
-use crate::header::sys_socket::socklen_t;
-use crate::platform;
-use crate::platform::types::*;
+use crate::{
+    c_str::CStr,
+    header::{
+        errno::*,
+        netinet_in::{in_addr, in_addr_t, INADDR_NONE},
+        sys_socket::{constants::*, socklen_t},
+    },
+    platform::{self, types::*},
+};
 
 #[no_mangle]
 pub extern "C" fn htonl(hostlong: u32) -> u32 {

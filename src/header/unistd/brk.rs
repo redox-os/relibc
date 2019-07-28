@@ -1,9 +1,9 @@
 use core::ptr;
 
-use crate::header::errno::ENOMEM;
-use crate::platform;
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
+use crate::{
+    header::errno::ENOMEM,
+    platform::{self, types::*, Pal, Sys},
+};
 
 static mut BRK: *mut c_void = ptr::null_mut();
 

@@ -2,8 +2,7 @@
 
 use core::ptr;
 
-use crate::header::getopt;
-use crate::platform::types::*;
+use crate::{header::getopt, platform::types::*};
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]

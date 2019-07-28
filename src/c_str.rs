@@ -8,23 +8,23 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use alloc::borrow::{Borrow, Cow, ToOwned};
-use alloc::boxed::Box;
-use alloc::rc::Rc;
-use alloc::string::String;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use core::ascii;
-use core::cmp::Ordering;
-use core::fmt::{self, Write};
-use core::mem;
-use core::ops;
-use core::ptr;
-use core::slice;
-use core::str::{self, Utf8Error};
+use alloc::{
+    borrow::{Borrow, Cow, ToOwned},
+    boxed::Box,
+    rc::Rc,
+    string::String,
+    sync::Arc,
+    vec::Vec,
+};
+use core::{
+    ascii,
+    cmp::Ordering,
+    fmt::{self, Write},
+    mem, ops, ptr, slice,
+    str::{self, Utf8Error},
+};
 
-use crate::header::string::strlen;
-use crate::platform::types::*;
+use crate::{header::string::strlen, platform::types::*};
 
 pub fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
     use crate::header::string;

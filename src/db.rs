@@ -1,10 +1,11 @@
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
-use crate::c_str::CStr;
-use crate::fs::File;
-use crate::header::fcntl;
-use crate::io::{self, BufRead, BufReader};
+use crate::{
+    c_str::CStr,
+    fs::File,
+    header::fcntl,
+    io::{self, BufRead, BufReader},
+};
 
 pub enum Separator {
     Character(char),

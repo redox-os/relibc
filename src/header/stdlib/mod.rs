@@ -1,26 +1,28 @@
 //! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 
-use core::convert::TryFrom;
-use core::{intrinsics, iter, mem, ptr, slice};
-use rand::distributions::{Alphanumeric, Distribution, Uniform};
-use rand::prng::XorShiftRng;
-use rand::rngs::JitterRng;
-use rand::{Rng, SeedableRng};
+use core::{convert::TryFrom, intrinsics, iter, mem, ptr, slice};
+use rand::{
+    distributions::{Alphanumeric, Distribution, Uniform},
+    prng::XorShiftRng,
+    rngs::JitterRng,
+    Rng, SeedableRng,
+};
 
-use crate::c_str::CStr;
-use crate::fs::File;
-use crate::header::errno::*;
-use crate::header::fcntl::*;
-use crate::header::limits;
-use crate::header::string::*;
-use crate::header::time::constants::CLOCK_MONOTONIC;
-use crate::header::time::timespec;
-use crate::header::unistd::{sysconf, _SC_PAGESIZE};
-use crate::header::wchar::*;
-use crate::header::{ctype, errno, unistd};
-use crate::platform;
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
+use crate::{
+    c_str::CStr,
+    fs::File,
+    header::{
+        ctype,
+        errno::{self, *},
+        fcntl::*,
+        limits,
+        string::*,
+        time::{constants::CLOCK_MONOTONIC, timespec},
+        unistd::{self, sysconf, _SC_PAGESIZE},
+        wchar::*,
+    },
+    platform::{self, types::*, Pal, Sys},
+};
 
 mod lcg48;
 mod sort;

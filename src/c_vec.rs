@@ -1,9 +1,12 @@
-use core::iter::IntoIterator;
-use core::ops::{Deref, DerefMut};
-use core::ptr::{self, NonNull};
-use core::{cmp, mem, slice};
-use crate::platform::types::*;
-use crate::platform;
+use crate::platform::{self, types::*};
+use core::{
+    cmp,
+    iter::IntoIterator,
+    mem,
+    ops::{Deref, DerefMut},
+    ptr::{self, NonNull},
+    slice,
+};
 
 /// Error that occurs when an allocation fails
 #[derive(Debug, Default, Hash, PartialEq, Eq, Clone, Copy)]
@@ -18,14 +21,14 @@ pub struct AllocError;
 pub struct CVec<T> {
     ptr: NonNull<T>,
     len: usize,
-    cap: usize
+    cap: usize,
 }
 impl<T> CVec<T> {
     pub fn new() -> Self {
         Self {
             ptr: NonNull::dangling(),
             len: 0,
-            cap: 0
+            cap: 0,
         }
     }
     fn check_bounds(i: usize) -> Result<usize, AllocError> {
@@ -36,7 +39,8 @@ impl<T> CVec<T> {
         }
     }
     fn check_mul(x: usize, y: usize) -> Result<usize, AllocError> {
-        x.checked_mul(y).ok_or(AllocError)
+        x.checked_mul(y)
+            .ok_or(AllocError)
             .and_then(Self::check_bounds)
     }
     pub fn with_capacity(cap: usize) -> Result<Self, AllocError> {
@@ -45,15 +49,12 @@ impl<T> CVec<T> {
         }
         let size = Self::check_mul(cap, mem::size_of::<T>())?;
         let ptr = NonNull::new(unsafe { platform::alloc(size) as *mut T }).ok_or(AllocError)?;
-        Ok(Self {
-            ptr,
-            len: 0,
-            cap
-        })
+        Ok(Self { ptr, len: 0, cap })
     }
     unsafe fn resize(&mut self, cap: usize) -> Result<(), AllocError> {
         let size = Self::check_mul(cap, mem::size_of::<T>())?;
-        let ptr = NonNull::new(platform::realloc(self.ptr.as_ptr() as *mut c_void, size) as *mut T).ok_or(AllocError)?;
+        let ptr = NonNull::new(platform::realloc(self.ptr.as_ptr() as *mut c_void, size) as *mut T)
+            .ok_or(AllocError)?;
         self.ptr = ptr;
         self.cap = cap;
         Ok(())
@@ -67,7 +68,9 @@ impl<T> CVec<T> {
         }
     }
     pub fn reserve(&mut self, required: usize) -> Result<(), AllocError> {
-        let reserved_len = self.len.checked_add(required)
+        let reserved_len = self
+            .len
+            .checked_add(required)
             .ok_or(AllocError)
             .and_then(Self::check_bounds)?;
         let new_cap = cmp::min(reserved_len.next_power_of_two(), core::isize::MAX as usize);
@@ -87,7 +90,8 @@ impl<T> CVec<T> {
         Ok(())
     }
     pub fn extend_from_slice(&mut self, elems: &[T]) -> Result<(), AllocError>
-        where T: Copy
+    where
+        T: Copy,
     {
         unsafe {
             self.reserve(elems.len())?;
@@ -142,16 +146,12 @@ impl<T> Deref for CVec<T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
-        unsafe {
-            slice::from_raw_parts(self.ptr.as_ptr(), self.len)
-        }
+        unsafe { slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
     }
 }
 impl<T> DerefMut for CVec<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe {
-            slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len)
-        }
+        unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
     }
 }
 impl<T> Drop for CVec<T> {

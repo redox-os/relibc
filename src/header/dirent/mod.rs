@@ -3,14 +3,14 @@
 use alloc::boxed::Box;
 use core::{mem, ptr};
 
-use crate::c_str::CStr;
-use crate::c_vec::CVec;
-use crate::fs::File;
-use crate::header::{errno, fcntl, stdlib, string};
-use crate::io::{Seek, SeekFrom};
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
-use crate::platform;
+use crate::{
+    c_str::CStr,
+    c_vec::CVec,
+    fs::File,
+    header::{errno, fcntl, stdlib, string},
+    io::{Seek, SeekFrom},
+    platform::{self, types::*, Pal, Sys},
+};
 
 const DIR_BUF_SIZE: usize = mem::size_of::<dirent>() * 3;
 
@@ -137,7 +137,7 @@ pub unsafe extern "C" fn scandir(
 
     let mut vec = match CVec::with_capacity(4) {
         Ok(vec) => vec,
-        Err(err) => return -1
+        Err(err) => return -1,
     };
 
     let old_errno = platform::errno;

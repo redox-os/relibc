@@ -1,6 +1,7 @@
-use super::super::types::*;
-use super::super::PalSocket;
-use super::{e, Sys};
+use super::{
+    super::{types::*, PalSocket},
+    e, Sys,
+};
 use crate::header::sys_socket::{sockaddr, socklen_t};
 
 impl PalSocket for Sys {

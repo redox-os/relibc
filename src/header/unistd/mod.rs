@@ -1,25 +1,15 @@
 //! unistd implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/unistd.h.html
 
-use core::convert::TryFrom;
-use core::{mem, ptr, slice};
+use core::{convert::TryFrom, mem, ptr, slice};
 
+use crate::{
+    c_str::CStr,
+    header::{errno, limits, stdlib::getenv, sys_ioctl, sys_time, termios, time::timespec},
+    platform::{self, types::*, Pal, Sys},
+};
 use alloc::collections::LinkedList;
-use crate::c_str::CStr;
-use crate::header::errno;
-use crate::header::limits;
-use crate::header::stdlib::getenv;
-use crate::header::sys_ioctl;
-use crate::header::sys_time;
-use crate::header::termios;
-use crate::header::time::timespec;
-use crate::platform;
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
 
-pub use self::brk::*;
-pub use self::getopt::*;
-pub use self::pathconf::*;
-pub use self::sysconf::*;
+pub use self::{brk::*, getopt::*, pathconf::*, sysconf::*};
 
 mod brk;
 mod getopt;

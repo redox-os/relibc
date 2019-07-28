@@ -1,15 +1,17 @@
 pub mod mutex;
 pub mod once;
 
-pub use self::mutex::{Mutex, MutexGuard};
-pub use self::once::Once;
+pub use self::{
+    mutex::{Mutex, MutexGuard},
+    once::Once,
+};
 
-use core::cell::UnsafeCell;
-use core::ops::Deref;
-use core::sync::atomic;
-use core::sync::atomic::AtomicI32 as AtomicInt;
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
+use crate::platform::{types::*, Pal, Sys};
+use core::{
+    cell::UnsafeCell,
+    ops::Deref,
+    sync::atomic::{self, AtomicI32 as AtomicInt},
+};
 
 const FUTEX_WAIT: c_int = 0;
 const FUTEX_WAKE: c_int = 1;

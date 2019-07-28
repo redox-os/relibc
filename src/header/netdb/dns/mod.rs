@@ -8,13 +8,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-pub use self::answer::DnsAnswer;
-pub use self::query::DnsQuery;
+pub use self::{answer::DnsAnswer, query::DnsQuery};
 
-use alloc::string::String;
-use alloc::vec::Vec;
-use core::slice;
-use core::u16;
+use alloc::{string::String, vec::Vec};
+use core::{slice, u16};
 
 mod answer;
 mod query;

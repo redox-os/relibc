@@ -1,7 +1,6 @@
 //! dl-tls implementation for Redox
 
-use crate::ld_so::tcb::Tcb;
-use crate::platform::types::*;
+use crate::{ld_so::tcb::Tcb, platform::types::*};
 
 #[repr(C)]
 pub struct dl_tls_index {

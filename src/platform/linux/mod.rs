@@ -1,18 +1,19 @@
 use core::ptr;
 use core_io::Write;
 
-use super::types::*;
-use super::{errno, Pal};
-use crate::c_str::CStr;
-use crate::header::dirent::dirent;
-use crate::header::signal::SIGCHLD;
+use super::{errno, types::*, Pal};
+use crate::{
+    c_str::CStr,
+    header::{dirent::dirent, signal::SIGCHLD},
+};
 // use header::sys_resource::rusage;
-use crate::header::sys_stat::stat;
-use crate::header::sys_statvfs::statvfs;
-use crate::header::sys_time::{timeval, timezone};
+use crate::header::{
+    sys_stat::stat,
+    sys_statvfs::statvfs,
+    sys_time::{timeval, timezone},
+};
 // use header::sys_times::tms;
-use crate::header::sys_utsname::utsname;
-use crate::header::time::timespec;
+use crate::header::{sys_utsname::utsname, time::timespec};
 
 mod epoll;
 mod ptrace;

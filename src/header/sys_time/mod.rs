@@ -1,9 +1,10 @@
 //! sys/time implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/systime.h.html
 
-use crate::c_str::CStr;
-use crate::header::time::timespec;
-use crate::platform::types::*;
-use crate::platform::{Pal, PalSignal, Sys};
+use crate::{
+    c_str::CStr,
+    header::time::timespec,
+    platform::{types::*, Pal, PalSignal, Sys},
+};
 
 pub const ITIMER_REAL: c_int = 0;
 pub const ITIMER_VIRTUAL: c_int = 1;

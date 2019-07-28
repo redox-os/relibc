@@ -1,29 +1,30 @@
-use core::result::Result as CoreResult;
-use core::{mem, ptr, slice};
-use syscall::data::Map;
-use syscall::data::Stat as redox_stat;
-use syscall::data::StatVfs as redox_statvfs;
-use syscall::data::TimeSpec as redox_timespec;
-use syscall::{self, Result};
+use core::{mem, ptr, result::Result as CoreResult, slice};
+use syscall::{
+    self,
+    data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
+    Result,
+};
 
-use crate::c_str::{CStr, CString};
-use crate::fs::File;
-use crate::header::dirent::dirent;
-use crate::header::errno::{EINVAL, EIO, EPERM, ERANGE};
-use crate::header::fcntl;
-use crate::header::sys_mman::MAP_ANON;
-use crate::header::sys_stat::stat;
-use crate::header::sys_statvfs::statvfs;
-use crate::header::sys_time::{timeval, timezone};
-use crate::header::sys_wait;
-use crate::header::sys_utsname::{utsname, UTSLENGTH};
-use crate::header::time::timespec;
-use crate::header::unistd::{F_OK, R_OK, W_OK, X_OK};
-use crate::io::prelude::*;
-use crate::io::{self, BufReader, SeekFrom};
+use crate::{
+    c_str::{CStr, CString},
+    fs::File,
+    header::{
+        dirent::dirent,
+        errno::{EINVAL, EIO, EPERM, ERANGE},
+        fcntl,
+        sys_mman::MAP_ANON,
+        sys_stat::stat,
+        sys_statvfs::statvfs,
+        sys_time::{timeval, timezone},
+        sys_utsname::{utsname, UTSLENGTH},
+        sys_wait,
+        time::timespec,
+        unistd::{F_OK, R_OK, W_OK, X_OK},
+    },
+    io::{self, prelude::*, BufReader, SeekFrom},
+};
 
-use super::types::*;
-use super::{errno, Pal, Read};
+use super::{errno, types::*, Pal, Read};
 
 mod epoll;
 mod extra;
@@ -414,7 +415,7 @@ impl Pal for Sys {
 
     fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
         let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize) };
-        if ! buf_slice.is_empty() {
+        if !buf_slice.is_empty() {
             let nonnull_size = buf_slice.len() - 1;
             let read = e(syscall::getcwd(&mut buf_slice[..nonnull_size]));
             if read == !0 {
@@ -631,7 +632,9 @@ impl Pal for Sys {
         let map = Map {
             offset: off as usize,
             size: len,
-            flags: syscall::MapFlags::from_bits_truncate(((prot as usize) << 16) | ((flags as usize) & 0xFFFF)),
+            flags: syscall::MapFlags::from_bits_truncate(
+                ((prot as usize) << 16) | ((flags as usize) & 0xFFFF),
+            ),
         };
 
         if flags & MAP_ANON == MAP_ANON {
@@ -657,7 +660,8 @@ impl Pal for Sys {
         e(syscall::mprotect(
             addr as usize,
             len,
-            syscall::MapFlags::from_bits((prot as usize) << 16).expect("mprotect: invalid bit pattern")
+            syscall::MapFlags::from_bits((prot as usize) << 16)
+                .expect("mprotect: invalid bit pattern"),
         )) as c_int
     }
 
@@ -928,11 +932,14 @@ impl Pal for Sys {
         let mut res = None;
         let mut status = 0;
 
-        let inner = |status: &mut usize, flags| syscall::waitpid(
-            pid as usize,
-            status,
-            syscall::WaitFlags::from_bits(flags as usize).expect("waitpid: invalid bit pattern")
-        );
+        let inner = |status: &mut usize, flags| {
+            syscall::waitpid(
+                pid as usize,
+                status,
+                syscall::WaitFlags::from_bits(flags as usize)
+                    .expect("waitpid: invalid bit pattern"),
+            )
+        };
 
         // First, allow ptrace to handle waitpid
         // TODO: Handle special PIDs here (such as -1)
@@ -940,8 +947,12 @@ impl Pal for Sys {
         let mut sessions = state.sessions.lock();
         if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
             if options & sys_wait::WNOHANG != sys_wait::WNOHANG {
-                let _ = (&mut &session.tracer).write(&syscall::PTRACE_FLAG_WAIT.bits().to_ne_bytes());
-                res = Some(e(inner(&mut status, options | sys_wait::WNOHANG | sys_wait::WUNTRACED)));
+                let _ =
+                    (&mut &session.tracer).write(&syscall::PTRACE_FLAG_WAIT.bits().to_ne_bytes());
+                res = Some(e(inner(
+                    &mut status,
+                    options | sys_wait::WNOHANG | sys_wait::WUNTRACED,
+                )));
                 if res == Some(0) {
                     // WNOHANG, just pretend ptrace SIGSTOP:ped this
                     status = (syscall::SIGSTOP << 8) | 0x7f;

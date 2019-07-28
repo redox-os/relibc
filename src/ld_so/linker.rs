@@ -1,19 +1,27 @@
-use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{mem, ptr, slice};
-use goblin::elf::{program_header, reloc, sym, Elf};
-use goblin::error::{Error, Result};
+use goblin::{
+    elf::{program_header, reloc, sym, Elf},
+    error::{Error, Result},
+};
 
-use crate::c_str::CString;
-use crate::fs::File;
-use crate::header::{fcntl, sys_mman, unistd};
-use crate::io::Read;
-use crate::platform::types::c_void;
+use crate::{
+    c_str::CString,
+    fs::File,
+    header::{fcntl, sys_mman, unistd},
+    io::Read,
+    platform::types::c_void,
+};
 
-use super::tcb::{Master, Tcb};
-use super::PAGE_SIZE;
+use super::{
+    tcb::{Master, Tcb},
+    PAGE_SIZE,
+};
 
 #[cfg(target_os = "redox")]
 const PATH_SEP: char = ';';

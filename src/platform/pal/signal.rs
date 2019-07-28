@@ -1,7 +1,8 @@
-use super::super::types::*;
-use super::super::Pal;
-use crate::header::signal::{sigaction, sigset_t, stack_t};
-use crate::header::sys_time::itimerval;
+use super::super::{types::*, Pal};
+use crate::header::{
+    signal::{sigaction, sigset_t, stack_t},
+    sys_time::itimerval,
+};
 
 pub trait PalSignal: Pal {
     fn getitimer(which: c_int, out: *mut itimerval) -> c_int;

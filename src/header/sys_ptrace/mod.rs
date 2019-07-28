@@ -1,8 +1,7 @@
 //! ptrace compatibility layer for Redox OS
 
+use crate::platform::{types::*, PalPtrace, Sys};
 use core::ffi::VaList;
-use crate::platform::types::*;
-use crate::platform::{PalPtrace, Sys};
 
 pub const PTRACE_TRACEME: c_int = 0;
 pub const PTRACE_PEEKTEXT: c_int = 1;

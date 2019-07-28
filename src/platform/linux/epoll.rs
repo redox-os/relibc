@@ -1,8 +1,8 @@
-use super::super::types::*;
-use super::super::PalEpoll;
-use super::{e, Sys};
-use crate::header::signal::sigset_t;
-use crate::header::sys_epoll::epoll_event;
+use super::{
+    super::{types::*, PalEpoll},
+    e, Sys,
+};
+use crate::header::{signal::sigset_t, sys_epoll::epoll_event};
 
 impl PalEpoll for Sys {
     fn epoll_create1(flags: c_int) -> c_int {

@@ -1,17 +1,19 @@
-use super::super::types::*;
-use super::super::{Pal, PalEpoll};
-use super::Sys;
+use super::{
+    super::{types::*, Pal, PalEpoll},
+    Sys,
+};
 
+use crate::{
+    fs::File,
+    header::{errno::*, fcntl::*, signal::sigset_t, sys_epoll::*},
+    io::prelude::*,
+    platform,
+};
 use core::{mem, slice};
-use crate::fs::File;
-use crate::header::errno::*;
-use crate::header::fcntl::*;
-use crate::header::signal::sigset_t;
-use crate::header::sys_epoll::*;
-use crate::io::prelude::*;
-use crate::platform;
-use syscall::data::{Event, TimeSpec};
-use syscall::flag::EVENT_READ;
+use syscall::{
+    data::{Event, TimeSpec},
+    flag::EVENT_READ,
+};
 
 impl PalEpoll for Sys {
     fn epoll_create1(flags: c_int) -> c_int {
@@ -25,7 +27,8 @@ impl PalEpoll for Sys {
                     epfd,
                     &Event {
                         id: fd as usize,
-                        flags: syscall::EventFlags::from_bits(unsafe { (*event).events as usize }).expect("epoll: invalid bit pattern"),
+                        flags: syscall::EventFlags::from_bits(unsafe { (*event).events as usize })
+                            .expect("epoll: invalid bit pattern"),
                         // NOTE: Danger when using non 64-bit systems. If this is
                         // needed, use a box or something
                         data: unsafe { mem::transmute((*event).data) },

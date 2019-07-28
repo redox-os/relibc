@@ -1,15 +1,15 @@
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::vec::Vec;
-use core::ffi::VaList;
-use core::ops::Range;
-use core::{char, cmp, f64, fmt, slice};
 use crate::io::{self, Write};
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{char, cmp, f64, ffi::VaList, fmt, ops::Range, slice};
 
-use crate::header::errno::EILSEQ;
-use crate::platform::types::*;
-use crate::platform;
+use crate::{
+    header::errno::EILSEQ,
+    platform::{self, types::*},
+};
 
 //  ____        _ _                 _       _
 // | __ )  ___ (_) | ___ _ __ _ __ | | __ _| |_ ___ _
@@ -103,8 +103,9 @@ impl VaArg {
         match (fmtkind, intkind) {
             (FmtKind::Percent, _) => panic!("Can't call arg_from on %"),
 
-            (FmtKind::Char, IntKind::Long)
-            | (FmtKind::Char, IntKind::LongLong) => VaArg::wint_t(ap.arg::<wint_t>()),
+            (FmtKind::Char, IntKind::Long) | (FmtKind::Char, IntKind::LongLong) => {
+                VaArg::wint_t(ap.arg::<wint_t>())
+            }
 
             (FmtKind::Char, _)
             | (FmtKind::Unsigned, IntKind::Byte)
@@ -178,8 +179,9 @@ impl VaArg {
         match (fmtkind, intkind) {
             (FmtKind::Percent, _) => panic!("Can't call transmute on %"),
 
-            (FmtKind::Char, IntKind::Long)
-            | (FmtKind::Char, IntKind::LongLong) => VaArg::wint_t(untyped.wint_t),
+            (FmtKind::Char, IntKind::Long) | (FmtKind::Char, IntKind::LongLong) => {
+                VaArg::wint_t(untyped.wint_t)
+            }
 
             (FmtKind::Char, _)
             | (FmtKind::Unsigned, IntKind::Byte)
@@ -843,30 +845,28 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     }
                 }
             }
-            FmtKind::Char => {
-                match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
-                    VaArg::c_char(c) => {
-                        pad(w, !left, b' ', 1..pad_space)?;
-                        w.write_all(&[c as u8])?;
-                        pad(w, left, b' ', 1..pad_space)?;
-                    },
-                    VaArg::wint_t(c) => {
-                        let c = match char::from_u32(c as _) {
-                            Some(c) => c,
-                            None => {
-                                platform::errno = EILSEQ;
-                                return Err(io::last_os_error());
-                            }
-                        };
-                        let mut buf = [0; 4];
-
-                        pad(w, !left, b' ', 1..pad_space)?;
-                        w.write_all(c.encode_utf8(&mut buf).as_bytes())?;
-                        pad(w, left, b' ', 1..pad_space)?;
-                    },
-                    _ => unreachable!("this should not be possible"),
+            FmtKind::Char => match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
+                VaArg::c_char(c) => {
+                    pad(w, !left, b' ', 1..pad_space)?;
+                    w.write_all(&[c as u8])?;
+                    pad(w, left, b' ', 1..pad_space)?;
                 }
-            }
+                VaArg::wint_t(c) => {
+                    let c = match char::from_u32(c as _) {
+                        Some(c) => c,
+                        None => {
+                            platform::errno = EILSEQ;
+                            return Err(io::last_os_error());
+                        }
+                    };
+                    let mut buf = [0; 4];
+
+                    pad(w, !left, b' ', 1..pad_space)?;
+                    w.write_all(c.encode_utf8(&mut buf).as_bytes())?;
+                    pad(w, left, b' ', 1..pad_space)?;
+                }
+                _ => unreachable!("this should not be possible"),
+            },
             FmtKind::Pointer => {
                 let ptr = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::pointer(p) => p,

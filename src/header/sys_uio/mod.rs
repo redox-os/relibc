@@ -3,9 +3,10 @@
 use alloc::vec::Vec;
 use core::slice;
 
-use crate::header::{errno, unistd};
-use crate::platform;
-use crate::platform::types::*;
+use crate::{
+    header::{errno, unistd},
+    platform::{self, types::*},
+};
 
 pub const IOV_MAX: c_int = 1024;
 

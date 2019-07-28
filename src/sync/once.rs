@@ -1,8 +1,6 @@
 use super::{AtomicLock, AttemptStatus};
-use core::cell::UnsafeCell;
-use core::mem::MaybeUninit;
-use core::sync::atomic::Ordering::SeqCst;
 use crate::platform::types::*;
+use core::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::Ordering::SeqCst};
 
 const UNINITIALIZED: c_int = 0;
 const INITIALIZING: c_int = 1;

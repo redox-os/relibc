@@ -1,13 +1,18 @@
 use core::mem;
 use syscall;
 
-use super::super::types::*;
-use super::super::{Pal, PalSignal};
-use super::{e, Sys};
-use crate::header::errno::EINVAL;
-use crate::header::signal::{sigaction, sigset_t, stack_t};
-use crate::header::sys_time::{itimerval, ITIMER_REAL};
-use crate::platform::errno;
+use super::{
+    super::{types::*, Pal, PalSignal},
+    e, Sys,
+};
+use crate::{
+    header::{
+        errno::EINVAL,
+        signal::{sigaction, sigset_t, stack_t},
+        sys_time::{itimerval, ITIMER_REAL},
+    },
+    platform::errno,
+};
 
 impl PalSignal for Sys {
     fn getitimer(which: c_int, out: *mut itimerval) -> c_int {

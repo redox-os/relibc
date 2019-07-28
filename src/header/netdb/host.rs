@@ -1,17 +1,18 @@
-use alloc::boxed::Box;
-use alloc::str::SplitWhitespace;
-use alloc::vec::Vec;
+use alloc::{boxed::Box, str::SplitWhitespace, vec::Vec};
 use core::{mem, ptr};
 
-use crate::c_str::CString;
-use crate::header::arpa_inet::inet_aton;
-use crate::header::fcntl::O_RDONLY;
-use crate::header::netinet_in::in_addr;
-use crate::header::sys_socket::constants::AF_INET;
-use crate::header::unistd::SEEK_SET;
-use crate::platform::rlb::{Line, RawLineBuffer};
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
+use crate::{
+    c_str::CString,
+    header::{
+        arpa_inet::inet_aton, fcntl::O_RDONLY, netinet_in::in_addr, sys_socket::constants::AF_INET,
+        unistd::SEEK_SET,
+    },
+    platform::{
+        rlb::{Line, RawLineBuffer},
+        types::*,
+        Pal, Sys,
+    },
+};
 
 use super::{bytes_to_box_str, hostent};
 

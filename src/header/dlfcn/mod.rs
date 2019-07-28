@@ -1,10 +1,11 @@
 //! dlfcn implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/dlfcn.h.html
 
-use core::sync::atomic::{AtomicUsize, Ordering};
-use core::{ptr, str};
+use core::{
+    ptr, str,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
-use crate::c_str::CStr;
-use crate::platform::types::*;
+use crate::{c_str::CStr, platform::types::*};
 
 pub const RTLD_LAZY: c_int = 0x0001;
 pub const RTLD_NOW: c_int = 0x0002;

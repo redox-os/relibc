@@ -1,8 +1,10 @@
 use super::{AtomicLock, AttemptStatus};
-use core::cell::UnsafeCell;
-use core::ops::{Deref, DerefMut};
-use core::sync::atomic::Ordering::SeqCst;
 use crate::platform::types::*;
+use core::{
+    cell::UnsafeCell,
+    ops::{Deref, DerefMut},
+    sync::atomic::Ordering::SeqCst,
+};
 
 const UNLOCKED: c_int = 0;
 const LOCKED: c_int = 1;

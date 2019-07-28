@@ -1,7 +1,6 @@
 //! errno implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/errno.h.html
 
-use crate::platform;
-use crate::platform::types::*;
+use crate::platform::{self, types::*};
 
 //TODO: Consider removing, provided for compatibility with newlib
 #[no_mangle]

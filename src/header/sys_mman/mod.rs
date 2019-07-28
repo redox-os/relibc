@@ -1,7 +1,8 @@
-use crate::c_str::{CStr, CString};
-use crate::header::{fcntl, unistd};
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
+use crate::{
+    c_str::{CStr, CString},
+    header::{fcntl, unistd},
+    platform::{types::*, Pal, Sys},
+};
 
 pub use self::sys::*;
 

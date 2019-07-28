@@ -1,7 +1,6 @@
 #![allow(non_camel_case_types)]
 
-use crate::header::sys_socket::sa_family_t;
-use crate::platform::types::*;
+use crate::{header::sys_socket::sa_family_t, platform::types::*};
 
 pub type in_addr_t = u32;
 pub type in_port_t = u16;

@@ -1,11 +1,7 @@
 use super::{constants, Buffer, BUFSIZ, FILE};
-use core::cell::UnsafeCell;
-use core::ptr;
+use core::{cell::UnsafeCell, ptr};
 
-use crate::fs::File;
-use crate::io::LineWriter;
-use crate::platform::types::*;
-use crate::sync::Mutex;
+use crate::{fs::File, io::LineWriter, platform::types::*, sync::Mutex};
 
 pub struct GlobalFile(UnsafeCell<FILE>);
 impl GlobalFile {

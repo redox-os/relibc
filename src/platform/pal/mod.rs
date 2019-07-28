@@ -1,11 +1,15 @@
 use super::types::*;
-use crate::c_str::CStr;
-use crate::header::dirent::dirent;
-use crate::header::sys_stat::stat;
-use crate::header::sys_statvfs::statvfs;
-use crate::header::sys_time::{timeval, timezone};
-use crate::header::sys_utsname::utsname;
-use crate::header::time::timespec;
+use crate::{
+    c_str::CStr,
+    header::{
+        dirent::dirent,
+        sys_stat::stat,
+        sys_statvfs::statvfs,
+        sys_time::{timeval, timezone},
+        sys_utsname::utsname,
+        time::timespec,
+    },
+};
 
 pub use self::epoll::PalEpoll;
 mod epoll;

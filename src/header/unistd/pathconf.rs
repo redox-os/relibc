@@ -1,6 +1,7 @@
-use crate::header::errno;
-use crate::platform;
-use crate::platform::types::*;
+use crate::{
+    header::errno,
+    platform::{self, types::*},
+};
 
 pub const _PC_LINK_MAX: c_int = 0;
 pub const _PC_MAX_CANON: c_int = 1;

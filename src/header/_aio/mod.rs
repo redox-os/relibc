@@ -1,5 +1,7 @@
-use crate::header::time::{sigevent, timespec};
-use crate::platform::types::*;
+use crate::{
+    header::time::{sigevent, timespec},
+    platform::types::*,
+};
 
 pub struct aiocb {
     pub aio_fildes: c_int,

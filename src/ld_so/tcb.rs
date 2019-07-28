@@ -1,6 +1,5 @@
 use alloc::boxed::Box;
-use core::ops::Range;
-use core::{mem, ptr, slice};
+use core::{mem, ops::Range, ptr, slice};
 use goblin::error::{Error, Result};
 
 use crate::header::sys_mman;

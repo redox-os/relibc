@@ -1,12 +1,12 @@
 //! regex.h implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/regex.h.html
 
-use alloc::borrow::Cow;
-use alloc::vec::Vec;
+use crate::{header::string::strlen, platform::types::*};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{mem, ptr, slice};
-use crate::header::string::strlen;
-use crate::platform::types::*;
-use posix_regex::compile::{Error as CompileError, Range, Token};
-use posix_regex::{PosixRegex, PosixRegexBuilder};
+use posix_regex::{
+    compile::{Error as CompileError, Range, Token},
+    PosixRegex, PosixRegexBuilder,
+};
 
 pub type regoff_t = size_t;
 

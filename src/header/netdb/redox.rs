@@ -1,8 +1,5 @@
+use crate::{c_str::CString, fs::File, header::fcntl, io::Read};
 use alloc::string::String;
-use crate::c_str::CString;
-use crate::fs::File;
-use crate::header::fcntl;
-use crate::io::Read;
 
 pub fn get_dns_server() -> String {
     let mut string = String::new();

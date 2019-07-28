@@ -2,8 +2,7 @@
 
 use core::ptr;
 
-use crate::platform::types::*;
-use crate::platform::{PalSocket, Sys};
+use crate::platform::{types::*, PalSocket, Sys};
 
 pub mod constants;
 

@@ -1,10 +1,11 @@
 use alloc::vec::Vec;
 use core::ptr;
 
-use crate::header::stdio::FILE;
-use crate::header::stdlib;
-use crate::io::BufRead;
-use crate::platform::types::*;
+use crate::{
+    header::{stdio::FILE, stdlib},
+    io::BufRead,
+    platform::types::*,
+};
 
 #[no_mangle]
 pub unsafe extern "C" fn __getline(

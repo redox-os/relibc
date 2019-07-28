@@ -1,7 +1,6 @@
 //! sys/file.h implementation
 
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
+use crate::platform::{types::*, Pal, Sys};
 
 pub const LOCK_SH: usize = 1;
 pub const LOCK_EX: usize = 2;

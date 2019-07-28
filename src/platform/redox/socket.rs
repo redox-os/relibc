@@ -1,14 +1,15 @@
 use core::{mem, ptr, slice};
-use syscall::flag::*;
-use syscall::{self, Result};
+use syscall::{self, flag::*, Result};
 
-use super::super::types::*;
-use super::super::{errno, Pal, PalSocket};
-use super::{e, Sys};
-use crate::header::netinet_in::{in_port_t, sockaddr_in};
-use crate::header::sys_socket::constants::*;
-use crate::header::sys_socket::{sockaddr, socklen_t};
-use crate::header::sys_time::timeval;
+use super::{
+    super::{errno, types::*, Pal, PalSocket},
+    e, Sys,
+};
+use crate::header::{
+    netinet_in::{in_port_t, sockaddr_in},
+    sys_socket::{constants::*, sockaddr, socklen_t},
+    sys_time::timeval,
+};
 
 macro_rules! bind_or_connect {
     (bind $path:expr) => {
@@ -146,11 +147,7 @@ impl PalSocket for Sys {
     ) -> c_int {
         eprintln!(
             "getsockopt({}, {}, {}, {:p}, {:p})",
-            socket,
-            level,
-            option_name,
-            option_value,
-            option_len
+            socket, level, option_name, option_value, option_len
         );
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
     }
@@ -244,7 +241,11 @@ impl PalSocket for Sys {
 
             let _ = syscall::close(fd);
 
-            if ret >= 0 { 0 } else { -1 }
+            if ret >= 0 {
+                0
+            } else {
+                -1
+            }
         };
 
         match level {
@@ -253,26 +254,18 @@ impl PalSocket for Sys {
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
                 _ => (),
             },
-            _ => ()
+            _ => (),
         }
 
         eprintln!(
             "setsockopt({}, {}, {}, {:p}, {})",
-            socket,
-            level,
-            option_name,
-            option_value,
-            option_len
+            socket, level, option_name, option_value, option_len
         );
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
     }
 
     fn shutdown(socket: c_int, how: c_int) -> c_int {
-        eprintln!(
-            "shutdown({}, {})",
-            socket,
-            how
-        );
+        eprintln!("shutdown({}, {})", socket, how);
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
     }
 

@@ -1,16 +1,14 @@
 use alloc::boxed::Box;
 
-use crate::fs::File;
-use crate::header::errno;
-use crate::header::fcntl::*;
-use crate::header::string::strchr;
-use crate::io::LineWriter;
-use crate::platform;
-use crate::platform::types::*;
-use crate::sync::Mutex;
+use crate::{
+    fs::File,
+    header::{errno, fcntl::*, string::strchr},
+    io::LineWriter,
+    platform::{self, types::*},
+    sync::Mutex,
+};
 
-use super::constants::*;
-use super::{Buffer, FILE};
+use super::{constants::*, Buffer, FILE};
 
 /// Parse mode flags as a string and output a mode flags integer
 pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {

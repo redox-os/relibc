@@ -4,16 +4,15 @@
 //! we are NOT going to bend our API for the sake of
 //! compatibility. So, this module will be a hellhole.
 
-use super::super::types::*;
-use super::super::{errno, Pal, PalPtrace, PalSignal, Sys};
-use crate::c_str::CString;
-use crate::fs::File;
-use crate::header::sys_user::user_regs_struct;
-use crate::header::{errno as errnoh, fcntl, signal, sys_ptrace};
-use crate::io::{self, prelude::*};
-use crate::sync::{Mutex, Once};
-use alloc::collections::BTreeMap;
-use alloc::collections::btree_map::Entry;
+use super::super::{errno, types::*, Pal, PalPtrace, PalSignal, Sys};
+use crate::{
+    c_str::CString,
+    fs::File,
+    header::{errno as errnoh, fcntl, signal, sys_ptrace, sys_user::user_regs_struct},
+    io::{self, prelude::*},
+    sync::{Mutex, Once},
+};
+use alloc::collections::{btree_map::Entry, BTreeMap};
 use core::mem;
 use syscall;
 
@@ -21,15 +20,15 @@ pub struct Session {
     pub tracer: File,
     pub mem: File,
     pub regs: File,
-    pub fpregs: File
+    pub fpregs: File,
 }
 pub struct State {
-    pub sessions: Mutex<BTreeMap<pid_t, Session>>
+    pub sessions: Mutex<BTreeMap<pid_t, Session>>,
 }
 impl State {
     fn new() -> Self {
         Self {
-            sessions: Mutex::new(BTreeMap::new())
+            sessions: Mutex::new(BTreeMap::new()),
         }
     }
 }
@@ -40,28 +39,53 @@ pub fn init_state() -> &'static State {
     STATE.call_once(|| State::new())
 }
 pub fn is_traceme(pid: pid_t) -> bool {
-    File::open(&CString::new(format!("chan:ptrace-relibc/{}/traceme", pid)).unwrap(), fcntl::O_PATH).is_ok()
+    File::open(
+        &CString::new(format!("chan:ptrace-relibc/{}/traceme", pid)).unwrap(),
+        fcntl::O_PATH,
+    )
+    .is_ok()
 }
 pub fn get_session(sessions: &mut BTreeMap<pid_t, Session>, pid: pid_t) -> io::Result<&Session> {
     const NEW_FLAGS: c_int = fcntl::O_RDWR | fcntl::O_CLOEXEC;
 
     match sessions.entry(pid) {
-        Entry::Vacant(entry) => if is_traceme(pid) {
-            Ok(entry.insert(Session {
-                tracer: File::open(&CString::new(format!("proc:{}/trace", pid)).unwrap(), NEW_FLAGS | fcntl::O_NONBLOCK)?,
-                mem: File::open(&CString::new(format!("proc:{}/mem", pid)).unwrap(), NEW_FLAGS)?,
-                regs: File::open(&CString::new(format!("proc:{}/regs/int", pid)).unwrap(), NEW_FLAGS)?,
-                fpregs: File::open(&CString::new(format!("proc:{}/regs/float", pid)).unwrap(), NEW_FLAGS)?,
-            }))
-        } else {
-            unsafe { errno = errnoh::ESRCH; }
-            Err(io::last_os_error())
-        },
-        Entry::Occupied(entry) => Ok(entry.into_mut())
+        Entry::Vacant(entry) => {
+            if is_traceme(pid) {
+                Ok(entry.insert(Session {
+                    tracer: File::open(
+                        &CString::new(format!("proc:{}/trace", pid)).unwrap(),
+                        NEW_FLAGS | fcntl::O_NONBLOCK,
+                    )?,
+                    mem: File::open(
+                        &CString::new(format!("proc:{}/mem", pid)).unwrap(),
+                        NEW_FLAGS,
+                    )?,
+                    regs: File::open(
+                        &CString::new(format!("proc:{}/regs/int", pid)).unwrap(),
+                        NEW_FLAGS,
+                    )?,
+                    fpregs: File::open(
+                        &CString::new(format!("proc:{}/regs/float", pid)).unwrap(),
+                        NEW_FLAGS,
+                    )?,
+                }))
+            } else {
+                unsafe {
+                    errno = errnoh::ESRCH;
+                }
+                Err(io::last_os_error())
+            }
+        }
+        Entry::Occupied(entry) => Ok(entry.into_mut()),
     }
 }
 
-fn inner_ptrace(request: c_int, pid: pid_t, addr: *mut c_void, data: *mut c_void) -> io::Result<c_int> {
+fn inner_ptrace(
+    request: c_int,
+    pid: pid_t,
+    addr: *mut c_void,
+    data: *mut c_void,
+) -> io::Result<c_int> {
     let state = init_state();
 
     if request == sys_ptrace::PTRACE_TRACEME {
@@ -69,7 +93,7 @@ fn inner_ptrace(request: c_int, pid: pid_t, addr: *mut c_void, data: *mut c_void
         let pid = Sys::getpid();
         mem::forget(File::open(
             &CString::new(format!("chan:ptrace-relibc/{}/traceme", pid)).unwrap(),
-            fcntl::O_CREAT | fcntl::O_PATH | fcntl::O_EXCL
+            fcntl::O_CREAT | fcntl::O_PATH | fcntl::O_EXCL,
         )?);
         return Ok(0);
     }
@@ -78,23 +102,31 @@ fn inner_ptrace(request: c_int, pid: pid_t, addr: *mut c_void, data: *mut c_void
     let session = get_session(&mut sessions, pid)?;
 
     match request {
-        sys_ptrace::PTRACE_CONT | sys_ptrace::PTRACE_SINGLESTEP |
-        sys_ptrace::PTRACE_SYSCALL | sys_ptrace::PTRACE_SYSEMU |
-        sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => {
+        sys_ptrace::PTRACE_CONT
+        | sys_ptrace::PTRACE_SINGLESTEP
+        | sys_ptrace::PTRACE_SYSCALL
+        | sys_ptrace::PTRACE_SYSEMU
+        | sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => {
             Sys::kill(pid, signal::SIGCONT as _);
 
             // TODO: Translate errors
-            let syscall = syscall::PTRACE_STOP_PRE_SYSCALL.bits() | syscall::PTRACE_STOP_POST_SYSCALL.bits();
-            (&mut &session.tracer).write(&match request {
-                sys_ptrace::PTRACE_CONT => 0,
-                sys_ptrace::PTRACE_SINGLESTEP => syscall::PTRACE_STOP_SINGLESTEP.bits(),
-                sys_ptrace::PTRACE_SYSCALL => syscall,
-                sys_ptrace::PTRACE_SYSEMU => syscall::PTRACE_FLAG_SYSEMU.bits() | syscall,
-                sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => syscall::PTRACE_FLAG_SYSEMU.bits() | syscall::PTRACE_STOP_SINGLESTEP.bits(),
-                _ => unreachable!("unhandled ptrace request type {}", request)
-            }.to_ne_bytes())?;
+            let syscall =
+                syscall::PTRACE_STOP_PRE_SYSCALL.bits() | syscall::PTRACE_STOP_POST_SYSCALL.bits();
+            (&mut &session.tracer).write(
+                &match request {
+                    sys_ptrace::PTRACE_CONT => 0,
+                    sys_ptrace::PTRACE_SINGLESTEP => syscall::PTRACE_STOP_SINGLESTEP.bits(),
+                    sys_ptrace::PTRACE_SYSCALL => syscall,
+                    sys_ptrace::PTRACE_SYSEMU => syscall::PTRACE_FLAG_SYSEMU.bits() | syscall,
+                    sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => {
+                        syscall::PTRACE_FLAG_SYSEMU.bits() | syscall::PTRACE_STOP_SINGLESTEP.bits()
+                    }
+                    _ => unreachable!("unhandled ptrace request type {}", request),
+                }
+                .to_ne_bytes(),
+            )?;
             Ok(0)
-        },
+        }
         sys_ptrace::PTRACE_GETREGS => {
             let c_regs = unsafe { &mut *(data as *mut user_regs_struct) };
             let mut redox_regs = syscall::IntRegisters::default();
@@ -123,13 +155,13 @@ fn inner_ptrace(request: c_int, pid: pid_t, addr: *mut c_void, data: *mut c_void
                 ss: redox_regs.ss as _,
                 fs_base: 0, // fs_base: redox_regs.fs_base as _,
                 gs_base: 0, // gs_base: redox_regs.gs_base as _,
-                ds: 0, // ds: redox_regs.ds as _,
-                es: 0, // es: redox_regs.es as _,
+                ds: 0,      // ds: redox_regs.ds as _,
+                es: 0,      // es: redox_regs.es as _,
                 fs: redox_regs.fs as _,
                 gs: 0, // gs: redox_regs.gs as _,
             };
             Ok(0)
-        },
+        }
         sys_ptrace::PTRACE_SETREGS => {
             let c_regs = unsafe { &*(data as *mut user_regs_struct) };
             let redox_regs = syscall::IntRegisters {
@@ -163,8 +195,8 @@ fn inner_ptrace(request: c_int, pid: pid_t, addr: *mut c_void, data: *mut c_void
             };
             (&mut &session.regs).write(&redox_regs)?;
             Ok(0)
-        },
-        _ => unimplemented!()
+        }
+        _ => unimplemented!(),
     }
 }
 

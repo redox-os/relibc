@@ -1,7 +1,6 @@
 use alloc::string::String;
 
-use crate::platform::types::*;
-use crate::platform::{self, WriteByte};
+use crate::platform::{self, types::*, WriteByte};
 
 use super::tm;
 

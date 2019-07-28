@@ -2,28 +2,32 @@
 
 mod dns;
 
-use core::str::FromStr;
-use core::{mem, ptr, slice, str};
+use core::{
+    mem, ptr, slice,
+    str::{self, FromStr},
+};
 
-use alloc::borrow::ToOwned;
-use alloc::boxed::Box;
-use alloc::str::SplitWhitespace;
-use alloc::vec::Vec;
+use alloc::{borrow::ToOwned, boxed::Box, str::SplitWhitespace, vec::Vec};
 
-use crate::c_str::{CStr, CString};
-use crate::header::arpa_inet::htons;
-use crate::header::errno::*;
-use crate::header::fcntl::O_RDONLY;
-use crate::header::netinet_in::{in_addr, sockaddr_in, sockaddr_in6};
-use crate::header::stdlib::atoi;
-use crate::header::strings::strcasecmp;
-use crate::header::sys_socket::constants::AF_INET;
-use crate::header::sys_socket::{sa_family_t, sockaddr, socklen_t};
-use crate::header::unistd::SEEK_SET;
-use crate::platform;
-use crate::platform::rlb::{Line, RawLineBuffer};
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
+use crate::{
+    c_str::{CStr, CString},
+    header::{
+        arpa_inet::htons,
+        errno::*,
+        fcntl::O_RDONLY,
+        netinet_in::{in_addr, sockaddr_in, sockaddr_in6},
+        stdlib::atoi,
+        strings::strcasecmp,
+        sys_socket::{constants::AF_INET, sa_family_t, sockaddr, socklen_t},
+        unistd::SEEK_SET,
+    },
+    platform::{
+        self,
+        rlb::{Line, RawLineBuffer},
+        types::*,
+        Pal, Sys,
+    },
+};
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
