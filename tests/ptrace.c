@@ -48,28 +48,32 @@ int main() {
 
         int status;
         while (true) {
-            // Pre-syscall:
+            puts("----- Pre-syscall -----");
             result = ptrace(PTRACE_SYSCALL, pid, NULL, NULL);
             ERROR_IF(ptrace, result, == -1);
             UNEXP_IF(ptrace, result, != 0);
+            puts("Wait...");
             result = waitpid(pid, &status, 0);
             ERROR_IF(waitpid, result, == -1);
             if (WIFEXITED(status)) { break; }
 
             struct user_regs_struct regs;
+            puts("Get regs");
             result = ptrace(PTRACE_GETREGS, pid, NULL, &regs);
             ERROR_IF(ptrace, result, == -1);
 
             if (regs.orig_rax == SYS_write || regs.orig_rax == SYS_write) {
                 regs.rdi = 2;
+                puts("Set regs");
                 result = ptrace(PTRACE_SETREGS, pid, NULL, &regs);
                 ERROR_IF(ptrace, result, == -1);
             }
 
-            // Post-syscall:
+            puts("Post-syscall");
             result = ptrace(PTRACE_SYSCALL, pid, NULL, NULL);
             ERROR_IF(ptrace, result, == -1);
             UNEXP_IF(ptrace, result, != 0);
+            puts("Wait...");
             result = waitpid(pid, &status, 0);
             ERROR_IF(waitpid, result, == -1);
             if (WIFEXITED(status)) { break; }

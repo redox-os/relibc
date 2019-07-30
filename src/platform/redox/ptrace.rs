@@ -17,10 +17,11 @@ use core::mem;
 use syscall;
 
 pub struct Session {
-    pub tracer: File,
+    pub first: bool,
+    pub fpregs: File,
     pub mem: File,
     pub regs: File,
-    pub fpregs: File,
+    pub tracer: File,
 }
 pub struct State {
     pub sessions: Mutex<BTreeMap<pid_t, Session>>,
@@ -45,13 +46,17 @@ pub fn is_traceme(pid: pid_t) -> bool {
     )
     .is_ok()
 }
-pub fn get_session(sessions: &mut BTreeMap<pid_t, Session>, pid: pid_t) -> io::Result<&Session> {
+pub fn get_session(
+    sessions: &mut BTreeMap<pid_t, Session>,
+    pid: pid_t,
+) -> io::Result<&mut Session> {
     const NEW_FLAGS: c_int = fcntl::O_RDWR | fcntl::O_CLOEXEC;
 
     match sessions.entry(pid) {
         Entry::Vacant(entry) => {
             if is_traceme(pid) {
                 Ok(entry.insert(Session {
+                    first: true,
                     tracer: File::open(
                         &CString::new(format!("proc:{}/trace", pid)).unwrap(),
                         NEW_FLAGS | fcntl::O_NONBLOCK,
@@ -110,21 +115,25 @@ fn inner_ptrace(
             Sys::kill(pid, signal::SIGCONT as _);
 
             // TODO: Translate errors
-            let syscall =
-                syscall::PTRACE_STOP_PRE_SYSCALL.bits() | syscall::PTRACE_STOP_POST_SYSCALL.bits();
-            (&mut &session.tracer).write(
-                &match request {
-                    sys_ptrace::PTRACE_CONT => 0,
-                    sys_ptrace::PTRACE_SINGLESTEP => syscall::PTRACE_STOP_SINGLESTEP.bits(),
-                    sys_ptrace::PTRACE_SYSCALL => syscall,
-                    sys_ptrace::PTRACE_SYSEMU => syscall::PTRACE_FLAG_SYSEMU.bits() | syscall,
-                    sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => {
-                        syscall::PTRACE_FLAG_SYSEMU.bits() | syscall::PTRACE_STOP_SINGLESTEP.bits()
-                    }
-                    _ => unreachable!("unhandled ptrace request type {}", request),
+            let syscall = syscall::PTRACE_STOP_PRE_SYSCALL | syscall::PTRACE_STOP_POST_SYSCALL;
+            (&mut &session.tracer).write(&match request {
+                sys_ptrace::PTRACE_CONT => syscall::PtraceFlags::empty(),
+                sys_ptrace::PTRACE_SINGLESTEP => syscall::PTRACE_STOP_SINGLESTEP,
+                // Skip the first post-syscall when connected
+                sys_ptrace::PTRACE_SYSCALL if session.first => syscall::PTRACE_STOP_PRE_SYSCALL,
+                sys_ptrace::PTRACE_SYSCALL => syscall,
+                // Skip the first post-syscall when connected
+                sys_ptrace::PTRACE_SYSEMU if session.first => {
+                    syscall::PTRACE_FLAG_SYSEMU | syscall::PTRACE_STOP_PRE_SYSCALL
                 }
-                .to_ne_bytes(),
-            )?;
+                sys_ptrace::PTRACE_SYSEMU => syscall::PTRACE_FLAG_SYSEMU | syscall,
+                sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => {
+                    syscall::PTRACE_FLAG_SYSEMU | syscall::PTRACE_STOP_SINGLESTEP
+                }
+                _ => unreachable!("unhandled ptrace request type {}", request),
+            })?;
+
+            session.first = false;
             Ok(0)
         }
         sys_ptrace::PTRACE_GETREGS => {
