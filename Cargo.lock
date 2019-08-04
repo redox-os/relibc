@@ -163,7 +163,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "redox_syscall"
 version = "0.1.56"
-source = "git+https://gitlab.redox-os.org/jD91mZM2/syscall?branch=ptrace-6#51f0ef2826ef2b0369766c8f23c8069ae0a56846"
+source = "git+https://gitlab.redox-os.org/redox-os/syscall?rev=0e1e7d5d#0e1e7d5d36f8c6f045e30c37515d366350eb2122"
 dependencies = [
  "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -187,7 +187,7 @@ dependencies = [
  "posix-regex 0.1.0",
  "ralloc 1.0.0",
  "rand 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "redox_syscall 0.1.56 (git+https://gitlab.redox-os.org/jD91mZM2/syscall?branch=ptrace-6)",
+ "redox_syscall 0.1.56 (git+https://gitlab.redox-os.org/redox-os/syscall?rev=0e1e7d5d)",
  "sc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -293,7 +293,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum rand 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c618c47cd3ebd209790115ab837de41425723956ad3ce2e6a7f09890947cacb9"
 "checksum rand_core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6fdeb83b075e8266dcc8762c22776f6877a63111121f5f8c7411e5be7eed4b"
 "checksum rand_core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d0e7a549d590831370895ab7ba4ea0c1b6b011d106b5ff2da6eee112615e6dc0"
-"checksum redox_syscall 0.1.56 (git+https://gitlab.redox-os.org/jD91mZM2/syscall?branch=ptrace-6)" = "<none>"
+"checksum redox_syscall 0.1.56 (git+https://gitlab.redox-os.org/redox-os/syscall?rev=0e1e7d5d)" = "<none>"
 "checksum redox_syscall 0.1.56 (registry+https://github.com/rust-lang/crates.io-index)" = "2439c63f3f6139d1b57529d16bc3b8bb855230c8efcc5d3a896c8bea7c3b1e84"
 "checksum rustc_version 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "c5f5376ea5e30ce23c03eb77cbe4962b988deead10910c372b226388b594c084"
 "checksum rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"

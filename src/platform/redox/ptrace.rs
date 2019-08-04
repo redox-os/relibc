@@ -124,11 +124,11 @@ fn inner_ptrace(
                 sys_ptrace::PTRACE_SYSCALL => syscall,
                 // Skip the first post-syscall when connected
                 sys_ptrace::PTRACE_SYSEMU if session.first => {
-                    syscall::PTRACE_FLAG_SYSEMU | syscall::PTRACE_STOP_PRE_SYSCALL
+                    syscall::PTRACE_FLAG_IGNORE | syscall::PTRACE_STOP_PRE_SYSCALL
                 }
-                sys_ptrace::PTRACE_SYSEMU => syscall::PTRACE_FLAG_SYSEMU | syscall,
+                sys_ptrace::PTRACE_SYSEMU => syscall::PTRACE_FLAG_IGNORE | syscall,
                 sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => {
-                    syscall::PTRACE_FLAG_SYSEMU | syscall::PTRACE_STOP_SINGLESTEP
+                    syscall::PTRACE_FLAG_IGNORE | syscall::PTRACE_STOP_SINGLESTEP
                 }
                 _ => unreachable!("unhandled ptrace request type {}", request),
             })?;
