@@ -340,12 +340,13 @@ pub unsafe extern "C" fn pte_osSemaphorePend(
 ) -> pte_osResult {
     //TODO: pTimeout
     let semaphore = &mut *handle;
-    let mut acquired = false;
-    while !acquired {
-        let _guard = semaphore.lock.lock();
-        if intrinsics::atomic_load(&semaphore.count) > 0 {
-            intrinsics::atomic_xsub(&mut semaphore.count, 1);
-            acquired = true;
+    loop {
+        {
+            let _guard = semaphore.lock.lock();
+            if intrinsics::atomic_load(&semaphore.count) > 0 {
+                intrinsics::atomic_xsub(&mut semaphore.count, 1);
+                break;
+            }
         }
         Sys::sched_yield();
     }
