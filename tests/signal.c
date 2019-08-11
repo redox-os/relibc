@@ -11,8 +11,12 @@ void handler(int sig) {
 }
 
 int main(void) {
-    void (*signal_status)(int) = signal(SIGUSR1, &handler);
+    printf("handler: %x\n", handler);
+    void (*signal_status)(int) = signal(SIGUSR1, handler);
     ERROR_IF(signal, signal_status, == SIG_ERR);
+    signal_status = signal(SIGUSR1, handler);
+    ERROR_IF(signal, signal_status, == SIG_ERR);
+    printf("out: %x\n", signal_status);
 
     puts("Raising...");
 

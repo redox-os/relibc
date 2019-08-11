@@ -30,12 +30,12 @@ pub const SIG_UNBLOCK: c_int = 1;
 pub const SIG_SETMASK: c_int = 2;
 
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct sigaction {
-    pub sa_handler: extern "C" fn(c_int),
-    pub sa_flags: c_ulong,
-    pub sa_restorer: unsafe extern "C" fn(),
+    pub sa_handler: Option<extern "C" fn(c_int)>,
     pub sa_mask: sigset_t,
+    pub sa_flags: c_ulong,
+    pub sa_restorer: Option<unsafe extern "C" fn()>,
 }
 
 #[repr(C)]
@@ -93,7 +93,11 @@ pub unsafe extern "C" fn sigaction(
     } else {
         None
     };
-    Sys::sigaction(sig, act_opt.map_or(ptr::null_mut(), |x| &x), oact)
+    println!("sig => {:?}", act_opt);
+    println!("osig => {:?}", (*oact));
+    let out = Sys::sigaction(sig, act_opt.map_or(ptr::null_mut(), |x| &x), oact);
+    println!("aosig => {:?}", (*oact).sa_handler);
+    out
 }
 
 #[no_mangle]
@@ -194,11 +198,12 @@ extern "C" {
 }
 
 #[no_mangle]
-pub extern "C" fn signal(sig: c_int, func: extern "C" fn(c_int)) -> extern "C" fn(c_int) {
+pub extern "C" fn signal(sig: c_int, func: Option<extern "C" fn(c_int)>) -> Option<extern "C" fn(c_int)> {
+    println!("{:?}", func);
     let sa = sigaction {
         sa_handler: func,
         sa_flags: SA_RESTART as c_ulong,
-        sa_restorer: __restore_rt,
+        sa_restorer: Some(__restore_rt),
         sa_mask: sigset_t::default(),
     };
     let mut old_sa = unsafe { mem::uninitialized() };

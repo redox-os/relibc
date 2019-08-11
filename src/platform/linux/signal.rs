@@ -36,6 +36,7 @@ impl PalSignal for Sys {
     }
 
     unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {
+        println!("in: {:?}", (*act));
         e(syscall!(
             RT_SIGACTION,
             sig,
