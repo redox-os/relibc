@@ -96,11 +96,11 @@ EXPECT_NAMES=\
 	wchar/wcsrchr \
 	wchar/wcstod \
 	wchar/wcstok \
-	wchar/wcstol
+	wchar/wcstol \
+	signal
 	# TODO: Fix these
 	# netdb/getaddrinfo \
 	# netdb/netdb \
-	# signal
 
 # Binaries that may generate varied output
 NAMES=\
