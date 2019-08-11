@@ -2,14 +2,19 @@ use core::{mem, slice};
 use syscall;
 
 use crate::{
-    header::{errno, termios},
+    header::{errno, fcntl, termios},
     platform::{self, e, types::*},
 };
 
 use super::winsize;
 
+pub const FIONBIO: c_ulong = 0x5421;
+
 pub const TCGETS: c_ulong = 0x5401;
 pub const TCSETS: c_ulong = 0x5402;
+pub const TCSBRK: c_ulong = 0x5409;
+
+pub const TCXONC: c_ulong = 0x540A;
 
 pub const TCFLSH: c_ulong = 0x540B;
 
@@ -50,6 +55,22 @@ fn dup_write<T>(fd: c_int, name: &str, t: &T) -> syscall::Result<usize> {
 #[no_mangle]
 pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
     match request {
+        FIONBIO => {
+            let mut flags = fcntl::sys_fcntl(fd, fcntl::F_GETFL, 0);
+            if flags < 0 {
+                return -1;
+            }
+            flags = if *(out as *mut c_int) == 0 {
+                flags & !fcntl::O_NONBLOCK
+            } else {
+                flags | fcntl::O_NONBLOCK
+            };
+            if fcntl::sys_fcntl(fd, fcntl::F_SETFL, flags) < 0 {
+                -1
+            } else {
+                0
+            }
+        }
         TCGETS => {
             let termios = &mut *(out as *mut termios::termios);
             if e(dup_read(fd, "termios", termios)) == !0 {
@@ -58,7 +79,6 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
                 0
             }
         }
-
         TCSETS => {
             let termios = &*(out as *const termios::termios);
             if e(dup_write(fd, "termios", termios)) == !0 {
@@ -106,6 +126,14 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
             } else {
                 0
             }
+        }
+        TCSBRK => {
+            // TODO
+            0
+        }
+        TCXONC => {
+            // TODO
+            0
         }
         _ => {
             platform::errno = errno::EINVAL;

@@ -12,6 +12,37 @@ use platform::{Pal, Sys};
 // const RUSAGE_BOTH: c_int = -2;
 // const RUSAGE_THREAD: c_int = 1;
 
+pub const RLIM_INFINITY: u64 = 0xFFFF_FFFF_FFFF_FFFF;
+pub const RLIM_SAVED_CUR: u64 = RLIM_INFINITY;
+pub const RLIM_SAVED_MAX: u64 = RLIM_INFINITY;
+
+pub const RLIMIT_CPU: u64 = 0;
+pub const RLIMIT_FSIZE: u64 = 1;
+pub const RLIMIT_DATA: u64 = 2;
+pub const RLIMIT_STACK: u64 = 3;
+pub const RLIMIT_CORE: u64 = 4;
+pub const RLIMIT_RSS: u64 = 5;
+pub const RLIMIT_NPROC: u64 = 6;
+pub const RLIMIT_NOFILE: u64 = 7;
+pub const RLIMIT_MEMLOCK: u64 = 8;
+pub const RLIMIT_AS: u64 = 9;
+pub const RLIMIT_LOCKS: u64 = 10;
+pub const RLIMIT_SIGPENDING: u64 = 11;
+pub const RLIMIT_MSGQUEUE: u64 = 12;
+pub const RLIMIT_NICE: u64 = 13;
+pub const RLIMIT_RTPRIO: u64 = 14;
+pub const RLIMIT_NLIMITS: u64 = 15;
+
+#[cfg(target_os = "linux")]
+mod linux;
+#[cfg(target_os = "redox")]
+mod redox;
+
+#[cfg(target_os = "linux")]
+pub use linux::*;
+#[cfg(target_os = "redox")]
+pub use redox::*;
+
 type rlim_t = u64;
 
 #[repr(C)]
@@ -46,13 +77,9 @@ pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
 }
 
 // #[no_mangle]
-pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
-    unimplemented!();
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-    Sys::getrusage(who, r_usage)
+    // Sys::getrusage(who, r_usage)
+    unimplemented!();
 }
 
 // #[no_mangle]

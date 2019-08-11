@@ -196,3 +196,22 @@ pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) ->
 pub unsafe extern "C" fn tcflush(fd: c_int, queue: c_int) -> c_int {
     sys_ioctl::ioctl(fd, sys_ioctl::TCFLSH, queue as *mut c_void)
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn tcdrain(fd: c_int) -> c_int {
+    sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, 1 as *mut _)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn tcsendbreak(fd: c_int, _dur: c_int) -> c_int {
+    // non-zero duration is ignored by musl due to it being
+    // implementation-defined. we do the same.
+    sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, 0 as *mut _)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn tcflow(fd: c_int, action: c_int) -> c_int {
+    // non-zero duration is ignored by musl due to it being
+    // implementation-defined. we do the same.
+    sys_ioctl::ioctl(fd, sys_ioctl::TCXONC, action as *mut _)
+}
