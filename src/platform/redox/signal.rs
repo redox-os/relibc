@@ -109,9 +109,6 @@ impl PalSignal for Sys {
         let new_opt = act.map(|act| {
             let m = act.sa_mask;
             let sa_handler = unsafe { mem::transmute(act.sa_handler) };
-            println!("signal called with {:x}", unsafe {
-                mem::transmute::<_, usize>(sa_handler)
-            });
             syscall::SigAction {
                 sa_handler,
                 sa_mask: [m as u64, 0],
@@ -120,16 +117,12 @@ impl PalSignal for Sys {
             }
         });
         let mut old_opt = oact.as_ref().map(|_| syscall::SigAction::default());
-        println!("before : {:?}", new_opt);
-        println!("before old : {:?}", old_opt);
         let ret = e(syscall::sigaction(
             sig as usize,
             new_opt.as_ref(),
             old_opt.as_mut(),
         )) as c_int;
-        println!("after : {:?}", old_opt);
         if let (Some(old), Some(oact)) = (old_opt, oact) {
-            println!("after : {:?}", oact);
             oact.sa_handler = unsafe { mem::transmute(old.sa_handler) };
             let m = old.sa_mask;
             oact.sa_mask = m[0] as c_ulong;

@@ -33,9 +33,9 @@ pub const SIG_SETMASK: c_int = 2;
 #[derive(Clone, Debug)]
 pub struct sigaction {
     pub sa_handler: Option<extern "C" fn(c_int)>,
-    pub sa_mask: sigset_t,
     pub sa_flags: c_ulong,
     pub sa_restorer: Option<unsafe extern "C" fn()>,
+    pub sa_mask: sigset_t,
 }
 
 #[repr(C)]
