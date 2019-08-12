@@ -41,7 +41,7 @@ int main(void) {
     puts("--- Checking getpwuid_r ---");
     struct passwd pwd2;
     struct passwd* result;
-    char* buf = malloc(100);
+    char* buf = malloc(300);
     if (getpwuid_r(0, &pwd2, buf, 100, &result) < 0) {
         perror("getpwuid_r");
         free(buf);
@@ -56,7 +56,7 @@ int main(void) {
     }
 
     puts("--- Checking getpwnam_r ---");
-    if (getpwnam_r("nobody", &pwd2, buf, 100, &result) < 0) {
+    if (getpwnam_r("nobody", &pwd2, buf, 300, &result) < 0) {
         perror("getpwuid_r");
         free(buf);
         exit(EXIT_FAILURE);
@@ -73,7 +73,7 @@ int main(void) {
     puts("--- Checking getpwuid_r error handling ---");
     char buf2[1];
     if (getpwuid_r(0, &pwd2, buf2, 1, &result) == 0) {
-        puts("This shouldn't have succeeded, but did!");
+        puts("This shouldn't have succeeded, but it did!");
         exit(EXIT_FAILURE);
     }
     if (errno != ERANGE) {
@@ -81,4 +81,25 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
     puts("Returned ERANGE because the buffer was too small 👍");
+
+    errno = 0;
+
+    struct passwd *entry = NULL;
+    for (int i = 1; entry = getpwent(); ++i) {
+        int backup = errno;
+        printf("--- getpwent #%d ---\n", i);
+        if (backup != 0) {
+            errno = backup;
+            perror("getpwent");
+            exit(EXIT_FAILURE);
+        }
+        print(entry);
+    }
+    puts("--- getpwent #1 (rewind) ---");
+    setpwent();
+    entry = getpwent();
+    perror("getpwent");
+    print(entry);
+
+    endpwent();
 }

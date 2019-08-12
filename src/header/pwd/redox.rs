@@ -1,11 +1,15 @@
-pub fn split(line: &[u8]) -> [&[u8]; 7] {
-    let mut parts: [&[u8]; 7] = [&[]; 7];
-    let mut iter = line.split(|b| *b == b';');
+use super::{parsed, passwd};
+use crate::platform::types::*;
 
-    parts[0] = iter.next().unwrap_or(&[]);
-    // Skip passwd
-    for i in 2..7 {
-        parts[i] = iter.next().unwrap_or(&[]);
-    }
-    parts
+pub fn split(line: &mut [u8]) -> Option<passwd> {
+    let mut parts = line.split_mut(|&c| c == b'\0');
+    Some(passwd {
+        pw_name: parts.next()?.as_mut_ptr() as *mut c_char,
+        pw_passwd: "x\0".as_ptr() as *const c_char as *mut c_char,
+        pw_uid: parsed(parts.next())?,
+        pw_gid: parsed(parts.next())?,
+        pw_gecos: parts.next()?.as_mut_ptr() as *mut c_char,
+        pw_dir: parts.next()?.as_mut_ptr() as *mut c_char,
+        pw_shell: parts.next()?.as_mut_ptr() as *mut c_char,
+    })
 }
