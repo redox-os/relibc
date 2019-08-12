@@ -35,14 +35,16 @@ impl PalSignal for Sys {
         e(unsafe { syscall!(SETITIMER, which, new, old) }) as c_int
     }
 
-    unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {
-        e(syscall!(
-            RT_SIGACTION,
-            sig,
-            act,
-            oact,
-            mem::size_of::<sigset_t>()
-        )) as c_int
+    fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> c_int {
+        e(unsafe {
+            syscall!(
+                RT_SIGACTION,
+                sig,
+                act.map_or_else(core::ptr::null, |x| x as *const _),
+                oact.map_or_else(core::ptr::null_mut, |x| x as *mut _),
+                mem::size_of::<sigset_t>()
+            )
+        }) as c_int
     }
 
     fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {

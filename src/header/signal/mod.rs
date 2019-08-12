@@ -1,6 +1,6 @@
 //! signal implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/signal.h.html
 
-use core::{mem, ptr};
+use core::mem;
 
 use cbitset::BitSet;
 
@@ -21,20 +21,20 @@ pub mod sys;
 
 type SigSet = BitSet<[c_ulong; 1]>;
 
-pub (crate) const SIG_DFL: usize = 0;
-pub (crate) const SIG_IGN: usize = 1;
-pub (crate) const SIG_ERR: isize = -1;
+pub(crate) const SIG_DFL: usize = 0;
+pub(crate) const SIG_IGN: usize = 1;
+pub(crate) const SIG_ERR: isize = -1;
 
 pub const SIG_BLOCK: c_int = 0;
 pub const SIG_UNBLOCK: c_int = 1;
 pub const SIG_SETMASK: c_int = 2;
 
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct sigaction {
-    pub sa_handler: extern "C" fn(c_int),
+    pub sa_handler: Option<extern "C" fn(c_int)>,
     pub sa_flags: c_ulong,
-    pub sa_restorer: unsafe extern "C" fn(),
+    pub sa_restorer: Option<unsafe extern "C" fn()>,
     pub sa_mask: sigset_t,
 }
 
@@ -86,14 +86,12 @@ pub unsafe extern "C" fn sigaction(
     act: *const sigaction,
     oact: *mut sigaction,
 ) -> c_int {
-    let act_opt = if !act.is_null() {
-        let mut act_clone = (*act).clone();
+    let act_opt = act.as_ref().map(|act| {
+        let mut act_clone = act.clone();
         act_clone.sa_flags |= SA_RESTORER as c_ulong;
-        Some(act_clone)
-    } else {
-        None
-    };
-    Sys::sigaction(sig, act_opt.map_or(ptr::null_mut(), |x| &x), oact)
+        act_clone
+    });
+    Sys::sigaction(sig, act_opt.as_ref(), oact.as_mut())
 }
 
 #[no_mangle]
@@ -194,11 +192,14 @@ extern "C" {
 }
 
 #[no_mangle]
-pub extern "C" fn signal(sig: c_int, func: extern "C" fn(c_int)) -> extern "C" fn(c_int) {
+pub extern "C" fn signal(
+    sig: c_int,
+    func: Option<extern "C" fn(c_int)>,
+) -> Option<extern "C" fn(c_int)> {
     let sa = sigaction {
         sa_handler: func,
         sa_flags: SA_RESTART as c_ulong,
-        sa_restorer: __restore_rt,
+        sa_restorer: Some(__restore_rt),
         sa_mask: sigset_t::default(),
     };
     let mut old_sa = unsafe { mem::uninitialized() };

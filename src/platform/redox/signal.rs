@@ -105,33 +105,28 @@ impl PalSignal for Sys {
         0
     }
 
-    unsafe fn sigaction(sig: c_int, act: *const sigaction, oact: *mut sigaction) -> c_int {
-        let new_opt = if act.is_null() {
-            None
-        } else {
-            let m = (*act).sa_mask;
-            Some(syscall::SigAction {
-                sa_handler: mem::transmute((*act).sa_handler),
+    fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> c_int {
+        let new_opt = act.map(|act| {
+            let m = act.sa_mask;
+            let sa_handler = unsafe { mem::transmute(act.sa_handler) };
+            syscall::SigAction {
+                sa_handler,
                 sa_mask: [m as u64, 0],
-                sa_flags: syscall::SigActionFlags::from_bits((*act).sa_flags as usize)
+                sa_flags: syscall::SigActionFlags::from_bits(act.sa_flags as usize)
                     .expect("sigaction: invalid bit pattern"),
-            })
-        };
-        let mut old_opt = if oact.is_null() {
-            None
-        } else {
-            Some(syscall::SigAction::default())
-        };
+            }
+        });
+        let mut old_opt = oact.as_ref().map(|_| syscall::SigAction::default());
         let ret = e(syscall::sigaction(
             sig as usize,
             new_opt.as_ref(),
             old_opt.as_mut(),
         )) as c_int;
-        if let Some(old) = old_opt {
-            (*oact).sa_handler = mem::transmute(old.sa_handler);
+        if let (Some(old), Some(oact)) = (old_opt, oact) {
+            oact.sa_handler = unsafe { mem::transmute(old.sa_handler) };
             let m = old.sa_mask;
-            (*oact).sa_mask = m[0] as c_ulong;
-            (*oact).sa_flags = old.sa_flags.bits() as c_ulong;
+            oact.sa_mask = m[0] as c_ulong;
+            oact.sa_flags = old.sa_flags.bits() as c_ulong;
         }
         ret
     }
