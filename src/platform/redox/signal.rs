@@ -111,7 +111,9 @@ impl PalSignal for Sys {
         } else {
             let m = (*act).sa_mask;
             let sa_handler = mem::transmute((*act).sa_handler);
-    println!("signal called with {:x}", unsafe { mem::transmute::<_, usize>(sa_handler) });
+            println!("signal called with {:x}", unsafe {
+                mem::transmute::<_, usize>(sa_handler)
+            });
             Some(syscall::SigAction {
                 sa_handler,
                 sa_mask: [m as u64, 0],
@@ -138,7 +140,7 @@ impl PalSignal for Sys {
             (*oact).sa_mask = m[0] as c_ulong;
             (*oact).sa_flags = old.sa_flags.bits() as c_ulong;
         }
-        println!("after : {:?}", oact);
+        println!("after : {:?}", (*oact));
         ret
     }
 
