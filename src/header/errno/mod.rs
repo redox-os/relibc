@@ -14,8 +14,8 @@ pub unsafe extern "C" fn __errno_location() -> *mut c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn __program_invocation_name() -> *mut c_char {
-    platform::inner_argv[0]
+pub unsafe extern "C" fn __program_invocation_name() -> *mut *mut c_char {
+    &mut platform::inner_argv[0]
 }
 
 pub const EPERM: c_int = 1; /* Operation not permitted */

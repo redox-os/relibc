@@ -8,7 +8,7 @@ extern "C" {
 #define ENOTSUP EOPNOTSUPP
 
 #define errno (*__errno_location())
-#define program_invocation_name (__program_invocation_name())
+#define program_invocation_name (*__program_invocation_name())
 
 #ifdef __cplusplus
 } // extern "C"
