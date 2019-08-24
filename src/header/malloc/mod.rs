@@ -1,4 +1,3 @@
-use core::{convert::TryFrom, ptr};
 use crate::{
     header::{
         errno::*,
@@ -6,6 +5,7 @@ use crate::{
     },
     platform::{self, types::*},
 };
+use core::{convert::TryFrom, ptr};
 
 // GNU extension, always declared in malloc.h.
 #[no_mangle]
@@ -25,7 +25,7 @@ pub unsafe extern "C" fn pvalloc(size: size_t) -> *mut c_void {
             } else {
                 0
             };
-            
+
             match num_pages.checked_mul(page_size) {
                 Some(alloc_size) => {
                     // Perform the allocation.
