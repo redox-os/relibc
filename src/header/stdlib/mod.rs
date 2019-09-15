@@ -51,29 +51,38 @@ pub extern "C" fn _Exit(status: c_int) {
 
 #[no_mangle]
 pub unsafe extern "C" fn a64l(s: *const c_char) -> c_long {
+    // Early return upon null pointer argument
     if s.is_null() {
         return 0;
     }
+
     // POSIX says only the low-order 32 bits are used.
     let mut l: i32 = 0;
-    // a64l does not support more than 6 characters at once
-    for x in 0..6 {
-        let c = *s.offset(x);
-        if c == 0 {
-            // string is null terminated
-            return c_long::from(l);
-        }
-        // ASCII to base64 conversion:
-        let mut bits: i32 = if c < 58 {
-            (c - 46) as i32 // ./0123456789
-        } else if c < 91 {
-            (c - 53) as i32 // A-Z
-        } else {
-            (c - 59) as i32 // a-z
+
+    // Handle up to 6 input characters (excl. null terminator)
+    for i in 0..6 {
+        let digit_char = *s.offset(i);
+
+        let digit_value = match digit_char {
+            0 => break, // Null terminator encountered
+            46..=57 => {
+                // ./0123456789 represents values 0 to 11. b'.' == 46
+                digit_char - 46
+            }
+            65..=90 => {
+                // A-Z for values 12 to 37. b'A' == 65, 65-12 == 53
+                digit_char - 53
+            }
+            97..=122 => {
+                // a-z for values 38 to 63. b'a' == 97, 97-38 == 59
+                digit_char - 59
+            }
+            _ => return 0, // Early return for anything else
         };
-        bits <<= 6 * x;
-        l |= bits;
+
+        l |= i32::from(digit_value) << 6 * i;
     }
+
     c_long::from(l)
 }
 
@@ -381,24 +390,30 @@ pub unsafe extern "C" fn l64a(value: c_long) -> *mut c_char {
      * left unused can then be found by taking the number of leading
      * zeros, dividing by 6 and rounding down (i.e. using integer
      * division). */
-    let num_output_digits = 6 - (value_as_i32.leading_zeros() + 4) / 6;
+    let num_output_digits = usize::try_from(6 - (value_as_i32.leading_zeros() + 4) / 6).unwrap();
 
     // Reset buffer (and have null terminator in place for any result)
     L64A_BUFFER = [0; 7];
 
-    for i in 0..num_output_digits as usize {
-        let digit_value = ((value_as_i32 >> 6 * i) & 63) as c_char;
+    for i in 0..num_output_digits {
+        // Conversion to c_char always succeeds for the range 0..=63
+        let digit_value = c_char::try_from((value_as_i32 >> 6 * i) & 63).unwrap();
 
-        if digit_value < 12 {
-            // ./0123456789 for values 0 to 11. b'.' == 46
-            L64A_BUFFER[i] = 46 + digit_value;
-        } else if digit_value < 38 {
-            // A-Z for values 12 to 37. b'A' == 65, 65-12 == 53
-            L64A_BUFFER[i] = 53 + digit_value;
-        } else {
-            // a-z for values 38 to 63. b'a' == 97, 97-38 == 59
-            L64A_BUFFER[i] = 59 + digit_value;
-        }
+        L64A_BUFFER[i] = match digit_value {
+            0..=11 => {
+                // ./0123456789 for values 0 to 11. b'.' == 46
+                46 + digit_value
+            }
+            12..=37 => {
+                // A-Z for values 12 to 37. b'A' == 65, 65-12 == 53
+                53 + digit_value
+            }
+            38..=63 => {
+                // a-z for values 38 to 63. b'a' == 97, 97-38 == 59
+                59 + digit_value
+            }
+            _ => unreachable!(), // Guaranteed by taking "& 63" above
+        };
     }
 
     L64A_BUFFER.as_mut_ptr()
