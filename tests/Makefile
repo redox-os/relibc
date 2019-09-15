@@ -8,6 +8,7 @@ EXPECT_NAMES=\
 	ctype \
 	destructor \
 	dirent/scandir \
+	errno \
 	error \
 	fcntl/create \
 	fcntl/fcntl \
