@@ -1,5 +1,6 @@
 # Binaries that should generate the same output every time
 EXPECT_NAMES=\
+	futimens \
 	alloca \
 	args \
 	arpainet \

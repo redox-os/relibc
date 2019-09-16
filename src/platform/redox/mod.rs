@@ -318,31 +318,29 @@ impl Pal for Sys {
         let mut redox_buf: redox_stat = redox_stat::default();
         match e(syscall::fstat(fildes as usize, &mut redox_buf)) {
             0 => {
-                unsafe {
-                    if !buf.is_null() {
-                        (*buf).st_dev = redox_buf.st_dev as dev_t;
-                        (*buf).st_ino = redox_buf.st_ino as ino_t;
-                        (*buf).st_nlink = redox_buf.st_nlink as nlink_t;
-                        (*buf).st_mode = redox_buf.st_mode as mode_t;
-                        (*buf).st_uid = redox_buf.st_uid as uid_t;
-                        (*buf).st_gid = redox_buf.st_gid as gid_t;
-                        // TODO st_rdev
-                        (*buf).st_rdev = 0;
-                        (*buf).st_size = redox_buf.st_size as off_t;
-                        (*buf).st_blksize = redox_buf.st_blksize as blksize_t;
-                        (*buf).st_atim = timespec {
-                            tv_sec: redox_buf.st_atime as time_t,
-                            tv_nsec: redox_buf.st_atime_nsec as c_long,
-                        };
-                        (*buf).st_mtim = timespec {
-                            tv_sec: redox_buf.st_mtime as time_t,
-                            tv_nsec: redox_buf.st_mtime_nsec as c_long,
-                        };
-                        (*buf).st_ctim = timespec {
-                            tv_sec: redox_buf.st_ctime as time_t,
-                            tv_nsec: redox_buf.st_ctime_nsec as c_long,
-                        };
-                    }
+                if let Some(buf) = unsafe { buf.as_mut() } {
+                    buf.st_dev = redox_buf.st_dev as dev_t;
+                    buf.st_ino = redox_buf.st_ino as ino_t;
+                    buf.st_nlink = redox_buf.st_nlink as nlink_t;
+                    buf.st_mode = redox_buf.st_mode as mode_t;
+                    buf.st_uid = redox_buf.st_uid as uid_t;
+                    buf.st_gid = redox_buf.st_gid as gid_t;
+                    // TODO st_rdev
+                    buf.st_rdev = 0;
+                    buf.st_size = redox_buf.st_size as off_t;
+                    buf.st_blksize = redox_buf.st_blksize as blksize_t;
+                    buf.st_atim = timespec {
+                        tv_sec: redox_buf.st_atime as time_t,
+                        tv_nsec: redox_buf.st_atime_nsec as c_long,
+                    };
+                    buf.st_mtim = timespec {
+                        tv_sec: redox_buf.st_mtime as time_t,
+                        tv_nsec: redox_buf.st_mtime_nsec as c_long,
+                    };
+                    buf.st_ctim = timespec {
+                        tv_sec: redox_buf.st_ctime as time_t,
+                        tv_nsec: redox_buf.st_ctime_nsec as c_long,
+                    };
                 }
                 0
             }
