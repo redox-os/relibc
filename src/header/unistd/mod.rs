@@ -4,7 +4,7 @@ use core::{convert::TryFrom, mem, ptr, slice};
 
 use crate::{
     c_str::CStr,
-    header::{errno, limits, stdlib::getenv, sys_ioctl, sys_time, termios, time::timespec},
+    header::{errno, limits, fcntl::sys::O_WRONLY, stdlib::getenv, sys_ioctl, sys_time, termios, time::timespec},
     platform::{self, types::*, Pal, Sys},
 };
 use alloc::collections::LinkedList;
@@ -647,9 +647,19 @@ pub extern "C" fn tcsetpgrp(fd: c_int, pgrp: pid_t) -> c_int {
     pgrp
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn truncate(path: *const c_char, length: off_t) -> c_int {
-    unimplemented!();
+    let file = unsafe { CStr::from_ptr(path) };
+    let fd = Sys::open(file, O_WRONLY, 0);
+    if fd < 0 {
+        return -1;
+    }
+
+    let res = ftruncate(fd, length);
+
+    Sys::close(fd);
+
+    res
 }
 
 #[no_mangle]

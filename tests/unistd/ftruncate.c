@@ -17,4 +17,8 @@ int main(void) {
     int c = close(fd);
     ERROR_IF(close, c, == -1);
     UNEXP_IF(close, c, != 0);
+
+    status = truncate("ftruncate.out", 100);
+    ERROR_IF(truncate, status, == -1);
+    UNEXP_IF(truncate, status, != 0);
 }
