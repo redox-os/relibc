@@ -16,7 +16,6 @@ EXPECT_NAMES=\
 	libgen \
 	locale \
 	math \
-	mkfifo \
     ptrace \
 	regex \
 	select \
@@ -103,6 +102,7 @@ EXPECT_NAMES=\
 	# TODO: Fix these
 	# netdb/getaddrinfo \
 	# netdb/netdb \
+	# mkfifo \
 
 # Binaries that may generate varied output
 NAMES=\
