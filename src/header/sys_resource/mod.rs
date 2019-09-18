@@ -1,10 +1,10 @@
 //! sys/resource.h implementation for Redox, following
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysresource.h.html
 
-use header::sys_time::timeval;
-use platform;
-use platform::types::*;
-use platform::{Pal, Sys};
+use crate::header::sys_time::timeval;
+use crate::platform;
+use crate::platform::types::*;
+use crate::platform::{Pal, Sys};
 
 // Exported in bits file
 // const RUSAGE_SELF: c_int = 0;
@@ -32,16 +32,6 @@ pub const RLIMIT_MSGQUEUE: u64 = 12;
 pub const RLIMIT_NICE: u64 = 13;
 pub const RLIMIT_RTPRIO: u64 = 14;
 pub const RLIMIT_NLIMITS: u64 = 15;
-
-#[cfg(target_os = "linux")]
-mod linux;
-#[cfg(target_os = "redox")]
-mod redox;
-
-#[cfg(target_os = "linux")]
-pub use linux::*;
-#[cfg(target_os = "redox")]
-pub use redox::*;
 
 type rlim_t = u64;
 
@@ -72,22 +62,27 @@ pub struct rusage {
 }
 
 // #[no_mangle]
-pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
-    unimplemented!();
-}
-
+// pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
+//     unimplemented!();
+// }
+//
 // #[no_mangle]
-pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-    // Sys::getrusage(who, r_usage)
-    unimplemented!();
-}
-
+// pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
+//     Sys::getrlimit(resource, rlp)
+// }
+//
 // #[no_mangle]
-pub unsafe extern "C" fn setpriority(which: c_int, who: id_t, nice: c_int) -> c_int {
-    unimplemented!();
-}
-
+// pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
+//     // Sys::getrusage(who, r_usage)
+//     unimplemented!();
+// }
+//
 // #[no_mangle]
-pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int {
-    unimplemented!();
-}
+// pub unsafe extern "C" fn setpriority(which: c_int, who: id_t, nice: c_int) -> c_int {
+//     unimplemented!();
+// }
+//
+// #[no_mangle]
+// pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int {
+//     unimplemented!();
+// }

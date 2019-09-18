@@ -38,7 +38,7 @@ pub mod sys_file;
 pub mod sys_ioctl;
 pub mod sys_mman;
 pub mod sys_ptrace;
-//pub mod sys_resource;
+pub mod sys_resource;
 pub mod sys_select;
 pub mod sys_socket;
 pub mod sys_stat;
