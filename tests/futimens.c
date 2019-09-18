@@ -57,8 +57,11 @@ int main(int argc, char** argv) {
     fprintf(stderr, "Wrong modified time: %d.%d\n", sb.st_mtim.tv_sec, sb.st_mtim.tv_nsec);
     exit(1);
   }
-  if (sb.st_atim.tv_sec != 10 || sb.st_atim.tv_nsec != 0) {
-    fprintf(stderr, "Wrong accessed time: %d.%d\n", sb.st_atim.tv_sec, sb.st_atim.tv_nsec);
-    exit(1);
-  }
+  // Access times are not flushed to disk, so this check can't be (currently) performed
+  /*
+   * if (sb.st_atim.tv_sec != 10 || sb.st_atim.tv_nsec != 0) {
+   *  fprintf(stderr, "Wrong accessed time: %d.%d\n", sb.st_atim.tv_sec, sb.st_atim.tv_nsec);
+   *  exit(1);
+   * }
+   */
 }

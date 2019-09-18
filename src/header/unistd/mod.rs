@@ -4,7 +4,10 @@ use core::{convert::TryFrom, mem, ptr, slice};
 
 use crate::{
     c_str::CStr,
-    header::{errno, limits, fcntl::sys::O_WRONLY, stdlib::getenv, sys_ioctl, sys_time, termios, time::timespec},
+    header::{
+        errno, fcntl::sys::O_WRONLY, limits, stdlib::getenv, sys_ioctl, sys_time, termios,
+        time::timespec,
+    },
     platform::{self, types::*, Pal, Sys},
 };
 use alloc::collections::LinkedList;
