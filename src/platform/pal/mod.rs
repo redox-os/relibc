@@ -3,6 +3,7 @@ use crate::{
     c_str::CStr,
     header::{
         dirent::dirent,
+        sys_resource::rlimit,
         sys_stat::stat,
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
@@ -89,6 +90,8 @@ pub trait Pal {
     fn getpid() -> pid_t;
 
     fn getppid() -> pid_t;
+
+    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int;
 
     fn gettid() -> pid_t;
 

@@ -13,6 +13,7 @@ use crate::{
         errno::{EINVAL, EIO, EPERM, ERANGE},
         fcntl,
         sys_mman::MAP_ANON,
+        sys_resource::{rlimit, RLIM_INFINITY},
         sys_stat::stat,
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
@@ -554,6 +555,15 @@ impl Pal for Sys {
 
     fn getppid() -> pid_t {
         e(syscall::getppid()) as pid_t
+    }
+
+    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int {
+        //TODO
+        if ! rlim.is_null() {
+            (*rlim).rlim_cur = RLIM_INFINITY;
+            (*rlim).rlim_max = RLIM_INFINITY;
+        }
+        0
     }
 
     fn gettid() -> pid_t {

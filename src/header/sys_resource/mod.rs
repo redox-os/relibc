@@ -2,7 +2,6 @@
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysresource.h.html
 
 use crate::header::sys_time::timeval;
-use crate::platform;
 use crate::platform::types::*;
 use crate::platform::{Pal, Sys};
 
@@ -33,7 +32,7 @@ pub const RLIMIT_NICE: u64 = 13;
 pub const RLIMIT_RTPRIO: u64 = 14;
 pub const RLIMIT_NLIMITS: u64 = 15;
 
-type rlim_t = u64;
+pub type rlim_t = u64;
 
 #[repr(C)]
 pub struct rlimit {
@@ -65,12 +64,12 @@ pub struct rusage {
 // pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
 //     unimplemented!();
 // }
-//
-// #[no_mangle]
-// pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
-//     Sys::getrlimit(resource, rlp)
-// }
-//
+
+#[no_mangle]
+pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
+    Sys::getrlimit(resource, rlp)
+}
+
 // #[no_mangle]
 // pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
 //     // Sys::getrusage(who, r_usage)

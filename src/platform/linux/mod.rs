@@ -8,6 +8,7 @@ use crate::{
 };
 // use header::sys_resource::rusage;
 use crate::header::{
+    sys_resource::rlimit,
     sys_stat::stat,
     sys_statvfs::statvfs,
     sys_time::{timeval, timezone},
@@ -251,6 +252,10 @@ impl Pal for Sys {
 
     fn getppid() -> pid_t {
         e(unsafe { syscall!(GETPPID) }) as pid_t
+    }
+
+    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int {
+        e(syscall!(GETRLIMIT, resource, rlim)) as c_int
     }
 
     fn gettid() -> pid_t {
