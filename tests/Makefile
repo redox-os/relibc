@@ -95,6 +95,7 @@ EXPECT_NAMES=\
 	wchar/wcrtomb \
 	wchar/wcscspn \
 	wchar/wcsrchr \
+	wchar/wcsstr \
 	wchar/wcstod \
 	wchar/wcstok \
 	wchar/wcstol \
