@@ -1,6 +1,6 @@
 //! wchar implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/wchar.h.html
 
-use core::{char, ffi::VaList as va_list, mem, ptr, usize};
+use core::{char, ffi::VaList as va_list, mem, ptr, slice, usize};
 
 use crate::{
     header::{ctype::isspace, errno::ERANGE, stdio::*, stdlib::MB_CUR_MAX, string, time::*},
@@ -353,11 +353,11 @@ pub extern "C" fn wcsftime(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wcslen(ws: *const wchar_t) -> c_ulong {
+pub unsafe extern "C" fn wcslen(ws: *const wchar_t) -> size_t {
     let mut i = 0;
     loop {
         if *ws.add(i) == 0 {
-            return i as c_ulong;
+            return i;
         }
         i += 1;
     }
@@ -370,7 +370,7 @@ pub unsafe extern "C" fn wcsncat(
     n: size_t,
 ) -> *mut wchar_t {
     let len = wcslen(ws1);
-    let dest = ws1.add(len as usize);
+    let dest = ws1.add(len);
     let mut i = 0;
     while i < n {
         let wc = *ws2.add(i);
@@ -462,9 +462,32 @@ pub unsafe extern "C" fn wcsspn(wcs: *const wchar_t, set: *const wchar_t) -> siz
     inner_wcsspn(wcs, set, false)
 }
 
-// #[no_mangle]
-pub extern "C" fn wcsstr(ws1: *const wchar_t, ws2: *const wchar_t) -> *mut wchar_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcsstr(ws1: *const wchar_t, ws2: *const wchar_t) -> *mut wchar_t {
+    // Get length of ws2, not including null terminator
+    let ws2_len = wcslen(ws2);
+
+    // The standard says that we must return ws1 if ws2 has length 0
+    if ws2_len == 0 {
+        ws1 as *mut wchar_t
+    } else {
+        let ws1_len = wcslen(ws1);
+
+        // Construct slices without null terminator
+        let ws1_slice = slice::from_raw_parts(ws1, ws1_len);
+        let ws2_slice = slice::from_raw_parts(ws2, ws2_len);
+
+        /* Sliding ws2-sized window iterator on ws1. The iterator
+         * returns None if ws2 is longer than ws1. */
+        let mut ws1_windows = ws1_slice.windows(ws2_len);
+
+        /* Find the first offset into ws1 where the window is equal to
+         * the ws2 contents. Return null pointer if no match is found. */
+        match ws1_windows.position(|ws1_window| ws1_window == ws2_slice) {
+            Some(pos) => ws1.add(pos) as *mut wchar_t,
+            None => ptr::null_mut(),
+        }
+    }
 }
 
 macro_rules! skipws {
