@@ -8,8 +8,6 @@
 #![feature(c_variadic)]
 #![feature(const_fn)]
 #![feature(const_raw_ptr_deref)]
-#![feature(const_str_as_bytes)]
-#![feature(const_vec_new)]
 #![feature(core_intrinsics)]
 #![feature(global_asm)]
 #![feature(lang_items)]
