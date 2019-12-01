@@ -21,6 +21,10 @@ pub const MAP_FIXED: c_int = 0x0010;
 pub const MAP_ANON: c_int = 0x0020;
 pub const MAP_ANONYMOUS: c_int = MAP_ANON;
 
+pub const MS_ASYNC: c_int = 0x0001;
+pub const MS_INVALIDATE: c_int = 0x0002;
+pub const MS_SYNC: c_int = 0x0004;
+
 // #[no_mangle]
 pub extern "C" fn mlock(addr: *const c_void, len: usize) -> c_int {
     unimplemented!();
@@ -44,13 +48,13 @@ pub unsafe extern "C" fn mmap(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
+pub unsafe extern "C" fn mprotect(addr: *mut c_void, len: size_t, prot: c_int) -> c_int {
     Sys::mprotect(addr, len, prot)
 }
 
-// #[no_mangle]
-pub extern "C" fn msync(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn msync(addr: *mut c_void, len: size_t, flags: c_int) -> c_int {
+    Sys::msync(addr, len, flags)
 }
 
 // #[no_mangle]

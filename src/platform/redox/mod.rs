@@ -675,6 +675,18 @@ impl Pal for Sys {
         )) as c_int
     }
 
+    unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
+        eprintln!("msync {:p} {:x} {:x}", addr, len, flags);
+        e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
+        /* TODO
+        e(syscall::msync(
+            addr as usize,
+            len,
+            flags
+        )) as c_int
+        */
+    }
+
     unsafe fn munmap(addr: *mut c_void, _len: usize) -> c_int {
         if e(syscall::funmap(addr as usize)) == !0 {
             return !0;
