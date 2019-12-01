@@ -390,6 +390,9 @@ impl Linker {
                     reloc::R_X86_64_DTPMOD64 => {
                         set_u64(tm as u64);
                     }
+                    reloc::R_X86_64_DTPOFF64 => {
+                        set_u64((s + a) as u64);
+                    }
                     reloc::R_X86_64_GLOB_DAT | reloc::R_X86_64_JUMP_SLOT => {
                         set_u64(s as u64);
                     }
