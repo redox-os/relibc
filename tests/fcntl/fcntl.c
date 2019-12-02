@@ -19,7 +19,7 @@ int main(void) {
     int newfd2 = fcntl(newfd, F_DUPFD, 0);
     // TODO: The standard doesn't define errors for F_DUPFD
 
-    printf("fd %d duped into fd %d\n", newfd, newfd2);
+    printf("duped fd is %d greater than the original fd\n", newfd2 - newfd);
 
     int c1 = close(newfd);
     ERROR_IF(close, c1, == -1);
