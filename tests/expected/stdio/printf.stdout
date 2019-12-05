@@ -52,3 +52,11 @@ Float madness:
 0.0001
 1E-05
 1.000000E-05
+
+Non-finite float madness:
+%e: inf -inf nan -nan
+%E: INF -INF NAN -NAN
+%f: inf -inf nan -nan
+%F: INF -INF NAN -NAN
+%g: inf -inf nan -nan
+%G: INF -INF NAN -NAN
