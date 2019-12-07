@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{char, cmp, f64, ffi::VaList, fmt, ops::Range, slice};
+use core::{char, cmp, f64, ffi::VaList, fmt, num::FpCategory, ops::Range, slice};
 
 use crate::{
     header::errno::EILSEQ,
@@ -259,6 +259,18 @@ impl VaListCache {
 // |___|_| |_| |_| .__/|_|\___|_| |_| |_|\___|_| |_|\__\__,_|\__|_|\___/|_| |_(_)
 //               |_|
 
+enum FmtCase {
+    Lower,
+    Upper,
+}
+
+// The spelled-out "infinity"/"INFINITY" is also permitted by the standard
+static INF_STR_LOWER: &str = "inf";
+static INF_STR_UPPER: &str = "INF";
+
+static NAN_STR_LOWER: &str = "nan";
+static NAN_STR_UPPER: &str = "NAN";
+
 unsafe fn pop_int_raw(format: &mut *const u8) -> Option<usize> {
     let mut int = None;
     while let Some(digit) = (**format as char).to_digit(10) {
@@ -418,6 +430,32 @@ fn fmt_float_normal<W: Write>(
     pad(w, left, b' ', string.len()..pad_space)?;
 
     Ok(string.len())
+}
+
+/// Write ±infinity or ±NaN representation for any floating-point style
+fn fmt_float_nonfinite<W: Write>(w: &mut W, float: c_double, case: FmtCase) -> io::Result<()> {
+    if float.is_sign_negative() {
+        w.write_all(&[b'-'])?;
+    }
+
+    let nonfinite_str = match float.classify() {
+        FpCategory::Infinite => match case {
+            FmtCase::Lower => INF_STR_LOWER,
+            FmtCase::Upper => INF_STR_UPPER,
+        },
+        FpCategory::Nan => match case {
+            FmtCase::Lower => NAN_STR_LOWER,
+            FmtCase::Upper => NAN_STR_UPPER,
+        },
+        _ => {
+            // This function should only be called with infinite or NaN value.
+            panic!("this should not be possible")
+        }
+    };
+
+    w.write_all(nonfinite_str.as_bytes())?;
+
+    Ok(())
 }
 
 #[derive(Clone, Copy)]
@@ -634,6 +672,11 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
         let intkind = arg.intkind;
         let fmt = arg.fmt;
         let fmtkind = arg.fmtkind;
+        let fmtcase = match fmt {
+            b'x' | b'f' | b'e' | b'g' => Some(FmtCase::Lower),
+            b'X' | b'F' | b'E' | b'G' => Some(FmtCase::Upper),
+            _ => None,
+        };
 
         let index = arg.index.map(|i| i - 1).unwrap_or_else(|| {
             if fmtkind == FmtKind::Percent {
@@ -756,47 +799,59 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     VaArg::c_double(i) => i,
                     _ => panic!("this should not be possible"),
                 };
-                let (float, exp) = float_exp(float);
-                let precision = precision.unwrap_or(6);
+                if float.is_finite() {
+                    let (float, exp) = float_exp(float);
+                    let precision = precision.unwrap_or(6);
 
-                fmt_float_exp(
-                    w, fmt, false, precision, float, exp, left, pad_space, pad_zero,
-                )?;
+                    fmt_float_exp(
+                        w, fmt, false, precision, float, exp, left, pad_space, pad_zero,
+                    )?;
+                } else {
+                    fmt_float_nonfinite(w, float, fmtcase.unwrap())?;
+                }
             }
             FmtKind::Decimal => {
                 let float = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::c_double(i) => i,
                     _ => panic!("this should not be possible"),
                 };
-                let precision = precision.unwrap_or(6);
+                if float.is_finite() {
+                    let precision = precision.unwrap_or(6);
 
-                fmt_float_normal(w, false, precision, float, left, pad_space, pad_zero)?;
+                    fmt_float_normal(w, false, precision, float, left, pad_space, pad_zero)?;
+                } else {
+                    fmt_float_nonfinite(w, float, fmtcase.unwrap())?;
+                }
             }
             FmtKind::AnyNotation => {
                 let float = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
                     VaArg::c_double(i) => i,
                     _ => panic!("this should not be possible"),
                 };
-                let (log, exp) = float_exp(float);
-                let exp_fmt = b'E' | (fmt & 32);
-                let precision = precision.unwrap_or(6);
-                let use_exp_format = exp < -4 || exp >= precision as isize;
+                if float.is_finite() {
+                    let (log, exp) = float_exp(float);
+                    let exp_fmt = b'E' | (fmt & 32);
+                    let precision = precision.unwrap_or(6);
+                    let use_exp_format = exp < -4 || exp >= precision as isize;
 
-                if use_exp_format {
-                    // Length of integral part will always be 1 here,
-                    // because that's how x/floor(log10(x)) works
-                    let precision = precision.saturating_sub(1);
-                    fmt_float_exp(
-                        w, exp_fmt, true, precision, log, exp, left, pad_space, pad_zero,
-                    )?;
+                    if use_exp_format {
+                        // Length of integral part will always be 1 here,
+                        // because that's how x/floor(log10(x)) works
+                        let precision = precision.saturating_sub(1);
+                        fmt_float_exp(
+                            w, exp_fmt, true, precision, log, exp, left, pad_space, pad_zero,
+                        )?;
+                    } else {
+                        // Length of integral part will be the exponent of
+                        // the unused logarithm, unless the exponent is
+                        // negative which in case the integral part must
+                        // of course be 0, 1 in length
+                        let len = 1 + cmp::max(0, exp) as usize;
+                        let precision = precision.saturating_sub(len);
+                        fmt_float_normal(w, true, precision, float, left, pad_space, pad_zero)?;
+                    }
                 } else {
-                    // Length of integral part will be the exponent of
-                    // the unused logarithm, unless the exponent is
-                    // negative which in case the integral part must
-                    // of course be 0, 1 in length
-                    let len = 1 + cmp::max(0, exp) as usize;
-                    let precision = precision.saturating_sub(len);
-                    fmt_float_normal(w, true, precision, float, left, pad_space, pad_zero)?;
+                    fmt_float_nonfinite(w, float, fmtcase.unwrap())?;
                 }
             }
             FmtKind::String => {
