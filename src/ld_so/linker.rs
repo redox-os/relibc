@@ -193,6 +193,7 @@ impl Linker {
                 {
                     return Err(Error::Malformed(format!("failed to map {}", elf_name)));
                 }
+                ptr::write_bytes(ptr as *mut u8, 0, size);
                 slice::from_raw_parts_mut(ptr as *mut u8, size)
             };
             println!("  mmap {:p}, {:#x}", mmap.as_mut_ptr(), mmap.len());
@@ -404,7 +405,7 @@ impl Linker {
                     }
                     reloc::R_X86_64_IRELATIVE => (), // Handled below
                     _ => {
-                        println!(
+                        panic!(
                             "    {} unsupported",
                             reloc::r_to_str(rel.r_type, elf.header.e_machine)
                         );
