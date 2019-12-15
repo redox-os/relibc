@@ -220,7 +220,12 @@ impl Linker {
         // Copy data
         let mut tls_offset = tls_primary;
         let mut tcb_masters = Vec::new();
-        let mut tls_index = 0;
+        // Insert main image master
+        tcb_masters.push(Master {
+            ptr: ptr::null_mut(),
+            len: 0,
+            offset: 0,
+        });
         let mut tls_ranges = BTreeMap::new();
         for (elf_name, elf) in elfs.iter() {
             let object = match self.objects.get(*elf_name) {
@@ -299,12 +304,11 @@ impl Linker {
 
                         if *elf_name == primary {
                             tls_ranges.insert(elf_name, (0, tcb_master.range()));
-                            tcb_masters.insert(0, tcb_master);
+                            tcb_masters[0] = tcb_master;
                         } else {
                             tcb_master.offset -= tls_offset;
                             tls_offset += vsize;
-                            tls_index += 1;
-                            tls_ranges.insert(elf_name, (tls_index, tcb_master.range()));
+                            tls_ranges.insert(elf_name, (tcb_masters.len(), tcb_master.range()));
                             tcb_masters.push(tcb_master);
                         }
                     }
