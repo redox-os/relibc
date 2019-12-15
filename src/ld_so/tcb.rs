@@ -156,6 +156,7 @@ impl Tcb {
         {
             return Err(Error::Malformed(format!("failed to map tls")));
         }
+        ptr::write_bytes(ptr as *mut u8, 0, size);
         Ok(slice::from_raw_parts_mut(ptr as *mut u8, size))
     }
 
