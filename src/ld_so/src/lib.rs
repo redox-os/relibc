@@ -26,6 +26,7 @@ pub unsafe extern "C" fn _start() {
         xor r9, r9
         xor r10, r10
         xor r11, r11
+        fninit
         jmp rax
         "
         :
