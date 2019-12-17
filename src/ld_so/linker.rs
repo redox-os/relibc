@@ -4,7 +4,12 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{mem, ptr, slice};
+use core::{
+    mem,
+    ops::Range,
+    ptr,
+    slice
+};
 use goblin::{
     elf::{program_header, reloc, sym, Elf},
     error::{Error, Result},
@@ -30,8 +35,13 @@ const PATH_SEP: char = ';';
 const PATH_SEP: char = ':';
 
 pub struct Linker {
+    // Used by load
     library_path: String,
     objects: BTreeMap<String, Box<[u8]>>,
+    // Used by link
+    mmaps: BTreeMap<String, &'static mut [u8]>,
+    globals: BTreeMap<String, usize>,
+    tls_ranges: BTreeMap<String, (usize, Range<usize>)>,
 }
 
 impl Linker {
@@ -39,6 +49,9 @@ impl Linker {
         Self {
             library_path: library_path.to_string(),
             objects: BTreeMap::new(),
+            mmaps: BTreeMap::new(),
+            globals: BTreeMap::new(),
+            tls_ranges: BTreeMap::new(),
         }
     }
 
@@ -125,8 +138,6 @@ impl Linker {
         // Load all ELF files into memory and find all globals
         let mut tls_primary = 0;
         let mut tls_size = 0;
-        let mut mmaps = BTreeMap::new();
-        let mut globals = BTreeMap::new();
         for (elf_name, elf) in elfs.iter() {
             println!("map {}", elf_name);
 
@@ -205,12 +216,12 @@ impl Linker {
                         let name = name_res?;
                         let value = mmap.as_ptr() as usize + sym.st_value as usize;
                         // println!("  global {}: {:x?} = {:#x}", name, sym, value);
-                        globals.insert(name, value);
+                        self.globals.insert(name.to_string(), value);
                     }
                 }
             }
 
-            mmaps.insert(elf_name, mmap);
+            self.mmaps.insert(elf_name.to_string(), mmap);
         }
 
         // Allocate TLS
@@ -226,14 +237,13 @@ impl Linker {
             len: 0,
             offset: 0,
         });
-        let mut tls_ranges = BTreeMap::new();
         for (elf_name, elf) in elfs.iter() {
             let object = match self.objects.get(*elf_name) {
                 Some(some) => some,
                 None => continue,
             };
 
-            let mmap = match mmaps.get_mut(elf_name) {
+            let mmap = match self.mmaps.get_mut(*elf_name) {
                 Some(some) => some,
                 None => continue,
             };
@@ -303,12 +313,12 @@ impl Linker {
                         );
 
                         if *elf_name == primary {
-                            tls_ranges.insert(elf_name, (0, tcb_master.range()));
+                            self.tls_ranges.insert(elf_name.to_string(), (0, tcb_master.range()));
                             tcb_masters[0] = tcb_master;
                         } else {
                             tcb_master.offset -= tls_offset;
                             tls_offset += vsize;
-                            tls_ranges.insert(elf_name, (tcb_masters.len(), tcb_master.range()));
+                            self.tls_ranges.insert(elf_name.to_string(), (tcb_masters.len(), tcb_master.range()));
                             tcb_masters.push(tcb_master);
                         }
                     }
@@ -325,7 +335,7 @@ impl Linker {
 
         // Perform relocations, and protect pages
         for (elf_name, elf) in elfs.iter() {
-            let mmap = match mmaps.get_mut(elf_name) {
+            let mmap = match self.mmaps.get_mut(*elf_name) {
                 Some(some) => some,
                 None => continue,
             };
@@ -362,7 +372,7 @@ impl Linker {
                                 sym
                             )))??;
 
-                    if let Some(value) = globals.get(name) {
+                    if let Some(value) = self.globals.get(name) {
                         // println!("    sym {}: {:x?} = {:#x}", name, sym, value);
                         *value
                     } else {
@@ -373,7 +383,7 @@ impl Linker {
                     0
                 };
 
-                let (tm, t) = if let Some((tls_index, tls_range)) = tls_ranges.get(elf_name) {
+                let (tm, t) = if let Some((tls_index, tls_range)) = self.tls_ranges.get(*elf_name) {
                     (*tls_index, tls_range.start)
                 } else {
                     (0, 0)
@@ -460,7 +470,7 @@ impl Linker {
         // Perform indirect relocations (necessary evil), gather entry point
         let mut entry_opt = None;
         for (elf_name, elf) in elfs.iter() {
-            let mmap = match mmaps.get_mut(elf_name) {
+            let mmap = match self.mmaps.get_mut(*elf_name) {
                 Some(some) => some,
                 None => continue,
             };
