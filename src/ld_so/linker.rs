@@ -6,7 +6,6 @@ use alloc::{
 };
 use core::{
     mem,
-    ops::Range,
     ptr,
     slice
 };
@@ -36,12 +35,16 @@ const PATH_SEP: char = ':';
 
 pub struct Linker {
     // Used by load
+    /// Library path to search when loading library by name
     library_path: String,
+    /// Loaded library raw data
     objects: BTreeMap<String, Box<[u8]>>,
+
     // Used by link
-    mmaps: BTreeMap<String, &'static mut [u8]>,
+    /// Global symbols
     globals: BTreeMap<String, usize>,
-    tls_ranges: BTreeMap<String, (usize, Range<usize>)>,
+    /// Loaded library in-memory data
+    mmaps: BTreeMap<String, &'static mut [u8]>,
 }
 
 impl Linker {
@@ -49,9 +52,8 @@ impl Linker {
         Self {
             library_path: library_path.to_string(),
             objects: BTreeMap::new(),
-            mmaps: BTreeMap::new(),
             globals: BTreeMap::new(),
-            tls_ranges: BTreeMap::new(),
+            mmaps: BTreeMap::new(),
         }
     }
 
@@ -82,9 +84,7 @@ impl Linker {
             //println!("{:#?}", elf);
 
             for library in elf.libraries.iter() {
-                if !self.objects.contains_key(&library.to_string()) {
-                    self.load_library(library)?;
-                }
+                self.load_library(library)?;
             }
         }
 
@@ -94,7 +94,9 @@ impl Linker {
     }
 
     pub fn load_library(&mut self, name: &str) -> Result<()> {
-        if name.contains('/') {
+        if self.objects.contains_key(name) {
+            Ok(())
+        } else if name.contains('/') {
             self.load(name, name)
         } else {
             let library_path = self.library_path.clone();
@@ -126,11 +128,14 @@ impl Linker {
         }
     }
 
-    pub fn link(&mut self, primary: &str) -> Result<usize> {
+    pub fn link(&mut self, primary_opt: Option<&str>) -> Result<Option<usize>> {
         let elfs = {
             let mut elfs = BTreeMap::new();
             for (name, data) in self.objects.iter() {
-                elfs.insert(name.as_str(), Elf::parse(&data)?);
+                // Skip already linked libraries
+                if ! self.mmaps.contains_key(&*name) {
+                    elfs.insert(name.as_str(), Elf::parse(&data)?);
+                }
             }
             elfs
         };
@@ -173,7 +178,7 @@ impl Linker {
                         program_header::PT_TLS => {
                             println!("  load tls {:#x}: {:x?}", vsize, ph);
                             tls_size += vsize;
-                            if *elf_name == primary {
+                            if Some(*elf_name) == primary_opt {
                                 tls_primary += vsize;
                             }
                         }
@@ -237,6 +242,7 @@ impl Linker {
             len: 0,
             offset: 0,
         });
+        let mut tls_ranges = BTreeMap::new();
         for (elf_name, elf) in elfs.iter() {
             let object = match self.objects.get(*elf_name) {
                 Some(some) => some,
@@ -312,13 +318,13 @@ impl Linker {
                             tcb_master.ptr, tcb_master.len, tcb_master.offset, valign,
                         );
 
-                        if *elf_name == primary {
-                            self.tls_ranges.insert(elf_name.to_string(), (0, tcb_master.range()));
+                        if Some(*elf_name) == primary_opt {
+                            tls_ranges.insert(elf_name.to_string(), (0, tcb_master.range()));
                             tcb_masters[0] = tcb_master;
                         } else {
                             tcb_master.offset -= tls_offset;
                             tls_offset += vsize;
-                            self.tls_ranges.insert(elf_name.to_string(), (tcb_masters.len(), tcb_master.range()));
+                            tls_ranges.insert(elf_name.to_string(), (tcb_masters.len(), tcb_master.range()));
                             tcb_masters.push(tcb_master);
                         }
                     }
@@ -383,7 +389,7 @@ impl Linker {
                     0
                 };
 
-                let (tm, t) = if let Some((tls_index, tls_range)) = self.tls_ranges.get(*elf_name) {
+                let (tm, t) = if let Some((tls_index, tls_range)) = tls_ranges.get(*elf_name) {
                     (*tls_index, tls_range.start)
                 } else {
                     (0, 0)
@@ -477,7 +483,7 @@ impl Linker {
 
             println!("entry {}", elf_name);
 
-            if *elf_name == primary {
+            if Some(*elf_name) == primary_opt {
                 entry_opt = Some(mmap.as_mut_ptr() as usize + elf.header.e_entry as usize);
             }
 
@@ -549,6 +555,6 @@ impl Linker {
             }
         }
 
-        entry_opt.ok_or(Error::Malformed(format!("missing entry for {}", primary)))
+        Ok(entry_opt)
     }
 }

@@ -1,9 +1,13 @@
 // Start code adapted from https://gitlab.redox-os.org/redox-os/relibc/blob/master/src/start.rs
 
-use crate::{c_str::CStr, header::unistd, platform::types::c_char};
+use crate::{
+    c_str::CStr,
+    header::unistd,
+    platform::types::c_char,
+    start::Stack,
+};
 
 use super::linker::Linker;
-use crate::start::Stack;
 
 #[no_mangle]
 pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
@@ -107,16 +111,22 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
         }
     }
 
-    match linker.link(&path) {
-        Ok(entry) => {
-            eprintln!("ld.so: entry '{}': {:#x}", path, entry);
-            //unistd::_exit(0);
-            entry
-        }
+    let entry = match linker.link(Some(&path)) {
+        Ok(ok) => match ok {
+            Some(some) => some,
+            None => {
+                eprintln!("ld.so: failed to link '{}': missing entry", path);
+                unistd::_exit(1);
+                loop {}
+            }
+        },
         Err(err) => {
             eprintln!("ld.so: failed to link '{}': {}", path, err);
             unistd::_exit(1);
             loop {}
         }
-    }
+    };
+
+    eprintln!("ld.so: entry '{}': {:#x}", path, entry);
+    entry
 }
