@@ -8,7 +8,10 @@ use core::{
 
 use crate::{
     header::{sys_mman, time::timespec},
-    ld_so::tcb::{Master, Tcb},
+    ld_so::{
+        linker::Linker,
+        tcb::{Master, Tcb},
+    },
     platform::{
         types::{c_int, c_uint, c_void, pid_t, size_t},
         Pal, Sys,
@@ -72,6 +75,7 @@ unsafe extern "C" fn pte_osThreadShim(
     tls_size: usize,
     tls_masters_ptr: *mut Master,
     tls_masters_len: usize,
+    tls_linker_ptr: *const Mutex<Linker>,
 ) {
     // The kernel allocated TLS does not have masters set, so do not attempt to copy it.
     // It will be copied by the kernel.
@@ -79,6 +83,7 @@ unsafe extern "C" fn pte_osThreadShim(
         let tcb = Tcb::new(tls_size).unwrap();
         tcb.masters_ptr = tls_masters_ptr;
         tcb.masters_len = tls_masters_len;
+        tcb.linker_ptr = tls_linker_ptr;
         tcb.copy_masters().unwrap();
         tcb.activate();
     }
@@ -125,11 +130,16 @@ pub unsafe extern "C" fn pte_osThreadCreate(
             *stack = value;
         };
 
+        // Stack must be 128-bit aligned for SSE
+        push(0);
+
         if let Some(tcb) = Tcb::current() {
+            push(tcb.linker_ptr as usize);
             push(tcb.masters_len);
             push(tcb.masters_ptr as usize);
             push(tcb.tls_len);
         } else {
+            push(0);
             push(0);
             push(0);
             push(0);

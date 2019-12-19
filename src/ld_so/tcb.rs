@@ -2,7 +2,11 @@ use alloc::boxed::Box;
 use core::{mem, ops::Range, ptr, slice};
 use goblin::error::{Error, Result};
 
-use crate::header::sys_mman;
+use crate::{
+    header::sys_mman,
+    ld_so::linker::Linker,
+    sync::mutex::Mutex,
+};
 
 use super::PAGE_SIZE;
 
@@ -43,6 +47,8 @@ pub struct Tcb {
     pub masters_ptr: *mut Master,
     /// Size of the masters list in bytes (multiple of mem::size_of::<Master>())
     pub masters_len: usize,
+    /// Pointer to dynamic linker
+    pub linker_ptr: *const Mutex<Linker>,
 }
 
 impl Tcb {
@@ -61,6 +67,7 @@ impl Tcb {
                 tcb_len: tcb_page.len(),
                 masters_ptr: ptr::null_mut(),
                 masters_len: 0,
+                linker_ptr: ptr::null(),
             },
         );
 

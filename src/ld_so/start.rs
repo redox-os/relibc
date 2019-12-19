@@ -1,8 +1,11 @@
 // Start code adapted from https://gitlab.redox-os.org/redox-os/relibc/blob/master/src/start.rs
 
-use crate::{c_str::CStr, header::unistd, platform::types::c_char, start::Stack};
+use alloc::boxed::Box;
+
+use crate::{c_str::CStr, header::unistd, platform::types::c_char, start::Stack, sync::mutex::Mutex};
 
 use super::linker::Linker;
+use super::tcb::Tcb;
 
 #[no_mangle]
 pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
@@ -121,6 +124,10 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack) -> usize {
             loop {}
         }
     };
+
+    if let Some(tcb) = unsafe { Tcb::current() } {
+        tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
+    }
 
     eprintln!("ld.so: entry '{}': {:#x}", path, entry);
     entry
