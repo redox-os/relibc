@@ -559,7 +559,7 @@ impl Pal for Sys {
 
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int {
         //TODO
-        if ! rlim.is_null() {
+        if !rlim.is_null() {
             (*rlim).rlim_cur = RLIM_INFINITY;
             (*rlim).rlim_max = RLIM_INFINITY;
         }

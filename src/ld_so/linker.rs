@@ -4,11 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{
-    mem,
-    ptr,
-    slice
-};
+use core::{mem, ptr, slice};
 use goblin::{
     elf::{program_header, reloc, sym, Elf},
     error::{Error, Result},
@@ -133,7 +129,7 @@ impl Linker {
             let mut elfs = BTreeMap::new();
             for (name, data) in self.objects.iter() {
                 // Skip already linked libraries
-                if ! self.mmaps.contains_key(&*name) {
+                if !self.mmaps.contains_key(&*name) {
                     elfs.insert(name.as_str(), Elf::parse(&data)?);
                 }
             }
@@ -324,7 +320,10 @@ impl Linker {
                         } else {
                             tcb_master.offset -= tls_offset;
                             tls_offset += vsize;
-                            tls_ranges.insert(elf_name.to_string(), (tcb_masters.len(), tcb_master.range()));
+                            tls_ranges.insert(
+                                elf_name.to_string(),
+                                (tcb_masters.len(), tcb_master.range()),
+                            );
                             tcb_masters.push(tcb_master);
                         }
                     }

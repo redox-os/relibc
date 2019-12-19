@@ -1,9 +1,10 @@
 //! sys/resource.h implementation for Redox, following
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysresource.h.html
 
-use crate::header::sys_time::timeval;
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
+use crate::{
+    header::sys_time::timeval,
+    platform::{types::*, Pal, Sys},
+};
 
 // Exported in bits file
 // const RUSAGE_SELF: c_int = 0;

@@ -140,11 +140,10 @@ pub unsafe extern "C" fn ctime(clock: *const time_t) -> *mut c_char {
 
 #[no_mangle]
 pub unsafe extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut c_char {
-    let mut tm1 : tm = core::mem::uninitialized();
+    let mut tm1: tm = core::mem::uninitialized();
     localtime_r(clock, &mut tm1);
     asctime_r(&mut tm1, buf)
 }
-
 
 #[no_mangle]
 pub extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {

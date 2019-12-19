@@ -1,9 +1,6 @@
 //! pwd implementation for relibc
 
-use alloc::{
-    boxed::Box,
-    vec::Vec,
-};
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     ops::{Deref, DerefMut},
     pin::Pin,
@@ -12,11 +9,7 @@ use core::{
 
 use crate::{
     fs::File,
-    header::{
-        errno,
-        fcntl,
-        string::strcmp,
-    },
+    header::{errno, fcntl, string::strcmp},
     io::{prelude::*, BufReader, SeekFrom},
     platform::{self, types::*},
 };
@@ -122,9 +115,16 @@ where
     string.parse().ok()
 }
 
-fn getpwent_r(reader: &mut BufReader<File>, destination: Option<DestBuffer>) -> Result<OwnedPwd, Cause> {
+fn getpwent_r(
+    reader: &mut BufReader<File>,
+    destination: Option<DestBuffer>,
+) -> Result<OwnedPwd, Cause> {
     let mut buf = Vec::new();
-    if reader.read_until(b'\n', &mut buf).map_err(|_| Cause::Other)? == 0 {
+    if reader
+        .read_until(b'\n', &mut buf)
+        .map_err(|_| Cause::Other)?
+        == 0
+    {
         return Err(Cause::Eof);
     }
 
@@ -155,7 +155,7 @@ fn getpwent_r(reader: &mut BufReader<File>, destination: Option<DestBuffer>) -> 
             }
             new[..buf.len()].copy_from_slice(&buf);
             new
-        },
+        }
     };
 
     // Chop up the result into a valid structure
@@ -187,21 +187,25 @@ where
     }
 }
 
-unsafe fn mux(status: Result<OwnedPwd, Cause>, out: *mut passwd, result: *mut *mut passwd) -> c_int {
+unsafe fn mux(
+    status: Result<OwnedPwd, Cause>,
+    out: *mut passwd,
+    result: *mut *mut passwd,
+) -> c_int {
     match status {
         Ok(owned) => {
             *out = owned.reference;
             *result = out;
             0
-        },
+        }
         Err(Cause::Eof) => {
             *result = ptr::null_mut();
             0
-        },
+        }
         Err(Cause::Other) => {
             *result = ptr::null_mut();
             -1
-        },
+        }
     }
 }
 
@@ -214,10 +218,13 @@ pub unsafe extern "C" fn getpwnam_r(
     result: *mut *mut passwd,
 ) -> c_int {
     mux(
-        pwd_lookup(|parts| strcmp(parts.pw_name, name) == 0, Some(DestBuffer {
-            ptr: buf as *mut u8,
-            len: size,
-        })),
+        pwd_lookup(
+            |parts| strcmp(parts.pw_name, name) == 0,
+            Some(DestBuffer {
+                ptr: buf as *mut u8,
+                len: size,
+            }),
+        ),
         out,
         result,
     )
@@ -233,10 +240,13 @@ pub unsafe extern "C" fn getpwuid_r(
 ) -> c_int {
     let slice = core::slice::from_raw_parts_mut(buf as *mut u8, size);
     mux(
-        pwd_lookup(|part| part.pw_uid == uid, Some(DestBuffer {
-            ptr: buf as *mut u8,
-            len: size,
-        })),
+        pwd_lookup(
+            |part| part.pw_uid == uid,
+            Some(DestBuffer {
+                ptr: buf as *mut u8,
+                len: size,
+            }),
+        ),
         out,
         result,
     )
