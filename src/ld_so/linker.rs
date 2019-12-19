@@ -38,7 +38,7 @@ pub struct Linker {
 
     // Used by link
     /// Global symbols
-    globals: BTreeMap<String, usize>,
+    pub globals: BTreeMap<String, usize>,
     /// Loaded library in-memory data
     mmaps: BTreeMap<String, &'static mut [u8]>,
 }
@@ -226,8 +226,12 @@ impl Linker {
         }
 
         // Allocate TLS
-        let tcb = unsafe { Tcb::new(tls_size)? };
-        println!("tcb {:x?}", tcb);
+        let mut tcb_opt = if primary_opt.is_some() {
+            Some(unsafe { Tcb::new(tls_size)? })
+        } else {
+            None
+        };
+        println!("tcb {:x?}", tcb_opt);
 
         // Copy data
         let mut tls_offset = tls_primary;
@@ -333,9 +337,11 @@ impl Linker {
         }
 
         // Set master images for TLS and copy TLS data
-        unsafe {
-            tcb.set_masters(tcb_masters.into_boxed_slice());
-            tcb.copy_masters()?;
+        if let Some(ref mut tcb) = tcb_opt {
+            unsafe {
+                tcb.set_masters(tcb_masters.into_boxed_slice());
+                tcb.copy_masters()?;
+            }
         }
 
         // Perform relocations, and protect pages
@@ -468,8 +474,10 @@ impl Linker {
         }
 
         // Activate TLS
-        unsafe {
-            tcb.activate();
+        if let Some(ref mut tcb) = tcb_opt {
+            unsafe {
+                tcb.activate();
+            }
         }
 
         // Perform indirect relocations (necessary evil), gather entry point

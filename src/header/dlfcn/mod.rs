@@ -5,7 +5,7 @@ use core::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::{c_str::CStr, platform::types::*};
+use crate::{c_str::CStr, ld_so::tcb::Tcb, platform::types::*};
 
 pub const RTLD_LAZY: c_int = 0x0001;
 pub const RTLD_NOW: c_int = 0x0002;
@@ -47,8 +47,41 @@ pub unsafe extern "C" fn dlopen(filename: *const c_char, flags: c_int) -> *mut c
     eprintln!("dlopen({:?}, {:#>04x})", filename_opt, flags);
 
     if let Some(filename) = filename_opt {
-        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-        ptr::null_mut()
+        if let Some(tcb) = Tcb::current() {
+            if tcb.linker_ptr.is_null() {
+                eprintln!("dlopen: linker not found");
+                ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+                return ptr::null_mut();
+            }
+
+            eprintln!("dlopen: linker_ptr: {:p}", tcb.linker_ptr);
+            let mut linker = (&*tcb.linker_ptr).lock();
+
+            match linker.load_library(filename) {
+                Ok(()) => (),
+                Err(err) => {
+                    eprintln!("dlopen: failed to load {}", filename);
+                    ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+                    return ptr::null_mut();
+                }
+            }
+
+            match linker.link(None) {
+                Ok(ok) => (),
+                Err(err) => {
+                    eprintln!("dlopen: failed to link '{}': {}", filename, err);
+                    ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+                    return ptr::null_mut();
+                }
+            };
+
+            // TODO
+            1 as *mut c_void
+        } else {
+            eprintln!("dlopen: tcb not found");
+            ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+            ptr::null_mut()
+        }
     } else {
         1 as *mut c_void
     }
@@ -56,15 +89,38 @@ pub unsafe extern "C" fn dlopen(filename: *const c_char, flags: c_int) -> *mut c
 
 #[no_mangle]
 pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void {
-    let symbol_opt = if symbol.is_null() {
-        None
+    if symbol.is_null() {
+        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+        return ptr::null_mut();
+    }
+
+    let symbol_str = str::from_utf8_unchecked(CStr::from_ptr(symbol).to_bytes());
+
+    eprintln!("dlsym({:p}, {})", handle, symbol_str);
+
+    if let Some(tcb) = Tcb::current() {
+        if tcb.linker_ptr.is_null() {
+            eprintln!("dlopen: linker not found");
+            ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+            return ptr::null_mut();
+        }
+
+        eprintln!("dlsym: linker_ptr: {:p}", tcb.linker_ptr);
+        let linker = (&*tcb.linker_ptr).lock();
+
+        if let Some(global) = linker.globals.get(symbol_str) {
+            eprintln!("dlsym({:p}, {}) = 0x{:x}", handle, symbol_str, *global);
+            *global as *mut c_void
+        } else {
+            eprintln!("dlsym: symbol not found");
+            ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+            ptr::null_mut()
+        }
     } else {
-        Some(str::from_utf8_unchecked(CStr::from_ptr(symbol).to_bytes()))
-    };
-
-    eprintln!("dlsym({:p}, {:?})", handle, symbol_opt);
-
-    ptr::null_mut()
+        eprintln!("dlsym: tcb not found");
+        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+        ptr::null_mut()
+    }
 }
 
 #[no_mangle]
