@@ -13,16 +13,19 @@ endif
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
 	export CC=aarch64-linux-gnu-gcc
 	export LD=aarch64-linux-gnu-ld
+	export AR=aarch64-linux-gnu-ar
 endif
 
 ifeq ($(TARGET),aarch64-unknown-redox)
 	export CC=aarch64-unknown-redox-gcc
 	export LD=aarch64-unknown-redox-ld
+	export AR=aarch64-unknown-redox-ar
 endif
 
 ifeq ($(TARGET),x86_64-unknown-redox)
 	export CC=x86_64-unknown-redox-gcc
 	export LD=x86_64-unknown-redox-ld
+	export AR=x86_64-unknown-redox-ar
 endif
 
 SRC=\
@@ -96,7 +99,7 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/pthreads-emb/libpthre
 	done
 	echo "save" >> "$@.mri"
 	echo "end" >> "$@.mri"
-	ar -M < "$@.mri"
+	$(AR) -M < "$@.mri"
 
 $(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
 	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
@@ -133,7 +136,7 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libp
 	done
 	echo "save" >> "$@.mri"
 	echo "end" >> "$@.mri"
-	ar -M < "$@.mri"
+	$(AR) -M < "$@.mri"
 
 $(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
 	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -o $@
