@@ -16,10 +16,13 @@ EXPECT_NAMES=\
 	libgen \
 	locale \
 	math \
+	netdb/getaddrinfo \
+	netdb/netdb \
     ptrace \
 	regex \
 	select \
 	setjmp \
+	signal \
 	stdio/all \
 	stdio/buffer \
 	stdio/fgets \
@@ -98,11 +101,7 @@ EXPECT_NAMES=\
 	wchar/wcsstr \
 	wchar/wcstod \
 	wchar/wcstok \
-	wchar/wcstol \
-	signal
-	# TODO: Fix these
-	# netdb/getaddrinfo \
-	# netdb/netdb \
+	wchar/wcstol
 
 # Binaries that may generate varied output
 NAMES=\
