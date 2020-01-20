@@ -4,7 +4,7 @@ use core_io::Write;
 use super::{errno, types::*, Pal};
 use crate::{
     c_str::CStr,
-    header::{dirent::dirent, signal::SIGCHLD},
+    header::{dirent::dirent, signal::SIGCHLD, sys_stat::S_IFIFO},
 };
 // use header::sys_resource::rusage;
 use crate::header::{
@@ -292,7 +292,7 @@ impl Pal for Sys {
     }
 
     fn mkfifo(path: &CStr, mode: mode_t) -> c_int {
-        e(unsafe { syscall!(MKNODAT, AT_FDCWD, path.as_ptr(), mode, 0) }) as c_int
+        e(unsafe { syscall!(MKNODAT, AT_FDCWD, path.as_ptr(), mode | S_IFIFO, 0) }) as c_int
     }
 
     unsafe fn mmap(

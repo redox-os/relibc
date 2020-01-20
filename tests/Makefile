@@ -13,6 +13,7 @@ EXPECT_NAMES=\
 	fcntl/create \
 	fcntl/fcntl \
 	fnmatch \
+	futimens \
 	libgen \
 	locale \
 	math \
@@ -102,6 +103,8 @@ EXPECT_NAMES=\
 	wchar/wcstod \
 	wchar/wcstok \
 	wchar/wcstol
+	# TODO: Fix these
+	# mkfifo
 
 # Binaries that may generate varied output
 NAMES=\
