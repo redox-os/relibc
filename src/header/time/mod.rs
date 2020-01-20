@@ -102,11 +102,12 @@ pub unsafe extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_ch
 
 #[no_mangle]
 pub extern "C" fn clock() -> clock_t {
-    let mut ts: timespec = unsafe { core::mem::uninitialized() };
+    let mut ts = core::mem::MaybeUninit::<timespec>::uninit();
 
-    if clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &mut ts) != 0 {
+    if clock_gettime(CLOCK_PROCESS_CPUTIME_ID, ts.as_mut_ptr()) != 0 {
         return -1;
     }
+    let ts = unsafe { ts.assume_init() };
 
     if ts.tv_sec > time_t::max_value() / CLOCKS_PER_SEC
         || ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC)

@@ -17,7 +17,7 @@ use crate::{
         fcntl::*,
         limits,
         string::*,
-        time::{constants::CLOCK_MONOTONIC, timespec},
+        time::constants::CLOCK_MONOTONIC,
         unistd::{self, sysconf, _SC_PAGESIZE},
         wchar::*,
     },
@@ -589,9 +589,9 @@ pub unsafe extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
 }
 
 fn get_nstime() -> u64 {
-    let mut ts: timespec = unsafe { mem::uninitialized() };
-    Sys::clock_gettime(CLOCK_MONOTONIC, &mut ts);
-    ts.tv_nsec as u64
+    let mut ts = mem::MaybeUninit::uninit();
+    Sys::clock_gettime(CLOCK_MONOTONIC, ts.as_mut_ptr());
+    unsafe { ts.assume_init() }.tv_nsec as u64
 }
 
 #[no_mangle]

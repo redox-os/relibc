@@ -21,9 +21,9 @@ pub mod sys;
 
 type SigSet = BitSet<[c_ulong; 1]>;
 
-pub(crate) const SIG_DFL: usize = 0;
-pub(crate) const SIG_IGN: usize = 1;
-pub(crate) const SIG_ERR: isize = -1;
+pub const SIG_DFL: usize = 0;
+pub const SIG_IGN: usize = 1;
+pub const SIG_ERR: isize = -1;
 
 pub const SIG_BLOCK: c_int = 0;
 pub const SIG_UNBLOCK: c_int = 1;
@@ -202,12 +202,12 @@ pub extern "C" fn signal(
         sa_restorer: Some(__restore_rt),
         sa_mask: sigset_t::default(),
     };
-    let mut old_sa = unsafe { mem::uninitialized() };
-    if unsafe { sigaction(sig, &sa, &mut old_sa) } < 0 {
+    let mut old_sa = mem::MaybeUninit::uninit();
+    if unsafe { sigaction(sig, &sa, old_sa.as_mut_ptr()) } < 0 {
         mem::forget(old_sa);
         return unsafe { mem::transmute(SIG_ERR) };
     }
-    old_sa.sa_handler
+    unsafe { old_sa.assume_init() }.sa_handler
 }
 
 // #[no_mangle]
