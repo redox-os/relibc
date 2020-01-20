@@ -17,7 +17,7 @@ int main(void) {
     ERROR_IF(dup, fd2, == -1);
     UNEXP_IF(dup, fd2, < 0);
 
-    printf("fd %d duped into fd %d\n", fd1, fd2);
+    printf("duped fd is %d greater than the original fd\n", fd2 - fd1);
 
     int c1 = close(fd1);
     ERROR_IF(close, c1, == -1);
