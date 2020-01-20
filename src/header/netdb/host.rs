@@ -80,8 +80,9 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
     let mut addr_vec = iter.next().unwrap().as_bytes().to_vec();
     addr_vec.push(b'\0');
     let addr_cstr = addr_vec.as_slice().as_ptr() as *const i8;
-    let mut addr = mem::uninitialized();
-    inet_aton(addr_cstr, &mut addr);
+    let mut addr = mem::MaybeUninit::uninit();
+    inet_aton(addr_cstr, addr.as_mut_ptr());
+    let addr = addr.assume_init();
 
     _HOST_ADDR_LIST = mem::transmute::<u32, [u8; 4]>(addr.s_addr);
     HOST_ADDR_LIST = [_HOST_ADDR_LIST.as_mut_ptr() as *mut c_char, ptr::null_mut()];

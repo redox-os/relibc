@@ -4,7 +4,9 @@ use core::{convert::TryFrom, mem, ptr, slice};
 
 use crate::{
     c_str::CStr,
-    header::{errno, limits, stdlib::getenv, sys_ioctl, sys_time, termios, time::timespec},
+    header::{
+        errno, limits, stdlib::getenv, sys_ioctl, sys_time, sys_utsname, termios, time::timespec,
+    },
     platform::{self, types::*, Pal, Sys},
 };
 use alloc::collections::LinkedList;
@@ -309,13 +311,13 @@ pub extern "C" fn gethostid() -> c_long {
 
 #[no_mangle]
 pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> c_int {
-    let mut uts = mem::uninitialized();
-    let err = Sys::uname(&mut uts);
+    let mut uts = mem::MaybeUninit::<sys_utsname::utsname>::uninit();
+    let err = Sys::uname(uts.as_mut_ptr());
     if err < 0 {
         mem::forget(uts);
         return err;
     }
-    for c in uts.nodename.iter() {
+    for c in uts.assume_init().nodename.iter() {
         if len == 0 {
             break;
         }

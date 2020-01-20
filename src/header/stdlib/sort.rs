@@ -224,16 +224,15 @@ fn swap(mut ptr1: *mut c_char, mut ptr2: *mut c_char, mut width: size_t) {
 
     const BUFSIZE: usize = 128;
 
-    let mut buffer: [c_char; BUFSIZE] = unsafe { mem::uninitialized() };
+    let mut buffer = mem::MaybeUninit::<[c_char; BUFSIZE]>::uninit();
     while width > 0 {
         let copy_size = BUFSIZE.min(width as usize);
+        let buf = buffer.as_mut_ptr() as *mut c_char;
 
         unsafe {
-            buffer
-                .as_mut_ptr()
-                .copy_from_nonoverlapping(ptr1, copy_size);
+            buf.copy_from_nonoverlapping(ptr1, copy_size);
             ptr1.copy_from_nonoverlapping(ptr2, copy_size);
-            ptr2.copy_from_nonoverlapping(buffer.as_ptr(), copy_size);
+            ptr2.copy_from_nonoverlapping(buf, copy_size);
 
             ptr1 = ptr1.add(copy_size);
             ptr2 = ptr2.add(copy_size);
