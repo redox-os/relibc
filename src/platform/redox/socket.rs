@@ -145,6 +145,28 @@ impl PalSocket for Sys {
         option_value: *mut c_void,
         option_len: *mut socklen_t,
     ) -> c_int {
+        match level {
+            SOL_SOCKET => match option_name {
+                SO_ERROR => {
+                    if option_value.is_null() {
+                        return e(Err(syscall::Error::new(syscall::EFAULT))) as c_int;
+                    }
+
+                    if (option_len as usize) < mem::size_of::<c_int>() {
+                        return e(Err(syscall::Error::new(syscall::EINVAL))) as c_int;
+                    }
+
+                    let error = unsafe { &mut *(option_value as *mut c_int) };
+                    //TODO: Socket nonblock connection error
+                    *error = 0;
+
+                    return 0;
+                },
+                _ => (),
+            },
+            _ => (),
+        }
+
         eprintln!(
             "getsockopt({}, {}, {}, {:p}, {:p})",
             socket, level, option_name, option_value, option_len
