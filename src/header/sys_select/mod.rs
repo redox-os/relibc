@@ -54,57 +54,55 @@ pub fn select_epoll(
     // Keep track of the number of file descriptors that do not support epoll
     let mut not_epoll = 0;
     for fd in 0..nfds {
-        if let Some(ref mut fd_set) = read_bitset {
+        let mut events = 0;
+
+        if let Some(ref fd_set) = read_bitset {
             if fd_set.contains(fd as usize) {
-                let mut event = epoll_event {
-                    events: EPOLLIN,
-                    data: epoll_data { fd },
-                    ..Default::default()
-                };
-                if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
-                    if unsafe { platform::errno == errno::EPERM } {
-                        not_epoll += 1;
-                    } else {
-                        return -1;
-                    }
-                } else {
-                    fd_set.remove(fd as usize);
-                }
+                events |= EPOLLIN;
             }
         }
-        if let Some(ref mut fd_set) = write_bitset {
+
+        if let Some(ref fd_set) = write_bitset {
             if fd_set.contains(fd as usize) {
-                let mut event = epoll_event {
-                    events: EPOLLOUT,
-                    data: epoll_data { fd },
-                    ..Default::default()
-                };
-                if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
-                    if unsafe { platform::errno == errno::EPERM } {
-                        not_epoll += 1;
-                    } else {
-                        return -1;
-                    }
-                } else {
-                    fd_set.remove(fd as usize);
-                }
+                events |= EPOLLOUT;
             }
         }
-        if let Some(ref mut fd_set) = except_bitset {
+
+        if let Some(ref fd_set) = except_bitset {
             if fd_set.contains(fd as usize) {
-                let mut event = epoll_event {
-                    events: EPOLLERR,
-                    data: epoll_data { fd },
-                    ..Default::default()
-                };
-                if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
-                    if unsafe { platform::errno == errno::EPERM } {
-                        not_epoll += 1;
-                    } else {
-                        return -1;
-                    }
+                events |= EPOLLERR;
+            }
+        }
+
+        if events > 0 {
+            let mut event = epoll_event {
+                events,
+                data: epoll_data { fd },
+                ..Default::default()
+            };
+            if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
+                if unsafe { platform::errno == errno::EPERM } {
+                    not_epoll += 1;
                 } else {
-                    fd_set.remove(fd as usize);
+                    return -1;
+                }
+            } else {
+                if let Some(ref mut fd_set) = read_bitset {
+                    if fd_set.contains(fd as usize) {
+                        fd_set.remove(fd as usize);
+                    }
+                }
+
+                if let Some(ref mut fd_set) = write_bitset {
+                    if fd_set.contains(fd as usize) {
+                        fd_set.remove(fd as usize);
+                    }
+                }
+
+                if let Some(ref mut fd_set) = except_bitset {
+                    if fd_set.contains(fd as usize) {
+                        fd_set.remove(fd as usize);
+                    }
                 }
             }
         }
