@@ -1,4 +1,4 @@
-use core::{mem, ptr, slice};
+use core::{mem, ptr, slice, str};
 use syscall::{self, flag::*, Result};
 
 use super::{
@@ -9,6 +9,7 @@ use crate::header::{
     netinet_in::{in_port_t, sockaddr_in},
     sys_socket::{constants::*, sockaddr, socklen_t},
     sys_time::timeval,
+    sys_un::sockaddr_un,
 };
 
 macro_rules! bind_or_connect {
@@ -29,28 +30,48 @@ macro_rules! bind_or_connect {
         0
     }};
     ($mode:ident copy, $socket:expr, $address:expr, $address_len:expr) => {{
-        if (*$address).sa_family as c_int != AF_INET {
-            errno = syscall::EAFNOSUPPORT;
-            return -1;
-        }
         if ($address_len as usize) < mem::size_of::<sockaddr>() {
             errno = syscall::EINVAL;
             return -1;
         }
-        let data = &*($address as *const sockaddr_in);
-        let addr = slice::from_raw_parts(
-            &data.sin_addr.s_addr as *const _ as *const u8,
-            mem::size_of_val(&data.sin_addr.s_addr),
-        );
-        let port = in_port_t::from_be(data.sin_port);
-        let path = format!(
-            bind_or_connect!($mode "{}.{}.{}.{}:{}"),
-            addr[0],
-            addr[1],
-            addr[2],
-            addr[3],
-            port
-        );
+
+        let path = match (*$address).sa_family as c_int {
+            AF_INET => {
+                let data = &*($address as *const sockaddr_in);
+                let addr = slice::from_raw_parts(
+                    &data.sin_addr.s_addr as *const _ as *const u8,
+                    mem::size_of_val(&data.sin_addr.s_addr),
+                );
+                let port = in_port_t::from_be(data.sin_port);
+                let path = format!(
+                    bind_or_connect!($mode "{}.{}.{}.{}:{}"),
+                    addr[0],
+                    addr[1],
+                    addr[2],
+                    addr[3],
+                    port
+                );
+
+                path
+            },
+            AF_UNIX => {
+                let data = &*($address as *const sockaddr_un);
+                let addr = slice::from_raw_parts(
+                    &data.sun_path as *const _ as *const u8,
+                    mem::size_of_val(&data.sun_path),
+                );
+                let path = format!(
+                    "{}",
+                    str::from_utf8(addr).unwrap()
+                );
+
+                path
+            },
+            _ => {
+                errno = syscall::EAFNOSUPPORT;
+                return -1;
+            },
+        };
 
         // Duplicate the socket, and then duplicate the copy back to the original fd
         let fd = e(syscall::dup($socket as usize, path.as_bytes()));
