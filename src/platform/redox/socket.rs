@@ -292,7 +292,7 @@ impl PalSocket for Sys {
     }
 
     unsafe fn socket(domain: c_int, mut kind: c_int, protocol: c_int) -> c_int {
-        if domain != AF_INET {
+        if domain != AF_INET && domain != AF_UNIX {
             errno = syscall::EAFNOSUPPORT;
             return -1;
         }
@@ -313,9 +313,10 @@ impl PalSocket for Sys {
 
         // The tcp: and udp: schemes allow using no path,
         // and later specifying one using `dup`.
-        match kind {
-            SOCK_STREAM => e(syscall::open("tcp:", flags)) as c_int,
-            SOCK_DGRAM => e(syscall::open("udp:", flags)) as c_int,
+        match (domain, kind) {
+            (AF_INET, SOCK_STREAM) => e(syscall::open("tcp:", flags)) as c_int,
+            (AF_INET, SOCK_DGRAM) => e(syscall::open("udp:", flags)) as c_int,
+            (AF_UNIX, SOCK_STREAM) => e(syscall::open("chan:", flags | O_CREAT)) as c_int,
             _ => {
                 errno = syscall::EPROTONOSUPPORT;
                 -1
