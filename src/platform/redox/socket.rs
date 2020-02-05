@@ -82,21 +82,28 @@ macro_rules! bind_or_connect {
     }};
 }
 
-unsafe fn inner_get_name(
+unsafe fn inner_af_unix(buf: &[u8], address: *mut sockaddr, address_len: *mut socklen_t) {
+    let data = &mut *(address as *mut sockaddr_un);
+
+    data.sun_family = AF_UNIX as c_ushort;
+
+    let path = slice::from_raw_parts_mut(
+        &mut data.sun_path as *mut _ as *mut u8,
+        mem::size_of_val(&data.sun_path),
+    );
+
+    let len = path.len().min(buf.len());
+    path[..len].copy_from_slice(&buf[..len]);
+
+    *address_len = len as socklen_t;
+}
+
+unsafe fn inner_af_inet(
     local: bool,
-    socket: c_int,
+    buf: &[u8],
     address: *mut sockaddr,
     address_len: *mut socklen_t,
-) -> Result<usize> {
-    // 32 should probably be large enough.
-    // Format: tcp:remote/local
-    // and since we only yet support IPv4 (I think)...
-    let mut buf = [0; 32];
-    let len = syscall::fpath(socket as usize, &mut buf)?;
-    let buf = &buf[..len];
-    assert!(&buf[..4] == b"tcp:" || &buf[..4] == b"udp:");
-    let buf = &buf[4..];
-
+) {
     let mut parts = buf.split(|c| *c == b'/');
     if local {
         // Skip the remote part
@@ -117,6 +124,32 @@ unsafe fn inner_get_name(
     data[..len].copy_from_slice(&part[..len]);
 
     *address_len = len as socklen_t;
+}
+
+unsafe fn inner_get_name(
+    local: bool,
+    socket: c_int,
+    address: *mut sockaddr,
+    address_len: *mut socklen_t,
+) -> Result<usize> {
+    // 32 should probably be large enough.
+    // Format: [udp|tcp:]remote/local, chan:path
+    let mut buf = [0; 32];
+    let len = syscall::fpath(socket as usize, &mut buf)?;
+    let buf = &buf[..len];
+    assert!(&buf[..4] == b"tcp:" || &buf[..4] == b"udp:" || &buf[..5] == b"chan:");
+
+    match &buf[..5] {
+        b"tcp:" | b"udp:" => {
+            inner_af_inet(local, &buf[4..], address, address_len);
+        }
+        b"chan:" => {
+            inner_af_unix(&buf[5..], address, address_len);
+        }
+        // Socket doesn't belong to any scheme
+        _ => panic!("socket doesn't match either tcp, udp or chan schemes"),
+    };
+
     Ok(0)
 }
 
