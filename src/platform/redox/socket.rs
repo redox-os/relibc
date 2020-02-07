@@ -1,4 +1,4 @@
-use core::{mem, ptr, slice};
+use core::{mem, ptr, slice, str};
 use syscall::{self, flag::*, Result};
 
 use super::{
@@ -9,6 +9,7 @@ use crate::header::{
     netinet_in::{in_port_t, sockaddr_in},
     sys_socket::{constants::*, sockaddr, socklen_t},
     sys_time::timeval,
+    sys_un::sockaddr_un,
 };
 
 macro_rules! bind_or_connect {
@@ -29,28 +30,48 @@ macro_rules! bind_or_connect {
         0
     }};
     ($mode:ident copy, $socket:expr, $address:expr, $address_len:expr) => {{
-        if (*$address).sa_family as c_int != AF_INET {
-            errno = syscall::EAFNOSUPPORT;
-            return -1;
-        }
         if ($address_len as usize) < mem::size_of::<sockaddr>() {
             errno = syscall::EINVAL;
             return -1;
         }
-        let data = &*($address as *const sockaddr_in);
-        let addr = slice::from_raw_parts(
-            &data.sin_addr.s_addr as *const _ as *const u8,
-            mem::size_of_val(&data.sin_addr.s_addr),
-        );
-        let port = in_port_t::from_be(data.sin_port);
-        let path = format!(
-            bind_or_connect!($mode "{}.{}.{}.{}:{}"),
-            addr[0],
-            addr[1],
-            addr[2],
-            addr[3],
-            port
-        );
+
+        let path = match (*$address).sa_family as c_int {
+            AF_INET => {
+                let data = &*($address as *const sockaddr_in);
+                let addr = slice::from_raw_parts(
+                    &data.sin_addr.s_addr as *const _ as *const u8,
+                    mem::size_of_val(&data.sin_addr.s_addr),
+                );
+                let port = in_port_t::from_be(data.sin_port);
+                let path = format!(
+                    bind_or_connect!($mode "{}.{}.{}.{}:{}"),
+                    addr[0],
+                    addr[1],
+                    addr[2],
+                    addr[3],
+                    port
+                );
+
+                path
+            },
+            AF_UNIX => {
+                let data = &*($address as *const sockaddr_un);
+                let addr = slice::from_raw_parts(
+                    &data.sun_path as *const _ as *const u8,
+                    mem::size_of_val(&data.sun_path),
+                );
+                let path = format!(
+                    "{}",
+                    str::from_utf8(addr).unwrap()
+                );
+
+                path
+            },
+            _ => {
+                errno = syscall::EAFNOSUPPORT;
+                return -1;
+            },
+        };
 
         // Duplicate the socket, and then duplicate the copy back to the original fd
         let fd = e(syscall::dup($socket as usize, path.as_bytes()));
@@ -61,21 +82,28 @@ macro_rules! bind_or_connect {
     }};
 }
 
-unsafe fn inner_get_name(
+unsafe fn inner_af_unix(buf: &[u8], address: *mut sockaddr, address_len: *mut socklen_t) {
+    let data = &mut *(address as *mut sockaddr_un);
+
+    data.sun_family = AF_UNIX as c_ushort;
+
+    let path = slice::from_raw_parts_mut(
+        &mut data.sun_path as *mut _ as *mut u8,
+        mem::size_of_val(&data.sun_path),
+    );
+
+    let len = path.len().min(buf.len());
+    path[..len].copy_from_slice(&buf[..len]);
+
+    *address_len = len as socklen_t;
+}
+
+unsafe fn inner_af_inet(
     local: bool,
-    socket: c_int,
+    buf: &[u8],
     address: *mut sockaddr,
     address_len: *mut socklen_t,
-) -> Result<usize> {
-    // 32 should probably be large enough.
-    // Format: tcp:remote/local
-    // and since we only yet support IPv4 (I think)...
-    let mut buf = [0; 32];
-    let len = syscall::fpath(socket as usize, &mut buf)?;
-    let buf = &buf[..len];
-    assert!(&buf[..4] == b"tcp:" || &buf[..4] == b"udp:");
-    let buf = &buf[4..];
-
+) {
     let mut parts = buf.split(|c| *c == b'/');
     if local {
         // Skip the remote part
@@ -96,6 +124,32 @@ unsafe fn inner_get_name(
     data[..len].copy_from_slice(&part[..len]);
 
     *address_len = len as socklen_t;
+}
+
+unsafe fn inner_get_name(
+    local: bool,
+    socket: c_int,
+    address: *mut sockaddr,
+    address_len: *mut socklen_t,
+) -> Result<usize> {
+    // 32 should probably be large enough.
+    // Format: [udp|tcp:]remote/local, chan:path
+    let mut buf = [0; 32];
+    let len = syscall::fpath(socket as usize, &mut buf)?;
+    let buf = &buf[..len];
+    assert!(&buf[..4] == b"tcp:" || &buf[..4] == b"udp:" || &buf[..5] == b"chan:");
+
+    match &buf[..5] {
+        b"tcp:" | b"udp:" => {
+            inner_af_inet(local, &buf[4..], address, address_len);
+        }
+        b"chan:" => {
+            inner_af_unix(&buf[5..], address, address_len);
+        }
+        // Socket doesn't belong to any scheme
+        _ => panic!("socket doesn't match either tcp, udp or chan schemes"),
+    };
+
     Ok(0)
 }
 
@@ -292,7 +346,7 @@ impl PalSocket for Sys {
     }
 
     unsafe fn socket(domain: c_int, mut kind: c_int, protocol: c_int) -> c_int {
-        if domain != AF_INET {
+        if domain != AF_INET && domain != AF_UNIX {
             errno = syscall::EAFNOSUPPORT;
             return -1;
         }
@@ -313,9 +367,10 @@ impl PalSocket for Sys {
 
         // The tcp: and udp: schemes allow using no path,
         // and later specifying one using `dup`.
-        match kind {
-            SOCK_STREAM => e(syscall::open("tcp:", flags)) as c_int,
-            SOCK_DGRAM => e(syscall::open("udp:", flags)) as c_int,
+        match (domain, kind) {
+            (AF_INET, SOCK_STREAM) => e(syscall::open("tcp:", flags)) as c_int,
+            (AF_INET, SOCK_DGRAM) => e(syscall::open("udp:", flags)) as c_int,
+            (AF_UNIX, SOCK_STREAM) => e(syscall::open("chan:", flags | O_CREAT)) as c_int,
             _ => {
                 errno = syscall::EPROTONOSUPPORT;
                 -1
