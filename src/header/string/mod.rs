@@ -129,7 +129,7 @@ pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_v
     s
 }
 
-#[cfg!(target_feature = "sse2")]
+#[cfg(target_feature = "sse2")]
 fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
     use core::arch::x86_64::*;
 
@@ -212,7 +212,7 @@ fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
     }
 }
 
-#[not(cfg!(target_feature = "sse2"))]
+#[not(cfg(target_feature = "sse2"))]
 fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
     #[inline(always)]
     fn contains_zero_byte(x: usize) -> bool {
