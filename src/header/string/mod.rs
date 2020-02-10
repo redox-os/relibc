@@ -129,8 +129,8 @@ pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_v
     s
 }
 
-#[target_feature(enable = "sse2")]
-unsafe fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
+#[cfg!(target_feature = "sse2")]
+fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
     use core::arch::x86_64::*;
 
     unsafe fn forward_search2(
@@ -163,54 +163,56 @@ unsafe fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
     const VECTOR_ALIGN: usize = VECTOR_SIZE - 1;
     const LOOP_SIZE2: usize = 2 * VECTOR_SIZE;
 
-    let vn1 = _mm_set1_epi8(n1 as i8);
-    let vn2 = _mm_set1_epi8(n2 as i8);
-    let loop_size = LOOP_SIZE2;
-    let start_ptr = haystack;
-    let mut ptr = start_ptr;
+    unsafe {
+        let vn1 = _mm_set1_epi8(n1 as i8);
+        let vn2 = _mm_set1_epi8(n2 as i8);
+        let loop_size = LOOP_SIZE2;
+        let start_ptr = haystack;
+        let mut ptr = start_ptr;
 
-    if let Some(i) = forward_search2(start_ptr, ptr, vn1, vn2) {
-        return i;
-    }
-
-    ptr = ptr.add(VECTOR_SIZE - (start_ptr as usize & VECTOR_ALIGN));
-    debug_assert!(ptr > start_ptr);
-    while loop_size == LOOP_SIZE2 {
-        debug_assert_eq!(0, (ptr as usize) % VECTOR_SIZE);
-
-        let a = _mm_load_si128(ptr as *const __m128i);
-        let b = _mm_load_si128(ptr.add(VECTOR_SIZE) as *const __m128i);
-        let eqa1 = _mm_cmpeq_epi8(vn1, a);
-        let eqb1 = _mm_cmpeq_epi8(vn1, b);
-        let eqa2 = _mm_cmpeq_epi8(vn2, a);
-        let eqb2 = _mm_cmpeq_epi8(vn2, b);
-        let or1 = _mm_or_si128(eqa1, eqb1);
-        let or2 = _mm_or_si128(eqa2, eqb2);
-        let or3 = _mm_or_si128(or1, or2);
-        if _mm_movemask_epi8(or3) != 0 {
-            let mut at = (ptr as usize - start_ptr as usize);
-            let mask1 = _mm_movemask_epi8(eqa1);
-            let mask2 = _mm_movemask_epi8(eqa2);
-            if mask1 != 0 || mask2 != 0 {
-                return at + forward_pos2(mask1, mask2);
-            }
-
-            at += VECTOR_SIZE;
-            let mask1 = _mm_movemask_epi8(eqb1);
-            let mask2 = _mm_movemask_epi8(eqb2);
-            return at + forward_pos2(mask1, mask2);
-        }
-        ptr = ptr.add(loop_size);
-    }
-    loop {
         if let Some(i) = forward_search2(start_ptr, ptr, vn1, vn2) {
             return i;
+    }
+
+        ptr = ptr.add(VECTOR_SIZE - (start_ptr as usize & VECTOR_ALIGN));
+        debug_assert!(ptr > start_ptr);
+        while loop_size == LOOP_SIZE2 {
+            debug_assert_eq!(0, (ptr as usize) % VECTOR_SIZE);
+
+            let a = _mm_load_si128(ptr as *const __m128i);
+            let b = _mm_load_si128(ptr.add(VECTOR_SIZE) as *const __m128i);
+            let eqa1 = _mm_cmpeq_epi8(vn1, a);
+            let eqb1 = _mm_cmpeq_epi8(vn1, b);
+            let eqa2 = _mm_cmpeq_epi8(vn2, a);
+            let eqb2 = _mm_cmpeq_epi8(vn2, b);
+            let or1 = _mm_or_si128(eqa1, eqb1);
+            let or2 = _mm_or_si128(eqa2, eqb2);
+            let or3 = _mm_or_si128(or1, or2);
+            if _mm_movemask_epi8(or3) != 0 {
+                let mut at = (ptr as usize - start_ptr as usize);
+                let mask1 = _mm_movemask_epi8(eqa1);
+                let mask2 = _mm_movemask_epi8(eqa2);
+                if mask1 != 0 || mask2 != 0 {
+                    return at + forward_pos2(mask1, mask2);
+                }
+
+                at += VECTOR_SIZE;
+                let mask1 = _mm_movemask_epi8(eqb1);
+                let mask2 = _mm_movemask_epi8(eqb2);
+                return at + forward_pos2(mask1, mask2);
+            }
+            ptr = ptr.add(loop_size);
         }
-        ptr = ptr.add(VECTOR_SIZE);
+        loop {
+            if let Some(i) = forward_search2(start_ptr, ptr, vn1, vn2) {
+                return i;
+            }
+            ptr = ptr.add(VECTOR_SIZE);
+        }
     }
 }
 
-#[target_feature(disable = "sse2")]
+#[not(cfg!(target_feature = "sse2"))]
 fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
     #[inline(always)]
     fn contains_zero_byte(x: usize) -> bool {
