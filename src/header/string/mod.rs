@@ -297,7 +297,7 @@ fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
 
 #[no_mangle]
 pub unsafe extern "C" fn strchr(s: *const c_char, c: c_int) -> *mut c_char {
-    let index = rawmemchr2(c as u8, 0u8, s as *const u8);
+    let index = rawmemchr2(c as u8, 0u8, s as *const u8) as isize;
     if *s.offset(index) != 0 {
         s.offset(index) as *mut c_char
     }
