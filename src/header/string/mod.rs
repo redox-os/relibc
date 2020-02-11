@@ -212,7 +212,7 @@ fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
     }
 }
 
-#[not(cfg(target_feature = "sse2"))]
+#[cfg(not(target_feature = "sse2"))]
 fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
     #[inline(always)]
     fn contains_zero_byte(x: usize) -> bool {
