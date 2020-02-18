@@ -7,5 +7,5 @@ then
     make all
     make test
 else
-    make libc
+    make libs
 fi
