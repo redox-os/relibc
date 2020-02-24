@@ -41,21 +41,24 @@ pub struct Linker {
     pub globals: BTreeMap<String, usize>,
     /// Loaded library in-memory data
     mmaps: BTreeMap<String, &'static mut [u8]>,
+    verbose: bool
 }
 
 impl Linker {
-    pub fn new(library_path: &str) -> Self {
+    pub fn new(library_path: &str, verbose: bool) -> Self {
         Self {
             library_path: library_path.to_string(),
             objects: BTreeMap::new(),
             globals: BTreeMap::new(),
             mmaps: BTreeMap::new(),
+            verbose: verbose
         }
     }
 
     pub fn load(&mut self, name: &str, path: &str) -> Result<()> {
-        println!("load {}: {}", name, path);
-
+        if self.verbose {
+            println!("load {}: {}", name, path);
+        }
         let mut data = Vec::new();
 
         let path_c = CString::new(path)
@@ -102,9 +105,9 @@ impl Linker {
                 } else {
                     format!("{}/{}", part, name)
                 };
-
-                println!("check {}", path);
-
+                if self.verbose {
+                    println!("check {}", path);
+                }
                 let access = unsafe {
                     let path_c = CString::new(path.as_bytes()).map_err(|err| {
                         Error::Malformed(format!("invalid path '{}': {}", path, err))
@@ -140,8 +143,9 @@ impl Linker {
         let mut tls_primary = 0;
         let mut tls_size = 0;
         for (elf_name, elf) in elfs.iter() {
-            println!("map {}", elf_name);
-
+            if self.verbose {
+                println!("map {}", elf_name);
+            }
             let object = match self.objects.get(*elf_name) {
                 Some(some) => some,
                 None => continue,
@@ -158,8 +162,9 @@ impl Linker {
 
                     match ph.p_type {
                         program_header::PT_LOAD => {
-                            println!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
-
+                            if self.verbose {
+                                println!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
+                            }
                             if let Some(ref mut bounds) = bounds_opt {
                                 if vaddr < bounds.0 {
                                     bounds.0 = vaddr;
@@ -172,7 +177,9 @@ impl Linker {
                             }
                         }
                         program_header::PT_TLS => {
-                            println!("  load tls {:#x}: {:x?}", vsize, ph);
+                            if self.verbose{
+                                println!("  load tls {:#x}: {:x?}", vsize, ph);
+                            }
                             tls_size += vsize;
                             if Some(*elf_name) == primary_opt {
                                 tls_primary += vsize;
@@ -186,8 +193,9 @@ impl Linker {
                     None => continue,
                 }
             };
-            println!("  bounds {:#x}, {:#x}", bounds.0, bounds.1);
-
+            if self.verbose {
+                println!("  bounds {:#x}, {:#x}", bounds.0, bounds.1);
+            }
             // Allocate memory
             let mmap = unsafe {
                 let size = bounds.1 /* - bounds.0 */;
@@ -208,8 +216,9 @@ impl Linker {
                 ptr::write_bytes(ptr as *mut u8, 0, size);
                 slice::from_raw_parts_mut(ptr as *mut u8, size)
             };
-            println!("  mmap {:p}, {:#x}", mmap.as_mut_ptr(), mmap.len());
-
+            if self.verbose {
+                println!("  mmap {:p}, {:#x}", mmap.as_mut_ptr(), mmap.len());
+            }
             // Locate all globals
             for sym in elf.dynsyms.iter() {
                 if sym.st_bind() == sym::STB_GLOBAL && sym.st_value != 0 {
@@ -231,8 +240,9 @@ impl Linker {
         } else {
             None
         };
-        println!("tcb {:x?}", tcb_opt);
-
+        if self.verbose{
+            println!("tcb {:x?}", tcb_opt);
+        }
         // Copy data
         let mut tls_offset = tls_primary;
         let mut tcb_masters = Vec::new();
@@ -253,9 +263,9 @@ impl Linker {
                 Some(some) => some,
                 None => continue,
             };
-
-            println!("load {}", elf_name);
-
+            if self.verbose {
+                println!("load {}", elf_name);
+            }
             // Copy data
             for ph in elf.program_headers.iter() {
                 let voff = ph.p_vaddr as usize % PAGE_SIZE;
@@ -289,15 +299,15 @@ impl Linker {
                                 }
                             }
                         };
-
-                        println!(
-                            "  copy {:#x}, {:#x}: {:#x}, {:#x}",
-                            vaddr,
-                            vsize,
-                            voff,
-                            obj_data.len()
-                        );
-
+                        if self.verbose {
+                            println!(
+                                "  copy {:#x}, {:#x}: {:#x}, {:#x}",
+                                vaddr,
+                                vsize,
+                                voff,
+                                obj_data.len()
+                            );
+                        }
                         mmap_data.copy_from_slice(obj_data);
                     }
                     program_header::PT_TLS => {
@@ -312,12 +322,12 @@ impl Linker {
                             len: ph.p_filesz as usize,
                             offset: tls_size - valign,
                         };
-
-                        println!(
-                            "  tls master {:p}, {:#x}: {:#x}, {:#x}",
-                            tcb_master.ptr, tcb_master.len, tcb_master.offset, valign,
-                        );
-
+                        if self.verbose {
+                            println!(
+                                "  tls master {:p}, {:#x}: {:#x}, {:#x}",
+                                tcb_master.ptr, tcb_master.len, tcb_master.offset, valign,
+                            );
+                        }
                         if Some(*elf_name) == primary_opt {
                             tls_ranges.insert(elf_name.to_string(), (0, tcb_master.range()));
                             tcb_masters[0] = tcb_master;
@@ -350,9 +360,9 @@ impl Linker {
                 Some(some) => some,
                 None => continue,
             };
-
-            println!("link {}", elf_name);
-
+            if self.verbose {
+                println!("link {}", elf_name);
+            }
             // Relocate
             for rel in elf
                 .dynrelas
@@ -461,8 +471,9 @@ impl Linker {
 
                     let res = unsafe {
                         let ptr = mmap.as_mut_ptr().add(vaddr);
-                        println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
-
+                        if self.verbose {
+                            println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
+                        }
                         sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
                     };
 
@@ -487,9 +498,9 @@ impl Linker {
                 Some(some) => some,
                 None => continue,
             };
-
-            println!("entry {}", elf_name);
-
+            if self.verbose {
+                println!("entry {}", elf_name);
+            }
             if Some(*elf_name) == primary_opt {
                 entry_opt = Some(mmap.as_mut_ptr() as usize + elf.header.e_entry as usize);
             }
@@ -550,8 +561,9 @@ impl Linker {
 
                     let res = unsafe {
                         let ptr = mmap.as_mut_ptr().add(vaddr);
-                        println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
-
+                        if self.verbose {
+                            println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
+                        }
                         sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
                     };
 

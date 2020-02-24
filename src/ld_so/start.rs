@@ -153,7 +153,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         path = &argv[0];
     }
 
-    let mut linker = Linker::new(library_path);
+    let mut linker = Linker::new(library_path, is_manual);
     match linker.load(&path, &path) {
         Ok(()) => (),
         Err(err) => {
@@ -182,7 +182,8 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     if let Some(tcb) = unsafe { Tcb::current() } {
         tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
     }
-
-    eprintln!("ld.so: entry '{}': {:#x}", path, entry);
+    if is_manual {
+        eprintln!("ld.so: entry '{}': {:#x}", path, entry);
+    }
     entry
 }
