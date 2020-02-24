@@ -8,12 +8,17 @@
 pub unsafe extern "C" fn _start() {
     #[cfg(target_arch = "x86_64")]
     asm!("
+        # rsi = _start + 5
+        call next
+next:   pop rsi
+
         # Save original stack and align stack to 16 bytes
         mov rbp, rsp
         and rsp, 0xFFFFFFFFFFFFFFF0
 
-        # Call ld_so_start(stack)
+        # Call ld_so_start(stack, entry)
         mov rdi, rbp
+        sub rsi, 5
         call relibc_ld_so_start
 
         # Restore original stack, clear registers, and jump to new start function
