@@ -41,7 +41,8 @@ pub struct Linker {
     pub globals: BTreeMap<String, usize>,
     /// Loaded library in-memory data
     mmaps: BTreeMap<String, &'static mut [u8]>,
-    verbose: bool
+    verbose: bool,
+    tls_index_offset: usize,
 }
 
 impl Linker {
@@ -51,7 +52,8 @@ impl Linker {
             objects: BTreeMap::new(),
             globals: BTreeMap::new(),
             mmaps: BTreeMap::new(),
-            verbose: verbose
+            verbose,
+            tls_index_offset: 0,
         }
     }
 
@@ -329,14 +331,14 @@ impl Linker {
                             );
                         }
                         if Some(*elf_name) == primary_opt {
-                            tls_ranges.insert(elf_name.to_string(), (0, tcb_master.range()));
+                            tls_ranges.insert(elf_name.to_string(), (self.tls_index_offset, tcb_master.range()));
                             tcb_masters[0] = tcb_master;
                         } else {
                             tcb_master.offset -= tls_offset;
                             tls_offset += vsize;
                             tls_ranges.insert(
                                 elf_name.to_string(),
-                                (tcb_masters.len(), tcb_master.range()),
+                                (self.tls_index_offset + tcb_masters.len(), tcb_master.range()),
                             );
                             tcb_masters.push(tcb_master);
                         }
@@ -345,6 +347,8 @@ impl Linker {
                 }
             }
         }
+
+        self.tls_index_offset += tcb_masters.len();
 
         // Set master images for TLS and copy TLS data
         if let Some(ref mut tcb) = tcb_opt {

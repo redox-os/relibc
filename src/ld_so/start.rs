@@ -121,11 +121,11 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         (argv, envs, auxv)
     };
 
-    let img_entry = *auxv.get(&AT_ENTRY).unwrap_or_else(|| {
-        eprintln!("failed to find AT_ENTRY");
-        unistd::_exit(1);
-        loop {}
-    });
+    let is_manual = if let Some(img_entry) = auxv.get(&AT_ENTRY) {
+        *img_entry == ld_entry
+    } else {
+        true
+    };
 
     // Some variables that will be overridden by environment and auxiliary vectors
     let library_path = match envs.get("LD_LIBRARY_PATH") {
@@ -133,10 +133,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         None => "/lib",
     };
 
-    let path;
-
-    let is_manual = img_entry == ld_entry;
-    if is_manual {
+    let path = if is_manual {
         // ld.so is run directly by user and not via execve() or similar systemcall
         println!("argv: {:#?}", argv);
         println!("envs: {:#?}", envs);
@@ -148,10 +145,10 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
             loop {}
         }
         unsafe { adjust_stack(sp) };
-        path = &argv[1];
+        &argv[1]
     } else {
-        path = &argv[0];
-    }
+        &argv[0]
+    };
 
     let mut linker = Linker::new(library_path, is_manual);
     match linker.load(&path, &path) {
