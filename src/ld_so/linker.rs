@@ -1,6 +1,6 @@
 use alloc::{
     boxed::Box,
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     string::{String, ToString},
     vec::Vec,
 };
@@ -59,6 +59,8 @@ pub struct Linker {
     mmaps: BTreeMap<String, &'static mut [u8]>,
     verbose: bool,
     tls_index_offset: usize,
+    // used to detect circular dependencies in the Linker::load function
+    cir_dep: BTreeSet<String>,
 }
 
 impl Linker {
@@ -71,6 +73,7 @@ impl Linker {
             mmaps: BTreeMap::new(),
             verbose,
             tls_index_offset: 0,
+            cir_dep: BTreeSet::new(),
         }
     }
 
@@ -78,6 +81,14 @@ impl Linker {
         if self.verbose {
             println!("load {}: {}", name, path);
         }
+        if self.cir_dep.contains(name) {
+            return Err(Error::Malformed(format!(
+                "Circular dependency: {} is a dependency of itself",
+                name
+            )));
+        }
+
+        self.cir_dep.insert(name.to_string());
         let mut data = Vec::new();
 
         let path_c = CString::new(path)
@@ -91,19 +102,17 @@ impl Linker {
             file.read_to_end(&mut data)
                 .map_err(|err| Error::Malformed(format!("failed to read '{}': {}", path, err)))?;
         }
-
-        self.load_data(name, data.into_boxed_slice())
+        let result = self.load_data(name, data.into_boxed_slice());
+        self.cir_dep.remove(name);
+        result
     }
 
     pub fn load_data(&mut self, name: &str, data: Box<[u8]>) -> Result<()> {
-        //TODO: Prevent failures due to recursion
-        {
-            let elf = Elf::parse(&data)?;
-            //println!("{:#?}", elf);
+        let elf = Elf::parse(&data)?;
+        //println!("{:#?}", elf);
 
-            for library in elf.libraries.iter() {
-                self.load_library(library)?;
-            }
+        for library in elf.libraries.iter() {
+            self.load_library(library)?;
         }
 
         self.objects.insert(name.to_string(), data);
