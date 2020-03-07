@@ -38,7 +38,7 @@ pub struct Linker {
 
     // Used by link
     /// Global symbols
-    pub globals: BTreeMap<String, usize>,
+    globals: BTreeMap<String, usize>,
     /// Loaded library in-memory data
     mmaps: BTreeMap<String, &'static mut [u8]>,
     verbose: bool,
@@ -129,6 +129,37 @@ impl Linker {
         }
     }
 
+    fn collect_syms(elf: &Elf, mmap: &[u8], verbose: bool) -> Result<BTreeMap<String, usize>> {
+        let mut globals = BTreeMap::new();
+        for sym in elf.dynsyms.iter() {
+            if sym.st_bind() == sym::STB_GLOBAL && sym.st_value != 0 {
+                if let Some(name_res) = elf.dynstrtab.get(sym.st_name) {
+                    let name = name_res?;
+                    let value = mmap.as_ptr() as usize + sym.st_value as usize;
+                    if verbose {
+                        println!("  global {}: {:x?} = {:#x}", &name, sym, value);
+                    }
+                    globals.insert(name.to_string(), value);
+                }
+            }
+        }
+        return Ok(globals);
+    }
+
+    pub fn get_sym(&self, name: &str) -> Option<usize> {
+        if let Some(value) = self.globals.get(name) {
+            if self.verbose {
+                println!("    sym {} = {:#x}", name, value);
+            }
+            Some(*value)
+        } else {
+            if self.verbose {
+                println!("    sym {} = undefined", name);
+            }
+            None
+        }
+    }
+
     pub fn link(&mut self, primary_opt: Option<&str>) -> Result<Option<usize>> {
         let elfs = {
             let mut elfs = BTreeMap::new();
@@ -179,7 +210,7 @@ impl Linker {
                             }
                         }
                         program_header::PT_TLS => {
-                            if self.verbose{
+                            if self.verbose {
                                 println!("  load tls {:#x}: {:x?}", vsize, ph);
                             }
                             tls_size += vsize;
@@ -221,18 +252,8 @@ impl Linker {
             if self.verbose {
                 println!("  mmap {:p}, {:#x}", mmap.as_mut_ptr(), mmap.len());
             }
-            // Locate all globals
-            for sym in elf.dynsyms.iter() {
-                if sym.st_bind() == sym::STB_GLOBAL && sym.st_value != 0 {
-                    if let Some(name_res) = elf.dynstrtab.get(sym.st_name) {
-                        let name = name_res?;
-                        let value = mmap.as_ptr() as usize + sym.st_value as usize;
-                        // println!("  global {}: {:x?} = {:#x}", name, sym, value);
-                        self.globals.insert(name.to_string(), value);
-                    }
-                }
-            }
-
+            let globals = Linker::collect_syms(&elf, &mmap, self.verbose)?;
+            self.globals.extend(globals.into_iter());
             self.mmaps.insert(elf_name.to_string(), mmap);
         }
 
@@ -242,7 +263,7 @@ impl Linker {
         } else {
             None
         };
-        if self.verbose{
+        if self.verbose {
             println!("tcb {:x?}", tcb_opt);
         }
         // Copy data
@@ -331,14 +352,20 @@ impl Linker {
                             );
                         }
                         if Some(*elf_name) == primary_opt {
-                            tls_ranges.insert(elf_name.to_string(), (self.tls_index_offset, tcb_master.range()));
+                            tls_ranges.insert(
+                                elf_name.to_string(),
+                                (self.tls_index_offset, tcb_master.range()),
+                            );
                             tcb_masters[0] = tcb_master;
                         } else {
                             tcb_master.offset -= tls_offset;
                             tls_offset += vsize;
                             tls_ranges.insert(
                                 elf_name.to_string(),
-                                (self.tls_index_offset + tcb_masters.len(), tcb_master.range()),
+                                (
+                                    self.tls_index_offset + tcb_masters.len(),
+                                    tcb_master.range(),
+                                ),
                             );
                             tcb_masters.push(tcb_master);
                         }
@@ -360,10 +387,6 @@ impl Linker {
 
         // Perform relocations, and protect pages
         for (elf_name, elf) in elfs.iter() {
-            let mmap = match self.mmaps.get_mut(*elf_name) {
-                Some(some) => some,
-                None => continue,
-            };
             if self.verbose {
                 println!("link {}", elf_name);
             }
@@ -379,10 +402,6 @@ impl Linker {
                 //     rel
                 // );
 
-                let a = rel.r_addend.unwrap_or(0) as usize;
-
-                let b = mmap.as_mut_ptr() as usize;
-
                 let s = if rel.r_sym > 0 {
                     let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(format!(
                         "missing symbol for relocation {:?}",
@@ -396,17 +415,19 @@ impl Linker {
                                 "missing name for symbol {:?}",
                                 sym
                             )))??;
-
-                    if let Some(value) = self.globals.get(name) {
-                        // println!("    sym {}: {:x?} = {:#x}", name, sym, value);
-                        *value
-                    } else {
-                        // println!("    sym {}: {:x?} = undefined", name, sym);
-                        0
-                    }
+                    self.get_sym(name).unwrap_or(0)
                 } else {
                     0
                 };
+
+                let a = rel.r_addend.unwrap_or(0) as usize;
+
+                let mmap = match self.mmaps.get_mut(*elf_name) {
+                    Some(some) => some,
+                    None => continue,
+                };
+
+                let b = mmap.as_mut_ptr() as usize;
 
                 let (tm, t) = if let Some((tls_index, tls_range)) = tls_ranges.get(*elf_name) {
                     (*tls_index, tls_range.start)
@@ -473,6 +494,10 @@ impl Linker {
                         prot |= sys_mman::PROT_WRITE;
                     }
 
+                    let mmap = match self.mmaps.get_mut(*elf_name) {
+                        Some(some) => some,
+                        None => continue,
+                    };
                     let res = unsafe {
                         let ptr = mmap.as_mut_ptr().add(vaddr);
                         if self.verbose {
