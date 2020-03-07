@@ -215,7 +215,7 @@ impl PalSocket for Sys {
                     *error = 0;
 
                     return 0;
-                },
+                }
                 _ => (),
             },
             _ => (),

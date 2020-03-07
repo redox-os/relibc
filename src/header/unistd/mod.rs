@@ -5,7 +5,8 @@ use core::{convert::TryFrom, mem, ptr, slice};
 use crate::{
     c_str::CStr,
     header::{
-        errno, fcntl, limits, stdlib::getenv, sys_ioctl, sys_time, sys_utsname, termios, time::timespec,
+        errno, fcntl, limits, stdlib::getenv, sys_ioctl, sys_time, sys_utsname, termios,
+        time::timespec,
     },
     platform::{self, types::*, Pal, Sys},
 };
