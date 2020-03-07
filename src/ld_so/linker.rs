@@ -39,6 +39,8 @@ pub struct Linker {
     // Used by link
     /// Global symbols
     globals: BTreeMap<String, usize>,
+    /// Weak symbols
+    weak_syms: BTreeMap<String, usize>,
     /// Loaded library in-memory data
     mmaps: BTreeMap<String, &'static mut [u8]>,
     verbose: bool,
@@ -51,6 +53,7 @@ impl Linker {
             library_path: library_path.to_string(),
             objects: BTreeMap::new(),
             globals: BTreeMap::new(),
+            weak_syms: BTreeMap::new(),
             mmaps: BTreeMap::new(),
             verbose,
             tls_index_offset: 0,
@@ -129,25 +132,52 @@ impl Linker {
         }
     }
 
-    fn collect_syms(elf: &Elf, mmap: &[u8], verbose: bool) -> Result<BTreeMap<String, usize>> {
+    fn collect_syms(
+        elf: &Elf,
+        mmap: &[u8],
+        verbose: bool,
+    ) -> Result<(BTreeMap<String, usize>, BTreeMap<String, usize>)> {
         let mut globals = BTreeMap::new();
+        let mut weak_syms = BTreeMap::new();
         for sym in elf.dynsyms.iter() {
-            if sym.st_bind() == sym::STB_GLOBAL && sym.st_value != 0 {
-                if let Some(name_res) = elf.dynstrtab.get(sym.st_name) {
-                    let name = name_res?;
-                    let value = mmap.as_ptr() as usize + sym.st_value as usize;
+            let bind = sym.st_bind();
+            if sym.st_value == 0 || ![sym::STB_GLOBAL, sym::STB_WEAK].contains(&bind) {
+                continue;
+            }
+            let name: String;
+            let value: usize;
+            if let Some(name_res) = elf.dynstrtab.get(sym.st_name) {
+                name = name_res?.to_string();
+                value = mmap.as_ptr() as usize + sym.st_value as usize;
+            } else {
+                continue;
+            }
+            match sym.st_bind() {
+                sym::STB_GLOBAL => {
                     if verbose {
                         println!("  global {}: {:x?} = {:#x}", &name, sym, value);
                     }
-                    globals.insert(name.to_string(), value);
+                    globals.insert(name, value);
                 }
+                sym::STB_WEAK => {
+                    if verbose {
+                        println!("  weak {}: {:x?} = {:#x}", &name, sym, value);
+                    }
+                    weak_syms.insert(name, value);
+                }
+                _ => unreachable!(),
             }
         }
-        return Ok(globals);
+        return Ok((globals, weak_syms));
     }
 
     pub fn get_sym(&self, name: &str) -> Option<usize> {
         if let Some(value) = self.globals.get(name) {
+            if self.verbose {
+                println!("    sym {} = {:#x}", name, value);
+            }
+            Some(*value)
+        } else if let Some(value) = self.weak_syms.get(name) {
             if self.verbose {
                 println!("    sym {} = {:#x}", name, value);
             }
@@ -252,8 +282,9 @@ impl Linker {
             if self.verbose {
                 println!("  mmap {:p}, {:#x}", mmap.as_mut_ptr(), mmap.len());
             }
-            let globals = Linker::collect_syms(&elf, &mmap, self.verbose)?;
+            let (globals, weak_syms) = Linker::collect_syms(&elf, &mmap, self.verbose)?;
             self.globals.extend(globals.into_iter());
+            self.weak_syms.extend(weak_syms.into_iter());
             self.mmaps.insert(elf_name.to_string(), mmap);
         }
 
