@@ -1,6 +1,7 @@
 TARGET?=
 
 CARGO?=cargo
+CARGO_TEST?=$(CARGO)
 CARGOFLAGS=
 RUSTCFLAGS=
 
@@ -88,7 +89,7 @@ sysroot: all
 	touch $@
 
 test: sysroot
-	$(CARGO) test
+	$(CARGO_TEST) test
 	$(MAKE) -C tests verify
 
 # Debug targets
