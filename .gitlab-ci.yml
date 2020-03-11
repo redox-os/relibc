@@ -45,6 +45,7 @@ test:redox:
     variables:
         TARGET: x86_64-unknown-redox
     script:
+        - export CARGO="redoxer"
         - export RUSTUP_TOOLCHAIN="$HOME/.redoxer/toolchain"
         - export PATH="$RUSTUP_TOOLCHAIN/bin:$PATH"
         - export TEST_RUNNER="redoxer exec --folder . -- sh --"

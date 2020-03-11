@@ -88,6 +88,7 @@ sysroot: all
 	touch $@
 
 test: sysroot
+	$(CARGO) test
 	$(MAKE) -C tests verify
 
 # Debug targets
