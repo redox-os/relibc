@@ -108,9 +108,9 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
         eprintln!("dlsym: linker_ptr: {:p}", tcb.linker_ptr);
         let linker = (&*tcb.linker_ptr).lock();
 
-        if let Some(global) = linker.globals.get(symbol_str) {
-            eprintln!("dlsym({:p}, {}) = 0x{:x}", handle, symbol_str, *global);
-            *global as *mut c_void
+        if let Some(global) = linker.get_sym(symbol_str) {
+            eprintln!("dlsym({:p}, {}) = 0x{:x}", handle, symbol_str, global);
+            global as *mut c_void
         } else {
             eprintln!("dlsym: symbol not found");
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
