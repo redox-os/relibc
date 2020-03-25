@@ -127,7 +127,7 @@ $(BUILD)/debug/ld_so.o: $(SRC)
 	touch $@
 
 $(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debug/libc.a $(BUILD)/debug/crtn.o
-	$(LD) --allow-multiple-definition --gc-sections $^ -o $@
+	$(LD) --allow-multiple-definition --gc-sections --gc-keep-exported $^ -o $@
 
 # Release targets
 
@@ -164,7 +164,7 @@ $(BUILD)/release/ld_so.o: $(SRC)
 	touch $@
 
 $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD)/release/libc.a $(BUILD)/release/crtn.o
-	$(LD) --allow-multiple-definition --gc-sections $^ -o $@
+	$(LD) --allow-multiple-definition --gc-sections --gc-keep-exported $^ -o $@
 
 # Other targets
 
