@@ -150,7 +150,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         &argv[0]
     };
 
-    let mut linker = Linker::new(library_path, is_manual);
+    let mut linker = Linker::new(library_path, false);
     match linker.load(&path, &path) {
         Ok(()) => (),
         Err(err) => {
