@@ -66,7 +66,7 @@ pub unsafe extern "C" fn dlopen(filename: *const c_char, flags: c_int) -> *mut c
                 }
             }
 
-            match linker.link(None) {
+            match linker.link(None, None) {
                 Ok(ok) => (),
                 Err(err) => {
                     eprintln!("dlopen: failed to link '{}': {}", filename, err);

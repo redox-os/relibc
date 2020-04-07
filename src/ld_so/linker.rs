@@ -29,6 +29,12 @@ const PATH_SEP: char = ';';
 #[cfg(target_os = "linux")]
 const PATH_SEP: char = ':';
 
+pub struct DSO {
+    pub name: String,
+    pub base_addr: usize,
+    pub entry_point: usize,
+}
+
 pub struct Linker {
     // Used by load
     /// Library path to search when loading library by name
@@ -190,7 +196,7 @@ impl Linker {
         }
     }
 
-    pub fn link(&mut self, primary_opt: Option<&str>) -> Result<Option<usize>> {
+    pub fn link(&mut self, primary_opt: Option<&str>, dso: Option<DSO>) -> Result<Option<usize>> {
         let elfs = {
             let mut elfs = BTreeMap::new();
             for (name, data) in self.objects.iter() {
@@ -262,22 +268,41 @@ impl Linker {
             // Allocate memory
             let mmap = unsafe {
                 let size = bounds.1 /* - bounds.0 */;
-                let ptr = sys_mman::mmap(
-                    ptr::null_mut(),
-                    size,
-                    //TODO: Make it possible to not specify PROT_EXEC on Redox
-                    sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-                    sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
-                    -1,
-                    0,
-                );
-                if ptr as usize == !0
-                /* MAP_FAILED */
-                {
-                    return Err(Error::Malformed(format!("failed to map {}", elf_name)));
+                let same_elf = if let Some(prog) = dso.as_ref() {
+                    if prog.name == *elf_name {
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+                if same_elf {
+                    let addr = dso.as_ref().unwrap().base_addr;
+                    sys_mman::mprotect(
+                        addr as *mut c_void,
+                        size,
+                        sys_mman::PROT_READ | sys_mman::PROT_WRITE,
+                    );
+                    slice::from_raw_parts_mut(addr as *mut u8, size)
+                } else {
+                    let ptr = sys_mman::mmap(
+                        ptr::null_mut(),
+                        size,
+                        //TODO: Make it possible to not specify PROT_EXEC on Redox
+                        sys_mman::PROT_READ | sys_mman::PROT_WRITE,
+                        sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
+                        -1,
+                        0,
+                    );
+                    if ptr as usize == !0
+                    /* MAP_FAILED */
+                    {
+                        return Err(Error::Malformed(format!("failed to map {}", elf_name)));
+                    }
+                    ptr::write_bytes(ptr as *mut u8, 0, size);
+                    slice::from_raw_parts_mut(ptr as *mut u8, size)
                 }
-                ptr::write_bytes(ptr as *mut u8, 0, size);
-                slice::from_raw_parts_mut(ptr as *mut u8, size)
             };
             if self.verbose {
                 println!("  mmap {:p}, {:#x}", mmap.as_mut_ptr(), mmap.len());
@@ -308,6 +333,18 @@ impl Linker {
         });
         let mut tls_ranges = BTreeMap::new();
         for (elf_name, elf) in elfs.iter() {
+            let same_elf = if let Some(prog) = dso.as_ref() {
+                if prog.name == *elf_name {
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+            if same_elf {
+                continue;
+            }
             let object = match self.objects.get(*elf_name) {
                 Some(some) => some,
                 None => continue,

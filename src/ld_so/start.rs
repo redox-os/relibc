@@ -6,8 +6,11 @@ use crate::{
     c_str::CStr, header::unistd, platform::types::c_char, start::Stack, sync::mutex::Mutex,
 };
 
-use super::{linker::Linker, tcb::Tcb};
-use crate::header::sys_auxv::AT_ENTRY;
+use super::{
+    linker::{Linker, DSO},
+    tcb::Tcb,
+};
+use crate::header::sys_auxv::{AT_ENTRY, AT_PHDR};
 
 unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
     //traverse the stack and collect argument vector
@@ -149,7 +152,26 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     } else {
         &argv[0]
     };
-
+    // if we are not running in manual mode, then the main
+    // program is already loaded by the kernel and we want
+    // to use it.
+    let program = {
+        let mut pr = None;
+        if !is_manual {
+            let phdr = *auxv.get(&AT_PHDR).unwrap();
+            if phdr != 0 {
+                let p = DSO {
+                    name: path.to_owned(),
+                    entry_point: *auxv.get(&AT_ENTRY).unwrap(),
+                    // The 0x40 is the size of Elf header not a good idea for different bit size
+                    // compatiablility but it will always work on 64 bit systems,
+                    base_addr: phdr - 0x40,
+                };
+                pr = Some(p);
+            }
+        }
+        pr
+    };
     let mut linker = Linker::new(library_path, false);
     match linker.load(&path, &path) {
         Ok(()) => (),
@@ -160,7 +182,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         }
     }
 
-    let entry = match linker.link(Some(&path)) {
+    let entry = match linker.link(Some(&path), program) {
         Ok(ok) => match ok {
             Some(some) => some,
             None => {
