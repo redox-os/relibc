@@ -33,13 +33,12 @@ SRC=\
 	Cargo.* \
 	$(shell find src -type f)
 
-.PHONY: all clean fmt headers install install-headers libs test
+.PHONY: all clean fmt install install-headers libs test
 
-all: | headers libs
+all: | libs
 
 clean:
 	$(CARGO) clean
-	$(CARGO) clean --manifest-path cbindgen/Cargo.toml
 	$(MAKE) -C tests clean
 	rm -rf sysroot
 
@@ -49,12 +48,10 @@ check:
 fmt:
 	./fmt.sh
 
-headers: $(BUILD)/include
-
-install-headers: headers
+install-headers: libs
 	mkdir -pv "$(DESTDIR)/include"
 	cp -rv "include"/* "$(DESTDIR)/include"
-	cp -rv "$(BUILD)/include"/* "$(DESTDIR)/include"
+	cp -rv "target/include"/* "$(DESTDIR)/include"
 	cp -v "openlibm/include"/*.h "$(DESTDIR)/include"
 	cp -v "openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "pthreads-emb/"*.h "$(DESTDIR)/include"
@@ -168,13 +165,6 @@ $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD
 
 # Other targets
 
-$(BUILD)/include: $(SRC)
-	rm -rf $@ $@.partial
-	mkdir -p $@.partial
-	./include.sh $@.partial
-	mv $@.partial $@
-	touch $@
-
 $(BUILD)/openlibm: openlibm
 	rm -rf $@ $@.partial
 	mkdir -p $(BUILD)
@@ -182,8 +172,8 @@ $(BUILD)/openlibm: openlibm
 	mv $@.partial $@
 	touch $@
 
-$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/include
-	$(MAKE) CC=$(CC) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libopenlibm.a
+$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
+	$(MAKE) CC=$(CC) CPPFLAGS="-fno-stack-protector -I $(shell pwd)/include -I $(shell pwd)/target/include" -C $< libopenlibm.a
 
 $(BUILD)/pthreads-emb: pthreads-emb
 	rm -rf $@ $@.partial
@@ -192,5 +182,5 @@ $(BUILD)/pthreads-emb: pthreads-emb
 	mv $@.partial $@
 	touch $@
 
-$(BUILD)/pthreads-emb/libpthread.a: $(BUILD)/pthreads-emb $(BUILD)/include
-	$(MAKE) CC=$(CC) CFLAGS="-fno-stack-protector -I$(shell pwd)/include -I $(shell pwd)/$(BUILD)/include" -C $< libpthread.a
+$(BUILD)/pthreads-emb/libpthread.a: $(BUILD)/pthreads-emb $(BUILD)/release/librelibc.a
+	$(MAKE) CC=$(CC) CFLAGS="-fno-stack-protector -I $(shell pwd)/include -I $(shell pwd)/target/include" -C $< libpthread.a
