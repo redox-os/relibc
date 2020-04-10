@@ -1,9 +1,6 @@
 [submodule "openlibm"]
 	path = openlibm
 	url = https://gitlab.redox-os.org/redox-os/openlibm.git
-[submodule "cbindgen"]
-	path = cbindgen
-	url = https://github.com/eqrion/cbindgen.git
 [submodule "ralloc"]
 	path = ralloc
 	url = https://gitlab.redox-os.org/redox-os/ralloc.git
