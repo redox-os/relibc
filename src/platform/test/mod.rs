@@ -8,10 +8,7 @@ mod epoll;
 
 #[test]
 fn access() {
-    use crate::header::{
-        errno,
-        unistd,
-    };
+    use crate::header::{errno, unistd};
 
     //TODO: create test files
     assert_eq!(Sys::access(c_str!("not a file!"), unistd::F_OK), !0);
@@ -44,9 +41,7 @@ fn chdir() {
 
 #[test]
 fn clock_gettime() {
-    use crate::header::{
-        time
-    };
+    use crate::header::time;
 
     {
         let mut timespec = time::timespec {

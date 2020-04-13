@@ -4,9 +4,16 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{mem, ptr, slice};
+use core::{
+    mem::{size_of, transmute},
+    ptr, slice,
+};
 use goblin::{
-    elf::{program_header, reloc, sym, Elf},
+    elf::{
+        program_header,
+        r#dyn::{Dyn, DT_DEBUG},
+        reloc, sym, Elf,
+    },
     error::{Error, Result},
 };
 
@@ -19,6 +26,7 @@ use crate::{
 };
 
 use super::{
+    debug::{RTLDDebug, RTLDState, _dl_debug_state, _r_debug},
     tcb::{Master, Tcb},
     PAGE_SIZE,
 };
@@ -197,6 +205,8 @@ impl Linker {
     }
 
     pub fn link(&mut self, primary_opt: Option<&str>, dso: Option<DSO>) -> Result<Option<usize>> {
+        unsafe { _r_debug.state = RTLDState::RT_ADD };
+        _dl_debug_state();
         let elfs = {
             let mut elfs = BTreeMap::new();
             for (name, data) in self.objects.iter() {
@@ -219,7 +229,8 @@ impl Linker {
                 Some(some) => some,
                 None => continue,
             };
-
+            // data for struct LinkMap
+            let mut l_ld = 0;
             // Calculate virtual memory bounds
             let bounds = {
                 let mut bounds_opt: Option<(usize, usize)> = None;
@@ -230,6 +241,9 @@ impl Linker {
                         ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
 
                     match ph.p_type {
+                        program_header::PT_DYNAMIC => {
+                            l_ld = ph.p_vaddr;
+                        }
                         program_header::PT_LOAD => {
                             if self.verbose {
                                 println!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
@@ -284,6 +298,7 @@ impl Linker {
                         size,
                         sys_mman::PROT_READ | sys_mman::PROT_WRITE,
                     );
+                    _r_debug.insert(addr as usize, &elf_name, addr + l_ld as usize);
                     slice::from_raw_parts_mut(addr as *mut u8, size)
                 } else {
                     let ptr = sys_mman::mmap(
@@ -301,6 +316,7 @@ impl Linker {
                         return Err(Error::Malformed(format!("failed to map {}", elf_name)));
                     }
                     ptr::write_bytes(ptr as *mut u8, 0, size);
+                    _r_debug.insert(ptr as usize, &elf_name, ptr as usize + l_ld as usize);
                     slice::from_raw_parts_mut(ptr as *mut u8, size)
                 }
             };
@@ -541,6 +557,32 @@ impl Linker {
                 }
             }
 
+            // overwrite DT_DEBUG if exist in .dynamic section
+            for section in &elf.section_headers {
+                // we won't bother with half corrupted elfs.
+                let name = elf.shdr_strtab.get(section.sh_name).unwrap().unwrap();
+                if name != ".dynamic" {
+                    continue;
+                }
+                let mmap = match self.mmaps.get_mut(*elf_name) {
+                    Some(some) => some,
+                    None => continue,
+                };
+                let dyn_start = section.sh_addr as usize;
+                let bytes: [u8; size_of::<Dyn>() / 2] =
+                    unsafe { transmute((&_r_debug) as *const RTLDDebug as usize) };
+                if let Some(dynamic) = elf.dynamic.as_ref() {
+                    let mut i = 0;
+                    for entry in &dynamic.dyns {
+                        if entry.d_tag == DT_DEBUG {
+                            let start = dyn_start + i * size_of::<Dyn>() + size_of::<Dyn>() / 2;
+                            mmap[start..start + size_of::<Dyn>() / 2].clone_from_slice(&bytes);
+                        }
+                        i += 1;
+                    }
+                }
+            }
+
             // Protect pages
             for ph in elf.program_headers.iter() {
                 if ph.p_type == program_header::PT_LOAD {
@@ -629,7 +671,7 @@ impl Linker {
 
                 if rel.r_type == reloc::R_X86_64_IRELATIVE {
                     unsafe {
-                        let f: unsafe extern "C" fn() -> u64 = mem::transmute(b + a);
+                        let f: unsafe extern "C" fn() -> u64 = transmute(b + a);
                         set_u64(f());
                     }
                 }
@@ -670,7 +712,8 @@ impl Linker {
                 }
             }
         }
-
+        unsafe { _r_debug.state = RTLDState::RT_CONSISTENT };
+        _dl_debug_state();
         Ok(entry_opt)
     }
 }
