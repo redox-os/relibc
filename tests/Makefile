@@ -23,6 +23,7 @@ EXPECT_NAMES=\
 	regex \
 	select \
 	setjmp \
+	sigaction \
 	signal \
 	stdio/all \
 	stdio/buffer \
