@@ -89,6 +89,7 @@ pub unsafe extern "C" fn sigaction(
     let act_opt = act.as_ref().map(|act| {
         let mut act_clone = act.clone();
         act_clone.sa_flags |= SA_RESTORER as c_ulong;
+        act_clone.sa_restorer = Some(__restore_rt);
         act_clone
     });
     Sys::sigaction(sig, act_opt.as_ref(), oact.as_mut())
