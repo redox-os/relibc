@@ -7,6 +7,7 @@ use crate::{
 };
 
 use super::{
+    debug::_r_debug,
     linker::{Linker, DSO},
     tcb::Tcb,
 };
@@ -129,6 +130,11 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     } else {
         true
     };
+
+    // we might need global lock for this kind of stuff
+    unsafe {
+        _r_debug.r_ldbase = ld_entry;
+    }
 
     // Some variables that will be overridden by environment and auxiliary vectors
     let library_path = match envs.get("LD_LIBRARY_PATH") {

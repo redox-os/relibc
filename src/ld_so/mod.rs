@@ -5,10 +5,10 @@ use crate::start::Stack;
 
 pub const PAGE_SIZE: usize = 4096;
 
+pub mod debug;
 pub mod linker;
 pub mod start;
 pub mod tcb;
-
 pub fn static_init(sp: &'static Stack) {
     let mut phdr_opt = None;
     let mut phent_opt = None;
