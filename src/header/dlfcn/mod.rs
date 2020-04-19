@@ -57,22 +57,16 @@ pub unsafe extern "C" fn dlopen(filename: *const c_char, flags: c_int) -> *mut c
             eprintln!("dlopen: linker_ptr: {:p}", tcb.linker_ptr);
             let mut linker = (&*tcb.linker_ptr).lock();
 
-            match linker.load_library(filename) {
-                Ok(()) => (),
-                Err(err) => {
-                    eprintln!("dlopen: failed to load {}", filename);
-                    ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-                    return ptr::null_mut();
-                }
+            if let Err(err) = linker.load_library(filename) {
+                eprintln!("dlopen: failed to load {}", filename);
+                ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+                return ptr::null_mut();
             }
 
-            match linker.link(None, None) {
-                Ok(ok) => (),
-                Err(err) => {
-                    eprintln!("dlopen: failed to link '{}': {}", filename, err);
-                    ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-                    return ptr::null_mut();
-                }
+            if let Err(err) = linker.link(None, None) {
+                eprintln!("dlopen: failed to link '{}': {}", filename, err);
+                ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+                return ptr::null_mut();
             };
 
             // TODO
@@ -125,6 +119,8 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
 
 #[no_mangle]
 pub extern "C" fn dlclose(handle: *mut c_void) -> c_int {
+    // TODO: Loader::fini() should be called about here
+
     0
 }
 

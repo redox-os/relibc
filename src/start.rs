@@ -60,6 +60,24 @@ pub unsafe fn relibc_verify_host() {
         intrinsics::abort();
     }
 }
+#[link_section = ".init_array"]
+#[used]
+static INIT_ARRAY: [extern "C" fn(); 1] = [init_array];
+
+static mut init_complete: bool = false;
+
+extern "C" fn init_array() {
+    io_init();
+    unsafe { init_complete = true };
+}
+fn io_init() {
+    unsafe {
+        // Initialize stdin/stdout/stderr, see https://github.com/rust-lang/rust/issues/51718
+        stdio::stdin = stdio::default_stdin.get();
+        stdio::stdout = stdio::default_stdout.get();
+        stdio::stderr = stdio::default_stderr.get();
+    }
+}
 
 #[inline(never)]
 #[no_mangle]
@@ -95,11 +113,9 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     platform::inner_environ = copy_string_array(envp, len);
     platform::environ = platform::inner_environ.as_mut_ptr();
 
-    // Initialize stdin/stdout/stderr, see https://github.com/rust-lang/rust/issues/51718
-    stdio::stdin = stdio::default_stdin.get();
-    stdio::stdout = stdio::default_stdout.get();
-    stdio::stderr = stdio::default_stderr.get();
-
+    if !init_complete {
+        init_array();
+    }
     pthread_init();
 
     // Run preinit array

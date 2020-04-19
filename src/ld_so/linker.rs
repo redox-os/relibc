@@ -1,6 +1,6 @@
 use alloc::{
     boxed::Box,
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     string::{String, ToString},
     vec::Vec,
 };
@@ -42,7 +42,20 @@ pub struct DSO {
     pub base_addr: usize,
     pub entry_point: usize,
 }
+#[derive(Default, Debug)]
+pub struct DepTree {
+    pub name: String,
+    pub deps: Vec<DepTree>,
+}
 
+impl DepTree {
+    fn new(name: String) -> DepTree {
+        DepTree {
+            name,
+            deps: Vec::new(),
+        }
+    }
+}
 pub struct Linker {
     // Used by load
     /// Library path to search when loading library by name
@@ -59,6 +72,10 @@ pub struct Linker {
     mmaps: BTreeMap<String, &'static mut [u8]>,
     verbose: bool,
     tls_index_offset: usize,
+    /// A set used to detect circular dependencies in the Linker::load function
+    cir_dep: BTreeSet<String>,
+    /// Each object will have its children callec once with no repetition.
+    dep_tree: DepTree,
 }
 
 impl Linker {
@@ -71,15 +88,33 @@ impl Linker {
             mmaps: BTreeMap::new(),
             verbose,
             tls_index_offset: 0,
+            cir_dep: BTreeSet::new(),
+            dep_tree: Default::default(),
         }
     }
 
     pub fn load(&mut self, name: &str, path: &str) -> Result<()> {
+        self.dep_tree = self.load_recursive(name, path)?;
+        if self.verbose {
+            println!("Dep tree: {:#?}", self.dep_tree);
+        }
+        return Ok(());
+    }
+
+    fn load_recursive(&mut self, name: &str, path: &str) -> Result<DepTree> {
         if self.verbose {
             println!("load {}: {}", name, path);
         }
-        let mut data = Vec::new();
+        if self.cir_dep.contains(name) {
+            return Err(Error::Malformed(format!(
+                "Circular dependency: {} is a dependency of itself",
+                name
+            )));
+        }
 
+        let mut deps = DepTree::new(name.to_string());
+        let mut data = Vec::new();
+        self.cir_dep.insert(name.to_string());
         let path_c = CString::new(path)
             .map_err(|err| Error::Malformed(format!("invalid path '{}': {}", path, err)))?;
 
@@ -91,31 +126,32 @@ impl Linker {
             file.read_to_end(&mut data)
                 .map_err(|err| Error::Malformed(format!("failed to read '{}': {}", path, err)))?;
         }
-
-        self.load_data(name, data.into_boxed_slice())
+        deps.deps = self.load_data(name, data.into_boxed_slice())?;
+        self.cir_dep.remove(name);
+        Ok(deps)
     }
 
-    pub fn load_data(&mut self, name: &str, data: Box<[u8]>) -> Result<()> {
-        //TODO: Prevent failures due to recursion
-        {
-            let elf = Elf::parse(&data)?;
-            //println!("{:#?}", elf);
-
-            for library in elf.libraries.iter() {
-                self.load_library(library)?;
+    pub fn load_data(&mut self, name: &str, data: Box<[u8]>) -> Result<Vec<DepTree>> {
+        let elf = Elf::parse(&data)?;
+        //println!("{:#?}", elf);
+        let mut deps = Vec::new();
+        for library in elf.libraries.iter() {
+            if let Some(dep) = self.load_library(library)? {
+                deps.push(dep);
             }
         }
 
         self.objects.insert(name.to_string(), data);
 
-        Ok(())
+        return Ok(deps);
     }
 
-    pub fn load_library(&mut self, name: &str) -> Result<()> {
+    pub fn load_library(&mut self, name: &str) -> Result<Option<DepTree>> {
         if self.objects.contains_key(name) {
-            Ok(())
+            // It should be previously resolved so we don't need to worry about it
+            Ok(None)
         } else if name.contains('/') {
-            self.load(name, name)
+            Ok(Some(self.load_recursive(name, name)?))
         } else {
             let library_path = self.library_path.clone();
             for part in library_path.split(PATH_SEP) {
@@ -137,8 +173,7 @@ impl Linker {
                 };
 
                 if access {
-                    self.load(name, &path)?;
-                    return Ok(());
+                    return Ok(Some(self.load_recursive(name, &path)?));
                 }
             }
 
@@ -202,6 +237,73 @@ impl Linker {
             }
             None
         }
+    }
+    pub fn run_init(&self) -> Result<()> {
+        self.run_init_tree(&self.dep_tree)
+    }
+
+    fn run_init_tree(&self, root: &DepTree) -> Result<()> {
+        for node in root.deps.iter() {
+            self.run_init_tree(node)?;
+        }
+        if self.verbose {
+            println!("init {}", &root.name);
+        }
+        let mmap = match self.mmaps.get(&root.name) {
+            Some(some) => some,
+            None => return Ok(()),
+        };
+        let elf = Elf::parse(self.objects.get(&root.name).unwrap())?;
+        for section in elf.section_headers {
+            let name = match elf.shdr_strtab.get(section.sh_name) {
+                Some(x) => match x {
+                    Ok(y) => y,
+                    _ => continue,
+                },
+                _ => continue,
+            };
+            if name == ".init_array" {
+                let addr = mmap.as_ptr() as usize + section.vm_range().start;
+                for i in (0..section.sh_size).step_by(8) {
+                    unsafe { call_inits_finis(addr + i as usize) };
+                }
+            }
+        }
+        return Ok(());
+    }
+
+    pub fn run_fini(&self) -> Result<()> {
+        self.run_fini_tree(&self.dep_tree)
+    }
+
+    fn run_fini_tree(&self, root: &DepTree) -> Result<()> {
+        if self.verbose {
+            println!("init {}", &root.name);
+        }
+        let mmap = match self.mmaps.get(&root.name) {
+            Some(some) => some,
+            None => return Ok(()),
+        };
+        let elf = Elf::parse(self.objects.get(&root.name).unwrap())?;
+        for section in elf.section_headers {
+            let name = match elf.shdr_strtab.get(section.sh_name) {
+                Some(x) => match x {
+                    Ok(y) => y,
+                    _ => continue,
+                },
+                _ => continue,
+            };
+            if name == ".fini_array" {
+                let addr = mmap.as_ptr() as usize + section.vm_range().start;
+                for i in (0..section.sh_size).step_by(8) {
+                    unsafe { call_inits_finis(addr + i as usize) };
+                }
+            }
+        }
+        for node in root.deps.iter() {
+            self.run_fini_tree(node)?;
+        }
+        return Ok(());
     }
 
     pub fn link(&mut self, primary_opt: Option<&str>, dso: Option<DSO>) -> Result<Option<usize>> {
@@ -716,4 +818,19 @@ impl Linker {
         _dl_debug_state();
         Ok(entry_opt)
     }
+}
+
+unsafe extern "C" fn call_inits_finis(addr: usize) {
+    #[cfg(target_arch = "x86_64")]
+    asm!("
+        cmp qword ptr [rdi], 0
+        je end
+        call [rdi]
+end:    nop
+        "
+        :
+        :
+        :
+        : "intel", "volatile"
+    );
 }
