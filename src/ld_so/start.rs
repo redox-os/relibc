@@ -203,7 +203,11 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
             loop {}
         }
     };
-
+    if let Err(e) = linker.run_init() {
+        eprintln!("ld.so: failed to run .init_array");
+        unistd::_exit(1);
+        loop {}
+    }
     if let Some(tcb) = unsafe { Tcb::current() } {
         tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
     }

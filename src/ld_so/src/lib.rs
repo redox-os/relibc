@@ -33,6 +33,7 @@ next:   pop rsi
         xor r11, r11
         fninit
         jmp rax
+        # TODO: Loader::fini() should be called about here
         "
         :
         :
