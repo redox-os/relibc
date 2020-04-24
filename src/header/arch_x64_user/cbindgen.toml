@@ -1,5 +1,5 @@
 sys_includes = []
-include_guard = "_SYS_USER_H"
+include_guard = "_X64_USER_H"
 language = "C"
 style = "Tag"
 

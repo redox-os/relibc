@@ -1,0 +1,7 @@
+sys_includes = ["sys/user.h"]
+include_guard = "_SYS_PROCFS_H"
+language = "C"
+style = "Tag"
+
+[enum]
+prefix_with_name = true
