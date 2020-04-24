@@ -1,0 +1,7 @@
+sys_includes = []
+include_guard = "_AARCH64_USER_H"
+language = "C"
+style = "Tag"
+
+[enum]
+prefix_with_name = true
