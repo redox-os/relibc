@@ -1,0 +1,4 @@
+wcscasecmp(s1, s1) = 0
+wcscasecmp(s1, s2) = -1
+wcscasecmp(s2, s1) = 1
+wcscasecmp(s2, s2) = 0

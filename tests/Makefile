@@ -104,6 +104,8 @@ EXPECT_NAMES=\
 	wchar/wcstod \
 	wchar/wcstok \
 	wchar/wcstol \
+	wchar/wcscasecmp \
+	wchar/wcsncasecmp \
 	wctype/towlower \
 	wctype/towupper
 	# TODO: Fix these

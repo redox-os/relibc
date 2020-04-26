@@ -1,0 +1,5 @@
+wcsncasecmp(s1, s1, 17) = 0
+wcsncasecmp(s1, s2, 17) = -1
+wcsncasecmp(s2, s1, 17) = 1
+wcsncasecmp(s2, s1, 15) = 0
+wcsncasecmp(s1, s2, 0) = 0
