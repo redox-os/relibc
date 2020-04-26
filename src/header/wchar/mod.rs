@@ -3,14 +3,13 @@
 use core::{char, ffi::VaList as va_list, mem, ptr, slice, usize};
 
 use crate::{
-    header::{ctype::isspace, errno::ERANGE, stdio::*, stdlib::MB_CUR_MAX, string, time::*},
+    header::{
+        ctype::isspace, errno::ERANGE, stdio::*, stdlib::MB_CUR_MAX, string, time::*, wctype::*,
+    },
     platform::{self, types::*},
 };
 
 mod utf8;
-
-const WEOF: wint_t = 0xFFFF_FFFFu32;
-
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mbstate_t;
@@ -27,7 +26,7 @@ pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
     let mut ps: mbstate_t = mbstate_t;
     let mut wc: wchar_t = 0;
     let saved_errno = platform::errno;
-    let status = mbrtowc(&mut wc, &c as (*const c_char), 1, &mut ps);
+    let status = mbrtowc(&mut wc, &c as *const c_char, 1, &mut ps);
     if status == usize::max_value() || status == usize::max_value() - 1 {
         platform::errno = saved_errno;
         return WEOF;
@@ -235,16 +234,6 @@ pub extern "C" fn swprintf(
 
 // #[no_mangle]
 pub extern "C" fn swscanf(s: *const wchar_t, format: *const wchar_t, ap: va_list) -> c_int {
-    unimplemented!();
-}
-
-// #[no_mangle]
-pub extern "C" fn towlower(wc: wint_t) -> wint_t {
-    unimplemented!();
-}
-
-// #[no_mangle]
-pub extern "C" fn towupper(wc: wint_t) -> wint_t {
     unimplemented!();
 }
 

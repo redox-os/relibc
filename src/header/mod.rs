@@ -59,3 +59,4 @@ pub mod time;
 pub mod unistd;
 pub mod utime;
 pub mod wchar;
+pub mod wctype;
