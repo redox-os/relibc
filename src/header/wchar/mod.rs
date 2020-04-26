@@ -726,3 +726,35 @@ pub extern "C" fn wprintf(format: *const wchar_t, ap: va_list) -> c_int {
 pub extern "C" fn wscanf(format: *const wchar_t, ap: va_list) -> c_int {
     unimplemented!();
 }
+
+#[no_mangle]
+pub extern "C" fn wcscasecmp(mut s1: *const wchar_t, mut s2: *const wchar_t) -> c_int {
+    unsafe {
+        while *s1 != 0 && *s2 != 0 {
+            if towlower(*s1 as wint_t) != towlower(*s2 as wint_t) {
+                break;
+            }
+            s1 = s1.add(1);
+            s2 = s2.add(1);
+        }
+        let result = towlower(*s1 as wint_t).wrapping_sub(towlower(*s2 as wint_t));
+        return result as c_int;
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn wcsncasecmp(mut s1: *const wchar_t, mut s2: *const wchar_t, n: size_t) -> c_int {
+    if n == 0 {
+        return 0;
+    }
+    unsafe {
+        for _ in 0..n {
+            if *s1 == 0 || *s2 == 0 || towlower(*s1 as wint_t) != towlower(*s2 as wint_t) {
+                return towlower(*s1 as wint_t).wrapping_sub(towlower(*s2 as wint_t)) as c_int;
+            }
+            s1 = s1.add(1);
+            s2 = s2.add(1);
+        }
+        return 0;
+    }
+}
