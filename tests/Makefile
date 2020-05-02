@@ -103,7 +103,11 @@ EXPECT_NAMES=\
 	wchar/wcsstr \
 	wchar/wcstod \
 	wchar/wcstok \
-	wchar/wcstol
+	wchar/wcstol \
+	wchar/wcscasecmp \
+	wchar/wcsncasecmp \
+	wctype/towlower \
+	wctype/towupper
 	# TODO: Fix these
 	# mkfifo
 

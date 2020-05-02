@@ -1,0 +1,10 @@
+sys_includes = ["stddef.h", "stdint.h", "time.h", "stdio.h" ]
+include_guard = "_WCTYPE_H"
+header = ""
+language = "C"
+style = "Type"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true

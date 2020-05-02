@@ -3,14 +3,13 @@
 use core::{char, ffi::VaList as va_list, mem, ptr, slice, usize};
 
 use crate::{
-    header::{ctype::isspace, errno::ERANGE, stdio::*, stdlib::MB_CUR_MAX, string, time::*},
+    header::{
+        ctype::isspace, errno::ERANGE, stdio::*, stdlib::MB_CUR_MAX, string, time::*, wctype::*,
+    },
     platform::{self, types::*},
 };
 
 mod utf8;
-
-const WEOF: wint_t = 0xFFFF_FFFFu32;
-
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mbstate_t;
@@ -27,7 +26,7 @@ pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
     let mut ps: mbstate_t = mbstate_t;
     let mut wc: wchar_t = 0;
     let saved_errno = platform::errno;
-    let status = mbrtowc(&mut wc, &c as (*const c_char), 1, &mut ps);
+    let status = mbrtowc(&mut wc, &c as *const c_char, 1, &mut ps);
     if status == usize::max_value() || status == usize::max_value() - 1 {
         platform::errno = saved_errno;
         return WEOF;
@@ -235,16 +234,6 @@ pub extern "C" fn swprintf(
 
 // #[no_mangle]
 pub extern "C" fn swscanf(s: *const wchar_t, format: *const wchar_t, ap: va_list) -> c_int {
-    unimplemented!();
-}
-
-// #[no_mangle]
-pub extern "C" fn towlower(wc: wint_t) -> wint_t {
-    unimplemented!();
-}
-
-// #[no_mangle]
-pub extern "C" fn towupper(wc: wint_t) -> wint_t {
     unimplemented!();
 }
 
@@ -736,4 +725,36 @@ pub extern "C" fn wprintf(format: *const wchar_t, ap: va_list) -> c_int {
 // #[no_mangle]
 pub extern "C" fn wscanf(format: *const wchar_t, ap: va_list) -> c_int {
     unimplemented!();
+}
+
+#[no_mangle]
+pub extern "C" fn wcscasecmp(mut s1: *const wchar_t, mut s2: *const wchar_t) -> c_int {
+    unsafe {
+        while *s1 != 0 && *s2 != 0 {
+            if towlower(*s1 as wint_t) != towlower(*s2 as wint_t) {
+                break;
+            }
+            s1 = s1.add(1);
+            s2 = s2.add(1);
+        }
+        let result = towlower(*s1 as wint_t).wrapping_sub(towlower(*s2 as wint_t));
+        return result as c_int;
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn wcsncasecmp(mut s1: *const wchar_t, mut s2: *const wchar_t, n: size_t) -> c_int {
+    if n == 0 {
+        return 0;
+    }
+    unsafe {
+        for _ in 0..n {
+            if *s1 == 0 || *s2 == 0 || towlower(*s1 as wint_t) != towlower(*s2 as wint_t) {
+                return towlower(*s1 as wint_t).wrapping_sub(towlower(*s2 as wint_t)) as c_int;
+            }
+            s1 = s1.add(1);
+            s2 = s2.add(1);
+        }
+        return 0;
+    }
 }
