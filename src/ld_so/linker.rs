@@ -689,29 +689,36 @@ impl Linker {
                 }
             }
 
-            // overwrite DT_DEBUG if exist in .dynamic section
-            for section in &elf.section_headers {
-                // we won't bother with half corrupted elfs.
-                let name = elf.shdr_strtab.get(section.sh_name).unwrap().unwrap();
-                if name != ".dynamic" {
-                    continue;
+            // overwrite DT_DEBUG if exist in DYNAMIC segment
+            // first we identify the location of DYNAMIC segment
+            let mut dyn_start = None;
+            let mut debug_start = None;
+            for ph in elf.program_headers.iter() {
+                if ph.p_type == program_header::PT_DYNAMIC {
+                    dyn_start = Some(ph.p_vaddr as usize);
                 }
-                let mmap = match self.mmaps.get_mut(*elf_name) {
-                    Some(some) => some,
-                    None => continue,
-                };
-                let dyn_start = section.sh_addr as usize;
-                let bytes: [u8; size_of::<Dyn>() / 2] =
-                    unsafe { transmute((&_r_debug) as *const RTLDDebug as usize) };
-                if let Some(dynamic) = elf.dynamic.as_ref() {
-                    let mut i = 0;
-                    for entry in &dynamic.dyns {
-                        if entry.d_tag == DT_DEBUG {
-                            let start = dyn_start + i * size_of::<Dyn>() + size_of::<Dyn>() / 2;
-                            mmap[start..start + size_of::<Dyn>() / 2].clone_from_slice(&bytes);
-                        }
-                        i += 1;
+            }
+            // next we identify the location of DT_DEBUG in .dynamic section
+            if let Some(dynamic) = elf.dynamic.as_ref() {
+                let mut i = 0;
+                for entry in &dynamic.dyns {
+                    if entry.d_tag == DT_DEBUG {
+                        debug_start = Some(i as usize);
+                        break;
                     }
+                    i += 1;
+                }
+            }
+            if let Some(dyn_start_addr) = dyn_start {
+                if let Some(i) = debug_start {
+                    let mmap = match self.mmaps.get_mut(*elf_name) {
+                        Some(some) => some,
+                        None => continue,
+                    };
+                    let bytes: [u8; size_of::<Dyn>() / 2] =
+                        unsafe { transmute((&_r_debug) as *const RTLDDebug as usize) };
+                    let start = dyn_start_addr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2;
+                    mmap[start..start + size_of::<Dyn>() / 2].clone_from_slice(&bytes);
                 }
             }
 
