@@ -429,7 +429,7 @@ impl Linker {
                         size,
                         sys_mman::PROT_READ | sys_mman::PROT_WRITE,
                     );
-                    _r_debug.insert(addr as usize, &elf_name, addr + l_ld as usize);
+                    _r_debug.insert_first(addr as usize, &elf_name, addr + l_ld as usize);
                     slice::from_raw_parts_mut(addr as *mut u8, size)
                 } else {
                     let size = bounds.1;
