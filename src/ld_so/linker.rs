@@ -383,7 +383,6 @@ impl Linker {
             }
             // Allocate memory
             let mmap = unsafe {
-                let size = bounds.1 /* - bounds.0 */;
                 let same_elf = if let Some(prog) = dso.as_ref() {
                     if prog.name == *elf_name {
                         true
@@ -395,6 +394,36 @@ impl Linker {
                 };
                 if same_elf {
                     let addr = dso.as_ref().unwrap().base_addr;
+                    let mut size = bounds.1;
+                    // Fill the gaps i the binary
+                    let mut ranges = Vec::new();
+                    for ph in elf.program_headers.iter() {
+                        if ph.p_type == program_header::PT_LOAD {
+                            let voff = ph.p_vaddr as usize % PAGE_SIZE;
+                            let vaddr = ph.p_vaddr as usize - voff;
+                            let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE)
+                                * PAGE_SIZE;
+                            ranges.push((vaddr, vsize));
+                        }
+                    }
+                    ranges.sort();
+                    let mut start = addr;
+                    for (vaddr, vsize) in ranges.iter() {
+                        if start < addr + vaddr {
+                            let gap_size = addr + vaddr - start;
+                            size += gap_size;
+                            sys_mman::mmap(
+                                start as *mut c_void,
+                                addr + vaddr - start,
+                                //TODO: Make it possible to not specify PROT_EXEC on Redox
+                                sys_mman::PROT_READ | sys_mman::PROT_WRITE,
+                                sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
+                                -1,
+                                0,
+                            );
+                        }
+                        start = addr + vaddr + vsize
+                    }
                     sys_mman::mprotect(
                         addr as *mut c_void,
                         size,
@@ -403,6 +432,7 @@ impl Linker {
                     _r_debug.insert(addr as usize, &elf_name, addr + l_ld as usize);
                     slice::from_raw_parts_mut(addr as *mut u8, size)
                 } else {
+                    let size = bounds.1;
                     let ptr = sys_mman::mmap(
                         ptr::null_mut(),
                         size,
