@@ -394,7 +394,7 @@ impl Linker {
                 };
                 if same_elf {
                     let addr = dso.as_ref().unwrap().base_addr;
-                    let mut size = bounds.1;
+                    let size = bounds.1;
                     // Fill the gaps i the binary
                     let mut ranges = Vec::new();
                     for ph in elf.program_headers.iter() {
@@ -410,8 +410,6 @@ impl Linker {
                     let mut start = addr;
                     for (vaddr, vsize) in ranges.iter() {
                         if start < addr + vaddr {
-                            let gap_size = addr + vaddr - start;
-                            size += gap_size;
                             sys_mman::mmap(
                                 start as *mut c_void,
                                 addr + vaddr - start,
