@@ -472,7 +472,6 @@ struct PrintfArg {
     sign_always: bool,
     min_width: Number,
     precision: Option<Number>,
-    pad_space: Number,
     pad_zero: Number,
     intkind: IntKind,
     fmt: u8,
@@ -596,7 +595,6 @@ impl Iterator for PrintfIter {
                 sign_always,
                 min_width,
                 precision,
-                pad_space,
                 pad_zero,
                 intkind,
                 fmt,
@@ -667,8 +665,11 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
         let sign_always = arg.sign_always;
         let min_width = arg.min_width.resolve(&mut varargs, &mut ap);
         let precision = arg.precision.map(|n| n.resolve(&mut varargs, &mut ap));
-        let pad_space = arg.pad_space.resolve(&mut varargs, &mut ap);
         let pad_zero = arg.pad_zero.resolve(&mut varargs, &mut ap);
+        let pad_space = match pad_zero {
+            0 => min_width,
+            _ => 0,
+        };
         let intkind = arg.intkind;
         let fmt = arg.fmt;
         let fmtkind = arg.fmtkind;
