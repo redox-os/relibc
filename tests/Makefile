@@ -41,6 +41,7 @@ EXPECT_NAMES=\
 	stdio/scanf \
 	stdio/setvbuf \
 	stdio/sprintf \
+	stdio/printf_space_pad \
 	stdlib/a64l \
 	stdlib/alloc \
 	stdlib/atof \
