@@ -394,7 +394,7 @@ impl Linker {
                 };
                 if same_elf {
                     let addr = dso.as_ref().unwrap().base_addr;
-                    let mut size = bounds.1;
+                    let size = bounds.1;
                     // Fill the gaps i the binary
                     let mut ranges = Vec::new();
                     for ph in elf.program_headers.iter() {
@@ -410,8 +410,6 @@ impl Linker {
                     let mut start = addr;
                     for (vaddr, vsize) in ranges.iter() {
                         if start < addr + vaddr {
-                            let gap_size = addr + vaddr - start;
-                            size += gap_size;
                             sys_mman::mmap(
                                 start as *mut c_void,
                                 addr + vaddr - start,
@@ -668,7 +666,7 @@ impl Linker {
                         set_u64(tm as u64);
                     }
                     reloc::R_X86_64_DTPOFF64 => {
-                        set_u64((s + a) as u64);
+                        set_u64(rel.r_offset as u64);
                     }
                     reloc::R_X86_64_GLOB_DAT | reloc::R_X86_64_JUMP_SLOT => {
                         set_u64(s as u64);
