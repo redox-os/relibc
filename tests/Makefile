@@ -41,6 +41,7 @@ EXPECT_NAMES=\
 	stdio/scanf \
 	stdio/setvbuf \
 	stdio/sprintf \
+	stdio/printf_space_pad \
 	stdlib/a64l \
 	stdlib/alloc \
 	stdlib/atof \
@@ -103,7 +104,11 @@ EXPECT_NAMES=\
 	wchar/wcsstr \
 	wchar/wcstod \
 	wchar/wcstok \
-	wchar/wcstol
+	wchar/wcstol \
+	wchar/wcscasecmp \
+	wchar/wcsncasecmp \
+	wctype/towlower \
+	wctype/towupper
 	# TODO: Fix these
 	# mkfifo
 

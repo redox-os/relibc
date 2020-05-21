@@ -52,6 +52,16 @@ impl RTLDDebug {
         }
         return;
     }
+    pub fn insert_first(&mut self, l_addr: usize, name: &str, l_ld: usize) {
+        if self.r_map.is_null() {
+            self.r_map = LinkMap::new_with_args(l_addr, name, l_ld);
+        } else {
+            let tmp = self.r_map;
+            self.r_map = LinkMap::new_with_args(l_addr, name, l_ld);
+            unsafe { (*self.r_map).link(&mut *tmp) };
+        }
+        return;
+    }
 }
 
 #[repr(C)]
@@ -80,7 +90,10 @@ impl LinkMap {
         });
         Box::into_raw(map)
     }
-
+    fn link(&mut self, map: &mut LinkMap) {
+        map.l_prev = self as *mut LinkMap;
+        self.l_next = map as *mut LinkMap;
+    }
     fn new_with_args(l_addr: usize, name: &str, l_ld: usize) -> *mut Self {
         let map = LinkMap::new();
         unsafe {

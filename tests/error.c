@@ -20,7 +20,7 @@ int main(void) {
     int ret2 = strerror_r(err, buf2, 3);
     printf("errno: %d = %s, return: %d\n", err, buf2, ret2);
 
-    char buf3[256];
+    char buf3[256] = {0};
     int ret3 = strerror_r(err, buf3, 0);
     printf("errno: %d = %s, return: %d\n", err, buf3, ret3);
 }

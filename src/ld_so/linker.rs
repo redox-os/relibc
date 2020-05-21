@@ -383,7 +383,6 @@ impl Linker {
             }
             // Allocate memory
             let mmap = unsafe {
-                let size = bounds.1 /* - bounds.0 */;
                 let same_elf = if let Some(prog) = dso.as_ref() {
                     if prog.name == *elf_name {
                         true
@@ -395,14 +394,43 @@ impl Linker {
                 };
                 if same_elf {
                     let addr = dso.as_ref().unwrap().base_addr;
+                    let size = bounds.1;
+                    // Fill the gaps i the binary
+                    let mut ranges = Vec::new();
+                    for ph in elf.program_headers.iter() {
+                        if ph.p_type == program_header::PT_LOAD {
+                            let voff = ph.p_vaddr as usize % PAGE_SIZE;
+                            let vaddr = ph.p_vaddr as usize - voff;
+                            let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE)
+                                * PAGE_SIZE;
+                            ranges.push((vaddr, vsize));
+                        }
+                    }
+                    ranges.sort();
+                    let mut start = addr;
+                    for (vaddr, vsize) in ranges.iter() {
+                        if start < addr + vaddr {
+                            sys_mman::mmap(
+                                start as *mut c_void,
+                                addr + vaddr - start,
+                                //TODO: Make it possible to not specify PROT_EXEC on Redox
+                                sys_mman::PROT_READ | sys_mman::PROT_WRITE,
+                                sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
+                                -1,
+                                0,
+                            );
+                        }
+                        start = addr + vaddr + vsize
+                    }
                     sys_mman::mprotect(
                         addr as *mut c_void,
                         size,
                         sys_mman::PROT_READ | sys_mman::PROT_WRITE,
                     );
-                    _r_debug.insert(addr as usize, &elf_name, addr + l_ld as usize);
+                    _r_debug.insert_first(addr as usize, &elf_name, addr + l_ld as usize);
                     slice::from_raw_parts_mut(addr as *mut u8, size)
                 } else {
+                    let size = bounds.1;
                     let ptr = sys_mman::mmap(
                         ptr::null_mut(),
                         size,
@@ -638,7 +666,7 @@ impl Linker {
                         set_u64(tm as u64);
                     }
                     reloc::R_X86_64_DTPOFF64 => {
-                        set_u64((s + a) as u64);
+                        set_u64(rel.r_offset as u64);
                     }
                     reloc::R_X86_64_GLOB_DAT | reloc::R_X86_64_JUMP_SLOT => {
                         set_u64(s as u64);
@@ -659,29 +687,36 @@ impl Linker {
                 }
             }
 
-            // overwrite DT_DEBUG if exist in .dynamic section
-            for section in &elf.section_headers {
-                // we won't bother with half corrupted elfs.
-                let name = elf.shdr_strtab.get(section.sh_name).unwrap().unwrap();
-                if name != ".dynamic" {
-                    continue;
+            // overwrite DT_DEBUG if exist in DYNAMIC segment
+            // first we identify the location of DYNAMIC segment
+            let mut dyn_start = None;
+            let mut debug_start = None;
+            for ph in elf.program_headers.iter() {
+                if ph.p_type == program_header::PT_DYNAMIC {
+                    dyn_start = Some(ph.p_vaddr as usize);
                 }
-                let mmap = match self.mmaps.get_mut(*elf_name) {
-                    Some(some) => some,
-                    None => continue,
-                };
-                let dyn_start = section.sh_addr as usize;
-                let bytes: [u8; size_of::<Dyn>() / 2] =
-                    unsafe { transmute((&_r_debug) as *const RTLDDebug as usize) };
-                if let Some(dynamic) = elf.dynamic.as_ref() {
-                    let mut i = 0;
-                    for entry in &dynamic.dyns {
-                        if entry.d_tag == DT_DEBUG {
-                            let start = dyn_start + i * size_of::<Dyn>() + size_of::<Dyn>() / 2;
-                            mmap[start..start + size_of::<Dyn>() / 2].clone_from_slice(&bytes);
-                        }
-                        i += 1;
+            }
+            // next we identify the location of DT_DEBUG in .dynamic section
+            if let Some(dynamic) = elf.dynamic.as_ref() {
+                let mut i = 0;
+                for entry in &dynamic.dyns {
+                    if entry.d_tag == DT_DEBUG {
+                        debug_start = Some(i as usize);
+                        break;
                     }
+                    i += 1;
+                }
+            }
+            if let Some(dyn_start_addr) = dyn_start {
+                if let Some(i) = debug_start {
+                    let mmap = match self.mmaps.get_mut(*elf_name) {
+                        Some(some) => some,
+                        None => continue,
+                    };
+                    let bytes: [u8; size_of::<Dyn>() / 2] =
+                        unsafe { transmute((&_r_debug) as *const RTLDDebug as usize) };
+                    let start = dyn_start_addr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2;
+                    mmap[start..start + size_of::<Dyn>() / 2].clone_from_slice(&bytes);
                 }
             }
 
