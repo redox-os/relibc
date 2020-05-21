@@ -132,23 +132,19 @@ unsafe fn inner_get_name(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> Result<usize> {
-    // 32 should probably be large enough.
     // Format: [udp|tcp:]remote/local, chan:path
-    let mut buf = [0; 32];
+    let mut buf = [0; 256];
     let len = syscall::fpath(socket as usize, &mut buf)?;
     let buf = &buf[..len];
-    assert!(&buf[..4] == b"tcp:" || &buf[..4] == b"udp:" || &buf[..5] == b"chan:");
 
-    match &buf[..5] {
-        b"tcp:" | b"udp:" => {
-            inner_af_inet(local, &buf[4..], address, address_len);
-        }
-        b"chan:" => {
-            inner_af_unix(&buf[5..], address, address_len);
-        }
+    if buf.starts_with(b"tcp:") || buf.starts_with(b"udp:") {
+        inner_af_inet(local, &buf[4..], address, address_len);
+    } else if buf.starts_with(b"chan:") {
+        inner_af_unix(&buf[5..], address, address_len);
+    } else {
         // Socket doesn't belong to any scheme
-        _ => panic!("socket doesn't match either tcp, udp or chan schemes"),
-    };
+        panic!("socket {:?} doesn't match either tcp, udp or chan schemes", str::from_utf8(buf));
+    }
 
     Ok(0)
 }
