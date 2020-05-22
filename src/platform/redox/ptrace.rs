@@ -8,10 +8,15 @@ use super::super::{errno, types::*, Pal, PalPtrace, PalSignal, Sys};
 use crate::{
     c_str::CString,
     fs::File,
-    header::{errno as errnoh, fcntl, signal, sys_ptrace, sys_user::user_regs_struct},
+    header::{errno as errnoh, fcntl, signal, sys_ptrace},
     io::{self, prelude::*},
     sync::{Mutex, Once},
 };
+#[cfg(target_arch = "aarch64")]
+use crate::header::arch_aarch64_user::user_regs_struct;
+#[cfg(target_arch = "x86_64")]
+use crate::header::arch_x64_user::user_regs_struct;
+
 use alloc::collections::{btree_map::Entry, BTreeMap};
 use core::mem;
 use syscall;
