@@ -91,6 +91,8 @@ pub trait Pal {
 
     fn getppid() -> pid_t;
 
+    fn getrandom(buf: &mut [u8], flags: c_uint) -> ssize_t;
+
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int;
 
     fn gettid() -> pid_t;

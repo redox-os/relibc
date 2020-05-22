@@ -254,6 +254,10 @@ impl Pal for Sys {
         e(unsafe { syscall!(GETPPID) }) as pid_t
     }
 
+    fn getrandom(buf: &mut [u8], flags: c_uint) -> ssize_t {
+        e(unsafe { syscall!(GETRANDOM, buf.as_mut_ptr(), buf.len(), flags) }) as ssize_t
+    }
+
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int {
         e(syscall!(GETRLIMIT, resource, rlim)) as c_int
     }

@@ -63,3 +63,22 @@ fn clock_gettime() {
         assert_ne!(timespec.tv_nsec, -1);
     }
 }
+
+//TDOO: everything else
+
+#[test]
+fn getrandom() {
+    use crate::header::sys_random;
+    use crate::platform::types::ssize_t;
+
+    let mut arrays = [[0; 32]; 32];
+    for i in 1..arrays.len() {
+        assert_eq!(Sys::getrandom(&mut arrays[i], 0), arrays[i].len() as ssize_t);
+
+        for j in 0..arrays.len() {
+            if i != j {
+                assert_ne!(&arrays[i], &arrays[j]);
+            }
+        }
+    }
+}

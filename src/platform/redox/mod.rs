@@ -13,6 +13,7 @@ use crate::{
         errno::{EINVAL, EIO, EPERM, ERANGE},
         fcntl,
         sys_mman::MAP_ANON,
+        sys_random,
         sys_resource::{rlimit, RLIM_INFINITY},
         sys_stat::stat,
         sys_statvfs::statvfs,
@@ -553,6 +554,33 @@ impl Pal for Sys {
 
     fn getppid() -> pid_t {
         e(syscall::getppid()) as pid_t
+    }
+
+    fn getrandom(buf: &mut [u8], flags: c_uint) -> ssize_t {
+        //TODO: make this a system call?
+
+        let path = if flags & sys_random::GRND_RANDOM != 0 {
+            //TODO: /dev/random equivalent
+            "rand:"
+        } else {
+            "rand:"
+        };
+
+        let mut open_flags = syscall::O_RDONLY | syscall::O_CLOEXEC;
+        if flags & sys_random::GRND_NONBLOCK != 0 {
+            open_flags |= syscall::O_NONBLOCK;
+        }
+
+        let fd = e(syscall::open(path, open_flags));
+        if fd == !0 {
+            return -1;
+        }
+
+        let res = e(syscall::read(fd, buf)) as ssize_t;
+
+        let _ = syscall::close(fd);
+
+        res
     }
 
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int {
