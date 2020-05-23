@@ -44,6 +44,7 @@ EXPECT_NAMES=\
 	stdio/printf_space_pad \
 	stdio/ungetc_multiple \
 	stdio/ungetc_ftell \
+	stdio/fscanf_offby1 \
 	stdlib/a64l \
 	stdlib/alloc \
 	stdlib/atof \
