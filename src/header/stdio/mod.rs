@@ -6,6 +6,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{
+    cmp,
     ffi::VaList as va_list,
     fmt::{self, Write as WriteFmt},
     mem,
@@ -76,7 +77,7 @@ pub struct FILE {
     read_buf: Buffer<'static>,
     read_pos: usize,
     read_size: usize,
-    unget: Option<u8>,
+    unget: Vec<u8>,
     // pub for stdio_ext
     pub(crate) writer: LineWriter<File>,
 
@@ -86,11 +87,12 @@ pub struct FILE {
 
 impl Read for FILE {
     fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
-        if !out.is_empty() {
-            if let Some(c) = self.unget.take() {
-                out[0] = c;
-                return Ok(1);
-            }
+        let unget_read_size = cmp::min(out.len(), self.unget.len());
+        for i in 0..unget_read_size {
+            out[i] = self.unget.pop().unwrap();
+        }
+        if unget_read_size != 0 {
+            return Ok(unget_read_size);
         }
 
         let len = {
@@ -311,11 +313,12 @@ pub unsafe extern "C" fn fgets(
     let mut wrote = false;
 
     if left >= 1 {
-        if let Some(c) = stream.unget.take() {
-            *out = c as c_char;
+        let unget_read_size = cmp::min(left, stream.unget.len());
+        for _ in 0..unget_read_size {
+            *out = stream.unget.pop().unwrap() as i8;
             out = out.offset(1);
-            left -= 1;
         }
+        left -= unget_read_size;
     }
 
     loop {
@@ -533,7 +536,7 @@ pub unsafe extern "C" fn fseeko(stream: *mut FILE, mut off: off_t, whence: c_int
     stream.flags &= !(F_EOF | F_ERR);
     stream.read_pos = 0;
     stream.read_size = 0;
-    stream.unget = None;
+    stream.unget = Vec::new();
     0
 }
 
@@ -558,7 +561,7 @@ pub unsafe extern "C" fn ftello(stream: *mut FILE) -> off_t {
         return -1;
     }
 
-    pos - (stream.read_size - stream.read_pos) as off_t
+    pos - (stream.read_size - stream.read_pos) as off_t - stream.unget.len() as off_t
 }
 
 /// Try to lock the file. Returns 0 for success, 1 for failure
@@ -990,11 +993,7 @@ unsafe extern "C" fn tmpnam_inner(buf: *mut c_char, offset: usize) -> *mut c_cha
 #[no_mangle]
 pub unsafe extern "C" fn ungetc(c: c_int, stream: *mut FILE) -> c_int {
     let mut stream = (*stream).lock();
-    if stream.unget.is_some() {
-        platform::errno = errno::EIO;
-        return EOF;
-    }
-    stream.unget = Some(c as u8);
+    stream.unget.push(c as u8);
     c
 }
 
@@ -1042,8 +1041,12 @@ pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_
 
 #[no_mangle]
 pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_list) -> c_int {
-    let mut file = (*file).lock();
-    scanf::scanf(&mut *file, format, ap)
+    let ret = {
+        let mut file = (*file).lock();
+        scanf::scanf(&mut *file, format, ap)
+    };
+    fseeko(file, -1, SEEK_CUR);
+    ret
 }
 
 #[no_mangle]

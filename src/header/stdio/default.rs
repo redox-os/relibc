@@ -2,6 +2,7 @@ use super::{constants, Buffer, BUFSIZ, FILE};
 use core::{cell::UnsafeCell, ptr};
 
 use crate::{fs::File, io::LineWriter, platform::types::*, sync::Mutex};
+use alloc::vec::Vec;
 
 pub struct GlobalFile(UnsafeCell<FILE>);
 impl GlobalFile {
@@ -16,7 +17,7 @@ impl GlobalFile {
             read_buf: Buffer::Owned(vec![0; BUFSIZ as usize]),
             read_pos: 0,
             read_size: 0,
-            unget: None,
+            unget: Vec::new(),
             writer,
 
             pid: None,

@@ -42,6 +42,10 @@ EXPECT_NAMES=\
 	stdio/setvbuf \
 	stdio/sprintf \
 	stdio/printf_space_pad \
+	stdio/ungetc_multiple \
+	stdio/ungetc_ftell \
+	stdio/fscanf_offby1 \
+	stdio/printf_neg_pad \
 	stdlib/a64l \
 	stdlib/alloc \
 	stdlib/atof \

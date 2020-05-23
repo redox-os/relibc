@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 
+use super::{constants::*, Buffer, FILE};
 use crate::{
     fs::File,
     header::{errno, fcntl::*, string::strchr},
@@ -7,8 +8,7 @@ use crate::{
     platform::{self, types::*},
     sync::Mutex,
 };
-
-use super::{constants::*, Buffer, FILE};
+use alloc::vec::Vec;
 
 /// Parse mode flags as a string and output a mode flags integer
 pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
@@ -72,7 +72,7 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
         read_buf: Buffer::Owned(vec![0; BUFSIZ as usize]),
         read_pos: 0,
         read_size: 0,
-        unget: None,
+        unget: Vec::new(),
         writer,
 
         pid: None,

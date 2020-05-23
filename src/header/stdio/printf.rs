@@ -660,15 +660,21 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
         };
         let alternate = arg.alternate;
         let zero = arg.zero;
-        let left = arg.left;
+        let mut left = arg.left;
         let sign_reserve = arg.sign_reserve;
         let sign_always = arg.sign_always;
         let min_width = arg.min_width.resolve(&mut varargs, &mut ap);
         let precision = arg.precision.map(|n| n.resolve(&mut varargs, &mut ap));
         let pad_zero = arg.pad_zero.resolve(&mut varargs, &mut ap);
-        let pad_space = match pad_zero {
-            0 => min_width,
+        let signed_space = match pad_zero {
+            0 => min_width as isize,
             _ => 0,
+        };
+        let pad_space = if signed_space < 0 {
+            left = true;
+            -signed_space as usize
+        } else {
+            signed_space as usize
         };
         let intkind = arg.intkind;
         let fmt = arg.fmt;
