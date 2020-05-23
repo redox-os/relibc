@@ -561,7 +561,7 @@ pub unsafe extern "C" fn ftello(stream: *mut FILE) -> off_t {
         return -1;
     }
 
-    pos - (stream.read_size - stream.read_pos) as off_t
+    pos - (stream.read_size - stream.read_pos) as off_t - stream.unget.len() as off_t
 }
 
 /// Try to lock the file. Returns 0 for success, 1 for failure
