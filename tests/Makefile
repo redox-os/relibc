@@ -43,6 +43,7 @@ EXPECT_NAMES=\
 	stdio/sprintf \
 	stdio/printf_space_pad \
 	stdio/ungetc_multiple \
+	stdio/ungetc_ftell \
 	stdlib/a64l \
 	stdlib/alloc \
 	stdlib/atof \
