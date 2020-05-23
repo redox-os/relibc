@@ -1041,8 +1041,12 @@ pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_
 
 #[no_mangle]
 pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_list) -> c_int {
-    let mut file = (*file).lock();
-    scanf::scanf(&mut *file, format, ap)
+    let ret = {
+        let mut file = (*file).lock();
+        scanf::scanf(&mut *file, format, ap)
+    };
+    fseeko(file, -1, SEEK_CUR);
+    ret
 }
 
 #[no_mangle]
