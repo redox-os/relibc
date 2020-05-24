@@ -643,13 +643,9 @@ pub unsafe extern "C" fn posix_memalign(
     alignment: size_t,
     size: size_t,
 ) -> c_int {
-    const void_ptr_size: usize = mem::size_of::<*mut c_void>();
+    const VOID_PTR_SIZE: usize = mem::size_of::<*mut c_void>();
 
-    /* Check that alignment is:
-     * a) a multiple of sizeof(void *)
-     * b) a power-of-two multiple of sizeof(void *). Integer division as
-     *    below gives the correct result once a) is ensured. */
-    if alignment % void_ptr_size == 0 && (alignment / void_ptr_size).is_power_of_two() {
+    if alignment % VOID_PTR_SIZE == 0 && alignment.is_power_of_two() {
         let ptr = platform::alloc_align(size, alignment);
         if !ptr.is_null() {
             *memptr = ptr;
