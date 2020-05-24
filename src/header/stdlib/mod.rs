@@ -647,13 +647,14 @@ pub unsafe extern "C" fn posix_memalign(
 
     if alignment % VOID_PTR_SIZE == 0 && alignment.is_power_of_two() {
         let ptr = platform::alloc_align(size, alignment);
-        if !ptr.is_null() {
-            *memptr = ptr;
-            0
-        } else {
+        *memptr = ptr;
+        if ptr.is_null() {
             ENOMEM
+        } else {
+            0
         }
     } else {
+        *memptr = ptr::null_mut();
         EINVAL
     }
 }
