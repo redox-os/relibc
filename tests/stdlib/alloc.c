@@ -31,7 +31,7 @@ void test_valid_aligned(void *ptr, size_t alignment, int error_val) {
      * address. */
     uintptr_t ptr_alignment_rem = (uintptr_t)ptr % (uintptr_t)alignment;
     
-    if (ptr_alignment_rem == 0) {
+    if (ptr != NULL && ptr_alignment_rem == 0) {
         // Constant output for successful case
         printf("pointer: (alignment OK), ");
     }
