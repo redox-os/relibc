@@ -17,4 +17,15 @@ int main(void) {
 
     time_t input = 1531461823;
     fputs(ctime(&input), stdout); // Omit newline
+
+    char ctime_r_buffer[26];
+    /* ctime_r() generally returns the address of the provided buffer,
+     * but may return NULL upon error according to the spec. */
+    char *ctime_r_result = ctime_r(&input, ctime_r_buffer);
+    if (ctime_r_result == ctime_r_buffer) {
+        fputs(ctime_r_result, stdout);
+    }
+    else {
+        printf("Unexpected pointer from ctime_r: %p\n", ctime_r_result);
+    }
 }
