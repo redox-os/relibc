@@ -1,4 +1,1 @@
 [dependencies.alloc]
-
-[patch.crates-io]
-compiler_builtins = { git = "https://github.com/rust-lang/compiler-builtins.git", rev = "25ea08da2824b8137b6ac1222b0171cb07cca083" }

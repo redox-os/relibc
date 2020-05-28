@@ -13,3 +13,6 @@
 [submodule "pthreads-emb"]
 	path = pthreads-emb
 	url = https://gitlab.redox-os.org/redox-os/pthreads-emb.git
+[submodule "compiler-builtins"]
+	path = compiler-builtins
+	url = https://github.com/rust-lang/compiler-builtins.git
