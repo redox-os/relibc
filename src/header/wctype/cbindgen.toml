@@ -1,6 +1,6 @@
 sys_includes = ["stddef.h", "stdint.h", "time.h", "stdio.h" ]
 include_guard = "_WCTYPE_H"
-header = ""
+header = "#include <bits/wctype.h>"
 language = "C"
 style = "Type"
 no_includes = true
