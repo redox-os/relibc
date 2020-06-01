@@ -29,6 +29,7 @@ use super::{
     debug::{RTLDDebug, RTLDState, _dl_debug_state, _r_debug},
     tcb::{Master, Tcb},
     PAGE_SIZE,
+    access,
 };
 
 #[cfg(target_os = "redox")]
@@ -169,7 +170,9 @@ impl Linker {
                     })?;
 
                     // TODO: Use R_OK | X_OK
-                    unistd::access(path_c.as_ptr(), unistd::F_OK) == 0
+                    // We cannot use unix stdlib because errno is thead local variable
+                    // and fs:[0] is not set yet.
+                    access(path_c.as_ptr(), unistd::F_OK) == 0
                 };
 
                 if access {
