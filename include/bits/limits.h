@@ -21,12 +21,12 @@
 #define SHRT_MIN (-SHRT_MAX - 1)
 
 // TODO: These might not be accurate on all platforms
-#define SSIZE_MAX ((1 << 64 - 1) - 1)
+#define SSIZE_MAX 0x7fffffffffffffff
 #define UCHAR_MAX 255
-#define UINT_MAX ((1 << 32) - 1)
-#define ULLONG_MAX ((1 << 64) - 1)
-#define ULONG_MAX ((1 << 64) - 1)
-#define USHRT_MAX ((1 << 16) - 1)
+#define UINT_MAX 0xffffffff
+#define ULLONG_MAX 0xffffffffffffffff
+#define ULONG_MAX 0xffffffffffffffff
+#define USHRT_MAX 0xffffffffffffffff
 #define WORD_BIT 32
 
 #endif
