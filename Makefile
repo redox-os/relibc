@@ -2,13 +2,16 @@ TARGET?=
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
-CARGOFLAGS=
-RUSTCFLAGS=
+CARGOFLAGS?=
+RUSTCFLAGS?=
+
+# When using xargo, build it in local location
+export XARGO_HOME=$(CURDIR)/target/xargo
 
 BUILD=target
 ifneq ($(TARGET),)
 	BUILD="target/$(TARGET)"
-	CARGOFLAGS="--target=$(TARGET)"
+	CARGOFLAGS+="--target=$(TARGET)"
 endif
 
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
