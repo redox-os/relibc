@@ -27,7 +27,8 @@ global_asm!(
 );
 // https://git.musl-libc.org/cgit/musl/tree/crt/aarch64/crti.s
 #[cfg(target_arch = "aarch64")]
-global_asm!(r#"
+global_asm!(
+    r#"
     .section .init
     .global _init
     .type _init,%function
@@ -45,7 +46,8 @@ global_asm!(r#"
         mov x29,sp
         // stp: "stores two doublewords from the first and second argument to memory addressed by addr"
         // Body will be filled in by gcc and ended by crtn.o
-"#);
+"#
+);
 
 #[panic_handler]
 #[linkage = "weak"]

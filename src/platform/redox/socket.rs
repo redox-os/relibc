@@ -143,7 +143,10 @@ unsafe fn inner_get_name(
         inner_af_unix(&buf[5..], address, address_len);
     } else {
         // Socket doesn't belong to any scheme
-        panic!("socket {:?} doesn't match either tcp, udp or chan schemes", str::from_utf8(buf));
+        panic!(
+            "socket {:?} doesn't match either tcp, udp or chan schemes",
+            str::from_utf8(buf)
+        );
     }
 
     Ok(0)

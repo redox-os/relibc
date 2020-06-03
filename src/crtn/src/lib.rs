@@ -23,7 +23,8 @@ global_asm!(
 );
 // https://git.musl-libc.org/cgit/musl/tree/crt/aarch64/crtn.s
 #[cfg(target_arch = "aarch64")]
-global_asm!(r#"
+global_asm!(
+    r#"
     .section .init
         // This happens after crti.o and gcc has inserted code
         // ldp: "loads two doublewords from memory addressed by the third argument to the first and second"
@@ -35,7 +36,8 @@ global_asm!(r#"
         // ldp: "loads two doublewords from memory addressed by the third argument to the first and second"
         ldp x29,x30,[sp],#16
         ret
-"#);
+"#
+);
 
 #[panic_handler]
 #[linkage = "weak"]

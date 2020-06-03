@@ -516,7 +516,6 @@ pub unsafe extern "C" fn fseek(stream: *mut FILE, offset: c_long, whence: c_int)
 /// Seek to an offset `offset` from `whence`
 #[no_mangle]
 pub unsafe extern "C" fn fseeko(stream: *mut FILE, off: off_t, whence: c_int) -> c_int {
-
     let mut stream = (*stream).lock();
     fseek_locked(&mut *stream, off, whence)
 }
@@ -1051,7 +1050,7 @@ pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_
 pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_list) -> c_int {
     let ret = {
         let mut file = (*file).lock();
-        let f :&mut FILE = &mut *file;
+        let f: &mut FILE = &mut *file;
         let reader: LookAheadReader = f.into();
         scanf::scanf(reader, format, ap)
     };

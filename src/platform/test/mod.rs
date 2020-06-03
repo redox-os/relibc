@@ -68,12 +68,14 @@ fn clock_gettime() {
 
 #[test]
 fn getrandom() {
-    use crate::header::sys_random;
-    use crate::platform::types::ssize_t;
+    use crate::{header::sys_random, platform::types::ssize_t};
 
     let mut arrays = [[0; 32]; 32];
     for i in 1..arrays.len() {
-        assert_eq!(Sys::getrandom(&mut arrays[i], 0), arrays[i].len() as ssize_t);
+        assert_eq!(
+            Sys::getrandom(&mut arrays[i], 0),
+            arrays[i].len() as ssize_t
+        );
 
         for j in 0..arrays.len() {
             if i != j {
