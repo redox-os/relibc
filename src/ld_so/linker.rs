@@ -26,10 +26,10 @@ use crate::{
 };
 
 use super::{
+    access,
     debug::{RTLDDebug, RTLDState, _dl_debug_state, _r_debug},
     tcb::{Master, Tcb},
     PAGE_SIZE,
-    access,
 };
 
 #[cfg(target_os = "redox")]
