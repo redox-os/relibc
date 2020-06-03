@@ -39,6 +39,7 @@ mod getdelim;
 
 mod ext;
 mod helpers;
+mod lookaheadreader;
 mod printf;
 mod scanf;
 
