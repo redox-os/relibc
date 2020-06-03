@@ -514,9 +514,13 @@ pub unsafe extern "C" fn fseek(stream: *mut FILE, offset: c_long, whence: c_int)
 
 /// Seek to an offset `offset` from `whence`
 #[no_mangle]
-pub unsafe extern "C" fn fseeko(stream: *mut FILE, mut off: off_t, whence: c_int) -> c_int {
-    let mut stream = (*stream).lock();
+pub unsafe extern "C" fn fseeko(stream: *mut FILE, off: off_t, whence: c_int) -> c_int {
 
+    let mut stream = (*stream).lock();
+    fseek_locked(&mut *stream, off, whence)
+}
+
+pub unsafe fn fseek_locked(stream: &mut FILE, mut off: off_t, whence: c_int) -> c_int {
     if whence == SEEK_CUR {
         // Since it's a buffered writer, our actual cursor isn't where the user
         // thinks
@@ -555,7 +559,10 @@ pub unsafe extern "C" fn ftell(stream: *mut FILE) -> c_long {
 /// Get the current position of the cursor in the file
 #[no_mangle]
 pub unsafe extern "C" fn ftello(stream: *mut FILE) -> off_t {
-    let stream = (*stream).lock();
+    let mut stream = (*stream).lock();
+    ftell_locked(&mut *stream)
+}
+pub unsafe extern "C" fn ftell_locked(stream: &mut FILE) -> off_t {
     let pos = Sys::lseek(*stream.file, 0, SEEK_CUR);
     if pos < 0 {
         return -1;
