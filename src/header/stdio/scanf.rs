@@ -409,11 +409,13 @@ unsafe fn inner_scanf(
                     let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
 
                     // While we haven't used up all the width, and it matches
+                    let mut data_stored = false;
                     while width.map(|w| w > 0).unwrap_or(true) && !invert == matches.contains(&byte)
                     {
                         if let Some(ref mut ptr) = ptr {
                             **ptr = byte as c_char;
                             *ptr = ptr.offset(1);
+                            data_stored = true;
                         }
                         r.commit();
                         // Decrease the width, and read a new character unless the width is 0
@@ -426,8 +428,8 @@ unsafe fn inner_scanf(
                         }
                     }
 
-                    if let Some(ptr) = ptr {
-                        *ptr = 0;
+                    if data_stored {
+                        *ptr.unwrap() = 0;
                         matched += 1;
                     }
                 }
