@@ -42,7 +42,7 @@ mod helpers;
 mod lookaheadreader;
 mod printf;
 mod scanf;
-
+use lookaheadreader::LookAheadReader;
 static mut TMPNAM_BUF: [c_char; L_tmpnam as usize + 1] = [0; L_tmpnam as usize + 1];
 
 enum Buffer<'a> {
@@ -1051,9 +1051,10 @@ pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_
 pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_list) -> c_int {
     let ret = {
         let mut file = (*file).lock();
-        scanf::scanf(&mut *file, format, ap)
+        let f :&mut FILE = &mut *file;
+        let reader: LookAheadReader = f.into();
+        scanf::scanf(reader, format, ap)
     };
-    fseeko(file, -1, SEEK_CUR);
     ret
 }
 
@@ -1064,9 +1065,6 @@ pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
-    scanf::scanf(
-        &mut platform::UnsafeStringReader(s as *const u8),
-        format,
-        ap,
-    )
+    let reader = (s as *const u8).into();
+    scanf::scanf(reader, format, ap)
 }

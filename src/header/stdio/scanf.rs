@@ -1,4 +1,5 @@
-use crate::{io::Read, platform::types::*};
+use super::lookaheadreader::LookAheadReader;
+use crate::platform::types::*;
 use alloc::{string::String, vec::Vec};
 use core::ffi::VaList as va_list;
 
@@ -25,8 +26,8 @@ unsafe fn next_byte(string: &mut *const c_char) -> Result<u8, c_int> {
     }
 }
 
-unsafe fn inner_scanf<R: Read>(
-    mut r: R,
+unsafe fn inner_scanf(
+    mut r: LookAheadReader,
     mut format: *const c_char,
     mut ap: va_list,
 ) -> Result<c_int, c_int> {
@@ -37,15 +38,14 @@ unsafe fn inner_scanf<R: Read>(
 
     macro_rules! read {
         () => {{
-            let buf = &mut [byte];
-            match r.read(buf) {
-                Ok(0) => false,
-                Ok(_) => {
-                    byte = buf[0];
+            match r.lookahead1() {
+                Ok(None) => false,
+                Ok(Some(b)) => {
+                    byte = b;
                     count += 1;
                     true
                 }
-                Err(_) => return Err(-1),
+                Err(x) => return Err(x),
             }
         }};
     }
@@ -59,7 +59,10 @@ unsafe fn inner_scanf<R: Read>(
         };
         (inner $($placeholder:expr)*) => {
             if !skip_read && !read!() {
-                return Ok(matched);
+                match matched {
+                    0 => return Ok(-1),
+                    a => return Ok(a),
+                }
             }
             $(else {
                 // Hacky way of having this optional
@@ -86,6 +89,7 @@ unsafe fn inner_scanf<R: Read>(
             if c != byte {
                 return Ok(matched);
             }
+            r.commit();
         } else {
             c = next_byte(&mut format)?;
 
@@ -215,6 +219,7 @@ unsafe fn inner_scanf<R: Read>(
                             dot = true;
                         }
                         n.push(byte as char);
+                        r.commit();
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
                             return Ok(matched);
@@ -344,6 +349,7 @@ unsafe fn inner_scanf<R: Read>(
                     if let Some(ptr) = ptr {
                         *ptr = 0;
                         matched += 1;
+                        r.commit();
                     }
                 }
                 b'c' => {
@@ -362,6 +368,7 @@ unsafe fn inner_scanf<R: Read>(
 
                     if ptr.is_some() {
                         matched += 1;
+                        r.commit();
                     }
                 }
                 b'[' => {
@@ -408,6 +415,7 @@ unsafe fn inner_scanf<R: Read>(
                             **ptr = byte as c_char;
                             *ptr = ptr.offset(1);
                         }
+                        r.commit();
                         // Decrease the width, and read a new character unless the width is 0
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
@@ -444,7 +452,8 @@ unsafe fn inner_scanf<R: Read>(
     }
     Ok(matched)
 }
-pub unsafe fn scanf<R: Read>(r: R, format: *const c_char, ap: va_list) -> c_int {
+
+pub unsafe fn scanf(r: LookAheadReader, format: *const c_char, ap: va_list) -> c_int {
     match inner_scanf(r, format, ap) {
         Ok(n) => n,
         Err(n) => n,
