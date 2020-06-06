@@ -39,9 +39,10 @@ mod getdelim;
 
 mod ext;
 mod helpers;
+mod lookaheadreader;
 mod printf;
 mod scanf;
-
+use lookaheadreader::LookAheadReader;
 static mut TMPNAM_BUF: [c_char; L_tmpnam as usize + 1] = [0; L_tmpnam as usize + 1];
 
 enum Buffer<'a> {
@@ -514,9 +515,12 @@ pub unsafe extern "C" fn fseek(stream: *mut FILE, offset: c_long, whence: c_int)
 
 /// Seek to an offset `offset` from `whence`
 #[no_mangle]
-pub unsafe extern "C" fn fseeko(stream: *mut FILE, mut off: off_t, whence: c_int) -> c_int {
+pub unsafe extern "C" fn fseeko(stream: *mut FILE, off: off_t, whence: c_int) -> c_int {
     let mut stream = (*stream).lock();
+    fseek_locked(&mut *stream, off, whence)
+}
 
+pub unsafe fn fseek_locked(stream: &mut FILE, mut off: off_t, whence: c_int) -> c_int {
     if whence == SEEK_CUR {
         // Since it's a buffered writer, our actual cursor isn't where the user
         // thinks
@@ -555,7 +559,10 @@ pub unsafe extern "C" fn ftell(stream: *mut FILE) -> c_long {
 /// Get the current position of the cursor in the file
 #[no_mangle]
 pub unsafe extern "C" fn ftello(stream: *mut FILE) -> off_t {
-    let stream = (*stream).lock();
+    let mut stream = (*stream).lock();
+    ftell_locked(&mut *stream)
+}
+pub unsafe extern "C" fn ftell_locked(stream: &mut FILE) -> off_t {
     let pos = Sys::lseek(*stream.file, 0, SEEK_CUR);
     if pos < 0 {
         return -1;
@@ -1043,9 +1050,10 @@ pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_
 pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_list) -> c_int {
     let ret = {
         let mut file = (*file).lock();
-        scanf::scanf(&mut *file, format, ap)
+        let f: &mut FILE = &mut *file;
+        let reader: LookAheadReader = f.into();
+        scanf::scanf(reader, format, ap)
     };
-    fseeko(file, -1, SEEK_CUR);
     ret
 }
 
@@ -1056,9 +1064,6 @@ pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
-    scanf::scanf(
-        &mut platform::UnsafeStringReader(s as *const u8),
-        format,
-        ap,
-    )
+    let reader = (s as *const u8).into();
+    scanf::scanf(reader, format, ap)
 }

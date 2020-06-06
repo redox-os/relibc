@@ -1,11 +1,7 @@
 use goblin::elf::program_header::{self, program_header32, program_header64, ProgramHeader};
 
 use self::tcb::{Master, Tcb};
-use crate::{
-start::Stack,
-c_str::CStr,
-platform::types::*
-};
+use crate::{c_str::CStr, platform::types::*, start::Stack};
 pub const PAGE_SIZE: usize = 4096;
 
 pub mod debug;
@@ -85,8 +81,8 @@ pub fn static_init(sp: &'static Stack) {
 
 // Wrapper over the systemcall, Do not use outside of ld_so
 pub unsafe fn access(path: *const c_char, mode: c_int) -> c_int {
-        let path = CStr::from_ptr(path);
-        syscall!(ACCESS, (path).as_ptr(), mode) as c_int
+    let path = CStr::from_ptr(path);
+    syscall!(ACCESS, (path).as_ptr(), mode) as c_int
 }
 
 #[cfg(target_os = "linux")]

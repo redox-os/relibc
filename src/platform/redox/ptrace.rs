@@ -5,6 +5,10 @@
 //! compatibility. So, this module will be a hellhole.
 
 use super::super::{errno, types::*, Pal, PalPtrace, PalSignal, Sys};
+#[cfg(target_arch = "aarch64")]
+use crate::header::arch_aarch64_user::user_regs_struct;
+#[cfg(target_arch = "x86_64")]
+use crate::header::arch_x64_user::user_regs_struct;
 use crate::{
     c_str::CString,
     fs::File,
@@ -12,10 +16,6 @@ use crate::{
     io::{self, prelude::*},
     sync::{Mutex, Once},
 };
-#[cfg(target_arch = "aarch64")]
-use crate::header::arch_aarch64_user::user_regs_struct;
-#[cfg(target_arch = "x86_64")]
-use crate::header::arch_x64_user::user_regs_struct;
 
 use alloc::collections::{btree_map::Entry, BTreeMap};
 use core::mem;
