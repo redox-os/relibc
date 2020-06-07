@@ -79,12 +79,6 @@ pub fn static_init(sp: &'static Stack) {
     }
 }
 
-// Wrapper over the systemcall, Do not use outside of ld_so
-pub unsafe fn access(path: *const c_char, mode: c_int) -> c_int {
-    let path = CStr::from_ptr(path);
-    syscall!(ACCESS, (path).as_ptr(), mode) as c_int
-}
-
 #[cfg(target_os = "linux")]
 pub unsafe fn init(sp: &'static Stack) {
     let mut tp = 0usize;
