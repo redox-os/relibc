@@ -210,6 +210,25 @@ test_protocols (void)
   while (prptr != NULL);
   endprotoent ();
 }
+static void
+test_network (void)
+{
+  struct netent *nptr = getnetbyname ("loopback");
+  if (nptr != NULL) {
+    printf("network name %d", nptr->n_net);
+  } else {
+    ++error_count;
+  }
+  do
+    {
+      nptr = getnetent();
+      if (nptr != NULL) {
+          printf("network name %s", nptr->n_name);
+      }
+    }
+  while (nptr != NULL);
+  setnetent (0);
+}
 static int
 do_test (void)
 {
@@ -217,7 +236,7 @@ do_test (void)
     setdb ("db");
   */
   test_hosts ();
-  //test_network ();
+  test_network ();
   test_protocols ();
   test_services ();
   if (error_count)
