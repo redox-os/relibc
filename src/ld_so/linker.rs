@@ -21,7 +21,7 @@ use crate::{
     c_str::CString,
     fs::File,
     header::{fcntl, sys_mman, unistd},
-    io::Read,
+    io::{self, Read},
     platform::types::c_void,
 };
 
@@ -94,41 +94,54 @@ impl Linker {
     }
 
     pub fn load(&mut self, name: &str, path: &str) -> Result<()> {
-        self.dep_tree = self.load_recursive(name, path)?;
+        self.dep_tree = self.load_recursive(name, path)?
+            .ok_or(Error::Malformed(format!(
+                "failed to find '{}'",
+                path
+            )))?;
         if self.verbose {
             println!("Dep tree: {:#?}", self.dep_tree);
         }
         return Ok(());
     }
 
-    fn load_recursive(&mut self, name: &str, path: &str) -> Result<DepTree> {
+    fn load_recursive(&mut self, name: &str, path: &str) -> Result<Option<DepTree>> {
         if self.verbose {
             println!("load {}: {}", name, path);
         }
+
+        let path_c = CString::new(path)
+            .map_err(|err| Error::Malformed(format!("invalid path '{}': {}", path, err)))?;
+
+        let mut data = Vec::new();
+        {
+            let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
+            let mut file = match File::open(&path_c, flags) {
+                Ok(ok) => ok,
+                Err(err) => match err.kind() {
+                    io::ErrorKind::NotFound => return Ok(None),
+                    _ => return Err(Error::Malformed(format!("failed to open '{}': {}", path, err)))
+                }
+            };
+
+            file.read_to_end(&mut data)
+                .map_err(|err| Error::Malformed(format!("failed to read '{}': {}", path, err)))?;
+        }
+
         if self.cir_dep.contains(name) {
             return Err(Error::Malformed(format!(
                 "Circular dependency: {} is a dependency of itself",
                 name
             )));
         }
+        self.cir_dep.insert(name.to_string());
 
         let mut deps = DepTree::new(name.to_string());
-        let mut data = Vec::new();
-        self.cir_dep.insert(name.to_string());
-        let path_c = CString::new(path)
-            .map_err(|err| Error::Malformed(format!("invalid path '{}': {}", path, err)))?;
-
-        {
-            let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
-            let mut file = File::open(&path_c, flags)
-                .map_err(|err| Error::Malformed(format!("failed to open '{}': {}", path, err)))?;
-
-            file.read_to_end(&mut data)
-                .map_err(|err| Error::Malformed(format!("failed to read '{}': {}", path, err)))?;
-        }
         deps.deps = self.load_data(name, data.into_boxed_slice())?;
+
         self.cir_dep.remove(name);
-        Ok(deps)
+
+        Ok(Some(deps))
     }
 
     pub fn load_data(&mut self, name: &str, data: Box<[u8]>) -> Result<Vec<DepTree>> {
@@ -151,7 +164,12 @@ impl Linker {
             // It should be previously resolved so we don't need to worry about it
             Ok(None)
         } else if name.contains('/') {
-            Ok(Some(self.load_recursive(name, name)?))
+            Ok(Some(self.load_recursive(name, name)?
+                .ok_or(Error::Malformed(format!(
+                    "failed to find '{}'",
+                    name
+                )))?
+            ))
         } else {
             let library_path = self.library_path.clone();
             for part in library_path.split(PATH_SEP) {
@@ -163,7 +181,9 @@ impl Linker {
                 if self.verbose {
                     println!("check {}", path);
                 }
-                return Ok(Some(self.load_recursive(name, &path)?));
+                if let Some(deps) = self.load_recursive(name, &path)? {
+                    return Ok(Some(deps));
+                }
             }
 
             Err(Error::Malformed(format!("failed to locate '{}'", name)))
