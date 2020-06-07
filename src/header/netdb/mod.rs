@@ -12,7 +12,7 @@ use alloc::{borrow::ToOwned, boxed::Box, str::SplitWhitespace, vec::Vec};
 use crate::{
     c_str::{CStr, CString},
     header::{
-        arpa_inet::htons,
+        arpa_inet::htons, arpa_inet::ntohl, arpa_inet::inet_aton,
         errno::*,
         fcntl::O_RDONLY,
         netinet_in::{in_addr, sockaddr_in, sockaddr_in6},
@@ -119,6 +119,15 @@ pub const NI_NAMEREQD: c_int = 0x0008;
 pub const NI_DGRAM: c_int = 0x0010;
 
 static mut NETDB: c_int = 0;
+pub static mut NET_ENTRY: netent = netent {
+    n_name: ptr::null_mut(),
+    n_aliases: ptr::null_mut(),
+    n_addrtype: 0,
+    n_net: 0,
+};
+pub static mut NET_NAME: Option<Vec<u8>> = None;
+pub static mut NET_ALIASES: Option<Vec<Vec<u8>>> = None;
+pub static mut NET_ADDR: Option<u32> = None;
 static mut N_POS: usize = 0;
 static mut NET_STAYOPEN: c_int = 0;
 
@@ -339,12 +348,83 @@ pub unsafe extern "C" fn getnetbyaddr(net: u32, net_type: c_int) -> *mut netent 
     unimplemented!();
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn getnetbyname(name: *const c_char) -> *mut netent {
-    unimplemented!();
+    let mut n: *mut netent;
+    setnetent(NET_STAYOPEN);
+    while {
+        n = getnetent();
+        !n.is_null()
+    } {
+        if strcasecmp((*n).n_name, name) == 0 {
+            setnetent(NET_STAYOPEN);
+            return n;
+        }
+    }
+    setnetent(NET_STAYOPEN);
+
+    platform::errno = ENOENT;
+    ptr::null_mut() as *mut netent
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn getnetent() -> *mut netent {
-    unimplemented!();
+    if NETDB == 0 {
+        NETDB = Sys::open(&CString::new("/etc/networks").unwrap(), O_RDONLY, 0);
+    }
+
+    let mut rlb = RawLineBuffer::new(NETDB);
+    rlb.seek(N_POS);
+
+    let mut r: Box<str> = Box::default();
+    while r.is_empty() || r.split_whitespace().next() == None || r.starts_with('#') {
+        r = match rlb.next() {
+            Line::Some(s) => bytes_to_box_str(s),
+            _ => {
+                if NET_STAYOPEN == 0 {
+                    endnetent();
+                }
+                return ptr::null_mut();
+            }
+        };
+    }
+    rlb.next();
+    N_POS = rlb.line_pos();
+
+    let mut iter: SplitWhitespace = r.split_whitespace();
+
+    let mut net_name = iter.next().unwrap().as_bytes().to_vec();
+    net_name.push(b'\0');
+    NET_NAME = Some(net_name);
+
+    let mut addr_vec = iter.next().unwrap().as_bytes().to_vec();
+    addr_vec.push(b'\0');
+    let addr_cstr = addr_vec.as_slice().as_ptr() as *const i8;
+    let mut addr = mem::MaybeUninit::uninit();
+    inet_aton(addr_cstr, addr.as_mut_ptr());
+    let addr = addr.assume_init();
+    NET_ADDR = Some(ntohl(addr.s_addr));
+
+    let mut _net_aliases: Vec<Vec<u8>> = Vec::new();
+    for s in iter {
+        let mut alias = s.as_bytes().to_vec();
+        alias.push(b'\0');
+        _net_aliases.push(alias);
+    }
+    let mut net_aliases: Vec<*mut i8> = _net_aliases
+        .iter_mut()
+        .map(|x| x.as_mut_ptr() as *mut i8)
+        .collect();
+    net_aliases.push(ptr::null_mut());
+    NET_ALIASES = Some(_net_aliases);
+
+    NET_ENTRY = netent {
+        n_name: NET_NAME.as_mut().unwrap().as_mut_ptr() as *mut c_char,
+        n_aliases: net_aliases.as_mut_slice().as_mut_ptr() as *mut *mut i8,
+        n_addrtype: AF_INET,
+        n_net: NET_ADDR.unwrap() as u64,
+    };
+    &mut NET_ENTRY as *mut netent
 }
 
 #[no_mangle]
