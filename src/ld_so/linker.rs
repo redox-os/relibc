@@ -26,12 +26,11 @@ use crate::{
 };
 
 use super::{
-    access,
+    access::access,
     debug::{RTLDDebug, RTLDState, _dl_debug_state, _r_debug},
     tcb::{Master, Tcb},
     PAGE_SIZE,
 };
-
 #[cfg(target_os = "redox")]
 const PATH_SEP: char = ';';
 
