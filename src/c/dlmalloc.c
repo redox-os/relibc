@@ -613,7 +613,7 @@ void *memset(void *s, int c, size_t n);
 #endif  /* DARWIN */
 
 #ifndef LACKS_SYS_TYPES_H
-#include <sys/types.h>  /* For size_t */
+#include <sys/types_internal.h>  /* For size_t */
 #endif  /* LACKS_SYS_TYPES_H */
 
 /* The maximum possible size_t value has all bits set */

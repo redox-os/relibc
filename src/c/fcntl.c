@@ -1,5 +1,5 @@
 #include <stdarg.h>
-#include <sys/types.h>
+#include <sys/types_internal.h>
 
 // TODO: Can be implemented in rust when cbindgen supports "..." syntax
 
