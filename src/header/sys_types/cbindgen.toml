@@ -1,0 +1,7 @@
+sys_includes = ["stddef.h", "sys/types_internal.h", "sys/select.h"]
+include_guard = "_SYS_TYPES_H"
+language = "C"
+style = "Tag"
+
+[enum]
+prefix_with_name = true

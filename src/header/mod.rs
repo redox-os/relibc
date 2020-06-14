@@ -51,6 +51,7 @@ pub mod arch_aarch64_user;
 pub mod arch_x64_user;
 pub mod sys_procfs;
 pub mod sys_random;
+pub mod sys_types;
 pub mod sys_uio;
 pub mod sys_un;
 pub mod sys_utsname;

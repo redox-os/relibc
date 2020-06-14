@@ -1,5 +1,5 @@
-#ifndef _SYS_TYPES_H
-#define _SYS_TYPES_H
+#ifndef _SYS_TYPES_INTERNAL_H
+#define _SYS_TYPES_INTERNAL_H
 #include <stddef.h>
 
 typedef long blksize_t;
@@ -31,5 +31,4 @@ typedef unsigned long u_long, ulong;
 typedef long long quad_t;
 typedef unsigned long long u_quad_t;
 typedef char *caddr_t;
-
-#endif /* _SYS_TYPES_H */
+#endif /* _SYS_TYPES_INTERNAL_H */
