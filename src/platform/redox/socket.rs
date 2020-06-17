@@ -1,4 +1,5 @@
-use core::{mem, ptr, slice, str};
+use alloc::vec::Vec;
+use core::{cmp, mem, ptr, slice, str};
 use syscall::{self, flag::*, Result};
 
 use super::{
@@ -6,8 +7,9 @@ use super::{
     e, Sys,
 };
 use crate::header::{
-    netinet_in::{in_port_t, sockaddr_in},
-    sys_socket::{constants::*, sockaddr, socklen_t},
+    arpa_inet::inet_aton,
+    netinet_in::{in_port_t, sockaddr_in, in_addr},
+    sys_socket::{constants::*, sa_family_t, sockaddr, socklen_t},
     sys_time::timeval,
     sys_un::sockaddr_un,
 };
@@ -92,7 +94,7 @@ unsafe fn inner_af_unix(buf: &[u8], address: *mut sockaddr, address_len: *mut so
         mem::size_of_val(&data.sun_path),
     );
 
-    let len = path.len().min(buf.len());
+    let len = cmp::min(path.len(), buf.len());
     path[..len].copy_from_slice(&buf[..len]);
 
     *address_len = len as socklen_t;
@@ -109,20 +111,31 @@ unsafe fn inner_af_inet(
         // Skip the remote part
         parts.next();
     }
-    let part = parts.next().expect("Invalid reply from netstack");
+    let mut unparsed_addr = Vec::from(parts.next().expect("missing address"));
 
-    trace!("path: {}", ::core::str::from_utf8_unchecked(&part));
+    let sep = memchr::memchr(b':', &unparsed_addr).expect("missing port");
+    let (raw_addr, rest) = unparsed_addr.split_at_mut(sep);
+    let (colon, raw_port) = rest.split_at_mut(1);
+    let port = str::from_utf8(raw_port).expect("non-utf8 port").parse().expect("invalid port");
 
-    (*address).sa_family = AF_INET as c_ushort;
+    // Make address be followed by a NUL-byte
+    colon[0] = b'\0';
 
-    let data = slice::from_raw_parts_mut(
-        &mut (*address).sa_data as *mut _ as *mut u8,
-        (*address).sa_data.len(),
-    );
+    trace!("address: {:?}, port: {:?}", str::from_utf8(&raw_addr), port);
 
-    let len = data.len().min(part.len());
-    data[..len].copy_from_slice(&part[..len]);
+    let mut addr = in_addr::default();
+    assert_eq!(inet_aton(raw_addr.as_ptr() as *mut i8, &mut addr), 1, "inet_aton might be broken, failed to parse netstack address");
 
+    let ret = sockaddr_in {
+        sin_family: AF_INET as sa_family_t,
+        sin_port: port,
+        sin_addr: addr,
+
+        ..sockaddr_in::default()
+    };
+    let len = cmp::min(*address_len as usize, mem::size_of_val(&ret));
+
+    ptr::copy_nonoverlapping(&ret as *const _ as *const u8, address as *mut u8, len);
     *address_len = len as socklen_t;
 }
 
@@ -333,10 +346,10 @@ impl PalSocket for Sys {
         }
 
         eprintln!(
-            "setsockopt({}, {}, {}, {:p}, {})",
+            "setsockopt({}, {}, {}, {:p}, {}) - unknown option",
             socket, level, option_name, option_value, option_len
         );
-        e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
+        0
     }
 
     fn shutdown(socket: c_int, how: c_int) -> c_int {
