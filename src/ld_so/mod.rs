@@ -1,13 +1,15 @@
 use goblin::elf::program_header::{self, program_header32, program_header64, ProgramHeader};
 
 use self::tcb::{Master, Tcb};
-use crate::{c_str::CStr, platform::types::*, start::Stack};
+use crate::start::Stack;
 pub const PAGE_SIZE: usize = 4096;
 
+mod access;
 pub mod debug;
 pub mod linker;
 pub mod start;
 pub mod tcb;
+
 pub fn static_init(sp: &'static Stack) {
     let mut phdr_opt = None;
     let mut phent_opt = None;
