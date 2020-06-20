@@ -865,16 +865,6 @@ impl Linker {
 }
 
 unsafe extern "C" fn call_inits_finis(addr: usize) {
-    #[cfg(target_arch = "x86_64")]
-    asm!("
-        cmp qword ptr [rdi], 0
-        je end
-        call [rdi]
-end:    nop
-        "
-        :
-        :
-        :
-        : "intel", "volatile"
-    );
+    let func = transmute::<usize, *const Option<extern "C" fn()>>(addr);
+    (*func).map(|x| x());
 }
