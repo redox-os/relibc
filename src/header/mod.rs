@@ -7,6 +7,7 @@ pub mod dirent;
 #[path = "dl-tls/mod.rs"]
 pub mod dl_tls;
 pub mod dlfcn;
+pub mod elf;
 pub mod errno;
 pub mod fcntl;
 pub mod float;
