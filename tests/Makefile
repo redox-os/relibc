@@ -56,6 +56,7 @@ EXPECT_NAMES=\
 	stdlib/lcg48 \
 	stdlib/mkostemps \
 	stdlib/rand \
+	stdlib/random \
 	stdlib/strtod \
 	stdlib/strtol \
 	stdlib/strtoul \
