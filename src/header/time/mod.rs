@@ -141,9 +141,22 @@ pub unsafe extern "C" fn ctime(clock: *const time_t) -> *mut c_char {
 
 #[no_mangle]
 pub unsafe extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut c_char {
-    let mut tm1: tm = core::mem::uninitialized();
+    // Using MaybeUninit<tm> seems to cause a panic during the build process
+    let mut tm1 = tm {
+        tm_sec: 0,
+        tm_min: 0,
+        tm_hour: 0,
+        tm_mday: 0,
+        tm_mon: 0,
+        tm_year: 0,
+        tm_wday: 0,
+        tm_yday: 0,
+        tm_isdst: 0,
+        tm_gmtoff: 0,
+        tm_zone: core::ptr::null_mut(),
+    };
     localtime_r(clock, &mut tm1);
-    asctime_r(&mut tm1, buf)
+    asctime_r(&tm1, buf)
 }
 
 #[no_mangle]
