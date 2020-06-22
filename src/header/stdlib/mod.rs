@@ -25,6 +25,7 @@ use crate::{
 };
 
 mod lcg48;
+mod random;
 mod sort;
 
 pub const EXIT_FAILURE: c_int = 1;
@@ -369,9 +370,31 @@ pub extern "C" fn grantpt(fildes: c_int) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn initstate(seec: c_uint, state: *mut c_char, size: size_t) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_t) -> *mut c_char {
+    // Ported from musl
+
+    if size < 8 {
+        ptr::null_mut()
+    } else {
+        // TODO: lock?
+        let old_state = random::save_state();
+        random::N = match size {
+            0..=7 => unreachable!(), // ensured above
+            8..=31 => 0,
+            32..=63 => 7,
+            64..=127 => 15,
+            128..=255 => 31,
+            _ => 63,
+        };
+
+        random::X_PTR = (state as *mut u32).offset(1);
+        random::seed(seed);
+        random::save_state();
+        // TODO: unlock?
+
+        old_state as _
+    }
 }
 
 #[no_mangle]
@@ -731,9 +754,37 @@ pub unsafe extern "C" fn rand_r(seed: *mut c_uint) -> c_int {
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn random() -> c_long {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn random() -> c_long {
+    // Ported from musl
+
+    let k: u32;
+    // TODO: lock?
+    random::ensure_x_ptr_init();
+
+    if random::N == 0 {
+        *random::X_PTR = random::lcg31_step(*random::X_PTR);
+        k = *random::X_PTR;
+    } else {
+        *random::X_PTR.add(usize::from(random::I)) += *random::X_PTR.add(usize::from(random::J));
+
+        k = *random::X_PTR.add(usize::from(random::I)) >> 1;
+
+        random::I += 1;
+        if random::I == random::N {
+            random::I = 0;
+        }
+
+        random::J += 1;
+        if random::J == random::N {
+            random::J = 0;
+        }
+    }
+    // TODO: unlock?
+
+    /* Both branches of this function result in a "u31", which will
+     * always fit in a c_long. */
+    c_long::try_from(k).unwrap()
 }
 
 #[no_mangle]
@@ -858,9 +909,16 @@ pub extern "C" fn setkey(key: *const c_char) {
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn setstate(state: *const c_char) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn setstate(state: *mut c_char) -> *mut c_char {
+    /* Ported from musl. The state parameter is no longer const in newer
+     * versions of POSIX. */
+
+    // TODO: lock?
+    let old_state = random::save_state();
+    random::load_state(state as *mut u32);
+    // TODO: unlock?
+    old_state as _
 }
 
 #[no_mangle]
@@ -879,9 +937,13 @@ pub unsafe extern "C" fn srand48(seedval: c_long) {
     lcg48::DEFAULT_XSUBI = lcg48::ushort_arr3_from_u48(xsubi_value);
 }
 
-// #[no_mangle]
-pub extern "C" fn srandom(seed: c_uint) {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn srandom(seed: c_uint) {
+    // Ported from musl
+
+    // TODO: lock?
+    random::seed(seed);
+    // TODO: unlock?
 }
 
 #[no_mangle]
