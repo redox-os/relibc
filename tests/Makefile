@@ -53,9 +53,9 @@ EXPECT_NAMES=\
 	stdlib/atoi \
 	stdlib/div \
 	stdlib/env \
-	stdlib/lcg48 \
 	stdlib/mkostemps \
 	stdlib/rand \
+	stdlib/rand48 \
 	stdlib/random \
 	stdlib/strtod \
 	stdlib/strtol \
