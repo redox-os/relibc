@@ -388,12 +388,12 @@ pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_
             _ => 63,
         };
 
-        random::X_PTR = (state as *mut u32).offset(1);
+        random::X_PTR = (state.cast::<[u8; 4]>()).offset(1);
         random::seed(seed);
         random::save_state();
         // TODO: unlock?
 
-        old_state as _
+        old_state.cast::<_>()
     }
 }
 
@@ -763,12 +763,18 @@ pub unsafe extern "C" fn random() -> c_long {
     random::ensure_x_ptr_init();
 
     if random::N == 0 {
-        *random::X_PTR = random::lcg31_step(*random::X_PTR);
-        k = *random::X_PTR;
+        let x_old = u32::from_ne_bytes(*random::X_PTR);
+        let x_new = random::lcg31_step(x_old);
+        *random::X_PTR = x_new.to_ne_bytes();
+        k = x_new;
     } else {
-        *random::X_PTR.add(usize::from(random::I)) += *random::X_PTR.add(usize::from(random::J));
+        // The non-u32-aligned way of saying x[i] += x[j]...
+        let x_i_old = u32::from_ne_bytes(*random::X_PTR.add(usize::from(random::I)));
+        let x_j = u32::from_ne_bytes(*random::X_PTR.add(usize::from(random::J)));
+        let x_i_new = x_i_old.wrapping_add(x_j);
+        *random::X_PTR.add(usize::from(random::I)) = x_i_new.to_ne_bytes();
 
-        k = *random::X_PTR.add(usize::from(random::I)) >> 1;
+        k = x_i_new >> 1;
 
         random::I += 1;
         if random::I == random::N {
@@ -916,9 +922,9 @@ pub unsafe extern "C" fn setstate(state: *mut c_char) -> *mut c_char {
 
     // TODO: lock?
     let old_state = random::save_state();
-    random::load_state(state as *mut u32);
+    random::load_state(state.cast::<_>());
     // TODO: unlock?
-    old_state as _
+    old_state.cast::<_>()
 }
 
 #[no_mangle]
