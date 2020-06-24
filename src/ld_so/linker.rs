@@ -10,6 +10,7 @@ use core::{
 };
 use goblin::{
     elf::{
+        header::ET_DYN,
         program_header,
         r#dyn::{Dyn, DT_DEBUG},
         reloc, sym, Elf,
@@ -199,7 +200,11 @@ impl Linker {
             let value: usize;
             if let Some(name_res) = elf.dynstrtab.get(sym.st_name) {
                 name = name_res?.to_string();
-                value = mmap.as_ptr() as usize + sym.st_value as usize;
+                value = if is_pie_enabled(elf) {
+                    mmap.as_ptr() as usize + sym.st_value as usize
+                } else {
+                    sym.st_value as usize
+                };
             } else {
                 continue;
             }
@@ -256,7 +261,7 @@ impl Linker {
             None => return Ok(()),
         };
         let elf = Elf::parse(self.objects.get(&root.name).unwrap())?;
-        for section in elf.section_headers {
+        for section in &elf.section_headers {
             let name = match elf.shdr_strtab.get(section.sh_name) {
                 Some(x) => match x {
                     Ok(y) => y,
@@ -265,7 +270,11 @@ impl Linker {
                 _ => continue,
             };
             if name == ".init_array" {
-                let addr = mmap.as_ptr() as usize + section.vm_range().start;
+                let addr = if is_pie_enabled(&elf) {
+                    mmap.as_ptr() as usize + section.vm_range().start
+                } else {
+                    section.vm_range().start
+                };
                 for i in (0..section.sh_size).step_by(8) {
                     unsafe { call_inits_finis(addr + i as usize) };
                 }
@@ -287,7 +296,7 @@ impl Linker {
             None => return Ok(()),
         };
         let elf = Elf::parse(self.objects.get(&root.name).unwrap())?;
-        for section in elf.section_headers {
+        for section in &elf.section_headers {
             let name = match elf.shdr_strtab.get(section.sh_name) {
                 Some(x) => match x {
                     Ok(y) => y,
@@ -296,7 +305,11 @@ impl Linker {
                 _ => continue,
             };
             if name == ".fini_array" {
-                let addr = mmap.as_ptr() as usize + section.vm_range().start;
+                let addr = if is_pie_enabled(&elf) {
+                    mmap.as_ptr() as usize + section.vm_range().start
+                } else {
+                    section.vm_range().start
+                };
                 for i in (0..section.sh_size).step_by(8) {
                     unsafe { call_inits_finis(addr + i as usize) };
                 }
@@ -396,7 +409,12 @@ impl Linker {
                 };
                 if same_elf {
                     let addr = dso.as_ref().unwrap().base_addr;
-                    let size = bounds.1;
+                    let size = if is_pie_enabled(&elf) {
+                        bounds.1
+                    } else {
+                        bounds.1 - bounds.0
+                    };
+
                     // Fill the gaps i the binary
                     let mut ranges = Vec::new();
                     for ph in elf.program_headers.iter() {
@@ -405,7 +423,11 @@ impl Linker {
                             let vaddr = ph.p_vaddr as usize - voff;
                             let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE)
                                 * PAGE_SIZE;
-                            ranges.push((vaddr, vsize));
+                            if is_pie_enabled(&elf) {
+                                ranges.push((vaddr, vsize));
+                            } else {
+                                ranges.push((vaddr - addr, vsize));
+                            }
                         }
                     }
                     ranges.sort();
@@ -651,7 +673,11 @@ impl Linker {
                     (0, 0)
                 };
 
-                let ptr = unsafe { mmap.as_mut_ptr().add(rel.r_offset as usize) };
+                let ptr = if is_pie_enabled(&elf) {
+                    unsafe { mmap.as_mut_ptr().add(rel.r_offset as usize) }
+                } else {
+                    rel.r_offset as *mut u8
+                };
 
                 let set_u64 = |value| {
                     // println!("    set_u64 {:#x}", value);
@@ -717,7 +743,12 @@ impl Linker {
                     };
                     let bytes: [u8; size_of::<Dyn>() / 2] =
                         unsafe { transmute((&_r_debug) as *const RTLDDebug as usize) };
-                    let start = dyn_start_addr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2;
+                    let start = if is_pie_enabled(elf) {
+                        dyn_start_addr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
+                    } else {
+                        dyn_start_addr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
+                            - mmap.as_mut_ptr() as usize
+                    };
                     mmap[start..start + size_of::<Dyn>() / 2].clone_from_slice(&bytes);
                 }
             }
@@ -748,7 +779,11 @@ impl Linker {
                         None => continue,
                     };
                     let res = unsafe {
-                        let ptr = mmap.as_mut_ptr().add(vaddr);
+                        let ptr = if is_pie_enabled(elf) {
+                            mmap.as_mut_ptr().add(vaddr)
+                        } else {
+                            vaddr as *const u8
+                        };
                         if self.verbose {
                             println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
                         }
@@ -780,7 +815,11 @@ impl Linker {
                 println!("entry {}", elf_name);
             }
             if Some(*elf_name) == primary_opt {
-                entry_opt = Some(mmap.as_mut_ptr() as usize + elf.header.e_entry as usize);
+                if is_pie_enabled(&elf) {
+                    entry_opt = Some(mmap.as_mut_ptr() as usize + elf.header.e_entry as usize);
+                } else {
+                    entry_opt = Some(elf.header.e_entry as usize);
+                }
             }
 
             // Relocate
@@ -815,7 +854,6 @@ impl Linker {
                     }
                 }
             }
-
             // Protect pages
             for ph in elf.program_headers.iter() {
                 if let program_header::PT_LOAD = ph.p_type {
@@ -838,7 +876,11 @@ impl Linker {
                     }
 
                     let res = unsafe {
-                        let ptr = mmap.as_mut_ptr().add(vaddr);
+                        let ptr = if is_pie_enabled(&elf) {
+                            mmap.as_mut_ptr().add(vaddr)
+                        } else {
+                            vaddr as *const u8
+                        };
                         if self.verbose {
                             println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
                         }
@@ -852,12 +894,20 @@ impl Linker {
             }
         }
         unsafe { _r_debug.state = RTLDState::RT_CONSISTENT };
-        _dl_debug_state();
+        //_dl_debug_state();
         Ok(entry_opt)
     }
 }
 
-unsafe extern "C" fn call_inits_finis(addr: usize) {
+unsafe fn call_inits_finis(addr: usize) {
     let func = transmute::<usize, *const Option<extern "C" fn()>>(addr);
     (*func).map(|x| x());
+}
+
+fn is_pie_enabled(elf: &Elf) -> bool {
+    if elf.header.e_type == ET_DYN {
+        true
+    } else {
+        false
+    }
 }
