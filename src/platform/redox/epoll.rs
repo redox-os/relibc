@@ -29,9 +29,9 @@ impl PalEpoll for Sys {
                         id: fd as usize,
                         flags: syscall::EventFlags::from_bits(unsafe { (*event).events as usize })
                             .expect("epoll: invalid bit pattern"),
-                        // NOTE: Danger when using non 64-bit systems. If this is
-                        // needed, use a box or something
-                        data: unsafe { mem::transmute((*event).data) },
+                        // NOTE: Danger when using something smaller than 64-bit
+                        // systems. If this is needed, use a box or something
+                        data: unsafe { (*event).data.u64 as usize },
                     },
                 ) as c_int
             }
@@ -102,7 +102,7 @@ impl PalEpoll for Sys {
         if bytes_read == -1 {
             return -1;
         }
-        let read = bytes_read as usize / mem::size_of::<epoll_event>();
+        let read = bytes_read as usize / mem::size_of::<syscall::Event>();
 
         let mut count = 0;
         for i in 0..read {
@@ -117,7 +117,7 @@ impl PalEpoll for Sys {
                 }
                 *event_ptr = epoll_event {
                     events: event.flags.bits() as _,
-                    data: mem::transmute(event.data),
+                    data: epoll_data { u64: event.data as u64, },
                     ..Default::default()
                 };
                 count += 1;

@@ -32,13 +32,17 @@ macro_rules! bind_or_connect {
         0
     }};
     ($mode:ident copy, $socket:expr, $address:expr, $address_len:expr) => {{
-        if ($address_len as usize) < mem::size_of::<sockaddr>() {
+        if ($address_len as usize) < mem::size_of::<sa_family_t>() {
             errno = syscall::EINVAL;
             return -1;
         }
 
         let path = match (*$address).sa_family as c_int {
             AF_INET => {
+                if ($address_len as usize) != mem::size_of::<sockaddr_in>() {
+                    errno = syscall::EINVAL;
+                    return -1;
+                }
                 let data = &*($address as *const sockaddr_in);
                 let addr = slice::from_raw_parts(
                     &data.sin_addr.s_addr as *const _ as *const u8,
@@ -58,9 +62,10 @@ macro_rules! bind_or_connect {
             },
             AF_UNIX => {
                 let data = &*($address as *const sockaddr_un);
+                trace!("address: {:p}, data: {:p}, data2: {:#X}", $address, data, data as *const _ as usize);
                 let addr = slice::from_raw_parts(
                     &data.sun_path as *const _ as *const u8,
-                    mem::size_of_val(&data.sun_path),
+                    $address_len as usize - data.path_len(),
                 );
                 let path = format!(
                     "{}",
@@ -91,7 +96,7 @@ unsafe fn inner_af_unix(buf: &[u8], address: *mut sockaddr, address_len: *mut so
 
     let path = slice::from_raw_parts_mut(
         &mut data.sun_path as *mut _ as *mut u8,
-        mem::size_of_val(&data.sun_path),
+        data.path_len(),
     );
 
     let len = cmp::min(path.len(), buf.len());
@@ -163,6 +168,19 @@ unsafe fn inner_get_name(
     }
 
     Ok(0)
+}
+
+fn socket_kind(mut kind: c_int) -> (c_int, usize) {
+    let mut flags = O_RDWR;
+    if kind & SOCK_NONBLOCK == SOCK_NONBLOCK {
+        kind &= !SOCK_NONBLOCK;
+        flags |= O_NONBLOCK;
+    }
+    if kind & SOCK_CLOEXEC == SOCK_CLOEXEC {
+        kind &= !SOCK_CLOEXEC;
+        flags |= O_CLOEXEC;
+    }
+    (kind, flags)
 }
 
 impl PalSocket for Sys {
@@ -357,7 +375,7 @@ impl PalSocket for Sys {
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
     }
 
-    unsafe fn socket(domain: c_int, mut kind: c_int, protocol: c_int) -> c_int {
+    unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
         if domain != AF_INET && domain != AF_UNIX {
             errno = syscall::EAFNOSUPPORT;
             return -1;
@@ -367,15 +385,7 @@ impl PalSocket for Sys {
         //     return -1;
         // }
 
-        let mut flags = O_RDWR;
-        if kind & SOCK_NONBLOCK == SOCK_NONBLOCK {
-            kind &= !SOCK_NONBLOCK;
-            flags |= O_NONBLOCK;
-        }
-        if kind & SOCK_CLOEXEC == SOCK_CLOEXEC {
-            kind &= !SOCK_CLOEXEC;
-            flags |= O_CLOEXEC;
-        }
+        let (kind, flags) = socket_kind(kind);
 
         // The tcp: and udp: schemes allow using no path,
         // and later specifying one using `dup`.
@@ -386,19 +396,52 @@ impl PalSocket for Sys {
             _ => {
                 errno = syscall::EPROTONOSUPPORT;
                 -1
-            }
+            },
         }
     }
 
     fn socketpair(domain: c_int, kind: c_int, protocol: c_int, sv: &mut [c_int; 2]) -> c_int {
-        eprintln!(
-            "socketpair({}, {}, {}, {:p})",
-            domain,
-            kind,
-            protocol,
-            sv.as_mut_ptr()
-        );
-        unsafe { errno = syscall::ENOSYS };
-        return -1;
+        let (kind, flags) = socket_kind(kind);
+
+        match (domain, kind) {
+            (AF_UNIX, SOCK_STREAM) => {
+                let listener = e(syscall::open("chan:", flags | O_CREAT));
+                if listener == !0 {
+                    return -1;
+                }
+
+                // For now, chan: lets connects be instant, and instead blocks
+                // on any I/O performed. So we don't need to mark this as
+                // nonblocking.
+
+                let fd0 = e(syscall::dup(listener, b"connect"));
+                if fd0 == !0 {
+                    let _ = syscall::close(listener);
+                    return -1;
+                }
+
+                let fd1 = e(syscall::dup(listener, b"listen"));
+                if fd1 == !0 {
+                    let _ = syscall::close(fd0);
+                    let _ = syscall::close(listener);
+                    return -1;
+                }
+
+                sv[0] = fd0 as c_int;
+                sv[1] = fd1 as c_int;
+                0
+            },
+            _ => unsafe {
+                eprintln!(
+                    "socketpair({}, {}, {}, {:p})",
+                    domain,
+                    kind,
+                    protocol,
+                    sv.as_mut_ptr()
+                );
+                errno = syscall::EPROTONOSUPPORT;
+                -1
+            },
+        }
     }
 }
