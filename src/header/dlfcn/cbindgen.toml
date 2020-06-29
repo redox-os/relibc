@@ -1,5 +1,5 @@
 sys_includes = []
-include_guard = "_DLFCN_H"
+include_guard = "_RELIBC_DLFCN_H"
 language = "C"
 style = "Type"
 no_includes = true

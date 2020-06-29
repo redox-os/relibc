@@ -1,5 +1,5 @@
 sys_includes = []
-include_guard = "_TEMPLATE_H"
+include_guard = "_RELIBC_TEMPLATE_H"
 language = "C"
 style = "Tag"
 no_includes = true

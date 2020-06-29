@@ -1,5 +1,5 @@
 sys_includes = ["unistd.h"]
-include_guard = "_GETOPT_H"
+include_guard = "_RELIBC_GETOPT_H"
 language = "C"
 style = "Tag"
 no_includes = true

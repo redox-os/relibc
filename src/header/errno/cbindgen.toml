@@ -1,5 +1,5 @@
 sys_includes = ["bits/errno.h"]
-include_guard = "_ERRNO_H"
+include_guard = "_RELIBC_ERRNO_H"
 language = "C"
 style = "Tag"
 no_includes = true

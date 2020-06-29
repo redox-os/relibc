@@ -1,5 +1,5 @@
 sys_includes = []
-include_guard = "_LIMITS_H"
+include_guard = "_RELIBC_LIMITS_H"
 trailer = "#include <bits/limits.h>"
 language = "C"
 style = "Tag"

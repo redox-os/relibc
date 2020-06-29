@@ -1,4 +1,4 @@
-include_guard = "_FNMATCH_H"
+include_guard = "_RELIBC_FNMATCH_H"
 language = "C"
 style = "Tag"
 no_includes = true

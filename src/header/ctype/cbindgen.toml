@@ -1,5 +1,5 @@
 sys_includes = ["bits/ctype.h"]
-include_guard = "_CTYPE_H"
+include_guard = "_RELIBC_CTYPE_H"
 language = "C"
 style = "Tag"
 no_includes = true

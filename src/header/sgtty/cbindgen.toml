@@ -1,5 +1,5 @@
 sys_includes = ["sys/ioctl.h"]
-include_guard = "_SGTTY_H"
+include_guard = "_RELIBC_SGTTY_H"
 language = "C"
 style = "Tag"
 no_includes = true
