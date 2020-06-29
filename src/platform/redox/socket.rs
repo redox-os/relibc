@@ -9,6 +9,7 @@ use super::{
 use crate::header::{
     arpa_inet::inet_aton,
     netinet_in::{in_port_t, sockaddr_in, in_addr},
+    string::strnlen,
     sys_socket::{constants::*, sa_family_t, sockaddr, socklen_t},
     sys_time::timeval,
     sys_un::sockaddr_un,
@@ -62,15 +63,32 @@ macro_rules! bind_or_connect {
             },
             AF_UNIX => {
                 let data = &*($address as *const sockaddr_un);
-                trace!("address: {:p}, data: {:p}, data2: {:#X}", $address, data, data as *const _ as usize);
+
+                // NOTE: It's UB to access data in given address that exceeds
+                // the given address length.
+
+                let maxlen = cmp::min(
+                    // Max path length of the full-sized struct
+                    data.sun_path.len(),
+                    // Length inferred from given addrlen
+                    $address_len as usize - data.path_offset()
+                );
+                let len = cmp::min(
+                    // The maximum length of the address
+                    maxlen,
+                    // The first NUL byte, if any
+                    strnlen(&data.sun_path as *const _, maxlen as size_t),
+                );
+
                 let addr = slice::from_raw_parts(
                     &data.sun_path as *const _ as *const u8,
-                    $address_len as usize - data.path_len(),
+                    len,
                 );
                 let path = format!(
                     "{}",
                     str::from_utf8(addr).unwrap()
                 );
+                trace!("path: {:?}", path);
 
                 path
             },
@@ -96,7 +114,7 @@ unsafe fn inner_af_unix(buf: &[u8], address: *mut sockaddr, address_len: *mut so
 
     let path = slice::from_raw_parts_mut(
         &mut data.sun_path as *mut _ as *mut u8,
-        data.path_len(),
+        data.sun_path.len(),
     );
 
     let len = cmp::min(path.len(), buf.len());

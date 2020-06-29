@@ -7,7 +7,7 @@ pub struct sockaddr_un {
 }
 
 impl sockaddr_un {
-    pub fn path_len(&self) -> usize {
+    pub fn path_offset(&self) -> usize {
         let base = self as *const _ as usize;
         let path = &self.sun_path as *const _ as usize;
         trace!("base: {:#X}, path: {:#X}", base, path);
