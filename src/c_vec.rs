@@ -57,8 +57,13 @@ impl<T> CVec<T> {
     }
     unsafe fn resize(&mut self, cap: usize) -> Result<(), AllocError> {
         let size = Self::check_mul(cap, mem::size_of::<T>())?;
-        let ptr = NonNull::new(platform::realloc(self.ptr.as_ptr() as *mut c_void, size) as *mut T)
-            .ok_or(AllocError)?;
+        let ptr = if cap == 0 {
+            NonNull::dangling()
+        } else if self.cap > 0 {
+            NonNull::new(platform::realloc(self.ptr.as_ptr() as *mut c_void, size) as *mut T).ok_or(AllocError)?
+        } else {
+            NonNull::new((platform::alloc(size)) as *mut T).ok_or(AllocError)?
+        };
         self.ptr = ptr;
         self.cap = cap;
         Ok(())
@@ -75,13 +80,13 @@ impl<T> CVec<T> {
     // Push stuff
 
     pub fn reserve(&mut self, required: usize) -> Result<(), AllocError> {
-        let reserved_len = self
+        let required_len = self
             .len
             .checked_add(required)
             .ok_or(AllocError)
             .and_then(Self::check_bounds)?;
-        let new_cap = cmp::min(reserved_len.next_power_of_two(), core::isize::MAX as usize);
-        if new_cap > self.cap {
+        if required_len > self.cap {
+            let new_cap = cmp::min(required_len.next_power_of_two(), core::isize::MAX as usize);
             unsafe {
                 self.resize(new_cap)?;
             }
@@ -223,5 +228,60 @@ impl WriteByte for CVec<u8> {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
         self.write(&[byte]).map_err(|_| fmt::Error)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CVec;
+
+    #[test]
+    fn push_pop() {
+        let mut vec = CVec::new();
+        vec.push(1).unwrap();
+        vec.push(2).unwrap();
+        vec.push(3).unwrap();
+        assert_eq!(&vec[..], &[1, 2, 3]);
+        assert_eq!(vec.pop().unwrap(), 3);
+        assert_eq!(&vec[..], &[1, 2]);
+    }
+    #[test]
+    fn extend_from_slice() {
+        use core_io::Write;
+
+        let mut vec = CVec::new();
+        vec.extend_from_slice(&[1, 2, 3]).unwrap();
+        vec.extend_from_slice(&[4, 5, 6]).unwrap();
+        assert_eq!(&vec[..], &[1, 2, 3, 4, 5, 6]);
+        assert_eq!(vec.write(&[7, 8, 9]).unwrap(), 3);
+        assert_eq!(&vec[..], &[1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+    #[test]
+    fn dropped() {
+        use alloc::rc::Rc;
+
+        let counter = Rc::new(());
+        let mut vec = CVec::with_capacity(3).unwrap();
+        vec.push(Rc::clone(&counter)).unwrap();
+        vec.push(Rc::clone(&counter)).unwrap();
+        vec.push(Rc::clone(&counter)).unwrap();
+        assert_eq!(Rc::strong_count(&counter), 4);
+
+        let popped = vec.pop().unwrap();
+        assert_eq!(Rc::strong_count(&counter), 4);
+        drop(popped);
+        assert_eq!(Rc::strong_count(&counter), 3);
+
+        vec.push(Rc::clone(&counter)).unwrap();
+        vec.push(Rc::clone(&counter)).unwrap();
+        vec.push(Rc::clone(&counter)).unwrap();
+
+        assert_eq!(vec.len(), 5);
+        assert_eq!(Rc::strong_count(&counter), 6);
+        vec.truncate(1);
+        assert_eq!(Rc::strong_count(&counter), 2);
+
+        drop(vec);
+        assert_eq!(Rc::strong_count(&counter), 1);
     }
 }

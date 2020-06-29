@@ -40,6 +40,5 @@ do
     if [ "${status}" != "0" ]
     then
         echo "# ${name}: failed with status ${status} #"
-        exit 1
     fi
 done
