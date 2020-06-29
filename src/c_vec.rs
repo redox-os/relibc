@@ -1,6 +1,10 @@
-use crate::platform::{self, types::*};
+use crate::{
+    io::{self, Write},
+    platform::{self, WriteByte, types::*},
+};
 use core::{
     cmp,
+    fmt,
     iter::IntoIterator,
     mem,
     ops::{Deref, DerefMut},
@@ -67,6 +71,9 @@ impl<T> CVec<T> {
             start = start.add(1);
         }
     }
+
+    // Push stuff
+
     pub fn reserve(&mut self, required: usize) -> Result<(), AllocError> {
         let reserved_len = self
             .len
@@ -82,8 +89,8 @@ impl<T> CVec<T> {
         Ok(())
     }
     pub fn push(&mut self, elem: T) -> Result<(), AllocError> {
+        self.reserve(1)?;
         unsafe {
-            self.reserve(1)?;
             ptr::write(self.ptr.as_ptr().add(self.len), elem);
         }
         self.len += 1; // no need to bounds check, as new len <= cap
@@ -93,21 +100,26 @@ impl<T> CVec<T> {
     where
         T: Copy,
     {
+        self.reserve(elems.len())?;
         unsafe {
-            self.reserve(elems.len())?;
             ptr::copy_nonoverlapping(elems.as_ptr(), self.ptr.as_ptr().add(self.len), elems.len());
         }
         self.len += elems.len(); // no need to bounds check, as new len <= cap
         Ok(())
     }
     pub fn append(&mut self, other: &mut Self) -> Result<(), AllocError> {
+        let len = other.len;
+        other.len = 0; // move
+        self.reserve(len)?;
         unsafe {
-            self.reserve(other.len())?;
-            ptr::copy_nonoverlapping(other.as_ptr(), self.ptr.as_ptr().add(self.len), other.len());
+            ptr::copy_nonoverlapping(other.as_ptr(), self.ptr.as_ptr().add(self.len), len);
         }
         self.len += other.len(); // no need to bounds check, as new len <= cap
         Ok(())
     }
+
+    // Pop stuff
+
     pub fn truncate(&mut self, len: usize) {
         if len < self.len {
             unsafe {
@@ -126,6 +138,18 @@ impl<T> CVec<T> {
         }
         Ok(())
     }
+    pub fn pop(&mut self) -> Option<T> {
+        if self.is_empty() {
+            None
+        } else {
+            let elem = unsafe { ptr::read(self.as_ptr().add(self.len - 1)) };
+            self.len -= 1;
+            Some(elem)
+        }
+    }
+
+    // Misc stuff
+
     pub fn capacity(&self) -> usize {
         self.cap
     }
@@ -174,5 +198,30 @@ impl<'a, T> IntoIterator for &'a mut CVec<T> {
     type IntoIter = <&'a mut [T] as IntoIterator>::IntoIter;
     fn into_iter(self) -> Self::IntoIter {
         <&mut [T]>::into_iter(&mut *self)
+    }
+}
+
+impl Write for CVec<u8> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.extend_from_slice(buf).map_err(|err| io::Error::new(
+            io::ErrorKind::Other,
+            "AllocStringWriter::write failed to allocate",
+        ))?;
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+impl fmt::Write for CVec<u8> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write(s.as_bytes()).map_err(|_| fmt::Error)?;
+        Ok(())
+    }
+}
+impl WriteByte for CVec<u8> {
+    fn write_u8(&mut self, byte: u8) -> fmt::Result {
+        self.write(&[byte]).map_err(|_| fmt::Error)?;
+        Ok(())
     }
 }
