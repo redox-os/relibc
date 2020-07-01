@@ -1,5 +1,5 @@
 sys_includes = ["stdarg.h", "sys/types.h"]
-include_guard = "_FCNTL_H"
+include_guard = "_RELIBC_FCNTL_H"
 trailer = "#include <bits/fcntl.h>"
 language = "C"
 style = "Tag"

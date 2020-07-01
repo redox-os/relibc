@@ -74,4 +74,16 @@ int main(void) {
         }
         printf("\n");
     }
+
+    puts("Testing asprintf...");
+    char *s = NULL;
+    int res = asprintf(&s, "test string");
+    printf("printed: %s, value: %d\n", s, res);
+    free(s);
+    res = asprintf(&s, "test string %d", 2);
+    printf("printed: %s, value: %d\n", s, res);
+    free(s);
+    res = asprintf(&s, "test %s %d", "string", 2);
+    printf("printed: %s, value: %d\n", s, res);
+    free(s);
 }

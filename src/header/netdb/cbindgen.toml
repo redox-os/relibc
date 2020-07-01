@@ -1,5 +1,5 @@
 sys_includes = ["sys/socket.h", "netinet/in.h"]
-include_guard = "_NETDB_H"
+include_guard = "_RELIBC_NETDB_H"
 trailer = "#include <bits/netdb.h>"
 language = "C"
 style = "Tag"

@@ -1,5 +1,5 @@
 sys_includes = ["sys/types.h"]
-include_guard = "_DIRENT_H"
+include_guard = "_RELIBC_DIRENT_H"
 language = "C"
 style = "Both"
 trailer = "#include <bits/dirent.h>"

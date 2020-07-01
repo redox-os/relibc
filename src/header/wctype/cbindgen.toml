@@ -1,5 +1,5 @@
 sys_includes = ["stddef.h", "stdint.h", "time.h", "stdio.h" ]
-include_guard = "_WCTYPE_H"
+include_guard = "_RELIBC_WCTYPE_H"
 header = "#include <bits/wctype.h>"
 language = "C"
 style = "Type"

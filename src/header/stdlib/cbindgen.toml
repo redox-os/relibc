@@ -1,5 +1,5 @@
 sys_includes = ["stddef.h", "alloca.h"]
-include_guard = "_STDLIB_H"
+include_guard = "_RELIBC_STDLIB_H"
 trailer = "#include <bits/stdlib.h>"
 language = "C"
 style = "Type"

@@ -1,5 +1,5 @@
 sys_includes = []
-include_guard = "_GRP_H"
+include_guard = "_RELIBC_GRP_H"
 language = "C"
 style = "Tag"
 no_includes = true

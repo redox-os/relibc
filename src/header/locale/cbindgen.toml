@@ -1,4 +1,4 @@
-include_guard = "_LOCALE_H"
+include_guard = "_RELIBC_LOCALE_H"
 trailer = "#include <bits/locale.h>"
 language = "C"
 style = "Tag"

@@ -1,5 +1,5 @@
 sys_includes = ["stdint.h", "sys/types.h"]
-include_guard = "_SIGNAL_H"
+include_guard = "_RELIBC_SIGNAL_H"
 trailer = "#include <bits/signal.h>"
 language = "C"
 style = "Tag"

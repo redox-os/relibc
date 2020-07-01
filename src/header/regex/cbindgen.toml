@@ -1,5 +1,5 @@
 sys_includes = ["sys/types.h"]
-include_guard = "_REGEX_H"
+include_guard = "_RELIBC_REGEX_H"
 language = "C"
 style = "Type"
 no_includes = true

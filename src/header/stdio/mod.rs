@@ -16,6 +16,7 @@ use core::{
 
 use crate::{
     c_str::CStr,
+    c_vec::CVec,
     fs::File,
     header::{
         errno::{self, STR_ERROR},
@@ -1021,9 +1022,11 @@ pub unsafe extern "C" fn vasprintf(
     format: *const c_char,
     ap: va_list,
 ) -> c_int {
-    let mut alloc_writer = platform::AllocStringWriter(ptr::null_mut(), 0);
+    let mut alloc_writer = CVec::new();
     let ret = printf::printf(&mut alloc_writer, format, ap);
-    *strp = alloc_writer.0 as *mut c_char;
+    alloc_writer.push(0).unwrap();
+    alloc_writer.shrink_to_fit().unwrap();
+    *strp = alloc_writer.leak() as *mut c_char;
     ret
 }
 

@@ -1,5 +1,5 @@
 sys_includes = ["stdint.h", "wchar.h"]
-include_guard = "_INTTYPES_H"
+include_guard = "_RELIBC_INTTYPES_H"
 trailer = "#include <bits/inttypes.h>"
 language = "C"
 style = "Type"

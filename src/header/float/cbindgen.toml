@@ -1,5 +1,5 @@
 sys_includes = ["sys/types.h", "bits/float.h"]
-include_guard = "_FLOAT_H"
+include_guard = "_RELIBC_FLOAT_H"
 language = "C"
 style = "Tag"
 no_includes = true
