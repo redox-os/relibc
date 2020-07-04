@@ -85,7 +85,7 @@ impl Linker {
     pub fn unload(&mut self, libspace: usize) {
         if let Some(lib) = self.lib_spaces.remove(&libspace) {
             for (_, mmap) in lib.mmaps {
-                unsafe { sys_mman::munmap(mmap.as_mut_ptr() as *mut c_void, mmap.len()) };
+                unsafe{sys_mman::munmap(mmap.as_mut_ptr() as *mut c_void, mmap.len())};
             }
         }
     }
@@ -250,7 +250,7 @@ impl Linker {
     pub fn run_fini(&self, libspace: Option<usize>) -> Result<()> {
         match libspace {
             Some(id) => {
-                let lib = self.lib_spaces.get(&id).unwrap().unwrap();
+                let lib = self.lib_spaces.get(&id).unwrap();
                 self.run_tree(&lib, &lib.dep_tree, ".fini_array")
             }
             None => {
