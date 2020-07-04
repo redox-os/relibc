@@ -5,7 +5,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{
-    mem::{size_of, transmute},
+    mem::{size_of, swap, transmute},
     ptr, slice,
 };
 use goblin::{
@@ -65,18 +65,21 @@ impl Linker {
     }
 
     pub fn load(&mut self, name: &str, path: &str) -> Result<()> {
-        self.root.dep_tree = self.load_recursive(name, path)?;
+        let mut lib: Library = Library::new();
+        swap(&mut lib, &mut self.root);
+        lib.dep_tree = self.load_recursive(name, path, &mut lib)?;
+        swap(&mut lib, &mut self.root);
         if self.verbose {
             println!("Dep tree: {:#?}", self.root.dep_tree);
         }
         return Ok(());
     }
 
-    fn load_recursive(&mut self, name: &str, path: &str) -> Result<DepTree> {
+    fn load_recursive(&mut self, name: &str, path: &str, lib: &mut Library) -> Result<DepTree> {
         if self.verbose {
             println!("load {}: {}", name, path);
         }
-        if self.root.cir_dep.contains(name) {
+        if lib.cir_dep.contains(name) {
             return Err(Error::Malformed(format!(
                 "Circular dependency: {} is a dependency of itself",
                 name
@@ -85,7 +88,7 @@ impl Linker {
 
         let mut deps = DepTree::new(name.to_string());
         let mut data = Vec::new();
-        self.root.cir_dep.insert(name.to_string());
+        lib.cir_dep.insert(name.to_string());
         let path_c = CString::new(path)
             .map_err(|err| Error::Malformed(format!("invalid path '{}': {}", path, err)))?;
 
@@ -97,32 +100,42 @@ impl Linker {
             file.read_to_end(&mut data)
                 .map_err(|err| Error::Malformed(format!("failed to read '{}': {}", path, err)))?;
         }
-        deps.deps = self.load_data(name, data.into_boxed_slice())?;
-        self.root.cir_dep.remove(name);
+        deps.deps = self.load_data(name, data.into_boxed_slice(), lib)?;
+        lib.cir_dep.remove(name);
         Ok(deps)
     }
 
-    pub fn load_data(&mut self, name: &str, data: Box<[u8]>) -> Result<Vec<DepTree>> {
+    fn load_data(
+        &mut self,
+        name: &str,
+        data: Box<[u8]>,
+        lib: &mut Library,
+    ) -> Result<Vec<DepTree>> {
         let elf = Elf::parse(&data)?;
         //println!("{:#?}", elf);
         let mut deps = Vec::new();
         for library in elf.libraries.iter() {
-            if let Some(dep) = self.load_library(library)? {
+            if let Some(dep) = self._load_library(library, lib)? {
                 deps.push(dep);
             }
         }
 
-        self.root.objects.insert(name.to_string(), data);
+        lib.objects.insert(name.to_string(), data);
 
         return Ok(deps);
     }
 
     pub fn load_library(&mut self, name: &str) -> Result<Option<DepTree>> {
-        if self.root.objects.contains_key(name) {
+        // TODO this is wrong
+        let mut lib = Library::new();
+        self._load_library(name, &mut lib)
+    }
+    fn _load_library(&mut self, name: &str, lib: &mut Library) -> Result<Option<DepTree>> {
+        if lib.objects.contains_key(name) {
             // It should be previously resolved so we don't need to worry about it
             Ok(None)
         } else if name.contains('/') {
-            Ok(Some(self.load_recursive(name, name)?))
+            Ok(Some(self.load_recursive(name, name, lib)?))
         } else {
             let library_path = self.library_path.clone();
             for part in library_path.split(PATH_SEP) {
@@ -146,7 +159,7 @@ impl Linker {
                 };
 
                 if access {
-                    return Ok(Some(self.load_recursive(name, &path)?));
+                    return Ok(Some(self.load_recursive(name, &path, lib)?));
                 }
             }
 
@@ -197,25 +210,43 @@ impl Linker {
         return Ok((globals, weak_syms));
     }
 
-    pub fn get_sym(&self, name: &str) -> Option<usize> {
-        self.root.get_sym(name)
-    }
-    pub fn run_init(&self) -> Result<()> {
-        self.run_init_tree(&self.root.dep_tree)
+    pub fn get_sym(&self, name: &str, libspace: Option<usize>) -> Option<usize> {
+        match libspace {
+            Some(lib) => {
+                //TODO this is the same kind of wrong
+                let lib = Library::new();
+                lib.get_sym(name)
+            }
+            None => self.root.get_sym(name),
+        }
     }
 
-    fn run_init_tree(&self, root: &DepTree) -> Result<()> {
+    pub fn run_init(&self, libspace: Option<usize>) -> Result<()> {
+        match libspace {
+            Some(lib) => {
+                //TODO this is the same kind of wrong
+                let lib = Library::new();
+                self.run_init_tree(&lib, &lib.dep_tree)
+            }
+            None => {
+                //TODO we first need to deinitialize all the loaded libraries first!
+                self.run_init_tree(&self.root, &self.root.dep_tree)
+            }
+        }
+    }
+
+    fn run_init_tree(&self, lib: &Library, root: &DepTree) -> Result<()> {
         for node in root.deps.iter() {
-            self.run_init_tree(node)?;
+            self.run_init_tree(lib, node)?;
         }
         if self.verbose {
             println!("init {}", &root.name);
         }
-        let mmap = match self.root.mmaps.get(&root.name) {
+        let mmap = match lib.mmaps.get(&root.name) {
             Some(some) => some,
             None => return Ok(()),
         };
-        let elf = Elf::parse(self.root.objects.get(&root.name).unwrap())?;
+        let elf = Elf::parse(lib.objects.get(&root.name).unwrap())?;
         for section in &elf.section_headers {
             let name = match elf.shdr_strtab.get(section.sh_name) {
                 Some(x) => match x {
@@ -238,19 +269,29 @@ impl Linker {
         return Ok(());
     }
 
-    pub fn run_fini(&self) -> Result<()> {
-        self.run_fini_tree(&self.root.dep_tree)
+    pub fn run_fini(&self, libspace: Option<usize>) -> Result<()> {
+        match libspace {
+            Some(lib) => {
+                //TODO this is the same kind of wrong
+                let lib = Library::new();
+                self.run_fini_tree(&lib, &lib.dep_tree)
+            }
+            None => {
+                //TODO we first need to deinitialize all the loaded libraries first!
+                self.run_fini_tree(&self.root, &self.root.dep_tree)
+            }
+        }
     }
 
-    fn run_fini_tree(&self, root: &DepTree) -> Result<()> {
+    fn run_fini_tree(&self, lib: &Library, root: &DepTree) -> Result<()> {
         if self.verbose {
             println!("init {}", &root.name);
         }
-        let mmap = match self.root.mmaps.get(&root.name) {
+        let mmap = match lib.mmaps.get(&root.name) {
             Some(some) => some,
             None => return Ok(()),
         };
-        let elf = Elf::parse(self.root.objects.get(&root.name).unwrap())?;
+        let elf = Elf::parse(lib.objects.get(&root.name).unwrap())?;
         for section in &elf.section_headers {
             let name = match elf.shdr_strtab.get(section.sh_name) {
                 Some(x) => match x {
@@ -271,19 +312,45 @@ impl Linker {
             }
         }
         for node in root.deps.iter() {
-            self.run_fini_tree(node)?;
+            self.run_fini_tree(lib, node)?;
         }
         return Ok(());
     }
+    pub fn link(
+        &mut self,
+        primary_opt: Option<&str>,
+        dso: Option<DSO>,
+        libspace: Option<usize>,
+    ) -> Result<Option<usize>> {
+        match libspace {
+            Some(lib) => {
+                //TODO this is the same kind of wrong
+                let mut lib = Library::new();
+                self._link(primary_opt, dso, &mut lib)
+            }
+            None => {
+                let mut lib = Library::new();
+                swap(&mut lib, &mut self.root);
+                let res = self._link(primary_opt, dso, &mut lib);
+                swap(&mut lib, &mut self.root);
+                res
+            }
+        }
+    }
 
-    pub fn link(&mut self, primary_opt: Option<&str>, dso: Option<DSO>) -> Result<Option<usize>> {
+    pub fn _link(
+        &mut self,
+        primary_opt: Option<&str>,
+        dso: Option<DSO>,
+        lib: &mut Library,
+    ) -> Result<Option<usize>> {
         unsafe { _r_debug.state = RTLDState::RT_ADD };
         _dl_debug_state();
         let elfs = {
             let mut elfs = BTreeMap::new();
-            for (name, data) in self.root.objects.iter() {
+            for (name, data) in lib.objects.iter() {
                 // Skip already linked libraries
-                if !self.root.mmaps.contains_key(&*name) {
+                if !lib.mmaps.contains_key(&*name) {
                     elfs.insert(name.as_str(), Elf::parse(&data)?);
                 }
             }
@@ -297,7 +364,7 @@ impl Linker {
             if self.verbose {
                 println!("map {}", elf_name);
             }
-            let object = match self.root.objects.get(*elf_name) {
+            let object = match lib.objects.get(*elf_name) {
                 Some(some) => some,
                 None => continue,
             };
@@ -433,9 +500,9 @@ impl Linker {
                 println!("  mmap {:p}, {:#x}", mmap.as_mut_ptr(), mmap.len());
             }
             let (globals, weak_syms) = Linker::collect_syms(&elf, &mmap, self.verbose)?;
-            self.root.globals.extend(globals.into_iter());
-            self.root.weak_syms.extend(weak_syms.into_iter());
-            self.root.mmaps.insert(elf_name.to_string(), mmap);
+            lib.globals.extend(globals.into_iter());
+            lib.weak_syms.extend(weak_syms.into_iter());
+            lib.mmaps.insert(elf_name.to_string(), mmap);
         }
 
         // Allocate TLS
@@ -470,12 +537,12 @@ impl Linker {
             if same_elf {
                 continue;
             }
-            let object = match self.root.objects.get(*elf_name) {
+            let object = match lib.objects.get(*elf_name) {
                 Some(some) => some,
                 None => continue,
             };
 
-            let mmap = match self.root.mmaps.get_mut(*elf_name) {
+            let mmap = match lib.mmaps.get_mut(*elf_name) {
                 Some(some) => some,
                 None => continue,
             };
@@ -608,14 +675,15 @@ impl Linker {
                                 "missing name for symbol {:?}",
                                 sym
                             )))??;
-                    self.get_sym(name).unwrap_or(0)
+                    lib.get_sym(name)
+                        .unwrap_or(self.root.get_sym(name).unwrap_or(0))
                 } else {
                     0
                 };
 
                 let a = rel.r_addend.unwrap_or(0) as usize;
 
-                let mmap = match self.root.mmaps.get_mut(*elf_name) {
+                let mmap = match lib.mmaps.get_mut(*elf_name) {
                     Some(some) => some,
                     None => continue,
                 };
@@ -696,7 +764,7 @@ impl Linker {
             }
             if let Some(dyn_start_addr) = dyn_start {
                 if let Some(i) = debug_start {
-                    let mmap = match self.root.mmaps.get_mut(*elf_name) {
+                    let mmap = match lib.mmaps.get_mut(*elf_name) {
                         Some(some) => some,
                         None => continue,
                     };
@@ -733,7 +801,7 @@ impl Linker {
                         prot |= sys_mman::PROT_WRITE;
                     }
 
-                    let mmap = match self.root.mmaps.get_mut(*elf_name) {
+                    let mmap = match lib.mmaps.get_mut(*elf_name) {
                         Some(some) => some,
                         None => continue,
                     };
@@ -766,7 +834,7 @@ impl Linker {
         // Perform indirect relocations (necessary evil), gather entry point
         let mut entry_opt = None;
         for (elf_name, elf) in elfs.iter() {
-            let mmap = match self.root.mmaps.get_mut(*elf_name) {
+            let mmap = match lib.mmaps.get_mut(*elf_name) {
                 Some(some) => some,
                 None => continue,
             };

@@ -63,7 +63,8 @@ pub unsafe extern "C" fn dlopen(filename: *const c_char, flags: c_int) -> *mut c
                 return ptr::null_mut();
             }
 
-            if let Err(err) = linker.link(None, None) {
+            if let Err(err) = linker.link(None, None, None) {
+                //TODO
                 eprintln!("dlopen: failed to link '{}': {}", filename, err);
                 ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
                 return ptr::null_mut();
@@ -102,7 +103,8 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
         eprintln!("dlsym: linker_ptr: {:p}", tcb.linker_ptr);
         let linker = (&*tcb.linker_ptr).lock();
 
-        if let Some(global) = linker.get_sym(symbol_str) {
+        if let Some(global) = linker.get_sym(symbol_str, None) {
+            //TODO
             eprintln!("dlsym({:p}, {}) = 0x{:x}", handle, symbol_str, global);
             global as *mut c_void
         } else {
