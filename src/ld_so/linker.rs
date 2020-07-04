@@ -1,10 +1,12 @@
 use alloc::{
     boxed::Box,
     collections::BTreeMap,
+    rc::Rc,
     string::{String, ToString},
     vec::Vec,
 };
 use core::{
+    cell::RefCell,
     mem::{size_of, swap, transmute},
     ptr, slice,
 };
@@ -28,6 +30,7 @@ use crate::{
 
 use super::{
     access::access,
+    callbacks::LinkerCallbacks,
     debug::{RTLDDebug, RTLDState, _dl_debug_state, _r_debug},
     library::{DepTree, Library},
     tcb::{Master, Tcb},
@@ -52,6 +55,9 @@ pub struct Linker {
     root: Library,
     verbose: bool,
     tls_index_offset: usize,
+    lib_spaces: BTreeMap<usize, Library>,
+    counter: usize,
+    pub cbs: Rc<RefCell<LinkerCallbacks>>,
 }
 
 impl Linker {
@@ -61,9 +67,11 @@ impl Linker {
             root: Library::new(),
             verbose,
             tls_index_offset: 0,
+            lib_spaces: BTreeMap::new(),
+            counter: 1,
+            cbs: Rc::new(RefCell::new(LinkerCallbacks::new())),
         }
     }
-
     pub fn load(&mut self, name: &str, path: &str) -> Result<()> {
         let mut lib: Library = Library::new();
         swap(&mut lib, &mut self.root);
@@ -74,7 +82,13 @@ impl Linker {
         }
         return Ok(());
     }
-
+    pub fn unload(&mut self, libspace: usize) {
+        if let Some(lib) = self.lib_spaces.remove(&libspace) {
+            for (_, mmap) in lib.mmaps {
+                unsafe { sys_mman::munmap(mmap.as_mut_ptr() as *mut c_void, mmap.len()) };
+            }
+        }
+    }
     fn load_recursive(&mut self, name: &str, path: &str, lib: &mut Library) -> Result<DepTree> {
         if self.verbose {
             println!("load {}: {}", name, path);
@@ -125,13 +139,16 @@ impl Linker {
         return Ok(deps);
     }
 
-    pub fn load_library(&mut self, name: &str) -> Result<Option<DepTree>> {
-        // TODO this is wrong
+    pub fn load_library(&mut self, name: &str) -> Result<usize> {
         let mut lib = Library::new();
-        self._load_library(name, &mut lib)
+        self._load_library(name, &mut lib)?;
+        let ret = self.counter;
+        self.lib_spaces.insert(ret, lib);
+        self.counter += 1;
+        return Ok(ret);
     }
     fn _load_library(&mut self, name: &str, lib: &mut Library) -> Result<Option<DepTree>> {
-        if lib.objects.contains_key(name) {
+        if lib.objects.contains_key(name) || self.root.objects.contains_key(name) {
             // It should be previously resolved so we don't need to worry about it
             Ok(None)
         } else if name.contains('/') {
@@ -212,9 +229,8 @@ impl Linker {
 
     pub fn get_sym(&self, name: &str, libspace: Option<usize>) -> Option<usize> {
         match libspace {
-            Some(lib) => {
-                //TODO this is the same kind of wrong
-                let lib = Library::new();
+            Some(id) => {
+                let lib = self.lib_spaces.get(&id)?;
                 lib.get_sym(name)
             }
             None => self.root.get_sym(name),
@@ -223,23 +239,18 @@ impl Linker {
 
     pub fn run_init(&self, libspace: Option<usize>) -> Result<()> {
         match libspace {
-            Some(lib) => {
-                //TODO this is the same kind of wrong
-                let lib = Library::new();
+            Some(id) => {
+                let lib = self.lib_spaces.get(&id).unwrap();
                 self.run_tree(&lib, &lib.dep_tree, ".init_array")
             }
-            None => {
-                //TODO we first need to deinitialize all the loaded libraries first!
-                self.run_tree(&self.root, &self.root.dep_tree, ".init_array")
-            }
+            None => self.run_tree(&self.root, &self.root.dep_tree, ".init_array"),
         }
     }
 
     pub fn run_fini(&self, libspace: Option<usize>) -> Result<()> {
         match libspace {
-            Some(lib) => {
-                //TODO this is the same kind of wrong
-                let lib = Library::new();
+            Some(id) => {
+                let lib = self.lib_spaces.get(&id).unwrap().unwrap();
                 self.run_tree(&lib, &lib.dep_tree, ".fini_array")
             }
             None => {
@@ -290,10 +301,11 @@ impl Linker {
         libspace: Option<usize>,
     ) -> Result<Option<usize>> {
         match libspace {
-            Some(lib) => {
-                //TODO this is the same kind of wrong
-                let mut lib = Library::new();
-                self._link(primary_opt, dso, &mut lib)
+            Some(id) => {
+                let mut lib = self.lib_spaces.remove(&id).unwrap();
+                let res = self._link(primary_opt, dso, &mut lib);
+                self.lib_spaces.insert(id, lib);
+                res
             }
             None => {
                 let mut lib = Library::new();
@@ -317,7 +329,7 @@ impl Linker {
             let mut elfs = BTreeMap::new();
             for (name, data) in lib.objects.iter() {
                 // Skip already linked libraries
-                if !lib.mmaps.contains_key(&*name) {
+                if !lib.mmaps.contains_key(&*name) && !self.root.mmaps.contains_key(&*name) {
                     elfs.insert(name.as_str(), Elf::parse(&data)?);
                 }
             }
