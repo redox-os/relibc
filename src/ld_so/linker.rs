@@ -226,47 +226,13 @@ impl Linker {
             Some(lib) => {
                 //TODO this is the same kind of wrong
                 let lib = Library::new();
-                self.run_init_tree(&lib, &lib.dep_tree)
+                self.run_tree(&lib, &lib.dep_tree, ".init_array")
             }
             None => {
                 //TODO we first need to deinitialize all the loaded libraries first!
-                self.run_init_tree(&self.root, &self.root.dep_tree)
+                self.run_tree(&self.root, &self.root.dep_tree, ".init_array")
             }
         }
-    }
-
-    fn run_init_tree(&self, lib: &Library, root: &DepTree) -> Result<()> {
-        for node in root.deps.iter() {
-            self.run_init_tree(lib, node)?;
-        }
-        if self.verbose {
-            println!("init {}", &root.name);
-        }
-        let mmap = match lib.mmaps.get(&root.name) {
-            Some(some) => some,
-            None => return Ok(()),
-        };
-        let elf = Elf::parse(lib.objects.get(&root.name).unwrap())?;
-        for section in &elf.section_headers {
-            let name = match elf.shdr_strtab.get(section.sh_name) {
-                Some(x) => match x {
-                    Ok(y) => y,
-                    _ => continue,
-                },
-                _ => continue,
-            };
-            if name == ".init_array" {
-                let addr = if is_pie_enabled(&elf) {
-                    mmap.as_ptr() as usize + section.vm_range().start
-                } else {
-                    section.vm_range().start
-                };
-                for i in (0..section.sh_size).step_by(8) {
-                    unsafe { call_inits_finis(addr + i as usize) };
-                }
-            }
-        }
-        return Ok(());
     }
 
     pub fn run_fini(&self, libspace: Option<usize>) -> Result<()> {
@@ -274,18 +240,21 @@ impl Linker {
             Some(lib) => {
                 //TODO this is the same kind of wrong
                 let lib = Library::new();
-                self.run_fini_tree(&lib, &lib.dep_tree)
+                self.run_tree(&lib, &lib.dep_tree, ".fini_array")
             }
             None => {
                 //TODO we first need to deinitialize all the loaded libraries first!
-                self.run_fini_tree(&self.root, &self.root.dep_tree)
+                self.run_tree(&self.root, &self.root.dep_tree, ".fini_array")
             }
         }
     }
 
-    fn run_fini_tree(&self, lib: &Library, root: &DepTree) -> Result<()> {
+    fn run_tree(&self, lib: &Library, root: &DepTree, tree_name: &str) -> Result<()> {
+        for node in root.deps.iter() {
+            self.run_tree(lib, node, tree_name)?;
+        }
         if self.verbose {
-            println!("init {}", &root.name);
+            println!("running {} {}", tree_name, &root.name);
         }
         let mmap = match lib.mmaps.get(&root.name) {
             Some(some) => some,
@@ -300,7 +269,7 @@ impl Linker {
                 },
                 _ => continue,
             };
-            if name == ".fini_array" {
+            if name == tree_name {
                 let addr = if is_pie_enabled(&elf) {
                     mmap.as_ptr() as usize + section.vm_range().start
                 } else {
@@ -311,11 +280,9 @@ impl Linker {
                 }
             }
         }
-        for node in root.deps.iter() {
-            self.run_fini_tree(lib, node)?;
-        }
         return Ok(());
     }
+
     pub fn link(
         &mut self,
         primary_opt: Option<&str>,
