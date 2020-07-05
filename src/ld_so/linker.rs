@@ -898,7 +898,7 @@ impl Linker {
             }
         }
         unsafe { _r_debug.state = RTLDState::RT_CONSISTENT };
-        //_dl_debug_state();
+        _dl_debug_state();
         Ok(entry_opt)
     }
 }
