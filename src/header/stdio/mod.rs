@@ -9,7 +9,7 @@ use core::{
     cmp,
     ffi::VaList as va_list,
     fmt::{self, Write as WriteFmt},
-    mem,
+    i32, mem,
     ops::{Deref, DerefMut},
     ptr, slice, str,
 };
@@ -85,6 +85,9 @@ pub struct FILE {
 
     // Optional pid for use with popen/pclose
     pid: Option<c_int>,
+
+    // wchar support
+    pub(crate) orientation: c_int,
 }
 
 impl Read for FILE {
@@ -168,6 +171,18 @@ impl FILE {
             flockfile(self);
         }
         LockGuard(self)
+    }
+
+    pub fn try_set_orientation(&mut self, mode: c_int) -> c_int {
+        let mut stream = self.lock();
+        if stream.0.orientation == 0 {
+            stream.0.orientation = match mode {
+                1..=i32::MAX => 1,
+                i32::MIN..=-1 => -1,
+                0 => stream.0.orientation,
+            };
+        }
+        stream.0.orientation
     }
 }
 
