@@ -188,6 +188,13 @@ impl FILE {
         }
         self.orientation
     }
+
+    pub fn try_set_byte_orientation_unlocked(&mut self) -> core::result::Result<(), c_int> {
+        match self.try_set_orientation_unlocked(-1) {
+            i32::MIN..=-1 => Ok(()),
+            x => Err(x),
+        }
+    }
 }
 
 pub struct LockGuard<'a>(&'a mut FILE);
@@ -306,6 +313,10 @@ pub unsafe extern "C" fn fflush(stream: *mut FILE) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn fgetc(stream: *mut FILE) -> c_int {
     let mut stream = (*stream).lock();
+    if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
+        return -1;
+    }
+
     getc_unlocked(&mut *stream)
 }
 
@@ -328,6 +339,10 @@ pub unsafe extern "C" fn fgets(
     stream: *mut FILE,
 ) -> *mut c_char {
     let mut stream = (*stream).lock();
+    if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
+        return ptr::null_mut();
+    }
+
     let mut out = original;
     let max = max as usize;
     let mut left = max.saturating_sub(1); // Make space for the terminating NUL-byte
@@ -441,6 +456,10 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
 #[no_mangle]
 pub unsafe extern "C" fn fputc(c: c_int, stream: *mut FILE) -> c_int {
     let mut stream = (*stream).lock();
+    if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
+        return -1;
+    }
+
     putc_unlocked(c, &mut *stream)
 }
 
@@ -448,6 +467,10 @@ pub unsafe extern "C" fn fputc(c: c_int, stream: *mut FILE) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn fputs(s: *const c_char, stream: *mut FILE) -> c_int {
     let mut stream = (*stream).lock();
+    if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
+        return -1;
+    }
+
     let buf = slice::from_raw_parts(s as *mut u8, strlen(s));
 
     if stream.write_all(&buf).is_ok() {
@@ -470,6 +493,10 @@ pub unsafe extern "C" fn fread(
     }
 
     let mut stream = (*stream).lock();
+    if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
+        return 0;
+    }
+
     let buf = slice::from_raw_parts_mut(ptr as *mut u8, size as usize * nitems as usize);
     let mut read = 0;
     while read < buf.len() {
@@ -620,6 +647,10 @@ pub unsafe extern "C" fn fwrite(
         return 0;
     }
     let mut stream = (*stream).lock();
+    if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
+        return 0;
+    }
+
     let buf = slice::from_raw_parts(ptr as *const u8, size as usize * nitems as usize);
     let mut written = 0;
     while written < buf.len() {
@@ -647,6 +678,10 @@ pub unsafe extern "C" fn getchar() -> c_int {
 /// Get a char from a stream without locking the stream
 #[no_mangle]
 pub unsafe extern "C" fn getc_unlocked(stream: *mut FILE) -> c_int {
+    if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
+        return -1;
+    }
+
     let mut buf = [0];
 
     match (*stream).read(&mut buf) {
@@ -826,6 +861,10 @@ pub unsafe extern "C" fn putchar(c: c_int) -> c_int {
 /// Put a character `c` into `stream` without locking `stream`
 #[no_mangle]
 pub unsafe extern "C" fn putc_unlocked(c: c_int, stream: *mut FILE) -> c_int {
+    if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
+        return -1;
+    }
+
     match (*stream).write(&[c as u8]) {
         Ok(0) | Err(_) => EOF,
         Ok(_) => c,
@@ -842,6 +881,10 @@ pub unsafe extern "C" fn putchar_unlocked(c: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn puts(s: *const c_char) -> c_int {
     let mut stream = (&mut *stdout).lock();
+    if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
+        return -1;
+    }
+
     let buf = slice::from_raw_parts(s as *mut u8, strlen(s));
 
     if stream.write_all(&buf).is_err() {
@@ -1021,6 +1064,10 @@ unsafe extern "C" fn tmpnam_inner(buf: *mut c_char, offset: usize) -> *mut c_cha
 #[no_mangle]
 pub unsafe extern "C" fn ungetc(c: c_int, stream: *mut FILE) -> c_int {
     let mut stream = (*stream).lock();
+    if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
+        return -1;
+    }
+
     stream.unget.push(c as u8);
     c
 }
@@ -1028,6 +1075,10 @@ pub unsafe extern "C" fn ungetc(c: c_int, stream: *mut FILE) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn vfprintf(file: *mut FILE, format: *const c_char, ap: va_list) -> c_int {
     let mut file = (*file).lock();
+    if let Err(_) = file.try_set_byte_orientation_unlocked() {
+        return -1;
+    }
+
     printf::printf(&mut *file, format, ap)
 }
 
@@ -1073,6 +1124,10 @@ pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_
 pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_list) -> c_int {
     let ret = {
         let mut file = (*file).lock();
+        if let Err(_) = file.try_set_byte_orientation_unlocked() {
+            return -1;
+        }
+
         let f: &mut FILE = &mut *file;
         let reader: LookAheadReader = f.into();
         scanf::scanf(reader, format, ap)
