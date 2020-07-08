@@ -519,6 +519,7 @@ pub unsafe extern "C" fn freopen(
         stream.flags = (stream.flags & constants::F_PERM) | new.flags;
         fclose(new);
     }
+    stream.orientation = 0;
     funlockfile(stream);
     stream
 }
