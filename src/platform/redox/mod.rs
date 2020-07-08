@@ -996,7 +996,6 @@ impl Pal for Sys {
         let mut sessions = state.sessions.lock();
         if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
             if options & sys_wait::WNOHANG != sys_wait::WNOHANG {
-                let _ = (&mut &session.tracer).write(&syscall::PTRACE_FLAG_WAIT);
                 let mut _event = PtraceEvent::default();
                 let _ = (&mut &session.tracer).read(&mut _event);
 
