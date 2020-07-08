@@ -174,15 +174,19 @@ impl FILE {
     }
 
     pub fn try_set_orientation(&mut self, mode: c_int) -> c_int {
-        let mut stream = self.lock();
-        if stream.0.orientation == 0 {
-            stream.0.orientation = match mode {
+        let stream = self.lock();
+        stream.0.try_set_orientation_unlocked(mode)
+    }
+
+    pub fn try_set_orientation_unlocked(&mut self, mode: c_int) -> c_int {
+        if self.orientation == 0 {
+            self.orientation = match mode {
                 1..=i32::MAX => 1,
                 i32::MIN..=-1 => -1,
-                0 => stream.0.orientation,
+                0 => self.orientation,
             };
         }
-        stream.0.orientation
+        self.orientation
     }
 }
 
