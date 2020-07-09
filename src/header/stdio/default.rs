@@ -21,6 +21,8 @@ impl GlobalFile {
             writer,
 
             pid: None,
+
+            orientation: 0,
         }))
     }
     pub fn get(&self) -> *mut FILE {

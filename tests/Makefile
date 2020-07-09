@@ -100,6 +100,7 @@ EXPECT_NAMES=\
 	unistd/swab \
 	unistd/write \
 	waitpid \
+	wchar/fwide \
 	wchar/mbrtowc \
 	wchar/mbsrtowcs \
 	wchar/printf-on-wchars \

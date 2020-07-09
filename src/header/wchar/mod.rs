@@ -89,9 +89,9 @@ pub unsafe extern "C" fn fputws(ws: *const wchar_t, stream: *mut FILE) -> c_int 
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn fwide(stream: *mut FILE, mode: c_int) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn fwide(stream: *mut FILE, mode: c_int) -> c_int {
+    (*stream).try_set_orientation(mode)
 }
 
 #[no_mangle]

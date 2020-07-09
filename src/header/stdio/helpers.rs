@@ -76,5 +76,7 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
         writer,
 
         pid: None,
+
+        orientation: 0,
     })))
 }
