@@ -6,6 +6,10 @@
 
 typedef struct FILE FILE;
 
+// A typedef doesn't suffice, because libgmp uses this definition to check if
+// STDIO was loaded.
+#define FILE FILE
+
 #ifdef __cplusplus
 extern "C" {
 #endif
