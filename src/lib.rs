@@ -59,10 +59,10 @@ pub mod platform;
 pub mod start;
 pub mod sync;
 
-use crate::platform::{Allocator, Pal, Sys};
+use crate::platform::{Allocator, Pal, Sys, NEWALLOCATOR};
 
 #[global_allocator]
-static ALLOCATOR: Allocator = Allocator;
+static ALLOCATOR: Allocator = NEWALLOCATOR;
 
 #[no_mangle]
 pub extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {

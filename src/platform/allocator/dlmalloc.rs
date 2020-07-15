@@ -1,4 +1,7 @@
-use core::alloc::{GlobalAlloc, Layout};
+use core::{
+    alloc::{GlobalAlloc, Layout},
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use super::types::*;
 
@@ -9,8 +12,22 @@ extern "C" {
     fn dlfree(mem: *mut c_void);
 }
 
-pub struct Allocator;
+pub struct Allocator {
+    mstate: AtomicUsize,
+}
 
+pub const NEWALLOCATOR:Allocator = Allocator{
+    mstate: AtomicUsize::new(0),
+};
+
+impl Allocator {
+    pub fn set_bookkeeper(&self, mstate: usize) {
+        self.mstate.store(mstate, Ordering::Relaxed);
+    }
+    fn get_bookKeeper(&self) ->usize {
+        self.mstate.load(Ordering::Relaxed)
+    }
+}
 unsafe impl<'a> GlobalAlloc for Allocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         alloc_align(layout.size(), layout.align()) as *mut u8
