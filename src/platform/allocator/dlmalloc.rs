@@ -6,6 +6,7 @@ use core::{
 use super::types::*;
 
 extern "C" {
+    fn create_mspace(capacity: size_t, locked: c_int) -> usize;
     fn dlmalloc(bytes: size_t) -> *mut c_void;
     fn dlmemalign(alignment: size_t, bytes: size_t) -> *mut c_void;
     fn dlrealloc(oldmem: *mut c_void, bytes: size_t) -> *mut c_void;
@@ -16,15 +17,15 @@ pub struct Allocator {
     mstate: AtomicUsize,
 }
 
-pub const NEWALLOCATOR:Allocator = Allocator{
+pub const NEWALLOCATOR: Allocator = Allocator {
     mstate: AtomicUsize::new(0),
 };
 
 impl Allocator {
-    pub fn set_bookkeeper(&self, mstate: usize) {
+    pub fn set_book_keeper(&self, mstate: usize) {
         self.mstate.store(mstate, Ordering::Relaxed);
     }
-    fn get_bookKeeper(&self) ->usize {
+    pub fn get_book_keeper(&self) -> usize {
         self.mstate.load(Ordering::Relaxed)
     }
 }
@@ -52,4 +53,8 @@ pub unsafe fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {
 
 pub unsafe fn free(ptr: *mut c_void) {
     dlfree(ptr)
+}
+
+pub fn new_mspace() -> usize {
+    unsafe { create_mspace(0, 0) }
 }

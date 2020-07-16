@@ -4,7 +4,8 @@ use core::{intrinsics, ptr};
 use crate::{
     header::{stdio, stdlib},
     ld_so,
-    platform::{self, types::*, Pal, Sys},
+    platform::{self, new_mspace, types::*, Pal, Sys},
+    ALLOCATOR,
 };
 
 #[repr(C)]
@@ -91,6 +92,13 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         fn pthread_init();
         fn _init();
         fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
+    }
+    // Step 1 setup the right allocator...
+    // if any memory rust based memory allocation happen before this step .. we are doomed.
+    if let Some(tcb) = ld_so::tcb::Tcb::current() {
+        ALLOCATOR.set_book_keeper(tcb.mspace);
+    } else {
+        ALLOCATOR.set_book_keeper(new_mspace());
     }
 
     // Ensure correct host system before executing more system calls
