@@ -523,7 +523,8 @@ MAX_RELEASE_CHECK_RATE   default: 4095 unless not HAVE_MMAP
 
 /* Customizations { */
 
-#define HAVE_MMAP 0
+#define HAVE_MMAP 1
+#define MSPACES 1
 #define LACKS_ERRNO_H
 #define LACKS_FCNTL_H
 #define LACKS_SCHED_H
@@ -536,7 +537,7 @@ MAX_RELEASE_CHECK_RATE   default: 4095 unless not HAVE_MMAP
 #define USE_DL_PREFIX 1
 #define USE_LOCKS 1
 #define USE_SPIN_LOCKS 1
-
+#define HAVE_MREMAP 0
 #define malloc_getpagesize ((size_t)4096U)
 
 #include <stddef.h>
@@ -545,7 +546,22 @@ MAX_RELEASE_CHECK_RATE   default: 4095 unless not HAVE_MMAP
 #define EINVAL 22
 
 extern __thread int errno;
+#if defined(__linux__)
+#define O_RDWR 2
+#define PROT_READ 1
+#define PROT_WRITE 2
+#elif defined(__redox__)
+#define O_RDWR 196608
+#define PROT_READ 4
+#define PROT_WRITE 2
+#endif /*defined(__redox__)*/
 
+#define MAP_PRIVATE 2
+typedef long off_t;
+
+int open(const char *pathname, int flags);
+void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t off);
+int munmap(void *addr, size_t len);
 void abort(void);
 void *memcpy(void *dest, const void *src, size_t n);
 void *memset(void *s, int c, size_t n);
