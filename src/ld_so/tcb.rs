@@ -45,6 +45,8 @@ pub struct Tcb {
     pub masters_len: usize,
     /// Pointer to dynamic linker
     pub linker_ptr: *const Mutex<Linker>,
+    /// pointer to rust memory allocator structure
+    pub mspace: usize,
 }
 
 impl Tcb {
@@ -64,6 +66,7 @@ impl Tcb {
                 masters_ptr: ptr::null_mut(),
                 masters_len: 0,
                 linker_ptr: ptr::null(),
+                mspace: 0,
             },
         );
 

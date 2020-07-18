@@ -17,6 +17,7 @@ use crate::{
         Pal, Sys,
     },
     sync::Mutex,
+    ALLOCATOR,
 };
 
 pub struct Semaphore {
@@ -76,6 +77,7 @@ unsafe extern "C" fn pte_osThreadShim(
     tls_masters_ptr: *mut Master,
     tls_masters_len: usize,
     tls_linker_ptr: *const Mutex<Linker>,
+    tls_mspace: usize,
 ) {
     // The kernel allocated TLS does not have masters set, so do not attempt to copy it.
     // It will be copied by the kernel.
@@ -84,6 +86,7 @@ unsafe extern "C" fn pte_osThreadShim(
         tcb.masters_ptr = tls_masters_ptr;
         tcb.masters_len = tls_masters_len;
         tcb.linker_ptr = tls_linker_ptr;
+        tcb.mspace = tls_mspace;
         tcb.copy_masters().unwrap();
         tcb.activate();
     }
@@ -134,11 +137,13 @@ pub unsafe extern "C" fn pte_osThreadCreate(
         push(0);
 
         if let Some(tcb) = Tcb::current() {
+            push(tcb.mspace as usize);
             push(tcb.linker_ptr as usize);
             push(tcb.masters_len);
             push(tcb.masters_ptr as usize);
             push(tcb.tls_len);
         } else {
+            push(ALLOCATOR.get_book_keeper());
             push(0);
             push(0);
             push(0);

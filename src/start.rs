@@ -4,7 +4,8 @@ use core::{intrinsics, ptr};
 use crate::{
     header::{stdio, stdlib},
     ld_so,
-    platform::{self, types::*, Pal, Sys},
+    platform::{self, new_mspace, types::*, Pal, Sys},
+    ALLOCATOR,
 };
 
 #[repr(C)]
@@ -66,7 +67,26 @@ static INIT_ARRAY: [extern "C" fn(); 1] = [init_array];
 
 static mut init_complete: bool = false;
 
+fn alloc_init() {
+    unsafe{
+        if let Some(tcb) = ld_so::tcb::Tcb::current() {
+            if tcb.mspace != 0 {
+                ALLOCATOR.set_book_keeper(tcb.mspace);
+            } else if ALLOCATOR.get_book_keeper() == 0 {
+                ALLOCATOR.set_book_keeper(new_mspace());
+            }
+        } else if ALLOCATOR.get_book_keeper() == 0 {
+            ALLOCATOR.set_book_keeper(new_mspace());
+        }
+    }
+}
+
 extern "C" fn init_array() {
+    // The thing is that we cannot guarantee if
+    // init_array runs first or if relibc_start runs first
+    // Still whoever gets to run first must initialize rust
+    // memory allocator before doing anything else.
+    alloc_init();
     io_init();
     unsafe { init_complete = true };
 }
@@ -92,6 +112,9 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         fn _init();
         fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
     }
+    // Step 1 setup the right allocator...
+    // if any memory rust based memory allocation happen before this step .. we are doomed.
+    alloc_init();
 
     // Ensure correct host system before executing more system calls
     relibc_verify_host();
