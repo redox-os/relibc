@@ -524,7 +524,7 @@ MAX_RELEASE_CHECK_RATE   default: 4095 unless not HAVE_MMAP
 /* Customizations { */
 
 #define HAVE_MMAP 1
-#define MSPACES 1
+#define ONLY_MSPACES 1
 #define LACKS_ERRNO_H
 #define LACKS_FCNTL_H
 #define LACKS_SCHED_H
