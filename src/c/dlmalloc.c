@@ -557,6 +557,7 @@ extern __thread int errno;
 #endif /*defined(__redox__)*/
 
 #define MAP_PRIVATE 2
+#define MAP_ANON 32
 typedef long off_t;
 
 int open(const char *pathname, int flags);
