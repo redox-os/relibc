@@ -1,8 +1,8 @@
+use crate::ALLOCATOR;
 use core::{
     alloc::{GlobalAlloc, Layout},
     sync::atomic::{AtomicUsize, Ordering},
 };
-use crate::ALLOCATOR;
 
 use super::types::*;
 
@@ -12,10 +12,10 @@ extern "C" {
     fn mspace_memalign(msp: usize, alignment: size_t, bytes: size_t) -> *mut c_void;
     fn mspace_realloc(msp: usize, oldmem: *mut c_void, bytes: size_t) -> *mut c_void;
     fn mspace_free(msp: usize, mem: *mut c_void);
-    //fn dlmalloc(bytes: size_t) -> *mut c_void;
-    //fn dlmemalign(alignment: size_t, bytes: size_t) -> *mut c_void;
-    //fn dlrealloc(oldmem: *mut c_void, bytes: size_t) -> *mut c_void;
-    //fn dlfree(mem: *mut c_void);
+//fn dlmalloc(bytes: size_t) -> *mut c_void;
+//fn dlmemalign(alignment: size_t, bytes: size_t) -> *mut c_void;
+//fn dlrealloc(oldmem: *mut c_void, bytes: size_t) -> *mut c_void;
+//fn dlfree(mem: *mut c_void);
 }
 
 pub struct Allocator {

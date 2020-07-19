@@ -12,7 +12,7 @@ use alloc::{borrow::ToOwned, boxed::Box, str::SplitWhitespace, vec::Vec};
 use crate::{
     c_str::{CStr, CString},
     header::{
-        arpa_inet::htons, arpa_inet::ntohl, arpa_inet::inet_aton,
+        arpa_inet::{htons, inet_aton, ntohl},
         errno::*,
         fcntl::O_RDONLY,
         netinet_in::{in_addr, sockaddr_in, sockaddr_in6},

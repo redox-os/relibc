@@ -117,7 +117,9 @@ impl PalEpoll for Sys {
                 }
                 *event_ptr = epoll_event {
                     events: event.flags.bits() as _,
-                    data: epoll_data { u64: event.data as u64, },
+                    data: epoll_data {
+                        u64: event.data as u64,
+                    },
                     ..Default::default()
                 };
                 count += 1;

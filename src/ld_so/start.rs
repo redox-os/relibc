@@ -195,7 +195,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         }
     }
 
-    let entry = match linker.link(Some(&path), program) {
+    let entry = match linker.link(Some(&path), program, None) {
         Ok(ok) => match ok {
             Some(some) => some,
             None => {
@@ -210,7 +210,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
             loop {}
         }
     };
-    if let Err(e) = linker.run_init() {
+    if let Err(e) = linker.run_init(None) {
         eprintln!("ld.so: failed to run .init_array");
         unistd::_exit(1);
         loop {}

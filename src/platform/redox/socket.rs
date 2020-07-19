@@ -8,7 +8,7 @@ use super::{
 };
 use crate::header::{
     arpa_inet::inet_aton,
-    netinet_in::{in_port_t, sockaddr_in, in_addr},
+    netinet_in::{in_addr, in_port_t, sockaddr_in},
     string::strnlen,
     sys_socket::{constants::*, sa_family_t, sockaddr, socklen_t},
     sys_time::timeval,
@@ -112,10 +112,8 @@ unsafe fn inner_af_unix(buf: &[u8], address: *mut sockaddr, address_len: *mut so
 
     data.sun_family = AF_UNIX as c_ushort;
 
-    let path = slice::from_raw_parts_mut(
-        &mut data.sun_path as *mut _ as *mut u8,
-        data.sun_path.len(),
-    );
+    let path =
+        slice::from_raw_parts_mut(&mut data.sun_path as *mut _ as *mut u8, data.sun_path.len());
 
     let len = cmp::min(path.len(), buf.len());
     path[..len].copy_from_slice(&buf[..len]);
@@ -139,7 +137,10 @@ unsafe fn inner_af_inet(
     let sep = memchr::memchr(b':', &unparsed_addr).expect("missing port");
     let (raw_addr, rest) = unparsed_addr.split_at_mut(sep);
     let (colon, raw_port) = rest.split_at_mut(1);
-    let port = str::from_utf8(raw_port).expect("non-utf8 port").parse().expect("invalid port");
+    let port = str::from_utf8(raw_port)
+        .expect("non-utf8 port")
+        .parse()
+        .expect("invalid port");
 
     // Make address be followed by a NUL-byte
     colon[0] = b'\0';
@@ -147,7 +148,11 @@ unsafe fn inner_af_inet(
     trace!("address: {:?}, port: {:?}", str::from_utf8(&raw_addr), port);
 
     let mut addr = in_addr::default();
-    assert_eq!(inet_aton(raw_addr.as_ptr() as *mut i8, &mut addr), 1, "inet_aton might be broken, failed to parse netstack address");
+    assert_eq!(
+        inet_aton(raw_addr.as_ptr() as *mut i8, &mut addr),
+        1,
+        "inet_aton might be broken, failed to parse netstack address"
+    );
 
     let ret = sockaddr_in {
         sin_family: AF_INET as sa_family_t,
@@ -414,7 +419,7 @@ impl PalSocket for Sys {
             _ => {
                 errno = syscall::EPROTONOSUPPORT;
                 -1
-            },
+            }
         }
     }
 
@@ -448,7 +453,7 @@ impl PalSocket for Sys {
                 sv[0] = fd0 as c_int;
                 sv[1] = fd1 as c_int;
                 0
-            },
+            }
             _ => unsafe {
                 eprintln!(
                     "socketpair({}, {}, {}, {:p})",
