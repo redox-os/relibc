@@ -68,7 +68,7 @@ static INIT_ARRAY: [extern "C" fn(); 1] = [init_array];
 static mut init_complete: bool = false;
 
 fn alloc_init() {
-    unsafe{
+    unsafe {
         if let Some(tcb) = ld_so::tcb::Tcb::current() {
             if tcb.mspace != 0 {
                 ALLOCATOR.set_book_keeper(tcb.mspace);

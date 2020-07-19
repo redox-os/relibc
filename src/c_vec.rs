@@ -1,10 +1,9 @@
 use crate::{
     io::{self, Write},
-    platform::{self, WriteByte, types::*},
+    platform::{self, types::*, WriteByte},
 };
 use core::{
-    cmp,
-    fmt,
+    cmp, fmt,
     iter::IntoIterator,
     mem,
     ops::{Deref, DerefMut},
@@ -60,7 +59,8 @@ impl<T> CVec<T> {
         let ptr = if cap == 0 {
             NonNull::dangling()
         } else if self.cap > 0 {
-            NonNull::new(platform::realloc(self.ptr.as_ptr() as *mut c_void, size) as *mut T).ok_or(AllocError)?
+            NonNull::new(platform::realloc(self.ptr.as_ptr() as *mut c_void, size) as *mut T)
+                .ok_or(AllocError)?
         } else {
             NonNull::new((platform::alloc(size)) as *mut T).ok_or(AllocError)?
         };
@@ -208,10 +208,12 @@ impl<'a, T> IntoIterator for &'a mut CVec<T> {
 
 impl Write for CVec<u8> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.extend_from_slice(buf).map_err(|err| io::Error::new(
-            io::ErrorKind::Other,
-            "AllocStringWriter::write failed to allocate",
-        ))?;
+        self.extend_from_slice(buf).map_err(|err| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                "AllocStringWriter::write failed to allocate",
+            )
+        })?;
         Ok(buf.len())
     }
     fn flush(&mut self) -> io::Result<()> {
