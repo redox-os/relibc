@@ -133,9 +133,7 @@ pub unsafe extern "C" fn pte_osThreadCreate(
             *stack = value;
         };
 
-        // Stack must be 128-bit aligned for SSE
-        push(0);
-
+        //WARNING: Stack must be 128-bit aligned for SSE
         if let Some(tcb) = Tcb::current() {
             push(tcb.mspace as usize);
             push(tcb.linker_ptr as usize);
