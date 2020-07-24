@@ -714,8 +714,8 @@ impl Pal for Sys {
         */
     }
 
-    unsafe fn munmap(addr: *mut c_void, _len: usize) -> c_int {
-        if e(syscall::funmap(addr as usize)) == !0 {
+    unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
+        if e(syscall::funmap2(addr as usize, len)) == !0 {
             return !0;
         }
         0

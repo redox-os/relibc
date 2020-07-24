@@ -64,7 +64,7 @@ pub fn get_session(
                     first: true,
                     tracer: File::open(
                         &CString::new(format!("proc:{}/trace", pid)).unwrap(),
-                        NEW_FLAGS | fcntl::O_NONBLOCK,
+                        NEW_FLAGS,
                     )?,
                     mem: File::open(
                         &CString::new(format!("proc:{}/mem", pid)).unwrap(),
