@@ -2,7 +2,7 @@
 
 set -e
 
-if [[ "$(cargo install --list | grep '^redoxer ')" != "redoxer "* ]]
+if ! which redoxer
 then
     cargo install redoxer
 fi

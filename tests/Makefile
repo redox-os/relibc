@@ -19,7 +19,7 @@ EXPECT_NAMES=\
 	math \
 	netdb/getaddrinfo \
 	netdb/netdb \
-    ptrace \
+	ptrace \
 	regex \
 	select \
 	setjmp \
@@ -76,6 +76,7 @@ EXPECT_NAMES=\
 	string/strtok_r \
 	string/strsignal \
 	strings \
+	sys_mman \
 	time/asctime \
 	time/gmtime \
 	time/localtime \

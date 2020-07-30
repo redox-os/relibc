@@ -17,7 +17,6 @@ pub mod sys;
 pub const MAP_SHARED: c_int = 0x0001;
 pub const MAP_PRIVATE: c_int = 0x0002;
 pub const MAP_TYPE: c_int = 0x000F;
-pub const MAP_FIXED: c_int = 0x0010;
 pub const MAP_ANON: c_int = 0x0020;
 pub const MAP_ANONYMOUS: c_int = MAP_ANON;
 

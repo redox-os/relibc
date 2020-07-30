@@ -1,7 +1,7 @@
 use core::{mem, ptr, result::Result as CoreResult, slice};
 use syscall::{
     self,
-    data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
+    data::{Map2, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
     PtraceEvent, Result,
 };
 
@@ -658,19 +658,20 @@ impl Pal for Sys {
     }
 
     unsafe fn mmap(
-        _addr: *mut c_void,
+        addr: *mut c_void,
         len: usize,
         prot: c_int,
         flags: c_int,
         fildes: c_int,
         off: off_t,
     ) -> *mut c_void {
-        let map = Map {
+        let map = Map2 {
             offset: off as usize,
             size: len,
             flags: syscall::MapFlags::from_bits_truncate(
                 ((prot as usize) << 16) | ((flags as usize) & 0xFFFF),
             ),
+            address: addr as usize,
         };
 
         if flags & MAP_ANON == MAP_ANON {
@@ -682,13 +683,13 @@ impl Pal for Sys {
                 return !0 as *mut c_void;
             }
 
-            let addr = e(syscall::fmap(fd, &map)) as *mut c_void;
+            let addr = e(syscall::fmap2(fd, &map)) as *mut c_void;
 
             let _ = syscall::close(fd);
 
             addr
         } else {
-            e(syscall::fmap(fildes as usize, &map)) as *mut c_void
+            e(syscall::fmap2(fildes as usize, &map)) as *mut c_void
         }
     }
 
@@ -713,8 +714,8 @@ impl Pal for Sys {
         */
     }
 
-    unsafe fn munmap(addr: *mut c_void, _len: usize) -> c_int {
-        if e(syscall::funmap(addr as usize)) == !0 {
+    unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
+        if e(syscall::funmap2(addr as usize, len)) == !0 {
             return !0;
         }
         0
@@ -995,7 +996,6 @@ impl Pal for Sys {
         let mut sessions = state.sessions.lock();
         if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
             if options & sys_wait::WNOHANG != sys_wait::WNOHANG {
-                let _ = (&mut &session.tracer).write(&syscall::PTRACE_FLAG_WAIT);
                 let mut _event = PtraceEvent::default();
                 let _ = (&mut &session.tracer).read(&mut _event);
 
