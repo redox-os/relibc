@@ -39,8 +39,7 @@ optional = true
 sc = "0.2.2"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-#redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall", rev = "0e1e7d5d" }
-redox_syscall = { path = "../kernel/syscall" }
+redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall", rev = "a0ea09ceb3380b1d1e878bb18886e13742d34e8a" }
 spin = "0.4.10"
 
 [features]
