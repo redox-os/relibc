@@ -1,3 +1,4 @@
+use core::{mem, ptr};
 use goblin::elf::program_header::{self, program_header32, program_header64, ProgramHeader};
 
 use self::tcb::{Master, Tcb};
@@ -11,6 +12,13 @@ mod library;
 pub mod linker;
 pub mod start;
 pub mod tcb;
+
+static mut STATIC_TCB_MASTER: Master = Master {
+    ptr: ptr::null_mut(),
+    len: 0,
+    offset: 0,
+};
+
 pub fn static_init(sp: &'static Stack) {
     let mut phdr_opt = None;
     let mut phent_opt = None;
@@ -61,15 +69,14 @@ pub fn static_init(sp: &'static Stack) {
                     ph.p_memsz
                 } as usize;
 
-                let tcb_master = Master {
-                    ptr: ph.p_vaddr as usize as *const u8,
-                    len: ph.p_filesz as usize,
-                    offset: vsize - valign,
-                };
-
                 unsafe {
+                    STATIC_TCB_MASTER.ptr = ph.p_vaddr as usize as *const u8;
+                    STATIC_TCB_MASTER.len = ph.p_filesz as usize;
+                    STATIC_TCB_MASTER.offset = vsize - valign;
+
                     let tcb = Tcb::new(vsize).expect("failed to allocate TCB");
-                    tcb.set_masters(vec![tcb_master].into_boxed_slice());
+                    tcb.masters_ptr = &mut STATIC_TCB_MASTER;
+                    tcb.masters_len = mem::size_of::<Master>();
                     tcb.copy_masters().expect("failed to copy TLS master data");
                     tcb.activate();
                 }
