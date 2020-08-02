@@ -3,6 +3,7 @@
 #![no_std]
 #![feature(asm)]
 #![feature(linkage)]
+#![feature(llvm_asm)]
 #![feature(naked_functions)]
 
 #[no_mangle]
