@@ -193,7 +193,7 @@ impl Tcb {
     #[cfg(target_arch = "x86_64")]
     unsafe fn arch_read(offset: usize) -> usize {
         let value;
-        asm!("
+        llvm_asm!("
             mov rax, fs:[rdi]
             "
             : "={rax}"(value)

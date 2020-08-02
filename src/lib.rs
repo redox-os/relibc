@@ -12,6 +12,7 @@
 #![feature(global_asm)]
 #![feature(lang_items)]
 #![feature(linkage)]
+#![feature(llvm_asm)]
 #![feature(maybe_uninit_extra)]
 #![feature(stmt_expr_attributes)]
 #![feature(str_internals)]

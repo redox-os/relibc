@@ -338,7 +338,7 @@ impl Pal for Sys {
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND;
         let pid;
-        asm!("
+        llvm_asm!("
             # Call clone syscall
             syscall
 
