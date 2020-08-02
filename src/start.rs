@@ -112,14 +112,16 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         fn _init();
         fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
     }
-    // Step 1 setup the right allocator...
-    // if any memory rust based memory allocation happen before this step .. we are doomed.
-    alloc_init();
 
     // Ensure correct host system before executing more system calls
     relibc_verify_host();
 
+    // Initialize TLS, if necessary
     ld_so::init(sp);
+
+    // Set up the right allocator...
+    // if any memory rust based memory allocation happen before this step .. we are doomed.
+    alloc_init();
 
     // Set up argc and argv
     let argc = sp.argc;
