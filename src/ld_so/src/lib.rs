@@ -7,7 +7,7 @@
 #[no_mangle]
 pub unsafe extern "C" fn _start() {
     #[cfg(target_arch = "x86_64")]
-    asm!("
+    llvm_asm!("
         # rsi = _start + 5
         call next
 next:   pop rsi
@@ -41,7 +41,7 @@ next:   pop rsi
         : "intel", "volatile"
     );
     #[cfg(target_arch = "aarch64")]
-    asm!("
+    llvm_asm!("
         mov x0, sp
         bl ld_so_start
         TODO

@@ -766,7 +766,7 @@ impl Pal for Sys {
             | syscall::CLONE_SIGHAND
             | syscall::CLONE_STACK;
         let pid;
-        asm!("
+        llvm_asm!("
             # Call clone syscall
             syscall
 

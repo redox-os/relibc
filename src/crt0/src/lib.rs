@@ -9,7 +9,7 @@
 #[naked]
 pub unsafe extern "C" fn _start() {
     #[cfg(target_arch = "x86_64")]
-    asm!("mov rdi, rsp
+    llvm_asm!("mov rdi, rsp
         and rsp, 0xFFFFFFFFFFFFFFF0
         call relibc_start"
         :
@@ -18,7 +18,7 @@ pub unsafe extern "C" fn _start() {
         : "intel", "volatile"
     );
     #[cfg(target_arch = "aarch64")]
-    asm!("mov x0, sp
+    llvm_asm!("mov x0, sp
         bl relibc_start"
         :
         :
