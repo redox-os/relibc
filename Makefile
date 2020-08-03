@@ -12,24 +12,28 @@ BUILD=target
 ifneq ($(TARGET),)
 	BUILD="target/$(TARGET)"
 	CARGOFLAGS+="--target=$(TARGET)"
+	export OBJCOPY=objcopy
 endif
 
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
 	export CC=aarch64-linux-gnu-gcc
 	export LD=aarch64-linux-gnu-ld
 	export AR=aarch64-linux-gnu-ar
+	export OBJCOPY=aarch64-linux-gnu-objcopy
 endif
 
 ifeq ($(TARGET),aarch64-unknown-redox)
 	export CC=aarch64-unknown-redox-gcc
 	export LD=aarch64-unknown-redox-ld
 	export AR=aarch64-unknown-redox-ar
+	export OBJCOPY=aarch64-unknown-redox-objcopy
 endif
 
 ifeq ($(TARGET),x86_64-unknown-redox)
 	export CC=x86_64-unknown-redox-gcc
 	export LD=x86_64-unknown-redox-ld
 	export AR=x86_64-unknown-redox-ar
+	export OBJCOPY=x86_64-unknown-redox-objcopy
 endif
 
 SRC=\
@@ -108,6 +112,8 @@ $(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/pthreads-emb/libpthr
 
 $(BUILD)/debug/librelibc.a: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
+	# FIXME: Remove the following line. It's only required since xargo automatically links with compiler_builtins, which conflicts with the compiler_builtins that rustc always links with.
+	$(OBJCOPY) $@ -W __divti3 -W __muloti4 -W __udivti3
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
@@ -145,6 +151,8 @@ $(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/lib
 
 $(BUILD)/release/librelibc.a: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
+	# FIXME: Remove the following line. It's only required since xargo automatically links with compiler_builtins, which conflicts with the compiler_builtins that rustc always links with.
+	$(OBJCOPY) $@ -W __divti3 -W __muloti4 -W __udivti3
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
