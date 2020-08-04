@@ -116,7 +116,7 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
     if let Some(global) = (cbs.get_sym)(&linker, symbol_str, Some(handle as usize)) {
-        global as *mut c_void
+        global.as_ptr()
     } else {
         eprintln!("dlsym: symbol not found");
         ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);

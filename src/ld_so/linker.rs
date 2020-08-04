@@ -15,7 +15,9 @@ use goblin::{
         header::ET_DYN,
         program_header,
         r#dyn::{Dyn, DT_DEBUG},
-        reloc, sym, Elf,
+        reloc,
+        sym,
+        Elf,
     },
     error::{Error, Result},
 };
@@ -23,9 +25,9 @@ use goblin::{
 use crate::{
     c_str::CString,
     fs::File,
-    header::{fcntl, sys_mman, unistd},
+    header::{fcntl, sys_mman, unistd, errno::STR_ERROR},
     io::Read,
-    platform::types::c_void,
+    platform::{errno, types::c_void},
 };
 
 use super::{
@@ -46,6 +48,18 @@ pub struct DSO {
     pub name: String,
     pub base_addr: usize,
     pub entry_point: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Symbol {
+    pub value: usize,
+    pub base: usize,
+    pub size: usize,
+}
+impl Symbol {
+    pub fn as_ptr(self) -> *mut c_void {
+        (self.base + self.value) as *mut c_void
+    }
 }
 
 pub struct Linker {
@@ -84,7 +98,7 @@ impl Linker {
     }
     pub fn unload(&mut self, libspace: usize) {
         if let Some(lib) = self.lib_spaces.remove(&libspace) {
-            for (_, mmap) in lib.mmaps {
+            for (_, (_, mmap)) in lib.mmaps {
                 unsafe { sys_mman::munmap(mmap.as_mut_ptr() as *mut c_void, mmap.len()) };
             }
         }
@@ -188,7 +202,7 @@ impl Linker {
         elf: &Elf,
         mmap: &[u8],
         verbose: bool,
-    ) -> Result<(BTreeMap<String, usize>, BTreeMap<String, usize>)> {
+    ) -> Result<(BTreeMap<String, Symbol>, BTreeMap<String, Symbol>)> {
         let mut globals = BTreeMap::new();
         let mut weak_syms = BTreeMap::new();
         for sym in elf.dynsyms.iter() {
@@ -197,13 +211,21 @@ impl Linker {
                 continue;
             }
             let name: String;
-            let value: usize;
+            let value: Symbol;
             if let Some(name_res) = elf.dynstrtab.get(sym.st_name) {
                 name = name_res?.to_string();
                 value = if is_pie_enabled(elf) {
-                    mmap.as_ptr() as usize + sym.st_value as usize
+                    Symbol {
+                        base: mmap.as_ptr() as usize,
+                        value: sym.st_value as usize,
+                        size: sym.st_size as usize,
+                    }
                 } else {
-                    sym.st_value as usize
+                    Symbol {
+                        base: 0,
+                        value: sym.st_value as usize,
+                        size: sym.st_size as usize,
+                    }
                 };
             } else {
                 continue;
@@ -211,13 +233,13 @@ impl Linker {
             match sym.st_bind() {
                 sym::STB_GLOBAL => {
                     if verbose {
-                        println!("  global {}: {:x?} = {:#x}", &name, sym, value);
+                        println!("  global {}: {:x?} = {:p}", &name, sym, value.as_ptr());
                     }
                     globals.insert(name, value);
                 }
                 sym::STB_WEAK => {
                     if verbose {
-                        println!("  weak {}: {:x?} = {:#x}", &name, sym, value);
+                        println!("  weak {}: {:x?} = {:p}", &name, sym, value.as_ptr());
                     }
                     weak_syms.insert(name, value);
                 }
@@ -227,7 +249,7 @@ impl Linker {
         return Ok((globals, weak_syms));
     }
 
-    pub fn get_sym(&self, name: &str, libspace: Option<usize>) -> Option<usize> {
+    pub fn get_sym(&self, name: &str, libspace: Option<usize>) -> Option<Symbol> {
         match libspace {
             Some(id) => {
                 let lib = self.lib_spaces.get(&id)?;
@@ -267,7 +289,7 @@ impl Linker {
         if self.verbose {
             println!("running {} {}", tree_name, &root.name);
         }
-        let mmap = match lib.mmaps.get(&root.name) {
+        let (_, mmap) = match lib.mmaps.get(&root.name) {
             Some(some) => some,
             None => return Ok(()),
         };
@@ -435,15 +457,26 @@ impl Linker {
                     let mut start = addr;
                     for (vaddr, vsize) in ranges.iter() {
                         if start < addr + vaddr {
-                            sys_mman::mmap(
+                            println!("mmap({:#x}, {})", start, addr + vaddr - start);
+                            let mut flags = sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE;
+                            if start != 0 {
+                                flags |= sys_mman::MAP_FIXED_NOREPLACE;
+                            }
+                            let ptr = sys_mman::mmap(
                                 start as *mut c_void,
                                 addr + vaddr - start,
                                 //TODO: Make it possible to not specify PROT_EXEC on Redox
                                 sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-                                sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
+                                flags,
                                 -1,
                                 0,
                             );
+                            if ptr as usize == !0 /* MAP_FAILED */ {
+                                return Err(Error::Malformed(format!("failed to map {}. errno: {}", elf_name, STR_ERROR[errno as usize])));
+                            }
+                            if start as *mut c_void != ptr::null_mut() {
+                                assert_eq!(ptr, start as *mut c_void, "mmap must always map on the destination we requested");
+                            }
                         }
                         start = addr + vaddr + vsize
                     }
@@ -453,32 +486,39 @@ impl Linker {
                         sys_mman::PROT_READ | sys_mman::PROT_WRITE,
                     );
                     _r_debug.insert_first(addr as usize, &elf_name, addr + l_ld as usize);
-                    slice::from_raw_parts_mut(addr as *mut u8, size)
+                    (addr as usize, slice::from_raw_parts_mut(addr as *mut u8, size))
                 } else {
-                    let size = bounds.1;
+                    let (start, end) = bounds;
+                    let size = end - start;
+                    println!("mmap({:#x}, {})", start, size);
+                    let mut flags = sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE;
+                    if start != 0 {
+                        flags |= sys_mman::MAP_FIXED_NOREPLACE;
+                    }
                     let ptr = sys_mman::mmap(
-                        ptr::null_mut(),
+                        start as *mut c_void,
                         size,
                         //TODO: Make it possible to not specify PROT_EXEC on Redox
                         sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-                        sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
+                        flags,
                         -1,
                         0,
                     );
-                    if ptr as usize == !0
-                    /* MAP_FAILED */
-                    {
-                        return Err(Error::Malformed(format!("failed to map {}", elf_name)));
+                    if ptr as usize == !0 /* MAP_FAILED */ {
+                        return Err(Error::Malformed(format!("failed to map {}. errno: {}", elf_name, STR_ERROR[errno as usize])));
+                    }
+                    if start as *mut c_void != ptr::null_mut() {
+                        assert_eq!(ptr, start as *mut c_void, "mmap must always map on the destination we requested");
                     }
                     ptr::write_bytes(ptr as *mut u8, 0, size);
                     _r_debug.insert(ptr as usize, &elf_name, ptr as usize + l_ld as usize);
-                    slice::from_raw_parts_mut(ptr as *mut u8, size)
+                    (start, slice::from_raw_parts_mut(ptr as *mut u8, size))
                 }
             };
             if self.verbose {
-                println!("  mmap {:p}, {:#x}", mmap.as_mut_ptr(), mmap.len());
+                println!("  mmap {:p}, {:#x}", mmap.1.as_mut_ptr(), mmap.1.len());
             }
-            let (globals, weak_syms) = Linker::collect_syms(&elf, &mmap, self.verbose)?;
+            let (globals, weak_syms) = Linker::collect_syms(&elf, &mmap.1, self.verbose)?;
             lib.globals.extend(globals.into_iter());
             lib.weak_syms.extend(weak_syms.into_iter());
             lib.mmaps.insert(elf_name.to_string(), mmap);
@@ -521,7 +561,7 @@ impl Linker {
                 None => continue,
             };
 
-            let mmap = match lib.mmaps.get_mut(*elf_name) {
+            let &mut (base_addr, ref mut mmap) = match lib.mmaps.get_mut(*elf_name) {
                 Some(some) => some,
                 None => continue,
             };
@@ -542,7 +582,7 @@ impl Linker {
                                 Some(some) => some,
                                 None => {
                                     return Err(Error::Malformed(format!(
-                                        "failed to read {:?}",
+                                        "failed to read {:x?}",
                                         range
                                     )))
                                 }
@@ -550,12 +590,13 @@ impl Linker {
                         };
 
                         let mmap_data = {
-                            let range = ph.p_vaddr as usize..ph.p_vaddr as usize + obj_data.len();
+                            let range = ph.p_vaddr as usize - base_addr..ph.p_vaddr as usize + obj_data.len() - base_addr;
                             match mmap.get_mut(range.clone()) {
                                 Some(some) => some,
                                 None => {
+                                    println!("mmap: {}", mmap.len());
                                     return Err(Error::Malformed(format!(
-                                        "failed to write {:?}",
+                                        "failed to write {:x?}",
                                         range
                                     )))
                                 }
@@ -641,7 +682,7 @@ impl Linker {
                 //     rel
                 // );
 
-                let s = if rel.r_sym > 0 {
+                let symbol = if rel.r_sym > 0 {
                     let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(format!(
                         "missing symbol for relocation {:?}",
                         rel
@@ -649,20 +690,22 @@ impl Linker {
 
                     let name =
                         elf.dynstrtab
-                            .get(sym.st_name)
-                            .ok_or(Error::Malformed(format!(
-                                "missing name for symbol {:?}",
-                                sym
-                            )))??;
+                           .get(sym.st_name)
+                           .ok_or(Error::Malformed(format!(
+                               "missing name for symbol {:?}",
+                               sym
+                           )))??;
                     lib.get_sym(name)
-                        .unwrap_or(self.root.get_sym(name).unwrap_or(0))
+                       .or_else(|| self.root.get_sym(name))
                 } else {
-                    0
+                    None
                 };
+
+                let s = symbol.as_ref().map(|sym| sym.as_ptr() as usize).unwrap_or(0);
 
                 let a = rel.r_addend.unwrap_or(0) as usize;
 
-                let mmap = match lib.mmaps.get_mut(*elf_name) {
+                let (_, mmap) = match lib.mmaps.get_mut(*elf_name) {
                     Some(some) => some,
                     None => continue,
                 };
@@ -712,6 +755,11 @@ impl Linker {
                         set_u64((s + a).wrapping_sub(t) as u64);
                     }
                     reloc::R_X86_64_IRELATIVE => (), // Handled below
+                    reloc::R_X86_64_COPY => unsafe {
+                        // TODO: Make this work
+                        let sym = symbol.as_ref().expect("R_X86_64_COPY called without valid symbol");
+                        ptr::copy_nonoverlapping(sym.as_ptr() as *const u8, ptr, sym.size as usize);
+                    }
                     _ => {
                         panic!(
                             "    {} unsupported",
@@ -743,7 +791,7 @@ impl Linker {
             }
             if let Some(dyn_start_addr) = dyn_start {
                 if let Some(i) = debug_start {
-                    let mmap = match lib.mmaps.get_mut(*elf_name) {
+                    let (_, mmap) = match lib.mmaps.get_mut(*elf_name) {
                         Some(some) => some,
                         None => continue,
                     };
@@ -780,7 +828,7 @@ impl Linker {
                         prot |= sys_mman::PROT_WRITE;
                     }
 
-                    let mmap = match lib.mmaps.get_mut(*elf_name) {
+                    let (_, mmap) = match lib.mmaps.get_mut(*elf_name) {
                         Some(some) => some,
                         None => continue,
                     };
@@ -813,7 +861,7 @@ impl Linker {
         // Perform indirect relocations (necessary evil), gather entry point
         let mut entry_opt = None;
         for (elf_name, elf) in elfs.iter() {
-            let mmap = match lib.mmaps.get_mut(*elf_name) {
+            let (_, mmap) = match lib.mmaps.get_mut(*elf_name) {
                 Some(some) => some,
                 None => continue,
             };

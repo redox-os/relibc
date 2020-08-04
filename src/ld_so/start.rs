@@ -4,11 +4,11 @@ use alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String, 
 
 use crate::{
     c_str::CStr,
-    header::unistd,
+    header::{unistd, sys_auxv::AT_NULL},
     platform::{new_mspace, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
-    ALLOCATOR,
+    ALLOCATOR
 };
 
 use super::{
@@ -57,7 +57,7 @@ unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const us
 unsafe fn get_auxv(mut ptr: *const usize) -> BTreeMap<usize, usize> {
     //traverse the stack and collect argument environment variables
     let mut auxv = BTreeMap::new();
-    while *ptr != 0 {
+    while *ptr != AT_NULL {
         let kind = *ptr;
         ptr = ptr.add(1);
         let value = *ptr;
@@ -165,12 +165,12 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     } else {
         &argv[0]
     };
-    // if we are not running in manual mode, then the main
-    // program is already loaded by the kernel and we want
-    // to use it.
+    // if we are not running in manual mode, then the main program is already
+    // loaded by the linux kernel and we want to use it. on redox, we treat it
+    // the same.
     let program = {
         let mut pr = None;
-        if !is_manual {
+        if !is_manual && cfg!(not(target_os = "redox")) {
             let phdr = *auxv.get(&AT_PHDR).unwrap();
             if phdr != 0 {
                 let p = DSO {

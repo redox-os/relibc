@@ -1,4 +1,4 @@
-use super::linker::{Linker, DSO};
+use super::linker::{DSO, Linker, Symbol};
 use alloc::boxed::Box;
 use goblin::error::Result;
 
@@ -7,7 +7,7 @@ pub struct LinkerCallbacks {
     pub load_library: Box<dyn Fn(&mut Linker, &str) -> Result<usize>>,
     pub link:
         Box<dyn Fn(&mut Linker, Option<&str>, Option<DSO>, Option<usize>) -> Result<Option<usize>>>,
-    pub get_sym: Box<dyn Fn(&Linker, &str, Option<usize>) -> Option<usize>>,
+    pub get_sym: Box<dyn Fn(&Linker, &str, Option<usize>) -> Option<Symbol>>,
     pub run_init: Box<dyn Fn(&Linker, Option<usize>) -> Result<()>>,
     pub run_fini: Box<dyn Fn(&Linker, Option<usize>) -> Result<()>>,
 }
@@ -42,7 +42,7 @@ fn link(
     linker.link(primary_opt, dso, libspace)
 }
 
-fn get_sym(linker: &Linker, name: &str, libspace: Option<usize>) -> Option<usize> {
+fn get_sym(linker: &Linker, name: &str, libspace: Option<usize>) -> Option<Symbol> {
     linker.get_sym(name, libspace)
 }
 fn run_init(linker: &Linker, libspace: Option<usize>) -> Result<()> {
