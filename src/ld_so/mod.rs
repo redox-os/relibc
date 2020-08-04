@@ -1,8 +1,10 @@
 use core::{mem, ptr};
 use goblin::elf::program_header::{self, program_header32, program_header64, ProgramHeader};
 
-use self::tcb::{Master, Tcb};
+use crate::header::sys_auxv::AT_NULL;
 use crate::start::Stack;
+use self::tcb::{Master, Tcb};
+
 pub const PAGE_SIZE: usize = 4096;
 
 mod access;
@@ -27,7 +29,7 @@ pub fn static_init(sp: &'static Stack) {
     let mut auxv = sp.auxv();
     loop {
         let (kind, value) = unsafe { *auxv };
-        if kind == 0 {
+        if kind == AT_NULL {
             break;
         }
 
