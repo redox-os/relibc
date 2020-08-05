@@ -18,7 +18,7 @@ use crate::{
 // |____/ \___/|_|_|\___|_|  | .__/|_|\__,_|\__\___(_)
 //                           |_|
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum IntKind {
     Byte,
     Short,
@@ -29,7 +29,7 @@ enum IntKind {
     PtrDiff,
     Size,
 }
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum FmtKind {
     Percent,
 
@@ -52,8 +52,8 @@ enum Number {
     Next,
 }
 impl Number {
-    unsafe fn resolve(&self, varargs: &mut VaListCache, ap: &mut VaList) -> usize {
-        let arg = match *self {
+    unsafe fn resolve(self, varargs: &mut VaListCache, ap: &mut VaList) -> usize {
+        let arg = match self {
             Number::Static(num) => return num,
             Number::Index(i) => varargs.get(i - 1, ap, None),
             Number::Next => {
@@ -231,12 +231,16 @@ impl VaListCache {
         default: Option<(FmtKind, IntKind)>,
     ) -> VaArg {
         if let Some(&arg) = self.args.get(i) {
+            // This value is already cached
             let mut arg = arg;
             if let Some((fmtkind, intkind)) = default {
+                // ...but as a different type
                 arg = arg.transmute(fmtkind, intkind);
             }
             return arg;
         }
+
+        // Get all values before this value
         while self.args.len() < i {
             // We can't POSSIBLY know the type if we reach this
             // point. Reaching here means there are unused gaps in the
@@ -244,10 +248,14 @@ impl VaListCache {
             // defaulting to c_int.
             self.args.push(VaArg::c_int(ap.arg::<c_int>()))
         }
+
+        // Add the value to the cache
         self.args.push(match default {
             Some((fmtkind, intkind)) => VaArg::arg_from(fmtkind, intkind, ap),
             None => VaArg::c_int(ap.arg::<c_int>()),
         });
+
+        // Return the value
         self.args[i]
     }
 }
@@ -462,7 +470,7 @@ fn fmt_float_nonfinite<W: Write>(w: &mut W, float: c_double, case: FmtCase) -> i
 struct PrintfIter {
     format: *const u8,
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct PrintfArg {
     index: Option<usize>,
     alternate: bool,
@@ -472,11 +480,11 @@ struct PrintfArg {
     sign_always: bool,
     min_width: Number,
     precision: Option<Number>,
-    pad_zero: Number,
     intkind: IntKind,
     fmt: u8,
     fmtkind: FmtKind,
 }
+#[derive(Debug)]
 enum PrintfFmt {
     Plain(&'static [u8]),
     Arg(PrintfArg),
@@ -540,9 +548,6 @@ impl Iterator for PrintfIter {
                 None
             };
 
-            let pad_space = if zero { Number::Static(0) } else { min_width };
-            let pad_zero = if zero { min_width } else { Number::Static(0) };
-
             // Integer size:
             let mut intkind = IntKind::Int;
             loop {
@@ -595,7 +600,6 @@ impl Iterator for PrintfIter {
                 sign_always,
                 min_width,
                 precision,
-                pad_zero,
                 intkind,
                 fmt,
                 fmtkind,
@@ -643,6 +647,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 .push(VaArg::arg_from(arg.fmtkind, arg.intkind, &mut ap)),
         }
     }
+
     // Make sure, in order, the positional arguments exist with the specified type
     for (i, arg) in positional {
         varargs.get(i, &mut ap, Some(arg));
@@ -665,7 +670,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
         let sign_always = arg.sign_always;
         let min_width = arg.min_width.resolve(&mut varargs, &mut ap);
         let precision = arg.precision.map(|n| n.resolve(&mut varargs, &mut ap));
-        let pad_zero = arg.pad_zero.resolve(&mut varargs, &mut ap);
+        let pad_zero = if zero { min_width } else { 0 };
         let signed_space = match pad_zero {
             0 => min_width as isize,
             _ => 0,
@@ -684,6 +689,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
             b'X' | b'F' | b'E' | b'G' => Some(FmtCase::Upper),
             _ => None,
         };
+
 
         let index = arg.index.map(|i| i - 1).unwrap_or_else(|| {
             if fmtkind == FmtKind::Percent {

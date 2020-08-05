@@ -75,6 +75,9 @@ int main(void) {
         printf("\n");
     }
 
+    puts("Things that have been buggy");
+    printf("%s%0*lu\n", "+", 2, 5l); // this format string was found in GDB
+
     puts("Testing asprintf...");
     char *s = NULL;
     int res = asprintf(&s, "test string");

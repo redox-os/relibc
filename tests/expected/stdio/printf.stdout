@@ -60,6 +60,8 @@ Non-finite float madness:
 %F: INF -INF NAN -NAN
 %g: inf -inf nan -nan
 %G: INF -INF NAN -NAN
+Things that have been buggy
++05
 Testing asprintf...
 printed: test string, value: 11
 printed: test string 2, value: 13
