@@ -12,6 +12,7 @@ fn access() {
 
     //TODO: create test files
     assert_eq!(Sys::access(c_str!("not a file!"), unistd::F_OK), !0);
+    assert_eq!(Sys::access(c_str!("README.md"), unistd::F_OK), 0);
     assert_eq!(Sys::access(c_str!("README.md"), unistd::R_OK), 0);
     assert_eq!(Sys::access(c_str!("README.md"), unistd::W_OK), 0);
     assert_eq!(Sys::access(c_str!("README.md"), unistd::X_OK), !0);
