@@ -1,6 +1,6 @@
 use alloc::{
     boxed::Box,
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     rc::Rc,
     string::{String, ToString},
     vec::Vec,
@@ -350,12 +350,15 @@ impl Linker {
     ) -> Result<Option<usize>> {
         unsafe { _r_debug.state = RTLDState::RT_ADD };
         _dl_debug_state();
+        let mut skip_list = BTreeSet::new();
         let elfs = {
             let mut elfs = BTreeMap::new();
             for (name, data) in lib.objects.iter() {
                 // Skip already linked libraries
                 if !lib.mmaps.contains_key(&*name) && !self.root.mmaps.contains_key(&*name) {
                     elfs.insert(name.as_str(), Elf::parse(&data)?);
+                } else {
+                    skip_list.insert(name.as_str());
                 }
             }
             elfs
@@ -365,6 +368,9 @@ impl Linker {
         let mut tls_primary = 0;
         let mut tls_size = 0;
         for (elf_name, elf) in elfs.iter() {
+            if skip_list.contains(elf_name) {
+                continue;
+            }
             if self.verbose {
                 println!("map {}", elf_name);
             }
@@ -566,6 +572,9 @@ impl Linker {
         });
         let mut tls_ranges = BTreeMap::new();
         for (elf_name, elf) in elfs.iter() {
+            if skip_list.contains(elf_name) {
+                continue;
+            }
             let same_elf = if let Some(prog) = dso.as_ref() {
                 if prog.name == *elf_name {
                     true
@@ -690,6 +699,9 @@ impl Linker {
 
         // Perform relocations, and protect pages
         for (elf_name, elf) in elfs.iter() {
+            if skip_list.contains(elf_name) {
+                continue;
+            }
             if self.verbose {
                 println!("link {}", elf_name);
             }
@@ -888,6 +900,9 @@ impl Linker {
         // Perform indirect relocations (necessary evil), gather entry point
         let mut entry_opt = None;
         for (elf_name, elf) in elfs.iter() {
+            if skip_list.contains(elf_name) {
+                continue;
+            }
             let (_, mmap) = match lib.mmaps.get_mut(*elf_name) {
                 Some(some) => some,
                 None => continue,
