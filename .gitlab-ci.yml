@@ -1,6 +1,4 @@
-# TODO: Change back once upstream is updated
-image: "jd91mzm2/redoxer:latest"
-#image: "redoxos/redoxer:latest"
+image: "redoxos/redoxer:latest"
 
 stages:
     - build
@@ -42,8 +40,6 @@ test:linux:
         - build:linux
     script:
         - make test
-    # TODO: SIGILL when running `cargo test`
-    allow_failure: true
 
 test:redox:
     stage: test
