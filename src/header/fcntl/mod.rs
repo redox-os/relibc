@@ -32,7 +32,14 @@ pub const F_UNLCK: c_int = 2;
 pub unsafe extern "C" fn creat(path: *const c_char, mode: mode_t) -> c_int {
     sys_open(path, O_WRONLY | O_CREAT | O_TRUNC, mode)
 }
-
+#[repr(C)]
+pub struct flock {
+    pub l_type: c_short,
+    pub l_whence: c_short,
+    pub l_start: off_t,
+    pub l_len: off_t,
+    pub l_pid: pid_t,
+}
 #[no_mangle]
 pub extern "C" fn sys_fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
     Sys::fcntl(fildes, cmd, arg)
@@ -43,3 +50,6 @@ pub unsafe extern "C" fn sys_open(path: *const c_char, oflag: c_int, mode: mode_
     let path = CStr::from_ptr(path);
     Sys::open(path, oflag, mode)
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_fcntl(a: flock) {}

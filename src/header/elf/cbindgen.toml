@@ -1,0 +1,9 @@
+sys_includes = ["bits/elf.h"]
+include_guard = "_ELF_H"
+language = "C"
+style = "Tag"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true
