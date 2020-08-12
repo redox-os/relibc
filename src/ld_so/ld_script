@@ -8,10 +8,20 @@ OUTPUT_FORMAT("elf64-x86-64", "elf64-x86-64",
 OUTPUT_ARCH(i386:x86-64)
 ENTRY(_start)
 SEARCH_DIR("/x86_64-unknown-redox/lib");
+SEARCH_DIR("/usr/x86_64-pc-linux-gnu/lib64");
+SEARCH_DIR("/usr/lib64/binutils/x86_64-pc-linux-gnu/2.33.164");
+SEARCH_DIR("/usr/local/lib64");
+SEARCH_DIR("/lib64");
+SEARCH_DIR("/usr/lib64");
+SEARCH_DIR("/usr/x86_64-pc-linux-gnu/lib");
+SEARCH_DIR("/usr/lib64/binutils/x86_64-pc-linux-gnu/2.33.1");
+SEARCH_DIR("/usr/local/lib");
+SEARCH_DIR("/lib");
+SEARCH_DIR("/usr/lib");
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
-  PROVIDE (__executable_start = SEGMENT_START("text-segment", 0x400000)); . = SEGMENT_START("text-segment", 0x20000000) + SIZEOF_HEADERS;
+  PROVIDE (__executable_start = SEGMENT_START("text-segment", 0x12340000)); . = SEGMENT_START("text-segment", 0x1234000) + SIZEOF_HEADERS;
   .interp         : { *(.interp) }
   .note.gnu.build-id  : { *(.note.gnu.build-id) }
   .hash           : { *(.hash) }
@@ -46,6 +56,7 @@ SECTIONS
       *(.rela.iplt)
       PROVIDE_HIDDEN (__rela_iplt_end = .);
     }
+  . = ALIGN(CONSTANT (MAXPAGESIZE));
   .init           :
   {
     KEEP (*(SORT_NONE(.init)))
@@ -59,7 +70,6 @@ SECTIONS
     *(.text.exit .text.exit.*)
     *(.text.startup .text.startup.*)
     *(.text.hot .text.hot.*)
-    *(SORT(.text.sorted.*))
     *(.text .stub .text.* .gnu.linkonce.t.*)
     /* .gnu.warning sections are handled specially by elf.em.  */
     *(.gnu.warning)
@@ -71,6 +81,10 @@ SECTIONS
   PROVIDE (__etext = .);
   PROVIDE (_etext = .);
   PROVIDE (etext = .);
+  . = ALIGN(CONSTANT (MAXPAGESIZE));
+  /* Adjust the address for the rodata segment.  We want to adjust up to
+     the same address within the page on the next page up.  */
+  . = SEGMENT_START("rodata-segment", ALIGN(CONSTANT (MAXPAGESIZE)) + (. & (CONSTANT (MAXPAGESIZE) - 1)));
   .rodata         : { *(.rodata .rodata.* .gnu.linkonce.r.*) }
   .rodata1        : { *(.rodata1) }
   .eh_frame_hdr   : { *(.eh_frame_hdr) *(.eh_frame_entry .eh_frame_entry.*) }

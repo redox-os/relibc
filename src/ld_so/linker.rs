@@ -31,7 +31,7 @@ use crate::{
 };
 
 use super::{
-    access::access,
+    access::accessible,
     callbacks::LinkerCallbacks,
     debug::{RTLDDebug, RTLDState, _dl_debug_state, _r_debug},
     library::{DepTree, Library},
@@ -39,10 +39,10 @@ use super::{
     PAGE_SIZE,
 };
 #[cfg(target_os = "redox")]
-const PATH_SEP: char = ';';
+pub const PATH_SEP: char = ';';
 
 #[cfg(target_os = "linux")]
-const PATH_SEP: char = ':';
+pub const PATH_SEP: char = ':';
 
 pub struct DSO {
     pub name: String,
@@ -178,18 +178,8 @@ impl Linker {
                 if self.verbose {
                     println!("check {}", path);
                 }
-                let access = unsafe {
-                    let path_c = CString::new(path.as_bytes()).map_err(|err| {
-                        Error::Malformed(format!("invalid path '{}': {}", path, err))
-                    })?;
 
-                    // TODO: Use R_OK | X_OK
-                    // We cannot use unix stdlib because errno is thead local variable
-                    // and fs:[0] is not set yet.
-                    access(path_c.as_ptr(), unistd::F_OK) == 0
-                };
-
-                if access {
+                if accessible(&path, unistd::F_OK) == 0 {
                     return Ok(Some(self.load_recursive(name, &path, lib)?));
                 }
             }
