@@ -1,10 +1,10 @@
+use super::linker::Symbol;
 use alloc::{
     boxed::Box,
     collections::{BTreeMap, BTreeSet},
     string::String,
     vec::Vec,
 };
-use super::linker::Symbol;
 
 #[derive(Default, Debug)]
 pub struct DepTree {

@@ -690,7 +690,6 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
             _ => None,
         };
 
-
         let index = arg.index.map(|i| i - 1).unwrap_or_else(|| {
             if fmtkind == FmtKind::Percent {
                 0

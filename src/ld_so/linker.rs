@@ -466,7 +466,9 @@ impl Linker {
                     let mut start = addr;
                     for (vaddr, vsize) in ranges.iter() {
                         if start < addr + vaddr {
-                            println!("mmap({:#x}, {})", start, addr + vaddr - start);
+                            if self.verbose {
+                                println!("mmap({:#x}, {})", start, addr + vaddr - start);
+                            }
                             let mut flags = sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE;
                             if start != 0 {
                                 flags |= sys_mman::MAP_FIXED_NOREPLACE;
@@ -510,7 +512,9 @@ impl Linker {
                 } else {
                     let (start, end) = bounds;
                     let size = end - start;
-                    println!("mmap({:#x}, {})", start, size);
+                    if self.verbose {
+                        println!("mmap({:#x}, {})", start, size);
+                    }
                     let mut flags = sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE;
                     if start != 0 {
                         flags |= sys_mman::MAP_FIXED_NOREPLACE;
@@ -716,7 +720,6 @@ impl Linker {
                 //     reloc::r_to_str(rel.r_type, elf.header.e_machine),
                 //     rel
                 // );
-
                 let symbol = if rel.r_sym > 0 {
                     let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(format!(
                         "missing symbol for relocation {:?}",
@@ -760,7 +763,6 @@ impl Linker {
                 } else {
                     rel.r_offset as *mut u8
                 };
-
                 let set_u64 = |value| {
                     // println!("    set_u64 {:#x}", value);
                     unsafe {
