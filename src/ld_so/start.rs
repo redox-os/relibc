@@ -1,6 +1,12 @@
 // Start code adapted from https://gitlab.redox-os.org/redox-os/relibc/blob/master/src/start.rs
 
-use alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String, vec::Vec};
+use alloc::{
+    borrow::ToOwned,
+    boxed::Box,
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 use crate::{
     c_str::CStr,
@@ -12,8 +18,9 @@ use crate::{
 };
 
 use super::{
+    access::accessible,
     debug::_r_debug,
-    linker::{Linker, DSO},
+    linker::{Linker, DSO, PATH_SEP},
     tcb::Tcb,
 };
 use crate::header::sys_auxv::{AT_ENTRY, AT_PHDR};
@@ -116,8 +123,40 @@ unsafe fn adjust_stack(sp: &'static mut Stack) {
             break;
         }
     }
-
     sp.argc -= 1;
+}
+
+fn resolve_path_name(
+    name_or_path: &str,
+    envs: &BTreeMap<String, String>,
+) -> Option<(String, String)> {
+    if accessible(name_or_path, unistd::F_OK) == 0 {
+        return Some((
+            name_or_path.to_string(),
+            name_or_path
+                .split("/")
+                .collect::<Vec<&str>>()
+                .last()
+                .unwrap()
+                .to_string(),
+        ));
+    }
+    if name_or_path.split("/").collect::<Vec<&str>>().len() != 1 {
+        return None;
+    }
+
+    let env_path = envs.get("PATH")?;
+    for part in env_path.split(PATH_SEP) {
+        let path = if part.is_empty() {
+            format!("./{}", name_or_path)
+        } else {
+            format!("{}/{}", part, name_or_path)
+        };
+        if accessible(&path, unistd::F_OK) == 0 {
+            return Some((path.to_string(), name_or_path.to_string()));
+        }
+    }
+    None
 }
 #[no_mangle]
 pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) -> usize {
@@ -149,7 +188,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         None => "/lib".to_owned(),
     };
 
-    let path = if is_manual {
+    let name_or_path = if is_manual {
         // ld.so is run directly by user and not via execve() or similar systemcall
         println!("argv: {:#?}", argv);
         println!("envs: {:#?}", envs);
@@ -161,13 +200,23 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
             loop {}
         }
         unsafe { adjust_stack(sp) };
-        &argv[1]
+        argv[1].to_string()
     } else {
-        &argv[0]
+        argv[0].to_string()
     };
-    // if we are not running in manual mode, then the main program is already
-    // loaded by the linux kernel and we want to use it. on redox, we treat it
-    // the same.
+
+    let (path, name) = match resolve_path_name(&name_or_path, &envs) {
+        Some((p, n)) => (p, n),
+        None => {
+            eprintln!("ld.so: failed to locate '{}'", name_or_path);
+            unistd::_exit(1);
+            loop {}
+        }
+    };
+
+    // if we are not running in manual mode, then the main
+    // program is already loaded by the kernel and we want
+    // to use it. on redox, we treat it the same.
     let program = {
         let mut pr = None;
         if !is_manual && cfg!(not(target_os = "redox")) {

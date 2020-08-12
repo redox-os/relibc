@@ -2,3 +2,5 @@
 prefix/
 sysroot/
 **/target/
+.gdb_history
+*.patch
