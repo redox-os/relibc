@@ -1,9 +1,8 @@
 use core::{mem, ptr};
 use goblin::elf::program_header::{self, program_header32, program_header64, ProgramHeader};
 
-use crate::header::sys_auxv::AT_NULL;
-use crate::start::Stack;
 use self::tcb::{Master, Tcb};
+use crate::{header::sys_auxv::AT_NULL, start::Stack};
 
 pub const PAGE_SIZE: usize = 4096;
 

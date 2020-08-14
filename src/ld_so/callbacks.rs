@@ -1,4 +1,4 @@
-use super::linker::{DSO, Linker, Symbol};
+use super::linker::{Linker, Symbol, DSO};
 use alloc::boxed::Box;
 use goblin::error::Result;
 

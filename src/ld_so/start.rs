@@ -10,11 +10,11 @@ use alloc::{
 
 use crate::{
     c_str::CStr,
-    header::{unistd, sys_auxv::AT_NULL},
+    header::{sys_auxv::AT_NULL, unistd},
     platform::{new_mspace, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
-    ALLOCATOR
+    ALLOCATOR,
 };
 
 use super::{
