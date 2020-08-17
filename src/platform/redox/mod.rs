@@ -10,9 +10,9 @@ use crate::{
     fs::File,
     header::{
         dirent::dirent,
-        errno::{EINVAL, EIO, EPERM, ERANGE},
+        errno::{EINVAL, EIO, ENOMEM, EPERM, ERANGE},
         fcntl,
-        sys_mman::MAP_ANON,
+        sys_mman::{PROT_READ, PROT_WRITE, MAP_ANONYMOUS},
         sys_random,
         sys_resource::{rlimit, RLIM_INFINITY},
         sys_stat::stat,
@@ -27,6 +27,9 @@ use crate::{
 };
 
 use super::{errno, types::*, Pal, Read};
+
+static mut BRK_CUR: *mut c_void = ptr::null_mut();
+static mut BRK_END: *mut c_void = ptr::null_mut();
 
 mod epoll;
 mod extra;
@@ -95,7 +98,41 @@ impl Pal for Sys {
     }
 
     fn brk(addr: *mut c_void) -> *mut c_void {
-        unsafe { syscall::brk(addr as usize).unwrap_or(0) as *mut c_void }
+        unsafe {
+            // On first invocation, allocate a buffer for brk
+            if BRK_CUR.is_null() {
+                // 4 megabytes of RAM ought to be enough for anybody
+                const BRK_MAX_SIZE: usize = 4 * 1024 * 1024;
+
+                let allocated = Self::mmap(
+                    ptr::null_mut(),
+                    BRK_MAX_SIZE,
+                    PROT_READ | PROT_WRITE,
+                    MAP_ANONYMOUS,
+                    0,
+                    0,
+                );
+                if allocated == !0 as *mut c_void /* MAP_FAILED */ {
+                    return !0 as *mut c_void;
+                }
+
+                BRK_CUR = allocated;
+                BRK_END = (allocated as *mut u8).add(BRK_MAX_SIZE) as *mut c_void;
+            }
+
+            if addr.is_null() {
+                // Lookup what previous brk() invocations have set the address to
+                BRK_CUR
+            } else if BRK_CUR <= addr && addr < BRK_END {
+                // It's inside buffer, return
+                BRK_CUR = addr;
+                addr
+            } else {
+                // It was outside of valid range
+                errno = ENOMEM;
+                ptr::null_mut()
+            }
+        }
     }
 
     fn chdir(path: &CStr) -> c_int {
@@ -674,7 +711,7 @@ impl Pal for Sys {
             address: addr as usize,
         };
 
-        if flags & MAP_ANON == MAP_ANON {
+        if flags & MAP_ANONYMOUS == MAP_ANONYMOUS {
             let fd = e(syscall::open(
                 "memory:",
                 syscall::O_STAT | syscall::O_CLOEXEC,
