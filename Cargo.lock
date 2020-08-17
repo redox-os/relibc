@@ -302,7 +302,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "redox_syscall"
 version = "0.2.0"
-source = "git+https://gitlab.redox-os.org/redox-os/syscall?rev=a0ea09ceb3380b1d1e878bb18886e13742d34e8a#a0ea09ceb3380b1d1e878bb18886e13742d34e8a"
+source = "git+https://gitlab.redox-os.org/redox-os/syscall?rev=4115e0f43547449ce56f7d7749732813e9505955#4115e0f43547449ce56f7d7749732813e9505955"
 dependencies = [
  "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -322,7 +322,7 @@ dependencies = [
  "posix-regex 0.1.0",
  "ralloc 1.0.0",
  "rand 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "redox_syscall 0.2.0 (git+https://gitlab.redox-os.org/redox-os/syscall?rev=a0ea09ceb3380b1d1e878bb18886e13742d34e8a)",
+ "redox_syscall 0.2.0 (git+https://gitlab.redox-os.org/redox-os/syscall?rev=4115e0f43547449ce56f7d7749732813e9505955)",
  "sc 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -568,7 +568,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum rand_core 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "90bde5296fc891b0cef12a6d03ddccc162ce7b2aff54160af9338f8d40df6d19"
 "checksum rand_hc 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ca3129af7b92a17112d59ad498c6f81eaf463253766b90396d39ea7a39d6613c"
 "checksum redox_syscall 0.1.56 (registry+https://github.com/rust-lang/crates.io-index)" = "2439c63f3f6139d1b57529d16bc3b8bb855230c8efcc5d3a896c8bea7c3b1e84"
-"checksum redox_syscall 0.2.0 (git+https://gitlab.redox-os.org/redox-os/syscall?rev=a0ea09ceb3380b1d1e878bb18886e13742d34e8a)" = "<none>"
+"checksum redox_syscall 0.2.0 (git+https://gitlab.redox-os.org/redox-os/syscall?rev=4115e0f43547449ce56f7d7749732813e9505955)" = "<none>"
 "checksum remove_dir_all 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "3acd125665422973a33ac9d3dd2df85edad0f4ae9b00dafb1a05e43a9f5ef8e7"
 "checksum rustc_version 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "c5f5376ea5e30ce23c03eb77cbe4962b988deead10910c372b226388b594c084"
 "checksum rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"

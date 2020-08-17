@@ -1,7 +1,7 @@
 use core::{mem, ptr, result::Result as CoreResult, slice};
 use syscall::{
     self,
-    data::{Map2, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
+    data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
     PtraceEvent, Result,
 };
 
@@ -702,7 +702,7 @@ impl Pal for Sys {
         fildes: c_int,
         off: off_t,
     ) -> *mut c_void {
-        let map = Map2 {
+        let map = Map {
             offset: off as usize,
             size: len,
             flags: syscall::MapFlags::from_bits_truncate(
@@ -720,13 +720,13 @@ impl Pal for Sys {
                 return !0 as *mut c_void;
             }
 
-            let addr = e(syscall::fmap2(fd, &map)) as *mut c_void;
+            let addr = e(syscall::fmap(fd, &map)) as *mut c_void;
 
             let _ = syscall::close(fd);
 
             addr
         } else {
-            e(syscall::fmap2(fildes as usize, &map)) as *mut c_void
+            e(syscall::fmap(fildes as usize, &map)) as *mut c_void
         }
     }
 
@@ -752,7 +752,7 @@ impl Pal for Sys {
     }
 
     unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
-        if e(syscall::funmap2(addr as usize, len)) == !0 {
+        if e(syscall::funmap(addr as usize, len)) == !0 {
             return !0;
         }
         0
