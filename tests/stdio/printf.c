@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h> // free()
 #include <math.h> // INFINITY, NAN constants
 
 int main(void) {
