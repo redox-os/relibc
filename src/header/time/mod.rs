@@ -187,7 +187,7 @@ fn leap_year(year: c_int) -> bool {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gmtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
+pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut tm {
     let clock = *clock;
 
     let mut day = (clock / (60 * 60 * 24)) as c_int;
@@ -197,26 +197,26 @@ pub unsafe extern "C" fn gmtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
         day -= 1;
     }
 
-    (*t).tm_sec = (clock % 60) as c_int;
-    (*t).tm_min = ((clock / 60) % 60) as c_int;
-    (*t).tm_hour = ((clock / (60 * 60)) % 24) as c_int;
+    (*result).tm_sec = (clock % 60) as c_int;
+    (*result).tm_min = ((clock / 60) % 60) as c_int;
+    (*result).tm_hour = ((clock / (60 * 60)) % 24) as c_int;
 
-    while (*t).tm_sec < 0 {
-        (*t).tm_sec += 60;
-        (*t).tm_min -= 1;
+    while (*result).tm_sec < 0 {
+        (*result).tm_sec += 60;
+        (*result).tm_min -= 1;
     }
-    while (*t).tm_min < 0 {
-        (*t).tm_min += 60;
-        (*t).tm_hour -= 1;
+    while (*result).tm_min < 0 {
+        (*result).tm_min += 60;
+        (*result).tm_hour -= 1;
     }
-    while (*t).tm_hour < 0 {
-        (*t).tm_hour += 24;
+    while (*result).tm_hour < 0 {
+        (*result).tm_hour += 24;
     }
 
     // Jan 1th was a thursday, 4th of a zero-indexed week.
-    (*t).tm_wday = (day + 4) % 7;
-    if (*t).tm_wday < 0 {
-        (*t).tm_wday += 7;
+    (*result).tm_wday = (day + 4) % 7;
+    if (*result).tm_wday < 0 {
+        (*result).tm_wday += 7;
     }
 
     let mut year = 1970;
@@ -227,8 +227,8 @@ pub unsafe extern "C" fn gmtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
             day += days_in_year;
             year -= 1;
         }
-        (*t).tm_year = year - 1900;
-        (*t).tm_yday = day + 1;
+        (*result).tm_year = year - 1900;
+        (*result).tm_yday = day + 1;
     } else {
         loop {
             let days_in_year = if leap_year(year) { 366 } else { 365 };
@@ -240,29 +240,29 @@ pub unsafe extern "C" fn gmtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
             day -= days_in_year;
             year += 1;
         }
-        (*t).tm_year = year - 1900;
-        (*t).tm_yday = day;
+        (*result).tm_year = year - 1900;
+        (*result).tm_yday = day;
     }
 
     let leap = if leap_year(year) { 1 } else { 0 };
-    (*t).tm_mon = 0;
+    (*result).tm_mon = 0;
     loop {
-        let days_in_month = MONTH_DAYS[leap][(*t).tm_mon as usize];
+        let days_in_month = MONTH_DAYS[leap][(*result).tm_mon as usize];
 
         if day < days_in_month {
             break;
         }
 
         day -= days_in_month;
-        (*t).tm_mon += 1;
+        (*result).tm_mon += 1;
     }
-    (*t).tm_mday = 1 + day as c_int;
+    (*result).tm_mday = 1 + day as c_int;
 
-    (*t).tm_isdst = 0;
-    (*t).tm_gmtoff = 0;
-    (*t).tm_zone = UTC;
+    (*result).tm_isdst = 0;
+    (*result).tm_gmtoff = 0;
+    (*result).tm_zone = UTC;
 
-    t
+    result
 }
 
 #[no_mangle]
