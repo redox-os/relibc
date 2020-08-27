@@ -195,7 +195,7 @@ pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut
      * Note that we need 0-based months here, though.
      * Overall, this implementation should generate correct results as
      * long as the tm_year value will fit in a c_int. */
-    const SECS_PER_DAY: time_t = 24*60*60;
+    const SECS_PER_DAY: time_t = 24 * 60 * 60;
     const DAYS_PER_ERA: time_t = 146097;
 
     let unix_secs = *clock;
@@ -203,38 +203,48 @@ pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut
     /* Day number here is possibly negative, remainder will always be
      * nonnegative when using Euclidean division */
     let unix_days: time_t = unix_secs.div_euclid(SECS_PER_DAY);
-    
+
     /* In range [0, 86399]. Needs a u32 since this is larger (at least
      * theoretically) than the guaranteed range of c_int */
     let secs_of_day: u32 = unix_secs.rem_euclid(SECS_PER_DAY).try_into().unwrap();
-    
+
     /* Shift origin from 1970-01-01 to 0000-03-01 and find out where we
      * are in terms of 400-year eras since then */
     let days_since_origin = unix_days + 719468;
     let era = days_since_origin.div_euclid(DAYS_PER_ERA);
     let day_of_era = days_since_origin.rem_euclid(DAYS_PER_ERA);
-    let year_of_era = (day_of_era - day_of_era/1460 + day_of_era/36524 - day_of_era/146096) / 365;
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146096) / 365;
 
     /* "transformed" here refers to dates in a calendar where years
      * start on March 1 */
-    let year_transformed = year_of_era + 400*era; // retain large range, don't convert to c_int yet
-    let day_of_year_transformed: c_int = (day_of_era - (365*year_of_era + year_of_era/4 - year_of_era/100)).try_into().unwrap();
-    let month_transformed: c_int = (5*day_of_year_transformed + 2)/153;
-    
+    let year_transformed = year_of_era + 400 * era; // retain large range, don't convert to c_int yet
+    let day_of_year_transformed: c_int = (day_of_era
+        - (365 * year_of_era + year_of_era / 4 - year_of_era / 100))
+        .try_into()
+        .unwrap();
+    let month_transformed: c_int = (5 * day_of_year_transformed + 2) / 153;
+
     // Convert back to calendar with year starting on January 1
     let month: c_int = (month_transformed + 2) % 12; // adapted to 0-based months
-    let year: time_t = if month < 2 {year_transformed + 1} else {year_transformed};
-    
+    let year: time_t = if month < 2 {
+        year_transformed + 1
+    } else {
+        year_transformed
+    };
+
     /* Subtract 1900 *before* converting down to c_int in order to
      * maximize the range of input timestamps that will succeed */
     match c_int::try_from(year - 1900) {
         Ok(year_less_1900) => {
-            let mday: c_int = (day_of_year_transformed - (153*month_transformed+2)/5 + 1).try_into().unwrap();
-            
+            let mday: c_int = (day_of_year_transformed - (153 * month_transformed + 2) / 5 + 1)
+                .try_into()
+                .unwrap();
+
             /* 1970-01-01 was a Thursday. Again, Euclidean division is
              * used to ensure a nonnegative remainder (range [0, 6]). */
             let wday: c_int = ((unix_days + 4).rem_euclid(7)).try_into().unwrap();
-            
+
             /* Yes, duplicated code for now (to work on non-c_int-values
              * so that we are not constrained by the subtraction of
              * 1900) */
@@ -246,15 +256,15 @@ pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut
              * year is a leap year. Therefore, we use the already
              * computed date for those two months. */
             let yday: c_int = match month {
-                0 => mday - 1, // January
+                0 => mday - 1,      // January
                 1 => 31 + mday - 1, // February
-                _ => day_of_year_transformed + if is_leap_year {60} else {59},
+                _ => day_of_year_transformed + if is_leap_year { 60 } else { 59 },
             };
-            
-            let hour: c_int = (secs_of_day / (60*60)).try_into().unwrap();
+
+            let hour: c_int = (secs_of_day / (60 * 60)).try_into().unwrap();
             let min: c_int = ((secs_of_day / 60) % 60).try_into().unwrap();
             let sec: c_int = (secs_of_day % 60).try_into().unwrap();
-            
+
             *result = tm {
                 tm_sec: sec,
                 tm_min: min,
@@ -268,7 +278,7 @@ pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut
                 tm_gmtoff: 0,
                 tm_zone: UTC,
             };
-            
+
             result
         }
         Err(_) => {
