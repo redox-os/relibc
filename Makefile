@@ -48,7 +48,8 @@ WEAKEN_SYMBOLS=\
 	-W __floattidf \
 	-W __muloti4 \
 	-W __udivti3 \
-	-W __umodti3
+	-W __umodti3 \
+	-W __rust_probestack
 
 .PHONY: all clean fmt install install-headers libs test
 
