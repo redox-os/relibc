@@ -128,20 +128,22 @@ pub unsafe extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_ch
     );
     assert!(0 <= tm_wday && tm_wday <= 6, OUT_OF_RANGE_MESSAGE);
 
-    let result = core::fmt::write(
-        &mut platform::UnsafeStringWriter(buf as *mut u8),
+    // At this point, we can safely use the values as given.
+    let write_result = core::fmt::write(
+        // buf may be either `*mut u8` or `*mut i8`
+        &mut platform::UnsafeStringWriter(buf.cast()),
         format_args!(
             "{:.3} {:.3}{:3} {:02}:{:02}:{:02} {}\n",
-            DAY_NAMES[tm_wday as usize],
-            MON_NAMES[tm_mon as usize],
-            tm_mday as usize,
-            tm_hour as usize,
-            tm_min as usize,
-            tm_sec as usize,
-            (1900 + tm_year)
+            DAY_NAMES[usize::try_from(tm_wday).unwrap()],
+            MON_NAMES[usize::try_from(tm_mon).unwrap()],
+            tm_mday,
+            tm_hour,
+            tm_min,
+            tm_sec,
+            1900 + tm_year
         ),
     );
-    match result {
+    match write_result {
         Ok(_) => buf,
         Err(_) => {
             platform::errno = EIO;
