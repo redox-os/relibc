@@ -72,7 +72,7 @@ pub struct sigevent;
 
 #[no_mangle]
 pub unsafe extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
-    asctime_r(timeptr, &mut ASCTIME as *mut [i8; 26] as *mut i8)
+    asctime_r(timeptr, ASCTIME.as_mut_ptr().cast())
 }
 
 #[no_mangle]
