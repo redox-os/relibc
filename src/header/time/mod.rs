@@ -1,7 +1,9 @@
 //! time implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/time.h.html
 
+use core::convert::{TryFrom, TryInto};
+
 use crate::{
-    header::errno::EIO,
+    header::errno::{EIO, EOVERFLOW},
     platform::{self, types::*, Pal, Sys},
 };
 
@@ -187,82 +189,103 @@ fn leap_year(year: c_int) -> bool {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gmtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
-    let clock = *clock;
+pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut tm {
+    /* For the details of the algorithm used here, see
+     * http://howardhinnant.github.io/date_algorithms.html#civil_from_days
+     * Note that we need 0-based months here, though.
+     * Overall, this implementation should generate correct results as
+     * long as the tm_year value will fit in a c_int. */
+    const SECS_PER_DAY: time_t = 24 * 60 * 60;
+    const DAYS_PER_ERA: time_t = 146097;
 
-    let mut day = (clock / (60 * 60 * 24)) as c_int;
-    if clock < 0 && clock % (60 * 60 * 24) != 0 {
-        // -1 because for negative values round upwards
-        // -0.3 == 0, but we want -1
-        day -= 1;
-    }
+    let unix_secs = *clock;
 
-    (*t).tm_sec = (clock % 60) as c_int;
-    (*t).tm_min = ((clock / 60) % 60) as c_int;
-    (*t).tm_hour = ((clock / (60 * 60)) % 24) as c_int;
+    /* Day number here is possibly negative, remainder will always be
+     * nonnegative when using Euclidean division */
+    let unix_days: time_t = unix_secs.div_euclid(SECS_PER_DAY);
 
-    while (*t).tm_sec < 0 {
-        (*t).tm_sec += 60;
-        (*t).tm_min -= 1;
-    }
-    while (*t).tm_min < 0 {
-        (*t).tm_min += 60;
-        (*t).tm_hour -= 1;
-    }
-    while (*t).tm_hour < 0 {
-        (*t).tm_hour += 24;
-    }
+    /* In range [0, 86399]. Needs a u32 since this is larger (at least
+     * theoretically) than the guaranteed range of c_int */
+    let secs_of_day: u32 = unix_secs.rem_euclid(SECS_PER_DAY).try_into().unwrap();
 
-    // Jan 1th was a thursday, 4th of a zero-indexed week.
-    (*t).tm_wday = (day + 4) % 7;
-    if (*t).tm_wday < 0 {
-        (*t).tm_wday += 7;
-    }
+    /* Shift origin from 1970-01-01 to 0000-03-01 and find out where we
+     * are in terms of 400-year eras since then */
+    let days_since_origin = unix_days + 719468;
+    let era = days_since_origin.div_euclid(DAYS_PER_ERA);
+    let day_of_era = days_since_origin.rem_euclid(DAYS_PER_ERA);
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146096) / 365;
 
-    let mut year = 1970;
-    if day < 0 {
-        while day < 0 {
-            let days_in_year = if leap_year(year) { 366 } else { 365 };
+    /* "transformed" here refers to dates in a calendar where years
+     * start on March 1 */
+    let year_transformed = year_of_era + 400 * era; // retain large range, don't convert to c_int yet
+    let day_of_year_transformed: c_int = (day_of_era
+        - (365 * year_of_era + year_of_era / 4 - year_of_era / 100))
+        .try_into()
+        .unwrap();
+    let month_transformed: c_int = (5 * day_of_year_transformed + 2) / 153;
 
-            day += days_in_year;
-            year -= 1;
-        }
-        (*t).tm_year = year - 1900;
-        (*t).tm_yday = day + 1;
+    // Convert back to calendar with year starting on January 1
+    let month: c_int = (month_transformed + 2) % 12; // adapted to 0-based months
+    let year: time_t = if month < 2 {
+        year_transformed + 1
     } else {
-        loop {
-            let days_in_year = if leap_year(year) { 366 } else { 365 };
+        year_transformed
+    };
 
-            if day < days_in_year {
-                break;
-            }
+    /* Subtract 1900 *before* converting down to c_int in order to
+     * maximize the range of input timestamps that will succeed */
+    match c_int::try_from(year - 1900) {
+        Ok(year_less_1900) => {
+            let mday: c_int = (day_of_year_transformed - (153 * month_transformed + 2) / 5 + 1)
+                .try_into()
+                .unwrap();
 
-            day -= days_in_year;
-            year += 1;
+            /* 1970-01-01 was a Thursday. Again, Euclidean division is
+             * used to ensure a nonnegative remainder (range [0, 6]). */
+            let wday: c_int = ((unix_days + 4).rem_euclid(7)).try_into().unwrap();
+
+            /* Yes, duplicated code for now (to work on non-c_int-values
+             * so that we are not constrained by the subtraction of
+             * 1900) */
+            let is_leap_year: bool = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+
+            /* For dates that are March 1 or later, we can use day-of-
+             * year in the transformed calendar. For January and
+             * February, that value is sensitive to whether the previous
+             * year is a leap year. Therefore, we use the already
+             * computed date for those two months. */
+            let yday: c_int = match month {
+                0 => mday - 1,      // January
+                1 => 31 + mday - 1, // February
+                _ => day_of_year_transformed + if is_leap_year { 60 } else { 59 },
+            };
+
+            let hour: c_int = (secs_of_day / (60 * 60)).try_into().unwrap();
+            let min: c_int = ((secs_of_day / 60) % 60).try_into().unwrap();
+            let sec: c_int = (secs_of_day % 60).try_into().unwrap();
+
+            *result = tm {
+                tm_sec: sec,
+                tm_min: min,
+                tm_hour: hour,
+                tm_mday: mday,
+                tm_mon: month,
+                tm_year: year_less_1900,
+                tm_wday: wday,
+                tm_yday: yday,
+                tm_isdst: 0,
+                tm_gmtoff: 0,
+                tm_zone: UTC,
+            };
+
+            result
         }
-        (*t).tm_year = year - 1900;
-        (*t).tm_yday = day;
-    }
-
-    let leap = if leap_year(year) { 1 } else { 0 };
-    (*t).tm_mon = 0;
-    loop {
-        let days_in_month = MONTH_DAYS[leap][(*t).tm_mon as usize];
-
-        if day < days_in_month {
-            break;
+        Err(_) => {
+            platform::errno = EOVERFLOW;
+            core::ptr::null_mut()
         }
-
-        day -= days_in_month;
-        (*t).tm_mon += 1;
     }
-    (*t).tm_mday = 1 + day as c_int;
-
-    (*t).tm_isdst = 0;
-    (*t).tm_gmtoff = 0;
-    (*t).tm_zone = UTC;
-
-    t
 }
 
 #[no_mangle]
