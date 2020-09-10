@@ -225,7 +225,8 @@ pub unsafe extern "C" fn pte_osThreadDelete(handle: pte_osThreadHandle) -> pte_o
     pte_osMutexLock(&mut pid_stacks_lock);
     if let Some(ref mut stacks) = pid_stacks {
         if let Some((stack_base, stack_size)) = stacks.remove(&handle) {
-            sys_mman::munmap(stack_base, stack_size);
+            //TODO: this currently unmaps the thread's stack, while it is being used!
+            //sys_mman::munmap(stack_base, stack_size);
         }
     }
     pte_osMutexUnlock(&mut pid_stacks_lock);
