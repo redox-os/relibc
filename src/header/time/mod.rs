@@ -79,24 +79,75 @@ pub unsafe extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
 
 #[no_mangle]
 pub unsafe extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_char {
-    let tm = &*tm;
-    let result = core::fmt::write(
-        &mut platform::UnsafeStringWriter(buf as *mut u8),
+    let tm_sec = (*tm).tm_sec;
+    let tm_min = (*tm).tm_min;
+    let tm_hour = (*tm).tm_hour;
+    let tm_mday = (*tm).tm_mday;
+    let tm_mon = (*tm).tm_mon;
+    let tm_year = (*tm).tm_year;
+    let tm_wday = (*tm).tm_wday;
+
+    /* Panic when we run into undefined behavior.
+     *
+     * POSIX says (since issue 7) that asctime()/asctime_r() cause UB
+     * when the tm member values would cause out-of-bounds array access
+     * or overflow the output buffer. This contrasts with ISO C11+,
+     * which specifies UB for any tm members being outside their normal
+     * ranges. While POSIX explicitly defers to the C standard in case
+     * of contradictions, the assertions below follow the interpretation
+     * that POSIX simply defines some of C's undefined behavior, rather
+     * than conflict with the ISO standard.
+     *
+     * Note that C's "%.2d" formatting, unlike Rust's "{:02}"
+     * formatting, does not count a minus sign against the two digits to
+     * print, meaning that we must reject all negative values for
+     * seconds, minutes and hours. However, C's "%3d" (for day-of-month)
+     * is similar to Rust's "{:3}".
+     *
+     * To avoid year overflow problems (in Rust, where numeric overflow
+     * is considered an error), we subtract 1900 from the endpoints,
+     * rather than adding to the tm_year value. POSIX' requirement that
+     * tm_year be at most {INT_MAX}-1990 is satisfied for all legal
+     * values of {INT_MAX} through the max-4-digit requirement on the
+     * year.
+     *
+     * The tm_mon and tm_wday fields are used for array access and thus
+     * will already cause a panic in Rust code when out of range.
+     * However, using the assertions below allows a consistent error
+     * message for all fields. */
+    const OUT_OF_RANGE_MESSAGE: &str = "tm member out of range";
+
+    assert!(0 <= tm_sec && tm_sec <= 99, OUT_OF_RANGE_MESSAGE);
+    assert!(0 <= tm_min && tm_min <= 99, OUT_OF_RANGE_MESSAGE);
+    assert!(0 <= tm_hour && tm_hour <= 99, OUT_OF_RANGE_MESSAGE);
+    assert!(-99 <= tm_mday && tm_mday <= 999, OUT_OF_RANGE_MESSAGE);
+    assert!(0 <= tm_mon && tm_mon <= 11, OUT_OF_RANGE_MESSAGE);
+    assert!(
+        -999 - 1900 <= tm_year && tm_year <= 9999 - 1900,
+        OUT_OF_RANGE_MESSAGE
+    );
+    assert!(0 <= tm_wday && tm_wday <= 6, OUT_OF_RANGE_MESSAGE);
+
+    // At this point, we can safely use the values as given.
+    let write_result = core::fmt::write(
+        // buf may be either `*mut u8` or `*mut i8`
+        &mut platform::UnsafeStringWriter(buf.cast()),
         format_args!(
             "{:.3} {:.3}{:3} {:02}:{:02}:{:02} {}\n",
-            DAY_NAMES[tm.tm_wday as usize],
-            MON_NAMES[tm.tm_mon as usize],
-            tm.tm_mday as usize,
-            tm.tm_hour as usize,
-            tm.tm_min as usize,
-            tm.tm_sec as usize,
-            (1900 + tm.tm_year)
+            DAY_NAMES[usize::try_from(tm_wday).unwrap()],
+            MON_NAMES[usize::try_from(tm_mon).unwrap()],
+            tm_mday,
+            tm_hour,
+            tm_min,
+            tm_sec,
+            1900 + tm_year
         ),
     );
-    match result {
+    match write_result {
         Ok(_) => buf,
         Err(_) => {
-            platform::errno = EIO;
+            /* asctime()/asctime_r() or the equivalent sprintf() call
+             * have no defined errno setting */
             core::ptr::null_mut()
         }
     }
