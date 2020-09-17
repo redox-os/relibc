@@ -146,7 +146,8 @@ pub unsafe extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_ch
     match write_result {
         Ok(_) => buf,
         Err(_) => {
-            platform::errno = EIO;
+            /* asctime()/asctime_r() or the equivalent sprintf() call
+             * have no defined errno setting */
             core::ptr::null_mut()
         }
     }
