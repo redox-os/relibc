@@ -204,90 +204,102 @@ impl Pal for Sys {
         let mut args: Vec<[usize; 2]> = Vec::with_capacity(len as usize);
 
         // Read shebang (for example #!/bin/sh)
-        let interpreter = {
-            let mut reader = BufReader::new(&mut file);
 
-            let mut shebang = [0; 2];
-            let mut read = 0;
+        let mut reader = BufReader::new(&mut file);
 
-            while read < 2 {
-                match reader.read(&mut shebang) {
-                    Ok(0) => break,
-                    Ok(i) => read += i,
-                    Err(_) => return -1,
-                }
+        let mut shebang = [0; 2];
+        let mut read = 0;
+
+        while read < 2 {
+            match reader.read(&mut shebang) {
+                Ok(0) => break,
+                Ok(i) => read += i,
+                Err(_) => return -1,
+            }
+        }
+
+        // see https://github.com/torvalds/linux/blob/c8d2bc9bc39ebea8437fd974fdbc21847bb897a3/fs/binfmt_script.c#L69-L78
+        let is_shebang = &shebang == b"#!";
+        let mut skip_copy_first_arg = is_shebang;
+        if is_shebang {
+            // So, this file is interpreted.
+            // That means the actual file descriptor passed to `fexec` won't be this file.
+            // So we need to check ourselves that this file is actually be executable.
+
+            let mut stat = redox_stat::default();
+            if e(syscall::fstat(fd, &mut stat)) == !0 {
+                return -1;
+            }
+            let uid = e(syscall::getuid());
+            if uid == !0 {
+                return -1;
+            }
+            let gid = e(syscall::getuid());
+            if gid == !0 {
+                return -1;
             }
 
-            if &shebang == b"#!" {
-                // So, this file is interpreted.
-                // That means the actual file descriptor passed to `fexec` won't be this file.
-                // So we need to check ourselves that this file is actually be executable.
-
-                let mut stat = redox_stat::default();
-                if e(syscall::fstat(fd, &mut stat)) == !0 {
-                    return -1;
-                }
-                let uid = e(syscall::getuid());
-                if uid == !0 {
-                    return -1;
-                }
-                let gid = e(syscall::getuid());
-                if gid == !0 {
-                    return -1;
-                }
-
-                let mode = if uid == stat.st_uid as usize {
-                    (stat.st_mode >> 3 * 2) & 0o7
-                } else if gid == stat.st_gid as usize {
-                    (stat.st_mode >> 3 * 1) & 0o7
-                } else {
-                    stat.st_mode & 0o7
-                };
-
-                if mode & 0o1 == 0o0 {
-                    errno = EPERM;
-                    return -1;
-                }
-
-                // Then, read the actual interpreter:
-                let mut interpreter = Vec::new();
-                match reader.read_until(b'\n', &mut interpreter) {
-                    Err(_) => return -1,
-                    Ok(_) => {
-                        if interpreter.ends_with(&[b'\n']) {
-                            interpreter.pop().unwrap();
-                        }
-                        // TODO: Returning the interpreter here is actually a
-                        // hack. Preferrably we should reassign `file =`
-                        // directly from here. Just wait until NLL comes
-                        // around...
-                        Some(interpreter)
-                    }
-                }
+            let mode = if uid == stat.st_uid as usize {
+                (stat.st_mode >> 3 * 2) & 0o7
+            } else if gid == stat.st_gid as usize {
+                (stat.st_mode >> 3 * 1) & 0o7
             } else {
-                None
-            }
-        };
-        let mut _interpreter_path = None;
-        if let Some(interpreter) = interpreter {
-            let cstring = match CString::new(interpreter) {
-                Ok(cstring) => cstring,
-                Err(_) => return -1,
-            };
-            file = match File::open(&cstring, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
-                Ok(file) => file,
-                Err(_) => return -1,
+                stat.st_mode & 0o7
             };
 
-            // Make sure path is kept alive long enough, and push it to the arguments
-            _interpreter_path = Some(cstring);
-            let path_ref = _interpreter_path.as_ref().unwrap();
-            args.push([path_ref.as_ptr() as usize, path_ref.to_bytes().len()]);
+            if mode & 0o1 == 0o0 {
+                errno = EPERM;
+                return -1;
+            }
+
+            // Then, read the actual interpreter:
+            let mut shebang = Vec::new();
+            match reader.read_until(b'\n', &mut shebang) {
+                Err(_) => return -1,
+                Ok(_) => {
+                    if shebang.ends_with(&[b'\n']) {
+                        shebang.pop().unwrap();
+                    }
+
+                    let mut parts = shebang.split(|x| x == &b' ');
+                    
+                    let interpreter = match parts.next() {
+                        Some(x) => x, None => return -1,
+                    };
+                    let interpreter_cstring = match CString::new(interpreter) {
+                        Ok(x) => x, Err(_) => return -1,
+                    };
+
+                    file = match File::open(&interpreter_cstring, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
+                        Ok(x) => x, Err(_) => return -1,
+                    };
+
+                    // Make sure path is kept alive long enough, and push it to the arguments
+                    let _interpreter_path = Some(interpreter_cstring);
+                    let path_ref = _interpreter_path.as_ref().unwrap();
+                    args.push([path_ref.as_ptr() as usize, path_ref.to_bytes().len()]);
+
+                    for interpreter_arg in parts {
+                        let cstring = match CString::new(interpreter_arg) {
+                            Ok(cstring) => cstring,
+                            Err(_) => return -1,
+                        };
+                        let _interpreter_arg = Some(cstring);
+                        let arg_ref = _interpreter_arg.as_ref().unwrap();
+                        args.push([arg_ref.as_ptr() as usize, arg_ref.to_bytes().len()]);
+                    }
+
+                    let _script_path = Some(path);
+                    let _script_path_ref = _script_path.as_ref().unwrap();
+                    args.push([_script_path_ref.as_ptr() as usize, _script_path_ref.to_bytes().len()]);
+                }
+            }
         } else {
             if file.seek(SeekFrom::Start(0)).is_err() {
                 return -1;
             }
         }
+
 
         // Arguments
         while !(*argv).is_null() {
@@ -297,7 +309,11 @@ impl Pal for Sys {
             while *arg.offset(len) != 0 {
                 len += 1;
             }
-            args.push([arg as usize, len as usize]);
+            if skip_copy_first_arg {
+                skip_copy_first_arg = false;
+            } else {
+                args.push([arg as usize, len as usize]);
+            }
             argv = argv.offset(1);
         }
 
