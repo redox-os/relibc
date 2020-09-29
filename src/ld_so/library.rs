@@ -36,6 +36,7 @@ pub struct Library {
     pub dep_tree: DepTree,
     /// A set used to detect circular dependencies in the Linker::load function
     pub cir_dep: BTreeSet<String>,
+    pub runpath: Option<String>,
 }
 impl Library {
     pub fn new() -> Library {
