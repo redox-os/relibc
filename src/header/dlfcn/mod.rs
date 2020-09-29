@@ -40,10 +40,11 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
     //TODO support all sort of flags
 
     let filename = if cfilename.is_null() {
-        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-        return ptr::null_mut();
+        None
     } else {
-        str::from_utf8_unchecked(CStr::from_ptr(cfilename).to_bytes())
+        Some(str::from_utf8_unchecked(
+            CStr::from_ptr(cfilename).to_bytes(),
+        ))
     };
 
     let tcb = match Tcb::current() {
@@ -60,31 +61,34 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
         return ptr::null_mut();
     }
     let mut linker = (&*tcb.linker_ptr).lock();
+
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
 
     let id = match (cbs.load_library)(&mut linker, filename) {
         Err(err) => {
-            eprintln!("dlopen: failed to load {}", filename);
+            eprintln!("dlopen: failed to load {:?}", filename);
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
             return ptr::null_mut();
         }
         Ok(id) => id,
     };
 
-    if let Err(err) = (cbs.link)(&mut linker, None, None, Some(id)) {
-        (cbs.unload)(&mut linker, id);
-        eprintln!("dlopen: failed to link '{}': {}", filename, err);
-        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-        return ptr::null_mut();
-    };
+    if let Some(fname) = filename {
+        if let Err(err) = (cbs.link)(&mut linker, None, None, Some(id)) {
+            (cbs.unload)(&mut linker, id);
+            eprintln!("dlopen: failed to link '{}': {}", fname, err);
+            ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+            return ptr::null_mut();
+        };
 
-    if let Err(err) = (cbs.run_init)(&mut linker, Some(id)) {
-        (cbs.unload)(&mut linker, id);
-        eprintln!("dlopen: failed to link '{}': {}", filename, err);
-        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-        return ptr::null_mut();
-    };
+        if let Err(err) = (cbs.run_init)(&mut linker, Some(id)) {
+            (cbs.unload)(&mut linker, id);
+            eprintln!("dlopen: failed to link '{}': {}", fname, err);
+            ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+            return ptr::null_mut();
+        };
+    }
     id as *mut c_void
 }
 

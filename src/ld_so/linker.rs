@@ -73,6 +73,8 @@ pub struct Linker {
     pub cbs: Rc<RefCell<LinkerCallbacks>>,
 }
 
+const root_id: usize = 1;
+
 impl Linker {
     pub fn new(ld_library_path: Option<String>, verbose: bool) -> Self {
         Self {
@@ -82,7 +84,7 @@ impl Linker {
             verbose,
             tls_index_offset: 0,
             lib_spaces: BTreeMap::new(),
-            counter: 1,
+            counter: root_id + 1,
             cbs: Rc::new(RefCell::new(LinkerCallbacks::new())),
         }
     }
@@ -175,13 +177,18 @@ impl Linker {
         return Ok(deps);
     }
 
-    pub fn load_library(&mut self, name: &str) -> Result<usize> {
-        let mut lib = Library::new();
-        self._load_library(name, &mut lib)?;
-        let ret = self.counter;
-        self.lib_spaces.insert(ret, lib);
-        self.counter += 1;
-        return Ok(ret);
+    pub fn load_library(&mut self, name: Option<&str>) -> Result<usize> {
+        match name {
+            Some(name) => {
+                let mut lib = Library::new();
+                self._load_library(name, &mut lib)?;
+                let ret = self.counter;
+                self.lib_spaces.insert(ret, lib);
+                self.counter += 1;
+                return Ok(ret);
+            }
+            None => return Ok(root_id),
+        }
     }
     fn _load_library(&mut self, name: &str, lib: &mut Library) -> Result<Option<DepTree>> {
         if lib.objects.contains_key(name) || self.root.objects.contains_key(name) {
@@ -270,11 +277,11 @@ impl Linker {
 
     pub fn get_sym(&self, name: &str, libspace: Option<usize>) -> Option<Symbol> {
         match libspace {
+            None | Some(root_id) => self.root.get_sym(name),
             Some(id) => {
                 let lib = self.lib_spaces.get(&id)?;
                 lib.get_sym(name)
             }
-            None => self.root.get_sym(name),
         }
     }
 
@@ -290,6 +297,7 @@ impl Linker {
 
     pub fn run_fini(&self, libspace: Option<usize>) -> Result<()> {
         match libspace {
+            Some(root_id) => return Ok(()),
             Some(id) => {
                 let lib = self.lib_spaces.get(&id).unwrap();
                 self.run_tree(&lib, &lib.dep_tree, ".fini_array")
