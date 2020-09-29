@@ -647,7 +647,7 @@ impl Linker {
                         } as usize;
 
                         let mut tcb_master = Master {
-                            ptr: unsafe { mmap.as_ptr().add(ph.p_vaddr as usize) },
+                            ptr: unsafe { mmap.as_ptr().add(ph.p_vaddr as usize - base_addr) },
                             len: ph.p_filesz as usize,
                             offset: tls_size - valign,
                         };
