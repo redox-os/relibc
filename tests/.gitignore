@@ -1,3 +1,4 @@
-/bins/
+/bins_static/
+/bins_dynamic/
 /gen/
 /*.out
