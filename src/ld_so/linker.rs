@@ -14,7 +14,7 @@ use goblin::{
     elf::{
         header::ET_DYN,
         program_header,
-        r#dyn::{Dyn, DT_DEBUG},
+        r#dyn::{Dyn, DT_DEBUG, DT_RUNPATH},
         reloc, sym, Elf,
     },
     error::{Error, Result},
@@ -63,7 +63,8 @@ impl Symbol {
 pub struct Linker {
     // Used by load
     /// Library path to search when loading library by name
-    library_path: String,
+    default_library_path: String,
+    ld_library_path: Option<String>,
     root: Library,
     verbose: bool,
     tls_index_offset: usize,
@@ -73,9 +74,10 @@ pub struct Linker {
 }
 
 impl Linker {
-    pub fn new(library_path: &str, verbose: bool) -> Self {
+    pub fn new(ld_library_path: Option<String>, verbose: bool) -> Self {
         Self {
-            library_path: library_path.to_string(),
+            default_library_path: "/lib".to_string(),
+            ld_library_path: ld_library_path,
             root: Library::new(),
             verbose,
             tls_index_offset: 0,
@@ -139,13 +141,30 @@ impl Linker {
     ) -> Result<Vec<DepTree>> {
         let elf = Elf::parse(&data)?;
         //println!("{:#?}", elf);
+
+        // search for RUNPATH
+        lib.runpath = if let Some(dynamic) = elf.dynamic {
+            let entry = dynamic.dyns.iter().find(|d| d.d_tag == DT_RUNPATH);
+            match entry {
+                Some(entry) => {
+                    let path = elf
+                        .dynstrtab
+                        .get(entry.d_val as usize)
+                        .ok_or(Error::Malformed("Missing RUNPATH in dynstrtab".to_string()))??;
+                    Some(path.to_string())
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+
         let mut deps = Vec::new();
         for library in elf.libraries.iter() {
             if let Some(dep) = self._load_library(library, lib)? {
                 deps.push(dep);
             }
         }
-        let elf = Elf::parse(&data)?;
         let key = match elf.soname {
             Some(soname) => soname,
             _ => name,
@@ -171,8 +190,15 @@ impl Linker {
         } else if name.contains('/') {
             Ok(Some(self.load_recursive(name, name, lib)?))
         } else {
-            let library_path = self.library_path.clone();
-            for part in library_path.split(PATH_SEP) {
+            let mut paths = Vec::new();
+            if let Some(ld_library_path) = &self.ld_library_path {
+                paths.push(ld_library_path);
+            }
+            if let Some(runpath) = &lib.runpath {
+                paths.push(runpath);
+            }
+            paths.push(&self.default_library_path);
+            for part in paths.iter() {
                 let path = if part.is_empty() {
                     format!("./{}", name)
                 } else {
@@ -647,7 +673,7 @@ impl Linker {
                         } as usize;
 
                         let mut tcb_master = Master {
-                            ptr: unsafe { mmap.as_ptr().add(ph.p_vaddr as usize) },
+                            ptr: unsafe { mmap.as_ptr().add(ph.p_vaddr as usize - base_addr) },
                             len: ph.p_filesz as usize,
                             offset: tls_size - valign,
                         };

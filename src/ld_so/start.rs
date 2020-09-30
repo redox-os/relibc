@@ -183,10 +183,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     }
 
     // Some variables that will be overridden by environment and auxiliary vectors
-    let library_path = match envs.get("LD_LIBRARY_PATH") {
-        Some(lib_path) => lib_path.to_owned() + ":/lib",
-        None => "/lib".to_owned(),
-    };
+    let ld_library_path = envs.get("LD_LIBRARY_PATH").map(|s| s.to_owned());
 
     let name_or_path = if is_manual {
         // ld.so is run directly by user and not via execve() or similar systemcall
@@ -234,7 +231,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         }
         pr
     };
-    let mut linker = Linker::new(&library_path, false);
+    let mut linker = Linker::new(ld_library_path, false);
     match linker.load(&path, &path) {
         Ok(()) => (),
         Err(err) => {

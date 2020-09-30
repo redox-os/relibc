@@ -86,6 +86,7 @@ install-libs: libs
 	mkdir -pv "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/libc.a" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/libc.so" "$(DESTDIR)/lib"
+	ln -sr "$(DESTDIR)/lib/libc.so" "$(DESTDIR)/lib/libc.so.6"
 	cp -v "$(BUILD)/release/crt0.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"

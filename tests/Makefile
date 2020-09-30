@@ -6,43 +6,33 @@ EXPECT_NAMES=\
 	assert \
 	constructor \
 	ctype \
-	destructor \
 	dirent/scandir \
 	errno \
 	error \
 	fcntl/create \
 	fcntl/fcntl \
 	fnmatch \
-	futimens \
 	libgen \
 	locale \
 	math \
 	netdb/getaddrinfo \
-	netdb/netdb \
 	ptrace \
 	regex \
 	select \
 	setjmp \
 	sigaction \
 	signal \
-	stdio/all \
-	stdio/buffer \
-	stdio/fgets \
 	stdio/fputs \
 	stdio/fread \
-	stdio/freopen \
 	stdio/fseek \
 	stdio/fwrite \
-	stdio/getc_unget \
 	stdio/mutex \
 	stdio/popen \
 	stdio/printf \
 	stdio/rename \
 	stdio/scanf \
-	stdio/setvbuf \
 	stdio/sprintf \
 	stdio/printf_space_pad \
-	stdio/ungetc_multiple \
 	stdio/ungetc_ftell \
 	stdio/fscanf_offby1 \
 	stdio/fscanf \
@@ -79,12 +69,10 @@ EXPECT_NAMES=\
 	sys_mman \
 	time/asctime \
 	time/gmtime \
-	time/localtime \
 	time/macros \
 	time/mktime \
 	time/strftime \
 	time/time \
-	tls \
 	unistd/access \
 	unistd/brk \
 	unistd/dup \
@@ -93,8 +81,6 @@ EXPECT_NAMES=\
 	unistd/fork \
 	unistd/fsync \
 	unistd/ftruncate \
-	unistd/getopt \
-	unistd/getopt_long \
 	unistd/pipe \
 	unistd/rmdir \
 	unistd/sleep \
@@ -111,14 +97,37 @@ EXPECT_NAMES=\
 	wchar/wcsrchr \
 	wchar/wcsstr \
 	wchar/wcstod \
-	wchar/wcstok \
 	wchar/wcstol \
 	wchar/wcscasecmp \
 	wchar/wcsncasecmp \
-	wctype/towlower \
-	wctype/towupper
 	# TODO: Fix these
 	# mkfifo
+	# netdb/netdb \
+
+# issues with linking stdin, stdout, stderr
+STATIC_ONLY_NAMES=\
+	futimens \
+	stdio/all \
+	stdio/buffer \
+	stdio/fgets \
+	stdio/freopen \
+	stdio/getc_unget \
+	stdio/setvbuf \
+	stdio/ungetc_multiple \
+	time/localtime \
+	wchar/wcstok \
+	wctype/towlower \
+	wctype/towupper \
+# need to call fini in ld_so's _start
+STATIC_ONLY_NAMES+=\
+	destructor \
+# comparison issue
+STATIC_ONLY_NAMES+=\
+	tls \
+# issues with linking optarg, optind etc.
+STATIC_ONLY_NAMES+=\
+	unistd/getopt \
+	unistd/getopt_long \
 
 # Binaries that may generate varied output
 NAMES=\
@@ -147,8 +156,12 @@ NAMES=\
 #	resource/getrusage
 #	time/times
 
-BINS=$(patsubst %,bins/%,$(NAMES))
-EXPECT_BINS=$(patsubst %,bins/%,$(EXPECT_NAMES))
+BINS=$(patsubst %,bins_static/%,$(NAMES))
+BINS+=$(patsubst %,bins_static/%,$(STATIC_ONLY_NAMES))
+BINS+=$(patsubst %,bins_dynamic/%,$(NAMES))
+EXPECT_BINS=$(patsubst %,bins_static/%,$(EXPECT_NAMES))
+EXPECT_BINS+=$(patsubst %,bins_static/%,$(STATIC_ONLY_NAMES))
+EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(EXPECT_NAMES))
 
 TEST_RUNNER?=sh --
 
@@ -157,61 +170,76 @@ TEST_RUNNER?=sh --
 all: $(BINS)
 
 clean:
-	rm -rf bins gen *.out
+	rm -rf bins_* gen *.out
 
 run: | $(BINS)
-	for name in $(NAMES); \
+	for bin in $(BINS); \
 	do \
-		echo "# $${name} #"; \
-		"bins/$${name}" test args || exit $$?; \
+		echo "# $${bin} #"; \
+		"$${bin}" test args || exit $$?; \
 	done
 
 expected: | $(EXPECT_BINS)
 	rm -rf expected
 	mkdir -p expected
-	for name in $(EXPECT_NAMES); \
+	for bin in $(EXPECT_BINS); \
 	do \
-		echo "# $${name} #"; \
-		mkdir -p expected/`dirname $${name}`; \
-		"bins/$${name}" test args > "expected/$${name}.stdout" 2> "expected/$${name}.stderr" || exit $$?; \
+		echo "# $${bin} #"; \
+		mkdir -p expected/`dirname $${bin}`; \
+		"$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr" || exit $$?; \
 	done
 
 verify: | $(EXPECT_BINS)
-	$(TEST_RUNNER) ./verify.sh $(EXPECT_NAMES)
+	$(TEST_RUNNER) ./verify.sh $(EXPECT_BINS)
 
-CFLAGS=\
+FLAGS=\
 	-std=c11 \
 	-fno-builtin \
 	-fno-stack-protector \
-	-static \
 	-Wall \
 	-pedantic \
 	-g \
 	-I .
 
-LIBS=
+STATIC_FLAGS=\
+	../sysroot/lib/libc.a \
+	-static
 
 NATIVE_RELIBC?=0
 ifeq ($(NATIVE_RELIBC),0)
-CFLAGS+=\
+FLAGS+=\
 	-nostdinc \
 	-nostdlib \
 	-isystem ../sysroot/include \
 	../sysroot/lib/crt0.o \
-	../sysroot/lib/crti.o
-
-LIBS=\
-	../sysroot/lib/libc.a \
+	../sysroot/lib/crti.o \
 	../sysroot/lib/crtn.o
 
 ../sysroot:
 	$(MAKE) -C .. sysroot
 
-bins/%: %.c ../sysroot
+bins_static/%: %.c ../sysroot
 	mkdir -p "$$(dirname "$@")"
-	$(CC) $(CFLAGS) "$<" $(LIBS) -o "$@"
+	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
+
+SYSROOT_LIB=$(shell realpath ../sysroot/lib/)
+
+DYNAMIC_FLAGS=\
+	-Wl,-dynamic-linker=$(SYSROOT_LIB)/ld64.so.1 \
+	-Wl,--enable-new-dtags \
+	-Wl,-rpath=$(SYSROOT_LIB) \
+	-L $(SYSROOT_LIB) \
+	-lc
+
+bins_dynamic/%: %.c ../sysroot
+	mkdir -p "$$(dirname "$@")"
+	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
 else
-bins/%: %.c
+bins_static/%: %.c
 	mkdir -p "$$(dirname "$@")"
-	$(CC) $(CFLAGS) "$<" $(LIBS) -o "$@"
+	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
+
+bins_dynamic/%: %.c
+	mkdir -p "$$(dirname "$@")"
+	$(CC) "$<" -o "$@" $(FLAGS)
 endif

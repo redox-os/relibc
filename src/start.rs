@@ -86,9 +86,23 @@ extern "C" fn init_array() {
     // init_array runs first or if relibc_start runs first
     // Still whoever gets to run first must initialize rust
     // memory allocator before doing anything else.
+
+    unsafe {
+        if init_complete {
+            return;
+        }
+    }
+
     alloc_init();
     io_init();
-    unsafe { init_complete = true };
+
+    extern "C" {
+        fn pthread_init();
+    }
+    unsafe {
+        pthread_init();
+        init_complete = true
+    }
 }
 fn io_init() {
     unsafe {
@@ -108,7 +122,6 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         static __init_array_start: extern "C" fn();
         static __init_array_end: extern "C" fn();
 
-        fn pthread_init();
         fn _init();
         fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
     }
@@ -138,10 +151,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     platform::inner_environ = copy_string_array(envp, len);
     platform::environ = platform::inner_environ.as_mut_ptr();
 
-    if !init_complete {
-        init_array();
-    }
-    pthread_init();
+    init_array();
 
     // Run preinit array
     {
