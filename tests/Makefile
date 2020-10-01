@@ -73,6 +73,7 @@ EXPECT_NAMES=\
 	time/mktime \
 	time/strftime \
 	time/time \
+	tls \
 	unistd/access \
 	unistd/brk \
 	unistd/dup \
@@ -121,9 +122,6 @@ STATIC_ONLY_NAMES=\
 # need to call fini in ld_so's _start
 STATIC_ONLY_NAMES+=\
 	destructor \
-# comparison issue
-STATIC_ONLY_NAMES+=\
-	tls \
 # issues with linking optarg, optind etc.
 STATIC_ONLY_NAMES+=\
 	unistd/getopt \
