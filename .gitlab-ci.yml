@@ -64,4 +64,3 @@ fmt:
     script:
         - rustup component add rustfmt-preview
         - ./fmt.sh -- --check
-    allow_failure: true

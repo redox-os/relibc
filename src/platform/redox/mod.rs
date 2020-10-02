@@ -12,7 +12,7 @@ use crate::{
         dirent::dirent,
         errno::{EINVAL, EIO, ENOMEM, EPERM, ERANGE},
         fcntl,
-        sys_mman::{PROT_READ, PROT_WRITE, MAP_ANONYMOUS},
+        sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, RLIM_INFINITY},
         sys_stat::stat,
@@ -112,7 +112,9 @@ impl Pal for Sys {
                     0,
                     0,
                 );
-                if allocated == !0 as *mut c_void /* MAP_FAILED */ {
+                if allocated == !0 as *mut c_void
+                /* MAP_FAILED */
+                {
                     return !0 as *mut c_void;
                 }
 
