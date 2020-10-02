@@ -127,6 +127,9 @@ STATIC_ONLY_NAMES+=\
 	unistd/getopt \
 	unistd/getopt_long \
 
+DYNAMIC_ONLY_NAMES=\
+	dlfcn
+
 # Binaries that may generate varied output
 NAMES=\
 	$(EXPECT_NAMES) \
@@ -157,9 +160,11 @@ NAMES=\
 BINS=$(patsubst %,bins_static/%,$(NAMES))
 BINS+=$(patsubst %,bins_static/%,$(STATIC_ONLY_NAMES))
 BINS+=$(patsubst %,bins_dynamic/%,$(NAMES))
+BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_BINS=$(patsubst %,bins_static/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,bins_static/%,$(STATIC_ONLY_NAMES))
 EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(EXPECT_NAMES))
+EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 
 TEST_RUNNER?=sh --
 
@@ -226,6 +231,7 @@ DYNAMIC_FLAGS=\
 	-Wl,-dynamic-linker=$(SYSROOT_LIB)/ld64.so.1 \
 	-Wl,--enable-new-dtags \
 	-Wl,-rpath=$(SYSROOT_LIB) \
+	-Wl,-export-dynamic \
 	-L $(SYSROOT_LIB) \
 	-lc
 

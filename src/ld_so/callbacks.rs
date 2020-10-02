@@ -4,7 +4,7 @@ use goblin::error::Result;
 
 pub struct LinkerCallbacks {
     pub unload: Box<dyn Fn(&mut Linker, usize)>,
-    pub load_library: Box<dyn Fn(&mut Linker, &str) -> Result<usize>>,
+    pub load_library: Box<dyn Fn(&mut Linker, Option<&str>) -> Result<usize>>,
     pub link:
         Box<dyn Fn(&mut Linker, Option<&str>, Option<DSO>, Option<usize>) -> Result<Option<usize>>>,
     pub get_sym: Box<dyn Fn(&Linker, &str, Option<usize>) -> Option<Symbol>>,
@@ -29,7 +29,7 @@ fn unload(linker: &mut Linker, libspace: usize) {
     linker.unload(libspace)
 }
 
-fn load_library(linker: &mut Linker, name: &str) -> Result<usize> {
+fn load_library(linker: &mut Linker, name: Option<&str>) -> Result<usize> {
     linker.load_library(name)
 }
 
