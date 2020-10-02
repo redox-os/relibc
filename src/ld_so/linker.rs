@@ -604,9 +604,6 @@ impl Linker {
             } else {
                 false
             };
-            if same_elf {
-                continue;
-            }
             let object = match lib.objects.get(*elf_name) {
                 Some(some) => some,
                 None => continue,
@@ -627,6 +624,9 @@ impl Linker {
 
                 match ph.p_type {
                     program_header::PT_LOAD => {
+                        if same_elf {
+                            continue;
+                        }
                         let obj_data = {
                             let range = ph.file_range();
                             match object.get(range.clone()) {
@@ -671,9 +671,15 @@ impl Linker {
                         } else {
                             ph.p_memsz
                         } as usize;
-
+                        let ptr = unsafe {
+                            if is_pie_enabled(elf) {
+                                mmap.as_ptr().add(ph.p_vaddr as usize)
+                            } else {
+                                ph.p_vaddr as *const u8
+                            }
+                        };
                         let mut tcb_master = Master {
-                            ptr: unsafe { mmap.as_ptr().add(ph.p_vaddr as usize - base_addr) },
+                            ptr: ptr,
                             len: ph.p_filesz as usize,
                             offset: tls_size - valign,
                         };
