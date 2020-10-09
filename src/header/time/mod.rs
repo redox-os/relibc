@@ -3,7 +3,7 @@
 use core::convert::{TryFrom, TryInto};
 
 use crate::{
-    header::errno::{EIO, EOVERFLOW},
+    header::errno::EOVERFLOW,
     platform::{self, types::*, Pal, Sys},
 };
 
@@ -384,10 +384,10 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
             day += MONTH_DAYS[leap][month as usize] as i64;
         }
 
-        (day * (60 * 60 * 24)
+        day * (60 * 60 * 24)
             + ((*t).tm_hour as i64) * (60 * 60)
             + ((*t).tm_min as i64) * 60
-            + (*t).tm_sec as i64)
+            + (*t).tm_sec as i64
     }
 }
 
