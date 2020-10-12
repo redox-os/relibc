@@ -176,7 +176,7 @@ fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
 
         ptr = ptr.add(VECTOR_SIZE - (start_ptr as usize & VECTOR_ALIGN));
         debug_assert!(ptr > start_ptr);
-        while loop_size == LOOP_SIZE2 {
+        loop {
             debug_assert_eq!(0, (ptr as usize) % VECTOR_SIZE);
 
             let a = _mm_load_si128(ptr as *const __m128i);
@@ -202,12 +202,6 @@ fn rawmemchr2(n1: u8, n2: u8, haystack: *const u8) -> usize {
                 return at + forward_pos2(mask1, mask2);
             }
             ptr = ptr.add(loop_size);
-        }
-        loop {
-            if let Some(i) = forward_search2(start_ptr, ptr, vn1, vn2) {
-                return i;
-            }
-            ptr = ptr.add(VECTOR_SIZE);
         }
     }
 }
