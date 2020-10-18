@@ -51,7 +51,7 @@ WEAKEN_SYMBOLS=\
 	-W __umodti3 \
 	-W __rust_probestack
 
-.PHONY: all clean fmt install install-headers libs test
+.PHONY: all clean fmt install install-headers libs submodules test
 
 all: | libs
 
@@ -95,6 +95,10 @@ install-libs: libs
 	cp -v "$(BUILD)/pthreads-emb/libpthread.a" "$(DESTDIR)/lib/libpthread.a"
 
 install: install-headers install-libs
+
+submodules:
+	git submodule sync
+	git submodule update --init --recursive
 
 sysroot: all
 	rm -rf $@
