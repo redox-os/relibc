@@ -12,6 +12,8 @@ pub const FIONBIO: c_ulong = 0x5421;
 
 pub const TCGETS: c_ulong = 0x5401;
 pub const TCSETS: c_ulong = 0x5402;
+pub const TCSETSW: c_ulong = 0x5403;
+pub const TCSETSF: c_ulong = 0x5404;
 pub const TCSBRK: c_ulong = 0x5409;
 
 pub const TCXONC: c_ulong = 0x540A;
@@ -23,6 +25,8 @@ pub const TIOCSPGRP: c_ulong = 0x5410;
 
 pub const TIOCGWINSZ: c_ulong = 0x5413;
 pub const TIOCSWINSZ: c_ulong = 0x5414;
+
+// TODO: some of the structs passed as T have padding bytes, so casting to a byte slice is UB
 
 fn dup_read<T>(fd: c_int, name: &str, t: &mut T) -> syscall::Result<usize> {
     let dup = syscall::dup(fd as usize, name.as_bytes())?;
@@ -79,7 +83,8 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
                 0
             }
         }
-        TCSETS => {
+        // TODO: give these different behaviors
+        TCSETS | TCSETSW | TCSETSF => {
             let termios = &*(out as *const termios::termios);
             if e(dup_write(fd, "termios", termios)) == !0 {
                 -1
