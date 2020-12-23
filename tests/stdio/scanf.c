@@ -61,7 +61,7 @@ int main(void) {
     memset(pathbuf, 97, 100);
 
     int ret = sscanf(
-        "https://redox-os.org", "%15[^\n/:]:%3[/]%[^\n/?#]%[^\n]",
+        "https://redox-os.org\0# extra garbage for nul test", "%15[^\n/:]:%3[/]%[^\n/?#]%[^\n]",
         &protobuf, &slashbuf, &hostbuf, &pathbuf
     );
     if (ret < 4) {
