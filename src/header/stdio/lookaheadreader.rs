@@ -8,8 +8,12 @@ struct LookAheadBuffer {
 impl LookAheadBuffer {
     fn look_ahead(&mut self) -> Result<Option<u8>, i32> {
         let byte = unsafe { *self.buf.offset(self.look_ahead) };
-        self.look_ahead += 1;
-        Ok(Some(byte))
+        if byte == 0 {
+            Ok(None)
+        } else {
+            self.look_ahead += 1;
+            Ok(Some(byte))
+        }
     }
 
     fn commit(&mut self) {
