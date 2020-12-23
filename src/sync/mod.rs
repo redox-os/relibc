@@ -1,9 +1,11 @@
 pub mod mutex;
 pub mod once;
+pub mod semaphore;
 
 pub use self::{
     mutex::{Mutex, MutexGuard},
     once::Once,
+    semaphore::Semaphore,
 };
 
 use crate::platform::{types::*, Pal, Sys};

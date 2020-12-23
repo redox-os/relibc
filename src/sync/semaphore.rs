@@ -1,0 +1,46 @@
+// From https://www.remlab.net/op/futex-misc.shtml
+//TODO: improve implementation
+
+use crate::platform::{types::*, Pal, Sys};
+use super::AtomicLock;
+use core::sync::atomic::Ordering;
+
+pub struct Semaphore {
+    lock: AtomicLock,
+}
+
+impl Semaphore {
+    pub const fn new(value: c_int) -> Self {
+        Self {
+            lock: AtomicLock::new(value),
+        }
+    }
+
+    pub fn post(&self) {
+        self.lock.fetch_add(1, Ordering::Relaxed);
+        self.lock.notify_one();
+    }
+
+    pub fn wait(&self) {
+        let mut value = 1;
+
+        loop {
+            match self.lock.compare_exchange_weak(
+                value,
+                value - 1,
+                Ordering::Acquire,
+                Ordering::Relaxed
+            ) {
+                Ok(ok) => return,
+                Err(err) => {
+                    value = err;
+                }
+            }
+
+            if value == 0 {
+                self.lock.wait_if(0);
+                value = 1;
+            }
+        }
+    }
+}
