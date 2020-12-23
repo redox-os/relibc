@@ -273,20 +273,20 @@ pub const SHT_HIPROC: usize = 0x7fffffff;
 pub const SHT_LOUSER: usize = 0x80000000;
 pub const SHT_HIUSER: usize = 0x8fffffff;
 
-pub const SHF_WRITE: usize = (1 << 0);
-pub const SHF_ALLOC: usize = (1 << 1);
-pub const SHF_EXECINSTR: usize = (1 << 2);
-pub const SHF_MERGE: usize = (1 << 4);
-pub const SHF_STRINGS: usize = (1 << 5);
-pub const SHF_INFO_LINK: usize = (1 << 6);
-pub const SHF_LINK_ORDER: usize = (1 << 7);
-pub const SHF_OS_NONCONFORMING: usize = (1 << 8);
-pub const SHF_GROUP: usize = (1 << 9);
-pub const SHF_TLS: usize = (1 << 10);
+pub const SHF_WRITE: usize = 1 << 0;
+pub const SHF_ALLOC: usize = 1 << 1;
+pub const SHF_EXECINSTR: usize = 1 << 2;
+pub const SHF_MERGE: usize = 1 << 4;
+pub const SHF_STRINGS: usize = 1 << 5;
+pub const SHF_INFO_LINK: usize = 1 << 6;
+pub const SHF_LINK_ORDER: usize = 1 << 7;
+pub const SHF_OS_NONCONFORMING: usize = 1 << 8;
+pub const SHF_GROUP: usize = 1 << 9;
+pub const SHF_TLS: usize = 1 << 10;
 pub const SHF_MASKOS: usize = 0x0ff00000;
 pub const SHF_MASKPROC: usize = 0xf0000000;
-pub const SHF_ORDERED: usize = (1 << 30);
-pub const SHF_EXCLUDE: usize = (1 << 31);
+pub const SHF_ORDERED: usize = 1 << 30;
+pub const SHF_EXCLUDE: usize = 1 << 31;
 pub const GRP_COMDAT: usize = 0x1;
 
 #[repr(C)]
@@ -432,9 +432,9 @@ pub const PT_HIOS: usize = 0x6fffffff;
 pub const PT_LOPROC: usize = 0x70000000;
 pub const PT_HIPROC: usize = 0x7fffffff;
 pub const PN_XNUM: usize = 0xffff;
-pub const PF_X: usize = (1 << 0);
-pub const PF_W: usize = (1 << 1);
-pub const PF_R: usize = (1 << 2);
+pub const PF_X: usize = 1 << 0;
+pub const PF_W: usize = 1 << 1;
+pub const PF_R: usize = 1 << 2;
 pub const PF_MASKOS: usize = 0x0ff00000;
 pub const PF_MASKPROC: usize = 0xf0000000;
 
