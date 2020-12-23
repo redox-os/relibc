@@ -16,14 +16,9 @@ use crate::{
         types::{c_int, c_uint, c_void, pid_t, size_t},
         Pal, Sys,
     },
-    sync::Mutex,
+    sync::{Mutex, Semaphore},
     ALLOCATOR,
 };
-
-pub struct Semaphore {
-    lock: Mutex<()>,
-    count: i32,
-}
 
 type pte_osThreadHandle = pid_t;
 type pte_osMutexHandle = *mut Mutex<()>;
@@ -324,10 +319,7 @@ pub unsafe extern "C" fn pte_osSemaphoreCreate(
     initialValue: c_int,
     pHandle: *mut pte_osSemaphoreHandle,
 ) -> pte_osResult {
-    *pHandle = Box::into_raw(Box::new(Semaphore {
-        lock: Mutex::new(()),
-        count: initialValue,
-    }));
+    *pHandle = Box::into_raw(Box::new(Semaphore::new(initialValue)));
     PTE_OS_OK
 }
 
@@ -342,9 +334,7 @@ pub unsafe extern "C" fn pte_osSemaphorePost(
     handle: pte_osSemaphoreHandle,
     count: c_int,
 ) -> pte_osResult {
-    let semaphore = &mut *handle;
-    let _guard = semaphore.lock.lock();
-    intrinsics::atomic_xadd(&mut semaphore.count, 1);
+    (*handle).post();
     PTE_OS_OK
 }
 
@@ -354,17 +344,7 @@ pub unsafe extern "C" fn pte_osSemaphorePend(
     pTimeout: *mut c_uint,
 ) -> pte_osResult {
     //TODO: pTimeout
-    let semaphore = &mut *handle;
-    loop {
-        {
-            let _guard = semaphore.lock.lock();
-            if intrinsics::atomic_load(&semaphore.count) > 0 {
-                intrinsics::atomic_xsub(&mut semaphore.count, 1);
-                break;
-            }
-        }
-        Sys::sched_yield();
-    }
+    (*handle).wait();
     PTE_OS_OK
 }
 
