@@ -89,6 +89,7 @@ pub unsafe extern "C" fn a64l(s: *const c_char) -> c_long {
 
 #[no_mangle]
 pub unsafe extern "C" fn abort() {
+    eprintln!("abort() called");
     intrinsics::abort();
 }
 
