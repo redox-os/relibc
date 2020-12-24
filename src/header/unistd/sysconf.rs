@@ -18,6 +18,7 @@ pub const _SC_PAGE_SIZE: c_int = 30;
 // ...
 pub const _SC_RE_DUP_MAX: c_int = 44;
 // ...
+pub const _SC_GETPW_R_SIZE_MAX: c_int = 70;
 pub const _SC_LOGIN_NAME_MAX: c_int = 71;
 pub const _SC_TTY_NAME_MAX: c_int = 72;
 // ...
@@ -40,6 +41,7 @@ pub extern "C" fn sysconf(name: c_int) -> c_long {
         _SC_VERSION => 200809,
         _SC_PAGESIZE => 4096,
         _SC_RE_DUP_MAX => 32767,
+        _SC_GETPW_R_SIZE_MAX => -1,
         _SC_LOGIN_NAME_MAX => 256,
         _SC_TTY_NAME_MAX => 32,
         _SC_SYMLOOP_MAX => -1,
