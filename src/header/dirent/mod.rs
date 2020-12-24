@@ -69,6 +69,11 @@ pub unsafe extern "C" fn closedir(dir: *mut DIR) -> c_int {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn dirfd(dir: *mut DIR) -> c_int {
+    *((*dir).file)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn readdir(dir: *mut DIR) -> *mut dirent {
     if (*dir).index >= (*dir).len {
         let read = Sys::getdents(
