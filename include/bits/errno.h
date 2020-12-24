@@ -9,6 +9,7 @@ extern "C" {
 
 #define errno (*__errno_location())
 #define program_invocation_name (*__program_invocation_name())
+#define program_invocation_short_name (*__program_invocation_short_name())
 
 #ifdef __cplusplus
 } // extern "C"

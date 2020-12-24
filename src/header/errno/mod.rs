@@ -18,6 +18,23 @@ pub unsafe extern "C" fn __program_invocation_name() -> *mut *mut c_char {
     &mut platform::inner_argv[0]
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn __program_invocation_short_name() -> *mut *mut c_char {
+    let mut ptr = platform::inner_argv[0];
+    let mut slash_ptr = ptr;
+    loop {
+        let b = *ptr as u8;
+        if b == 0 {
+            return &mut slash_ptr;
+        } else {
+            ptr = ptr.add(1);
+            if b == b'/' {
+                slash_ptr = ptr;
+            }
+        }
+    }
+}
+
 pub const EPERM: c_int = 1; /* Operation not permitted */
 pub const ENOENT: c_int = 2; /* No such file or directory */
 pub const ESRCH: c_int = 3; /* No such process */
