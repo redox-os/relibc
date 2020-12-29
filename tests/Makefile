@@ -12,6 +12,7 @@ EXPECT_NAMES=\
 	fcntl/create \
 	fcntl/fcntl \
 	fnmatch \
+	futimens \
 	libgen \
 	locale \
 	math \
@@ -22,18 +23,25 @@ EXPECT_NAMES=\
 	setjmp \
 	sigaction \
 	signal \
+	stdio/all \
+	stdio/buffer \
+	stdio/fgets \
 	stdio/fputs \
 	stdio/fread \
+	stdio/freopen \
 	stdio/fseek \
 	stdio/fwrite \
+	stdio/getc_unget \
 	stdio/mutex \
 	stdio/popen \
 	stdio/printf \
 	stdio/rename \
 	stdio/scanf \
+	stdio/setvbuf \
 	stdio/sprintf \
 	stdio/printf_space_pad \
 	stdio/ungetc_ftell \
+	stdio/ungetc_multiple \
 	stdio/fscanf_offby1 \
 	stdio/fscanf \
 	stdio/printf_neg_pad \
@@ -69,6 +77,7 @@ EXPECT_NAMES=\
 	sys_mman \
 	time/asctime \
 	time/gmtime \
+	time/localtime \
 	time/macros \
 	time/mktime \
 	time/strftime \
@@ -82,6 +91,8 @@ EXPECT_NAMES=\
 	unistd/fork \
 	unistd/fsync \
 	unistd/ftruncate \
+	unistd/getopt \
+	unistd/getopt_long \
 	unistd/pipe \
 	unistd/rmdir \
 	unistd/sleep \
@@ -98,34 +109,20 @@ EXPECT_NAMES=\
 	wchar/wcsrchr \
 	wchar/wcsstr \
 	wchar/wcstod \
+	wchar/wcstok \
 	wchar/wcstol \
 	wchar/wcscasecmp \
 	wchar/wcsncasecmp \
+	wctype/towlower \
+	wctype/towupper
 	# TODO: Fix these
 	# mkfifo
 	# netdb/netdb \
 
-# issues with linking stdin, stdout, stderr
-STATIC_ONLY_NAMES=\
-	futimens \
-	stdio/all \
-	stdio/buffer \
-	stdio/fgets \
-	stdio/freopen \
-	stdio/getc_unget \
-	stdio/setvbuf \
-	stdio/ungetc_multiple \
-	time/localtime \
-	wchar/wcstok \
-	wctype/towlower \
-	wctype/towupper \
 # need to call fini in ld_so's _start
-STATIC_ONLY_NAMES+=\
-	destructor \
-# issues with linking optarg, optind etc.
-STATIC_ONLY_NAMES+=\
-	unistd/getopt \
-	unistd/getopt_long \
+STATIC_ONLY_NAMES=\
+	destructor
+
 
 DYNAMIC_ONLY_NAMES=\
 	dlfcn
@@ -205,8 +202,14 @@ FLAGS=\
 	-I .
 
 STATIC_FLAGS=\
-	../sysroot/lib/libc.a \
 	-static
+
+DYNAMIC_FLAGS=\
+	-Wl,--enable-new-dtags \
+	-Wl,-export-dynamic
+
+../sysroot:
+	$(MAKE) -C .. sysroot
 
 NATIVE_RELIBC?=0
 ifeq ($(NATIVE_RELIBC),0)
@@ -218,32 +221,24 @@ FLAGS+=\
 	../sysroot/lib/crti.o \
 	../sysroot/lib/crtn.o
 
-../sysroot:
-	$(MAKE) -C .. sysroot
-
-bins_static/%: %.c ../sysroot
-	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
-
 SYSROOT_LIB=$(shell realpath ../sysroot/lib/)
 
-DYNAMIC_FLAGS=\
+STATIC_FLAGS+=\
+	$(SYSROOT_LIB)/libc.a
+
+DYNAMIC_FLAGS+=\
 	-Wl,-dynamic-linker=$(SYSROOT_LIB)/ld64.so.1 \
-	-Wl,--enable-new-dtags \
-	-Wl,-rpath=$(SYSROOT_LIB) \
-	-Wl,-export-dynamic \
+	-Wl,-rpath=$(SYSROOT_LIB):\$$ORIGIN \
 	-L $(SYSROOT_LIB) \
 	-lc
 
-bins_dynamic/%: %.c ../sysroot
-	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
-else
-bins_static/%: %.c
+DEPS=../sysroot
+endif
+
+bins_static/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
 
-bins_dynamic/%: %.c
+bins_dynamic/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS)
-endif
+	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)

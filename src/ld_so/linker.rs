@@ -1,52 +1,31 @@
 use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     rc::Rc,
     string::{String, ToString},
     vec::Vec,
 };
-use core::{
-    cell::RefCell,
-    mem::{size_of, swap, transmute},
-    ptr, slice,
-};
+use core::{cell::RefCell, mem::transmute, ptr};
 use goblin::{
-    elf::{
-        header::ET_DYN,
-        program_header,
-        r#dyn::{Dyn, DT_DEBUG, DT_RUNPATH},
-        reloc, sym, Elf,
-    },
+    elf::{program_header, reloc, Elf},
     error::{Error, Result},
 };
 
 use crate::{
     c_str::CString,
     fs::File,
-    header::{errno::STR_ERROR, fcntl, sys_mman, unistd},
+    header::{fcntl, sys_mman, unistd::F_OK},
     io::Read,
-    platform::{errno, types::c_void},
+    platform::types::c_void,
 };
 
 use super::{
     access::accessible,
     callbacks::LinkerCallbacks,
-    debug::{RTLDDebug, RTLDState, _dl_debug_state, _r_debug},
-    library::{DepTree, Library},
-    tcb::{Master, Tcb},
-    PAGE_SIZE,
+    debug::{RTLDState, _dl_debug_state, _r_debug},
+    dso::{is_pie_enabled, DSO},
+    tcb::{round_up, Master, Tcb},
+    PATH_SEP,
 };
-#[cfg(target_os = "redox")]
-pub const PATH_SEP: char = ';';
-
-#[cfg(target_os = "linux")]
-pub const PATH_SEP: char = ':';
-
-pub struct DSO {
-    pub name: String,
-    pub base_addr: usize,
-    pub entry_point: usize,
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Symbol {
@@ -54,6 +33,7 @@ pub struct Symbol {
     pub base: usize,
     pub size: usize,
 }
+
 impl Symbol {
     pub fn as_ptr(self) -> *mut c_void {
         (self.base + self.value) as *mut c_void
@@ -61,684 +41,242 @@ impl Symbol {
 }
 
 pub struct Linker {
-    // Used by load
-    /// Library path to search when loading library by name
-    default_library_path: String,
     ld_library_path: Option<String>,
-    root: Library,
-    verbose: bool,
-    tls_index_offset: usize,
-    lib_spaces: BTreeMap<usize, Library>,
-    counter: usize,
+    next_object_id: usize,
+    next_tls_module_id: usize,
+    tls_size: usize,
+    objects: BTreeMap<usize, DSO>,
+    name_to_object_id_map: BTreeMap<String, usize>,
     pub cbs: Rc<RefCell<LinkerCallbacks>>,
 }
 
 const root_id: usize = 1;
 
 impl Linker {
-    pub fn new(ld_library_path: Option<String>, verbose: bool) -> Self {
+    pub fn new(ld_library_path: Option<String>) -> Self {
         Self {
-            default_library_path: "/lib".to_string(),
             ld_library_path: ld_library_path,
-            root: Library::new(),
-            verbose,
-            tls_index_offset: 0,
-            lib_spaces: BTreeMap::new(),
-            counter: root_id + 1,
+            next_object_id: root_id,
+            next_tls_module_id: 0,
+            tls_size: 0,
+            objects: BTreeMap::new(),
+            name_to_object_id_map: BTreeMap::new(),
             cbs: Rc::new(RefCell::new(LinkerCallbacks::new())),
         }
     }
-    pub fn load(&mut self, name: &str, path: &str) -> Result<()> {
-        let mut lib: Library = Library::new();
-        swap(&mut lib, &mut self.root);
-        lib.dep_tree = self.load_recursive(name, path, &mut lib)?;
-        swap(&mut lib, &mut self.root);
-        if self.verbose {
-            println!("Dep tree: {:#?}", self.root.dep_tree);
-        }
-        return Ok(());
-    }
-    pub fn unload(&mut self, libspace: usize) {
-        if let Some(lib) = self.lib_spaces.remove(&libspace) {
-            for (_, (_, mmap)) in lib.mmaps {
-                unsafe { sys_mman::munmap(mmap.as_mut_ptr() as *mut c_void, mmap.len()) };
-            }
-        }
-    }
-    fn load_recursive(&mut self, name: &str, path: &str, lib: &mut Library) -> Result<DepTree> {
-        if self.verbose {
-            println!("load {}: {}", name, path);
-        }
-        if lib.cir_dep.contains(name) {
-            return Err(Error::Malformed(format!(
-                "Circular dependency: {} is a dependency of itself",
-                name
-            )));
-        }
 
-        let mut deps = DepTree::new(name.to_string());
-        let mut data = Vec::new();
-        lib.cir_dep.insert(name.to_string());
-        let path_c = CString::new(path)
-            .map_err(|err| Error::Malformed(format!("invalid path '{}': {}", path, err)))?;
-
-        {
-            let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
-            let mut file = File::open(&path_c, flags)
-                .map_err(|err| Error::Malformed(format!("failed to open '{}': {}", path, err)))?;
-
-            file.read_to_end(&mut data)
-                .map_err(|err| Error::Malformed(format!("failed to read '{}': {}", path, err)))?;
-        }
-        deps.deps = self.load_data(name, data.into_boxed_slice(), lib)?;
-        lib.cir_dep.remove(name);
-        Ok(deps)
-    }
-
-    fn load_data(
-        &mut self,
-        name: &str,
-        data: Box<[u8]>,
-        lib: &mut Library,
-    ) -> Result<Vec<DepTree>> {
-        let elf = Elf::parse(&data)?;
-        //println!("{:#?}", elf);
-
-        // search for RUNPATH
-        lib.runpath = if let Some(dynamic) = elf.dynamic {
-            let entry = dynamic.dyns.iter().find(|d| d.d_tag == DT_RUNPATH);
-            match entry {
-                Some(entry) => {
-                    let path = elf
-                        .dynstrtab
-                        .get(entry.d_val as usize)
-                        .ok_or(Error::Malformed("Missing RUNPATH in dynstrtab".to_string()))??;
-                    Some(path.to_string())
-                }
-                _ => None,
-            }
-        } else {
-            None
-        };
-
-        let mut deps = Vec::new();
-        for library in elf.libraries.iter() {
-            if let Some(dep) = self._load_library(library, lib)? {
-                deps.push(dep);
-            }
-        }
-        let key = match elf.soname {
-            Some(soname) => soname,
-            _ => name,
-        };
-        if !lib.objects.contains_key(key) {
-            lib.objects.insert(key.to_string(), data);
-        }
-        return Ok(deps);
+    pub fn load_program(&mut self, path: &str, base_addr: Option<usize>) -> Result<usize> {
+        self.load_object(path, &None, base_addr, false)?;
+        return Ok(self.objects.get(&root_id).unwrap().entry_point);
     }
 
     pub fn load_library(&mut self, name: Option<&str>) -> Result<usize> {
         match name {
             Some(name) => {
-                let mut lib = Library::new();
-                self._load_library(name, &mut lib)?;
-                let ret = self.counter;
-                self.lib_spaces.insert(ret, lib);
-                self.counter += 1;
-                return Ok(ret);
+                if let Some(id) = self.name_to_object_id_map.get(name) {
+                    let obj = self.objects.get_mut(id).unwrap();
+                    obj.use_count += 1;
+                    return Ok(*id);
+                } else {
+                    let parent_runpath = &self.objects.get(&root_id).unwrap().runpath.clone();
+                    let lib_id = self.next_object_id;
+                    self.load_object(name, parent_runpath, None, true)?;
+
+                    return Ok(lib_id);
+                }
             }
             None => return Ok(root_id),
         }
     }
-    fn _load_library(&mut self, name: &str, lib: &mut Library) -> Result<Option<DepTree>> {
-        if lib.objects.contains_key(name) || self.root.objects.contains_key(name) {
-            // It should be previously resolved so we don't need to worry about it
-            Ok(None)
-        } else if name.contains('/') {
-            Ok(Some(self.load_recursive(name, name, lib)?))
-        } else {
-            let mut paths = Vec::new();
-            if let Some(ld_library_path) = &self.ld_library_path {
-                paths.push(ld_library_path);
-            }
-            if let Some(runpath) = &lib.runpath {
-                paths.push(runpath);
-            }
-            paths.push(&self.default_library_path);
-            for part in paths.iter() {
-                let path = if part.is_empty() {
-                    format!("./{}", name)
-                } else {
-                    format!("{}/{}", part, name)
-                };
-                if self.verbose {
-                    println!("check {}", path);
-                }
 
-                if accessible(&path, unistd::F_OK) == 0 {
-                    return Ok(Some(self.load_recursive(name, &path, lib)?));
-                }
-            }
-
-            Err(Error::Malformed(format!("failed to locate '{}'", name)))
+    pub fn get_sym(&self, lib_id: usize, name: &str) -> Option<*mut c_void> {
+        match self.objects.get(&lib_id) {
+            Some(obj) => obj.get_sym(name).map(|s| s.as_ptr()),
+            _ => None,
         }
     }
 
-    fn collect_syms(
-        elf: &Elf,
-        mmap: &[u8],
-        verbose: bool,
-    ) -> Result<(BTreeMap<String, Symbol>, BTreeMap<String, Symbol>)> {
-        let mut globals = BTreeMap::new();
-        let mut weak_syms = BTreeMap::new();
-        for sym in elf.dynsyms.iter() {
-            let bind = sym.st_bind();
-            if sym.st_value == 0 || ![sym::STB_GLOBAL, sym::STB_WEAK].contains(&bind) {
-                continue;
-            }
-            let name: String;
-            let value: Symbol;
-            if let Some(name_res) = elf.dynstrtab.get(sym.st_name) {
-                name = name_res?.to_string();
-                value = if is_pie_enabled(elf) {
-                    Symbol {
-                        base: mmap.as_ptr() as usize,
-                        value: sym.st_value as usize,
-                        size: sym.st_size as usize,
+    pub fn unload(&mut self, lib_id: usize) {
+        if let Some(obj) = self.objects.get_mut(&lib_id) {
+            if obj.dlopened {
+                if obj.use_count == 1 {
+                    let obj = self.objects.remove(&lib_id).unwrap();
+                    for dep in obj.dependencies.iter() {
+                        self.unload(*self.name_to_object_id_map.get(dep).unwrap());
                     }
+                    self.name_to_object_id_map.remove(&obj.name);
+                    drop(obj);
                 } else {
-                    Symbol {
-                        base: 0,
-                        value: sym.st_value as usize,
-                        size: sym.st_size as usize,
-                    }
-                };
+                    obj.use_count -= 1;
+                }
+            }
+        }
+    }
+
+    fn load_object(
+        &mut self,
+        path: &str,
+        runpath: &Option<String>,
+        base_addr: Option<usize>,
+        dlopened: bool,
+    ) -> Result<()> {
+        unsafe { _r_debug.state = RTLDState::RT_ADD };
+        _dl_debug_state();
+
+        let mut new_objects = Vec::new();
+        let mut objects_data = Vec::new();
+        let mut tcb_masters = Vec::new();
+        self.load_objects_recursive(
+            path,
+            runpath,
+            base_addr,
+            dlopened,
+            &mut new_objects,
+            &mut objects_data,
+            &mut tcb_masters,
+        )?;
+
+        unsafe {
+            let tcb = if self.objects.len() == 0 {
+                Tcb::new(self.tls_size)?
             } else {
-                continue;
-            }
-            match sym.st_bind() {
-                sym::STB_GLOBAL => {
-                    if verbose {
-                        println!("  global {}: {:x?} = {:p}", &name, sym, value.as_ptr());
-                    }
-                    globals.insert(name, value);
-                }
-                sym::STB_WEAK => {
-                    if verbose {
-                        println!("  weak {}: {:x?} = {:p}", &name, sym, value.as_ptr());
-                    }
-                    weak_syms.insert(name, value);
-                }
-                _ => unreachable!(),
-            }
-        }
-        return Ok((globals, weak_syms));
-    }
-
-    pub fn get_sym(&self, name: &str, libspace: Option<usize>) -> Option<Symbol> {
-        match libspace {
-            None | Some(root_id) => self.root.get_sym(name),
-            Some(id) => {
-                let lib = self.lib_spaces.get(&id)?;
-                lib.get_sym(name)
-            }
-        }
-    }
-
-    pub fn run_init(&self, libspace: Option<usize>) -> Result<()> {
-        match libspace {
-            Some(id) => {
-                let lib = self.lib_spaces.get(&id).unwrap();
-                self.run_tree(&lib, &lib.dep_tree, ".init_array")
-            }
-            None => self.run_tree(&self.root, &self.root.dep_tree, ".init_array"),
-        }
-    }
-
-    pub fn run_fini(&self, libspace: Option<usize>) -> Result<()> {
-        match libspace {
-            Some(root_id) => return Ok(()),
-            Some(id) => {
-                let lib = self.lib_spaces.get(&id).unwrap();
-                self.run_tree(&lib, &lib.dep_tree, ".fini_array")
-            }
-            None => {
-                //TODO we first need to deinitialize all the loaded libraries first!
-                self.run_tree(&self.root, &self.root.dep_tree, ".fini_array")
-            }
-        }
-    }
-
-    fn run_tree(&self, lib: &Library, root: &DepTree, tree_name: &str) -> Result<()> {
-        for node in root.deps.iter() {
-            self.run_tree(lib, node, tree_name)?;
-        }
-        if self.verbose {
-            println!("running {} {}", tree_name, &root.name);
-        }
-        let (_, mmap) = match lib.mmaps.get(&root.name) {
-            Some(some) => some,
-            None => return Ok(()),
-        };
-        let elf = Elf::parse(lib.objects.get(&root.name).unwrap())?;
-        for section in &elf.section_headers {
-            let name = match elf.shdr_strtab.get(section.sh_name) {
-                Some(x) => match x {
-                    Ok(y) => y,
-                    _ => continue,
-                },
-                _ => continue,
+                Tcb::current().unwrap()
             };
-            if name == tree_name {
-                let addr = if is_pie_enabled(&elf) {
-                    mmap.as_ptr() as usize + section.vm_range().start
-                } else {
-                    section.vm_range().start
-                };
-                for i in (0..section.sh_size).step_by(8) {
-                    unsafe { call_inits_finis(addr + i as usize) };
-                }
-            }
+            tcb.append_masters(tcb_masters);
+            tcb.copy_masters()?;
+            tcb.activate();
         }
+
+        self.relocate(&new_objects, &objects_data)?;
+        self.run_init(&new_objects);
+
+        for obj in new_objects.into_iter() {
+            self.name_to_object_id_map.insert(obj.name.clone(), obj.id);
+            self.objects.insert(obj.id, obj);
+        }
+
+        unsafe { _r_debug.state = RTLDState::RT_CONSISTENT };
+        _dl_debug_state();
+
         return Ok(());
     }
 
-    pub fn link(
+    fn load_objects_recursive(
         &mut self,
-        primary_opt: Option<&str>,
-        dso: Option<DSO>,
-        libspace: Option<usize>,
-    ) -> Result<Option<usize>> {
-        match libspace {
-            Some(id) => {
-                let mut lib = self.lib_spaces.remove(&id).unwrap();
-                let res = self._link(primary_opt, dso, &mut lib);
-                self.lib_spaces.insert(id, lib);
-                res
+        name: &str,
+        parent_runpath: &Option<String>,
+        base_addr: Option<usize>,
+        dlopened: bool,
+        new_objects: &mut Vec<DSO>,
+        objects_data: &mut Vec<Vec<u8>>,
+        tcb_masters: &mut Vec<Master>,
+    ) -> Result<()> {
+        if let Some(obj) = {
+            if let Some(id) = self.name_to_object_id_map.get(name) {
+                self.objects.get_mut(id)
+            } else {
+                new_objects.iter_mut().find(|o| o.name == name)
             }
-            None => {
-                let mut lib = Library::new();
-                swap(&mut lib, &mut self.root);
-                let res = self._link(primary_opt, dso, &mut lib);
-                swap(&mut lib, &mut self.root);
-                res
-            }
+        } {
+            obj.use_count += 1;
+            return Ok(());
         }
+
+        let path = Linker::search_object(name, &self.ld_library_path, parent_runpath)?;
+        let data = Linker::read_file(&path)?;
+        let (obj, tcb_master) = DSO::new(
+            &path,
+            &data,
+            base_addr,
+            dlopened,
+            self.next_object_id,
+            self.next_tls_module_id,
+            self.tls_size,
+        )?;
+        new_objects.push(obj);
+        objects_data.push(data);
+        self.next_object_id += 1;
+
+        if let Some(master) = tcb_master {
+            self.next_tls_module_id += 1;
+            self.tls_size = master.offset;
+            tcb_masters.push(master);
+        }
+
+        let (runpath, dependencies) = {
+            let parent = new_objects.last().unwrap();
+            (parent.runpath.clone(), parent.dependencies.clone())
+        };
+        for dep_name in dependencies.iter() {
+            self.load_objects_recursive(
+                dep_name,
+                &runpath,
+                None,
+                dlopened,
+                new_objects,
+                objects_data,
+                tcb_masters,
+            )?;
+        }
+
+        return Ok(());
     }
 
-    pub fn _link(
-        &mut self,
-        primary_opt: Option<&str>,
-        dso: Option<DSO>,
-        lib: &mut Library,
-    ) -> Result<Option<usize>> {
-        unsafe { _r_debug.state = RTLDState::RT_ADD };
-        _dl_debug_state();
-        let mut skip_list = BTreeSet::new();
-        let elfs = {
-            let mut elfs = BTreeMap::new();
-            for (name, data) in lib.objects.iter() {
-                // Skip already linked libraries
-                if !lib.mmaps.contains_key(&*name) && !self.root.mmaps.contains_key(&*name) {
-                    elfs.insert(name.as_str(), Elf::parse(&data)?);
-                } else {
-                    skip_list.insert(name.as_str());
-                }
-            }
-            elfs
-        };
-
-        // Load all ELF files into memory and find all globals
-        let mut tls_primary = 0;
-        let mut tls_size = 0;
-        for (elf_name, elf) in elfs.iter() {
-            if skip_list.contains(elf_name) {
-                continue;
-            }
-            if self.verbose {
-                println!("map {}", elf_name);
-            }
-            let object = match lib.objects.get(*elf_name) {
-                Some(some) => some,
-                None => continue,
-            };
-            // data for struct LinkMap
-            let mut l_ld = 0;
-            // Calculate virtual memory bounds
-            let bounds = {
-                let mut bounds_opt: Option<(usize, usize)> = None;
-                for ph in elf.program_headers.iter() {
-                    let voff = ph.p_vaddr as usize % PAGE_SIZE;
-                    let vaddr = ph.p_vaddr as usize - voff;
-                    let vsize =
-                        ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
-
-                    match ph.p_type {
-                        program_header::PT_DYNAMIC => {
-                            l_ld = ph.p_vaddr;
-                        }
-                        program_header::PT_LOAD => {
-                            if self.verbose {
-                                println!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
-                            }
-                            if let Some(ref mut bounds) = bounds_opt {
-                                if vaddr < bounds.0 {
-                                    bounds.0 = vaddr;
-                                }
-                                if vaddr + vsize > bounds.1 {
-                                    bounds.1 = vaddr + vsize;
-                                }
-                            } else {
-                                bounds_opt = Some((vaddr, vaddr + vsize));
-                            }
-                        }
-                        program_header::PT_TLS => {
-                            if self.verbose {
-                                println!("  load tls {:#x}: {:x?}", vsize, ph);
-                            }
-                            tls_size += vsize;
-                            if Some(*elf_name) == primary_opt {
-                                tls_primary += vsize;
-                            }
-                        }
-                        _ => (),
-                    }
-                }
-                match bounds_opt {
-                    Some(some) => some,
-                    None => continue,
-                }
-            };
-            if self.verbose {
-                println!("  bounds {:#x}, {:#x}", bounds.0, bounds.1);
-            }
-            // Allocate memory
-            let mmap = unsafe {
-                let same_elf = if let Some(prog) = dso.as_ref() {
-                    if prog.name == *elf_name {
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                };
-                if same_elf {
-                    let addr = dso.as_ref().unwrap().base_addr;
-                    let size = if is_pie_enabled(&elf) {
-                        bounds.1
-                    } else {
-                        bounds.1 - bounds.0
-                    };
-
-                    // Fill the gaps i the binary
-                    let mut ranges = Vec::new();
-                    for ph in elf.program_headers.iter() {
-                        if ph.p_type == program_header::PT_LOAD {
-                            let voff = ph.p_vaddr as usize % PAGE_SIZE;
-                            let vaddr = ph.p_vaddr as usize - voff;
-                            let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE)
-                                * PAGE_SIZE;
-                            if is_pie_enabled(&elf) {
-                                ranges.push((vaddr, vsize));
-                            } else {
-                                ranges.push((vaddr - addr, vsize));
-                            }
-                        }
-                    }
-                    ranges.sort();
-                    let mut start = addr;
-                    for (vaddr, vsize) in ranges.iter() {
-                        if start < addr + vaddr {
-                            if self.verbose {
-                                println!("mmap({:#x}, {})", start, addr + vaddr - start);
-                            }
-                            let mut flags = sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE;
-                            if start != 0 {
-                                flags |= sys_mman::MAP_FIXED_NOREPLACE;
-                            }
-                            let ptr = sys_mman::mmap(
-                                start as *mut c_void,
-                                addr + vaddr - start,
-                                //TODO: Make it possible to not specify PROT_EXEC on Redox
-                                sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-                                flags,
-                                -1,
-                                0,
-                            );
-                            if ptr as usize == !0
-                            /* MAP_FAILED */
-                            {
-                                return Err(Error::Malformed(format!(
-                                    "failed to map {}. errno: {}",
-                                    elf_name, STR_ERROR[errno as usize]
-                                )));
-                            }
-                            if start as *mut c_void != ptr::null_mut() {
-                                assert_eq!(
-                                    ptr, start as *mut c_void,
-                                    "mmap must always map on the destination we requested"
-                                );
-                            }
-                        }
-                        start = addr + vaddr + vsize
-                    }
-                    sys_mman::mprotect(
-                        addr as *mut c_void,
-                        size,
-                        sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-                    );
-                    _r_debug.insert_first(addr as usize, &elf_name, addr + l_ld as usize);
-                    (
-                        addr as usize,
-                        slice::from_raw_parts_mut(addr as *mut u8, size),
-                    )
-                } else {
-                    let (start, end) = bounds;
-                    let size = end - start;
-                    if self.verbose {
-                        println!("mmap({:#x}, {})", start, size);
-                    }
-                    let mut flags = sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE;
-                    if start != 0 {
-                        flags |= sys_mman::MAP_FIXED_NOREPLACE;
-                    }
-                    let ptr = sys_mman::mmap(
-                        start as *mut c_void,
-                        size,
-                        //TODO: Make it possible to not specify PROT_EXEC on Redox
-                        sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-                        flags,
-                        -1,
-                        0,
-                    );
-                    if ptr as usize == !0
-                    /* MAP_FAILED */
-                    {
-                        return Err(Error::Malformed(format!(
-                            "failed to map {}. errno: {}",
-                            elf_name, STR_ERROR[errno as usize]
-                        )));
-                    }
-                    if start as *mut c_void != ptr::null_mut() {
-                        assert_eq!(
-                            ptr, start as *mut c_void,
-                            "mmap must always map on the destination we requested"
-                        );
-                    }
-                    ptr::write_bytes(ptr as *mut u8, 0, size);
-                    _r_debug.insert(ptr as usize, &elf_name, ptr as usize + l_ld as usize);
-                    (start, slice::from_raw_parts_mut(ptr as *mut u8, size))
-                }
-            };
-            if self.verbose {
-                println!("  mmap {:p}, {:#x}", mmap.1.as_mut_ptr(), mmap.1.len());
-            }
-            let (globals, weak_syms) = Linker::collect_syms(&elf, &mmap.1, self.verbose)?;
-            lib.globals.extend(globals.into_iter());
-            lib.weak_syms.extend(weak_syms.into_iter());
-            lib.mmaps.insert(elf_name.to_string(), mmap);
-        }
-
-        // Allocate TLS
-        let mut tcb_opt = if primary_opt.is_some() {
-            Some(unsafe { Tcb::new(tls_size)? })
+    fn search_object(
+        name: &str,
+        ld_library_path: &Option<String>,
+        parent_runpath: &Option<String>,
+    ) -> Result<String> {
+        let mut full_path = name.to_string();
+        if accessible(&full_path, F_OK) == 0 {
+            return Ok(full_path);
         } else {
-            None
-        };
-        if self.verbose {
-            println!("tcb {:x?}", tcb_opt);
-        }
-        // Copy data
-        let mut tls_offset = tls_primary;
-        let mut tcb_masters = Vec::new();
-        // Insert main image master
-        tcb_masters.push(Master {
-            ptr: ptr::null_mut(),
-            len: 0,
-            offset: 0,
-        });
-        let mut tls_ranges = BTreeMap::new();
-        for (elf_name, elf) in elfs.iter() {
-            if skip_list.contains(elf_name) {
-                continue;
+            let mut search_paths = Vec::new();
+            if let Some(runpath) = parent_runpath {
+                search_paths.extend(runpath.split(PATH_SEP));
             }
-            let same_elf = if let Some(prog) = dso.as_ref() {
-                if prog.name == *elf_name {
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-            let object = match lib.objects.get(*elf_name) {
-                Some(some) => some,
-                None => continue,
-            };
-
-            let &mut (base_addr, ref mut mmap) = match lib.mmaps.get_mut(*elf_name) {
-                Some(some) => some,
-                None => continue,
-            };
-            if self.verbose {
-                println!("load {}", elf_name);
+            if let Some(ld_path) = ld_library_path {
+                search_paths.extend(ld_path.split(PATH_SEP));
             }
-            // Copy data
-            for ph in elf.program_headers.iter() {
-                let voff = ph.p_vaddr as usize % PAGE_SIZE;
-                let vaddr = ph.p_vaddr as usize - voff;
-                let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
-
-                match ph.p_type {
-                    program_header::PT_LOAD => {
-                        if same_elf {
-                            continue;
-                        }
-                        let obj_data = {
-                            let range = ph.file_range();
-                            match object.get(range.clone()) {
-                                Some(some) => some,
-                                None => {
-                                    return Err(Error::Malformed(format!(
-                                        "failed to read {:x?}",
-                                        range
-                                    )))
-                                }
-                            }
-                        };
-
-                        let mmap_data = {
-                            let range = ph.p_vaddr as usize - base_addr
-                                ..ph.p_vaddr as usize + obj_data.len() - base_addr;
-                            match mmap.get_mut(range.clone()) {
-                                Some(some) => some,
-                                None => {
-                                    println!("mmap: {}", mmap.len());
-                                    return Err(Error::Malformed(format!(
-                                        "failed to write {:x?}",
-                                        range
-                                    )));
-                                }
-                            }
-                        };
-                        if self.verbose {
-                            println!(
-                                "  copy {:#x}, {:#x}: {:#x}, {:#x}",
-                                vaddr,
-                                vsize,
-                                voff,
-                                obj_data.len()
-                            );
-                        }
-                        mmap_data.copy_from_slice(obj_data);
-                    }
-                    program_header::PT_TLS => {
-                        let valign = if ph.p_align > 0 {
-                            ((ph.p_memsz + (ph.p_align - 1)) / ph.p_align) * ph.p_align
-                        } else {
-                            ph.p_memsz
-                        } as usize;
-                        let ptr = unsafe {
-                            if is_pie_enabled(elf) {
-                                mmap.as_ptr().add(ph.p_vaddr as usize)
-                            } else {
-                                ph.p_vaddr as *const u8
-                            }
-                        };
-                        let mut tcb_master = Master {
-                            ptr: ptr,
-                            len: ph.p_filesz as usize,
-                            offset: tls_size - valign,
-                        };
-                        if self.verbose {
-                            println!(
-                                "  tls master {:p}, {:#x}: {:#x}, {:#x}",
-                                tcb_master.ptr, tcb_master.len, tcb_master.offset, valign,
-                            );
-                        }
-                        if Some(*elf_name) == primary_opt {
-                            tls_ranges.insert(
-                                elf_name.to_string(),
-                                (self.tls_index_offset, tcb_master.range()),
-                            );
-                            tcb_masters[0] = tcb_master;
-                        } else {
-                            tcb_master.offset -= tls_offset;
-                            tls_offset += vsize;
-                            tls_ranges.insert(
-                                elf_name.to_string(),
-                                (
-                                    self.tls_index_offset + tcb_masters.len(),
-                                    tcb_master.range(),
-                                ),
-                            );
-                            tcb_masters.push(tcb_master);
-                        }
-                    }
-                    _ => (),
+            search_paths.push("/lib");
+            for part in search_paths.iter() {
+                full_path = format!("{}/{}", part, name);
+                trace!("trying path {}", full_path);
+                if accessible(&full_path, F_OK) == 0 {
+                    return Ok(full_path);
                 }
             }
         }
+        return Err(Error::Malformed(format!("failed to locate '{}'", name)));
+    }
 
-        self.tls_index_offset += tcb_masters.len();
+    fn read_file(path: &str) -> Result<Vec<u8>> {
+        let mut data = Vec::new();
+        let path_c = CString::new(path)
+            .map_err(|err| Error::Malformed(format!("invalid path '{}': {}", path, err)))?;
+        let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
+        let mut file = File::open(&path_c, flags)
+            .map_err(|err| Error::Malformed(format!("failed to open '{}': {}", path, err)))?;
+        file.read_to_end(&mut data)
+            .map_err(|err| Error::Malformed(format!("failed to read '{}': {}", path, err)))?;
 
-        // Set master images for TLS and copy TLS data
-        if let Some(ref mut tcb) = tcb_opt {
-            unsafe {
-                tcb.set_masters(tcb_masters.into_boxed_slice());
-                tcb.copy_masters()?;
-            }
-        }
+        return Ok(data);
+    }
 
-        // Perform relocations, and protect pages
-        for (elf_name, elf) in elfs.iter() {
-            if skip_list.contains(elf_name) {
-                continue;
-            }
-            if self.verbose {
-                println!("link {}", elf_name);
-            }
+    fn relocate(&self, new_objects: &Vec<DSO>, objects_data: &Vec<Vec<u8>>) -> Result<()> {
+        let symbols_lookup_objects: Vec<&DSO> =
+            self.objects.values().chain(new_objects.iter()).collect();
+
+        // Perform relocations
+        for i in (0..new_objects.len()).rev() {
+            let elf = Elf::parse(&objects_data[i])?;
+            let obj = &new_objects[i];
+
+            trace!("link {}", obj.name);
+
+            let mmap = &obj.mmap;
+            let b = mmap.as_ptr() as usize;
+
             // Relocate
             for rel in elf
                 .dynrelas
@@ -746,16 +284,18 @@ impl Linker {
                 .chain(elf.dynrels.iter())
                 .chain(elf.pltrelocs.iter())
             {
-                // println!("  rel {}: {:x?}",
-                //     reloc::r_to_str(rel.r_type, elf.header.e_machine),
-                //     rel
-                // );
-                let symbol = if rel.r_sym > 0 {
+                trace!(
+                    "  rel {}: {:x?}",
+                    reloc::r_to_str(rel.r_type, elf.header.e_machine),
+                    rel
+                );
+                let (symbol, t) = if rel.r_sym > 0 {
                     let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(format!(
                         "missing symbol for relocation {:?}",
                         rel
                     )))?;
 
+                    let mut t = 0;
                     let name =
                         elf.dynstrtab
                             .get(sym.st_name)
@@ -763,9 +303,32 @@ impl Linker {
                                 "missing name for symbol {:?}",
                                 sym
                             )))??;
-                    lib.get_sym(name).or_else(|| self.root.get_sym(name))
+                    let mut symbol = None;
+                    let mut found = false;
+                    let lookup_start = match rel.r_type {
+                        reloc::R_X86_64_COPY => 1,
+                        _ => 0,
+                    };
+                    for lookup_id in lookup_start..symbols_lookup_objects.len() {
+                        let obj = &symbols_lookup_objects[lookup_id];
+                        let s = obj.get_sym(name);
+                        if s.is_some() {
+                            trace!("symbol {} from {} found in {}", name, obj.name, obj.name);
+                            symbol = s;
+                            t = obj.tls_offset;
+                            found = true;
+                            break;
+                        }
+                    }
+                    // TODO: below doesn't work because of missing __preinit_array_{start,end} and __init_array_{start,end} symbols in dynamic linked programs
+                    /*
+                    if !found {
+                        return Err(Error::Malformed(format!("missing symbol for name {}", name)));
+                    }
+                    */
+                    (symbol, t)
                 } else {
-                    None
+                    (None, 0)
                 };
 
                 let s = symbol
@@ -775,26 +338,13 @@ impl Linker {
 
                 let a = rel.r_addend.unwrap_or(0) as usize;
 
-                let (_, mmap) = match lib.mmaps.get_mut(*elf_name) {
-                    Some(some) => some,
-                    None => continue,
-                };
-
-                let b = mmap.as_mut_ptr() as usize;
-
-                let (tm, t) = if let Some((tls_index, tls_range)) = tls_ranges.get(*elf_name) {
-                    (*tls_index, tls_range.start)
-                } else {
-                    (0, 0)
-                };
-
                 let ptr = if is_pie_enabled(&elf) {
-                    unsafe { mmap.as_mut_ptr().add(rel.r_offset as usize) }
+                    (b + rel.r_offset as usize) as *mut u8
                 } else {
                     rel.r_offset as *mut u8
                 };
                 let set_u64 = |value| {
-                    // println!("    set_u64 {:#x}", value);
+                    trace!("    set_u64 {:#x}", value);
                     unsafe {
                         *(ptr as *mut u64) = value;
                     }
@@ -805,7 +355,7 @@ impl Linker {
                         set_u64((s + a) as u64);
                     }
                     reloc::R_X86_64_DTPMOD64 => {
-                        set_u64(tm as u64);
+                        set_u64(obj.tls_module_id as u64);
                     }
                     reloc::R_X86_64_DTPOFF64 => {
                         if s != 0 {
@@ -821,11 +371,16 @@ impl Linker {
                         set_u64((b + a) as u64);
                     }
                     reloc::R_X86_64_TPOFF64 => {
-                        set_u64((s + a).wrapping_sub(t) as u64);
+                        let sym = symbol
+                            .as_ref()
+                            .expect("R_X86_64_TPOFF64 called without valid symbol");
+                        set_u64((sym.value + a).wrapping_sub(t) as u64);
                     }
-                    reloc::R_X86_64_IRELATIVE => (), // Handled below
+                    reloc::R_X86_64_IRELATIVE => unsafe {
+                        let f: unsafe extern "C" fn() -> u64 = transmute(b + a);
+                        set_u64(f());
+                    },
                     reloc::R_X86_64_COPY => unsafe {
-                        // TODO: Make this work
                         let sym = symbol
                             .as_ref()
                             .expect("R_X86_64_COPY called without valid symbol");
@@ -840,202 +395,49 @@ impl Linker {
                 }
             }
 
-            // overwrite DT_DEBUG if exist in DYNAMIC segment
-            // first we identify the location of DYNAMIC segment
-            let mut dyn_start = None;
-            let mut debug_start = None;
-            for ph in elf.program_headers.iter() {
-                if ph.p_type == program_header::PT_DYNAMIC {
-                    dyn_start = Some(ph.p_vaddr as usize);
-                }
-            }
-            // next we identify the location of DT_DEBUG in .dynamic section
-            if let Some(dynamic) = elf.dynamic.as_ref() {
-                let mut i = 0;
-                for entry in &dynamic.dyns {
-                    if entry.d_tag == DT_DEBUG {
-                        debug_start = Some(i as usize);
-                        break;
-                    }
-                    i += 1;
-                }
-            }
-            if let Some(dyn_start_addr) = dyn_start {
-                if let Some(i) = debug_start {
-                    let (_, mmap) = match lib.mmaps.get_mut(*elf_name) {
-                        Some(some) => some,
-                        None => continue,
-                    };
-                    let bytes: [u8; size_of::<Dyn>() / 2] =
-                        unsafe { transmute((&_r_debug) as *const RTLDDebug as usize) };
-                    let start = if is_pie_enabled(elf) {
-                        dyn_start_addr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
-                    } else {
-                        dyn_start_addr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
-                            - mmap.as_mut_ptr() as usize
-                    };
-                    mmap[start..start + size_of::<Dyn>() / 2].clone_from_slice(&bytes);
-                }
-            }
-
             // Protect pages
-            for ph in elf.program_headers.iter() {
-                if ph.p_type == program_header::PT_LOAD {
-                    let voff = ph.p_vaddr as usize % PAGE_SIZE;
-                    let vaddr = ph.p_vaddr as usize - voff;
-                    let vsize =
-                        ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
-
-                    let mut prot = 0;
-
-                    if ph.p_flags & program_header::PF_R == program_header::PF_R {
-                        prot |= sys_mman::PROT_READ;
-                    }
-
-                    // W ^ X. If it is executable, do not allow it to be writable, even if requested
-                    if ph.p_flags & program_header::PF_X == program_header::PF_X {
-                        prot |= sys_mman::PROT_EXEC;
-                    } else if ph.p_flags & program_header::PF_W == program_header::PF_W {
-                        prot |= sys_mman::PROT_WRITE;
-                    }
-
-                    let (_, mmap) = match lib.mmaps.get_mut(*elf_name) {
-                        Some(some) => some,
-                        None => continue,
-                    };
-                    let res = unsafe {
-                        let ptr = if is_pie_enabled(elf) {
-                            mmap.as_mut_ptr().add(vaddr)
-                        } else {
-                            vaddr as *const u8
-                        };
-                        if self.verbose {
-                            println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
-                        }
-                        sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
-                    };
-
-                    if res < 0 {
-                        return Err(Error::Malformed(format!("failed to mprotect {}", elf_name)));
-                    }
-                }
-            }
-        }
-
-        // Activate TLS
-        if let Some(ref mut tcb) = tcb_opt {
-            unsafe {
-                tcb.activate();
-            }
-        }
-
-        // Perform indirect relocations (necessary evil), gather entry point
-        let mut entry_opt = None;
-        for (elf_name, elf) in elfs.iter() {
-            if skip_list.contains(elf_name) {
-                continue;
-            }
-            let (_, mmap) = match lib.mmaps.get_mut(*elf_name) {
-                Some(some) => some,
-                None => continue,
-            };
-            if self.verbose {
-                println!("entry {}", elf_name);
-            }
-            if Some(*elf_name) == primary_opt {
-                if is_pie_enabled(&elf) {
-                    entry_opt = Some(mmap.as_mut_ptr() as usize + elf.header.e_entry as usize);
-                } else {
-                    entry_opt = Some(elf.header.e_entry as usize);
-                }
-            }
-
-            // Relocate
-            for rel in elf
-                .dynrelas
+            for ph in elf
+                .program_headers
                 .iter()
-                .chain(elf.dynrels.iter())
-                .chain(elf.pltrelocs.iter())
+                .filter(|ph| ph.p_type == program_header::PT_LOAD)
             {
-                // println!("  rel {}: {:x?}",
-                //     reloc::r_to_str(rel.r_type, elf.header.e_machine),
-                //     rel
-                // );
+                let voff = ph.p_vaddr % ph.p_align;
+                let vaddr = (ph.p_vaddr - voff) as usize;
+                let vsize = round_up((ph.p_memsz + voff) as usize, ph.p_align as usize);
+                let mut prot = 0;
+                if ph.p_flags & program_header::PF_R == program_header::PF_R {
+                    prot |= sys_mman::PROT_READ;
+                }
 
-                let a = rel.r_addend.unwrap_or(0) as usize;
+                // W ^ X. If it is executable, do not allow it to be writable, even if requested
+                if ph.p_flags & program_header::PF_X == program_header::PF_X {
+                    prot |= sys_mman::PROT_EXEC;
+                } else if ph.p_flags & program_header::PF_W == program_header::PF_W {
+                    prot |= sys_mman::PROT_WRITE;
+                }
 
-                let b = mmap.as_mut_ptr() as usize;
-
-                let ptr = unsafe { mmap.as_mut_ptr().add(rel.r_offset as usize) };
-
-                let set_u64 = |value| {
-                    // println!("    set_u64 {:#x}", value);
-                    unsafe {
-                        *(ptr as *mut u64) = value;
-                    }
+                let res = unsafe {
+                    let ptr = if is_pie_enabled(&elf) {
+                        mmap.as_ptr().add(vaddr)
+                    } else {
+                        vaddr as *const u8
+                    };
+                    trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
+                    sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
                 };
 
-                if rel.r_type == reloc::R_X86_64_IRELATIVE {
-                    unsafe {
-                        let f: unsafe extern "C" fn() -> u64 = transmute(b + a);
-                        set_u64(f());
-                    }
-                }
-            }
-            // Protect pages
-            for ph in elf.program_headers.iter() {
-                if let program_header::PT_LOAD = ph.p_type {
-                    let voff = ph.p_vaddr as usize % PAGE_SIZE;
-                    let vaddr = ph.p_vaddr as usize - voff;
-                    let vsize =
-                        ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
-
-                    let mut prot = 0;
-
-                    if ph.p_flags & program_header::PF_R == program_header::PF_R {
-                        prot |= sys_mman::PROT_READ;
-                    }
-
-                    // W ^ X. If it is executable, do not allow it to be writable, even if requested
-                    if ph.p_flags & program_header::PF_X == program_header::PF_X {
-                        prot |= sys_mman::PROT_EXEC;
-                    } else if ph.p_flags & program_header::PF_W == program_header::PF_W {
-                        prot |= sys_mman::PROT_WRITE;
-                    }
-
-                    let res = unsafe {
-                        let ptr = if is_pie_enabled(&elf) {
-                            mmap.as_mut_ptr().add(vaddr)
-                        } else {
-                            vaddr as *const u8
-                        };
-                        if self.verbose {
-                            println!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
-                        }
-                        sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
-                    };
-
-                    if res < 0 {
-                        return Err(Error::Malformed(format!("failed to mprotect {}", elf_name)));
-                    }
+                if res < 0 {
+                    return Err(Error::Malformed(format!("failed to mprotect {}", obj.name)));
                 }
             }
         }
-        unsafe { _r_debug.state = RTLDState::RT_CONSISTENT };
-        _dl_debug_state();
-        Ok(entry_opt)
+
+        return Ok(());
     }
-}
 
-unsafe fn call_inits_finis(addr: usize) {
-    let func = transmute::<usize, *const Option<extern "C" fn()>>(addr);
-    (*func).map(|x| x());
-}
-
-fn is_pie_enabled(elf: &Elf) -> bool {
-    if elf.header.e_type == ET_DYN {
-        true
-    } else {
-        false
+    fn run_init(&self, objects: &Vec<DSO>) {
+        for obj in objects.iter().rev() {
+            obj.run_init();
+        }
     }
 }

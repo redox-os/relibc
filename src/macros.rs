@@ -78,7 +78,6 @@ macro_rules! trace {
     ($($arg:tt)*) => ({
         use $crate::{Pal, Sys};
         eprintln!($($arg)*);
-        Sys::fsync(2);
     });
 }
 

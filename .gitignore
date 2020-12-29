@@ -4,3 +4,5 @@ sysroot/
 **/target/
 .gdb_history
 *.patch
+*.swp
+*.swo

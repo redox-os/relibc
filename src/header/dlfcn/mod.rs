@@ -50,13 +50,11 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
     let tcb = match Tcb::current() {
         Some(tcb) => tcb,
         None => {
-            eprintln!("dlopen: tcb not found");
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
             return ptr::null_mut();
         }
     };
     if tcb.linker_ptr.is_null() {
-        eprintln!("dlopen: linker not found");
         ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
         return ptr::null_mut();
     }
@@ -67,28 +65,12 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
 
     let id = match (cbs.load_library)(&mut linker, filename) {
         Err(err) => {
-            eprintln!("dlopen: failed to load {:?}", filename);
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
             return ptr::null_mut();
         }
         Ok(id) => id,
     };
 
-    if let Some(fname) = filename {
-        if let Err(err) = (cbs.link)(&mut linker, None, None, Some(id)) {
-            (cbs.unload)(&mut linker, id);
-            eprintln!("dlopen: failed to link '{}': {}", fname, err);
-            ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-            return ptr::null_mut();
-        };
-
-        if let Err(err) = (cbs.run_init)(&mut linker, Some(id)) {
-            (cbs.unload)(&mut linker, id);
-            eprintln!("dlopen: failed to link '{}': {}", fname, err);
-            ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-            return ptr::null_mut();
-        };
-    }
     id as *mut c_void
 }
 
@@ -104,14 +86,12 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
     let tcb = match Tcb::current() {
         Some(tcb) => tcb,
         None => {
-            eprintln!("dlsym: tcb not found");
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
             return ptr::null_mut();
         }
     };
 
     if tcb.linker_ptr.is_null() {
-        eprintln!("dlsym: linker not found");
         ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
         return ptr::null_mut();
     }
@@ -119,12 +99,12 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
     let linker = (&*tcb.linker_ptr).lock();
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
-    if let Some(global) = (cbs.get_sym)(&linker, symbol_str, Some(handle as usize)) {
-        global.as_ptr()
-    } else {
-        eprintln!("dlsym: symbol not found");
-        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-        ptr::null_mut()
+    match (cbs.get_sym)(&linker, handle as usize, symbol_str) {
+        Some(sym) => sym,
+        _ => {
+            ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+            ptr::null_mut()
+        }
     }
 }
 
@@ -133,24 +113,18 @@ pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
     let tcb = match Tcb::current() {
         Some(tcb) => tcb,
         None => {
-            eprintln!("dlclose: tcb not found");
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
             return -1;
         }
     };
 
     if tcb.linker_ptr.is_null() {
-        eprintln!("dlclose: linker not found");
         ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
         return -1;
     };
     let mut linker = (&*tcb.linker_ptr).lock();
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
-    if let Err(err) = (cbs.run_fini)(&mut linker, Some(handle as usize)) {
-        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-        return -1;
-    };
     (cbs.unload)(&mut linker, handle as usize);
     0
 }
