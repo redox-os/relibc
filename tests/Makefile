@@ -6,6 +6,7 @@ EXPECT_NAMES=\
 	assert \
 	constructor \
 	ctype \
+	destructor \
 	dirent/scandir \
 	errno \
 	error \
@@ -119,11 +120,6 @@ EXPECT_NAMES=\
 	# mkfifo
 	# netdb/netdb \
 
-# need to call fini in ld_so's _start
-STATIC_ONLY_NAMES=\
-	destructor
-
-
 DYNAMIC_ONLY_NAMES=\
 	dlfcn
 
@@ -155,11 +151,9 @@ NAMES=\
 #	time/times
 
 BINS=$(patsubst %,bins_static/%,$(NAMES))
-BINS+=$(patsubst %,bins_static/%,$(STATIC_ONLY_NAMES))
 BINS+=$(patsubst %,bins_dynamic/%,$(NAMES))
 BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_BINS=$(patsubst %,bins_static/%,$(EXPECT_NAMES))
-EXPECT_BINS+=$(patsubst %,bins_static/%,$(STATIC_ONLY_NAMES))
 EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 

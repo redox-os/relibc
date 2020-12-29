@@ -113,6 +113,12 @@ impl Linker {
         }
     }
 
+    pub fn fini(&self) {
+        for obj in self.objects.values() {
+            obj.run_fini();
+        }
+    }
+
     fn load_object(
         &mut self,
         path: &str,

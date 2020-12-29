@@ -21,6 +21,7 @@ use crate::{
         unistd::{self, sysconf, _SC_PAGESIZE},
         wchar::*,
     },
+    ld_so,
     platform::{self, types::*, Pal, Sys},
 };
 
@@ -291,6 +292,8 @@ pub unsafe extern "C" fn exit(status: c_int) {
     }
 
     _fini();
+
+    ld_so::fini();
 
     pthread_terminate();
 
