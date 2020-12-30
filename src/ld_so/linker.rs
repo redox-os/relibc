@@ -6,14 +6,18 @@ use alloc::{
 };
 use core::{cell::RefCell, mem::transmute, ptr};
 use goblin::{
-    elf::{program_header, reloc, Elf},
+    elf::{program_header, reloc, sym::STT_TLS, Elf},
     error::{Error, Result},
 };
 
 use crate::{
     c_str::CString,
     fs::File,
-    header::{fcntl, sys_mman, unistd::F_OK},
+    header::{
+        dl_tls::{__tls_get_addr, dl_tls_index},
+        fcntl, sys_mman,
+        unistd::F_OK,
+    },
     io::Read,
     platform::types::c_void,
 };
@@ -32,6 +36,7 @@ pub struct Symbol {
     pub value: usize,
     pub base: usize,
     pub size: usize,
+    pub sym_type: u8,
 }
 
 impl Symbol {
@@ -91,8 +96,24 @@ impl Linker {
 
     pub fn get_sym(&self, lib_id: usize, name: &str) -> Option<*mut c_void> {
         match self.objects.get(&lib_id) {
-            Some(obj) => obj.get_sym(name).map(|s| s.as_ptr()),
-            _ => None,
+            Some(obj) => {
+                return obj.get_sym(name).map(|s| {
+                    if s.sym_type != STT_TLS {
+                        s.as_ptr()
+                    } else {
+                        unsafe {
+                            let mut tls_index = dl_tls_index {
+                                ti_module: obj.tls_module_id as u64,
+                                ti_offset: s.value as u64,
+                            };
+                            __tls_get_addr(&mut tls_index)
+                        }
+                    }
+                });
+            }
+            _ => {
+                return None;
+            }
         }
     }
 

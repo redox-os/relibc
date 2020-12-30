@@ -358,12 +358,14 @@ impl DSO {
                         base: mmap.as_ptr() as usize,
                         value: sym.st_value as usize,
                         size: sym.st_size as usize,
+                        sym_type: sym::st_type(sym.st_info),
                     }
                 } else {
                     Symbol {
                         base: 0,
                         value: sym.st_value as usize,
                         size: sym.st_size as usize,
+                        sym_type: sym::st_type(sym.st_info),
                     }
                 };
             } else {

@@ -40,7 +40,7 @@ pub struct Tcb {
     /// Size of the masters list in bytes (multiple of mem::size_of::<Master>())
     pub masters_len: usize,
     /// Index of last copied Master
-    pub last_master_copied: usize,
+    pub num_copied_masters: usize,
     /// Pointer to dynamic linker
     pub linker_ptr: *const Mutex<Linker>,
     /// pointer to rust memory allocator structure
@@ -63,7 +63,7 @@ impl Tcb {
                 tcb_len: tcb_page.len(),
                 masters_ptr: ptr::null_mut(),
                 masters_len: 0,
-                last_master_copied: 0,
+                num_copied_masters: 0,
                 linker_ptr: ptr::null(),
                 mspace: 0,
             },
@@ -114,7 +114,7 @@ impl Tcb {
             if let Some(masters) = self.masters() {
                 for (i, master) in masters
                     .iter()
-                    .skip(self.last_master_copied)
+                    .skip(self.num_copied_masters)
                     .filter(|m| m.len > 0)
                     .enumerate()
                 {
@@ -135,7 +135,7 @@ impl Tcb {
                         return Err(Error::Malformed(format!("failed to copy tls master {}", i)));
                     }
                 }
-                self.last_master_copied = masters.len();
+                self.num_copied_masters = masters.len();
             }
         }
 
