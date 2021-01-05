@@ -17,13 +17,9 @@ use crate::{
     ALLOCATOR,
 };
 
-use super::{
-    access::accessible,
-    debug::_r_debug,
-    linker::{Linker, DSO, PATH_SEP},
-    tcb::Tcb,
-};
+use super::{access::accessible, debug::_r_debug, linker::Linker, tcb::Tcb, PATH_SEP};
 use crate::header::sys_auxv::{AT_ENTRY, AT_PHDR};
+use goblin::elf::header::header64::SIZEOF_EHDR;
 
 unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
     //traverse the stack and collect argument vector
@@ -214,53 +210,25 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     // if we are not running in manual mode, then the main
     // program is already loaded by the kernel and we want
     // to use it. on redox, we treat it the same.
-    let program = {
-        let mut pr = None;
+    let base_addr = {
+        let mut base = None;
         if !is_manual && cfg!(not(target_os = "redox")) {
             let phdr = *auxv.get(&AT_PHDR).unwrap();
             if phdr != 0 {
-                let p = DSO {
-                    name: path.to_owned(),
-                    entry_point: *auxv.get(&AT_ENTRY).unwrap(),
-                    // The 0x40 is the size of Elf header not a good idea for different bit size
-                    // compatiablility but it will always work on 64 bit systems,
-                    base_addr: phdr - 0x40,
-                };
-                pr = Some(p);
+                base = Some(phdr - SIZEOF_EHDR);
             }
         }
-        pr
+        base
     };
-    let mut linker = Linker::new(ld_library_path, false);
-    match linker.load(&path, &path) {
-        Ok(()) => (),
-        Err(err) => {
-            eprintln!("ld.so: failed to load '{}': {}", path, err);
-            unistd::_exit(1);
-            loop {}
-        }
-    }
-
-    let entry = match linker.link(Some(&path), program, None) {
-        Ok(ok) => match ok {
-            Some(some) => some,
-            None => {
-                eprintln!("ld.so: failed to link '{}': missing entry", path);
-                unistd::_exit(1);
-                loop {}
-            }
-        },
+    let mut linker = Linker::new(ld_library_path);
+    let entry = match linker.load_program(&path, base_addr) {
+        Ok(entry) => entry,
         Err(err) => {
             eprintln!("ld.so: failed to link '{}': {}", path, err);
             unistd::_exit(1);
             loop {}
         }
     };
-    if let Err(e) = linker.run_init(None) {
-        eprintln!("ld.so: failed to run .init_array");
-        unistd::_exit(1);
-        loop {}
-    }
     if let Some(tcb) = unsafe { Tcb::current() } {
         tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
         tcb.mspace = ALLOCATOR.get_book_keeper();

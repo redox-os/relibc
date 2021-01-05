@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
   char temp[] = "/tmp/stattest-XXXXXX";
   const char file[] = "/mkfifo_fifo";
   int len = sizeof(temp) + sizeof(int);
-  char* path = malloc(len * sizeof(char));
+  char* path = calloc(len, sizeof(char));
 
   if (path == NULL) {
     fprintf(stderr, "Could not allocate: %s\n", strerror(errno));

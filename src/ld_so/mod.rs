@@ -6,10 +6,16 @@ use crate::{header::sys_auxv::AT_NULL, start::Stack};
 
 pub const PAGE_SIZE: usize = 4096;
 
+#[cfg(target_os = "redox")]
+pub const PATH_SEP: char = ';';
+
+#[cfg(target_os = "linux")]
+pub const PATH_SEP: char = ':';
+
 mod access;
 pub mod callbacks;
 pub mod debug;
-mod library;
+mod dso;
 pub mod linker;
 pub mod start;
 pub mod tcb;
@@ -73,7 +79,7 @@ pub fn static_init(sp: &'static Stack) {
                 unsafe {
                     STATIC_TCB_MASTER.ptr = ph.p_vaddr as usize as *const u8;
                     STATIC_TCB_MASTER.len = ph.p_filesz as usize;
-                    STATIC_TCB_MASTER.offset = vsize - valign;
+                    STATIC_TCB_MASTER.offset = valign;
 
                     let tcb = Tcb::new(vsize).expect("failed to allocate TCB");
                     tcb.masters_ptr = &mut STATIC_TCB_MASTER;

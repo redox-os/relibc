@@ -1,8 +1,8 @@
 // From https://www.remlab.net/op/futex-misc.shtml
 //TODO: improve implementation
 
-use crate::platform::{types::*, Pal, Sys};
 use super::AtomicLock;
+use crate::platform::{types::*, Pal, Sys};
 use core::sync::atomic::Ordering;
 
 pub struct Semaphore {
@@ -29,7 +29,7 @@ impl Semaphore {
                 value,
                 value - 1,
                 Ordering::Acquire,
-                Ordering::Relaxed
+                Ordering::Relaxed,
             ) {
                 Ok(ok) => return,
                 Err(err) => {

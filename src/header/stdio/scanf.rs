@@ -222,7 +222,7 @@ unsafe fn inner_scanf(
                         r.commit();
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
-                            return Ok(matched);
+                            break;
                         }
                     }
 

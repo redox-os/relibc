@@ -33,7 +33,7 @@ void test(char* fmt_in, char* input, struct params *p, ...) {
 int main(void) {
     struct params p = { .c = 'a' };
 
-    test("%hhd %d", "12 345", &p, &p.sa, &p.ia);
+    test("%hd %d", "12 345", &p, &p.sa, &p.ia);
     test("%x %i %i", "12 0x345 010", &p, &p.ia, &p.ib, &p.ic);
     test("%f.%lf", "0.1.0.2", &p, &p.fa, &p.da);
     test("%p", "0xABCDEF", &p, &p.ptr);

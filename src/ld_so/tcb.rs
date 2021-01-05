@@ -1,5 +1,5 @@
-use alloc::boxed::Box;
-use core::{mem, ops::Range, ptr, slice};
+use alloc::vec::Vec;
+use core::{mem, ptr, slice};
 use goblin::error::{Error, Result};
 
 use crate::{header::sys_mman, ld_so::linker::Linker, sync::mutex::Mutex};
@@ -7,6 +7,7 @@ use crate::{header::sys_mman, ld_so::linker::Linker, sync::mutex::Mutex};
 use super::PAGE_SIZE;
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct Master {
     /// Pointer to initial data
     pub ptr: *const u8,
@@ -20,11 +21,6 @@ impl Master {
     /// The initial data for this TLS region
     pub unsafe fn data(&self) -> &'static [u8] {
         slice::from_raw_parts(self.ptr, self.len)
-    }
-
-    /// The region of TLS that the master will initialize
-    pub fn range(&self) -> Range<usize> {
-        self.offset..self.offset + self.len
     }
 }
 
@@ -43,6 +39,8 @@ pub struct Tcb {
     pub masters_ptr: *mut Master,
     /// Size of the masters list in bytes (multiple of mem::size_of::<Master>())
     pub masters_len: usize,
+    /// Index of last copied Master
+    pub last_master_copied: usize,
     /// Pointer to dynamic linker
     pub linker_ptr: *const Mutex<Linker>,
     /// pointer to rust memory allocator structure
@@ -52,10 +50,10 @@ pub struct Tcb {
 impl Tcb {
     /// Create a new TCB
     pub unsafe fn new(size: usize) -> Result<&'static mut Self> {
-        let (tls, tcb_page) = Self::os_new(size)?;
+        let (tls, tcb_page) = Self::os_new(round_up(size, PAGE_SIZE))?;
 
         let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
-        // println!("New TCB: {:p}", tcb_ptr);
+        trace!("New TCB: {:p}", tcb_ptr);
         ptr::write(
             tcb_ptr,
             Self {
@@ -65,6 +63,7 @@ impl Tcb {
                 tcb_len: tcb_page.len(),
                 masters_ptr: ptr::null_mut(),
                 masters_len: 0,
+                last_master_copied: 0,
                 linker_ptr: ptr::null(),
                 mspace: 0,
             },
@@ -109,26 +108,34 @@ impl Tcb {
     }
 
     /// Copy data from masters
-    pub unsafe fn copy_masters(&self) -> Result<()> {
+    pub unsafe fn copy_masters(&mut self) -> Result<()> {
         //TODO: Complain if masters or tls exist without the other
         if let Some(tls) = self.tls() {
             if let Some(masters) = self.masters() {
-                for (i, master) in masters.iter().enumerate() {
-                    let range = master.range();
-                    let data = master.data();
+                for (i, master) in masters
+                    .iter()
+                    .skip(self.last_master_copied)
+                    .filter(|m| m.len > 0)
+                    .enumerate()
+                {
+                    let range =
+                        self.tls_len - master.offset..self.tls_len - master.offset + master.len;
                     if let Some(tls_data) = tls.get_mut(range) {
-                        // println!(
-                        //     "tls master {}: {:p}, {:#x}: {:p}, {:#x}",
-                        //     i,
-                        //     data.as_ptr(), data.len(),
-                        //     tls_data.as_mut_ptr(), tls_data.len()
-                        // );
-
+                        let data = master.data();
+                        trace!(
+                            "tls master {}: {:p}, {:#x}: {:p}, {:#x}",
+                            i,
+                            data.as_ptr(),
+                            data.len(),
+                            tls_data.as_mut_ptr(),
+                            tls_data.len()
+                        );
                         tls_data.copy_from_slice(data);
                     } else {
                         return Err(Error::Malformed(format!("failed to copy tls master {}", i)));
                     }
                 }
+                self.last_master_copied = masters.len();
             }
         }
 
@@ -136,10 +143,19 @@ impl Tcb {
     }
 
     /// The initial images for TLS
-    pub unsafe fn set_masters(&mut self, mut masters: Box<[Master]>) {
-        self.masters_ptr = masters.as_mut_ptr();
-        self.masters_len = masters.len() * mem::size_of::<Master>();
-        mem::forget(masters);
+    pub unsafe fn append_masters(&mut self, mut new_masters: Vec<Master>) {
+        if self.masters_ptr.is_null() {
+            self.masters_ptr = new_masters.as_mut_ptr();
+            self.masters_len = new_masters.len() * mem::size_of::<Master>();
+            mem::forget(new_masters);
+        } else {
+            let len = self.masters_len / mem::size_of::<Master>();
+            let mut masters = Vec::from_raw_parts(self.masters_ptr, len, len);
+            masters.extend(new_masters.into_iter());
+            self.masters_ptr = masters.as_mut_ptr();
+            self.masters_len = masters.len() * mem::size_of::<Master>();
+            mem::forget(masters);
+        }
     }
 
     /// Activate TLS
@@ -216,4 +232,8 @@ impl Tcb {
     unsafe fn os_arch_activate(tp: usize) {
         //TODO: Consider setting FS offset to TCB pointer
     }
+}
+
+pub fn round_up(value: usize, alignment: usize) -> usize {
+    return (value + alignment - 1) & (!(alignment - 1));
 }
