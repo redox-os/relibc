@@ -108,3 +108,12 @@ pub unsafe fn init(sp: &'static Stack) {
 
 #[cfg(target_os = "redox")]
 pub unsafe fn init(_sp: &'static Stack) {}
+
+pub unsafe fn fini() {
+    if let Some(tcb) = Tcb::current() {
+        if tcb.linker_ptr != ptr::null_mut() {
+            let linker = (&*tcb.linker_ptr).lock();
+            linker.fini();
+        }
+    }
+}
