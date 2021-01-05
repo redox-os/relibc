@@ -227,11 +227,22 @@ DYNAMIC_FLAGS+=\
 	-lc
 
 DEPS=../sysroot
+else
+DYNAMIC_FLAGS+=\
+	-Wl,-rpath=\$$ORIGIN
 endif
 
 bins_static/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
+
+bins_dynamic/%.so: %.c $(DEPS)
+	mkdir -p "$$(dirname "$@")"
+	$(CC) "$<" -o "$@" -shared -fpic $(FLAGS) $(DYNAMIC_FLAGS)
+
+bins_dynamic/dlfcn: dlfcn.c bins_dynamic/sharedlib.so $(DEPS)
+	mkdir -p "$$(dirname "$@")"
+	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
 
 bins_dynamic/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
