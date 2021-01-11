@@ -7,6 +7,17 @@
 #[naked]
 #[no_mangle]
 pub unsafe extern "C" fn _start() {
+    #[cfg(target_arch = "aarch64")]
+    llvm_asm!("
+        mov x0, sp
+        bl relibc_ld_so_start
+        # TODO: aarch64
+        "
+        :
+        :
+        :
+        : "volatile"
+    );
     #[cfg(target_arch = "x86_64")]
     llvm_asm!("
         # rsi = _start + 5
@@ -39,17 +50,6 @@ next:   pop rsi
         :
         :
         : "intel", "volatile"
-    );
-    #[cfg(target_arch = "aarch64")]
-    llvm_asm!("
-        mov x0, sp
-        bl ld_so_start
-        TODO
-        "
-        :
-        :
-        :
-        : "volatile"
     );
 }
 

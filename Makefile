@@ -1,20 +1,16 @@
-TARGET?=
+TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
 CARGOFLAGS?=
 RUSTCFLAGS?=
+export OBJCOPY?=objcopy
 
 # When using xargo, build it in local location
 export XARGO_HOME=$(CURDIR)/target/xargo
 
-export OBJCOPY=objcopy
-
-BUILD=target
-ifneq ($(TARGET),)
-	BUILD="target/$(TARGET)"
-	CARGOFLAGS+="--target=$(TARGET)"
-endif
+BUILD="target/$(TARGET)"
+CARGOFLAGS+="--target=$(TARGET)"
 
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
 	export CC=aarch64-linux-gnu-gcc
@@ -28,6 +24,13 @@ ifeq ($(TARGET),aarch64-unknown-redox)
 	export LD=aarch64-unknown-redox-ld
 	export AR=aarch64-unknown-redox-ar
 	export OBJCOPY=aarch64-unknown-redox-objcopy
+endif
+
+ifeq ($(TARGET),x86_64-unknown-linux-gnu)
+	export CC=x86_64-linux-gnu-gcc
+	export LD=x86_64-linux-gnu-ld
+	export AR=x86_64-linux-gnu-ar
+	export OBJCOPY=x86_64-linux-gnu-objcopy
 endif
 
 ifeq ($(TARGET),x86_64-unknown-redox)
@@ -150,7 +153,7 @@ $(BUILD)/debug/ld_so.o: $(SRC)
 	touch $@
 
 $(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debug/libc.a $(BUILD)/debug/crtn.o
-	$(LD) --no-relax -T src/ld_so/ld_script --allow-multiple-definition --gc-sections --gc-keep-exported $^ -o $@
+	$(LD) --no-relax -T src/ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections --gc-keep-exported $^ -o $@
 
 # Release targets
 
@@ -188,7 +191,7 @@ $(BUILD)/release/ld_so.o: $(SRC)
 	touch $@
 
 $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD)/release/libc.a $(BUILD)/release/crtn.o
-	$(LD) --no-relax -T src/ld_so/ld_script --allow-multiple-definition --gc-sections --gc-keep-exported $^ -o $@
+	$(LD) --no-relax -T src/ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections --gc-keep-exported $^ -o $@
 
 # Other targets
 
@@ -200,7 +203,7 @@ $(BUILD)/openlibm: openlibm
 	touch $@
 
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
-	$(MAKE) CC=$(CC) CPPFLAGS="-fno-stack-protector -I $(shell pwd)/include -I $(shell pwd)/target/include" -C $< libopenlibm.a
+	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CPPFLAGS="-fno-stack-protector -I $(shell pwd)/include -I $(shell pwd)/target/include" -C $< libopenlibm.a
 
 $(BUILD)/pthreads-emb: pthreads-emb
 	rm -rf $@ $@.partial
@@ -210,4 +213,4 @@ $(BUILD)/pthreads-emb: pthreads-emb
 	touch $@
 
 $(BUILD)/pthreads-emb/libpthread.a: $(BUILD)/pthreads-emb $(BUILD)/release/librelibc.a
-	$(MAKE) CC=$(CC) CFLAGS="-fno-stack-protector -I $(shell pwd)/include -I $(shell pwd)/target/include" -C $< libpthread.a
+	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CFLAGS="-fno-stack-protector -I $(shell pwd)/include -I $(shell pwd)/target/include" -C $< libpthread.a

@@ -206,6 +206,14 @@ impl Tcb {
 
     /// Architecture specific code to read a usize from the TCB - x86_64
     #[inline(always)]
+    #[cfg(target_arch = "aarch64")]
+    unsafe fn arch_read(offset: usize) -> usize {
+        //TODO: aarch64
+        unimplemented!("arch_read not implemented on aarch64");
+    }
+
+    /// Architecture specific code to read a usize from the TCB - x86_64
+    #[inline(always)]
     #[cfg(target_arch = "x86_64")]
     unsafe fn arch_read(offset: usize) -> usize {
         let value;
@@ -227,7 +235,13 @@ impl Tcb {
         syscall!(ARCH_PRCTL, ARCH_SET_FS, tp);
     }
 
-    /// OS and architecture specific code to activate TLS - Linux x86_64
+    /// OS and architecture specific code to activate TLS - Redox aarch64
+    #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
+    unsafe fn os_arch_activate(tp: usize) {
+        //TODO: aarch64
+    }
+
+    /// OS and architecture specific code to activate TLS - Redox x86_64
     #[cfg(all(target_os = "redox", target_arch = "x86_64"))]
     unsafe fn os_arch_activate(tp: usize) {
         //TODO: Consider setting FS offset to TCB pointer

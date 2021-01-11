@@ -90,6 +90,18 @@ pub fn get_session(
     }
 }
 
+#[cfg(target_arch = "aarch64")]
+fn inner_ptrace(
+    request: c_int,
+    pid: pid_t,
+    addr: *mut c_void,
+    data: *mut c_void,
+) -> io::Result<c_int> {
+    //TODO: aarch64
+    unimplemented!("inner_ptrace not implemented on aarch64");
+}
+
+#[cfg(target_arch = "x86_64")]
 fn inner_ptrace(
     request: c_int,
     pid: pid_t,

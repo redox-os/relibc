@@ -797,6 +797,12 @@ impl Pal for Sys {
         res as c_int
     }
 
+    #[cfg(target_arch = "aarch64")]
+    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
+        //TODO: aarch64
+        unimplemented!("pte_clone not implemented on aarch64");
+    }
+
     #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
         let flags = syscall::CLONE_VM
