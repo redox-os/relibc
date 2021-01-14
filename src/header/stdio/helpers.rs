@@ -4,7 +4,7 @@ use super::{constants::*, Buffer, FILE};
 use crate::{
     fs::File,
     header::{errno, fcntl::*, string::strchr},
-    io::LineWriter,
+    io::BufWriter,
     platform::{self, types::*},
     sync::Mutex,
 };
@@ -62,7 +62,7 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
     }
 
     let file = File::new(fd);
-    let writer = LineWriter::new(file.get_ref());
+    let writer = Box::new(BufWriter::new(file.get_ref()));
 
     Some(Box::into_raw(Box::new(FILE {
         lock: Mutex::new(()),

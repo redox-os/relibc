@@ -7,7 +7,7 @@ use crate::{
 pub extern "C" fn __fpending(stream: *mut FILE) -> size_t {
     let stream = unsafe { &mut *stream }.lock();
 
-    stream.writer.inner.buf.len() as size_t
+    stream.writer.pending()
 }
 
 #[no_mangle]
