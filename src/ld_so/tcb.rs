@@ -208,8 +208,20 @@ impl Tcb {
     #[inline(always)]
     #[cfg(target_arch = "aarch64")]
     unsafe fn arch_read(offset: usize) -> usize {
-        //TODO: aarch64
-        unimplemented!("arch_read not implemented on aarch64");
+        let mut value = 0usize;
+        let mut tmp = 0usize;
+
+        llvm_asm!("
+            mrs $0, tpidr_el0
+            add $0, $0, $2
+            ldr $1, [$0]
+            "
+            : "=r"(tmp), "=r"(value)
+            : "r"(offset)
+            :
+            : "volatile"
+        );
+        value
     }
 
     /// Architecture specific code to read a usize from the TCB - x86_64
