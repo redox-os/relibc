@@ -2,13 +2,13 @@ use super::{constants, Buffer, BUFSIZ, FILE};
 use core::{cell::UnsafeCell, ptr};
 
 use crate::{fs::File, io::LineWriter, platform::types::*, sync::Mutex};
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 
 pub struct GlobalFile(UnsafeCell<FILE>);
 impl GlobalFile {
     fn new(file: c_int, flags: c_int) -> Self {
         let file = File::new(file);
-        let writer = LineWriter::new(unsafe { file.get_ref() });
+        let writer = Box::new(LineWriter::new(unsafe { file.get_ref() }));
         GlobalFile(UnsafeCell::new(FILE {
             lock: Mutex::new(()),
 

@@ -24,7 +24,7 @@ use crate::{
         string::{self, strlen},
         unistd,
     },
-    io::{self, BufRead, LineWriter, Read, Write},
+    io::{self, BufRead, BufWriter, LineWriter, Read, Write},
     platform::{self, errno, types::*, Pal, Sys, WriteByte},
     sync::Mutex,
 };
@@ -69,6 +69,27 @@ impl<'a> DerefMut for Buffer<'a> {
     }
 }
 
+pub trait Pending {
+    fn pending(&self) -> size_t;
+}
+
+impl<W: core_io::Write> Pending for BufWriter<W> {
+    fn pending(&self) -> size_t {
+        self.buf.len() as size_t
+    }
+}
+
+impl<W: core_io::Write> Pending for LineWriter<W> {
+    fn pending(&self) -> size_t {
+        self.inner.buf.len() as size_t
+    }
+}
+
+pub trait Writer: Write + Pending {}
+
+impl<W: core_io::Write> Writer for BufWriter<W> {}
+impl<W: core_io::Write> Writer for LineWriter<W> {}
+
 /// This struct gets exposed to the C API.
 pub struct FILE {
     lock: Mutex<()>,
@@ -81,7 +102,7 @@ pub struct FILE {
     read_size: usize,
     unget: Vec<u8>,
     // pub for stdio_ext
-    pub(crate) writer: LineWriter<File>,
+    pub(crate) writer: Box<dyn Writer + Send>,
 
     // Optional pid for use with popen/pclose
     pid: Option<c_int>,
@@ -1144,4 +1165,13 @@ pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
 pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
     let reader = (s as *const u8).into();
     scanf::scanf(reader, format, ap)
+}
+
+pub unsafe fn flush_io_streams() {
+    let flush = |stream: *mut FILE| {
+        let stream = &mut *stream;
+        stream.flush()
+    };
+    flush(stdout);
+    flush(stderr);
 }

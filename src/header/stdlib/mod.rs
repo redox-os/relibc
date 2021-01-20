@@ -16,6 +16,7 @@ use crate::{
         errno::{self, *},
         fcntl::*,
         limits,
+        stdio::flush_io_streams,
         string::*,
         time::constants::CLOCK_MONOTONIC,
         unistd::{self, sysconf, _SC_PAGESIZE},
@@ -296,6 +297,8 @@ pub unsafe extern "C" fn exit(status: c_int) {
     ld_so::fini();
 
     pthread_terminate();
+
+    flush_io_streams();
 
     Sys::exit(status);
 }
