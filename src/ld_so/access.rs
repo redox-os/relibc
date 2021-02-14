@@ -24,7 +24,11 @@ unsafe fn access(path: *const c_char, mode: c_int) -> c_int {
 // Wrapper over the systemcall, Do not use outside of ld_so
 #[cfg(target_os = "redox")]
 unsafe fn access(path: *const c_char, mode: c_int) -> c_int {
-    let path = CStr::from_ptr(path).to_bytes();
+    use core::str;
+    let path = match str::from_utf8(CStr::from_ptr(path).to_bytes()) {
+        Ok(ok) => ok,
+        Err(_) => return -1,
+    };
     let fd = match syscall::open(path, syscall::O_CLOEXEC) {
         Ok(fd) => fd,
         _ => return -1,

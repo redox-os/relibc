@@ -1,4 +1,4 @@
-use core::{mem, ptr, result::Result as CoreResult, slice};
+use core::{mem, ptr, result::Result as CoreResult, slice, str};
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
@@ -36,6 +36,20 @@ mod extra;
 mod ptrace;
 mod signal;
 mod socket;
+
+macro_rules! path_from_c_str {
+    ($c_str:expr) => {{
+        match $c_str.to_str() {
+            Ok(ok) => ok,
+            Err(err) => {
+                unsafe {
+                    errno = EINVAL;
+                }
+                return -1;
+            }
+        }
+    }};
+}
 
 pub fn e(sys: Result<usize>) -> usize {
     match sys {
@@ -138,7 +152,8 @@ impl Pal for Sys {
     }
 
     fn chdir(path: &CStr) -> c_int {
-        e(syscall::chdir(path.to_bytes())) as c_int
+        let path = path_from_c_str!(path);
+        e(syscall::chdir(path)) as c_int
     }
 
     fn chmod(path: &CStr, mode: mode_t) -> c_int {
@@ -330,7 +345,13 @@ impl Pal for Sys {
         if res == !0 {
             !0
         } else {
-            e(syscall::chdir(&buf[..res])) as c_int
+            match str::from_utf8(&buf[..res]) {
+                Ok(path) => e(syscall::chdir(&path)) as c_int,
+                Err(_) => {
+                    unsafe { errno = EINVAL };
+                    return -1;
+                }
+            }
         }
     }
 
@@ -783,8 +804,9 @@ impl Pal for Sys {
     }
 
     fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
+        let path = path_from_c_str!(path);
         e(syscall::open(
-            path.to_bytes(),
+            path,
             ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF),
         )) as c_int
     }
@@ -883,14 +905,16 @@ impl Pal for Sys {
     }
 
     fn rename(oldpath: &CStr, newpath: &CStr) -> c_int {
+        let newpath = path_from_c_str!(newpath);
         match File::open(oldpath, fcntl::O_PATH | fcntl::O_CLOEXEC) {
-            Ok(file) => e(syscall::frename(*file as usize, newpath.to_bytes())) as c_int,
+            Ok(file) => e(syscall::frename(*file as usize, newpath)) as c_int,
             Err(_) => -1,
         }
     }
 
     fn rmdir(path: &CStr) -> c_int {
-        e(syscall::rmdir(path.to_bytes())) as c_int
+        let path = path_from_c_str!(path);
+        e(syscall::rmdir(path)) as c_int
     }
 
     fn sched_yield() -> c_int {
@@ -1016,7 +1040,8 @@ impl Pal for Sys {
     }
 
     fn unlink(path: &CStr) -> c_int {
-        e(syscall::unlink(path.to_bytes())) as c_int
+        let path = path_from_c_str!(path);
+        e(syscall::unlink(path)) as c_int
     }
 
     fn waitpid(mut pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
