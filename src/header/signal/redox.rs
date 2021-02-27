@@ -6,7 +6,7 @@ global_asm!(
     .global __restore_rt
     __restore_rt:
         mov $119, %rax
-        int $0x80
+        syscall
 "
 );
 // x8 is register, 119 is SIGRETURN
