@@ -77,6 +77,7 @@ EXPECT_NAMES=\
 	strings \
 	sys_mman \
 	time/asctime \
+	time/constants \
 	time/gmtime \
 	time/localtime \
 	time/macros \
