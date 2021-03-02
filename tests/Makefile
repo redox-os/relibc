@@ -158,7 +158,8 @@ EXPECT_BINS=$(patsubst %,bins_static/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 
-TEST_RUNNER?=sh --
+CARGO_TEST?=cargo
+TEST_RUNNER?=
 
 .PHONY: all clean run expected verify
 
@@ -184,8 +185,11 @@ expected: | $(EXPECT_BINS)
 		"$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr" || exit $$?; \
 	done
 
-verify: | $(EXPECT_BINS)
-	$(TEST_RUNNER) ./verify.sh $(EXPECT_BINS)
+bins_verify/relibc-tests: src/main.rs
+	$(CARGO_TEST) build --release --bin relibc-tests --out-dir bins_verify -Z unstable-options
+
+verify: bins_verify/relibc-tests | $(EXPECT_BINS)
+	$(TEST_RUNNER) $< $(EXPECT_BINS)
 
 FLAGS=\
 	-std=c11 \
