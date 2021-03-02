@@ -1,18 +1,13 @@
 use std::{
-    env,
-    fs,
+    env, fs,
     io::{self, Write},
     path::PathBuf,
     process::{self, Command, ExitStatus},
 };
 
 fn expected(bin: &str, kind: &str, generated: &[u8], status: ExitStatus) -> Result<(), String> {
-    let mut expected_file = PathBuf::from(format!(
-        "expected/{}.{}",
-        bin,
-        kind
-    ));
-    if ! expected_file.exists() {
+    let mut expected_file = PathBuf::from(format!("expected/{}.{}", bin, kind));
+    if !expected_file.exists() {
         expected_file = PathBuf::from(format!(
             "expected/{}.{}",
             bin.replace("bins_static", "").replace("bins_dynamic", ""),
@@ -41,9 +36,7 @@ fn expected(bin: &str, kind: &str, generated: &[u8], status: ExitStatus) -> Resu
 
         return Err(format!(
             "{} failed - retcode {}, {} mismatch",
-            bin,
-            status,
-            kind
+            bin, status, kind
         ));
     }
 
@@ -67,7 +60,7 @@ fn main() {
                     println!("{}", failure);
                     failures.push(failure);
                 }
-            },
+            }
             Err(err) => {
                 let failure = format!("{}: failed to execute: {}", bin, err);
                 println!("{}", failure);
@@ -76,7 +69,7 @@ fn main() {
         }
     }
 
-    if ! failures.is_empty() {
+    if !failures.is_empty() {
         println!("# FAILURES #");
         for failure in failures {
             println!("{}", failure);
