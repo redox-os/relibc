@@ -249,11 +249,15 @@ pub unsafe extern "C" fn pte_osThreadCheckCancel(handle: pte_osThreadHandle) -> 
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadSleep(msecs: c_uint) {
-    let tm = timespec {
-        tv_sec: msecs as i64 / 1000,
-        tv_nsec: (msecs % 1000) as i64 * 1000000,
-    };
-    Sys::nanosleep(&tm, ptr::null_mut());
+    if msecs == 0 {
+        Sys::sched_yield();
+    } else {
+        let tm = timespec {
+            tv_sec: msecs as i64 / 1000,
+            tv_nsec: (msecs % 1000) as i64 * 1000000,
+        };
+        Sys::nanosleep(&tm, ptr::null_mut());
+    }
 }
 
 #[no_mangle]
