@@ -2,7 +2,7 @@ TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-t
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
-CARGOFLAGS?=
+CARGOFLAGS?=-Z build-std=core,alloc,compiler_builtins
 RUSTCFLAGS?=
 export OBJCOPY?=objcopy
 
