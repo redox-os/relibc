@@ -85,6 +85,11 @@ pub trait Pal {
 
     fn getgid() -> gid_t;
 
+    /* Note that this is distinct from the legacy POSIX function
+     * getpagesize(), which returns a c_int. On some Linux platforms,
+     * page size may be determined through a syscall ("getpagesize"). */
+    fn getpagesize() -> usize;
+
     fn getpgid(pid: pid_t) -> pid_t;
 
     fn getpid() -> pid_t;

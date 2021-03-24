@@ -1,6 +1,8 @@
+use core::convert::TryInto;
+
 use crate::{
     header::errno,
-    platform::{self, types::*},
+    platform::{self, types::*, Pal, Sys},
 };
 
 // POSIX.1 {
@@ -39,7 +41,9 @@ pub extern "C" fn sysconf(name: c_int) -> c_long {
         _SC_STREAM_MAX => 16,
         _SC_TZNAME_MAX => -1,
         _SC_VERSION => 200809,
-        _SC_PAGESIZE => 4096,
+        _SC_PAGESIZE => Sys::getpagesize()
+            .try_into()
+            .expect("page size not representable as type `long`"),
         _SC_RE_DUP_MAX => 32767,
         _SC_GETPW_R_SIZE_MAX => -1,
         _SC_LOGIN_NAME_MAX => 256,

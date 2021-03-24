@@ -604,6 +604,10 @@ impl Pal for Sys {
         e(syscall::getgid()) as gid_t
     }
 
+    fn getpagesize() -> usize {
+        4096
+    }
+
     fn getpgid(pid: pid_t) -> pid_t {
         e(syscall::getpgid(pid as usize)) as pid_t
     }

@@ -2,9 +2,12 @@ use alloc::vec::Vec;
 use core::{mem, ptr, slice};
 use goblin::error::{Error, Result};
 
-use crate::{header::sys_mman, ld_so::linker::Linker, sync::mutex::Mutex};
-
-use super::PAGE_SIZE;
+use crate::{
+    header::sys_mman,
+    ld_so::linker::Linker,
+    platform::{Pal, Sys},
+    sync::mutex::Mutex,
+};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -29,11 +32,11 @@ impl Master {
 pub struct Tcb {
     /// Pointer to the end of static TLS. Must be the first member
     pub tls_end: *mut u8,
-    /// Size of the memory allocated for the static TLS in bytes (multiple of PAGE_SIZE)
+    /// Size of the memory allocated for the static TLS in bytes (multiple of page size)
     pub tls_len: usize,
     /// Pointer to this structure
     pub tcb_ptr: *mut Tcb,
-    /// Size of the memory allocated for this structure in bytes (should be PAGE_SIZE)
+    /// Size of the memory allocated for this structure in bytes (should be same as page size)
     pub tcb_len: usize,
     /// Pointer to a list of initial TLS data
     pub masters_ptr: *mut Master,
@@ -50,7 +53,8 @@ pub struct Tcb {
 impl Tcb {
     /// Create a new TCB
     pub unsafe fn new(size: usize) -> Result<&'static mut Self> {
-        let (tls, tcb_page) = Self::os_new(round_up(size, PAGE_SIZE))?;
+        let page_size = Sys::getpagesize();
+        let (tls, tcb_page) = Self::os_new(round_up(size, page_size))?;
 
         let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
         trace!("New TCB: {:p}", tcb_ptr);
@@ -185,7 +189,8 @@ impl Tcb {
     /// OS specific code to create a new TLS and TCB - Linux
     #[cfg(target_os = "linux")]
     unsafe fn os_new(size: usize) -> Result<(&'static mut [u8], &'static mut [u8])> {
-        let tls_tcb = Self::map(size + PAGE_SIZE)?;
+        let page_size = Sys::getpagesize();
+        let tls_tcb = Self::map(size + page_size)?;
         Ok(tls_tcb.split_at_mut(size))
     }
 
@@ -195,12 +200,13 @@ impl Tcb {
         use crate::header::unistd;
         //TODO: better method of finding fs offset
         let pid = unistd::getpid();
-        let tcb_addr = 0xB000_0000 + pid as usize * PAGE_SIZE;
+        let page_size = Sys::getpagesize();
+        let tcb_addr = 0xB000_0000 + pid as usize * page_size;
         let tls = Self::map(size)?;
         Ok((
             tls,
             //TODO: Consider allocating TCB as part of TLS
-            slice::from_raw_parts_mut(tcb_addr as *mut u8, PAGE_SIZE),
+            slice::from_raw_parts_mut(tcb_addr as *mut u8, page_size),
         ))
     }
 

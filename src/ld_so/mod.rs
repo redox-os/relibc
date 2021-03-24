@@ -2,9 +2,11 @@ use core::{mem, ptr};
 use goblin::elf::program_header::{self, program_header32, program_header64, ProgramHeader};
 
 use self::tcb::{Master, Tcb};
-use crate::{header::sys_auxv::AT_NULL, start::Stack};
-
-pub const PAGE_SIZE: usize = 4096;
+use crate::{
+    header::sys_auxv::AT_NULL,
+    platform::{Pal, Sys},
+    start::Stack,
+};
 
 #[cfg(target_os = "redox")]
 pub const PATH_SEP: char = ';';
@@ -64,9 +66,10 @@ pub fn static_init(sp: &'static Stack) {
             _ => panic!("unknown AT_PHENT size {}", phent),
         };
 
-        let voff = ph.p_vaddr as usize % PAGE_SIZE;
+        let page_size = Sys::getpagesize();
+        let voff = ph.p_vaddr as usize % page_size;
         let vaddr = ph.p_vaddr as usize - voff;
-        let vsize = ((ph.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
+        let vsize = ((ph.p_memsz as usize + voff + page_size - 1) / page_size) * page_size;
 
         match ph.p_type {
             program_header::PT_TLS => {
