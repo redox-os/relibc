@@ -301,15 +301,13 @@ pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut
              * 1900) */
             let is_leap_year: bool = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
 
-            /* For dates that are March 1 or later, we can use day-of-
-             * year in the transformed calendar. For January and
-             * February, that value is sensitive to whether the previous
-             * year is a leap year. Therefore, we use the already
-             * computed date for those two months. */
-            let yday: c_int = match month {
-                0 => mday - 1,      // January
-                1 => 31 + mday - 1, // February
-                _ => day_of_year_transformed + if is_leap_year { 60 } else { 59 },
+            /* For dates in January or February, we use the fact that
+             * January 1 is always 306 days after March 1 in the
+             * previous year. */
+            let yday: c_int = if month < 2 {
+                day_of_year_transformed - 306
+            } else {
+                day_of_year_transformed + if is_leap_year { 60 } else { 59 }
             };
 
             let hour: c_int = (secs_of_day / (60 * 60)).try_into().unwrap();
