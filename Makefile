@@ -31,6 +31,20 @@ ifeq ($(TARGET),aarch64-unknown-redox)
 	export OBJCOPY=aarch64-unknown-redox-objcopy
 endif
 
+ifeq ($(TARGET),riscv64gc-unknown-linux-gnu)
+	export CC=riscv64-linux-gnu-gcc
+	export LD=riscv64-linux-gnu-ld
+	export AR=riscv64-linux-gnu-ar
+	export OBJCOPY=riscv64-linux-gnu-objcopy
+endif
+
+ifeq ($(TARGET),riscv64gc-unknown-redox)
+	export CC=riscv64-unknown-redox-gcc
+	export LD=riscv64-unknown-redox-ld
+	export AR=riscv64-unknown-redox-ar
+	export OBJCOPY=riscv64-unknown-redox-objcopy
+endif
+
 ifeq ($(TARGET),x86_64-unknown-linux-gnu)
 	export CC=x86_64-linux-gnu-gcc
 	export LD=x86_64-linux-gnu-ld
