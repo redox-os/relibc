@@ -49,6 +49,7 @@ pub mod sys_timeb;
 //pub mod sys_times;
 pub mod _wctype;
 pub mod arch_aarch64_user;
+pub mod arch_riscv64_user;
 pub mod arch_x64_user;
 pub mod sys_procfs;
 pub mod sys_random;
