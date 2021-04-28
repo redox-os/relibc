@@ -13,7 +13,7 @@ macro_rules! platform_specific {
 
 platform_specific! {
     "aarch64","s";
-    "arm","s";
+    "arm","S";
     "i386","s";
     "m68k","s";
     "microblaze","s";
@@ -23,6 +23,7 @@ platform_specific! {
     "or1k","s";
     "powerpc","S";
     "powerpc64","s";
+    "riscv64","S";
     "s390x","s";
     "sh","S";
     "x32","s";
