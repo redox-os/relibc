@@ -99,11 +99,20 @@ pub fn static_init(sp: &'static Stack) {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub unsafe fn init(sp: &'static Stack) {
     let mut tp = 0usize;
     const ARCH_GET_FS: usize = 0x1003;
     syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut tp as *mut usize);
+    if tp == 0 {
+        static_init(sp);
+    }
+}
+
+#[cfg(all(target_os = "linux", not(target_arch = "x86_64")))]
+pub unsafe fn init(sp: &'static Stack) {
+    let mut tp = 0usize;
+    //TODO: Read TP on non-x86_64
     if tp == 0 {
         static_init(sp);
     }

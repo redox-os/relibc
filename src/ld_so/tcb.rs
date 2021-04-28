@@ -210,7 +210,7 @@ impl Tcb {
         ))
     }
 
-    /// Architecture specific code to read a usize from the TCB - x86_64
+    /// Architecture specific code to read a usize from the TCB - aarch64
     #[inline(always)]
     #[cfg(target_arch = "aarch64")]
     unsafe fn arch_read(offset: usize) -> usize {
@@ -230,6 +230,14 @@ impl Tcb {
         value
     }
 
+    /// Architecture specific code to read a usize from the TCB - riscv64
+    #[inline(always)]
+    #[cfg(target_arch = "riscv64")]
+    unsafe fn arch_read(offset: usize) -> usize {
+        //TODO: riscv64
+        unimplemented!("cannot read from TCB on riscv64");
+    }
+
     /// Architecture specific code to read a usize from the TCB - x86_64
     #[inline(always)]
     #[cfg(target_arch = "x86_64")]
@@ -246,6 +254,18 @@ impl Tcb {
         value
     }
 
+    /// OS and architecture specific code to activate TLS - Linux aarch64
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    unsafe fn os_arch_activate(tp: usize) {
+        //TODO: aarch64
+    }
+
+    /// OS and architecture specific code to activate TLS - Linux riscv64
+    #[cfg(all(target_os = "linux", target_arch = "riscv64"))]
+    unsafe fn os_arch_activate(tp: usize) {
+        //TODO: riscv64
+    }
+
     /// OS and architecture specific code to activate TLS - Linux x86_64
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     unsafe fn os_arch_activate(tp: usize) {
@@ -257,6 +277,12 @@ impl Tcb {
     #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
     unsafe fn os_arch_activate(tp: usize) {
         //TODO: aarch64
+    }
+
+    /// OS and architecture specific code to activate TLS - Redox riscv64
+    #[cfg(all(target_os = "redox", target_arch = "riscv64"))]
+    unsafe fn os_arch_activate(tp: usize) {
+        //TODO: riscv64
     }
 
     /// OS and architecture specific code to activate TLS - Redox x86_64
