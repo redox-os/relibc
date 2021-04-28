@@ -78,7 +78,9 @@ impl Sys {
 
 impl Pal for Sys {
     fn access(path: &CStr, mode: c_int) -> c_int {
-        e(unsafe { syscall!(ACCESS, path.as_ptr(), mode) }) as c_int
+        // The flags argument is not used on Linux, and must be 0, see man page
+        let flags = 0;
+        e(unsafe { syscall!(FACCESSAT, AT_FDCWD, path.as_ptr(), mode, flags) }) as c_int
     }
 
     fn brk(addr: *mut c_void) -> *mut c_void {
@@ -411,7 +413,11 @@ impl Pal for Sys {
     }
 
     fn rename(old: &CStr, new: &CStr) -> c_int {
-        e(unsafe { syscall!(RENAMEAT, AT_FDCWD, old.as_ptr(), AT_FDCWD, new.as_ptr()) }) as c_int
+        // RENAMEAT2 is only available on Linux and was added in version 3.15.
+        // We use it to support newer architectures like riscv64. Passing flags
+        // of 0 is identical to RENAMEAT
+        let flags = 0;
+        e(unsafe { syscall!(RENAMEAT2, AT_FDCWD, old.as_ptr(), AT_FDCWD, new.as_ptr(), flags) }) as c_int
     }
 
     fn rmdir(path: &CStr) -> c_int {
