@@ -45,6 +45,10 @@ typedef unsigned long long jmp_buf[56];
 typedef uint128_t jmp_buf[32];
 #endif
 
+#ifdef __riscv
+typedef unsigned long jmp_buf[26];
+#endif
+
 #ifdef __s390x__
 typedef unsigned long jmp_buf[18];
 #endif
