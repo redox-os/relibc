@@ -1,5 +1,10 @@
 TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
 
+# riscv64 should be riscv64gc
+ifeq ($(TARGET),riscv64-unknown-linux-gnu)
+	TARGET=riscv64gc-unknown-linux-gnu
+endif
+
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
 CARGOFLAGS?=
