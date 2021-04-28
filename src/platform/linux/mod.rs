@@ -338,6 +338,18 @@ impl Pal for Sys {
         e(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), flags) }) as c_int
     }
 
+    #[cfg(target_arch = "aarch64")]
+    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
+        //TODO: aarch64
+        unimplemented!("pte_clone not implemented on Linux aarch64");
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
+        //TODO: riscv64
+        unimplemented!("pte_clone not implemented on Linux riscv64");
+    }
+
     #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND;

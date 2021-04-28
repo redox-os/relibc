@@ -826,7 +826,13 @@ impl Pal for Sys {
     #[cfg(target_arch = "aarch64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
         //TODO: aarch64
-        unimplemented!("pte_clone not implemented on aarch64");
+        unimplemented!("pte_clone not implemented on Redox aarch64");
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
+        //TODO: riscv64
+        unimplemented!("pte_clone not implemented on Redox riscv64");
     }
 
     #[cfg(target_arch = "x86_64")]
