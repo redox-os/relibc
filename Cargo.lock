@@ -322,7 +322,7 @@ dependencies = [
  "ralloc 1.0.0",
  "rand 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "sc 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sc 0.2.3",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -354,6 +354,10 @@ dependencies = [
 name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "sc"
+version = "0.2.3"
 
 [[package]]
 name = "sc"

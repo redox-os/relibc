@@ -10,7 +10,7 @@ crate-type = ["staticlib"]
 
 [workspace]
 members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so"]
-exclude = ["core_io", "ralloc", "tests"]
+exclude = ["core_io", "ralloc", "syscall.rs", "tests"]
 
 [build-dependencies]
 cbindgen = "0.13.2"
@@ -36,7 +36,7 @@ default-features = false
 optional = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
-sc = "0.2.3"
+sc = { path = "syscall.rs" }
 
 [target.'cfg(target_os = "redox")'.dependencies]
 redox_syscall = "0.2.5"
