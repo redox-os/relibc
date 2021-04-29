@@ -214,20 +214,15 @@ impl Tcb {
     #[inline(always)]
     #[cfg(target_arch = "aarch64")]
     unsafe fn arch_read(offset: usize) -> usize {
-        let mut value = 0usize;
-        let mut tmp = 0usize;
-
-        llvm_asm!("
-            mrs $0, tpidr_el0
-            add $0, $0, $2
-            ldr $1, [$0]
-            "
-            : "=r"(tmp), "=r"(value)
-            : "r"(offset)
+        let tp: usize;
+        llvm_asm!("mrs $0, tpidr_el0"
+            : "=r"(tp)
+            :
             :
             : "volatile"
         );
-        value
+
+        *((tp + offset) as *const usize)
     }
 
     /// Architecture specific code to read a usize from the TCB - x86_64
