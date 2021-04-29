@@ -825,8 +825,55 @@ impl Pal for Sys {
 
     #[cfg(target_arch = "aarch64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        //TODO: aarch64
-        unimplemented!("pte_clone not implemented on aarch64");
+        let flags = syscall::CLONE_VM
+            | syscall::CLONE_FS
+            | syscall::CLONE_FILES
+            | syscall::CLONE_SIGHAND
+            | syscall::CLONE_STACK;
+        let pid;
+        llvm_asm!("
+            # Call clone syscall
+            svc 0
+
+            # Check if child or parent
+            cmp x0, 0
+            beq .parent
+
+            # Load registers
+            ldr x8, [sp], 8
+            ldr x0, [sp], 8
+            ldr x1, [sp], 8
+            ldr x2, [sp], 8
+            ldr x3, [sp], 8
+            ldr x4, [sp], 8
+            ldr x5, [sp], 8
+            ldr x6, [sp], 8
+            ldr x7, [sp], 8
+
+            # Call entry point
+            blr x8
+
+            # Exit
+            mov x8, 1
+            mov x0, 0
+            svc 0
+
+            # TODO: Invalid instruction on failure to exit
+        .halt:
+            b .halt
+
+            # Return PID if parent
+            .parent:
+            "
+            : "={x0}"(pid)
+            : "{x8}"(syscall::SYS_CLONE), "{x0}"(flags), "{x1}"(stack)
+            : "memory", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8",
+              "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16",
+              "x17", "x18", "x19", "x20", "x21", "x21", "x22", "x23",
+              "x24", "x25", "x26", "x27", "x28", "x29"
+            : "volatile"
+        );
+        e(syscall::Error::demux(pid)) as pid_t
     }
 
     #[cfg(target_arch = "x86_64")]
