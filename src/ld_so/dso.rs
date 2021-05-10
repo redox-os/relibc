@@ -151,6 +151,7 @@ impl DSO {
         base_addr: Option<usize>,
         tls_offset: usize,
     ) -> Result<(&'static mut [u8], Option<Master>)> {
+        trace!("# {}", path);
         // data for struct LinkMap
         let mut l_ld = 0;
         // Calculate virtual memory bounds
@@ -203,7 +204,7 @@ impl DSO {
                 if start != 0 {
                     flags |= sys_mman::MAP_FIXED_NOREPLACE;
                 }
-                trace!("mmap({:#x}, {:x}, {:x})", start, size, flags);
+                trace!("  mmap({:#x}, {:x}, {:x})", start, size, flags);
                 let ptr = sys_mman::mmap(
                     start as *mut c_void,
                     size,
@@ -227,6 +228,7 @@ impl DSO {
                         "mmap must always map on the destination we requested"
                     );
                 }
+                trace!("    = {:p}", ptr);
                 ptr::write_bytes(ptr as *mut u8, 0, size);
                 _r_debug.insert(ptr as usize, path, ptr as usize + l_ld as usize);
                 slice::from_raw_parts_mut(ptr as *mut u8, size)
