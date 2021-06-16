@@ -11,13 +11,13 @@ global_asm!(
     .section .init
         // This happens after crti.o and gcc has inserted code
         // Pop the stack frame
-        pop %rbp
+        pop rbp
         ret
 
     .section .fini
         // This happens after crti.o and gcc has inserted code
         // Pop the stack frame
-        pop %rbp
+        pop rbp
         ret
 "#
 );

@@ -5,18 +5,18 @@
 .type longjmp,@function
 _longjmp:
 longjmp:
-	mov %rsi,%rax           /* val will be longjmp return */
-	test %rax,%rax
+	mov rax,rsi								/* val will be longjmp return */
+	test rax,rax
 	jnz 1f
-	inc %rax                /* if val==0, val=1 per longjmp semantics */
+	inc rax										/* if val==0, val=1 per longjmp semantics */
 1:
-	mov (%rdi),%rbx         /* rdi is the jmp_buf, restore regs from it */
-	mov 8(%rdi),%rbp
-	mov 16(%rdi),%r12
-	mov 24(%rdi),%r13
-	mov 32(%rdi),%r14
-	mov 40(%rdi),%r15
-	mov 48(%rdi),%rdx       /* this ends up being the stack pointer */
-	mov %rdx,%rsp
-	mov 56(%rdi),%rdx       /* this is the instruction pointer */
-	jmp *%rdx               /* goto saved address without altering rsp */
+	mov rbx, [rdi]						/* rdi is the jmp_buf, restore regs from it */
+	mov rbp, [rdi + 8]
+	mov r12, [rdi + 16]
+	mov r13, [rdi + 24]
+	mov r14, [rdi + 32]
+	mov r15, [rdi + 40]
+	mov rdx, [rdi + 48] 			/* this ends up being the stack pointer */
+	mov rsp, rdx 
+	mov rdx, [rdi + 56]   		/* this is the instruction pointer */
+	jmp rdx									  /* goto saved address without altering rsp */

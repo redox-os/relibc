@@ -8,15 +8,15 @@
 __setjmp:
 _setjmp:
 setjmp:
-	mov %rbx,(%rdi)         /* rdi is jmp_buf, move registers onto it */
-	mov %rbp,8(%rdi)
-	mov %r12,16(%rdi)
-	mov %r13,24(%rdi)
-	mov %r14,32(%rdi)
-	mov %r15,40(%rdi)
-	lea 8(%rsp),%rdx        /* this is our rsp WITHOUT current ret addr */
-	mov %rdx,48(%rdi)
-	mov (%rsp),%rdx         /* save return addr ptr for new rip */
-	mov %rdx,56(%rdi)
-	xor %rax,%rax           /* always return 0 */
+	mov [rdi], rbx						/* rdi is jmp_buf, move registers onto it */
+	mov [rdi + 8], rbp
+	mov [rdi + 16], r12
+	mov [rdi + 24], r13
+	mov [rdi + 32], r14
+	mov [rdi + 40], r15
+	lea rdx, [rsp + 8]				/* this is our rsp WITHOUT current ret addr */
+	mov [rdi + 48], rdx
+	mov rdx, [rsp]						/* save return addr ptr for new rip */
+	mov [rdi + 56], rdx
+	xor rax, rax							/* always return 0 */
 	ret

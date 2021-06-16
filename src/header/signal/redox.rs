@@ -5,7 +5,7 @@ global_asm!(
     "
     .global __restore_rt
     __restore_rt:
-        mov $119, %rax
+        mov rax, 119
         syscall
 "
 );
