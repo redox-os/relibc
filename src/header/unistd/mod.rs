@@ -88,9 +88,14 @@ pub unsafe extern "C" fn chdir(path: *const c_char) -> c_int {
     Sys::chdir(path)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn chroot(path: *const c_char) -> c_int {
-    unimplemented!();
+    // TODO: Implement
+    unsafe {
+        platform::errno = crate::header::errno::EPERM;
+    }
+
+    -1
 }
 
 #[no_mangle]

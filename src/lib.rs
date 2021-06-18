@@ -6,7 +6,6 @@
 #![feature(asm)]
 #![feature(box_into_pin)]
 #![feature(c_variadic)]
-#![feature(const_fn)]
 #![feature(const_raw_ptr_deref)]
 #![feature(core_intrinsics)]
 #![feature(global_asm)]
