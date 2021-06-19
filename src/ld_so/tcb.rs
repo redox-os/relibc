@@ -80,7 +80,7 @@ impl Tcb {
     pub unsafe fn current() -> Option<&'static mut Self> {
         let tcb_ptr = Self::arch_read(offset_of!(Self, tcb_ptr)) as *mut Self;
         let tcb_len = Self::arch_read(offset_of!(Self, tcb_len));
-        if tcb_ptr.is_null() || tcb_len < mem::size_of::<Self>() {
+        if tcb_ptr.is_null() || tcb_len < mem::size_of::<Self>() || tcb_len > 4096 /* hack for invalid TCB on aarch64 */ {
             None
         } else {
             Some(&mut *tcb_ptr)
