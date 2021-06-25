@@ -134,7 +134,9 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
 
     // Set up the right allocator...
     // if any memory rust based memory allocation happen before this step .. we are doomed.
-    alloc_init();
+    // The init_array also init the allocator, so call it instead to avoid
+    // call to alloc_init twice
+    init_array();
 
     // Set up argc and argv
     let argc = sp.argc;
@@ -150,8 +152,6 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     }
     platform::inner_environ = copy_string_array(envp, len);
     platform::environ = platform::inner_environ.as_mut_ptr();
-
-    init_array();
 
     // Run preinit array
     {
