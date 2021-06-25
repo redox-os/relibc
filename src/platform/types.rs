@@ -47,6 +47,7 @@ pub type c_ulong = u64;
 pub type wchar_t = i32;
 pub type wint_t = u32;
 pub type wctype_t = i64;
+pub type wctrans_t = u32;
 
 pub type regoff_t = size_t;
 pub type off_t = c_long;
