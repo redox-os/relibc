@@ -24,6 +24,7 @@ ifeq ($(TARGET),aarch64-unknown-redox)
 	export LD=aarch64-unknown-redox-ld
 	export AR=aarch64-unknown-redox-ar
 	export OBJCOPY=aarch64-unknown-redox-objcopy
+	export CFLAGS="-mno-outline-atomics"
 endif
 
 ifeq ($(TARGET),x86_64-unknown-linux-gnu)
