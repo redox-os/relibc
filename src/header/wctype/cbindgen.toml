@@ -1,4 +1,4 @@
-sys_includes = ["stddef.h", "stdint.h", "time.h", "stdio.h" ]
+sys_includes = ["wchar.h" ]
 include_guard = "_RELIBC_WCTYPE_H"
 header = "#include <bits/wctype.h>"
 language = "C"

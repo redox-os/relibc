@@ -1,9 +1,0 @@
-sys_includes = []
-include_guard = "_RELIBC_WCTYPE_H"
-language = "C"
-style = "Tag"
-no_includes = true
-cpp_compat = true
-
-[enum]
-prefix_with_name = true
