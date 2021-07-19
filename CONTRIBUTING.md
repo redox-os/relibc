@@ -11,12 +11,22 @@ Maintaining a libc is tough work, and we'd love some help!
 
 ## What to do
 
+To get started, you'll need to execute:
+
+```git-clone --recurse-submodules <url>```
+
+If cargo ever complains about not having a file,
+you might need to do: `git submodule init` and/or `git submodule update`
+
 For now, we are still trying to get full libc compatibility before we move on to
 any optimisation.
 
 - We currently have a number of unimplemented functions. Search for 
     `unimplemented!()` and hop right in!
 - If you notice any missing functionality, feel free to add it in
+- Good places to look at the current implementations are:
+    [here](https://gitlab.com/bminor/musl/) and [here](https://code.woboq.org/userspace/glibc/).
+- To compile, just execute `cargo build`.
 
 ## Code style
 
