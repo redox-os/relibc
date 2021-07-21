@@ -40,4 +40,8 @@ int main(void) {
     char* str = "hihih";
     assert(index(str, 'i') == str + 1);
     assert(rindex(str, 'i') == str + 3);
+
+    char buf[] = "password";
+    explicit_bzero(buf, sizeof(buf));
+    assert(buf[0] == 0);
 }
