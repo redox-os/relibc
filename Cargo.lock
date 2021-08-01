@@ -352,6 +352,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox_syscall"
+version = "0.2.9"
+source = "git+https://gitlab.redox-os.org/4lDO2/syscall.git?branch=fsgsbase#519a09e96400309a14375c04815da00f7cf5f526"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
 name = "relibc"
 version = "0.2.5"
 dependencies = [
@@ -366,7 +374,7 @@ dependencies = [
  "posix-regex",
  "ralloc",
  "rand 0.5.6",
- "redox_syscall 0.2.9",
+ "redox_syscall 0.2.9 (git+https://gitlab.redox-os.org/4lDO2/syscall.git?branch=fsgsbase)",
  "sc",
  "spin 0.9.2",
 ]
@@ -541,7 +549,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "rand 0.8.4",
- "redox_syscall 0.2.9",
+ "redox_syscall 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "remove_dir_all",
  "winapi",
 ]

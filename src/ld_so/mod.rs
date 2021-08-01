@@ -28,6 +28,41 @@ static mut STATIC_TCB_MASTER: Master = Master {
     offset: 0,
 };
 
+fn panic_notls(msg: impl core::fmt::Display) -> ! {
+    eprintln!("panicked in ld.so: {}", msg);
+
+    unsafe {
+        core::intrinsics::abort();
+    }
+}
+
+pub trait ExpectTlsFree {
+    type Unwrapped;
+
+    fn expect_notls(self, msg: &str) -> Self::Unwrapped;
+}
+impl<T, E: core::fmt::Debug> ExpectTlsFree for Result<T, E> {
+    type Unwrapped = T;
+
+    fn expect_notls(self, msg: &str) -> T {
+        match self {
+            Ok(t) => t,
+            Err(err) => panic_notls(format_args!("expect failed for Result with err: {:?}", err)),
+        }
+    }
+}
+impl<T> ExpectTlsFree for Option<T> {
+    type Unwrapped = T;
+
+    fn expect_notls(self, msg: &str) -> T {
+        match self {
+            Some(t) => t,
+            None => panic_notls("expect failed for Option"),
+        }
+    }
+}
+
+#[inline(never)]
 pub fn static_init(sp: &'static Stack) {
     let mut phdr_opt = None;
     let mut phent_opt = None;
@@ -50,9 +85,9 @@ pub fn static_init(sp: &'static Stack) {
         auxv = unsafe { auxv.add(1) };
     }
 
-    let phdr = phdr_opt.expect("failed to find AT_PHDR");
-    let phent = phent_opt.expect("failed to find AT_PHENT");
-    let phnum = phnum_opt.expect("failed to find AT_PHNUM");
+    let phdr = phdr_opt.expect_notls("failed to find AT_PHDR");
+    let phent = phent_opt.expect_notls("failed to find AT_PHENT");
+    let phnum = phnum_opt.expect_notls("failed to find AT_PHNUM");
 
     for i in 0..phnum {
         let ph_addr = phdr + phent * i;
@@ -63,7 +98,7 @@ pub fn static_init(sp: &'static Stack) {
             program_header64::SIZEOF_PHDR => {
                 unsafe { *(ph_addr as *const program_header64::ProgramHeader) }.into()
             }
-            _ => panic!("unknown AT_PHENT size {}", phent),
+            _ => panic_notls(format_args!("unknown AT_PHENT size {}", phent)),
         };
 
         let page_size = Sys::getpagesize();
@@ -84,10 +119,10 @@ pub fn static_init(sp: &'static Stack) {
                     STATIC_TCB_MASTER.len = ph.p_filesz as usize;
                     STATIC_TCB_MASTER.offset = valign;
 
-                    let tcb = Tcb::new(vsize).expect("failed to allocate TCB");
+                    let tcb = Tcb::new(vsize).expect_notls("failed to allocate TCB");
                     tcb.masters_ptr = &mut STATIC_TCB_MASTER;
                     tcb.masters_len = mem::size_of::<Master>();
-                    tcb.copy_masters().expect("failed to copy TLS master data");
+                    tcb.copy_masters().expect_notls("failed to copy TLS master data");
                     tcb.activate();
                 }
 
@@ -99,18 +134,34 @@ pub fn static_init(sp: &'static Stack) {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "redox"))]
 pub unsafe fn init(sp: &'static Stack) {
     let mut tp = 0usize;
-    const ARCH_GET_FS: usize = 0x1003;
-    syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut tp as *mut usize);
+
+    #[cfg(target_os = "linux")]
+    {
+        const ARCH_GET_FS: usize = 0x1003;
+        syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut tp as *mut usize);
+    }
+    #[cfg(target_os = "redox")]
+    {
+        let mut env = syscall::EnvRegisters::default();
+
+        let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDONLY)
+            .expect_notls("failed to open handle for process registers");
+
+        let _ = syscall::read(file, &mut env)
+            .expect_notls("failed to read fsbase");
+
+        let _ = syscall::close(file);
+
+        tp = env.fsbase as usize;
+    }
+
     if tp == 0 {
         static_init(sp);
     }
 }
-
-#[cfg(target_os = "redox")]
-pub unsafe fn init(_sp: &'static Stack) {}
 
 pub unsafe fn fini() {
     if let Some(tcb) = Tcb::current() {

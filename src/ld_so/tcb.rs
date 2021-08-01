@@ -4,7 +4,7 @@ use goblin::error::{Error, Result};
 
 use crate::{
     header::sys_mman,
-    ld_so::linker::Linker,
+    ld_so::{linker::Linker, ExpectTlsFree},
     platform::{Pal, Sys},
     sync::mutex::Mutex,
 };
@@ -186,28 +186,12 @@ impl Tcb {
         Ok(slice::from_raw_parts_mut(ptr as *mut u8, size))
     }
 
-    /// OS specific code to create a new TLS and TCB - Linux
-    #[cfg(target_os = "linux")]
+    /// OS specific code to create a new TLS and TCB - Linux and Redox
+    #[cfg(any(target_os = "linux", target_os = "redox"))]
     unsafe fn os_new(size: usize) -> Result<(&'static mut [u8], &'static mut [u8])> {
         let page_size = Sys::getpagesize();
         let tls_tcb = Self::map(size + page_size)?;
         Ok(tls_tcb.split_at_mut(size))
-    }
-
-    /// OS specific code to create a new TLS and TCB - Redox
-    #[cfg(target_os = "redox")]
-    unsafe fn os_new(size: usize) -> Result<(&'static mut [u8], &'static mut [u8])> {
-        use crate::header::unistd;
-        //TODO: better method of finding fs offset
-        let pid = unistd::getpid();
-        let page_size = Sys::getpagesize();
-        let tcb_addr = 0xB000_0000 + pid as usize * page_size;
-        let tls = Self::map(size)?;
-        Ok((
-            tls,
-            //TODO: Consider allocating TCB as part of TLS
-            slice::from_raw_parts_mut(tcb_addr as *mut u8, page_size),
-        ))
     }
 
     /// Architecture specific code to read a usize from the TCB - x86_64
@@ -230,13 +214,12 @@ impl Tcb {
     #[cfg(target_arch = "x86_64")]
     unsafe fn arch_read(offset: usize) -> usize {
         let value;
-        llvm_asm!("
-            mov rax, fs:[rdi]
+        asm!(
             "
-            : "={rax}"(value)
-            : "{rdi}"(offset)
-            :
-            : "intel"
+            mov {}, fs:[{}]
+            ",
+            out(reg) value,
+            in(reg) offset,
         );
         value
     }
@@ -257,7 +240,20 @@ impl Tcb {
     /// OS and architecture specific code to activate TLS - Redox x86_64
     #[cfg(all(target_os = "redox", target_arch = "x86_64"))]
     unsafe fn os_arch_activate(tp: usize) {
-        //TODO: Consider setting FS offset to TCB pointer
+        let mut env = syscall::EnvRegisters::default();
+
+        let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDWR)
+            .expect_notls("failed to open handle for process registers");
+
+        let _ = syscall::read(file, &mut env)
+            .expect_notls("failed to read fsbase");
+
+        env.fsbase = tp as u64;
+
+        let _ = syscall::write(file, &env)
+            .expect_notls("failed to write fsbase");
+
+        let _ = syscall::close(file);
     }
 }
 
