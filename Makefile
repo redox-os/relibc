@@ -95,6 +95,7 @@ install-libs: libs
 	cp -v "$(BUILD)/release/libc.so" "$(DESTDIR)/lib"
 	ln -frsv "$(DESTDIR)/lib/libc.so" "$(DESTDIR)/lib/libc.so.6"
 	cp -v "$(BUILD)/release/crt0.o" "$(DESTDIR)/lib"
+	ln -frsv "$(DESTDIR)/lib/crt0.o" "$(DESTDIR)/lib/crt1.o"
 	cp -v "$(BUILD)/release/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/ld_so" "$(DESTDIR)/lib/ld64.so.1"
