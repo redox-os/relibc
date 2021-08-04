@@ -49,12 +49,15 @@ global_asm!(
 "#
 );
 
+#[linkage = "weak"]
+#[no_mangle]
+extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {
+    loop {}
+}
+
 #[panic_handler]
 #[linkage = "weak"]
 #[no_mangle]
 pub unsafe extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
-    extern "C" {
-        fn relibc_panic(pi: &::core::panic::PanicInfo) -> !;
-    }
     relibc_panic(pi)
 }
