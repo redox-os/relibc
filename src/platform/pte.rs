@@ -2,6 +2,7 @@
 
 use alloc::{boxed::Box, collections::BTreeMap};
 use core::{
+    cell::UnsafeCell,
     intrinsics, ptr,
     sync::atomic::{AtomicU32, Ordering},
 };
@@ -45,16 +46,14 @@ static mut pid_mutexes_lock: Mutex<()> = Mutex::new(());
 static mut pid_stacks: Option<BTreeMap<pte_osThreadHandle, (*mut c_void, size_t)>> = None;
 static mut pid_stacks_lock: Mutex<()> = Mutex::new(());
 
+// TODO: VecMap/SLOB (speed) / radix tree (speed while allowing randomization for security).
 #[thread_local]
-static mut LOCALS: *mut BTreeMap<c_uint, *mut c_void> = ptr::null_mut();
+static LOCALS: UnsafeCell<BTreeMap<c_uint, *mut c_void>> = UnsafeCell::new(BTreeMap::new());
 
 static NEXT_KEY: AtomicU32 = AtomicU32::new(0);
 
-unsafe fn locals() -> &'static mut BTreeMap<c_uint, *mut c_void> {
-    if LOCALS.is_null() {
-        LOCALS = Box::into_raw(Box::new(BTreeMap::new()));
-    }
-    &mut *LOCALS
+unsafe fn locals<'a>() -> &'a mut BTreeMap<c_uint, *mut c_void> {
+    &mut *LOCALS.get()
 }
 
 // pte_osResult pte_osInit(void)
@@ -403,7 +402,7 @@ pub unsafe extern "C" fn pte_osTlsGetValue(index: c_uint) -> *mut c_void {
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osTlsAlloc(pKey: *mut c_uint) -> pte_osResult {
-    *pKey = NEXT_KEY.fetch_add(1, Ordering::SeqCst);
+    *pKey = NEXT_KEY.fetch_add(1, Ordering::Relaxed);
     PTE_OS_OK
 }
 
