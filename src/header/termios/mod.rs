@@ -32,6 +32,7 @@ pub const TCSANOW: usize = 0;
 pub const TCSADRAIN: usize = 1;
 pub const TCSAFLUSH: usize = 2;
 
+#[cfg(target_os = "linux")]
 #[repr(C)]
 #[derive(Default)]
 pub struct termios {
@@ -43,6 +44,18 @@ pub struct termios {
     c_cc: [cc_t; NCCS],
     __c_ispeed: speed_t,
     __c_ospeed: speed_t,
+}
+
+// Must match structure in redox_termios
+#[cfg(target_os = "redox")]
+#[repr(C)]
+#[derive(Default)]
+pub struct termios {
+    c_iflag: tcflag_t,
+    c_oflag: tcflag_t,
+    c_cflag: tcflag_t,
+    c_lflag: tcflag_t,
+    c_cc: [cc_t; NCCS],
 }
 
 #[no_mangle]
@@ -60,16 +73,33 @@ pub unsafe extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *mut termios) -
     sys_ioctl::ioctl(fd, sys_ioctl::TCSETS + act as c_ulong, value as *mut c_void)
 }
 
+#[cfg(target_os = "linux")]
 #[no_mangle]
 pub unsafe extern "C" fn cfgetispeed(termios_p: *const termios) -> speed_t {
     (*termios_p).__c_ispeed
 }
 
+#[cfg(target_os = "redox")]
+#[no_mangle]
+pub unsafe extern "C" fn cfgetispeed(termios_p: *const termios) -> speed_t {
+    //TODO
+    0
+}
+
+#[cfg(target_os = "linux")]
 #[no_mangle]
 pub unsafe extern "C" fn cfgetospeed(termios_p: *const termios) -> speed_t {
     (*termios_p).__c_ospeed
 }
 
+#[cfg(target_os = "redox")]
+#[no_mangle]
+pub unsafe extern "C" fn cfgetospeed(termios_p: *const termios) -> speed_t {
+    //TODO
+    0
+}
+
+#[cfg(target_os = "linux")]
 #[no_mangle]
 pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) -> c_int {
     match speed as usize {
@@ -84,6 +114,7 @@ pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) ->
     }
 }
 
+#[cfg(target_os = "linux")]
 #[no_mangle]
 pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) -> c_int {
     match speed as usize {
