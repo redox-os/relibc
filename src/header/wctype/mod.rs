@@ -11,6 +11,8 @@ mod alpha;
 mod casecmp;
 mod punct;
 
+pub type wctype_t = u32;
+
 pub const WEOF: wint_t = 0xFFFF_FFFFu32;
 
 pub const WCTYPE_ALNUM: wctype_t = 1;

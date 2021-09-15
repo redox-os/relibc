@@ -12,7 +12,6 @@ typedef __PTRDIFF_TYPE__ ptrdiff_t;
 #ifndef __cplusplus
 typedef int32_t wchar_t;
 #endif /* #ifndef __cplusplus */
-typedef uint32_t wctype_t;
 typedef uint32_t wint_t;
 
 
