@@ -114,6 +114,14 @@ pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) ->
     }
 }
 
+#[cfg(target_os = "redox")]
+#[no_mangle]
+pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) -> c_int {
+    //TODO
+    platform::errno = errno::EINVAL;
+    -1
+}
+
 #[cfg(target_os = "linux")]
 #[no_mangle]
 pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) -> c_int {
@@ -127,6 +135,14 @@ pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) ->
             -1
         }
     }
+}
+
+#[cfg(target_os = "redox")]
+#[no_mangle]
+pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) -> c_int {
+    //TODO
+    platform::errno = errno::EINVAL;
+    -1
 }
 
 #[no_mangle]
