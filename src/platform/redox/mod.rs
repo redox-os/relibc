@@ -739,19 +739,7 @@ impl Pal for Sys {
         };
 
         if flags & MAP_ANONYMOUS == MAP_ANONYMOUS {
-            let fd = e(syscall::open(
-                "memory:",
-                syscall::O_STAT | syscall::O_CLOEXEC,
-            )); // flags don't matter currently
-            if fd == !0 {
-                return !0 as *mut c_void;
-            }
-
-            let addr = e(syscall::fmap(fd, &map)) as *mut c_void;
-
-            let _ = syscall::close(fd);
-
-            addr
+            e(syscall::fmap(!0, &map)) as *mut c_void
         } else {
             e(syscall::fmap(fildes as usize, &map)) as *mut c_void
         }
