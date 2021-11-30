@@ -30,6 +30,7 @@ const CLONE_VM: usize = 0x0100;
 const CLONE_FS: usize = 0x0200;
 const CLONE_FILES: usize = 0x0400;
 const CLONE_SIGHAND: usize = 0x0800;
+const CLONE_THREAD: usize = 0x00010000;
 
 #[repr(C)]
 #[derive(Default)]
@@ -340,7 +341,7 @@ impl Pal for Sys {
 
     #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND;
+        let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
         let pid;
         llvm_asm!("
             # Call clone syscall
