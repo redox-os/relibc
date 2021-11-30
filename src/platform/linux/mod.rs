@@ -375,7 +375,7 @@ impl Pal for Sys {
             .parent:
             "
             : "={rax}"(pid)
-            : "{rax}"(SYS_CLONE), "{rdi}"(flags), "{rsi}"(stack), "{rdx}"(0), "{rcx}"(0), "{r8}"(0)
+            : "{rax}"(SYS_CLONE), "{rdi}"(flags), "{rsi}"(stack), "{rdx}"(0), "{r10}"(0), "{r8}"(0)
             : "memory", "rbx", "rcx", "rdx", "rsi", "rdi", "r8",
               "r9", "r10", "r11", "r12", "r13", "r14", "r15"
             : "intel", "volatile"
