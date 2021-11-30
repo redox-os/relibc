@@ -95,7 +95,7 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
         }
 
         let i = 0 as socklen_t;
-        let mut buf = [0u8; 65536];
+        let mut buf = vec![0u8; 65536];
         let buf_ptr = buf.as_mut_ptr() as *mut c_void;
 
         let count = unsafe { sys_socket::recv(sock, buf_ptr, 65536, 0) };
