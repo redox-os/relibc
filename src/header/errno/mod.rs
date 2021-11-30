@@ -15,24 +15,12 @@ pub unsafe extern "C" fn __errno_location() -> *mut c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn __program_invocation_name() -> *mut *mut c_char {
-    &mut platform::inner_argv[0]
+    &mut platform::program_invocation_name
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn __program_invocation_short_name() -> *mut *mut c_char {
-    let mut ptr = platform::inner_argv[0];
-    let mut slash_ptr = ptr;
-    loop {
-        let b = *ptr as u8;
-        if b == 0 {
-            return &mut slash_ptr;
-        } else {
-            ptr = ptr.add(1);
-            if b == b'/' {
-                slash_ptr = ptr;
-            }
-        }
-    }
+    &mut platform::program_invocation_short_name
 }
 
 pub const EPERM: c_int = 1; /* Operation not permitted */

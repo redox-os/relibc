@@ -46,6 +46,10 @@ pub static mut errno: c_int = 0;
 pub static mut argv: *mut *mut c_char = ptr::null_mut();
 #[allow(non_upper_case_globals)]
 pub static mut inner_argv: Vec<*mut c_char> = Vec::new();
+#[allow(non_upper_case_globals)]
+pub static mut program_invocation_name: *mut c_char = ptr::null_mut();
+#[allow(non_upper_case_globals)]
+pub static mut program_invocation_short_name: *mut c_char = ptr::null_mut();
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]

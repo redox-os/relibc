@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use core::{intrinsics, ptr};
 
 use crate::{
-    header::{stdio, stdlib},
+    header::{libgen, stdio, stdlib},
     ld_so,
     platform::{self, new_mspace, types::*, Pal, Sys},
     ALLOCATOR,
@@ -141,6 +141,11 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     let argv = sp.argv();
     platform::inner_argv = copy_string_array(argv, argc as usize);
     platform::argv = platform::inner_argv.as_mut_ptr();
+    // Special code for program_invocation_name and program_invocation_short_name
+    if let Some(arg) = platform::inner_argv.get(0) {
+        platform::program_invocation_name = *arg;
+        platform::program_invocation_short_name = libgen::basename(*arg);
+    }
 
     // Set up envp
     let envp = sp.envp();

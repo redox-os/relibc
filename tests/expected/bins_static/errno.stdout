@@ -1,6 +1,6 @@
 bins_static/errno
 bins_static/errno
 errno
-yes, you can change this
-yes, you can change this
-yes, you can change this
+changed to argv[0]
+changed to program_invocation_name
+changed to program_invocation_short_name
