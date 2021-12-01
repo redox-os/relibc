@@ -39,10 +39,17 @@ impl State {
     }
 }
 
-static STATE: Once<State> = Once::new();
+#[thread_local]
+static mut STATE: Option<State> = None;
 
 pub fn init_state() -> &'static State {
-    STATE.call_once(|| State::new())
+    // Safe due to STATE being thread_local
+    unsafe {
+        if STATE.is_none() {
+            STATE = Some(State::new())
+        }
+        STATE.as_ref().unwrap()
+    }
 }
 pub fn is_traceme(pid: pid_t) -> bool {
     File::open(
