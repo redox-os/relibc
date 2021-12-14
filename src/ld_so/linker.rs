@@ -398,10 +398,14 @@ impl Linker {
                         set_u64((b + a) as u64);
                     }
                     reloc::R_X86_64_TPOFF64 => {
-                        let sym = symbol
-                            .as_ref()
-                            .expect("R_X86_64_TPOFF64 called without valid symbol");
-                        set_u64((sym.value + a).wrapping_sub(t) as u64);
+                        if rel.r_sym > 0 {
+                            let sym = symbol
+                                .as_ref()
+                                .expect("R_X86_64_TPOFF64 called without valid symbol");
+                            set_u64((sym.value + a).wrapping_sub(t) as u64);
+                        } else {
+                            set_u64(a.wrapping_sub(t) as u64);
+                        }
                     }
                     reloc::R_X86_64_IRELATIVE => unsafe {
                         let f: unsafe extern "C" fn() -> u64 = transmute(b + a);
