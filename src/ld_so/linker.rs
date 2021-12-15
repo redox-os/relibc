@@ -97,7 +97,7 @@ impl Linker {
     pub fn get_sym(&self, lib_id: usize, name: &str) -> Option<*mut c_void> {
         match self.objects.get(&lib_id) {
             Some(obj) => {
-                return obj.get_sym(name).map(|s| {
+                return obj.get_sym(name).map(|(s, strong)| {
                     if s.sym_type != STT_TLS {
                         s.as_ptr()
                     } else {
@@ -337,14 +337,19 @@ impl Linker {
                         _ => 0,
                     };
                     for lookup_id in lookup_start..symbols_lookup_objects.len() {
-                        let obj = &symbols_lookup_objects[lookup_id];
-                        let s = obj.get_sym(name);
-                        if s.is_some() {
-                            trace!("symbol {} from {} found in {}", name, obj.name, obj.name);
-                            symbol = s;
-                            t = obj.tls_offset;
+                        let lookup_obj = &symbols_lookup_objects[lookup_id];
+                        if let Some((s, strong)) = lookup_obj.get_sym(name) {
+                            trace!(
+                                "symbol {} from {} found in {} ({})",
+                                name, obj.name, lookup_obj.name, if strong { "strong" } else { "weak" }
+                            );
+                            symbol = Some(s);
+                            t = lookup_obj.tls_offset;
                             found = true;
-                            break;
+                            // Stop looking if any strong symbol is found
+                            if strong {
+                                break;
+                            }
                         }
                     }
                     // TODO: below doesn't work because of missing __preinit_array_{start,end} and __init_array_{start,end} symbols in dynamic linked programs

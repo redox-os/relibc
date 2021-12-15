@@ -96,11 +96,11 @@ impl DSO {
         return Ok((dso, tcb_master));
     }
 
-    pub fn get_sym(&self, name: &str) -> Option<Symbol> {
+    pub fn get_sym(&self, name: &str) -> Option<(Symbol, bool)> {
         if let Some(value) = self.global_syms.get(name) {
-            Some(*value)
+            Some((*value, true))
         } else if let Some(value) = self.weak_syms.get(name) {
-            Some(*value)
+            Some((*value, false))
         } else {
             None
         }
