@@ -2,12 +2,10 @@ TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-t
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
-CARGOFLAGS?=-Z build-std=core,alloc,compiler_builtins
+CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins
+CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
 RUSTCFLAGS?=
 export OBJCOPY?=objcopy
-
-# When using xargo, build it in local location
-export XARGO_HOME=$(CURDIR)/target/xargo
 
 BUILD="target/$(TARGET)"
 CARGOFLAGS+="--target=$(TARGET)"
@@ -51,21 +49,7 @@ SRC=\
 	Cargo.* \
 	$(shell find src -type f)
 
-# FIXME: Remove the following line. It's only required since xargo automatically links with compiler_builtins, which conflicts with the compiler_builtins that rustc always links with.
-WEAKEN_SYMBOLS=\
-	-W __divti3 \
-	-W __fixdfti \
-	-W __floattidf \
-	-W __muloti4 \
-	-W __udivti3 \
-	-W __umodti3 \
-	-W __rust_probestack \
-	-W __rust_alloc \
-	-W __rust_alloc_zeroed \
-	-W __rust_dealloc \
-	-W __rust_realloc \
-	-W __rdl_oom \
-	-W __rg_oom
+BUILTINS_VERSION=0.1.70
 
 .PHONY: all clean fmt install install-headers libs submodules test
 
@@ -146,8 +130,7 @@ $(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/pthreads-emb/libpthr
 
 $(BUILD)/debug/librelibc.a: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
-	# FIXME: Remove the following line. It's only required since xargo automatically links with compiler_builtins, which conflicts with the compiler_builtins that rustc always links with.
-	$(OBJCOPY) $@ $(WEAKEN_SYMBOLS)
+	./renamesyms.sh $@ $(BUILD)/debug/deps/
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
@@ -185,7 +168,9 @@ $(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/lib
 
 $(BUILD)/release/librelibc.a: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
-	$(OBJCOPY) $@ $(WEAKEN_SYMBOLS)
+	# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
+	# use some cbindgen hook, specify them manually, or grep for #[no_mangle].
+	./renamesyms.sh $@ $(BUILD)/release/deps/
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)

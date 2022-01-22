@@ -3,7 +3,7 @@ use core::arch::asm;
 
 use syscall::{
     self,
-    data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
+    data::{CloneInfo, Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
     PtraceEvent, Result,
 };
 
@@ -34,6 +34,7 @@ static mut BRK_CUR: *mut c_void = ptr::null_mut();
 static mut BRK_END: *mut c_void = ptr::null_mut();
 
 mod epoll;
+mod exec;
 mod extra;
 mod ptrace;
 mod signal;
@@ -220,7 +221,7 @@ impl Pal for Sys {
             len += 1;
         }
 
-        let mut args: Vec<[usize; 2]> = Vec::with_capacity(len as usize);
+        let mut args: Vec<&[u8]> = Vec::with_capacity(len as usize);
 
         // Read shebang (for example #!/bin/sh)
         let interpreter = {
@@ -301,44 +302,50 @@ impl Pal for Sys {
             // Make sure path is kept alive long enough, and push it to the arguments
             _interpreter_path = Some(cstring);
             let path_ref = _interpreter_path.as_ref().unwrap();
-            args.push([path_ref.as_ptr() as usize, path_ref.to_bytes().len()]);
+            args.push(path_ref.as_bytes());
         } else {
             if file.seek(SeekFrom::Start(0)).is_err() {
                 return -1;
             }
         }
 
-        // Arguments
-        while !(*argv).is_null() {
-            let arg = *argv;
+        let mut args_envs_size_without_nul = 0;
 
+        // Arguments
+        while !argv.read().is_null() {
+            let arg = argv.read();
+
+            // TODO: Optimized strlen?
             let mut len = 0;
-            while *arg.offset(len) != 0 {
+            while arg.add(len).read() != 0 {
                 len += 1;
             }
-            args.push([arg as usize, len as usize]);
+            args.push(core::slice::from_raw_parts(arg as *const u8, len));
+            args_envs_size_without_nul += len;
             argv = argv.offset(1);
         }
 
         // Environment variables
         let mut len = 0;
-        while !(*envp.offset(len)).is_null() {
+        while !envp.add(len).read().is_null() {
             len += 1;
         }
 
-        let mut envs: Vec<[usize; 2]> = Vec::with_capacity(len as usize);
-        while !(*envp).is_null() {
-            let env = *envp;
+        let mut envs: Vec<&[u8]> = Vec::with_capacity(len);
+        while !envp.read().is_null() {
+            let env = envp.read();
 
+            // TODO: Optimized strlen?
             let mut len = 0;
-            while *env.offset(len) != 0 {
+            while env.add(len).read() != 0 {
                 len += 1;
             }
-            envs.push([env as usize, len as usize]);
-            envp = envp.offset(1);
+            envs.push(core::slice::from_raw_parts(env as *const u8, len));
+            args_envs_size_without_nul += len;
+            envp = envp.add(1);
         }
 
-        e(syscall::fexec(*file as usize, &args, &envs)) as c_int
+        e(self::exec::fexec_impl(*file as usize, path.to_bytes(), &args, &envs, args_envs_size_without_nul)) as c_int
     }
 
     fn fchdir(fd: c_int) -> c_int {
@@ -858,7 +865,29 @@ impl Pal for Sys {
 
     #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        e(syscall::Error::demux(extra::pte_clone_inner(stack as usize))) as pid_t
+        let flags = syscall::CLONE_VM
+            | syscall::CLONE_FS
+            | syscall::CLONE_FILES
+            | syscall::CLONE_SIGHAND
+            | syscall::CLONE_STACK;
+        let flags = flags.bits();
+
+        use syscall::{Map, MapFlags};
+
+        const SIGSTACK_SIZE: usize = 1024 * 256;
+
+        // TODO: Put sigstack at high addresses?
+        let target_sigstack = match syscall::fmap(!0, &Map { address: 0, flags: MapFlags::PROT_READ | MapFlags::PROT_WRITE | MapFlags::MAP_PRIVATE, offset: 0, size: SIGSTACK_SIZE }) {
+            Ok(s) => s + SIGSTACK_SIZE,
+            Err(err) => return e(Err(err)) as pid_t,
+        };
+
+        let info = CloneInfo {
+            target_stack: stack as usize,
+            target_sigstack,
+        };
+
+        e(syscall::Error::demux(extra::pte_clone_inner(&info))) as pid_t
     }
 
     fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {

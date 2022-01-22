@@ -168,6 +168,22 @@ impl Tcb {
         Self::os_arch_activate(self.tcb_ptr as usize);
     }
 
+    /// Deactive TLS, used before exec() on Redox to not trick target executable into thinking TLS
+    /// is already initialized as if it was a thread.
+    #[cfg(all(target_os = "redox", target_arch = "x86_64"))]
+    pub unsafe fn deactivate() {
+        let mut env = syscall::EnvRegisters::default();
+
+        let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_WRONLY)
+            .expect_notls("failed to open handle for process registers");
+
+        env.fsbase = 0;
+        env.gsbase = 0;
+
+        let _ = syscall::write(file, &mut env)
+            .expect_notls("failed to read fsbase");
+    }
+
     /// Mapping with correct flags for TCB and TLS
     unsafe fn map(size: usize) -> Result<&'static mut [u8]> {
         let ptr = sys_mman::mmap(

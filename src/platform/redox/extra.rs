@@ -1,6 +1,8 @@
 use core::{ptr, slice};
 use core::arch::global_asm;
 
+use syscall::data::CloneInfo;
+
 use crate::platform::{sys::e, types::*};
 
 #[no_mangle]
@@ -50,11 +52,64 @@ pub unsafe extern "C" fn redox_physunmap(virtual_address: *mut c_void) -> c_int 
 }
 
 extern "C" {
-    pub fn pte_clone_inner(stack: usize) -> usize;
+    pub fn pte_clone_inner(info: *const CloneInfo) -> usize;
 }
 
 #[cfg(target_arch = "x86_64")]
 global_asm!("
+    .globl pte_clone_inner
+    .type pte_clone_inner, @function
+    .p2align 6",
+    // Parameters: <info_ptr> in RDI
+"pte_clone_inner:
+    mov rax, {SYS_CLONE}
+    mov rsi, rdi
+    mov rdi, {CLONE_FLAGS}
+    mov rdx, {INFO_LEN}",
+    // Call clone(flags, info_ptr, info_len) syscall
+    "syscall
+
+    # Check if child or parent
+    test rax, rax
+    jnz .parent
+
+    # Load registers
+    pop rax
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop r8
+    pop r9
+
+    # Call entry point
+    call rax
+
+    # Exit
+    mov rax, {SYS_EXIT}
+    xor rdi, rdi
+    syscall
+
+    # Invalid instruction on failure to exit
+    ud2
+
+    # Return PID if parent
+.parent:
+    ret
+    ",
+    SYS_EXIT = const(syscall::SYS_EXIT),
+    SYS_CLONE = const(syscall::SYS_CLONE),
+    CLONE_FLAGS = const(
+        syscall::CLONE_VM.bits()
+            | syscall::CLONE_FS.bits()
+            | syscall::CLONE_FILES.bits()
+            | syscall::CLONE_SIGHAND.bits()
+            | syscall::CLONE_STACK.bits()
+    ),
+    INFO_LEN = const(core::mem::size_of::<CloneInfo>()),
+);
+
+/*global_asm!("
     .globl pte_clone_inner
     .type pte_clone_inner, @function
 
@@ -107,4 +162,4 @@ pte_clone_inner:
             | syscall::CLONE_STACK.bits()
     ),
     SYS_CLONE = const(syscall::SYS_CLONE),
-);
+);*/

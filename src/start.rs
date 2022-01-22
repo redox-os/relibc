@@ -112,6 +112,15 @@ fn io_init() {
         stdio::stderr = stdio::default_stderr.get();
     }
 }
+fn setup_sigstack() {
+    use syscall::{Map, MapFlags};
+    const SIGSTACK_SIZE: usize = 1024 * 256;
+    let sigstack = unsafe { syscall::fmap(!0, &Map { address: 0, offset: 0, flags: MapFlags::MAP_PRIVATE | MapFlags::PROT_READ | MapFlags::PROT_WRITE, size: SIGSTACK_SIZE }) }.expect("failed to allocate sigstack") + SIGSTACK_SIZE;
+
+    let fd = syscall::open("thisproc:current/sigstack", syscall::O_WRONLY | syscall::O_CLOEXEC).expect("failed to open thisproc:current/sigstack");
+    syscall::write(fd, &usize::to_ne_bytes(sigstack)).expect("failed to write to thisproc:current/sigstack");
+    let _ = syscall::close(fd);
+}
 
 #[inline(never)]
 #[no_mangle]
@@ -155,6 +164,9 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     }
     platform::inner_environ = copy_string_array(envp, len);
     platform::environ = platform::inner_environ.as_mut_ptr();
+
+    // Setup signal stack, otherwise we cannot handle any signals besides SIG_IGN/SIG_DFL behavior.
+    setup_sigstack();
 
     init_array();
 
