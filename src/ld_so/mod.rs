@@ -143,7 +143,7 @@ pub unsafe fn init(sp: &'static Stack) {
         const ARCH_GET_FS: usize = 0x1003;
         syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut tp as *mut usize);
     }
-    #[cfg(target_os = "redox")]
+    #[cfg(all(target_os = "redox", target_arch = "x86_64"))]
     {
         let mut env = syscall::EnvRegisters::default();
 
