@@ -1,32 +1,25 @@
 //! crt0
 
 #![no_std]
-#![feature(asm)]
 #![feature(linkage)]
-#![feature(llvm_asm)]
-#![feature(naked_functions)]
 
-#[no_mangle]
-#[naked]
-pub unsafe extern "C" fn _start() {
-    #[cfg(target_arch = "x86_64")]
-    llvm_asm!("mov rdi, rsp
-        and rsp, 0xFFFFFFFFFFFFFFF0
-        call relibc_start"
-        :
-        :
-        :
-        : "intel", "volatile"
-    );
-    #[cfg(target_arch = "aarch64")]
-    llvm_asm!("mov x0, sp
-        bl relibc_start"
-        :
-        :
-        :
-        : "volatile"
-    );
-}
+use core::arch::global_asm;
+
+#[cfg(target_arch = "x86_64")]
+global_asm!("
+    .globl _start
+_start:
+    mov rdi, rsp
+    and rsp, 0xFFFFFFFFFFFFFFF0
+    call relibc_start
+");
+#[cfg(target_arch = "aarch64")]
+global_asm!("
+    .globl _start
+_start:
+    mov x0, sp
+    bl relibc_start
+");
 
 #[linkage = "weak"]
 #[no_mangle]

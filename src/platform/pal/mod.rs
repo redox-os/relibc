@@ -106,6 +106,8 @@ pub trait Pal {
 
     fn getuid() -> uid_t;
 
+    fn lchown(path: &CStr, owner: uid_t, group: gid_t) -> c_int;
+
     fn link(path1: &CStr, path2: &CStr) -> c_int;
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t;

@@ -279,6 +279,10 @@ impl Pal for Sys {
         e(unsafe { syscall!(GETUID) }) as uid_t
     }
 
+    fn lchown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
+        e(unsafe { syscall!(LCHOWN, path.as_ptr(), owner, group) })
+    }
+
     fn link(path1: &CStr, path2: &CStr) -> c_int {
         e(unsafe {
             syscall!(

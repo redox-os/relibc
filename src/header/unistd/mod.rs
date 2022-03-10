@@ -427,9 +427,10 @@ pub extern "C" fn isatty(fd: c_int) -> c_int {
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn lchown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn lchown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
+    let path = CStr::from_ptr(path);
+    Sys::lchown(path, owner, group)
 }
 
 #[no_mangle]

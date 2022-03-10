@@ -1,4 +1,6 @@
 use core::{mem, ptr, result::Result as CoreResult, slice, str};
+use core::arch::asm;
+
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
@@ -686,6 +688,17 @@ impl Pal for Sys {
         e(syscall::getuid()) as pid_t
     }
 
+    fn lchown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
+        // TODO: Is it correct for regular chown to use O_PATH? On Linux the meaning of that flag
+        // is to forbid file operations, including fchown.
+
+        // unlike chown, never follow symbolic links
+        match File::open(path, fcntl::O_CLOEXEC | fcntl::O_NOFOLLOW) {
+            Ok(file) => Self::fchown(*file, owner, group),
+            Err(_) => -1,
+        }
+    }
+
     fn link(path1: &CStr, path2: &CStr) -> c_int {
         e(unsafe { syscall::link(path1.as_ptr() as *const u8, path2.as_ptr() as *const u8) })
             as c_int
@@ -839,50 +852,7 @@ impl Pal for Sys {
 
     #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        let flags = syscall::CLONE_VM
-            | syscall::CLONE_FS
-            | syscall::CLONE_FILES
-            | syscall::CLONE_SIGHAND
-            | syscall::CLONE_STACK;
-        let pid;
-        llvm_asm!("
-            # Call clone syscall
-            syscall
-
-            # Check if child or parent
-            test rax, rax
-            jnz .parent
-
-            # Load registers
-            pop rax
-            pop rdi
-            pop rsi
-            pop rdx
-            pop rcx
-            pop r8
-            pop r9
-
-            # Call entry point
-            call rax
-
-            # Exit
-            mov rax, 1
-            xor rdi, rdi
-            syscall
-
-            # Invalid instruction on failure to exit
-            ud2
-
-            # Return PID if parent
-            .parent:
-            "
-            : "={rax}"(pid)
-            : "{rax}"(syscall::SYS_CLONE), "{rdi}"(flags), "{rsi}"(stack)
-            : "memory", "rbx", "rcx", "rdx", "rsi", "rdi", "r8",
-              "r9", "r10", "r11", "r12", "r13", "r14", "r15"
-            : "intel", "volatile"
-        );
-        e(syscall::Error::demux(pid)) as pid_t
+        e(syscall::Error::demux(extra::pte_clone_inner(stack as usize))) as pid_t
     }
 
     fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
