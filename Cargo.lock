@@ -305,17 +305,17 @@ checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.10"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8383f39639269cde97d255a32bdb68c047337295414940c68bdd30c2e13203ff"
+checksum = "8380fe0152551244f0747b1bf41737e0f8a74f97a14ccefd1148187271634f3c"
 dependencies = [
  "bitflags",
 ]
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.11"
-source = "git+https://gitlab.redox-os.org/4lDO2/syscall.git?branch=update-toolchain-2022#938d1c1cb6ebfae84b449cbd7dbe860f0e8a5ea5"
+version = "0.2.12"
+source = "git+https://gitlab.redox-os.org/4lDO2/syscall.git?branch=update-toolchain-2022#94de991da2a75c45be0b73b18adc26522fb6f4a8"
 dependencies = [
  "bitflags",
 ]
@@ -335,7 +335,7 @@ dependencies = [
  "posix-regex",
  "ralloc",
  "rand",
- "redox_syscall 0.2.11",
+ "redox_syscall 0.2.12",
  "sc",
  "spin 0.9.2",
 ]
@@ -510,7 +510,7 @@ dependencies = [
  "cfg-if",
  "fastrand",
  "libc",
- "redox_syscall 0.2.10",
+ "redox_syscall 0.2.11",
  "remove_dir_all",
  "winapi",
 ]
