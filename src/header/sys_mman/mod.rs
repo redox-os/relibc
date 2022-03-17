@@ -24,14 +24,14 @@ pub const MS_ASYNC: c_int = 0x0001;
 pub const MS_INVALIDATE: c_int = 0x0002;
 pub const MS_SYNC: c_int = 0x0004;
 
-// #[no_mangle]
-pub extern "C" fn mlock(addr: *const c_void, len: usize) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn mlock(addr: *const c_void, len: usize) -> c_int {
+    Sys::mlock(addr, len)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn mlockall(flags: c_int) -> c_int {
-    unimplemented!();
+    Sys::mlockall(flags)
 }
 
 #[no_mangle]
@@ -56,14 +56,14 @@ pub unsafe extern "C" fn msync(addr: *mut c_void, len: size_t, flags: c_int) -> 
     Sys::msync(addr, len, flags)
 }
 
-// #[no_mangle]
-pub extern "C" fn munlock(addr: *const c_void, len: usize) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn munlock(addr: *const c_void, len: usize) -> c_int {
+    Sys::munlock(addr, len)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn munlockall() -> c_int {
-    unimplemented!();
+    Sys::munlockall()
 }
 
 #[no_mangle]

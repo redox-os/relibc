@@ -114,6 +114,10 @@ pub trait Pal {
 
     fn mkfifo(path: &CStr, mode: mode_t) -> c_int;
 
+    unsafe fn mlock(addr: *const c_void, len: usize) -> c_int;
+
+    fn mlockall(flags: c_int) -> c_int;
+
     unsafe fn mmap(
         addr: *mut c_void,
         len: usize,
@@ -126,6 +130,10 @@ pub trait Pal {
     unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int;
 
     unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> c_int;
+
+    unsafe fn munlock(addr: *const c_void, len: usize) -> c_int;
+
+    fn munlockall() -> c_int;
 
     unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int;
 

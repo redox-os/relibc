@@ -304,6 +304,14 @@ impl Pal for Sys {
         e(unsafe { syscall!(MKNODAT, AT_FDCWD, path.as_ptr(), mode | S_IFIFO, 0) }) as c_int
     }
 
+    unsafe fn mlock(addr: *const c_void, len: usize) -> c_int {
+        e(syscall!(MLOCK, addr, len)) as c_int
+    }
+
+    fn mlockall(flags: c_int) -> c_int {
+        e(unsafe { syscall!(MLOCKALL, flags) }) as c_int
+    }
+
     unsafe fn mmap(
         addr: *mut c_void,
         len: usize,
@@ -321,6 +329,14 @@ impl Pal for Sys {
 
     unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
         e(syscall!(MSYNC, addr, len, flags)) as c_int
+    }
+
+    unsafe fn munlock(addr: *const c_void, len: usize) -> c_int {
+        e(syscall!(MUNLOCK, addr, len)) as c_int
+    }
+
+    fn munlockall() -> c_int {
+        e(unsafe { syscall!(MUNLOCKALL) }) as c_int
     }
 
     unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {

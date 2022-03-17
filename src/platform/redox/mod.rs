@@ -721,6 +721,16 @@ impl Pal for Sys {
         }
     }
 
+    unsafe fn mlock(addr: *const c_void, len: usize) -> c_int {
+        // Redox never swaps
+        0
+    }
+
+    fn mlockall(flags: c_int) -> c_int {
+        // Redox never swaps
+        0
+    }
+
     unsafe fn mmap(
         addr: *mut c_void,
         len: usize,
@@ -764,6 +774,16 @@ impl Pal for Sys {
             flags
         )) as c_int
         */
+    }
+
+    unsafe fn munlock(addr: *const c_void, len: usize) -> c_int {
+        // Redox never swaps
+        0
+    }
+
+    fn munlockall() -> c_int {
+        // Redox never swaps
+        0
     }
 
     unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
