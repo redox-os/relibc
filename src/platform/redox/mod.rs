@@ -894,26 +894,10 @@ impl Pal for Sys {
     }
 
     fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t {
-        let file = match File::open(
-            pathname,
-            fcntl::O_PATH | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
-        ) {
-            Ok(ok) => ok,
+        match File::open(pathname, fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC) {
+            Ok(file) => Self::read(*file, out),
             Err(_) => return -1,
-        };
-
-        if out.is_empty() {
-            return 0;
         }
-
-        let len = out.len();
-        let read = e(syscall::fpath(*file as usize, &mut out[..len - 1]));
-        if (read as c_int) < 0 {
-            return -1;
-        }
-        out[read as usize] = 0;
-
-        0
     }
 
     fn rename(oldpath: &CStr, newpath: &CStr) -> c_int {
