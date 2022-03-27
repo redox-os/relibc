@@ -56,7 +56,9 @@ WEAKEN_SYMBOLS=\
 	-W __rust_alloc \
 	-W __rust_alloc_zeroed \
 	-W __rust_dealloc \
-	-W __rust_realloc
+	-W __rust_realloc \
+	-W __rdl_oom \
+	-W __rg_oom
 
 .PHONY: all clean fmt install install-headers libs submodules test
 

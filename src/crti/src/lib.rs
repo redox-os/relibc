@@ -1,8 +1,9 @@
 //! crti
 
 #![no_std]
-#![feature(global_asm)]
 #![feature(linkage)]
+
+use core::arch::global_asm;
 
 // https://wiki.osdev.org/Creating_a_C_Library#crtbegin.o.2C_crtend.o.2C_crti.o.2C_and_crtn.o
 #[cfg(target_arch = "x86_64")]

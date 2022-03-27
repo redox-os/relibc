@@ -1,5 +1,6 @@
-use alloc::vec::Vec;
 use core::{mem, ptr, slice};
+use core::arch::asm;
+use alloc::vec::Vec;
 use goblin::error::{Error, Result};
 
 use crate::{
@@ -198,6 +199,7 @@ impl Tcb {
     #[inline(always)]
     #[cfg(target_arch = "aarch64")]
     unsafe fn arch_read(offset: usize) -> usize {
+        // TODO: s/llvm_asm/asm/g
         let tp: usize;
         llvm_asm!("mrs $0, tpidr_el0"
             : "=r"(tp)
