@@ -8,6 +8,7 @@ pub use self::{
     semaphore::Semaphore,
 };
 
+use crate::header::time::timespec;
 use crate::platform::{types::*, Pal, Sys};
 use core::{
     cell::UnsafeCell,
@@ -37,22 +38,25 @@ impl AtomicLock {
         }
     }
     pub fn notify_one(&self) {
-        Sys::futex(unsafe { &mut *self.atomic.get() }.get_mut(), FUTEX_WAKE, 1);
+        Sys::futex(unsafe { &mut *self.atomic.get() }.get_mut(), FUTEX_WAKE, 1, 0);
     }
     pub fn notify_all(&self) {
         Sys::futex(
             unsafe { &mut *self.atomic.get() }.get_mut(),
             FUTEX_WAKE,
             c_int::max_value(),
+            0
         );
     }
-    pub fn wait_if(&self, value: c_int) {
+    pub fn wait_if(&self, value: c_int, timeout_opt: Option<&timespec>) {
         Sys::futex(
             unsafe { &mut *self.atomic.get() }.get_mut(),
             FUTEX_WAIT,
             value,
+            timeout_opt.map_or(0, |timeout| timeout as *const timespec as usize)
         );
     }
+
     /// A general way to efficiently wait for what might be a long time, using two closures:
     ///
     /// - `attempt` = Attempt to modify the atomic value to any
@@ -103,7 +107,7 @@ impl AtomicLock {
                 // wait informed us that we might be done waiting
                 mark_long(self) != AttemptStatus::Desired
             {
-                self.wait_if(long);
+                self.wait_if(long, None);
             }
 
             previous = attempt(self);

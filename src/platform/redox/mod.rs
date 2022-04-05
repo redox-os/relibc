@@ -446,13 +446,13 @@ impl Pal for Sys {
         e(syscall::ftruncate(fd as usize, len as usize)) as c_int
     }
 
-    fn futex(addr: *mut c_int, op: c_int, val: c_int) -> c_int {
+    fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> c_int {
         match unsafe {
             syscall::futex(
                 addr as *mut i32,
                 op as usize,
                 val as i32,
-                0,
+                val2,
                 ptr::null_mut(),
             )
         } {

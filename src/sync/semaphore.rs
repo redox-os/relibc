@@ -2,6 +2,7 @@
 //TODO: improve implementation
 
 use super::AtomicLock;
+use crate::header::time::timespec;
 use crate::platform::{types::*, Pal, Sys};
 use core::sync::atomic::Ordering;
 
@@ -21,7 +22,7 @@ impl Semaphore {
         self.lock.notify_one();
     }
 
-    pub fn wait(&self) {
+    pub fn wait(&self, timeout_opt: Option<&timespec>) {
         let mut value = 1;
 
         loop {
@@ -38,7 +39,7 @@ impl Semaphore {
             }
 
             if value == 0 {
-                self.lock.wait_if(0);
+                self.lock.wait_if(0, timeout_opt);
                 value = 1;
             }
         }

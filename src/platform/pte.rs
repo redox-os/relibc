@@ -346,8 +346,15 @@ pub unsafe extern "C" fn pte_osSemaphorePend(
     handle: pte_osSemaphoreHandle,
     pTimeout: *mut c_uint,
 ) -> pte_osResult {
-    //TODO: pTimeout
-    (*handle).wait();
+    let timeout_opt = if ! pTimeout.is_null() {
+        let timeout = *pTimeout as i64;
+        let tv_sec = timeout / 1000;
+        let tv_nsec = (timeout % 1000) * 1000000;
+        Some(timespec { tv_sec, tv_nsec })
+    } else {
+        None
+    };
+    (*handle).wait(timeout_opt.as_ref());
     PTE_OS_OK
 }
 
@@ -356,7 +363,7 @@ pub unsafe extern "C" fn pte_osSemaphoreCancellablePend(
     handle: pte_osSemaphoreHandle,
     pTimeout: *mut c_uint,
 ) -> pte_osResult {
-    //TODO
+    //TODO: thread cancel
     pte_osSemaphorePend(handle, pTimeout)
 }
 
