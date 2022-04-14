@@ -237,12 +237,15 @@ pub unsafe extern "C" fn pte_osThreadWaitForEnd(handle: pte_osThreadHandle) -> p
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadCancel(handle: pte_osThreadHandle) -> pte_osResult {
+    println!("pte_osThreadCancel {:#x}", handle);
     //TODO: allow cancel of thread
     PTE_OS_OK
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadCheckCancel(handle: pte_osThreadHandle) -> pte_osResult {
+    println!("pte_osThreadCheckCancel {:#x}", handle);
+    //TODO: thread cancel
     PTE_OS_OK
 }
 
@@ -363,6 +366,7 @@ pub unsafe extern "C" fn pte_osSemaphoreCancellablePend(
     handle: pte_osSemaphoreHandle,
     pTimeout: *mut c_uint,
 ) -> pte_osResult {
+    println!("pte_osSemaphoreCancellablePend {:p} {:p}", handle, pTimeout);
     //TODO: thread cancel
     pte_osSemaphorePend(handle, pTimeout)
 }
