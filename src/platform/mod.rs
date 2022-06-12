@@ -54,8 +54,24 @@ pub static mut program_invocation_short_name: *mut c_char = ptr::null_mut();
 #[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut environ: *mut *mut c_char = ptr::null_mut();
-#[allow(non_upper_case_globals)]
-pub static mut inner_environ: Vec<*mut c_char> = Vec::new();
+
+pub static mut OUR_ENVIRON: Vec<*mut c_char> = Vec::new();
+
+pub fn environ_iter() -> impl Iterator<Item = *mut c_char> + 'static {
+    unsafe {
+        let mut ptrs = environ;
+
+        core::iter::from_fn(move || {
+            let ptr = ptrs.read();
+            if ptr.is_null() {
+                None
+            } else {
+                ptrs = ptrs.add(1);
+                Some(ptr)
+            }
+        })
+    }
+}
 
 pub trait WriteByte: fmt::Write {
     fn write_u8(&mut self, byte: u8) -> fmt::Result;

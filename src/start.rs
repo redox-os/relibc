@@ -162,8 +162,8 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     while !(*envp.add(len)).is_null() {
         len += 1;
     }
-    platform::inner_environ = copy_string_array(envp, len);
-    platform::environ = platform::inner_environ.as_mut_ptr();
+    platform::OUR_ENVIRON = copy_string_array(envp, len);
+    platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
 
     // Setup signal stack, otherwise we cannot handle any signals besides SIG_IGN/SIG_DFL behavior.
     setup_sigstack();

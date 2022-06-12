@@ -324,16 +324,7 @@ pub extern "C" fn gcvt(value: c_double, ndigit: c_int, buf: *mut c_char) -> *mut
 }
 
 unsafe fn find_env(search: *const c_char) -> Option<(usize, *mut c_char)> {
-    for (i, item) in platform::inner_environ.iter().enumerate() {
-        let mut item = *item;
-        if item.is_null() {
-            assert_eq!(
-                i,
-                platform::inner_environ.len() - 1,
-                "an early null pointer in environ vector"
-            );
-            break;
-        }
+    for (i, mut item) in platform::environ_iter().enumerate() {
         let mut search = search;
         loop {
             let end_of_query = *search == 0 || *search == b'=' as c_char;
@@ -341,7 +332,7 @@ unsafe fn find_env(search: *const c_char) -> Option<(usize, *mut c_char)> {
             if *item == b'=' as c_char || end_of_query {
                 if *item == b'=' as c_char && end_of_query {
                     // Both keys env here
-                    return Some((i, item.offset(1)));
+                    return Some((i, item.add(1)));
                 } else {
                     break;
                 }
@@ -351,10 +342,11 @@ unsafe fn find_env(search: *const c_char) -> Option<(usize, *mut c_char)> {
                 break;
             }
 
-            item = item.offset(1);
-            search = search.offset(1);
+            item = item.add(1);
+            search = search.add(1);
         }
     }
+
     None
 }
 
@@ -694,22 +686,33 @@ pub extern "C" fn ptsname(fildes: c_int) -> *mut c_char {
     unimplemented!();
 }
 
+unsafe fn put_new_env(insert: *mut c_char) {
+    // XXX: Another problem is that `environ` can be set to any pointer, which means there is a
+    // chance of a memory leak. But we can check if it was the same as before, like musl does.
+    if platform::environ == platform::OUR_ENVIRON.as_mut_ptr() {
+        *platform::OUR_ENVIRON.last_mut().unwrap() = insert;
+        platform::OUR_ENVIRON.push(core::ptr::null_mut());
+        // Likely a no-op but is needed due to Stacked Borrows.
+        platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
+    } else {
+        platform::OUR_ENVIRON.clear();
+        platform::OUR_ENVIRON.extend(platform::environ_iter());
+        platform::OUR_ENVIRON.push(insert);
+        platform::OUR_ENVIRON.push(core::ptr::null_mut());
+        platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn putenv(insert: *mut c_char) -> c_int {
     assert_ne!(insert, ptr::null_mut(), "putenv(NULL)");
     if let Some((i, _)) = find_env(insert) {
-        //TODO: find out why this crashes: platform::free(platform::inner_environ[i] as *mut c_void);
-        platform::inner_environ[i] = insert;
+        // XXX: The POSIX manual states that environment variables can be *set* via the `environ`
+        // global variable. While we can check if a pointer belongs to our allocator, or check
+        // `environ` against a vector which we control, it is likely not worth the effort.
+        platform::environ.add(i).write(insert);
     } else {
-        let i = platform::inner_environ.len() - 1;
-        assert_eq!(
-            platform::inner_environ[i],
-            ptr::null_mut(),
-            "environ did not end with null"
-        );
-        platform::inner_environ[i] = insert;
-        platform::inner_environ.push(ptr::null_mut());
-        platform::environ = platform::inner_environ.as_mut_ptr();
+        put_new_env(insert);
     }
     0
 }
@@ -850,69 +853,45 @@ pub unsafe extern "C" fn seed48(seed16v: *mut c_ushort) -> *mut c_ushort {
     rand48::SEED48_XSUBI.as_mut_ptr()
 }
 
+unsafe fn copy_kv(existing: *mut c_char, key: *const c_char, value: *const c_char, key_len: usize, value_len: usize) {
+    core::ptr::copy_nonoverlapping(key, existing, key_len);
+    core::ptr::write(existing.add(key_len), b'=' as c_char);
+    core::ptr::copy_nonoverlapping(value, existing.add(key_len + 1), value_len);
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn setenv(
     mut key: *const c_char,
     mut value: *const c_char,
     overwrite: c_int,
 ) -> c_int {
-    let mut key_len = 0;
-    while *key.offset(key_len) != 0 {
-        key_len += 1;
-    }
-    let mut value_len = 0;
-    while *value.offset(value_len) != 0 {
-        value_len += 1;
-    }
+    let key_len = strlen(key);
+    let value_len = strlen(value);
 
-    let index = if let Some((i, existing)) = find_env(key) {
+    if let Some((i, existing)) = find_env(key) {
         if overwrite == 0 {
             return 0;
         }
 
-        let mut existing_len = 0;
-        while *existing.offset(existing_len) != 0 {
-            existing_len += 1;
-        }
+        let existing_len = strlen(existing);
 
         if existing_len >= value_len {
             // Reuse existing element's allocation
-            for i in 0..=value_len {
-                *existing.offset(i) = *value.offset(i);
-            }
-            return 0;
+            core::ptr::copy_nonoverlapping(value, existing, value_len);
         } else {
-            i
+            // Reuse platform::environ slot, but allocate a new pointer.
+            let mut ptr = platform::alloc(key_len as usize + 1 + value_len as usize) as *mut c_char;
+            copy_kv(ptr, key, value, key_len, value_len);
+            platform::environ.add(i).write(ptr);
         }
     } else {
-        let i = platform::inner_environ.len() - 1;
-        assert_eq!(
-            platform::inner_environ[i],
-            ptr::null_mut(),
-            "environ did not end with null"
-        );
-        platform::inner_environ.push(ptr::null_mut());
-        platform::environ = platform::inner_environ.as_mut_ptr();
-        i
-    };
+        // Expand platform::environ and allocate a new pointer.
+        let mut ptr = platform::alloc(key_len as usize + 1 + value_len as usize) as *mut c_char;
+        copy_kv(ptr, key, value, key_len, value_len);
+        put_new_env(ptr);
+    }
 
     //platform::free(platform::inner_environ[index] as *mut c_void);
-    let mut ptr = platform::alloc(key_len as usize + 1 + value_len as usize) as *mut c_char;
-    platform::inner_environ[index] = ptr;
-
-    while *key != 0 {
-        *ptr = *key;
-        ptr = ptr.offset(1);
-        key = key.offset(1);
-    }
-    *ptr = b'=' as c_char;
-    ptr = ptr.offset(1);
-    while *value != 0 {
-        *ptr = *value;
-        ptr = ptr.offset(1);
-        value = value.offset(1);
-    }
-    *ptr = 0;
 
     0
 }
@@ -1174,9 +1153,19 @@ pub extern "C" fn unlockpt(fildes: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn unsetenv(key: *const c_char) -> c_int {
     if let Some((i, _)) = find_env(key) {
-        // No need to worry about updating the pointer, this does not
-        // reallocate in any way. And the final null is already shifted back.
-        platform::inner_environ.remove(i);
+        if platform::environ == platform::OUR_ENVIRON.as_mut_ptr() {
+            // No need to worry about updating the pointer, this does not
+            // reallocate in any way. And the final null is already shifted back.
+            platform::OUR_ENVIRON.remove(i);
+
+            // My UB paranoia.
+            platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
+        } else {
+            platform::OUR_ENVIRON.clear();
+            platform::OUR_ENVIRON.extend(platform::environ_iter().enumerate().filter(|&(j, _)| j != i).map(|(_, v)| v));
+            platform::OUR_ENVIRON.push(core::ptr::null_mut());
+            platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
+        }
     }
     0
 }
