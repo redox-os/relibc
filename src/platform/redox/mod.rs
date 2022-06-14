@@ -14,10 +14,11 @@ use crate::{
         dirent::dirent,
         errno::{EINVAL, EIO, ENOMEM, EPERM, ERANGE},
         fcntl,
+        string::strlen,
         sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, RLIM_INFINITY},
-        sys_stat::stat,
+        sys_stat::{stat, S_ISGID, S_ISUID},
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
         sys_utsname::{utsname, UTSLENGTH},
@@ -64,6 +65,14 @@ pub fn e(sys: Result<usize>) -> usize {
             !0
         }
     }
+}
+fn flatten_with_nul<T>(iter: impl IntoIterator<Item = T>) -> Box<[u8]> where T: AsRef<[u8]> {
+    let mut vec = Vec::new();
+    for item in iter {
+        vec.extend(item.as_ref());
+        vec.push(b'\0');
+    }
+    vec.into_boxed_slice()
 }
 
 pub struct Sys;
@@ -215,81 +224,87 @@ impl Pal for Sys {
         };
         let fd = *file as usize;
 
+        // With execve now being implemented in userspace, we need to check ourselves that this
+        // file is actually executable. While checking for read permission is unnecessary as the
+        // scheme will not allow us to read otherwise, the execute bit is completely unenforced. We
+        // have the permission to mmap executable memory and fill it with the program even if it is
+        // unset, so the best we can do is check that nothing is executed by accident.
+        //
+        // TODO: At some point we might have capabilities limiting the ability to allocate
+        // executable memory, and in that case we might use the `escalate:` scheme as we already do
+        // when the binary needs setuid/setgid.
+
+        let mut stat = redox_stat::default();
+        if e(syscall::fstat(fd, &mut stat)) == !0 {
+            return -1;
+        }
+        let uid = e(syscall::getuid());
+        if uid == !0 {
+            return -1;
+        }
+        let gid = e(syscall::getuid());
+        if gid == !0 {
+            return -1;
+        }
+
+        let mode = if uid == stat.st_uid as usize {
+            (stat.st_mode >> 3 * 2) & 0o7
+        } else if gid == stat.st_gid as usize {
+            (stat.st_mode >> 3 * 1) & 0o7
+        } else {
+            stat.st_mode & 0o7
+        };
+
+        if mode & 0o1 == 0o0 {
+            errno = EPERM;
+            return -1;
+        }
+        let wants_setugid = stat.st_mode & ((S_ISUID | S_ISGID) as u16) != 0;
+
         // Count arguments
         let mut len = 0;
-        while !(*argv.offset(len)).is_null() {
+        while !(*argv.add(len)).is_null() {
             len += 1;
         }
 
-        let mut args: Vec<&[u8]> = Vec::with_capacity(len as usize);
+        let mut args: Vec<&[u8]> = Vec::with_capacity(len);
 
         // Read shebang (for example #!/bin/sh)
-        let interpreter = {
-            let mut reader = BufReader::new(&mut file);
-
-            let mut shebang = [0; 2];
+        let mut _interpreter_path = None;
+        let is_interpreted = {
             let mut read = 0;
+            let mut shebang = [0; 2];
 
             while read < 2 {
-                match reader.read(&mut shebang) {
+                match file.read(&mut shebang) {
                     Ok(0) => break,
                     Ok(i) => read += i,
                     Err(_) => return -1,
                 }
             }
-
-            if &shebang == b"#!" {
-                // So, this file is interpreted.
-                // That means the actual file descriptor passed to `fexec` won't be this file.
-                // So we need to check ourselves that this file is actually be executable.
-
-                let mut stat = redox_stat::default();
-                if e(syscall::fstat(fd, &mut stat)) == !0 {
-                    return -1;
-                }
-                let uid = e(syscall::getuid());
-                if uid == !0 {
-                    return -1;
-                }
-                let gid = e(syscall::getuid());
-                if gid == !0 {
-                    return -1;
-                }
-
-                let mode = if uid == stat.st_uid as usize {
-                    (stat.st_mode >> 3 * 2) & 0o7
-                } else if gid == stat.st_gid as usize {
-                    (stat.st_mode >> 3 * 1) & 0o7
-                } else {
-                    stat.st_mode & 0o7
-                };
-
-                if mode & 0o1 == 0o0 {
-                    errno = EPERM;
-                    return -1;
-                }
-
-                // Then, read the actual interpreter:
-                let mut interpreter = Vec::new();
-                match reader.read_until(b'\n', &mut interpreter) {
-                    Err(_) => return -1,
-                    Ok(_) => {
-                        if interpreter.ends_with(&[b'\n']) {
-                            interpreter.pop().unwrap();
-                        }
-                        // TODO: Returning the interpreter here is actually a
-                        // hack. Preferrably we should reassign `file =`
-                        // directly from here. Just wait until NLL comes
-                        // around...
-                        Some(interpreter)
-                    }
-                }
-            } else {
-                None
-            }
+            shebang == *b"#!"
         };
-        let mut _interpreter_path = None;
-        if let Some(interpreter) = interpreter {
+        // Since the fexec implementation is almost fully done in userspace, the kernel can no
+        // longer set UID/GID accordingly, and this code checking for them before using
+        // hypothetical interfaces to upgrade UID/GID, can not be trusted. So we ask the
+        // `escalate:` scheme for help. Note that `escalate:` can be deliberately excluded from the
+        // scheme namespace to deny privilege escalation (such as su/sudo/doas) for untrusted
+        // processes.
+        //
+        // According to execve(2), Linux and most other UNIXes ignore setuid/setgid for interpreted
+        // executables and thereby simply keep the privileges as is. For compatibility we do that
+        // too.
+
+        if is_interpreted {
+            // So, this file is interpreted.
+            // Then, read the actual interpreter:
+            let mut interpreter = Vec::new();
+            if BufReader::new(&mut file).read_until(b'\n', &mut interpreter).is_err() {
+                return -1;
+            }
+            if interpreter.ends_with(&[b'\n']) {
+                interpreter.pop().unwrap();
+            }
             let cstring = match CString::new(interpreter) {
                 Ok(cstring) => cstring,
                 Err(_) => return -1,
@@ -308,21 +323,16 @@ impl Pal for Sys {
                 return -1;
             }
         }
-
         let mut args_envs_size_without_nul = 0;
 
         // Arguments
         while !argv.read().is_null() {
             let arg = argv.read();
 
-            // TODO: Optimized strlen?
-            let mut len = 0;
-            while arg.add(len).read() != 0 {
-                len += 1;
-            }
+            let len = strlen(arg);
             args.push(core::slice::from_raw_parts(arg as *const u8, len));
             args_envs_size_without_nul += len;
-            argv = argv.offset(1);
+            argv = argv.add(1);
         }
 
         // Environment variables
@@ -335,17 +345,51 @@ impl Pal for Sys {
         while !envp.read().is_null() {
             let env = envp.read();
 
-            // TODO: Optimized strlen?
-            let mut len = 0;
-            while env.add(len).read() != 0 {
-                len += 1;
-            }
+            let len = strlen(env);
             envs.push(core::slice::from_raw_parts(env as *const u8, len));
             args_envs_size_without_nul += len;
             envp = envp.add(1);
         }
 
-        e(self::exec::fexec_impl(*file as usize, path.to_bytes(), &args, &envs, args_envs_size_without_nul)) as c_int
+        if !is_interpreted && wants_setugid {
+            let name = CStr::from_bytes_with_nul(b"escalate:\0").expect("string should be valid");
+            // We are now going to invoke `escalate:` rather than loading the program ourselves.
+            let mut escalate_fd = match File::open(name, fcntl::O_WRONLY | fcntl::O_CLOEXEC) {
+                Ok(f) => f,
+                Err(_) => return -1,
+            };
+
+            // First, we write the path.
+            //
+            // TODO: For improved security, use a hypothetical SYS_DUP_FORWARD syscall to give the
+            // scheme our file descriptor. It can check through the kernel-overwritten stat.st_dev
+            // field that it pertains to a "trusted" scheme (i.e. of at least the privilege the
+            // new uid/gid has), although for now only root can open schemes. Passing a file
+            // descriptor and not a path will allow escalated to run in a limited namespace.
+            //
+            // TODO: Plus, at this point fexecve is not implemented (but specified in
+            // POSIX.1-2008), and to avoid bad syscalls such as fpath passing a file descriptor
+            // would be better.
+            escalate_fd.write_all(path.to_bytes());
+
+            // Second, we write the flattened args and envs with NUL characters separating
+            // individual items.
+            if escalate_fd.write_all(&flatten_with_nul(args)).is_err() {
+                return -1;
+            }
+            if escalate_fd.write_all(&flatten_with_nul(envs)).is_err() {
+                return -1;
+            }
+
+            // escalated will take care of the rest when responding to SYS_CLOSE.
+            if escalate_fd.write(&[]).is_err() {
+                return -1;
+            }
+
+            unreachable!()
+        } else {
+            e(self::exec::fexec_impl(*file as usize, path.to_bytes(), &args, &envs, args_envs_size_without_nul)) as c_int
+        }
     }
 
     fn fchdir(fd: c_int) -> c_int {
