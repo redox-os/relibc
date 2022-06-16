@@ -218,7 +218,9 @@ impl Pal for Sys {
         mut argv: *const *mut c_char,
         mut envp: *const *mut c_char,
     ) -> c_int {
-        let mut file = match File::open(path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
+        // NOTE: We must omit O_CLOEXEC and close manually, otherwise it will be closed before we
+        // have even read it!
+        let mut file = match File::open(path, fcntl::O_RDONLY) {
             Ok(file) => file,
             Err(_) => return -1,
         };
@@ -309,7 +311,7 @@ impl Pal for Sys {
                 Ok(cstring) => cstring,
                 Err(_) => return -1,
             };
-            file = match File::open(&cstring, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
+            file = match File::open(&cstring, fcntl::O_RDONLY) {
                 Ok(file) => file,
                 Err(_) => return -1,
             };
@@ -351,6 +353,32 @@ impl Pal for Sys {
             envp = envp.add(1);
         }
 
+        // Close all O_CLOEXEC file descriptors. TODO: close_range?
+        {
+            let name = CStr::from_bytes_with_nul(b"thisproc:current/files\0").expect("string should be valid");
+            let files_fd = match File::open(name, fcntl::O_RDONLY) {
+                Ok(f) => f,
+                Err(_) => return -1,
+            };
+            for line in BufReader::new(files_fd).lines() {
+                let line = match line {
+                    Ok(l) => l,
+                    Err(_) => break,
+                };
+                let fd = match line.parse::<usize>() {
+                    Ok(f) => f,
+                    Err(_) => continue,
+                };
+
+                let flags = Self::fcntl(fd as c_int, fcntl::F_GETFD, 0);
+                if flags != -1 {
+                    if flags & fcntl::O_CLOEXEC == fcntl::O_CLOEXEC {
+                        let _ = Self::close(fd as c_int);
+                    }
+                }
+            }
+        }
+
         if !is_interpreted && wants_setugid {
             let name = CStr::from_bytes_with_nul(b"escalate:\0").expect("string should be valid");
             // We are now going to invoke `escalate:` rather than loading the program ourselves.
@@ -368,7 +396,7 @@ impl Pal for Sys {
             // descriptor and not a path will allow escalated to run in a limited namespace.
             //
             // TODO: Plus, at this point fexecve is not implemented (but specified in
-            // POSIX.1-2008), and to avoid bad syscalls such as fpath passing a file descriptor
+            // POSIX.1-2008), and to avoid bad syscalls such as fpath, passing a file descriptor
             // would be better.
             escalate_fd.write_all(path.to_bytes());
 
@@ -382,13 +410,14 @@ impl Pal for Sys {
             }
 
             // escalated will take care of the rest when responding to SYS_CLOSE.
+            // FIXME: close escalate_fd
             if escalate_fd.write(&[]).is_err() {
                 return -1;
             }
 
             unreachable!()
         } else {
-            e(self::exec::fexec_impl(*file as usize, path.to_bytes(), &args, &envs, args_envs_size_without_nul)) as c_int
+            e(self::exec::fexec_impl(file, path.to_bytes(), &args, &envs, args_envs_size_without_nul)) as c_int
         }
     }
 

@@ -11,6 +11,8 @@ use syscall::{
     flag::{AT_ENTRY, AT_NULL, AT_PHDR, AT_PHENT, AT_PHNUM, MapFlags},
 };
 
+use crate::fs::File;
+
 fn read_all(fd: usize, offset: u64, buf: &mut [u8]) -> Result<()> {
     syscall::lseek(fd, offset as isize, syscall::SEEK_SET).unwrap();
 
@@ -63,7 +65,8 @@ const PAGE_SIZE: usize = 4096;
 
 const FD_ANONYMOUS: usize = !0;
 
-pub fn fexec_impl(fd: usize, path: &[u8], args: &[&[u8]], envs: &[&[u8]], args_envs_size_without_nul: usize) -> Result<usize> {
+pub fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], args_envs_size_without_nul: usize) -> Result<usize> {
+    let fd = *file as usize;
     let total_args_envs_size = args_envs_size_without_nul + args.len() + envs.len();
 
     // Here, we do the minimum part of loading an application, which is what the kernel used to do.
@@ -261,10 +264,11 @@ pub fn fexec_impl(fd: usize, path: &[u8], args: &[&[u8]], envs: &[&[u8]], args_e
     unsafe { crate::ld_so::tcb::Tcb::deactivate(); }
 
     // TODO: Restore old name if exec failed?
-    if let Ok(fd) = syscall::open("thisproc:current/name", syscall::O_WRONLY) {
-        let _ = syscall::write(fd, path);
-        let _ = syscall::close(fd);
+    if let Ok(name_fd) = syscall::open("thisproc:current/name", syscall::O_WRONLY) {
+        let _ = syscall::write(name_fd, path);
+        let _ = syscall::close(name_fd);
     }
+    drop(file);
 
     syscall::exec(&memranges, instruction_ptr, sp)?;
     unreachable!();
