@@ -355,7 +355,7 @@ impl Pal for Sys {
 
         // Close all O_CLOEXEC file descriptors. TODO: close_range?
         {
-            let name = CStr::from_bytes_with_nul(b"thisproc:current/files\0").expect("string should be valid");
+            let name = CStr::from_bytes_with_nul(b"thisproc:current/filetable\0").expect("string should be valid");
             let files_fd = match File::open(name, fcntl::O_RDONLY) {
                 Ok(f) => f,
                 Err(_) => return -1,
@@ -455,7 +455,7 @@ impl Pal for Sys {
     }
 
     fn fork() -> pid_t {
-        e(unsafe { syscall::clone(syscall::CloneFlags::empty()) }) as pid_t
+        e(extra::fork_impl()) as pid_t
     }
 
     fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
@@ -938,29 +938,7 @@ impl Pal for Sys {
 
     #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        let flags = syscall::CLONE_VM
-            | syscall::CLONE_FS
-            | syscall::CLONE_FILES
-            | syscall::CLONE_SIGHAND
-            | syscall::CLONE_STACK;
-        let flags = flags.bits();
-
-        use syscall::{Map, MapFlags};
-
-        const SIGSTACK_SIZE: usize = 1024 * 256;
-
-        // TODO: Put sigstack at high addresses?
-        let target_sigstack = match syscall::fmap(!0, &Map { address: 0, flags: MapFlags::PROT_READ | MapFlags::PROT_WRITE | MapFlags::MAP_PRIVATE, offset: 0, size: SIGSTACK_SIZE }) {
-            Ok(s) => s + SIGSTACK_SIZE,
-            Err(err) => return e(Err(err)) as pid_t,
-        };
-
-        let info = CloneInfo {
-            target_stack: stack as usize,
-            target_sigstack,
-        };
-
-        e(syscall::Error::demux(extra::pte_clone_inner(&info))) as pid_t
+        e(extra::pte_clone_impl(stack)) as pid_t
     }
 
     fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {

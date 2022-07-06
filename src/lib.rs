@@ -3,6 +3,7 @@
 #![allow(non_upper_case_globals)]
 #![allow(unused_variables)]
 #![feature(allocator_api)]
+#![feature(array_chunks)]
 #![feature(asm_const)]
 #![feature(box_into_pin)]
 #![feature(c_variadic)]

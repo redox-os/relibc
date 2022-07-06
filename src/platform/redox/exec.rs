@@ -1,4 +1,5 @@
 use core::convert::TryFrom;
+use super::extra::FdGuard;
 
 use alloc::{
     collections::{btree_map::Entry, BTreeMap},
@@ -7,14 +8,16 @@ use alloc::{
 
 use syscall::{
     data::ExecMemRange,
-    error::{Error, Result, ENOEXEC, ENOMEM},
-    flag::{AT_ENTRY, AT_NULL, AT_PHDR, AT_PHENT, AT_PHNUM, MapFlags},
+    error::*,
+    flag::{AT_ENTRY, AT_NULL, AT_PHDR, AT_PHENT, AT_PHNUM, MapFlags, O_WRONLY, SEEK_SET},
 };
 
 use crate::fs::File;
 
-fn read_all(fd: usize, offset: u64, buf: &mut [u8]) -> Result<()> {
-    syscall::lseek(fd, offset as isize, syscall::SEEK_SET).unwrap();
+fn read_all(fd: usize, offset: Option<u64>, buf: &mut [u8]) -> Result<()> {
+    if let Some(offset) = offset {
+        syscall::lseek(fd, offset as isize, syscall::SEEK_SET).unwrap();
+    }
 
     let mut total_bytes_read = 0;
 
@@ -27,12 +30,12 @@ fn read_all(fd: usize, offset: u64, buf: &mut [u8]) -> Result<()> {
     Ok(())
 }
 
-fn find_free_target_addr(tree: &BTreeMap<usize, TreeEntry>, size: usize) -> Option<usize> {
+fn find_free_target_addr(tree: &BTreeMap<usize, usize>, size: usize) -> Option<usize> {
     let mut iterator = tree.iter().peekable();
 
     // Ignore the space between zero and the first region, to avoid null pointers.
-    while let Some((cur_address, entry)) = iterator.next() {
-        let end = *cur_address + entry.size;
+    while let Some((cur_address, entry_size)) = iterator.next() {
+        let end = *cur_address + entry_size;
 
         if let Some((next_address, _)) = iterator.peek() {
             if **next_address - end > size {
@@ -45,20 +48,6 @@ fn find_free_target_addr(tree: &BTreeMap<usize, TreeEntry>, size: usize) -> Opti
 
     None
 }
-struct TreeEntry {
-    size: usize, // always a page-size multiple
-    flags: MapFlags,
-    accessible_addr: *mut u8, // also always a page-size multiple
-}
-impl Drop for TreeEntry {
-    fn drop(&mut self) {
-        unsafe {
-            if !self.accessible_addr.is_null() {
-                let _ = syscall::funmap(self.accessible_addr as usize, self.size);
-            }
-        }
-    }
-}
 
 #[cfg(target_arch = "x86_64")]
 const PAGE_SIZE: usize = 4096;
@@ -66,6 +55,8 @@ const PAGE_SIZE: usize = 4096;
 const FD_ANONYMOUS: usize = !0;
 
 pub fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], args_envs_size_without_nul: usize) -> Result<usize> {
+    use goblin::elf64::{header::Header, program_header::program_header64::{ProgramHeader, PT_LOAD, PF_W, PF_X}};
+
     let fd = *file as usize;
     let total_args_envs_size = args_envs_size_without_nul + args.len() + envs.len();
 
@@ -78,198 +69,155 @@ pub fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], args_
     // TODO: Introduce RAII guards to all owned allocations so that no leaks occur in case of
     // errors.
 
-    use goblin::elf::header::header64::Header;
-
     let mut header_bytes = [0_u8; core::mem::size_of::<Header>()];
-
-    read_all(fd, 0, &mut header_bytes)?;
-
+    read_all(fd, Some(0), &mut header_bytes)?;
     let header = Header::from_bytes(&header_bytes);
+
+    let grants_fd = {
+        let current_addrspace_fd = FdGuard::new(syscall::open("thisproc:current/addrspace", 0)?);
+        FdGuard::new(syscall::dup(*current_addrspace_fd, b"empty")?)
+    };
+    let memory_fd = FdGuard::new(syscall::dup(*grants_fd, b"mem")?);
 
     let instruction_ptr = usize::try_from(header.e_entry).map_err(|_| Error::new(ENOEXEC))?;
 
-    let mut tree = BTreeMap::<usize, TreeEntry>::new();
+    // Never allow more than 1 MiB of program headers. TODO: Capabilities again?
+    const MAX_PH_SIZE: usize = 1024 * 1024;
+    let phentsize = u64::from(header.e_phentsize) as usize;
+    let phnum = u64::from(header.e_phnum) as usize;
+    let pheaders_size = phentsize.saturating_mul(phnum);
 
-    use goblin::elf64::program_header::{self, ProgramHeader};
+    if pheaders_size > MAX_PH_SIZE {
+        return Err(Error::new(E2BIG));
+    }
+    let mut phs = vec! [0_u8; pheaders_size];
 
-    let phdrs_size = (header.e_phnum as usize) * (header.e_phentsize as usize);
-    let phdrs_size_aligned = (phdrs_size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
-    let phdrs_mem = unsafe { syscall::fmap(FD_ANONYMOUS, &syscall::Map { offset: 0, size: phdrs_size_aligned, address: 0, flags: MapFlags::PROT_WRITE | MapFlags::MAP_PRIVATE })? };
-    read_all(fd, header.e_phoff, unsafe { core::slice::from_raw_parts_mut(phdrs_mem as *mut u8, phdrs_size) })?;
+    let mut tree = BTreeMap::new();
+    tree.insert(0, PAGE_SIZE);
 
-    let phdrs = unsafe { core::slice::from_raw_parts(phdrs_mem as *const ProgramHeader, header.e_phnum as usize) };
+    const BUFSZ: usize = 16384;
+    let mut buf = vec! [0_u8; BUFSZ];
 
-    for segment in phdrs {
+    read_all(*file as usize, Some(header.e_phoff), &mut phs).map_err(|_| Error::new(EIO))?;
+
+    for ph_idx in 0..phnum {
+        let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
+        let segment: &ProgramHeader = plain::from_bytes(ph_bytes).map_err(|_| Error::new(EINVAL))?;
         let mut flags = syscall::PROT_READ;
 
         // W ^ X. If it is executable, do not allow it to be writable, even if requested
-        if segment.p_flags & program_header::PF_X == program_header::PF_X {
+        if segment.p_flags & PF_X == PF_X {
             flags |= syscall::PROT_EXEC;
-        } else if segment.p_flags & program_header::PF_W == program_header::PF_W {
+        } else if segment.p_flags & PF_W == PF_W {
             flags |= syscall::PROT_WRITE;
         }
 
-        match segment.p_type {
-            program_header::PT_LOAD => {
-                let voff = segment.p_vaddr as usize % PAGE_SIZE;
-                let vaddr = segment.p_vaddr as usize - voff;
-                let size =
-                    (segment.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+        let voff = segment.p_vaddr as usize % PAGE_SIZE;
+        let vaddr = segment.p_vaddr as usize - voff;
+        let size =
+            (segment.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 
-                if segment.p_filesz > segment.p_memsz {
-                    return Err(Error::new(ENOEXEC));
-                }
+        if segment.p_filesz > segment.p_memsz {
+            return Err(Error::new(ENOEXEC));
+        }
+        if segment.p_type == PT_LOAD {
+            mprotect_remote(*grants_fd, vaddr, size, flags)?;
+            syscall::lseek(*file as usize, segment.p_offset as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
+            syscall::lseek(*memory_fd, segment.p_vaddr as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
 
-                let mem = match tree
-                    .range_mut(..=vaddr)
-                    .next_back()
-                    .filter(|(other_vaddr, entry)| **other_vaddr + entry.size > vaddr)
-                {
-                    None => unsafe {
-                        let mem = syscall::fmap(
-                            FD_ANONYMOUS,
-                            &syscall::Map {
-                                offset: 0,
-                                address: 0,
-                                size,
-                                flags: syscall::PROT_WRITE,
-                            },
-                        )
-                        .map_err(|_| Error::new(ENOMEM))?
-                            as *mut u8;
-                        tree.insert(
-                            vaddr,
-                            TreeEntry {
-                                size,
-                                flags,
-                                accessible_addr: mem,
-                            },
-                        );
-                        mem
-                    },
-                    Some((
-                        _,
-                        &mut TreeEntry {
-                            flags: ref mut f,
-                            accessible_addr,
-                            ..
-                        },
-                    )) => {
-                        *f |= flags;
-                        accessible_addr
-                    }
-                };
-                read_all(fd, segment.p_offset, unsafe {
-                    core::slice::from_raw_parts_mut(mem.add(voff), segment.p_filesz as usize)
-                })?;
+            for size in core::iter::repeat(BUFSZ).take((segment.p_filesz as usize) / BUFSZ).chain(Some((segment.p_filesz as usize) % BUFSZ)) {
+                read_all(*file as usize, None, &mut buf[..size]).map_err(|_| Error::new(EIO))?;
+                let _ = syscall::write(*memory_fd, &buf[..size]).map_err(|_| Error::new(EIO))?;
             }
-            _ => (),
+
+            if !tree.range(..=vaddr).next_back().filter(|(start, size)| **start + **size > vaddr).is_some() {
+                tree.insert(vaddr, size);
+            }
         }
     }
-    let (stack_base, mut stack_mem) = unsafe {
-        let stack_base = syscall::fmap(FD_ANONYMOUS, &syscall::Map { offset: 0, size: STACK_SIZE, address: 0, flags: MapFlags::PROT_WRITE | MapFlags::PROT_READ | MapFlags::MAP_PRIVATE })? as *mut u8;
-        let stack_mem = stack_base.add(STACK_SIZE).sub(256);
+    // Setup a stack starting from the very end of the address space, and then growing downwards.
+    const STACK_TOP: usize = 1 << 47;
+    const STACK_SIZE: usize = 1024 * 1024;
 
-        (stack_base, stack_mem)
-    };
-
-    tree.insert(STACK_TOP - STACK_SIZE, TreeEntry {
-        size: STACK_SIZE,
-        flags: MapFlags::PROT_READ | MapFlags::PROT_WRITE | MapFlags::MAP_PRIVATE,
-        accessible_addr: stack_base,
-    });
-    let mut stack_mem = stack_mem.cast::<usize>();
-
-    let target_phdr_address = find_free_target_addr(&tree, phdrs_size_aligned).ok_or(Error::new(ENOMEM))?;
-    tree.insert(target_phdr_address, TreeEntry {
-        size: phdrs_size_aligned,
-        accessible_addr: phdrs_mem as *mut u8,
-        flags: MapFlags::PROT_READ | MapFlags::MAP_PRIVATE,
-    });
+    mprotect_remote(*grants_fd, STACK_TOP - STACK_SIZE, STACK_SIZE, MapFlags::PROT_READ | MapFlags::PROT_WRITE)?;
+    tree.insert(STACK_TOP - STACK_SIZE, STACK_SIZE);
 
     let mut sp = STACK_TOP - 256;
 
-    let mut push = |word: usize| unsafe {
+    let mut push = |word: usize| {
         sp -= core::mem::size_of::<usize>();
-        stack_mem = stack_mem.sub(1);
-        stack_mem.write(word);
+        let _ = syscall::lseek(*memory_fd, sp as isize, SEEK_SET)?;
+        let _ = syscall::write(*memory_fd, &usize::to_ne_bytes(word))?;
+        Ok(())
     };
 
-    push(0);
-    push(AT_NULL);
-    push(instruction_ptr);
-    push(AT_ENTRY);
-    push(target_phdr_address);
-    push(AT_PHDR);
-    push(header.e_phnum as usize);
-    push(AT_PHNUM);
-    push(header.e_phentsize as usize);
-    push(AT_PHENT);
+    let pheaders_size_aligned = (pheaders_size+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;
+    let pheaders = find_free_target_addr(&tree, pheaders_size_aligned).ok_or(Error::new(ENOMEM))?;
+    tree.insert(pheaders, pheaders_size_aligned);
+    mprotect_remote(*grants_fd, pheaders, pheaders_size_aligned, MapFlags::PROT_READ)?;
+
+    syscall::lseek(*memory_fd, pheaders as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
+    syscall::write(*memory_fd, &phs).map_err(|_| Error::new(EIO))?;
+
+    push(0)?;
+    push(AT_NULL)?;
+    push(header.e_entry as usize)?;
+    push(AT_ENTRY)?;
+    push(pheaders)?;
+    push(AT_PHDR)?;
+    push(header.e_phnum as usize)?;
+    push(AT_PHNUM)?;
+    push(header.e_phentsize as usize)?;
+    push(AT_PHENT)?;
 
     let args_envs_size_aligned = (total_args_envs_size+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;
     let target_args_env_address = find_free_target_addr(&tree, args_envs_size_aligned).ok_or(Error::new(ENOMEM))?;
+    mprotect_remote(*grants_fd, target_args_env_address, args_envs_size_aligned, MapFlags::PROT_READ | MapFlags::PROT_WRITE)?;
+    tree.insert(target_args_env_address, args_envs_size_aligned);
 
-    unsafe {
-        let map = syscall::Map {
-            offset: 0,
-            flags: MapFlags::PROT_READ | MapFlags::PROT_WRITE | MapFlags::MAP_PRIVATE,
-            address: 0,
-            size: args_envs_size_aligned,
-        };
-        let ptr = syscall::fmap(FD_ANONYMOUS, &map)? as *mut u8;
-        let args_envs_region = core::slice::from_raw_parts_mut(ptr, total_args_envs_size);
-        let mut offset = 0;
+    let mut offset = 0;
 
-        for collection in &[envs, args] {
-            push(0);
+    let mut argc = 0;
 
-            for source_slice in collection.iter().rev().copied() {
-                push(target_args_env_address + offset);
-                args_envs_region[offset..offset + source_slice.len()].copy_from_slice(source_slice);
-                offset += source_slice.len() + 1;
-            }
+    for (collection, is_args) in [(envs, false), (args, true)] {
+        push(0)?;
+
+        for source_slice in collection.iter().rev() {
+            if is_args { argc += 1; }
+            push(target_args_env_address + offset)?;
+
+            syscall::lseek(*memory_fd, (target_args_env_address + offset) as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
+            let _ = syscall::write(*memory_fd, source_slice).map_err(|_| Error::new(EIO))?;
+            offset += source_slice.len() + 1;
         }
-
-        tree.insert(target_args_env_address, TreeEntry {
-            accessible_addr: ptr,
-            size: args_envs_size_aligned,
-            flags: MapFlags::PROT_READ | MapFlags::MAP_PRIVATE,
-        });
     }
-    push(args.len());
 
-    const STACK_TOP: usize = (1 << 47);
-    const STACK_SIZE: usize = 1024 * 1024;
-
-    let memranges = tree
-        .into_iter()
-        .map(|(address, mut tree_entry)| {
-            // Prevent use-after-free
-            let old_address = core::mem::replace(&mut tree_entry.accessible_addr, core::ptr::null_mut()) as usize;
-
-            ExecMemRange {
-                address,
-                size: tree_entry.size,
-                flags: tree_entry.flags.bits(),
-                old_address,
-            }
-        })
-        .collect::<Vec<_>>();
-
-    /*unsafe {
-        let stack = &*(stack_mem as *const crate::start::Stack);
-
-    }*/
+    push(argc)?;
 
     unsafe { crate::ld_so::tcb::Tcb::deactivate(); }
 
     // TODO: Restore old name if exec failed?
-    if let Ok(name_fd) = syscall::open("thisproc:current/name", syscall::O_WRONLY) {
+    if let Ok(name_fd) = syscall::open("thisproc:current/name", O_WRONLY) {
         let _ = syscall::write(name_fd, path);
         let _ = syscall::close(name_fd);
     }
     drop(file);
 
-    syscall::exec(&memranges, instruction_ptr, sp)?;
+    let addrspace_selection_fd = FdGuard::new(syscall::open("thisproc:current/current-addrspace", O_WRONLY)?);
+
+    let mut buf = [0_u8; 24];
+    buf[..8].copy_from_slice(&usize::to_ne_bytes(*grants_fd));
+    buf[8..16].copy_from_slice(&usize::to_ne_bytes(sp));
+    buf[16..24].copy_from_slice(&usize::to_ne_bytes(header.e_entry as usize));
+
+    let _ = syscall::write(*addrspace_selection_fd, &buf);
     unreachable!();
+}
+fn mprotect_remote(socket: usize, addr: usize, len: usize, flags: MapFlags) -> Result<()> {
+    let mut grants_buf = [0_u8; 24];
+    grants_buf[..8].copy_from_slice(&usize::to_ne_bytes(addr));
+    grants_buf[8..16].copy_from_slice(&usize::to_ne_bytes(len));
+    grants_buf[16..24].copy_from_slice(&usize::to_ne_bytes(flags.bits()));
+    syscall::write(socket, &grants_buf)?;
+    Ok(())
 }

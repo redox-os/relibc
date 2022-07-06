@@ -333,6 +333,7 @@ dependencies = [
  "lazy_static",
  "memchr",
  "memoffset",
+ "plain",
  "posix-regex",
  "ralloc",
  "rand",
