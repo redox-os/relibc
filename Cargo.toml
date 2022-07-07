@@ -9,7 +9,7 @@ name = "relibc"
 crate-type = ["staticlib"]
 
 [workspace]
-members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so"]
+members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so", "src/platform/redox/redox-exec"]
 exclude = ["core_io", "ralloc", "tests"]
 
 [build-dependencies]
@@ -43,6 +43,7 @@ sc = "0.2.3"
 #redox_syscall = "0.2.15"
 redox_syscall = { git = "https://gitlab.redox-os.org/4lDO2/syscall.git", branch = "userspace_fexec" }
 spin = "0.9.0"
+redox-exec = { path = "src/platform/redox/redox-exec" }
 
 [features]
 default = []
