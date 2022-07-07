@@ -34,6 +34,7 @@ use super::{errno, types::*, Pal, Read};
 static mut BRK_CUR: *mut c_void = ptr::null_mut();
 static mut BRK_END: *mut c_void = ptr::null_mut();
 
+mod clone;
 mod epoll;
 mod exec;
 mod extra;
@@ -355,6 +356,10 @@ impl Pal for Sys {
 
         // Close all O_CLOEXEC file descriptors. TODO: close_range?
         {
+            // NOTE: This approach of implementing O_CLOEXEC will not work in multithreaded
+            // scenarios. While execve() is undefined according to POSIX if there exist sibling
+            // threads, it could still be allowed by keeping certain file descriptors and instead
+            // set the active file table.
             let name = CStr::from_bytes_with_nul(b"thisproc:current/filetable\0").expect("string should be valid");
             let files_fd = match File::open(name, fcntl::O_RDONLY) {
                 Ok(f) => f,
@@ -398,7 +403,9 @@ impl Pal for Sys {
             // TODO: Plus, at this point fexecve is not implemented (but specified in
             // POSIX.1-2008), and to avoid bad syscalls such as fpath, passing a file descriptor
             // would be better.
-            escalate_fd.write_all(path.to_bytes());
+            if escalate_fd.write_all(path.to_bytes()).is_err() {
+                return -1;
+            }
 
             // Second, we write the flattened args and envs with NUL characters separating
             // individual items.
@@ -455,7 +462,7 @@ impl Pal for Sys {
     }
 
     fn fork() -> pid_t {
-        e(extra::fork_impl()) as pid_t
+        e(clone::fork_impl()) as pid_t
     }
 
     fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
@@ -938,7 +945,7 @@ impl Pal for Sys {
 
     #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        e(extra::pte_clone_impl(stack)) as pid_t
+        e(clone::pte_clone_impl(stack)) as pid_t
     }
 
     fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {

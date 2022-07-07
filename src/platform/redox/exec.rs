@@ -1,5 +1,5 @@
 use core::convert::TryFrom;
-use super::extra::FdGuard;
+use super::extra::{create_set_addr_space_buf, FdGuard};
 
 use alloc::{
     collections::{btree_map::Entry, BTreeMap},
@@ -16,7 +16,7 @@ use crate::fs::File;
 
 fn read_all(fd: usize, offset: Option<u64>, buf: &mut [u8]) -> Result<()> {
     if let Some(offset) = offset {
-        syscall::lseek(fd, offset as isize, syscall::SEEK_SET).unwrap();
+        syscall::lseek(fd, offset as isize, SEEK_SET)?;
     }
 
     let mut total_bytes_read = 0;
@@ -25,6 +25,21 @@ fn read_all(fd: usize, offset: Option<u64>, buf: &mut [u8]) -> Result<()> {
         total_bytes_read += match syscall::read(fd, &mut buf[total_bytes_read..])? {
             0 => return Err(Error::new(ENOEXEC)),
             bytes_read => bytes_read,
+        }
+    }
+    Ok(())
+}
+fn write_all(fd: usize, offset: Option<u64>, buf: &[u8]) -> Result<()> {
+    if let Some(offset) = offset {
+        syscall::lseek(fd, offset as isize, SEEK_SET)?;
+    }
+
+    let mut total_bytes_written = 0;
+
+    while total_bytes_written < buf.len() {
+        total_bytes_written += match syscall::write(fd, &buf[total_bytes_written..])? {
+            0 => return Err(Error::new(EIO)),
+            bytes_written => bytes_written,
         }
     }
     Ok(())
@@ -55,6 +70,14 @@ const PAGE_SIZE: usize = 4096;
 const FD_ANONYMOUS: usize = !0;
 
 pub fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], args_envs_size_without_nul: usize) -> Result<usize> {
+    let addrspace_selection_fd = fexec_impl_inner(file, path, args, envs, args_envs_size_without_nul)?;
+
+    // Dropping this FD will cause the address space switch.
+    drop(addrspace_selection_fd);
+
+    unreachable!();
+}
+fn fexec_impl_inner(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], args_envs_size_without_nul: usize) -> Result<FdGuard> {
     use goblin::elf64::{header::Header, program_header::program_header64::{ProgramHeader, PT_LOAD, PF_W, PF_X}};
 
     let fd = *file as usize;
@@ -65,7 +88,6 @@ pub fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], args_
     // some misalignments, and then execute the SYS_EXEC syscall to replace the program memory
     // entirely.
 
-    // TODO: setuid/setgid
     // TODO: Introduce RAII guards to all owned allocations so that no leaks occur in case of
     // errors.
 
@@ -146,9 +168,7 @@ pub fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], args_
 
     let mut push = |word: usize| {
         sp -= core::mem::size_of::<usize>();
-        let _ = syscall::lseek(*memory_fd, sp as isize, SEEK_SET)?;
-        let _ = syscall::write(*memory_fd, &usize::to_ne_bytes(word))?;
-        Ok(())
+        write_all(*memory_fd, Some(sp as u64), &usize::to_ne_bytes(word))
     };
 
     let pheaders_size_aligned = (pheaders_size+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;
@@ -156,8 +176,7 @@ pub fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], args_
     tree.insert(pheaders, pheaders_size_aligned);
     mprotect_remote(*grants_fd, pheaders, pheaders_size_aligned, MapFlags::PROT_READ)?;
 
-    syscall::lseek(*memory_fd, pheaders as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
-    syscall::write(*memory_fd, &phs).map_err(|_| Error::new(EIO))?;
+    write_all(*memory_fd, Some(pheaders as u64), &phs)?;
 
     push(0)?;
     push(AT_NULL)?;
@@ -186,8 +205,7 @@ pub fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], args_
             if is_args { argc += 1; }
             push(target_args_env_address + offset)?;
 
-            syscall::lseek(*memory_fd, (target_args_env_address + offset) as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
-            let _ = syscall::write(*memory_fd, source_slice).map_err(|_| Error::new(EIO))?;
+            write_all(*memory_fd, Some((target_args_env_address + offset) as u64), source_slice)?;
             offset += source_slice.len() + 1;
         }
     }
@@ -197,21 +215,15 @@ pub fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], args_
     unsafe { crate::ld_so::tcb::Tcb::deactivate(); }
 
     // TODO: Restore old name if exec failed?
-    if let Ok(name_fd) = syscall::open("thisproc:current/name", O_WRONLY) {
-        let _ = syscall::write(name_fd, path);
-        let _ = syscall::close(name_fd);
+    if let Ok(name_fd) = syscall::open("thisproc:current/name", O_WRONLY).map(FdGuard::new) {
+        let _ = syscall::write(*name_fd, path);
     }
-    drop(file);
 
     let addrspace_selection_fd = FdGuard::new(syscall::open("thisproc:current/current-addrspace", O_WRONLY)?);
 
-    let mut buf = [0_u8; 24];
-    buf[..8].copy_from_slice(&usize::to_ne_bytes(*grants_fd));
-    buf[8..16].copy_from_slice(&usize::to_ne_bytes(sp));
-    buf[16..24].copy_from_slice(&usize::to_ne_bytes(header.e_entry as usize));
+    let _ = syscall::write(*addrspace_selection_fd, &create_set_addr_space_buf(*grants_fd, header.e_entry as usize, sp));
 
-    let _ = syscall::write(*addrspace_selection_fd, &buf);
-    unreachable!();
+    Ok(addrspace_selection_fd)
 }
 fn mprotect_remote(socket: usize, addr: usize, len: usize, flags: MapFlags) -> Result<()> {
     let mut grants_buf = [0_u8; 24];
