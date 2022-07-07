@@ -119,9 +119,11 @@ pub fn fork_impl() -> Result<usize> {
 }
 
 fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
-    let new_pid = {
+    let (cur_filetable_fd, new_pid_fd, new_pid);
+
+    {
         let cur_pid_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", O_CLOEXEC)?);
-        let (new_pid_fd, new_pid) = new_context()?;
+        (new_pid_fd, new_pid) = new_context()?;
 
         // Do not allocate new signal stack, but copy existing address (all memory will be re-mapped
         // CoW later).
@@ -137,6 +139,18 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
 
         copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
         copy_str(*cur_pid_fd, *new_pid_fd, "cwd")?;
+
+        // Copy existing files into new file table, but do not reuse the same file table (i.e. new
+        // parent FDs will not show up for the child).
+        {
+            cur_filetable_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"filetable")?);
+
+            // This must be done before the address space is copied.
+            unsafe {
+                initial_rsp.write(*cur_filetable_fd);
+                initial_rsp.add(1).write(*new_pid_fd);
+            }
+        }
 
         // CoW-duplicate address space.
         {
@@ -190,22 +204,18 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
             let buf = create_set_addr_space_buf(*new_addr_space_fd, fork_ret as usize, initial_rsp as usize);
             let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
         }
-
-        // Copy existing files into new file table, but do not reuse the same file table (i.e. new
-        // parent FDs will not show up for the child).
-        {
-            let cur_filetable_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"filetable")?);
-            // TODO: Use cross_scheme_links or something similar to avoid copying the file table in the
-            // kernel.
-            let new_filetable_fd = FdGuard::new(syscall::dup(*cur_filetable_fd, b"copy")?);
-            let new_filetable_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-filetable")?);
-
-            let _ = syscall::write(*new_filetable_sel_fd, &usize::to_ne_bytes(*new_filetable_fd));
-        }
         copy_float_env_regs(*cur_pid_fd, *new_pid_fd)?;
-
-        new_pid
-    };
+    }
+    // Copy the file table. We do this last to ensure that all previously used file descriptors are
+    // closed. The only exception -- the filetable selection fd and the current filetable fd --
+    // will be closed by the child process.
+    {
+        // TODO: Use cross_scheme_links or something similar to avoid copying the file table in the
+        // kernel.
+        let new_filetable_fd = FdGuard::new(syscall::dup(*cur_filetable_fd, b"copy")?);
+        let new_filetable_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-filetable")?);
+        let _ = syscall::write(*new_filetable_sel_fd, &usize::to_ne_bytes(*new_filetable_fd));
+    }
 
     // Unblock context.
     syscall::kill(new_pid, SIGCONT)?;
@@ -215,6 +225,11 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
 #[no_mangle]
 unsafe extern "sysv64" fn __relibc_internal_fork_impl(initial_rsp: *mut usize) -> usize {
     Error::mux(fork_inner(initial_rsp))
+}
+#[no_mangle]
+unsafe extern "sysv64" fn __relibc_internal_fork_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
+    let _ = syscall::close(cur_filetable_fd);
+    let _ = syscall::close(new_pid_fd);
 }
 
 #[no_mangle]
@@ -233,13 +248,19 @@ fork_wrapper:
     push r14
     push r15
 
+    sub rsp, 16
+
     mov rdi, rsp
     call __relibc_internal_fork_impl
     jmp 2f
 
 fork_ret:
+    mov rdi, [rsp]
+    mov rsi, [rsp + 8]
+    call __relibc_internal_fork_hook
     xor rax, rax
 2:
+    add rsp, 16
     pop r15
     pop r14
     pop r13

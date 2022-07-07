@@ -88,9 +88,6 @@ fn fexec_impl_inner(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], arg
     // some misalignments, and then execute the SYS_EXEC syscall to replace the program memory
     // entirely.
 
-    // TODO: Introduce RAII guards to all owned allocations so that no leaks occur in case of
-    // errors.
-
     let mut header_bytes = [0_u8; core::mem::size_of::<Header>()];
     read_all(fd, Some(0), &mut header_bytes)?;
     let header = Header::from_bytes(&header_bytes);
