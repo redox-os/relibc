@@ -385,9 +385,12 @@ impl Pal for Sys {
         }
 
         if !is_interpreted && wants_setugid {
+            // Make sure the last file descriptor not covered by O_CLOEXEC is not leaked.
+            drop(file);
+
             let name = CStr::from_bytes_with_nul(b"escalate:\0").expect("string should be valid");
             // We are now going to invoke `escalate:` rather than loading the program ourselves.
-            let mut escalate_fd = match File::open(name, fcntl::O_WRONLY | fcntl::O_CLOEXEC) {
+            let mut escalate_fd = match File::open(name, fcntl::O_WRONLY) {
                 Ok(f) => f,
                 Err(_) => return -1,
             };
@@ -408,7 +411,7 @@ impl Pal for Sys {
             }
 
             // Second, we write the flattened args and envs with NUL characters separating
-            // individual items.
+            // individual items. This can be copied directly into the new executable's memory.
             if escalate_fd.write_all(&flatten_with_nul(args)).is_err() {
                 return -1;
             }
@@ -416,10 +419,14 @@ impl Pal for Sys {
                 return -1;
             }
 
-            // escalated will take care of the rest when responding to SYS_CLOSE.
-            // FIXME: close escalate_fd
-            if escalate_fd.write(&[]).is_err() {
-                return -1;
+            // Closing will notify the scheme, and from that point we will no longer have control
+            // over this process (unless it fails). We do this manually since drop cannot handle
+            // errors.
+            let fd = *escalate_fd as usize;
+            core::mem::forget(escalate_fd);
+
+            if let Err(err) = syscall::close(fd) {
+                return e(Err(err)) as c_int;
             }
 
             unreachable!()

@@ -61,7 +61,7 @@ where
     let mut tree = BTreeMap::new();
     tree.insert(0, PAGE_SIZE);
 
-    const BUFSZ: usize = 16384;
+    const BUFSZ: usize = 65536;
     let mut buf = vec! [0_u8; BUFSZ];
 
     read_all(*image_file as usize, Some(header.e_phoff), &mut phs).map_err(|_| Error::new(EIO))?;
@@ -91,7 +91,7 @@ where
             syscall::lseek(*image_file as usize, segment.p_offset as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
             syscall::lseek(*memory_fd, segment.p_vaddr as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
 
-            for size in core::iter::repeat(BUFSZ).take((segment.p_filesz as usize) / BUFSZ).chain(Some((segment.p_filesz as usize) % BUFSZ)) {
+            for size in core::iter::repeat(buf.len()).take((segment.p_filesz as usize) / buf.len()).chain(Some((segment.p_filesz as usize) % buf.len())) {
                 read_all(*image_file as usize, None, &mut buf[..size]).map_err(|_| Error::new(EIO))?;
                 let _ = syscall::write(*memory_fd, &buf[..size]).map_err(|_| Error::new(EIO))?;
             }
