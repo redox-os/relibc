@@ -42,7 +42,7 @@ fn copy_str(cur_pid_fd: usize, new_pid_fd: usize, key: &str) -> Result<()> {
     Ok(())
 }
 #[cfg(target_arch = "x86_64")]
-fn copy_float_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
+fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
     // Copy environment registers.
     {
         let cur_env_regs_fd = FdGuard::new(syscall::dup(cur_pid_fd, b"regs/env")?);
@@ -51,15 +51,6 @@ fn copy_float_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
         let mut env_regs = syscall::EnvRegisters::default();
         let _ = syscall::read(*cur_env_regs_fd, &mut env_regs)?;
         let _ = syscall::write(*new_env_regs_fd, &env_regs)?;
-    }
-    // Copy float registers.
-    {
-        let cur_float_regs_fd = FdGuard::new(syscall::dup(cur_pid_fd, b"regs/float")?);
-        let new_float_regs_fd = FdGuard::new(syscall::dup(new_pid_fd, b"regs/float")?);
-
-        let mut float_regs = syscall::FloatRegisters::default();
-        let _ = syscall::read(*cur_float_regs_fd, &mut float_regs)?;
-        let _ = syscall::write(*new_float_regs_fd, &float_regs)?;
     }
 
     Ok(())
@@ -102,7 +93,7 @@ pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
         let _ = syscall::write(*new_filetable_sel_fd, &usize::to_ne_bytes(*cur_filetable_fd))?;
     }
 
-    copy_float_env_regs(*cur_pid_fd, *new_pid_fd)?;
+    copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
 
     // Unblock context. 
     syscall::kill(new_pid, SIGCONT)?;
@@ -204,7 +195,7 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
             let buf = create_set_addr_space_buf(*new_addr_space_fd, fork_ret as usize, initial_rsp as usize);
             let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
         }
-        copy_float_env_regs(*cur_pid_fd, *new_pid_fd)?;
+        copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
     }
     // Copy the file table. We do this last to ensure that all previously used file descriptors are
     // closed. The only exception -- the filetable selection fd and the current filetable fd --
@@ -248,7 +239,10 @@ fork_wrapper:
     push r14
     push r15
 
-    sub rsp, 16
+    sub rsp, 32
+
+    stmxcsr [rsp+16]
+    fnstcw [rsp+24]
 
     mov rdi, rsp
     call __relibc_internal_fork_impl
@@ -258,9 +252,13 @@ fork_ret:
     mov rdi, [rsp]
     mov rsi, [rsp + 8]
     call __relibc_internal_fork_hook
+
+    ldmxcsr [rsp+16]
+    fldcw [rsp+24]
+
     xor rax, rax
 2:
-    add rsp, 16
+    add rsp, 32
     pop r15
     pop r14
     pop r13

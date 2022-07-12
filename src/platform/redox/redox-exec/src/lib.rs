@@ -45,9 +45,7 @@ where
     };
     let memory_fd = FdGuard::new(syscall::dup(*grants_fd, b"mem")?);
 
-    let instruction_ptr = usize::try_from(header.e_entry).map_err(|_| Error::new(ENOEXEC))?;
-
-    // Never allow more than 1 MiB of program headers. TODO: Capabilities again?
+    // Never allow more than 1 MiB of program headers.
     const MAX_PH_SIZE: usize = 1024 * 1024;
     let phentsize = u64::from(header.e_phentsize) as usize;
     let phnum = u64::from(header.e_phnum) as usize;
