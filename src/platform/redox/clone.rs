@@ -93,6 +93,15 @@ pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
         let _ = syscall::write(*new_filetable_sel_fd, &usize::to_ne_bytes(*cur_filetable_fd))?;
     }
 
+    // Reuse sigactions (on Linux, CLONE_THREAD requires CLONE_SIGHAND which implies the sigactions
+    // table is reused).
+    {
+        let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);
+        let new_sigaction_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-sigactions")?);
+
+        let _ = syscall::write(*new_sigaction_sel_fd, &usize::to_ne_bytes(*cur_sigaction_fd))?;
+    }
+
     copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
 
     // Unblock context. 
@@ -130,6 +139,14 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
 
         copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
         copy_str(*cur_pid_fd, *new_pid_fd, "cwd")?;
+
+        {
+            let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);
+            let new_sigaction_fd = FdGuard::new(syscall::dup(*cur_sigaction_fd, b"copy")?);
+            let new_sigaction_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-sigactions")?);
+
+            let _ = syscall::write(*new_sigaction_sel_fd, &usize::to_ne_bytes(*new_sigaction_fd))?;
+        }
 
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new
         // parent FDs will not show up for the child).

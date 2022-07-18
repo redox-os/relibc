@@ -166,6 +166,14 @@ where
 
     unsafe { deactivate_tcb(*open_via_dup)?; }
 
+    {
+        let current_sigaction_fd = FdGuard::new(syscall::dup(*open_via_dup, b"sigactions")?);
+        let empty_sigaction_fd = FdGuard::new(syscall::dup(*current_sigaction_fd, b"empty")?);
+        let sigaction_selection_fd = FdGuard::new(syscall::dup(*open_via_dup, b"current-sigactions")?);
+
+        let _ = syscall::write(*sigaction_selection_fd, &usize::to_ne_bytes(*empty_sigaction_fd))?;
+    }
+
     // TODO: Restore old name if exec failed?
     if let Ok(name_fd) = syscall::dup(*open_via_dup, b"name").map(FdGuard::new) {
         let _ = syscall::write(*name_fd, path);
