@@ -296,7 +296,6 @@ fork_ret:
     .globl pte_clone_ret
     .type pte_clone_ret, @function
 pte_clone_ret:
-
     # Load registers
     pop rax
     pop rdi
@@ -305,6 +304,15 @@ pte_clone_ret:
     pop rcx
     pop r8
     pop r9
+
+    sub rsp, 8
+
+    mov DWORD PTR [rsp], 0x00001F80
+    ldmxcsr [rsp]
+    mov WORD PTR [rsp], 0x031F
+    fldcw [rsp]
+
+    add rsp, 8
 
     # Call entry point
     call rax
