@@ -1,34 +1,46 @@
 #![no_std]
 
-#![feature(array_chunks)]
+#![feature(array_chunks, map_first_last)]
 
 extern crate alloc;
 
-use core::convert::TryFrom;
 use core::mem::size_of;
 
 use alloc::{
-    collections::{btree_map::Entry, BTreeMap},
-    vec::Vec,
+    boxed::Box,
+    collections::BTreeMap,
     vec,
 };
 
 use syscall::{
     error::*,
-    flag::{AT_ENTRY, AT_NULL, AT_PHDR, AT_PHENT, AT_PHNUM, MapFlags, O_WRONLY, SEEK_SET},
+    flag::{MapFlags, SEEK_SET},
 };
 
 #[cfg(target_arch = "x86_64")]
 const PAGE_SIZE: usize = 4096;
 
-pub fn fexec_impl<A, E>(image_file: FdGuard, open_via_dup: FdGuard, path: &[u8], args: A, envs: E, total_args_envs_size: usize) -> Result<FdGuard>
+pub enum FexecResult {
+    Normal { addrspace_handle: FdGuard },
+    Interp { path: Box<[u8]>, image_file: FdGuard, open_via_dup: FdGuard, interp_override: InterpOverride },
+}
+pub struct InterpOverride {
+    phs: Box<[u8]>,
+    at_entry: usize,
+    at_phnum: usize,
+    at_phent: usize,
+    name: Box<[u8]>,
+    tree: BTreeMap<usize, usize>,
+}
+
+pub fn fexec_impl<A, E>(image_file: FdGuard, open_via_dup: FdGuard, path: &[u8], args: A, envs: E, total_args_envs_size: usize, mut interp_override: Option<InterpOverride>) -> Result<FexecResult>
 where
     A: IntoIterator,
     E: IntoIterator,
     A::Item: AsRef<[u8]>,
     E::Item: AsRef<[u8]>,
 {
-    use goblin::elf64::{header::Header, program_header::program_header64::{ProgramHeader, PT_LOAD, PF_W, PF_X}};
+    use goblin::elf64::{header::Header, program_header::program_header64::{ProgramHeader, PT_LOAD, PT_INTERP, PF_W, PF_X}};
 
     // Here, we do the minimum part of loading an application, which is what the kernel used to do.
     // We load the executable into memory (albeit at different offsets in this executable), fix
@@ -49,20 +61,24 @@ where
     const MAX_PH_SIZE: usize = 1024 * 1024;
     let phentsize = u64::from(header.e_phentsize) as usize;
     let phnum = u64::from(header.e_phnum) as usize;
-    let pheaders_size = phentsize.saturating_mul(phnum);
+    let pheaders_size = phentsize.saturating_mul(phnum).saturating_add(size_of::<Header>());
 
     if pheaders_size > MAX_PH_SIZE {
         return Err(Error::new(E2BIG));
     }
-    let mut phs = vec! [0_u8; pheaders_size];
+    let mut phs_raw = vec! [0_u8; pheaders_size];
+    phs_raw[..size_of::<Header>()].copy_from_slice(&header_bytes);
+    let phs = &mut phs_raw[size_of::<Header>()..];
 
-    let mut tree = BTreeMap::new();
-    tree.insert(0, PAGE_SIZE);
+    // TODO: Remove clone, but this would require more as_refs and as_muts
+    let mut tree = interp_override.as_mut().map_or_else(|| {
+        core::iter::once((0, PAGE_SIZE)).collect::<BTreeMap<_, _>>()
+    }, |o| core::mem::take(&mut o.tree));
 
-    const BUFSZ: usize = 65536;
+    const BUFSZ: usize = 1024 * 256;
     let mut buf = vec! [0_u8; BUFSZ];
 
-    read_all(*image_file as usize, Some(header.e_phoff), &mut phs).map_err(|_| Error::new(EIO))?;
+    read_all(*image_file as usize, Some(header.e_phoff), phs).map_err(|_| Error::new(EIO))?;
 
     for ph_idx in 0..phnum {
         let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
@@ -84,19 +100,42 @@ where
         if segment.p_filesz > segment.p_memsz {
             return Err(Error::new(ENOEXEC));
         }
-        if segment.p_type == PT_LOAD {
-            mprotect_remote(*grants_fd, vaddr, size, flags)?;
-            syscall::lseek(*image_file as usize, segment.p_offset as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
-            syscall::lseek(*memory_fd, segment.p_vaddr as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
+        #[forbid(unreachable_patterns)]
+        match segment.p_type {
+            // PT_INTERP must come before any PT_LOAD, so we don't have to iterate twice.
+            PT_INTERP => {
+                let mut interp = vec! [0_u8; segment.p_filesz as usize];
+                read_all(*image_file as usize, Some(segment.p_offset), &mut interp)?;
 
-            for size in core::iter::repeat(buf.len()).take((segment.p_filesz as usize) / buf.len()).chain(Some((segment.p_filesz as usize) % buf.len())) {
-                read_all(*image_file as usize, None, &mut buf[..size]).map_err(|_| Error::new(EIO))?;
-                let _ = syscall::write(*memory_fd, &buf[..size]).map_err(|_| Error::new(EIO))?;
+                return Ok(FexecResult::Interp {
+                    path: interp.into_boxed_slice(),
+                    image_file,
+                    open_via_dup,
+                    interp_override: InterpOverride {
+                        at_entry: header.e_entry as usize,
+                        at_phnum: phnum,
+                        at_phent: phentsize,
+                        phs: phs_raw.into_boxed_slice(),
+                        name: path.into(),
+                        tree,
+                    }
+                });
             }
+            PT_LOAD => {
+                mprotect_remote(*grants_fd, vaddr, size, flags)?;
+                syscall::lseek(*image_file as usize, segment.p_offset as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
+                syscall::lseek(*memory_fd, segment.p_vaddr as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
 
-            if !tree.range(..=vaddr).next_back().filter(|(start, size)| **start + **size > vaddr).is_some() {
-                tree.insert(vaddr, size);
+                for size in core::iter::repeat(buf.len()).take((segment.p_filesz as usize) / buf.len()).chain(Some((segment.p_filesz as usize) % buf.len())) {
+                    read_all(*image_file as usize, None, &mut buf[..size]).map_err(|_| Error::new(EIO))?;
+                    let _ = syscall::write(*memory_fd, &buf[..size]).map_err(|_| Error::new(EIO))?;
+                }
+
+                if !tree.range(..=vaddr).next_back().filter(|(start, size)| **start + **size > vaddr).is_some() {
+                    tree.insert(vaddr, size);
+                }
             }
+            _ => continue,
         }
     }
     // Setup a stack starting from the very end of the address space, and then growing downwards.
@@ -113,22 +152,31 @@ where
         write_all(*memory_fd, Some(sp as u64), &usize::to_ne_bytes(word))
     };
 
-    let pheaders_size_aligned = (pheaders_size+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;
+    let pheaders_to_convey = if let Some(ref r#override) = interp_override {
+        &*r#override.phs
+    } else {
+        &*phs_raw
+    };
+    let pheaders_size_aligned = (pheaders_to_convey.len()+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;
     let pheaders = find_free_target_addr(&tree, pheaders_size_aligned).ok_or(Error::new(ENOMEM))?;
     tree.insert(pheaders, pheaders_size_aligned);
     mprotect_remote(*grants_fd, pheaders, pheaders_size_aligned, MapFlags::PROT_READ)?;
 
-    write_all(*memory_fd, Some(pheaders as u64), &phs)?;
+    write_all(*memory_fd, Some(pheaders as u64), &pheaders_to_convey)?;
 
     push(0)?;
     push(AT_NULL)?;
     push(header.e_entry as usize)?;
+    if let Some(ref r#override) = interp_override {
+        push(AT_BASE)?;
+        push(r#override.at_entry)?;
+    }
     push(AT_ENTRY)?;
-    push(pheaders)?;
+    push(pheaders + size_of::<Header>())?;
     push(AT_PHDR)?;
-    push(header.e_phnum as usize)?;
+    push(interp_override.as_ref().map_or(header.e_phnum as usize, |o| o.at_phnum))?;
     push(AT_PHNUM)?;
-    push(header.e_phentsize as usize)?;
+    push(interp_override.as_ref().map_or(header.e_phentsize as usize, |o| o.at_phent))?;
     push(AT_PHENT)?;
 
     let args_envs_size_aligned = (total_args_envs_size+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;
@@ -176,14 +224,18 @@ where
 
     // TODO: Restore old name if exec failed?
     if let Ok(name_fd) = syscall::dup(*open_via_dup, b"name").map(FdGuard::new) {
-        let _ = syscall::write(*name_fd, path);
+        let _ = syscall::write(*name_fd, interp_override.as_ref().map_or(path, |o| &o.name));
+    }
+    {
+        let mmap_min_fd = FdGuard::new(syscall::dup(*open_via_dup, b"mmap-min-addr")?);
+        let _ = syscall::write(*mmap_min_fd, &usize::to_ne_bytes(tree.iter().rev().nth(1).map_or(0, |(off, len)| *off + *len)));
     }
 
     let addrspace_selection_fd = FdGuard::new(syscall::dup(*open_via_dup, b"current-addrspace")?);
 
     let _ = syscall::write(*addrspace_selection_fd, &create_set_addr_space_buf(*grants_fd, header.e_entry as usize, sp));
 
-    Ok(addrspace_selection_fd)
+    Ok(FexecResult::Normal { addrspace_handle: addrspace_selection_fd })
 }
 fn mprotect_remote(socket: usize, addr: usize, len: usize, flags: MapFlags) -> Result<()> {
     let mut grants_buf = [0_u8; 24];
@@ -295,3 +347,8 @@ pub fn create_set_addr_space_buf(space: usize, ip: usize, sp: usize) -> [u8; siz
     *chunks.next().unwrap() = usize::to_ne_bytes(ip);
     buf
 }
+
+#[path = "../../../auxv_defs.rs"]
+pub mod auxv_defs;
+
+use auxv_defs::*;

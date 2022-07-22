@@ -34,6 +34,11 @@ use super::{errno, types::*, Pal, Read};
 static mut BRK_CUR: *mut c_void = ptr::null_mut();
 static mut BRK_END: *mut c_void = ptr::null_mut();
 
+const PAGE_SIZE: usize = 4096;
+fn round_up_to_page_size(val: usize) -> usize {
+    (val + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE
+}
+
 mod clone;
 mod epoll;
 mod exec;
@@ -66,14 +71,6 @@ pub fn e(sys: Result<usize>) -> usize {
             !0
         }
     }
-}
-fn flatten_with_nul<T>(iter: impl IntoIterator<Item = T>) -> Box<[u8]> where T: AsRef<[u8]> {
-    let mut vec = Vec::new();
-    for item in iter {
-        vec.extend(item.as_ref());
-        vec.push(b'\0');
-    }
-    vec.into_boxed_slice()
 }
 
 pub struct Sys;
@@ -216,223 +213,10 @@ impl Pal for Sys {
 
     unsafe fn execve(
         path: &CStr,
-        mut argv: *const *mut c_char,
-        mut envp: *const *mut c_char,
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
     ) -> c_int {
-        // NOTE: We must omit O_CLOEXEC and close manually, otherwise it will be closed before we
-        // have even read it!
-        let mut file = match File::open(path, fcntl::O_RDONLY) {
-            Ok(file) => file,
-            Err(_) => return -1,
-        };
-        let fd = *file as usize;
-
-        // With execve now being implemented in userspace, we need to check ourselves that this
-        // file is actually executable. While checking for read permission is unnecessary as the
-        // scheme will not allow us to read otherwise, the execute bit is completely unenforced. We
-        // have the permission to mmap executable memory and fill it with the program even if it is
-        // unset, so the best we can do is check that nothing is executed by accident.
-        //
-        // TODO: At some point we might have capabilities limiting the ability to allocate
-        // executable memory, and in that case we might use the `escalate:` scheme as we already do
-        // when the binary needs setuid/setgid.
-
-        let mut stat = redox_stat::default();
-        if e(syscall::fstat(fd, &mut stat)) == !0 {
-            return -1;
-        }
-        let uid = e(syscall::getuid());
-        if uid == !0 {
-            return -1;
-        }
-        let gid = e(syscall::getuid());
-        if gid == !0 {
-            return -1;
-        }
-
-        let mode = if uid == stat.st_uid as usize {
-            (stat.st_mode >> 3 * 2) & 0o7
-        } else if gid == stat.st_gid as usize {
-            (stat.st_mode >> 3 * 1) & 0o7
-        } else {
-            stat.st_mode & 0o7
-        };
-
-        if mode & 0o1 == 0o0 {
-            errno = EPERM;
-            return -1;
-        }
-        let wants_setugid = stat.st_mode & ((S_ISUID | S_ISGID) as u16) != 0;
-
-        // Count arguments
-        let mut len = 0;
-        while !(*argv.add(len)).is_null() {
-            len += 1;
-        }
-
-        let mut args: Vec<&[u8]> = Vec::with_capacity(len);
-
-        // Read shebang (for example #!/bin/sh)
-        let mut _interpreter_path = None;
-        let is_interpreted = {
-            let mut read = 0;
-            let mut shebang = [0; 2];
-
-            while read < 2 {
-                match file.read(&mut shebang) {
-                    Ok(0) => break,
-                    Ok(i) => read += i,
-                    Err(_) => return -1,
-                }
-            }
-            shebang == *b"#!"
-        };
-        // Since the fexec implementation is almost fully done in userspace, the kernel can no
-        // longer set UID/GID accordingly, and this code checking for them before using
-        // hypothetical interfaces to upgrade UID/GID, can not be trusted. So we ask the
-        // `escalate:` scheme for help. Note that `escalate:` can be deliberately excluded from the
-        // scheme namespace to deny privilege escalation (such as su/sudo/doas) for untrusted
-        // processes.
-        //
-        // According to execve(2), Linux and most other UNIXes ignore setuid/setgid for interpreted
-        // executables and thereby simply keep the privileges as is. For compatibility we do that
-        // too.
-
-        if is_interpreted {
-            // So, this file is interpreted.
-            // Then, read the actual interpreter:
-            let mut interpreter = Vec::new();
-            if BufReader::new(&mut file).read_until(b'\n', &mut interpreter).is_err() {
-                return -1;
-            }
-            if interpreter.ends_with(&[b'\n']) {
-                interpreter.pop().unwrap();
-            }
-            let cstring = match CString::new(interpreter) {
-                Ok(cstring) => cstring,
-                Err(_) => return -1,
-            };
-            file = match File::open(&cstring, fcntl::O_RDONLY) {
-                Ok(file) => file,
-                Err(_) => return -1,
-            };
-
-            // Make sure path is kept alive long enough, and push it to the arguments
-            _interpreter_path = Some(cstring);
-            let path_ref = _interpreter_path.as_ref().unwrap();
-            args.push(path_ref.as_bytes());
-        } else {
-            if file.seek(SeekFrom::Start(0)).is_err() {
-                return -1;
-            }
-        }
-        let mut args_envs_size_without_nul = 0;
-
-        // Arguments
-        while !argv.read().is_null() {
-            let arg = argv.read();
-
-            let len = strlen(arg);
-            args.push(core::slice::from_raw_parts(arg as *const u8, len));
-            args_envs_size_without_nul += len;
-            argv = argv.add(1);
-        }
-
-        // Environment variables
-        let mut len = 0;
-        while !envp.add(len).read().is_null() {
-            len += 1;
-        }
-
-        let mut envs: Vec<&[u8]> = Vec::with_capacity(len);
-        while !envp.read().is_null() {
-            let env = envp.read();
-
-            let len = strlen(env);
-            envs.push(core::slice::from_raw_parts(env as *const u8, len));
-            args_envs_size_without_nul += len;
-            envp = envp.add(1);
-        }
-
-        // Close all O_CLOEXEC file descriptors. TODO: close_range?
-        {
-            // NOTE: This approach of implementing O_CLOEXEC will not work in multithreaded
-            // scenarios. While execve() is undefined according to POSIX if there exist sibling
-            // threads, it could still be allowed by keeping certain file descriptors and instead
-            // set the active file table.
-            let name = CStr::from_bytes_with_nul(b"thisproc:current/filetable\0").expect("string should be valid");
-            let files_fd = match File::open(name, fcntl::O_RDONLY) {
-                Ok(f) => f,
-                Err(_) => return -1,
-            };
-            for line in BufReader::new(files_fd).lines() {
-                let line = match line {
-                    Ok(l) => l,
-                    Err(_) => break,
-                };
-                let fd = match line.parse::<usize>() {
-                    Ok(f) => f,
-                    Err(_) => continue,
-                };
-
-                let flags = Self::fcntl(fd as c_int, fcntl::F_GETFD, 0);
-                if flags != -1 {
-                    if flags & fcntl::O_CLOEXEC == fcntl::O_CLOEXEC {
-                        let _ = Self::close(fd as c_int);
-                    }
-                }
-            }
-        }
-
-        if !is_interpreted && wants_setugid {
-            // Make sure the last file descriptor not covered by O_CLOEXEC is not leaked.
-            drop(file);
-
-            let name = CStr::from_bytes_with_nul(b"escalate:\0").expect("string should be valid");
-            // We are now going to invoke `escalate:` rather than loading the program ourselves.
-            let mut escalate_fd = match File::open(name, fcntl::O_WRONLY) {
-                Ok(f) => f,
-                Err(_) => return -1,
-            };
-
-            // First, we write the path.
-            //
-            // TODO: For improved security, use a hypothetical SYS_DUP_FORWARD syscall to give the
-            // scheme our file descriptor. It can check through the kernel-overwritten stat.st_dev
-            // field that it pertains to a "trusted" scheme (i.e. of at least the privilege the
-            // new uid/gid has), although for now only root can open schemes. Passing a file
-            // descriptor and not a path will allow escalated to run in a limited namespace.
-            //
-            // TODO: Plus, at this point fexecve is not implemented (but specified in
-            // POSIX.1-2008), and to avoid bad syscalls such as fpath, passing a file descriptor
-            // would be better.
-            if escalate_fd.write_all(path.to_bytes()).is_err() {
-                return -1;
-            }
-
-            // Second, we write the flattened args and envs with NUL characters separating
-            // individual items. This can be copied directly into the new executable's memory.
-            if escalate_fd.write_all(&flatten_with_nul(args)).is_err() {
-                return -1;
-            }
-            if escalate_fd.write_all(&flatten_with_nul(envs)).is_err() {
-                return -1;
-            }
-
-            // Closing will notify the scheme, and from that point we will no longer have control
-            // over this process (unless it fails). We do this manually since drop cannot handle
-            // errors.
-            let fd = *escalate_fd as usize;
-            core::mem::forget(escalate_fd);
-
-            if let Err(err) = syscall::close(fd) {
-                return e(Err(err)) as c_int;
-            }
-
-            unreachable!()
-        } else {
-            e(self::exec::fexec_impl(file, path.to_bytes(), &args, &envs, args_envs_size_without_nul)) as c_int
-        }
+        e(self::exec::execve(path, self::exec::ArgEnv::C { argv, envp }, None)) as c_int
     }
 
     fn fchdir(fd: c_int) -> c_int {
@@ -701,7 +485,7 @@ impl Pal for Sys {
     }
 
     fn getpagesize() -> usize {
-        4096
+        PAGE_SIZE
     }
 
     fn getpgid(pid: pid_t) -> pid_t {
@@ -848,7 +632,7 @@ impl Pal for Sys {
     ) -> *mut c_void {
         let map = Map {
             offset: off as usize,
-            size: len,
+            size: round_up_to_page_size(len),
             flags: syscall::MapFlags::from_bits_truncate(
                 ((prot as usize) << 16) | ((flags as usize) & 0xFFFF),
             ),
@@ -865,7 +649,7 @@ impl Pal for Sys {
     unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
         e(syscall::mprotect(
             addr as usize,
-            len,
+            round_up_to_page_size(len),
             syscall::MapFlags::from_bits((prot as usize) << 16)
                 .expect("mprotect: invalid bit pattern"),
         )) as c_int
@@ -877,7 +661,7 @@ impl Pal for Sys {
         /* TODO
         e(syscall::msync(
             addr as usize,
-            len,
+            round_up_to_page_size(len),
             flags
         )) as c_int
         */
@@ -894,7 +678,7 @@ impl Pal for Sys {
     }
 
     unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
-        if e(syscall::funmap(addr as usize, len)) == !0 {
+        if e(syscall::funmap(addr as usize, round_up_to_page_size(len))) == !0 {
             return !0;
         }
         0

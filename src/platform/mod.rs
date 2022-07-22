@@ -34,6 +34,12 @@ mod pte;
 pub use self::rlb::{Line, RawLineBuffer};
 pub mod rlb;
 
+#[cfg(target_os = "linux")]
+pub mod auxv_defs;
+
+#[cfg(target_os = "redox")]
+pub use redox_exec::auxv_defs;
+
 use self::types::*;
 pub mod types;
 
