@@ -305,9 +305,9 @@ checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.12"
+version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ae183fc1b06c149f0c1793e1eb447c8b04bfe46d48e9e48bfb8d2d7ed64ecf0"
+checksum = "534cfe58d6a18cc17120fbf4635d53d14691c1fe4d951064df9bd326178d7d5a"
 dependencies = [
  "bitflags",
 ]
@@ -327,7 +327,7 @@ dependencies = [
  "posix-regex",
  "ralloc",
  "rand",
- "redox_syscall 0.2.12",
+ "redox_syscall 0.2.15",
  "sc",
  "spin 0.9.2",
 ]
@@ -502,7 +502,7 @@ dependencies = [
  "cfg-if",
  "fastrand",
  "libc",
- "redox_syscall 0.2.12",
+ "redox_syscall 0.2.15",
  "remove_dir_all",
  "winapi",
 ]

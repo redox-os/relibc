@@ -17,14 +17,24 @@ use core::{
     ptr, slice,
 };
 use goblin::{
-    elf::{
-        header::ET_DYN,
-        program_header,
-        r#dyn::{Dyn, DT_DEBUG, DT_RUNPATH},
-        section_header::{SHN_UNDEF, SHT_FINI_ARRAY, SHT_INIT_ARRAY},
-        sym, Elf,
-    },
+    elf::Elf,
     error::{Error, Result},
+};
+#[cfg(target_pointer_width = "32")]
+use goblin::elf32::{
+    header::ET_DYN,
+    program_header,
+    r#dyn::{Dyn, DT_DEBUG, DT_RUNPATH},
+    section_header::{SHN_UNDEF, SHT_FINI_ARRAY, SHT_INIT_ARRAY},
+    sym,
+};
+#[cfg(target_pointer_width = "64")]
+use goblin::elf64::{
+    header::ET_DYN,
+    program_header,
+    r#dyn::{Dyn, DT_DEBUG, DT_RUNPATH},
+    section_header::{SHN_UNDEF, SHT_FINI_ARRAY, SHT_INIT_ARRAY},
+    sym,
 };
 
 /// Use to represent a library as well as all the symbols that is loaded withen it.

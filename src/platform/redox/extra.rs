@@ -53,6 +53,7 @@ extern "C" {
     pub fn pte_clone_inner(stack: usize) -> usize;
 }
 
+#[cfg(target_arch = "x86_64")]
 global_asm!("
     .globl pte_clone_inner
     .type pte_clone_inner, @function

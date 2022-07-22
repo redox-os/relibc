@@ -3,14 +3,14 @@
    Copying and distribution of this script, with or without modification,
    are permitted in any medium without royalty provided the copyright
    notice and this notice are preserved.  */
-OUTPUT_FORMAT("elf64-littleaarch64", "elf64-littleaarch64",
-              "elf64-littleaarch64")
-OUTPUT_ARCH(aarch64)
+OUTPUT_FORMAT("elf32-i386", "elf32-i386",
+              "elf32-i386")
+OUTPUT_ARCH(i386)
 ENTRY(_start)
-SEARCH_DIR("/aarch64-unknown-redox/lib");
-SEARCH_DIR("/usr/local/lib64");
-SEARCH_DIR("/lib64");
-SEARCH_DIR("/usr/lib64");
+SEARCH_DIR("/i686-unknown-redox/lib");
+SEARCH_DIR("/usr/local/lib32");
+SEARCH_DIR("/lib32");
+SEARCH_DIR("/usr/lib32");
 SEARCH_DIR("/usr/local/lib");
 SEARCH_DIR("/lib");
 SEARCH_DIR("/usr/lib");

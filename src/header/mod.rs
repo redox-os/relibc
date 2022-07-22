@@ -49,6 +49,7 @@ pub mod sys_timeb;
 //pub mod sys_times;
 pub mod arch_aarch64_user;
 pub mod arch_x64_user;
+#[cfg(not(target_arch = "x86"))] // TODO: x86
 pub mod sys_procfs;
 pub mod sys_random;
 pub mod sys_types;

@@ -850,6 +850,12 @@ impl Pal for Sys {
         unimplemented!("pte_clone not implemented on aarch64");
     }
 
+    #[cfg(target_arch = "x86")]
+    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
+        //TODO: x86
+        unimplemented!("pte_clone not implemented on x86");
+    }
+
     #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
         e(syscall::Error::demux(extra::pte_clone_inner(stack as usize))) as pid_t

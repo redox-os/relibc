@@ -213,7 +213,7 @@ impl Tcb {
 
     /// Architecture specific code to read a usize from the TCB - x86_64
     #[inline(always)]
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     unsafe fn arch_read(offset: usize) -> usize {
         let value;
         asm!(
@@ -237,6 +237,25 @@ impl Tcb {
     #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
     unsafe fn os_arch_activate(tp: usize) {
         //TODO: aarch64
+    }
+
+    /// OS and architecture specific code to activate TLS - Redox x86
+    #[cfg(all(target_os = "redox", target_arch = "x86"))]
+    unsafe fn os_arch_activate(tp: usize) {
+        let mut env = syscall::EnvRegisters::default();
+
+        let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDWR)
+            .expect_notls("failed to open handle for process registers");
+
+        let _ = syscall::read(file, &mut env)
+            .expect_notls("failed to read fsbase");
+
+        env.fsbase = tp as u32;
+
+        let _ = syscall::write(file, &env)
+            .expect_notls("failed to write fsbase");
+
+        let _ = syscall::close(file);
     }
 
     /// OS and architecture specific code to activate TLS - Redox x86_64

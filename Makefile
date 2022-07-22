@@ -33,6 +33,13 @@ ifeq ($(TARGET),x86_64-unknown-linux-gnu)
 	export OBJCOPY=x86_64-linux-gnu-objcopy
 endif
 
+ifeq ($(TARGET),i686-unknown-redox)
+	export CC=i686-unknown-redox-gcc
+	export LD=i686-unknown-redox-ld
+	export AR=i686-unknown-redox-ar
+	export OBJCOPY=i686-unknown-redox-objcopy
+endif
+
 ifeq ($(TARGET),x86_64-unknown-redox)
 	export CC=x86_64-unknown-redox-gcc
 	export LD=x86_64-unknown-redox-ld
