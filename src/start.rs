@@ -67,7 +67,16 @@ static INIT_ARRAY: [extern "C" fn(); 1] = [init_array];
 
 static mut init_complete: bool = false;
 
+#[used]
+#[no_mangle]
+static mut __relibc_init_environ: *mut *mut c_char = ptr::null_mut();
+
 fn alloc_init() {
+    unsafe {
+        if init_complete {
+            return;
+        }
+    }
     unsafe {
         if let Some(tcb) = ld_so::tcb::Tcb::current() {
             if tcb.mspace != 0 {
@@ -95,6 +104,10 @@ extern "C" fn init_array() {
 
     alloc_init();
     io_init();
+
+    unsafe {
+        platform::environ = __relibc_init_environ;
+    }
 
     extern "C" {
         fn pthread_init();
@@ -155,15 +168,19 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         platform::program_invocation_name = *arg;
         platform::program_invocation_short_name = libgen::basename(*arg);
     }
-
-    // Set up envp
-    let envp = sp.envp();
-    let mut len = 0;
-    while !(*envp.add(len)).is_null() {
-        len += 1;
+    // We check for NULL here since ld.so might already have initialized it for us, and we don't
+    // want to overwrite it if constructors in .init_array of dependency libraries have called
+    // setenv.
+    if platform::environ.is_null() {
+        // Set up envp
+        let envp = sp.envp();
+        let mut len = 0;
+        while !(*envp.add(len)).is_null() {
+            len += 1;
+        }
+        platform::OUR_ENVIRON = copy_string_array(envp, len);
+        platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
     }
-    platform::OUR_ENVIRON = copy_string_array(envp, len);
-    platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
 
     // Setup signal stack, otherwise we cannot handle any signals besides SIG_IGN/SIG_DFL behavior.
     setup_sigstack();
