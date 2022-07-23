@@ -38,3 +38,10 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
         (*ti).ti_offset
     );
 }
+
+// x86 can define a version that does not require stack alignment
+#[cfg(target_arch = "x86")]
+#[no_mangle]
+pub unsafe extern "C" fn ___tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
+    __tls_get_addr(ti)
+}
