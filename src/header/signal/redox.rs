@@ -1,5 +1,26 @@
 use core::arch::global_asm;
 
+// x8 is register, 119 is SIGRETURN
+#[cfg(target_arch = "aarch64")]
+global_asm!(
+    "
+    .global __restore_rt
+    __restore_rt:
+        mov x8, #119
+        svc 0
+"
+);
+// Needs to be defined in assembly because it can't have a function prologue
+// eax is register, 119 is SIGRETURN
+#[cfg(target_arch = "x86")]
+global_asm!(
+    "
+    .global __restore_rt
+    __restore_rt:
+        mov eax, 119
+        int 0x80
+"
+);
 // Needs to be defined in assembly because it can't have a function prologue
 // rax is register, 119 is SIGRETURN
 #[cfg(target_arch = "x86_64")]
@@ -9,16 +30,6 @@ global_asm!(
     __restore_rt:
         mov rax, 119
         syscall
-"
-);
-// x8 is register, 119 is SIGRETURN
-#[cfg(target_arch = "aarch64")]
-global_asm!(
-    "
-    .global __restore_rt
-    __restore_rt:
-        mov x8, #119
-        svc 0
 "
 );
 
