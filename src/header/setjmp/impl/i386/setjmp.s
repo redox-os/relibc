@@ -10,14 +10,14 @@ ___setjmp:
 __setjmp:
 _setjmp:
 setjmp:
-	mov 4(%esp), %eax
-	mov    %ebx, (%eax)
-	mov    %esi, 4(%eax)
-	mov    %edi, 8(%eax)
-	mov    %ebp, 12(%eax)
-	lea 4(%esp), %ecx
-	mov    %ecx, 16(%eax)
-	mov  (%esp), %ecx
-	mov    %ecx, 20(%eax)
-	xor    %eax, %eax
+	mov eax, [esp + 4]
+	mov [eax], ebx
+	mov [eax + 4], esi
+	mov [eax + 8], edi
+	mov [eax + 12], ebp
+	lea ecx, [esp + 4]
+	mov [eax + 16], ecx
+	mov ecx, [esp]
+	mov [eax + 20], ecx
+	xor eax, eax
 	ret
