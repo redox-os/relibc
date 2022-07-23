@@ -81,7 +81,7 @@ pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
         let cur_addr_space_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"addrspace")?);
         let new_addr_space_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-addrspace")?);
 
-        let buf = create_set_addr_space_buf(*cur_addr_space_fd, pte_clone_ret as usize, stack as usize);
+        let buf = create_set_addr_space_buf(*cur_addr_space_fd, __relibc_internal_pte_clone_ret as usize, stack as usize);
         let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
     }
 
@@ -106,6 +106,7 @@ pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
 
     // Unblock context. 
     syscall::kill(new_pid, SIGCONT)?;
+    let _ = syscall::waitpid(new_pid, &mut 0, syscall::WUNTRACED | syscall::WCONTINUED);
 
     Ok(0)
 }
@@ -114,7 +115,7 @@ pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
 pub fn fork_impl() -> Result<usize> {
     unsafe {
-        Error::demux(fork_wrapper())
+        Error::demux(__relibc_internal_fork_wrapper())
     }
 }
 
@@ -209,7 +210,7 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
             }
             let new_addr_space_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-addrspace")?);
 
-            let buf = create_set_addr_space_buf(*new_addr_space_fd, fork_ret as usize, initial_rsp as usize);
+            let buf = create_set_addr_space_buf(*new_addr_space_fd, __relibc_internal_fork_ret as usize, initial_rsp as usize);
             let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
         }
         copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
@@ -249,9 +250,9 @@ unsafe extern "sysv64" fn __relibc_internal_fork_hook(cur_filetable_fd: usize, n
 #[no_mangle]
 core::arch::global_asm!("
     .p2align 6
-    .globl fork_wrapper
-    .type fork_wrapper, @function
-fork_wrapper:
+    .globl __relibc_internal_fork_wrapper
+    .type __relibc_internal_fork_wrapper, @function
+__relibc_internal_fork_wrapper:
     push rbp
     mov rbp, rsp
 
@@ -271,7 +272,11 @@ fork_wrapper:
     call __relibc_internal_fork_impl
     jmp 2f
 
-fork_ret:
+    .size __relibc_internal_fork_wrapper, . - __relibc_internal_fork_wrapper
+
+    .p2align 6
+    .type __relibc_internal_fork_ret, @function
+__relibc_internal_fork_ret:
     mov rdi, [rsp]
     mov rsi, [rsp + 8]
     call __relibc_internal_fork_hook
@@ -280,6 +285,8 @@ fork_ret:
     fldcw [rsp+24]
 
     xor rax, rax
+
+    .p2align 4
 2:
     add rsp, 32
     pop r15
@@ -291,11 +298,13 @@ fork_ret:
 
     pop rbp
     ret
-    .size fork_wrapper, . - fork_wrapper
 
-    .globl pte_clone_ret
-    .type pte_clone_ret, @function
-pte_clone_ret:
+    .size __relibc_internal_fork_ret, . - __relibc_internal_fork_ret
+
+    .globl __relibc_internal_pte_clone_ret
+    .type __relibc_internal_pte_clone_ret, @function
+    .p2align 6
+__relibc_internal_pte_clone_ret:
     # Load registers
     pop rax
     pop rdi
@@ -318,11 +327,11 @@ pte_clone_ret:
     call rax
 
     ret
-    .size pte_clone_ret, . - pte_clone_ret
+    .size __relibc_internal_pte_clone_ret, . - __relibc_internal_pte_clone_ret
 ");
 
 extern "sysv64" {
-    fn fork_wrapper() -> usize;
-    fn fork_ret();
-    fn pte_clone_ret();
+    fn __relibc_internal_fork_wrapper() -> usize;
+    fn __relibc_internal_fork_ret();
+    fn __relibc_internal_pte_clone_ret();
 }
