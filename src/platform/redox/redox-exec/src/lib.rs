@@ -33,7 +33,7 @@ pub struct InterpOverride {
     tree: BTreeMap<usize, usize>,
 }
 
-pub fn fexec_impl<A, E>(image_file: FdGuard, open_via_dup: FdGuard, path: &[u8], args: A, envs: E, total_args_envs_size: usize, mut interp_override: Option<InterpOverride>) -> Result<FexecResult>
+pub fn fexec_impl<A, E>(image_file: FdGuard, open_via_dup: FdGuard, memory_scheme_fd: &FdGuard, path: &[u8], args: A, envs: E, total_args_envs_size: usize, mut interp_override: Option<InterpOverride>) -> Result<FexecResult>
 where
     A: IntoIterator,
     E: IntoIterator,
@@ -122,7 +122,7 @@ where
                 });
             }
             PT_LOAD => {
-                mprotect_remote(*grants_fd, vaddr, size, flags)?;
+                allocate_remote(&grants_fd, memory_scheme_fd, vaddr, size, syscall::PROT_READ | syscall::PROT_WRITE)?;
                 syscall::lseek(*image_file as usize, segment.p_offset as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
                 syscall::lseek(*memory_fd, segment.p_vaddr as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
 
@@ -130,6 +130,7 @@ where
                     read_all(*image_file as usize, None, &mut buf[..size]).map_err(|_| Error::new(EIO))?;
                     let _ = syscall::write(*memory_fd, &buf[..size]).map_err(|_| Error::new(EIO))?;
                 }
+                mprotect_remote(&grants_fd, vaddr, size, flags)?;
 
                 if !tree.range(..=vaddr).next_back().filter(|(start, size)| **start + **size > vaddr).is_some() {
                     tree.insert(vaddr, size);
@@ -142,7 +143,7 @@ where
     const STACK_TOP: usize = 1 << 47;
     const STACK_SIZE: usize = 1024 * 1024;
 
-    mprotect_remote(*grants_fd, STACK_TOP - STACK_SIZE, STACK_SIZE, MapFlags::PROT_READ | MapFlags::PROT_WRITE)?;
+    allocate_remote(&grants_fd, memory_scheme_fd, STACK_TOP - STACK_SIZE, STACK_SIZE, MapFlags::PROT_READ | MapFlags::PROT_WRITE)?;
     tree.insert(STACK_TOP - STACK_SIZE, STACK_SIZE);
 
     let mut sp = STACK_TOP - 256;
@@ -160,9 +161,9 @@ where
     let pheaders_size_aligned = (pheaders_to_convey.len()+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;
     let pheaders = find_free_target_addr(&tree, pheaders_size_aligned).ok_or(Error::new(ENOMEM))?;
     tree.insert(pheaders, pheaders_size_aligned);
-    mprotect_remote(*grants_fd, pheaders, pheaders_size_aligned, MapFlags::PROT_READ)?;
-
+    allocate_remote(&grants_fd, memory_scheme_fd, pheaders, pheaders_size_aligned, MapFlags::PROT_READ | MapFlags::PROT_WRITE)?;
     write_all(*memory_fd, Some(pheaders as u64), &pheaders_to_convey)?;
+    mprotect_remote(&grants_fd, pheaders, pheaders_size_aligned, MapFlags::PROT_READ)?;
 
     push(0)?;
     push(AT_NULL)?;
@@ -181,7 +182,7 @@ where
 
     let args_envs_size_aligned = (total_args_envs_size+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;
     let target_args_env_address = find_free_target_addr(&tree, args_envs_size_aligned).ok_or(Error::new(ENOMEM))?;
-    mprotect_remote(*grants_fd, target_args_env_address, args_envs_size_aligned, MapFlags::PROT_READ | MapFlags::PROT_WRITE)?;
+    allocate_remote(&grants_fd, memory_scheme_fd, target_args_env_address, args_envs_size_aligned, MapFlags::PROT_READ | MapFlags::PROT_WRITE)?;
     tree.insert(target_args_env_address, args_envs_size_aligned);
 
     let mut offset = 0;
@@ -226,7 +227,7 @@ where
     if let Ok(name_fd) = syscall::dup(*open_via_dup, b"name").map(FdGuard::new) {
         let _ = syscall::write(*name_fd, interp_override.as_ref().map_or(path, |o| &o.name));
     }
-    {
+    if interp_override.is_some() {
         let mmap_min_fd = FdGuard::new(syscall::dup(*open_via_dup, b"mmap-min-addr")?);
         let _ = syscall::write(*mmap_min_fd, &usize::to_ne_bytes(tree.iter().rev().nth(1).map_or(0, |(off, len)| *off + *len)));
     }
@@ -237,13 +238,66 @@ where
 
     Ok(FexecResult::Normal { addrspace_handle: addrspace_selection_fd })
 }
-fn mprotect_remote(socket: usize, addr: usize, len: usize, flags: MapFlags) -> Result<()> {
-    let mut grants_buf = [0_u8; 24];
-    grants_buf[..8].copy_from_slice(&usize::to_ne_bytes(addr));
-    grants_buf[8..16].copy_from_slice(&usize::to_ne_bytes(len));
-    grants_buf[16..24].copy_from_slice(&usize::to_ne_bytes(flags.bits()));
-    syscall::write(socket, &grants_buf)?;
+fn write_usizes<const N: usize>(fd: &FdGuard, usizes: [usize; N]) -> Result<()> {
+    let _ = syscall::write(**fd, unsafe { plain::as_bytes(&usizes) });
     Ok(())
+}
+fn allocate_remote(addrspace_fd: &FdGuard, memory_scheme_fd: &FdGuard, dst_addr: usize, len: usize, flags: MapFlags) -> Result<()> {
+    mmap_remote(addrspace_fd, memory_scheme_fd, 0, dst_addr, len, flags)
+}
+pub fn mmap_remote(addrspace_fd: &FdGuard, fd: &FdGuard, offset: usize, dst_addr: usize, len: usize, flags: MapFlags) -> Result<()> {
+    write_usizes(addrspace_fd, [
+        // op
+        syscall::flag::ADDRSPACE_OP_MMAP,
+        // fd
+        **fd,
+        // "offset"
+        offset,
+        // address
+        dst_addr,
+        // size
+        len,
+        // flags
+        (flags | MapFlags::MAP_FIXED_NOREPLACE).bits(),
+    ])
+}
+pub fn mprotect_remote(addrspace_fd: &FdGuard, addr: usize, len: usize, flags: MapFlags) -> Result<()> {
+    write_usizes(addrspace_fd, [
+        // op
+        syscall::flag::ADDRSPACE_OP_MPROTECT,
+        // address
+        addr,
+        // size
+        len,
+        // flags
+        flags.bits(),
+    ])
+}
+pub fn munmap_remote(addrspace_fd: &FdGuard, addr: usize, len: usize) -> Result<()> {
+    write_usizes(addrspace_fd, [
+        // op
+        syscall::flag::ADDRSPACE_OP_MUNMAP,
+        // address
+        addr,
+        // size
+        len,
+    ])
+}
+pub fn munmap_transfer(src: &FdGuard, dst: &FdGuard, src_addr: usize, dst_addr: usize, len: usize, flags: MapFlags) -> Result<()> {
+    write_usizes(dst, [
+        // op
+        syscall::flag::ADDRSPACE_OP_TRANSFER,
+        // fd
+        **src,
+        // "offset" (source address)
+        src_addr,
+        // address
+        dst_addr,
+        // size
+        len,
+        // flags
+        (flags | MapFlags::MAP_FIXED_NOREPLACE).bits(),
+    ])
 }
 fn read_all(fd: usize, offset: Option<u64>, buf: &mut [u8]) -> Result<()> {
     if let Some(offset) = offset {
@@ -276,6 +330,8 @@ fn write_all(fd: usize, offset: Option<u64>, buf: &[u8]) -> Result<()> {
     Ok(())
 }
 
+// TODO: With the introduction of remote mmaps, remove this and let the kernel handle address
+// allocation.
 fn find_free_target_addr(tree: &BTreeMap<usize, usize>, size: usize) -> Option<usize> {
     let mut iterator = tree.iter().peekable();
 

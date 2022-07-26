@@ -3,7 +3,7 @@ use core::arch::asm;
 
 use syscall::{
     self,
-    data::{CloneInfo, Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
+    data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
     PtraceEvent, Result,
 };
 

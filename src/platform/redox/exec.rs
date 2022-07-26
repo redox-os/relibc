@@ -15,12 +15,14 @@ fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], total_arg
     let image_file = FdGuard::new(fd as usize);
 
     let open_via_dup = FdGuard::new(syscall::open("thisproc:current/open_via_dup", 0)?);
+    let memory = FdGuard::new(syscall::open("memory:", 0)?);
 
-    let addrspace_selection_fd = match redox_exec::fexec_impl(image_file, open_via_dup, path, args.iter().rev(), envs.iter().rev(), total_args_envs_size, interp_override)? {
+    let addrspace_selection_fd = match redox_exec::fexec_impl(image_file, open_via_dup, &memory, path, args.iter().rev(), envs.iter().rev(), total_args_envs_size, interp_override)? {
         FexecResult::Normal { addrspace_handle } => addrspace_handle,
         FexecResult::Interp { image_file, open_via_dup, path, interp_override: new_interp_override } => {
             drop(image_file);
             drop(open_via_dup);
+            drop(memory);
 
             // According to elf(5), PT_INTERP requires that the interpreter path be
             // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
@@ -29,6 +31,7 @@ fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], total_arg
             return execve(path_cstr, ArgEnv::Parsed { total_args_envs_size, args, envs }, Some(new_interp_override));
         }
     };
+    drop(memory);
 
     // Dropping this FD will cause the address space switch.
     drop(addrspace_selection_fd);

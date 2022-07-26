@@ -33,6 +33,7 @@ fn copy_str(cur_pid_fd: usize, new_pid_fd: usize, key: &str) -> Result<()> {
     let cur_name_fd = FdGuard::new(syscall::dup(cur_pid_fd, key.as_bytes())?);
     let new_name_fd = FdGuard::new(syscall::dup(new_pid_fd, key.as_bytes())?);
 
+    // TODO: Max path size?
     let mut buf = [0_u8; 256];
     let len = syscall::read(*cur_name_fd, &mut buf)?;
     let buf = buf.get(..len).ok_or(Error::new(ENAMETOOLONG))?;
@@ -194,19 +195,8 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
                 }
                 let map_flags = MapFlags::from_bits_truncate(flags);
 
-                let mapped_address = unsafe {
-                    let fd = FdGuard::new(syscall::dup(*cur_addr_space_fd, format!("grant-{:x}", addr).as_bytes())?);
-                    syscall::fmap(*fd, &syscall::Map { address: 0, size, flags: map_flags, offset })?
-                };
-
-                let mut buf = [0_u8; size_of::<usize>() * 4];
-                let mut chunks = buf.array_chunks_mut::<{size_of::<usize>()}>();
-                *chunks.next().unwrap() = usize::to_ne_bytes(addr);
-                *chunks.next().unwrap() = usize::to_ne_bytes(size);
-                *chunks.next().unwrap() = usize::to_ne_bytes(map_flags.bits());
-                *chunks.next().unwrap() = usize::to_ne_bytes(mapped_address);
-
-                let _ = syscall::write(*new_addr_space_fd, &buf)?;
+                let grant_fd = FdGuard::new(syscall::dup(*cur_addr_space_fd, format!("grant-{:x}", addr).as_bytes())?);
+                redox_exec::mmap_remote(&new_addr_space_fd, &grant_fd, offset, addr, size, map_flags)?;
             }
             let new_addr_space_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-addrspace")?);
 
