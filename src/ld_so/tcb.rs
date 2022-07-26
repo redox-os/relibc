@@ -201,11 +201,9 @@ impl Tcb {
     unsafe fn arch_read(offset: usize) -> usize {
         // TODO: s/llvm_asm/asm/g
         let tp: usize;
-        llvm_asm!("mrs $0, tpidr_el0"
-            : "=r"(tp)
-            :
-            :
-            : "volatile"
+        asm!(
+            "mrs {}, tpidr_el0",
+            out(reg) tp,
         );
 
         *((tp + offset) as *const usize)
