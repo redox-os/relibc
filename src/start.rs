@@ -106,7 +106,9 @@ extern "C" fn init_array() {
     io_init();
 
     unsafe {
-        platform::environ = __relibc_init_environ;
+        if platform::environ.is_null() {
+            platform::environ = __relibc_init_environ;
+        }
     }
 
     extern "C" {
