@@ -228,8 +228,10 @@ where
         let _ = syscall::write(*name_fd, interp_override.as_ref().map_or(path, |o| &o.name));
     }
     if interp_override.is_some() {
-        let mmap_min_fd = FdGuard::new(syscall::dup(*open_via_dup, b"mmap-min-addr")?);
-        let _ = syscall::write(*mmap_min_fd, &usize::to_ne_bytes(tree.iter().rev().nth(1).map_or(0, |(off, len)| *off + *len)));
+        let mmap_min_fd = FdGuard::new(syscall::dup(*grants_fd, b"mmap-min-addr")?);
+        let last_addr = tree.iter().rev().nth(1).map_or(0, |(off, len)| *off + *len);
+        let aligned_last_addr = (last_addr + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+        let _ = syscall::write(*mmap_min_fd, &usize::to_ne_bytes(aligned_last_addr));
     }
 
     let addrspace_selection_fd = FdGuard::new(syscall::dup(*open_via_dup, b"current-addrspace")?);
