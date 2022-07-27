@@ -233,6 +233,8 @@ macro_rules! strto_float_impl {
         let mut s = $s;
         let endptr = $endptr;
 
+        // TODO: Handle named floats: NaN, Inf...
+
         while ctype::isspace(*s as c_int) != 0 {
             s = s.offset(1);
         }
@@ -240,16 +242,16 @@ macro_rules! strto_float_impl {
         let mut result: $type = 0.0;
         let mut radix = 10;
 
-        let negative = match *s as u8 {
+        let result_sign = match *s as u8 {
             b'-' => {
                 s = s.offset(1);
-                true
+                -1.0
             }
             b'+' => {
                 s = s.offset(1);
-                false
+                1.0
             }
-            _ => false,
+            _ => 1.0,
         };
 
         if *s as u8 == b'0' && *s.offset(1) as u8 == b'x' {
@@ -274,6 +276,54 @@ macro_rules! strto_float_impl {
             }
         }
 
+        let s_before_exponent = s;
+
+        let exponent = match (*s as u8, radix) {
+            (b'e' | b'E', 10) | (b'p' | b'P', 16) => {
+                s = s.offset(1);
+
+                let is_exponent_positive = match *s as u8 {
+                    b'-' => {
+                        s = s.offset(1);
+                        false
+                    }
+                    b'+' => {
+                        s = s.offset(1);
+                        true
+                    }
+                    _ => true,
+                };
+
+                // Exponent digits are always in base 10.
+                if (*s as u8 as char).is_digit(10) {
+                    let mut exponent_value = 0;
+
+                    while let Some(digit) = (*s as u8 as char).to_digit(10) {
+                        exponent_value *= 10;
+                        exponent_value += digit;
+                        s = s.offset(1);
+                    }
+
+                    let exponent_base = match radix {
+                        10 => 10u128,
+                        16 => 2u128,
+                        _ => unreachable!(),
+                    };
+
+                    if is_exponent_positive {
+                        Some(exponent_base.pow(exponent_value) as $type)
+                    } else {
+                        Some(1.0 / (exponent_base.pow(exponent_value) as $type))
+                    }
+                } else {
+                    // Exponent had no valid digits after 'e'/'p' and '+'/'-', rollback
+                    s = s_before_exponent;
+                    None
+                }
+            }
+            _ => None,
+        };
+
         if !endptr.is_null() {
             // This is stupid, but apparently strto* functions want
             // const input but mut output, yet the man page says
@@ -282,10 +332,10 @@ macro_rules! strto_float_impl {
             *endptr = s as *mut _;
         }
 
-        if negative {
-            -result
+        if let Some(exponent) = exponent {
+            result_sign * result * exponent
         } else {
-            result
+            result_sign * result
         }
     }};
 }
