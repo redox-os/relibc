@@ -304,7 +304,7 @@ version = "0.1.0"
 dependencies = [
  "goblin",
  "plain",
- "redox_syscall 0.2.13",
+ "redox_syscall 0.3.0",
 ]
 
 [[package]]
@@ -315,17 +315,18 @@ checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.13"
-source = "git+https://gitlab.redox-os.org/4lDO2/syscall.git?branch=userspace_fexec#676b758a4f8de3fa7f22d72f84c0f7b05152c5df"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "534cfe58d6a18cc17120fbf4635d53d14691c1fe4d951064df9bd326178d7d5a"
 dependencies = [
  "bitflags",
 ]
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.15"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "534cfe58d6a18cc17120fbf4635d53d14691c1fe4d951064df9bd326178d7d5a"
+checksum = "ca8ce969b6629faa6f60a71f84022b0217e5ca8bcaeb6d11654506a55ebf8fed"
 dependencies = [
  "bitflags",
 ]
@@ -347,7 +348,7 @@ dependencies = [
  "ralloc",
  "rand",
  "redox-exec",
- "redox_syscall 0.2.13",
+ "redox_syscall 0.3.0",
  "sc",
  "spin 0.9.4",
 ]
