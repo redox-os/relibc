@@ -1,4 +1,4 @@
-use core::ptr;
+use core::{arch::asm, ptr};
 use core_io::Write;
 
 use super::{errno, types::*, Pal};
@@ -280,7 +280,7 @@ impl Pal for Sys {
     }
 
     fn lchown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
-        e(unsafe { syscall!(LCHOWN, path.as_ptr(), owner, group) })
+        e(unsafe { syscall!(LCHOWN, path.as_ptr(), owner, group) }) as c_int
     }
 
     fn link(path1: &CStr, path2: &CStr) -> c_int {
@@ -363,13 +363,13 @@ impl Pal for Sys {
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
         let pid;
-        llvm_asm!("
+        asm!("
             # Call clone syscall
             syscall
 
             # Check if child or parent
             test rax, rax
-            jnz .parent
+            jnz 1f
 
             # Load registers
             pop rax
@@ -392,13 +392,22 @@ impl Pal for Sys {
             ud2
 
             # Return PID if parent
-            .parent:
-            "
-            : "={rax}"(pid)
-            : "{rax}"(SYS_CLONE), "{rdi}"(flags), "{rsi}"(stack), "{rdx}"(0), "{r10}"(0), "{r8}"(0)
-            : "memory", "rbx", "rcx", "rdx", "rsi", "rdi", "r8",
-              "r9", "r10", "r11", "r12", "r13", "r14", "r15"
-            : "intel", "volatile"
+            1:
+            ",
+            inout("rax") SYS_CLONE => pid,
+            inout("rdi") flags => _,
+            inout("rsi") stack => _,
+            inout("rdx") 0 => _,
+            inout("r10") 0 => _,
+            inout("r8") 0 => _,
+            //TODO: out("rbx") _,
+            out("rcx") _,
+            out("r9") _,
+            out("r11") _,
+            out("r12") _,
+            out("r13") _,
+            out("r14") _,
+            out("r15") _,
         );
         e(pid) as pid_t
     }

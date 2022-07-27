@@ -1,3 +1,5 @@
+use core::arch::global_asm;
+
 // Needs to be defined in assembly because it can't have a function prologue
 // rax is register, 15 is RT_SIGRETURN
 #[cfg(target_arch = "x86_64")]

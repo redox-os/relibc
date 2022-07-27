@@ -127,6 +127,8 @@ fn io_init() {
         stdio::stderr = stdio::default_stderr.get();
     }
 }
+
+#[cfg(target_os = "redox")]
 fn setup_sigstack() {
     use syscall::{Map, MapFlags};
     const SIGSTACK_SIZE: usize = 1024 * 256;
@@ -185,6 +187,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     }
 
     // Setup signal stack, otherwise we cannot handle any signals besides SIG_IGN/SIG_DFL behavior.
+    #[cfg(target_os = "redox")]
     setup_sigstack();
 
     init_array();
