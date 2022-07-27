@@ -14,10 +14,11 @@ use crate::{
         dirent::dirent,
         errno::{EINVAL, EIO, ENOMEM, EPERM, ERANGE},
         fcntl,
+        string::strlen,
         sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, RLIM_INFINITY},
-        sys_stat::stat,
+        sys_stat::{stat, S_ISGID, S_ISUID},
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
         sys_utsname::{utsname, UTSLENGTH},
@@ -33,7 +34,14 @@ use super::{errno, types::*, Pal, Read};
 static mut BRK_CUR: *mut c_void = ptr::null_mut();
 static mut BRK_END: *mut c_void = ptr::null_mut();
 
+const PAGE_SIZE: usize = 4096;
+fn round_up_to_page_size(val: usize) -> usize {
+    (val + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE
+}
+
+mod clone;
 mod epoll;
+mod exec;
 mod extra;
 mod ptrace;
 mod signal;
@@ -205,140 +213,10 @@ impl Pal for Sys {
 
     unsafe fn execve(
         path: &CStr,
-        mut argv: *const *mut c_char,
-        mut envp: *const *mut c_char,
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
     ) -> c_int {
-        let mut file = match File::open(path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
-            Ok(file) => file,
-            Err(_) => return -1,
-        };
-        let fd = *file as usize;
-
-        // Count arguments
-        let mut len = 0;
-        while !(*argv.offset(len)).is_null() {
-            len += 1;
-        }
-
-        let mut args: Vec<[usize; 2]> = Vec::with_capacity(len as usize);
-
-        // Read shebang (for example #!/bin/sh)
-        let interpreter = {
-            let mut reader = BufReader::new(&mut file);
-
-            let mut shebang = [0; 2];
-            let mut read = 0;
-
-            while read < 2 {
-                match reader.read(&mut shebang) {
-                    Ok(0) => break,
-                    Ok(i) => read += i,
-                    Err(_) => return -1,
-                }
-            }
-
-            if &shebang == b"#!" {
-                // So, this file is interpreted.
-                // That means the actual file descriptor passed to `fexec` won't be this file.
-                // So we need to check ourselves that this file is actually be executable.
-
-                let mut stat = redox_stat::default();
-                if e(syscall::fstat(fd, &mut stat)) == !0 {
-                    return -1;
-                }
-                let uid = e(syscall::getuid());
-                if uid == !0 {
-                    return -1;
-                }
-                let gid = e(syscall::getuid());
-                if gid == !0 {
-                    return -1;
-                }
-
-                let mode = if uid == stat.st_uid as usize {
-                    (stat.st_mode >> 3 * 2) & 0o7
-                } else if gid == stat.st_gid as usize {
-                    (stat.st_mode >> 3 * 1) & 0o7
-                } else {
-                    stat.st_mode & 0o7
-                };
-
-                if mode & 0o1 == 0o0 {
-                    errno = EPERM;
-                    return -1;
-                }
-
-                // Then, read the actual interpreter:
-                let mut interpreter = Vec::new();
-                match reader.read_until(b'\n', &mut interpreter) {
-                    Err(_) => return -1,
-                    Ok(_) => {
-                        if interpreter.ends_with(&[b'\n']) {
-                            interpreter.pop().unwrap();
-                        }
-                        // TODO: Returning the interpreter here is actually a
-                        // hack. Preferrably we should reassign `file =`
-                        // directly from here. Just wait until NLL comes
-                        // around...
-                        Some(interpreter)
-                    }
-                }
-            } else {
-                None
-            }
-        };
-        let mut _interpreter_path = None;
-        if let Some(interpreter) = interpreter {
-            let cstring = match CString::new(interpreter) {
-                Ok(cstring) => cstring,
-                Err(_) => return -1,
-            };
-            file = match File::open(&cstring, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
-                Ok(file) => file,
-                Err(_) => return -1,
-            };
-
-            // Make sure path is kept alive long enough, and push it to the arguments
-            _interpreter_path = Some(cstring);
-            let path_ref = _interpreter_path.as_ref().unwrap();
-            args.push([path_ref.as_ptr() as usize, path_ref.to_bytes().len()]);
-        } else {
-            if file.seek(SeekFrom::Start(0)).is_err() {
-                return -1;
-            }
-        }
-
-        // Arguments
-        while !(*argv).is_null() {
-            let arg = *argv;
-
-            let mut len = 0;
-            while *arg.offset(len) != 0 {
-                len += 1;
-            }
-            args.push([arg as usize, len as usize]);
-            argv = argv.offset(1);
-        }
-
-        // Environment variables
-        let mut len = 0;
-        while !(*envp.offset(len)).is_null() {
-            len += 1;
-        }
-
-        let mut envs: Vec<[usize; 2]> = Vec::with_capacity(len as usize);
-        while !(*envp).is_null() {
-            let env = *envp;
-
-            let mut len = 0;
-            while *env.offset(len) != 0 {
-                len += 1;
-            }
-            envs.push([env as usize, len as usize]);
-            envp = envp.offset(1);
-        }
-
-        e(syscall::fexec(*file as usize, &args, &envs)) as c_int
+        e(self::exec::execve(path, self::exec::ArgEnv::C { argv, envp }, None)) as c_int
     }
 
     fn fchdir(fd: c_int) -> c_int {
@@ -375,7 +253,7 @@ impl Pal for Sys {
     }
 
     fn fork() -> pid_t {
-        e(unsafe { syscall::clone(syscall::CloneFlags::empty()) }) as pid_t
+        e(clone::fork_impl()) as pid_t
     }
 
     fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
@@ -607,7 +485,7 @@ impl Pal for Sys {
     }
 
     fn getpagesize() -> usize {
-        4096
+        PAGE_SIZE
     }
 
     fn getpgid(pid: pid_t) -> pid_t {
@@ -754,7 +632,7 @@ impl Pal for Sys {
     ) -> *mut c_void {
         let map = Map {
             offset: off as usize,
-            size: len,
+            size: round_up_to_page_size(len),
             flags: syscall::MapFlags::from_bits_truncate(
                 ((prot as usize) << 16) | ((flags as usize) & 0xFFFF),
             ),
@@ -771,7 +649,7 @@ impl Pal for Sys {
     unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
         e(syscall::mprotect(
             addr as usize,
-            len,
+            round_up_to_page_size(len),
             syscall::MapFlags::from_bits((prot as usize) << 16)
                 .expect("mprotect: invalid bit pattern"),
         )) as c_int
@@ -783,7 +661,7 @@ impl Pal for Sys {
         /* TODO
         e(syscall::msync(
             addr as usize,
-            len,
+            round_up_to_page_size(len),
             flags
         )) as c_int
         */
@@ -800,7 +678,7 @@ impl Pal for Sys {
     }
 
     unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
-        if e(syscall::funmap(addr as usize, len)) == !0 {
+        if e(syscall::funmap(addr as usize, round_up_to_page_size(len))) == !0 {
             return !0;
         }
         0
@@ -858,7 +736,7 @@ impl Pal for Sys {
 
     #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        e(syscall::Error::demux(extra::pte_clone_inner(stack as usize))) as pid_t
+        e(clone::pte_clone_impl(stack)) as pid_t
     }
 
     fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {

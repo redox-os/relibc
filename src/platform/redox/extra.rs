@@ -1,5 +1,4 @@
-use core::{ptr, slice};
-use core::arch::global_asm;
+use core::{mem::size_of, ptr, slice};
 
 use crate::platform::{sys::e, types::*};
 
@@ -49,62 +48,4 @@ pub unsafe extern "C" fn redox_physunmap(virtual_address: *mut c_void) -> c_int 
     e(syscall::physunmap(virtual_address as usize)) as c_int
 }
 
-extern "C" {
-    pub fn pte_clone_inner(stack: usize) -> usize;
-}
-
-#[cfg(target_arch = "x86_64")]
-global_asm!("
-    .globl pte_clone_inner
-    .type pte_clone_inner, @function
-
-pte_clone_inner:
-    # Move the 1st argument `stack` of this function into the second argument to clone.
-    mov rsi, rdi
-    mov rax, {SYS_CLONE}
-    mov rdi, {flags}
-
-    # Call clone syscall
-    syscall
-
-    # Check if child or parent
-    test rax, rax
-    jnz 2f
-
-    # Load registers
-    pop rax
-    pop rdi
-    pop rsi
-    pop rdx
-    pop rcx
-    pop r8
-    pop r9
-
-    # Call entry point
-    call rax
-
-    # Exit
-    mov rax, 1
-    xor rdi, rdi
-    syscall
-
-    # Invalid instruction on failure to exit
-    ud2
-
-    # Return PID if parent
-2:
-    ret
-
-    .size pte_clone_inner, . - pte_clone_inner
-
-    ",
-
-    flags = const(
-        syscall::CLONE_VM.bits()
-            | syscall::CLONE_FS.bits()
-            | syscall::CLONE_FILES.bits()
-            | syscall::CLONE_SIGHAND.bits()
-            | syscall::CLONE_STACK.bits()
-    ),
-    SYS_CLONE = const(syscall::SYS_CLONE),
-);
+pub use redox_exec::{create_set_addr_space_buf, FdGuard};

@@ -9,7 +9,7 @@ name = "relibc"
 crate-type = ["staticlib"]
 
 [workspace]
-members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so"]
+members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so", "src/platform/redox/redox-exec"]
 exclude = ["core_io", "ralloc", "tests"]
 
 [build-dependencies]
@@ -24,6 +24,7 @@ memoffset = "0.5.1"
 posix-regex = { path = "posix-regex", features = ["no_std"] }
 rand = { version = "0.5.5", default-features = false }
 memchr = { version = "2.2.0", default-features = false }
+plain = "0.2"
 
 [dependencies.goblin]
 version = "0.0.21"
@@ -39,8 +40,9 @@ optional = true
 sc = "0.2.3"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-redox_syscall = "0.2.15"
+redox_syscall = "0.3"
 spin = "0.9.0"
+redox-exec = { path = "src/platform/redox/redox-exec" }
 
 [features]
 default = []

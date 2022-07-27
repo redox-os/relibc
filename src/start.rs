@@ -67,7 +67,16 @@ static INIT_ARRAY: [extern "C" fn(); 1] = [init_array];
 
 static mut init_complete: bool = false;
 
+#[used]
+#[no_mangle]
+static mut __relibc_init_environ: *mut *mut c_char = ptr::null_mut();
+
 fn alloc_init() {
+    unsafe {
+        if init_complete {
+            return;
+        }
+    }
     unsafe {
         if let Some(tcb) = ld_so::tcb::Tcb::current() {
             if tcb.mspace != 0 {
@@ -96,6 +105,12 @@ extern "C" fn init_array() {
     alloc_init();
     io_init();
 
+    unsafe {
+        if platform::environ.is_null() {
+            platform::environ = __relibc_init_environ;
+        }
+    }
+
     extern "C" {
         fn pthread_init();
     }
@@ -111,6 +126,15 @@ fn io_init() {
         stdio::stdout = stdio::default_stdout.get();
         stdio::stderr = stdio::default_stderr.get();
     }
+}
+fn setup_sigstack() {
+    use syscall::{Map, MapFlags};
+    const SIGSTACK_SIZE: usize = 1024 * 256;
+    let sigstack = unsafe { syscall::fmap(!0, &Map { address: 0, offset: 0, flags: MapFlags::MAP_PRIVATE | MapFlags::PROT_READ | MapFlags::PROT_WRITE, size: SIGSTACK_SIZE }) }.expect("failed to allocate sigstack") + SIGSTACK_SIZE;
+
+    let fd = syscall::open("thisproc:current/sigstack", syscall::O_WRONLY | syscall::O_CLOEXEC).expect("failed to open thisproc:current/sigstack");
+    syscall::write(fd, &usize::to_ne_bytes(sigstack)).expect("failed to write to thisproc:current/sigstack");
+    let _ = syscall::close(fd);
 }
 
 #[inline(never)]
@@ -146,15 +170,22 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         platform::program_invocation_name = *arg;
         platform::program_invocation_short_name = libgen::basename(*arg);
     }
-
-    // Set up envp
-    let envp = sp.envp();
-    let mut len = 0;
-    while !(*envp.add(len)).is_null() {
-        len += 1;
+    // We check for NULL here since ld.so might already have initialized it for us, and we don't
+    // want to overwrite it if constructors in .init_array of dependency libraries have called
+    // setenv.
+    if platform::environ.is_null() {
+        // Set up envp
+        let envp = sp.envp();
+        let mut len = 0;
+        while !(*envp.add(len)).is_null() {
+            len += 1;
+        }
+        platform::OUR_ENVIRON = copy_string_array(envp, len);
+        platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
     }
-    platform::inner_environ = copy_string_array(envp, len);
-    platform::environ = platform::inner_environ.as_mut_ptr();
+
+    // Setup signal stack, otherwise we cannot handle any signals besides SIG_IGN/SIG_DFL behavior.
+    setup_sigstack();
 
     init_array();
 

@@ -124,6 +124,7 @@ pub fn static_init(sp: &'static Stack) {
                     tcb.masters_len = mem::size_of::<Master>();
                     tcb.copy_masters().expect_notls("failed to copy TLS master data");
                     tcb.activate();
+
                 }
 
                 //TODO: Warning on multiple TLS sections?

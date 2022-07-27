@@ -118,7 +118,6 @@ pub unsafe extern "C" fn pte_osThreadCreate(
     if stack_base as isize == -1 {
         return PTE_OS_GENERAL_FAILURE;
     }
-    ptr::write_bytes(stack_base as *mut u8, 0, stack_size);
     let stack_end = stack_base.add(stack_size);
     let mut stack = stack_end as *mut usize;
     {

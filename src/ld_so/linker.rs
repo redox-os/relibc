@@ -472,7 +472,15 @@ impl Linker {
     }
 
     fn run_init(&self, objects: &Vec<DSO>) {
+        use crate::platform::{self, types::*};
+
         for obj in objects.iter().rev() {
+            if let Some((symbol, true)) = obj.get_sym("__relibc_init_environ") {
+                unsafe {
+                    symbol.as_ptr().cast::<*mut *mut c_char>().write(platform::environ);
+                }
+            }
+
             obj.run_init();
         }
     }

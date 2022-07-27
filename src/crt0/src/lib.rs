@@ -8,10 +8,22 @@ use core::arch::global_asm;
 #[cfg(target_arch = "x86_64")]
 global_asm!("
     .globl _start
+    .type _start, @function
 _start:
     mov rdi, rsp
     and rsp, 0xFFFFFFFFFFFFFFF0
+
+    sub rsp, 8
+
+    mov DWORD PTR [rsp], 0x00001F80
+    ldmxcsr [rsp]
+    mov WORD PTR [rsp], 0x031F
+    fldcw [rsp]
+
+    add rsp, 8
+
     call relibc_start
+    .size _start, . - _start
 ");
 #[cfg(target_arch = "aarch64")]
 global_asm!("
