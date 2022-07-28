@@ -61,13 +61,14 @@ pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
 
     copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
 
-    // Unblock context. 
+    // Unblock context.
     syscall::kill(new_pid, SIGCONT)?;
     let _ = syscall::waitpid(new_pid, &mut 0, syscall::WUNTRACED | syscall::WCONTINUED);
 
     Ok(0)
 }
 
+#[cfg(target_arch = "x86_64")]
 core::arch::global_asm!("
     .globl __relibc_internal_pte_clone_ret
     .type __relibc_internal_pte_clone_ret, @function
@@ -98,6 +99,7 @@ __relibc_internal_pte_clone_ret:
     .size __relibc_internal_pte_clone_ret, . - __relibc_internal_pte_clone_ret
 ");
 
+#[cfg(target_arch = "x86_64")]
 extern "sysv64" {
     fn __relibc_internal_pte_clone_ret();
 }
