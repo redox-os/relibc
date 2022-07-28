@@ -68,6 +68,23 @@ pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
     Ok(0)
 }
 
+//TODO
+#[cfg(target_arch = "x86")]
+core::arch::global_asm!("
+    .globl __relibc_internal_pte_clone_ret
+    .type __relibc_internal_pte_clone_ret, @function
+    .p2align 6
+__relibc_internal_pte_clone_ret:
+    ud2
+
+    .size __relibc_internal_pte_clone_ret, . - __relibc_internal_pte_clone_ret
+");
+
+#[cfg(target_arch = "x86")]
+extern "cdecl" {
+    fn __relibc_internal_pte_clone_ret();
+}
+
 #[cfg(target_arch = "x86_64")]
 core::arch::global_asm!("
     .globl __relibc_internal_pte_clone_ret
