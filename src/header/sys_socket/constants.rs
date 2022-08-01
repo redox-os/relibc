@@ -46,6 +46,7 @@ pub const MSG_EOR: c_int = 128;
 pub const MSG_OOB: c_int = 1;
 pub const MSG_PEEK: c_int = 2;
 pub const MSG_TRUNC: c_int = 32;
+pub const MSG_DONTWAIT: c_int = 64;
 pub const MSG_WAITALL: c_int = 256;
 
 pub const AF_INET: c_int = 2;
