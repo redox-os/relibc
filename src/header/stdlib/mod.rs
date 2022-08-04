@@ -857,6 +857,7 @@ unsafe fn copy_kv(existing: *mut c_char, key: *const c_char, value: *const c_cha
     core::ptr::copy_nonoverlapping(key, existing, key_len);
     core::ptr::write(existing.add(key_len), b'=' as c_char);
     core::ptr::copy_nonoverlapping(value, existing.add(key_len + 1), value_len);
+    core::ptr::write(existing.add(key_len + 1 + value_len), 0);
 }
 
 #[no_mangle]
@@ -878,15 +879,17 @@ pub unsafe extern "C" fn setenv(
         if existing_len >= value_len {
             // Reuse existing element's allocation
             core::ptr::copy_nonoverlapping(value, existing, value_len);
+            //TODO: fill to end with zeroes
+            core::ptr::write(existing.add(value_len), 0);
         } else {
             // Reuse platform::environ slot, but allocate a new pointer.
-            let mut ptr = platform::alloc(key_len as usize + 1 + value_len as usize) as *mut c_char;
+            let mut ptr = platform::alloc(key_len as usize + 1 + value_len as usize + 1) as *mut c_char;
             copy_kv(ptr, key, value, key_len, value_len);
             platform::environ.add(i).write(ptr);
         }
     } else {
         // Expand platform::environ and allocate a new pointer.
-        let mut ptr = platform::alloc(key_len as usize + 1 + value_len as usize) as *mut c_char;
+        let mut ptr = platform::alloc(key_len as usize + 1 + value_len as usize + 1) as *mut c_char;
         copy_kv(ptr, key, value, key_len, value_len);
         put_new_env(ptr);
     }
