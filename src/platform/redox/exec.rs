@@ -225,7 +225,7 @@ pub fn execve(path: &CStr, arg_env: ArgEnv, interp_override: Option<redox_exec::
         // individual items. This can be copied directly into the new executable's memory.
         let _ = syscall::write(*escalate_fd, &flatten_with_nul(args))?;
         let _ = syscall::write(*escalate_fd, &flatten_with_nul(envs))?;
-        let _ = syscall::write(*escalate_fd, &cwd);
+        let _ = syscall::write(*escalate_fd, &cwd)?;
 
         // Closing will notify the scheme, and from that point we will no longer have control
         // over this process (unless it fails). We do this manually since drop cannot handle
