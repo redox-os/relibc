@@ -21,11 +21,11 @@ pub use self::sys::{e, Sys};
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
 #[path = "linux/mod.rs"]
-mod sys;
+pub(crate) mod sys;
 
 #[cfg(all(not(feature = "no_std"), target_os = "redox"))]
 #[path = "redox/mod.rs"]
-mod sys;
+pub(crate) mod sys;
 
 #[cfg(test)]
 mod test;

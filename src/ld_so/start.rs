@@ -181,6 +181,9 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         _r_debug.r_ldbase = ld_entry;
     }
 
+    // TODO: Fix memory leak, although minimal.
+    crate::platform::init(auxv.clone());
+
     // Some variables that will be overridden by environment and auxiliary vectors
     let ld_library_path = envs.get("LD_LIBRARY_PATH").map(|s| s.to_owned());
 
