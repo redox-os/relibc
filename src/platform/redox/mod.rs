@@ -1,10 +1,11 @@
 use core::{mem, ptr, result::Result as CoreResult, slice, str};
+use core::convert::TryFrom;
 use core::arch::asm;
 
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
-    PtraceEvent, Result,
+    PtraceEvent, Result, Error, EMFILE,
 };
 
 use crate::{
@@ -705,12 +706,18 @@ impl Pal for Sys {
     fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
         let path = path_from_c_str!(path);
 
-        e(canonicalize(path).and_then(|canon| {
-            syscall::open(
-                &canon,
-                ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF),
-            )
-        })) as c_int
+        match path::open(path, ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF)) {
+            Ok(fd) => {
+                match c_int::try_from(fd) {
+                    Ok(c_fd) => c_fd,
+                    Err(_) => {
+                        let _ = syscall::close(fd);
+                        e(Err(Error::new(EMFILE))) as c_int
+                    }
+                }
+            }
+            Err(error) => e(Err(error)) as c_int,
+        }
     }
 
     fn pipe2(fds: &mut [c_int], flags: c_int) -> c_int {
