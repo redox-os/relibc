@@ -31,7 +31,6 @@ pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
     }
 
     copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
-    copy_str(*cur_pid_fd, *new_pid_fd, "cwd")?;
 
     // Reuse existing address space
     {

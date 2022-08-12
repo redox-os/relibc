@@ -29,6 +29,8 @@ use crate::{
     io::{self, prelude::*, BufReader, SeekFrom},
 };
 
+pub use redox_exec::FdGuard;
+
 use super::{errno, types::*, Pal, Read};
 
 static mut BRK_CUR: *mut c_void = ptr::null_mut();
@@ -43,6 +45,7 @@ mod clone;
 mod epoll;
 mod exec;
 mod extra;
+pub(crate) mod path;
 mod ptrace;
 mod signal;
 mod socket;
@@ -60,6 +63,8 @@ macro_rules! path_from_c_str {
         }
     }};
 }
+
+use self::path::canonicalize;
 
 pub fn e(sys: Result<usize>) -> usize {
     match sys {
@@ -163,7 +168,7 @@ impl Pal for Sys {
 
     fn chdir(path: &CStr) -> c_int {
         let path = path_from_c_str!(path);
-        e(syscall::chdir(path)) as c_int
+        e(path::chdir(path).map(|()| 0)) as c_int
     }
 
     fn chmod(path: &CStr, mode: mode_t) -> c_int {
@@ -354,29 +359,20 @@ impl Pal for Sys {
     }
 
     fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
+        // TODO: Not using MaybeUninit seems a little unsafe
+
         let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize) };
-        if !buf_slice.is_empty() {
-            let nonnull_size = buf_slice.len() - 1;
-            let read = e(syscall::getcwd(&mut buf_slice[..nonnull_size]));
-            if read == !0 {
-                ptr::null_mut()
-            } else if read == nonnull_size {
-                unsafe {
-                    errno = ERANGE;
-                }
-                ptr::null_mut()
-            } else {
-                for b in &mut buf_slice[read..] {
-                    *b = 0;
-                }
-                buf
-            }
-        } else {
-            unsafe {
-                errno = EINVAL;
-            }
-            ptr::null_mut()
+        if buf_slice.is_empty() {
+            unsafe { errno = EINVAL; }
+            return ptr::null_mut();
         }
+
+        if path::getcwd(buf_slice).is_none() {
+            unsafe { errno = ERANGE; }
+            return ptr::null_mut()
+        }
+
+        buf
     }
 
     fn getdents(fd: c_int, mut dirents: *mut dirent, max_bytes: usize) -> c_int {
@@ -708,10 +704,13 @@ impl Pal for Sys {
 
     fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
         let path = path_from_c_str!(path);
-        e(syscall::open(
-            path,
-            ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF),
-        )) as c_int
+
+        e(canonicalize(path).and_then(|canon| {
+            syscall::open(
+                &canon,
+                ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF),
+            )
+        })) as c_int
     }
 
     fn pipe2(fds: &mut [c_int], flags: c_int) -> c_int {
@@ -764,7 +763,7 @@ impl Pal for Sys {
 
     fn rmdir(path: &CStr) -> c_int {
         let path = path_from_c_str!(path);
-        e(syscall::rmdir(path)) as c_int
+        e(canonicalize(path).and_then(|path| syscall::rmdir(&path))) as c_int
     }
 
     fn sched_yield() -> c_int {
@@ -891,7 +890,7 @@ impl Pal for Sys {
 
     fn unlink(path: &CStr) -> c_int {
         let path = path_from_c_str!(path);
-        e(syscall::unlink(path)) as c_int
+        e(canonicalize(path).and_then(|path| syscall::unlink(&path))) as c_int
     }
 
     fn waitpid(mut pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {

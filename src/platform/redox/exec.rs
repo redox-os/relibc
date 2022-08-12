@@ -7,9 +7,9 @@ use crate::platform::{sys::{S_ISUID, S_ISGID}, types::*};
 use syscall::data::Stat;
 use syscall::flag::*;
 use syscall::error::*;
-use redox_exec::{FdGuard, FexecResult};
+use redox_exec::{FdGuard, ExtraInfo, FexecResult};
 
-fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], total_args_envs_size: usize, interp_override: Option<redox_exec::InterpOverride>) -> Result<usize> {
+fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], total_args_envs_size: usize, extrainfo: &ExtraInfo, interp_override: Option<redox_exec::InterpOverride>) -> Result<usize> {
     let fd = *file;
     core::mem::forget(file);
     let image_file = FdGuard::new(fd as usize);
@@ -17,7 +17,7 @@ fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], total_arg
     let open_via_dup = FdGuard::new(syscall::open("thisproc:current/open_via_dup", 0)?);
     let memory = FdGuard::new(syscall::open("memory:", 0)?);
 
-    let addrspace_selection_fd = match redox_exec::fexec_impl(image_file, open_via_dup, &memory, path, args.iter().rev(), envs.iter().rev(), total_args_envs_size, interp_override)? {
+    let addrspace_selection_fd = match redox_exec::fexec_impl(image_file, open_via_dup, &memory, path, args.iter().rev(), envs.iter().rev(), total_args_envs_size, extrainfo, interp_override)? {
         FexecResult::Normal { addrspace_handle } => addrspace_handle,
         FexecResult::Interp { image_file, open_via_dup, path, interp_override: new_interp_override } => {
             drop(image_file);
@@ -75,6 +75,8 @@ pub fn execve(path: &CStr, arg_env: ArgEnv, interp_override: Option<redox_exec::
     }
     let wants_setugid = stat.st_mode & ((S_ISUID | S_ISGID) as u16) != 0;
 
+    let cwd: Box<[u8]> = super::path::clone_cwd().unwrap_or_default().into();
+
     // Count arguments
     let mut len = 0;
 
@@ -103,12 +105,11 @@ pub fn execve(path: &CStr, arg_env: ArgEnv, interp_override: Option<redox_exec::
         }
         shebang == *b"#!"
     };
-    // Since the fexec implementation is almost fully done in userspace, the kernel can no
-    // longer set UID/GID accordingly, and this code checking for them before using
-    // hypothetical interfaces to upgrade UID/GID, can not be trusted. So we ask the
-    // `escalate:` scheme for help. Note that `escalate:` can be deliberately excluded from the
-    // scheme namespace to deny privilege escalation (such as su/sudo/doas) for untrusted
-    // processes.
+    // Since the fexec implementation is almost fully done in userspace, the kernel can no longer
+    // set UID/GID accordingly, and this code checking for them before using interfaces to upgrade
+    // UID/GID, can not be trusted. So we ask the `escalate:` scheme for help. Note that
+    // `escalate:` can be deliberately excluded from the scheme namespace to deny privilege
+    // escalation (such as su/sudo/doas) for untrusted processes.
     //
     // According to execve(2), Linux and most other UNIXes ignore setuid/setgid for interpreted
     // executables and thereby simply keep the privileges as is. For compatibility we do that
@@ -224,6 +225,7 @@ pub fn execve(path: &CStr, arg_env: ArgEnv, interp_override: Option<redox_exec::
         // individual items. This can be copied directly into the new executable's memory.
         let _ = syscall::write(*escalate_fd, &flatten_with_nul(args))?;
         let _ = syscall::write(*escalate_fd, &flatten_with_nul(envs))?;
+        let _ = syscall::write(*escalate_fd, &cwd);
 
         // Closing will notify the scheme, and from that point we will no longer have control
         // over this process (unless it fails). We do this manually since drop cannot handle
@@ -235,7 +237,8 @@ pub fn execve(path: &CStr, arg_env: ArgEnv, interp_override: Option<redox_exec::
 
         unreachable!()
     } else {
-        fexec_impl(image_file, path.to_bytes(), &args, &envs, total_args_envs_size, interp_override)
+        let extrainfo = ExtraInfo { cwd: Some(&cwd) };
+        fexec_impl(image_file, path.to_bytes(), &args, &envs, total_args_envs_size, &extrainfo, interp_override)
     }
 }
 fn flatten_with_nul<T>(iter: impl IntoIterator<Item = T>) -> Box<[u8]> where T: AsRef<[u8]> {

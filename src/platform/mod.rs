@@ -1,4 +1,5 @@
 use crate::io::{self, Read, Write};
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::{fmt, ptr};
 
@@ -261,3 +262,41 @@ impl<T: Write> Write for CountingWriter<T> {
         self.inner.flush()
     }
 }
+
+// TODO: Set a global variable once get_auxvs is called, and then implement getauxval based on
+// get_auxv.
+
+#[cold]
+pub unsafe fn get_auxvs(mut ptr: *const usize) -> Box<[[usize; 2]]> {
+    //traverse the stack and collect argument environment variables
+    let mut auxvs = Vec::new();
+
+    while *ptr != self::auxv_defs::AT_NULL {
+        let kind = ptr.read();
+        ptr = ptr.add(1);
+        let value = ptr.read();
+        ptr = ptr.add(1);
+        auxvs.push([kind, value]);
+    }
+
+    auxvs.sort_unstable_by_key(|[kind, _]| *kind);
+    auxvs.into_boxed_slice()
+}
+pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
+    auxvs.binary_search_by_key(&key, |[entry_key, _]| *entry_key).ok().map(|idx| auxvs[idx][1])
+}
+
+#[cold]
+#[cfg(target_os = "redox")]
+pub fn init(auxvs: Box<[[usize; 2]]>) {
+    use self::auxv_defs::*;
+
+    if let (Some(cwd_ptr), Some(cwd_len)) = (get_auxv(&auxvs, AT_REDOX_INITIALCWD_PTR), get_auxv(&auxvs, AT_REDOX_INITIALCWD_LEN)) {
+        let cwd_bytes: &'static [u8] = unsafe { core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len) };
+        if let Ok(cwd) = core::str::from_utf8(cwd_bytes) {
+            self::sys::path::setcwd_manual(cwd.into());
+        }
+    }
+}
+#[cfg(not(target_os = "redox"))]
+pub fn init(auxvs: Box<[[usize; 2]]>) {}
