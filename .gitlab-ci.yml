@@ -19,6 +19,7 @@ build:linux:
     stage: build
     script:
         - rustup toolchain add "$(cat rust-toolchain)"
+        - rustup component add rust-src
         - rustup show      # Print version info for debugging
         - make -j "$(nproc)" all
 

@@ -893,3 +893,15 @@ pub extern "C" fn gai_strerror(errcode: c_int) -> *const c_char {
     }
     .as_ptr()
 }
+
+#[no_mangle]
+pub extern "C" fn hstrerror(errcode: c_int) -> *const c_char {
+    match errcode {
+        HOST_NOT_FOUND => c_str!("Unknown hostname"),
+        NO_DATA => c_str!("No address for hostname"),
+        NO_RECOVERY => c_str!("Unknown server error"),
+        TRY_AGAIN => c_str!("Hostname lookup failure"),
+        _ => c_str!("Unknown error"),
+    }
+    .as_ptr()
+}
