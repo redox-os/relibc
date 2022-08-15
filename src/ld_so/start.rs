@@ -11,7 +11,7 @@ use alloc::{
 use crate::{
     c_str::CStr,
     header::{sys_auxv::AT_NULL, unistd},
-    platform::{new_mspace, types::c_char},
+    platform::{get_auxvs, get_auxv, new_mspace, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
     ALLOCATOR,
@@ -55,19 +55,6 @@ unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const us
         ptr = ptr.add(1);
     }
     return (envs, ptr);
-}
-
-unsafe fn get_auxv(mut ptr: *const usize) -> BTreeMap<usize, usize> {
-    //traverse the stack and collect argument environment variables
-    let mut auxv = BTreeMap::new();
-    while *ptr != AT_NULL {
-        let kind = *ptr;
-        ptr = ptr.add(1);
-        let value = *ptr;
-        ptr = ptr.add(1);
-        auxv.insert(kind, value);
-    }
-    return auxv;
 }
 
 unsafe fn adjust_stack(sp: &'static mut Stack) {
@@ -163,7 +150,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         let argv_start = sp.argv() as *mut usize;
         let (argv, argv_end) = get_argv(argv_start);
         let (envs, envs_end) = get_env(argv_end.add(1));
-        let auxv = get_auxv(envs_end.add(1));
+        let auxv = get_auxvs(envs_end.add(1));
         (argv, envs, auxv)
     };
 
@@ -183,8 +170,8 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         crate::platform::environ = crate::platform::OUR_ENVIRON.as_mut_ptr();
     }
 
-    let is_manual = if let Some(img_entry) = auxv.get(&AT_ENTRY) {
-        *img_entry == ld_entry
+    let is_manual = if let Some(img_entry) = get_auxv(&auxv, AT_ENTRY) {
+        img_entry == ld_entry
     } else {
         true
     };
@@ -193,6 +180,9 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     unsafe {
         _r_debug.r_ldbase = ld_entry;
     }
+
+    // TODO: Fix memory leak, although minimal.
+    crate::platform::init(auxv.clone());
 
     // Some variables that will be overridden by environment and auxiliary vectors
     let ld_library_path = envs.get("LD_LIBRARY_PATH").map(|s| s.to_owned());
@@ -229,7 +219,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     let base_addr = {
         let mut base = None;
         if !is_manual && cfg!(not(target_os = "redox")) {
-            let phdr = *auxv.get(&AT_PHDR).unwrap();
+            let phdr = get_auxv(&auxv, AT_PHDR).unwrap();
             if phdr != 0 {
                 base = Some(phdr - SIZEOF_EHDR);
             }

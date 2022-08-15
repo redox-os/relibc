@@ -29,7 +29,7 @@ unsafe fn access(path: *const c_char, mode: c_int) -> c_int {
         Ok(ok) => ok,
         Err(_) => return -1,
     };
-    let fd = match syscall::open(path, syscall::O_CLOEXEC) {
+    let fd = match crate::platform::sys::path::open(path, syscall::O_CLOEXEC) {
         Ok(fd) => fd,
         _ => return -1,
     };
@@ -40,6 +40,7 @@ unsafe fn access(path: *const c_char, mode: c_int) -> c_int {
     if syscall::fstat(fd, &mut stat).is_err() {
         return -1;
     }
+    let _ = syscall::close(fd);
     let uid = match syscall::getuid() {
         Ok(uid) => uid,
         Err(_) => return -1,

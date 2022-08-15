@@ -34,7 +34,11 @@ pub struct InterpOverride {
     tree: BTreeMap<usize, usize>,
 }
 
-pub fn fexec_impl<A, E>(image_file: FdGuard, open_via_dup: FdGuard, memory_scheme_fd: &FdGuard, path: &[u8], args: A, envs: E, total_args_envs_size: usize, mut interp_override: Option<InterpOverride>) -> Result<FexecResult>
+pub struct ExtraInfo<'a> {
+    pub cwd: Option<&'a [u8]>,
+}
+
+pub fn fexec_impl<A, E>(image_file: FdGuard, open_via_dup: FdGuard, memory_scheme_fd: &FdGuard, path: &[u8], args: A, envs: E, total_args_envs_size: usize, extrainfo: &ExtraInfo, mut interp_override: Option<InterpOverride>) -> Result<FexecResult>
 where
     A: IntoIterator,
     E: IntoIterator,
@@ -178,7 +182,8 @@ where
     push(interp_override.as_ref().map_or(header.e_phentsize as usize, |o| o.at_phent))?;
     push(AT_PHENT)?;
 
-    let args_envs_size_aligned = (total_args_envs_size+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;
+    let total_args_envs_auxvpointee_size = total_args_envs_size + extrainfo.cwd.map_or(0, |s| s.len() + 1);
+    let args_envs_size_aligned = (total_args_envs_auxvpointee_size+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;
     let target_args_env_address = find_free_target_addr(&tree, args_envs_size_aligned).ok_or(Error::new(ENOMEM))?;
     allocate_remote(&grants_fd, memory_scheme_fd, target_args_env_address, args_envs_size_aligned, MapFlags::PROT_READ | MapFlags::PROT_WRITE)?;
     tree.insert(target_args_env_address, args_envs_size_aligned);
@@ -194,6 +199,13 @@ where
             offset += source_slice.len() + 1;
             Ok(address)
         };
+
+        if let Some(cwd) = extrainfo.cwd {
+            push(append(cwd)?)?;
+            push(AT_REDOX_INITIALCWD_PTR)?;
+            push(cwd.len())?;
+            push(AT_REDOX_INITIALCWD_LEN)?;
+        }
 
         push(0)?;
 
@@ -424,7 +436,6 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
         }
 
         copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
-        copy_str(*cur_pid_fd, *new_pid_fd, "cwd")?;
 
         {
             let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);

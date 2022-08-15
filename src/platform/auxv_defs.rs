@@ -25,3 +25,9 @@ pub const AT_BASE_PLATFORM: usize = 24; /* String identifying real platforms.*/
 pub const AT_RANDOM: usize = 25; /* Address of 16 random bytes.  */
 pub const AT_HWCAP2: usize = 26; /* More machine-dependent hints about*/
 pub const AT_EXECFN: usize = 31; /* Filename of executable.  */
+
+#[cfg(target_os = "redox")]
+// XXX: The name AT_CWD is already used in openat... for a completely different purpose.
+pub const AT_REDOX_INITIALCWD_PTR: usize = 32;
+#[cfg(target_os = "redox")]
+pub const AT_REDOX_INITIALCWD_LEN: usize = 33;
