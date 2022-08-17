@@ -51,7 +51,24 @@ core::arch::global_asm!("
     .globl __relibc_internal_fork_wrapper
     .type __relibc_internal_fork_wrapper, @function
 __relibc_internal_fork_wrapper:
-    ud2
+    push ebp
+    mov ebp, esp
+
+    push ebx
+    push esi
+    push edi
+    push ebp
+
+    sub esp, 32
+
+    //TODO stmxcsr [esp+16]
+    fnstcw [esp+24]
+
+    mov edi, esp
+    push edi
+    call __relibc_internal_fork_impl
+    pop edi
+    jmp 2f
 
     .size __relibc_internal_fork_wrapper, . - __relibc_internal_fork_wrapper
 
@@ -59,7 +76,29 @@ __relibc_internal_fork_wrapper:
     .globl __relibc_internal_fork_ret
     .type __relibc_internal_fork_ret, @function
 __relibc_internal_fork_ret:
-    ud2
+    mov edi, [esp]
+    mov esi, [esp + 4]
+    push esi
+    push edi
+    call __relibc_internal_fork_hook
+    pop edi
+    pop esi
+
+    //TODO ldmxcsr [esp+16]
+    fldcw [esp+24]
+
+    xor eax, eax
+
+    .p2align 4
+2:
+    add esp, 32
+    pop ebp
+    pop esi
+    pop edi
+    pop ebx
+
+    pop ebp
+    ret
 
     .size __relibc_internal_fork_ret, . - __relibc_internal_fork_ret"
 );
