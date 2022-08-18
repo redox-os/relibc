@@ -64,10 +64,9 @@ __relibc_internal_fork_wrapper:
     //TODO stmxcsr [esp+16]
     fnstcw [esp+24]
 
-    mov edi, esp
-    push edi
+    push esp
     call __relibc_internal_fork_impl
-    pop edi
+    pop esp
     jmp 2f
 
     .size __relibc_internal_fork_wrapper, . - __relibc_internal_fork_wrapper
@@ -76,13 +75,8 @@ __relibc_internal_fork_wrapper:
     .globl __relibc_internal_fork_ret
     .type __relibc_internal_fork_ret, @function
 __relibc_internal_fork_ret:
-    mov edi, [esp]
-    mov esi, [esp + 4]
-    push esi
-    push edi
+    // Arguments already on the stack
     call __relibc_internal_fork_hook
-    pop edi
-    pop esi
 
     //TODO ldmxcsr [esp+16]
     fldcw [esp+24]
