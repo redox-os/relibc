@@ -54,9 +54,10 @@ __relibc_internal_fork_wrapper:
     push ebp
     mov ebp, esp
 
+    // Push preserved registers
     push ebx
-    push esi
     push edi
+    push esi
     push ebp
 
     sub esp, 32
@@ -86,6 +87,8 @@ __relibc_internal_fork_ret:
     .p2align 4
 2:
     add esp, 32
+
+    // Pop preserved registers
     pop ebp
     pop esi
     pop edi
