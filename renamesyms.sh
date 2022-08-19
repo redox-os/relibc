@@ -11,7 +11,7 @@ symbols_file=`mktemp`
 special_syms="__rg_alloc __rg_dealloc __rg_realloc __rg_alloc_zeroed __rg_oom"
 
 for dep in `find $deps_dir -type f -name "*.rlib"`; do
-    nm --format=posix -g "$dep" 2>/dev/null | sed 's/.*:.*//g' | awk '{if ($2 == "T") print $1}' | sed 's/^\(.*\)$/\1 __relibc_\1/g' >> $symbols_file
+    "${TARGET}-nm" --format=posix -g "$dep" 2>/dev/null | sed 's/.*:.*//g' | awk '{if ($2 == "T") print $1}' | sed 's/^\(.*\)$/\1 __relibc_\1/g' >> $symbols_file
 done
 
 for special_sym in $special_syms; do
@@ -22,6 +22,6 @@ sorted_file=`mktemp`
 sort -u "$symbols_file" > "$sorted_file"
 rm -f "$symbols_file"
 
-objcopy --redefine-syms="$sorted_file" "$target"
+"${TARGET}-objcopy" --redefine-syms="$sorted_file" "$target"
 
 rm -f "$sorted_file"
