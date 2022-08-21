@@ -12,6 +12,13 @@ use alloc::{
     vec,
 };
 
+//TODO: allow use of either 32-bit or 64-bit programs
+#[cfg(target_pointer_width = "32")]
+use goblin::elf32::{header::Header, program_header::program_header64::{ProgramHeader, PT_LOAD, PT_INTERP, PF_W, PF_X}};
+#[cfg(target_pointer_width = "64")]
+use goblin::elf64::{header::Header, program_header::program_header64::{ProgramHeader, PT_LOAD, PT_INTERP, PF_W, PF_X}};
+
+
 use syscall::{
     PAGE_SIZE,
     error::*,
@@ -45,8 +52,6 @@ where
     A::Item: AsRef<[u8]>,
     E::Item: AsRef<[u8]>,
 {
-    use goblin::elf64::{header::Header, program_header::program_header64::{ProgramHeader, PT_LOAD, PT_INTERP, PF_W, PF_X}};
-
     // Here, we do the minimum part of loading an application, which is what the kernel used to do.
     // We load the executable into memory (albeit at different offsets in this executable), fix
     // some misalignments, and then execute the SYS_EXEC syscall to replace the program memory
@@ -83,7 +88,7 @@ where
     const BUFSZ: usize = 1024 * 256;
     let mut buf = vec! [0_u8; BUFSZ];
 
-    read_all(*image_file as usize, Some(header.e_phoff), phs).map_err(|_| Error::new(EIO))?;
+    read_all(*image_file as usize, Some(header.e_phoff as u64), phs).map_err(|_| Error::new(EIO))?;
 
     for ph_idx in 0..phnum {
         let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
