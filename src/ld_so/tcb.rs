@@ -195,11 +195,10 @@ impl Tcb {
         Ok(tls_tcb.split_at_mut(size))
     }
 
-    /// Architecture specific code to read a usize from the TCB - x86_64
+    /// Architecture specific code to read a usize from the TCB - aarch64
     #[inline(always)]
     #[cfg(target_arch = "aarch64")]
     unsafe fn arch_read(offset: usize) -> usize {
-        // TODO: s/llvm_asm/asm/g
         let tp: usize;
         asm!(
             "mrs {}, tpidr_el0",
@@ -209,9 +208,24 @@ impl Tcb {
         *((tp + offset) as *const usize)
     }
 
+    /// Architecture specific code to read a usize from the TCB - x86
+    #[inline(always)]
+    #[cfg(any(target_arch = "x86")]
+    unsafe fn arch_read(offset: usize) -> usize {
+        let value;
+        asm!(
+            "
+            mov {}, gs:[{}]
+            ",
+            out(reg) value,
+            in(reg) offset,
+        );
+        value
+    }
+
     /// Architecture specific code to read a usize from the TCB - x86_64
     #[inline(always)]
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(any(target_arch = "x86_64")]
     unsafe fn arch_read(offset: usize) -> usize {
         let value;
         asm!(
@@ -248,7 +262,7 @@ impl Tcb {
         let _ = syscall::read(file, &mut env)
             .expect_notls("failed to read fsbase");
 
-        env.fsbase = tp as u32;
+        env.gsbase = tp as u32;
 
         let _ = syscall::write(file, &env)
             .expect_notls("failed to write fsbase");
