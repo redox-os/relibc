@@ -12,6 +12,17 @@ _start:
     # TODO: aarch64
 ");
 
+#[cfg(target_arch = "x86")]
+global_asm!("
+.globl _start
+_start:
+    push esp
+    call relibc_ld_so_start
+    pop esp
+    # TODO: x86
+    ud2
+");
+
 #[cfg(target_arch = "x86_64")]
 global_asm!("
 .globl _start
