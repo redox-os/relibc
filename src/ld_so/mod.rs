@@ -144,6 +144,20 @@ pub unsafe fn init(sp: &'static Stack) {
         const ARCH_GET_FS: usize = 0x1003;
         syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut tp as *mut usize);
     }
+    #[cfg(all(target_os = "redox", target_arch = "x86"))]
+    {
+        let mut env = syscall::EnvRegisters::default();
+
+        let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDONLY)
+            .expect_notls("failed to open handle for process registers");
+
+        let _ = syscall::read(file, &mut env)
+            .expect_notls("failed to read gsbase");
+
+        let _ = syscall::close(file);
+
+        tp = env.gsbase as usize;
+    }
     #[cfg(all(target_os = "redox", target_arch = "x86_64"))]
     {
         let mut env = syscall::EnvRegisters::default();

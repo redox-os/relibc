@@ -260,12 +260,12 @@ impl Tcb {
             .expect_notls("failed to open handle for process registers");
 
         let _ = syscall::read(file, &mut env)
-            .expect_notls("failed to read fsbase");
+            .expect_notls("failed to read gsbase");
 
         env.gsbase = tp as u32;
 
         let _ = syscall::write(file, &env)
-            .expect_notls("failed to write fsbase");
+            .expect_notls("failed to write gsbase");
 
         let _ = syscall::close(file);
     }
