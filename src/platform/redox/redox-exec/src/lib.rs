@@ -14,7 +14,7 @@ use alloc::{
 
 //TODO: allow use of either 32-bit or 64-bit programs
 #[cfg(target_pointer_width = "32")]
-use goblin::elf32::{header::Header, program_header::program_header64::{ProgramHeader, PT_LOAD, PT_INTERP, PF_W, PF_X}};
+use goblin::elf32::{header::Header, program_header::program_header32::{ProgramHeader, PT_LOAD, PT_INTERP, PF_W, PF_X}};
 #[cfg(target_pointer_width = "64")]
 use goblin::elf64::{header::Header, program_header::program_header64::{ProgramHeader, PT_LOAD, PT_INTERP, PF_W, PF_X}};
 
@@ -115,7 +115,7 @@ where
             // PT_INTERP must come before any PT_LOAD, so we don't have to iterate twice.
             PT_INTERP => {
                 let mut interp = vec! [0_u8; segment.p_filesz as usize];
-                read_all(*image_file as usize, Some(segment.p_offset), &mut interp)?;
+                read_all(*image_file as usize, Some(segment.p_offset as u64), &mut interp)?;
 
                 return Ok(FexecResult::Interp {
                     path: interp.into_boxed_slice(),
