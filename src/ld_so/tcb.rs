@@ -210,7 +210,7 @@ impl Tcb {
 
     /// Architecture specific code to read a usize from the TCB - x86
     #[inline(always)]
-    #[cfg(any(target_arch = "x86")]
+    #[cfg(target_arch = "x86")]
     unsafe fn arch_read(offset: usize) -> usize {
         let value;
         asm!(
@@ -225,7 +225,7 @@ impl Tcb {
 
     /// Architecture specific code to read a usize from the TCB - x86_64
     #[inline(always)]
-    #[cfg(any(target_arch = "x86_64")]
+    #[cfg(target_arch = "x86_64")]
     unsafe fn arch_read(offset: usize) -> usize {
         let value;
         asm!(
