@@ -728,19 +728,6 @@ impl Pal for Sys {
         res as c_int
     }
 
-    #[cfg(target_arch = "aarch64")]
-    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        //TODO: aarch64
-        unimplemented!("pte_clone not implemented on aarch64");
-    }
-
-    #[cfg(target_arch = "x86")]
-    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        //TODO: x86
-        unimplemented!("pte_clone not implemented on x86");
-    }
-
-    #[cfg(target_arch = "x86_64")]
     unsafe fn pte_clone(stack: *mut usize) -> pid_t {
         e(clone::pte_clone_impl(stack)) as pid_t
     }

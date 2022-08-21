@@ -91,8 +91,22 @@ core::arch::global_asm!("
     .type __relibc_internal_pte_clone_ret, @function
     .p2align 6
 __relibc_internal_pte_clone_ret:
-    ud2
+    # Load registers
+    pop eax
 
+    sub esp, 8
+
+    mov DWORD PTR [esp], 0x00001F80
+    # TODO: ldmxcsr [esp]
+    mov WORD PTR [esp], 0x031F
+    fldcw [esp]
+
+    add esp, 8
+
+    # Call entry point
+    call eax
+
+    ret
     .size __relibc_internal_pte_clone_ret, . - __relibc_internal_pte_clone_ret
 ");
 
