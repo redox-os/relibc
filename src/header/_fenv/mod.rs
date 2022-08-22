@@ -28,7 +28,7 @@ pub unsafe extern "C" fn fegetexceptflag(flagp: *mut fexcept_t, excepts: c_int) 
     unimplemented!();
 }
 
-#[no_mangle]
+// #[no_mangle]
 pub unsafe extern "C" fn fegetround() -> c_int {
     FE_TONEAREST
 }
