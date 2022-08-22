@@ -98,7 +98,7 @@ __relibc_internal_pte_clone_ret:
 
     mov DWORD PTR [esp], 0x00001F80
     # TODO: ldmxcsr [esp]
-    mov WORD PTR [esp], 0x031F
+    mov WORD PTR [esp], 0x037F
     fldcw [esp]
 
     add esp, 8
@@ -134,7 +134,7 @@ __relibc_internal_pte_clone_ret:
 
     mov DWORD PTR [rsp], 0x00001F80
     ldmxcsr [rsp]
-    mov WORD PTR [rsp], 0x031F
+    mov WORD PTR [rsp], 0x037F
     fldcw [rsp]
 
     add rsp, 8

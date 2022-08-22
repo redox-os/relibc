@@ -22,7 +22,7 @@ _start:
 
     mov DWORD PTR [esp], 0x00001F80
     # ldmxcsr [esp]
-    mov WORD PTR [esp], 0x031F
+    mov WORD PTR [esp], 0x037F
     fldcw [esp]
 
     add esp, 8
@@ -44,7 +44,7 @@ _start:
 
     mov DWORD PTR [rsp], 0x00001F80
     ldmxcsr [rsp]
-    mov WORD PTR [rsp], 0x031F
+    mov WORD PTR [rsp], 0x037F
     fldcw [rsp]
 
     add rsp, 8
