@@ -1,3 +1,4 @@
+use syscall::data::Stat;
 use syscall::error::*;
 use syscall::flag::*;
 
@@ -94,6 +95,13 @@ pub fn chdir(path: &str) -> Result<()> {
     let mut cwd_guard = CWD.lock();
 
     let canonicalized = canonicalize_using_cwd(cwd_guard.as_deref(), path).ok_or(Error::new(ENOENT))?;
+
+    let fd = syscall::open(&canonicalized, O_STAT | O_CLOEXEC)?;
+    let mut stat = Stat::default();
+    if syscall::fstat(fd, &mut stat).is_err() || (stat.st_mode & MODE_TYPE) != MODE_DIR {
+        return Err(Error::new(ENOTDIR));
+    }
+    let _ = syscall::close(fd);
 
     *cwd_guard = Some(canonicalized.into_boxed_str());
 
