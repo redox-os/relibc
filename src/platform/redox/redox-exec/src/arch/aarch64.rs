@@ -15,6 +15,7 @@ pub unsafe fn deactivate_tcb(open_via_dup: usize) -> Result<()> {
 
 pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
     // Copy environment registers.
+    /*TODO
     {
         let cur_env_regs_fd = FdGuard::new(syscall::dup(cur_pid_fd, b"regs/env")?);
         let new_env_regs_fd = FdGuard::new(syscall::dup(new_pid_fd, b"regs/env")?);
@@ -23,6 +24,7 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
         let _ = syscall::read(*cur_env_regs_fd, &mut env_regs)?;
         let _ = syscall::write(*new_env_regs_fd, &env_regs)?;
     }
+    */
 
     Ok(())
 }
