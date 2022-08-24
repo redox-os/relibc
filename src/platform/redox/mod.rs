@@ -232,7 +232,7 @@ impl Pal for Sys {
             !0
         } else {
             match str::from_utf8(&buf[..res]) {
-                Ok(path) => e(syscall::chdir(&path)) as c_int,
+                Ok(path) => Sys::chdir(&CString::new(path).unwrap()),
                 Err(_) => {
                     unsafe { errno = EINVAL };
                     return -1;
