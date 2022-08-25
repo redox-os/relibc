@@ -82,7 +82,7 @@ __relibc_internal_fork_ret:
 
     //TODO: load floating point regs
 
-    ldr x0, #0
+    mov x0, xzr
 
     .p2align 4
 2:
