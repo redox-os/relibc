@@ -248,7 +248,20 @@ impl Tcb {
     /// OS and architecture specific code to activate TLS - Redox aarch64
     #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
     unsafe fn os_arch_activate(tp: usize) {
-        //TODO: aarch64
+        let mut env = syscall::EnvRegisters::default();
+
+        let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDWR)
+            .expect_notls("failed to open handle for process registers");
+
+        let _ = syscall::read(file, &mut env)
+            .expect_notls("failed to read thread pointer");
+
+        env.tpidr_el0 = tp;
+
+        let _ = syscall::write(file, &env)
+            .expect_notls("failed to write thread pointer");
+
+        let _ = syscall::close(file);
     }
 
     /// OS and architecture specific code to activate TLS - Redox x86
