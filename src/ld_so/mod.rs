@@ -146,17 +146,10 @@ pub unsafe fn init(sp: &'static Stack) {
     }
     #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
     {
-        let mut env = syscall::EnvRegisters::default();
-
-        let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDONLY)
-            .expect_notls("failed to open handle for process registers");
-
-        let _ = syscall::read(file, &mut env)
-            .expect_notls("failed to read tpidr_el0");
-
-        let _ = syscall::close(file);
-
-        tp = env.tpidr_el0;
+        core::arch::asm!(
+            "mrs {}, tpidr_el0",
+            out(reg) tp,
+        );
     }
     #[cfg(all(target_os = "redox", target_arch = "x86"))]
     {
