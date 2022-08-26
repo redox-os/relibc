@@ -55,7 +55,7 @@ impl Tcb {
     /// Create a new TCB
     pub unsafe fn new(size: usize) -> Result<&'static mut Self> {
         let page_size = Sys::getpagesize();
-        let (tls, tcb_page) = Self::os_new(round_up(size, page_size))?;
+        let (abi_page, tls, tcb_page) = Self::os_new(round_up(size, page_size))?;
 
         let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
         trace!("New TCB: {:p}", tcb_ptr);
@@ -123,8 +123,14 @@ impl Tcb {
                     .filter(|m| m.len > 0)
                     .enumerate()
                 {
-                    let range =
-                        self.tls_len - master.offset..self.tls_len - master.offset + master.len;
+                    let range = if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
+                        // x86 TLS layout is backwards
+                        self.tls_len - master.offset..self.tls_len - master.offset + master.len
+                    } else {
+                        //TODO: fix aarch64 TLS layout when there is more than one master
+                        assert_eq!(i, 0, "aarch64 TLS layout only supports one master");
+                        0..master.len
+                    };
                     if let Some(tls_data) = tls.get_mut(range) {
                         let data = master.data();
                         trace!(
@@ -165,7 +171,7 @@ impl Tcb {
 
     /// Activate TLS
     pub unsafe fn activate(&mut self) {
-        Self::os_arch_activate(self.tcb_ptr as usize);
+        Self::os_arch_activate(self.tls_end as usize, self.tls_len);
     }
 
     /// Mapping with correct flags for TCB and TLS
@@ -189,23 +195,26 @@ impl Tcb {
 
     /// OS specific code to create a new TLS and TCB - Linux and Redox
     #[cfg(any(target_os = "linux", target_os = "redox"))]
-    unsafe fn os_new(size: usize) -> Result<(&'static mut [u8], &'static mut [u8])> {
+    unsafe fn os_new(size: usize) -> Result<(&'static mut [u8], &'static mut [u8], &'static mut [u8])> {
         let page_size = Sys::getpagesize();
-        let tls_tcb = Self::map(size + page_size)?;
-        Ok(tls_tcb.split_at_mut(size))
+        let abi_tls_tcb = Self::map(page_size + size + page_size)?;
+        let (abi, tls_tcb) = abi_tls_tcb.split_at_mut(page_size);
+        let (tls, tcb) = tls_tcb.split_at_mut(size);
+        Ok((abi, tls, tcb))
     }
 
     /// Architecture specific code to read a usize from the TCB - aarch64
     #[inline(always)]
     #[cfg(target_arch = "aarch64")]
     unsafe fn arch_read(offset: usize) -> usize {
-        let tp: usize;
+        let abi_ptr: usize;
         asm!(
             "mrs {}, tpidr_el0",
-            out(reg) tp,
+            out(reg) abi_ptr,
         );
 
-        *((tp + offset) as *const usize)
+        let tcb_ptr = *(abi_ptr as *const usize);
+        *((tcb_ptr + offset) as *const usize)
     }
 
     /// Architecture specific code to read a usize from the TCB - x86
@@ -240,33 +249,26 @@ impl Tcb {
 
     /// OS and architecture specific code to activate TLS - Linux x86_64
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    unsafe fn os_arch_activate(tp: usize) {
+    unsafe fn os_arch_activate(tls_end: usize, _tls_len: usize) {
         const ARCH_SET_FS: usize = 0x1002;
-        syscall!(ARCH_PRCTL, ARCH_SET_FS, tp);
+        syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
     }
 
     /// OS and architecture specific code to activate TLS - Redox aarch64
     #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
-    unsafe fn os_arch_activate(tp: usize) {
-        let mut env = syscall::EnvRegisters::default();
-
-        let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDWR)
-            .expect_notls("failed to open handle for process registers");
-
-        let _ = syscall::read(file, &mut env)
-            .expect_notls("failed to read thread pointer");
-
-        env.tpidr_el0 = tp;
-
-        let _ = syscall::write(file, &env)
-            .expect_notls("failed to write thread pointer");
-
-        let _ = syscall::close(file);
+    unsafe fn os_arch_activate(tls_end: usize, tls_len: usize) {
+        // Uses ABI page
+        let abi_ptr = tls_end - tls_len - 16;
+        ptr::write(abi_ptr as *mut usize, tls_end);
+        asm!(
+            "msr tpidr_el0, {}",
+            in(reg) abi_ptr,
+        );
     }
 
     /// OS and architecture specific code to activate TLS - Redox x86
     #[cfg(all(target_os = "redox", target_arch = "x86"))]
-    unsafe fn os_arch_activate(tp: usize) {
+    unsafe fn os_arch_activate(tls_end: usize, _tls_len: usize) {
         let mut env = syscall::EnvRegisters::default();
 
         let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDWR)
@@ -275,7 +277,7 @@ impl Tcb {
         let _ = syscall::read(file, &mut env)
             .expect_notls("failed to read gsbase");
 
-        env.gsbase = tp as u32;
+        env.gsbase = tls_end as u32;
 
         let _ = syscall::write(file, &env)
             .expect_notls("failed to write gsbase");
@@ -285,7 +287,7 @@ impl Tcb {
 
     /// OS and architecture specific code to activate TLS - Redox x86_64
     #[cfg(all(target_os = "redox", target_arch = "x86_64"))]
-    unsafe fn os_arch_activate(tp: usize) {
+    unsafe fn os_arch_activate(tls_end: usize, _tls_len: usize) {
         let mut env = syscall::EnvRegisters::default();
 
         let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDWR)
@@ -294,7 +296,7 @@ impl Tcb {
         let _ = syscall::read(file, &mut env)
             .expect_notls("failed to read fsbase");
 
-        env.fsbase = tp as u64;
+        env.fsbase = tls_end as u64;
 
         let _ = syscall::write(file, &env)
             .expect_notls("failed to write fsbase");
