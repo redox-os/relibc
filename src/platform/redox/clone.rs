@@ -67,24 +67,32 @@ pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
     Ok(0)
 }
 
-//TODO: aarch64
+extern "C" {
+    fn __relibc_internal_pte_clone_ret();
+}
+
 #[cfg(target_arch = "aarch64")]
 core::arch::global_asm!("
     .globl __relibc_internal_pte_clone_ret
     .type __relibc_internal_pte_clone_ret, @function
     .p2align 6
 __relibc_internal_pte_clone_ret:
-    b __relibc_internal_pte_clone_ret
+    # Load registers
+    ldr x8, [sp], #8
+    ldr x0, [sp], #8
+    ldr x1, [sp], #8
+    ldr x2, [sp], #8
+    ldr x3, [sp], #8
+    ldr x4, [sp], #8
+    ldr x5, [sp], #8
 
+    # Call entry point
+    blr x8
+
+    ret
     .size __relibc_internal_pte_clone_ret, . - __relibc_internal_pte_clone_ret
 ");
 
-#[cfg(target_arch = "aarch64")]
-extern "C" {
-    fn __relibc_internal_pte_clone_ret();
-}
-
-//TODO: x86
 #[cfg(target_arch = "x86")]
 core::arch::global_asm!("
     .globl __relibc_internal_pte_clone_ret
@@ -109,11 +117,6 @@ __relibc_internal_pte_clone_ret:
     ret
     .size __relibc_internal_pte_clone_ret, . - __relibc_internal_pte_clone_ret
 ");
-
-#[cfg(target_arch = "x86")]
-extern "cdecl" {
-    fn __relibc_internal_pte_clone_ret();
-}
 
 #[cfg(target_arch = "x86_64")]
 core::arch::global_asm!("
@@ -145,8 +148,3 @@ __relibc_internal_pte_clone_ret:
     ret
     .size __relibc_internal_pte_clone_ret, . - __relibc_internal_pte_clone_ret
 ");
-
-#[cfg(target_arch = "x86_64")]
-extern "sysv64" {
-    fn __relibc_internal_pte_clone_ret();
-}

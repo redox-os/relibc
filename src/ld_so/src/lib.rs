@@ -10,6 +10,7 @@ _start:
     mov x0, sp
     bl relibc_ld_so_start
     # TODO: aarch64
+    udf #0
 ");
 
 #[cfg(target_arch = "x86")]
