@@ -1,11 +1,6 @@
 use syscall::{data::Stat, error::*, flag::*};
 
-use alloc::{
-    borrow::{Cow, ToOwned},
-    boxed::Box,
-    string::String,
-    vec::Vec,
-};
+use alloc::{borrow::ToOwned, boxed::Box, string::String, vec::Vec};
 
 use super::FdGuard;
 use crate::sync::Mutex;

@@ -1238,7 +1238,7 @@ pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va
 pub unsafe fn flush_io_streams() {
     let flush = |stream: *mut FILE| {
         let stream = &mut *stream;
-        stream.flush()
+        let _ = stream.flush();
     };
     flush(stdout);
     flush(stderr);

@@ -3,10 +3,10 @@
 use core::{
     cell::{Cell, UnsafeCell},
     ptr::NonNull,
-    sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
-use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap};
 
 use crate::{
     header::{errno::*, pthread as header, sched::sched_param, sys_mman},
@@ -83,8 +83,6 @@ pub struct OsTid {
 
 unsafe impl Send for Pthread {}
 unsafe impl Sync for Pthread {}
-
-use crate::header::bits_pthread::pthread_attr_t;
 
 /// Positive error codes (EINVAL, not -EINVAL).
 #[derive(Debug, Eq, PartialEq)]

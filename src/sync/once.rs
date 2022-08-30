@@ -1,4 +1,4 @@
-use super::{AtomicLock, AttemptStatus};
+use super::AttemptStatus;
 use crate::platform::types::*;
 use core::{
     cell::UnsafeCell,

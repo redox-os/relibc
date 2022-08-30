@@ -2,7 +2,7 @@ use crate::{
     c_str::{CStr, CString},
     core_io::{prelude::*, BufReader, SeekFrom},
     fs::File,
-    header::{fcntl, string::strlen},
+    header::string::strlen,
     platform::{
         sys::{S_ISGID, S_ISUID},
         types::*,

@@ -11,45 +11,9 @@
 pub use self::{answer::DnsAnswer, query::DnsQuery};
 
 use alloc::{string::String, vec::Vec};
-use core::{slice, u16};
 
 mod answer;
 mod query;
-
-#[allow(non_camel_case_types)]
-#[derive(Copy, Clone, Debug, Default)]
-#[repr(packed)]
-pub struct n16 {
-    inner: u16,
-}
-
-impl n16 {
-    pub fn as_bytes(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(core::ptr::addr_of!(self.inner).cast::<u8>(), 2) }
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        n16 {
-            inner: unsafe {
-                slice::from_raw_parts(bytes.as_ptr() as *const u16, bytes.len() / 2)[0]
-            },
-        }
-    }
-}
-
-impl From<u16> for n16 {
-    fn from(value: u16) -> Self {
-        n16 {
-            inner: value.to_be(),
-        }
-    }
-}
-
-impl From<n16> for u16 {
-    fn from(value: n16) -> Self {
-        u16::from_be(value.inner)
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct Dns {
@@ -67,13 +31,13 @@ impl Dns {
             ($value:expr) => {
                 data.push($value);
             };
-        };
+        }
 
         macro_rules! push_n16 {
             ($value:expr) => {
-                data.extend_from_slice(n16::from($value).as_bytes());
+                data.extend_from_slice(&u16::to_be_bytes($value));
             };
-        };
+        }
 
         push_n16!(self.transaction_id);
         push_n16!(self.flags);
@@ -106,17 +70,19 @@ impl Dns {
                 }
                 data[i - 1]
             }};
-        };
+        }
 
         macro_rules! pop_n16 {
             () => {{
+                use core::convert::TryInto;
                 i += 2;
                 if i > data.len() {
                     return Err(format!("{}: {}: pop_n16", file!(), line!()));
                 }
-                u16::from(n16::from_bytes(&data[i - 2..i]))
+                let bytes: [u8; 2] = data[i - 2..i].try_into().unwrap();
+                u16::from_be_bytes(bytes)
             }};
-        };
+        }
 
         macro_rules! pop_data {
             () => {{
@@ -129,7 +95,7 @@ impl Dns {
 
                 data
             }};
-        };
+        }
 
         macro_rules! pop_name {
             () => {{
@@ -160,7 +126,7 @@ impl Dns {
 
                 name
             }};
-        };
+        }
 
         let transaction_id = pop_n16!();
         let flags = pop_n16!();

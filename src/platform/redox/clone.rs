@@ -1,10 +1,6 @@
-use core::{arch::global_asm, mem::size_of};
-
-use alloc::{boxed::Box, vec::Vec};
-
 use syscall::{
     data::Map,
-    error::{Error, Result, EINVAL, ENAMETOOLONG},
+    error::Result,
     flag::{MapFlags, O_CLOEXEC},
     SIGCONT,
 };

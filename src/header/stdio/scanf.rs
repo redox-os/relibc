@@ -239,13 +239,13 @@ unsafe fn inner_scanf(
                             }
                         }};
                         (c_double) => {
-                            parse_type!(noformat c_double);
+                            parse_type!(noformat c_double)
                         };
                         (c_float) => {
-                            parse_type!(noformat c_float);
+                            parse_type!(noformat c_float)
                         };
                         ($type:ident) => {
-                            parse_type!($type, $type);
+                            parse_type!($type, $type)
                         };
                         ($type:ident, $final:ty) => {{
                             let n = if n.is_empty() {

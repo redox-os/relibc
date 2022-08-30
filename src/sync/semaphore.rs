@@ -1,10 +1,9 @@
 // From https://www.remlab.net/op/futex-misc.shtml
 //TODO: improve implementation
 
-use super::AtomicLock;
 use crate::{
     header::time::{clock_gettime, timespec, CLOCK_MONOTONIC},
-    platform::{types::*, Pal, Sys},
+    platform::types::*,
 };
 
 use core::sync::atomic::{AtomicU32, Ordering};

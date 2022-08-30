@@ -1,4 +1,4 @@
-use core::{arch::asm, convert::TryFrom, mem, ptr, result::Result as CoreResult, slice, str};
+use core::{convert::TryFrom, mem, ptr, result::Result as CoreResult, slice, str};
 
 use syscall::{
     self,
@@ -13,7 +13,6 @@ use crate::{
         dirent::dirent,
         errno::{EINVAL, EIO, ENOMEM, ENOSYS, EPERM, ERANGE},
         fcntl,
-        string::strlen,
         sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, RLIM_INFINITY},
@@ -25,7 +24,7 @@ use crate::{
         time::timespec,
         unistd::{F_OK, R_OK, W_OK, X_OK},
     },
-    io::{self, prelude::*, BufReader, SeekFrom},
+    io::{self, prelude::*, BufReader},
 };
 
 pub use redox_exec::FdGuard;
