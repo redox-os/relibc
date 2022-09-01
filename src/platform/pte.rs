@@ -237,6 +237,7 @@ pub unsafe extern "C" fn pte_osThreadWaitForEnd(handle: pte_osThreadHandle) -> p
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadCancel(handle: pte_osThreadHandle) -> pte_osResult {
     //TODO: allow cancel of thread
+    println!("pte_osThreadCancel");
     PTE_OS_OK
 }
 

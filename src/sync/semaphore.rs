@@ -4,12 +4,14 @@
 use super::AtomicLock;
 use crate::header::time::timespec;
 use crate::platform::{types::*, Pal, Sys};
+use core::hint::spin_loop;
 use core::sync::atomic::Ordering;
 
 pub struct Semaphore {
     lock: AtomicLock,
 }
 
+//TODO: fix to use futex again
 impl Semaphore {
     pub const fn new(value: c_int) -> Self {
         Self {
@@ -18,30 +20,22 @@ impl Semaphore {
     }
 
     pub fn post(&self) {
-        self.lock.fetch_add(1, Ordering::Relaxed);
-        self.lock.notify_one();
+        self.lock.fetch_add(1, Ordering::Release);
     }
 
     pub fn wait(&self, timeout_opt: Option<&timespec>) {
-        let mut value = 1;
-
+        if let Some(timeout) = timeout_opt {
+            println!("semaphore wait tv_sec: {}, tv_nsec: {}", timeout.tv_sec, timeout.tv_nsec);
+        }
         loop {
-            match self.lock.compare_exchange_weak(
-                value,
-                value - 1,
-                Ordering::Acquire,
-                Ordering::Relaxed,
-            ) {
-                Ok(ok) => return,
-                Err(err) => {
-                    value = err;
-                }
+            while self.lock.load(Ordering::Acquire) < 1 {
+                spin_loop();
             }
-
-            if value == 0 {
-                self.lock.wait_if(0, timeout_opt);
-                value = 1;
+            let tmp = self.lock.fetch_sub(1, Ordering::AcqRel);
+            if tmp >= 1 {
+                break;
             }
+            self.lock.fetch_add(1, Ordering::Release);
         }
     }
 }
