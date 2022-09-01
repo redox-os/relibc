@@ -29,7 +29,8 @@ impl Semaphore {
         }
         loop {
             while self.lock.load(Ordering::Acquire) < 1 {
-                spin_loop();
+                //spin_loop();
+                Sys::sched_yield();
             }
             let tmp = self.lock.fetch_sub(1, Ordering::AcqRel);
             if tmp >= 1 {
