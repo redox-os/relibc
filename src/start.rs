@@ -1,10 +1,11 @@
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::{intrinsics, ptr};
 
 use crate::{
     header::{libgen, stdio, stdlib},
-    ld_so,
+    ld_so::{self, linker::Linker},
     platform::{self, get_auxvs, new_mspace, types::*, Pal, Sys},
+    sync::mutex::Mutex,
     ALLOCATOR,
 };
 
@@ -161,6 +162,19 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     // Set up the right allocator...
     // if any memory rust based memory allocation happen before this step .. we are doomed.
     alloc_init();
+
+    if let Some(tcb) = ld_so::tcb::Tcb::current() {
+        // Update TCB mspace
+        tcb.mspace = ALLOCATOR.get_book_keeper();
+
+        // Set linker pointer if necessary
+        if tcb.linker_ptr.is_null() {
+            //TODO: get ld path
+            let linker = Linker::new(None);
+            //TODO: load root object
+            tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
+        }
+    }
 
     // Set up argc and argv
     let argc = sp.argc;

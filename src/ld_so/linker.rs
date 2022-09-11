@@ -83,7 +83,9 @@ impl Linker {
                     obj.use_count += 1;
                     return Ok(*id);
                 } else {
-                    let parent_runpath = &self.objects.get(&root_id).unwrap().runpath.clone();
+                    let parent_runpath = &self.objects.get(&root_id).and_then(|parent| {
+                        parent.runpath.clone()
+                    });
                     let lib_id = self.next_object_id;
                     self.load_object(name, parent_runpath, None, true)?;
 
