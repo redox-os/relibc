@@ -166,10 +166,9 @@ impl Linker {
         )?;
 
         unsafe {
-            let tcb = if self.objects.len() == 0 {
-                Tcb::new(self.tls_size)?
-            } else {
-                Tcb::current().unwrap()
+            let tcb = match Tcb::current() {
+                Some(some) => some,
+                None => Tcb::new(self.tls_size)?,
             };
             tcb.append_masters(tcb_masters);
             tcb.copy_masters()?;
