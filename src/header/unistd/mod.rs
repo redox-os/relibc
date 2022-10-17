@@ -402,9 +402,9 @@ pub extern "C" fn getppid() -> pid_t {
     Sys::getppid()
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn getsid(pid: pid_t) -> pid_t {
-    unimplemented!();
+    Sys::getsid(pid)
 }
 
 #[no_mangle]

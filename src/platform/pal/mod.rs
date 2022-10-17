@@ -100,6 +100,8 @@ pub trait Pal {
 
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int;
 
+    fn getsid(pid: pid_t) -> pid_t;
+
     fn gettid() -> pid_t;
 
     fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int;

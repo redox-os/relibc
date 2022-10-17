@@ -13,7 +13,7 @@ use crate::{
     fs::File,
     header::{
         dirent::dirent,
-        errno::{EINVAL, EIO, ENOMEM, EPERM, ERANGE},
+        errno::{EINVAL, EIO, ENOMEM, ENOSYS, EPERM, ERANGE},
         fcntl,
         string::strlen,
         sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
@@ -531,6 +531,12 @@ impl Pal for Sys {
             (*rlim).rlim_max = RLIM_INFINITY;
         }
         0
+    }
+
+    fn getsid(pid: pid_t) -> pid_t {
+        //TODO
+        unsafe { errno = ENOSYS };
+        -1
     }
 
     fn gettid() -> pid_t {
