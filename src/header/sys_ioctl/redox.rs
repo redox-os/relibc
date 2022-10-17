@@ -8,6 +8,7 @@ use crate::{
 
 use super::winsize;
 
+pub const FIONREAD: c_ulong = 0x541B;
 pub const FIONBIO: c_ulong = 0x5421;
 
 pub const TCGETS: c_ulong = 0x5401;
