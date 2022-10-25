@@ -14,6 +14,12 @@ pub mod sys;
 #[path = "redox.rs"]
 pub mod sys;
 
+pub const MADV_NORMAL: c_int = 0;
+pub const MADV_RANDOM: c_int = 1;
+pub const MADV_SEQUENTIAL: c_int = 2;
+pub const MADV_WILLNEED: c_int = 3;
+pub const MADV_DONTNEED: c_int = 4;
+
 pub const MAP_SHARED: c_int = 0x0001;
 pub const MAP_PRIVATE: c_int = 0x0002;
 pub const MAP_TYPE: c_int = 0x000F;
