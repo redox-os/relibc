@@ -25,6 +25,7 @@ posix-regex = { path = "posix-regex", features = ["no_std"] }
 rand = { version = "0.5.5", default-features = false }
 memchr = { version = "2.2.0", default-features = false }
 plain = "0.2"
+unicode-width = "0.1"
 
 [dependencies.goblin]
 version = "0.0.21"

@@ -656,9 +656,15 @@ pub extern "C" fn wctob(c: wint_t) -> c_int {
     }
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn wcwidth(wc: wchar_t) -> c_int {
-    unimplemented!();
+    match char::from_u32(wc as u32) {
+        Some(c) => match unicode_width::UnicodeWidthChar::width(c) {
+            Some(width) => width as c_int,
+            None => -1,
+        },
+        None => -1,
+    }
 }
 
 #[no_mangle]

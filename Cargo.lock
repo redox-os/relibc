@@ -351,6 +351,7 @@ dependencies = [
  "redox_syscall 0.3.2",
  "sc",
  "spin 0.9.4",
+ "unicode-width",
 ]
 
 [[package]]
