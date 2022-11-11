@@ -28,6 +28,7 @@ use super::{
     debug::{RTLDState, _dl_debug_state, _r_debug},
     dso::{is_pie_enabled, DSO},
     tcb::{round_up, Master, Tcb},
+    ExpectTlsFree,
     PATH_SEP,
 };
 
@@ -226,6 +227,13 @@ impl Linker {
         self.next_object_id += 1;
 
         if let Some(master) = tcb_master {
+            if self.next_tls_module_id == 0 {
+                // Hack to allocate TCB on the first TLS module
+                unsafe {
+                    let tcb = Tcb::new(master.offset).expect_notls("failed to allocate TCB");
+                    tcb.activate();
+                }
+            }
             self.next_tls_module_id += 1;
             self.tls_size = master.offset;
             tcb_masters.push(master);

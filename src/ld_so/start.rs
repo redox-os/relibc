@@ -17,7 +17,7 @@ use crate::{
     ALLOCATOR,
 };
 
-use super::{access::accessible, debug::_r_debug, linker::Linker, tcb::Tcb, ExpectTlsFree, PATH_SEP};
+use super::{access::accessible, debug::_r_debug, linker::Linker, tcb::Tcb, PATH_SEP};
 use crate::header::sys_auxv::{AT_ENTRY, AT_PHDR};
 use goblin::elf::header::header64::SIZEOF_EHDR;
 
@@ -212,12 +212,6 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
             loop {}
         }
     };
-
-    // Ensure there is a stub Tcb
-    unsafe {
-        let tcb = Tcb::new(0).expect_notls("failed to allocate TCB");
-        tcb.activate();
-    }
 
     // if we are not running in manual mode, then the main
     // program is already loaded by the kernel and we want
