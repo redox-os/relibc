@@ -8,8 +8,10 @@ pub use self::{
     semaphore::Semaphore,
 };
 
-use crate::header::time::timespec;
-use crate::platform::{types::*, Pal, Sys};
+use crate::{
+    header::time::timespec,
+    platform::{types::*, Pal, Sys},
+};
 use core::{
     cell::UnsafeCell,
     ops::Deref,
@@ -38,14 +40,19 @@ impl AtomicLock {
         }
     }
     pub fn notify_one(&self) {
-        Sys::futex(unsafe { &mut *self.atomic.get() }.get_mut(), FUTEX_WAKE, 1, 0);
+        Sys::futex(
+            unsafe { &mut *self.atomic.get() }.get_mut(),
+            FUTEX_WAKE,
+            1,
+            0,
+        );
     }
     pub fn notify_all(&self) {
         Sys::futex(
             unsafe { &mut *self.atomic.get() }.get_mut(),
             FUTEX_WAKE,
             c_int::max_value(),
-            0
+            0,
         );
     }
     pub fn wait_if(&self, value: c_int, timeout_opt: Option<&timespec>) {
@@ -53,7 +60,7 @@ impl AtomicLock {
             unsafe { &mut *self.atomic.get() }.get_mut(),
             FUTEX_WAIT,
             value,
-            timeout_opt.map_or(0, |timeout| timeout as *const timespec as usize)
+            timeout_opt.map_or(0, |timeout| timeout as *const timespec as usize),
         );
     }
 

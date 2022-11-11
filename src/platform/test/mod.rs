@@ -8,7 +8,7 @@ mod epoll;
 
 #[test]
 fn access() {
-    use crate::header::{errno, unistd};
+    use crate::header::unistd;
 
     //TODO: create test files
     assert_eq!(Sys::access(c_str!("not a file!"), unistd::F_OK), !0);
@@ -69,7 +69,7 @@ fn clock_gettime() {
 
 #[test]
 fn getrandom() {
-    use crate::{header::sys_random, platform::types::ssize_t};
+    use crate::platform::types::ssize_t;
 
     let mut arrays = [[0; 32]; 32];
     for i in 1..arrays.len() {

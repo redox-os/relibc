@@ -1,15 +1,26 @@
-use crate::c_str::{CStr, CString};
-use crate::core_io::{BufReader, prelude::*, SeekFrom};
-use crate::fs::File;
-use crate::header::{fcntl, string::strlen};
-use crate::platform::{sys::{S_ISUID, S_ISGID}, types::*};
+use crate::{
+    c_str::{CStr, CString},
+    core_io::{prelude::*, BufReader, SeekFrom},
+    fs::File,
+    header::{fcntl, string::strlen},
+    platform::{
+        sys::{S_ISGID, S_ISUID},
+        types::*,
+    },
+};
 
-use syscall::data::Stat;
-use syscall::flag::*;
-use syscall::error::*;
-use redox_exec::{FdGuard, ExtraInfo, FexecResult};
+use redox_exec::{ExtraInfo, FdGuard, FexecResult};
+use syscall::{data::Stat, error::*, flag::*};
 
-fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], total_args_envs_size: usize, extrainfo: &ExtraInfo, interp_override: Option<redox_exec::InterpOverride>) -> Result<usize> {
+fn fexec_impl(
+    file: File,
+    path: &[u8],
+    args: &[&[u8]],
+    envs: &[&[u8]],
+    total_args_envs_size: usize,
+    extrainfo: &ExtraInfo,
+    interp_override: Option<redox_exec::InterpOverride>,
+) -> Result<usize> {
     let fd = *file;
     core::mem::forget(file);
     let image_file = FdGuard::new(fd as usize);
@@ -17,9 +28,24 @@ fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], total_arg
     let open_via_dup = FdGuard::new(syscall::open("thisproc:current/open_via_dup", 0)?);
     let memory = FdGuard::new(syscall::open("memory:", 0)?);
 
-    let addrspace_selection_fd = match redox_exec::fexec_impl(image_file, open_via_dup, &memory, path, args.iter().rev(), envs.iter().rev(), total_args_envs_size, extrainfo, interp_override)? {
+    let addrspace_selection_fd = match redox_exec::fexec_impl(
+        image_file,
+        open_via_dup,
+        &memory,
+        path,
+        args.iter().rev(),
+        envs.iter().rev(),
+        total_args_envs_size,
+        extrainfo,
+        interp_override,
+    )? {
         FexecResult::Normal { addrspace_handle } => addrspace_handle,
-        FexecResult::Interp { image_file, open_via_dup, path, interp_override: new_interp_override } => {
+        FexecResult::Interp {
+            image_file,
+            open_via_dup,
+            path,
+            interp_override: new_interp_override,
+        } => {
             drop(image_file);
             drop(open_via_dup);
             drop(memory);
@@ -28,7 +54,15 @@ fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], total_arg
             // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
             let path_cstr = CStr::from_bytes_with_nul(&path).map_err(|_| Error::new(ENOEXEC))?;
 
-            return execve(path_cstr, ArgEnv::Parsed { total_args_envs_size, args, envs }, Some(new_interp_override));
+            return execve(
+                path_cstr,
+                ArgEnv::Parsed {
+                    total_args_envs_size,
+                    args,
+                    envs,
+                },
+                Some(new_interp_override),
+            );
         }
     };
     drop(memory);
@@ -39,10 +73,21 @@ fn fexec_impl(file: File, path: &[u8], args: &[&[u8]], envs: &[&[u8]], total_arg
     unreachable!();
 }
 pub enum ArgEnv<'a> {
-    C { argv: *const *mut c_char, envp: *const *mut c_char },
-    Parsed { args: &'a [&'a [u8]], envs: &'a [&'a [u8]], total_args_envs_size: usize },
+    C {
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
+    },
+    Parsed {
+        args: &'a [&'a [u8]],
+        envs: &'a [&'a [u8]],
+        total_args_envs_size: usize,
+    },
 }
-pub fn execve(path: &CStr, arg_env: ArgEnv, interp_override: Option<redox_exec::InterpOverride>) -> Result<usize> {
+pub fn execve(
+    path: &CStr,
+    arg_env: ArgEnv,
+    interp_override: Option<redox_exec::InterpOverride>,
+) -> Result<usize> {
     // NOTE: We must omit O_CLOEXEC and close manually, otherwise it will be closed before we
     // have even read it!
     let mut image_file = File::open(path, O_RDONLY as c_int).map_err(|_| Error::new(ENOENT))?;
@@ -85,7 +130,7 @@ pub fn execve(path: &CStr, arg_env: ArgEnv, interp_override: Option<redox_exec::
             while !(*argv.add(len)).is_null() {
                 len += 1;
             }
-        }
+        },
         ArgEnv::Parsed { args, .. } => len = args.len(),
     }
 
@@ -98,7 +143,10 @@ pub fn execve(path: &CStr, arg_env: ArgEnv, interp_override: Option<redox_exec::
         let mut shebang = [0; 2];
 
         while read < 2 {
-            match image_file.read(&mut shebang).map_err(|_| Error::new(ENOEXEC))? {
+            match image_file
+                .read(&mut shebang)
+                .map_err(|_| Error::new(ENOEXEC))?
+            {
                 0 => break,
                 i => read += i,
             }
@@ -122,7 +170,9 @@ pub fn execve(path: &CStr, arg_env: ArgEnv, interp_override: Option<redox_exec::
         // So, this file is interpreted.
         // Then, read the actual interpreter:
         let mut interpreter = Vec::new();
-        BufReader::new(&mut image_file).read_until(b'\n', &mut interpreter).map_err(|_| Error::new(EIO))?;
+        BufReader::new(&mut image_file)
+            .read_until(b'\n', &mut interpreter)
+            .map_err(|_| Error::new(EIO))?;
         if interpreter.ends_with(&[b'\n']) {
             interpreter.pop().unwrap();
         }
@@ -134,7 +184,9 @@ pub fn execve(path: &CStr, arg_env: ArgEnv, interp_override: Option<redox_exec::
         let path_ref = _interpreter_path.as_ref().unwrap();
         args.push(path_ref.as_bytes());
     } else {
-        image_file.seek(SeekFrom::Start(0)).map_err(|_| Error::new(EIO))?;
+        image_file
+            .seek(SeekFrom::Start(0))
+            .map_err(|_| Error::new(EIO))?;
     }
 
     let (total_args_envs_size, args, envs): (usize, Vec<_>, Vec<_>) = match arg_env {
@@ -166,15 +218,22 @@ pub fn execve(path: &CStr, arg_env: ArgEnv, interp_override: Option<redox_exec::
                 args_envs_size_without_nul += len;
                 envp = envp.add(1);
             }
-            (args_envs_size_without_nul + args.len() + envs.len(), args, envs)
-        }
-        ArgEnv::Parsed { args: new_args, envs, total_args_envs_size } => {
+            (
+                args_envs_size_without_nul + args.len() + envs.len(),
+                args,
+                envs,
+            )
+        },
+        ArgEnv::Parsed {
+            args: new_args,
+            envs,
+            total_args_envs_size,
+        } => {
             let prev_size: usize = args.iter().map(|a| a.len()).sum();
             args.extend(new_args);
             (total_args_envs_size + prev_size, args, Vec::from(envs))
         }
     };
-
 
     // Close all O_CLOEXEC file descriptors. TODO: close_range?
     {
@@ -238,10 +297,21 @@ pub fn execve(path: &CStr, arg_env: ArgEnv, interp_override: Option<redox_exec::
         unreachable!()
     } else {
         let extrainfo = ExtraInfo { cwd: Some(&cwd) };
-        fexec_impl(image_file, path.to_bytes(), &args, &envs, total_args_envs_size, &extrainfo, interp_override)
+        fexec_impl(
+            image_file,
+            path.to_bytes(),
+            &args,
+            &envs,
+            total_args_envs_size,
+            &extrainfo,
+            interp_override,
+        )
     }
 }
-fn flatten_with_nul<T>(iter: impl IntoIterator<Item = T>) -> Box<[u8]> where T: AsRef<[u8]> {
+fn flatten_with_nul<T>(iter: impl IntoIterator<Item = T>) -> Box<[u8]>
+where
+    T: AsRef<[u8]>,
+{
     let mut vec = Vec::new();
     for item in iter {
         vec.extend(item.as_ref());

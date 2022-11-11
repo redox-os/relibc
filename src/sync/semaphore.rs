@@ -2,9 +2,11 @@
 //TODO: improve implementation
 
 use super::AtomicLock;
-use crate::header::time::timespec;
-use crate::platform::{types::*, Pal, Sys};
-use core::hint::spin_loop;
+use crate::{
+    header::time::timespec,
+    platform::{types::*, Pal, Sys},
+};
+
 use core::sync::atomic::Ordering;
 
 pub struct Semaphore {
@@ -25,7 +27,10 @@ impl Semaphore {
 
     pub fn wait(&self, timeout_opt: Option<&timespec>) {
         if let Some(timeout) = timeout_opt {
-            println!("semaphore wait tv_sec: {}, tv_nsec: {}", timeout.tv_sec, timeout.tv_nsec);
+            println!(
+                "semaphore wait tv_sec: {}, tv_nsec: {}",
+                timeout.tv_sec, timeout.tv_nsec
+            );
         }
         loop {
             while self.lock.load(Ordering::Acquire) < 1 {

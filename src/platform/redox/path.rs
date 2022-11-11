@@ -1,11 +1,11 @@
-use syscall::data::Stat;
-use syscall::error::*;
-use syscall::flag::*;
+use syscall::{data::Stat, error::*, flag::*};
 
-use alloc::borrow::{Cow, ToOwned};
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{
+    borrow::{Cow, ToOwned},
+    boxed::Box,
+    string::String,
+    vec::Vec,
+};
 
 use super::FdGuard;
 use crate::sync::Mutex;
@@ -25,7 +25,7 @@ pub fn canonicalize_using_cwd<'a>(cwd_opt: Option<&str>, path: &'a str) -> Optio
 
         let mut canon = if !path.starts_with('/') {
             let mut c = cwd.to_owned();
-            if ! c.ends_with('/') {
+            if !c.ends_with('/') {
                 c.push('/');
             }
             c
@@ -41,7 +41,8 @@ pub fn canonicalize_using_cwd<'a>(cwd_opt: Option<&str>, path: &'a str) -> Optio
 
     // NOTE: assumes the scheme does not include anything like "../" or "./"
     let mut result = {
-        let parts = canon.split('/')
+        let parts = canon
+            .split('/')
             .rev()
             .scan(0, |nskip, part| {
                 if part == "." {
@@ -50,8 +51,8 @@ pub fn canonicalize_using_cwd<'a>(cwd_opt: Option<&str>, path: &'a str) -> Optio
                     *nskip += 1;
                     Some(None)
                 } else if *nskip > 0 {
-                        *nskip -= 1;
-                        Some(None)
+                    *nskip -= 1;
+                    Some(None)
                 } else {
                     Some(Some(part))
                 }
@@ -59,21 +60,17 @@ pub fn canonicalize_using_cwd<'a>(cwd_opt: Option<&str>, path: &'a str) -> Optio
             .filter_map(|x| x)
             .filter(|x| !x.is_empty())
             .collect::<Vec<_>>();
-        parts
-            .iter()
-            .rev()
-            .fold(String::new(), |mut string, &part| {
-                string.push_str(part);
-                string.push('/');
-                string
-            })
+        parts.iter().rev().fold(String::new(), |mut string, &part| {
+            string.push_str(part);
+            string.push('/');
+            string
+        })
     };
     result.pop(); // remove extra '/'
 
     // replace with the root of the scheme if it's empty
     Some(if result.is_empty() {
-        let pos = canon.find(':')
-                        .map_or(canon.len(), |p| p + 1);
+        let pos = canon.find(':').map_or(canon.len(), |p| p + 1);
         canon.truncate(pos);
         canon
     } else {
@@ -94,7 +91,8 @@ pub fn chdir(path: &str) -> Result<()> {
     let _siglock = SignalMask::lock();
     let mut cwd_guard = CWD.lock();
 
-    let canonicalized = canonicalize_using_cwd(cwd_guard.as_deref(), path).ok_or(Error::new(ENOENT))?;
+    let canonicalized =
+        canonicalize_using_cwd(cwd_guard.as_deref(), path).ok_or(Error::new(ENOENT))?;
 
     let fd = syscall::open(&canonicalized, O_STAT | O_CLOEXEC)?;
     let mut stat = Stat::default();
@@ -122,7 +120,9 @@ pub fn getcwd(buf: &mut [u8]) -> Option<usize> {
     let cwd = cwd_guard.as_deref().unwrap_or("").as_bytes();
 
     // But is already checked not to be empty.
-    if buf.len() - 1 < cwd.len() { return None; }
+    if buf.len() - 1 < cwd.len() {
+        return None;
+    }
 
     buf[..cwd.len()].copy_from_slice(&cwd);
     buf[cwd.len()..].fill(0_u8);
@@ -153,7 +153,8 @@ pub struct SignalMask {
 impl SignalMask {
     pub fn lock() -> Self {
         let mut oldset = [0; 2];
-        syscall::sigprocmask(syscall::SIG_SETMASK, Some(&[!0, !0]), Some(&mut oldset)).expect("failed to run sigprocmask");
+        syscall::sigprocmask(syscall::SIG_SETMASK, Some(&[!0, !0]), Some(&mut oldset))
+            .expect("failed to run sigprocmask");
         Self { oldset }
     }
 }
@@ -180,11 +181,14 @@ pub fn open(path: &str, flags: usize) -> Result<usize> {
 
                 let bytes_read = syscall::read(*resolve_fd, &mut resolve_buf)?;
                 // TODO: make resolve_buf PATH_MAX + 1 bytes?
-                if bytes_read == resolve_buf.len() { return Err(Error::new(ENAMETOOLONG)); }
+                if bytes_read == resolve_buf.len() {
+                    return Err(Error::new(ENAMETOOLONG));
+                }
 
                 // If the symbolic link path is non-UTF8, it cannot be opened, and is thus
                 // considered a "dangling symbolic link".
-                path = core::str::from_utf8(&resolve_buf[..bytes_read]).map_err(|_| Error::new(ENOENT))?;
+                path = core::str::from_utf8(&resolve_buf[..bytes_read])
+                    .map_err(|_| Error::new(ENOENT))?;
             }
             Err(other_error) => return Err(other_error),
         }

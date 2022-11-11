@@ -1,11 +1,10 @@
-use core::{mem, ptr, slice};
-use core::arch::asm;
 use alloc::vec::Vec;
+use core::{arch::asm, mem, ptr, slice};
 use goblin::error::{Error, Result};
 
 use crate::{
     header::sys_mman,
-    ld_so::{linker::Linker, ExpectTlsFree},
+    ld_so::linker::Linker,
     platform::{Pal, Sys},
     sync::mutex::Mutex,
 };
@@ -195,7 +194,9 @@ impl Tcb {
 
     /// OS specific code to create a new TLS and TCB - Linux and Redox
     #[cfg(any(target_os = "linux", target_os = "redox"))]
-    unsafe fn os_new(size: usize) -> Result<(&'static mut [u8], &'static mut [u8], &'static mut [u8])> {
+    unsafe fn os_new(
+        size: usize,
+    ) -> Result<(&'static mut [u8], &'static mut [u8], &'static mut [u8])> {
         let page_size = Sys::getpagesize();
         let abi_tls_tcb = Self::map(page_size + size + page_size)?;
         let (abi, tls_tcb) = abi_tls_tcb.split_at_mut(page_size);
@@ -271,16 +272,17 @@ impl Tcb {
     unsafe fn os_arch_activate(tls_end: usize, _tls_len: usize) {
         let mut env = syscall::EnvRegisters::default();
 
-        let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDWR)
-            .expect_notls("failed to open handle for process registers");
+        let file = syscall::open(
+            "thisproc:current/regs/env",
+            syscall::O_CLOEXEC | syscall::O_RDWR,
+        )
+        .expect_notls("failed to open handle for process registers");
 
-        let _ = syscall::read(file, &mut env)
-            .expect_notls("failed to read gsbase");
+        let _ = syscall::read(file, &mut env).expect_notls("failed to read gsbase");
 
         env.gsbase = tls_end as u32;
 
-        let _ = syscall::write(file, &env)
-            .expect_notls("failed to write gsbase");
+        let _ = syscall::write(file, &env).expect_notls("failed to write gsbase");
 
         let _ = syscall::close(file);
     }
@@ -290,16 +292,17 @@ impl Tcb {
     unsafe fn os_arch_activate(tls_end: usize, _tls_len: usize) {
         let mut env = syscall::EnvRegisters::default();
 
-        let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDWR)
-            .expect_notls("failed to open handle for process registers");
+        let file = syscall::open(
+            "thisproc:current/regs/env",
+            syscall::O_CLOEXEC | syscall::O_RDWR,
+        )
+        .expect_notls("failed to open handle for process registers");
 
-        let _ = syscall::read(file, &mut env)
-            .expect_notls("failed to read fsbase");
+        let _ = syscall::read(file, &mut env).expect_notls("failed to read fsbase");
 
         env.fsbase = tls_end as u64;
 
-        let _ = syscall::write(file, &env)
-            .expect_notls("failed to write fsbase");
+        let _ = syscall::write(file, &env).expect_notls("failed to write fsbase");
 
         let _ = syscall::close(file);
     }

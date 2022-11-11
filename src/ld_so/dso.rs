@@ -16,10 +16,6 @@ use core::{
     mem::{size_of, transmute},
     ptr, slice,
 };
-use goblin::{
-    elf::Elf,
-    error::{Error, Result},
-};
 #[cfg(target_pointer_width = "32")]
 use goblin::elf32::{
     header::ET_DYN,
@@ -35,6 +31,10 @@ use goblin::elf64::{
     r#dyn::{Dyn, DT_DEBUG, DT_RUNPATH},
     section_header::{SHN_UNDEF, SHT_FINI_ARRAY, SHT_INIT_ARRAY},
     sym,
+};
+use goblin::{
+    elf::Elf,
+    error::{Error, Result},
 };
 
 /// Use to represent a library as well as all the symbols that is loaded withen it.

@@ -47,7 +47,10 @@ impl<T, E: core::fmt::Debug> ExpectTlsFree for Result<T, E> {
     fn expect_notls(self, msg: &str) -> T {
         match self {
             Ok(t) => t,
-            Err(err) => panic_notls(format_args!("{}: expect failed for Result with err: {:?}", msg, err)),
+            Err(err) => panic_notls(format_args!(
+                "{}: expect failed for Result with err: {:?}",
+                msg, err
+            )),
         }
     }
 }
@@ -122,9 +125,9 @@ pub fn static_init(sp: &'static Stack) {
                     let tcb = Tcb::new(vsize).expect_notls("failed to allocate TCB");
                     tcb.masters_ptr = &mut STATIC_TCB_MASTER;
                     tcb.masters_len = mem::size_of::<Master>();
-                    tcb.copy_masters().expect_notls("failed to copy TLS master data");
+                    tcb.copy_masters()
+                        .expect_notls("failed to copy TLS master data");
                     tcb.activate();
-
                 }
 
                 //TODO: Warning on multiple TLS sections?
@@ -155,11 +158,13 @@ pub unsafe fn init(sp: &'static Stack) {
     {
         let mut env = syscall::EnvRegisters::default();
 
-        let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDONLY)
-            .expect_notls("failed to open handle for process registers");
+        let file = syscall::open(
+            "thisproc:current/regs/env",
+            syscall::O_CLOEXEC | syscall::O_RDONLY,
+        )
+        .expect_notls("failed to open handle for process registers");
 
-        let _ = syscall::read(file, &mut env)
-            .expect_notls("failed to read gsbase");
+        let _ = syscall::read(file, &mut env).expect_notls("failed to read gsbase");
 
         let _ = syscall::close(file);
 
@@ -169,11 +174,13 @@ pub unsafe fn init(sp: &'static Stack) {
     {
         let mut env = syscall::EnvRegisters::default();
 
-        let file = syscall::open("thisproc:current/regs/env", syscall::O_CLOEXEC | syscall::O_RDONLY)
-            .expect_notls("failed to open handle for process registers");
+        let file = syscall::open(
+            "thisproc:current/regs/env",
+            syscall::O_CLOEXEC | syscall::O_RDONLY,
+        )
+        .expect_notls("failed to open handle for process registers");
 
-        let _ = syscall::read(file, &mut env)
-            .expect_notls("failed to read fsbase");
+        let _ = syscall::read(file, &mut env).expect_notls("failed to read fsbase");
 
         let _ = syscall::close(file);
 

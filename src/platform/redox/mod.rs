@@ -1,11 +1,9 @@
-use core::{mem, ptr, result::Result as CoreResult, slice, str};
-use core::convert::TryFrom;
-use core::arch::asm;
+use core::{arch::asm, convert::TryFrom, mem, ptr, result::Result as CoreResult, slice, str};
 
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
-    PtraceEvent, Result, Error, EMFILE,
+    Error, PtraceEvent, Result, EMFILE,
 };
 
 use crate::{
@@ -217,12 +215,12 @@ impl Pal for Sys {
         loop {}
     }
 
-    unsafe fn execve(
-        path: &CStr,
-        argv: *const *mut c_char,
-        envp: *const *mut c_char,
-    ) -> c_int {
-        e(self::exec::execve(path, self::exec::ArgEnv::C { argv, envp }, None)) as c_int
+    unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
+        e(self::exec::execve(
+            path,
+            self::exec::ArgEnv::C { argv, envp },
+            None,
+        )) as c_int
     }
 
     fn fchdir(fd: c_int) -> c_int {
@@ -364,13 +362,17 @@ impl Pal for Sys {
 
         let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize) };
         if buf_slice.is_empty() {
-            unsafe { errno = EINVAL; }
+            unsafe {
+                errno = EINVAL;
+            }
             return ptr::null_mut();
         }
 
         if path::getcwd(buf_slice).is_none() {
-            unsafe { errno = ERANGE; }
-            return ptr::null_mut()
+            unsafe {
+                errno = ERANGE;
+            }
+            return ptr::null_mut();
         }
 
         buf
@@ -712,16 +714,17 @@ impl Pal for Sys {
     fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
         let path = path_from_c_str!(path);
 
-        match path::open(path, ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF)) {
-            Ok(fd) => {
-                match c_int::try_from(fd) {
-                    Ok(c_fd) => c_fd,
-                    Err(_) => {
-                        let _ = syscall::close(fd);
-                        e(Err(Error::new(EMFILE))) as c_int
-                    }
+        match path::open(
+            path,
+            ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF),
+        ) {
+            Ok(fd) => match c_int::try_from(fd) {
+                Ok(c_fd) => c_fd,
+                Err(_) => {
+                    let _ = syscall::close(fd);
+                    e(Err(Error::new(EMFILE))) as c_int
                 }
-            }
+            },
             Err(error) => e(Err(error)) as c_int,
         }
     }
@@ -747,7 +750,10 @@ impl Pal for Sys {
     }
 
     fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t {
-        match File::open(pathname, fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC) {
+        match File::open(
+            pathname,
+            fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
+        ) {
             Ok(file) => Self::read(*file, out),
             Err(_) => return -1,
         }

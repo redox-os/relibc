@@ -3,7 +3,7 @@
 use core::convert::{TryFrom, TryInto};
 
 use crate::{
-    header::errno::{EIO, EOVERFLOW},
+    header::errno::EOVERFLOW,
     platform::{self, types::*, Pal, Sys},
 };
 
@@ -117,16 +117,17 @@ pub unsafe extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_ch
      * message for all fields. */
     const OUT_OF_RANGE_MESSAGE: &str = "tm member out of range";
 
-    assert!(0 <= tm_sec && tm_sec <= 99, OUT_OF_RANGE_MESSAGE);
-    assert!(0 <= tm_min && tm_min <= 99, OUT_OF_RANGE_MESSAGE);
-    assert!(0 <= tm_hour && tm_hour <= 99, OUT_OF_RANGE_MESSAGE);
-    assert!(-99 <= tm_mday && tm_mday <= 999, OUT_OF_RANGE_MESSAGE);
-    assert!(0 <= tm_mon && tm_mon <= 11, OUT_OF_RANGE_MESSAGE);
+    assert!(0 <= tm_sec && tm_sec <= 99, "{}", OUT_OF_RANGE_MESSAGE);
+    assert!(0 <= tm_min && tm_min <= 99, "{}", OUT_OF_RANGE_MESSAGE);
+    assert!(0 <= tm_hour && tm_hour <= 99, "{}", OUT_OF_RANGE_MESSAGE);
+    assert!(-99 <= tm_mday && tm_mday <= 999, "{}", OUT_OF_RANGE_MESSAGE);
+    assert!(0 <= tm_mon && tm_mon <= 11, "{}", OUT_OF_RANGE_MESSAGE);
     assert!(
         -999 - 1900 <= tm_year && tm_year <= 9999 - 1900,
+        "{}",
         OUT_OF_RANGE_MESSAGE
     );
-    assert!(0 <= tm_wday && tm_wday <= 6, OUT_OF_RANGE_MESSAGE);
+    assert!(0 <= tm_wday && tm_wday <= 6, "{}", OUT_OF_RANGE_MESSAGE);
 
     // At this point, we can safely use the values as given.
     let write_result = core::fmt::write(
@@ -382,10 +383,10 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
             day += MONTH_DAYS[leap][month as usize] as i64;
         }
 
-        (day * (60 * 60 * 24)
+        day * (60 * 60 * 24)
             + ((*t).tm_hour as i64) * (60 * 60)
             + ((*t).tm_min as i64) * 60
-            + (*t).tm_sec as i64)
+            + (*t).tm_sec as i64
     }
 }
 

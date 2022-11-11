@@ -1,6 +1,5 @@
 use crate::io::{self, Read, Write};
-use alloc::boxed::Box;
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::{fmt, ptr};
 
 pub use self::allocator::*;
@@ -283,7 +282,10 @@ pub unsafe fn get_auxvs(mut ptr: *const usize) -> Box<[[usize; 2]]> {
     auxvs.into_boxed_slice()
 }
 pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
-    auxvs.binary_search_by_key(&key, |[entry_key, _]| *entry_key).ok().map(|idx| auxvs[idx][1])
+    auxvs
+        .binary_search_by_key(&key, |[entry_key, _]| *entry_key)
+        .ok()
+        .map(|idx| auxvs[idx][1])
 }
 
 #[cold]
@@ -291,8 +293,12 @@ pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
 pub fn init(auxvs: Box<[[usize; 2]]>) {
     use self::auxv_defs::*;
 
-    if let (Some(cwd_ptr), Some(cwd_len)) = (get_auxv(&auxvs, AT_REDOX_INITIALCWD_PTR), get_auxv(&auxvs, AT_REDOX_INITIALCWD_LEN)) {
-        let cwd_bytes: &'static [u8] = unsafe { core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len) };
+    if let (Some(cwd_ptr), Some(cwd_len)) = (
+        get_auxv(&auxvs, AT_REDOX_INITIALCWD_PTR),
+        get_auxv(&auxvs, AT_REDOX_INITIALCWD_LEN),
+    ) {
+        let cwd_bytes: &'static [u8] =
+            unsafe { core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len) };
         if let Ok(cwd) = core::str::from_utf8(cwd_bytes) {
             self::sys::path::setcwd_manual(cwd.into());
         }

@@ -1,11 +1,7 @@
 //! wchar implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/wctype.h.html
 
-use crate::{
-    c_str::CStr,
-    header::ctype,
-    platform::types::*,
-};
 use self::casecmp::casemap;
+use crate::{c_str::CStr, header::ctype, platform::types::*};
 
 mod alpha;
 mod casecmp;
@@ -63,7 +59,7 @@ pub unsafe extern "C" fn wctype(name: *const c_char) -> wctype_t {
         b"space" => WCTYPE_SPACE,
         b"upper" => WCTYPE_UPPER,
         b"xdigit" => WCTYPE_XDIGIT,
-        _ => 0
+        _ => 0,
     }
 }
 
@@ -85,10 +81,10 @@ pub extern "C" fn iswblank(wc: wint_t) -> c_int {
 #[no_mangle]
 pub extern "C" fn iswcntrl(wc: wint_t) -> c_int {
     c_int::from(
-        wc < 32 ||
-        wc.wrapping_sub(0x7f) < 33 ||
-        wc.wrapping_sub(0x2028) < 2 ||
-        wc.wrapping_sub(0xfff9) < 3
+        wc < 32
+            || wc.wrapping_sub(0x7f) < 33
+            || wc.wrapping_sub(0x2028) < 2
+            || wc.wrapping_sub(0xfff9) < 3,
     )
 }
 
@@ -110,13 +106,13 @@ pub extern "C" fn iswlower(wc: wint_t) -> c_int {
 #[no_mangle]
 pub extern "C" fn iswprint(wc: wint_t) -> c_int {
     if wc < 0xff {
-        c_int::from((wc+1 & 0x7f) >= 0x21)
+        c_int::from((wc + 1 & 0x7f) >= 0x21)
     } else if wc < 0x2028
-        || wc.wrapping_sub(0x202a) < 0xd800-0x202a
-        || wc.wrapping_sub(0xe000) < 0xfff9-0xe000 {
+        || wc.wrapping_sub(0x202a) < 0xd800 - 0x202a
+        || wc.wrapping_sub(0xe000) < 0xfff9 - 0xe000
+    {
         1
-    } else if wc.wrapping_sub(0xfffc) > 0x10ffff-0xfffc
-        || (wc&0xfffe)==0xfffe {
+    } else if wc.wrapping_sub(0xfffc) > 0x10ffff - 0xfffc || (wc & 0xfffe) == 0xfffe {
         0
     } else {
         1
@@ -130,13 +126,32 @@ pub extern "C" fn iswpunct(wc: wint_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn iswspace(wc: wint_t) -> c_int {
-    c_int::from([
-        ' ' as wint_t, '\t' as wint_t, '\n' as wint_t, '\r' as wint_t,
-        11, 12, 0x0085,
-        0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005,
-        0x2006, 0x2008, 0x2009, 0x200a,
-        0x2028, 0x2029, 0x205f, 0x3000
-    ].contains(&wc))
+    c_int::from(
+        [
+            ' ' as wint_t,
+            '\t' as wint_t,
+            '\n' as wint_t,
+            '\r' as wint_t,
+            11,
+            12,
+            0x0085,
+            0x2000,
+            0x2001,
+            0x2002,
+            0x2003,
+            0x2004,
+            0x2005,
+            0x2006,
+            0x2008,
+            0x2009,
+            0x200a,
+            0x2028,
+            0x2029,
+            0x205f,
+            0x3000,
+        ]
+        .contains(&wc),
+    )
 }
 
 #[no_mangle]
@@ -146,10 +161,7 @@ pub extern "C" fn iswupper(wc: wint_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn iswxdigit(wc: wint_t) -> c_int {
-    c_int::from(
-        wc.wrapping_sub('0' as wint_t) < 10 ||
-        (wc|32).wrapping_sub('a' as wint_t) < 6
-    )
+    c_int::from(wc.wrapping_sub('0' as wint_t) < 10 || (wc | 32).wrapping_sub('a' as wint_t) < 6)
 }
 
 #[no_mangle]

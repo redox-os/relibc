@@ -28,8 +28,7 @@ use super::{
     debug::{RTLDState, _dl_debug_state, _r_debug},
     dso::{is_pie_enabled, DSO},
     tcb::{round_up, Master, Tcb},
-    ExpectTlsFree,
-    PATH_SEP,
+    ExpectTlsFree, PATH_SEP,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -84,9 +83,10 @@ impl Linker {
                     obj.use_count += 1;
                     return Ok(*id);
                 } else {
-                    let parent_runpath = &self.objects.get(&root_id).and_then(|parent| {
-                        parent.runpath.clone()
-                    });
+                    let parent_runpath = &self
+                        .objects
+                        .get(&root_id)
+                        .and_then(|parent| parent.runpath.clone());
                     let lib_id = self.next_object_id;
                     self.load_object(name, parent_runpath, None, true)?;
 
@@ -350,7 +350,10 @@ impl Linker {
                         if let Some((s, strong)) = lookup_obj.get_sym(name) {
                             trace!(
                                 "symbol {} from {} found in {} ({})",
-                                name, obj.name, lookup_obj.name, if strong { "strong" } else { "weak" }
+                                name,
+                                obj.name,
+                                lookup_obj.name,
+                                if strong { "strong" } else { "weak" }
                             );
                             symbol = Some(s);
                             t = lookup_obj.tls_offset;
@@ -486,7 +489,10 @@ impl Linker {
         for obj in objects.iter().rev() {
             if let Some((symbol, true)) = obj.get_sym("__relibc_init_environ") {
                 unsafe {
-                    symbol.as_ptr().cast::<*mut *mut c_char>().write(platform::environ);
+                    symbol
+                        .as_ptr()
+                        .cast::<*mut *mut c_char>()
+                        .write(platform::environ);
                 }
             }
 

@@ -53,7 +53,9 @@ pub fn init_state() -> &'static State {
 }
 pub fn is_traceme(pid: pid_t) -> bool {
     // Skip special PIDs (<=0)
-    if pid <= 0 { return false; }
+    if pid <= 0 {
+        return false;
+    }
     File::open(
         &CString::new(format!("chan:ptrace-relibc/{}/traceme", pid)).unwrap(),
         fcntl::O_PATH,

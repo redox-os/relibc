@@ -853,7 +853,13 @@ pub unsafe extern "C" fn seed48(seed16v: *mut c_ushort) -> *mut c_ushort {
     rand48::SEED48_XSUBI.as_mut_ptr()
 }
 
-unsafe fn copy_kv(existing: *mut c_char, key: *const c_char, value: *const c_char, key_len: usize, value_len: usize) {
+unsafe fn copy_kv(
+    existing: *mut c_char,
+    key: *const c_char,
+    value: *const c_char,
+    key_len: usize,
+    value_len: usize,
+) {
     core::ptr::copy_nonoverlapping(key, existing, key_len);
     core::ptr::write(existing.add(key_len), b'=' as c_char);
     core::ptr::copy_nonoverlapping(value, existing.add(key_len + 1), value_len);
@@ -862,8 +868,8 @@ unsafe fn copy_kv(existing: *mut c_char, key: *const c_char, value: *const c_cha
 
 #[no_mangle]
 pub unsafe extern "C" fn setenv(
-    mut key: *const c_char,
-    mut value: *const c_char,
+    key: *const c_char,
+    value: *const c_char,
     overwrite: c_int,
 ) -> c_int {
     let key_len = strlen(key);
@@ -883,13 +889,13 @@ pub unsafe extern "C" fn setenv(
             core::ptr::write(existing.add(value_len), 0);
         } else {
             // Reuse platform::environ slot, but allocate a new pointer.
-            let mut ptr = platform::alloc(key_len as usize + 1 + value_len as usize + 1) as *mut c_char;
+            let ptr = platform::alloc(key_len as usize + 1 + value_len as usize + 1) as *mut c_char;
             copy_kv(ptr, key, value, key_len, value_len);
             platform::environ.add(i).write(ptr);
         }
     } else {
         // Expand platform::environ and allocate a new pointer.
-        let mut ptr = platform::alloc(key_len as usize + 1 + value_len as usize + 1) as *mut c_char;
+        let ptr = platform::alloc(key_len as usize + 1 + value_len as usize + 1) as *mut c_char;
         copy_kv(ptr, key, value, key_len, value_len);
         put_new_env(ptr);
     }
@@ -1165,7 +1171,12 @@ pub unsafe extern "C" fn unsetenv(key: *const c_char) -> c_int {
             platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
         } else {
             platform::OUR_ENVIRON.clear();
-            platform::OUR_ENVIRON.extend(platform::environ_iter().enumerate().filter(|&(j, _)| j != i).map(|(_, v)| v));
+            platform::OUR_ENVIRON.extend(
+                platform::environ_iter()
+                    .enumerate()
+                    .filter(|&(j, _)| j != i)
+                    .map(|(_, v)| v),
+            );
             platform::OUR_ENVIRON.push(core::ptr::null_mut());
             platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
         }
