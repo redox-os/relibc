@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 use core::{arch::asm, mem, ptr, slice};
 use goblin::error::{Error, Result};
 
+use super::ExpectTlsFree;
 use crate::{
     header::sys_mman,
     ld_so::linker::Linker,
