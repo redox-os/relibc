@@ -3,7 +3,7 @@
 
 use super::AtomicLock;
 use crate::{
-    header::time::timespec,
+    header::time::{CLOCK_MONOTONIC, clock_gettime, timespec},
     platform::{types::*, Pal, Sys},
 };
 
