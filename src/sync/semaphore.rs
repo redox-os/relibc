@@ -21,27 +21,46 @@ impl Semaphore {
         }
     }
 
-    pub fn post(&self) {
-        self.lock.fetch_add(1, Ordering::Release);
+    pub fn post(&self, count: c_int) {
+        self.lock.fetch_add(count, Ordering::SeqCst);
     }
 
-    pub fn wait(&self, timeout_opt: Option<&timespec>) {
-        if let Some(timeout) = timeout_opt {
-            println!(
-                "semaphore wait tv_sec: {}, tv_nsec: {}",
-                timeout.tv_sec, timeout.tv_nsec
-            );
+    pub fn try_wait(&self) -> Result<(), ()> {
+        let mut value = self.lock.load(Ordering::SeqCst);
+        if value > 0 {
+            match self.lock.compare_exchange(
+                value,
+                value - 1,
+                Ordering::SeqCst,
+                Ordering::SeqCst
+            ) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(())
+            }
+        } else {
+            Err(())
         }
+    }
+
+    pub fn wait(&self, timeout_opt: Option<&timespec>) -> Result<(), ()> {
+
         loop {
-            while self.lock.load(Ordering::Acquire) < 1 {
-                //spin_loop();
-                Sys::sched_yield();
+            match self.try_wait() {
+                Ok(()) => {
+                    return Ok(());
+                }
+                Err(()) => ()
             }
-            let tmp = self.lock.fetch_sub(1, Ordering::AcqRel);
-            if tmp >= 1 {
-                break;
+            if let Some(timeout) = timeout_opt {
+                let mut time = timespec::default();
+                clock_gettime(CLOCK_MONOTONIC, &mut time);
+                if (time.tv_sec > timeout.tv_sec) ||
+                   (time.tv_sec == timeout.tv_sec && time.tv_nsec >= timeout.tv_nsec)
+                {
+                    return Err(())
+                }
             }
-            self.lock.fetch_add(1, Ordering::Release);
+            Sys::sched_yield();
         }
     }
 }

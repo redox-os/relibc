@@ -8,7 +8,7 @@ use core::{
 };
 
 use crate::{
-    header::{sys_mman, time::timespec},
+    header::{sys_mman, time::{CLOCK_MONOTONIC, clock_gettime, timespec}},
     ld_so::{
         linker::Linker,
         tcb::{Master, Tcb},
@@ -237,7 +237,7 @@ pub unsafe extern "C" fn pte_osThreadWaitForEnd(handle: pte_osThreadHandle) -> p
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadCancel(handle: pte_osThreadHandle) -> pte_osResult {
     //TODO: allow cancel of thread
-    println!("pte_osThreadCancel");
+    eprintln!("pte_osThreadCancel");
     PTE_OS_OK
 }
 
@@ -338,7 +338,7 @@ pub unsafe extern "C" fn pte_osSemaphorePost(
     handle: pte_osSemaphoreHandle,
     count: c_int,
 ) -> pte_osResult {
-    (*handle).post();
+    (*handle).post(count);
     PTE_OS_OK
 }
 
@@ -348,15 +348,26 @@ pub unsafe extern "C" fn pte_osSemaphorePend(
     pTimeout: *mut c_uint,
 ) -> pte_osResult {
     let timeout_opt = if !pTimeout.is_null() {
+        // Get current time
+        let mut time = timespec::default();
+        clock_gettime(CLOCK_MONOTONIC, &mut time);
+
+        // Add timeout to time
         let timeout = *pTimeout as i64;
-        let tv_sec = timeout / 1000;
-        let tv_nsec = (timeout % 1000) * 1000000;
-        Some(timespec { tv_sec, tv_nsec })
+        time.tv_sec += timeout / 1000;
+        time.tv_nsec += (timeout % 1000) * 1_000_000;
+        while time.tv_nsec >= 1_000_000_000 {
+            time.tv_sec += 1;
+            time.tv_nsec -= 1_000_000_000;
+        }
+        Some(time)
     } else {
         None
     };
-    (*handle).wait(timeout_opt.as_ref());
-    PTE_OS_OK
+    match (*handle).wait(timeout_opt.as_ref()) {
+        Ok(()) => PTE_OS_OK,
+        Err(()) => PTE_OS_TIMEOUT,
+    }
 }
 
 #[no_mangle]
