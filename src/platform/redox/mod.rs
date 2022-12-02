@@ -190,7 +190,7 @@ impl Pal for Sys {
             -1 => -1,
             _ => {
                 unsafe {
-                    (*tp).tv_sec = redox_tp.tv_sec as c_long;
+                    (*tp).tv_sec = redox_tp.tv_sec as time_t;
                     (*tp).tv_nsec = redox_tp.tv_nsec as c_long;
                 };
                 0
@@ -702,7 +702,7 @@ impl Pal for Sys {
             _ => {
                 unsafe {
                     if !rmtp.is_null() {
-                        (*rmtp).tv_sec = redox_rmtp.tv_sec as c_long;
+                        (*rmtp).tv_sec = redox_rmtp.tv_sec as time_t;
                         (*rmtp).tv_nsec = redox_rmtp.tv_nsec as c_long;
                     }
                 }

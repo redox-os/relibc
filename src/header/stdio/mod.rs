@@ -616,7 +616,7 @@ pub unsafe fn fseek_locked(stream: &mut FILE, mut off: off_t, whence: c_int) -> 
 /// Seek to a position `pos` in the file from the beginning of the file
 #[no_mangle]
 pub unsafe extern "C" fn fsetpos(stream: *mut FILE, pos: *const fpos_t) -> c_int {
-    fseek(stream, *pos, SEEK_SET)
+    fseeko(stream, *pos, SEEK_SET)
 }
 
 /// Get the current position of the cursor in the file

@@ -39,9 +39,9 @@ impl PalSignal for Sys {
         }
 
         unsafe {
-            (*out).it_interval.tv_sec = spec.it_interval.tv_sec as c_long;
+            (*out).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
             (*out).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
-            (*out).it_value.tv_sec = spec.it_value.tv_sec as c_long;
+            (*out).it_value.tv_sec = spec.it_value.tv_sec as time_t;
             (*out).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
         }
 
@@ -81,9 +81,9 @@ impl PalSignal for Sys {
         if count != !0 {
             unsafe {
                 if !old.is_null() {
-                    (*old).it_interval.tv_sec = spec.it_interval.tv_sec as c_long;
+                    (*old).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
                     (*old).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
-                    (*old).it_value.tv_sec = spec.it_value.tv_sec as c_long;
+                    (*old).it_value.tv_sec = spec.it_value.tv_sec as time_t;
                     (*old).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
                 }
 

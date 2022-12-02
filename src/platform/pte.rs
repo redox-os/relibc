@@ -14,7 +14,7 @@ use crate::{
         tcb::{Master, Tcb},
     },
     platform::{
-        types::{c_int, c_uint, c_long, c_void, pid_t, size_t},
+        types::{c_int, c_uint, c_long, c_void, pid_t, size_t, time_t},
         Pal, Sys,
     },
     sync::{Mutex, Semaphore},
@@ -253,8 +253,8 @@ pub unsafe extern "C" fn pte_osThreadSleep(msecs: c_uint) {
         Sys::sched_yield();
     } else {
         let tm = timespec {
-            tv_sec: msecs as c_long / 1000,
-            tv_nsec: (msecs % 1000) as c_long * 1000000,
+            tv_sec: msecs as time_t / 1000,
+            tv_nsec: ((msecs as c_long) % 1000) * 1000000,
         };
         Sys::nanosleep(&tm, ptr::null_mut());
     }
@@ -353,9 +353,9 @@ pub unsafe extern "C" fn pte_osSemaphorePend(
         clock_gettime(CLOCK_MONOTONIC, &mut time);
 
         // Add timeout to time
-        let timeout = *pTimeout as c_long;
+        let timeout = *pTimeout as time_t;
         time.tv_sec += timeout / 1000;
-        time.tv_nsec += (timeout % 1000) * 1_000_000;
+        time.tv_nsec += ((timeout % 1000) * 1_000_000) as c_long;
         while time.tv_nsec >= 1_000_000_000 {
             time.tv_sec += 1;
             time.tv_nsec -= 1_000_000_000;
