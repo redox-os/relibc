@@ -422,7 +422,7 @@ pub unsafe extern "C" fn getnetent() -> *mut netent {
         n_name: NET_NAME.as_mut().unwrap().as_mut_ptr() as *mut c_char,
         n_aliases: net_aliases.as_mut_slice().as_mut_ptr() as *mut *mut i8,
         n_addrtype: AF_INET,
-        n_net: NET_ADDR.unwrap() as u64,
+        n_net: NET_ADDR.unwrap() as c_ulong,
     };
     &mut NET_ENTRY as *mut netent
 }

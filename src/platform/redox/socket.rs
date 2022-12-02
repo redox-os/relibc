@@ -362,7 +362,7 @@ impl PalSocket for Sys {
             }
 
             let timespec = syscall::TimeSpec {
-                tv_sec: timeval.tv_sec,
+                tv_sec: timeval.tv_sec as i64,
                 tv_nsec: timeval.tv_usec * 1000,
             };
 

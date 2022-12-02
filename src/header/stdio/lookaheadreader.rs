@@ -1,5 +1,8 @@
 use super::{fseek_locked, ftell_locked, FILE, SEEK_SET};
-use crate::core_io::Read;
+use crate::{
+    core_io::Read,
+    platform::types::off_t,
+};
 struct LookAheadBuffer {
     buf: *const u8,
     pos: isize,
@@ -40,7 +43,7 @@ impl<'a> LookAheadFile<'a> {
     fn look_ahead(&mut self) -> Result<Option<u8>, i32> {
         let buf = &mut [0];
         let seek = unsafe { ftell_locked(self.f) };
-        unsafe { fseek_locked(self.f, self.look_ahead, SEEK_SET) };
+        unsafe { fseek_locked(self.f, self.look_ahead as off_t, SEEK_SET) };
         let ret = match self.f.read(buf) {
             Ok(0) => Ok(None),
             Ok(_) => Ok(Some(buf[0])),
@@ -52,7 +55,7 @@ impl<'a> LookAheadFile<'a> {
     }
 
     fn commit(&mut self) {
-        unsafe { fseek_locked(self.f, self.look_ahead, SEEK_SET) };
+        unsafe { fseek_locked(self.f, self.look_ahead as off_t, SEEK_SET) };
     }
 }
 

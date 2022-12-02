@@ -1099,7 +1099,15 @@ pub unsafe extern "C" fn strtoull(
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> c_ulonglong {
-    strtoul(s, endptr, base)
+    strto_impl!(
+        c_ulonglong,
+        false,
+        c_ulonglong::max_value(),
+        c_ulonglong::min_value(),
+        s,
+        endptr,
+        base
+    )
 }
 
 #[no_mangle]
@@ -1108,7 +1116,15 @@ pub unsafe extern "C" fn strtoll(
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> c_longlong {
-    strtol(s, endptr, base)
+    strto_impl!(
+        c_longlong,
+        true,
+        c_longlong::max_value(),
+        c_longlong::min_value(),
+        s,
+        endptr,
+        base
+    )
 }
 
 #[no_mangle]

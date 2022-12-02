@@ -23,7 +23,7 @@ pub struct timespec {
 impl<'a> From<&'a timespec> for syscall::TimeSpec {
     fn from(tp: &timespec) -> Self {
         Self {
-            tv_sec: tp.tv_sec,
+            tv_sec: tp.tv_sec as i64,
             tv_nsec: tp.tv_nsec as i32,
         }
     }
@@ -370,8 +370,10 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
             day += MONTH_DAYS[leap][month as usize] as i64;
         }
 
-        -(day * (60 * 60 * 24)
+        (
+            -(day * (60 * 60 * 24)
             - (((*t).tm_hour as i64) * (60 * 60) + ((*t).tm_min as i64) * 60 + (*t).tm_sec as i64))
+        ) as time_t
     } else {
         while year > 1970 {
             year -= 1;
@@ -383,10 +385,12 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
             day += MONTH_DAYS[leap][month as usize] as i64;
         }
 
-        day * (60 * 60 * 24)
+        (
+            day * (60 * 60 * 24)
             + ((*t).tm_hour as i64) * (60 * 60)
             + ((*t).tm_min as i64) * 60
             + (*t).tm_sec as i64
+        ) as time_t
     }
 }
 

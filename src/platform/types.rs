@@ -41,7 +41,13 @@ pub type uintptr_t = usize;
 pub type ssize_t = isize;
 
 pub type c_char = i8;
+#[cfg(target_pointer_width = "32")]
+pub type c_long = i32;
+#[cfg(target_pointer_width = "32")]
+pub type c_ulong = u32;
+#[cfg(target_pointer_width = "64")]
 pub type c_long = i64;
+#[cfg(target_pointer_width = "64")]
 pub type c_ulong = u64;
 
 pub type wchar_t = i32;

@@ -190,8 +190,8 @@ impl Pal for Sys {
             -1 => -1,
             _ => {
                 unsafe {
-                    (*tp).tv_sec = redox_tp.tv_sec;
-                    (*tp).tv_nsec = redox_tp.tv_nsec as i64;
+                    (*tp).tv_sec = redox_tp.tv_sec as c_long;
+                    (*tp).tv_nsec = redox_tp.tv_nsec as c_long;
                 };
                 0
             }
@@ -302,9 +302,9 @@ impl Pal for Sys {
                     if !buf.is_null() {
                         (*buf).f_bsize = kbuf.f_bsize as c_ulong;
                         (*buf).f_frsize = kbuf.f_bsize as c_ulong;
-                        (*buf).f_blocks = kbuf.f_blocks;
-                        (*buf).f_bfree = kbuf.f_bfree;
-                        (*buf).f_bavail = kbuf.f_bavail;
+                        (*buf).f_blocks = kbuf.f_blocks as c_ulong;
+                        (*buf).f_bfree = kbuf.f_bfree as c_ulong;
+                        (*buf).f_bavail = kbuf.f_bavail as c_ulong;
                         //TODO
                         (*buf).f_files = 0;
                         (*buf).f_ffree = 0;
@@ -702,8 +702,8 @@ impl Pal for Sys {
             _ => {
                 unsafe {
                     if !rmtp.is_null() {
-                        (*rmtp).tv_sec = redox_rmtp.tv_sec;
-                        (*rmtp).tv_nsec = redox_rmtp.tv_nsec as i64;
+                        (*rmtp).tv_sec = redox_rmtp.tv_sec as c_long;
+                        (*rmtp).tv_nsec = redox_rmtp.tv_nsec as c_long;
                     }
                 }
                 0

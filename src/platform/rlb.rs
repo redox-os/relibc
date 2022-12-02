@@ -92,7 +92,7 @@ impl RawLineBuffer {
 
     /// Seek to a byte position in the file
     pub fn seek(&mut self, pos: usize) -> off_t {
-        let ret = lseek(self.fd, pos as i64, SEEK_SET);
+        let ret = lseek(self.fd, pos as off_t, SEEK_SET);
         if ret != !0 {
             self.read = pos;
         }

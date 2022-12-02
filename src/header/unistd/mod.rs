@@ -603,7 +603,7 @@ pub extern "C" fn setuid(uid: uid_t) -> c_int {
 #[no_mangle]
 pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
     let rqtp = timespec {
-        tv_sec: seconds as i64,
+        tv_sec: seconds as c_long,
         tv_nsec: 0,
     };
     let rmtp = ptr::null_mut();
@@ -731,8 +731,8 @@ pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
 #[no_mangle]
 pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
     let rqtp = timespec {
-        tv_sec: (useconds / 1_000_000) as i64,
-        tv_nsec: ((useconds % 1_000_000) * 1000) as i64,
+        tv_sec: (useconds / 1_000_000) as c_long,
+        tv_nsec: ((useconds % 1_000_000) * 1000) as c_long,
     };
     let rmtp = ptr::null_mut();
     Sys::nanosleep(&rqtp, rmtp)
