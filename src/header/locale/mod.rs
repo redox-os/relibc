@@ -32,7 +32,8 @@ pub struct lconv {
 }
 unsafe impl Sync for lconv {}
 
-static CURRENT_LOCALE: lconv = lconv {
+//TODO: thread local?
+static mut CURRENT_LOCALE: lconv = lconv {
     currency_symbol: EMPTY_PTR,
     decimal_point: ".\0" as *const _ as *const c_char,
     frac_digits: c_char::max_value(),
@@ -54,8 +55,8 @@ static CURRENT_LOCALE: lconv = lconv {
 };
 
 #[no_mangle]
-pub extern "C" fn localeconv() -> *const lconv {
-    &CURRENT_LOCALE as *const _
+pub unsafe extern "C" fn localeconv() -> *mut lconv {
+    &mut CURRENT_LOCALE as *mut _
 }
 
 #[no_mangle]
