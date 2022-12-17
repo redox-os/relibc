@@ -163,8 +163,8 @@ pub extern "C" fn clock() -> clock_t {
     }
     let ts = unsafe { ts.assume_init() };
 
-    let clocks = ts.tv_sec * CLOCKS_PER_SEC as i64
-               + (ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC)) as i64;
+    let clocks =
+        ts.tv_sec * CLOCKS_PER_SEC as i64 + (ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC)) as i64;
     match clock_t::try_from(clocks) {
         Ok(ok) => ok,
         Err(_err) => -1,
@@ -368,10 +368,9 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
             day += MONTH_DAYS[leap][month as usize] as i64;
         }
 
-        (
-            -(day * (60 * 60 * 24)
-            - (((*t).tm_hour as i64) * (60 * 60) + ((*t).tm_min as i64) * 60 + (*t).tm_sec as i64))
-        ) as time_t
+        (-(day * (60 * 60 * 24)
+            - (((*t).tm_hour as i64) * (60 * 60) + ((*t).tm_min as i64) * 60 + (*t).tm_sec as i64)))
+            as time_t
     } else {
         while year > 1970 {
             year -= 1;
@@ -383,12 +382,10 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
             day += MONTH_DAYS[leap][month as usize] as i64;
         }
 
-        (
-            day * (60 * 60 * 24)
+        (day * (60 * 60 * 24)
             + ((*t).tm_hour as i64) * (60 * 60)
             + ((*t).tm_min as i64) * 60
-            + (*t).tm_sec as i64
-        ) as time_t
+            + (*t).tm_sec as i64) as time_t
     }
 }
 

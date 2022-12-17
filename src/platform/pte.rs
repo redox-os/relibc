@@ -8,13 +8,16 @@ use core::{
 };
 
 use crate::{
-    header::{sys_mman, time::{CLOCK_MONOTONIC, clock_gettime, timespec}},
+    header::{
+        sys_mman,
+        time::{clock_gettime, timespec, CLOCK_MONOTONIC},
+    },
     ld_so::{
         linker::Linker,
         tcb::{Master, Tcb},
     },
     platform::{
-        types::{c_int, c_uint, c_long, c_void, pid_t, size_t, time_t},
+        types::{c_int, c_long, c_uint, c_void, pid_t, size_t, time_t},
         Pal, Sys,
     },
     sync::{Mutex, Semaphore},

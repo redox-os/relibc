@@ -3,7 +3,7 @@
 
 use super::AtomicLock;
 use crate::{
-    header::time::{CLOCK_MONOTONIC, clock_gettime, timespec},
+    header::time::{clock_gettime, timespec, CLOCK_MONOTONIC},
     platform::{types::*, Pal, Sys},
 };
 
@@ -33,13 +33,13 @@ impl Semaphore {
                     value,
                     value - 1,
                     Ordering::SeqCst,
-                    Ordering::SeqCst
+                    Ordering::SeqCst,
                 ) {
                     Ok(_) => {
                         // Acquired
                         return Ok(());
                     }
-                    Err(_) => ()
+                    Err(_) => (),
                 }
                 // Try again (as long as value > 0)
                 continue;
@@ -47,11 +47,11 @@ impl Semaphore {
             if let Some(timeout) = timeout_opt {
                 let mut time = timespec::default();
                 clock_gettime(CLOCK_MONOTONIC, &mut time);
-                if (time.tv_sec > timeout.tv_sec) ||
-                   (time.tv_sec == timeout.tv_sec && time.tv_nsec >= timeout.tv_nsec)
+                if (time.tv_sec > timeout.tv_sec)
+                    || (time.tv_sec == timeout.tv_sec && time.tv_nsec >= timeout.tv_nsec)
                 {
                     //Timeout happened, return error
-                    return Err(())
+                    return Err(());
                 } else {
                     // Use futex to wait for the next change, with a relative timeout
                     let mut relative = timespec {
