@@ -637,9 +637,17 @@ pub extern "C" fn wcswcs(ws1: *const wchar_t, ws2: *const wchar_t) -> *mut wchar
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn wcswidth(pwcs: *const wchar_t, n: size_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcswidth(pwcs: *const wchar_t, n: size_t) -> c_int {
+    let mut total_width = 0;
+    for i in 0..n {
+        let wc_width = wcwidth(*pwcs.add(i));
+        if wc_width < 0 {
+            return -1;
+        }
+        total_width += wc_width;
+    }
+    total_width
 }
 
 // #[no_mangle]
