@@ -32,7 +32,8 @@ pub struct lconv {
 }
 unsafe impl Sync for lconv {}
 
-//TODO: thread local?
+// Mutable because POSIX demands a mutable pointer, even though it warns
+// against mutating it
 static mut CURRENT_LOCALE: lconv = lconv {
     currency_symbol: EMPTY_PTR,
     decimal_point: ".\0" as *const _ as *const c_char,
