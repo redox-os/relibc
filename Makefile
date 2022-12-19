@@ -94,6 +94,9 @@ install-libs: libs
 	cp -v "$(BUILD)/release/ld_so" "$(DESTDIR)/lib/ld64.so.1"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 	cp -v "$(BUILD)/pthreads-emb/libpthread.a" "$(DESTDIR)/lib/libpthread.a"
+	# Empty libraries for dl and rt
+	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
+	$(AR) -rcs "$(DESTDIR)/lib/librt.a"
 
 install: install-headers install-libs
 
