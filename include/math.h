@@ -1,5 +1,9 @@
 #include <openlibm_math.h>
 
+// Missing typedefs
+typedef float float_t;
+typedef double double_t;
+
 // Included to fix mesa issues
 #ifndef M_PI
 #define	M_PI		3.14159265358979323846	/* pi */
