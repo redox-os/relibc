@@ -82,7 +82,7 @@ pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
     syscall::kill(new_pid, SIGCONT)?;
     let _ = syscall::waitpid(new_pid, &mut 0, syscall::WUNTRACED | syscall::WCONTINUED);
 
-    Ok(0)
+    Ok(new_pid)
 }
 
 extern "C" {
