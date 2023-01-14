@@ -1222,9 +1222,9 @@ pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
 }
 
 #[no_mangle]
-pub extern "C" fn wcstombs(s: *mut c_char, pwcs: *mut *const wchar_t, n: size_t) -> size_t {
+pub extern "C" fn wcstombs(s: *mut c_char, mut pwcs: *const wchar_t, n: size_t) -> size_t {
     let mut state: mbstate_t = mbstate_t {};
-    wcsrtombs(s, pwcs, n, &mut state)
+    wcsrtombs(s, &mut pwcs, n, &mut state)
 }
 
 #[no_mangle]
