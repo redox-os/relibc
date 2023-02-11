@@ -384,7 +384,7 @@ pub unsafe extern "C" fn pte_osSemaphoreCancellablePend(
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osAtomicExchange(ptarg: *mut c_int, val: c_int) -> c_int {
-    intrinsics::atomic_xchg(ptarg, val)
+    intrinsics::atomic_xchg_seqcst(ptarg, val)
 }
 
 #[no_mangle]
@@ -393,22 +393,22 @@ pub unsafe extern "C" fn pte_osAtomicCompareExchange(
     exchange: c_int,
     comp: c_int,
 ) -> c_int {
-    intrinsics::atomic_cxchg(pdest, comp, exchange).0
+    intrinsics::atomic_cxchg_seqcst_seqcst(pdest, comp, exchange).0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osAtomicExchangeAdd(pAppend: *mut c_int, value: c_int) -> c_int {
-    intrinsics::atomic_xadd(pAppend, value)
+    intrinsics::atomic_xadd_seqcst(pAppend, value)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osAtomicDecrement(pdest: *mut c_int) -> c_int {
-    intrinsics::atomic_xadd(pdest, -1) - 1
+    intrinsics::atomic_xadd_seqcst(pdest, -1) - 1
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pte_osAtomicIncrement(pdest: *mut c_int) -> c_int {
-    intrinsics::atomic_xadd(pdest, 1) + 1
+    intrinsics::atomic_xadd_seqcst(pdest, 1) + 1
 }
 
 #[no_mangle]

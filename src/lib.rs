@@ -2,6 +2,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
 #![allow(unused_variables)]
+#![feature(alloc_error_handler)]
 #![feature(allocator_api)]
 #![feature(array_chunks)]
 #![feature(asm_const)]
@@ -19,6 +20,8 @@
 #![allow(clippy::derive_hash_xor_eq)]
 #![allow(clippy::eval_order_dependence)]
 #![allow(clippy::mut_from_ref)]
+// TODO: fix these
+#![warn(unaligned_references)]
 
 #[macro_use]
 extern crate alloc;
@@ -87,7 +90,7 @@ pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
 pub extern "C" fn rust_eh_personality() {}
 
 #[cfg(not(test))]
-#[lang = "oom"]
+#[alloc_error_handler]
 #[linkage = "weak"]
 #[no_mangle]
 pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
