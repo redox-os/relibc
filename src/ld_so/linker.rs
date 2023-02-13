@@ -230,8 +230,10 @@ impl Linker {
             if self.next_tls_module_id == 0 {
                 // Hack to allocate TCB on the first TLS module
                 unsafe {
-                    let tcb = Tcb::new(master.offset).expect_notls("failed to allocate TCB");
-                    tcb.activate();
+                    if Tcb::current().is_none() {
+                        let tcb = Tcb::new(master.offset).expect_notls("failed to allocate TCB");
+                        tcb.activate();
+                    }
                 }
             }
             self.next_tls_module_id += 1;
