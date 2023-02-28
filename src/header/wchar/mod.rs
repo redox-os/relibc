@@ -223,16 +223,6 @@ pub unsafe extern "C" fn putwchar(wc: wchar_t) -> wint_t {
 }
 
 // #[no_mangle]
-pub extern "C" fn swprintf(
-    s: *mut wchar_t,
-    n: size_t,
-    format: *const wchar_t,
-    ap: va_list,
-) -> c_int {
-    unimplemented!();
-}
-
-// #[no_mangle]
 pub extern "C" fn swscanf(s: *const wchar_t, format: *const wchar_t, ap: va_list) -> c_int {
     unimplemented!();
 }
@@ -257,24 +247,27 @@ pub unsafe extern "C" fn ungetwc(wc: wint_t, stream: &mut FILE) -> wint_t {
     wc
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn vfwprintf(stream: *mut FILE, format: *const wchar_t, arg: va_list) -> c_int {
-    unimplemented!();
+    eprintln!("vfwprintf not implemented");
+    -1
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn vwprintf(format: *const wchar_t, arg: va_list) -> c_int {
-    unimplemented!();
+    eprintln!("vwprintf not implemented");
+    -1
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn vswprintf(
     s: *mut wchar_t,
     n: size_t,
     format: *const wchar_t,
     arg: va_list,
 ) -> c_int {
-    unimplemented!();
+    eprintln!("vswprintf not implemented");
+    -1
 }
 
 //widechar to multibyte
@@ -819,11 +812,6 @@ pub unsafe extern "C" fn wmemset(ws: *mut wchar_t, wc: wchar_t, n: size_t) -> *m
         *ws.add(i) = wc;
     }
     ws
-}
-
-// #[no_mangle]
-pub extern "C" fn wprintf(format: *const wchar_t, ap: va_list) -> c_int {
-    unimplemented!();
 }
 
 // #[no_mangle]
