@@ -104,7 +104,7 @@ submodules:
 	git submodule sync
 	git submodule update --init --recursive
 
-sysroot: all
+sysroot:
 	rm -rf $@
 	rm -rf $@.partial
 	mkdir -p $@.partial
