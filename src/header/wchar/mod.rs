@@ -10,6 +10,8 @@ use crate::{
 };
 
 mod utf8;
+mod wprintf;
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mbstate_t;
@@ -248,24 +250,29 @@ pub unsafe extern "C" fn ungetwc(wc: wint_t, stream: &mut FILE) -> wint_t {
 }
 
 #[no_mangle]
-pub extern "C" fn vfwprintf(stream: *mut FILE, format: *const wchar_t, arg: va_list) -> c_int {
-    eprintln!("vfwprintf not implemented");
-    -1
+pub unsafe extern "C" fn vfwprintf(stream: *mut FILE, format: *const wchar_t, arg: va_list) -> c_int {
+    let mut stream = (*stream).lock();
+    if let Err(_) = (*stream).try_set_wide_orientation_unlocked() {
+        return -1;
+    }
+
+    wprintf::wprintf(&mut *stream, format, arg)
 }
 
 #[no_mangle]
-pub extern "C" fn vwprintf(format: *const wchar_t, arg: va_list) -> c_int {
-    eprintln!("vwprintf not implemented");
-    -1
+pub unsafe extern "C" fn vwprintf(format: *const wchar_t, arg: va_list) -> c_int {
+    vfwprintf(&mut *stdout, format, arg)
 }
 
 #[no_mangle]
-pub extern "C" fn vswprintf(
+pub unsafe extern "C" fn vswprintf(
     s: *mut wchar_t,
     n: size_t,
     format: *const wchar_t,
     arg: va_list,
 ) -> c_int {
+    //TODO: implement vswprintf. This is not as simple as wprintf, since the output is not UTF-8
+    // but instead is a wchar array.
     eprintln!("vswprintf not implemented");
     -1
 }

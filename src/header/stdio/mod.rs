@@ -227,6 +227,13 @@ impl FILE {
         }
     }
 
+    pub fn try_set_wide_orientation_unlocked(&mut self) -> core::result::Result<(), c_int> {
+        match self.try_set_orientation_unlocked(1) {
+            1..=i32::MAX => Ok(()),
+            x => Err(x),
+        }
+    }
+
     pub fn purge(&mut self) {
         // Purge read buffer
         self.read_pos = 0;
