@@ -1,16 +1,13 @@
 image: "redoxos/redoxer:latest"
 
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
 stages:
     - build
     - test
 
 default:
-    before_script:
-        - apt-get update -qq
-        - apt-get install -qq git
-        - git submodule sync --recursive
-        - git submodule update --init --recursive
-
     cache:
         paths:
             - target/
@@ -18,8 +15,6 @@ default:
 build:linux:
     stage: build
     script:
-        - rustup toolchain add "$(cat rust-toolchain)"
-        - rustup component add rust-src
         - rustup show      # Print version info for debugging
         - make -j "$(nproc)" all
 
