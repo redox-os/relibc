@@ -12,6 +12,7 @@ then
     redoxer toolchain
 fi
 
+export CARGOFLAGS=""
 export CARGO_TEST="redoxer"
 export TEST_RUNNER="redoxer exec --folder . --"
 redoxer env make "$@"
