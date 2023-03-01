@@ -612,7 +612,11 @@ impl Iterator for WPrintfIter {
     }
 }
 
-unsafe fn inner_wprintf<W: Write>(w: W, format: *const wchar_t, mut ap: VaList) -> io::Result<c_int> {
+unsafe fn inner_wprintf<W: Write>(
+    w: W,
+    format: *const wchar_t,
+    mut ap: VaList,
+) -> io::Result<c_int> {
     let w = &mut platform::CountingWriter::new(w);
 
     let iterator = WPrintfIter {

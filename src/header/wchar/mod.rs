@@ -250,7 +250,11 @@ pub unsafe extern "C" fn ungetwc(wc: wint_t, stream: &mut FILE) -> wint_t {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vfwprintf(stream: *mut FILE, format: *const wchar_t, arg: va_list) -> c_int {
+pub unsafe extern "C" fn vfwprintf(
+    stream: *mut FILE,
+    format: *const wchar_t,
+    arg: va_list,
+) -> c_int {
     let mut stream = (*stream).lock();
     if let Err(_) = (*stream).try_set_wide_orientation_unlocked() {
         return -1;
