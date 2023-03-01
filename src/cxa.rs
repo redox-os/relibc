@@ -5,8 +5,8 @@ use crate::platform::types::*;
 #[derive(Clone, Copy)]
 struct CxaAtExitFunc {
     //func: extern "C" fn(*mut c_void),
-//arg: *mut c_void,
-//dso: *mut c_void,
+    //arg: *mut c_void,
+    //dso: *mut c_void,
 }
 
 static mut CXA_ATEXIT_FUNCS: [Option<CxaAtExitFunc>; 32] = [None; 32];
