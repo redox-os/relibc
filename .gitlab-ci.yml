@@ -15,7 +15,7 @@ default:
 build:linux:
     stage: build
     script:
-        - rustup show      # Print version info for debugging
+        - rustup show # Ensure correct toolchain is downloaded and installed
         - make -j "$(nproc)" all
 
 build:redox:
@@ -23,10 +23,7 @@ build:redox:
     variables:
         TARGET: x86_64-unknown-redox
     script:
-        - export RUSTUP_TOOLCHAIN="$HOME/.redoxer/toolchain"
-        - export PATH="$RUSTUP_TOOLCHAIN/bin:$PATH"
-        - rustup show      # Print version info for debugging
-        - make -j "$(nproc)" all
+        - ./redoxer.sh -j "$(nproc)" all
 
 test:linux:
     stage: test
@@ -46,11 +43,7 @@ test:redox:
     variables:
         TARGET: x86_64-unknown-redox
     script:
-        - export CARGO_TEST="redoxer"
-        - export RUSTUP_TOOLCHAIN="$HOME/.redoxer/toolchain"
-        - export PATH="$RUSTUP_TOOLCHAIN/bin:$PATH"
-        - export TEST_RUNNER="redoxer exec --folder . -- sh --"
-        - make test
+        - ./redoxer.sh test
     # TODO: Out of memory
     allow_failure: true
 
