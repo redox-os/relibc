@@ -25,6 +25,7 @@ pub mod netinet_tcp;
 pub mod poll;
 pub mod pwd;
 pub mod regex;
+pub mod sched;
 pub mod semaphore;
 pub mod setjmp;
 pub mod sgtty;

@@ -58,7 +58,6 @@ fn main() {
         .flag("-nostdlib")
         .include(&format!("{}/include", crate_dir))
         .include(&format!("{}/target/include", crate_dir))
-        .include(&format!("{}/pthreads-emb", crate_dir))
         .flag("-fno-stack-protector")
         .flag("-Wno-expansion-to-defined")
         .files(
