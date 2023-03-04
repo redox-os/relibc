@@ -35,6 +35,7 @@ impl Default for epoll_data {
     }
 }
 
+#[cfg(all(target_os = "redox", target_pointer_width = "64"))]
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 // This will match in size with syscall::Event (24 bytes on 64-bit
@@ -45,8 +46,15 @@ pub struct epoll_event {
     // 4 automatic alignment bytes
     pub data: epoll_data, // 8 bytes
 
-    #[cfg(target_os = "redox")]
     pub _pad: u64, // 8 bytes
+}
+
+#[cfg(not(all(target_os = "redox", target_pointer_width = "64")))]
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct epoll_event {
+    pub events: u32,
+    pub data: epoll_data,
 }
 
 #[no_mangle]
