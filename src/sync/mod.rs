@@ -22,7 +22,7 @@ const FUTEX_WAIT: c_int = 0;
 const FUTEX_WAKE: c_int = 1;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum AttemptStatus {
+pub enum AttemptStatus {
     Desired,
     Waiting,
     Other,

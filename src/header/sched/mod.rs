@@ -6,7 +6,7 @@ use crate::header::time::timespec;
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct sched_param {
-    sched_priority: c_int,
+    pub sched_priority: c_int,
 }
 
 pub const SCHED_FIFO: c_int = 0;

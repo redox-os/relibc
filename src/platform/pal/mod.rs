@@ -157,7 +157,9 @@ pub trait Pal {
 
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int;
 
-    unsafe fn pte_clone(stack: *mut usize) -> crate::pthread::OsTid;
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, crate::pthread::Errno>;
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), crate::pthread::Errno>;
+    fn current_os_tid() -> crate::pthread::OsTid;
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
 

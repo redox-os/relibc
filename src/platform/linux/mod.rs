@@ -49,14 +49,22 @@ struct linux_statfs {
     f_spare: [c_long; 4],
 }
 
-pub fn e(sys: usize) -> usize {
+pub fn e_raw(sys: usize) -> Result<usize, usize> {
     if (sys as isize) < 0 && (sys as isize) >= -256 {
-        unsafe {
-            errno = -(sys as isize) as c_int;
-        }
-        !0
+        Err(sys.wrapping_neg())
     } else {
-        sys
+        Ok(sys)
+    }
+}
+pub fn e(sys: usize) -> usize {
+    match e_raw(sys) {
+        Ok(value) => value,
+        Err(errcode) => {
+            unsafe {
+                errno = errcode;
+            }
+            !0
+        }
     }
 }
 
@@ -380,7 +388,7 @@ impl Pal for Sys {
     }
 
     #[cfg(target_arch = "x86_64")]
-    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
         let pid;
         asm!("
@@ -429,7 +437,18 @@ impl Pal for Sys {
             out("r14") _,
             out("r15") _,
         );
-        e(pid) as pid_t
+        let tid = e_raw(pid)?;
+
+        Ok(crate::pthread::OsTid { thread_id: tid })
+    }
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), crate::pthread::Errno> {
+        let tgid = Self::getpid();
+        e_raw(unsafe { syscall!(TGKILL, pid, os_tid.thread_id, signal) })
+    }
+    fn current_os_tid() -> crate::pthread::OsTid {
+        crate::pthread::OsTid {
+            thread_id: unsafe { syscall!(GETTID) },
+        }
     }
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {

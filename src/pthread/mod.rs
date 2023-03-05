@@ -1,3 +1,5 @@
+//! Relibc Threads, or RLCT.
+
 use core::cell::{Cell, UnsafeCell};
 use core::ptr::NonNull;
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -11,30 +13,33 @@ use crate::header::sched::sched_param;
 use crate::header::errno::*;
 use crate::header::sys_mman;
 use crate::ld_so::{linker::Linker, tcb::{Master, Tcb}};
+use crate::ALLOCATOR;
 
 use crate::sync::{Mutex, waitval::Waitval};
 
+#[no_mangle]
 extern "C" fn pthread_init() {
 }
+#[no_mangle]
 extern "C" fn pthread_terminate() {
 }
 
-struct Pthread {
+pub struct Pthread {
     waitval: Waitval<Retval>,
     wants_cancel: AtomicBool,
 
     stack_base: *mut c_void,
     stack_size: usize,
 
-    os_tid: OsTid,
+    os_tid: UnsafeCell<OsTid>,
 }
 
-#[derive(Clone, Copy, Debug, Ord, Eq, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Ord, Eq, PartialOrd, PartialEq)]
 pub struct OsTid {
     #[cfg(target_os = "redox")]
-    context_id: usize,
+    pub context_id: usize,
     #[cfg(target_os = "linux")]
-    thread_id: usize,
+    pub thread_id: usize,
 }
 
 unsafe impl Send for Pthread {}
@@ -46,6 +51,7 @@ use crate::header::pthread::attr::Attr;
 #[derive(Debug)]
 pub struct Errno(pub c_int);
 
+#[derive(Clone, Copy)]
 pub struct Retval(pub *mut c_void);
 
 struct MmapGuard { page_start: *mut c_void, mmap_size: usize }
@@ -84,7 +90,7 @@ pub unsafe fn create(attrs: Option<&pthread_attr_t>, start_routine: extern "C" f
         wants_cancel: AtomicBool::new(false),
         stack_base,
         stack_size,
-        os_tid,
+        os_tid: UnsafeCell::new(OsTid::default()),
     };
     let ptr = Box::into_raw(Box::new(pthread));
 
@@ -124,13 +130,12 @@ pub unsafe fn create(attrs: Option<&pthread_attr_t>, start_routine: extern "C" f
         push(new_thread_shim as usize);
     }
 
-    let id = Sys::pte_clone(stack);
-    if id < 0 {
+    let Ok(os_tid) = Sys::rlct_clone(stack) else {
         return Err(Errno(EAGAIN));
-    }
+    };
 
     let _ = (&mut *synchronization_mutex).lock();
-    CID_TO_PTHREAD.lock().insert(id, ForceSendSync(ptr.cast()));
+    OS_TID_TO_PTHREAD.lock().insert(os_tid, ForceSendSync(ptr.cast()));
 
     core::mem::forget(stack_raii);
 
@@ -159,6 +164,8 @@ unsafe extern "C" fn new_thread_shim(
         tcb.activate();
     }
     PTHREAD_SELF.set(pthread);
+
+    core::ptr::write((&*pthread).os_tid.get(), Sys::current_os_tid());
 
     (&*mutex).manual_unlock();
     let retval = entry_point(arg);
@@ -205,9 +212,14 @@ pub unsafe fn exit_current_thread(retval: Retval) -> ! {
     Sys::exit_thread()
 }
 
+pub const SIGRT_RLCT_CANCEL: usize = 32;
+pub const SIGRT_RLCT_TIMER: usize = 33;
+
 pub unsafe fn cancel(thread: &Pthread) -> Result<(), Errno> {
     thread.wants_cancel.store(true, Ordering::SeqCst);
-    crate::header::signal
+    Sys::rlct_kill(thread.os_tid.get().read(), SIGRT_RLCT_CANCEL)?;
+    todo!();
+    Ok(())
 }
 
 // TODO: Hash map?
@@ -219,17 +231,3 @@ unsafe impl<T> Sync for ForceSendSync<T> {}
 
 #[thread_local]
 static PTHREAD_SELF: Cell<*mut Pthread> = Cell::new(core::ptr::null_mut());
-
-pub struct ForkHandlers {
-    pub prepare: Vec<extern "C" fn()>,
-    pub parent: Vec<extern "C" fn()>,
-    pub child: Vec<extern "C" fn()>,
-}
-
-// TODO: Use fork handlers
-// TODO: Append-only atomic queue, not because of performance, but because of atomicity.
-pub static FORK_HANDLERS: Mutex<ForkHandlers> = Mutex::new(ForkHandlers {
-    parent: Vec::new(),
-    child: Vec::new(),
-    prepare: Vec::new(),
-});

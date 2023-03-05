@@ -758,8 +758,16 @@ impl Pal for Sys {
         res as c_int
     }
 
-    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        e(clone::pte_clone_impl(stack)) as pid_t
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
+        clone::pte_clone_impl(stack).map(|context_id| crate::pthread::OsTid { context_id }).map_err(|error| crate::pthread::Errno(error.errno))
+    }
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), crate::pthread::Errno> {
+        syscall::kill(os_tid.context_id, signal).map_err(|error| crate::pthread::Errno(error.errno))?;
+        Ok(())
+    }
+    fn current_os_tid() -> crate::pthread::OsTid {
+        // TODO
+        crate::pthread::OsTid { context_id: Self::getpid() as _ }
     }
 
     fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {

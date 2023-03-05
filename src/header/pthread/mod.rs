@@ -39,19 +39,6 @@ pub const PTHREAD_PROCESS_PRIVATE: c_int = 1;
 pub const PTHREAD_SCOPE_PROCESS: c_int = 0;
 pub const PTHREAD_SCOPE_SYSTEM: c_int = 1;
 
-#[no_mangle]
-pub unsafe extern "C" fn pthread_atfork(prepare: extern "C" fn(), parent: extern "C" fn(), child: extern "C" fn()) -> c_int {
-    let mut guard = pthread::FORK_HANDLERS.lock();
-
-    // TODO: try_reserve
-
-    guard.prepare.push(prepare);
-    guard.child.push(child);
-    guard.parent.push(parent);
-
-    0
-}
-
 pub mod attr;
 pub use self::attr::*;
 
