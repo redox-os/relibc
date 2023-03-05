@@ -12,10 +12,6 @@ use crate::{
         sys_mman,
         time::{clock_gettime, timespec, CLOCK_MONOTONIC},
     },
-    ld_so::{
-        linker::Linker,
-        tcb::{Master, Tcb},
-    },
     platform::{
         types::{c_int, c_long, c_uint, c_void, pid_t, size_t, time_t},
         Pal, Sys,
@@ -57,126 +53,6 @@ static NEXT_KEY: AtomicU32 = AtomicU32::new(0);
 
 unsafe fn locals<'a>() -> &'a mut BTreeMap<c_uint, *mut c_void> {
     &mut *LOCALS.get()
-}
-
-// pte_osResult pte_osInit(void)
-#[no_mangle]
-pub unsafe extern "C" fn pte_osInit() -> pte_osResult {
-    PTE_OS_OK
-}
-
-/// A shim to wrap thread entry points in logic to set up TLS, for example
-unsafe extern "C" fn pte_osThreadShim(
-    entryPoint: pte_osThreadEntryPoint,
-    argv: *mut c_void,
-    mutex: pte_osMutexHandle,
-    tls_size: usize,
-    tls_masters_ptr: *mut Master,
-    tls_masters_len: usize,
-    tls_linker_ptr: *const Mutex<Linker>,
-    tls_mspace: usize,
-) {
-    // The kernel allocated TLS does not have masters set, so do not attempt to copy it.
-    // It will be copied by the kernel.
-    if !tls_masters_ptr.is_null() {
-        let tcb = Tcb::new(tls_size).unwrap();
-        tcb.masters_ptr = tls_masters_ptr;
-        tcb.masters_len = tls_masters_len;
-        tcb.linker_ptr = tls_linker_ptr;
-        tcb.mspace = tls_mspace;
-        tcb.copy_masters().unwrap();
-        tcb.activate();
-    }
-
-    // Wait until pte_osThreadStart
-    pte_osMutexLock(mutex);
-    entryPoint(argv);
-    pte_osThreadExit();
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pte_osThreadCreate(
-    entryPoint: pte_osThreadEntryPoint,
-    stackSize: c_int,
-    _initialPriority: c_int,
-    argv: *mut c_void,
-    ppte_osThreadHandle: *mut pte_osThreadHandle,
-) -> pte_osResult {
-    // Create a locked mutex, unlocked by pte_osThreadStart
-    let mutex: pte_osMutexHandle = Box::into_raw(Box::new(Mutex::locked(())));
-
-    let stack_size = if stackSize == 0 {
-        1024 * 1024
-    } else {
-        stackSize as usize
-    };
-    let stack_base = sys_mman::mmap(
-        ptr::null_mut(),
-        stack_size,
-        sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-        sys_mman::MAP_SHARED | sys_mman::MAP_ANONYMOUS,
-        -1,
-        0,
-    );
-    if stack_base as isize == -1 {
-        return PTE_OS_GENERAL_FAILURE;
-    }
-    let stack_end = stack_base.add(stack_size);
-    let mut stack = stack_end as *mut usize;
-    {
-        let mut push = |value: usize| {
-            stack = stack.offset(-1);
-            *stack = value;
-        };
-
-        //WARNING: Stack must be 128-bit aligned for SSE
-        if let Some(tcb) = Tcb::current() {
-            push(tcb.mspace as usize);
-            push(tcb.linker_ptr as usize);
-            push(tcb.masters_len);
-            push(tcb.masters_ptr as usize);
-            push(tcb.tls_len);
-        } else {
-            push(ALLOCATOR.get_book_keeper());
-            push(0);
-            push(0);
-            push(0);
-            push(0);
-        }
-
-        push(mutex as usize);
-
-        push(argv as usize);
-        push(entryPoint as usize);
-
-        push(pte_osThreadShim as usize);
-    }
-
-    let id = Sys::pte_clone(stack);
-    if id < 0 {
-        return PTE_OS_GENERAL_FAILURE;
-    }
-
-    pte_osMutexLock(&mut pid_mutexes_lock);
-    if pid_mutexes.is_none() {
-        pid_mutexes = Some(BTreeMap::new());
-    }
-    pid_mutexes.as_mut().unwrap().insert(id, mutex);
-    pte_osMutexUnlock(&mut pid_mutexes_lock);
-
-    pte_osMutexLock(&mut pid_stacks_lock);
-    if pid_stacks.is_none() {
-        pid_stacks = Some(BTreeMap::new());
-    }
-    pid_stacks
-        .as_mut()
-        .unwrap()
-        .insert(id, (stack_base, stack_size));
-    pte_osMutexUnlock(&mut pid_stacks_lock);
-
-    *ppte_osThreadHandle = id;
-
-    PTE_OS_OK
 }
 
 #[no_mangle]

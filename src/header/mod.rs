@@ -23,6 +23,7 @@ pub mod netinet_in;
 pub mod netinet_ip;
 pub mod netinet_tcp;
 pub mod poll;
+pub mod pthread;
 pub mod pwd;
 pub mod regex;
 pub mod sched;

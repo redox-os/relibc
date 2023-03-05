@@ -1005,4 +1005,8 @@ impl Pal for Sys {
         // GETPID on Redox is 20, which is WRITEV on Linux
         e(unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) }) != !0
     }
+
+    fn exit_thread() -> ! {
+        Self::exit(0)
+    }
 }

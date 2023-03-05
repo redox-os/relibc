@@ -1,6 +1,7 @@
 pub mod mutex;
 pub mod once;
 pub mod semaphore;
+pub mod waitval;
 
 pub use self::{
     mutex::{Mutex, MutexGuard},
@@ -13,7 +14,6 @@ use crate::{
     platform::{types::*, Pal, Sys},
 };
 use core::{
-    cell::UnsafeCell,
     ops::Deref,
     sync::atomic::{self, AtomicI32 as AtomicInt},
 };
@@ -30,18 +30,19 @@ enum AttemptStatus {
 
 /// Convenient wrapper around the "futex" system call for
 /// synchronization implementations
-struct AtomicLock {
-    atomic: UnsafeCell<AtomicInt>,
+#[repr(C)]
+pub(crate) struct AtomicLock {
+    pub(crate) atomic: AtomicInt,
 }
 impl AtomicLock {
     pub const fn new(value: c_int) -> Self {
         Self {
-            atomic: UnsafeCell::new(AtomicInt::new(value)),
+            atomic: AtomicInt::new(value),
         }
     }
     pub fn notify_one(&self) {
         Sys::futex(
-            unsafe { &mut *self.atomic.get() }.get_mut(),
+            self.atomic.as_mut_ptr(),
             FUTEX_WAKE,
             1,
             0,
@@ -49,7 +50,7 @@ impl AtomicLock {
     }
     pub fn notify_all(&self) {
         Sys::futex(
-            unsafe { &mut *self.atomic.get() }.get_mut(),
+            self.atomic.as_mut_ptr(),
             FUTEX_WAKE,
             c_int::max_value(),
             0,
@@ -57,7 +58,7 @@ impl AtomicLock {
     }
     pub fn wait_if(&self, value: c_int, timeout_opt: Option<&timespec>) {
         Sys::futex(
-            unsafe { &mut *self.atomic.get() }.get_mut(),
+            self.atomic.as_mut_ptr(),
             FUTEX_WAIT,
             value,
             timeout_opt.map_or(0, |timeout| timeout as *const timespec as usize),
@@ -125,6 +126,6 @@ impl Deref for AtomicLock {
     type Target = AtomicInt;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { &*self.atomic.get() }
+        &self.atomic
     }
 }

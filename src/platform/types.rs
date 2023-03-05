@@ -76,3 +76,17 @@ pub type suseconds_t = c_int;
 pub type clock_t = c_long;
 pub type clockid_t = c_int;
 pub type timer_t = *mut c_void;
+
+pub type pthread_attr_t = crate::header::pthread::attr::Attr;
+pub type pthread_barrier_t = crate::header::pthread::barrier::Barrier;
+pub type pthread_barrierattr_t = crate::header::pthread::barrier::BarrierAttr;
+pub type pthread_cond_t = crate::header::pthread::cond::Cond;
+pub type pthread_condattr_t = crate::header::pthread::cond::CondAttr;
+pub type pthread_key_t = *mut c_void;
+pub type pthread_mutex_t = crate::header::pthread::mutex::Mutex;
+pub type pthread_mutexattr_t = crate::header::pthread::mutex::MutexAttr;
+pub type pthread_once_t = crate::header::pthread::once::Once;
+pub type pthread_rwlock_t = crate::header::pthread::rwlock::Rwlock;
+pub type pthread_rwlockattr_t = crate::header::pthread::rwlock::RwlockAttr;
+pub type pthread_spinlock_t = crate::header::pthread::spin::Spinlock;
+pub type pthread_t = *mut c_void;

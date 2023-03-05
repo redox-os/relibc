@@ -4,7 +4,7 @@ use crate::platform::{Pal, Sys, types::*};
 use crate::header::time::timespec;
 
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct sched_param {
     sched_priority: c_int,
 }

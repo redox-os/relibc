@@ -6,10 +6,10 @@
 #![feature(allocator_api)]
 #![feature(array_chunks)]
 #![feature(asm_const)]
-#![feature(box_into_pin)]
+#![feature(atomic_mut_ptr)]
 #![feature(c_variadic)]
-#![feature(const_btree_new)]
 #![feature(core_intrinsics)]
+#![feature(int_roundings)]
 #![feature(lang_items)]
 #![feature(linkage)]
 #![feature(stmt_expr_attributes)]
@@ -57,6 +57,7 @@ pub mod header;
 pub mod io;
 pub mod ld_so;
 pub mod platform;
+pub mod pthread;
 pub mod start;
 pub mod sync;
 

@@ -47,6 +47,8 @@ pub trait Pal {
 
     fn exit(status: c_int) -> !;
 
+    fn exit_thread() -> !;
+
     fn fchdir(fildes: c_int) -> c_int;
 
     fn fchmod(fildes: c_int, mode: mode_t) -> c_int;
@@ -155,7 +157,7 @@ pub trait Pal {
 
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int;
 
-    unsafe fn pte_clone(stack: *mut usize) -> pid_t;
+    unsafe fn pte_clone(stack: *mut usize) -> crate::pthread::OsTid;
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
 
