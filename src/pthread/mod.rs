@@ -48,7 +48,8 @@ unsafe impl Sync for Pthread {}
 use crate::header::pthread::attr::Attr;
 
 /// Positive error codes (EINVAL, not -EINVAL).
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
+// TODO: Move to a more generic place.
 pub struct Errno(pub c_int);
 
 #[derive(Clone, Copy)]
@@ -134,7 +135,8 @@ pub unsafe fn create(attrs: Option<&pthread_attr_t>, start_routine: extern "C" f
         return Err(Errno(EAGAIN));
     };
 
-    let _ = (&mut *synchronization_mutex).lock();
+    let _ = (&*synchronization_mutex).lock();
+
     OS_TID_TO_PTHREAD.lock().insert(os_tid, ForceSendSync(ptr.cast()));
 
     core::mem::forget(stack_raii);

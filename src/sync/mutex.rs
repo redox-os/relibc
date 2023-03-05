@@ -11,7 +11,7 @@ const LOCKED: c_int = 1;
 const WAITING: c_int = 2;
 
 pub struct Mutex<T> {
-    lock: AtomicLock,
+    pub(crate) lock: AtomicLock,
     content: UnsafeCell<T>,
 }
 unsafe impl<T: Send> Send for Mutex<T> {}

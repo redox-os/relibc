@@ -28,6 +28,21 @@ pub enum AttemptStatus {
     Other,
 }
 
+pub unsafe fn futex_wake_ptr(ptr: *mut i32, n: i32) -> usize {
+    // TODO: unwrap_unchecked?
+    Sys::futex(ptr, FUTEX_WAKE, n, 0).unwrap() as usize
+}
+pub unsafe fn futex_wait_ptr(ptr: *mut i32, value: i32, timeout_opt: Option<&timespec>) -> bool {
+    // TODO: unwrap_unchecked?
+    Sys::futex(ptr, FUTEX_WAIT, value, timeout_opt.map_or(0, |t| t as *const _ as usize)) == Ok(0)
+}
+pub fn futex_wake(atomic: &AtomicInt, n: i32) -> usize {
+    unsafe { futex_wake_ptr(atomic.as_mut_ptr(), n) }
+}
+pub fn futex_wait(atomic: &AtomicInt, value: i32, timeout_opt: Option<&timespec>) -> bool {
+    unsafe { futex_wait_ptr(atomic.as_mut_ptr(), value, timeout_opt) }
+}
+
 /// Convenient wrapper around the "futex" system call for
 /// synchronization implementations
 #[repr(C)]
@@ -41,28 +56,16 @@ impl AtomicLock {
         }
     }
     pub fn notify_one(&self) {
-        Sys::futex(
-            self.atomic.as_mut_ptr(),
-            FUTEX_WAKE,
-            1,
-            0,
-        );
+        futex_wake(&self.atomic, 1);
     }
     pub fn notify_all(&self) {
-        Sys::futex(
-            self.atomic.as_mut_ptr(),
-            FUTEX_WAKE,
-            c_int::max_value(),
-            0,
-        );
+        futex_wake(&self.atomic, i32::MAX);
     }
     pub fn wait_if(&self, value: c_int, timeout_opt: Option<&timespec>) {
-        Sys::futex(
-            self.atomic.as_mut_ptr(),
-            FUTEX_WAIT,
-            value,
-            timeout_opt.map_or(0, |timeout| timeout as *const timespec as usize),
-        );
+        self.wait_if_raw(value, timeout_opt);
+    }
+    pub fn wait_if_raw(&self, value: c_int, timeout_opt: Option<&timespec>) -> bool {
+        futex_wait(&self.atomic, value, timeout_opt)
     }
 
     /// A general way to efficiently wait for what might be a long time, using two closures:

@@ -9,9 +9,9 @@ use crate::pthread;
 pub const PTHREAD_BARRIER_SERIAL_THREAD: c_int = 1;
 
 pub const PTHREAD_CANCEL_ASYNCHRONOUS: c_int = 0;
-pub const PTHREAD_CANCEL_ENABLE: c_int = 0;
-pub const PTHREAD_CANCEL_DEFERRED: c_int = 0;
-pub const PTHREAD_CANCEL_DISABLE: c_int = 0;
+pub const PTHREAD_CANCEL_ENABLE: c_int = 1;
+pub const PTHREAD_CANCEL_DEFERRED: c_int = 2;
+pub const PTHREAD_CANCEL_DISABLE: c_int = 3;
 pub const PTHREAD_CANCELED: *mut c_void = core::ptr::null_mut();
 
 pub const PTHREAD_CREATE_DETACHED: c_int = 0;
@@ -21,11 +21,12 @@ pub const PTHREAD_EXPLICIT_SCHED: c_int = 0;
 pub const PTHREAD_INHERIT_SCHED: c_int = 1;
 
 pub const PTHREAD_MUTEX_DEFAULT: c_int = 0;
-pub const PTHREAD_MUTEX_ERRORCHECK: c_int = 0;
-pub const PTHREAD_MUTEX_NORMAL: c_int = 0;
-pub const PTHREAD_MUTEX_RECURSIVE: c_int = 0;
+pub const PTHREAD_MUTEX_ERRORCHECK: c_int = 1;
+pub const PTHREAD_MUTEX_NORMAL: c_int = 2;
+pub const PTHREAD_MUTEX_RECURSIVE: c_int = 3;
+
 pub const PTHREAD_MUTEX_ROBUST: c_int = 0;
-pub const PTHREAD_MUTEX_STALLED: c_int = 0;
+pub const PTHREAD_MUTEX_STALLED: c_int = 1;
 
 pub const PTHREAD_PRIO_INHERIT: c_int = 0;
 
@@ -102,10 +103,8 @@ pub extern "C" fn pthread_getschedparam(thread: pthread_t, policy: *mut clockid_
     todo!()
 }
 
-// #[no_mangle]
-pub extern "C" fn pthread_getspecific(key: pthread_key_t) -> *mut c_void {
-    todo!()
-}
+pub mod tls;
+pub use tls::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_join(thread: pthread_t, retval: *mut *mut c_void) -> c_int {
@@ -116,16 +115,6 @@ pub unsafe extern "C" fn pthread_join(thread: pthread_t, retval: *mut *mut c_voi
         }
         Err(pthread::Errno(error)) => error,
     }
-}
-
-// #[no_mangle]
-pub extern "C" fn pthread_key_create(key: *mut pthread_key_t, destructor: extern "C" fn(value: *mut c_void)) -> c_int {
-    todo!()
-}
-
-// #[no_mangle]
-pub extern "C" fn pthread_key_delete(key: pthread_key_t) -> c_int {
-    todo!()
 }
 
 pub mod mutex;
@@ -155,9 +144,6 @@ pub extern "C" fn pthread_setschedparam(thread: pthread_t, policy: c_int, param:
     todo!();
 }
 pub extern "C" fn pthread_setschedprio(thread: pthread_t, prio: c_int) -> c_int {
-    todo!();
-}
-pub extern "C" fn pthread_setspecific(key: pthread_key_t, value: *const c_void) -> c_int {
     todo!();
 }
 

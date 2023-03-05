@@ -51,10 +51,6 @@ static LOCALS: UnsafeCell<BTreeMap<c_uint, *mut c_void>> = UnsafeCell::new(BTree
 
 static NEXT_KEY: AtomicU32 = AtomicU32::new(0);
 
-unsafe fn locals<'a>() -> &'a mut BTreeMap<c_uint, *mut c_void> {
-    &mut *LOCALS.get()
-}
-
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadStart(handle: pte_osThreadHandle) -> pte_osResult {
     let mut ret = PTE_OS_GENERAL_FAILURE;
@@ -249,65 +245,4 @@ pub unsafe extern "C" fn pte_osSemaphorePend(
         Ok(()) => PTE_OS_OK,
         Err(()) => PTE_OS_TIMEOUT,
     }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pte_osSemaphoreCancellablePend(
-    handle: pte_osSemaphoreHandle,
-    pTimeout: *mut c_uint,
-) -> pte_osResult {
-    //TODO: thread cancel
-    pte_osSemaphorePend(handle, pTimeout)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pte_osAtomicExchange(ptarg: *mut c_int, val: c_int) -> c_int {
-    intrinsics::atomic_xchg_seqcst(ptarg, val)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pte_osAtomicCompareExchange(
-    pdest: *mut c_int,
-    exchange: c_int,
-    comp: c_int,
-) -> c_int {
-    intrinsics::atomic_cxchg_seqcst_seqcst(pdest, comp, exchange).0
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pte_osAtomicExchangeAdd(pAppend: *mut c_int, value: c_int) -> c_int {
-    intrinsics::atomic_xadd_seqcst(pAppend, value)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pte_osAtomicDecrement(pdest: *mut c_int) -> c_int {
-    intrinsics::atomic_xadd_seqcst(pdest, -1) - 1
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pte_osAtomicIncrement(pdest: *mut c_int) -> c_int {
-    intrinsics::atomic_xadd_seqcst(pdest, 1) + 1
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pte_osTlsSetValue(index: c_uint, value: *mut c_void) -> pte_osResult {
-    locals().insert(index, value);
-    PTE_OS_OK
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pte_osTlsGetValue(index: c_uint) -> *mut c_void {
-    locals().get_mut(&index).copied().unwrap_or(ptr::null_mut())
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pte_osTlsAlloc(pKey: *mut c_uint) -> pte_osResult {
-    *pKey = NEXT_KEY.fetch_add(1, Ordering::Relaxed);
-    PTE_OS_OK
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pte_osTlsFree(index: c_uint) -> pte_osResult {
-    // XXX free keys
-    PTE_OS_OK
 }

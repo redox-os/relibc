@@ -333,7 +333,7 @@ impl Pal for Sys {
         e(syscall::ftruncate(fd as usize, len as usize)) as c_int
     }
 
-    fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> c_int {
+    fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> Result<c_long, crate::pthread::Errno> {
         match unsafe {
             syscall::futex(
                 addr as *mut i32,
@@ -343,8 +343,8 @@ impl Pal for Sys {
                 ptr::null_mut(),
             )
         } {
-            Ok(success) => success as c_int,
-            Err(err) => -(err.errno as c_int),
+            Ok(success) => Ok(success as c_long),
+            Err(err) => Err(crate::pthread::Errno(err.errno)),
         }
     }
 

@@ -46,7 +46,7 @@ pub unsafe extern "C" fn pthread_rwlock_rdlock(rwlock: *mut pthread_rwlock_t) ->
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlock_timedrdlock(rwlock: *mut pthread_rwlock_t, timeout: *const timespec) -> c_int {
     let rwlock: &pthread_rwlock_t = &*rwlock;
-    let timeout = NonNull::new(timeout as *mut _).map(|n| n.as_ref());
+    let timeout = timeout.as_ref();
 
     loop {
         if pthread_rwlock_tryrdlock(rwlock as *const _ as *mut _) == EBUSY {
@@ -58,7 +58,7 @@ pub unsafe extern "C" fn pthread_rwlock_timedrdlock(rwlock: *mut pthread_rwlock_
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlock_timedwrlock(rwlock: *mut pthread_rwlock_t, timeout: *const timespec) -> c_int {
     let rwlock: &pthread_rwlock_t = &*rwlock;
-    let timeout = NonNull::new(timeout as *mut _).map(|n| n.as_ref());
+    let timeout = timeout.as_ref();
 
     loop {
         if pthread_rwlock_trywrlock(rwlock as *const _ as *mut _) == EBUSY {
