@@ -90,8 +90,21 @@ pub unsafe extern "C" fn a64l(s: *const c_char) -> c_long {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn abort() {
-    eprintln!("abort() called");
+pub unsafe extern "C" fn __abort(
+    func: *const c_char,
+    file: *const c_char,
+    line: c_int,
+) {
+    let func = CStr::from_ptr(func).to_str().unwrap();
+    let file = CStr::from_ptr(file).to_str().unwrap();
+
+    eprintln!(
+        "{}: {}:{}: Abort",
+        func,
+        file,
+        line
+    );
+
     intrinsics::abort();
 }
 

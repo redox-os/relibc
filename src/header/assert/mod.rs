@@ -5,7 +5,6 @@ use crate::{
     header::{stdio, stdlib},
     platform::types::*,
 };
-use core::fmt::Write;
 
 #[no_mangle]
 pub unsafe extern "C" fn __assert_fail(
@@ -18,14 +17,13 @@ pub unsafe extern "C" fn __assert_fail(
     let file = CStr::from_ptr(file).to_str().unwrap();
     let cond = CStr::from_ptr(cond).to_str().unwrap();
 
-    writeln!(
-        *stdio::stderr,
+    eprintln!(
         "{}: {}:{}: Assertion `{}` failed.",
         func,
         file,
         line,
         cond
-    )
-    .unwrap();
-    stdlib::abort();
+    );
+
+    core::intrinsics::abort();
 }

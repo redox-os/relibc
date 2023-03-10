@@ -1,6 +1,8 @@
 #ifndef _BITS_STDLIB_H
 #define _BITS_STDLIB_H
 
+# define abort() __abort(__func__, __FILE__, __LINE__)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
