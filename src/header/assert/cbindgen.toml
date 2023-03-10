@@ -7,3 +7,6 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
+
+[fn]
+no_return = "__attribute__((noreturn))"

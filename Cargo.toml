@@ -13,7 +13,7 @@ members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so", "src/platform/redox/
 exclude = ["core_io", "ralloc", "tests"]
 
 [build-dependencies]
-cbindgen = "0.13.2"
+cbindgen = "0.24.3"
 cc = "1.0.25"
 
 [dependencies]
