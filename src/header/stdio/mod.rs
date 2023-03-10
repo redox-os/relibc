@@ -85,10 +85,20 @@ impl<W: core_io::Write> Pending for LineWriter<W> {
     }
 }
 
-pub trait Writer: Write + Pending {}
+pub trait Writer: Write + Pending {
+    fn purge(&mut self);
+}
 
-impl<W: core_io::Write> Writer for BufWriter<W> {}
-impl<W: core_io::Write> Writer for LineWriter<W> {}
+impl<W: core_io::Write> Writer for BufWriter<W> {
+    fn purge(&mut self) {
+        self.buf.clear();
+    }
+}
+impl<W: core_io::Write> Writer for LineWriter<W> {
+    fn purge(&mut self) {
+        self.inner.buf.clear();
+    }
+}
 
 /// This struct gets exposed to the C API.
 pub struct FILE {
@@ -215,6 +225,16 @@ impl FILE {
             i32::MIN..=-1 => Ok(()),
             x => Err(x),
         }
+    }
+
+    pub fn purge(&mut self) {
+        // Purge read buffer
+        self.read_pos = 0;
+        self.read_size = 0;
+        // Purge unget
+        self.unget.clear();
+        // Purge write buffer
+        self.writer.purge();
     }
 }
 
@@ -470,6 +490,17 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
     } else {
         Sys::close(fd);
         ptr::null_mut()
+    }
+}
+
+/// Clear the buffers of a stream
+/// Ensure the file is unlocked before calling this function, as it will attempt to lock the file
+/// itself.
+#[no_mangle]
+pub unsafe extern "C" fn __fpurge(stream: *mut FILE) {
+    if ! stream.is_null() {
+        let mut stream = (*stream).lock();
+        stream.purge();
     }
 }
 
