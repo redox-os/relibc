@@ -1,6 +1,7 @@
 //! strings implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/strings.h.html
-#![feature(llvm_asm)]
+
 use core::ptr;
+use core::arch;
 
 use crate::{
     header::{ctype, string},
@@ -27,7 +28,7 @@ pub unsafe extern "C" fn explicit_bzero(s: *mut c_void, n: size_t) {
     for i in 0..n {
         *(s as *mut u8).add(i) = 0 as u8;
     }
-    llvm_asm!("" :: "r"(s) : "memory")
+    arch::asm!("");
 }
 
 #[no_mangle]
