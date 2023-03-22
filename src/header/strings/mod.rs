@@ -1,6 +1,7 @@
 //! strings implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/strings.h.html
 
 use core::ptr;
+use core::arch;
 
 use crate::{
     header::{ctype, string},
@@ -20,6 +21,14 @@ pub unsafe extern "C" fn bcopy(src: *const c_void, dst: *mut c_void, n: size_t) 
 #[no_mangle]
 pub unsafe extern "C" fn bzero(dst: *mut c_void, n: size_t) {
     ptr::write_bytes(dst as *mut u8, 0, n);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn explicit_bzero(s: *mut c_void, n: size_t) {
+    for i in 0..n {
+        *(s as *mut u8).add(i) = 0 as u8;
+    }
+    arch::asm!("");
 }
 
 #[no_mangle]
