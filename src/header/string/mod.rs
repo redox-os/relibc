@@ -461,3 +461,25 @@ pub unsafe extern "C" fn strxfrm(s1: *mut c_char, s2: *const c_char, n: size_t) 
     }
     len
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn strlcpy(dst: *mut c_char, src: *const c_char, n: size_t) -> size_t {
+    let mut i = 0;
+
+    while *src.add(i) != 0 && i < n {
+        *dst.add(i) = *src.add(i);
+        i += 1;
+    }
+
+    *dst.add(i) = 0;
+
+    i as size_t
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn strlcat(dst: *mut c_char, src: *const c_char, n: size_t) -> size_t {
+    let len = strlen(dst) as isize;
+    let mut d = dst.offset(len);
+
+    strlcpy(d, src, n)
+}
