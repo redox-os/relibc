@@ -16,4 +16,14 @@ int main(void) {
     dst[19] = 0;
     strncpy(dst, "strncpy should work here too", 10);
     puts(dst);
+
+    // The string should be properly terminated regardless
+    char ndst[28];
+
+    size_t r = strlcpy(ndst, "strlcpy works!", 28);
+    puts(ndst);
+    printf("copied %lu\n", r);
+    r = strlcat(ndst, " and strlcat!", 28);
+    puts(ndst);
+    printf("copied %lu\n", r);
 }
