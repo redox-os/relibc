@@ -6,7 +6,7 @@ use crate::{
     fs::File,
     header::sys_epoll::{
         epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR, EPOLLHUP, EPOLLIN,
-        EPOLLNVAL, EPOLLOUT, EPOLLPRI, EPOLL_CLOEXEC, EPOLL_CTL_ADD,
+        EPOLLNVAL, EPOLLOUT, EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, EPOLL_CLOEXEC, EPOLL_CTL_ADD,
     },
     platform::types::*,
 };
@@ -17,6 +17,10 @@ pub const POLLOUT: c_short = 0x004;
 pub const POLLERR: c_short = 0x008;
 pub const POLLHUP: c_short = 0x010;
 pub const POLLNVAL: c_short = 0x020;
+pub const POLLRDNORM: c_short = 0x040;
+pub const POLLRDBAND: c_short = 0x080;
+pub const POLLWRNORM: c_short = 0x100;
+pub const POLLWRBAND: c_short = 0x200;
 
 pub type nfds_t = c_ulong;
 
@@ -35,6 +39,10 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
         (POLLERR, EPOLLERR),
         (POLLHUP, EPOLLHUP),
         (POLLNVAL, EPOLLNVAL),
+        (POLLRDNORM, EPOLLRDNORM),
+        (POLLWRNORM, EPOLLWRNORM),
+        (POLLRDBAND, EPOLLRDBAND),
+        (POLLWRBAND, EPOLLWRBAND),
     ];
 
     let ep = {
