@@ -165,6 +165,22 @@ int main(void) {
     printf("realloc (SIZE_MAX): ");
     test_cannot_alloc(ptr_realloc_maxsize, realloc_maxsize_errno);
     free(ptr_realloc_maxsize);
+
+    errno = 0;
+    char * ptr_reallocarray_maxsize = (char *)malloc(sample_alloc_size);
+    ptr_reallocarray_maxsize = (char *)reallocarray(ptr_reallocarray_maxsize, 2, sample_alloc_size);
+    int reallocarray_errno = errno;
+    printf("reallocarray: ");
+    test_non_null(ptr_reallocarray_maxsize, reallocarray_errno);
+    for(i = 0; i < sample_realloc_size; i++) {
+        ptr_realloc[i] = (char)i;
+    }
+    errno = 0;
+    ptr_reallocarray_maxsize = (char *)reallocarray(ptr_reallocarray_maxsize, 2, max_size);
+    reallocarray_errno = errno;
+    printf("reallocarray (SIZE_MAX): ");
+    test_cannot_alloc(ptr_reallocarray_maxsize, reallocarray_errno);
+    free(ptr_reallocarray_maxsize);
     
     errno = 0;
     char * ptr_memalign_size0 = (char *)memalign(aligned_alloc_alignment, zero_size);
