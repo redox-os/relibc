@@ -6,6 +6,7 @@ pub const SOCK_NONBLOCK: c_int = 0o4_000;
 pub const SOCK_CLOEXEC: c_int = 0o2_000_000;
 
 // Other constants
+pub const SOCK_RDM: c_int = 4;
 pub const SOCK_SEQPACKET: c_int = 5;
 
 pub const SOL_SOCKET: c_int = 1;
