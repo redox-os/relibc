@@ -813,6 +813,22 @@ pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void 
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn reallocarray(ptr: *mut c_void, m: size_t, n: size_t) -> *mut c_void {
+    //Handle possible integer overflow in size calculation
+    match m.checked_mul(n) {
+        Some(size) => {
+            realloc(ptr, size)
+        }
+        None => {
+            // For overflowing multiplication, we have to set errno here
+            platform::errno = ENOMEM;
+            ptr::null_mut()
+
+        }
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char) -> *mut c_char {
     let ptr = if resolved.is_null() {
         malloc(limits::PATH_MAX) as *mut c_char
