@@ -6,7 +6,7 @@ int main() {
     wchar_t *str = L"HaLf WiDe ChAr StRiNg!\n";
     fputws(str, stdout);
     for (int i = 0; i < wcslen(str); i++) {
-        putwchar(towupper(str[i]));
+        putwchar(towctrans(str[i], wctrans("toupper")));
     }
     return 0;
 }
