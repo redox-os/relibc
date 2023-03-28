@@ -30,6 +30,15 @@ pub const MS_ASYNC: c_int = 0x0001;
 pub const MS_INVALIDATE: c_int = 0x0002;
 pub const MS_SYNC: c_int = 0x0004;
 
+pub const MCL_CURRENT: c_int = 1;
+pub const MCL_FUTURE: c_int = 2;
+
+pub const POSIX_MADV_NORMAL: c_int = 0;
+pub const POSIX_MADV_RANDOM: c_int = 1;
+pub const POSIX_MADV_SEQUENTIAL: c_int = 2;
+pub const POSIX_MADV_WILLNEED: c_int = 3;
+pub const POSIX_MADV_WONTNEED: c_int = 4;
+
 #[no_mangle]
 pub unsafe extern "C" fn mlock(addr: *const c_void, len: usize) -> c_int {
     Sys::mlock(addr, len)
