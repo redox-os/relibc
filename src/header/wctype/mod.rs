@@ -8,6 +8,7 @@ mod casecmp;
 mod punct;
 
 pub type wctype_t = u32;
+pub type wctrans_t = *const i32;
 
 pub const WEOF: wint_t = 0xFFFF_FFFFu32;
 
@@ -23,6 +24,9 @@ pub const WCTYPE_PUNCT: wctype_t = 9;
 pub const WCTYPE_SPACE: wctype_t = 10;
 pub const WCTYPE_UPPER: wctype_t = 11;
 pub const WCTYPE_XDIGIT: wctype_t = 12;
+
+const WCTRANSUP: wctrans_t = 1 as wctrans_t;
+const WCTRANSLW: wctrans_t = 2 as wctrans_t;
 
 #[no_mangle]
 pub extern "C" fn iswctype(wc: wint_t, desc: wctype_t) -> c_int {
@@ -172,4 +176,23 @@ pub extern "C" fn towlower(wc: wint_t) -> wint_t {
 #[no_mangle]
 pub extern "C" fn towupper(wc: wint_t) -> wint_t {
     casemap(wc, 1)
+}
+
+#[no_mangle]
+pub extern "C" fn wctrans(class: *const c_char) -> wctrans_t {
+    let class_cstr = unsafe { CStr::from_ptr(class) };
+    match class_cstr.to_bytes() {
+        b"toupper" => WCTRANSUP,
+        b"tolower" => WCTRANSLW,
+        _ => 0 as wctrans_t,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn towctrans(wc: wint_t, trans: wctrans_t) -> wint_t {
+    match trans {
+        WCTRANSUP => towupper(wc),
+        WCTRANSLW => towlower(wc),
+        _ => wc,
+    }
 }
