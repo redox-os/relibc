@@ -233,7 +233,9 @@ pub unsafe extern "C" fn pte_osThreadDelete(handle: pte_osThreadHandle) -> pte_o
 #[no_mangle]
 pub unsafe extern "C" fn pte_osThreadWaitForEnd(handle: pte_osThreadHandle) -> pte_osResult {
     let mut status = 0;
-    Sys::waitpid(handle, &mut status, 0);
+    if Sys::waitpid(handle, &mut status, 0) < 0 {
+        return PTE_OS_GENERAL_FAILURE;
+    }
     PTE_OS_OK
 }
 
