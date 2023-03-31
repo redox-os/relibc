@@ -9,6 +9,7 @@ cpp_compat = true
 [defines]
 "target_os=linux" = "__linux__"
 "target_os=redox" = "__redox__"
+"target_os=dragonos" = "__dragonos__"
 
 [enum]
 prefix_with_name = true

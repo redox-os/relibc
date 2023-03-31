@@ -40,6 +40,9 @@ optional = true
 [target.'cfg(target_os = "linux")'.dependencies]
 sc = "0.2.3"
 
+[target.'cfg(target_os = "dragonos")'.dependencies]
+dsc = { path = "/home/longjin/code/dragonos-syscall" }
+
 [target.'cfg(target_os = "redox")'.dependencies]
 redox_syscall = "0.3"
 spin = "0.9.0"

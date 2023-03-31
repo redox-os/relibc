@@ -21,6 +21,13 @@ unsafe fn access(path: *const c_char, mode: c_int) -> c_int {
     syscall!(ACCESS, (path).as_ptr(), mode) as c_int
 }
 
+#[cfg(target_os = "dragonos")]
+unsafe fn access(path: *const c_char, mode: c_int) -> c_int {
+    // let path = CStr::from_ptr(path);
+    // syscall!(ACCESS, (path).as_ptr(), mode) as c_int
+    return -1;
+}
+
 // Wrapper over the systemcall, Do not use outside of ld_so
 #[cfg(target_os = "redox")]
 unsafe fn access(path: *const c_char, mode: c_int) -> c_int {

@@ -22,6 +22,10 @@ pub use self::sys::{e, Sys};
 #[path = "linux/mod.rs"]
 pub(crate) mod sys;
 
+#[cfg(all(not(feature = "no_std"), target_os = "dragonos"))]
+#[path = "dragonos/mod.rs"]
+pub(crate) mod sys;
+
 #[cfg(all(not(feature = "no_std"), target_os = "redox"))]
 #[path = "redox/mod.rs"]
 pub(crate) mod sys;
@@ -35,6 +39,9 @@ pub use self::rlb::{Line, RawLineBuffer};
 pub mod rlb;
 
 #[cfg(target_os = "linux")]
+pub mod auxv_defs;
+
+#[cfg(target_os = "dragonos")]
 pub mod auxv_defs;
 
 #[cfg(target_os = "redox")]

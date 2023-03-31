@@ -14,6 +14,9 @@ pub const PATH_SEP: char = ';';
 #[cfg(target_os = "linux")]
 pub const PATH_SEP: char = ':';
 
+#[cfg(target_os = "dragonos")]
+pub const PATH_SEP: char = ':';
+
 mod access;
 pub mod callbacks;
 pub mod debug;
@@ -138,11 +141,16 @@ pub fn static_init(sp: &'static Stack) {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "redox"))]
+#[cfg(any(target_os = "linux", target_os = "redox", target_os = "dragonos"))]
 pub unsafe fn init(sp: &'static Stack) {
     let mut tp = 0usize;
 
     #[cfg(target_os = "linux")]
+    {
+        const ARCH_GET_FS: usize = 0x1003;
+        syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut tp as *mut usize);
+    }
+    #[cfg(target_os = "dragonos")]
     {
         const ARCH_GET_FS: usize = 0x1003;
         syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut tp as *mut usize);

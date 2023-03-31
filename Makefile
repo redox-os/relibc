@@ -1,4 +1,5 @@
-TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
+# TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
+TARGET=x86_64-unknown-dragonos
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
@@ -43,6 +44,16 @@ ifeq ($(TARGET),x86_64-unknown-redox)
 	export LD=x86_64-unknown-redox-ld
 	export AR=x86_64-unknown-redox-ar
 	export OBJCOPY=x86_64-unknown-redox-objcopy
+endif
+
+ifeq ($(TARGET),x86_64-unknown-dragonos)
+	export CC=x86_64-dragonos-gcc
+# export LD=ld
+	export LD=x86_64-dragonos-ld
+	export AR=ar
+# export AR=x86_64-dragonos-ar
+	export OBJCOPY=objcopy
+# export OBJCOPY=x86_64-dragonos-objcopy
 endif
 
 SRC=\
