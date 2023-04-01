@@ -47,9 +47,9 @@ ifeq ($(TARGET),x86_64-unknown-redox)
 endif
 
 ifeq ($(TARGET),x86_64-unknown-dragonos)
-	export CC=x86_64-dragonos-gcc
+	export CC=gcc
 # export LD=ld
-	export LD=x86_64-dragonos-ld
+	export LD=ld
 	export AR=ar
 # export AR=x86_64-dragonos-ar
 	export OBJCOPY=objcopy
