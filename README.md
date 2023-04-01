@@ -1,10 +1,19 @@
 # relibc ![build](https://travis-ci.org/redox-os/relibc.svg?branch=master)
-relibc is a portable POSIX C standard library written in Rust. It is under heavy development, and currently supports Redox and Linux.
+relibc is a portable POSIX C standard library written in Rust. It is under heavy development, and currently supports Redox, Linux and DragonOS.
 
 The motivation for this project is twofold: Reduce issues the redox crew was having with newlib, and create a safer alternative to a C standard library written in C. It is mainly designed to be used under redox, as an alternative to newlib, but it also supports linux syscalls via the [sc](https://crates.io/crates/sc) crate.
 
 ## Building
 Just run `make all`.
+
+### Build for DragonOS
+
+You can follow the instructions to build relibc for DragonOS:
+
+```bash
+mkdir -p sysroot/usr
+make -j $(nproc) && DESTDIR=sysroot/usr make install -j $(nproc)
+```
 
 ### Issues
 #### I'm building for my own platform which I run, and am getting `x86_64-linux-gnu-ar: command not found` (or similar)
@@ -27,6 +36,7 @@ An easy fix would be to replace the corresponding lines in the Makefile, e.g.
 
  - Redox OS
  - Linux
+ - DragonOS
 
 ## Supported architectures
 

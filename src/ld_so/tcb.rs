@@ -194,7 +194,7 @@ impl Tcb {
     }
 
     /// OS specific code to create a new TLS and TCB - Linux and Redox
-    #[cfg(any(target_os = "linux", target_os = "redox"))]
+    #[cfg(any(target_os = "linux", target_os = "redox", target_os = "dragonos"))]
     unsafe fn os_new(
         size: usize,
     ) -> Result<(&'static mut [u8], &'static mut [u8], &'static mut [u8])> {
@@ -254,6 +254,14 @@ impl Tcb {
     unsafe fn os_arch_activate(tls_end: usize, _tls_len: usize) {
         const ARCH_SET_FS: usize = 0x1002;
         syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
+    }
+    
+    /// OS and architecture specific code to activate TLS - DragonOS x86_64
+    #[cfg(all(target_os = "dragonos", target_arch = "x86_64"))]
+    unsafe fn os_arch_activate(tls_end: usize, _tls_len: usize) {
+        const ARCH_SET_FS: usize = 0x1002;
+        // syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
+        unimplemented!()
     }
 
     /// OS and architecture specific code to activate TLS - Redox aarch64

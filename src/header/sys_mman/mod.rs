@@ -10,6 +10,10 @@ pub use self::sys::*;
 #[path = "linux.rs"]
 pub mod sys;
 
+#[cfg(target_os = "dragonos")]
+#[path = "dragonos.rs"]
+pub mod sys;
+
 #[cfg(target_os = "redox")]
 #[path = "redox.rs"]
 pub mod sys;
@@ -87,6 +91,9 @@ pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
 }
 
 #[cfg(target_os = "linux")]
+static SHM_PATH: &'static [u8] = b"/dev/shm/";
+
+#[cfg(target_os = "dragonos")]
 static SHM_PATH: &'static [u8] = b"/dev/shm/";
 
 #[cfg(target_os = "redox")]

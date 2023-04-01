@@ -40,6 +40,11 @@ extern crate rand;
 #[macro_use]
 extern crate sc;
 
+// TODO: fix this: adjust to dragonos sc
+#[cfg(target_os = "dragonos")]
+#[macro_use]
+extern crate dsc;
+
 #[cfg(target_os = "redox")]
 extern crate syscall;
 

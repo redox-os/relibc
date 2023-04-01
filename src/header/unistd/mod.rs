@@ -171,6 +171,9 @@ pub unsafe extern "C" fn execve(
 #[cfg(target_os = "linux")]
 const PATH_SEPARATOR: u8 = b':';
 
+#[cfg(target_os = "dragonos")]
+const PATH_SEPARATOR: u8 = b':';
+
 #[cfg(target_os = "redox")]
 const PATH_SEPARATOR: u8 = b';';
 

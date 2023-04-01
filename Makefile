@@ -1,4 +1,5 @@
-TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
+# TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
+TARGET=x86_64-unknown-dragonos
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
@@ -45,6 +46,16 @@ ifeq ($(TARGET),x86_64-unknown-redox)
 	export OBJCOPY=x86_64-unknown-redox-objcopy
 endif
 
+ifeq ($(TARGET),x86_64-unknown-dragonos)
+	export CC=gcc
+# export LD=ld
+	export LD=ld
+	export AR=ar
+# export AR=x86_64-dragonos-ar
+	export OBJCOPY=objcopy
+# export OBJCOPY=x86_64-dragonos-objcopy
+endif
+
 SRC=\
 	Cargo.* \
 	$(shell find src -type f)
@@ -74,24 +85,24 @@ install-headers: libs
 	cp -v "openlibm/src"/*.h "$(DESTDIR)/include"
 	cp -v "pthreads-emb/"*.h "$(DESTDIR)/include"
 
+# $(BUILD)/release/libc.so
 libs: \
 	$(BUILD)/release/libc.a \
-	$(BUILD)/release/libc.so \
 	$(BUILD)/release/crt0.o \
 	$(BUILD)/release/crti.o \
-	$(BUILD)/release/crtn.o \
-	$(BUILD)/release/ld_so
+	$(BUILD)/release/crtn.o
+#$(BUILD)/release/ld_so
 
 install-libs: libs
 	mkdir -pv "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/libc.a" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/release/libc.so" "$(DESTDIR)/lib"
-	ln -frsv "$(DESTDIR)/lib/libc.so" "$(DESTDIR)/lib/libc.so.6"
+# cp -v "$(BUILD)/release/libc.so" "$(DESTDIR)/lib"
+# ln -frsv "$(DESTDIR)/lib/libc.so" "$(DESTDIR)/lib/libc.so.6"
 	cp -v "$(BUILD)/release/crt0.o" "$(DESTDIR)/lib"
 	ln -frsv "$(DESTDIR)/lib/crt0.o" "$(DESTDIR)/lib/crt1.o"
 	cp -v "$(BUILD)/release/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/release/ld_so" "$(DESTDIR)/lib/ld64.so.1"
+# cp -v "$(BUILD)/release/ld_so" "$(DESTDIR)/lib/ld64.so.1"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 	cp -v "$(BUILD)/pthreads-emb/libpthread.a" "$(DESTDIR)/lib/libpthread.a"
 	# Empty libraries for dl and rt

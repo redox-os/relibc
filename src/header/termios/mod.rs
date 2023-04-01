@@ -11,6 +11,10 @@ pub use self::sys::*;
 #[path = "linux.rs"]
 pub mod sys;
 
+#[cfg(target_os = "dragonos")]
+#[path = "dragonos.rs"]
+pub mod sys;
+
 #[cfg(target_os = "redox")]
 #[path = "redox.rs"]
 pub mod sys;
@@ -33,6 +37,20 @@ pub const TCSADRAIN: usize = 1;
 pub const TCSAFLUSH: usize = 2;
 
 #[cfg(target_os = "linux")]
+#[repr(C)]
+#[derive(Default)]
+pub struct termios {
+    c_iflag: tcflag_t,
+    c_oflag: tcflag_t,
+    c_cflag: tcflag_t,
+    c_lflag: tcflag_t,
+    c_line: cc_t,
+    c_cc: [cc_t; NCCS],
+    __c_ispeed: speed_t,
+    __c_ospeed: speed_t,
+}
+
+#[cfg(target_os = "dragonos")]
 #[repr(C)]
 #[derive(Default)]
 pub struct termios {
