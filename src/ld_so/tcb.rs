@@ -260,7 +260,8 @@ impl Tcb {
     #[cfg(all(target_os = "dragonos", target_arch = "x86_64"))]
     unsafe fn os_arch_activate(tls_end: usize, _tls_len: usize) {
         const ARCH_SET_FS: usize = 0x1002;
-        syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
+        // syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
+        unimplemented!()
     }
 
     /// OS and architecture specific code to activate TLS - Redox aarch64

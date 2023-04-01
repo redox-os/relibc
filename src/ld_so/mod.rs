@@ -153,7 +153,8 @@ pub unsafe fn init(sp: &'static Stack) {
     #[cfg(target_os = "dragonos")]
     {
         const ARCH_GET_FS: usize = 0x1003;
-        syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut tp as *mut usize);
+        // syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut tp as *mut usize);
+        unimplemented!()
     }
     #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
     {
