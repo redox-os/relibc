@@ -25,6 +25,7 @@ pub const MAP_PRIVATE: c_int = 0x0002;
 pub const MAP_TYPE: c_int = 0x000F;
 pub const MAP_ANON: c_int = 0x0020;
 pub const MAP_ANONYMOUS: c_int = MAP_ANON;
+pub const MAP_STACK: c_int = 0x20000;
 
 pub const MS_ASYNC: c_int = 0x0001;
 pub const MS_INVALIDATE: c_int = 0x0002;
