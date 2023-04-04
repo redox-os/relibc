@@ -43,7 +43,7 @@ sc = "0.2.3"
 [target.'cfg(target_os = "dragonos")'.dependencies]
 # Development
 #dsc = { path = "本地存放dsc的代码的路径" }
-dsc = { git = "https://github.com/DragonOS-Community/dsc.git", rev = "f073773" }
+dsc = { git = "https://github.com/DragonOS-Community/dsc.git", rev = "0f61350" }
 
 [target.'cfg(target_os = "redox")'.dependencies]
 redox_syscall = "0.3"

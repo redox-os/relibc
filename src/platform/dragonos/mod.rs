@@ -120,13 +120,11 @@ impl Pal for Sys {
     }
 
     fn dup(fildes: c_int) -> c_int {
-        // e(unsafe { syscall!(DUP, fildes) }) as c_int
-        unimplemented!()
+        e(unsafe { syscall!(SYS_DUP, fildes) }) as c_int
     }
 
     fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
-        // e(unsafe { syscall!(DUP3, fildes, fildes2, 0) }) as c_int
-        unimplemented!()
+        e(unsafe { syscall!(SYS_DUP2, fildes, fildes2) }) as c_int
     }
 
     unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {

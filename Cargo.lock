@@ -111,7 +111,7 @@ version = "0.1.0"
 [[package]]
 name = "dsc"
 version = "0.1.0"
-source = "git+https://github.com/DragonOS-Community/dsc.git?rev=f073773#f073773275e0969be41a3de68d4cf2aa8773ad05"
+source = "git+https://github.com/DragonOS-Community/dsc.git?rev=0f61350#0f61350272d93e1cbda1f5f565bdaf81cc942a9f"
 
 [[package]]
 name = "errno"
