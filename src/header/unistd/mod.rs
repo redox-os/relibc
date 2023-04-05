@@ -37,6 +37,8 @@ pub const STDIN_FILENO: c_int = 0;
 pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
 
+pub const L_cuserid: usize = 9;
+
 #[thread_local]
 pub static mut fork_hooks_static: Option<[LinkedList<extern "C" fn()>; 3]> = None;
 

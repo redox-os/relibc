@@ -20,8 +20,8 @@ use crate::{
     fs::File,
     header::{
         errno::{self, STR_ERROR},
-        fcntl, stdlib,
-        string::{self, strlen},
+        fcntl, stdlib, pwd,
+        string::{self, strlen, strncpy},
         unistd,
     },
     io::{self, BufRead, BufWriter, LineWriter, Read, Write},
@@ -272,8 +272,24 @@ pub extern "C" fn ctermid(_s: *mut c_char) -> *mut c_char {
 }
 
 // #[no_mangle]
-pub extern "C" fn cuserid(_s: *mut c_char) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
+    let mut buf: Vec<i8> = vec![0; 256];
+    let mut pwd: pwd::passwd = unsafe { mem::zeroed() };
+    let mut pwdbuf: *mut pwd::passwd = unsafe { mem::zeroed() };
+    if s != ptr::null_mut() {
+        *s.add(0) = 0;
+    }
+    pwd::getpwuid_r(unistd::geteuid(), &mut pwd, buf.as_mut_ptr(), buf.len(), &mut pwdbuf);
+    if pwdbuf == ptr::null_mut() {
+        return s;
+    }
+
+    if s != ptr::null_mut() {
+        strncpy(s, (*pwdbuf).pw_name, unistd::L_cuserid);
+        return s;
+    }
+
+    (*pwdbuf).pw_name
 }
 
 /// Close a file
