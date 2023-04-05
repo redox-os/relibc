@@ -479,7 +479,7 @@ pub unsafe extern "C" fn strlcpy(dst: *mut c_char, src: *const c_char, n: size_t
 #[no_mangle]
 pub unsafe extern "C" fn strlcat(dst: *mut c_char, src: *const c_char, n: size_t) -> size_t {
     let len = strlen(dst) as isize;
-    let mut d = dst.offset(len);
+    let d = dst.offset(len);
 
     strlcpy(d, src, n)
 }
