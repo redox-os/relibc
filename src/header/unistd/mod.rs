@@ -3,9 +3,9 @@
 use core::{convert::TryFrom, mem, ptr, slice};
 
 use crate::{
-    c_str::CStr,
+    c_str::{CStr, CString},
     header::{
-        errno, fcntl, limits, stdlib::getenv, sys_ioctl, sys_time, sys_utsname, termios,
+        errno, fcntl, limits, stdlib::getenv, string, sys_ioctl, sys_time, sys_utsname, termios,
         time::timespec,
     },
     platform::{self, types::*, Pal, Sys},
@@ -38,6 +38,7 @@ pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
 
 pub const L_cuserid: usize = 9;
+pub const _CS_PATH: c_int = 0;
 
 #[thread_local]
 pub static mut fork_hooks_static: Option<[LinkedList<extern "C" fn()>; 3]> = None;
@@ -112,8 +113,16 @@ pub extern "C" fn close(fildes: c_int) -> c_int {
 }
 
 // #[no_mangle]
-pub extern "C" fn confstr(name: c_int, buf: *mut c_char, len: size_t) -> size_t {
-    unimplemented!();
+pub unsafe extern "C" fn confstr(name: c_int, buf: *mut c_char, len: size_t) -> size_t {
+    let mut ret: size_t = 0;
+    if name == _CS_PATH {
+        let binpath = CString::new("/bin:/usr/bin").unwrap();
+        ret = string::strlcpy(buf, binpath.as_ptr() as *const c_char, len);
+    } else {
+        let error = errno::EINVAL;
+        platform::errno = error;
+    }
+    ret
 }
 
 // #[no_mangle]
