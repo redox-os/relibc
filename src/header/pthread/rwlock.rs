@@ -1,7 +1,6 @@
 use super::*;
 
-use crate::sync::AtomicLock;
-use core::sync::atomic::Ordering;
+use core::sync::atomic::{AtomicI32 as AtomicInt, Ordering};
 
 use crate::header::errno::EBUSY;
 
@@ -15,16 +14,6 @@ const EXCLUSIVE: u32 = (1 << (u32::BITS - 1)) - 1;
 // Separate "waiting for wrlocks" and "waiting for rdlocks"?
 //const WAITING: u32 = 1 << (u32::BITS - 1);
 
-#[repr(C)]
-pub struct Rwlock {
-    state: AtomicLock,
-}
-
-#[repr(C)]
-pub struct RwlockAttr {
-    pshared: c_int,
-}
-
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlock_destroy(rwlock: *mut pthread_rwlock_t) -> c_int {
     // (Informing the compiler that this pointer is valid, might improve optimizations.)
@@ -33,8 +22,8 @@ pub unsafe extern "C" fn pthread_rwlock_destroy(rwlock: *mut pthread_rwlock_t) -
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlock_init(rwlock: *mut pthread_rwlock_t, _attr: *const pthread_rwlockattr_t) -> c_int {
-    core::ptr::write(rwlock, Rwlock {
-        state: AtomicLock::new(0),
+    core::ptr::write(rwlock, pthread_rwlock_t {
+        state: AtomicInt::new(0),
     });
 
     0
@@ -50,7 +39,7 @@ pub unsafe extern "C" fn pthread_rwlock_timedrdlock(rwlock: *mut pthread_rwlock_
 
     loop {
         if pthread_rwlock_tryrdlock(rwlock as *const _ as *mut _) == EBUSY {
-            rwlock.state.wait_if(EXCLUSIVE as i32, timeout);
+            crate::sync::futex_wait(&rwlock.state, EXCLUSIVE as i32, timeout);
         }
         return 0;
     }
@@ -60,11 +49,20 @@ pub unsafe extern "C" fn pthread_rwlock_timedwrlock(rwlock: *mut pthread_rwlock_
     let rwlock: &pthread_rwlock_t = &*rwlock;
     let timeout = timeout.as_ref();
 
-    loop {
+    /*loop {
         if pthread_rwlock_trywrlock(rwlock as *const _ as *mut _) == EBUSY {
-            rwlock.state.wait_if(EXCLUSIVE as i32, timeout);
+            crate::sync::futex_wait(&rwlock.state, EXCLUSIVE as i32, timeout);
         }
         return 0;
+    }*/
+    loop {
+        match rwlock.state.compare_exchange(0, EXCLUSIVE as i32, Ordering::Acquire, Ordering::Relaxed) {
+            Ok(_) => return 0,
+            Err(value) => {
+                // TODO: More than just forwarding the timeout.
+                crate::sync::futex_wait(&rwlock.state, value, timeout);
+            }
+        }
     }
 }
 #[no_mangle]
@@ -105,7 +103,7 @@ pub unsafe extern "C" fn pthread_rwlock_unlock(rwlock: *const pthread_rwlock_t) 
     let old = rwlock.state.swap(0, Ordering::Release) as u32;
 
     if old == EXCLUSIVE {
-        rwlock.state.notify_all();
+        crate::sync::futex_wake(&rwlock.state, i32::MAX);
     }
 
     0
@@ -129,7 +127,7 @@ pub unsafe extern "C" fn pthread_rwlockattr_getpshared(attr: *const pthread_rwlo
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlockattr_init(attr: *mut pthread_rwlockattr_t) -> c_int {
-    core::ptr::write(attr, RwlockAttr {
+    core::ptr::write(attr, pthread_rwlockattr_t {
         // Default according to POSIX.
         pshared: PTHREAD_PROCESS_PRIVATE,
     });

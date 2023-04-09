@@ -1,0 +1,37 @@
+sys_includes = ["bits/sched.h"]
+include_guard = "_RELIBC_BITS_PTHREAD_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+trailer = """
+#define PTHREAD_COND_INITIALIZER {0}
+#define PTHREAD_MUTEX_INITIALIZER {0}
+#define PTHREAD_ONCE_INIT {0}
+#define PTHREAD_RWLOCK_INITIALIZER {0}
+"""
+
+[export.rename]
+"sched_param" = "struct sched_param"
+"AtomicInt" = "int"
+"AtomicUint" = "unsigned"
+
+[export]
+include = [
+  "pthread_attr_t",
+  "pthread_rwlockattr_t",
+  "pthread_rwlock_t",
+  "pthread_barrier_t",
+  "pthread_barrierattr_t",
+  "pthread_mutex_t",
+  "pthread_mutexattr_t",
+  "pthread_condattr_t",
+  "pthread_cond_t",
+  "pthread_spinlock_t",
+  "pthread_once_t",
+  "pthread_t",
+  "pthread_key_t",
+]
+
+[enum]
+prefix_with_name = true

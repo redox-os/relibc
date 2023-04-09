@@ -3,11 +3,7 @@
 use crate::platform::{Pal, Sys, types::*};
 use crate::header::time::timespec;
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-pub struct sched_param {
-    pub sched_priority: c_int,
-}
+pub use crate::header::bits_sched::sched_param;
 
 pub const SCHED_FIFO: c_int = 0;
 pub const SCHED_RR: c_int = 1;

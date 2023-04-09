@@ -4,20 +4,6 @@ use crate::header::errno::EBUSY;
 
 // PTHREAD_MUTEX_INITIALIZER
 
-#[repr(C)]
-pub struct Mutex {
-    pub(crate) inner: crate::sync::Mutex<()>,
-}
-
-#[repr(C)]
-pub struct MutexAttr {
-    prioceiling: c_int,
-    protocol: c_int,
-    pshared: c_int,
-    robust: c_int,
-    ty: c_int,
-}
-
 // #[no_mangle]
 pub extern "C" fn pthread_mutex_consistent(mutex: *mut pthread_mutex_t) -> c_int {
     todo!();
@@ -36,14 +22,14 @@ pub extern "C" fn pthread_mutex_getprioceiling(mutex: *const pthread_mutex_t, pr
 #[no_mangle]
 pub unsafe extern "C" fn pthread_mutex_init(mutex: *mut pthread_mutex_t, _attr: *const pthread_mutexattr_t) -> c_int {
     // TODO: attr
-    mutex.write(Mutex {
-        inner: crate::sync::Mutex::new(()),
+    mutex.write(pthread_mutex_t {
+        inner: crate::sync::mutex::UNLOCKED.into(),
     });
     0
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_mutex_lock(mutex: *mut pthread_mutex_t) -> c_int {
-    (&*mutex).inner.manual_lock();
+    crate::sync::mutex::manual_lock_generic(&(&*mutex).inner);
 
     0
 }
@@ -59,14 +45,15 @@ pub extern "C" fn pthread_mutex_timedlock(mutex: *mut pthread_mutex_t, timespec:
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_mutex_trylock(mutex: *mut pthread_mutex_t) -> c_int {
-    match (&*mutex).inner.manual_try_lock() {
-        Ok(_) => 0,
-        Err(_) => EBUSY,
+    if crate::sync::mutex::manual_try_lock_generic(&(&*mutex).inner) {
+        0
+    } else {
+        EBUSY
     }
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_mutex_unlock(mutex: *mut pthread_mutex_t) -> c_int {
-    (&*mutex).inner.manual_unlock();
+    crate::sync::mutex::manual_unlock_generic(&(&*mutex).inner);
     0
 }
 
@@ -105,7 +92,7 @@ pub unsafe extern "C" fn pthread_mutexattr_gettype(attr: *const pthread_mutexatt
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_mutexattr_init(attr: *mut pthread_mutexattr_t) -> c_int {
-    attr.write(MutexAttr {
+    attr.write(pthread_mutexattr_t {
         robust: PTHREAD_MUTEX_STALLED,
         pshared: PTHREAD_PROCESS_PRIVATE,
         protocol: PTHREAD_PRIO_NONE,

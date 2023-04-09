@@ -1,9 +1,13 @@
-sys_includes = ["sched.h", "time.h"]
+sys_includes = ["sched.h", "time.h", "bits/pthread.h"]
 include_guard = "_RELIBC_PTHREAD_H"
 language = "C"
-style = "Tag"
+style = "tag"
 no_includes = true
 cpp_compat = true
+
+[export.rename]
+"sched_param" = "struct sched_param"
+"timespec" = "struct timespec"
 
 [enum]
 prefix_with_name = true

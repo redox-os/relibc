@@ -759,7 +759,7 @@ impl Pal for Sys {
     }
 
     unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
-        clone::pte_clone_impl(stack).map(|context_id| crate::pthread::OsTid { context_id }).map_err(|error| crate::pthread::Errno(error.errno))
+        clone::rlct_clone_impl(stack).map(|context_id| crate::pthread::OsTid { context_id }).map_err(|error| crate::pthread::Errno(error.errno))
     }
     unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), crate::pthread::Errno> {
         syscall::kill(os_tid.context_id, signal).map_err(|error| crate::pthread::Errno(error.errno))?;

@@ -14,7 +14,7 @@ use super::extra::{create_set_addr_space_buf, FdGuard};
 pub use redox_exec::*;
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
-pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
+pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
     let cur_pid_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", O_CLOEXEC)?);
     let (new_pid_fd, new_pid) = new_context()?;
 
@@ -47,7 +47,7 @@ pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
 
         let buf = create_set_addr_space_buf(
             *cur_addr_space_fd,
-            __relibc_internal_pte_clone_ret as usize,
+            __relibc_internal_rlct_clone_ret as usize,
             stack as usize,
         );
         let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
@@ -86,16 +86,16 @@ pub unsafe fn pte_clone_impl(stack: *mut usize) -> Result<usize> {
 }
 
 extern "C" {
-    fn __relibc_internal_pte_clone_ret();
+    fn __relibc_internal_rlct_clone_ret();
 }
 
 #[cfg(target_arch = "aarch64")]
 core::arch::global_asm!(
     "
-    .globl __relibc_internal_pte_clone_ret
-    .type __relibc_internal_pte_clone_ret, @function
+    .globl __relibc_internal_rlct_clone_ret
+    .type __relibc_internal_rlct_clone_ret, @function
     .p2align 6
-__relibc_internal_pte_clone_ret:
+__relibc_internal_rlct_clone_ret:
     # Load registers
     ldr x8, [sp], #8
     ldr x0, [sp], #8
@@ -109,17 +109,17 @@ __relibc_internal_pte_clone_ret:
     blr x8
 
     ret
-    .size __relibc_internal_pte_clone_ret, . - __relibc_internal_pte_clone_ret
+    .size __relibc_internal_rlct_clone_ret, . - __relibc_internal_rlct_clone_ret
 "
 );
 
 #[cfg(target_arch = "x86")]
 core::arch::global_asm!(
     "
-    .globl __relibc_internal_pte_clone_ret
-    .type __relibc_internal_pte_clone_ret, @function
+    .globl __relibc_internal_rlct_clone_ret
+    .type __relibc_internal_rlct_clone_ret, @function
     .p2align 6
-__relibc_internal_pte_clone_ret:
+__relibc_internal_rlct_clone_ret:
     # Load registers
     pop eax
 
@@ -136,17 +136,17 @@ __relibc_internal_pte_clone_ret:
     call eax
 
     ret
-    .size __relibc_internal_pte_clone_ret, . - __relibc_internal_pte_clone_ret
+    .size __relibc_internal_rlct_clone_ret, . - __relibc_internal_rlct_clone_ret
 "
 );
 
 #[cfg(target_arch = "x86_64")]
 core::arch::global_asm!(
     "
-    .globl __relibc_internal_pte_clone_ret
-    .type __relibc_internal_pte_clone_ret, @function
+    .globl __relibc_internal_rlct_clone_ret
+    .type __relibc_internal_rlct_clone_ret, @function
     .p2align 6
-__relibc_internal_pte_clone_ret:
+__relibc_internal_rlct_clone_ret:
     # Load registers
     pop rax
     pop rdi
@@ -169,6 +169,6 @@ __relibc_internal_pte_clone_ret:
     call rax
 
     ret
-    .size __relibc_internal_pte_clone_ret, . - __relibc_internal_pte_clone_ret
+    .size __relibc_internal_rlct_clone_ret, . - __relibc_internal_rlct_clone_ret
 "
 );

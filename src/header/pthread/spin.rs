@@ -4,11 +4,6 @@ use crate::header::errno::EBUSY;
 
 use super::*;
 
-#[repr(C)]
-pub struct Spinlock {
-    inner: AtomicInt,
-}
-
 pub const UNLOCKED: c_int = 0;
 pub const LOCKED: c_int = 1;
 
@@ -19,12 +14,12 @@ pub unsafe extern "C" fn pthread_spin_init(spinlock: *mut pthread_spinlock_t, _p
     // TODO: pshared doesn't matter in most situations, as memory is just memory, but this may be
     // different on some architectures...
 
-    core::ptr::write(spinlock, Spinlock { inner: AtomicInt::new(UNLOCKED) });
+    core::ptr::write(spinlock, pthread_spinlock_t { inner: AtomicInt::new(UNLOCKED) });
 
     0
 }
 pub unsafe extern "C" fn pthread_spin_lock(spinlock: *mut pthread_spinlock_t) -> c_int {
-    let spinlock: &Spinlock = &*spinlock;
+    let spinlock: &pthread_spinlock_t = &*spinlock;
 
     loop {
         match spinlock.inner.compare_exchange_weak(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed) {
@@ -34,7 +29,7 @@ pub unsafe extern "C" fn pthread_spin_lock(spinlock: *mut pthread_spinlock_t) ->
     }
 }
 pub unsafe extern "C" fn pthread_spin_trylock(spinlock: *mut pthread_spinlock_t) -> c_int {
-    let spinlock: &Spinlock = &*spinlock;
+    let spinlock: &pthread_spinlock_t = &*spinlock;
 
     match spinlock.inner.compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed) {
         Ok(_) => 0,
@@ -42,7 +37,7 @@ pub unsafe extern "C" fn pthread_spin_trylock(spinlock: *mut pthread_spinlock_t)
     }
 }
 pub unsafe extern "C" fn pthread_spin_unlock(spinlock: *mut pthread_spinlock_t) -> c_int {
-    let spinlock: &Spinlock = &*spinlock;
+    let spinlock: &pthread_spinlock_t = &*spinlock;
 
     spinlock.inner.store(UNLOCKED, Ordering::Release);
 

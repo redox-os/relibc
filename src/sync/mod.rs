@@ -37,10 +37,47 @@ pub unsafe fn futex_wait_ptr(ptr: *mut i32, value: i32, timeout_opt: Option<&tim
     Sys::futex(ptr, FUTEX_WAIT, value, timeout_opt.map_or(0, |t| t as *const _ as usize)) == Ok(0)
 }
 pub fn futex_wake(atomic: &AtomicInt, n: i32) -> usize {
-    unsafe { futex_wake_ptr(atomic.as_mut_ptr(), n) }
+    unsafe { futex_wake_ptr(atomic.as_ptr(), n) }
 }
 pub fn futex_wait(atomic: &AtomicInt, value: i32, timeout_opt: Option<&timespec>) -> bool {
-    unsafe { futex_wait_ptr(atomic.as_mut_ptr(), value, timeout_opt) }
+    unsafe { futex_wait_ptr(atomic.as_ptr(), value, timeout_opt) }
+}
+pub fn wait_until_generic<F1, F2>(word: &AtomicInt, attempt: F1, mark_long: F2, long: c_int)
+where
+    F1: Fn(&AtomicInt) -> AttemptStatus,
+    F2: Fn(&AtomicInt) -> AttemptStatus,
+{
+    // First, try spinning for really short durations
+    for _ in 0..999 {
+        atomic::spin_loop_hint();
+        if attempt(word) == AttemptStatus::Desired {
+            return;
+        }
+    }
+
+    // One last attempt, to initiate "previous"
+    let mut previous = attempt(word);
+
+    // Ok, that seems to take quite some time. Let's go into a
+    // longer, more patient, wait.
+    loop {
+        if previous == AttemptStatus::Desired {
+            return;
+        }
+
+        if
+        // If we or somebody else already initiated a long
+        // wait, OR
+        previous == AttemptStatus::Waiting ||
+            // Otherwise, unless our attempt to initiate a long
+            // wait informed us that we might be done waiting
+            mark_long(word) != AttemptStatus::Desired
+        {
+            futex_wait(word, long, None);
+        }
+
+        previous = attempt(word);
+    }
 }
 
 /// Convenient wrapper around the "futex" system call for
@@ -92,37 +129,7 @@ impl AtomicLock {
         F1: Fn(&AtomicInt) -> AttemptStatus,
         F2: Fn(&AtomicInt) -> AttemptStatus,
     {
-        // First, try spinning for really short durations
-        for _ in 0..999 {
-            atomic::spin_loop_hint();
-            if attempt(self) == AttemptStatus::Desired {
-                return;
-            }
-        }
-
-        // One last attempt, to initiate "previous"
-        let mut previous = attempt(self);
-
-        // Ok, that seems to take quite some time. Let's go into a
-        // longer, more patient, wait.
-        loop {
-            if previous == AttemptStatus::Desired {
-                return;
-            }
-
-            if
-            // If we or somebody else already initiated a long
-            // wait, OR
-            previous == AttemptStatus::Waiting ||
-                // Otherwise, unless our attempt to initiate a long
-                // wait informed us that we might be done waiting
-                mark_long(self) != AttemptStatus::Desired
-            {
-                self.wait_if(long, None);
-            }
-
-            previous = attempt(self);
-        }
+        wait_until_generic(&self.atomic, attempt, mark_long, long)
     }
 }
 impl Deref for AtomicLock {

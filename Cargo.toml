@@ -15,8 +15,10 @@ exclude = ["core_io", "ralloc", "tests"]
 [build-dependencies]
 cbindgen = "0.24.3"
 cc = "1.0.25"
+#env_logger = "0.10"
 
 [dependencies]
+bitflags = "1"
 cbitset = "0.1.0"
 core_io = { path = "core_io", features = ["collections"] }
 lazy_static = { version = "1.4.0", default-features = false, features = ["spin_no_std"] }

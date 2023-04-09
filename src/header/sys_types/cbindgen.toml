@@ -5,7 +5,8 @@ sys_includes = [
     "sys/types_internal.h",
 
     "stddef.h",
-    "sys/select.h"
+    "sys/select.h",
+    "bits/pthread.h",
 ]
 
 include_guard = "_SYS_TYPES_H"

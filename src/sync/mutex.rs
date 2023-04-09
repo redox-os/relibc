@@ -3,12 +3,12 @@ use crate::platform::types::*;
 use core::{
     cell::UnsafeCell,
     ops::{Deref, DerefMut},
-    sync::atomic::Ordering::SeqCst,
+    sync::atomic::{AtomicI32 as AtomicInt, Ordering},
 };
 
-const UNLOCKED: c_int = 0;
-const LOCKED: c_int = 1;
-const WAITING: c_int = 2;
+pub(crate) const UNLOCKED: c_int = 0;
+pub(crate) const LOCKED: c_int = 1;
+pub(crate) const WAITING: c_int = 2;
 
 pub struct Mutex<T> {
     pub(crate) lock: AtomicLock,
@@ -16,6 +16,39 @@ pub struct Mutex<T> {
 }
 unsafe impl<T: Send> Send for Mutex<T> {}
 unsafe impl<T: Send> Sync for Mutex<T> {}
+
+pub(crate) unsafe fn manual_try_lock_generic(word: &AtomicInt) -> bool {
+    word.compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed).is_ok()
+}
+pub(crate) unsafe fn manual_lock_generic(word: &AtomicInt) {
+    crate::sync::wait_until_generic(
+        word,
+        |lock| {
+            lock.compare_exchange_weak(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed)
+                .map(|_| AttemptStatus::Desired)
+                .unwrap_or_else(|e| match e {
+                    WAITING => AttemptStatus::Waiting,
+                    _ => AttemptStatus::Other,
+                })
+        },
+        |lock| match lock
+        // TODO: Ordering
+            .compare_exchange_weak(LOCKED, WAITING, Ordering::SeqCst, Ordering::SeqCst)
+            .unwrap_or_else(|e| e)
+        {
+            UNLOCKED => AttemptStatus::Desired,
+            WAITING => AttemptStatus::Waiting,
+            _ => AttemptStatus::Other,
+        },
+        WAITING,
+    );
+}
+pub(crate) unsafe fn manual_unlock_generic(word: &AtomicInt) {
+    if word.swap(UNLOCKED, Ordering::Release) == WAITING {
+        crate::sync::futex_wake(word, 1);
+    }
+}
+
 impl<T> Mutex<T> {
     /// Create a new mutex
     pub const fn new(content: T) -> Self {
@@ -42,40 +75,22 @@ impl<T> Mutex<T> {
     /// on failure. You should probably not worry about this, it's used for
     /// internal optimizations.
     pub unsafe fn manual_try_lock(&self) -> Result<&mut T, c_int> {
-        self.lock
-            .compare_exchange(UNLOCKED, LOCKED, SeqCst, SeqCst)
-            .map(|_| &mut *self.content.get())
+        if manual_try_lock_generic(&self.lock) {
+            Ok(&mut *self.content.get())
+        } else {
+            Err(0)
+        }
     }
     /// Lock the mutex, returning the inner content. After doing this, it's
     /// your responsibility to unlock it after usage. Mostly useful for FFI:
     /// Prefer normal .lock() where possible.
     pub unsafe fn manual_lock(&self) -> &mut T {
-        self.lock.wait_until(
-            |lock| {
-                lock.compare_exchange_weak(UNLOCKED, LOCKED, SeqCst, SeqCst)
-                    .map(|_| AttemptStatus::Desired)
-                    .unwrap_or_else(|e| match e {
-                        WAITING => AttemptStatus::Waiting,
-                        _ => AttemptStatus::Other,
-                    })
-            },
-            |lock| match lock
-                .compare_exchange_weak(LOCKED, WAITING, SeqCst, SeqCst)
-                .unwrap_or_else(|e| e)
-            {
-                UNLOCKED => AttemptStatus::Desired,
-                WAITING => AttemptStatus::Waiting,
-                _ => AttemptStatus::Other,
-            },
-            WAITING,
-        );
+        manual_lock_generic(&self.lock);
         &mut *self.content.get()
     }
     /// Unlock the mutex, if it's locked.
     pub unsafe fn manual_unlock(&self) {
-        if self.lock.swap(UNLOCKED, SeqCst) == WAITING {
-            self.lock.notify_one();
-        }
+        manual_unlock_generic(&self.lock)
     }
 
     /// Tries to lock the mutex and returns a guard that automatically unlocks

@@ -6,18 +6,6 @@ use core::sync::atomic::{AtomicI32 as AtomicInt, Ordering};
 
 // PTHREAD_COND_INITIALIZER
 
-#[repr(C)]
-pub struct CondAttr {
-    clock: clockid_t,
-    pshared: c_int,
-}
-
-#[repr(C)]
-pub struct Cond {
-    cur: AtomicInt,
-    prev: AtomicInt,
-}
-
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_broadcast(cond: *mut pthread_cond_t) -> c_int {
     wake(cond, i32::MAX)
@@ -43,7 +31,7 @@ pub unsafe extern "C" fn pthread_cond_destroy(cond: *mut pthread_cond_t) -> c_in
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_init(cond: *mut pthread_cond_t, _attr: *const pthread_condattr_t) -> c_int {
-    cond.write(Cond {
+    cond.write(pthread_cond_t {
         cur: AtomicInt::new(0),
         prev: AtomicInt::new(0),
     });
@@ -56,25 +44,24 @@ pub unsafe extern "C" fn pthread_cond_signal(cond: *mut pthread_cond_t) -> c_int
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pthread_cond_timedwait(cond: *mut pthread_cond_t, mutex_ptr: *const pthread_mutex_t, timeout: *const timespec) -> c_int {
+pub unsafe extern "C" fn pthread_cond_timedwait(cond: *mut pthread_cond_t, mutex_ptr: *mut pthread_mutex_t, timeout: *const timespec) -> c_int {
     // TODO: Error checking for certain types (i.e. robust and errorcheck) of mutexes, e.g. if the
     // mutex is not locked.
     let cond: &pthread_cond_t = &*cond;
-    let mutex: &pthread_mutex_t = &*mutex_ptr;
     let timeout: Option<&timespec> = timeout.as_ref();
 
     let current = cond.cur.load(Ordering::Relaxed);
     cond.prev.store(current, Ordering::SeqCst);
 
-    mutex.inner.manual_unlock();
+    pthread_mutex_unlock(mutex_ptr);
     crate::sync::futex_wait(&cond.cur, current, timeout);
-    mutex.inner.manual_lock();
+    pthread_mutex_lock(mutex_ptr);
 
     0
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pthread_cond_wait(cond: *mut pthread_cond_t, mutex: *const pthread_mutex_t) -> c_int {
+pub unsafe extern "C" fn pthread_cond_wait(cond: *mut pthread_cond_t, mutex: *mut pthread_mutex_t) -> c_int {
     pthread_cond_timedwait(cond, mutex, core::ptr::null())
 }
 
@@ -97,7 +84,7 @@ pub unsafe extern "C" fn pthread_condattr_getpshared(condattr: *const pthread_co
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_condattr_init(condattr: *mut pthread_condattr_t) -> c_int {
-    core::ptr::write(condattr, CondAttr {
+    core::ptr::write(condattr, pthread_condattr_t {
         // FIXME: system clock
         clock: 0,
         // Default

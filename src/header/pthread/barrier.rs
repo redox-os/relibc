@@ -1,21 +1,8 @@
 use crate::header::errno::*;
 
-use crate::sync::AtomicLock;
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{AtomicU32, AtomicI32 as AtomicInt, Ordering};
 
 use super::*;
-
-#[repr(C)]
-pub struct Barrier {
-    count: AtomicU32,
-    original_count: u32,
-    epoch: AtomicLock,
-}
-
-#[repr(C)]
-pub struct BarrierAttr {
-    pshared: c_int,
-}
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_barrier_destroy(barrier: *mut pthread_barrier_t) -> c_int {
@@ -29,10 +16,10 @@ pub unsafe extern "C" fn pthread_barrier_init(barrier: *mut pthread_barrier_t, a
         return EINVAL;
     }
 
-    core::ptr::write(barrier, Barrier {
+    core::ptr::write(barrier, pthread_barrier_t {
         count: AtomicU32::new(0),
         original_count: count,
-        epoch: AtomicLock::new(0),
+        epoch: AtomicInt::new(0),
     });
     0
 }
@@ -73,7 +60,7 @@ pub unsafe extern "C" fn pthread_barrier_wait(barrier: *mut pthread_barrier_t) -
 #[no_mangle]
 pub unsafe extern "C" fn pthread_barrierattr_init(attr: *mut pthread_barrierattr_t) -> c_int {
     // PTHREAD_PROCESS_PRIVATE is default according to POSIX.
-    core::ptr::write(attr, BarrierAttr { pshared: PTHREAD_PROCESS_PRIVATE });
+    core::ptr::write(attr, pthread_barrierattr_t { pshared: PTHREAD_PROCESS_PRIVATE });
 
     0
 }

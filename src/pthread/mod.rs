@@ -2,7 +2,7 @@
 
 use core::cell::{Cell, UnsafeCell};
 use core::ptr::NonNull;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -12,21 +12,47 @@ use crate::platform::{Pal, Sys, types::*};
 use crate::header::sched::sched_param;
 use crate::header::errno::*;
 use crate::header::sys_mman;
+use crate::header::pthread as header;
 use crate::ld_so::{linker::Linker, tcb::{Master, Tcb}};
 use crate::ALLOCATOR;
 
 use crate::sync::{Mutex, waitval::Waitval};
 
-#[no_mangle]
-extern "C" fn pthread_init() {
+const MAIN_PTHREAD_ID: usize = 1;
+
+/// Called only by the main thread, as part of relibc_start.
+pub unsafe fn init() {
+    let obj = Box::into_raw(Box::new(Pthread {
+        waitval: Waitval::new(),
+        wants_cancel: AtomicBool::new(false),
+        flags: PthreadFlags::empty().bits().into(),
+
+        // TODO
+        stack_base: core::ptr::null_mut(),
+        stack_size: 0,
+
+        os_tid: UnsafeCell::new(Sys::current_os_tid()),
+    }));
+
+    PTHREAD_SELF.set(obj);
 }
-#[no_mangle]
-extern "C" fn pthread_terminate() {
+pub unsafe fn terminate_from_main_thread() {
+    for (tid, pthread) in OS_TID_TO_PTHREAD.lock().iter() {
+        // TODO: Cancel?
+        Sys::rlct_kill(*tid, crate::header::signal::SIGTERM);
+    }
+}
+
+bitflags::bitflags! {
+    struct PthreadFlags: usize {
+        const DETACHED = 1;
+    }
 }
 
 pub struct Pthread {
     waitval: Waitval<Retval>,
     wants_cancel: AtomicBool,
+    flags: AtomicUsize,
 
     stack_base: *mut c_void,
     stack_size: usize,
@@ -45,7 +71,7 @@ pub struct OsTid {
 unsafe impl Send for Pthread {}
 unsafe impl Sync for Pthread {}
 
-use crate::header::pthread::attr::Attr;
+use crate::header::bits_pthread::pthread_attr_t;
 
 /// Positive error codes (EINVAL, not -EINVAL).
 #[derive(Debug, Eq, PartialEq)]
@@ -75,7 +101,7 @@ pub unsafe fn create(attrs: Option<&pthread_attr_t>, start_routine: extern "C" f
     // TODO: Custom stacks
     let stack_base = sys_mman::mmap(
         core::ptr::null_mut(),
-        attrs.stacksize,
+        stack_size,
         sys_mman::PROT_READ | sys_mman::PROT_WRITE,
         sys_mman::MAP_SHARED | sys_mman::MAP_ANONYMOUS,
         -1,
@@ -86,8 +112,17 @@ pub unsafe fn create(attrs: Option<&pthread_attr_t>, start_routine: extern "C" f
         return Err(Errno(EAGAIN));
     }
 
+    let mut flags = PthreadFlags::empty();
+    match i32::from(attrs.detachstate) {
+        header::PTHREAD_CREATE_DETACHED => flags |= PthreadFlags::DETACHED,
+        header::PTHREAD_CREATE_JOINABLE => (),
+
+        other => unreachable!("unknown detachstate {}", other),
+    }
+
     let pthread = Pthread {
         waitval: Waitval::new(),
+        flags: flags.bits().into(),
         wants_cancel: AtomicBool::new(false),
         stack_base,
         stack_size,
@@ -134,12 +169,11 @@ pub unsafe fn create(attrs: Option<&pthread_attr_t>, start_routine: extern "C" f
     let Ok(os_tid) = Sys::rlct_clone(stack) else {
         return Err(Errno(EAGAIN));
     };
+    core::mem::forget(stack_raii);
 
     let _ = (&*synchronization_mutex).lock();
 
     OS_TID_TO_PTHREAD.lock().insert(os_tid, ForceSendSync(ptr.cast()));
-
-    core::mem::forget(stack_raii);
 
     Ok(ptr.cast())
 }
@@ -180,16 +214,24 @@ pub unsafe fn join(thread: &Pthread) -> Result<Retval, Errno> {
     if core::ptr::eq(thread, current_thread().unwrap_unchecked()) {
         return Err(Errno(EDEADLK));
     }
+
     // Waitval starts locked, and is unlocked when the thread finishes.
     let retval = *thread.waitval.wait();
 
-    // TODO: Deinitialization code
+    // We have now awaited the thread and received its return value. POSIX states that the
+    // pthread_t of this thread, will no longer be valid. In practice, we can thus deallocate the
+    // thread state.
+
+    OS_TID_TO_PTHREAD.lock().remove(&thread.os_tid.get().read());
+
+    dealloc_thread(thread);
 
     Ok(retval)
 }
 
 pub unsafe fn detach(thread: &Pthread) -> Result<(), Errno> {
-    todo!()
+    thread.flags.fetch_or(PthreadFlags::DETACHED.bits(), Ordering::Release);
+    Ok(())
 }
 
 // Returns option because that's a no-op, but PTHREAD_SELF should always be initialized except in
@@ -208,25 +250,52 @@ pub unsafe fn testcancel() {
 }
 
 pub unsafe fn exit_current_thread(retval: Retval) -> ! {
-    let this = current_thread().unwrap_unchecked();
-    this.waitval.post(retval);
+    let this = current_thread().expect("failed to obtain current thread when exiting");
+
+    if this.flags.load(Ordering::Acquire) & PthreadFlags::DETACHED.bits() != 0 {
+        // When detached, the thread state no longer makes any sense, and can immediately be
+        // deallocated.
+        dealloc_thread(this);
+    } else {
+        // When joinable, the return value should be made available to other threads.
+        this.waitval.post(retval);
+    }
 
     Sys::exit_thread()
 }
 
+// TODO: Use Arc? One strong reference from each OS_TID_TO_PTHREAD and one strong reference from
+// PTHREAD_SELF. The latter ref disappears when the thread exits, while the former disappears when
+// detaching. Isn't that sufficient?
+unsafe fn dealloc_thread(thread: &Pthread) {
+    drop(Box::from_raw(thread as *const Pthread as *mut Pthread));
+}
 pub const SIGRT_RLCT_CANCEL: usize = 32;
 pub const SIGRT_RLCT_TIMER: usize = 33;
 
+unsafe fn cancel_sighandler(_: c_int) {
+    // TODO: pthread_cleanup_push stack
+    // TODO: thread-specific data
+
+    // Terminate the thread
+    exit_current_thread(Retval(header::PTHREAD_CANCELED));
+}
+
 pub unsafe fn cancel(thread: &Pthread) -> Result<(), Errno> {
+    // TODO: Ordering
     thread.wants_cancel.store(true, Ordering::SeqCst);
+
     Sys::rlct_kill(thread.os_tid.get().read(), SIGRT_RLCT_CANCEL)?;
+
     todo!();
     Ok(())
 }
 
 // TODO: Hash map?
-static OS_TID_TO_PTHREAD: Mutex<BTreeMap<OsTid, ForceSendSync<pthread_t>>> = Mutex::new(BTreeMap::new());
+// TODO: RwLock
+static OS_TID_TO_PTHREAD: Mutex<BTreeMap<OsTid, ForceSendSync<*mut Pthread>>> = Mutex::new(BTreeMap::new());
 
+#[derive(Clone, Copy)]
 struct ForceSendSync<T>(T);
 unsafe impl<T> Send for ForceSendSync<T> {}
 unsafe impl<T> Sync for ForceSendSync<T> {}

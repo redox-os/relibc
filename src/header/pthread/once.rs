@@ -1,10 +1,5 @@
 use super::*;
 
-#[repr(C)]
-pub struct Once {
-    inner: crate::sync::Once<()>,
-}
-
 // PTHREAD_ONCE_INIT
 
 #[no_mangle]
@@ -12,7 +7,7 @@ pub unsafe extern "C" fn pthread_once(once: *mut pthread_once_t, constructor: ex
     let once: &pthread_once_t = &*once;
 
     // TODO: Cancellation points
-    once.inner.call_once(|| constructor());
+    crate::sync::once::call_once_generic(&once.inner, || constructor());
 
     0
 }

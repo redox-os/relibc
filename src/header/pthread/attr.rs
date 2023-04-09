@@ -1,18 +1,8 @@
 use super::*;
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct Attr {
-    pub detachstate: u8,
-    pub inheritsched: u8,
-    pub schedpolicy: u8,
-    pub scope: u8,
-    pub guardsize: usize,
-    pub stacksize: usize,
-    pub stack: usize,
-    pub param: sched_param,
-}
-impl Default for Attr {
+use crate::header::bits_pthread::pthread_attr_t;
+
+impl Default for pthread_attr_t {
     fn default() -> Self {
         Self {
             // Default according to POSIX.
@@ -93,7 +83,7 @@ pub unsafe extern "C" fn pthread_attr_getstacksize(attr: *const pthread_attr_t, 
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_attr_init(attr: *mut pthread_attr_t) -> c_int {
-    core::ptr::write(attr, Attr::default());
+    core::ptr::write(attr, pthread_attr_t::default());
     0
 }
 

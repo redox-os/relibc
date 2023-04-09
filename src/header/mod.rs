@@ -2,6 +2,8 @@ pub mod _aio;
 pub mod _fenv;
 pub mod arpa_inet;
 pub mod assert;
+pub mod bits_pthread;
+pub mod bits_sched;
 pub mod ctype;
 pub mod dirent;
 #[path = "dl-tls/mod.rs"]

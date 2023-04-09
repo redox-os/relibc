@@ -25,7 +25,7 @@ pub struct n16 {
 
 impl n16 {
     pub fn as_bytes(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts((&self.inner as *const u16) as *const u8, 2) }
+        unsafe { slice::from_raw_parts(core::ptr::addr_of!(self.inner).cast::<u8>(), 2) }
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Self {

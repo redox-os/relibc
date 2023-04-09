@@ -112,11 +112,8 @@ extern "C" fn init_array() {
         }
     }
 
-    extern "C" {
-        fn pthread_init();
-    }
     unsafe {
-        pthread_init();
+        crate::pthread::init();
         init_complete = true
     }
 }

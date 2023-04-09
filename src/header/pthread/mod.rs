@@ -126,6 +126,7 @@ pub use self::once::*;
 pub mod rwlock;
 pub use self::rwlock::*;
 
+#[no_mangle]
 pub unsafe extern "C" fn pthread_self() -> pthread_t {
     pthread::current_thread().unwrap_unchecked() as *const _ as *mut _
 }

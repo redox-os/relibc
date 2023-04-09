@@ -1,4 +1,4 @@
-sys_includes = ["time.h"]
+sys_includes = ["time.h", "bits/sched.h"]
 include_guard = "_RELIBC_SCHED_H"
 language = "C"
 style = "Tag"
