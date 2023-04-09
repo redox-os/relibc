@@ -1,8 +1,17 @@
 use crate::header::errno::*;
 
-use core::sync::atomic::{AtomicU32, AtomicI32 as AtomicInt, Ordering};
+use core::sync::atomic::{AtomicU32 as AtomicUint, AtomicI32 as AtomicInt, Ordering};
 
 use super::*;
+
+pub(crate) struct RlctBarrier {
+    pub count: AtomicUint,
+    pub original_count: c_uint,
+    pub epoch: AtomicInt,
+}
+pub(crate) struct RlctBarrierAttr {
+    pub pshared: c_int,
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_barrier_destroy(barrier: *mut pthread_barrier_t) -> c_int {
@@ -12,12 +21,14 @@ pub unsafe extern "C" fn pthread_barrier_destroy(barrier: *mut pthread_barrier_t
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_barrier_init(barrier: *mut pthread_barrier_t, attr: *const pthread_barrierattr_t, count: c_uint) -> c_int {
+    let attr = attr.cast::<RlctBarrierAttr>().as_ref();
+
     if count == 0 {
         return EINVAL;
     }
 
-    core::ptr::write(barrier, pthread_barrier_t {
-        count: AtomicU32::new(0),
+    barrier.cast::<RlctBarrier>().write(RlctBarrier {
+        count: AtomicUint::new(0),
         original_count: count,
         epoch: AtomicInt::new(0),
     });
@@ -26,7 +37,7 @@ pub unsafe extern "C" fn pthread_barrier_init(barrier: *mut pthread_barrier_t, a
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_barrier_wait(barrier: *mut pthread_barrier_t) -> c_int {
-    let barrier: &pthread_barrier_t = &*barrier;
+    let barrier = &*barrier.cast::<RlctBarrier>();
 
     // TODO: Orderings
     let mut cached = barrier.count.load(Ordering::SeqCst);
@@ -60,13 +71,13 @@ pub unsafe extern "C" fn pthread_barrier_wait(barrier: *mut pthread_barrier_t) -
 #[no_mangle]
 pub unsafe extern "C" fn pthread_barrierattr_init(attr: *mut pthread_barrierattr_t) -> c_int {
     // PTHREAD_PROCESS_PRIVATE is default according to POSIX.
-    core::ptr::write(attr, pthread_barrierattr_t { pshared: PTHREAD_PROCESS_PRIVATE });
+    core::ptr::write(attr.cast::<RlctBarrierAttr>(), RlctBarrierAttr { pshared: PTHREAD_PROCESS_PRIVATE });
 
     0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_barrierattr_setpshared(attr: *mut pthread_barrierattr_t, pshared: c_int) -> c_int {
-    (*attr).pshared = pshared;
+    (*attr.cast::<RlctBarrierAttr>()).pshared = pshared;
     0
 }

@@ -21,8 +21,10 @@ pub unsafe extern "C" fn pthread_rwlock_destroy(rwlock: *mut pthread_rwlock_t) -
     0
 }
 #[no_mangle]
-pub unsafe extern "C" fn pthread_rwlock_init(rwlock: *mut pthread_rwlock_t, _attr: *const pthread_rwlockattr_t) -> c_int {
-    core::ptr::write(rwlock, pthread_rwlock_t {
+pub unsafe extern "C" fn pthread_rwlock_init(rwlock: *mut pthread_rwlock_t, attr: *const pthread_rwlockattr_t) -> c_int {
+    let attr = attr.cast::<RlctRwlockAttr>().as_ref();
+
+    rwlock.cast::<RlctRwlock>().write(RlctRwlock {
         state: AtomicInt::new(0),
     });
 
@@ -34,7 +36,7 @@ pub unsafe extern "C" fn pthread_rwlock_rdlock(rwlock: *mut pthread_rwlock_t) ->
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlock_timedrdlock(rwlock: *mut pthread_rwlock_t, timeout: *const timespec) -> c_int {
-    let rwlock: &pthread_rwlock_t = &*rwlock;
+    let rwlock = &*rwlock.cast::<RlctRwlock>();
     let timeout = timeout.as_ref();
 
     loop {
@@ -46,7 +48,7 @@ pub unsafe extern "C" fn pthread_rwlock_timedrdlock(rwlock: *mut pthread_rwlock_
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlock_timedwrlock(rwlock: *mut pthread_rwlock_t, timeout: *const timespec) -> c_int {
-    let rwlock: &pthread_rwlock_t = &*rwlock;
+    let rwlock = &*rwlock.cast::<RlctRwlock>();
     let timeout = timeout.as_ref();
 
     /*loop {
@@ -67,7 +69,7 @@ pub unsafe extern "C" fn pthread_rwlock_timedwrlock(rwlock: *mut pthread_rwlock_
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlock_tryrdlock(rwlock: *mut pthread_rwlock_t) -> c_int {
-    let rwlock: &pthread_rwlock_t = &*rwlock;
+    let rwlock = &*rwlock.cast::<RlctRwlock>();
 
     let mut cached = rwlock.state.load(Ordering::Acquire) as u32;
 
@@ -89,7 +91,7 @@ pub unsafe extern "C" fn pthread_rwlock_tryrdlock(rwlock: *mut pthread_rwlock_t)
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlock_trywrlock(rwlock: *mut pthread_rwlock_t) -> c_int {
-    let rwlock: &pthread_rwlock_t = &*rwlock;
+    let rwlock = &*rwlock.cast::<RlctRwlock>();
 
     match rwlock.state.compare_exchange(0, EXCLUSIVE as i32, Ordering::Acquire, Ordering::Relaxed) {
         Ok(_) => 0,
@@ -98,7 +100,7 @@ pub unsafe extern "C" fn pthread_rwlock_trywrlock(rwlock: *mut pthread_rwlock_t)
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlock_unlock(rwlock: *const pthread_rwlock_t) -> c_int {
-    let rwlock: &pthread_rwlock_t = &*rwlock;
+    let rwlock = &*rwlock.cast::<RlctRwlock>();
 
     let old = rwlock.state.swap(0, Ordering::Release) as u32;
 
@@ -114,20 +116,23 @@ pub unsafe extern "C" fn pthread_rwlock_wrlock(rwlock: *mut pthread_rwlock_t) ->
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pthread_rwlockattr_destroy(_attr: *mut pthread_rwlockattr_t) -> c_int {
+pub unsafe extern "C" fn pthread_rwlockattr_destroy(attr: *mut pthread_rwlockattr_t) -> c_int {
+    let _attr = &mut *attr.cast::<RlctRwlockAttr>();
+
+    // No-op
     0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlockattr_getpshared(attr: *const pthread_rwlockattr_t, pshared: *mut c_int) -> c_int {
-    core::ptr::write(pshared, (*attr).pshared);
+    core::ptr::write(pshared, (*attr.cast::<RlctRwlockAttr>()).pshared);
 
     0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlockattr_init(attr: *mut pthread_rwlockattr_t) -> c_int {
-    core::ptr::write(attr, pthread_rwlockattr_t {
+    attr.cast::<RlctRwlockAttr>().write(RlctRwlockAttr {
         // Default according to POSIX.
         pshared: PTHREAD_PROCESS_PRIVATE,
     });
@@ -137,6 +142,13 @@ pub unsafe extern "C" fn pthread_rwlockattr_init(attr: *mut pthread_rwlockattr_t
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlockattr_setpshared(attr: *mut pthread_rwlockattr_t, pshared: c_int) -> c_int {
-    (*attr).pshared = pshared;
+    (*attr.cast::<RlctRwlockAttr>()).pshared = pshared;
     0
+}
+
+pub(crate) struct RlctRwlockAttr {
+    pub pshared: c_int,
+}
+pub(crate) struct RlctRwlock {
+    pub state: AtomicInt,
 }

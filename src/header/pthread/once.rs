@@ -4,10 +4,14 @@ use super::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_once(once: *mut pthread_once_t, constructor: extern "C" fn()) -> c_int {
-    let once: &pthread_once_t = &*once;
+    let once = &*once.cast::<RlctOnce>();
 
     // TODO: Cancellation points
-    crate::sync::once::call_once_generic(&once.inner, || constructor());
+
+    once.call_once(|| constructor());
+
+    //crate::sync::once::call_once_generic(&once.inner, || constructor());
 
     0
 }
+pub(crate) type RlctOnce = crate::sync::Once<()>;

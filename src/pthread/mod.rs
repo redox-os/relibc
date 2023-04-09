@@ -90,7 +90,7 @@ impl Drop for MmapGuard {
     }
 }
 
-pub unsafe fn create(attrs: Option<&pthread_attr_t>, start_routine: extern "C" fn(arg: *mut c_void) -> *mut c_void, arg: *mut c_void) -> Result<pthread_t, Errno> {
+pub(crate) unsafe fn create(attrs: Option<&header::RlctAttr>, start_routine: extern "C" fn(arg: *mut c_void) -> *mut c_void, arg: *mut c_void) -> Result<pthread_t, Errno> {
     let attrs = attrs.copied().unwrap_or_default();
 
     // Create a locked mutex, unlocked by the thread after it has started.

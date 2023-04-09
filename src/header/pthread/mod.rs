@@ -6,6 +6,18 @@ use crate::platform::{self, Pal, Sys, types::*};
 use crate::header::{sched::*, time::timespec};
 use crate::pthread;
 
+#[derive(Clone, Copy)]
+pub(crate) struct RlctAttr {
+    pub detachstate: c_uchar,
+    pub inheritsched: c_uchar,
+    pub schedpolicy: c_uchar,
+    pub scope: c_uchar,
+    pub guardsize: size_t,
+    pub stacksize: size_t,
+    pub stack: size_t,
+    pub param: sched_param,
+}
+
 pub const PTHREAD_BARRIER_SERIAL_THREAD: c_int = 1;
 
 pub const PTHREAD_CANCEL_ASYNCHRONOUS: c_int = 0;
@@ -59,7 +71,7 @@ pub use self::cond::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_create(pthread: *mut pthread_t, attr: *const pthread_attr_t, start_routine: extern "C" fn(arg: *mut c_void) -> *mut c_void, arg: *mut c_void) -> c_int {
-    let attr = NonNull::new(attr as *mut _).map(|n| n.as_ref());
+    let attr = attr.cast::<RlctAttr>().as_ref();
 
     match pthread::create(attr, start_routine, arg) {
         Ok(ptr) => {
