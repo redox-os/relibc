@@ -94,3 +94,11 @@ struct Record {
 
 #[thread_local]
 static NEXTKEY: Cell<pthread_key_t> = Cell::new(1);
+
+pub(crate) unsafe fn run_all_destructors() {
+    for (key, Record { data }) in VALUES.take() {
+        let Some(&Dtor { destructor }) = KEYS.lock().get(&key) else { continue };
+
+        destructor(data);
+    }
+}

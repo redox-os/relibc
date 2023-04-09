@@ -62,7 +62,7 @@ pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn pthread_sigmask(
+pub unsafe extern "C" fn pthread_sigmask(
     how: c_int,
     set: *const sigset_t,
     oldset: *mut sigset_t,
@@ -246,9 +246,15 @@ pub extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
     Sys::sigpending(set)
 }
 
+const BELOW_SIGRTMIN_MASK: u64 = (1 << SIGRTMIN) - 1;
+const STANDARD_SIG_MASK: u64 = (1 << 32) - 1;
+const RLCT_SIGNAL_MASK: u64 = BELOW_SIGRTMIN_MASK & !STANDARD_SIG_MASK;
+
 #[no_mangle]
-pub extern "C" fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
-    Sys::sigprocmask(how, set, oset)
+pub unsafe extern "C" fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
+    let set = set.as_ref().map(|&block| block & !RLCT_SIGNAL_MASK);
+
+    Sys::sigprocmask(how, set.as_ref().map_or(core::ptr::null(), |r| r as *const sigset_t), oset)
 }
 
 #[no_mangle]

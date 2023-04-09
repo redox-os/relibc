@@ -4,11 +4,27 @@ language = "C"
 style = "type"
 no_includes = true
 cpp_compat = true
-trailer = """
+after_includes = """
 #define PTHREAD_COND_INITIALIZER ((pthread_cond_t){0})
 #define PTHREAD_MUTEX_INITIALIZER ((pthread_mutex_t){0})
 #define PTHREAD_ONCE_INIT ((pthread_once_t){0})
 #define PTHREAD_RWLOCK_INITIALIZER ((pthread_rwlock_t){0})
+
+#define pthread_cleanup_push(routine, arg) { \
+  struct { \
+    void (*routine)(void *); \
+    void *arg; \
+    void *prev; \
+  } __relibc_internal_pthread_ll_entry = { \
+    .routine = (routine), \
+    .arg = (arg), \
+  }; \
+  __relibc_internal_pthread_cleanup_push(&__relibc_internal_pthread_ll_entry);
+
+#define pthread_cleanup_pop(execute) \
+  __relibc_internal_pthread_cleanup_pop(&__relibc_internal_pthread_ll_entry, (execute)); \
+}
+
 """
 
 [export.rename]

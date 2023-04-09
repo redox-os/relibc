@@ -1,6 +1,7 @@
 //! pthread.h implementation for Redox, following https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/pthread.h.html
 
 use core::ptr::NonNull;
+use core::cell::Cell;
 
 use crate::platform::{self, Pal, Sys, types::*};
 use crate::header::{sched::*, time::timespec};
@@ -163,9 +164,46 @@ pub extern "C" fn pthread_setschedprio(thread: pthread_t, prio: c_int) -> c_int 
 pub mod spin;
 pub use self::spin::*;
 
+#[no_mangle]
 pub unsafe extern "C" fn pthread_testcancel() {
     pthread::testcancel();
 }
 
-// pthread_cleanup_pop()
-// pthread_cleanup_push()
+// Must be the same struct as defined in the pthread_cleanup_push macro.
+#[repr(C)]
+pub(crate) struct CleanupLinkedListEntry {
+    routine: extern "C" fn(*mut c_void),
+    arg: *mut c_void,
+    prev: *const c_void,
+}
+
+#[thread_local]
+pub(crate) static CLEANUP_LL_HEAD: Cell<*const CleanupLinkedListEntry> = Cell::new(core::ptr::null());
+
+#[no_mangle]
+pub unsafe extern "C" fn __relibc_internal_pthread_cleanup_push(new_entry: *mut c_void) {
+    let new_entry = &mut *new_entry.cast::<CleanupLinkedListEntry>();
+
+    new_entry.prev = CLEANUP_LL_HEAD.get().cast();
+    CLEANUP_LL_HEAD.set(new_entry);
+}
+#[no_mangle]
+pub unsafe extern "C" fn __relibc_internal_pthread_cleanup_pop(execute: c_int) {
+    let prev_head = CLEANUP_LL_HEAD.get().read();
+    CLEANUP_LL_HEAD.set(prev_head.prev.cast());
+
+    if execute != 0 {
+        (prev_head.routine)(prev_head.arg);
+    }
+}
+
+pub(crate) unsafe fn run_destructor_stack() {
+    let mut ptr = CLEANUP_LL_HEAD.get();
+
+    while !ptr.is_null() {
+        let entry = ptr.read();
+        ptr = entry.prev.cast();
+
+        (entry.routine)(entry.arg);
+    }
+}

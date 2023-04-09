@@ -243,9 +243,8 @@ pub fn current_thread() -> Option<&'static Pthread> {
 }
 
 pub unsafe fn testcancel() {
-    // TODO: Ordering
-    if current_thread().unwrap_unchecked().wants_cancel.load(Ordering::SeqCst) {
-        todo!("cancel")
+    if current_thread().unwrap_unchecked().wants_cancel.load(Ordering::Acquire) {
+        cancel_current_thread();
     }
 }
 
@@ -267,32 +266,38 @@ pub unsafe fn exit_current_thread(retval: Retval) -> ! {
 // TODO: Use Arc? One strong reference from each OS_TID_TO_PTHREAD and one strong reference from
 // PTHREAD_SELF. The latter ref disappears when the thread exits, while the former disappears when
 // detaching. Isn't that sufficient?
+//
+// On the other hand, there can be at most two strong references to each thread (OS_TID_TO_PTHREAD
+// and PTHREAD_SELF), so maybe Arc is unnecessary except from being memory-safe.
 unsafe fn dealloc_thread(thread: &Pthread) {
     drop(Box::from_raw(thread as *const Pthread as *mut Pthread));
 }
 pub const SIGRT_RLCT_CANCEL: usize = 32;
 pub const SIGRT_RLCT_TIMER: usize = 33;
 
-unsafe fn cancel_sighandler(_: c_int) {
-    // TODO: pthread_cleanup_push stack
-    // TODO: thread-specific data
+unsafe extern "C" fn cancel_sighandler(_: c_int) {
+    cancel_current_thread();
+}
+unsafe fn cancel_current_thread() {
+    // Run pthread_cleanup_push/pthread_cleanup_pop destructors.
+    header::run_destructor_stack();
+
+    header::tls::run_all_destructors();
 
     // Terminate the thread
     exit_current_thread(Retval(header::PTHREAD_CANCELED));
 }
 
 pub unsafe fn cancel(thread: &Pthread) -> Result<(), Errno> {
-    // TODO: Ordering
-    thread.wants_cancel.store(true, Ordering::SeqCst);
+    thread.wants_cancel.store(true, Ordering::Release);
 
     Sys::rlct_kill(thread.os_tid.get().read(), SIGRT_RLCT_CANCEL)?;
 
-    todo!();
     Ok(())
 }
 
 // TODO: Hash map?
-// TODO: RwLock
+// TODO: RwLock to improve perf?
 static OS_TID_TO_PTHREAD: Mutex<BTreeMap<OsTid, ForceSendSync<*mut Pthread>>> = Mutex::new(BTreeMap::new());
 
 #[derive(Clone, Copy)]
