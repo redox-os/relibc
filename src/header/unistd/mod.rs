@@ -5,7 +5,7 @@ use core::{convert::TryFrom, mem, ptr, slice};
 use crate::{
     c_str::CStr,
     header::{
-        errno, fcntl, limits, stdlib::getenv, sys_ioctl, sys_time, sys_utsname, termios,
+        errno, fcntl, limits, stdlib::getenv, sys_ioctl, sys_resource, sys_time, sys_utsname, termios,
         time::timespec,
     },
     platform::{self, types::*, Pal, Sys},
@@ -289,7 +289,16 @@ pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char 
 
 // #[no_mangle]
 pub extern "C" fn getdtablesize() -> c_int {
-    unimplemented!();
+    let mut lim = mem::MaybeUninit::<sys_resource::rlimit>::uninit();
+    let r = unsafe { sys_resource::getrlimit(sys_resource::RLIMIT_NOFILE as c_int, lim.as_mut_ptr() as *mut sys_resource::rlimit) };
+    if r == 0 {
+        let cur = unsafe { lim.assume_init() }.rlim_cur;
+        match cur {
+            c if c < i32::MAX as u64 => c as i32,
+            _ => i32::MAX
+        };
+    }
+    -1
 }
 
 #[no_mangle]
