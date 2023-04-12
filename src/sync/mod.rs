@@ -35,7 +35,7 @@ pub trait FutexTy {
 pub trait FutexAtomicTy {
     type Ty: FutexTy;
 
-    fn as_mut_ptr(&self) -> *mut Self::Ty;
+    fn ptr(&self) -> *mut Self::Ty;
 }
 impl FutexTy for u32 {
     fn conv(self) -> i32 {
@@ -50,15 +50,15 @@ impl FutexTy for i32 {
 impl FutexAtomicTy for AtomicU32 {
     type Ty = u32;
 
-    fn as_mut_ptr(&self) -> *mut u32 {
-        AtomicU32::as_mut_ptr(self)
+    fn ptr(&self) -> *mut u32 {
+        AtomicU32::as_ptr(self)
     }
 }
 impl FutexAtomicTy for AtomicI32 {
     type Ty = i32;
 
-    fn as_mut_ptr(&self) -> *mut i32 {
-        AtomicI32::as_mut_ptr(self)
+    fn ptr(&self) -> *mut i32 {
+        AtomicI32::as_ptr(self)
     }
 }
 
@@ -71,10 +71,10 @@ pub unsafe fn futex_wait_ptr<T: FutexTy>(ptr: *mut T, value: T, timeout_opt: Opt
     Sys::futex(ptr.cast(), FUTEX_WAIT, value.conv(), timeout_opt.map_or(0, |t| t as *const _ as usize)) == Ok(0)
 }
 pub fn futex_wake(atomic: &impl FutexAtomicTy, n: i32) -> usize {
-    unsafe { futex_wake_ptr(atomic.as_mut_ptr(), n) }
+    unsafe { futex_wake_ptr(atomic.ptr(), n) }
 }
 pub fn futex_wait<T: FutexAtomicTy>(atomic: &T, value: T::Ty, timeout_opt: Option<&timespec>) -> bool {
-    unsafe { futex_wait_ptr(atomic.as_mut_ptr(), value, timeout_opt) }
+    unsafe { futex_wait_ptr(atomic.ptr(), value, timeout_opt) }
 }
 pub fn wait_until_generic<F1, F2>(word: &AtomicInt, attempt: F1, mark_long: F2, long: c_int)
 where
