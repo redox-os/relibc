@@ -7,6 +7,13 @@ use crate::platform::{self, Pal, Sys, types::*};
 use crate::header::{sched::*, time::timespec};
 use crate::pthread;
 
+fn e(result: Result<(), pthread::Errno>) -> i32 {
+    match result {
+        Ok(()) => 0,
+        Err(pthread::Errno(error)) => error,
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct RlctAttr {
     pub detachstate: c_uchar,
@@ -25,7 +32,7 @@ pub const PTHREAD_CANCEL_ASYNCHRONOUS: c_int = 0;
 pub const PTHREAD_CANCEL_ENABLE: c_int = 1;
 pub const PTHREAD_CANCEL_DEFERRED: c_int = 2;
 pub const PTHREAD_CANCEL_DISABLE: c_int = 3;
-pub const PTHREAD_CANCELED: *mut c_void = core::ptr::null_mut();
+pub const PTHREAD_CANCELED: *mut c_void = (!0_usize) as *mut c_void;
 
 pub const PTHREAD_CREATE_DETACHED: c_int = 0;
 pub const PTHREAD_CREATE_JOINABLE: c_int = 1;
@@ -101,19 +108,34 @@ pub unsafe extern "C" fn pthread_exit(retval: *mut c_void) -> ! {
     pthread::exit_current_thread(pthread::Retval(retval))
 }
 
-// #[no_mangle]
-pub extern "C" fn pthread_getconcurrency() -> c_int {
-    todo!()
+#[no_mangle]
+pub unsafe extern "C" fn pthread_getconcurrency() -> c_int {
+    // Redox and Linux threads are 1:1, not M:N.
+    1
 }
 
-// #[no_mangle]
-pub extern "C" fn pthread_getcpuclockid(thread: pthread_t, clock: *mut clockid_t) -> c_int {
-    todo!()
+#[no_mangle]
+pub unsafe extern "C" fn pthread_getcpuclockid(thread: pthread_t, clock_out: *mut clockid_t) -> c_int {
+    match pthread::get_cpu_clkid(&*thread.cast()) {
+        Ok(clock) => {
+            clock_out.write(clock);
+            0
+        }
+        Err(pthread::Errno(error)) => error,
+    }
 }
 
-// #[no_mangle]
-pub extern "C" fn pthread_getschedparam(thread: pthread_t, policy: *mut clockid_t, param: *mut sched_param) -> c_int {
-    todo!()
+#[no_mangle]
+pub unsafe extern "C" fn pthread_getschedparam(thread: pthread_t, policy_out: *mut c_int, param_out: *mut sched_param) -> c_int {
+    match pthread::get_sched_param(&*thread.cast()) {
+        Ok((policy, param)) => {
+            policy_out.write(policy);
+            param_out.write(param);
+
+            0
+        }
+        Err(pthread::Errno(error)) => error,
+    }
 }
 
 pub mod tls;
@@ -143,22 +165,40 @@ pub use self::rwlock::*;
 pub unsafe extern "C" fn pthread_self() -> pthread_t {
     pthread::current_thread().unwrap_unchecked() as *const _ as *mut _
 }
-pub extern "C" fn pthread_setcancelstate(state: c_int, oldstate: *mut c_int) -> c_int {
-    todo!();
+#[no_mangle]
+pub unsafe extern "C" fn pthread_setcancelstate(state: c_int, oldstate: *mut c_int) -> c_int {
+    match pthread::set_cancel_state(state) {
+        Ok(old) => {
+            oldstate.write(old);
+            0
+        }
+        Err(pthread::Errno(error)) => error,
+    }
 }
-pub extern "C" fn pthread_setcanceltype(ty: c_int, oldty: *mut c_int) -> c_int {
-    todo!();
+#[no_mangle]
+pub unsafe extern "C" fn pthread_setcanceltype(ty: c_int, oldty: *mut c_int) -> c_int {
+    match pthread::set_cancel_type(ty) {
+        Ok(old) => {
+            oldty.write(old);
+            0
+        }
+        Err(pthread::Errno(error)) => error,
+    }
 }
 
+#[no_mangle]
 pub extern "C" fn pthread_setconcurrency(concurrency: c_int) -> c_int {
-    todo!();
+    // Redox and Linux threads are 1:1, not M:N.
+    0
 }
 
-pub extern "C" fn pthread_setschedparam(thread: pthread_t, policy: c_int, param: *const sched_param) -> c_int {
-    todo!();
+#[no_mangle]
+pub unsafe extern "C" fn pthread_setschedparam(thread: pthread_t, policy: c_int, param: *const sched_param) -> c_int {
+    e(pthread::set_sched_param(&*thread.cast(), policy, &*param))
 }
-pub extern "C" fn pthread_setschedprio(thread: pthread_t, prio: c_int) -> c_int {
-    todo!();
+#[no_mangle]
+pub unsafe extern "C" fn pthread_setschedprio(thread: pthread_t, prio: c_int) -> c_int {
+    e(pthread::set_sched_priority(&*thread.cast(), prio))
 }
 
 pub mod spin;

@@ -24,7 +24,8 @@ const MAIN_PTHREAD_ID: usize = 1;
 pub unsafe fn init() {
     let obj = Box::into_raw(Box::new(Pthread {
         waitval: Waitval::new(),
-        wants_cancel: AtomicBool::new(false),
+        has_enabled_cancelation: AtomicBool::new(false),
+        has_queued_cancelation: AtomicBool::new(false),
         flags: PthreadFlags::empty().bits().into(),
 
         // TODO
@@ -51,7 +52,8 @@ bitflags::bitflags! {
 
 pub struct Pthread {
     waitval: Waitval<Retval>,
-    wants_cancel: AtomicBool,
+    has_queued_cancelation: AtomicBool,
+    has_enabled_cancelation: AtomicBool,
     flags: AtomicUsize,
 
     stack_base: *mut c_void,
@@ -123,7 +125,8 @@ pub(crate) unsafe fn create(attrs: Option<&header::RlctAttr>, start_routine: ext
     let pthread = Pthread {
         waitval: Waitval::new(),
         flags: flags.bits().into(),
-        wants_cancel: AtomicBool::new(false),
+        has_enabled_cancelation: AtomicBool::new(false),
+        has_queued_cancelation: AtomicBool::new(false),
         stack_base,
         stack_size,
         os_tid: UnsafeCell::new(OsTid::default()),
@@ -211,7 +214,7 @@ unsafe extern "C" fn new_thread_shim(
 pub unsafe fn join(thread: &Pthread) -> Result<Retval, Errno> {
     // We don't have to return EDEADLK, but unlike e.g. pthread_t lifetime checking, it's a
     // relatively easy check.
-    if core::ptr::eq(thread, current_thread().unwrap_unchecked()) {
+    if core::ptr::eq(thread, current_thread().expect("current thread not present")) {
         return Err(Errno(EDEADLK));
     }
 
@@ -243,7 +246,9 @@ pub fn current_thread() -> Option<&'static Pthread> {
 }
 
 pub unsafe fn testcancel() {
-    if current_thread().unwrap_unchecked().wants_cancel.load(Ordering::Acquire) {
+    let this_thread = current_thread().expect("current thread not present");
+
+    if this_thread.has_queued_cancelation.load(Ordering::Acquire) && this_thread.has_enabled_cancelation.load(Ordering::Acquire) {
         cancel_current_thread();
     }
 }
@@ -289,11 +294,64 @@ unsafe fn cancel_current_thread() {
 }
 
 pub unsafe fn cancel(thread: &Pthread) -> Result<(), Errno> {
-    thread.wants_cancel.store(true, Ordering::Release);
+    // TODO: What order should these atomic bools be accessed in?
+    thread.has_queued_cancelation.store(true, Ordering::Release);
 
-    Sys::rlct_kill(thread.os_tid.get().read(), SIGRT_RLCT_CANCEL)?;
+    if thread.has_enabled_cancelation.load(Ordering::Acquire) {
+        Sys::rlct_kill(thread.os_tid.get().read(), SIGRT_RLCT_CANCEL)?;
+    }
 
     Ok(())
+}
+
+pub fn set_sched_param(_thread: &Pthread, _policy: c_int, _param: &sched_param) -> Result<(), Errno> {
+    // TODO
+    Ok(())
+}
+pub fn set_sched_priority(_thread: &Pthread, _prio: c_int) -> Result<(), Errno> {
+    // TODO
+    Ok(())
+}
+pub fn set_cancel_state(state: c_int) -> Result<c_int, Errno> {
+    let this_thread = current_thread().expect("current thread not present");
+
+    let was_cancelable = match state {
+        header::PTHREAD_CANCEL_ENABLE => {
+            let old = this_thread.has_enabled_cancelation.swap(true, Ordering::Release);
+
+            if this_thread.has_queued_cancelation.load(Ordering::Acquire) {
+                unsafe { cancel_current_thread(); }
+            }
+            old
+        },
+        header::PTHREAD_CANCEL_DISABLE => this_thread.has_enabled_cancelation.swap(false, Ordering::Release),
+
+        _ => return Err(Errno(EINVAL)),
+    };
+
+    Ok(match was_cancelable {
+        true => header::PTHREAD_CANCEL_ENABLE,
+        false => header::PTHREAD_CANCEL_DISABLE,
+    })
+}
+pub fn set_cancel_type(ty: c_int) -> Result<c_int, Errno> {
+    let this_thread = current_thread().expect("current thread not present");
+
+    // TODO
+    match ty {
+        header::PTHREAD_CANCEL_DEFERRED => (),
+        header::PTHREAD_CANCEL_ASYNCHRONOUS => (),
+
+        _ => return Err(Errno(EINVAL)),
+    }
+    Ok(header::PTHREAD_CANCEL_DEFERRED)
+}
+pub fn get_cpu_clkid(thread: &Pthread) -> Result<clockid_t, Errno> {
+    // TODO
+    Err(Errno(ENOENT))
+}
+pub fn get_sched_param(thread: &Pthread) -> Result<(clockid_t, sched_param), Errno> {
+    todo!()
 }
 
 // TODO: Hash map?

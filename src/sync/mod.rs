@@ -1,3 +1,4 @@
+pub mod barrier;
 pub mod mutex;
 pub mod once;
 pub mod semaphore;
@@ -15,7 +16,7 @@ use crate::{
 };
 use core::{
     ops::Deref,
-    sync::atomic::{self, AtomicI32 as AtomicInt},
+    sync::atomic::{self, AtomicI32, AtomicU32, AtomicI32 as AtomicInt},
 };
 
 const FUTEX_WAIT: c_int = 0;
@@ -28,19 +29,52 @@ pub enum AttemptStatus {
     Other,
 }
 
-pub unsafe fn futex_wake_ptr(ptr: *mut i32, n: i32) -> usize {
+pub trait FutexTy {
+    fn conv(self) -> i32;
+}
+pub trait FutexAtomicTy {
+    type Ty: FutexTy;
+
+    fn as_mut_ptr(&self) -> *mut Self::Ty;
+}
+impl FutexTy for u32 {
+    fn conv(self) -> i32 {
+        self as i32
+    }
+}
+impl FutexTy for i32 {
+    fn conv(self) -> i32 {
+        self
+    }
+}
+impl FutexAtomicTy for AtomicU32 {
+    type Ty = u32;
+
+    fn as_mut_ptr(&self) -> *mut u32 {
+        AtomicU32::as_mut_ptr(self)
+    }
+}
+impl FutexAtomicTy for AtomicI32 {
+    type Ty = i32;
+
+    fn as_mut_ptr(&self) -> *mut i32 {
+        AtomicI32::as_mut_ptr(self)
+    }
+}
+
+pub unsafe fn futex_wake_ptr(ptr: *mut impl FutexTy, n: i32) -> usize {
     // TODO: unwrap_unchecked?
-    Sys::futex(ptr, FUTEX_WAKE, n, 0).unwrap() as usize
+    Sys::futex(ptr.cast(), FUTEX_WAKE, n, 0).unwrap() as usize
 }
-pub unsafe fn futex_wait_ptr(ptr: *mut i32, value: i32, timeout_opt: Option<&timespec>) -> bool {
+pub unsafe fn futex_wait_ptr<T: FutexTy>(ptr: *mut T, value: T, timeout_opt: Option<&timespec>) -> bool {
     // TODO: unwrap_unchecked?
-    Sys::futex(ptr, FUTEX_WAIT, value, timeout_opt.map_or(0, |t| t as *const _ as usize)) == Ok(0)
+    Sys::futex(ptr.cast(), FUTEX_WAIT, value.conv(), timeout_opt.map_or(0, |t| t as *const _ as usize)) == Ok(0)
 }
-pub fn futex_wake(atomic: &AtomicInt, n: i32) -> usize {
-    unsafe { futex_wake_ptr(atomic.as_ptr(), n) }
+pub fn futex_wake(atomic: &impl FutexAtomicTy, n: i32) -> usize {
+    unsafe { futex_wake_ptr(atomic.as_mut_ptr(), n) }
 }
-pub fn futex_wait(atomic: &AtomicInt, value: i32, timeout_opt: Option<&timespec>) -> bool {
-    unsafe { futex_wait_ptr(atomic.as_ptr(), value, timeout_opt) }
+pub fn futex_wait<T: FutexAtomicTy>(atomic: &T, value: T::Ty, timeout_opt: Option<&timespec>) -> bool {
+    unsafe { futex_wait_ptr(atomic.as_mut_ptr(), value, timeout_opt) }
 }
 pub fn wait_until_generic<F1, F2>(word: &AtomicInt, attempt: F1, mark_long: F2, long: c_int)
 where
