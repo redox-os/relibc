@@ -71,6 +71,10 @@ pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
     Sys::getrlimit(resource, rlp)
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int {
+    Sys::setrlimit(rsource, rlp)
+}
 // #[no_mangle]
 // pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
 //     // Sys::getrusage(who, r_usage)
@@ -82,7 +86,3 @@ pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
 //     unimplemented!();
 // }
 //
-// #[no_mangle]
-// pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int {
-//     unimplemented!();
-// }
