@@ -4,10 +4,6 @@ use super::*;
 
 // PTHREAD_COND_INITIALIZER is defined manually in bits_pthread/cbindgen.toml
 
-fn e(r: Result<(), pthread::Errno>) -> c_int {
-    r.map_or_else(|pthread::Errno(errno)| errno, |()| 0)
-}
-
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_broadcast(cond: *mut pthread_cond_t) -> c_int {
     e((&*cond.cast::<RlctCond>()).broadcast())
@@ -33,13 +29,13 @@ pub unsafe extern "C" fn pthread_cond_signal(cond: *mut pthread_cond_t) -> c_int
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pthread_cond_timedwait(cond: *mut pthread_cond_t, mutex_ptr: *mut pthread_mutex_t, timeout: *const timespec) -> c_int {
-    e((&*cond.cast::<RlctCond>()).timedwait(mutex_ptr, Some(&*timeout)))
+pub unsafe extern "C" fn pthread_cond_timedwait(cond: *mut pthread_cond_t, mutex: *mut pthread_mutex_t, timeout: *const timespec) -> c_int {
+    e((&*cond.cast::<RlctCond>()).timedwait(&*mutex.cast::<RlctMutex>(), &*timeout))
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_wait(cond: *mut pthread_cond_t, mutex: *mut pthread_mutex_t) -> c_int {
-    e((&*cond.cast::<RlctCond>()).wait(mutex))
+    e((&*cond.cast::<RlctCond>()).wait(&*mutex.cast::<RlctMutex>()))
 }
 
 #[no_mangle]

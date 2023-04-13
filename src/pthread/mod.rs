@@ -2,7 +2,7 @@
 
 use core::cell::{Cell, UnsafeCell};
 use core::ptr::NonNull;
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -28,6 +28,8 @@ pub unsafe fn init() {
         has_queued_cancelation: AtomicBool::new(false),
         flags: PthreadFlags::empty().bits().into(),
 
+        //index: FIRST_THREAD_IDX,
+
         // TODO
         stack_base: core::ptr::null_mut(),
         stack_size: 0,
@@ -37,6 +39,10 @@ pub unsafe fn init() {
 
     PTHREAD_SELF.set(obj);
 }
+
+//static NEXT_INDEX: AtomicU32 = AtomicU32::new(FIRST_THREAD_IDX + 1);
+//const FIRST_THREAD_IDX: usize = 1;
+
 pub unsafe fn terminate_from_main_thread() {
     for (tid, pthread) in OS_TID_TO_PTHREAD.lock().iter() {
         // TODO: Cancel?
@@ -55,6 +61,10 @@ pub struct Pthread {
     has_queued_cancelation: AtomicBool,
     has_enabled_cancelation: AtomicBool,
     flags: AtomicUsize,
+
+    // Small index (compared to pointer size) used for e.g. recursive mutexes. Zero is reserved,
+    // so it starts from one. The 31st bit is reserved.
+    //index: u32,
 
     stack_base: *mut c_void,
     stack_size: usize,
@@ -130,6 +140,7 @@ pub(crate) unsafe fn create(attrs: Option<&header::RlctAttr>, start_routine: ext
         stack_base,
         stack_size,
         os_tid: UnsafeCell::new(OsTid::default()),
+        //index: NEXT_INDEX.fetch_add(1, Ordering::Relaxed),
     };
     let ptr = Box::into_raw(Box::new(pthread));
 
@@ -365,3 +376,7 @@ unsafe impl<T> Sync for ForceSendSync<T> {}
 
 #[thread_local]
 static PTHREAD_SELF: Cell<*mut Pthread> = Cell::new(core::ptr::null_mut());
+
+/*pub(crate) fn current_thread_index() -> u32 {
+    current_thread().expect("current thread not present").index
+}*/

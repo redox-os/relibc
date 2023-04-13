@@ -1,7 +1,10 @@
 pub mod barrier;
 pub mod cond;
+// TODO: Merge with pthread_mutex
 pub mod mutex;
+
 pub mod once;
+pub mod pthread_mutex;
 pub mod semaphore;
 pub mod waitval;
 

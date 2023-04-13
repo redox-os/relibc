@@ -1,89 +1,74 @@
 use super::*;
 
 use crate::header::errno::*;
+use crate::pthread::Errno;
 
 use core::sync::atomic::AtomicI32 as AtomicInt;
 
 // PTHREAD_MUTEX_INITIALIZER is defined in bits_pthread/cbindgen.toml
 
-#[repr(u8)]
-enum State {
-    Unlocked,
-    Locked,
-    Waiting,
-}
-
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn pthread_mutex_consistent(mutex: *mut pthread_mutex_t) -> c_int {
-    let mutex = &*mutex.cast::<RlctMutex>();
-
-    todo!()
+    e((&*mutex.cast::<RlctMutex>()).make_consistent())
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_mutex_destroy(mutex: *mut pthread_mutex_t) -> c_int {
-    let _mutex = &mut *mutex.cast::<RlctMutex>();
+    // No-op
+    core::ptr::drop_in_place(mutex.cast::<RlctMutex>());
     0
 }
 
-// #[no_mangle]
-pub extern "C" fn pthread_mutex_getprioceiling(mutex: *const pthread_mutex_t, prioceiling: *mut c_int) -> c_int {
-    todo!();
+#[no_mangle]
+pub unsafe extern "C" fn pthread_mutex_getprioceiling(mutex: *const pthread_mutex_t, prioceiling: *mut c_int) -> c_int {
+    match (&*mutex.cast::<RlctMutex>()).prioceiling() {
+        Ok(value) => {
+            prioceiling.write(value);
+            0
+        }
+        Err(Errno(errno)) => errno,
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_mutex_init(mutex: *mut pthread_mutex_t, attr: *const pthread_mutexattr_t) -> c_int {
     let attr = attr.cast::<RlctMutexAttr>().as_ref().copied().unwrap_or_default();
 
-    // TODO: attr
-    mutex.cast::<RlctMutex>().write(RlctMutex {
-        inner: crate::sync::mutex::UNLOCKED.into(),
-        /*robust: attr.robust != 0,
-        ty: match attr.ty {
-            PTHREAD_MUTEX_DEFAULT => Ty::Def,
-            PTHREAD_MUTEX_ERRORCHECK => Ty::Errck,
-            PTHREAD_MUTEX_RECURSIVE => Ty::Recursive,
-            PTHREAD_MUTEX_NORMAL => Ty::Normal,
+    match RlctMutex::new(&attr) {
+        Ok(new) => {
+            mutex.cast::<RlctMutex>().write(new);
 
-            _ => return EINVAL,
-        }*/
-    });
-    0
-}
-#[no_mangle]
-pub unsafe extern "C" fn pthread_mutex_lock(mutex: *mut pthread_mutex_t) -> c_int {
-    let mutex = &*mutex.cast::<RlctMutex>();
-
-    crate::sync::mutex::manual_lock_generic(&(&*mutex).inner);
-
-    0
-}
-
-// #[no_mangle]
-pub extern "C" fn pthread_mutex_setprioceiling(mutex: *mut pthread_mutex_t, prioceiling: c_int, old_prioceiling: *mut c_int) -> c_int {
-    todo!();
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pthread_mutex_timedlock(mutex: *mut pthread_mutex_t, _timespec: *const timespec) -> c_int {
-    // TODO
-    pthread_mutex_lock(mutex)
-}
-#[no_mangle]
-pub unsafe extern "C" fn pthread_mutex_trylock(mutex: *mut pthread_mutex_t) -> c_int {
-    let mutex = &*mutex.cast::<RlctMutex>();
-
-    if crate::sync::mutex::manual_try_lock_generic(&(&*mutex).inner) {
-        0
-    } else {
-        EBUSY
+            0
+        }
+        Err(Errno(errno)) => errno,
     }
 }
 #[no_mangle]
-pub unsafe extern "C" fn pthread_mutex_unlock(mutex: *mut pthread_mutex_t) -> c_int {
-    let mutex = &*mutex.cast::<RlctMutex>();
+pub unsafe extern "C" fn pthread_mutex_lock(mutex: *mut pthread_mutex_t) -> c_int {
+    e((&*mutex.cast::<RlctMutex>()).lock())
+}
 
-    crate::sync::mutex::manual_unlock_generic(&(&*mutex).inner);
-    0
+#[no_mangle]
+pub unsafe extern "C" fn pthread_mutex_setprioceiling(mutex: *mut pthread_mutex_t, prioceiling: c_int, old_prioceiling: *mut c_int) -> c_int {
+    match (&*mutex.cast::<RlctMutex>()).replace_prioceiling(prioceiling) {
+        Ok(old) => {
+            old_prioceiling.write(old);
+            0
+        }
+        Err(Errno(errno)) => errno,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pthread_mutex_timedlock(mutex: *mut pthread_mutex_t, timespec: *const timespec) -> c_int {
+    e((&*mutex.cast::<RlctMutex>()).lock_with_timeout(&*timespec))
+}
+#[no_mangle]
+pub unsafe extern "C" fn pthread_mutex_trylock(mutex: *mut pthread_mutex_t) -> c_int {
+    e((&*mutex.cast::<RlctMutex>()).try_lock())
+}
+#[no_mangle]
+pub unsafe extern "C" fn pthread_mutex_unlock(mutex: *mut pthread_mutex_t) -> c_int {
+    e((&*mutex.cast::<RlctMutex>()).unlock())
 }
 
 #[no_mangle]
@@ -156,22 +141,7 @@ pub unsafe extern "C" fn pthread_mutexattr_settype(attr: *mut pthread_mutexattr_
     0
 }
 
-#[repr(C)]
-pub(crate) struct RlctMutex {
-    // Actual locking word. Allows the states UNLOCKED, LOCKED, and WAITING, a substate of LOCKED.
-    inner: AtomicInt,
-
-    /*robust: bool,
-    ty: Ty,*/
-
-    // TODO: Robust mutexes, errorcheck, recursive mutexes
-}
-enum Ty {
-    Normal,
-    Def,
-    Errck,
-    Recursive,
-}
+pub use crate::sync::pthread_mutex::RlctMutex;
 
 #[repr(C)]
 #[derive(Clone, Copy)]

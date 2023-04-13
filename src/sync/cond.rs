@@ -30,28 +30,30 @@ impl Cond {
     pub fn signal(&self) -> Result<(), Errno> {
         self.wake(1)
     }
-    // TODO: Safe version using RlctMutexGuard?
-    pub unsafe fn timedwait(&self, mutex_ptr: *mut pthread_mutex_t, timeout: Option<&timespec>) -> Result<(), Errno> {
+    pub fn timedwait(&self, mutex: &RlctMutex, timeout: &timespec) -> Result<(), Errno> {
+        self.wait_inner(mutex, Some(timeout))
+    }
+    fn wait_inner(&self, mutex: &RlctMutex, timeout: Option<&timespec>) -> Result<(), Errno> {
         // TODO: Error checking for certain types (i.e. robust and errorcheck) of mutexes, e.g. if the
         // mutex is not locked.
         let current = self.cur.load(Ordering::Relaxed);
         self.prev.store(current, Ordering::Relaxed); // TODO: ordering?
 
-        pthread_mutex_unlock(mutex_ptr);
+        mutex.unlock();
 
         match timeout {
             Some(timeout) => {
                 crate::sync::futex_wait(&self.cur, current, timespec::subtract(*timeout, crate::sync::rttime()).as_ref());
-                pthread_mutex_timedlock(mutex_ptr, timespec::subtract(*timeout, crate::sync::rttime()).as_ref().map_or(core::ptr::null(), |r| r as *const timespec));
+                mutex.lock_with_timeout(timeout);
             }
             None => {
                 crate::sync::futex_wait(&self.cur, current, None);
-                pthread_mutex_lock(mutex_ptr);
+                mutex.lock();
             }
         }
         Ok(())
     }
-    pub unsafe fn wait(&self, mutex_ptr: *mut pthread_mutex_t) -> Result<(), Errno> {
-        self.timedwait(mutex_ptr, None)
+    pub fn wait(&self, mutex: &RlctMutex) -> Result<(), Errno> {
+        self.wait_inner(mutex, None)
     }
 }

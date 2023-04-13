@@ -7,7 +7,7 @@ use crate::platform::{self, Pal, Sys, types::*};
 use crate::header::{sched::*, time::timespec};
 use crate::pthread;
 
-fn e(result: Result<(), pthread::Errno>) -> i32 {
+pub fn e(result: Result<(), pthread::Errno>) -> i32 {
     match result {
         Ok(()) => 0,
         Err(pthread::Errno(error)) => error,

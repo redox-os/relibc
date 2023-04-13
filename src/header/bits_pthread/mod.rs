@@ -40,7 +40,7 @@ pub union pthread_barrierattr_t {
 }
 #[repr(C)]
 pub union pthread_mutex_t {
-    __relibc_internal_size: [c_uchar; 4],
+    __relibc_internal_size: [c_uchar; 12],
     __relibc_internal_align: c_int,
 }
 #[repr(C)]
