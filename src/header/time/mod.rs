@@ -13,10 +13,31 @@ pub mod constants;
 mod strftime;
 
 #[repr(C)]
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub struct timespec {
     pub tv_sec: time_t,
     pub tv_nsec: c_long,
+}
+
+impl timespec {
+    // TODO: Write test
+    pub fn subtract(later: timespec, earlier: timespec) -> Option<timespec> {
+        // TODO: Can tv_nsec be negative?
+        let later_nsec = c_ulong::try_from(later.tv_nsec).ok()?;
+        let earlier_nsec = c_ulong::try_from(earlier.tv_nsec).ok()?;
+
+        Some(if later_nsec > earlier_nsec {
+            timespec {
+                tv_sec: later.tv_sec.checked_sub(earlier.tv_sec)?,
+                tv_nsec: (later_nsec - earlier_nsec) as i64,
+            }
+        } else {
+            timespec {
+                tv_sec: later.tv_sec.checked_sub(earlier.tv_sec)?.checked_sub(1)?,
+                tv_nsec: 1_000_000_000 - (earlier_nsec - later_nsec) as i64,
+            }
+        })
+    }
 }
 
 #[cfg(target_os = "redox")]

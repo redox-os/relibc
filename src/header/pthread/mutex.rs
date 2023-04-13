@@ -63,9 +63,10 @@ pub extern "C" fn pthread_mutex_setprioceiling(mutex: *mut pthread_mutex_t, prio
     todo!();
 }
 
-// #[no_mangle]
-pub extern "C" fn pthread_mutex_timedlock(mutex: *mut pthread_mutex_t, timespec: *const timespec) -> c_int {
-    todo!();
+#[no_mangle]
+pub unsafe extern "C" fn pthread_mutex_timedlock(mutex: *mut pthread_mutex_t, _timespec: *const timespec) -> c_int {
+    // TODO
+    pthread_mutex_lock(mutex)
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_mutex_trylock(mutex: *mut pthread_mutex_t) -> c_int {
@@ -88,8 +89,7 @@ pub unsafe extern "C" fn pthread_mutex_unlock(mutex: *mut pthread_mutex_t) -> c_
 #[no_mangle]
 pub unsafe extern "C" fn pthread_mutexattr_destroy(attr: *mut pthread_mutexattr_t) -> c_int {
     // No-op
-
-    core::ptr::drop_in_place(attr);
+    core::ptr::drop_in_place(attr.cast::<RlctMutexAttr>());
     0
 }
 
@@ -164,7 +164,7 @@ pub(crate) struct RlctMutex {
     /*robust: bool,
     ty: Ty,*/
 
-    // TODO: Robust mutexes
+    // TODO: Robust mutexes, errorcheck, recursive mutexes
 }
 enum Ty {
     Normal,

@@ -2,75 +2,49 @@
 
 use super::*;
 
-use core::sync::atomic::{AtomicI32 as AtomicInt, Ordering};
+// PTHREAD_COND_INITIALIZER is defined manually in bits_pthread/cbindgen.toml
 
-// PTHREAD_COND_INITIALIZER
+fn e(r: Result<(), pthread::Errno>) -> c_int {
+    r.map_or_else(|pthread::Errno(errno)| errno, |()| 0)
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_broadcast(cond: *mut pthread_cond_t) -> c_int {
-    wake(cond, i32::MAX)
-}
-
-unsafe fn wake(cond: *mut pthread_cond_t, n: i32) -> c_int {
-    let cond = &*cond.cast::<RlctCond>();
-
-    // This is formally correct as long as we don't have more than u32::MAX threads.
-    let prev = cond.prev.load(Ordering::SeqCst);
-    cond.cur.store(prev.wrapping_add(1), Ordering::SeqCst);
-
-    crate::sync::futex_wake(&cond.cur, n);
-
-    0
+    e((&*cond.cast::<RlctCond>()).broadcast())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_destroy(cond: *mut pthread_cond_t) -> c_int {
-    let _cond = &mut cond.cast::<RlctCond>();
-
     // No-op
+    core::ptr::drop_in_place(cond.cast::<RlctCond>());
     0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_init(cond: *mut pthread_cond_t, _attr: *const pthread_condattr_t) -> c_int {
-    cond.cast::<RlctCond>().write(RlctCond {
-        cur: AtomicInt::new(0),
-        prev: AtomicInt::new(0),
-    });
+    cond.cast::<RlctCond>().write(RlctCond::new());
+
     0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_signal(cond: *mut pthread_cond_t) -> c_int {
-    wake(cond, 1)
+    e((&*cond.cast::<RlctCond>()).signal())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_timedwait(cond: *mut pthread_cond_t, mutex_ptr: *mut pthread_mutex_t, timeout: *const timespec) -> c_int {
-    // TODO: Error checking for certain types (i.e. robust and errorcheck) of mutexes, e.g. if the
-    // mutex is not locked.
-    let cond = &*cond.cast::<RlctCond>();
-    let timeout: Option<&timespec> = timeout.as_ref();
-
-    let current = cond.cur.load(Ordering::Relaxed);
-    cond.prev.store(current, Ordering::SeqCst); // TODO: ordering?
-
-    pthread_mutex_unlock(mutex_ptr);
-    crate::sync::futex_wait(&cond.cur, current, timeout);
-    pthread_mutex_lock(mutex_ptr);
-
-    0
+    e((&*cond.cast::<RlctCond>()).timedwait(mutex_ptr, Some(&*timeout)))
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_wait(cond: *mut pthread_cond_t, mutex: *mut pthread_mutex_t) -> c_int {
-    pthread_cond_timedwait(cond, mutex, core::ptr::null())
+    e((&*cond.cast::<RlctCond>()).wait(mutex))
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_condattr_destroy(condattr: *mut pthread_condattr_t) -> c_int {
-    let _condattr = &mut *condattr.cast::<RlctCondAttr>();
-
+    core::ptr::drop_in_place(condattr.cast::<RlctCondAttr>());
     // No-op
     0
 }
@@ -89,12 +63,7 @@ pub unsafe extern "C" fn pthread_condattr_getpshared(condattr: *const pthread_co
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_condattr_init(condattr: *mut pthread_condattr_t) -> c_int {
-    condattr.cast::<RlctCondAttr>().write(RlctCondAttr {
-        // FIXME: system clock
-        clock: 0,
-        // Default
-        pshared: PTHREAD_PROCESS_PRIVATE,
-    });
+    condattr.cast::<RlctCondAttr>().write(RlctCondAttr::default());
 
     0
 }
@@ -112,11 +81,19 @@ pub unsafe extern "C" fn pthread_condattr_setpshared(condattr: *mut pthread_cond
 }
 
 pub(crate) struct RlctCondAttr {
-    pub clock: clockid_t,
-    pub pshared: c_int,
+    clock: clockid_t,
+    pshared: c_int,
 }
 
-pub(crate) struct RlctCond {
-    pub cur: AtomicInt,
-    pub prev: AtomicInt,
+pub(crate) type RlctCond = crate::sync::cond::Cond;
+
+impl Default for RlctCondAttr {
+    fn default() -> Self {
+        Self {
+            // FIXME: system clock
+            clock: 0,
+            // Default
+            pshared: PTHREAD_PROCESS_PRIVATE,
+        }
+    }
 }

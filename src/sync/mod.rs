@@ -1,4 +1,5 @@
 pub mod barrier;
+pub mod cond;
 pub mod mutex;
 pub mod once;
 pub mod semaphore;
@@ -15,6 +16,7 @@ use crate::{
     platform::{types::*, Pal, Sys},
 };
 use core::{
+    mem::MaybeUninit,
     ops::Deref,
     sync::atomic::{self, AtomicI32, AtomicU32, AtomicI32 as AtomicInt},
 };
@@ -76,6 +78,18 @@ pub fn futex_wake(atomic: &impl FutexAtomicTy, n: i32) -> usize {
 pub fn futex_wait<T: FutexAtomicTy>(atomic: &T, value: T::Ty, timeout_opt: Option<&timespec>) -> bool {
     unsafe { futex_wait_ptr(atomic.ptr(), value, timeout_opt) }
 }
+
+pub fn rttime() -> timespec {
+    unsafe {
+        let mut time = MaybeUninit::uninit();
+
+        // TODO: Handle error
+        Sys::clock_gettime(crate::header::time::CLOCK_REALTIME, time.as_mut_ptr());
+
+        time.assume_init()
+    }
+}
+
 pub fn wait_until_generic<F1, F2>(word: &AtomicInt, attempt: F1, mark_long: F2, long: c_int)
 where
     F1: Fn(&AtomicInt) -> AttemptStatus,
