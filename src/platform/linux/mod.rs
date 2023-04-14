@@ -268,7 +268,7 @@ impl Pal for Sys {
     }
 
     unsafe fn setrlimit(resource: c_int, rlimit: *const rlimit) -> c_int {
-        e(syscall!(SETRLIMIT, resource, rlim)) as c_int
+        e(syscall!(SETRLIMIT, resource, rlimit)) as c_int
     }
 
     fn getsid(pid: pid_t) -> pid_t {
