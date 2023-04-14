@@ -535,6 +535,11 @@ impl Pal for Sys {
         0
     }
 
+    unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> c_int {
+        unsafe { errno = EPERM };
+        -1
+    }
+
     fn getsid(pid: pid_t) -> pid_t {
         //TODO
         unsafe { errno = ENOSYS };
