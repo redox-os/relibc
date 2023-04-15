@@ -355,6 +355,10 @@ impl Pal for Sys {
         e(syscall!(MUNMAP, addr, len)) as c_int
     }
 
+    unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
+        e(syscall!(MADVISE, addr, len, flags)) as c_int
+    }
+
     fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
         e(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }) as c_int
     }

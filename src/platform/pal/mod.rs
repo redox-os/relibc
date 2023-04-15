@@ -139,6 +139,8 @@ pub trait Pal {
 
     unsafe fn munlock(addr: *const c_void, len: usize) -> c_int;
 
+    unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> c_int;
+
     fn munlockall() -> c_int;
 
     unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int;

@@ -87,6 +87,11 @@ pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
     Sys::munmap(addr, len)
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn madvise(addr: *mut c_void, len: size_t, flags: c_int) -> c_int {
+    Sys::madvise(addr, len, flags)
+}
+
 #[cfg(target_os = "linux")]
 static SHM_PATH: &'static [u8] = b"/dev/shm/";
 

@@ -694,6 +694,11 @@ impl Pal for Sys {
         0
     }
 
+    unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
+        eprintln!("madvise {:p} {:x} {:x}", addr, len, flags);
+        e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
+    }
+
     fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
         let redox_rqtp = unsafe { redox_timespec::from(&*rqtp) };
         let mut redox_rmtp: redox_timespec;
