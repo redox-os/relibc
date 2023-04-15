@@ -26,7 +26,7 @@ pub(crate) struct RlctAttr {
     pub param: sched_param,
 }
 
-pub const PTHREAD_BARRIER_SERIAL_THREAD: c_int = 1;
+pub const PTHREAD_BARRIER_SERIAL_THREAD: c_int = -1;
 
 pub const PTHREAD_CANCEL_ASYNCHRONOUS: c_int = 0;
 pub const PTHREAD_CANCEL_ENABLE: c_int = 1;
