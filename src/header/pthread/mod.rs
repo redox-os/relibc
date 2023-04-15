@@ -145,7 +145,9 @@ pub use tls::*;
 pub unsafe extern "C" fn pthread_join(thread: pthread_t, retval: *mut *mut c_void) -> c_int {
     match pthread::join(&*thread.cast()) {
         Ok(pthread::Retval(ret)) => {
-            core::ptr::write(retval, ret);
+            if !retval.is_null() {
+                core::ptr::write(retval, ret);
+            }
             0
         }
         Err(pthread::Errno(error)) => error,
