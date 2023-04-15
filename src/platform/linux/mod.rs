@@ -259,6 +259,10 @@ impl Pal for Sys {
         e(unsafe { syscall!(GETPPID) }) as pid_t
     }
 
+    fn getpriority(which: c_int, who: id_t) -> c_int {
+        e(unsafe { syscall!(GETPRIORITY, which, who) }) as c_int
+    }
+
     fn getrandom(buf: &mut [u8], flags: c_uint) -> ssize_t {
         e(unsafe { syscall!(GETRANDOM, buf.as_mut_ptr(), buf.len(), flags) }) as ssize_t
     }
@@ -450,6 +454,10 @@ impl Pal for Sys {
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
         e(unsafe { syscall!(SETPGID, pid, pgid) }) as c_int
+    }
+
+    fn setpriority(which: c_int, who: id_t, prio: c_int) -> c_int {
+        e(unsafe { syscall!(SETPRIORITY, which, who, prio) }) as c_int
     }
 
     fn setregid(rgid: gid_t, egid: gid_t) -> c_int {

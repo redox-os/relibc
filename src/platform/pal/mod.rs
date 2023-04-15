@@ -96,6 +96,8 @@ pub trait Pal {
 
     fn getppid() -> pid_t;
 
+    fn getpriority(which: c_int, who: id_t) -> c_int;
+
     fn getrandom(buf: &mut [u8], flags: c_uint) -> ssize_t;
 
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int;
@@ -162,6 +164,8 @@ pub trait Pal {
     fn sched_yield() -> c_int;
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> c_int;
+
+    fn setpriority(which: c_int, who: id_t, prio: c_int) -> c_int;
 
     fn setregid(rgid: gid_t, egid: gid_t) -> c_int;
 
