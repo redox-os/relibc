@@ -356,12 +356,38 @@ pub unsafe extern "C" fn getenv(name: *const c_char) -> *mut c_char {
 }
 
 // #[no_mangle]
-pub extern "C" fn getsubopt(
+pub unsafe extern "C" fn getsubopt(
     optionp: *mut *mut c_char,
     tokens: *const *mut c_char,
     valuep: *mut *mut c_char,
 ) -> c_int {
-    unimplemented!();
+    let start = *optionp;
+    let max = strlen(start) as isize;
+    let mut i: usize = 0;
+    *valuep = ptr::null_mut();
+    *optionp = strchr(start, b',' as i32);
+    if !(*optionp).is_null() {
+        *(*optionp).add(0) = 0;
+        *optionp = *optionp.add(1);
+    } else {
+        *(optionp) = start.add(max as usize);
+    }
+    while !tokens.offset(i as isize).is_null() {
+        let cur = tokens.offset(i as isize) as *const _;
+        let len = strlen(cur) as isize;
+        if strncmp(cur, start, len as usize) != 0 {
+            i = i + 1;
+            continue;
+        }
+        if (*start.offset(len)) == b'=' as i8 {
+            *valuep = start.offset(len + 1);
+        } else if !start.offset(len).is_null() {
+            i = i + 1;
+            continue;
+        }
+        return i as c_int;
+    }
+    -1
 }
 
 // #[no_mangle]
