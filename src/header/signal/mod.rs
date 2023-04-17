@@ -1,6 +1,6 @@
 //! signal implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/signal.h.html
 
-use core::mem;
+use core::{mem, ptr};
 
 use cbitset::BitSet;
 
@@ -23,6 +23,7 @@ type SigSet = BitSet<[c_ulong; 1]>;
 
 pub const SIG_DFL: usize = 0;
 pub const SIG_IGN: usize = 1;
+pub const SIG_HOLD: usize = 2;
 pub const SIG_ERR: isize = -1;
 
 pub const SIG_BLOCK: c_int = 0;
@@ -155,19 +156,57 @@ pub extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
     0
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn sighold(sig: c_int) -> c_int {
-    unimplemented!();
+    if sig <= 0 || sig as usize > NSIG {
+        unsafe {
+            platform::errno = errno::EINVAL;
+        }
+        return -1;
+    }
+
+    let mut set = SigSet::new();
+    set.insert(sig as usize - 1);
+    sigprocmask(
+        SIG_BLOCK,
+        &set as *const _ as *const sigset_t,
+        ptr::null_mut(),
+    )
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn sigignore(sig: c_int) -> c_int {
-    unimplemented!();
+    let old_handler = signal(sig, unsafe { mem::transmute(SIG_IGN) });
+    match unsafe { mem::transmute(old_handler) } {
+        SIG_ERR => -1,
+        _ => 0,
+    }
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
-    unimplemented!();
+    // First syscall: get current signal disposition and flags
+    let mut old_sa = mem::MaybeUninit::uninit();
+    if unsafe { sigaction(sig, ptr::null(), old_sa.as_mut_ptr()) } < 0 {
+        mem::forget(old_sa);
+        return -1;
+    }
+    let mut act: sigaction = unsafe { old_sa.assume_init() };
+
+    let flag = flag != 0;
+    let old_flag = act.sa_flags & SA_RESTART as c_ulong != 0;
+    if flag == old_flag {
+        // Fast path: no change in behaviour needed
+        0
+    } else {
+        act.sa_flags ^= SA_RESTART as c_ulong;
+        // Second syscall: apply the new signal handling flag
+        if unsafe { sigaction(sig, &act, ptr::null_mut()) } < 0 {
+            -1
+        } else {
+            0
+        }
+    }
 }
 
 #[no_mangle]
@@ -226,14 +265,61 @@ pub extern "C" fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigse
     Sys::sigprocmask(how, set, oset)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn sigrelse(sig: c_int) -> c_int {
-    unimplemented!();
+    if sig <= 0 || sig as usize > NSIG {
+        unsafe {
+            platform::errno = errno::EINVAL;
+        }
+        return -1;
+    }
+
+    let mut set = SigSet::new();
+    set.insert(sig as usize - 1);
+    sigprocmask(
+        SIG_UNBLOCK,
+        &set as *const _ as *const sigset_t,
+        ptr::null_mut(),
+    )
 }
 
-// #[no_mangle]
-pub extern "C" fn sigset(sig: c_int, func: fn(c_int)) -> fn(c_int) {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn sigset(
+    sig: c_int,
+    func: Option<extern "C" fn(c_int)>,
+) -> Option<extern "C" fn(c_int)> {
+    if unsafe { mem::transmute_copy::<_, usize>(&func) } == SIG_HOLD {
+        // Signal should be blocked
+        let mut set = SigSet::new();
+        set.insert(sig as usize - 1);
+        let mut old_mask = mem::MaybeUninit::uninit();
+        if sigprocmask(
+            SIG_BLOCK,
+            &set as *const _ as *const sigset_t,
+            old_mask.as_mut_ptr(),
+        ) < 0
+        {
+            mem::forget(old_mask);
+            return unsafe { mem::transmute(SIG_ERR) };
+        }
+
+        if set.contains(sig as usize - 1) {
+            // Signal was already blocked
+            unsafe { mem::transmute(SIG_HOLD) }
+        } else {
+            // Signal was not blocked
+            // Second syscall necessary to find the signal’s actual disposition for returning
+            let mut old_sa = mem::MaybeUninit::uninit();
+            if unsafe { sigaction(sig, ptr::null(), old_sa.as_mut_ptr()) } < 0 {
+                mem::forget(old_sa);
+                return unsafe { mem::transmute(SIG_ERR) };
+            }
+            unsafe { old_sa.assume_init() }.sa_handler
+        }
+    } else {
+        // Just do the same thing as signal() cause that already has the correct semantics
+        signal(sig, func)
+    }
 }
 
 // #[no_mangle]
