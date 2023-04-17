@@ -6,6 +6,7 @@ fi
 
 DRAGONOS_UNKNOWN_ELF_PATH=$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-dragonos
 mkdir -p ${DRAGONOS_UNKNOWN_ELF_PATH}/lib
+echo $DRAGONOS_UNKNOWN_ELF_PATH
 # 设置工具链配置文件
 echo   \
 "{\

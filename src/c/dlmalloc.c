@@ -665,6 +665,7 @@ MAX_RELEASE_CHECK_RATE   default: 4095 unless not HAVE_MMAP
 #ifndef MALLOC_FAILURE_ACTION
 #define MALLOC_FAILURE_ACTION  errno = ENOMEM;
 #endif  /* MALLOC_FAILURE_ACTION */
+
 #ifndef HAVE_MORECORE
 #if ONLY_MSPACES
 #define HAVE_MORECORE 0
@@ -5445,6 +5446,7 @@ mspace create_mspace(size_t capacity, int locked) {
   return (mspace)m;
 }
 
+
 mspace create_mspace_with_base(void* base, size_t capacity, int locked) {
   mstate m = 0;
   size_t msize;
@@ -5456,6 +5458,7 @@ mspace create_mspace_with_base(void* base, size_t capacity, int locked) {
     m->seg.sflags = EXTERN_BIT;
     set_lock(m, locked);
   }
+
   return (mspace)m;
 }
 

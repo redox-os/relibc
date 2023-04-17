@@ -4,8 +4,12 @@ use core::{fmt, ptr};
 
 pub use self::allocator::*;
 
-#[cfg(not(feature = "ralloc"))]
+#[cfg(all(not(feature = "ralloc"), not(target_os = "dragonos")))]
 #[path = "allocator/dlmalloc.rs"]
+mod allocator;
+
+#[cfg(all(not(feature = "ralloc"), target_os = "dragonos"))]
+#[path = "allocator/dragonos_malloc.rs"]
 mod allocator;
 
 #[cfg(feature = "ralloc")]

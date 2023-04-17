@@ -53,8 +53,8 @@ fn main() {
             generate_bindings(&p);
         });
 
-    cc::Build::new()
-        .flag("-nostdinc")
+    let mut c = cc::Build::new();
+    c.flag("-nostdinc")
         .flag("-nostdlib")
         .include(&format!("{}/include", crate_dir))
         .include(&format!("{}/target/include", crate_dir))
@@ -65,8 +65,15 @@ fn main() {
             fs::read_dir("src/c")
                 .expect("src/c directory missing")
                 .map(|res| res.expect("read_dir error").path()),
-        )
-        .compile("relibc_c");
+        );
+
+    #[cfg(target_os = "dragonos")]
+    {
+        // for dragonos only
+        c.define("HAVE_MMAP", "0");
+    }
+
+    c.compile("relibc_c");
 
     println!("cargo:rustc-link-lib=static=relibc_c");
 }

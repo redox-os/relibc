@@ -24,7 +24,7 @@ _start:
     ud2
 ");
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", not(target_os = "dragonos")))]
 global_asm!("
 .globl _start
 _start:
@@ -40,6 +40,37 @@ _start:
     mov rdi, rbp
     sub rsi, 5
     call relibc_ld_so_start
+
+    # Restore original stack, clear registers, and jump to new start function
+    mov rsp, rbp
+    xor rcx, rcx
+    xor rdx, rdx
+    xor rdi, rdi
+    xor rsi, rsi
+    xor r8, r8
+    xor r9, r9
+    xor r10, r10
+    xor r11, r11
+    fninit
+    jmp rax
+");
+
+#[cfg(all(target_arch = "x86_64", target_os = "dragonos"))]
+global_asm!("
+.globl _start
+_start:
+    # rsi = _start + 5
+    call 2f
+2:  pop rsi
+
+    # Save original stack and align stack to 16 bytes
+    mov rbp, rsp
+    and rsp, 0xFFFFFFFFFFFFFFF0
+
+    # Call ld_so_start(stack, entry)
+    mov rdi, rbp
+    sub rsi, 5
+    # call relibc_ld_so_start
 
     # Restore original stack, clear registers, and jump to new start function
     mov rsp, rbp

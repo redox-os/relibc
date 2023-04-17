@@ -154,7 +154,7 @@ pub unsafe fn init(sp: &'static Stack) {
     {
         const ARCH_GET_FS: usize = 0x1003;
         // syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut tp as *mut usize);
-        unimplemented!()
+        // unimplemented!()
     }
     #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
     {
@@ -196,6 +196,7 @@ pub unsafe fn init(sp: &'static Stack) {
         tp = env.fsbase as usize;
     }
 
+    #[cfg(not(target_os = "dragonos"))]
     if tp == 0 {
         static_init(sp);
     }

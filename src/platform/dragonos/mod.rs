@@ -4,7 +4,7 @@ use core_io::Write;
 use super::{errno, types::*, Pal};
 use crate::{
     c_str::CStr,
-    header::{dirent::dirent, signal::SIGCHLD, sys_stat::S_IFIFO},
+    header::{dirent::dirent, errno::ENOSYS, signal::SIGCHLD, sys_stat::S_IFIFO},
 };
 // use header::sys_resource::rusage;
 use crate::header::{
@@ -112,7 +112,8 @@ impl Pal for Sys {
 
     fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int {
         // e(unsafe { syscall!(CLOCK_GETTIME, clk_id, tp) }) as c_int
-        unimplemented!()
+        // unimplemented!()
+        return -ENOSYS;
     }
 
     fn close(fildes: c_int) -> c_int {
@@ -368,7 +369,12 @@ impl Pal for Sys {
         off: off_t,
     ) -> *mut c_void {
         // e(syscall!(MMAP, addr, len, prot, flags, fildes, off)) as *mut c_void
-        unimplemented!()
+
+        // Due to DragonOS has not implement mmap yet,
+        // set the return value here as 0xFFFF_FFFF_FFFF_FFFF to match dlmalloc's requirements.
+        // See https://opengrok.ringotek.cn/xref/dragonos-relibc/src/c/dlmalloc.c?r=031194b9#5439
+        return !(0usize) as *mut c_void;
+        // unimplemented!()
     }
 
     unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
@@ -539,6 +545,7 @@ impl Pal for Sys {
     fn verify() -> bool {
         // GETPID on Linux is 39, which does not exist on Redox
         // e(unsafe { dsc::syscall5(dsc::nr::GETPID, !0, !0, !0, !0, !0) }) != !0
-        unimplemented!()
+        // unimplemented!()
+        return true;
     }
 }
