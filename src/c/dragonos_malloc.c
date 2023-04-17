@@ -15,17 +15,15 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 // Or you can visit https://www.gnu.org/licenses/gpl-2.0.html
 
-#include <unistd.h>
 #include <errno.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #define PAGE_4K_SHIFT 12
 #define PAGE_2M_SHIFT 21
 #define PAGE_1G_SHIFT 30
 #define PAGE_GDT_SHIFT 39
-
-
 
 /***************************/
 
@@ -38,9 +36,11 @@
 #define PAGE_4K_MASK (~(PAGE_4K_SIZE - 1))
 #define PAGE_2M_MASK (~(PAGE_2M_SIZE - 1))
 
+#define ALIGN_UP16(x) (((x) + 15) & ~15)
+
 // 将addr按照x的上边界对齐
-//#define PAGE_4K_ALIGN(addr) (((unsigned long)(addr) + PAGE_4K_SIZE - 1) & PAGE_4K_MASK)
-//#define PAGE_2M_ALIGN(addr) (((unsigned long)(addr) + PAGE_2M_SIZE - 1) & PAGE_2M_MASK)
+// #define PAGE_4K_ALIGN(addr) (((unsigned long)(addr) + PAGE_4K_SIZE - 1) & PAGE_4K_MASK)
+// #define PAGE_2M_ALIGN(addr) (((unsigned long)(addr) + PAGE_2M_SIZE - 1) & PAGE_2M_MASK)
 
 /**
  * @brief 显式链表的结点
@@ -48,7 +48,7 @@
  */
 typedef struct malloc_mem_chunk_t
 {
-    uint64_t length;                 // 整个块所占用的内存区域的大小
+    uint64_t length; // 整个块所占用的内存区域的大小
     uint64_t padding;
     struct malloc_mem_chunk_t *prev; // 上一个结点的指针
     struct malloc_mem_chunk_t *next; // 下一个结点的指针
@@ -165,7 +165,7 @@ static int malloc_enlarge(int64_t size)
             brk_max_addr = sbrk((0));
         else
         {
-            //put_string("malloc_enlarge(): no_mem\n", COLOR_YELLOW, COLOR_BLACK);
+            // put_string("malloc_enlarge(): no_mem\n", COLOR_YELLOW, COLOR_BLACK);
             return -ENOMEM;
         }
 
@@ -177,7 +177,8 @@ static int malloc_enlarge(int64_t size)
     // printf("managed addr = %#018lx\n", brk_managed_addr);
     malloc_mem_chunk_t *new_ck = (malloc_mem_chunk_t *)brk_managed_addr;
     new_ck->length = brk_max_addr - brk_managed_addr;
-    // printf("new_ck->start_addr=%#018lx\tbrk_max_addr=%#018lx\tbrk_managed_addr=%#018lx\n", (uint64_t)new_ck, brk_max_addr, brk_managed_addr);
+    // printf("new_ck->start_addr=%#018lx\tbrk_max_addr=%#018lx\tbrk_managed_addr=%#018lx\n", (uint64_t)new_ck,
+    // brk_max_addr, brk_managed_addr);
     new_ck->prev = NULL;
     new_ck->next = NULL;
     brk_managed_addr = brk_max_addr;
@@ -290,20 +291,19 @@ static void malloc_insert_free_list(malloc_mem_chunk_t *ck)
  */
 void *_dragonos_malloc(ssize_t size)
 {
-    
     // 计算需要分配的块的大小
-    // reserve for len
-    if (size + 2*sizeof(uint64_t) <= sizeof(malloc_mem_chunk_t))
+    if (size < sizeof(malloc_mem_chunk_t) - 16)
         size = sizeof(malloc_mem_chunk_t);
-    else
-        size += 2*sizeof(uint64_t);
+
+    // 16字节对齐
+    size = ALIGN_UP16(size);
 
     // 采用best fit
     malloc_mem_chunk_t *ck = malloc_query_free_chunk_bf(size);
 
     if (ck == NULL) // 没有空闲块
     {
-        
+
         // printf("no free blocks\n");
         // 尝试合并空闲块
         malloc_merge_free_chunk();
@@ -357,7 +357,7 @@ found:;
     }
     // printf("malloc done: %#018lx, length=%#018lx\n", ((uint64_t)ck + sizeof(uint64_t)), ck->length);
     // 此时链表结点的指针的空间被分配出去
-    return (void *)((uint64_t)ck + sizeof(uint64_t));
+    return (void *)((uint64_t)ck + 2 * sizeof(uint64_t));
 }
 
 /**
@@ -373,13 +373,14 @@ static void release_brk()
         printf("release(): free list end is null. \n");
         return;
     }
-    if ((uint64_t)malloc_free_list_end + malloc_free_list_end->length == brk_max_addr && (uint64_t)malloc_free_list_end <= brk_max_addr - (PAGE_2M_SIZE << 1))
+    if ((uint64_t)malloc_free_list_end + malloc_free_list_end->length == brk_max_addr &&
+        (uint64_t)malloc_free_list_end <= brk_max_addr - (PAGE_2M_SIZE << 1))
     {
         int64_t delta = ((brk_max_addr - (uint64_t)malloc_free_list_end) & PAGE_2M_MASK) - PAGE_2M_SIZE;
-        // printf("(brk_max_addr - (uint64_t)malloc_free_list_end) & PAGE_2M_MASK=%#018lx\n ", (brk_max_addr - (uint64_t)malloc_free_list_end) & PAGE_2M_MASK);
-        // printf("PAGE_2M_SIZE=%#018lx\n", PAGE_2M_SIZE);
-        // printf("tdfghgbdfggkmfn=%#018lx\n ", (brk_max_addr - (uint64_t)malloc_free_list_end) & PAGE_2M_MASK - PAGE_2M_SIZE);
-        // printf("delta=%#018lx\n ", delta);
+        // printf("(brk_max_addr - (uint64_t)malloc_free_list_end) & PAGE_2M_MASK=%#018lx\n ", (brk_max_addr -
+        // (uint64_t)malloc_free_list_end) & PAGE_2M_MASK); printf("PAGE_2M_SIZE=%#018lx\n", PAGE_2M_SIZE);
+        // printf("tdfghgbdfggkmfn=%#018lx\n ", (brk_max_addr - (uint64_t)malloc_free_list_end) & PAGE_2M_MASK -
+        // PAGE_2M_SIZE); printf("delta=%#018lx\n ", delta);
         if (delta <= 0) // 不用释放内存
             return;
         sbrk(-delta);
@@ -397,7 +398,7 @@ static void release_brk()
 void _dragonos_free(void *ptr)
 {
     // 找到结点（此时prev和next都处于未初始化的状态）
-    malloc_mem_chunk_t *ck = (malloc_mem_chunk_t *)((uint64_t)ptr - sizeof(uint64_t));
+    malloc_mem_chunk_t *ck = (malloc_mem_chunk_t *)((uint64_t)ptr - 2 * sizeof(uint64_t));
     // printf("free(): addr = %#018lx\t len=%#018lx\n", (uint64_t)ck, ck->length);
     count_last_free_size += ck->length;
 

@@ -46,8 +46,13 @@ pub unsafe fn alloc(size: usize) -> *mut c_void {
     //mspace_malloc(ALLOCATOR.get_book_keeper(), size)
 }
 
-pub unsafe fn alloc_align(size: usize, alignment: usize) -> *mut c_void {
+fn align_up(addr: usize, align: usize) -> usize {
+    (addr + align - 1) & !(align - 1)
+}
+pub unsafe fn alloc_align(mut size: usize, alignment: usize) -> *mut c_void {
     // println!("alloc align size: {}, alignment: {}", size, alignment);
+    size = align_up(size, alignment);
+    
     // TODO: 实现对齐分配
     _dragonos_malloc(size)
     //mspace_memalign(ALLOCATOR.get_book_keeper(), alignment, size)
