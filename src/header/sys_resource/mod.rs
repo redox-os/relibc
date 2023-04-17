@@ -61,10 +61,23 @@ pub struct rusage {
     pub ru_nivcsw: c_long,
 }
 
-// #[no_mangle]
-// pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
-//     unimplemented!();
-// }
+pub const PRIO_PROGRESS: c_int = 0;
+pub const PRIO_PGRP: c_int = 1;
+pub const PRIO_USER: c_int = 2;
+
+#[no_mangle]
+pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
+     let r = Sys::getpriority(which, who);
+     if r < 0 {
+         return r
+     }
+     20-r
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn setpriority(which: c_int, who: id_t, nice: c_int) -> c_int {
+     Sys::setpriority(which, who, nice)
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {

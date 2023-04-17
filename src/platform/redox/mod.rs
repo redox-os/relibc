@@ -499,6 +499,12 @@ impl Pal for Sys {
         e(syscall::getppid()) as pid_t
     }
 
+    fn getpriority(which: c_int, who: id_t) -> c_int {
+        // TODO
+        unsafe { errno = ENOSYS };
+        -1
+    }
+
     fn getrandom(buf: &mut [u8], flags: c_uint) -> ssize_t {
         //TODO: make this a system call?
 
@@ -788,6 +794,12 @@ impl Pal for Sys {
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
         e(syscall::setpgid(pid as usize, pgid as usize)) as c_int
+    }
+
+    fn setpriority(which: c_int, who: id_t, prio: c_int) -> c_int {
+        // TODO
+        unsafe { errno = ENOSYS };
+        -1
     }
 
     fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
