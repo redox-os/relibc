@@ -18,6 +18,7 @@ use crate::{
         limits,
         stdio::flush_io_streams,
         string::*,
+        sys_ioctl::*,
         time::constants::CLOCK_MONOTONIC,
         unistd::{self, sysconf, _SC_PAGESIZE},
         wchar::*,
@@ -1213,8 +1214,9 @@ pub extern "C" fn ttyslot() -> c_int {
 }
 
 // #[no_mangle]
-pub extern "C" fn unlockpt(fildes: c_int) -> c_int {
-    unimplemented!();
+pub unsafe extern "C" fn unlockpt(fildes: c_int) -> c_int {
+    let mut u: c_int = 0;
+    ioctl(fildes, TIOCSPTLCK, &mut u as *mut i32 as *mut c_void)
 }
 
 #[no_mangle]

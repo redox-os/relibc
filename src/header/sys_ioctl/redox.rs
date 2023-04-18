@@ -26,6 +26,8 @@ pub const TIOCSPGRP: c_ulong = 0x5410;
 
 pub const TIOCGWINSZ: c_ulong = 0x5413;
 pub const TIOCSWINSZ: c_ulong = 0x5414;
+pub const TIOCSPTLCK: c_ulong = 0x4004_5431;
+pub const TIOCGPTLCK: c_ulong = 0x8004_5439;
 
 // TODO: some of the structs passed as T have padding bytes, so casting to a byte slice is UB
 
@@ -133,6 +135,12 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
                 0
             }
         }
+        TIOCGPTLCK => {
+            0
+        },
+        TIOCSPTLCK => {
+            0
+        },
         TCSBRK => {
             // TODO
             0
