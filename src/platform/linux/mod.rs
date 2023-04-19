@@ -145,6 +145,10 @@ impl Pal for Sys {
         e(unsafe { syscall!(FCHOWN, fildes, owner, group) }) as c_int
     }
 
+    fn fdatasync(fildes: c_int) -> c_int {
+        e(unsafe { syscall!(FDATASYNC, fildes) }) as c_int
+    }
+
     fn flock(fd: c_int, operation: c_int) -> c_int {
         e(unsafe { syscall!(FLOCK, fd, operation) }) as c_int
     }

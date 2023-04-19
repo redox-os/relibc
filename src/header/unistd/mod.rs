@@ -223,7 +223,7 @@ pub extern "C" fn fchdir(fildes: c_int) -> c_int {
 
 // #[no_mangle]
 pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
-    unimplemented!();
+    Sys::fdatasync(fildes)
 }
 
 #[no_mangle]
