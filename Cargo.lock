@@ -109,9 +109,9 @@ name = "crtn"
 version = "0.1.0"
 
 [[package]]
-name = "dsc"
-version = "0.1.0"
-source = "git+https://github.com/DragonOS-Community/dsc.git?rev=0f61350#0f61350272d93e1cbda1f5f565bdaf81cc942a9f"
+name = "dragonos-dsc"
+version = "0.0.1"
+source = "git+https://github.com/DragonOS-Community/dsc.git?rev=194f741#194f741bc36411c2ce1579b17ba010951312730d"
 
 [[package]]
 name = "errno"
@@ -411,7 +411,7 @@ dependencies = [
  "cbitset",
  "cc",
  "core_io",
- "dsc",
+ "dragonos-dsc",
  "goblin",
  "lazy_static",
  "memchr",

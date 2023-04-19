@@ -54,7 +54,15 @@ pub use redox_exec::auxv_defs;
 use self::types::*;
 pub mod types;
 
+#[cfg(not(target_os = "dragonos"))]
 #[thread_local]
+#[allow(non_upper_case_globals)]
+#[no_mangle]
+pub static mut errno: c_int = 0;
+
+/// DragonOS doesn't have thread_local, so we use a global variable instead.
+/// TODO: This is a hack, and should be fixed.
+#[cfg(target_os = "dragonos")]
 #[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut errno: c_int = 0;

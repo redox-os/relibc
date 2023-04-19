@@ -63,7 +63,10 @@ pub const ENOLCK: c_int = 37; /* No record locks available */
 pub const ENOSYS: c_int = 38; /* Function not implemented */
 pub const ENOTEMPTY: c_int = 39; /* Directory not empty */
 pub const ELOOP: c_int = 40; /* Too many symbolic links encountered */
+#[cfg(not(target_os = "dragonos"))]
 pub const EWOULDBLOCK: c_int = 41; /* Operation would block */
+#[cfg(target_os = "dragonos")]
+pub const EWOULDBLOCK: c_int = EAGAIN; /* Operation would block */
 pub const ENOMSG: c_int = 42; /* No message of desired type */
 pub const EIDRM: c_int = 43; /* Identifier removed */
 pub const ECHRNG: c_int = 44; /* Channel number out of range */
@@ -167,7 +170,10 @@ pub static STR_ERROR: [&'static str; 132] = [
     "Exec format error",
     "Bad file number",
     "No child processes",
+    #[cfg(not(target_os = "dragonos"))]
     "Try again",
+    #[cfg(target_os = "dragonos")]
+    "Try again or operation would block",
     "Out of memory",
     "Permission denied",
     "Bad address",
@@ -197,6 +203,7 @@ pub static STR_ERROR: [&'static str; 132] = [
     "Function not implemented",
     "Directory not empty",
     "Too many symbolic links encountered",
+    #[cfg(not(target_os = "dragonos"))]
     "Operation would block",
     "No message of desired type",
     "Identifier removed",
@@ -288,4 +295,6 @@ pub static STR_ERROR: [&'static str; 132] = [
     "Key was rejected by service",
     "Owner died",
     "State not recoverable",
+    #[cfg(target_os = "dragonos")]
+    "Unknown"
 ];
