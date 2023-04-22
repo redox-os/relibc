@@ -647,7 +647,7 @@ pub unsafe extern "C" fn symlink(path1: *const c_char, path2: *const c_char) -> 
 
 // #[no_mangle]
 pub extern "C" fn sync() {
-    unimplemented!();
+    Sys::sync();
 }
 
 #[no_mangle]

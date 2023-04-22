@@ -827,6 +827,10 @@ impl Pal for Sys {
         0
     }
 
+    fn sync() -> c_int {
+        0
+    }
+
     fn umask(mask: mode_t) -> mode_t {
         e(syscall::umask(mask as usize)) as mode_t
     }

@@ -476,6 +476,10 @@ impl Pal for Sys {
         e(unsafe { syscall!(SYMLINKAT, path1.as_ptr(), AT_FDCWD, path2.as_ptr()) }) as c_int
     }
 
+    fn sync() -> c_int {
+        e(unsafe { syscall!(SYNC) }) as c_int
+    }
+
     fn umask(mask: mode_t) -> mode_t {
         unsafe { syscall!(UMASK, mask) as mode_t }
     }
