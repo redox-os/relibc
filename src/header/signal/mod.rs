@@ -1,6 +1,6 @@
 //! signal implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/signal.h.html
 
-use core::mem;
+use core::{mem, ptr};
 
 use cbitset::BitSet;
 
@@ -157,17 +157,37 @@ pub extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
 
 // #[no_mangle]
 pub extern "C" fn sighold(sig: c_int) -> c_int {
-    unimplemented!();
+    let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
+    unsafe { sigemptyset(pset.as_mut_ptr()) };
+    let mut set = unsafe { pset.assume_init() };
+    if sigaddset(&mut set, sig) < 0 {
+        return -1;
+    }
+    sigprocmask(SIG_BLOCK, &set, ptr::null_mut())
 }
 
 // #[no_mangle]
 pub extern "C" fn sigignore(sig: c_int) -> c_int {
-    unimplemented!();
+    let mut psa = mem::MaybeUninit::<sigaction>::uninit();
+    unsafe { sigemptyset(&mut (*psa.as_mut_ptr()).sa_mask) };
+    let mut sa = unsafe { psa.assume_init() };
+    sa.sa_handler = unsafe { mem::transmute(SIG_IGN) };
+    sa.sa_flags = 0;
+    unsafe { sigaction(sig, &mut sa, ptr::null_mut()) }
 }
 
 // #[no_mangle]
 pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
-    unimplemented!();
+    let mut psa = mem::MaybeUninit::<sigaction>::uninit();
+    unsafe { sigaction(sig, ptr::null_mut(), psa.as_mut_ptr()) };
+    let mut sa = unsafe { psa.assume_init() };
+    if flag != 0 {
+        sa.sa_flags &= !SA_RESTART as c_ulong;
+    } else {
+        sa.sa_flags |= SA_RESTART as c_ulong;
+    }
+
+    unsafe { sigaction(sig, &mut sa, ptr::null_mut()) }
 }
 
 #[no_mangle]
