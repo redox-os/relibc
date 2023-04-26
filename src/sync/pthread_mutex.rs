@@ -90,10 +90,13 @@ impl RlctMutex {
                     return Err(Errno(EAGAIN));
                 }
                 // CAS spuriously failed, simply retry the CAS. TODO: Use core::hint::spin_loop()?
-                Err(thread) if thread & INDEX_MASK == 0 => continue,
+                Err(thread) if thread & INDEX_MASK == 0 => {
+                    continue;
+                }
                 // CAS failed because some other thread owned the lock. We must now wait.
                 Err(thread) => {
-                    if spins_left > 0 {
+                    /*if spins_left > 0 {
+                        // TODO: Faster to spin trying to load the flag, compared to CAS?
                         spins_left -= 1;
                         core::hint::spin_loop();
                         continue;
@@ -105,10 +108,11 @@ impl RlctMutex {
 
                     if inner == STATE_UNLOCKED {
                         continue;
-                    }
+                    }*/
 
                     // If the mutex is not robust, simply futex_wait until unblocked.
-                    crate::sync::futex_wait(&self.inner, inner | WAITING_BIT, None);
+                    //crate::sync::futex_wait(&self.inner, inner | WAITING_BIT, None);
+                    crate::sync::futex_wait(&self.inner, thread, None);
                 }
             }
         }
@@ -161,7 +165,7 @@ impl RlctMutex {
     }
     // Safe because we are not protecting any data.
     pub fn unlock(&self) -> Result<(), Errno> {
-        if self.robust || matches!(self.ty, Ty::Recursive | Ty::Errck){
+        if self.robust || matches!(self.ty, Ty::Recursive | Ty::Errck) {
             if self.inner.load(Ordering::Relaxed) & INDEX_MASK != os_tid_invalid_after_fork() {
                 return Err(Errno(EPERM));
             }
@@ -177,11 +181,13 @@ impl RlctMutex {
             if next > 0 { return Ok(()) }
         }
 
-        let was_waiting = self.inner.swap(STATE_UNLOCKED, Ordering::Release) & WAITING_BIT != 0;
+        self.inner.store(STATE_UNLOCKED, Ordering::Release);
+        crate::sync::futex_wake(&self.inner, i32::MAX);
+        /*let was_waiting = self.inner.swap(STATE_UNLOCKED, Ordering::Release) & WAITING_BIT != 0;
 
         if was_waiting {
             let _ = crate::sync::futex_wake(&self.inner, 1);
-        }
+        }*/
 
         Ok(())
     }
