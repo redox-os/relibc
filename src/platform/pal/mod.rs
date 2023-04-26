@@ -177,6 +177,8 @@ pub trait Pal {
 
     fn symlink(path1: &CStr, path2: &CStr) -> c_int;
 
+    fn sync() -> c_int;
+
     fn umask(mask: mode_t) -> mode_t;
 
     fn uname(utsname: *mut utsname) -> c_int;
