@@ -1,3 +1,5 @@
+// Used design from https://www.remlab.net/op/futex-condvar.shtml
+
 use crate::header::pthread::*;
 use crate::header::bits_pthread::*;
 use crate::header::time::timespec;
@@ -28,7 +30,8 @@ impl Cond {
         self.wake(i32::MAX)
     }
     pub fn signal(&self) -> Result<(), Errno> {
-        self.wake(1)
+        self.broadcast()
+        //self.wake(1)
     }
     pub fn timedwait(&self, mutex: &RlctMutex, timeout: &timespec) -> Result<(), Errno> {
         self.wait_inner(mutex, Some(timeout))
@@ -37,7 +40,7 @@ impl Cond {
         // TODO: Error checking for certain types (i.e. robust and errorcheck) of mutexes, e.g. if the
         // mutex is not locked.
         let current = self.cur.load(Ordering::Relaxed);
-        self.prev.store(current, Ordering::Relaxed); // TODO: ordering?
+        self.prev.store(current, Ordering::Relaxed);
 
         mutex.unlock();
 
