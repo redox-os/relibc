@@ -251,6 +251,11 @@ impl Pal for Sys {
         e(syscall::fcntl(fd as usize, cmd as usize, args as usize)) as c_int
     }
 
+    fn fdatasync(fd: c_int) -> c_int {
+        // TODO: "Needs" syscall update
+        e(syscall::fsync(fd as usize)) as c_int
+    }
+
     fn flock(_fd: c_int, _operation: c_int) -> c_int {
         // TODO: Redox does not have file locking yet
         0

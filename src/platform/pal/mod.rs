@@ -53,6 +53,8 @@ pub trait Pal {
 
     fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int;
 
+    fn fdatasync(fildes: c_int) -> c_int;
+
     fn flock(fd: c_int, operation: c_int) -> c_int;
 
     fn fstat(fildes: c_int, buf: *mut stat) -> c_int;
