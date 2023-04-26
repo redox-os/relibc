@@ -30,7 +30,7 @@ pub union pthread_rwlock_t {
 }
 #[repr(C)]
 pub union pthread_barrier_t {
-    __relibc_internal_size: [c_uchar; 12],
+    __relibc_internal_size: [c_uchar; 16],
     __relibc_internal_align: c_int,
 }
 #[repr(C)]
