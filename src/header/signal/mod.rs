@@ -155,7 +155,7 @@ pub extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
     0
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn sighold(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
     unsafe { sigemptyset(pset.as_mut_ptr()) };
@@ -166,7 +166,7 @@ pub extern "C" fn sighold(sig: c_int) -> c_int {
     sigprocmask(SIG_BLOCK, &set, ptr::null_mut())
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn sigignore(sig: c_int) -> c_int {
     let mut psa = mem::MaybeUninit::<sigaction>::uninit();
     unsafe { sigemptyset(&mut (*psa.as_mut_ptr()).sa_mask) };
@@ -176,7 +176,7 @@ pub extern "C" fn sigignore(sig: c_int) -> c_int {
     unsafe { sigaction(sig, &mut sa, ptr::null_mut()) }
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
     let mut psa = mem::MaybeUninit::<sigaction>::uninit();
     unsafe { sigaction(sig, ptr::null_mut(), psa.as_mut_ptr()) };

@@ -356,7 +356,7 @@ pub unsafe extern "C" fn getenv(name: *const c_char) -> *mut c_char {
     find_env(name).map(|val| val.1).unwrap_or(ptr::null_mut())
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn getsubopt(
     optionp: *mut *mut c_char,
     tokens: *const *mut c_char,
@@ -1213,7 +1213,7 @@ pub extern "C" fn ttyslot() -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn unlockpt(fildes: c_int) -> c_int {
     let mut u: c_int = 0;
     ioctl(fildes, TIOCSPTLCK, &mut u as *mut i32 as *mut c_void)

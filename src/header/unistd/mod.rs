@@ -221,7 +221,7 @@ pub extern "C" fn fchdir(fildes: c_int) -> c_int {
     Sys::fchdir(fildes)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
     Sys::fdatasync(fildes)
 }
@@ -287,7 +287,7 @@ pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char 
     }
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn getdtablesize() -> c_int {
     let mut lim = mem::MaybeUninit::<sys_resource::rlimit>::uninit();
     let r = unsafe { sys_resource::getrlimit(sys_resource::RLIMIT_NOFILE as c_int, lim.as_mut_ptr() as *mut sys_resource::rlimit) };
@@ -645,7 +645,7 @@ pub unsafe extern "C" fn symlink(path1: *const c_char, path2: *const c_char) -> 
     Sys::symlink(path1, path2)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn sync() {
     Sys::sync();
 }
