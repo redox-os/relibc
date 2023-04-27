@@ -4,6 +4,7 @@ language = "C"
 style = "type"
 no_includes = true
 cpp_compat = true
+# TODO: Any better way to implement pthread_cleanup_push/pthread_cleanup_pop?
 after_includes = """
 #define PTHREAD_COND_INITIALIZER ((pthread_cond_t){0})
 #define PTHREAD_MUTEX_INITIALIZER ((pthread_mutex_t){0})
@@ -11,17 +12,15 @@ after_includes = """
 #define PTHREAD_RWLOCK_INITIALIZER ((pthread_rwlock_t){0})
 
 #define pthread_cleanup_push(routine, arg) do { \
-  do { \
-    struct { \
-      void (*routine)(void *); \
-      void *arg; \
-      void *prev; \
-    } __relibc_internal_pthread_ll_entry = { \
-      .routine = (routine), \
-      .arg = (arg), \
-    }; \
-    __relibc_internal_pthread_cleanup_push(&__relibc_internal_pthread_ll_entry); \
-  } while(0)
+  struct { \
+    void (*routine)(void *); \
+    void *arg; \
+    void *prev; \
+  } __relibc_internal_pthread_ll_entry = { \
+    .routine = (routine), \
+    .arg = (arg), \
+  }; \
+  __relibc_internal_pthread_cleanup_push(&__relibc_internal_pthread_ll_entry);
 
 #define pthread_cleanup_pop(execute) \
   __relibc_internal_pthread_cleanup_pop((execute)); \

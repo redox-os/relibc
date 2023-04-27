@@ -222,6 +222,8 @@ pub(crate) struct CleanupLinkedListEntry {
 #[thread_local]
 pub(crate) static CLEANUP_LL_HEAD: Cell<*const CleanupLinkedListEntry> = Cell::new(core::ptr::null());
 
+// TODO: unwind? setjmp/longjmp?
+
 #[no_mangle]
 pub unsafe extern "C" fn __relibc_internal_pthread_cleanup_push(new_entry: *mut c_void) {
     let new_entry = &mut *new_entry.cast::<CleanupLinkedListEntry>();

@@ -265,6 +265,11 @@ pub unsafe fn testcancel() {
 }
 
 pub unsafe fn exit_current_thread(retval: Retval) -> ! {
+    // Run pthread_cleanup_push/pthread_cleanup_pop destructors.
+    header::run_destructor_stack();
+
+    header::tls::run_all_destructors();
+
     let this = current_thread().expect("failed to obtain current thread when exiting");
 
     if this.flags.load(Ordering::Acquire) & PthreadFlags::DETACHED.bits() != 0 {
@@ -295,11 +300,6 @@ unsafe extern "C" fn cancel_sighandler(_: c_int) {
     cancel_current_thread();
 }
 unsafe fn cancel_current_thread() {
-    // Run pthread_cleanup_push/pthread_cleanup_pop destructors.
-    header::run_destructor_stack();
-
-    header::tls::run_all_destructors();
-
     // Terminate the thread
     exit_current_thread(Retval(header::PTHREAD_CANCELED));
 }
