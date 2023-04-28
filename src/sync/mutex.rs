@@ -114,7 +114,7 @@ impl<T> Mutex<T> {
 }
 
 pub struct MutexGuard<'a, T: 'a> {
-    mutex: &'a Mutex<T>,
+    pub(crate) mutex: &'a Mutex<T>,
     content: &'a mut T,
 }
 impl<'a, T> Deref for MutexGuard<'a, T> {

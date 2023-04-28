@@ -11,6 +11,9 @@ pub struct Cond {
     cur: AtomicUint,
     prev: AtomicUint,
 }
+
+type Result<T, E = crate::pthread::Errno> = core::result::Result<T, E>;
+
 impl Cond {
     pub fn new() -> Self {
         Self{
@@ -37,21 +40,31 @@ impl Cond {
         self.wait_inner(mutex, Some(timeout))
     }
     fn wait_inner(&self, mutex: &RlctMutex, timeout: Option<&timespec>) -> Result<(), Errno> {
+        self.wait_inner_generic(|| mutex.unlock(), || mutex.lock(), |timeout| mutex.lock_with_timeout(timeout), timeout)
+    }
+    pub fn wait_inner_typedmutex<'lock, T>(&self, guard: crate::sync::MutexGuard<'lock, T>) -> crate::sync::MutexGuard<'lock, T> {
+        let mut newguard = None;
+        let lock = guard.mutex;
+        self.wait_inner_generic(|| Ok(drop(guard)), || Ok(newguard = Some(lock.lock())), |_| unreachable!(), None).unwrap();
+        newguard.unwrap()
+    }
+    // TODO: FUTEX_REQUEUE
+    fn wait_inner_generic(&self, unlock: impl FnOnce() -> Result<()>, lock: impl FnOnce() -> Result<()>, lock_with_timeout: impl FnOnce(&timespec) -> Result<()>, timeout: Option<&timespec>) -> Result<(), Errno> {
         // TODO: Error checking for certain types (i.e. robust and errorcheck) of mutexes, e.g. if the
         // mutex is not locked.
         let current = self.cur.load(Ordering::Relaxed);
         self.prev.store(current, Ordering::Relaxed);
 
-        mutex.unlock();
+        unlock();
 
         match timeout {
             Some(timeout) => {
                 crate::sync::futex_wait(&self.cur, current, timespec::subtract(*timeout, crate::sync::rttime()).as_ref());
-                mutex.lock_with_timeout(timeout);
+                lock_with_timeout(timeout);
             }
             None => {
                 crate::sync::futex_wait(&self.cur, current, None);
-                mutex.lock();
+                lock();
             }
         }
         Ok(())
