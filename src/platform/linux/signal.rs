@@ -5,7 +5,7 @@ use super::{
     e, Sys,
 };
 use crate::header::{
-    signal::{sigaction, sigset_t, stack_t},
+    signal::{NSIG, sigaction, sigset_t, stack_t},
     sys_time::itimerval,
 };
 
@@ -51,7 +51,15 @@ impl PalSignal for Sys {
         e(unsafe { syscall!(SIGALTSTACK, ss, old_ss) }) as c_int
     }
 
+    fn sigpending(set: *mut sigset_t) -> c_int {
+        e(unsafe { syscall!(RT_SIGPENDING, set, NSIG/8) }) as c_int
+    }
+
     fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
         e(unsafe { syscall!(RT_SIGPROCMASK, how, set, oset, mem::size_of::<sigset_t>()) }) as c_int
+    }
+
+    fn sigsuspend(set: *const sigset_t) -> c_int {
+        e(unsafe { syscall!(RT_SIGSUSPEND, set, NSIG/8) }) as c_int
     }
 }

@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     header::{
-        errno::EINVAL,
+        errno::{EINVAL, ENOSYS},
         signal::{sigaction, sigset_t, stack_t},
         sys_time::{itimerval, ITIMER_REAL},
     },
@@ -135,6 +135,11 @@ impl PalSignal for Sys {
         unimplemented!()
     }
 
+    fn sigpending(set: *mut sigset_t) -> c_int {
+        platform::errno = ENOSYS;
+        -1
+    }
+
     fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
         let new_opt = if set.is_null() {
             None
@@ -151,5 +156,10 @@ impl PalSignal for Sys {
             unsafe { *oset = old[0] as sigset_t };
         }
         ret
+    }
+
+    fn sigsuspend(set: *const sigset_t) -> c_int {
+        platform::errno = ENOSYS;
+        -1
     }
 }

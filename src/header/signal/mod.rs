@@ -24,6 +24,7 @@ type SigSet = BitSet<[c_ulong; 1]>;
 pub const SIG_DFL: usize = 0;
 pub const SIG_IGN: usize = 1;
 pub const SIG_ERR: isize = -1;
+pub const SIG_HOLD: isize = 2;
 
 pub const SIG_BLOCK: c_int = 0;
 pub const SIG_UNBLOCK: c_int = 1;
@@ -231,14 +232,18 @@ pub extern "C" fn signal(
     unsafe { old_sa.assume_init() }.sa_handler
 }
 
-// #[no_mangle]
-pub extern "C" fn sigpause(sig: c_int) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
+    let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
+    sigprocmask(0, ptr::null_mut(), pset.as_mut_ptr());
+    let mut set = pset.assume_init();
+    sigdelset(&mut set, sig);
+    sigsuspend(&mut set)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
-    unimplemented!();
+    Sys::sigpending(set)
 }
 
 #[no_mangle]
@@ -246,19 +251,61 @@ pub extern "C" fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigse
     Sys::sigprocmask(how, set, oset)
 }
 
-// #[no_mangle]
-pub extern "C" fn sigrelse(sig: c_int) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn sigrelse(sig: c_int) -> c_int {
+    let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
+    sigemptyset(pset.as_mut_ptr());
+    let mut set = pset.assume_init();
+    if sigaddset(&mut set, sig) < 0 {
+        return -1;
+    }
+    sigprocmask(SIG_UNBLOCK, &mut set, ptr::null_mut())
 }
 
-// #[no_mangle]
-pub extern "C" fn sigset(sig: c_int, func: fn(c_int)) -> fn(c_int) {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn sigset(
+    sig: c_int,
+    func: Option<extern "C" fn(c_int)>
+) -> Option<extern "C" fn(c_int)> {
+    let mut old_sa = mem::MaybeUninit::uninit();
+    let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
+    let sig_hold: Option<extern "C" fn(c_int)> = mem::transmute(SIG_HOLD);
+    let sig_err: Option<extern "C" fn(c_int)> = mem::transmute(SIG_ERR);
+    sigemptyset(pset.as_mut_ptr());
+    let mut set = pset.assume_init();
+    if sigaddset(&mut set, sig) < 0 {
+        return sig_err;
+    } else {
+        if func == sig_hold {
+            if sigaction(sig, ptr::null_mut(), old_sa.as_mut_ptr()) < 0 ||
+               sigprocmask(SIG_BLOCK, &mut set, &mut set) < 0 {
+                   mem::forget(old_sa);
+                   return sig_err;
+            }
+        } else {
+            let mut sa = sigaction {
+                sa_handler: func,
+                sa_flags: 0 as c_ulong,
+                sa_restorer: Some(__restore_rt),
+                sa_mask: sigset_t::default(),
+            };
+            sigemptyset(&mut sa.sa_mask);
+            if sigaction(sig, &sa, old_sa.as_mut_ptr()) < 0 ||
+               sigprocmask(SIG_UNBLOCK, &mut set, &mut set) < 0 {
+                   mem::forget(old_sa);
+                   return sig_err;
+            }
+        }
+    }
+    if sigismember(&mut set, sig) == 1 {
+        return sig_hold;
+    }
+    old_sa.assume_init().sa_handler
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
-    unimplemented!();
+    Sys::sigsuspend(sigmask)
 }
 
 // #[no_mangle]
