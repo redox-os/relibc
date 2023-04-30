@@ -45,7 +45,7 @@ pub(crate) unsafe fn manual_lock_generic(word: &AtomicInt) {
 }
 pub(crate) unsafe fn manual_unlock_generic(word: &AtomicInt) {
     if word.swap(UNLOCKED, Ordering::Release) == WAITING {
-        crate::sync::futex_wake(word, 1);
+        crate::sync::futex_wake(word, i32::MAX);
     }
 }
 
