@@ -45,7 +45,13 @@ impl Cond {
     pub fn wait_inner_typedmutex<'lock, T>(&self, guard: crate::sync::MutexGuard<'lock, T>) -> crate::sync::MutexGuard<'lock, T> {
         let mut newguard = None;
         let lock = guard.mutex;
-        self.wait_inner_generic(|| Ok(drop(guard)), || Ok(newguard = Some(lock.lock())), |_| unreachable!(), None).unwrap();
+        self.wait_inner_generic(move || {
+            drop(guard);
+            Ok(())
+        }, || {
+            newguard = Some(lock.lock());
+            Ok(())
+        }, |_| unreachable!(), None).unwrap();
         newguard.unwrap()
     }
     // TODO: FUTEX_REQUEUE

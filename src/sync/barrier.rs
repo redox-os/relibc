@@ -10,8 +10,10 @@ pub struct Barrier {
     cvar: crate::header::pthread::RlctCond,
     // 24
 }
+#[derive(Debug)]
 struct Inner {
     count: u32,
+    // TODO: Overflows might be problematic... 64-bit?
     gen_id: u32,
 }
 
@@ -30,12 +32,37 @@ impl Barrier {
     }
     pub fn wait(&self) -> WaitResult {
         let mut guard = self.lock.lock();
+        let gen_id = guard.gen_id;
+
+        guard.count += 1;
+
+        if guard.count == self.original_count.get() {
+            guard.gen_id = guard.gen_id.wrapping_add(1);
+            guard.count = 0;
+            self.cvar.broadcast();
+
+            drop(guard);
+
+            WaitResult::NotifiedAll
+        } else {
+            while guard.gen_id == gen_id {
+                guard = self.cvar.wait_inner_typedmutex(guard);
+            }
+
+            WaitResult::Waited
+        }
+        /*
+        let mut guard = self.lock.lock();
         let Inner { count, gen_id } = *guard;
+
         let last = self.original_count.get() - 1;
 
         if count == last {
+            eprintln!("last {:?}", *guard);
             guard.gen_id = guard.gen_id.wrapping_add(1);
             guard.count = 0;
+
+            drop(guard);
 
             self.cvar.broadcast();
 
@@ -44,10 +71,14 @@ impl Barrier {
             guard.count += 1;
 
             while guard.count != last && guard.gen_id == gen_id {
+                eprintln!("before {:?}", *guard);
                 guard = self.cvar.wait_inner_typedmutex(guard);
+                eprintln!("after {:?}", *guard);
             }
 
             WaitResult::Waited
         }
+        */
     }
 }
+static LOCK: crate::sync::Mutex<()> = crate::sync::Mutex::new(());
