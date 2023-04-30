@@ -84,7 +84,8 @@ macro_rules! assert_equal_size(
             let a = [0_u8; core::mem::align_of::<$export>()];
             let b: [u8; core::mem::align_of::<Wrapped>()] = core::mem::transmute(a);
         };
-        #[cfg(feature = "check_against_libc_crate")]
+        // TODO: Turn into a macro?
+        #[cfg(all(target_os = "redox", feature = "check_against_libc_crate"))]
         const _: () = unsafe {
             let export = $export { __relibc_internal_align: 0 };
             let _: libc::$export = core::mem::transmute(export.__relibc_internal_size); 
