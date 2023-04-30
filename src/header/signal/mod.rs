@@ -157,7 +157,7 @@ pub extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn sighold(sig: c_int) -> c_int {
+pub unsafe extern "C" fn sighold(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
     unsafe { sigemptyset(pset.as_mut_ptr()) };
     let mut set = unsafe { pset.assume_init() };
