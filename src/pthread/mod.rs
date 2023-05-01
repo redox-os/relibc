@@ -44,9 +44,8 @@ pub unsafe fn init() {
 //const FIRST_THREAD_IDX: usize = 1;
 
 pub unsafe fn terminate_from_main_thread() {
-    for (tid, pthread) in OS_TID_TO_PTHREAD.lock().iter() {
-        // TODO: Cancel?
-        Sys::rlct_kill(*tid, crate::header::signal::SIGTERM);
+    for (_, pthread) in OS_TID_TO_PTHREAD.lock().iter() {
+        let _ = cancel(&*pthread.0);
     }
 }
 
@@ -63,7 +62,8 @@ pub struct Pthread {
     flags: AtomicUsize,
 
     // Small index (compared to pointer size) used for e.g. recursive mutexes. Zero is reserved,
-    // so it starts from one. The 31st bit is reserved.
+    // so it starts from one. The 31st bit is reserved. Only for process-private mutexes, which we
+    // currently don't handle separately.
     //index: u32,
 
     stack_base: *mut c_void,
