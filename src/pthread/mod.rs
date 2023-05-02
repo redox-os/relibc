@@ -110,19 +110,23 @@ pub(crate) unsafe fn create(attrs: Option<&header::RlctAttr>, start_routine: ext
 
     let stack_size = attrs.stacksize.next_multiple_of(Sys::getpagesize());
 
-    // TODO: Custom stacks
-    let stack_base = sys_mman::mmap(
-        core::ptr::null_mut(),
-        stack_size,
-        sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-        sys_mman::MAP_SHARED | sys_mman::MAP_ANONYMOUS,
-        -1,
-        0,
-    );
-    if stack_base as isize == -1 {
-        // "Insufficient resources"
-        return Err(Errno(EAGAIN));
-    }
+    let stack_base = if attrs.stack != 0 {
+        attrs.stack as *mut c_void
+    } else {
+        let ret = sys_mman::mmap(
+            core::ptr::null_mut(),
+            stack_size,
+            sys_mman::PROT_READ | sys_mman::PROT_WRITE,
+            sys_mman::MAP_SHARED | sys_mman::MAP_ANONYMOUS,
+            -1,
+            0,
+        );
+        if ret as isize == -1 {
+            // "Insufficient resources"
+            return Err(Errno(EAGAIN));
+        }
+        ret
+    };
 
     let mut flags = PthreadFlags::empty();
     match i32::from(attrs.detachstate) {
