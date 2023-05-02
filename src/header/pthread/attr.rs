@@ -29,9 +29,7 @@ impl Default for RlctAttr {
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_attr_destroy(attr: *mut pthread_attr_t) -> c_int {
-    let _attr = &mut *attr.cast::<RlctAttr>();
-
-    // No-op
+    core::ptr::drop_in_place(attr);
     0
 }
 
