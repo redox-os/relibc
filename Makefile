@@ -7,7 +7,7 @@ CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
 RUSTCFLAGS?=
 export OBJCOPY?=objcopy
 
-BUILD="target/$(TARGET)"
+BUILD?="$(shell pwd)/target/$(TARGET)"
 CARGOFLAGS+="--target=$(TARGET)"
 
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
@@ -51,7 +51,7 @@ SRC=\
 
 BUILTINS_VERSION=0.1.70
 
-.PHONY: all clean fmt install install-headers libs submodules test
+.PHONY: all clean fmt install install-libs install-headers install-tests libs submodules test
 
 all: | libs
 
@@ -96,6 +96,11 @@ install-libs: libs
 	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
 	$(AR) -rcs "$(DESTDIR)/lib/librt.a"
 
+install-tests: tests
+	$(MAKE) -C tests
+	mkdir -p "$(DESTDIR)/bin/relibc-tests"
+	cp -vr tests/bins_static/* "$(DESTDIR)/bin/relibc-tests/"
+
 install: install-headers install-libs
 
 submodules:
@@ -113,6 +118,7 @@ sysroot: all
 test: sysroot
 	# TODO: Fix SIGILL when running cargo test
 	# $(CARGO_TEST) test
+	# TODO: $(MAKE) -C tests run?
 	$(MAKE) -C tests verify
 
 # Debug targets
