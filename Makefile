@@ -118,7 +118,7 @@ sysroot: all
 test: sysroot
 	# TODO: Fix SIGILL when running cargo test
 	# $(CARGO_TEST) test
-	# TODO: $(MAKE) -C tests run?
+	$(MAKE) -C tests run
 	$(MAKE) -C tests verify
 
 # Debug targets
