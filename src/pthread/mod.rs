@@ -384,3 +384,27 @@ static PTHREAD_SELF: Cell<*mut Pthread> = Cell::new(core::ptr::null_mut());
 /*pub(crate) fn current_thread_index() -> u32 {
     current_thread().expect("current thread not present").index
 }*/
+
+#[derive(Clone, Copy, Default, Debug)]
+pub enum Pshared {
+    #[default]
+    Private,
+
+    Shared,
+}
+impl Pshared {
+    pub const fn from_raw(raw: c_int) -> Option<Self> {
+        Some(match raw {
+            header::PTHREAD_PROCESS_PRIVATE => Self::Private,
+            header::PTHREAD_PROCESS_SHARED => Self::Shared,
+
+            _ => return None,
+        })
+    }
+    pub const fn raw(self) -> c_int {
+        match self {
+            Self::Private => header::PTHREAD_PROCESS_PRIVATE,
+            Self::Shared => header::PTHREAD_PROCESS_SHARED,
+        }
+    }
+}

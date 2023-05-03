@@ -5,6 +5,7 @@ pub mod mutex;
 
 pub mod once;
 pub mod pthread_mutex;
+pub mod rwlock;
 pub mod semaphore;
 pub mod waitval;
 

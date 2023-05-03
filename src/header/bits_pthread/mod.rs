@@ -20,8 +20,8 @@ pub union pthread_attr_t {
 }
 #[repr(C)]
 pub union pthread_rwlockattr_t {
-    __relibc_internal_size: [c_uchar; 4],
-    __relibc_internal_align: c_int,
+    __relibc_internal_size: [c_uchar; 1],
+    __relibc_internal_align: c_uchar,
 }
 #[repr(C)]
 pub union pthread_rwlock_t {
@@ -98,7 +98,7 @@ macro_rules! assert_equal_size(
 );
 assert_equal_size!(pthread_attr_t, RlctAttr);
 assert_equal_size!(pthread_rwlock_t, RlctRwlock);
-assert_equal_size!(pthread_rwlock_t, RlctRwlockAttr);
+assert_equal_size!(pthread_rwlockattr_t, RlctRwlockAttr);
 assert_equal_size!(pthread_barrier_t, RlctBarrier);
 assert_equal_size!(pthread_barrierattr_t, RlctBarrierAttr);
 assert_equal_size!(pthread_mutex_t, RlctMutex);
