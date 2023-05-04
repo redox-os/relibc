@@ -77,3 +77,10 @@ pub unsafe extern "C" fn pthread_barrierattr_getpshared(attr: *const pthread_bar
     core::ptr::write(pshared, (*attr.cast::<RlctBarrierAttr>()).pshared);
     0
 }
+
+// Not async-signal-safe.
+#[no_mangle]
+pub unsafe extern "C" fn pthread_barrierattr_destroy(attr: *mut pthread_barrierattr_t) -> c_int {
+    core::ptr::drop_in_place(attr);
+    0
+}
