@@ -155,7 +155,11 @@ NAMES=\
 	pthread/cleanup \
 	pthread/extjoin \
 	pthread/once \
-	pthread/customstack
+	pthread/customstack \
+	pthread/barrier \
+	pthread/rwlock_trylock \
+	pthread/rwlock_randtest \
+	pthread/mutex_recursive
 #	resource/getrusage
 #	time/times
 
