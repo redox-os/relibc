@@ -476,6 +476,10 @@ impl Pal for Sys {
         e(unsafe { syscall!(SETREUID, ruid, euid) }) as c_int
     }
 
+    fn setsid() -> c_int {
+        e(unsafe { syscall!(SETSID) }) as c_int
+    }
+
     fn symlink(path1: &CStr, path2: &CStr) -> c_int {
         e(unsafe { syscall!(SYMLINKAT, path1.as_ptr(), AT_FDCWD, path2.as_ptr()) }) as c_int
     }
