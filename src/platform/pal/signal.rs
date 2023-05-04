@@ -19,5 +19,9 @@ pub trait PalSignal: Pal {
 
     fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int;
 
+    fn sigpending(set: *mut sigset_t) -> c_int;
+
     fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int;
+
+    fn sigsuspend(set: *const sigset_t) -> c_int;
 }
