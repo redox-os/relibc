@@ -168,3 +168,14 @@ pub unsafe extern "C" fn tcflow(fd: c_int, action: c_int) -> c_int {
     // implementation-defined. we do the same.
     sys_ioctl::ioctl(fd, sys_ioctl::TCXONC, action as *mut _)
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn cfmakeraw(termios_p: *mut termios) {
+    (*termios_p).c_iflag &= !(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|IXON) as u32;
+    (*termios_p).c_oflag &= !OPOST as u32;
+    (*termios_p).c_lflag &= !(ECHO|ECHONL|ICANON|ISIG|IEXTEN) as u32;
+    (*termios_p).c_cflag &= !(CSIZE|PARENB) as u32;
+    (*termios_p).c_cflag |= CS8 as u32;
+    (*termios_p).c_cc[VMIN] = 1;
+    (*termios_p).c_cc[VTIME] = 0;
+}
