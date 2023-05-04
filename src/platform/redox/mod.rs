@@ -807,6 +807,12 @@ impl Pal for Sys {
         -1
     }
 
+    fn setsid() -> c_int {
+        // TODO
+        unsafe { errno = ENOSYS };
+        -1
+    }
+
     fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
         e(syscall::setregid(rgid as usize, egid as usize)) as c_int
     }

@@ -175,6 +175,8 @@ pub trait Pal {
 
     fn setreuid(ruid: uid_t, euid: uid_t) -> c_int;
 
+    fn setsid() -> c_int;
+
     fn symlink(path1: &CStr, path2: &CStr) -> c_int;
 
     fn sync() -> c_int;

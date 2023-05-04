@@ -601,9 +601,9 @@ pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
     Sys::setreuid(ruid, euid)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn setsid() -> pid_t {
-    unimplemented!();
+    Sys::setsid()
 }
 
 #[no_mangle]
