@@ -64,6 +64,25 @@ static mut TM: tm = tm {
 // The C Standard says that ctime and asctime return the same pointer.
 static mut ASCTIME: [c_char; 26] = [0; 26];
 
+// We don't handle timezones, so just initialize the timezone info to GMT
+// TODO: timezones
+#[repr(C)]
+pub struct TzName {
+    tz: [*const c_char; 2],
+}
+
+unsafe impl Sync for TzName {}
+
+#[allow(non_upper_case_globals)]
+#[no_mangle]
+pub static tzname: TzName = TzName { tz: [UTC, UTC] };
+#[allow(non_upper_case_globals)]
+#[no_mangle]
+pub static daylight: c_int = 0;
+#[allow(non_upper_case_globals)]
+#[no_mangle]
+pub static timezone: c_long = 0;
+
 #[repr(C)]
 pub struct itimerspec {
     pub it_interval: timespec,
@@ -466,9 +485,10 @@ pub extern "C" fn timer_delete(timerid: timer_t) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn tzset() {
-    unimplemented!();
+    // no-op because we only do GMT
+    // TODO: timezones, parse env var TZ
 }
 
 // #[no_mangle]
