@@ -146,6 +146,15 @@ pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) ->
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn cfsetspeed(termios_p: *mut termios, speed: speed_t) -> c_int {
+    let r = cfsetispeed(termios_p, speed);
+    if r < 0 {
+        return r;
+    }
+    cfsetospeed(termios_p, speed)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn tcflush(fd: c_int, queue: c_int) -> c_int {
     sys_ioctl::ioctl(fd, sys_ioctl::TCFLSH, queue as *mut c_void)
 }
