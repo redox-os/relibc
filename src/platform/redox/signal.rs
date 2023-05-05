@@ -136,7 +136,9 @@ impl PalSignal for Sys {
     }
 
     fn sigpending(set: *mut sigset_t) -> c_int {
-        platform::errno = ENOSYS;
+        unsafe {
+            errno = ENOSYS;
+        }
         -1
     }
 
@@ -159,7 +161,9 @@ impl PalSignal for Sys {
     }
 
     fn sigsuspend(set: *const sigset_t) -> c_int {
-        platform::errno = ENOSYS;
+        unsafe {
+            errno = ENOSYS;
+        }
         -1
     }
 }
