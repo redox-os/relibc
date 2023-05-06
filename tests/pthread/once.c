@@ -6,29 +6,26 @@
 #include <unistd.h>
 
 #include "common.h"
+#include "../test_helpers.h"
 
-struct once_data {
-  size_t count;
-};
-
-_Thread_local struct once_data once_data = {0};
+_Thread_local size_t this_thread_count = 0;
 
 #define COUNT 1024
 #define THREADS 4
 
-void constructor() {
-  once_data.count += 1;
+static void constructor(void) {
+  this_thread_count++;
 }
 
 struct arg {
   pthread_barrier_t *barrier;
   pthread_once_t *onces;
-  int status;
   size_t count;
   size_t index;
 };
 
 void *routine(void *arg_raw) {
+  int status;
   struct arg *arg = arg_raw;
 
   if (arg->index == THREADS - 1) {
@@ -37,21 +34,21 @@ void *routine(void *arg_raw) {
     printf("spawned %zu\n", arg->index);
   }
 
-  int wait_status = pthread_barrier_wait(arg->barrier);
+  status = pthread_barrier_wait(arg->barrier);
 
-  printf("waited %zu leader=%s\n", arg->index, (wait_status == PTHREAD_BARRIER_SERIAL_THREAD) ? "true" : "false");
+  printf("waited %zu leader=%s\n", arg->index, (status == PTHREAD_BARRIER_SERIAL_THREAD) ? "true" : "false");
 
-  if (wait_status != PTHREAD_BARRIER_SERIAL_THREAD && wait_status != 0) {
+  if (status != PTHREAD_BARRIER_SERIAL_THREAD) {
+    ERROR_IF(pthread_barrier_wait, status, != 0);
     return NULL;
   }
 
   for (size_t i = 0; i < COUNT; i++) {
-    if ((arg->status = pthread_once(&arg->onces[i], constructor)) != 0) {
-      return NULL;
-    }
+    status = pthread_once(&arg->onces[i], constructor);
+    ERROR_IF(pthread_once, status, != 0);
   }
 
-  arg->count = once_data.count;
+  arg->count = this_thread_count;
 
   return NULL;
 }
@@ -71,43 +68,31 @@ int main(void) {
 
   printf("Barrier at %p, onces at %p\n", &barrier, onces);
 
-  if ((status = pthread_barrier_init(&barrier, NULL, THREADS)) != 0) {
-    return fail(status, "barrier init");
-  }
+  status = pthread_barrier_init(&barrier, NULL, THREADS);
+  ERROR_IF(pthread_barrier_init, status, != 0);
 
   pthread_t threads[THREADS];
   struct arg args[THREADS];
 
-  threads[0] = pthread_self();
-
   for (size_t i = 0; i < THREADS; i++) {
-    args[i] = (struct arg){ .barrier = &barrier, .onces = onces, .status = 0, .count = 0, .index = i };
+    args[i] = (struct arg){ .barrier = &barrier, .onces = onces, .count = 0, .index = i };
     printf("spawning %zu\n", i);
 
-    if (i == 0) {
-      continue;
-    }
-
-    if ((status = pthread_create(&threads[i], NULL, routine, &args[i])) != 0) {
-      return fail(status, "thread create");
-    }
+    status = pthread_create(&threads[i], NULL, routine, &args[i]);
+    ERROR_IF(pthread_create, status, != 0);
   }
-
-  routine(&args[0]);
 
   size_t total_count = 0;
 
   for (size_t i = 0; i < THREADS; i++) {
-    if (i != 0) {
-      if ((status = pthread_join(threads[i], NULL)) != 0) {
-        return fail(status, "join");
-      }
-    }
-    if (args[i].status != 0) {
-      return fail(args[i].status, "thread");
-    }
+    status = pthread_join(threads[i], NULL);
+    ERROR_IF(pthread_join, status, != 0);
+
     total_count += args[i].count;
   }
+
+  status = pthread_barrier_destroy(&barrier);
+  ERROR_IF(pthread_barrier_destroy, status, != 0);
 
   assert(total_count == COUNT);
 
