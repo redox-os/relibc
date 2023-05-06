@@ -84,6 +84,7 @@ EXPECT_NAMES=\
 	time/mktime \
 	time/strftime \
 	time/time \
+	time/tzset \
 	tls \
 	unistd/access \
 	unistd/brk \

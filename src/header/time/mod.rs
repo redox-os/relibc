@@ -66,7 +66,7 @@ static mut ASCTIME: [c_char; 26] = [0; 26];
 
 // We don't handle timezones, so just initialize the timezone info to GMT
 // TODO: timezones
-#[repr(C)]
+#[repr(transparent)]
 pub struct TzName {
     tz: [*const c_char; 2],
 }
@@ -75,13 +75,13 @@ unsafe impl Sync for TzName {}
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static tzname: TzName = TzName { tz: [UTC, UTC] };
+pub static mut tzname: TzName = TzName { tz: [UTC, UTC] };
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static daylight: c_int = 0;
+pub static mut daylight: c_int = 0;
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static timezone: c_long = 0;
+pub static mut timezone: c_long = 0;
 
 #[repr(C)]
 pub struct itimerspec {
