@@ -66,22 +66,30 @@ static mut ASCTIME: [c_char; 26] = [0; 26];
 
 // We don't handle timezones, so just initialize the timezone info to GMT
 // TODO: timezones
-#[repr(C)]
+#[repr(transparent)]
 pub struct TzName {
-    tz: [*const c_char; 2],
+    tz: [*mut c_char; 2],
 }
 
 unsafe impl Sync for TzName {}
 
+static mut TZ_STD: [c_char; 8] = [b'U' as c_char, b'T' as c_char, b'C' as c_char, 0, 0, 0, 0, 0];
+static mut TZ_DST: [c_char; 8] = [b'U' as c_char, b'T' as c_char, b'C' as c_char, 0, 0, 0, 0, 0];
+
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static tzname: TzName = TzName { tz: [UTC, UTC] };
+pub static mut tzname: TzName = TzName {
+    tz: [
+        unsafe { TZ_DST.as_mut_ptr() },
+        unsafe { TZ_DST.as_mut_ptr() },
+    ] };
+
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static daylight: c_int = 0;
+pub static mut daylight: c_int = 0;
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static timezone: c_long = 0;
+pub static mut timezone: c_long = 0;
 
 #[repr(C)]
 pub struct itimerspec {
@@ -487,7 +495,7 @@ pub extern "C" fn timer_delete(timerid: timer_t) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn tzset() {
-    // no-op because we only do GMT
+    // no-op because we only do UTC
     // TODO: timezones, parse env var TZ
 }
 
