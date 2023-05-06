@@ -5,7 +5,7 @@
 
 extern int daylight;
 extern long timezone;
-extern const char *tzname[2];
+extern char *tzname[2];
 void tzset(void);
 
 int main(void) {
