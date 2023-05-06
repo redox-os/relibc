@@ -61,5 +61,7 @@ pub unsafe fn free(ptr: *mut c_void) {
 }
 
 pub fn new_mspace() -> usize {
-    unsafe { create_mspace(0, 0) }
+    let capacity = 0; // don't specify capacity explicitly
+    let locked = 1;
+    unsafe { create_mspace(capacity, locked) }
 }
