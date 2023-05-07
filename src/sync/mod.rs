@@ -59,12 +59,19 @@ impl FutexAtomicTy for AtomicU32 {
     fn ptr(&self) -> *mut u32 {
         // TODO: Change when Redox's toolchain is updated. This is not about targets, but compiler
         // versions!
+        /*
 
         #[cfg(target_os = "redox")]
         return AtomicU32::as_ptr(self);
 
         #[cfg(target_os = "linux")]
         return AtomicU32::as_mut_ptr(self);
+
+        */
+
+        // AtomicU32::as_mut_ptr internally calls UnsafeCell::get, which itself simply does (&self
+        // as *const Self as *mut Self).
+        self as *const AtomicU32 as *mut u32
     }
 }
 impl FutexAtomicTy for AtomicI32 {
@@ -72,11 +79,13 @@ impl FutexAtomicTy for AtomicI32 {
 
     fn ptr(&self) -> *mut i32 {
         // TODO
-        #[cfg(target_os = "redox")]
+        /*#[cfg(target_os = "redox")]
         return AtomicI32::as_ptr(self);
 
         #[cfg(target_os = "linux")]
-        return AtomicI32::as_mut_ptr(self);
+        return AtomicI32::as_mut_ptr(self);*/
+
+        self as *const AtomicI32 as *mut i32
     }
 }
 
