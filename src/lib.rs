@@ -6,7 +6,6 @@
 #![feature(allocator_api)]
 #![feature(array_chunks)]
 #![feature(asm_const)]
-#![feature(atomic_mut_ptr)]
 #![feature(c_variadic)]
 #![feature(core_intrinsics)]
 #![feature(int_roundings)]
