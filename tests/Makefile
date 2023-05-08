@@ -110,6 +110,7 @@ EXPECT_NAMES=\
 	wchar/wcrtomb \
 	wchar/wcscspn \
 	wchar/wcsrchr \
+	wchar/wcsrtombs \
 	wchar/wcsstr \
 	wchar/wcstod \
 	wchar/wcstok \
