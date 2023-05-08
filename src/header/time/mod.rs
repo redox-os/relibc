@@ -198,9 +198,9 @@ pub extern "C" fn clock() -> clock_t {
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn clock_getres(clock_id: clockid_t, res: *mut timespec) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub extern "C" fn clock_getres(clock_id: clockid_t, tp: *mut timespec) -> c_int {
+    Sys::clock_getres(clock_id, tp)
 }
 
 #[no_mangle]
@@ -208,9 +208,9 @@ pub extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -> c_int
     Sys::clock_gettime(clock_id, tp)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn clock_settime(clock_id: clockid_t, tp: *const timespec) -> c_int {
-    unimplemented!();
+    Sys::clock_settime(clock_id, tp)
 }
 
 #[no_mangle]
