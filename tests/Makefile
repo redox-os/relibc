@@ -43,6 +43,7 @@ EXPECT_NAMES=\
 	stdio/printf_space_pad \
 	stdio/ungetc_ftell \
 	stdio/ungetc_multiple \
+	stdio/ungetwc \
 	stdio/fscanf_offby1 \
 	stdio/fscanf \
 	stdio/printf_neg_pad \
