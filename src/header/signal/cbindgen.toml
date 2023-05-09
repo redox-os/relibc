@@ -1,4 +1,4 @@
-sys_includes = ["stdint.h", "sys/types.h"]
+sys_includes = ["stdint.h", "sys/types.h", "time.h"]
 include_guard = "_RELIBC_SIGNAL_H"
 trailer = "#include <bits/signal.h>"
 language = "C"
@@ -12,3 +12,6 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
+
+[export.rename]
+"timespec" = "struct timespec"

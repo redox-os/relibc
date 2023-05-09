@@ -8,8 +8,9 @@ use super::{
 use crate::{
     header::{
         errno::{EINVAL, ENOSYS},
-        signal::{sigaction, sigset_t, stack_t},
+        signal::{sigaction, siginfo_t, sigset_t, stack_t},
         sys_time::{itimerval, ITIMER_REAL},
+        time::timespec,
     },
     platform::errno,
 };
@@ -161,6 +162,13 @@ impl PalSignal for Sys {
     }
 
     fn sigsuspend(set: *const sigset_t) -> c_int {
+        unsafe {
+            errno = ENOSYS;
+        }
+        -1
+    }
+
+    fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec) -> c_int {
         unsafe {
             errno = ENOSYS;
         }

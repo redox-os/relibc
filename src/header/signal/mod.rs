@@ -5,8 +5,11 @@ use core::{mem, ptr};
 use cbitset::BitSet;
 
 use crate::{
-    header::errno,
-    platform::{self, types::*, PalSignal, Sys},
+    header::{
+        errno,
+        time::timespec,
+    },
+    platform::{self, types::*, Pal, PalSignal, Sys},
 };
 
 pub use self::sys::*;
@@ -45,6 +48,16 @@ pub struct sigaltstack {
     pub ss_sp: *mut c_void,
     pub ss_flags: c_int,
     pub ss_size: size_t,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug)]
+pub struct siginfo_t {
+    pub si_signo: c_int,
+    pub si_errno: c_int,
+    pub si_code: c_int,
+    _padding: [c_int; 29],
+    _si_align: [usize; 0],
 }
 
 pub type sigset_t = c_ulong;
@@ -308,9 +321,22 @@ pub extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
     Sys::sigsuspend(sigmask)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int {
-    unimplemented!();
+    let mut pinfo = mem::MaybeUninit::<siginfo_t>::uninit();
+    if sigtimedwait(set, pinfo.as_mut_ptr(), ptr::null_mut()) < 0 {
+        return -1;
+    }
+    unsafe {
+        let mut info = pinfo.assume_init();
+        (*sig) = info.si_signo;
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec) -> c_int {
+    Sys::sigtimedwait(set, sig, tp)
 }
 
 pub const _signal_strings: [&str; 32] = [
