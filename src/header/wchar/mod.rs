@@ -237,9 +237,24 @@ pub extern "C" fn swscanf(s: *const wchar_t, format: *const wchar_t, ap: va_list
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn ungetwc(wc: wint_t, stream: *mut FILE) -> wint_t {
-    unimplemented!();
+/// Push wide character `wc` back onto `stream` so it'll be read next
+#[no_mangle]
+pub unsafe extern "C" fn ungetwc(wc: wint_t, stream: &mut FILE) -> wint_t {
+    if wc == WEOF {
+        return wc;
+    }
+    static mut INTERNAL: mbstate_t = mbstate_t;
+    let mut bytes: [c_char; MB_CUR_MAX as usize] = [0; MB_CUR_MAX as usize];
+
+    let amount = wcrtomb(bytes.as_mut_ptr(), wc as wchar_t, &mut INTERNAL);
+    if amount == usize::MAX {
+        return WEOF;
+    }
+    for i in 0..amount {
+        ungetc(bytes[i] as c_int, &mut *stream);
+    }
+    
+    wc
 }
 
 // #[no_mangle]
