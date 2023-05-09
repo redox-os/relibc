@@ -184,6 +184,12 @@ impl Pal for Sys {
         }
     }
 
+    fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> c_int {
+        // TODO
+        unsafe { errno = ENOSYS };
+        -1
+    }
+
     fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int {
         let mut redox_tp = unsafe { redox_timespec::from(&*tp) };
         match e(syscall::clock_gettime(clk_id as usize, &mut redox_tp)) as c_int {
@@ -196,6 +202,12 @@ impl Pal for Sys {
                 0
             }
         }
+    }
+
+    fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> c_int {
+        // TODO
+        unsafe { errno = ENOSYS };
+        -1
     }
 
     fn close(fd: c_int) -> c_int {

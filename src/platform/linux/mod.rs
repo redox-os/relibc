@@ -106,8 +106,16 @@ impl Pal for Sys {
         }) as c_int
     }
 
+    fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> c_int {
+        e(unsafe { syscall!(CLOCK_GETRES, clk_id, tp) }) as c_int
+    }
+
     fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int {
         e(unsafe { syscall!(CLOCK_GETTIME, clk_id, tp) }) as c_int
+    }
+
+    fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> c_int {
+        e(unsafe { syscall!(CLOCK_SETTIME, clk_id, tp) }) as c_int
     }
 
     fn close(fildes: c_int) -> c_int {

@@ -35,7 +35,11 @@ pub trait Pal {
 
     fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int;
 
+    fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> c_int;
+
     fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int;
+
+    fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> c_int;
 
     fn close(fildes: c_int) -> c_int;
 
