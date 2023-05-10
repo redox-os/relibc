@@ -1,7 +1,8 @@
 use super::super::{types::*, Pal};
 use crate::header::{
-    signal::{sigaction, sigset_t, stack_t},
+    signal::{sigaction, siginfo_t, sigset_t, stack_t},
     sys_time::itimerval,
+    time::timespec,
 };
 
 pub trait PalSignal: Pal {
@@ -24,4 +25,6 @@ pub trait PalSignal: Pal {
     fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int;
 
     fn sigsuspend(set: *const sigset_t) -> c_int;
+
+    fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec) -> c_int;
 }
