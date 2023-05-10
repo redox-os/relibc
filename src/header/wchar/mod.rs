@@ -321,28 +321,33 @@ pub unsafe extern "C" fn wcsrtombs(
     }
 
     while n >= 4 {
-        if **ws.wrapping_sub(1) >= 0x7f {
+        if (**ws).wrapping_sub(1) >= 0x7f {
             if **ws == 0 {
                 *s = 0;
                 *ws = 0 as *const wchar_t;
                 return N.wrapping_sub(n);
             }
+
             l = wcrtomb(s, **ws, ptr::null_mut());
             if l.wrapping_add(1) == 0 {
                 return usize::MAX;
             }
+
             s = s.offset(l as isize);
             n = n.wrapping_sub(l);
         } else {
+
             let new_s = s;
             s = s.offset(1);
             *new_s = **ws as c_char;
             n = n.wrapping_sub(1);
         }
+
         *ws = (*ws).offset(1);
     }
+
     while n != 0 {
-        if **ws.wrapping_sub(1) >= 0x7f {
+        if (**ws).wrapping_sub(1) >= 0x7f {
             if **ws == 0 {
                 *s = 0;
                 *ws = 0 as *const wchar_t;
@@ -366,6 +371,7 @@ pub unsafe extern "C" fn wcsrtombs(
         }
         *ws = (*ws).offset(1);
     }
+
     return N;
 }
 
