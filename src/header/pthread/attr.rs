@@ -22,7 +22,9 @@ impl Default for RlctAttr {
             param: sched_param {
                 // TODO
                 sched_priority: 0,
-            }
+            },
+            #[cfg(target_pointer_width = "32")]
+            _pad: [0; 12],
         }
     }
 }

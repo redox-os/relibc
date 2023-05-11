@@ -24,6 +24,8 @@ pub(crate) struct RlctAttr {
     pub stacksize: size_t,
     pub stack: size_t,
     pub param: sched_param,
+    #[cfg(target_pointer_width = "32")]
+    _pad: [u8; 12],
 }
 
 pub const PTHREAD_BARRIER_SERIAL_THREAD: c_int = -1;

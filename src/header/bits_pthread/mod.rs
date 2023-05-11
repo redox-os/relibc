@@ -16,7 +16,7 @@ use core::sync::atomic::{AtomicU32 as AtomicUint, AtomicI32 as AtomicInt};
 #[repr(C)]
 pub union pthread_attr_t {
     __relibc_internal_size: [c_uchar; 32],
-    __relibc_internal_align: c_long,
+    __relibc_internal_align: size_t,
 }
 #[repr(C)]
 pub union pthread_rwlockattr_t {
@@ -88,7 +88,7 @@ macro_rules! assert_equal_size(
         #[cfg(all(target_os = "redox", feature = "check_against_libc_crate"))]
         const _: () = unsafe {
             let export = $export { __relibc_internal_align: 0 };
-            let _: libc::$export = core::mem::transmute(export.__relibc_internal_size); 
+            let _: libc::$export = core::mem::transmute(export.__relibc_internal_size);
 
             let a = [0_u8; core::mem::align_of::<$export>()];
             let b: [u8; core::mem::align_of::<libc::$export>()] = core::mem::transmute(a);
