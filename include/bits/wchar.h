@@ -12,4 +12,8 @@
 
 #include <stdint.h>
 
+int wprintf(const wchar_t * fmt, ...);
+int fwprintf(FILE * stream, const wchar_t * fmt, ...);
+int swprintf(wchar_t *s, size_t n, const wchar_t * fmt, ...);
+
 #endif /* _BITS_WCHAR_H */

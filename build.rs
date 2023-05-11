@@ -53,6 +53,7 @@ fn main() {
             generate_bindings(&p);
         });
 
+    println!("cargo:rerun-if-changed=src/c");
     cc::Build::new()
         .flag("-nostdinc")
         .flag("-nostdlib")

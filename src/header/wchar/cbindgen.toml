@@ -1,6 +1,6 @@
 sys_includes = ["stddef.h", "stdint.h", "time.h", "stdio.h" ]
 include_guard = "_RELIBC_WCHAR_H"
-header = "#include <bits/wchar.h>"
+trailer = "#include <bits/wchar.h>"
 language = "C"
 style = "Type"
 no_includes = true
