@@ -15,8 +15,10 @@ exclude = ["core_io", "ralloc", "tests"]
 [build-dependencies]
 cbindgen = "0.24.3"
 cc = "1.0.25"
+#env_logger = "0.10"
 
 [dependencies]
+bitflags = "1"
 cbitset = "0.1.0"
 core_io = { path = "core_io", features = ["collections"] }
 lazy_static = { version = "1.4.0", default-features = false, features = ["spin_no_std"] }
@@ -26,6 +28,7 @@ rand = { version = "0.5.5", default-features = false }
 memchr = { version = "2.2.0", default-features = false }
 plain = "0.2"
 unicode-width = "0.1"
+libc = { version = "0.2", optional = true }
 
 [dependencies.goblin]
 version = "0.0.21"
@@ -46,11 +49,15 @@ spin = "0.9.0"
 redox-exec = { path = "src/platform/redox/redox-exec" }
 
 [features]
-default = []
+default = ["check_against_libc_crate"]
 trace = []
+check_against_libc_crate = ["libc"]
 
 [profile.dev]
 panic = "abort"
 
 [profile.release]
 panic = "abort"
+
+[patch.crates-io]
+libc = { git = "https://gitlab.redox-os.org/4lDO2/liblibc.git", branch = "redox" }

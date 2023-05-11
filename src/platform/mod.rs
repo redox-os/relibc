@@ -29,8 +29,6 @@ pub(crate) mod sys;
 #[cfg(test)]
 mod test;
 
-mod pte;
-
 pub use self::rlb::{Line, RawLineBuffer};
 pub mod rlb;
 

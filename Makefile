@@ -7,7 +7,7 @@ CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
 RUSTCFLAGS?=
 export OBJCOPY?=objcopy
 
-BUILD="target/$(TARGET)"
+BUILD?="$(shell pwd)/target/$(TARGET)"
 CARGOFLAGS+="--target=$(TARGET)"
 
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
@@ -51,7 +51,7 @@ SRC=\
 
 BUILTINS_VERSION=0.1.70
 
-.PHONY: all clean fmt install install-headers libs submodules test
+.PHONY: all clean fmt install install-libs install-headers install-tests libs submodules test
 
 all: | libs
 
@@ -72,7 +72,6 @@ install-headers: libs
 	cp -rv "target/include"/* "$(DESTDIR)/include"
 	cp -v "openlibm/include"/*.h "$(DESTDIR)/include"
 	cp -v "openlibm/src"/*.h "$(DESTDIR)/include"
-	cp -v "pthreads-emb/"*.h "$(DESTDIR)/include"
 
 libs: \
 	$(BUILD)/release/libc.a \
@@ -93,10 +92,14 @@ install-libs: libs
 	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/ld_so" "$(DESTDIR)/lib/ld64.so.1"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
-	cp -v "$(BUILD)/pthreads-emb/libpthread.a" "$(DESTDIR)/lib/libpthread.a"
 	# Empty libraries for dl and rt
 	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
 	$(AR) -rcs "$(DESTDIR)/lib/librt.a"
+
+install-tests: tests
+	$(MAKE) -C tests
+	mkdir -p "$(DESTDIR)/bin/relibc-tests"
+	cp -vr tests/bins_static/* "$(DESTDIR)/bin/relibc-tests/"
 
 install: install-headers install-libs
 
@@ -115,11 +118,12 @@ sysroot:
 test: sysroot
 	# TODO: Fix SIGILL when running cargo test
 	# $(CARGO_TEST) test
+	$(MAKE) -C tests run
 	$(MAKE) -C tests verify
 
 # Debug targets
 
-$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -128,7 +132,7 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/pthreads-emb/libpthre
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
 
-$(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -Wl,-soname,libc.so.6 -o $@
 
 $(BUILD)/debug/librelibc.a: $(SRC)
@@ -157,7 +161,7 @@ $(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debu
 
 # Release targets
 
-$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -166,7 +170,7 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libp
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
 
-$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/pthreads-emb/libpthread.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -Wl,-soname,libc.so.6 -o $@
 
 $(BUILD)/release/librelibc.a: $(SRC)
@@ -206,13 +210,3 @@ $(BUILD)/openlibm: openlibm
 
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
 	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CPPFLAGS="-fno-stack-protector -I $(shell pwd)/include -I $(shell pwd)/target/include" -C $< libopenlibm.a
-
-$(BUILD)/pthreads-emb: pthreads-emb
-	rm -rf $@ $@.partial
-	mkdir -p $(BUILD)
-	cp -r $< $@.partial
-	mv $@.partial $@
-	touch $@
-
-$(BUILD)/pthreads-emb/libpthread.a: $(BUILD)/pthreads-emb $(BUILD)/release/librelibc.a
-	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CFLAGS="-fno-stack-protector -I $(shell pwd)/include -I $(shell pwd)/target/include" -C $< libpthread.a

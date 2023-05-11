@@ -49,14 +49,25 @@ struct linux_statfs {
     f_spare: [c_long; 4],
 }
 
-pub fn e(sys: usize) -> usize {
-    if (sys as isize) < 0 && (sys as isize) >= -256 {
-        unsafe {
-            errno = -(sys as isize) as c_int;
-        }
-        !0
+// TODO
+const ERRNO_MAX: usize = 4095;
+
+pub fn e_raw(sys: usize) -> Result<usize, usize> {
+    if sys > ERRNO_MAX.wrapping_neg() {
+        Err(sys.wrapping_neg())
     } else {
-        sys
+        Ok(sys)
+    }
+}
+pub fn e(sys: usize) -> usize {
+    match e_raw(sys) {
+        Ok(value) => value,
+        Err(errcode) => {
+            unsafe {
+                errno = errcode as c_int;
+            }
+            !0
+        }
     }
 }
 
@@ -140,6 +151,10 @@ impl Pal for Sys {
         }
         loop {}
     }
+    fn exit_thread() -> ! {
+        // TODO
+        Self::exit(0)
+    }
 
     fn fchdir(fildes: c_int) -> c_int {
         e(unsafe { syscall!(FCHDIR, fildes) }) as c_int
@@ -219,8 +234,8 @@ impl Pal for Sys {
         e(unsafe { syscall!(FTRUNCATE, fildes, length) }) as c_int
     }
 
-    fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> c_int {
-        unsafe { syscall!(FUTEX, addr, op, val, val2, 0, 0) as c_int }
+    fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> Result<c_long, crate::pthread::Errno> {
+        e_raw(unsafe { syscall!(FUTEX, addr, op, val, val2, 0, 0)}).map(|r| r as c_long).map_err(|e| crate::pthread::Errno(e as c_int))
     }
 
     fn futimens(fd: c_int, times: *const timespec) -> c_int {
@@ -388,7 +403,7 @@ impl Pal for Sys {
     }
 
     #[cfg(target_arch = "x86_64")]
-    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
         let pid;
         asm!("
@@ -437,7 +452,18 @@ impl Pal for Sys {
             out("r14") _,
             out("r15") _,
         );
-        e(pid) as pid_t
+        let tid = e_raw(pid).map_err(|err| crate::pthread::Errno(err as c_int))?;
+
+        Ok(crate::pthread::OsTid { thread_id: tid })
+    }
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), crate::pthread::Errno> {
+        let tgid = Self::getpid();
+        e_raw(unsafe { syscall!(TGKILL, tgid, os_tid.thread_id, signal) }).map(|_| ()).map_err(|err| crate::pthread::Errno(err as c_int))
+    }
+    fn current_os_tid() -> crate::pthread::OsTid {
+        crate::pthread::OsTid {
+            thread_id: unsafe { syscall!(GETTID) },
+        }
     }
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {

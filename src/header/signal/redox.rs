@@ -66,6 +66,9 @@ pub const SIGPWR: usize = 30;
 pub const SIGSYS: usize = 31;
 pub const NSIG: usize = 32;
 
+pub const SIGRTMIN: usize = 34;
+pub const SIGRTMAX: usize = 64;
+
 pub const SA_NOCLDSTOP: usize = 0x00000001;
 pub const SA_NOCLDWAIT: usize = 0x00000002;
 pub const SA_SIGINFO: usize = 0x00000004;

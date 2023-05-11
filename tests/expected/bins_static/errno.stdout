@@ -1,5 +1,5 @@
-bins_static/errno
-bins_static/errno
+./bins_static/errno
+./bins_static/errno
 errno
 changed to argv[0]
 changed to program_invocation_name

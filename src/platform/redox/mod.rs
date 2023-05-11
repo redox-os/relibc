@@ -345,7 +345,7 @@ impl Pal for Sys {
         e(syscall::ftruncate(fd as usize, len as usize)) as c_int
     }
 
-    fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> c_int {
+    fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> Result<c_long, crate::pthread::Errno> {
         match unsafe {
             syscall::futex(
                 addr as *mut i32,
@@ -355,8 +355,8 @@ impl Pal for Sys {
                 ptr::null_mut(),
             )
         } {
-            Ok(success) => success as c_int,
-            Err(err) => -(err.errno as c_int),
+            Ok(success) => Ok(success as c_long),
+            Err(err) => Err(crate::pthread::Errno(err.errno)),
         }
     }
 
@@ -770,8 +770,16 @@ impl Pal for Sys {
         res as c_int
     }
 
-    unsafe fn pte_clone(stack: *mut usize) -> pid_t {
-        e(clone::pte_clone_impl(stack)) as pid_t
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
+        clone::rlct_clone_impl(stack).map(|context_id| crate::pthread::OsTid { context_id }).map_err(|error| crate::pthread::Errno(error.errno))
+    }
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), crate::pthread::Errno> {
+        syscall::kill(os_tid.context_id, signal).map_err(|error| crate::pthread::Errno(error.errno))?;
+        Ok(())
+    }
+    fn current_os_tid() -> crate::pthread::OsTid {
+        // TODO
+        crate::pthread::OsTid { context_id: Self::getpid() as _ }
     }
 
     fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
@@ -1016,5 +1024,9 @@ impl Pal for Sys {
     fn verify() -> bool {
         // GETPID on Redox is 20, which is WRITEV on Linux
         e(unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) }) != !0
+    }
+
+    fn exit_thread() -> ! {
+        Self::exit(0)
     }
 }

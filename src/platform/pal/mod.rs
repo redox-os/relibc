@@ -51,6 +51,8 @@ pub trait Pal {
 
     fn exit(status: c_int) -> !;
 
+    fn exit_thread() -> !;
+
     fn fchdir(fildes: c_int) -> c_int;
 
     fn fchmod(fildes: c_int, mode: mode_t) -> c_int;
@@ -75,7 +77,7 @@ pub trait Pal {
 
     fn ftruncate(fildes: c_int, length: off_t) -> c_int;
 
-    fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> c_int;
+    fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> Result<c_long, crate::pthread::Errno>;
 
     fn futimens(fd: c_int, times: *const timespec) -> c_int;
 
@@ -159,7 +161,9 @@ pub trait Pal {
 
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int;
 
-    unsafe fn pte_clone(stack: *mut usize) -> pid_t;
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, crate::pthread::Errno>;
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), crate::pthread::Errno>;
+    fn current_os_tid() -> crate::pthread::OsTid;
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
 

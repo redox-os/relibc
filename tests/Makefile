@@ -126,6 +126,8 @@ EXPECT_NAMES=\
 	# mkfifo
 	# netdb/netdb \
 
+BUILD?=.
+
 DYNAMIC_ONLY_NAMES=\
 	dlfcn
 
@@ -152,15 +154,24 @@ NAMES=\
 	unistd/pathconf \
 	unistd/setid \
 	unistd/stat \
-	unistd/sysconf
+	unistd/sysconf \
+	pthread/main \
+	pthread/cleanup \
+	pthread/extjoin \
+	pthread/once \
+	pthread/customstack \
+	pthread/barrier \
+	pthread/rwlock_trylock \
+	pthread/rwlock_randtest \
+	pthread/mutex_recursive
 #	resource/getrusage
 #	time/times
 
 #TODO: dynamic tests currently broken
-BINS=$(patsubst %,bins_static/%,$(NAMES))
+BINS=$(patsubst %,$(BUILD)/bins_static/%,$(NAMES))
 #BINS+=$(patsubst %,bins_dynamic/%,$(NAMES))
 #BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
-EXPECT_BINS=$(patsubst %,bins_static/%,$(EXPECT_NAMES))
+EXPECT_BINS=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
 #EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(EXPECT_NAMES))
 #EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 
@@ -243,18 +254,18 @@ DYNAMIC_FLAGS+=\
 	-Wl,-rpath=\$$ORIGIN
 endif
 
-bins_static/%: %.c $(DEPS)
+$(BUILD)/bins_static/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
 
-bins_dynamic/%.so: %.c $(DEPS)
+$(BUILD)/bins_dynamic/%.so: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) "$<" -o "$@" -shared -fpic $(FLAGS) $(DYNAMIC_FLAGS)
 
-bins_dynamic/dlfcn: dlfcn.c bins_dynamic/sharedlib.so $(DEPS)
+$(BUILD)/bins_dynamic/dlfcn: dlfcn.c $(BUILD)/bins_dynamic/sharedlib.so $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
 
-bins_dynamic/%: %.c $(DEPS)
+$(BUILD)/bins_dynamic/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)

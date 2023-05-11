@@ -88,4 +88,6 @@
         _exit(code); \
     } while(0)
 
+#define random_bool() (lrand48() % 2 == 0)
+
 #endif /* _TEST_HELPERS */

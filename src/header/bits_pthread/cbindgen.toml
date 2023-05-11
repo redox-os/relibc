@@ -1,0 +1,54 @@
+sys_includes = ["bits/sched.h"]
+include_guard = "_RELIBC_BITS_PTHREAD_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+# TODO: Any better way to implement pthread_cleanup_push/pthread_cleanup_pop?
+after_includes = """
+#define PTHREAD_COND_INITIALIZER ((pthread_cond_t){0})
+#define PTHREAD_MUTEX_INITIALIZER ((pthread_mutex_t){0})
+#define PTHREAD_ONCE_INIT ((pthread_once_t){0})
+#define PTHREAD_RWLOCK_INITIALIZER ((pthread_rwlock_t){0})
+
+#define pthread_cleanup_push(routine, arg) do { \
+  struct { \
+    void (*routine)(void *); \
+    void *arg; \
+    void *prev; \
+  } __relibc_internal_pthread_ll_entry = { \
+    .routine = (routine), \
+    .arg = (arg), \
+  }; \
+  __relibc_internal_pthread_cleanup_push(&__relibc_internal_pthread_ll_entry);
+
+#define pthread_cleanup_pop(execute) \
+  __relibc_internal_pthread_cleanup_pop((execute)); \
+} while(0)
+
+"""
+
+[export.rename]
+"sched_param" = "struct sched_param"
+"AtomicInt" = "int"
+"AtomicUint" = "unsigned"
+
+[export]
+include = [
+  "pthread_attr_t",
+  "pthread_rwlockattr_t",
+  "pthread_rwlock_t",
+  "pthread_barrier_t",
+  "pthread_barrierattr_t",
+  "pthread_mutex_t",
+  "pthread_mutexattr_t",
+  "pthread_condattr_t",
+  "pthread_cond_t",
+  "pthread_spinlock_t",
+  "pthread_once_t",
+  "pthread_t",
+  "pthread_key_t",
+]
+
+[enum]
+prefix_with_name = true
