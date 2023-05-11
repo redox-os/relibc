@@ -7,43 +7,57 @@ use crate::{
     platform::{types::*, Pal, Sys},
 };
 
-use core::sync::atomic::Ordering;
+use core::sync::atomic::{AtomicU32, Ordering};
 
 pub struct Semaphore {
-    lock: AtomicLock,
+    count: AtomicU32,
 }
 
 impl Semaphore {
-    pub const fn new(value: c_int) -> Self {
+    pub const fn new(value: c_uint) -> Self {
         Self {
-            lock: AtomicLock::new(value),
+            count: AtomicU32::new(value),
         }
     }
 
-    pub fn post(&self, count: c_int) {
-        self.lock.fetch_add(count, Ordering::SeqCst);
-        self.lock.notify_all();
+    // TODO: Acquire-Release ordering?
+
+    pub fn post(&self, count: c_uint) {
+        self.count.fetch_add(count, Ordering::SeqCst);
+        // TODO: notify one?
+        crate::sync::futex_wake(&self.count, i32::MAX);
+    }
+
+    pub fn try_wait(&self) -> u32 {
+        loop {
+            let value = self.count.load(Ordering::SeqCst);
+
+            if value == 0 { return 0 }
+
+            match self.count.compare_exchange_weak(
+                value,
+                value - 1,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => {
+                    // Acquired
+                    return value;
+                }
+                Err(_) => (),
+            }
+            // Try again (as long as value > 0)
+        }
     }
 
     pub fn wait(&self, timeout_opt: Option<&timespec>) -> Result<(), ()> {
         loop {
-            let value = self.lock.load(Ordering::SeqCst);
-            if value > 0 {
-                match self.lock.compare_exchange(
-                    value,
-                    value - 1,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                ) {
-                    Ok(_) => {
-                        // Acquired
-                        return Ok(());
-                    }
-                    Err(_) => (),
-                }
-                // Try again (as long as value > 0)
-                continue;
+            let value = self.try_wait();
+
+            if value == 0 {
+                return Ok(());
             }
+
             if let Some(timeout) = timeout_opt {
                 let mut time = timespec::default();
                 clock_gettime(CLOCK_MONOTONIC, &mut time);
@@ -64,12 +78,16 @@ impl Semaphore {
                     }
                     relative.tv_sec -= time.tv_sec;
                     relative.tv_nsec -= time.tv_nsec;
-                    self.lock.wait_if(value, Some(&relative));
+
+                    crate::sync::futex_wait(&self.count, value, Some(&relative));
                 }
             } else {
                 // Use futex to wait for the next change, without a timeout
-                self.lock.wait_if(value, None);
+                crate::sync::futex_wait(&self.count, value, None);
             }
         }
+    }
+    pub fn value(&self) -> c_uint {
+        self.count.load(Ordering::SeqCst)
     }
 }
