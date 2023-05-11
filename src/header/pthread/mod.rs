@@ -28,6 +28,8 @@ pub(crate) struct RlctAttr {
     _pad: [u8; 12],
 }
 
+pub const _POSIX_THREADS: c_int = 1;
+
 pub const PTHREAD_BARRIER_SERIAL_THREAD: c_int = -1;
 
 pub const PTHREAD_CANCEL_ASYNCHRONOUS: c_int = 0;
