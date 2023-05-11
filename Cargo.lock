@@ -227,8 +227,8 @@ version = "0.1.0"
 
 [[package]]
 name = "libc"
-version = "0.2.142"
-source = "git+https://gitlab.redox-os.org/4lDO2/liblibc.git?branch=redox#83c9eeaa49a9e40dd67b72de98b1cf4d516be0ec"
+version = "0.2.138"
+source = "git+https://gitlab.redox-os.org/redox-os/liblibc.git?branch=redox_0.2.138#00afc8eaaacc565798d3adb8071bc4d8a0f4f6a9"
 
 [[package]]
 name = "linux-raw-sys"
@@ -440,16 +440,16 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.37.11"
+version = "0.37.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85597d61f83914ddeba6a47b3b8ffe7365107221c2e557ed94426489fefb5f77"
+checksum = "62b24138615de35e32031d041a09032ef3487a616d901ca4db224e7d557efae2"
 dependencies = [
  "bitflags",
  "errno",
  "io-lifetimes",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.48.0",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
