@@ -126,7 +126,7 @@ impl PalSignal for Sys {
         if let (Some(old), Some(oact)) = (old_opt, oact) {
             oact.sa_handler = unsafe { mem::transmute(old.sa_handler) };
             let m = old.sa_mask;
-            oact.sa_mask = m[0] as c_ulong;
+            oact.sa_mask = m[0] as sigset_t;
             oact.sa_flags = old.sa_flags.bits() as c_ulong;
         }
         ret
