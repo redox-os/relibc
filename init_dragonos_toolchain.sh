@@ -4,9 +4,34 @@ if [ -z "$(which cargo)" ]; then
     exit 1
 fi
 
+# 是否强制覆盖已有的工具链配置文件
+FORCE=0
+
+while getopts "f" arg
+do
+    case $arg in
+        f)
+            FORCE=1
+            ;;
+        ?)
+            echo "unkonw argument"
+            exit 1
+        ;;
+    esac
+done
+
 DRAGONOS_UNKNOWN_ELF_PATH=$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-dragonos
 mkdir -p ${DRAGONOS_UNKNOWN_ELF_PATH}/lib
 echo $DRAGONOS_UNKNOWN_ELF_PATH
+
+# 判断是否已经存在工具链配置文件
+if [ -f "${DRAGONOS_UNKNOWN_ELF_PATH}/target.json" ]; then
+    if [ $FORCE -eq 0 ]; then
+        echo "已存在工具链配置文件，如需重新初始化，请使用-f参数"
+        exit 0
+    fi
+fi
+
 # 设置工具链配置文件
 echo   \
 "{\
