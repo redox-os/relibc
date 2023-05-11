@@ -92,8 +92,9 @@ install-libs: libs
 	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/ld_so" "$(DESTDIR)/lib/ld64.so.1"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
-	# Empty libraries for dl and rt
+	# Empty libraries for dl, pthread, and rt
 	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
+	$(AR) -rcs "$(DESTDIR)/lib/libpthread.a"
 	$(AR) -rcs "$(DESTDIR)/lib/librt.a"
 
 install-tests: tests
