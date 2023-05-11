@@ -1,6 +1,5 @@
 sys_includes = ["wchar.h" ]
 include_guard = "_RELIBC_WCTYPE_H"
-header = "#include <bits/wctype.h>"
 language = "C"
 style = "Type"
 no_includes = true

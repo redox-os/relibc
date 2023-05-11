@@ -1,6 +1,5 @@
-sys_includes = ["stddef.h", "stdint.h", "time.h", "stdio.h" ]
+sys_includes = ["stddef.h", "stdint.h", "stdio.h", "time.h", "bits/wchar.h"]
 include_guard = "_RELIBC_WCHAR_H"
-trailer = "#include <bits/wchar.h>"
 language = "C"
 style = "Type"
 no_includes = true

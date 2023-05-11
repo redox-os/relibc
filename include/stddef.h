@@ -9,12 +9,6 @@
 #endif
 typedef __PTRDIFF_TYPE__ ptrdiff_t;
 
-#ifndef __cplusplus
-typedef int32_t wchar_t;
-#endif /* #ifndef __cplusplus */
-typedef uint32_t wint_t;
-
-
 typedef long unsigned int size_t;
 
 typedef struct { long long __ll; long double __ld; } max_align_t;

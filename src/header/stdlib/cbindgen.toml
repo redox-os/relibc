@@ -1,4 +1,4 @@
-sys_includes = ["stddef.h", "alloca.h"]
+sys_includes = ["stddef.h", "alloca.h", "wchar.h"]
 include_guard = "_RELIBC_STDLIB_H"
 trailer = "#include <bits/stdlib.h>"
 language = "C"

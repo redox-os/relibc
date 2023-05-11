@@ -3,6 +3,8 @@
 
 typedef struct FILE FILE;
 
+#include <bits/wchar.h>
+
 int vwprintf(const wchar_t * fmt, va_list ap);
 
 int wprintf(const wchar_t * fmt, ...) {
