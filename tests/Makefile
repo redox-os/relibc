@@ -43,7 +43,6 @@ EXPECT_NAMES=\
 	stdio/printf_space_pad \
 	stdio/ungetc_ftell \
 	stdio/ungetc_multiple \
-	stdio/ungetwc \
 	stdio/fscanf_offby1 \
 	stdio/fscanf \
 	stdio/printf_neg_pad \
@@ -108,6 +107,7 @@ EXPECT_NAMES=\
 	wchar/mbsrtowcs \
 	wchar/printf-on-wchars \
 	wchar/putwchar \
+	wchar/ungetwc \
 	wchar/wprintf \
 	wchar/wcrtomb \
 	wchar/wcscspn \
