@@ -228,7 +228,7 @@ version = "0.1.0"
 [[package]]
 name = "libc"
 version = "0.2.138"
-source = "git+https://gitlab.redox-os.org/redox-os/liblibc.git?branch=redox_0.2.138#00afc8eaaacc565798d3adb8071bc4d8a0f4f6a9"
+source = "git+https://gitlab.redox-os.org/redox-os/liblibc.git?branch=redox_0.2.138#a92e39c0616f068b9fd9172d325004248c2dc1e8"
 
 [[package]]
 name = "linux-raw-sys"
