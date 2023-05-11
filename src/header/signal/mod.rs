@@ -259,9 +259,9 @@ pub extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
     Sys::sigpending(set)
 }
 
-const BELOW_SIGRTMIN_MASK: u64 = (1 << SIGRTMIN) - 1;
-const STANDARD_SIG_MASK: u64 = (1 << 32) - 1;
-const RLCT_SIGNAL_MASK: u64 = BELOW_SIGRTMIN_MASK & !STANDARD_SIG_MASK;
+const BELOW_SIGRTMIN_MASK: c_ulong = (1 << SIGRTMIN) - 1;
+const STANDARD_SIG_MASK: c_ulong = (1 << 32) - 1;
+const RLCT_SIGNAL_MASK: c_ulong = BELOW_SIGRTMIN_MASK & !STANDARD_SIG_MASK;
 
 #[no_mangle]
 pub unsafe extern "C" fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {

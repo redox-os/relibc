@@ -29,12 +29,12 @@ impl timespec {
         Some(if later_nsec > earlier_nsec {
             timespec {
                 tv_sec: later.tv_sec.checked_sub(earlier.tv_sec)?,
-                tv_nsec: (later_nsec - earlier_nsec) as i64,
+                tv_nsec: (later_nsec - earlier_nsec) as c_long,
             }
         } else {
             timespec {
                 tv_sec: later.tv_sec.checked_sub(earlier.tv_sec)?.checked_sub(1)?,
-                tv_nsec: 1_000_000_000 - (earlier_nsec - later_nsec) as i64,
+                tv_nsec: 1_000_000_000 - (earlier_nsec - later_nsec) as c_long,
             }
         })
     }
