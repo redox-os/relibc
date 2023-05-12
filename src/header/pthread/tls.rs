@@ -30,7 +30,7 @@ pub unsafe extern "C" fn pthread_getspecific(key: pthread_key_t) -> *mut c_void 
     data
 }
 #[no_mangle]
-pub unsafe extern "C" fn pthread_key_create(key_ptr: *mut pthread_key_t, destructor: extern "C" fn(value: *mut c_void)) -> c_int {
+pub unsafe extern "C" fn pthread_key_create(key_ptr: *mut pthread_key_t, destructor: Option<extern "C" fn(value: *mut c_void)>) -> c_int {
     let key = NEXTKEY.get();
     NEXTKEY.set(key + 1);
     //println!("pthread_key_create new key {:#0x}, dtor {:p}", key, destructor);
@@ -82,7 +82,7 @@ pub unsafe extern "C" fn pthread_setspecific(key: pthread_key_t, value: *const c
 static KEYS: Mutex<BTreeMap<pthread_key_t, Dtor>> = Mutex::new(BTreeMap::new());
 
 struct Dtor {
-    destructor: extern "C" fn(value: *mut c_void)
+    destructor: Option<extern "C" fn(value: *mut c_void)>,
 }
 
 #[thread_local]
@@ -97,8 +97,8 @@ static NEXTKEY: Cell<pthread_key_t> = Cell::new(1);
 
 pub(crate) unsafe fn run_all_destructors() {
     for (key, Record { data }) in VALUES.take() {
-        let Some(&Dtor { destructor }) = KEYS.lock().get(&key) else { continue };
+        let Some(&Dtor { destructor: Some(dtor) }) = KEYS.lock().get(&key) else { continue };
 
-        destructor(data);
+        dtor(data);
     }
 }
