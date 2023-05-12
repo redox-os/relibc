@@ -69,7 +69,7 @@ pub struct Pthread {
     stack_base: *mut c_void,
     stack_size: usize,
 
-    os_tid: UnsafeCell<OsTid>,
+    pub(crate) os_tid: UnsafeCell<OsTid>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Ord, Eq, PartialOrd, PartialEq)]

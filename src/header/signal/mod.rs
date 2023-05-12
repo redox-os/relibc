@@ -10,6 +10,7 @@ use crate::{
         time::timespec,
     },
     platform::{self, types::*, Pal, PalSignal, Sys},
+    pthread,
 };
 
 pub use self::sys::*;
@@ -72,6 +73,17 @@ pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
 #[no_mangle]
 pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
     Sys::killpg(pgrp, sig)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
+    let os_tid = {
+        let pthread = &*(thread as *const pthread::Pthread);
+        pthread.os_tid.get().read()
+    };
+    crate::header::pthread::e(
+        Sys::rlct_kill(os_tid, sig as usize)
+    )
 }
 
 #[no_mangle]
