@@ -47,6 +47,9 @@ ifeq ($(TARGET),x86_64-unknown-redox)
 endif
 
 ifeq ($(TARGET),x86_64-unknown-dragonos)
+# 如果存在x86_64-dragonos-gcc，就用它，否则用gcc
+
+ifeq ($(shell which x86_64-dragonos-gcc),)
 	export CC=gcc
 # export LD=ld
 	export LD=ld
@@ -54,6 +57,12 @@ ifeq ($(TARGET),x86_64-unknown-dragonos)
 # export AR=x86_64-dragonos-ar
 	export OBJCOPY=objcopy
 # export OBJCOPY=x86_64-dragonos-objcopy
+else
+	export CC=x86_64-dragonos-gcc
+	export LD=x86_64-dragonos-ld
+	export AR=x86_64-dragonos-ar
+	export OBJCOPY=x86_64-dragonos-objcopy
+endif
 endif
 
 SRC=\
