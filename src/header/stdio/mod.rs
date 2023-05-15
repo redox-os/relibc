@@ -16,12 +16,13 @@ use core::{
 
 use crate::{
     c_str::CStr,
+    c_str::CString,
     c_vec::CVec,
     fs::File,
     header::{
         errno::{self, STR_ERROR},
         fcntl, stdlib, pwd,
-        string::{self, strlen, strncpy},
+        string::{self, strcpy, strlen, strncpy},
         unistd,
     },
     io::{self, BufRead, BufWriter, LineWriter, Read, Write},
@@ -274,8 +275,13 @@ pub unsafe extern "C" fn clearerr(stream: *mut FILE) {
 }
 
 // #[no_mangle]
-pub extern "C" fn ctermid(_s: *mut c_char) -> *mut c_char {
-    unimplemented!();
+pub unsafe extern "C" fn ctermid(s: *mut c_char) -> *mut c_char {
+    let default_tty = CString::new("/dev/tty").unwrap().as_ptr() as *mut c_char;
+    if s == ptr::null_mut() {
+        return default_tty;
+    }
+
+    strcpy(s, default_tty)
 }
 
 // #[no_mangle]
