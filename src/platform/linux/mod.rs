@@ -210,7 +210,7 @@ impl Pal for Sys {
         res
     }
 
-    fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
+    fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> c_int {
         e(unsafe { syscall!(FCNTL, fildes, cmd, arg) }) as c_int
     }
 

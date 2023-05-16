@@ -259,7 +259,7 @@ impl Pal for Sys {
         e(syscall::fchown(fd as usize, owner as u32, group as u32)) as c_int
     }
 
-    fn fcntl(fd: c_int, cmd: c_int, args: c_int) -> c_int {
+    fn fcntl(fd: c_int, cmd: c_int, args: c_ulonglong) -> c_int {
         e(syscall::fcntl(fd as usize, cmd as usize, args as usize)) as c_int
     }
 

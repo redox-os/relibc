@@ -67,7 +67,7 @@ pub trait Pal {
 
     fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int;
 
-    fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int;
+    fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> c_int;
 
     fn fork() -> pid_t;
 
