@@ -5,10 +5,7 @@ use core::{mem, ptr};
 use cbitset::BitSet;
 
 use crate::{
-    header::{
-        errno,
-        time::timespec,
-    },
+    header::{errno, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},
     pthread,
 };
@@ -81,9 +78,7 @@ pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
         let pthread = &*(thread as *const pthread::Pthread);
         pthread.os_tid.get().read()
     };
-    crate::header::pthread::e(
-        Sys::rlct_kill(os_tid, sig as usize)
-    )
+    crate::header::pthread::e(Sys::rlct_kill(os_tid, sig as usize))
 }
 
 #[no_mangle]
@@ -276,10 +271,19 @@ const STANDARD_SIG_MASK: sigset_t = (1 << 32) - 1;
 const RLCT_SIGNAL_MASK: sigset_t = BELOW_SIGRTMIN_MASK & !STANDARD_SIG_MASK;
 
 #[no_mangle]
-pub unsafe extern "C" fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
+pub unsafe extern "C" fn sigprocmask(
+    how: c_int,
+    set: *const sigset_t,
+    oset: *mut sigset_t,
+) -> c_int {
     let set = set.as_ref().map(|&block| block & !RLCT_SIGNAL_MASK);
 
-    Sys::sigprocmask(how, set.as_ref().map_or(core::ptr::null(), |r| r as *const sigset_t), oset)
+    Sys::sigprocmask(
+        how,
+        set.as_ref()
+            .map_or(core::ptr::null(), |r| r as *const sigset_t),
+        oset,
+    )
 }
 
 #[no_mangle]
@@ -296,7 +300,7 @@ pub unsafe extern "C" fn sigrelse(sig: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn sigset(
     sig: c_int,
-    func: Option<extern "C" fn(c_int)>
+    func: Option<extern "C" fn(c_int)>,
 ) -> Option<extern "C" fn(c_int)> {
     let mut old_sa = mem::MaybeUninit::uninit();
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
@@ -308,10 +312,11 @@ pub unsafe extern "C" fn sigset(
         return sig_err;
     } else {
         if func == sig_hold {
-            if sigaction(sig, ptr::null_mut(), old_sa.as_mut_ptr()) < 0 ||
-               sigprocmask(SIG_BLOCK, &mut set, &mut set) < 0 {
-                   mem::forget(old_sa);
-                   return sig_err;
+            if sigaction(sig, ptr::null_mut(), old_sa.as_mut_ptr()) < 0
+                || sigprocmask(SIG_BLOCK, &mut set, &mut set) < 0
+            {
+                mem::forget(old_sa);
+                return sig_err;
             }
         } else {
             let mut sa = sigaction {
@@ -321,10 +326,11 @@ pub unsafe extern "C" fn sigset(
                 sa_mask: sigset_t::default(),
             };
             sigemptyset(&mut sa.sa_mask);
-            if sigaction(sig, &sa, old_sa.as_mut_ptr()) < 0 ||
-               sigprocmask(SIG_UNBLOCK, &mut set, &mut set) < 0 {
-                   mem::forget(old_sa);
-                   return sig_err;
+            if sigaction(sig, &sa, old_sa.as_mut_ptr()) < 0
+                || sigprocmask(SIG_UNBLOCK, &mut set, &mut set) < 0
+            {
+                mem::forget(old_sa);
+                return sig_err;
             }
         }
     }
@@ -353,7 +359,11 @@ pub extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec) -> c_int {
+pub extern "C" fn sigtimedwait(
+    set: *const sigset_t,
+    sig: *mut siginfo_t,
+    tp: *const timespec,
+) -> c_int {
     Sys::sigtimedwait(set, sig, tp)
 }
 

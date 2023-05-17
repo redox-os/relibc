@@ -18,7 +18,8 @@ unsafe impl<T: Send> Send for Mutex<T> {}
 unsafe impl<T: Send> Sync for Mutex<T> {}
 
 pub(crate) unsafe fn manual_try_lock_generic(word: &AtomicInt) -> bool {
-    word.compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed).is_ok()
+    word.compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed)
+        .is_ok()
 }
 pub(crate) unsafe fn manual_lock_generic(word: &AtomicInt) {
     crate::sync::wait_until_generic(
@@ -32,7 +33,7 @@ pub(crate) unsafe fn manual_lock_generic(word: &AtomicInt) {
                 })
         },
         |lock| match lock
-        // TODO: Ordering
+            // TODO: Ordering
             .compare_exchange_weak(LOCKED, WAITING, Ordering::SeqCst, Ordering::SeqCst)
             .unwrap_or_else(|e| e)
         {

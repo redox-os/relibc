@@ -20,7 +20,7 @@ use crate::{
     fs::File,
     header::{
         errno::{self, STR_ERROR},
-        fcntl, stdlib, pwd,
+        fcntl, pwd, stdlib,
         string::{self, strlen, strncpy},
         unistd,
     },
@@ -286,7 +286,13 @@ pub unsafe extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
     if s != ptr::null_mut() {
         *s.add(0) = 0;
     }
-    pwd::getpwuid_r(unistd::geteuid(), &mut pwd, buf.as_mut_ptr(), buf.len(), &mut pwdbuf);
+    pwd::getpwuid_r(
+        unistd::geteuid(),
+        &mut pwd,
+        buf.as_mut_ptr(),
+        buf.len(),
+        &mut pwdbuf,
+    );
     if pwdbuf == ptr::null_mut() {
         return s;
     }
@@ -521,7 +527,7 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
 /// itself.
 #[no_mangle]
 pub unsafe extern "C" fn __fpurge(stream: *mut FILE) {
-    if ! stream.is_null() {
+    if !stream.is_null() {
         let mut stream = (*stream).lock();
         stream.purge();
     }
@@ -596,7 +602,11 @@ pub unsafe extern "C" fn freopen(
     if filename.is_null() {
         // Reopen stream in new mode
         if flags & fcntl::O_CLOEXEC > 0 {
-            fcntl::sys_fcntl(*stream.file, fcntl::F_SETFD, fcntl::FD_CLOEXEC as c_ulonglong);
+            fcntl::sys_fcntl(
+                *stream.file,
+                fcntl::F_SETFD,
+                fcntl::FD_CLOEXEC as c_ulonglong,
+            );
         }
         flags &= !(fcntl::O_CREAT | fcntl::O_EXCL | fcntl::O_CLOEXEC);
         if fcntl::sys_fcntl(*stream.file, fcntl::F_SETFL, flags as c_ulonglong) < 0 {
@@ -615,7 +625,11 @@ pub unsafe extern "C" fn freopen(
         if *new.file == *stream.file {
             new.file.fd = -1;
         } else if Sys::dup2(*new.file, *stream.file) < 0
-            || fcntl::sys_fcntl(*stream.file, fcntl::F_SETFL, (flags & fcntl::O_CLOEXEC) as c_ulonglong) < 0
+            || fcntl::sys_fcntl(
+                *stream.file,
+                fcntl::F_SETFL,
+                (flags & fcntl::O_CLOEXEC) as c_ulonglong,
+            ) < 0
         {
             funlockfile(stream);
             fclose(new);

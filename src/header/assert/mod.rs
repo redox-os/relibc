@@ -17,13 +17,7 @@ pub unsafe extern "C" fn __assert_fail(
     let file = CStr::from_ptr(file).to_str().unwrap();
     let cond = CStr::from_ptr(cond).to_str().unwrap();
 
-    eprintln!(
-        "{}: {}:{}: Assertion `{}` failed.",
-        func,
-        file,
-        line,
-        cond
-    );
+    eprintln!("{}: {}:{}: Assertion `{}` failed.", func, file, line, cond);
 
     core::intrinsics::abort();
 }

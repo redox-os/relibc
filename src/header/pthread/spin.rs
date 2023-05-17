@@ -15,11 +15,16 @@ pub unsafe extern "C" fn pthread_spin_destroy(spinlock: *mut pthread_spinlock_t)
     0
 }
 #[no_mangle]
-pub unsafe extern "C" fn pthread_spin_init(spinlock: *mut pthread_spinlock_t, _pshared: c_int) -> c_int {
+pub unsafe extern "C" fn pthread_spin_init(
+    spinlock: *mut pthread_spinlock_t,
+    _pshared: c_int,
+) -> c_int {
     // TODO: pshared doesn't matter in most situations, as memory is just memory, but this may be
     // different on some architectures...
 
-    spinlock.cast::<RlctSpinlock>().write(RlctSpinlock { inner: AtomicInt::new(UNLOCKED) });
+    spinlock.cast::<RlctSpinlock>().write(RlctSpinlock {
+        inner: AtomicInt::new(UNLOCKED),
+    });
 
     0
 }
@@ -28,7 +33,12 @@ pub unsafe extern "C" fn pthread_spin_lock(spinlock: *mut pthread_spinlock_t) ->
     let spinlock = &*spinlock.cast::<RlctSpinlock>();
 
     loop {
-        match spinlock.inner.compare_exchange_weak(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed) {
+        match spinlock.inner.compare_exchange_weak(
+            UNLOCKED,
+            LOCKED,
+            Ordering::Acquire,
+            Ordering::Relaxed,
+        ) {
             Ok(_) => break,
             Err(_) => core::hint::spin_loop(),
         }
@@ -40,7 +50,10 @@ pub unsafe extern "C" fn pthread_spin_lock(spinlock: *mut pthread_spinlock_t) ->
 pub unsafe extern "C" fn pthread_spin_trylock(spinlock: *mut pthread_spinlock_t) -> c_int {
     let spinlock = &*spinlock.cast::<RlctSpinlock>();
 
-    match spinlock.inner.compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed) {
+    match spinlock
+        .inner
+        .compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed)
+    {
         Ok(_) => (),
         Err(_) => return EBUSY,
     }

@@ -94,16 +94,34 @@ pub struct TzName {
 
 unsafe impl Sync for TzName {}
 
-static mut TZ_STD: [c_char; 8] = [b'U' as c_char, b'T' as c_char, b'C' as c_char, 0, 0, 0, 0, 0];
-static mut TZ_DST: [c_char; 8] = [b'U' as c_char, b'T' as c_char, b'C' as c_char, 0, 0, 0, 0, 0];
+static mut TZ_STD: [c_char; 8] = [
+    b'U' as c_char,
+    b'T' as c_char,
+    b'C' as c_char,
+    0,
+    0,
+    0,
+    0,
+    0,
+];
+static mut TZ_DST: [c_char; 8] = [
+    b'U' as c_char,
+    b'T' as c_char,
+    b'C' as c_char,
+    0,
+    0,
+    0,
+    0,
+    0,
+];
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut tzname: TzName = TzName {
-    tz: [
-        unsafe { TZ_DST.as_mut_ptr() },
-        unsafe { TZ_DST.as_mut_ptr() },
-    ] };
+    tz: [unsafe { TZ_DST.as_mut_ptr() }, unsafe {
+        TZ_DST.as_mut_ptr()
+    }],
+};
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]

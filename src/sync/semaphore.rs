@@ -32,7 +32,9 @@ impl Semaphore {
         loop {
             let value = self.count.load(Ordering::SeqCst);
 
-            if value == 0 { return 0 }
+            if value == 0 {
+                return 0;
+            }
 
             match self.count.compare_exchange_weak(
                 value,

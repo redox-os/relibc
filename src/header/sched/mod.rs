@@ -1,7 +1,9 @@
 //! sched.h implementation for Redox, following https://pubs.opengroup.org/onlinepubs/7908799/xsh/sched.h.html
 
-use crate::platform::{Pal, Sys, types::*};
-use crate::header::time::timespec;
+use crate::{
+    header::time::timespec,
+    platform::{types::*, Pal, Sys},
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct sched_param {
@@ -33,7 +35,11 @@ pub unsafe extern "C" fn sched_setparam(pid: pid_t, param: *const sched_param) -
     todo!()
 }
 // #[no_mangle]
-pub extern "C" fn sched_setscheduler(pid: pid_t, policy: c_int, param: *const sched_param) -> c_int {
+pub extern "C" fn sched_setscheduler(
+    pid: pid_t,
+    policy: c_int,
+    param: *const sched_param,
+) -> c_int {
     todo!()
 }
 #[no_mangle]

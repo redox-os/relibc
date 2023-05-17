@@ -15,7 +15,9 @@ pub(crate) struct RlctBarrierAttr {
 impl Default for RlctBarrierAttr {
     fn default() -> Self {
         // pshared = PTHREAD_PROCESS_PRIVATE is default according to POSIX.
-        Self { pshared: PTHREAD_PROCESS_PRIVATE }
+        Self {
+            pshared: PTHREAD_PROCESS_PRIVATE,
+        }
     }
 }
 
@@ -32,8 +34,16 @@ pub unsafe extern "C" fn pthread_barrier_destroy(barrier: *mut pthread_barrier_t
 
 // Not async-signal-safe.
 #[no_mangle]
-pub unsafe extern "C" fn pthread_barrier_init(barrier: *mut pthread_barrier_t, attr: *const pthread_barrierattr_t, count: c_uint) -> c_int {
-    let attr = attr.cast::<RlctBarrierAttr>().as_ref().copied().unwrap_or_default();
+pub unsafe extern "C" fn pthread_barrier_init(
+    barrier: *mut pthread_barrier_t,
+    attr: *const pthread_barrierattr_t,
+    count: c_uint,
+) -> c_int {
+    let attr = attr
+        .cast::<RlctBarrierAttr>()
+        .as_ref()
+        .copied()
+        .unwrap_or_default();
 
     let Some(count) = NonZeroU32::new(count) else {
         return EINVAL;
@@ -43,7 +53,9 @@ pub unsafe extern "C" fn pthread_barrier_init(barrier: *mut pthread_barrier_t, a
     0
 }
 
-fn unlikely(condition: bool) -> bool { condition }
+fn unlikely(condition: bool) -> bool {
+    condition
+}
 
 // Not async-signal-safe.
 #[no_mangle]
@@ -66,14 +78,20 @@ pub unsafe extern "C" fn pthread_barrierattr_init(attr: *mut pthread_barrierattr
 
 // Not async-signal-safe.
 #[no_mangle]
-pub unsafe extern "C" fn pthread_barrierattr_setpshared(attr: *mut pthread_barrierattr_t, pshared: c_int) -> c_int {
+pub unsafe extern "C" fn pthread_barrierattr_setpshared(
+    attr: *mut pthread_barrierattr_t,
+    pshared: c_int,
+) -> c_int {
     (*attr.cast::<RlctBarrierAttr>()).pshared = pshared;
     0
 }
 
 // Not async-signal-safe.
 #[no_mangle]
-pub unsafe extern "C" fn pthread_barrierattr_getpshared(attr: *const pthread_barrierattr_t, pshared: *mut c_int) -> c_int {
+pub unsafe extern "C" fn pthread_barrierattr_getpshared(
+    attr: *const pthread_barrierattr_t,
+    pshared: *mut c_int,
+) -> c_int {
     core::ptr::write(pshared, (*attr.cast::<RlctBarrierAttr>()).pshared);
     0
 }

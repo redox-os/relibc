@@ -245,7 +245,7 @@ pub unsafe extern "C" fn ungetwc(wc: wint_t, stream: &mut FILE) -> wint_t {
     for i in 0..amount {
         ungetc(bytes[i] as c_int, &mut *stream);
     }
-    
+
     wc
 }
 
@@ -340,7 +340,6 @@ pub unsafe extern "C" fn wcsrtombs(
             s = s.offset(l as isize);
             n = n.wrapping_sub(l);
         } else {
-
             let new_s = s;
             s = s.offset(1);
             *new_s = **ws as c_char;

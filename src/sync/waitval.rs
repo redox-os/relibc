@@ -1,6 +1,8 @@
-use core::cell::UnsafeCell;
-use core::mem::MaybeUninit;
-use core::sync::atomic::{AtomicU32 as AtomicUint, Ordering};
+use core::{
+    cell::UnsafeCell,
+    mem::MaybeUninit,
+    sync::atomic::{AtomicU32 as AtomicUint, Ordering},
+};
 
 use super::*;
 

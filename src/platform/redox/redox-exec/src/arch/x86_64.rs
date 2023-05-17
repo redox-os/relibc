@@ -1,6 +1,6 @@
 use syscall::error::*;
 
-use crate::{FdGuard, fork_inner};
+use crate::{fork_inner, FdGuard};
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 47;
@@ -45,7 +45,8 @@ unsafe extern "sysv64" fn __relibc_internal_fork_hook(cur_filetable_fd: usize, n
     let _ = syscall::close(new_pid_fd);
 }
 
-core::arch::global_asm!("
+core::arch::global_asm!(
+    "
     .p2align 6
     .globl __relibc_internal_fork_wrapper
     .type __relibc_internal_fork_wrapper, @function

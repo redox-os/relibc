@@ -1,36 +1,43 @@
 #![no_std]
-
 #![feature(array_chunks, map_first_last)]
 
 extern crate alloc;
 
 use core::mem::size_of;
 
-use alloc::{
-    boxed::Box,
-    collections::BTreeMap,
-    vec,
-};
+use alloc::{boxed::Box, collections::BTreeMap, vec};
 
 //TODO: allow use of either 32-bit or 64-bit programs
 #[cfg(target_pointer_width = "32")]
-use goblin::elf32::{header::Header, program_header::program_header32::{ProgramHeader, PT_LOAD, PT_INTERP, PF_W, PF_X}};
+use goblin::elf32::{
+    header::Header,
+    program_header::program_header32::{ProgramHeader, PF_W, PF_X, PT_INTERP, PT_LOAD},
+};
 #[cfg(target_pointer_width = "64")]
-use goblin::elf64::{header::Header, program_header::program_header64::{ProgramHeader, PT_LOAD, PT_INTERP, PF_W, PF_X}};
-
+use goblin::elf64::{
+    header::Header,
+    program_header::program_header64::{ProgramHeader, PF_W, PF_X, PT_INTERP, PT_LOAD},
+};
 
 use syscall::{
-    PAGE_SIZE,
     error::*,
     flag::{MapFlags, SEEK_SET},
+    PAGE_SIZE,
 };
 
 pub use self::arch::*;
 mod arch;
 
 pub enum FexecResult {
-    Normal { addrspace_handle: FdGuard },
-    Interp { path: Box<[u8]>, image_file: FdGuard, open_via_dup: FdGuard, interp_override: InterpOverride },
+    Normal {
+        addrspace_handle: FdGuard,
+    },
+    Interp {
+        path: Box<[u8]>,
+        image_file: FdGuard,
+        open_via_dup: FdGuard,
+        interp_override: InterpOverride,
+    },
 }
 pub struct InterpOverride {
     phs: Box<[u8]>,
@@ -45,7 +52,17 @@ pub struct ExtraInfo<'a> {
     pub cwd: Option<&'a [u8]>,
 }
 
-pub fn fexec_impl<A, E>(image_file: FdGuard, open_via_dup: FdGuard, memory_scheme_fd: &FdGuard, path: &[u8], args: A, envs: E, total_args_envs_size: usize, extrainfo: &ExtraInfo, mut interp_override: Option<InterpOverride>) -> Result<FexecResult>
+pub fn fexec_impl<A, E>(
+    image_file: FdGuard,
+    open_via_dup: FdGuard,
+    memory_scheme_fd: &FdGuard,
+    path: &[u8],
+    args: A,
+    envs: E,
+    total_args_envs_size: usize,
+    extrainfo: &ExtraInfo,
+    mut interp_override: Option<InterpOverride>,
+) -> Result<FexecResult>
 where
     A: IntoIterator,
     E: IntoIterator,
@@ -71,28 +88,33 @@ where
     const MAX_PH_SIZE: usize = 1024 * 1024;
     let phentsize = u64::from(header.e_phentsize) as usize;
     let phnum = u64::from(header.e_phnum) as usize;
-    let pheaders_size = phentsize.saturating_mul(phnum).saturating_add(size_of::<Header>());
+    let pheaders_size = phentsize
+        .saturating_mul(phnum)
+        .saturating_add(size_of::<Header>());
 
     if pheaders_size > MAX_PH_SIZE {
         return Err(Error::new(E2BIG));
     }
-    let mut phs_raw = vec! [0_u8; pheaders_size];
+    let mut phs_raw = vec![0_u8; pheaders_size];
     phs_raw[..size_of::<Header>()].copy_from_slice(&header_bytes);
     let phs = &mut phs_raw[size_of::<Header>()..];
 
     // TODO: Remove clone, but this would require more as_refs and as_muts
-    let mut tree = interp_override.as_mut().map_or_else(|| {
-        core::iter::once((0, PAGE_SIZE)).collect::<BTreeMap<_, _>>()
-    }, |o| core::mem::take(&mut o.tree));
+    let mut tree = interp_override.as_mut().map_or_else(
+        || core::iter::once((0, PAGE_SIZE)).collect::<BTreeMap<_, _>>(),
+        |o| core::mem::take(&mut o.tree),
+    );
 
     const BUFSZ: usize = 1024 * 256;
-    let mut buf = vec! [0_u8; BUFSZ];
+    let mut buf = vec![0_u8; BUFSZ];
 
-    read_all(*image_file as usize, Some(header.e_phoff as u64), phs).map_err(|_| Error::new(EIO))?;
+    read_all(*image_file as usize, Some(header.e_phoff as u64), phs)
+        .map_err(|_| Error::new(EIO))?;
 
     for ph_idx in 0..phnum {
         let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
-        let segment: &ProgramHeader = plain::from_bytes(ph_bytes).map_err(|_| Error::new(EINVAL))?;
+        let segment: &ProgramHeader =
+            plain::from_bytes(ph_bytes).map_err(|_| Error::new(EINVAL))?;
         let mut flags = syscall::PROT_READ;
 
         // W ^ X. If it is executable, do not allow it to be writable, even if requested
@@ -104,8 +126,7 @@ where
 
         let voff = segment.p_vaddr as usize % PAGE_SIZE;
         let vaddr = segment.p_vaddr as usize - voff;
-        let size =
-            (segment.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+        let size = (segment.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 
         if segment.p_filesz > segment.p_memsz {
             return Err(Error::new(ENOEXEC));
@@ -114,8 +135,12 @@ where
         match segment.p_type {
             // PT_INTERP must come before any PT_LOAD, so we don't have to iterate twice.
             PT_INTERP => {
-                let mut interp = vec! [0_u8; segment.p_filesz as usize];
-                read_all(*image_file as usize, Some(segment.p_offset as u64), &mut interp)?;
+                let mut interp = vec![0_u8; segment.p_filesz as usize];
+                read_all(
+                    *image_file as usize,
+                    Some(segment.p_offset as u64),
+                    &mut interp,
+                )?;
 
                 return Ok(FexecResult::Interp {
                     path: interp.into_boxed_slice(),
@@ -128,21 +153,39 @@ where
                         phs: phs_raw.into_boxed_slice(),
                         name: path.into(),
                         tree,
-                    }
+                    },
                 });
             }
             PT_LOAD => {
-                allocate_remote(&grants_fd, memory_scheme_fd, vaddr, size, syscall::PROT_READ | syscall::PROT_WRITE)?;
-                syscall::lseek(*image_file as usize, segment.p_offset as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
-                syscall::lseek(*memory_fd, segment.p_vaddr as isize, SEEK_SET).map_err(|_| Error::new(EIO))?;
+                allocate_remote(
+                    &grants_fd,
+                    memory_scheme_fd,
+                    vaddr,
+                    size,
+                    syscall::PROT_READ | syscall::PROT_WRITE,
+                )?;
+                syscall::lseek(*image_file as usize, segment.p_offset as isize, SEEK_SET)
+                    .map_err(|_| Error::new(EIO))?;
+                syscall::lseek(*memory_fd, segment.p_vaddr as isize, SEEK_SET)
+                    .map_err(|_| Error::new(EIO))?;
 
-                for size in core::iter::repeat(buf.len()).take((segment.p_filesz as usize) / buf.len()).chain(Some((segment.p_filesz as usize) % buf.len())) {
-                    read_all(*image_file as usize, None, &mut buf[..size]).map_err(|_| Error::new(EIO))?;
-                    let _ = syscall::write(*memory_fd, &buf[..size]).map_err(|_| Error::new(EIO))?;
+                for size in core::iter::repeat(buf.len())
+                    .take((segment.p_filesz as usize) / buf.len())
+                    .chain(Some((segment.p_filesz as usize) % buf.len()))
+                {
+                    read_all(*image_file as usize, None, &mut buf[..size])
+                        .map_err(|_| Error::new(EIO))?;
+                    let _ =
+                        syscall::write(*memory_fd, &buf[..size]).map_err(|_| Error::new(EIO))?;
                 }
                 mprotect_remote(&grants_fd, vaddr, size, flags)?;
 
-                if !tree.range(..=vaddr).next_back().filter(|(start, size)| **start + **size > vaddr).is_some() {
+                if !tree
+                    .range(..=vaddr)
+                    .next_back()
+                    .filter(|(start, size)| **start + **size > vaddr)
+                    .is_some()
+                {
                     tree.insert(vaddr, size);
                 }
             }
@@ -150,7 +193,13 @@ where
         }
     }
 
-    allocate_remote(&grants_fd, memory_scheme_fd, STACK_TOP - STACK_SIZE, STACK_SIZE, MapFlags::PROT_READ | MapFlags::PROT_WRITE)?;
+    allocate_remote(
+        &grants_fd,
+        memory_scheme_fd,
+        STACK_TOP - STACK_SIZE,
+        STACK_SIZE,
+        MapFlags::PROT_READ | MapFlags::PROT_WRITE,
+    )?;
     tree.insert(STACK_TOP - STACK_SIZE, STACK_SIZE);
 
     let mut sp = STACK_TOP - 256;
@@ -165,12 +214,23 @@ where
     } else {
         &*phs_raw
     };
-    let pheaders_size_aligned = (pheaders_to_convey.len()+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;
+    let pheaders_size_aligned = (pheaders_to_convey.len() + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
     let pheaders = find_free_target_addr(&tree, pheaders_size_aligned).ok_or(Error::new(ENOMEM))?;
     tree.insert(pheaders, pheaders_size_aligned);
-    allocate_remote(&grants_fd, memory_scheme_fd, pheaders, pheaders_size_aligned, MapFlags::PROT_READ | MapFlags::PROT_WRITE)?;
+    allocate_remote(
+        &grants_fd,
+        memory_scheme_fd,
+        pheaders,
+        pheaders_size_aligned,
+        MapFlags::PROT_READ | MapFlags::PROT_WRITE,
+    )?;
     write_all(*memory_fd, Some(pheaders as u64), &pheaders_to_convey)?;
-    mprotect_remote(&grants_fd, pheaders, pheaders_size_aligned, MapFlags::PROT_READ)?;
+    mprotect_remote(
+        &grants_fd,
+        pheaders,
+        pheaders_size_aligned,
+        MapFlags::PROT_READ,
+    )?;
 
     push(0)?;
     push(AT_NULL)?;
@@ -182,15 +242,32 @@ where
     push(AT_ENTRY)?;
     push(pheaders + size_of::<Header>())?;
     push(AT_PHDR)?;
-    push(interp_override.as_ref().map_or(header.e_phnum as usize, |o| o.at_phnum))?;
+    push(
+        interp_override
+            .as_ref()
+            .map_or(header.e_phnum as usize, |o| o.at_phnum),
+    )?;
     push(AT_PHNUM)?;
-    push(interp_override.as_ref().map_or(header.e_phentsize as usize, |o| o.at_phent))?;
+    push(
+        interp_override
+            .as_ref()
+            .map_or(header.e_phentsize as usize, |o| o.at_phent),
+    )?;
     push(AT_PHENT)?;
 
-    let total_args_envs_auxvpointee_size = total_args_envs_size + extrainfo.cwd.map_or(0, |s| s.len() + 1);
-    let args_envs_size_aligned = (total_args_envs_auxvpointee_size+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;
-    let target_args_env_address = find_free_target_addr(&tree, args_envs_size_aligned).ok_or(Error::new(ENOMEM))?;
-    allocate_remote(&grants_fd, memory_scheme_fd, target_args_env_address, args_envs_size_aligned, MapFlags::PROT_READ | MapFlags::PROT_WRITE)?;
+    let total_args_envs_auxvpointee_size =
+        total_args_envs_size + extrainfo.cwd.map_or(0, |s| s.len() + 1);
+    let args_envs_size_aligned =
+        (total_args_envs_auxvpointee_size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+    let target_args_env_address =
+        find_free_target_addr(&tree, args_envs_size_aligned).ok_or(Error::new(ENOMEM))?;
+    allocate_remote(
+        &grants_fd,
+        memory_scheme_fd,
+        target_args_env_address,
+        args_envs_size_aligned,
+        MapFlags::PROT_READ | MapFlags::PROT_WRITE,
+    )?;
     tree.insert(target_args_env_address, args_envs_size_aligned);
 
     let mut offset = 0;
@@ -228,14 +305,20 @@ where
 
     push(argc)?;
 
-    unsafe { deactivate_tcb(*open_via_dup)?; }
+    unsafe {
+        deactivate_tcb(*open_via_dup)?;
+    }
 
     {
         let current_sigaction_fd = FdGuard::new(syscall::dup(*open_via_dup, b"sigactions")?);
         let empty_sigaction_fd = FdGuard::new(syscall::dup(*current_sigaction_fd, b"empty")?);
-        let sigaction_selection_fd = FdGuard::new(syscall::dup(*open_via_dup, b"current-sigactions")?);
+        let sigaction_selection_fd =
+            FdGuard::new(syscall::dup(*open_via_dup, b"current-sigactions")?);
 
-        let _ = syscall::write(*sigaction_selection_fd, &usize::to_ne_bytes(*empty_sigaction_fd))?;
+        let _ = syscall::write(
+            *sigaction_selection_fd,
+            &usize::to_ne_bytes(*empty_sigaction_fd),
+        )?;
     }
 
     // TODO: Restore old name if exec failed?
@@ -251,70 +334,112 @@ where
 
     let addrspace_selection_fd = FdGuard::new(syscall::dup(*open_via_dup, b"current-addrspace")?);
 
-    let _ = syscall::write(*addrspace_selection_fd, &create_set_addr_space_buf(*grants_fd, header.e_entry as usize, sp));
+    let _ = syscall::write(
+        *addrspace_selection_fd,
+        &create_set_addr_space_buf(*grants_fd, header.e_entry as usize, sp),
+    );
 
-    Ok(FexecResult::Normal { addrspace_handle: addrspace_selection_fd })
+    Ok(FexecResult::Normal {
+        addrspace_handle: addrspace_selection_fd,
+    })
 }
 fn write_usizes<const N: usize>(fd: &FdGuard, usizes: [usize; N]) -> Result<()> {
     let _ = syscall::write(**fd, unsafe { plain::as_bytes(&usizes) });
     Ok(())
 }
-fn allocate_remote(addrspace_fd: &FdGuard, memory_scheme_fd: &FdGuard, dst_addr: usize, len: usize, flags: MapFlags) -> Result<()> {
+fn allocate_remote(
+    addrspace_fd: &FdGuard,
+    memory_scheme_fd: &FdGuard,
+    dst_addr: usize,
+    len: usize,
+    flags: MapFlags,
+) -> Result<()> {
     mmap_remote(addrspace_fd, memory_scheme_fd, 0, dst_addr, len, flags)
 }
-pub fn mmap_remote(addrspace_fd: &FdGuard, fd: &FdGuard, offset: usize, dst_addr: usize, len: usize, flags: MapFlags) -> Result<()> {
-    write_usizes(addrspace_fd, [
-        // op
-        syscall::flag::ADDRSPACE_OP_MMAP,
-        // fd
-        **fd,
-        // "offset"
-        offset,
-        // address
-        dst_addr,
-        // size
-        len,
-        // flags
-        (flags | MapFlags::MAP_FIXED_NOREPLACE).bits(),
-    ])
+pub fn mmap_remote(
+    addrspace_fd: &FdGuard,
+    fd: &FdGuard,
+    offset: usize,
+    dst_addr: usize,
+    len: usize,
+    flags: MapFlags,
+) -> Result<()> {
+    write_usizes(
+        addrspace_fd,
+        [
+            // op
+            syscall::flag::ADDRSPACE_OP_MMAP,
+            // fd
+            **fd,
+            // "offset"
+            offset,
+            // address
+            dst_addr,
+            // size
+            len,
+            // flags
+            (flags | MapFlags::MAP_FIXED_NOREPLACE).bits(),
+        ],
+    )
 }
-pub fn mprotect_remote(addrspace_fd: &FdGuard, addr: usize, len: usize, flags: MapFlags) -> Result<()> {
-    write_usizes(addrspace_fd, [
-        // op
-        syscall::flag::ADDRSPACE_OP_MPROTECT,
-        // address
-        addr,
-        // size
-        len,
-        // flags
-        flags.bits(),
-    ])
+pub fn mprotect_remote(
+    addrspace_fd: &FdGuard,
+    addr: usize,
+    len: usize,
+    flags: MapFlags,
+) -> Result<()> {
+    write_usizes(
+        addrspace_fd,
+        [
+            // op
+            syscall::flag::ADDRSPACE_OP_MPROTECT,
+            // address
+            addr,
+            // size
+            len,
+            // flags
+            flags.bits(),
+        ],
+    )
 }
 pub fn munmap_remote(addrspace_fd: &FdGuard, addr: usize, len: usize) -> Result<()> {
-    write_usizes(addrspace_fd, [
-        // op
-        syscall::flag::ADDRSPACE_OP_MUNMAP,
-        // address
-        addr,
-        // size
-        len,
-    ])
+    write_usizes(
+        addrspace_fd,
+        [
+            // op
+            syscall::flag::ADDRSPACE_OP_MUNMAP,
+            // address
+            addr,
+            // size
+            len,
+        ],
+    )
 }
-pub fn munmap_transfer(src: &FdGuard, dst: &FdGuard, src_addr: usize, dst_addr: usize, len: usize, flags: MapFlags) -> Result<()> {
-    write_usizes(dst, [
-        // op
-        syscall::flag::ADDRSPACE_OP_TRANSFER,
-        // fd
-        **src,
-        // "offset" (source address)
-        src_addr,
-        // address
-        dst_addr,
-        // size
-        len,
-        // flags
-        (flags | MapFlags::MAP_FIXED_NOREPLACE).bits(),
-    ])
+pub fn munmap_transfer(
+    src: &FdGuard,
+    dst: &FdGuard,
+    src_addr: usize,
+    dst_addr: usize,
+    len: usize,
+    flags: MapFlags,
+) -> Result<()> {
+    write_usizes(
+        dst,
+        [
+            // op
+            syscall::flag::ADDRSPACE_OP_TRANSFER,
+            // fd
+            **src,
+            // "offset" (source address)
+            src_addr,
+            // address
+            dst_addr,
+            // size
+            len,
+            // flags
+            (flags | MapFlags::MAP_FIXED_NOREPLACE).bits(),
+        ],
+    )
 }
 fn read_all(fd: usize, offset: Option<u64>, buf: &mut [u8]) -> Result<()> {
     if let Some(offset) = offset {
@@ -374,9 +499,7 @@ pub struct FdGuard {
 }
 impl FdGuard {
     pub fn new(fd: usize) -> Self {
-        Self {
-            fd, taken: false,
-        }
+        Self { fd, taken: false }
     }
     pub fn take(&mut self) -> usize {
         self.taken = true;
@@ -398,9 +521,13 @@ impl Drop for FdGuard {
         }
     }
 }
-pub fn create_set_addr_space_buf(space: usize, ip: usize, sp: usize) -> [u8; size_of::<usize>() * 3] {
+pub fn create_set_addr_space_buf(
+    space: usize,
+    ip: usize,
+    sp: usize,
+) -> [u8; size_of::<usize>() * 3] {
     let mut buf = [0_u8; 3 * size_of::<usize>()];
-    let mut chunks = buf.array_chunks_mut::<{size_of::<usize>()}>();
+    let mut chunks = buf.array_chunks_mut::<{ size_of::<usize>() }>();
     *chunks.next().unwrap() = usize::to_ne_bytes(space);
     *chunks.next().unwrap() = usize::to_ne_bytes(sp);
     *chunks.next().unwrap() = usize::to_ne_bytes(ip);
@@ -416,16 +543,17 @@ use auxv_defs::*;
 /// descriptors from other schemes are reobtained with `dup`, and grants referencing such file
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
 pub fn fork_impl() -> Result<usize> {
-    unsafe {
-        Error::demux(__relibc_internal_fork_wrapper())
-    }
+    unsafe { Error::demux(__relibc_internal_fork_wrapper()) }
 }
 
 fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     let (cur_filetable_fd, new_pid_fd, new_pid);
 
     {
-        let cur_pid_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", syscall::O_CLOEXEC)?);
+        let cur_pid_fd = FdGuard::new(syscall::open(
+            "thisproc:current/open_via_dup",
+            syscall::O_CLOEXEC,
+        )?);
         (new_pid_fd, new_pid) = new_context()?;
 
         // Do not allocate new signal stack, but copy existing address (all memory will be re-mapped
@@ -445,9 +573,13 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
         {
             let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);
             let new_sigaction_fd = FdGuard::new(syscall::dup(*cur_sigaction_fd, b"copy")?);
-            let new_sigaction_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-sigactions")?);
+            let new_sigaction_sel_fd =
+                FdGuard::new(syscall::dup(*new_pid_fd, b"current-sigactions")?);
 
-            let _ = syscall::write(*new_sigaction_sel_fd, &usize::to_ne_bytes(*new_sigaction_fd))?;
+            let _ = syscall::write(
+                *new_sigaction_sel_fd,
+                &usize::to_ne_bytes(*new_sigaction_fd),
+            )?;
         }
 
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new
@@ -470,20 +602,25 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
 
             let new_addr_space_fd = FdGuard::new(syscall::dup(*cur_addr_space_fd, b"exclusive")?);
 
-            let mut buf = vec! [0_u8; 4096];
+            let mut buf = vec![0_u8; 4096];
             let mut bytes_read = 0;
 
             loop {
                 let new_bytes_read = syscall::read(*cur_addr_space_fd, &mut buf[bytes_read..])?;
 
-                if new_bytes_read == 0 { break }
+                if new_bytes_read == 0 {
+                    break;
+                }
 
                 bytes_read += new_bytes_read;
             }
             let bytes = &buf[..bytes_read];
 
-            for struct_bytes in bytes.array_chunks::<{size_of::<usize>() * 4}>() {
-                let mut words = struct_bytes.array_chunks::<{size_of::<usize>()}>().copied().map(usize::from_ne_bytes);
+            for struct_bytes in bytes.array_chunks::<{ size_of::<usize>() * 4 }>() {
+                let mut words = struct_bytes
+                    .array_chunks::<{ size_of::<usize>() }>()
+                    .copied()
+                    .map(usize::from_ne_bytes);
 
                 let addr = words.next().unwrap();
                 let size = words.next().unwrap();
@@ -495,12 +632,20 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
                 }
                 let map_flags = MapFlags::from_bits_truncate(flags);
 
-                let grant_fd = FdGuard::new(syscall::dup(*cur_addr_space_fd, alloc::format!("grant-{:x}", addr).as_bytes())?);
+                let grant_fd = FdGuard::new(syscall::dup(
+                    *cur_addr_space_fd,
+                    alloc::format!("grant-{:x}", addr).as_bytes(),
+                )?);
                 mmap_remote(&new_addr_space_fd, &grant_fd, offset, addr, size, map_flags)?;
             }
-            let new_addr_space_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-addrspace")?);
+            let new_addr_space_sel_fd =
+                FdGuard::new(syscall::dup(*new_pid_fd, b"current-addrspace")?);
 
-            let buf = create_set_addr_space_buf(*new_addr_space_fd, __relibc_internal_fork_ret as usize, initial_rsp as usize);
+            let buf = create_set_addr_space_buf(
+                *new_addr_space_fd,
+                __relibc_internal_fork_ret as usize,
+                initial_rsp as usize,
+            );
             let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
         }
         copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
@@ -513,7 +658,10 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
         // kernel.
         let new_filetable_fd = FdGuard::new(syscall::dup(*cur_filetable_fd, b"copy")?);
         let new_filetable_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-filetable")?);
-        let _ = syscall::write(*new_filetable_sel_fd, &usize::to_ne_bytes(*new_filetable_fd));
+        let _ = syscall::write(
+            *new_filetable_sel_fd,
+            &usize::to_ne_bytes(*new_filetable_fd),
+        );
     }
 
     // Unblock context.
@@ -530,16 +678,29 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
 
 pub fn new_context() -> Result<(FdGuard, usize)> {
     // Create a new context (fields such as uid/gid will be inherited from the current context).
-    let fd = FdGuard::new(syscall::open("thisproc:new/open_via_dup", syscall::O_CLOEXEC)?);
+    let fd = FdGuard::new(syscall::open(
+        "thisproc:new/open_via_dup",
+        syscall::O_CLOEXEC,
+    )?);
 
     // Extract pid.
     let mut buffer = [0_u8; 64];
     let len = syscall::fpath(*fd, &mut buffer)?;
     let buffer = buffer.get(..len).ok_or(Error::new(ENAMETOOLONG))?;
 
-    let colon_idx = buffer.iter().position(|c| *c == b':').ok_or(Error::new(EINVAL))?;
-    let slash_idx = buffer.iter().skip(colon_idx).position(|c| *c == b'/').ok_or(Error::new(EINVAL))? + colon_idx;
-    let pid_bytes = buffer.get(colon_idx + 1..slash_idx).ok_or(Error::new(EINVAL))?;
+    let colon_idx = buffer
+        .iter()
+        .position(|c| *c == b':')
+        .ok_or(Error::new(EINVAL))?;
+    let slash_idx = buffer
+        .iter()
+        .skip(colon_idx)
+        .position(|c| *c == b'/')
+        .ok_or(Error::new(EINVAL))?
+        + colon_idx;
+    let pid_bytes = buffer
+        .get(colon_idx + 1..slash_idx)
+        .ok_or(Error::new(EINVAL))?;
     let pid_str = core::str::from_utf8(pid_bytes).map_err(|_| Error::new(EINVAL))?;
     let pid = pid_str.parse::<usize>().map_err(|_| Error::new(EINVAL))?;
 

@@ -1,7 +1,6 @@
 use core::sync::atomic::{AtomicU32, Ordering};
 
-use crate::header::time::timespec;
-use crate::pthread::Pshared;
+use crate::{header::time::timespec, pthread::Pshared};
 
 pub struct Rwlock {
     state: AtomicU32,
@@ -44,7 +43,12 @@ impl Rwlock {
             // TODO: Return with error code instead?
             assert_ne!(new, EXCLUSIVE, "maximum number of rwlock readers reached");
 
-            match self.state.compare_exchange_weak(cached, new, Ordering::Acquire, Ordering::Relaxed) {
+            match self.state.compare_exchange_weak(
+                cached,
+                new,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            ) {
                 Ok(_) => return Ok(()),
 
                 Err(value) if value == EXCLUSIVE => return Err(EXCLUSIVE),
@@ -57,7 +61,9 @@ impl Rwlock {
         }
     }
     pub fn try_acquire_write_lock(&self) -> Result<(), u32> {
-        self.state.compare_exchange(0, EXCLUSIVE, Ordering::Acquire, Ordering::Relaxed).map(|_| ())
+        self.state
+            .compare_exchange(0, EXCLUSIVE, Ordering::Acquire, Ordering::Relaxed)
+            .map(|_| ())
     }
 
     pub fn unlock(&self) {

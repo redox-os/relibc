@@ -5,8 +5,7 @@ use alloc::collections::BTreeMap;
 
 use core::cell::{Cell, RefCell};
 
-use crate::header::errno::EINVAL;
-use crate::sync::Mutex;
+use crate::{header::errno::EINVAL, sync::Mutex};
 
 // TODO: What should this limit be?
 pub const PTHREAD_KEYS_MAX: u32 = 4096 * 32;
@@ -30,7 +29,10 @@ pub unsafe extern "C" fn pthread_getspecific(key: pthread_key_t) -> *mut c_void 
     data
 }
 #[no_mangle]
-pub unsafe extern "C" fn pthread_key_create(key_ptr: *mut pthread_key_t, destructor: Option<extern "C" fn(value: *mut c_void)>) -> c_int {
+pub unsafe extern "C" fn pthread_key_create(
+    key_ptr: *mut pthread_key_t,
+    destructor: Option<extern "C" fn(value: *mut c_void)>,
+) -> c_int {
     let key = NEXTKEY.get();
     NEXTKEY.set(key + 1);
     //println!("pthread_key_create new key {:#0x}, dtor {:p}", key, destructor);
@@ -41,9 +43,12 @@ pub unsafe extern "C" fn pthread_key_create(key_ptr: *mut pthread_key_t, destruc
 
     KEYS.lock().insert(key, Dtor { destructor });
 
-    VALUES.borrow_mut().insert(key, Record {
-        data: core::ptr::null_mut(),
-    });
+    VALUES.borrow_mut().insert(
+        key,
+        Record {
+            data: core::ptr::null_mut(),
+        },
+    );
 
     key_ptr.write(key);
 
@@ -61,7 +66,7 @@ pub unsafe extern "C" fn pthread_key_delete(key: pthread_key_t) -> c_int {
     0
 }
 
- #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn pthread_setspecific(key: pthread_key_t, value: *const c_void) -> c_int {
     if !KEYS.lock().contains_key(&key) {
         // We don't have to return anything, but it's not less expensive to ignore it.
@@ -71,7 +76,9 @@ pub unsafe extern "C" fn pthread_setspecific(key: pthread_key_t, value: *const c
 
     let mut guard = VALUES.borrow_mut();
 
-    let Record { ref mut data, .. } = guard.entry(key).or_insert(Record { data: core::ptr::null_mut() });
+    let Record { ref mut data, .. } = guard.entry(key).or_insert(Record {
+        data: core::ptr::null_mut(),
+    });
     //println!("Valid key for pthread_setspecific key {:#0x} value {:p} (was {:p})", key, value, *data);
 
     *data = value as *mut c_void;

@@ -5,7 +5,7 @@ use super::{
     e, Sys,
 };
 use crate::header::{
-    signal::{NSIG, sigaction, siginfo_t, sigset_t, stack_t},
+    signal::{sigaction, siginfo_t, sigset_t, stack_t, NSIG},
     sys_time::itimerval,
     time::timespec,
 };
@@ -53,7 +53,7 @@ impl PalSignal for Sys {
     }
 
     fn sigpending(set: *mut sigset_t) -> c_int {
-        e(unsafe { syscall!(RT_SIGPENDING, set, NSIG/8) }) as c_int
+        e(unsafe { syscall!(RT_SIGPENDING, set, NSIG / 8) }) as c_int
     }
 
     fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
@@ -61,10 +61,10 @@ impl PalSignal for Sys {
     }
 
     fn sigsuspend(set: *const sigset_t) -> c_int {
-        e(unsafe { syscall!(RT_SIGSUSPEND, set, NSIG/8) }) as c_int
+        e(unsafe { syscall!(RT_SIGSUSPEND, set, NSIG / 8) }) as c_int
     }
 
     fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec) -> c_int {
-        e(unsafe { syscall!(RT_SIGTIMEDWAIT, set, sig, tp, NSIG/8) }) as c_int
+        e(unsafe { syscall!(RT_SIGTIMEDWAIT, set, sig, tp, NSIG / 8) }) as c_int
     }
 }

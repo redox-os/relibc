@@ -135,12 +135,8 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
                 0
             }
         }
-        TIOCGPTLCK => {
-            0
-        },
-        TIOCSPTLCK => {
-            0
-        },
+        TIOCGPTLCK => 0,
+        TIOCSPTLCK => 0,
         TCSBRK => {
             // TODO
             0

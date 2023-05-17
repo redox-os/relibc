@@ -1,6 +1,8 @@
-use core::cmp;
-use core::num::NonZeroU32;
-use core::sync::atomic::{AtomicU32 as AtomicUint, Ordering};
+use core::{
+    cmp,
+    num::NonZeroU32,
+    sync::atomic::{AtomicU32 as AtomicUint, Ordering},
+};
 
 pub struct Barrier {
     original_count: NonZeroU32,
@@ -26,7 +28,10 @@ impl Barrier {
     pub fn new(count: NonZeroU32) -> Self {
         Self {
             original_count: count,
-            lock: crate::sync::Mutex::new(Inner { count: 0, gen_id: 0 }),
+            lock: crate::sync::Mutex::new(Inner {
+                count: 0,
+                gen_id: 0,
+            }),
             cvar: crate::header::pthread::RlctCond::new(),
         }
     }

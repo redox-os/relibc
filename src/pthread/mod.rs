@@ -1,22 +1,24 @@
 //! Relibc Threads, or RLCT.
 
-use core::cell::{Cell, UnsafeCell};
-use core::ptr::NonNull;
-use core::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+use core::{
+    cell::{Cell, UnsafeCell},
+    ptr::NonNull,
+    sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
+};
 
-use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
+use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
 
-use crate::platform::{Pal, Sys, types::*};
-use crate::header::sched::sched_param;
-use crate::header::errno::*;
-use crate::header::sys_mman;
-use crate::header::pthread as header;
-use crate::ld_so::{linker::Linker, tcb::{Master, Tcb}};
-use crate::ALLOCATOR;
+use crate::{
+    header::{errno::*, pthread as header, sched::sched_param, sys_mman},
+    ld_so::{
+        linker::Linker,
+        tcb::{Master, Tcb},
+    },
+    platform::{types::*, Pal, Sys},
+    ALLOCATOR,
+};
 
-use crate::sync::{Mutex, waitval::Waitval};
+use crate::sync::{waitval::Waitval, Mutex};
 
 const MAIN_PTHREAD_ID: usize = 1;
 
@@ -65,7 +67,6 @@ pub struct Pthread {
     // so it starts from one. The 31st bit is reserved. Only for process-private mutexes, which we
     // currently don't handle separately.
     //index: u32,
-
     stack_base: *mut c_void,
     stack_size: usize,
 
@@ -93,7 +94,10 @@ pub struct Errno(pub c_int);
 #[derive(Clone, Copy)]
 pub struct Retval(pub *mut c_void);
 
-struct MmapGuard { page_start: *mut c_void, mmap_size: usize }
+struct MmapGuard {
+    page_start: *mut c_void,
+    mmap_size: usize,
+}
 impl Drop for MmapGuard {
     fn drop(&mut self) {
         unsafe {
@@ -102,7 +106,11 @@ impl Drop for MmapGuard {
     }
 }
 
-pub(crate) unsafe fn create(attrs: Option<&header::RlctAttr>, start_routine: extern "C" fn(arg: *mut c_void) -> *mut c_void, arg: *mut c_void) -> Result<pthread_t, Errno> {
+pub(crate) unsafe fn create(
+    attrs: Option<&header::RlctAttr>,
+    start_routine: extern "C" fn(arg: *mut c_void) -> *mut c_void,
+    arg: *mut c_void,
+) -> Result<pthread_t, Errno> {
     let attrs = attrs.copied().unwrap_or_default();
 
     // Create a locked mutex, unlocked by the thread after it has started.
@@ -148,7 +156,10 @@ pub(crate) unsafe fn create(attrs: Option<&header::RlctAttr>, start_routine: ext
     };
     let ptr = Box::into_raw(Box::new(pthread));
 
-    let stack_raii = MmapGuard { page_start: stack_base, mmap_size: stack_size };
+    let stack_raii = MmapGuard {
+        page_start: stack_base,
+        mmap_size: stack_size,
+    };
 
     let stack_end = stack_base.add(stack_size);
     let mut stack = stack_end as *mut usize;
@@ -191,7 +202,9 @@ pub(crate) unsafe fn create(attrs: Option<&header::RlctAttr>, start_routine: ext
 
     let _ = (&*synchronization_mutex).lock();
 
-    OS_TID_TO_PTHREAD.lock().insert(os_tid, ForceSendSync(ptr.cast()));
+    OS_TID_TO_PTHREAD
+        .lock()
+        .insert(os_tid, ForceSendSync(ptr.cast()));
 
     Ok(ptr.cast())
 }
@@ -229,7 +242,10 @@ unsafe extern "C" fn new_thread_shim(
 pub unsafe fn join(thread: &Pthread) -> Result<Retval, Errno> {
     // We don't have to return EDEADLK, but unlike e.g. pthread_t lifetime checking, it's a
     // relatively easy check.
-    if core::ptr::eq(thread, current_thread().expect("current thread not present")) {
+    if core::ptr::eq(
+        thread,
+        current_thread().expect("current thread not present"),
+    ) {
         return Err(Errno(EDEADLK));
     }
 
@@ -248,22 +264,24 @@ pub unsafe fn join(thread: &Pthread) -> Result<Retval, Errno> {
 }
 
 pub unsafe fn detach(thread: &Pthread) -> Result<(), Errno> {
-    thread.flags.fetch_or(PthreadFlags::DETACHED.bits(), Ordering::Release);
+    thread
+        .flags
+        .fetch_or(PthreadFlags::DETACHED.bits(), Ordering::Release);
     Ok(())
 }
 
 // Returns option because that's a no-op, but PTHREAD_SELF should always be initialized except in
 // early init code.
 pub fn current_thread() -> Option<&'static Pthread> {
-    unsafe {
-        NonNull::new(PTHREAD_SELF.get()).map(|p| p.as_ref())
-    }
+    unsafe { NonNull::new(PTHREAD_SELF.get()).map(|p| p.as_ref()) }
 }
 
 pub unsafe fn testcancel() {
     let this_thread = current_thread().expect("current thread not present");
 
-    if this_thread.has_queued_cancelation.load(Ordering::Acquire) && this_thread.has_enabled_cancelation.load(Ordering::Acquire) {
+    if this_thread.has_queued_cancelation.load(Ordering::Acquire)
+        && this_thread.has_enabled_cancelation.load(Ordering::Acquire)
+    {
         cancel_current_thread();
     }
 }
@@ -319,7 +337,11 @@ pub unsafe fn cancel(thread: &Pthread) -> Result<(), Errno> {
     Ok(())
 }
 
-pub fn set_sched_param(_thread: &Pthread, _policy: c_int, _param: &sched_param) -> Result<(), Errno> {
+pub fn set_sched_param(
+    _thread: &Pthread,
+    _policy: c_int,
+    _param: &sched_param,
+) -> Result<(), Errno> {
     // TODO
     Ok(())
 }
@@ -332,14 +354,20 @@ pub fn set_cancel_state(state: c_int) -> Result<c_int, Errno> {
 
     let was_cancelable = match state {
         header::PTHREAD_CANCEL_ENABLE => {
-            let old = this_thread.has_enabled_cancelation.swap(true, Ordering::Release);
+            let old = this_thread
+                .has_enabled_cancelation
+                .swap(true, Ordering::Release);
 
             if this_thread.has_queued_cancelation.load(Ordering::Acquire) {
-                unsafe { cancel_current_thread(); }
+                unsafe {
+                    cancel_current_thread();
+                }
             }
             old
-        },
-        header::PTHREAD_CANCEL_DISABLE => this_thread.has_enabled_cancelation.swap(false, Ordering::Release),
+        }
+        header::PTHREAD_CANCEL_DISABLE => this_thread
+            .has_enabled_cancelation
+            .swap(false, Ordering::Release),
 
         _ => return Err(Errno(EINVAL)),
     };
@@ -371,7 +399,8 @@ pub fn get_sched_param(thread: &Pthread) -> Result<(clockid_t, sched_param), Err
 
 // TODO: Hash map?
 // TODO: RwLock to improve perf?
-static OS_TID_TO_PTHREAD: Mutex<BTreeMap<OsTid, ForceSendSync<*mut Pthread>>> = Mutex::new(BTreeMap::new());
+static OS_TID_TO_PTHREAD: Mutex<BTreeMap<OsTid, ForceSendSync<*mut Pthread>>> =
+    Mutex::new(BTreeMap::new());
 
 #[derive(Clone, Copy)]
 struct ForceSendSync<T>(T);

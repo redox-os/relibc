@@ -1,14 +1,14 @@
-use core::cell::Cell;
-use core::sync::atomic::{AtomicU32 as AtomicUint, Ordering};
+use core::{
+    cell::Cell,
+    sync::atomic::{AtomicU32 as AtomicUint, Ordering},
+};
 
-use crate::header::pthread::*;
-use crate::pthread::*;
-use crate::header::time::timespec;
-use crate::header::errno::*;
-use crate::header::sys_wait::*;
+use crate::{
+    header::{errno::*, pthread::*, sys_wait::*, time::timespec},
+    pthread::*,
+};
 
-use crate::platform::types::*;
-use crate::platform::{Pal, Sys};
+use crate::platform::{types::*, Pal, Sys};
 
 pub struct RlctMutex {
     // Actual locking word.
@@ -31,7 +31,13 @@ const SPIN_COUNT: usize = 0;
 
 impl RlctMutex {
     pub(crate) fn new(attr: &RlctMutexAttr) -> Result<Self, Errno> {
-        let RlctMutexAttr { prioceiling, protocol, pshared: _, robust, ty } = *attr;
+        let RlctMutexAttr {
+            prioceiling,
+            protocol,
+            pshared: _,
+            robust,
+            ty,
+        } = *attr;
 
         Ok(Self {
             inner: AtomicUint::new(STATE_UNLOCKED),
@@ -49,7 +55,7 @@ impl RlctMutex {
                 PTHREAD_MUTEX_NORMAL => Ty::Normal,
 
                 _ => return Err(Errno(EINVAL)),
-            }
+            },
         })
     }
     pub fn prioceiling(&self) -> Result<c_int, Errno> {
@@ -70,7 +76,12 @@ impl RlctMutex {
         let mut spins_left = SPIN_COUNT;
 
         loop {
-            let result = self.inner.compare_exchange_weak(STATE_UNLOCKED, this_thread, Ordering::Acquire, Ordering::Relaxed);
+            let result = self.inner.compare_exchange_weak(
+                STATE_UNLOCKED,
+                this_thread,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            );
 
             match result {
                 // CAS succeeded
@@ -79,7 +90,7 @@ impl RlctMutex {
                         self.increment_recursive_count()?;
                     }
                     return Ok(());
-                },
+                }
                 // CAS failed, but the mutex was recursive and we already own the lock.
                 Err(thread) if thread & INDEX_MASK == this_thread && self.ty == Ty::Recursive => {
                     self.increment_recursive_count()?;
@@ -136,7 +147,8 @@ impl RlctMutex {
             return Err(Errno(EAGAIN));
         }
 
-        self.recursive_count.store(prev_recursive_count + 1, Ordering::Relaxed);
+        self.recursive_count
+            .store(prev_recursive_count + 1, Ordering::Relaxed);
 
         Ok(())
     }
@@ -144,7 +156,12 @@ impl RlctMutex {
         let this_thread = os_tid_invalid_after_fork();
 
         // TODO: If recursive, omitting CAS may be faster if it is already owned by this thread.
-        let result = self.inner.compare_exchange(STATE_UNLOCKED, this_thread, Ordering::Acquire, Ordering::Relaxed);
+        let result = self.inner.compare_exchange(
+            STATE_UNLOCKED,
+            this_thread,
+            Ordering::Acquire,
+            Ordering::Relaxed,
+        );
 
         if self.ty == Ty::Recursive {
             match result {
@@ -159,7 +176,9 @@ impl RlctMutex {
 
         match result {
             Ok(_) => Ok(()),
-            Err(index) if index & INDEX_MASK == this_thread && self.ty == Ty::Errck => Err(Errno(EDEADLK)),
+            Err(index) if index & INDEX_MASK == this_thread && self.ty == Ty::Errck => {
+                Err(Errno(EDEADLK))
+            }
             Err(_) => Err(Errno(EBUSY)),
         }
     }
@@ -178,7 +197,9 @@ impl RlctMutex {
             let next = self.recursive_count.load(Ordering::Relaxed) - 1;
             self.recursive_count.store(next, Ordering::Relaxed);
 
-            if next > 0 { return Ok(()) }
+            if next > 0 {
+                return Ok(());
+            }
         }
 
         self.inner.store(STATE_UNLOCKED, Ordering::Release);
@@ -215,7 +236,7 @@ fn os_tid_invalid_after_fork() -> u32 {
     // TODO: Coordinate better if using shared == PTHREAD_PROCESS_SHARED, with up to 2^32 separate
     // threads within possibly distinct processes, using the mutex. OS thread IDs on Redox are
     // pointer-sized, but relibc and POSIX uses int everywhere.
-    
+
     let value = CACHED_OS_TID_INVALID_AFTER_FORK.get();
 
     if value == 0 {
