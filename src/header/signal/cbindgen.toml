@@ -1,4 +1,4 @@
-sys_includes = ["stdint.h", "sys/types.h", "time.h"]
+sys_includes = ["stdint.h", "sys/types.h", "time.h", "bits/pthread.h"]
 include_guard = "_RELIBC_SIGNAL_H"
 trailer = "#include <bits/signal.h>"
 language = "C"
