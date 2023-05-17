@@ -63,7 +63,7 @@ fn dup_write<T>(fd: c_int, name: &str, t: &T) -> syscall::Result<usize> {
 pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
     match request {
         FIONBIO => {
-            let mut flags = fcntl::sys_fcntl(fd, fcntl::F_GETFL, 0usize);
+            let mut flags = fcntl::sys_fcntl(fd, fcntl::F_GETFL, 0);
             if flags < 0 {
                 return -1;
             }
