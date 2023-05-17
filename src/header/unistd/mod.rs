@@ -5,8 +5,8 @@ use core::{convert::TryFrom, mem, ptr, slice};
 use crate::{
     c_str::CStr,
     header::{
-        errno, fcntl, limits, stdlib::getenv, sys_ioctl, sys_resource, sys_time, sys_utsname, termios,
-        time::timespec,
+        errno, fcntl, limits, stdlib::getenv, sys_ioctl, sys_resource, sys_time, sys_utsname,
+        termios, time::timespec,
     },
     platform::{self, types::*, Pal, Sys},
 };
@@ -290,12 +290,17 @@ pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char 
 #[no_mangle]
 pub extern "C" fn getdtablesize() -> c_int {
     let mut lim = mem::MaybeUninit::<sys_resource::rlimit>::uninit();
-    let r = unsafe { sys_resource::getrlimit(sys_resource::RLIMIT_NOFILE as c_int, lim.as_mut_ptr() as *mut sys_resource::rlimit) };
+    let r = unsafe {
+        sys_resource::getrlimit(
+            sys_resource::RLIMIT_NOFILE as c_int,
+            lim.as_mut_ptr() as *mut sys_resource::rlimit,
+        )
+    };
     if r == 0 {
         let cur = unsafe { lim.assume_init() }.rlim_cur;
         match cur {
             c if c < i32::MAX as u64 => c as i32,
-            _ => i32::MAX
+            _ => i32::MAX,
         };
     }
     -1
@@ -472,21 +477,21 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
             }
             platform::errno = errno::EACCES;
             return -1;
-        },
+        }
         fcntl::F_ULOCK => {
             fl.l_type = fcntl::F_UNLCK as c_short;
             return fcntl::sys_fcntl(fildes, fcntl::F_SETLK, &mut fl as *mut _ as c_ulonglong);
-        },
+        }
         fcntl::F_TLOCK => {
             return fcntl::sys_fcntl(fildes, fcntl::F_SETLK, &mut fl as *mut _ as c_ulonglong);
-        },
+        }
         fcntl::F_LOCK => {
             return fcntl::sys_fcntl(fildes, fcntl::F_SETLKW, &mut fl as *mut _ as c_ulonglong);
-        },
+        }
         _ => {
             platform::errno = errno::EINVAL;
             return -1;
-        },
+        }
     };
 }
 

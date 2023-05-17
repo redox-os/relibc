@@ -22,7 +22,7 @@ use crate::{
 use core::{
     mem::MaybeUninit,
     ops::Deref,
-    sync::atomic::{self, AtomicI32, AtomicU32, AtomicI32 as AtomicInt},
+    sync::atomic::{self, AtomicI32, AtomicI32 as AtomicInt, AtomicU32},
 };
 
 const FUTEX_WAIT: c_int = 0;
@@ -93,14 +93,27 @@ pub unsafe fn futex_wake_ptr(ptr: *mut impl FutexTy, n: i32) -> usize {
     // TODO: unwrap_unchecked?
     Sys::futex(ptr.cast(), FUTEX_WAKE, n, 0).unwrap() as usize
 }
-pub unsafe fn futex_wait_ptr<T: FutexTy>(ptr: *mut T, value: T, timeout_opt: Option<&timespec>) -> bool {
+pub unsafe fn futex_wait_ptr<T: FutexTy>(
+    ptr: *mut T,
+    value: T,
+    timeout_opt: Option<&timespec>,
+) -> bool {
     // TODO: unwrap_unchecked?
-    Sys::futex(ptr.cast(), FUTEX_WAIT, value.conv(), timeout_opt.map_or(0, |t| t as *const _ as usize)) == Ok(0)
+    Sys::futex(
+        ptr.cast(),
+        FUTEX_WAIT,
+        value.conv(),
+        timeout_opt.map_or(0, |t| t as *const _ as usize),
+    ) == Ok(0)
 }
 pub fn futex_wake(atomic: &impl FutexAtomicTy, n: i32) -> usize {
     unsafe { futex_wake_ptr(atomic.ptr(), n) }
 }
-pub fn futex_wait<T: FutexAtomicTy>(atomic: &T, value: T::Ty, timeout_opt: Option<&timespec>) -> bool {
+pub fn futex_wait<T: FutexAtomicTy>(
+    atomic: &T,
+    value: T::Ty,
+    timeout_opt: Option<&timespec>,
+) -> bool {
     unsafe { futex_wait_ptr(atomic.ptr(), value, timeout_opt) }
 }
 

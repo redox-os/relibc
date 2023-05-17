@@ -842,14 +842,11 @@ pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void 
 pub unsafe extern "C" fn reallocarray(ptr: *mut c_void, m: size_t, n: size_t) -> *mut c_void {
     //Handle possible integer overflow in size calculation
     match m.checked_mul(n) {
-        Some(size) => {
-            realloc(ptr, size)
-        }
+        Some(size) => realloc(ptr, size),
         None => {
             // For overflowing multiplication, we have to set errno here
             platform::errno = ENOMEM;
             ptr::null_mut()
-
         }
     }
 }

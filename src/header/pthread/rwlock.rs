@@ -5,10 +5,19 @@ use crate::header::errno::EBUSY;
 use crate::pthread::Pshared;
 
 #[no_mangle]
-pub unsafe extern "C" fn pthread_rwlock_init(rwlock: *mut pthread_rwlock_t, attr: *const pthread_rwlockattr_t) -> c_int {
-    let attr = attr.cast::<RlctRwlockAttr>().as_ref().copied().unwrap_or_default();
+pub unsafe extern "C" fn pthread_rwlock_init(
+    rwlock: *mut pthread_rwlock_t,
+    attr: *const pthread_rwlockattr_t,
+) -> c_int {
+    let attr = attr
+        .cast::<RlctRwlockAttr>()
+        .as_ref()
+        .copied()
+        .unwrap_or_default();
 
-    rwlock.cast::<RlctRwlock>().write(RlctRwlock::new(attr.pshared));
+    rwlock
+        .cast::<RlctRwlock>()
+        .write(RlctRwlock::new(attr.pshared));
 
     0
 }
@@ -19,13 +28,19 @@ pub unsafe extern "C" fn pthread_rwlock_rdlock(rwlock: *mut pthread_rwlock_t) ->
     0
 }
 #[no_mangle]
-pub unsafe extern "C" fn pthread_rwlock_timedrdlock(rwlock: *mut pthread_rwlock_t, timeout: *const timespec) -> c_int {
+pub unsafe extern "C" fn pthread_rwlock_timedrdlock(
+    rwlock: *mut pthread_rwlock_t,
+    timeout: *const timespec,
+) -> c_int {
     get(rwlock).acquire_read_lock(Some(&*timeout));
 
     0
 }
 #[no_mangle]
-pub unsafe extern "C" fn pthread_rwlock_timedwrlock(rwlock: *mut pthread_rwlock_t, timeout: *const timespec) -> c_int {
+pub unsafe extern "C" fn pthread_rwlock_timedwrlock(
+    rwlock: *mut pthread_rwlock_t,
+    timeout: *const timespec,
+) -> c_int {
     get(rwlock).acquire_write_lock(Some(&*timeout));
 
     0
@@ -59,21 +74,29 @@ pub unsafe extern "C" fn pthread_rwlock_wrlock(rwlock: *mut pthread_rwlock_t) ->
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_rwlockattr_init(attr: *mut pthread_rwlockattr_t) -> c_int {
-    attr.cast::<RlctRwlockAttr>().write(RlctRwlockAttr::default());
+    attr.cast::<RlctRwlockAttr>()
+        .write(RlctRwlockAttr::default());
 
     0
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pthread_rwlockattr_getpshared(attr: *const pthread_rwlockattr_t, pshared_out: *mut c_int) -> c_int {
+pub unsafe extern "C" fn pthread_rwlockattr_getpshared(
+    attr: *const pthread_rwlockattr_t,
+    pshared_out: *mut c_int,
+) -> c_int {
     core::ptr::write(pshared_out, (*attr.cast::<RlctRwlockAttr>()).pshared.raw());
 
     0
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pthread_rwlockattr_setpshared(attr: *mut pthread_rwlockattr_t, pshared: c_int) -> c_int {
-    (*attr.cast::<RlctRwlockAttr>()).pshared = Pshared::from_raw(pshared).expect("invalid pshared in pthread_rwlockattr_setpshared");
+pub unsafe extern "C" fn pthread_rwlockattr_setpshared(
+    attr: *mut pthread_rwlockattr_t,
+    pshared: c_int,
+) -> c_int {
+    (*attr.cast::<RlctRwlockAttr>()).pshared =
+        Pshared::from_raw(pshared).expect("invalid pshared in pthread_rwlockattr_setpshared");
 
     0
 }

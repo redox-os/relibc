@@ -1,7 +1,10 @@
 use super::{AtomicLock, AttemptStatus};
 use crate::platform::types::*;
-use core::{cell::UnsafeCell, mem::MaybeUninit};
-use core::sync::atomic::{AtomicI32 as AtomicInt, Ordering};
+use core::{
+    cell::UnsafeCell,
+    mem::MaybeUninit,
+    sync::atomic::{AtomicI32 as AtomicInt, Ordering},
+};
 
 const UNINITIALIZED: c_int = 0;
 const INITIALIZING: c_int = 1;
@@ -51,8 +54,7 @@ impl<T> Once<T> {
             // then Relaxed is sufficient, as it will have to be Acquire-loaded again later. If
             // INITIALIZED is encountered however, it will nonatomically read the value in the
             // Cell, which necessitates Acquire.
-            Ordering::Acquire
-            // TODO: On archs where this matters, use Relaxed and core::sync::atomic::fence?
+            Ordering::Acquire, // TODO: On archs where this matters, use Relaxed and core::sync::atomic::fence?
         ) {
             Ok(_must_be_uninit) => {
                 // We now have exclusive access to the cell, let's initiate things!
@@ -77,7 +79,12 @@ impl<T> Once<T> {
                 // it was INITIALIZED, the nonatomic write by the constructor thread, must be
                 // visible.
                 |status| match status
-                    .compare_exchange_weak(INITIALIZING, WAITING, Ordering::Acquire, Ordering::Acquire)
+                    .compare_exchange_weak(
+                        INITIALIZING,
+                        WAITING,
+                        Ordering::Acquire,
+                        Ordering::Acquire,
+                    )
                     .unwrap_or_else(|e| e)
                 {
                     WAITING => AttemptStatus::Waiting,

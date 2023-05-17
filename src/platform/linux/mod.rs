@@ -234,8 +234,15 @@ impl Pal for Sys {
         e(unsafe { syscall!(FTRUNCATE, fildes, length) }) as c_int
     }
 
-    fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> Result<c_long, crate::pthread::Errno> {
-        e_raw(unsafe { syscall!(FUTEX, addr, op, val, val2, 0, 0)}).map(|r| r as c_long).map_err(|e| crate::pthread::Errno(e as c_int))
+    fn futex(
+        addr: *mut c_int,
+        op: c_int,
+        val: c_int,
+        val2: usize,
+    ) -> Result<c_long, crate::pthread::Errno> {
+        e_raw(unsafe { syscall!(FUTEX, addr, op, val, val2, 0, 0) })
+            .map(|r| r as c_long)
+            .map_err(|e| crate::pthread::Errno(e as c_int))
     }
 
     fn futimens(fd: c_int, times: *const timespec) -> c_int {
@@ -403,7 +410,9 @@ impl Pal for Sys {
     }
 
     #[cfg(target_arch = "x86_64")]
-    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
+    unsafe fn rlct_clone(
+        stack: *mut usize,
+    ) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
         let pid;
         asm!("
@@ -456,9 +465,14 @@ impl Pal for Sys {
 
         Ok(crate::pthread::OsTid { thread_id: tid })
     }
-    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), crate::pthread::Errno> {
+    unsafe fn rlct_kill(
+        os_tid: crate::pthread::OsTid,
+        signal: usize,
+    ) -> Result<(), crate::pthread::Errno> {
         let tgid = Self::getpid();
-        e_raw(unsafe { syscall!(TGKILL, tgid, os_tid.thread_id, signal) }).map(|_| ()).map_err(|err| crate::pthread::Errno(err as c_int))
+        e_raw(unsafe { syscall!(TGKILL, tgid, os_tid.thread_id, signal) })
+            .map(|_| ())
+            .map_err(|err| crate::pthread::Errno(err as c_int))
     }
     fn current_os_tid() -> crate::pthread::OsTid {
         crate::pthread::OsTid {

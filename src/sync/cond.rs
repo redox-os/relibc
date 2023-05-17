@@ -1,9 +1,9 @@
 // Used design from https://www.remlab.net/op/futex-condvar.shtml
 
-use crate::header::pthread::*;
-use crate::header::bits_pthread::*;
-use crate::header::time::timespec;
-use crate::pthread::Errno;
+use crate::{
+    header::{bits_pthread::*, pthread::*, time::timespec},
+    pthread::Errno,
+};
 
 use core::sync::atomic::{AtomicU32 as AtomicUint, Ordering};
 
@@ -16,7 +16,7 @@ type Result<T, E = crate::pthread::Errno> = core::result::Result<T, E>;
 
 impl Cond {
     pub fn new() -> Self {
-        Self{
+        Self {
             cur: AtomicUint::new(0),
             prev: AtomicUint::new(0),
         }
@@ -40,22 +40,42 @@ impl Cond {
         self.wait_inner(mutex, Some(timeout))
     }
     fn wait_inner(&self, mutex: &RlctMutex, timeout: Option<&timespec>) -> Result<(), Errno> {
-        self.wait_inner_generic(|| mutex.unlock(), || mutex.lock(), |timeout| mutex.lock_with_timeout(timeout), timeout)
+        self.wait_inner_generic(
+            || mutex.unlock(),
+            || mutex.lock(),
+            |timeout| mutex.lock_with_timeout(timeout),
+            timeout,
+        )
     }
-    pub fn wait_inner_typedmutex<'lock, T>(&self, guard: crate::sync::MutexGuard<'lock, T>) -> crate::sync::MutexGuard<'lock, T> {
+    pub fn wait_inner_typedmutex<'lock, T>(
+        &self,
+        guard: crate::sync::MutexGuard<'lock, T>,
+    ) -> crate::sync::MutexGuard<'lock, T> {
         let mut newguard = None;
         let lock = guard.mutex;
-        self.wait_inner_generic(move || {
-            drop(guard);
-            Ok(())
-        }, || {
-            newguard = Some(lock.lock());
-            Ok(())
-        }, |_| unreachable!(), None).unwrap();
+        self.wait_inner_generic(
+            move || {
+                drop(guard);
+                Ok(())
+            },
+            || {
+                newguard = Some(lock.lock());
+                Ok(())
+            },
+            |_| unreachable!(),
+            None,
+        )
+        .unwrap();
         newguard.unwrap()
     }
     // TODO: FUTEX_REQUEUE
-    fn wait_inner_generic(&self, unlock: impl FnOnce() -> Result<()>, lock: impl FnOnce() -> Result<()>, lock_with_timeout: impl FnOnce(&timespec) -> Result<()>, timeout: Option<&timespec>) -> Result<(), Errno> {
+    fn wait_inner_generic(
+        &self,
+        unlock: impl FnOnce() -> Result<()>,
+        lock: impl FnOnce() -> Result<()>,
+        lock_with_timeout: impl FnOnce(&timespec) -> Result<()>,
+        timeout: Option<&timespec>,
+    ) -> Result<(), Errno> {
         // TODO: Error checking for certain types (i.e. robust and errorcheck) of mutexes, e.g. if the
         // mutex is not locked.
         let current = self.cur.load(Ordering::Relaxed);
@@ -65,7 +85,11 @@ impl Cond {
 
         match timeout {
             Some(timeout) => {
-                crate::sync::futex_wait(&self.cur, current, timespec::subtract(*timeout, crate::sync::rttime()).as_ref());
+                crate::sync::futex_wait(
+                    &self.cur,
+                    current,
+                    timespec::subtract(*timeout, crate::sync::rttime()).as_ref(),
+                );
                 lock_with_timeout(timeout);
             }
             None => {

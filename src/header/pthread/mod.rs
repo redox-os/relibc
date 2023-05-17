@@ -1,11 +1,12 @@
 //! pthread.h implementation for Redox, following https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/pthread.h.html
 
-use core::ptr::NonNull;
-use core::cell::Cell;
+use core::{cell::Cell, ptr::NonNull};
 
-use crate::platform::{self, Pal, Sys, types::*};
-use crate::header::{sched::*, time::timespec};
-use crate::pthread;
+use crate::{
+    header::{sched::*, time::timespec},
+    platform::{self, types::*, Pal, Sys},
+    pthread,
+};
 
 pub fn e(result: Result<(), pthread::Errno>) -> i32 {
     match result {
@@ -82,7 +83,12 @@ pub mod cond;
 pub use self::cond::*;
 
 #[no_mangle]
-pub unsafe extern "C" fn pthread_create(pthread: *mut pthread_t, attr: *const pthread_attr_t, start_routine: extern "C" fn(arg: *mut c_void) -> *mut c_void, arg: *mut c_void) -> c_int {
+pub unsafe extern "C" fn pthread_create(
+    pthread: *mut pthread_t,
+    attr: *const pthread_attr_t,
+    start_routine: extern "C" fn(arg: *mut c_void) -> *mut c_void,
+    arg: *mut c_void,
+) -> c_int {
     let attr = attr.cast::<RlctAttr>().as_ref();
 
     match pthread::create(attr, start_routine, arg) {
@@ -119,7 +125,10 @@ pub unsafe extern "C" fn pthread_getconcurrency() -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pthread_getcpuclockid(thread: pthread_t, clock_out: *mut clockid_t) -> c_int {
+pub unsafe extern "C" fn pthread_getcpuclockid(
+    thread: pthread_t,
+    clock_out: *mut clockid_t,
+) -> c_int {
     match pthread::get_cpu_clkid(&*thread.cast()) {
         Ok(clock) => {
             clock_out.write(clock);
@@ -130,7 +139,11 @@ pub unsafe extern "C" fn pthread_getcpuclockid(thread: pthread_t, clock_out: *mu
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pthread_getschedparam(thread: pthread_t, policy_out: *mut c_int, param_out: *mut sched_param) -> c_int {
+pub unsafe extern "C" fn pthread_getschedparam(
+    thread: pthread_t,
+    policy_out: *mut c_int,
+    param_out: *mut sched_param,
+) -> c_int {
     match pthread::get_sched_param(&*thread.cast()) {
         Ok((policy, param)) => {
             policy_out.write(policy);
@@ -199,7 +212,11 @@ pub extern "C" fn pthread_setconcurrency(concurrency: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pthread_setschedparam(thread: pthread_t, policy: c_int, param: *const sched_param) -> c_int {
+pub unsafe extern "C" fn pthread_setschedparam(
+    thread: pthread_t,
+    policy: c_int,
+    param: *const sched_param,
+) -> c_int {
     e(pthread::set_sched_param(&*thread.cast(), policy, &*param))
 }
 #[no_mangle]
@@ -224,7 +241,8 @@ pub(crate) struct CleanupLinkedListEntry {
 }
 
 #[thread_local]
-pub(crate) static CLEANUP_LL_HEAD: Cell<*const CleanupLinkedListEntry> = Cell::new(core::ptr::null());
+pub(crate) static CLEANUP_LL_HEAD: Cell<*const CleanupLinkedListEntry> =
+    Cell::new(core::ptr::null());
 
 // TODO: unwind? setjmp/longjmp?
 

@@ -67,16 +67,16 @@ pub const PRIO_USER: c_int = 2;
 
 #[no_mangle]
 pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
-     let r = Sys::getpriority(which, who);
-     if r < 0 {
-         return r
-     }
-     20-r
+    let r = Sys::getpriority(which, who);
+    if r < 0 {
+        return r;
+    }
+    20 - r
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn setpriority(which: c_int, who: id_t, nice: c_int) -> c_int {
-     Sys::setpriority(which, who, nice)
+    Sys::setpriority(which, who, nice)
 }
 
 #[no_mangle]

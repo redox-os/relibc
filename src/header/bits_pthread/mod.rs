@@ -5,7 +5,7 @@ use crate::platform::types::*;
 use crate::header::sched::sched_param;
 
 use crate::sync::AtomicLock;
-use core::sync::atomic::{AtomicU32 as AtomicUint, AtomicI32 as AtomicInt};
+use core::sync::atomic::{AtomicI32 as AtomicInt, AtomicU32 as AtomicUint};
 
 // XXX: https://github.com/eqrion/cbindgen/issues/685
 //

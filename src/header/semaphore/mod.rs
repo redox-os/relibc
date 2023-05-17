@@ -22,10 +22,12 @@ pub unsafe extern "C" fn sem_destroy(sem: *mut sem_t) -> c_int {
     0
 }
 
-
 // TODO: va_list
 // #[no_mangle]
-pub unsafe extern "C" fn sem_open(name: *const c_char, oflag: c_int, /* (va_list) value: c_uint */) -> *mut sem_t {
+pub unsafe extern "C" fn sem_open(
+    name: *const c_char,
+    oflag: c_int, /* (va_list) value: c_uint */
+) -> *mut sem_t {
     todo!("named semaphores")
 }
 
