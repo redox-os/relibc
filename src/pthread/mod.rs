@@ -1,7 +1,7 @@
 //! Relibc Threads, or RLCT.
 
 use core::{
-    cell::{Cell, UnsafeCell},
+    cell::{Cell, RefCell, UnsafeCell},
     ptr::NonNull,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
@@ -9,7 +9,7 @@ use core::{
 use alloc::{boxed::Box, collections::BTreeMap};
 
 use crate::{
-    header::{errno::*, pthread as header, sched::sched_param, sys_mman},
+    header::{errno::*, pthread as header, sched::sched_param, string, sys_mman},
     ld_so::{
         linker::Linker,
         tcb::{Master, Tcb},
@@ -35,6 +35,7 @@ pub unsafe fn init() {
         // TODO
         stack_base: core::ptr::null_mut(),
         stack_size: 0,
+        name: None.into(),
 
         os_tid: UnsafeCell::new(Sys::current_os_tid()),
     }));
@@ -69,6 +70,7 @@ pub struct Pthread {
     //index: u32,
     stack_base: *mut c_void,
     stack_size: usize,
+    name: RefCell<Option<Box<[u8]>>>,
 
     pub(crate) os_tid: UnsafeCell<OsTid>,
 }
@@ -149,6 +151,7 @@ pub(crate) unsafe fn create(
         has_queued_cancelation: AtomicBool::new(false),
         stack_base,
         stack_size,
+        name: None.into(),
         os_tid: UnsafeCell::new(OsTid::default()),
         //index: NEXT_INDEX.fetch_add(1, Ordering::Relaxed),
     };
@@ -393,6 +396,10 @@ pub fn get_cpu_clkid(thread: &Pthread) -> Result<clockid_t, Errno> {
 }
 pub fn get_sched_param(thread: &Pthread) -> Result<(clockid_t, sched_param), Errno> {
     todo!()
+}
+
+pub unsafe fn set_name(thread: &Pthread, name: &[u8]) {
+    thread.name.replace(Some(Box::from(name)));
 }
 
 // TODO: Hash map?
