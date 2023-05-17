@@ -28,11 +28,17 @@ pub const F_RDLCK: c_int = 0;
 pub const F_WRLCK: c_int = 1;
 pub const F_UNLCK: c_int = 2;
 
+pub const F_ULOCK: c_int = 0;
+pub const F_LOCK: c_int = 1;
+pub const F_TLOCK: c_int = 2;
+pub const F_TEST: c_int = 3;
+
 #[no_mangle]
 pub unsafe extern "C" fn creat(path: *const c_char, mode: mode_t) -> c_int {
     sys_open(path, O_WRONLY | O_CREAT | O_TRUNC, mode)
 }
 #[repr(C)]
+#[derive(Clone, Copy, Default)]
 pub struct flock {
     pub l_type: c_short,
     pub l_whence: c_short,
@@ -41,7 +47,7 @@ pub struct flock {
     pub l_pid: pid_t,
 }
 #[no_mangle]
-pub extern "C" fn sys_fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
+pub extern "C" fn sys_fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> c_int {
     Sys::fcntl(fildes, cmd, arg)
 }
 

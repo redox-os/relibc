@@ -451,9 +451,43 @@ pub unsafe extern "C" fn link(path1: *const c_char, path2: *const c_char) -> c_i
     Sys::link(path1, path2)
 }
 
-// #[no_mangle]
-pub extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c_int {
+    let mut fl = fcntl::flock {
+        l_type: fcntl::F_WRLCK as c_short,
+        l_whence: SEEK_CUR as c_short,
+        l_start: 0,
+        l_len: size,
+        l_pid: -1,
+    };
+
+    match function {
+        fcntl::F_TEST => {
+            fl.l_type = fcntl::F_RDLCK as c_short;
+            if fcntl::sys_fcntl(fildes, fcntl::F_GETLK, &mut fl as *mut _ as c_ulonglong) < 0 {
+                return -1;
+            }
+            if fl.l_type == fcntl::F_UNLCK as c_short || fl.l_pid == getpid() {
+                return 0;
+            }
+            platform::errno = errno::EACCES;
+            return -1;
+        },
+        fcntl::F_ULOCK => {
+            fl.l_type = fcntl::F_UNLCK as c_short;
+            return fcntl::sys_fcntl(fildes, fcntl::F_SETLK, &mut fl as *mut _ as c_ulonglong);
+        },
+        fcntl::F_TLOCK => {
+            return fcntl::sys_fcntl(fildes, fcntl::F_SETLK, &mut fl as *mut _ as c_ulonglong);
+        },
+        fcntl::F_LOCK => {
+            return fcntl::sys_fcntl(fildes, fcntl::F_SETLKW, &mut fl as *mut _ as c_ulonglong);
+        },
+        _ => {
+            platform::errno = errno::EINVAL;
+            return -1;
+        },
+    };
 }
 
 #[no_mangle]

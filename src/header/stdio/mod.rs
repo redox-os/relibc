@@ -505,7 +505,7 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
     }
 
     if flags & fcntl::O_CLOEXEC > 0 {
-        fcntl::sys_fcntl(fd, fcntl::F_SETFD, fcntl::FD_CLOEXEC);
+        fcntl::sys_fcntl(fd, fcntl::F_SETFD, fcntl::FD_CLOEXEC as c_ulonglong);
     }
 
     if let Some(f) = helpers::_fdopen(fd, mode) {
@@ -596,10 +596,10 @@ pub unsafe extern "C" fn freopen(
     if filename.is_null() {
         // Reopen stream in new mode
         if flags & fcntl::O_CLOEXEC > 0 {
-            fcntl::sys_fcntl(*stream.file, fcntl::F_SETFD, fcntl::FD_CLOEXEC);
+            fcntl::sys_fcntl(*stream.file, fcntl::F_SETFD, fcntl::FD_CLOEXEC as c_ulonglong);
         }
         flags &= !(fcntl::O_CREAT | fcntl::O_EXCL | fcntl::O_CLOEXEC);
-        if fcntl::sys_fcntl(*stream.file, fcntl::F_SETFL, flags) < 0 {
+        if fcntl::sys_fcntl(*stream.file, fcntl::F_SETFL, flags as c_ulonglong) < 0 {
             funlockfile(stream);
             fclose(stream);
             return ptr::null_mut();
@@ -615,7 +615,7 @@ pub unsafe extern "C" fn freopen(
         if *new.file == *stream.file {
             new.file.fd = -1;
         } else if Sys::dup2(*new.file, *stream.file) < 0
-            || fcntl::sys_fcntl(*stream.file, fcntl::F_SETFL, flags & fcntl::O_CLOEXEC) < 0
+            || fcntl::sys_fcntl(*stream.file, fcntl::F_SETFL, (flags & fcntl::O_CLOEXEC) as c_ulonglong) < 0
         {
             funlockfile(stream);
             fclose(new);
