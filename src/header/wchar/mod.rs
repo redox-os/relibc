@@ -660,14 +660,28 @@ macro_rules! strtou_impl {
         strtou_impl!($type, $ptr, $base, false)
     };
     ($type:ident, $ptr:expr, $base:expr, $negative:expr) => {{
-        if $base == 16 && *$ptr == '0' as wchar_t && *$ptr.add(1) | 0x20 == 'x' as wchar_t {
+        let mut base = $base;
+        
+        if (base == 16 || base == 0)
+            && *$ptr == '0' as wchar_t
+            && (*$ptr.add(1) == 'x' as wchar_t || *$ptr.add(1) == 'X' as wchar_t)
+        {
             $ptr = $ptr.add(2);
+            base = 16;
         }
+        
+        if base == 0 {
+            base = if *$ptr == '0' as wchar_t {
+                8
+            } else {
+                10
+            };
+        };
 
         let mut result: $type = 0;
-        while let Some(digit) = char::from_u32(*$ptr as u32).and_then(|c| c.to_digit($base as u32))
+        while let Some(digit) = char::from_u32(*$ptr as u32).and_then(|c| c.to_digit(base as u32))
         {
-            let new = result.checked_mul($base as $type).and_then(|result| {
+            let new = result.checked_mul(base as $type).and_then(|result| {
                 if $negative {
                     result.checked_sub(digit as $type)
                 } else {
@@ -712,6 +726,34 @@ pub unsafe extern "C" fn wcstol(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn wcstoll(
+    mut ptr: *const wchar_t,
+    end: *mut *mut wchar_t,
+    base: c_int,
+) -> c_longlong {
+    skipws!(ptr);
+    let result = strto_impl!(c_longlong, ptr, base);
+    if !end.is_null() {
+        *end = ptr as *mut _;
+    }
+    result
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wcstoimax(
+    mut ptr: *const wchar_t,
+    end: *mut *mut wchar_t,
+    base: c_int,
+) -> intmax_t {
+    skipws!(ptr);
+    let result = strto_impl!(intmax_t, ptr, base);
+    if !end.is_null() {
+        *end = ptr as *mut _;
+    }
+    result
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn wcstoul(
     mut ptr: *const wchar_t,
     end: *mut *mut wchar_t,
@@ -719,6 +761,34 @@ pub unsafe extern "C" fn wcstoul(
 ) -> c_ulong {
     skipws!(ptr);
     let result = strtou_impl!(c_ulong, ptr, base);
+    if !end.is_null() {
+        *end = ptr as *mut _;
+    }
+    result
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wcstoull(
+    mut ptr: *const wchar_t,
+    end: *mut *mut wchar_t,
+    base: c_int,
+) -> c_ulonglong {
+    skipws!(ptr);
+    let result = strtou_impl!(c_ulonglong, ptr, base);
+    if !end.is_null() {
+        *end = ptr as *mut _;
+    }
+    result
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wcstoumax(
+    mut ptr: *const wchar_t,
+    end: *mut *mut wchar_t,
+    base: c_int,
+) -> uintmax_t {
+    skipws!(ptr);
+    let result = strtou_impl!(uintmax_t, ptr, base);
     if !end.is_null() {
         *end = ptr as *mut _;
     }

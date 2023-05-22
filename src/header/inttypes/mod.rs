@@ -1,5 +1,7 @@
+use core::{convert::TryInto, ptr};
+
 use crate::{
-    header::{ctype, errno::*, stdlib::*},
+    header::{ctype, errno::*, stdlib::*, wctype::iswspace},
     platform::{self, types::*},
 };
 
@@ -55,24 +57,4 @@ pub unsafe extern "C" fn strtoumax(
         endptr,
         base
     )
-}
-
-#[allow(unused)]
-// #[no_mangle]
-pub extern "C" fn wcstoimax(
-    nptr: *const wchar_t,
-    endptr: *mut *mut wchar_t,
-    base: c_int,
-) -> intmax_t {
-    unimplemented!();
-}
-
-#[allow(unused)]
-// #[no_mangle]
-pub extern "C" fn wcstoumax(
-    nptr: *const wchar_t,
-    endptr: *mut *mut wchar_t,
-    base: c_int,
-) -> uintmax_t {
-    unimplemented!();
 }

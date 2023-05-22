@@ -117,6 +117,8 @@ EXPECT_NAMES=\
 	wchar/wcstod \
 	wchar/wcstok \
 	wchar/wcstol \
+	wchar/wcstoimax \
+	wchar/wcstoumax \
 	wchar/wcscasecmp \
 	wchar/wcsncasecmp \
 	wchar/wcswidth \
