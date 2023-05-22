@@ -661,7 +661,7 @@ macro_rules! strtou_impl {
     };
     ($type:ident, $ptr:expr, $base:expr, $negative:expr) => {{
         let mut base = $base;
-        
+
         if (base == 16 || base == 0)
             && *$ptr == '0' as wchar_t
             && (*$ptr.add(1) == 'x' as wchar_t || *$ptr.add(1) == 'X' as wchar_t)
@@ -669,18 +669,13 @@ macro_rules! strtou_impl {
             $ptr = $ptr.add(2);
             base = 16;
         }
-        
+
         if base == 0 {
-            base = if *$ptr == '0' as wchar_t {
-                8
-            } else {
-                10
-            };
+            base = if *$ptr == '0' as wchar_t { 8 } else { 10 };
         };
 
         let mut result: $type = 0;
-        while let Some(digit) = char::from_u32(*$ptr as u32).and_then(|c| c.to_digit(base as u32))
-        {
+        while let Some(digit) = char::from_u32(*$ptr as u32).and_then(|c| c.to_digit(base as u32)) {
             let new = result.checked_mul(base as $type).and_then(|result| {
                 if $negative {
                     result.checked_sub(digit as $type)
