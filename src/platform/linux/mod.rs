@@ -4,7 +4,11 @@ use core_io::Write;
 use super::{errno, types::*, Pal};
 use crate::{
     c_str::CStr,
-    header::{dirent::dirent, signal::SIGCHLD, sys_stat::S_IFIFO},
+    header::{
+        dirent::dirent,
+        signal::{siginfo_t, SIGCHLD},
+        sys_stat::S_IFIFO,
+    },
 };
 // use header::sys_resource::rusage;
 use crate::header::{
@@ -12,6 +16,7 @@ use crate::header::{
     sys_stat::stat,
     sys_statvfs::statvfs,
     sys_time::{timeval, timezone},
+    sys_wait::{id_t, idtype_t},
 };
 // use header::sys_times::tms;
 use crate::header::{sys_utsname::utsname, time::timespec};
@@ -550,6 +555,10 @@ impl Pal for Sys {
 
     fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
         e(unsafe { syscall!(WAIT4, pid, stat_loc, options, 0) }) as pid_t
+    }
+
+    fn waitid(idtype: idtype_t, id: id_t, infop: *mut siginfo_t, options: c_int) -> c_int {
+        e(unsafe { syscall!(WAITID, idtype, id, infop, options) }) as c_int
     }
 
     fn write(fildes: c_int, buf: &[u8]) -> ssize_t {

@@ -13,6 +13,8 @@ use crate::{
         dirent::dirent,
         errno::{EINVAL, EIO, ENOMEM, ENOSYS, EPERM, ERANGE},
         fcntl,
+        signal::siginfo_t,
+        string::strlen,
         sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, RLIM_INFINITY},
@@ -20,7 +22,7 @@ use crate::{
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
         sys_utsname::{utsname, UTSLENGTH},
-        sys_wait,
+        sys_wait::{id_t, idtype_t, WNOHANG, WUNTRACED},
         time::timespec,
         unistd::{F_OK, R_OK, W_OK, X_OK},
     },
@@ -991,14 +993,11 @@ impl Pal for Sys {
         let state = ptrace::init_state();
         let mut sessions = state.sessions.lock();
         if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
-            if options & sys_wait::WNOHANG != sys_wait::WNOHANG {
+            if options & WNOHANG != WNOHANG {
                 let mut _event = PtraceEvent::default();
                 let _ = (&mut &session.tracer).read(&mut _event);
 
-                res = Some(e(inner(
-                    &mut status,
-                    options | sys_wait::WNOHANG | sys_wait::WUNTRACED,
-                )));
+                res = Some(e(inner(&mut status, options | WNOHANG | WUNTRACED)));
                 if res == Some(0) {
                     // WNOHANG, just pretend ptrace SIGSTOP:ped this
                     status = (syscall::SIGSTOP << 8) | 0x7f;
@@ -1014,7 +1013,7 @@ impl Pal for Sys {
         // it if (and only if) a ptrace traceme was activated during
         // the wait.
         let res = res.unwrap_or_else(|| loop {
-            let res = e(inner(&mut status, options | sys_wait::WUNTRACED));
+            let res = e(inner(&mut status, options | WUNTRACED));
 
             // TODO: Also handle special PIDs here
             if !syscall::wifstopped(res) || ptrace::is_traceme(pid) {
@@ -1029,6 +1028,12 @@ impl Pal for Sys {
             }
         }
         res as pid_t
+    }
+
+    fn waitid(idtype: idtype_t, id: id_t, infop: *mut siginfo_t, options: c_int) -> c_int {
+        // TODO
+        unsafe { errno = ENOSYS };
+        -1
     }
 
     fn write(fd: c_int, buf: &[u8]) -> ssize_t {
