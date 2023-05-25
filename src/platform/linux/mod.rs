@@ -12,6 +12,7 @@ use crate::header::{
     sys_stat::stat,
     sys_statvfs::statvfs,
     sys_time::{timeval, timezone},
+    time::itimerspec,
 };
 // use header::sys_times::tms;
 use crate::header::{sys_utsname::utsname, time::timespec};
@@ -534,6 +535,31 @@ impl Pal for Sys {
 
     fn sync() -> c_int {
         e(unsafe { syscall!(SYNC) }) as c_int
+    }
+
+    fn timer_create(clockid: clockid_t, evp: c_ulonglong, timerid: *mut timer_t) -> c_int {
+        e(unsafe { syscall!(TIMER_CREATE, evp, timerid) }) as c_int
+    }
+
+    fn timer_delete(timerid: timer_t) -> c_int {
+        e(unsafe { syscall!(TIMER_DELETE, timerid) }) as c_int
+    }
+
+    fn timer_getoverrun(timerid: timer_t) -> c_int {
+        e(unsafe { syscall!(TIMER_GETOVERRUN, timerid) }) as c_int
+    }
+
+    fn timer_gettime(timerid: timer_t, ts: *mut itimerspec) -> c_int {
+        e(unsafe { syscall!(TIMER_GETTIME, timerid, ts) }) as c_int
+    }
+
+    fn timer_settime(
+        timerid: timer_t,
+        flags: c_int,
+        ts: *const itimerspec,
+        oldts: *mut itimerspec,
+    ) -> c_int {
+        e(unsafe { syscall!(TIMER_SETTIME, flags, timerid, ts, oldts) }) as c_int
     }
 
     fn umask(mask: mode_t) -> mode_t {

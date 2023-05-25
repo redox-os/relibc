@@ -22,7 +22,7 @@ use crate::{
         sys_time::{timeval, timezone},
         sys_utsname::{utsname, UTSLENGTH},
         sys_wait,
-        time::timespec,
+        time::{itimerspec, timespec},
         unistd::{F_OK, R_OK, W_OK, X_OK},
     },
     io::{self, prelude::*, BufReader, SeekFrom},
@@ -875,6 +875,41 @@ impl Pal for Sys {
 
     fn sync() -> c_int {
         0
+    }
+
+    fn timer_create(clockid: clockid_t, evp: c_ulonglong, timerid: *mut timer_t) -> c_int {
+        // TODO
+        unsafe { errno = ENOSYS };
+        -1
+    }
+
+    fn timer_delete(timerid: timer_t) -> c_int {
+        // TODO
+        unsafe { errno = ENOSYS };
+        -1
+    }
+
+    fn timer_getoverrun(timerid: timer_t) -> c_int {
+        // TODO
+        unsafe { errno = ENOSYS };
+        -1
+    }
+
+    fn timer_gettime(timerid: timer_t, ts: *mut itimerspec) -> c_int {
+        // TODO
+        unsafe { errno = ENOSYS };
+        -1
+    }
+
+    fn timer_settime(
+        timerid: timer_t,
+        flags: c_int,
+        ts: *const itimerspec,
+        oldts: *mut itimerspec,
+    ) -> c_int {
+        // TODO
+        unsafe { errno = ENOSYS };
+        -1
     }
 
     fn umask(mask: mode_t) -> mode_t {
