@@ -1,8 +1,6 @@
 use super::*;
 
-use crate::{header::errno::*, pthread::Errno};
-
-use core::sync::atomic::AtomicI32 as AtomicInt;
+use crate::pthread::Errno;
 
 // PTHREAD_MUTEX_INITIALIZER is defined in bits_pthread/cbindgen.toml
 

@@ -1,8 +1,4 @@
-use core::{
-    cmp,
-    num::NonZeroU32,
-    sync::atomic::{AtomicU32 as AtomicUint, Ordering},
-};
+use core::num::NonZeroU32;
 
 pub struct Barrier {
     original_count: NonZeroU32,

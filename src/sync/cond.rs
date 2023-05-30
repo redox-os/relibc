@@ -1,7 +1,7 @@
 // Used design from https://www.remlab.net/op/futex-condvar.shtml
 
 use crate::{
-    header::{bits_pthread::*, pthread::*, time::timespec},
+    header::{pthread::*, time::timespec},
     pthread::Errno,
 };
 

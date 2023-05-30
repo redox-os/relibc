@@ -31,9 +31,7 @@ static mut STATIC_TCB_MASTER: Master = Master {
 fn panic_notls(msg: impl core::fmt::Display) -> ! {
     eprintln!("panicked in ld.so: {}", msg);
 
-    unsafe {
-        core::intrinsics::abort();
-    }
+    core::intrinsics::abort();
 }
 
 pub trait ExpectTlsFree {
@@ -140,12 +138,14 @@ pub fn static_init(sp: &'static Stack) {
 
 #[cfg(any(target_os = "linux", target_os = "redox"))]
 pub unsafe fn init(sp: &'static Stack) {
-    let mut tp = 0usize;
+    let tp: usize;
 
     #[cfg(target_os = "linux")]
     {
         const ARCH_GET_FS: usize = 0x1003;
-        syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut tp as *mut usize);
+        let mut val = 0usize;
+        syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut val as *mut usize);
+        tp = val;
     }
     #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
     {

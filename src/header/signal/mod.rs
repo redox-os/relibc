@@ -352,7 +352,7 @@ pub extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int {
         return -1;
     }
     unsafe {
-        let mut info = pinfo.assume_init();
+        let info = pinfo.assume_init();
         (*sig) = info.si_signo;
     }
     0

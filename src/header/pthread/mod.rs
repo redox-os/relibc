@@ -1,10 +1,10 @@
 //! pthread.h implementation for Redox, following https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/pthread.h.html
 
-use core::{cell::Cell, ptr::NonNull};
+use core::cell::Cell;
 
 use crate::{
     header::{sched::*, time::timespec},
-    platform::{self, types::*, Pal, Sys},
+    platform::{types::*, Pal, Sys},
     pthread,
 };
 

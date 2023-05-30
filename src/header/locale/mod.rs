@@ -9,7 +9,6 @@ const EMPTY_PTR: *const c_char = "\0" as *const _ as *const c_char;
 static mut C_LOCALE: [c_char; 2] = [b'C' as c_char, 0];
 
 #[repr(C)]
-#[no_mangle]
 pub struct lconv {
     currency_symbol: *const c_char,
     decimal_point: *const c_char,

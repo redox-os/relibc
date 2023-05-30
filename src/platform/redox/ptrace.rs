@@ -14,7 +14,7 @@ use crate::{
     fs::File,
     header::{errno as errnoh, fcntl, signal, sys_ptrace},
     io::{self, prelude::*},
-    sync::{Mutex, Once},
+    sync::Mutex,
 };
 
 use alloc::collections::{btree_map::Entry, BTreeMap};

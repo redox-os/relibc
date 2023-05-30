@@ -1,7 +1,5 @@
-use core::{convert::TryInto, ptr};
-
 use crate::{
-    header::{ctype, errno::*, stdlib::*, wctype::iswspace},
+    header::{ctype, errno::*, stdlib::*},
     platform::{self, types::*},
 };
 
@@ -10,7 +8,6 @@ pub extern "C" fn imaxabs(i: intmax_t) -> intmax_t {
     i.abs()
 }
 
-#[no_mangle]
 #[repr(C)]
 pub struct imaxdiv_t {
     quot: intmax_t,

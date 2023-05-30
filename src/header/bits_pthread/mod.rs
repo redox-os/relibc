@@ -2,11 +2,6 @@
 
 use crate::platform::types::*;
 
-use crate::header::sched::sched_param;
-
-use crate::sync::AtomicLock;
-use core::sync::atomic::{AtomicI32 as AtomicInt, AtomicU32 as AtomicUint};
-
 // XXX: https://github.com/eqrion/cbindgen/issues/685
 //
 // We need to write the opaque types ourselves, and apparently cbindgen doesn't even support

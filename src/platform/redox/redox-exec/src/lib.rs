@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(array_chunks, map_first_last)]
+#![feature(array_chunks)]
 
 extern crate alloc;
 

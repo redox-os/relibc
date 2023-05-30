@@ -1,4 +1,4 @@
-use core::{mem::size_of, ptr, slice};
+use core::{ptr, slice};
 
 use crate::platform::{sys::e, types::*};
 
