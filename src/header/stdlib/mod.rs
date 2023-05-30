@@ -1170,13 +1170,19 @@ pub unsafe extern "C" fn strtoll(
 pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
     //TODO: share code with popen
 
+    // handle shell detection on command == NULL
+    if command.is_null() {
+        let status = system("exit 0\0".as_ptr() as *const c_char);
+        if status == 0 {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+
     let child_pid = unistd::fork();
     if child_pid == 0 {
-        let command_nonnull = if command.is_null() {
-            "exit 0\0".as_ptr()
-        } else {
-            command as *const u8
-        };
+        let command_nonnull = command as *const u8;
 
         let shell = "/bin/sh\0".as_ptr();
 
