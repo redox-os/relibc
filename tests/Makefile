@@ -53,6 +53,7 @@ EXPECT_NAMES=\
 	stdlib/div \
 	stdlib/env \
 	stdlib/mkostemps \
+	stdlib/qsort \
 	stdlib/rand \
 	stdlib/rand48 \
 	stdlib/random \
