@@ -76,7 +76,7 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
 
     // Unblock context.
     syscall::kill(new_pid, SIGCONT)?;
-    let _ = syscall::waitpid(new_pid, &mut 0, syscall::WUNTRACED | syscall::WCONTINUED);
+    let _ = syscall::waitpid(new_pid, &mut 0, syscall::WUNTRACED | syscall::WCONTINUED | syscall::WNOHANG);
 
     Ok(new_pid)
 }
