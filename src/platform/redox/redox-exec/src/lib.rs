@@ -671,7 +671,7 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     // context. This means that if pgid is changed (as it is in ion for example), the pgid message
     // in syscall::exit() will not be inserted as the key comparator thinks they're equal as their
     // PIDs are. So, we have to call this to clear the waitpid queue to prevent deadlocks.
-    let _ = syscall::waitpid(new_pid, &mut 0, syscall::WUNTRACED | syscall::WCONTINUED | syscall::WNOHANG);
+    let _ = syscall::waitpid(new_pid, &mut 0, syscall::WUNTRACED | syscall::WCONTINUED);
 
     Ok(new_pid)
 }
