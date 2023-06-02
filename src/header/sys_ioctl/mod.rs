@@ -21,6 +21,12 @@ pub struct winsize {
     ws_ypixel: c_ushort,
 }
 
+impl winsize {
+    pub fn get_row_col(&self) -> (c_ushort, c_ushort) {
+        (self.ws_row, self.ws_col)
+    }
+}
+
 pub use self::sys::*;
 
 #[cfg(target_os = "linux")]
