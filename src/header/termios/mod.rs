@@ -1,7 +1,10 @@
 //! termios implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/termios.h.html
 
 use crate::{
-    header::{errno, sys_ioctl},
+    header::{
+        errno,
+        sys_ioctl::{self, winsize},
+    },
     platform::{self, types::*},
 };
 
@@ -169,6 +172,11 @@ pub unsafe extern "C" fn tcsendbreak(fd: c_int, _dur: c_int) -> c_int {
     // non-zero duration is ignored by musl due to it being
     // implementation-defined. we do the same.
     sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, 0 as *mut _)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn tcsetwinsize(fd: c_int, mut sws: winsize) -> c_int {
+    sys_ioctl::ioctl(fd, sys_ioctl::TIOCSWINSZ, &mut sws as *mut _ as *mut c_void)
 }
 
 #[no_mangle]
