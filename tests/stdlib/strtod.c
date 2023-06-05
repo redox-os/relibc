@@ -61,6 +61,17 @@ int main(void) {
         "-0.5e25", "-0.5e26", "-0.5e27", "-0.5e28", "-0.5e29",
         "-0.5e30", "-0.5e31", "-0.5e32", "-0.5e33", "-0.5e34",
         "-0.5e35", "-0.5e36", "-0.5e37", "-0.5e38",
+
+        "-0",
+
+        "INF", "inf", "iNf", "Inf foobarbaz",
+        "+INF", "+inf", "+iNf", "+Inf foobarbaz",
+        "-INF", "-inf", "-iNf", "-Inf foobarbaz",
+
+        "NaN0.1e5", "nan-37", "nAn1.05", "Nan foo bar baz",
+        "+NaN0.1e5", "+nan-37", "+nAn1.05", "+Nan foo bar baz",
+        "-NaN0.1e5", "-nan-37", "-nAn1.05", "-Nan foo bar baz",
+
     };
     for (int i = 0; i < sizeof(inputs) / sizeof(char*); i += 1) {
         d = strtod(inputs[i], &endptr);
