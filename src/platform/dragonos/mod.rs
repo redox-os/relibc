@@ -308,8 +308,7 @@ impl Pal for Sys {
     }
 
     fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
-        // e(unsafe { syscall!(GETTIMEOFDAY, tp, tzp) }) as c_int
-        unimplemented!()
+        e(unsafe { syscall!(SYS_GETTIMEOFDAY, tp, tzp) }) as c_int
     }
 
     fn getuid() -> uid_t {
