@@ -1,5 +1,6 @@
 use core::{convert::TryFrom, mem, ptr, result::Result as CoreResult, slice, str};
 
+use redox_exec::ForkInfo;
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
@@ -45,7 +46,7 @@ mod exec;
 mod extra;
 pub(crate) mod path;
 mod ptrace;
-mod signal;
+pub(crate) mod signal;
 mod socket;
 
 macro_rules! path_from_c_str {
@@ -273,7 +274,10 @@ impl Pal for Sys {
     }
 
     fn fork() -> pid_t {
-        e(clone::fork_impl()) as pid_t
+        e(clone::fork_impl(&ForkInfo {
+            sighandler: self::signal::sighandler(),
+            sigaltstack: self::signal::current_altstack(),
+        })) as pid_t
     }
 
     fn fstat(fildes: c_int, buf: *mut stat) -> c_int {

@@ -1,9 +1,9 @@
-use core::mem;
-use syscall;
+use core::{mem, cell::Cell};
+use syscall::{self, SignalStack, SigAction, SigActionFlags};
 
 use super::{
     super::{types::*, Pal, PalSignal},
-    e, Sys,
+    e, Sys, path::SignalMask,
 };
 use crate::{
     header::{
@@ -107,28 +107,43 @@ impl PalSignal for Sys {
     }
 
     fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> c_int {
-        let new_opt = act.map(|act| {
-            let m = act.sa_mask;
-            let sa_handler = unsafe { mem::transmute(act.sa_handler) };
-            syscall::SigAction {
-                sa_handler,
-                sa_mask: [m as u64, 0],
-                sa_flags: syscall::SigActionFlags::from_bits(act.sa_flags as usize)
-                    .expect("sigaction: invalid bit pattern"),
+        let _guard = SignalMask::lock();
+
+        let mut is_sa_siginfo = false;
+
+        let new_abi = act.map(|act| {
+            let sa_flags = SigActionFlags::from_bits_truncate(act.sa_flags as usize);
+            is_sa_siginfo = sa_flags.contains(SigActionFlags::SA_SIGINFO);
+
+            SigAction {
+                sa_mask: act.sa_mask,
+                sa_flags,
             }
         });
-        let mut old_opt = oact.as_ref().map(|_| syscall::SigAction::default());
+        let mut old_abi = Some(SigAction::default()).filter(|_| oact.is_some());
+
         let ret = e(syscall::sigaction(
             sig as usize,
-            new_opt.as_ref(),
-            old_opt.as_mut(),
+            new_abi.as_ref(),
+            old_abi.as_mut(),
         )) as c_int;
-        if let (Some(old), Some(oact)) = (old_opt, oact) {
-            oact.sa_handler = unsafe { mem::transmute(old.sa_handler) };
-            let m = old.sa_mask;
-            oact.sa_mask = m[0] as sigset_t;
-            oact.sa_flags = old.sa_flags.bits() as c_ulong;
+
+        if ret == 0 {
+            if let Some(act) = act {
+                HANDLERS[sig as usize].set(if is_sa_siginfo {
+                    Handler { sa_sigaction: unsafe { mem::transmute(act.sa_handler) } }
+                } else {
+                    Handler { sa_handler: act.sa_handler }
+                });
+            }
+
+            if let (Some(old_abi), Some(oact)) = (old_abi, oact) {
+                oact.sa_handler = unsafe { mem::transmute(HANDLERS[sig as usize].get()) };
+                oact.sa_mask = old_abi.sa_mask;
+                oact.sa_flags = old_abi.sa_flags.bits() as c_ulong;
+            }
         }
+
         ret
     }
 
@@ -144,21 +159,10 @@ impl PalSignal for Sys {
     }
 
     fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
-        let new_opt = if set.is_null() {
-            None
-        } else {
-            Some([unsafe { *set as u64 }, 0])
-        };
-        let mut old_opt = if oset.is_null() { None } else { Some([0, 0]) };
-        let ret = e(syscall::sigprocmask(
-            how as usize,
-            new_opt.as_ref(),
-            old_opt.as_mut(),
-        )) as c_int;
-        if let Some(old) = old_opt {
-            unsafe { *oset = old[0] as sigset_t };
-        }
-        ret
+        let new_opt = unsafe { set.as_ref() };
+        let old_opt = unsafe { oset.as_mut() };
+
+        e(syscall::sigprocmask(how as usize, new_opt, old_opt)) as c_int
     }
 
     fn sigsuspend(set: *const sigset_t) -> c_int {
@@ -174,4 +178,77 @@ impl PalSignal for Sys {
         }
         -1
     }
+}
+
+extern "C" {
+    fn __relibc_internal_sighandler();
+}
+
+struct Stack {
+    float_regs: [u8; 512],
+    inner: SignalStack,
+}
+
+#[derive(Clone, Copy)]
+union Handler {
+    sa_sigaction: Option<extern "C" fn(c_int, *const siginfo_t, *mut c_void)>,
+    sa_handler: Option<extern "C" fn(c_int)>,
+}
+const DEFAULT_HANDLER: Cell<Handler> = Cell::new(Handler { sa_handler: None });
+
+// TODO: AtomicPtr + compiler_fence?
+#[thread_local]
+static HANDLERS: [Cell<Handler>; 64] = [DEFAULT_HANDLER; 64];
+
+unsafe extern "C" fn sighandler_inner(stack: &mut Stack) {
+    let signal = u8::try_from(stack.inner.signal).expect("signal must be less than 64");
+    let flags = stack.inner.sa_flags;
+
+    let handler = HANDLERS[usize::from(signal)].get();
+
+    if flags.contains(SigActionFlags::SA_SIGINFO) {
+        let siginfo = siginfo_t {
+            si_signo: c_int::from(signal),
+            si_errno: 0,
+            si_code: 0,
+            ..Default::default()
+        };
+        if let Some(sa_sigaction) = handler.sa_sigaction {
+            sa_sigaction(c_int::from(signal), &siginfo, (stack as *mut Stack).cast());
+        }
+    } else {
+        if let Some(sa_handler) = handler.sa_handler {
+            sa_handler(c_int::from(signal));
+        }
+    }
+}
+
+core::arch::global_asm!("
+    .globl __relibc_internal_sighandler
+    .type __relibc_internal_sighandler, @function
+    .p2align 6
+__relibc_internal_sighandler:
+    sub rsp, 512
+    fxsave [rsp]
+
+    mov rdi, rsp
+    call {inner}
+
+    fxrstor [rsp]
+    add rsp, 512
+
+    mov rax, {SYS_SIGRETURN}
+    syscall
+
+    ud2
+
+    .size __relibc_internal_sighandler, . - __relibc_internal_sighandler
+", inner = sym sighandler_inner, SYS_SIGRETURN = const syscall::SYS_SIGRETURN);
+
+pub fn current_altstack() -> usize {
+    // TODO
+    0
+}
+pub fn sighandler() -> usize {
+    __relibc_internal_sighandler as usize
 }

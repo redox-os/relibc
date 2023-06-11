@@ -421,15 +421,26 @@ where
     }
 
     {
-        let current_sigaction_fd = FdGuard::new(syscall::dup(*open_via_dup, b"sigactions")?);
-        let empty_sigaction_fd = FdGuard::new(syscall::dup(*current_sigaction_fd, b"empty")?);
-        let sigaction_selection_fd =
-            FdGuard::new(syscall::dup(*open_via_dup, b"current-sigactions")?);
+        let cur_sigaction_fd = FdGuard::new(syscall::dup(*open_via_dup, b"sigactions")?);
+        let new_sigaction_fd = FdGuard::new(syscall::dup(*cur_sigaction_fd, b"keep-ignored")?);
+        let new_sigaction_sel_fd = FdGuard::new(syscall::dup(*open_via_dup, b"current-sigactions")?);
 
-        let _ = syscall::write(
-            *sigaction_selection_fd,
-            &usize::to_ne_bytes(*empty_sigaction_fd),
-        )?;
+        let _ = syscall::write(*new_sigaction_sel_fd, &new_sigaction_fd.to_ne_bytes())?;
+    }
+
+    // TODO: Pass sigprocmask to the next context, allowing it to temporarily block signals before
+    // signal handling is set up? auxv?
+
+    // sigprocmask is preserved across execve()
+
+    {
+        // Reset sighandler and sigaltstack
+
+        let new_sighandler_fd = FdGuard::new(syscall::dup(*open_via_dup, b"sighandler")?);
+
+        let sighandler_buf = [0_u8; size_of::<usize>() * 2];
+
+        let _ = syscall::write(*new_sighandler_fd, &sighandler_buf)?;
     }
 
     // TODO: Restore old name if exec failed?
@@ -696,11 +707,16 @@ use auxv_defs::*;
 /// Spawns a new context which will not share the same address space as the current one. File
 /// descriptors from other schemes are reobtained with `dup`, and grants referencing such file
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
-pub fn fork_impl() -> Result<usize> {
-    unsafe { Error::demux(__relibc_internal_fork_wrapper()) }
+pub fn fork_impl(info: &ForkInfo) -> Result<usize> {
+    unsafe { Error::demux(__relibc_internal_fork_wrapper(info)) }
 }
 
-fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
+pub struct ForkInfo {
+    pub sighandler: usize,
+    pub sigaltstack: usize,
+}
+
+fn fork_inner(info: &ForkInfo, initial_rsp: *mut usize) -> Result<usize> {
     let (cur_filetable_fd, new_pid_fd, new_pid);
 
     {
@@ -710,30 +726,41 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
         )?);
         (new_pid_fd, new_pid) = new_context()?;
 
-        // Do not allocate new signal stack, but copy existing address (all memory will be re-mapped
-        // CoW later).
         {
-            let cur_sigstack_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigstack")?);
-            let new_sigstack_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sigstack")?);
+            // Reuse the same signal handler and signal stack.
 
-            let mut sigstack_buf = usize::to_ne_bytes(0);
+            let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
 
-            let _ = syscall::read(*cur_sigstack_fd, &mut sigstack_buf);
-            let _ = syscall::write(*new_sigstack_fd, &sigstack_buf);
+            let mut sighandler_buf = [0_u8; 2 * size_of::<usize>()];
+            let (altstack, handler) = sighandler_buf.split_at_mut(size_of::<usize>());
+
+            altstack.copy_from_slice(&info.sigaltstack.to_ne_bytes());
+            handler.copy_from_slice(&info.sighandler.to_ne_bytes());
+
+            let _ = syscall::write(*new_sighandler_fd, &sighandler_buf)?;
+        }
+        {
+            // Reuse the same sigprocmask.
+
+            let cur_sigmask_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigmask")?);
+            let new_sigmask_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sigmask")?);
+
+            let mut mask = 0_u64.to_ne_bytes();
+
+            let _ = syscall::read(*cur_sigmask_fd, &mut mask)?;
+            let _ = syscall::write(*new_sigmask_fd, &mask)?;
         }
 
         copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
 
         {
+            // Copy sigactions, by value.
+
             let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);
             let new_sigaction_fd = FdGuard::new(syscall::dup(*cur_sigaction_fd, b"copy")?);
-            let new_sigaction_sel_fd =
-                FdGuard::new(syscall::dup(*new_pid_fd, b"current-sigactions")?);
+            let new_sigaction_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-sigactions")?);
 
-            let _ = syscall::write(
-                *new_sigaction_sel_fd,
-                &usize::to_ne_bytes(*new_sigaction_fd),
-            )?;
+            let _ = syscall::write(*new_sigaction_sel_fd, &new_sigaction_fd.to_ne_bytes())?;
         }
 
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new

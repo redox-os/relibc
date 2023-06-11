@@ -5,7 +5,7 @@ use syscall::{
     SIGCONT,
 };
 
-use super::extra::{create_set_addr_space_buf, FdGuard};
+use super::{extra::{create_set_addr_space_buf, FdGuard}, signal::{current_altstack, sighandler}};
 
 pub use redox_exec::*;
 
@@ -14,25 +14,40 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
     let cur_pid_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", O_CLOEXEC)?);
     let (new_pid_fd, new_pid) = new_context()?;
 
-    // Allocate a new signal stack.
+    // Setup the sighandler
     {
-        let sigstack_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sigstack")?);
+        let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
 
-        const SIGSTACK_SIZE: usize = 1024 * 256;
+        let mut sighandler_buf = [0_u8; size_of::<usize>()];
+        let (altstack, handler) = sighandler_buf.split_at_mut(size_of::<usize>());
 
-        // TODO: Put sigstack at high addresses?
-        let target_sigstack = syscall::fmap(
-            !0,
-            &Map {
-                address: 0,
-                flags: MapFlags::PROT_READ | MapFlags::PROT_WRITE | MapFlags::MAP_PRIVATE,
-                offset: 0,
-                size: SIGSTACK_SIZE,
-            },
-        )? + SIGSTACK_SIZE;
+        altstack.copy_from_slice(&current_altstack());
+        handler.copy_from_slice(&sighandler());
 
-        let _ = syscall::write(*sigstack_fd, &usize::to_ne_bytes(target_sigstack))?;
+        let _ = syscall::write(*new_sighandler_fd, &sighandler_buf)?;
     }
+    // Reuse sigmask
+    {
+        let cur_sigmask_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigmask")?);
+        let new_sigmask_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sigmask")?);
+
+        let mut buf = 0_u64.to_ne_bytes();
+
+        let _ = syscall::read(*cur_sigmask_fd, &mut buf)?;
+        let _ = syscall::write(*new_sigmask_fd, &buf);
+    }
+    // Reuse sigactions (on Linux, CLONE_THREAD requires CLONE_SIGHAND which implies the sigactions
+    // table is reused).
+    {
+        let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);
+        let new_sigaction_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-sigactions")?);
+
+        let _ = syscall::write(
+            *new_sigaction_sel_fd,
+            &usize::to_ne_bytes(*cur_sigaction_fd),
+        )?;
+    }
+
 
     copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
 
@@ -57,18 +72,6 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
         let _ = syscall::write(
             *new_filetable_sel_fd,
             &usize::to_ne_bytes(*cur_filetable_fd),
-        )?;
-    }
-
-    // Reuse sigactions (on Linux, CLONE_THREAD requires CLONE_SIGHAND which implies the sigactions
-    // table is reused).
-    {
-        let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);
-        let new_sigaction_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-sigactions")?);
-
-        let _ = syscall::write(
-            *new_sigaction_sel_fd,
-            &usize::to_ne_bytes(*cur_sigaction_fd),
         )?;
     }
 

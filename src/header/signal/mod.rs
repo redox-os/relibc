@@ -49,13 +49,13 @@ pub struct sigaltstack {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct siginfo_t {
     pub si_signo: c_int,
     pub si_errno: c_int,
     pub si_code: c_int,
-    _padding: [c_int; 29],
-    _si_align: [usize; 0],
+    pub(crate) _padding: [c_int; 29],
+    pub(crate) _si_align: [usize; 0],
 }
 
 pub type sigset_t = c_ulonglong;
