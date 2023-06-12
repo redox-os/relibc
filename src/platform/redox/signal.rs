@@ -1,5 +1,7 @@
-use core::{mem, cell::Cell};
-use syscall::{self, SignalStack, SigAction, SigActionFlags};
+use core::{mem, cell::Cell, sync::atomic::{AtomicUsize, Ordering}};
+use libc::{SIG_DFL, SIG_IGN};
+use redox_exec::FdGuard;
+use syscall::{self, SignalStack, SigAction, SigActionFlags, O_CLOEXEC};
 
 use super::{
     super::{types::*, Pal, PalSignal},
@@ -8,11 +10,11 @@ use super::{
 use crate::{
     header::{
         errno::{EINVAL, ENOSYS},
-        signal::{sigaction, siginfo_t, sigset_t, stack_t},
+        signal::{sigaction, siginfo_t, sigset_t, stack_t, sival},
         sys_time::{itimerval, ITIMER_REAL},
         time::timespec,
     },
-    platform::errno,
+    platform::errno, sync::Mutex,
 };
 
 impl PalSignal for Sys {
@@ -107,16 +109,24 @@ impl PalSignal for Sys {
     }
 
     fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> c_int {
-        let _guard = SignalMask::lock();
-
         let mut is_sa_siginfo = false;
 
         let new_abi = act.map(|act| {
-            let sa_flags = SigActionFlags::from_bits_truncate(act.sa_flags as usize);
+            let mut sa_flags = SigActionFlags::from_bits_truncate(act.sa_flags as usize);
+
+            if act.sa_handler == unsafe { mem::transmute(SIG_DFL) } {
+                // DFL is the default
+            } else if act.sa_handler == unsafe { mem::transmute(SIG_IGN) } {
+                sa_flags |= SigActionFlags::SA_TY_IGN;
+            } else {
+                sa_flags |= SigActionFlags::SA_TY_USR;
+            }
+
             is_sa_siginfo = sa_flags.contains(SigActionFlags::SA_SIGINFO);
 
             SigAction {
                 sa_mask: act.sa_mask,
+                sa_handler: act.sa_handler.map_or(0, |h| h as usize),
                 sa_flags,
             }
         });
@@ -129,16 +139,24 @@ impl PalSignal for Sys {
         )) as c_int;
 
         if ret == 0 {
-            if let Some(act) = act {
-                HANDLERS[sig as usize].set(if is_sa_siginfo {
+            /*if let Some(act) = act {
+                HANDLERS[sig as usize].store(if is_sa_siginfo {
                     Handler { sa_sigaction: unsafe { mem::transmute(act.sa_handler) } }
                 } else {
                     Handler { sa_handler: act.sa_handler }
                 });
-            }
+            }*/
 
             if let (Some(old_abi), Some(oact)) = (old_abi, oact) {
-                oact.sa_handler = unsafe { mem::transmute(HANDLERS[sig as usize].get()) };
+                oact.sa_handler = unsafe { mem::transmute(old_abi.sa_handler) };
+                /*
+                if old_abi.sa_flags.contains(SigActionFlags::SA_TY_IGN) {
+                    oact.sa_handler = unsafe { mem::transmute(SIG_IGN) };
+                } else if old_abi.sa_flags.contains(SigActionFlags::SA_TY_USR) {
+                    oact.sa_handler = unsafe { mem::transmute(HANDLERS[sig as usize].get()) };
+                } else {
+                    oact.sa_handler = unsafe { mem::transmute(SIG_DFL) };
+                }*/
                 oact.sa_mask = old_abi.sa_mask;
                 oact.sa_flags = old_abi.sa_flags.bits() as c_ulong;
             }
@@ -194,23 +212,20 @@ union Handler {
     sa_sigaction: Option<extern "C" fn(c_int, *const siginfo_t, *mut c_void)>,
     sa_handler: Option<extern "C" fn(c_int)>,
 }
-const DEFAULT_HANDLER: Cell<Handler> = Cell::new(Handler { sa_handler: None });
-
-// TODO: AtomicPtr + compiler_fence?
-#[thread_local]
-static HANDLERS: [Cell<Handler>; 64] = [DEFAULT_HANDLER; 64];
 
 unsafe extern "C" fn sighandler_inner(stack: &mut Stack) {
     let signal = u8::try_from(stack.inner.signal).expect("signal must be less than 64");
     let flags = stack.inner.sa_flags;
 
-    let handler = HANDLERS[usize::from(signal)].get();
+    //let mut handler = HANDLERS[usize::from(signal)].load(Ordering::Acquire);
+    let handler: Handler = mem::transmute(stack.inner.sa_handler);
 
     if flags.contains(SigActionFlags::SA_SIGINFO) {
         let siginfo = siginfo_t {
             si_signo: c_int::from(signal),
             si_errno: 0,
             si_code: 0,
+            si_sival: sival { sigval_ptr: stack.inner.sigval as *mut c_void },
             ..Default::default()
         };
         if let Some(sa_sigaction) = handler.sa_sigaction {
@@ -251,4 +266,14 @@ pub fn current_altstack() -> usize {
 }
 pub fn sighandler() -> usize {
     __relibc_internal_sighandler as usize
+}
+
+pub unsafe fn init() {
+    let mut buf = [0_u8; 2 * core::mem::size_of::<usize>()];
+    let (altstack, handler) = buf.split_at_mut(core::mem::size_of::<usize>());
+    altstack.copy_from_slice(&current_altstack().to_ne_bytes());
+    handler.copy_from_slice(&sighandler().to_ne_bytes());
+
+    let fd = FdGuard::new(syscall::open("thisproc:current/sighandler", O_CLOEXEC).expect("failed to open sighandler fd"));
+    let _ = syscall::write(*fd, &buf).expect("failed to write sighandler struct");
 }

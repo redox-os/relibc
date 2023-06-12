@@ -301,6 +301,10 @@ pub fn init(auxvs: Box<[[usize; 2]]>) {
             self::sys::path::setcwd_manual(cwd.into());
         }
     }
+
+    unsafe {
+        self::sys::signal::init();
+    }
 }
 #[cfg(not(target_os = "redox"))]
 pub fn init(auxvs: Box<[[usize; 2]]>) {}

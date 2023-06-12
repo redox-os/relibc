@@ -18,11 +18,11 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
     {
         let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
 
-        let mut sighandler_buf = [0_u8; size_of::<usize>()];
+        let mut sighandler_buf = [0_u8; 2 * size_of::<usize>()];
         let (altstack, handler) = sighandler_buf.split_at_mut(size_of::<usize>());
 
-        altstack.copy_from_slice(&current_altstack());
-        handler.copy_from_slice(&sighandler());
+        altstack.copy_from_slice(&current_altstack().to_ne_bytes());
+        handler.copy_from_slice(&sighandler().to_ne_bytes());
 
         let _ = syscall::write(*new_sighandler_fd, &sighandler_buf)?;
     }

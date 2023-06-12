@@ -49,13 +49,24 @@ pub struct sigaltstack {
 }
 
 #[repr(C)]
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default)]
 pub struct siginfo_t {
     pub si_signo: c_int,
     pub si_errno: c_int,
     pub si_code: c_int,
-    pub(crate) _padding: [c_int; 29],
-    pub(crate) _si_align: [usize; 0],
+    pub si_sival: sival,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union sival {
+    pub sigval_int: c_int,
+    pub sigval_ptr: *mut c_void,
+}
+impl Default for sival {
+    fn default() -> Self {
+        Self { sigval_ptr: core::ptr::null_mut() }
+    }
 }
 
 pub type sigset_t = c_ulonglong;
