@@ -1,7 +1,8 @@
 use core::{mem, cell::Cell, sync::atomic::{AtomicUsize, Ordering}};
 use libc::{SIG_DFL, SIG_IGN};
 use redox_exec::FdGuard;
-use syscall::{self, SignalStack, SigAction, SigActionFlags, O_CLOEXEC};
+
+use syscall::{data::{SignalStack, Sighandler, SigAction}, flag::{SigActionFlags, O_CLOEXEC, O_WRONLY}, error::{Result, Error, ENOMEM}};
 
 use super::{
     super::{types::*, Pal, PalSignal},
@@ -10,7 +11,7 @@ use super::{
 use crate::{
     header::{
         errno::{EINVAL, ENOSYS},
-        signal::{sigaction, siginfo_t, sigset_t, stack_t, sigval},
+        signal::{sigaction, siginfo_t, sigset_t, stack_t, sigval, SS_ONSTACK, SS_DISABLE, MINSIGSTKSZ},
         sys_time::{itimerval, ITIMER_REAL},
         time::timespec,
     },
@@ -174,7 +175,7 @@ impl PalSignal for Sys {
     }
 
     fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
-        unimplemented!()
+        e(sigaltstack_impl(unsafe { ss.as_ref() }, unsafe { old_ss.as_mut() }).map(|()| 0)) as c_int
     }
 
     fn sigpending(set: *mut sigset_t) -> c_int {
@@ -215,8 +216,62 @@ impl PalSignal for Sys {
     }
 }
 
+fn sigaltstack_impl(new: Option<&stack_t>, old: Option<&mut stack_t>) -> Result<()> {
+    let old_altstack = ALTSTACK.get();
+
+    if let Some(new) = new {
+        if new.ss_flags & !(SS_ONSTACK as c_int | SS_DISABLE as c_int) != 0 {
+            return Err(Error::new(EINVAL));
+        }
+
+        if new.ss_size < MINSIGSTKSZ {
+            return Err(Error::new(ENOMEM));
+        }
+
+        let handler = Sighandler {
+            altstack_base: new.ss_sp as usize,
+            altstack_size: new.ss_size,
+            handler: __relibc_internal_sighandler as usize,
+        };
+
+        let _ = syscall::write(*FdGuard::new(syscall::open("thisproc:current/sighandler", O_CLOEXEC | O_WRONLY)?), &handler)?;
+        ALTSTACK.set(Altstack { base: new.ss_sp as usize, size: new.ss_size });
+    }
+    if let Some(old) = old {
+        let range = old_altstack.base..old_altstack.base + old_altstack.size;
+
+        old.ss_flags = if range.contains(&get_current_sp()) {
+            SS_ONSTACK as c_int
+        } else if old_altstack.size == 0 {
+            SS_DISABLE as c_int
+        } else {
+            0
+        };
+        old.ss_size = old_altstack.size;
+        old.ss_sp = old_altstack.base as *mut c_void;
+    }
+    Ok(())
+}
+
+fn get_current_sp() -> usize {
+    unsafe {
+        let sp: usize;
+
+        #[cfg(target_arch = "x86_64")]
+        core::arch::asm!("mov {}, rsp", out(reg) sp);
+
+        #[cfg(target_arch = "x86")]
+        core::arch::asm!("mov {}, esp", out(reg) sp);
+
+        #[cfg(target_arch = "aarch64")]
+        core::arch::asm!("mov {}, sp", out(reg) sp);
+
+        sp
+    }
+}
+
 extern "C" {
-    fn __relibc_internal_sighandler();
+    pub fn __relibc_internal_sighandler();
 }
 
 struct Stack {
@@ -303,20 +358,24 @@ __relibc_internal_sighandler:
     .size __relibc_internal_sighandler, . - __relibc_internal_sighandler
 ", inner = sym sighandler_inner, SYS_SIGRETURN = const syscall::SYS_SIGRETURN);
 
-pub fn current_altstack() -> usize {
-    // TODO
-    0
+#[thread_local]
+static ALTSTACK: Cell<Altstack> = Cell::new(Altstack { base: 0, size: 0 });
+
+#[derive(Clone, Copy)]
+struct Altstack {
+    base: usize,
+    size: usize,
 }
-pub fn sighandler() -> usize {
-    __relibc_internal_sighandler as usize
+
+pub fn current_sighandler() -> Sighandler {
+    Sighandler {
+        altstack_base: ALTSTACK.get().base,
+        altstack_size: ALTSTACK.get().size,
+        handler: __relibc_internal_sighandler as usize,
+    }
 }
 
 pub unsafe fn init() {
-    let mut buf = [0_u8; 2 * core::mem::size_of::<usize>()];
-    let (altstack, handler) = buf.split_at_mut(core::mem::size_of::<usize>());
-    altstack.copy_from_slice(&current_altstack().to_ne_bytes());
-    handler.copy_from_slice(&sighandler().to_ne_bytes());
-
     let fd = FdGuard::new(syscall::open("thisproc:current/sighandler", O_CLOEXEC).expect("failed to open sighandler fd"));
-    let _ = syscall::write(*fd, &buf).expect("failed to write sighandler struct");
+    let _ = syscall::write(*fd, &current_sighandler()).expect("failed to write sighandler struct");
 }

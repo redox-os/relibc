@@ -275,8 +275,7 @@ impl Pal for Sys {
 
     fn fork() -> pid_t {
         e(clone::fork_impl(&ForkInfo {
-            sighandler: self::signal::sighandler(),
-            sigaltstack: self::signal::current_altstack(),
+            sighandler: self::signal::current_sighandler(),
         })) as pid_t
     }
 

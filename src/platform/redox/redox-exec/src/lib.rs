@@ -23,8 +23,8 @@ use goblin::elf64::{
 use syscall::{
     error::*,
     flag::{MapFlags, SEEK_SET},
-    PAGE_SIZE, Map, PROT_WRITE, O_CLOEXEC,
-    GrantDesc, GrantFlags, PROT_READ, PROT_EXEC, MAP_SHARED, MAP_FIXED_NOREPLACE,
+    PAGE_SIZE, Map, PROT_WRITE, O_CLOEXEC, GrantDesc, GrantFlags, PROT_READ, PROT_EXEC, MAP_SHARED,
+    MAP_FIXED_NOREPLACE, Sighandler,
 };
 
 pub use self::arch::*;
@@ -438,9 +438,7 @@ where
 
         let new_sighandler_fd = FdGuard::new(syscall::dup(*open_via_dup, b"sighandler")?);
 
-        let sighandler_buf = [0_u8; size_of::<usize>() * 2];
-
-        let _ = syscall::write(*new_sighandler_fd, &sighandler_buf)?;
+        let _ = syscall::write(*new_sighandler_fd, &Sighandler::default())?;
     }
 
     // TODO: Restore old name if exec failed?
@@ -712,8 +710,7 @@ pub fn fork_impl(info: &ForkInfo) -> Result<usize> {
 }
 
 pub struct ForkInfo {
-    pub sighandler: usize,
-    pub sigaltstack: usize,
+    pub sighandler: Sighandler,
 }
 
 fn fork_inner(info: &ForkInfo, initial_rsp: *mut usize) -> Result<usize> {
@@ -727,17 +724,11 @@ fn fork_inner(info: &ForkInfo, initial_rsp: *mut usize) -> Result<usize> {
         (new_pid_fd, new_pid) = new_context()?;
 
         {
-            // Reuse the same signal handler and signal stack.
+            // Reuse the same signal handler and alternate signal stack.
 
             let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
 
-            let mut sighandler_buf = [0_u8; 2 * size_of::<usize>()];
-            let (altstack, handler) = sighandler_buf.split_at_mut(size_of::<usize>());
-
-            altstack.copy_from_slice(&info.sigaltstack.to_ne_bytes());
-            handler.copy_from_slice(&info.sighandler.to_ne_bytes());
-
-            let _ = syscall::write(*new_sighandler_fd, &sighandler_buf)?;
+            let _ = syscall::write(*new_sighandler_fd, &info.sighandler)?;
         }
         {
             // Reuse the same sigprocmask.

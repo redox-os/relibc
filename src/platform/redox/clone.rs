@@ -1,11 +1,10 @@
 use syscall::{
-    data::Map,
+    data::{Map, Sighandler},
     error::Result,
-    flag::{MapFlags, O_CLOEXEC},
-    SIGCONT,
+    flag::{MapFlags, O_CLOEXEC, SIGCONT},
 };
 
-use super::{extra::{create_set_addr_space_buf, FdGuard}, signal::{current_altstack, sighandler}};
+use super::extra::{create_set_addr_space_buf, FdGuard};
 
 pub use redox_exec::*;
 
@@ -18,13 +17,11 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
     {
         let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
 
-        let mut sighandler_buf = [0_u8; 2 * size_of::<usize>()];
-        let (altstack, handler) = sighandler_buf.split_at_mut(size_of::<usize>());
-
-        altstack.copy_from_slice(&current_altstack().to_ne_bytes());
-        handler.copy_from_slice(&sighandler().to_ne_bytes());
-
-        let _ = syscall::write(*new_sighandler_fd, &sighandler_buf)?;
+        let _ = syscall::write(*new_sighandler_fd, &Sighandler {
+            altstack_base: 0,
+            altstack_size: 0,
+            handler: crate::platform::sys::signal::__relibc_internal_sighandler as usize,
+        })?;
     }
     // Reuse sigmask
     {
