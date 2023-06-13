@@ -97,13 +97,10 @@ core::arch::global_asm!(
     .p2align 6
 __relibc_internal_rlct_clone_ret:
     # Load registers
-    ldr x8, [sp], #8
-    ldr x0, [sp], #8
-    ldr x1, [sp], #8
-    ldr x2, [sp], #8
-    ldr x3, [sp], #8
-    ldr x4, [sp], #8
-    ldr x5, [sp], #8
+    ldp x0, x8, [sp], #16
+    ldp x2, x1, [sp], #16
+    ldp x4, x3, [sp], #16
+    ldr x5, [sp], #16
 
     # Call entry point
     blr x8
