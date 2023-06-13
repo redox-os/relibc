@@ -2,8 +2,6 @@
 
 use core::{mem, ptr};
 
-use cbitset::BitSet;
-
 use crate::{
     header::{errno, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},
@@ -20,8 +18,6 @@ pub mod sys;
 #[path = "redox.rs"]
 pub mod sys;
 
-type SigSet = BitSet<[c_ulong; 1]>;
-
 pub const SIG_DFL: usize = 0;
 pub const SIG_IGN: usize = 1;
 pub const SIG_ERR: isize = -1;
@@ -35,43 +31,43 @@ pub const SIG_SETMASK: c_int = 2;
 #[derive(Clone, Debug)]
 pub struct sigaction {
     pub sa_handler: Option<extern "C" fn(c_int)>,
-    pub sa_flags: c_ulong,
-    pub sa_restorer: Option<unsafe extern "C" fn()>,
+    pub sa_flags: c_int,
     pub sa_mask: sigset_t,
+    pub sa_restorer: Option<unsafe extern "C" fn()>,
 }
 
 #[repr(C)]
 #[derive(Clone)]
-pub struct sigaltstack {
+pub struct __relibc_sigaltstack {
     pub ss_sp: *mut c_void,
     pub ss_flags: c_int,
     pub ss_size: size_t,
 }
+pub type stack_t = __relibc_sigaltstack;
 
 #[repr(C)]
 #[derive(Clone, Default)]
-pub struct siginfo_t {
+pub struct __relibc_siginfo {
     pub si_signo: c_int,
     pub si_errno: c_int,
     pub si_code: c_int,
-    pub si_sival: sival,
+    pub si_value: sigval,
 }
+pub type siginfo_t = __relibc_siginfo;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub union sival {
+pub union sigval {
     pub sigval_int: c_int,
     pub sigval_ptr: *mut c_void,
 }
-impl Default for sival {
+impl Default for sigval {
     fn default() -> Self {
         Self { sigval_ptr: core::ptr::null_mut() }
     }
 }
 
 pub type sigset_t = c_ulonglong;
-
-pub type stack_t = sigaltstack;
 
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
@@ -90,6 +86,20 @@ pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
         pthread.os_tid.get().read()
     };
     crate::header::pthread::e(Sys::rlct_kill(os_tid, sig as usize))
+}
+
+#[no_mangle]
+pub extern "C" fn sigqueue(pid: pid_t, sig: c_int, value: sigval) -> c_int {
+    Sys::sigqueue(pid, sig, value)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pthread_sigqueue(thread: pthread_t, sig: c_int, value: sigval) -> c_int {
+    let os_tid = {
+        let pthread = &*(thread as *const pthread::Pthread);
+        pthread.os_tid.get().read()
+    };
+    Sys::rlct_sigqueue(os_tid, sig, value)
 }
 
 #[no_mangle]
@@ -120,7 +130,7 @@ pub unsafe extern "C" fn sigaction(
 ) -> c_int {
     let act_opt = act.as_ref().map(|act| {
         let mut act_clone = act.clone();
-        act_clone.sa_flags |= SA_RESTORER as c_ulong;
+        act_clone.sa_flags |= SA_RESTORER as c_int;
         act_clone.sa_restorer = Some(__restore_rt);
         act_clone
     });
@@ -128,17 +138,14 @@ pub unsafe extern "C" fn sigaction(
 }
 
 #[no_mangle]
-pub extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize > NSIG {
-        unsafe {
-            platform::errno = errno::EINVAL;
-        }
+pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
+    if signo <= 0 || signo as usize >= NSIG {
+        platform::errno = errno::EINVAL;
         return -1;
     }
 
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
-        set.insert(signo as usize - 1); // 0-indexed usize, please!
-    }
+    set.write(set.read() | (1 << signo));
+
     0
 }
 
@@ -157,33 +164,28 @@ pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -
 }
 
 #[no_mangle]
-pub extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize > NSIG {
-        unsafe {
-            platform::errno = errno::EINVAL;
-        }
+pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
+    if signo <= 0 || signo as usize >= NSIG {
+        platform::errno = errno::EINVAL;
         return -1;
     }
 
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
-        set.remove(signo as usize - 1); // 0-indexed usize, please!
-    }
+    set.write(set.read() & !(1 << signo));
+
     0
 }
 
 #[no_mangle]
-pub extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
-        set.clear();
-    }
+pub unsafe extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
+    set.write(0);
+
     0
 }
 
 #[no_mangle]
-pub extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
-        set.fill(.., true);
-    }
+pub unsafe extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
+    set.write(!0);
+
     0
 }
 
@@ -214,29 +216,22 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
     unsafe { sigaction(sig, ptr::null_mut(), psa.as_mut_ptr()) };
     let mut sa = unsafe { psa.assume_init() };
     if flag != 0 {
-        sa.sa_flags &= !SA_RESTART as c_ulong;
+        sa.sa_flags &= !SA_RESTART as c_int;
     } else {
-        sa.sa_flags |= SA_RESTART as c_ulong;
+        sa.sa_flags |= SA_RESTART as c_int;
     }
 
     unsafe { sigaction(sig, &mut sa, ptr::null_mut()) }
 }
 
 #[no_mangle]
-pub extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize > NSIG {
-        unsafe {
-            platform::errno = errno::EINVAL;
-        }
+pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
+    if signo <= 0 || signo as usize >= NSIG {
+        platform::errno = errno::EINVAL;
         return -1;
     }
 
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
-        if set.contains(signo as usize - 1) {
-            return 1;
-        }
-    }
-    0
+    c_int::from(set.read() & (1 << signo) != 0)
 }
 
 extern "C" {
@@ -251,7 +246,7 @@ pub extern "C" fn signal(
 ) -> Option<extern "C" fn(c_int)> {
     let sa = sigaction {
         sa_handler: func,
-        sa_flags: SA_RESTART as c_ulong,
+        sa_flags: SA_RESTART as c_int,
         sa_restorer: Some(__restore_rt),
         sa_mask: sigset_t::default(),
     };
@@ -332,7 +327,7 @@ pub unsafe extern "C" fn sigset(
         } else {
             let mut sa = sigaction {
                 sa_handler: func,
-                sa_flags: 0 as c_ulong,
+                sa_flags: 0 as c_int,
                 sa_restorer: Some(__restore_rt),
                 sa_mask: sigset_t::default(),
             };

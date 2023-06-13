@@ -64,8 +64,9 @@ pub const SIGWINCH: usize = 28;
 pub const SIGIO: usize = 29;
 pub const SIGPWR: usize = 30;
 pub const SIGSYS: usize = 31;
-pub const NSIG: usize = 32;
+pub const NSIG: usize = 64;
 
+// Real-time signals 32 and 33 are reserved for RLCT.
 pub const SIGRTMIN: usize = 34;
 pub const SIGRTMAX: usize = 64;
 

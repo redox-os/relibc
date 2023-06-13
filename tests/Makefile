@@ -19,6 +19,7 @@ EXPECT_NAMES=\
 	math \
 	netdb/getaddrinfo \
 	ptrace \
+	realtime_signal \
 	regex \
 	select \
 	setjmp \

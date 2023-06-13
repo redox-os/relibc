@@ -10,11 +10,11 @@ use super::{
 use crate::{
     header::{
         errno::{EINVAL, ENOSYS},
-        signal::{sigaction, siginfo_t, sigset_t, stack_t, sival},
+        signal::{sigaction, siginfo_t, sigset_t, stack_t, sigval},
         sys_time::{itimerval, ITIMER_REAL},
         time::timespec,
     },
-    platform::errno, sync::Mutex,
+    platform::errno, sync::Mutex, pthread::OsTid,
 };
 
 impl PalSignal for Sys {
@@ -132,11 +132,19 @@ impl PalSignal for Sys {
         });
         let mut old_abi = Some(SigAction::default()).filter(|_| oact.is_some());
 
+        if sigdebug() {
+            dbg!((new_abi, old_abi));
+        }
+
         let ret = e(syscall::sigaction(
             sig as usize,
             new_abi.as_ref(),
             old_abi.as_mut(),
         )) as c_int;
+
+        if sigdebug() {
+            dbg!((new_abi, old_abi));
+        }
 
         if ret == 0 {
             /*if let Some(act) = act {
@@ -158,7 +166,7 @@ impl PalSignal for Sys {
                     oact.sa_handler = unsafe { mem::transmute(SIG_DFL) };
                 }*/
                 oact.sa_mask = old_abi.sa_mask;
-                oact.sa_flags = old_abi.sa_flags.bits() as c_ulong;
+                oact.sa_flags = old_abi.sa_flags.bits() as c_int;
             }
         }
 
@@ -196,6 +204,15 @@ impl PalSignal for Sys {
         }
         -1
     }
+
+    // TODO: TIDs and PIDs are not the same thing!
+
+    fn sigqueue(pid: pid_t, sig: c_int, val: crate::header::signal::sigval) -> c_int {
+        e(syscall::sigqueue(pid as usize, sig as usize, unsafe { val.sigval_ptr } as usize)) as c_int
+    }
+    fn rlct_sigqueue(tid: OsTid, sig: c_int, val: crate::header::signal::sigval) -> c_int {
+        e(syscall::sigqueue(tid.context_id as usize, sig as usize, unsafe { val.sigval_ptr } as usize)) as c_int
+    }
 }
 
 extern "C" {
@@ -213,6 +230,20 @@ union Handler {
     sa_handler: Option<extern "C" fn(c_int)>,
 }
 
+//static SIGDEBUG: AtomicBool = AtomicBool::new(false);
+
+fn sigdebug() -> bool {
+    false
+    //SIGDEBUG.load(Ordering::SeqCst)
+}
+
+/*
+#[no_mangle]
+pub fn __relibc_internal_enable_sigdebug() {
+    SIGDEBUG.store(true, Ordering::SeqCst);
+}
+*/
+
 unsafe extern "C" fn sighandler_inner(stack: &mut Stack) {
     let signal = u8::try_from(stack.inner.signal).expect("signal must be less than 64");
     let flags = stack.inner.sa_flags;
@@ -225,14 +256,26 @@ unsafe extern "C" fn sighandler_inner(stack: &mut Stack) {
             si_signo: c_int::from(signal),
             si_errno: 0,
             si_code: 0,
-            si_sival: sival { sigval_ptr: stack.inner.sigval as *mut c_void },
+            si_value: sigval { sigval_ptr: stack.inner.sigval as *mut c_void },
             ..Default::default()
         };
+        if sigdebug() {
+            dbg!(&siginfo.si_value.sigval_ptr);
+        }
         if let Some(sa_sigaction) = handler.sa_sigaction {
+            if sigdebug() {
+                dbg!();
+            }
             sa_sigaction(c_int::from(signal), &siginfo, (stack as *mut Stack).cast());
         }
     } else {
+        if sigdebug() {
+            dbg!();
+        }
         if let Some(sa_handler) = handler.sa_handler {
+            if sigdebug() {
+                dbg!();
+            }
             sa_handler(c_int::from(signal));
         }
     }
