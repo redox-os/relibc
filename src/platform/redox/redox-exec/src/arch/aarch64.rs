@@ -50,18 +50,12 @@ core::arch::global_asm!(
     .globl __relibc_internal_fork_wrapper
     .type __relibc_internal_fork_wrapper, @function
 __relibc_internal_fork_wrapper:
-    str x19, [sp, #-8]!
-    str x20, [sp, #-8]!
-    str x21, [sp, #-8]!
-    str x22, [sp, #-8]!
-    str x23, [sp, #-8]!
-    str x24, [sp, #-8]!
-    str x25, [sp, #-8]!
-    str x26, [sp, #-8]!
-    str x27, [sp, #-8]!
-    str x28, [sp, #-8]!
-    str x29, [sp, #-8]!
-    str x30, [sp, #-8]!
+    stp     x29, x30, [sp, #-16]!
+    stp     x27, x28, [sp, #-16]!
+    stp     x25, x26, [sp, #-16]!
+    stp     x23, x24, [sp, #-16]!
+    stp     x21, x22, [sp, #-16]!
+    stp     x19, x20, [sp, #-16]!
 
     sub sp, sp, #32
 
@@ -77,8 +71,7 @@ __relibc_internal_fork_wrapper:
     .globl __relibc_internal_fork_ret
     .type __relibc_internal_fork_ret, @function
 __relibc_internal_fork_ret:
-    ldr x0, [sp]
-    ldr x1, [sp, #8]
+    ldp x0, x1, [sp]
     bl __relibc_internal_fork_hook
 
     //TODO: load floating point regs
@@ -88,18 +81,13 @@ __relibc_internal_fork_ret:
     .p2align 4
 2:
     add sp, sp, #32
-    ldr x30, [sp], #8
-    ldr x29, [sp], #8
-    ldr x28, [sp], #8
-    ldr x27, [sp], #8
-    ldr x26, [sp], #8
-    ldr x25, [sp], #8
-    ldr x24, [sp], #8
-    ldr x23, [sp], #8
-    ldr x22, [sp], #8
-    ldr x21, [sp], #8
-    ldr x20, [sp], #8
-    ldr x19, [sp], #8
+    ldp     x19, x20, [sp], #16
+    ldp     x21, x22, [sp], #16
+    ldp     x23, x24, [sp], #16
+    ldp     x25, x26, [sp], #16
+    ldp     x27, x28, [sp], #16
+    ldp     x29, x30, [sp], #16
+
     ret
 
     .size __relibc_internal_fork_ret, . - __relibc_internal_fork_ret"
