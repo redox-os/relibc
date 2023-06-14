@@ -139,6 +139,7 @@ DYNAMIC_ONLY_NAMES=\
 NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
+	sigaltstack \
 	pwd \
 	stdio/tempnam \
 	stdio/tmpnam \

@@ -139,9 +139,14 @@ pub unsafe extern "C" fn sigaction(
 
 #[no_mangle]
 pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize >= NSIG {
-        platform::errno = errno::EINVAL;
-        return -1;
+    match signo {
+        1..NSIG => (),
+        SIGRTMIN..SIGRTMAX => (),
+
+        _ => {
+            platform::errno = errno::EINVAL;
+            return -1;
+        }
     }
 
     set.write(set.read() | (1 << signo));
@@ -151,23 +156,19 @@ pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
-    if !ss.is_null() {
-        if (*ss).ss_flags != SS_DISABLE as c_int {
-            return errno::EINVAL;
-        }
-        if (*ss).ss_size < MINSIGSTKSZ {
-            return errno::ENOMEM;
-        }
-    }
-
     Sys::sigaltstack(ss, old_ss)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize >= NSIG {
-        platform::errno = errno::EINVAL;
-        return -1;
+    match signo {
+        1..NSIG => (),
+        SIGRTMIN..SIGRTMAX => (),
+
+        _ => {
+            platform::errno = errno::EINVAL;
+            return -1;
+        }
     }
 
     set.write(set.read() & !(1 << signo));
@@ -226,9 +227,14 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize >= NSIG {
-        platform::errno = errno::EINVAL;
-        return -1;
+    match signo {
+        1..NSIG => (),
+        SIGRTMIN..SIGRTMAX => (),
+
+        _ => {
+            platform::errno = errno::EINVAL;
+            return -1;
+        }
     }
 
     c_int::from(set.read() & (1 << signo) != 0)

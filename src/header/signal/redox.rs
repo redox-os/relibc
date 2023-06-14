@@ -64,7 +64,7 @@ pub const SIGWINCH: usize = 28;
 pub const SIGIO: usize = 29;
 pub const SIGPWR: usize = 30;
 pub const SIGSYS: usize = 31;
-pub const NSIG: usize = 64;
+pub const NSIG: usize = 32;
 
 // Real-time signals 32 and 33 are reserved for RLCT.
 pub const SIGRTMIN: usize = 34;
@@ -84,4 +84,4 @@ pub const SS_DISABLE: usize = 0x00000002;
 
 // TODO: It's just a guess based on Linux
 pub const MINSIGSTKSZ: usize = 2048;
-pub const SIGSTKSZ: usize = 8096;
+pub const SIGSTKSZ: usize = 8192;
