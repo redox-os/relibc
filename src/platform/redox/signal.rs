@@ -1,21 +1,35 @@
-use core::{mem, cell::Cell, sync::atomic::{AtomicUsize, Ordering}};
+use core::{
+    cell::Cell,
+    mem,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 use libc::{SIG_DFL, SIG_IGN};
 use redox_exec::FdGuard;
 
-use syscall::{data::{SignalStack, Sighandler, SigAction}, flag::{SigActionFlags, O_CLOEXEC, O_WRONLY}, error::{Result, Error, ENOMEM}};
+use syscall::{
+    data::{SigAction, Sighandler, SignalStack},
+    error::{Error, Result, ENOMEM},
+    flag::{SigActionFlags, O_CLOEXEC, O_WRONLY},
+};
 
 use super::{
     super::{types::*, Pal, PalSignal},
-    e, Sys, path::SignalMask,
+    e,
+    path::SignalMask,
+    Sys,
 };
 use crate::{
     header::{
         errno::{EINVAL, ENOSYS},
-        signal::{sigaction, siginfo_t, sigset_t, stack_t, sigval, SS_ONSTACK, SS_DISABLE, MINSIGSTKSZ},
+        signal::{
+            sigaction, siginfo_t, sigset_t, sigval, stack_t, MINSIGSTKSZ, SS_DISABLE, SS_ONSTACK,
+        },
         sys_time::{itimerval, ITIMER_REAL},
         time::timespec,
     },
-    platform::errno, sync::Mutex, pthread::OsTid,
+    platform::errno,
+    pthread::OsTid,
+    sync::Mutex,
 };
 
 impl PalSignal for Sys {
@@ -209,10 +223,18 @@ impl PalSignal for Sys {
     // TODO: TIDs and PIDs are not the same thing!
 
     fn sigqueue(pid: pid_t, sig: c_int, val: crate::header::signal::sigval) -> c_int {
-        e(syscall::sigqueue(pid as usize, sig as usize, unsafe { val.sigval_ptr } as usize)) as c_int
+        e(syscall::sigqueue(
+            pid as usize,
+            sig as usize,
+            unsafe { val.sigval_ptr } as usize,
+        )) as c_int
     }
     fn rlct_sigqueue(tid: OsTid, sig: c_int, val: crate::header::signal::sigval) -> c_int {
-        e(syscall::sigqueue(tid.context_id as usize, sig as usize, unsafe { val.sigval_ptr } as usize)) as c_int
+        e(syscall::sigqueue(
+            tid.context_id as usize,
+            sig as usize,
+            unsafe { val.sigval_ptr } as usize,
+        )) as c_int
     }
 }
 
@@ -234,8 +256,17 @@ fn sigaltstack_impl(new: Option<&stack_t>, old: Option<&mut stack_t>) -> Result<
             handler: __relibc_internal_sighandler as usize,
         };
 
-        let _ = syscall::write(*FdGuard::new(syscall::open("thisproc:current/sighandler", O_CLOEXEC | O_WRONLY)?), &handler)?;
-        ALTSTACK.set(Altstack { base: new.ss_sp as usize, size: new.ss_size });
+        let _ = syscall::write(
+            *FdGuard::new(syscall::open(
+                "thisproc:current/sighandler",
+                O_CLOEXEC | O_WRONLY,
+            )?),
+            &handler,
+        )?;
+        ALTSTACK.set(Altstack {
+            base: new.ss_sp as usize,
+            size: new.ss_size,
+        });
     }
     if let Some(old) = old {
         let range = old_altstack.base..old_altstack.base + old_altstack.size;
@@ -311,7 +342,9 @@ unsafe extern "C" fn sighandler_inner(stack: &mut Stack) {
             si_signo: c_int::from(signal),
             si_errno: 0,
             si_code: 0,
-            si_value: sigval { sigval_ptr: stack.inner.sigval as *mut c_void },
+            si_value: sigval {
+                sigval_ptr: stack.inner.sigval as *mut c_void,
+            },
             ..Default::default()
         };
         if sigdebug() {
@@ -376,6 +409,9 @@ pub fn current_sighandler() -> Sighandler {
 }
 
 pub unsafe fn init() {
-    let fd = FdGuard::new(syscall::open("thisproc:current/sighandler", O_CLOEXEC).expect("failed to open sighandler fd"));
+    let fd = FdGuard::new(
+        syscall::open("thisproc:current/sighandler", O_CLOEXEC)
+            .expect("failed to open sighandler fd"),
+    );
     let _ = syscall::write(*fd, &current_sighandler()).expect("failed to write sighandler struct");
 }

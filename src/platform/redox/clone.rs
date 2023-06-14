@@ -17,11 +17,14 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
     {
         let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
 
-        let _ = syscall::write(*new_sighandler_fd, &Sighandler {
-            altstack_base: 0,
-            altstack_size: 0,
-            handler: crate::platform::sys::signal::__relibc_internal_sighandler as usize,
-        })?;
+        let _ = syscall::write(
+            *new_sighandler_fd,
+            &Sighandler {
+                altstack_base: 0,
+                altstack_size: 0,
+                handler: crate::platform::sys::signal::__relibc_internal_sighandler as usize,
+            },
+        )?;
     }
     // Reuse sigmask
     {
@@ -44,7 +47,6 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
             &usize::to_ne_bytes(*cur_sigaction_fd),
         )?;
     }
-
 
     copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
 

@@ -63,7 +63,9 @@ pub union sigval {
 }
 impl Default for sigval {
     fn default() -> Self {
-        Self { sigval_ptr: core::ptr::null_mut() }
+        Self {
+            sigval_ptr: core::ptr::null_mut(),
+        }
     }
 }
 
