@@ -330,7 +330,17 @@ pub fn __relibc_internal_enable_sigdebug() {
 }
 */
 
-unsafe extern "C" fn sighandler_inner(stack: &mut Stack) {
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+unsafe extern "C" fn sighandler_arch(stack: &mut Stack) {
+    sighandler_inner(stack)
+}
+#[cfg(target_arch = "x86")]
+unsafe extern "fastcall" fn sighandler_arch(stack: &mut Stack) {
+    sighandler_inner(stack)
+}
+
+#[inline(always)]
+unsafe fn sighandler_inner(stack: &mut Stack) {
     let signal = u8::try_from(stack.inner.signal).expect("signal must be less than 64");
     let flags = stack.inner.sa_flags;
 
@@ -369,18 +379,19 @@ unsafe extern "C" fn sighandler_inner(stack: &mut Stack) {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 core::arch::global_asm!("
     .globl __relibc_internal_sighandler
     .type __relibc_internal_sighandler, @function
     .p2align 6
 __relibc_internal_sighandler:
     sub rsp, 512
-    fxsave [rsp]
+    fxsave64 [rsp]
 
     mov rdi, rsp
     call {inner}
 
-    fxrstor [rsp]
+    fxrstor64 [rsp]
     add rsp, 512
 
     mov rax, {SYS_SIGRETURN}
@@ -389,7 +400,30 @@ __relibc_internal_sighandler:
     ud2
 
     .size __relibc_internal_sighandler, . - __relibc_internal_sighandler
-", inner = sym sighandler_inner, SYS_SIGRETURN = const syscall::SYS_SIGRETURN);
+", inner = sym sighandler_arch, SYS_SIGRETURN = const syscall::SYS_SIGRETURN);
+
+#[cfg(target_arch = "x86")]
+core::arch::global_asm!("
+    .globl __relibc_internal_sighandler
+    .type __relibc_internal_sighandler, @function
+    .p2align 6
+__relibc_internal_sighandler:
+    sub esp, 512
+    fxsave [esp]
+
+    mov ecx, esp
+    call {inner}
+
+    fxrstor [esp]
+    add esp, 512
+
+    mov eax, {SYS_SIGRETURN}
+    int 0x80
+
+    ud2
+
+    .size __relibc_internal_sighandler, . - __relibc_internal_sighandler
+", inner = sym sighandler_arch, SYS_SIGRETURN = const syscall::SYS_SIGRETURN);
 
 #[thread_local]
 static ALTSTACK: Cell<Altstack> = Cell::new(Altstack { base: 0, size: 0 });

@@ -141,9 +141,9 @@ pub unsafe extern "C" fn sigaction(
 
 #[no_mangle]
 pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
-    match signo {
-        1..NSIG => (),
-        SIGRTMIN..SIGRTMAX => (),
+    match usize::try_from(signo).ok() {
+        Some(1..NSIG) => (),
+        Some(SIGRTMIN..SIGRTMAX) => (),
 
         _ => {
             platform::errno = errno::EINVAL;
@@ -163,9 +163,9 @@ pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -
 
 #[no_mangle]
 pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
-    match signo {
-        1..NSIG => (),
-        SIGRTMIN..SIGRTMAX => (),
+    match usize::try_from(signo).ok() {
+        Some(1..NSIG) => (),
+        Some(SIGRTMIN..SIGRTMAX) => (),
 
         _ => {
             platform::errno = errno::EINVAL;
@@ -229,9 +229,9 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
-    match signo {
-        1..NSIG => (),
-        SIGRTMIN..SIGRTMAX => (),
+    match usize::try_from(signo).ok() {
+        Some(1..NSIG) => (),
+        Some(SIGRTMIN..SIGRTMAX) => (),
 
         _ => {
             platform::errno = errno::EINVAL;

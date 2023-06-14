@@ -8,6 +8,7 @@
 #![feature(asm_const)]
 #![feature(c_variadic)]
 #![feature(core_intrinsics)]
+#![feature(exclusive_range_pattern)]
 #![feature(int_roundings)]
 #![feature(lang_items)]
 #![feature(linkage)]
