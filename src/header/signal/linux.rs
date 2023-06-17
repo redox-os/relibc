@@ -56,9 +56,10 @@ pub const SIGPOLL: usize = SIGIO;
 pub const SIGPWR: usize = 30;
 pub const SIGSYS: usize = 31;
 pub const SIGUNUSED: usize = SIGSYS;
-pub const NSIG: usize = 32;
+pub const NSIG: usize = 65;
 
 pub const SIGRTMIN: usize = 34;
+pub const SIGRTMAX: usize = 64;
 
 pub const SA_NOCLDSTOP: usize = 1;
 pub const SA_NOCLDWAIT: usize = 2;

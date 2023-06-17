@@ -10,9 +10,9 @@ struct sigaction {
     void (*sa_handler)(int);
     void (*sa_sigaction)(int, siginfo_t *siginfo, void *context);
   };
-  int sa_flags;
-  sigset_t sa_mask;
+  unsigned long sa_flags;
   void (*sa_restorer)(void);
+  sigset_t sa_mask;
 };
 
 // XXX: cbindgen blocks both sigaction and struct sigaction, so define the function manually

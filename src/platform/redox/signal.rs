@@ -181,7 +181,7 @@ impl PalSignal for Sys {
                     oact.sa_handler = unsafe { mem::transmute(SIG_DFL) };
                 }*/
                 oact.sa_mask = old_abi.sa_mask;
-                oact.sa_flags = old_abi.sa_flags.bits() as c_int;
+                oact.sa_flags = old_abi.sa_flags.bits() as c_ulong;
             }
         }
 
