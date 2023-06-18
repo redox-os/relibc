@@ -425,6 +425,21 @@ __relibc_internal_sighandler:
     .size __relibc_internal_sighandler, . - __relibc_internal_sighandler
 ", inner = sym sighandler_arch, SYS_SIGRETURN = const syscall::SYS_SIGRETURN);
 
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!("
+    .globl __relibc_internal_sighandler
+    .type __relibc_internal_sighandler, @function
+    .p2align 6
+__relibc_internal_sighandler:
+    mov x0, sp
+    bl {inner}
+
+    mov x0, {SYS_SIGRETURN}
+    svc 0
+
+    .size __relibc_internal_sighandler, . - __relibc_internal_sighandler
+", inner = sym sighandler_arch, SYS_SIGRETURN = const syscall::SYS_SIGRETURN);
+
 #[thread_local]
 static ALTSTACK: Cell<Altstack> = Cell::new(Altstack { base: 0, size: 0 });
 

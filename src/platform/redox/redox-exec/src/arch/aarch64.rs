@@ -34,8 +34,8 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
 }
 
 #[no_mangle]
-unsafe extern "C" fn __relibc_internal_fork_impl(initial_rsp: *mut usize) -> usize {
-    Error::mux(fork_inner(initial_rsp))
+unsafe extern "C" fn __relibc_internal_fork_impl(info: &crate::ForkInfo, initial_rsp: *mut usize) -> usize {
+    Error::mux(fork_inner(info, initial_rsp))
 }
 
 #[no_mangle]
@@ -61,7 +61,7 @@ __relibc_internal_fork_wrapper:
 
     //TODO: store floating point regs
 
-    mov x0, sp
+    mov x1, sp
     bl __relibc_internal_fork_impl
     b 2f
 
@@ -94,6 +94,6 @@ __relibc_internal_fork_ret:
 );
 
 extern "C" {
-    pub(crate) fn __relibc_internal_fork_wrapper() -> usize;
+    pub(crate) fn __relibc_internal_fork_wrapper(info: &crate::ForkInfo) -> usize;
     pub(crate) fn __relibc_internal_fork_ret();
 }
