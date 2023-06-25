@@ -97,7 +97,10 @@ impl PalEpoll for Sys {
         };
 
         let bytes_read = Sys::read(epfd, unsafe {
-            slice::from_raw_parts_mut(events as *mut u8, maxevents as usize)
+            slice::from_raw_parts_mut(
+                events as *mut u8,
+                maxevents as usize * mem::size_of::<syscall::Event>(),
+            )
         });
         if bytes_read == -1 {
             return -1;
