@@ -182,7 +182,7 @@ where
                 const PAGES_PER_ITER: usize = 64;
 
                 for page_idx in (0..file_page_count).step_by(PAGES_PER_ITER) {
-                    let pages_in_this_group = core::cmp::min(PAGES_PER_ITER, file_page_count - page_idx);
+                    let pages_in_this_group = core::cmp::min(PAGES_PER_ITER, file_page_count - page_idx * PAGES_PER_ITER);
 
                     if pages_in_this_group == 0 { break }
 
@@ -202,7 +202,11 @@ where
                     // lengths are aligned, obviously)?
 
                     let voff_here = if page_idx == 0 { voff } else { 0 };
-                    let size_here = if pages_in_this_group == PAGES_PER_ITER { PAGES_PER_ITER * PAGE_SIZE } else { (file_page_count) * PAGE_SIZE + (segment.p_filesz as usize % PAGE_SIZE) } - voff_here;
+                    let size_here = if pages_in_this_group == PAGES_PER_ITER {
+                        PAGES_PER_ITER * PAGE_SIZE
+                    } else {
+                        file_page_count.div_floor(PAGES_PER_ITER) * PAGES_PER_ITER * PAGE_SIZE + (segment.p_filesz as usize % PAGE_SIZE)
+                    } - voff_here;
 
                     read_all(*image_file, None, &mut dst_memory[voff_here..][..size_here])?;
 
