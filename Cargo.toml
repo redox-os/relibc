@@ -2,7 +2,7 @@
 name = "relibc"
 version = "0.2.5"
 authors = ["Jeremy Soller <jackpot51@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "relibc"
