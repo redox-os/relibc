@@ -3,6 +3,7 @@
 #include <sys/epoll.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <errno.h>
 
 int reader(int fd) {
     // Create an epoll file
@@ -21,8 +22,22 @@ int reader(int fd) {
         return 1;
     }
 
-    // Process exactly 1024 events
     struct epoll_event events[8];
+
+    // Check that epoll returns error on a zero or negative number of events
+    int nfds0 = epoll_wait(epollfd, events, 0, -1);
+    if (nfds0 != -1 || errno != EINVAL) {
+        perror("epoll_wait");
+        return 1;
+    }
+
+    int nfds_n1 = epoll_wait(epollfd, events, -1, -1);
+    if (nfds_n1 != -1 || errno != EINVAL) {
+        perror("epoll_wait");
+        return 1;
+    }
+
+    // Process exactly 1024 events
     for (int i = 0; i < 1024; i++) {
         // Wait for the next event
         int nfds = epoll_wait(epollfd, events, sizeof(events)/sizeof(struct epoll_event), -1);
