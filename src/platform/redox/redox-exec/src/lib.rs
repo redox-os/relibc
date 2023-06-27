@@ -23,7 +23,7 @@ use goblin::elf64::{
 use syscall::{
     error::*,
     flag::{MapFlags, SEEK_SET},
-    PAGE_SIZE, Map,
+    PAGE_SIZE, Map, PROT_WRITE, O_CLOEXEC,
 };
 
 pub use self::arch::*;
@@ -148,13 +148,9 @@ where
             PT_LOAD => {
                 let voff = segment.p_vaddr as usize % PAGE_SIZE;
                 let vaddr = segment.p_vaddr as usize - voff;
+                let filesz = segment.p_filesz as usize;
 
-                // TODO: Use CoW mmap from the underlying filesystem.
-                let _poff = segment.p_offset - voff as u64;
-
-                let file_page_count = (segment.p_filesz as usize + voff).div_ceil(PAGE_SIZE);
-                let zero_page_count = ((segment.p_memsz as usize + voff) - file_page_count * PAGE_SIZE).div_ceil(PAGE_SIZE);
-                let total_page_count = file_page_count + zero_page_count;
+                let total_page_count = (segment.p_memsz as usize + voff).div_ceil(PAGE_SIZE);
 
                 // The case where segments overlap so that they share one page, is not handled.
                 // TODO: Should it be?
@@ -170,8 +166,32 @@ where
                     total_page_count * PAGE_SIZE,
                     flags,
                 )?;
-                syscall::lseek(*image_file as usize, segment.p_offset as isize, SEEK_SET)
+                syscall::lseek(*image_file, segment.p_offset as isize, SEEK_SET)
                     .map_err(|_| Error::new(EIO))?;
+
+                // If unaligned, read the head page separately.
+                let (first_aligned_page, remaining_filesz) = if voff > 0 {
+                    let bytes_to_next_page = PAGE_SIZE - voff;
+
+                    let (_guard, dst_page) = unsafe {
+                        MmapGuard::map_mut_anywhere(
+                            *grants_fd,
+                            vaddr,
+                            PAGE_SIZE,
+                        )?
+                    };
+
+                    let length = core::cmp::min(bytes_to_next_page, filesz);
+
+                    read_all(*image_file, None, &mut dst_page[voff..][..length])?;
+
+                    (vaddr + PAGE_SIZE, filesz - length)
+                } else {
+                    (vaddr, filesz)
+                };
+
+                let remaining_page_count = remaining_filesz.div_floor(PAGE_SIZE);
+                let tail_bytes = remaining_filesz % PAGE_SIZE;
 
                 // TODO: Unless the calling process if *very* memory-constrained, the max amount of
                 // pages per iteration has no limit other than the time it takes to setup page
@@ -181,37 +201,45 @@ where
                 // situation?
                 const PAGES_PER_ITER: usize = 64;
 
-                for page_idx in (0..file_page_count).step_by(PAGES_PER_ITER) {
+                // TODO: Before this loop, attempt to mmap with MAP_PRIVATE directly from the image
+                // file.
+
+                for page_idx in (0..remaining_page_count).step_by(PAGES_PER_ITER) {
                     // Use commented out lines to trigger kernel bug (FIXME).
 
                     //let pages_in_this_group = core::cmp::min(PAGES_PER_ITER, file_page_count - page_idx * PAGES_PER_ITER);
-                    let pages_in_this_group = core::cmp::min(PAGES_PER_ITER, file_page_count - page_idx);
+                    let pages_in_this_group = core::cmp::min(PAGES_PER_ITER, remaining_page_count - page_idx);
 
                     if pages_in_this_group == 0 { break }
 
-                    let mut mmap_guard = MmapGuard::map(*grants_fd, &Map {
-                        offset: vaddr + page_idx * PAGE_SIZE,
-                        size: pages_in_this_group * PAGE_SIZE,
-                        // TODO: MAP_FIXED (without MAP_FIXED_NOREPLACE) to a fixed offset, to
-                        // avoid mapping/unmapping repeatedly?
-                        flags: MapFlags::PROT_WRITE,
-                        address: 0, // let the kernel choose
-                    })?;
+                    let _ = syscall::write(1, alloc::format!("idx {} reading (segment {:#?})\n", page_idx, segment).as_bytes());
 
-                    let dst_memory = unsafe { &mut *mmap_guard.as_mut_ptr_slice() };
+                    // TODO: MAP_FIXED to optimize away funmap?
+                    let (_guard, dst_memory) = unsafe {
+                        MmapGuard::map_mut_anywhere(
+                            *grants_fd,
+                            first_aligned_page + page_idx * PAGE_SIZE, // offset
+                            pages_in_this_group * PAGE_SIZE, // size
+                        )?
+                    };
+
                     // TODO: Are &mut [u8] and &mut [[u8; PAGE_SIZE]] interchangeable (if the
                     // lengths are aligned, obviously)?
 
-                    let voff_here = if page_idx == 0 { voff } else { 0 };
-                    let size_here = if pages_in_this_group == PAGES_PER_ITER {
-                        PAGES_PER_ITER * PAGE_SIZE
-                    } else {
-                        (pages_in_this_group - 1) * PAGE_SIZE + (segment.p_filesz as usize % PAGE_SIZE)
-                        //pages_in_this_group.div_floor(PAGES_PER_ITER) * PAGES_PER_ITER * PAGE_SIZE + (segment.p_filesz as usize % PAGE_SIZE)
-                    } - voff_here;
-
-                    read_all(*image_file, None, &mut dst_memory[voff_here..][..size_here])?;
+                    read_all(*image_file, None, dst_memory)?;
                 }
+
+                if tail_bytes > 0 {
+                    let (_guard, dst_page) = unsafe {
+                        MmapGuard::map_mut_anywhere(
+                            *grants_fd,
+                            first_aligned_page + remaining_page_count * PAGE_SIZE,
+                            PAGE_SIZE,
+                        )?
+                    };
+                    read_all(*image_file, None, &mut dst_page[..tail_bytes])?;
+                }
+
                 // file_page_count..file_page_count + zero_page_count are already zero-initialized
                 // by the kernel.
 
@@ -286,14 +314,13 @@ where
         MapFlags::PROT_READ | MapFlags::PROT_WRITE,
     )?;
     unsafe {
-        let mut base = MmapGuard::map(*grants_fd, &Map {
-            offset: pheaders,
-            size: pheaders_size_aligned,
-            flags: MapFlags::PROT_WRITE,
-            address: 0,
-        })?;
+        let (_guard, memory) = MmapGuard::map_mut_anywhere(
+            *grants_fd,
+            pheaders,
+            pheaders_size_aligned,
+        )?;
 
-        (&mut *base.as_mut_ptr_slice())[..pheaders_to_convey.len()].copy_from_slice(pheaders_to_convey);
+        memory[..pheaders_to_convey.len()].copy_from_slice(pheaders_to_convey);
     }
     mprotect_remote(
         &grants_fd,
@@ -344,7 +371,7 @@ where
     let mut argc = 0;
 
     {
-        let mut append = |source_slice: &[u8]| unsafe {
+        let mut append = |source_slice: &[u8]| {
             // TODO
             let address = target_args_env_address + offset;
 
@@ -354,8 +381,14 @@ where
                 let size = source_slice.len() + displacement;
                 let aligned_size = size.next_multiple_of(PAGE_SIZE);
 
-                let mut base = MmapGuard::map(*grants_fd, &Map { offset: containing_page, size: aligned_size, flags: MapFlags::PROT_WRITE, address: 0 })?;
-                (unsafe { &mut *base.as_mut_ptr_slice() })[displacement..][..source_slice.len()].copy_from_slice(source_slice);
+                let (_guard, memory) = unsafe {
+                    MmapGuard::map_mut_anywhere(
+                        *grants_fd, 
+                        containing_page,
+                        aligned_size,
+                    )?
+                };
+                memory[displacement..][..source_slice.len()].copy_from_slice(source_slice);
             }
 
             offset += source_slice.len() + 1;
@@ -537,21 +570,6 @@ fn read_all(fd: usize, offset: Option<u64>, buf: &mut [u8]) -> Result<()> {
     }
     Ok(())
 }
-fn write_all(fd: usize, offset: Option<u64>, buf: &[u8]) -> Result<()> {
-    if let Some(offset) = offset {
-        syscall::lseek(fd, offset as isize, SEEK_SET)?;
-    }
-
-    let mut total_bytes_written = 0;
-
-    while total_bytes_written < buf.len() {
-        total_bytes_written += match syscall::write(fd, &buf[total_bytes_written..])? {
-            0 => return Err(Error::new(EIO)),
-            bytes_written => bytes_written,
-        }
-    }
-    Ok(())
-}
 
 // TODO: With the introduction of remote mmaps, remove this and let the kernel handle address
 // allocation.
@@ -587,6 +605,17 @@ impl MmapGuard {
 
             base: unsafe { syscall::fmap(fd, map)? },
         })
+    }
+    pub unsafe fn map_mut_anywhere<'a>(fd: usize, offset: usize, size: usize) -> Result<(Self, &'a mut [u8])> {
+        let mut this = Self::map(fd, &Map {
+            size,
+            offset,
+            address: 0,
+            flags: PROT_WRITE,
+        })?;
+        let slice = &mut *this.as_mut_ptr_slice();
+
+        Ok((this, slice))
     }
     pub fn addr(&self) -> usize {
         self.base
@@ -668,7 +697,7 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     {
         let cur_pid_fd = FdGuard::new(syscall::open(
             "thisproc:current/open_via_dup",
-            syscall::O_CLOEXEC,
+            O_CLOEXEC,
         )?);
         (new_pid_fd, new_pid) = new_context()?;
 
@@ -757,7 +786,7 @@ pub fn new_context() -> Result<(FdGuard, usize)> {
     // Create a new context (fields such as uid/gid will be inherited from the current context).
     let fd = FdGuard::new(syscall::open(
         "thisproc:new/open_via_dup",
-        syscall::O_CLOEXEC,
+        O_CLOEXEC,
     )?);
 
     // Extract pid.
