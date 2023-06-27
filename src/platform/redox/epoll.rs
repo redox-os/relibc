@@ -63,6 +63,11 @@ impl PalEpoll for Sys {
         // TODO: sigset
         assert_eq!(mem::size_of::<epoll_event>(), mem::size_of::<Event>());
 
+        if maxevents <= 0 {
+            unsafe { platform::errno = EINVAL };
+            return -1;
+        }
+
         let timer_opt = if timeout != -1 {
             match File::open(c_str!("time:4"), O_RDWR) {
                 Err(_) => return -1,
