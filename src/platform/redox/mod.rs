@@ -767,11 +767,7 @@ impl Pal for Sys {
     }
 
     fn pipe2(fds: &mut [c_int], flags: c_int) -> c_int {
-        let mut usize_fds: [usize; 2] = [0; 2];
-        let res = e(syscall::pipe2(&mut usize_fds, flags as usize));
-        fds[0] = usize_fds[0] as c_int;
-        fds[1] = usize_fds[1] as c_int;
-        res as c_int
+        e(extra::pipe2(fds, flags as usize).map(|()| 0)) as c_int
     }
 
     unsafe fn rlct_clone(
