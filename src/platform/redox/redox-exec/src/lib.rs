@@ -212,8 +212,6 @@ where
 
                     if pages_in_this_group == 0 { break }
 
-                    let _ = syscall::write(1, alloc::format!("idx {} reading (segment {:#?})\n", page_idx, segment).as_bytes());
-
                     // TODO: MAP_FIXED to optimize away funmap?
                     let (_guard, dst_memory) = unsafe {
                         MmapGuard::map_mut_anywhere(
@@ -446,7 +444,6 @@ where
     }
 
     let addrspace_selection_fd = FdGuard::new(syscall::dup(*open_via_dup, b"current-addrspace")?);
-            let _ = syscall::write(1, alloc::format!("ENTER {:p} {:p}\n", header.e_entry as *const u8, sp as *const u8).as_bytes());
 
     let _ = syscall::write(
         *addrspace_selection_fd,
