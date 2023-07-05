@@ -34,7 +34,7 @@ unsafe fn scatter(iovs: &[iovec], vec: Vec<u8>) {
     let mut i = 0;
     for iov in iovs.iter() {
         let slice = iov.to_slice();
-        slice.copy_from_slice(&vec[i..]);
+        slice.copy_from_slice(&vec[i..][..slice.len()]);
         i += slice.len();
     }
 }
