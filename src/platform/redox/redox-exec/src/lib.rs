@@ -24,6 +24,7 @@ use syscall::{
     error::*,
     flag::{MapFlags, SEEK_SET},
     PAGE_SIZE, Map, PROT_WRITE, O_CLOEXEC,
+    GrantDesc, GrantFlags, PROT_READ, PROT_EXEC, MAP_SHARED, MAP_FIXED_NOREPLACE,
 };
 
 pub use self::arch::*;
@@ -743,6 +744,59 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
 
             let cur_addr_space_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"addrspace")?);
             let new_addr_space_fd = FdGuard::new(syscall::dup(*cur_addr_space_fd, b"exclusive")?);
+
+            let mut grant_desc_buf = [GrantDesc::default(); 16];
+            loop {
+                let bytes_read = {
+                    let buf = unsafe { core::slice::from_raw_parts_mut(grant_desc_buf.as_mut_ptr().cast(), grant_desc_buf.len() * size_of::<GrantDesc>()) };
+                    syscall::read(*cur_addr_space_fd, buf)?
+                };
+                if bytes_read == 0 {
+                    break;
+                }
+
+                let grants = &grant_desc_buf[..bytes_read / size_of::<GrantDesc>()];
+
+                for grant in grants {
+                    if !grant.flags.contains(GrantFlags::GRANT_SCHEME) || !grant.flags.contains(GrantFlags::GRANT_SHARED) {
+                        continue;
+                    }
+
+                    let mut buf;
+
+                    // TODO: write! using some #![no_std] Cursor type (tracking the length)?
+                    #[cfg(target_pointer_width = "64")]
+                    {
+                        //buf = *b"grant-fd-AAAABBBBCCCCDDDD";
+                        //write!(&mut buf, "grant-fd-{:>016x}", grant.base).unwrap();
+                        buf = alloc::format!("grant-fd-{:>016x}", grant.base).into_bytes();
+                    }
+
+                    #[cfg(target_pointer_width = "32")]
+                    {
+                        //buf = *b"grant-fd-AAAABBBB";
+                        //write!(&mut buf[..], "grant-fd-{:>08x}", grant.base).unwrap();
+                        buf = alloc::format!("grant-fd-{:>08x}", grant.base).into_bytes();
+                    }
+
+                    let grant_fd = FdGuard::new(syscall::dup(*cur_addr_space_fd, &buf)?);
+
+                    let mut flags = MAP_SHARED | MAP_FIXED_NOREPLACE;
+
+                    flags.set(PROT_READ, grant.flags.contains(GrantFlags::GRANT_READ));
+                    flags.set(PROT_WRITE, grant.flags.contains(GrantFlags::GRANT_WRITE));
+                    flags.set(PROT_EXEC, grant.flags.contains(GrantFlags::GRANT_EXEC));
+
+                    mmap_remote(
+                        &new_addr_space_fd,
+                        &grant_fd,
+                        grant.offset as usize,
+                        grant.base,
+                        grant.size,
+                        flags,
+                    )?;
+                }
+            }
 
             let buf = create_set_addr_space_buf(
                 *new_addr_space_fd,
