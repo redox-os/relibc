@@ -9,6 +9,7 @@ global_asm!(
 .globl _start
 _start:
     mov x0, sp
+    and sp, x0, #0xfffffffffffffff0 //align sp
     bl relibc_ld_so_start
     # TODO: aarch64
     udf #0
