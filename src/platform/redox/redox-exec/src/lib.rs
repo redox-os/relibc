@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(array_chunks, int_roundings, slice_ptr_get)]
+#![feature(array_chunks, int_roundings, let_chains, slice_ptr_get)]
 #![forbid(unreachable_patterns)]
 
 extern crate alloc;
@@ -273,25 +273,24 @@ where
         let new_page_no = sp / PAGE_SIZE;
         let new_page_off = sp % PAGE_SIZE;
 
-        if old_page_no != new_page_no {
-            stack_page = None;
-        }
-
-        let page = if let Some(ref mut page) = stack_page {
-            page.as_mut_ptr_slice()
+        let page = if let Some(ref mut page) = stack_page && old_page_no == new_page_no {
+            page
+        } else if let Some(ref mut stack_page) = stack_page {
+            stack_page.remap(new_page_no * PAGE_SIZE, PROT_WRITE)?;
+            stack_page
         } else {
             let new = MmapGuard::map(*grants_fd, &Map {
                 offset: new_page_no * PAGE_SIZE,
                 size: PAGE_SIZE,
-                flags: MapFlags::PROT_WRITE,
+                flags: PROT_WRITE,
                 address: 0, // let kernel decide
             })?;
 
-            stack_page.insert(new).as_mut_ptr_slice()
+            stack_page.insert(new)
         };
 
         unsafe {
-            page.as_mut_ptr().add(new_page_off).cast::<usize>().write(word);
+            page.as_mut_ptr_slice().as_mut_ptr().add(new_page_off).cast::<usize>().write(word);
         }
 
         Ok(())
@@ -591,18 +590,30 @@ fn find_free_target_addr(tree: &BTreeMap<usize, usize>, size: usize) -> Option<u
 }
 
 pub struct MmapGuard {
+    fd: usize,
     base: usize,
     size: usize,
-    taken: bool,
 }
 impl MmapGuard {
     pub fn map(fd: usize, map: &Map) -> Result<Self> {
         Ok(Self {
+            fd,
             size: map.size,
-            taken: false,
-
             base: unsafe { syscall::fmap(fd, map)? },
         })
+    }
+    pub fn remap(&mut self, offset: usize, mut flags: MapFlags) -> Result<()> {
+        flags.remove(MapFlags::MAP_FIXED_NOREPLACE);
+        flags.insert(MapFlags::MAP_FIXED);
+
+        let _new_base = unsafe { syscall::fmap(self.fd, &Map {
+            offset,
+            size: self.size,
+            flags,
+            address: self.base,
+        })? };
+
+        Ok(())
     }
     pub unsafe fn map_mut_anywhere<'a>(fd: usize, offset: usize, size: usize) -> Result<(Self, &'a mut [u8])> {
         let mut this = Self::map(fd, &Map {
@@ -624,13 +635,13 @@ impl MmapGuard {
     pub fn as_mut_ptr_slice(&mut self) -> *mut [u8] {
         core::ptr::slice_from_raw_parts_mut(self.base as *mut u8, self.size)
     }
-    pub fn take(&mut self) {
-        self.taken = true;
+    pub fn take(mut self) {
+        self.size = 0;
     }
 }
 impl Drop for MmapGuard {
     fn drop(&mut self) {
-        if !self.taken {
+        if self.size != 0 {
             let _ = unsafe { syscall::funmap(self.base, self.size) };
         }
     }
