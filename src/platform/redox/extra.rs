@@ -27,29 +27,6 @@ pub unsafe extern "C" fn redox_physfree(physical_address: *mut c_void, size: siz
     e(syscall::physfree(physical_address as usize, size)) as c_int
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn redox_physmap(
-    physical_address: *mut c_void,
-    size: size_t,
-    flags: c_int,
-) -> *mut c_void {
-    let res = e(syscall::physmap(
-        physical_address as usize,
-        size,
-        syscall::PhysmapFlags::from_bits(flags as usize).expect("physmap: invalid bit pattern"),
-    ));
-    if res == !0 {
-        return ptr::null_mut();
-    } else {
-        return res as *mut c_void;
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn redox_physunmap(virtual_address: *mut c_void) -> c_int {
-    e(syscall::physunmap(virtual_address as usize)) as c_int
-}
-
 pub fn pipe2(fds: &mut [c_int], flags: usize) -> syscall::error::Result<()> {
     let fds =
         <&mut [c_int; 2]>::try_from(fds).expect("expected Pal pipe2 to have validated pipe2 array");
