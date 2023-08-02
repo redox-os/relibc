@@ -163,7 +163,8 @@ impl Pal for Sys {
         // let empty = b"\0";
         // let empty_ptr = empty.as_ptr() as *const c_char;
         // e(unsafe { syscall!(NEWFSTATAT, fildes, empty_ptr, buf, AT_EMPTY_PATH) }) as c_int
-        unimplemented!()
+        // unimplemented!()
+        e(unsafe { syscall!(SYS_FSTAT, fildes, buf) }) as c_int
     }
 
     fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
