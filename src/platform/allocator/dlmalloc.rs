@@ -38,7 +38,6 @@ impl Allocator {
 }
 
 unsafe impl<'a> GlobalAlloc for Allocator {
-
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         alloc_align(layout.size(), layout.align()) as *mut u8
     }
@@ -83,7 +82,9 @@ pub fn new_mspace() -> usize {
     }
     //println!("I am here");
     //println!("{:#?}",unsafe{space[x as usize].as_mut_ptr()});
-    let r = unsafe { create_mspace_with_base(space[x as usize].as_mut_ptr() as *mut c_void, 128 * 16, 0)};
+    let r = unsafe {
+        create_mspace_with_base(space[x as usize].as_mut_ptr() as *mut c_void, 128 * 16, 0)
+    };
     println!("new_mspace: {:#018x}", r);
     return r;
 }

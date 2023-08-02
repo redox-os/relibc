@@ -498,7 +498,7 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
 /// itself.
 #[no_mangle]
 pub unsafe extern "C" fn __fpurge(stream: *mut FILE) {
-    if ! stream.is_null() {
+    if !stream.is_null() {
         let mut stream = (*stream).lock();
         stream.purge();
     }

@@ -1,7 +1,6 @@
 //! strings implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/strings.h.html
 
-use core::ptr;
-use core::arch;
+use core::{arch, ptr};
 
 use crate::{
     header::{ctype, string},

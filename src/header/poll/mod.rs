@@ -6,7 +6,8 @@ use crate::{
     fs::File,
     header::sys_epoll::{
         epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR, EPOLLHUP, EPOLLIN,
-        EPOLLNVAL, EPOLLOUT, EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, EPOLL_CLOEXEC, EPOLL_CTL_ADD,
+        EPOLLNVAL, EPOLLOUT, EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM,
+        EPOLL_CLOEXEC, EPOLL_CTL_ADD,
     },
     platform::types::*,
 };

@@ -296,5 +296,5 @@ pub static STR_ERROR: [&'static str; 132] = [
     "Owner died",
     "State not recoverable",
     #[cfg(target_os = "dragonos")]
-    "Unknown"
+    "Unknown",
 ];

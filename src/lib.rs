@@ -24,7 +24,6 @@
 // TODO: fix these
 #![warn(unaligned_references)]
 
-
 #[macro_use]
 extern crate alloc;
 extern crate cbitset;

@@ -4,17 +4,20 @@
 use core::arch::global_asm;
 
 #[cfg(target_arch = "aarch64")]
-global_asm!("
+global_asm!(
+    "
 .globl _start
 _start:
     mov x0, sp
     bl relibc_ld_so_start
     # TODO: aarch64
     udf #0
-");
+"
+);
 
 #[cfg(target_arch = "x86")]
-global_asm!("
+global_asm!(
+    "
 .globl _start
 _start:
     push esp
@@ -22,10 +25,12 @@ _start:
     pop esp
     # TODO: x86
     ud2
-");
+"
+);
 
 #[cfg(all(target_arch = "x86_64", not(target_os = "dragonos")))]
-global_asm!("
+global_asm!(
+    "
 .globl _start
 _start:
     # rsi = _start + 5
@@ -53,10 +58,12 @@ _start:
     xor r11, r11
     fninit
     jmp rax
-");
+"
+);
 
 #[cfg(all(target_arch = "x86_64", target_os = "dragonos"))]
-global_asm!("
+global_asm!(
+    "
 .globl _start
 _start:
     # rsi = _start + 5
@@ -84,7 +91,8 @@ _start:
     xor r11, r11
     fninit
     jmp rax
-");
+"
+);
 
 #[no_mangle]
 pub unsafe extern "C" fn main(_argc: isize, _argv: *const *const i8) -> usize {

@@ -52,7 +52,7 @@ fn align_up(addr: usize, align: usize) -> usize {
 pub unsafe fn alloc_align(mut size: usize, alignment: usize) -> *mut c_void {
     // println!("alloc align size: {}, alignment: {}", size, alignment);
     size = align_up(size, alignment);
-    
+
     // TODO: 实现对齐分配
     _dragonos_malloc(size)
     //mspace_memalign(ALLOCATOR.get_book_keeper(), alignment, size)

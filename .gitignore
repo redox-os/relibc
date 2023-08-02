@@ -6,3 +6,4 @@ sysroot/
 *.patch
 *.swp
 *.swo
+Cargo.lock
