@@ -37,7 +37,12 @@ pub const STDIN_FILENO: c_int = 0;
 pub const STDOUT_FILENO: c_int = 1;
 pub const STDERR_FILENO: c_int = 2;
 
+#[cfg(not(target_os = "dragonos"))]
 #[thread_local]
+pub static mut fork_hooks_static: Option<[LinkedList<extern "C" fn()>; 3]> = None;
+
+/// due to dragonos not supporting thread_local, we need to use a static directly
+#[cfg(target_os = "dragonos")]
 pub static mut fork_hooks_static: Option<[LinkedList<extern "C" fn()>; 3]> = None;
 
 unsafe fn init_fork_hooks<'a>() -> &'a mut [LinkedList<extern "C" fn()>; 3] {
