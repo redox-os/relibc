@@ -65,7 +65,7 @@ pub unsafe fn free(ptr: *mut c_void) {
 
 #[cfg(not(target_os = "dragonos"))]
 pub fn new_mspace() -> usize {
-    unsafe { create_mspace(0, 0) };
+    unsafe { create_mspace(0, 0) }
 }
 
 #[cfg(target_os = "dragonos")]

@@ -404,7 +404,13 @@ impl Pal for Sys {
 
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int {
         // e(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), flags) }) as c_int
-        unimplemented!()
+
+        //since dragonos hasn't implemented pipe2 system call yet. We use a seperate pipe function instead of a special type of pipe2 function
+        if flags == 0 {
+            e(unsafe { syscall!(SYS_PIPE, fildes.as_mut_ptr()) }) as c_int
+        } else {
+            unimplemented!()
+        }
     }
 
     #[cfg(target_arch = "x86_64")]
