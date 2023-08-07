@@ -37,6 +37,7 @@
 #define PAGE_2M_MASK (~(PAGE_2M_SIZE - 1))
 
 #define ALIGN_UP16(x) (((x) + 15) & ~15)
+#define PAGE_ALIGN_UP(x) (((x) + PAGE_4K_SIZE - 1) & PAGE_4K_MASK)
 
 // 将addr按照x的上边界对齐
 // #define PAGE_4K_ALIGN(addr) (((unsigned long)(addr) + PAGE_4K_SIZE - 1) & PAGE_4K_MASK)
@@ -161,7 +162,7 @@ static int malloc_enlarge(int64_t size)
     // printf("size=%ld\tfree_space=%ld\n", size, free_space);
     if (free_space < size) // 现有堆空间不足
     {
-        if (sbrk(size - free_space) != (void *)(-1))
+        if (sbrk(PAGE_ALIGN_UP(size - free_space)) != (void *)(-1))
             brk_max_addr = sbrk((0));
         else
         {
@@ -294,7 +295,10 @@ void *_dragonos_malloc(ssize_t size)
     // 计算需要分配的块的大小
     if (size < sizeof(malloc_mem_chunk_t) - 16)
         size = sizeof(malloc_mem_chunk_t);
-
+    else
+    {
+        size += 16;
+    }
     // 16字节对齐
     size = ALIGN_UP16(size);
 
@@ -410,4 +414,17 @@ void _dragonos_free(void *ptr)
         malloc_merge_free_chunk();
         release_brk();
     }
+}
+
+/**
+ * @brief 根据分配出去的指针获取堆内存块的长度
+ * 
+ * @param ptr 分配出去的指针
+ * 
+ * @return 堆内存块的长度
+*/
+uint64_t _dragonos_chunk_length(void *ptr)
+{
+    malloc_mem_chunk_t *ck = (malloc_mem_chunk_t *)((uint64_t)ptr - 2 * sizeof(uint64_t));
+    return ck->length;
 }

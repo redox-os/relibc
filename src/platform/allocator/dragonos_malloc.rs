@@ -10,6 +10,7 @@ use super::types::*;
 extern "C" {
     fn _dragonos_free(ptr: *mut c_void) -> *mut c_void;
     fn _dragonos_malloc(size: usize) -> *mut c_void;
+    fn _dragonos_chunk_length(ptr: *mut c_void) -> usize;
 }
 
 pub struct Allocator {
@@ -59,7 +60,29 @@ pub unsafe fn alloc_align(mut size: usize, alignment: usize) -> *mut c_void {
 }
 
 pub unsafe fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {
-    todo!()
+    if ptr.is_null() {
+        return alloc(size);
+    }
+    if size == 0 {
+        free(ptr);
+        return null_mut();
+    }
+
+    let old_len = _dragonos_chunk_length(ptr);
+
+    // 暴力实现
+
+    let new_ptr = alloc(size);
+    if new_ptr.is_null() {
+        return null_mut();
+    }
+
+    let copy_len = if old_len < size { old_len } else { size };
+    core::ptr::copy_nonoverlapping(ptr, new_ptr, copy_len);
+
+    free(ptr);
+
+    return new_ptr;
 }
 
 pub unsafe fn free(ptr: *mut c_void) {

@@ -42,7 +42,7 @@ sc = "0.2.3"
 
 [target.'cfg(target_os = "dragonos")'.dependencies]
 # Development
-dragonos-dsc = { git = "https://github.com/DragonOS-Community/dsc.git", rev = "b7ebf35" }
+dragonos-dsc = { git = "https://github.com/DragonOS-Community/dsc.git", rev = "d6e4fd8" }
 
 [target.'cfg(target_os = "redox")'.dependencies]
 redox_syscall = "0.3"

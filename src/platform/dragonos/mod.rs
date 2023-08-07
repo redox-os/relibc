@@ -198,8 +198,9 @@ impl Pal for Sys {
     }
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_int) -> c_int {
-        // e(unsafe { syscall!(FCNTL, fildes, cmd, arg) }) as c_int
-        unimplemented!()
+        let rc = e(unsafe { syscall!(SYS_FCNTL, fildes, cmd, arg) }) as c_int;
+        // println!("fcntl: fildes: {}, cmd: {}, arg: {}, rc: {}", fildes, cmd, arg, rc);
+        return rc;
     }
 
     fn fork() -> pid_t {
@@ -247,7 +248,15 @@ impl Pal for Sys {
         // } else {
         //     buf
         // }
-        unimplemented!()
+        // 临时实现，设置所有的cwd为根目录
+        if size > 2 {
+            unsafe {
+                *buf = b'/' as c_char;
+                *buf.add(1) = b'\0' as c_char;
+            }
+        }
+
+        return buf;
     }
 
     fn getdents(fd: c_int, dirents: *mut dirent, bytes: usize) -> c_int {
