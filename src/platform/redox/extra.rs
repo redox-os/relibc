@@ -1,8 +1,9 @@
 use core::{ptr, slice};
 
 use crate::platform::{sys::e, types::*};
-
 use syscall::{error::*, F_SETFD, F_SETFL};
+
+pub use redox_exec::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_fpath(fd: c_int, buf: *mut c_void, count: size_t) -> ssize_t {
@@ -46,5 +47,3 @@ pub fn pipe2(fds: &mut [c_int], flags: usize) -> syscall::error::Result<()> {
 
     Ok(())
 }
-
-pub use redox_exec::{create_set_addr_space_buf, FdGuard};

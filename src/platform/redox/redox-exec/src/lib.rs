@@ -1,5 +1,6 @@
 #![no_std]
-#![feature(array_chunks)]
+#![feature(array_chunks, int_roundings, let_chains, slice_ptr_get)]
+#![forbid(unreachable_patterns)]
 
 extern crate alloc;
 
@@ -22,7 +23,8 @@ use goblin::elf64::{
 use syscall::{
     error::*,
     flag::{MapFlags, SEEK_SET},
-    PAGE_SIZE,
+    PAGE_SIZE, Map, PROT_WRITE, O_CLOEXEC,
+    GrantDesc, GrantFlags, PROT_READ, PROT_EXEC, MAP_SHARED, MAP_FIXED_NOREPLACE,
 };
 
 pub use self::arch::*;
@@ -82,7 +84,6 @@ where
         let current_addrspace_fd = FdGuard::new(syscall::dup(*open_via_dup, b"addrspace")?);
         FdGuard::new(syscall::dup(*current_addrspace_fd, b"empty")?)
     };
-    let memory_fd = FdGuard::new(syscall::dup(*grants_fd, b"mem")?);
 
     // Never allow more than 1 MiB of program headers.
     const MAX_PH_SIZE: usize = 1024 * 1024;
@@ -105,9 +106,6 @@ where
         |o| core::mem::take(&mut o.tree),
     );
 
-    const BUFSZ: usize = 1024 * 256;
-    let mut buf = vec![0_u8; BUFSZ];
-
     read_all(*image_file as usize, Some(header.e_phoff as u64), phs)
         .map_err(|_| Error::new(EIO))?;
 
@@ -124,14 +122,6 @@ where
             flags |= syscall::PROT_WRITE;
         }
 
-        let voff = segment.p_vaddr as usize % PAGE_SIZE;
-        let vaddr = segment.p_vaddr as usize - voff;
-        let size = (segment.p_memsz as usize + voff + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
-
-        if segment.p_filesz > segment.p_memsz {
-            return Err(Error::new(ENOEXEC));
-        }
-        #[forbid(unreachable_patterns)]
         match segment.p_type {
             // PT_INTERP must come before any PT_LOAD, so we don't have to iterate twice.
             PT_INTERP => {
@@ -157,28 +147,100 @@ where
                 });
             }
             PT_LOAD => {
+                let voff = segment.p_vaddr as usize % PAGE_SIZE;
+                let vaddr = segment.p_vaddr as usize - voff;
+                let filesz = segment.p_filesz as usize;
+
+                let total_page_count = (segment.p_memsz as usize + voff).div_ceil(PAGE_SIZE);
+
+                // The case where segments overlap so that they share one page, is not handled.
+                // TODO: Should it be?
+
+                if segment.p_filesz > segment.p_memsz {
+                    return Err(Error::new(ENOEXEC));
+                }
+
                 allocate_remote(
                     &grants_fd,
                     memory_scheme_fd,
                     vaddr,
-                    size,
-                    syscall::PROT_READ | syscall::PROT_WRITE,
+                    total_page_count * PAGE_SIZE,
+                    flags,
                 )?;
-                syscall::lseek(*image_file as usize, segment.p_offset as isize, SEEK_SET)
-                    .map_err(|_| Error::new(EIO))?;
-                syscall::lseek(*memory_fd, segment.p_vaddr as isize, SEEK_SET)
+                syscall::lseek(*image_file, segment.p_offset as isize, SEEK_SET)
                     .map_err(|_| Error::new(EIO))?;
 
-                for size in core::iter::repeat(buf.len())
-                    .take((segment.p_filesz as usize) / buf.len())
-                    .chain(Some((segment.p_filesz as usize) % buf.len()))
-                {
-                    read_all(*image_file as usize, None, &mut buf[..size])
-                        .map_err(|_| Error::new(EIO))?;
-                    let _ =
-                        syscall::write(*memory_fd, &buf[..size]).map_err(|_| Error::new(EIO))?;
+                // If unaligned, read the head page separately.
+                let (first_aligned_page, remaining_filesz) = if voff > 0 {
+                    let bytes_to_next_page = PAGE_SIZE - voff;
+
+                    let (_guard, dst_page) = unsafe {
+                        MmapGuard::map_mut_anywhere(
+                            *grants_fd,
+                            vaddr,
+                            PAGE_SIZE,
+                        )?
+                    };
+
+                    let length = core::cmp::min(bytes_to_next_page, filesz);
+
+                    read_all(*image_file, None, &mut dst_page[voff..][..length])?;
+
+                    (vaddr + PAGE_SIZE, filesz - length)
+                } else {
+                    (vaddr, filesz)
+                };
+
+                let remaining_page_count = remaining_filesz.div_floor(PAGE_SIZE);
+                let tail_bytes = remaining_filesz % PAGE_SIZE;
+
+                // TODO: Unless the calling process if *very* memory-constrained, the max amount of
+                // pages per iteration has no limit other than the time it takes to setup page
+                // tables.
+                //
+                // TODO: Reserve PAGES_PER_ITER "scratch pages" of virtual memory for that type of
+                // situation?
+                const PAGES_PER_ITER: usize = 64;
+
+                // TODO: Before this loop, attempt to mmap with MAP_PRIVATE directly from the image
+                // file.
+
+                for page_idx in (0..remaining_page_count).step_by(PAGES_PER_ITER) {
+                    // Use commented out lines to trigger kernel bug (FIXME).
+
+                    //let pages_in_this_group = core::cmp::min(PAGES_PER_ITER, file_page_count - page_idx * PAGES_PER_ITER);
+                    let pages_in_this_group = core::cmp::min(PAGES_PER_ITER, remaining_page_count - page_idx);
+
+                    if pages_in_this_group == 0 { break }
+
+                    // TODO: MAP_FIXED to optimize away funmap?
+                    let (_guard, dst_memory) = unsafe {
+                        MmapGuard::map_mut_anywhere(
+                            *grants_fd,
+                            first_aligned_page + page_idx * PAGE_SIZE, // offset
+                            pages_in_this_group * PAGE_SIZE, // size
+                        )?
+                    };
+
+                    // TODO: Are &mut [u8] and &mut [[u8; PAGE_SIZE]] interchangeable (if the
+                    // lengths are aligned, obviously)?
+
+                    read_all(*image_file, None, dst_memory)?;
                 }
-                mprotect_remote(&grants_fd, vaddr, size, flags)?;
+
+                if tail_bytes > 0 {
+                    let (_guard, dst_page) = unsafe {
+                        MmapGuard::map_mut_anywhere(
+                            *grants_fd,
+                            first_aligned_page + remaining_page_count * PAGE_SIZE,
+                            PAGE_SIZE,
+                        )?
+                    };
+                    read_all(*image_file, None, &mut dst_page[..tail_bytes])?;
+                }
+
+                // file_page_count..file_page_count + zero_page_count are already zero-initialized
+                // by the kernel.
 
                 if !tree
                     .range(..=vaddr)
@@ -186,7 +248,7 @@ where
                     .filter(|(start, size)| **start + **size > vaddr)
                     .is_some()
                 {
-                    tree.insert(vaddr, size);
+                    tree.insert(vaddr, total_page_count * PAGE_SIZE);
                 }
             }
             _ => continue,
@@ -202,11 +264,36 @@ where
     )?;
     tree.insert(STACK_TOP - STACK_SIZE, STACK_SIZE);
 
-    let mut sp = STACK_TOP - 256;
+    let mut sp = STACK_TOP;
+    let mut stack_page = Option::<MmapGuard>::None;
 
     let mut push = |word: usize| {
+        let old_page_no = sp / PAGE_SIZE;
         sp -= size_of::<usize>();
-        write_all(*memory_fd, Some(sp as u64), &usize::to_ne_bytes(word))
+        let new_page_no = sp / PAGE_SIZE;
+        let new_page_off = sp % PAGE_SIZE;
+
+        let page = if let Some(ref mut page) = stack_page && old_page_no == new_page_no {
+            page
+        } else if let Some(ref mut stack_page) = stack_page {
+            stack_page.remap(new_page_no * PAGE_SIZE, PROT_WRITE)?;
+            stack_page
+        } else {
+            let new = MmapGuard::map(*grants_fd, &Map {
+                offset: new_page_no * PAGE_SIZE,
+                size: PAGE_SIZE,
+                flags: PROT_WRITE,
+                address: 0, // let kernel decide
+            })?;
+
+            stack_page.insert(new)
+        };
+
+        unsafe {
+            page.as_mut_ptr_slice().as_mut_ptr().add(new_page_off).cast::<usize>().write(word);
+        }
+
+        Ok(())
     };
 
     let pheaders_to_convey = if let Some(ref r#override) = interp_override {
@@ -214,7 +301,7 @@ where
     } else {
         &*phs_raw
     };
-    let pheaders_size_aligned = (pheaders_to_convey.len() + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+    let pheaders_size_aligned = pheaders_to_convey.len().next_multiple_of(PAGE_SIZE);
     let pheaders = find_free_target_addr(&tree, pheaders_size_aligned).ok_or(Error::new(ENOMEM))?;
     tree.insert(pheaders, pheaders_size_aligned);
     allocate_remote(
@@ -224,7 +311,15 @@ where
         pheaders_size_aligned,
         MapFlags::PROT_READ | MapFlags::PROT_WRITE,
     )?;
-    write_all(*memory_fd, Some(pheaders as u64), &pheaders_to_convey)?;
+    unsafe {
+        let (_guard, memory) = MmapGuard::map_mut_anywhere(
+            *grants_fd,
+            pheaders,
+            pheaders_size_aligned,
+        )?;
+
+        memory[..pheaders_to_convey.len()].copy_from_slice(pheaders_to_convey);
+    }
     mprotect_remote(
         &grants_fd,
         pheaders,
@@ -257,8 +352,7 @@ where
 
     let total_args_envs_auxvpointee_size =
         total_args_envs_size + extrainfo.cwd.map_or(0, |s| s.len() + 1);
-    let args_envs_size_aligned =
-        (total_args_envs_auxvpointee_size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+    let args_envs_size_aligned = total_args_envs_auxvpointee_size.next_multiple_of(PAGE_SIZE);
     let target_args_env_address =
         find_free_target_addr(&tree, args_envs_size_aligned).ok_or(Error::new(ENOMEM))?;
     allocate_remote(
@@ -276,8 +370,25 @@ where
 
     {
         let mut append = |source_slice: &[u8]| {
+            // TODO
             let address = target_args_env_address + offset;
-            write_all(*memory_fd, Some(address as u64), source_slice)?;
+
+            if !source_slice.is_empty() {
+                let containing_page = address.div_floor(PAGE_SIZE) * PAGE_SIZE;
+                let displacement = address - containing_page;
+                let size = source_slice.len() + displacement;
+                let aligned_size = size.next_multiple_of(PAGE_SIZE);
+
+                let (_guard, memory) = unsafe {
+                    MmapGuard::map_mut_anywhere(
+                        *grants_fd, 
+                        containing_page,
+                        aligned_size,
+                    )?
+                };
+                memory[displacement..][..source_slice.len()].copy_from_slice(source_slice);
+            }
+
             offset += source_slice.len() + 1;
             Ok(address)
         };
@@ -328,7 +439,7 @@ where
     if interp_override.is_some() {
         let mmap_min_fd = FdGuard::new(syscall::dup(*grants_fd, b"mmap-min-addr")?);
         let last_addr = tree.iter().rev().nth(1).map_or(0, |(off, len)| *off + *len);
-        let aligned_last_addr = (last_addr + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+        let aligned_last_addr = last_addr.next_multiple_of(PAGE_SIZE);
         let _ = syscall::write(*mmap_min_fd, &usize::to_ne_bytes(aligned_last_addr));
     }
 
@@ -456,21 +567,6 @@ fn read_all(fd: usize, offset: Option<u64>, buf: &mut [u8]) -> Result<()> {
     }
     Ok(())
 }
-fn write_all(fd: usize, offset: Option<u64>, buf: &[u8]) -> Result<()> {
-    if let Some(offset) = offset {
-        syscall::lseek(fd, offset as isize, SEEK_SET)?;
-    }
-
-    let mut total_bytes_written = 0;
-
-    while total_bytes_written < buf.len() {
-        total_bytes_written += match syscall::write(fd, &buf[total_bytes_written..])? {
-            0 => return Err(Error::new(EIO)),
-            bytes_written => bytes_written,
-        }
-    }
-    Ok(())
-}
 
 // TODO: With the introduction of remote mmaps, remove this and let the kernel handle address
 // allocation.
@@ -491,6 +587,64 @@ fn find_free_target_addr(tree: &BTreeMap<usize, usize>, size: usize) -> Option<u
     }
 
     None
+}
+
+pub struct MmapGuard {
+    fd: usize,
+    base: usize,
+    size: usize,
+}
+impl MmapGuard {
+    pub fn map(fd: usize, map: &Map) -> Result<Self> {
+        Ok(Self {
+            fd,
+            size: map.size,
+            base: unsafe { syscall::fmap(fd, map)? },
+        })
+    }
+    pub fn remap(&mut self, offset: usize, mut flags: MapFlags) -> Result<()> {
+        flags.remove(MapFlags::MAP_FIXED_NOREPLACE);
+        flags.insert(MapFlags::MAP_FIXED);
+
+        let _new_base = unsafe { syscall::fmap(self.fd, &Map {
+            offset,
+            size: self.size,
+            flags,
+            address: self.base,
+        })? };
+
+        Ok(())
+    }
+    pub unsafe fn map_mut_anywhere<'a>(fd: usize, offset: usize, size: usize) -> Result<(Self, &'a mut [u8])> {
+        let mut this = Self::map(fd, &Map {
+            size,
+            offset,
+            address: 0,
+            flags: PROT_WRITE,
+        })?;
+        let slice = &mut *this.as_mut_ptr_slice();
+
+        Ok((this, slice))
+    }
+    pub fn addr(&self) -> usize {
+        self.base
+    }
+    pub fn len(&self) -> usize {
+        self.size
+    }
+    pub fn as_mut_ptr_slice(&mut self) -> *mut [u8] {
+        core::ptr::slice_from_raw_parts_mut(self.base as *mut u8, self.size)
+    }
+    pub fn take(mut self) {
+        self.size = 0;
+    }
+}
+impl Drop for MmapGuard {
+    fn drop(&mut self) {
+        if self.size != 0 {
+            let _ = unsafe { syscall::funmap(self.base, self.size) };
+        }
+    }
 }
 
 pub struct FdGuard {
@@ -552,7 +706,7 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     {
         let cur_pid_fd = FdGuard::new(syscall::open(
             "thisproc:current/open_via_dup",
-            syscall::O_CLOEXEC,
+            O_CLOEXEC,
         )?);
         (new_pid_fd, new_pid) = new_context()?;
 
@@ -596,50 +750,64 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
 
         // CoW-duplicate address space.
         {
+            let new_addr_space_sel_fd =
+                FdGuard::new(syscall::dup(*new_pid_fd, b"current-addrspace")?);
+
             let cur_addr_space_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"addrspace")?);
-
-            // FIXME: Find mappings which use external file descriptors
-
             let new_addr_space_fd = FdGuard::new(syscall::dup(*cur_addr_space_fd, b"exclusive")?);
 
-            let mut buf = vec![0_u8; 4096];
-            let mut bytes_read = 0;
-
+            let mut grant_desc_buf = [GrantDesc::default(); 16];
             loop {
-                let new_bytes_read = syscall::read(*cur_addr_space_fd, &mut buf[bytes_read..])?;
-
-                if new_bytes_read == 0 {
+                let bytes_read = {
+                    let buf = unsafe { core::slice::from_raw_parts_mut(grant_desc_buf.as_mut_ptr().cast(), grant_desc_buf.len() * size_of::<GrantDesc>()) };
+                    syscall::read(*cur_addr_space_fd, buf)?
+                };
+                if bytes_read == 0 {
                     break;
                 }
 
-                bytes_read += new_bytes_read;
-            }
-            let bytes = &buf[..bytes_read];
+                let grants = &grant_desc_buf[..bytes_read / size_of::<GrantDesc>()];
 
-            for struct_bytes in bytes.array_chunks::<{ size_of::<usize>() * 4 }>() {
-                let mut words = struct_bytes
-                    .array_chunks::<{ size_of::<usize>() }>()
-                    .copied()
-                    .map(usize::from_ne_bytes);
+                for grant in grants {
+                    if !grant.flags.contains(GrantFlags::GRANT_SCHEME) || !grant.flags.contains(GrantFlags::GRANT_SHARED) {
+                        continue;
+                    }
 
-                let addr = words.next().unwrap();
-                let size = words.next().unwrap();
-                let flags = words.next().unwrap();
-                let offset = words.next().unwrap();
+                    let mut buf;
 
-                if flags & 0x8000_0000 == 0 {
-                    continue;
+                    // TODO: write! using some #![no_std] Cursor type (tracking the length)?
+                    #[cfg(target_pointer_width = "64")]
+                    {
+                        //buf = *b"grant-fd-AAAABBBBCCCCDDDD";
+                        //write!(&mut buf, "grant-fd-{:>016x}", grant.base).unwrap();
+                        buf = alloc::format!("grant-fd-{:>016x}", grant.base).into_bytes();
+                    }
+
+                    #[cfg(target_pointer_width = "32")]
+                    {
+                        //buf = *b"grant-fd-AAAABBBB";
+                        //write!(&mut buf[..], "grant-fd-{:>08x}", grant.base).unwrap();
+                        buf = alloc::format!("grant-fd-{:>08x}", grant.base).into_bytes();
+                    }
+
+                    let grant_fd = FdGuard::new(syscall::dup(*cur_addr_space_fd, &buf)?);
+
+                    let mut flags = MAP_SHARED | MAP_FIXED_NOREPLACE;
+
+                    flags.set(PROT_READ, grant.flags.contains(GrantFlags::GRANT_READ));
+                    flags.set(PROT_WRITE, grant.flags.contains(GrantFlags::GRANT_WRITE));
+                    flags.set(PROT_EXEC, grant.flags.contains(GrantFlags::GRANT_EXEC));
+
+                    mmap_remote(
+                        &new_addr_space_fd,
+                        &grant_fd,
+                        grant.offset as usize,
+                        grant.base,
+                        grant.size,
+                        flags,
+                    )?;
                 }
-                let map_flags = MapFlags::from_bits_truncate(flags);
-
-                let grant_fd = FdGuard::new(syscall::dup(
-                    *cur_addr_space_fd,
-                    alloc::format!("grant-{:x}", addr).as_bytes(),
-                )?);
-                mmap_remote(&new_addr_space_fd, &grant_fd, offset, addr, size, map_flags)?;
             }
-            let new_addr_space_sel_fd =
-                FdGuard::new(syscall::dup(*new_pid_fd, b"current-addrspace")?);
 
             let buf = create_set_addr_space_buf(
                 *new_addr_space_fd,
@@ -680,7 +848,7 @@ pub fn new_context() -> Result<(FdGuard, usize)> {
     // Create a new context (fields such as uid/gid will be inherited from the current context).
     let fd = FdGuard::new(syscall::open(
         "thisproc:new/open_via_dup",
-        syscall::O_CLOEXEC,
+        O_CLOEXEC,
     )?);
 
     // Extract pid.
