@@ -223,8 +223,7 @@ impl Pal for Sys {
     }
 
     fn ftruncate(fildes: c_int, length: off_t) -> c_int {
-        // e(unsafe { syscall!(FTRUNCATE, fildes, length) }) as c_int
-        unimplemented!()
+        e(unsafe { syscall!(SYS_FTRUNCATE, fildes, length) }) as c_int
     }
 
     fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> c_int {
@@ -279,8 +278,7 @@ impl Pal for Sys {
     }
 
     fn getpagesize() -> usize {
-        // 4096
-        1024 * 1024 * 2
+        return 4096;
     }
 
     fn getpgid(pid: pid_t) -> pid_t {

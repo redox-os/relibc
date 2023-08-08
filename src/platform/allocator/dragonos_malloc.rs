@@ -68,7 +68,7 @@ pub unsafe fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {
         return null_mut();
     }
 
-    let old_len = _dragonos_chunk_length(ptr);
+    let old_len = _dragonos_chunk_length(ptr) - 16;
 
     // 暴力实现
 
