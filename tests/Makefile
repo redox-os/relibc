@@ -166,7 +166,11 @@ NAMES=\
 	pthread/barrier \
 	pthread/rwlock_trylock \
 	pthread/rwlock_randtest \
-	pthread/mutex_recursive
+	pthread/mutex_recursive \
+	grp/getgrouplist \
+	grp/getgrgid_r \
+	grp/getgrnam_r \
+	grp/gr_iter \
 #	resource/getrusage
 #	time/times
 
