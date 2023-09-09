@@ -1,4 +1,4 @@
-sys_includes = ["bits/sys/select.h", "sys/time.h"]
+sys_includes = ["bits/sys/select.h", "sys/time.h", "signal.h"]
 include_guard = "_SYS_SELECT_H"
 language = "C"
 style = "Tag"
