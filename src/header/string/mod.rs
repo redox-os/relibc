@@ -365,11 +365,11 @@ pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn strsignal(sig: c_int) -> *const c_char {
+pub unsafe extern "C" fn strsignal(sig: c_int) -> *mut c_char {
     signal::_signal_strings
         .get(sig as usize)
         .unwrap_or(&signal::_signal_strings[0]) // Unknown signal message
-        .as_ptr() as *const c_char
+        .as_ptr() as *mut c_char
 }
 
 #[no_mangle]
