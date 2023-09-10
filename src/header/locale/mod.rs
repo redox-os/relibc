@@ -60,10 +60,7 @@ pub unsafe extern "C" fn localeconv() -> *mut lconv {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn setlocale(_option: c_int, val: *const c_char) -> *mut c_char {
-    if val.is_null() {
-        return C_LOCALE.as_mut_ptr() as *mut c_char;
-    }
+pub unsafe extern "C" fn setlocale(_option: c_int, _val: *const c_char) -> *mut c_char {
     // TODO actually implement
-    ptr::null_mut()
+    C_LOCALE.as_mut_ptr() as *mut c_char
 }
