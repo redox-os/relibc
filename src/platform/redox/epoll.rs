@@ -116,6 +116,7 @@ impl PalEpoll for Sys {
         for i in 0..read {
             unsafe {
                 let event_ptr = events.add(i);
+                let target_ptr = events.add(count);
                 let event = *(event_ptr as *mut Event);
                 if let Some(ref timer) = timer_opt {
                     if event.id as c_int == timer.fd {
@@ -123,7 +124,7 @@ impl PalEpoll for Sys {
                         continue;
                     }
                 }
-                *event_ptr = epoll_event {
+                *target_ptr = epoll_event {
                     events: event.flags.bits() as _,
                     data: epoll_data {
                         u64: event.data as u64,
