@@ -19,6 +19,7 @@ special_syms=(
     __rust_alloc_error_handler_should_panic
     __rust_alloc_zeroed
     __rust_dealloc
+    __rust_no_alloc_shim_is_unstable
     __rust_realloc
 )
 
