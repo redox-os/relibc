@@ -15,6 +15,8 @@ special_syms=(
     __rg_oom
     __rg_realloc
     __rust_alloc
+    __rust_alloc_error_handler
+    __rust_alloc_error_handler_should_panic
     __rust_alloc_zeroed
     __rust_dealloc
     __rust_realloc
