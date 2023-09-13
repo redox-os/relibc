@@ -185,6 +185,7 @@ impl Pal for Sys {
 
     fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> c_int {
         // TODO
+        eprintln!("relibc clock_getres({}, {:p}): not implemented", clk_id, tp);
         unsafe { errno = ENOSYS };
         -1
     }
@@ -205,6 +206,7 @@ impl Pal for Sys {
 
     fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> c_int {
         // TODO
+        eprintln!("relibc clock_settime({}, {:p}): not implemented", clk_id, tp);
         unsafe { errno = ENOSYS };
         -1
     }
@@ -529,6 +531,7 @@ impl Pal for Sys {
 
     fn getpriority(which: c_int, who: id_t) -> c_int {
         // TODO
+        eprintln!("getpriority({}, {}): not implemented", which, who);
         unsafe { errno = ENOSYS };
         -1
     }
@@ -562,6 +565,7 @@ impl Pal for Sys {
 
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int {
         //TODO
+        eprintln!("relibc getrlimit({}, {:p}): not implemented", resource, rlim);
         if !rlim.is_null() {
             (*rlim).rlim_cur = RLIM_INFINITY;
             (*rlim).rlim_max = RLIM_INFINITY;
@@ -570,12 +574,15 @@ impl Pal for Sys {
     }
 
     unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> c_int {
+        //TOOD
+        eprintln!("relibc setrlimit({}, {:p}): not implemented", resource, rlim);
         unsafe { errno = EPERM };
         -1
     }
 
     fn getsid(pid: pid_t) -> pid_t {
         //TODO
+        eprintln!("relibc getsid({}): not implemented", pid);
         unsafe { errno = ENOSYS };
         -1
     }
@@ -700,7 +707,7 @@ impl Pal for Sys {
     }
 
     unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
-        eprintln!("msync {:p} {:x} {:x}", addr, len, flags);
+        eprintln!("relibc msync({:p}, 0x{:x}, 0x{:x}): not implemented", addr, len, flags);
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
         /* TODO
         e(syscall::msync(
@@ -729,7 +736,7 @@ impl Pal for Sys {
     }
 
     unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
-        eprintln!("madvise {:p} {:x} {:x}", addr, len, flags);
+        eprintln!("relibc madvise({:p}, 0x{:x}, 0x{:x}): not implemented", addr, len, flags);
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
     }
 
@@ -847,12 +854,14 @@ impl Pal for Sys {
 
     fn setpriority(which: c_int, who: id_t, prio: c_int) -> c_int {
         // TODO
+        eprintln!("relibc setpriority({}, {}, {}): not implemented", which, who, prio);
         unsafe { errno = ENOSYS };
         -1
     }
 
     fn setsid() -> c_int {
         // TODO
+        eprintln!("relibc setsid(): not implemented");
         unsafe { errno = ENOSYS };
         -1
     }
