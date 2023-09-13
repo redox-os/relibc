@@ -98,6 +98,8 @@ pub trait Pal {
 
     fn getgid() -> gid_t;
 
+    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> c_int;
+
     /* Note that this is distinct from the legacy POSIX function
      * getpagesize(), which returns a c_int. On some Linux platforms,
      * page size may be determined through a syscall ("getpagesize"). */
@@ -183,6 +185,8 @@ pub trait Pal {
     fn rmdir(path: &CStr) -> c_int;
 
     fn sched_yield() -> c_int;
+
+    unsafe fn setgroups(size: size_t, list: *const gid_t) -> c_int;
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> c_int;
 

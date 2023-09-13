@@ -321,9 +321,9 @@ pub extern "C" fn getgid() -> gid_t {
     Sys::getgid()
 }
 
-// #[no_mangle]
-pub extern "C" fn getgroups(gidsetsize: c_int, grouplist: *mut gid_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
+    Sys::getgroups(size, list)
 }
 
 // #[no_mangle]
@@ -618,6 +618,11 @@ pub unsafe extern "C" fn rmdir(path: *const c_char) -> c_int {
 #[no_mangle]
 pub extern "C" fn setgid(gid: gid_t) -> c_int {
     Sys::setregid(gid, gid)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn setgroups(size: size_t, list: *const gid_t) -> c_int {
+    Sys::setgroups(size, list)
 }
 
 #[no_mangle]

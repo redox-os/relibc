@@ -504,6 +504,13 @@ impl Pal for Sys {
         e(syscall::getgid()) as gid_t
     }
 
+    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
+        // TODO
+        eprintln!("relibc getgroups({}, {:p}): not implemented", size, list);
+        unsafe { errno = ENOSYS };
+        -1
+    }
+
     fn getpagesize() -> usize {
         PAGE_SIZE
     }
@@ -825,6 +832,13 @@ impl Pal for Sys {
 
     fn sched_yield() -> c_int {
         e(syscall::sched_yield()) as c_int
+    }
+
+    unsafe fn setgroups(size: size_t, list: *const gid_t) -> c_int {
+        // TODO
+        eprintln!("relibc setgroups({}, {:p}): not implemented", size, list);
+        unsafe { errno = ENOSYS };
+        -1
     }
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
