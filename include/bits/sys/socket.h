@@ -7,4 +7,10 @@ struct sockaddr_storage {
 	unsigned long __ss_align;
 };
 
+struct ucred {
+	pid_t pid;
+	uid_t uid;
+	gid_t gid;
+};
+
 #endif // _BITS_SYS_SOCKET_H
