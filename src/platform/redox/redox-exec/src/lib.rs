@@ -52,6 +52,10 @@ pub struct InterpOverride {
 
 pub struct ExtraInfo<'a> {
     pub cwd: Option<&'a [u8]>,
+    // POSIX states that while sigactions are reset, ignored sigactions will remain ignored.
+    pub sigignmask: u64,
+    // POSIX also states that the sigprocmask must be preserved across execs.
+    pub sigprocmask: u64,
 }
 
 pub fn fexec_impl<A, E>(
@@ -394,6 +398,20 @@ where
             push(cwd.len())?;
             push(AT_REDOX_INITIALCWD_LEN)?;
         }
+        #[cfg(target_pointer_width = "32")]
+        {
+            push((extrainfo.sigignmask >> 32) as usize)?;
+            push(AT_REDOX_INHERITED_SIGIGNMASK_HI)?;
+        }
+        push(extrainfo.sigignmask as usize)?;
+        push(AT_REDOX_INHERITED_SIGIGNMASK)?;
+        #[cfg(target_pointer_width = "32")]
+        {
+            push((extrainfo.sigprocmask >> 32) as usize)?;
+            push(AT_REDOX_INHERITED_SIGPROCMASK_HI)?;
+        }
+        push(extrainfo.sigprocmask as usize)?;
+        push(AT_REDOX_INHERITED_SIGPROCMASK)?;
 
         push(0)?;
 
@@ -714,20 +732,18 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
         let cur_pid_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", O_CLOEXEC)?);
         (new_pid_fd, new_pid) = new_context()?;
 
-        // Do not allocate new signal stack, but copy existing address (all memory will be re-mapped
-        // CoW later).
+        // Reuse the same sigaltstack and signal entry (all memory will be re-mapped CoW later).
         {
-            let cur_sigstack_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigstack")?);
-            let new_sigstack_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sigstack")?);
+            let cur_sighandler_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sighandler")?);
+            let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
 
-            let mut sigstack_buf = usize::to_ne_bytes(0);
+            let mut sighandler_buf = [0; size_of::<usize>() * 3];
 
-            let _ = syscall::read(*cur_sigstack_fd, &mut sigstack_buf);
-            let _ = syscall::write(*new_sigstack_fd, &sigstack_buf);
+            let _ = syscall::read(*cur_sighandler_fd, &mut sighandler_buf);
+            let _ = syscall::write(*new_sighandler_fd, &sighandler_buf);
         }
 
-        copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
-
+        // Reuse the same sigactions.
         {
             let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);
             let new_sigaction_fd = FdGuard::new(syscall::dup(*cur_sigaction_fd, b"copy")?);
@@ -738,6 +754,16 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
                 *new_sigaction_sel_fd,
                 &usize::to_ne_bytes(*new_sigaction_fd),
             )?;
+        }
+        copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
+
+        // Reuse the same sigprocmask.
+        {
+            let cur_sigprocmask_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigprocmask")?);
+            let mut buf = 0_u64.to_ne_bytes();
+            let _ = syscall::read(*cur_sigprocmask_fd, &mut buf)?;
+            let new_sigprocmask_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sigprocmask")?);
+            let _ = syscall::write(*new_sigprocmask_fd, &buf)?;
         }
 
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new
@@ -833,24 +859,17 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     // closed. The only exception -- the filetable selection fd and the current filetable fd --
     // will be closed by the child process.
     {
-        // TODO: Use cross_scheme_links or something similar to avoid copying the file table in the
-        // kernel.
+        // TODO: Use file descriptor forwarding or something similar to avoid copying the file
+        // table in the kernel.
         let new_filetable_fd = FdGuard::new(syscall::dup(*cur_filetable_fd, b"copy")?);
         let new_filetable_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-filetable")?);
         let _ = syscall::write(
             *new_filetable_sel_fd,
             &usize::to_ne_bytes(*new_filetable_fd),
-        );
+        )?;
     }
-
-    // Unblock context.
-    syscall::kill(new_pid, syscall::SIGCONT)?;
-
-    // XXX: Killing with SIGCONT will put (pid, 65536) at key (pid, pgid) into the waitpid of this
-    // context. This means that if pgid is changed (as it is in ion for example), the pgid message
-    // in syscall::exit() will not be inserted as the key comparator thinks they're equal as their
-    // PIDs are. So, we have to call this to clear the waitpid queue to prevent deadlocks.
-    let _ = syscall::waitpid(new_pid, &mut 0, syscall::WUNTRACED | syscall::WCONTINUED);
+    let start_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"start")?);
+    let _ = syscall::write(*start_fd, &[0])?;
 
     Ok(new_pid)
 }

@@ -1,5 +1,5 @@
 use core::mem;
-use syscall::{self, Result};
+use syscall::{self, Result, number::SYS_SIGRETURN};
 
 use super::{
     super::{types::*, Pal, PalSignal},
@@ -172,3 +172,96 @@ pub(crate) fn sigprocmask_impl(how: i32, set: *const sigset_t, oset: *mut sigset
     }
     Ok(())
 }
+#[cfg(target_arch = "x86_64")]
+static CPUID_EAX1_ECX: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+
+pub fn sighandler_function() -> usize {
+    #[cfg(target_arch = "x86_64")]
+    // Check OSXSAVE bit
+    // TODO: HWCAP?
+    if CPUID_EAX1_ECX.load(core::sync::atomic::Ordering::Relaxed) & (1 << 27) != 0 {
+        __relibc_internal_sigentry_xsave as usize
+    } else {
+        __relibc_internal_sigentry_fxsave as usize
+    }
+}
+
+pub fn setup_sighandler() {
+    use core::mem::size_of;
+
+    // TODO
+    let altstack_base = 0_usize;
+    let altstack_len = 0_usize;
+
+    #[cfg(target_arch = "x86_64")]
+    {
+        let cpuid_eax1_ecx = unsafe { core::arch::x86_64::__cpuid(1) }.ecx;
+        CPUID_EAX1_ECX.store(cpuid_eax1_ecx, core::sync::atomic::Ordering::Relaxed);
+    }
+
+    let mut buf = [0_u8; 3 * size_of::<usize>()];
+    {
+        let mut iter = buf.array_chunks_mut();
+        *iter.next().unwrap() = altstack_base.to_ne_bytes();
+        *iter.next().unwrap() = altstack_len.to_ne_bytes();
+        *iter.next().unwrap() = sighandler_function().to_ne_bytes();
+    }
+
+    let fd = syscall::open(
+        "thisproc:current/sighandler",
+        syscall::O_WRONLY | syscall::O_CLOEXEC,
+    )
+    .expect("failed to open thisproc:current/sighandler");
+    syscall::write(fd, &buf)
+        .expect("failed to write to thisproc:current/sighandler");
+    let _ = syscall::close(fd);
+}
+
+unsafe extern "C" fn inner(stack: usize) {
+}
+
+#[cfg(target_arch = "x86_64")]
+asmfunction!(__relibc_internal_sigentry_xsave: ["
+    and rsp, -64
+    mov eax, 0xffffffff
+    mov edx, eax
+    sub rsp, 4096
+
+    mov rdi, rsp
+    xor eax, eax
+    mov ecx, 4096
+    rep stosb
+
+    xsave [rsp]
+
+    mov rdi, rsp
+    call {inner}
+
+    mov eax, 0xffffffff
+    mov edx, eax
+    xrstor [rsp]
+    add rsp, 4096
+
+    mov eax, {SYS_SIGRETURN}
+    syscall
+"] <= [inner = sym inner, SYS_SIGRETURN = const SYS_SIGRETURN]);
+#[cfg(target_arch = "x86_64")]
+asmfunction!(__relibc_internal_sigentry_fxsave: ["
+    sub rsp, 512
+
+    mov rdi, rsp
+    xor eax, eax
+    mov ecx, 512
+    rep stosb
+
+    fxsave64 [rsp]
+
+    mov rdi, rsp
+    call {inner}
+
+    fxrstor64 [rsp]
+    add rsp, 512
+
+    mov eax, {SYS_SIGRETURN}
+    syscall
+"] <= [inner = sym inner, SYS_SIGRETURN = const SYS_SIGRETURN]);
