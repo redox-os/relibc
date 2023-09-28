@@ -25,6 +25,7 @@ use crate::{
     },
     ld_so,
     platform::{self, types::*, Pal, Sys},
+    sync::Mutex,
 };
 
 mod rand48;
@@ -402,7 +403,9 @@ pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_
     if size < 8 {
         ptr::null_mut()
     } else {
-        // TODO: lock?
+        let mtx = Mutex::new(());
+        mtx.manual_lock();
+
         let old_state = random::save_state();
         random::N = match size {
             0..=7 => unreachable!(), // ensured above
@@ -416,7 +419,7 @@ pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_
         random::X_PTR = (state.cast::<[u8; 4]>()).offset(1);
         random::seed(seed);
         random::save_state();
-        // TODO: unlock?
+        mtx.manual_unlock();
 
         old_state.cast::<_>()
     }
