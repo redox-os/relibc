@@ -44,6 +44,7 @@ pub const MB_LEN_MAX: c_int = 4;
 static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
 static mut L64A_BUFFER: [c_char; 7] = [0; 7]; // up to 6 digits plus null terminator
 static mut RNG: Option<XorShiftRng> = None;
+static RNGMUTEX: Mutex<()> = Mutex::new(());
 
 lazy_static! {
     static ref RNG_SAMPLER: Uniform<c_int> = Uniform::new_inclusive(0, RAND_MAX);
@@ -403,8 +404,7 @@ pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_
     if size < 8 {
         ptr::null_mut()
     } else {
-        let mtx = Mutex::new(());
-        mtx.manual_lock();
+        RNGMUTEX.manual_lock();
 
         let old_state = random::save_state();
         random::N = match size {
@@ -419,7 +419,7 @@ pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_
         random::X_PTR = (state.cast::<[u8; 4]>()).offset(1);
         random::seed(seed);
         random::save_state();
-        mtx.manual_unlock();
+        RNGMUTEX.manual_unlock();
 
         old_state.cast::<_>()
     }
