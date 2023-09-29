@@ -43,6 +43,7 @@ mod clone;
 mod epoll;
 mod exec;
 mod extra;
+mod libredox;
 pub(crate) mod path;
 mod ptrace;
 mod signal;
@@ -765,19 +766,7 @@ impl Pal for Sys {
     fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
         let path = path_from_c_str!(path);
 
-        match path::open(
-            path,
-            ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF),
-        ) {
-            Ok(fd) => match c_int::try_from(fd) {
-                Ok(c_fd) => c_fd,
-                Err(_) => {
-                    let _ = syscall::close(fd);
-                    e(Err(Error::new(EMFILE))) as c_int
-                }
-            },
-            Err(error) => e(Err(error)) as c_int,
-        }
+        e(libredox::open(path, oflag, mode)) as c_int
     }
 
     fn pipe2(fds: &mut [c_int], flags: c_int) -> c_int {
