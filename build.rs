@@ -3,6 +3,7 @@ extern crate cc;
 
 use std::{env, fs, fs::DirEntry, path::Path};
 
+
 // include src/header directories that don't start with '_'
 fn include_dir(d: &DirEntry) -> bool {
     d.metadata().map(|m| m.is_dir()).unwrap_or(false)
@@ -59,7 +60,7 @@ fn main() {
         .flag("-nostdlib")
         .include(&format!("{}/include", crate_dir))
         .include(&format!("{}/target/include", crate_dir))
-        .flag("-mno-outline-atomics")
+        .flag_if_supported("-mno-outline-atomics")
         .flag("-fno-stack-protector")
         .flag("-Wno-expansion-to-defined")
         .files(
