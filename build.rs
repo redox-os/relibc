@@ -13,6 +13,15 @@ fn include_dir(d: &DirEntry) -> bool {
             .map_or(false, |c| c.to_str().map_or(false, |x| !x.starts_with("_")))
 }
 
+fn get_target() -> String {
+    env::var("TARGET").unwrap_or(
+        option_env!("TARGET").map_or(
+            "x86_64-unknown-redox".to_string(),
+            |x| x.to_string()
+        )
+    )
+}
+
 fn generate_bindings(cbindgen_config_path: &Path) {
     let relative_path = cbindgen_config_path
         .strip_prefix("src/header")
@@ -36,6 +45,7 @@ fn generate_bindings(cbindgen_config_path: &Path) {
 
 fn main() {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
+    let target = get_target();
 
     // Generate C includes
     // - based on contents of src/header/**
@@ -55,13 +65,19 @@ fn main() {
         });
 
     println!("cargo:rerun-if-changed=src/c");
-    cc::Build::new()
-        .flag("-nostdinc")
+
+    let mut cc_builder = &mut cc::Build::new();
+
+    cc_builder = cc_builder.flag("-nostdinc")
         .flag("-nostdlib")
         .include(&format!("{}/include", crate_dir))
-        .include(&format!("{}/target/include", crate_dir))
-        .flag_if_supported("-mno-outline-atomics")
-        .flag("-fno-stack-protector")
+        .include(&format!("{}/target/include", crate_dir));
+
+    if target.starts_with("aarch64") {
+        cc_builder = cc_builder.flag("-mno-outline-atomics")
+    }
+
+    cc_builder.flag("-fno-stack-protector")
         .flag("-Wno-expansion-to-defined")
         .files(
             fs::read_dir("src/c")
