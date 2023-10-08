@@ -3,6 +3,8 @@ use core::{slice, str};
 use libc::{c_int, mode_t};
 use syscall::{Error, Result, EMFILE, WaitFlags};
 
+use crate::header::signal::sigaction;
+
 pub type RawResult = usize;
 
 pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
@@ -18,8 +20,8 @@ pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn redox_open_v1(path_base: *const u8, path_len: usize, flags: i32, mode: u16) -> RawResult {
-    Error::mux(open(str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)), flags, mode as mode_t))
+pub unsafe extern "C" fn redox_open_v1(path_base: *const u8, path_len: usize, flags: u32, mode: u16) -> RawResult {
+    Error::mux(open(str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)), flags as c_int, mode as mode_t))
 }
 
 #[no_mangle]
@@ -65,6 +67,11 @@ pub unsafe extern "C" fn redox_close_v1(fd: usize) -> RawResult {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn redox_get_pid_v1() -> RawResult {
+    Error::mux(syscall::getpid())
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn redox_get_euid_v1() -> RawResult {
     Error::mux(syscall::geteuid())
 }
@@ -85,9 +92,24 @@ pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {
     Error::mux(syscall::setrens(rns, ens))
 }
 #[no_mangle]
-pub unsafe extern "C" fn redox_waitpid_v1(pid: usize, status: *mut i32, options: i32) -> RawResult {
+pub unsafe extern "C" fn redox_waitpid_v1(pid: usize, status: *mut i32, options: u32) -> RawResult {
     let mut sts = 0_usize;
     let res = Error::mux(syscall::waitpid(pid, &mut sts, WaitFlags::from_bits_truncate(options as usize)));
     status.write(sts as i32);
     res
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn redox_kill_v1(pid: usize, signal: u32) -> RawResult {
+    Error::mux(syscall::kill(pid, signal as usize))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn redox_sigaction_v1(signal: u32, new: *const sigaction, old: *mut sigaction) -> RawResult {
+    Error::mux(super::signal::sigaction_impl(signal as i32, new.as_ref(), old.as_mut()).map(|()| 0))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn redox_sigprocmask_v1(how: u32, new: *const u64, old: *mut u64) -> RawResult {
+    Error::mux(super::signal::sigprocmask_impl(how as i32, new, old).map(|()| 0))
 }
