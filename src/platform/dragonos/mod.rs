@@ -353,8 +353,7 @@ impl Pal for Sys {
     }
 
     fn mkfifo(path: &CStr, mode: mode_t) -> c_int {
-        // e(unsafe { syscall!(MKNODAT, AT_FDCWD, path.as_ptr(), mode | S_IFIFO, 0) }) as c_int
-        unimplemented!()
+        e(unsafe { syscall!(SYS_MKNOD, path.as_ptr(), mode | S_IFIFO, 0) }) as c_int
     }
 
     unsafe fn mlock(addr: *const c_void, len: usize) -> c_int {
