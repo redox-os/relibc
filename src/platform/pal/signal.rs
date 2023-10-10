@@ -1,8 +1,11 @@
 use super::super::{types::*, Pal};
-use crate::header::{
-    signal::{sigaction, siginfo_t, sigset_t, stack_t},
-    sys_time::itimerval,
-    time::timespec,
+use crate::{
+    header::{
+        signal::{sigaction, siginfo_t, sigset_t, sigval, stack_t},
+        sys_time::itimerval,
+        time::timespec,
+    },
+    pthread::OsTid,
 };
 
 pub trait PalSignal: Pal {
@@ -27,4 +30,8 @@ pub trait PalSignal: Pal {
     fn sigsuspend(set: *const sigset_t) -> c_int;
 
     fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec) -> c_int;
+
+    fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> c_int;
+
+    fn rlct_sigqueue(os_tid: OsTid, sig: c_int, val: sigval) -> c_int;
 }

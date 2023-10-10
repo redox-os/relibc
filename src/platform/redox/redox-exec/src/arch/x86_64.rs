@@ -35,8 +35,8 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
 }
 
 #[no_mangle]
-unsafe extern "sysv64" fn __relibc_internal_fork_impl(initial_rsp: *mut usize) -> usize {
-    Error::mux(fork_inner(initial_rsp))
+unsafe extern "sysv64" fn __relibc_internal_fork_impl(info: &crate::ForkInfo, initial_rsp: *mut usize) -> usize {
+    Error::mux(fork_inner(info, initial_rsp))
 }
 
 #[no_mangle]
@@ -66,7 +66,8 @@ __relibc_internal_fork_wrapper:
     stmxcsr [rsp+16]
     fnstcw [rsp+24]
 
-    mov rdi, rsp
+    // rdi is already the ForkInfo arg
+    mov rsi, rsp
     call __relibc_internal_fork_impl
     jmp 2f
 
@@ -102,6 +103,6 @@ __relibc_internal_fork_ret:
 );
 
 extern "sysv64" {
-    pub(crate) fn __relibc_internal_fork_wrapper() -> usize;
+    pub(crate) fn __relibc_internal_fork_wrapper(info: &crate::ForkInfo) -> usize;
     pub(crate) fn __relibc_internal_fork_ret();
 }

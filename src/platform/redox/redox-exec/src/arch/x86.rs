@@ -35,8 +35,8 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
 }
 
 #[no_mangle]
-unsafe extern "cdecl" fn __relibc_internal_fork_impl(initial_rsp: *mut usize) -> usize {
-    Error::mux(fork_inner(initial_rsp))
+unsafe extern "fastcall" fn __relibc_internal_fork_impl(info: &crate::ForkInfo, initial_rsp: *mut usize) -> usize {
+    Error::mux(fork_inner(info, initial_rsp))
 }
 
 #[no_mangle]
@@ -45,7 +45,6 @@ unsafe extern "cdecl" fn __relibc_internal_fork_hook(cur_filetable_fd: usize, ne
     let _ = syscall::close(new_pid_fd);
 }
 
-//TODO: x86
 core::arch::global_asm!(
     "
     .p2align 6
@@ -66,9 +65,9 @@ __relibc_internal_fork_wrapper:
     //TODO stmxcsr [esp+16]
     fnstcw [esp+24]
 
-    push esp
+    // ecx has already been passed as an argument to __relibc_internal_fork_wrapper
+    mov edx, esp
     call __relibc_internal_fork_impl
-    pop esp
     jmp 2f
 
     .size __relibc_internal_fork_wrapper, . - __relibc_internal_fork_wrapper
@@ -101,7 +100,9 @@ __relibc_internal_fork_ret:
     .size __relibc_internal_fork_ret, . - __relibc_internal_fork_ret"
 );
 
+extern "fastcall" {
+    pub(crate) fn __relibc_internal_fork_wrapper(info: &crate::ForkInfo) -> usize;
+}
 extern "cdecl" {
-    pub(crate) fn __relibc_internal_fork_wrapper() -> usize;
     pub(crate) fn __relibc_internal_fork_ret();
 }

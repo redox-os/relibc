@@ -19,6 +19,7 @@ EXPECT_NAMES=\
 	math \
 	netdb/getaddrinfo \
 	ptrace \
+	realtime_signal \
 	regex \
 	select \
 	setjmp \
@@ -138,6 +139,7 @@ DYNAMIC_ONLY_NAMES=\
 NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
+	sigaltstack \
 	pwd \
 	stdio/tempnam \
 	stdio/tmpnam \

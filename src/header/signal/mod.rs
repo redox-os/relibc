@@ -2,8 +2,6 @@
 
 use core::{mem, ptr};
 
-use cbitset::BitSet;
-
 use crate::{
     header::{errno, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},
@@ -19,8 +17,6 @@ pub mod sys;
 #[cfg(target_os = "redox")]
 #[path = "redox.rs"]
 pub mod sys;
-
-type SigSet = BitSet<[c_ulong; 1]>;
 
 pub const SIG_DFL: usize = 0;
 pub const SIG_IGN: usize = 1;
@@ -42,25 +38,38 @@ pub struct sigaction {
 
 #[repr(C)]
 #[derive(Clone)]
-pub struct sigaltstack {
+pub struct __relibc_sigaltstack {
     pub ss_sp: *mut c_void,
     pub ss_flags: c_int,
     pub ss_size: size_t,
 }
+pub type stack_t = __relibc_sigaltstack;
 
 #[repr(C)]
-#[derive(Clone, Debug)]
-pub struct siginfo_t {
+#[derive(Clone, Default)]
+pub struct __relibc_siginfo {
     pub si_signo: c_int,
     pub si_errno: c_int,
     pub si_code: c_int,
-    _padding: [c_int; 29],
-    _si_align: [usize; 0],
+    pub si_value: sigval,
+}
+pub type siginfo_t = __relibc_siginfo;
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union sigval {
+    pub sigval_int: c_int,
+    pub sigval_ptr: *mut c_void,
+}
+impl Default for sigval {
+    fn default() -> Self {
+        Self {
+            sigval_ptr: core::ptr::null_mut(),
+        }
+    }
 }
 
 pub type sigset_t = c_ulonglong;
-
-pub type stack_t = sigaltstack;
 
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
@@ -79,6 +88,20 @@ pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
         pthread.os_tid.get().read()
     };
     crate::header::pthread::e(Sys::rlct_kill(os_tid, sig as usize))
+}
+
+#[no_mangle]
+pub extern "C" fn sigqueue(pid: pid_t, sig: c_int, value: sigval) -> c_int {
+    Sys::sigqueue(pid, sig, value)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pthread_sigqueue(thread: pthread_t, sig: c_int, value: sigval) -> c_int {
+    let os_tid = {
+        let pthread = &*(thread as *const pthread::Pthread);
+        pthread.os_tid.get().read()
+    };
+    Sys::rlct_sigqueue(os_tid, sig, value)
 }
 
 #[no_mangle]
@@ -117,62 +140,69 @@ pub unsafe extern "C" fn sigaction(
 }
 
 #[no_mangle]
-pub extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize > NSIG {
-        unsafe {
-            platform::errno = errno::EINVAL;
-        }
+pub unsafe extern "C" fn sigaddset(set_ptr: *mut sigset_t, signo: c_int) -> c_int {
+    // POSIX does not explicitly allow set_ptr to be NULL, but check anyway.
+    let Some(set) = set_ptr.as_mut() else {
+        platform::errno = errno::EFAULT;
+        return -1;
+    };
+
+    if signo <= 0 || signo >= (NSIG as c_int) || signal_is_internal(signo) {
+        platform::errno = errno::EINVAL;
         return -1;
     }
 
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
-        set.insert(signo as usize - 1); // 0-indexed usize, please!
-    }
+    *set |= 1 << (signo - 1);
+
     0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
-    if !ss.is_null() {
-        if (*ss).ss_flags != SS_DISABLE as c_int {
-            return errno::EINVAL;
-        }
-        if (*ss).ss_size < MINSIGSTKSZ {
-            return errno::ENOMEM;
-        }
-    }
-
     Sys::sigaltstack(ss, old_ss)
 }
 
 #[no_mangle]
-pub extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize > NSIG {
-        unsafe {
-            platform::errno = errno::EINVAL;
-        }
+pub unsafe extern "C" fn sigdelset(set_ptr: *mut sigset_t, signo: c_int) -> c_int {
+    // POSIX does not explicitly allow set_ptr to be NULL, but check anyway.
+    let Some(set) = set_ptr.as_mut() else {
+        platform::errno = errno::EFAULT;
+        return -1;
+    };
+
+    if signo <= 0 || signo >= (NSIG as c_int) || signal_is_internal(signo) {
+        platform::errno = errno::EINVAL;
         return -1;
     }
 
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
-        set.remove(signo as usize - 1); // 0-indexed usize, please!
-    }
+    *set &= !(1 << (signo - 1));
+
     0
 }
 
 #[no_mangle]
-pub extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
-        set.clear();
-    }
+pub unsafe extern "C" fn sigemptyset(set_ptr: *mut sigset_t) -> c_int {
+    // POSIX does not explicitly allow set_ptr to be NULL, but check anyway.
+    let Some(set) = set_ptr.as_mut() else {
+        platform::errno = errno::EFAULT;
+        return -1;
+    };
+
+    *set = 0;
+
     0
 }
 
 #[no_mangle]
-pub extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
-        set.fill(.., true);
-    }
+pub unsafe extern "C" fn sigfillset(set_ptr: *mut sigset_t) -> c_int {
+    // POSIX does not explicitly allow set_ptr to be NULL, but check anyway.
+    let Some(set) = set_ptr.as_mut() else {
+        platform::errno = errno::EFAULT;
+        return -1;
+    };
+
+    *set = !0;
+
     0
 }
 
@@ -212,20 +242,19 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize > NSIG {
-        unsafe {
-            platform::errno = errno::EINVAL;
-        }
+pub unsafe extern "C" fn sigismember(set_ptr: *const sigset_t, signo: c_int) -> c_int {
+    // POSIX does not explicitly allow set_ptr to be NULL, but check anyway.
+    let Some(set) = set_ptr.as_ref() else {
+        platform::errno = errno::EFAULT;
+        return -1;
+    };
+
+    if signo <= 0 || signo >= (NSIG as c_int) || signal_is_internal(signo) {
+        platform::errno = errno::EINVAL;
         return -1;
     }
 
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
-        if set.contains(signo as usize - 1) {
-            return 1;
-        }
-    }
-    0
+    c_int::from(*set & (1 << (signo - 1)) != 0)
 }
 
 extern "C" {
@@ -266,9 +295,13 @@ pub extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
     Sys::sigpending(set)
 }
 
-const BELOW_SIGRTMIN_MASK: sigset_t = (1 << SIGRTMIN) - 1;
-const STANDARD_SIG_MASK: sigset_t = (1 << 32) - 1;
+const BELOW_SIGRTMIN_MASK: sigset_t = (1 << (SIGRTMIN - 1)) - 1;
+const STANDARD_SIG_MASK: sigset_t = (1 << 31) - 1;
 const RLCT_SIGNAL_MASK: sigset_t = BELOW_SIGRTMIN_MASK & !STANDARD_SIG_MASK;
+
+fn signal_is_internal(signo: c_int) -> bool {
+    (1 << (signo - 1)) & RLCT_SIGNAL_MASK != 0
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn sigprocmask(
