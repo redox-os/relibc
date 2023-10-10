@@ -44,7 +44,7 @@ optional = true
 sc = "0.2.3"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-redox_syscall = "0.3"
+redox_syscall = "0.4"
 spin = "0.9.0"
 redox-exec = { path = "src/platform/redox/redox-exec" }
 
