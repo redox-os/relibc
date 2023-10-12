@@ -278,7 +278,7 @@ impl Pal for Sys {
     }
 
     unsafe fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
-        e(unsafe { syscall!(GETGROUPS, size, list) })
+        e(unsafe { syscall!(GETGROUPS, size, list) }) as c_int
     }
 
     fn getpagesize() -> usize {
@@ -513,7 +513,7 @@ impl Pal for Sys {
     }
 
     unsafe fn setgroups(size: size_t, list: *const gid_t) -> c_int {
-        e(unsafe { syscall!(SETGROUPS, size, list) })
+        e(unsafe { syscall!(SETGROUPS, size, list) }) as c_int
     }
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
