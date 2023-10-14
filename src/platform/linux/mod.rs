@@ -144,6 +144,9 @@ impl Pal for Sys {
     unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
         e(syscall!(EXECVE, path.as_ptr(), argv, envp)) as c_int
     }
+    unsafe fn fexecve(fildes: c_int, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
+        todo!("not yet used by relibc")
+    }
 
     fn exit(status: c_int) -> ! {
         unsafe {

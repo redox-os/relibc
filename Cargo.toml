@@ -61,4 +61,4 @@ panic = "abort"
 
 [patch.crates-io]
 libc = { git = "https://gitlab.redox-os.org/redox-os/liblibc.git", branch = "redox_0.2.138" }
-redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall" }
+redox_syscall = { git = "https://gitlab.redox-os.org/4lDO2/syscall", branch = "sendfd" }

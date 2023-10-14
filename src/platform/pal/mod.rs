@@ -48,6 +48,7 @@ pub trait Pal {
     fn dup2(fildes: c_int, fildes2: c_int) -> c_int;
 
     unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int;
+    unsafe fn fexecve(fildes: c_int, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int;
 
     fn exit(status: c_int) -> !;
 

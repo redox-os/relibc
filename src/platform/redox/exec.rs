@@ -13,7 +13,8 @@ use redox_exec::{ExtraInfo, FdGuard, FexecResult};
 use syscall::{data::Stat, error::*, flag::*};
 
 fn fexec_impl(
-    file: File,
+    exec_file: FdGuard,
+    open_via_dup: FdGuard,
     path: &[u8],
     args: &[&[u8]],
     envs: &[&[u8]],
@@ -21,15 +22,10 @@ fn fexec_impl(
     extrainfo: &ExtraInfo,
     interp_override: Option<redox_exec::InterpOverride>,
 ) -> Result<usize> {
-    let fd = *file;
-    core::mem::forget(file);
-    let image_file = FdGuard::new(fd as usize);
-
-    let open_via_dup = FdGuard::new(syscall::open("thisproc:current/open_via_dup", 0)?);
     let memory = FdGuard::new(syscall::open("memory:", 0)?);
 
     let addrspace_selection_fd = match redox_exec::fexec_impl(
-        image_file,
+        exec_file,
         open_via_dup,
         &memory,
         path,
@@ -55,7 +51,7 @@ fn fexec_impl(
             let path_cstr = CStr::from_bytes_with_nul(&path).map_err(|_| Error::new(ENOEXEC))?;
 
             return execve(
-                path_cstr,
+                Executable::AtPath(path_cstr),
                 ArgEnv::Parsed {
                     total_args_envs_size,
                     args,
@@ -83,20 +79,31 @@ pub enum ArgEnv<'a> {
         total_args_envs_size: usize,
     },
 }
+
+pub enum Executable<'a> {
+    AtPath(&'a CStr),
+    InFd { file: File, arg0: &'a [u8] },
+}
+
 pub fn execve(
-    path: &CStr,
+    exec: Executable<'_>,
     arg_env: ArgEnv,
     interp_override: Option<redox_exec::InterpOverride>,
 ) -> Result<usize> {
     // NOTE: We must omit O_CLOEXEC and close manually, otherwise it will be closed before we
     // have even read it!
-    let mut image_file = File::open(path, O_RDONLY as c_int).map_err(|_| Error::new(ENOENT))?;
+    let (mut image_file, arg0) = match exec {
+        Executable::AtPath(path) => (File::open(path, O_RDONLY as c_int).map_err(|_| Error::new(ENOENT))?, path.to_bytes()),
+        Executable::InFd { file, arg0 } => (file, arg0),
+    };
 
     // With execve now being implemented in userspace, we need to check ourselves that this
     // file is actually executable. While checking for read permission is unnecessary as the
-    // scheme will not allow us to read otherwise, the execute bit is completely unenforced. We
-    // have the permission to mmap executable memory and fill it with the program even if it is
-    // unset, so the best we can do is check that nothing is executed by accident.
+    // scheme will not allow us to read otherwise, the execute bit is completely unenforced.
+    //
+    // But we do (currently) have the permission to mmap executable memory and fill it with any
+    // program, even marked non-executable, so really the best we can do is check that nothing is
+    // executed by accident.
     //
     // TODO: At some point we might have capabilities limiting the ability to allocate
     // executable memory, and in that case we might use the `escalate:` scheme as we already do
@@ -260,25 +267,23 @@ pub fn execve(
         }
     }
 
-    if !is_interpreted && wants_setugid {
-        // Make sure the last file descriptor not covered by O_CLOEXEC is not leaked.
-        drop(image_file);
+    let this_context_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", 0)?);
+    // TODO: Convert image_file to FdGuard earlier?
+    let exec_fd_guard = FdGuard::new(image_file.fd as usize);
+    core::mem::forget(image_file);
 
+    if !is_interpreted && wants_setugid {
         // We are now going to invoke `escalate:` rather than loading the program ourselves.
         let escalate_fd = FdGuard::new(syscall::open("escalate:", O_WRONLY)?);
 
-        // First, we write the path.
-        //
-        // TODO: For improved security, use a hypothetical SYS_DUP_FORWARD syscall to give the
-        // scheme our file descriptor. It can check through the kernel-overwritten stat.st_dev
-        // field that it pertains to a "trusted" scheme (i.e. of at least the privilege the
-        // new uid/gid has), although for now only root can open schemes. Passing a file
-        // descriptor and not a path will allow escalated to run in a limited namespace.
-        //
-        // TODO: Plus, at this point fexecve is not implemented (but specified in
-        // POSIX.1-2008), and to avoid bad syscalls such as fpath, passing a file descriptor
-        // would be better.
-        let _ = syscall::write(*escalate_fd, path.to_bytes());
+        // First, send the context handle of this process to escalated.
+        send_fd_guard(*escalate_fd, this_context_fd)?;
+
+        // Then, send the file descriptor containing the file descriptor to be executed.
+        send_fd_guard(*escalate_fd, exec_fd_guard)?;
+
+        // Then, write the path (argv[0]).
+        let _ = syscall::write(*escalate_fd, arg0);
 
         // Second, we write the flattened args and envs with NUL characters separating
         // individual items. This can be copied directly into the new executable's memory.
@@ -298,8 +303,9 @@ pub fn execve(
     } else {
         let extrainfo = ExtraInfo { cwd: Some(&cwd) };
         fexec_impl(
-            image_file,
-            path.to_bytes(),
+            exec_fd_guard,
+            this_context_fd,
+            arg0,
             &args,
             &envs,
             total_args_envs_size,
@@ -318,4 +324,11 @@ where
         vec.push(b'\0');
     }
     vec.into_boxed_slice()
+}
+
+fn send_fd_guard(dst_socket: usize, fd: FdGuard) -> Result<()> {
+    syscall::sendfd(dst_socket, *fd, 0, 0)?;
+    // The kernel closes file descriptors that are sent, so don't call SYS_CLOSE redundantly.
+    core::mem::forget(fd);
+    Ok(())
 }
