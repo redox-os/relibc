@@ -4,9 +4,10 @@ use core::{char, ffi::VaList as va_list, mem, ptr, slice, usize};
 
 use crate::{
     header::{
-        ctype::isspace, errno::ERANGE, stdio::*, stdlib::MB_CUR_MAX, string, time::*, wctype::*,
+        ctype::isspace, errno::{ERANGE, EILSEQ}, stdio::*, 
+        stdlib::MB_CUR_MAX, string, time::*, wctype::*,
     },
-    platform::{self, types::*},
+    platform::{self, errno, types::*},
 };
 
 mod utf8;
@@ -38,8 +39,45 @@ pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
-    //TODO: Real multibyte
-    btowc(fgetc(stream))
+    // TODO: Process locale
+    let mut buf: [c_uchar; MB_CUR_MAX as usize] = [0; MB_CUR_MAX as usize];
+    let mut encoded_length = 0;
+    let mut bytes_read = 0;
+    let mut wc: wchar_t = 0;
+
+    loop {
+        let nread = fread(buf[bytes_read..bytes_read+1].as_mut_ptr() as *mut c_void, 1, 1, stream);
+        
+        if nread != 1 {
+            errno = EILSEQ;
+            return WEOF;
+        }
+
+        bytes_read += 1;
+
+        if bytes_read == 1 {
+            encoded_length = if buf[0] >> 7 == 0 {
+                1
+            } else if buf[0] >> 5 == 6 {
+                2
+            } else if buf[0] >> 4 == 0xe {
+                3
+            } else if buf[0] >> 3 == 0x1e {
+                4
+            } else {
+                errno = EILSEQ;
+                return WEOF;
+            };
+        }
+
+        if bytes_read >= encoded_length {
+            break;
+        }
+    }
+
+    mbrtowc(&mut wc, buf.as_ptr() as *const c_char, encoded_length, ptr::null_mut());
+
+    wc as wint_t
 }
 
 #[no_mangle]
