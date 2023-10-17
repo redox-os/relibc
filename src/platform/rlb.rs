@@ -58,7 +58,10 @@ impl RawLineBuffer {
                 self.buf.set_len(capacity);
             }
 
-            let read = Sys::read(self.fd, &mut self.buf[len..]);
+            let read = match Sys::read(self.fd, &mut self.buf[len..]) {
+                Ok(ok) => ok,
+                Err(_) => -1,
+            };
 
             let read_usize = read.max(0) as usize;
 

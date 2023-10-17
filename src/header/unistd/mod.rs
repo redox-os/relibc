@@ -4,6 +4,7 @@ use core::{convert::TryFrom, mem, ptr, slice};
 
 use crate::{
     c_str::CStr,
+    errno::IntoPosix,
     header::{
         errno, fcntl, limits, stdlib::getenv, sys_ioctl, sys_resource, sys_time, sys_utsname,
         termios, time::timespec,
@@ -59,7 +60,7 @@ pub extern "C" fn _exit(status: c_int) {
 #[no_mangle]
 pub unsafe extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::access(path, mode)
+    Sys::access(path, mode).into_posix_style()
 }
 
 #[no_mangle]
@@ -87,7 +88,7 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
 #[no_mangle]
 pub unsafe extern "C" fn chdir(path: *const c_char) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::chdir(path)
+    Sys::chdir(path).into_posix_style()
 }
 
 #[no_mangle]
@@ -103,12 +104,12 @@ pub extern "C" fn chroot(path: *const c_char) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::chown(path, owner, group)
+    Sys::chown(path, owner, group).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn close(fildes: c_int) -> c_int {
-    Sys::close(fildes)
+    Sys::close(fildes).into_posix_style()
 }
 
 // #[no_mangle]
@@ -123,12 +124,12 @@ pub extern "C" fn crypt(key: *const c_char, salt: *const c_char) -> *mut c_char 
 
 #[no_mangle]
 pub extern "C" fn dup(fildes: c_int) -> c_int {
-    Sys::dup(fildes)
+    Sys::dup(fildes).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
-    Sys::dup2(fildes, fildes2)
+    Sys::dup2(fildes, fildes2).into_posix_style()
 }
 
 // #[no_mangle]
@@ -167,7 +168,7 @@ pub unsafe extern "C" fn execve(
     envp: *const *mut c_char,
 ) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::execve(path, argv, envp)
+    Sys::execve(path, argv, envp).into_posix_style()
 }
 
 #[cfg(target_os = "linux")]
@@ -213,17 +214,17 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
 
 #[no_mangle]
 pub extern "C" fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
-    Sys::fchown(fildes, owner, group)
+    Sys::fchown(fildes, owner, group).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn fchdir(fildes: c_int) -> c_int {
-    Sys::fchdir(fildes)
+    Sys::fchdir(fildes).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
-    Sys::fdatasync(fildes)
+    Sys::fdatasync(fildes).into_posix_style()
 }
 
 #[no_mangle]
@@ -232,7 +233,7 @@ pub extern "C" fn fork() -> pid_t {
     for prepare in &fork_hooks[0] {
         prepare();
     }
-    let pid = Sys::fork();
+    let pid = Sys::fork().into_posix_style();
     if pid == 0 {
         for child in &fork_hooks[2] {
             child();
@@ -247,12 +248,12 @@ pub extern "C" fn fork() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn fsync(fildes: c_int) -> c_int {
-    Sys::fsync(fildes)
+    Sys::fsync(fildes).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn ftruncate(fildes: c_int, length: off_t) -> c_int {
-    Sys::ftruncate(fildes, length)
+    Sys::ftruncate(fildes, length).into_posix_style()
 }
 
 #[no_mangle]
@@ -264,7 +265,7 @@ pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char 
         size = stack_buf.len();
     }
 
-    let ret = Sys::getcwd(buf, size);
+    let ret = Sys::getcwd(buf, size).into_posix_style();
     if ret.is_null() {
         return ptr::null_mut();
     }
@@ -323,7 +324,7 @@ pub extern "C" fn getgid() -> gid_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
-    Sys::getgroups(size, list)
+    Sys::getgroups(size, list).into_posix_style()
 }
 
 // #[no_mangle]
@@ -334,7 +335,7 @@ pub extern "C" fn gethostid() -> c_long {
 #[no_mangle]
 pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> c_int {
     let mut uts = mem::MaybeUninit::<sys_utsname::utsname>::uninit();
-    let err = Sys::uname(uts.as_mut_ptr());
+    let err = Sys::uname(uts.as_mut_ptr()).into_posix_style();
     if err < 0 {
         mem::forget(uts);
         return err;
@@ -400,12 +401,12 @@ pub extern "C" fn getpass(prompt: *const c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn getpgid(pid: pid_t) -> pid_t {
-    Sys::getpgid(pid)
+    Sys::getpgid(pid).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn getpgrp() -> pid_t {
-    Sys::getpgid(Sys::getpid())
+    Sys::getpgid(Sys::getpid()).into_posix_style()
 }
 
 #[no_mangle]
@@ -420,7 +421,7 @@ pub extern "C" fn getppid() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn getsid(pid: pid_t) -> pid_t {
-    Sys::getsid(pid)
+    Sys::getsid(pid).into_posix_style()
 }
 
 #[no_mangle]
@@ -446,14 +447,14 @@ pub extern "C" fn isatty(fd: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn lchown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::lchown(path, owner, group)
+    Sys::lchown(path, owner, group).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     let path1 = CStr::from_ptr(path1);
     let path2 = CStr::from_ptr(path2);
-    Sys::link(path1, path2)
+    Sys::link(path1, path2).into_posix_style()
 }
 
 #[no_mangle]
@@ -497,7 +498,7 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
 
 #[no_mangle]
 pub extern "C" fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
-    Sys::lseek(fildes, offset, whence)
+    Sys::lseek(fildes, offset, whence).into_posix_style()
 }
 
 // #[no_mangle]
@@ -517,7 +518,7 @@ pub unsafe extern "C" fn pipe(fildes: *mut c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
-    Sys::pipe2(slice::from_raw_parts_mut(fildes, 2), flags)
+    Sys::pipe2(slice::from_raw_parts_mut(fildes, 2), flags).into_posix_style()
 }
 
 #[no_mangle]
@@ -596,6 +597,7 @@ pub extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssiz
         buf,
         nbyte
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
@@ -606,28 +608,28 @@ pub unsafe extern "C" fn readlink(
 ) -> ssize_t {
     let path = CStr::from_ptr(path);
     let buf = slice::from_raw_parts_mut(buf as *mut u8, bufsize as usize);
-    Sys::readlink(path, buf)
+    Sys::readlink(path, buf).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn rmdir(path: *const c_char) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::rmdir(path)
+    Sys::rmdir(path).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn setgid(gid: gid_t) -> c_int {
-    Sys::setregid(gid, gid)
+    Sys::setregid(gid, gid).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn setgroups(size: size_t, list: *const gid_t) -> c_int {
-    Sys::setgroups(size, list)
+    Sys::setgroups(size, list).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
-    Sys::setpgid(pid, pgid)
+    Sys::setpgid(pid, pgid).into_posix_style()
 }
 
 #[no_mangle]
@@ -637,22 +639,22 @@ pub extern "C" fn setpgrp() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
-    Sys::setregid(rgid, egid)
+    Sys::setregid(rgid, egid).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
-    Sys::setreuid(ruid, euid)
+    Sys::setreuid(ruid, euid).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn setsid() -> pid_t {
-    Sys::setsid()
+    Sys::setsid().into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn setuid(uid: uid_t) -> c_int {
-    Sys::setreuid(uid, uid)
+    Sys::setreuid(uid, uid).into_posix_style()
 }
 
 #[no_mangle]
@@ -662,7 +664,7 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
         tv_nsec: 0,
     };
     let rmtp = ptr::null_mut();
-    Sys::nanosleep(&rqtp, rmtp);
+    Sys::nanosleep(&rqtp, rmtp).into_posix_style();
     0
 }
 
@@ -686,12 +688,12 @@ pub extern "C" fn swab(src: *const c_void, dest: *mut c_void, nbytes: ssize_t) {
 pub unsafe extern "C" fn symlink(path1: *const c_char, path2: *const c_char) -> c_int {
     let path1 = CStr::from_ptr(path1);
     let path2 = CStr::from_ptr(path2);
-    Sys::symlink(path1, path2)
+    Sys::symlink(path1, path2).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn sync() {
-    Sys::sync();
+    Sys::sync().into_posix_style();
 }
 
 #[no_mangle]
@@ -714,14 +716,14 @@ pub extern "C" fn tcsetpgrp(fd: c_int, pgrp: pid_t) -> c_int {
 #[no_mangle]
 pub extern "C" fn truncate(path: *const c_char, length: off_t) -> c_int {
     let file = unsafe { CStr::from_ptr(path) };
-    let fd = Sys::open(file, fcntl::O_WRONLY, 0);
+    let fd = Sys::open(file, fcntl::O_WRONLY, 0).into_posix_style();
     if fd < 0 {
         return -1;
     }
 
     let res = ftruncate(fd, length);
 
-    Sys::close(fd);
+    Sys::close(fd).into_posix_style();
 
     res
 }
@@ -743,7 +745,7 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
         return errno::ERANGE;
     }
 
-    let len = Sys::fpath(fildes, &mut name[..namesize - 1]);
+    let len = Sys::fpath(fildes, &mut name[..namesize - 1]).into_posix_style();
     if len < 0 {
         return unsafe { -platform::errno };
     }
@@ -780,7 +782,7 @@ pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t 
 #[no_mangle]
 pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::unlink(path)
+    Sys::unlink(path).into_posix_style()
 }
 
 #[no_mangle]
@@ -790,7 +792,7 @@ pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
         tv_nsec: ((useconds % 1_000_000) * 1000) as c_long,
     };
     let rmtp = ptr::null_mut();
-    Sys::nanosleep(&rqtp, rmtp)
+    Sys::nanosleep(&rqtp, rmtp).into_posix_style()
 }
 
 // #[no_mangle]
@@ -801,5 +803,5 @@ pub extern "C" fn vfork() -> pid_t {
 #[no_mangle]
 pub extern "C" fn write(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
     let buf = unsafe { slice::from_raw_parts(buf as *const u8, nbyte as usize) };
-    Sys::write(fildes, buf)
+    Sys::write(fildes, buf).into_posix_style()
 }

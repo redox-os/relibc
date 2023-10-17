@@ -1,5 +1,6 @@
 use crate::{
     c_str::{CStr, CString},
+    errno::IntoPosix,
     header::{fcntl, unistd},
     platform::{types::*, Pal, Sys},
 };
@@ -42,12 +43,12 @@ pub const POSIX_MADV_WONTNEED: c_int = 4;
 
 #[no_mangle]
 pub unsafe extern "C" fn mlock(addr: *const c_void, len: usize) -> c_int {
-    Sys::mlock(addr, len)
+    Sys::mlock(addr, len).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn mlockall(flags: c_int) -> c_int {
-    Sys::mlockall(flags)
+    Sys::mlockall(flags).into_posix_style()
 }
 
 #[no_mangle]
@@ -59,37 +60,37 @@ pub unsafe extern "C" fn mmap(
     fildes: c_int,
     off: off_t,
 ) -> *mut c_void {
-    Sys::mmap(addr, len, prot, flags, fildes, off)
+    Sys::mmap(addr, len, prot, flags, fildes, off).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn mprotect(addr: *mut c_void, len: size_t, prot: c_int) -> c_int {
-    Sys::mprotect(addr, len, prot)
+    Sys::mprotect(addr, len, prot).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn msync(addr: *mut c_void, len: size_t, flags: c_int) -> c_int {
-    Sys::msync(addr, len, flags)
+    Sys::msync(addr, len, flags).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn munlock(addr: *const c_void, len: usize) -> c_int {
-    Sys::munlock(addr, len)
+    Sys::munlock(addr, len).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn munlockall() -> c_int {
-    Sys::munlockall()
+    Sys::munlockall().into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
-    Sys::munmap(addr, len)
+    Sys::munmap(addr, len).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn madvise(addr: *mut c_void, len: size_t, flags: c_int) -> c_int {
-    Sys::madvise(addr, len, flags)
+    Sys::madvise(addr, len, flags).into_posix_style()
 }
 
 #[cfg(target_os = "linux")]

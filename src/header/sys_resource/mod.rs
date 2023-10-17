@@ -2,6 +2,7 @@
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysresource.h.html
 
 use crate::{
+    errno::IntoPosix,
     header::sys_time::timeval,
     platform::{types::*, Pal, Sys},
 };
@@ -67,26 +68,28 @@ pub const PRIO_USER: c_int = 2;
 
 #[no_mangle]
 pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
-    let r = Sys::getpriority(which, who);
-    if r < 0 {
-        return r;
+    match Sys::getpriority(which, who) {
+        Ok(r) => 20 - r,
+        Err(err) => {
+            err.set_errno();
+            -1
+        }
     }
-    20 - r
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn setpriority(which: c_int, who: id_t, nice: c_int) -> c_int {
-    Sys::setpriority(which, who, nice)
+    Sys::setpriority(which, who, nice).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
-    Sys::getrlimit(resource, rlp)
+    Sys::getrlimit(resource, rlp).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int {
-    Sys::setrlimit(resource, rlp)
+    Sys::setrlimit(resource, rlp).into_posix_style()
 }
 // #[no_mangle]
 // pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {

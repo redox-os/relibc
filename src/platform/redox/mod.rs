@@ -8,6 +8,7 @@ use syscall::{
 
 use crate::{
     c_str::{CStr, CString},
+    errno::Errno,
     fs::File,
     header::{
         dirent::dirent,
@@ -51,59 +52,32 @@ mod socket;
 
 macro_rules! path_from_c_str {
     ($c_str:expr) => {{
-        match $c_str.to_str() {
-            Ok(ok) => ok,
-            Err(err) => {
-                unsafe {
-                    errno = EINVAL;
-                }
-                return -1;
-            }
-        }
+        $c_str.to_str().map_err(|_| Errno(EINVAL))
     }};
 }
 
 use self::{exec::Executable, path::canonicalize};
 
-pub fn e(sys: Result<usize>) -> usize {
-    match sys {
-        Ok(ok) => ok,
-        Err(err) => {
-            unsafe {
-                errno = err.errno as c_int;
-            }
-            !0
-        }
-    }
+pub fn e_raw(sys: Result<usize>) -> Result<usize, Errno> {
+    sys.map_err(|err| Errno(err.errno as c_int))
 }
 
 pub struct Sys;
 
 impl Pal for Sys {
-    fn access(path: CStr, mode: c_int) -> c_int {
-        let fd = match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
-            Ok(fd) => fd,
-            Err(_) => return -1,
-        };
+    fn access(path: CStr, mode: c_int) -> Result<(), Errno> {
+        let fd = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
 
         if mode == F_OK {
-            return 0;
+            return Ok(());
         }
 
         let mut stat = syscall::Stat::default();
 
-        if e(syscall::fstat(*fd as usize, &mut stat)) == !0 {
-            return -1;
-        }
+        e_raw(syscall::fstat(*fd as usize, &mut stat))?;
 
-        let uid = e(syscall::getuid());
-        if uid == !0 {
-            return -1;
-        }
-        let gid = e(syscall::getgid());
-        if gid == !0 {
-            return -1;
-        }
+        let uid = e_raw(syscall::getuid())?;
+        let gid = e_raw(syscall::getgid())?;
 
         let perms = if stat.st_uid as usize == uid {
             stat.st_mode >> (3 * 2 & 0o7)
@@ -116,16 +90,13 @@ impl Pal for Sys {
             || (mode & W_OK == W_OK && perms & 0o2 != 0o2)
             || (mode & X_OK == X_OK && perms & 0o1 != 0o1)
         {
-            unsafe {
-                errno = EINVAL;
-            }
-            return -1;
+            return Err(Errno(EINVAL));
         }
 
-        0
+        Ok(())
     }
 
-    fn brk(addr: *mut c_void) -> *mut c_void {
+    fn brk(addr: *mut c_void) -> Result<*mut c_void, Errno> {
         unsafe {
             // On first invocation, allocate a buffer for brk
             if BRK_CUR.is_null() {
@@ -139,12 +110,7 @@ impl Pal for Sys {
                     MAP_ANONYMOUS,
                     0,
                     0,
-                );
-                if allocated == !0 as *mut c_void
-                /* MAP_FAILED */
-                {
-                    return !0 as *mut c_void;
-                }
+                )?;
 
                 BRK_CUR = allocated;
                 BRK_END = (allocated as *mut u8).add(BRK_MAX_SIZE) as *mut c_void;
@@ -152,72 +118,70 @@ impl Pal for Sys {
 
             if addr.is_null() {
                 // Lookup what previous brk() invocations have set the address to
-                BRK_CUR
+                Ok(BRK_CUR)
             } else if BRK_CUR <= addr && addr < BRK_END {
                 // It's inside buffer, return
                 BRK_CUR = addr;
-                addr
+                Ok(addr)
             } else {
                 // It was outside of valid range
-                errno = ENOMEM;
-                ptr::null_mut()
+                return Err(Errno(ENOMEM));
             }
         }
     }
 
-    fn chdir(path: CStr) -> c_int {
-        let path = path_from_c_str!(path);
-        e(path::chdir(path).map(|()| 0)) as c_int
+    fn chdir(path: CStr) -> Result<(), Errno> {
+        let path = path_from_c_str!(path)?;
+        e_raw(path::chdir(path).map(|()| 0))?;
+        Ok(())
     }
 
-    fn chmod(path: CStr, mode: mode_t) -> c_int {
-        match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
-            Ok(file) => Self::fchmod(*file, mode),
-            Err(_) => -1,
-        }
+    fn chmod(path: CStr, mode: mode_t) -> Result<(), Errno> {
+        let file = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
+        Self::fchmod(*file, mode)
     }
 
-    fn chown(path: CStr, owner: uid_t, group: gid_t) -> c_int {
-        match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
-            Ok(file) => Self::fchown(*file, owner, group),
-            Err(_) => -1,
-        }
+    fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<(), Errno> {
+        let file = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
+        Self::fchown(*file, owner, group)
     }
 
     // FIXME: unsound
-    fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> c_int {
+    fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> Result<(), Errno> {
         // TODO
         eprintln!("relibc clock_getres({}, {:p}): not implemented", clk_id, tp);
-        unsafe { errno = ENOSYS };
-        -1
+        Err(Errno(ENOSYS))
     }
 
     // FIXME: unsound
-    fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int {
-        unsafe { e(libredox::clock_gettime(clk_id as usize, tp).map(|()| 0)) as c_int }
+    fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> Result<(), Errno> {
+        unsafe {
+            e_raw(libredox::clock_gettime(clk_id as usize, tp).map(|()| 0))?;
+        }
+        Ok(())
     }
 
     // FIXME: unsound
-    fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> c_int {
+    fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> Result<(), Errno> {
         // TODO
         eprintln!(
             "relibc clock_settime({}, {:p}): not implemented",
             clk_id, tp
         );
-        unsafe { errno = ENOSYS };
-        -1
+        Err(Errno(ENOSYS))
     }
 
-    fn close(fd: c_int) -> c_int {
-        e(syscall::close(fd as usize)) as c_int
+    fn close(fd: c_int) -> Result<(), Errno> {
+        e_raw(syscall::close(fd as usize))?;
+        Ok(())
     }
 
-    fn dup(fd: c_int) -> c_int {
-        e(syscall::dup(fd as usize, &[])) as c_int
+    fn dup(fd: c_int) -> Result<c_int, Errno> {
+        e_raw(syscall::dup(fd as usize, &[])).map(|res| res as c_int)
     }
 
-    fn dup2(fd1: c_int, fd2: c_int) -> c_int {
-        e(syscall::dup2(fd1 as usize, fd2 as usize, &[])) as c_int
+    fn dup2(fd1: c_int, fd2: c_int) -> Result<c_int, Errno> {
+        e_raw(syscall::dup2(fd1 as usize, fd2 as usize, &[])).map(|res| res as c_int)
     }
 
     fn exit(status: c_int) -> ! {
@@ -225,91 +189,103 @@ impl Pal for Sys {
         loop {}
     }
 
-    unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
-        e(self::exec::execve(
+    unsafe fn execve(
+        path: CStr,
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
+    ) -> Result<(), Errno> {
+        e_raw(self::exec::execve(
             Executable::AtPath(path),
             self::exec::ArgEnv::C { argv, envp },
             None,
-        )) as c_int
+        ))?;
+        Ok(())
     }
-    unsafe fn fexecve(fildes: c_int, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
-        e(self::exec::execve(
+    unsafe fn fexecve(
+        fildes: c_int,
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
+    ) -> Result<(), Errno> {
+        e_raw(self::exec::execve(
             Executable::InFd {
                 file: File::new(fildes),
                 arg0: CStr::from_ptr(argv.read()).to_bytes(),
             },
             self::exec::ArgEnv::C { argv, envp },
             None,
-        )) as c_int
+        ))?;
+        Ok(())
     }
 
-    fn fchdir(fd: c_int) -> c_int {
+    fn fchdir(fd: c_int) -> Result<(), Errno> {
         let mut buf = [0; 4096];
-        let res = e(syscall::fpath(fd as usize, &mut buf));
-        if res == !0 {
-            !0
-        } else {
-            match str::from_utf8(&buf[..res]) {
-                Ok(path) => e(path::chdir(path).map(|()| 0)) as c_int,
-                Err(_) => {
-                    unsafe { errno = EINVAL };
-                    return -1;
-                }
+        let res = e_raw(syscall::fpath(fd as usize, &mut buf))?;
+        match str::from_utf8(&buf[..res]) {
+            Ok(path) => {
+                e_raw(path::chdir(path).map(|()| 0))?;
+                Ok(())
             }
+            Err(_) => Err(Errno(EINVAL)),
         }
     }
 
-    fn fchmod(fd: c_int, mode: mode_t) -> c_int {
-        e(syscall::fchmod(fd as usize, mode as u16)) as c_int
+    fn fchmod(fd: c_int, mode: mode_t) -> Result<(), Errno> {
+        e_raw(syscall::fchmod(fd as usize, mode as u16))?;
+        Ok(())
     }
 
-    fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> c_int {
-        e(syscall::fchown(fd as usize, owner as u32, group as u32)) as c_int
+    fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> Result<(), Errno> {
+        e_raw(syscall::fchown(fd as usize, owner as u32, group as u32))?;
+        Ok(())
     }
 
-    fn fcntl(fd: c_int, cmd: c_int, args: c_ulonglong) -> c_int {
-        e(syscall::fcntl(fd as usize, cmd as usize, args as usize)) as c_int
+    fn fcntl(fd: c_int, cmd: c_int, args: c_ulonglong) -> Result<c_int, Errno> {
+        e_raw(syscall::fcntl(fd as usize, cmd as usize, args as usize)).map(|res| res as c_int)
     }
 
-    fn fdatasync(fd: c_int) -> c_int {
+    fn fdatasync(fd: c_int) -> Result<(), Errno> {
         // TODO: "Needs" syscall update
-        e(syscall::fsync(fd as usize)) as c_int
+        e_raw(syscall::fsync(fd as usize))?;
+        Ok(())
     }
 
-    fn flock(_fd: c_int, _operation: c_int) -> c_int {
+    fn flock(_fd: c_int, _operation: c_int) -> Result<(), Errno> {
         // TODO: Redox does not have file locking yet
-        0
+        Ok(())
     }
 
-    fn fork() -> pid_t {
-        e(clone::fork_impl()) as pid_t
-    }
-
-    // FIXME: unsound
-    fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
-        unsafe { e(libredox::fstat(fildes as usize, buf).map(|()| 0)) as c_int }
+    fn fork() -> Result<pid_t, Errno> {
+        e_raw(clone::fork_impl()).map(|res| res as pid_t)
     }
 
     // FIXME: unsound
-    fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
-        unsafe { e(libredox::fstatvfs(fildes as usize, buf).map(|()| 0)) as c_int }
-    }
-
-    fn fsync(fd: c_int) -> c_int {
-        e(syscall::fsync(fd as usize)) as c_int
-    }
-
-    fn ftruncate(fd: c_int, len: off_t) -> c_int {
-        e(syscall::ftruncate(fd as usize, len as usize)) as c_int
+    fn fstat(fildes: c_int, buf: *mut stat) -> Result<(), Errno> {
+        unsafe {
+            e_raw(libredox::fstat(fildes as usize, buf).map(|()| 0))?;
+        }
+        Ok(())
     }
 
     // FIXME: unsound
-    fn futex(
-        addr: *mut c_int,
-        op: c_int,
-        val: c_int,
-        val2: usize,
-    ) -> Result<c_long, crate::pthread::Errno> {
+    fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<(), Errno> {
+        unsafe {
+            e_raw(libredox::fstatvfs(fildes as usize, buf).map(|()| 0))?;
+        }
+        Ok(())
+    }
+
+    fn fsync(fd: c_int) -> Result<(), Errno> {
+        e_raw(syscall::fsync(fd as usize))?;
+        Ok(())
+    }
+
+    fn ftruncate(fd: c_int, len: off_t) -> Result<(), Errno> {
+        e_raw(syscall::ftruncate(fd as usize, len as usize))?;
+        Ok(())
+    }
+
+    // FIXME: unsound
+    fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> Result<c_long, Errno> {
         match unsafe {
             syscall::futex(
                 addr as *mut i32,
@@ -320,54 +296,46 @@ impl Pal for Sys {
             )
         } {
             Ok(success) => Ok(success as c_long),
-            Err(err) => Err(crate::pthread::Errno(err.errno)),
+            Err(err) => Err(Errno(err.errno)),
         }
     }
 
     // FIXME: unsound
-    fn futimens(fd: c_int, times: *const timespec) -> c_int {
-        unsafe { e(libredox::futimens(fd as usize, times).map(|()| 0)) as c_int }
-    }
-
-    // FIXME: unsound
-    fn utimens(path: CStr, times: *const timespec) -> c_int {
-        match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
-            Ok(file) => Self::futimens(*file, times),
-            Err(_) => -1,
+    fn futimens(fd: c_int, times: *const timespec) -> Result<(), Errno> {
+        unsafe {
+            e_raw(libredox::futimens(fd as usize, times).map(|()| 0))?;
         }
+        Ok(())
     }
 
     // FIXME: unsound
-    fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
+    fn utimens(path: CStr, times: *const timespec) -> Result<(), Errno> {
+        let file = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
+        Self::futimens(*file, times)
+    }
+
+    // FIXME: unsound
+    fn getcwd(buf: *mut c_char, size: size_t) -> Result<*mut c_char, Errno> {
         // TODO: Not using MaybeUninit seems a little unsafe
 
         let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize) };
         if buf_slice.is_empty() {
-            unsafe {
-                errno = EINVAL;
-            }
-            return ptr::null_mut();
+            return Err(Errno(EINVAL));
         }
 
         if path::getcwd(buf_slice).is_none() {
-            unsafe {
-                errno = ERANGE;
-            }
-            return ptr::null_mut();
+            return Err(Errno(ERANGE));
         }
 
-        buf
+        Ok(buf)
     }
 
-    fn getdents(fd: c_int, mut dirents: *mut dirent, max_bytes: usize) -> c_int {
+    fn getdents(fd: c_int, mut dirents: *mut dirent, max_bytes: usize) -> Result<c_int, Errno> {
         //TODO: rewrite this code. Originally the *dirents = dirent { ... } stuff below caused
         // massive issues. This has been hacked around, but it still isn't perfect
 
         // Get initial reading position
-        let mut read = match syscall::lseek(fd as usize, 0, syscall::SEEK_CUR) {
-            Ok(pos) => pos as isize,
-            Err(err) => return -err.errno,
-        };
+        let mut read = e_raw(syscall::lseek(fd as usize, 0, syscall::SEEK_CUR))? as isize;
 
         let mut written = 0;
         let mut buf = [0; 1024];
@@ -412,13 +380,16 @@ impl Pal for Sys {
                 Ok(0) => {
                     if i > 0 {
                         if let Some(value) = flush(&mut written, &mut i, &mut name) {
-                            return value;
+                            if value < 0 {
+                                return Err(Errno(-value));
+                            }
+                            return Ok(value);
                         }
                     }
-                    return written as c_int;
+                    return Ok(written as c_int);
                 }
                 Ok(n) => n,
-                Err(err) => return -err.errno,
+                Err(err) => return Err(Errno(err.errno)),
             };
 
             // Handle everything
@@ -445,7 +416,10 @@ impl Pal for Sys {
                 // Write the directory entry
                 if newline.is_some() {
                     if let Some(value) = flush(&mut written, &mut i, &mut name) {
-                        return value;
+                        if value < 0 {
+                            return Err(Errno(-value));
+                        }
+                        return Ok(value);
                     }
                 }
             }
@@ -453,48 +427,46 @@ impl Pal for Sys {
     }
 
     fn getegid() -> gid_t {
-        e(syscall::getegid()) as gid_t
+        syscall::getegid().unwrap() as gid_t
     }
 
     fn geteuid() -> uid_t {
-        e(syscall::geteuid()) as uid_t
+        syscall::geteuid().unwrap() as uid_t
     }
 
     fn getgid() -> gid_t {
-        e(syscall::getgid()) as gid_t
+        syscall::getgid().unwrap() as gid_t
     }
 
-    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
+    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int, Errno> {
         // TODO
         eprintln!("relibc getgroups({}, {:p}): not implemented", size, list);
-        unsafe { errno = ENOSYS };
-        -1
+        Err(Errno(ENOSYS))
     }
 
     fn getpagesize() -> usize {
         PAGE_SIZE
     }
 
-    fn getpgid(pid: pid_t) -> pid_t {
-        e(syscall::getpgid(pid as usize)) as pid_t
+    fn getpgid(pid: pid_t) -> Result<pid_t, Errno> {
+        e_raw(syscall::getpgid(pid as usize)).map(|res| res as pid_t)
     }
 
     fn getpid() -> pid_t {
-        e(syscall::getpid()) as pid_t
+        syscall::getpid().unwrap() as pid_t
     }
 
     fn getppid() -> pid_t {
-        e(syscall::getppid()) as pid_t
+        syscall::getppid().unwrap() as pid_t
     }
 
-    fn getpriority(which: c_int, who: id_t) -> c_int {
+    fn getpriority(which: c_int, who: id_t) -> Result<c_int, Errno> {
         // TODO
         eprintln!("getpriority({}, {}): not implemented", which, who);
-        unsafe { errno = ENOSYS };
-        -1
+        Err(Errno(ENOSYS))
     }
 
-    fn getrandom(buf: &mut [u8], flags: c_uint) -> ssize_t {
+    fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<ssize_t, Errno> {
         //TODO: make this a system call?
 
         let path = if flags & sys_random::GRND_RANDOM != 0 {
@@ -509,19 +481,16 @@ impl Pal for Sys {
             open_flags |= syscall::O_NONBLOCK;
         }
 
-        let fd = e(syscall::open(path, open_flags));
-        if fd == !0 {
-            return -1;
-        }
+        let fd = e_raw(syscall::open(path, open_flags))?;
 
-        let res = e(syscall::read(fd, buf)) as ssize_t;
+        let res = e_raw(syscall::read(fd, buf)).map(|res| res as ssize_t);
 
         let _ = syscall::close(fd);
 
         res
     }
 
-    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int {
+    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<(), Errno> {
         //TODO
         eprintln!(
             "relibc getrlimit({}, {:p}): not implemented",
@@ -531,24 +500,22 @@ impl Pal for Sys {
             (*rlim).rlim_cur = RLIM_INFINITY;
             (*rlim).rlim_max = RLIM_INFINITY;
         }
-        0
+        Ok(())
     }
 
-    unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> c_int {
+    unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> Result<(), Errno> {
         //TOOD
         eprintln!(
             "relibc setrlimit({}, {:p}): not implemented",
             resource, rlim
         );
-        unsafe { errno = EPERM };
-        -1
+        Err(Errno(EPERM))
     }
 
-    fn getsid(pid: pid_t) -> pid_t {
+    fn getsid(pid: pid_t) -> Result<pid_t, Errno> {
         //TODO
         eprintln!("relibc getsid({}): not implemented", pid);
-        unsafe { errno = ENOSYS };
-        -1
+        Err(Errno(ENOSYS))
     }
 
     fn gettid() -> pid_t {
@@ -556,15 +523,12 @@ impl Pal for Sys {
         Self::getpid()
     }
 
-    fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
+    fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> Result<(), Errno> {
         let mut redox_tp = redox_timespec::default();
-        let err = e(syscall::clock_gettime(
+        e_raw(syscall::clock_gettime(
             syscall::CLOCK_REALTIME,
             &mut redox_tp,
-        )) as c_int;
-        if err < 0 {
-            return err;
-        }
+        ))?;
         unsafe {
             (*tp).tv_sec = redox_tp.tv_sec as time_t;
             (*tp).tv_usec = (redox_tp.tv_nsec / 1000) as suseconds_t;
@@ -574,67 +538,62 @@ impl Pal for Sys {
                 (*tzp).tz_dsttime = 0;
             }
         }
-        0
+        Ok(())
     }
 
     fn getuid() -> uid_t {
-        e(syscall::getuid()) as pid_t
+        syscall::getuid().unwrap() as pid_t
     }
 
-    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> c_int {
+    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<(), Errno> {
         // TODO: Is it correct for regular chown to use O_PATH? On Linux the meaning of that flag
         // is to forbid file operations, including fchown.
 
         // unlike chown, never follow symbolic links
-        match File::open(path, fcntl::O_CLOEXEC | fcntl::O_NOFOLLOW) {
-            Ok(file) => Self::fchown(*file, owner, group),
-            Err(_) => -1,
-        }
+        let file = File::open(path, fcntl::O_CLOEXEC | fcntl::O_NOFOLLOW)?;
+        Self::fchown(*file, owner, group)
     }
 
-    fn link(path1: CStr, path2: CStr) -> c_int {
-        e(unsafe { syscall::link(path1.as_ptr() as *const u8, path2.as_ptr() as *const u8) })
-            as c_int
+    fn link(path1: CStr, path2: CStr) -> Result<(), Errno> {
+        e_raw(unsafe { syscall::link(path1.as_ptr() as *const u8, path2.as_ptr() as *const u8) })?;
+        Ok(())
     }
 
-    fn lseek(fd: c_int, offset: off_t, whence: c_int) -> off_t {
-        e(syscall::lseek(
+    fn lseek(fd: c_int, offset: off_t, whence: c_int) -> Result<off_t, Errno> {
+        e_raw(syscall::lseek(
             fd as usize,
             offset as isize,
             whence as usize,
-        )) as off_t
+        ))
+        .map(|res| res as off_t)
     }
 
-    fn mkdir(path: CStr, mode: mode_t) -> c_int {
-        match File::create(
+    fn mkdir(path: CStr, mode: mode_t) -> Result<(), Errno> {
+        File::create(
             path,
             fcntl::O_DIRECTORY | fcntl::O_EXCL | fcntl::O_CLOEXEC,
             0o777,
-        ) {
-            Ok(_fd) => 0,
-            Err(_) => -1,
-        }
+        )?;
+        Ok(())
     }
 
-    fn mkfifo(path: CStr, mode: mode_t) -> c_int {
-        match File::create(
+    fn mkfifo(path: CStr, mode: mode_t) -> Result<(), Errno> {
+        File::create(
             path,
             fcntl::O_CREAT | fcntl::O_CLOEXEC,
             syscall::MODE_FIFO as mode_t | (mode & 0o777),
-        ) {
-            Ok(fd) => 0,
-            Err(_) => -1,
-        }
+        )?;
+        Ok(())
     }
 
-    unsafe fn mlock(addr: *const c_void, len: usize) -> c_int {
+    unsafe fn mlock(addr: *const c_void, len: usize) -> Result<(), Errno> {
         // Redox never swaps
-        0
+        Ok(())
     }
 
-    fn mlockall(flags: c_int) -> c_int {
+    fn mlockall(flags: c_int) -> Result<(), Errno> {
         // Redox never swaps
-        0
+        Ok(())
     }
 
     unsafe fn mmap(
@@ -644,7 +603,7 @@ impl Pal for Sys {
         flags: c_int,
         fildes: c_int,
         off: off_t,
-    ) -> *mut c_void {
+    ) -> Result<*mut c_void, Errno> {
         let map = Map {
             offset: off as usize,
             size: round_up_to_page_size(len),
@@ -655,62 +614,64 @@ impl Pal for Sys {
         };
 
         if flags & MAP_ANONYMOUS == MAP_ANONYMOUS {
-            e(syscall::fmap(!0, &map)) as *mut c_void
+            e_raw(syscall::fmap(!0, &map)).map(|res| res as *mut c_void)
         } else {
-            e(syscall::fmap(fildes as usize, &map)) as *mut c_void
+            e_raw(syscall::fmap(fildes as usize, &map)).map(|res| res as *mut c_void)
         }
     }
 
-    unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
-        e(syscall::mprotect(
+    unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> Result<(), Errno> {
+        e_raw(syscall::mprotect(
             addr as usize,
             round_up_to_page_size(len),
             syscall::MapFlags::from_bits((prot as usize) << 16)
                 .expect("mprotect: invalid bit pattern"),
-        )) as c_int
+        ))?;
+        Ok(())
     }
 
-    unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
+    unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> Result<(), Errno> {
         eprintln!(
             "relibc msync({:p}, 0x{:x}, 0x{:x}): not implemented",
             addr, len, flags
         );
-        e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
+        e_raw(Err(syscall::Error::new(syscall::ENOSYS)))?;
+        Ok(())
         /* TODO
-        e(syscall::msync(
+        e_raw(syscall::msync(
             addr as usize,
             round_up_to_page_size(len),
             flags
-        )) as c_int
+        ))?;
+        Ok(())
         */
     }
 
-    unsafe fn munlock(addr: *const c_void, len: usize) -> c_int {
+    unsafe fn munlock(addr: *const c_void, len: usize) -> Result<(), Errno> {
         // Redox never swaps
-        0
+        Ok(())
     }
 
-    fn munlockall() -> c_int {
+    fn munlockall() -> Result<(), Errno> {
         // Redox never swaps
-        0
+        Ok(())
     }
 
-    unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
-        if e(syscall::funmap(addr as usize, round_up_to_page_size(len))) == !0 {
-            return !0;
-        }
-        0
+    unsafe fn munmap(addr: *mut c_void, len: usize) -> Result<(), Errno> {
+        e_raw(syscall::funmap(addr as usize, round_up_to_page_size(len)))?;
+        Ok(())
     }
 
-    unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
+    unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> Result<(), Errno> {
         eprintln!(
             "relibc madvise({:p}, 0x{:x}, 0x{:x}): not implemented",
             addr, len, flags
         );
-        e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
+        e_raw(Err(syscall::Error::new(syscall::ENOSYS)))?;
+        Ok(())
     }
 
-    fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
+    fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<(), Errno> {
         let redox_rqtp = unsafe { redox_timespec::from(&*rqtp) };
         let mut redox_rmtp: redox_timespec;
         if rmtp.is_null() {
@@ -718,43 +679,33 @@ impl Pal for Sys {
         } else {
             redox_rmtp = unsafe { redox_timespec::from(&*rmtp) };
         }
-        match e(syscall::nanosleep(&redox_rqtp, &mut redox_rmtp)) as c_int {
-            -1 => -1,
-            _ => {
-                unsafe {
-                    if !rmtp.is_null() {
-                        (*rmtp).tv_sec = redox_rmtp.tv_sec as time_t;
-                        (*rmtp).tv_nsec = redox_rmtp.tv_nsec as c_long;
-                    }
-                }
-                0
+        e_raw(syscall::nanosleep(&redox_rqtp, &mut redox_rmtp))?;
+        unsafe {
+            if !rmtp.is_null() {
+                (*rmtp).tv_sec = redox_rmtp.tv_sec as time_t;
+                (*rmtp).tv_nsec = redox_rmtp.tv_nsec as c_long;
             }
         }
+        Ok(())
     }
 
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> c_int {
-        let path = path_from_c_str!(path);
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int, Errno> {
+        let path = path_from_c_str!(path)?;
 
-        e(libredox::open(path, oflag, mode)) as c_int
+        e_raw(libredox::open(path, oflag, mode)).map(|res| res as c_int)
     }
 
-    fn pipe2(fds: &mut [c_int], flags: c_int) -> c_int {
-        e(extra::pipe2(fds, flags as usize).map(|()| 0)) as c_int
+    fn pipe2(fds: &mut [c_int], flags: c_int) -> Result<(), Errno> {
+        extra::pipe2(fds, flags as usize).map_err(|err| Errno(err.errno as c_int))
     }
 
-    unsafe fn rlct_clone(
-        stack: *mut usize,
-    ) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, Errno> {
         clone::rlct_clone_impl(stack)
             .map(|context_id| crate::pthread::OsTid { context_id })
-            .map_err(|error| crate::pthread::Errno(error.errno))
+            .map_err(|error| Errno(error.errno))
     }
-    unsafe fn rlct_kill(
-        os_tid: crate::pthread::OsTid,
-        signal: usize,
-    ) -> Result<(), crate::pthread::Errno> {
-        syscall::kill(os_tid.context_id, signal)
-            .map_err(|error| crate::pthread::Errno(error.errno))?;
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), Errno> {
+        syscall::kill(os_tid.context_id, signal).map_err(|error| Errno(error.errno))?;
         Ok(())
     }
     fn current_os_tid() -> crate::pthread::OsTid {
@@ -764,103 +715,97 @@ impl Pal for Sys {
         }
     }
 
-    fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
-        e(syscall::read(fd as usize, buf)) as ssize_t
+    fn read(fd: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno> {
+        e_raw(syscall::read(fd as usize, buf)).map(|res| res as ssize_t)
     }
 
-    fn fpath(fildes: c_int, out: &mut [u8]) -> ssize_t {
-        e(syscall::fpath(fildes as usize, out)) as ssize_t
+    fn fpath(fildes: c_int, out: &mut [u8]) -> Result<ssize_t, Errno> {
+        e_raw(syscall::fpath(fildes as usize, out)).map(|res| res as ssize_t)
     }
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> ssize_t {
-        match File::open(
+    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<ssize_t, Errno> {
+        let file = File::open(
             pathname,
             fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
-        ) {
-            Ok(file) => Self::read(*file, out),
-            Err(_) => return -1,
-        }
+        )?;
+        Self::read(*file, out)
     }
 
-    fn rename(oldpath: CStr, newpath: CStr) -> c_int {
-        let newpath = path_from_c_str!(newpath);
-        match File::open(oldpath, fcntl::O_PATH | fcntl::O_CLOEXEC) {
-            Ok(file) => e(syscall::frename(*file as usize, newpath)) as c_int,
-            Err(_) => -1,
-        }
+    fn rename(oldpath: CStr, newpath: CStr) -> Result<(), Errno> {
+        let newpath = path_from_c_str!(newpath)?;
+        let file = File::open(oldpath, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
+        e_raw(syscall::frename(*file as usize, newpath))?;
+        Ok(())
     }
 
-    fn rmdir(path: CStr) -> c_int {
-        let path = path_from_c_str!(path);
-        e(canonicalize(path).and_then(|path| syscall::rmdir(&path))) as c_int
+    fn rmdir(path: CStr) -> Result<(), Errno> {
+        let path = path_from_c_str!(path)?;
+        e_raw(canonicalize(path).and_then(|path| syscall::rmdir(&path)))?;
+        Ok(())
     }
 
-    fn sched_yield() -> c_int {
-        e(syscall::sched_yield()) as c_int
+    fn sched_yield() -> Result<(), Errno> {
+        e_raw(syscall::sched_yield())?;
+        Ok(())
     }
 
-    unsafe fn setgroups(size: size_t, list: *const gid_t) -> c_int {
+    unsafe fn setgroups(size: size_t, list: *const gid_t) -> Result<(), Errno> {
         // TODO
         eprintln!("relibc setgroups({}, {:p}): not implemented", size, list);
-        unsafe { errno = ENOSYS };
-        -1
+        Err(Errno(ENOSYS))
     }
 
-    fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
-        e(syscall::setpgid(pid as usize, pgid as usize)) as c_int
+    fn setpgid(pid: pid_t, pgid: pid_t) -> Result<(), Errno> {
+        e_raw(syscall::setpgid(pid as usize, pgid as usize))?;
+        Ok(())
     }
 
-    fn setpriority(which: c_int, who: id_t, prio: c_int) -> c_int {
+    fn setpriority(which: c_int, who: id_t, prio: c_int) -> Result<(), Errno> {
         // TODO
         eprintln!(
             "relibc setpriority({}, {}, {}): not implemented",
             which, who, prio
         );
-        unsafe { errno = ENOSYS };
-        -1
+        Err(Errno(ENOSYS))
     }
 
-    fn setsid() -> c_int {
+    fn setsid() -> Result<(), Errno> {
         // TODO
         eprintln!("relibc setsid(): not implemented");
-        unsafe { errno = ENOSYS };
-        -1
+        Err(Errno(ENOSYS))
     }
 
-    fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
-        e(syscall::setregid(rgid as usize, egid as usize)) as c_int
+    fn setregid(rgid: gid_t, egid: gid_t) -> Result<(), Errno> {
+        e_raw(syscall::setregid(rgid as usize, egid as usize))?;
+        Ok(())
     }
 
-    fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
-        e(syscall::setreuid(ruid as usize, euid as usize)) as c_int
+    fn setreuid(ruid: uid_t, euid: uid_t) -> Result<(), Errno> {
+        e_raw(syscall::setreuid(ruid as usize, euid as usize))?;
+        Ok(())
     }
 
-    fn symlink(path1: CStr, path2: CStr) -> c_int {
-        let mut file = match File::create(
+    fn symlink(path1: CStr, path2: CStr) -> Result<(), Errno> {
+        let mut file = File::create(
             path2,
             fcntl::O_WRONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
             0o777,
-        ) {
-            Ok(ok) => ok,
-            Err(_) => return -1,
-        };
+        )?;
 
-        if file.write(path1.to_bytes()).is_err() {
-            return -1;
-        }
+        file.write(path1.to_bytes())?;
 
-        0
+        Ok(())
     }
 
-    fn sync() -> c_int {
-        0
+    fn sync() -> Result<(), Errno> {
+        Ok(())
     }
 
     fn umask(mask: mode_t) -> mode_t {
-        e(syscall::umask(mask as usize)) as mode_t
+        e_raw(syscall::umask(mask as usize)).unwrap() as mode_t
     }
 
-    fn uname(utsname: *mut utsname) -> c_int {
+    fn uname(utsname: *mut utsname) -> Result<(), Errno> {
         fn gethostname(name: &mut [u8]) -> io::Result<()> {
             if name.is_empty() {
                 return Ok(());
@@ -933,21 +878,16 @@ impl Pal for Sys {
             Ok(())
         }
 
-        match inner(utsname) {
-            Ok(()) => 0,
-            Err(err) => unsafe {
-                errno = err;
-                -1
-            },
-        }
+        inner(utsname).map_err(|err| Errno(err))
     }
 
-    fn unlink(path: CStr) -> c_int {
-        let path = path_from_c_str!(path);
-        e(canonicalize(path).and_then(|path| syscall::unlink(&path))) as c_int
+    fn unlink(path: CStr) -> Result<(), Errno> {
+        let path = path_from_c_str!(path)?;
+        e_raw(canonicalize(path).and_then(|path| syscall::unlink(&path)))?;
+        Ok(())
     }
 
-    fn waitpid(mut pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
+    fn waitpid(mut pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t, Errno> {
         if pid == !0 {
             pid = 0;
         }
@@ -972,16 +912,16 @@ impl Pal for Sys {
                 let mut _event = PtraceEvent::default();
                 let _ = (&mut &session.tracer).read(&mut _event);
 
-                res = Some(e(inner(
+                res = Some(e_raw(inner(
                     &mut status,
                     options | sys_wait::WNOHANG | sys_wait::WUNTRACED,
                 )));
-                if res == Some(0) {
+                if res == Some(Ok(0)) {
                     // WNOHANG, just pretend ptrace SIGSTOP:ped this
                     status = (syscall::SIGSTOP << 8) | 0x7f;
                     assert!(syscall::wifstopped(status));
                     assert_eq!(syscall::wstopsig(status), syscall::SIGSTOP);
-                    res = Some(pid as usize);
+                    res = Some(Ok(pid as usize));
                 }
             }
         }
@@ -990,14 +930,16 @@ impl Pal for Sys {
         // normal: We still need to add WUNTRACED, but we only return
         // it if (and only if) a ptrace traceme was activated during
         // the wait.
-        let res = res.unwrap_or_else(|| loop {
-            let res = e(inner(&mut status, options | sys_wait::WUNTRACED));
+        let res = res
+            .unwrap_or_else(|| loop {
+                let res = e_raw(inner(&mut status, options | sys_wait::WUNTRACED));
 
-            // TODO: Also handle special PIDs here
-            if !syscall::wifstopped(status) || ptrace::is_traceme(pid) {
-                break res;
-            }
-        });
+                // TODO: Also handle special PIDs here
+                if !syscall::wifstopped(status) || ptrace::is_traceme(pid) {
+                    break res;
+                }
+            })
+            .map(|res| res as pid_t);
 
         // If stat_loc is non-null, set that and the return
         unsafe {
@@ -1005,16 +947,17 @@ impl Pal for Sys {
                 *stat_loc = status as c_int;
             }
         }
-        res as pid_t
+        res
     }
 
-    fn write(fd: c_int, buf: &[u8]) -> ssize_t {
-        e(syscall::write(fd as usize, buf)) as ssize_t
+    fn write(fd: c_int, buf: &[u8]) -> Result<ssize_t, Errno> {
+        e_raw(syscall::write(fd as usize, buf)).map(|res| res as ssize_t)
     }
 
-    fn verify() -> bool {
+    fn verify() -> Result<(), Errno> {
         // GETPID on Redox is 20, which is WRITEV on Linux
-        e(unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) }) != !0
+        e_raw(unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) })?;
+        Ok(())
     }
 
     fn exit_thread() -> ! {

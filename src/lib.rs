@@ -48,6 +48,7 @@ pub mod c_str;
 pub mod c_vec;
 pub mod cxa;
 pub mod db;
+pub mod errno;
 pub mod fs;
 pub mod header;
 pub mod io;

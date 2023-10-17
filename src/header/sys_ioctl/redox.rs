@@ -2,8 +2,9 @@ use core::{mem, slice};
 use syscall;
 
 use crate::{
+    errno::IntoPosix,
     header::{errno, fcntl, termios},
-    platform::{self, e, types::*},
+    platform::{self, e_raw, types::*},
 };
 
 use super::winsize;
@@ -80,60 +81,46 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
         }
         TCGETS => {
             let termios = &mut *(out as *mut termios::termios);
-            if e(dup_read(fd, "termios", termios)) == !0 {
-                -1
-            } else {
-                0
-            }
+            e_raw(dup_read(fd, "termios", termios))
+                .map(|_| ())
+                .into_posix_style()
         }
         // TODO: give these different behaviors
         TCSETS | TCSETSW | TCSETSF => {
             let termios = &*(out as *const termios::termios);
-            if e(dup_write(fd, "termios", termios)) == !0 {
-                -1
-            } else {
-                0
-            }
+            e_raw(dup_write(fd, "termios", termios))
+                .map(|_| ())
+                .into_posix_style()
         }
         TCFLSH => {
             let queue = out as c_int;
-            if e(dup_write(fd, "flush", &queue)) == !0 {
-                -1
-            } else {
-                0
-            }
+            e_raw(dup_write(fd, "flush", &queue))
+                .map(|_| ())
+                .into_posix_style()
         }
         TIOCGPGRP => {
             let pgrp = &mut *(out as *mut pid_t);
-            if e(dup_read(fd, "pgrp", pgrp)) == !0 {
-                -1
-            } else {
-                0
-            }
+            e_raw(dup_read(fd, "pgrp", pgrp))
+                .map(|_| ())
+                .into_posix_style()
         }
         TIOCSPGRP => {
             let pgrp = &*(out as *const pid_t);
-            if e(dup_write(fd, "pgrp", pgrp)) == !0 {
-                -1
-            } else {
-                0
-            }
+            e_raw(dup_write(fd, "pgrp", pgrp))
+                .map(|_| ())
+                .into_posix_style()
         }
         TIOCGWINSZ => {
             let winsize = &mut *(out as *mut winsize);
-            if e(dup_read(fd, "winsize", winsize)) == !0 {
-                -1
-            } else {
-                0
-            }
+            e_raw(dup_read(fd, "winsize", winsize))
+                .map(|_| ())
+                .into_posix_style()
         }
         TIOCSWINSZ => {
             let winsize = &*(out as *const winsize);
-            if e(dup_write(fd, "winsize", winsize)) == !0 {
-                -1
-            } else {
-                0
-            }
+            e_raw(dup_write(fd, "winsize", winsize))
+                .map(|_| ())
+                .into_posix_style()
         }
         TIOCGPTLCK => 0,
         TIOCSPTLCK => 0,

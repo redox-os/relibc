@@ -3,6 +3,7 @@
 use core::convert::{TryFrom, TryInto};
 
 use crate::{
+    errno::IntoPosix,
     header::errno::EOVERFLOW,
     platform::{self, types::*, Pal, Sys},
 };
@@ -239,17 +240,17 @@ pub extern "C" fn clock() -> clock_t {
 
 #[no_mangle]
 pub extern "C" fn clock_getres(clock_id: clockid_t, tp: *mut timespec) -> c_int {
-    Sys::clock_getres(clock_id, tp)
+    Sys::clock_getres(clock_id, tp).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -> c_int {
-    Sys::clock_gettime(clock_id, tp)
+    Sys::clock_gettime(clock_id, tp).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn clock_settime(clock_id: clockid_t, tp: *const timespec) -> c_int {
-    Sys::clock_settime(clock_id, tp)
+    Sys::clock_settime(clock_id, tp).into_posix_style()
 }
 
 #[no_mangle]
@@ -457,7 +458,7 @@ pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
 
 #[no_mangle]
 pub extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
-    Sys::nanosleep(rqtp, rmtp)
+    Sys::nanosleep(rqtp, rmtp).into_posix_style()
 }
 
 #[no_mangle]
@@ -487,7 +488,7 @@ pub extern "C" fn strptime(buf: *const c_char, format: *const c_char, tm: *mut t
 #[no_mangle]
 pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
     let mut ts = timespec::default();
-    Sys::clock_gettime(CLOCK_REALTIME, &mut ts);
+    Sys::clock_gettime(CLOCK_REALTIME, &mut ts).into_posix_style();
     if !tloc.is_null() {
         *tloc = ts.tv_sec
     };

@@ -2,6 +2,7 @@
 
 use crate::{
     c_str::CStr,
+    errno::IntoPosix,
     header::fcntl::O_PATH,
     platform::{types::*, Pal, Sys},
 };
@@ -27,20 +28,20 @@ pub struct statvfs {
 
 #[no_mangle]
 pub extern "C" fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
-    Sys::fstatvfs(fildes, buf)
+    Sys::fstatvfs(fildes, buf).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn statvfs(file: *const c_char, buf: *mut statvfs) -> c_int {
     let file = CStr::from_ptr(file);
-    let fd = Sys::open(file, O_PATH, 0);
+    let fd = Sys::open(file, O_PATH, 0).into_posix_style();
     if fd < 0 {
         return -1;
     }
 
-    let res = Sys::fstatvfs(fd, buf);
+    let res = Sys::fstatvfs(fd, buf).into_posix_style();
 
-    Sys::close(fd);
+    Sys::close(fd).into_posix_style();
 
     res
 }

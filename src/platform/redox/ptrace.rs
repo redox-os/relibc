@@ -11,6 +11,7 @@ use crate::header::arch_aarch64_user::user_regs_struct;
 use crate::header::arch_x64_user::user_regs_struct;
 use crate::{
     c_str::{CStr, CString},
+    errno::Errno,
     fs::File,
     header::{errno as errnoh, fcntl, signal, sys_ptrace},
     io::{self, prelude::*},
@@ -151,7 +152,7 @@ fn inner_ptrace(
         | sys_ptrace::PTRACE_SYSCALL
         | sys_ptrace::PTRACE_SYSEMU
         | sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => {
-            Sys::kill(pid, signal::SIGCONT as _);
+            Sys::kill(pid, signal::SIGCONT as _)?;
 
             // TODO: Translate errors
             let syscall = syscall::PTRACE_STOP_PRE_SYSCALL | syscall::PTRACE_STOP_POST_SYSCALL;
@@ -249,7 +250,12 @@ fn inner_ptrace(
 }
 
 impl PalPtrace for Sys {
-    fn ptrace(request: c_int, pid: pid_t, addr: *mut c_void, data: *mut c_void) -> c_int {
-        inner_ptrace(request, pid, addr, data).unwrap_or(-1)
+    fn ptrace(
+        request: c_int,
+        pid: pid_t,
+        addr: *mut c_void,
+        data: *mut c_void,
+    ) -> Result<c_int, Errno> {
+        Ok(inner_ptrace(request, pid, addr, data)?)
     }
 }

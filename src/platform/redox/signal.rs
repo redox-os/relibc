@@ -3,9 +3,10 @@ use syscall::{self, Result};
 
 use super::{
     super::{types::*, Pal, PalSignal},
-    e, Sys,
+    e_raw, Sys,
 };
 use crate::{
+    errno::Errno,
     header::{
         errno::{EINVAL, ENOSYS},
         signal::{sigaction, siginfo_t, sigset_t, stack_t},
@@ -16,28 +17,20 @@ use crate::{
 };
 
 impl PalSignal for Sys {
-    fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
+    fn getitimer(which: c_int, out: *mut itimerval) -> Result<(), Errno> {
         let path = match which {
             ITIMER_REAL => "itimer:1",
-            _ => unsafe {
-                errno = EINVAL;
-                return -1;
-            },
+            _ => return Err(Errno(EINVAL)),
         };
 
-        let fd = e(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC));
-        if fd == !0 {
-            return -1;
-        }
+        let fd = e_raw(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC))?;
 
         let mut spec = syscall::ITimerSpec::default();
-        let count = e(syscall::read(fd, &mut spec));
+        let count = e_raw(syscall::read(fd, &mut spec));
 
         let _ = syscall::close(fd);
 
-        if count == !0 {
-            return -1;
-        }
+        count?;
 
         unsafe {
             (*out).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
@@ -46,40 +39,36 @@ impl PalSignal for Sys {
             (*out).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
         }
 
-        0
+        Ok(())
     }
 
-    fn kill(pid: pid_t, sig: c_int) -> c_int {
-        e(syscall::kill(pid as usize, sig as usize)) as c_int
+    fn kill(pid: pid_t, sig: c_int) -> Result<(), Errno> {
+        e_raw(syscall::kill(pid as usize, sig as usize))?;
+        Ok(())
     }
 
-    fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-        e(syscall::kill(-(pgrp as isize) as usize, sig as usize)) as c_int
+    fn killpg(pgrp: pid_t, sig: c_int) -> Result<(), Errno> {
+        e_raw(syscall::kill(-(pgrp as isize) as usize, sig as usize))?;
+        Ok(())
     }
 
-    fn raise(sig: c_int) -> c_int {
+    fn raise(sig: c_int) -> Result<(), Errno> {
         Self::kill(Self::getpid(), sig)
     }
 
-    fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
+    fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> Result<(), Errno> {
         let path = match which {
             ITIMER_REAL => "itimer:1",
-            _ => unsafe {
-                errno = EINVAL;
-                return -1;
-            },
+            _ => return Err(Errno(EINVAL)),
         };
 
-        let fd = e(syscall::open(path, syscall::O_RDWR | syscall::O_CLOEXEC));
-        if fd == !0 {
-            return -1;
-        }
+        let fd = e_raw(syscall::open(path, syscall::O_RDWR | syscall::O_CLOEXEC))?;
 
         let mut spec = syscall::ITimerSpec::default();
 
-        let mut count = e(syscall::read(fd, &mut spec));
+        let mut count = e_raw(syscall::read(fd, &mut spec));
 
-        if count != !0 {
+        if let Ok(_) = count {
             unsafe {
                 if !old.is_null() {
                     (*old).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
@@ -94,49 +83,48 @@ impl PalSignal for Sys {
                 spec.it_value.tv_nsec = (*new).it_value.tv_usec * 1000;
             }
 
-            count = e(syscall::write(fd, &spec));
+            count = e_raw(syscall::write(fd, &spec));
         }
 
         let _ = syscall::close(fd);
 
-        if count == !0 {
-            return -1;
-        }
+        count?;
 
-        0
+        Ok(())
     }
 
-    fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> c_int {
-        e(sigaction_impl(sig, act, oact).map(|()| 0)) as c_int
+    fn sigaction(
+        sig: c_int,
+        act: Option<&sigaction>,
+        oact: Option<&mut sigaction>,
+    ) -> Result<(), Errno> {
+        e_raw(sigaction_impl(sig, act, oact).map(|()| 0))?;
+        Ok(())
     }
 
-    fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
+    fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> Result<(), Errno> {
         unimplemented!()
     }
 
-    fn sigpending(set: *mut sigset_t) -> c_int {
-        unsafe {
-            errno = ENOSYS;
-        }
-        -1
+    fn sigpending(set: *mut sigset_t) -> Result<(), Errno> {
+        Err(Errno(ENOSYS))
     }
 
-    fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
-        e(sigprocmask_impl(how, set, oset).map(|()| 0)) as c_int
+    fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> Result<(), Errno> {
+        e_raw(sigprocmask_impl(how, set, oset).map(|()| 0))?;
+        Ok(())
     }
 
-    fn sigsuspend(set: *const sigset_t) -> c_int {
-        unsafe {
-            errno = ENOSYS;
-        }
-        -1
+    fn sigsuspend(set: *const sigset_t) -> Errno {
+        Errno(ENOSYS)
     }
 
-    fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec) -> c_int {
-        unsafe {
-            errno = ENOSYS;
-        }
-        -1
+    fn sigtimedwait(
+        set: *const sigset_t,
+        sig: *mut siginfo_t,
+        tp: *const timespec,
+    ) -> Result<c_int, Errno> {
+        Err(Errno(ENOSYS))
     }
 }
 

@@ -3,6 +3,7 @@ use core::{mem, ptr};
 
 use crate::{
     c_str::CString,
+    errno::IntoPosix,
     header::{
         arpa_inet::inet_aton, fcntl::O_RDONLY, netinet_in::in_addr, sys_socket::constants::AF_INET,
         unistd::SEEK_SET,
@@ -36,7 +37,7 @@ pub static mut HOST_STAYOPEN: c_int = 0;
 #[no_mangle]
 pub unsafe extern "C" fn endhostent() {
     if HOSTDB >= 0 {
-        Sys::close(HOSTDB);
+        Sys::close(HOSTDB).into_posix_style();
     }
     HOSTDB = -1;
 }
@@ -45,9 +46,9 @@ pub unsafe extern "C" fn endhostent() {
 pub unsafe extern "C" fn sethostent(stayopen: c_int) {
     HOST_STAYOPEN = stayopen;
     if HOSTDB < 0 {
-        HOSTDB = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0)
+        HOSTDB = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0).into_posix_style()
     } else {
-        Sys::lseek(HOSTDB, 0, SEEK_SET);
+        Sys::lseek(HOSTDB, 0, SEEK_SET).into_posix_style();
     }
     H_POS = 0;
 }
@@ -55,7 +56,7 @@ pub unsafe extern "C" fn sethostent(stayopen: c_int) {
 #[no_mangle]
 pub unsafe extern "C" fn gethostent() -> *mut hostent {
     if HOSTDB < 0 {
-        HOSTDB = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0);
+        HOSTDB = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0).into_posix_style();
     }
     let mut rlb = RawLineBuffer::new(HOSTDB);
     rlb.seek(H_POS);
