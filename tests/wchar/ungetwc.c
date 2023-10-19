@@ -3,9 +3,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
- 
+#include <locale.h>
+
 int main()
 {
+   setlocale(LC_ALL, "");
    FILE *stream;
    wint_t wc;
    wint_t wc2;
