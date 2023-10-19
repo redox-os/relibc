@@ -63,7 +63,7 @@ macro_rules! path_from_c_str {
     }};
 }
 
-use self::path::canonicalize;
+use self::{path::canonicalize, exec::Executable};
 
 pub fn e(sys: Result<usize>) -> usize {
     match sys {
@@ -231,7 +231,14 @@ impl Pal for Sys {
 
     unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
         e(self::exec::execve(
-            path,
+            Executable::AtPath(path),
+            self::exec::ArgEnv::C { argv, envp },
+            None,
+        )) as c_int
+    }
+    unsafe fn fexecve(fildes: c_int, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
+        e(self::exec::execve(
+            Executable::InFd { file: File::new(fildes), arg0: CStr::from_ptr(argv.read()).to_bytes() },
             self::exec::ArgEnv::C { argv, envp },
             None,
         )) as c_int
