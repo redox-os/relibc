@@ -37,6 +37,9 @@ pub const S_ISUID: c_int = 0o4_000;
 pub const S_ISGID: c_int = 0o2_000;
 pub const S_ISVTX: c_int = 0o1_000;
 
+pub const UTIME_NOW: useconds_t = (1 << 30) - 1;
+pub const UTIME_OMIT: useconds_t = (1 << 30) - 2;
+
 #[repr(C)]
 #[derive(Default)]
 pub struct stat {
