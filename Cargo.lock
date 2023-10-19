@@ -230,9 +230,9 @@ checksum = "ef53942eb7bf7ff43a617b3e2c1c4a5ecf5944a7c1bc12d7ee39bbb15e5c1519"
 
 [[package]]
 name = "lock_api"
-version = "0.4.10"
+version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1cc9717a20b1bb222f333e6a92fd32f7d8a18ddc5a3191a11af45dcbf4dcd16"
+checksum = "3c168f8615b12bc01f9c17e2eb0cc07dcae1940121185446edc3744920e8ef45"
 dependencies = [
  "autocfg",
  "scopeguard",
@@ -270,9 +270,9 @@ dependencies = [
 
 [[package]]
 name = "os_str_bytes"
-version = "6.5.1"
+version = "6.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d5d9eb14b174ee9aa2ef96dc2b94637a2d4b6e7cb873c7e171f0c20c6cf3eac"
+checksum = "e2355d85b9a3786f481747ced0e0ff2ba35213a1f9bd406ed906554d7af805a1"
 
 [[package]]
 name = "plain"
@@ -387,7 +387,7 @@ dependencies = [
 [[package]]
 name = "redox_syscall"
 version = "0.4.1"
-source = "git+https://gitlab.redox-os.org/4lDO2/syscall?branch=sendfd#0200e818a4ba752c1869be9718eb7f090c19d65c"
+source = "git+https://gitlab.redox-os.org/redox-os/syscall#06d569933f24af0c72b8bb2eb1aaa031113843fd"
 dependencies = [
  "bitflags",
 ]
