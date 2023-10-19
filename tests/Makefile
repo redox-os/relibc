@@ -111,7 +111,10 @@ EXPECT_NAMES=\
 	wchar/ungetwc \
 	wchar/wprintf \
 	wchar/wcrtomb \
+	wchar/wcpcpy \
+	wchar/wcpncpy \
 	wchar/wcscspn \
+	wchar/wcsdup \
 	wchar/wcsrchr \
 	wchar/wcsrtombs \
 	wchar/wcsstr \
@@ -122,6 +125,8 @@ EXPECT_NAMES=\
 	wchar/wcstoumax \
 	wchar/wcscasecmp \
 	wchar/wcsncasecmp \
+	wchar/wcsnlen \
+	wchar/wcsnrtombs \
 	wchar/wcswidth \
 	wctype/towlower \
 	wctype/towupper

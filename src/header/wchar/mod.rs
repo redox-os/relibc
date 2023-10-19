@@ -4,8 +4,8 @@ use core::{char, ffi::VaList as va_list, mem, ptr, slice, usize};
 
 use crate::{
     header::{
-        ctype::isspace, errno::{ERANGE, EILSEQ}, stdio::*, 
-        stdlib::MB_CUR_MAX, string, time::*, wctype::*,
+        ctype::isspace, errno::{ERANGE, EILSEQ, ENOMEM}, stdio::*, 
+        stdlib::{MB_CUR_MAX, MB_LEN_MAX, malloc}, string, time::*, wctype::*,
     },
     platform::{self, errno, types::*},
 };
@@ -319,6 +319,23 @@ pub unsafe extern "C" fn vswprintf(
     -1
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn wcpcpy(
+    d: *mut wchar_t,
+    s: *const wchar_t,
+) -> *mut wchar_t {
+    return (wcscpy(d, s)).offset(wcslen(s) as isize);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wcpncpy(
+    d: *mut wchar_t,
+    s: *const wchar_t,
+    n: size_t,
+) -> *mut wchar_t {
+    return (wcsncpy(d, s, n)).offset(wcsnlen(s, n) as isize);
+}
+
 //widechar to multibyte
 #[no_mangle]
 pub unsafe extern "C" fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t) -> size_t {
@@ -330,6 +347,20 @@ pub unsafe extern "C" fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t
     };
 
     utf8::wcrtomb(s_cpy, wc_cpy, ps)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wcsdup(s: *const wchar_t) -> *mut wchar_t {
+    let l = wcslen(s);
+    
+    let mut d = malloc((l + 1)*mem::size_of::<wchar_t>()) as *mut wchar_t;
+
+    if d.is_null() {
+        errno = ENOMEM;
+        return ptr::null_mut();
+    }
+
+    wmemcpy(d, s, l + 1)
 }
 
 #[no_mangle]
@@ -549,6 +580,66 @@ pub unsafe extern "C" fn wcsncpy(
     }
     ws1
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn wcsnlen(mut s: *const wchar_t, maxlen: size_t) -> size_t {
+    let mut len = 0;
+    
+    while len < maxlen {
+        if *s == 0 {
+            break;
+        }
+
+        len = len + 1;
+        s = s.offset(1);
+    }
+
+    return len;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wcsnrtombs(
+    mut dest: *mut c_char,
+    src: *mut *const wchar_t,
+    nwc: size_t,
+    len: size_t,
+    ps: *mut mbstate_t,
+) -> size_t {
+    let mut written = 0;
+    let mut read = 0;
+    let mut buf: [c_char; MB_LEN_MAX as usize] = [0; MB_LEN_MAX as usize];
+    
+    while read < nwc {
+        buf.fill(0);
+        
+        let ret = wcrtomb(buf.as_mut_ptr(), **src, ps);
+
+        if ret == size_t::MAX {
+            errno = EILSEQ;
+            return size_t::MAX;
+        }
+
+        if !dest.is_null() && len < written + ret {
+            return written;
+        }
+
+        if !dest.is_null() {
+            ptr::copy_nonoverlapping(buf.as_ptr(), dest, ret);
+            dest = dest.add(ret);
+        }
+
+        if **src == '\0' as wchar_t {
+            *src = ptr::null();
+            return written;
+        }
+
+        *src = (*src).add(1);
+        read += 1;
+        written += ret;
+    }
+    written
+}
+
 
 #[no_mangle]
 pub unsafe extern "C" fn wcspbrk(mut wcs: *const wchar_t, set: *const wchar_t) -> *mut wchar_t {
