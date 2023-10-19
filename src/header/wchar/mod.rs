@@ -280,8 +280,15 @@ pub unsafe extern "C" fn ungetwc(wc: wint_t, stream: &mut FILE) -> wint_t {
     if amount == usize::MAX {
         return WEOF;
     }
+
+    /* 
+    We might have unget multiple bytes for a single wchar, eg, `ç` is [195, 167]. 
+    We need to unget them in reversed, so they are pused as [..., 167, 195, ...]
+    When we do fgetwc, we pop from the Vec, getting the write order of bytes [195, 167].
+    If we called ungetc in the non-reversed order, we would get [167, 195]
+    */
     for i in 0..amount {
-        ungetc(bytes[i] as c_int, &mut *stream);
+        ungetc(bytes[amount - 1 - i] as c_int, &mut *stream);
     }
 
     wc
