@@ -71,6 +71,7 @@
             fprintf(stderr, _Generic((status), \
                 char *: "char*(%p) = \"%1$s\"", \
                 void *: "void*(%p)", \
+                ssize_t: "%li", \
                 default: "%i" \
             ), status); \
             fprintf(stderr, "\n"); \
@@ -89,5 +90,28 @@
     } while(0)
 
 #define random_bool() (lrand48() % 2 == 0)
+
+// Quick helper for checking desired errno status.
+// Use as macro: CHECK_AND_PRINT_ERRNO(<desired errno, e.g. EINVAL>);
+// If errno is as expected, prints this; otherwise, prints expected vs. actual and exit.
+void printf_errno(int errnoval, char *errnoname) {
+
+    printf("%d (%s)",
+               errno, strerror(errno));
+    if (errno != errnoval) {
+        printf("\n^^^^^ FAILURE ^^^^^ (SHOULD BE %d - %s (%s))\n",
+               errnoval, errnoname, strerror(errnoval));
+    } else {
+        printf(" - %s\n", errnoname);
+    }
+}
+
+#define CHECK_AND_PRINT_ERRNO(errnoval)     \
+    do {                                    \
+        printf_errno(errnoval, #errnoval);  \
+        if (errnoval != errno) {            \
+            exit(EXIT_FAILURE);             \
+        }                                   \
+    } while(0);
 
 #endif /* _TEST_HELPERS */
