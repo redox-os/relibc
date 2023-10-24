@@ -7,8 +7,13 @@ global_asm!(
     "
     .global __restore_rt
     __restore_rt:
-        mov rax, 25
-        int 0x80
+        push   rbp      
+        mov    rbp,rsp
+        mov    eax, 25
+        int    0x80
+        nop
+        pop    rbp
+        ret  
 "
 );
 
