@@ -360,7 +360,7 @@ pub unsafe extern "C" fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t
 pub unsafe extern "C" fn wcsdup(s: *const wchar_t) -> *mut wchar_t {
     let l = wcslen(s);
     
-    let mut d = malloc((l + 1)*mem::size_of::<wchar_t>()) as *mut wchar_t;
+    let d = malloc((l + 1)*mem::size_of::<wchar_t>()) as *mut wchar_t;
 
     if d.is_null() {
         errno = ENOMEM;
@@ -372,86 +372,16 @@ pub unsafe extern "C" fn wcsdup(s: *const wchar_t) -> *mut wchar_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn wcsrtombs(
-    mut s: *mut c_char,
+    s: *mut c_char,
     ws: *mut *const wchar_t,
-    mut n: size_t,
-    st: *mut mbstate_t,
+    n: size_t,
+    mut st: *mut mbstate_t,
 ) -> size_t {
-    let mut ws2 = 0 as *const wchar_t;
-    let mut buf = [0i8; 4];
-    let N = n;
-    let mut l = 0usize;
-
-    if s.is_null() {
-        n = 0;
-        ws2 = *ws;
-        while *ws2 != 0 {
-            if *ws2 >= 0x80 {
-                l = wcrtomb(buf.as_mut_ptr(), *ws2, ptr::null_mut());
-                if l.wrapping_add(1) == 0 {
-                    return usize::MAX;
-                }
-                n = n.wrapping_add(l);
-            } else {
-                n = n.wrapping_add(1);
-            }
-            ws2 = ws2.offset(1);
-        }
-        return n;
+    let mut mbs = mbstate_t {};
+    if st.is_null() {
+        st = &mut mbs;
     }
-
-    while n >= 4 {
-        if (**ws).wrapping_sub(1) >= 0x7f {
-            if **ws == 0 {
-                *s = 0;
-                *ws = 0 as *const wchar_t;
-                return N.wrapping_sub(n);
-            }
-
-            l = wcrtomb(s, **ws, ptr::null_mut());
-            if l.wrapping_add(1) == 0 {
-                return usize::MAX;
-            }
-
-            s = s.offset(l as isize);
-            n = n.wrapping_sub(l);
-        } else {
-            let new_s = s;
-            s = s.offset(1);
-            *new_s = **ws as c_char;
-            n = n.wrapping_sub(1);
-        }
-
-        *ws = (*ws).offset(1);
-    }
-
-    while n != 0 {
-        if (**ws).wrapping_sub(1) >= 0x7f {
-            if **ws == 0 {
-                *s = 0;
-                *ws = 0 as *const wchar_t;
-                return N.wrapping_sub(n);
-            }
-            l = wcrtomb(buf.as_mut_ptr(), **ws, ptr::null_mut());
-            if l.wrapping_add(1) == 0 {
-                return usize::MAX;
-            }
-            if l > n {
-                return N.wrapping_sub(n);
-            }
-            wcrtomb(s, **ws, ptr::null_mut());
-            s = s.offset(l as isize);
-            n = n.wrapping_sub(l) as size_t;
-        } else {
-            let new_s = s;
-            s = s.offset(1);
-            *new_s = **ws as c_char;
-            n = n.wrapping_sub(1);
-        }
-        *ws = (*ws).offset(1);
-    }
-
-    return N;
+    wcsnrtombs(s, ws, size_t::MAX, n, st)
 }
 
 #[no_mangle]
@@ -610,11 +540,16 @@ pub unsafe extern "C" fn wcsnrtombs(
     src: *mut *const wchar_t,
     nwc: size_t,
     len: size_t,
-    ps: *mut mbstate_t,
+    mut ps: *mut mbstate_t,
 ) -> size_t {
     let mut written = 0;
     let mut read = 0;
     let mut buf: [c_char; MB_LEN_MAX as usize] = [0; MB_LEN_MAX as usize];
+    let mut mbs = mbstate_t {};
+
+    if ps.is_null() {
+        ps = &mut mbs;
+    }
     
     while read < nwc {
         buf.fill(0);
@@ -639,7 +574,7 @@ pub unsafe extern "C" fn wcsnrtombs(
             *src = ptr::null();
             return written;
         }
-
+        
         *src = (*src).add(1);
         read += 1;
         written += ret;
@@ -926,9 +861,9 @@ pub unsafe extern "C" fn wcstoumax(
     result
 }
 
-// #[no_mangle]
-pub extern "C" fn wcswcs(ws1: *const wchar_t, ws2: *const wchar_t) -> *mut wchar_t {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wcswcs(ws1: *const wchar_t, ws2: *const wchar_t) -> *mut wchar_t {
+    wcsstr(ws1, ws2)
 }
 
 #[no_mangle]
