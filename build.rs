@@ -3,7 +3,6 @@ extern crate cc;
 
 use std::{env, fs, fs::DirEntry, path::Path};
 
-
 // include src/header directories that don't start with '_'
 fn include_dir(d: &DirEntry) -> bool {
     d.metadata().map(|m| m.is_dir()).unwrap_or(false)
@@ -15,10 +14,7 @@ fn include_dir(d: &DirEntry) -> bool {
 
 fn get_target() -> String {
     env::var("TARGET").unwrap_or(
-        option_env!("TARGET").map_or(
-            "x86_64-unknown-redox".to_string(),
-            |x| x.to_string()
-        )
+        option_env!("TARGET").map_or("x86_64-unknown-redox".to_string(), |x| x.to_string()),
     )
 }
 
@@ -68,7 +64,8 @@ fn main() {
 
     let mut cc_builder = &mut cc::Build::new();
 
-    cc_builder = cc_builder.flag("-nostdinc")
+    cc_builder = cc_builder
+        .flag("-nostdinc")
         .flag("-nostdlib")
         .include(&format!("{}/include", crate_dir))
         .include(&format!("{}/target/include", crate_dir));
@@ -77,7 +74,8 @@ fn main() {
         cc_builder = cc_builder.flag("-mno-outline-atomics")
     }
 
-    cc_builder.flag("-fno-stack-protector")
+    cc_builder
+        .flag("-fno-stack-protector")
         .flag("-Wno-expansion-to-defined")
         .files(
             fs::read_dir("src/c")

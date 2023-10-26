@@ -82,6 +82,8 @@ macro_rules! assert_equal_size(
         // TODO: Turn into a macro?
         #[cfg(all(target_os = "redox", feature = "check_against_libc_crate"))]
         const _: () = unsafe {
+            use ::__libc_only_for_layout_checks as libc;
+
             let export = $export { __relibc_internal_align: 0 };
             let _: libc::$export = core::mem::transmute(export.__relibc_internal_size);
 

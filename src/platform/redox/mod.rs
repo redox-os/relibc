@@ -63,7 +63,7 @@ macro_rules! path_from_c_str {
     }};
 }
 
-use self::{path::canonicalize, exec::Executable};
+use self::{exec::Executable, path::canonicalize};
 
 pub fn e(sys: Result<usize>) -> usize {
     match sys {
@@ -207,7 +207,10 @@ impl Pal for Sys {
 
     fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> c_int {
         // TODO
-        eprintln!("relibc clock_settime({}, {:p}): not implemented", clk_id, tp);
+        eprintln!(
+            "relibc clock_settime({}, {:p}): not implemented",
+            clk_id, tp
+        );
         unsafe { errno = ENOSYS };
         -1
     }
@@ -238,7 +241,10 @@ impl Pal for Sys {
     }
     unsafe fn fexecve(fildes: c_int, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
         e(self::exec::execve(
-            Executable::InFd { file: File::new(fildes), arg0: CStr::from_ptr(argv.read()).to_bytes() },
+            Executable::InFd {
+                file: File::new(fildes),
+                arg0: CStr::from_ptr(argv.read()).to_bytes(),
+            },
             self::exec::ArgEnv::C { argv, envp },
             None,
         )) as c_int
@@ -573,7 +579,10 @@ impl Pal for Sys {
 
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int {
         //TODO
-        eprintln!("relibc getrlimit({}, {:p}): not implemented", resource, rlim);
+        eprintln!(
+            "relibc getrlimit({}, {:p}): not implemented",
+            resource, rlim
+        );
         if !rlim.is_null() {
             (*rlim).rlim_cur = RLIM_INFINITY;
             (*rlim).rlim_max = RLIM_INFINITY;
@@ -583,7 +592,10 @@ impl Pal for Sys {
 
     unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> c_int {
         //TOOD
-        eprintln!("relibc setrlimit({}, {:p}): not implemented", resource, rlim);
+        eprintln!(
+            "relibc setrlimit({}, {:p}): not implemented",
+            resource, rlim
+        );
         unsafe { errno = EPERM };
         -1
     }
@@ -715,7 +727,10 @@ impl Pal for Sys {
     }
 
     unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
-        eprintln!("relibc msync({:p}, 0x{:x}, 0x{:x}): not implemented", addr, len, flags);
+        eprintln!(
+            "relibc msync({:p}, 0x{:x}, 0x{:x}): not implemented",
+            addr, len, flags
+        );
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
         /* TODO
         e(syscall::msync(
@@ -744,7 +759,10 @@ impl Pal for Sys {
     }
 
     unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
-        eprintln!("relibc madvise({:p}, 0x{:x}, 0x{:x}): not implemented", addr, len, flags);
+        eprintln!(
+            "relibc madvise({:p}, 0x{:x}, 0x{:x}): not implemented",
+            addr, len, flags
+        );
         e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
     }
 
@@ -850,7 +868,10 @@ impl Pal for Sys {
 
     fn setpriority(which: c_int, who: id_t, prio: c_int) -> c_int {
         // TODO
-        eprintln!("relibc setpriority({}, {}, {}): not implemented", which, who, prio);
+        eprintln!(
+            "relibc setpriority({}, {}, {}): not implemented",
+            which, who, prio
+        );
         unsafe { errno = ENOSYS };
         -1
     }

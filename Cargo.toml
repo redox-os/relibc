@@ -28,7 +28,7 @@ rand = { version = "0.5.5", default-features = false }
 memchr = { version = "2.2.0", default-features = false }
 plain = "0.2"
 unicode-width = "0.1"
-libc = { version = "=0.2.138", optional = true }
+__libc_only_for_layout_checks = { package = "libc", version = "0.2.149", optional = true }
 
 [dependencies.goblin]
 version = "0.0.21"
@@ -51,7 +51,7 @@ redox-exec = { path = "src/platform/redox/redox-exec" }
 [features]
 default = ["check_against_libc_crate"]
 trace = []
-check_against_libc_crate = ["libc"]
+check_against_libc_crate = ["__libc_only_for_layout_checks"]
 
 [profile.dev]
 panic = "abort"
@@ -60,5 +60,4 @@ panic = "abort"
 panic = "abort"
 
 [patch.crates-io]
-libc = { git = "https://gitlab.redox-os.org/redox-os/liblibc.git", branch = "redox_0.2.138" }
 redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall" }

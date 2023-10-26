@@ -93,7 +93,10 @@ pub fn execve(
     // NOTE: We must omit O_CLOEXEC and close manually, otherwise it will be closed before we
     // have even read it!
     let (mut image_file, arg0) = match exec {
-        Executable::AtPath(path) => (File::open(path, O_RDONLY as c_int).map_err(|_| Error::new(ENOENT))?, path.to_bytes()),
+        Executable::AtPath(path) => (
+            File::open(path, O_RDONLY as c_int).map_err(|_| Error::new(ENOENT))?,
+            path.to_bytes(),
+        ),
         Executable::InFd { file, arg0 } => (file, arg0),
     };
 

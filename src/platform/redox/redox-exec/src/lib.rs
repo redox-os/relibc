@@ -23,8 +23,8 @@ use goblin::elf64::{
 use syscall::{
     error::*,
     flag::{MapFlags, SEEK_SET},
-    PAGE_SIZE, Map, PROT_WRITE, O_CLOEXEC,
-    GrantDesc, GrantFlags, PROT_READ, PROT_EXEC, MAP_SHARED, MAP_FIXED_NOREPLACE,
+    GrantDesc, GrantFlags, Map, MAP_FIXED_NOREPLACE, MAP_SHARED, O_CLOEXEC, PAGE_SIZE, PROT_EXEC,
+    PROT_READ, PROT_WRITE,
 };
 
 pub use self::arch::*;
@@ -174,13 +174,8 @@ where
                 let (first_aligned_page, remaining_filesz) = if voff > 0 {
                     let bytes_to_next_page = PAGE_SIZE - voff;
 
-                    let (_guard, dst_page) = unsafe {
-                        MmapGuard::map_mut_anywhere(
-                            *grants_fd,
-                            vaddr,
-                            PAGE_SIZE,
-                        )?
-                    };
+                    let (_guard, dst_page) =
+                        unsafe { MmapGuard::map_mut_anywhere(*grants_fd, vaddr, PAGE_SIZE)? };
 
                     let length = core::cmp::min(bytes_to_next_page, filesz);
 
@@ -209,16 +204,19 @@ where
                     // Use commented out lines to trigger kernel bug (FIXME).
 
                     //let pages_in_this_group = core::cmp::min(PAGES_PER_ITER, file_page_count - page_idx * PAGES_PER_ITER);
-                    let pages_in_this_group = core::cmp::min(PAGES_PER_ITER, remaining_page_count - page_idx);
+                    let pages_in_this_group =
+                        core::cmp::min(PAGES_PER_ITER, remaining_page_count - page_idx);
 
-                    if pages_in_this_group == 0 { break }
+                    if pages_in_this_group == 0 {
+                        break;
+                    }
 
                     // TODO: MAP_FIXED to optimize away funmap?
                     let (_guard, dst_memory) = unsafe {
                         MmapGuard::map_mut_anywhere(
                             *grants_fd,
                             first_aligned_page + page_idx * PAGE_SIZE, // offset
-                            pages_in_this_group * PAGE_SIZE, // size
+                            pages_in_this_group * PAGE_SIZE,           // size
                         )?
                     };
 
@@ -290,7 +288,11 @@ where
         };
 
         unsafe {
-            page.as_mut_ptr_slice().as_mut_ptr().add(new_page_off).cast::<usize>().write(word);
+            page.as_mut_ptr_slice()
+                .as_mut_ptr()
+                .add(new_page_off)
+                .cast::<usize>()
+                .write(word);
         }
 
         Ok(())
@@ -312,11 +314,8 @@ where
         MapFlags::PROT_READ | MapFlags::PROT_WRITE,
     )?;
     unsafe {
-        let (_guard, memory) = MmapGuard::map_mut_anywhere(
-            *grants_fd,
-            pheaders,
-            pheaders_size_aligned,
-        )?;
+        let (_guard, memory) =
+            MmapGuard::map_mut_anywhere(*grants_fd, pheaders, pheaders_size_aligned)?;
 
         memory[..pheaders_to_convey.len()].copy_from_slice(pheaders_to_convey);
     }
@@ -380,11 +379,7 @@ where
                 let aligned_size = size.next_multiple_of(PAGE_SIZE);
 
                 let (_guard, memory) = unsafe {
-                    MmapGuard::map_mut_anywhere(
-                        *grants_fd, 
-                        containing_page,
-                        aligned_size,
-                    )?
+                    MmapGuard::map_mut_anywhere(*grants_fd, containing_page, aligned_size)?
                 };
                 memory[displacement..][..source_slice.len()].copy_from_slice(source_slice);
             }
@@ -606,22 +601,34 @@ impl MmapGuard {
         flags.remove(MapFlags::MAP_FIXED_NOREPLACE);
         flags.insert(MapFlags::MAP_FIXED);
 
-        let _new_base = unsafe { syscall::fmap(self.fd, &Map {
-            offset,
-            size: self.size,
-            flags,
-            address: self.base,
-        })? };
+        let _new_base = unsafe {
+            syscall::fmap(
+                self.fd,
+                &Map {
+                    offset,
+                    size: self.size,
+                    flags,
+                    address: self.base,
+                },
+            )?
+        };
 
         Ok(())
     }
-    pub unsafe fn map_mut_anywhere<'a>(fd: usize, offset: usize, size: usize) -> Result<(Self, &'a mut [u8])> {
-        let mut this = Self::map(fd, &Map {
-            size,
-            offset,
-            address: 0,
-            flags: PROT_WRITE,
-        })?;
+    pub unsafe fn map_mut_anywhere<'a>(
+        fd: usize,
+        offset: usize,
+        size: usize,
+    ) -> Result<(Self, &'a mut [u8])> {
+        let mut this = Self::map(
+            fd,
+            &Map {
+                size,
+                offset,
+                address: 0,
+                flags: PROT_WRITE,
+            },
+        )?;
         let slice = &mut *this.as_mut_ptr_slice();
 
         Ok((this, slice))
@@ -704,10 +711,7 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     let (cur_filetable_fd, new_pid_fd, new_pid);
 
     {
-        let cur_pid_fd = FdGuard::new(syscall::open(
-            "thisproc:current/open_via_dup",
-            O_CLOEXEC,
-        )?);
+        let cur_pid_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", O_CLOEXEC)?);
         (new_pid_fd, new_pid) = new_context()?;
 
         // Do not allocate new signal stack, but copy existing address (all memory will be re-mapped
@@ -759,7 +763,12 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
             let mut grant_desc_buf = [GrantDesc::default(); 16];
             loop {
                 let bytes_read = {
-                    let buf = unsafe { core::slice::from_raw_parts_mut(grant_desc_buf.as_mut_ptr().cast(), grant_desc_buf.len() * size_of::<GrantDesc>()) };
+                    let buf = unsafe {
+                        core::slice::from_raw_parts_mut(
+                            grant_desc_buf.as_mut_ptr().cast(),
+                            grant_desc_buf.len() * size_of::<GrantDesc>(),
+                        )
+                    };
                     syscall::read(*cur_addr_space_fd, buf)?
                 };
                 if bytes_read == 0 {
@@ -769,7 +778,9 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
                 let grants = &grant_desc_buf[..bytes_read / size_of::<GrantDesc>()];
 
                 for grant in grants {
-                    if !grant.flags.contains(GrantFlags::GRANT_SCHEME) || !grant.flags.contains(GrantFlags::GRANT_SHARED) {
+                    if !grant.flags.contains(GrantFlags::GRANT_SCHEME)
+                        || !grant.flags.contains(GrantFlags::GRANT_SHARED)
+                    {
                         continue;
                     }
 
@@ -846,10 +857,7 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
 
 pub fn new_context() -> Result<(FdGuard, usize)> {
     // Create a new context (fields such as uid/gid will be inherited from the current context).
-    let fd = FdGuard::new(syscall::open(
-        "thisproc:new/open_via_dup",
-        O_CLOEXEC,
-    )?);
+    let fd = FdGuard::new(syscall::open("thisproc:new/open_via_dup", O_CLOEXEC)?);
 
     // Extract pid.
     let mut buffer = [0_u8; 64];
