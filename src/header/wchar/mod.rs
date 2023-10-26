@@ -4,8 +4,13 @@ use core::{char, ffi::VaList as va_list, mem, ptr, slice, usize};
 
 use crate::{
     header::{
-        ctype::isspace, errno::{ERANGE, EILSEQ, ENOMEM}, stdio::*, 
-        stdlib::{MB_CUR_MAX, MB_LEN_MAX, malloc}, string, time::*, wctype::*,
+        ctype::isspace,
+        errno::{EILSEQ, ENOMEM, ERANGE},
+        stdio::*,
+        stdlib::{malloc, MB_CUR_MAX, MB_LEN_MAX},
+        string,
+        time::*,
+        wctype::*,
     },
     platform::{self, errno, types::*},
 };
@@ -46,8 +51,13 @@ pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
     let mut wc: wchar_t = 0;
 
     loop {
-        let nread = fread(buf[bytes_read..bytes_read+1].as_mut_ptr() as *mut c_void, 1, 1, stream);
-        
+        let nread = fread(
+            buf[bytes_read..bytes_read + 1].as_mut_ptr() as *mut c_void,
+            1,
+            1,
+            stream,
+        );
+
         if nread != 1 {
             errno = EILSEQ;
             return WEOF;
@@ -75,7 +85,12 @@ pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
         }
     }
 
-    mbrtowc(&mut wc, buf.as_ptr() as *const c_char, encoded_length, ptr::null_mut());
+    mbrtowc(
+        &mut wc,
+        buf.as_ptr() as *const c_char,
+        encoded_length,
+        ptr::null_mut(),
+    );
 
     wc as wint_t
 }
@@ -281,8 +296,8 @@ pub unsafe extern "C" fn ungetwc(wc: wint_t, stream: &mut FILE) -> wint_t {
         return WEOF;
     }
 
-    /* 
-    We might have unget multiple bytes for a single wchar, eg, `ç` is [195, 167]. 
+    /*
+    We might have unget multiple bytes for a single wchar, eg, `ç` is [195, 167].
     We need to unget them in reversed, so they are pused as [..., 167, 195, ...]
     When we do fgetwc, we pop from the Vec, getting the write order of bytes [195, 167].
     If we called ungetc in the non-reversed order, we would get [167, 195]
@@ -327,19 +342,12 @@ pub unsafe extern "C" fn vswprintf(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wcpcpy(
-    d: *mut wchar_t,
-    s: *const wchar_t,
-) -> *mut wchar_t {
+pub unsafe extern "C" fn wcpcpy(d: *mut wchar_t, s: *const wchar_t) -> *mut wchar_t {
     return (wcscpy(d, s)).offset(wcslen(s) as isize);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wcpncpy(
-    d: *mut wchar_t,
-    s: *const wchar_t,
-    n: size_t,
-) -> *mut wchar_t {
+pub unsafe extern "C" fn wcpncpy(d: *mut wchar_t, s: *const wchar_t, n: size_t) -> *mut wchar_t {
     return (wcsncpy(d, s, n)).offset(wcsnlen(s, n) as isize);
 }
 
@@ -359,8 +367,8 @@ pub unsafe extern "C" fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t
 #[no_mangle]
 pub unsafe extern "C" fn wcsdup(s: *const wchar_t) -> *mut wchar_t {
     let l = wcslen(s);
-    
-    let d = malloc((l + 1)*mem::size_of::<wchar_t>()) as *mut wchar_t;
+
+    let d = malloc((l + 1) * mem::size_of::<wchar_t>()) as *mut wchar_t;
 
     if d.is_null() {
         errno = ENOMEM;
@@ -521,7 +529,7 @@ pub unsafe extern "C" fn wcsncpy(
 #[no_mangle]
 pub unsafe extern "C" fn wcsnlen(mut s: *const wchar_t, maxlen: size_t) -> size_t {
     let mut len = 0;
-    
+
     while len < maxlen {
         if *s == 0 {
             break;
@@ -550,10 +558,10 @@ pub unsafe extern "C" fn wcsnrtombs(
     if ps.is_null() {
         ps = &mut mbs;
     }
-    
+
     while read < nwc {
         buf.fill(0);
-        
+
         let ret = wcrtomb(buf.as_mut_ptr(), **src, ps);
 
         if ret == size_t::MAX {
@@ -574,14 +582,13 @@ pub unsafe extern "C" fn wcsnrtombs(
             *src = ptr::null();
             return written;
         }
-        
+
         *src = (*src).add(1);
         read += 1;
         written += ret;
     }
     written
 }
-
 
 #[no_mangle]
 pub unsafe extern "C" fn wcspbrk(mut wcs: *const wchar_t, set: *const wchar_t) -> *mut wchar_t {
