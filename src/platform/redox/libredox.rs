@@ -1,9 +1,9 @@
 use core::{slice, str};
 
-use libc::{c_int, mode_t};
 use syscall::{Error, Result, EMFILE, WaitFlags};
 
 use crate::header::signal::sigaction;
+use crate::platform::types::{c_int, mode_t};
 
 pub type RawResult = usize;
 
