@@ -31,6 +31,12 @@ use crate::{
 
 use super::{errno::*, string::strncmp};
 
+#[cfg(target_os = "linux")]
+const SEPARATOR: char = ':';
+
+#[cfg(target_os = "redox")]
+const SEPARATOR: char = ';';
+
 #[derive(Clone, Copy, Debug)]
 struct DestBuffer {
     ptr: *mut u8,
@@ -136,7 +142,7 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
 
     let mut buffer = buffer
         .into_iter()
-        .map(|i| if i == b':' { b'\0' } else { i })
+        .map(|i| if i == SEPARATOR as u8 { b'\0' } else { i })
         .chain([b'\0'])
         .collect::<Vec<_>>();
     let mut buffer = buffer.split_mut(|i| *i == b'\0');
@@ -146,7 +152,11 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
         let mut vec: Vec<u8> = Vec::new();
 
         let gr_name = buffer.next().ok_or(Error::EOF)?.to_vec();
-        let gr_passwd = buffer.next().ok_or(Error::EOF)?.to_vec();
+        let gr_passwd = if cfg!(target_os = "redox") {
+            Vec::new()
+        } else {
+            buffer.next().ok_or(Error::EOF)?.to_vec()
+        };
         gr_gid = String::from_utf8(buffer.next().ok_or(Error::EOF)?.to_vec())
             .map_err(|err| Error::FromUtf8Error(err))?
             .parse::<gid_t>()
@@ -353,7 +363,7 @@ pub unsafe extern "C" fn getgrouplist(
         match line {
             Err(_) => return 0,
             Ok(line) => {
-                let mut parts = line.split(':');
+                let mut parts = line.split(SEPARATOR);
 
                 let group_name = parts.next().unwrap_or("");
                 let group_password = parts.next().unwrap_or("");
