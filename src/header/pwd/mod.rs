@@ -24,6 +24,12 @@ use self::linux as sys;
 #[cfg(target_os = "redox")]
 use self::redox as sys;
 
+#[cfg(target_os = "linux")]
+const SEPARATOR: u8 = b':';
+
+#[cfg(target_os = "redox")]
+const SEPARATOR: u8 = b';';
+
 #[repr(C)]
 #[derive(Debug)]
 pub struct passwd {
@@ -128,9 +134,9 @@ fn getpwent_r(
         return Err(Cause::Eof);
     }
 
-    // Replace all occurences of ':' with terminating NUL byte
+    // Replace all occurences of seperator with terminating NUL byte
     let mut start = 0;
-    while let Some(i) = memchr::memchr(b':', &buf[start..]) {
+    while let Some(i) = memchr::memchr(SEPARATOR, &buf[start..]) {
         buf[start + i] = 0;
         start += i + 1;
     }
