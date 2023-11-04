@@ -81,7 +81,7 @@ pub enum ArgEnv<'a> {
 }
 
 pub enum Executable<'a> {
-    AtPath(&'a CStr),
+    AtPath(CStr<'a>),
     InFd { file: File, arg0: &'a [u8] },
 }
 
@@ -187,7 +187,8 @@ pub fn execve(
             interpreter.pop().unwrap();
         }
         let cstring = CString::new(interpreter).map_err(|_| Error::new(ENOEXEC))?;
-        image_file = File::open(&cstring, O_RDONLY as c_int).map_err(|_| Error::new(ENOENT))?;
+        image_file = File::open(CStr::borrow(&cstring), O_RDONLY as c_int)
+            .map_err(|_| Error::new(ENOENT))?;
 
         // Make sure path is kept alive long enough, and push it to the arguments
         _interpreter_path = Some(cstring);

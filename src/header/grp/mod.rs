@@ -1,8 +1,9 @@
-//! grp implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/grp.h.html
+//! grp implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/grp.h.html
 
 use core::{
+    cell::SyncUnsafeCell,
     convert::{TryFrom, TryInto},
-    mem,
+    mem::{self, MaybeUninit},
     num::ParseIntError,
     ops::{Deref, DerefMut},
     pin::Pin,
@@ -10,8 +11,6 @@ use core::{
     ptr, slice,
     str::Matches,
 };
-
-use lazy_static::lazy_static;
 
 use alloc::{
     borrow::ToOwned,
@@ -80,9 +79,7 @@ static mut GROUP: group = group {
     gr_mem: ptr::null_mut(),
 };
 
-lazy_static! {
-    static ref LINE_READER: Mutex<Option<Lines<BufReader<File>>>> = Mutex::new(None);
-}
+static LINE_READER: SyncUnsafeCell<Option<Lines<BufReader<File>>>> = SyncUnsafeCell::new(None);
 
 #[repr(C)]
 #[derive(Debug)]
@@ -307,7 +304,7 @@ pub unsafe extern "C" fn getgrnam_r(
 // MT-Unsafe race:grent race:grentbuf locale
 #[no_mangle]
 pub unsafe extern "C" fn getgrent() -> *mut group {
-    let mut line_reader = LINE_READER.lock();
+    let mut line_reader = &mut *LINE_READER.get();
 
     if line_reader.is_none() {
         let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else { return ptr::null_mut() };
@@ -331,60 +328,74 @@ pub unsafe extern "C" fn getgrent() -> *mut group {
 // MT-Unsafe race:grent locale
 #[no_mangle]
 pub unsafe extern "C" fn endgrent() {
-    let mut line_reader = LINE_READER.lock();
-    *line_reader = None;
+    *(&mut *LINE_READER.get()) = None;
 }
 
 // MT-Unsafe race:grent locale
 #[no_mangle]
 pub unsafe extern "C" fn setgrent() {
-    let mut line_reader = LINE_READER.lock();
+    let mut line_reader = &mut *LINE_READER.get();
     let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else { return };
     *line_reader = Some(BufReader::new(db).lines());
 }
 
+// MT-Safe locale
+// Not POSIX
 #[no_mangle]
 pub unsafe extern "C" fn getgrouplist(
     user: *const c_char,
     group: gid_t,
     groups: *mut gid_t,
-    ngroups: i32,
-) -> i32 {
-    let mut grps = Vec::<gid_t>::from_raw_parts(groups, 0, ngroups as usize);
-    let Ok(usr) = (crate::c_str::CStr::from_ptr(user).to_str()) else { return 0 };
+    ngroups: *mut c_int,
+) -> c_int {
+    let mut grps =
+        slice::from_raw_parts_mut(groups.cast::<MaybeUninit<gid_t>>(), ngroups.read() as usize);
+
+    // FIXME: This API probably expects the group database to already exist in memory, as it
+    // doesn't seem to have any documented error handling.
+
+    let Ok(user) = (crate::c_str::CStr::from_ptr(user).to_str()) else { return 0 };
 
     let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else { return 0; };
 
+    let mut groups_found: c_int = 0;
+
     for line in BufReader::new(db).lines() {
-        if grps.len() >= ngroups as usize {
-            return ngroups;
+        let Ok(line) = line else {
+            return 0;
+        };
+
+        let mut parts = line.split(SEPARATOR);
+
+        let group_name = parts.next().unwrap_or("");
+        let group_password = parts.next().unwrap_or("");
+        let group_id = parts.next().unwrap_or("-1").parse::<c_int>().unwrap();
+        let members = parts
+            .next()
+            .unwrap_or("")
+            .split(",")
+            .map(|i| i.trim())
+            .collect::<Vec<_>>();
+
+        if !members.iter().any(|i| *i == user) {
+            continue;
         }
 
-        match line {
-            Err(_) => return 0,
-            Ok(line) => {
-                let mut parts = line.split(SEPARATOR);
+        if let Some(dst) = grps.get_mut(groups_found as usize) {
+            dst.write(group_id);
+        }
 
-                let group_name = parts.next().unwrap_or("");
-                let group_password = parts.next().unwrap_or("");
-                let group_id = parts.next().unwrap_or("-1").parse::<i32>().unwrap();
-                let members = parts
-                    .next()
-                    .unwrap_or("")
-                    .split(",")
-                    .map(|i| i.trim())
-                    .collect::<Vec<_>>();
-
-                if members.iter().any(|i| *i == usr) {
-                    grps.push(group_id);
-                }
-            }
+        groups_found = match groups_found.checked_add(1) {
+            Some(g) => g,
+            None => break,
         };
     }
 
-    if grps.len() <= 0 {
-        grps.push(group);
-    }
+    ngroups.write(groups_found);
 
-    return grps.len() as i32;
+    if groups_found as usize > grps.len() {
+        -1
+    } else {
+        grps.len() as c_int
+    }
 }

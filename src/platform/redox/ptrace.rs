@@ -10,7 +10,7 @@ use crate::header::arch_aarch64_user::user_regs_struct;
 #[cfg(target_arch = "x86_64")]
 use crate::header::arch_x64_user::user_regs_struct;
 use crate::{
-    c_str::CString,
+    c_str::{CStr, CString},
     fs::File,
     header::{errno as errnoh, fcntl, signal, sys_ptrace},
     io::{self, prelude::*},
@@ -57,7 +57,7 @@ pub fn is_traceme(pid: pid_t) -> bool {
         return false;
     }
     File::open(
-        &CString::new(format!("chan:ptrace-relibc/{}/traceme", pid)).unwrap(),
+        CStr::borrow(&CString::new(format!("chan:ptrace-relibc/{}/traceme", pid)).unwrap()),
         fcntl::O_PATH,
     )
     .is_ok()
@@ -74,19 +74,19 @@ pub fn get_session(
                 Ok(entry.insert(Session {
                     first: true,
                     tracer: File::open(
-                        &CString::new(format!("proc:{}/trace", pid)).unwrap(),
+                        CStr::borrow(&CString::new(format!("proc:{}/trace", pid)).unwrap()),
                         NEW_FLAGS,
                     )?,
                     mem: File::open(
-                        &CString::new(format!("proc:{}/mem", pid)).unwrap(),
+                        CStr::borrow(&CString::new(format!("proc:{}/mem", pid)).unwrap()),
                         NEW_FLAGS,
                     )?,
                     regs: File::open(
-                        &CString::new(format!("proc:{}/regs/int", pid)).unwrap(),
+                        CStr::borrow(&CString::new(format!("proc:{}/regs/int", pid)).unwrap()),
                         NEW_FLAGS,
                     )?,
                     fpregs: File::open(
-                        &CString::new(format!("proc:{}/regs/float", pid)).unwrap(),
+                        CStr::borrow(&CString::new(format!("proc:{}/regs/float", pid)).unwrap()),
                         NEW_FLAGS,
                     )?,
                 }))
@@ -136,7 +136,7 @@ fn inner_ptrace(
         // Mark this child as traced, parent will check for this marker file
         let pid = Sys::getpid();
         mem::forget(File::open(
-            &CString::new(format!("chan:ptrace-relibc/{}/traceme", pid)).unwrap(),
+            CStr::borrow(&CString::new(format!("chan:ptrace-relibc/{}/traceme", pid)).unwrap()),
             fcntl::O_CREAT | fcntl::O_PATH | fcntl::O_EXCL,
         )?);
         return Ok(0);

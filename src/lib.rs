@@ -13,6 +13,7 @@
 #![feature(linkage)]
 #![feature(stmt_expr_attributes)]
 #![feature(str_internals)]
+#![feature(sync_unsafe_cell)]
 #![feature(thread_local)]
 #![feature(vec_into_raw_parts)]
 #![allow(clippy::cast_lossless)]
@@ -28,8 +29,6 @@ extern crate alloc;
 extern crate cbitset;
 extern crate core_io;
 extern crate goblin;
-#[macro_use]
-extern crate lazy_static;
 extern crate memchr;
 #[macro_use]
 extern crate memoffset;
@@ -42,9 +41,6 @@ extern crate sc;
 
 #[cfg(target_os = "redox")]
 extern crate syscall;
-
-#[cfg(target_os = "redox")]
-extern crate spin;
 
 #[macro_use]
 mod macros;

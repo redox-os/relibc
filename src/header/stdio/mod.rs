@@ -107,11 +107,16 @@ pub struct FILE {
     file: File,
     // pub for stdio_ext
     pub(crate) flags: c_int,
+
+    // TODO: Is the read_buf dropped?
     read_buf: Buffer<'static>,
+
     read_pos: usize,
     read_size: usize,
     unget: Vec<u8>,
     // pub for stdio_ext
+
+    // TODO: To support const fn initialization, use static dispatch (perhaps partially)?
     pub(crate) writer: Box<dyn Writer + Send>,
 
     // Optional pid for use with popen/pclose

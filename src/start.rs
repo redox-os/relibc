@@ -119,10 +119,11 @@ extern "C" fn init_array() {
 }
 fn io_init() {
     unsafe {
-        // Initialize stdin/stdout/stderr, see https://github.com/rust-lang/rust/issues/51718
-        stdio::stdin = stdio::default_stdin.get();
-        stdio::stdout = stdio::default_stdout.get();
-        stdio::stderr = stdio::default_stderr.get();
+        // Initialize stdin/stdout/stderr.
+        // TODO: const fn initialization of FILE
+        stdio::stdin = stdio::default_stdin().get();
+        stdio::stdout = stdio::default_stdout().get();
+        stdio::stderr = stdio::default_stderr().get();
     }
 }
 

@@ -13,25 +13,29 @@ members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so", "src/platform/redox/
 exclude = ["core_io", "ralloc", "tests"]
 
 [build-dependencies]
-cbindgen = "0.24.3"
+cbindgen = "0.26"
 cc = "1.0.25"
 #env_logger = "0.10"
 
 [dependencies]
-bitflags = "1"
-cbitset = "0.1.0"
+bitflags = "2"
+cbitset = "0.2"
 core_io = { path = "core_io", features = ["collections"] }
-lazy_static = { version = "1.4.0", default-features = false, features = ["spin_no_std"] }
-memoffset = "0.5.1"
+memoffset = "0.9"
 posix-regex = { path = "posix-regex", features = ["no_std"] }
-rand = { version = "0.5.5", default-features = false }
+
+# TODO: For some reason, rand_jitter hasn't been updated to use the latest rand_core
+rand = { version = "0.7", default-features = false }
+rand_xorshift = "0.2"
+rand_jitter = "0.3"
+
 memchr = { version = "2.2.0", default-features = false }
 plain = "0.2"
 unicode-width = "0.1"
 __libc_only_for_layout_checks = { package = "libc", version = "0.2.149", optional = true }
 
 [dependencies.goblin]
-version = "0.0.21"
+version = "0.7"
 default-features = false
 features = ["elf32", "elf64", "endian_fd"]
 
@@ -45,7 +49,6 @@ sc = "0.2.3"
 
 [target.'cfg(target_os = "redox")'.dependencies]
 redox_syscall = "0.4"
-spin = "0.9.0"
 redox-exec = { path = "src/platform/redox/redox-exec" }
 
 [features]

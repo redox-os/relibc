@@ -11,7 +11,7 @@ use goblin::{
 };
 
 use crate::{
-    c_str::CString,
+    c_str::{CStr, CString},
     fs::File,
     header::{
         dl_tls::{__tls_get_addr, dl_tls_index},
@@ -293,7 +293,7 @@ impl Linker {
         let path_c = CString::new(path)
             .map_err(|err| Error::Malformed(format!("invalid path '{}': {}", path, err)))?;
         let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
-        let mut file = File::open(&path_c, flags)
+        let mut file = File::open(CStr::borrow(&path_c), flags)
             .map_err(|err| Error::Malformed(format!("failed to open '{}': {}", path, err)))?;
         file.read_to_end(&mut data)
             .map_err(|err| Error::Malformed(format!("failed to read '{}': {}", path, err)))?;

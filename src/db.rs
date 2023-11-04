@@ -44,7 +44,7 @@ impl<R: BufRead> Db<R> {
 pub type FileDb = Db<BufReader<File>>;
 
 impl FileDb {
-    pub fn open(path: &CStr, separator: Separator) -> io::Result<Self> {
+    pub fn open(path: CStr, separator: Separator) -> io::Result<Self> {
         let file = File::open(path, fcntl::O_RDONLY | fcntl::O_CLOEXEC)?;
         Ok(Db::new(BufReader::new(file), separator))
     }

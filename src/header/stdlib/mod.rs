@@ -3,10 +3,10 @@
 use core::{convert::TryFrom, intrinsics, iter, mem, ptr, slice};
 use rand::{
     distributions::{Alphanumeric, Distribution, Uniform},
-    prng::XorShiftRng,
-    rngs::JitterRng,
     Rng, SeedableRng,
 };
+use rand_jitter::JitterRng;
+use rand_xorshift::XorShiftRng;
 
 use crate::{
     c_str::CStr,
@@ -25,6 +25,7 @@ use crate::{
     },
     ld_so,
     platform::{self, types::*, Pal, Sys},
+    sync::Once,
 };
 
 mod rand48;
@@ -44,8 +45,11 @@ static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
 static mut L64A_BUFFER: [c_char; 7] = [0; 7]; // up to 6 digits plus null terminator
 static mut RNG: Option<XorShiftRng> = None;
 
-lazy_static! {
-    static ref RNG_SAMPLER: Uniform<c_int> = Uniform::new_inclusive(0, RAND_MAX);
+// TODO: This could be const fn, but the trait system won't allow that.
+static RNG_SAMPLER: Once<Uniform<c_int>> = Once::new();
+
+fn rng_sampler() -> &'static Uniform<c_int> {
+    RNG_SAMPLER.call_once(|| Uniform::new_inclusive(0, RAND_MAX))
 }
 
 #[no_mangle]
@@ -131,55 +135,53 @@ pub unsafe extern "C" fn atof(s: *const c_char) -> c_double {
 }
 
 macro_rules! dec_num_from_ascii {
-    ($s:expr, $t:ty) => {
-        unsafe {
-            let mut s = $s;
-            // Iterate past whitespace
-            while ctype::isspace(*s as c_int) != 0 {
-                s = s.offset(1);
-            }
-
-            // Find out if there is a - sign
-            let neg_sign = match *s {
-                0x2d => {
-                    s = s.offset(1);
-                    true
-                }
-                // '+' increment s and continue parsing
-                0x2b => {
-                    s = s.offset(1);
-                    false
-                }
-                _ => false,
-            };
-
-            let mut n: $t = 0;
-            while ctype::isdigit(*s as c_int) != 0 {
-                n = 10 * n - (*s as $t - 0x30);
-                s = s.offset(1);
-            }
-
-            if neg_sign {
-                n
-            } else {
-                -n
-            }
+    ($s:expr, $t:ty) => {{
+        let mut s = $s;
+        // Iterate past whitespace
+        while ctype::isspace(*s as c_int) != 0 {
+            s = s.offset(1);
         }
-    };
+
+        // Find out if there is a - sign
+        let neg_sign = match *s {
+            0x2d => {
+                s = s.offset(1);
+                true
+            }
+            // '+' increment s and continue parsing
+            0x2b => {
+                s = s.offset(1);
+                false
+            }
+            _ => false,
+        };
+
+        let mut n: $t = 0;
+        while ctype::isdigit(*s as c_int) != 0 {
+            n = 10 * n - (*s as $t - 0x30);
+            s = s.offset(1);
+        }
+
+        if neg_sign {
+            n
+        } else {
+            -n
+        }
+    }};
 }
 
 #[no_mangle]
-pub extern "C" fn atoi(s: *const c_char) -> c_int {
+pub unsafe extern "C" fn atoi(s: *const c_char) -> c_int {
     dec_num_from_ascii!(s, c_int)
 }
 
 #[no_mangle]
-pub extern "C" fn atol(s: *const c_char) -> c_long {
+pub unsafe extern "C" fn atol(s: *const c_char) -> c_long {
     dec_num_from_ascii!(s, c_long)
 }
 
 #[no_mangle]
-pub extern "C" fn atoll(s: *const c_char) -> c_longlong {
+pub unsafe extern "C" fn atoll(s: *const c_char) -> c_longlong {
     dec_num_from_ascii!(s, c_longlong)
 }
 
@@ -643,12 +645,16 @@ fn get_nstime() -> u64 {
 }
 
 #[no_mangle]
-pub extern "C" fn mkostemps(name: *mut c_char, suffix_len: c_int, mut flags: c_int) -> c_int {
+pub unsafe extern "C" fn mkostemps(
+    name: *mut c_char,
+    suffix_len: c_int,
+    mut flags: c_int,
+) -> c_int {
     flags &= !O_ACCMODE;
     flags |= O_RDWR | O_CREAT | O_EXCL;
 
     inner_mktemp(name, suffix_len, || {
-        let name = unsafe { CStr::from_ptr(name) };
+        let name = CStr::from_ptr(name);
         let fd = Sys::open(name, flags, 0o600);
 
         if fd >= 0 {
@@ -661,15 +667,15 @@ pub extern "C" fn mkostemps(name: *mut c_char, suffix_len: c_int, mut flags: c_i
 }
 
 #[no_mangle]
-pub extern "C" fn mkstemp(name: *mut c_char) -> c_int {
+pub unsafe extern "C" fn mkstemp(name: *mut c_char) -> c_int {
     mkostemps(name, 0, 0)
 }
 #[no_mangle]
-pub extern "C" fn mkostemp(name: *mut c_char, flags: c_int) -> c_int {
+pub unsafe extern "C" fn mkostemp(name: *mut c_char, flags: c_int) -> c_int {
     mkostemps(name, 0, flags)
 }
 #[no_mangle]
-pub extern "C" fn mkstemps(name: *mut c_char, suffix_len: c_int) -> c_int {
+pub unsafe extern "C" fn mkstemps(name: *mut c_char, suffix_len: c_int) -> c_int {
     mkostemps(name, suffix_len, 0)
 }
 
@@ -744,7 +750,7 @@ pub unsafe extern "C" fn putenv(insert: *mut c_char) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn qsort(
+pub unsafe extern "C" fn qsort(
     base: *mut c_void,
     nel: size_t,
     width: size_t,
@@ -763,10 +769,10 @@ pub extern "C" fn qsort(
 #[no_mangle]
 pub unsafe extern "C" fn rand() -> c_int {
     match RNG {
-        Some(ref mut rng) => RNG_SAMPLER.sample(rng),
+        Some(ref mut rng) => rng_sampler().sample(rng),
         None => {
             let mut rng = XorShiftRng::from_seed([1; 16]);
-            let ret = RNG_SAMPLER.sample(&mut rng);
+            let ret = rng_sampler().sample(&mut rng);
             RNG = Some(rng);
             ret
         }
@@ -782,7 +788,7 @@ pub unsafe extern "C" fn rand_r(seed: *mut c_uint) -> c_int {
         let seed_arr: [u8; 16] = mem::transmute([*seed; 16 / mem::size_of::<c_uint>()]);
 
         let mut rng = XorShiftRng::from_seed(seed_arr);
-        let ret = RNG_SAMPLER.sample(&mut rng);
+        let ret = rng_sampler().sample(&mut rng);
 
         *seed = ret as _;
 
@@ -861,7 +867,7 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
 
     let out = slice::from_raw_parts_mut(ptr as *mut u8, limits::PATH_MAX);
     {
-        let file = match File::open(&CStr::from_ptr(pathname), O_PATH | O_CLOEXEC) {
+        let file = match File::open(CStr::from_ptr(pathname), O_PATH | O_CLOEXEC) {
             Ok(file) => file,
             Err(_) => return ptr::null_mut(),
         };
@@ -945,7 +951,7 @@ pub unsafe extern "C" fn setenv(
 }
 
 // #[no_mangle]
-pub extern "C" fn setkey(key: *const c_char) {
+pub unsafe extern "C" fn setkey(key: *const c_char) {
     unimplemented!();
 }
 
