@@ -157,3 +157,28 @@ pub unsafe extern "C" fn redox_sigprocmask_v1(
 ) -> RawResult {
     Error::mux(super::signal::sigprocmask_impl(how as i32, new, old).map(|()| 0))
 }
+#[no_mangle]
+pub unsafe extern "C" fn redox_mmap_v1(
+    addr: *mut (),
+    unaligned_len: usize,
+    prot: u32,
+    flags: u32,
+    fd: usize,
+    offset: u64,
+) -> RawResult {
+    Error::mux(syscall::fmap(
+        fd,
+        &syscall::Map {
+            address: addr as usize,
+            offset: offset as usize,
+            size: unaligned_len,
+            flags: syscall::MapFlags::from_bits_truncate(
+                ((prot << 16) | (flags & 0xffff)) as usize,
+            ),
+        },
+    ))
+}
+#[no_mangle]
+pub unsafe extern "C" fn redox_munmap_v1(addr: *mut (), unaligned_len: usize) -> RawResult {
+    Error::mux(syscall::funmap(addr as usize, unaligned_len))
+}
