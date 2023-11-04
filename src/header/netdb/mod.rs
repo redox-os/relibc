@@ -370,7 +370,7 @@ pub unsafe extern "C" fn getnetbyname(name: *const c_char) -> *mut netent {
 #[no_mangle]
 pub unsafe extern "C" fn getnetent() -> *mut netent {
     if NETDB == 0 {
-        NETDB = Sys::open(&CString::new("/etc/networks").unwrap(), O_RDONLY, 0);
+        NETDB = Sys::open(c_str!("/etc/networks"), O_RDONLY, 0);
     }
 
     let mut rlb = RawLineBuffer::new(NETDB);
@@ -484,7 +484,7 @@ pub unsafe extern "C" fn getprotobynumber(number: c_int) -> *mut protoent {
 #[no_mangle]
 pub unsafe extern "C" fn getprotoent() -> *mut protoent {
     if PROTODB == 0 {
-        PROTODB = Sys::open(&CString::new("/etc/protocols").unwrap(), O_RDONLY, 0);
+        PROTODB = Sys::open(c_str!("/etc/protocols"), O_RDONLY, 0);
     }
 
     let mut rlb = RawLineBuffer::new(PROTODB);
@@ -603,7 +603,7 @@ pub unsafe extern "C" fn getservbyport(port: c_int, proto: *const c_char) -> *mu
 #[no_mangle]
 pub unsafe extern "C" fn getservent() -> *mut servent {
     if SERVDB == 0 {
-        SERVDB = Sys::open(&CString::new("/etc/services").unwrap(), O_RDONLY, 0);
+        SERVDB = Sys::open(c_str!("/etc/services"), O_RDONLY, 0);
     }
     let mut rlb = RawLineBuffer::new(SERVDB);
     rlb.seek(S_POS);
@@ -690,7 +690,7 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
 pub unsafe extern "C" fn setnetent(stayopen: c_int) {
     NET_STAYOPEN = stayopen;
     if NETDB == 0 {
-        NETDB = Sys::open(&CString::new("/etc/networks").unwrap(), O_RDONLY, 0)
+        NETDB = Sys::open(c_str!("/etc/networks"), O_RDONLY, 0)
     } else {
         Sys::lseek(NETDB, 0, SEEK_SET);
         N_POS = 0;
@@ -701,7 +701,7 @@ pub unsafe extern "C" fn setnetent(stayopen: c_int) {
 pub unsafe extern "C" fn setprotoent(stayopen: c_int) {
     PROTO_STAYOPEN = stayopen;
     if PROTODB == 0 {
-        PROTODB = Sys::open(&CString::new("/etc/protocols").unwrap(), O_RDONLY, 0)
+        PROTODB = Sys::open(c_str!("/etc/protocols"), O_RDONLY, 0)
     } else {
         Sys::lseek(PROTODB, 0, SEEK_SET);
         P_POS = 0;
@@ -712,7 +712,7 @@ pub unsafe extern "C" fn setprotoent(stayopen: c_int) {
 pub unsafe extern "C" fn setservent(stayopen: c_int) {
     SERV_STAYOPEN = stayopen;
     if SERVDB == 0 {
-        SERVDB = Sys::open(&CString::new("/etc/services").unwrap(), O_RDONLY, 0)
+        SERVDB = Sys::open(c_str!("/etc/services"), O_RDONLY, 0)
     } else {
         Sys::lseek(SERVDB, 0, SEEK_SET);
         S_POS = 0;
@@ -727,17 +727,8 @@ pub unsafe extern "C" fn getaddrinfo(
     res: *mut *mut addrinfo,
 ) -> c_int {
     //TODO: getaddrinfo
-    let node_opt = if node.is_null() {
-        None
-    } else {
-        Some(CStr::from_ptr(node))
-    };
-
-    let service_opt = if service.is_null() {
-        None
-    } else {
-        Some(CStr::from_ptr(service))
-    };
+    let node_opt = CStr::from_nullable_ptr(node);
+    let service_opt = CStr::from_nullable_ptr(service);
 
     let hints_opt = if hints.is_null() { None } else { Some(&*hints) };
 
@@ -791,7 +782,7 @@ pub unsafe extern "C" fn getaddrinfo(
 
             let ai_canonname = if ai_flags & AI_CANONNAME > 0 {
                 ai_flags &= !AI_CANONNAME;
-                node.to_owned().into_raw()
+                node.to_owned_cstring().into_raw()
             } else {
                 ptr::null_mut()
             };
@@ -859,7 +850,7 @@ pub unsafe extern "C" fn freeaddrinfo(res: *mut addrinfo) {
     while !ai.is_null() {
         let bai = Box::from_raw(ai);
         if !bai.ai_canonname.is_null() {
-            CString::from_raw(bai.ai_canonname);
+            drop(CString::from_raw(bai.ai_canonname));
         }
         if !bai.ai_addr.is_null() {
             if bai.ai_addrlen == mem::size_of::<sockaddr_in>() {

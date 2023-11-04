@@ -12,7 +12,7 @@ pub const RTLD_NOW: c_int = 0x0002;
 pub const RTLD_GLOBAL: c_int = 0x0100;
 pub const RTLD_LOCAL: c_int = 0x0000;
 
-static ERROR_NOT_SUPPORTED: &'static CStr = c_str!("dlfcn not supported");
+static ERROR_NOT_SUPPORTED: CStr = c_str!("dlfcn not supported");
 
 #[thread_local]
 static ERROR: AtomicUsize = AtomicUsize::new(0);

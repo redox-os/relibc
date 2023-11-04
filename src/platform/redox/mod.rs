@@ -80,7 +80,7 @@ pub fn e(sys: Result<usize>) -> usize {
 pub struct Sys;
 
 impl Pal for Sys {
-    fn access(path: &CStr, mode: c_int) -> c_int {
+    fn access(path: CStr, mode: c_int) -> c_int {
         let fd = match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
             Ok(fd) => fd,
             Err(_) => return -1,
@@ -165,19 +165,19 @@ impl Pal for Sys {
         }
     }
 
-    fn chdir(path: &CStr) -> c_int {
+    fn chdir(path: CStr) -> c_int {
         let path = path_from_c_str!(path);
         e(path::chdir(path).map(|()| 0)) as c_int
     }
 
-    fn chmod(path: &CStr, mode: mode_t) -> c_int {
+    fn chmod(path: CStr, mode: mode_t) -> c_int {
         match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
             Ok(file) => Self::fchmod(*file, mode),
             Err(_) => -1,
         }
     }
 
-    fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
+    fn chown(path: CStr, owner: uid_t, group: gid_t) -> c_int {
         match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
             Ok(file) => Self::fchown(*file, owner, group),
             Err(_) => -1,
@@ -232,7 +232,7 @@ impl Pal for Sys {
         loop {}
     }
 
-    unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
+    unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
         e(self::exec::execve(
             Executable::AtPath(path),
             self::exec::ArgEnv::C { argv, envp },
@@ -257,7 +257,7 @@ impl Pal for Sys {
             !0
         } else {
             match str::from_utf8(&buf[..res]) {
-                Ok(path) => Sys::chdir(&CString::new(path).unwrap()),
+                Ok(path) => e(path::chdir(path).map(|()| 0)) as c_int,
                 Err(_) => {
                     unsafe { errno = EINVAL };
                     return -1;
@@ -387,7 +387,7 @@ impl Pal for Sys {
         e(syscall::futimens(fd as usize, &times)) as c_int
     }
 
-    fn utimens(path: &CStr, times: *const timespec) -> c_int {
+    fn utimens(path: CStr, times: *const timespec) -> c_int {
         match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
             Ok(file) => Self::futimens(*file, times),
             Err(_) => -1,
@@ -637,7 +637,7 @@ impl Pal for Sys {
         e(syscall::getuid()) as pid_t
     }
 
-    fn lchown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
+    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> c_int {
         // TODO: Is it correct for regular chown to use O_PATH? On Linux the meaning of that flag
         // is to forbid file operations, including fchown.
 
@@ -648,7 +648,7 @@ impl Pal for Sys {
         }
     }
 
-    fn link(path1: &CStr, path2: &CStr) -> c_int {
+    fn link(path1: CStr, path2: CStr) -> c_int {
         e(unsafe { syscall::link(path1.as_ptr() as *const u8, path2.as_ptr() as *const u8) })
             as c_int
     }
@@ -661,7 +661,7 @@ impl Pal for Sys {
         )) as off_t
     }
 
-    fn mkdir(path: &CStr, mode: mode_t) -> c_int {
+    fn mkdir(path: CStr, mode: mode_t) -> c_int {
         match File::create(
             path,
             fcntl::O_DIRECTORY | fcntl::O_EXCL | fcntl::O_CLOEXEC,
@@ -672,7 +672,7 @@ impl Pal for Sys {
         }
     }
 
-    fn mkfifo(path: &CStr, mode: mode_t) -> c_int {
+    fn mkfifo(path: CStr, mode: mode_t) -> c_int {
         match File::create(
             path,
             fcntl::O_CREAT | fcntl::O_CLOEXEC,
@@ -788,7 +788,7 @@ impl Pal for Sys {
         }
     }
 
-    fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> c_int {
         let path = path_from_c_str!(path);
 
         e(libredox::open(path, oflag, mode)) as c_int
@@ -828,7 +828,7 @@ impl Pal for Sys {
         e(syscall::fpath(fildes as usize, out)) as ssize_t
     }
 
-    fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t {
+    fn readlink(pathname: CStr, out: &mut [u8]) -> ssize_t {
         match File::open(
             pathname,
             fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
@@ -838,7 +838,7 @@ impl Pal for Sys {
         }
     }
 
-    fn rename(oldpath: &CStr, newpath: &CStr) -> c_int {
+    fn rename(oldpath: CStr, newpath: CStr) -> c_int {
         let newpath = path_from_c_str!(newpath);
         match File::open(oldpath, fcntl::O_PATH | fcntl::O_CLOEXEC) {
             Ok(file) => e(syscall::frename(*file as usize, newpath)) as c_int,
@@ -846,7 +846,7 @@ impl Pal for Sys {
         }
     }
 
-    fn rmdir(path: &CStr) -> c_int {
+    fn rmdir(path: CStr) -> c_int {
         let path = path_from_c_str!(path);
         e(canonicalize(path).and_then(|path| syscall::rmdir(&path))) as c_int
     }
@@ -891,7 +891,7 @@ impl Pal for Sys {
         e(syscall::setreuid(ruid as usize, euid as usize)) as c_int
     }
 
-    fn symlink(path1: &CStr, path2: &CStr) -> c_int {
+    fn symlink(path1: CStr, path2: CStr) -> c_int {
         let mut file = match File::create(
             path2,
             fcntl::O_WRONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
@@ -922,10 +922,7 @@ impl Pal for Sys {
                 return Ok(());
             }
 
-            let mut file = File::open(
-                &CString::new("/etc/hostname").unwrap(),
-                fcntl::O_RDONLY | fcntl::O_CLOEXEC,
-            )?;
+            let mut file = File::open(c_str!("/etc/hostname"), fcntl::O_RDONLY | fcntl::O_CLOEXEC)?;
 
             let mut read = 0;
             let name_len = name.len();
@@ -1001,7 +998,7 @@ impl Pal for Sys {
         }
     }
 
-    fn unlink(path: &CStr) -> c_int {
+    fn unlink(path: CStr) -> c_int {
         let path = path_from_c_str!(path);
         e(canonicalize(path).and_then(|path| syscall::unlink(&path))) as c_int
     }

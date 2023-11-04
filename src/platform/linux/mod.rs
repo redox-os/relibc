@@ -89,7 +89,7 @@ impl Sys {
 }
 
 impl Pal for Sys {
-    fn access(path: &CStr, mode: c_int) -> c_int {
+    fn access(path: CStr, mode: c_int) -> c_int {
         e(unsafe { syscall!(ACCESS, path.as_ptr(), mode) }) as c_int
     }
 
@@ -97,15 +97,15 @@ impl Pal for Sys {
         unsafe { syscall!(BRK, addr) as *mut c_void }
     }
 
-    fn chdir(path: &CStr) -> c_int {
+    fn chdir(path: CStr) -> c_int {
         e(unsafe { syscall!(CHDIR, path.as_ptr()) }) as c_int
     }
 
-    fn chmod(path: &CStr, mode: mode_t) -> c_int {
+    fn chmod(path: CStr, mode: mode_t) -> c_int {
         e(unsafe { syscall!(FCHMODAT, AT_FDCWD, path.as_ptr(), mode, 0) }) as c_int
     }
 
-    fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
+    fn chown(path: CStr, owner: uid_t, group: gid_t) -> c_int {
         e(unsafe {
             syscall!(
                 FCHOWNAT,
@@ -141,7 +141,7 @@ impl Pal for Sys {
         e(unsafe { syscall!(DUP3, fildes, fildes2, 0) }) as c_int
     }
 
-    unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
+    unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
         e(syscall!(EXECVE, path.as_ptr(), argv, envp)) as c_int
     }
     unsafe fn fexecve(fildes: c_int, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
@@ -252,7 +252,7 @@ impl Pal for Sys {
         e(unsafe { syscall!(UTIMENSAT, fd, ptr::null::<c_char>(), times, 0) }) as c_int
     }
 
-    fn utimens(path: &CStr, times: *const timespec) -> c_int {
+    fn utimens(path: CStr, times: *const timespec) -> c_int {
         e(unsafe { syscall!(UTIMENSAT, AT_FDCWD, path.as_ptr(), times, 0) }) as c_int
     }
 
@@ -332,11 +332,11 @@ impl Pal for Sys {
         e(unsafe { syscall!(GETUID) }) as uid_t
     }
 
-    fn lchown(path: &CStr, owner: uid_t, group: gid_t) -> c_int {
+    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> c_int {
         e(unsafe { syscall!(LCHOWN, path.as_ptr(), owner, group) }) as c_int
     }
 
-    fn link(path1: &CStr, path2: &CStr) -> c_int {
+    fn link(path1: CStr, path2: CStr) -> c_int {
         e(unsafe {
             syscall!(
                 LINKAT,
@@ -353,11 +353,11 @@ impl Pal for Sys {
         e(unsafe { syscall!(LSEEK, fildes, offset, whence) }) as off_t
     }
 
-    fn mkdir(path: &CStr, mode: mode_t) -> c_int {
+    fn mkdir(path: CStr, mode: mode_t) -> c_int {
         e(unsafe { syscall!(MKDIRAT, AT_FDCWD, path.as_ptr(), mode) }) as c_int
     }
 
-    fn mkfifo(path: &CStr, mode: mode_t) -> c_int {
+    fn mkfifo(path: CStr, mode: mode_t) -> c_int {
         e(unsafe { syscall!(MKNODAT, AT_FDCWD, path.as_ptr(), mode | S_IFIFO, 0) }) as c_int
     }
 
@@ -408,7 +408,7 @@ impl Pal for Sys {
         e(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }) as c_int
     }
 
-    fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> c_int {
         e(unsafe { syscall!(OPENAT, AT_FDCWD, path.as_ptr(), oflag, mode) }) as c_int
     }
 
@@ -491,7 +491,7 @@ impl Pal for Sys {
         e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
     }
 
-    fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t {
+    fn readlink(pathname: CStr, out: &mut [u8]) -> ssize_t {
         e(unsafe {
             syscall!(
                 READLINKAT,
@@ -503,11 +503,11 @@ impl Pal for Sys {
         }) as ssize_t
     }
 
-    fn rename(old: &CStr, new: &CStr) -> c_int {
+    fn rename(old: CStr, new: CStr) -> c_int {
         e(unsafe { syscall!(RENAMEAT, AT_FDCWD, old.as_ptr(), AT_FDCWD, new.as_ptr()) }) as c_int
     }
 
-    fn rmdir(path: &CStr) -> c_int {
+    fn rmdir(path: CStr) -> c_int {
         e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), AT_REMOVEDIR) }) as c_int
     }
 
@@ -539,7 +539,7 @@ impl Pal for Sys {
         e(unsafe { syscall!(SETSID) }) as c_int
     }
 
-    fn symlink(path1: &CStr, path2: &CStr) -> c_int {
+    fn symlink(path1: CStr, path2: CStr) -> c_int {
         e(unsafe { syscall!(SYMLINKAT, path1.as_ptr(), AT_FDCWD, path2.as_ptr()) }) as c_int
     }
 
@@ -555,7 +555,7 @@ impl Pal for Sys {
         e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
     }
 
-    fn unlink(path: &CStr) -> c_int {
+    fn unlink(path: CStr) -> c_int {
         e(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), 0) }) as c_int
     }
 

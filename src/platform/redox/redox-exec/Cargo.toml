@@ -9,6 +9,5 @@ license = "MIT"
 
 [dependencies]
 redox_syscall = "0.4"
-# TODO: Update
-goblin = { version = "0.0.21", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
+goblin = { version = "0.7", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
 plain = "0.2"

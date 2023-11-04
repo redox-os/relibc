@@ -1,10 +1,17 @@
 use super::{constants, Buffer, BUFSIZ, FILE};
 use core::{cell::UnsafeCell, ptr};
 
-use crate::{fs::File, io::LineWriter, platform::types::*, sync::Mutex};
+use crate::{
+    fs::File,
+    io::LineWriter,
+    platform::types::*,
+    sync::{Mutex, Once},
+};
 use alloc::{boxed::Box, vec::Vec};
 
+// TODO: Change FILE to allow const fn initialization?
 pub struct GlobalFile(UnsafeCell<FILE>);
+
 impl GlobalFile {
     fn new(file: c_int, flags: c_int) -> Self {
         let file = File::new(file);
@@ -32,15 +39,19 @@ impl GlobalFile {
 // statics need to be Sync
 unsafe impl Sync for GlobalFile {}
 
-lazy_static! {
-    #[allow(non_upper_case_globals)]
-    pub static ref default_stdin: GlobalFile = GlobalFile::new(0, constants::F_NOWR);
+// TODO: Allow const fn initialization of FILE
+static DEFAULT_STDIN: Once<GlobalFile> = Once::new();
+static DEFAULT_STDOUT: Once<GlobalFile> = Once::new();
+static DEFAULT_STDERR: Once<GlobalFile> = Once::new();
 
-    #[allow(non_upper_case_globals)]
-    pub static ref default_stdout: GlobalFile = GlobalFile::new(1, constants::F_NORD);
-
-    #[allow(non_upper_case_globals)]
-    pub static ref default_stderr: GlobalFile = GlobalFile::new(2, constants::F_NORD);
+pub fn default_stdin() -> &'static GlobalFile {
+    DEFAULT_STDIN.call_once(|| GlobalFile::new(0, constants::F_NOWR))
+}
+pub fn default_stdout() -> &'static GlobalFile {
+    DEFAULT_STDOUT.call_once(|| GlobalFile::new(1, constants::F_NORD))
+}
+pub fn default_stderr() -> &'static GlobalFile {
+    DEFAULT_STDERR.call_once(|| GlobalFile::new(2, constants::F_NORD))
 }
 
 #[no_mangle]

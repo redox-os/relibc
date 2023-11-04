@@ -25,15 +25,15 @@ pub use self::socket::PalSocket;
 mod socket;
 
 pub trait Pal {
-    fn access(path: &CStr, mode: c_int) -> c_int;
+    fn access(path: CStr, mode: c_int) -> c_int;
 
     fn brk(addr: *mut c_void) -> *mut c_void;
 
-    fn chdir(path: &CStr) -> c_int;
+    fn chdir(path: CStr) -> c_int;
 
-    fn chmod(path: &CStr, mode: mode_t) -> c_int;
+    fn chmod(path: CStr, mode: mode_t) -> c_int;
 
-    fn chown(path: &CStr, owner: uid_t, group: gid_t) -> c_int;
+    fn chown(path: CStr, owner: uid_t, group: gid_t) -> c_int;
 
     fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> c_int;
 
@@ -47,7 +47,7 @@ pub trait Pal {
 
     fn dup2(fildes: c_int, fildes2: c_int) -> c_int;
 
-    unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int;
+    unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int;
     unsafe fn fexecve(fildes: c_int, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int;
 
     fn exit(status: c_int) -> !;
@@ -87,7 +87,7 @@ pub trait Pal {
 
     fn futimens(fd: c_int, times: *const timespec) -> c_int;
 
-    fn utimens(path: &CStr, times: *const timespec) -> c_int;
+    fn utimens(path: CStr, times: *const timespec) -> c_int;
 
     fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char;
 
@@ -128,15 +128,15 @@ pub trait Pal {
 
     fn getuid() -> uid_t;
 
-    fn lchown(path: &CStr, owner: uid_t, group: gid_t) -> c_int;
+    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> c_int;
 
-    fn link(path1: &CStr, path2: &CStr) -> c_int;
+    fn link(path1: CStr, path2: CStr) -> c_int;
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t;
 
-    fn mkdir(path: &CStr, mode: mode_t) -> c_int;
+    fn mkdir(path: CStr, mode: mode_t) -> c_int;
 
-    fn mkfifo(path: &CStr, mode: mode_t) -> c_int;
+    fn mkfifo(path: CStr, mode: mode_t) -> c_int;
 
     unsafe fn mlock(addr: *const c_void, len: usize) -> c_int;
 
@@ -165,7 +165,7 @@ pub trait Pal {
 
     fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int;
 
-    fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int;
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> c_int;
 
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int;
 
@@ -179,11 +179,11 @@ pub trait Pal {
 
     fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
 
-    fn readlink(pathname: &CStr, out: &mut [u8]) -> ssize_t;
+    fn readlink(pathname: CStr, out: &mut [u8]) -> ssize_t;
 
-    fn rename(old: &CStr, new: &CStr) -> c_int;
+    fn rename(old: CStr, new: CStr) -> c_int;
 
-    fn rmdir(path: &CStr) -> c_int;
+    fn rmdir(path: CStr) -> c_int;
 
     fn sched_yield() -> c_int;
 
@@ -199,7 +199,7 @@ pub trait Pal {
 
     fn setsid() -> c_int;
 
-    fn symlink(path1: &CStr, path2: &CStr) -> c_int;
+    fn symlink(path1: CStr, path2: CStr) -> c_int;
 
     fn sync() -> c_int;
 
@@ -207,7 +207,7 @@ pub trait Pal {
 
     fn uname(utsname: *mut utsname) -> c_int;
 
-    fn unlink(path: &CStr) -> c_int;
+    fn unlink(path: CStr) -> c_int;
 
     fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t;
 

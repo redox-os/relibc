@@ -7,7 +7,7 @@ use crate::{
 use alloc::string::String;
 
 pub fn get_dns_server() -> String {
-    let file = match File::open(&CString::new("/etc/resolv.conf").unwrap(), fcntl::O_RDONLY) {
+    let file = match File::open(c_str!("/etc/resolv.conf"), fcntl::O_RDONLY) {
         Ok(file) => file,
         Err(_) => return String::new(), // TODO: better error handling
     };

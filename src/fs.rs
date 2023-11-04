@@ -24,14 +24,14 @@ impl File {
         }
     }
 
-    pub fn open(path: &CStr, oflag: c_int) -> io::Result<Self> {
+    pub fn open(path: CStr, oflag: c_int) -> io::Result<Self> {
         match Sys::open(path, oflag, 0) {
             -1 => Err(io::last_os_error()),
             ok => Ok(Self::new(ok)),
         }
     }
 
-    pub fn create(path: &CStr, oflag: c_int, mode: mode_t) -> io::Result<Self> {
+    pub fn create(path: CStr, oflag: c_int, mode: mode_t) -> io::Result<Self> {
         match Sys::open(path, oflag | O_CREAT, mode) {
             -1 => Err(io::last_os_error()),
             ok => Ok(Self::new(ok)),
