@@ -184,6 +184,7 @@ impl Pal for Sys {
         }
     }
 
+    // FIXME: unsound
     fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> c_int {
         // TODO
         eprintln!("relibc clock_getres({}, {:p}): not implemented", clk_id, tp);
@@ -191,20 +192,12 @@ impl Pal for Sys {
         -1
     }
 
+    // FIXME: unsound
     fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int {
-        let mut redox_tp = unsafe { redox_timespec::from(&*tp) };
-        match e(syscall::clock_gettime(clk_id as usize, &mut redox_tp)) as c_int {
-            -1 => -1,
-            _ => {
-                unsafe {
-                    (*tp).tv_sec = redox_tp.tv_sec as time_t;
-                    (*tp).tv_nsec = redox_tp.tv_nsec as c_long;
-                };
-                0
-            }
-        }
+        unsafe { e(libredox::clock_gettime(clk_id as usize, tp).map(|()| 0)) as c_int }
     }
 
+    // FIXME: unsound
     fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> c_int {
         // TODO
         eprintln!(
@@ -292,64 +285,14 @@ impl Pal for Sys {
         e(clone::fork_impl()) as pid_t
     }
 
+    // FIXME: unsound
     fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
-        let mut redox_buf: redox_stat = redox_stat::default();
-        match e(syscall::fstat(fildes as usize, &mut redox_buf)) {
-            0 => {
-                if let Some(buf) = unsafe { buf.as_mut() } {
-                    buf.st_dev = redox_buf.st_dev as dev_t;
-                    buf.st_ino = redox_buf.st_ino as ino_t;
-                    buf.st_nlink = redox_buf.st_nlink as nlink_t;
-                    buf.st_mode = redox_buf.st_mode as mode_t;
-                    buf.st_uid = redox_buf.st_uid as uid_t;
-                    buf.st_gid = redox_buf.st_gid as gid_t;
-                    // TODO st_rdev
-                    buf.st_rdev = 0;
-                    buf.st_size = redox_buf.st_size as off_t;
-                    buf.st_blksize = redox_buf.st_blksize as blksize_t;
-                    buf.st_atim = timespec {
-                        tv_sec: redox_buf.st_atime as time_t,
-                        tv_nsec: redox_buf.st_atime_nsec as c_long,
-                    };
-                    buf.st_mtim = timespec {
-                        tv_sec: redox_buf.st_mtime as time_t,
-                        tv_nsec: redox_buf.st_mtime_nsec as c_long,
-                    };
-                    buf.st_ctim = timespec {
-                        tv_sec: redox_buf.st_ctime as time_t,
-                        tv_nsec: redox_buf.st_ctime_nsec as c_long,
-                    };
-                }
-                0
-            }
-            _ => -1,
-        }
+        unsafe { e(libredox::fstat(fildes as usize, buf).map(|()| 0)) as c_int }
     }
 
+    // FIXME: unsound
     fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
-        let mut kbuf: redox_statvfs = redox_statvfs::default();
-        match e(syscall::fstatvfs(fildes as usize, &mut kbuf)) {
-            0 => {
-                unsafe {
-                    if !buf.is_null() {
-                        (*buf).f_bsize = kbuf.f_bsize as c_ulong;
-                        (*buf).f_frsize = kbuf.f_bsize as c_ulong;
-                        (*buf).f_blocks = kbuf.f_blocks as c_ulong;
-                        (*buf).f_bfree = kbuf.f_bfree as c_ulong;
-                        (*buf).f_bavail = kbuf.f_bavail as c_ulong;
-                        //TODO
-                        (*buf).f_files = 0;
-                        (*buf).f_ffree = 0;
-                        (*buf).f_favail = 0;
-                        (*buf).f_fsid = 0;
-                        (*buf).f_flag = 0;
-                        (*buf).f_namemax = 0;
-                    }
-                }
-                0
-            }
-            _ => -1,
-        }
+        unsafe { e(libredox::fstatvfs(fildes as usize, buf).map(|()| 0)) as c_int }
     }
 
     fn fsync(fd: c_int) -> c_int {
@@ -360,6 +303,7 @@ impl Pal for Sys {
         e(syscall::ftruncate(fd as usize, len as usize)) as c_int
     }
 
+    // FIXME: unsound
     fn futex(
         addr: *mut c_int,
         op: c_int,
@@ -380,13 +324,12 @@ impl Pal for Sys {
         }
     }
 
+    // FIXME: unsound
     fn futimens(fd: c_int, times: *const timespec) -> c_int {
-        let times = [unsafe { redox_timespec::from(&*times) }, unsafe {
-            redox_timespec::from(&*times.offset(1))
-        }];
-        e(syscall::futimens(fd as usize, &times)) as c_int
+        unsafe { e(libredox::futimens(fd as usize, times).map(|()| 0)) as c_int }
     }
 
+    // FIXME: unsound
     fn utimens(path: CStr, times: *const timespec) -> c_int {
         match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
             Ok(file) => Self::futimens(*file, times),
@@ -394,6 +337,7 @@ impl Pal for Sys {
         }
     }
 
+    // FIXME: unsound
     fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
         // TODO: Not using MaybeUninit seems a little unsafe
 
