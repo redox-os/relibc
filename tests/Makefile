@@ -227,6 +227,7 @@ FLAGS=\
 	-fno-builtin \
 	-fno-stack-protector \
 	-Wall \
+	-Werror \
 	-pedantic \
 	-g \
 	-I .

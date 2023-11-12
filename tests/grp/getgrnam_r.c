@@ -4,46 +4,36 @@
 #include <string.h>
 #include <grp.h>
 
-bool test_getgrnam(char* gr_name) {
+void test_getgrnam(const char *gr_name) {
     struct group* out = getgrnam(gr_name);
     
     if (out == NULL) {
         printf("Did not find a group '%s'", gr_name);
-        return false;
+        return;
     }
     
     printf("getgrnam\n");
 
-    char* start = out->gr_name;
-    int len = strlen(out->gr_name);
-    
     printf("    '%s' = %d\n", gr_name, out->gr_gid);
-    
-    return true;
 }
 
-bool test_getgrnam_r(char* gr_name) {
-    char* buf[100];
+void test_getgrnam_r(const char *gr_name) {
+    char buf[100];
     
     struct group grp;
     struct group* out = &grp;
-    struct group* tmp;
     
-    int status = getgrnam_r(gr_name, out, buf, sizeof(buf), &tmp);
+    int status = getgrnam_r(gr_name, &grp, buf, sizeof(buf), &out);
     
     if (out == NULL) {
-        printf("Did not find a group '%s'", gr_name);
-        return false;
+        const char *reason = (status != 0) ? strerror(status) : "(not found)";
+        printf("Did not find a group %s: %s\n", gr_name, reason);
+        return;
     }
     
     printf("getgrnam_r\n");   
     
-    char* start = grp.gr_name;
-    int len = strlen(grp.gr_name);
-
     printf("    '%s' = %d\n", gr_name, out->gr_gid);
-    
-    return true;
 }
 
 int main(void) {

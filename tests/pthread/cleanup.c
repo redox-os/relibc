@@ -34,6 +34,7 @@ void *routine(void *arg) {
   puts("6");
   pthread_cleanup_pop(true);
   pthread_cleanup_pop(true);
+  return NULL;
 }
 
 int main(void) {

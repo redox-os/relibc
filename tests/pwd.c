@@ -85,7 +85,7 @@ int main(void) {
     errno = 0;
 
     struct passwd *entry = NULL;
-    for (int i = 1; entry = getpwent(); ++i) {
+    for (int i = 1; (entry = getpwent()); ++i) {
         int backup = errno;
         printf("--- getpwent #%d ---\n", i);
         if (backup != 0) {

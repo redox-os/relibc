@@ -17,8 +17,8 @@ after_includes = """
     void *arg; \
     void *prev; \
   } __relibc_internal_pthread_ll_entry = { \
-    .routine = (routine), \
-    .arg = (arg), \
+    .routine = (void (*)(void *))(routine), \
+    .arg = (void *)(arg), \
   }; \
   __relibc_internal_pthread_cleanup_push(&__relibc_internal_pthread_ll_entry);
 
