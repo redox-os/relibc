@@ -89,7 +89,7 @@ int main(void) {
     size_t nonpow2_mul_voidptr_size = 3*sizeof(void *);
     size_t pow2_mul_voidptr_size = 4*sizeof(void *);
     
-    int i;
+    size_t i;
     
     errno = 0;
     char * ptr_zerosize_malloc = (char *)malloc(zero_size);

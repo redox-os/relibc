@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdio.h>
 #include <time.h>
 
@@ -6,7 +7,7 @@
 int main(void) {
     int day = 60 * 60 * 24;
     time_t inputs[] = { -(day * 33), -day, -1, -500, 0, 1, 1531454950 };
-    for (int i = 0; i < (sizeof(inputs) / sizeof(time_t)); i += 1) {
+    for (size_t i = 0; i < (sizeof(inputs) / sizeof(time_t)); i += 1) {
         struct tm* t = localtime(&inputs[i]);
 
         printf(
@@ -24,8 +25,7 @@ int main(void) {
     char *ctime_r_result = ctime_r(&input, ctime_r_buffer);
     if (ctime_r_result == ctime_r_buffer) {
         fputs(ctime_r_result, stdout);
-    }
-    else {
+    } else {
         printf("Unexpected pointer from ctime_r: %p\n", ctime_r_result);
     }
 }

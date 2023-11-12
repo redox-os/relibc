@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stddef.h>
 #include <stdlib.h>
 
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
@@ -12,7 +13,7 @@ int cmpfunc (const void * a_ptr, const void * b_ptr) {
 }
 
 int main () {
-    int i;
+    size_t i;
 
     printf("Before: ");
     for(i = 0; i < ARRAY_SIZE(values); i++) {

@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "../test_helpers.h"
+
 int reader(int fd) {
     // Create an epoll file
     int epollfd = epoll_create1(EPOLL_CLOEXEC);
@@ -52,12 +54,12 @@ int reader(int fd) {
             if (events[n].data.fd == fd) {
                 // Read the current event count
                 int writer_i;
-                int count = read(fd, &writer_i, sizeof(writer_i));
-                if (count < 0) {
-                    perror("read");
-                    return 1;
-                } else if (count < sizeof(writer_i)) {
-                    fprintf(stderr, "read %d instead of %d\n", count, sizeof(writer_i));
+                ssize_t status = read(fd, &writer_i, sizeof(writer_i));
+                ERROR_IF(read, status, == -1);
+                size_t count = (size_t)status;
+
+                if (count < sizeof(writer_i)) {
+                    fprintf(stderr, "read %zu instead of %d\n", count, sizeof(writer_i));
                     return 1;
                 }
                 // Make sure the writer's event count matches our own
@@ -109,12 +111,12 @@ int writer(int fd) {
             // If the event is the writer file
             if (events[n].data.fd == fd) {
                 // Write the current event count
-                int count = write(fd, &i, sizeof(i));
-                if (count < 0) {
-                    perror("write");
-                    return 1;
-                } else if (count < sizeof(i)) {
-                    fprintf(stderr, "wrote %d instead of %d\n", count, sizeof(i));
+                ssize_t status = write(fd, &i, sizeof(i));
+                ERROR_IF(write, status, == -1);
+                size_t count = (size_t)status;
+
+                if (count < sizeof(i)) {
+                    fprintf(stderr, "wrote %zu instead of %d\n", count, sizeof(i));
                     return 1;
                 }
             } else {
@@ -128,7 +130,7 @@ int writer(int fd) {
     return 0;
 }
 
-int main(int argc, char **argv) {
+int main(void) {
     // Create a non-blocking pipe to use for epoll testing
     int pipefd[2];
     if (pipe2(pipefd, O_CLOEXEC | O_NONBLOCK) < 0) {

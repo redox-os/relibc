@@ -1,8 +1,11 @@
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include "test_helpers.h"
 
 int main(int argc, char **argv) {
+    assert(argc > 0);
+
     puts(argv[0]);
     puts(program_invocation_name);
     puts(program_invocation_short_name);

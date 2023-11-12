@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <wchar.h>
 
@@ -32,7 +33,7 @@ int main(void) {
         &test_reopen_opens_file,
         &test_reopen_resets_orientation,
     };
-    for(int i=0; i<sizeof(tests)/sizeof(int(*)(void)); i++) {
+    for(size_t i = 0; i < sizeof(tests) / sizeof(int(*)(void)); i++) {
         printf("%d\n", (*tests[i])());
     }
 }

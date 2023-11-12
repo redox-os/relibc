@@ -10,12 +10,12 @@
 
 #ifdef __linux__
 
-const int SYS_write = 1;
+#define SYS_write 1
 
 #endif
 #ifdef __redox__
 
-const int SYS_write = 0x21000004;
+#define SYS_write 0x21000004
 
 #endif
 

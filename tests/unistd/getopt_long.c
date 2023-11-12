@@ -55,7 +55,7 @@ void runner(int argc, char *argv[]) {
     }
 }
 
-int main(int argc, const char *argv[]) {
+int main(void) {
     RUN("test", "--test0", "-a");
     RUN("test", "--test1", "-a");
     RUN("test", "--test2", "-a");

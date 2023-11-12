@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -73,7 +74,7 @@ int main(void) {
         "-NaN0.1e5", "-nan-37", "-nAn1.05", "-Nan foo bar baz",
 
     };
-    for (int i = 0; i < sizeof(inputs) / sizeof(char*); i += 1) {
+    for (size_t i = 0; i < sizeof(inputs) / sizeof(char*); i += 1) {
         d = strtod(inputs[i], &endptr);
         printf("d: %f Endptr: \"%s\"\n", d, endptr);
     }

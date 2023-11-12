@@ -10,9 +10,15 @@ int main(void) {
 
     char buf[33] = { 0 };
     for (int i = 1; i <= 32; ++i) {
-        if (fread(buf, 1, i, fp) < 0) {
-            perror("fread");
-            exit(EXIT_FAILURE);
+        size_t nread = fread(buf, 1, i, fp);
+        if (nread == 0) {
+            if (feof(fp)) {
+                fprintf(stderr, "early EOF\n");
+                return EXIT_FAILURE;
+            } else {
+                perror("fread");
+                return EXIT_FAILURE;
+            }
         }
         buf[i] = 0;
 

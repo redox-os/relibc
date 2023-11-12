@@ -60,7 +60,7 @@ int runner(int argc, char *argv[]) {
     return 0;
 }
 
-int main(int argc, const char *argv[]) {
+int main(void) {
     RUN("test", "-ao", "arg", "path", "path");
     RUN("test", "-a", "-o", "arg", "path", "path");
     RUN("test", "-o", "arg", "-a", "path", "path");
