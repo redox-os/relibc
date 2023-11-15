@@ -26,11 +26,11 @@ int main(void) {
         UNEXP_IF(close, cr, != 0);
 
         // send 7 characters in the string, including end-of-string
-        int bytes = write(pip[1], outstring, strlen(outstring));
+        ssize_t bytes = write(pip[1], outstring, strlen(outstring));
         ERROR_IF(write, bytes, == -1);
 
         // check result
-        if (bytes != strlen(outstring)) {
+        if ((size_t)bytes != strlen(outstring)) {
             fprintf(stderr, "pipe write: %d != %ld\n", bytes, strlen(outstring));
             exit(EXIT_FAILURE);
         }
@@ -52,11 +52,11 @@ int main(void) {
         memset(instring, 0, sizeof(instring));
 
         // read from the pipe
-        int bytes = read(pip[0], instring, sizeof(instring) - 1);
+        ssize_t bytes = read(pip[0], instring, sizeof(instring) - 1);
         ERROR_IF(read, bytes, == -1);
 
         // check result
-        if (bytes != strlen(outstring)) {
+        if ((size_t)bytes != strlen(outstring)) {
             fprintf(stderr, "pipe read: %d != %ld\n", bytes, strlen(outstring));
             exit(EXIT_FAILURE);
         } else if (memcmp(instring, outstring, strlen(outstring)) != 0) {

@@ -53,7 +53,7 @@ int main() {
 		&test_manual_wchar_orientation,
 		&test_orientation_after_fprintf,
 	};
-	for(int i=0; i<sizeof(tests)/sizeof(int(*)(void)); i++) {
+	for(size_t i = 0; i < sizeof(tests) / sizeof(int(*)(void)); i++) {
 		printf("%d\n", (*tests[i])());
 	}
 }

@@ -7,6 +7,7 @@
 #include "test_helpers.h"
 
 void handler(int sig) {
+    UNEXP_IF(signal, sig, != SIGUSR1);
     puts("Signal handler called!");
 }
 

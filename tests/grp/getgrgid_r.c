@@ -4,46 +4,36 @@
 #include <string.h>
 #include <grp.h>
 
-bool test_getgrgid(gid_t gid) {
-    struct group* out = getgrgid(gid);
+void test_getgrgid(gid_t gid) {
+    struct group *out = getgrgid(gid);
     
     if (out == NULL) {
-        printf("Did not find a group %d", gid);
-        return false;
+        printf("Did not find a group %d\n", gid);
+        return;
     }
     
     printf("getgrgid\n");
     
-    char* start = out->gr_name;
-    int len = strlen(out->gr_name);
-    
     printf("    %d = %s, GID: %d\n", gid, out->gr_name, out->gr_gid);
-    
-    return true;
 }
 
-bool test_getgrgid_r(gid_t gid) {
-    char* buf[100];
+void test_getgrgid_r(gid_t gid) {
+    char buf[100];
     
     struct group grp;
-    struct group* out = &grp;
-    struct group* tmp;
+    struct group *tmp;
     
-    int status = getgrgid_r(gid, out, buf, sizeof(buf), &tmp);
+    int status = getgrgid_r(gid, &grp, buf, sizeof(buf), &tmp);
     
-    if (out == NULL) {
-        printf("Did not find a group %d", gid);
-        return false;
+    if (tmp == NULL) {
+        const char *reason = status != 0 ? strerror(status) : "(not found)";
+        printf("Did not find a group %d: %s\n", gid, reason);
+        return;
     }
     
     printf("getgrgid_r\n");   
     
-    char* start = grp.gr_name;
-    int len = strlen(grp.gr_name);
-    
     printf("    %d = %s, GID: %d\n", gid, grp.gr_name, grp.gr_gid);
-    
-    return true;
 }
 
 int main(void) {

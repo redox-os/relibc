@@ -31,7 +31,7 @@ int check_mtime(char *path, int expected_sec, int expected_nsec, int err_gap) {
 }
 
 
-int main(int argc, char** argv) {
+int main(void) {
   char temp[] = "/tmp/stattest-XXXXXX";
   const char file[] = "/mkfifo_fifo";
   int len = sizeof(temp) + sizeof(int);

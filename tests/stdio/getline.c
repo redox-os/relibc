@@ -66,6 +66,7 @@ void test_null_args() {
             free(lineptr);                           \
         stream = NULL;                               \
         errno = 0;                                   \
+        (void)n;                                     \
     } while (0);
 
         static size_t counter = 0;

@@ -111,7 +111,7 @@ int safe_strcmp(char *s1, char *s2) {
 int main(void) {
     int retval = EXIT_SUCCESS;
 
-    for(int i = 0; i < num_test_cases; ++i) {
+    for(size_t i = 0; i < num_test_cases; ++i) {
         struct test_case tc = test_cases[i];
         CHECK_TEST(tc, dirname, retval);
         CHECK_TEST(tc, basename, retval);
