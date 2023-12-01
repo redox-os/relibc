@@ -1,5 +1,6 @@
 use crate::{
     c_str::CStr,
+    errno::IntoPosix,
     header::{
         fcntl::O_CREAT,
         unistd::{SEEK_CUR, SEEK_END, SEEK_SET},
@@ -25,38 +26,23 @@ impl File {
     }
 
     pub fn open(path: CStr, oflag: c_int) -> io::Result<Self> {
-        match Sys::open(path, oflag, 0) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(Self::new(ok)),
-        }
+        Ok(Self::new(Sys::open(path, oflag, 0)?))
     }
 
     pub fn create(path: CStr, oflag: c_int, mode: mode_t) -> io::Result<Self> {
-        match Sys::open(path, oflag | O_CREAT, mode) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(Self::new(ok)),
-        }
+        Ok(Self::new(Sys::open(path, oflag | O_CREAT, mode)?))
     }
 
     pub fn sync_all(&self) -> io::Result<()> {
-        match Sys::fsync(self.fd) {
-            -1 => Err(io::last_os_error()),
-            _ok => Ok(()),
-        }
+        Ok(Sys::fsync(self.fd)?)
     }
 
     pub fn set_len(&self, size: u64) -> io::Result<()> {
-        match Sys::ftruncate(self.fd, size as off_t) {
-            -1 => Err(io::last_os_error()),
-            _ok => Ok(()),
-        }
+        Ok(Sys::ftruncate(self.fd, size as off_t)?)
     }
 
     pub fn try_clone(&self) -> io::Result<Self> {
-        match Sys::dup(self.fd) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(Self::new(ok)),
-        }
+        Ok(Self::new(Sys::dup(self.fd)?))
     }
 
     /// Create a new file pointing to the same underlying descriptor. This file
@@ -72,19 +58,13 @@ impl File {
 
 impl io::Read for &File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match Sys::read(self.fd, buf) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(ok as usize),
-        }
+        Ok(Sys::read(self.fd, buf)? as usize)
     }
 }
 
 impl io::Write for &File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match Sys::write(self.fd, buf) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(ok as usize),
-        }
+        Ok(Sys::write(self.fd, buf)? as usize)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -100,10 +80,7 @@ impl io::Seek for &File {
             io::SeekFrom::End(end) => (end as off_t, SEEK_END),
         };
 
-        match Sys::lseek(self.fd, offset, whence) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(ok as u64),
-        }
+        Ok(Sys::lseek(self.fd, offset, whence)? as u64)
     }
 }
 
@@ -140,7 +117,7 @@ impl Deref for File {
 impl Drop for File {
     fn drop(&mut self) {
         if !self.reference {
-            let _ = Sys::close(self.fd);
+            Sys::close(self.fd).into_posix_style();
         }
     }
 }

@@ -1,9 +1,12 @@
-use crate::platform::{types::*, Sys};
+use crate::{
+    errno::IntoPosix,
+    platform::{types::*, Sys},
+};
 
 #[no_mangle]
 pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
     // TODO: Somehow support varargs to syscall??
-    Sys::ioctl(fd, request, out)
+    Sys::ioctl(fd, request, out).into_posix_style()
 }
 
 pub const TCGETS: c_ulong = 0x5401;

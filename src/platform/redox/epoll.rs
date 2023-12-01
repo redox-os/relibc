@@ -4,6 +4,7 @@ use super::{
 };
 
 use crate::{
+    errno::Errno,
     fs::File,
     header::{errno::*, fcntl::*, signal::sigset_t, sys_epoll::*},
     io::prelude::*,
@@ -16,11 +17,11 @@ use syscall::{
 };
 
 impl PalEpoll for Sys {
-    fn epoll_create1(flags: c_int) -> c_int {
+    fn epoll_create1(flags: c_int) -> Result<c_int, Errno> {
         Sys::open(c_str!("event:"), O_RDWR | flags, 0)
     }
 
-    fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> c_int {
+    fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> Result<(), Errno> {
         match op {
             EPOLL_CTL_ADD | EPOLL_CTL_MOD => {
                 Sys::write(
@@ -33,7 +34,8 @@ impl PalEpoll for Sys {
                         // systems. If this is needed, use a box or something
                         data: unsafe { (*event).data.u64 as usize },
                     },
-                ) as c_int
+                )?;
+                Ok(())
             }
             EPOLL_CTL_DEL => {
                 Sys::write(
@@ -44,12 +46,10 @@ impl PalEpoll for Sys {
                         //TODO: Is data required?
                         data: 0,
                     },
-                ) as c_int
+                )?;
+                Ok(())
             }
-            _ => {
-                unsafe { platform::errno = EINVAL };
-                return -1;
-            }
+            _ => Err(Errno(EINVAL)),
         }
     }
 
@@ -59,44 +59,32 @@ impl PalEpoll for Sys {
         maxevents: c_int,
         timeout: c_int,
         _sigset: *const sigset_t,
-    ) -> c_int {
+    ) -> Result<c_int, Errno> {
         // TODO: sigset
         assert_eq!(mem::size_of::<epoll_event>(), mem::size_of::<Event>());
 
         if maxevents <= 0 {
-            unsafe { platform::errno = EINVAL };
-            return -1;
+            return Err(Errno(EINVAL));
         }
 
         let timer_opt = if timeout != -1 {
-            match File::open(c_str!("time:4"), O_RDWR) {
-                Err(_) => return -1,
-                Ok(mut timer) => {
-                    if Sys::write(
-                        epfd,
-                        &Event {
-                            id: timer.fd as usize,
-                            flags: EVENT_READ,
-                            data: 0,
-                        },
-                    ) == -1
-                    {
-                        return -1;
-                    }
+            let mut timer = File::open(c_str!("time:4"), O_RDWR)?;
+            let _ = Sys::write(
+                epfd,
+                &Event {
+                    id: timer.fd as usize,
+                    flags: EVENT_READ,
+                    data: 0,
+                },
+            )?;
 
-                    let mut time = TimeSpec::default();
-                    if let Err(err) = timer.read(&mut time) {
-                        return -1;
-                    }
-                    time.tv_sec += (timeout as i64) / 1000;
-                    time.tv_nsec += (timeout % 1000) * 1000000;
-                    if let Err(err) = timer.write(&time) {
-                        return -1;
-                    }
+            let mut time = TimeSpec::default();
+            let _ = timer.read(&mut time)?;
+            time.tv_sec += (timeout as i64) / 1000;
+            time.tv_nsec += (timeout % 1000) * 1000000;
+            let _ = timer.write(&time)?;
 
-                    Some(timer)
-                }
-            }
+            Some(timer)
         } else {
             None
         };
@@ -106,10 +94,7 @@ impl PalEpoll for Sys {
                 events as *mut u8,
                 maxevents as usize * mem::size_of::<syscall::Event>(),
             )
-        });
-        if bytes_read == -1 {
-            return -1;
-        }
+        })?;
         let read = bytes_read as usize / mem::size_of::<syscall::Event>();
 
         let mut count = 0;
@@ -135,6 +120,6 @@ impl PalEpoll for Sys {
             }
         }
 
-        count as c_int
+        Ok(count as c_int)
     }
 }

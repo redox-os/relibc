@@ -17,6 +17,7 @@ use core::{
 use crate::{
     c_str::CStr,
     c_vec::CVec,
+    errno::IntoPosix,
     fs::File,
     header::{
         errno::{self, STR_ERROR},
@@ -320,7 +321,7 @@ pub unsafe extern "C" fn fclose(stream: *mut FILE) -> c_int {
     flockfile(stream);
 
     let mut r = stream.flush().is_err();
-    let close = Sys::close(*stream.file) < 0;
+    let close = Sys::close(*stream.file).into_posix_style() < 0;
     r = r || close;
 
     if stream.flags & constants::F_PERM == 0 {
@@ -522,7 +523,7 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
     if let Some(f) = helpers::_fdopen(fd, mode) {
         f
     } else {
-        Sys::close(fd);
+        Sys::close(fd).into_posix_style();
         ptr::null_mut()
     }
 }
@@ -629,7 +630,7 @@ pub unsafe extern "C" fn freopen(
         let new = &mut *new; // Should be safe, new is not null
         if *new.file == *stream.file {
             new.file.fd = -1;
-        } else if Sys::dup2(*new.file, *stream.file) < 0
+        } else if Sys::dup2(*new.file, *stream.file).into_posix_style() < 0
             || fcntl::sys_fcntl(
                 *stream.file,
                 fcntl::F_SETFL,
@@ -674,7 +675,7 @@ pub unsafe fn fseek_locked(stream: &mut FILE, mut off: off_t, whence: c_int) -> 
         return -1;
     }
 
-    let err = Sys::lseek(*stream.file, off, whence);
+    let err = Sys::lseek(*stream.file, off, whence).into_posix_style();
     if err < 0 {
         return err as c_int;
     }
@@ -705,7 +706,7 @@ pub unsafe extern "C" fn ftello(stream: *mut FILE) -> off_t {
     ftell_locked(&mut *stream)
 }
 pub unsafe extern "C" fn ftell_locked(stream: &mut FILE) -> off_t {
-    let pos = Sys::lseek(*stream.file, 0, SEEK_CUR);
+    let pos = Sys::lseek(*stream.file, 0, SEEK_CUR).into_posix_style();
     if pos < 0 {
         return -1;
     }
@@ -829,9 +830,7 @@ pub unsafe extern "C" fn pclose(stream: *mut FILE) -> c_int {
     fclose(stream);
 
     let mut wstatus = 0;
-    if Sys::waitpid(pid, &mut wstatus, 0) < 0 {
-        return -1;
-    }
+    Sys::waitpid(pid, &mut wstatus, 0).into_posix_style();
 
     wstatus
 }
@@ -1000,9 +999,9 @@ pub unsafe extern "C" fn putw(w: c_int, stream: *mut FILE) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn remove(path: *const c_char) -> c_int {
     let path = CStr::from_ptr(path);
-    let r = Sys::unlink(path);
-    if r == -errno::EISDIR {
-        Sys::rmdir(path)
+    let r = Sys::unlink(path).into_posix_style();
+    if r == -1 && platform::errno == errno::EISDIR {
+        Sys::rmdir(path).into_posix_style()
     } else {
         r
     }
@@ -1012,7 +1011,7 @@ pub unsafe extern "C" fn remove(path: *const c_char) -> c_int {
 pub unsafe extern "C" fn rename(oldpath: *const c_char, newpath: *const c_char) -> c_int {
     let oldpath = CStr::from_ptr(oldpath);
     let newpath = CStr::from_ptr(newpath);
-    Sys::rename(oldpath, newpath)
+    Sys::rename(oldpath, newpath).into_posix_style()
 }
 
 /// Rewind `stream` back to the beginning of it
@@ -1115,11 +1114,11 @@ pub unsafe extern "C" fn tmpfile() -> *mut FILE {
     let fp = fdopen(fd, c_str!("w+").as_ptr());
     {
         let file_name = CStr::from_ptr(file_name);
-        Sys::unlink(file_name);
+        Sys::unlink(file_name).into_posix_style();
     }
 
     if fp.is_null() {
-        Sys::close(fd);
+        Sys::close(fd).into_posix_style();
     }
 
     fp

@@ -1,4 +1,7 @@
-use crate::platform::{Pal, Sys};
+use crate::{
+    errno::IntoPosix,
+    platform::{Pal, Sys},
+};
 
 // Stub for call used in exit
 #[no_mangle]
@@ -11,29 +14,44 @@ fn access() {
     use crate::header::unistd;
 
     //TODO: create test files
-    assert_eq!(Sys::access(c_str!("not a file!"), unistd::F_OK), !0);
-    assert_eq!(Sys::access(c_str!("README.md"), unistd::F_OK), 0);
-    assert_eq!(Sys::access(c_str!("README.md"), unistd::R_OK), 0);
-    assert_eq!(Sys::access(c_str!("README.md"), unistd::W_OK), 0);
-    assert_eq!(Sys::access(c_str!("README.md"), unistd::X_OK), !0);
+    assert_eq!(
+        Sys::access(c_str!("not a file!"), unistd::F_OK).into_posix_style(),
+        !0
+    );
+    assert_eq!(
+        Sys::access(c_str!("README.md"), unistd::F_OK).into_posix_style(),
+        0
+    );
+    assert_eq!(
+        Sys::access(c_str!("README.md"), unistd::R_OK).into_posix_style(),
+        0
+    );
+    assert_eq!(
+        Sys::access(c_str!("README.md"), unistd::W_OK).into_posix_style(),
+        0
+    );
+    assert_eq!(
+        Sys::access(c_str!("README.md"), unistd::X_OK).into_posix_style(),
+        !0
+    );
 }
 
 #[test]
 fn brk() {
     use core::ptr;
 
-    let current = Sys::brk(ptr::null_mut());
+    let current = Sys::brk(ptr::null_mut()).into_posix_style();
     assert_ne!(current, ptr::null_mut());
 
     let request = unsafe { current.add(4096) };
-    let next = Sys::brk(request);
+    let next = Sys::brk(request).into_posix_style();
     assert_eq!(next, request);
 }
 
 #[test]
 fn chdir() {
     //TODO: create test files
-    assert_eq!(Sys::chdir(c_str!("src")), 0);
+    assert_eq!(Sys::chdir(c_str!("src")), Ok(()));
 }
 
 //TODO: chmod
@@ -49,7 +67,10 @@ fn clock_gettime() {
             tv_sec: -1,
             tv_nsec: -1,
         };
-        assert_eq!(Sys::clock_gettime(time::CLOCK_REALTIME, &mut timespec), 0);
+        assert_eq!(
+            Sys::clock_gettime(time::CLOCK_REALTIME, &mut timespec),
+            Ok(())
+        );
         assert_ne!(timespec.tv_sec, -1);
         assert_ne!(timespec.tv_nsec, -1);
     }
@@ -59,7 +80,10 @@ fn clock_gettime() {
             tv_sec: -1,
             tv_nsec: -1,
         };
-        assert_eq!(Sys::clock_gettime(time::CLOCK_MONOTONIC, &mut timespec), 0);
+        assert_eq!(
+            Sys::clock_gettime(time::CLOCK_MONOTONIC, &mut timespec),
+            Ok(())
+        );
         assert_ne!(timespec.tv_sec, -1);
         assert_ne!(timespec.tv_nsec, -1);
     }
@@ -75,7 +99,7 @@ fn getrandom() {
     for i in 1..arrays.len() {
         assert_eq!(
             Sys::getrandom(&mut arrays[i], 0),
-            arrays[i].len() as ssize_t
+            Ok(arrays[i].len() as ssize_t)
         );
 
         for j in 0..arrays.len() {

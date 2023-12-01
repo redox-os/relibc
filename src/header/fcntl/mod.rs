@@ -2,6 +2,7 @@
 
 use crate::{
     c_str::CStr,
+    errno::IntoPosix,
     platform::{types::*, Pal, Sys},
 };
 
@@ -48,13 +49,13 @@ pub struct flock {
 }
 #[no_mangle]
 pub extern "C" fn sys_fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> c_int {
-    Sys::fcntl(fildes, cmd, arg)
+    Sys::fcntl(fildes, cmd, arg).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sys_open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::open(path, oflag, mode)
+    Sys::open(path, oflag, mode).into_posix_style()
 }
 
 #[no_mangle]

@@ -3,6 +3,7 @@
 use core::ptr;
 
 use crate::{
+    errno::IntoPosix,
     header::signal::sigset_t,
     platform::{types::*, PalEpoll, Sys},
 };
@@ -64,7 +65,7 @@ pub extern "C" fn epoll_create(_size: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn epoll_create1(flags: c_int) -> c_int {
-    trace_expr!(Sys::epoll_create1(flags), "epoll_create1({:#x})", flags)
+    trace_expr!(Sys::epoll_create1(flags), "epoll_create1({:#x})", flags).into_posix_style()
 }
 
 #[no_mangle]
@@ -77,6 +78,7 @@ pub extern "C" fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll
         fd,
         event
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
@@ -106,4 +108,5 @@ pub extern "C" fn epoll_pwait(
         timeout,
         sigmask
     )
+    .into_posix_style()
 }

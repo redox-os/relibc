@@ -1,6 +1,9 @@
 //! sys/utsname implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysutsname.h.html
 
-use crate::platform::{types::*, Pal, Sys};
+use crate::{
+    errno::IntoPosix,
+    platform::{types::*, Pal, Sys},
+};
 
 pub const UTSLENGTH: usize = 65;
 
@@ -16,5 +19,5 @@ pub struct utsname {
 
 #[no_mangle]
 pub unsafe extern "C" fn uname(uts: *mut utsname) -> c_int {
-    Sys::uname(uts)
+    Sys::uname(uts).into_posix_style()
 }

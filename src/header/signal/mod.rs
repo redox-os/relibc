@@ -5,6 +5,7 @@ use core::{mem, ptr};
 use cbitset::BitSet;
 
 use crate::{
+    errno::{IntoPThread, IntoPosix},
     header::{errno, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},
     pthread,
@@ -64,12 +65,12 @@ pub type stack_t = sigaltstack;
 
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
-    Sys::kill(pid, sig)
+    Sys::kill(pid, sig).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-    Sys::killpg(pgrp, sig)
+    Sys::killpg(pgrp, sig).into_posix_style()
 }
 
 #[no_mangle]
@@ -78,7 +79,7 @@ pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
         let pthread = &*(thread as *const pthread::Pthread);
         pthread.os_tid.get().read()
     };
-    crate::header::pthread::e(Sys::rlct_kill(os_tid, sig as usize))
+    Sys::rlct_kill(os_tid, sig as usize).into_pthread_style()
 }
 
 #[no_mangle]
@@ -98,7 +99,7 @@ pub unsafe extern "C" fn pthread_sigmask(
 
 #[no_mangle]
 pub extern "C" fn raise(sig: c_int) -> c_int {
-    Sys::raise(sig)
+    Sys::raise(sig).into_posix_style()
 }
 
 #[no_mangle]
@@ -113,7 +114,7 @@ pub unsafe extern "C" fn sigaction(
         act_clone.sa_restorer = Some(__restore_rt);
         act_clone
     });
-    Sys::sigaction(sig, act_opt.as_ref(), oact.as_mut())
+    Sys::sigaction(sig, act_opt.as_ref(), oact.as_mut()).into_posix_style()
 }
 
 #[no_mangle]
@@ -142,7 +143,7 @@ pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -
         }
     }
 
-    Sys::sigaltstack(ss, old_ss)
+    Sys::sigaltstack(ss, old_ss).into_posix_style()
 }
 
 #[no_mangle]
@@ -263,7 +264,7 @@ pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
-    Sys::sigpending(set)
+    Sys::sigpending(set).into_posix_style()
 }
 
 const BELOW_SIGRTMIN_MASK: sigset_t = (1 << SIGRTMIN) - 1;
@@ -284,6 +285,7 @@ pub unsafe extern "C" fn sigprocmask(
             .map_or(core::ptr::null(), |r| r as *const sigset_t),
         oset,
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
@@ -342,7 +344,7 @@ pub unsafe extern "C" fn sigset(
 
 #[no_mangle]
 pub extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
-    Sys::sigsuspend(sigmask)
+    Sys::sigsuspend(sigmask).set_errno()
 }
 
 #[no_mangle]
@@ -364,7 +366,7 @@ pub extern "C" fn sigtimedwait(
     sig: *mut siginfo_t,
     tp: *const timespec,
 ) -> c_int {
-    Sys::sigtimedwait(set, sig, tp)
+    Sys::sigtimedwait(set, sig, tp).into_posix_style()
 }
 
 pub const _signal_strings: [&str; 32] = [

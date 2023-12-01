@@ -16,6 +16,7 @@ pub use self::{
 };
 
 use crate::{
+    errno::IntoPosix,
     header::time::timespec,
     platform::{types::*, Pal, Sys},
 };
@@ -122,7 +123,8 @@ pub fn rttime() -> timespec {
         let mut time = MaybeUninit::uninit();
 
         // TODO: Handle error
-        Sys::clock_gettime(crate::header::time::CLOCK_REALTIME, time.as_mut_ptr());
+        Sys::clock_gettime(crate::header::time::CLOCK_REALTIME, time.as_mut_ptr())
+            .into_posix_style();
 
         time.assume_init()
     }

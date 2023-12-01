@@ -2,7 +2,10 @@
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/syswait.h.html
 
 //use header::sys_resource::rusage;
-use crate::platform::{types::*, Pal, Sys};
+use crate::{
+    errno::IntoPosix,
+    platform::{types::*, Pal, Sys},
+};
 
 pub const WNOHANG: c_int = 1;
 pub const WUNTRACED: c_int = 2;
@@ -47,5 +50,5 @@ pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
-    Sys::waitpid(pid, stat_loc, options)
+    Sys::waitpid(pid, stat_loc, options).into_posix_style()
 }

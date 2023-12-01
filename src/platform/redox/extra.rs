@@ -1,31 +1,35 @@
 use core::{ptr, slice};
 
-use crate::platform::{sys::e, types::*};
+use crate::{
+    errno::IntoPosix,
+    platform::{sys::e_raw, types::*},
+};
 use syscall::{error::*, F_SETFD, F_SETFL};
 
 pub use redox_exec::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_fpath(fd: c_int, buf: *mut c_void, count: size_t) -> ssize_t {
-    e(syscall::fpath(
+    e_raw(syscall::fpath(
         fd as usize,
         slice::from_raw_parts_mut(buf as *mut u8, count),
-    )) as ssize_t
+    ))
+    .map(|res| res as ssize_t)
+    .into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_physalloc(size: size_t) -> *mut c_void {
-    let res = e(syscall::physalloc(size));
-    if res == !0 {
-        return ptr::null_mut();
-    } else {
-        return res as *mut c_void;
-    }
+    e_raw(syscall::physalloc(size))
+        .map(|res| res as *mut c_void)
+        .into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_physfree(physical_address: *mut c_void, size: size_t) -> c_int {
-    e(syscall::physfree(physical_address as usize, size)) as c_int
+    e_raw(syscall::physfree(physical_address as usize, size))
+        .map(|res| res as c_int)
+        .into_posix_style()
 }
 
 pub fn pipe2(fds: &mut [c_int], flags: usize) -> syscall::error::Result<()> {

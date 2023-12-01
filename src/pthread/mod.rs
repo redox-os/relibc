@@ -9,6 +9,7 @@ use core::{
 use alloc::{boxed::Box, collections::BTreeMap};
 
 use crate::{
+    errno::{Errno, IntoPosix},
     header::{errno::*, pthread as header, sched::sched_param, sys_mman},
     ld_so::{
         linker::Linker,
@@ -84,11 +85,6 @@ pub struct OsTid {
 unsafe impl Send for Pthread {}
 unsafe impl Sync for Pthread {}
 
-/// Positive error codes (EINVAL, not -EINVAL).
-#[derive(Debug, Eq, PartialEq)]
-// TODO: Move to a more generic place.
-pub struct Errno(pub c_int);
-
 #[derive(Clone, Copy)]
 pub struct Retval(pub *mut c_void);
 
@@ -99,7 +95,7 @@ struct MmapGuard {
 impl Drop for MmapGuard {
     fn drop(&mut self) {
         unsafe {
-            let _ = Sys::munmap(self.page_start, self.mmap_size);
+            Sys::munmap(self.page_start, self.mmap_size).into_posix_style();
         }
     }
 }

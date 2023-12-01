@@ -6,6 +6,7 @@ use core::{mem, ptr};
 use crate::{
     c_str::CStr,
     c_vec::CVec,
+    errno::IntoPosix,
     fs::File,
     header::{errno, fcntl, stdlib, string},
     io::{Seek, SeekFrom},
@@ -60,7 +61,7 @@ pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
 pub unsafe extern "C" fn closedir(dir: *mut DIR) -> c_int {
     let mut dir = Box::from_raw(dir);
 
-    let ret = Sys::close(*dir.file);
+    let ret = Sys::close(*dir.file).into_posix_style();
 
     // Reference files aren't closed when dropped
     dir.file.reference = true;
@@ -80,7 +81,8 @@ pub unsafe extern "C" fn readdir(dir: *mut DIR) -> *mut dirent {
             *(*dir).file,
             (*dir).buf.as_mut_ptr() as *mut dirent,
             (*dir).buf.len(),
-        );
+        )
+        .into_posix_style();
         if read <= 0 {
             if read != 0 && read != -errno::ENOENT {
                 platform::errno = -read;

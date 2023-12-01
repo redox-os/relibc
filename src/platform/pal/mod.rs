@@ -1,6 +1,7 @@
 use super::types::*;
 use crate::{
     c_str::CStr,
+    errno::Errno,
     header::{
         dirent::dirent,
         sys_resource::rlimit,
@@ -25,73 +26,76 @@ pub use self::socket::PalSocket;
 mod socket;
 
 pub trait Pal {
-    fn access(path: CStr, mode: c_int) -> c_int;
+    fn access(path: CStr, mode: c_int) -> Result<(), Errno>;
 
-    fn brk(addr: *mut c_void) -> *mut c_void;
+    fn brk(addr: *mut c_void) -> Result<*mut c_void, Errno>;
 
-    fn chdir(path: CStr) -> c_int;
+    fn chdir(path: CStr) -> Result<(), Errno>;
 
-    fn chmod(path: CStr, mode: mode_t) -> c_int;
+    fn chmod(path: CStr, mode: mode_t) -> Result<(), Errno>;
 
-    fn chown(path: CStr, owner: uid_t, group: gid_t) -> c_int;
+    fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<(), Errno>;
 
-    fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> c_int;
+    fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> Result<(), Errno>;
 
-    fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int;
+    fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> Result<(), Errno>;
 
-    fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> c_int;
+    fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> Result<(), Errno>;
 
-    fn close(fildes: c_int) -> c_int;
+    fn close(fildes: c_int) -> Result<(), Errno>;
 
-    fn dup(fildes: c_int) -> c_int;
+    fn dup(fildes: c_int) -> Result<c_int, Errno>;
 
-    fn dup2(fildes: c_int, fildes2: c_int) -> c_int;
+    fn dup2(fildes: c_int, fildes2: c_int) -> Result<c_int, Errno>;
 
-    unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int;
-    unsafe fn fexecve(fildes: c_int, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int;
+    unsafe fn execve(
+        path: CStr,
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
+    ) -> Result<(), Errno>;
+    unsafe fn fexecve(
+        fildes: c_int,
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
+    ) -> Result<(), Errno>;
 
     fn exit(status: c_int) -> !;
 
     fn exit_thread() -> !;
 
-    fn fchdir(fildes: c_int) -> c_int;
+    fn fchdir(fildes: c_int) -> Result<(), Errno>;
 
-    fn fchmod(fildes: c_int, mode: mode_t) -> c_int;
+    fn fchmod(fildes: c_int, mode: mode_t) -> Result<(), Errno>;
 
-    fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int;
+    fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<(), Errno>;
 
-    fn fdatasync(fildes: c_int) -> c_int;
+    fn fdatasync(fildes: c_int) -> Result<(), Errno>;
 
-    fn flock(fd: c_int, operation: c_int) -> c_int;
+    fn flock(fd: c_int, operation: c_int) -> Result<(), Errno>;
 
-    fn fstat(fildes: c_int, buf: *mut stat) -> c_int;
+    fn fstat(fildes: c_int, buf: *mut stat) -> Result<(), Errno>;
 
-    fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int;
+    fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<(), Errno>;
 
-    fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> c_int;
+    fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> Result<c_int, Errno>;
 
-    fn fork() -> pid_t;
+    fn fork() -> Result<pid_t, Errno>;
 
-    fn fpath(fildes: c_int, out: &mut [u8]) -> ssize_t;
+    fn fpath(fildes: c_int, out: &mut [u8]) -> Result<ssize_t, Errno>;
 
-    fn fsync(fildes: c_int) -> c_int;
+    fn fsync(fildes: c_int) -> Result<(), Errno>;
 
-    fn ftruncate(fildes: c_int, length: off_t) -> c_int;
+    fn ftruncate(fildes: c_int, length: off_t) -> Result<(), Errno>;
 
-    fn futex(
-        addr: *mut c_int,
-        op: c_int,
-        val: c_int,
-        val2: usize,
-    ) -> Result<c_long, crate::pthread::Errno>;
+    fn futex(addr: *mut c_int, op: c_int, val: c_int, val2: usize) -> Result<c_long, Errno>;
 
-    fn futimens(fd: c_int, times: *const timespec) -> c_int;
+    fn futimens(fd: c_int, times: *const timespec) -> Result<(), Errno>;
 
-    fn utimens(path: CStr, times: *const timespec) -> c_int;
+    fn utimens(path: CStr, times: *const timespec) -> Result<(), Errno>;
 
-    fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char;
+    fn getcwd(buf: *mut c_char, size: size_t) -> Result<*mut c_char, Errno>;
 
-    fn getdents(fd: c_int, dirents: *mut dirent, bytes: usize) -> c_int;
+    fn getdents(fd: c_int, dirents: *mut dirent, bytes: usize) -> Result<c_int, Errno>;
 
     fn getegid() -> gid_t;
 
@@ -99,48 +103,48 @@ pub trait Pal {
 
     fn getgid() -> gid_t;
 
-    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> c_int;
+    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int, Errno>;
 
     /* Note that this is distinct from the legacy POSIX function
      * getpagesize(), which returns a c_int. On some Linux platforms,
      * page size may be determined through a syscall ("getpagesize"). */
     fn getpagesize() -> usize;
 
-    fn getpgid(pid: pid_t) -> pid_t;
+    fn getpgid(pid: pid_t) -> Result<pid_t, Errno>;
 
     fn getpid() -> pid_t;
 
     fn getppid() -> pid_t;
 
-    fn getpriority(which: c_int, who: id_t) -> c_int;
+    fn getpriority(which: c_int, who: id_t) -> Result<c_int, Errno>;
 
-    fn getrandom(buf: &mut [u8], flags: c_uint) -> ssize_t;
+    fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<ssize_t, Errno>;
 
-    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int;
+    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<(), Errno>;
 
-    unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> c_int;
+    unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> Result<(), Errno>;
 
-    fn getsid(pid: pid_t) -> pid_t;
+    fn getsid(pid: pid_t) -> Result<pid_t, Errno>;
 
     fn gettid() -> pid_t;
 
-    fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int;
+    fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> Result<(), Errno>;
 
     fn getuid() -> uid_t;
 
-    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> c_int;
+    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<(), Errno>;
 
-    fn link(path1: CStr, path2: CStr) -> c_int;
+    fn link(path1: CStr, path2: CStr) -> Result<(), Errno>;
 
-    fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t;
+    fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t, Errno>;
 
-    fn mkdir(path: CStr, mode: mode_t) -> c_int;
+    fn mkdir(path: CStr, mode: mode_t) -> Result<(), Errno>;
 
-    fn mkfifo(path: CStr, mode: mode_t) -> c_int;
+    fn mkfifo(path: CStr, mode: mode_t) -> Result<(), Errno>;
 
-    unsafe fn mlock(addr: *const c_void, len: usize) -> c_int;
+    unsafe fn mlock(addr: *const c_void, len: usize) -> Result<(), Errno>;
 
-    fn mlockall(flags: c_int) -> c_int;
+    fn mlockall(flags: c_int) -> Result<(), Errno>;
 
     unsafe fn mmap(
         addr: *mut c_void,
@@ -149,69 +153,65 @@ pub trait Pal {
         flags: c_int,
         fildes: c_int,
         off: off_t,
-    ) -> *mut c_void;
+    ) -> Result<*mut c_void, Errno>;
 
-    unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int;
+    unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> Result<(), Errno>;
 
-    unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> c_int;
+    unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> Result<(), Errno>;
 
-    unsafe fn munlock(addr: *const c_void, len: usize) -> c_int;
+    unsafe fn munlock(addr: *const c_void, len: usize) -> Result<(), Errno>;
 
-    unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> c_int;
+    unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> Result<(), Errno>;
 
-    fn munlockall() -> c_int;
+    fn munlockall() -> Result<(), Errno>;
 
-    unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int;
+    unsafe fn munmap(addr: *mut c_void, len: usize) -> Result<(), Errno>;
 
-    fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int;
+    fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<(), Errno>;
 
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> c_int;
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int, Errno>;
 
-    fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int;
+    fn pipe2(fildes: &mut [c_int], flags: c_int) -> Result<(), Errno>;
 
-    unsafe fn rlct_clone(stack: *mut usize)
-        -> Result<crate::pthread::OsTid, crate::pthread::Errno>;
-    unsafe fn rlct_kill(
-        os_tid: crate::pthread::OsTid,
-        signal: usize,
-    ) -> Result<(), crate::pthread::Errno>;
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, Errno>;
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), Errno>;
     fn current_os_tid() -> crate::pthread::OsTid;
 
-    fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
+    fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno>;
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> ssize_t;
+    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<ssize_t, Errno>;
 
-    fn rename(old: CStr, new: CStr) -> c_int;
+    fn rename(old: CStr, new: CStr) -> Result<(), Errno>;
 
-    fn rmdir(path: CStr) -> c_int;
+    fn rmdir(path: CStr) -> Result<(), Errno>;
 
-    fn sched_yield() -> c_int;
+    fn sched_yield() -> Result<(), Errno>;
 
-    unsafe fn setgroups(size: size_t, list: *const gid_t) -> c_int;
+    unsafe fn setgroups(size: size_t, list: *const gid_t) -> Result<(), Errno>;
 
-    fn setpgid(pid: pid_t, pgid: pid_t) -> c_int;
+    fn setpgid(pid: pid_t, pgid: pid_t) -> Result<(), Errno>;
 
-    fn setpriority(which: c_int, who: id_t, prio: c_int) -> c_int;
+    fn setpriority(which: c_int, who: id_t, prio: c_int) -> Result<(), Errno>;
 
-    fn setregid(rgid: gid_t, egid: gid_t) -> c_int;
+    fn setregid(rgid: gid_t, egid: gid_t) -> Result<(), Errno>;
 
-    fn setreuid(ruid: uid_t, euid: uid_t) -> c_int;
+    fn setreuid(ruid: uid_t, euid: uid_t) -> Result<(), Errno>;
 
-    fn setsid() -> c_int;
+    fn setsid() -> Result<(), Errno>;
 
-    fn symlink(path1: CStr, path2: CStr) -> c_int;
+    fn symlink(path1: CStr, path2: CStr) -> Result<(), Errno>;
 
-    fn sync() -> c_int;
+    fn sync() -> Result<(), Errno>;
 
     fn umask(mask: mode_t) -> mode_t;
 
-    fn uname(utsname: *mut utsname) -> c_int;
+    fn uname(utsname: *mut utsname) -> Result<(), Errno>;
 
-    fn unlink(path: CStr) -> c_int;
+    fn unlink(path: CStr) -> Result<(), Errno>;
 
-    fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t;
+    fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t, Errno>;
 
-    fn write(fildes: c_int, buf: &[u8]) -> ssize_t;
+    fn write(fildes: c_int, buf: &[u8]) -> Result<ssize_t, Errno>;
 
-    fn verify() -> bool;
+    fn verify() -> Result<(), Errno>;
 }

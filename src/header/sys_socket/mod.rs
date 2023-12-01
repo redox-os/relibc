@@ -2,7 +2,10 @@
 
 use core::ptr;
 
-use crate::platform::{types::*, PalSocket, Sys};
+use crate::{
+    errno::IntoPosix,
+    platform::{types::*, PalSocket, Sys},
+};
 
 pub mod constants;
 
@@ -29,6 +32,7 @@ pub unsafe extern "C" fn accept(
         address,
         address_len
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
@@ -44,6 +48,7 @@ pub unsafe extern "C" fn bind(
         address,
         address_len
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
@@ -59,6 +64,7 @@ pub unsafe extern "C" fn connect(
         address,
         address_len
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
@@ -74,6 +80,7 @@ pub unsafe extern "C" fn getpeername(
         address,
         address_len
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
@@ -89,6 +96,7 @@ pub unsafe extern "C" fn getsockname(
         address,
         address_len
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
@@ -108,11 +116,12 @@ pub unsafe extern "C" fn getsockopt(
         option_value,
         option_len
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn listen(socket: c_int, backlog: c_int) -> c_int {
-    Sys::listen(socket, backlog)
+    Sys::listen(socket, backlog).into_posix_style()
 }
 
 #[no_mangle]
@@ -151,6 +160,7 @@ pub unsafe extern "C" fn recvfrom(
         address,
         address_len
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
@@ -182,6 +192,7 @@ pub unsafe extern "C" fn sendto(
         dest_addr,
         dest_len
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
@@ -201,11 +212,12 @@ pub unsafe extern "C" fn setsockopt(
         option_value,
         option_len
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {
-    Sys::shutdown(socket, how)
+    Sys::shutdown(socket, how).into_posix_style()
 }
 
 #[no_mangle]
@@ -217,6 +229,7 @@ pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> 
         kind,
         protocol,
     )
+    .into_posix_style()
 }
 
 #[no_mangle]
@@ -234,4 +247,5 @@ pub unsafe extern "C" fn socketpair(
         protocol,
         sv
     )
+    .into_posix_style()
 }

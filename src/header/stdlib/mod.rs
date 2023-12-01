@@ -10,6 +10,7 @@ use rand_xorshift::XorShiftRng;
 
 use crate::{
     c_str::CStr,
+    errno::IntoPosix,
     fs::File,
     header::{
         ctype,
@@ -625,7 +626,7 @@ where
 pub unsafe extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
     if inner_mktemp(name, 0, || {
         let name = CStr::from_ptr(name);
-        if Sys::access(name, 0) != 0 && platform::errno == ENOENT {
+        if Sys::access(name, 0).into_posix_style() != 0 && platform::errno == ENOENT {
             Some(())
         } else {
             None
@@ -640,7 +641,7 @@ pub unsafe extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
 
 fn get_nstime() -> u64 {
     let mut ts = mem::MaybeUninit::uninit();
-    Sys::clock_gettime(CLOCK_MONOTONIC, ts.as_mut_ptr());
+    Sys::clock_gettime(CLOCK_MONOTONIC, ts.as_mut_ptr()).into_posix_style();
     unsafe { ts.assume_init() }.tv_nsec as u64
 }
 
@@ -655,13 +656,9 @@ pub unsafe extern "C" fn mkostemps(
 
     inner_mktemp(name, suffix_len, || {
         let name = CStr::from_ptr(name);
-        let fd = Sys::open(name, flags, 0o600);
-
-        if fd >= 0 {
-            Some(fd)
-        } else {
-            None
-        }
+        Sys::open(name, flags, 0o600)
+            .map_err(|err| err.set_errno())
+            .ok()
     })
     .unwrap_or(-1)
 }
@@ -873,7 +870,7 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
         };
 
         let len = out.len();
-        let read = Sys::fpath(*file, &mut out[..len - 1]);
+        let read = Sys::fpath(*file, &mut out[..len - 1]).into_posix_style();
         if read < 0 {
             return ptr::null_mut();
         }
@@ -1206,7 +1203,7 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
         unreachable!();
     } else if child_pid > 0 {
         let mut wstatus = 0;
-        if Sys::waitpid(child_pid, &mut wstatus, 0) == !0 {
+        if Sys::waitpid(child_pid, &mut wstatus, 0).into_posix_style() < 0 {
             return -1;
         }
 

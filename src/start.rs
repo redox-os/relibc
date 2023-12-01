@@ -2,6 +2,7 @@ use alloc::{boxed::Box, vec::Vec};
 use core::{intrinsics, ptr};
 
 use crate::{
+    errno::IntoPosix,
     header::{libgen, stdio, stdlib},
     ld_so::{self, linker::Linker},
     platform::{self, get_auxvs, new_mspace, types::*, Pal, Sys},
@@ -58,7 +59,7 @@ unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut
 // other. This will test that the current system is compatible with the current binary
 #[no_mangle]
 pub unsafe fn relibc_verify_host() {
-    if !Sys::verify() {
+    if Sys::verify().into_posix_style() != 0 {
         intrinsics::abort();
     }
 }

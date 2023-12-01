@@ -2,6 +2,7 @@
 
 use crate::{
     c_str::CStr,
+    errno::IntoPosix,
     header::time::timespec,
     platform::{types::*, Pal, Sys},
 };
@@ -26,5 +27,5 @@ pub unsafe extern "C" fn utime(filename: *const c_char, times: *const utimbuf) -
             tv_nsec: 0,
         },
     ];
-    Sys::utimens(filename, times_spec.as_ptr())
+    Sys::utimens(filename, times_spec.as_ptr()).into_posix_style()
 }

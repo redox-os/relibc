@@ -1,4 +1,7 @@
-use crate::io::{self, Read, Write};
+use crate::{
+    errno::{Errno, IntoPosix},
+    io::{self, Read, Write},
+};
 use alloc::{boxed::Box, vec::Vec};
 use core::{fmt, ptr};
 
@@ -16,7 +19,7 @@ pub use self::pal::{Pal, PalEpoll, PalPtrace, PalSignal, PalSocket};
 
 mod pal;
 
-pub use self::sys::{e, Sys};
+pub use self::sys::{e_raw, Sys};
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
 #[path = "linux/mod.rs"]
@@ -91,7 +94,7 @@ pub struct FileWriter(pub c_int);
 
 impl FileWriter {
     pub fn write(&mut self, buf: &[u8]) -> isize {
-        Sys::write(self.0, buf)
+        Sys::write(self.0, buf).into_posix_style()
     }
 }
 
@@ -113,18 +116,13 @@ pub struct FileReader(pub c_int);
 
 impl FileReader {
     pub fn read(&mut self, buf: &mut [u8]) -> isize {
-        Sys::read(self.0, buf)
+        Sys::read(self.0, buf).into_posix_style()
     }
 }
 
 impl Read for FileReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let i = Sys::read(self.0, buf);
-        if i >= 0 {
-            Ok(i as usize)
-        } else {
-            Err(io::Error::from_raw_os_error(-i as i32))
-        }
+        Ok(Sys::read(self.0, buf)? as usize)
     }
 }
 

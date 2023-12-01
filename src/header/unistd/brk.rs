@@ -1,6 +1,7 @@
 use core::ptr;
 
 use crate::{
+    errno::IntoPosix,
     header::errno::ENOMEM,
     platform::{self, types::*, Pal, Sys},
 };
@@ -9,7 +10,7 @@ static mut BRK: *mut c_void = ptr::null_mut();
 
 #[no_mangle]
 pub unsafe extern "C" fn brk(addr: *mut c_void) -> c_int {
-    BRK = Sys::brk(addr);
+    BRK = Sys::brk(addr).into_posix_style();
 
     if BRK < addr {
         platform::errno = ENOMEM;
@@ -22,7 +23,7 @@ pub unsafe extern "C" fn brk(addr: *mut c_void) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
     if BRK.is_null() {
-        BRK = Sys::brk(ptr::null_mut());
+        BRK = Sys::brk(ptr::null_mut()).into_posix_style();
     }
 
     let old_brk = BRK;
@@ -30,7 +31,7 @@ pub unsafe extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
     if incr != 0 {
         let addr = old_brk.offset(incr);
 
-        BRK = Sys::brk(addr);
+        BRK = Sys::brk(addr).into_posix_style();
 
         if BRK < addr {
             platform::errno = ENOMEM;

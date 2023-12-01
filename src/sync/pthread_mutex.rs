@@ -4,6 +4,7 @@ use core::{
 };
 
 use crate::{
+    errno::Errno,
     header::{errno::*, pthread::*, time::timespec},
     pthread::*,
 };

@@ -2,6 +2,7 @@
 
 use crate::{
     c_str::CStr,
+    errno::IntoPosix,
     header::{
         fcntl::{O_NOFOLLOW, O_PATH},
         time::timespec,
@@ -67,17 +68,17 @@ pub struct stat {
 #[no_mangle]
 pub unsafe extern "C" fn chmod(path: *const c_char, mode: mode_t) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::chmod(path, mode)
+    Sys::chmod(path, mode).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
-    Sys::fchmod(fildes, mode)
+    Sys::fchmod(fildes, mode).into_posix_style()
 }
 
 #[no_mangle]
 pub extern "C" fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
-    Sys::fstat(fildes, buf)
+    Sys::fstat(fildes, buf).into_posix_style()
 }
 
 #[no_mangle]
@@ -87,20 +88,20 @@ pub extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut stat) -> c_int 
 
 #[no_mangle]
 pub extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
-    Sys::futimens(fd, times)
+    Sys::futimens(fd, times).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = CStr::from_ptr(path);
-    let fd = Sys::open(path, O_PATH | O_NOFOLLOW, 0);
+    let fd = Sys::open(path, O_PATH | O_NOFOLLOW, 0).into_posix_style();
     if fd < 0 {
         return -1;
     }
 
-    let res = Sys::fstat(fd, buf);
+    let res = Sys::fstat(fd, buf).into_posix_style();
 
-    Sys::close(fd);
+    Sys::close(fd).into_posix_style();
 
     res
 }
@@ -108,13 +109,13 @@ pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::mkdir(path, mode)
+    Sys::mkdir(path, mode).into_posix_style()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::mkfifo(path, mode)
+    Sys::mkfifo(path, mode).into_posix_style()
 }
 
 // #[no_mangle]
@@ -125,14 +126,14 @@ pub extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int 
 #[no_mangle]
 pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     let file = CStr::from_ptr(file);
-    let fd = Sys::open(file, O_PATH, 0);
+    let fd = Sys::open(file, O_PATH, 0).into_posix_style();
     if fd < 0 {
         return -1;
     }
 
-    let res = Sys::fstat(fd, buf);
+    let res = Sys::fstat(fd, buf).into_posix_style();
 
-    Sys::close(fd);
+    Sys::close(fd).into_posix_style();
 
     res
 }
