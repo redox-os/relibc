@@ -3,7 +3,7 @@ use core::{slice, str};
 use syscall::{Error, Result, WaitFlags, EMFILE};
 
 use crate::{
-    header::{signal::sigaction, time::timespec},
+    header::{signal::sigaction, sys_stat::UTIME_NOW, time::timespec},
     platform::types::*,
 };
 
@@ -77,10 +77,24 @@ pub unsafe fn fstatvfs(
     Ok(())
 }
 pub unsafe fn futimens(fd: usize, times: *const timespec) -> syscall::Result<()> {
-    let times = times
-        .cast::<[timespec; 2]>()
-        .read()
-        .map(|ts| syscall::TimeSpec::from(&ts));
+    let times = if times.is_null() {
+        // null means set to current time using special UTIME_NOW value (tv_sec is ignored in that case)
+        [
+            syscall::TimeSpec {
+                tv_sec: 0,
+                tv_nsec: UTIME_NOW as c_int,
+            },
+            syscall::TimeSpec {
+                tv_sec: 0,
+                tv_nsec: UTIME_NOW as c_int,
+            },
+        ]
+    } else {
+        times
+            .cast::<[timespec; 2]>()
+            .read()
+            .map(|ts| syscall::TimeSpec::from(&ts))
+    };
     syscall::futimens(fd as usize, &times)?;
     Ok(())
 }

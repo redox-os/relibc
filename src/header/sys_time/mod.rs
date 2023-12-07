@@ -5,6 +5,7 @@ use crate::{
     header::time::timespec,
     platform::{types::*, Pal, PalSignal, Sys},
 };
+use core::ptr::null;
 
 pub const ITIMER_REAL: c_int = 0;
 pub const ITIMER_VIRTUAL: c_int = 1;
@@ -57,15 +58,23 @@ pub extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c_int {
     let path = CStr::from_ptr(path);
-    let times_spec = [
-        timespec {
-            tv_sec: (*times.offset(0)).tv_sec,
-            tv_nsec: ((*times.offset(0)).tv_usec as c_long) * 1000,
-        },
-        timespec {
-            tv_sec: (*times.offset(1)).tv_sec,
-            tv_nsec: ((*times.offset(1)).tv_usec as c_long) * 1000,
-        },
-    ];
-    Sys::utimens(path, times_spec.as_ptr())
+    // Nullptr is valid here, it means "use current time"
+    let times_spec = if times.is_null() {
+        null()
+    } else {
+        {
+            [
+                timespec {
+                    tv_sec: (*times.offset(0)).tv_sec,
+                    tv_nsec: ((*times.offset(0)).tv_usec as c_long) * 1000,
+                },
+                timespec {
+                    tv_sec: (*times.offset(1)).tv_sec,
+                    tv_nsec: ((*times.offset(1)).tv_usec as c_long) * 1000,
+                },
+            ]
+        }
+        .as_ptr()
+    };
+    Sys::utimens(path, times_spec)
 }
