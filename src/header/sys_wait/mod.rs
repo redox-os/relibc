@@ -2,7 +2,10 @@
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/syswait.h.html
 
 //use header::sys_resource::rusage;
-use crate::platform::{types::*, Pal, Sys};
+use crate::{
+    header::signal::siginfo_t,
+    platform::{types::*, Pal, Sys},
+};
 
 pub const WNOHANG: c_int = 1;
 pub const WUNTRACED: c_int = 2;
@@ -16,6 +19,15 @@ pub const __WNOTHREAD: c_int = 0x2000_0000;
 pub const __WALL: c_int = 0x4000_0000;
 #[allow(overflowing_literals)]
 pub const __WCLONE: c_int = 0x8000_0000;
+
+pub type id_t = u32;
+
+#[repr(u32)]
+pub enum idtype_t {
+    P_ALL = 0,
+    P_PID = 1,
+    P_PGID = 2,
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {
@@ -31,19 +43,15 @@ pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {
 //     unimplemented!();
 // }
 
-/*
- * TODO: implement idtype_t, id_t, and siginfo_t
- *
- * #[no_mangle]
- * pub unsafe extern "C" fn waitid(
- *     idtype: idtype_t,
- *     id: id_t,
- *     infop: siginfo_t,
- *     options: c_int
- *  ) -> c_int {
- *      unimplemented!();
- *  }
- */
+#[no_mangle]
+pub unsafe extern "C" fn waitid(
+    idtype: idtype_t,
+    id: id_t,
+    infop: *mut siginfo_t,
+    options: c_int,
+) -> c_int {
+    Sys::waitid(idtype, id, infop, options)
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {

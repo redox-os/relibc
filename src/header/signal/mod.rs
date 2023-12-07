@@ -50,7 +50,7 @@ pub struct sigaltstack {
 
 #[repr(C)]
 #[derive(Clone, Debug)]
-pub struct siginfo_t {
+pub struct siginfo {
     pub si_signo: c_int,
     pub si_errno: c_int,
     pub si_code: c_int,
@@ -61,6 +61,8 @@ pub struct siginfo_t {
 pub type sigset_t = c_ulonglong;
 
 pub type stack_t = sigaltstack;
+
+pub type siginfo_t = siginfo;
 
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {

@@ -1,4 +1,4 @@
-sys_includes = ["sys/types.h", "sys/resource.h"]
+sys_includes = ["sys/types.h", "sys/resource.h", "signal.h"]
 include_guard = "_SYS_WAIT_H"
 trailer = "#include <bits/sys/wait.h>"
 language = "C"

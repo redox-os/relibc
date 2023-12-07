@@ -3,11 +3,13 @@ use crate::{
     c_str::CStr,
     header::{
         dirent::dirent,
+        signal::siginfo_t,
         sys_resource::rlimit,
         sys_stat::stat,
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
         sys_utsname::utsname,
+        sys_wait::{id_t, idtype_t},
         time::timespec,
     },
 };
@@ -210,6 +212,8 @@ pub trait Pal {
     fn unlink(path: CStr) -> c_int;
 
     fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t;
+
+    fn waitid(idtype: idtype_t, id: id_t, infop: *mut siginfo_t, options: c_int) -> c_int;
 
     fn write(fildes: c_int, buf: &[u8]) -> ssize_t;
 
