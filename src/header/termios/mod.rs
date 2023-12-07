@@ -188,7 +188,7 @@ pub unsafe extern "C" fn tcflow(fd: c_int, action: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn cfmakeraw(termios_p: *mut termios) {
-    (*termios_p).c_iflag &= !(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | IXON) as u32;
+    (*termios_p).c_iflag &= !(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON) as u32;
     (*termios_p).c_oflag &= !OPOST as u32;
     (*termios_p).c_lflag &= !(ECHO | ECHONL | ICANON | ISIG | IEXTEN) as u32;
     (*termios_p).c_cflag &= !(CSIZE | PARENB) as u32;
