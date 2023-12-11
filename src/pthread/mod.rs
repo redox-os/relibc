@@ -254,8 +254,6 @@ pub unsafe fn join(thread: &Pthread) -> Result<Retval, Errno> {
     // pthread_t of this thread, will no longer be valid. In practice, we can thus deallocate the
     // thread state.
 
-    OS_TID_TO_PTHREAD.lock().remove(&thread.os_tid.get().read());
-
     dealloc_thread(thread);
 
     Ok(retval)
@@ -311,6 +309,7 @@ pub unsafe fn exit_current_thread(retval: Retval) -> ! {
 // On the other hand, there can be at most two strong references to each thread (OS_TID_TO_PTHREAD
 // and PTHREAD_SELF), so maybe Arc is unnecessary except from being memory-safe.
 unsafe fn dealloc_thread(thread: &Pthread) {
+    OS_TID_TO_PTHREAD.lock().remove(&thread.os_tid.get().read());
     drop(Box::from_raw(thread as *const Pthread as *mut Pthread));
 }
 pub const SIGRT_RLCT_CANCEL: usize = 32;
