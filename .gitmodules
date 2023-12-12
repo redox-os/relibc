@@ -10,10 +10,10 @@
 [submodule "posix-regex"]
 	path = posix-regex
 	url = https://gitlab.redox-os.org/redox-os/posix-regex.git
-[submodule "pthreads-emb"]
-	path = pthreads-emb
-	url = https://gitlab.redox-os.org/redox-os/pthreads-emb.git
 [submodule "compiler-builtins"]
 	path = compiler-builtins
 	url = https://gitlab.redox-os.org/redox-os/compiler-builtins.git
 	branch = relibc_fix_dup_symbols
+[submodule "src/dlmalloc-rs"]
+	path = dlmalloc-rs
+	url = https://gitlab.redox-os.org/redox-os/dlmalloc-rs.git

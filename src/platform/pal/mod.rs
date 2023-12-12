@@ -151,6 +151,14 @@ pub trait Pal {
         off: off_t,
     ) -> *mut c_void;
 
+    unsafe fn mremap(
+        addr: *mut c_void,
+        len: usize,
+        new_len: usize,
+        flags: c_int,
+        args: *mut c_void,
+    ) -> *mut c_void;
+
     unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int;
 
     unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> c_int;

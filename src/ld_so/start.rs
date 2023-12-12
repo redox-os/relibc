@@ -11,7 +11,7 @@ use alloc::{
 use crate::{
     c_str::CStr,
     header::unistd,
-    platform::{get_auxv, get_auxvs, new_mspace, types::c_char},
+    platform::{get_auxv, get_auxvs, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
     ALLOCATOR,
@@ -143,9 +143,7 @@ fn resolve_path_name(
 }
 #[no_mangle]
 pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) -> usize {
-    // First thing we initialize the mspace
-    ALLOCATOR.set_book_keeper(new_mspace());
-    // next we get the arguments, the environment, and the auxilary vector
+    // We get the arguments, the environment, and the auxilary vector
     let (argv, envs, auxv) = unsafe {
         let argv_start = sp.argv() as *mut usize;
         let (argv, argv_end) = get_argv(argv_start);
@@ -241,7 +239,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     };
     if let Some(tcb) = unsafe { Tcb::current() } {
         tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
-        tcb.mspace = ALLOCATOR.get_book_keeper();
+        tcb.mspace = ALLOCATOR.get();
     }
     if is_manual {
         eprintln!("ld.so: entry '{}': {:#x}", path, entry);

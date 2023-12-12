@@ -15,7 +15,6 @@ use crate::{
         tcb::{Master, Tcb},
     },
     platform::{types::*, Pal, Sys},
-    ALLOCATOR,
 };
 
 use crate::sync::{waitval::Waitval, Mutex};
@@ -159,6 +158,14 @@ pub(crate) unsafe fn create(
         mmap_size: stack_size,
     };
 
+    let current_tcb = Tcb::current().expect("no TCB!");
+    let new_tcb = Tcb::new(current_tcb.tls_len).map_err(|_| Errno(ENOMEM))?;
+
+    new_tcb.masters_ptr = current_tcb.masters_ptr;
+    new_tcb.masters_len = current_tcb.masters_len;
+    new_tcb.linker_ptr = current_tcb.linker_ptr;
+    new_tcb.mspace = current_tcb.mspace;
+
     let stack_end = stack_base.add(stack_size);
     let mut stack = stack_end as *mut usize;
     {
@@ -168,24 +175,9 @@ pub(crate) unsafe fn create(
         };
 
         push(0);
-        push(ptr as usize);
-
-        //WARNING: Stack must be 128-bit aligned for SSE
-        if let Some(tcb) = Tcb::current() {
-            push(tcb.mspace as usize);
-            push(tcb.linker_ptr as usize);
-            push(tcb.masters_len);
-            push(tcb.masters_ptr as usize);
-            push(tcb.tls_len);
-        } else {
-            push(ALLOCATOR.get_book_keeper());
-            push(0);
-            push(0);
-            push(0);
-            push(0);
-        }
-
         push(synchronization_mutex as usize);
+        push(ptr as usize);
+        push(new_tcb as *mut _ as usize);
 
         push(arg as usize);
         push(start_routine as usize);
@@ -210,21 +202,11 @@ pub(crate) unsafe fn create(
 unsafe extern "C" fn new_thread_shim(
     entry_point: unsafe extern "C" fn(*mut c_void) -> *mut c_void,
     arg: *mut c_void,
-    mutex: *const Mutex<()>,
-    tls_size: usize,
-    tls_masters_ptr: *mut Master,
-    tls_masters_len: usize,
-    tls_linker_ptr: *const Mutex<Linker>,
-    tls_mspace: usize,
+    tcb: *mut Tcb,
     pthread: *mut Pthread,
+    mutex: *const Mutex<()>,
 ) -> ! {
-    // TODO: Pass less arguments by allocating the TCB from the creator thread.
-    if !tls_masters_ptr.is_null() {
-        let tcb = Tcb::new(tls_size).unwrap();
-        tcb.masters_ptr = tls_masters_ptr;
-        tcb.masters_len = tls_masters_len;
-        tcb.linker_ptr = tls_linker_ptr;
-        tcb.mspace = tls_mspace;
+    if let Some(tcb) = tcb.as_mut() {
         tcb.copy_masters().unwrap();
         tcb.activate();
     }

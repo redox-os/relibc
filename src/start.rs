@@ -4,7 +4,7 @@ use core::{intrinsics, ptr};
 use crate::{
     header::{libgen, stdio, stdlib},
     ld_so::{self, linker::Linker},
-    platform::{self, get_auxvs, new_mspace, types::*, Pal, Sys},
+    platform::{self, get_auxvs, types::*, Pal, Sys},
     sync::mutex::Mutex,
     ALLOCATOR,
 };
@@ -80,13 +80,9 @@ fn alloc_init() {
     }
     unsafe {
         if let Some(tcb) = ld_so::tcb::Tcb::current() {
-            if tcb.mspace != 0 {
-                ALLOCATOR.set_book_keeper(tcb.mspace);
-            } else if ALLOCATOR.get_book_keeper() == 0 {
-                ALLOCATOR.set_book_keeper(new_mspace());
+            if !tcb.mspace.is_null() {
+                ALLOCATOR.get().write(tcb.mspace.read());
             }
-        } else if ALLOCATOR.get_book_keeper() == 0 {
-            ALLOCATOR.set_book_keeper(new_mspace());
         }
     }
 }
@@ -180,7 +176,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
 
     if let Some(tcb) = ld_so::tcb::Tcb::current() {
         // Update TCB mspace
-        tcb.mspace = ALLOCATOR.get_book_keeper();
+        tcb.mspace = ALLOCATOR.get();
 
         // Set linker pointer if necessary
         if tcb.linker_ptr.is_null() {
