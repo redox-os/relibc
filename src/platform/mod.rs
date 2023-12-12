@@ -5,7 +5,7 @@ use core::{fmt, ptr};
 pub use self::allocator::*;
 
 #[cfg(not(feature = "ralloc"))]
-#[path = "allocator/dlmalloc.rs"]
+#[path = "allocator/dlmalloc/mod.rs"]
 mod allocator;
 
 #[cfg(feature = "ralloc")]

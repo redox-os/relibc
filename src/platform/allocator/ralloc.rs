@@ -2,6 +2,8 @@ extern crate ralloc;
 
 pub use ralloc::Allocator;
 
+pub const NEWALLOCATOR: Allocator = Allocator;
+
 unsafe fn alloc_inner(size: usize, offset: usize, align: usize) -> *mut c_void {
     let ptr = ralloc::alloc(size + offset, align);
     if !ptr.is_null() {

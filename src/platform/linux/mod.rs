@@ -380,6 +380,16 @@ impl Pal for Sys {
         e(syscall!(MMAP, addr, len, prot, flags, fildes, off)) as *mut c_void
     }
 
+    unsafe fn mremap(
+        addr: *mut c_void,
+        len: usize,
+        new_len: usize,
+        flags: c_int,
+        args: *mut c_void,
+    ) -> *mut c_void {
+        e(syscall!(MREMAP, addr, len, new_len, flags, args)) as *mut c_void
+    }
+
     unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
         e(syscall!(MPROTECT, addr, len, prot)) as c_int
     }
@@ -428,7 +438,7 @@ impl Pal for Sys {
 
             # Check if child or parent
             test rax, rax
-            jnz 1f
+            jnz 2f
 
             # Load registers
             pop rax
@@ -451,7 +461,7 @@ impl Pal for Sys {
             ud2
 
             # Return PID if parent
-            1:
+            2:
             ",
             inout("rax") SYS_CLONE => pid,
             inout("rdi") flags => _,

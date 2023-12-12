@@ -10,7 +10,7 @@ crate-type = ["staticlib"]
 
 [workspace]
 members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so", "src/platform/redox/redox-exec"]
-exclude = ["core_io", "ralloc", "tests"]
+exclude = ["core_io", "ralloc", "tests", "dlmalloc-rs"]
 
 [build-dependencies]
 cbindgen = "0.26"
@@ -43,6 +43,11 @@ features = ["elf32", "elf64", "endian_fd"]
 path = "ralloc"
 default-features = false
 optional = true
+
+[dependencies.dlmalloc]
+path = "dlmalloc-rs"
+default-features = false
+features = ["c_api"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
 sc = "0.2.3"

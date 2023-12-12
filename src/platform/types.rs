@@ -78,3 +78,8 @@ pub type clockid_t = c_int;
 pub type timer_t = *mut c_void;
 
 pub use crate::header::{bits_pthread::*, bits_sched::*};
+
+#[repr(C, align(16))]
+pub struct max_align_t {
+    _priv: [f64; 4],
+}

@@ -7,7 +7,7 @@ int main() {
     setlocale(LC_ALL, "");
 
     const wchar_t *src = L"こんにちは世界Привет мир";
-    char dst[20];
+    char dst[20] = {0};
     mbstate_t ps;
 
     size_t result = wcsnrtombs(dst, &src, 4, sizeof(dst), &ps);

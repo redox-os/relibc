@@ -1,5 +1,4 @@
 use core::{convert::TryFrom, mem, ptr, result::Result as CoreResult, slice, str};
-
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
@@ -13,7 +12,7 @@ use crate::{
         dirent::dirent,
         errno::{EINVAL, EIO, ENOMEM, ENOSYS, EPERM, ERANGE},
         fcntl,
-        sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
+        sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, RLIM_INFINITY},
         sys_stat::{stat, S_ISGID, S_ISUID},
@@ -659,6 +658,16 @@ impl Pal for Sys {
         } else {
             e(syscall::fmap(fildes as usize, &map)) as *mut c_void
         }
+    }
+
+    unsafe fn mremap(
+        addr: *mut c_void,
+        len: usize,
+        new_len: usize,
+        flags: c_int,
+        args: *mut c_void,
+    ) -> *mut c_void {
+        MAP_FAILED
     }
 
     unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {

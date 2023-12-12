@@ -6,7 +6,7 @@ use super::ExpectTlsFree;
 use crate::{
     header::sys_mman,
     ld_so::linker::Linker,
-    platform::{Pal, Sys},
+    platform::{Dlmalloc, Pal, Sys},
     sync::mutex::Mutex,
 };
 
@@ -48,7 +48,7 @@ pub struct Tcb {
     /// Pointer to dynamic linker
     pub linker_ptr: *const Mutex<Linker>,
     /// pointer to rust memory allocator structure
-    pub mspace: usize,
+    pub mspace: *const Mutex<Dlmalloc>,
 }
 
 impl Tcb {
@@ -70,7 +70,7 @@ impl Tcb {
                 masters_len: 0,
                 num_copied_masters: 0,
                 linker_ptr: ptr::null(),
-                mspace: 0,
+                mspace: ptr::null(),
             },
         );
 

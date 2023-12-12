@@ -26,6 +26,9 @@ pub const MAP_TYPE: c_int = 0x000F;
 pub const MAP_ANON: c_int = 0x0020;
 pub const MAP_ANONYMOUS: c_int = MAP_ANON;
 pub const MAP_STACK: c_int = 0x20000;
+pub const MAP_FAILED: *mut c_void = usize::wrapping_neg(1) as *mut c_void;
+
+pub const MREMAP_MAYMOVE: c_int = 1;
 
 pub const MS_ASYNC: c_int = 0x0001;
 pub const MS_INVALIDATE: c_int = 0x0002;
@@ -60,6 +63,18 @@ pub unsafe extern "C" fn mmap(
     off: off_t,
 ) -> *mut c_void {
     Sys::mmap(addr, len, prot, flags, fildes, off)
+}
+
+#[no_mangle]
+unsafe extern "C" fn mremap(
+    old_address: *mut c_void,
+    old_size: usize,
+    new_size: usize,
+    flags: c_int,
+    mut args: ...
+) -> *mut c_void {
+    let new_address = args.arg::<*mut c_void>();
+    Sys::mremap(old_address, old_size, new_size, flags, new_address)
 }
 
 #[no_mangle]
