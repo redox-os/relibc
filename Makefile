@@ -70,8 +70,6 @@ install-headers: libs
 	mkdir -pv "$(DESTDIR)/include"
 	cp -rv "include"/* "$(DESTDIR)/include"
 	cp -rv "target/include"/* "$(DESTDIR)/include"
-	cp -v "openlibm/include"/*.h "$(DESTDIR)/include"
-	cp -v "openlibm/src"/*.h "$(DESTDIR)/include"
 
 libs: \
 	$(BUILD)/release/libc.a \
@@ -91,7 +89,7 @@ install-libs: libs
 	cp -v "$(BUILD)/release/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/ld_so" "$(DESTDIR)/lib/ld64.so.1"
-	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
+	cp -v "$(BUILD)/release/libm.a" "$(DESTDIR)/lib/libm.a"
 	# Empty libraries for dl, pthread, and rt
 	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
 	$(AR) -rcs "$(DESTDIR)/lib/libpthread.a"
@@ -124,7 +122,7 @@ test: sysroot
 
 # Debug targets
 
-$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/debug/libm.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -133,7 +131,7 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
 
-$(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/debug/libm.a
 	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -Wl,-soname,libc.so.6 -o $@
 
 $(BUILD)/debug/librelibc.a: $(SRC)
@@ -162,7 +160,7 @@ $(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debu
 
 # Release targets
 
-$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/release/libm.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -171,7 +169,7 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenl
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
 
-$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/release/libm.a
 	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -Wl,-soname,libc.so.6 -o $@
 
 $(BUILD)/release/librelibc.a: $(SRC)
@@ -200,14 +198,3 @@ $(BUILD)/release/ld_so.o: $(SRC)
 $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD)/release/libc.a $(BUILD)/release/crtn.o
 	$(LD) --no-relax -T src/ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections --gc-keep-exported $^ -o $@
 
-# Other targets
-
-$(BUILD)/openlibm: openlibm
-	rm -rf $@ $@.partial
-	mkdir -p $(BUILD)
-	cp -r $< $@.partial
-	mv $@.partial $@
-	touch $@
-
-$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
-	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CPPFLAGS="-fno-stack-protector -I $(shell pwd)/include -I $(shell pwd)/target/include" -C $< libopenlibm.a

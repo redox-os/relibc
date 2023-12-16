@@ -1,0 +1,9 @@
+sys_includes = ["complex.h"]
+include_guard = "_RELIBC_COMPLEX_H"
+language = "C"
+style = "Type"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true
