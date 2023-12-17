@@ -197,6 +197,10 @@ checksum = "a08173bc88b7955d1b3145aa561539096c421ac8debde8cbc3612ec635fee29b"
 
 [[package]]
 name = "libm"
+version = "0.1.0"
+
+[[package]]
+name = "libm"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
@@ -244,7 +248,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39e3200413f237f41ab11ad6d161bc7239c84dcb631773ccd7de3dfe4b5c267c"
 dependencies = [
  "autocfg",
- "libm",
+ "libm 0.2.8",
 ]
 
 [[package]]
@@ -394,7 +398,7 @@ dependencies = [
  "dlmalloc",
  "goblin",
  "libc",
- "libm",
+ "libm 0.2.8",
  "memchr",
  "memoffset",
  "num-complex",

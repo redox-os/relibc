@@ -74,6 +74,7 @@ install-headers: libs
 libs: \
 	$(BUILD)/release/libc.a \
 	$(BUILD)/release/libc.so \
+	$(BUILD)/release/libm.a \
 	$(BUILD)/release/crt0.o \
 	$(BUILD)/release/crti.o \
 	$(BUILD)/release/crtn.o \
@@ -139,6 +140,10 @@ $(BUILD)/debug/librelibc.a: $(SRC)
 	./renamesyms.sh $@ $(BUILD)/debug/deps/
 	touch $@
 
+$(BUILD)/debug/libm.a: $(SRC)
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+	touch $@
+
 $(BUILD)/debug/crt0.o: $(SRC)
 	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
@@ -177,6 +182,10 @@ $(BUILD)/release/librelibc.a: $(SRC)
 	# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
 	# use some cbindgen hook, specify them manually, or grep for #[no_mangle].
 	./renamesyms.sh $@ $(BUILD)/release/deps/
+	touch $@
+
+$(BUILD)/release/libm.a: $(SRC)
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)

@@ -9,7 +9,7 @@ name = "relibc"
 crate-type = ["staticlib"]
 
 [workspace]
-members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so", "src/platform/redox/redox-exec"]
+members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so", "src/libm", "src/platform/redox/redox-exec"]
 exclude = ["core_io", "ralloc", "tests", "dlmalloc-rs"]
 
 [build-dependencies]

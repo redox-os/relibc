@@ -1,5 +1,4 @@
 use crate::platform::types::{c_char, c_double, c_float, c_int, c_long, c_longlong};
-use core::num::FpCategory;
 use inner_libm;
 
 pub static mut signgam: c_int = 0;
