@@ -60,7 +60,7 @@ fn main() {
             generate_bindings(&p, "src/header");
         });
 
-        fs::read_dir(&Path::new("src/libm"))
+    fs::read_dir(&Path::new("src/libm"))
         .unwrap()
         .into_iter()
         .filter_map(Result::ok)
