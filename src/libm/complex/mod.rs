@@ -1,4 +1,5 @@
-use crate::platform::types::{c_double, c_float, c_long, c_int};
+use crate::platform::types::{c_double, c_float, c_int, c_long};
+use inner_libm;
 use num_complex::{Complex32, Complex64, ComplexFloat};
 
 #[no_mangle]
@@ -216,7 +217,7 @@ unsafe extern "C" fn cproj(x: Complex64) -> Complex64 {
     if x.re.abs() == f64::INFINITY && x.im.abs() == f64::INFINITY {
         Complex64 {
             re: f64::INFINITY,
-            im: libm::copysign(0.0, x.im),
+            im: inner_libm::copysign(0.0, x.im),
         }
     } else {
         x
@@ -228,7 +229,7 @@ unsafe extern "C" fn cprojf(x: Complex32) -> Complex32 {
     if x.re.abs() == f32::INFINITY && x.im.abs() == f32::INFINITY {
         Complex32 {
             re: f32::INFINITY,
-            im: libm::copysignf(0.0, x.im),
+            im: inner_libm::copysignf(0.0, x.im),
         }
     } else {
         x

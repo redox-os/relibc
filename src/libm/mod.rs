@@ -1,7 +1,3 @@
-//! libm
-
-#![no_std]
-
 // Enable support for complex numbers only on architectures where the builtin
 // C complex type has the same calling convention rules as a struct containing
 // two scalars. Notably, this excludes 32-bit "x86".
@@ -11,6 +7,6 @@
     target_arch = "riscv64",
     target_arch = "x86_64"
 ))]
-pub use complex::*;
-pub use fenv::*;
-pub use math::*;
+pub mod complex;
+pub mod fenv;
+pub mod math;

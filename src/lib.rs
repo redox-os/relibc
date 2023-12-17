@@ -52,6 +52,7 @@ pub mod fs;
 pub mod header;
 pub mod io;
 pub mod ld_so;
+pub mod libm;
 pub mod platform;
 pub mod pthread;
 pub mod start;

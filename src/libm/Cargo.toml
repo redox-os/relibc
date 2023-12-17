@@ -6,5 +6,3 @@ authors = ["Darley Barreto <darleybarreto@gmail.com>"]
 [lib]
 name = "libm"
 crate-type = ["staticlib"]
-
-[dependencies]

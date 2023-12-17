@@ -196,6 +196,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a08173bc88b7955d1b3145aa561539096c421ac8debde8cbc3612ec635fee29b"
 
 [[package]]
+name = "libm"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -223,12 +229,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-complex"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ba157ca0885411de85d6ca030ba7e2a83a28636056c7c699b07c8b6f7383214"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39e3200413f237f41ab11ad6d161bc7239c84dcb631773ccd7de3dfe4b5c267c"
 dependencies = [
  "autocfg",
+ "libm",
 ]
 
 [[package]]
@@ -378,8 +394,10 @@ dependencies = [
  "dlmalloc",
  "goblin",
  "libc",
+ "libm",
  "memchr",
  "memoffset",
+ "num-complex",
  "plain",
  "posix-regex",
  "ralloc",

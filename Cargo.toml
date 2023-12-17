@@ -34,7 +34,7 @@ plain = "0.2"
 unicode-width = "0.1"
 __libc_only_for_layout_checks = { package = "libc", version = "0.2.149", optional = true }
 
-libm = "0.2.8"
+inner_libm = {package = "libm", version = "0.2.8"}
 num-complex = { version = "0.4.4", default-features = false, features = ["libm"] }
 
 [dependencies.goblin]

@@ -2,7 +2,7 @@
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/float.h.html
 
 use crate::{
-    header::fenv::{fegetround, FE_TONEAREST},
+    libm::fenv::{fegetround, FE_TONEAREST},
     platform::types::*,
 };
 

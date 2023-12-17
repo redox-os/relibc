@@ -1,4 +1,3 @@
-sys_includes = ["math.h"]
 include_guard = "_RELIBC_MATH_H"
 language = "C"
 style = "Type"

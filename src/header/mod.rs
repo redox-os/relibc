@@ -3,13 +3,6 @@ pub mod arpa_inet;
 pub mod assert;
 pub mod bits_pthread;
 pub mod bits_sched;
-#[cfg(any(
-    target_arch = "arm",
-    target_arch = "aarch64",
-    target_arch = "riscv64",
-    target_arch = "x86_64"
-))]
-pub mod complex;
 pub mod ctype;
 pub mod dirent;
 #[path = "dl-tls/mod.rs"]
@@ -18,7 +11,6 @@ pub mod dlfcn;
 pub mod elf;
 pub mod errno;
 pub mod fcntl;
-pub mod fenv;
 pub mod float;
 pub mod fnmatch;
 pub mod getopt;
@@ -27,7 +19,6 @@ pub mod inttypes;
 pub mod libgen;
 pub mod limits;
 pub mod locale;
-pub mod math;
 pub mod netdb;
 pub mod netinet_in;
 pub mod netinet_ip;
