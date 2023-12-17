@@ -3,6 +3,46 @@ language = "C"
 style = "Type"
 no_includes = true
 cpp_compat = true
+after_includes = """
+#define complex _Complex
+
+#define _Complex_I 1.0fi
+#define I _Complex_I
+
+#ifdef __clang__
+#  define CMPLXF(x, y) ((float complex){x, y})
+#  define CMPLX(x, y) ((double complex){x, y})
+#elif (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 7)) && !defined(__INTEL_COMPILER)
+#  define CMPLXF(x,y) __builtin_complex ((float) (x), (float) (y))
+#  define CMPLX(x,y) __builtin_complex ((double) (x), (double) (y))
+#else
+static inline float complex
+CMPLXF(float x, float y)
+{
+	union {
+		float a[2];
+		float complex f;
+	} z = {{ x, y }};
+
+	return (z.f);
+}
+
+static inline double complex
+CMPLX(double x, double y)
+{
+	union {
+		double a[2];
+		double complex f;
+	} z = {{ x, y }};
+
+	return (z.f);
+}
+#endif
+"""
 
 [enum]
 prefix_with_name = true
+
+[export.rename]
+"Complex32" = "float complex"
+"Complex64" = "double complex"

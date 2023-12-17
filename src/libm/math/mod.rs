@@ -21,14 +21,12 @@ pub const MAXFLOAT: c_float = c_float::MAX;
 
 pub const HUGE_VAL: c_double = c_double::INFINITY;
 pub const HUGE_VALF: c_float = c_float::INFINITY;
-pub const HUGE_VALL: c_double = c_double::INFINITY;
 
 pub const INFINITY: c_float = c_float::INFINITY;
 pub const NAN: c_float = c_float::NAN;
 
 pub const FP_FAST_FMA: c_int = 1;
 pub const FP_FAST_FMAF: c_int = 1;
-pub const FP_FAST_FMAL: c_int = 1;
 
 pub const FP_ILOGB0: c_int = c_int::MIN;
 pub const FP_ILOGBNAN: c_int = c_int::MAX;
