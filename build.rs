@@ -18,9 +18,9 @@ fn get_target() -> String {
     )
 }
 
-fn generate_bindings(cbindgen_config_path: &Path) {
+fn generate_bindings(cbindgen_config_path: &Path, prefix: &str) {
     let relative_path = cbindgen_config_path
-        .strip_prefix("src/header")
+        .strip_prefix(prefix)
         .ok()
         .and_then(|p| p.parent())
         .and_then(|p| p.to_str())
@@ -57,7 +57,21 @@ fn main() {
             println!("cargo:rerun-if-changed={:?}", p.parent().unwrap());
             println!("cargo:rerun-if-changed={:?}", p);
             println!("cargo:rerun-if-changed={:?}", p.with_file_name("mod.rs"));
-            generate_bindings(&p);
+            generate_bindings(&p, "src/header");
+        });
+
+        fs::read_dir(&Path::new("src/libm"))
+        .unwrap()
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|d| include_dir(d))
+        .map(|d| d.path().as_path().join("cbindgen.toml"))
+        .filter(|p| p.exists())
+        .for_each(|p| {
+            println!("cargo:rerun-if-changed={:?}", p.parent().unwrap());
+            println!("cargo:rerun-if-changed={:?}", p);
+            println!("cargo:rerun-if-changed={:?}", p.with_file_name("mod.rs"));
+            generate_bindings(&p, "src/libm");
         });
 
     println!("cargo:rerun-if-changed=src/c");

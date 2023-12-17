@@ -26,12 +26,6 @@ pub const HUGE_VALL: c_double = c_double::INFINITY;
 pub const INFINITY: c_float = c_float::INFINITY;
 pub const NAN: c_float = c_float::NAN;
 
-pub const FP_INFINITE: c_int = 0;
-pub const FP_NAN: c_int = 1;
-pub const FP_NORMAL: c_int = 2;
-pub const FP_SUBNORMAL: c_int = 3;
-pub const FP_ZERO: c_int = 4;
-
 pub const FP_FAST_FMA: c_int = 1;
 pub const FP_FAST_FMAF: c_int = 1;
 pub const FP_FAST_FMAL: c_int = 1;
