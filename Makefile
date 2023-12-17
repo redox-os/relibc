@@ -160,7 +160,7 @@ $(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debu
 
 # Release targets
 
-$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/release/libm.a
+$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -169,7 +169,7 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/release/libm.a
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
 
-$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/release/libm.a
+$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a
 	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -Wl,-soname,libc.so.6 -o $@
 
 $(BUILD)/release/librelibc.a: $(SRC)
@@ -197,4 +197,3 @@ $(BUILD)/release/ld_so.o: $(SRC)
 
 $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD)/release/libc.a $(BUILD)/release/crtn.o
 	$(LD) --no-relax -T src/ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections --gc-keep-exported $^ -o $@
-
