@@ -164,7 +164,7 @@ pub unsafe extern "C" fn fetestexcept(mut excepts: c_int) -> c_int {
     let mut mxcsr = 0;
     excepts &= FE_ALL_EXCEPT;
     // Store the current x87 status register
-    asm!("fnstsw [{0}]", in (reg) & mut status, options(preserves_flags));
+    asm!("fnstsw [{}]", in(reg) &mut status);
     // Store the MXCSR register state
     asm!("stmxcsr [{0}]", in (reg) & mut mxcsr, options(preserves_flags));
     (status | mxcsr) & excepts
