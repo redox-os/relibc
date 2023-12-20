@@ -41,37 +41,37 @@ pub const FE_TOWARDZERO: c_int = 0xc00000;
 pub type fenv_t = c_ulonglong;
 pub type fexcept_t = c_ulonglong;
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn feclearexcept(excepts: c_int) -> c_int {
-    unimplemented!();
+    0
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn feraiseexcept(except: c_int) -> c_int {
-    unimplemented!();
+    0
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn fesetenv(mut envp: *const fenv_t) -> c_int {
-    unimplemented!();
+    0
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn fesetround(round: c_int) -> c_int {
-    unimplemented!();
+    0
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn fegetround() -> c_int {
     FE_TONEAREST
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn fegetenv(envp: *const fenv_t) -> c_int {
-    unimplemented!();
+    0
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn fetestexcept(excepts: c_int) -> c_int {
-    unimplemented!();
+    0
 }

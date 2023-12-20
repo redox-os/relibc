@@ -63,7 +63,7 @@ pub type fexcept_t = c_uint;
 /// The feclearexcept() function clears the supported floating-point exceptions
 /// represented by `excepts'.
 #[no_mangle]
-pub unsafe extern "C" fn feclearexcept(mut excepts: c_int) -> c_int {
+pub unsafe extern "C" fn feclearexcept(excepts: c_int) -> c_int {
     let mut fenv: fenv_t = Default::default();
     let mut mxcsr: c_uint = 0;
 
@@ -128,7 +128,7 @@ pub unsafe extern "C" fn fesetexceptflag(flagp: *const fexcept_t, excepts: c_int
 /// floating-point exceptions, but only installs the state of the floating-point
 /// status flags represented through its argument.
 #[no_mangle]
-pub unsafe extern "C" fn fesetenv(mut envp: *const fenv_t) -> c_int {
+pub unsafe extern "C" fn fesetenv(envp: *const fenv_t) -> c_int {
     //  Load the x87 floating-point environment
     asm!("fldenv [{0}]", in (reg) & * envp, options(preserves_flags));
     // Store the MXCSR register
@@ -140,7 +140,7 @@ pub unsafe extern "C" fn fesetenv(mut envp: *const fenv_t) -> c_int {
 /// its argument `round'. If the argument is not equal to the value of a rounding
 /// direction macro, the rounding direction is not changed.
 #[no_mangle]
-pub unsafe extern "C" fn fesetround(mut round: c_int) -> c_int {
+pub unsafe extern "C" fn fesetround(round: c_int) -> c_int {
     let mut control = 0;
     let mut mxcsr = 0;
     // Check whether requested rounding direction is supported

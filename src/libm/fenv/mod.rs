@@ -13,7 +13,7 @@ pub use arch::x86::*;
 pub use arch::x86_64::*;
 
 #[no_mangle]
-pub unsafe extern "C" fn fegetexceptflag(flagp: *mut fexcept_t, mut excepts: c_int) -> c_int {
+pub unsafe extern "C" fn fegetexceptflag(flagp: *mut fexcept_t, excepts: c_int) -> c_int {
     *flagp = fetestexcept(excepts) as fexcept_t;
     0
 }
@@ -27,7 +27,7 @@ pub unsafe extern "C" fn feholdexcept(envp: *mut fenv_t) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn feupdateenv(envp: *mut fenv_t) -> c_int {
-    let mut ex = fetestexcept(FE_ALL_EXCEPT);
+    let ex = fetestexcept(FE_ALL_EXCEPT);
     fesetenv(envp);
     feraiseexcept(ex);
     0

@@ -26,6 +26,7 @@
 
 use crate::platform::types::*;
 use core::arch::asm;
+use raw_cpuid::CpuId;
 
 pub const FE_INVALID: c_int = 1;
 pub const FE_DIVBYZERO: c_int = 4;
@@ -40,15 +41,15 @@ pub const FE_DOWNWARD: c_int = 0x400;
 pub const FE_UPWARD: c_int = 0x800;
 pub const FE_TOWARDZERO: c_int = 0xc00;
 
-const HAS_SSE: bool = cfg!(any(
-    target_feature = "sse",
-    target_feature = "sse2",
-    target_feature = "sse3",
-    target_feature = "ssse3",
-    target_feature = "sse4.1",
-    target_feature = "sse4.2",
-    target_feature = "sse4a"
-));
+const ROUND_MASK: c_int = FE_TONEAREST | FE_DOWNWARD | FE_UPWARD | FE_TOWARDZERO;
+const SSE_ROUND_SHIFT: c_int = 3;
+
+fn has_sse() -> bool {
+    let cpuid = CpuId::new();
+    cpuid
+        .get_feature_info()
+        .map_or(false, |finfo| finfo.has_sse())
+}
 
 #[repr(C)]
 #[derive(Default)]
@@ -68,14 +69,36 @@ struct X87Reg {
 
 pub type fexcept_t = c_uint;
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn feclearexcept(excepts: c_int) -> c_int {
-    unimplemented!();
+    let mut fenv: fenv_t = Default::default();
+    let mut mxcsr = 0;
+    let excepts = excepts & FE_ALL_EXCEPT;
+
+    // Store the current x87 floating-point environment
+    asm!("fnstenv [{0}]", in (reg) & mut fenv, options(preserves_flags));
+
+    //  Clear the requested floating-point exceptions
+    fenv.x87.status &= !(excepts as c_uint);
+
+    // Load the x87 floating-point environment
+    asm!("fldenv [{0}]", in (reg) & fenv, options(preserves_flags));
+
+    // Same for SSE environment
+    if has_sse() {
+        asm!("stmxcsr [{0}]", in (reg) & mut mxcsr, options(preserves_flags));
+        mxcsr &= !excepts;
+        asm!("ldmxcsr [{0}]", in (reg) & mxcsr, options(preserves_flags));
+    }
+    0
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn feraiseexcept(except: c_int) -> c_int {
-    unimplemented!();
+    let excepts = except & FE_ALL_EXCEPT;
+    fesetexceptflag(excepts as *const fexcept_t, excepts);
+    asm!("fwait", options(preserves_flags));
+    0
 }
 
 /// This function sets the floating-point status flags indicated by the argument
@@ -83,30 +106,127 @@ pub unsafe extern "C" fn feraiseexcept(except: c_int) -> c_int {
 /// NOT raise any floating-point exceptions, but only sets the state of the flags.
 #[no_mangle]
 pub unsafe extern "C" fn fesetexceptflag(flagp: *const fexcept_t, excepts: c_int) -> c_int {
-    
+    let mut fenv: fenv_t = Default::default();
+    let mut mxcsr = 0;
+    let excepts = excepts & FE_ALL_EXCEPT;
+    // Store the current x87 floating-point environment
+    asm!("fnstenv [{0}]", in (reg) & mut fenv, options(preserves_flags));
+
+    // Set the requested status flags
+    fenv.x87.status &= !(excepts as c_uint);
+    fenv.x87.status |= *flagp & (excepts as c_uint);
+    // Load the x87 floating-point environment
+    asm!("fldenv [{0}]", in (reg) & fenv, options(preserves_flags));
+
+    // Same for SSE environment
+    if has_sse() {
+        asm!("stmxcsr [{0}]", in (reg) & mut mxcsr, options(preserves_flags));
+        mxcsr &= !(excepts as c_uint);
+        mxcsr |= *flagp & (excepts as c_uint);
+        asm!("ldmxcsr [{0}]", in (reg) & mxcsr, options(preserves_flags));
+    }
+    0
 }
 
-// #[no_mangle]
-pub unsafe extern "C" fn fesetenv(mut envp: *const fenv_t) -> c_int {
-    unimplemented!();
+/// The fesetenv() function attempts to establish the floating-point environment
+/// represented by the object pointed to by envp. The argument `envp' points
+/// to an object set by a call to fegetenv() or feholdexcept(), or equal a
+/// floating-point environment macro. The fesetenv() function does not raise
+/// floating-point exceptions, but only installs the state of the floating-point
+/// status flags represented through its argument.
+#[no_mangle]
+pub unsafe extern "C" fn fesetenv(envp: *const fenv_t) -> c_int {
+    // Load the x87 floating-point environment
+    asm!("fldenv [{0}]", in (reg) & * envp, options(preserves_flags));
+    // Store the MXCSR register
+    if has_sse() {
+        asm!("ldmxcsr [{0}]", in (reg) & (* envp).mxcsr, options(preserves_flags));
+    }
+    0
 }
 
-// #[no_mangle]
+/// The fesetround() function establishes the rounding direction represented by
+/// its argument `round'. If the argument is not equal to the value of a rounding
+/// direction macro, the rounding direction is not changed.
+#[no_mangle]
 pub unsafe extern "C" fn fesetround(round: c_int) -> c_int {
-    unimplemented!();
+    let mut control = 0;
+    let mut mxcsr = 0;
+
+    // Check whether requested rounding direction is supported
+    if round & !ROUND_MASK != 0 {
+        return -(1 as c_int);
+    }
+
+    // Store the current x87 control word register
+    asm!("fnstcw [{0}]", in (reg) & mut control, options(preserves_flags));
+
+    // Set the rounding direction
+    control &= ROUND_MASK;
+    control |= round;
+
+    // Load the x87 control word register
+    asm!("fldcw [{0}]", in (reg) & control, options(preserves_flags));
+
+    // Same for the SSE environment
+    if has_sse() {
+        asm!("stmxcsr [{0}]", in (reg) & mut mxcsr, options(preserves_flags));
+        mxcsr &= !(ROUND_MASK << SSE_ROUND_SHIFT);
+        mxcsr |= round << SSE_ROUND_SHIFT;
+        asm!("ldmxcsr [{0}]", in (reg) & mxcsr, options(preserves_flags));
+    }
+    0
 }
 
-// #[no_mangle]
+/// The fegetround() function gets the current rounding direction.
+#[no_mangle]
 pub unsafe extern "C" fn fegetround() -> c_int {
-    FE_TONEAREST
+    let mut control = 0;
+
+    // We assume that the x87 and the SSE unit agree on the
+    // rounding mode.  Reading the control word on the x87 turns
+    // out to be about 5 times faster than reading it on the SSE
+    // unit on an Opteron 244.
+    asm!("fnstcw [{0}]", in (reg) & mut control, options(preserves_flags));
+    control & ROUND_MASK
 }
 
-// #[no_mangle]
-pub unsafe extern "C" fn fegetenv(envp: *const fenv_t) -> c_int {
-    unimplemented!();
+/// The fegetenv() function attempts to store the current floating-point
+/// environment in the object pointed to by envp.
+#[no_mangle]
+pub unsafe extern "C" fn fegetenv(envp: *mut fenv_t) -> c_int {
+    //  Store the current x87 floating-point environment
+    asm!("fnstenv [{0}]", in (reg) & mut * envp, options(preserves_flags));
+
+    // Store the MXCSR register state
+    if has_sse() {
+        asm!("stmxcsr [{0}]", in (reg) & mut (* envp).mxcsr, options(preserves_flags));
+    }
+
+    // When an FNSTENV instruction is executed, all pending exceptions are
+    // essentially lost (either the x87 FPU status register is cleared or
+    // all exceptions are masked).
+    //
+    // 8.6 X87 FPU EXCEPTION SYNCHRONIZATION -
+    // Intel(R) 64 and IA-32 Architectures Softare Developer's Manual - Vol1
+    //
+    asm!("fldcw [{0}]", in (reg) & (* envp).x87.control, options(preserves_flags));
+    0
 }
 
-// #[no_mangle]
+/// The fetestexcept() function determines which of a specified subset of the
+/// floating-point exception flags are currently set. The `excepts' argument
+/// specifies the floating-point status flags to be queried.
+#[no_mangle]
 pub unsafe extern "C" fn fetestexcept(excepts: c_int) -> c_int {
-    unimplemented!();
+    let mut status = 0;
+    let mut mxcsr = 0;
+    let excepts = excepts & FE_ALL_EXCEPT;
+
+    // Store the current x87 status register
+    asm!("fnstsw [{}]", in(reg) &mut status);
+    if has_sse() {
+        asm!("stmxcsr [{0}]", in (reg) & mut mxcsr, options(preserves_flags));
+    }
+    (status | mxcsr) & excepts
 }
