@@ -1,6 +1,6 @@
-//!	$OpenBSD: fenv.h,v 1.3 2011/05/25 21:46:49 martynas Exp $
-//!	$NetBSD: fenv.h,v 1.1.6.2 2010/10/24 22:48:02 jym Exp $
-//! Copyright (c) 2004-2005 David Schultz <das (at) FreeBSD.ORG>
+//!	$OpenBSD: fenv.c,v 1.7 2022/12/27 17:10:07 jmc Exp $
+//!	$NetBSD: fenv.c,v 1.3 2010/08/01 06:34:38 taca Exp $
+//! Copyright (c) 2004-2005 David Schultz <das@FreeBSD.ORG>
 //! All rights reserved.
 //!
 //! Redistribution and use in source and binary forms, with or without
@@ -40,6 +40,16 @@ pub const FE_DOWNWARD: c_int = 0x400;
 pub const FE_UPWARD: c_int = 0x800;
 pub const FE_TOWARDZERO: c_int = 0xc00;
 
+const HAS_SSE: bool = cfg!(any(
+    target_feature = "sse",
+    target_feature = "sse2",
+    target_feature = "sse3",
+    target_feature = "ssse3",
+    target_feature = "sse4.1",
+    target_feature = "sse4.2",
+    target_feature = "sse4a"
+));
+
 #[repr(C)]
 #[derive(Default)]
 pub struct fenv_t {
@@ -66,6 +76,14 @@ pub unsafe extern "C" fn feclearexcept(excepts: c_int) -> c_int {
 // #[no_mangle]
 pub unsafe extern "C" fn feraiseexcept(except: c_int) -> c_int {
     unimplemented!();
+}
+
+/// This function sets the floating-point status flags indicated by the argument
+/// `excepts' to the states stored in the object pointed to by `flagp'. It does
+/// NOT raise any floating-point exceptions, but only sets the state of the flags.
+#[no_mangle]
+pub unsafe extern "C" fn fesetexceptflag(flagp: *const fexcept_t, excepts: c_int) -> c_int {
+    
 }
 
 // #[no_mangle]
