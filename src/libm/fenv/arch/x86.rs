@@ -1,6 +1,6 @@
-//!	$OpenBSD: fenv.c,v 1.7 2022/12/27 17:10:07 jmc Exp $
-//!	$NetBSD: fenv.c,v 1.3 2010/08/01 06:34:38 taca Exp $
-//! Copyright (c) 2004-2005 David Schultz <das@FreeBSD.ORG>
+//!	$OpenBSD: fenv.h,v 1.3 2011/05/25 21:46:49 martynas Exp $
+//!	$NetBSD: fenv.h,v 1.1.6.2 2010/10/24 22:48:02 jym Exp $
+//! Copyright (c) 2004-2005 David Schultz <das (at) FreeBSD.ORG>
 //! All rights reserved.
 //!
 //! Redistribution and use in source and binary forms, with or without

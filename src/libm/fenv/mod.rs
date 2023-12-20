@@ -26,13 +26,6 @@ pub unsafe extern "C" fn feholdexcept(envp: *mut fenv_t) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fesetexceptflag(flagp: *const fexcept_t, excepts: c_int) -> c_int {
-    feclearexcept(!(*flagp as c_int) & excepts);
-    feraiseexcept(*flagp as c_int & excepts);
-    0
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn feupdateenv(envp: *mut fenv_t) -> c_int {
     let mut ex = fetestexcept(FE_ALL_EXCEPT);
     fesetenv(envp);
