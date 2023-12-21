@@ -36,6 +36,8 @@ __libc_only_for_layout_checks = { package = "libc", version = "0.2.149", optiona
 
 inner_libm = {package = "libm", version = "0.2.8"}
 num-complex = { version = "0.4.4", default-features = false, features = ["libm"] }
+raw-cpuid = "11"
+
 
 [dependencies.goblin]
 version = "0.7"

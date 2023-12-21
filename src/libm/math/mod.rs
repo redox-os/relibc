@@ -469,6 +469,9 @@ unsafe extern "C" fn logf(x: c_float) -> c_float {
     inner_libm::logf(x)
 }
 
+// TODO: We don't support floating-point exceptions,
+// for now we ignore `FE_INEXACT`.
+
 #[no_mangle]
 unsafe extern "C" fn lrint(x: c_double) -> c_long {
     rint(x) as c_long

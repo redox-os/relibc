@@ -364,6 +364,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raw-cpuid"
+version = "11.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d86a7c4638d42c44551f4791a20e687dbb4c3de1f33c43dd71e355cd429def1"
+dependencies = [
+ "bitflags 2.4.1",
+]
+
+[[package]]
 name = "redox-exec"
 version = "0.1.0"
 dependencies = [
@@ -408,6 +417,7 @@ dependencies = [
  "rand",
  "rand_jitter",
  "rand_xorshift",
+ "raw-cpuid",
  "redox-exec",
  "redox_syscall 0.4.1",
  "sc",
