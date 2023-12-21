@@ -159,6 +159,16 @@ unsafe extern "C" fn coshf(x: c_float) -> c_float {
 }
 
 #[no_mangle]
+unsafe extern "C" fn drem(x: f64, y: f64) -> f64 {
+    remainder(x, y)
+}
+
+#[no_mangle]
+unsafe extern "C" fn dremf(x: c_float, y: c_float) -> c_float {
+    remainderf(x, y)
+}
+
+#[no_mangle]
 unsafe extern "C" fn erf(x: c_double) -> c_double {
     inner_libm::erf(x)
 }
@@ -442,25 +452,16 @@ unsafe extern "C" fn log10f(x: c_float) -> c_float {
 }
 
 #[no_mangle]
-unsafe extern "C" fn logb(x: c_double) -> c_double {
-    if x.is_finite() {
-        return x * x;
-    }
-    if x == 0.0 {
-        return -1.0 / (x * x);
-    }
-    ilogb(x) as c_double
-}
-
-#[no_mangle]
 unsafe extern "C" fn logbf(x: c_float) -> c_float {
-    if x.is_finite() {
-        return x * x;
+    if x.is_nan() {
+        x - 0.0
+    } else if x == 0.0 {
+        -c_float::INFINITY
+    } else if fabsf(x) == c_float::INFINITY {
+        c_float::INFINITY
+    } else {
+        ilogbf(x) as c_float
     }
-    if x == 0.0 {
-        return -1.0 / (x * x);
-    }
-    ilogbf(x) as c_float
 }
 
 #[no_mangle]
@@ -567,32 +568,66 @@ unsafe extern "C" fn roundf(x: c_float) -> c_float {
 }
 
 #[no_mangle]
-unsafe extern "C" fn scalbln(x: c_double, n: c_long) -> c_double {
-    let clamped_n = if n > c_long::MAX {
-        c_long::MAX
-    } else if n < c_long::MIN {
-        c_long::MIN
-    } else {
-        n
-    };
-    scalbn(x, clamped_n as c_int)
+unsafe extern "C" fn scalbln(x: c_double, y: c_long) -> c_double {
+    let y = y.clamp(c_int::MIN.into(), c_int::MAX.into()) as _;
+    scalbn(x, y)
 }
 
 #[no_mangle]
-unsafe extern "C" fn scalblnf(x: c_float, n: c_long) -> c_float {
-    let clamped_n = if n > c_long::MAX {
-        c_long::MAX
-    } else if n < c_long::MIN {
-        c_long::MIN
-    } else {
-        n
-    };
-    scalbnf(x, clamped_n as c_int)
+unsafe extern "C" fn scalblnf(x: c_float, y: c_long) -> c_float {
+    let y = y.clamp(c_int::MIN.into(), c_int::MAX.into()) as _;
+    scalbnf(x, y)
 }
 
 #[no_mangle]
 unsafe extern "C" fn scalbn(x: c_double, y: c_int) -> c_double {
     inner_libm::scalbn(x, y)
+}
+
+#[no_mangle]
+unsafe extern "C" fn scalb(x: f64, exp: f64) -> f64 {
+    if x.is_nan() {
+        x - 0.0
+    } else if exp.is_nan() {
+        exp - 0.0
+    } else if !exp.is_finite() {
+        if exp > 0.0 {
+            x * exp
+        } else {
+            x / -exp
+        }
+    } else if rint(exp) != exp {
+        f64::NAN
+    } else if exp > 65000.0 {
+        scalbn(x, 65000)
+    } else if -exp > 65000.0 {
+        scalbn(x, -65000)
+    } else {
+        scalbn(x, exp as i32)
+    }
+}
+
+#[no_mangle]
+unsafe extern "C" fn scalbf(x: c_float, exp: c_float) -> c_float {
+    if x.is_nan() {
+        x - 0.0
+    } else if exp.is_nan() {
+        exp - 0.0
+    } else if !exp.is_finite() {
+        if exp > 0.0 {
+            x * exp
+        } else {
+            x / -exp
+        }
+    } else if rintf(exp) != exp {
+        c_float::NAN
+    } else if exp > 65000.0 {
+        scalbnf(x, 65000)
+    } else if -exp > 65000.0 {
+        scalbnf(x, -65000)
+    } else {
+        scalbnf(x, exp as i32)
+    }
 }
 
 #[no_mangle]
