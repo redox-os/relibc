@@ -5,12 +5,7 @@ use crate::platform::types::c_int;
 
 mod arch;
 
-#[cfg(target_arch = "aarch64")]
-pub use arch::aarch64::*;
-#[cfg(target_arch = "x86")]
-pub use arch::x86::*;
-#[cfg(target_arch = "x86_64")]
-pub use arch::x86_64::*;
+pub use arch::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn fegetexceptflag(flagp: *mut fexcept_t, excepts: c_int) -> c_int {
