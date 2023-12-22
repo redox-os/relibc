@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //!	$OpenBSD: fenv.c,v 1.7 2022/12/27 17:10:07 jmc Exp $
 //!	$NetBSD: fenv.c,v 1.3 2010/08/01 06:34:38 taca Exp $
 //! Copyright (c) 2004-2005 David Schultz <das@FreeBSD.ORG>
@@ -69,6 +71,8 @@ struct X87Reg {
 
 pub type fexcept_t = c_uint;
 
+/// The feclearexcept() function clears the supported floating-point exceptions
+/// represented by `excepts'.
 #[no_mangle]
 pub unsafe extern "C" fn feclearexcept(excepts: c_int) -> c_int {
     let mut fenv: fenv_t = Default::default();
@@ -93,6 +97,12 @@ pub unsafe extern "C" fn feclearexcept(excepts: c_int) -> c_int {
     0
 }
 
+/// The feraiseexcept() function raises the supported floating-point exceptions
+/// represented by the argument `excepts'.
+/// The standard explicitly allows us to execute an instruction that has the
+/// exception as a side effect, but we choose to manipulate the status register
+/// directly.
+/// The validation of input is being deferred to fesetexceptflag().
 #[no_mangle]
 pub unsafe extern "C" fn feraiseexcept(except: c_int) -> c_int {
     let excepts = except & FE_ALL_EXCEPT;

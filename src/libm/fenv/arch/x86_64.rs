@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //!	$OpenBSD: fenv.c,v 1.6 2022/12/27 17:10:07 jmc Exp $
 //!	$NetBSD: fenv.c,v 1.1 2010/07/31 21:47:53 joerg Exp $
 

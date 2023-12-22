@@ -1,4 +1,4 @@
-use crate::platform::types::{c_double, c_float, c_int, c_long};
+use crate::platform::types::{c_double, c_float};
 use inner_libm;
 use num_complex::{Complex32, Complex64, ComplexFloat};
 
