@@ -50,35 +50,15 @@ pub mod native {
     pub type fenv_t = c_ulonglong;
     pub type fexcept_t = c_ulonglong;
 
-    #[inline(always)]
-    unsafe fn mrs_fpcr(mut r: fexcept_t) {
-        asm!("mrs {0:e}, fpcr", in (reg) & mut r, options(preserves_flags));
-    }
-
-    #[inline(always)]
-    unsafe fn msr_fpcr(r: fexcept_t) {
-        asm!("msr fpcr, {0:r}", inlateout(reg) r => _, options(preserves_flags));
-    }
-
-    #[inline(always)]
-    unsafe fn mrs_fpsr(mut r: fexcept_t) {
-        asm!("mrs {0:r}, fpsr", in (reg) & mut r, options(preserves_flags));
-    }
-
-    #[inline(always)]
-    unsafe fn msr_fpsr(r: fexcept_t) {
-        asm!("msr fpsr, {0:r}", inlateout(reg) r => _, options(preserves_flags));
-    }
-
     /// The feclearexcept() function clears the supported floating-point exceptions
     /// represented by `excepts'.
     #[no_mangle]
     pub unsafe extern "C" fn feclearexcept(excepts: c_int) -> c_int {
         let mut r = 0;
         let excepts = (excepts & FE_ALL_EXCEPT) as fexcept_t;
-        mrs_fpsr(r);
+        asm!("mrs {0:}, fpsr", lateout(reg) r, options(preserves_flags));
         r &= !excepts;
-        msr_fpsr(r);
+        asm!("msr fpsr, {0:}", inlateout(reg) r => _, options(preserves_flags));
         0
     }
 
@@ -92,9 +72,9 @@ pub mod native {
     pub unsafe extern "C" fn feraiseexcept(excepts: c_int) -> c_int {
         let mut r = 0;
         let excepts = (excepts & FE_ALL_EXCEPT) as fexcept_t;
-        mrs_fpsr(r);
+        asm!("mrs {0:}, fpsr", lateout(reg) r, options(preserves_flags));
         r |= excepts;
-        msr_fpsr(r);
+        asm!("msr fpsr, {0:}", inlateout(reg) r => _, options(preserves_flags));
         0
     }
 
@@ -105,10 +85,10 @@ pub mod native {
     pub unsafe extern "C" fn fesetexceptflag(flagp: *const fexcept_t, excepts: c_int) -> c_int {
         let mut r = 0;
         let excepts = (excepts & FE_ALL_EXCEPT) as fexcept_t;
-        mrs_fpsr(r);
+        asm!("mrs {0:}, fpsr", lateout(reg) r, options(preserves_flags));
         r |= !excepts;
         r |= *flagp & excepts;
-        msr_fpsr(r);
+        asm!("msr fpsr, {0:}", inlateout(reg) r => _, options(preserves_flags));
         0
     }
 
@@ -120,8 +100,8 @@ pub mod native {
     /// status flags represented through its argument.
     #[no_mangle]
     pub unsafe extern "C" fn fesetenv(envp: *const fenv_t) -> c_int {
-        msr_fpcr(*envp & 0xffffffff);
-        msr_fpsr(*envp >> 32);
+        asm!("msr fpcr, {0:}", inlateout(reg) *envp & 0xffffffff => _, options(preserves_flags));
+        asm!("msr fpsr, {0:}", inlateout(reg) r => _, options(preserves_flags));
         0
     }
 
@@ -135,10 +115,12 @@ pub mod native {
             return -(1 as c_int);
         }
 
-        mrs_fpcr(r);
+        asm!("mrs {0:}, fpcr", lateout(reg) r, options(preserves_flags));
+
         r &= (!ROUND_MASK << ROUND_SHIFT) as fenv_t;
         r |= (round << ROUND_SHIFT) as fenv_t;
-        msr_fpcr(r);
+        asm!("msr fpcr, {0:}", inlateout(reg) r => _, options(preserves_flags));
+
         0
     }
 
@@ -146,7 +128,7 @@ pub mod native {
     #[no_mangle]
     pub unsafe extern "C" fn fegetround() -> c_int {
         let r = 0;
-        mrs_fpcr(r);
+        asm!("mrs {0:}, fpcr", lateout(reg) r, options(preserves_flags));
         (r as c_int >> ROUND_SHIFT) & ROUND_MASK
     }
 
@@ -155,9 +137,9 @@ pub mod native {
     #[no_mangle]
     pub unsafe extern "C" fn fegetenv(envp: *mut fenv_t) -> c_int {
         let r = 0;
-        mrs_fpcr(r);
+        asm!("mrs {0:}, fpcr", lateout(reg) r, options(preserves_flags));
         *envp = r;
-        mrs_fpsr(r);
+        asm!("mrs {0:}, fpsr", lateout(reg) r, options(preserves_flags));
         *envp |= r << 32;
 
         0
@@ -171,7 +153,7 @@ pub mod native {
         let r = 0;
 
         let excepts = excepts & FE_ALL_EXCEPT;
-        mrs_fpsr(r);
+        asm!("mrs {0:}, fpsr", lateout(reg) r, options(preserves_flags));
         r as c_int & excepts
     }
 }
