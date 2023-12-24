@@ -4,9 +4,6 @@
 [submodule "ralloc"]
 	path = ralloc
 	url = https://gitlab.redox-os.org/redox-os/ralloc.git
-[submodule "core_io"]
-	path = core_io
-	url = https://gitlab.redox-os.org/redox-os/core_io.git
 [submodule "posix-regex"]
 	path = posix-regex
 	url = https://gitlab.redox-os.org/redox-os/posix-regex.git

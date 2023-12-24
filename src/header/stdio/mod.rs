@@ -73,13 +73,13 @@ pub trait Pending {
     fn pending(&self) -> size_t;
 }
 
-impl<W: core_io::Write> Pending for BufWriter<W> {
+impl<W: crate::io::Write> Pending for BufWriter<W> {
     fn pending(&self) -> size_t {
         self.buf.len() as size_t
     }
 }
 
-impl<W: core_io::Write> Pending for LineWriter<W> {
+impl<W: crate::io::Write> Pending for LineWriter<W> {
     fn pending(&self) -> size_t {
         self.inner.buf.len() as size_t
     }
@@ -89,12 +89,12 @@ pub trait Writer: Write + Pending {
     fn purge(&mut self);
 }
 
-impl<W: core_io::Write> Writer for BufWriter<W> {
+impl<W: crate::io::Write> Writer for BufWriter<W> {
     fn purge(&mut self) {
         self.buf.clear();
     }
 }
-impl<W: core_io::Write> Writer for LineWriter<W> {
+impl<W: crate::io::Write> Writer for LineWriter<W> {
     fn purge(&mut self) {
         self.inner.buf.clear();
     }
