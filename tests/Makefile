@@ -181,8 +181,16 @@ NAMES=\
 #	resource/getrusage
 #	time/times
 
+MNAMES=\
+	libm/test-float \
+	libm/test-double
+
+EXPECT_NAMES+=\
+	$(MNAMES)
+
 #TODO: dynamic tests currently broken
 BINS=$(patsubst %,$(BUILD)/bins_static/%,$(NAMES))
+MBINS=$(patsubst %,$(BUILD)/bins_static/%,$(MNAMES))
 #BINS+=$(patsubst %,bins_dynamic/%,$(NAMES))
 #BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_BINS=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
@@ -192,12 +200,19 @@ EXPECT_BINS=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
 CARGO_TEST?=cargo
 TEST_RUNNER?=
 
-.PHONY: all clean run expected verify
+.PHONY: all clean run math expected verify
 
-all: $(BINS)
+all: $(BINS) $(MBINS)
 
 clean:
 	rm -rf bins_* gen *.out
+
+math:| $(MBINS)
+	for bin in $(MBINS); \
+	do \
+		echo "# $${bin} #"; \
+		"$${bin}" test args || exit $$?; \
+	done
 
 run: | $(BINS)
 	for bin in $(BINS); \
@@ -258,6 +273,9 @@ SYSROOT_LIB=$(shell realpath ../sysroot/lib/)
 STATIC_FLAGS+=\
 	$(SYSROOT_LIB)/libc.a
 
+M_FLAGS+=\
+	$(SYSROOT_LIB)/libm.a
+
 DYNAMIC_FLAGS+=\
 	-Wl,-dynamic-linker=$(SYSROOT_LIB)/ld64.so.1 \
 	-Wl,-rpath=$(SYSROOT_LIB):\$$ORIGIN \
@@ -273,6 +291,10 @@ endif
 $(BUILD)/bins_static/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
+
+$(BUILD)/bins_static/libm/%: %.c $(DEPS)
+	mkdir -p "$$(dirname "$@")"
+	$(CC) "$<" -o "$@" $(FLAGS) $(M_FLAGS)
 
 $(BUILD)/bins_dynamic/%.so: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
