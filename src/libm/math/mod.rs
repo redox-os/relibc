@@ -453,6 +453,19 @@ pub unsafe extern "C" fn log10f(x: c_float) -> c_float {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn logb(x: c_double) -> c_double {
+    if x.is_nan() {
+        x - 0.0
+    } else if x == 0.0 {
+        -c_double::INFINITY
+    } else if fabs(x) == c_double::INFINITY {
+        c_double::INFINITY
+    } else {
+        ilogb(x) as c_double
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn logbf(x: c_float) -> c_float {
     if x.is_nan() {
         x - 0.0

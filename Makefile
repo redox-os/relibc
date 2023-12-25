@@ -123,7 +123,7 @@ test: sysroot
 
 # Debug targets
 
-$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/debug/libm.a
+$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -132,7 +132,7 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/debug/libm.a
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
 
-$(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/debug/libm.a
+$(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a
 	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -Wl,-soname,libc.so.6 -o $@
 
 $(BUILD)/debug/librelibc.a: $(SRC)
@@ -140,8 +140,8 @@ $(BUILD)/debug/librelibc.a: $(SRC)
 	./renamesyms.sh $@ $(BUILD)/debug/deps/
 	touch $@
 
-$(BUILD)/debug/libm.a: $(SRC)
-	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+$(BUILD)/debug/libm.a:
+	CARGO_INCREMENTAL=0 $(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
@@ -184,8 +184,8 @@ $(BUILD)/release/librelibc.a: $(SRC)
 	./renamesyms.sh $@ $(BUILD)/release/deps/
 	touch $@
 
-$(BUILD)/release/libm.a: $(SRC)
-	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+$(BUILD)/release/libm.a:
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)

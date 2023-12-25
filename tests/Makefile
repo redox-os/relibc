@@ -273,14 +273,18 @@ SYSROOT_LIB=$(shell realpath ../sysroot/lib/)
 STATIC_FLAGS+=\
 	$(SYSROOT_LIB)/libc.a
 
-M_FLAGS+=\
-	$(SYSROOT_LIB)/libm.a
+M_FLAGS=\
+	-Wl,-dynamic-linker=$(SYSROOT_LIB)/ld64.so.1 \
+	-Wl,-rpath=$(SYSROOT_LIB):\$$ORIGIN \
+	-L $(SYSROOT_LIB)/libm.a \
+	-lc
 
 DYNAMIC_FLAGS+=\
 	-Wl,-dynamic-linker=$(SYSROOT_LIB)/ld64.so.1 \
 	-Wl,-rpath=$(SYSROOT_LIB):\$$ORIGIN \
 	-L $(SYSROOT_LIB) \
-	-lc
+	-lalm \
+	-lm
 
 DEPS=../sysroot
 else
