@@ -59,6 +59,8 @@ after_includes = """
 extern int signgam;
 """
 
+[export]
+item_types = ["constants", "functions", "typedefs", "structs"]
 
 [enum]
 prefix_with_name = true
