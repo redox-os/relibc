@@ -27,42 +27,8 @@
 
 #[cfg(target_arch = "x86_64")]
 pub mod native {
-    use crate::platform::types::*;
+    use crate::{libm::fenv::x86_common::*, platform::types::*};
     use core::arch::asm;
-
-    pub const FE_INVALID: c_int = 1;
-    pub const FE_DIVBYZERO: c_int = 4;
-    pub const FE_OVERFLOW: c_int = 8;
-    pub const FE_UNDERFLOW: c_int = 16;
-    pub const FE_INEXACT: c_int = 32;
-
-    pub const FE_ALL_EXCEPT: c_int = 63;
-
-    pub const FE_TONEAREST: c_int = 0;
-    pub const FE_DOWNWARD: c_int = 0x400;
-    pub const FE_UPWARD: c_int = 0x800;
-    pub const FE_TOWARDZERO: c_int = 0xc00;
-
-    const ROUND_MASK: c_int = FE_TONEAREST | FE_DOWNWARD | FE_UPWARD | FE_TOWARDZERO;
-    const SSE_ROUND_SHIFT: c_int = 3;
-
-    #[repr(C)]
-    #[derive(Default)]
-    pub struct fenv_t {
-        x87: X87Reg,
-        mxcsr: c_uint,
-    }
-
-    #[repr(C)]
-    #[derive(Default)]
-    struct X87Reg {
-        control: c_uint,
-        status: c_uint,
-        tag: c_uint,
-        others: [c_uint; 4],
-    }
-
-    pub type fexcept_t = c_uint;
 
     /// The feclearexcept() function clears the supported floating-point exceptions
     /// represented by `excepts'.
