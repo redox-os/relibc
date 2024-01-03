@@ -22,18 +22,18 @@ pub type cc_t = u8;
 pub type speed_t = u32;
 pub type tcflag_t = u32;
 
-pub const TCOOFF: usize = 0;
-pub const TCOON: usize = 1;
-pub const TCIOFF: usize = 2;
-pub const TCION: usize = 3;
+pub const TCOOFF: c_int = 0;
+pub const TCOON: c_int = 1;
+pub const TCIOFF: c_int = 2;
+pub const TCION: c_int = 3;
 
-pub const TCIFLUSH: usize = 0;
-pub const TCOFLUSH: usize = 1;
-pub const TCIOFLUSH: usize = 2;
+pub const TCIFLUSH: c_int = 0;
+pub const TCOFLUSH: c_int = 1;
+pub const TCIOFLUSH: c_int = 2;
 
-pub const TCSANOW: usize = 0;
-pub const TCSADRAIN: usize = 1;
-pub const TCSAFLUSH: usize = 2;
+pub const TCSANOW: c_int = 0;
+pub const TCSADRAIN: c_int = 1;
+pub const TCSAFLUSH: c_int = 2;
 
 #[cfg(target_os = "linux")]
 #[repr(C)]
@@ -67,7 +67,7 @@ pub unsafe extern "C" fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *mut termios) -> c_int {
+pub unsafe extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *const termios) -> c_int {
     if act < 0 || act > 2 {
         platform::errno = errno::EINVAL;
         return -1;
