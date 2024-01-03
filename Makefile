@@ -74,7 +74,7 @@ install-headers: libs
 libs: \
 	$(BUILD)/release/libc.a \
 	$(BUILD)/release/libc.so \
-	$(BUILD)/release/libm.a \
+	$(BUILD)/release/libm.o \
 	$(BUILD)/release/crt0.o \
 	$(BUILD)/release/crti.o \
 	$(BUILD)/release/crtn.o \
@@ -90,10 +90,11 @@ install-libs: libs
 	cp -v "$(BUILD)/release/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/ld_so" "$(DESTDIR)/lib/ld64.so.1"
-	cp -v "$(BUILD)/release/libm.a" "$(DESTDIR)/lib/libm.a"
+	cp -v "$(BUILD)/release/libm.o" "$(DESTDIR)/lib/"
 	# Empty libraries for dl, pthread, and rt
 	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
 	$(AR) -rcs "$(DESTDIR)/lib/libpthread.a"
+	$(AR) -rcs "$(DESTDIR)/lib/libm.a"
 	$(AR) -rcs "$(DESTDIR)/lib/librt.a"
 
 install-tests: tests
@@ -140,8 +141,8 @@ $(BUILD)/debug/librelibc.a: $(SRC)
 	./renamesyms.sh $@ $(BUILD)/debug/deps/
 	touch $@
 
-$(BUILD)/debug/libm.a:
-	CARGO_INCREMENTAL=0 $(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
+$(BUILD)/debug/libm.o:
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
@@ -184,8 +185,8 @@ $(BUILD)/release/librelibc.a: $(SRC)
 	./renamesyms.sh $@ $(BUILD)/release/deps/
 	touch $@
 
-$(BUILD)/release/libm.a:
-	CARGO_INCREMENTAL=0 $(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
+$(BUILD)/release/libm.o:
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
