@@ -1,5 +1,6 @@
-sys_includes = ["bits/assert.h"]
+sys_includes = []
 include_guard = "_RELIBC_ASSERT_H"
+trailer = "#include <bits/assert.h>"
 language = "C"
 style = "Tag"
 no_includes = true
