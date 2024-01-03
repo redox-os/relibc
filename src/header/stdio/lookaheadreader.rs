@@ -1,5 +1,5 @@
 use super::{fseek_locked, ftell_locked, FILE, SEEK_SET};
-use crate::{core_io::Read, platform::types::off_t};
+use crate::{io::Read, platform::types::off_t};
 struct LookAheadBuffer {
     buf: *const u8,
     pos: isize,

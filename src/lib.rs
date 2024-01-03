@@ -27,7 +27,6 @@
 #[macro_use]
 extern crate alloc;
 extern crate cbitset;
-extern crate core_io;
 extern crate goblin;
 extern crate memchr;
 #[macro_use]

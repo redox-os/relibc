@@ -249,7 +249,7 @@ mod tests {
     }
     #[test]
     fn extend_from_slice() {
-        use core_io::Write;
+        use crate::io::Write;
 
         let mut vec = CVec::new();
         vec.extend_from_slice(&[1, 2, 3]).unwrap();
