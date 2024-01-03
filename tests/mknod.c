@@ -9,7 +9,7 @@
 
 int main(void) {
   char temp[] = "/tmp/stattest-XXXXXX";
-  const char file[] = "/mkfifo_fifo";
+  const char file[] = "/mknod";
   int len = sizeof(temp) + sizeof(file);
   char* path = malloc(len * sizeof(char));
 
@@ -18,14 +18,19 @@ int main(void) {
     exit(1);
   }
 
-  path = strncat(path, mktemp(temp), sizeof(temp));
-  path = strncat(path, file, sizeof(file));
+  if(!mktemp(temp)) {
+    fprintf(stderr, "Unable to create a unique dir name %s: %s\n", temp, strerror(errno));
+    exit(1);
+  }
+
+  path = strncat(path, temp, strlen(temp));
+  path = strncat(path, file, strlen(file));
   if (mkdir(temp, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0) {
     fprintf(stderr, "mkdir %s: %s\n", temp, strerror(errno));
     exit(1);
   }
-  if (mkfifo(path, S_IRUSR) == -1) {
-    fprintf(stderr, "mkfifo %s: %s\n", path, strerror(errno));
+  if (mknod(path, S_IFREG, S_IRUSR) == -1) {
+    fprintf(stderr, "mknod %s: %s\n", path, strerror(errno));
     exit(1);
   }
   struct stat sb;
@@ -33,8 +38,8 @@ int main(void) {
     fprintf(stderr, "stat: %s\n", strerror(errno));
     exit(1);
   }
-  if (!(sb.st_mode & S_IFIFO)) {
-    fprintf(stderr, "Not a FIFO: %d\n", sb.st_mode);
+  if (!(sb.st_mode & S_IFREG)) {
+    fprintf(stderr, "Expected S_IFREG flag to be set, got mode: %d\n", sb.st_mode);
     exit(1);
   }
 }

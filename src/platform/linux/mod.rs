@@ -4,7 +4,7 @@ use core_io::Write;
 use super::{errno, types::*, Pal};
 use crate::{
     c_str::CStr,
-    header::{dirent::dirent, signal::SIGCHLD, sys_stat::S_IFIFO},
+    header::{dirent::dirent, errno::EINVAL, signal::SIGCHLD, sys_stat::S_IFIFO},
 };
 // use header::sys_resource::rusage;
 use crate::header::{
@@ -357,8 +357,23 @@ impl Pal for Sys {
         e(unsafe { syscall!(MKDIRAT, AT_FDCWD, path.as_ptr(), mode) }) as c_int
     }
 
+    fn mknodat(dir_fildes: c_int, path: CStr, mode: mode_t, dev: dev_t) -> c_int {
+        // Note: dev_t is c_long (i64) and __kernel_dev_t is u32; So we need to cast it
+        //       and check for overflow
+        let k_dev: c_uint = dev as c_uint;
+        if k_dev as dev_t != dev {
+            return e(EINVAL as usize) as c_int;
+        }
+
+        e(unsafe { syscall!(MKNODAT, dir_fildes, path.as_ptr(), mode, k_dev) }) as c_int
+    }
+
+    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> c_int {
+        Sys::mknodat(AT_FDCWD, path, mode, dev)
+    }
+
     fn mkfifo(path: CStr, mode: mode_t) -> c_int {
-        e(unsafe { syscall!(MKNODAT, AT_FDCWD, path.as_ptr(), mode | S_IFIFO, 0) }) as c_int
+        Sys::mknod(path, mode | S_IFIFO, 0)
     }
 
     unsafe fn mlock(addr: *const c_void, len: usize) -> c_int {

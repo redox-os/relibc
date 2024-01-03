@@ -33,7 +33,7 @@ EXPECT_NAMES=\
 	stdio/fseek \
 	stdio/fwrite \
 	stdio/getc_unget \
-  stdio/getline \
+  	stdio/getline \
 	stdio/mutex \
 	stdio/popen \
 	stdio/printf \
@@ -131,9 +131,11 @@ EXPECT_NAMES=\
 	wchar/wcsnrtombs \
 	wchar/wcswidth \
 	wctype/towlower \
-	wctype/towupper
+	wctype/towupper \
+	mkfifo \
+	mknod \
+	mknodat \
 	# TODO: Fix these
-	# mkfifo
 	# netdb/netdb \
 
 BUILD?=.
