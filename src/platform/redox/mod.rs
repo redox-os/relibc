@@ -10,7 +10,7 @@ use crate::{
     fs::File,
     header::{
         dirent::dirent,
-        errno::{EINVAL, EIO, ENOMEM, ENOSYS, EPERM, ERANGE},
+        errno::{EBADR, EINVAL, EIO, ENOENT, ENOMEM, ENOSYS, EPERM, ERANGE},
         fcntl,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
@@ -187,7 +187,7 @@ impl Pal for Sys {
     fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> c_int {
         // TODO
         eprintln!("relibc clock_getres({}, {:p}): not implemented", clk_id, tp);
-        unsafe { errno = ENOSYS };
+        unsafe { errno = ENOSYS }
         -1
     }
 
@@ -616,11 +616,44 @@ impl Pal for Sys {
     }
 
     fn mkfifo(path: CStr, mode: mode_t) -> c_int {
-        match File::create(
-            path,
-            fcntl::O_CREAT | fcntl::O_CLOEXEC,
-            syscall::MODE_FIFO as mode_t | (mode & 0o777),
-        ) {
+        Sys::mknod(path, syscall::MODE_FIFO as mode_t | (mode & 0o777), 0)
+    }
+
+    fn mknodat(dir_fd: c_int, path_name: CStr, mode: mode_t, dev: dev_t) -> c_int {
+        let mut dir_path_buf = [0; 4096];
+        let res = Sys::fpath(dir_fd, &mut dir_path_buf);
+        if res < 0 {
+            return !0;
+        }
+
+        let dir_path = match str::from_utf8(&dir_path_buf[..res as usize]) {
+            Ok(path) => path,
+            Err(_) => {
+                unsafe { errno = EBADR };
+                return !0;
+            }
+        };
+
+        let resource_path =
+            match path::canonicalize_using_cwd(Some(&dir_path), &path_name.to_string_lossy()) {
+                Some(path) => path,
+                None => {
+                    // Since parent_dir_path is resolved by fpath, it is more likely that
+                    // the problem was with path.
+                    unsafe { errno = ENOENT };
+                    return !0;
+                }
+            };
+
+        Sys::mknod(
+            CStr::borrow(&CString::new(resource_path.as_bytes()).unwrap()),
+            mode,
+            dev,
+        )
+    }
+
+    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> c_int {
+        match File::create(path, fcntl::O_CREAT | fcntl::O_CLOEXEC, mode) {
             Ok(fd) => 0,
             Err(_) => -1,
         }
