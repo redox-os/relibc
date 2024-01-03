@@ -42,6 +42,7 @@ mod clone;
 mod epoll;
 mod exec;
 mod extra;
+mod libcscheme;
 mod libredox;
 pub(crate) mod path;
 mod ptrace;
@@ -743,6 +744,10 @@ impl Pal for Sys {
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> c_int {
         let path = path_from_c_str!(path);
+
+        if path.starts_with(libcscheme::LIBC_SCHEME) {
+            return e(libcscheme::open(path, oflag, mode)) as c_int;
+        }
 
         e(libredox::open(path, oflag, mode)) as c_int
     }
