@@ -117,9 +117,21 @@ pub unsafe extern "C" fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
     Sys::mkfifo(path, mode)
 }
 
-// #[no_mangle]
-pub extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
+    let path = CStr::from_ptr(path);
+    Sys::mknod(path, mode, dev)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mknodat(
+    dirfd: c_int,
+    path: *const c_char,
+    mode: mode_t,
+    dev: dev_t,
+) -> c_int {
+    let path = CStr::from_ptr(path);
+    Sys::mknodat(dirfd, path, mode, dev)
 }
 
 #[no_mangle]

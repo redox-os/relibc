@@ -138,6 +138,10 @@ pub trait Pal {
 
     fn mkfifo(path: CStr, mode: mode_t) -> c_int;
 
+    fn mknodat(fildes: c_int, path: CStr, mode: mode_t, dev: dev_t) -> c_int;
+
+    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> c_int;
+
     unsafe fn mlock(addr: *const c_void, len: usize) -> c_int;
 
     fn mlockall(flags: c_int) -> c_int;
