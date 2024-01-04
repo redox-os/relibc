@@ -1,6 +1,6 @@
 use crate::{
     header::{fcntl, sys_ioctl, unistd},
-    io::Cursor,
+    io::{Cursor, Write},
     platform::types::*,
 };
 
