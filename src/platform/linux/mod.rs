@@ -1,5 +1,5 @@
+use crate::io::Write;
 use core::{arch::asm, ptr};
-use core_io::Write;
 
 use super::{errno, types::*, Pal};
 use crate::{

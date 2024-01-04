@@ -1,8 +1,8 @@
 use crate::{
     c_str::{CStr, CString},
-    core_io::{prelude::*, BufReader, SeekFrom},
     fs::File,
     header::string::strlen,
+    io::{prelude::*, BufReader, SeekFrom},
     platform::{
         sys::{S_ISGID, S_ISUID},
         types::*,

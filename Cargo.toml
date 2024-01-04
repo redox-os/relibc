@@ -10,7 +10,7 @@ crate-type = ["staticlib"]
 
 [workspace]
 members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so", "src/libm", "src/platform/redox/redox-exec"]
-exclude = ["core_io", "ralloc", "tests", "dlmalloc-rs"]
+exclude = ["ralloc", "tests", "dlmalloc-rs"]
 
 [build-dependencies]
 cbindgen = "0.26"
@@ -20,7 +20,6 @@ cc = "1.0.25"
 [dependencies]
 bitflags = "2"
 cbitset = "0.2"
-core_io = { path = "core_io", features = ["collections"] }
 memoffset = "0.9"
 posix-regex = { path = "posix-regex", features = ["no_std"] }
 

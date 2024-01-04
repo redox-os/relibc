@@ -206,11 +206,17 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
 // MT-Unsafe race:grgid locale
 #[no_mangle]
 pub unsafe extern "C" fn getgrgid(gid: gid_t) -> *mut group {
-    let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else { return ptr::null_mut() };
+    let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else {
+        return ptr::null_mut();
+    };
 
     for line in BufReader::new(db).lines() {
-        let Ok(line) = line else { return ptr::null_mut() };
-        let Ok(grp) = parse_grp(line, None) else { return ptr::null_mut() };
+        let Ok(line) = line else {
+            return ptr::null_mut();
+        };
+        let Ok(grp) = parse_grp(line, None) else {
+            return ptr::null_mut();
+        };
 
         if grp.reference.gr_gid == gid {
             return grp.into_global();
@@ -223,12 +229,18 @@ pub unsafe extern "C" fn getgrgid(gid: gid_t) -> *mut group {
 // MT-Unsafe race:grnam locale
 #[no_mangle]
 pub unsafe extern "C" fn getgrnam(name: *const c_char) -> *mut group {
-    let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else { return ptr::null_mut() };
+    let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else {
+        return ptr::null_mut();
+    };
 
     for line in BufReader::new(db).lines() {
-        let Ok(line) = line else { return ptr::null_mut() };
+        let Ok(line) = line else {
+            return ptr::null_mut();
+        };
 
-        let Ok(grp) = parse_grp(line, None) else { return ptr::null_mut() };
+        let Ok(grp) = parse_grp(line, None) else {
+            return ptr::null_mut();
+        };
 
         // Attempt to prevent BO vulnerabilities
         if strncmp(
@@ -253,11 +265,21 @@ pub unsafe extern "C" fn getgrgid_r(
     buflen: usize,
     result: *mut *mut group,
 ) -> c_int {
-    let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else { return ENOENT };
+    let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else {
+        return ENOENT;
+    };
 
     for line in BufReader::new(db).lines() {
         let Ok(line) = line else { return EINVAL };
-        let Ok(mut grp) = parse_grp(line, Some(DestBuffer { ptr: buffer as *mut u8, len: buflen })) else { return EINVAL };
+        let Ok(mut grp) = parse_grp(
+            line,
+            Some(DestBuffer {
+                ptr: buffer as *mut u8,
+                len: buflen,
+            }),
+        ) else {
+            return EINVAL;
+        };
 
         if grp.reference.gr_gid == gid {
             *result_buf = grp.reference;
@@ -279,11 +301,21 @@ pub unsafe extern "C" fn getgrnam_r(
     buflen: usize,
     result: *mut *mut group,
 ) -> c_int {
-    let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else { return ENOENT };
+    let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else {
+        return ENOENT;
+    };
 
     for line in BufReader::new(db).lines() {
         let Ok(line) = line else { return EINVAL };
-        let Ok(mut grp) = parse_grp(line, Some(DestBuffer { ptr: buffer as *mut u8, len: buflen })) else { return EINVAL };
+        let Ok(mut grp) = parse_grp(
+            line,
+            Some(DestBuffer {
+                ptr: buffer as *mut u8,
+                len: buflen,
+            }),
+        ) else {
+            return EINVAL;
+        };
 
         if strncmp(
             grp.reference.gr_name,
@@ -307,13 +339,19 @@ pub unsafe extern "C" fn getgrent() -> *mut group {
     let mut line_reader = &mut *LINE_READER.get();
 
     if line_reader.is_none() {
-        let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else { return ptr::null_mut() };
+        let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else {
+            return ptr::null_mut();
+        };
         *line_reader = Some(BufReader::new(db).lines());
     }
 
     if let Some(lines) = line_reader.deref_mut() {
-        let Some(line) = lines.next() else { return ptr::null_mut() };
-        let Ok(line) = line else { return ptr::null_mut() };
+        let Some(line) = lines.next() else {
+            return ptr::null_mut();
+        };
+        let Ok(line) = line else {
+            return ptr::null_mut();
+        };
 
         if let Ok(grp) = parse_grp(line, None) {
             return grp.into_global();
@@ -335,7 +373,9 @@ pub unsafe extern "C" fn endgrent() {
 #[no_mangle]
 pub unsafe extern "C" fn setgrent() {
     let mut line_reader = &mut *LINE_READER.get();
-    let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else { return };
+    let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else {
+        return;
+    };
     *line_reader = Some(BufReader::new(db).lines());
 }
 
@@ -354,9 +394,13 @@ pub unsafe extern "C" fn getgrouplist(
     // FIXME: This API probably expects the group database to already exist in memory, as it
     // doesn't seem to have any documented error handling.
 
-    let Ok(user) = (crate::c_str::CStr::from_ptr(user).to_str()) else { return 0 };
+    let Ok(user) = (crate::c_str::CStr::from_ptr(user).to_str()) else {
+        return 0;
+    };
 
-    let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else { return 0; };
+    let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else {
+        return 0;
+    };
 
     let mut groups_found: c_int = 0;
 

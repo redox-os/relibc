@@ -104,7 +104,12 @@ static NEXTKEY: Cell<pthread_key_t> = Cell::new(1);
 
 pub(crate) unsafe fn run_all_destructors() {
     for (key, Record { data }) in VALUES.take() {
-        let Some(&Dtor { destructor: Some(dtor) }) = KEYS.lock().get(&key) else { continue };
+        let Some(&Dtor {
+            destructor: Some(dtor),
+        }) = KEYS.lock().get(&key)
+        else {
+            continue;
+        };
 
         dtor(data);
     }
