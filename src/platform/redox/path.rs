@@ -2,7 +2,7 @@ use syscall::{data::Stat, error::*, flag::*};
 
 use alloc::{borrow::ToOwned, boxed::Box, string::String, vec::Vec};
 
-use super::FdGuard;
+use super::{libcscheme, FdGuard};
 use crate::sync::Mutex;
 
 // TODO: Define in syscall
@@ -168,7 +168,14 @@ pub fn open(path: &str, flags: usize) -> Result<usize> {
 
     for _ in 0..MAX_LEVEL {
         let canon = canonicalize(path)?;
-        match syscall::open(&*canon, flags) {
+
+        let open_res = if canon.starts_with(libcscheme::LIBC_SCHEME) {
+            libcscheme::open(&canon, flags)
+        } else {
+            syscall::open(&*canon, flags)
+        };
+
+        match open_res {
             Ok(fd) => return Ok(fd),
             Err(error) if error == Error::new(EXDEV) => {
                 let resolve_flags = O_CLOEXEC | O_SYMLINK | O_RDONLY;
