@@ -292,6 +292,12 @@ struct Guard<'a> {
     len: usize,
 }
 
+impl<'a> Drop for Guard<'a> {
+    fn drop(&mut self) {
+        unsafe { self.buf.set_len(self.len); }
+    }
+}
+
 // A few methods below (read_to_string, read_line) will append data into a
 // `String` buffer, but we need to be pretty careful when doing this. The
 // implementation will just call `.as_mut_vec()` and then delegate to a
