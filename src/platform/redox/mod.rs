@@ -545,10 +545,20 @@ impl Pal for Sys {
     }
 
     fn getsid(pid: pid_t) -> pid_t {
-        //TODO
-        eprintln!("relibc getsid({}): not implemented", pid);
-        unsafe { errno = ENOSYS };
-        -1
+        let mut buf = [0; mem::size_of::<usize>()];
+        let path = if pid == 0 {
+            format!("thisproc:current/session_id")
+        } else {
+            format!("proc:{}/session_id", pid)
+        };
+        let path_c = CString::new(path).unwrap();
+        match File::open(CStr::borrow(&path_c), fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
+            Ok(mut file) => match file.read(&mut buf) {
+                Ok(_) => usize::from_ne_bytes(buf).try_into().unwrap(),
+                Err(_) => -1,
+            },
+            Err(_) => -1,
+        }
     }
 
     fn gettid() -> pid_t {
@@ -864,10 +874,20 @@ impl Pal for Sys {
     }
 
     fn setsid() -> c_int {
-        // TODO
-        eprintln!("relibc setsid(): not implemented");
-        unsafe { errno = ENOSYS };
-        -1
+        let session_id = Self::getpid();
+        if session_id < 0 {
+            return -1;
+        }
+        match File::open(
+            c_str!("thisproc:current/session_id"),
+            fcntl::O_WRONLY | fcntl::O_CLOEXEC,
+        ) {
+            Ok(mut file) => match file.write(&usize::to_ne_bytes(session_id.try_into().unwrap())) {
+                Ok(_) => session_id,
+                Err(_) => -1,
+            },
+            Err(_) => -1,
+        }
     }
 
     fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
