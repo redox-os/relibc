@@ -1,7 +1,7 @@
 use super::libredox;
 use crate::{c_str::CStr, header::stdlib::getenv, platform::types::*};
 use core::{ptr, slice};
-use syscall::{Error, Result, EINVAL, EIO, ENOENT};
+use syscall::{flag::*, Error, Result, EINVAL, EIO, ENOENT};
 
 pub const LIBC_SCHEME: &'static str = "libc:";
 
@@ -25,11 +25,15 @@ macro_rules! env_str {
     };
 }
 
-pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
+pub fn open(path: &str, flags: usize) -> Result<usize> {
     assert!(path.starts_with(LIBC_SCHEME));
 
+    if flags & O_SYMLINK != 0 {
+        return Err(Error::new(ENOENT));
+    }
+
     let basename = match path.strip_prefix(LIBC_SCHEME) {
-        Some(path) => path.trim_start_matches('/').trim_end_matches('/'),
+        Some(path) => path.trim_matches('/'),
         _ => return Err(Error::new(EIO)),
     };
 
@@ -40,7 +44,7 @@ pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
         "stdout" => syscall::dup(1, &[]),
         "tty" => {
             if let Some(tty) = env_str!("TTY") {
-                return libredox::open(tty, oflag, mode);
+                return syscall::open(tty, flags);
             }
             Err(Error::new(ENOENT))
         }
