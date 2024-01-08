@@ -294,7 +294,9 @@ struct Guard<'a> {
 
 impl<'a> Drop for Guard<'a> {
     fn drop(&mut self) {
-        unsafe { self.buf.set_len(self.len); }
+        unsafe {
+            self.buf.set_len(self.len);
+        }
     }
 }
 
