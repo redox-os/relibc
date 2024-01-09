@@ -105,6 +105,10 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
                 0
             }
         }
+        TIOCSCTTY => {
+            eprintln!("TODO: ioctl TIOCSCTTY");
+            0
+        }
         TIOCGPGRP => {
             let pgrp = &mut *(out as *mut pid_t);
             if e(dup_read(fd, "pgrp", pgrp)) == !0 {
@@ -137,14 +141,20 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
                 0
             }
         }
-        TIOCGPTLCK => 0,
-        TIOCSPTLCK => 0,
+        TIOCGPTLCK => {
+            eprintln!("TODO: ioctl TIOCGPTLCK");
+            0
+        },
+        TIOCSPTLCK => {
+            eprintln!("TODO: ioctl TIOCSPTLCK");
+            0
+        },
         TCSBRK => {
-            // TODO
+            eprintln!("TODO: ioctl TCSBRK");
             0
         }
         TCXONC => {
-            // TODO
+            eprintln!("TODO: ioctl TCXONC");
             0
         }
         _ => {
