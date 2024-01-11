@@ -322,10 +322,22 @@ pub unsafe extern "C" fn vfwprintf(
 
     wprintf::wprintf(&mut *stream, format, arg)
 }
+#[no_mangle]
+pub unsafe extern "C" fn fwprintf(
+    stream: *mut FILE,
+    format: *const wchar_t,
+    mut __valist: ...
+) -> c_int {
+    vfwprintf(stream, format, __valist.as_va_list())
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn vwprintf(format: *const wchar_t, arg: va_list) -> c_int {
     vfwprintf(&mut *stdout, format, arg)
+}
+#[no_mangle]
+pub unsafe extern "C" fn wprintf(format: *const wchar_t, mut __valist: ...) -> c_int {
+    vfwprintf(&mut *stdout, format, __valist.as_va_list())
 }
 
 #[no_mangle]
@@ -339,6 +351,15 @@ pub unsafe extern "C" fn vswprintf(
     // but instead is a wchar array.
     eprintln!("vswprintf not implemented");
     -1
+}
+#[no_mangle]
+pub unsafe extern "C" fn swprintf(
+    s: *mut wchar_t,
+    n: size_t,
+    format: *const wchar_t,
+    mut __valist: ...
+) -> c_int {
+    vswprintf(s, n, format, __valist.as_va_list())
 }
 
 #[no_mangle]

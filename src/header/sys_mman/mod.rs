@@ -71,9 +71,9 @@ unsafe extern "C" fn mremap(
     old_size: usize,
     new_size: usize,
     flags: c_int,
-    mut args: ...
+    mut __valist: ...
 ) -> *mut c_void {
-    let new_address = args.arg::<*mut c_void>();
+    let new_address = __valist.arg::<*mut c_void>();
     Sys::mremap(old_address, old_size, new_size, flags, new_address)
 }
 
@@ -136,7 +136,7 @@ unsafe fn shm_path(name: *const c_char) -> CString {
 #[no_mangle]
 pub unsafe extern "C" fn shm_open(name: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     let path = shm_path(name);
-    fcntl::sys_open(path.as_ptr(), oflag, mode)
+    fcntl::open(path.as_ptr(), oflag, mode)
 }
 
 #[no_mangle]

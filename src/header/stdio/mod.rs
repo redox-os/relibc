@@ -510,13 +510,13 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
         0
     };
 
-    let fd = fcntl::sys_open(filename, flags, new_mode);
+    let fd = fcntl::open(filename, flags, new_mode);
     if fd < 0 {
         return ptr::null_mut();
     }
 
     if flags & fcntl::O_CLOEXEC > 0 {
-        fcntl::sys_fcntl(fd, fcntl::F_SETFD, fcntl::FD_CLOEXEC as c_ulonglong);
+        fcntl::fcntl(fd, fcntl::F_SETFD, fcntl::FD_CLOEXEC as c_ulonglong);
     }
 
     if let Some(f) = helpers::_fdopen(fd, mode) {
@@ -607,14 +607,14 @@ pub unsafe extern "C" fn freopen(
     if filename.is_null() {
         // Reopen stream in new mode
         if flags & fcntl::O_CLOEXEC > 0 {
-            fcntl::sys_fcntl(
+            fcntl::fcntl(
                 *stream.file,
                 fcntl::F_SETFD,
                 fcntl::FD_CLOEXEC as c_ulonglong,
             );
         }
         flags &= !(fcntl::O_CREAT | fcntl::O_EXCL | fcntl::O_CLOEXEC);
-        if fcntl::sys_fcntl(*stream.file, fcntl::F_SETFL, flags as c_ulonglong) < 0 {
+        if fcntl::fcntl(*stream.file, fcntl::F_SETFL, flags as c_ulonglong) < 0 {
             funlockfile(stream);
             fclose(stream);
             return ptr::null_mut();
@@ -630,7 +630,7 @@ pub unsafe extern "C" fn freopen(
         if *new.file == *stream.file {
             new.file.fd = -1;
         } else if Sys::dup2(*new.file, *stream.file) < 0
-            || fcntl::sys_fcntl(
+            || fcntl::fcntl(
                 *stream.file,
                 fcntl::F_SETFL,
                 (flags & fcntl::O_CLOEXEC) as c_ulonglong,
@@ -1175,10 +1175,22 @@ pub unsafe extern "C" fn vfprintf(file: *mut FILE, format: *const c_char, ap: va
 
     printf::printf(&mut *file, format, ap)
 }
+#[no_mangle]
+pub unsafe extern "C" fn fprintf(
+    file: *mut FILE,
+    format: *const c_char,
+    mut __valist: ...
+) -> c_int {
+    vfprintf(file, format, __valist.as_va_list())
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
     vfprintf(&mut *stdout, format, ap)
+}
+#[no_mangle]
+pub unsafe extern "C" fn printf(format: *const c_char, mut __valist: ...) -> c_int {
+    vfprintf(&mut *stdout, format, __valist.as_va_list())
 }
 
 #[no_mangle]
@@ -1194,6 +1206,14 @@ pub unsafe extern "C" fn vasprintf(
     *strp = alloc_writer.leak() as *mut c_char;
     ret
 }
+#[no_mangle]
+pub unsafe extern "C" fn asprintf(
+    strp: *mut *mut c_char,
+    format: *const c_char,
+    mut __valist: ...
+) -> c_int {
+    vasprintf(strp, format, __valist.as_va_list())
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn vsnprintf(
@@ -1208,10 +1228,35 @@ pub unsafe extern "C" fn vsnprintf(
         ap,
     )
 }
+#[no_mangle]
+pub unsafe extern "C" fn snprintf(
+    s: *mut c_char,
+    n: size_t,
+    format: *const c_char,
+    mut __valist: ...
+) -> c_int {
+    printf::printf(
+        &mut platform::StringWriter(s as *mut u8, n as usize),
+        format,
+        __valist.as_va_list(),
+    )
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_list) -> c_int {
     printf::printf(&mut platform::UnsafeStringWriter(s as *mut u8), format, ap)
+}
+#[no_mangle]
+pub unsafe extern "C" fn sprintf(
+    s: *mut c_char,
+    format: *const c_char,
+    mut __valist: ...
+) -> c_int {
+    printf::printf(
+        &mut platform::UnsafeStringWriter(s as *mut u8),
+        format,
+        __valist.as_va_list(),
+    )
 }
 
 #[no_mangle]
@@ -1228,16 +1273,41 @@ pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_
     };
     ret
 }
+#[no_mangle]
+pub unsafe extern "C" fn fscanf(
+    file: *mut FILE,
+    format: *const c_char,
+    mut __valist: ...
+) -> c_int {
+    vfscanf(file, format, __valist.as_va_list())
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
     vfscanf(&mut *stdin, format, ap)
 }
+#[no_mangle]
+pub unsafe extern "C" fn scanf(format: *const c_char, mut __valist: ...) -> c_int {
+    vfscanf(&mut *stdin, format, __valist.as_va_list())
+}
 
 #[no_mangle]
-pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
+pub unsafe extern "C" fn vsscanf(
+    s: *const c_char,
+    format: *const c_char,
+    __valist: va_list,
+) -> c_int {
     let reader = (s as *const u8).into();
-    scanf::scanf(reader, format, ap)
+    scanf::scanf(reader, format, __valist)
+}
+#[no_mangle]
+pub unsafe extern "C" fn sscanf(
+    s: *const c_char,
+    format: *const c_char,
+    mut __valist: ...
+) -> c_int {
+    let reader = (s as *const u8).into();
+    scanf::scanf(reader, format, __valist.as_va_list())
 }
 
 pub unsafe fn flush_io_streams() {
