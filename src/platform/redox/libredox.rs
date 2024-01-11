@@ -3,7 +3,7 @@ use core::{slice, str};
 use syscall::{Error, Result, WaitFlags, EMFILE};
 
 use crate::{
-    header::{signal::sigaction, sys_stat::UTIME_NOW, time::timespec},
+    header::{errno::EINVAL, signal::sigaction, sys_stat::UTIME_NOW, time::timespec},
     platform::types::*,
 };
 
@@ -287,4 +287,35 @@ pub unsafe extern "C" fn redox_munmap_v1(addr: *mut (), unaligned_len: usize) ->
 #[no_mangle]
 pub unsafe extern "C" fn redox_clock_gettime_v1(clock: usize, ts: *mut timespec) -> RawResult {
     Error::mux(clock_gettime(clock, ts).map(|()| 0))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn redox_strerror_v1(
+    buf: *mut u8,
+    buflen: *mut usize,
+    error: u32,
+) -> RawResult {
+    let dst = core::slice::from_raw_parts_mut(buf, buflen.read());
+
+    Error::mux((|| {
+        // TODO: Merge syscall::error::STR_ERROR into crate::header::error::?
+
+        let src = syscall::error::STR_ERROR
+            .get(error as usize)
+            .ok_or(Error::new(EINVAL))?;
+
+        // This API ensures that the returned buffer is proper UTF-8. Thus, it returns both the
+        // copied length and the actual length.
+
+        buflen.write(src.len());
+
+        let raw_len = core::cmp::min(dst.len(), src.len());
+        let len = match core::str::from_utf8(&src.as_bytes()[..raw_len]) {
+            Ok(_valid) => raw_len,
+            Err(error) => error.valid_up_to(),
+        };
+
+        dst[..len].copy_from_slice(&src.as_bytes()[..len]);
+        Ok(len)
+    })())
 }
