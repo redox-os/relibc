@@ -1,6 +1,11 @@
 //! unistd implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/unistd.h.html
 
-use core::{convert::TryFrom, mem, ptr, slice};
+use core::{
+    convert::TryFrom,
+    ffi::VaListImpl,
+    mem::{self, MaybeUninit},
+    ptr, slice,
+};
 
 use crate::{
     c_str::CStr,
@@ -13,6 +18,8 @@ use crate::{
 use alloc::collections::LinkedList;
 
 pub use self::{brk::*, getopt::*, pathconf::*, sysconf::*};
+
+use super::errno::{E2BIG, ENOMEM};
 
 mod brk;
 mod getopt;
@@ -136,24 +143,84 @@ pub extern "C" fn encrypt(block: [c_char; 64], edflag: c_int) {
     unimplemented!();
 }
 
-// #[no_mangle]
-// pub extern "C" fn execl(path: *const c_char, args: *const *mut c_char) -> c_int {
-//     unimplemented!();
-// }
+unsafe fn with_argv(
+    mut va: VaListImpl,
+    arg0: *const c_char,
+    f: impl FnOnce(&[*const c_char], VaListImpl) -> c_int,
+) -> c_int {
+    let argc = 1 + va.with_copy(|mut copy| {
+        core::iter::from_fn(|| Some(copy.arg::<*const c_char>()))
+            .position(|p| p.is_null())
+            .unwrap()
+    });
 
-// #[no_mangle]
-// pub extern "C" fn execle(
-//   path: *const c_char,
-//   args: *const *mut c_char,
-//   envp: *const *mut c_char,
-// ) -> c_int {
-//     unimplemented!();
-// }
+    let mut stack: [MaybeUninit<*const c_char>; 32] = MaybeUninit::uninit_array();
 
-// #[no_mangle]
-// pub extern "C" fn execlp(file: *const c_char, args: *const *mut c_char) -> c_int {
-//     unimplemented!();
-// }
+    let out = if argc < 32 {
+        stack.as_mut_slice()
+    } else if argc < 4096 {
+        // TODO: Use ARG_MAX, not this hardcoded constant
+        let ptr = crate::header::stdlib::malloc(argc * mem::size_of::<*const c_char>());
+        if ptr.is_null() {
+            platform::errno = ENOMEM;
+            return -1;
+        }
+        slice::from_raw_parts_mut(ptr.cast::<MaybeUninit<*const c_char>>(), argc)
+    } else {
+        platform::errno = E2BIG;
+        return -1;
+    };
+    out[0].write(arg0);
+
+    for i in 1..argc {
+        out[i].write(va.arg::<*const c_char>());
+    }
+    out[argc].write(core::ptr::null());
+    // NULL
+    va.arg::<*const c_char>();
+
+    f(MaybeUninit::slice_assume_init_ref(&*out), va);
+
+    // f only returns if it fails
+    if argc >= 32 {
+        crate::header::stdlib::free(out.as_mut_ptr().cast());
+    }
+    -1
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn execl(
+    path: *const c_char,
+    arg0: *const c_char,
+    mut __valist: ...
+) -> c_int {
+    with_argv(__valist, arg0, |args, _remaining_va| {
+        execv(path, args.as_ptr().cast())
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn execle(
+    path: *const c_char,
+    arg0: *const c_char,
+    mut __valist: ...
+) -> c_int {
+    with_argv(__valist, arg0, |args, mut remaining_va| {
+        let envp = remaining_va.arg::<*const *mut c_char>();
+        execve(path, args.as_ptr().cast(), envp)
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn execlp(
+    file: *const c_char,
+    arg0: *const c_char,
+    mut __valist: ...
+) -> c_int {
+    with_argv(__valist, arg0, |args, _remaining_va| {
+        execvp(file, args.as_ptr().cast())
+    })
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn execv(path: *const c_char, argv: *const *mut c_char) -> c_int {
@@ -469,7 +536,7 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
     match function {
         fcntl::F_TEST => {
             fl.l_type = fcntl::F_RDLCK as c_short;
-            if fcntl::sys_fcntl(fildes, fcntl::F_GETLK, &mut fl as *mut _ as c_ulonglong) < 0 {
+            if fcntl::fcntl(fildes, fcntl::F_GETLK, &mut fl as *mut _ as c_ulonglong) < 0 {
                 return -1;
             }
             if fl.l_type == fcntl::F_UNLCK as c_short || fl.l_pid == getpid() {
@@ -480,13 +547,13 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
         }
         fcntl::F_ULOCK => {
             fl.l_type = fcntl::F_UNLCK as c_short;
-            return fcntl::sys_fcntl(fildes, fcntl::F_SETLK, &mut fl as *mut _ as c_ulonglong);
+            return fcntl::fcntl(fildes, fcntl::F_SETLK, &mut fl as *mut _ as c_ulonglong);
         }
         fcntl::F_TLOCK => {
-            return fcntl::sys_fcntl(fildes, fcntl::F_SETLK, &mut fl as *mut _ as c_ulonglong);
+            return fcntl::fcntl(fildes, fcntl::F_SETLK, &mut fl as *mut _ as c_ulonglong);
         }
         fcntl::F_LOCK => {
-            return fcntl::sys_fcntl(fildes, fcntl::F_SETLKW, &mut fl as *mut _ as c_ulonglong);
+            return fcntl::fcntl(fildes, fcntl::F_SETLKW, &mut fl as *mut _ as c_ulonglong);
         }
         _ => {
             platform::errno = errno::EINVAL;

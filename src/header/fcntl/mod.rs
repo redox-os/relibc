@@ -35,7 +35,7 @@ pub const F_TEST: c_int = 3;
 
 #[no_mangle]
 pub unsafe extern "C" fn creat(path: *const c_char, mode: mode_t) -> c_int {
-    sys_open(path, O_WRONLY | O_CREAT | O_TRUNC, mode)
+    open(path, O_WRONLY | O_CREAT | O_TRUNC, mode)
 }
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -47,12 +47,26 @@ pub struct flock {
     pub l_pid: pid_t,
 }
 #[no_mangle]
-pub extern "C" fn sys_fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> c_int {
+pub unsafe extern "C" fn fcntl(fildes: c_int, cmd: c_int, mut __valist: ...) -> c_int {
+    // c_ulonglong
+    let arg = match cmd {
+        F_DUPFD | F_SETFD | F_SETFL | F_SETLK | F_SETLKW | F_GETLK => __valist.arg::<c_ulonglong>(),
+        _ => 0,
+    };
+
     Sys::fcntl(fildes, cmd, arg)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sys_open(path: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
+pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: ...) -> c_int {
+    let mode = if oflag & O_CREAT == O_CREAT
+    /* || oflag & O_TMPFILE == O_TMPFILE */
+    {
+        __valist.arg::<mode_t>()
+    } else {
+        0
+    };
+
     let path = CStr::from_ptr(path);
     Sys::open(path, oflag, mode)
 }
