@@ -2,12 +2,26 @@
 
 use core::ptr;
 
-use crate::platform::{types::*, PalSocket, Sys};
+use crate::{
+    header::sys_uio::iovec,
+    platform::{types::*, PalSocket, Sys},
+};
 
 pub mod constants;
 
 pub type sa_family_t = u16;
 pub type socklen_t = u32;
+
+#[repr(C)]
+pub struct msghdr {
+    pub msg_name: *mut c_void,
+    pub msg_namelen: socklen_t,
+    pub msg_iov: *mut iovec,
+    pub msg_iovlen: size_t,
+    pub msg_control: *mut c_void,
+    pub msg_controllen: size_t,
+    pub msg_flags: c_int,
+}
 
 #[repr(C)]
 #[derive(Default)]
@@ -161,6 +175,11 @@ pub unsafe extern "C" fn send(
     flags: c_int,
 ) -> ssize_t {
     sendto(socket, message, length, flags, ptr::null(), 0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> ssize_t {
+    Sys::sendmsg(socket, msg, flags)
 }
 
 #[no_mangle]

@@ -16,9 +16,7 @@ fn main() {
 
     let mut cc_builder = &mut cc::Build::new();
 
-    cc_builder = cc_builder
-        .flag("-nostdinc")
-        .flag("-nostdlib");
+    cc_builder = cc_builder.flag("-nostdinc").flag("-nostdlib");
 
     if target.starts_with("aarch64") {
         cc_builder = cc_builder.flag("-mno-outline-atomics")

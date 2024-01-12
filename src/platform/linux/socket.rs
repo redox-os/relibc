@@ -2,7 +2,7 @@ use super::{
     super::{types::*, PalSocket},
     e, Sys,
 };
-use crate::header::sys_socket::{sockaddr, socklen_t};
+use crate::header::sys_socket::{msghdr, sockaddr, socklen_t};
 
 impl PalSocket for Sys {
     unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
@@ -73,6 +73,10 @@ impl PalSocket for Sys {
             address,
             address_len
         )) as ssize_t
+    }
+
+    unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> ssize_t {
+        e(syscall!(SENDMSG, socket, msg, flags)) as ssize_t
     }
 
     unsafe fn sendto(
