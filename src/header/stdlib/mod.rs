@@ -100,6 +100,19 @@ pub unsafe extern "C" fn abort() -> ! {
     intrinsics::abort();
 }
 
+#[cfg(not(target_pointer_width = "64"))]
+#[no_mangle]
+static __stack_chk_guard: uintptr_t = 0x19fcadfe;
+
+#[cfg(target_pointer_width = "64")]
+#[no_mangle]
+static __stack_chk_guard: uintptr_t = 0xd048c37519fcadfe;
+
+#[no_mangle]
+unsafe extern "C" fn __stack_chk_fail() -> ! {
+    abort();
+}
+
 #[no_mangle]
 pub extern "C" fn abs(i: c_int) -> c_int {
     i.abs()

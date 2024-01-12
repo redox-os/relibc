@@ -8,7 +8,7 @@ pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
     const O_NOCTTY: c_int = 0x100;
 
     //TODO: wrap in auto-close struct
-    let master = fcntl::sys_open(c_str!("/dev/ptmx").as_ptr(), fcntl::O_RDWR | O_NOCTTY, 0);
+    let master = fcntl::open(c_str!("/dev/ptmx").as_ptr(), fcntl::O_RDWR | O_NOCTTY, 0);
     if master < 0 {
         return Err(());
     }
@@ -38,7 +38,7 @@ pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
     let mut cursor = Cursor::new(name);
     write!(cursor, "/dev/pts/{}", ptn);
 
-    let slave = fcntl::sys_open(
+    let slave = fcntl::open(
         cursor.get_ref().as_ptr() as *const c_char,
         fcntl::O_RDWR | O_NOCTTY,
         0,

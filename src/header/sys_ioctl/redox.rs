@@ -65,7 +65,7 @@ fn dup_write<T>(fd: c_int, name: &str, t: &T) -> syscall::Result<usize> {
 pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
     match request {
         FIONBIO => {
-            let mut flags = fcntl::sys_fcntl(fd, fcntl::F_GETFL, 0);
+            let mut flags = fcntl::fcntl(fd, fcntl::F_GETFL, 0);
             if flags < 0 {
                 return -1;
             }
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
             } else {
                 flags | fcntl::O_NONBLOCK
             };
-            if fcntl::sys_fcntl(fd, fcntl::F_SETFL, flags as c_ulonglong) < 0 {
+            if fcntl::fcntl(fd, fcntl::F_SETFL, flags as c_ulonglong) < 0 {
                 -1
             } else {
                 0
@@ -104,6 +104,10 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
             } else {
                 0
             }
+        }
+        TIOCSCTTY => {
+            eprintln!("TODO: ioctl TIOCSCTTY");
+            0
         }
         TIOCGPGRP => {
             let pgrp = &mut *(out as *mut pid_t);
@@ -137,14 +141,20 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
                 0
             }
         }
-        TIOCGPTLCK => 0,
-        TIOCSPTLCK => 0,
+        TIOCGPTLCK => {
+            eprintln!("TODO: ioctl TIOCGPTLCK");
+            0
+        }
+        TIOCSPTLCK => {
+            eprintln!("TODO: ioctl TIOCSPTLCK");
+            0
+        }
         TCSBRK => {
-            // TODO
+            eprintln!("TODO: ioctl TCSBRK");
             0
         }
         TCXONC => {
-            // TODO
+            eprintln!("TODO: ioctl TCXONC");
             0
         }
         _ => {

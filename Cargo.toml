@@ -12,11 +12,6 @@ crate-type = ["staticlib"]
 members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so", "src/libm", "src/platform/redox/redox-exec"]
 exclude = ["ralloc", "tests", "dlmalloc-rs"]
 
-[build-dependencies]
-cbindgen = "0.26"
-cc = "1.0.25"
-#env_logger = "0.10"
-
 [dependencies]
 bitflags = "2"
 cbitset = "0.2"

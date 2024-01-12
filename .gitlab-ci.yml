@@ -6,6 +6,8 @@ variables:
 stages:
     - build
     - test
+before_script:
+    cargo install cbindgen
 
 default:
     cache:

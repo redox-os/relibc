@@ -50,13 +50,13 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
     }
 
     if !strchr(mode, b'e' as i32).is_null() {
-        sys_fcntl(fd, F_SETFD, FD_CLOEXEC as c_ulonglong);
+        fcntl(fd, F_SETFD, FD_CLOEXEC as c_ulonglong);
     }
 
     if *mode == 'a' as i8 {
-        let f = sys_fcntl(fd, F_GETFL, 0);
+        let f = fcntl(fd, F_GETFL, 0);
         if (f & O_APPEND) == 0 {
-            sys_fcntl(fd, F_SETFL, (f | O_APPEND) as c_ulonglong);
+            fcntl(fd, F_SETFL, (f | O_APPEND) as c_ulonglong);
         }
         flags |= F_APP;
     }

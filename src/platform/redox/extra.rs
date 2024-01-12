@@ -13,21 +13,6 @@ pub unsafe extern "C" fn redox_fpath(fd: c_int, buf: *mut c_void, count: size_t)
     )) as ssize_t
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn redox_physalloc(size: size_t) -> *mut c_void {
-    let res = e(syscall::physalloc(size));
-    if res == !0 {
-        return ptr::null_mut();
-    } else {
-        return res as *mut c_void;
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn redox_physfree(physical_address: *mut c_void, size: size_t) -> c_int {
-    e(syscall::physfree(physical_address as usize, size)) as c_int
-}
-
 pub fn pipe2(fds: &mut [c_int], flags: usize) -> syscall::error::Result<()> {
     let fds =
         <&mut [c_int; 2]>::try_from(fds).expect("expected Pal pipe2 to have validated pipe2 array");
