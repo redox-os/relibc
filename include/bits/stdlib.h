@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-static inline long double strtold(const char *nptr, char **endptr) {
+inline long double strtold(const char *nptr, char **endptr) {
   return (long double)strtod(nptr, endptr);
 }
 
