@@ -12,3 +12,6 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
+
+[export.rename]
+"iovec" = "struct iovec"
