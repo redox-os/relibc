@@ -13,6 +13,7 @@ CARGOFLAGS+="--target=$(TARGET)"
 TARGET_HEADERS?="$(BUILD)/include"
 
 HEADERS_UNPARSED=$(shell find src/header -mindepth 1 -maxdepth 1 -type d -not -name "_*" -printf "%f\n")
+MHEADERS_UNPARSED=$(shell find src/libm -mindepth 1 -maxdepth 1 -type d -not -name "src" -printf "%f\n")
 HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "*.rs" \))
 #HEADERS=$(patsubst %,%.h,$(subst _,/,$(HEADERS_UNPARSED)))
 
@@ -68,6 +69,15 @@ headers: $(HEADERS_DEPS)
 		cbindgen --output "$$out" \
 			--config="src/header/$$header/cbindgen.toml" \
 			"src/header/$$header/mod.rs"; \
+		sed -i "s/va_list __valist/.../g" "$$out"; \
+	done
+
+	for header in $(MHEADERS_UNPARSED); do \
+		out=`echo "$$header" | sed 's/_/\//g'`; \
+		out="$(TARGET_HEADERS)/$$out.h"; \
+		cbindgen --output "$$out" \
+			--config="src/libm/$$header/cbindgen.toml" \
+			"src/libm/$$header/mod.rs"; \
 		sed -i "s/va_list __valist/.../g" "$$out"; \
 	done
 
