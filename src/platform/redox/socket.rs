@@ -10,7 +10,7 @@ use crate::header::{
     arpa_inet::inet_aton,
     netinet_in::{in_addr, in_port_t, sockaddr_in},
     string::strnlen,
-    sys_socket::{constants::*, sa_family_t, sockaddr, socklen_t},
+    sys_socket::{constants::*, msghdr, sa_family_t, sockaddr, socklen_t},
     sys_time::timeval,
     sys_un::sockaddr_un,
 };
@@ -314,6 +314,12 @@ impl PalSocket for Sys {
             let _ = syscall::close(fd);
             ret
         }
+    }
+
+    unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> ssize_t {
+        eprintln!("sendmsg not implemented on redox");
+        errno = syscall::ENOSYS;
+        return -1;
     }
 
     unsafe fn sendto(

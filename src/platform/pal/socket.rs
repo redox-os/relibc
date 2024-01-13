@@ -1,5 +1,5 @@
 use super::super::{types::*, Pal};
-use crate::header::sys_socket::{sockaddr, socklen_t};
+use crate::header::sys_socket::{msghdr, sockaddr, socklen_t};
 
 pub trait PalSocket: Pal {
     unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int;
@@ -38,6 +38,8 @@ pub trait PalSocket: Pal {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> ssize_t;
+
+    unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> ssize_t;
 
     unsafe fn sendto(
         socket: c_int,
