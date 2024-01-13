@@ -4,12 +4,6 @@ use core::{fmt, ptr};
 
 pub use self::allocator::*;
 
-#[cfg(not(feature = "ralloc"))]
-#[path = "allocator/dlmalloc/mod.rs"]
-mod allocator;
-
-#[cfg(feature = "ralloc")]
-#[path = "allocator/ralloc.rs"]
 mod allocator;
 
 pub use self::pal::{Pal, PalEpoll, PalPtrace, PalSignal, PalSocket};

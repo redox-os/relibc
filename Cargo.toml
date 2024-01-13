@@ -10,7 +10,7 @@ crate-type = ["staticlib"]
 
 [workspace]
 members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so", "src/libm", "src/platform/redox/redox-exec"]
-exclude = ["ralloc", "tests", "dlmalloc-rs"]
+exclude = ["tests", "dlmalloc-rs"]
 
 [build-dependencies]
 cc = "1"
@@ -40,11 +40,6 @@ raw-cpuid = "11"
 version = "0.7"
 default-features = false
 features = ["elf32", "elf64", "endian_fd"]
-
-[dependencies.ralloc]
-path = "ralloc"
-default-features = false
-optional = true
 
 [dependencies.dlmalloc]
 path = "dlmalloc-rs"
