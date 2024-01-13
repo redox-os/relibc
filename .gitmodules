@@ -1,9 +1,6 @@
 [submodule "openlibm"]
 	path = openlibm
 	url = https://gitlab.redox-os.org/redox-os/openlibm.git
-[submodule "ralloc"]
-	path = ralloc
-	url = https://gitlab.redox-os.org/redox-os/ralloc.git
 [submodule "posix-regex"]
 	path = posix-regex
 	url = https://gitlab.redox-os.org/redox-os/posix-regex.git
