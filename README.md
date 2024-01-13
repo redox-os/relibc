@@ -8,6 +8,7 @@ The motivation for this project is twofold: Reduce issues that the Redox develop
 
 - `include` - Header files (mostly macros and variadic functions `cbindgen` can't generate)
 - `src` - Source files
+- `src/c` - C code
 - `src/crt0` - Runtime code
 - `src/crti` - Runtime code
 - `src/crtn` - Runtime code
