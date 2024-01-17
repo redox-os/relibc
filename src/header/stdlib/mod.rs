@@ -726,9 +726,88 @@ pub unsafe extern "C" fn posix_memalign(
     }
 }
 
-// #[no_mangle]
-pub extern "C" fn ptsname(fildes: c_int) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
+    #[cfg(target_os = "redox")]
+    let r = open((b"pty:\0" as *const u8).cast(), O_CREAT);
+
+    #[cfg(target_os = "linux")]
+    let r = open((b"/dev/ptmx\0" as *const u8).cast(), flags);
+
+    if r < 0 && platform::errno == ENOSPC {
+        platform::errno = EAGAIN;
+    }
+
+    return r;
+}
+
+#[no_mangle]
+unsafe extern "C" fn ptsname(fd: c_int) -> *mut c_char {
+    static mut PTS_BUFFER: [c_char; 9 + mem::size_of::<c_int>() * 3 + 1] =
+        [0; 9 + mem::size_of::<c_int>() * 3 + 1];
+    if ptsname_r(fd, PTS_BUFFER.as_mut_ptr(), PTS_BUFFER.len()) != 0 {
+        ptr::null_mut()
+    } else {
+        PTS_BUFFER.as_mut_ptr()
+    }
+}
+
+#[no_mangle]
+unsafe extern "C" fn ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
+    if buf.is_null() {
+        platform::errno = EINVAL;
+        EINVAL
+    } else {
+        __ptsname_r(fd, buf, buflen)
+    }
+}
+
+#[cfg(target_os = "redox")]
+#[inline(always)]
+unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
+    let tty_ptr = unistd::ttyname(fd);
+
+    if !tty_ptr.is_null() {
+        if let Ok(name) = CStr::from_ptr(tty_ptr).to_str() {
+            let len = name.len();
+            if len > buflen {
+                platform::errno = ERANGE;
+                return ERANGE;
+            } else {
+                // we have checked the string will fit in the buffer
+                // so can use strcpy safely
+                let s = name.as_ptr().cast();
+                ptr::copy_nonoverlapping(s, buf, len);
+                return 0;
+            }
+        }
+    }
+    platform::errno
+}
+
+#[cfg(target_os = "linux")]
+#[inline(always)]
+unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
+    let mut pty = 0;
+    let err = platform::errno;
+
+    if ioctl(fd, TIOCGPTN, &mut pty as *mut _ as *mut c_void) == 0 {
+        let name = format!("/dev/pts/{}", pty);
+        let len = name.len();
+        if len > buflen {
+            platform::errno = ERANGE;
+            ERANGE
+        } else {
+            // we have checked the string will fit in the buffer
+            // so can use strcpy safely
+            let s = name.as_ptr().cast();
+            ptr::copy_nonoverlapping(s, buf, len);
+            platform::errno = err;
+            0
+        }
+    } else {
+        platform::errno
+    }
 }
 
 unsafe fn put_new_env(insert: *mut c_char) {

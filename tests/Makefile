@@ -19,6 +19,7 @@ EXPECT_NAMES=\
 	math \
 	netdb/getaddrinfo \
 	ptrace \
+	pty/forkpty \
 	regex \
 	select \
 	setjmp \
@@ -54,6 +55,7 @@ EXPECT_NAMES=\
 	stdlib/div \
 	stdlib/env \
 	stdlib/mkostemps \
+	stdlib/ptsname \
 	stdlib/qsort \
 	stdlib/rand \
 	stdlib/rand48 \

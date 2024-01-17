@@ -20,7 +20,7 @@ use alloc::{
 use crate::{
     c_str::CStr,
     fs::File,
-    header::{errno, fcntl, string::strlen},
+    header::{errno, fcntl, limits, string::strlen, unistd},
     io,
     io::{prelude::*, BufReader, Lines},
     platform,
@@ -442,4 +442,16 @@ pub unsafe extern "C" fn getgrouplist(
     } else {
         grps.len() as c_int
     }
+}
+
+// MT-Safe locale
+// Not POSIX
+#[no_mangle]
+pub unsafe extern "C" fn initgroups(user: *const c_char, gid: gid_t) -> c_int {
+    let mut groups = [0; limits::NGROUPS_MAX];
+    let mut count = groups.len() as c_int;
+    if getgrouplist(user, gid, groups.as_mut_ptr(), &mut count) < 0 {
+        return -1;
+    }
+    unistd::setgroups(count as size_t, groups.as_ptr())
 }

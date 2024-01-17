@@ -168,6 +168,11 @@ pub unsafe extern "C" fn recvfrom(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> ssize_t {
+    Sys::recvmsg(socket, msg, flags)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn send(
     socket: c_int,
     message: *const c_void,
