@@ -9,7 +9,14 @@ name = "relibc"
 crate-type = ["staticlib"]
 
 [workspace]
-members = ["src/crt0", "src/crti", "src/crtn", "src/ld_so", "src/platform/redox/redox-exec"]
+members = [
+    "src/crt0",
+    "src/crti",
+    "src/crtn",
+    "src/ld_so",
+    "src/platform/redox/redox-exec",
+    "src/platform/redox/redox-path",
+]
 exclude = ["tests", "dlmalloc-rs"]
 
 [build-dependencies]
@@ -47,6 +54,7 @@ sc = "0.2.3"
 [target.'cfg(target_os = "redox")'.dependencies]
 redox_syscall = "0.4"
 redox-exec = { path = "src/platform/redox/redox-exec" }
+redox-path = { path = "src/platform/redox/redox-path" }
 
 [features]
 default = ["check_against_libc_crate"]

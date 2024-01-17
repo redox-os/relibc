@@ -1,77 +1,13 @@
-use syscall::{data::Stat, error::*, flag::*};
-
 use alloc::{borrow::ToOwned, boxed::Box, string::String, vec::Vec};
+use syscall::{data::Stat, error::*, flag::*};
 
 use super::{libcscheme, FdGuard};
 use crate::sync::Mutex;
 
+pub use redox_path::canonicalize_using_cwd;
+
 // TODO: Define in syscall
 const PATH_MAX: usize = 4096;
-
-/// Make a relative path absolute.
-///
-/// Given a cwd of "scheme:/path", this his function will turn "foo" into "scheme:/path/foo".
-/// "/foo" will turn into "file:/foo". "bar:/foo" will be used directly, as it is already
-/// absolute
-pub fn canonicalize_using_cwd<'a>(cwd_opt: Option<&str>, path: &'a str) -> Option<String> {
-    let mut canon = if path.find(':').is_none() {
-        let cwd = cwd_opt?;
-
-        let mut canon = if !path.starts_with('/') {
-            let mut c = cwd.to_owned();
-            if !c.ends_with('/') {
-                c.push('/');
-            }
-            c
-        } else {
-            // Fall back to the file scheme if no scheme provided
-            "file:".to_owned()
-        };
-
-        canon.push_str(&path);
-        canon
-    } else {
-        path.to_owned()
-    };
-
-    // NOTE: assumes the scheme does not include anything like "../" or "./"
-    let mut result = {
-        let parts = canon
-            .split('/')
-            .rev()
-            .scan(0, |nskip, part| {
-                if part == "." {
-                    Some(None)
-                } else if part == ".." {
-                    *nskip += 1;
-                    Some(None)
-                } else if *nskip > 0 {
-                    *nskip -= 1;
-                    Some(None)
-                } else {
-                    Some(Some(part))
-                }
-            })
-            .filter_map(|x| x)
-            .filter(|x| !x.is_empty())
-            .collect::<Vec<_>>();
-        parts.iter().rev().fold(String::new(), |mut string, &part| {
-            string.push_str(part);
-            string.push('/');
-            string
-        })
-    };
-    result.pop(); // remove extra '/'
-
-    // replace with the root of the scheme if it's empty
-    Some(if result.is_empty() {
-        let pos = canon.find(':').map_or(canon.len(), |p| p + 1);
-        canon.truncate(pos);
-        canon
-    } else {
-        result
-    })
-}
 
 // XXX: chdir is not marked thread-safe (MT-safe) by POSIX. But on Linux it is simply run as a
 // syscall and is therefore atomic, which is presumably why Rust's libstd doesn't synchronize

@@ -199,6 +199,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox-path"
+version = "0.1.0"
+
+[[package]]
 name = "redox_syscall"
 version = "0.4.1"
 source = "git+https://gitlab.redox-os.org/redox-os/syscall#5948affdd53f27bccce21dbb8f193fb4805b39c6"
@@ -224,6 +228,7 @@ dependencies = [
  "rand_jitter",
  "rand_xorshift",
  "redox-exec",
+ "redox-path",
  "redox_syscall",
  "sc",
  "unicode-width",
