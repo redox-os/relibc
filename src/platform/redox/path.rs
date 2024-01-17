@@ -11,12 +11,11 @@ const PATH_MAX: usize = 4096;
 /// Make a relative path absolute.
 ///
 /// Given a cwd of "scheme:/path", this his function will turn "foo" into "scheme:/path/foo".
-/// "/foo" will turn into "scheme:/foo". "bar:/foo" will be used directly, as it is already
+/// "/foo" will turn into "file:/foo". "bar:/foo" will be used directly, as it is already
 /// absolute
 pub fn canonicalize_using_cwd<'a>(cwd_opt: Option<&str>, path: &'a str) -> Option<String> {
     let mut canon = if path.find(':').is_none() {
         let cwd = cwd_opt?;
-        let path_start = cwd.find(':')? + 1;
 
         let mut canon = if !path.starts_with('/') {
             let mut c = cwd.to_owned();
@@ -25,7 +24,8 @@ pub fn canonicalize_using_cwd<'a>(cwd_opt: Option<&str>, path: &'a str) -> Optio
             }
             c
         } else {
-            cwd[..path_start].to_owned()
+            // Fall back to the file scheme if no scheme provided
+            "file:".to_owned()
         };
 
         canon.push_str(&path);
