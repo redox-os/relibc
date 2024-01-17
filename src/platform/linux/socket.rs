@@ -75,6 +75,10 @@ impl PalSocket for Sys {
         )) as ssize_t
     }
 
+    unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> ssize_t {
+        e(syscall!(RECVMSG, socket, msg, flags)) as ssize_t
+    }
+
     unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> ssize_t {
         e(syscall!(SENDMSG, socket, msg, flags)) as ssize_t
     }

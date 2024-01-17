@@ -316,7 +316,15 @@ impl PalSocket for Sys {
         }
     }
 
+    unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> ssize_t {
+        //TODO: implement recvfrom with recvmsg
+        eprintln!("recvmsg not implemented on redox");
+        errno = syscall::ENOSYS;
+        return -1;
+    }
+
     unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> ssize_t {
+        //TODO: implement sendto with sendmsg
         eprintln!("sendmsg not implemented on redox");
         errno = syscall::ENOSYS;
         return -1;
