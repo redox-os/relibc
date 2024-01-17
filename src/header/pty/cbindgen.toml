@@ -7,3 +7,7 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
+
+[export.rename]
+"winsize" = "struct winsize"
+"termios" = "struct termios"
