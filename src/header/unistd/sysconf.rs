@@ -1,7 +1,7 @@
 use core::convert::TryInto;
 
 use crate::{
-    header::errno,
+    header::{errno, limits},
     platform::{self, types::*, Pal, Sys},
 };
 
@@ -37,7 +37,7 @@ pub extern "C" fn sysconf(name: c_int) -> c_long {
         _SC_ARG_MAX => 4096,
         _SC_CHILD_MAX => 65536,
         _SC_CLK_TCK => 100,
-        _SC_NGROUPS_MAX => 65536,
+        _SC_NGROUPS_MAX => limits::NGROUPS_MAX as c_long,
         _SC_OPEN_MAX => 1024,
         _SC_STREAM_MAX => 16,
         _SC_TZNAME_MAX => -1,
