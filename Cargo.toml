@@ -15,7 +15,6 @@ members = [
     "src/crtn",
     "src/ld_so",
     "src/platform/redox/redox-exec",
-    "src/platform/redox/redox-path",
 ]
 exclude = ["tests", "dlmalloc-rs"]
 
@@ -54,7 +53,7 @@ sc = "0.2.3"
 [target.'cfg(target_os = "redox")'.dependencies]
 redox_syscall = "0.4"
 redox-exec = { path = "src/platform/redox/redox-exec" }
-redox-path = { path = "src/platform/redox/redox-path" }
+redox-path = "0.1"
 
 [features]
 default = ["check_against_libc_crate"]
