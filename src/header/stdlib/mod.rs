@@ -405,9 +405,10 @@ pub unsafe extern "C" fn getsubopt(
     -1
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn grantpt(fildes: c_int) -> c_int {
-    unimplemented!();
+    // No-op on Linux and Redox
+    0
 }
 
 #[no_mangle]
