@@ -371,7 +371,7 @@ checksum = "64072665120942deff5fd5425d6c1811b854f4939e7f1c01ce755f64432bbea7"
 [[package]]
 name = "redox_syscall"
 version = "0.4.1"
-source = "git+https://gitlab.redox-os.org/redox-os/syscall#5948affdd53f27bccce21dbb8f193fb4805b39c6"
+source = "git+https://gitlab.redox-os.org/4lDO2/syscall.git?branch=signals#0652a057f9d28ed556dbcd1c2a9ae4a72d697298"
 dependencies = [
  "bitflags",
 ]
