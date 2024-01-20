@@ -10,9 +10,9 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "bitflags"
-version = "2.4.1"
+version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "327762f6e5a765692301e5bb513e0d9fef63be86bbc14528052b1cd3e6f03e07"
+checksum = "ed570934406eb16438a4e976b1b4500774099c13b8cb96eec99f620f05090ddf"
 
 [[package]]
 name = "cbitset"
@@ -228,6 +228,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox-path"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f45c7275fe1467ea17542c01766ae9872fa98aa7fe06ba5ea6595f7a9f0699c6"
+
+[[package]]
 name = "redox_syscall"
 version = "0.4.1"
 source = "git+https://gitlab.redox-os.org/redox-os/syscall#5948affdd53f27bccce21dbb8f193fb4805b39c6"
@@ -256,6 +262,7 @@ dependencies = [
  "rand_xorshift",
  "raw-cpuid",
  "redox-exec",
+ "redox-path",
  "redox_syscall",
  "sc",
  "unicode-width",
