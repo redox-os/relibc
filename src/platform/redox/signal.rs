@@ -1,5 +1,5 @@
 use core::mem;
-use syscall::{self, Result, number::SYS_SIGRETURN, SignalStack};
+use syscall::{self, Result, number::SYS_SIGRETURN, SignalStack, SetSighandlerData};
 
 use super::{
     super::{types::*, Pal, PalSignal},
@@ -186,20 +186,18 @@ pub fn setup_sighandler() {
         CPUID_EAX1_ECX.store(cpuid_eax1_ecx, core::sync::atomic::Ordering::Relaxed);
     }
 
-    let mut buf = [0_u8; 3 * size_of::<usize>()];
-    {
-        let mut iter = buf.array_chunks_mut();
-        *iter.next().unwrap() = altstack_base.to_ne_bytes();
-        *iter.next().unwrap() = altstack_len.to_ne_bytes();
-        *iter.next().unwrap() = sighandler_function().to_ne_bytes();
-    }
+    let data = SetSighandlerData {
+        entry: sighandler_function(),
+        altstack_base,
+        altstack_len,
+    };
 
     let fd = syscall::open(
         "thisproc:current/sighandler",
         syscall::O_WRONLY | syscall::O_CLOEXEC,
     )
     .expect("failed to open thisproc:current/sighandler");
-    syscall::write(fd, &buf)
+    syscall::write(fd, &data)
         .expect("failed to write to thisproc:current/sighandler");
     let _ = syscall::close(fd);
 }

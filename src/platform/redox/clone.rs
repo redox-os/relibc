@@ -4,7 +4,7 @@ use syscall::{
     data::Map,
     error::Result,
     flag::{MapFlags, O_CLOEXEC},
-    SIGCONT,
+    SIGCONT, SetSighandlerData,
 };
 
 use super::{extra::{create_set_addr_space_buf, FdGuard}, signal::sighandler_function};
@@ -56,21 +56,19 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
     // Inherit sighandler, but not the sigaltstack.
     {
         let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
-        let mut buf = [0_u8; size_of::<usize>() * 3];
-        buf[..size_of::<usize>()].copy_from_slice(&sighandler_function().to_ne_bytes());
-        let _ = syscall::write(*new_sighandler_fd, &buf)?;
-    }
-    // Inherit sigprocmask.
-    {
-        let cur_sigprocmask_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigprocmask")?);
-        let mut buf = 0_u64.to_ne_bytes();
-        let _ = syscall::read(*cur_sigprocmask_fd, &mut buf)?;
-
-        let new_sigprocmask_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sigprocmask")?);
-        let _ = syscall::write(*new_sigprocmask_fd, &buf)?;
+        let data = SetSighandlerData {
+            entry: sighandler_function(),
+            altstack_base: 0,
+            altstack_len: 0,
+        };
+        let _ = syscall::write(*new_sighandler_fd, &data)?;
     }
 
-    copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
+    // Sigprocmask starts as "block all", and is initialized when the thread has actually returned
+    // from clone_ret.
+
+    // TODO: Should some of these registers be inherited?
+    //copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
 
     // Unblock context.
     let start_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"start")?);

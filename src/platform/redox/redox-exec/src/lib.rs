@@ -24,7 +24,7 @@ use syscall::{
     error::*,
     flag::{MapFlags, SEEK_SET},
     GrantDesc, GrantFlags, Map, MAP_FIXED_NOREPLACE, MAP_SHARED, O_CLOEXEC, PAGE_SIZE, PROT_EXEC,
-    PROT_READ, PROT_WRITE,
+    PROT_READ, PROT_WRITE, SetSighandlerData,
 };
 
 pub use self::arch::*;
@@ -722,7 +722,14 @@ use auxv_defs::*;
 /// descriptors from other schemes are reobtained with `dup`, and grants referencing such file
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
 pub fn fork_impl() -> Result<usize> {
-    unsafe { Error::demux(__relibc_internal_fork_wrapper()) }
+    let mut old_mask = 0_u64;
+    syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut old_mask))?;
+    let pid = unsafe { Error::demux(__relibc_internal_fork_wrapper())? };
+
+    if pid == 0 {
+        syscall::sigprocmask(syscall::SIG_SETMASK, Some(&old_mask), None)?;
+    }
+    Ok(pid)
 }
 
 fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
@@ -737,13 +744,13 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
             let cur_sighandler_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sighandler")?);
             let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
 
-            let mut sighandler_buf = [0; size_of::<usize>() * 3];
+            let mut sighandler_buf = SetSighandlerData::default();
 
-            let _ = syscall::read(*cur_sighandler_fd, &mut sighandler_buf);
-            let _ = syscall::write(*new_sighandler_fd, &sighandler_buf);
+            let _ = syscall::read(*cur_sighandler_fd, &mut sighandler_buf)?;
+            let _ = syscall::write(*new_sighandler_fd, &sighandler_buf)?;
         }
 
-        // Reuse the same sigactions.
+        // Reuse the same sigactions (by value).
         {
             let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);
             let new_sigaction_fd = FdGuard::new(syscall::dup(*cur_sigaction_fd, b"copy")?);
@@ -756,15 +763,6 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
             )?;
         }
         copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
-
-        // Reuse the same sigprocmask.
-        {
-            let cur_sigprocmask_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigprocmask")?);
-            let mut buf = 0_u64.to_ne_bytes();
-            let _ = syscall::read(*cur_sigprocmask_fd, &mut buf)?;
-            let new_sigprocmask_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sigprocmask")?);
-            let _ = syscall::write(*new_sigprocmask_fd, &buf)?;
-        }
 
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new
         // parent FDs will not show up for the child).

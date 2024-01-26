@@ -305,20 +305,10 @@ pub fn execve(
 
         unreachable!()
     } else {
-        let mut buf = 0_u64.to_ne_bytes();
-        let sigignmask;
-        let sigprocmask;
-        {
-            let procmask_fd = FdGuard::new(syscall::open("thisproc:current/sigprocmask", O_CLOEXEC)?);
-            let _ = syscall::read(*procmask_fd, &mut buf)?;
-            sigprocmask = u64::from_ne_bytes(buf);
-            // TODO: REPLACE
-            let ignmask_fd = FdGuard::new(syscall::open("thisproc:current/sigprocmask", O_CLOEXEC)?);
-            let _ = syscall::read(*ignmask_fd, &mut buf)?;
-            sigignmask = u64::from_ne_bytes(buf);
-        }
+        let mut sigprocmask = 0_u64;
+        syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut sigprocmask)).unwrap();
 
-        let extrainfo = ExtraInfo { cwd: Some(&cwd), sigignmask, sigprocmask };
+        let extrainfo = ExtraInfo { cwd: Some(&cwd), sigignmask: 0, sigprocmask };
         fexec_impl(
             exec_fd_guard,
             this_context_fd,

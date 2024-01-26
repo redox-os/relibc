@@ -182,12 +182,11 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         platform::OUR_ENVIRON = copy_string_array(envp, len);
         platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
     }
-    let auxvs = get_auxvs(sp.auxv().cast());
-    crate::platform::init(auxvs);
-
-    // Setup signal stack, otherwise we cannot handle any signals besides SIG_IGN/SIG_DFL behavior.
     #[cfg(target_os = "redox")]
     platform::sys::signal::setup_sighandler();
+
+    let auxvs = get_auxvs(sp.auxv().cast());
+    crate::platform::init(auxvs);
 
     init_array();
 

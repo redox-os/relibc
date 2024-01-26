@@ -265,9 +265,9 @@ checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.76"
+version = "1.0.78"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95fc56cda0b5c3325f5fbbd7ff9fda9e02bb00bb3dac51252d2f1bfa1cb8cc8c"
+checksum = "e2422ad645d89c99f8f3e6b88a9fdeca7fabeac836b1002371c4367c8f984aae"
 dependencies = [
  "unicode-ident",
 ]
@@ -371,7 +371,7 @@ checksum = "64072665120942deff5fd5425d6c1811b854f4939e7f1c01ce755f64432bbea7"
 [[package]]
 name = "redox_syscall"
 version = "0.4.1"
-source = "git+https://gitlab.redox-os.org/4lDO2/syscall.git?branch=signals#0652a057f9d28ed556dbcd1c2a9ae4a72d697298"
+source = "git+https://gitlab.redox-os.org/4lDO2/syscall.git?branch=signals#f1719f57dffd1edf35aa3564dad45caf26b5d374"
 dependencies = [
  "bitflags",
 ]
