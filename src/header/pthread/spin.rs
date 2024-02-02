@@ -4,8 +4,8 @@ use crate::header::errno::EBUSY;
 
 use super::*;
 
-pub const UNLOCKED: c_int = 0;
-pub const LOCKED: c_int = 1;
+const UNLOCKED: c_int = 0;
+const LOCKED: c_int = 1;
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_spin_destroy(spinlock: *mut pthread_spinlock_t) -> c_int {
