@@ -13,6 +13,13 @@ pub type sa_family_t = u16;
 pub type socklen_t = u32;
 
 #[repr(C)]
+#[derive(Default)]
+pub struct linger {
+    pub l_onoff: c_int,
+    pub l_linger: c_int,
+}
+
+#[repr(C)]
 pub struct msghdr {
     pub msg_name: *mut c_void,
     pub msg_namelen: socklen_t,
