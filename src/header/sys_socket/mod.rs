@@ -19,6 +19,9 @@ pub struct linger {
     pub l_linger: c_int,
 }
 
+#[no_mangle]
+pub extern "C" fn _cbindgen_export_linger(linger: linger) {}
+
 #[repr(C)]
 pub struct msghdr {
     pub msg_name: *mut c_void,
