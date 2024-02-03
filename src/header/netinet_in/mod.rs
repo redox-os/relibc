@@ -44,12 +44,19 @@ pub struct ipv6_mreq {
 pub const INET_ADDRSTRLEN: c_int = 16;
 pub const INET6_ADDRSTRLEN: c_int = 46;
 
+// IP options
+pub const IP_TOS: c_int = 1;
+pub const IP_RECVTOS: c_int = 13;
+
 // Protocol Numbers
-pub const IPPROTO_IP: u8 = 0x00;
-pub const IPPROTO_ICMP: u8 = 0x01;
-pub const IPPROTO_TCP: u8 = 0x06;
-pub const IPPROTO_UDP: u8 = 0x11;
-pub const IPPROTO_IPV6: u8 = 0x29;
+pub const IPPROTO_IP: u8 = 0;
+pub const IPPROTO_ICMP: u8 = 1;
+pub const IPPROTO_IGMP: u8 = 2;
+pub const IPPROTO_TCP: u8 = 6;
+pub const IPPROTO_PUP: u8 = 12;
+pub const IPPROTO_UDP: u8 = 17;
+pub const IPPROTO_IDP: u8 = 22;
+pub const IPPROTO_IPV6: u8 = 41;
 pub const IPPROTO_RAW: u8 = 0xff;
 pub const IPPROTO_MAX: u8 = 0xff;
 
