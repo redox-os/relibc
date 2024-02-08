@@ -207,7 +207,7 @@ run: | $(BINS)
 	for bin in $(BINS); \
 	do \
 		echo "# $${bin} #"; \
-		"$${bin}" test args || exit $$?; \
+		${TEST_RUNNER} "$${bin}" test args || exit $$?; \
 	done
 
 expected: | $(EXPECT_BINS)
