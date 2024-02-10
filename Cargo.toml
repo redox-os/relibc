@@ -61,6 +61,7 @@ sc = "0.2.3"
 redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall.git" }
 redox-exec = { path = "src/platform/redox/redox-exec" }
 redox-path = "0.2"
+redox_event = { git = "https://gitlab.redox-os.org/4lDO2/event.git", default-features = false, features = ["redox_syscall"], branch = "abi" }
 
 [features]
 default = ["check_against_libc_crate"]
