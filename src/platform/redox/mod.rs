@@ -11,7 +11,7 @@ use crate::{
     header::{
         dirent::dirent,
         errno::{EBADR, EINVAL, EIO, ENOENT, ENOMEM, ENOSYS, EPERM, ERANGE},
-        fcntl,
+        fcntl, limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, RLIM_INFINITY},
@@ -822,7 +822,36 @@ impl Pal for Sys {
     }
 
     fn fpath(fildes: c_int, out: &mut [u8]) -> ssize_t {
-        e(syscall::fpath(fildes as usize, out)) as ssize_t
+        // Since this is used by realpath, it converts from the old format to the new one for
+        // compatibility reasons
+        let mut buf = [0; limits::PATH_MAX];
+        let count = match syscall::fpath(fildes as usize, &mut buf) {
+            Ok(ok) => ok,
+            Err(err) => return e(Err(err)) as ssize_t,
+        };
+
+        let redox_path = match str::from_utf8(&buf[..count])
+            .ok()
+            .and_then(|x| redox_path::RedoxPath::from_absolute(x))
+        {
+            Some(some) => some,
+            None => return e(Err(syscall::Error::new(EINVAL))) as ssize_t,
+        };
+
+        let (scheme, reference) = match redox_path.as_parts() {
+            Some(some) => some,
+            None => return e(Err(syscall::Error::new(EINVAL))) as ssize_t,
+        };
+
+        let mut cursor = io::Cursor::new(out);
+        let res = match scheme.as_ref() {
+            "file" => write!(cursor, "/{}", reference.as_ref()),
+            _ => write!(cursor, "/scheme/{}/{}", scheme.as_ref(), reference.as_ref()),
+        };
+        match res {
+            Ok(()) => cursor.position() as ssize_t,
+            Err(_err) => e(Err(syscall::Error::new(syscall::ENAMETOOLONG))) as ssize_t,
+        }
     }
 
     fn readlink(pathname: CStr, out: &mut [u8]) -> ssize_t {

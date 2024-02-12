@@ -200,9 +200,9 @@ dependencies = [
 
 [[package]]
 name = "redox-path"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f45c7275fe1467ea17542c01766ae9872fa98aa7fe06ba5ea6595f7a9f0699c6"
+checksum = "64072665120942deff5fd5425d6c1811b854f4939e7f1c01ce755f64432bbea7"
 
 [[package]]
 name = "redox_syscall"
