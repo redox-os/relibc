@@ -15,8 +15,10 @@ use crate::{
     platform::{self, errno, types::*},
 };
 
+mod lookaheadreader;
 mod utf8;
 mod wprintf;
+mod wscanf;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -277,9 +279,10 @@ pub unsafe extern "C" fn putwchar(wc: wchar_t) -> wint_t {
     fputwc(wc, &mut *stdout)
 }
 
-// #[no_mangle]
-pub extern "C" fn swscanf(s: *const wchar_t, format: *const wchar_t, ap: va_list) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn swscanf(s: *const wchar_t, format: *const wchar_t, ap: va_list) -> c_int {
+    let reader = (s as *const u32).into();
+    wscanf::scanf(reader, format, ap)
 }
 
 /// Push wide character `wc` back onto `stream` so it'll be read next
