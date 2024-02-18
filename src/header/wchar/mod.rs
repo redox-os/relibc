@@ -280,9 +280,14 @@ pub unsafe extern "C" fn putwchar(wc: wchar_t) -> wint_t {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn swscanf(s: *const wchar_t, format: *const wchar_t, ap: va_list) -> c_int {
+// pub unsafe extern "C" fn swscanf(s: *const wchar_t, format: *const wchar_t, ap: va_list) -> c_int {
+pub unsafe extern "C" fn swscanf(
+    s: *const wchar_t,
+    format: *const wchar_t,
+    mut __valist: ...
+) -> c_int {
     let reader = (s as *const u32).into();
-    wscanf::scanf(reader, format, ap)
+    wscanf::scanf(reader, format, __valist.as_va_list())
 }
 
 /// Push wide character `wc` back onto `stream` so it'll be read next

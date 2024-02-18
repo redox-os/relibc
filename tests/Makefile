@@ -112,6 +112,7 @@ EXPECT_NAMES=\
 	wchar/mbsrtowcs \
 	wchar/printf-on-wchars \
 	wchar/putwchar \
+	wchar/swscanf \
 	wchar/ungetwc \
 	wchar/wprintf \
 	wchar/wcrtomb \
