@@ -1,5 +1,4 @@
 pub mod _aio;
-pub mod _fenv;
 pub mod arpa_inet;
 pub mod assert;
 pub mod bits_pthread;

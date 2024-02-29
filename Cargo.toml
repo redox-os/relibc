@@ -14,6 +14,7 @@ members = [
     "src/crti",
     "src/crtn",
     "src/ld_so",
+    "src/libm",
     "src/platform/redox/redox-exec",
 ]
 exclude = ["tests", "dlmalloc-rs"]
@@ -36,6 +37,11 @@ memchr = { version = "2.2.0", default-features = false }
 plain = "0.2"
 unicode-width = "0.1"
 __libc_only_for_layout_checks = { package = "libc", version = "0.2.149", optional = true }
+
+inner_libm = {package = "libm", version = "0.2.8"}
+num-complex = { version = "0.4.4", default-features = false, features = ["libm"] }
+raw-cpuid = "11"
+
 
 [dependencies.goblin]
 version = "0.7"
