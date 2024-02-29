@@ -34,14 +34,14 @@ macro_rules! bind_or_connect {
     }};
     ($mode:ident copy, $socket:expr, $address:expr, $address_len:expr) => {{
         if ($address_len as usize) < mem::size_of::<sa_family_t>() {
-            errno = syscall::EINVAL;
+            errno.set(syscall::EINVAL);
             return -1;
         }
 
         let path = match (*$address).sa_family as c_int {
             AF_INET => {
                 if ($address_len as usize) != mem::size_of::<sockaddr_in>() {
-                    errno = syscall::EINVAL;
+                    errno.set(syscall::EINVAL);
                     return -1;
                 }
                 let data = &*($address as *const sockaddr_in);
@@ -93,7 +93,7 @@ macro_rules! bind_or_connect {
                 path
             },
             _ => {
-                errno = syscall::EAFNOSUPPORT;
+                errno.set(syscall::EAFNOSUPPORT);
                 return -1;
             },
         };
@@ -295,7 +295,7 @@ impl PalSocket for Sys {
         address_len: *mut socklen_t,
     ) -> ssize_t {
         if flags != 0 {
-            errno = syscall::EOPNOTSUPP;
+            errno.set(syscall::EOPNOTSUPP);
             return -1;
         }
         if address == ptr::null_mut() || address_len == ptr::null_mut() {
@@ -319,14 +319,14 @@ impl PalSocket for Sys {
     unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> ssize_t {
         //TODO: implement recvfrom with recvmsg
         eprintln!("recvmsg not implemented on redox");
-        errno = syscall::ENOSYS;
+        errno.set(syscall::ENOSYS);
         return -1;
     }
 
     unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> ssize_t {
         //TODO: implement sendto with sendmsg
         eprintln!("sendmsg not implemented on redox");
-        errno = syscall::ENOSYS;
+        errno.set(syscall::ENOSYS);
         return -1;
     }
 
@@ -339,7 +339,7 @@ impl PalSocket for Sys {
         dest_len: socklen_t,
     ) -> ssize_t {
         if flags != 0 {
-            errno = syscall::EOPNOTSUPP;
+            errno.set(syscall::EOPNOTSUPP);
             return -1;
         }
         if dest_addr == ptr::null() || dest_len == 0 {
@@ -414,11 +414,11 @@ impl PalSocket for Sys {
 
     unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
         if domain != AF_INET && domain != AF_UNIX {
-            errno = syscall::EAFNOSUPPORT;
+            errno.set(syscall::EAFNOSUPPORT);
             return -1;
         }
         // if protocol != 0 {
-        //     errno = syscall::EPROTONOSUPPORT;
+        //     errno.set(syscall::EPROTONOSUPPORT);
         //     return -1;
         // }
 
@@ -431,7 +431,7 @@ impl PalSocket for Sys {
             (AF_INET, SOCK_DGRAM) => e(syscall::open("udp:", flags)) as c_int,
             (AF_UNIX, SOCK_STREAM) => e(syscall::open("chan:", flags | O_CREAT)) as c_int,
             _ => {
-                errno = syscall::EPROTONOSUPPORT;
+                errno.set(syscall::EPROTONOSUPPORT);
                 -1
             }
         }
@@ -476,7 +476,7 @@ impl PalSocket for Sys {
                     protocol,
                     sv.as_mut_ptr()
                 );
-                errno = syscall::EPROTONOSUPPORT;
+                errno.set(syscall::EPROTONOSUPPORT);
                 -1
             },
         }

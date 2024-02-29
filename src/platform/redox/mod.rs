@@ -54,9 +54,7 @@ macro_rules! path_from_c_str {
         match $c_str.to_str() {
             Ok(ok) => ok,
             Err(err) => {
-                unsafe {
-                    errno = EINVAL;
-                }
+                errno.set(EINVAL);
                 return -1;
             }
         }
@@ -69,9 +67,7 @@ pub fn e(sys: Result<usize>) -> usize {
     match sys {
         Ok(ok) => ok,
         Err(err) => {
-            unsafe {
-                errno = err.errno as c_int;
-            }
+            errno.set(err.errno as c_int);
             !0
         }
     }
@@ -116,9 +112,7 @@ impl Pal for Sys {
             || (mode & W_OK == W_OK && perms & 0o2 != 0o2)
             || (mode & X_OK == X_OK && perms & 0o1 != 0o1)
         {
-            unsafe {
-                errno = EINVAL;
-            }
+            errno.set(EINVAL);
             return -1;
         }
 
@@ -159,7 +153,7 @@ impl Pal for Sys {
                 addr
             } else {
                 // It was outside of valid range
-                errno = ENOMEM;
+                errno.set(ENOMEM);
                 ptr::null_mut()
             }
         }
@@ -188,7 +182,7 @@ impl Pal for Sys {
     fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> c_int {
         // TODO
         eprintln!("relibc clock_getres({}, {:p}): not implemented", clk_id, tp);
-        unsafe { errno = ENOSYS }
+        errno.set(ENOSYS);
         -1
     }
 
@@ -204,7 +198,7 @@ impl Pal for Sys {
             "relibc clock_settime({}, {:p}): not implemented",
             clk_id, tp
         );
-        unsafe { errno = ENOSYS };
+        errno.set(ENOSYS);
         -1
     }
 
@@ -252,7 +246,7 @@ impl Pal for Sys {
             match str::from_utf8(&buf[..res]) {
                 Ok(path) => e(path::chdir(path).map(|()| 0)) as c_int,
                 Err(_) => {
-                    unsafe { errno = EINVAL };
+                    errno.set(EINVAL);
                     return -1;
                 }
             }
@@ -343,16 +337,12 @@ impl Pal for Sys {
 
         let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize) };
         if buf_slice.is_empty() {
-            unsafe {
-                errno = EINVAL;
-            }
+            errno.set(EINVAL);
             return ptr::null_mut();
         }
 
         if path::getcwd(buf_slice).is_none() {
-            unsafe {
-                errno = ERANGE;
-            }
+            errno.set(ERANGE);
             return ptr::null_mut();
         }
 
@@ -467,7 +457,7 @@ impl Pal for Sys {
     unsafe fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
         // TODO
         eprintln!("relibc getgroups({}, {:p}): not implemented", size, list);
-        unsafe { errno = ENOSYS };
+        errno.set(ENOSYS);
         -1
     }
 
@@ -490,7 +480,7 @@ impl Pal for Sys {
     fn getpriority(which: c_int, who: id_t) -> c_int {
         // TODO
         eprintln!("getpriority({}, {}): not implemented", which, who);
-        unsafe { errno = ENOSYS };
+        errno.set(ENOSYS);
         -1
     }
 
@@ -540,7 +530,7 @@ impl Pal for Sys {
             "relibc setrlimit({}, {:p}): not implemented",
             resource, rlim
         );
-        unsafe { errno = EPERM };
+        errno.set(EPERM);
         -1
     }
 
@@ -640,7 +630,7 @@ impl Pal for Sys {
         let dir_path = match str::from_utf8(&dir_path_buf[..res as usize]) {
             Ok(path) => path,
             Err(_) => {
-                unsafe { errno = EBADR };
+                errno.set(EBADR);
                 return !0;
             }
         };
@@ -651,7 +641,7 @@ impl Pal for Sys {
                 None => {
                     // Since parent_dir_path is resolved by fpath, it is more likely that
                     // the problem was with path.
-                    unsafe { errno = ENOENT };
+                    errno.set(ENOENT);
                     return !0;
                 }
             };
@@ -884,7 +874,7 @@ impl Pal for Sys {
     unsafe fn setgroups(size: size_t, list: *const gid_t) -> c_int {
         // TODO
         eprintln!("relibc setgroups({}, {:p}): not implemented", size, list);
-        unsafe { errno = ENOSYS };
+        errno.set(ENOSYS);
         -1
     }
 
@@ -898,7 +888,7 @@ impl Pal for Sys {
             "relibc setpriority({}, {}, {}): not implemented",
             which, who, prio
         );
-        unsafe { errno = ENOSYS };
+        errno.set(ENOSYS);
         -1
     }
 
@@ -1027,10 +1017,10 @@ impl Pal for Sys {
 
         match inner(utsname) {
             Ok(()) => 0,
-            Err(err) => unsafe {
-                errno = err;
+            Err(err) => {
+                errno.set(err);
                 -1
-            },
+            }
         }
     }
 

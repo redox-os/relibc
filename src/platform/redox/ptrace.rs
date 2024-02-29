@@ -91,9 +91,7 @@ pub fn get_session(
                     )?,
                 }))
             } else {
-                unsafe {
-                    errno = errnoh::ESRCH;
-                }
+                errno.set(errnoh::ESRCH);
                 Err(io::last_os_error())
             }
         }

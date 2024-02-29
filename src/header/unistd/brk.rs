@@ -12,7 +12,7 @@ pub unsafe extern "C" fn brk(addr: *mut c_void) -> c_int {
     BRK = Sys::brk(addr);
 
     if BRK < addr {
-        platform::errno = ENOMEM;
+        platform::errno.set(ENOMEM);
         return -1;
     }
 
@@ -33,7 +33,7 @@ pub unsafe extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
         BRK = Sys::brk(addr);
 
         if BRK < addr {
-            platform::errno = ENOMEM;
+            platform::errno.set(ENOMEM);
             return -1isize as *mut c_void;
         }
     }

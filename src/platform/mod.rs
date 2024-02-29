@@ -1,6 +1,6 @@
 use crate::io::{self, Read, Write};
 use alloc::{boxed::Box, vec::Vec};
-use core::{fmt, ptr};
+use core::{cell::Cell, fmt, ptr};
 
 pub use self::allocator::*;
 
@@ -38,7 +38,7 @@ pub mod types;
 #[thread_local]
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static mut errno: c_int = 0;
+pub static errno: Cell<c_int> = Cell::new(0);
 
 #[allow(non_upper_case_globals)]
 pub static mut argv: *mut *mut c_char = ptr::null_mut();

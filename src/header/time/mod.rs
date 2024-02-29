@@ -396,7 +396,7 @@ pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut
             result
         }
         Err(_) => {
-            platform::errno = EOVERFLOW;
+            platform::errno.set(EOVERFLOW);
             core::ptr::null_mut()
         }
     }

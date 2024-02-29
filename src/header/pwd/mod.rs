@@ -154,9 +154,7 @@ fn getpwent_r(
         Some(dst) => {
             let mut new = MaybeAllocated::Borrowed(dst);
             if new.len() < buf.len() {
-                unsafe {
-                    platform::errno = errno::ERANGE;
-                }
+                platform::errno.set(errno::ERANGE);
                 return Err(Cause::Other);
             }
             new[..buf.len()].copy_from_slice(&buf);

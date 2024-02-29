@@ -229,7 +229,8 @@ impl DSO {
                 {
                     return Err(Error::Malformed(format!(
                         "failed to map {}. errno: {}",
-                        path, STR_ERROR[errno as usize]
+                        path,
+                        STR_ERROR[errno.get() as usize]
                     )));
                 }
                 if start as *mut c_void != ptr::null_mut() {
