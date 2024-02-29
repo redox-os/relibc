@@ -19,10 +19,10 @@ impl PalSignal for Sys {
     fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
         let path = match which {
             ITIMER_REAL => "itimer:1",
-            _ => unsafe {
-                errno = EINVAL;
+            _ => {
+                errno.set(EINVAL);
                 return -1;
-            },
+            }
         };
 
         let fd = e(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC));
@@ -64,10 +64,10 @@ impl PalSignal for Sys {
     fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
         let path = match which {
             ITIMER_REAL => "itimer:1",
-            _ => unsafe {
-                errno = EINVAL;
+            _ => {
+                errno.set(EINVAL);
                 return -1;
-            },
+            }
         };
 
         let fd = e(syscall::open(path, syscall::O_RDWR | syscall::O_CLOEXEC));
@@ -115,9 +115,7 @@ impl PalSignal for Sys {
     }
 
     fn sigpending(set: *mut sigset_t) -> c_int {
-        unsafe {
-            errno = ENOSYS;
-        }
+        errno.set(ENOSYS);
         -1
     }
 
@@ -126,16 +124,12 @@ impl PalSignal for Sys {
     }
 
     fn sigsuspend(set: *const sigset_t) -> c_int {
-        unsafe {
-            errno = ENOSYS;
-        }
+        errno.set(ENOSYS);
         -1
     }
 
     fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec) -> c_int {
-        unsafe {
-            errno = ENOSYS;
-        }
+        errno.set(ENOSYS);
         -1
     }
 }

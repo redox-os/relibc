@@ -59,7 +59,7 @@ pub unsafe extern "C" fn getdelim(
         if let (Some(ptr), Some(n), Some(file)) = (lineptr.as_mut(), n.as_mut(), stream.as_mut()) {
             (ptr, n, file)
         } else {
-            errno = EINVAL;
+            errno.set(EINVAL);
             return -1 as ssize_t;
         };
 
@@ -72,7 +72,7 @@ pub unsafe extern "C" fn getdelim(
     let delim: u8 = if let Ok(delim) = delim.try_into() {
         delim
     } else {
-        errno = EINVAL;
+        errno.set(EINVAL);
         return -1;
     };
 
@@ -92,7 +92,7 @@ pub unsafe extern "C" fn getdelim(
     // "[EOVERFLOW]
     // The number of bytes to be written into the buffer, including the delimiter character (if encountered), would exceed {SSIZE_MAX}."
     if unlikely(count > ssize_t::MAX as usize) {
-        errno = EOVERFLOW;
+        errno.set(EOVERFLOW);
         return -1;
     }
 
@@ -124,7 +124,7 @@ pub unsafe extern "C" fn getdelim(
         *lineptr = stdlib::realloc(*lineptr as *mut c_void, *n) as *mut c_char;
         if unlikely(lineptr.is_null() && *n != 0usize) {
             // memory error; realloc returns NULL on alloc'ing 0 bytes
-            errno = ENOMEM;
+            errno.set(ENOMEM);
             return -1;
         }
 

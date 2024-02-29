@@ -69,7 +69,7 @@ pub unsafe extern "C" fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *const termios) -> c_int {
     if act < 0 || act > 2 {
-        platform::errno = errno::EINVAL;
+        platform::errno.set(errno::EINVAL);
         return -1;
     }
     // This is safe because ioctl shouldn't modify the value
@@ -111,7 +111,7 @@ pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) ->
             0
         }
         _ => {
-            platform::errno = errno::EINVAL;
+            platform::errno.set(errno::EINVAL);
             -1
         }
     }
@@ -121,7 +121,7 @@ pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) ->
 #[no_mangle]
 pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) -> c_int {
     //TODO
-    platform::errno = errno::EINVAL;
+    platform::errno.set(errno::EINVAL);
     -1
 }
 
@@ -134,7 +134,7 @@ pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) ->
             0
         }
         _ => {
-            platform::errno = errno::EINVAL;
+            platform::errno.set(errno::EINVAL);
             -1
         }
     }
@@ -144,7 +144,7 @@ pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) ->
 #[no_mangle]
 pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) -> c_int {
     //TODO
-    platform::errno = errno::EINVAL;
+    platform::errno.set(errno::EINVAL);
     -1
 }
 

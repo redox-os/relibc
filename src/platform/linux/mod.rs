@@ -63,9 +63,7 @@ pub fn e(sys: usize) -> usize {
     match e_raw(sys) {
         Ok(value) => value,
         Err(errcode) => {
-            unsafe {
-                errno = errcode as c_int;
-            }
+            errno.set(errcode as c_int);
             !0
         }
     }

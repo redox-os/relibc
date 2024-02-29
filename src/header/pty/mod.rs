@@ -106,7 +106,7 @@ pub unsafe extern "C" fn forkpty(
             let mut status = 0;
             sys_wait::waitpid(pid, &mut status, 0);
             pid = -1;
-            platform::errno = ec;
+            platform::errno.set(ec);
         }
         unistd::close(p[0]);
     }

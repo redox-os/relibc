@@ -56,7 +56,7 @@ pub unsafe extern "C" fn inet_ntoa(addr: in_addr) -> *const c_char {
 #[no_mangle]
 pub unsafe extern "C" fn inet_pton(domain: c_int, src: *const c_char, dest: *mut c_void) -> c_int {
     if domain != AF_INET {
-        platform::errno = EAFNOSUPPORT;
+        platform::errno.set(EAFNOSUPPORT);
         -1
     } else {
         let s_addr = slice::from_raw_parts_mut(
@@ -88,10 +88,10 @@ pub unsafe extern "C" fn inet_ntop(
     size: socklen_t,
 ) -> *const c_char {
     if domain != AF_INET {
-        platform::errno = EAFNOSUPPORT;
+        platform::errno.set(EAFNOSUPPORT);
         ptr::null()
     } else if size < 16 {
-        platform::errno = ENOSPC;
+        platform::errno.set(ENOSPC);
         ptr::null()
     } else {
         let s_addr = slice::from_raw_parts(

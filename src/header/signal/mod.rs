@@ -92,7 +92,7 @@ pub unsafe extern "C" fn pthread_sigmask(
         0
     } else {
         //TODO: Fix race
-        unsafe { platform::errno }
+        platform::errno.get()
     }
 }
 
@@ -119,9 +119,7 @@ pub unsafe extern "C" fn sigaction(
 #[no_mangle]
 pub extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG {
-        unsafe {
-            platform::errno = errno::EINVAL;
-        }
+        platform::errno.set(errno::EINVAL);
         return -1;
     }
 
@@ -148,9 +146,7 @@ pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -
 #[no_mangle]
 pub extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG {
-        unsafe {
-            platform::errno = errno::EINVAL;
-        }
+        platform::errno.set(errno::EINVAL);
         return -1;
     }
 
@@ -214,9 +210,7 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
 #[no_mangle]
 pub extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG {
-        unsafe {
-            platform::errno = errno::EINVAL;
-        }
+        platform::errno.set(errno::EINVAL);
         return -1;
     }
 
