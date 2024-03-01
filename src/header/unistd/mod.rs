@@ -81,13 +81,13 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
         },
         ..Default::default()
     };
-    let errno_backup = platform::errno.get();
+    let errno_backup = platform::ERRNO.get();
     let secs = if sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) < 0 {
         0
     } else {
         timer.it_value.tv_sec as c_uint + if timer.it_value.tv_usec > 0 { 1 } else { 0 }
     };
-    platform::errno.set(errno_backup);
+    platform::ERRNO.set(errno_backup);
 
     secs
 }
@@ -101,7 +101,7 @@ pub unsafe extern "C" fn chdir(path: *const c_char) -> c_int {
 #[no_mangle]
 pub extern "C" fn chroot(path: *const c_char) -> c_int {
     // TODO: Implement
-    platform::errno.set(crate::header::errno::EPERM);
+    platform::ERRNO.set(crate::header::errno::EPERM);
 
     -1
 }
@@ -162,12 +162,12 @@ unsafe fn with_argv(
         // TODO: Use ARG_MAX, not this hardcoded constant
         let ptr = crate::header::stdlib::malloc(argc * mem::size_of::<*const c_char>());
         if ptr.is_null() {
-            platform::errno.set(ENOMEM);
+            platform::ERRNO.set(ENOMEM);
             return -1;
         }
         slice::from_raw_parts_mut(ptr.cast::<MaybeUninit<*const c_char>>(), argc)
     } else {
-        platform::errno.set(E2BIG);
+        platform::ERRNO.set(E2BIG);
         return -1;
     };
     out[0].write(arg0);
@@ -266,14 +266,14 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
                 let program_c = CStr::from_bytes_with_nul(&program).unwrap();
                 execv(program_c.as_ptr(), argv);
 
-                match platform::errno.get() {
+                match platform::ERRNO.get() {
                     errno::ENOENT => (),
                     other => error = other,
                 }
             }
         }
 
-        platform::errno.set(error);
+        platform::ERRNO.set(error);
         -1
     }
 }
@@ -437,7 +437,7 @@ pub unsafe extern "C" fn getlogin() -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn getlogin_r(name: *mut c_char, namesize: size_t) -> c_int {
     //TODO: Determine correct getlogin result on Redox
-    platform::errno.set(errno::ENOENT);
+    platform::ERRNO.set(errno::ENOENT);
     -1
 }
 
@@ -531,7 +531,7 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
             if fl.l_type == fcntl::F_UNLCK as c_short || fl.l_pid == getpid() {
                 return 0;
             }
-            platform::errno.set(errno::EACCES);
+            platform::ERRNO.set(errno::EACCES);
             return -1;
         }
         fcntl::F_ULOCK => {
@@ -545,7 +545,7 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
             return fcntl::fcntl(fildes, fcntl::F_SETLKW, &mut fl as *mut _ as c_ulonglong);
         }
         _ => {
-            platform::errno.set(errno::EINVAL);
+            platform::ERRNO.set(errno::EINVAL);
             return -1;
         }
     };
@@ -801,7 +801,7 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
 
     let len = Sys::fpath(fildes, &mut name[..namesize - 1]);
     if len < 0 {
-        return -platform::errno.get();
+        return -platform::ERRNO.get();
     }
     name[len as usize] = 0;
 
@@ -820,13 +820,13 @@ pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t 
             tv_usec: interval as suseconds_t,
         },
     };
-    let errno_backup = platform::errno.get();
+    let errno_backup = platform::ERRNO.get();
     let ret = if sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) < 0 {
         0
     } else {
         timer.it_value.tv_sec as useconds_t * 1_000_000 + timer.it_value.tv_usec as useconds_t
     };
-    platform::errno.set(errno_backup);
+    platform::ERRNO.set(errno_backup);
 
     ret
 }

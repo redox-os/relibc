@@ -25,7 +25,7 @@ use crate::{
         unistd,
     },
     io::{self, BufRead, BufWriter, LineWriter, Read, Write},
-    platform::{self, errno, types::*, Pal, Sys, WriteByte},
+    platform::{self, types::*, Pal, Sys, WriteByte, ERRNO},
     sync::Mutex,
 };
 
@@ -498,7 +498,7 @@ pub unsafe extern "C" fn flockfile(file: *mut FILE) {
 pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FILE {
     let initial_mode = *mode;
     if initial_mode != b'r' as i8 && initial_mode != b'w' as i8 && initial_mode != b'a' as i8 {
-        platform::errno.set(errno::EINVAL);
+        platform::ERRNO.set(errno::EINVAL);
         return ptr::null_mut();
     }
 
@@ -821,7 +821,7 @@ pub unsafe extern "C" fn pclose(stream: *mut FILE) -> c_int {
         if let Some(pid) = stream.pid.take() {
             pid
         } else {
-            errno.set(errno::ECHILD);
+            ERRNO.set(errno::ECHILD);
             return -1;
         }
     };
@@ -842,7 +842,7 @@ pub unsafe extern "C" fn perror(s: *const c_char) {
     let s_str = str::from_utf8_unchecked(s_cstr.to_bytes());
 
     let mut w = platform::FileWriter(2);
-    let err = errno.get();
+    let err = ERRNO.get();
     if err >= 0 && err < STR_ERROR.len() as c_int {
         w.write_fmt(format_args!("{}: {}\n", s_str, STR_ERROR[err as usize]))
             .unwrap();
@@ -866,7 +866,7 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
             b'r' if write_opt.is_none() => write_opt = Some(false),
             b'w' if write_opt.is_none() => write_opt = Some(true),
             _ => {
-                errno.set(errno::EINVAL);
+                ERRNO.set(errno::EINVAL);
                 return ptr::null_mut();
             }
         }
@@ -875,7 +875,7 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
     let write = match write_opt {
         Some(some) => some,
         None => {
-            errno.set(errno::EINVAL);
+            ERRNO.set(errno::EINVAL);
             return ptr::null_mut();
         }
     };
@@ -1144,9 +1144,9 @@ unsafe extern "C" fn tmpnam_inner(buf: *mut c_char, offset: usize) -> *mut c_cha
     buf.add(offset)
         .copy_from_nonoverlapping(TEMPLATE.as_ptr() as _, TEMPLATE.len());
 
-    let err = platform::errno.get();
+    let err = platform::ERRNO.get();
     stdlib::mktemp(buf);
-    platform::errno.set(err);
+    platform::ERRNO.set(err);
 
     if *buf == 0 {
         ptr::null_mut()

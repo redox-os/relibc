@@ -47,7 +47,7 @@ impl PalEpoll for Sys {
                 ) as c_int
             }
             _ => {
-                platform::errno.set(EINVAL);
+                platform::ERRNO.set(EINVAL);
                 return -1;
             }
         }
@@ -64,7 +64,7 @@ impl PalEpoll for Sys {
         assert_eq!(mem::size_of::<epoll_event>(), mem::size_of::<Event>());
 
         if maxevents <= 0 {
-            platform::errno.set(EINVAL);
+            platform::ERRNO.set(EINVAL);
             return -1;
         }
 

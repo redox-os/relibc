@@ -244,7 +244,7 @@ pub unsafe extern "C" fn gethostbyaddr(
             &mut HOST_ENTRY
         }
         Err(e) => {
-            platform::errno.set(e);
+            platform::ERRNO.set(e);
             ptr::null_mut()
         }
     }
@@ -307,14 +307,14 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     let mut host = match lookup_host(str::from_utf8_unchecked(name_cstr.to_bytes())) {
         Ok(lookuphost) => lookuphost,
         Err(e) => {
-            platform::errno.set(e);
+            platform::ERRNO.set(e);
             return ptr::null_mut();
         }
     };
     let host_addr = match host.next() {
         Some(result) => result,
         None => {
-            platform::errno.set(ENOENT);
+            platform::ERRNO.set(ENOENT);
             return ptr::null_mut();
         }
     };
@@ -363,7 +363,7 @@ pub unsafe extern "C" fn getnetbyname(name: *const c_char) -> *mut netent {
     }
     setnetent(NET_STAYOPEN);
 
-    platform::errno.set(ENOENT);
+    platform::ERRNO.set(ENOENT);
     ptr::null_mut() as *mut netent
 }
 
@@ -459,7 +459,7 @@ pub unsafe extern "C" fn getprotobyname(name: *const c_char) -> *mut protoent {
     }
     setprotoent(PROTO_STAYOPEN);
 
-    platform::errno.set(ENOENT);
+    platform::ERRNO.set(ENOENT);
     ptr::null_mut() as *mut protoent
 }
 
@@ -477,7 +477,7 @@ pub unsafe extern "C" fn getprotobynumber(number: c_int) -> *mut protoent {
         }
     }
     setprotoent(PROTO_STAYOPEN);
-    platform::errno.set(ENOENT);
+    platform::ERRNO.set(ENOENT);
     ptr::null_mut() as *mut protoent
 }
 
@@ -566,7 +566,7 @@ pub unsafe extern "C" fn getservbyname(name: *const c_char, proto: *const c_char
         }
     }
     setservent(SERV_STAYOPEN);
-    platform::errno.set(ENOENT);
+    platform::ERRNO.set(ENOENT);
     ptr::null_mut() as *mut servent
 }
 
@@ -596,7 +596,7 @@ pub unsafe extern "C" fn getservbyport(port: c_int, proto: *const c_char) -> *mu
         }
     }
     setservent(SERV_STAYOPEN);
-    platform::errno.set(ENOENT);
+    platform::ERRNO.set(ENOENT);
     ptr::null_mut()
 }
 
@@ -762,7 +762,7 @@ pub unsafe extern "C" fn getaddrinfo(
         let lookuphost = match lookup_host(str::from_utf8_unchecked(node.to_bytes())) {
             Ok(lookuphost) => lookuphost,
             Err(e) => {
-                platform::errno.set(e);
+                platform::ERRNO.set(e);
                 return EAI_SYSTEM;
             }
         };
@@ -840,7 +840,7 @@ pub unsafe extern "C" fn getnameinfo(
 
     eprintln!("getnameinfo({:p}, {}, {:#x})", addr, addrlen, flags);
 
-    platform::errno.set(ENOSYS);
+    platform::ERRNO.set(ENOSYS);
     EAI_SYSTEM
 }
 

@@ -125,7 +125,7 @@ pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut 
          * difference between aligned_alloc() and memalign(). */
         memalign(alignment, size)
     } else {
-        platform::errno.set(EINVAL);
+        platform::ERRNO.set(EINVAL);
         ptr::null_mut()
     }
 }
@@ -242,7 +242,7 @@ pub unsafe extern "C" fn calloc(nelem: size_t, elsize: size_t) -> *mut c_void {
         }
         None => {
             // For overflowing multiplication, we have to set errno here
-            platform::errno.set(ENOMEM);
+            platform::ERRNO.set(ENOMEM);
             ptr::null_mut()
         }
     }
@@ -545,7 +545,7 @@ pub unsafe extern "C" fn lrand48() -> c_long {
 pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
     let ptr = platform::alloc(size);
     if ptr.is_null() {
-        platform::errno.set(ENOMEM);
+        platform::ERRNO.set(ENOMEM);
     }
     ptr
 }
@@ -555,11 +555,11 @@ pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_voi
     if alignment.is_power_of_two() {
         let ptr = platform::alloc_align(size, alignment);
         if ptr.is_null() {
-            platform::errno.set(ENOMEM);
+            platform::ERRNO.set(ENOMEM);
         }
         ptr
     } else {
-        platform::errno.set(EINVAL);
+        platform::ERRNO.set(EINVAL);
         ptr::null_mut()
     }
 }
@@ -599,13 +599,13 @@ where
     let len = unsafe { strlen(name) as c_int };
 
     if len < 6 || suffix_len > len - 6 {
-        platform::errno.set(errno::EINVAL);
+        platform::ERRNO.set(errno::EINVAL);
         return None;
     }
 
     for i in (len - suffix_len - 6)..(len - suffix_len) {
         if unsafe { *name.offset(i as isize) } != b'X' as c_char {
-            platform::errno.set(errno::EINVAL);
+            platform::ERRNO.set(errno::EINVAL);
             return None;
         }
     }
@@ -630,7 +630,7 @@ where
         }
     }
 
-    platform::errno.set(errno::EEXIST);
+    platform::ERRNO.set(errno::EEXIST);
 
     None
 }
@@ -639,7 +639,7 @@ where
 pub unsafe extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
     if inner_mktemp(name, 0, || {
         let name = CStr::from_ptr(name);
-        if Sys::access(name, 0) != 0 && platform::errno.get() == ENOENT {
+        if Sys::access(name, 0) != 0 && platform::ERRNO.get() == ENOENT {
             Some(())
         } else {
             None
@@ -735,8 +735,8 @@ pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
     #[cfg(target_os = "linux")]
     let r = open((b"/dev/ptmx\0" as *const u8).cast(), flags);
 
-    if r < 0 && platform::errno.get() == ENOSPC {
-        platform::errno.set(EAGAIN);
+    if r < 0 && platform::ERRNO.get() == ENOSPC {
+        platform::ERRNO.set(EAGAIN);
     }
 
     return r;
@@ -756,7 +756,7 @@ unsafe extern "C" fn ptsname(fd: c_int) -> *mut c_char {
 #[no_mangle]
 unsafe extern "C" fn ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
     if buf.is_null() {
-        platform::errno.set(EINVAL);
+        platform::ERRNO.set(EINVAL);
         EINVAL
     } else {
         __ptsname_r(fd, buf, buflen)
@@ -772,7 +772,7 @@ unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
         if let Ok(name) = CStr::from_ptr(tty_ptr).to_str() {
             let len = name.len();
             if len > buflen {
-                platform::errno.set(ERANGE);
+                platform::ERRNO.set(ERANGE);
                 return ERANGE;
             } else {
                 // we have checked the string will fit in the buffer
@@ -783,31 +783,31 @@ unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
             }
         }
     }
-    platform::errno.get()
+    platform::ERRNO.get()
 }
 
 #[cfg(target_os = "linux")]
 #[inline(always)]
 unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
     let mut pty = 0;
-    let err = platform::errno.get();
+    let err = platform::ERRNO.get();
 
     if ioctl(fd, TIOCGPTN, &mut pty as *mut _ as *mut c_void) == 0 {
         let name = format!("/dev/pts/{}", pty);
         let len = name.len();
         if len > buflen {
-            platform::errno.set(ERANGE);
+            platform::ERRNO.set(ERANGE);
             ERANGE
         } else {
             // we have checked the string will fit in the buffer
             // so can use strcpy safely
             let s = name.as_ptr().cast();
             ptr::copy_nonoverlapping(s, buf, len);
-            platform::errno.set(err);
+            platform::ERRNO.set(err);
             0
         }
     } else {
-        platform::errno.get()
+        platform::ERRNO.get()
     }
 }
 
@@ -932,7 +932,7 @@ pub unsafe extern "C" fn random() -> c_long {
 pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {
     let new_ptr = platform::realloc(ptr, size);
     if new_ptr.is_null() {
-        platform::errno.set(ENOMEM);
+        platform::ERRNO.set(ENOMEM);
     }
     new_ptr
 }
@@ -944,7 +944,7 @@ pub unsafe extern "C" fn reallocarray(ptr: *mut c_void, m: size_t, n: size_t) ->
         Some(size) => realloc(ptr, size),
         None => {
             // For overflowing multiplication, we have to set errno here
-            platform::errno.set(ENOMEM);
+            platform::ERRNO.set(ENOMEM);
             ptr::null_mut()
         }
     }
@@ -1185,7 +1185,7 @@ pub unsafe fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong,
             {
                 num = res;
             } else {
-                platform::errno.set(ERANGE);
+                platform::ERRNO.set(ERANGE);
                 num = c_ulong::max_value();
                 overflowed = true;
             }
@@ -1355,7 +1355,7 @@ pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
              * EINVAL, hence no call to memalign(). */
             let ptr = platform::alloc_align(size, page_size);
             if ptr.is_null() {
-                platform::errno.set(ENOMEM);
+                platform::ERRNO.set(ENOMEM);
             }
             ptr
         }

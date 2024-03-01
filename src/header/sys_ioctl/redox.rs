@@ -158,7 +158,7 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
             0
         }
         _ => {
-            platform::errno.set(errno::EINVAL);
+            platform::ERRNO.set(errno::EINVAL);
             -1
         }
     }

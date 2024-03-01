@@ -1,7 +1,7 @@
 use crate::io::Write;
 use core::{arch::asm, ptr};
 
-use super::{errno, types::*, Pal};
+use super::{types::*, Pal, ERRNO};
 use crate::{
     c_str::CStr,
     header::{dirent::dirent, errno::EINVAL, signal::SIGCHLD, sys_stat::S_IFIFO},
@@ -63,7 +63,7 @@ pub fn e(sys: usize) -> usize {
     match e_raw(sys) {
         Ok(value) => value,
         Err(errcode) => {
-            errno.set(errcode as c_int);
+            ERRNO.set(errcode as c_int);
             !0
         }
     }
