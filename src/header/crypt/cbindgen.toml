@@ -1,0 +1,9 @@
+include_guard = "_RELIBC_CRYPT_H"
+language = "C"
+style = "Type"
+no_includes = true
+cpp_compat = true
+
+
+[enum]
+prefix_with_name = true

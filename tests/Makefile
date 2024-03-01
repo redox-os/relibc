@@ -6,6 +6,12 @@ EXPECT_NAMES=\
 	assert \
 	constructor \
 	ctype \
+	crypt/blowfish \
+	crypt/md5 \
+	crypt/pbkdf2 \
+	crypt/scrypt \
+	crypt/sha256 \
+	crypt/sha512 \
 	destructor \
 	dirent/scandir \
 	errno \

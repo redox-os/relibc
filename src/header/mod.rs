@@ -4,6 +4,7 @@ pub mod arpa_inet;
 pub mod assert;
 pub mod bits_pthread;
 pub mod bits_sched;
+pub mod crypt;
 pub mod ctype;
 pub mod dirent;
 #[path = "dl-tls/mod.rs"]

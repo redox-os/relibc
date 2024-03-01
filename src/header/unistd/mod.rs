@@ -10,8 +10,11 @@ use core::{
 use crate::{
     c_str::CStr,
     header::{
-        errno, fcntl, limits, stdlib::getenv, sys_ioctl, sys_resource, sys_time, sys_utsname,
-        termios, time::timespec,
+        crypt::{crypt_data, crypt_r},
+        errno, fcntl, limits,
+        stdlib::getenv,
+        sys_ioctl, sys_resource, sys_time, sys_utsname, termios,
+        time::timespec,
     },
     platform::{self, types::*, Pal, Sys},
 };
@@ -123,9 +126,10 @@ pub extern "C" fn confstr(name: c_int, buf: *mut c_char, len: size_t) -> size_t 
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn crypt(key: *const c_char, salt: *const c_char) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn crypt(key: *const c_char, salt: *const c_char) -> *mut c_char {
+    let mut data = crypt_data::new();
+    crypt_r(key, salt, &mut data as *mut _)
 }
 
 #[no_mangle]
