@@ -50,7 +50,7 @@ fn pc(name: c_int) -> c_long {
         _PC_SYMLINK_MAX => -1,
         _PC_2_SYMLINKS => 1,
         _ => {
-            platform::errno.set(errno::EINVAL);
+            platform::ERRNO.set(errno::EINVAL);
             -1
         }
     }

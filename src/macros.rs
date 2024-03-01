@@ -145,7 +145,7 @@ macro_rules! strto_impl {
         };
 
         let invalid_input = || {
-            platform::errno.set(EINVAL);
+            platform::ERRNO.set(EINVAL);
             set_endptr(0);
         };
 
@@ -203,7 +203,7 @@ macro_rules! strto_impl {
         // account for the sign
         let num = num as $rettype;
         let num = if overflow {
-            platform::errno.set(ERANGE);
+            platform::ERRNO.set(ERANGE);
             if CHECK_SIGN {
                 if positive {
                     MAX_VAL

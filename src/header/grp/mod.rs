@@ -224,7 +224,7 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
             let mut buf = MaybeAllocated::Borrowed(buf);
 
             if buf.len() < buf.len() {
-                platform::errno.set(errno::ERANGE);
+                platform::ERRNO.set(errno::ERANGE);
                 return Err(Error::BufTooSmall);
             }
 

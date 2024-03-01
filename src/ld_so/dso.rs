@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     header::{errno::STR_ERROR, sys_mman},
-    platform::{errno, types::c_void},
+    platform::{types::c_void, ERRNO},
 };
 use alloc::{
     collections::BTreeMap,
@@ -230,7 +230,7 @@ impl DSO {
                     return Err(Error::Malformed(format!(
                         "failed to map {}. errno: {}",
                         path,
-                        STR_ERROR[errno.get() as usize]
+                        STR_ERROR[ERRNO.get() as usize]
                     )));
                 }
                 if start as *mut c_void != ptr::null_mut() {

@@ -12,7 +12,7 @@ use crate::{
         sys_time::{itimerval, ITIMER_REAL},
         time::timespec,
     },
-    platform::errno,
+    platform::ERRNO,
 };
 
 impl PalSignal for Sys {
@@ -20,7 +20,7 @@ impl PalSignal for Sys {
         let path = match which {
             ITIMER_REAL => "itimer:1",
             _ => {
-                errno.set(EINVAL);
+                ERRNO.set(EINVAL);
                 return -1;
             }
         };
@@ -65,7 +65,7 @@ impl PalSignal for Sys {
         let path = match which {
             ITIMER_REAL => "itimer:1",
             _ => {
-                errno.set(EINVAL);
+                ERRNO.set(EINVAL);
                 return -1;
             }
         };
@@ -115,7 +115,7 @@ impl PalSignal for Sys {
     }
 
     fn sigpending(set: *mut sigset_t) -> c_int {
-        errno.set(ENOSYS);
+        ERRNO.set(ENOSYS);
         -1
     }
 
@@ -124,12 +124,12 @@ impl PalSignal for Sys {
     }
 
     fn sigsuspend(set: *const sigset_t) -> c_int {
-        errno.set(ENOSYS);
+        ERRNO.set(ENOSYS);
         -1
     }
 
     fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec) -> c_int {
-        errno.set(ENOSYS);
+        ERRNO.set(ENOSYS);
         -1
     }
 }

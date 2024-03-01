@@ -36,9 +36,7 @@ use self::types::*;
 pub mod types;
 
 #[thread_local]
-#[allow(non_upper_case_globals)]
-#[no_mangle]
-pub static errno: Cell<c_int> = Cell::new(0);
+pub static ERRNO: Cell<c_int> = Cell::new(0);
 
 #[allow(non_upper_case_globals)]
 pub static mut argv: *mut *mut c_char = ptr::null_mut();

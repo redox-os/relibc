@@ -35,7 +35,7 @@ pub fn select_epoll(
     timeout: Option<&mut timeval>,
 ) -> c_int {
     if nfds < 0 || nfds > FD_SETSIZE as i32 {
-        platform::errno.set(errno::EINVAL);
+        platform::ERRNO.set(errno::EINVAL);
         return -1;
     };
 
@@ -81,7 +81,7 @@ pub fn select_epoll(
                 ..Default::default()
             };
             if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
-                if platform::errno.get() == errno::EPERM {
+                if platform::ERRNO.get() == errno::EPERM {
                     not_epoll += 1;
                 } else {
                     return -1;

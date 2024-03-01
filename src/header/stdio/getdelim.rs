@@ -17,7 +17,7 @@ use crate::{
 
 use crate::{
     header::stdio::{default_stdout, feof, ferror, F_EOF, F_ERR},
-    platform::errno,
+    platform::ERRNO,
 };
 
 /// see getdelim (getline is a special case of getdelim with delim == '\n')
@@ -59,7 +59,7 @@ pub unsafe extern "C" fn getdelim(
         if let (Some(ptr), Some(n), Some(file)) = (lineptr.as_mut(), n.as_mut(), stream.as_mut()) {
             (ptr, n, file)
         } else {
-            errno.set(EINVAL);
+            ERRNO.set(EINVAL);
             return -1 as ssize_t;
         };
 
@@ -72,7 +72,7 @@ pub unsafe extern "C" fn getdelim(
     let delim: u8 = if let Ok(delim) = delim.try_into() {
         delim
     } else {
-        errno.set(EINVAL);
+        ERRNO.set(EINVAL);
         return -1;
     };
 
@@ -92,7 +92,7 @@ pub unsafe extern "C" fn getdelim(
     // "[EOVERFLOW]
     // The number of bytes to be written into the buffer, including the delimiter character (if encountered), would exceed {SSIZE_MAX}."
     if unlikely(count > ssize_t::MAX as usize) {
-        errno.set(EOVERFLOW);
+        ERRNO.set(EOVERFLOW);
         return -1;
     }
 
@@ -124,7 +124,7 @@ pub unsafe extern "C" fn getdelim(
         *lineptr = stdlib::realloc(*lineptr as *mut c_void, *n) as *mut c_char;
         if unlikely(lineptr.is_null() && *n != 0usize) {
             // memory error; realloc returns NULL on alloc'ing 0 bytes
-            errno.set(ENOMEM);
+            ERRNO.set(ENOMEM);
             return -1;
         }
 

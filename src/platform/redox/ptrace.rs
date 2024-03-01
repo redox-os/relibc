@@ -4,7 +4,7 @@
 //! we are NOT going to bend our API for the sake of
 //! compatibility. So, this module will be a hellhole.
 
-use super::super::{errno, types::*, Pal, PalPtrace, PalSignal, Sys};
+use super::super::{types::*, Pal, PalPtrace, PalSignal, Sys, ERRNO};
 #[cfg(target_arch = "aarch64")]
 use crate::header::arch_aarch64_user::user_regs_struct;
 #[cfg(target_arch = "x86_64")]
@@ -91,7 +91,7 @@ pub fn get_session(
                     )?,
                 }))
             } else {
-                errno.set(errnoh::ESRCH);
+                ERRNO.set(errnoh::ESRCH);
                 Err(io::last_os_error())
             }
         }

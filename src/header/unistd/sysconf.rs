@@ -53,7 +53,7 @@ pub extern "C" fn sysconf(name: c_int) -> c_long {
         _SC_SYMLOOP_MAX => -1,
         _SC_HOST_NAME_MAX => 64,
         _ => {
-            platform::errno.set(errno::EINVAL);
+            platform::ERRNO.set(errno::EINVAL);
             -1
         }
     }

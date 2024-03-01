@@ -214,7 +214,7 @@ pub unsafe extern "C" fn strndup(s1: *const c_char, size: size_t) -> *mut c_char
     // the "+ 1" is to account for the NUL byte
     let buffer = platform::alloc(len + 1) as *mut c_char;
     if buffer.is_null() {
-        platform::errno.set(ENOMEM as c_int);
+        platform::ERRNO.set(ENOMEM as c_int);
     } else {
         //memcpy(buffer, s1, len)
         for i in 0..len {

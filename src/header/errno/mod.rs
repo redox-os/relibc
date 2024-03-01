@@ -10,7 +10,7 @@ pub extern "C" fn __errno() -> *mut c_int {
 
 #[no_mangle]
 pub extern "C" fn __errno_location() -> *mut c_int {
-    platform::errno.as_ptr()
+    platform::ERRNO.as_ptr()
 }
 
 #[no_mangle]
