@@ -78,7 +78,7 @@ pub unsafe extern "C" fn crypt_r(
         } else if setting_bytes[1] == b'8' && setting_bytes[2] == b'$' {
             crypt_pbkdf2(key, setting)
         } else {
-            platform::errno = EINVAL;
+            platform::ERRNO.set(EINVAL);
             return ptr::null_mut();
         }
     } else {
