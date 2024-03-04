@@ -188,6 +188,7 @@ NAMES=\
 	grp/getgrgid_r \
 	grp/getgrnam_r \
 	grp/gr_iter \
+	resource/prio_process \
 #	resource/getrusage
 #	time/times
 
