@@ -308,7 +308,11 @@ pub fn execve(
         let mut sigprocmask = 0_u64;
         syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut sigprocmask)).unwrap();
 
-        let extrainfo = ExtraInfo { cwd: Some(&cwd), sigignmask: 0, sigprocmask };
+        let extrainfo = ExtraInfo {
+            cwd: Some(&cwd),
+            sigignmask: 0,
+            sigprocmask,
+        };
         fexec_impl(
             exec_fd_guard,
             this_context_fd,

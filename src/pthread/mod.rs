@@ -111,7 +111,8 @@ pub(crate) unsafe fn create(
     let attrs = attrs.copied().unwrap_or_default();
 
     let mut procmask = 0_u64;
-    syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut procmask)).expect("failed to obtain sigprocmask for caller");
+    syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut procmask))
+        .expect("failed to obtain sigprocmask for caller");
 
     // Create a locked mutex, unlocked by the thread after it has started.
     let synchronization_mutex = Box::into_raw(Box::new(Mutex::locked(procmask)));
@@ -217,7 +218,8 @@ unsafe extern "C" fn new_thread_shim(
     mutex: *const Mutex<u64>,
 ) -> ! {
     let procmask = (*mutex).as_ptr().read();
-    syscall::sigprocmask(syscall::SIG_SETMASK, Some(&procmask), None).expect("failed to set procmask in child thread");
+    syscall::sigprocmask(syscall::SIG_SETMASK, Some(&procmask), None)
+        .expect("failed to set procmask in child thread");
 
     if let Some(tcb) = tcb.as_mut() {
         tcb.copy_masters().unwrap();

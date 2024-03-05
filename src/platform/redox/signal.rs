@@ -1,5 +1,5 @@
 use core::mem;
-use syscall::{self, Result, number::SYS_SIGRETURN, SignalStack, SetSighandlerData};
+use syscall::{self, number::SYS_SIGRETURN, Result, SetSighandlerData, SignalStack};
 
 use super::{
     super::{types::*, Pal, PalSignal},
@@ -126,7 +126,11 @@ impl PalSignal for Sys {
         -1
     }
 
-    unsafe fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec) -> c_int {
+    unsafe fn sigtimedwait(
+        set: *const sigset_t,
+        sig: *mut siginfo_t,
+        tp: *const timespec,
+    ) -> c_int {
         ERRNO.set(ENOSYS);
         -1
     }
@@ -155,7 +159,11 @@ pub(crate) fn sigaction_impl(
     }
     Ok(())
 }
-pub(crate) unsafe fn sigprocmask_impl(how: i32, set: *const sigset_t, oset: *mut sigset_t) -> Result<()> {
+pub(crate) unsafe fn sigprocmask_impl(
+    how: i32,
+    set: *const sigset_t,
+    oset: *mut sigset_t,
+) -> Result<()> {
     syscall::sigprocmask(how as usize, set.as_ref(), oset.as_mut())?;
     Ok(())
 }
@@ -197,8 +205,7 @@ pub fn setup_sighandler() {
         syscall::O_WRONLY | syscall::O_CLOEXEC,
     )
     .expect("failed to open thisproc:current/sighandler");
-    syscall::write(fd, &data)
-        .expect("failed to write to thisproc:current/sighandler");
+    syscall::write(fd, &data).expect("failed to write to thisproc:current/sighandler");
     let _ = syscall::close(fd);
 }
 

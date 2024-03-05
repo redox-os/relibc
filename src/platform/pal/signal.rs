@@ -26,5 +26,6 @@ pub trait PalSignal: Pal {
 
     unsafe fn sigsuspend(set: *const sigset_t) -> c_int;
 
-    unsafe fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec) -> c_int;
+    unsafe fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec)
+        -> c_int;
 }

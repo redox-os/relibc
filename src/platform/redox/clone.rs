@@ -4,10 +4,13 @@ use syscall::{
     data::Map,
     error::Result,
     flag::{MapFlags, O_CLOEXEC},
-    SIGCONT, SetSighandlerData,
+    SetSighandlerData, SIGCONT,
 };
 
-use super::{extra::{create_set_addr_space_buf, FdGuard}, signal::sighandler_function};
+use super::{
+    extra::{create_set_addr_space_buf, FdGuard},
+    signal::sighandler_function,
+};
 
 pub use redox_exec::*;
 
