@@ -238,14 +238,14 @@ unsafe extern "fastcall" fn inner_fastcall(stack: usize) {
 #[cfg(target_arch = "x86_64")]
 asmfunction!(__relibc_internal_sigentry_xsave: ["
     sub rsp, 4096
-    mov eax, 0xffffffff
-    mov edx, eax
 
     mov rdi, rsp
     xor eax, eax
     mov ecx, 4096
     rep stosb
 
+    mov eax, 0xffffffff
+    mov edx, eax
     xsave [rsp]
 
     mov rdi, rsp
