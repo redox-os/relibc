@@ -179,6 +179,11 @@ pub fn sighandler_function() -> usize {
     } else {
         __relibc_internal_sigentry_fxsave as usize
     }
+
+    #[cfg(any(target_arch = "x86", target_arch = "aarch64"))]
+    {
+        __relibc_internal_sigentry as usize
+    }
 }
 
 pub fn setup_sighandler() {
@@ -239,6 +244,7 @@ unsafe extern "fastcall" fn inner_fastcall(stack: usize) {
 asmfunction!(__relibc_internal_sigentry_xsave: ["
     sub rsp, 4096
 
+    cld
     mov rdi, rsp
     xor eax, eax
     mov ecx, 4096
@@ -264,11 +270,6 @@ asmfunction!(__relibc_internal_sigentry_xsave: ["
 asmfunction!(__relibc_internal_sigentry_fxsave: ["
     sub rsp, 4096
 
-    mov rdi, rsp
-    xor eax, eax
-    mov ecx, 512
-    rep stosb
-
     fxsave64 [rsp]
 
     mov rdi, rsp
@@ -282,10 +283,23 @@ asmfunction!(__relibc_internal_sigentry_fxsave: ["
 "] <= [inner = sym inner_c, SYS_SIGRETURN = const SYS_SIGRETURN]);
 
 #[cfg(target_arch = "x86")]
-asmfunction!(__relibc_internal_sigentry, ["
+asmfunction!(__relibc_internal_sigentry: ["
     sub esp, 512
     fxsave [esp]
 
     mov ecx, esp
     call {inner}
+
+    add esp, 512
+    mov eax, {SYS_SIGRETURN}
+    syscall
 "] <= [inner = sym inner_fastcall, SYS_SIGRETURN = const SYS_SIGRETURN]);
+
+#[cfg(target_arch = "aarch64")]
+asmfunction!(__relibc_internal_sigentry: ["
+    mov x0, sp
+    bl {inner}
+
+    mov x8, {SYS_SIGRETURN}
+    svc 0
+"] <= [inner = sym inner_c, SYS_SIGRETURN = const SYS_SIGRETURN]);
