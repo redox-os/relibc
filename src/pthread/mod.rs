@@ -111,6 +111,7 @@ pub(crate) unsafe fn create(
     let attrs = attrs.copied().unwrap_or_default();
 
     let mut procmask = 0_u64;
+    #[cfg(target_os = "redox")]
     syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut procmask))
         .expect("failed to obtain sigprocmask for caller");
 
@@ -218,6 +219,8 @@ unsafe extern "C" fn new_thread_shim(
     mutex: *const Mutex<u64>,
 ) -> ! {
     let procmask = (*mutex).as_ptr().read();
+
+    #[cfg(target_os = "redox")]
     syscall::sigprocmask(syscall::SIG_SETMASK, Some(&procmask), None)
         .expect("failed to set procmask in child thread");
 
