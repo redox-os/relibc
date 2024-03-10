@@ -31,6 +31,8 @@ pub const FIONBIO: c_ulong = 0x5421;
 pub const TIOCSPTLCK: c_ulong = 0x4004_5431;
 pub const TIOCGPTLCK: c_ulong = 0x8004_5439;
 
+pub const SIOCATMARK: c_ulong = 0x8905;
+
 // TODO: some of the structs passed as T have padding bytes, so casting to a byte slice is UB
 
 fn dup_read<T>(fd: c_int, name: &str, t: &mut T) -> syscall::Result<usize> {
@@ -155,6 +157,10 @@ pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) ->
         }
         TCXONC => {
             eprintln!("TODO: ioctl TCXONC");
+            0
+        }
+        SIOCATMARK => {
+            eprintln!("TODO: ioctl SIOCATMARK");
             0
         }
         _ => {
