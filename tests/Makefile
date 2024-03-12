@@ -162,6 +162,7 @@ NAMES=\
 	stdlib/mktemp \
 	stdlib/realpath \
 	sys_epoll/epoll \
+	sys_resource/constants \
 	sys_utsname/uname \
 	time/gettimeofday \
 	unistd/chdir \
@@ -188,7 +189,6 @@ NAMES=\
 	grp/getgrgid_r \
 	grp/getgrnam_r \
 	grp/gr_iter \
-	resource/prio_process \
 #	resource/getrusage
 #	time/times
 
