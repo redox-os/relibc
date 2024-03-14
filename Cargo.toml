@@ -58,7 +58,7 @@ features = ["c_api"]
 sc = "0.2.3"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-redox_syscall = "0.4"
+redox_syscall = "0.5"
 redox-exec = { path = "src/platform/redox/redox-exec" }
 redox-path = "0.2"
 
