@@ -3,7 +3,7 @@
 use core::cell::Cell;
 
 use crate::{
-    header::{sched::*, time::timespec},
+    header::{sched::*, string::strlen, time::timespec},
     platform::{types::*, Pal, Sys},
     pthread,
 };
@@ -230,6 +230,14 @@ pub use self::spin::*;
 #[no_mangle]
 pub unsafe extern "C" fn pthread_testcancel() {
     pthread::testcancel();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pthread_setname_np(thread: pthread_t, name: *const c_char) {
+    pthread::set_name(
+        &*thread.cast(),
+        core::slice::from_raw_parts(name as *const u8, strlen(name)),
+    )
 }
 
 // Must be the same struct as defined in the pthread_cleanup_push macro.
