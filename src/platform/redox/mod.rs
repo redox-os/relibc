@@ -40,6 +40,7 @@ fn round_up_to_page_size(val: usize) -> usize {
 
 mod clone;
 mod epoll;
+mod event;
 mod exec;
 mod extra;
 mod libcscheme;
