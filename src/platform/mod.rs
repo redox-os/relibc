@@ -293,6 +293,17 @@ pub fn init(auxvs: Box<[[usize; 2]]>) {
             self::sys::path::setcwd_manual(cwd.into());
         }
     }
+
+    let mut inherited_sigprocmask = 0_u64;
+
+    if let Some(mask) = get_auxv(&auxvs, AT_REDOX_INHERITED_SIGPROCMASK) {
+        inherited_sigprocmask |= mask as u64;
+    }
+    #[cfg(target_pointer_width = "32")]
+    if let Some(mask) = get_auxv(&auxvs, AT_REDOX_INHERITED_SIGPROCMASK_HI) {
+        inherited_sigprocmask |= (mask as u64) << 32;
+    }
+    syscall::sigprocmask(syscall::SIG_SETMASK, Some(&inherited_sigprocmask), None).unwrap();
 }
 #[cfg(not(target_os = "redox"))]
 pub fn init(auxvs: Box<[[usize; 2]]>) {}

@@ -93,6 +93,9 @@ impl<T> Mutex<T> {
     pub unsafe fn manual_unlock(&self) {
         manual_unlock_generic(&self.lock)
     }
+    pub fn as_ptr(&self) -> *mut T {
+        self.content.get()
+    }
 
     /// Tries to lock the mutex and returns a guard that automatically unlocks
     /// the mutex when it falls out of scope.

@@ -203,8 +203,8 @@ fn inner_ptrace(
                 gs_base: 0, // gs_base: redox_regs.gs_base as _,
                 ds: 0,      // ds: redox_regs.ds as _,
                 es: 0,      // es: redox_regs.es as _,
-                fs: redox_regs.fs as _,
-                gs: 0, // gs: redox_regs.gs as _,
+                fs: 0,      // fs: redox_regs.fs as _,
+                gs: 0,      // gs: redox_regs.gs as _,
             };
             Ok(0)
         }
@@ -236,7 +236,7 @@ fn inner_ptrace(
                 // gs_base: c_regs.gs_base as _,
                 // ds: c_regs.ds as _,
                 // es: c_regs.es as _,
-                fs: c_regs.fs as _,
+                // fs: c_regs.fs as _,
                 // gs: c_regs.gs as _,
             };
             (&mut &session.regs).write(&redox_regs)?;
