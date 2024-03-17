@@ -174,6 +174,13 @@ pub(crate) unsafe fn create(
             stack.write(value);
         };
 
+        if cfg!(target_arch = "aarch64") {
+            // Aarch64 requires the stack to be 16 byte aligned after
+            // the call instruction, unlike x86 which requires it to be
+            // aligned before the call instruction. As such push an
+            // extra word on the stack to align the stack to 16 bytes.
+            push(0);
+        }
         push(0);
         push(synchronization_mutex as usize);
         push(ptr as usize);
