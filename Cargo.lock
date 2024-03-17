@@ -378,7 +378,7 @@ checksum = "64072665120942deff5fd5425d6c1811b854f4939e7f1c01ce755f64432bbea7"
 [[package]]
 name = "redox_event"
 version = "0.4.0"
-source = "git+https://gitlab.redox-os.org/4lDO2/event.git?branch=abi#bd25d4155ef272d91d9c8249e70a8a7148a0402c"
+source = "git+https://gitlab.redox-os.org/redox-os/event.git#269452fca1655396536f38eba0f860c77e11cb92"
 dependencies = [
  "bitflags",
  "libredox",
