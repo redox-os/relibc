@@ -157,16 +157,16 @@ pub extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
+pub unsafe extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
+    if let Some(set) = (set as *mut SigSet).as_mut() {
         set.clear();
     }
     0
 }
 
 #[no_mangle]
-pub extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
+pub unsafe extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
+    if let Some(set) = (set as *mut SigSet).as_mut() {
         set.fill(.., true);
     }
     0
@@ -208,7 +208,7 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
+pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
@@ -256,7 +256,7 @@ pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
+pub unsafe extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
     Sys::sigpending(set)
 }
 
@@ -335,25 +335,23 @@ pub unsafe extern "C" fn sigset(
 }
 
 #[no_mangle]
-pub extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
+pub unsafe extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
     Sys::sigsuspend(sigmask)
 }
 
 #[no_mangle]
-pub extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int {
+pub unsafe extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int {
     let mut pinfo = mem::MaybeUninit::<siginfo_t>::uninit();
     if sigtimedwait(set, pinfo.as_mut_ptr(), ptr::null_mut()) < 0 {
         return -1;
     }
-    unsafe {
-        let info = pinfo.assume_init();
-        (*sig) = info.si_signo;
-    }
+    let info = pinfo.assume_init();
+    (*sig) = info.si_signo;
     0
 }
 
 #[no_mangle]
-pub extern "C" fn sigtimedwait(
+pub unsafe extern "C" fn sigtimedwait(
     set: *const sigset_t,
     sig: *mut siginfo_t,
     tp: *const timespec,

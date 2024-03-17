@@ -46,7 +46,7 @@ mod libcscheme;
 mod libredox;
 pub(crate) mod path;
 mod ptrace;
-mod signal;
+pub(crate) mod signal;
 mod socket;
 
 macro_rules! path_from_c_str {
