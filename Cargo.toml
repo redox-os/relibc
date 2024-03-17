@@ -58,7 +58,7 @@ features = ["c_api"]
 sc = "0.2.3"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-redox_syscall = "0.4"
+redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall.git" }
 redox-exec = { path = "src/platform/redox/redox-exec" }
 redox-path = "0.2"
 
@@ -72,6 +72,3 @@ panic = "abort"
 
 [profile.release]
 panic = "abort"
-
-[patch.crates-io]
-redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall" }

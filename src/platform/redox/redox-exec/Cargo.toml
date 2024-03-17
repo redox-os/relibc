@@ -8,6 +8,6 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-redox_syscall = "0.4"
+redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall.git" }
 goblin = { version = "0.7", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
 plain = "0.2"

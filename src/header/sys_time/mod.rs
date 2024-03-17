@@ -37,12 +37,12 @@ pub struct fd_set {
 }
 
 #[no_mangle]
-pub extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
+pub unsafe extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
     Sys::getitimer(which, value)
 }
 
 #[no_mangle]
-pub extern "C" fn setitimer(
+pub unsafe extern "C" fn setitimer(
     which: c_int,
     value: *const itimerval,
     ovalue: *mut itimerval,
@@ -51,7 +51,7 @@ pub extern "C" fn setitimer(
 }
 
 #[no_mangle]
-pub extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
+pub unsafe extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
     Sys::gettimeofday(tp, tzp)
 }
 

@@ -82,7 +82,7 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
         ..Default::default()
     };
     let errno_backup = platform::ERRNO.get();
-    let secs = if sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) < 0 {
+    let secs = if unsafe { sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) } < 0 {
         0
     } else {
         timer.it_value.tv_sec as c_uint + if timer.it_value.tv_usec > 0 { 1 } else { 0 }
@@ -821,7 +821,7 @@ pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t 
         },
     };
     let errno_backup = platform::ERRNO.get();
-    let ret = if sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) < 0 {
+    let ret = if unsafe { sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) } < 0 {
         0
     } else {
         timer.it_value.tv_sec as useconds_t * 1_000_000 + timer.it_value.tv_usec as useconds_t
