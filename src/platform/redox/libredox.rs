@@ -3,7 +3,9 @@ use core::{slice, str};
 use syscall::{Error, Result, WaitFlags, EMFILE};
 
 use crate::{
-    header::{errno::EINVAL, signal::sigaction, sys_stat::UTIME_NOW, time::timespec},
+    header::{
+        errno::EINVAL, signal::sigaction, sys_stat::UTIME_NOW, sys_uio::iovec, time::timespec,
+    },
     platform::types::*,
 };
 
@@ -317,5 +319,20 @@ pub unsafe extern "C" fn redox_strerror_v1(
 
         dst[..len].copy_from_slice(&src.as_bytes()[..len]);
         Ok(len)
+    })())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn redox_mkns_v1(
+    names: *const iovec,
+    num_names: usize,
+    flags: u32,
+) -> RawResult {
+    Error::mux((|| {
+        if flags != 0 {
+            return Err(Error::new(EINVAL));
+        }
+        // Kernel does the UTF-8 validation.
+        syscall::mkns(core::slice::from_raw_parts(names.cast(), num_names))
     })())
 }
