@@ -1,6 +1,6 @@
 //! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 
-use core::{convert::TryFrom, intrinsics, iter, mem, ptr, slice, ops::DerefMut};
+use core::{convert::TryFrom, intrinsics, iter, mem, ops::DerefMut, ptr, slice};
 use rand::{
     distributions::{Alphanumeric, Distribution, Uniform},
     Rng, SeedableRng,
