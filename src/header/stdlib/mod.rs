@@ -1,6 +1,6 @@
 //! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 
-use core::{convert::TryFrom, intrinsics, iter, mem, ptr, slice};
+use core::{convert::TryFrom, intrinsics, iter, mem, ptr, slice, ops::DerefMut};
 use rand::{
     distributions::{Alphanumeric, Distribution, Uniform},
     Rng, SeedableRng,
@@ -25,7 +25,7 @@ use crate::{
     },
     ld_so,
     platform::{self, types::*, Pal, Sys},
-    sync::Once,
+    sync::{Once, UncontendedMutex},
 };
 
 mod rand48;
@@ -42,7 +42,7 @@ pub const MB_CUR_MAX: c_int = 4;
 pub const MB_LEN_MAX: c_int = 4;
 
 static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
-static mut L64A_BUFFER: [c_char; 7] = [0; 7]; // up to 6 digits plus null terminator
+static L64A_BUFFER_MUTEX: UncontendedMutex<[c_char; 7]> = UncontendedMutex::new([0; 7]); // up to 6 digits plus nul terminator
 static mut RNG: Option<XorShiftRng> = None;
 
 // TODO: This could be const fn, but the trait system won't allow that.
@@ -456,14 +456,16 @@ pub unsafe extern "C" fn l64a(value: c_long) -> *mut c_char {
      * division). */
     let num_output_digits = usize::try_from(6 - (value_as_i32.leading_zeros() + 4) / 6).unwrap();
 
-    // Reset buffer (and have null terminator in place for any result)
-    L64A_BUFFER = [0; 7];
+    let mut buffer_guard = L64A_BUFFER_MUTEX.lock();
+    let buffer_mut_ref = buffer_guard.deref_mut();
 
+    // Reset buffer (and have nul terminator in place for any result)
+    *buffer_mut_ref = [0; 7];
     for i in 0..num_output_digits {
         // Conversion to c_char always succeeds for the range 0..=63
         let digit_value = c_char::try_from((value_as_i32 >> 6 * i) & 63).unwrap();
 
-        L64A_BUFFER[i] = match digit_value {
+        (*buffer_mut_ref)[i] = match digit_value {
             0..=11 => {
                 // ./0123456789 for values 0 to 11. b'.' == 46
                 46 + digit_value
@@ -480,7 +482,7 @@ pub unsafe extern "C" fn l64a(value: c_long) -> *mut c_char {
         };
     }
 
-    L64A_BUFFER.as_mut_ptr()
+    buffer_mut_ref.as_mut_ptr()
 }
 
 #[no_mangle]
