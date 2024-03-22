@@ -445,7 +445,7 @@ pub unsafe extern "C" fn jrand48(xsubi: *mut c_ushort) -> c_long {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn l64a(value: c_long) -> *mut c_char {
+pub extern "C" fn l64a(value: c_long) -> *mut c_char {
     // POSIX says we should only consider the lower 32 bits of value.
     let value_as_i32 = value as i32;
 
