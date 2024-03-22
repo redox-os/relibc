@@ -7,12 +7,14 @@ pub mod once;
 pub mod pthread_mutex;
 pub mod rwlock;
 pub mod semaphore;
+pub mod uncontended_mutex;
 pub mod waitval;
 
 pub use self::{
     mutex::{Mutex, MutexGuard},
     once::Once,
     semaphore::Semaphore,
+    uncontended_mutex::UncontendedMutex,
 };
 
 use crate::{
