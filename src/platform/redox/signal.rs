@@ -291,8 +291,10 @@ asmfunction!(__relibc_internal_sigentry: ["
     call {inner}
 
     add esp, 512
+    fxrstor [esp]
+
     mov eax, {SYS_SIGRETURN}
-    syscall
+    int 0x80
 "] <= [inner = sym inner_fastcall, SYS_SIGRETURN = const SYS_SIGRETURN]);
 
 #[cfg(target_arch = "aarch64")]
