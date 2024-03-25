@@ -127,7 +127,7 @@ pub(crate) unsafe fn create(
             core::ptr::null_mut(),
             stack_size,
             sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-            sys_mman::MAP_SHARED | sys_mman::MAP_ANONYMOUS,
+            sys_mman::MAP_PRIVATE | sys_mman::MAP_ANONYMOUS,
             -1,
             0,
         );
