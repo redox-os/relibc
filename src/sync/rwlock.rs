@@ -71,7 +71,7 @@ impl Rwlock {
             ) {
                 Ok(_) => return Ok(()),
 
-                Err(value) if value & COUNT_MASK == EXCLUSIVE || value & WAITING_WR == WAITING_WR => return Err(value),
+                Err(value) if value & COUNT_MASK == EXCLUSIVE => return Err(value),
                 Err(value) => {
                     cached = value;
                     // TODO: SCHED_YIELD?
