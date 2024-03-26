@@ -28,9 +28,8 @@ impl Rwlock {
             match self.state.compare_exchange_weak(waiting_wr, EXCLUSIVE, Ordering::Acquire, Ordering::Relaxed) {
                 Ok(_) => return,
                 Err(actual) => {
-                    waiting_wr = actual & WAITING_WR;
-
-                    let expected = if actual & COUNT_MASK != EXCLUSIVE && waiting_wr != WAITING_WR {
+                    let expected = actual;
+                    let expected = if actual & COUNT_MASK != EXCLUSIVE {
                         // Set the exclusive bit, but only if we're waiting for readers, to avoid
                         // reader starvation by overprioritizing write locks.
                         self.state.fetch_or(WAITING_WR, Ordering::Relaxed);
@@ -39,6 +38,7 @@ impl Rwlock {
                     } else {
                         actual
                     };
+                    waiting_wr = expected & WAITING_WR;
 
                     // TODO: timeout
                     let _ = crate::sync::futex_wait(&self.state, expected, None);
@@ -56,15 +56,16 @@ impl Rwlock {
         let mut cached = self.state.load(Ordering::Acquire);
 
         loop {
+            let waiting_wr = cached & WAITING_WR;
             let old = if cached & COUNT_MASK == EXCLUSIVE { 0 } else { cached & COUNT_MASK };
             let new = old + 1;
 
             // TODO: Return with error code instead?
-            assert_ne!(new, EXCLUSIVE, "maximum number of rwlock readers reached");
+            assert_ne!(new & COUNT_MASK, EXCLUSIVE, "maximum number of rwlock readers reached");
 
             match self.state.compare_exchange_weak(
-                cached & COUNT_MASK,
-                new,
+                (old & COUNT_MASK) | waiting_wr,
+                new | waiting_wr,
                 Ordering::Acquire,
                 Ordering::Relaxed,
             ) {
@@ -111,7 +112,7 @@ impl Rwlock {
             // Unlocking a read lock. Subtract one from the reader count, but preserve the
             // WAITING_WR bit.
 
-            if self.state.fetch_sub(1, Ordering::Release) == 1 {
+            if self.state.fetch_sub(1, Ordering::Release) & COUNT_MASK == 1 {
                 let _ = crate::sync::futex_wake(&self.state, i32::MAX);
             }
         }
