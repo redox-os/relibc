@@ -25,7 +25,12 @@ impl Rwlock {
         let mut waiting_wr = self.state.load(Ordering::Relaxed) & WAITING_WR;
 
         loop {
-            match self.state.compare_exchange_weak(waiting_wr, EXCLUSIVE, Ordering::Acquire, Ordering::Relaxed) {
+            match self.state.compare_exchange_weak(
+                waiting_wr,
+                EXCLUSIVE,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            ) {
                 Ok(_) => return,
                 Err(actual) => {
                     let expected = actual;
@@ -57,11 +62,19 @@ impl Rwlock {
 
         loop {
             let waiting_wr = cached & WAITING_WR;
-            let old = if cached & COUNT_MASK == EXCLUSIVE { 0 } else { cached & COUNT_MASK };
+            let old = if cached & COUNT_MASK == EXCLUSIVE {
+                0
+            } else {
+                cached & COUNT_MASK
+            };
             let new = old + 1;
 
             // TODO: Return with error code instead?
-            assert_ne!(new & COUNT_MASK, EXCLUSIVE, "maximum number of rwlock readers reached");
+            assert_ne!(
+                new & COUNT_MASK,
+                EXCLUSIVE,
+                "maximum number of rwlock readers reached"
+            );
 
             match self.state.compare_exchange_weak(
                 (old & COUNT_MASK) | waiting_wr,
@@ -84,7 +97,12 @@ impl Rwlock {
         let mut waiting_wr = self.state.load(Ordering::Relaxed) & WAITING_WR;
 
         loop {
-            match self.state.compare_exchange_weak(waiting_wr, EXCLUSIVE, Ordering::Acquire, Ordering::Relaxed) {
+            match self.state.compare_exchange_weak(
+                waiting_wr,
+                EXCLUSIVE,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            ) {
                 Ok(_) => return Ok(()),
                 Err(actual) if actual & COUNT_MASK > 0 => return Err(actual),
                 Err(can_retry) => {
