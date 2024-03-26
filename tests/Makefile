@@ -98,6 +98,7 @@ EXPECT_NAMES=\
 	tls \
 	unistd/access \
 	unistd/brk \
+	unistd/constants \
 	unistd/dup \
 	unistd/exec \
 	unistd/fchdir \
