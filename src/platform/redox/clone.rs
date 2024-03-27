@@ -7,12 +7,34 @@ use syscall::{
     SetSighandlerData, SIGCONT,
 };
 
+use crate::sync::rwlock::Rwlock;
+
 use super::{
     extra::{create_set_addr_space_buf, FdGuard},
     signal::sighandler_function,
 };
 
 pub use redox_exec::*;
+
+static CLONE_LOCK: Rwlock = Rwlock::new(crate::pthread::Pshared::Private);
+
+struct Guard;
+impl Drop for Guard {
+    fn drop(&mut self) {
+        CLONE_LOCK.unlock()
+    }
+}
+
+pub fn rdlock() -> impl Drop {
+    CLONE_LOCK.acquire_read_lock(None);
+
+    Guard
+}
+pub fn wrlock() -> impl Drop {
+    CLONE_LOCK.acquire_write_lock(None);
+
+    Guard
+}
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
 pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {

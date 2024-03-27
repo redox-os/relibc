@@ -277,7 +277,9 @@ impl Pal for Sys {
     }
 
     fn fork() -> pid_t {
-        e(clone::fork_impl()) as pid_t
+        let _guard = clone::wrlock();
+        let res = clone::fork_impl();
+        e(res) as pid_t
     }
 
     // FIXME: unsound
@@ -789,8 +791,10 @@ impl Pal for Sys {
     unsafe fn rlct_clone(
         stack: *mut usize,
     ) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
-        clone::rlct_clone_impl(stack)
-            .map(|context_id| crate::pthread::OsTid { context_id })
+        let _guard = clone::rdlock();
+        let res = clone::rlct_clone_impl(stack);
+
+        res.map(|context_id| crate::pthread::OsTid { context_id })
             .map_err(|error| crate::pthread::Errno(error.errno))
     }
     unsafe fn rlct_kill(
