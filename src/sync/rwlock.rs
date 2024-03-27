@@ -16,7 +16,7 @@ const EXCLUSIVE: u32 = COUNT_MASK;
 // TODO: Add futex ops that use bitmasks.
 
 impl Rwlock {
-    pub fn new(_pshared: Pshared) -> Self {
+    pub const fn new(_pshared: Pshared) -> Self {
         Self {
             state: AtomicU32::new(0),
         }
