@@ -1,9 +1,12 @@
 //! Helper functions for pseudorandom number generation using LCG, see https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/functions/drand48.html
 
-use crate::platform::types::*;
-use crate::sync::Mutex;
+use crate::{platform::types::*, sync::Mutex};
 
-const STATE_DEFAULT_VALUE: state = state { xsubi: U48(0), a: A_DEFAULT_VALUE, c: 0xb };
+const STATE_DEFAULT_VALUE: state = state {
+    xsubi: U48(0),
+    a: A_DEFAULT_VALUE,
+    c: 0xb,
+};
 pub static STATE: Mutex<state> = Mutex::<state>::new(STATE_DEFAULT_VALUE);
 pub const CONTENTION_MSG: &str = "attempted unsafe multithreaded access";
 
@@ -22,9 +25,11 @@ pub struct U48(u64);
 impl From<&[c_ushort; 3]> for U48 {
     fn from(value: &[c_ushort; 3]) -> Self {
         /* Cast via u16 to ensure we get only the lower 16 bits of each
-        * element, as specified by POSIX. */
+         * element, as specified by POSIX. */
         Self {
-            0: u64::from(value[0] as u16) | (u64::from(value[1] as u16) << 16) | (u64::from(value[2] as u16) << 32),
+            0: u64::from(value[0] as u16)
+                | (u64::from(value[1] as u16) << 16)
+                | (u64::from(value[2] as u16) << 32),
         }
     }
 }
@@ -34,9 +39,7 @@ impl TryFrom<u64> for U48 {
 
     fn try_from(value: u64) -> Result<Self, u64> {
         if value < 0x1_0000_0000_0000 {
-            Ok(Self {
-                0: value,
-            })
+            Ok(Self { 0: value })
         } else {
             Err(value)
         }
@@ -64,8 +67,8 @@ impl U48 {
     /// Get a C `double` in the interval [0.0, 1.0) (for `drand48()` and `erand48()`).
     pub fn get_f64(self) -> c_double {
         /* We set the exponent to 0, and the 48-bit integer is copied into the high
-        * 48 of the 52 significand bits. The value then lies in the range
-        * [1.0, 2.0), from which we simply subtract 1.0. */
+         * 48 of the 52 significand bits. The value then lies in the range
+         * [1.0, 2.0), from which we simply subtract 1.0. */
         f64::from_bits(0x3ff0_0000_0000_0000_u64 | (self.0 << 4)) - 1.0
     }
 
@@ -114,5 +117,10 @@ fn step(xsubi: U48, a: U48, c: u16) -> U48 {
      * X_(n+1) = (a * X_n + c) % m,
      * with m = 2**48. The multiplication and addition can overflow a u64, but
      * we just let it wrap since we take mod 2**48 anyway. */
-    (u64::from(a).wrapping_mul(u64::from(xsubi)).wrapping_add(u64::from(c)) & 0xffff_ffff_ffff).try_into().unwrap()
+    (u64::from(a)
+        .wrapping_mul(u64::from(xsubi))
+        .wrapping_add(u64::from(c))
+        & 0xffff_ffff_ffff)
+        .try_into()
+        .unwrap()
 }

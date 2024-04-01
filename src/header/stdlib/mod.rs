@@ -1077,7 +1077,9 @@ pub extern "C" fn srand48(seedval: c_long) {
     /* Set the high 32 bits of the 48-bit X_i value to the lower 32 bits
      * of the input argument, and the lower 16 bits to 0x330e, as
      * specified in POSIX. */
-    state.xsubi = ((u64::from(seedval as u32) << 16) | 0x330e).try_into().unwrap();
+    state.xsubi = ((u64::from(seedval as u32) << 16) | 0x330e)
+        .try_into()
+        .unwrap();
 }
 
 #[no_mangle]
