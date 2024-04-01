@@ -2,12 +2,12 @@
 
 use crate::{platform::types::*, sync::Mutex};
 
-const STATE_DEFAULT_VALUE: state = state {
+const STATE_DEFAULT_VALUE: State = State {
     xsubi: U48(0),
     a: A_DEFAULT_VALUE,
     c: 0xb,
 };
-pub static STATE: Mutex<state> = Mutex::<state>::new(STATE_DEFAULT_VALUE);
+pub static STATE: Mutex<State> = Mutex::<State>::new(STATE_DEFAULT_VALUE);
 pub const CONTENTION_MSG: &str = "attempted unsafe multithreaded access";
 
 // TODO: replace static mut?
@@ -86,13 +86,13 @@ impl U48 {
 
 #[derive(Default)]
 #[repr(C)]
-pub struct state {
+pub struct State {
     pub xsubi: U48,
     pub a: U48,
     pub c: u16,
 }
 
-impl state {
+impl State {
     pub fn step(&mut self) -> U48 {
         let new_xsubi_value = step(self.xsubi, self.a, self.c);
         self.xsubi = new_xsubi_value;
