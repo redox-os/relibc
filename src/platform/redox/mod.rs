@@ -840,8 +840,13 @@ impl Pal for Sys {
 
         let mut cursor = io::Cursor::new(out);
         let res = match scheme.as_ref() {
-            "file" => write!(cursor, "/{}", reference.as_ref()),
-            _ => write!(cursor, "/scheme/{}/{}", scheme.as_ref(), reference.as_ref()),
+            "file" => write!(cursor, "/{}", reference.as_ref().trim_start_matches('/')),
+            _ => write!(
+                cursor,
+                "/scheme/{}/{}",
+                scheme.as_ref(),
+                reference.as_ref().trim_start_matches('/')
+            ),
         };
         match res {
             Ok(()) => cursor.position() as ssize_t,
