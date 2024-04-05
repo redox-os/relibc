@@ -21,7 +21,7 @@ impl Rwlock {
             state: AtomicU32::new(0),
         }
     }
-    pub fn acquire_write_lock(&self, _timeout: Option<&timespec>) {
+    pub fn acquire_write_lock(&self, deadline: Option<&timespec>) {
         let mut waiting_wr = self.state.load(Ordering::Relaxed) & WAITING_WR;
 
         loop {
@@ -45,16 +45,15 @@ impl Rwlock {
                     };
                     waiting_wr = expected & WAITING_WR;
 
-                    // TODO: timeout
-                    let _ = crate::sync::futex_wait(&self.state, expected, None);
+                    let _ = crate::sync::futex_wait(&self.state, expected, deadline);
                 }
             }
         }
     }
-    pub fn acquire_read_lock(&self, _timeout: Option<&timespec>) {
+    pub fn acquire_read_lock(&self, deadline: Option<&timespec>) {
         // TODO: timeout
         while let Err(old) = self.try_acquire_read_lock() {
-            crate::sync::futex_wait(&self.state, old, None);
+            crate::sync::futex_wait(&self.state, old, deadline);
         }
     }
     pub fn try_acquire_read_lock(&self) -> Result<(), u32> {

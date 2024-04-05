@@ -24,6 +24,7 @@ use crate::{
         unistd::{F_OK, R_OK, W_OK, X_OK},
     },
     io::{self, prelude::*, BufReader},
+    pthread,
 };
 
 pub use redox_exec::FdGuard;
@@ -300,25 +301,35 @@ impl Pal for Sys {
         e(syscall::ftruncate(fd as usize, len as usize)) as c_int
     }
 
-    // FIXME: unsound
-    fn futex(
-        addr: *mut c_int,
-        op: c_int,
-        val: c_int,
-        val2: usize,
-    ) -> Result<c_long, crate::pthread::Errno> {
-        match unsafe {
-            syscall::futex(
-                addr as *mut i32,
-                op as usize,
-                val as i32,
-                val2,
-                ptr::null_mut(),
-            )
-        } {
-            Ok(success) => Ok(success as c_long),
-            Err(err) => Err(crate::pthread::Errno(err.errno)),
-        }
+    #[inline]
+    unsafe fn futex_wait(
+        addr: *mut u32,
+        val: u32,
+        deadline: *const timespec,
+    ) -> CoreResult<(), pthread::Errno> {
+        syscall::syscall5(
+            syscall::SYS_FUTEX,
+            addr as usize,
+            syscall::FUTEX_WAIT,
+            val as usize,
+            deadline as usize,
+            0,
+        )
+        .map_err(|s| pthread::Errno(s.errno))
+        .map(|_| ())
+    }
+    #[inline]
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<c_int, pthread::Errno> {
+        syscall::syscall5(
+            syscall::SYS_FUTEX,
+            addr as usize,
+            syscall::FUTEX_WAKE,
+            num as usize,
+            0,
+            0,
+        )
+        .map_err(|s| pthread::Errno(s.errno))
+        .map(|n| n as c_int)
     }
 
     // FIXME: unsound
@@ -1106,7 +1117,7 @@ impl Pal for Sys {
 
     fn verify() -> bool {
         // GETPID on Redox is 20, which is WRITEV on Linux
-        e(unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) }) != !0
+        (unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) }).is_ok()
     }
 
     fn exit_thread() -> ! {
