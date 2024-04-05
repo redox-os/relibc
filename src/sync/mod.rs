@@ -16,8 +16,12 @@ pub use self::{
 };
 
 use crate::{
-    header::time::timespec,
+    header::{
+        errno::{EAGAIN, ETIMEDOUT},
+        time::timespec,
+    },
     platform::{types::*, Pal, Sys},
+    pthread::Errno,
 };
 use core::{
     mem::MaybeUninit,
@@ -36,7 +40,7 @@ pub enum AttemptStatus {
 }
 
 pub trait FutexTy {
-    fn conv(self) -> i32;
+    fn conv(self) -> u32;
 }
 pub trait FutexAtomicTy {
     type Ty: FutexTy;
@@ -44,13 +48,13 @@ pub trait FutexAtomicTy {
     fn ptr(&self) -> *mut Self::Ty;
 }
 impl FutexTy for u32 {
-    fn conv(self) -> i32 {
-        self as i32
+    fn conv(self) -> u32 {
+        self
     }
 }
 impl FutexTy for i32 {
-    fn conv(self) -> i32 {
-        self
+    fn conv(self) -> u32 {
+        self as u32
     }
 }
 impl FutexAtomicTy for AtomicU32 {
@@ -91,20 +95,26 @@ impl FutexAtomicTy for AtomicI32 {
 
 pub unsafe fn futex_wake_ptr(ptr: *mut impl FutexTy, n: i32) -> usize {
     // TODO: unwrap_unchecked?
-    Sys::futex(ptr.cast(), FUTEX_WAKE, n, 0).unwrap() as usize
+    Sys::futex_wake(ptr.cast(), n as u32).unwrap() as usize
 }
 pub unsafe fn futex_wait_ptr<T: FutexTy>(
     ptr: *mut T,
     value: T,
-    timeout_opt: Option<&timespec>,
-) -> bool {
-    // TODO: unwrap_unchecked?
-    Sys::futex(
+    deadline_opt: Option<&timespec>,
+) -> FutexWaitResult {
+    match Sys::futex_wait(
         ptr.cast(),
-        FUTEX_WAIT,
         value.conv(),
-        timeout_opt.map_or(0, |t| t as *const _ as usize),
-    ) == Ok(0)
+        deadline_opt.map_or(core::ptr::null(), |t| t as *const _),
+    ) {
+        Ok(()) => FutexWaitResult::Waited,
+        Err(Errno(EAGAIN)) => FutexWaitResult::Stale,
+        Err(Errno(ETIMEDOUT)) if deadline_opt.is_some() => FutexWaitResult::TimedOut,
+        Err(other) => {
+            eprintln!("futex failed: {}", other.0);
+            FutexWaitResult::Waited
+        }
+    }
 }
 pub fn futex_wake(atomic: &impl FutexAtomicTy, n: i32) -> usize {
     unsafe { futex_wake_ptr(atomic.ptr(), n) }
@@ -112,9 +122,16 @@ pub fn futex_wake(atomic: &impl FutexAtomicTy, n: i32) -> usize {
 pub fn futex_wait<T: FutexAtomicTy>(
     atomic: &T,
     value: T::Ty,
-    timeout_opt: Option<&timespec>,
-) -> bool {
-    unsafe { futex_wait_ptr(atomic.ptr(), value, timeout_opt) }
+    deadline_opt: Option<&timespec>,
+) -> FutexWaitResult {
+    unsafe { futex_wait_ptr(atomic.ptr(), value, deadline_opt) }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FutexWaitResult {
+    Waited, // possibly spurious
+    Stale,  // outdated value
+    TimedOut,
 }
 
 pub fn rttime() -> timespec {
@@ -187,7 +204,7 @@ impl AtomicLock {
     pub fn wait_if(&self, value: c_int, timeout_opt: Option<&timespec>) {
         self.wait_if_raw(value, timeout_opt);
     }
-    pub fn wait_if_raw(&self, value: c_int, timeout_opt: Option<&timespec>) -> bool {
+    pub fn wait_if_raw(&self, value: c_int, timeout_opt: Option<&timespec>) -> FutexWaitResult {
         futex_wait(&self.atomic, value, timeout_opt)
     }
 

@@ -186,6 +186,7 @@ NAMES=\
 	pthread/rwlock_trylock \
 	pthread/rwlock_randtest \
 	pthread/mutex_recursive \
+	pthread/timeout \
 	grp/getgrouplist \
 	grp/getgrgid_r \
 	grp/getgrnam_r \

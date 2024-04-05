@@ -10,6 +10,8 @@ use crate::{
 
 use crate::platform::{types::*, Pal, Sys};
 
+use super::FutexWaitResult;
+
 pub struct RlctMutex {
     // Actual locking word.
     inner: AtomicUint,
@@ -123,7 +125,11 @@ impl RlctMutex {
 
                     // If the mutex is not robust, simply futex_wait until unblocked.
                     //crate::sync::futex_wait(&self.inner, inner | WAITING_BIT, None);
-                    crate::sync::futex_wait(&self.inner, thread, None);
+                    if crate::sync::futex_wait(&self.inner, thread, deadline)
+                        == FutexWaitResult::TimedOut
+                    {
+                        return Err(Errno(ETIMEDOUT));
+                    }
                 }
             }
         }

@@ -46,6 +46,15 @@
         } \
     } while(0)
 
+#define ERROR_IF2(func, status, condition) \
+    do { \
+        if (status condition) { \
+            fprintf(stderr, "%s:%s:%d: '%s' failed: %s (%d)\n", \
+                __FILE__, __func__, __LINE__, #func, strerror(status), status); \
+            _exit(EXIT_FAILURE); \
+        } \
+    } while(0)
+
 // Throws errors on API return values not defined by the standards.
 //
 // Do not pass functions as the status or condition arguments, they might be
