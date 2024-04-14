@@ -74,7 +74,7 @@ impl Cond {
         unlock: impl FnOnce() -> Result<()>,
         lock: impl FnOnce() -> Result<()>,
         lock_with_timeout: impl FnOnce(&timespec) -> Result<()>,
-        timeout: Option<&timespec>,
+        deadline: Option<&timespec>,
     ) -> Result<(), Errno> {
         // TODO: Error checking for certain types (i.e. robust and errorcheck) of mutexes, e.g. if the
         // mutex is not locked.
@@ -83,14 +83,10 @@ impl Cond {
 
         unlock();
 
-        match timeout {
-            Some(timeout) => {
-                crate::sync::futex_wait(
-                    &self.cur,
-                    current,
-                    timespec::subtract(*timeout, crate::sync::rttime()).as_ref(),
-                );
-                lock_with_timeout(timeout);
+        match deadline {
+            Some(deadline) => {
+                crate::sync::futex_wait(&self.cur, current, Some(&deadline));
+                lock_with_timeout(deadline);
             }
             None => {
                 crate::sync::futex_wait(&self.cur, current, None);

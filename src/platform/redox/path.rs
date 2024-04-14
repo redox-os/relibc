@@ -79,12 +79,12 @@ pub fn setcwd_manual(cwd: Box<str>) {
 /// RAII guard able to magically fix signal unsafety, by disabling signals during a critical
 /// section.
 pub struct SignalMask {
-    oldset: [u64; 2],
+    oldset: u64,
 }
 impl SignalMask {
     pub fn lock() -> Self {
-        let mut oldset = [0; 2];
-        syscall::sigprocmask(syscall::SIG_SETMASK, Some(&[!0, !0]), Some(&mut oldset))
+        let mut oldset = 0;
+        syscall::sigprocmask(syscall::SIG_SETMASK, Some(&!0), Some(&mut oldset))
             .expect("failed to run sigprocmask");
         Self { oldset }
     }

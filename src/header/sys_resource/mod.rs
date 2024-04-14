@@ -61,7 +61,7 @@ pub struct rusage {
     pub ru_nivcsw: c_long,
 }
 
-pub const PRIO_PROGRESS: c_int = 0;
+pub const PRIO_PROCESS: c_int = 0;
 pub const PRIO_PGRP: c_int = 1;
 pub const PRIO_USER: c_int = 2;
 

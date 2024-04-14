@@ -10,6 +10,7 @@ use crate::{
         sys_utsname::utsname,
         time::timespec,
     },
+    pthread,
 };
 
 pub use self::epoll::PalEpoll;
@@ -78,12 +79,12 @@ pub trait Pal {
 
     fn ftruncate(fildes: c_int, length: off_t) -> c_int;
 
-    fn futex(
-        addr: *mut c_int,
-        op: c_int,
-        val: c_int,
-        val2: usize,
-    ) -> Result<c_long, crate::pthread::Errno>;
+    unsafe fn futex_wait(
+        addr: *mut u32,
+        val: u32,
+        deadline: *const timespec,
+    ) -> Result<(), pthread::Errno>;
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<c_int, pthread::Errno>;
 
     fn futimens(fd: c_int, times: *const timespec) -> c_int;
 

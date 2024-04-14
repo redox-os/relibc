@@ -145,7 +145,7 @@ macro_rules! strto_impl {
         };
 
         let invalid_input = || {
-            platform::errno = EINVAL;
+            platform::ERRNO.set(EINVAL);
             set_endptr(0);
         };
 
@@ -203,7 +203,7 @@ macro_rules! strto_impl {
         // account for the sign
         let num = num as $rettype;
         let num = if overflow {
-            platform::errno = ERANGE;
+            platform::ERRNO.set(ERANGE);
             if CHECK_SIGN {
                 if positive {
                     MAX_VAL
@@ -352,3 +352,22 @@ macro_rules! strto_float_impl {
         }
     }};
 }
+
+#[macro_export]
+macro_rules! asmfunction(
+    ($name:ident : [$($asmstmt:expr),*$(,)?] <= [$($decl:ident = $(sym $symname:ident)?$(const $constval:expr)?),*$(,)?]$(,)? ) => {
+        ::core::arch::global_asm!(concat!("
+            .p2align 4
+            .section .text.", stringify!($name), ", \"ax\", @progbits
+            .globl ", stringify!($name), "
+            .type ", stringify!($name), ", @function
+        ", stringify!($name), ":
+        ", $($asmstmt, "\n",)* "
+            .size ", stringify!($name), ", . - ", stringify!($name), "
+        "), $($decl = $(sym $symname)?$(const $constval)?),*);
+
+        extern "C" {
+            pub fn $name();
+        }
+    }
+);

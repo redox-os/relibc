@@ -31,3 +31,12 @@ pub const AT_EXECFN: usize = 31; /* Filename of executable.  */
 pub const AT_REDOX_INITIALCWD_PTR: usize = 32;
 #[cfg(target_os = "redox")]
 pub const AT_REDOX_INITIALCWD_LEN: usize = 33;
+
+#[cfg(target_os = "redox")]
+pub const AT_REDOX_INHERITED_SIGIGNMASK: usize = 34;
+#[cfg(all(target_os = "redox", target_pointer_width = "32"))]
+pub const AT_REDOX_INHERITED_SIGIGNMASK_HI: usize = 35;
+#[cfg(target_os = "redox")]
+pub const AT_REDOX_INHERITED_SIGPROCMASK: usize = 36;
+#[cfg(all(target_os = "redox", target_pointer_width = "32"))]
+pub const AT_REDOX_INHERITED_SIGPROCMASK_HI: usize = 37;

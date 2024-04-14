@@ -12,7 +12,7 @@ use crate::{
         time::*,
         wctype::*,
     },
-    platform::{self, errno, types::*},
+    platform::{self, types::*, ERRNO},
 };
 
 mod lookaheadreader;
@@ -35,10 +35,10 @@ pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
     let c = uc as c_char;
     let mut ps: mbstate_t = mbstate_t;
     let mut wc: wchar_t = 0;
-    let saved_errno = platform::errno;
+    let saved_errno = platform::ERRNO.get();
     let status = mbrtowc(&mut wc, &c as *const c_char, 1, &mut ps);
     if status == usize::max_value() || status == usize::max_value() - 1 {
-        platform::errno = saved_errno;
+        platform::ERRNO.set(saved_errno);
         return WEOF;
     }
     wc as wint_t
@@ -61,7 +61,7 @@ pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
         );
 
         if nread != 1 {
-            errno = EILSEQ;
+            ERRNO.set(EILSEQ);
             return WEOF;
         }
 
@@ -77,7 +77,7 @@ pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
             } else if buf[0] >> 3 == 0x1e {
                 4
             } else {
-                errno = EILSEQ;
+                ERRNO.set(EILSEQ);
                 return WEOF;
             };
         }
@@ -400,7 +400,7 @@ pub unsafe extern "C" fn wcsdup(s: *const wchar_t) -> *mut wchar_t {
     let d = malloc((l + 1) * mem::size_of::<wchar_t>()) as *mut wchar_t;
 
     if d.is_null() {
-        errno = ENOMEM;
+        ERRNO.set(ENOMEM);
         return ptr::null_mut();
     }
 
@@ -594,7 +594,7 @@ pub unsafe extern "C" fn wcsnrtombs(
         let ret = wcrtomb(buf.as_mut_ptr(), **src, ps);
 
         if ret == size_t::MAX {
-            errno = EILSEQ;
+            ERRNO.set(EILSEQ);
             return size_t::MAX;
         }
 
@@ -793,7 +793,7 @@ macro_rules! strtou_impl {
             result = match new {
                 Some(new) => new,
                 None => {
-                    platform::errno = ERANGE;
+                    platform::ERRNO.set(ERANGE);
                     return !0;
                 }
             };

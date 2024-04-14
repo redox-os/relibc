@@ -170,7 +170,7 @@ impl Error {
     }
 
     pub fn last_os_error() -> Error {
-        let errno = unsafe { crate::platform::errno };
+        let errno = crate::platform::ERRNO.get();
         Error::from_raw_os_error(errno)
     }
 }

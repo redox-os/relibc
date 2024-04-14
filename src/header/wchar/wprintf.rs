@@ -898,7 +898,7 @@ unsafe fn inner_wprintf<W: Write>(
                             let c = match char::from_u32(*ptr as _) {
                                 Some(c) => c,
                                 None => {
-                                    platform::errno = EILSEQ;
+                                    platform::ERRNO.set(EILSEQ);
                                     return Err(io::last_os_error());
                                 }
                             };
@@ -934,7 +934,7 @@ unsafe fn inner_wprintf<W: Write>(
                     let c = match char::from_u32(c as _) {
                         Some(c) => c,
                         None => {
-                            platform::errno = EILSEQ;
+                            platform::ERRNO.set(EILSEQ);
                             return Err(io::last_os_error());
                         }
                     };

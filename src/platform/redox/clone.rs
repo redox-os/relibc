@@ -1,42 +1,49 @@
+use core::mem::size_of;
+
 use syscall::{
     data::Map,
     error::Result,
     flag::{MapFlags, O_CLOEXEC},
-    SIGCONT,
+    SetSighandlerData, SIGCONT,
 };
 
-use super::extra::{create_set_addr_space_buf, FdGuard};
+use crate::sync::rwlock::Rwlock;
+
+use super::{
+    extra::{create_set_addr_space_buf, FdGuard},
+    signal::sighandler_function,
+};
 
 pub use redox_exec::*;
+
+static CLONE_LOCK: Rwlock = Rwlock::new(crate::pthread::Pshared::Private);
+
+struct Guard;
+impl Drop for Guard {
+    fn drop(&mut self) {
+        CLONE_LOCK.unlock()
+    }
+}
+
+pub fn rdlock() -> impl Drop {
+    CLONE_LOCK.acquire_read_lock(None);
+
+    Guard
+}
+pub fn wrlock() -> impl Drop {
+    CLONE_LOCK.acquire_write_lock(None);
+
+    Guard
+}
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
 pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
     let cur_pid_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", O_CLOEXEC)?);
     let (new_pid_fd, new_pid) = new_context()?;
 
-    // Allocate a new signal stack.
-    {
-        let sigstack_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sigstack")?);
-
-        const SIGSTACK_SIZE: usize = 1024 * 256;
-
-        // TODO: Put sigstack at high addresses?
-        let target_sigstack = syscall::fmap(
-            !0,
-            &Map {
-                address: 0,
-                flags: MapFlags::PROT_READ | MapFlags::PROT_WRITE | MapFlags::MAP_PRIVATE,
-                offset: 0,
-                size: SIGSTACK_SIZE,
-            },
-        )? + SIGSTACK_SIZE;
-
-        let _ = syscall::write(*sigstack_fd, &usize::to_ne_bytes(target_sigstack))?;
-    }
-
     copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
 
-    // Reuse existing address space
+    // Inherit existing address space
     {
         let cur_addr_space_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"addrspace")?);
         let new_addr_space_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-addrspace")?);
@@ -49,7 +56,7 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
         let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
     }
 
-    // Reuse file table
+    // Inherit file table
     {
         let cur_filetable_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"filetable")?);
         let new_filetable_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-filetable")?);
@@ -60,7 +67,7 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
         )?;
     }
 
-    // Reuse sigactions (on Linux, CLONE_THREAD requires CLONE_SIGHAND which implies the sigactions
+    // Inherit sigactions (on Linux, CLONE_THREAD requires CLONE_SIGHAND which implies the sigactions
     // table is reused).
     {
         let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);
@@ -71,16 +78,26 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
             &usize::to_ne_bytes(*cur_sigaction_fd),
         )?;
     }
+    // Inherit sighandler, but not the sigaltstack.
+    {
+        let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
+        let data = SetSighandlerData {
+            entry: sighandler_function(),
+            altstack_base: 0,
+            altstack_len: 0,
+        };
+        let _ = syscall::write(*new_sighandler_fd, &data)?;
+    }
 
-    copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
+    // Sigprocmask starts as "block all", and is initialized when the thread has actually returned
+    // from clone_ret.
+
+    // TODO: Should some of these registers be inherited?
+    //copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
 
     // Unblock context.
-    syscall::kill(new_pid, SIGCONT)?;
-    let _ = syscall::waitpid(
-        new_pid,
-        &mut 0,
-        syscall::WUNTRACED | syscall::WCONTINUED | syscall::WNOHANG,
-    );
+    let start_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"start")?);
+    let _ = syscall::write(*start_fd, &[0])?;
 
     Ok(new_pid)
 }
@@ -97,10 +114,9 @@ core::arch::global_asm!(
     .p2align 6
 __relibc_internal_rlct_clone_ret:
     # Load registers
-    ldp x0, x8, [sp], #16
-    ldp x2, x1, [sp], #16
-    ldp x4, x3, [sp], #16
-    ldr x5, [sp], #16
+    ldp x8, x0, [sp], #16
+    ldp x1, x2, [sp], #16
+    ldp x3, x4, [sp], #16
 
     # Call entry point
     blr x8

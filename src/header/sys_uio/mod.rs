@@ -42,7 +42,7 @@ unsafe fn scatter(iovs: &[iovec], vec: Vec<u8>) {
 #[no_mangle]
 pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> ssize_t {
     if iovcnt < 0 || iovcnt > IOV_MAX {
-        platform::errno = errno::EINVAL;
+        platform::ERRNO.set(errno::EINVAL);
         return -1;
     }
 
@@ -59,7 +59,7 @@ pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> s
 #[no_mangle]
 pub unsafe extern "C" fn writev(fd: c_int, iov: *const iovec, iovcnt: c_int) -> ssize_t {
     if iovcnt < 0 || iovcnt > IOV_MAX {
-        platform::errno = errno::EINVAL;
+        platform::ERRNO.set(errno::EINVAL);
         return -1;
     }
 

@@ -6,6 +6,12 @@ EXPECT_NAMES=\
 	assert \
 	constructor \
 	ctype \
+	crypt/blowfish \
+	crypt/md5 \
+	crypt/pbkdf2 \
+	crypt/scrypt \
+	crypt/sha256 \
+	crypt/sha512 \
 	destructor \
 	dirent/scandir \
 	errno \
@@ -92,6 +98,7 @@ EXPECT_NAMES=\
 	tls \
 	unistd/access \
 	unistd/brk \
+	unistd/constants \
 	unistd/dup \
 	unistd/exec \
 	unistd/fchdir \
@@ -157,6 +164,7 @@ NAMES=\
 	stdlib/mktemp \
 	stdlib/realpath \
 	sys_epoll/epoll \
+	sys_resource/constants \
 	sys_utsname/uname \
 	time/gettimeofday \
 	unistd/chdir \
@@ -179,6 +187,7 @@ NAMES=\
 	pthread/rwlock_trylock \
 	pthread/rwlock_randtest \
 	pthread/mutex_recursive \
+	pthread/timeout \
 	grp/getgrouplist \
 	grp/getgrgid_r \
 	grp/getgrnam_r \

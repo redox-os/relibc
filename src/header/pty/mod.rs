@@ -83,8 +83,8 @@ pub unsafe extern "C" fn forkpty(
             if utmp::login_tty(s) != 0 {
                 unistd::write(
                     p[1],
-                    &platform::errno as *const _ as *const c_void,
-                    mem::size_of::<c_int>(),
+                    platform::ERRNO.as_ptr().cast(),
+                    mem::size_of_val(&platform::ERRNO),
                 );
                 unistd::_exit(127);
             }
@@ -106,7 +106,7 @@ pub unsafe extern "C" fn forkpty(
             let mut status = 0;
             sys_wait::waitpid(pid, &mut status, 0);
             pid = -1;
-            platform::errno = ec;
+            platform::ERRNO.set(ec);
         }
         unistd::close(p[0]);
     }
