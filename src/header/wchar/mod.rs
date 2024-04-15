@@ -280,7 +280,16 @@ pub unsafe extern "C" fn putwchar(wc: wchar_t) -> wint_t {
 }
 
 #[no_mangle]
-// pub unsafe extern "C" fn swscanf(s: *const wchar_t, format: *const wchar_t, ap: va_list) -> c_int {
+pub unsafe extern "C" fn vswscanf(
+    s: *const wchar_t,
+    format: *const wchar_t,
+    __valist: va_list,
+) -> c_int {
+    let reader = (s as *const u32).into();
+    wscanf::scanf(reader, format, __valist)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn swscanf(
     s: *const wchar_t,
     format: *const wchar_t,
