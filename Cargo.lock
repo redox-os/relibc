@@ -435,17 +435,12 @@ dependencies = [
  "dlmalloc",
  "goblin",
  "libc",
-<<<<<<< HEAD
  "libm 0.2.8",
- "memchr",
- "memoffset",
  "num-complex",
-=======
  "md-5",
  "memchr",
  "memoffset",
  "pbkdf2",
->>>>>>> master
  "plain",
  "posix-regex",
  "rand",
