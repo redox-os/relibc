@@ -40,7 +40,7 @@ pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
 /// Open a file with the file descriptor `fd` in the mode `mode`
 pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
     if *mode != b'r' as i8 && *mode != b'w' as i8 && *mode != b'a' as i8 {
-        platform::errno = errno::EINVAL;
+        platform::ERRNO.set(errno::EINVAL);
         return None;
     }
 

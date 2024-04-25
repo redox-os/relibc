@@ -44,18 +44,18 @@ fn utf8_char_width(b: u8) -> usize {
 pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, ps: *mut mbstate_t) -> usize {
     let size = utf8_char_width(*s as u8);
     if size > n {
-        platform::errno = errno::EILSEQ;
+        platform::ERRNO.set(errno::EILSEQ);
         return -2isize as usize;
     }
     if size == 0 {
-        platform::errno = errno::EILSEQ;
+        platform::ERRNO.set(errno::EILSEQ);
         return -1isize as usize;
     }
 
     let slice = slice::from_raw_parts(s as *const u8, size);
     let decoded = str::from_utf8(slice);
     if decoded.is_err() {
-        platform::errno = errno::EILSEQ;
+        platform::ERRNO.set(errno::EILSEQ);
         return -1isize as usize;
     }
 
@@ -79,7 +79,7 @@ pub unsafe fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t) -> usize 
     let dc = char::from_u32(wc as u32);
 
     if dc.is_none() {
-        platform::errno = errno::EILSEQ;
+        platform::ERRNO.set(errno::EILSEQ);
         return -1isize as usize;
     }
 

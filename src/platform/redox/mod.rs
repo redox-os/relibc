@@ -11,7 +11,7 @@ use crate::{
     header::{
         dirent::dirent,
         errno::{EBADR, EINVAL, EIO, ENOENT, ENOMEM, ENOSYS, EPERM, ERANGE},
-        fcntl,
+        fcntl, limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, RLIM_INFINITY},
@@ -24,11 +24,12 @@ use crate::{
         unistd::{F_OK, R_OK, W_OK, X_OK},
     },
     io::{self, prelude::*, BufReader},
+    pthread,
 };
 
 pub use redox_exec::FdGuard;
 
-use super::{errno, types::*, Pal, Read};
+use super::{types::*, Pal, Read, ERRNO};
 
 static mut BRK_CUR: *mut c_void = ptr::null_mut();
 static mut BRK_END: *mut c_void = ptr::null_mut();
@@ -40,13 +41,14 @@ fn round_up_to_page_size(val: usize) -> usize {
 
 mod clone;
 mod epoll;
+mod event;
 mod exec;
 mod extra;
 mod libcscheme;
 mod libredox;
 pub(crate) mod path;
 mod ptrace;
-mod signal;
+pub(crate) mod signal;
 mod socket;
 
 macro_rules! path_from_c_str {
@@ -54,9 +56,7 @@ macro_rules! path_from_c_str {
         match $c_str.to_str() {
             Ok(ok) => ok,
             Err(err) => {
-                unsafe {
-                    errno = EINVAL;
-                }
+                ERRNO.set(EINVAL);
                 return -1;
             }
         }
@@ -69,9 +69,7 @@ pub fn e(sys: Result<usize>) -> usize {
     match sys {
         Ok(ok) => ok,
         Err(err) => {
-            unsafe {
-                errno = err.errno as c_int;
-            }
+            ERRNO.set(err.errno as c_int);
             !0
         }
     }
@@ -116,9 +114,7 @@ impl Pal for Sys {
             || (mode & W_OK == W_OK && perms & 0o2 != 0o2)
             || (mode & X_OK == X_OK && perms & 0o1 != 0o1)
         {
-            unsafe {
-                errno = EINVAL;
-            }
+            ERRNO.set(EINVAL);
             return -1;
         }
 
@@ -159,7 +155,7 @@ impl Pal for Sys {
                 addr
             } else {
                 // It was outside of valid range
-                errno = ENOMEM;
+                ERRNO.set(ENOMEM);
                 ptr::null_mut()
             }
         }
@@ -188,7 +184,7 @@ impl Pal for Sys {
     fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> c_int {
         // TODO
         eprintln!("relibc clock_getres({}, {:p}): not implemented", clk_id, tp);
-        unsafe { errno = ENOSYS }
+        ERRNO.set(ENOSYS);
         -1
     }
 
@@ -204,7 +200,7 @@ impl Pal for Sys {
             "relibc clock_settime({}, {:p}): not implemented",
             clk_id, tp
         );
-        unsafe { errno = ENOSYS };
+        ERRNO.set(ENOSYS);
         -1
     }
 
@@ -252,7 +248,7 @@ impl Pal for Sys {
             match str::from_utf8(&buf[..res]) {
                 Ok(path) => e(path::chdir(path).map(|()| 0)) as c_int,
                 Err(_) => {
-                    unsafe { errno = EINVAL };
+                    ERRNO.set(EINVAL);
                     return -1;
                 }
             }
@@ -282,7 +278,9 @@ impl Pal for Sys {
     }
 
     fn fork() -> pid_t {
-        e(clone::fork_impl()) as pid_t
+        let _guard = clone::wrlock();
+        let res = clone::fork_impl();
+        e(res) as pid_t
     }
 
     // FIXME: unsound
@@ -303,25 +301,35 @@ impl Pal for Sys {
         e(syscall::ftruncate(fd as usize, len as usize)) as c_int
     }
 
-    // FIXME: unsound
-    fn futex(
-        addr: *mut c_int,
-        op: c_int,
-        val: c_int,
-        val2: usize,
-    ) -> Result<c_long, crate::pthread::Errno> {
-        match unsafe {
-            syscall::futex(
-                addr as *mut i32,
-                op as usize,
-                val as i32,
-                val2,
-                ptr::null_mut(),
-            )
-        } {
-            Ok(success) => Ok(success as c_long),
-            Err(err) => Err(crate::pthread::Errno(err.errno)),
-        }
+    #[inline]
+    unsafe fn futex_wait(
+        addr: *mut u32,
+        val: u32,
+        deadline: *const timespec,
+    ) -> CoreResult<(), pthread::Errno> {
+        syscall::syscall5(
+            syscall::SYS_FUTEX,
+            addr as usize,
+            syscall::FUTEX_WAIT,
+            val as usize,
+            deadline as usize,
+            0,
+        )
+        .map_err(|s| pthread::Errno(s.errno))
+        .map(|_| ())
+    }
+    #[inline]
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<c_int, pthread::Errno> {
+        syscall::syscall5(
+            syscall::SYS_FUTEX,
+            addr as usize,
+            syscall::FUTEX_WAKE,
+            num as usize,
+            0,
+            0,
+        )
+        .map_err(|s| pthread::Errno(s.errno))
+        .map(|n| n as c_int)
     }
 
     // FIXME: unsound
@@ -343,16 +351,12 @@ impl Pal for Sys {
 
         let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize) };
         if buf_slice.is_empty() {
-            unsafe {
-                errno = EINVAL;
-            }
+            ERRNO.set(EINVAL);
             return ptr::null_mut();
         }
 
         if path::getcwd(buf_slice).is_none() {
-            unsafe {
-                errno = ERANGE;
-            }
+            ERRNO.set(ERANGE);
             return ptr::null_mut();
         }
 
@@ -467,7 +471,7 @@ impl Pal for Sys {
     unsafe fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
         // TODO
         eprintln!("relibc getgroups({}, {:p}): not implemented", size, list);
-        unsafe { errno = ENOSYS };
+        ERRNO.set(ENOSYS);
         -1
     }
 
@@ -490,7 +494,7 @@ impl Pal for Sys {
     fn getpriority(which: c_int, who: id_t) -> c_int {
         // TODO
         eprintln!("getpriority({}, {}): not implemented", which, who);
-        unsafe { errno = ENOSYS };
+        ERRNO.set(ENOSYS);
         -1
     }
 
@@ -540,7 +544,7 @@ impl Pal for Sys {
             "relibc setrlimit({}, {:p}): not implemented",
             resource, rlim
         );
-        unsafe { errno = EPERM };
+        ERRNO.set(EPERM);
         -1
     }
 
@@ -640,7 +644,7 @@ impl Pal for Sys {
         let dir_path = match str::from_utf8(&dir_path_buf[..res as usize]) {
             Ok(path) => path,
             Err(_) => {
-                unsafe { errno = EBADR };
+                ERRNO.set(EBADR);
                 return !0;
             }
         };
@@ -651,7 +655,7 @@ impl Pal for Sys {
                 None => {
                     // Since parent_dir_path is resolved by fpath, it is more likely that
                     // the problem was with path.
-                    unsafe { errno = ENOENT };
+                    ERRNO.set(ENOENT);
                     return !0;
                 }
             };
@@ -798,8 +802,10 @@ impl Pal for Sys {
     unsafe fn rlct_clone(
         stack: *mut usize,
     ) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
-        clone::rlct_clone_impl(stack)
-            .map(|context_id| crate::pthread::OsTid { context_id })
+        let _guard = clone::rdlock();
+        let res = clone::rlct_clone_impl(stack);
+
+        res.map(|context_id| crate::pthread::OsTid { context_id })
             .map_err(|error| crate::pthread::Errno(error.errno))
     }
     unsafe fn rlct_kill(
@@ -822,7 +828,41 @@ impl Pal for Sys {
     }
 
     fn fpath(fildes: c_int, out: &mut [u8]) -> ssize_t {
-        e(syscall::fpath(fildes as usize, out)) as ssize_t
+        // Since this is used by realpath, it converts from the old format to the new one for
+        // compatibility reasons
+        let mut buf = [0; limits::PATH_MAX];
+        let count = match syscall::fpath(fildes as usize, &mut buf) {
+            Ok(ok) => ok,
+            Err(err) => return e(Err(err)) as ssize_t,
+        };
+
+        let redox_path = match str::from_utf8(&buf[..count])
+            .ok()
+            .and_then(|x| redox_path::RedoxPath::from_absolute(x))
+        {
+            Some(some) => some,
+            None => return e(Err(syscall::Error::new(EINVAL))) as ssize_t,
+        };
+
+        let (scheme, reference) = match redox_path.as_parts() {
+            Some(some) => some,
+            None => return e(Err(syscall::Error::new(EINVAL))) as ssize_t,
+        };
+
+        let mut cursor = io::Cursor::new(out);
+        let res = match scheme.as_ref() {
+            "file" => write!(cursor, "/{}", reference.as_ref().trim_start_matches('/')),
+            _ => write!(
+                cursor,
+                "/scheme/{}/{}",
+                scheme.as_ref(),
+                reference.as_ref().trim_start_matches('/')
+            ),
+        };
+        match res {
+            Ok(()) => cursor.position() as ssize_t,
+            Err(_err) => e(Err(syscall::Error::new(syscall::ENAMETOOLONG))) as ssize_t,
+        }
     }
 
     fn readlink(pathname: CStr, out: &mut [u8]) -> ssize_t {
@@ -855,7 +895,7 @@ impl Pal for Sys {
     unsafe fn setgroups(size: size_t, list: *const gid_t) -> c_int {
         // TODO
         eprintln!("relibc setgroups({}, {:p}): not implemented", size, list);
-        unsafe { errno = ENOSYS };
+        ERRNO.set(ENOSYS);
         -1
     }
 
@@ -869,7 +909,7 @@ impl Pal for Sys {
             "relibc setpriority({}, {}, {}): not implemented",
             which, who, prio
         );
-        unsafe { errno = ENOSYS };
+        ERRNO.set(ENOSYS);
         -1
     }
 
@@ -998,10 +1038,10 @@ impl Pal for Sys {
 
         match inner(utsname) {
             Ok(()) => 0,
-            Err(err) => unsafe {
-                errno = err;
+            Err(err) => {
+                ERRNO.set(err);
                 -1
-            },
+            }
         }
     }
 
@@ -1077,7 +1117,7 @@ impl Pal for Sys {
 
     fn verify() -> bool {
         // GETPID on Redox is 20, which is WRITEV on Linux
-        e(unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) }) != !0
+        (unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) }).is_ok()
     }
 
     fn exit_thread() -> ! {

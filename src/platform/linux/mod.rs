@@ -1,7 +1,7 @@
 use crate::io::Write;
 use core::{arch::asm, ptr};
 
-use super::{errno, types::*, Pal};
+use super::{types::*, Pal, ERRNO};
 use crate::{
     c_str::CStr,
     header::{dirent::dirent, errno::EINVAL, signal::SIGCHLD, sys_stat::S_IFIFO},
@@ -63,9 +63,7 @@ pub fn e(sys: usize) -> usize {
     match e_raw(sys) {
         Ok(value) => value,
         Err(errcode) => {
-            unsafe {
-                errno = errcode as c_int;
-            }
+            ERRNO.set(errcode as c_int);
             !0
         }
     }
@@ -237,15 +235,32 @@ impl Pal for Sys {
         e(unsafe { syscall!(FTRUNCATE, fildes, length) }) as c_int
     }
 
-    fn futex(
-        addr: *mut c_int,
-        op: c_int,
-        val: c_int,
-        val2: usize,
-    ) -> Result<c_long, crate::pthread::Errno> {
-        e_raw(unsafe { syscall!(FUTEX, addr, op, val, val2, 0, 0) })
-            .map(|r| r as c_long)
-            .map_err(|e| crate::pthread::Errno(e as c_int))
+    #[inline]
+    unsafe fn futex_wait(
+        addr: *mut u32,
+        val: u32,
+        deadline: *const timespec,
+    ) -> Result<(), crate::pthread::Errno> {
+        e_raw(unsafe {
+            syscall!(
+                FUTEX, addr,       // uaddr
+                9,          // futex_op: FUTEX_WAIT_BITSET
+                val,        // val
+                deadline,   // timeout: deadline
+                0,          // uaddr2/val2: 0/NULL
+                0xffffffff  // val3: FUTEX_BITSET_MATCH_ANY
+            )
+        })
+        .map_err(|e| crate::pthread::Errno(e as c_int))
+        .map(|_| ())
+    }
+    #[inline]
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<c_int, crate::pthread::Errno> {
+        e_raw(unsafe {
+            syscall!(FUTEX, addr, 1 /* FUTEX_WAKE */, num)
+        })
+        .map_err(|e| crate::pthread::Errno(e as c_int))
+        .map(|n| n as c_int)
     }
 
     fn futimens(fd: c_int, times: *const timespec) -> c_int {

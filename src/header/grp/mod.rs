@@ -118,19 +118,37 @@ impl OwnedGrp {
 }
 
 fn split(buf: &mut [u8]) -> Option<group> {
-    let gid = match buf[0..mem::size_of::<gid_t>()].try_into() {
+    let gr_gid = match buf[0..mem::size_of::<gid_t>()].try_into() {
         Ok(buf) => gid_t::from_ne_bytes(buf),
         Err(err) => return None,
     };
 
+    // Get address of buffer for fixing up gr_mem
+    let buf_addr = buf.as_ptr() as usize;
+
     // We moved the gid to the beginning of the byte buffer so we can do this.
     let mut parts = buf[mem::size_of::<gid_t>()..].split_mut(|&c| c == b'\0');
+    let gr_name = parts.next()?.as_mut_ptr() as *mut c_char;
+    let gr_passwd = parts.next()?.as_mut_ptr() as *mut c_char;
+    let gr_mem = parts.next()?.as_mut_ptr() as *mut usize;
+
+    // Adjust gr_mem address by buffer base address
+    // TODO: max group members length?
+    for i in 0..4096 {
+        unsafe {
+            if *gr_mem.add(i) == 0 {
+                // End of gr_mem pointer array
+                break;
+            }
+            *gr_mem.add(i) += buf_addr;
+        }
+    }
 
     Some(group {
-        gr_name: parts.next()?.as_mut_ptr() as *mut i8,
-        gr_passwd: parts.next()?.as_mut_ptr() as *mut i8,
-        gr_gid: gid,
-        gr_mem: parts.next()?.as_mut_ptr() as *mut *mut c_char, // this will work because this points to the first string, which also happens to be the start of the array. The two are equivalent, just need to by typecast.
+        gr_name,
+        gr_passwd,
+        gr_gid,
+        gr_mem: gr_mem as *mut *mut c_char,
     })
 }
 
@@ -167,17 +185,35 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
         vec.extend(gr_passwd);
         vec.push(0);
 
-        for i in buffer
-            .next()
-            .ok_or(Error::EOF)?
+        let members = buffer.next().ok_or(Error::EOF)?;
+
+        // Get the pointer to the members array
+        let member_array_ptr = unsafe { vec.as_mut_ptr().add(vec.len()) as *mut usize };
+
+        // Push enough null pointers to fit all members
+        for _member in members
             .split(|b| *b == b',')
-            .filter(|i| i.len() > 0)
+            .filter(|member| !member.is_empty())
         {
-            vec.extend(i.to_vec());
+            vec.extend(0usize.to_ne_bytes());
+        }
+        // Push a null pointer to terminate the members array
+        vec.extend(0usize.to_ne_bytes());
+
+        // Fill in member names
+        for (i, member) in members
+            .split(|b| *b == b',')
+            .filter(|member| !member.is_empty())
+            .enumerate()
+        {
+            // Store offset to start of member, MUST BE ADJUSTED LATER BASED ON THE ADDRESS OF THE BUFFER
+            unsafe {
+                *member_array_ptr.add(i) = vec.len();
+            }
+
+            vec.extend(member);
             vec.push(0);
         }
-
-        vec.extend(0usize.to_ne_bytes());
 
         vec
     };
@@ -188,9 +224,7 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
             let mut buf = MaybeAllocated::Borrowed(buf);
 
             if buf.len() < buf.len() {
-                unsafe {
-                    platform::errno = errno::ERANGE;
-                }
+                platform::ERRNO.set(errno::ERANGE);
                 return Err(Error::BufTooSmall);
             }
 

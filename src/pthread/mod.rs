@@ -110,8 +110,13 @@ pub(crate) unsafe fn create(
 ) -> Result<pthread_t, Errno> {
     let attrs = attrs.copied().unwrap_or_default();
 
+    let mut procmask = 0_u64;
+    #[cfg(target_os = "redox")]
+    syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut procmask))
+        .expect("failed to obtain sigprocmask for caller");
+
     // Create a locked mutex, unlocked by the thread after it has started.
-    let synchronization_mutex = Box::into_raw(Box::new(Mutex::locked(())));
+    let synchronization_mutex = Box::into_raw(Box::new(Mutex::locked(procmask)));
 
     let stack_size = attrs.stacksize.next_multiple_of(Sys::getpagesize());
 
@@ -122,7 +127,7 @@ pub(crate) unsafe fn create(
             core::ptr::null_mut(),
             stack_size,
             sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-            sys_mman::MAP_SHARED | sys_mman::MAP_ANONYMOUS,
+            sys_mman::MAP_PRIVATE | sys_mman::MAP_ANONYMOUS,
             -1,
             0,
         );
@@ -174,6 +179,13 @@ pub(crate) unsafe fn create(
             stack.write(value);
         };
 
+        if cfg!(target_arch = "aarch64") {
+            // Aarch64 requires the stack to be 16 byte aligned after
+            // the call instruction, unlike x86 which requires it to be
+            // aligned before the call instruction. As such push an
+            // extra word on the stack to align the stack to 16 bytes.
+            push(0);
+        }
         push(0);
         push(synchronization_mutex as usize);
         push(ptr as usize);
@@ -204,8 +216,14 @@ unsafe extern "C" fn new_thread_shim(
     arg: *mut c_void,
     tcb: *mut Tcb,
     pthread: *mut Pthread,
-    mutex: *const Mutex<()>,
+    mutex: *const Mutex<u64>,
 ) -> ! {
+    let procmask = (*mutex).as_ptr().read();
+
+    #[cfg(target_os = "redox")]
+    syscall::sigprocmask(syscall::SIG_SETMASK, Some(&procmask), None)
+        .expect("failed to set procmask in child thread");
+
     if let Some(tcb) = tcb.as_mut() {
         tcb.copy_masters().unwrap();
         tcb.activate();

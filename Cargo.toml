@@ -29,7 +29,7 @@ memoffset = "0.9"
 posix-regex = { path = "posix-regex", features = ["no_std"] }
 
 # TODO: For some reason, rand_jitter hasn't been updated to use the latest rand_core
-rand = { version = "0.7", default-features = false }
+rand = { version = "0.7", default-features = false, features = ["small_rng"] }
 rand_xorshift = "0.2"
 rand_jitter = "0.3"
 
@@ -37,6 +37,13 @@ memchr = { version = "2.2.0", default-features = false }
 plain = "0.2"
 unicode-width = "0.1"
 __libc_only_for_layout_checks = { package = "libc", version = "0.2.149", optional = true }
+md5-crypto = { package = "md-5", version = "0.10.6", default-features = false}
+sha-crypt = { version = "0.5", default-features = false }
+base64ct = { version = "1.6", default-features = false, features = ["alloc"] }
+bcrypt-pbkdf = { version = "0.10", default-features = false, features = ["alloc"] }
+scrypt = { version = "0.11", default-features = false, features = ["simple"]}
+pbkdf2 = { version = "0.12", features = ["sha2"]}
+sha2 = { version = "0.10", default-features = false }
 
 inner_libm = {package = "libm", version = "0.2.8"}
 num-complex = { version = "0.4.4", default-features = false, features = ["libm"] }
@@ -57,9 +64,10 @@ features = ["c_api"]
 sc = "0.2.3"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-redox_syscall = "0.4"
+redox_syscall = "0.5.1"
 redox-exec = { path = "src/platform/redox/redox-exec" }
-redox-path = "0.1"
+redox-path = "0.2"
+redox_event = { git = "https://gitlab.redox-os.org/redox-os/event.git", default-features = false, features = ["redox_syscall"] }
 
 [features]
 default = ["check_against_libc_crate"]
@@ -71,6 +79,3 @@ panic = "abort"
 
 [profile.release]
 panic = "abort"
-
-[patch.crates-io]
-redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall" }

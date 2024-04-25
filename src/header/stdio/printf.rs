@@ -886,7 +886,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                             let c = match char::from_u32(*ptr as _) {
                                 Some(c) => c,
                                 None => {
-                                    platform::errno = EILSEQ;
+                                    platform::ERRNO.set(EILSEQ);
                                     return Err(io::last_os_error());
                                 }
                             };
@@ -922,7 +922,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     let c = match char::from_u32(c as _) {
                         Some(c) => c,
                         None => {
-                            platform::errno = EILSEQ;
+                            platform::ERRNO.set(EILSEQ);
                             return Err(io::last_os_error());
                         }
                     };

@@ -10,8 +10,11 @@ use core::{
 use crate::{
     c_str::CStr,
     header::{
-        errno, fcntl, limits, stdlib::getenv, sys_ioctl, sys_resource, sys_time, sys_utsname,
-        termios, time::timespec,
+        crypt::{crypt_data, crypt_r},
+        errno, fcntl, limits,
+        stdlib::getenv,
+        sys_ioctl, sys_resource, sys_time, sys_utsname, termios,
+        time::timespec,
     },
     platform::{self, types::*, Pal, Sys},
 };
@@ -78,15 +81,13 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
         },
         ..Default::default()
     };
-    let errno_backup = unsafe { platform::errno };
-    let secs = if sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) < 0 {
+    let errno_backup = platform::ERRNO.get();
+    let secs = if unsafe { sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) } < 0 {
         0
     } else {
         timer.it_value.tv_sec as c_uint + if timer.it_value.tv_usec > 0 { 1 } else { 0 }
     };
-    unsafe {
-        platform::errno = errno_backup;
-    }
+    platform::ERRNO.set(errno_backup);
 
     secs
 }
@@ -100,9 +101,7 @@ pub unsafe extern "C" fn chdir(path: *const c_char) -> c_int {
 #[no_mangle]
 pub extern "C" fn chroot(path: *const c_char) -> c_int {
     // TODO: Implement
-    unsafe {
-        platform::errno = crate::header::errno::EPERM;
-    }
+    platform::ERRNO.set(crate::header::errno::EPERM);
 
     -1
 }
@@ -123,9 +122,10 @@ pub extern "C" fn confstr(name: c_int, buf: *mut c_char, len: size_t) -> size_t 
     unimplemented!();
 }
 
-// #[no_mangle]
-pub extern "C" fn crypt(key: *const c_char, salt: *const c_char) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn crypt(key: *const c_char, salt: *const c_char) -> *mut c_char {
+    let mut data = crypt_data::new();
+    crypt_r(key, salt, &mut data as *mut _)
 }
 
 #[no_mangle]
@@ -162,12 +162,12 @@ unsafe fn with_argv(
         // TODO: Use ARG_MAX, not this hardcoded constant
         let ptr = crate::header::stdlib::malloc(argc * mem::size_of::<*const c_char>());
         if ptr.is_null() {
-            platform::errno = ENOMEM;
+            platform::ERRNO.set(ENOMEM);
             return -1;
         }
         slice::from_raw_parts_mut(ptr.cast::<MaybeUninit<*const c_char>>(), argc)
     } else {
-        platform::errno = E2BIG;
+        platform::ERRNO.set(E2BIG);
         return -1;
     };
     out[0].write(arg0);
@@ -266,14 +266,14 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
                 let program_c = CStr::from_bytes_with_nul(&program).unwrap();
                 execv(program_c.as_ptr(), argv);
 
-                match platform::errno {
+                match platform::ERRNO.get() {
                     errno::ENOENT => (),
                     other => error = other,
                 }
             }
         }
 
-        platform::errno = error;
+        platform::ERRNO.set(error);
         -1
     }
 }
@@ -437,27 +437,16 @@ pub unsafe extern "C" fn getlogin() -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn getlogin_r(name: *mut c_char, namesize: size_t) -> c_int {
     //TODO: Determine correct getlogin result on Redox
-    unsafe { platform::errno = errno::ENOENT };
+    platform::ERRNO.set(errno::ENOENT);
     -1
 }
 
 #[no_mangle]
 pub extern "C" fn getpagesize() -> c_int {
-    match c_int::try_from(sysconf(_SC_PAGESIZE)) {
-        Ok(page_size) => page_size,
-        Err(_) => {
-            /* Behavior not specified by POSIX for this case. The -1
-             * value mimics sysconf()'s behavior, though.
-             *
-             * As specified for the limits.h header, the minimum
-             * acceptable value for {PAGESIZE} is 1. The -1 value thus
-             * cannot be mistaken for an acceptable value.
-             *
-             * POSIX does not specify any possible errors for this
-             * function, hence no errno setting. */
-            -1
-        }
-    }
+    // Panic if we can't uphold the required behavior (no errors are specified for this function)
+    Sys::getpagesize()
+        .try_into()
+        .expect("page size not representable as type `int`")
 }
 
 // #[no_mangle]
@@ -542,7 +531,7 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
             if fl.l_type == fcntl::F_UNLCK as c_short || fl.l_pid == getpid() {
                 return 0;
             }
-            platform::errno = errno::EACCES;
+            platform::ERRNO.set(errno::EACCES);
             return -1;
         }
         fcntl::F_ULOCK => {
@@ -556,7 +545,7 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
             return fcntl::fcntl(fildes, fcntl::F_SETLKW, &mut fl as *mut _ as c_ulonglong);
         }
         _ => {
-            platform::errno = errno::EINVAL;
+            platform::ERRNO.set(errno::EINVAL);
             return -1;
         }
     };
@@ -812,7 +801,7 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
 
     let len = Sys::fpath(fildes, &mut name[..namesize - 1]);
     if len < 0 {
-        return unsafe { -platform::errno };
+        return -platform::ERRNO.get();
     }
     name[len as usize] = 0;
 
@@ -831,15 +820,13 @@ pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t 
             tv_usec: interval as suseconds_t,
         },
     };
-    let errno_backup = unsafe { platform::errno };
-    let ret = if sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) < 0 {
+    let errno_backup = platform::ERRNO.get();
+    let ret = if unsafe { sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) } < 0 {
         0
     } else {
         timer.it_value.tv_sec as useconds_t * 1_000_000 + timer.it_value.tv_usec as useconds_t
     };
-    unsafe {
-        platform::errno = errno_backup;
-    }
+    platform::ERRNO.set(errno_backup);
 
     ret
 }

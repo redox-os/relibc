@@ -83,7 +83,7 @@ pub unsafe extern "C" fn readdir(dir: *mut DIR) -> *mut dirent {
         );
         if read <= 0 {
             if read != 0 && read != -errno::ENOENT {
-                platform::errno = -read;
+                platform::ERRNO.set(-read);
             }
             return ptr::null_mut();
         }
@@ -145,8 +145,8 @@ pub unsafe extern "C" fn scandir(
         Err(err) => return -1,
     };
 
-    let old_errno = platform::errno;
-    platform::errno = 0;
+    let old_errno = platform::ERRNO.get();
+    platform::ERRNO.set(0);
 
     loop {
         let entry: *mut dirent = readdir(dir);
@@ -177,7 +177,7 @@ pub unsafe extern "C" fn scandir(
         return -1;
     }
 
-    if platform::errno != 0 {
+    if platform::ERRNO.get() != 0 {
         for ptr in &mut vec {
             platform::free(*ptr as *mut c_void);
         }
@@ -185,7 +185,7 @@ pub unsafe extern "C" fn scandir(
     } else {
         *namelist = vec.leak();
 
-        platform::errno = old_errno;
+        platform::ERRNO.set(old_errno);
         stdlib::qsort(
             *namelist as *mut c_void,
             len as size_t,

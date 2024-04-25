@@ -4,13 +4,13 @@ use crate::platform::{self, types::*};
 
 //TODO: Consider removing, provided for compatibility with newlib
 #[no_mangle]
-pub unsafe extern "C" fn __errno() -> *mut c_int {
+pub extern "C" fn __errno() -> *mut c_int {
     __errno_location()
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn __errno_location() -> *mut c_int {
-    &mut platform::errno
+pub extern "C" fn __errno_location() -> *mut c_int {
+    platform::ERRNO.as_ptr()
 }
 
 #[no_mangle]
