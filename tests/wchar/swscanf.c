@@ -85,10 +85,18 @@ int main ()
 
     wprintf(L"%d \"%s\" \"%s\" \"%s\" \"%s\"\n", ret, &protobuf, &slashbuf, &hostbuf, &pathbuf);
 
+
+    wchar_t str12[20];
+    wchar_t str22[20];
+    wint_t status2 = swscanf(L"Привет мир", L"%s %s", str12, str22);
+    wprintf(L"==> 2 %d \"%s\" \"%s\"\n", status2, &str12, &str22);
+
     wchar_t str1[20];
     wchar_t str2[20];
-    wint_t status = swscanf(L"Привет мир", L"%s %s", str1, str2);
-    wprintf(L"%d \"%s\" \"%s\"\n", status, &str1, &str2);
+    wint_t status = swscanf(L"Привет мир", L"%ls %ls", str1, str2);
+    wprintf(L"--> 1 %d \"%ls\" \"%ls\"\n", status, &str1, &str2);
+
+
 
     // It should be %ls
     // wint_t status = swscanf(L"Привет мир", L"l%s %ls", str1, str2);

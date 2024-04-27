@@ -15,6 +15,12 @@ enum IntKind {
     Size,
 }
 
+#[derive(PartialEq, Eq)]
+enum CharKind {
+    Ascii,
+    Wide,
+}
+
 /// Helper function for progressing a C string
 // TODO: byte is not an accurate name
 unsafe fn next_byte(string: &mut *const wchar_t) -> Result<char, c_int> {
@@ -23,10 +29,6 @@ unsafe fn next_byte(string: &mut *const wchar_t) -> Result<char, c_int> {
     if c == 0 {
         Err(-1)
     } else {
-        // TODO: Probably rust char type is not good for this.
-        // i am just testing now, an idea could be
-        // const WCHAR_1 = <32 bit number of wchar 1>
-        // I hope char type works :)
         char::from_u32(c).ok_or(-1)
     }
 }
@@ -123,6 +125,7 @@ unsafe fn inner_scanf(
             let mut eof = false;
 
             let mut kind = IntKind::Int;
+            let mut c_kind = CharKind::Ascii;
             loop {
                 kind = match c {
                     'h' => {
@@ -143,6 +146,10 @@ unsafe fn inner_scanf(
                     'q' | 'L' => IntKind::LongLong,
                     't' => IntKind::PtrDiff,
                     'z' => IntKind::Size,
+                    'c' | 's' if kind == IntKind::Long => {
+                        c_kind = CharKind::Wide;
+                        break;
+                    }
                     _ => break,
                 };
 
@@ -166,6 +173,7 @@ unsafe fn inner_scanf(
                         return Ok(matched);
                     }
                 }
+
                 'd' | 'i' | 'o' | 'u' | 'x' | 'X' | 'f' | 'e' | 'g' | 'E' | 'a' | 'p' => {
                     while (byte as char).is_whitespace() {
                         if !read!() {
@@ -327,52 +335,79 @@ unsafe fn inner_scanf(
                         }
                     }
                 }
+
                 's' => {
-                    while (byte as char).is_whitespace() {
-                        if !read!() {
-                            return Ok(matched);
-                        }
+                    macro_rules! parse_string_type {
+                        ($type:ident) => {
+                            while (byte as char).is_whitespace() {
+                                if !read!() {
+                                    return Ok(matched);
+                                }
+                            }
+
+                            let mut ptr: Option<*mut $type> =
+                                if ignore { None } else { Some(ap.arg()) };
+
+                            while width.map(|w| w > 0).unwrap_or(true)
+                                && !(byte as char).is_whitespace()
+                            {
+                                if let Some(ref mut ptr) = ptr {
+                                    **ptr = byte as $type;
+                                    *ptr = ptr.offset(1);
+                                }
+                                width = width.map(|w| w - 1);
+                                if width.map(|w| w > 0).unwrap_or(true) && !read!() {
+                                    eof = true;
+                                    break;
+                                }
+                            }
+
+                            if let Some(ptr) = ptr {
+                                *ptr = 0;
+                                matched += 1;
+                                r.commit();
+                            }
+                        };
                     }
 
-                    let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
-
-                    while width.map(|w| w > 0).unwrap_or(true) && !(byte as char).is_whitespace() {
-                        if let Some(ref mut ptr) = ptr {
-                            **ptr = byte as c_char;
-                            *ptr = ptr.offset(1);
-                        }
-                        width = width.map(|w| w - 1);
-                        if width.map(|w| w > 0).unwrap_or(true) && !read!() {
-                            eof = true;
-                            break;
-                        }
-                    }
-
-                    if let Some(ptr) = ptr {
-                        *ptr = 0;
-                        matched += 1;
-                        r.commit();
+                    if c_kind == CharKind::Ascii {
+                        parse_string_type!(c_char);
+                    } else {
+                        parse_string_type!(wchar_t);
                     }
                 }
+
                 'c' => {
-                    let ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
+                    macro_rules! parse_char_type {
+                        ($type:ident) => {
+                            let ptr: Option<*mut $type> =
+                                if ignore { None } else { Some(ap.arg()) };
 
-                    for i in 0..width.unwrap_or(1) {
-                        if let Some(ptr) = ptr {
-                            *ptr.add(i) = byte as c_char;
-                        }
-                        width = width.map(|w| w - 1);
-                        if width.map(|w| w > 0).unwrap_or(true) && !read!() {
-                            eof = true;
-                            break;
-                        }
+                            for i in 0..width.unwrap_or(1) {
+                                if let Some(ptr) = ptr {
+                                    *ptr.add(i) = byte as $type;
+                                }
+                                width = width.map(|w| w - 1);
+                                if width.map(|w| w > 0).unwrap_or(true) && !read!() {
+                                    eof = true;
+                                    break;
+                                }
+                            }
+
+                            if ptr.is_some() {
+                                matched += 1;
+                                r.commit();
+                            }
+                        };
                     }
 
-                    if ptr.is_some() {
-                        matched += 1;
-                        r.commit();
+                    if c_kind == CharKind::Ascii {
+                        parse_char_type!(c_char);
+                    } else {
+                        parse_char_type!(wchar_t);
                     }
                 }
+
                 '[' => {
                     c = next_byte(&mut format)?;
 
