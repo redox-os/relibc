@@ -1,8 +1,6 @@
 /* swscanf example */
 #include <wchar.h>
 #include <stdio.h>
-#include <locale.h>
-
 
 #include "test_helpers.h"
 
@@ -36,8 +34,6 @@ void test(wchar_t* fmt_in, wchar_t* input, struct params *p, ...) {
 
 int main ()
 {
-    setlocale(LC_ALL, "en_US.UTF-8");
-
     struct params p = { .c = 'a' };
 
     test(L"%hd %d", L"12 345", &p, &p.sa, &p.ia);
@@ -86,15 +82,15 @@ int main ()
     wprintf(L"%d \"%s\" \"%s\" \"%s\" \"%s\"\n", ret, &protobuf, &slashbuf, &hostbuf, &pathbuf);
 
 
-    wchar_t str12[20];
+        wchar_t str1[20];
+    wchar_t str2[20];
+    wint_t status = swscanf(L"Привет мир", L"%ls %ls", str1, str2);
+    wprintf(L"--> 1 %d \"%ls\" \"%ls\"\n", status, &str1, &str2);
+wchar_t str12[20];
     wchar_t str22[20];
     wint_t status2 = swscanf(L"Привет мир", L"%s %s", str12, str22);
     wprintf(L"==> 2 %d \"%s\" \"%s\"\n", status2, &str12, &str22);
 
-    wchar_t str1[20];
-    wchar_t str2[20];
-    wint_t status = swscanf(L"Привет мир", L"%ls %ls", str1, str2);
-    wprintf(L"--> 1 %d \"%ls\" \"%ls\"\n", status, &str1, &str2);
 
 
 

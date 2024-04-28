@@ -22,8 +22,7 @@ enum CharKind {
 }
 
 /// Helper function for progressing a C string
-// TODO: byte is not an accurate name
-unsafe fn next_byte(string: &mut *const wchar_t) -> Result<char, c_int> {
+unsafe fn next_char(string: &mut *const wchar_t) -> Result<char, c_int> {
     let c = **string as u32;
     *string = string.offset(1);
     if c == 0 {
@@ -79,7 +78,7 @@ unsafe fn inner_scanf(
     }
 
     while *format != 0 {
-        let mut c = next_byte(&mut format)?;
+        let mut c = next_char(&mut format)?;
 
         if c == ' ' {
             maybe_read!(noreset);
@@ -98,18 +97,18 @@ unsafe fn inner_scanf(
             }
             r.commit();
         } else {
-            c = next_byte(&mut format)?;
+            c = next_char(&mut format)?;
 
             let mut ignore = false;
             if c == '*' {
                 ignore = true;
-                c = next_byte(&mut format)?;
+                c = next_char(&mut format)?;
             }
 
             let mut width = String::new();
             while c >= '0' && c <= '9' {
                 width.push(c as char);
-                c = next_byte(&mut format)?;
+                c = next_char(&mut format)?;
             }
             let mut width = if width.is_empty() {
                 None
@@ -146,6 +145,8 @@ unsafe fn inner_scanf(
                     'q' | 'L' => IntKind::LongLong,
                     't' => IntKind::PtrDiff,
                     'z' => IntKind::Size,
+                    // If kind is Long, means we found a 'l' before finding 'c' or 's'. In this
+                    // case the format corresponds to a wide char/string
                     'c' | 's' if kind == IntKind::Long => {
                         c_kind = CharKind::Wide;
                         break;
@@ -153,7 +154,7 @@ unsafe fn inner_scanf(
                     _ => break,
                 };
 
-                c = next_byte(&mut format)?;
+                c = next_char(&mut format)?;
             }
 
             if c != 'n' {
@@ -409,11 +410,11 @@ unsafe fn inner_scanf(
                 }
 
                 '[' => {
-                    c = next_byte(&mut format)?;
+                    c = next_char(&mut format)?;
 
                     let mut matches = Vec::new();
                     let invert = if c == '^' {
-                        c = next_byte(&mut format)?;
+                        c = next_char(&mut format)?;
                         true
                     } else {
                         false
@@ -423,20 +424,20 @@ unsafe fn inner_scanf(
                     loop {
                         matches.push(c);
                         prev = c;
-                        c = next_byte(&mut format)?;
+                        c = next_char(&mut format)?;
                         if c == '-' {
                             if prev == ']' {
                                 continue;
                             }
-                            c = next_byte(&mut format)?;
+                            c = next_char(&mut format)?;
                             if c == ']' {
                                 matches.push('-');
                                 break;
                             }
-                            // prev += 1; TODO: CHECK THIS!
-                            while prev < c {
+                            prev = char::from_u32_unchecked(prev as u32 + 1);
+                            while (prev as u32) < (c as u32) {
                                 matches.push(prev);
-                                // prev += 1; TODO: CHECK THIS!
+                                prev = char::from_u32_unchecked(prev as u32 + 1);
                             }
                         } else if c == ']' {
                             break;
