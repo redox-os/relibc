@@ -3,6 +3,8 @@ use crate::platform::types::*;
 use alloc::{string::String, vec::Vec};
 use core::ffi::VaList as va_list;
 
+// MB_CUR_MAX check this
+
 #[derive(PartialEq, Eq)]
 enum IntKind {
     Byte,
@@ -22,14 +24,20 @@ enum CharKind {
 }
 
 /// Helper function for progressing a C string
-unsafe fn next_char(string: &mut *const wchar_t) -> Result<char, c_int> {
-    let c = **string as u32;
+unsafe fn next_char(string: &mut *const wchar_t) -> Result<wint_t, c_int> {
+    let c = **string as wint_t;
     *string = string.offset(1);
     if c == 0 {
         Err(-1)
     } else {
-        char::from_u32(c).ok_or(-1)
+        Ok(c)
     }
+}
+
+macro_rules! wc_as_char {
+    ($c:ident) => {
+        char::try_from($c).map_err(|_| -1)?
+    };
 }
 
 unsafe fn inner_scanf(
@@ -38,7 +46,7 @@ unsafe fn inner_scanf(
     mut ap: va_list,
 ) -> Result<c_int, c_int> {
     let mut matched = 0;
-    let mut byte: char = '\0';
+    let mut byte = 0;
     let mut skip_read = false;
     let mut count = 0;
 
@@ -47,7 +55,7 @@ unsafe fn inner_scanf(
             match r.lookahead1() {
                 Ok(None) => false,
                 Ok(Some(b)) => {
-                    byte = char::from_u32(b).ok_or(-1)?;
+                    byte = b;
                     count += 1;
                     true
                 }
@@ -80,19 +88,19 @@ unsafe fn inner_scanf(
     while *format != 0 {
         let mut c = next_char(&mut format)?;
 
-        if c == ' ' {
+        if c as u8 == b' ' {
             maybe_read!(noreset);
 
-            while (byte as char).is_whitespace() {
+            while (wc_as_char!(byte)).is_whitespace() {
                 if !read!() {
                     return Ok(matched);
                 }
             }
 
             skip_read = true;
-        } else if c != '%' {
+        } else if c as u8 != b'%' {
             maybe_read!();
-            if c != byte as char {
+            if c != byte {
                 return Ok(matched);
             }
             r.commit();
@@ -100,14 +108,14 @@ unsafe fn inner_scanf(
             c = next_char(&mut format)?;
 
             let mut ignore = false;
-            if c == '*' {
+            if c as u8 == b'*' {
                 ignore = true;
                 c = next_char(&mut format)?;
             }
 
             let mut width = String::new();
-            while c >= '0' && c <= '9' {
-                width.push(c as char);
+            while c as u8 >= b'0' && c as u8 <= b'9' {
+                width.push(wc_as_char!(c));
                 c = next_char(&mut format)?;
             }
             let mut width = if width.is_empty() {
@@ -126,28 +134,28 @@ unsafe fn inner_scanf(
             let mut kind = IntKind::Int;
             let mut c_kind = CharKind::Ascii;
             loop {
-                kind = match c {
-                    'h' => {
+                kind = match c as u8 {
+                    b'h' => {
                         if kind == IntKind::Short || kind == IntKind::Byte {
                             IntKind::Byte
                         } else {
                             IntKind::Short
                         }
                     }
-                    'j' => IntKind::IntMax,
-                    'l' => {
+                    b'j' => IntKind::IntMax,
+                    b'l' => {
                         if kind == IntKind::Long || kind == IntKind::LongLong {
                             IntKind::LongLong
                         } else {
                             IntKind::Long
                         }
                     }
-                    'q' | 'L' => IntKind::LongLong,
-                    't' => IntKind::PtrDiff,
-                    'z' => IntKind::Size,
+                    b'q' | b'L' => IntKind::LongLong,
+                    b't' => IntKind::PtrDiff,
+                    b'z' => IntKind::Size,
                     // If kind is Long, means we found a 'l' before finding 'c' or 's'. In this
                     // case the format corresponds to a wide char/string
-                    'c' | 's' if kind == IntKind::Long => {
+                    b'c' | b's' if kind == IntKind::Long => {
                         c_kind = CharKind::Wide;
                         break;
                     }
@@ -157,39 +165,44 @@ unsafe fn inner_scanf(
                 c = next_char(&mut format)?;
             }
 
-            if c != 'n' {
+            if c as u8 != b'n' {
                 maybe_read!(noreset);
             }
-            match c {
-                '%' => {
-                    while (byte as char).is_whitespace() {
+            match c as u8 {
+                b'%' => {
+                    while (wc_as_char!(byte)).is_whitespace() {
                         if !read!() {
                             return Ok(matched);
                         }
                     }
 
-                    if byte != '%' {
+                    if byte as u8 != b'%' {
                         return Err(matched);
                     } else if !read!() {
                         return Ok(matched);
                     }
                 }
 
-                'd' | 'i' | 'o' | 'u' | 'x' | 'X' | 'f' | 'e' | 'g' | 'E' | 'a' | 'p' => {
-                    while (byte as char).is_whitespace() {
+                b'd' | b'i' | b'o' | b'u' | b'x' | b'X' | b'f' | b'e' | b'g' | b'E' | b'a'
+                | b'p' => {
+                    while (wc_as_char!(byte)).is_whitespace() {
                         if !read!() {
                             return Ok(matched);
                         }
                     }
 
-                    let pointer = c == 'p';
+                    let pointer = c as u8 == b'p';
                     // Pointers aren't automatic, but we do want to parse "0x"
-                    let auto = c == 'i' || pointer;
-                    let float = c == 'f' || c == 'e' || c == 'g' || c == 'E' || c == 'a';
+                    let auto = c as u8 == b'i' || pointer;
+                    let float = c as u8 == b'f'
+                        || c as u8 == b'e'
+                        || c as u8 == b'g'
+                        || c as u8 == b'E'
+                        || c as u8 == b'a';
 
-                    let mut radix = match c {
-                        'o' => 8,
-                        'x' | 'X' | 'p' => 16,
+                    let mut radix = match c as u8 {
+                        b'o' => 8,
+                        b'x' | b'X' | b'p' => 16,
                         _ => 10,
                     };
 
@@ -197,15 +210,16 @@ unsafe fn inner_scanf(
                     let mut dot = false;
 
                     while width.map(|w| w > 0).unwrap_or(true)
-                        && ((byte >= '0' && byte <= '7')
-                            || (radix >= 10 && (byte >= '8' && byte <= '9'))
-                            || (float && !dot && byte == '.')
+                        && ((byte as u8 >= b'0' && byte as u8 <= b'7')
+                            || (radix >= 10 && (byte as u8 >= b'8' && byte as u8 <= b'9'))
+                            || (float && !dot && byte as u8 == b'.')
                             || (radix == 16
-                                && ((byte >= 'a' && byte <= 'f') || (byte >= 'A' && byte <= 'F'))))
+                                && ((byte as u8 >= b'a' && byte as u8 <= b'f')
+                                    || (byte as u8 >= b'A' && byte as u8 <= b'F'))))
                     {
                         if auto
                             && n.is_empty()
-                            && byte == '0'
+                            && byte as u8 == b'0'
                             && width.map(|w| w > 0).unwrap_or(true)
                         {
                             if !pointer {
@@ -215,7 +229,8 @@ unsafe fn inner_scanf(
                             if !read!() {
                                 return Ok(matched);
                             }
-                            if width.map(|w| w > 0).unwrap_or(true) && (byte == 'x' || byte == 'X')
+                            if width.map(|w| w > 0).unwrap_or(true)
+                                && (byte as u8 == b'x' || byte as u8 == b'X')
                             {
                                 radix = 16;
                                 width = width.map(|w| w - 1);
@@ -225,11 +240,11 @@ unsafe fn inner_scanf(
                             }
                             continue;
                         }
-                        if byte == '.' {
+                        if byte as u8 == b'.' {
                             // Don't allow another dot
                             dot = true;
                         }
-                        n.push(byte as char);
+                        n.push(wc_as_char!(byte));
                         r.commit();
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
@@ -277,10 +292,13 @@ unsafe fn inner_scanf(
                         } else {
                             parse_type!(c_float);
                         }
-                    } else if c == 'p' {
+                    } else if c as u8 == b'p' {
                         parse_type!(size_t, *mut c_void);
                     } else {
-                        let unsigned = c == 'o' || c == 'u' || c == 'x' || c == 'X';
+                        let unsigned = c as u8 == b'o'
+                            || c as u8 == b'u'
+                            || c as u8 == b'x'
+                            || c as u8 == b'X';
 
                         match kind {
                             IntKind::Byte => {
@@ -337,10 +355,10 @@ unsafe fn inner_scanf(
                     }
                 }
 
-                's' => {
+                b's' => {
                     macro_rules! parse_string_type {
                         ($type:ident) => {
-                            while (byte as char).is_whitespace() {
+                            while (wc_as_char!(byte)).is_whitespace() {
                                 if !read!() {
                                     return Ok(matched);
                                 }
@@ -350,7 +368,7 @@ unsafe fn inner_scanf(
                                 if ignore { None } else { Some(ap.arg()) };
 
                             while width.map(|w| w > 0).unwrap_or(true)
-                                && !(byte as char).is_whitespace()
+                                && !(wc_as_char!(byte)).is_whitespace()
                             {
                                 if let Some(ref mut ptr) = ptr {
                                     **ptr = byte as $type;
@@ -378,7 +396,7 @@ unsafe fn inner_scanf(
                     }
                 }
 
-                'c' => {
+                b'c' => {
                     macro_rules! parse_char_type {
                         ($type:ident) => {
                             let ptr: Option<*mut $type> =
@@ -409,11 +427,11 @@ unsafe fn inner_scanf(
                     }
                 }
 
-                '[' => {
+                b'[' => {
                     c = next_char(&mut format)?;
 
                     let mut matches = Vec::new();
-                    let invert = if c == '^' {
+                    let invert = if c as u8 == b'^' {
                         c = next_char(&mut format)?;
                         true
                     } else {
@@ -425,21 +443,21 @@ unsafe fn inner_scanf(
                         matches.push(c);
                         prev = c;
                         c = next_char(&mut format)?;
-                        if c == '-' {
-                            if prev == ']' {
+                        if c as u8 == b'-' {
+                            if prev as u8 == b']' {
                                 continue;
                             }
                             c = next_char(&mut format)?;
-                            if c == ']' {
-                                matches.push('-');
+                            if c as u8 == b']' {
+                                matches.push('-' as wint_t);
                                 break;
                             }
-                            prev = char::from_u32_unchecked(prev as u32 + 1);
-                            while (prev as u32) < (c as u32) {
+                            prev += 1;
+                            while prev < c {
                                 matches.push(prev);
-                                prev = char::from_u32_unchecked(prev as u32 + 1);
+                                prev += 1;
                             }
-                        } else if c == ']' {
+                        } else if c as u8 == b']' {
                             break;
                         }
                     }
@@ -471,7 +489,7 @@ unsafe fn inner_scanf(
                         matched += 1;
                     }
                 }
-                'n' => {
+                b'n' => {
                     if !ignore {
                         *ap.arg::<*mut c_int>() = count as c_int;
                     }
@@ -483,7 +501,7 @@ unsafe fn inner_scanf(
                 return Ok(matched);
             }
 
-            if width != Some(0) && c != 'n' {
+            if width != Some(0) && c as u8 != b'n' {
                 // It didn't hit the width, so an extra character was read and matched.
                 // But this character did not match so let's reuse it.
                 skip_read = true;

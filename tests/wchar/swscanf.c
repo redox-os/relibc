@@ -93,6 +93,9 @@ wchar_t str12[20];
 
 
 
+    wchar_t wcs[4];
+    wint_t status3 = swscanf(L"zß水🍌", L"%ls", &wcs);
+    wprintf(L"==> 2 %d \"%ls\"\n", status3, &wcs);
 
     // It should be %ls
     // wint_t status = swscanf(L"Привет мир", L"l%s %ls", str1, str2);
