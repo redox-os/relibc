@@ -12,7 +12,7 @@ use crate::{
     header::{errno::*, pthread as header, sched::sched_param, sys_mman},
     ld_so::{
         linker::Linker,
-        tcb::{Master, Tcb},
+        tcb::{Master, Tcb}, ExpectTlsFree,
     },
     platform::{types::*, Pal, Sys},
 };
@@ -23,7 +23,7 @@ const MAIN_PTHREAD_ID: usize = 1;
 
 /// Called only by the main thread, as part of relibc_start.
 pub unsafe fn init() {
-    let obj = Box::into_raw(Box::new(Pthread {
+    Tcb::current().expect_notls("no TCB present for main thread").pthread = Pthread {
         waitval: Waitval::new(),
         has_enabled_cancelation: AtomicBool::new(false),
         has_queued_cancelation: AtomicBool::new(false),
@@ -36,17 +36,15 @@ pub unsafe fn init() {
         stack_size: 0,
 
         os_tid: UnsafeCell::new(Sys::current_os_tid()),
-    }));
-
-    PTHREAD_SELF.set(obj);
+    };
 }
 
 //static NEXT_INDEX: AtomicU32 = AtomicU32::new(FIRST_THREAD_IDX + 1);
 //const FIRST_THREAD_IDX: usize = 1;
 
 pub unsafe fn terminate_from_main_thread() {
-    for (_, pthread) in OS_TID_TO_PTHREAD.lock().iter() {
-        let _ = cancel(&*pthread.0);
+    for (_, tcb) in OS_TID_TO_PTHREAD.lock().iter() {
+        let _ = cancel(&(*tcb.0).pthread);
     }
 }
 
@@ -56,18 +54,15 @@ bitflags::bitflags! {
     }
 }
 
+#[derive(Debug)]
 pub struct Pthread {
-    waitval: Waitval<Retval>,
-    has_queued_cancelation: AtomicBool,
-    has_enabled_cancelation: AtomicBool,
-    flags: AtomicUsize,
+    pub(crate) waitval: Waitval<Retval>,
+    pub(crate) has_queued_cancelation: AtomicBool,
+    pub(crate) has_enabled_cancelation: AtomicBool,
+    pub(crate) flags: AtomicUsize,
 
-    // Small index (compared to pointer size) used for e.g. recursive mutexes. Zero is reserved,
-    // so it starts from one. The 31st bit is reserved. Only for process-private mutexes, which we
-    // currently don't handle separately.
-    //index: u32,
-    stack_base: *mut c_void,
-    stack_size: usize,
+    pub(crate) stack_base: *mut c_void,
+    pub(crate) stack_size: usize,
 
     pub(crate) os_tid: UnsafeCell<OsTid>,
 }
@@ -88,7 +83,7 @@ unsafe impl Sync for Pthread {}
 // TODO: Move to a more generic place.
 pub struct Errno(pub c_int);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Retval(pub *mut c_void);
 
 struct MmapGuard {
@@ -116,7 +111,8 @@ pub(crate) unsafe fn create(
         .expect("failed to obtain sigprocmask for caller");
 
     // Create a locked mutex, unlocked by the thread after it has started.
-    let synchronization_mutex = Box::into_raw(Box::new(Mutex::locked(procmask)));
+    let synchronization_mutex = Mutex::locked(procmask);
+    let synchronization_mutex = &synchronization_mutex;
 
     let stack_size = attrs.stacksize.next_multiple_of(Sys::getpagesize());
 
@@ -146,18 +142,6 @@ pub(crate) unsafe fn create(
         other => unreachable!("unknown detachstate {}", other),
     }
 
-    let pthread = Pthread {
-        waitval: Waitval::new(),
-        flags: flags.bits().into(),
-        has_enabled_cancelation: AtomicBool::new(false),
-        has_queued_cancelation: AtomicBool::new(false),
-        stack_base,
-        stack_size,
-        os_tid: UnsafeCell::new(OsTid::default()),
-        //index: NEXT_INDEX.fetch_add(1, Ordering::Relaxed),
-    };
-    let ptr = Box::into_raw(Box::new(pthread));
-
     let stack_raii = MmapGuard {
         page_start: stack_base,
         mmap_size: stack_size,
@@ -165,6 +149,9 @@ pub(crate) unsafe fn create(
 
     let current_tcb = Tcb::current().expect("no TCB!");
     let new_tcb = Tcb::new(current_tcb.tls_len).map_err(|_| Errno(ENOMEM))?;
+    new_tcb.pthread.flags = flags.bits().into();
+    new_tcb.pthread.stack_base = stack_base;
+    new_tcb.pthread.stack_size = stack_size;
 
     new_tcb.masters_ptr = current_tcb.masters_ptr;
     new_tcb.masters_len = current_tcb.masters_len;
@@ -187,8 +174,8 @@ pub(crate) unsafe fn create(
             push(0);
         }
         push(0);
-        push(synchronization_mutex as usize);
-        push(ptr as usize);
+        push(synchronization_mutex as *const _ as usize);
+        push(0);
         push(new_tcb as *mut _ as usize);
 
         push(arg as usize);
@@ -202,37 +189,37 @@ pub(crate) unsafe fn create(
     };
     core::mem::forget(stack_raii);
 
-    let _ = (&*synchronization_mutex).lock();
+    let _ = synchronization_mutex.lock();
 
     OS_TID_TO_PTHREAD
         .lock()
-        .insert(os_tid, ForceSendSync(ptr.cast()));
+        .insert(os_tid, ForceSendSync(new_tcb));
 
-    Ok(ptr.cast())
+    Ok((&new_tcb.pthread) as *const _ as *mut _)
 }
 /// A shim to wrap thread entry points in logic to set up TLS, for example
 unsafe extern "C" fn new_thread_shim(
     entry_point: unsafe extern "C" fn(*mut c_void) -> *mut c_void,
     arg: *mut c_void,
     tcb: *mut Tcb,
-    pthread: *mut Pthread,
+    _pthread: *mut Pthread,
     mutex: *const Mutex<u64>,
 ) -> ! {
     let procmask = (*mutex).as_ptr().read();
-
-    #[cfg(target_os = "redox")]
-    syscall::sigprocmask(syscall::SIG_SETMASK, Some(&procmask), None)
-        .expect("failed to set procmask in child thread");
 
     if let Some(tcb) = tcb.as_mut() {
         tcb.copy_masters().unwrap();
         tcb.activate();
     }
-    PTHREAD_SELF.set(pthread);
 
-    core::ptr::write((&*pthread).os_tid.get(), Sys::current_os_tid());
+    (*tcb).pthread.os_tid.get().write(Sys::current_os_tid());
 
     (&*mutex).manual_unlock();
+
+    #[cfg(target_os = "redox")]
+    syscall::sigprocmask(syscall::SIG_SETMASK, Some(&procmask), None)
+        .expect("failed to set procmask in child thread");
+
     let retval = entry_point(arg);
 
     exit_current_thread(Retval(retval))
@@ -266,10 +253,8 @@ pub unsafe fn detach(thread: &Pthread) -> Result<(), Errno> {
     Ok(())
 }
 
-// Returns option because that's a no-op, but PTHREAD_SELF should always be initialized except in
-// early init code.
 pub fn current_thread() -> Option<&'static Pthread> {
-    unsafe { NonNull::new(PTHREAD_SELF.get()).map(|p| p.as_ref()) }
+    unsafe { Tcb::current().map(|p| &p.pthread) }
 }
 
 pub unsafe fn testcancel() {
@@ -302,15 +287,9 @@ pub unsafe fn exit_current_thread(retval: Retval) -> ! {
     Sys::exit_thread()
 }
 
-// TODO: Use Arc? One strong reference from each OS_TID_TO_PTHREAD and one strong reference from
-// PTHREAD_SELF. The latter ref disappears when the thread exits, while the former disappears when
-// detaching. Isn't that sufficient?
-//
-// On the other hand, there can be at most two strong references to each thread (OS_TID_TO_PTHREAD
-// and PTHREAD_SELF), so maybe Arc is unnecessary except from being memory-safe.
 unsafe fn dealloc_thread(thread: &Pthread) {
     OS_TID_TO_PTHREAD.lock().remove(&thread.os_tid.get().read());
-    drop(Box::from_raw(thread as *const Pthread as *mut Pthread));
+    //drop(Box::from_raw(thread as *const Pthread as *mut Pthread));
 }
 pub const SIGRT_RLCT_CANCEL: usize = 32;
 pub const SIGRT_RLCT_TIMER: usize = 33;
@@ -396,16 +375,13 @@ pub fn get_sched_param(thread: &Pthread) -> Result<(clockid_t, sched_param), Err
 
 // TODO: Hash map?
 // TODO: RwLock to improve perf?
-static OS_TID_TO_PTHREAD: Mutex<BTreeMap<OsTid, ForceSendSync<*mut Pthread>>> =
+static OS_TID_TO_PTHREAD: Mutex<BTreeMap<OsTid, ForceSendSync<*mut Tcb>>> =
     Mutex::new(BTreeMap::new());
 
 #[derive(Clone, Copy)]
 struct ForceSendSync<T>(T);
 unsafe impl<T> Send for ForceSendSync<T> {}
 unsafe impl<T> Sync for ForceSendSync<T> {}
-
-#[thread_local]
-static PTHREAD_SELF: Cell<*mut Pthread> = Cell::new(core::ptr::null_mut());
 
 /*pub(crate) fn current_thread_index() -> u32 {
     current_thread().expect("current thread not present").index
