@@ -13,10 +13,15 @@ struct params {
     double da;
     int *ptr;
     char c;
+    wchar_t wc;
     char string1[20];
     char string2[20];
     char string3[20];
     char string4[20];
+    wchar_t wstring1[20];
+    wchar_t wstring2[20];
+    wchar_t wstring3[20];
+    wchar_t wstring4[20];
 };
 
 
@@ -27,8 +32,8 @@ void test(wchar_t* fmt_in, wchar_t* input, struct params *p, ...) {
     va_end(args);
 
     wprintf(
-        L"%d, { sa: %hhd, ia: %d, ib: %d, ic: %d, fa: %f, da: %lf, ptr: %p, char: %c, string1: %s, string2: %s, string3: %s, string4: %s }\n",
-        ret, p->sa, p->ia, p->ib, p->ic, p->fa, p->da, p->ptr, p->c, p->string1, p->string2, p->string3, p->string4
+        L"%d, { sa: %hhd, ia: %d, ib: %d, ic: %d, fa: %f, da: %lf, ptr: %p, char: %c, wide char: %lc, string1: %s, string2: %s, string3: %s, string4: %s, wstring1: %ls, wstring2: %ls, wstring3: %ls, wstring4: %ls }\n",
+        ret, p->sa, p->ia, p->ib, p->ic, p->fa, p->da, p->ptr, p->c, p->wc, p->string1, p->string2, p->string3, p->string4, p->wstring1, p->wstring2, p->wstring3, p->wstring4
     );
 }
 
@@ -43,12 +48,17 @@ int main ()
     test(L"%s", L"Hello World", &p, &p.string1);
     test(L"%3i", L"0xFF", &p, &p.ia);
     test(L"%c%3c", L"hello", &p, &p.c, &p.string1);
+    test(L"%lc", L"β", &p, &p.wc);
+    test(L"%lc %f", L"π 3.14", &p, &p.wc, &p.fa);
     test(L"test: %2i%n", L"test: 0xFF", &p, &p.ia, &p.ib);
     test(L"hello world%%", L"hello world%", &p);
     test(L"h%1[ae]ll%1[^a] wor%1[^\n]%[d]", L"hello world", &p, &p.string1, &p.string2, &p.string3, &p.string4);
     test(L"h%1[ae]ll%1[^a] wor%1[^\n]%[d]", L"halle worfdddddd", &p, &p.string1, &p.string2, &p.string3, &p.string4);
-    test(L"h%1[ae]ll%1[^a] wor%1[^\n]%[d]", L"halle worfdddddd", &p, &p.string1, &p.string2, &p.string3, &p.string4);
     test(L"%[^a]%[b]", L"testbbbb", &p, &p.string1, &p.string2);
+    test(L"%ls %ls", L"Привет мир", &p, &p.wstring1, &p.wstring2);
+    test(L"%ls %ls", L"こんにちは 世界", &p, &p.wstring1, &p.wstring2);
+    test(L"%ls %d %ls %d", L"αβγ 123 δεζ 456", &p, &p.wstring1, &p.ia, &p.wstring2, &p.ib);
+    test(L"%ls %ls %ls %ls", L"z ß 水 🍌", &p, &p.wstring1, &p.wstring2, &p.wstring3, &p.wstring4);
 
     // Scanf stolen from the url parsing in curl
     wchar_t protobuf[16];
@@ -80,26 +90,6 @@ int main ()
     }
 
     wprintf(L"%d \"%s\" \"%s\" \"%s\" \"%s\"\n", ret, &protobuf, &slashbuf, &hostbuf, &pathbuf);
-
-
-        wchar_t str1[20];
-    wchar_t str2[20];
-    wint_t status = swscanf(L"Привет мир", L"%ls %ls", str1, str2);
-    wprintf(L"--> 1 %d \"%ls\" \"%ls\"\n", status, &str1, &str2);
-wchar_t str12[20];
-    wchar_t str22[20];
-    wint_t status2 = swscanf(L"Привет мир", L"%s %s", str12, str22);
-    wprintf(L"==> 2 %d \"%s\" \"%s\"\n", status2, &str12, &str22);
-
-
-
-    wchar_t wcs[4];
-    wint_t status3 = swscanf(L"zß水🍌", L"%ls", &wcs);
-    wprintf(L"==> 2 %d \"%ls\"\n", status3, &wcs);
-
-    // It should be %ls
-    // wint_t status = swscanf(L"Привет мир", L"l%s %ls", str1, str2);
-    // wprintf(L"%d \"%ls\" \"%ls\"\n", status, &str1, &str2);
 
   return 0;
 }
