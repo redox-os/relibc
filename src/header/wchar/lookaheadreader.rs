@@ -1,19 +1,21 @@
 use super::{fseek_locked, ftell_locked, FILE, SEEK_SET};
-use crate::{io::Read, platform::types::off_t};
+use crate::{
+    io::Read,
+    platform::types::{off_t, wint_t},
+};
 struct LookAheadBuffer {
     buf: *const u32,
     pos: isize,
     look_ahead: isize,
 }
 impl LookAheadBuffer {
-    fn look_ahead(&mut self) -> Result<Option<u32>, i32> {
-        // TODO: byte is not an accurate name
-        let byte = unsafe { *self.buf.offset(self.look_ahead) };
-        if byte == 0 {
+    fn look_ahead(&mut self) -> Result<Option<wint_t>, i32> {
+        let wchar = unsafe { *self.buf.offset(self.look_ahead) };
+        if wchar == 0 {
             Ok(None)
         } else {
             self.look_ahead += 1;
-            Ok(Some(byte))
+            Ok(Some(wchar))
         }
     }
 

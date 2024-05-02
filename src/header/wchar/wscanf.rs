@@ -3,8 +3,6 @@ use crate::platform::types::*;
 use alloc::{string::String, vec::Vec};
 use core::ffi::VaList as va_list;
 
-// MB_CUR_MAX check this
-
 #[derive(PartialEq, Eq)]
 enum IntKind {
     Byte,
