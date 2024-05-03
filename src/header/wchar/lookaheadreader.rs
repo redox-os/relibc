@@ -4,7 +4,7 @@ use crate::{
     platform::types::{off_t, wint_t},
 };
 struct LookAheadBuffer {
-    buf: *const u32,
+    buf: *const wint_t,
     pos: isize,
     look_ahead: isize,
 }
@@ -24,8 +24,8 @@ impl LookAheadBuffer {
     }
 }
 
-impl From<*const u32> for LookAheadBuffer {
-    fn from(buff: *const u32) -> LookAheadBuffer {
+impl From<*const wint_t> for LookAheadBuffer {
+    fn from(buff: *const wint_t) -> LookAheadBuffer {
         LookAheadBuffer {
             buf: buff,
             pos: 0,
@@ -37,7 +37,7 @@ impl From<*const u32> for LookAheadBuffer {
 pub struct LookAheadReader(LookAheadBuffer);
 
 impl LookAheadReader {
-    pub fn lookahead1(&mut self) -> Result<Option<u32>, i32> {
+    pub fn lookahead1(&mut self) -> Result<Option<wint_t>, i32> {
         self.0.look_ahead()
     }
 
@@ -46,8 +46,8 @@ impl LookAheadReader {
     }
 }
 
-impl From<*const u32> for LookAheadReader {
-    fn from(buff: *const u32) -> LookAheadReader {
+impl From<*const wint_t> for LookAheadReader {
+    fn from(buff: *const wint_t) -> LookAheadReader {
         LookAheadReader(buff.into())
     }
 }

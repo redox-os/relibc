@@ -58,6 +58,7 @@ int main ()
     test(L"%ls %ls", L"Привет мир", &p, &p.wstring1, &p.wstring2);
     test(L"%ls %ls", L"こんにちは 世界", &p, &p.wstring1, &p.wstring2);
     test(L"%ls %d %ls %d", L"αβγ 123 δεζ 456", &p, &p.wstring1, &p.ia, &p.wstring2, &p.ib);
+    test(L"%ls %s %ls %s", L"αβγ test1 δεζ test2", &p, &p.wstring1, &p.string1, &p.wstring2, &p.string2);
     test(L"%ls %ls %ls %ls", L"z ß 水 🍌", &p, &p.wstring1, &p.wstring2, &p.wstring3, &p.wstring4);
 
     // Scanf stolen from the url parsing in curl
