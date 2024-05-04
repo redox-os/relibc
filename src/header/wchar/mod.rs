@@ -295,8 +295,7 @@ pub unsafe extern "C" fn swscanf(
     format: *const wchar_t,
     mut __valist: ...
 ) -> c_int {
-    let reader = (s as *const wint_t).into();
-    wscanf::scanf(reader, format, __valist.as_va_list())
+    vswscanf(s, format, __valist.as_va_list())
 }
 
 /// Push wide character `wc` back onto `stream` so it'll be read next
