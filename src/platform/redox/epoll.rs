@@ -26,10 +26,12 @@ fn epoll_to_event_flags(epoll: c_uint) -> syscall::EventFlags {
         event_flags |= syscall::EventFlags::EVENT_WRITE;
     }
 
+    /*TODO: support more EPOLL flags
     let unsupported = !(EPOLLIN | EPOLLOUT);
     if epoll & unsupported != 0 {
         eprintln!("epoll unsupported flags 0x{:X}", epoll & unsupported);
     }
+    */
 
     event_flags
 }
