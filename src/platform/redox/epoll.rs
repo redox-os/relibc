@@ -23,7 +23,7 @@ impl PalEpoll for Sys {
     fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> c_int {
         match op {
             EPOLL_CTL_ADD | EPOLL_CTL_MOD => {
-                Sys::write(
+                if Sys::write(
                     epfd,
                     &Event {
                         id: fd as usize,
@@ -33,10 +33,15 @@ impl PalEpoll for Sys {
                         // systems. If this is needed, use a box or something
                         data: unsafe { (*event).data.u64 as usize },
                     },
-                ) as c_int
+                ) < 0
+                {
+                    -1
+                } else {
+                    0
+                }
             }
             EPOLL_CTL_DEL => {
-                Sys::write(
+                if Sys::write(
                     epfd,
                     &Event {
                         id: fd as usize,
@@ -44,11 +49,16 @@ impl PalEpoll for Sys {
                         //TODO: Is data required?
                         data: 0,
                     },
-                ) as c_int
+                ) < 0
+                {
+                    -1
+                } else {
+                    0
+                }
             }
             _ => {
                 platform::ERRNO.set(EINVAL);
-                return -1;
+                -1
             }
         }
     }
