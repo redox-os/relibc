@@ -34,6 +34,20 @@ fn epoll_to_event_flags(epoll: c_uint) -> syscall::EventFlags {
     event_flags
 }
 
+fn event_flags_to_epoll(flags: syscall::EventFlags) -> c_uint {
+    let mut epoll = 0;
+
+    if flags.contains(syscall::EventFlags::EVENT_READ) {
+        epoll |= EPOLLIN;
+    }
+
+    if flags.contains(syscall::EventFlags::EVENT_WRITE) {
+        epoll |= EPOLLOUT;
+    }
+
+    epoll
+}
+
 impl PalEpoll for Sys {
     fn epoll_create1(flags: c_int) -> c_int {
         Sys::open(c_str!("event:"), O_RDWR | flags, 0)
@@ -153,7 +167,7 @@ impl PalEpoll for Sys {
                     }
                 }
                 *target_ptr = epoll_event {
-                    events: event.flags.bits() as _,
+                    events: event_flags_to_epoll(event.flags),
                     data: epoll_data {
                         u64: event.data as u64,
                     },
