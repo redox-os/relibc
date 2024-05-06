@@ -23,8 +23,8 @@ use goblin::elf64::{
 use syscall::{
     error::*,
     flag::{MapFlags, SEEK_SET},
-    GrantDesc, GrantFlags, Map, MAP_FIXED_NOREPLACE, MAP_SHARED, O_CLOEXEC, PAGE_SIZE, PROT_EXEC,
-    PROT_READ, PROT_WRITE, SetSighandlerData,
+    GrantDesc, GrantFlags, Map, SetSighandlerData, MAP_FIXED_NOREPLACE, MAP_SHARED, O_CLOEXEC,
+    PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE,
 };
 
 pub use self::arch::*;
