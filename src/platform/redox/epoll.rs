@@ -15,6 +15,25 @@ use syscall::{
     flag::EVENT_READ,
 };
 
+fn epoll_to_event_flags(epoll: c_uint) -> syscall::EventFlags {
+    let mut event_flags = syscall::EventFlags::empty();
+
+    if epoll & EPOLLIN != 0 {
+        event_flags |= syscall::EventFlags::EVENT_READ;
+    }
+
+    if epoll & EPOLLOUT != 0 {
+        event_flags |= syscall::EventFlags::EVENT_WRITE;
+    }
+
+    let unsupported = !(EPOLLIN | EPOLLOUT);
+    if epoll & unsupported != 0 {
+        eprintln!("epoll unsupported flags 0x{:X}", epoll & unsupported);
+    }
+
+    event_flags
+}
+
 impl PalEpoll for Sys {
     fn epoll_create1(flags: c_int) -> c_int {
         Sys::open(c_str!("event:"), O_RDWR | flags, 0)
@@ -27,8 +46,7 @@ impl PalEpoll for Sys {
                     epfd,
                     &Event {
                         id: fd as usize,
-                        flags: syscall::EventFlags::from_bits(unsafe { (*event).events as usize })
-                            .expect("epoll: invalid bit pattern"),
+                        flags: unsafe { epoll_to_event_flags((*event).events) },
                         // NOTE: Danger when using something smaller than 64-bit
                         // systems. If this is needed, use a box or something
                         data: unsafe { (*event).data.u64 as usize },
