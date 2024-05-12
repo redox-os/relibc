@@ -77,7 +77,7 @@ pub extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {
 #[panic_handler]
 #[linkage = "weak"]
 #[no_mangle]
-pub extern "C" fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
+pub fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
     relibc_panic(pi)
 }
 
