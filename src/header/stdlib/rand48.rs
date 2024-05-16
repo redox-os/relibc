@@ -1,6 +1,9 @@
 //! Helper functions for pseudorandom number generation using LCG, see https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/functions/drand48.html
 
-use crate::{platform::types::*, sync::{Mutex, MutexGuard}};
+use crate::{
+    platform::types::*,
+    sync::{Mutex, MutexGuard},
+};
 
 /// A 48-bit integer, used for the 48-bit arithmetic in these functions.
 #[derive(Clone, Copy, Default)]
@@ -108,11 +111,11 @@ impl Params {
          * with m = 2**48. The multiplication and addition can overflow a u64, but
          * we just let it wrap since we take mod 2**48 anyway. */
         (u64::from(self.a)
-        .wrapping_mul(u64::from(xsubi))
-        .wrapping_add(u64::from(self.c))
-        & 0xffff_ffff_ffff)
-        .try_into()
-        .unwrap()
+            .wrapping_mul(u64::from(xsubi))
+            .wrapping_add(u64::from(self.c))
+            & 0xffff_ffff_ffff)
+            .try_into()
+            .unwrap()
     }
 }
 
@@ -121,7 +124,9 @@ impl Params {
 pub fn params_lock<'a>() -> MutexGuard<'a, Params> {
     static PARAMS: Mutex<Params> = Mutex::<Params>::new(Params::new());
 
-    PARAMS.try_lock().expect("unable to acquire LCG parameter lock")
+    PARAMS
+        .try_lock()
+        .expect("unable to acquire LCG parameter lock")
 }
 
 /// Immediately get the global X_i lock, or panic if unsuccessful.
