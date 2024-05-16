@@ -1,23 +1,8 @@
 //! Helper functions for pseudorandom number generation using LCG, see https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/functions/drand48.html
 
-use crate::{platform::types::*, sync::Mutex};
+use crate::{platform::types::*, sync::{Mutex, MutexGuard}};
 
-const STATE_DEFAULT_VALUE: State = State {
-    xsubi: U48(0),
-    a: A_DEFAULT_VALUE,
-    c: 0xb,
-};
-pub static STATE: Mutex<State> = Mutex::<State>::new(STATE_DEFAULT_VALUE);
-pub const CONTENTION_MSG: &str = "attempted unsafe multithreaded access";
-
-// TODO: replace static mut?
-pub static mut SEED48_BUFFER: [c_ushort; 3] = [0; 3];
-
-/* Multiplier and addend, which may be set through lcong48(). Default
- * values as specified in POSIX. */
-const A_DEFAULT_VALUE: U48 = U48(0x5deece66d);
-const C_DEFAULT_VALUE: u16 = 0xb;
-
+/// A 48-bit integer, used for the 48-bit arithmetic in these functions.
 #[derive(Clone, Copy, Default)]
 #[repr(C)]
 pub struct U48(u64);
@@ -31,6 +16,12 @@ impl From<&[c_ushort; 3]> for U48 {
                 | (u64::from(value[1] as u16) << 16)
                 | (u64::from(value[2] as u16) << 32),
         }
+    }
+}
+
+impl From<&mut [c_ushort; 3]> for U48 {
+    fn from(value: &mut [c_ushort; 3]) -> Self {
+        Self::from(&*value)
     }
 }
 
@@ -84,43 +75,58 @@ impl U48 {
     }
 }
 
+/// The a and c parameters of an LCG.
 #[derive(Default)]
 #[repr(C)]
-pub struct State {
-    pub xsubi: U48,
+pub struct Params {
     pub a: U48,
     pub c: u16,
 }
 
-impl State {
-    pub fn step(&mut self) -> U48 {
-        let new_xsubi_value = step(self.xsubi, self.a, self.c);
-        self.xsubi = new_xsubi_value;
-        new_xsubi_value
+impl Params {
+    pub const fn new() -> Self {
+        // Default values as specified in POSIX
+        Params {
+            a: U48(0x5deece66d),
+            c: 0xb,
+        }
     }
 
-    pub fn step_other(&self, other: &mut [c_ushort; 3]) -> U48 {
-        let old_xsubi_value = U48::from(&*other);
-        let new_xsubi_value: U48 = step(old_xsubi_value, self.a, self.c);
-        *other = new_xsubi_value.into();
-        new_xsubi_value
+    pub fn reset(&mut self) {
+        *self = Self::new();
     }
 
-    pub fn reset_a_and_c(&mut self) {
-        self.a = A_DEFAULT_VALUE;
-        self.c = C_DEFAULT_VALUE;
+    /// For use in lcong48().
+    pub fn set(&mut self, a: &[c_ushort; 3], c: c_ushort) {
+        self.a = a.into();
+        self.c = c as u16; // Per POSIX, discard higher bits in case unsigned short is larger than u16
     }
-}
 
-fn step(xsubi: U48, a: U48, c: u16) -> U48 {
-    /* The recurrence relation of the linear congruential generator,
-     * X_(n+1) = (a * X_n + c) % m,
-     * with m = 2**48. The multiplication and addition can overflow a u64, but
-     * we just let it wrap since we take mod 2**48 anyway. */
-    (u64::from(a)
+    pub fn step(&self, xsubi: U48) -> U48 {
+        /* The recurrence relation of the linear congruential generator,
+         * X_(n+1) = (a * X_n + c) % m,
+         * with m = 2**48. The multiplication and addition can overflow a u64, but
+         * we just let it wrap since we take mod 2**48 anyway. */
+        (u64::from(self.a)
         .wrapping_mul(u64::from(xsubi))
-        .wrapping_add(u64::from(c))
+        .wrapping_add(u64::from(self.c))
         & 0xffff_ffff_ffff)
         .try_into()
         .unwrap()
+    }
+}
+
+// TODO: consider using rwlock instead of mutex for more fine-grained access
+/// Immediately get the global Params lock, or panic if unsuccessful.
+pub fn params_lock<'a>() -> MutexGuard<'a, Params> {
+    static PARAMS: Mutex<Params> = Mutex::<Params>::new(Params::new());
+
+    PARAMS.try_lock().expect("unable to acquire LCG parameter lock")
+}
+
+/// Immediately get the global X_i lock, or panic if unsuccessful.
+pub fn xsubi_lock<'a>() -> MutexGuard<'a, U48> {
+    static XSUBI: Mutex<U48> = Mutex::<U48>::new(U48(0));
+
+    XSUBI.try_lock().expect("unable to acquire LCG X_i lock")
 }
