@@ -263,9 +263,11 @@ pub extern "C" fn div(numer: c_int, denom: c_int) -> div_t {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn drand48() -> c_double {
-    let new_xsubi_value = rand48::generator_step(&mut rand48::DEFAULT_XSUBI);
-    rand48::f64_from_x(new_xsubi_value)
+pub extern "C" fn drand48() -> c_double {
+    let params = rand48::params_lock();
+    let mut xsubi = rand48::xsubi_lock();
+    *xsubi = params.step(*xsubi);
+    xsubi.get_f64()
 }
 
 // #[no_mangle]
@@ -280,8 +282,11 @@ pub extern "C" fn ecvt(
 
 #[no_mangle]
 pub unsafe extern "C" fn erand48(xsubi: *mut c_ushort) -> c_double {
-    let new_xsubi_value = rand48::generator_step(&mut *(xsubi as *mut [c_ushort; 3]));
-    rand48::f64_from_x(new_xsubi_value)
+    let params = rand48::params_lock();
+    let xsubi_mut: &mut [c_ushort; 3] = slice::from_raw_parts_mut(xsubi, 3).try_into().unwrap();
+    let new_xsubi_value = params.step(xsubi_mut.into());
+    *xsubi_mut = new_xsubi_value.into();
+    new_xsubi_value.get_f64()
 }
 
 #[no_mangle]
@@ -440,8 +445,11 @@ pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_
 
 #[no_mangle]
 pub unsafe extern "C" fn jrand48(xsubi: *mut c_ushort) -> c_long {
-    let new_xsubi_value = rand48::generator_step(&mut *(xsubi as *mut [c_ushort; 3]));
-    rand48::i32_from_x(new_xsubi_value)
+    let params = rand48::params_lock();
+    let xsubi_mut: &mut [c_ushort; 3] = slice::from_raw_parts_mut(xsubi, 3).try_into().unwrap();
+    let new_xsubi_value = params.step(xsubi_mut.into());
+    *xsubi_mut = new_xsubi_value.into();
+    new_xsubi_value.get_i32()
 }
 
 #[no_mangle]
@@ -490,16 +498,17 @@ pub extern "C" fn labs(i: c_long) -> c_long {
 
 #[no_mangle]
 pub unsafe extern "C" fn lcong48(param: *mut c_ushort) {
-    // Set DEFAULT_XSUBI buffer from elements 0-2
-    let xsubi_value = rand48::u48_from_ushort_arr3(&*(param as *const [c_ushort; 3]));
-    rand48::DEFAULT_XSUBI = rand48::ushort_arr3_from_u48(xsubi_value);
+    let mut xsubi = rand48::xsubi_lock();
+    let mut params = rand48::params_lock();
 
-    // Set multiplier from elements 3-5
-    rand48::A = rand48::u48_from_ushort_arr3(&*(param.offset(3) as *const [c_ushort; 3]));
+    let param_slice = slice::from_raw_parts(param, 7);
 
-    /* Set addend from element 6. Note that c_ushort may be more than 16
-     * bits, thus the cast. */
-    rand48::C = *param.offset(6) as u16;
+    let xsubi_ref: &[c_ushort; 3] = param_slice[0..3].try_into().unwrap();
+    let a_ref: &[c_ushort; 3] = param_slice[3..6].try_into().unwrap();
+    let c = param_slice[6];
+
+    *xsubi = xsubi_ref.into();
+    params.set(a_ref, c);
 }
 
 #[repr(C)]
@@ -536,9 +545,11 @@ pub extern "C" fn lldiv(numer: c_longlong, denom: c_longlong) -> lldiv_t {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lrand48() -> c_long {
-    let new_xsubi_value = rand48::generator_step(&mut rand48::DEFAULT_XSUBI);
-    rand48::u31_from_x(new_xsubi_value)
+pub extern "C" fn lrand48() -> c_long {
+    let params = rand48::params_lock();
+    let mut xsubi = rand48::xsubi_lock();
+    *xsubi = params.step(*xsubi);
+    xsubi.get_u31()
 }
 
 #[no_mangle]
@@ -694,15 +705,20 @@ pub unsafe extern "C" fn mkstemps(name: *mut c_char, suffix_len: c_int) -> c_int
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mrand48() -> c_long {
-    let new_xsubi_value = rand48::generator_step(&mut rand48::DEFAULT_XSUBI);
-    rand48::i32_from_x(new_xsubi_value)
+pub extern "C" fn mrand48() -> c_long {
+    let params = rand48::params_lock();
+    let mut xsubi = rand48::xsubi_lock();
+    *xsubi = params.step(*xsubi);
+    xsubi.get_i32()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn nrand48(xsubi: *mut c_ushort) -> c_long {
-    let new_xsubi_value = rand48::generator_step(&mut *(xsubi as *mut [c_ushort; 3]));
-    rand48::u31_from_x(new_xsubi_value)
+    let params = rand48::params_lock();
+    let xsubi_mut: &mut [c_ushort; 3] = slice::from_raw_parts_mut(xsubi, 3).try_into().unwrap();
+    let new_xsubi_value = params.step(xsubi_mut.into());
+    *xsubi_mut = new_xsubi_value.into();
+    new_xsubi_value.get_u31()
 }
 
 #[no_mangle]
@@ -978,17 +994,17 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
 
 #[no_mangle]
 pub unsafe extern "C" fn seed48(seed16v: *mut c_ushort) -> *mut c_ushort {
-    rand48::reset_a_and_c();
+    static mut BUFFER: [c_ushort; 3] = [0; 3];
 
-    // Stash current DEFAULT_XSUBI value in SEED48_XSUBI
-    rand48::SEED48_XSUBI = rand48::DEFAULT_XSUBI;
+    let mut params = rand48::params_lock();
+    let mut xsubi = rand48::xsubi_lock();
 
-    // Set DEFAULT_XSUBI from the argument provided
-    let xsubi_value = rand48::u48_from_ushort_arr3(&*(seed16v as *const [c_ushort; 3]));
-    rand48::DEFAULT_XSUBI = rand48::ushort_arr3_from_u48(xsubi_value);
+    let seed16v_ref: &[c_ushort; 3] = slice::from_raw_parts(seed16v, 3).try_into().unwrap();
 
-    // Return the stashed value
-    rand48::SEED48_XSUBI.as_mut_ptr()
+    BUFFER = (*xsubi).into();
+    *xsubi = seed16v_ref.into();
+    params.reset();
+    BUFFER.as_mut_ptr()
 }
 
 unsafe fn copy_kv(
@@ -1066,14 +1082,17 @@ pub unsafe extern "C" fn srand(seed: c_uint) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn srand48(seedval: c_long) {
-    rand48::reset_a_and_c();
+pub extern "C" fn srand48(seedval: c_long) {
+    let mut params = rand48::params_lock();
+    let mut xsubi = rand48::xsubi_lock();
 
+    params.reset();
     /* Set the high 32 bits of the 48-bit X_i value to the lower 32 bits
      * of the input argument, and the lower 16 bits to 0x330e, as
      * specified in POSIX. */
-    let xsubi_value = (u64::from(seedval as u32) << 16) | 0x330e;
-    rand48::DEFAULT_XSUBI = rand48::ushort_arr3_from_u48(xsubi_value);
+    *xsubi = ((u64::from(seedval as u32) << 16) | 0x330e)
+        .try_into()
+        .unwrap();
 }
 
 #[no_mangle]
