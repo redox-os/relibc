@@ -1,13 +1,10 @@
 use alloc::vec::Vec;
-use core::{arch::asm, mem, ptr, slice};
+use core::{arch::asm, cell::UnsafeCell, mem, ptr, slice, sync::atomic::AtomicBool};
 use goblin::error::{Error, Result};
 
 use super::ExpectTlsFree;
 use crate::{
-    header::sys_mman,
-    ld_so::linker::Linker,
-    platform::{Dlmalloc, Pal, Sys},
-    sync::mutex::Mutex,
+    header::sys_mman, ld_so::linker::Linker, platform::{Dlmalloc, Pal, Sys}, pthread::{OsTid, Pthread}, sync::{mutex::Mutex, waitval::Waitval}
 };
 
 #[repr(C)]
@@ -30,6 +27,7 @@ impl Master {
 
 #[derive(Debug)]
 #[repr(C)]
+// FIXME: Only return &Tcb, and use interior mutability, since it contains the Pthread struct
 pub struct Tcb {
     /// Pointer to the end of static TLS. Must be the first member
     pub tls_end: *mut u8,
@@ -49,6 +47,8 @@ pub struct Tcb {
     pub linker_ptr: *const Mutex<Linker>,
     /// pointer to rust memory allocator structure
     pub mspace: *const Mutex<Dlmalloc>,
+    /// Underlying pthread_t struct, pthread_self() returns &self.pthread
+    pub pthread: Pthread,
 }
 
 impl Tcb {
@@ -71,6 +71,15 @@ impl Tcb {
                 num_copied_masters: 0,
                 linker_ptr: ptr::null(),
                 mspace: ptr::null(),
+                pthread: Pthread {
+                    waitval: Waitval::new(),
+                    flags: Default::default(),
+                    has_enabled_cancelation: AtomicBool::new(false),
+                    has_queued_cancelation: AtomicBool::new(false),
+                    stack_base: core::ptr::null_mut(),
+                    stack_size: 0,
+                    os_tid: UnsafeCell::new(OsTid::default()),
+                },
             },
         );
 
