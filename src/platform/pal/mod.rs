@@ -10,7 +10,7 @@ use crate::{
         sys_utsname::utsname,
         time::timespec,
     },
-    pthread,
+    pthread::{self, Errno},
 };
 
 pub use self::epoll::PalEpoll;
@@ -190,7 +190,8 @@ pub trait Pal {
     ) -> Result<(), crate::pthread::Errno>;
     fn current_os_tid() -> crate::pthread::OsTid;
 
-    fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
+    fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno>;
+    fn pread(fildes: c_int, buf: &mut [u8], offset: off_t) -> Result<ssize_t, Errno>;
 
     fn readlink(pathname: CStr, out: &mut [u8]) -> ssize_t;
 
@@ -224,7 +225,8 @@ pub trait Pal {
 
     fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t;
 
-    fn write(fildes: c_int, buf: &[u8]) -> ssize_t;
+    fn write(fildes: c_int, buf: &[u8]) -> Result<ssize_t, Errno>;
+    fn pwrite(fildes: c_int, buf: &[u8], offset: off_t) -> Result<ssize_t, Errno>;
 
     fn verify() -> bool;
 }

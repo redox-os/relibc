@@ -24,7 +24,7 @@ use crate::{
         unistd::{F_OK, R_OK, W_OK, X_OK},
     },
     io::{self, prelude::*, BufReader},
-    pthread,
+    pthread::{self, Errno, ResultExt},
 };
 
 pub use redox_exec::FdGuard;
@@ -823,8 +823,20 @@ impl Pal for Sys {
         }
     }
 
-    fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
-        e(syscall::read(fd as usize, buf)) as ssize_t
+    fn read(fd: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno> {
+        Ok(syscall::read(fd as usize, buf)? as ssize_t)
+    }
+    fn pread(fd: c_int, buf: &mut [u8], offset: off_t) -> Result<ssize_t, Errno> {
+        unsafe {
+            Ok(syscall::syscall5(
+                syscall::SYS_READ2,
+                fd as usize,
+                buf.as_mut_ptr() as usize,
+                buf.len(),
+                offset as usize,
+                !0,
+            )? as ssize_t)
+        }
     }
 
     fn fpath(fildes: c_int, out: &mut [u8]) -> ssize_t {
@@ -870,7 +882,7 @@ impl Pal for Sys {
             pathname,
             fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
         ) {
-            Ok(file) => Self::read(*file, out),
+            Ok(file) => Self::read(*file, out).or_minus_one_errno(),
             Err(_) => return -1,
         }
     }
@@ -1111,8 +1123,20 @@ impl Pal for Sys {
         res as pid_t
     }
 
-    fn write(fd: c_int, buf: &[u8]) -> ssize_t {
-        e(syscall::write(fd as usize, buf)) as ssize_t
+    fn write(fd: c_int, buf: &[u8]) -> Result<ssize_t, Errno> {
+        Ok(syscall::write(fd as usize, buf)? as ssize_t)
+    }
+    fn pwrite(fd: c_int, buf: &[u8], offset: off_t) -> Result<ssize_t, Errno> {
+        unsafe {
+            Ok(syscall::syscall5(
+                syscall::SYS_WRITE2,
+                fd as usize,
+                buf.as_ptr() as usize,
+                buf.len(),
+                offset as usize,
+                !0,
+            )? as ssize_t)
+        }
     }
 
     fn verify() -> bool {
