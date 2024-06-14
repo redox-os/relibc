@@ -12,7 +12,8 @@ use crate::{
     header::{errno::*, pthread as header, sched::sched_param, sys_mman},
     ld_so::{
         linker::Linker,
-        tcb::{Master, Tcb}, ExpectTlsFree,
+        tcb::{Master, Tcb},
+        ExpectTlsFree,
     },
     platform::{types::*, Pal, Sys},
 };
@@ -23,7 +24,9 @@ const MAIN_PTHREAD_ID: usize = 1;
 
 /// Called only by the main thread, as part of relibc_start.
 pub unsafe fn init() {
-    Tcb::current().expect_notls("no TCB present for main thread").pthread = Pthread {
+    Tcb::current()
+        .expect_notls("no TCB present for main thread")
+        .pthread = Pthread {
         waitval: Waitval::new(),
         has_enabled_cancelation: AtomicBool::new(false),
         has_queued_cancelation: AtomicBool::new(false),
@@ -82,6 +85,28 @@ unsafe impl Sync for Pthread {}
 #[derive(Debug, Eq, PartialEq)]
 // TODO: Move to a more generic place.
 pub struct Errno(pub c_int);
+
+#[cfg(target_os = "redox")]
+impl From<syscall::Error> for Errno {
+    fn from(value: syscall::Error) -> Self {
+        Errno(value.errno)
+    }
+}
+
+pub trait ResultExt<T> {
+    fn or_minus_one_errno(self) -> T;
+}
+impl<T: From<i8>> ResultExt<T> for Result<T, Errno> {
+    fn or_minus_one_errno(self) -> T {
+        match self {
+            Self::Ok(v) => v,
+            Self::Err(Errno(errno)) => unsafe {
+                crate::platform::ERRNO.set(errno);
+                T::from(-1)
+            },
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Retval(pub *mut c_void);

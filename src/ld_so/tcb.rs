@@ -4,7 +4,11 @@ use goblin::error::{Error, Result};
 
 use super::ExpectTlsFree;
 use crate::{
-    header::sys_mman, ld_so::linker::Linker, platform::{Dlmalloc, Pal, Sys}, pthread::{OsTid, Pthread}, sync::{mutex::Mutex, waitval::Waitval}
+    header::sys_mman,
+    ld_so::linker::Linker,
+    platform::{Dlmalloc, Pal, Sys},
+    pthread::{OsTid, Pthread},
+    sync::{mutex::Mutex, waitval::Waitval},
 };
 
 #[repr(C)]
