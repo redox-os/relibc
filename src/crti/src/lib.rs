@@ -72,6 +72,8 @@ global_asm!(
 "#
 );
 
+// risc-v has no _init / _fini functions; it exclusively uses init/fini arrays
+
 #[linkage = "weak"]
 #[no_mangle]
 extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {

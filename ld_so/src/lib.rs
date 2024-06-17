@@ -62,6 +62,17 @@ _start:
 "
 );
 
+#[cfg(target_arch = "riscv64")]
+global_asm!(
+    "
+.globl _start
+_start:
+    mv a0, sp
+    jal relibc_ld_so_start
+    unimp
+"
+);
+
 #[no_mangle]
 pub unsafe extern "C" fn main(_argc: isize, _argv: *const *const i8) -> usize {
     // LD

@@ -60,6 +60,17 @@ _start:
 "
 );
 
+#[cfg(target_arch = "riscv64")]
+global_asm!(
+    "
+    .globl _start
+_start:
+    mv a0, sp
+    la t0, relibc_start
+    jalr ra, t0
+"
+);
+
 #[linkage = "weak"]
 #[no_mangle]
 extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {

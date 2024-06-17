@@ -77,7 +77,11 @@ pub(crate) type mcontext_t = mcontext;
 
 #[repr(C)]
 pub struct ucontext {
-    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    #[cfg(any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "riscv64"
+    ))]
     _pad: [usize; 1], // pad from 7*8 to 64
 
     #[cfg(target_arch = "x86")]
@@ -100,6 +104,8 @@ pub struct mcontext {
     _opaque: [u8; 864],
     #[cfg(target_arch = "aarch64")]
     _opaque: [u8; 272],
+    #[cfg(target_arch = "riscv64")]
+    _opaque: [u8; 520],
 }
 #[no_mangle]
 pub extern "C" fn __completely_unused_cbindgen_workaround_fn_ucontext_mcontext(

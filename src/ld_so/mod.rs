@@ -153,6 +153,13 @@ pub unsafe fn init(sp: &'static Stack) {
 
         tp = env.fsbase as usize;
     }
+    #[cfg(all(target_os = "redox", target_arch = "riscv64"))]
+    {
+        core::arch::asm!(
+            "mv {}, tp",
+            out(reg) tp,
+        );
+    }
 
     if tp == 0 {
         static_init(sp);
