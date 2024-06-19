@@ -361,19 +361,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "redox-exec"
+name = "redox-path"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64072665120942deff5fd5425d6c1811b854f4939e7f1c01ce755f64432bbea7"
+
+[[package]]
+name = "redox-rt"
 version = "0.1.0"
 dependencies = [
  "goblin",
  "plain",
  "redox_syscall",
 ]
-
-[[package]]
-name = "redox-path"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64072665120942deff5fd5425d6c1811b854f4939e7f1c01ce755f64432bbea7"
 
 [[package]]
 name = "redox_event"
@@ -415,8 +415,8 @@ dependencies = [
  "rand",
  "rand_jitter",
  "rand_xorshift",
- "redox-exec",
  "redox-path",
+ "redox-rt",
  "redox_event",
  "redox_syscall",
  "sc",

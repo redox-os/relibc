@@ -1,10 +1,5 @@
-#![no_std]
-#![feature(array_chunks, int_roundings, let_chains, slice_ptr_get)]
-#![forbid(unreachable_patterns)]
-
-extern crate alloc;
-
 use core::mem::size_of;
+use crate::{arch::*, auxv_defs::*};
 
 use alloc::{boxed::Box, collections::BTreeMap, vec};
 
@@ -26,9 +21,6 @@ use syscall::{
     GrantDesc, GrantFlags, Map, SetSighandlerData, MAP_FIXED_NOREPLACE, MAP_SHARED, O_CLOEXEC,
     PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE,
 };
-
-pub use self::arch::*;
-mod arch;
 
 pub enum FexecResult {
     Normal {
@@ -713,11 +705,6 @@ pub fn create_set_addr_space_buf(
     buf
 }
 
-#[path = "../../../auxv_defs.rs"]
-pub mod auxv_defs;
-
-use auxv_defs::*;
-
 /// Spawns a new context which will not share the same address space as the current one. File
 /// descriptors from other schemes are reobtained with `dup`, and grants referencing such file
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
@@ -732,7 +719,7 @@ pub fn fork_impl() -> Result<usize> {
     Ok(pid)
 }
 
-fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
+pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     let (cur_filetable_fd, new_pid_fd, new_pid);
 
     {

@@ -10,11 +10,11 @@ use syscall::{
 use crate::sync::rwlock::Rwlock;
 
 use super::{
-    extra::{create_set_addr_space_buf, FdGuard},
+    extra::FdGuard,
     signal::sighandler_function,
 };
 
-pub use redox_exec::*;
+pub use redox_rt::proc::*;
 
 static CLONE_LOCK: Rwlock = Rwlock::new(crate::pthread::Pshared::Private);
 

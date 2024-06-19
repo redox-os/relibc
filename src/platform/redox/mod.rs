@@ -27,7 +27,7 @@ use crate::{
     pthread::{self, Errno, ResultExt},
 };
 
-pub use redox_exec::FdGuard;
+pub use redox_rt::proc::FdGuard;
 
 use super::{types::*, Pal, Read, ERRNO};
 

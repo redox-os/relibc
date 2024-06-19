@@ -1,6 +1,6 @@
 use syscall::error::*;
 
-use crate::{fork_inner, FdGuard};
+use crate::proc::{fork_inner, FdGuard};
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 47;

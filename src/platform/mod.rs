@@ -33,7 +33,7 @@ pub mod rlb;
 pub mod auxv_defs;
 
 #[cfg(target_os = "redox")]
-pub use redox_exec::auxv_defs;
+pub use redox_rt::auxv_defs;
 
 use self::types::*;
 pub mod types;
