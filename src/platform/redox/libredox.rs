@@ -4,7 +4,7 @@ use syscall::{Error, Result, WaitFlags, EMFILE};
 
 use crate::{
     header::{
-        errno::EINVAL, signal::sigaction, sys_stat::UTIME_NOW, sys_uio::iovec, time::timespec,
+        errno::EINVAL, signal::{sigaction, SIG_SETMASK}, sys_stat::UTIME_NOW, sys_uio::iovec, time::timespec,
     },
     platform::types::*,
 };
@@ -249,7 +249,7 @@ pub unsafe extern "C" fn redox_sigaction_v1(
     new: *const sigaction,
     old: *mut sigaction,
 ) -> RawResult {
-    Error::mux(super::signal::sigaction_impl(signal as i32, new.as_ref(), old.as_mut()).map(|()| 0))
+    todo!()
 }
 
 #[no_mangle]
@@ -258,7 +258,7 @@ pub unsafe extern "C" fn redox_sigprocmask_v1(
     new: *const u64,
     old: *mut u64,
 ) -> RawResult {
-    Error::mux(super::signal::sigprocmask_impl(how as i32, new, old).map(|()| 0))
+    todo!()
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_mmap_v1(

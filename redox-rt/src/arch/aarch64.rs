@@ -89,3 +89,15 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov x8, {SYS_SIGRETURN}
     svc 0
 "] <= [inner = sym inner_c, SYS_SIGRETURN = const SYS_SIGRETURN]);
+
+asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
+    # Load registers
+    ldp x8, x0, [sp], #16
+    ldp x1, x2, [sp], #16
+    ldp x3, x4, [sp], #16
+
+    # Call entry point
+    blr x8
+
+    ret
+"]);

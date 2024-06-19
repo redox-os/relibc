@@ -101,3 +101,22 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov eax, {SYS_SIGRETURN}
     int 0x80
 "] <= [inner = sym inner_fastcall, SYS_SIGRETURN = const SYS_SIGRETURN]);
+
+asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
+    # Load registers
+    pop eax
+
+    sub esp, 8
+
+    mov DWORD PTR [esp], 0x00001F80
+    # TODO: ldmxcsr [esp]
+    mov WORD PTR [esp], 0x037F
+    fldcw [esp]
+
+    add esp, 8
+
+    # Call entry point
+    call eax
+
+    ret
+"] <= []);

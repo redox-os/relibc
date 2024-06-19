@@ -306,7 +306,7 @@ pub fn execve(
         unreachable!()
     } else {
         let mut sigprocmask = 0_u64;
-        syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut sigprocmask)).unwrap();
+        redox_rt::signal::set_sigmask(None, Some(&mut sigprocmask)).unwrap();
 
         let extrainfo = ExtraInfo {
             cwd: Some(&cwd),

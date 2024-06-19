@@ -132,7 +132,7 @@ pub(crate) unsafe fn create(
 
     let mut procmask = 0_u64;
     #[cfg(target_os = "redox")]
-    syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut procmask))
+    redox_rt::signal::set_sigmask(None, Some(&mut procmask))
         .expect("failed to obtain sigprocmask for caller");
 
     // Create a locked mutex, unlocked by the thread after it has started.
@@ -242,7 +242,7 @@ unsafe extern "C" fn new_thread_shim(
     (&*mutex).manual_unlock();
 
     #[cfg(target_os = "redox")]
-    syscall::sigprocmask(syscall::SIG_SETMASK, Some(&procmask), None)
+    redox_rt::signal::set_sigmask(Some(procmask), None)
         .expect("failed to set procmask in child thread");
 
     let retval = entry_point(arg);

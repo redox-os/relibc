@@ -710,11 +710,11 @@ pub fn create_set_addr_space_buf(
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
 pub fn fork_impl() -> Result<usize> {
     let mut old_mask = 0_u64;
-    syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut old_mask))?;
+    crate::signal::set_sigmask(None, Some(&mut old_mask))?;
     let pid = unsafe { Error::demux(__relibc_internal_fork_wrapper())? };
 
     if pid == 0 {
-        syscall::sigprocmask(syscall::SIG_SETMASK, Some(&old_mask), None)?;
+        crate::signal::set_sigmask(Some(old_mask), None)?;
     }
     Ok(pid)
 }

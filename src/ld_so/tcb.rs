@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use syscall::Sigcontrol;
 use core::{arch::asm, cell::UnsafeCell, mem, ptr, slice, sync::atomic::AtomicBool};
 use goblin::error::{Error, Result};
 
@@ -53,6 +54,8 @@ pub struct Tcb {
     pub mspace: *const Mutex<Dlmalloc>,
     /// Underlying pthread_t struct, pthread_self() returns &self.pthread
     pub pthread: Pthread,
+    #[cfg(target_os = "redox")]
+    pub sigcontrol: Sigcontrol,
 }
 
 impl Tcb {
@@ -84,6 +87,8 @@ impl Tcb {
                     stack_size: 0,
                     os_tid: UnsafeCell::new(OsTid::default()),
                 },
+                #[cfg(target_os = "redox")]
+                sigcontrol: Default::default(),
             },
         );
 

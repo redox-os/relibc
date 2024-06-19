@@ -1,4 +1,3 @@
-use syscall::number::SYS_SIGRETURN;
 use syscall::error::*;
 
 use crate::proc::{fork_inner, FdGuard};
@@ -103,9 +102,9 @@ asmfunction!(__relibc_internal_sigentry_fxsave: ["
     fxrstor64 [rsp]
     add rsp, 4096
 
-    mov eax, {SYS_SIGRETURN}
+    //mov eax, {{SYS_SIGRETURN}}
     syscall
-"] <= [inner = sym inner_c, SYS_SIGRETURN = const SYS_SIGRETURN]);
+"] <= [inner = sym inner_c]);
 asmfunction!(__relibc_internal_sigentry_xsave: ["
     sub rsp, 4096
 
@@ -127,6 +126,31 @@ asmfunction!(__relibc_internal_sigentry_xsave: ["
     xrstor [rsp]
     add rsp, 4096
 
-    mov eax, {SYS_SIGRETURN}
+    //mov eax, {{SYS_SIGRETURN}}
     syscall
-"] <= [inner = sym inner_c, SYS_SIGRETURN = const SYS_SIGRETURN]);
+"] <= [inner = sym inner_c]);
+
+asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
+    # Load registers
+    pop rax
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop r8
+    pop r9
+
+    sub rsp, 8
+
+    mov DWORD PTR [rsp], 0x00001F80
+    ldmxcsr [rsp]
+    mov WORD PTR [rsp], 0x037F
+    fldcw [rsp]
+
+    add rsp, 8
+
+    # Call entry point
+    call rax
+
+    ret
+"] <= []);

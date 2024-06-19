@@ -1,4 +1,7 @@
+use core::cell::Cell;
 use core::ffi::c_int;
+
+use syscall::{Result, Sigcontrol};
 
 use crate::arch::*;
 
@@ -21,11 +24,7 @@ pub fn sighandler_function() -> usize {
     }
 }
 
-pub fn setup_sighandler() {
-    // TODO
-    let altstack_base = 0_usize;
-    let altstack_len = 0_usize;
-
+pub fn setup_sighandler(control: &Sigcontrol) {
     #[cfg(target_arch = "x86_64")]
     {
         let cpuid_eax1_ecx = unsafe { core::arch::x86_64::__cpuid(1) }.ecx;
@@ -33,9 +32,9 @@ pub fn setup_sighandler() {
     }
 
     let data = syscall::SetSighandlerData {
-        entry: sighandler_function(),
-        altstack_base,
-        altstack_len,
+        user_handler: sighandler_function(),
+        excp_handler: 0, // TODO
+        word_addr: control as *const Sigcontrol as usize,
     };
 
     let fd = syscall::open(
@@ -55,13 +54,14 @@ pub struct SigStack {
     #[cfg(target_arch = "x86")]
     fx: [u8; 512],
 
-    kernel_pushed: syscall::SignalStack,
+    sa_handler: usize,
+    sig_num: usize,
 }
 
 #[inline(always)]
 unsafe fn inner(stack: &mut SigStack) {
-    let handler: extern "C" fn(c_int) = core::mem::transmute(stack.kernel_pushed.sa_handler);
-    handler(stack.kernel_pushed.sig_num as c_int)
+    let handler: extern "C" fn(c_int) = core::mem::transmute(stack.sa_handler);
+    handler(stack.sig_num as c_int)
 }
 #[cfg(not(target_arch = "x86"))]
 pub(crate) unsafe extern "C" fn inner_c(stack: usize) {
@@ -70,4 +70,47 @@ pub(crate) unsafe extern "C" fn inner_c(stack: usize) {
 #[cfg(target_arch = "x86")]
 unsafe extern "fastcall" fn inner_fastcall(stack: usize) {
     inner(&mut *(stack as *mut SigStack))
+}
+
+pub fn set_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
+    todo!()
+}
+pub fn or_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
+    todo!()
+}
+pub fn andn_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
+    todo!()
+}
+
+extern "C" {
+    pub fn __relibc_internal_get_sigcontrol_addr() -> &'static Sigcontrol;
+}
+
+pub struct TmpDisableSignalsGuard { _inner: () }
+
+#[thread_local]
+static TMP_DISABLE_SIGNALS_DEPTH: Cell<u64> = Cell::new(0);
+
+pub fn tmp_disable_signals() -> TmpDisableSignalsGuard {
+    unsafe {
+        let ctl = __relibc_internal_get_sigcontrol_addr().control_flags.get();
+        ctl.write_volatile(ctl.read_volatile() | syscall::flag::INHIBIT_DELIVERY);
+        // TODO: fence?
+        TMP_DISABLE_SIGNALS_DEPTH.set(TMP_DISABLE_SIGNALS_DEPTH.get() + 1);
+    }
+
+    TmpDisableSignalsGuard { _inner: () }
+}
+impl Drop for TmpDisableSignalsGuard {
+    fn drop(&mut self) {
+        unsafe {
+            let old = TMP_DISABLE_SIGNALS_DEPTH.get();
+            TMP_DISABLE_SIGNALS_DEPTH.set(old - 1);
+
+            if old == 1 {
+                let ctl = __relibc_internal_get_sigcontrol_addr().control_flags.get();
+                ctl.write_volatile(ctl.read_volatile() & !syscall::flag::INHIBIT_DELIVERY);
+            }
+        }
+    }
 }

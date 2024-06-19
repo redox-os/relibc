@@ -7,7 +7,7 @@ use cbitset::BitSet;
 use crate::{
     header::{errno, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},
-    pthread,
+    pthread::{self, ResultExt},
 };
 
 pub use self::sys::*;
@@ -107,13 +107,7 @@ pub unsafe extern "C" fn sigaction(
     act: *const sigaction,
     oact: *mut sigaction,
 ) -> c_int {
-    let act_opt = act.as_ref().map(|act| {
-        let mut act_clone = act.clone();
-        act_clone.sa_flags |= SA_RESTORER as c_ulong;
-        act_clone.sa_restorer = Some(__restore_rt);
-        act_clone
-    });
-    Sys::sigaction(sig, act_opt.as_ref(), oact.as_mut())
+    Sys::sigaction(sig, act.as_ref(), oact.as_mut()).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -270,14 +264,22 @@ pub unsafe extern "C" fn sigprocmask(
     set: *const sigset_t,
     oset: *mut sigset_t,
 ) -> c_int {
-    let set = set.as_ref().map(|&block| block & !RLCT_SIGNAL_MASK);
+    (|| {
+        let set = set.as_ref().map(|&block| block & !RLCT_SIGNAL_MASK);
+        let mut oset = oset.as_mut();
 
-    Sys::sigprocmask(
-        how,
-        set.as_ref()
-            .map_or(core::ptr::null(), |r| r as *const sigset_t),
-        oset,
-    )
+        Sys::sigprocmask(
+            how,
+            set.as_ref(),
+            oset.as_deref_mut(), // as_deref_mut for lifetime reasons
+        )?;
+
+        if let Some(oset) = oset {
+            *oset &= !RLCT_SIGNAL_MASK;
+        }
+
+        Ok(0)
+    })().or_minus_one_errno()
 }
 
 #[no_mangle]

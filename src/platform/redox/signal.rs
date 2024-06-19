@@ -1,5 +1,5 @@
 use core::mem;
-use syscall::{self, number::SYS_SIGRETURN, Result, SetSighandlerData, SignalStack};
+use syscall::{self, Result};
 
 use super::{
     super::{types::*, Pal, PalSignal},
@@ -8,11 +8,11 @@ use super::{
 use crate::{
     header::{
         errno::{EINVAL, ENOSYS},
-        signal::{sigaction, siginfo_t, sigset_t, stack_t},
+        signal::{sigaction, siginfo_t, sigset_t, stack_t, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK},
         sys_time::{itimerval, ITIMER_REAL},
         time::timespec,
     },
-    platform::ERRNO,
+    platform::ERRNO, pthread::Errno,
 };
 
 impl PalSignal for Sys {
@@ -104,8 +104,8 @@ impl PalSignal for Sys {
         0
     }
 
-    fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> c_int {
-        e(sigaction_impl(sig, act, oact).map(|()| 0)) as c_int
+    fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> Result<(), Errno> {
+        todo!()
     }
 
     unsafe fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
@@ -117,8 +117,14 @@ impl PalSignal for Sys {
         -1
     }
 
-    unsafe fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
-        e(sigprocmask_impl(how, set, oset).map(|()| 0)) as c_int
+    fn sigprocmask(how: c_int, set: Option<&sigset_t>, oset: Option<&mut sigset_t>) -> Result<(), Errno> {
+        Ok(match how {
+            SIG_SETMASK => redox_rt::signal::set_sigmask(set.copied(), oset)?,
+            SIG_BLOCK => redox_rt::signal::or_sigmask(set.copied(), oset)?,
+            SIG_UNBLOCK => redox_rt::signal::andn_sigmask(set.copied(), oset)?,
+
+            _ => return Err(Errno(EINVAL)),
+        })
     }
 
     unsafe fn sigsuspend(set: *const sigset_t) -> c_int {
@@ -134,35 +140,4 @@ impl PalSignal for Sys {
         ERRNO.set(ENOSYS);
         -1
     }
-}
-pub(crate) fn sigaction_impl(
-    sig: i32,
-    act: Option<&sigaction>,
-    oact: Option<&mut sigaction>,
-) -> Result<()> {
-    let new_opt = act.map(|act| {
-        let sa_handler = unsafe { mem::transmute(act.sa_handler) };
-        syscall::SigAction {
-            sa_handler,
-            sa_mask: act.sa_mask as u64,
-            sa_flags: syscall::SigActionFlags::from_bits(act.sa_flags as usize)
-                .expect("sigaction: invalid bit pattern"),
-        }
-    });
-    let mut old_opt = oact.as_ref().map(|_| syscall::SigAction::default());
-    syscall::sigaction(sig as usize, new_opt.as_ref(), old_opt.as_mut())?;
-    if let (Some(old), Some(oact)) = (old_opt, oact) {
-        oact.sa_handler = unsafe { mem::transmute(old.sa_handler) };
-        oact.sa_mask = old.sa_mask as sigset_t;
-        oact.sa_flags = old.sa_flags.bits() as c_ulong;
-    }
-    Ok(())
-}
-pub(crate) unsafe fn sigprocmask_impl(
-    how: i32,
-    set: *const sigset_t,
-    oset: *mut sigset_t,
-) -> Result<()> {
-    syscall::sigprocmask(how as usize, set.as_ref(), oset.as_mut())?;
-    Ok(())
 }

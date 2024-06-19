@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(asm_const, array_chunks, int_roundings, let_chains, slice_ptr_get)]
+#![feature(asm_const, array_chunks, int_roundings, let_chains, slice_ptr_get, sync_unsafe_cell, thread_local)]
 #![forbid(unreachable_patterns)]
 
 extern crate alloc;
@@ -31,3 +31,4 @@ pub mod proc;
 pub mod auxv_defs;
 
 pub mod signal;
+pub mod thread;
