@@ -44,12 +44,7 @@ unsafe extern "C" fn __relibc_internal_fork_hook(cur_filetable_fd: usize, new_pi
     let _ = syscall::close(new_pid_fd);
 }
 
-core::arch::global_asm!(
-    "
-    .p2align 6
-    .globl __relibc_internal_fork_wrapper
-    .type __relibc_internal_fork_wrapper, @function
-__relibc_internal_fork_wrapper:
+asmfunction!(__relibc_internal_fork_wrapper: ["
     stp     x29, x30, [sp, #-16]!
     stp     x27, x28, [sp, #-16]!
     stp     x25, x26, [sp, #-16]!
@@ -64,13 +59,9 @@ __relibc_internal_fork_wrapper:
     mov x0, sp
     bl __relibc_internal_fork_impl
     b 2f
+"]);
 
-    .size __relibc_internal_fork_wrapper, . - __relibc_internal_fork_wrapper
-
-    .p2align 6
-    .globl __relibc_internal_fork_ret
-    .type __relibc_internal_fork_ret, @function
-__relibc_internal_fork_ret:
+asmfunction!(__relibc_internal_fork_hook: ["
     ldp x0, x1, [sp]
     bl __relibc_internal_fork_hook
 
@@ -89,11 +80,12 @@ __relibc_internal_fork_ret:
     ldp     x29, x30, [sp], #16
 
     ret
+"]);
 
-    .size __relibc_internal_fork_ret, . - __relibc_internal_fork_ret"
-);
+asmfunction!(__relibc_internal_sigentry: ["
+    mov x0, sp
+    bl {inner}
 
-extern "C" {
-    pub(crate) fn __relibc_internal_fork_wrapper() -> usize;
-    pub(crate) fn __relibc_internal_fork_ret();
-}
+    mov x8, {SYS_SIGRETURN}
+    svc 0
+"] <= [inner = sym inner_c, SYS_SIGRETURN = const SYS_SIGRETURN]);

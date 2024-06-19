@@ -9,10 +9,7 @@ use syscall::{
 
 use crate::sync::rwlock::Rwlock;
 
-use super::{
-    extra::FdGuard,
-    signal::sighandler_function,
-};
+use redox_rt::{proc::FdGuard, signal::sighandler_function};
 
 pub use redox_rt::proc::*;
 

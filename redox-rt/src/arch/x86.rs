@@ -45,13 +45,7 @@ unsafe extern "cdecl" fn __relibc_internal_fork_hook(cur_filetable_fd: usize, ne
     let _ = syscall::close(new_pid_fd);
 }
 
-//TODO: x86
-core::arch::global_asm!(
-    "
-    .p2align 6
-    .globl __relibc_internal_fork_wrapper
-    .type __relibc_internal_fork_wrapper, @function
-__relibc_internal_fork_wrapper:
+asmfunction!(__relibc_internal_fork_wrapper: ["
     push ebp
     mov ebp, esp
 
@@ -70,13 +64,9 @@ __relibc_internal_fork_wrapper:
     call __relibc_internal_fork_impl
     pop esp
     jmp 2f
+"] <= []);
 
-    .size __relibc_internal_fork_wrapper, . - __relibc_internal_fork_wrapper
-
-    .p2align 6
-    .globl __relibc_internal_fork_ret
-    .type __relibc_internal_fork_ret, @function
-__relibc_internal_fork_ret:
+asmfunction!(__relibc_internal_fork_ret: ["
     // Arguments already on the stack
     call __relibc_internal_fork_hook
 
@@ -97,11 +87,17 @@ __relibc_internal_fork_ret:
 
     pop ebp
     ret
+"] <= []);
+asmfunction!(__relibc_internal_sigentry: ["
+    sub esp, 512
+    fxsave [esp]
 
-    .size __relibc_internal_fork_ret, . - __relibc_internal_fork_ret"
-);
+    mov ecx, esp
+    call {inner}
 
-extern "cdecl" {
-    pub(crate) fn __relibc_internal_fork_wrapper() -> usize;
-    pub(crate) fn __relibc_internal_fork_ret();
-}
+    add esp, 512
+    fxrstor [esp]
+
+    mov eax, {SYS_SIGRETURN}
+    int 0x80
+"] <= [inner = sym inner_fastcall, SYS_SIGRETURN = const SYS_SIGRETURN]);

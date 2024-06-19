@@ -795,7 +795,7 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
                         continue;
                     }
 
-                    let mut buf;
+                    let buf;
 
                     // TODO: write! using some #![no_std] Cursor type (tracking the length)?
                     #[cfg(target_pointer_width = "64")]

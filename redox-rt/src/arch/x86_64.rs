@@ -1,6 +1,8 @@
+use syscall::number::SYS_SIGRETURN;
 use syscall::error::*;
 
 use crate::proc::{fork_inner, FdGuard};
+use crate::signal::inner_c;
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 47;
@@ -45,12 +47,7 @@ unsafe extern "sysv64" fn __relibc_internal_fork_hook(cur_filetable_fd: usize, n
     let _ = syscall::close(new_pid_fd);
 }
 
-core::arch::global_asm!(
-    "
-    .p2align 6
-    .globl __relibc_internal_fork_wrapper
-    .type __relibc_internal_fork_wrapper, @function
-__relibc_internal_fork_wrapper:
+asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
     push rbp
     mov rbp, rsp
 
@@ -70,12 +67,8 @@ __relibc_internal_fork_wrapper:
     call __relibc_internal_fork_impl
     jmp 2f
 
-    .size __relibc_internal_fork_wrapper, . - __relibc_internal_fork_wrapper
-
-    .p2align 6
-    .globl __relibc_internal_fork_ret
-    .type __relibc_internal_fork_ret, @function
-__relibc_internal_fork_ret:
+"] <= []);
+asmfunction!(__relibc_internal_fork_ret: ["
     mov rdi, [rsp]
     mov rsi, [rsp + 8]
     call __relibc_internal_fork_hook
@@ -97,11 +90,43 @@ __relibc_internal_fork_ret:
 
     pop rbp
     ret
+"] <= []);
+// TODO: is the memset necessary?
+asmfunction!(__relibc_internal_sigentry_fxsave: ["
+    sub rsp, 4096
 
-    .size __relibc_internal_fork_ret, . - __relibc_internal_fork_ret"
-);
+    fxsave64 [rsp]
 
-extern "sysv64" {
-    pub(crate) fn __relibc_internal_fork_wrapper() -> usize;
-    pub(crate) fn __relibc_internal_fork_ret();
-}
+    mov rdi, rsp
+    call {inner}
+
+    fxrstor64 [rsp]
+    add rsp, 4096
+
+    mov eax, {SYS_SIGRETURN}
+    syscall
+"] <= [inner = sym inner_c, SYS_SIGRETURN = const SYS_SIGRETURN]);
+asmfunction!(__relibc_internal_sigentry_xsave: ["
+    sub rsp, 4096
+
+    cld
+    mov rdi, rsp
+    xor eax, eax
+    mov ecx, 4096
+    rep stosb
+
+    mov eax, 0xffffffff
+    mov edx, eax
+    xsave [rsp]
+
+    mov rdi, rsp
+    call {inner}
+
+    mov eax, 0xffffffff
+    mov edx, eax
+    xrstor [rsp]
+    add rsp, 4096
+
+    mov eax, {SYS_SIGRETURN}
+    syscall
+"] <= [inner = sym inner_c, SYS_SIGRETURN = const SYS_SIGRETURN]);
