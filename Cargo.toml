@@ -73,3 +73,6 @@ panic = "abort"
 
 [profile.release]
 panic = "abort"
+
+[patch.crates-io]
+redox_syscall = { git = "https://gitlab.redox-os.org/4lDO2/syscall.git", branch = "usignal" }
