@@ -316,8 +316,8 @@ unsafe fn dealloc_thread(thread: &Pthread) {
     OS_TID_TO_PTHREAD.lock().remove(&thread.os_tid.get().read());
     //drop(Box::from_raw(thread as *const Pthread as *mut Pthread));
 }
-pub const SIGRT_RLCT_CANCEL: usize = 32;
-pub const SIGRT_RLCT_TIMER: usize = 33;
+pub const SIGRT_RLCT_CANCEL: usize = 33;
+pub const SIGRT_RLCT_TIMER: usize = 34;
 
 unsafe extern "C" fn cancel_sighandler(_: c_int) {
     cancel_current_thread();
