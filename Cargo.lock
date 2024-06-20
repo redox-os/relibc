@@ -144,6 +144,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "generic-rt"
+version = "0.1.0"
+
+[[package]]
 name = "goblin"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -362,6 +366,7 @@ name = "redox-rt"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "generic-rt",
  "goblin",
  "plain",
  "redox_syscall",
@@ -395,6 +400,7 @@ dependencies = [
  "cbitset",
  "cc",
  "dlmalloc",
+ "generic-rt",
  "goblin",
  "libc",
  "md-5",

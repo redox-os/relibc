@@ -143,9 +143,15 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
             // TODO: handle tmp_disable_signals
         }
         // TODO: Handle pending signals before these flags are set.
-        (SIGTSTP, Sigaction::Default) => PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TSTP_IS_STOP_BIT, Ordering::SeqCst),
-        (SIGTTIN, Sigaction::Default) => PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TTIN_IS_STOP_BIT, Ordering::SeqCst),
-        (SIGTTOU, Sigaction::Default) => PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TTOU_IS_STOP_BIT, Ordering::SeqCst),
+        (SIGTSTP, Sigaction::Default) => {
+            PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TSTP_IS_STOP_BIT, Ordering::SeqCst);
+        }
+        (SIGTTIN, Sigaction::Default) => {
+            PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TTIN_IS_STOP_BIT, Ordering::SeqCst);
+        }
+        (SIGTTOU, Sigaction::Default) => {
+            PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TTOU_IS_STOP_BIT, Ordering::SeqCst);
+        }
 
         (_, Sigaction::Default) => (),
         (_, Sigaction::Handled { .. }) => (),
@@ -274,4 +280,9 @@ pub fn setup_sighandler(control: &Sigcontrol) {
     .expect("failed to open thisproc:current/sighandler");
     syscall::write(fd, &data).expect("failed to write to thisproc:current/sighandler");
     let _ = syscall::close(fd);
+}
+#[derive(Debug, Default)]
+pub struct RtSigarea {
+    pub control: Sigcontrol,
+    pub arch: crate::arch::SigArea,
 }

@@ -15,6 +15,7 @@ members = [
     "src/crtn",
     "redox-rt",
     "ld_so",
+    "generic-rt",
 ]
 exclude = ["tests", "dlmalloc-rs"]
 
@@ -42,6 +43,7 @@ bcrypt-pbkdf = { version = "0.10", default-features = false, features = ["alloc"
 scrypt = { version = "0.11", default-features = false, features = ["simple"]}
 pbkdf2 = { version = "0.12", features = ["sha2"]}
 sha2 = { version = "0.10", default-features = false }
+generic-rt = { path = "generic-rt" }
 
 [dependencies.goblin]
 version = "0.7"

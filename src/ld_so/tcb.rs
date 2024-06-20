@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
+use generic_rt::GenericTcb;
 use syscall::Sigcontrol;
-use core::{arch::asm, cell::UnsafeCell, mem::{self, offset_of}, ptr, slice, sync::atomic::AtomicBool};
+use core::{arch::asm, cell::UnsafeCell, mem, ops::{Deref, DerefMut}, ptr, slice, sync::atomic::AtomicBool};
 use goblin::error::{Error, Result};
 
 use super::ExpectTlsFree;
@@ -30,18 +31,17 @@ impl Master {
     }
 }
 
+#[cfg(target_os = "linux")]
+type OsSpecific = ();
+
+#[cfg(target_os = "redox")]
+type OsSpecific = redox_rt::signal::RtSigarea;
+
 #[derive(Debug)]
 #[repr(C)]
 // FIXME: Only return &Tcb, and use interior mutability, since it contains the Pthread struct
 pub struct Tcb {
-    /// Pointer to the end of static TLS. Must be the first member
-    pub tls_end: *mut u8,
-    /// Size of the memory allocated for the static TLS in bytes (multiple of page size)
-    pub tls_len: usize,
-    /// Pointer to this structure
-    pub tcb_ptr: *mut Tcb,
-    /// Size of the memory allocated for this structure in bytes (should be same as page size)
-    pub tcb_len: usize,
+    pub generic: GenericTcb<OsSpecific>,
     /// Pointer to a list of initial TLS data
     pub masters_ptr: *mut Master,
     /// Size of the masters list in bytes (multiple of mem::size_of::<Master>())
@@ -54,13 +54,6 @@ pub struct Tcb {
     pub mspace: *const Mutex<Dlmalloc>,
     /// Underlying pthread_t struct, pthread_self() returns &self.pthread
     pub pthread: Pthread,
-    #[cfg(target_os = "redox")]
-    pub sigcontrol: RtSigarea,
-}
-#[derive(Debug, Default)]
-pub struct RtSigarea {
-    pub control: Sigcontrol,
-    pub internal: [usize; 4],
 }
 
 impl Tcb {
@@ -74,10 +67,13 @@ impl Tcb {
         ptr::write(
             tcb_ptr,
             Self {
-                tls_end: tls.as_mut_ptr().add(tls.len()),
-                tls_len: tls.len(),
-                tcb_ptr,
-                tcb_len: tcb_page.len(),
+                generic: GenericTcb {
+                    tls_end: tls.as_mut_ptr().add(tls.len()),
+                    tls_len: tls.len(),
+                    tcb_ptr: tcb_ptr.cast(),
+                    tcb_len: tcb_page.len(),
+                    os_specific: OsSpecific::default(),
+                },
                 masters_ptr: ptr::null_mut(),
                 masters_len: 0,
                 num_copied_masters: 0,
@@ -92,8 +88,6 @@ impl Tcb {
                     stack_size: 0,
                     os_tid: UnsafeCell::new(OsTid::default()),
                 },
-                #[cfg(target_os = "redox")]
-                sigcontrol: Default::default(),
             },
         );
 
@@ -102,13 +96,7 @@ impl Tcb {
 
     /// Get the current TCB
     pub unsafe fn current() -> Option<&'static mut Self> {
-        let tcb_ptr = Self::arch_read(offset_of!(Self, tcb_ptr)) as *mut Self;
-        let tcb_len = Self::arch_read(offset_of!(Self, tcb_len));
-        if tcb_ptr.is_null() || tcb_len < mem::size_of::<Self>() {
-            None
-        } else {
-            Some(&mut *tcb_ptr)
-        }
+        Some(&mut *GenericTcb::<OsSpecific>::current_ptr()?.cast())
     }
 
     /// A slice for all of the TLS data
@@ -228,50 +216,6 @@ impl Tcb {
         Ok((abi, tls, tcb))
     }
 
-    /// Architecture specific code to read a usize from the TCB - aarch64
-    #[inline(always)]
-    #[cfg(target_arch = "aarch64")]
-    unsafe fn arch_read(offset: usize) -> usize {
-        let abi_ptr: usize;
-        asm!(
-            "mrs {}, tpidr_el0",
-            out(reg) abi_ptr,
-        );
-
-        let tcb_ptr = *(abi_ptr as *const usize);
-        *((tcb_ptr + offset) as *const usize)
-    }
-
-    /// Architecture specific code to read a usize from the TCB - x86
-    #[inline(always)]
-    #[cfg(target_arch = "x86")]
-    unsafe fn arch_read(offset: usize) -> usize {
-        let value;
-        asm!(
-            "
-            mov {}, gs:[{}]
-            ",
-            out(reg) value,
-            in(reg) offset,
-        );
-        value
-    }
-
-    /// Architecture specific code to read a usize from the TCB - x86_64
-    #[inline(always)]
-    #[cfg(target_arch = "x86_64")]
-    unsafe fn arch_read(offset: usize) -> usize {
-        let value;
-        asm!(
-            "
-            mov {}, fs:[{}]
-            ",
-            out(reg) value,
-            in(reg) offset,
-        );
-        value
-    }
-
     /// OS and architecture specific code to activate TLS - Linux x86_64
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     unsafe fn os_arch_activate(tls_end: usize, _tls_len: usize) {
@@ -329,5 +273,18 @@ impl Tcb {
         let _ = syscall::write(file, &env).expect_notls("failed to write fsbase");
 
         let _ = syscall::close(file);
+    }
+}
+
+impl Deref for Tcb {
+    type Target = GenericTcb<OsSpecific>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.generic
+    }
+}
+impl DerefMut for Tcb {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.generic
     }
 }

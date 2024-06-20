@@ -11,12 +11,11 @@ use crate::signal::inner_c;
 pub(crate) const STACK_TOP: usize = 1 << 47;
 pub(crate) const STACK_SIZE: usize = 1024 * 1024;
 
-// NOTE: MUST MATCH TCB STRUCT
+#[derive(Debug, Default)]
 pub struct SigArea {
     altstack_top: usize,
     altstack_bottom: usize,
     tmp: usize,
-    _rsvd: usize,
 }
 
 /// Deactive TLS, used before exec() on Redox to not trick target executable into thinking TLS
