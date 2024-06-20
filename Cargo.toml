@@ -24,7 +24,6 @@ cc = "1"
 [dependencies]
 bitflags = "2"
 cbitset = "0.2"
-memoffset = "0.9"
 posix-regex = { path = "posix-regex", features = ["no_std"] }
 
 # TODO: For some reason, rand_jitter hasn't been updated to use the latest rand_core

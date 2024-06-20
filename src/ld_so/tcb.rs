@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use syscall::Sigcontrol;
-use core::{arch::asm, cell::UnsafeCell, mem, ptr, slice, sync::atomic::AtomicBool};
+use core::{arch::asm, cell::UnsafeCell, mem::{self, offset_of}, ptr, slice, sync::atomic::AtomicBool};
 use goblin::error::{Error, Result};
 
 use super::ExpectTlsFree;
