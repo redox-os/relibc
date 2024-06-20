@@ -158,7 +158,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
             tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
         }
         #[cfg(target_os = "redox")]
-        redox_rt::signal::setup_sighandler(&tcb.sigcontrol);
+        redox_rt::signal::setup_sighandler(&tcb.sigcontrol.control);
     }
 
     // Set up argc and argv

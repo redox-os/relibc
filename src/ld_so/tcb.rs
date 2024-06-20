@@ -55,14 +55,19 @@ pub struct Tcb {
     /// Underlying pthread_t struct, pthread_self() returns &self.pthread
     pub pthread: Pthread,
     #[cfg(target_os = "redox")]
-    pub sigcontrol: Sigcontrol,
+    pub sigcontrol: RtSigarea,
+}
+#[derive(Debug, Default)]
+pub struct RtSigarea {
+    pub control: Sigcontrol,
+    pub internal: [usize; 4],
 }
 
 impl Tcb {
     /// Create a new TCB
     pub unsafe fn new(size: usize) -> Result<&'static mut Self> {
         let page_size = Sys::getpagesize();
-        let (abi_page, tls, tcb_page) = Self::os_new(round_up(size, page_size))?;
+        let (abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
 
         let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
         trace!("New TCB: {:p}", tcb_ptr);
@@ -325,8 +330,4 @@ impl Tcb {
 
         let _ = syscall::close(file);
     }
-}
-
-pub fn round_up(value: usize, alignment: usize) -> usize {
-    return (value + alignment - 1) & (!(alignment - 1));
 }

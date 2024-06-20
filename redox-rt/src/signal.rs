@@ -2,7 +2,7 @@ use core::cell::Cell;
 use core::ffi::c_int;
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use syscall::{Error, Result, Sigcontrol, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH};
+use syscall::{Error, IntRegisters, Result, Sigcontrol, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH};
 
 use crate::arch::*;
 use crate::sync::Mutex;
@@ -14,13 +14,13 @@ pub fn sighandler_function() -> usize {
     #[cfg(target_arch = "x86_64")]
     // Check OSXSAVE bit
     // TODO: HWCAP?
-    if CPUID_EAX1_ECX.load(core::sync::atomic::Ordering::Relaxed) & (1 << 27) != 0 {
+    /*if CPUID_EAX1_ECX.load(core::sync::atomic::Ordering::Relaxed) & (1 << 27) != 0 {
         __relibc_internal_sigentry_xsave as usize
     } else {
         __relibc_internal_sigentry_fxsave as usize
-    }
+    }*/
 
-    #[cfg(any(target_arch = "x86", target_arch = "aarch64"))]
+    //#[cfg(any(target_arch = "x86", target_arch = "aarch64"))]
     {
         __relibc_internal_sigentry as usize
     }
@@ -28,14 +28,17 @@ pub fn sighandler_function() -> usize {
 
 #[repr(C)]
 pub struct SigStack {
+    sa_handler: usize,
+    sig_num: usize,
+
     #[cfg(target_arch = "x86_64")]
     fx: [u8; 4096],
 
     #[cfg(target_arch = "x86")]
     fx: [u8; 512],
 
-    sa_handler: usize,
-    sig_num: usize,
+    _pad: [usize; 4], // pad to 192 = 3 * 64 bytes
+    regs: IntRegisters, // 160 bytes currently
 }
 
 #[inline(always)]
