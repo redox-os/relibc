@@ -5,7 +5,7 @@ use syscall::data::Sigcontrol;
 use syscall::error::*;
 
 use crate::proc::{fork_inner, FdGuard};
-use crate::signal::inner_c;
+use crate::signal::{inner_c, RtSigarea};
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 47;
@@ -231,8 +231,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     sc_saved_rflags = const offset_of!(Sigcontrol, saved_flags),
     sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
     sc_saved_rsp = const offset_of!(Sigcontrol, saved_sp),
-    tcb_sa_off = const 0, // FIXME
-    tcb_sc_off = const 0, // FIXME
+    tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
+    tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     supports_xsave = sym SUPPORTS_XSAVE,
 ]);
 

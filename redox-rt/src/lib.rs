@@ -2,6 +2,10 @@
 #![feature(asm_const, array_chunks, int_roundings, let_chains, slice_ptr_get, sync_unsafe_cell, thread_local)]
 #![forbid(unreachable_patterns)]
 
+use generic_rt::GenericTcb;
+
+use self::signal::RtSigarea;
+
 extern crate alloc;
 
 #[macro_export]
@@ -33,3 +37,5 @@ pub mod auxv_defs;
 pub mod signal;
 pub mod sync;
 pub mod thread;
+
+pub type Tcb = GenericTcb<RtSigarea>;
