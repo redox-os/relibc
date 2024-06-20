@@ -2,7 +2,7 @@ use core::cell::Cell;
 use core::ffi::c_int;
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use syscall::{Result, Sigcontrol, SIGCHLD, SIGCONT, SIGURG, SIGWINCH};
+use syscall::{Error, Result, Sigcontrol, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH};
 
 use crate::arch::*;
 use crate::sync::Mutex;
@@ -101,6 +101,54 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32
     Ok(())
 }
 
+#[derive(Clone, Copy)]
+pub enum Sigaction {
+    Default,
+    Ignore,
+    Handled {
+        handler: SignalHandler,
+        mask: u64,
+        flags: SigactionFlags,
+    },
+}
+pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction>) -> Result<()> {
+    if matches!(usize::from(signal), 0 | 32 | SIGKILL | SIGSTOP | 65..) {
+        return Err(Error::new(EINVAL));
+    }
+
+    let _sigguard = tmp_disable_signals();
+    let ctl = current_sigctl();
+    let guard = SIGACTIONS.lock();
+    let old_ignmask = IGNMASK.load(Ordering::Relaxed);
+
+    if let Some(old) = old {
+    }
+
+    let Some(new) = new else {
+        return Ok(());
+    };
+
+    match (usize::from(signal), new) {
+        (_, Sigaction::Ignore) | (SIGCHLD | SIGURG | SIGWINCH, Sigaction::Default) => {
+            IGNMASK.store(old_ignmask | sig_bit(signal.into()), Ordering::Relaxed);
+
+            // mark the signal as masked
+            ctl.word[usize::from(signal) / 32].fetch_or(1 << ((signal - 1) % 32), Ordering::Relaxed);
+
+            // POSIX specifies that pending signals shall be discarded if set to SIG_IGN by
+            // sigaction.
+            // TODO: handle tmp_disable_signals
+        }
+        (SIGTSTP, Sigaction::Default) => (), // stop
+        (SIGTTIN, Sigaction::Default) => (), // stop
+        (SIGTTOU, Sigaction::Default) => (), // stop
+        (_, Sigaction::Default) => (),
+        (_, Sigaction::Handled { .. }) => (),
+    }
+
+    todo!()
+}
+
 extern "C" {
     pub fn __relibc_internal_get_sigcontrol_addr() -> &'static Sigcontrol;
 }
@@ -137,16 +185,18 @@ impl Drop for TmpDisableSignalsGuard {
     }
 }
 
-#[derive(Clone, Copy)]
-struct SignalAction {
-    handler: SignalHandler,
-    flags: SigactionFlags,
-    mask: u64,
-}
 bitflags::bitflags! {
+    // Some flags are ignored by the rt, but they match relibc's 1:1 to simplify conversion.
     #[derive(Clone, Copy)]
-    struct SigactionFlags: u32 {
-        const SA_RESETHAND = 1;
+    pub struct SigactionFlags: u32 {
+        const NOCLDSTOP = 1;
+        const NOCLDWAIT = 2;
+        const SIGINFO = 4;
+        const RESTORER = 0x0400_0000;
+        const ONSTACK = 0x0800_0000;
+        const RESTART = 0x1000_0000;
+        const NODEFER = 0x4000_0000;
+        const RESETHAND = 0x8000_0000;
     }
 }
 fn default_term_handler(sig: c_int) {
@@ -161,22 +211,18 @@ fn stop_handler_sentinel(_: c_int) {
 }
 
 #[derive(Clone, Copy)]
-union SignalHandler {
-    sa_handler: Option<extern "C" fn(c_int)>,
-    sa_sigaction: Option<unsafe extern "C" fn(c_int, *const (), *mut ())>,
+pub union SignalHandler {
+    pub handler: Option<extern "C" fn(c_int)>,
+    pub sigaction: Option<unsafe extern "C" fn(c_int, *const (), *mut ())>,
 }
 
 struct TheDefault {
-    actions: [SignalAction; 64],
+    actions: [Sigaction; 64],
     ignmask: u64,
 }
 
-static SIGACTIONS: Mutex<[SignalAction; 64]> = Mutex::new([SignalAction {
-    handler: SignalHandler { sa_handler: None },
-    flags: SigactionFlags::empty(),
-    mask: 0,
-}; 64]);
-static IGNMASK: AtomicU64 = AtomicU64::new(sig_bit(SIGCHLD) | sig_bit(SIGURG) | sig_bit(SIGWINCH) | sig_bit(SIGCONT));
+static SIGACTIONS: Mutex<[Sigaction; 64]> = Mutex::new([Sigaction::Default; 64]);
+static IGNMASK: AtomicU64 = AtomicU64::new(sig_bit(SIGCHLD) | sig_bit(SIGURG) | sig_bit(SIGWINCH));
 
 fn expand_mask(mask: u64) -> [u64; 2] {
     [mask & 0xffff_ffff, mask >> 32]
