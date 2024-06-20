@@ -2,7 +2,7 @@ use core::cell::Cell;
 use core::ffi::c_int;
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use syscall::{Error, IntRegisters, Result, Sigcontrol, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH};
+use syscall::{Error, IntRegisters, Result, SigProcControl, Sigcontrol, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGW0_TSTP_IS_STOP_BIT, SIGW0_TTIN_IS_STOP_BIT, SIGW0_TTOU_IS_STOP_BIT, SIGWINCH};
 
 use crate::arch::*;
 use crate::sync::Mutex;
@@ -142,9 +142,11 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
             // sigaction.
             // TODO: handle tmp_disable_signals
         }
-        (SIGTSTP, Sigaction::Default) => (), // stop
-        (SIGTTIN, Sigaction::Default) => (), // stop
-        (SIGTTOU, Sigaction::Default) => (), // stop
+        // TODO: Handle pending signals before these flags are set.
+        (SIGTSTP, Sigaction::Default) => PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TSTP_IS_STOP_BIT, Ordering::SeqCst),
+        (SIGTTIN, Sigaction::Default) => PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TTIN_IS_STOP_BIT, Ordering::SeqCst),
+        (SIGTTOU, Sigaction::Default) => PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TTOU_IS_STOP_BIT, Ordering::SeqCst),
+
         (_, Sigaction::Default) => (),
         (_, Sigaction::Handled { .. }) => (),
     }
@@ -227,6 +229,13 @@ struct TheDefault {
 static SIGACTIONS: Mutex<[Sigaction; 64]> = Mutex::new([Sigaction::Default; 64]);
 static IGNMASK: AtomicU64 = AtomicU64::new(sig_bit(SIGCHLD) | sig_bit(SIGURG) | sig_bit(SIGWINCH));
 
+static PROC_CONTROL_STRUCT: SigProcControl = SigProcControl {
+    word: [
+        AtomicU64::new(SIGW0_TSTP_IS_STOP_BIT | SIGW0_TTIN_IS_STOP_BIT | SIGW0_TTOU_IS_STOP_BIT),
+        AtomicU64::new(0),
+    ],
+};
+
 fn expand_mask(mask: u64) -> [u64; 2] {
     [mask & 0xffff_ffff, mask >> 32]
 }
@@ -254,7 +263,8 @@ pub fn setup_sighandler(control: &Sigcontrol) {
     let data = syscall::SetSighandlerData {
         user_handler: sighandler_function(),
         excp_handler: 0, // TODO
-        word_addr: control as *const Sigcontrol as usize,
+        thread_control_addr: control as *const Sigcontrol as usize,
+        proc_control_addr: &PROC_CONTROL_STRUCT as *const SigProcControl as usize,
     };
 
     let fd = syscall::open(

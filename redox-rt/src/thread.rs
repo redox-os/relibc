@@ -53,7 +53,8 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
         let data = SetSighandlerData {
             user_handler: sighandler_function(),
             excp_handler: 0,
-            word_addr: 0, // TODO
+            thread_control_addr: 0, // TODO
+            proc_control_addr: 0, // TODO
         };
         let _ = syscall::write(*new_sighandler_fd, &data)?;
     }
