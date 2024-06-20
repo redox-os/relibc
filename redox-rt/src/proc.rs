@@ -709,8 +709,7 @@ pub fn create_set_addr_space_buf(
 /// descriptors from other schemes are reobtained with `dup`, and grants referencing such file
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
 pub fn fork_impl() -> Result<usize> {
-    let mut old_mask = 0_u64;
-    crate::signal::set_sigmask(None, Some(&mut old_mask))?;
+    let mut old_mask = crate::signal::get_sigmask()?;
     let pid = unsafe { Error::demux(__relibc_internal_fork_wrapper())? };
 
     if pid == 0 {

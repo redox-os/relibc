@@ -31,4 +31,5 @@ pub mod proc;
 pub mod auxv_defs;
 
 pub mod signal;
+pub mod sync;
 pub mod thread;

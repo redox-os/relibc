@@ -370,6 +370,7 @@ checksum = "64072665120942deff5fd5425d6c1811b854f4939e7f1c01ce755f64432bbea7"
 name = "redox-rt"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "goblin",
  "plain",
  "redox_syscall",

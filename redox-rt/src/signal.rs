@@ -1,9 +1,11 @@
 use core::cell::Cell;
 use core::ffi::c_int;
+use core::sync::atomic::{AtomicU64, Ordering};
 
-use syscall::{Result, Sigcontrol};
+use syscall::{Result, Sigcontrol, SIGCHLD, SIGCONT, SIGURG, SIGWINCH};
 
 use crate::arch::*;
+use crate::sync::Mutex;
 
 #[cfg(target_arch = "x86_64")]
 static CPUID_EAX1_ECX: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
@@ -22,28 +24,6 @@ pub fn sighandler_function() -> usize {
     {
         __relibc_internal_sigentry as usize
     }
-}
-
-pub fn setup_sighandler(control: &Sigcontrol) {
-    #[cfg(target_arch = "x86_64")]
-    {
-        let cpuid_eax1_ecx = unsafe { core::arch::x86_64::__cpuid(1) }.ecx;
-        CPUID_EAX1_ECX.store(cpuid_eax1_ecx, core::sync::atomic::Ordering::Relaxed);
-    }
-
-    let data = syscall::SetSighandlerData {
-        user_handler: sighandler_function(),
-        excp_handler: 0, // TODO
-        word_addr: control as *const Sigcontrol as usize,
-    };
-
-    let fd = syscall::open(
-        "thisproc:current/sighandler",
-        syscall::O_WRONLY | syscall::O_CLOEXEC,
-    )
-    .expect("failed to open thisproc:current/sighandler");
-    syscall::write(fd, &data).expect("failed to write to thisproc:current/sighandler");
-    let _ = syscall::close(fd);
 }
 
 #[repr(C)]
@@ -72,18 +52,60 @@ unsafe extern "fastcall" fn inner_fastcall(stack: usize) {
     inner(&mut *(stack as *mut SigStack))
 }
 
+pub fn get_sigmask() -> Result<u64> {
+    let mut mask = 0;
+    modify_sigmask(Some(&mut mask), Option::<fn(u32, bool) -> u32>::None)?;
+    Ok(mask)
+}
 pub fn set_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
-    todo!()
+    modify_sigmask(old, new.map(move |newmask| move |_, upper| if upper { newmask >> 32 } else { newmask } as u32))
 }
 pub fn or_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
-    todo!()
+    // Parsing nightmare...
+    modify_sigmask(old, new.map(move |newmask| move |oldmask, upper| oldmask | if upper { newmask >> 32 } else { newmask } as u32))
 }
 pub fn andn_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
-    todo!()
+    modify_sigmask(old, new.map(move |newmask| move |oldmask, upper| oldmask & !if upper { newmask >> 32 } else { newmask } as u32))
+}
+fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32>) -> Result<()> {
+    let _guard = tmp_disable_signals();
+    let ctl = current_sigctl();
+
+    let mut words = ctl.word.each_ref().map(|w| w.load(Ordering::Relaxed));
+
+    if let Some(old) = old {
+        *old = combine_mask(words);
+    }
+    let Some(mut op) = op else {
+        return Ok(());
+    };
+
+    let mut can_raise = 0;
+    let mut cant_raise = 0;
+
+    for i in 0..2 {
+        while let Err(changed) = ctl.word[i].compare_exchange(words[i], ((words[i] >> 32) << 32) | u64::from(op(words[i] as u32, i == 1)), Ordering::Relaxed, Ordering::Relaxed) {
+            // If kernel observed a signal being unblocked and pending simultaneously, it will have
+            // set a flag causing it to check for the INHIBIT_SIGNALS flag every time the context
+            // is switched to. To avoid race conditions, we should NOT auto-raise those signals in
+            // userspace as a result of unblocking it. The kernel will instead take care of that later.
+            can_raise |= (changed & (changed >> 32)) << (32 * i);
+            cant_raise |= (changed & !(changed >> 32)) << (32 * i);
+
+            words[i] = changed;
+        }
+    }
+
+    // TODO: Prioritize cant_raise realtime signals?
+
+    Ok(())
 }
 
 extern "C" {
     pub fn __relibc_internal_get_sigcontrol_addr() -> &'static Sigcontrol;
+}
+fn current_sigctl() -> &'static Sigcontrol {
+    unsafe { __relibc_internal_get_sigcontrol_addr() }
 }
 
 pub struct TmpDisableSignalsGuard { _inner: () }
@@ -113,4 +135,84 @@ impl Drop for TmpDisableSignalsGuard {
             }
         }
     }
+}
+
+#[derive(Clone, Copy)]
+struct SignalAction {
+    handler: SignalHandler,
+    flags: SigactionFlags,
+    mask: u64,
+}
+bitflags::bitflags! {
+    #[derive(Clone, Copy)]
+    struct SigactionFlags: u32 {
+        const SA_RESETHAND = 1;
+    }
+}
+fn default_term_handler(sig: c_int) {
+    syscall::exit((sig as usize) << 8);
+}
+fn default_core_handler(sig: c_int) {
+    syscall::exit((sig as usize) << 8);
+}
+fn default_ign_handler(_: c_int) {
+}
+fn stop_handler_sentinel(_: c_int) {
+}
+
+#[derive(Clone, Copy)]
+union SignalHandler {
+    sa_handler: Option<extern "C" fn(c_int)>,
+    sa_sigaction: Option<unsafe extern "C" fn(c_int, *const (), *mut ())>,
+}
+
+struct TheDefault {
+    actions: [SignalAction; 64],
+    ignmask: u64,
+}
+
+static SIGACTIONS: Mutex<[SignalAction; 64]> = Mutex::new([SignalAction {
+    handler: SignalHandler { sa_handler: None },
+    flags: SigactionFlags::empty(),
+    mask: 0,
+}; 64]);
+static IGNMASK: AtomicU64 = AtomicU64::new(sig_bit(SIGCHLD) | sig_bit(SIGURG) | sig_bit(SIGWINCH) | sig_bit(SIGCONT));
+
+fn expand_mask(mask: u64) -> [u64; 2] {
+    [mask & 0xffff_ffff, mask >> 32]
+}
+fn combine_mask([lo, hi]: [u64; 2]) -> u64 {
+    lo | ((hi & 0xffff_ffff) << 32)
+}
+
+const fn sig_bit(sig: usize) -> u64 {
+    //assert_ne!(sig, 32);
+    //assert_ne!(sig, 0);
+    1 << (sig - 1)
+}
+
+pub fn setup_sighandler(control: &Sigcontrol) {
+    {
+        let mut sigactions = SIGACTIONS.lock();
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    {
+        let cpuid_eax1_ecx = unsafe { core::arch::x86_64::__cpuid(1) }.ecx;
+        CPUID_EAX1_ECX.store(cpuid_eax1_ecx, core::sync::atomic::Ordering::Relaxed);
+    }
+
+    let data = syscall::SetSighandlerData {
+        user_handler: sighandler_function(),
+        excp_handler: 0, // TODO
+        word_addr: control as *const Sigcontrol as usize,
+    };
+
+    let fd = syscall::open(
+        "thisproc:current/sighandler",
+        syscall::O_WRONLY | syscall::O_CLOEXEC,
+    )
+    .expect("failed to open thisproc:current/sighandler");
+    syscall::write(fd, &data).expect("failed to write to thisproc:current/sighandler");
+    let _ = syscall::close(fd);
 }
