@@ -16,6 +16,7 @@ pub struct SigArea {
     altstack_top: usize,
     altstack_bottom: usize,
     tmp: usize,
+    pub onstack: u64,
     pub disable_signals_depth: u64,
 }
 
@@ -128,18 +129,41 @@ asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
 "] <= []);
 
 asmfunction!(__relibc_internal_sigentry: ["
-    // Get offset to TCB
-    mov rax, gs:[0]
+    // First, select signal, always pick first available bit
+
+    // Read first signal word
+    mov rdx, fs:[{tcb_sc_off} + {sc_word}]
+    mov rcx, rdx
+    shr rcx, 32
+    and edx, ecx
+    bsf edx, edx
+    jnz 2f
+
+    // Read second signal word
+    mov rdx, fs:[{tcb_sc_off} + {sc_word} + 8]
+    mov rcx, rdx
+    shr rcx, 32
+    and edx, ecx
+    bsf edx, edx
+    jnz 4f
+    add edx, 32
+2:
+    // By now we have selected a signal, stored in edx (6-bit). We now need to choose whether or
+    // not to switch to the alternate signal stack. If SA_ONSTACK is clear for this signal, then
+    // skip the sigaltstack logic.
+    bt fs:[{tcb_sa_off} + {sa_onstack}], edx
+    jc 3f
 
     // If current RSP is above altstack region, switch to altstack
-    mov rdx, [rax + {tcb_sa_off} + {sa_altstack_top}]
+    mov rdx, fs:[{tcb_sa_off} + {sa_altstack_top}]
     cmp rdx, rsp
     cmova rsp, rdx
 
     // If current RSP is below altstack region, also switch to altstack
-    mov rdx, [rax + {tcb_sa_off} + {sa_altstack_bottom}]
-    cmp rdx, rax
+    mov rdx, fs:[{tcb_sa_off} + {sa_altstack_bottom}]
+    cmp rdx, rsp
     cmovbe rsp, rdx
+3:
 
     // Otherwise, the altstack is already active. The sigaltstack being disabled, is equivalent
     // to setting 'top' to usize::MAX and 'bottom' to 0.
@@ -147,16 +171,16 @@ asmfunction!(__relibc_internal_sigentry: ["
     // Now that we have a stack, we can finally start initializing the signal stack!
 
     push 0 // SS
-    push [rax + {tcb_sc_off} + {sc_saved_rsp}]
-    push [rax + {tcb_sc_off} + {sc_saved_rflags}]
+    push fs:[{tcb_sc_off} + {sc_saved_rsp}]
+    push fs:[{tcb_sc_off} + {sc_saved_rflags}]
     push 0 // CS
-    push [rax + {tcb_sc_off} + {sc_saved_rip}]
+    push fs:[{tcb_sc_off} + {sc_saved_rip}]
 
     push rdi
     push rsi
-    push [rax + {tcb_sc_off} + {sc_saved_rdx}]
+    push fs:[{tcb_sc_off} + {sc_saved_rdx}]
     push rcx
-    push [rax + {tcb_sc_off} + {sc_saved_rax}]
+    push fs:[{tcb_sc_off} + {sc_saved_rax}]
     push r8
     push r9
     push r10
@@ -168,12 +192,14 @@ asmfunction!(__relibc_internal_sigentry: ["
     push r14
     push r15
 
-    sub rsp, 4096 + 32
+    push rdx // selected signal
+
+    sub rsp, 4096 + 24
 
     cld
     mov rdi, rsp
     xor eax, eax
-    mov ecx, 4096 + 32
+    mov ecx, 4096 + 24
     rep stosb
 
     // TODO: self-modifying?
@@ -191,7 +217,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov edx, eax
     xrstor [rsp]
 
-    add rsp, 4096 + 32
+    add rsp, 4096 + 24
 2:
     pop r15
     pop r14
@@ -209,11 +235,11 @@ asmfunction!(__relibc_internal_sigentry: ["
     pop rsi
     pop rdi
 
-    pop qword ptr gs:[{tcb_sa_off} + {sa_tmp}]
+    pop qword ptr fs:[{tcb_sa_off} + {sa_tmp}]
     add rsp, 8
     popfq
     pop rsp
-    jmp qword ptr gs:[{tcb_sa_off} + {sa_tmp}]
+    jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp}]
 3:
     fxsave64 [rsp]
 
@@ -222,16 +248,20 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     fxrstor64 [rsp]
     jmp 2b
+4:
+    // Spurious signal
 "] <= [
     inner = sym inner_c,
     sa_tmp = const offset_of!(SigArea, tmp),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
+    sa_onstack = const offset_of!(SigArea, onstack),
     sc_saved_rax = const offset_of!(Sigcontrol, saved_scratch_a),
     sc_saved_rdx = const offset_of!(Sigcontrol, saved_scratch_b),
     sc_saved_rflags = const offset_of!(Sigcontrol, saved_flags),
     sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
     sc_saved_rsp = const offset_of!(Sigcontrol, saved_sp),
+    sc_word = const offset_of!(Sigcontrol, word),
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     supports_xsave = sym SUPPORTS_XSAVE,

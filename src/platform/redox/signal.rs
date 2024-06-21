@@ -1,5 +1,5 @@
 use core::mem;
-use redox_rt::signal::{Sigaction, SigactionFlags, SignalHandler};
+use redox_rt::signal::{Sigaction, SigactionFlags, SigactionKind, SignalHandler};
 use syscall::{self, Result};
 
 use super::{
@@ -111,49 +111,53 @@ impl PalSignal for Sys {
         let new_action = c_act.map(|c_act| {
             let handler = c_act.sa_handler.map_or(0, |f| f as usize);
 
-            if handler == SIG_DFL {
-                Sigaction::Default
+            let kind = if handler == SIG_DFL {
+                SigactionKind::Default
             } else if handler == SIG_IGN {
-                Sigaction::Ignore
+                SigactionKind::Ignore
             } else {
-                Sigaction::Handled {
+                SigactionKind::Handled {
                     handler: if c_act.sa_flags & crate::header::signal::SA_SIGINFO as u64 != 0 {
                         SignalHandler { sigaction: unsafe { core::mem::transmute(c_act.sa_handler) } }
                     } else {
                         SignalHandler { handler: c_act.sa_handler }
                     },
-                    mask: c_act.sa_mask,
-                    flags: SigactionFlags::from_bits_retain(c_act.sa_flags as u32),
                 }
+            };
+
+            Sigaction {
+                kind,
+                mask: c_act.sa_mask,
+                flags: SigactionFlags::from_bits_retain(c_act.sa_flags as u32),
             }
         });
-        let mut old_action = c_oact.as_ref().map(|_| Sigaction::Default);
+        let mut old_action = c_oact.as_ref().map(|_| Sigaction::default());
 
         redox_rt::signal::sigaction(sig, new_action.as_ref(), old_action.as_mut())?;
 
         if let (Some(c_oact), Some(old_action)) = (c_oact, old_action) {
-            *c_oact = match old_action {
-                Sigaction::Ignore => sigaction {
+            *c_oact = match old_action.kind {
+                SigactionKind::Ignore => sigaction {
                     sa_handler: unsafe { core::mem::transmute(SIG_IGN) },
                     sa_flags: 0,
                     sa_restorer: None,
                     sa_mask: 0,
                 },
-                Sigaction::Default => sigaction {
+                SigactionKind::Default => sigaction {
                     sa_handler: unsafe { core::mem::transmute(SIG_DFL) },
                     sa_flags: 0,
                     sa_restorer: None,
                     sa_mask: 0,
                 },
-                Sigaction::Handled { handler, mask, flags } => sigaction {
-                    sa_handler: if flags.contains(SigactionFlags::SIGINFO) {
+                SigactionKind::Handled { handler } => sigaction {
+                    sa_handler: if old_action.flags.contains(SigactionFlags::SIGINFO) {
                         unsafe { core::mem::transmute(handler.sigaction) }
                     } else {
                         unsafe { handler.handler }
                     },
                     sa_restorer: None,
-                    sa_flags: flags.bits().into(),
-                    sa_mask: mask,
+                    sa_flags: old_action.flags.bits().into(),
+                    sa_mask: old_action.mask,
                 },
             };
         }

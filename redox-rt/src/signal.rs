@@ -2,7 +2,7 @@ use core::cell::Cell;
 use core::ffi::c_int;
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use syscall::{Error, IntRegisters, Result, SetSighandlerData, SigProcControl, Sigcontrol, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGW0_TSTP_IS_STOP_BIT, SIGW0_TTIN_IS_STOP_BIT, SIGW0_TTOU_IS_STOP_BIT, SIGWINCH};
+use syscall::{Error, IntRegisters, Result, SetSighandlerData, SigProcControl, Sigcontrol, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGW0_NOCLDSTOP_BIT, SIGW0_TSTP_IS_STOP_BIT, SIGW0_TTIN_IS_STOP_BIT, SIGW0_TTOU_IS_STOP_BIT, SIGWINCH};
 
 use crate::{arch::*, Tcb};
 use crate::sync::Mutex;
@@ -104,16 +104,24 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32
     Ok(())
 }
 
-#[derive(Clone, Copy)]
-pub enum Sigaction {
+#[derive(Clone, Copy, Default)]
+pub enum SigactionKind {
+    #[default]
     Default,
+
     Ignore,
     Handled {
         handler: SignalHandler,
-        mask: u64,
-        flags: SigactionFlags,
     },
 }
+
+#[derive(Clone, Copy, Default)]
+pub struct Sigaction {
+    pub kind: SigactionKind,
+    pub mask: u64,
+    pub flags: SigactionFlags,
+}
+
 pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction>) -> Result<()> {
     if matches!(usize::from(signal), 0 | 32 | SIGKILL | SIGSTOP | 65..) {
         return Err(Error::new(EINVAL));
@@ -125,39 +133,59 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
     let old_ignmask = IGNMASK.load(Ordering::Relaxed);
 
     if let Some(old) = old {
+        // TODO
     }
 
     let Some(new) = new else {
         return Ok(());
     };
 
-    match (usize::from(signal), new) {
-        (_, Sigaction::Ignore) | (SIGCHLD | SIGURG | SIGWINCH, Sigaction::Default) => {
+    let sig_group = usize::from(signal) / 32;
+    let sig_bit32 = 1 << ((signal - 1) % 32);
+
+    match (usize::from(signal), new.kind) {
+        (_, SigactionKind::Ignore) | (SIGURG | SIGWINCH, SigactionKind::Default) => {
             IGNMASK.store(old_ignmask | sig_bit(signal.into()), Ordering::Relaxed);
 
             // mark the signal as masked
-            ctl.word[usize::from(signal) / 32].fetch_or(1 << ((signal - 1) % 32), Ordering::Relaxed);
+            ctl.word[sig_group].fetch_or(sig_bit32, Ordering::Relaxed);
 
             // POSIX specifies that pending signals shall be discarded if set to SIG_IGN by
             // sigaction.
             // TODO: handle tmp_disable_signals
         }
         // TODO: Handle pending signals before these flags are set.
-        (SIGTSTP, Sigaction::Default) => {
+        (SIGTSTP, SigactionKind::Default) => {
             PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TSTP_IS_STOP_BIT, Ordering::SeqCst);
         }
-        (SIGTTIN, Sigaction::Default) => {
+        (SIGTTIN, SigactionKind::Default) => {
             PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TTIN_IS_STOP_BIT, Ordering::SeqCst);
         }
-        (SIGTTOU, Sigaction::Default) => {
+        (SIGTTOU, SigactionKind::Default) => {
             PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TTOU_IS_STOP_BIT, Ordering::SeqCst);
         }
+        (SIGCHLD, SigactionKind::Default) => {
+            if new.flags.contains(SigactionFlags::NOCLDSTOP) {
+                PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_NOCLDSTOP_BIT, Ordering::SeqCst);
+            } else {
+                PROC_CONTROL_STRUCT.word[0].fetch_and(!SIGW0_NOCLDSTOP_BIT, Ordering::SeqCst);
+            }
+            IGNMASK.store(old_ignmask | sig_bit(signal.into()), Ordering::Relaxed);
 
-        (_, Sigaction::Default) => (),
-        (_, Sigaction::Handled { .. }) => (),
+            // mark the signal as masked
+            ctl.word[sig_group].fetch_or(sig_bit32, Ordering::Relaxed);
+        }
+
+        (_, SigactionKind::Default) => {
+            IGNMASK.store(old_ignmask & !sig_bit(signal.into()), Ordering::Relaxed);
+
+            // TODO: update mask
+            //ctl.word[usize::from(signal)].fetch_or();
+        },
+        (_, SigactionKind::Handled { .. }) => (),
     }
 
-    todo!()
+    Ok(())
 }
 
 fn current_sigctl() -> &'static Sigcontrol {
@@ -192,7 +220,7 @@ impl Drop for TmpDisableSignalsGuard {
 
 bitflags::bitflags! {
     // Some flags are ignored by the rt, but they match relibc's 1:1 to simplify conversion.
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, Default)]
     pub struct SigactionFlags: u32 {
         const NOCLDSTOP = 1;
         const NOCLDWAIT = 2;
@@ -226,7 +254,7 @@ struct TheDefault {
     ignmask: u64,
 }
 
-static SIGACTIONS: Mutex<[Sigaction; 64]> = Mutex::new([Sigaction::Default; 64]);
+static SIGACTIONS: Mutex<[Sigaction; 64]> = Mutex::new([Sigaction { flags: SigactionFlags::empty(), mask: 0, kind: SigactionKind::Default }; 64]);
 static IGNMASK: AtomicU64 = AtomicU64::new(sig_bit(SIGCHLD) | sig_bit(SIGURG) | sig_bit(SIGWINCH));
 
 static PROC_CONTROL_STRUCT: SigProcControl = SigProcControl {
