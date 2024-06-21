@@ -425,18 +425,6 @@ where
         deactivate_tcb(*open_via_dup)?;
     }
 
-    {
-        let current_sigaction_fd = FdGuard::new(syscall::dup(*open_via_dup, b"sigactions")?);
-        let empty_sigaction_fd = FdGuard::new(syscall::dup(*current_sigaction_fd, b"empty")?);
-        let sigaction_selection_fd =
-            FdGuard::new(syscall::dup(*open_via_dup, b"current-sigactions")?);
-
-        let _ = syscall::write(
-            *sigaction_selection_fd,
-            &usize::to_ne_bytes(*empty_sigaction_fd),
-        )?;
-    }
-
     // TODO: Restore old name if exec failed?
     if let Ok(name_fd) = syscall::dup(*open_via_dup, b"name").map(FdGuard::new) {
         let _ = syscall::write(*name_fd, interp_override.as_ref().map_or(path, |o| &o.name));
@@ -727,27 +715,10 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
 
         // Reuse the same sigaltstack and signal entry (all memory will be re-mapped CoW later).
         {
-            let cur_sighandler_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sighandler")?);
             let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
-
-            let mut sighandler_buf = SetSighandlerData::default();
-
-            let _ = syscall::read(*cur_sighandler_fd, &mut sighandler_buf)?;
-            let _ = syscall::write(*new_sighandler_fd, &sighandler_buf)?;
+            let _ = syscall::write(*new_sighandler_fd, &crate::signal::current_setsighandler_struct())?;
         }
 
-        // Reuse the same sigactions (by value).
-        {
-            let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);
-            let new_sigaction_fd = FdGuard::new(syscall::dup(*cur_sigaction_fd, b"copy")?);
-            let new_sigaction_sel_fd =
-                FdGuard::new(syscall::dup(*new_pid_fd, b"current-sigactions")?);
-
-            let _ = syscall::write(
-                *new_sigaction_sel_fd,
-                &usize::to_ne_bytes(*new_sigaction_fd),
-            )?;
-        }
         copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
 
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new

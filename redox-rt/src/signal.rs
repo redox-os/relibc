@@ -2,7 +2,7 @@ use core::cell::Cell;
 use core::ffi::c_int;
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use syscall::{Error, IntRegisters, Result, SigProcControl, Sigcontrol, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGW0_TSTP_IS_STOP_BIT, SIGW0_TTIN_IS_STOP_BIT, SIGW0_TTOU_IS_STOP_BIT, SIGWINCH};
+use syscall::{Error, IntRegisters, Result, SetSighandlerData, SigProcControl, Sigcontrol, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGW0_TSTP_IS_STOP_BIT, SIGW0_TTIN_IS_STOP_BIT, SIGW0_TTOU_IS_STOP_BIT, SIGWINCH};
 
 use crate::{arch::*, Tcb};
 use crate::sync::Mutex;
@@ -260,12 +260,7 @@ pub fn setup_sighandler(control: &Sigcontrol) {
         CPUID_EAX1_ECX.store(cpuid_eax1_ecx, core::sync::atomic::Ordering::Relaxed);
     }
 
-    let data = syscall::SetSighandlerData {
-        user_handler: sighandler_function(),
-        excp_handler: 0, // TODO
-        thread_control_addr: control as *const Sigcontrol as usize,
-        proc_control_addr: &PROC_CONTROL_STRUCT as *const SigProcControl as usize,
-    };
+    let data = current_setsighandler_struct();
 
     let fd = syscall::open(
         "thisproc:current/sighandler",
@@ -279,4 +274,12 @@ pub fn setup_sighandler(control: &Sigcontrol) {
 pub struct RtSigarea {
     pub control: Sigcontrol,
     pub arch: crate::arch::SigArea,
+}
+pub fn current_setsighandler_struct() -> SetSighandlerData {
+    SetSighandlerData {
+        user_handler: sighandler_function(),
+        excp_handler: 0, // TODO
+        thread_control_addr: core::ptr::addr_of!(unsafe { Tcb::current() }.unwrap().os_specific.control) as usize,
+        proc_control_addr: &PROC_CONTROL_STRUCT as *const SigProcControl as usize,
+    }
 }
