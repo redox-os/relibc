@@ -223,56 +223,9 @@ impl Tcb {
         syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
     }
 
-    /// OS and architecture specific code to activate TLS - Redox aarch64
-    #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
+    #[cfg(all(target_os = "redox"))]
     unsafe fn os_arch_activate(tls_end: usize, tls_len: usize) {
-        // Uses ABI page
-        let abi_ptr = tls_end - tls_len - 16;
-        ptr::write(abi_ptr as *mut usize, tls_end);
-        asm!(
-            "msr tpidr_el0, {}",
-            in(reg) abi_ptr,
-        );
-    }
-
-    /// OS and architecture specific code to activate TLS - Redox x86
-    #[cfg(all(target_os = "redox", target_arch = "x86"))]
-    unsafe fn os_arch_activate(tls_end: usize, _tls_len: usize) {
-        let mut env = syscall::EnvRegisters::default();
-
-        let file = syscall::open(
-            "thisproc:current/regs/env",
-            syscall::O_CLOEXEC | syscall::O_RDWR,
-        )
-        .expect_notls("failed to open handle for process registers");
-
-        let _ = syscall::read(file, &mut env).expect_notls("failed to read gsbase");
-
-        env.gsbase = tls_end as u32;
-
-        let _ = syscall::write(file, &env).expect_notls("failed to write gsbase");
-
-        let _ = syscall::close(file);
-    }
-
-    /// OS and architecture specific code to activate TLS - Redox x86_64
-    #[cfg(all(target_os = "redox", target_arch = "x86_64"))]
-    unsafe fn os_arch_activate(tls_end: usize, _tls_len: usize) {
-        let mut env = syscall::EnvRegisters::default();
-
-        let file = syscall::open(
-            "thisproc:current/regs/env",
-            syscall::O_CLOEXEC | syscall::O_RDWR,
-        )
-        .expect_notls("failed to open handle for process registers");
-
-        let _ = syscall::read(file, &mut env).expect_notls("failed to read fsbase");
-
-        env.fsbase = tls_end as u64;
-
-        let _ = syscall::write(file, &env).expect_notls("failed to write fsbase");
-
-        let _ = syscall::close(file);
+        redox_rt::tcb_activate(tls_end, tls_len)
     }
 }
 

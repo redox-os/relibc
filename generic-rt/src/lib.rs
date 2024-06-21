@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(core_intrinsics)]
 
 use core::arch::asm;
 use core::mem::{self, offset_of};
@@ -70,4 +71,42 @@ impl<Os> GenericTcb<Os> {
             Some(tcb_ptr)
         }
     }
+    pub unsafe fn current() -> Option<&'static mut Self> {
+        Some(&mut *Self::current_ptr()?)
+    }
 }
+pub fn panic_notls(msg: impl core::fmt::Display) -> ! {
+    //eprintln!("panicked in ld.so: {}", msg);
+
+    core::intrinsics::abort();
+}
+
+pub trait ExpectTlsFree {
+    type Unwrapped;
+
+    fn expect_notls(self, msg: &str) -> Self::Unwrapped;
+}
+impl<T, E: core::fmt::Debug> ExpectTlsFree for Result<T, E> {
+    type Unwrapped = T;
+
+    fn expect_notls(self, msg: &str) -> T {
+        match self {
+            Ok(t) => t,
+            Err(err) => panic_notls(format_args!(
+                "{}: expect failed for Result with err: {:?}",
+                msg, err
+            )),
+        }
+    }
+}
+impl<T> ExpectTlsFree for Option<T> {
+    type Unwrapped = T;
+
+    fn expect_notls(self, msg: &str) -> T {
+        match self {
+            Some(t) => t,
+            None => panic_notls(format_args!("{}: expect failed for Option", msg)),
+        }
+    }
+}
+

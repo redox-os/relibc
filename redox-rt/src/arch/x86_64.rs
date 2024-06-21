@@ -16,6 +16,7 @@ pub struct SigArea {
     altstack_top: usize,
     altstack_bottom: usize,
     tmp: usize,
+    pub disable_signals_depth: u64,
 }
 
 /// Deactive TLS, used before exec() on Redox to not trick target executable into thinking TLS
@@ -145,10 +146,10 @@ asmfunction!(__relibc_internal_sigentry: ["
     //
     // Now that we have a stack, we can finally start initializing the signal stack!
 
-    push ss
+    push 0 // SS
     push [rax + {tcb_sc_off} + {sc_saved_rsp}]
     push [rax + {tcb_sc_off} + {sc_saved_rflags}]
-    push cs
+    push 0 // CS
     push [rax + {tcb_sc_off} + {sc_saved_rip}]
 
     push rdi
@@ -176,7 +177,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     rep stosb
 
     // TODO: self-modifying?
-    cmp byte ptr [{supports_xsave}], 0
+    cmp byte ptr [rip + {supports_xsave}], 0
     je 3f
 
     mov eax, 0xffffffff
@@ -208,11 +209,11 @@ asmfunction!(__relibc_internal_sigentry: ["
     pop rsi
     pop rdi
 
-    pop gs:[{tcb_sa_off} + {sa_tmp}]
+    pop qword ptr gs:[{tcb_sa_off} + {sa_tmp}]
     add rsp, 8
     popfq
     pop rsp
-    jmp gs:[{tcb_sa_off} + {sa_tmp}]
+    jmp qword ptr gs:[{tcb_sa_off} + {sa_tmp}]
 3:
     fxsave64 [rsp]
 

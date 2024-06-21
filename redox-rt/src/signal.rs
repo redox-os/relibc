@@ -4,7 +4,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 
 use syscall::{Error, IntRegisters, Result, SigProcControl, Sigcontrol, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGW0_TSTP_IS_STOP_BIT, SIGW0_TTIN_IS_STOP_BIT, SIGW0_TTOU_IS_STOP_BIT, SIGWINCH};
 
-use crate::arch::*;
+use crate::{arch::*, Tcb};
 use crate::sync::Mutex;
 
 #[cfg(target_arch = "x86_64")]
@@ -160,24 +160,18 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
     todo!()
 }
 
-extern "C" {
-    pub fn __relibc_internal_get_sigcontrol_addr() -> &'static Sigcontrol;
-}
 fn current_sigctl() -> &'static Sigcontrol {
-    unsafe { __relibc_internal_get_sigcontrol_addr() }
+    &unsafe { Tcb::current() }.unwrap().os_specific.control
 }
 
 pub struct TmpDisableSignalsGuard { _inner: () }
 
-#[thread_local]
-static TMP_DISABLE_SIGNALS_DEPTH: Cell<u64> = Cell::new(0);
-
 pub fn tmp_disable_signals() -> TmpDisableSignalsGuard {
     unsafe {
-        let ctl = __relibc_internal_get_sigcontrol_addr().control_flags.get();
+        let ctl = current_sigctl().control_flags.get();
         ctl.write_volatile(ctl.read_volatile() | syscall::flag::INHIBIT_DELIVERY);
         // TODO: fence?
-        TMP_DISABLE_SIGNALS_DEPTH.set(TMP_DISABLE_SIGNALS_DEPTH.get() + 1);
+        Tcb::current().unwrap().os_specific.arch.disable_signals_depth += 1;
     }
 
     TmpDisableSignalsGuard { _inner: () }
@@ -185,11 +179,11 @@ pub fn tmp_disable_signals() -> TmpDisableSignalsGuard {
 impl Drop for TmpDisableSignalsGuard {
     fn drop(&mut self) {
         unsafe {
-            let old = TMP_DISABLE_SIGNALS_DEPTH.get();
-            TMP_DISABLE_SIGNALS_DEPTH.set(old - 1);
+            let depth = &mut Tcb::current().unwrap().os_specific.arch.disable_signals_depth;
+            *depth -= 1;
 
-            if old == 1 {
-                let ctl = __relibc_internal_get_sigcontrol_addr().control_flags.get();
+            if *depth == 0 {
+                let ctl = current_sigctl().control_flags.get();
                 ctl.write_volatile(ctl.read_volatile() & !syscall::flag::INHIBIT_DELIVERY);
             }
         }
