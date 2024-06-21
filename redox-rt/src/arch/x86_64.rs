@@ -3,6 +3,7 @@ use core::sync::atomic::AtomicU8;
 
 use syscall::data::Sigcontrol;
 use syscall::error::*;
+use syscall::flag::*;
 
 use crate::proc::{fork_inner, FdGuard};
 use crate::signal::{inner_c, RtSigarea};
@@ -136,6 +137,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov rcx, rdx
     shr rcx, 32
     and edx, ecx
+    and edx, {SIGW0_PENDING_MASK}
     bsf edx, edx
     jnz 2f
 
@@ -144,6 +146,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov rcx, rdx
     shr rcx, 32
     and edx, ecx
+    and edx, {SIGW1_PENDING_MASK}
     bsf edx, edx
     jnz 4f
     add edx, 32
@@ -265,6 +268,10 @@ asmfunction!(__relibc_internal_sigentry: ["
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     supports_xsave = sym SUPPORTS_XSAVE,
+    SIGW0_PENDING_MASK = const !(
+        SIGW0_TSTP_IS_STOP_BIT | SIGW0_TTIN_IS_STOP_BIT | SIGW0_TTOU_IS_STOP_BIT | SIGW0_NOCLDSTOP_BIT | SIGW0_UNUSED1 | SIGW0_UNUSED2
+    ),
+    SIGW1_PENDING_MASK = const !0,
 ]);
 
 static SUPPORTS_XSAVE: AtomicU8 = AtomicU8::new(0); // FIXME
