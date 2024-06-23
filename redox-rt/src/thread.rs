@@ -19,13 +19,13 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
 
         let buf = create_set_addr_space_buf(
             *cur_addr_space_fd,
-            __relibc_internal_rlct_clone_ret() as usize,
+            __relibc_internal_rlct_clone_ret as usize,
             stack as usize,
         );
         let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
     }
 
-    // Inherit file table
+    // Inherit reference to file table
     {
         let cur_filetable_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"filetable")?);
         let new_filetable_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-filetable")?);
@@ -36,34 +36,10 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
         )?;
     }
 
-    // Inherit sigactions (on Linux, CLONE_THREAD requires CLONE_SIGHAND which implies the sigactions
-    // table is reused).
-    {
-        let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);
-        let new_sigaction_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-sigactions")?);
-
-        let _ = syscall::write(
-            *new_sigaction_sel_fd,
-            &usize::to_ne_bytes(*cur_sigaction_fd),
-        )?;
-    }
-    // Inherit sighandler, but not the sigaltstack.
-    {
-        let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
-        let data = SetSighandlerData {
-            user_handler: sighandler_function(),
-            excp_handler: 0,
-            thread_control_addr: 0, // TODO
-            proc_control_addr: 0, // TODO
-        };
-        let _ = syscall::write(*new_sighandler_fd, &data)?;
-    }
-
-    // Sigprocmask starts as "block all", and is initialized when the thread has actually returned
-    // from clone_ret.
-
-    // TODO: Should some of these registers be inherited?
-    //copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
+    // Since the signal handler is not yet initialized, signals specifically targeting the thread
+    // (relibc is only required to implement thread-specific signals that already originate from
+    // the same process) will be discarded. Process-specific signals will ignore this new thread,
+    // until it has initialized its own signal handler.
 
     // Unblock context.
     let start_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"start")?);

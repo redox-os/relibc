@@ -106,7 +106,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
     pop rbp
     ret
 "] <= []);
-asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
+asmfunction!(__relibc_internal_rlct_clone_ret: ["
     # Load registers
     pop rax
     pop rdi
