@@ -1,10 +1,10 @@
-# relibc
+# Redox C Library (relibc)
 
 relibc is a portable POSIX C standard library written in Rust. It is under heavy development, and currently supports Redox and Linux.
 
 The motivation for this project is twofold: Reduce issues that the Redox developers were having with [newlib](https://sourceware.org/newlib/), and create a safer alternative to a C standard library written in C. It is mainly designed to be used under Redox, as an alternative to newlib, but it also supports Linux system calls via the [sc](https://crates.io/crates/sc) crate.
 
-### Repository Layout
+## Repository Layout
 
 - `include` - Header files (mostly macros and variadic functions `cbindgen` can't generate)
 - `src` - Source files
@@ -22,7 +22,7 @@ The motivation for this project is twofold: Reduce issues that the Redox develop
 - `src/sync` - Synchronization primitives
 - `tests` - C tests (each MR needs to give success in all of them)
 
-### Build On The Build System
+## Build On The Build System
 
 Inside of your Redox build system, run:
 
@@ -32,7 +32,46 @@ make prefix
 
 (It only works if the timestamp of the `relibc` folder changed)
 
-### Issues
+## Tests
+
+This section explain how to build and run the tests.
+
+### Build
+
+To build the tests run `make` on the `tests` folder, it will store the executables at `tests/bins_static`
+
+### Redox OS Testing
+
+To test on Redox do the following steps:
+
+- Add the `relibc-tests` recipe on your filesystem configuration at `config/your-cpu/your-config.toml` (generally `desktop.toml`)
+- Run the following commands to rebuild relibc with your changes, update the `relibc-tests` recipe and update your QEMU image:
+
+```sh
+touch relibc
+```
+
+```sh
+make prefix cr.relibc-tests image
+```
+
+- Run the tests
+
+```sh
+/usr/share/relibc-tests/test-name
+```
+
+### Linux Testing
+
+Run `make test` on the relibc directory.
+
+If you want to run one test, run the following command:
+
+```sh
+tests/bins_static/test-name
+```
+
+## Issues
 
 #### I'm building for my own platform which I run, and am getting `x86_64-linux-gnu-ar: command not found` (or similar)
 
@@ -51,16 +90,17 @@ An easy fix would be to replace the corresponding lines in the Makefile, e.g.
  endif
 ```
 
-### Contributing
+## Contributing
 
 Before starting to contribute, read [this](CONTRIBUTING.md) document.
 
-### Supported OSes
+## Supported OSes
 
- - Redox OS
- - Linux
+- Redox OS
+- Linux
 
-### Supported architectures
+## Supported architectures
 
- - x86_64 (Intel/AMD)
- - Aarch64 (ARM64)
+- i686 (Intel/AMD)
+- x86_64 (Intel/AMD)
+- Aarch64 (ARM64)
