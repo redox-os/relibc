@@ -150,13 +150,13 @@ asmfunction!(__relibc_internal_sigentry: ["
     and eax, ecx
     and eax, {SIGW1_PENDING_MASK}
     bsf eax, eax
-    jnz 4f
+    jnz 7f
     add eax, 32
 2:
     // By now we have selected a signal, stored in eax (6-bit). We now need to choose whether or
     // not to switch to the alternate signal stack. If SA_ONSTACK is clear for this signal, then
     // skip the sigaltstack logic.
-    bt fs:[{tcb_sa_off} + {sa_onstack}], edx
+    bt fs:[{tcb_sa_off} + {sa_onstack}], eax
     jc 3f
 
     // Otherwise, the altstack is already active. The sigaltstack being disabled, is equivalent
@@ -180,10 +180,10 @@ asmfunction!(__relibc_internal_sigentry: ["
 4:
     // Now that we have a stack, we can finally start initializing the signal stack!
 
-    push 0 // SS
+    push 0x23 // SS
     push fs:[{tcb_sc_off} + {sc_saved_rsp}]
     push fs:[{tcb_sc_off} + {sc_saved_rflags}]
-    push 0 // CS
+    push 0x2b // CS
     push fs:[{tcb_sc_off} + {sc_saved_rip}]
 
     push rdi
@@ -202,7 +202,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     push r14
     push r15
 
-    push rdx // selected signal
+    push rax // selected signal
 
     sub rsp, 4096 + 24
 
@@ -214,7 +214,7 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     // TODO: self-modifying?
     cmp byte ptr [rip + {supports_xsave}], 0
-    je 3f
+    je 6f
 
     mov eax, 0xffffffff
     mov edx, eax
@@ -227,8 +227,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov edx, eax
     xrstor [rsp]
 
-    add rsp, 4096 + 24
-2:
+5:
+    add rsp, 4096 + 32
     pop r15
     pop r14
     pop r13
@@ -245,20 +245,24 @@ asmfunction!(__relibc_internal_sigentry: ["
     pop rsi
     pop rdi
 
+    iretq
+    /*
     pop qword ptr fs:[{tcb_sa_off} + {sa_tmp}]
     add rsp, 8
     popfq
     pop rsp
     jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp}]
-3:
+    */
+6:
     fxsave64 [rsp]
 
     mov rdi, rsp
     call {inner}
 
     fxrstor64 [rsp]
-    jmp 2b
-4:
+    jmp 5b
+7:
+    ud2
     // Spurious signal
 "] <= [
     inner = sym inner_c,

@@ -795,6 +795,14 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
                 }
             }
 
+            let buf = create_set_addr_space_buf(
+                *new_addr_space_fd,
+                __relibc_internal_fork_ret as usize,
+                initial_rsp as usize,
+            );
+            let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
+        }
+        {
             // Reuse the same sigaltstack and signal entry (all memory will be re-mapped CoW later).
             //
             // Do this after the address space is cloned, since the kernel will get a shared
@@ -804,12 +812,6 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
                 let _ = syscall::write(*new_sighandler_fd, &crate::signal::current_setsighandler_struct())?;
             }
 
-            let buf = create_set_addr_space_buf(
-                *new_addr_space_fd,
-                __relibc_internal_fork_ret as usize,
-                initial_rsp as usize,
-            );
-            let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
         }
         copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
     }

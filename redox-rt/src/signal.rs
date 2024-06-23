@@ -2,7 +2,7 @@ use core::cell::{Cell, UnsafeCell};
 use core::ffi::c_int;
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use syscall::{Error, IntRegisters, Result, SetSighandlerData, SigProcControl, Sigcontrol, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGW0_NOCLDSTOP_BIT, SIGW0_TSTP_IS_STOP_BIT, SIGW0_TTIN_IS_STOP_BIT, SIGW0_TTOU_IS_STOP_BIT, SIGWINCH};
+use syscall::{Error, IntRegisters, Result, SetSighandlerData, SigProcControl, Sigcontrol, SigcontrolFlags, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGW0_NOCLDSTOP_BIT, SIGW0_TSTP_IS_STOP_BIT, SIGW0_TTIN_IS_STOP_BIT, SIGW0_TTOU_IS_STOP_BIT, SIGWINCH};
 
 use crate::{arch::*, Tcb};
 use crate::sync::Mutex;
@@ -28,25 +28,30 @@ pub fn sighandler_function() -> usize {
 
 #[repr(C)]
 pub struct SigStack {
-    sa_handler: usize,
-    sig_num: usize,
-
     #[cfg(target_arch = "x86_64")]
     fx: [u8; 4096],
 
     #[cfg(target_arch = "x86")]
     fx: [u8; 512],
 
-    _pad: [usize; 4], // pad to 192 = 3 * 64 bytes
+    _pad: [usize; 3], // pad to 192 = 3 * 64 = 168 + 24 bytes
+    sig_num: usize,
     regs: IntRegisters, // 160 bytes currently
 }
 
 #[inline(always)]
 unsafe fn inner(stack: &mut SigStack) {
+    // TODO: Set procmask based on SA_NODEFER, SA_RESETHAND, and sa_mask.
+
+    // Re-enable signals again.
+    let control_flags = &Tcb::current().unwrap().os_specific.control.control_flags;
+    control_flags.store(control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(), Ordering::Release);
+    core::sync::atomic::compiler_fence(Ordering::Acquire);
+
     let _ = syscall::write(1, b"INNER SIGNAL HANDLER\n");
-    loop {}
+    /*loop {}
     let handler: extern "C" fn(c_int) = core::mem::transmute(stack.sa_handler);
-    handler(stack.sig_num as c_int)
+    handler(stack.sig_num as c_int)*/
 }
 #[cfg(not(target_arch = "x86"))]
 pub(crate) unsafe extern "C" fn inner_c(stack: usize) {
