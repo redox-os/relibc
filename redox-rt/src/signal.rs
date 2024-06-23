@@ -1,4 +1,4 @@
-use core::cell::Cell;
+use core::cell::{Cell, UnsafeCell};
 use core::ffi::c_int;
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -43,6 +43,8 @@ pub struct SigStack {
 
 #[inline(always)]
 unsafe fn inner(stack: &mut SigStack) {
+    let _ = syscall::write(1, b"INNER SIGNAL HANDLER\n");
+    loop {}
     let handler: extern "C" fn(c_int) = core::mem::transmute(stack.sa_handler);
     handler(stack.sig_num as c_int)
 }
@@ -197,10 +199,12 @@ pub struct TmpDisableSignalsGuard { _inner: () }
 
 pub fn tmp_disable_signals() -> TmpDisableSignalsGuard {
     unsafe {
-        let ctl = current_sigctl().control_flags.get();
-        ctl.write_volatile(ctl.read_volatile() | syscall::flag::INHIBIT_DELIVERY);
+        let ctl = &current_sigctl().control_flags;
+        ctl.store(ctl.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(), Ordering::Release);
+        core::sync::atomic::compiler_fence(Ordering::Acquire);
+
         // TODO: fence?
-        Tcb::current().unwrap().os_specific.arch.disable_signals_depth += 1;
+        (*Tcb::current().unwrap().os_specific.arch.get()).disable_signals_depth += 1;
     }
 
     TmpDisableSignalsGuard { _inner: () }
@@ -208,12 +212,13 @@ pub fn tmp_disable_signals() -> TmpDisableSignalsGuard {
 impl Drop for TmpDisableSignalsGuard {
     fn drop(&mut self) {
         unsafe {
-            let depth = &mut Tcb::current().unwrap().os_specific.arch.disable_signals_depth;
+            let depth = &mut (*Tcb::current().unwrap().os_specific.arch.get()).disable_signals_depth;
             *depth -= 1;
 
             if *depth == 0 {
-                let ctl = current_sigctl().control_flags.get();
-                ctl.write_volatile(ctl.read_volatile() & !syscall::flag::INHIBIT_DELIVERY);
+                let ctl = &current_sigctl().control_flags;
+                ctl.store(ctl.load(Ordering::Relaxed) & !syscall::flag::INHIBIT_DELIVERY.bits(), Ordering::Release);
+                core::sync::atomic::compiler_fence(Ordering::Acquire);
             }
         }
     }
@@ -278,13 +283,20 @@ const fn sig_bit(sig: usize) -> u64 {
     1 << (sig - 1)
 }
 
-pub fn setup_sighandler(control: &Sigcontrol) {
+pub fn setup_sighandler(area: &RtSigarea) {
     {
         let mut sigactions = SIGACTIONS.lock();
     }
+    let arch = unsafe { &mut *area.arch.get() };
 
     #[cfg(target_arch = "x86_64")]
     {
+        // The asm decides whether to use the altstack, based on whether the saved stack pointer
+        // was already on that stack. Thus, setting the altstack to the entire address space, is
+        // equivalent to not using any altstack at all (the default).
+        arch.altstack_top = usize::MAX;
+        arch.altstack_bottom = 0;
+
         let cpuid_eax1_ecx = unsafe { core::arch::x86_64::__cpuid(1) }.ecx;
         CPUID_EAX1_ECX.store(cpuid_eax1_ecx, core::sync::atomic::Ordering::Relaxed);
     }
@@ -302,7 +314,7 @@ pub fn setup_sighandler(control: &Sigcontrol) {
 #[derive(Debug, Default)]
 pub struct RtSigarea {
     pub control: Sigcontrol,
-    pub arch: crate::arch::SigArea,
+    pub arch: UnsafeCell<crate::arch::SigArea>,
 }
 pub fn current_setsighandler_struct() -> SetSighandlerData {
     SetSighandlerData {

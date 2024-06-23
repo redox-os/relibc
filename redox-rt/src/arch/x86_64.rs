@@ -14,9 +14,9 @@ pub(crate) const STACK_SIZE: usize = 1024 * 1024;
 
 #[derive(Debug, Default)]
 pub struct SigArea {
-    altstack_top: usize,
-    altstack_bottom: usize,
-    tmp: usize,
+    pub altstack_top: usize,
+    pub altstack_bottom: usize,
+    pub tmp: usize,
     pub onstack: u64,
     pub disable_signals_depth: u64,
 }
