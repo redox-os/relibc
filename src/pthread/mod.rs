@@ -92,6 +92,12 @@ impl From<syscall::Error> for Errno {
         Errno(value.errno)
     }
 }
+#[cfg(target_os = "redox")]
+impl From<Errno> for syscall::Error {
+    fn from(value: Errno) -> Self {
+        syscall::Error::new(value.0)
+    }
+}
 
 pub trait ResultExt<T> {
     fn or_minus_one_errno(self) -> T;
