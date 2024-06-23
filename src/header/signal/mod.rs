@@ -111,7 +111,7 @@ pub unsafe extern "C" fn sigaction(
 }
 
 #[no_mangle]
-pub extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
+pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -
 }
 
 #[no_mangle]
-pub extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
+pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
