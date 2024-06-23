@@ -135,30 +135,37 @@ asmfunction!(__relibc_internal_sigentry: ["
     // First, select signal, always pick first available bit
 
     // Read first signal word
-    mov rdx, fs:[{tcb_sc_off} + {sc_word}]
-    mov rcx, rdx
+    mov rax, fs:[{tcb_sc_off} + {sc_word}]
+    mov rcx, rax
     shr rcx, 32
-    and edx, ecx
-    and edx, {SIGW0_PENDING_MASK}
-    bsf edx, edx
+    and eax, ecx
+    and eax, {SIGW0_PENDING_MASK}
+    bsf eax, eax
     jnz 2f
 
     // Read second signal word
-    mov rdx, fs:[{tcb_sc_off} + {sc_word} + 8]
-    mov rcx, rdx
+    mov rax, fs:[{tcb_sc_off} + {sc_word} + 8]
+    mov rcx, rax
     shr rcx, 32
-    and edx, ecx
-    and edx, {SIGW1_PENDING_MASK}
-    bsf edx, edx
+    and eax, ecx
+    and eax, {SIGW1_PENDING_MASK}
+    bsf eax, eax
     jnz 4f
-    add edx, 32
+    add eax, 32
 2:
-    // By now we have selected a signal, stored in edx (6-bit). We now need to choose whether or
+    // By now we have selected a signal, stored in eax (6-bit). We now need to choose whether or
     // not to switch to the alternate signal stack. If SA_ONSTACK is clear for this signal, then
     // skip the sigaltstack logic.
     bt fs:[{tcb_sa_off} + {sa_onstack}], edx
     jc 3f
 
+    // Otherwise, the altstack is already active. The sigaltstack being disabled, is equivalent
+    // to setting 'top' to usize::MAX and 'bottom' to 0.
+
+    sub rsp, {REDZONE_SIZE}
+    and rsp, -{STACK_ALIGN}
+    jmp 4f
+3:
     // If current RSP is above altstack region, switch to altstack
     mov rdx, fs:[{tcb_sa_off} + {sa_altstack_top}]
     cmp rdx, rsp
@@ -168,11 +175,9 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov rdx, fs:[{tcb_sa_off} + {sa_altstack_bottom}]
     cmp rdx, rsp
     cmovbe rsp, rdx
-3:
 
-    // Otherwise, the altstack is already active. The sigaltstack being disabled, is equivalent
-    // to setting 'top' to usize::MAX and 'bottom' to 0.
-    //
+    .p2align 4
+4:
     // Now that we have a stack, we can finally start initializing the signal stack!
 
     push 0 // SS
@@ -274,6 +279,8 @@ asmfunction!(__relibc_internal_sigentry: ["
         SIGW0_TSTP_IS_STOP_BIT | SIGW0_TTIN_IS_STOP_BIT | SIGW0_TTOU_IS_STOP_BIT | SIGW0_NOCLDSTOP_BIT | SIGW0_UNUSED1 | SIGW0_UNUSED2
     ),
     SIGW1_PENDING_MASK = const !0,
+    REDZONE_SIZE = const 128,
+    STACK_ALIGN = const 64, // if xsave is used
 ]);
 
-static SUPPORTS_XSAVE: AtomicU8 = AtomicU8::new(0); // FIXME
+static SUPPORTS_XSAVE: AtomicU8 = AtomicU8::new(1); // FIXME
