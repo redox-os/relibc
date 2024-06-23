@@ -713,12 +713,6 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
         let cur_pid_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", O_CLOEXEC)?);
         (new_pid_fd, new_pid) = new_context()?;
 
-        // Reuse the same sigaltstack and signal entry (all memory will be re-mapped CoW later).
-        {
-            let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
-            let _ = syscall::write(*new_sighandler_fd, &crate::signal::current_setsighandler_struct())?;
-        }
-
         copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
 
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new
@@ -799,6 +793,15 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
                         flags,
                     )?;
                 }
+            }
+
+            // Reuse the same sigaltstack and signal entry (all memory will be re-mapped CoW later).
+            //
+            // Do this after the address space is cloned, since the kernel will get a shared
+            // reference to the TCB and whatever pages stores the signal proc control struct.
+            {
+                let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
+                let _ = syscall::write(*new_sighandler_fd, &crate::signal::current_setsighandler_struct())?;
             }
 
             let buf = create_set_addr_space_buf(
