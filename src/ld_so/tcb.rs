@@ -56,6 +56,13 @@ pub struct Tcb {
     pub pthread: Pthread,
 }
 
+#[cfg(target_os = "redox")]
+const _: () = {
+    if mem::size_of::<Tcb>() > syscall::PAGE_SIZE {
+        panic!("too large TCB!");
+    }
+};
+
 impl Tcb {
     /// Create a new TCB
     pub unsafe fn new(size: usize) -> Result<&'static mut Self> {
@@ -223,7 +230,7 @@ impl Tcb {
         syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
     }
 
-    #[cfg(all(target_os = "redox"))]
+    #[cfg(target_os = "redox")]
     unsafe fn os_arch_activate(tls_end: usize, tls_len: usize) {
         redox_rt::tcb_activate(tls_end, tls_len)
     }

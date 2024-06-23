@@ -78,7 +78,11 @@ asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
 
     mov rdi, rsp
     call __relibc_internal_fork_impl
-    jmp 2f
+
+    add rsp, 80
+
+    pop rbp
+    ret
 
 "] <= []);
 asmfunction!(__relibc_internal_fork_ret: ["
@@ -91,8 +95,6 @@ asmfunction!(__relibc_internal_fork_ret: ["
 
     xor rax, rax
 
-    .p2align 4
-2:
     add rsp, 32
     pop r15
     pop r14

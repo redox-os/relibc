@@ -129,16 +129,17 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
 
     let _sigguard = tmp_disable_signals();
     let ctl = current_sigctl();
-    let guard = SIGACTIONS.lock();
+    let mut guard = SIGACTIONS.lock();
     let old_ignmask = IGNMASK.load(Ordering::Relaxed);
 
     if let Some(old) = old {
-        // TODO
+        *old = guard[usize::from(signal)];
     }
 
     let Some(new) = new else {
         return Ok(());
     };
+    guard[usize::from(signal)] = *new;
 
     let sig_group = usize::from(signal) / 32;
     let sig_bit32 = 1 << ((signal - 1) % 32);

@@ -2,7 +2,7 @@
 
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
-use core::sync::atomic::AtomicU32;
+use core::sync::atomic::{AtomicU32, Ordering};
 
 pub struct Mutex<T> {
     pub lockword: AtomicU32,
@@ -24,6 +24,9 @@ impl<T> Mutex<T> {
         }
     }
     pub fn lock(&self) -> MutexGuard<'_, T> {
+        while self.lockword.compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed).is_err() {
+            core::hint::spin_loop();
+        }
         MutexGuard { lock: self }
     }
 }
@@ -44,5 +47,6 @@ impl<T> DerefMut for MutexGuard<'_, T> {
 }
 impl<T> Drop for MutexGuard<'_, T> {
     fn drop(&mut self) {
+        self.lock.lockword.store(UNLOCKED, Ordering::Release);
     }
 }
