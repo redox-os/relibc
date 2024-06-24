@@ -173,7 +173,7 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     pop dword ptr gs:[{tcb_sa_off} + {sa_tmp}]
     add esp, 4
-    popf
+    popfd
     pop esp
     jmp dword ptr gs:[{tcb_sa_off} + {sa_tmp}]
 7:
