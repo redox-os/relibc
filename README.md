@@ -38,7 +38,9 @@ This section explain how to build and run the tests.
 
 ### Build
 
-To build the tests run `make` on the `tests` folder, it will store the executables at `tests/bins_static`
+To build the tests run `make all` on the `tests` folder, it will store the executables at `tests/bins_static`
+
+If you did changes to your tests, run `make clean all` to rebuild the executables.
 
 ### Redox OS Testing
 
