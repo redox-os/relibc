@@ -43,15 +43,30 @@ pub struct SigStack {
 unsafe fn inner(stack: &mut SigStack) {
     // TODO: Set procmask based on SA_NODEFER, SA_RESETHAND, and sa_mask.
 
+    // asm counts from 0
+    stack.sig_num += 1;
+
+    let sigaction = SIGACTIONS.lock()[stack.sig_num];
+
+    let handler = match sigaction.kind {
+        SigactionKind::Ignore => unreachable!(),
+        SigactionKind::Default => {
+            syscall::exit(stack.sig_num << 8);
+            unreachable!();
+        }
+        SigactionKind::Handled { handler } => handler,
+    };
+
     // Re-enable signals again.
     let control_flags = &Tcb::current().unwrap().os_specific.control.control_flags;
     control_flags.store(control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(), Ordering::Release);
     core::sync::atomic::compiler_fence(Ordering::Acquire);
 
-    let _ = syscall::write(1, b"INNER SIGNAL HANDLER\n");
-    /*loop {}
-    let handler: extern "C" fn(c_int) = core::mem::transmute(stack.sa_handler);
-    handler(stack.sig_num as c_int)*/
+    if sigaction.flags.contains(SigactionFlags::SIGINFO) && let Some(sigaction) = handler.sigaction {
+        sigaction(stack.sig_num as c_int, core::ptr::null_mut(), core::ptr::null_mut());
+    } else if let Some(handler) = handler.handler {
+        handler(stack.sig_num as c_int);
+    }
 }
 #[cfg(not(target_arch = "x86"))]
 pub(crate) unsafe extern "C" fn inner_c(stack: usize) {
@@ -265,7 +280,9 @@ struct TheDefault {
     ignmask: u64,
 }
 
+// indexed directly by signal number
 static SIGACTIONS: Mutex<[Sigaction; 64]> = Mutex::new([Sigaction { flags: SigactionFlags::empty(), mask: 0, kind: SigactionKind::Default }; 64]);
+
 static IGNMASK: AtomicU64 = AtomicU64::new(sig_bit(SIGCHLD) | sig_bit(SIGURG) | sig_bit(SIGWINCH));
 
 static PROC_CONTROL_STRUCT: SigProcControl = SigProcControl {

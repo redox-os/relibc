@@ -136,18 +136,20 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     // Read first signal word
     mov rax, fs:[{tcb_sc_off} + {sc_word}]
-    mov rcx, rax
-    shr rcx, 32
-    and eax, ecx
+    mov rdx, rax
+    shr rdx, 32
+    not edx
+    and eax, edx
     and eax, {SIGW0_PENDING_MASK}
     bsf eax, eax
     jnz 2f
 
     // Read second signal word
     mov rax, fs:[{tcb_sc_off} + {sc_word} + 8]
-    mov rcx, rax
-    shr rcx, 32
-    and eax, ecx
+    mov rdx, rax
+    shr rdx, 32
+    not edx
+    and eax, edx
     and eax, {SIGW1_PENDING_MASK}
     bsf eax, eax
     jnz 7f
