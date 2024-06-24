@@ -44,13 +44,11 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
     Ok(())
 }
 
-#[no_mangle]
-unsafe extern "cdecl" fn __relibc_internal_fork_impl(initial_rsp: *mut usize) -> usize {
+unsafe extern "cdecl" fn fork_impl(initial_rsp: *mut usize) -> usize {
     Error::mux(fork_inner(initial_rsp))
 }
 
-#[no_mangle]
-unsafe extern "cdecl" fn __relibc_internal_fork_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
+unsafe extern "cdecl" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
     let _ = syscall::close(new_pid_fd);
 }
@@ -71,14 +69,14 @@ asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
     fnstcw [esp+24]
 
     push esp
-    call __relibc_internal_fork_impl
+    call {fork_impl}
     pop esp
     jmp 2f
-"] <= []);
+"] <= [fork_impl = sym fork_impl]);
 
 asmfunction!(__relibc_internal_fork_ret: ["
     // Arguments already on the stack
-    call __relibc_internal_fork_hook
+    call {child_hook}
 
     //TODO ldmxcsr [esp+16]
     fldcw [esp+24]
@@ -97,7 +95,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
 
     pop ebp
     ret
-"] <= []);
+"] <= [child_hook = sym child_hook]);
 asmfunction!(__relibc_internal_sigentry: ["
     sub esp, 512
     fxsave [esp]

@@ -49,13 +49,11 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
     Ok(())
 }
 
-#[no_mangle]
-unsafe extern "sysv64" fn __relibc_internal_fork_impl(initial_rsp: *mut usize) -> usize {
+unsafe extern "sysv64" fn fork_impl(initial_rsp: *mut usize) -> usize {
     Error::mux(fork_inner(initial_rsp))
 }
 
-#[no_mangle]
-unsafe extern "sysv64" fn __relibc_internal_fork_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
+unsafe extern "sysv64" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
     let _ = syscall::close(new_pid_fd);
 }
@@ -77,18 +75,18 @@ asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
     fnstcw [rsp+24]
 
     mov rdi, rsp
-    call __relibc_internal_fork_impl
+    call {fork_impl}
 
     add rsp, 80
 
     pop rbp
     ret
 
-"] <= []);
+"] <= [fork_impl = sym fork_impl]);
 asmfunction!(__relibc_internal_fork_ret: ["
     mov rdi, [rsp]
     mov rsi, [rsp + 8]
-    call __relibc_internal_fork_hook
+    call {child_hook}
 
     ldmxcsr [rsp+16]
     fldcw [rsp+24]
@@ -105,7 +103,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
 
     pop rbp
     ret
-"] <= []);
+"] <= [child_hook = sym child_hook]);
 asmfunction!(__relibc_internal_rlct_clone_ret: ["
     # Load registers
     pop rax
