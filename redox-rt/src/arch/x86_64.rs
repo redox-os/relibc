@@ -153,27 +153,25 @@ asmfunction!(__relibc_internal_sigentry: ["
     jnz 7f
     add eax, 32
 2:
+    sub rsp, {REDZONE_SIZE}
+    and rsp, -{STACK_ALIGN}
+
     // By now we have selected a signal, stored in eax (6-bit). We now need to choose whether or
     // not to switch to the alternate signal stack. If SA_ONSTACK is clear for this signal, then
     // skip the sigaltstack logic.
     bt fs:[{tcb_sa_off} + {sa_onstack}], eax
-    jc 3f
+    jnc 4f
 
     // Otherwise, the altstack is already active. The sigaltstack being disabled, is equivalent
     // to setting 'top' to usize::MAX and 'bottom' to 0.
 
-    sub rsp, {REDZONE_SIZE}
-    and rsp, -{STACK_ALIGN}
-    jmp 4f
-3:
     // If current RSP is above altstack region, switch to altstack
     mov rdx, fs:[{tcb_sa_off} + {sa_altstack_top}]
-    cmp rdx, rsp
+    cmp rsp, rdx
     cmova rsp, rdx
 
     // If current RSP is below altstack region, also switch to altstack
-    mov rdx, fs:[{tcb_sa_off} + {sa_altstack_bottom}]
-    cmp rdx, rsp
+    cmp rsp, fs:[{tcb_sa_off} + {sa_altstack_bottom}]
     cmovbe rsp, rdx
 
     .p2align 4

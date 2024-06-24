@@ -1,4 +1,6 @@
-use syscall::error::*;
+use core::mem::offset_of;
+
+use syscall::*;
 
 use crate::proc::{fork_inner, FdGuard};
 use crate::signal::{inner_fastcall, RtSigarea};
@@ -97,17 +99,105 @@ asmfunction!(__relibc_internal_fork_ret: ["
     ret
 "] <= [child_hook = sym child_hook]);
 asmfunction!(__relibc_internal_sigentry: ["
-    sub esp, 512
+    // Read pending half of first signal. This can be done nonatomically wrt the mask bits, since
+    // only this thread is allowed to modify the latter.
+
+    // Read first signal word
+    mov eax, gs:[{tcb_sc_off} + {sc_word}]
+    mov edx, gs:[{tcb_sc_off} + {sc_word} + 4]
+    not edx
+    and eax, edx
+    and eax, {SIGW0_PENDING_MASK}
+    bsf eax, eax
+    jnz 2f
+
+    // Read second signal word
+    mov eax, gs:[{tcb_sc_off} + {sc_word} + 8]
+    mov edx, gs:[{tcb_sc_off} + {sc_word} + 12]
+    not edx
+    and eax, edx
+    and eax, {SIGW1_PENDING_MASK}
+    bsf eax, eax
+    jz 7f
+    add eax, 32
+2:
+    and esp, -{STACK_ALIGN}
+    bt gs:[{tcb_sa_off} + {sa_onstack}], eax
+    jnc 4f
+
+    mov edx, gs:[{tcb_sa_off} + {sa_altstack_top}]
+    cmp esp, edx
+    ja 3f
+
+    cmp esp, gs:[{tcb_sa_off} + {sa_altstack_bottom}]
+    jnbe 4f
+3:
+    mov esp, edx
+4:
+    // Now that we have a stack, we can finally start populating the signal stack.
+    push fs
+    .byte 0x66, 0x6a, 0x00 // pushw 0
+    push ss
+    .byte 0x66, 0x6a, 0x00 // pushw 0
+    push dword ptr gs:[{tcb_sc_off} + {sc_saved_esp}]
+    push dword ptr gs:[{tcb_sc_off} + {sc_saved_eflags}]
+    push cs
+    .byte 0x66, 0x6a, 0x00 // pushw 0
+    push dword ptr gs:[{tcb_sc_off} + {sc_saved_eip}]
+
+    push dword ptr gs:[{tcb_sc_off} + {sc_saved_edx}]
+    push ecx
+    push dword ptr gs:[{tcb_sc_off} + {sc_saved_eax}]
+    push ebx
+    push edi
+    push esi
+    push ebp
+
+    push eax
+    sub esp, 512 + 8
     fxsave [esp]
 
     mov ecx, esp
     call {inner}
 
-    add esp, 512
     fxrstor [esp]
+    add esp, 512 + 12
 
+    pop ebp
+    pop esi
+    pop edi
+    pop ebx
+    pop eax
+    pop ecx
+    pop edx
+
+    pop dword ptr gs:[{tcb_sa_off} + {sa_tmp}]
+    add esp, 4
+    popf
+    pop esp
+    jmp dword ptr gs:[{tcb_sa_off} + {sa_tmp}]
+7:
     ud2
-"] <= [inner = sym inner_fastcall]);
+"] <= [
+    inner = sym inner_fastcall,
+    sa_tmp = const offset_of!(SigArea, tmp),
+    sa_altstack_top = const offset_of!(SigArea, altstack_top),
+    sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
+    sa_onstack = const offset_of!(SigArea, onstack),
+    sc_saved_eax = const offset_of!(Sigcontrol, saved_scratch_a),
+    sc_saved_edx = const offset_of!(Sigcontrol, saved_scratch_b),
+    sc_saved_eflags = const offset_of!(Sigcontrol, saved_flags),
+    sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
+    sc_saved_esp = const offset_of!(Sigcontrol, saved_sp),
+    sc_word = const offset_of!(Sigcontrol, word),
+    tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
+    tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
+    SIGW0_PENDING_MASK = const !(
+        SIGW0_TSTP_IS_STOP_BIT | SIGW0_TTIN_IS_STOP_BIT | SIGW0_TTOU_IS_STOP_BIT | SIGW0_NOCLDSTOP_BIT | SIGW0_UNUSED1 | SIGW0_UNUSED2
+    ),
+    SIGW1_PENDING_MASK = const !0,
+    STACK_ALIGN = const 16,
+]);
 
 asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
     # Load registers

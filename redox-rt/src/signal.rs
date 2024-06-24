@@ -34,7 +34,12 @@ pub struct SigStack {
     #[cfg(target_arch = "x86")]
     fx: [u8; 512],
 
+    #[cfg(target_arch = "x86_64")]
     _pad: [usize; 3], // pad to 192 = 3 * 64 = 168 + 24 bytes
+
+    #[cfg(target_arch = "x86")]
+    _pad: [usize; 2], // pad to 192 = 3 * 64 = 168 + 24 bytes
+
     sig_num: usize,
     regs: IntRegisters, // 160 bytes currently
 }
@@ -310,15 +315,17 @@ pub fn setup_sighandler(area: &RtSigarea) {
         let mut sigactions = SIGACTIONS.lock();
     }
     let arch = unsafe { &mut *area.arch.get() };
-
-    #[cfg(target_arch = "x86_64")]
     {
         // The asm decides whether to use the altstack, based on whether the saved stack pointer
         // was already on that stack. Thus, setting the altstack to the entire address space, is
         // equivalent to not using any altstack at all (the default).
         arch.altstack_top = usize::MAX;
         arch.altstack_bottom = 0;
+        arch.onstack = 0;
+    }
 
+    #[cfg(target_arch = "x86_64")]
+    {
         let cpuid_eax1_ecx = unsafe { core::arch::x86_64::__cpuid(1) }.ecx;
         CPUID_EAX1_ECX.store(cpuid_eax1_ecx, core::sync::atomic::Ordering::Relaxed);
     }
