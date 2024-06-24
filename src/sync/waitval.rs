@@ -8,6 +8,7 @@ use super::*;
 
 /// An unsafe "one thread to one thread" synchronization primitive. Used for and modeled after
 /// pthread_join only, at the moment.
+#[derive(Debug)]
 pub struct Waitval<T> {
     state: AtomicUint,
     value: UnsafeCell<MaybeUninit<T>>,

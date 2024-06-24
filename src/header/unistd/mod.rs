@@ -17,6 +17,7 @@ use crate::{
         time::timespec,
     },
     platform::{self, types::*, Pal, Sys},
+    pthread::ResultExt,
 };
 use alloc::collections::LinkedList;
 
@@ -577,24 +578,18 @@ pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn pread(fildes: c_int, buf: *mut c_void, nbyte: size_t, offset: off_t) -> ssize_t {
-    //TODO: better pread using system calls
-
-    let previous = lseek(fildes, offset, SEEK_SET);
-    if previous == -1 {
-        return -1;
-    }
-
-    let res = read(fildes, buf, nbyte);
-    if res < 0 {
-        return res;
-    }
-
-    if lseek(fildes, previous, SEEK_SET) == -1 {
-        return -1;
-    }
-
-    res
+pub unsafe extern "C" fn pread(
+    fildes: c_int,
+    buf: *mut c_void,
+    nbyte: size_t,
+    offset: off_t,
+) -> ssize_t {
+    Sys::pread(
+        fildes,
+        slice::from_raw_parts_mut(buf.cast::<u8>(), nbyte),
+        offset,
+    )
+    .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -617,36 +612,25 @@ pub extern "C" fn pthread_atfork(
 }
 
 #[no_mangle]
-pub extern "C" fn pwrite(
+pub unsafe extern "C" fn pwrite(
     fildes: c_int,
     buf: *const c_void,
     nbyte: size_t,
     offset: off_t,
 ) -> ssize_t {
-    //TODO: better pwrite using system calls
-
-    let previous = lseek(fildes, offset, SEEK_SET);
-    if previous == -1 {
-        return -1;
-    }
-
-    let res = write(fildes, buf, nbyte);
-    if res < 0 {
-        return res;
-    }
-
-    if lseek(fildes, previous, SEEK_SET) == -1 {
-        return -1;
-    }
-
-    res
+    Sys::pwrite(
+        fildes,
+        slice::from_raw_parts(buf.cast::<u8>(), nbyte),
+        offset,
+    )
+    .or_minus_one_errno()
 }
 
 #[no_mangle]
-pub extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
+pub unsafe extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
     let buf = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte as usize) };
     trace_expr!(
-        Sys::read(fildes, buf),
+        Sys::read(fildes, buf).or_minus_one_errno(),
         "read({}, {:p}, {})",
         fildes,
         buf,
@@ -853,7 +837,7 @@ pub extern "C" fn vfork() -> pid_t {
 }
 
 #[no_mangle]
-pub extern "C" fn write(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
-    let buf = unsafe { slice::from_raw_parts(buf as *const u8, nbyte as usize) };
-    Sys::write(fildes, buf)
+pub unsafe extern "C" fn write(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
+    let buf = slice::from_raw_parts(buf as *const u8, nbyte as usize);
+    Sys::write(fildes, buf).or_minus_one_errno()
 }

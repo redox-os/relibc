@@ -1,4 +1,7 @@
-use crate::io::{self, Read, Write};
+use crate::{
+    io::{self, Read, Write},
+    pthread::ResultExt,
+};
 use alloc::{boxed::Box, vec::Vec};
 use core::{cell::Cell, fmt, ptr};
 
@@ -83,7 +86,7 @@ pub struct FileWriter(pub c_int);
 
 impl FileWriter {
     pub fn write(&mut self, buf: &[u8]) -> isize {
-        Sys::write(self.0, buf)
+        Sys::write(self.0, buf).or_minus_one_errno()
     }
 }
 
@@ -105,13 +108,13 @@ pub struct FileReader(pub c_int);
 
 impl FileReader {
     pub fn read(&mut self, buf: &mut [u8]) -> isize {
-        Sys::read(self.0, buf)
+        Sys::read(self.0, buf).or_minus_one_errno()
     }
 }
 
 impl Read for FileReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let i = Sys::read(self.0, buf);
+        let i = Sys::read(self.0, buf).or_minus_one_errno(); // TODO
         if i >= 0 {
             Ok(i as usize)
         } else {

@@ -8,6 +8,7 @@ use crate::{
     header::{errno::*, fcntl::*, signal::sigset_t, sys_epoll::*},
     io::prelude::*,
     platform,
+    pthread::ResultExt,
 };
 use core::{mem, slice};
 use syscall::{
@@ -67,7 +68,9 @@ impl PalEpoll for Sys {
                         // systems. If this is needed, use a box or something
                         data: unsafe { (*event).data.u64 as usize },
                     },
-                ) < 0
+                )
+                .or_minus_one_errno()
+                    < 0
                 {
                     -1
                 } else {
@@ -83,7 +86,9 @@ impl PalEpoll for Sys {
                         //TODO: Is data required?
                         data: 0,
                     },
-                ) < 0
+                )
+                .or_minus_one_errno()
+                    < 0
                 {
                     -1
                 } else {
@@ -123,7 +128,9 @@ impl PalEpoll for Sys {
                             flags: EVENT_READ,
                             data: 0,
                         },
-                    ) == -1
+                    )
+                    .or_minus_one_errno()
+                        == -1
                     {
                         return -1;
                     }
@@ -150,7 +157,8 @@ impl PalEpoll for Sys {
                 events as *mut u8,
                 maxevents as usize * mem::size_of::<syscall::Event>(),
             )
-        });
+        })
+        .or_minus_one_errno(); // TODO
         if bytes_read == -1 {
             return -1;
         }
