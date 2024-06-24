@@ -1,6 +1,5 @@
 use alloc::vec::Vec;
 use generic_rt::GenericTcb;
-use syscall::Sigcontrol;
 use core::{arch::asm, cell::UnsafeCell, mem, ops::{Deref, DerefMut}, ptr, slice, sync::atomic::AtomicBool};
 use goblin::error::{Error, Result};
 
