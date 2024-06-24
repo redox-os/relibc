@@ -51,7 +51,15 @@ unsafe fn inner(stack: &mut SigStack) {
     // asm counts from 0
     stack.sig_num += 1;
 
-    let sigaction = SIGACTIONS.lock()[stack.sig_num];
+    let sigaction = {
+        let mut guard = SIGACTIONS.lock();
+        let action = guard[stack.sig_num];
+        if action.flags.contains(SigactionFlags::RESETHAND) {
+            // TODO: other things that must be set
+            guard[stack.sig_num].kind = SigactionKind::Default;
+        }
+        action
+    };
 
     let handler = match sigaction.kind {
         SigactionKind::Ignore => unreachable!(),
@@ -62,16 +70,73 @@ unsafe fn inner(stack: &mut SigStack) {
         SigactionKind::Handled { handler } => handler,
     };
 
+    let mut sigmask_inside = sigaction.mask;
+    if !sigaction.flags.contains(SigactionFlags::NODEFER) {
+        sigmask_inside &= !sig_bit(stack.sig_num);
+    }
+
+    let os = &Tcb::current().unwrap().os_specific;
+
+    // Set sigmask to sa_mask and unmark the signal as pending.
+    let lo = os.control.word[0].load(Ordering::Relaxed) >> 32;
+    let hi = os.control.word[1].load(Ordering::Relaxed) >> 32;
+    let prev_sigmask = lo | (hi << 32);
+
+    let sig_group = stack.sig_num / 32;
+
+    let prev_w0 = os.control.word[0].fetch_update(Ordering::Relaxed, Ordering::Relaxed, |mut prev| {
+        prev &= 0xffff_ffff;
+        if sig_group == 0 {
+            prev &= !sig_bit(stack.sig_num);
+        }
+        prev |= (sigmask_inside & 0xffff_ffff) << 32;
+        Some(prev)
+    }).unwrap();
+    let prev_w1 = os.control.word[1].fetch_update(Ordering::Relaxed, Ordering::Relaxed, |mut prev| {
+        prev &= 0xffff_ffff;
+        if sig_group == 1 {
+            prev &= !sig_bit(stack.sig_num);
+        }
+        prev |= (sigmask_inside >> 32) << 32;
+        Some(prev)
+    }).unwrap();
+
+    // TODO: If sa_mask caused signals to be unblocked, deliver one or all of those first?
+
     // Re-enable signals again.
-    let control_flags = &Tcb::current().unwrap().os_specific.control.control_flags;
+    let control_flags = &os.control.control_flags;
     control_flags.store(control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(), Ordering::Release);
     core::sync::atomic::compiler_fence(Ordering::Acquire);
 
+    // Call handler, either sa_handler or sa_siginfo depending on flag.
     if sigaction.flags.contains(SigactionFlags::SIGINFO) && let Some(sigaction) = handler.sigaction {
         sigaction(stack.sig_num as c_int, core::ptr::null_mut(), core::ptr::null_mut());
     } else if let Some(handler) = handler.handler {
         handler(stack.sig_num as c_int);
     }
+
+    // Disable signals while we modify the sigmask again
+    control_flags.store(control_flags.load(Ordering::Relaxed) | SigcontrolFlags::INHIBIT_DELIVERY.bits(), Ordering::Release);
+    core::sync::atomic::compiler_fence(Ordering::Acquire);
+
+    // Update sigmask again.
+    let prev_w0 = os.control.word[0].fetch_update(Ordering::Relaxed, Ordering::Relaxed, |mut prev| {
+        prev &= 0xffff_ffff;
+        prev |= lo << 32;
+        Some(prev)
+    }).unwrap();
+    let prev_w1 = os.control.word[1].fetch_update(Ordering::Relaxed, Ordering::Relaxed, |mut prev| {
+        prev &= 0xffff_ffff;
+        prev |= hi << 32;
+        Some(prev)
+    }).unwrap();
+
+    // TODO: If resetting the sigmask caused signals to be unblocked, then should they be delivered
+    // here? And would it be possible to tail-call-optimize that?
+
+    // And re-enable them again
+    control_flags.store(control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(), Ordering::Release);
+    core::sync::atomic::compiler_fence(Ordering::Acquire);
 }
 #[cfg(not(target_arch = "x86"))]
 pub(crate) unsafe extern "C" fn inner_c(stack: usize) {
