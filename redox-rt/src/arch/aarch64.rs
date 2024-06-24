@@ -1,10 +1,20 @@
 use syscall::error::*;
 
-use crate::{fork_inner, FdGuard};
+use crate::proc::{fork_inner, FdGuard};
+use crate::signal::inner_c;
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 47;
 pub(crate) const STACK_SIZE: usize = 1024 * 1024;
+
+#[derive(Debug, Default)]
+pub struct SigArea {
+    pub altstack_top: usize,
+    pub altstack_bottom: usize,
+    pub tmp: usize,
+    pub onstack: u64,
+    pub disable_signals_depth: u64,
+}
 
 /// Deactive TLS, used before exec() on Redox to not trick target executable into thinking TLS
 /// is already initialized as if it was a thread.
@@ -33,18 +43,16 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
     Ok(())
 }
 
-#[no_mangle]
-unsafe extern "C" fn __relibc_internal_fork_impl(initial_rsp: *mut usize) -> usize {
+unsafe extern "C" fn fork_impl(initial_rsp: *mut usize) -> usize {
     Error::mux(fork_inner(initial_rsp))
 }
 
-#[no_mangle]
-unsafe extern "C" fn __relibc_internal_fork_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
+unsafe extern "C" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
     let _ = syscall::close(new_pid_fd);
 }
 
-asmfunction!(__relibc_internal_fork_wrapper: ["
+asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
     stp     x29, x30, [sp, #-16]!
     stp     x27, x28, [sp, #-16]!
     stp     x25, x26, [sp, #-16]!
@@ -57,20 +65,20 @@ asmfunction!(__relibc_internal_fork_wrapper: ["
     //TODO: store floating point regs
 
     mov x0, sp
-    bl __relibc_internal_fork_impl
-    b 2f
-"]);
+    bl {fork_impl}
 
-asmfunction!(__relibc_internal_fork_hook: ["
+    add sp, sp, #128
+    ret
+"] <= [fork_impl = sym fork_impl]);
+
+asmfunction!(__relibc_internal_fork_ret: ["
     ldp x0, x1, [sp]
-    bl __relibc_internal_fork_hook
+    bl {child_hook}
 
     //TODO: load floating point regs
 
     mov x0, xzr
 
-    .p2align 4
-2:
     add sp, sp, #32
     ldp     x19, x20, [sp], #16
     ldp     x21, x22, [sp], #16
@@ -80,17 +88,17 @@ asmfunction!(__relibc_internal_fork_hook: ["
     ldp     x29, x30, [sp], #16
 
     ret
-"]);
+"] <= [child_hook = sym child_hook]);
 
 asmfunction!(__relibc_internal_sigentry: ["
     mov x0, sp
     bl {inner}
 
-    mov x8, {SYS_SIGRETURN}
-    svc 0
-"] <= [inner = sym inner_c, SYS_SIGRETURN = const SYS_SIGRETURN]);
+    // FIXME
+    b .
+"] <= [inner = sym inner_c]);
 
-asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
+asmfunction!(__relibc_internal_rlct_clone_ret: ["
     # Load registers
     ldp x8, x0, [sp], #16
     ldp x1, x2, [sp], #16
@@ -100,4 +108,4 @@ asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
     blr x8
 
     ret
-"]);
+"] <= []);

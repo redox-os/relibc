@@ -1,10 +1,20 @@
 use syscall::error::*;
 
-use crate::{fork_inner, FdGuard};
+use crate::proc::{fork_inner, FdGuard};
+use crate::signal::{inner_fastcall, RtSigarea};
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 31;
 pub(crate) const STACK_SIZE: usize = 1024 * 1024;
+
+#[derive(Debug, Default)]
+pub struct SigArea {
+    pub altstack_top: usize,
+    pub altstack_bottom: usize,
+    pub tmp: usize,
+    pub onstack: u64,
+    pub disable_signals_depth: u64,
+}
 
 /// Deactive TLS, used before exec() on Redox to not trick target executable into thinking TLS
 /// is already initialized as if it was a thread.
@@ -45,7 +55,7 @@ unsafe extern "cdecl" fn __relibc_internal_fork_hook(cur_filetable_fd: usize, ne
     let _ = syscall::close(new_pid_fd);
 }
 
-asmfunction!(__relibc_internal_fork_wrapper: ["
+asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
     push ebp
     mov ebp, esp
 
@@ -98,9 +108,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     add esp, 512
     fxrstor [esp]
 
-    mov eax, {SYS_SIGRETURN}
-    int 0x80
-"] <= [inner = sym inner_fastcall, SYS_SIGRETURN = const SYS_SIGRETURN]);
+    ud2
+"] <= [inner = sym inner_fastcall]);
 
 asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
     # Load registers

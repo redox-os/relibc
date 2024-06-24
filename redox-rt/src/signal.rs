@@ -11,7 +11,7 @@ use crate::sync::Mutex;
 static CPUID_EAX1_ECX: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
 
 pub fn sighandler_function() -> usize {
-    #[cfg(target_arch = "x86_64")]
+    //#[cfg(target_arch = "x86_64")]
     // Check OSXSAVE bit
     // TODO: HWCAP?
     /*if CPUID_EAX1_ECX.load(core::sync::atomic::Ordering::Relaxed) & (1 << 27) != 0 {
@@ -73,7 +73,7 @@ pub(crate) unsafe extern "C" fn inner_c(stack: usize) {
     inner(&mut *(stack as *mut SigStack))
 }
 #[cfg(target_arch = "x86")]
-unsafe extern "fastcall" fn inner_fastcall(stack: usize) {
+pub(crate) unsafe extern "fastcall" fn inner_fastcall(stack: usize) {
     inner(&mut *(stack as *mut SigStack))
 }
 

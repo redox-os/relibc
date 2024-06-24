@@ -45,8 +45,8 @@ pub type Tcb = GenericTcb<RtSigarea>;
 pub unsafe fn tcb_activate(tls_end: usize, tls_len: usize) {
     // Uses ABI page
     let abi_ptr = tls_end - tls_len - 16;
-    ptr::write(abi_ptr as *mut usize, tls_end);
-    asm!(
+    core::ptr::write(abi_ptr as *mut usize, tls_end);
+    core::arch::asm!(
         "msr tpidr_el0, {}",
         in(reg) abi_ptr,
     );
