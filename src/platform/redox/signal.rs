@@ -9,11 +9,15 @@ use super::{
 use crate::{
     header::{
         errno::{EINVAL, ENOSYS},
-        signal::{sigaction, siginfo_t, sigset_t, stack_t, SA_SIGINFO, SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK},
+        signal::{
+            sigaction, siginfo_t, sigset_t, stack_t, SA_SIGINFO, SIG_BLOCK, SIG_DFL, SIG_IGN,
+            SIG_SETMASK, SIG_UNBLOCK,
+        },
         sys_time::{itimerval, ITIMER_REAL},
         time::timespec,
     },
-    platform::ERRNO, pthread::Errno,
+    platform::ERRNO,
+    pthread::Errno,
 };
 
 impl PalSignal for Sys {
@@ -105,7 +109,11 @@ impl PalSignal for Sys {
         0
     }
 
-    fn sigaction(sig: c_int, c_act: Option<&sigaction>, c_oact: Option<&mut sigaction>) -> Result<(), Errno> {
+    fn sigaction(
+        sig: c_int,
+        c_act: Option<&sigaction>,
+        c_oact: Option<&mut sigaction>,
+    ) -> Result<(), Errno> {
         let sig = u8::try_from(sig).map_err(|_| syscall::Error::new(syscall::EINVAL))?;
 
         let new_action = c_act.map(|c_act| {
@@ -118,9 +126,13 @@ impl PalSignal for Sys {
             } else {
                 SigactionKind::Handled {
                     handler: if c_act.sa_flags & crate::header::signal::SA_SIGINFO as u64 != 0 {
-                        SignalHandler { sigaction: unsafe { core::mem::transmute(c_act.sa_handler) } }
+                        SignalHandler {
+                            sigaction: unsafe { core::mem::transmute(c_act.sa_handler) },
+                        }
                     } else {
-                        SignalHandler { handler: c_act.sa_handler }
+                        SignalHandler {
+                            handler: c_act.sa_handler,
+                        }
                     },
                 }
             };
@@ -173,7 +185,11 @@ impl PalSignal for Sys {
         -1
     }
 
-    fn sigprocmask(how: c_int, set: Option<&sigset_t>, oset: Option<&mut sigset_t>) -> Result<(), Errno> {
+    fn sigprocmask(
+        how: c_int,
+        set: Option<&sigset_t>,
+        oset: Option<&mut sigset_t>,
+    ) -> Result<(), Errno> {
         Ok(match how {
             SIG_SETMASK => redox_rt::signal::set_sigmask(set.copied(), oset)?,
             SIG_BLOCK => redox_rt::signal::or_sigmask(set.copied(), oset)?,

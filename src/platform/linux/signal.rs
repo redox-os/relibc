@@ -4,12 +4,14 @@ use super::{
     super::{types::*, PalSignal},
     e, e_raw, Sys,
 };
-use crate::header::{
-    signal::{sigaction, siginfo_t, sigset_t, stack_t, NSIG},
-    sys_time::itimerval,
-    time::timespec,
+use crate::{
+    header::{
+        signal::{sigaction, siginfo_t, sigset_t, stack_t, NSIG, SA_RESTORER},
+        sys_time::itimerval,
+        time::timespec,
+    },
+    pthread::Errno,
 };
-use crate::pthread::Errno;
 
 impl PalSignal for Sys {
     unsafe fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
@@ -37,16 +39,30 @@ impl PalSignal for Sys {
         e(syscall!(SETITIMER, which, new, old)) as c_int
     }
 
-    fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> Result<(), Errno> {
+    fn sigaction(
+        sig: c_int,
+        act: Option<&sigaction>,
+        oact: Option<&mut sigaction>,
+    ) -> Result<(), Errno> {
+        extern "C" {
+            fn __restore_rt();
+        }
+        let act = act.map(|act| {
+            let mut act_clone = act.clone();
+            act_clone.sa_flags |= SA_RESTORER as c_ulong;
+            act_clone.sa_restorer = Some(__restore_rt);
+            act_clone
+        });
         e_raw(unsafe {
             syscall!(
                 RT_SIGACTION,
                 sig,
-                act.map_or_else(core::ptr::null, |x| x as *const _),
+                act.as_ref().map_or_else(core::ptr::null, |x| x as *const _),
                 oact.map_or_else(core::ptr::null_mut, |x| x as *mut _),
                 mem::size_of::<sigset_t>()
             )
-        }).map(|_| ())
+        })
+        .map(|_| ())
     }
 
     unsafe fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
@@ -57,7 +73,11 @@ impl PalSignal for Sys {
         e(syscall!(RT_SIGPENDING, set, NSIG / 8)) as c_int
     }
 
-    fn sigprocmask(how: c_int, set: Option<&sigset_t>, oset: Option<&mut sigset_t>) -> Result<(), Errno> {
+    fn sigprocmask(
+        how: c_int,
+        set: Option<&sigset_t>,
+        oset: Option<&mut sigset_t>,
+    ) -> Result<(), Errno> {
         e_raw(unsafe {
             syscall!(
                 RT_SIGPROCMASK,
@@ -66,7 +86,8 @@ impl PalSignal for Sys {
                 oset.map_or_else(core::ptr::null_mut, |x| x as *mut _),
                 mem::size_of::<sigset_t>()
             )
-        }).map(|_| ())
+        })
+        .map(|_| ())
     }
 
     unsafe fn sigsuspend(set: *const sigset_t) -> c_int {

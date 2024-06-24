@@ -107,7 +107,9 @@ pub unsafe extern "C" fn sigaction(
     act: *const sigaction,
     oact: *mut sigaction,
 ) -> c_int {
-    Sys::sigaction(sig, act.as_ref(), oact.as_mut()).map(|()| 0).or_minus_one_errno()
+    Sys::sigaction(sig, act.as_ref(), oact.as_mut())
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -216,11 +218,6 @@ pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_in
     0
 }
 
-extern "C" {
-    // Defined in assembly inside platform/x/mod.rs
-    fn __restore_rt();
-}
-
 #[no_mangle]
 pub extern "C" fn signal(
     sig: c_int,
@@ -228,8 +225,8 @@ pub extern "C" fn signal(
 ) -> Option<extern "C" fn(c_int)> {
     let sa = sigaction {
         sa_handler: func,
-        sa_flags: SA_RESTART as c_ulong,
-        sa_restorer: Some(__restore_rt),
+        sa_flags: SA_RESTART as _,
+        sa_restorer: None, // set by platform if applicable
         sa_mask: sigset_t::default(),
     };
     let mut old_sa = mem::MaybeUninit::uninit();
@@ -279,7 +276,8 @@ pub unsafe extern "C" fn sigprocmask(
         }
 
         Ok(0)
-    })().or_minus_one_errno()
+    })()
+    .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -318,7 +316,7 @@ pub unsafe extern "C" fn sigset(
             let mut sa = sigaction {
                 sa_handler: func,
                 sa_flags: 0 as c_ulong,
-                sa_restorer: Some(__restore_rt),
+                sa_restorer: None, // set by platform if applicable
                 sa_mask: sigset_t::default(),
             };
             sigemptyset(&mut sa.sa_mask);
