@@ -31,6 +31,7 @@ EXPECT_NAMES=\
 	setjmp \
 	sigaction \
 	signal \
+	sigsetjmp \
 	stdio/all \
 	stdio/buffer \
 	stdio/fgets \
