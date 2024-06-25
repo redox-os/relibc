@@ -1,6 +1,6 @@
 //! signal implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/signal.h.html
 
-use core::{mem, ptr, arch::global_asm};
+use core::{arch::global_asm, mem, ptr};
 
 use cbitset::BitSet;
 
