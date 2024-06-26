@@ -421,6 +421,15 @@ where
 
     push(argc)?;
 
+    if let Ok(sighandler_fd) = syscall::dup(*open_via_dup, b"sighandler").map(FdGuard::new) {
+        let _ = syscall::write(*sighandler_fd, &SetSighandlerData {
+            user_handler: 0,
+            excp_handler: 0,
+            thread_control_addr: 0,
+            proc_control_addr: 0,
+        });
+    }
+
     unsafe {
         deactivate_tcb(*open_via_dup)?;
     }
