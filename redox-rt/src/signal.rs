@@ -70,9 +70,9 @@ unsafe fn inner(stack: &mut SigStack) {
         SigactionKind::Handled { handler } => handler,
     };
 
-    let mut sigmask_inside = sigaction.mask;
+    let mut sigallow_inside = !sigaction.mask;
     if !sigaction.flags.contains(SigactionFlags::NODEFER) {
-        sigmask_inside &= !sig_bit(stack.sig_num);
+        sigallow_inside &= !sig_bit(stack.sig_num);
     }
 
     let os = &Tcb::current().unwrap().os_specific;
@@ -80,7 +80,7 @@ unsafe fn inner(stack: &mut SigStack) {
     // Set sigmask to sa_mask and unmark the signal as pending.
     let lo = os.control.word[0].load(Ordering::Relaxed) >> 32;
     let hi = os.control.word[1].load(Ordering::Relaxed) >> 32;
-    let prev_sigmask = lo | (hi << 32);
+    let prev_sigallow = lo | (hi << 32);
 
     let sig_group = stack.sig_num / 32;
 
@@ -89,7 +89,7 @@ unsafe fn inner(stack: &mut SigStack) {
         if sig_group == 0 {
             prev &= !sig_bit(stack.sig_num);
         }
-        prev |= (sigmask_inside & 0xffff_ffff) << 32;
+        prev |= (sigallow_inside & 0xffff_ffff) << 32;
         Some(prev)
     }).unwrap();
     let prev_w1 = os.control.word[1].fetch_update(Ordering::Relaxed, Ordering::Relaxed, |mut prev| {
@@ -97,7 +97,7 @@ unsafe fn inner(stack: &mut SigStack) {
         if sig_group == 1 {
             prev &= !sig_bit(stack.sig_num);
         }
-        prev |= (sigmask_inside >> 32) << 32;
+        prev |= (sigallow_inside >> 32) << 32;
         Some(prev)
     }).unwrap();
 
@@ -119,7 +119,7 @@ unsafe fn inner(stack: &mut SigStack) {
     control_flags.store(control_flags.load(Ordering::Relaxed) | SigcontrolFlags::INHIBIT_DELIVERY.bits(), Ordering::Release);
     core::sync::atomic::compiler_fence(Ordering::Acquire);
 
-    // Update sigmask again.
+    // Update allowset again.
     let prev_w0 = os.control.word[0].fetch_update(Ordering::Relaxed, Ordering::Relaxed, |mut prev| {
         prev &= 0xffff_ffff;
         prev |= lo << 32;
@@ -156,7 +156,7 @@ pub fn set_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
     modify_sigmask(old, new.map(move |newmask| move |_, upper| if upper { newmask >> 32 } else { newmask } as u32))
 }
 pub fn or_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
-    // Parsing nightmare...
+    // Parsing nightmare... :)
     modify_sigmask(old, new.map(move |newmask| move |oldmask, upper| oldmask | if upper { newmask >> 32 } else { newmask } as u32))
 }
 pub fn andn_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
@@ -169,7 +169,7 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32
     let mut words = ctl.word.each_ref().map(|w| w.load(Ordering::Relaxed));
 
     if let Some(old) = old {
-        *old = combine_mask(words);
+        *old = !combine_allowset(words);
     }
     let Some(mut op) = op else {
         return Ok(());
@@ -179,7 +179,11 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32
     let mut cant_raise = 0;
 
     for i in 0..2 {
-        while let Err(changed) = ctl.word[i].compare_exchange(words[i], ((words[i] >> 32) << 32) | u64::from(op(words[i] as u32, i == 1)), Ordering::Relaxed, Ordering::Relaxed) {
+        let pending_bits = words[i] & 0xffff_ffff;
+        let allow_bits = (words[i] >> 32) as u32;
+        let new_allow_bits = !op(!allow_bits, i == 1);
+
+        while let Err(changed) = ctl.word[i].compare_exchange(words[i], pending_bits | (u64::from(new_allow_bits) << 32), Ordering::Relaxed, Ordering::Relaxed) {
             // If kernel observed a signal being unblocked and pending simultaneously, it will have
             // set a flag causing it to check for the INHIBIT_SIGNALS flag every time the context
             // is switched to. To avoid race conditions, we should NOT auto-raise those signals in
@@ -357,16 +361,14 @@ static IGNMASK: AtomicU64 = AtomicU64::new(sig_bit(SIGCHLD) | sig_bit(SIGURG) | 
 
 static PROC_CONTROL_STRUCT: SigProcControl = SigProcControl {
     word: [
-        AtomicU64::new(SIGW0_TSTP_IS_STOP_BIT | SIGW0_TTIN_IS_STOP_BIT | SIGW0_TTOU_IS_STOP_BIT),
-        AtomicU64::new(0),
+        //AtomicU64::new(SIGW0_TSTP_IS_STOP_BIT | SIGW0_TTIN_IS_STOP_BIT | SIGW0_TTOU_IS_STOP_BIT | 0xffff_ffff_0000_0000),
+        AtomicU64::new(0xffff_ffff_0000_0000), // "allow all, no pending"
+        AtomicU64::new(0xffff_ffff_0000_0000), // "allow all, no pending"
     ],
 };
 
-fn expand_mask(mask: u64) -> [u64; 2] {
-    [mask & 0xffff_ffff, mask >> 32]
-}
-fn combine_mask([lo, hi]: [u64; 2]) -> u64 {
-    lo | ((hi & 0xffff_ffff) << 32)
+fn combine_allowset([lo, hi]: [u64; 2]) -> u64 {
+    (lo >> 32) | ((hi >> 32) << 32)
 }
 
 const fn sig_bit(sig: usize) -> u64 {
@@ -404,6 +406,9 @@ pub fn setup_sighandler(area: &RtSigarea) {
     .expect("failed to open thisproc:current/sighandler");
     syscall::write(fd, &data).expect("failed to write to thisproc:current/sighandler");
     let _ = syscall::close(fd);
+
+    // TODO: Inherited set of ignored signals
+    set_sigmask(Some(0), None);
 }
 #[derive(Debug, Default)]
 pub struct RtSigarea {

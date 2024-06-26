@@ -104,18 +104,14 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     // Read first signal word
     mov eax, gs:[{tcb_sc_off} + {sc_word}]
-    mov edx, gs:[{tcb_sc_off} + {sc_word} + 4]
-    not edx
-    and eax, edx
+    and eax, gs:[{tcb_sc_off} + {sc_word} + 4]
     and eax, {SIGW0_PENDING_MASK}
     bsf eax, eax
     jnz 2f
 
     // Read second signal word
     mov eax, gs:[{tcb_sc_off} + {sc_word} + 8]
-    mov edx, gs:[{tcb_sc_off} + {sc_word} + 12]
-    not edx
-    and eax, edx
+    and eax, gs:[{tcb_sc_off} + {sc_word} + 12]
     and eax, {SIGW1_PENDING_MASK}
     bsf eax, eax
     jz 7f

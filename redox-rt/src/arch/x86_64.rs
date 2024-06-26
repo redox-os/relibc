@@ -136,7 +136,6 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov rax, fs:[{tcb_sc_off} + {sc_word}]
     mov rdx, rax
     shr rdx, 32
-    not edx
     and eax, edx
     and eax, {SIGW0_PENDING_MASK}
     bsf eax, eax
@@ -146,7 +145,6 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov rax, fs:[{tcb_sc_off} + {sc_word} + 8]
     mov rdx, rax
     shr rdx, 32
-    not edx
     and eax, edx
     and eax, {SIGW1_PENDING_MASK}
     bsf eax, eax

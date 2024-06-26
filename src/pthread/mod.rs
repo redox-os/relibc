@@ -136,13 +136,15 @@ pub(crate) unsafe fn create(
 ) -> Result<pthread_t, Errno> {
     let attrs = attrs.copied().unwrap_or_default();
 
-    let mut procmask = 0_u64;
+    let mut current_sigmask = 0_u64;
     #[cfg(target_os = "redox")]
-    redox_rt::signal::set_sigmask(None, Some(&mut procmask))
-        .expect("failed to obtain sigprocmask for caller");
+    {
+        current_sigmask = redox_rt::signal::get_sigmask()
+            .expect("failed to obtain sigprocmask for caller");
+    }
 
     // Create a locked mutex, unlocked by the thread after it has started.
-    let synchronization_mutex = Mutex::locked(procmask);
+    let synchronization_mutex = Mutex::locked(current_sigmask);
     let synchronization_mutex = &synchronization_mutex;
 
     let stack_size = attrs.stacksize.next_multiple_of(Sys::getpagesize());
@@ -248,8 +250,10 @@ unsafe extern "C" fn new_thread_shim(
     (&*mutex).manual_unlock();
 
     #[cfg(target_os = "redox")]
-    redox_rt::signal::set_sigmask(Some(procmask), None)
-        .expect("failed to set procmask in child thread");
+    {
+        redox_rt::signal::set_sigmask(Some(procmask), None)
+            .expect("failed to set procmask in child thread");
+    }
 
     let retval = entry_point(arg);
 

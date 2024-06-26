@@ -305,8 +305,7 @@ pub fn execve(
 
         unreachable!()
     } else {
-        let mut sigprocmask = 0_u64;
-        redox_rt::signal::set_sigmask(None, Some(&mut sigprocmask)).unwrap();
+        let sigprocmask = redox_rt::signal::get_sigmask().unwrap();
 
         let extrainfo = ExtraInfo {
             cwd: Some(&cwd),
