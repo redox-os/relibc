@@ -148,7 +148,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     and eax, edx
     and eax, {SIGW1_PENDING_MASK}
     bsf eax, eax
-    jnz 7f
+    jz 7f
     add eax, 32
 2:
     sub rsp, {REDZONE_SIZE}
