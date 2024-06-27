@@ -29,19 +29,22 @@ pub fn sighandler_function() -> usize {
 #[repr(C)]
 pub struct SigStack {
     #[cfg(target_arch = "x86_64")]
-    fx: [u8; 4096],
+    fx: [u8; 4096], // 64 byte aligned
 
     #[cfg(target_arch = "x86")]
-    fx: [u8; 512],
+    fx: [u8; 512], // 16 byte aligned
 
     #[cfg(target_arch = "x86_64")]
     _pad: [usize; 3], // pad to 192 = 3 * 64 = 168 + 24 bytes
 
     #[cfg(target_arch = "x86")]
-    _pad: [usize; 2], // pad to 192 = 3 * 64 = 168 + 24 bytes
+    _pad: [usize; 3], // pad to 64 = 4 * 16 = 52 + 12 bytes
 
     sig_num: usize,
-    pub regs: ArchIntRegs, // 160 bytes currently
+
+    // x86_64: 160 bytes
+    // i686: 48 bytes
+    pub regs: ArchIntRegs,
 }
 
 #[inline(always)]

@@ -3,7 +3,7 @@ use core::mem::offset_of;
 use syscall::*;
 
 use crate::proc::{fork_inner, FdGuard};
-use crate::signal::{inner_fastcall, RtSigarea};
+use crate::signal::{inner_fastcall, RtSigarea, SigStack};
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 31;
@@ -14,9 +14,29 @@ pub(crate) const STACK_SIZE: usize = 1024 * 1024;
 pub struct SigArea {
     pub altstack_top: usize,
     pub altstack_bottom: usize,
-    pub tmp: usize,
+    pub tmp_eip: usize,
+    pub tmp_esp: usize,
+    pub tmp_eax: usize,
+    pub tmp_edx: usize,
     pub onstack: u64,
     pub disable_signals_depth: u64,
+}
+#[derive(Debug, Default)]
+#[repr(C)]
+pub struct ArchIntRegs {
+    pub _pad: [usize; 2], // make size divisible by 16
+
+    pub ebp: usize,
+    pub esi: usize,
+    pub edi: usize,
+    pub ebx: usize,
+    pub eax: usize,
+    pub ecx: usize,
+    pub edx: usize,
+
+    pub eflags: usize,
+    pub eip: usize,
+    pub esp: usize,
 }
 
 /// Deactive TLS, used before exec() on Redox to not trick target executable into thinking TLS
@@ -100,6 +120,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
     ret
 "] <= [child_hook = sym child_hook]);
 asmfunction!(__relibc_internal_sigentry: ["
+    // Save some registers
     mov gs:[{tcb_sa_off} + {sa_tmp_esp}], esp
     mov gs:[{tcb_sa_off} + {sa_tmp_eax}], eax
     mov gs:[{tcb_sa_off} + {sa_tmp_edx}], edx
@@ -136,33 +157,29 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov esp, edx
 4:
     // Now that we have a stack, we can finally start populating the signal stack.
-    push fs
-    .byte 0x66, 0x6a, 0x00 // pushw 0
-    push ss
-    .byte 0x66, 0x6a, 0x00 // pushw 0
-    push dword ptr gs:[{tcb_sa_off} + {sc_tmp_esp}]
-    push dword ptr gs:[{tcb_sc_off} + {sc_saved_eflags}]
-    push cs
-    .byte 0x66, 0x6a, 0x00 // pushw 0
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_esp}]
     push dword ptr gs:[{tcb_sc_off} + {sc_saved_eip}]
+    push dword ptr gs:[{tcb_sc_off} + {sc_saved_eflags}]
 
-    push dword ptr gs:[{tcb_sa_off} + {sc_tmp_edx}]
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_edx}]
     push ecx
-    push dword ptr gs:[{tcb_sa_off} + {sc_tmp_eax}]
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_eax}]
     push ebx
     push edi
     push esi
     push ebp
 
+    sub esp, 8
+
     push eax
-    sub esp, 512 + 8
+    sub esp, 12 + 512
     fxsave [esp]
 
     mov ecx, esp
     call {inner}
 
     fxrstor [esp]
-    add esp, 512 + 12
+    add esp, 512 + 12 + 4 + 8
 
     pop ebp
     pop esi
@@ -172,10 +189,15 @@ asmfunction!(__relibc_internal_sigentry: ["
     pop ecx
     pop edx
 
-    pop dword ptr gs:[{tcb_sa_off} + {sa_tmp_eip}]
-    add esp, 4
     popfd
+    pop dword ptr gs:[{tcb_sa_off} + {sa_tmp_eip}]
+
+    .globl __relibc_internal_sigentry_crit_first
+__relibc_internal_sigentry_crit_first:
     pop esp
+
+    .globl __relibc_internal_sigentry_crit_second
+__relibc_internal_sigentry_crit_second:
     jmp dword ptr gs:[{tcb_sa_off} + {sa_tmp_eip}]
 7:
     ud2
@@ -218,3 +240,16 @@ asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
 
     ret
 "] <= []);
+extern "C" {
+    fn __relibc_internal_sigentry_crit_first();
+    fn __relibc_internal_sigentry_crit_second();
+}
+pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
+    if stack.regs.eip == __relibc_internal_sigentry_crit_first as usize {
+        let stack_ptr = stack.regs.esp as *const usize;
+        stack.regs.esp = stack_ptr.read();
+        stack.regs.eip = stack_ptr.sub(1).read();
+    } else if stack.regs.eip == __relibc_internal_sigentry_crit_second as usize {
+        stack.regs.eip = area.tmp_eip;
+    }
+}
