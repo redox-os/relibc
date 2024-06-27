@@ -14,9 +14,13 @@ pub(crate) const STACK_SIZE: usize = 1024 * 1024;
 
 #[derive(Debug, Default)]
 pub struct SigArea {
+    pub tmp_rip: usize,
+    pub tmp_rsp: usize,
+    pub tmp_rax: usize,
+    pub tmp_rdx: usize,
+
     pub altstack_top: usize,
     pub altstack_bottom: usize,
-    pub tmp: usize,
     pub onstack: u64,
     pub disable_signals_depth: u64,
 }
@@ -130,6 +134,11 @@ asmfunction!(__relibc_internal_rlct_clone_ret: ["
 "] <= []);
 
 asmfunction!(__relibc_internal_sigentry: ["
+    // Save some registers
+    mov fs:[{tcb_sa_off} + {sa_tmp_rsp}], rsp
+    mov fs:[{tcb_sa_off} + {sa_tmp_rax}], rax
+    mov fs:[{tcb_sa_off} + {sa_tmp_rdx}], rdx
+
     // First, select signal, always pick first available bit
 
     // Read first signal word
@@ -177,16 +186,16 @@ asmfunction!(__relibc_internal_sigentry: ["
     // Now that we have a stack, we can finally start initializing the signal stack!
 
     push 0x23 // SS
-    push fs:[{tcb_sc_off} + {sc_saved_rsp}]
+    push fs:[{tcb_sa_off} + {sa_tmp_rsp}]
     push fs:[{tcb_sc_off} + {sc_saved_rflags}]
     push 0x2b // CS
     push fs:[{tcb_sc_off} + {sc_saved_rip}]
 
     push rdi
     push rsi
-    push fs:[{tcb_sc_off} + {sc_saved_rdx}]
+    push fs:[{tcb_sa_off} + {sa_tmp_rdx}]
     push rcx
-    push fs:[{tcb_sc_off} + {sc_saved_rax}]
+    push fs:[{tcb_sa_off} + {sa_tmp_rax}]
     push r8
     push r9
     push r10
@@ -243,11 +252,11 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     iretq
     /*
-    pop qword ptr fs:[{tcb_sa_off} + {sa_tmp}]
+    pop qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
     add rsp, 8
     popfq
     pop rsp
-    jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp}]
+    jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
     */
 6:
     fxsave64 [rsp]
@@ -262,15 +271,15 @@ asmfunction!(__relibc_internal_sigentry: ["
     // Spurious signal
 "] <= [
     inner = sym inner_c,
-    sa_tmp = const offset_of!(SigArea, tmp),
+    sa_tmp_rip = const offset_of!(SigArea, tmp_rip),
+    sa_tmp_rsp = const offset_of!(SigArea, tmp_rsp),
+    sa_tmp_rax = const offset_of!(SigArea, tmp_rax),
+    sa_tmp_rdx = const offset_of!(SigArea, tmp_rdx),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
     sa_onstack = const offset_of!(SigArea, onstack),
-    sc_saved_rax = const offset_of!(Sigcontrol, saved_scratch_a),
-    sc_saved_rdx = const offset_of!(Sigcontrol, saved_scratch_b),
-    sc_saved_rflags = const offset_of!(Sigcontrol, saved_flags),
+    sc_saved_rflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
-    sc_saved_rsp = const offset_of!(Sigcontrol, saved_sp),
     sc_word = const offset_of!(Sigcontrol, word),
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),

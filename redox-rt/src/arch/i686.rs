@@ -99,6 +99,10 @@ asmfunction!(__relibc_internal_fork_ret: ["
     ret
 "] <= [child_hook = sym child_hook]);
 asmfunction!(__relibc_internal_sigentry: ["
+    mov gs:[{tcb_sa_off} + {sa_tmp_esp}], esp
+    mov gs:[{tcb_sa_off} + {sa_tmp_eax}], eax
+    mov gs:[{tcb_sa_off} + {sa_tmp_edx}], edx
+
     // Read pending half of first signal. This can be done nonatomically wrt the mask bits, since
     // only this thread is allowed to modify the latter.
 
@@ -135,15 +139,15 @@ asmfunction!(__relibc_internal_sigentry: ["
     .byte 0x66, 0x6a, 0x00 // pushw 0
     push ss
     .byte 0x66, 0x6a, 0x00 // pushw 0
-    push dword ptr gs:[{tcb_sc_off} + {sc_saved_esp}]
+    push dword ptr gs:[{tcb_sa_off} + {sc_tmp_esp}]
     push dword ptr gs:[{tcb_sc_off} + {sc_saved_eflags}]
     push cs
     .byte 0x66, 0x6a, 0x00 // pushw 0
     push dword ptr gs:[{tcb_sc_off} + {sc_saved_eip}]
 
-    push dword ptr gs:[{tcb_sc_off} + {sc_saved_edx}]
+    push dword ptr gs:[{tcb_sa_off} + {sc_tmp_edx}]
     push ecx
-    push dword ptr gs:[{tcb_sc_off} + {sc_saved_eax}]
+    push dword ptr gs:[{tcb_sa_off} + {sc_tmp_eax}]
     push ebx
     push edi
     push esi
@@ -167,24 +171,24 @@ asmfunction!(__relibc_internal_sigentry: ["
     pop ecx
     pop edx
 
-    pop dword ptr gs:[{tcb_sa_off} + {sa_tmp}]
+    pop dword ptr gs:[{tcb_sa_off} + {sa_tmp_eip}]
     add esp, 4
     popfd
     pop esp
-    jmp dword ptr gs:[{tcb_sa_off} + {sa_tmp}]
+    jmp dword ptr gs:[{tcb_sa_off} + {sa_tmp_eip}]
 7:
     ud2
 "] <= [
     inner = sym inner_fastcall,
-    sa_tmp = const offset_of!(SigArea, tmp),
+    sa_tmp_eip = const offset_of!(SigArea, tmp_eip),
+    sa_tmp_esp = const offset_of!(SigArea, tmp_esp),
+    sa_tmp_eax = const offset_of!(SigArea, tmp_eax),
+    sa_tmp_edx = const offset_of!(SigArea, tmp_edx),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
     sa_onstack = const offset_of!(SigArea, onstack),
-    sc_saved_eax = const offset_of!(Sigcontrol, saved_scratch_a),
-    sc_saved_edx = const offset_of!(Sigcontrol, saved_scratch_b),
-    sc_saved_eflags = const offset_of!(Sigcontrol, saved_flags),
+    sc_saved_eflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
-    sc_saved_esp = const offset_of!(Sigcontrol, saved_sp),
     sc_word = const offset_of!(Sigcontrol, word),
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
