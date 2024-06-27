@@ -231,6 +231,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     push r13
     push r14
     push r15
+    sub rsp, 16
 
     push rax // selected signal
 
@@ -258,7 +259,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     xrstor [rsp]
 
 5:
-    add rsp, 4096 + 32
+    add rsp, 4096 + 32 + 16
     pop r15
     pop r14
     pop r13
@@ -277,8 +278,17 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     popfq
     pop qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
+
+    // x86 lacks atomic instructions for setting both the stack and instruction pointer
+    // simultaneously, except the slow microcoded IRETQ instruction. Thus, we let the arch_pre
+    // function emulate atomicity between the pop rsp and indirect jump.
+
+    .globl __relibc_internal_sigentry_crit_first
 __relibc_internal_sigentry_crit_first:
+
     pop rsp
+
+    .globl __relibc_internal_sigentry_crit_second
 __relibc_internal_sigentry_crit_second:
     jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
 6:
