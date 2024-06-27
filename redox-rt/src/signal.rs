@@ -79,30 +79,18 @@ unsafe fn inner(stack: &mut SigStack) {
     if !sigaction.flags.contains(SigactionFlags::NODEFER) {
         sigallow_inside &= !sig_bit(stack.sig_num);
     }
+    let sigallow_inside_lo = sigallow_inside & 0xffff_ffff;
+    let sigallow_inside_hi = sigallow_inside >> 32;
 
     // Set sigmask to sa_mask and unmark the signal as pending.
-    let lo = os.control.word[0].load(Ordering::Relaxed) >> 32;
-    let hi = os.control.word[1].load(Ordering::Relaxed) >> 32;
-    let prev_sigallow = lo | (hi << 32);
+    let prev_sigallow_lo = os.control.word[0].load(Ordering::Relaxed) >> 32;
+    let prev_sigallow_hi = os.control.word[1].load(Ordering::Relaxed) >> 32;
+    let prev_sigallow = prev_sigallow_lo | (prev_sigallow_hi << 32);
 
     let sig_group = stack.sig_num / 32;
 
-    let prev_w0 = os.control.word[0].fetch_update(Ordering::Relaxed, Ordering::Relaxed, |mut prev| {
-        prev &= 0xffff_ffff;
-        if sig_group == 0 {
-            prev &= !sig_bit(stack.sig_num);
-        }
-        prev |= (sigallow_inside & 0xffff_ffff) << 32;
-        Some(prev)
-    }).unwrap();
-    let prev_w1 = os.control.word[1].fetch_update(Ordering::Relaxed, Ordering::Relaxed, |mut prev| {
-        prev &= 0xffff_ffff;
-        if sig_group == 1 {
-            prev &= !sig_bit(stack.sig_num);
-        }
-        prev |= (sigallow_inside >> 32) << 32;
-        Some(prev)
-    }).unwrap();
+    let prev_w0 = os.control.word[0].fetch_add(sigallow_inside_lo.wrapping_sub(prev_sigallow_lo), Ordering::Relaxed);
+    let prev_w1 = os.control.word[1].fetch_add(sigallow_inside_hi.wrapping_sub(prev_sigallow_hi), Ordering::Relaxed);
 
     // TODO: If sa_mask caused signals to be unblocked, deliver one or all of those first?
 
@@ -123,16 +111,8 @@ unsafe fn inner(stack: &mut SigStack) {
     core::sync::atomic::compiler_fence(Ordering::Acquire);
 
     // Update allowset again.
-    let prev_w0 = os.control.word[0].fetch_update(Ordering::Relaxed, Ordering::Relaxed, |mut prev| {
-        prev &= 0xffff_ffff;
-        prev |= lo << 32;
-        Some(prev)
-    }).unwrap();
-    let prev_w1 = os.control.word[1].fetch_update(Ordering::Relaxed, Ordering::Relaxed, |mut prev| {
-        prev &= 0xffff_ffff;
-        prev |= hi << 32;
-        Some(prev)
-    }).unwrap();
+    let prev_w0 = os.control.word[0].fetch_add(prev_sigallow_lo.wrapping_sub(sigallow_inside_lo), Ordering::Relaxed);
+    let prev_w1 = os.control.word[1].fetch_add(prev_sigallow_hi.wrapping_sub(sigallow_inside_hi), Ordering::Relaxed);
 
     // TODO: If resetting the sigmask caused signals to be unblocked, then should they be delivered
     // here? And would it be possible to tail-call-optimize that?
@@ -183,19 +163,10 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32
 
     for i in 0..2 {
         let pending_bits = words[i] & 0xffff_ffff;
-        let allow_bits = (words[i] >> 32) as u32;
-        let new_allow_bits = !op(!allow_bits, i == 1);
+        let old_allow_bits = words[i] & 0xffff_ffff_0000_0000;
+        let new_allow_bits = u64::from(!op(!((old_allow_bits >> 32) as u32), i == 1)) << 32;
 
-        while let Err(changed) = ctl.word[i].compare_exchange(words[i], pending_bits | (u64::from(new_allow_bits) << 32), Ordering::Relaxed, Ordering::Relaxed) {
-            // If kernel observed a signal being unblocked and pending simultaneously, it will have
-            // set a flag causing it to check for the INHIBIT_SIGNALS flag every time the context
-            // is switched to. To avoid race conditions, we should NOT auto-raise those signals in
-            // userspace as a result of unblocking it. The kernel will instead take care of that later.
-            can_raise |= (changed & (changed >> 32)) << (32 * i);
-            cant_raise |= (changed & !(changed >> 32)) << (32 * i);
-
-            words[i] = changed;
-        }
+        ctl.word[i].fetch_add(new_allow_bits.wrapping_sub(old_allow_bits), Ordering::Relaxed);
     }
 
     // TODO: Prioritize cant_raise realtime signals?
