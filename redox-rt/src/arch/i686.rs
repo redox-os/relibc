@@ -10,6 +10,7 @@ pub(crate) const STACK_TOP: usize = 1 << 31;
 pub(crate) const STACK_SIZE: usize = 1024 * 1024;
 
 #[derive(Debug, Default)]
+#[repr(C)]
 pub struct SigArea {
     pub altstack_top: usize,
     pub altstack_bottom: usize,

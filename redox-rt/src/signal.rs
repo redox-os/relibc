@@ -2,7 +2,7 @@ use core::cell::{Cell, UnsafeCell};
 use core::ffi::c_int;
 use core::sync::atomic::Ordering;
 
-use syscall::{Error, IntRegisters, Result, SetSighandlerData, SigProcControl, Sigcontrol, SigcontrolFlags, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGW0_NOCLDSTOP_BIT, SIGW0_TSTP_IS_STOP_BIT, SIGW0_TTIN_IS_STOP_BIT, SIGW0_TTOU_IS_STOP_BIT, SIGWINCH, data::AtomicU64};
+use syscall::{Error, Result, SetSighandlerData, SigProcControl, Sigcontrol, SigcontrolFlags, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGW0_NOCLDSTOP_BIT, SIGW0_TSTP_IS_STOP_BIT, SIGW0_TTIN_IS_STOP_BIT, SIGW0_TTOU_IS_STOP_BIT, SIGWINCH, data::AtomicU64};
 
 use crate::{arch::*, Tcb};
 use crate::sync::Mutex;
@@ -41,15 +41,17 @@ pub struct SigStack {
     _pad: [usize; 2], // pad to 192 = 3 * 64 = 168 + 24 bytes
 
     sig_num: usize,
-    regs: IntRegisters, // 160 bytes currently
+    pub regs: ArchIntRegs, // 160 bytes currently
 }
 
 #[inline(always)]
 unsafe fn inner(stack: &mut SigStack) {
-    // TODO: Set procmask based on SA_NODEFER, SA_RESETHAND, and sa_mask.
+    let os = &Tcb::current().unwrap().os_specific;
 
     // asm counts from 0
     stack.sig_num += 1;
+
+    arch_pre(stack, &mut *os.arch.get());
 
     let sigaction = {
         let mut guard = SIGACTIONS.lock();
@@ -74,8 +76,6 @@ unsafe fn inner(stack: &mut SigStack) {
     if !sigaction.flags.contains(SigactionFlags::NODEFER) {
         sigallow_inside &= !sig_bit(stack.sig_num);
     }
-
-    let os = &Tcb::current().unwrap().os_specific;
 
     // Set sigmask to sa_mask and unmark the signal as pending.
     let lo = os.control.word[0].load(Ordering::Relaxed) >> 32;

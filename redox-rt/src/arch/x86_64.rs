@@ -6,6 +6,7 @@ use syscall::error::*;
 use syscall::flag::*;
 
 use crate::proc::{fork_inner, FdGuard};
+use crate::signal::SigStack;
 use crate::signal::{inner_c, RtSigarea};
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
@@ -13,6 +14,7 @@ pub(crate) const STACK_TOP: usize = 1 << 47;
 pub(crate) const STACK_SIZE: usize = 1024 * 1024;
 
 #[derive(Debug, Default)]
+#[repr(C)]
 pub struct SigArea {
     pub tmp_rip: usize,
     pub tmp_rsp: usize,
@@ -23,6 +25,31 @@ pub struct SigArea {
     pub altstack_bottom: usize,
     pub onstack: u64,
     pub disable_signals_depth: u64,
+}
+
+#[repr(C, align(64))]
+#[derive(Debug, Default)]
+pub struct ArchIntRegs {
+    _pad: [usize; 2], // ensure size is divisible by 32
+
+    pub r15: usize,
+    pub r14: usize,
+    pub r13: usize,
+    pub r12: usize,
+    pub rbp: usize,
+    pub rbx: usize,
+    pub r11: usize,
+    pub r10: usize,
+    pub r9: usize,
+    pub r8: usize,
+    pub rax: usize,
+    pub rcx: usize,
+    pub rdx: usize,
+    pub rsi: usize,
+    pub rdi: usize,
+    pub rflags: usize,
+    pub rip: usize,
+    pub rsp: usize,
 }
 
 /// Deactive TLS, used before exec() on Redox to not trick target executable into thinking TLS
@@ -185,11 +212,9 @@ asmfunction!(__relibc_internal_sigentry: ["
 4:
     // Now that we have a stack, we can finally start initializing the signal stack!
 
-    push 0x23 // SS
     push fs:[{tcb_sa_off} + {sa_tmp_rsp}]
-    push fs:[{tcb_sc_off} + {sc_saved_rflags}]
-    push 0x2b // CS
     push fs:[{tcb_sc_off} + {sc_saved_rip}]
+    push fs:[{tcb_sc_off} + {sc_saved_rflags}]
 
     push rdi
     push rsi
@@ -250,14 +275,12 @@ asmfunction!(__relibc_internal_sigentry: ["
     pop rsi
     pop rdi
 
-    iretq
-    /*
-    pop qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
-    add rsp, 8
     popfq
+    pop qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
+__relibc_internal_sigentry_crit_first:
     pop rsp
+__relibc_internal_sigentry_crit_second:
     jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
-    */
 6:
     fxsave64 [rsp]
 
@@ -291,5 +314,30 @@ asmfunction!(__relibc_internal_sigentry: ["
     REDZONE_SIZE = const 128,
     STACK_ALIGN = const 64, // if xsave is used
 ]);
+
+extern "C" {
+    fn __relibc_internal_sigentry_crit_first();
+    fn __relibc_internal_sigentry_crit_second();
+}
+pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
+    // It is impossible to update RSP and RIP atomically on x86_64, without using IRETQ, which is
+    // almost as slow as calling a SIGRETURN syscall would be. Instead, we abuse the fact that
+    // signals are disabled in the prologue of the signal trampoline, which allows us to emulate
+    // atomicity inside the critical section, consisting of one instruction at 'crit_first', and
+    // one at 'crit_second', see asm.
+
+    if stack.regs.rip == __relibc_internal_sigentry_crit_first as usize {
+        // Reexecute pop rsp and jump steps. This case needs to be different from the one below,
+        // since rsp has not been overwritten with the previous context's stack, just yet. At this
+        // point, we know [rsp+0] contains the saved RSP, and [rsp-8] contains the saved RIP.
+        let stack_ptr = stack.regs.rsp as *const usize;
+        stack.regs.rsp = stack_ptr.read();
+        stack.regs.rip = stack_ptr.sub(1).read();
+    } else if stack.regs.rip == __relibc_internal_sigentry_crit_second as usize {
+        // Almost finished, just reexecute the jump before tmp_rip is overwritten by this
+        // deeper-level signal.
+        stack.regs.rip = area.tmp_rip;
+    }
+}
 
 static SUPPORTS_XSAVE: AtomicU8 = AtomicU8::new(1); // FIXME
