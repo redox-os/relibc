@@ -219,7 +219,7 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
             IGNMASK.store(old_ignmask | sig_bit(signal.into()), Ordering::Relaxed);
 
             // mark the signal as masked
-            ctl.word[sig_group].fetch_or(sig_bit32, Ordering::Relaxed);
+            ctl.word[sig_group].fetch_and(!(sig_bit32 << 32), Ordering::Relaxed);
 
             // POSIX specifies that pending signals shall be discarded if set to SIG_IGN by
             // sigaction.
