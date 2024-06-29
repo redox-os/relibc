@@ -1,8 +1,9 @@
 use core::cell::{Cell, UnsafeCell};
 use core::ffi::c_int;
-use core::sync::atomic::Ordering;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
-use syscall::{Error, Result, SetSighandlerData, SigProcControl, Sigcontrol, SigcontrolFlags, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGW0_NOCLDSTOP_BIT, SIGW0_TSTP_IS_STOP_BIT, SIGW0_TTIN_IS_STOP_BIT, SIGW0_TTOU_IS_STOP_BIT, SIGWINCH, data::AtomicU64};
+use syscall::{RawAction, SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGQUIT, SIGSEGV, SIGSYS, SIGTRAP, SIGXCPU, SIGXFSZ};
+use syscall::{Error, Result, SetSighandlerData, SigProcControl, Sigcontrol, SigcontrolFlags, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH, data::AtomicU64};
 
 use crate::{arch::*, Tcb};
 use crate::sync::Mutex;
@@ -57,11 +58,16 @@ unsafe fn inner(stack: &mut SigStack) {
     arch_pre(stack, &mut *os.arch.get());
 
     let sigaction = {
-        let mut guard = SIGACTIONS.lock();
-        let action = guard[stack.sig_num];
+        let mut guard = SIGACTIONS_LOCK.lock();
+        let action = convert_old(&PROC_CONTROL_STRUCT.actions[stack.sig_num - 1]);
         if action.flags.contains(SigactionFlags::RESETHAND) {
             // TODO: other things that must be set
-            guard[stack.sig_num].kind = SigactionKind::Default;
+            drop(guard);
+            sigaction(stack.sig_num as u8, Some(&Sigaction {
+                kind: SigactionKind::Default,
+                mask: 0,
+                flags: SigactionFlags::empty(),
+            }), None);
         }
         action
     };
@@ -191,6 +197,44 @@ pub struct Sigaction {
     pub mask: u64,
     pub flags: SigactionFlags,
 }
+impl Sigaction {
+    fn ip(&self) -> usize {
+        unsafe {
+            match self.kind {
+                SigactionKind::Handled { handler } => if self.flags.contains(SigactionFlags::SIGINFO) {
+                    handler.sigaction.map_or(0, |a| a as usize)
+                } else {
+                    handler.handler.map_or(0, |a| a as usize)
+                }
+                _ => 0,
+            }
+        }
+    }
+}
+
+const MASK_DONTCARE: u64 = !0;
+
+fn convert_old(action: &RawAction) -> Sigaction {
+    let old_first = action.first.load(Ordering::Relaxed);
+    let old_mask = action.user_data.load(Ordering::Relaxed);
+
+    let handler = (old_first & !(u64::from(STORED_FLAGS) << 32)) as usize;
+    let flags = SigactionFlags::from_bits_retain(((old_first >> 32) as u32) & STORED_FLAGS);
+
+    let kind = if handler == default_handler as usize {
+        SigactionKind::Default
+    } else if flags.contains(SigactionFlags::IGNORED) {
+        SigactionKind::Ignore
+    } else {
+        SigactionKind::Handled { handler: unsafe { core::mem::transmute(handler as usize) } }
+    };
+
+    Sigaction {
+        mask: old_mask,
+        flags,
+        kind,
+    }
+}
 
 pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction>) -> Result<()> {
     if matches!(usize::from(signal), 0 | 32 | SIGKILL | SIGSTOP | 65..) {
@@ -199,62 +243,46 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
 
     let _sigguard = tmp_disable_signals();
     let ctl = current_sigctl();
-    let mut guard = SIGACTIONS.lock();
-    let old_ignmask = IGNMASK.load(Ordering::Relaxed);
+
+    let action = &PROC_CONTROL_STRUCT.actions[usize::from(signal) - 1];
 
     if let Some(old) = old {
-        *old = guard[usize::from(signal)];
+        *old = convert_old(action);
     }
 
     let Some(new) = new else {
         return Ok(());
     };
-    guard[usize::from(signal)] = *new;
 
-    let sig_group = usize::from(signal) / 32;
-    let sig_bit32 = 1 << ((signal - 1) % 32);
+    let explicit_handler = new.ip();
 
-    match (usize::from(signal), new.kind) {
+    let (mask, flags, handler) = match (usize::from(signal), new.kind) {
         (_, SigactionKind::Ignore) | (SIGURG | SIGWINCH, SigactionKind::Default) => {
-            IGNMASK.store(old_ignmask | sig_bit(signal.into()), Ordering::Relaxed);
-
-            // mark the signal as masked
-            ctl.word[sig_group].fetch_and(!(sig_bit32 << 32), Ordering::Relaxed);
-
-            // POSIX specifies that pending signals shall be discarded if set to SIG_IGN by
+            // TODO: POSIX specifies that pending signals shall be discarded if set to SIG_IGN by
             // sigaction.
             // TODO: handle tmp_disable_signals
+            (MASK_DONTCARE, SigactionFlags::IGNORED, if matches!(new.kind, SigactionKind::Default) {
+                default_handler as usize
+            } else {
+                0
+            })
         }
         // TODO: Handle pending signals before these flags are set.
-        (SIGTSTP, SigactionKind::Default) => {
-            PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TSTP_IS_STOP_BIT, Ordering::SeqCst);
-        }
-        (SIGTTIN, SigactionKind::Default) => {
-            PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TTIN_IS_STOP_BIT, Ordering::SeqCst);
-        }
-        (SIGTTOU, SigactionKind::Default) => {
-            PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_TTOU_IS_STOP_BIT, Ordering::SeqCst);
-        }
+        (SIGTSTP | SIGTTOU | SIGTTIN, SigactionKind::Default) => (MASK_DONTCARE, SigactionFlags::SIG_SPECIFIC, default_handler as usize),
         (SIGCHLD, SigactionKind::Default) => {
-            if new.flags.contains(SigactionFlags::NOCLDSTOP) {
-                PROC_CONTROL_STRUCT.word[0].fetch_or(SIGW0_NOCLDSTOP_BIT, Ordering::SeqCst);
-            } else {
-                PROC_CONTROL_STRUCT.word[0].fetch_and(!SIGW0_NOCLDSTOP_BIT, Ordering::SeqCst);
-            }
-            IGNMASK.store(old_ignmask | sig_bit(signal.into()), Ordering::Relaxed);
-
-            // mark the signal as masked
-            ctl.word[sig_group].fetch_or(sig_bit32, Ordering::Relaxed);
+            let nocldstop_bit = new.flags & SigactionFlags::SIG_SPECIFIC;
+            (MASK_DONTCARE, SigactionFlags::IGNORED | nocldstop_bit, default_handler as usize)
         }
 
         (_, SigactionKind::Default) => {
-            IGNMASK.store(old_ignmask & !sig_bit(signal.into()), Ordering::Relaxed);
-
-            // TODO: update mask
-            //ctl.word[usize::from(signal)].fetch_or();
+            (new.mask, new.flags, default_handler as usize)
         },
-        (_, SigactionKind::Handled { .. }) => (),
-    }
+        (_, SigactionKind::Handled { .. }) => {
+            (new.mask, new.flags, explicit_handler)
+        }
+    };
+    action.first.store((handler as u64) | (u64::from(flags.bits() & STORED_FLAGS) << 32), Ordering::Relaxed);
+    action.user_data.store(mask, Ordering::Relaxed);
 
     Ok(())
 }
@@ -296,25 +324,22 @@ bitflags::bitflags! {
     // Some flags are ignored by the rt, but they match relibc's 1:1 to simplify conversion.
     #[derive(Clone, Copy, Default)]
     pub struct SigactionFlags: u32 {
-        const NOCLDSTOP = 1;
         const NOCLDWAIT = 2;
-        const SIGINFO = 4;
-        const RESTORER = 0x0400_0000;
-        const ONSTACK = 0x0800_0000;
-        const RESTART = 0x1000_0000;
-        const NODEFER = 0x4000_0000;
-        const RESETHAND = 0x8000_0000;
+        const RESTORER = 4;
+        const SIGINFO = 0x0200_0000;
+        const ONSTACK = 0x0400_0000;
+        const RESTART = 0x0800_0000;
+        const NODEFER = 0x1000_0000;
+        const RESETHAND = 0x2000_0000;
+        const SIG_SPECIFIC = 0x4000_0000;
+        const IGNORED = 0x8000_0000;
     }
 }
-fn default_term_handler(sig: c_int) {
+
+const STORED_FLAGS: u32 = 0xfe00_0000;
+
+fn default_handler(sig: c_int) {
     syscall::exit((sig as usize) << 8);
-}
-fn default_core_handler(sig: c_int) {
-    syscall::exit((sig as usize) << 8);
-}
-fn default_ign_handler(_: c_int) {
-}
-fn stop_handler_sentinel(_: c_int) {
 }
 
 #[derive(Clone, Copy)]
@@ -323,22 +348,16 @@ pub union SignalHandler {
     pub sigaction: Option<unsafe extern "C" fn(c_int, *const (), *mut ())>,
 }
 
-struct TheDefault {
-    actions: [Sigaction; 64],
-    ignmask: u64,
-}
-
-// indexed directly by signal number
-static SIGACTIONS: Mutex<[Sigaction; 64]> = Mutex::new([Sigaction { flags: SigactionFlags::empty(), mask: 0, kind: SigactionKind::Default }; 64]);
-
-static IGNMASK: AtomicU64 = AtomicU64::new(sig_bit(SIGCHLD) | sig_bit(SIGURG) | sig_bit(SIGWINCH));
+static SIGACTIONS_LOCK: Mutex<()> = Mutex::new(());
 
 static PROC_CONTROL_STRUCT: SigProcControl = SigProcControl {
-    word: [
-        //AtomicU64::new(SIGW0_TSTP_IS_STOP_BIT | SIGW0_TTIN_IS_STOP_BIT | SIGW0_TTOU_IS_STOP_BIT | 0xffff_ffff_0000_0000),
-        AtomicU64::new(0xffff_ffff_0000_0000), // "allow all, no pending"
-        AtomicU64::new(0xffff_ffff_0000_0000), // "allow all, no pending"
-    ],
+    pending: AtomicU64::new(0),
+    actions: [const {
+        RawAction {
+            first: AtomicU64::new(0),
+            user_data: AtomicU64::new(0),
+        }
+    }; 64],
 };
 
 fn combine_allowset([lo, hi]: [u64; 2]) -> u64 {
@@ -353,7 +372,7 @@ const fn sig_bit(sig: usize) -> u64 {
 
 pub fn setup_sighandler(area: &RtSigarea) {
     {
-        let mut sigactions = SIGACTIONS.lock();
+        let mut sigactions = SIGACTIONS_LOCK.lock();
     }
     let arch = unsafe { &mut *area.arch.get() };
     {

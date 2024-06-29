@@ -36,14 +36,14 @@ pub const NSIG: usize = 32;
 pub const SIGRTMIN: usize = 35;
 pub const SIGRTMAX: usize = 64;
 
-pub const SA_NOCLDSTOP: usize = 0x0000_0001;
 pub const SA_NOCLDWAIT: usize = 0x0000_0002;
-pub const SA_SIGINFO: usize = 0x0000_0004;
-pub const SA_RESTORER: usize = 0x0400_0000;
-pub const SA_ONSTACK: usize = 0x0800_0000;
-pub const SA_RESTART: usize = 0x1000_0000;
-pub const SA_NODEFER: usize = 0x4000_0000;
-pub const SA_RESETHAND: usize = 0x8000_0000;
+pub const SA_RESTORER: usize = 0x0000_0004; // TODO: remove
+pub const SA_SIGINFO: usize = 0x0200_0000;
+pub const SA_ONSTACK: usize = 0x0400_0000;
+pub const SA_RESTART: usize = 0x0800_0000;
+pub const SA_NODEFER: usize = 0x1000_0000;
+pub const SA_RESETHAND: usize = 0x2000_0000;
+pub const SA_NOCLDSTOP: usize = 0x4000_0000;
 
 pub const SS_ONSTACK: usize = 0x00000001;
 pub const SS_DISABLE: usize = 0x00000002;

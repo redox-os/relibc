@@ -317,9 +317,7 @@ __relibc_internal_sigentry_crit_second:
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     supports_xsave = sym SUPPORTS_XSAVE,
-    SIGW0_PENDING_MASK = const !(
-        SIGW0_TSTP_IS_STOP_BIT | SIGW0_TTIN_IS_STOP_BIT | SIGW0_TTOU_IS_STOP_BIT | SIGW0_NOCLDSTOP_BIT | SIGW0_UNUSED1 | SIGW0_UNUSED2
-    ),
+    SIGW0_PENDING_MASK = const !0,
     SIGW1_PENDING_MASK = const !0,
     REDZONE_SIZE = const 128,
     STACK_ALIGN = const 64, // if xsave is used
