@@ -1,13 +1,13 @@
 use core::mem::offset_of;
 use core::sync::atomic::AtomicU8;
 
-use syscall::data::Sigcontrol;
+use syscall::data::{Sigcontrol, SigProcControl};
 use syscall::error::*;
 use syscall::flag::*;
 
 use crate::proc::{fork_inner, FdGuard};
 use crate::signal::SigStack;
-use crate::signal::{inner_c, RtSigarea};
+use crate::signal::{inner_c, RtSigarea, PROC_CONTROL_STRUCT};
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 47;
@@ -23,8 +23,8 @@ pub struct SigArea {
 
     pub altstack_top: usize,
     pub altstack_bottom: usize,
-    pub onstack: u64,
     pub disable_signals_depth: u64,
+    pub pctl: usize, // TODO: find out how to correctly reference that static
 }
 
 #[repr(C, align(64))]
@@ -193,7 +193,13 @@ asmfunction!(__relibc_internal_sigentry: ["
     // By now we have selected a signal, stored in eax (6-bit). We now need to choose whether or
     // not to switch to the alternate signal stack. If SA_ONSTACK is clear for this signal, then
     // skip the sigaltstack logic.
-    bt fs:[{tcb_sa_off} + {sa_onstack}], eax
+    mov edx, eax
+    add edx, edx
+    lea rdx, [{pctl_off_actions} + edx * 8]
+    add rdx, fs:[{tcb_sa_off} + {sa_off_pctl}]
+
+    // scale factor 16 doesn't exist, so we premultiplied edx by 2
+    bt qword ptr [rdx], 56
     jnc 4f
 
     // Otherwise, the altstack is already active. The sigaltstack being disabled, is equivalent
@@ -310,12 +316,14 @@ __relibc_internal_sigentry_crit_second:
     sa_tmp_rdx = const offset_of!(SigArea, tmp_rdx),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
-    sa_onstack = const offset_of!(SigArea, onstack),
     sc_saved_rflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
     sc_word = const offset_of!(Sigcontrol, word),
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
+    pctl_off_actions = const offset_of!(SigProcControl, actions),
+    //pctl = sym PROC_CONTROL_STRUCT,
+    sa_off_pctl = const offset_of!(SigArea, pctl),
     supports_xsave = sym SUPPORTS_XSAVE,
     SIGW0_PENDING_MASK = const !0,
     SIGW1_PENDING_MASK = const !0,

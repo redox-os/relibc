@@ -350,7 +350,7 @@ pub union SignalHandler {
 
 static SIGACTIONS_LOCK: Mutex<()> = Mutex::new(());
 
-static PROC_CONTROL_STRUCT: SigProcControl = SigProcControl {
+pub(crate) static PROC_CONTROL_STRUCT: SigProcControl = SigProcControl {
     pending: AtomicU64::new(0),
     actions: [const {
         RawAction {
@@ -381,7 +381,7 @@ pub fn setup_sighandler(area: &RtSigarea) {
         // equivalent to not using any altstack at all (the default).
         arch.altstack_top = usize::MAX;
         arch.altstack_bottom = 0;
-        arch.onstack = 0;
+        arch.pctl = core::ptr::addr_of!(PROC_CONTROL_STRUCT) as usize;
     }
 
     #[cfg(target_arch = "x86_64")]
