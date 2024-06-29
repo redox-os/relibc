@@ -1,5 +1,6 @@
 use core::{slice, str};
 
+use redox_rt::sys::{posix_read, posix_write};
 use syscall::{Error, Result, WaitFlags, EMFILE};
 
 use crate::{
@@ -147,7 +148,7 @@ pub unsafe extern "C" fn redox_dup2_v1(
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_read_v1(fd: usize, dst_base: *mut u8, dst_len: usize) -> RawResult {
-    Error::mux(syscall::read(
+    Error::mux(posix_read(
         fd,
         slice::from_raw_parts_mut(dst_base, dst_len),
     ))
@@ -158,7 +159,7 @@ pub unsafe extern "C" fn redox_write_v1(
     src_base: *const u8,
     src_len: usize,
 ) -> RawResult {
-    Error::mux(syscall::write(fd, slice::from_raw_parts(src_base, src_len)))
+    Error::mux(posix_write(fd, slice::from_raw_parts(src_base, src_len)))
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_fsync_v1(fd: usize) -> RawResult {

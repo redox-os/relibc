@@ -73,7 +73,9 @@ unsafe fn inner(stack: &mut SigStack) {
     };
 
     let handler = match sigaction.kind {
-        SigactionKind::Ignore => unreachable!(),
+        SigactionKind::Ignore => {
+            panic!("ctl {:x?} signal {}", os.control, stack.sig_num)
+        }
         SigactionKind::Default => {
             syscall::exit(stack.sig_num << 8);
             unreachable!();
@@ -95,8 +97,10 @@ unsafe fn inner(stack: &mut SigStack) {
 
     let sig_group = stack.sig_num / 32;
 
-    let prev_w0 = os.control.word[0].fetch_add(sigallow_inside_lo.wrapping_sub(prev_sigallow_lo), Ordering::Relaxed);
-    let prev_w1 = os.control.word[1].fetch_add(sigallow_inside_hi.wrapping_sub(prev_sigallow_hi), Ordering::Relaxed);
+    //let _ = syscall::write(1, &alloc::format!("WORD0 {:x?}\n", os.control.word).as_bytes());
+    let prev_w0 = os.control.word[0].fetch_add((sigallow_inside_lo << 32).wrapping_sub(prev_sigallow_lo << 32), Ordering::Relaxed);
+    let prev_w1 = os.control.word[1].fetch_add((sigallow_inside_hi << 32).wrapping_sub(prev_sigallow_hi << 32), Ordering::Relaxed);
+    //let _ = syscall::write(1, &alloc::format!("WORD1 {:x?}\n", os.control.word).as_bytes());
 
     // TODO: If sa_mask caused signals to be unblocked, deliver one or all of those first?
 
@@ -117,8 +121,10 @@ unsafe fn inner(stack: &mut SigStack) {
     core::sync::atomic::compiler_fence(Ordering::Acquire);
 
     // Update allowset again.
-    let prev_w0 = os.control.word[0].fetch_add(prev_sigallow_lo.wrapping_sub(sigallow_inside_lo), Ordering::Relaxed);
-    let prev_w1 = os.control.word[1].fetch_add(prev_sigallow_hi.wrapping_sub(sigallow_inside_hi), Ordering::Relaxed);
+    //let _ = syscall::write(1, &alloc::format!("WORD2 {:x?}\n", os.control.word).as_bytes());
+    let prev_w0 = os.control.word[0].fetch_add((prev_sigallow_lo << 32).wrapping_sub(sigallow_inside_lo << 32), Ordering::Relaxed);
+    let prev_w1 = os.control.word[1].fetch_add((prev_sigallow_hi << 32).wrapping_sub(sigallow_inside_hi << 32), Ordering::Relaxed);
+    //let _ = syscall::write(1, &alloc::format!("WORD3 {:x?}\n", os.control.word).as_bytes());
 
     // TODO: If resetting the sigmask caused signals to be unblocked, then should they be delivered
     // here? And would it be possible to tail-call-optimize that?
@@ -167,13 +173,14 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32
     let mut can_raise = 0;
     let mut cant_raise = 0;
 
+    //let _ = syscall::write(1, &alloc::format!("OLDWORD {:x?}\n", ctl.word).as_bytes());
     for i in 0..2 {
-        let pending_bits = words[i] & 0xffff_ffff;
         let old_allow_bits = words[i] & 0xffff_ffff_0000_0000;
         let new_allow_bits = u64::from(!op(!((old_allow_bits >> 32) as u32), i == 1)) << 32;
 
         ctl.word[i].fetch_add(new_allow_bits.wrapping_sub(old_allow_bits), Ordering::Relaxed);
     }
+    //let _ = syscall::write(1, &alloc::format!("NEWWORD {:x?}\n", ctl.word).as_bytes());
 
     // TODO: Prioritize cant_raise realtime signals?
 

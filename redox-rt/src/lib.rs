@@ -36,6 +36,7 @@ pub mod auxv_defs;
 
 pub mod signal;
 pub mod sync;
+pub mod sys;
 pub mod thread;
 
 pub type Tcb = GenericTcb<RtSigarea>;

@@ -6,8 +6,9 @@ use syscall::error::*;
 use syscall::flag::*;
 
 use crate::proc::{fork_inner, FdGuard};
-use crate::signal::SigStack;
+use crate::signal::{tmp_disable_signals, SigStack};
 use crate::signal::{inner_c, RtSigarea, PROC_CONTROL_STRUCT};
+use crate::Tcb;
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 47;
@@ -357,3 +358,21 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
 }
 
 static SUPPORTS_XSAVE: AtomicU8 = AtomicU8::new(1); // FIXME
+
+pub unsafe fn manually_enter_trampoline() {
+    let _g = tmp_disable_signals();
+
+    let a = &Tcb::current().unwrap().os_specific.control;
+    a.saved_archdep_reg.set(0); // TODO: Just reset DF on x86?
+
+    core::arch::asm!("
+        lea rax, [rip + 2f]
+        mov fs:[{tcb_sc_off} + {sc_saved_rip}], rax
+        jmp __relibc_internal_sigentry
+    2:
+    ",
+        out("rax") _,
+        tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
+        sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
+    );
+}
