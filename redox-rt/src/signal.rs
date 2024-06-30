@@ -83,19 +83,17 @@ unsafe fn inner(stack: &mut SigStack) {
         SigactionKind::Handled { handler } => handler,
     };
 
-    let mut sigallow_inside = !sigaction.mask;
-    if !sigaction.flags.contains(SigactionFlags::NODEFER) {
-        sigallow_inside &= !sig_bit(stack.sig_num);
-    }
-    let sigallow_inside_lo = sigallow_inside & 0xffff_ffff;
-    let sigallow_inside_hi = sigallow_inside >> 32;
-
     // Set sigmask to sa_mask and unmark the signal as pending.
     let prev_sigallow_lo = os.control.word[0].load(Ordering::Relaxed) >> 32;
     let prev_sigallow_hi = os.control.word[1].load(Ordering::Relaxed) >> 32;
     let prev_sigallow = prev_sigallow_lo | (prev_sigallow_hi << 32);
 
-    let sig_group = stack.sig_num / 32;
+    let mut sigallow_inside = !sigaction.mask & prev_sigallow;
+    if !sigaction.flags.contains(SigactionFlags::NODEFER) {
+        sigallow_inside &= !sig_bit(stack.sig_num);
+    }
+    let sigallow_inside_lo = sigallow_inside & 0xffff_ffff;
+    let sigallow_inside_hi = sigallow_inside >> 32;
 
     //let _ = syscall::write(1, &alloc::format!("WORD0 {:x?}\n", os.control.word).as_bytes());
     let prev_w0 = os.control.word[0].fetch_add((sigallow_inside_lo << 32).wrapping_sub(prev_sigallow_lo << 32), Ordering::Relaxed);
@@ -125,6 +123,7 @@ unsafe fn inner(stack: &mut SigStack) {
 
     // Update allowset again.
     //let _ = syscall::write(1, &alloc::format!("WORD2 {:x?}\n", os.control.word).as_bytes());
+
     let prev_w0 = os.control.word[0].fetch_add((prev_sigallow_lo << 32).wrapping_sub(sigallow_inside_lo << 32), Ordering::Relaxed);
     let prev_w1 = os.control.word[1].fetch_add((prev_sigallow_hi << 32).wrapping_sub(sigallow_inside_hi << 32), Ordering::Relaxed);
     //let _ = syscall::write(1, &alloc::format!("WORD3 {:x?}\n", os.control.word).as_bytes());
