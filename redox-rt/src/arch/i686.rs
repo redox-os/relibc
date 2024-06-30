@@ -1,9 +1,10 @@
 use core::mem::offset_of;
+use core::sync::atomic::Ordering;
 
 use syscall::*;
 
 use crate::proc::{fork_inner, FdGuard};
-use crate::signal::{inner_fastcall, RtSigarea, SigStack};
+use crate::signal::{inner_fastcall, PROC_CONTROL_STRUCT, RtSigarea, SigStack};
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 31;
@@ -18,7 +19,6 @@ pub struct SigArea {
     pub tmp_esp: usize,
     pub tmp_eax: usize,
     pub tmp_edx: usize,
-    pub onstack: u64,
     pub disable_signals_depth: u64,
 }
 #[derive(Debug, Default)]
@@ -144,7 +144,10 @@ asmfunction!(__relibc_internal_sigentry: ["
     add eax, 32
 2:
     and esp, -{STACK_ALIGN}
-    bt gs:[{tcb_sa_off} + {sa_onstack}], eax
+
+    mov edx, eax
+    add edx, edx
+    bt dword ptr [{pctl} + {pctl_off_actions} + edx * 8 + 4], 28
     jnc 4f
 
     mov edx, gs:[{tcb_sa_off} + {sa_altstack_top}]
@@ -209,15 +212,14 @@ __relibc_internal_sigentry_crit_second:
     sa_tmp_edx = const offset_of!(SigArea, tmp_edx),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
-    sa_onstack = const offset_of!(SigArea, onstack),
     sc_saved_eflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
     sc_word = const offset_of!(Sigcontrol, word),
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
-    SIGW0_PENDING_MASK = const !(
-        SIGW0_TSTP_IS_STOP_BIT | SIGW0_TTIN_IS_STOP_BIT | SIGW0_TTOU_IS_STOP_BIT | SIGW0_NOCLDSTOP_BIT | SIGW0_UNUSED1 | SIGW0_UNUSED2
-    ),
+    pctl_off_actions = const offset_of!(SigProcControl, actions),
+    pctl = sym PROC_CONTROL_STRUCT,
+    SIGW0_PENDING_MASK = const !0,
     SIGW1_PENDING_MASK = const !0,
     STACK_ALIGN = const 16,
 ]);
@@ -252,4 +254,21 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
     } else if stack.regs.eip == __relibc_internal_sigentry_crit_second as usize {
         stack.regs.eip = area.tmp_eip;
     }
+}
+pub unsafe fn manually_enter_trampoline() {
+    let c = &crate::Tcb::current().unwrap().os_specific.control;
+    c.control_flags.store(c.control_flags.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(), Ordering::Release);
+    c.saved_archdep_reg.set(0); // TODO: Just reset DF on x86?
+
+    core::arch::asm!("
+        call 2f
+        jmp 3f
+    2:
+        pop dword ptr gs:[{tcb_sc_off} + {sc_saved_eip}]
+        jmp __relibc_internal_sigentry
+    3:
+    ",
+        tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
+        sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
+    );
 }

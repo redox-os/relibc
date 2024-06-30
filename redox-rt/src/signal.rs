@@ -111,10 +111,13 @@ unsafe fn inner(stack: &mut SigStack) {
 
     // Call handler, either sa_handler or sa_siginfo depending on flag.
     if sigaction.flags.contains(SigactionFlags::SIGINFO) && let Some(sigaction) = handler.sigaction {
+        //let _ = syscall::write(1, alloc::format!("SIGACTION {:p}\n", sigaction).as_bytes());
         sigaction(stack.sig_num as c_int, core::ptr::null_mut(), core::ptr::null_mut());
     } else if let Some(handler) = handler.handler {
+        //let _ = syscall::write(1, alloc::format!("HANDLER {:p}\n", handler).as_bytes());
         handler(stack.sig_num as c_int);
     }
+    //let _ = syscall::write(1, alloc::format!("RETURNED HANDLER\n").as_bytes());
 
     // Disable signals while we modify the sigmask again
     control_flags.store(control_flags.load(Ordering::Relaxed) | SigcontrolFlags::INHIBIT_DELIVERY.bits(), Ordering::Release);
@@ -128,6 +131,8 @@ unsafe fn inner(stack: &mut SigStack) {
 
     // TODO: If resetting the sigmask caused signals to be unblocked, then should they be delivered
     // here? And would it be possible to tail-call-optimize that?
+
+    //let _ = syscall::write(1, alloc::format!("will return to {:x?}\n", stack.regs.eip).as_bytes());
 
     // And re-enable them again
     control_flags.store(control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(), Ordering::Release);
@@ -388,7 +393,10 @@ pub fn setup_sighandler(area: &RtSigarea) {
         // equivalent to not using any altstack at all (the default).
         arch.altstack_top = usize::MAX;
         arch.altstack_bottom = 0;
-        arch.pctl = core::ptr::addr_of!(PROC_CONTROL_STRUCT) as usize;
+        #[cfg(not(target_arch = "x86"))]
+        {
+            arch.pctl = core::ptr::addr_of!(PROC_CONTROL_STRUCT) as usize;
+        }
     }
 
     #[cfg(target_arch = "x86_64")]

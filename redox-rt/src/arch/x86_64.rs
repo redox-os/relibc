@@ -1,5 +1,5 @@
 use core::mem::offset_of;
-use core::sync::atomic::AtomicU8;
+use core::sync::atomic::{AtomicU8, Ordering};
 
 use syscall::data::{Sigcontrol, SigProcControl};
 use syscall::error::*;
@@ -360,10 +360,9 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
 static SUPPORTS_XSAVE: AtomicU8 = AtomicU8::new(1); // FIXME
 
 pub unsafe fn manually_enter_trampoline() {
-    let _g = tmp_disable_signals();
-
-    let a = &Tcb::current().unwrap().os_specific.control;
-    a.saved_archdep_reg.set(0); // TODO: Just reset DF on x86?
+    let c = &Tcb::current().unwrap().os_specific.control;
+    c.control_flags.store(c.control_flags.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(), Ordering::Release);
+    c.saved_archdep_reg.set(0); // TODO: Just reset DF on x86?
 
     core::arch::asm!("
         lea rax, [rip + 2f]
