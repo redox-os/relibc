@@ -52,6 +52,11 @@ pub struct SigStack {
 unsafe fn inner(stack: &mut SigStack) {
     let os = &Tcb::current().unwrap().os_specific;
 
+    let sig_idx = stack.sig_num;
+
+    // Commenting out this line will stress test how the signal code responds to 'interrupt spraying'.
+    os.control.word[sig_idx / 32].fetch_and(!(1 << (sig_idx % 32)), Ordering::Relaxed);
+
     // asm counts from 0
     stack.sig_num += 1;
 
