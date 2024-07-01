@@ -375,3 +375,12 @@ pub unsafe fn manually_enter_trampoline() {
         sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
     );
 }
+
+/// Get current stack pointer, weak granularity guarantees.
+pub fn current_sp() -> usize {
+    let sp: usize;
+    unsafe {
+        core::arch::asm!("mov {}, rsp", out(reg) sp);
+    }
+    sp
+}

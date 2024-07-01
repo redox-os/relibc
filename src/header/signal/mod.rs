@@ -127,16 +127,9 @@ pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
-    if !ss.is_null() {
-        if (*ss).ss_flags != SS_DISABLE as c_int {
-            return errno::EINVAL;
-        }
-        if (*ss).ss_size < MINSIGSTKSZ {
-            return errno::ENOMEM;
-        }
-    }
-
-    Sys::sigaltstack(ss, old_ss)
+    Sys::sigaltstack(ss.as_ref(), old_ss.as_mut())
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]

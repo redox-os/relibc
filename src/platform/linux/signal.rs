@@ -65,8 +65,13 @@ impl PalSignal for Sys {
         .map(|_| ())
     }
 
-    unsafe fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
-        e(syscall!(SIGALTSTACK, ss, old_ss)) as c_int
+    unsafe fn sigaltstack(ss: Option<&stack_t>, old_ss: Option<&mut stack_t>) -> Result<(), Errno> {
+        e_raw(syscall!(
+            SIGALTSTACK,
+            ss.map_or_else(core::ptr::null, |x| x as *const _),
+            old_ss.map_or_else(core::ptr::null_mut, |x| x as *mut _)
+        ))
+        .map(|_| ())
     }
 
     unsafe fn sigpending(set: *mut sigset_t) -> c_int {

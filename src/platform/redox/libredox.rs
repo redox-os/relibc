@@ -148,10 +148,7 @@ pub unsafe extern "C" fn redox_dup2_v1(
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_read_v1(fd: usize, dst_base: *mut u8, dst_len: usize) -> RawResult {
-    Error::mux(posix_read(
-        fd,
-        slice::from_raw_parts_mut(dst_base, dst_len),
-    ))
+    Error::mux(posix_read(fd, slice::from_raw_parts_mut(dst_base, dst_len)))
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_write_v1(

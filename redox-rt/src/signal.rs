@@ -2,7 +2,7 @@ use core::cell::{Cell, UnsafeCell};
 use core::ffi::c_int;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use syscall::{RawAction, SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGQUIT, SIGSEGV, SIGSYS, SIGTRAP, SIGXCPU, SIGXFSZ};
+use syscall::{RawAction, ENOMEM, EPERM, SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGQUIT, SIGSEGV, SIGSYS, SIGTRAP, SIGXCPU, SIGXFSZ};
 use syscall::{Error, Result, SetSighandlerData, SigProcControl, Sigcontrol, SigcontrolFlags, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH, data::AtomicU64};
 
 use crate::{arch::*, Tcb};
@@ -213,6 +213,7 @@ pub struct Sigaction {
     pub mask: u64,
     pub flags: SigactionFlags,
 }
+
 impl Sigaction {
     fn ip(&self) -> usize {
         unsafe {
@@ -446,3 +447,53 @@ pub fn current_setsighandler_struct() -> SetSighandlerData {
         proc_control_addr: &PROC_CONTROL_STRUCT as *const SigProcControl as usize,
     }
 }
+
+#[derive(Clone, Copy, Default, PartialEq)]
+pub enum Sigaltstack {
+    #[default]
+    Disabled,
+
+    Enabled { onstack: bool, base: *mut (), size: usize },
+}
+pub unsafe fn sigaltstack(new: Option<&Sigaltstack>, old_out: Option<&mut Sigaltstack>) -> Result<()> {
+    let _g = tmp_disable_signals();
+    let tcb = &mut *Tcb::current().unwrap().os_specific.arch.get();
+
+    let old = if tcb.altstack_bottom == 0 && tcb.altstack_top == usize::MAX {
+        Sigaltstack::Disabled
+    } else {
+        Sigaltstack::Enabled {
+            base: tcb.altstack_bottom as *mut (),
+            size: tcb.altstack_top - tcb.altstack_bottom,
+            onstack: (tcb.altstack_bottom..tcb.altstack_top).contains(&crate::arch::current_sp()),
+        }
+    };
+
+    if matches!(old, Sigaltstack::Enabled { onstack: true, .. }) && new != Some(&old) {
+        return Err(Error::new(EPERM));
+    }
+
+    if let Some(old_out) = old_out {
+        *old_out = old;
+    }
+    if let Some(new) = new {
+        match *new {
+            Sigaltstack::Disabled => {
+                tcb.altstack_bottom = 0;
+                tcb.altstack_top = usize::MAX;
+            }
+            Sigaltstack::Enabled { onstack: true, .. } => return Err(Error::new(EINVAL)),
+            Sigaltstack::Enabled { base, size, onstack: false } => {
+                if size < MIN_SIGALTSTACK_SIZE {
+                    return Err(Error::new(ENOMEM));
+                }
+
+                tcb.altstack_bottom = base as usize;
+                tcb.altstack_top = base as usize + size;
+            }
+        }
+    }
+    Ok(())
+}
+
+pub const MIN_SIGALTSTACK_SIZE: usize = 8192;

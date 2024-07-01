@@ -1,5 +1,5 @@
 use core::mem;
-use redox_rt::signal::{Sigaction, SigactionFlags, SigactionKind, SignalHandler};
+use redox_rt::signal::{Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler};
 use syscall::{self, Result};
 
 use super::{
@@ -11,7 +11,7 @@ use crate::{
         errno::{EINVAL, ENOSYS},
         signal::{
             sigaction, siginfo_t, sigset_t, stack_t, SA_SIGINFO, SIG_BLOCK, SIG_DFL, SIG_IGN,
-            SIG_SETMASK, SIG_UNBLOCK,
+            SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE, SS_ONSTACK,
         },
         sys_time::{itimerval, ITIMER_REAL},
         time::timespec,
@@ -176,8 +176,51 @@ impl PalSignal for Sys {
         Ok(())
     }
 
-    unsafe fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
-        unimplemented!()
+    unsafe fn sigaltstack(
+        new_c: Option<&stack_t>,
+        old_c: Option<&mut stack_t>,
+    ) -> Result<(), Errno> {
+        let new = new_c
+            .map(|c_stack| {
+                let flags = usize::try_from(c_stack.ss_flags).map_err(|_| Errno(EINVAL))?;
+                if flags != flags & (SS_DISABLE | SS_ONSTACK) {
+                    return Err(Errno(EINVAL));
+                }
+
+                Ok(if flags & SS_DISABLE == SS_DISABLE {
+                    Sigaltstack::Disabled
+                } else {
+                    Sigaltstack::Enabled {
+                        onstack: false,
+                        base: c_stack.ss_sp.cast(),
+                        size: c_stack.ss_size,
+                    }
+                })
+            })
+            .transpose()?;
+
+        let mut old = old_c.as_ref().map(|_| Sigaltstack::default());
+        redox_rt::signal::sigaltstack(new.as_ref(), old.as_mut())?;
+
+        if let (Some(old_c_stack), Some(old)) = (old_c, old) {
+            *old_c_stack = match old {
+                Sigaltstack::Disabled => stack_t {
+                    ss_sp: core::ptr::null_mut(),
+                    ss_size: 0,
+                    ss_flags: SS_DISABLE.try_into().unwrap(),
+                },
+                Sigaltstack::Enabled {
+                    onstack,
+                    base,
+                    size,
+                } => stack_t {
+                    ss_sp: base.cast(),
+                    ss_size: size,
+                    ss_flags: SS_ONSTACK.try_into().unwrap(),
+                },
+            };
+        }
+        Ok(())
     }
 
     unsafe fn sigpending(set: *mut sigset_t) -> c_int {

@@ -139,8 +139,8 @@ pub(crate) unsafe fn create(
     let mut current_sigmask = 0_u64;
     #[cfg(target_os = "redox")]
     {
-        current_sigmask = redox_rt::signal::get_sigmask()
-            .expect("failed to obtain sigprocmask for caller");
+        current_sigmask =
+            redox_rt::signal::get_sigmask().expect("failed to obtain sigprocmask for caller");
     }
 
     // Create a locked mutex, unlocked by the thread after it has started.

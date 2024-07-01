@@ -25,7 +25,7 @@ pub trait PalSignal: Pal {
         oact: Option<&mut sigaction>,
     ) -> Result<(), Errno>;
 
-    unsafe fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int;
+    unsafe fn sigaltstack(ss: Option<&stack_t>, old_ss: Option<&mut stack_t>) -> Result<(), Errno>;
 
     unsafe fn sigpending(set: *mut sigset_t) -> c_int;
 
