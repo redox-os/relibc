@@ -28,7 +28,7 @@ pub struct SigArea {
     pub pctl: usize, // TODO: find out how to correctly reference that static
 }
 
-#[repr(C, align(64))]
+#[repr(C)]
 #[derive(Debug, Default)]
 pub struct ArchIntRegs {
     _pad: [usize; 2], // ensure size is divisible by 32
