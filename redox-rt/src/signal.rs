@@ -389,6 +389,17 @@ const fn sig_bit(sig: usize) -> u64 {
 pub fn setup_sighandler(area: &RtSigarea) {
     {
         let mut sigactions = SIGACTIONS_LOCK.lock();
+        for (sig_idx, action) in PROC_CONTROL_STRUCT.actions.iter().enumerate() {
+            let sig = sig_idx + 1;
+            let bits = if matches!(sig, SIGTSTP | SIGTTIN | SIGTTOU) {
+                SigactionFlags::SIG_SPECIFIC
+            } else if matches!(sig, SIGCHLD | SIGURG | SIGWINCH) {
+                SigactionFlags::IGNORED
+            } else {
+                SigactionFlags::empty()
+            };
+            action.first.store((u64::from(bits.bits()) << 32) | default_handler as u64, Ordering::Relaxed);
+        }
     }
     let arch = unsafe { &mut *area.arch.get() };
     {
