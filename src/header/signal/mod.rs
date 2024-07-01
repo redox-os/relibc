@@ -7,10 +7,12 @@ use cbitset::BitSet;
 use crate::{
     header::{errno, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},
-    pthread::{self, ResultExt},
+    pthread::{self, Errno, ResultExt},
 };
 
 pub use self::sys::*;
+
+use super::errno::EFAULT;
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
@@ -241,7 +243,9 @@ pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
-    Sys::sigpending(set)
+    (|| Sys::sigpending(set.as_mut().ok_or(Errno(EFAULT))?))()
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 const BELOW_SIGRTMIN_MASK: sigset_t = (1 << SIGRTMIN) - 1;

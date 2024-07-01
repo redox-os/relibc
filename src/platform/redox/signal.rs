@@ -223,9 +223,9 @@ impl PalSignal for Sys {
         Ok(())
     }
 
-    unsafe fn sigpending(set: *mut sigset_t) -> c_int {
-        ERRNO.set(ENOSYS);
-        -1
+    fn sigpending(set: &mut sigset_t) -> Result<(), Errno> {
+        *set = redox_rt::signal::currently_pending();
+        Ok(())
     }
 
     fn sigprocmask(

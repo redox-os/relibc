@@ -74,8 +74,15 @@ impl PalSignal for Sys {
         .map(|_| ())
     }
 
-    unsafe fn sigpending(set: *mut sigset_t) -> c_int {
-        e(syscall!(RT_SIGPENDING, set, NSIG / 8)) as c_int
+    fn sigpending(set: &mut sigset_t) -> Result<(), Errno> {
+        e_raw(unsafe {
+            syscall!(
+                RT_SIGPENDING,
+                set as *mut sigset_t as usize,
+                mem::size_of::<sigset_t>()
+            )
+        })
+        .map(|_| ())
     }
 
     fn sigprocmask(

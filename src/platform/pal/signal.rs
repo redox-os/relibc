@@ -27,7 +27,7 @@ pub trait PalSignal: Pal {
 
     unsafe fn sigaltstack(ss: Option<&stack_t>, old_ss: Option<&mut stack_t>) -> Result<(), Errno>;
 
-    unsafe fn sigpending(set: *mut sigset_t) -> c_int;
+    fn sigpending(set: &mut sigset_t) -> Result<(), Errno>;
 
     fn sigprocmask(
         how: c_int,
