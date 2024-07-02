@@ -95,6 +95,10 @@ pub unsafe fn tcb_activate(tls_end_and_tcb_start: usize, _tls_len: usize) {
 
 /// Initialize redox-rt in situations where relibc is not used
 pub fn initialize_freestanding() {
+    // TODO: This code is a hack! Integrate the ld_so TCB code into generic-rt, and then use that
+    // (this function will need pointers to the ELF structs normally passed in auxvs), so the TCB
+    // is initialized properly.
+
     // TODO: TLS
     let page = unsafe {
         &mut *(syscall::fmap(!0, &syscall::Map {
@@ -108,7 +112,13 @@ pub fn initialize_freestanding() {
     page.tcb_len = syscall::PAGE_SIZE;
     page.tls_end = (page as *mut Tcb).cast();
 
+    #[cfg(not(target_arch = "aarch64"))]
     unsafe {
         tcb_activate(page as *mut Tcb as usize, 0)
+    }
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        let abi_ptr = core::ptr::addr_of_mut!(page.tcb_ptr);
+        core::arch::asm!("msr tpidr_el0, {}", in(reg) abi_ptr);
     }
 }
