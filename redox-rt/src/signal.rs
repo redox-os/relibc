@@ -501,7 +501,7 @@ pub const MIN_SIGALTSTACK_SIZE: usize = 8192;
 pub fn currently_pending() -> u64 {
     let control = &unsafe { Tcb::current().unwrap() }.os_specific.control;
     let w0 = control.word[0].load(Ordering::Relaxed);
-    let w1 = control.word[0].load(Ordering::Relaxed);
+    let w1 = control.word[1].load(Ordering::Relaxed);
     let pending_blocked_lo = w0 & !(w0 >> 32);
     let pending_unblocked_hi = w1 & !(w0 >> 32);
     pending_blocked_lo | (pending_unblocked_hi << 32)
