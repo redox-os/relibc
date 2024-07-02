@@ -116,7 +116,13 @@ asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
     mov x0, sp
     bl {fork_impl}
 
-    add sp, sp, #128
+    add sp, sp, #32
+    ldp     x19, x20, [sp], #16
+    ldp     x21, x22, [sp], #16
+    ldp     x23, x24, [sp], #16
+    ldp     x25, x26, [sp], #16
+    ldp     x27, x28, [sp], #16
+    ldp     x29, x30, [sp], #16
     ret
 "] <= [fork_impl = sym fork_impl]);
 
