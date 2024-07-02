@@ -283,7 +283,7 @@ pub unsafe fn manually_enter_trampoline() {
         bl 2f
         b 3f
     2:
-        ldr lr, [x0]
+        str lr, [x0]
         b __relibc_internal_sigentry
     3:
     ", inout("x0") ip_location => _, out("lr") _);
