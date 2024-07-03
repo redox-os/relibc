@@ -53,11 +53,11 @@ impl PalSignal for Sys {
     }
 
     fn kill(pid: pid_t, sig: c_int) -> c_int {
-        e(syscall::kill(pid as usize, sig as usize)) as c_int
+        e(redox_rt::sys::posix_kill(pid as usize, sig as usize).map(|()| 0)) as c_int
     }
 
     fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-        e(syscall::kill(-(pgrp as isize) as usize, sig as usize)) as c_int
+        e(redox_rt::sys::posix_killpg(pgrp as usize, sig as usize).map(|()| 0)) as c_int
     }
 
     fn raise(sig: c_int) -> c_int {
