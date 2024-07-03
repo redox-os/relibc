@@ -67,7 +67,7 @@ unsafe fn inner(stack: &mut SigStack) {
             panic!("ctl {:x?} signal {}", os.control, stack.sig_num)
         }
         SigactionKind::Default => {
-            syscall::exit(stack.sig_num << 8);
+            syscall::exit(stack.sig_num);
             unreachable!();
         }
         SigactionKind::Handled { handler } => handler,
@@ -344,7 +344,7 @@ bitflags::bitflags! {
 const STORED_FLAGS: u32 = 0xfe00_0000;
 
 fn default_handler(sig: c_int) {
-    syscall::exit((sig as usize) << 8);
+    syscall::exit(sig as usize);
 }
 
 #[derive(Clone, Copy)]

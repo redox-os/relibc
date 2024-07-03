@@ -217,7 +217,7 @@ impl Pal for Sys {
     }
 
     fn exit(status: c_int) -> ! {
-        let _ = syscall::exit(status as usize);
+        let _ = syscall::exit((status as usize) << 8);
         loop {}
     }
 
