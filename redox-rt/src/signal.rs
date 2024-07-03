@@ -12,39 +12,24 @@ use crate::sync::Mutex;
 static CPUID_EAX1_ECX: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
 
 pub fn sighandler_function() -> usize {
-    //#[cfg(target_arch = "x86_64")]
-    // Check OSXSAVE bit
     // TODO: HWCAP?
-    /*if CPUID_EAX1_ECX.load(core::sync::atomic::Ordering::Relaxed) & (1 << 27) != 0 {
-        __relibc_internal_sigentry_xsave as usize
-    } else {
-        __relibc_internal_sigentry_fxsave as usize
-    }*/
 
-    //#[cfg(any(target_arch = "x86", target_arch = "aarch64"))]
-    {
-        __relibc_internal_sigentry as usize
-    }
+    __relibc_internal_sigentry as usize
 }
 
 #[repr(C)]
 pub struct SigStack {
-    #[cfg(target_arch = "x86_64")]
-    fx: [u8; 4096], // 64 byte aligned
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    _pad: [usize; 1], // pad to 16 bytes alignment
 
     #[cfg(target_arch = "x86")]
-    fx: [u8; 512], // 16 byte aligned
-
-    #[cfg(target_arch = "x86_64")]
-    _pad: [usize; 3], // pad to 192 = 3 * 64 = 168 + 24 bytes
-
-    #[cfg(target_arch = "x86")]
-    _pad: [usize; 3], // pad to 64 = 4 * 16 = 52 + 12 bytes
+    _pad: [usize; 3], // pad to 16 bytes alignment
 
     sig_num: usize,
 
-    // x86_64: 160 bytes
-    // i686: 48 bytes
+    // x86_64: 864 bytes
+    // i686: 512 bytes
+    // aarch64: 272 bytes (SIMD TODO)
     pub regs: ArchIntRegs,
 }
 
@@ -261,6 +246,8 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
     let _sigguard = tmp_disable_signals();
     let ctl = current_sigctl();
 
+    let _guard = SIGACTIONS_LOCK.lock();
+
     let action = &PROC_CONTROL_STRUCT.actions[usize::from(signal) - 1];
 
     if let Some(old) = old {
@@ -298,7 +285,8 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
             (new.mask, new.flags, explicit_handler)
         }
     };
-    action.first.store((handler as u64) | (u64::from(flags.bits() & STORED_FLAGS) << 32), Ordering::Relaxed);
+    let new_first = (handler as u64) | (u64::from(flags.bits() & STORED_FLAGS) << 32);
+    action.first.store(new_first, Ordering::Relaxed);
     action.user_data.store(mask, Ordering::Relaxed);
 
     Ok(())

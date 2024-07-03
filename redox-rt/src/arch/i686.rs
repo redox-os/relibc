@@ -22,21 +22,24 @@ pub struct SigArea {
     pub disable_signals_depth: u64,
 }
 #[derive(Debug, Default)]
-#[repr(C)]
+#[repr(C, align(16))]
 pub struct ArchIntRegs {
-    pub _pad: [usize; 2], // make size divisible by 16
+    pub fxsave: [u16; 29],
 
-    pub ebp: usize,
-    pub esi: usize,
-    pub edi: usize,
-    pub ebx: usize,
-    pub eax: usize,
-    pub ecx: usize,
-    pub edx: usize,
+    // ensure fxsave region is 16 byte aligned
+    pub _pad: [usize; 2], // fxsave "available" +0
 
-    pub eflags: usize,
-    pub eip: usize,
-    pub esp: usize,
+    pub ebp: usize, // fxsave "available" +8
+    pub esi: usize, // avail +12
+    pub edi: usize, // avail +16
+    pub ebx: usize, // avail +20
+    pub eax: usize, // avail +24
+    pub ecx: usize, // avail +28
+    pub edx: usize, // avail +32
+
+    pub eflags: usize, // avail +36
+    pub eip: usize, // avail +40
+    pub esp: usize, // avail +44
 }
 
 /// Deactive TLS, used before exec() on Redox to not trick target executable into thinking TLS
@@ -131,14 +134,12 @@ asmfunction!(__relibc_internal_sigentry: ["
     // Read first signal word
     mov eax, gs:[{tcb_sc_off} + {sc_word}]
     and eax, gs:[{tcb_sc_off} + {sc_word} + 4]
-    and eax, {SIGW0_PENDING_MASK}
     bsf eax, eax
     jnz 2f
 
     // Read second signal word
     mov eax, gs:[{tcb_sc_off} + {sc_word} + 8]
     and eax, gs:[{tcb_sc_off} + {sc_word} + 12]
-    and eax, {SIGW1_PENDING_MASK}
     bsf eax, eax
     jz 7f
     add eax, 32
@@ -172,17 +173,17 @@ asmfunction!(__relibc_internal_sigentry: ["
     push esi
     push ebp
 
-    sub esp, 8
+    sub esp, 2 * 4 + 29 * 16
+    fxsave [esp]
 
     push eax
-    sub esp, 12 + 512
-    fxsave [esp]
+    sub esp, 3 * 4
 
     mov ecx, esp
     call {inner}
 
-    fxrstor [esp]
-    add esp, 512 + 12 + 4 + 8
+    fxrstor [esp + 16]
+    add esp, 16 + 29 * 16 + 2 * 4
 
     pop ebp
     pop esi
@@ -219,8 +220,6 @@ __relibc_internal_sigentry_crit_second:
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     pctl_off_actions = const offset_of!(SigProcControl, actions),
     pctl = sym PROC_CONTROL_STRUCT,
-    SIGW0_PENDING_MASK = const !0,
-    SIGW1_PENDING_MASK = const !0,
     STACK_ALIGN = const 16,
 ]);
 

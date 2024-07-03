@@ -28,18 +28,18 @@ pub struct SigArea {
     pub pctl: usize, // TODO: find out how to correctly reference that static
 }
 
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Debug, Default)]
 pub struct ArchIntRegs {
-    _pad: [usize; 2], // ensure size is divisible by 32
-
-    pub r15: usize,
-    pub r14: usize,
-    pub r13: usize,
-    pub r12: usize,
-    pub rbp: usize,
-    pub rbx: usize,
-    pub r11: usize,
+    pub ymm_upper: [u128; 16],
+    pub fxsave: [u128; 29],
+    pub r15: usize, // fxsave "available" +0
+    pub r14: usize, // available +8
+    pub r13: usize, // available +16
+    pub r12: usize, // available +24
+    pub rbp: usize, // available +32
+    pub rbx: usize, // available +40
+    pub r11: usize, // outside fxsave, and so on
     pub r10: usize,
     pub r9: usize,
     pub r8: usize,
@@ -174,7 +174,6 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov rdx, rax
     shr rdx, 32
     and eax, edx
-    and eax, {SIGW0_PENDING_MASK}
     bsf eax, eax
     jnz 2f
 
@@ -183,9 +182,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov rdx, rax
     shr rdx, 32
     and eax, edx
-    and eax, {SIGW1_PENDING_MASK}
     bsf eax, eax
-    jz 7f
+    jz 6f
     add eax, 32
 2:
     sub rsp, {REDZONE_SIZE}
@@ -238,35 +236,63 @@ asmfunction!(__relibc_internal_sigentry: ["
     push r13
     push r14
     push r15
-    sub rsp, 16
-
-    push rax // selected signal
-
-    sub rsp, 4096 + 24
-
-    cld
-    mov rdi, rsp
-    xor eax, eax
-    mov ecx, 4096 + 24
-    rep stosb
+    sub rsp, (29 + 16) * 16 // fxsave region minus available bytes
+    fxsave64 [rsp + 16 * 16]
 
     // TODO: self-modifying?
-    cmp byte ptr [rip + {supports_xsave}], 0
-    je 6f
+    cmp byte ptr [rip + {supports_avx}], 0
+    je 5f
 
-    mov eax, 0xffffffff
-    mov edx, eax
-    xsave [rsp]
+    // Prefer vextractf128 over vextracti128 since the former only requires AVX version 1.
+    vextractf128 [rsp + 15 * 16], ymm0, 1
+    vextractf128 [rsp + 14 * 16], ymm1, 1
+    vextractf128 [rsp + 13 * 16], ymm2, 1
+    vextractf128 [rsp + 12 * 16], ymm3, 1
+    vextractf128 [rsp + 11 * 16], ymm4, 1
+    vextractf128 [rsp + 10 * 16], ymm5, 1
+    vextractf128 [rsp + 9 * 16], ymm6, 1
+    vextractf128 [rsp + 8 * 16], ymm7, 1
+    vextractf128 [rsp + 7 * 16], ymm8, 1
+    vextractf128 [rsp + 6 * 16], ymm9, 1
+    vextractf128 [rsp + 5 * 16], ymm10, 1
+    vextractf128 [rsp + 4 * 16], ymm11, 1
+    vextractf128 [rsp + 3 * 16], ymm12, 1
+    vextractf128 [rsp + 2 * 16], ymm13, 1
+    vextractf128 [rsp + 16], ymm14, 1
+    vextractf128 [rsp], ymm15, 1
+5:
+    push rax // selected signal
+    sub rsp, 8
 
     mov rdi, rsp
     call {inner}
 
-    mov eax, 0xffffffff
-    mov edx, eax
-    xrstor [rsp]
+    add rsp, 16
 
-5:
-    add rsp, 4096 + 32 + 16
+    fxrstor64 [rsp]
+
+    cmp byte ptr [rip + {supports_avx}], 0
+    je 6f
+
+    vinsertf128 ymm0, ymm0, [rsp + 15 * 16], 1
+    vinsertf128 ymm1, ymm1, [rsp + 14 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 13 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 12 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 11 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 10 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 9 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 8 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 7 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 6 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 5 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 4 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 3 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 2 * 16], 1
+    vinsertf128 ymm2, ymm2, [rsp + 16], 1
+    vinsertf128 ymm2, ymm2, [rsp], 1
+6:
+    add rsp, (29 + 16) * 16
+
     pop r15
     pop r14
     pop r13
@@ -299,14 +325,6 @@ __relibc_internal_sigentry_crit_first:
 __relibc_internal_sigentry_crit_second:
     jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
 6:
-    fxsave64 [rsp]
-
-    mov rdi, rsp
-    call {inner}
-
-    fxrstor64 [rsp]
-    jmp 5b
-7:
     ud2
     // Spurious signal
 "] <= [
@@ -325,11 +343,9 @@ __relibc_internal_sigentry_crit_second:
     pctl_off_actions = const offset_of!(SigProcControl, actions),
     //pctl = sym PROC_CONTROL_STRUCT,
     sa_off_pctl = const offset_of!(SigArea, pctl),
-    supports_xsave = sym SUPPORTS_XSAVE,
-    SIGW0_PENDING_MASK = const !0,
-    SIGW1_PENDING_MASK = const !0,
+    supports_avx = sym SUPPORTS_AVX,
     REDZONE_SIZE = const 128,
-    STACK_ALIGN = const 64, // if xsave is used
+    STACK_ALIGN = const 16,
 ]);
 
 extern "C" {
@@ -357,7 +373,7 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
     }
 }
 
-static SUPPORTS_XSAVE: AtomicU8 = AtomicU8::new(1); // FIXME
+static SUPPORTS_AVX: AtomicU8 = AtomicU8::new(1); // FIXME
 
 pub unsafe fn manually_enter_trampoline() {
     let c = &Tcb::current().unwrap().os_specific.control;
