@@ -26,12 +26,17 @@ void handler(int sig) {
 }
 
 int main(void) {
-    int child = fork();
-    ERROR_IF(fork, child, == -1);
-
     int fds[2];
     int status = pipe(fds);
     ERROR_IF(pipe, status, == -1);
+
+    int child = fork();
+    ERROR_IF(fork, child, == -1);
+
+    sigset_t set;
+    sigemptyset(&set);
+    status = sigprocmask(SIG_SETMASK, &set, NULL);
+    ERROR_IF(sigprocmask, status, == -1);
 
     struct sigaction sa;
     sigemptyset(&sa.sa_mask);
@@ -75,6 +80,9 @@ int main(void) {
         assert(WSTOPSIG(waitpid_stat) == SIGSTOP);
         puts("Correct, sending SIGCONT...");
 
+        status = write(fds[1], "C", 1);
+        ERROR_IF(write, status, == -1);
+
         status = kill(child, SIGCONT);
         ERROR_IF(kill, status, == -1);
 
@@ -91,7 +99,7 @@ int main(void) {
         puts("Child exited.");
 
         puts("Writing to (broken) pipe.");
-        status = write(fds[1], "C", 1);
+        status = write(fds[1], "B", 1);
         ERROR_IF(write, status, != -1);
         assert(errno == EPIPE);
 
