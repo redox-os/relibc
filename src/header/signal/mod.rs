@@ -35,6 +35,7 @@ pub const SIG_SETMASK: c_int = 2;
 
 #[repr(C)]
 #[derive(Clone, Debug)]
+/// cbindgen:ignore
 pub struct sigaction {
     pub sa_handler: Option<extern "C" fn(c_int)>,
     pub sa_flags: c_ulong,
@@ -52,7 +53,7 @@ pub struct sigaltstack {
 
 #[repr(C)]
 #[derive(Clone, Debug)]
-pub struct siginfo_t {
+pub struct siginfo {
     pub si_signo: c_int,
     pub si_errno: c_int,
     pub si_code: c_int,
@@ -60,7 +61,10 @@ pub struct siginfo_t {
     _si_align: [usize; 0],
 }
 
+/// cbindgen:ignore
 pub type sigset_t = c_ulonglong;
+/// cbindgen:ignore
+pub type siginfo_t = siginfo;
 
 pub type stack_t = sigaltstack;
 
