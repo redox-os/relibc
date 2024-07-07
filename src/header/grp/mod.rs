@@ -310,20 +310,38 @@ pub unsafe extern "C" fn getgrgid_r(
     buflen: usize,
     result: *mut *mut group,
 ) -> c_int {
+    // In case of error or the requested entry is not found.
+    *result = ptr::null_mut();
+
     let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else {
         return ENOENT;
     };
 
     for line in BufReader::new(db).lines() {
         let Ok(line) = line else { return EINVAL };
-        let Ok(mut grp) = parse_grp(
+        let grp = match parse_grp(
             line,
             Some(DestBuffer {
                 ptr: buffer as *mut u8,
                 len: buflen,
             }),
-        ) else {
-            return EINVAL;
+        ) {
+            Ok(grp) => grp,
+            Err(err) => {
+                return match err {
+                    Error::BufTooSmall => ERANGE,
+                    Error::EOF
+                    | Error::SyntaxError
+                    | Error::FromUtf8Error(_)
+                    | Error::ParseIntError(_)
+                    | Error::Other => EINVAL,
+                    Error::Misc(io_err) => match io_err.kind() {
+                        io::ErrorKind::InvalidData | io::ErrorKind::UnexpectedEof => EINVAL,
+                        io::ErrorKind::NotFound => ENOENT,
+                        _ => EIO,
+                    },
+                }
+            }
         };
 
         if grp.reference.gr_gid == gid {
@@ -334,7 +352,8 @@ pub unsafe extern "C" fn getgrgid_r(
         }
     }
 
-    return ENOENT;
+    // The requested entry was not found.
+    return 0;
 }
 
 // MT-Safe locale
