@@ -45,7 +45,15 @@ impl Rwlock {
                     };
                     waiting_wr = expected & WAITING_WR;
 
-                    let _ = crate::sync::futex_wait(&self.state, expected, deadline);
+                    if actual & COUNT_MASK > 0 {
+                        let _ = crate::sync::futex_wait(&self.state, expected, deadline);
+                    } else {
+                        // We must avoid blocking indefinitely in our `futex_wait()`, in this case
+                        // where it's possible that `self.state == expected` but our futex might
+                        // never be woken again, because it's possible that all other threads
+                        // already did their `futex_wake()` before we would've done our
+                        // `futex_wait()`.
+                    }
                 }
             }
         }
