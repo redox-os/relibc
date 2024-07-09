@@ -30,7 +30,6 @@ EXPECT_NAMES=\
 	select \
 	setjmp \
 	sigaction \
-	sigchld \
 	signal \
 	stdio/all \
 	stdio/buffer \
@@ -158,6 +157,7 @@ NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
 	pwd \
+	sigchld \
 	stdio/tempnam \
 	stdio/tmpnam \
 	stdlib/bsearch \
