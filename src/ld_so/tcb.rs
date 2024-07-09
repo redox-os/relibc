@@ -195,7 +195,7 @@ impl Tcb {
 
     /// Activate TLS
     pub unsafe fn activate(&mut self) {
-        Self::os_arch_activate(self.tls_end as usize, self.tls_len);
+        Self::os_arch_activate(&self.os_specific, self.tls_end as usize, self.tls_len);
     }
 
     /// Mapping with correct flags for TCB and TLS
@@ -231,14 +231,14 @@ impl Tcb {
 
     /// OS and architecture specific code to activate TLS - Linux x86_64
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    unsafe fn os_arch_activate(tls_end: usize, _tls_len: usize) {
+    unsafe fn os_arch_activate(os: &(), tls_end: usize, _tls_len: usize) {
         const ARCH_SET_FS: usize = 0x1002;
         syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
     }
 
     #[cfg(target_os = "redox")]
-    unsafe fn os_arch_activate(tls_end: usize, tls_len: usize) {
-        redox_rt::tcb_activate(tls_end, tls_len)
+    unsafe fn os_arch_activate(os: &OsSpecific, tls_end: usize, tls_len: usize) {
+        redox_rt::tcb_activate(os, tls_end, tls_len)
     }
 }
 

@@ -9,9 +9,12 @@
 )]
 #![forbid(unreachable_patterns)]
 
-use generic_rt::{ExpectTlsFree, GenericTcb};
+use core::cell::UnsafeCell;
 
-use self::signal::RtSigarea;
+use generic_rt::{ExpectTlsFree, GenericTcb};
+use syscall::{Sigcontrol, O_CLOEXEC};
+
+use self::proc::FdGuard;
 
 extern crate alloc;
 
@@ -46,11 +49,33 @@ pub mod sync;
 pub mod sys;
 pub mod thread;
 
-pub type Tcb = GenericTcb<RtSigarea>;
+#[derive(Debug, Default)]
+pub struct RtTcb {
+    pub control: Sigcontrol,
+    pub arch: UnsafeCell<crate::arch::SigArea>,
+    pub thr_fd: UnsafeCell<Option<FdGuard>>,
+}
+impl RtTcb {
+    pub fn current() -> &'static Self {
+        unsafe { &Tcb::current().unwrap().os_specific }
+    }
+    pub fn thread_fd(&self) -> &FdGuard {
+        unsafe {
+            if (&*self.thr_fd.get()).is_none() {
+                self.thr_fd.get().write(Some(FdGuard::new(
+                    syscall::open("thisproc:current/open_via_dup", O_CLOEXEC).unwrap(),
+                )));
+            }
+            (&*self.thr_fd.get()).as_ref().unwrap()
+        }
+    }
+}
+
+pub type Tcb = GenericTcb<RtTcb>;
 
 /// OS and architecture specific code to activate TLS - Redox aarch64
 #[cfg(target_arch = "aarch64")]
-pub unsafe fn tcb_activate(tls_end: usize, tls_len: usize) {
+pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
     // Uses ABI page
     let abi_ptr = tls_end - tls_len - 16;
     core::ptr::write(abi_ptr as *mut usize, tls_end);
@@ -62,42 +87,36 @@ pub unsafe fn tcb_activate(tls_end: usize, tls_len: usize) {
 
 /// OS and architecture specific code to activate TLS - Redox x86
 #[cfg(target_arch = "x86")]
-pub unsafe fn tcb_activate(tls_end: usize, _tls_len: usize) {
+pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
     let mut env = syscall::EnvRegisters::default();
 
-    let file = syscall::open(
-        "thisproc:current/regs/env",
-        syscall::O_CLOEXEC | syscall::O_RDWR,
-    )
-    .expect_notls("failed to open handle for process registers");
+    let file = FdGuard::new(
+        syscall::dup(**tcb.thread_fd(), b"regs/env")
+            .expect_notls("failed to open handle for process registers"),
+    );
 
-    let _ = syscall::read(file, &mut env).expect_notls("failed to read gsbase");
+    let _ = syscall::read(*file, &mut env).expect_notls("failed to read gsbase");
 
     env.gsbase = tls_end as u32;
 
-    let _ = syscall::write(file, &env).expect_notls("failed to write gsbase");
-
-    let _ = syscall::close(file);
+    let _ = syscall::write(*file, &env).expect_notls("failed to write gsbase");
 }
 
 /// OS and architecture specific code to activate TLS - Redox x86_64
 #[cfg(target_arch = "x86_64")]
-pub unsafe fn tcb_activate(tls_end_and_tcb_start: usize, _tls_len: usize) {
+pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end_and_tcb_start: usize, _tls_len: usize) {
     let mut env = syscall::EnvRegisters::default();
 
-    let file = syscall::open(
-        "thisproc:current/regs/env",
-        syscall::O_CLOEXEC | syscall::O_RDWR,
-    )
-    .expect_notls("failed to open handle for process registers");
+    let file = FdGuard::new(
+        syscall::dup(**tcb.thread_fd(), b"regs/env")
+            .expect_notls("failed to open handle for process registers"),
+    );
 
-    let _ = syscall::read(file, &mut env).expect_notls("failed to read fsbase");
+    let _ = syscall::read(*file, &mut env).expect_notls("failed to read fsbase");
 
     env.fsbase = tls_end_and_tcb_start as u64;
 
-    let _ = syscall::write(file, &env).expect_notls("failed to write fsbase");
-
-    let _ = syscall::close(file);
+    let _ = syscall::write(*file, &env).expect_notls("failed to write fsbase");
 }
 
 /// Initialize redox-rt in situations where relibc is not used
@@ -127,7 +146,8 @@ pub fn initialize_freestanding() {
 
     #[cfg(not(target_arch = "aarch64"))]
     unsafe {
-        tcb_activate(page as *mut Tcb as usize, 0)
+        let tcb_addr = page as *mut Tcb as usize;
+        tcb_activate(&page.os_specific, tcb_addr, 0)
     }
     #[cfg(target_arch = "aarch64")]
     unsafe {

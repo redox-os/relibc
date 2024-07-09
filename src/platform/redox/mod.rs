@@ -1,4 +1,5 @@
 use core::{convert::TryFrom, mem, ptr, slice, str};
+use redox_rt::RtTcb;
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
@@ -792,21 +793,23 @@ impl Pal for Sys {
         let _guard = clone::rdlock();
         let res = clone::rlct_clone_impl(stack);
 
-        res.map(|context_id| crate::pthread::OsTid { context_id })
-            .map_err(|error| crate::pthread::Errno(error.errno))
+        res.map(|mut fd| crate::pthread::OsTid {
+            thread_fd: fd.take(),
+        })
+        .map_err(|error| crate::pthread::Errno(error.errno))
     }
     unsafe fn rlct_kill(
         os_tid: crate::pthread::OsTid,
         signal: usize,
     ) -> Result<(), crate::pthread::Errno> {
-        syscall::kill(os_tid.context_id, signal)
-            .map_err(|error| crate::pthread::Errno(error.errno))?;
+        todo!();
+        /*syscall::kill(os_tid.context_id, signal)
+        .map_err(|error| crate::pthread::Errno(error.errno))?;*/
         Ok(())
     }
     fn current_os_tid() -> crate::pthread::OsTid {
-        // TODO
         crate::pthread::OsTid {
-            context_id: Self::getpid() as _,
+            thread_fd: **RtTcb::current().thread_fd(),
         }
     }
 

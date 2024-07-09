@@ -11,7 +11,7 @@ use syscall::{
     SIGWINCH, SIGXCPU, SIGXFSZ,
 };
 
-use crate::{arch::*, sync::Mutex, Tcb};
+use crate::{arch::*, proc::FdGuard, sync::Mutex, RtTcb, Tcb};
 
 #[cfg(target_arch = "x86_64")]
 static CPUID_EAX1_ECX: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
@@ -450,9 +450,9 @@ const fn sig_bit(sig: usize) -> u64 {
     1 << (sig - 1)
 }
 
-pub fn setup_sighandler(area: &RtSigarea) {
+pub fn setup_sighandler(tcb: &RtTcb) {
     {
-        let mut sigactions = SIGACTIONS_LOCK.lock();
+        let _guard = SIGACTIONS_LOCK.lock();
         for (sig_idx, action) in PROC_CONTROL_STRUCT.actions.iter().enumerate() {
             let sig = sig_idx + 1;
             let bits = if matches!(sig, SIGTSTP | SIGTTIN | SIGTTOU) {
@@ -468,7 +468,7 @@ pub fn setup_sighandler(area: &RtSigarea) {
             );
         }
     }
-    let arch = unsafe { &mut *area.arch.get() };
+    let arch = unsafe { &mut *tcb.arch.get() };
     {
         // The asm decides whether to use the altstack, based on whether the saved stack pointer
         // was already on that stack. Thus, setting the altstack to the entire address space, is
@@ -489,22 +489,15 @@ pub fn setup_sighandler(area: &RtSigarea) {
 
     let data = current_setsighandler_struct();
 
-    let fd = syscall::open(
-        "thisproc:current/sighandler",
-        syscall::O_WRONLY | syscall::O_CLOEXEC,
-    )
-    .expect("failed to open thisproc:current/sighandler");
-    syscall::write(fd, &data).expect("failed to write to thisproc:current/sighandler");
-    let _ = syscall::close(fd);
+    let fd = FdGuard::new(
+        syscall::dup(**tcb.thread_fd(), b"sighandler").expect("failed to open sighandler fd"),
+    );
+    let _ = syscall::write(*fd, &data).expect("failed to write to sighandler fd");
 
     // TODO: Inherited set of ignored signals
     set_sigmask(Some(0), None);
 }
-#[derive(Debug, Default)]
-pub struct RtSigarea {
-    pub control: Sigcontrol,
-    pub arch: UnsafeCell<crate::arch::SigArea>,
-}
+pub type RtSigarea = RtTcb; // TODO
 pub fn current_setsighandler_struct() -> SetSighandlerData {
     SetSighandlerData {
         user_handler: sighandler_function(),

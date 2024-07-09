@@ -12,7 +12,7 @@ use syscall::{
 use crate::{
     proc::{fork_inner, FdGuard},
     signal::{inner_c, tmp_disable_signals, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
-    Tcb,
+    RtTcb, Tcb,
 };
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
@@ -93,7 +93,11 @@ unsafe extern "sysv64" fn fork_impl(initial_rsp: *mut usize) -> usize {
 
 unsafe extern "sysv64" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
-    let _ = syscall::close(new_pid_fd);
+    // TODO: Currently equivalent, but this will not be the case later.
+    RtTcb::current()
+        .thr_fd
+        .get()
+        .write(Some(FdGuard::new(new_pid_fd)));
 }
 
 asmfunction!(__relibc_internal_fork_wrapper -> usize: ["

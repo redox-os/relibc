@@ -1,18 +1,21 @@
-use syscall::{Result, SetSighandlerData, O_CLOEXEC};
+use syscall::{Result, O_CLOEXEC};
 
-use crate::{arch::*, proc::*, signal::sighandler_function};
+use crate::{arch::*, proc::*, RtTcb};
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
-pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
-    let cur_pid_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", O_CLOEXEC)?);
-    let (new_pid_fd, new_pid) = new_context()?;
+pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuard> {
+    let cur_thr_fd = RtTcb::current().thread_fd();
+    let new_thr_fd = FdGuard::new(syscall::open(
+        "thisproc:new-thread/open_via_dup",
+        O_CLOEXEC,
+    )?);
 
-    copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
+    copy_str(**cur_thr_fd, *new_thr_fd, "name")?;
 
     // Inherit existing address space
     {
-        let cur_addr_space_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"addrspace")?);
-        let new_addr_space_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-addrspace")?);
+        let cur_addr_space_fd = FdGuard::new(syscall::dup(**cur_thr_fd, b"addrspace")?);
+        let new_addr_space_sel_fd = FdGuard::new(syscall::dup(*new_thr_fd, b"current-addrspace")?);
 
         let buf = create_set_addr_space_buf(
             *cur_addr_space_fd,
@@ -24,8 +27,8 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
 
     // Inherit reference to file table
     {
-        let cur_filetable_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"filetable")?);
-        let new_filetable_sel_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"current-filetable")?);
+        let cur_filetable_fd = FdGuard::new(syscall::dup(**cur_thr_fd, b"filetable")?);
+        let new_filetable_sel_fd = FdGuard::new(syscall::dup(*new_thr_fd, b"current-filetable")?);
 
         let _ = syscall::write(
             *new_filetable_sel_fd,
@@ -39,8 +42,8 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {
     // until it has initialized its own signal handler.
 
     // Unblock context.
-    let start_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"start")?);
+    let start_fd = FdGuard::new(syscall::dup(*new_thr_fd, b"start")?);
     let _ = syscall::write(*start_fd, &[0])?;
 
-    Ok(new_pid)
+    Ok(new_thr_fd)
 }

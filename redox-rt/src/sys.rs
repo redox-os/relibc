@@ -81,8 +81,7 @@ pub fn sys_waitpid(pid: usize, status: &mut usize, flags: usize) -> Result<usize
         syscall::waitpid(
             pid,
             status,
-            syscall::WaitFlags::from_bits(flags)
-                .expect("waitpid: invalid bit pattern"),
+            syscall::WaitFlags::from_bits(flags).expect("waitpid: invalid bit pattern"),
         )
     })
 }
