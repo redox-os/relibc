@@ -47,3 +47,11 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuard> {
 
     Ok(new_thr_fd)
 }
+
+pub fn exit_this_thread() -> ! {
+    let thread_fd = RtTcb::current().thread_fd();
+    // TODO: modify interface so it writes directly to the thread fd?
+    let status_fd = syscall::dup(**thread_fd, b"status").unwrap();
+    syscall::write(status_fd, &0_usize.to_ne_bytes()).unwrap();
+    unreachable!()
+}

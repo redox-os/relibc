@@ -1138,6 +1138,6 @@ impl Pal for Sys {
     }
 
     fn exit_thread() -> ! {
-        Self::exit(0)
+        redox_rt::thread::exit_this_thread()
     }
 }
