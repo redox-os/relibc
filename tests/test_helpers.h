@@ -98,7 +98,12 @@
         _exit(code); \
     } while(0)
 
-#define random_bool() (lrand48() % 2 == 0)
+// Duplicate of lrand48() logic but suitable for multithreaded use
+int random_bool() {
+    _Thread_local static uint64_t xsubi = 0;
+    xsubi = 0x5deece66d * xsubi + 0xb;
+    return (xsubi >> 17) % 2 == 0;
+}
 
 // Quick helper for checking desired errno status.
 // Use as macro: CHECK_AND_PRINT_ERRNO(<desired errno, e.g. EINVAL>);
