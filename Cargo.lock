@@ -369,7 +369,7 @@ dependencies = [
  "generic-rt",
  "goblin",
  "plain",
- "redox_syscall 0.5.2 (git+https://gitlab.redox-os.org/redox-os/syscall.git)",
+ "redox_syscall",
 ]
 
 [[package]]
@@ -379,21 +379,14 @@ source = "git+https://gitlab.redox-os.org/redox-os/event.git#36ac5a57a8573f7546d
 dependencies = [
  "bitflags",
  "libredox",
- "redox_syscall 0.5.2 (git+https://gitlab.redox-os.org/redox-os/syscall.git?rev=387f1c3)",
+ "redox_syscall",
 ]
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.2"
-source = "git+https://gitlab.redox-os.org/redox-os/syscall.git?rev=387f1c3#387f1c332681a3cabe04294bce801e9c8c433df5"
-dependencies = [
- "bitflags",
-]
-
-[[package]]
-name = "redox_syscall"
-version = "0.5.2"
-source = "git+https://gitlab.redox-os.org/redox-os/syscall.git#387f1c332681a3cabe04294bce801e9c8c433df5"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a908a6e00f1fdd0dfd9c0eb08ce85126f6d8bbda50017e74bc4a4b7d4a926a4"
 dependencies = [
  "bitflags",
 ]
@@ -422,7 +415,7 @@ dependencies = [
  "redox-path",
  "redox-rt",
  "redox_event",
- "redox_syscall 0.5.2 (git+https://gitlab.redox-os.org/redox-os/syscall.git?rev=387f1c3)",
+ "redox_syscall",
  "sc",
  "scrypt",
  "sha-crypt",
