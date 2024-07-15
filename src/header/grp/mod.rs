@@ -187,8 +187,8 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
 
         let members = buffer.next().ok_or(Error::EOF)?;
 
-        // Get the pointer to the members array
-        let member_array_ptr = unsafe { vec.as_mut_ptr().add(vec.len()) as *mut usize };
+        // Get the offset of the members array
+        let member_array_start = vec.len();
 
         // Push enough null pointers to fit all members
         for _member in members
@@ -197,6 +197,7 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
         {
             vec.extend(0usize.to_ne_bytes());
         }
+        let member_array_end = vec.len();
         // Push a null pointer to terminate the members array
         vec.extend(0usize.to_ne_bytes());
 
@@ -206,10 +207,20 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
             .filter(|member| !member.is_empty())
             .enumerate()
         {
+            let cur_offset = vec.len();
+
+            // This must be recomputed each time, because `vec` is undergoing extensions and so
+            // its backing memory might be reallocated and moved and its old memory deallocated.
+            let member_array = &mut vec[member_array_start..member_array_end];
+            let member_ptr = {
+                const SIZEOF_PTR: usize = mem::size_of::<*mut c_void>();
+                let start = i * SIZEOF_PTR;
+                let end = start + SIZEOF_PTR;
+                &mut member_array[start..end]
+            };
+
             // Store offset to start of member, MUST BE ADJUSTED LATER BASED ON THE ADDRESS OF THE BUFFER
-            unsafe {
-                *member_array_ptr.add(i) = vec.len();
-            }
+            member_ptr.copy_from_slice(&cur_offset.to_ne_bytes());
 
             vec.extend(member);
             vec.push(0);
@@ -223,7 +234,7 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
         Some(buf) => {
             let mut buf = MaybeAllocated::Borrowed(buf);
 
-            if buf.len() < buf.len() {
+            if buf.len() < strings.len() {
                 platform::ERRNO.set(errno::ERANGE);
                 return Err(Error::BufTooSmall);
             }
@@ -299,20 +310,38 @@ pub unsafe extern "C" fn getgrgid_r(
     buflen: usize,
     result: *mut *mut group,
 ) -> c_int {
+    // In case of error or the requested entry is not found.
+    *result = ptr::null_mut();
+
     let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else {
         return ENOENT;
     };
 
     for line in BufReader::new(db).lines() {
         let Ok(line) = line else { return EINVAL };
-        let Ok(mut grp) = parse_grp(
+        let grp = match parse_grp(
             line,
             Some(DestBuffer {
                 ptr: buffer as *mut u8,
                 len: buflen,
             }),
-        ) else {
-            return EINVAL;
+        ) {
+            Ok(grp) => grp,
+            Err(err) => {
+                return match err {
+                    Error::BufTooSmall => ERANGE,
+                    Error::EOF
+                    | Error::SyntaxError
+                    | Error::FromUtf8Error(_)
+                    | Error::ParseIntError(_)
+                    | Error::Other => EINVAL,
+                    Error::Misc(io_err) => match io_err.kind() {
+                        io::ErrorKind::InvalidData | io::ErrorKind::UnexpectedEof => EINVAL,
+                        io::ErrorKind::NotFound => ENOENT,
+                        _ => EIO,
+                    },
+                }
+            }
         };
 
         if grp.reference.gr_gid == gid {
@@ -323,7 +352,8 @@ pub unsafe extern "C" fn getgrgid_r(
         }
     }
 
-    return ENOENT;
+    // The requested entry was not found.
+    return 0;
 }
 
 // MT-Safe locale
