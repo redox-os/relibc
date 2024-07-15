@@ -30,7 +30,16 @@ Inside of your Redox build system, run:
 make prefix
 ```
 
-(It only works if the timestamp of the `relibc` folder changed)
+If you need to rebuild `relibc` for testing a Cookbook recipe, run:
+
+```sh
+touch relibc
+make prefix r.recipe-name
+```
+
+Touching (changing the "last modified time" of) the `relibc` folder is needed to trigger recompilation for `make prefix`. Replace `recipe-name` with your desired recipe name.
+
+Note: Do not edit `relibc` inside `prefix` folder! Do your work on `relibc` folder directly inside your Redox build system instead.
 
 ## Tests
 
