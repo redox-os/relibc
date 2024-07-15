@@ -10,7 +10,7 @@ use crate::{
     fs::File,
     header::{
         dirent::dirent,
-        errno::{EBADR, EINVAL, EIO, ENOENT, ENOMEM, ENOSYS, EPERM, ERANGE},
+        errno::{EBADF, EBADFD, EBADR, EINVAL, EIO, ENOENT, ENOMEM, ENOSYS, EPERM, ERANGE},
         fcntl, limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
@@ -27,7 +27,7 @@ use crate::{
     pthread::{self, Errno, ResultExt},
 };
 
-pub use redox_exec::FdGuard;
+pub use redox_rt::proc::FdGuard;
 
 use super::{types::*, Pal, Read, ERRNO};
 
@@ -217,7 +217,7 @@ impl Pal for Sys {
     }
 
     fn exit(status: c_int) -> ! {
-        let _ = syscall::exit(status as usize);
+        let _ = syscall::exit((status as usize) << 8);
         loop {}
     }
 
@@ -824,7 +824,8 @@ impl Pal for Sys {
     }
 
     fn read(fd: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno> {
-        Ok(syscall::read(fd as usize, buf)? as ssize_t)
+        let fd = usize::try_from(fd).map_err(|_| Errno(EBADF))?;
+        Ok(redox_rt::sys::posix_read(fd, buf)? as ssize_t)
     }
     fn pread(fd: c_int, buf: &mut [u8], offset: off_t) -> Result<ssize_t, Errno> {
         unsafe {
@@ -1124,7 +1125,8 @@ impl Pal for Sys {
     }
 
     fn write(fd: c_int, buf: &[u8]) -> Result<ssize_t, Errno> {
-        Ok(syscall::write(fd as usize, buf)? as ssize_t)
+        let fd = usize::try_from(fd).map_err(|_| Errno(EBADFD))?;
+        Ok(redox_rt::sys::posix_write(fd, buf)? as ssize_t)
     }
     fn pwrite(fd: c_int, buf: &[u8], offset: off_t) -> Result<ssize_t, Errno> {
         unsafe {

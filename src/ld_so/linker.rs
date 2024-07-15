@@ -27,7 +27,7 @@ use super::{
     callbacks::LinkerCallbacks,
     debug::{RTLDState, _dl_debug_state, _r_debug},
     dso::{is_pie_enabled, DSO},
-    tcb::{round_up, Master, Tcb},
+    tcb::{Master, Tcb},
     ExpectTlsFree, PATH_SEP,
 };
 
@@ -453,7 +453,7 @@ impl Linker {
             {
                 let voff = ph.p_vaddr % ph.p_align;
                 let vaddr = (ph.p_vaddr - voff) as usize;
-                let vsize = round_up((ph.p_memsz + voff) as usize, ph.p_align as usize);
+                let vsize = ((ph.p_memsz + voff) as usize).next_multiple_of(ph.p_align as usize);
                 let mut prot = 0;
                 if ph.p_flags & program_header::PF_R == program_header::PF_R {
                     prot |= sys_mman::PROT_READ;

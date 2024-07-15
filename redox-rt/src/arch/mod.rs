@@ -4,9 +4,9 @@ pub use self::aarch64::*;
 pub mod aarch64;
 
 #[cfg(target_arch = "x86")]
-pub use self::x86::*;
+pub use self::i686::*;
 #[cfg(target_arch = "x86")]
-pub mod x86;
+pub mod i686;
 
 #[cfg(target_arch = "x86_64")]
 pub use self::x86_64::*;

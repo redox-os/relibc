@@ -157,6 +157,7 @@ NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
 	pwd \
+	sigchld \
 	stdio/tempnam \
 	stdio/tmpnam \
 	stdlib/bsearch \

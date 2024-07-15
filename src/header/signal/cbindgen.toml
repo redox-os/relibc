@@ -1,4 +1,4 @@
-sys_includes = ["stdint.h", "sys/types.h", "time.h", "bits/pthread.h"]
+sys_includes = ["bits/signal.h", "stdint.h", "sys/types.h", "time.h", "bits/pthread.h"]
 include_guard = "_RELIBC_SIGNAL_H"
 trailer = "#include <bits/signal.h>"
 language = "C"
@@ -15,3 +15,4 @@ prefix_with_name = true
 
 [export.rename]
 "timespec" = "struct timespec"
+"sigaction" = "struct sigaction"

@@ -31,8 +31,6 @@ extern crate alloc;
 extern crate cbitset;
 extern crate goblin;
 extern crate memchr;
-#[macro_use]
-extern crate memoffset;
 extern crate posix_regex;
 extern crate rand;
 

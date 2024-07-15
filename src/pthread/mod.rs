@@ -92,6 +92,12 @@ impl From<syscall::Error> for Errno {
         Errno(value.errno)
     }
 }
+#[cfg(target_os = "redox")]
+impl From<Errno> for syscall::Error {
+    fn from(value: Errno) -> Self {
+        syscall::Error::new(value.0)
+    }
+}
 
 pub trait ResultExt<T> {
     fn or_minus_one_errno(self) -> T;
@@ -130,13 +136,15 @@ pub(crate) unsafe fn create(
 ) -> Result<pthread_t, Errno> {
     let attrs = attrs.copied().unwrap_or_default();
 
-    let mut procmask = 0_u64;
+    let mut current_sigmask = 0_u64;
     #[cfg(target_os = "redox")]
-    syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut procmask))
-        .expect("failed to obtain sigprocmask for caller");
+    {
+        current_sigmask =
+            redox_rt::signal::get_sigmask().expect("failed to obtain sigprocmask for caller");
+    }
 
     // Create a locked mutex, unlocked by the thread after it has started.
-    let synchronization_mutex = Mutex::locked(procmask);
+    let synchronization_mutex = Mutex::locked(current_sigmask);
     let synchronization_mutex = &synchronization_mutex;
 
     let stack_size = attrs.stacksize.next_multiple_of(Sys::getpagesize());
@@ -242,8 +250,10 @@ unsafe extern "C" fn new_thread_shim(
     (&*mutex).manual_unlock();
 
     #[cfg(target_os = "redox")]
-    syscall::sigprocmask(syscall::SIG_SETMASK, Some(&procmask), None)
-        .expect("failed to set procmask in child thread");
+    {
+        redox_rt::signal::set_sigmask(Some(procmask), None)
+            .expect("failed to set procmask in child thread");
+    }
 
     let retval = entry_point(arg);
 
@@ -316,8 +326,8 @@ unsafe fn dealloc_thread(thread: &Pthread) {
     OS_TID_TO_PTHREAD.lock().remove(&thread.os_tid.get().read());
     //drop(Box::from_raw(thread as *const Pthread as *mut Pthread));
 }
-pub const SIGRT_RLCT_CANCEL: usize = 32;
-pub const SIGRT_RLCT_TIMER: usize = 33;
+pub const SIGRT_RLCT_CANCEL: usize = 33;
+pub const SIGRT_RLCT_TIMER: usize = 34;
 
 unsafe extern "C" fn cancel_sighandler(_: c_int) {
     cancel_current_thread();

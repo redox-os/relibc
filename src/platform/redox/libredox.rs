@@ -1,13 +1,20 @@
 use core::{slice, str};
 
+use redox_rt::sys::{posix_read, posix_write};
 use syscall::{Error, Result, WaitFlags, EMFILE};
 
 use crate::{
     header::{
-        errno::EINVAL, signal::sigaction, sys_stat::UTIME_NOW, sys_uio::iovec, time::timespec,
+        errno::EINVAL,
+        signal::{sigaction, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK},
+        sys_stat::UTIME_NOW,
+        sys_uio::iovec,
+        time::timespec,
     },
-    platform::types::*,
+    platform::{types::*, PalSignal},
 };
+
+use super::Sys;
 
 pub type RawResult = usize;
 
@@ -141,10 +148,7 @@ pub unsafe extern "C" fn redox_dup2_v1(
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_read_v1(fd: usize, dst_base: *mut u8, dst_len: usize) -> RawResult {
-    Error::mux(syscall::read(
-        fd,
-        slice::from_raw_parts_mut(dst_base, dst_len),
-    ))
+    Error::mux(posix_read(fd, slice::from_raw_parts_mut(dst_base, dst_len)))
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_write_v1(
@@ -152,7 +156,7 @@ pub unsafe extern "C" fn redox_write_v1(
     src_base: *const u8,
     src_len: usize,
 ) -> RawResult {
-    Error::mux(syscall::write(fd, slice::from_raw_parts(src_base, src_len)))
+    Error::mux(posix_write(fd, slice::from_raw_parts(src_base, src_len)))
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_fsync_v1(fd: usize) -> RawResult {
@@ -249,7 +253,11 @@ pub unsafe extern "C" fn redox_sigaction_v1(
     new: *const sigaction,
     old: *mut sigaction,
 ) -> RawResult {
-    Error::mux(super::signal::sigaction_impl(signal as i32, new.as_ref(), old.as_mut()).map(|()| 0))
+    Error::mux(
+        Sys::sigaction(signal as c_int, new.as_ref(), old.as_mut())
+            .map(|()| 0)
+            .map_err(Into::into),
+    )
 }
 
 #[no_mangle]
@@ -258,7 +266,11 @@ pub unsafe extern "C" fn redox_sigprocmask_v1(
     new: *const u64,
     old: *mut u64,
 ) -> RawResult {
-    Error::mux(super::signal::sigprocmask_impl(how as i32, new, old).map(|()| 0))
+    Error::mux(
+        Sys::sigprocmask(how as c_int, new.as_ref(), old.as_mut())
+            .map(|()| 0)
+            .map_err(Into::into),
+    )
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_mmap_v1(

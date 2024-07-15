@@ -7,10 +7,12 @@ use cbitset::BitSet;
 use crate::{
     header::{errno, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},
-    pthread,
+    pthread::{self, Errno, ResultExt},
 };
 
 pub use self::sys::*;
+
+use super::errno::EFAULT;
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
@@ -33,6 +35,7 @@ pub const SIG_SETMASK: c_int = 2;
 
 #[repr(C)]
 #[derive(Clone, Debug)]
+/// cbindgen:ignore
 pub struct sigaction {
     pub sa_handler: Option<extern "C" fn(c_int)>,
     pub sa_flags: c_ulong,
@@ -50,7 +53,7 @@ pub struct sigaltstack {
 
 #[repr(C)]
 #[derive(Clone, Debug)]
-pub struct siginfo_t {
+pub struct siginfo {
     pub si_signo: c_int,
     pub si_errno: c_int,
     pub si_code: c_int,
@@ -58,7 +61,10 @@ pub struct siginfo_t {
     _si_align: [usize; 0],
 }
 
+/// cbindgen:ignore
 pub type sigset_t = c_ulonglong;
+/// cbindgen:ignore
+pub type siginfo_t = siginfo;
 
 pub type stack_t = sigaltstack;
 
@@ -107,17 +113,13 @@ pub unsafe extern "C" fn sigaction(
     act: *const sigaction,
     oact: *mut sigaction,
 ) -> c_int {
-    let act_opt = act.as_ref().map(|act| {
-        let mut act_clone = act.clone();
-        act_clone.sa_flags |= SA_RESTORER as c_ulong;
-        act_clone.sa_restorer = Some(__restore_rt);
-        act_clone
-    });
-    Sys::sigaction(sig, act_opt.as_ref(), oact.as_mut())
+    Sys::sigaction(sig, act.as_ref(), oact.as_mut())
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
-pub extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
+pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
@@ -131,20 +133,13 @@ pub extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
-    if !ss.is_null() {
-        if (*ss).ss_flags != SS_DISABLE as c_int {
-            return errno::EINVAL;
-        }
-        if (*ss).ss_size < MINSIGSTKSZ {
-            return errno::ENOMEM;
-        }
-    }
-
-    Sys::sigaltstack(ss, old_ss)
+    Sys::sigaltstack(ss.as_ref(), old_ss.as_mut())
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
-pub extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
+pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
@@ -222,11 +217,6 @@ pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_in
     0
 }
 
-extern "C" {
-    // Defined in assembly inside platform/x/mod.rs
-    fn __restore_rt();
-}
-
 #[no_mangle]
 pub extern "C" fn signal(
     sig: c_int,
@@ -234,8 +224,8 @@ pub extern "C" fn signal(
 ) -> Option<extern "C" fn(c_int)> {
     let sa = sigaction {
         sa_handler: func,
-        sa_flags: SA_RESTART as c_ulong,
-        sa_restorer: Some(__restore_rt),
+        sa_flags: SA_RESTART as _,
+        sa_restorer: None, // set by platform if applicable
         sa_mask: sigset_t::default(),
     };
     let mut old_sa = mem::MaybeUninit::uninit();
@@ -257,7 +247,9 @@ pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
-    Sys::sigpending(set)
+    (|| Sys::sigpending(set.as_mut().ok_or(Errno(EFAULT))?))()
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 const BELOW_SIGRTMIN_MASK: sigset_t = (1 << SIGRTMIN) - 1;
@@ -270,14 +262,23 @@ pub unsafe extern "C" fn sigprocmask(
     set: *const sigset_t,
     oset: *mut sigset_t,
 ) -> c_int {
-    let set = set.as_ref().map(|&block| block & !RLCT_SIGNAL_MASK);
+    (|| {
+        let set = set.as_ref().map(|&block| block & !RLCT_SIGNAL_MASK);
+        let mut oset = oset.as_mut();
 
-    Sys::sigprocmask(
-        how,
-        set.as_ref()
-            .map_or(core::ptr::null(), |r| r as *const sigset_t),
-        oset,
-    )
+        Sys::sigprocmask(
+            how,
+            set.as_ref(),
+            oset.as_deref_mut(), // as_deref_mut for lifetime reasons
+        )?;
+
+        if let Some(oset) = oset {
+            *oset &= !RLCT_SIGNAL_MASK;
+        }
+
+        Ok(0)
+    })()
+    .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -316,7 +317,7 @@ pub unsafe extern "C" fn sigset(
             let mut sa = sigaction {
                 sa_handler: func,
                 sa_flags: 0 as c_ulong,
-                sa_restorer: Some(__restore_rt),
+                sa_restorer: None, // set by platform if applicable
                 sa_mask: sigset_t::default(),
             };
             sigemptyset(&mut sa.sa_mask);

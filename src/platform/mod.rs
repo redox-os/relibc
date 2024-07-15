@@ -33,7 +33,7 @@ pub mod rlb;
 pub mod auxv_defs;
 
 #[cfg(target_os = "redox")]
-pub use redox_exec::auxv_defs;
+pub use redox_rt::auxv_defs;
 
 use self::types::*;
 pub mod types;
@@ -306,7 +306,7 @@ pub fn init(auxvs: Box<[[usize; 2]]>) {
     if let Some(mask) = get_auxv(&auxvs, AT_REDOX_INHERITED_SIGPROCMASK_HI) {
         inherited_sigprocmask |= (mask as u64) << 32;
     }
-    syscall::sigprocmask(syscall::SIG_SETMASK, Some(&inherited_sigprocmask), None).unwrap();
+    redox_rt::signal::set_sigmask(Some(inherited_sigprocmask), None).unwrap();
 }
 #[cfg(not(target_os = "redox"))]
 pub fn init(auxvs: Box<[[usize; 2]]>) {}
