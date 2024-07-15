@@ -2,15 +2,21 @@ use syscall::error::{Result, Error, EINTR};
 
 use crate::arch::manually_enter_trampoline;
 use crate::signal::tmp_disable_signals;
+use crate::Tcb;
 
 #[inline]
 fn wrapper(mut f: impl FnMut() -> Result<usize>) -> Result<usize> {
     loop {
+        let _guard = tmp_disable_signals();
+        let rt_sigarea = unsafe { &Tcb::current().unwrap().os_specific };
         let res = f();
 
         if res == Err(Error::new(EINTR)) {
             unsafe {
                 manually_enter_trampoline();
+            }
+            if unsafe { (*rt_sigarea.arch.get()).last_sig_was_restart } {
+                continue;
             }
         }
 

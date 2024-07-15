@@ -26,6 +26,7 @@ pub struct SigArea {
     pub altstack_bottom: usize,
     pub disable_signals_depth: u64,
     pub pctl: usize, // TODO: find out how to correctly reference that static
+    pub last_sig_was_restart: bool,
 }
 
 #[repr(C, align(16))]

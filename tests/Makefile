@@ -31,6 +31,7 @@ EXPECT_NAMES=\
 	setjmp \
 	sigaction \
 	signal \
+	sa_restart \
 	stdio/all \
 	stdio/buffer \
 	stdio/fgets \

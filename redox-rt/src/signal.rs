@@ -44,7 +44,6 @@ unsafe fn inner(stack: &mut SigStack) {
 
     // asm counts from 0
     stack.sig_num += 1;
-
     arch_pre(stack, &mut *os.arch.get());
 
     let sigaction = {
@@ -61,6 +60,7 @@ unsafe fn inner(stack: &mut SigStack) {
         }
         action
     };
+    let shall_restart = sigaction.flags.contains(SigactionFlags::RESTART);
 
     let handler = match sigaction.kind {
         SigactionKind::Ignore => {
@@ -122,6 +122,8 @@ unsafe fn inner(stack: &mut SigStack) {
     // here? And would it be possible to tail-call-optimize that?
 
     //let _ = syscall::write(1, alloc::format!("will return to {:x?}\n", stack.regs.eip).as_bytes());
+
+    (*os.arch.get()).last_sig_was_restart = shall_restart;
 
     // And re-enable them again
     control_flags.store(control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(), Ordering::Release);
