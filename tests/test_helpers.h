@@ -101,7 +101,7 @@
 // Duplicate of lrand48() logic but suitable for multithreaded use
 int random_bool() {
     _Thread_local static uint64_t xsubi = 0;
-    xsubi = 0x5deece66d * xsubi + 0xb;
+    xsubi = (0x5deece66d * xsubi + 0xb) & (0xffffffffffff);
     return (xsubi >> 17) % 2 == 0;
 }
 
