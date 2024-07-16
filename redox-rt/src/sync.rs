@@ -1,8 +1,10 @@
 // TODO: Share code for simple futex-based mutex between relibc's Mutex<()> and this.
 
-use core::cell::UnsafeCell;
-use core::ops::{Deref, DerefMut};
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::{
+    cell::UnsafeCell,
+    ops::{Deref, DerefMut},
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 pub struct Mutex<T> {
     pub lockword: AtomicU32,
@@ -24,7 +26,11 @@ impl<T> Mutex<T> {
         }
     }
     pub fn lock(&self) -> MutexGuard<'_, T> {
-        while self.lockword.compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed).is_err() {
+        while self
+            .lockword
+            .compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
             core::hint::spin_loop();
         }
         MutexGuard { lock: self }

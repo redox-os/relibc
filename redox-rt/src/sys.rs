@@ -1,17 +1,20 @@
-use syscall::error::{Result, Error, EINTR};
+use syscall::{
+    error::{Error, Result, EINTR},
+    TimeSpec,
+};
 
-use crate::arch::manually_enter_trampoline;
-use crate::signal::tmp_disable_signals;
-use crate::Tcb;
+use crate::{arch::manually_enter_trampoline, signal::tmp_disable_signals, Tcb};
 
 #[inline]
-fn wrapper(mut f: impl FnMut() -> Result<usize>) -> Result<usize> {
+fn wrapper<T>(mut f: impl FnMut() -> Result<T>) -> Result<T> {
     loop {
         let _guard = tmp_disable_signals();
         let rt_sigarea = unsafe { &Tcb::current().unwrap().os_specific };
         let res = f();
 
-        if res == Err(Error::new(EINTR)) {
+        if let Err(err) = res
+            && err == Error::new(EINTR)
+        {
             unsafe {
                 manually_enter_trampoline();
             }
@@ -46,4 +49,30 @@ pub fn posix_killpg(pgrp: usize, sig: usize) -> Result<()> {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
     }
+}
+#[inline]
+pub unsafe fn sys_futex_wait(addr: *mut u32, val: u32, deadline: Option<&TimeSpec>) -> Result<()> {
+    wrapper(|| {
+        syscall::syscall5(
+            syscall::SYS_FUTEX,
+            addr as usize,
+            syscall::FUTEX_WAIT,
+            val as usize,
+            deadline.map_or(0, |d| d as *const _ as usize),
+            0,
+        )
+        .map(|_| ())
+    })
+}
+#[inline]
+pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
+    syscall::syscall5(
+        syscall::SYS_FUTEX,
+        addr as usize,
+        syscall::FUTEX_WAKE,
+        num as usize,
+        0,
+        0,
+    )
+    .map(|awoken| awoken as u32)
 }

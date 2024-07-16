@@ -1,12 +1,12 @@
 use core::mem::offset_of;
 
-use syscall::data::*;
-use syscall::error::*;
+use syscall::{data::*, error::*};
 
-use crate::proc::{fork_inner, FdGuard};
-use crate::signal::SigStack;
-use crate::signal::{inner_c, RtSigarea, PROC_CONTROL_STRUCT};
-use crate::Tcb;
+use crate::{
+    proc::{fork_inner, FdGuard},
+    signal::{inner_c, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    Tcb,
+};
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 47;

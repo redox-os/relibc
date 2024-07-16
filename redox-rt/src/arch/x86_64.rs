@@ -1,14 +1,19 @@
-use core::mem::offset_of;
-use core::sync::atomic::{AtomicU8, Ordering};
+use core::{
+    mem::offset_of,
+    sync::atomic::{AtomicU8, Ordering},
+};
 
-use syscall::data::{Sigcontrol, SigProcControl};
-use syscall::error::*;
-use syscall::flag::*;
+use syscall::{
+    data::{SigProcControl, Sigcontrol},
+    error::*,
+    flag::*,
+};
 
-use crate::proc::{fork_inner, FdGuard};
-use crate::signal::{tmp_disable_signals, SigStack};
-use crate::signal::{inner_c, RtSigarea, PROC_CONTROL_STRUCT};
-use crate::Tcb;
+use crate::{
+    proc::{fork_inner, FdGuard},
+    signal::{inner_c, tmp_disable_signals, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    Tcb,
+};
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 47;
@@ -378,7 +383,10 @@ static SUPPORTS_AVX: AtomicU8 = AtomicU8::new(1); // FIXME
 
 pub unsafe fn manually_enter_trampoline() {
     let c = &Tcb::current().unwrap().os_specific.control;
-    c.control_flags.store(c.control_flags.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(), Ordering::Release);
+    c.control_flags.store(
+        c.control_flags.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(),
+        Ordering::Release,
+    );
     c.saved_archdep_reg.set(0); // TODO: Just reset DF on x86?
 
     core::arch::asm!("

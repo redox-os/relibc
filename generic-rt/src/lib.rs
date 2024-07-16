@@ -1,8 +1,10 @@
 #![no_std]
 #![feature(core_intrinsics)]
 
-use core::arch::asm;
-use core::mem::{self, offset_of};
+use core::{
+    arch::asm,
+    mem::{self, offset_of},
+};
 
 #[derive(Debug)]
 #[repr(C)]
@@ -109,4 +111,3 @@ impl<T> ExpectTlsFree for Option<T> {
         }
     }
 }
-

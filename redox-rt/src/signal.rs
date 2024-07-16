@@ -1,12 +1,17 @@
-use core::cell::{Cell, UnsafeCell};
-use core::ffi::c_int;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{
+    cell::{Cell, UnsafeCell},
+    ffi::c_int,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
-use syscall::{RawAction, ENOMEM, EPERM, SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGQUIT, SIGSEGV, SIGSYS, SIGTRAP, SIGXCPU, SIGXFSZ};
-use syscall::{Error, Result, SetSighandlerData, SigProcControl, Sigcontrol, SigcontrolFlags, EINVAL, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH, data::AtomicU64};
+use syscall::{
+    data::AtomicU64, Error, RawAction, Result, SetSighandlerData, SigProcControl, Sigcontrol,
+    SigcontrolFlags, EINVAL, ENOMEM, EPERM, SIGABRT, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGILL,
+    SIGKILL, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG,
+    SIGWINCH, SIGXCPU, SIGXFSZ,
+};
 
-use crate::{arch::*, Tcb};
-use crate::sync::Mutex;
+use crate::{arch::*, sync::Mutex, Tcb};
 
 #[cfg(target_arch = "x86_64")]
 static CPUID_EAX1_ECX: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
@@ -52,11 +57,15 @@ unsafe fn inner(stack: &mut SigStack) {
         if action.flags.contains(SigactionFlags::RESETHAND) {
             // TODO: other things that must be set
             drop(guard);
-            sigaction(stack.sig_num as u8, Some(&Sigaction {
-                kind: SigactionKind::Default,
-                mask: 0,
-                flags: SigactionFlags::empty(),
-            }), None);
+            sigaction(
+                stack.sig_num as u8,
+                Some(&Sigaction {
+                    kind: SigactionKind::Default,
+                    mask: 0,
+                    flags: SigactionFlags::empty(),
+                }),
+                None,
+            );
         }
         action
     };
@@ -86,21 +95,36 @@ unsafe fn inner(stack: &mut SigStack) {
     let sigallow_inside_hi = sigallow_inside >> 32;
 
     //let _ = syscall::write(1, &alloc::format!("WORD0 {:x?}\n", os.control.word).as_bytes());
-    let prev_w0 = os.control.word[0].fetch_add((sigallow_inside_lo << 32).wrapping_sub(prev_sigallow_lo << 32), Ordering::Relaxed);
-    let prev_w1 = os.control.word[1].fetch_add((sigallow_inside_hi << 32).wrapping_sub(prev_sigallow_hi << 32), Ordering::Relaxed);
+    let prev_w0 = os.control.word[0].fetch_add(
+        (sigallow_inside_lo << 32).wrapping_sub(prev_sigallow_lo << 32),
+        Ordering::Relaxed,
+    );
+    let prev_w1 = os.control.word[1].fetch_add(
+        (sigallow_inside_hi << 32).wrapping_sub(prev_sigallow_hi << 32),
+        Ordering::Relaxed,
+    );
     //let _ = syscall::write(1, &alloc::format!("WORD1 {:x?}\n", os.control.word).as_bytes());
 
     // TODO: If sa_mask caused signals to be unblocked, deliver one or all of those first?
 
     // Re-enable signals again.
     let control_flags = &os.control.control_flags;
-    control_flags.store(control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(), Ordering::Release);
+    control_flags.store(
+        control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(),
+        Ordering::Release,
+    );
     core::sync::atomic::compiler_fence(Ordering::Acquire);
 
     // Call handler, either sa_handler or sa_siginfo depending on flag.
-    if sigaction.flags.contains(SigactionFlags::SIGINFO) && let Some(sigaction) = handler.sigaction {
+    if sigaction.flags.contains(SigactionFlags::SIGINFO)
+        && let Some(sigaction) = handler.sigaction
+    {
         //let _ = syscall::write(1, alloc::format!("SIGACTION {:p}\n", sigaction).as_bytes());
-        sigaction(stack.sig_num as c_int, core::ptr::null_mut(), core::ptr::null_mut());
+        sigaction(
+            stack.sig_num as c_int,
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+        );
     } else if let Some(handler) = handler.handler {
         //let _ = syscall::write(1, alloc::format!("HANDLER {:p}\n", handler).as_bytes());
         handler(stack.sig_num as c_int);
@@ -108,14 +132,23 @@ unsafe fn inner(stack: &mut SigStack) {
     //let _ = syscall::write(1, alloc::format!("RETURNED HANDLER\n").as_bytes());
 
     // Disable signals while we modify the sigmask again
-    control_flags.store(control_flags.load(Ordering::Relaxed) | SigcontrolFlags::INHIBIT_DELIVERY.bits(), Ordering::Release);
+    control_flags.store(
+        control_flags.load(Ordering::Relaxed) | SigcontrolFlags::INHIBIT_DELIVERY.bits(),
+        Ordering::Release,
+    );
     core::sync::atomic::compiler_fence(Ordering::Acquire);
 
     // Update allowset again.
     //let _ = syscall::write(1, &alloc::format!("WORD2 {:x?}\n", os.control.word).as_bytes());
 
-    let prev_w0 = os.control.word[0].fetch_add((prev_sigallow_lo << 32).wrapping_sub(sigallow_inside_lo << 32), Ordering::Relaxed);
-    let prev_w1 = os.control.word[1].fetch_add((prev_sigallow_hi << 32).wrapping_sub(sigallow_inside_hi << 32), Ordering::Relaxed);
+    let prev_w0 = os.control.word[0].fetch_add(
+        (prev_sigallow_lo << 32).wrapping_sub(sigallow_inside_lo << 32),
+        Ordering::Relaxed,
+    );
+    let prev_w1 = os.control.word[1].fetch_add(
+        (prev_sigallow_hi << 32).wrapping_sub(sigallow_inside_hi << 32),
+        Ordering::Relaxed,
+    );
     //let _ = syscall::write(1, &alloc::format!("WORD3 {:x?}\n", os.control.word).as_bytes());
 
     // TODO: If resetting the sigmask caused signals to be unblocked, then should they be delivered
@@ -126,7 +159,10 @@ unsafe fn inner(stack: &mut SigStack) {
     (*os.arch.get()).last_sig_was_restart = shall_restart;
 
     // And re-enable them again
-    control_flags.store(control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(), Ordering::Release);
+    control_flags.store(
+        control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(),
+        Ordering::Release,
+    );
     core::sync::atomic::compiler_fence(Ordering::Acquire);
 }
 #[cfg(not(target_arch = "x86"))]
@@ -144,14 +180,27 @@ pub fn get_sigmask() -> Result<u64> {
     Ok(mask)
 }
 pub fn set_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
-    modify_sigmask(old, new.map(move |newmask| move |_, upper| if upper { newmask >> 32 } else { newmask } as u32))
+    modify_sigmask(
+        old,
+        new.map(move |newmask| move |_, upper| if upper { newmask >> 32 } else { newmask } as u32),
+    )
 }
 pub fn or_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
     // Parsing nightmare... :)
-    modify_sigmask(old, new.map(move |newmask| move |oldmask, upper| oldmask | if upper { newmask >> 32 } else { newmask } as u32))
+    modify_sigmask(
+        old,
+        new.map(move |newmask| {
+            move |oldmask, upper| oldmask | if upper { newmask >> 32 } else { newmask } as u32
+        }),
+    )
 }
 pub fn andn_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
-    modify_sigmask(old, new.map(move |newmask| move |oldmask, upper| oldmask & !if upper { newmask >> 32 } else { newmask } as u32))
+    modify_sigmask(
+        old,
+        new.map(move |newmask| {
+            move |oldmask, upper| oldmask & !if upper { newmask >> 32 } else { newmask } as u32
+        }),
+    )
 }
 fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32>) -> Result<()> {
     let _guard = tmp_disable_signals();
@@ -174,7 +223,10 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32
         let old_allow_bits = words[i] & 0xffff_ffff_0000_0000;
         let new_allow_bits = u64::from(!op(!((old_allow_bits >> 32) as u32), i == 1)) << 32;
 
-        ctl.word[i].fetch_add(new_allow_bits.wrapping_sub(old_allow_bits), Ordering::Relaxed);
+        ctl.word[i].fetch_add(
+            new_allow_bits.wrapping_sub(old_allow_bits),
+            Ordering::Relaxed,
+        );
     }
     //let _ = syscall::write(1, &alloc::format!("NEWWORD {:x?}\n", ctl.word).as_bytes());
 
@@ -205,10 +257,12 @@ impl Sigaction {
     fn ip(&self) -> usize {
         unsafe {
             match self.kind {
-                SigactionKind::Handled { handler } => if self.flags.contains(SigactionFlags::SIGINFO) {
-                    handler.sigaction.map_or(0, |a| a as usize)
-                } else {
-                    handler.handler.map_or(0, |a| a as usize)
+                SigactionKind::Handled { handler } => {
+                    if self.flags.contains(SigactionFlags::SIGINFO) {
+                        handler.sigaction.map_or(0, |a| a as usize)
+                    } else {
+                        handler.handler.map_or(0, |a| a as usize)
+                    }
                 }
                 _ => 0,
             }
@@ -230,7 +284,9 @@ fn convert_old(action: &RawAction) -> Sigaction {
     } else if flags.contains(SigactionFlags::IGNORED) {
         SigactionKind::Ignore
     } else {
-        SigactionKind::Handled { handler: unsafe { core::mem::transmute(handler as usize) } }
+        SigactionKind::Handled {
+            handler: unsafe { core::mem::transmute(handler as usize) },
+        }
     };
 
     Sigaction {
@@ -267,25 +323,33 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
             // TODO: POSIX specifies that pending signals shall be discarded if set to SIG_IGN by
             // sigaction.
             // TODO: handle tmp_disable_signals
-            (MASK_DONTCARE, SigactionFlags::IGNORED, if matches!(new.kind, SigactionKind::Default) {
-                default_handler as usize
-            } else {
-                0
-            })
+            (
+                MASK_DONTCARE,
+                SigactionFlags::IGNORED,
+                if matches!(new.kind, SigactionKind::Default) {
+                    default_handler as usize
+                } else {
+                    0
+                },
+            )
         }
         // TODO: Handle pending signals before these flags are set.
-        (SIGTSTP | SIGTTOU | SIGTTIN, SigactionKind::Default) => (MASK_DONTCARE, SigactionFlags::SIG_SPECIFIC, default_handler as usize),
+        (SIGTSTP | SIGTTOU | SIGTTIN, SigactionKind::Default) => (
+            MASK_DONTCARE,
+            SigactionFlags::SIG_SPECIFIC,
+            default_handler as usize,
+        ),
         (SIGCHLD, SigactionKind::Default) => {
             let nocldstop_bit = new.flags & SigactionFlags::SIG_SPECIFIC;
-            (MASK_DONTCARE, SigactionFlags::IGNORED | nocldstop_bit, default_handler as usize)
+            (
+                MASK_DONTCARE,
+                SigactionFlags::IGNORED | nocldstop_bit,
+                default_handler as usize,
+            )
         }
 
-        (_, SigactionKind::Default) => {
-            (new.mask, new.flags, default_handler as usize)
-        },
-        (_, SigactionKind::Handled { .. }) => {
-            (new.mask, new.flags, explicit_handler)
-        }
+        (_, SigactionKind::Default) => (new.mask, new.flags, default_handler as usize),
+        (_, SigactionKind::Handled { .. }) => (new.mask, new.flags, explicit_handler),
     };
     let new_first = (handler as u64) | (u64::from(flags.bits() & STORED_FLAGS) << 32);
     action.first.store(new_first, Ordering::Relaxed);
@@ -298,12 +362,17 @@ fn current_sigctl() -> &'static Sigcontrol {
     &unsafe { Tcb::current() }.unwrap().os_specific.control
 }
 
-pub struct TmpDisableSignalsGuard { _inner: () }
+pub struct TmpDisableSignalsGuard {
+    _inner: (),
+}
 
 pub fn tmp_disable_signals() -> TmpDisableSignalsGuard {
     unsafe {
         let ctl = &current_sigctl().control_flags;
-        ctl.store(ctl.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(), Ordering::Release);
+        ctl.store(
+            ctl.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(),
+            Ordering::Release,
+        );
         core::sync::atomic::compiler_fence(Ordering::Acquire);
 
         // TODO: fence?
@@ -315,12 +384,16 @@ pub fn tmp_disable_signals() -> TmpDisableSignalsGuard {
 impl Drop for TmpDisableSignalsGuard {
     fn drop(&mut self) {
         unsafe {
-            let depth = &mut (*Tcb::current().unwrap().os_specific.arch.get()).disable_signals_depth;
+            let depth =
+                &mut (*Tcb::current().unwrap().os_specific.arch.get()).disable_signals_depth;
             *depth -= 1;
 
             if *depth == 0 {
                 let ctl = &current_sigctl().control_flags;
-                ctl.store(ctl.load(Ordering::Relaxed) & !syscall::flag::INHIBIT_DELIVERY.bits(), Ordering::Release);
+                ctl.store(
+                    ctl.load(Ordering::Relaxed) & !syscall::flag::INHIBIT_DELIVERY.bits(),
+                    Ordering::Release,
+                );
                 core::sync::atomic::compiler_fence(Ordering::Acquire);
             }
         }
@@ -389,7 +462,10 @@ pub fn setup_sighandler(area: &RtSigarea) {
             } else {
                 SigactionFlags::empty()
             };
-            action.first.store((u64::from(bits.bits()) << 32) | default_handler as u64, Ordering::Relaxed);
+            action.first.store(
+                (u64::from(bits.bits()) << 32) | default_handler as u64,
+                Ordering::Relaxed,
+            );
         }
     }
     let arch = unsafe { &mut *area.arch.get() };
@@ -433,7 +509,9 @@ pub fn current_setsighandler_struct() -> SetSighandlerData {
     SetSighandlerData {
         user_handler: sighandler_function(),
         excp_handler: 0, // TODO
-        thread_control_addr: core::ptr::addr_of!(unsafe { Tcb::current() }.unwrap().os_specific.control) as usize,
+        thread_control_addr: core::ptr::addr_of!(
+            unsafe { Tcb::current() }.unwrap().os_specific.control
+        ) as usize,
         proc_control_addr: &PROC_CONTROL_STRUCT as *const SigProcControl as usize,
     }
 }
@@ -443,9 +521,16 @@ pub enum Sigaltstack {
     #[default]
     Disabled,
 
-    Enabled { onstack: bool, base: *mut (), size: usize },
+    Enabled {
+        onstack: bool,
+        base: *mut (),
+        size: usize,
+    },
 }
-pub unsafe fn sigaltstack(new: Option<&Sigaltstack>, old_out: Option<&mut Sigaltstack>) -> Result<()> {
+pub unsafe fn sigaltstack(
+    new: Option<&Sigaltstack>,
+    old_out: Option<&mut Sigaltstack>,
+) -> Result<()> {
     let _g = tmp_disable_signals();
     let tcb = &mut *Tcb::current().unwrap().os_specific.arch.get();
 
@@ -473,7 +558,11 @@ pub unsafe fn sigaltstack(new: Option<&Sigaltstack>, old_out: Option<&mut Sigalt
                 tcb.altstack_top = usize::MAX;
             }
             Sigaltstack::Enabled { onstack: true, .. } => return Err(Error::new(EINVAL)),
-            Sigaltstack::Enabled { base, size, onstack: false } => {
+            Sigaltstack::Enabled {
+                base,
+                size,
+                onstack: false,
+            } => {
                 if size < MIN_SIGALTSTACK_SIZE {
                     return Err(Error::new(ENOMEM));
                 }
