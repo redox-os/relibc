@@ -126,8 +126,8 @@ asmfunction!(__relibc_internal_fork_ret: ["
     mov rsi, [rsp + 8]
     call {child_hook}
 
-    ldmxcsr [rsp+16]
-    fldcw [rsp+24]
+    ldmxcsr [rsp + 16]
+    fldcw [rsp + 24]
 
     xor rax, rax
 
@@ -152,14 +152,10 @@ asmfunction!(__relibc_internal_rlct_clone_ret: ["
     pop r8
     pop r9
 
-    sub rsp, 8
-
-    mov DWORD PTR [rsp], 0x00001F80
-    ldmxcsr [rsp]
-    mov WORD PTR [rsp], 0x037F
-    fldcw [rsp]
-
-    add rsp, 8
+    mov DWORD PTR [rsp - 8], 0x00001F80
+    ldmxcsr [rsp - 8]
+    mov WORD PTR [rsp - 8], 0x037F
+    fldcw [rsp - 8]
 
     # Call entry point
     call rax
@@ -275,7 +271,7 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     add rsp, 16
 
-    fxrstor64 [rsp]
+    fxrstor64 [rsp + 16 * 16]
 
     cmp byte ptr [rip + {supports_avx}], 0
     je 6f
