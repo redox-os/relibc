@@ -76,3 +76,13 @@ pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
     )
     .map(|awoken| awoken as u32)
 }
+pub fn sys_waitpid(pid: usize, status: &mut usize, flags: usize) -> Result<usize> {
+    wrapper(|| {
+        syscall::waitpid(
+            pid,
+            status,
+            syscall::WaitFlags::from_bits(flags)
+                .expect("waitpid: invalid bit pattern"),
+        )
+    })
+}

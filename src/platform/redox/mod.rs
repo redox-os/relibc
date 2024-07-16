@@ -1058,12 +1058,7 @@ impl Pal for Sys {
         let mut status = 0;
 
         let inner = |status: &mut usize, flags| {
-            syscall::waitpid(
-                pid as usize,
-                status,
-                syscall::WaitFlags::from_bits(flags as usize)
-                    .expect("waitpid: invalid bit pattern"),
-            )
+            redox_rt::sys::sys_waitpid(pid as usize, status, flags as usize)
         };
 
         // First, allow ptrace to handle waitpid
