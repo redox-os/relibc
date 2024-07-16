@@ -21,6 +21,7 @@ pub struct SigArea {
     pub tmp_eax: usize,
     pub tmp_edx: usize,
     pub disable_signals_depth: u64,
+    pub last_sig_was_restart: bool,
 }
 #[derive(Debug, Default)]
 #[repr(C, align(16))]

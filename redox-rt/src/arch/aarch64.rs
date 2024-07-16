@@ -23,6 +23,7 @@ pub struct SigArea {
     pub onstack: u64,
     pub disable_signals_depth: u64,
     pub pctl: usize, // TODO: remove
+    pub last_sig_was_restart: bool,
 }
 #[repr(C)]
 #[derive(Debug, Default)]
