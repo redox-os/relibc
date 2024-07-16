@@ -31,7 +31,6 @@ EXPECT_NAMES=\
 	setjmp \
 	sigaction \
 	signal \
-	sa_restart \
 	stdio/all \
 	stdio/buffer \
 	stdio/fgets \
@@ -158,6 +157,7 @@ NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
 	pwd \
+	sa_restart \
 	sigchld \
 	stdio/tempnam \
 	stdio/tmpnam \
