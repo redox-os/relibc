@@ -802,8 +802,7 @@ impl Pal for Sys {
         os_tid: crate::pthread::OsTid,
         signal: usize,
     ) -> Result<(), crate::pthread::Errno> {
-        let killfd = FdGuard::new(syscall::dup(os_tid.thread_fd, b"signal")?);
-        syscall::write(*killfd, &(signal as u32).to_ne_bytes())?;
+        redox_rt::sys::posix_kill_thread(os_tid.thread_fd, signal as u32)?;
         Ok(())
     }
     fn current_os_tid() -> crate::pthread::OsTid {

@@ -26,13 +26,10 @@ impl PalSignal for Sys {
         e(unsafe { syscall!(KILL, -(pgrp as isize) as pid_t, sig) }) as c_int
     }
 
-    fn raise(sig: c_int) -> c_int {
-        let tid = e(unsafe { syscall!(GETTID) }) as pid_t;
-        if tid == !0 {
-            -1
-        } else {
-            e(unsafe { syscall!(TKILL, tid, sig) }) as c_int
-        }
+    fn raise(sig: c_int) -> Result<(), Errno> {
+        let tid = e_raw(unsafe { syscall!(GETTID) })? as pid_t;
+        e_raw(unsafe { syscall!(TKILL, tid, sig) })?;
+        Ok(())
     }
 
     unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {

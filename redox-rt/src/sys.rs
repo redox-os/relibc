@@ -3,10 +3,10 @@ use syscall::{
     TimeSpec,
 };
 
-use crate::{arch::manually_enter_trampoline, signal::tmp_disable_signals, Tcb};
+use crate::{arch::manually_enter_trampoline, proc::FdGuard, signal::tmp_disable_signals, Tcb};
 
 #[inline]
-fn wrapper<T>(mut f: impl FnMut() -> Result<T>) -> Result<T> {
+fn wrapper<T>(restart: bool, mut f: impl FnMut() -> Result<T>) -> Result<T> {
     loop {
         let _guard = tmp_disable_signals();
         let rt_sigarea = unsafe { &Tcb::current().unwrap().os_specific };
@@ -14,6 +14,7 @@ fn wrapper<T>(mut f: impl FnMut() -> Result<T>) -> Result<T> {
 
         if let Err(err) = res
             && err == Error::new(EINTR)
+            && restart
         {
             unsafe {
                 manually_enter_trampoline();
@@ -30,29 +31,29 @@ fn wrapper<T>(mut f: impl FnMut() -> Result<T>) -> Result<T> {
 // TODO: uninitialized memory?
 #[inline]
 pub fn posix_read(fd: usize, buf: &mut [u8]) -> Result<usize> {
-    wrapper(|| syscall::read(fd, buf))
+    wrapper(true, || syscall::read(fd, buf))
 }
 #[inline]
 pub fn posix_write(fd: usize, buf: &[u8]) -> Result<usize> {
-    wrapper(|| syscall::write(fd, buf))
+    wrapper(true, || syscall::write(fd, buf))
 }
 #[inline]
 pub fn posix_kill(pid: usize, sig: usize) -> Result<()> {
-    match wrapper(|| syscall::kill(pid, sig)) {
+    match wrapper(false, || syscall::kill(pid, sig)) {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
     }
 }
 #[inline]
 pub fn posix_killpg(pgrp: usize, sig: usize) -> Result<()> {
-    match wrapper(|| syscall::kill(usize::wrapping_neg(pgrp), sig)) {
+    match wrapper(false, || syscall::kill(usize::wrapping_neg(pgrp), sig)) {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
     }
 }
 #[inline]
 pub unsafe fn sys_futex_wait(addr: *mut u32, val: u32, deadline: Option<&TimeSpec>) -> Result<()> {
-    wrapper(|| {
+    wrapper(true, || {
         syscall::syscall5(
             syscall::SYS_FUTEX,
             addr as usize,
@@ -77,11 +78,18 @@ pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
     .map(|awoken| awoken as u32)
 }
 pub fn sys_waitpid(pid: usize, status: &mut usize, flags: usize) -> Result<usize> {
-    wrapper(|| {
+    wrapper(true, || {
         syscall::waitpid(
             pid,
             status,
             syscall::WaitFlags::from_bits(flags).expect("waitpid: invalid bit pattern"),
         )
     })
+}
+pub fn posix_kill_thread(thread_fd: usize, signal: u32) -> Result<()> {
+    let killfd = FdGuard::new(syscall::dup(thread_fd, b"signal")?);
+    match wrapper(false, || syscall::write(*killfd, &signal.to_ne_bytes())) {
+        Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
+        Err(error) => Err(error),
+    }
 }

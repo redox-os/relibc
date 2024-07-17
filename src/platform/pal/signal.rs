@@ -15,7 +15,7 @@ pub trait PalSignal: Pal {
 
     fn killpg(pgrp: pid_t, sig: c_int) -> c_int;
 
-    fn raise(sig: c_int) -> c_int;
+    fn raise(sig: c_int) -> Result<(), Errno>;
 
     unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int;
 
