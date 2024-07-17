@@ -194,7 +194,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     bsf eax, eax
     jz 8f
     lock btr [rcx + {pctl_off_pending}], eax
-    jnc 9f
+    jc 9f
 8:
     // Read second signal word - both process and thread simultaneously.
     // This must be done since POSIX requires low realtime signals to be picked first.
@@ -229,7 +229,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     add rdx, fs:[{tcb_sa_off} + {sa_off_pctl}]
 
     // scale factor 16 doesn't exist, so we premultiplied edx by 2
-    bt qword ptr [rdx], 56
+    bt qword ptr [rdx], 58
     jnc 4f
 
     // Otherwise, the altstack is already active. The sigaltstack being disabled, is equivalent
