@@ -1,14 +1,19 @@
-use core::mem::offset_of;
-use core::sync::atomic::{AtomicU8, Ordering};
+use core::{
+    mem::offset_of,
+    sync::atomic::{AtomicU8, Ordering},
+};
 
-use syscall::data::{Sigcontrol, SigProcControl};
-use syscall::error::*;
-use syscall::flag::*;
+use syscall::{
+    data::{SigProcControl, Sigcontrol},
+    error::*,
+    flag::*,
+};
 
-use crate::proc::{fork_inner, FdGuard};
-use crate::signal::{tmp_disable_signals, SigStack};
-use crate::signal::{inner_c, RtSigarea, PROC_CONTROL_STRUCT};
-use crate::Tcb;
+use crate::{
+    proc::{fork_inner, FdGuard},
+    signal::{inner_c, tmp_disable_signals, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    Tcb,
+};
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 47;
@@ -26,6 +31,7 @@ pub struct SigArea {
     pub altstack_bottom: usize,
     pub disable_signals_depth: u64,
     pub pctl: usize, // TODO: find out how to correctly reference that static
+    pub last_sig_was_restart: bool,
 }
 
 #[repr(C, align(16))]
@@ -120,8 +126,8 @@ asmfunction!(__relibc_internal_fork_ret: ["
     mov rsi, [rsp + 8]
     call {child_hook}
 
-    ldmxcsr [rsp+16]
-    fldcw [rsp+24]
+    ldmxcsr [rsp + 16]
+    fldcw [rsp + 24]
 
     xor rax, rax
 
@@ -146,14 +152,10 @@ asmfunction!(__relibc_internal_rlct_clone_ret: ["
     pop r8
     pop r9
 
-    sub rsp, 8
-
-    mov DWORD PTR [rsp], 0x00001F80
-    ldmxcsr [rsp]
-    mov WORD PTR [rsp], 0x037F
-    fldcw [rsp]
-
-    add rsp, 8
+    mov DWORD PTR [rsp - 8], 0x00001F80
+    ldmxcsr [rsp - 8]
+    mov WORD PTR [rsp - 8], 0x037F
+    fldcw [rsp - 8]
 
     # Call entry point
     call rax
@@ -269,7 +271,7 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     add rsp, 16
 
-    fxrstor64 [rsp]
+    fxrstor64 [rsp + 16 * 16]
 
     cmp byte ptr [rip + {supports_avx}], 0
     je 6f
@@ -377,7 +379,10 @@ static SUPPORTS_AVX: AtomicU8 = AtomicU8::new(1); // FIXME
 
 pub unsafe fn manually_enter_trampoline() {
     let c = &Tcb::current().unwrap().os_specific.control;
-    c.control_flags.store(c.control_flags.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(), Ordering::Release);
+    c.control_flags.store(
+        c.control_flags.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(),
+        Ordering::Release,
+    );
     c.saved_archdep_reg.set(0); // TODO: Just reset DF on x86?
 
     core::arch::asm!("

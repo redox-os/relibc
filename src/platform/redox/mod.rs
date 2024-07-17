@@ -1,4 +1,4 @@
-use core::{convert::TryFrom, mem, ptr, result::Result as CoreResult, slice, str};
+use core::{convert::TryFrom, mem, ptr, slice, str};
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
@@ -305,31 +305,18 @@ impl Pal for Sys {
     unsafe fn futex_wait(
         addr: *mut u32,
         val: u32,
-        deadline: *const timespec,
-    ) -> CoreResult<(), pthread::Errno> {
-        syscall::syscall5(
-            syscall::SYS_FUTEX,
-            addr as usize,
-            syscall::FUTEX_WAIT,
-            val as usize,
-            deadline as usize,
-            0,
-        )
-        .map_err(|s| pthread::Errno(s.errno))
-        .map(|_| ())
+        deadline: Option<&timespec>,
+    ) -> Result<(), pthread::Errno> {
+        let deadline = deadline.map(|d| syscall::TimeSpec {
+            tv_sec: d.tv_sec,
+            tv_nsec: d.tv_nsec as i32,
+        });
+        redox_rt::sys::sys_futex_wait(addr, val, deadline.as_ref())?;
+        Ok(())
     }
     #[inline]
-    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<c_int, pthread::Errno> {
-        syscall::syscall5(
-            syscall::SYS_FUTEX,
-            addr as usize,
-            syscall::FUTEX_WAKE,
-            num as usize,
-            0,
-            0,
-        )
-        .map_err(|s| pthread::Errno(s.errno))
-        .map(|n| n as c_int)
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, pthread::Errno> {
+        Ok(redox_rt::sys::sys_futex_wake(addr, num)?)
     }
 
     // FIXME: unsound
@@ -996,7 +983,7 @@ impl Pal for Sys {
             Ok(())
         }
 
-        fn inner(utsname: *mut utsname) -> CoreResult<(), i32> {
+        fn inner(utsname: *mut utsname) -> Result<(), i32> {
             match gethostname(unsafe {
                 slice::from_raw_parts_mut(
                     (*utsname).nodename.as_mut_ptr() as *mut u8,
@@ -1071,12 +1058,7 @@ impl Pal for Sys {
         let mut status = 0;
 
         let inner = |status: &mut usize, flags| {
-            syscall::waitpid(
-                pid as usize,
-                status,
-                syscall::WaitFlags::from_bits(flags as usize)
-                    .expect("waitpid: invalid bit pattern"),
-            )
+            redox_rt::sys::sys_waitpid(pid as usize, status, flags as usize)
         };
 
         // First, allow ptrace to handle waitpid

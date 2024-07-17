@@ -1,5 +1,12 @@
 #![no_std]
-#![feature(asm_const, array_chunks, int_roundings, let_chains, slice_ptr_get, sync_unsafe_cell)]
+#![feature(
+    asm_const,
+    array_chunks,
+    int_roundings,
+    let_chains,
+    slice_ptr_get,
+    sync_unsafe_cell
+)]
 #![forbid(unreachable_patterns)]
 
 use generic_rt::{ExpectTlsFree, GenericTcb};
@@ -101,12 +108,18 @@ pub fn initialize_freestanding() {
 
     // TODO: TLS
     let page = unsafe {
-        &mut *(syscall::fmap(!0, &syscall::Map {
-            offset: 0,
-            size: syscall::PAGE_SIZE,
-            flags: syscall::MapFlags::PROT_READ | syscall::MapFlags::PROT_WRITE | syscall::MapFlags::MAP_PRIVATE,
-            address: 0,
-        }).unwrap() as *mut Tcb)
+        &mut *(syscall::fmap(
+            !0,
+            &syscall::Map {
+                offset: 0,
+                size: syscall::PAGE_SIZE,
+                flags: syscall::MapFlags::PROT_READ
+                    | syscall::MapFlags::PROT_WRITE
+                    | syscall::MapFlags::MAP_PRIVATE,
+                address: 0,
+            },
+        )
+        .unwrap() as *mut Tcb)
     };
     page.tcb_ptr = page;
     page.tcb_len = syscall::PAGE_SIZE;

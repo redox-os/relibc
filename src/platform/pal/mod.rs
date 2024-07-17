@@ -82,9 +82,9 @@ pub trait Pal {
     unsafe fn futex_wait(
         addr: *mut u32,
         val: u32,
-        deadline: *const timespec,
+        deadline: Option<&timespec>,
     ) -> Result<(), pthread::Errno>;
-    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<c_int, pthread::Errno>;
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, pthread::Errno>;
 
     fn futimens(fd: c_int, times: *const timespec) -> c_int;
 

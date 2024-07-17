@@ -1,9 +1,6 @@
-use syscall::SetSighandlerData;
-use syscall::{Result, O_CLOEXEC};
+use syscall::{Result, SetSighandlerData, O_CLOEXEC};
 
-use crate::arch::*;
-use crate::proc::*;
-use crate::signal::sighandler_function;
+use crate::{arch::*, proc::*, signal::sighandler_function};
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
 pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<usize> {

@@ -1,10 +1,11 @@
-use core::mem::offset_of;
-use core::sync::atomic::Ordering;
+use core::{mem::offset_of, sync::atomic::Ordering};
 
 use syscall::*;
 
-use crate::proc::{fork_inner, FdGuard};
-use crate::signal::{inner_fastcall, PROC_CONTROL_STRUCT, RtSigarea, SigStack};
+use crate::{
+    proc::{fork_inner, FdGuard},
+    signal::{inner_fastcall, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+};
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 31;
@@ -20,6 +21,7 @@ pub struct SigArea {
     pub tmp_eax: usize,
     pub tmp_edx: usize,
     pub disable_signals_depth: u64,
+    pub last_sig_was_restart: bool,
 }
 #[derive(Debug, Default)]
 #[repr(C, align(16))]
@@ -38,8 +40,8 @@ pub struct ArchIntRegs {
     pub edx: usize, // avail +32
 
     pub eflags: usize, // avail +36
-    pub eip: usize, // avail +40
-    pub esp: usize, // avail +44
+    pub eip: usize,    // avail +40
+    pub esp: usize,    // avail +44
 }
 
 /// Deactive TLS, used before exec() on Redox to not trick target executable into thinking TLS
@@ -256,7 +258,10 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
 }
 pub unsafe fn manually_enter_trampoline() {
     let c = &crate::Tcb::current().unwrap().os_specific.control;
-    c.control_flags.store(c.control_flags.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(), Ordering::Release);
+    c.control_flags.store(
+        c.control_flags.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(),
+        Ordering::Release,
+    );
     c.saved_archdep_reg.set(0); // TODO: Just reset DF on x86?
 
     core::arch::asm!("

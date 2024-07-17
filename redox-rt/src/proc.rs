@@ -1,5 +1,5 @@
-use core::mem::size_of;
 use crate::{arch::*, auxv_defs::*};
+use core::mem::size_of;
 
 use alloc::{boxed::Box, collections::BTreeMap, vec};
 
@@ -267,18 +267,23 @@ where
         let new_page_no = sp / PAGE_SIZE;
         let new_page_off = sp % PAGE_SIZE;
 
-        let page = if let Some(ref mut page) = stack_page && old_page_no == new_page_no {
+        let page = if let Some(ref mut page) = stack_page
+            && old_page_no == new_page_no
+        {
             page
         } else if let Some(ref mut stack_page) = stack_page {
             stack_page.remap(new_page_no * PAGE_SIZE, PROT_WRITE)?;
             stack_page
         } else {
-            let new = MmapGuard::map(*grants_fd, &Map {
-                offset: new_page_no * PAGE_SIZE,
-                size: PAGE_SIZE,
-                flags: PROT_WRITE,
-                address: 0, // let kernel decide
-            })?;
+            let new = MmapGuard::map(
+                *grants_fd,
+                &Map {
+                    offset: new_page_no * PAGE_SIZE,
+                    size: PAGE_SIZE,
+                    flags: PROT_WRITE,
+                    address: 0, // let kernel decide
+                },
+            )?;
 
             stack_page.insert(new)
         };
@@ -422,12 +427,15 @@ where
     push(argc)?;
 
     if let Ok(sighandler_fd) = syscall::dup(*open_via_dup, b"sighandler").map(FdGuard::new) {
-        let _ = syscall::write(*sighandler_fd, &SetSighandlerData {
-            user_handler: 0,
-            excp_handler: 0,
-            thread_control_addr: 0,
-            proc_control_addr: 0,
-        });
+        let _ = syscall::write(
+            *sighandler_fd,
+            &SetSighandlerData {
+                user_handler: 0,
+                excp_handler: 0,
+                thread_control_addr: 0,
+                proc_control_addr: 0,
+            },
+        );
     }
 
     unsafe {
@@ -818,9 +826,11 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
             // reference to the TCB and whatever pages stores the signal proc control struct.
             {
                 let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
-                let _ = syscall::write(*new_sighandler_fd, &crate::signal::current_setsighandler_struct())?;
+                let _ = syscall::write(
+                    *new_sighandler_fd,
+                    &crate::signal::current_setsighandler_struct(),
+                )?;
             }
-
         }
         copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
     }
