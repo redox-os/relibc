@@ -473,7 +473,8 @@ pub fn setup_sighandler(tcb: &RtTcb) {
         // equivalent to not using any altstack at all (the default).
         arch.altstack_top = usize::MAX;
         arch.altstack_bottom = 0;
-        #[cfg(not(target_arch = "x86"))]
+        // TODO
+        #[cfg(target_arch = "aarch64")]
         {
             arch.pctl = core::ptr::addr_of!(PROC_CONTROL_STRUCT) as usize;
         }

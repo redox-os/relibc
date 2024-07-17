@@ -10,7 +10,7 @@ use syscall::{
 
 use crate::{
     proc::{fork_inner, FdGuard},
-    signal::{inner_c, RtSigarea, SigStack},
+    signal::{inner_c, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     RtTcb, Tcb,
 };
 
@@ -24,13 +24,11 @@ pub struct SigArea {
     pub tmp_rip: usize,
     pub tmp_rsp: usize,
     pub tmp_rax: usize,
-    pub tmp_rcx: usize,
     pub tmp_rdx: usize,
 
     pub altstack_top: usize,
     pub altstack_bottom: usize,
     pub disable_signals_depth: u64,
-    pub pctl: usize, // TODO: find out how to correctly reference that static
     pub last_sig_was_restart: bool,
 }
 
@@ -171,13 +169,10 @@ asmfunction!(__relibc_internal_sigentry: ["
     // Save some registers
     mov fs:[{tcb_sa_off} + {sa_tmp_rsp}], rsp
     mov fs:[{tcb_sa_off} + {sa_tmp_rax}], rax
-    mov fs:[{tcb_sa_off} + {sa_tmp_rcx}], rcx
     mov fs:[{tcb_sa_off} + {sa_tmp_rdx}], rdx
 
     // First, select signal, always pick first available bit
 1:
-    mov rcx, fs:[{tcb_sa_off} + {sa_off_pctl}]
-
     // Read standard signal word - first targeting this thread
     mov rax, fs:[{tcb_sc_off} + {sc_word}]
     mov rdx, rax
@@ -189,17 +184,17 @@ asmfunction!(__relibc_internal_sigentry: ["
     // If no unblocked thread signal was found, check for process.
     // This is competitive; we need to atomically check if *we* cleared the process-wide pending
     // bit, otherwise restart.
-    mov eax, [rcx + {pctl_off_pending}]
+    mov eax, [rip + {pctl} + {pctl_off_pending}]
     and eax, edx
     bsf eax, eax
     jz 8f
-    lock btr [rcx + {pctl_off_pending}], eax
+    lock btr [rip + {pctl} + {pctl_off_pending}], eax
     jc 9f
 8:
     // Read second signal word - both process and thread simultaneously.
     // This must be done since POSIX requires low realtime signals to be picked first.
     mov edx, fs:[{tcb_sc_off} + {sc_word} + 8]
-    mov eax, [rcx + {pctl_off_pending} + 4]
+    mov eax, [rip + {pctl} + {pctl_off_pending} + 4]
     or eax, edx
     and eax, fs:[{tcb_sc_off} + {sc_word} + 12]
     bsf eax, eax
@@ -209,7 +204,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     jc 2f // then continue as usual
 
     // otherwise, try clearing pending
-    lock btr [rcx + {pctl_off_pending}], eax
+    lock btr [rip + {pctl} + {pctl_off_pending}], eax
     jnc 1b
 2:
     mov edx, eax
@@ -223,13 +218,13 @@ asmfunction!(__relibc_internal_sigentry: ["
     // By now we have selected a signal, stored in eax (6-bit). We now need to choose whether or
     // not to switch to the alternate signal stack. If SA_ONSTACK is clear for this signal, then
     // skip the sigaltstack logic.
-    mov edx, eax
-    add edx, edx
-    lea rdx, [{pctl_off_actions} + edx * 8]
-    add rdx, fs:[{tcb_sa_off} + {sa_off_pctl}]
+    lea rdx, [rip + {pctl} + {pctl_off_actions}]
 
-    // scale factor 16 doesn't exist, so we premultiplied edx by 2
-    bt qword ptr [rdx], 58
+    // LEA doesn't support x16, so just do two x8s.
+    lea rdx, [rdx + 8 * rax]
+    lea rdx, [rdx + 8 * rax]
+
+    bt qword ptr [rdx], {SA_ONSTACK_BIT}
     jnc 4f
 
     // Otherwise, the altstack is already active. The sigaltstack being disabled, is equivalent
@@ -363,7 +358,6 @@ __relibc_internal_sigentry_crit_second:
     sa_tmp_rip = const offset_of!(SigArea, tmp_rip),
     sa_tmp_rsp = const offset_of!(SigArea, tmp_rsp),
     sa_tmp_rax = const offset_of!(SigArea, tmp_rax),
-    sa_tmp_rcx = const offset_of!(SigArea, tmp_rcx),
     sa_tmp_rdx = const offset_of!(SigArea, tmp_rdx),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
@@ -374,11 +368,11 @@ __relibc_internal_sigentry_crit_second:
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     pctl_off_actions = const offset_of!(SigProcControl, actions),
     pctl_off_pending = const offset_of!(SigProcControl, pending),
-    //pctl = sym PROC_CONTROL_STRUCT,
-    sa_off_pctl = const offset_of!(SigArea, pctl),
+    pctl = sym PROC_CONTROL_STRUCT,
     supports_avx = sym SUPPORTS_AVX,
     REDZONE_SIZE = const 128,
     STACK_ALIGN = const 16,
+    SA_ONSTACK_BIT = const 58, // (1 << 58) >> 32 = 0x0400_0000
 ]);
 
 extern "C" {
