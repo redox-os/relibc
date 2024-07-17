@@ -212,7 +212,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     lock btr [rcx + {pctl_off_pending}], eax
     jnc 1b
 2:
-    mov eax, edx
+    mov edx, eax
     shr edx, 5
     lock btr fs:[{tcb_sc_off} + {sc_word} + edx * 4], eax
     add eax, 64 // indicate signal was targeted at thread

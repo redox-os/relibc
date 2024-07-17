@@ -42,7 +42,8 @@ pub struct SigStack {
 unsafe fn inner(stack: &mut SigStack) {
     let os = &Tcb::current().unwrap().os_specific;
 
-    let sig_idx = stack.sig_num;
+    let _targeted_thread_not_process = stack.sig_num >= 64;
+    stack.sig_num %= 64;
 
     // asm counts from 0
     stack.sig_num += 1;
