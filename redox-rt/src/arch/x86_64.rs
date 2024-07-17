@@ -6,12 +6,11 @@ use core::{
 use syscall::{
     data::{SigProcControl, Sigcontrol},
     error::*,
-    flag::*,
 };
 
 use crate::{
     proc::{fork_inner, FdGuard},
-    signal::{inner_c, tmp_disable_signals, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    signal::{inner_c, RtSigarea, SigStack},
     RtTcb, Tcb,
 };
 
@@ -25,6 +24,7 @@ pub struct SigArea {
     pub tmp_rip: usize,
     pub tmp_rsp: usize,
     pub tmp_rax: usize,
+    pub tmp_rcx: usize,
     pub tmp_rdx: usize,
 
     pub altstack_top: usize,
@@ -171,11 +171,14 @@ asmfunction!(__relibc_internal_sigentry: ["
     // Save some registers
     mov fs:[{tcb_sa_off} + {sa_tmp_rsp}], rsp
     mov fs:[{tcb_sa_off} + {sa_tmp_rax}], rax
+    mov fs:[{tcb_sa_off} + {sa_tmp_rcx}], rcx
     mov fs:[{tcb_sa_off} + {sa_tmp_rdx}], rdx
 
     // First, select signal, always pick first available bit
+1:
+    mov rcx, fs:[{tcb_sa_off} + {sa_off_pctl}]
 
-    // Read first signal word
+    // Read standard signal word - first targeting this thread
     mov rax, fs:[{tcb_sc_off} + {sc_word}]
     mov rdx, rax
     shr rdx, 32
@@ -183,15 +186,37 @@ asmfunction!(__relibc_internal_sigentry: ["
     bsf eax, eax
     jnz 2f
 
-    // Read second signal word
-    mov rax, fs:[{tcb_sc_off} + {sc_word} + 8]
-    mov rdx, rax
-    shr rdx, 32
+    // If no unblocked thread signal was found, check for process.
+    // This is competitive; we need to atomically check if *we* cleared the process-wide pending
+    // bit, otherwise restart.
+    mov eax, [rcx + {pctl_off_pending}]
     and eax, edx
     bsf eax, eax
-    jz 6f
-    add eax, 32
+    jz 8f
+    lock btr [rcx + {pctl_off_pending}], eax
+    jnc 9f
+8:
+    // Read second signal word - both process and thread simultaneously.
+    // This must be done since POSIX requires low realtime signals to be picked first.
+    mov edx, fs:[{tcb_sc_off} + {sc_word} + 8]
+    mov eax, [rcx + {pctl_off_pending} + 4]
+    or eax, edx
+    and eax, fs:[{tcb_sc_off} + {sc_word} + 12]
+    bsf eax, eax
+    jz 7f
+
+    bt edx, eax // check if signal was sent to thread specifically
+    jc 2f // then continue as usual
+
+    // otherwise, try clearing pending
+    lock btr [rcx + {pctl_off_pending}], eax
+    jnc 1b
 2:
+    mov eax, edx
+    shr edx, 5
+    lock btr fs:[{tcb_sc_off} + {sc_word} + edx * 4], eax
+    add eax, 64 // indicate signal was targeted at thread
+9:
     sub rsp, {REDZONE_SIZE}
     and rsp, -{STACK_ALIGN}
 
@@ -330,7 +355,7 @@ __relibc_internal_sigentry_crit_first:
     .globl __relibc_internal_sigentry_crit_second
 __relibc_internal_sigentry_crit_second:
     jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
-6:
+7:
     ud2
     // Spurious signal
 "] <= [
@@ -338,6 +363,7 @@ __relibc_internal_sigentry_crit_second:
     sa_tmp_rip = const offset_of!(SigArea, tmp_rip),
     sa_tmp_rsp = const offset_of!(SigArea, tmp_rsp),
     sa_tmp_rax = const offset_of!(SigArea, tmp_rax),
+    sa_tmp_rcx = const offset_of!(SigArea, tmp_rcx),
     sa_tmp_rdx = const offset_of!(SigArea, tmp_rdx),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
@@ -347,6 +373,7 @@ __relibc_internal_sigentry_crit_second:
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     pctl_off_actions = const offset_of!(SigProcControl, actions),
+    pctl_off_pending = const offset_of!(SigProcControl, pending),
     //pctl = sym PROC_CONTROL_STRUCT,
     sa_off_pctl = const offset_of!(SigArea, pctl),
     supports_avx = sym SUPPORTS_AVX,
