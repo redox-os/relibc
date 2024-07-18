@@ -244,6 +244,10 @@ unsafe extern "C" fn new_thread_shim(
     mutex1: *const Mutex<MaybeUninit<OsTid>>,
     mutex2: *const Mutex<u64>,
 ) -> ! {
+    if let Some(tcb) = tcb.as_mut() {
+        tcb.activate();
+    }
+
     let procmask = (&*mutex2).as_ptr().read();
     let tid = (*(&*mutex1).lock()).assume_init();
 
@@ -256,7 +260,6 @@ unsafe extern "C" fn new_thread_shim(
 
     if let Some(tcb) = tcb.as_mut() {
         tcb.copy_masters().unwrap();
-        tcb.activate();
     }
 
     (*tcb).pthread.os_tid.get().write(Sys::current_os_tid());
