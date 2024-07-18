@@ -351,8 +351,32 @@ __relibc_internal_sigentry_crit_first:
 __relibc_internal_sigentry_crit_second:
     jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
 7:
-    ud2
-    // Spurious signal
+    // A spurious signal occurred. Signals are still disabled here, but will need to be re-enabled.
+
+    // restore flags
+    mov rax, fs:[0] // load FS base
+    // TODO: Use lahf/sahf rather than pushfq/popfq?
+    lea rsp, [rax + {tcb_sc_off} + {sc_saved_rflags}]
+    popfq
+
+    // restore stack
+    mov rsp, fs:[{tcb_sa_off} + {sa_tmp_rsp}]
+
+    // move saved RIP away from control, allowing arch_pre to save us if interrupted.
+    mov rax, fs:[{tcb_sc_off} + {sc_saved_rip}]
+    mov fs:[{tcb_sa_off} + {sa_tmp_rip}], rax
+
+    // restore regs
+    mov rax, fs:[{tcb_sa_off} + {sa_tmp_rax}]
+    mov rdx, fs:[{tcb_sa_off} + {sa_tmp_rdx}]
+
+    // Re-enable signals. This code can be interrupted after this signal, so we need to define
+    // 'crit_third'.
+    and qword ptr fs:[{tcb_sc_off} + {sc_control}], ~1
+
+    .globl __relibc_internal_sigentry_crit_third
+__relibc_internal_sigentry_crit_third:
+    jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
 "] <= [
     inner = sym inner_c,
     sa_tmp_rip = const offset_of!(SigArea, tmp_rip),
@@ -364,6 +388,7 @@ __relibc_internal_sigentry_crit_second:
     sc_saved_rflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
     sc_word = const offset_of!(Sigcontrol, word),
+    sc_control = const offset_of!(Sigcontrol, control_flags),
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     pctl_off_actions = const offset_of!(SigProcControl, actions),
@@ -378,13 +403,14 @@ __relibc_internal_sigentry_crit_second:
 extern "C" {
     fn __relibc_internal_sigentry_crit_first();
     fn __relibc_internal_sigentry_crit_second();
+    fn __relibc_internal_sigentry_crit_third();
 }
 pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
     // It is impossible to update RSP and RIP atomically on x86_64, without using IRETQ, which is
     // almost as slow as calling a SIGRETURN syscall would be. Instead, we abuse the fact that
     // signals are disabled in the prologue of the signal trampoline, which allows us to emulate
-    // atomicity inside the critical section, consisting of one instruction at 'crit_first', and
-    // one at 'crit_second', see asm.
+    // atomicity inside the critical section, consisting of one instruction at 'crit_first', one at
+    // 'crit_second', and one at 'crit_third', see asm.
 
     if stack.regs.rip == __relibc_internal_sigentry_crit_first as usize {
         // Reexecute pop rsp and jump steps. This case needs to be different from the one below,
@@ -396,6 +422,8 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
     } else if stack.regs.rip == __relibc_internal_sigentry_crit_second as usize {
         // Almost finished, just reexecute the jump before tmp_rip is overwritten by this
         // deeper-level signal.
+        stack.regs.rip = area.tmp_rip;
+    } else if stack.regs.rip == __relibc_internal_sigentry_crit_third as usize {
         stack.regs.rip = area.tmp_rip;
     }
 }
