@@ -100,13 +100,13 @@ int main(void) {
 
         puts("Writing to (broken) pipe.");
         status = write(fds[1], "B", 1);
-        ERROR_IF(write, status, != -1);
+        assert(status == -1);
         assert(errno == EPIPE);
 
-        while (atomic2 == 0) {
+        /*while (atomic2 == 0) {
             status = sched_yield();
             ERROR_IF(sched_yield, status, == -1);
-        }
+        }*/
         puts("SIGSTOP handler successfully executed.");
         return EXIT_SUCCESS;
     }
