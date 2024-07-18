@@ -1099,7 +1099,10 @@ impl Pal for Sys {
             let res = e(inner(&mut status, options | sys_wait::WUNTRACED));
 
             // TODO: Also handle special PIDs here
-            if !syscall::wifstopped(status) || ptrace::is_traceme(pid) {
+            if !syscall::wifstopped(status)
+                || options & sys_wait::WUNTRACED != 0
+                || ptrace::is_traceme(pid)
+            {
                 break res;
             }
         });
