@@ -657,7 +657,7 @@ pub unsafe extern "C" fn rmdir(path: *const c_char) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn setgid(gid: gid_t) -> c_int {
-    Sys::setregid(gid, gid)
+    Sys::setresgid(gid, gid, -1)
 }
 
 #[no_mangle]
@@ -677,12 +677,16 @@ pub extern "C" fn setpgrp() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
-    Sys::setregid(rgid, egid)
+    Sys::setresgid(rgid, egid, -1)
+}
+#[no_mangle]
+pub extern "C" fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int {
+    Sys::setresgid(rgid, egid, sgid)
 }
 
 #[no_mangle]
 pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
-    Sys::setreuid(ruid, euid)
+    Sys::setresuid(ruid, euid, -1)
 }
 
 #[no_mangle]
@@ -692,7 +696,11 @@ pub extern "C" fn setsid() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn setuid(uid: uid_t) -> c_int {
-    Sys::setreuid(uid, uid)
+    Sys::setresuid(uid, uid, -1)
+}
+#[no_mangle]
+pub extern "C" fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int {
+    Sys::setresuid(ruid, euid, suid)
 }
 
 #[no_mangle]

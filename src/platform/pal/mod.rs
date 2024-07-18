@@ -207,9 +207,9 @@ pub trait Pal {
 
     fn setpriority(which: c_int, who: id_t, prio: c_int) -> c_int;
 
-    fn setregid(rgid: gid_t, egid: gid_t) -> c_int;
+    fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int;
 
-    fn setreuid(ruid: uid_t, euid: uid_t) -> c_int;
+    fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int;
 
     fn setsid() -> c_int;
 

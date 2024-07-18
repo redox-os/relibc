@@ -568,12 +568,12 @@ impl Pal for Sys {
         e(unsafe { syscall!(SETPRIORITY, which, who, prio) }) as c_int
     }
 
-    fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
-        e(unsafe { syscall!(SETREGID, rgid, egid) }) as c_int
+    fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int {
+        e(unsafe { syscall!(SETRESGID, rgid, egid, sgid) }) as c_int
     }
 
-    fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
-        e(unsafe { syscall!(SETREUID, ruid, euid) }) as c_int
+    fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int {
+        e(unsafe { syscall!(SETRESUID, ruid, euid, suid) }) as c_int
     }
 
     fn setsid() -> c_int {

@@ -930,11 +930,17 @@ impl Pal for Sys {
         }
     }
 
-    fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
+    fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int {
+        if sgid != -1 {
+            println!("TODO: suid");
+        }
         e(syscall::setregid(rgid as usize, egid as usize)) as c_int
     }
 
-    fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
+    fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int {
+        if suid != -1 {
+            println!("TODO: suid");
+        }
         e(syscall::setreuid(ruid as usize, euid as usize)) as c_int
     }
 
