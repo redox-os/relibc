@@ -14,12 +14,11 @@ fn wrapper<T>(restart: bool, mut f: impl FnMut() -> Result<T>) -> Result<T> {
 
         if let Err(err) = res
             && err == Error::new(EINTR)
-            && restart
         {
             unsafe {
                 manually_enter_trampoline();
             }
-            if unsafe { (*rt_sigarea.arch.get()).last_sig_was_restart } {
+            if restart && unsafe { (*rt_sigarea.arch.get()).last_sig_was_restart } {
                 continue;
             }
         }
