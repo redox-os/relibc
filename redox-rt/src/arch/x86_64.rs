@@ -428,7 +428,7 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
     }
 }
 
-static SUPPORTS_AVX: AtomicU8 = AtomicU8::new(1); // FIXME
+pub(crate) static SUPPORTS_AVX: AtomicU8 = AtomicU8::new(0);
 
 // __relibc will be prepended to the name, so mangling is fine
 #[no_mangle]
