@@ -41,6 +41,7 @@ pub struct SigStack {
 #[inline(always)]
 unsafe fn inner(stack: &mut SigStack) {
     let os = &Tcb::current().unwrap().os_specific;
+    let signals_were_disabled = (*os.arch.get()).disable_signals_depth > 0;
 
     let _targeted_thread_not_process = stack.sig_num >= 64;
     stack.sig_num %= 64;
@@ -50,7 +51,7 @@ unsafe fn inner(stack: &mut SigStack) {
     arch_pre(stack, &mut *os.arch.get());
 
     let sigaction = {
-        let mut guard = SIGACTIONS_LOCK.lock();
+        let guard = SIGACTIONS_LOCK.lock();
         let action = convert_old(&PROC_CONTROL_STRUCT.actions[stack.sig_num - 1]);
         if action.flags.contains(SigactionFlags::RESETHAND) {
             // TODO: other things that must be set
@@ -157,11 +158,13 @@ unsafe fn inner(stack: &mut SigStack) {
     (*os.arch.get()).last_sig_was_restart = shall_restart;
 
     // And re-enable them again
-    control_flags.store(
-        control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(),
-        Ordering::Release,
-    );
-    core::sync::atomic::compiler_fence(Ordering::Acquire);
+    if !signals_were_disabled {
+        core::sync::atomic::compiler_fence(Ordering::Release);
+        control_flags.store(
+            control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(),
+            Ordering::Relaxed,
+        );
+    }
 }
 #[cfg(not(target_arch = "x86"))]
 pub(crate) unsafe extern "C" fn inner_c(stack: usize) {
@@ -204,7 +207,7 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32
     let _guard = tmp_disable_signals();
     let ctl = current_sigctl();
 
-    let mut words = ctl.word.each_ref().map(|w| w.load(Ordering::Relaxed));
+    let words = ctl.word.each_ref().map(|w| w.load(Ordering::Relaxed));
 
     if let Some(old) = old {
         *old = !combine_allowset(words);
@@ -214,21 +217,25 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32
     };
 
     let mut can_raise = 0;
-    let mut cant_raise = 0;
 
-    //let _ = syscall::write(1, &alloc::format!("OLDWORD {:x?}\n", ctl.word).as_bytes());
     for i in 0..2 {
         let old_allow_bits = words[i] & 0xffff_ffff_0000_0000;
         let new_allow_bits = u64::from(!op(!((old_allow_bits >> 32) as u32), i == 1)) << 32;
 
-        ctl.word[i].fetch_add(
+        let old_word = ctl.word[i].fetch_add(
             new_allow_bits.wrapping_sub(old_allow_bits),
             Ordering::Relaxed,
         );
+        can_raise |= ((old_word & 0xffff_ffff) & (new_allow_bits >> 32)) << (i * 32);
     }
-    //let _ = syscall::write(1, &alloc::format!("NEWWORD {:x?}\n", ctl.word).as_bytes());
 
-    // TODO: Prioritize cant_raise realtime signals?
+    // POSIX requires that at least one pending unblocked signal be delivered before
+    // pthread_sigmask returns, if there is one. Deliver the lowest-numbered one.
+    if can_raise != 0 {
+        let signal = can_raise.trailing_zeros() + 1;
+        // TODO
+        crate::sys::posix_kill_thread(**RtTcb::current().thread_fd(), signal);
+    }
 
     Ok(())
 }
