@@ -481,7 +481,7 @@ pub fn setup_sighandler(tcb: &RtTcb) {
         arch.altstack_top = usize::MAX;
         arch.altstack_bottom = 0;
         // TODO
-        #[cfg(target_arch = "aarch64")]
+        #[cfg(any(target_arch = "i686", target_arch = "aarch64"))]
         {
             arch.pctl = core::ptr::addr_of!(PROC_CONTROL_STRUCT) as usize;
         }

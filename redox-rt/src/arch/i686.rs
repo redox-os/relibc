@@ -19,7 +19,9 @@ pub struct SigArea {
     pub tmp_eip: usize,
     pub tmp_esp: usize,
     pub tmp_eax: usize,
+    pub tmp_ecx: usize,
     pub tmp_edx: usize,
+    pub pctl: usize, // TODO: reference pctl directly
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
 }
@@ -129,22 +131,47 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov gs:[{tcb_sa_off} + {sa_tmp_esp}], esp
     mov gs:[{tcb_sa_off} + {sa_tmp_eax}], eax
     mov gs:[{tcb_sa_off} + {sa_tmp_edx}], edx
-
-    // Read pending half of first signal. This can be done nonatomically wrt the mask bits, since
-    // only this thread is allowed to modify the latter.
-
-    // Read first signal word
+    mov gs:[{tcb_sa_off} + {sa_tmp_ecx}], ecx
+1:
+    // Read standard signal word - first for this thread
+    mov edx, gs:[{tcb_sc_off} + {sc_word} + 4]
     mov eax, gs:[{tcb_sc_off} + {sc_word}]
-    and eax, gs:[{tcb_sc_off} + {sc_word} + 4]
+    and eax, edx
     bsf eax, eax
-    jnz 2f
+    jnz 9f
 
-    // Read second signal word
-    mov eax, gs:[{tcb_sc_off} + {sc_word} + 8]
-    and eax, gs:[{tcb_sc_off} + {sc_word} + 12]
+    mov ecx, gs:[{tcb_sa_off} + {sa_pctl}]
+
+    // Read standard signal word - for the process
+    mov eax, [ecx + {pctl_word}]
+    and eax, edx
+    jz 3f
     bsf eax, eax
-    jz 7f
+
+    // Try clearing the pending bit, otherwise retry if another thread did that first
+    lock btr [ecx + {pctl_word}], eax
+    jc 1b
+    jmp 2f
+3:
+    // Read realtime thread and process signal word together
+    mov edx, [ecx + {pctl_word} + 4]
+    mov eax, gs:[{tcb_sc_off} + {sc_word} + 8]
+    or eax, edx
+    and eax, gs:[{tcb_sc_off} + {sc_word} + 12]
+    jz 7f // spurious signal
+    bsf eax, eax
+
+    bt edx, eax
+    jc 8f
+
+    lock btr [ecx + {pctl_word} + 4], eax
+    jc 1b
     add eax, 32
+    jmp 2f
+8:
+    add eax, 32
+9:
+    add eax, 64
 2:
     and esp, -{STACK_ALIGN}
 
@@ -212,15 +239,18 @@ __relibc_internal_sigentry_crit_second:
     sa_tmp_eip = const offset_of!(SigArea, tmp_eip),
     sa_tmp_esp = const offset_of!(SigArea, tmp_esp),
     sa_tmp_eax = const offset_of!(SigArea, tmp_eax),
+    sa_tmp_ecx = const offset_of!(SigArea, tmp_ecx),
     sa_tmp_edx = const offset_of!(SigArea, tmp_edx),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
+    sa_pctl = const offset_of!(SigArea, pctl),
     sc_saved_eflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
     sc_word = const offset_of!(Sigcontrol, word),
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     pctl_off_actions = const offset_of!(SigProcControl, actions),
+    pctl_word = const offset_of!(SigProcControl, actions),
     pctl = sym PROC_CONTROL_STRUCT,
     STACK_ALIGN = const 16,
 ]);
@@ -256,6 +286,7 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
         stack.regs.eip = area.tmp_eip;
     }
 }
+#[no_mangle]
 pub unsafe fn manually_enter_trampoline() {
     let c = &crate::Tcb::current().unwrap().os_specific.control;
     c.control_flags.store(
