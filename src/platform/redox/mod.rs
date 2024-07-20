@@ -1,4 +1,5 @@
 use core::{convert::TryFrom, mem, ptr, slice, str};
+use redox_rt::RtTcb;
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
@@ -792,21 +793,21 @@ impl Pal for Sys {
         let _guard = clone::rdlock();
         let res = clone::rlct_clone_impl(stack);
 
-        res.map(|context_id| crate::pthread::OsTid { context_id })
-            .map_err(|error| crate::pthread::Errno(error.errno))
+        res.map(|mut fd| crate::pthread::OsTid {
+            thread_fd: fd.take(),
+        })
+        .map_err(|error| crate::pthread::Errno(error.errno))
     }
     unsafe fn rlct_kill(
         os_tid: crate::pthread::OsTid,
         signal: usize,
     ) -> Result<(), crate::pthread::Errno> {
-        syscall::kill(os_tid.context_id, signal)
-            .map_err(|error| crate::pthread::Errno(error.errno))?;
+        redox_rt::sys::posix_kill_thread(os_tid.thread_fd, signal as u32)?;
         Ok(())
     }
     fn current_os_tid() -> crate::pthread::OsTid {
-        // TODO
         crate::pthread::OsTid {
-            context_id: Self::getpid() as _,
+            thread_fd: **RtTcb::current().thread_fd(),
         }
     }
 
@@ -1098,7 +1099,10 @@ impl Pal for Sys {
             let res = e(inner(&mut status, options | sys_wait::WUNTRACED));
 
             // TODO: Also handle special PIDs here
-            if !syscall::wifstopped(status) || ptrace::is_traceme(pid) {
+            if !syscall::wifstopped(status)
+                || options & sys_wait::WUNTRACED != 0
+                || ptrace::is_traceme(pid)
+            {
                 break res;
             }
         });
@@ -1135,6 +1139,6 @@ impl Pal for Sys {
     }
 
     fn exit_thread() -> ! {
-        Self::exit(0)
+        redox_rt::thread::exit_this_thread()
     }
 }

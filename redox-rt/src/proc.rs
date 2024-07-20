@@ -1,5 +1,6 @@
+use core::{fmt::Debug, mem::size_of};
+
 use crate::{arch::*, auxv_defs::*};
-use core::mem::size_of;
 
 use alloc::{boxed::Box, collections::BTreeMap, vec};
 
@@ -697,6 +698,11 @@ impl Drop for FdGuard {
         }
     }
 }
+impl Debug for FdGuard {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "[fd {}]", self.fd)
+    }
+}
 pub fn create_set_addr_space_buf(
     space: usize,
     ip: usize,
@@ -714,7 +720,7 @@ pub fn create_set_addr_space_buf(
 /// descriptors from other schemes are reobtained with `dup`, and grants referencing such file
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
 pub fn fork_impl() -> Result<usize> {
-    let mut old_mask = crate::signal::get_sigmask()?;
+    let old_mask = crate::signal::get_sigmask()?;
     let pid = unsafe { Error::demux(__relibc_internal_fork_wrapper())? };
 
     if pid == 0 {
@@ -728,7 +734,7 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
 
     {
         let cur_pid_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", O_CLOEXEC)?);
-        (new_pid_fd, new_pid) = new_context()?;
+        (new_pid_fd, new_pid) = new_child_process()?;
 
         copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
 
@@ -853,7 +859,7 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     Ok(new_pid)
 }
 
-pub fn new_context() -> Result<(FdGuard, usize)> {
+pub fn new_child_process() -> Result<(FdGuard, usize)> {
     // Create a new context (fields such as uid/gid will be inherited from the current context).
     let fd = FdGuard::new(syscall::open("thisproc:new/open_via_dup", O_CLOEXEC)?);
 

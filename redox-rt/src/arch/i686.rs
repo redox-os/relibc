@@ -5,6 +5,7 @@ use syscall::*;
 use crate::{
     proc::{fork_inner, FdGuard},
     signal::{inner_fastcall, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    RtTcb,
 };
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
@@ -19,7 +20,9 @@ pub struct SigArea {
     pub tmp_eip: usize,
     pub tmp_esp: usize,
     pub tmp_eax: usize,
+    pub tmp_ecx: usize,
     pub tmp_edx: usize,
+    pub pctl: usize, // TODO: reference pctl directly
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
 }
@@ -78,7 +81,11 @@ unsafe extern "cdecl" fn fork_impl(initial_rsp: *mut usize) -> usize {
 
 unsafe extern "cdecl" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
-    let _ = syscall::close(new_pid_fd);
+    // TODO: Currently pidfd == threadfd, but this will not be the case later.
+    RtTcb::current()
+        .thr_fd
+        .get()
+        .write(Some(FdGuard::new(new_pid_fd)));
 }
 
 asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
@@ -129,22 +136,47 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov gs:[{tcb_sa_off} + {sa_tmp_esp}], esp
     mov gs:[{tcb_sa_off} + {sa_tmp_eax}], eax
     mov gs:[{tcb_sa_off} + {sa_tmp_edx}], edx
-
-    // Read pending half of first signal. This can be done nonatomically wrt the mask bits, since
-    // only this thread is allowed to modify the latter.
-
-    // Read first signal word
+    mov gs:[{tcb_sa_off} + {sa_tmp_ecx}], ecx
+1:
+    // Read standard signal word - first for this thread
+    mov edx, gs:[{tcb_sc_off} + {sc_word} + 4]
     mov eax, gs:[{tcb_sc_off} + {sc_word}]
-    and eax, gs:[{tcb_sc_off} + {sc_word} + 4]
+    and eax, edx
     bsf eax, eax
-    jnz 2f
+    jnz 9f
 
-    // Read second signal word
-    mov eax, gs:[{tcb_sc_off} + {sc_word} + 8]
-    and eax, gs:[{tcb_sc_off} + {sc_word} + 12]
+    mov ecx, gs:[{tcb_sa_off} + {sa_pctl}]
+
+    // Read standard signal word - for the process
+    mov eax, [ecx + {pctl_word}]
+    and eax, edx
+    jz 3f
     bsf eax, eax
-    jz 7f
+
+    // Try clearing the pending bit, otherwise retry if another thread did that first
+    lock btr [ecx + {pctl_word}], eax
+    jnc 1b
+    jmp 2f
+3:
+    // Read realtime thread and process signal word together
+    mov edx, [ecx + {pctl_word} + 4]
+    mov eax, gs:[{tcb_sc_off} + {sc_word} + 8]
+    or eax, edx
+    and eax, gs:[{tcb_sc_off} + {sc_word} + 12]
+    jz 7f // spurious signal
+    bsf eax, eax
+
+    bt edx, eax
+    jc 8f
+
+    lock btr [ecx + {pctl_word} + 4], eax
+    jnc 1b
     add eax, 32
+    jmp 2f
+8:
+    add eax, 32
+9:
+    add eax, 64
 2:
     and esp, -{STACK_ALIGN}
 
@@ -206,21 +238,41 @@ __relibc_internal_sigentry_crit_first:
 __relibc_internal_sigentry_crit_second:
     jmp dword ptr gs:[{tcb_sa_off} + {sa_tmp_eip}]
 7:
-    ud2
+    mov eax, gs:[0]
+    lea esp, [eax + {tcb_sc_off} + {sc_saved_eflags}]
+    popfd
+
+    mov esp, gs:[{tcb_sa_off} + {sa_tmp_esp}]
+
+    mov eax, gs:[{tcb_sc_off} + {sc_saved_eip}]
+    mov gs:[{tcb_sa_off} + {sa_tmp_eip}], eax
+
+    mov eax, gs:[{tcb_sa_off} + {sa_tmp_eax}]
+    mov ecx, gs:[{tcb_sa_off} + {sa_tmp_ecx}]
+    mov edx, gs:[{tcb_sa_off} + {sa_tmp_edx}]
+
+    and dword ptr gs:[{tcb_sc_off} + {sc_control}], ~1
+    .globl __relibc_internal_sigentry_crit_third
+__relibc_internal_sigentry_crit_third:
+    jmp dword ptr gs:[{tcb_sa_off} + {sa_tmp_eip}]
 "] <= [
     inner = sym inner_fastcall,
     sa_tmp_eip = const offset_of!(SigArea, tmp_eip),
     sa_tmp_esp = const offset_of!(SigArea, tmp_esp),
     sa_tmp_eax = const offset_of!(SigArea, tmp_eax),
+    sa_tmp_ecx = const offset_of!(SigArea, tmp_ecx),
     sa_tmp_edx = const offset_of!(SigArea, tmp_edx),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
+    sa_pctl = const offset_of!(SigArea, pctl),
+    sc_control = const offset_of!(Sigcontrol, control_flags),
     sc_saved_eflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
     sc_word = const offset_of!(Sigcontrol, word),
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     pctl_off_actions = const offset_of!(SigProcControl, actions),
+    pctl_word = const offset_of!(SigProcControl, actions),
     pctl = sym PROC_CONTROL_STRUCT,
     STACK_ALIGN = const 16,
 ]);
@@ -246,6 +298,7 @@ asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
 extern "C" {
     fn __relibc_internal_sigentry_crit_first();
     fn __relibc_internal_sigentry_crit_second();
+    fn __relibc_internal_sigentry_crit_third();
 }
 pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
     if stack.regs.eip == __relibc_internal_sigentry_crit_first as usize {
@@ -254,8 +307,11 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
         stack.regs.eip = stack_ptr.sub(1).read();
     } else if stack.regs.eip == __relibc_internal_sigentry_crit_second as usize {
         stack.regs.eip = area.tmp_eip;
+    } else if stack.regs.eip == __relibc_internal_sigentry_crit_third as usize {
+        stack.regs.eip = area.tmp_eip;
     }
 }
+#[no_mangle]
 pub unsafe fn manually_enter_trampoline() {
     let c = &crate::Tcb::current().unwrap().os_specific.control;
     c.control_flags.store(

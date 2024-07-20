@@ -6,13 +6,12 @@ use core::{
 use syscall::{
     data::{SigProcControl, Sigcontrol},
     error::*,
-    flag::*,
 };
 
 use crate::{
     proc::{fork_inner, FdGuard},
-    signal::{inner_c, tmp_disable_signals, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
-    Tcb,
+    signal::{inner_c, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    RtTcb, Tcb,
 };
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
@@ -30,7 +29,6 @@ pub struct SigArea {
     pub altstack_top: usize,
     pub altstack_bottom: usize,
     pub disable_signals_depth: u64,
-    pub pctl: usize, // TODO: find out how to correctly reference that static
     pub last_sig_was_restart: bool,
 }
 
@@ -93,7 +91,11 @@ unsafe extern "sysv64" fn fork_impl(initial_rsp: *mut usize) -> usize {
 
 unsafe extern "sysv64" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
-    let _ = syscall::close(new_pid_fd);
+    // TODO: Currently pidfd == threadfd, but this will not be the case later.
+    RtTcb::current()
+        .thr_fd
+        .get()
+        .write(Some(FdGuard::new(new_pid_fd)));
 }
 
 asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
@@ -170,8 +172,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov fs:[{tcb_sa_off} + {sa_tmp_rdx}], rdx
 
     // First, select signal, always pick first available bit
-
-    // Read first signal word
+1:
+    // Read standard signal word - first targeting this thread
     mov rax, fs:[{tcb_sc_off} + {sc_word}]
     mov rdx, rax
     shr rdx, 32
@@ -179,28 +181,50 @@ asmfunction!(__relibc_internal_sigentry: ["
     bsf eax, eax
     jnz 2f
 
-    // Read second signal word
-    mov rax, fs:[{tcb_sc_off} + {sc_word} + 8]
-    mov rdx, rax
-    shr rdx, 32
+    // If no unblocked thread signal was found, check for process.
+    // This is competitive; we need to atomically check if *we* cleared the process-wide pending
+    // bit, otherwise restart.
+    mov eax, [rip + {pctl} + {pctl_off_pending}]
     and eax, edx
     bsf eax, eax
-    jz 6f
-    add eax, 32
+    jz 8f
+    lock btr [rip + {pctl} + {pctl_off_pending}], eax
+    jc 9f
+8:
+    // Read second signal word - both process and thread simultaneously.
+    // This must be done since POSIX requires low realtime signals to be picked first.
+    mov edx, fs:[{tcb_sc_off} + {sc_word} + 8]
+    mov eax, [rip + {pctl} + {pctl_off_pending} + 4]
+    or eax, edx
+    and eax, fs:[{tcb_sc_off} + {sc_word} + 12]
+    bsf eax, eax
+    jz 7f
+
+    bt edx, eax // check if signal was sent to thread specifically
+    jc 2f // then continue as usual
+
+    // otherwise, try clearing pending
+    lock btr [rip + {pctl} + {pctl_off_pending}], eax
+    jnc 1b
 2:
+    mov edx, eax
+    shr edx, 5
+    lock btr fs:[{tcb_sc_off} + {sc_word} + edx * 4], eax
+    add eax, 64 // indicate signal was targeted at thread
+9:
     sub rsp, {REDZONE_SIZE}
     and rsp, -{STACK_ALIGN}
 
     // By now we have selected a signal, stored in eax (6-bit). We now need to choose whether or
     // not to switch to the alternate signal stack. If SA_ONSTACK is clear for this signal, then
     // skip the sigaltstack logic.
-    mov edx, eax
-    add edx, edx
-    lea rdx, [{pctl_off_actions} + edx * 8]
-    add rdx, fs:[{tcb_sa_off} + {sa_off_pctl}]
+    lea rdx, [rip + {pctl} + {pctl_off_actions}]
 
-    // scale factor 16 doesn't exist, so we premultiplied edx by 2
-    bt qword ptr [rdx], 56
+    // LEA doesn't support x16, so just do two x8s.
+    lea rdx, [rdx + 8 * rax]
+    lea rdx, [rdx + 8 * rax]
+
+    bt qword ptr [rdx], {SA_ONSTACK_BIT}
     jnc 4f
 
     // Otherwise, the altstack is already active. The sigaltstack being disabled, is equivalent
@@ -326,9 +350,33 @@ __relibc_internal_sigentry_crit_first:
     .globl __relibc_internal_sigentry_crit_second
 __relibc_internal_sigentry_crit_second:
     jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
-6:
-    ud2
-    // Spurious signal
+7:
+    // A spurious signal occurred. Signals are still disabled here, but will need to be re-enabled.
+
+    // restore flags
+    mov rax, fs:[0] // load FS base
+    // TODO: Use lahf/sahf rather than pushfq/popfq?
+    lea rsp, [rax + {tcb_sc_off} + {sc_saved_rflags}]
+    popfq
+
+    // restore stack
+    mov rsp, fs:[{tcb_sa_off} + {sa_tmp_rsp}]
+
+    // move saved RIP away from control, allowing arch_pre to save us if interrupted.
+    mov rax, fs:[{tcb_sc_off} + {sc_saved_rip}]
+    mov fs:[{tcb_sa_off} + {sa_tmp_rip}], rax
+
+    // restore regs
+    mov rax, fs:[{tcb_sa_off} + {sa_tmp_rax}]
+    mov rdx, fs:[{tcb_sa_off} + {sa_tmp_rdx}]
+
+    // Re-enable signals. This code can be interrupted after this signal, so we need to define
+    // 'crit_third'.
+    and qword ptr fs:[{tcb_sc_off} + {sc_control}], ~1
+
+    .globl __relibc_internal_sigentry_crit_third
+__relibc_internal_sigentry_crit_third:
+    jmp qword ptr fs:[{tcb_sa_off} + {sa_tmp_rip}]
 "] <= [
     inner = sym inner_c,
     sa_tmp_rip = const offset_of!(SigArea, tmp_rip),
@@ -340,26 +388,29 @@ __relibc_internal_sigentry_crit_second:
     sc_saved_rflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
     sc_word = const offset_of!(Sigcontrol, word),
+    sc_control = const offset_of!(Sigcontrol, control_flags),
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     pctl_off_actions = const offset_of!(SigProcControl, actions),
-    //pctl = sym PROC_CONTROL_STRUCT,
-    sa_off_pctl = const offset_of!(SigArea, pctl),
+    pctl_off_pending = const offset_of!(SigProcControl, pending),
+    pctl = sym PROC_CONTROL_STRUCT,
     supports_avx = sym SUPPORTS_AVX,
     REDZONE_SIZE = const 128,
     STACK_ALIGN = const 16,
+    SA_ONSTACK_BIT = const 58, // (1 << 58) >> 32 = 0x0400_0000
 ]);
 
 extern "C" {
     fn __relibc_internal_sigentry_crit_first();
     fn __relibc_internal_sigentry_crit_second();
+    fn __relibc_internal_sigentry_crit_third();
 }
 pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
     // It is impossible to update RSP and RIP atomically on x86_64, without using IRETQ, which is
     // almost as slow as calling a SIGRETURN syscall would be. Instead, we abuse the fact that
     // signals are disabled in the prologue of the signal trampoline, which allows us to emulate
-    // atomicity inside the critical section, consisting of one instruction at 'crit_first', and
-    // one at 'crit_second', see asm.
+    // atomicity inside the critical section, consisting of one instruction at 'crit_first', one at
+    // 'crit_second', and one at 'crit_third', see asm.
 
     if stack.regs.rip == __relibc_internal_sigentry_crit_first as usize {
         // Reexecute pop rsp and jump steps. This case needs to be different from the one below,
@@ -372,11 +423,15 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
         // Almost finished, just reexecute the jump before tmp_rip is overwritten by this
         // deeper-level signal.
         stack.regs.rip = area.tmp_rip;
+    } else if stack.regs.rip == __relibc_internal_sigentry_crit_third as usize {
+        stack.regs.rip = area.tmp_rip;
     }
 }
 
-static SUPPORTS_AVX: AtomicU8 = AtomicU8::new(1); // FIXME
+pub(crate) static SUPPORTS_AVX: AtomicU8 = AtomicU8::new(0);
 
+// __relibc will be prepended to the name, so mangling is fine
+#[no_mangle]
 pub unsafe fn manually_enter_trampoline() {
     let c = &Tcb::current().unwrap().os_specific.control;
     c.control_flags.store(

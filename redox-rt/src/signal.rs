@@ -11,7 +11,7 @@ use syscall::{
     SIGWINCH, SIGXCPU, SIGXFSZ,
 };
 
-use crate::{arch::*, sync::Mutex, Tcb};
+use crate::{arch::*, proc::FdGuard, sync::Mutex, RtTcb, Tcb};
 
 #[cfg(target_arch = "x86_64")]
 static CPUID_EAX1_ECX: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
@@ -41,18 +41,17 @@ pub struct SigStack {
 #[inline(always)]
 unsafe fn inner(stack: &mut SigStack) {
     let os = &Tcb::current().unwrap().os_specific;
+    let signals_were_disabled = (*os.arch.get()).disable_signals_depth > 0;
 
-    let sig_idx = stack.sig_num;
-
-    // Commenting out this line will stress test how the signal code responds to 'interrupt spraying'.
-    os.control.word[sig_idx / 32].fetch_and(!(1 << (sig_idx % 32)), Ordering::Relaxed);
+    let _targeted_thread_not_process = stack.sig_num >= 64;
+    stack.sig_num %= 64;
 
     // asm counts from 0
     stack.sig_num += 1;
     arch_pre(stack, &mut *os.arch.get());
 
     let sigaction = {
-        let mut guard = SIGACTIONS_LOCK.lock();
+        let guard = SIGACTIONS_LOCK.lock();
         let action = convert_old(&PROC_CONTROL_STRUCT.actions[stack.sig_num - 1]);
         if action.flags.contains(SigactionFlags::RESETHAND) {
             // TODO: other things that must be set
@@ -159,11 +158,13 @@ unsafe fn inner(stack: &mut SigStack) {
     (*os.arch.get()).last_sig_was_restart = shall_restart;
 
     // And re-enable them again
-    control_flags.store(
-        control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(),
-        Ordering::Release,
-    );
-    core::sync::atomic::compiler_fence(Ordering::Acquire);
+    if !signals_were_disabled {
+        core::sync::atomic::compiler_fence(Ordering::Release);
+        control_flags.store(
+            control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(),
+            Ordering::Relaxed,
+        );
+    }
 }
 #[cfg(not(target_arch = "x86"))]
 pub(crate) unsafe extern "C" fn inner_c(stack: usize) {
@@ -206,7 +207,7 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32
     let _guard = tmp_disable_signals();
     let ctl = current_sigctl();
 
-    let mut words = ctl.word.each_ref().map(|w| w.load(Ordering::Relaxed));
+    let words = ctl.word.each_ref().map(|w| w.load(Ordering::Relaxed));
 
     if let Some(old) = old {
         *old = !combine_allowset(words);
@@ -216,21 +217,25 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32
     };
 
     let mut can_raise = 0;
-    let mut cant_raise = 0;
 
-    //let _ = syscall::write(1, &alloc::format!("OLDWORD {:x?}\n", ctl.word).as_bytes());
     for i in 0..2 {
         let old_allow_bits = words[i] & 0xffff_ffff_0000_0000;
         let new_allow_bits = u64::from(!op(!((old_allow_bits >> 32) as u32), i == 1)) << 32;
 
-        ctl.word[i].fetch_add(
+        let old_word = ctl.word[i].fetch_add(
             new_allow_bits.wrapping_sub(old_allow_bits),
             Ordering::Relaxed,
         );
+        can_raise |= ((old_word & 0xffff_ffff) & (new_allow_bits >> 32)) << (i * 32);
     }
-    //let _ = syscall::write(1, &alloc::format!("NEWWORD {:x?}\n", ctl.word).as_bytes());
 
-    // TODO: Prioritize cant_raise realtime signals?
+    // POSIX requires that at least one pending unblocked signal be delivered before
+    // pthread_sigmask returns, if there is one. Deliver the lowest-numbered one.
+    if can_raise != 0 {
+        let signal = can_raise.trailing_zeros() + 1;
+        // TODO
+        crate::sys::posix_kill_thread(**RtTcb::current().thread_fd(), signal);
+    }
 
     Ok(())
 }
@@ -450,9 +455,9 @@ const fn sig_bit(sig: usize) -> u64 {
     1 << (sig - 1)
 }
 
-pub fn setup_sighandler(area: &RtSigarea) {
+pub fn setup_sighandler(tcb: &RtTcb) {
     {
-        let mut sigactions = SIGACTIONS_LOCK.lock();
+        let _guard = SIGACTIONS_LOCK.lock();
         for (sig_idx, action) in PROC_CONTROL_STRUCT.actions.iter().enumerate() {
             let sig = sig_idx + 1;
             let bits = if matches!(sig, SIGTSTP | SIGTTIN | SIGTTOU) {
@@ -468,14 +473,15 @@ pub fn setup_sighandler(area: &RtSigarea) {
             );
         }
     }
-    let arch = unsafe { &mut *area.arch.get() };
+    let arch = unsafe { &mut *tcb.arch.get() };
     {
         // The asm decides whether to use the altstack, based on whether the saved stack pointer
         // was already on that stack. Thus, setting the altstack to the entire address space, is
         // equivalent to not using any altstack at all (the default).
         arch.altstack_top = usize::MAX;
         arch.altstack_bottom = 0;
-        #[cfg(not(target_arch = "x86"))]
+        // TODO
+        #[cfg(any(target_arch = "x86", target_arch = "aarch64"))]
         {
             arch.pctl = core::ptr::addr_of!(PROC_CONTROL_STRUCT) as usize;
         }
@@ -485,26 +491,20 @@ pub fn setup_sighandler(area: &RtSigarea) {
     {
         let cpuid_eax1_ecx = unsafe { core::arch::x86_64::__cpuid(1) }.ecx;
         CPUID_EAX1_ECX.store(cpuid_eax1_ecx, core::sync::atomic::Ordering::Relaxed);
+        SUPPORTS_AVX.store(u8::from(cpuid_eax1_ecx & 1 << 28 != 0), Ordering::Relaxed);
     }
 
     let data = current_setsighandler_struct();
 
-    let fd = syscall::open(
-        "thisproc:current/sighandler",
-        syscall::O_WRONLY | syscall::O_CLOEXEC,
-    )
-    .expect("failed to open thisproc:current/sighandler");
-    syscall::write(fd, &data).expect("failed to write to thisproc:current/sighandler");
-    let _ = syscall::close(fd);
+    let fd = FdGuard::new(
+        syscall::dup(**tcb.thread_fd(), b"sighandler").expect("failed to open sighandler fd"),
+    );
+    let _ = syscall::write(*fd, &data).expect("failed to write to sighandler fd");
 
     // TODO: Inherited set of ignored signals
     set_sigmask(Some(0), None);
 }
-#[derive(Debug, Default)]
-pub struct RtSigarea {
-    pub control: Sigcontrol,
-    pub arch: UnsafeCell<crate::arch::SigArea>,
-}
+pub type RtSigarea = RtTcb; // TODO
 pub fn current_setsighandler_struct() -> SetSighandlerData {
     SetSighandlerData {
         user_handler: sighandler_function(),

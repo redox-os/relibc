@@ -60,8 +60,9 @@ impl PalSignal for Sys {
         e(redox_rt::sys::posix_killpg(pgrp as usize, sig as usize).map(|()| 0)) as c_int
     }
 
-    fn raise(sig: c_int) -> c_int {
-        Self::kill(Self::getpid(), sig)
+    fn raise(sig: c_int) -> Result<(), Errno> {
+        // TODO: Bypass kernel?
+        unsafe { Self::rlct_kill(Self::current_os_tid(), sig as _) }
     }
 
     unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {

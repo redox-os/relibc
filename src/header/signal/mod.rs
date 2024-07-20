@@ -104,7 +104,7 @@ pub unsafe extern "C" fn pthread_sigmask(
 
 #[no_mangle]
 pub extern "C" fn raise(sig: c_int) -> c_int {
-    Sys::raise(sig)
+    Sys::raise(sig).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
