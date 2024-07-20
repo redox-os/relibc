@@ -155,7 +155,7 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     // Try clearing the pending bit, otherwise retry if another thread did that first
     lock btr [ecx + {pctl_word}], eax
-    jc 1b
+    jnc 1b
     jmp 2f
 3:
     // Read realtime thread and process signal word together
@@ -170,7 +170,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     jc 8f
 
     lock btr [ecx + {pctl_word} + 4], eax
-    jc 1b
+    jnc 1b
     add eax, 32
     jmp 2f
 8:
@@ -238,7 +238,23 @@ __relibc_internal_sigentry_crit_first:
 __relibc_internal_sigentry_crit_second:
     jmp dword ptr gs:[{tcb_sa_off} + {sa_tmp_eip}]
 7:
-    ud2
+    mov eax, gs:[0]
+    lea esp, [eax + {tcb_sc_off} + {sc_saved_eflags}]
+    popfd
+
+    mov esp, gs:[{tcb_sa_off} + {sa_tmp_esp}]
+
+    mov eax, gs:[{tcb_sc_off} + {sc_saved_eip}]
+    mov gs:[{tcb_sa_off} + {sa_tmp_eip}], eax
+
+    mov eax, gs:[{tcb_sa_off} + {sa_tmp_eax}]
+    mov ecx, gs:[{tcb_sa_off} + {sa_tmp_ecx}]
+    mov edx, gs:[{tcb_sa_off} + {sa_tmp_edx}]
+
+    and dword ptr gs:[{tcb_sc_off} + {sc_control}], ~1
+    .globl __relibc_internal_sigentry_crit_third
+__relibc_internal_sigentry_crit_third:
+    jmp dword ptr gs:[{tcb_sa_off} + {sa_tmp_eip}]
 "] <= [
     inner = sym inner_fastcall,
     sa_tmp_eip = const offset_of!(SigArea, tmp_eip),
@@ -249,6 +265,7 @@ __relibc_internal_sigentry_crit_second:
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
     sa_pctl = const offset_of!(SigArea, pctl),
+    sc_control = const offset_of!(Sigcontrol, control_flags),
     sc_saved_eflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
     sc_word = const offset_of!(Sigcontrol, word),
@@ -281,6 +298,7 @@ asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
 extern "C" {
     fn __relibc_internal_sigentry_crit_first();
     fn __relibc_internal_sigentry_crit_second();
+    fn __relibc_internal_sigentry_crit_third();
 }
 pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
     if stack.regs.eip == __relibc_internal_sigentry_crit_first as usize {
@@ -288,6 +306,8 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
         stack.regs.esp = stack_ptr.read();
         stack.regs.eip = stack_ptr.sub(1).read();
     } else if stack.regs.eip == __relibc_internal_sigentry_crit_second as usize {
+        stack.regs.eip = area.tmp_eip;
+    } else if stack.regs.eip == __relibc_internal_sigentry_crit_third as usize {
         stack.regs.eip = area.tmp_eip;
     }
 }
