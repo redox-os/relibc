@@ -5,6 +5,7 @@ use syscall::*;
 use crate::{
     proc::{fork_inner, FdGuard},
     signal::{inner_fastcall, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    RtTcb,
 };
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
@@ -80,7 +81,11 @@ unsafe extern "cdecl" fn fork_impl(initial_rsp: *mut usize) -> usize {
 
 unsafe extern "cdecl" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
-    let _ = syscall::close(new_pid_fd);
+    // TODO: Currently pidfd == threadfd, but this will not be the case later.
+    RtTcb::current()
+        .thr_fd
+        .get()
+        .write(Some(FdGuard::new(new_pid_fd)));
 }
 
 asmfunction!(__relibc_internal_fork_wrapper -> usize: ["

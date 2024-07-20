@@ -91,7 +91,7 @@ unsafe extern "sysv64" fn fork_impl(initial_rsp: *mut usize) -> usize {
 
 unsafe extern "sysv64" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
-    // TODO: Currently equivalent, but this will not be the case later.
+    // TODO: Currently pidfd == threadfd, but this will not be the case later.
     RtTcb::current()
         .thr_fd
         .get()
