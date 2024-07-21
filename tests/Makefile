@@ -196,6 +196,11 @@ NAMES=\
 #	resource/getrusage
 #	time/times
 
+# Tests run with `expect` (require a .c file and an .exp file
+# that takes the produced binary as the first argument)
+EXPECT_INPUT_NAMES=\
+	unistd/getpass
+
 #TODO: dynamic tests currently broken
 BINS=$(patsubst %,$(BUILD)/bins_static/%,$(NAMES))
 #BINS+=$(patsubst %,bins_dynamic/%,$(NAMES))
@@ -203,6 +208,7 @@ BINS=$(patsubst %,$(BUILD)/bins_static/%,$(NAMES))
 EXPECT_BINS=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
 #EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(EXPECT_NAMES))
 #EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
+EXPECT_INPUT_BINS=$(patsubst %,$(BUILD)/bins_expect_input/%,$(EXPECT_INPUT_NAMES))
 
 CARGO_TEST?=cargo
 TEST_RUNNER?=
@@ -214,11 +220,16 @@ all: $(BINS)
 clean:
 	rm -rf bins_* gen *.out
 
-run: | $(BINS)
+run: | $(BINS) $(EXPECT_INPUT_BINS)
 	for bin in $(BINS); \
 	do \
 		echo "# $${bin} #"; \
 		${TEST_RUNNER} "$${bin}" test args || exit $$?; \
+	done
+	for exp in $(EXPECT_INPUT_BINS); \
+	do \
+		echo "# expect $$(readlink -e $${exp}.exp) $$(readlink -e $${exp}) #"; \
+		expect "$$(readlink -e $${exp}.exp)" "$$(readlink -e $${exp})" test args || exit $$?; \
 	done
 
 expected: | $(EXPECT_BINS)
@@ -288,6 +299,11 @@ endif
 $(BUILD)/bins_static/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
+
+$(BUILD)/bins_expect_input/%: %.c %.exp $(DEPS)
+	mkdir -p "$$(dirname "$@")"
+	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
+	cp $(word 2, "$^") $(addsuffix .exp,"$@")
 
 $(BUILD)/bins_dynamic/%.so: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
