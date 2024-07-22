@@ -33,6 +33,7 @@ EXPECT_NAMES=\
 	signal \
 	stdio/all \
 	stdio/buffer \
+	stdio/dprintf \
 	stdio/fgets \
 	stdio/fputs \
 	stdio/fread \
