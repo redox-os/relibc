@@ -13,7 +13,7 @@ use crate::{
 
 use crate::platform::types::*;
 
-fn getpass_rs(prompt: CStr, passbuff: &mut [c_char]) -> Result<*mut c_char, io::Error> {
+fn getpass_rs(prompt: CStr, passbuff: &mut [u8]) -> Result<*mut c_char, io::Error> {
     let mut f = File::open(c_str!("/dev/tty"), O_RDWR | O_CLOEXEC)?;
 
     let mut term = termios::termios::default();
@@ -34,12 +34,12 @@ fn getpass_rs(prompt: CStr, passbuff: &mut [c_char]) -> Result<*mut c_char, io::
     }
 
     f.write(&prompt.to_bytes())?;
+    f.flush()?;
 
-    let buff = unsafe { &mut *(passbuff as *mut [i8] as *mut [u8]) };
-    let mut len = f.read(buff)?;
+    let mut len = f.read(passbuff)?;
 
     if len > 0 {
-        if passbuff[len - 1] == b'\n' as c_char || passbuff.len() == len {
+        if passbuff[len - 1] == b'\n' || passbuff.len() == len {
             len -= 1;
         }
     }
@@ -55,13 +55,14 @@ fn getpass_rs(prompt: CStr, passbuff: &mut [c_char]) -> Result<*mut c_char, io::
     }
 
     f.write(b"\n")?;
+    f.flush()?;
 
-    Ok(passbuff.as_mut_ptr())
+    Ok(passbuff.as_mut_ptr() as *mut c_char)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn getpass(prompt: *const c_char) -> *mut c_char {
-    static mut PASSBUFF: [c_char; PASS_MAX] = [0; PASS_MAX];
+    static mut PASSBUFF: [u8; PASS_MAX] = [0; PASS_MAX];
 
     unsafe { getpass_rs(CStr::from_ptr(prompt), &mut PASSBUFF).unwrap_or(ptr::null_mut()) }
 }
