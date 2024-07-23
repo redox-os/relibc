@@ -1186,6 +1186,21 @@ pub unsafe extern "C" fn fprintf(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn vdprintf(fd: c_int, format: *const c_char, ap: va_list) -> c_int {
+    let mut f = File::new(fd);
+
+    // We don't want to close the file on drop; we're merely
+    // borrowing the file descriptor here
+    f.reference = true;
+
+    printf::printf(f, format, ap)
+}
+#[no_mangle]
+pub unsafe extern "C" fn dprintf(fd: c_int, format: *const c_char, mut __valist: ...) -> c_int {
+    vdprintf(fd, format, __valist.as_va_list())
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
     vfprintf(&mut *stdout, format, ap)
 }
