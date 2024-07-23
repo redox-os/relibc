@@ -19,14 +19,16 @@ use crate::{
     platform::{self, types::*, Pal, Sys},
     pthread::ResultExt,
 };
+
 use alloc::collections::LinkedList;
 
-pub use self::{brk::*, getopt::*, pathconf::*, sysconf::*};
+pub use self::{brk::*, getopt::*, getpass::getpass, pathconf::*, sysconf::*};
 
 use super::errno::{E2BIG, ENOMEM};
 
 mod brk;
 mod getopt;
+mod getpass;
 mod pathconf;
 mod sysconf;
 
@@ -448,11 +450,6 @@ pub extern "C" fn getpagesize() -> c_int {
     Sys::getpagesize()
         .try_into()
         .expect("page size not representable as type `int`")
-}
-
-// #[no_mangle]
-pub extern "C" fn getpass(prompt: *const c_char) -> *mut c_char {
-    unimplemented!();
 }
 
 #[no_mangle]

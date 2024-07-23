@@ -1,0 +1,18 @@
+#!/usr/bin/expect
+
+set testgetpass [lindex $argv 0];
+
+spawn $testgetpass
+expect "Enter password: "
+send -- "pass\r"
+
+expect "Enter password: "
+send -- "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r"
+
+expect "Enter password: "
+send -- "\r"
+
+expect {
+    "incorrect password" { exit 123 }
+    eof
+}
