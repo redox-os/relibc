@@ -37,28 +37,28 @@ pub const TCSAFLUSH: c_int = 2;
 
 #[cfg(target_os = "linux")]
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct termios {
-    c_iflag: tcflag_t,
-    c_oflag: tcflag_t,
-    c_cflag: tcflag_t,
-    c_lflag: tcflag_t,
-    c_line: cc_t,
-    c_cc: [cc_t; NCCS],
-    __c_ispeed: speed_t,
-    __c_ospeed: speed_t,
+    pub c_iflag: tcflag_t,
+    pub c_oflag: tcflag_t,
+    pub c_cflag: tcflag_t,
+    pub c_lflag: tcflag_t,
+    pub c_line: cc_t,
+    pub c_cc: [cc_t; NCCS],
+    pub __c_ispeed: speed_t,
+    pub __c_ospeed: speed_t,
 }
 
 // Must match structure in redox_termios
 #[cfg(target_os = "redox")]
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct termios {
-    c_iflag: tcflag_t,
-    c_oflag: tcflag_t,
-    c_cflag: tcflag_t,
-    c_lflag: tcflag_t,
-    c_cc: [cc_t; NCCS],
+    pub c_iflag: tcflag_t,
+    pub c_oflag: tcflag_t,
+    pub c_cflag: tcflag_t,
+    pub c_lflag: tcflag_t,
+    pub c_cc: [cc_t; NCCS],
 }
 
 #[no_mangle]
