@@ -1,36 +1,27 @@
 use core::ptr;
 
-use alloc::vec::Vec;
-
 use crate::{
+    c_str::CStr,
     fs::File,
     header::{
         fcntl::{O_CLOEXEC, O_RDWR},
         limits::PASS_MAX,
-        stdio, termios,
+        termios,
     },
-    io::{self, Read},
+    io::{self, Read, Write},
 };
 
 use crate::platform::types::*;
 
-#[derive(Debug)]
-enum Error {
-    Io(io::Error),
-    CannotConvertFd,
-}
-
-impl From<io::Error> for Error {
-    fn from(value: io::Error) -> Self {
-        Error::Io(value)
-    }
-}
-
-unsafe fn getpass_rs(prompt: *const c_char) -> Result<*mut c_char, Error> {
+fn getpass_rs(prompt: CStr, passbuff: &mut [c_char]) -> Result<*mut c_char, io::Error> {
     let mut f = File::open(c_str!("/dev/tty"), O_RDWR | O_CLOEXEC)?;
 
     let mut term = termios::termios::default();
-    termios::tcgetattr(f.fd, &mut term as *mut termios::termios);
+
+    unsafe {
+        termios::tcgetattr(f.fd, &mut term as *mut termios::termios);
+    }
+
     let old_term = term.clone();
 
     term.c_iflag &= !(termios::IGNCR | termios::INLCR) as u32;
@@ -38,44 +29,39 @@ unsafe fn getpass_rs(prompt: *const c_char) -> Result<*mut c_char, Error> {
     term.c_lflag &= !(termios::ECHO | termios::ISIG) as u32;
     term.c_lflag |= termios::ICANON as u32;
 
-    let cfile = stdio::fdopen(f.fd, c_str!("w+e").as_ptr());
-
-    if cfile.is_null() {
-        return Err(Error::CannotConvertFd);
+    unsafe {
+        termios::tcsetattr(f.fd, termios::TCSAFLUSH, &term as *const termios::termios);
     }
 
-    termios::tcsetattr(f.fd, termios::TCSAFLUSH, &term as *const termios::termios);
-    stdio::fputs(prompt, cfile);
-    stdio::fflush(cfile);
+    f.write(&prompt.to_bytes())?;
 
-    let mut buff = Vec::new();
-    let mut len = f.read(&mut buff)?;
-
-    static mut PASSBUFF: [c_char; PASS_MAX] = [0; PASS_MAX];
-
-    for (dst, src) in PASSBUFF.iter_mut().zip(&buff) {
-        *dst = *src as c_char;
-    }
+    let buff = unsafe { &mut *(passbuff as *mut [i8] as *mut [u8]) };
+    let mut len = f.read(buff)?;
 
     if len > 0 {
-        if PASSBUFF[len - 1] == b'\n' as c_char || PASSBUFF.len() == len {
+        if passbuff[len - 1] == b'\n' as c_char || passbuff.len() == len {
             len -= 1;
         }
     }
 
-    PASSBUFF[len] = 0;
+    passbuff[len] = 0;
 
-    termios::tcsetattr(
-        f.fd,
-        termios::TCSAFLUSH,
-        &old_term as *const termios::termios,
-    );
-    stdio::fputs(c_str!("\n").as_ptr(), cfile);
+    unsafe {
+        termios::tcsetattr(
+            f.fd,
+            termios::TCSAFLUSH,
+            &old_term as *const termios::termios,
+        );
+    }
 
-    Ok(PASSBUFF.as_mut_ptr())
+    f.write(b"\n")?;
+
+    Ok(passbuff.as_mut_ptr())
 }
 
 #[no_mangle]
-pub extern "C" fn getpass(prompt: *const c_char) -> *mut c_char {
-    unsafe { getpass_rs(prompt).unwrap_or(ptr::null_mut()) }
+pub unsafe extern "C" fn getpass(prompt: *const c_char) -> *mut c_char {
+    static mut PASSBUFF: [c_char; PASS_MAX] = [0; PASS_MAX];
+
+    unsafe { getpass_rs(CStr::from_ptr(prompt), &mut PASSBUFF).unwrap_or(ptr::null_mut()) }
 }
