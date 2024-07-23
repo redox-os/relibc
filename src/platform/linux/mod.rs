@@ -242,8 +242,9 @@ impl Pal for Sys {
     unsafe fn futex_wait(
         addr: *mut u32,
         val: u32,
-        deadline: *const timespec,
+        deadline: Option<&timespec>,
     ) -> Result<(), crate::pthread::Errno> {
+        let deadline = deadline.map_or(0, |d| d as *const _ as usize);
         e_raw(unsafe {
             syscall!(
                 FUTEX, addr,       // uaddr
@@ -257,11 +258,11 @@ impl Pal for Sys {
         .map(|_| ())
     }
     #[inline]
-    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<c_int, Errno> {
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, Errno> {
         e_raw(unsafe {
             syscall!(FUTEX, addr, 1 /* FUTEX_WAKE */, num)
         })
-        .map(|n| n as c_int)
+        .map(|n| n as u32)
     }
 
     fn futimens(fd: c_int, times: *const timespec) -> c_int {
@@ -567,12 +568,12 @@ impl Pal for Sys {
         e(unsafe { syscall!(SETPRIORITY, which, who, prio) }) as c_int
     }
 
-    fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
-        e(unsafe { syscall!(SETREGID, rgid, egid) }) as c_int
+    fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int {
+        e(unsafe { syscall!(SETRESGID, rgid, egid, sgid) }) as c_int
     }
 
-    fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
-        e(unsafe { syscall!(SETREUID, ruid, euid) }) as c_int
+    fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int {
+        e(unsafe { syscall!(SETRESUID, ruid, euid, suid) }) as c_int
     }
 
     fn setsid() -> c_int {

@@ -1,90 +1,137 @@
 //! Helper functions for pseudorandom number generation using LCG, see https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/functions/drand48.html
 
-use crate::platform::types::*;
+use crate::{
+    platform::types::*,
+    sync::{Mutex, MutexGuard},
+};
 
-/* The default element buffer for the linear congruential generator's
- * sequence. Implemented using a c_ushort array for consistency between
- * the drand48()/lrand48()/mrand48() and erand48()/nrand48()/jrand48()
- * functions, and with SEED48_XSUBI (see below). */
-pub static mut DEFAULT_XSUBI: [c_ushort; 3] = [0; 3];
+/// A 48-bit integer, used for the 48-bit arithmetic in these functions.
+#[derive(Clone, Copy, Default)]
+#[repr(C)]
+pub struct U48(u64);
 
-// Used by seed48() (returns a pointer to this array).
-pub static mut SEED48_XSUBI: [c_ushort; 3] = [0; 3];
-
-/* Multiplier and addend, which may be set through lcong48(). Default
- * values as specified in POSIX. */
-const A_DEFAULT_VALUE: u64 = 0x5deece66d;
-const C_DEFAULT_VALUE: u16 = 0xb;
-
-pub static mut A: u64 = A_DEFAULT_VALUE;
-pub static mut C: u16 = C_DEFAULT_VALUE;
-
-/// Used by `srand48()` and `seed48()`.
-pub unsafe fn reset_a_and_c() {
-    A = A_DEFAULT_VALUE;
-    C = C_DEFAULT_VALUE;
+impl From<&[c_ushort; 3]> for U48 {
+    fn from(value: &[c_ushort; 3]) -> Self {
+        /* Cast via u16 to ensure we get only the lower 16 bits of each
+         * element, as specified by POSIX. */
+        Self {
+            0: u64::from(value[0] as u16)
+                | (u64::from(value[1] as u16) << 16)
+                | (u64::from(value[2] as u16) << 32),
+        }
+    }
 }
 
-/// Build a 48-bit integer from a size-3 array of unsigned short.
-///
-/// Pointers to c_ushort can be converted to &[c_ushort; 3] by taking
-/// &*(YOUR_C_USHORT_POINTER as *const [c_ushort; 3])
-///
-/// See also this cbindgen issue for why the stdlib functions can't just
-/// have an xsubi: *mut [c_ushort; 3] parameter:
-/// https://github.com/eqrion/cbindgen/issues/171
-pub fn u48_from_ushort_arr3(arr: &[c_ushort; 3]) -> u64 {
-    /* Cast via u16 to ensure we get only the lower 16 bits of each
-     * element, as specified by POSIX. */
-    u64::from(arr[0] as u16) | (u64::from(arr[1] as u16) << 16) | (u64::from(arr[2] as u16) << 32)
+impl From<&mut [c_ushort; 3]> for U48 {
+    fn from(value: &mut [c_ushort; 3]) -> Self {
+        Self::from(&*value)
+    }
 }
 
-/// Make a size-3 array of unsigned short from a 48-bit integer.
-pub fn ushort_arr3_from_u48(value: u64) -> [c_ushort; 3] {
-    [
-        c_ushort::from(value as u16),
-        c_ushort::from((value >> 16) as u16),
-        c_ushort::from((value >> 32) as u16),
-    ]
+impl TryFrom<u64> for U48 {
+    type Error = u64;
+
+    fn try_from(value: u64) -> Result<Self, u64> {
+        if value < 0x1_0000_0000_0000 {
+            Ok(Self { 0: value })
+        } else {
+            Err(value)
+        }
+    }
 }
 
-/// Advances the buffer from the input argument to the next element in
-/// the linear congruential generator's sequence.
-///
-/// Modifies the passed argument in-place and returns the new value as a
-/// u64.
-pub unsafe fn generator_step(xsubi: &mut [c_ushort; 3]) -> u64 {
-    let old_xsubi_value: u64 = u48_from_ushort_arr3(xsubi);
-
-    /* The recurrence relation of the linear congruential generator,
-     * X_(n+1) = (a * X_n + c) % m,
-     * with m = 2**48. The multiplication and addition can overflow a
-     * u64, but we just let it wrap since we take mod 2**48 anyway. */
-    let new_xsubi_value: u64 =
-        A.wrapping_mul(old_xsubi_value).wrapping_add(u64::from(C)) & 0xffff_ffff_ffff;
-
-    *xsubi = ushort_arr3_from_u48(new_xsubi_value);
-    new_xsubi_value
+impl From<U48> for u64 {
+    fn from(value: U48) -> Self {
+        value.0
+    }
 }
 
-/// Get a C `double` from a 48-bit integer (for `drand48()` and
-/// `erand48()`).
-pub fn f64_from_x(x: u64) -> c_double {
-    /* We set the exponent to 0, and the 48-bit integer is copied into the high
-     * 48 of the 52 significand bits. The value then lies in the range
-     * [1.0, 2.0), from which we simply subtract 1.0. */
-    f64::from_bits(0x3ff0_0000_0000_0000_u64 | (x << 4)) - 1.0
+impl From<U48> for [c_ushort; 3] {
+    fn from(value: U48) -> Self {
+        [
+            // "as u16" in case c_ushort is larger than u16
+            (value.0 as u16).into(),
+            ((value.0 >> 16) as u16).into(),
+            ((value.0 >> 32) as u16).into(),
+        ]
+    }
 }
 
-/// Get the high 31 bits of a 48-bit integer (for `lrand48()` and
-/// `nrand48()`).
-pub fn u31_from_x(x: u64) -> c_long {
-    (x >> 17) as c_long
+impl U48 {
+    /// Get a C `double` in the interval [0.0, 1.0) (for `drand48()` and `erand48()`).
+    pub fn get_f64(self) -> c_double {
+        /* We set the exponent to 0, and the 48-bit integer is copied into the high
+         * 48 of the 52 significand bits. The value then lies in the range
+         * [1.0, 2.0), from which we simply subtract 1.0. */
+        f64::from_bits(0x3ff0_0000_0000_0000_u64 | (self.0 << 4)) - 1.0
+    }
+
+    /// Get the high 31 bits (for `lrand48()` and `nrand48()`).
+    pub fn get_u31(self) -> c_long {
+        (self.0 >> 17).try_into().unwrap()
+    }
+
+    /// Get the high 32 bits, signed (for `mrand48()` and `jrand48()`).
+    pub fn get_i32(self) -> c_long {
+        // Cast via i32 to ensure we get the sign correct
+        ((self.0 >> 16) as i32).into()
+    }
 }
 
-/// Get the high 32 bits, signed, of a 48-bit integer (for `mrand48()`
-/// and `jrand48()`).
-pub fn i32_from_x(x: u64) -> c_long {
-    // Cast via i32 to ensure we get the sign correct
-    c_long::from((x >> 16) as i32)
+/// The a and c parameters of an LCG.
+#[derive(Default)]
+#[repr(C)]
+pub struct Params {
+    pub a: U48,
+    pub c: u16,
+}
+
+impl Params {
+    pub const fn new() -> Self {
+        // Default values as specified in POSIX
+        Params {
+            a: U48(0x5deece66d),
+            c: 0xb,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        *self = Self::new();
+    }
+
+    /// For use in lcong48().
+    pub fn set(&mut self, a: &[c_ushort; 3], c: c_ushort) {
+        self.a = a.into();
+        self.c = c as u16; // Per POSIX, discard higher bits in case unsigned short is larger than u16
+    }
+
+    pub fn step(&self, xsubi: U48) -> U48 {
+        /* The recurrence relation of the linear congruential generator,
+         * X_(n+1) = (a * X_n + c) % m,
+         * with m = 2**48. The multiplication and addition can overflow a u64, but
+         * we just let it wrap since we take mod 2**48 anyway. */
+        (u64::from(self.a)
+            .wrapping_mul(u64::from(xsubi))
+            .wrapping_add(u64::from(self.c))
+            & 0xffff_ffff_ffff)
+            .try_into()
+            .unwrap()
+    }
+}
+
+// TODO: consider using rwlock instead of mutex for more fine-grained access
+/// Immediately get the global Params lock, or panic if unsuccessful.
+pub fn params_lock<'a>() -> MutexGuard<'a, Params> {
+    static PARAMS: Mutex<Params> = Mutex::<Params>::new(Params::new());
+
+    PARAMS
+        .try_lock()
+        .expect("unable to acquire LCG parameter lock")
+}
+
+/// Immediately get the global X_i lock, or panic if unsuccessful.
+pub fn xsubi_lock<'a>() -> MutexGuard<'a, U48> {
+    static XSUBI: Mutex<U48> = Mutex::<U48>::new(U48(0));
+
+    XSUBI.try_lock().expect("unable to acquire LCG X_i lock")
 }

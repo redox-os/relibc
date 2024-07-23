@@ -1,4 +1,5 @@
 use alloc::{borrow::ToOwned, boxed::Box, string::String, vec::Vec};
+use redox_rt::signal::tmp_disable_signals;
 use syscall::{data::Stat, error::*, flag::*};
 
 use super::{libcscheme, FdGuard};
@@ -19,7 +20,7 @@ const PATH_MAX: usize = 4096;
 // and after acquiring the locks. (TODO: ArcSwap? That will need to be ported to no_std first,
 // though).
 pub fn chdir(path: &str) -> Result<()> {
-    let _siglock = SignalMask::lock();
+    let _siglock = tmp_disable_signals();
     let mut cwd_guard = CWD.lock();
 
     let canonicalized =
@@ -40,13 +41,13 @@ pub fn chdir(path: &str) -> Result<()> {
 }
 
 pub fn clone_cwd() -> Option<Box<str>> {
-    let _siglock = SignalMask::lock();
+    let _siglock = tmp_disable_signals();
     CWD.lock().clone()
 }
 
 // TODO: MaybeUninit
 pub fn getcwd(buf: &mut [u8]) -> Option<usize> {
-    let _siglock = SignalMask::lock();
+    let _siglock = tmp_disable_signals();
     let cwd_guard = CWD.lock();
     let cwd = cwd_guard.as_deref().unwrap_or("").as_bytes();
 
@@ -61,9 +62,8 @@ pub fn getcwd(buf: &mut [u8]) -> Option<usize> {
     Some(cwd.len())
 }
 
-// TODO: Move cwd from kernel to libc. It is passed via auxiliary vectors.
 pub fn canonicalize(path: &str) -> Result<String> {
-    let _siglock = SignalMask::lock();
+    let _siglock = tmp_disable_signals();
     let cwd = CWD.lock();
     canonicalize_using_cwd(cwd.as_deref(), path).ok_or(Error::new(ENOENT))
 }
@@ -72,27 +72,8 @@ pub fn canonicalize(path: &str) -> Result<String> {
 static CWD: Mutex<Option<Box<str>>> = Mutex::new(None);
 
 pub fn setcwd_manual(cwd: Box<str>) {
-    let _siglock = SignalMask::lock();
+    let _siglock = tmp_disable_signals();
     *CWD.lock() = Some(cwd);
-}
-
-/// RAII guard able to magically fix signal unsafety, by disabling signals during a critical
-/// section.
-pub struct SignalMask {
-    oldset: u64,
-}
-impl SignalMask {
-    pub fn lock() -> Self {
-        let mut oldset = 0;
-        syscall::sigprocmask(syscall::SIG_SETMASK, Some(&!0), Some(&mut oldset))
-            .expect("failed to run sigprocmask");
-        Self { oldset }
-    }
-}
-impl Drop for SignalMask {
-    fn drop(&mut self) {
-        let _ = syscall::sigprocmask(syscall::SIG_SETMASK, Some(&self.oldset), None);
-    }
 }
 
 pub fn open(path: &str, flags: usize) -> Result<usize> {

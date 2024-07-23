@@ -63,12 +63,14 @@ all: | headers libs
 
 headers: $(HEADERS_DEPS)
 	for header in $(HEADERS_UNPARSED); do \
+		if test -f "src/header/$$header/cbindgen.toml"; then \
 		out=`echo "$$header" | sed 's/_/\//g'`; \
 		out="$(TARGET_HEADERS)/$$out.h"; \
 		cbindgen --output "$$out" \
 			--config="src/header/$$header/cbindgen.toml" \
 			"src/header/$$header/mod.rs"; \
 		sed -i "s/va_list __valist/.../g" "$$out"; \
+		fi \
 	done
 
 clean:

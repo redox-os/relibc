@@ -1,38 +1,5 @@
 use core::arch::global_asm;
 
-// x8 is register, 119 is SIGRETURN
-#[cfg(target_arch = "aarch64")]
-global_asm!(
-    "
-    .global __restore_rt
-    __restore_rt:
-        mov x8, #119
-        svc 0
-"
-);
-// Needs to be defined in assembly because it can't have a function prologue
-// eax is register, 119 is SIGRETURN
-#[cfg(target_arch = "x86")]
-global_asm!(
-    "
-    .global __restore_rt
-    __restore_rt:
-        mov eax, 119
-        int 0x80
-"
-);
-// Needs to be defined in assembly because it can't have a function prologue
-// rax is register, 119 is SIGRETURN
-#[cfg(target_arch = "x86_64")]
-global_asm!(
-    "
-    .global __restore_rt
-    __restore_rt:
-        mov rax, 119
-        syscall
-"
-);
-
 pub const SIGHUP: usize = 1;
 pub const SIGINT: usize = 2;
 pub const SIGQUIT: usize = 3;
@@ -66,17 +33,17 @@ pub const SIGPWR: usize = 30;
 pub const SIGSYS: usize = 31;
 pub const NSIG: usize = 32;
 
-pub const SIGRTMIN: usize = 34;
+pub const SIGRTMIN: usize = 35;
 pub const SIGRTMAX: usize = 64;
 
-pub const SA_NOCLDSTOP: usize = 0x00000001;
-pub const SA_NOCLDWAIT: usize = 0x00000002;
-pub const SA_SIGINFO: usize = 0x00000004;
-pub const SA_RESTORER: usize = 0x04000000;
-pub const SA_ONSTACK: usize = 0x08000000;
-pub const SA_RESTART: usize = 0x10000000;
-pub const SA_NODEFER: usize = 0x40000000;
-pub const SA_RESETHAND: usize = 0x80000000;
+pub const SA_NOCLDWAIT: usize = 0x0000_0002;
+pub const SA_RESTORER: usize = 0x0000_0004; // TODO: remove
+pub const SA_SIGINFO: usize = 0x0200_0000;
+pub const SA_ONSTACK: usize = 0x0400_0000;
+pub const SA_RESTART: usize = 0x0800_0000;
+pub const SA_NODEFER: usize = 0x1000_0000;
+pub const SA_RESETHAND: usize = 0x2000_0000;
+pub const SA_NOCLDSTOP: usize = 0x4000_0000;
 
 pub const SS_ONSTACK: usize = 0x00000001;
 pub const SS_DISABLE: usize = 0x00000002;

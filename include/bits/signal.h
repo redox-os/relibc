@@ -5,4 +5,18 @@
 #define SIG_IGN ((void (*)(int))1)
 #define SIG_ERR ((void (*)(int))-1)
 
+struct siginfo;
+typedef struct siginfo siginfo_t;
+typedef unsigned long long sigset_t;
+
+struct sigaction {
+  union {
+    void (*sa_handler)(int);
+    void (*sa_sigaction)(int, siginfo_t *, void *);
+  };
+  unsigned long sa_flags;
+  void (*sa_restorer)(void);
+  sigset_t sa_mask;
+};
+
 #endif // _BITS_SIGNAL_H

@@ -2,7 +2,8 @@
 
 use core::{
     cell::{Cell, UnsafeCell},
-    ptr::NonNull,
+    mem::MaybeUninit,
+    ptr::{addr_of, NonNull},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
@@ -67,13 +68,13 @@ pub struct Pthread {
     pub(crate) stack_base: *mut c_void,
     pub(crate) stack_size: usize,
 
-    pub(crate) os_tid: UnsafeCell<OsTid>,
+    pub os_tid: UnsafeCell<OsTid>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Ord, Eq, PartialOrd, PartialEq)]
 pub struct OsTid {
     #[cfg(target_os = "redox")]
-    pub context_id: usize,
+    pub thread_fd: usize,
     #[cfg(target_os = "linux")]
     pub thread_id: usize,
 }
@@ -90,6 +91,12 @@ pub struct Errno(pub c_int);
 impl From<syscall::Error> for Errno {
     fn from(value: syscall::Error) -> Self {
         Errno(value.errno)
+    }
+}
+#[cfg(target_os = "redox")]
+impl From<Errno> for syscall::Error {
+    fn from(value: Errno) -> Self {
+        syscall::Error::new(value.0)
     }
 }
 
@@ -130,14 +137,19 @@ pub(crate) unsafe fn create(
 ) -> Result<pthread_t, Errno> {
     let attrs = attrs.copied().unwrap_or_default();
 
-    let mut procmask = 0_u64;
+    let mut current_sigmask = 0_u64;
     #[cfg(target_os = "redox")]
-    syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut procmask))
-        .expect("failed to obtain sigprocmask for caller");
+    {
+        current_sigmask =
+            redox_rt::signal::get_sigmask().expect("failed to obtain sigprocmask for caller");
+    }
 
     // Create a locked mutex, unlocked by the thread after it has started.
-    let synchronization_mutex = Mutex::locked(procmask);
+    let synchronization_mutex = Mutex::locked(current_sigmask);
     let synchronization_mutex = &synchronization_mutex;
+
+    let tid_mutex = Mutex::<MaybeUninit<OsTid>>::new(MaybeUninit::uninit());
+    let mut tid_guard = tid_mutex.lock();
 
     let stack_size = attrs.stacksize.next_multiple_of(Sys::getpagesize());
 
@@ -200,7 +212,7 @@ pub(crate) unsafe fn create(
         }
         push(0);
         push(synchronization_mutex as *const _ as usize);
-        push(0);
+        push(addr_of!(tid_mutex) as usize);
         push(new_tcb as *mut _ as usize);
 
         push(arg as usize);
@@ -214,6 +226,8 @@ pub(crate) unsafe fn create(
     };
     core::mem::forget(stack_raii);
 
+    tid_guard.write(os_tid);
+    drop(tid_guard);
     let _ = synchronization_mutex.lock();
 
     OS_TID_TO_PTHREAD
@@ -227,23 +241,36 @@ unsafe extern "C" fn new_thread_shim(
     entry_point: unsafe extern "C" fn(*mut c_void) -> *mut c_void,
     arg: *mut c_void,
     tcb: *mut Tcb,
-    _pthread: *mut Pthread,
-    mutex: *const Mutex<u64>,
+    mutex1: *const Mutex<MaybeUninit<OsTid>>,
+    mutex2: *const Mutex<u64>,
 ) -> ! {
-    let procmask = (*mutex).as_ptr().read();
+    if let Some(tcb) = tcb.as_mut() {
+        tcb.activate();
+    }
+
+    let procmask = (&*mutex2).as_ptr().read();
+    let tid = (*(&*mutex1).lock()).assume_init();
+
+    #[cfg(target_os = "redox")]
+    (*tcb)
+        .os_specific
+        .thr_fd
+        .get()
+        .write(Some(redox_rt::proc::FdGuard::new(tid.thread_fd)));
 
     if let Some(tcb) = tcb.as_mut() {
         tcb.copy_masters().unwrap();
-        tcb.activate();
     }
 
     (*tcb).pthread.os_tid.get().write(Sys::current_os_tid());
 
-    (&*mutex).manual_unlock();
+    (&*mutex2).manual_unlock();
 
     #[cfg(target_os = "redox")]
-    syscall::sigprocmask(syscall::SIG_SETMASK, Some(&procmask), None)
-        .expect("failed to set procmask in child thread");
+    {
+        redox_rt::signal::set_sigmask(Some(procmask), None)
+            .expect("failed to set procmask in child thread");
+    }
 
     let retval = entry_point(arg);
 
@@ -316,8 +343,8 @@ unsafe fn dealloc_thread(thread: &Pthread) {
     OS_TID_TO_PTHREAD.lock().remove(&thread.os_tid.get().read());
     //drop(Box::from_raw(thread as *const Pthread as *mut Pthread));
 }
-pub const SIGRT_RLCT_CANCEL: usize = 32;
-pub const SIGRT_RLCT_TIMER: usize = 33;
+pub const SIGRT_RLCT_CANCEL: usize = 33;
+pub const SIGRT_RLCT_TIMER: usize = 34;
 
 unsafe extern "C" fn cancel_sighandler(_: c_int) {
     cancel_current_thread();

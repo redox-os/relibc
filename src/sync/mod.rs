@@ -102,11 +102,7 @@ pub unsafe fn futex_wait_ptr<T: FutexTy>(
     value: T,
     deadline_opt: Option<&timespec>,
 ) -> FutexWaitResult {
-    match Sys::futex_wait(
-        ptr.cast(),
-        value.conv(),
-        deadline_opt.map_or(core::ptr::null(), |t| t as *const _),
-    ) {
+    match Sys::futex_wait(ptr.cast(), value.conv(), deadline_opt) {
         Ok(()) => FutexWaitResult::Waited,
         Err(Errno(EAGAIN)) => FutexWaitResult::Stale,
         Err(Errno(ETIMEDOUT)) if deadline_opt.is_some() => FutexWaitResult::TimedOut,

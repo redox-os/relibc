@@ -3,7 +3,7 @@ use core::{intrinsics, ptr};
 
 use crate::{
     header::{libgen, stdio, stdlib},
-    ld_so::{self, linker::Linker},
+    ld_so::{self, linker::Linker, tcb::Tcb},
     platform::{self, get_auxvs, types::*, Pal, Sys},
     sync::mutex::Mutex,
     ALLOCATOR,
@@ -157,6 +157,8 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
             //TODO: load root object
             tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
         }
+        #[cfg(target_os = "redox")]
+        redox_rt::signal::setup_sighandler(&tcb.os_specific);
     }
 
     // Set up argc and argv
@@ -182,8 +184,6 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         platform::OUR_ENVIRON = copy_string_array(envp, len);
         platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
     }
-    #[cfg(target_os = "redox")]
-    platform::sys::signal::setup_sighandler();
 
     let auxvs = get_auxvs(sp.auxv().cast());
     crate::platform::init(auxvs);
