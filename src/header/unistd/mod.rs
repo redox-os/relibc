@@ -11,9 +11,7 @@ use crate::{
     c_str::CStr,
     header::{
         crypt::{crypt_data, crypt_r},
-        errno, fcntl,
-        limits::{self, PASS_MAX},
-        stdio,
+        errno, fcntl, limits,
         stdlib::getenv,
         sys_ioctl, sys_resource, sys_time, sys_utsname, termios,
         time::timespec,
@@ -21,14 +19,16 @@ use crate::{
     platform::{self, types::*, Pal, Sys},
     pthread::ResultExt,
 };
+
 use alloc::collections::LinkedList;
 
-pub use self::{brk::*, getopt::*, pathconf::*, sysconf::*};
+pub use self::{brk::*, getopt::*, getpass::getpass, pathconf::*, sysconf::*};
 
 use super::errno::{E2BIG, ENOMEM};
 
 mod brk;
 mod getopt;
+mod getpass;
 mod pathconf;
 mod sysconf;
 
@@ -450,53 +450,6 @@ pub extern "C" fn getpagesize() -> c_int {
     Sys::getpagesize()
         .try_into()
         .expect("page size not representable as type `int`")
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn getpass(prompt: *const c_char) -> *mut c_char {
-    let tty = stdio::fopen(c_str!("/dev/tty").as_ptr(), c_str!("w+e").as_ptr());
-
-    if tty.is_null() {
-        return ptr::null_mut();
-    }
-
-    let fd = stdio::fileno(tty);
-
-    let mut term = termios::termios::default();
-    termios::tcgetattr(fd, &mut term as *mut termios::termios);
-    let old_temr = term.clone();
-
-    term.c_iflag &= !(termios::IGNCR | termios::INLCR) as u32;
-    term.c_iflag |= termios::ICRNL as u32;
-    term.c_lflag &= !(termios::ECHO | termios::ISIG) as u32;
-    term.c_lflag |= termios::ICANON as u32;
-
-    termios::tcsetattr(fd, termios::TCSAFLUSH, &term as *const termios::termios);
-    stdio::fputs(prompt, tty);
-    stdio::fflush(tty);
-
-    static mut PASSBUFF: [c_char; PASS_MAX] = [0; PASS_MAX];
-
-    let len = read(fd, PASSBUFF.as_mut_ptr() as *const c_void, PASSBUFF.len());
-
-    if len >= 0 {
-        let mut l = len as usize;
-        if PASSBUFF[l - 1] == b'\n' as c_char || PASSBUFF.len() == l {
-            l -= 1;
-        }
-
-        PASSBUFF[l] = 0;
-    }
-
-    termios::tcsetattr(fd, termios::TCSAFLUSH, &old_temr as *const termios::termios);
-    stdio::fputs(c_str!("\n").as_ptr(), tty);
-    stdio::fclose(tty);
-
-    if len < 0 {
-        return ptr::null_mut();
-    }
-
-    PASSBUFF.as_mut_ptr()
 }
 
 #[no_mangle]
