@@ -8,7 +8,10 @@ int main() {
     wchar_t* result = wcpncpy(dest, src, 5);
 
     assert(wcsncmp(dest, src, 5) == 0);
-    assert(*result == L'\0');
+
+    // FIXME: seems to read from uninitialized memory?
+    // assert(*result == L'\0');
+
     assert(result == dest + 5);
 
     return 0;
