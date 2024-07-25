@@ -45,7 +45,9 @@ pub fn posix_kill(pid: usize, sig: usize) -> Result<()> {
 }
 #[inline]
 pub fn posix_sigqueue(pid: usize, sig: usize, val: usize) -> Result<()> {
-    match wrapper(false, || unsafe { syscall::syscall3(101, pid, sig, val) }) {
+    match wrapper(false, || unsafe {
+        syscall::syscall3(syscall::SYS_SIGQUEUE, pid, sig, val)
+    }) {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
     }
