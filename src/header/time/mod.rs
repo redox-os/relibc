@@ -420,56 +420,59 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
      * https://howardhinnant.github.io/date_algorithms.html#days_from_civil
      */
 
-    let timeptr_mut: &mut tm = &mut *timeptr;
+    fn inner(timeptr_mut: &mut tm) -> Option<time_t> {
+        let year = time_t::try_from(timeptr_mut.tm_year).ok().and_then(|tm_year| tm_year.checked_add(1900))?;
+        let month = time_t::try_from(timeptr_mut.tm_mon).ok()?;
+        let mday = time_t::try_from(timeptr_mut.tm_mday).ok()?;
 
-    let year = time_t::try_from(timeptr_mut.tm_year).unwrap() + 1900;
-    let month = time_t::try_from(timeptr_mut.tm_mon).unwrap();
-    let mday = time_t::try_from(timeptr_mut.tm_mday).unwrap();
+        let hour = time_t::try_from(timeptr_mut.tm_hour).ok()?;
+        let min = time_t::try_from(timeptr_mut.tm_min).ok()?;
+        let sec = time_t::try_from(timeptr_mut.tm_sec).ok()?;
 
-    let hour = time_t::try_from(timeptr_mut.tm_hour).unwrap();
-    let min = time_t::try_from(timeptr_mut.tm_min).unwrap();
-    let sec = time_t::try_from(timeptr_mut.tm_sec).unwrap();
+        // TODO: handle tm_isdst
 
-    // TODO: handle tm_isdst
+        let year_transformed = if month < 2 {
+            year - 1
+        } else {
+            year
+        };
 
-    let year_transformed = if month < 2 {
-        year - 1
-    } else {
-        year
-    };
+        let era = year_transformed.div_euclid(YEARS_PER_ERA);
+        let year_of_era = year_transformed.rem_euclid(YEARS_PER_ERA);
 
-    let era = year_transformed.div_euclid(YEARS_PER_ERA);
-    let year_of_era = year_transformed.rem_euclid(YEARS_PER_ERA);
+        let day_of_year = (153 * (if month > 1 { month - 2} else { month + 10 }) + 2) / 5 + mday - 1; // adapted for zero-based months
 
-    let day_of_year = (153 * (if month > 1 { month - 2} else { month + 10 }) + 2) / 5 + mday - 1; // adapted for zero-based months
+        let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+        let unix_days = era * DAYS_PER_ERA + day_of_era - 719468;
+        let secs_of_day = hour * (60 * 60) + min * 60 + sec;
 
-    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
-    let unix_days = era * DAYS_PER_ERA + day_of_era - 719468;
-    let secs_of_day = hour * (60 * 60) + min * 60 + sec;
+        let unix_secs = unix_days.checked_mul(SECS_PER_DAY).and_then(|day_secs| day_secs.checked_add(secs_of_day))?;
 
-    match unix_days.checked_mul(SECS_PER_DAY).and_then(|day_secs| day_secs.checked_add(secs_of_day)) {
+        // Normalize input struct with values from their standard ranges
+        let mut normalized_tm = tm {
+            tm_sec: 0,
+            tm_min: 0,
+            tm_hour: 0,
+            tm_mday: 0,
+            tm_mon: 0,
+            tm_year: 0,
+            tm_wday: 0,
+            tm_yday: 0,
+            tm_isdst: 0,
+            tm_gmtoff: 0,
+            tm_zone: UTC,
+        };
+        if unsafe { gmtime_r(&unix_secs, &mut normalized_tm).is_null() } {
+            None
+        } else {
+            *timeptr_mut = normalized_tm;
+            Some(unix_secs)
+        }
+    }
+
+    match inner(&mut *timeptr) {
         Some(unix_secs) => {
-            // Normalize input struct with values from their standard ranges
-            let mut normalized_tm = tm {
-                tm_sec: 0,
-                tm_min: 0,
-                tm_hour: 0,
-                tm_mday: 0,
-                tm_mon: 0,
-                tm_year: 0,
-                tm_wday: 0,
-                tm_yday: 0,
-                tm_isdst: 0,
-                tm_gmtoff: 0,
-                tm_zone: UTC,
-            };
-            if gmtime_r(&unix_secs, &mut normalized_tm).is_null() {
-                platform::ERRNO.set(EOVERFLOW);
-                -1 as time_t
-            } else {
-                *timeptr_mut = normalized_tm;
-                unix_secs
-            }
+            unix_secs
         }
         None => {
             platform::ERRNO.set(EOVERFLOW);
