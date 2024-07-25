@@ -1,14 +1,14 @@
 use core::{
     cell::{Cell, UnsafeCell},
     ffi::c_int,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicU8, AtomicUsize, Ordering},
 };
 
 use syscall::{
-    data::AtomicU64, Error, RawAction, Result, SetSighandlerData, SigProcControl, Sigcontrol,
-    SigcontrolFlags, EINVAL, ENOMEM, EPERM, SIGABRT, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGILL,
-    SIGKILL, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG,
-    SIGWINCH, SIGXCPU, SIGXFSZ,
+    data::AtomicU64, Error, NonatomicUsize, RawAction, RealtimeSig, Result, SetSighandlerData,
+    SigProcControl, Sigcontrol, SigcontrolFlags, EINVAL, ENOMEM, EPERM, SIGABRT, SIGBUS, SIGCHLD,
+    SIGCONT, SIGFPE, SIGILL, SIGKILL, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTRAP, SIGTSTP, SIGTTIN,
+    SIGTTOU, SIGURG, SIGWINCH, SIGXCPU, SIGXFSZ,
 };
 
 use crate::{arch::*, proc::FdGuard, sync::Mutex, RtTcb, Tcb};
@@ -443,6 +443,14 @@ pub(crate) static PROC_CONTROL_STRUCT: SigProcControl = SigProcControl {
             user_data: AtomicU64::new(0),
         }
     }; 64],
+    qhead: AtomicU8::new(0),
+    _rsvd: [0; 7],
+    queue: [const {
+        RealtimeSig {
+            arg: NonatomicUsize::new(0),
+        }
+    }; 32],
+    qtail: AtomicU8::new(0),
 };
 
 fn combine_allowset([lo, hi]: [u64; 2]) -> u64 {
