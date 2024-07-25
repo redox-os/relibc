@@ -61,6 +61,11 @@ pub struct siginfo {
     _si_align: [usize; 0],
 }
 
+pub union sigval {
+    pub si_int: c_int,
+    pub si_ptr: *mut c_void,
+}
+
 /// cbindgen:ignore
 pub type sigset_t = c_ulonglong;
 /// cbindgen:ignore
@@ -71,6 +76,12 @@ pub type stack_t = sigaltstack;
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
     Sys::kill(pid, sig)
+}
+#[no_mangle]
+pub extern "C" fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> c_int {
+    Sys::sigqueue(pid, sig, val)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
