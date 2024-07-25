@@ -11,8 +11,8 @@ use crate::{
     header::{
         errno::{EINVAL, ENOSYS},
         signal::{
-            sigaction, siginfo_t, sigset_t, stack_t, SA_SIGINFO, SIG_BLOCK, SIG_DFL, SIG_IGN,
-            SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE, SS_ONSTACK,
+            sigaction, siginfo_t, sigset_t, sigval, stack_t, SA_SIGINFO, SIG_BLOCK, SIG_DFL,
+            SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE, SS_ONSTACK,
         },
         sys_time::{itimerval, ITIMER_REAL},
         time::timespec,
@@ -54,6 +54,13 @@ impl PalSignal for Sys {
 
     fn kill(pid: pid_t, sig: c_int) -> c_int {
         e(redox_rt::sys::posix_kill(pid as usize, sig as usize).map(|()| 0)) as c_int
+    }
+    fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<(), Errno> {
+        Ok(redox_rt::sys::posix_sigqueue(
+            pid as usize,
+            sig as usize,
+            unsafe { val.si_ptr } as usize,
+        )?)
     }
 
     fn killpg(pgrp: pid_t, sig: c_int) -> c_int {

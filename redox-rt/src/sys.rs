@@ -44,6 +44,13 @@ pub fn posix_kill(pid: usize, sig: usize) -> Result<()> {
     }
 }
 #[inline]
+pub fn posix_sigqueue(pid: usize, sig: usize, val: usize) -> Result<()> {
+    match wrapper(false, || unsafe { syscall::syscall3(101, pid, sig, val) }) {
+        Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+#[inline]
 pub fn posix_killpg(pgrp: usize, sig: usize) -> Result<()> {
     match wrapper(false, || syscall::kill(usize::wrapping_neg(pgrp), sig)) {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
