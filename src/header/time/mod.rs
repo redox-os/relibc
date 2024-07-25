@@ -421,7 +421,9 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
      */
 
     fn inner(timeptr_mut: &mut tm) -> Option<time_t> {
-        let year = time_t::try_from(timeptr_mut.tm_year).ok().and_then(|tm_year| tm_year.checked_add(1900))?;
+        let year = time_t::try_from(timeptr_mut.tm_year)
+            .ok()
+            .and_then(|tm_year| tm_year.checked_add(1900))?;
         let month = time_t::try_from(timeptr_mut.tm_mon).ok()?;
         let mday = time_t::try_from(timeptr_mut.tm_mday).ok()?;
 
@@ -431,22 +433,21 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
 
         // TODO: handle tm_isdst
 
-        let year_transformed = if month < 2 {
-            year - 1
-        } else {
-            year
-        };
+        let year_transformed = if month < 2 { year - 1 } else { year };
 
         let era = year_transformed.div_euclid(YEARS_PER_ERA);
         let year_of_era = year_transformed.rem_euclid(YEARS_PER_ERA);
 
-        let day_of_year = (153 * (if month > 1 { month - 2} else { month + 10 }) + 2) / 5 + mday - 1; // adapted for zero-based months
+        let day_of_year =
+            (153 * (if month > 1 { month - 2 } else { month + 10 }) + 2) / 5 + mday - 1; // adapted for zero-based months
 
         let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
         let unix_days = era * DAYS_PER_ERA + day_of_era - 719468;
         let secs_of_day = hour * (60 * 60) + min * 60 + sec;
 
-        let unix_secs = unix_days.checked_mul(SECS_PER_DAY).and_then(|day_secs| day_secs.checked_add(secs_of_day))?;
+        let unix_secs = unix_days
+            .checked_mul(SECS_PER_DAY)
+            .and_then(|day_secs| day_secs.checked_add(secs_of_day))?;
 
         // Normalize input struct with values from their standard ranges
         let mut normalized_tm = tm {
@@ -471,9 +472,7 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     }
 
     match inner(&mut *timeptr) {
-        Some(unix_secs) => {
-            unix_secs
-        }
+        Some(unix_secs) => unix_secs,
         None => {
             platform::ERRNO.set(EOVERFLOW);
             -1 as time_t
