@@ -1,4 +1,5 @@
-use core::mem;
+use crate::header::signal::sigval;
+use core::{mem, ptr::addr_of};
 
 use super::{
     super::{types::*, PalSignal},
@@ -7,7 +8,7 @@ use super::{
 use crate::{
     error::Errno,
     header::{
-        signal::{sigaction, siginfo_t, sigset_t, stack_t, NSIG, SA_RESTORER},
+        signal::{sigaction, siginfo_t, sigset_t, stack_t, NSIG, SA_RESTORER, SI_QUEUE},
         sys_time::itimerval,
         time::timespec,
     },
@@ -20,6 +21,19 @@ impl PalSignal for Sys {
 
     fn kill(pid: pid_t, sig: c_int) -> c_int {
         e(unsafe { syscall!(KILL, pid, sig) }) as c_int
+    }
+    fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<(), Errno> {
+        let info = siginfo_t {
+            si_addr: core::ptr::null_mut(),
+            si_code: SI_QUEUE,
+            si_errno: 0,
+            si_pid: 0, // TODO: GETPID?
+            si_signo: sig,
+            si_status: 0,
+            si_uid: 0, // TODO: GETUID?
+            si_value: val,
+        };
+        e_raw(unsafe { syscall!(RT_SIGQUEUEINFO, pid, sig, addr_of!(info)) }).map(|_| ())
     }
 
     fn killpg(pgrp: pid_t, sig: c_int) -> c_int {

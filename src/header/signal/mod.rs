@@ -55,21 +55,26 @@ pub struct sigaltstack {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy)]
 pub struct siginfo {
     pub si_signo: c_int,
     pub si_errno: c_int,
     pub si_code: c_int,
-    _padding: [c_int; 29],
-    _si_align: [usize; 0],
+    pub si_pid: pid_t,
+    pub si_uid: uid_t,
+    pub si_addr: *mut c_void,
+    pub si_status: c_int,
+    pub si_value: sigval,
 }
 
 #[no_mangle]
 pub extern "C" fn _cbindgen_export_siginfo(a: siginfo) {}
 
+#[derive(Clone, Copy)]
+#[repr(C)]
 pub union sigval {
-    pub si_int: c_int,
-    pub si_ptr: *mut c_void,
+    pub sival_int: c_int,
+    pub sival_ptr: *mut c_void,
 }
 
 /// cbindgen:ignore
@@ -371,7 +376,7 @@ pub unsafe extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int
 #[no_mangle]
 pub unsafe extern "C" fn sigtimedwait(
     set: *const sigset_t,
-    sig: *mut siginfo_t,
+    sig: *mut siginfo, // https://github.com/mozilla/cbindgen/issues/621
     tp: *const timespec,
 ) -> c_int {
     Sys::sigtimedwait(set, sig, tp)
