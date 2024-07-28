@@ -1,14 +1,14 @@
 use core::{
     cell::{Cell, UnsafeCell},
-    ffi::c_int,
+    ffi::{c_int, c_void},
     sync::atomic::{AtomicU8, AtomicUsize, Ordering},
 };
 
 use syscall::{
-    data::AtomicU64, Error, NonatomicUsize, RawAction, RealtimeSig, Result, SetSighandlerData,
-    SigProcControl, Sigcontrol, SigcontrolFlags, EINVAL, ENOMEM, EPERM, SIGABRT, SIGBUS, SIGCHLD,
-    SIGCONT, SIGFPE, SIGILL, SIGKILL, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTRAP, SIGTSTP, SIGTTIN,
-    SIGTTOU, SIGURG, SIGWINCH, SIGXCPU, SIGXFSZ,
+    data::AtomicU64, Error, NonatomicUsize, RawAction, Result, SetSighandlerData, SigProcControl,
+    Sigcontrol, SigcontrolFlags, EINVAL, ENOMEM, EPERM, SIGABRT, SIGBUS, SIGCHLD, SIGCONT, SIGFPE,
+    SIGILL, SIGKILL, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG,
+    SIGWINCH, SIGXCPU, SIGXFSZ,
 };
 
 use crate::{arch::*, proc::FdGuard, sync::Mutex, RtTcb, Tcb};
@@ -25,11 +25,12 @@ pub fn sighandler_function() -> usize {
 #[repr(C)]
 pub struct SigStack {
     #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-    _pad: [usize; 1], // pad to 16 bytes alignment
+    _pad: [usize; 0], // pad to 16 bytes alignment
 
     #[cfg(target_arch = "x86")]
-    _pad: [usize; 3], // pad to 16 bytes alignment
+    _pad: [usize; 2], // pad to 16 bytes alignment
 
+    sival: usize,
     sig_num: usize,
 
     // x86_64: 864 bytes
@@ -119,10 +120,33 @@ unsafe fn inner(stack: &mut SigStack) {
         && let Some(sigaction) = handler.sigaction
     {
         //let _ = syscall::write(1, alloc::format!("SIGACTION {:p}\n", sigaction).as_bytes());
+        // TODO: This struct is for practical reasons locked to Linux's ABI, but avoid redefining
+        // it here. Alternatively, check at compile time that the structs are equivalent.
+        #[repr(C)]
+        struct siginfo {
+            si_signo: c_int,
+            si_errno: c_int,
+            si_code: c_int,
+            si_pid: c_int, // TODO pid_t
+            si_uid: c_int, // TODO uid_t
+            si_addr: *mut c_void,
+            si_status: c_int,
+            si_value: usize, // TODO union
+        }
+        let info = siginfo {
+            si_signo: stack.sig_num as c_int,
+            si_addr: core::ptr::null_mut(),
+            si_code: 0, // TODO: SIG_QUEUE/SIG_USER/etc
+            si_errno: 0,
+            si_pid: 0,
+            si_status: 0,
+            si_uid: 0,
+            si_value: stack.sival,
+        };
         sigaction(
             stack.sig_num as c_int,
-            core::ptr::null_mut(),
-            core::ptr::null_mut(),
+            core::ptr::addr_of!(info).cast(),
+            core::ptr::null_mut(), // TODO
         );
     } else if let Some(handler) = handler.handler {
         //let _ = syscall::write(1, alloc::format!("HANDLER {:p}\n", handler).as_bytes());
@@ -232,9 +256,9 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnMut(u32, bool) -> u32
     // POSIX requires that at least one pending unblocked signal be delivered before
     // pthread_sigmask returns, if there is one. Deliver the lowest-numbered one.
     if can_raise != 0 {
-        let signal = can_raise.trailing_zeros() + 1;
-        // TODO
-        crate::sys::posix_kill_thread(**RtTcb::current().thread_fd(), signal);
+        unsafe {
+            manually_enter_trampoline();
+        }
     }
 
     Ok(())
@@ -443,14 +467,6 @@ pub(crate) static PROC_CONTROL_STRUCT: SigProcControl = SigProcControl {
             user_data: AtomicU64::new(0),
         }
     }; 64],
-    qhead: AtomicU8::new(0),
-    _rsvd: [0; 7],
-    queue: [const {
-        RealtimeSig {
-            arg: NonatomicUsize::new(0),
-        }
-    }; 32],
-    qtail: AtomicU8::new(0),
 };
 
 fn combine_allowset([lo, hi]: [u64; 2]) -> u64 {

@@ -59,7 +59,7 @@ impl PalSignal for Sys {
         Ok(redox_rt::sys::posix_sigqueue(
             pid as usize,
             sig as usize,
-            unsafe { val.si_ptr } as usize,
+            unsafe { val.sival_ptr } as usize,
         )?)
     }
 

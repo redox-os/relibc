@@ -162,6 +162,7 @@ NAMES=\
 	sa_restart \
 	sigchld \
 	stdio/ctermid \
+	sigqueue \
 	stdio/tempnam \
 	stdio/tmpnam \
 	stdlib/bsearch \

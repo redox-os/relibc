@@ -25,6 +25,9 @@ pub struct SigArea {
     pub tmp_rsp: usize,
     pub tmp_rax: usize,
     pub tmp_rdx: usize,
+    pub tmp_rdi: usize,
+    pub tmp_rsi: usize,
+    pub tmp_ptr: usize,
 
     pub altstack_top: usize,
     pub altstack_bottom: usize,
@@ -170,6 +173,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov fs:[{tcb_sa_off} + {sa_tmp_rsp}], rsp
     mov fs:[{tcb_sa_off} + {sa_tmp_rax}], rax
     mov fs:[{tcb_sa_off} + {sa_tmp_rdx}], rdx
+    mov fs:[{tcb_sa_off} + {sa_tmp_rdi}], rdi
+    mov fs:[{tcb_sa_off} + {sa_tmp_rsi}], rsi
 
     // First, select signal, always pick first available bit
 1:
@@ -201,11 +206,18 @@ asmfunction!(__relibc_internal_sigentry: ["
     jz 7f
 
     bt edx, eax // check if signal was sent to thread specifically
-    jc 2f // then continue as usual
+    jc 2f // if so, continue as usual
 
-    // otherwise, try clearing pending
-    lock btr [rip + {pctl} + {pctl_off_pending}], eax
-    jnc 1b
+    // otherwise, try (competitively) dequeueing realtime signal
+    mov esi, eax
+    mov eax, {SYS_SIGDEQUEUE}
+    mov rdi, fs:[0]
+    add rdi, {tcb_sa_off} + {sa_tmp_ptr} // out pointer of dequeued realtime sig
+    syscall
+    test eax, eax
+    jnz 1b // assumes error can only be EAGAIN
+    lea eax, [esi + 32]
+    jmp 9f
 2:
     mov edx, eax
     shr edx, 5
@@ -220,7 +232,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     // skip the sigaltstack logic.
     lea rdx, [rip + {pctl} + {pctl_off_actions}]
 
-    // LEA doesn't support x16, so just do two x8s.
+    // LEA doesn't support 16x, so just do two x8s.
     lea rdx, [rdx + 8 * rax]
     lea rdx, [rdx + 8 * rax]
 
@@ -247,8 +259,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     push fs:[{tcb_sc_off} + {sc_saved_rip}]
     push fs:[{tcb_sc_off} + {sc_saved_rflags}]
 
-    push rdi
-    push rsi
+    push fs:[{tcb_sa_off} + {sa_tmp_rdi}]
+    push fs:[{tcb_sa_off} + {sa_tmp_rsi}]
     push fs:[{tcb_sa_off} + {sa_tmp_rdx}]
     push rcx
     push fs:[{tcb_sa_off} + {sa_tmp_rax}]
@@ -288,7 +300,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     vextractf128 [rsp], ymm15, 1
 5:
     push rax // selected signal
-    sub rsp, 8
+    push fs:[{tcb_sa_off} + {sa_tmp_ptr}]
 
     mov rdi, rsp
     call {inner}
@@ -383,6 +395,9 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_rsp = const offset_of!(SigArea, tmp_rsp),
     sa_tmp_rax = const offset_of!(SigArea, tmp_rax),
     sa_tmp_rdx = const offset_of!(SigArea, tmp_rdx),
+    sa_tmp_rdi = const offset_of!(SigArea, tmp_rdi),
+    sa_tmp_rsi = const offset_of!(SigArea, tmp_rsi),
+    sa_tmp_ptr = const offset_of!(SigArea, tmp_ptr),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
     sc_saved_rflags = const offset_of!(Sigcontrol, saved_archdep_reg),
@@ -398,6 +413,7 @@ __relibc_internal_sigentry_crit_third:
     REDZONE_SIZE = const 128,
     STACK_ALIGN = const 16,
     SA_ONSTACK_BIT = const 58, // (1 << 58) >> 32 = 0x0400_0000
+    SYS_SIGDEQUEUE = const syscall::SYS_SIGDEQUEUE,
 ]);
 
 extern "C" {
