@@ -1,7 +1,10 @@
 //! Helper functions for random() and friends, see https://pubs.opengroup.org/onlinepubs/7908799/xsh/initstate.html
 // Ported from musl's implementation (src/prng/random.c)
 
-use crate::{platform::types::*, sync::{Mutex, MutexGuard}};
+use crate::{
+    platform::types::*,
+    sync::{Mutex, MutexGuard},
+};
 use core::{convert::TryFrom, ptr};
 
 pub struct State {
@@ -27,7 +30,8 @@ impl State {
     pub unsafe fn save(&mut self) -> *mut [u8; 4] {
         self.ensure_x_ptr_init();
 
-        let stash_value: u32 = (u32::from(self.n) << 16) | (u32::from(self.i) << 8) | u32::from(self.j);
+        let stash_value: u32 =
+            (u32::from(self.n) << 16) | (u32::from(self.i) << 8) | u32::from(self.j);
         *self.x_ptr.offset(-1) = stash_value.to_ne_bytes();
         self.x_ptr.offset(-1)
     }
@@ -37,8 +41,8 @@ impl State {
         self.x_ptr = state_ptr.offset(1);
 
         /* This calculation of n does not have a bit mask in the musl
-        * original, in principle resulting in a u16, but obtaining a value
-        * larger than 63 can probably be dismissed as pathological. */
+         * original, in principle resulting in a u16, but obtaining a value
+         * larger than 63 can probably be dismissed as pathological. */
         self.n = u8::try_from((stash_value >> 16) & 0xff).unwrap();
 
         // i and j calculations are straight from musl
