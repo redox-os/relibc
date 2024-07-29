@@ -76,35 +76,35 @@ impl State {
     }
 }
 
-static STATE: Mutex<State> = Mutex::new(State {
-    #[rustfmt::skip]
-    x_init: [
-        0x00000000, 0x5851f42d, 0xc0b18ccf, 0xcbb5f646,
-        0xc7033129, 0x30705b04, 0x20fd5db4, 0x9a8b7f78,
-        0x502959d8, 0xab894868, 0x6c0356a7, 0x88cdb7ff,
-        0xb477d43f, 0x70a3a52b, 0xa8e4baf1, 0xfd8341fc,
-        0x8ae16fd9, 0x742d2f7a, 0x0d1f0796, 0x76035e09,
-        0x40f7702c, 0x6fa72ca5, 0xaaa84157, 0x58a0df74,
-        0xc74a0364, 0xae533cc4, 0x04185faf, 0x6de3b115,
-        0x0cab8628, 0xf043bfa4, 0x398150e9, 0x37521657,
-    ],
-    /* As such, random() and related functions work on u32 values, but POSIX
-     * allows the user to supply a custom state data array as a `char *`
-     * with no requirements on alignment. Thus, we must assume the worst in
-     * terms of alignment and convert back and forth from [u8; 4].
-     *
-     * Also, unlike in C, we can't take the address of the initializing
-     * array outside of a function. */
-    x_ptr: ptr::null_mut(),
-    /* N needs to accommodate values up to 63, corresponding to the maximum
-     * state array size of 256 bytes. I and J must be able to accommodate
-     * values less than or equal to N. */
-    n: 31,
-    i: 3,
-    j: 0,
-});
-
 pub fn state_lock<'a>() -> MutexGuard<'a, State> {
+    static STATE: Mutex<State> = Mutex::new(State {
+        #[rustfmt::skip]
+        x_init: [
+            0x00000000, 0x5851f42d, 0xc0b18ccf, 0xcbb5f646,
+            0xc7033129, 0x30705b04, 0x20fd5db4, 0x9a8b7f78,
+            0x502959d8, 0xab894868, 0x6c0356a7, 0x88cdb7ff,
+            0xb477d43f, 0x70a3a52b, 0xa8e4baf1, 0xfd8341fc,
+            0x8ae16fd9, 0x742d2f7a, 0x0d1f0796, 0x76035e09,
+            0x40f7702c, 0x6fa72ca5, 0xaaa84157, 0x58a0df74,
+            0xc74a0364, 0xae533cc4, 0x04185faf, 0x6de3b115,
+            0x0cab8628, 0xf043bfa4, 0x398150e9, 0x37521657,
+        ],
+        /* As such, random() and related functions work on u32 values, but POSIX
+         * allows the user to supply a custom state data array as a `char *`
+         * with no requirements on alignment. Thus, we must assume the worst in
+         * terms of alignment and convert back and forth from [u8; 4].
+         *
+         * Also, unlike in C, we can't take the address of the initializing
+         * array outside of a function. */
+        x_ptr: ptr::null_mut(),
+        /* N needs to accommodate values up to 63, corresponding to the maximum
+         * state array size of 256 bytes. I and J must be able to accommodate
+         * values less than or equal to N. */
+        n: 31,
+        i: 3,
+        j: 0,
+    });
+
     STATE.try_lock().expect("unable to acquire PRNG lock")
 }
 
