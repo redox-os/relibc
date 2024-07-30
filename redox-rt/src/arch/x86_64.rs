@@ -1,5 +1,6 @@
 use core::{
     mem::offset_of,
+    ptr::NonNull,
     sync::atomic::{AtomicU8, Ordering},
 };
 
@@ -33,6 +34,7 @@ pub struct SigArea {
     pub altstack_bottom: usize,
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
+    pub last_sigstack: Option<NonNull<SigStack>>,
 }
 
 #[repr(C, align(16))]
@@ -301,11 +303,12 @@ asmfunction!(__relibc_internal_sigentry: ["
 5:
     push rax // selected signal
     push fs:[{tcb_sa_off} + {sa_tmp_ptr}]
+    sub rsp, 48 // alloc space for ucontext fields
 
     mov rdi, rsp
     call {inner}
 
-    add rsp, 16
+    add rsp, 64
 
     fxrstor64 [rsp + 16 * 16]
 

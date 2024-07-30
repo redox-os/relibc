@@ -1,6 +1,7 @@
 use core::{
     cell::{Cell, UnsafeCell},
     ffi::{c_int, c_void},
+    ptr::NonNull,
     sync::atomic::{AtomicU8, AtomicUsize, Ordering},
 };
 
@@ -22,14 +23,19 @@ pub fn sighandler_function() -> usize {
     __relibc_internal_sigentry as usize
 }
 
+/// ucontext_t representation
 #[repr(C)]
 pub struct SigStack {
     #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-    _pad: [usize; 0], // pad to 16 bytes alignment
+    _pad: [usize; 1], // pad from 7*8 to 64
 
     #[cfg(target_arch = "x86")]
-    _pad: [usize; 2], // pad to 16 bytes alignment
+    _pad: [usize; 0], // don't pad from 8*4
 
+    pub link: *mut SigStack,
+
+    pub old_stack: PosixStackt,
+    pub old_mask: u64,
     sival: usize,
     sig_num: usize,
 
@@ -38,10 +44,35 @@ pub struct SigStack {
     // aarch64: 272 bytes (SIMD TODO)
     pub regs: ArchIntRegs,
 }
+#[repr(C)]
+pub struct PosixStackt {
+    pub sp: *mut (),
+    pub flags: i32,
+    pub size: usize,
+}
+
+#[repr(C)]
+// TODO: This struct is for practical reasons locked to Linux's ABI, but avoid redefining
+// it here. Alternatively, check at compile time that the structs are equivalent.
+pub struct SiginfoAbi {
+    pub si_signo: i32,
+    pub si_errno: i32,
+    pub si_code: i32,
+    pub si_pid: i32,      // pid_t
+    pub si_uid: i32,      // uid_t
+    pub si_addr: *mut (), // *mut c_void
+    pub si_status: i32,
+    pub si_value: usize, // sigval
+}
 
 #[inline(always)]
 unsafe fn inner(stack: &mut SigStack) {
     let os = &Tcb::current().unwrap().os_specific;
+
+    let stack_ptr = NonNull::from(&mut *stack);
+    stack.link = core::mem::replace(&mut (*os.arch.get()).last_sigstack, Some(stack_ptr))
+        .map_or_else(core::ptr::null_mut, |x| x.as_ptr());
+
     let signals_were_disabled = (*os.arch.get()).disable_signals_depth > 0;
 
     let _targeted_thread_not_process = stack.sig_num >= 64;
@@ -119,21 +150,11 @@ unsafe fn inner(stack: &mut SigStack) {
     if sigaction.flags.contains(SigactionFlags::SIGINFO)
         && let Some(sigaction) = handler.sigaction
     {
+        stack.old_mask = ((prev_w1 >> 32) << 32) | (prev_w0 & 0xffff_ffff);
+        // TODO: stack.old_stack
+
         //let _ = syscall::write(1, alloc::format!("SIGACTION {:p}\n", sigaction).as_bytes());
-        // TODO: This struct is for practical reasons locked to Linux's ABI, but avoid redefining
-        // it here. Alternatively, check at compile time that the structs are equivalent.
-        #[repr(C)]
-        struct siginfo {
-            si_signo: c_int,
-            si_errno: c_int,
-            si_code: c_int,
-            si_pid: c_int, // TODO pid_t
-            si_uid: c_int, // TODO uid_t
-            si_addr: *mut c_void,
-            si_status: c_int,
-            si_value: usize, // TODO union
-        }
-        let info = siginfo {
+        let info = SiginfoAbi {
             si_signo: stack.sig_num as c_int,
             si_addr: core::ptr::null_mut(),
             si_code: 0, // TODO: SIG_QUEUE/SIG_USER/etc
@@ -146,7 +167,7 @@ unsafe fn inner(stack: &mut SigStack) {
         sigaction(
             stack.sig_num as c_int,
             core::ptr::addr_of!(info).cast(),
-            core::ptr::null_mut(), // TODO
+            stack as *mut SigStack as *mut (),
         );
     } else if let Some(handler) = handler.handler {
         //let _ = syscall::write(1, alloc::format!("HANDLER {:p}\n", handler).as_bytes());
