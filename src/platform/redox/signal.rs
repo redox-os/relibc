@@ -1,5 +1,7 @@
-use core::mem;
-use redox_rt::signal::{Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler};
+use core::mem::{self, offset_of};
+use redox_rt::signal::{
+    SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
+};
 use syscall::{self, Result};
 
 use super::{
@@ -19,6 +21,53 @@ use crate::{
     },
     platform::ERRNO,
 };
+
+#[repr(C)]
+pub struct ucontext_t {
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    _pad: [usize; 1], // pad from 7*8 to 64
+
+    #[cfg(target_arch = "x86")]
+    _pad: [usize; 0], // don't pad from 8*4
+
+    pub uc_link: *mut ucontext_t,
+    pub uc_stack: stack_t,
+    pub uc_sigmask: sigset_t,
+    _sival: usize,
+    _signum: usize,
+    pub uc_mcontext: mcontext_t,
+}
+
+const _: () = {
+    const fn assert_eq(a: usize, b: usize) {
+        if a != b {
+            panic!("compile-time struct verification failed");
+        }
+    }
+    assert_eq(offset_of!(ucontext_t, uc_link), offset_of!(SigStack, link));
+    assert_eq(
+        offset_of!(ucontext_t, uc_stack),
+        offset_of!(SigStack, old_stack),
+    );
+    assert_eq(
+        offset_of!(ucontext_t, uc_sigmask),
+        offset_of!(SigStack, old_mask),
+    );
+    assert_eq(
+        offset_of!(ucontext_t, uc_mcontext),
+        offset_of!(SigStack, regs),
+    );
+};
+
+#[repr(C)]
+pub struct mcontext_t {
+    #[cfg(target_arch = "x86")]
+    _opaque: [u8; 512],
+    #[cfg(target_arch = "x86-64")]
+    _opaque: [u8; 864],
+    #[cfg(target_arch = "aarch64")]
+    _opaque: [u8; 272],
+}
 
 impl PalSignal for Sys {
     unsafe fn getitimer(which: c_int, out: *mut itimerval) -> c_int {

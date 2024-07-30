@@ -222,13 +222,13 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     push eax
     push dword ptr gs:[{tcb_sa_off} + {sa_tmp_ptr}]
-    sub esp, 2 * 4
+    sub esp, 24
 
     mov ecx, esp
     call {inner}
 
-    fxrstor [esp + 16]
-    add esp, 16 + 29 * 16 + 2 * 4
+    fxrstor [esp + 32]
+    add esp, 32 + 29 * 16 + 2 * 4
 
     pop ebp
     pop esi
