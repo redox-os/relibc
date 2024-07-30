@@ -22,6 +22,7 @@ pub struct SigArea {
     pub tmp_eax: usize,
     pub tmp_ecx: usize,
     pub tmp_edx: usize,
+    pub tmp_ptr: usize,
     pub pctl: usize, // TODO: reference pctl directly
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
@@ -166,12 +167,21 @@ asmfunction!(__relibc_internal_sigentry: ["
     jz 7f // spurious signal
     bsf eax, eax
 
+    // If thread was specifically targeted, send the signal to it first.
     bt edx, eax
     jc 8f
 
-    lock btr [ecx + {pctl_word} + 4], eax
-    jnc 1b
-    add eax, 32
+    mov edx, ebx
+    lea ecx, [eax+32]
+    mov eax, {SYS_SIGDEQUEUE}
+    mov edx, gs:[0]
+    add edx, {tcb_sa_off} + {sa_tmp_ptr}
+    int 0x80
+    mov ebx, edx
+    test eax, eax
+    jnz 1b
+
+    mov eax, ecx
     jmp 2f
 8:
     add eax, 32
@@ -200,7 +210,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     push dword ptr gs:[{tcb_sc_off} + {sc_saved_eflags}]
 
     push dword ptr gs:[{tcb_sa_off} + {sa_tmp_edx}]
-    push ecx
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_ecx}]
     push dword ptr gs:[{tcb_sa_off} + {sa_tmp_eax}]
     push ebx
     push edi
@@ -211,7 +221,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     fxsave [esp]
 
     push eax
-    sub esp, 3 * 4
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_ptr}]
+    sub esp, 2 * 4
 
     mov ecx, esp
     call {inner}
@@ -262,6 +273,7 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_eax = const offset_of!(SigArea, tmp_eax),
     sa_tmp_ecx = const offset_of!(SigArea, tmp_ecx),
     sa_tmp_edx = const offset_of!(SigArea, tmp_edx),
+    sa_tmp_ptr = const offset_of!(SigArea, tmp_ptr),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
     sa_pctl = const offset_of!(SigArea, pctl),
@@ -275,6 +287,7 @@ __relibc_internal_sigentry_crit_third:
     pctl_word = const offset_of!(SigProcControl, pending),
     pctl = sym PROC_CONTROL_STRUCT,
     STACK_ALIGN = const 16,
+    SYS_SIGDEQUEUE = const syscall::SYS_SIGDEQUEUE,
 ]);
 
 asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
