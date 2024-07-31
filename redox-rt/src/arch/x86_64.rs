@@ -11,7 +11,7 @@ use syscall::{
 
 use crate::{
     proc::{fork_inner, FdGuard},
-    signal::{inner_c, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    signal::{inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     RtTcb, Tcb,
 };
 
@@ -424,7 +424,8 @@ extern "C" {
     fn __relibc_internal_sigentry_crit_second();
     fn __relibc_internal_sigentry_crit_third();
 }
-pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
+/// Fixes some edge cases, and calculates the value for uc_stack.
+pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt {
     // It is impossible to update RSP and RIP atomically on x86_64, without using IRETQ, which is
     // almost as slow as calling a SIGRETURN syscall would be. Instead, we abuse the fact that
     // signals are disabled in the prologue of the signal trampoline, which allows us to emulate
@@ -438,12 +439,18 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
         let stack_ptr = stack.regs.rsp as *const usize;
         stack.regs.rsp = stack_ptr.read();
         stack.regs.rip = stack_ptr.sub(1).read();
-    } else if stack.regs.rip == __relibc_internal_sigentry_crit_second as usize {
+    } else if stack.regs.rip == __relibc_internal_sigentry_crit_second as usize
+        || stack.regs.rip == __relibc_internal_sigentry_crit_third as usize
+    {
         // Almost finished, just reexecute the jump before tmp_rip is overwritten by this
         // deeper-level signal.
         stack.regs.rip = area.tmp_rip;
-    } else if stack.regs.rip == __relibc_internal_sigentry_crit_third as usize {
-        stack.regs.rip = area.tmp_rip;
+    }
+
+    PosixStackt {
+        sp: stack.regs.rsp as *mut (),
+        size: 0,  // TODO
+        flags: 0, // TODO
     }
 }
 

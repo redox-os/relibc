@@ -80,7 +80,7 @@ unsafe fn inner(stack: &mut SigStack) {
 
     // asm counts from 0
     stack.sig_num += 1;
-    arch_pre(stack, &mut *os.arch.get());
+    stack.old_stack = arch_pre(stack, &mut *os.arch.get());
 
     let sigaction = {
         let guard = SIGACTIONS_LOCK.lock();

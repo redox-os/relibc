@@ -4,7 +4,7 @@ use syscall::*;
 
 use crate::{
     proc::{fork_inner, FdGuard},
-    signal::{inner_fastcall, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    signal::{inner_fastcall, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     RtTcb,
 };
 
@@ -314,15 +314,20 @@ extern "C" {
     fn __relibc_internal_sigentry_crit_second();
     fn __relibc_internal_sigentry_crit_third();
 }
-pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
+pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt {
     if stack.regs.eip == __relibc_internal_sigentry_crit_first as usize {
         let stack_ptr = stack.regs.esp as *const usize;
         stack.regs.esp = stack_ptr.read();
         stack.regs.eip = stack_ptr.sub(1).read();
-    } else if stack.regs.eip == __relibc_internal_sigentry_crit_second as usize {
+    } else if stack.regs.eip == __relibc_internal_sigentry_crit_second as usize
+        || stack.regs.eip == __relibc_internal_sigentry_crit_third as usize
+    {
         stack.regs.eip = area.tmp_eip;
-    } else if stack.regs.eip == __relibc_internal_sigentry_crit_third as usize {
-        stack.regs.eip = area.tmp_eip;
+    }
+    PosixStackt {
+        sp: stack.regs.esp as *mut (),
+        size: 0,  // TODO
+        flags: 0, // TODO
     }
 }
 #[no_mangle]
