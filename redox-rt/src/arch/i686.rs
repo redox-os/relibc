@@ -1,4 +1,4 @@
-use core::{mem::offset_of, sync::atomic::Ordering};
+use core::{mem::offset_of, ptr::NonNull, sync::atomic::Ordering};
 
 use syscall::*;
 
@@ -26,6 +26,7 @@ pub struct SigArea {
     pub pctl: usize, // TODO: reference pctl directly
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
+    pub last_sigstack: Option<NonNull<SigStack>>,
 }
 #[derive(Debug, Default)]
 #[repr(C, align(16))]
