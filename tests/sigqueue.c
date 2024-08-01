@@ -12,12 +12,15 @@
 
 volatile sig_atomic_t num = 1;
 
+int parent;
+
 void action(int sig, siginfo_t *info, void *context) {
   (void)context;
   assert(sig == THE_SIG);
   assert(info->si_signo == THE_SIG);
   assert(info->si_value.sival_int == num);
   assert(info->si_code == SI_QUEUE);
+  assert(info->si_pid == parent);
   num++;
   write(1, "action\n", 7);
 }
@@ -27,6 +30,9 @@ int main(void) {
 
   status = pipe(fds);
   ERROR_IF(pipe, status, == -1);
+
+  parent = getpid();
+  assert(parent != 0);
 
   int child = fork();
   ERROR_IF(fork, child, == -1);

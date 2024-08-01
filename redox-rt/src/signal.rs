@@ -81,13 +81,27 @@ unsafe fn inner(stack: &mut SigStack) {
 
     // asm counts from 0
     stack.sig_num += 1;
-    stack.old_stack = arch_pre(stack, &mut *os.arch.get(), targeted_thread_not_process);
+
+    let (sender_pid, sender_uid) = {
+        let area = &mut *os.arch.get();
+
+        stack.sival = area.tmp_inf.arg;
+        stack.old_stack = arch_pre(stack, area);
+
+        if (stack.sig_num - 1) / 32 == 1 && !targeted_thread_not_process {
+            stack.sig_code = area.tmp_inf.code as u32;
+            (area.tmp_inf.pid, area.tmp_inf.uid)
+        } else {
+            // TODO: SIGCHLD information when applicable
+            stack.sig_code = 0;
+            (0, 0) // TODO
+        }
+    };
 
     let sigaction = {
         let guard = SIGACTIONS_LOCK.lock();
         let action = convert_old(&PROC_CONTROL_STRUCT.actions[stack.sig_num as usize - 1]);
         if action.flags.contains(SigactionFlags::RESETHAND) {
-            // TODO: other things that must be set
             drop(guard);
             sigaction(
                 stack.sig_num as u8,
@@ -159,9 +173,9 @@ unsafe fn inner(stack: &mut SigStack) {
             si_addr: core::ptr::null_mut(),
             si_code: stack.sig_code as i32,
             si_errno: 0,
-            si_pid: 0, // TODO
+            si_pid: sender_pid as i32,
             si_status: 0,
-            si_uid: 0, // TODO
+            si_uid: sender_uid as i32,
             si_value: stack.sival,
         };
         sigaction(

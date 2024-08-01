@@ -39,6 +39,7 @@ pub struct ucontext_t {
 }
 
 const _: () = {
+    #[track_caller]
     const fn assert_eq(a: usize, b: usize) {
         if a != b {
             panic!("compile-time struct verification failed");
