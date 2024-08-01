@@ -1,6 +1,8 @@
+use core::ptr::addr_of;
+
 use syscall::{
     error::{Error, Result, EINTR},
-    TimeSpec,
+    RtSigInfo, TimeSpec,
 };
 
 use crate::{arch::manually_enter_trampoline, proc::FdGuard, signal::tmp_disable_signals, Tcb};
@@ -44,9 +46,13 @@ pub fn posix_kill(pid: usize, sig: usize) -> Result<()> {
     }
 }
 #[inline]
-pub fn posix_sigqueue(pid: usize, sig: usize, val: usize) -> Result<()> {
+pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
+    let siginf = RtSigInfo {
+        arg,
+        code: usize::wrapping_neg(1), // TODO: SI_QUEUE
+    };
     match wrapper(false, || unsafe {
-        syscall::syscall3(syscall::SYS_SIGENQUEUE, pid, sig, val)
+        syscall::syscall3(syscall::SYS_SIGENQUEUE, pid, sig, addr_of!(siginf) as usize)
     }) {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
