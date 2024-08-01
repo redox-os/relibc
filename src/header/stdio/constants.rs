@@ -24,6 +24,8 @@ pub const _IOFBF: c_int = 0;
 pub const _IOLBF: c_int = 1;
 pub const _IONBF: c_int = 2;
 
+// /dev/tty + nul
+pub const L_ctermid: usize = 9;
 // form of name is /XXXXXX, so 7
 pub const L_tmpnam: c_int = 7;
 // 36^6 (26 letters + 10 digits) is larger than i32::MAX, so just set to that
