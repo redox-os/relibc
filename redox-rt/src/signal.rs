@@ -37,8 +37,8 @@ pub struct SigStack {
     pub old_stack: PosixStackt,
     pub old_mask: u64,
     pub(crate) sival: usize,
-    pub(crate) sig_num: u32,
     pub(crate) sig_code: u32,
+    pub(crate) sig_num: u32,
 
     // x86_64: 864 bytes
     // i686: 512 bytes
