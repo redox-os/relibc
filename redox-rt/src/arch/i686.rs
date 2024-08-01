@@ -22,7 +22,7 @@ pub struct SigArea {
     pub tmp_eax: usize,
     pub tmp_ecx: usize,
     pub tmp_edx: usize,
-    pub tmp_ptr: usize,
+    pub tmp_inf: RtSigInfo,
     pub pctl: usize, // TODO: reference pctl directly
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
@@ -83,11 +83,7 @@ unsafe extern "cdecl" fn fork_impl(initial_rsp: *mut usize) -> usize {
 
 unsafe extern "cdecl" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
-    // TODO: Currently pidfd == threadfd, but this will not be the case later.
-    RtTcb::current()
-        .thr_fd
-        .get()
-        .write(Some(FdGuard::new(new_pid_fd)));
+    crate::child_hook_common(FdGuard::new(new_pid_fd));
 }
 
 asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
@@ -176,7 +172,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     lea ecx, [eax+32]
     mov eax, {SYS_SIGDEQUEUE}
     mov edx, gs:[0]
-    add edx, {tcb_sa_off} + {sa_tmp_ptr}
+    add edx, {tcb_sa_off} + {sa_tmp_inf}
     int 0x80
     mov ebx, edx
     test eax, eax
@@ -221,15 +217,14 @@ asmfunction!(__relibc_internal_sigentry: ["
     sub esp, 2 * 4 + 29 * 16
     fxsave [esp]
 
-    push eax
-    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_ptr}]
-    sub esp, 24
+    mov [esp - 4], eax
+    sub esp, 48
 
     mov ecx, esp
     call {inner}
 
     fxrstor [esp + 32]
-    add esp, 32 + 29 * 16 + 2 * 4
+    add esp, 48 + 29 * 16 + 2 * 4
 
     pop ebp
     pop esi
@@ -274,7 +269,7 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_eax = const offset_of!(SigArea, tmp_eax),
     sa_tmp_ecx = const offset_of!(SigArea, tmp_ecx),
     sa_tmp_edx = const offset_of!(SigArea, tmp_edx),
-    sa_tmp_ptr = const offset_of!(SigArea, tmp_ptr),
+    sa_tmp_inf = const offset_of!(SigArea, tmp_inf),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
     sa_pctl = const offset_of!(SigArea, pctl),

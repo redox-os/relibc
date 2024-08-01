@@ -28,13 +28,14 @@ pub struct ucontext_t {
     _pad: [usize; 1], // pad from 7*8 to 64
 
     #[cfg(target_arch = "x86")]
-    _pad: [usize; 0], // don't pad from 8*4
+    _pad: [usize; 3], // pad from 9*4 to 12*4
 
     pub uc_link: *mut ucontext_t,
     pub uc_stack: stack_t,
     pub uc_sigmask: sigset_t,
     _sival: usize,
-    _signum: usize,
+    _sigcode: u32,
+    _signum: u32,
     pub uc_mcontext: mcontext_t,
 }
 

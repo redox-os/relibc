@@ -298,7 +298,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     vextractf128 [rsp + 16], ymm14, 1
     vextractf128 [rsp], ymm15, 1
 5:
-    mov [rsp - 8], eax
+    mov [rsp - 4], eax
     sub rsp, 64 // alloc space for ucontext fields
 
     mov rdi, rsp
