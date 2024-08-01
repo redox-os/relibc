@@ -97,11 +97,7 @@ unsafe extern "sysv64" fn fork_impl(initial_rsp: *mut usize) -> usize {
 
 unsafe extern "sysv64" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
-    // TODO: Currently pidfd == threadfd, but this will not be the case later.
-    RtTcb::current()
-        .thr_fd
-        .get()
-        .write(Some(FdGuard::new(new_pid_fd)));
+    crate::child_hook_common(FdGuard::new(new_pid_fd));
 }
 
 asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
@@ -425,11 +421,7 @@ extern "C" {
     fn __relibc_internal_sigentry_crit_third();
 }
 /// Fixes some edge cases, and calculates the value for uc_stack.
-pub unsafe fn arch_pre(
-    stack: &mut SigStack,
-    area: &mut SigArea,
-    targeted_thread: bool,
-) -> PosixStackt {
+pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt {
     // It is impossible to update RSP and RIP atomically on x86_64, without using IRETQ, which is
     // almost as slow as calling a SIGRETURN syscall would be. Instead, we abuse the fact that
     // signals are disabled in the prologue of the signal trampoline, which allows us to emulate
@@ -450,14 +442,6 @@ pub unsafe fn arch_pre(
         // deeper-level signal.
         stack.regs.rip = area.tmp_rip;
     }
-
-    stack.sig_code = if (stack.sig_num - 1) / 32 == 1 && !targeted_thread {
-        area.tmp_inf.code as u32
-    } else {
-        // TODO: SIGCHLD information when applicable
-        0
-    };
-    stack.sival = area.tmp_inf.arg;
 
     PosixStackt {
         sp: stack.regs.rsp as *mut (),

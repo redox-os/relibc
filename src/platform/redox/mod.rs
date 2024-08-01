@@ -470,7 +470,7 @@ impl Pal for Sys {
     }
 
     fn getpid() -> pid_t {
-        e(syscall::getpid()) as pid_t
+        redox_rt::sys::posix_getpid() as pid_t
     }
 
     fn getppid() -> pid_t {

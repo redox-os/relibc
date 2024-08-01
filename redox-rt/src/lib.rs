@@ -9,7 +9,7 @@
 )]
 #![forbid(unreachable_patterns)]
 
-use core::cell::UnsafeCell;
+use core::cell::{SyncUnsafeCell, UnsafeCell};
 
 use generic_rt::{ExpectTlsFree, GenericTcb};
 use syscall::{Sigcontrol, O_CLOEXEC};
@@ -120,13 +120,13 @@ pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end_and_tcb_start: usize, _tls_len: 
 }
 
 /// Initialize redox-rt in situations where relibc is not used
-pub fn initialize_freestanding() {
+pub unsafe fn initialize_freestanding() {
     // TODO: This code is a hack! Integrate the ld_so TCB code into generic-rt, and then use that
     // (this function will need pointers to the ELF structs normally passed in auxvs), so the TCB
     // is initialized properly.
 
     // TODO: TLS
-    let page = unsafe {
+    let page = {
         &mut *(syscall::fmap(
             !0,
             &syscall::Map {
@@ -155,4 +155,20 @@ pub fn initialize_freestanding() {
         let abi_ptr = core::ptr::addr_of_mut!(page.tcb_ptr);
         core::arch::asm!("msr tpidr_el0, {}", in(reg) abi_ptr);
     }
+    initialize();
+}
+pub unsafe fn initialize() {
+    THIS_PID
+        .get()
+        .write(Some(syscall::getpid().unwrap().try_into().unwrap()).unwrap());
+}
+
+static THIS_PID: SyncUnsafeCell<u32> = SyncUnsafeCell::new(0);
+
+unsafe fn child_hook_common(new_pid_fd: FdGuard) {
+    // TODO: Currently pidfd == threadfd, but this will not be the case later.
+    RtTcb::current().thr_fd.get().write(Some(new_pid_fd));
+    THIS_PID
+        .get()
+        .write(Some(syscall::getpid().unwrap().try_into().unwrap()).unwrap());
 }
