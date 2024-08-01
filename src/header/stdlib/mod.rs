@@ -416,16 +416,15 @@ pub extern "C" fn grantpt(fildes: c_int) -> c_int {
     0
 }
 
+// Ported from musl
 #[no_mangle]
 pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_t) -> *mut c_char {
-    // Ported from musl
-
     if size < 8 {
         ptr::null_mut()
     } else {
-        // TODO: lock?
-        let old_state = random::save_state();
-        random::N = match size {
+        let mut random_state = random::state_lock();
+        let old_state = random_state.save();
+        random_state.n = match size {
             0..=7 => unreachable!(), // ensured above
             8..=31 => 0,
             32..=63 => 7,
@@ -434,10 +433,9 @@ pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_
             _ => 63,
         };
 
-        random::X_PTR = (state.cast::<[u8; 4]>()).offset(1);
-        random::seed(seed);
-        random::save_state();
-        // TODO: unlock?
+        random_state.x_ptr = (state.cast::<[u8; 4]>()).offset(1);
+        random_state.seed(seed);
+        random_state.save();
 
         old_state.cast::<_>()
     }
@@ -905,39 +903,39 @@ pub unsafe extern "C" fn rand_r(seed: *mut c_uint) -> c_int {
     }
 }
 
+// Ported from musl
 #[no_mangle]
 pub unsafe extern "C" fn random() -> c_long {
-    // Ported from musl
+    let mut random_state = random::state_lock();
 
     let k: u32;
-    // TODO: lock?
-    random::ensure_x_ptr_init();
 
-    if random::N == 0 {
-        let x_old = u32::from_ne_bytes(*random::X_PTR);
+    random_state.ensure_x_ptr_init();
+
+    if random_state.n == 0 {
+        let x_old = u32::from_ne_bytes(*random_state.x_ptr);
         let x_new = random::lcg31_step(x_old);
-        *random::X_PTR = x_new.to_ne_bytes();
+        *random_state.x_ptr = x_new.to_ne_bytes();
         k = x_new;
     } else {
         // The non-u32-aligned way of saying x[i] += x[j]...
-        let x_i_old = u32::from_ne_bytes(*random::X_PTR.add(usize::from(random::I)));
-        let x_j = u32::from_ne_bytes(*random::X_PTR.add(usize::from(random::J)));
+        let x_i_old = u32::from_ne_bytes(*random_state.x_ptr.add(usize::from(random_state.i)));
+        let x_j = u32::from_ne_bytes(*random_state.x_ptr.add(usize::from(random_state.j)));
         let x_i_new = x_i_old.wrapping_add(x_j);
-        *random::X_PTR.add(usize::from(random::I)) = x_i_new.to_ne_bytes();
+        *random_state.x_ptr.add(usize::from(random_state.i)) = x_i_new.to_ne_bytes();
 
         k = x_i_new >> 1;
 
-        random::I += 1;
-        if random::I == random::N {
-            random::I = 0;
+        random_state.i += 1;
+        if random_state.i == random_state.n {
+            random_state.i = 0;
         }
 
-        random::J += 1;
-        if random::J == random::N {
-            random::J = 0;
+        random_state.j += 1;
+        if random_state.j == random_state.n {
+            random_state.j = 0;
         }
     }
-    // TODO: unlock?
 
     /* Both branches of this function result in a "u31", which will
      * always fit in a c_long. */
@@ -1064,14 +1062,13 @@ pub unsafe extern "C" fn setkey(key: *const c_char) {
     unimplemented!();
 }
 
+// Ported from musl. The state parameter is no longer const in newer versions of POSIX.
 #[no_mangle]
 pub unsafe extern "C" fn setstate(state: *mut c_char) -> *mut c_char {
-    /* Ported from musl. The state parameter is no longer const in newer
-     * versions of POSIX. */
+    let mut random_state = random::state_lock();
 
-    // TODO: lock?
-    let old_state = random::save_state();
-    random::load_state(state.cast::<_>());
+    let old_state = random_state.save();
+    random_state.load(state.cast::<_>());
     // TODO: unlock?
     old_state.cast::<_>()
 }
@@ -1095,13 +1092,12 @@ pub extern "C" fn srand48(seedval: c_long) {
         .unwrap();
 }
 
+// Ported from musl
 #[no_mangle]
 pub unsafe extern "C" fn srandom(seed: c_uint) {
-    // Ported from musl
+    let mut random_state = random::state_lock();
 
-    // TODO: lock?
-    random::seed(seed);
-    // TODO: unlock?
+    random_state.seed(seed);
 }
 
 #[no_mangle]
