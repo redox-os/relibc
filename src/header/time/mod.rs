@@ -12,6 +12,10 @@ pub use self::constants::*;
 pub mod constants;
 mod strftime;
 
+const YEARS_PER_ERA: time_t = 400;
+const DAYS_PER_ERA: time_t = 146097;
+const SECS_PER_DAY: time_t = 24 * 60 * 60;
+
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct timespec {
@@ -311,9 +315,6 @@ pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut
      * Note that we need 0-based months here, though.
      * Overall, this implementation should generate correct results as
      * long as the tm_year value will fit in a c_int. */
-    const SECS_PER_DAY: time_t = 24 * 60 * 60;
-    const DAYS_PER_ERA: time_t = 146097;
-
     let unix_secs = *clock;
 
     /* Day number here is possibly negative, remainder will always be
@@ -414,44 +415,68 @@ pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut t
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mktime(t: *mut tm) -> time_t {
-    let mut year = (*t).tm_year + 1900;
-    let mut month = (*t).tm_mon;
-    let mut day = (*t).tm_mday as i64 - 1;
+pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
+    /* For the details of the algorithm used here, see
+     * https://howardhinnant.github.io/date_algorithms.html#days_from_civil
+     */
 
-    let leap = if leap_year(year) { 1 } else { 0 };
+    fn inner(timeptr_mut: &mut tm) -> Option<time_t> {
+        let year = time_t::try_from(timeptr_mut.tm_year)
+            .ok()
+            .and_then(|tm_year| tm_year.checked_add(1900))?;
+        let month = time_t::try_from(timeptr_mut.tm_mon).ok()?;
+        let mday = time_t::try_from(timeptr_mut.tm_mday).ok()?;
 
-    if year < 1970 {
-        day = MONTH_DAYS[if leap_year(year) { 1 } else { 0 }][(*t).tm_mon as usize] as i64 - day;
+        let hour = time_t::try_from(timeptr_mut.tm_hour).ok()?;
+        let min = time_t::try_from(timeptr_mut.tm_min).ok()?;
+        let sec = time_t::try_from(timeptr_mut.tm_sec).ok()?;
 
-        while year < 1969 {
-            year += 1;
-            day += if leap_year(year) { 366 } else { 365 };
+        // TODO: handle tm_isdst
+
+        let year_transformed = if month < 2 { year - 1 } else { year };
+
+        let era = year_transformed.div_euclid(YEARS_PER_ERA);
+        let year_of_era = year_transformed.rem_euclid(YEARS_PER_ERA);
+
+        let day_of_year =
+            (153 * (if month > 1 { month - 2 } else { month + 10 }) + 2) / 5 + mday - 1; // adapted for zero-based months
+
+        let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+        let unix_days = era * DAYS_PER_ERA + day_of_era - 719468;
+        let secs_of_day = hour * (60 * 60) + min * 60 + sec;
+
+        let unix_secs = unix_days
+            .checked_mul(SECS_PER_DAY)
+            .and_then(|day_secs| day_secs.checked_add(secs_of_day))?;
+
+        // Normalize input struct with values from their standard ranges
+        let mut normalized_tm = tm {
+            tm_sec: 0,
+            tm_min: 0,
+            tm_hour: 0,
+            tm_mday: 0,
+            tm_mon: 0,
+            tm_year: 0,
+            tm_wday: 0,
+            tm_yday: 0,
+            tm_isdst: 0,
+            tm_gmtoff: 0,
+            tm_zone: UTC,
+        };
+        if unsafe { gmtime_r(&unix_secs, &mut normalized_tm).is_null() } {
+            None
+        } else {
+            *timeptr_mut = normalized_tm;
+            Some(unix_secs)
         }
+    }
 
-        while month < 11 {
-            month += 1;
-            day += MONTH_DAYS[leap][month as usize] as i64;
+    match inner(&mut *timeptr) {
+        Some(unix_secs) => unix_secs,
+        None => {
+            platform::ERRNO.set(EOVERFLOW);
+            -1 as time_t
         }
-
-        (-(day * (60 * 60 * 24)
-            - (((*t).tm_hour as i64) * (60 * 60) + ((*t).tm_min as i64) * 60 + (*t).tm_sec as i64)))
-            as time_t
-    } else {
-        while year > 1970 {
-            year -= 1;
-            day += if leap_year(year) { 366 } else { 365 };
-        }
-
-        while month > 0 {
-            month -= 1;
-            day += MONTH_DAYS[leap][month as usize] as i64;
-        }
-
-        (day * (60 * 60 * 24)
-            + ((*t).tm_hour as i64) * (60 * 60)
-            + ((*t).tm_min as i64) * 60
-            + (*t).tm_sec as i64) as time_t
     }
 }
 
@@ -502,20 +527,7 @@ pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
-    let mut y = (*tm).tm_year as time_t + 1900;
-    let mut m = (*tm).tm_mon as time_t + 1;
-    if m <= 2 {
-        y -= 1;
-        m += 12;
-    }
-    let d = (*tm).tm_mday as time_t;
-    let h = (*tm).tm_hour as time_t;
-    let mi = (*tm).tm_min as time_t;
-    let s = (*tm).tm_sec as time_t;
-    (365 * y + y / 4 - y / 100 + y / 400 + 3 * (m + 1) / 5 + 30 * m + d - 719561) * 86400
-        + 3600 * h
-        + 60 * mi
-        + s
+    mktime(tm)
 }
 
 // #[no_mangle]
