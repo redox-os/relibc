@@ -57,6 +57,12 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
     for i in 0..fds.len() {
         let mut pfd = &mut fds[i];
 
+        // Ignore the entry with negative fd, set the revents to 0
+        if pfd.fd < 0 {
+            pfd.revents = 0;
+            continue;
+        }
+
         let mut event = epoll_event {
             events: 0,
             data: epoll_data { u64: i as u64 },
