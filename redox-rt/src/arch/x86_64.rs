@@ -7,6 +7,7 @@ use core::{
 use syscall::{
     data::{SigProcControl, Sigcontrol},
     error::*,
+    RtSigInfo,
 };
 
 use crate::{
@@ -28,7 +29,7 @@ pub struct SigArea {
     pub tmp_rdx: usize,
     pub tmp_rdi: usize,
     pub tmp_rsi: usize,
-    pub tmp_ptr: usize,
+    pub tmp_inf: RtSigInfo,
 
     pub altstack_top: usize,
     pub altstack_bottom: usize,
@@ -214,7 +215,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov esi, eax
     mov eax, {SYS_SIGDEQUEUE}
     mov rdi, fs:[0]
-    add rdi, {tcb_sa_off} + {sa_tmp_ptr} // out pointer of dequeued realtime sig
+    add rdi, {tcb_sa_off} + {sa_tmp_inf} // out pointer of dequeued realtime sig
     syscall
     test eax, eax
     jnz 1b // assumes error can only be EAGAIN
@@ -301,9 +302,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     vextractf128 [rsp + 16], ymm14, 1
     vextractf128 [rsp], ymm15, 1
 5:
-    push rax // selected signal
-    push fs:[{tcb_sa_off} + {sa_tmp_ptr}]
-    sub rsp, 48 // alloc space for ucontext fields
+    mov [rsp - 8], eax
+    sub rsp, 64 // alloc space for ucontext fields
 
     mov rdi, rsp
     call {inner}
@@ -400,7 +400,7 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_rdx = const offset_of!(SigArea, tmp_rdx),
     sa_tmp_rdi = const offset_of!(SigArea, tmp_rdi),
     sa_tmp_rsi = const offset_of!(SigArea, tmp_rsi),
-    sa_tmp_ptr = const offset_of!(SigArea, tmp_ptr),
+    sa_tmp_inf = const offset_of!(SigArea, tmp_inf),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
     sc_saved_rflags = const offset_of!(Sigcontrol, saved_archdep_reg),
@@ -425,7 +425,11 @@ extern "C" {
     fn __relibc_internal_sigentry_crit_third();
 }
 /// Fixes some edge cases, and calculates the value for uc_stack.
-pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt {
+pub unsafe fn arch_pre(
+    stack: &mut SigStack,
+    area: &mut SigArea,
+    targeted_thread: bool,
+) -> PosixStackt {
     // It is impossible to update RSP and RIP atomically on x86_64, without using IRETQ, which is
     // almost as slow as calling a SIGRETURN syscall would be. Instead, we abuse the fact that
     // signals are disabled in the prologue of the signal trampoline, which allows us to emulate
@@ -447,6 +451,14 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
         stack.regs.rip = area.tmp_rip;
     }
 
+    stack.sig_code = if (stack.sig_num - 1) / 32 == 1 && !targeted_thread {
+        area.tmp_inf.code as u32
+    } else {
+        // TODO: SIGCHLD information when applicable
+        0
+    };
+    stack.sival = area.tmp_inf.arg;
+
     PosixStackt {
         sp: stack.regs.rsp as *mut (),
         size: 0,  // TODO
@@ -456,7 +468,7 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
 
 pub(crate) static SUPPORTS_AVX: AtomicU8 = AtomicU8::new(0);
 
-// __relibc will be prepended to the name, so mangling is fine
+// __relibc will be prepended to the name, so no_mangle is fine
 #[no_mangle]
 pub unsafe fn manually_enter_trampoline() {
     let c = &Tcb::current().unwrap().os_specific.control;

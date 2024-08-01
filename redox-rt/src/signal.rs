@@ -30,14 +30,15 @@ pub struct SigStack {
     _pad: [usize; 1], // pad from 7*8 to 64
 
     #[cfg(target_arch = "x86")]
-    _pad: [usize; 0], // don't pad from 8*4
+    _pad: [usize; 3], // pad from 9*4 to 12*4
 
     pub link: *mut SigStack,
 
     pub old_stack: PosixStackt,
     pub old_mask: u64,
-    sival: usize,
-    sig_num: usize,
+    pub(crate) sival: usize,
+    pub(crate) sig_num: u32,
+    pub(crate) sig_code: u32,
 
     // x86_64: 864 bytes
     // i686: 512 bytes
@@ -75,16 +76,16 @@ unsafe fn inner(stack: &mut SigStack) {
 
     let signals_were_disabled = (*os.arch.get()).disable_signals_depth > 0;
 
-    let _targeted_thread_not_process = stack.sig_num >= 64;
+    let targeted_thread_not_process = stack.sig_num >= 64;
     stack.sig_num %= 64;
 
     // asm counts from 0
     stack.sig_num += 1;
-    stack.old_stack = arch_pre(stack, &mut *os.arch.get());
+    stack.old_stack = arch_pre(stack, &mut *os.arch.get(), targeted_thread_not_process);
 
     let sigaction = {
         let guard = SIGACTIONS_LOCK.lock();
-        let action = convert_old(&PROC_CONTROL_STRUCT.actions[stack.sig_num - 1]);
+        let action = convert_old(&PROC_CONTROL_STRUCT.actions[stack.sig_num as usize - 1]);
         if action.flags.contains(SigactionFlags::RESETHAND) {
             // TODO: other things that must be set
             drop(guard);
@@ -107,7 +108,7 @@ unsafe fn inner(stack: &mut SigStack) {
             panic!("ctl {:x?} signal {}", os.control, stack.sig_num)
         }
         SigactionKind::Default => {
-            syscall::exit(stack.sig_num);
+            syscall::exit(stack.sig_num as usize);
             unreachable!();
         }
         SigactionKind::Handled { handler } => handler,
@@ -150,18 +151,17 @@ unsafe fn inner(stack: &mut SigStack) {
     if sigaction.flags.contains(SigactionFlags::SIGINFO)
         && let Some(sigaction) = handler.sigaction
     {
-        stack.old_mask = ((prev_w1 >> 32) << 32) | (prev_w0 & 0xffff_ffff);
-        // TODO: stack.old_stack
+        stack.old_mask = ((prev_w1 >> 32) << 32) | (prev_w0 >> 32);
 
         //let _ = syscall::write(1, alloc::format!("SIGACTION {:p}\n", sigaction).as_bytes());
         let info = SiginfoAbi {
             si_signo: stack.sig_num as c_int,
             si_addr: core::ptr::null_mut(),
-            si_code: 0, // TODO: SIG_QUEUE/SIG_USER/etc
+            si_code: stack.sig_code as i32,
             si_errno: 0,
-            si_pid: 0,
+            si_pid: 0, // TODO
             si_status: 0,
-            si_uid: 0,
+            si_uid: 0, // TODO
             si_value: stack.sival,
         };
         sigaction(
@@ -185,11 +185,11 @@ unsafe fn inner(stack: &mut SigStack) {
     // Update allowset again.
     //let _ = syscall::write(1, &alloc::format!("WORD2 {:x?}\n", os.control.word).as_bytes());
 
-    let prev_w0 = os.control.word[0].fetch_add(
+    let _prev_w0 = os.control.word[0].fetch_add(
         (prev_sigallow_lo << 32).wrapping_sub(sigallow_inside_lo << 32),
         Ordering::Relaxed,
     );
-    let prev_w1 = os.control.word[1].fetch_add(
+    let _prev_w1 = os.control.word[1].fetch_add(
         (prev_sigallow_hi << 32).wrapping_sub(sigallow_inside_hi << 32),
         Ordering::Relaxed,
     );
@@ -494,7 +494,7 @@ fn combine_allowset([lo, hi]: [u64; 2]) -> u64 {
     (lo >> 32) | ((hi >> 32) << 32)
 }
 
-const fn sig_bit(sig: usize) -> u64 {
+const fn sig_bit(sig: u32) -> u64 {
     //assert_ne!(sig, 32);
     //assert_ne!(sig, 0);
     1 << (sig - 1)

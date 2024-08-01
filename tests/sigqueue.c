@@ -17,6 +17,7 @@ void action(int sig, siginfo_t *info, void *context) {
   assert(sig == THE_SIG);
   assert(info->si_signo == THE_SIG);
   assert(info->si_value.sival_int == num);
+  assert(info->si_code == SI_QUEUE);
   num++;
   write(1, "action\n", 7);
 }
