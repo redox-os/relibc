@@ -22,7 +22,9 @@ pub struct SigArea {
     pub tmp_eax: usize,
     pub tmp_ecx: usize,
     pub tmp_edx: usize,
-    pub tmp_inf: RtSigInfo,
+    pub tmp_rt_inf: RtSigInfo,
+    pub tmp_id_inf: u64,
+    pub tmp_mm0: u64,
     pub pctl: usize, // TODO: reference pctl directly
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
@@ -151,6 +153,12 @@ asmfunction!(__relibc_internal_sigentry: ["
     jz 3f
     bsf eax, eax
 
+    // Read si_pid and si_uid, atomically.
+    movq gs:[{tcb_sa_off} + {sa_tmp_mm0}], mm0
+    movq mm0, [ecx + {pctl_sender_infos} + eax * 8]
+    movq gs:[{tcb_sa_off} + {sa_tmp_id_inf}], mm0
+    movq mm0, gs:[{tcb_sa_off} + {sa_tmp_mm0}]
+
     // Try clearing the pending bit, otherwise retry if another thread did that first
     lock btr [ecx + {pctl_word}], eax
     jnc 1b
@@ -172,7 +180,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     lea ecx, [eax+32]
     mov eax, {SYS_SIGDEQUEUE}
     mov edx, gs:[0]
-    add edx, {tcb_sa_off} + {sa_tmp_inf}
+    add edx, {tcb_sa_off} + {sa_tmp_rt_inf}
     int 0x80
     mov ebx, edx
     test eax, eax
@@ -183,13 +191,24 @@ asmfunction!(__relibc_internal_sigentry: ["
 8:
     add eax, 32
 9:
+    // Read si_pid and si_uid, atomically.
+    movq gs:[{tcb_sa_off} + {sa_tmp_mm0}], mm0
+    movq mm0, gs:[{tcb_sc_off} + {sc_sender_infos} + eax * 8]
+    movq gs:[{tcb_sa_off} + {sa_tmp_id_inf}], mm0
+    movq mm0, gs:[{tcb_sa_off} + {sa_tmp_mm0}]
+    mov edx, eax
+    shr edx, 5
+    mov ecx, eax
+    and ecx, 31
+    lock btr gs:[{tcb_sc_off} + {sc_word} + edx * 8], ecx
+
     add eax, 64
 2:
     and esp, -{STACK_ALIGN}
 
     mov edx, eax
     add edx, edx
-    bt dword ptr [{pctl} + {pctl_off_actions} + edx * 8 + 4], 28
+    bt dword ptr [{pctl} + {pctl_actions} + edx * 8 + 4], 28
     jnc 4f
 
     mov edx, gs:[{tcb_sa_off} + {sa_altstack_top}]
@@ -269,7 +288,9 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_eax = const offset_of!(SigArea, tmp_eax),
     sa_tmp_ecx = const offset_of!(SigArea, tmp_ecx),
     sa_tmp_edx = const offset_of!(SigArea, tmp_edx),
-    sa_tmp_inf = const offset_of!(SigArea, tmp_inf),
+    sa_tmp_mm0 = const offset_of!(SigArea, tmp_mm0),
+    sa_tmp_rt_inf = const offset_of!(SigArea, tmp_rt_inf),
+    sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
     sa_pctl = const offset_of!(SigArea, pctl),
@@ -277,9 +298,11 @@ __relibc_internal_sigentry_crit_third:
     sc_saved_eflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
     sc_word = const offset_of!(Sigcontrol, word),
+    sc_sender_infos = const offset_of!(Sigcontrol, sender_infos),
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
-    pctl_off_actions = const offset_of!(SigProcControl, actions),
+    pctl_actions = const offset_of!(SigProcControl, actions),
+    pctl_sender_infos = const offset_of!(SigProcControl, sender_infos),
     pctl_word = const offset_of!(SigProcControl, pending),
     pctl = sym PROC_CONTROL_STRUCT,
     STACK_ALIGN = const 16,
