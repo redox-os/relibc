@@ -3,7 +3,7 @@
 use core::convert::{TryFrom, TryInto};
 
 use crate::{
-    header::errno::EOVERFLOW,
+    header::errno::{EINVAL, EOVERFLOW},
     platform::{self, types::*, Pal, Sys},
 };
 
@@ -140,7 +140,35 @@ pub struct itimerspec {
     pub it_value: timespec,
 }
 
-pub struct sigevent;
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union sigval {
+    pub sival_int: c_int,
+    pub sival_ptr: *mut c_void,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct sigevent {
+    pub sigev_value: sigval,
+    pub sigev_signo: c_int,
+    pub sigev_notify: c_int,
+    pub sigev_notify_function: Option<extern "C" fn(sigval)>,
+    pub sigev_notify_attributes: *mut pthread_attr_t,
+}
+
+// Not meant to be exposed to userland
+#[repr(C)]
+struct Ksigevent {
+    sigev_value: sigval,
+    sigev_signo: c_int,
+    sigev_notify: c_int,
+    sigev_tid: c_int,
+}
+
+pub const SIGEV_SIGNAL: c_int = 0;
+pub const SIGEV_NONE: c_int = 1;
+pub const SIGEV_THREAD: c_int = 2;
 
 #[no_mangle]
 pub unsafe extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
@@ -530,18 +558,41 @@ pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
     mktime(tm)
 }
 
-// #[no_mangle]
-pub extern "C" fn timer_create(
+#[no_mangle]
+pub unsafe extern "C" fn timer_create(
     clock_id: clockid_t,
     evp: *mut sigevent,
     timerid: *mut timer_t,
 ) -> c_int {
-    unimplemented!();
+    if evp != core::ptr::null_mut() {
+        match (*evp).sigev_notify {
+            SIGEV_NONE | SIGEV_THREAD => {
+                let mut sigevp = Ksigevent {
+                    sigev_value: (*evp).sigev_value,
+                    sigev_signo: (*evp).sigev_signo,
+                    sigev_notify: (*evp).sigev_notify,
+                    sigev_tid: 0,
+                };
+                if Sys::timer_create(clock_id, &mut sigevp as *mut _ as c_ulonglong, timerid) < 0 {
+                    return -1;
+                }
+                return 0;
+            }
+            _ => {
+                // TODO other cases
+                platform::errno = EINVAL;
+                return -1;
+            }
+        }
+    }
+
+    platform::errno = EINVAL;
+    -1
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn timer_delete(timerid: timer_t) -> c_int {
-    unimplemented!();
+    Sys::timer_delete(timerid)
 }
 
 #[no_mangle]
@@ -550,24 +601,24 @@ pub extern "C" fn tzset() {
     // TODO: timezones, parse env var TZ
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn timer_settime(
     timerid: timer_t,
     flags: c_int,
     value: *const itimerspec,
     ovalue: *mut itimerspec,
 ) -> c_int {
-    unimplemented!();
+    Sys::timer_settime(timerid, flags, value, ovalue)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> c_int {
-    unimplemented!();
+    Sys::timer_gettime(timerid, value)
 }
 
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
-    unimplemented!();
+    Sys::timer_getoverrun(timerid)
 }
 
 /*
