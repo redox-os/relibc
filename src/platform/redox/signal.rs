@@ -1,6 +1,6 @@
 use core::mem::{self, offset_of};
 use redox_rt::signal::{
-    SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
+    PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
 };
 use syscall::{self, Result};
 
@@ -235,21 +235,11 @@ impl PalSignal for Sys {
         redox_rt::signal::sigaltstack(new.as_ref(), old.as_mut())?;
 
         if let (Some(old_c_stack), Some(old)) = (old_c, old) {
-            *old_c_stack = match old {
-                Sigaltstack::Disabled => stack_t {
-                    ss_sp: core::ptr::null_mut(),
-                    ss_size: 0,
-                    ss_flags: SS_DISABLE.try_into().unwrap(),
-                },
-                Sigaltstack::Enabled {
-                    onstack,
-                    base,
-                    size,
-                } => stack_t {
-                    ss_sp: base.cast(),
-                    ss_size: size,
-                    ss_flags: SS_ONSTACK.try_into().unwrap(),
-                },
+            let c_stack = PosixStackt::from(old);
+            *old_c_stack = stack_t {
+                ss_sp: c_stack.sp.cast(),
+                ss_size: c_stack.size,
+                ss_flags: c_stack.flags,
             };
         }
         Ok(())

@@ -50,6 +50,15 @@ pub const SA_NOCLDSTOP: usize = 0x4000_0000;
 pub const SS_ONSTACK: usize = 0x00000001;
 pub const SS_DISABLE: usize = 0x00000002;
 
+const _: () = {
+    if SS_ONSTACK != redox_rt::signal::SS_ONSTACK {
+        panic!();
+    }
+    if SS_DISABLE != redox_rt::signal::SS_DISABLE {
+        panic!();
+    }
+};
+
 // TODO: It's just a guess based on Linux
 pub const MINSIGSTKSZ: usize = 2048;
 pub const SIGSTKSZ: usize = 8096;
