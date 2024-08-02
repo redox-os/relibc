@@ -1,0 +1,10 @@
+sys_includes = ["stddef.h"]
+include_guard = "_MALLOC_H"
+trailer = "#include <bits/malloc.h>"
+language = "C"
+style = "Type"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true
