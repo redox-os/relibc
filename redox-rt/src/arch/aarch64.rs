@@ -26,7 +26,8 @@ pub struct SigArea {
     pub pctl: usize, // TODO: remove
     pub last_sig_was_restart: bool,
     pub last_sigstack: Option<NonNull<SigStack>>,
-    pub tmp_inf: RtSigInfo,
+    pub tmp_rt_inf: RtSigInfo,
+    pub tmp_id_inf: u64,
 }
 #[repr(C)]
 #[derive(Debug, Default)]
@@ -176,65 +177,73 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     ldr x6, [x0, #{tcb_sa_off} + {sa_pctl}]
 1:
-    // Load x1 and x2 with each signal group's bits (tearing between x1 and x2 can occur) with
-    // acquire ordering
-    add x2, x0, #{tcb_sc_off} + {sc_word}
-    ldaxp x1, x2, [x2]
+    // Load x1 with the thread's bits
+    add x5, x0, #{tcb_sc_off} + {sc_word}
+    ldaxr x1, [x5]
 
     // First check if there are standard thread signals,
     and x4, x1, x1, lsr #32 // x4 := x1 & (x1 >> 32)
     cbnz x4, 3f // jump if x4 != 0
+    clrex
 
     // and if not, load process pending bitset.
-    add x3, x6, #{pctl_pending}
-    ldaxr x3, [x3]
+    add x1, x6, #{pctl_pending}
+    ldaxr x2, [x1]
 
     // Check if there are standard proc signals:
-    lsr x4, x1, #32 // mask
-    and w4, w4, w3 // pending unblocked proc
-    cbz w4, 4f // skip 'fetch_andn' step if zero
+    lsr x3, x1, #32 // mask
+    and w3, w3, w3 // pending unblocked proc
+    cbz w3, 4f // skip 'fetch_andn' step if zero
 
     // If there was one, find which one, and try clearing the bit (last value in x3, addr in x6)
     // this picks the MSB rather than the LSB, unlike x86. POSIX does not require any specific
     // ordering though.
-    clz x4, x4
-    mov x5, #32
-    sub x4, x5, x4
+    clz x3, x3
+    mov x4, #32
+    sub x3, x4, x3
+    // x3 now contains the sig_idx
 
-    mov x5, #1
-    lsl x5, x5, x4 // bit to remove
+    mov x4, #1
+    lsl x4, x4, x3 // bit to remove
 
-    sub x5, x3, x5 // bit was certainly set, so sub is allowed
-    add x3, x6, #{pctl_pending}
+    sub x4, x2, x4 // bit was certainly set, so sub is allowed
+    // x4 is now the new mask to be set
+    add x5, x6, #{pctl_pending}
 
     // Try clearing the bit, retrying on failure.
-    add x3, x6, #{pctl_pending}
-    stxr w1, x5, [x3] // try setting [x3] to x5, set x5 := 0 on success
-    cbnz x1, 1b
-    mov x1, x4
+    stxr w1, x4, [x1] // try setting pending set to x4, set w1 := 0 on success
+    cbnz x1, 1b // retry everything if this fails
+    mov x1, x3
     b 2f
 4:
-    // Check for realtime signals, thread/proc. x1 is now free real estate (but needs to contain
-    // the selected signal number when entering Rust).
+    // Check for realtime signals, thread/proc.
+    clrex
 
-    b .
+    // Load the pending set again. TODO: optimize this?
+    add x1, x6, #{pctl_pending}
+    ldaxr x2, [x1]
+    lsr x2, x2, #32
 
-    mov w1, w2
-    orr w1, w1, w3
-    and x1, x1, x1, lsr #32
+    add x5, x0, #{tcb_sc_off} + {sc_word} + 8
+    ldar x1, [x5]
 
-    rbit x1, x1
-    clz x1, x1
-    mov x2, #32
-    sub x1, x2, x1
-    mov x2, #1
-    lsl x2, x2, x1
+    orr x2, x1, x2
+    and x2, x2, x2, lsr #32
+
+    rbit x3, x2
+    clz x3, x3
+    mov x4, #32
+    sub x2, x4, x3
+    // x2 now contains sig_idx - 32
+
+    // If realtime signal was directed at thread, handle it as an idempotent signal.
+    tbnz x1, x2, 5f
 
     mov x5, x0
     mov x4, x8
     mov x8, {SYS_SIGDEQUEUE}
     // x1 contains signal
-    add x2, x0, #{tcb_sa_off} + {sa_tmp_inf}
+    add x2, x0, #{tcb_sa_off} + {sa_tmp_rt_inf}
     svc 0
     cbnz x0, 1b
     mov x0, x5
@@ -254,10 +263,26 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     // skip sigaltstack step if SA_ONSTACK is clear
     // tbz x2, #{SA_ONSTACK_BIT}, 2f
+    b 2f
+5:
+    add x1, x2, 32
+    b 3b
 3:
+    // A signal was sent to this thread, try clearing its bit.
     clz x1, x1
-    mov x2, #32 + 64
+    mov x2, #32
     sub x1, x2, x1
+
+    add x2, x0, #{tcb_sc_off} + {sc_sender_infos}
+    add x2, x2, w1, utxb #3
+    ldar x2, [x2]
+
+    stxr w3, x1, [x5]
+    cbnz w3, 1b
+
+    str x3, [x0, #{tcb_sa_off} + {sa_tmp_id_inf}]
+    add x1, x1, #64
+    b 2f
 2:
     ldr x2, [x0, #{tcb_sc_off} + {sc_saved_pc}]
     ldr x3, [x0, #{tcb_sc_off} + {sc_saved_x0}]
@@ -325,10 +350,12 @@ asmfunction!(__relibc_internal_sigentry: ["
     sa_tmp_x3_x4 = const offset_of!(SigArea, tmp_x3_x4),
     sa_tmp_x5_x6 = const offset_of!(SigArea, tmp_x5_x6),
     sa_tmp_sp = const offset_of!(SigArea, tmp_sp),
-    sa_tmp_inf = const offset_of!(SigArea, tmp_inf),
+    sa_tmp_rt_inf = const offset_of!(SigArea, tmp_rt_inf),
+    sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
     sa_pctl = const offset_of!(SigArea, pctl),
     sc_saved_pc = const offset_of!(Sigcontrol, saved_ip),
     sc_saved_x0 = const offset_of!(Sigcontrol, saved_archdep_reg),
+    sc_sender_infos = const offset_of!(Sigcontrol, sender_infos),
     sc_word = const offset_of!(Sigcontrol, word),
     inner = sym inner_c,
 
