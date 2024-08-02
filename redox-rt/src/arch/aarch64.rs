@@ -1,10 +1,10 @@
-use core::mem::offset_of;
+use core::{mem::offset_of, ptr::NonNull};
 
 use syscall::{data::*, error::*};
 
 use crate::{
     proc::{fork_inner, FdGuard},
-    signal::{inner_c, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    signal::{inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     RtTcb, Tcb,
 };
 
@@ -19,11 +19,14 @@ pub struct SigArea {
     pub altstack_bottom: usize,
     pub tmp_x1_x2: [usize; 2],
     pub tmp_x3_x4: [usize; 2],
+    pub tmp_x5_x6: [usize; 2],
     pub tmp_sp: usize,
     pub onstack: u64,
     pub disable_signals_depth: u64,
     pub pctl: usize, // TODO: remove
     pub last_sig_was_restart: bool,
+    pub last_sigstack: Option<NonNull<SigStack>>,
+    pub tmp_inf: RtSigInfo,
 }
 #[repr(C)]
 #[derive(Debug, Default)]
@@ -150,32 +153,92 @@ asmfunction!(__relibc_internal_fork_ret: ["
     ret
 "] <= [child_hook = sym child_hook]);
 
+// https://devblogs.microsoft.com/oldnewthing/20220811-00/?p=106963
 asmfunction!(__relibc_internal_sigentry: ["
-    // old pc and x0 are saved in the sigcontrol struct
+    // Clear any active reservation.
+    clrex
+
+    // The old pc and x0 are saved in the sigcontrol struct.
     mrs x0, tpidr_el0 // ABI ptr
     ldr x0, [x0] // TCB ptr
 
-    // save x1-x3 and sp
+    // Save x1-x6 and sp
     stp x1, x2, [x0, #{tcb_sa_off} + {sa_tmp_x1_x2}]
     stp x3, x4, [x0, #{tcb_sa_off} + {sa_tmp_x3_x4}]
+    stp x5, x6, [x0, #{tcb_sa_off} + {sa_tmp_x5_x6}]
     mov x1, sp
     str x1, [x0, #{tcb_sa_off} + {sa_tmp_sp}]
 
-    sub x1, x1, 128
-    and x1, x1, -16
+    // Calculate new sp wrt redzone and alignment
+    sub x1, x1, {REDZONE_SIZE}
+    and x1, x1, -{STACK_ALIGN}
     mov sp, x1
 
-    ldr x3, [x0, #{tcb_sa_off} + {sa_pctl}]
-
-    // load x1 and x2 with each word (tearing between x1 and x2 can occur)
+    ldr x6, [x0, #{tcb_sa_off} + {sa_pctl}]
+1:
+    // Load x1 and x2 with each signal group's bits (tearing between x1 and x2 can occur) with
     // acquire ordering
     add x2, x0, #{tcb_sc_off} + {sc_word}
     ldaxp x1, x2, [x2]
 
-    // reduce them by ANDing the upper and lower 32 bits
-    and x1, x1, x1, lsr #32 // put result in lo half
-    and x2, x2, x2, lsl #32 // put result in hi half
-    orr x1, x1, x2 // combine them into the set of pending unblocked
+    // First check if there are standard thread signals,
+    and x4, x1, x1, lsr #32 // x4 := x1 & (x1 >> 32)
+    cbnz x4, 3f // jump if x4 != 0
+
+    // and if not, load process pending bitset.
+    add x3, x6, #{pctl_pending}
+    ldaxr x3, [x3]
+
+    // Check if there are standard proc signals:
+    lsr x4, x1, #32 // mask
+    and w4, w4, w3 // pending unblocked proc
+    cbz w4, 4f // skip 'fetch_andn' step if zero
+
+    // If there was one, find which one, and try clearing the bit (last value in x3, addr in x6)
+    // this picks the MSB rather than the LSB, unlike x86. POSIX does not require any specific
+    // ordering though.
+    clz x4, x4
+    mov x5, #32
+    sub x4, x5, x4
+
+    mov x5, #1
+    lsl x5, x5, x4 // bit to remove
+
+    sub x5, x3, x5 // bit was certainly set, so sub is allowed
+    add x3, x6, #{pctl_pending}
+
+    // Try clearing the bit, retrying on failure.
+    add x3, x6, #{pctl_pending}
+    stxr w1, x5, [x3] // try setting [x3] to x5, set x5 := 0 on success
+    cbnz x1, 1b
+    mov x1, x4
+    b 2f
+4:
+    // Check for realtime signals, thread/proc. x1 is now free real estate (but needs to contain
+    // the selected signal number when entering Rust).
+
+    b .
+
+    mov w1, w2
+    orr w1, w1, w3
+    and x1, x1, x1, lsr #32
+
+    rbit x1, x1
+    clz x1, x1
+    mov x2, #32
+    sub x1, x2, x1
+    mov x2, #1
+    lsl x2, x2, x1
+
+    mov x5, x0
+    mov x4, x8
+    mov x8, {SYS_SIGDEQUEUE}
+    // x1 contains signal
+    add x2, x0, #{tcb_sa_off} + {sa_tmp_inf}
+    svc 0
+    cbnz x0, 1b
+    mov x0, x5
+    mov x8, x4
 
     // count trailing zeroes, to find signal bit
     rbit x1, x1
@@ -183,12 +246,18 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov x2, #32
     sub x1, x2, x1
 
-    // TODO: NOT ATOMIC!
+    ldr x3, [x0, #{tcb_sa_off} + {sa_pctl}]
+    add x2, x2, {pctl_actions}
     add x2, x3, w1, uxtb #4 // actions_base + sig_idx * sizeof Action
+    // TODO: NOT ATOMIC (tearing allowed between regs)!
     ldxp x2, x3, [x2]
 
     // skip sigaltstack step if SA_ONSTACK is clear
-    // tbz x2, #57, 2f
+    // tbz x2, #{SA_ONSTACK_BIT}, 2f
+3:
+    clz x1, x1
+    mov x2, #32 + 64
+    sub x1, x2, x1
 2:
     ldr x2, [x0, #{tcb_sc_off} + {sc_saved_pc}]
     ldr x3, [x0, #{tcb_sc_off} + {sc_saved_x0}]
@@ -202,7 +271,9 @@ asmfunction!(__relibc_internal_sigentry: ["
     stp x2, x3, [sp], #-16
     ldp x3, x4, [x0, #{tcb_sa_off} + {sa_tmp_x3_x4}]
     stp x4, x3, [sp], #-16
+    ldp x5, x6, [x0, #{tcb_sa_off} + {sa_tmp_x5_x6}]
     stp x6, x5, [sp], #-16
+
     stp x8, x7, [sp], #-16
     stp x10, x9, [sp], #-16
     stp x12, x11, [sp], #-16
@@ -246,16 +317,25 @@ asmfunction!(__relibc_internal_sigentry: ["
     ldp x18, x0, [x0]
     br x18
 "] <= [
+    pctl_pending = const (offset_of!(SigProcControl, pending)),
+    pctl_actions = const (offset_of!(SigProcControl, actions)),
     tcb_sc_off = const (offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control)),
     tcb_sa_off = const (offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch)),
     sa_tmp_x1_x2 = const offset_of!(SigArea, tmp_x1_x2),
     sa_tmp_x3_x4 = const offset_of!(SigArea, tmp_x3_x4),
+    sa_tmp_x5_x6 = const offset_of!(SigArea, tmp_x5_x6),
     sa_tmp_sp = const offset_of!(SigArea, tmp_sp),
+    sa_tmp_inf = const offset_of!(SigArea, tmp_inf),
     sa_pctl = const offset_of!(SigArea, pctl),
     sc_saved_pc = const offset_of!(Sigcontrol, saved_ip),
     sc_saved_x0 = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_word = const offset_of!(Sigcontrol, word),
     inner = sym inner_c,
+
+    SA_ONSTACK_BIT = const 58, // (1 << 58) >> 32 = 0x0400_0000
+    SYS_SIGDEQUEUE = const syscall::SYS_SIGDEQUEUE,
+    STACK_ALIGN = const 16,
+    REDZONE_SIZE = const 128,
 ]);
 
 asmfunction!(__relibc_internal_rlct_clone_ret: ["
@@ -294,4 +374,10 @@ pub unsafe fn manually_enter_trampoline() {
     ", inout("x0") ip_location => _, out("lr") _);
 }
 
-pub unsafe fn arch_pre(stack: &mut SigStack, os: &mut SigArea) {}
+pub unsafe fn arch_pre(stack: &mut SigStack, os: &mut SigArea) -> PosixStackt {
+    PosixStackt {
+        sp: core::ptr::null_mut(), // TODO
+        size: 0,                   // TODO
+        flags: 0,                  // TODO
+    }
+}
