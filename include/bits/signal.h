@@ -7,6 +7,8 @@
 
 typedef struct siginfo siginfo_t;
 typedef unsigned long long sigset_t;
+typedef struct ucontext ucontext_t;
+typedef struct mcontext mcontext_t;
 
 struct sigaction {
   union {

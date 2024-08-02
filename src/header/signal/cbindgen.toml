@@ -9,6 +9,9 @@ cpp_compat = true
 [defines]
 "target_os=linux" = "__linux__"
 "target_os=redox" = "__redox__"
+"target_arch = x86" = "__i386__"
+"target_arch = x86_64" = "__x86_64__"
+"target_arch = aarch64" = "__aarch64__"
 
 [enum]
 prefix_with_name = true

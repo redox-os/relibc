@@ -1,5 +1,7 @@
 use core::arch::global_asm;
 
+use super::{sigset_t, stack_t};
+
 pub const SIGHUP: usize = 1;
 pub const SIGINT: usize = 2;
 pub const SIGQUIT: usize = 3;
@@ -54,3 +56,39 @@ pub const SIGSTKSZ: usize = 8096;
 
 pub const SI_QUEUE: i32 = -1;
 pub const SI_USER: i32 = 0;
+
+pub(crate) type ucontext_t = ucontext;
+pub(crate) type mcontext_t = mcontext;
+
+#[repr(C)]
+pub struct ucontext {
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    _pad: [usize; 1], // pad from 7*8 to 64
+
+    #[cfg(target_arch = "x86")]
+    _pad: [usize; 3], // pad from 9*4 to 12*4
+
+    pub uc_link: *mut ucontext_t,
+    pub uc_stack: stack_t,
+    pub uc_sigmask: sigset_t,
+    _sival: usize,
+    _sigcode: u32,
+    _signum: u32,
+    pub uc_mcontext: mcontext_t,
+}
+
+#[repr(C)]
+pub struct mcontext {
+    #[cfg(target_arch = "x86")]
+    _opaque: [u8; 512],
+    #[cfg(target_arch = "x86-64")]
+    _opaque: [u8; 864],
+    #[cfg(target_arch = "aarch64")]
+    _opaque: [u8; 272],
+}
+#[no_mangle]
+pub extern "C" fn __completely_unused_cbindgen_workaround_fn_ucontext_mcontext(
+    a: *const ucontext_t,
+    b: *const mcontext_t,
+) {
+}
