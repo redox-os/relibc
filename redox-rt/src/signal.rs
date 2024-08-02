@@ -52,6 +52,34 @@ pub struct PosixStackt {
     pub size: usize,
 }
 
+pub const SS_ONSTACK: usize = 1;
+pub const SS_DISABLE: usize = 2;
+
+impl From<Sigaltstack> for PosixStackt {
+    fn from(value: Sigaltstack) -> Self {
+        match value {
+            Sigaltstack::Disabled => PosixStackt {
+                sp: core::ptr::null_mut(),
+                size: 0,
+                flags: SS_DISABLE.try_into().unwrap(),
+            },
+            Sigaltstack::Enabled {
+                onstack,
+                base,
+                size,
+            } => PosixStackt {
+                sp: base.cast(),
+                size,
+                flags: if onstack {
+                    SS_ONSTACK.try_into().unwrap()
+                } else {
+                    0
+                },
+            },
+        }
+    }
+}
+
 #[repr(C)]
 // TODO: This struct is for practical reasons locked to Linux's ABI, but avoid redefining
 // it here. Alternatively, check at compile time that the structs are equivalent.
@@ -590,6 +618,19 @@ pub enum Sigaltstack {
         size: usize,
     },
 }
+
+pub(crate) fn get_sigaltstack(tcb: &SigArea, sp: usize) -> Sigaltstack {
+    if tcb.altstack_bottom == 0 && tcb.altstack_top == usize::MAX {
+        Sigaltstack::Disabled
+    } else {
+        Sigaltstack::Enabled {
+            base: tcb.altstack_bottom as *mut (),
+            size: tcb.altstack_top - tcb.altstack_bottom,
+            onstack: (tcb.altstack_bottom..tcb.altstack_top).contains(&sp),
+        }
+    }
+}
+
 pub unsafe fn sigaltstack(
     new: Option<&Sigaltstack>,
     old_out: Option<&mut Sigaltstack>,
@@ -597,15 +638,7 @@ pub unsafe fn sigaltstack(
     let _g = tmp_disable_signals();
     let tcb = &mut *Tcb::current().unwrap().os_specific.arch.get();
 
-    let old = if tcb.altstack_bottom == 0 && tcb.altstack_top == usize::MAX {
-        Sigaltstack::Disabled
-    } else {
-        Sigaltstack::Enabled {
-            base: tcb.altstack_bottom as *mut (),
-            size: tcb.altstack_top - tcb.altstack_bottom,
-            onstack: (tcb.altstack_bottom..tcb.altstack_top).contains(&crate::arch::current_sp()),
-        }
-    };
+    let old = get_sigaltstack(tcb, crate::arch::current_sp());
 
     if matches!(old, Sigaltstack::Enabled { onstack: true, .. }) && new != Some(&old) {
         return Err(Error::new(EPERM));

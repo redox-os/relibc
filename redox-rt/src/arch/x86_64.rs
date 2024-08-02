@@ -12,7 +12,10 @@ use syscall::{
 
 use crate::{
     proc::{fork_inner, FdGuard},
-    signal::{inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    signal::{
+        get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack, Sigaltstack,
+        PROC_CONTROL_STRUCT,
+    },
     RtTcb, Tcb,
 };
 
@@ -452,11 +455,7 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
         stack.regs.rip = area.tmp_rip;
     }
 
-    PosixStackt {
-        sp: stack.regs.rsp as *mut (),
-        size: 0,  // TODO
-        flags: 0, // TODO
-    }
+    get_sigaltstack(area, stack.regs.rsp).into()
 }
 
 pub(crate) static SUPPORTS_AVX: AtomicU8 = AtomicU8::new(0);
