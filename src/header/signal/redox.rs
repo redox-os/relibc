@@ -59,8 +59,9 @@ const _: () = {
     }
 };
 
-// TODO: It's just a guess based on Linux
+// should include both SigStack size, and some extra room for the libc handler
 pub const MINSIGSTKSZ: usize = 2048;
+
 pub const SIGSTKSZ: usize = 8096;
 
 pub const SI_QUEUE: i32 = -1;
@@ -90,7 +91,7 @@ pub struct ucontext {
 pub struct mcontext {
     #[cfg(target_arch = "x86")]
     _opaque: [u8; 512],
-    #[cfg(target_arch = "x86-64")]
+    #[cfg(target_arch = "x86_64")]
     _opaque: [u8; 864],
     #[cfg(target_arch = "aarch64")]
     _opaque: [u8; 272],
