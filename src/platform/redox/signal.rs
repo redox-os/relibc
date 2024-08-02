@@ -13,31 +13,14 @@ use crate::{
     header::{
         errno::{EINVAL, ENOSYS},
         signal::{
-            sigaction, siginfo_t, sigset_t, sigval, stack_t, SA_SIGINFO, SIG_BLOCK, SIG_DFL,
-            SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE, SS_ONSTACK,
+            sigaction, siginfo_t, sigset_t, sigval, stack_t, ucontext_t, SA_SIGINFO, SIG_BLOCK,
+            SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE, SS_ONSTACK,
         },
         sys_time::{itimerval, ITIMER_REAL},
         time::timespec,
     },
     platform::ERRNO,
 };
-
-#[repr(C)]
-pub struct ucontext_t {
-    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-    _pad: [usize; 1], // pad from 7*8 to 64
-
-    #[cfg(target_arch = "x86")]
-    _pad: [usize; 3], // pad from 9*4 to 12*4
-
-    pub uc_link: *mut ucontext_t,
-    pub uc_stack: stack_t,
-    pub uc_sigmask: sigset_t,
-    _sival: usize,
-    _sigcode: u32,
-    _signum: u32,
-    pub uc_mcontext: mcontext_t,
-}
 
 const _: () = {
     #[track_caller]
@@ -60,16 +43,6 @@ const _: () = {
         offset_of!(SigStack, regs),
     );
 };
-
-#[repr(C)]
-pub struct mcontext_t {
-    #[cfg(target_arch = "x86")]
-    _opaque: [u8; 512],
-    #[cfg(target_arch = "x86-64")]
-    _opaque: [u8; 864],
-    #[cfg(target_arch = "aarch64")]
-    _opaque: [u8; 272],
-}
 
 impl PalSignal for Sys {
     unsafe fn getitimer(which: c_int, out: *mut itimerval) -> c_int {

@@ -29,7 +29,8 @@ pub struct SigArea {
     pub tmp_rdx: usize,
     pub tmp_rdi: usize,
     pub tmp_rsi: usize,
-    pub tmp_inf: RtSigInfo,
+    pub tmp_rt_inf: RtSigInfo,
+    pub tmp_id_inf: u64,
 
     pub altstack_top: usize,
     pub altstack_bottom: usize,
@@ -192,7 +193,10 @@ asmfunction!(__relibc_internal_sigentry: ["
     and eax, edx
     bsf eax, eax
     jz 8f
+    lea rdi, [rip + {pctl} + {pctl_off_sender_infos}]
+    mov rdi, [rdi + rax * 8]
     lock btr [rip + {pctl} + {pctl_off_pending}], eax
+    mov fs:[{tcb_sa_off} + {sa_tmp_id_inf}], rdi
     jc 9f
 8:
     // Read second signal word - both process and thread simultaneously.
@@ -211,7 +215,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov esi, eax
     mov eax, {SYS_SIGDEQUEUE}
     mov rdi, fs:[0]
-    add rdi, {tcb_sa_off} + {sa_tmp_inf} // out pointer of dequeued realtime sig
+    add rdi, {tcb_sa_off} + {sa_tmp_rt_inf} // out pointer of dequeued realtime sig
     syscall
     test eax, eax
     jnz 1b // assumes error can only be EAGAIN
@@ -220,7 +224,9 @@ asmfunction!(__relibc_internal_sigentry: ["
 2:
     mov edx, eax
     shr edx, 5
+    mov rdi, fs:[{tcb_sc_off} + {sc_sender_infos} + eax * 8]
     lock btr fs:[{tcb_sc_off} + {sc_word} + edx * 4], eax
+    mov fs:[{tcb_sa_off} + {sa_tmp_id_inf}], rdi
     add eax, 64 // indicate signal was targeted at thread
 9:
     sub rsp, {REDZONE_SIZE}
@@ -396,17 +402,20 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_rdx = const offset_of!(SigArea, tmp_rdx),
     sa_tmp_rdi = const offset_of!(SigArea, tmp_rdi),
     sa_tmp_rsi = const offset_of!(SigArea, tmp_rsi),
-    sa_tmp_inf = const offset_of!(SigArea, tmp_inf),
+    sa_tmp_rt_inf = const offset_of!(SigArea, tmp_rt_inf),
+    sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
     sc_saved_rflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
     sc_word = const offset_of!(Sigcontrol, word),
+    sc_sender_infos = const offset_of!(Sigcontrol, sender_infos),
     sc_control = const offset_of!(Sigcontrol, control_flags),
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     pctl_off_actions = const offset_of!(SigProcControl, actions),
     pctl_off_pending = const offset_of!(SigProcControl, pending),
+    pctl_off_sender_infos = const offset_of!(SigProcControl, sender_infos),
     pctl = sym PROC_CONTROL_STRUCT,
     supports_avx = sym SUPPORTS_AVX,
     REDZONE_SIZE = const 128,

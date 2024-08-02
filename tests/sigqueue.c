@@ -17,6 +17,8 @@ int parent;
 void action(int sig, siginfo_t *info, void *context) {
   (void)context;
   assert(sig == THE_SIG);
+  assert(info != NULL);
+  assert(context != NULL);
   assert(info->si_signo == THE_SIG);
   assert(info->si_value.sival_int == num);
   assert(info->si_code == SI_QUEUE);

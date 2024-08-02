@@ -6,10 +6,10 @@ use core::{
 };
 
 use syscall::{
-    data::AtomicU64, Error, NonatomicUsize, RawAction, Result, SetSighandlerData, SigProcControl,
-    Sigcontrol, SigcontrolFlags, EINVAL, ENOMEM, EPERM, SIGABRT, SIGBUS, SIGCHLD, SIGCONT, SIGFPE,
-    SIGILL, SIGKILL, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG,
-    SIGWINCH, SIGXCPU, SIGXFSZ,
+    data::AtomicU64, Error, NonatomicUsize, RawAction, Result, SenderInfo, SetSighandlerData,
+    SigProcControl, Sigcontrol, SigcontrolFlags, EINVAL, ENOMEM, EPERM, SIGABRT, SIGBUS, SIGCHLD,
+    SIGCONT, SIGFPE, SIGILL, SIGKILL, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTRAP, SIGTSTP, SIGTTIN,
+    SIGTTOU, SIGURG, SIGWINCH, SIGXCPU, SIGXFSZ,
 };
 
 use crate::{arch::*, proc::FdGuard, sync::Mutex, RtTcb, Tcb};
@@ -85,16 +85,19 @@ unsafe fn inner(stack: &mut SigStack) {
     let (sender_pid, sender_uid) = {
         let area = &mut *os.arch.get();
 
-        stack.sival = area.tmp_inf.arg;
+        // Undefined if the signal was not realtime
+        stack.sival = area.tmp_rt_inf.arg;
+
         stack.old_stack = arch_pre(stack, area);
 
         if (stack.sig_num - 1) / 32 == 1 && !targeted_thread_not_process {
-            stack.sig_code = area.tmp_inf.code as u32;
-            (area.tmp_inf.pid, area.tmp_inf.uid)
+            stack.sig_code = area.tmp_rt_inf.code as u32;
+            (area.tmp_rt_inf.pid, area.tmp_rt_inf.uid)
         } else {
-            // TODO: SIGCHLD information when applicable
-            stack.sig_code = 0;
-            (0, 0) // TODO
+            stack.sig_code = 0; // TODO: SI_USER constant?
+                                // TODO: Handle SIGCHLD. Maybe that should always be queued though?
+            let inf = SenderInfo::from_raw(area.tmp_id_inf);
+            (inf.pid, inf.ruid)
         }
     };
 
@@ -140,7 +143,6 @@ unsafe fn inner(stack: &mut SigStack) {
     let sigallow_inside_lo = sigallow_inside & 0xffff_ffff;
     let sigallow_inside_hi = sigallow_inside >> 32;
 
-    //let _ = syscall::write(1, &alloc::format!("WORD0 {:x?}\n", os.control.word).as_bytes());
     let prev_w0 = os.control.word[0].fetch_add(
         (sigallow_inside_lo << 32).wrapping_sub(prev_sigallow_lo << 32),
         Ordering::Relaxed,
@@ -149,7 +151,6 @@ unsafe fn inner(stack: &mut SigStack) {
         (sigallow_inside_hi << 32).wrapping_sub(prev_sigallow_hi << 32),
         Ordering::Relaxed,
     );
-    //let _ = syscall::write(1, &alloc::format!("WORD1 {:x?}\n", os.control.word).as_bytes());
 
     // TODO: If sa_mask caused signals to be unblocked, deliver one or all of those first?
 
@@ -161,13 +162,12 @@ unsafe fn inner(stack: &mut SigStack) {
     );
     core::sync::atomic::compiler_fence(Ordering::Acquire);
 
+    stack.old_mask = ((prev_w1 >> 32) << 32) | (prev_w0 >> 32);
+
     // Call handler, either sa_handler or sa_siginfo depending on flag.
     if sigaction.flags.contains(SigactionFlags::SIGINFO)
         && let Some(sigaction) = handler.sigaction
     {
-        stack.old_mask = ((prev_w1 >> 32) << 32) | (prev_w0 >> 32);
-
-        //let _ = syscall::write(1, alloc::format!("SIGACTION {:p}\n", sigaction).as_bytes());
         let info = SiginfoAbi {
             si_signo: stack.sig_num as c_int,
             si_addr: core::ptr::null_mut(),
@@ -184,10 +184,8 @@ unsafe fn inner(stack: &mut SigStack) {
             stack as *mut SigStack as *mut (),
         );
     } else if let Some(handler) = handler.handler {
-        //let _ = syscall::write(1, alloc::format!("HANDLER {:p}\n", handler).as_bytes());
         handler(stack.sig_num as c_int);
     }
-    //let _ = syscall::write(1, alloc::format!("RETURNED HANDLER\n").as_bytes());
 
     // Disable signals while we modify the sigmask again
     control_flags.store(
@@ -197,24 +195,29 @@ unsafe fn inner(stack: &mut SigStack) {
     core::sync::atomic::compiler_fence(Ordering::Acquire);
 
     // Update allowset again.
-    //let _ = syscall::write(1, &alloc::format!("WORD2 {:x?}\n", os.control.word).as_bytes());
+
+    let new_mask = stack.old_mask;
+    let old_mask = (os.control.word[0].load(Ordering::Relaxed) >> 32)
+        | ((os.control.word[1].load(Ordering::Relaxed) >> 32) << 32);
 
     let _prev_w0 = os.control.word[0].fetch_add(
-        (prev_sigallow_lo << 32).wrapping_sub(sigallow_inside_lo << 32),
+        ((new_mask & 0xffff_ffff) << 32).wrapping_sub((old_mask & 0xffff_ffff) << 32),
         Ordering::Relaxed,
     );
     let _prev_w1 = os.control.word[1].fetch_add(
-        (prev_sigallow_hi << 32).wrapping_sub(sigallow_inside_hi << 32),
+        ((new_mask >> 32) << 32).wrapping_sub((old_mask >> 32) << 32),
         Ordering::Relaxed,
     );
-    //let _ = syscall::write(1, &alloc::format!("WORD3 {:x?}\n", os.control.word).as_bytes());
 
     // TODO: If resetting the sigmask caused signals to be unblocked, then should they be delivered
     // here? And would it be possible to tail-call-optimize that?
 
-    //let _ = syscall::write(1, alloc::format!("will return to {:x?}\n", stack.regs.eip).as_bytes());
-
     (*os.arch.get()).last_sig_was_restart = shall_restart;
+
+    // TODO: Support setting uc_link to jump back to a different context?
+    (*os.arch.get()).last_sigstack = NonNull::new(stack.link);
+
+    // TODO: Support restoring uc_stack?
 
     // And re-enable them again
     if !signals_were_disabled {
@@ -502,6 +505,7 @@ pub(crate) static PROC_CONTROL_STRUCT: SigProcControl = SigProcControl {
             user_data: AtomicU64::new(0),
         }
     }; 64],
+    sender_infos: [const { AtomicU64::new(0) }; 32],
 };
 
 fn combine_allowset([lo, hi]: [u64; 2]) -> u64 {
