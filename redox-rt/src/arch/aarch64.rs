@@ -210,9 +210,13 @@ asmfunction!(__relibc_internal_sigentry: ["
     // x4 is now the new mask to be set
     add x5, x6, #{pctl_pending}
 
+    add x2, x5, #{pctl_sender_infos}
+    add x2, x2, w3, uxtb 3
+    ldar x2, [x2]
+
     // Try clearing the bit, retrying on failure.
-    stxr w1, x4, [x1] // try setting pending set to x4, set w1 := 0 on success
-    cbnz x1, 1b // retry everything if this fails
+    stxr w5, x4, [x1] // try setting pending set to x4, set w1 := 0 on success
+    cbnz w5, 1b // retry everything if this fails
     mov x1, x3
     b 2f
 4:
@@ -237,24 +241,67 @@ asmfunction!(__relibc_internal_sigentry: ["
     // x2 now contains sig_idx - 32
 
     // If realtime signal was directed at thread, handle it as an idempotent signal.
-    tbnz x1, x2, 5f
+    lsr x3, x1, x2
+    tbnz x3, #0, 5f
 
     mov x5, x0
     mov x4, x8
-    mov x8, {SYS_SIGDEQUEUE}
-    // x1 contains signal
-    add x2, x0, #{tcb_sa_off} + {sa_tmp_rt_inf}
+    mov x8, #{SYS_SIGDEQUEUE}
+    mov x0, x1
+    add x1, x0, #{tcb_sa_off} + {sa_tmp_rt_inf}
     svc 0
-    cbnz x0, 1b
     mov x0, x5
     mov x8, x4
+    cbnz x0, 1b
 
-    // count trailing zeroes, to find signal bit
-    rbit x1, x1
+    b 2f
+5:
+    // A realtime signal was sent to this thread, try clearing its bit.
+    // x3 contains last rt signal word, x2 contains rt_idx
+    clrex
+
+    // Calculate the absolute sig_idx
+    add x1, x3, 32
+
+    // Load si_pid and si_uid
+    add x2, x0, #{tcb_sc_off} + {sc_sender_infos}
+    add x2, x2, w1, uxtb #3
+    ldar x2, [x2]
+
+    add x3, x0, #{tcb_sc_off} + {sc_word} + 8
+    ldxr x2, [x3]
+
+    // Calculate new mask
+    mov x4, #1
+    lsl x4, x4, x2
+    sub x2, x2, x4 // remove bit
+
+    stxr w5, x2, [x3]
+    cbnz w5, 1b
+    str x2, [x0, #{tcb_sa_off} + {sa_tmp_id_inf}]
+    b 2f
+3:
+    // A standard signal was sent to this thread, try clearing its bit.
     clz x1, x1
     mov x2, #32
     sub x1, x2, x1
 
+    // Load si_pid and si_uid
+    add x2, x0, #{tcb_sc_off} + {sc_sender_infos}
+    add x2, x2, w1, uxtb #3
+    ldar x2, [x2]
+
+    // Clear bit from mask
+    mov x3, #1
+    lsl x3, x3, x1
+    sub x4, x4, x3
+
+    // Try updating the mask
+    stxr w3, x1, [x5]
+    cbnz w3, 1b
+
+    str x2, [x0, #{tcb_sa_off} + {sa_tmp_id_inf}]
+2:
     ldr x3, [x0, #{tcb_sa_off} + {sa_pctl}]
     add x2, x2, {pctl_actions}
     add x2, x3, w1, uxtb #4 // actions_base + sig_idx * sizeof Action
@@ -263,27 +310,6 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     // skip sigaltstack step if SA_ONSTACK is clear
     // tbz x2, #{SA_ONSTACK_BIT}, 2f
-    b 2f
-5:
-    add x1, x2, 32
-    b 3b
-3:
-    // A signal was sent to this thread, try clearing its bit.
-    clz x1, x1
-    mov x2, #32
-    sub x1, x2, x1
-
-    add x2, x0, #{tcb_sc_off} + {sc_sender_infos}
-    add x2, x2, w1, utxb #3
-    ldar x2, [x2]
-
-    stxr w3, x1, [x5]
-    cbnz w3, 1b
-
-    str x3, [x0, #{tcb_sa_off} + {sa_tmp_id_inf}]
-    add x1, x1, #64
-    b 2f
-2:
     ldr x2, [x0, #{tcb_sc_off} + {sc_saved_pc}]
     ldr x3, [x0, #{tcb_sc_off} + {sc_saved_x0}]
     stp x2, x3, [sp], #-16
@@ -344,6 +370,7 @@ asmfunction!(__relibc_internal_sigentry: ["
 "] <= [
     pctl_pending = const (offset_of!(SigProcControl, pending)),
     pctl_actions = const (offset_of!(SigProcControl, actions)),
+    pctl_sender_infos = const (offset_of!(SigProcControl, sender_infos)),
     tcb_sc_off = const (offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control)),
     tcb_sa_off = const (offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch)),
     sa_tmp_x1_x2 = const offset_of!(SigArea, tmp_x1_x2),
