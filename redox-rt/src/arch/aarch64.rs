@@ -170,11 +170,6 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov x1, sp
     str x1, [x0, #{tcb_sa_off} + {sa_tmp_sp}]
 
-    // Calculate new sp wrt redzone and alignment
-    sub x1, x1, {REDZONE_SIZE}
-    and x1, x1, -{STACK_ALIGN}
-    mov sp, x1
-
     ldr x6, [x0, #{tcb_sa_off} + {sa_pctl}]
 1:
     // Load x1 with the thread's bits
@@ -187,20 +182,20 @@ asmfunction!(__relibc_internal_sigentry: ["
     clrex
 
     // and if not, load process pending bitset.
-    add x1, x6, #{pctl_pending}
-    ldaxr x2, [x1]
+    add x5, x6, #{pctl_pending}
+    ldaxr x2, [x5]
 
     // Check if there are standard proc signals:
     lsr x3, x1, #32 // mask
-    and w3, w3, w3 // pending unblocked proc
+    and w3, w2, w3 // pending unblocked proc
     cbz w3, 4f // skip 'fetch_andn' step if zero
 
     // If there was one, find which one, and try clearing the bit (last value in x3, addr in x6)
     // this picks the MSB rather than the LSB, unlike x86. POSIX does not require any specific
     // ordering though.
-    clz x3, x3
-    mov x4, #32
-    sub x3, x4, x3
+    clz w3, w3
+    mov w4, #31
+    sub w3, w4, w3
     // x3 now contains the sig_idx
 
     mov x4, #1
@@ -215,8 +210,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     ldar x2, [x2]
 
     // Try clearing the bit, retrying on failure.
-    stxr w5, x4, [x1] // try setting pending set to x4, set w1 := 0 on success
-    cbnz w5, 1b // retry everything if this fails
+    stxr w1, x4, [x5] // try setting pending set to x4, set w1 := 0 on success
+    cbnz w1, 1b // retry everything if this fails
     mov x1, x3
     b 2f
 4:
@@ -233,10 +228,11 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     orr x2, x1, x2
     and x2, x2, x2, lsr #32
+    cbz x2, 7f
 
     rbit x3, x2
     clz x3, x3
-    mov x4, #32
+    mov x4, #31
     sub x2, x4, x3
     // x2 now contains sig_idx - 32
 
@@ -283,7 +279,7 @@ asmfunction!(__relibc_internal_sigentry: ["
 3:
     // A standard signal was sent to this thread, try clearing its bit.
     clz x1, x1
-    mov x2, #32
+    mov x2, #31
     sub x1, x2, x1
 
     // Load si_pid and si_uid
@@ -307,39 +303,52 @@ asmfunction!(__relibc_internal_sigentry: ["
     add x2, x3, w1, uxtb #4 // actions_base + sig_idx * sizeof Action
     // TODO: NOT ATOMIC (tearing allowed between regs)!
     ldxp x2, x3, [x2]
+    clrex
+
+    // Calculate new sp wrt redzone and alignment
+    mov x4, sp
+    sub x4, x4, {REDZONE_SIZE}
+    and x4, x4, -{STACK_ALIGN}
+    mov sp, x4
 
     // skip sigaltstack step if SA_ONSTACK is clear
     // tbz x2, #{SA_ONSTACK_BIT}, 2f
+
     ldr x2, [x0, #{tcb_sc_off} + {sc_saved_pc}]
     ldr x3, [x0, #{tcb_sc_off} + {sc_saved_x0}]
-    stp x2, x3, [sp], #-16
+    stp x2, x3, [sp, #-16]!
 
     ldr x2, [x0, #{tcb_sa_off} + {sa_tmp_sp}]
     mrs x3, nzcv
-    stp x2, x3, [sp], #-16
+    stp x2, x3, [sp, #-16]!
 
     ldp x2, x3, [x0, #{tcb_sa_off} + {sa_tmp_x1_x2}]
-    stp x2, x3, [sp], #-16
+    stp x2, x3, [sp, #-16]!
     ldp x3, x4, [x0, #{tcb_sa_off} + {sa_tmp_x3_x4}]
-    stp x4, x3, [sp], #-16
+    stp x4, x3, [sp, #-16]!
     ldp x5, x6, [x0, #{tcb_sa_off} + {sa_tmp_x5_x6}]
-    stp x6, x5, [sp], #-16
+    stp x6, x5, [sp, #-16]!
 
-    stp x8, x7, [sp], #-16
-    stp x10, x9, [sp], #-16
-    stp x12, x11, [sp], #-16
-    stp x14, x13, [sp], #-16
-    stp x16, x15, [sp], #-16
-    stp x18, x17, [sp], #-16
-    stp x20, x19, [sp], #-16
-    stp x22, x21, [sp], #-16
-    stp x24, x23, [sp], #-16
-    stp x26, x25, [sp], #-16
-    stp x28, x27, [sp], #-16
-    stp x30, x29, [sp], #-16
+    stp x8, x7, [sp, #-16]!
+    stp x10, x9, [sp, #-16]!
+    stp x12, x11, [sp, #-16]!
+    stp x14, x13, [sp, #-16]!
+    stp x16, x15, [sp, #-16]!
+    stp x18, x17, [sp, #-16]!
+    stp x20, x19, [sp, #-16]!
+    stp x22, x21, [sp, #-16]!
+    stp x24, x23, [sp, #-16]!
+    stp x26, x25, [sp, #-16]!
+    stp x28, x27, [sp, #-16]!
+    stp x30, x29, [sp, #-16]!
+
+    str w1, [sp, #-4]
+    sub sp, sp, #64
 
     mov x0, sp
     bl {inner}
+
+    add sp, sp, #64
 
     ldp x30, x29, [sp], #16
     ldp x28, x27, [sp], #16
@@ -356,16 +365,31 @@ asmfunction!(__relibc_internal_sigentry: ["
     ldp x6, x5, [sp], #16
     ldp x4, x3, [sp], #16
     ldp x2, x1, [sp], #16
+
     ldr x0, [sp, #8]
     msr nzcv, x0
 
+8:
     // x18 is reserved by ABI as 'platform register', so clobbering it should be safe.
     mov x18, sp
-    ldr x0, [sp], #16
+    ldr x0, [x18]
     mov sp, x0
-    mov x0, x18
 
-    ldp x18, x0, [x0]
+    ldp x18, x0, [x18, #16]
+    br x18
+7:
+    // Spurious signal, i.e. all bitsets were 0 at the time they were checked
+    clrex
+
+    ldr x1, [x0, #{tcb_sc_off} + {sc_flags}]
+    and x1, x1, ~1
+    str x1, [x0, #{tcb_sc_off} + {sc_flags}]
+
+    ldp x1, x2, [x0, #{tcb_sa_off} + {sa_tmp_x1_x2}]
+    ldp x3, x4, [x0, #{tcb_sa_off} + {sa_tmp_x3_x4}]
+    ldp x5, x6, [x0, #{tcb_sa_off} + {sa_tmp_x5_x6}]
+    ldr x18, [x0, #{tcb_sc_off} + {sc_saved_pc}]
+    ldr x0, [x0, #{tcb_sc_off} + {sc_saved_x0}]
     br x18
 "] <= [
     pctl_pending = const (offset_of!(SigProcControl, pending)),
@@ -384,6 +408,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     sc_saved_x0 = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_sender_infos = const offset_of!(Sigcontrol, sender_infos),
     sc_word = const offset_of!(Sigcontrol, word),
+    sc_flags = const offset_of!(Sigcontrol, control_flags),
     inner = sym inner_c,
 
     SA_ONSTACK_BIT = const 58, // (1 << 58) >> 32 = 0x0400_0000
