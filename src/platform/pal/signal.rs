@@ -39,5 +39,9 @@ pub trait PalSignal: Pal {
 
     fn sigsuspend(mask: &sigset_t) -> Errno; // always fails
 
-    fn sigtimedwait(set: &sigset_t, sig: &mut siginfo_t, tp: &timespec) -> Result<(), Errno>;
+    fn sigtimedwait(
+        set: &sigset_t,
+        sig: Option<&mut siginfo_t>,
+        tp: &timespec,
+    ) -> Result<(), Errno>;
 }

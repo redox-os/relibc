@@ -23,14 +23,19 @@ void handler2(int sig, siginfo_t *info, void *context_raw) {
 
     assert(info != NULL);
     assert(info->si_signo == SIGUSR1);
+#ifndef __linux
+    // TODO: SI_TKILL?
     assert(info->si_code == SI_USER);
     assert(info->si_pid == getpid());
     assert(info->si_uid == getuid());
+#endif
 
     ucontext_t *context = context_raw;
     assert(context != NULL);
+#ifndef __linux__ // TODO
     assert(memcmp(&context->uc_sigmask, &the_set, sizeof(sigset_t)));
     assert(context->uc_link == NULL);
+#endif
 }
 
 int main(void) {

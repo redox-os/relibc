@@ -727,13 +727,15 @@ fn try_claim_multiple(
 ) -> Option<SiginfoAbi> {
     while (proc_pending | thread_pending) & allowset != 0 {
         let sig_idx = ((proc_pending | thread_pending) & allowset).trailing_zeros();
-        if thread_pending & (1 << sig_idx) != 0
+        if thread_pending & allowset & (1 << sig_idx) != 0
             && let Some(res) = try_claim_single(sig_idx, Some(control))
         {
             return Some(res);
         }
         thread_pending &= !(1 << sig_idx);
-        if let Some(res) = try_claim_single(sig_idx, None) {
+        if proc_pending & allowset & (1 << sig_idx) != 0
+            && let Some(res) = try_claim_single(sig_idx, None)
+        {
             return Some(res);
         }
         proc_pending &= !(1 << sig_idx);
@@ -741,7 +743,7 @@ fn try_claim_multiple(
     None
 }
 fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option<SiginfoAbi> {
-    let sig_group = sig_idx / 1;
+    let sig_group = sig_idx / 32;
 
     if sig_group == 1 && thread_control.is_none() {
         // Queued (realtime) signal
@@ -749,8 +751,8 @@ fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option
         let rt_inf = unsafe {
             syscall::syscall2(
                 syscall::SYS_SIGDEQUEUE,
-                sig_idx as usize,
                 ret.as_mut_ptr() as usize,
+                sig_idx as usize - 32,
             )
             .ok()?;
             ret.assume_init()
