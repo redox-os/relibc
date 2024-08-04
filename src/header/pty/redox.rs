@@ -5,7 +5,7 @@ use crate::{
 };
 
 pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
-    let master = fcntl::open(c_str!("pty:").as_ptr(), fcntl::O_RDWR, 0);
+    let master = fcntl::open(c_str!("/scheme/pty").as_ptr(), fcntl::O_RDWR, 0);
     if master < 0 {
         return Err(());
     }

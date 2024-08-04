@@ -126,7 +126,7 @@ pub unsafe fn init(sp: &'static Stack) {
         let mut env = syscall::EnvRegisters::default();
 
         let file = syscall::open(
-            "thisproc:current/regs/env",
+            "/scheme/thisproc/current/regs/env",
             syscall::O_CLOEXEC | syscall::O_RDONLY,
         )
         .expect_notls("failed to open handle for process registers");
@@ -142,7 +142,7 @@ pub unsafe fn init(sp: &'static Stack) {
         let mut env = syscall::EnvRegisters::default();
 
         let file = syscall::open(
-            "thisproc:current/regs/env",
+            "/scheme/thisproc/current/regs/env",
             syscall::O_CLOEXEC | syscall::O_RDONLY,
         )
         .expect_notls("failed to open handle for process registers");

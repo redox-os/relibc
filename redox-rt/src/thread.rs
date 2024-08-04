@@ -6,7 +6,7 @@ use crate::{arch::*, proc::*, RtTcb};
 pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuard> {
     let cur_thr_fd = RtTcb::current().thread_fd();
     let new_thr_fd = FdGuard::new(syscall::open(
-        "thisproc:new-thread/open_via_dup",
+        "/scheme/thisproc/new-thread/open_via_dup",
         O_CLOEXEC,
     )?);
 

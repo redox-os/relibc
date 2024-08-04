@@ -23,7 +23,7 @@ use crate::{
 impl PalSignal for Sys {
     unsafe fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
         let path = match which {
-            ITIMER_REAL => "itimer:1",
+            ITIMER_REAL => "/scheme/itimer/1",
             _ => {
                 ERRNO.set(EINVAL);
                 return -1;
@@ -67,7 +67,7 @@ impl PalSignal for Sys {
 
     unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
         let path = match which {
-            ITIMER_REAL => "itimer:1",
+            ITIMER_REAL => "/scheme/itimer/1",
             _ => {
                 ERRNO.set(EINVAL);
                 return -1;
