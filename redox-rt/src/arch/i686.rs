@@ -148,10 +148,10 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov ecx, gs:[{tcb_sa_off} + {sa_pctl}]
 
     // Read standard signal word - for the process
-    mov eax, [ecx + {pctl_word}]
+    mov eax, [ecx + {pctl_pending}]
     and eax, edx
-    jz 3f
     bsf eax, eax
+    jz 3f
 
     // Read si_pid and si_uid, atomically.
     movq gs:[{tcb_sa_off} + {sa_tmp_mm0}], mm0
@@ -160,12 +160,12 @@ asmfunction!(__relibc_internal_sigentry: ["
     movq mm0, gs:[{tcb_sa_off} + {sa_tmp_mm0}]
 
     // Try clearing the pending bit, otherwise retry if another thread did that first
-    lock btr [ecx + {pctl_word}], eax
+    lock btr [ecx + {pctl_pending}], eax
     jnc 1b
     jmp 2f
 3:
     // Read realtime thread and process signal word together
-    mov edx, [ecx + {pctl_word} + 4]
+    mov edx, [ecx + {pctl_pending} + 4]
     mov eax, gs:[{tcb_sc_off} + {sc_word} + 8]
     or eax, edx
     and eax, gs:[{tcb_sc_off} + {sc_word} + 12]
@@ -242,7 +242,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov ecx, esp
     call {inner}
 
-    fxrstor [esp + 32]
+    fxrstor [esp + 48]
     add esp, 48 + 29 * 16 + 2 * 4
 
     pop ebp
@@ -303,7 +303,7 @@ __relibc_internal_sigentry_crit_third:
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     pctl_actions = const offset_of!(SigProcControl, actions),
     pctl_sender_infos = const offset_of!(SigProcControl, sender_infos),
-    pctl_word = const offset_of!(SigProcControl, pending),
+    pctl_pending = const offset_of!(SigProcControl, pending),
     pctl = sym PROC_CONTROL_STRUCT,
     STACK_ALIGN = const 16,
     SYS_SIGDEQUEUE = const syscall::SYS_SIGDEQUEUE,
