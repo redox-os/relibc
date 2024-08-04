@@ -24,6 +24,7 @@ EXPECT_NAMES=\
 	locale \
 	math \
 	netdb/getaddrinfo \
+	psignal \
 	ptrace \
 	pty/forkpty \
 	regex \

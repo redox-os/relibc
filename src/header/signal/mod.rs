@@ -5,6 +5,7 @@ use core::{mem, ptr};
 use cbitset::BitSet;
 
 use crate::{
+    c_str::CStr,
     header::{errno, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},
     pthread::{self, Errno, ResultExt},
@@ -12,7 +13,7 @@ use crate::{
 
 pub use self::sys::*;
 
-use super::errno::EFAULT;
+use super::{errno::EFAULT, unistd};
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
@@ -51,6 +52,7 @@ pub struct sigaltstack {
     pub ss_size: size_t,
 }
 
+// FIXME: This struct is wrong on Linux
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct siginfo {
@@ -389,7 +391,7 @@ pub unsafe extern "C" fn sigwaitinfo(set: *const sigset_t, sig: *mut siginfo_t) 
     sigtimedwait(set, sig, core::ptr::null())
 }
 
-pub const _signal_strings: [&str; 32] = [
+pub(crate) const SIGNAL_STRINGS: [&str; 32] = [
     "Unknown signal\0",
     "Hangup\0",
     "Interrupt\0",
@@ -423,3 +425,55 @@ pub const _signal_strings: [&str; 32] = [
     "Power failure\0",
     "Bad system call\0",
 ];
+#[no_mangle]
+pub unsafe extern "C" fn psignal(sig: c_int, prefix: *const c_char) {
+    let c_description = usize::try_from(sig)
+        .ok()
+        .and_then(|idx| SIGNAL_STRINGS.get(idx))
+        .unwrap_or(&SIGNAL_STRINGS[0]);
+    let description = &c_description[..c_description.len() - 1];
+    let prefix = CStr::from_ptr(prefix).to_string_lossy();
+    // TODO: stack vec or print directly?
+    let string = alloc::format!("{prefix}:{description}\n");
+    // TODO: better internal libc API?
+    let _ = unistd::write(
+        unistd::STDERR_FILENO,
+        string.as_bytes().as_ptr().cast(),
+        string.as_bytes().len(),
+    );
+}
+#[no_mangle]
+pub unsafe extern "C" fn psiginfo(info: *const siginfo_t, prefix: *const c_char) {
+    let siginfo_t {
+        si_code,
+        si_signo,
+        si_pid,
+        si_uid,
+        si_errno,
+        si_addr,
+        si_status,
+        si_value,
+    } = &*info;
+    let sival_ptr = si_value.sival_ptr;
+    let prefix = CStr::from_ptr(prefix).to_string_lossy();
+    // TODO: stack vec or print directly?
+    let string = alloc::format!(
+        "{prefix}:siginfo_t {{
+    si_code: {si_code}
+    si_signo: {si_signo}
+    si_pid: {si_pid}
+    si_uid: {si_uid}
+    si_errno: {si_errno}
+    si_addr: {si_addr:p}
+    si_status: {si_status}
+    si_value: {sival_ptr:p}
+}}
+"
+    );
+    // TODO: better internal libc API?
+    let _ = unistd::write(
+        unistd::STDERR_FILENO,
+        string.as_bytes().as_ptr().cast(),
+        string.as_bytes().len(),
+    );
+}
