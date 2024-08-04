@@ -380,12 +380,19 @@ pub unsafe extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int
 #[no_mangle]
 pub unsafe extern "C" fn sigtimedwait(
     set: *const sigset_t,
-    sig: *mut siginfo, // https://github.com/mozilla/cbindgen/issues/621
+    // s/siginfo_t/siginfo due to https://github.com/mozilla/cbindgen/issues/621
+    sig: *mut siginfo,
+    // POSIX leaves behavior unspecified if this is NULL, but on both Linux and Redox, NULL is used
+    // to differentiate between sigtimedwait and sigwaitinfo internally
     tp: *const timespec,
 ) -> c_int {
-    Sys::sigtimedwait(&*set, sig.as_mut(), &*tp)
+    Sys::sigtimedwait(&*set, sig.as_mut(), tp.as_ref())
         .map(|()| 0)
         .or_minus_one_errno()
+}
+#[no_mangle]
+pub unsafe extern "C" fn sigwaitinfo(set: *const sigset_t, sig: *mut siginfo_t) -> c_int {
+    sigtimedwait(set, sig, core::ptr::null())
 }
 
 pub const _signal_strings: [&str; 32] = [
