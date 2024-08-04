@@ -1,6 +1,8 @@
 use core::arch::global_asm;
 
-use super::{sigset_t, stack_t};
+use redox_rt::signal::SiginfoAbi;
+
+use super::{siginfo_t, sigset_t, stack_t};
 
 pub const SIGHUP: usize = 1;
 pub const SIGINT: usize = 2;
@@ -57,6 +59,9 @@ const _: () = {
     if SS_DISABLE != redox_rt::signal::SS_DISABLE {
         panic!();
     }
+    if MINSIGSTKSZ != redox_rt::signal::MIN_SIGALTSTACK_SIZE {
+        panic!();
+    }
 };
 
 // should include both SigStack size, and some extra room for the libc handler
@@ -101,4 +106,10 @@ pub extern "C" fn __completely_unused_cbindgen_workaround_fn_ucontext_mcontext(
     a: *const ucontext_t,
     b: *const mcontext_t,
 ) {
+}
+
+impl From<SiginfoAbi> for siginfo_t {
+    fn from(value: SiginfoAbi) -> Self {
+        unsafe { core::mem::transmute(value) }
+    }
 }

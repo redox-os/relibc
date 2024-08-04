@@ -264,19 +264,24 @@ impl PalSignal for Sys {
         })
     }
 
-    fn sigsuspend(set: &sigset_t) -> Errno {
-        match redox_rt::signal::wait_with_mask(*set) {
+    fn sigsuspend(mask: &sigset_t) -> Errno {
+        match redox_rt::signal::await_signal_async(!*mask) {
             Ok(_) => unreachable!(),
             Err(err) => err.into(),
         }
     }
 
-    unsafe fn sigtimedwait(
-        set: *const sigset_t,
-        sig: *mut siginfo_t,
-        tp: *const timespec,
-    ) -> c_int {
-        ERRNO.set(ENOSYS);
-        -1
+    fn sigtimedwait(
+        set: &sigset_t,
+        info_out: &mut siginfo_t,
+        timeout: &timespec,
+    ) -> Result<(), Errno> {
+        // TODO: deadline-based API
+        let timeout = syscall::TimeSpec {
+            tv_sec: timeout.tv_sec,
+            tv_nsec: timeout.tv_nsec as _,
+        };
+        *info_out = redox_rt::signal::await_signal_sync(*set, &timeout)?.into();
+        Ok(())
     }
 }

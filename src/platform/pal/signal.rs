@@ -37,8 +37,7 @@ pub trait PalSignal: Pal {
         oset: Option<&mut sigset_t>,
     ) -> Result<(), Errno>;
 
-    fn sigsuspend(set: &sigset_t) -> Errno; // always fails
+    fn sigsuspend(mask: &sigset_t) -> Errno; // always fails
 
-    unsafe fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec)
-        -> c_int;
+    fn sigtimedwait(set: &sigset_t, sig: &mut siginfo_t, tp: &timespec) -> Result<(), Errno>;
 }
