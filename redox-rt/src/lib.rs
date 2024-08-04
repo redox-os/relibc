@@ -63,7 +63,7 @@ impl RtTcb {
         unsafe {
             if (&*self.thr_fd.get()).is_none() {
                 self.thr_fd.get().write(Some(FdGuard::new(
-                    syscall::open("thisproc:current/open_via_dup", O_CLOEXEC).unwrap(),
+                    syscall::open("/scheme/thisproc/current/open_via_dup", O_CLOEXEC).unwrap(),
                 )));
             }
             (&*self.thr_fd.get()).as_ref().unwrap()

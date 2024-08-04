@@ -111,7 +111,7 @@ pub unsafe extern "C" fn madvise(addr: *mut c_void, len: size_t, flags: c_int) -
 static SHM_PATH: &'static [u8] = b"/dev/shm/";
 
 #[cfg(target_os = "redox")]
-static SHM_PATH: &'static [u8] = b"shm:";
+static SHM_PATH: &'static [u8] = b"/scheme/shm/";
 
 unsafe fn shm_path(name: *const c_char) -> CString {
     let name_c = CStr::from_ptr(name);

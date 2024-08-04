@@ -491,9 +491,9 @@ impl Pal for Sys {
 
         let path = if flags & sys_random::GRND_RANDOM != 0 {
             //TODO: /dev/random equivalent
-            "rand:"
+            "/scheme/rand"
         } else {
-            "rand:"
+            "/scheme/rand"
         };
 
         let mut open_flags = syscall::O_RDONLY | syscall::O_CLOEXEC;
@@ -539,9 +539,9 @@ impl Pal for Sys {
     fn getsid(pid: pid_t) -> pid_t {
         let mut buf = [0; mem::size_of::<usize>()];
         let path = if pid == 0 {
-            format!("thisproc:current/session_id")
+            format!("/scheme/thisproc/current/session_id")
         } else {
-            format!("proc:{}/session_id", pid)
+            format!("/scheme/proc/{}/session_id", pid)
         };
         let path_c = CString::new(path).unwrap();
         match File::open(CStr::borrow(&path_c), fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
@@ -920,7 +920,7 @@ impl Pal for Sys {
             return -1;
         }
         match File::open(
-            c_str!("thisproc:current/session_id"),
+            c_str!("/scheme/thisproc/current/session_id"),
             fcntl::O_WRONLY | fcntl::O_CLOEXEC,
         ) {
             Ok(mut file) => match file.write(&usize::to_ne_bytes(session_id.try_into().unwrap())) {
@@ -1001,7 +1001,7 @@ impl Pal for Sys {
                 Err(_) => return Err(EIO),
             }
 
-            let file_path = c_str!("sys:uname");
+            let file_path = c_str!("/scheme/sys/uname");
             let mut file = match File::open(file_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
                 Ok(ok) => ok,
                 Err(_) => return Err(EIO),
