@@ -274,14 +274,14 @@ impl PalSignal for Sys {
     fn sigtimedwait(
         set: &sigset_t,
         info_out: Option<&mut siginfo_t>,
-        timeout: &timespec,
+        timeout: Option<&timespec>,
     ) -> Result<(), Errno> {
         // TODO: deadline-based API
-        let timeout = syscall::TimeSpec {
+        let timeout = timeout.map(|timeout| syscall::TimeSpec {
             tv_sec: timeout.tv_sec,
             tv_nsec: timeout.tv_nsec as _,
-        };
-        let info = redox_rt::signal::await_signal_sync(*set, &timeout)?.into();
+        });
+        let info = redox_rt::signal::await_signal_sync(*set, timeout.as_ref())?.into();
         if let Some(out) = info_out {
             *out = info;
         }

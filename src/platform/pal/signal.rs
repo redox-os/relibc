@@ -42,6 +42,6 @@ pub trait PalSignal: Pal {
     fn sigtimedwait(
         set: &sigset_t,
         sig: Option<&mut siginfo_t>,
-        tp: &timespec,
+        tp: Option<&timespec>,
     ) -> Result<(), Errno>;
 }

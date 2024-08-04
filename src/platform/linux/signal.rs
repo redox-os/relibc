@@ -165,14 +165,14 @@ impl PalSignal for Sys {
     fn sigtimedwait(
         set: &sigset_t,
         sig: Option<&mut siginfo_t>,
-        tp: &timespec,
+        tp: Option<&timespec>,
     ) -> Result<(), Errno> {
         unsafe {
             e_raw(syscall!(
                 RT_SIGTIMEDWAIT,
                 set as *const _,
-                sig.map_or_else(core::ptr::null_mut, |s| s as *mut _) as usize,
-                tp as *const _,
+                sig.map_or_else(core::ptr::null_mut, |s| s as *mut _),
+                tp.map_or_else(core::ptr::null, |t| t as *const _),
                 NSIG / 8
             ))
             .map(|_| ())

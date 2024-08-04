@@ -24,11 +24,11 @@ void validate(int sig, const siginfo_t *info) {
 }
 
 void action(int sig, siginfo_t *info, void *context) {
-  num++;
   (void)context;
   assert(context != NULL);
   validate(sig, info);
   write(1, "action\n", 7);
+  num++;
 }
 
 int main(void) {
@@ -39,12 +39,6 @@ int main(void) {
 
   parent = getpid();
   assert(parent != 0);
-
-  int child = fork();
-  ERROR_IF(fork, child, == -1);
-
-  status = close(fds[child == 0 ? 0 : 1]);
-  ERROR_IF(close, status, == -1);
 
   sigset_t set, mask;
   status = sigfillset(&mask);
@@ -67,6 +61,16 @@ int main(void) {
   status = sigaddset(&set, THE_SIG);
   ERROR_IF(sigaddset, status, == -1);
 
+  sigset_t empty_set;
+  status = sigemptyset(&empty_set);
+  ERROR_IF(sigemptyset, status, == -1);
+
+  int child = fork();
+  ERROR_IF(fork, child, == -1);
+
+  status = close(fds[child == 0 ? 0 : 1]);
+  ERROR_IF(close, status, == -1);
+
   struct sigaction sa;
   memcpy(&sa.sa_mask, &set, sizeof (sigset_t));
   sa.sa_flags = SA_SIGINFO;
@@ -83,6 +87,20 @@ int main(void) {
     ERROR_IF(sigtimedwait, status, == -1);
     validate(THE_SIG, &info);
     assert(num == 0); // ensure no signal handler ran
+
+    num++;
+
+    // TODO: check status
+    status = sigsuspend(&empty_set);
+    if (status == -1) {
+        perror("error in sigsuspend");
+        puts("[EINTR] is usually expected");
+    }
+
+    assert(num == 2); // ensure signal handler ran
+
+    status = sigprocmask(SIG_SETMASK, &empty_set, NULL);
+    ERROR_IF(sigprocmask, status, == -1);
 
     while (num < 31) {}
 

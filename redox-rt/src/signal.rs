@@ -673,10 +673,13 @@ pub fn currently_pending_blocked() -> u64 {
 }
 pub enum Unreachable {}
 
-pub fn await_signal_async(set: u64) -> Result<Unreachable> {
-    let mut old = 0;
-    set_sigmask(Some(!set), Some(&mut old))?;
-    // TODO: RAII guard
+pub fn await_signal_async(inner_allowset: u64) -> Result<Unreachable> {
+    let _guard = tmp_disable_signals();
+    let control = &unsafe { Tcb::current().unwrap() }.os_specific.control;
+
+    let old_allowset = get_allowset_raw(&control.word);
+    set_allowset_raw(&control.word, old_allowset, inner_allowset);
+
     let res = syscall::nanosleep(
         &TimeSpec {
             tv_sec: i64::MAX,
@@ -684,12 +687,19 @@ pub fn await_signal_async(set: u64) -> Result<Unreachable> {
         },
         &mut TimeSpec::default(),
     );
-    set_sigmask(Some(old), None)?;
+    set_allowset_raw(&control.word, inner_allowset, old_allowset);
+
+    if res == Err(Error::new(EINTR)) {
+        unsafe {
+            manually_enter_trampoline();
+        }
+    }
+
     res?;
     unreachable!()
 }
 // TODO: deadline-based API
-pub fn await_signal_sync(inner_allowset: u64, timeout: &TimeSpec) -> Result<SiginfoAbi> {
+pub fn await_signal_sync(inner_allowset: u64, timeout: Option<&TimeSpec>) -> Result<SiginfoAbi> {
     let _guard = tmp_disable_signals();
     let control = &unsafe { Tcb::current().unwrap() }.os_specific.control;
 
@@ -704,7 +714,17 @@ pub fn await_signal_sync(inner_allowset: u64, timeout: &TimeSpec) -> Result<Sigi
         return Ok(info);
     }
 
-    let res = syscall::nanosleep(&timeout, &mut TimeSpec::default());
+    let res = match timeout {
+        Some(t) => syscall::nanosleep(&t, &mut TimeSpec::default()),
+        None => syscall::nanosleep(
+            &TimeSpec {
+                tv_sec: i64::MAX,
+                tv_nsec: 0,
+            },
+            &mut TimeSpec::default(),
+        ),
+    };
+
     let thread_pending = set_allowset_raw(&control.word, inner_allowset, old_allowset);
     let proc_pending = PROC_CONTROL_STRUCT.pending.load(Ordering::Acquire);
 
