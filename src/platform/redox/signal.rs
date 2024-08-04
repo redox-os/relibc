@@ -246,7 +246,7 @@ impl PalSignal for Sys {
     }
 
     fn sigpending(set: &mut sigset_t) -> Result<(), Errno> {
-        *set = redox_rt::signal::currently_pending();
+        *set = redox_rt::signal::currently_pending_blocked();
         Ok(())
     }
 
@@ -264,9 +264,11 @@ impl PalSignal for Sys {
         })
     }
 
-    unsafe fn sigsuspend(set: *const sigset_t) -> c_int {
-        ERRNO.set(ENOSYS);
-        -1
+    fn sigsuspend(set: &sigset_t) -> Errno {
+        match redox_rt::signal::wait_with_mask(*set) {
+            Ok(_) => unreachable!(),
+            Err(err) => err.into(),
+        }
     }
 
     unsafe fn sigtimedwait(
