@@ -142,7 +142,9 @@ pub unsafe extern "C" fn sigaction(
 
 #[no_mangle]
 pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize > NSIG {
+    if signo <= 0 || signo as usize > NSIG.max(SIGRTMAX)
+    /* TODO */
+    {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
     }
@@ -162,7 +164,9 @@ pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -
 
 #[no_mangle]
 pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize > NSIG {
+    if signo <= 0 || signo as usize > NSIG.max(SIGRTMAX)
+    /* TODO */
+    {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
     }
@@ -379,7 +383,7 @@ pub unsafe extern "C" fn sigtimedwait(
     sig: *mut siginfo, // https://github.com/mozilla/cbindgen/issues/621
     tp: *const timespec,
 ) -> c_int {
-    Sys::sigtimedwait(&*set, &mut *sig, &*tp)
+    Sys::sigtimedwait(&*set, sig.as_mut(), &*tp)
         .map(|()| 0)
         .or_minus_one_errno()
 }
