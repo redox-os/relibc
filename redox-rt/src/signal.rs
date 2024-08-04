@@ -657,11 +657,30 @@ pub unsafe fn sigaltstack(
 
 pub const MIN_SIGALTSTACK_SIZE: usize = 8192;
 
-pub fn currently_pending() -> u64 {
+pub fn currently_pending_blocked() -> u64 {
     let control = &unsafe { Tcb::current().unwrap() }.os_specific.control;
     let w0 = control.word[0].load(Ordering::Relaxed);
     let w1 = control.word[1].load(Ordering::Relaxed);
-    let pending_blocked_lo = w0 & !(w0 >> 32);
-    let pending_unblocked_hi = w1 & !(w0 >> 32);
-    pending_blocked_lo | (pending_unblocked_hi << 32)
+    let allow = (w0 >> 32) | ((w1 >> 32) << 32);
+    let thread_pending = (w0 & 0xffff_ffff) | ((w1 >> 32) & 0xffff_ffff);
+    let proc_pending = PROC_CONTROL_STRUCT.pending.load(Ordering::Relaxed);
+
+    core::sync::atomic::fence(Ordering::Acquire); // TODO: Correct ordering?
+
+    (thread_pending | proc_pending) & !allow
+}
+pub enum Unreachable {}
+pub fn wait_with_mask(mask: u64) -> Result<Unreachable, Error> {
+    let mut old = 0;
+    set_sigmask(Some(mask), Some(&mut old))?;
+    let res = syscall::nanosleep(
+        &syscall::TimeSpec {
+            tv_sec: i64::MAX,
+            tv_nsec: 0,
+        },
+        &mut syscall::TimeSpec::default(),
+    );
+    set_sigmask(Some(old), None)?;
+    res?;
+    unreachable!()
 }

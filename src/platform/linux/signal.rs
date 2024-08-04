@@ -155,8 +155,10 @@ impl PalSignal for Sys {
         .map(|_| ())
     }
 
-    fn sigsuspend(set: &sigset_t) -> c_int {
-        unsafe { e(syscall!(RT_SIGSUSPEND, set as *const sigset_t, NSIG / 8)) as c_int }
+    fn sigsuspend(set: &sigset_t) -> Errno {
+        unsafe {
+            e_raw(syscall!(RT_SIGSUSPEND, set as *const sigset_t, NSIG / 8)).expect_err("must fail")
+        }
     }
 
     unsafe fn sigtimedwait(

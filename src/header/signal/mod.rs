@@ -359,7 +359,7 @@ pub unsafe extern "C" fn sigset(
 
 #[no_mangle]
 pub unsafe extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
-    Sys::sigsuspend(&*sigmask)
+    Err(Sys::sigsuspend(&*sigmask)).or_minus_one_errno()
 }
 
 #[no_mangle]
