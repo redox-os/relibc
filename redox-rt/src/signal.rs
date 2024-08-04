@@ -1,15 +1,17 @@
 use core::{
     cell::{Cell, UnsafeCell},
     ffi::{c_int, c_void},
+    mem::MaybeUninit,
     ptr::NonNull,
     sync::atomic::{AtomicU8, AtomicUsize, Ordering},
 };
 
 use syscall::{
-    data::AtomicU64, Error, NonatomicUsize, RawAction, Result, SenderInfo, SetSighandlerData,
-    SigProcControl, Sigcontrol, SigcontrolFlags, EINVAL, ENOMEM, EPERM, SIGABRT, SIGBUS, SIGCHLD,
-    SIGCONT, SIGFPE, SIGILL, SIGKILL, SIGQUIT, SIGSEGV, SIGSTOP, SIGSYS, SIGTRAP, SIGTSTP, SIGTTIN,
-    SIGTTOU, SIGURG, SIGWINCH, SIGXCPU, SIGXFSZ,
+    data::AtomicU64, Error, NonatomicUsize, RawAction, Result, RtSigInfo, SenderInfo,
+    SetSighandlerData, SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, EAGAIN, EINTR,
+    EINVAL, ENOMEM, EPERM, SIGABRT, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGILL, SIGKILL, SIGQUIT,
+    SIGSEGV, SIGSTOP, SIGSYS, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH, SIGXCPU,
+    SIGXFSZ,
 };
 
 use crate::{arch::*, proc::FdGuard, sync::Mutex, RtTcb, Tcb};
@@ -160,14 +162,14 @@ unsafe fn inner(stack: &mut SigStack) {
     };
 
     // Set sigmask to sa_mask and unmark the signal as pending.
-    let prev_sigallow = get_mask_raw(&os.control.word);
+    let prev_sigallow = get_allowset_raw(&os.control.word);
 
     let mut sigallow_inside = !sigaction.mask & prev_sigallow;
     if !sigaction.flags.contains(SigactionFlags::NODEFER) {
         sigallow_inside &= !sig_bit(stack.sig_num);
     }
 
-    let _pending_when_sa_mask = set_mask_raw(&os.control.word, prev_sigallow, sigallow_inside);
+    let _pending_when_sa_mask = set_allowset_raw(&os.control.word, prev_sigallow, sigallow_inside);
 
     // TODO: If sa_mask caused signals to be unblocked, deliver one or all of those first?
 
@@ -214,9 +216,9 @@ unsafe fn inner(stack: &mut SigStack) {
     // Update allowset again.
 
     let new_mask = stack.old_mask;
-    let old_mask = get_mask_raw(&os.control.word);
+    let old_mask = get_allowset_raw(&os.control.word);
 
-    let _pending_when_restored_mask = set_mask_raw(&os.control.word, old_mask, new_mask);
+    let _pending_when_restored_mask = set_allowset_raw(&os.control.word, old_mask, new_mask);
 
     // TODO: If resetting the sigmask caused signals to be unblocked, then should they be delivered
     // here? And would it be possible to tail-call-optimize that?
@@ -267,11 +269,11 @@ pub fn andn_sigmask(new: Option<u64>, old: Option<&mut u64>) -> Result<()> {
         new.map(move |newmask| move |oldmask| oldmask & !newmask),
     )
 }
-fn get_mask_raw(words: &[AtomicU64; 2]) -> u64 {
+fn get_allowset_raw(words: &[AtomicU64; 2]) -> u64 {
     (words[0].load(Ordering::Relaxed) >> 32) | ((words[1].load(Ordering::Relaxed) >> 32) << 32)
 }
 /// Sets mask from old to new, returning what was pending at the time.
-fn set_mask_raw(words: &[AtomicU64; 2], old: u64, new: u64) -> u64 {
+fn set_allowset_raw(words: &[AtomicU64; 2], old: u64, new: u64) -> u64 {
     // This assumes *only this thread* can change the allowset. If this rule is broken, the use of
     // fetch_add will corrupt the words entirely. fetch_add is very efficient on x86, being
     // generated as LOCK XADD which is the fastest RMW instruction AFAIK.
@@ -290,7 +292,7 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnOnce(u64) -> u64>) ->
     let _guard = tmp_disable_signals();
     let ctl = current_sigctl();
 
-    let prev = get_mask_raw(&ctl.word);
+    let prev = get_allowset_raw(&ctl.word);
 
     if let Some(old) = old {
         *old = !prev;
@@ -301,7 +303,7 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnOnce(u64) -> u64>) ->
 
     let next = !op(!prev);
 
-    let pending = set_mask_raw(&ctl.word, prev, next);
+    let pending = set_allowset_raw(&ctl.word, prev, next);
 
     // POSIX requires that at least one pending unblocked signal be delivered before
     // pthread_sigmask returns, if there is one.
@@ -655,7 +657,7 @@ pub unsafe fn sigaltstack(
     Ok(())
 }
 
-pub const MIN_SIGALTSTACK_SIZE: usize = 8192;
+pub const MIN_SIGALTSTACK_SIZE: usize = 2048;
 
 pub fn currently_pending_blocked() -> u64 {
     let control = &unsafe { Tcb::current().unwrap() }.os_specific.control;
@@ -670,17 +672,133 @@ pub fn currently_pending_blocked() -> u64 {
     (thread_pending | proc_pending) & !allow
 }
 pub enum Unreachable {}
-pub fn wait_with_mask(mask: u64) -> Result<Unreachable, Error> {
+
+pub fn await_signal_async(set: u64) -> Result<Unreachable> {
     let mut old = 0;
-    set_sigmask(Some(mask), Some(&mut old))?;
+    set_sigmask(Some(!set), Some(&mut old))?;
+    // TODO: RAII guard
     let res = syscall::nanosleep(
-        &syscall::TimeSpec {
+        &TimeSpec {
             tv_sec: i64::MAX,
             tv_nsec: 0,
         },
-        &mut syscall::TimeSpec::default(),
+        &mut TimeSpec::default(),
     );
     set_sigmask(Some(old), None)?;
     res?;
     unreachable!()
+}
+// TODO: deadline-based API
+pub fn await_signal_sync(inner_allowset: u64, timeout: &TimeSpec) -> Result<SiginfoAbi> {
+    let _guard = tmp_disable_signals();
+    let control = &unsafe { Tcb::current().unwrap() }.os_specific.control;
+
+    let old_allowset = get_allowset_raw(&control.word);
+    let proc_pending = PROC_CONTROL_STRUCT.pending.load(Ordering::Acquire);
+    let thread_pending = set_allowset_raw(&control.word, old_allowset, inner_allowset);
+
+    // Check if there are already signals matching the requested set, before waiting.
+    if let Some(info) = try_claim_multiple(proc_pending, thread_pending, inner_allowset, control) {
+        // TODO: RAII
+        set_allowset_raw(&control.word, inner_allowset, old_allowset);
+        return Ok(info);
+    }
+
+    let res = syscall::nanosleep(&timeout, &mut TimeSpec::default());
+    let thread_pending = set_allowset_raw(&control.word, inner_allowset, old_allowset);
+    let proc_pending = PROC_CONTROL_STRUCT.pending.load(Ordering::Acquire);
+
+    if let Err(error) = res
+        && error.errno != EINTR
+    {
+        return Err(error);
+    }
+
+    // Then check if there were any signals left after waiting.
+    try_claim_multiple(proc_pending, thread_pending, inner_allowset, control)
+        // Normally ETIMEDOUT but not for sigtimedwait.
+        .ok_or(Error::new(EAGAIN))
+}
+fn try_claim_multiple(
+    mut proc_pending: u64,
+    mut thread_pending: u64,
+    allowset: u64,
+    control: &Sigcontrol,
+) -> Option<SiginfoAbi> {
+    while (proc_pending | thread_pending) & allowset != 0 {
+        let sig_idx = ((proc_pending | thread_pending) & allowset).trailing_zeros();
+        if thread_pending & (1 << sig_idx) != 0
+            && let Some(res) = try_claim_single(sig_idx, Some(control))
+        {
+            return Some(res);
+        }
+        thread_pending &= !(1 << sig_idx);
+        if let Some(res) = try_claim_single(sig_idx, None) {
+            return Some(res);
+        }
+        proc_pending &= !(1 << sig_idx);
+    }
+    None
+}
+fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option<SiginfoAbi> {
+    let sig_group = sig_idx / 1;
+
+    if sig_group == 1 && thread_control.is_none() {
+        // Queued (realtime) signal
+        let mut ret = MaybeUninit::<RtSigInfo>::uninit();
+        let rt_inf = unsafe {
+            syscall::syscall2(
+                syscall::SYS_SIGDEQUEUE,
+                sig_idx as usize,
+                ret.as_mut_ptr() as usize,
+            )
+            .ok()?;
+            ret.assume_init()
+        };
+        Some(SiginfoAbi {
+            si_signo: sig_idx as i32 + 1,
+            si_errno: 0,
+            si_code: rt_inf.code,
+            si_pid: rt_inf.pid as i32,
+            si_uid: rt_inf.uid as i32,
+            si_status: 0,
+            si_value: rt_inf.arg,
+            si_addr: core::ptr::null_mut(),
+        })
+    } else {
+        // Idempotent (standard or thread realtime) signal
+        let info = SenderInfo::from_raw(match thread_control {
+            Some(ctl) => {
+                // Only this thread can clear pending bits, so this will always succeed.
+                let info = ctl.sender_infos[sig_idx as usize].load(Ordering::Acquire);
+                // TODO: Ordering
+                ctl.word[sig_group as usize].fetch_and(!(1 << (sig_idx % 32)), Ordering::Release);
+                info
+            }
+            None => {
+                let info =
+                    PROC_CONTROL_STRUCT.sender_infos[sig_idx as usize].load(Ordering::Acquire);
+                if PROC_CONTROL_STRUCT
+                    .pending
+                    .fetch_and(!(1 << sig_idx), Ordering::Release)
+                    & (1 << sig_idx)
+                    == 0
+                {
+                    // already claimed
+                    return None;
+                }
+                info
+            }
+        });
+        Some(SiginfoAbi {
+            si_signo: sig_idx as i32 + 1,
+            si_errno: 0,
+            si_code: 0, // TODO: SI_USER const?
+            si_pid: info.pid as i32,
+            si_uid: info.ruid as i32,
+            si_status: 0,
+            si_value: 0, // undefined
+            si_addr: core::ptr::null_mut(),
+        })
+    }
 }

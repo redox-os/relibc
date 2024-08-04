@@ -379,7 +379,9 @@ pub unsafe extern "C" fn sigtimedwait(
     sig: *mut siginfo, // https://github.com/mozilla/cbindgen/issues/621
     tp: *const timespec,
 ) -> c_int {
-    Sys::sigtimedwait(set, sig, tp)
+    Sys::sigtimedwait(&*set, &mut *sig, &*tp)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 pub const _signal_strings: [&str; 32] = [

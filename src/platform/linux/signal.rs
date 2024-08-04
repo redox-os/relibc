@@ -161,11 +161,16 @@ impl PalSignal for Sys {
         }
     }
 
-    unsafe fn sigtimedwait(
-        set: *const sigset_t,
-        sig: *mut siginfo_t,
-        tp: *const timespec,
-    ) -> c_int {
-        e(syscall!(RT_SIGTIMEDWAIT, set, sig, tp, NSIG / 8)) as c_int
+    fn sigtimedwait(set: &sigset_t, sig: &mut siginfo_t, tp: &timespec) -> Result<(), Errno> {
+        unsafe {
+            e_raw(syscall!(
+                RT_SIGTIMEDWAIT,
+                set as *const _,
+                sig as *mut _,
+                tp as *const _,
+                NSIG / 8
+            ))
+            .map(|_| ())
+        }
     }
 }
