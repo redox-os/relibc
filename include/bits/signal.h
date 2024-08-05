@@ -5,9 +5,10 @@
 #define SIG_IGN ((void (*)(int))1)
 #define SIG_ERR ((void (*)(int))-1)
 
-struct siginfo;
 typedef struct siginfo siginfo_t;
 typedef unsigned long long sigset_t;
+typedef struct ucontext ucontext_t;
+typedef struct mcontext mcontext_t;
 
 struct sigaction {
   union {

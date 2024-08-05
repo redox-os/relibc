@@ -24,6 +24,7 @@ EXPECT_NAMES=\
 	locale \
 	math \
 	netdb/getaddrinfo \
+	psignal \
 	ptrace \
 	pty/forkpty \
 	regex \
@@ -162,6 +163,7 @@ NAMES=\
 	sa_restart \
 	sigchld \
 	stdio/ctermid \
+	sigqueue \
 	stdio/tempnam \
 	stdio/tmpnam \
 	stdlib/bsearch \

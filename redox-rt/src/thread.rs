@@ -1,6 +1,8 @@
+use core::mem::size_of;
+
 use syscall::{Result, O_CLOEXEC};
 
-use crate::{arch::*, proc::*, RtTcb};
+use crate::{arch::*, proc::*, signal::tmp_disable_signals, RtTcb};
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
 pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuard> {
@@ -48,10 +50,20 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuard> {
     Ok(new_thr_fd)
 }
 
-pub fn exit_this_thread() -> ! {
-    let thread_fd = RtTcb::current().thread_fd();
+pub unsafe fn exit_this_thread(stack_base: *mut (), stack_size: usize) -> ! {
+    let _guard = tmp_disable_signals();
+
+    let tcb = RtTcb::current();
+    let thread_fd = tcb.thread_fd();
+
+    let _ = syscall::funmap(tcb as *const RtTcb as usize, syscall::PAGE_SIZE);
+
     // TODO: modify interface so it writes directly to the thread fd?
     let status_fd = syscall::dup(**thread_fd, b"status").unwrap();
-    syscall::write(status_fd, &usize::MAX.to_ne_bytes()).unwrap();
+    let mut buf = [0; size_of::<usize>() * 3];
+    plain::slice_from_mut_bytes(&mut buf)
+        .unwrap()
+        .copy_from_slice(&[usize::MAX, stack_base as usize, stack_size]);
+    syscall::write(status_fd, &buf).unwrap();
     unreachable!()
 }
