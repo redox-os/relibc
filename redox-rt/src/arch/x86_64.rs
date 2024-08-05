@@ -240,9 +240,12 @@ asmfunction!(__relibc_internal_sigentry: ["
     // skip the sigaltstack logic.
     lea rdx, [rip + {pctl} + {pctl_off_actions}]
 
+    mov ecx, eax
+    and ecx, 63
+
     // LEA doesn't support 16x, so just do two x8s.
-    lea rdx, [rdx + 8 * rax]
-    lea rdx, [rdx + 8 * rax]
+    lea rdx, [rdx + 8 * rcx]
+    lea rdx, [rdx + 8 * rcx]
 
     bt qword ptr [rdx], {SA_ONSTACK_BIT}
     jnc 4f
