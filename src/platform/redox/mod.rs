@@ -1137,7 +1137,7 @@ impl Pal for Sys {
         (unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) }).is_ok()
     }
 
-    fn exit_thread() -> ! {
-        redox_rt::thread::exit_this_thread()
+    unsafe fn exit_thread(stack_base: *mut (), stack_size: usize) -> ! {
+        redox_rt::thread::exit_this_thread(stack_base, stack_size)
     }
 }

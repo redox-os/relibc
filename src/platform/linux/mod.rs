@@ -157,7 +157,7 @@ impl Pal for Sys {
         }
         loop {}
     }
-    fn exit_thread() -> ! {
+    unsafe fn exit_thread(_stack_base: *mut (), _stack_size: usize) -> ! {
         // TODO
         Self::exit(0)
     }

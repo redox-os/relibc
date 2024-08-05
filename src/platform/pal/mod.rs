@@ -55,7 +55,7 @@ pub trait Pal {
 
     fn exit(status: c_int) -> !;
 
-    fn exit_thread() -> !;
+    unsafe fn exit_thread(stack_base: *mut (), stack_size: usize) -> !;
 
     fn fchdir(fildes: c_int) -> c_int;
 
