@@ -1,14 +1,13 @@
 #include <stdio.h>
-#include <fcntl.h>
+#include <unistd.h>
 
 #include "test_helpers.h"
 
-int main(void)
-{
-    int fd = open("/dev/stdout", O_WRONLY, 0222);
-    ERROR_IF(open, fd, < 0);
-
+int main(void) {
     const char *msg = "Hello, %s";
+
+    int fd = dup(STDOUT_FILENO);
+    ERROR_IF(dup, fd, == -1);
 
     int result = dprintf(fd, msg, "world");
     ERROR_IF(dprintf, result, != sizeof("Hello, world") - 1);
