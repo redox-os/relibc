@@ -82,11 +82,15 @@ pub fn get_session(
                         NEW_FLAGS,
                     )?,
                     regs: File::open(
-                        CStr::borrow(&CString::new(format!("/scheme/proc/{}/regs/int", pid)).unwrap()),
+                        CStr::borrow(
+                            &CString::new(format!("/scheme/proc/{}/regs/int", pid)).unwrap(),
+                        ),
                         NEW_FLAGS,
                     )?,
                     fpregs: File::open(
-                        CStr::borrow(&CString::new(format!("/scheme/proc/{}/regs/float", pid)).unwrap()),
+                        CStr::borrow(
+                            &CString::new(format!("/scheme/proc/{}/regs/float", pid)).unwrap(),
+                        ),
                         NEW_FLAGS,
                     )?,
                 }))
@@ -134,7 +138,9 @@ fn inner_ptrace(
         // Mark this child as traced, parent will check for this marker file
         let pid = Sys::getpid();
         mem::forget(File::open(
-            CStr::borrow(&CString::new(format!("/scheme/chan/ptrace-relibc/{}/traceme", pid)).unwrap()),
+            CStr::borrow(
+                &CString::new(format!("/scheme/chan/ptrace-relibc/{}/traceme", pid)).unwrap(),
+            ),
             fcntl::O_CREAT | fcntl::O_PATH | fcntl::O_EXCL,
         )?);
         return Ok(0);

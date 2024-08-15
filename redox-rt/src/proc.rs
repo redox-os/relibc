@@ -733,7 +733,10 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     let (cur_filetable_fd, new_pid_fd, new_pid);
 
     {
-        let cur_pid_fd = FdGuard::new(syscall::open("/scheme/thisproc/current/open_via_dup", O_CLOEXEC)?);
+        let cur_pid_fd = FdGuard::new(syscall::open(
+            "/scheme/thisproc/current/open_via_dup",
+            O_CLOEXEC,
+        )?);
         (new_pid_fd, new_pid) = new_child_process()?;
 
         copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
@@ -861,7 +864,10 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
 
 pub fn new_child_process() -> Result<(FdGuard, usize)> {
     // Create a new context (fields such as uid/gid will be inherited from the current context).
-    let fd = FdGuard::new(syscall::open("/scheme/thisproc/new/open_via_dup", O_CLOEXEC)?);
+    let fd = FdGuard::new(syscall::open(
+        "/scheme/thisproc/new/open_via_dup",
+        O_CLOEXEC,
+    )?);
 
     // Extract pid.
     let mut buffer = [0_u8; 64];
