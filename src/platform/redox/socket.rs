@@ -183,8 +183,12 @@ unsafe fn inner_get_name(
 
     if buf.starts_with(b"tcp:") || buf.starts_with(b"udp:") {
         inner_af_inet(local, &buf[4..], address, address_len);
+    } else if buf.starts_with(b"/scheme/tcp/") || buf.starts_with(b"/scheme/udp/") {
+        inner_af_inet(local, &buf[12..], address, address_len);
     } else if buf.starts_with(b"chan:") {
         inner_af_unix(&buf[5..], address, address_len);
+    } else if buf.starts_with(b"/scheme/chan/") {
+        inner_af_unix(&buf[13..], address, address_len);
     } else {
         // Socket doesn't belong to any scheme
         panic!(
@@ -432,9 +436,9 @@ impl PalSocket for Sys {
         // The tcp: and udp: schemes allow using no path,
         // and later specifying one using `dup`.
         match (domain, kind) {
-            (AF_INET, SOCK_STREAM) => e(syscall::open("tcp:", flags)) as c_int,
-            (AF_INET, SOCK_DGRAM) => e(syscall::open("udp:", flags)) as c_int,
-            (AF_UNIX, SOCK_STREAM) => e(syscall::open("chan:", flags | O_CREAT)) as c_int,
+            (AF_INET, SOCK_STREAM) => e(syscall::open("/scheme/tcp", flags)) as c_int,
+            (AF_INET, SOCK_DGRAM) => e(syscall::open("/scheme/udp", flags)) as c_int,
+            (AF_UNIX, SOCK_STREAM) => e(syscall::open("/scheme/chan", flags | O_CREAT)) as c_int,
             _ => {
                 ERRNO.set(syscall::EPROTONOSUPPORT);
                 -1
@@ -447,7 +451,7 @@ impl PalSocket for Sys {
 
         match (domain, kind) {
             (AF_UNIX, SOCK_STREAM) => {
-                let listener = e(syscall::open("chan:", flags | O_CREAT));
+                let listener = e(syscall::open("/scheme/chan", flags | O_CREAT));
                 if listener == !0 {
                     return -1;
                 }
