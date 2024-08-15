@@ -252,7 +252,8 @@ pub fn execve(
         // scenarios. While execve() is undefined according to POSIX if there exist sibling
         // threads, it could still be allowed by keeping certain file descriptors and instead
         // set the active file table.
-        let files_fd = File::new(syscall::open("/scheme/thisproc/current/filetable", O_RDONLY)? as c_int);
+        let files_fd =
+            File::new(syscall::open("/scheme/thisproc/current/filetable", O_RDONLY)? as c_int);
         for line in BufReader::new(files_fd).lines() {
             let line = match line {
                 Ok(l) => l,
