@@ -1,6 +1,6 @@
 //! pthread.h implementation for Redox, following https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/pthread.h.html
 
-use core::cell::Cell;
+use core::{cell::Cell, ptr::NonNull};
 
 use crate::{
     header::{sched::*, time::timespec},
@@ -188,7 +188,11 @@ pub unsafe extern "C" fn pthread_self() -> pthread_t {
 pub unsafe extern "C" fn pthread_setcancelstate(state: c_int, oldstate: *mut c_int) -> c_int {
     match pthread::set_cancel_state(state) {
         Ok(old) => {
-            oldstate.write(old);
+            // POSIX doesn't imply oldstate can be NULL anywhere, but a lot of C code probably
+            // relies on it...
+            if let Some(oldstate) = NonNull::new(oldstate) {
+                oldstate.write(old);
+            }
             0
         }
         Err(pthread::Errno(error)) => error,
@@ -198,7 +202,11 @@ pub unsafe extern "C" fn pthread_setcancelstate(state: c_int, oldstate: *mut c_i
 pub unsafe extern "C" fn pthread_setcanceltype(ty: c_int, oldty: *mut c_int) -> c_int {
     match pthread::set_cancel_type(ty) {
         Ok(old) => {
-            oldty.write(old);
+            // POSIX doesn't imply oldty can be NULL anywhere, but a lot of C code probably relies
+            // on it...
+            if let Some(oldty) = NonNull::new(oldty) {
+                oldty.write(old);
+            }
             0
         }
         Err(pthread::Errno(error)) => error,

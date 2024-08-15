@@ -25,7 +25,6 @@ EXPECT_NAMES=\
 	math \
 	netdb/getaddrinfo \
 	ptrace \
-	pty/forkpty \
 	regex \
 	select \
 	setjmp \
@@ -158,6 +157,7 @@ DYNAMIC_ONLY_NAMES=\
 NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
+	pty/forkpty \
 	pwd \
 	sa_restart \
 	sigchld \
