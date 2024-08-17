@@ -4,6 +4,10 @@ relibc is a portable POSIX C standard library written in Rust. It is under heavy
 
 The motivation for this project is twofold: Reduce issues that the Redox developers were having with [newlib](https://sourceware.org/newlib/), and create a safer alternative to a C standard library written in C. It is mainly designed to be used under Redox, as an alternative to newlib, but it also supports Linux system calls via the [sc](https://crates.io/crates/sc) crate.
 
+## redox-rt
+
+redox-rt is our equivalent for [vDSO](https://en.wikipedia.org/wiki/VDSO) from Linux.
+
 ## Repository Layout
 
 - `include` - Header files (mostly macros and variadic functions `cbindgen` can't generate)
