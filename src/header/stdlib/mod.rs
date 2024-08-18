@@ -1069,7 +1069,7 @@ pub unsafe extern "C" fn setstate(state: *mut c_char) -> *mut c_char {
 
     let old_state = random_state.save();
     random_state.load(state.cast::<_>());
-    // TODO: unlock?
+
     old_state.cast::<_>()
 }
 
