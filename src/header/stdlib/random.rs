@@ -5,10 +5,22 @@ use crate::{
     platform::types::*,
     sync::{Mutex, MutexGuard},
 };
-use core::{convert::TryFrom, ptr};
+use core::{cell::SyncUnsafeCell, convert::TryFrom, ptr};
+
+// This is the default buffer for X. Not guarded by mutex as a mutable pointer to this is available to the user through initstate() and setstate().
+#[rustfmt::skip]
+pub static DEFAULT_X: SyncUnsafeCell<[u32; 32]> = SyncUnsafeCell::new([
+    0x00000000, 0x5851f42d, 0xc0b18ccf, 0xcbb5f646,
+    0xc7033129, 0x30705b04, 0x20fd5db4, 0x9a8b7f78,
+    0x502959d8, 0xab894868, 0x6c0356a7, 0x88cdb7ff,
+    0xb477d43f, 0x70a3a52b, 0xa8e4baf1, 0xfd8341fc,
+    0x8ae16fd9, 0x742d2f7a, 0x0d1f0796, 0x76035e09,
+    0x40f7702c, 0x6fa72ca5, 0xaaa84157, 0x58a0df74,
+    0xc74a0364, 0xae533cc4, 0x04185faf, 0x6de3b115,
+    0x0cab8628, 0xf043bfa4, 0x398150e9, 0x37521657,
+]);
 
 pub struct State {
-    pub x_init: [u32; 32],
     pub x_ptr: *mut [u8; 4],
     pub n: u8,
     pub i: u8,
@@ -20,9 +32,9 @@ unsafe impl Send for State {}
 
 impl State {
     /// To be called in any function that may read from X_PTR
-    pub fn ensure_x_ptr_init(&mut self) {
+    pub unsafe fn ensure_x_ptr_init(&mut self) {
         if self.x_ptr.is_null() {
-            let x_u32_ptr: *mut u32 = &mut self.x_init[1];
+            let x_u32_ptr: *mut u32 = DEFAULT_X.get().cast::<u32>().add(1);
             self.x_ptr = x_u32_ptr.cast::<[u8; 4]>();
         }
     }
@@ -78,17 +90,6 @@ impl State {
 
 pub fn state_lock<'a>() -> MutexGuard<'a, State> {
     static STATE: Mutex<State> = Mutex::new(State {
-        #[rustfmt::skip]
-        x_init: [
-            0x00000000, 0x5851f42d, 0xc0b18ccf, 0xcbb5f646,
-            0xc7033129, 0x30705b04, 0x20fd5db4, 0x9a8b7f78,
-            0x502959d8, 0xab894868, 0x6c0356a7, 0x88cdb7ff,
-            0xb477d43f, 0x70a3a52b, 0xa8e4baf1, 0xfd8341fc,
-            0x8ae16fd9, 0x742d2f7a, 0x0d1f0796, 0x76035e09,
-            0x40f7702c, 0x6fa72ca5, 0xaaa84157, 0x58a0df74,
-            0xc74a0364, 0xae533cc4, 0x04185faf, 0x6de3b115,
-            0x0cab8628, 0xf043bfa4, 0x398150e9, 0x37521657,
-        ],
         /* As such, random() and related functions work on u32 values, but POSIX
          * allows the user to supply a custom state data array as a `char *`
          * with no requirements on alignment. Thus, we must assume the worst in
