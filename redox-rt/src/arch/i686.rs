@@ -272,7 +272,7 @@ __relibc_internal_sigentry_crit_third:
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
     pctl_off_actions = const offset_of!(SigProcControl, actions),
-    pctl_word = const offset_of!(SigProcControl, actions),
+    pctl_word = const offset_of!(SigProcControl, pending),
     pctl = sym PROC_CONTROL_STRUCT,
     STACK_ALIGN = const 16,
 ]);
