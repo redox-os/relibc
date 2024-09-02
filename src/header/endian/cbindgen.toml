@@ -1,0 +1,7 @@
+sys_includes = ["stdint.h"]
+include_guard = "_RELIBC_ENDIAN_H"
+trailer = "#include <machine/endian.h>"
+language = "C"
+style = "Tag"
+no_includes = true
+cpp_compat = true

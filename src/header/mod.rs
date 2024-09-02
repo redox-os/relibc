@@ -11,6 +11,7 @@ pub mod dirent;
 pub mod dl_tls;
 pub mod dlfcn;
 pub mod elf;
+pub mod endian;
 pub mod errno;
 pub mod fcntl;
 pub mod float;
