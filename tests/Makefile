@@ -14,6 +14,7 @@ EXPECT_NAMES=\
 	crypt/sha512 \
 	destructor \
 	dirent/scandir \
+	endian \
 	errno \
 	error \
 	fcntl/create \
