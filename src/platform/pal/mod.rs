@@ -76,9 +76,9 @@ pub trait Pal {
 
     fn fpath(fildes: c_int, out: &mut [u8]) -> ssize_t;
 
-    fn fsync(fildes: c_int) -> c_int;
+    fn fsync(fildes: c_int) -> Result<(), Errno>;
 
-    fn ftruncate(fildes: c_int, length: off_t) -> c_int;
+    fn ftruncate(fildes: c_int, length: off_t) -> Result<(), Errno>;
 
     unsafe fn futex_wait(
         addr: *mut u32,
@@ -179,12 +179,13 @@ pub trait Pal {
 
     fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int;
 
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> c_int;
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int, Errno>;
 
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int;
 
     unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, Errno>;
     unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), Errno>;
+
     fn current_os_tid() -> crate::pthread::OsTid;
 
     fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno>;

@@ -1,4 +1,4 @@
-use crate::platform::types::c_int;
+use crate::{header::errno::STR_ERROR, platform::types::c_int};
 
 /// Positive error codes (EINVAL, not -EINVAL).
 #[derive(Debug, Eq, PartialEq)]
@@ -24,6 +24,17 @@ impl From<Errno> for crate::io::Error {
     #[inline]
     fn from(Errno(errno): Errno) -> Self {
         Self::from_raw_os_error(errno)
+    }
+}
+
+// TODO: core::error::Error
+
+impl core::fmt::Display for Errno {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match usize::try_from(self.0).ok().and_then(|i| STR_ERROR.get(i)) {
+            Some(desc) => write!(f, "{desc}"),
+            None => write!(f, "unknown error ({})", self.0),
+        }
     }
 }
 

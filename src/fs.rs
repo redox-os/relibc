@@ -1,6 +1,6 @@
 use crate::{
     c_str::CStr,
-    error::ResultExt,
+    error::{Errno, ResultExt},
     header::{
         fcntl::O_CREAT,
         unistd::{SEEK_CUR, SEEK_END, SEEK_SET},
@@ -25,32 +25,20 @@ impl File {
         }
     }
 
-    pub fn open(path: CStr, oflag: c_int) -> io::Result<Self> {
-        match Sys::open(path, oflag, 0) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(Self::new(ok)),
-        }
+    pub fn open(path: CStr, oflag: c_int) -> Result<Self, Errno> {
+        Sys::open(path, oflag, 0).map(Self::new)
     }
 
-    pub fn create(path: CStr, oflag: c_int, mode: mode_t) -> io::Result<Self> {
-        match Sys::open(path, oflag | O_CREAT, mode) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(Self::new(ok)),
-        }
+    pub fn create(path: CStr, oflag: c_int, mode: mode_t) -> Result<Self, Errno> {
+        Sys::open(path, oflag | O_CREAT, mode).map(Self::new)
     }
 
-    pub fn sync_all(&self) -> io::Result<()> {
-        match Sys::fsync(self.fd) {
-            -1 => Err(io::last_os_error()),
-            _ok => Ok(()),
-        }
+    pub fn sync_all(&self) -> Result<(), Errno> {
+        Sys::fsync(self.fd)
     }
 
-    pub fn set_len(&self, size: u64) -> io::Result<()> {
-        match Sys::ftruncate(self.fd, size as off_t) {
-            -1 => Err(io::last_os_error()),
-            _ok => Ok(()),
-        }
+    pub fn set_len(&self, size: u64) -> Result<(), Errno> {
+        Sys::ftruncate(self.fd, size as off_t)
     }
 
     pub fn try_clone(&self) -> io::Result<Self> {

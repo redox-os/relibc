@@ -317,12 +317,14 @@ pub extern "C" fn fork() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn fsync(fildes: c_int) -> c_int {
-    Sys::fsync(fildes)
+    Sys::fsync(fildes).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn ftruncate(fildes: c_int, length: off_t) -> c_int {
     Sys::ftruncate(fildes, length)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -757,9 +759,10 @@ pub extern "C" fn tcsetpgrp(fd: c_int, pgrp: pid_t) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn truncate(path: *const c_char, length: off_t) -> c_int {
+pub unsafe extern "C" fn truncate(path: *const c_char, length: off_t) -> c_int {
     let file = unsafe { CStr::from_ptr(path) };
-    let fd = Sys::open(file, fcntl::O_WRONLY, 0);
+    // TODO: Rustify
+    let fd = Sys::open(file, fcntl::O_WRONLY, 0).or_minus_one_errno();
     if fd < 0 {
         return -1;
     }

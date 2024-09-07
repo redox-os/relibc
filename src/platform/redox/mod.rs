@@ -294,12 +294,14 @@ impl Pal for Sys {
         unsafe { e(libredox::fstatvfs(fildes as usize, buf).map(|()| 0)) as c_int }
     }
 
-    fn fsync(fd: c_int) -> c_int {
-        e(syscall::fsync(fd as usize)) as c_int
+    fn fsync(fd: c_int) -> Result<(), Errno> {
+        syscall::fsync(fd as usize)?;
+        Ok(())
     }
 
-    fn ftruncate(fd: c_int, len: off_t) -> c_int {
-        e(syscall::ftruncate(fd as usize, len as usize)) as c_int
+    fn ftruncate(fd: c_int, len: off_t) -> Result<(), Errno> {
+        syscall::ftruncate(fd as usize, len as usize)?;
+        Ok(())
     }
 
     #[inline]
@@ -777,10 +779,10 @@ impl Pal for Sys {
         }
     }
 
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> c_int {
-        let path = path_from_c_str!(path);
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int, Errno> {
+        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
 
-        e(libredox::open(path, oflag, mode)) as c_int
+        Ok(libredox::open(path, oflag, mode)? as c_int)
     }
 
     fn pipe2(fds: &mut [c_int], flags: c_int) -> c_int {

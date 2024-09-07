@@ -230,12 +230,12 @@ impl Pal for Sys {
         Self::readlink(CStr::from_bytes_with_nul(&proc_path).unwrap(), out)
     }
 
-    fn fsync(fildes: c_int) -> c_int {
-        e(unsafe { syscall!(FSYNC, fildes) }) as c_int
+    fn fsync(fildes: c_int) -> Result<(), Errno> {
+        e_raw(unsafe { syscall!(FSYNC, fildes) }).map(|_| ())
     }
 
-    fn ftruncate(fildes: c_int, length: off_t) -> c_int {
-        e(unsafe { syscall!(FTRUNCATE, fildes, length) }) as c_int
+    fn ftruncate(fildes: c_int, length: off_t) -> Result<(), Errno> {
+        e_raw(unsafe { syscall!(FTRUNCATE, fildes, length) }).map(|_| ())
     }
 
     #[inline]
@@ -450,8 +450,9 @@ impl Pal for Sys {
         e(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }) as c_int
     }
 
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> c_int {
-        e(unsafe { syscall!(OPENAT, AT_FDCWD, path.as_ptr(), oflag, mode) }) as c_int
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int, Errno> {
+        e_raw(unsafe { syscall!(OPENAT, AT_FDCWD, path.as_ptr(), oflag, mode) })
+            .map(|fd| fd as c_int)
     }
 
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int {
