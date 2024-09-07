@@ -61,4 +61,15 @@ int main() {
     assert(htobe64(u64_ne) == u64_be);
     assert(htole64(u64_ne) == u64_le);
     assert(le64toh(u64_le) == u64_ne);
+
+    /* Test that the BYTE_ORDER, LITTLE_ENDIAN and BIG_ENDIAN macros are available */
+    /* It is in principle possible to have further endiannesses, like PDP_ENDIAN */
+    if (u64_ne == u64_le) {
+        assert(BYTE_ORDER == LITTLE_ENDIAN);
+        assert(BYTE_ORDER != BIG_ENDIAN);
+    }
+    if (u64_ne == u64_be) {
+        assert(BYTE_ORDER == BIG_ENDIAN);
+        assert(BYTE_ORDER != LITTLE_ENDIAN);
+    }
 }
