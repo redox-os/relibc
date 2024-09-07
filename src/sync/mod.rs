@@ -19,12 +19,12 @@ pub use self::{
 };
 
 use crate::{
+    error::Errno,
     header::{
         errno::{EAGAIN, ETIMEDOUT},
         time::timespec,
     },
     platform::{types::*, Pal, Sys},
-    pthread::Errno,
 };
 use core::{
     mem::MaybeUninit,

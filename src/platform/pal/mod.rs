@@ -1,6 +1,7 @@
 use super::types::*;
 use crate::{
     c_str::CStr,
+    error::Errno,
     header::{
         dirent::dirent,
         sys_resource::rlimit,
@@ -10,7 +11,7 @@ use crate::{
         sys_utsname::utsname,
         time::timespec,
     },
-    pthread::{self, Errno},
+    pthread,
 };
 
 pub use self::epoll::PalEpoll;
@@ -83,8 +84,8 @@ pub trait Pal {
         addr: *mut u32,
         val: u32,
         deadline: Option<&timespec>,
-    ) -> Result<(), pthread::Errno>;
-    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, pthread::Errno>;
+    ) -> Result<(), Errno>;
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, Errno>;
 
     fn futimens(fd: c_int, times: *const timespec) -> c_int;
 
@@ -182,12 +183,8 @@ pub trait Pal {
 
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int;
 
-    unsafe fn rlct_clone(stack: *mut usize)
-        -> Result<crate::pthread::OsTid, crate::pthread::Errno>;
-    unsafe fn rlct_kill(
-        os_tid: crate::pthread::OsTid,
-        signal: usize,
-    ) -> Result<(), crate::pthread::Errno>;
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, Errno>;
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), Errno>;
     fn current_os_tid() -> crate::pthread::OsTid;
 
     fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno>;

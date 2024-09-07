@@ -3,15 +3,16 @@
 use core::{cell::Cell, ptr::NonNull};
 
 use crate::{
+    error::Errno,
     header::{sched::*, time::timespec},
     platform::{types::*, Pal, Sys},
     pthread,
 };
 
-pub fn e(result: Result<(), pthread::Errno>) -> i32 {
+pub fn e(result: Result<(), Errno>) -> i32 {
     match result {
         Ok(()) => 0,
-        Err(pthread::Errno(error)) => error,
+        Err(Errno(error)) => error,
     }
 }
 
@@ -75,7 +76,7 @@ pub use self::barrier::*;
 pub unsafe extern "C" fn pthread_cancel(thread: pthread_t) -> c_int {
     match pthread::cancel(&*thread.cast()) {
         Ok(()) => 0,
-        Err(pthread::Errno(error)) => error,
+        Err(Errno(error)) => error,
     }
 }
 
@@ -96,7 +97,7 @@ pub unsafe extern "C" fn pthread_create(
             core::ptr::write(pthread, ptr);
             0
         }
-        Err(pthread::Errno(code)) => code,
+        Err(Errno(code)) => code,
     }
 }
 
@@ -104,7 +105,7 @@ pub unsafe extern "C" fn pthread_create(
 pub unsafe extern "C" fn pthread_detach(pthread: pthread_t) -> c_int {
     match pthread::detach(&*pthread.cast()) {
         Ok(()) => 0,
-        Err(pthread::Errno(errno)) => errno,
+        Err(Errno(errno)) => errno,
     }
 }
 
@@ -134,7 +135,7 @@ pub unsafe extern "C" fn pthread_getcpuclockid(
             clock_out.write(clock);
             0
         }
-        Err(pthread::Errno(error)) => error,
+        Err(Errno(error)) => error,
     }
 }
 
@@ -151,7 +152,7 @@ pub unsafe extern "C" fn pthread_getschedparam(
 
             0
         }
-        Err(pthread::Errno(error)) => error,
+        Err(Errno(error)) => error,
     }
 }
 
@@ -167,7 +168,7 @@ pub unsafe extern "C" fn pthread_join(thread: pthread_t, retval: *mut *mut c_voi
             }
             0
         }
-        Err(pthread::Errno(error)) => error,
+        Err(Errno(error)) => error,
     }
 }
 
@@ -195,7 +196,7 @@ pub unsafe extern "C" fn pthread_setcancelstate(state: c_int, oldstate: *mut c_i
             }
             0
         }
-        Err(pthread::Errno(error)) => error,
+        Err(Errno(error)) => error,
     }
 }
 #[no_mangle]
@@ -209,7 +210,7 @@ pub unsafe extern "C" fn pthread_setcanceltype(ty: c_int, oldty: *mut c_int) -> 
             }
             0
         }
-        Err(pthread::Errno(error)) => error,
+        Err(Errno(error)) => error,
     }
 }
 

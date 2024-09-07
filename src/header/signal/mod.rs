@@ -5,9 +5,9 @@ use core::{mem, ptr};
 use cbitset::BitSet;
 
 use crate::{
+    error::{self, Errno, ResultExt},
     header::{errno, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},
-    pthread::{self, Errno, ResultExt},
 };
 
 pub use self::sys::*;
@@ -81,7 +81,7 @@ pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
     let os_tid = {
-        let pthread = &*(thread as *const pthread::Pthread);
+        let pthread = &*(thread as *const crate::pthread::Pthread);
         pthread.os_tid.get().read()
     };
     crate::header::pthread::e(Sys::rlct_kill(os_tid, sig as usize))

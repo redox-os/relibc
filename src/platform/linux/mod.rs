@@ -15,8 +15,8 @@ use crate::header::{
 };
 // use header::sys_times::tms;
 use crate::{
+    error::Errno,
     header::{sys_utsname::utsname, time::timespec},
-    pthread::Errno,
 };
 
 mod epoll;
@@ -243,7 +243,7 @@ impl Pal for Sys {
         addr: *mut u32,
         val: u32,
         deadline: Option<&timespec>,
-    ) -> Result<(), crate::pthread::Errno> {
+    ) -> Result<(), Errno> {
         let deadline = deadline.map_or(0, |d| d as *const _ as usize);
         e_raw(unsafe {
             syscall!(

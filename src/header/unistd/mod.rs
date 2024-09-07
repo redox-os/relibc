@@ -9,6 +9,7 @@ use core::{
 
 use crate::{
     c_str::CStr,
+    error::ResultExt,
     header::{
         crypt::{crypt_data, crypt_r},
         errno, fcntl, limits,
@@ -17,7 +18,6 @@ use crate::{
         time::timespec,
     },
     platform::{self, types::*, Pal, Sys},
-    pthread::ResultExt,
 };
 
 use alloc::collections::LinkedList;

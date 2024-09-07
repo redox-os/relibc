@@ -1,12 +1,12 @@
 use crate::{
     c_str::CStr,
+    error::ResultExt,
     header::{
         fcntl::O_CREAT,
         unistd::{SEEK_CUR, SEEK_END, SEEK_SET},
     },
     io,
     platform::{types::*, Pal, Sys},
-    pthread::ResultExt,
 };
 use core::ops::Deref;
 

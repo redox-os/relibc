@@ -8,6 +8,7 @@ use syscall::{
 
 use crate::{
     c_str::{CStr, CString},
+    error::{self, Errno, ResultExt},
     fs::File,
     header::{
         dirent::dirent,
@@ -25,7 +26,6 @@ use crate::{
         unistd::{F_OK, R_OK, W_OK, X_OK},
     },
     io::{self, prelude::*, BufReader},
-    pthread::{self, Errno, ResultExt},
 };
 
 pub use redox_rt::proc::FdGuard;
@@ -307,7 +307,7 @@ impl Pal for Sys {
         addr: *mut u32,
         val: u32,
         deadline: Option<&timespec>,
-    ) -> Result<(), pthread::Errno> {
+    ) -> Result<(), Errno> {
         let deadline = deadline.map(|d| syscall::TimeSpec {
             tv_sec: d.tv_sec,
             tv_nsec: d.tv_nsec as i32,
@@ -316,7 +316,7 @@ impl Pal for Sys {
         Ok(())
     }
     #[inline]
-    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, pthread::Errno> {
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, Errno> {
         Ok(redox_rt::sys::sys_futex_wake(addr, num)?)
     }
 
@@ -787,21 +787,16 @@ impl Pal for Sys {
         e(extra::pipe2(fds, flags as usize).map(|()| 0)) as c_int
     }
 
-    unsafe fn rlct_clone(
-        stack: *mut usize,
-    ) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, Errno> {
         let _guard = clone::rdlock();
         let res = clone::rlct_clone_impl(stack);
 
         res.map(|mut fd| crate::pthread::OsTid {
             thread_fd: fd.take(),
         })
-        .map_err(|error| crate::pthread::Errno(error.errno))
+        .map_err(|error| Errno(error.errno))
     }
-    unsafe fn rlct_kill(
-        os_tid: crate::pthread::OsTid,
-        signal: usize,
-    ) -> Result<(), crate::pthread::Errno> {
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), Errno> {
         redox_rt::sys::posix_kill_thread(os_tid.thread_fd, signal as u32)?;
         Ok(())
     }
