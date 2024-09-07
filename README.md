@@ -73,7 +73,7 @@ make prefix cr.relibc-tests image
 - Run the tests
 
 ```sh
-/usr/share/relibc-tests/test-name
+/usr/share/relibc-tests/bins_static/test-name
 ```
 
 ### Linux Testing
