@@ -1,5 +1,5 @@
 use crate::io::Write;
-use core::{arch::asm, ptr};
+use core::{arch::asm, mem::offset_of, ptr};
 
 use super::{types::*, Pal, ERRNO};
 use crate::{
@@ -12,6 +12,7 @@ use crate::header::{
     sys_stat::stat,
     sys_statvfs::statvfs,
     sys_time::{timeval, timezone},
+    unistd::SEEK_SET,
 };
 // use header::sys_times::tms;
 use crate::{
@@ -281,8 +282,16 @@ impl Pal for Sys {
         }
     }
 
-    fn getdents(fd: c_int, dirents: *mut dirent, bytes: usize) -> c_int {
-        unsafe { syscall!(GETDENTS64, fd, dirents, bytes) as c_int }
+    fn getdents(fd: c_int, buf: &mut [u8], _off: u64) -> Result<usize, Errno> {
+        e_raw(unsafe { syscall!(GETDENTS64, fd, buf.as_mut_ptr(), buf.len()) })
+    }
+    fn dir_seek(fd: c_int, off: u64) -> Result<(), Errno> {
+        e_raw(unsafe { syscall!(LSEEK, fd, off, SEEK_SET) })?;
+        Ok(())
+    }
+    unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)> {
+        let dent = this_dent.as_ptr().cast::<dirent>();
+        Some(((*dent).d_reclen, (*dent).d_off as u64))
     }
 
     fn getegid() -> gid_t {

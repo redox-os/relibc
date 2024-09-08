@@ -1,3 +1,5 @@
+use alloc::boxed::Box;
+
 use crate::{header::errno::STR_ERROR, platform::types::c_int};
 
 /// Positive error codes (EINVAL, not -EINVAL).
@@ -48,6 +50,31 @@ impl<T: From<i8>> ResultExt<T> for Result<T, Errno> {
             Self::Err(Errno(errno)) => {
                 crate::platform::ERRNO.set(errno);
                 T::from(-1)
+            }
+        }
+    }
+}
+pub trait ResultExtPtrMut<T> {
+    fn or_errno_null_mut(self) -> *mut T;
+}
+impl<T> ResultExtPtrMut<T> for Result<*mut T, Errno> {
+    fn or_errno_null_mut(self) -> *mut T {
+        match self {
+            Self::Ok(ptr) => ptr,
+            Self::Err(Errno(errno)) => {
+                crate::platform::ERRNO.set(errno);
+                core::ptr::null_mut()
+            }
+        }
+    }
+}
+impl<T> ResultExtPtrMut<T> for Result<Box<T>, Errno> {
+    fn or_errno_null_mut(self) -> *mut T {
+        match self {
+            Self::Ok(ptr) => Box::into_raw(ptr),
+            Self::Err(Errno(errno)) => {
+                crate::platform::ERRNO.set(errno);
+                core::ptr::null_mut()
             }
         }
     }

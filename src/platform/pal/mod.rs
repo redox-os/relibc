@@ -93,7 +93,13 @@ pub trait Pal {
 
     fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char;
 
-    fn getdents(fd: c_int, dirents: *mut dirent, bytes: usize) -> c_int;
+    fn getdents(fd: c_int, buf: &mut [u8], opaque_offset: u64) -> Result<usize, Errno>;
+    fn dir_seek(fd: c_int, opaque_offset: u64) -> Result<(), Errno>;
+
+    // SAFETY: This_dent must satisfy platform-specific size and alignment constraints. On Linux,
+    // this means the buffer came from a valid getdents64 invocation, whereas on Redox, every
+    // possible this_dent slice is safe (and will be validated).
+    unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)>;
 
     fn getegid() -> gid_t;
 

@@ -5,10 +5,6 @@ style = "Tag"
 no_includes = true
 cpp_compat = true
 
-[defines]
-"target_os=linux" = "__linux__"
-"target_os=redox" = "__redox__"
-
 [enum]
 prefix_with_name = true
 
