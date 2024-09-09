@@ -1,0 +1,50 @@
++inf:
+		f d ld
+correct:	1 1 1
+as floats:	1 0 0
+as double:	0 1 0
+as long double:	0 0 1
+sizes ?4 8 12?:	4 8 16
+sizes:	4 8 16
+bit repr:
+  f: 7f800000
+  d: 7ff0000000000000
+ ld: 7fff8000000000000000
+
+-inf:
+		f d ld
+correct:	ffffffff ffffffff ffffffff
+as floats:	ffffffff 0 0
+as double:	0 ffffffff 0
+as long double:	0 0 ffffffff
+sizes ?4 8 12?:	4 8 16
+bit repr:
+  f: ff800000
+  d: fff0000000000000
+ ld: ffff8000000000000000
+
++NaN:
+		f d ld
+correct:	1 1 1
+as floats:	1 0 0
+as double:	0 1 0
+as long double:	1 1 1
+sizes ?4 8 12?:	4 8 16
+sizes:	4 8 16
+bit repr:
+  f: 7fc00000
+  d: 7ff8000000000000
+ ld: 7fffc000000000000000
+
+-NaN:
+		f d ld
+correct:	1 1 1
+as floats:	1 0 0
+as double:	0 1 0
+as long double:	1 0 1
+sizes ?4 8 12?:	4 8 16
+bit repr:
+  f: ffc00000
+  d: fff8000000000000
+ ld: ffffc000000000000000
+

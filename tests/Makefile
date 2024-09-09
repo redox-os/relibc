@@ -202,7 +202,8 @@ NAMES=\
 
 MNAMES=\
 	libm/test-float \
-	libm/test-double
+	libm/test-double \
+	libm/inf-torture
 
 EXPECT_NAMES+=\
 	$(MNAMES)
