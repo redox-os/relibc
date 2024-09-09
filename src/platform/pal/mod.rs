@@ -10,7 +10,7 @@ use crate::{
         sys_utsname::utsname,
         time::timespec,
     },
-    pthread,
+    pthread::{self, Errno},
 };
 
 pub use self::epoll::PalEpoll;
@@ -82,9 +82,9 @@ pub trait Pal {
     unsafe fn futex_wait(
         addr: *mut u32,
         val: u32,
-        deadline: *const timespec,
+        deadline: Option<&timespec>,
     ) -> Result<(), pthread::Errno>;
-    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<c_int, pthread::Errno>;
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, pthread::Errno>;
 
     fn futimens(fd: c_int, times: *const timespec) -> c_int;
 
@@ -190,7 +190,8 @@ pub trait Pal {
     ) -> Result<(), crate::pthread::Errno>;
     fn current_os_tid() -> crate::pthread::OsTid;
 
-    fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t;
+    fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno>;
+    fn pread(fildes: c_int, buf: &mut [u8], offset: off_t) -> Result<ssize_t, Errno>;
 
     fn readlink(pathname: CStr, out: &mut [u8]) -> ssize_t;
 
@@ -206,9 +207,9 @@ pub trait Pal {
 
     fn setpriority(which: c_int, who: id_t, prio: c_int) -> c_int;
 
-    fn setregid(rgid: gid_t, egid: gid_t) -> c_int;
+    fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int;
 
-    fn setreuid(ruid: uid_t, euid: uid_t) -> c_int;
+    fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int;
 
     fn setsid() -> c_int;
 
@@ -224,7 +225,8 @@ pub trait Pal {
 
     fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t;
 
-    fn write(fildes: c_int, buf: &[u8]) -> ssize_t;
+    fn write(fildes: c_int, buf: &[u8]) -> Result<ssize_t, Errno>;
+    fn pwrite(fildes: c_int, buf: &[u8], offset: off_t) -> Result<ssize_t, Errno>;
 
     fn verify() -> bool;
 }

@@ -1,10 +1,6 @@
-#![no_std]
-#![feature(array_chunks, int_roundings, let_chains, slice_ptr_get)]
-#![forbid(unreachable_patterns)]
+use core::{fmt::Debug, mem::size_of};
 
-extern crate alloc;
-
-use core::mem::size_of;
+use crate::{arch::*, auxv_defs::*};
 
 use alloc::{boxed::Box, collections::BTreeMap, vec};
 
@@ -23,12 +19,9 @@ use goblin::elf64::{
 use syscall::{
     error::*,
     flag::{MapFlags, SEEK_SET},
-    GrantDesc, GrantFlags, Map, MAP_FIXED_NOREPLACE, MAP_SHARED, O_CLOEXEC, PAGE_SIZE, PROT_EXEC,
-    PROT_READ, PROT_WRITE, SetSighandlerData,
+    GrantDesc, GrantFlags, Map, SetSighandlerData, MAP_FIXED_NOREPLACE, MAP_SHARED, O_CLOEXEC,
+    PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE,
 };
-
-pub use self::arch::*;
-mod arch;
 
 pub enum FexecResult {
     Normal {
@@ -275,18 +268,23 @@ where
         let new_page_no = sp / PAGE_SIZE;
         let new_page_off = sp % PAGE_SIZE;
 
-        let page = if let Some(ref mut page) = stack_page && old_page_no == new_page_no {
+        let page = if let Some(ref mut page) = stack_page
+            && old_page_no == new_page_no
+        {
             page
         } else if let Some(ref mut stack_page) = stack_page {
             stack_page.remap(new_page_no * PAGE_SIZE, PROT_WRITE)?;
             stack_page
         } else {
-            let new = MmapGuard::map(*grants_fd, &Map {
-                offset: new_page_no * PAGE_SIZE,
-                size: PAGE_SIZE,
-                flags: PROT_WRITE,
-                address: 0, // let kernel decide
-            })?;
+            let new = MmapGuard::map(
+                *grants_fd,
+                &Map {
+                    offset: new_page_no * PAGE_SIZE,
+                    size: PAGE_SIZE,
+                    flags: PROT_WRITE,
+                    address: 0, // let kernel decide
+                },
+            )?;
 
             stack_page.insert(new)
         };
@@ -429,20 +427,20 @@ where
 
     push(argc)?;
 
-    unsafe {
-        deactivate_tcb(*open_via_dup)?;
+    if let Ok(sighandler_fd) = syscall::dup(*open_via_dup, b"sighandler").map(FdGuard::new) {
+        let _ = syscall::write(
+            *sighandler_fd,
+            &SetSighandlerData {
+                user_handler: 0,
+                excp_handler: 0,
+                thread_control_addr: 0,
+                proc_control_addr: 0,
+            },
+        );
     }
 
-    {
-        let current_sigaction_fd = FdGuard::new(syscall::dup(*open_via_dup, b"sigactions")?);
-        let empty_sigaction_fd = FdGuard::new(syscall::dup(*current_sigaction_fd, b"empty")?);
-        let sigaction_selection_fd =
-            FdGuard::new(syscall::dup(*open_via_dup, b"current-sigactions")?);
-
-        let _ = syscall::write(
-            *sigaction_selection_fd,
-            &usize::to_ne_bytes(*empty_sigaction_fd),
-        )?;
+    unsafe {
+        deactivate_tcb(*open_via_dup)?;
     }
 
     // TODO: Restore old name if exec failed?
@@ -700,6 +698,11 @@ impl Drop for FdGuard {
         }
     }
 }
+impl Debug for FdGuard {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "[fd {}]", self.fd)
+    }
+}
 pub fn create_set_addr_space_buf(
     space: usize,
     ip: usize,
@@ -713,55 +716,29 @@ pub fn create_set_addr_space_buf(
     buf
 }
 
-#[path = "../../../auxv_defs.rs"]
-pub mod auxv_defs;
-
-use auxv_defs::*;
-
 /// Spawns a new context which will not share the same address space as the current one. File
 /// descriptors from other schemes are reobtained with `dup`, and grants referencing such file
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
 pub fn fork_impl() -> Result<usize> {
-    let mut old_mask = 0_u64;
-    syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut old_mask))?;
+    let old_mask = crate::signal::get_sigmask()?;
     let pid = unsafe { Error::demux(__relibc_internal_fork_wrapper())? };
 
     if pid == 0 {
-        syscall::sigprocmask(syscall::SIG_SETMASK, Some(&old_mask), None)?;
+        crate::signal::set_sigmask(Some(old_mask), None)?;
     }
     Ok(pid)
 }
 
-fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
+pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     let (cur_filetable_fd, new_pid_fd, new_pid);
 
     {
-        let cur_pid_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", O_CLOEXEC)?);
-        (new_pid_fd, new_pid) = new_context()?;
+        let cur_pid_fd = FdGuard::new(syscall::open(
+            "/scheme/thisproc/current/open_via_dup",
+            O_CLOEXEC,
+        )?);
+        (new_pid_fd, new_pid) = new_child_process()?;
 
-        // Reuse the same sigaltstack and signal entry (all memory will be re-mapped CoW later).
-        {
-            let cur_sighandler_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sighandler")?);
-            let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
-
-            let mut sighandler_buf = SetSighandlerData::default();
-
-            let _ = syscall::read(*cur_sighandler_fd, &mut sighandler_buf)?;
-            let _ = syscall::write(*new_sighandler_fd, &sighandler_buf)?;
-        }
-
-        // Reuse the same sigactions (by value).
-        {
-            let cur_sigaction_fd = FdGuard::new(syscall::dup(*cur_pid_fd, b"sigactions")?);
-            let new_sigaction_fd = FdGuard::new(syscall::dup(*cur_sigaction_fd, b"copy")?);
-            let new_sigaction_sel_fd =
-                FdGuard::new(syscall::dup(*new_pid_fd, b"current-sigactions")?);
-
-            let _ = syscall::write(
-                *new_sigaction_sel_fd,
-                &usize::to_ne_bytes(*new_sigaction_fd),
-            )?;
-        }
         copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
 
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new
@@ -808,7 +785,7 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
                         continue;
                     }
 
-                    let mut buf;
+                    let buf;
 
                     // TODO: write! using some #![no_std] Cursor type (tracking the length)?
                     #[cfg(target_pointer_width = "64")]
@@ -851,6 +828,19 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
             );
             let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
         }
+        {
+            // Reuse the same sigaltstack and signal entry (all memory will be re-mapped CoW later).
+            //
+            // Do this after the address space is cloned, since the kernel will get a shared
+            // reference to the TCB and whatever pages stores the signal proc control struct.
+            {
+                let new_sighandler_fd = FdGuard::new(syscall::dup(*new_pid_fd, b"sighandler")?);
+                let _ = syscall::write(
+                    *new_sighandler_fd,
+                    &crate::signal::current_setsighandler_struct(),
+                )?;
+            }
+        }
         copy_env_regs(*cur_pid_fd, *new_pid_fd)?;
     }
     // Copy the file table. We do this last to ensure that all previously used file descriptors are
@@ -872,9 +862,12 @@ fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     Ok(new_pid)
 }
 
-pub fn new_context() -> Result<(FdGuard, usize)> {
+pub fn new_child_process() -> Result<(FdGuard, usize)> {
     // Create a new context (fields such as uid/gid will be inherited from the current context).
-    let fd = FdGuard::new(syscall::open("thisproc:new/open_via_dup", O_CLOEXEC)?);
+    let fd = FdGuard::new(syscall::open(
+        "/scheme/thisproc/new/open_via_dup",
+        O_CLOEXEC,
+    )?);
 
     // Extract pid.
     let mut buffer = [0_u8; 64];

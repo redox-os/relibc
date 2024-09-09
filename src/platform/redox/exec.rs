@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-use redox_exec::{ExtraInfo, FdGuard, FexecResult};
+use redox_rt::proc::{ExtraInfo, FdGuard, FexecResult, InterpOverride};
 use syscall::{data::Stat, error::*, flag::*};
 
 fn fexec_impl(
@@ -20,11 +20,11 @@ fn fexec_impl(
     envs: &[&[u8]],
     total_args_envs_size: usize,
     extrainfo: &ExtraInfo,
-    interp_override: Option<redox_exec::InterpOverride>,
+    interp_override: Option<InterpOverride>,
 ) -> Result<usize> {
-    let memory = FdGuard::new(syscall::open("memory:", 0)?);
+    let memory = FdGuard::new(syscall::open("/scheme/memory", 0)?);
 
-    let addrspace_selection_fd = match redox_exec::fexec_impl(
+    let addrspace_selection_fd = match redox_rt::proc::fexec_impl(
         exec_file,
         open_via_dup,
         &memory,
@@ -88,7 +88,7 @@ pub enum Executable<'a> {
 pub fn execve(
     exec: Executable<'_>,
     arg_env: ArgEnv,
-    interp_override: Option<redox_exec::InterpOverride>,
+    interp_override: Option<InterpOverride>,
 ) -> Result<usize> {
     // NOTE: We must omit O_CLOEXEC and close manually, otherwise it will be closed before we
     // have even read it!
@@ -252,7 +252,8 @@ pub fn execve(
         // scenarios. While execve() is undefined according to POSIX if there exist sibling
         // threads, it could still be allowed by keeping certain file descriptors and instead
         // set the active file table.
-        let files_fd = File::new(syscall::open("thisproc:current/filetable", O_RDONLY)? as c_int);
+        let files_fd =
+            File::new(syscall::open("/scheme/thisproc/current/filetable", O_RDONLY)? as c_int);
         for line in BufReader::new(files_fd).lines() {
             let line = match line {
                 Ok(l) => l,
@@ -271,14 +272,14 @@ pub fn execve(
         }
     }
 
-    let this_context_fd = FdGuard::new(syscall::open("thisproc:current/open_via_dup", 0)?);
+    let this_context_fd = FdGuard::new(syscall::open("/scheme/thisproc/current/open_via_dup", 0)?);
     // TODO: Convert image_file to FdGuard earlier?
     let exec_fd_guard = FdGuard::new(image_file.fd as usize);
     core::mem::forget(image_file);
 
     if !is_interpreted && wants_setugid {
         // We are now going to invoke `escalate:` rather than loading the program ourselves.
-        let escalate_fd = FdGuard::new(syscall::open("escalate:", O_WRONLY)?);
+        let escalate_fd = FdGuard::new(syscall::open("/scheme/escalate", O_WRONLY)?);
 
         // First, send the context handle of this process to escalated.
         send_fd_guard(*escalate_fd, this_context_fd)?;
@@ -305,8 +306,7 @@ pub fn execve(
 
         unreachable!()
     } else {
-        let mut sigprocmask = 0_u64;
-        syscall::sigprocmask(syscall::SIG_SETMASK, None, Some(&mut sigprocmask)).unwrap();
+        let sigprocmask = redox_rt::signal::get_sigmask().unwrap();
 
         let extrainfo = ExtraInfo {
             cwd: Some(&cwd),

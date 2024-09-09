@@ -6,13 +6,16 @@ use super::{
     super::{types::*, Pal, PalSocket, ERRNO},
     e, Sys,
 };
-use crate::header::{
-    arpa_inet::inet_aton,
-    netinet_in::{in_addr, in_port_t, sockaddr_in},
-    string::strnlen,
-    sys_socket::{constants::*, msghdr, sa_family_t, sockaddr, socklen_t},
-    sys_time::timeval,
-    sys_un::sockaddr_un,
+use crate::{
+    header::{
+        arpa_inet::inet_aton,
+        netinet_in::{in_addr, in_port_t, sockaddr_in},
+        string::strnlen,
+        sys_socket::{constants::*, msghdr, sa_family_t, sockaddr, socklen_t},
+        sys_time::timeval,
+        sys_un::sockaddr_un,
+    },
+    pthread::ResultExt,
 };
 
 macro_rules! bind_or_connect {
@@ -180,8 +183,12 @@ unsafe fn inner_get_name(
 
     if buf.starts_with(b"tcp:") || buf.starts_with(b"udp:") {
         inner_af_inet(local, &buf[4..], address, address_len);
+    } else if buf.starts_with(b"/scheme/tcp/") || buf.starts_with(b"/scheme/udp/") {
+        inner_af_inet(local, &buf[12..], address, address_len);
     } else if buf.starts_with(b"chan:") {
         inner_af_unix(&buf[5..], address, address_len);
+    } else if buf.starts_with(b"/scheme/chan/") {
+        inner_af_unix(&buf[13..], address, address_len);
     } else {
         // Socket doesn't belong to any scheme
         panic!(
@@ -299,7 +306,7 @@ impl PalSocket for Sys {
             return -1;
         }
         if address == ptr::null_mut() || address_len == ptr::null_mut() {
-            Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
+            Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len)).or_minus_one_errno()
         } else {
             let fd = e(syscall::dup(socket as usize, b"listen"));
             if fd == !0 {
@@ -310,7 +317,8 @@ impl PalSocket for Sys {
                 return -1;
             }
 
-            let ret = Self::read(fd as c_int, slice::from_raw_parts_mut(buf as *mut u8, len));
+            let ret = Self::read(fd as c_int, slice::from_raw_parts_mut(buf as *mut u8, len))
+                .or_minus_one_errno();
             let _ = syscall::close(fd);
             ret
         }
@@ -343,10 +351,11 @@ impl PalSocket for Sys {
             return -1;
         }
         if dest_addr == ptr::null() || dest_len == 0 {
-            Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
+            Self::write(socket, slice::from_raw_parts(buf as *const u8, len)).or_minus_one_errno()
         } else {
             let fd = bind_or_connect!(connect copy, socket, dest_addr, dest_len);
-            let ret = Self::write(fd as c_int, slice::from_raw_parts(buf as *const u8, len));
+            let ret = Self::write(fd as c_int, slice::from_raw_parts(buf as *const u8, len))
+                .or_minus_one_errno();
             let _ = syscall::close(fd);
             ret
         }
@@ -380,7 +389,7 @@ impl PalSocket for Sys {
                 tv_nsec: timeval.tv_usec * 1000,
             };
 
-            let ret = Self::write(fd as c_int, &timespec);
+            let ret = Self::write(fd as c_int, &timespec).or_minus_one_errno();
 
             let _ = syscall::close(fd);
 
@@ -427,9 +436,9 @@ impl PalSocket for Sys {
         // The tcp: and udp: schemes allow using no path,
         // and later specifying one using `dup`.
         match (domain, kind) {
-            (AF_INET, SOCK_STREAM) => e(syscall::open("tcp:", flags)) as c_int,
-            (AF_INET, SOCK_DGRAM) => e(syscall::open("udp:", flags)) as c_int,
-            (AF_UNIX, SOCK_STREAM) => e(syscall::open("chan:", flags | O_CREAT)) as c_int,
+            (AF_INET, SOCK_STREAM) => e(syscall::open("/scheme/tcp", flags)) as c_int,
+            (AF_INET, SOCK_DGRAM) => e(syscall::open("/scheme/udp", flags)) as c_int,
+            (AF_UNIX, SOCK_STREAM) => e(syscall::open("/scheme/chan", flags | O_CREAT)) as c_int,
             _ => {
                 ERRNO.set(syscall::EPROTONOSUPPORT);
                 -1
@@ -442,7 +451,7 @@ impl PalSocket for Sys {
 
         match (domain, kind) {
             (AF_UNIX, SOCK_STREAM) => {
-                let listener = e(syscall::open("chan:", flags | O_CREAT));
+                let listener = e(syscall::open("/scheme/chan", flags | O_CREAT));
                 if listener == !0 {
                     return -1;
                 }

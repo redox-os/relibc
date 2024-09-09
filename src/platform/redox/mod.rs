@@ -1,4 +1,5 @@
-use core::{convert::TryFrom, mem, ptr, result::Result as CoreResult, slice, str};
+use core::{convert::TryFrom, mem, ptr, slice, str};
+use redox_rt::RtTcb;
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
@@ -10,7 +11,7 @@ use crate::{
     fs::File,
     header::{
         dirent::dirent,
-        errno::{EBADR, EINVAL, EIO, ENOENT, ENOMEM, ENOSYS, EPERM, ERANGE},
+        errno::{EBADF, EBADFD, EBADR, EINVAL, EIO, ENOENT, ENOMEM, ENOSYS, EPERM, ERANGE},
         fcntl, limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
@@ -24,10 +25,10 @@ use crate::{
         unistd::{F_OK, R_OK, W_OK, X_OK},
     },
     io::{self, prelude::*, BufReader},
-    pthread,
+    pthread::{self, Errno, ResultExt},
 };
 
-pub use redox_exec::FdGuard;
+pub use redox_rt::proc::FdGuard;
 
 use super::{types::*, Pal, Read, ERRNO};
 
@@ -217,7 +218,7 @@ impl Pal for Sys {
     }
 
     fn exit(status: c_int) -> ! {
-        let _ = syscall::exit(status as usize);
+        let _ = syscall::exit((status as usize) << 8);
         loop {}
     }
 
@@ -305,31 +306,18 @@ impl Pal for Sys {
     unsafe fn futex_wait(
         addr: *mut u32,
         val: u32,
-        deadline: *const timespec,
-    ) -> CoreResult<(), pthread::Errno> {
-        syscall::syscall5(
-            syscall::SYS_FUTEX,
-            addr as usize,
-            syscall::FUTEX_WAIT,
-            val as usize,
-            deadline as usize,
-            0,
-        )
-        .map_err(|s| pthread::Errno(s.errno))
-        .map(|_| ())
+        deadline: Option<&timespec>,
+    ) -> Result<(), pthread::Errno> {
+        let deadline = deadline.map(|d| syscall::TimeSpec {
+            tv_sec: d.tv_sec,
+            tv_nsec: d.tv_nsec as i32,
+        });
+        redox_rt::sys::sys_futex_wait(addr, val, deadline.as_ref())?;
+        Ok(())
     }
     #[inline]
-    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<c_int, pthread::Errno> {
-        syscall::syscall5(
-            syscall::SYS_FUTEX,
-            addr as usize,
-            syscall::FUTEX_WAKE,
-            num as usize,
-            0,
-            0,
-        )
-        .map_err(|s| pthread::Errno(s.errno))
-        .map(|n| n as c_int)
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, pthread::Errno> {
+        Ok(redox_rt::sys::sys_futex_wake(addr, num)?)
     }
 
     // FIXME: unsound
@@ -503,9 +491,9 @@ impl Pal for Sys {
 
         let path = if flags & sys_random::GRND_RANDOM != 0 {
             //TODO: /dev/random equivalent
-            "rand:"
+            "/scheme/rand"
         } else {
-            "rand:"
+            "/scheme/rand"
         };
 
         let mut open_flags = syscall::O_RDONLY | syscall::O_CLOEXEC;
@@ -551,9 +539,9 @@ impl Pal for Sys {
     fn getsid(pid: pid_t) -> pid_t {
         let mut buf = [0; mem::size_of::<usize>()];
         let path = if pid == 0 {
-            format!("thisproc:current/session_id")
+            format!("/scheme/thisproc/current/session_id")
         } else {
-            format!("proc:{}/session_id", pid)
+            format!("/scheme/proc/{}/session_id", pid)
         };
         let path_c = CString::new(path).unwrap();
         match File::open(CStr::borrow(&path_c), fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
@@ -805,26 +793,39 @@ impl Pal for Sys {
         let _guard = clone::rdlock();
         let res = clone::rlct_clone_impl(stack);
 
-        res.map(|context_id| crate::pthread::OsTid { context_id })
-            .map_err(|error| crate::pthread::Errno(error.errno))
+        res.map(|mut fd| crate::pthread::OsTid {
+            thread_fd: fd.take(),
+        })
+        .map_err(|error| crate::pthread::Errno(error.errno))
     }
     unsafe fn rlct_kill(
         os_tid: crate::pthread::OsTid,
         signal: usize,
     ) -> Result<(), crate::pthread::Errno> {
-        syscall::kill(os_tid.context_id, signal)
-            .map_err(|error| crate::pthread::Errno(error.errno))?;
+        redox_rt::sys::posix_kill_thread(os_tid.thread_fd, signal as u32)?;
         Ok(())
     }
     fn current_os_tid() -> crate::pthread::OsTid {
-        // TODO
         crate::pthread::OsTid {
-            context_id: Self::getpid() as _,
+            thread_fd: **RtTcb::current().thread_fd(),
         }
     }
 
-    fn read(fd: c_int, buf: &mut [u8]) -> ssize_t {
-        e(syscall::read(fd as usize, buf)) as ssize_t
+    fn read(fd: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno> {
+        let fd = usize::try_from(fd).map_err(|_| Errno(EBADF))?;
+        Ok(redox_rt::sys::posix_read(fd, buf)? as ssize_t)
+    }
+    fn pread(fd: c_int, buf: &mut [u8], offset: off_t) -> Result<ssize_t, Errno> {
+        unsafe {
+            Ok(syscall::syscall5(
+                syscall::SYS_READ2,
+                fd as usize,
+                buf.as_mut_ptr() as usize,
+                buf.len(),
+                offset as usize,
+                !0,
+            )? as ssize_t)
+        }
     }
 
     fn fpath(fildes: c_int, out: &mut [u8]) -> ssize_t {
@@ -870,7 +871,7 @@ impl Pal for Sys {
             pathname,
             fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
         ) {
-            Ok(file) => Self::read(*file, out),
+            Ok(file) => Self::read(*file, out).or_minus_one_errno(),
             Err(_) => return -1,
         }
     }
@@ -919,7 +920,7 @@ impl Pal for Sys {
             return -1;
         }
         match File::open(
-            c_str!("thisproc:current/session_id"),
+            c_str!("/scheme/thisproc/current/session_id"),
             fcntl::O_WRONLY | fcntl::O_CLOEXEC,
         ) {
             Ok(mut file) => match file.write(&usize::to_ne_bytes(session_id.try_into().unwrap())) {
@@ -930,11 +931,17 @@ impl Pal for Sys {
         }
     }
 
-    fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
+    fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int {
+        if sgid != -1 {
+            println!("TODO: suid");
+        }
         e(syscall::setregid(rgid as usize, egid as usize)) as c_int
     }
 
-    fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
+    fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int {
+        if suid != -1 {
+            println!("TODO: suid");
+        }
         e(syscall::setreuid(ruid as usize, euid as usize)) as c_int
     }
 
@@ -983,7 +990,7 @@ impl Pal for Sys {
             Ok(())
         }
 
-        fn inner(utsname: *mut utsname) -> CoreResult<(), i32> {
+        fn inner(utsname: *mut utsname) -> Result<(), i32> {
             match gethostname(unsafe {
                 slice::from_raw_parts_mut(
                     (*utsname).nodename.as_mut_ptr() as *mut u8,
@@ -994,7 +1001,7 @@ impl Pal for Sys {
                 Err(_) => return Err(EIO),
             }
 
-            let file_path = c_str!("sys:uname");
+            let file_path = c_str!("/scheme/sys/uname");
             let mut file = match File::open(file_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
                 Ok(ok) => ok,
                 Err(_) => return Err(EIO),
@@ -1058,12 +1065,7 @@ impl Pal for Sys {
         let mut status = 0;
 
         let inner = |status: &mut usize, flags| {
-            syscall::waitpid(
-                pid as usize,
-                status,
-                syscall::WaitFlags::from_bits(flags as usize)
-                    .expect("waitpid: invalid bit pattern"),
-            )
+            redox_rt::sys::sys_waitpid(pid as usize, status, flags as usize)
         };
 
         // First, allow ptrace to handle waitpid
@@ -1097,7 +1099,10 @@ impl Pal for Sys {
             let res = e(inner(&mut status, options | sys_wait::WUNTRACED));
 
             // TODO: Also handle special PIDs here
-            if !syscall::wifstopped(status) || ptrace::is_traceme(pid) {
+            if !syscall::wifstopped(status)
+                || options & sys_wait::WUNTRACED != 0
+                || ptrace::is_traceme(pid)
+            {
                 break res;
             }
         });
@@ -1111,8 +1116,21 @@ impl Pal for Sys {
         res as pid_t
     }
 
-    fn write(fd: c_int, buf: &[u8]) -> ssize_t {
-        e(syscall::write(fd as usize, buf)) as ssize_t
+    fn write(fd: c_int, buf: &[u8]) -> Result<ssize_t, Errno> {
+        let fd = usize::try_from(fd).map_err(|_| Errno(EBADFD))?;
+        Ok(redox_rt::sys::posix_write(fd, buf)? as ssize_t)
+    }
+    fn pwrite(fd: c_int, buf: &[u8], offset: off_t) -> Result<ssize_t, Errno> {
+        unsafe {
+            Ok(syscall::syscall5(
+                syscall::SYS_WRITE2,
+                fd as usize,
+                buf.as_ptr() as usize,
+                buf.len(),
+                offset as usize,
+                !0,
+            )? as ssize_t)
+        }
     }
 
     fn verify() -> bool {
@@ -1121,6 +1139,6 @@ impl Pal for Sys {
     }
 
     fn exit_thread() -> ! {
-        Self::exit(0)
+        redox_rt::thread::exit_this_thread()
     }
 }

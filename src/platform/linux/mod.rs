@@ -14,7 +14,10 @@ use crate::header::{
     sys_time::{timeval, timezone},
 };
 // use header::sys_times::tms;
-use crate::header::{sys_utsname::utsname, time::timespec};
+use crate::{
+    header::{sys_utsname::utsname, time::timespec},
+    pthread::Errno,
+};
 
 mod epoll;
 mod ptrace;
@@ -52,9 +55,9 @@ struct linux_statfs {
 // TODO
 const ERRNO_MAX: usize = 4095;
 
-pub fn e_raw(sys: usize) -> Result<usize, usize> {
+pub fn e_raw(sys: usize) -> Result<usize, Errno> {
     if sys > ERRNO_MAX.wrapping_neg() {
-        Err(sys.wrapping_neg())
+        Err(Errno(sys.wrapping_neg() as _))
     } else {
         Ok(sys)
     }
@@ -62,7 +65,7 @@ pub fn e_raw(sys: usize) -> Result<usize, usize> {
 pub fn e(sys: usize) -> usize {
     match e_raw(sys) {
         Ok(value) => value,
-        Err(errcode) => {
+        Err(Errno(errcode)) => {
             ERRNO.set(errcode as c_int);
             !0
         }
@@ -239,8 +242,9 @@ impl Pal for Sys {
     unsafe fn futex_wait(
         addr: *mut u32,
         val: u32,
-        deadline: *const timespec,
+        deadline: Option<&timespec>,
     ) -> Result<(), crate::pthread::Errno> {
+        let deadline = deadline.map_or(0, |d| d as *const _ as usize);
         e_raw(unsafe {
             syscall!(
                 FUTEX, addr,       // uaddr
@@ -251,16 +255,14 @@ impl Pal for Sys {
                 0xffffffff  // val3: FUTEX_BITSET_MATCH_ANY
             )
         })
-        .map_err(|e| crate::pthread::Errno(e as c_int))
         .map(|_| ())
     }
     #[inline]
-    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<c_int, crate::pthread::Errno> {
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, Errno> {
         e_raw(unsafe {
             syscall!(FUTEX, addr, 1 /* FUTEX_WAKE */, num)
         })
-        .map_err(|e| crate::pthread::Errno(e as c_int))
-        .map(|n| n as c_int)
+        .map(|n| n as u32)
     }
 
     fn futimens(fd: c_int, times: *const timespec) -> c_int {
@@ -457,9 +459,7 @@ impl Pal for Sys {
     }
 
     #[cfg(target_arch = "x86_64")]
-    unsafe fn rlct_clone(
-        stack: *mut usize,
-    ) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, Errno> {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
         let pid;
         asm!("
@@ -508,18 +508,13 @@ impl Pal for Sys {
             out("r14") _,
             out("r15") _,
         );
-        let tid = e_raw(pid).map_err(|err| crate::pthread::Errno(err as c_int))?;
+        let tid = e_raw(pid)?;
 
         Ok(crate::pthread::OsTid { thread_id: tid })
     }
-    unsafe fn rlct_kill(
-        os_tid: crate::pthread::OsTid,
-        signal: usize,
-    ) -> Result<(), crate::pthread::Errno> {
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), Errno> {
         let tgid = Self::getpid();
-        e_raw(unsafe { syscall!(TGKILL, tgid, os_tid.thread_id, signal) })
-            .map(|_| ())
-            .map_err(|err| crate::pthread::Errno(err as c_int))
+        e_raw(unsafe { syscall!(TGKILL, tgid, os_tid.thread_id, signal) }).map(|_| ())
     }
     fn current_os_tid() -> crate::pthread::OsTid {
         crate::pthread::OsTid {
@@ -527,8 +522,14 @@ impl Pal for Sys {
         }
     }
 
-    fn read(fildes: c_int, buf: &mut [u8]) -> ssize_t {
-        e(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) }) as ssize_t
+    fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno> {
+        Ok(e_raw(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) })? as ssize_t)
+    }
+    fn pread(fildes: c_int, buf: &mut [u8], off: off_t) -> Result<ssize_t, Errno> {
+        Ok(
+            e_raw(unsafe { syscall!(PREAD64, fildes, buf.as_mut_ptr(), buf.len(), off) })?
+                as ssize_t,
+        )
     }
 
     fn readlink(pathname: CStr, out: &mut [u8]) -> ssize_t {
@@ -567,12 +568,12 @@ impl Pal for Sys {
         e(unsafe { syscall!(SETPRIORITY, which, who, prio) }) as c_int
     }
 
-    fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
-        e(unsafe { syscall!(SETREGID, rgid, egid) }) as c_int
+    fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int {
+        e(unsafe { syscall!(SETRESGID, rgid, egid, sgid) }) as c_int
     }
 
-    fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
-        e(unsafe { syscall!(SETREUID, ruid, euid) }) as c_int
+    fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int {
+        e(unsafe { syscall!(SETRESUID, ruid, euid, suid) }) as c_int
     }
 
     fn setsid() -> c_int {
@@ -603,8 +604,11 @@ impl Pal for Sys {
         e(unsafe { syscall!(WAIT4, pid, stat_loc, options, 0) }) as pid_t
     }
 
-    fn write(fildes: c_int, buf: &[u8]) -> ssize_t {
-        e(unsafe { syscall!(WRITE, fildes, buf.as_ptr(), buf.len()) }) as ssize_t
+    fn write(fildes: c_int, buf: &[u8]) -> Result<ssize_t, Errno> {
+        Ok(e_raw(unsafe { syscall!(WRITE, fildes, buf.as_ptr(), buf.len()) })? as ssize_t)
+    }
+    fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<ssize_t, Errno> {
+        Ok(e_raw(unsafe { syscall!(PWRITE64, fildes, buf.as_ptr(), buf.len(), off) })? as ssize_t)
     }
 
     fn verify() -> bool {

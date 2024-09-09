@@ -64,12 +64,14 @@ all: | headers libs
 
 headers: $(HEADERS_DEPS)
 	for header in $(HEADERS_UNPARSED); do \
+		if test -f "src/header/$$header/cbindgen.toml"; then \
 		out=`echo "$$header" | sed 's/_/\//g'`; \
 		out="$(TARGET_HEADERS)/$$out.h"; \
 		cbindgen --output "$$out" \
 			--config="src/header/$$header/cbindgen.toml" \
 			"src/header/$$header/mod.rs"; \
 		sed -i "s/va_list __valist/.../g" "$$out"; \
+		fi \
 	done
 
 	for header in $(MHEADERS_UNPARSED); do \
@@ -184,11 +186,11 @@ $(BUILD)/debug/crtn.o: $(SRC)
 	touch $@
 
 $(BUILD)/debug/ld_so.o: $(SRC)
-	$(CARGO) rustc --manifest-path src/ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+	$(CARGO) rustc --manifest-path ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debug/libc.a $(BUILD)/debug/crtn.o
-	$(LD) --no-relax -T src/ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections --gc-keep-exported $^ -o $@
+	$(LD) --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections --gc-keep-exported $^ -o $@
 
 # Release targets
 
@@ -228,8 +230,20 @@ $(BUILD)/release/crtn.o: $(SRC)
 	touch $@
 
 $(BUILD)/release/ld_so.o: $(SRC)
-	$(CARGO) rustc --release --manifest-path src/ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+	$(CARGO) rustc --release --manifest-path ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD)/release/libc.a $(BUILD)/release/crtn.o
-	$(LD) --no-relax -T src/ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections --gc-keep-exported $^ -o $@
+	$(LD) --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections --gc-keep-exported $^ -o $@
+
+# Other targets
+
+# $(BUILD)/openlibm: openlibm
+# 	rm -rf $@ $@.partial
+# 	mkdir -p $(BUILD)
+# 	cp -r $< $@.partial
+# 	mv $@.partial $@
+# 	touch $@
+
+# $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
+# 	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a

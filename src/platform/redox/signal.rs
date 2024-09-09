@@ -1,5 +1,6 @@
 use core::mem;
-use syscall::{self, number::SYS_SIGRETURN, Result, SetSighandlerData, SignalStack};
+use redox_rt::signal::{Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler};
+use syscall::{self, Result};
 
 use super::{
     super::{types::*, Pal, PalSignal},
@@ -8,17 +9,21 @@ use super::{
 use crate::{
     header::{
         errno::{EINVAL, ENOSYS},
-        signal::{sigaction, siginfo_t, sigset_t, stack_t},
+        signal::{
+            sigaction, siginfo_t, sigset_t, stack_t, SA_SIGINFO, SIG_BLOCK, SIG_DFL, SIG_IGN,
+            SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE, SS_ONSTACK,
+        },
         sys_time::{itimerval, ITIMER_REAL},
         time::timespec,
     },
     platform::ERRNO,
+    pthread::Errno,
 };
 
 impl PalSignal for Sys {
     unsafe fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
         let path = match which {
-            ITIMER_REAL => "itimer:1",
+            ITIMER_REAL => "/scheme/itimer/1",
             _ => {
                 ERRNO.set(EINVAL);
                 return -1;
@@ -48,20 +53,21 @@ impl PalSignal for Sys {
     }
 
     fn kill(pid: pid_t, sig: c_int) -> c_int {
-        e(syscall::kill(pid as usize, sig as usize)) as c_int
+        e(redox_rt::sys::posix_kill(pid as usize, sig as usize).map(|()| 0)) as c_int
     }
 
     fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-        e(syscall::kill(-(pgrp as isize) as usize, sig as usize)) as c_int
+        e(redox_rt::sys::posix_killpg(pgrp as usize, sig as usize).map(|()| 0)) as c_int
     }
 
-    fn raise(sig: c_int) -> c_int {
-        Self::kill(Self::getpid(), sig)
+    fn raise(sig: c_int) -> Result<(), Errno> {
+        // TODO: Bypass kernel?
+        unsafe { Self::rlct_kill(Self::current_os_tid(), sig as _) }
     }
 
     unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
         let path = match which {
-            ITIMER_REAL => "itimer:1",
+            ITIMER_REAL => "/scheme/itimer/1",
             _ => {
                 ERRNO.set(EINVAL);
                 return -1;
@@ -104,21 +110,137 @@ impl PalSignal for Sys {
         0
     }
 
-    fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> c_int {
-        e(sigaction_impl(sig, act, oact).map(|()| 0)) as c_int
+    fn sigaction(
+        sig: c_int,
+        c_act: Option<&sigaction>,
+        c_oact: Option<&mut sigaction>,
+    ) -> Result<(), Errno> {
+        let sig = u8::try_from(sig).map_err(|_| syscall::Error::new(syscall::EINVAL))?;
+
+        let new_action = c_act.map(|c_act| {
+            let handler = c_act.sa_handler.map_or(0, |f| f as usize);
+
+            let kind = if handler == SIG_DFL {
+                SigactionKind::Default
+            } else if handler == SIG_IGN {
+                SigactionKind::Ignore
+            } else {
+                SigactionKind::Handled {
+                    handler: if c_act.sa_flags & crate::header::signal::SA_SIGINFO as c_ulong != 0 {
+                        SignalHandler {
+                            sigaction: unsafe { core::mem::transmute(c_act.sa_handler) },
+                        }
+                    } else {
+                        SignalHandler {
+                            handler: c_act.sa_handler,
+                        }
+                    },
+                }
+            };
+
+            Sigaction {
+                kind,
+                mask: c_act.sa_mask,
+                flags: SigactionFlags::from_bits_retain(c_act.sa_flags as u32),
+            }
+        });
+        let mut old_action = c_oact.as_ref().map(|_| Sigaction::default());
+
+        redox_rt::signal::sigaction(sig, new_action.as_ref(), old_action.as_mut())?;
+
+        if let (Some(c_oact), Some(old_action)) = (c_oact, old_action) {
+            *c_oact = match old_action.kind {
+                SigactionKind::Ignore => sigaction {
+                    sa_handler: unsafe { core::mem::transmute(SIG_IGN) },
+                    sa_flags: 0,
+                    sa_restorer: None,
+                    sa_mask: 0,
+                },
+                SigactionKind::Default => sigaction {
+                    sa_handler: unsafe { core::mem::transmute(SIG_DFL) },
+                    sa_flags: 0,
+                    sa_restorer: None,
+                    sa_mask: 0,
+                },
+                SigactionKind::Handled { handler } => sigaction {
+                    sa_handler: if old_action.flags.contains(SigactionFlags::SIGINFO) {
+                        unsafe { core::mem::transmute(handler.sigaction) }
+                    } else {
+                        unsafe { handler.handler }
+                    },
+                    sa_restorer: None,
+                    sa_flags: old_action.flags.bits().into(),
+                    sa_mask: old_action.mask,
+                },
+            };
+        }
+        Ok(())
     }
 
-    unsafe fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
-        unimplemented!()
+    unsafe fn sigaltstack(
+        new_c: Option<&stack_t>,
+        old_c: Option<&mut stack_t>,
+    ) -> Result<(), Errno> {
+        let new = new_c
+            .map(|c_stack| {
+                let flags = usize::try_from(c_stack.ss_flags).map_err(|_| Errno(EINVAL))?;
+                if flags != flags & (SS_DISABLE | SS_ONSTACK) {
+                    return Err(Errno(EINVAL));
+                }
+
+                Ok(if flags & SS_DISABLE == SS_DISABLE {
+                    Sigaltstack::Disabled
+                } else {
+                    Sigaltstack::Enabled {
+                        onstack: false,
+                        base: c_stack.ss_sp.cast(),
+                        size: c_stack.ss_size,
+                    }
+                })
+            })
+            .transpose()?;
+
+        let mut old = old_c.as_ref().map(|_| Sigaltstack::default());
+        redox_rt::signal::sigaltstack(new.as_ref(), old.as_mut())?;
+
+        if let (Some(old_c_stack), Some(old)) = (old_c, old) {
+            *old_c_stack = match old {
+                Sigaltstack::Disabled => stack_t {
+                    ss_sp: core::ptr::null_mut(),
+                    ss_size: 0,
+                    ss_flags: SS_DISABLE.try_into().unwrap(),
+                },
+                Sigaltstack::Enabled {
+                    onstack,
+                    base,
+                    size,
+                } => stack_t {
+                    ss_sp: base.cast(),
+                    ss_size: size,
+                    ss_flags: SS_ONSTACK.try_into().unwrap(),
+                },
+            };
+        }
+        Ok(())
     }
 
-    unsafe fn sigpending(set: *mut sigset_t) -> c_int {
-        ERRNO.set(ENOSYS);
-        -1
+    fn sigpending(set: &mut sigset_t) -> Result<(), Errno> {
+        *set = redox_rt::signal::currently_pending();
+        Ok(())
     }
 
-    unsafe fn sigprocmask(how: c_int, set: *const sigset_t, oset: *mut sigset_t) -> c_int {
-        e(sigprocmask_impl(how, set, oset).map(|()| 0)) as c_int
+    fn sigprocmask(
+        how: c_int,
+        set: Option<&sigset_t>,
+        oset: Option<&mut sigset_t>,
+    ) -> Result<(), Errno> {
+        Ok(match how {
+            SIG_SETMASK => redox_rt::signal::set_sigmask(set.copied(), oset)?,
+            SIG_BLOCK => redox_rt::signal::or_sigmask(set.copied(), oset)?,
+            SIG_UNBLOCK => redox_rt::signal::andn_sigmask(set.copied(), oset)?,
+
+            _ => return Err(Errno(EINVAL)),
+        })
     }
 
     unsafe fn sigsuspend(set: *const sigset_t) -> c_int {
@@ -135,173 +257,3 @@ impl PalSignal for Sys {
         -1
     }
 }
-
-pub(crate) fn sigaction_impl(
-    sig: i32,
-    act: Option<&sigaction>,
-    oact: Option<&mut sigaction>,
-) -> Result<()> {
-    let new_opt = act.map(|act| {
-        let sa_handler = unsafe { mem::transmute(act.sa_handler) };
-        syscall::SigAction {
-            sa_handler,
-            sa_mask: act.sa_mask as u64,
-            sa_flags: syscall::SigActionFlags::from_bits(act.sa_flags as usize)
-                .expect("sigaction: invalid bit pattern"),
-        }
-    });
-    let mut old_opt = oact.as_ref().map(|_| syscall::SigAction::default());
-    syscall::sigaction(sig as usize, new_opt.as_ref(), old_opt.as_mut())?;
-    if let (Some(old), Some(oact)) = (old_opt, oact) {
-        oact.sa_handler = unsafe { mem::transmute(old.sa_handler) };
-        oact.sa_mask = old.sa_mask as sigset_t;
-        oact.sa_flags = old.sa_flags.bits() as c_ulong;
-    }
-    Ok(())
-}
-pub(crate) unsafe fn sigprocmask_impl(
-    how: i32,
-    set: *const sigset_t,
-    oset: *mut sigset_t,
-) -> Result<()> {
-    syscall::sigprocmask(how as usize, set.as_ref(), oset.as_mut())?;
-    Ok(())
-}
-#[cfg(target_arch = "x86_64")]
-static CPUID_EAX1_ECX: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
-
-pub fn sighandler_function() -> usize {
-    #[cfg(target_arch = "x86_64")]
-    // Check OSXSAVE bit
-    // TODO: HWCAP?
-    if CPUID_EAX1_ECX.load(core::sync::atomic::Ordering::Relaxed) & (1 << 27) != 0 {
-        __relibc_internal_sigentry_xsave as usize
-    } else {
-        __relibc_internal_sigentry_fxsave as usize
-    }
-
-    #[cfg(any(target_arch = "x86", target_arch = "aarch64"))]
-    {
-        __relibc_internal_sigentry as usize
-    }
-}
-
-pub fn setup_sighandler() {
-    use core::mem::size_of;
-
-    // TODO
-    let altstack_base = 0_usize;
-    let altstack_len = 0_usize;
-
-    #[cfg(target_arch = "x86_64")]
-    {
-        let cpuid_eax1_ecx = unsafe { core::arch::x86_64::__cpuid(1) }.ecx;
-        CPUID_EAX1_ECX.store(cpuid_eax1_ecx, core::sync::atomic::Ordering::Relaxed);
-    }
-
-    let data = SetSighandlerData {
-        entry: sighandler_function(),
-        altstack_base,
-        altstack_len,
-    };
-
-    let fd = syscall::open(
-        "thisproc:current/sighandler",
-        syscall::O_WRONLY | syscall::O_CLOEXEC,
-    )
-    .expect("failed to open thisproc:current/sighandler");
-    syscall::write(fd, &data).expect("failed to write to thisproc:current/sighandler");
-    let _ = syscall::close(fd);
-}
-
-#[repr(C)]
-pub struct SigStack {
-    #[cfg(target_arch = "x86_64")]
-    fx: [u8; 4096],
-
-    #[cfg(target_arch = "x86")]
-    fx: [u8; 512],
-
-    kernel_pushed: SignalStack,
-}
-
-#[inline(always)]
-unsafe fn inner(stack: &mut SigStack) {
-    let handler: extern "C" fn(c_int) = core::mem::transmute(stack.kernel_pushed.sa_handler);
-    handler(stack.kernel_pushed.sig_num as c_int)
-}
-#[cfg(not(target_arch = "x86"))]
-unsafe extern "C" fn inner_c(stack: usize) {
-    inner(&mut *(stack as *mut SigStack))
-}
-#[cfg(target_arch = "x86")]
-unsafe extern "fastcall" fn inner_fastcall(stack: usize) {
-    inner(&mut *(stack as *mut SigStack))
-}
-
-// TODO: is the memset necessary?
-#[cfg(target_arch = "x86_64")]
-asmfunction!(__relibc_internal_sigentry_xsave: ["
-    sub rsp, 4096
-
-    cld
-    mov rdi, rsp
-    xor eax, eax
-    mov ecx, 4096
-    rep stosb
-
-    mov eax, 0xffffffff
-    mov edx, eax
-    xsave [rsp]
-
-    mov rdi, rsp
-    call {inner}
-
-    mov eax, 0xffffffff
-    mov edx, eax
-    xrstor [rsp]
-    add rsp, 4096
-
-    mov eax, {SYS_SIGRETURN}
-    syscall
-"] <= [inner = sym inner_c, SYS_SIGRETURN = const SYS_SIGRETURN]);
-
-#[cfg(target_arch = "x86_64")]
-asmfunction!(__relibc_internal_sigentry_fxsave: ["
-    sub rsp, 4096
-
-    fxsave64 [rsp]
-
-    mov rdi, rsp
-    call {inner}
-
-    fxrstor64 [rsp]
-    add rsp, 4096
-
-    mov eax, {SYS_SIGRETURN}
-    syscall
-"] <= [inner = sym inner_c, SYS_SIGRETURN = const SYS_SIGRETURN]);
-
-#[cfg(target_arch = "x86")]
-asmfunction!(__relibc_internal_sigentry: ["
-    sub esp, 512
-    fxsave [esp]
-
-    mov ecx, esp
-    call {inner}
-
-    add esp, 512
-    fxrstor [esp]
-
-    mov eax, {SYS_SIGRETURN}
-    int 0x80
-"] <= [inner = sym inner_fastcall, SYS_SIGRETURN = const SYS_SIGRETURN]);
-
-#[cfg(target_arch = "aarch64")]
-asmfunction!(__relibc_internal_sigentry: ["
-    mov x0, sp
-    bl {inner}
-
-    mov x8, {SYS_SIGRETURN}
-    svc 0
-"] <= [inner = sym inner_c, SYS_SIGRETURN = const SYS_SIGRETURN]);

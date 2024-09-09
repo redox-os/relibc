@@ -6,6 +6,7 @@ use crate::{
     },
     io,
     platform::{types::*, Pal, Sys},
+    pthread::ResultExt,
 };
 use core::ops::Deref;
 
@@ -72,7 +73,7 @@ impl File {
 
 impl io::Read for &File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match Sys::read(self.fd, buf) {
+        match Sys::read(self.fd, buf).or_minus_one_errno() /* TODO */ {
             -1 => Err(io::last_os_error()),
             ok => Ok(ok as usize),
         }
@@ -81,7 +82,7 @@ impl io::Read for &File {
 
 impl io::Write for &File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match Sys::write(self.fd, buf) {
+        match Sys::write(self.fd, buf).or_minus_one_errno() {
             -1 => Err(io::last_os_error()),
             ok => Ok(ok as usize),
         }

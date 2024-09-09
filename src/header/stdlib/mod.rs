@@ -263,9 +263,11 @@ pub extern "C" fn div(numer: c_int, denom: c_int) -> div_t {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn drand48() -> c_double {
-    let new_xsubi_value = rand48::generator_step(&mut rand48::DEFAULT_XSUBI);
-    rand48::f64_from_x(new_xsubi_value)
+pub extern "C" fn drand48() -> c_double {
+    let params = rand48::params_lock();
+    let mut xsubi = rand48::xsubi_lock();
+    *xsubi = params.step(*xsubi);
+    xsubi.get_f64()
 }
 
 // #[no_mangle]
@@ -280,8 +282,11 @@ pub extern "C" fn ecvt(
 
 #[no_mangle]
 pub unsafe extern "C" fn erand48(xsubi: *mut c_ushort) -> c_double {
-    let new_xsubi_value = rand48::generator_step(&mut *(xsubi as *mut [c_ushort; 3]));
-    rand48::f64_from_x(new_xsubi_value)
+    let params = rand48::params_lock();
+    let xsubi_mut: &mut [c_ushort; 3] = slice::from_raw_parts_mut(xsubi, 3).try_into().unwrap();
+    let new_xsubi_value = params.step(xsubi_mut.into());
+    *xsubi_mut = new_xsubi_value.into();
+    new_xsubi_value.get_f64()
 }
 
 #[no_mangle]
@@ -411,16 +416,15 @@ pub extern "C" fn grantpt(fildes: c_int) -> c_int {
     0
 }
 
+// Ported from musl
 #[no_mangle]
 pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_t) -> *mut c_char {
-    // Ported from musl
-
     if size < 8 {
         ptr::null_mut()
     } else {
-        // TODO: lock?
-        let old_state = random::save_state();
-        random::N = match size {
+        let mut random_state = random::state_lock();
+        let old_state = random_state.save();
+        random_state.n = match size {
             0..=7 => unreachable!(), // ensured above
             8..=31 => 0,
             32..=63 => 7,
@@ -429,10 +433,9 @@ pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_
             _ => 63,
         };
 
-        random::X_PTR = (state.cast::<[u8; 4]>()).offset(1);
-        random::seed(seed);
-        random::save_state();
-        // TODO: unlock?
+        random_state.x_ptr = (state.cast::<[u8; 4]>()).offset(1);
+        random_state.seed(seed);
+        random_state.save();
 
         old_state.cast::<_>()
     }
@@ -440,8 +443,11 @@ pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_
 
 #[no_mangle]
 pub unsafe extern "C" fn jrand48(xsubi: *mut c_ushort) -> c_long {
-    let new_xsubi_value = rand48::generator_step(&mut *(xsubi as *mut [c_ushort; 3]));
-    rand48::i32_from_x(new_xsubi_value)
+    let params = rand48::params_lock();
+    let xsubi_mut: &mut [c_ushort; 3] = slice::from_raw_parts_mut(xsubi, 3).try_into().unwrap();
+    let new_xsubi_value = params.step(xsubi_mut.into());
+    *xsubi_mut = new_xsubi_value.into();
+    new_xsubi_value.get_i32()
 }
 
 #[no_mangle]
@@ -490,16 +496,17 @@ pub extern "C" fn labs(i: c_long) -> c_long {
 
 #[no_mangle]
 pub unsafe extern "C" fn lcong48(param: *mut c_ushort) {
-    // Set DEFAULT_XSUBI buffer from elements 0-2
-    let xsubi_value = rand48::u48_from_ushort_arr3(&*(param as *const [c_ushort; 3]));
-    rand48::DEFAULT_XSUBI = rand48::ushort_arr3_from_u48(xsubi_value);
+    let mut xsubi = rand48::xsubi_lock();
+    let mut params = rand48::params_lock();
 
-    // Set multiplier from elements 3-5
-    rand48::A = rand48::u48_from_ushort_arr3(&*(param.offset(3) as *const [c_ushort; 3]));
+    let param_slice = slice::from_raw_parts(param, 7);
 
-    /* Set addend from element 6. Note that c_ushort may be more than 16
-     * bits, thus the cast. */
-    rand48::C = *param.offset(6) as u16;
+    let xsubi_ref: &[c_ushort; 3] = param_slice[0..3].try_into().unwrap();
+    let a_ref: &[c_ushort; 3] = param_slice[3..6].try_into().unwrap();
+    let c = param_slice[6];
+
+    *xsubi = xsubi_ref.into();
+    params.set(a_ref, c);
 }
 
 #[repr(C)]
@@ -536,9 +543,11 @@ pub extern "C" fn lldiv(numer: c_longlong, denom: c_longlong) -> lldiv_t {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lrand48() -> c_long {
-    let new_xsubi_value = rand48::generator_step(&mut rand48::DEFAULT_XSUBI);
-    rand48::u31_from_x(new_xsubi_value)
+pub extern "C" fn lrand48() -> c_long {
+    let params = rand48::params_lock();
+    let mut xsubi = rand48::xsubi_lock();
+    *xsubi = params.step(*xsubi);
+    xsubi.get_u31()
 }
 
 #[no_mangle]
@@ -694,15 +703,20 @@ pub unsafe extern "C" fn mkstemps(name: *mut c_char, suffix_len: c_int) -> c_int
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mrand48() -> c_long {
-    let new_xsubi_value = rand48::generator_step(&mut rand48::DEFAULT_XSUBI);
-    rand48::i32_from_x(new_xsubi_value)
+pub extern "C" fn mrand48() -> c_long {
+    let params = rand48::params_lock();
+    let mut xsubi = rand48::xsubi_lock();
+    *xsubi = params.step(*xsubi);
+    xsubi.get_i32()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn nrand48(xsubi: *mut c_ushort) -> c_long {
-    let new_xsubi_value = rand48::generator_step(&mut *(xsubi as *mut [c_ushort; 3]));
-    rand48::u31_from_x(new_xsubi_value)
+    let params = rand48::params_lock();
+    let xsubi_mut: &mut [c_ushort; 3] = slice::from_raw_parts_mut(xsubi, 3).try_into().unwrap();
+    let new_xsubi_value = params.step(xsubi_mut.into());
+    *xsubi_mut = new_xsubi_value.into();
+    new_xsubi_value.get_u31()
 }
 
 #[no_mangle]
@@ -730,7 +744,7 @@ pub unsafe extern "C" fn posix_memalign(
 #[no_mangle]
 pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
     #[cfg(target_os = "redox")]
-    let r = open((b"pty:\0" as *const u8).cast(), O_CREAT);
+    let r = open((b"/scheme/pty\0" as *const u8).cast(), O_CREAT);
 
     #[cfg(target_os = "linux")]
     let r = open((b"/dev/ptmx\0" as *const u8).cast(), flags);
@@ -889,39 +903,39 @@ pub unsafe extern "C" fn rand_r(seed: *mut c_uint) -> c_int {
     }
 }
 
+// Ported from musl
 #[no_mangle]
 pub unsafe extern "C" fn random() -> c_long {
-    // Ported from musl
+    let mut random_state = random::state_lock();
 
     let k: u32;
-    // TODO: lock?
-    random::ensure_x_ptr_init();
 
-    if random::N == 0 {
-        let x_old = u32::from_ne_bytes(*random::X_PTR);
+    random_state.ensure_x_ptr_init();
+
+    if random_state.n == 0 {
+        let x_old = u32::from_ne_bytes(*random_state.x_ptr);
         let x_new = random::lcg31_step(x_old);
-        *random::X_PTR = x_new.to_ne_bytes();
+        *random_state.x_ptr = x_new.to_ne_bytes();
         k = x_new;
     } else {
         // The non-u32-aligned way of saying x[i] += x[j]...
-        let x_i_old = u32::from_ne_bytes(*random::X_PTR.add(usize::from(random::I)));
-        let x_j = u32::from_ne_bytes(*random::X_PTR.add(usize::from(random::J)));
+        let x_i_old = u32::from_ne_bytes(*random_state.x_ptr.add(usize::from(random_state.i)));
+        let x_j = u32::from_ne_bytes(*random_state.x_ptr.add(usize::from(random_state.j)));
         let x_i_new = x_i_old.wrapping_add(x_j);
-        *random::X_PTR.add(usize::from(random::I)) = x_i_new.to_ne_bytes();
+        *random_state.x_ptr.add(usize::from(random_state.i)) = x_i_new.to_ne_bytes();
 
         k = x_i_new >> 1;
 
-        random::I += 1;
-        if random::I == random::N {
-            random::I = 0;
+        random_state.i += 1;
+        if random_state.i == random_state.n {
+            random_state.i = 0;
         }
 
-        random::J += 1;
-        if random::J == random::N {
-            random::J = 0;
+        random_state.j += 1;
+        if random_state.j == random_state.n {
+            random_state.j = 0;
         }
     }
-    // TODO: unlock?
 
     /* Both branches of this function result in a "u31", which will
      * always fit in a c_long. */
@@ -978,17 +992,17 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
 
 #[no_mangle]
 pub unsafe extern "C" fn seed48(seed16v: *mut c_ushort) -> *mut c_ushort {
-    rand48::reset_a_and_c();
+    static mut BUFFER: [c_ushort; 3] = [0; 3];
 
-    // Stash current DEFAULT_XSUBI value in SEED48_XSUBI
-    rand48::SEED48_XSUBI = rand48::DEFAULT_XSUBI;
+    let mut params = rand48::params_lock();
+    let mut xsubi = rand48::xsubi_lock();
 
-    // Set DEFAULT_XSUBI from the argument provided
-    let xsubi_value = rand48::u48_from_ushort_arr3(&*(seed16v as *const [c_ushort; 3]));
-    rand48::DEFAULT_XSUBI = rand48::ushort_arr3_from_u48(xsubi_value);
+    let seed16v_ref: &[c_ushort; 3] = slice::from_raw_parts(seed16v, 3).try_into().unwrap();
 
-    // Return the stashed value
-    rand48::SEED48_XSUBI.as_mut_ptr()
+    BUFFER = (*xsubi).into();
+    *xsubi = seed16v_ref.into();
+    params.reset();
+    BUFFER.as_mut_ptr()
 }
 
 unsafe fn copy_kv(
@@ -1048,15 +1062,14 @@ pub unsafe extern "C" fn setkey(key: *const c_char) {
     unimplemented!();
 }
 
+// Ported from musl. The state parameter is no longer const in newer versions of POSIX.
 #[no_mangle]
 pub unsafe extern "C" fn setstate(state: *mut c_char) -> *mut c_char {
-    /* Ported from musl. The state parameter is no longer const in newer
-     * versions of POSIX. */
+    let mut random_state = random::state_lock();
 
-    // TODO: lock?
-    let old_state = random::save_state();
-    random::load_state(state.cast::<_>());
-    // TODO: unlock?
+    let old_state = random_state.save();
+    random_state.load(state.cast::<_>());
+
     old_state.cast::<_>()
 }
 
@@ -1066,23 +1079,25 @@ pub unsafe extern "C" fn srand(seed: c_uint) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn srand48(seedval: c_long) {
-    rand48::reset_a_and_c();
+pub extern "C" fn srand48(seedval: c_long) {
+    let mut params = rand48::params_lock();
+    let mut xsubi = rand48::xsubi_lock();
 
+    params.reset();
     /* Set the high 32 bits of the 48-bit X_i value to the lower 32 bits
      * of the input argument, and the lower 16 bits to 0x330e, as
      * specified in POSIX. */
-    let xsubi_value = (u64::from(seedval as u32) << 16) | 0x330e;
-    rand48::DEFAULT_XSUBI = rand48::ushort_arr3_from_u48(xsubi_value);
+    *xsubi = ((u64::from(seedval as u32) << 16) | 0x330e)
+        .try_into()
+        .unwrap();
 }
 
+// Ported from musl
 #[no_mangle]
 pub unsafe extern "C" fn srandom(seed: c_uint) {
-    // Ported from musl
+    let mut random_state = random::state_lock();
 
-    // TODO: lock?
-    random::seed(seed);
-    // TODO: unlock?
+    random_state.seed(seed);
 }
 
 #[no_mangle]

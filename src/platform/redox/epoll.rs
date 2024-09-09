@@ -8,6 +8,7 @@ use crate::{
     header::{errno::*, fcntl::*, signal::sigset_t, sys_epoll::*},
     io::prelude::*,
     platform,
+    pthread::ResultExt,
 };
 use core::{mem, slice};
 use syscall::{
@@ -15,28 +16,69 @@ use syscall::{
     flag::EVENT_READ,
 };
 
+fn epoll_to_event_flags(epoll: c_uint) -> syscall::EventFlags {
+    let mut event_flags = syscall::EventFlags::empty();
+
+    if epoll & EPOLLIN != 0 {
+        event_flags |= syscall::EventFlags::EVENT_READ;
+    }
+
+    if epoll & EPOLLOUT != 0 {
+        event_flags |= syscall::EventFlags::EVENT_WRITE;
+    }
+
+    /*TODO: support more EPOLL flags
+    let unsupported = !(EPOLLIN | EPOLLOUT);
+    if epoll & unsupported != 0 {
+        eprintln!("epoll unsupported flags 0x{:X}", epoll & unsupported);
+    }
+    */
+
+    event_flags
+}
+
+fn event_flags_to_epoll(flags: syscall::EventFlags) -> c_uint {
+    let mut epoll = 0;
+
+    if flags.contains(syscall::EventFlags::EVENT_READ) {
+        epoll |= EPOLLIN;
+    }
+
+    if flags.contains(syscall::EventFlags::EVENT_WRITE) {
+        epoll |= EPOLLOUT;
+    }
+
+    epoll
+}
+
 impl PalEpoll for Sys {
     fn epoll_create1(flags: c_int) -> c_int {
-        Sys::open(c_str!("event:"), O_RDWR | flags, 0)
+        Sys::open(c_str!("/scheme/event"), O_RDWR | flags, 0)
     }
 
     fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> c_int {
         match op {
             EPOLL_CTL_ADD | EPOLL_CTL_MOD => {
-                Sys::write(
+                if Sys::write(
                     epfd,
                     &Event {
                         id: fd as usize,
-                        flags: syscall::EventFlags::from_bits(unsafe { (*event).events as usize })
-                            .expect("epoll: invalid bit pattern"),
+                        flags: unsafe { epoll_to_event_flags((*event).events) },
                         // NOTE: Danger when using something smaller than 64-bit
                         // systems. If this is needed, use a box or something
                         data: unsafe { (*event).data.u64 as usize },
                     },
-                ) as c_int
+                )
+                .or_minus_one_errno()
+                    < 0
+                {
+                    -1
+                } else {
+                    0
+                }
             }
             EPOLL_CTL_DEL => {
-                Sys::write(
+                if Sys::write(
                     epfd,
                     &Event {
                         id: fd as usize,
@@ -44,11 +86,18 @@ impl PalEpoll for Sys {
                         //TODO: Is data required?
                         data: 0,
                     },
-                ) as c_int
+                )
+                .or_minus_one_errno()
+                    < 0
+                {
+                    -1
+                } else {
+                    0
+                }
             }
             _ => {
                 platform::ERRNO.set(EINVAL);
-                return -1;
+                -1
             }
         }
     }
@@ -69,7 +118,7 @@ impl PalEpoll for Sys {
         }
 
         let timer_opt = if timeout != -1 {
-            match File::open(c_str!("time:4"), O_RDWR) {
+            match File::open(c_str!("/scheme/time/4"), O_RDWR) {
                 Err(_) => return -1,
                 Ok(mut timer) => {
                     if Sys::write(
@@ -79,7 +128,9 @@ impl PalEpoll for Sys {
                             flags: EVENT_READ,
                             data: 0,
                         },
-                    ) == -1
+                    )
+                    .or_minus_one_errno()
+                        == -1
                     {
                         return -1;
                     }
@@ -106,7 +157,8 @@ impl PalEpoll for Sys {
                 events as *mut u8,
                 maxevents as usize * mem::size_of::<syscall::Event>(),
             )
-        });
+        })
+        .or_minus_one_errno(); // TODO
         if bytes_read == -1 {
             return -1;
         }
@@ -125,7 +177,7 @@ impl PalEpoll for Sys {
                     }
                 }
                 *target_ptr = epoll_event {
-                    events: event.flags.bits() as _,
+                    events: event_flags_to_epoll(event.flags),
                     data: epoll_data {
                         u64: event.data as u64,
                     },

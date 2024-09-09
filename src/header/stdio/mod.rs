@@ -278,9 +278,15 @@ pub unsafe extern "C" fn clearerr(stream: *mut FILE) {
     stream.flags &= !(F_EOF | F_ERR);
 }
 
-// #[no_mangle]
-pub extern "C" fn ctermid(_s: *mut c_char) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn ctermid(s: *mut c_char) -> *mut c_char {
+    static mut TERMID: [u8; L_ctermid] = *b"/dev/tty\0";
+
+    if s.is_null() {
+        return TERMID.as_mut_ptr() as *mut c_char;
+    }
+
+    strncpy(s, TERMID.as_mut_ptr() as *mut c_char, L_ctermid)
 }
 
 // #[no_mangle]
@@ -1183,6 +1189,21 @@ pub unsafe extern "C" fn fprintf(
     mut __valist: ...
 ) -> c_int {
     vfprintf(file, format, __valist.as_va_list())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn vdprintf(fd: c_int, format: *const c_char, ap: va_list) -> c_int {
+    let mut f = File::new(fd);
+
+    // We don't want to close the file on drop; we're merely
+    // borrowing the file descriptor here
+    f.reference = true;
+
+    printf::printf(f, format, ap)
+}
+#[no_mangle]
+pub unsafe extern "C" fn dprintf(fd: c_int, format: *const c_char, mut __valist: ...) -> c_int {
+    vdprintf(fd, format, __valist.as_va_list())
 }
 
 #[no_mangle]

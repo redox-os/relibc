@@ -9,6 +9,7 @@ fi
 
 symbols_file=`mktemp`
 special_syms=(
+    __rdl_oom
     __rg_alloc
     __rg_alloc_zeroed
     __rg_dealloc

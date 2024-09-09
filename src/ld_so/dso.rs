@@ -1,7 +1,7 @@
 use super::{
     debug::{RTLDDebug, _r_debug},
     linker::Symbol,
-    tcb::{round_up, Master},
+    tcb::Master,
 };
 use crate::{
     header::{errno::STR_ERROR, sys_mman},
@@ -170,7 +170,7 @@ impl DSO {
             for ph in elf.program_headers.iter() {
                 let voff = ph.p_vaddr % ph.p_align;
                 let vaddr = (ph.p_vaddr - voff) as usize;
-                let vsize = round_up((ph.p_memsz + voff) as usize, ph.p_align as usize);
+                let vsize = ((ph.p_memsz + voff) as usize).next_multiple_of(ph.p_align as usize);
 
                 match ph.p_type {
                     program_header::PT_DYNAMIC => {
@@ -253,7 +253,7 @@ impl DSO {
         for ph in elf.program_headers.iter() {
             let voff = ph.p_vaddr % ph.p_align;
             let vaddr = (ph.p_vaddr - voff) as usize;
-            let vsize = round_up((ph.p_memsz + voff) as usize, ph.p_align as usize);
+            let vsize = ((ph.p_memsz + voff) as usize).next_multiple_of(ph.p_align as usize);
 
             match ph.p_type {
                 program_header::PT_LOAD => {
