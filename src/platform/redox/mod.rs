@@ -1,17 +1,26 @@
-use core::{convert::TryFrom, mem, ptr, slice, str};
+use core::{
+    convert::TryFrom,
+    mem::{self, size_of},
+    ptr, slice, str,
+};
 use redox_rt::RtTcb;
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
+    dirent::{DirentHeader, DirentKind},
     Error, PtraceEvent, Result, EMFILE,
 };
 
 use crate::{
     c_str::{CStr, CString},
+    error::{self, Errno, ResultExt},
     fs::File,
     header::{
         dirent::dirent,
-        errno::{EBADF, EBADFD, EBADR, EINVAL, EIO, ENOENT, ENOMEM, ENOSYS, EPERM, ERANGE},
+        errno::{
+            EBADF, EBADFD, EBADR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS, EOPNOTSUPP,
+            EPERM, ERANGE,
+        },
         fcntl, limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
@@ -25,7 +34,6 @@ use crate::{
         unistd::{F_OK, R_OK, W_OK, X_OK},
     },
     io::{self, prelude::*, BufReader},
-    pthread::{self, Errno, ResultExt},
 };
 
 pub use redox_rt::proc::FdGuard;
@@ -294,12 +302,14 @@ impl Pal for Sys {
         unsafe { e(libredox::fstatvfs(fildes as usize, buf).map(|()| 0)) as c_int }
     }
 
-    fn fsync(fd: c_int) -> c_int {
-        e(syscall::fsync(fd as usize)) as c_int
+    fn fsync(fd: c_int) -> Result<(), Errno> {
+        syscall::fsync(fd as usize)?;
+        Ok(())
     }
 
-    fn ftruncate(fd: c_int, len: off_t) -> c_int {
-        e(syscall::ftruncate(fd as usize, len as usize)) as c_int
+    fn ftruncate(fd: c_int, len: off_t) -> Result<(), Errno> {
+        syscall::ftruncate(fd as usize, len as usize)?;
+        Ok(())
     }
 
     #[inline]
@@ -307,7 +317,7 @@ impl Pal for Sys {
         addr: *mut u32,
         val: u32,
         deadline: Option<&timespec>,
-    ) -> Result<(), pthread::Errno> {
+    ) -> Result<(), Errno> {
         let deadline = deadline.map(|d| syscall::TimeSpec {
             tv_sec: d.tv_sec,
             tv_nsec: d.tv_nsec as i32,
@@ -316,7 +326,7 @@ impl Pal for Sys {
         Ok(())
     }
     #[inline]
-    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, pthread::Errno> {
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, Errno> {
         Ok(redox_rt::sys::sys_futex_wake(addr, num)?)
     }
 
@@ -351,97 +361,74 @@ impl Pal for Sys {
         buf
     }
 
-    fn getdents(fd: c_int, mut dirents: *mut dirent, max_bytes: usize) -> c_int {
-        //TODO: rewrite this code. Originally the *dirents = dirent { ... } stuff below caused
-        // massive issues. This has been hacked around, but it still isn't perfect
+    fn getdents(fd: c_int, buf: &mut [u8], opaque: u64) -> Result<usize, Errno> {
+        //println!("GETDENTS {} into ({:p}+{})", fd, buf.as_ptr(), buf.len());
 
-        // Get initial reading position
-        let mut read = match syscall::lseek(fd as usize, 0, syscall::SEEK_CUR) {
-            Ok(pos) => pos as isize,
-            Err(err) => return -err.errno,
-        };
+        const HEADER_SIZE: usize = size_of::<DirentHeader>();
 
-        let mut written = 0;
-        let mut buf = [0; 1024];
-
-        let mut name = [0; 256];
-        let mut i = 0;
-
-        let mut flush = |written: &mut usize, i: &mut usize, name: &mut [c_char; 256]| {
-            if *i < name.len() {
-                // Set NUL byte
-                name[*i] = 0;
-            }
-            // Get size: full size - unused bytes
-            if *written + mem::size_of::<dirent>() > max_bytes {
-                // Seek back to after last read entry and return
-                match syscall::lseek(fd as usize, read, syscall::SEEK_SET) {
-                    Ok(_) => return Some(*written as c_int),
-                    Err(err) => return Some(-err.errno),
-                }
-            }
-            let size = mem::size_of::<dirent>() - name.len().saturating_sub(*i + 1);
-            unsafe {
-                //This is the offending code mentioned above
-                *dirents = dirent {
-                    d_ino: 0,
-                    d_off: read as off_t,
-                    d_reclen: size as c_ushort,
-                    d_type: 0,
-                    d_name: *name,
-                };
-                dirents = (dirents as *mut u8).offset(size as isize) as *mut dirent;
-            }
-            read += *i as isize + /* newline */ 1;
-            *written += size;
-            *i = 0;
-            None
-        };
-
-        loop {
-            // Read a chunk from the directory
-            let len = match syscall::read(fd as usize, &mut buf) {
-                Ok(0) => {
-                    if i > 0 {
-                        if let Some(value) = flush(&mut written, &mut i, &mut name) {
-                            return value;
-                        }
-                    }
-                    return written as c_int;
-                }
-                Ok(n) => n,
-                Err(err) => return -err.errno,
-            };
-
-            // Handle everything
-            let mut start = 0;
-            while start < len {
-                let buf = &buf[start..len];
-
-                // Copy everything up until a newline
-                let newline = buf.iter().position(|&c| c == b'\n');
-                let pre_len = newline.unwrap_or(buf.len());
-                let post_len = newline.map(|i| i + 1).unwrap_or(buf.len());
-                if i < pre_len {
-                    // Reserve space for NUL byte
-                    let name_len = name.len() - 1;
-                    let name = &mut name[i..name_len];
-                    let copy = pre_len.min(name.len());
-                    let buf = unsafe { slice::from_raw_parts(buf.as_ptr() as *const c_char, copy) };
-                    name[..copy].copy_from_slice(buf);
-                }
-
-                i += pre_len;
-                start += post_len;
-
-                // Write the directory entry
-                if newline.is_some() {
-                    if let Some(value) = flush(&mut written, &mut i, &mut name) {
-                        return value;
-                    }
-                }
+        // Use syscall if it exists.
+        match unsafe {
+            syscall::syscall5(
+                syscall::SYS_GETDENTS,
+                fd as usize,
+                buf.as_mut_ptr() as usize,
+                buf.len(),
+                HEADER_SIZE,
+                opaque as usize,
+            )
+        } {
+            Err(Error {
+                errno: EOPNOTSUPP | ENOSYS,
+            }) => (),
+            other => {
+                //println!("REAL GETDENTS {:?}", other);
+                return Ok(other?);
             }
         }
+
+        // Otherwise, for legacy schemes, assume the buffer is pre-arranged (all schemes do this in
+        // practice), and just read the name. If multiple names appear, pretend it didn't happen
+        // and just use the first entry.
+
+        let (header, name) = buf.split_at_mut(size_of::<DirentHeader>());
+
+        let bytes_read = Sys::pread(fd, name, opaque as i64)? as usize;
+        if bytes_read == 0 {
+            return Ok(0);
+        }
+
+        let (name_len, advance) = match name[..bytes_read].iter().position(|c| *c == b'\n') {
+            Some(idx) => (idx, idx + 1),
+
+            // Insufficient space for NUL byte, or entire entry was not read. Indicate we need a
+            // larger buffer.
+            None if bytes_read == name.len() => return Err(Errno(EINVAL)),
+
+            None => (bytes_read, name.len()),
+        };
+        name[name_len] = b'\0';
+
+        let record_len = u16::try_from(size_of::<DirentHeader>() + name_len + 1)
+            .map_err(|_| Error::new(ENAMETOOLONG))?;
+        header.copy_from_slice(&DirentHeader {
+            inode: 0,
+            next_opaque_id: opaque + advance as u64,
+            record_len,
+            kind: DirentKind::Unspecified as u8,
+        });
+        //println!("EMULATED GETDENTS");
+
+        Ok(record_len.into())
+    }
+    fn dir_seek(_fd: c_int, _off: u64) -> Result<(), Errno> {
+        // Redox getdents takes an explicit (opaque) offset, so this is a no-op.
+        Ok(())
+    }
+    // NOTE: fn is unsafe, but this just means we can assume more things. impl is safe
+    unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)> {
+        let mut header = DirentHeader::default();
+        header.copy_from_slice(&this_dent.get(..size_of::<DirentHeader>())?);
+        Some((header.record_len, header.next_opaque_id))
     }
 
     fn getegid() -> gid_t {
@@ -777,31 +764,26 @@ impl Pal for Sys {
         }
     }
 
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> c_int {
-        let path = path_from_c_str!(path);
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int, Errno> {
+        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
 
-        e(libredox::open(path, oflag, mode)) as c_int
+        Ok(libredox::open(path, oflag, mode)? as c_int)
     }
 
     fn pipe2(fds: &mut [c_int], flags: c_int) -> c_int {
         e(extra::pipe2(fds, flags as usize).map(|()| 0)) as c_int
     }
 
-    unsafe fn rlct_clone(
-        stack: *mut usize,
-    ) -> Result<crate::pthread::OsTid, crate::pthread::Errno> {
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, Errno> {
         let _guard = clone::rdlock();
         let res = clone::rlct_clone_impl(stack);
 
         res.map(|mut fd| crate::pthread::OsTid {
             thread_fd: fd.take(),
         })
-        .map_err(|error| crate::pthread::Errno(error.errno))
+        .map_err(|error| Errno(error.errno))
     }
-    unsafe fn rlct_kill(
-        os_tid: crate::pthread::OsTid,
-        signal: usize,
-    ) -> Result<(), crate::pthread::Errno> {
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), Errno> {
         redox_rt::sys::posix_kill_thread(os_tid.thread_fd, signal as u32)?;
         Ok(())
     }

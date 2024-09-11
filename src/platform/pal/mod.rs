@@ -1,6 +1,7 @@
 use super::types::*;
 use crate::{
     c_str::CStr,
+    error::Errno,
     header::{
         dirent::dirent,
         sys_resource::rlimit,
@@ -10,7 +11,7 @@ use crate::{
         sys_utsname::utsname,
         time::timespec,
     },
-    pthread::{self, Errno},
+    pthread,
 };
 
 pub use self::epoll::PalEpoll;
@@ -75,16 +76,16 @@ pub trait Pal {
 
     fn fpath(fildes: c_int, out: &mut [u8]) -> ssize_t;
 
-    fn fsync(fildes: c_int) -> c_int;
+    fn fsync(fildes: c_int) -> Result<(), Errno>;
 
-    fn ftruncate(fildes: c_int, length: off_t) -> c_int;
+    fn ftruncate(fildes: c_int, length: off_t) -> Result<(), Errno>;
 
     unsafe fn futex_wait(
         addr: *mut u32,
         val: u32,
         deadline: Option<&timespec>,
-    ) -> Result<(), pthread::Errno>;
-    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, pthread::Errno>;
+    ) -> Result<(), Errno>;
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, Errno>;
 
     fn futimens(fd: c_int, times: *const timespec) -> c_int;
 
@@ -92,7 +93,13 @@ pub trait Pal {
 
     fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char;
 
-    fn getdents(fd: c_int, dirents: *mut dirent, bytes: usize) -> c_int;
+    fn getdents(fd: c_int, buf: &mut [u8], opaque_offset: u64) -> Result<usize, Errno>;
+    fn dir_seek(fd: c_int, opaque_offset: u64) -> Result<(), Errno>;
+
+    // SAFETY: This_dent must satisfy platform-specific size and alignment constraints. On Linux,
+    // this means the buffer came from a valid getdents64 invocation, whereas on Redox, every
+    // possible this_dent slice is safe (and will be validated).
+    unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)>;
 
     fn getegid() -> gid_t;
 
@@ -178,16 +185,13 @@ pub trait Pal {
 
     fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int;
 
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> c_int;
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int, Errno>;
 
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int;
 
-    unsafe fn rlct_clone(stack: *mut usize)
-        -> Result<crate::pthread::OsTid, crate::pthread::Errno>;
-    unsafe fn rlct_kill(
-        os_tid: crate::pthread::OsTid,
-        signal: usize,
-    ) -> Result<(), crate::pthread::Errno>;
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, Errno>;
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), Errno>;
+
     fn current_os_tid() -> crate::pthread::OsTid;
 
     fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno>;

@@ -6,9 +6,6 @@ style = "Type"
 no_includes = true
 cpp_compat = true
 
-[defines]
-"target_pointer_width=64" = "__LP64__"
-
 [enum]
 prefix_with_name = true
 

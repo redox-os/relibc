@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::pthread::Errno;
+use crate::error::Errno;
 
 // PTHREAD_MUTEX_INITIALIZER is defined in bits_pthread/cbindgen.toml
 

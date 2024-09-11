@@ -3,8 +3,8 @@ use alloc::vec::Vec;
 use crate::platform::{types::*, Pal, Sys};
 
 use crate::{
+    error::ResultExt,
     header::unistd::{lseek, SEEK_SET},
-    pthread::ResultExt,
 };
 /// Implements an `Iterator` which returns on either newline or EOF.
 #[derive(Clone)]

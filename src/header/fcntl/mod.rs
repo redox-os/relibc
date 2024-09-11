@@ -2,6 +2,7 @@
 
 use crate::{
     c_str::CStr,
+    error::ResultExt,
     platform::{types::*, Pal, Sys},
 };
 
@@ -68,7 +69,7 @@ pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: .
     };
 
     let path = CStr::from_ptr(path);
-    Sys::open(path, oflag, mode)
+    Sys::open(path, oflag, mode).or_minus_one_errno()
 }
 
 #[no_mangle]

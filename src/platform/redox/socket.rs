@@ -7,6 +7,7 @@ use super::{
     e, Sys,
 };
 use crate::{
+    error::ResultExt,
     header::{
         arpa_inet::inet_aton,
         netinet_in::{in_addr, in_port_t, sockaddr_in},
@@ -15,7 +16,6 @@ use crate::{
         sys_time::timeval,
         sys_un::sockaddr_un,
     },
-    pthread::ResultExt,
 };
 
 macro_rules! bind_or_connect {

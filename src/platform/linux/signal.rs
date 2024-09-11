@@ -5,12 +5,12 @@ use super::{
     e, e_raw, Sys,
 };
 use crate::{
+    error::Errno,
     header::{
         signal::{sigaction, siginfo_t, sigset_t, stack_t, NSIG, SA_RESTORER},
         sys_time::itimerval,
         time::timespec,
     },
-    pthread::Errno,
 };
 
 impl PalSignal for Sys {

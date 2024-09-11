@@ -7,6 +7,7 @@ use super::{
     e, Sys,
 };
 use crate::{
+    error::Errno,
     header::{
         errno::{EINVAL, ENOSYS},
         signal::{
@@ -17,7 +18,6 @@ use crate::{
         time::timespec,
     },
     platform::ERRNO,
-    pthread::Errno,
 };
 
 impl PalSignal for Sys {

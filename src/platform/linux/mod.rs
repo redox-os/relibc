@@ -1,5 +1,5 @@
 use crate::io::Write;
-use core::{arch::asm, ptr};
+use core::{arch::asm, mem::offset_of, ptr};
 
 use super::{types::*, Pal, ERRNO};
 use crate::{
@@ -12,11 +12,12 @@ use crate::header::{
     sys_stat::stat,
     sys_statvfs::statvfs,
     sys_time::{timeval, timezone},
+    unistd::SEEK_SET,
 };
 // use header::sys_times::tms;
 use crate::{
+    error::Errno,
     header::{sys_utsname::utsname, time::timespec},
-    pthread::Errno,
 };
 
 mod epoll;
@@ -230,12 +231,12 @@ impl Pal for Sys {
         Self::readlink(CStr::from_bytes_with_nul(&proc_path).unwrap(), out)
     }
 
-    fn fsync(fildes: c_int) -> c_int {
-        e(unsafe { syscall!(FSYNC, fildes) }) as c_int
+    fn fsync(fildes: c_int) -> Result<(), Errno> {
+        e_raw(unsafe { syscall!(FSYNC, fildes) }).map(|_| ())
     }
 
-    fn ftruncate(fildes: c_int, length: off_t) -> c_int {
-        e(unsafe { syscall!(FTRUNCATE, fildes, length) }) as c_int
+    fn ftruncate(fildes: c_int, length: off_t) -> Result<(), Errno> {
+        e_raw(unsafe { syscall!(FTRUNCATE, fildes, length) }).map(|_| ())
     }
 
     #[inline]
@@ -243,7 +244,7 @@ impl Pal for Sys {
         addr: *mut u32,
         val: u32,
         deadline: Option<&timespec>,
-    ) -> Result<(), crate::pthread::Errno> {
+    ) -> Result<(), Errno> {
         let deadline = deadline.map_or(0, |d| d as *const _ as usize);
         e_raw(unsafe {
             syscall!(
@@ -281,8 +282,16 @@ impl Pal for Sys {
         }
     }
 
-    fn getdents(fd: c_int, dirents: *mut dirent, bytes: usize) -> c_int {
-        unsafe { syscall!(GETDENTS64, fd, dirents, bytes) as c_int }
+    fn getdents(fd: c_int, buf: &mut [u8], _off: u64) -> Result<usize, Errno> {
+        e_raw(unsafe { syscall!(GETDENTS64, fd, buf.as_mut_ptr(), buf.len()) })
+    }
+    fn dir_seek(fd: c_int, off: u64) -> Result<(), Errno> {
+        e_raw(unsafe { syscall!(LSEEK, fd, off, SEEK_SET) })?;
+        Ok(())
+    }
+    unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)> {
+        let dent = this_dent.as_ptr().cast::<dirent>();
+        Some(((*dent).d_reclen, (*dent).d_off as u64))
     }
 
     fn getegid() -> gid_t {
@@ -450,8 +459,9 @@ impl Pal for Sys {
         e(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }) as c_int
     }
 
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> c_int {
-        e(unsafe { syscall!(OPENAT, AT_FDCWD, path.as_ptr(), oflag, mode) }) as c_int
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int, Errno> {
+        e_raw(unsafe { syscall!(OPENAT, AT_FDCWD, path.as_ptr(), oflag, mode) })
+            .map(|fd| fd as c_int)
     }
 
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int {

@@ -2,6 +2,7 @@
 
 use crate::{
     c_str::CStr,
+    error::ResultExt,
     header::fcntl::O_PATH,
     platform::{types::*, Pal, Sys},
 };
@@ -33,7 +34,8 @@ pub extern "C" fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn statvfs(file: *const c_char, buf: *mut statvfs) -> c_int {
     let file = CStr::from_ptr(file);
-    let fd = Sys::open(file, O_PATH, 0);
+    // TODO: Rustify
+    let fd = Sys::open(file, O_PATH, 0).or_minus_one_errno();
     if fd < 0 {
         return -1;
     }

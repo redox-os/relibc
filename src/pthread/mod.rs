@@ -10,6 +10,7 @@ use core::{
 use alloc::{boxed::Box, collections::BTreeMap};
 
 use crate::{
+    error::Errno,
     header::{errno::*, pthread as header, sched::sched_param, sys_mman},
     ld_so::{
         linker::Linker,
@@ -81,39 +82,6 @@ pub struct OsTid {
 
 unsafe impl Send for Pthread {}
 unsafe impl Sync for Pthread {}
-
-/// Positive error codes (EINVAL, not -EINVAL).
-#[derive(Debug, Eq, PartialEq)]
-// TODO: Move to a more generic place.
-pub struct Errno(pub c_int);
-
-#[cfg(target_os = "redox")]
-impl From<syscall::Error> for Errno {
-    fn from(value: syscall::Error) -> Self {
-        Errno(value.errno)
-    }
-}
-#[cfg(target_os = "redox")]
-impl From<Errno> for syscall::Error {
-    fn from(value: Errno) -> Self {
-        syscall::Error::new(value.0)
-    }
-}
-
-pub trait ResultExt<T> {
-    fn or_minus_one_errno(self) -> T;
-}
-impl<T: From<i8>> ResultExt<T> for Result<T, Errno> {
-    fn or_minus_one_errno(self) -> T {
-        match self {
-            Self::Ok(v) => v,
-            Self::Err(Errno(errno)) => unsafe {
-                crate::platform::ERRNO.set(errno);
-                T::from(-1)
-            },
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Retval(pub *mut c_void);

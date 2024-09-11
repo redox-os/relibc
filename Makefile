@@ -62,14 +62,22 @@ BUILTINS_VERSION=0.1.70
 all: | headers libs
 
 headers: $(HEADERS_DEPS)
+	globdefs="$$(cat cbindgen.globdefs.toml)"; \
 	for header in $(HEADERS_UNPARSED); do \
+		echo "Header $$header"; \
 		if test -f "src/header/$$header/cbindgen.toml"; then \
-		out=`echo "$$header" | sed 's/_/\//g'`; \
-		out="$(TARGET_HEADERS)/$$out.h"; \
-		cbindgen --output "$$out" \
-			--config="src/header/$$header/cbindgen.toml" \
-			"src/header/$$header/mod.rs"; \
-		sed -i "s/va_list __valist/.../g" "$$out"; \
+			out=`echo "$$header" | sed 's/_/\//g'`; \
+			out="$(TARGET_HEADERS)/$$out.h"; \
+			header_path="src/header/$$header/cbindgen.toml"; \
+			if ( grep -F '[defines]' "$$header_path" >/dev/null ); then \
+				config=$$(cat "$$header_path" | sed "s/\[defines\]/$$globdefs/"); \
+			else \
+				config=$$(cat "$$header_path" cbindgen.globdefs.toml); \
+			fi; \
+			echo "$$config" \
+				 | tee "/tmp/a$$header.log" \
+				 | cbindgen "src/header/$$header/mod.rs" --config=/dev/stdin --output "$$out"; \
+			sed -i "s/va_list __valist/.../g" "$$out"; \
 		fi \
 	done
 

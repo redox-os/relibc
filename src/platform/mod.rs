@@ -1,6 +1,6 @@
 use crate::{
+    error::ResultExt,
     io::{self, Read, Write},
-    pthread::ResultExt,
 };
 use alloc::{boxed::Box, vec::Vec};
 use core::{cell::Cell, fmt, ptr};

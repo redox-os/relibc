@@ -12,6 +12,7 @@
 #![feature(maybe_uninit_slice)]
 #![feature(maybe_uninit_uninit_array)]
 #![feature(lang_items)]
+#![feature(let_chains)]
 #![feature(linkage)]
 #![feature(stmt_expr_attributes)]
 #![feature(str_internals)]
@@ -47,6 +48,7 @@ pub mod c_str;
 pub mod c_vec;
 pub mod cxa;
 pub mod db;
+pub mod error;
 pub mod fs;
 pub mod header;
 pub mod io;

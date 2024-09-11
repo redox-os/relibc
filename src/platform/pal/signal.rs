@@ -1,11 +1,11 @@
 use super::super::{types::*, Pal};
 use crate::{
+    error::Errno,
     header::{
         signal::{sigaction, siginfo_t, sigset_t, stack_t},
         sys_time::itimerval,
         time::timespec,
     },
-    pthread::Errno,
 };
 
 pub trait PalSignal: Pal {

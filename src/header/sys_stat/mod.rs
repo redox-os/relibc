@@ -2,6 +2,7 @@
 
 use crate::{
     c_str::CStr,
+    error::ResultExt,
     header::{
         fcntl::{O_NOFOLLOW, O_PATH},
         time::timespec,
@@ -93,7 +94,8 @@ pub extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = CStr::from_ptr(path);
-    let fd = Sys::open(path, O_PATH | O_NOFOLLOW, 0);
+    // TODO: Rustify
+    let fd = Sys::open(path, O_PATH | O_NOFOLLOW, 0).or_minus_one_errno();
     if fd < 0 {
         return -1;
     }
@@ -137,7 +139,8 @@ pub unsafe extern "C" fn mknodat(
 #[no_mangle]
 pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     let file = CStr::from_ptr(file);
-    let fd = Sys::open(file, O_PATH, 0);
+    // TODO: Rustify
+    let fd = Sys::open(file, O_PATH, 0).or_minus_one_errno();
     if fd < 0 {
         return -1;
     }

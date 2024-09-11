@@ -4,11 +4,11 @@ use super::{
 };
 
 use crate::{
+    error::ResultExt,
     fs::File,
     header::{errno::*, fcntl::*, signal::sigset_t, sys_epoll::*},
     io::prelude::*,
     platform,
-    pthread::ResultExt,
 };
 use core::{mem, slice};
 use syscall::{
@@ -53,7 +53,7 @@ fn event_flags_to_epoll(flags: syscall::EventFlags) -> c_uint {
 
 impl PalEpoll for Sys {
     fn epoll_create1(flags: c_int) -> c_int {
-        Sys::open(c_str!("/scheme/event"), O_RDWR | flags, 0)
+        Sys::open(c_str!("/scheme/event"), O_RDWR | flags, 0).or_minus_one_errno()
     }
 
     fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> c_int {
