@@ -28,7 +28,7 @@ impl<T> Waitval<T> {
     // SAFETY: Caller must ensure both (1) that the value has not yet been initialized, and (2)
     // that this is never run by more than one thread simultaneously.
     pub unsafe fn post(&self, value: T) {
-        self.value.get().write(MaybeUninit::new(value));
+        unsafe { self.value.get().write(MaybeUninit::new(value)) };
         self.state.store(1, Ordering::Release);
         crate::sync::futex_wake(&self.state, i32::MAX);
     }

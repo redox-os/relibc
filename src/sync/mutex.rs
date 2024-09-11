@@ -76,8 +76,8 @@ impl<T> Mutex<T> {
     /// on failure. You should probably not worry about this, it's used for
     /// internal optimizations.
     pub unsafe fn manual_try_lock(&self) -> Result<&mut T, c_int> {
-        if manual_try_lock_generic(&self.lock) {
-            Ok(&mut *self.content.get())
+        if unsafe { manual_try_lock_generic(&self.lock) } {
+            Ok(unsafe { &mut *self.content.get() })
         } else {
             Err(0)
         }
@@ -86,12 +86,12 @@ impl<T> Mutex<T> {
     /// your responsibility to unlock it after usage. Mostly useful for FFI:
     /// Prefer normal .lock() where possible.
     pub unsafe fn manual_lock(&self) -> &mut T {
-        manual_lock_generic(&self.lock);
-        &mut *self.content.get()
+        unsafe { manual_lock_generic(&self.lock) };
+        unsafe { &mut *self.content.get() }
     }
     /// Unlock the mutex, if it's locked.
     pub unsafe fn manual_unlock(&self) {
-        manual_unlock_generic(&self.lock)
+        unsafe { manual_unlock_generic(&self.lock) }
     }
     pub fn as_ptr(&self) -> *mut T {
         self.content.get()
