@@ -428,6 +428,12 @@ impl Pal for Sys {
     unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)> {
         let mut header = DirentHeader::default();
         header.copy_from_slice(&this_dent.get(..size_of::<DirentHeader>())?);
+
+        // If scheme does not send a NUL byte, this shouldn't be able to cause UB for the caller.
+        if this_dent.get(usize::from(header.record_len) - 1) != Some(&b'\0') {
+            return None;
+        }
+
         Some((header.record_len, header.next_opaque_id))
     }
 
