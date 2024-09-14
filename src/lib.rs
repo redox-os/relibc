@@ -26,6 +26,8 @@
 #![allow(clippy::mut_from_ref)]
 // TODO: fix these
 #![warn(unaligned_references)]
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
 
 #[macro_use]
 extern crate alloc;
