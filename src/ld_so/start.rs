@@ -24,9 +24,9 @@ use goblin::elf::header::header64::SIZEOF_EHDR;
 unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
     //traverse the stack and collect argument vector
     let mut argv = Vec::new();
-    while *ptr != 0 {
-        let arg = *ptr;
-        match CStr::from_ptr(arg as *const c_char).to_str() {
+    while unsafe { *ptr } != 0 {
+        let arg = unsafe { *ptr };
+        match unsafe { CStr::from_ptr(arg as *const c_char) }.to_str() {
             Ok(arg_str) => argv.push(arg_str.to_owned()),
             _ => {
                 eprintln!("ld.so: failed to parse argv[{}]", argv.len());
@@ -34,7 +34,7 @@ unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
                 loop {}
             }
         }
-        ptr = ptr.add(1);
+        ptr = unsafe { ptr.add(1) };
     }
     return (argv, ptr);
 }
@@ -42,9 +42,9 @@ unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
 unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const usize) {
     //traverse the stack and collect argument environment variables
     let mut envs = BTreeMap::new();
-    while *ptr != 0 {
-        let env = *ptr;
-        if let Ok(arg_str) = CStr::from_ptr(env as *const c_char).to_str() {
+    while unsafe { *ptr } != 0 {
+        let env = unsafe { *ptr };
+        if let Ok(arg_str) = unsafe { CStr::from_ptr(env as *const c_char) }.to_str() {
             let mut parts = arg_str.splitn(2, '=');
             if let Some(key) = parts.next() {
                 if let Some(value) = parts.next() {
@@ -52,7 +52,7 @@ unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const us
                 }
             }
         }
-        ptr = ptr.add(1);
+        ptr = unsafe { ptr.add(1) };
     }
     return (envs, ptr);
 }
@@ -62,9 +62,9 @@ unsafe fn adjust_stack(sp: &'static mut Stack) {
 
     // Move arguments
     loop {
-        let next_argv = argv.add(1);
-        let arg = *next_argv;
-        *argv = arg;
+        let next_argv = unsafe { argv.add(1) };
+        let arg = unsafe { *next_argv };
+        unsafe { *argv = arg };
         argv = next_argv;
         if arg == 0 {
             break;
@@ -73,14 +73,14 @@ unsafe fn adjust_stack(sp: &'static mut Stack) {
 
     // Move environment
     loop {
-        let next_argv = argv.add(1);
-        let arg = *next_argv;
-        *argv = arg;
+        let next_argv = unsafe { argv.add(1) };
+        let arg = unsafe { *next_argv };
+        unsafe { *argv = arg };
         argv = next_argv;
         if arg == 0 {
             break;
         }
-        if let Ok(arg_str) = CStr::from_ptr(arg as *const c_char).to_str() {
+        if let Ok(arg_str) = unsafe { CStr::from_ptr(arg as *const c_char) }.to_str() {
             let mut parts = arg_str.splitn(2, '=');
             if let Some(key) = parts.next() {
                 if let Some(value) = parts.next() {
@@ -94,13 +94,13 @@ unsafe fn adjust_stack(sp: &'static mut Stack) {
 
     // Move auxiliary vectors
     loop {
-        let next_argv = argv.add(1);
-        let kind = *next_argv;
-        *argv = kind;
+        let next_argv = unsafe { argv.add(1) };
+        let kind = unsafe { *next_argv };
+        unsafe { *argv = kind };
         argv = next_argv;
-        let next_argv = argv.add(1);
-        let value = *next_argv;
-        *argv = value;
+        let next_argv = unsafe { argv.add(1) };
+        let value = unsafe { *next_argv };
+        unsafe { *argv = value };
         argv = next_argv;
         if kind == 0 {
             break;

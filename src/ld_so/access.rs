@@ -17,7 +17,7 @@ pub fn accessible(path: &str, mode: c_int) -> c_int {
 
 #[cfg(target_os = "linux")]
 unsafe fn access(path: *const c_char, mode: c_int) -> c_int {
-    let path = CStr::from_ptr(path);
+    let path = unsafe { CStr::from_ptr(path) };
     syscall!(ACCESS, (path).as_ptr(), mode) as c_int
 }
 
