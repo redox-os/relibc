@@ -26,19 +26,19 @@ impl File {
     }
 
     pub fn open(path: CStr, oflag: c_int) -> Result<Self, Errno> {
-        Sys::open(path, oflag, 0).map(Self::new)
+        Sys::open(path, oflag, 0).map(Self::new).map_err(Errno::sync)
     }
 
     pub fn create(path: CStr, oflag: c_int, mode: mode_t) -> Result<Self, Errno> {
-        Sys::open(path, oflag | O_CREAT, mode).map(Self::new)
+        Sys::open(path, oflag | O_CREAT, mode).map(Self::new).map_err(Errno::sync)
     }
 
     pub fn sync_all(&self) -> Result<(), Errno> {
-        Sys::fsync(self.fd)
+        Sys::fsync(self.fd).map_err(Errno::sync)
     }
 
     pub fn set_len(&self, size: u64) -> Result<(), Errno> {
-        Sys::ftruncate(self.fd, size as off_t)
+        Sys::ftruncate(self.fd, size as off_t).map_err(Errno::sync)
     }
 
     pub fn try_clone(&self) -> io::Result<Self> {

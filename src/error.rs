@@ -7,6 +7,13 @@ use crate::{header::errno::STR_ERROR, platform::types::c_int};
 // TODO: Move to a more generic place.
 pub struct Errno(pub c_int);
 
+impl Errno {
+    pub fn sync(self) -> Self {
+        crate::platform::ERRNO.set(self.0);
+        self
+    }
+}
+
 #[cfg(target_os = "redox")]
 impl From<syscall::Error> for Errno {
     #[inline]
