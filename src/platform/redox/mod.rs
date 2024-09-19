@@ -531,10 +531,7 @@ impl Pal for Sys {
 
     fn getrusage(who: c_int, r_usage: &mut rusage) -> c_int {
         //TODO
-        eprintln!(
-            "relibc getrusage({}, {:p}): not implemented",
-            who, r_usage
-        );
+        eprintln!("relibc getrusage({}, {:p}): not implemented", who, r_usage);
         0
     }
 

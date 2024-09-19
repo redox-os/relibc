@@ -26,11 +26,15 @@ impl File {
     }
 
     pub fn open(path: CStr, oflag: c_int) -> Result<Self, Errno> {
-        Sys::open(path, oflag, 0).map(Self::new).map_err(Errno::sync)
+        Sys::open(path, oflag, 0)
+            .map(Self::new)
+            .map_err(Errno::sync)
     }
 
     pub fn create(path: CStr, oflag: c_int, mode: mode_t) -> Result<Self, Errno> {
-        Sys::open(path, oflag | O_CREAT, mode).map(Self::new).map_err(Errno::sync)
+        Sys::open(path, oflag | O_CREAT, mode)
+            .map(Self::new)
+            .map_err(Errno::sync)
     }
 
     pub fn sync_all(&self) -> Result<(), Errno> {

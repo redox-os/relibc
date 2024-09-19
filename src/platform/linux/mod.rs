@@ -4,14 +4,16 @@ use core::{arch::asm, mem::offset_of, ptr};
 use super::{types::*, Pal, ERRNO};
 use crate::{
     c_str::CStr,
-    header::{dirent::dirent, errno::EINVAL, signal::SIGCHLD, sys_stat::S_IFIFO},
-};
-use crate::header::{
-    sys_resource::{rlimit, rusage},
-    sys_stat::stat,
-    sys_statvfs::statvfs,
-    sys_time::{timeval, timezone},
-    unistd::SEEK_SET,
+    header::{
+        dirent::dirent,
+        errno::EINVAL,
+        signal::SIGCHLD,
+        sys_resource::{rlimit, rusage},
+        sys_stat::{stat, S_IFIFO},
+        sys_statvfs::statvfs,
+        sys_time::{timeval, timezone},
+        unistd::SEEK_SET,
+    },
 };
 // use header::sys_times::tms;
 use crate::{
