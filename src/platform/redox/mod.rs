@@ -24,7 +24,7 @@ use crate::{
         fcntl, limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
-        sys_resource::{rlimit, RLIM_INFINITY},
+        sys_resource::{rlimit, rusage, RLIM_INFINITY},
         sys_stat::{stat, S_ISGID, S_ISUID},
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
@@ -527,6 +527,15 @@ impl Pal for Sys {
         );
         ERRNO.set(EPERM);
         -1
+    }
+
+    fn getrusage(who: c_int, r_usage: &mut rusage) -> c_int {
+        //TODO
+        eprintln!(
+            "relibc getrusage({}, {:p}): not implemented",
+            who, r_usage
+        );
+        0
     }
 
     fn getsid(pid: pid_t) -> pid_t {

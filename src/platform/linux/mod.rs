@@ -6,9 +6,8 @@ use crate::{
     c_str::CStr,
     header::{dirent::dirent, errno::EINVAL, signal::SIGCHLD, sys_stat::S_IFIFO},
 };
-// use header::sys_resource::rusage;
 use crate::header::{
-    sys_resource::rlimit,
+    sys_resource::{rlimit, rusage},
     sys_stat::stat,
     sys_statvfs::statvfs,
     sys_time::{timeval, timezone},
@@ -76,10 +75,6 @@ pub fn e(sys: usize) -> usize {
 pub struct Sys;
 
 impl Sys {
-    // fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-    //     e(unsafe { syscall!(GETRUSAGE, who, r_usage) }) as c_int
-    // }
-
     pub unsafe fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
         // TODO: Somehow support varargs to syscall??
         e(syscall!(IOCTL, fd, request, out)) as c_int
@@ -340,6 +335,10 @@ impl Pal for Sys {
 
     unsafe fn setrlimit(resource: c_int, rlimit: *const rlimit) -> c_int {
         e(syscall!(SETRLIMIT, resource, rlimit)) as c_int
+    }
+
+    fn getrusage(who: c_int, r_usage: &mut rusage) -> c_int {
+        e(unsafe { syscall!(GETRUSAGE, who, r_usage) }) as c_int
     }
 
     fn getsid(pid: pid_t) -> pid_t {

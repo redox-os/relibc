@@ -4,7 +4,7 @@ use crate::{
     error::Errno,
     header::{
         dirent::dirent,
-        sys_resource::rlimit,
+        sys_resource::{rlimit, rusage},
         sys_stat::stat,
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
@@ -127,6 +127,8 @@ pub trait Pal {
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int;
 
     unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> c_int;
+
+    fn getrusage(who: c_int, r_usage: &mut rusage) -> c_int;
 
     fn getsid(pid: pid_t) -> pid_t;
 
