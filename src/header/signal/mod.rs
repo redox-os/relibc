@@ -33,6 +33,9 @@ pub const SIG_BLOCK: c_int = 0;
 pub const SIG_UNBLOCK: c_int = 1;
 pub const SIG_SETMASK: c_int = 2;
 
+pub const SI_QUEUE: c_int = -1;
+pub const SI_USER: c_int = 0;
+
 #[repr(C)]
 #[derive(Clone, Debug)]
 /// cbindgen:ignore
@@ -60,6 +63,9 @@ pub struct siginfo {
     _padding: [c_int; 29],
     _si_align: [usize; 0],
 }
+
+#[no_mangle]
+pub extern "C" fn _cbindgen_export_siginfo(a: siginfo) {}
 
 /// cbindgen:ignore
 pub type sigset_t = c_ulonglong;
