@@ -132,6 +132,35 @@ pub unsafe extern "C" fn crypt(key: *const c_char, salt: *const c_char) -> *mut 
 }
 
 #[no_mangle]
+pub extern "C" fn daemon(nochdir: c_int, noclose: c_int) -> c_int {
+    if nochdir == 0 {
+        if Sys::chdir(c_str!("/")) < 0 { return -1; }
+    }
+
+    if noclose == 0 {
+        let fd = Sys::open(c_str!("/dev/null"), fcntl::O_RDWR, 0).or_minus_one_errno();
+        if fd < 0 { return -1; }
+        if dup2(fd, 0) < 0 || dup2(fd, 1) < 0 || dup2(fd, 2) < 0 {
+            close(fd);
+            return -1;
+        }
+        if fd > 2 {
+            close(fd);
+        }
+    }
+
+    match fork() {
+        0 => {},
+        -1 => return -1,
+        _ => _exit(0),
+    }
+
+    if setsid() < 0 { return -1; }
+
+    0
+}
+
+#[no_mangle]
 pub extern "C" fn dup(fildes: c_int) -> c_int {
     Sys::dup(fildes)
 }
