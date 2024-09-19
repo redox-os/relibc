@@ -11,19 +11,19 @@ after_includes = """
 #define PTHREAD_ONCE_INIT ((pthread_once_t){0})
 #define PTHREAD_RWLOCK_INITIALIZER ((pthread_rwlock_t){0})
 
-#define pthread_cleanup_push(routine, arg) do { \\
+#define pthread_cleanup_push(ROUTINE, ARG) do { \\
   struct { \\
     void (*routine)(void *); \\
     void *arg; \\
     void *prev; \\
   } __relibc_internal_pthread_ll_entry = { \\
-    .routine = (void (*)(void *))(routine), \\
-    .arg = (void *)(arg), \\
+    .routine = (void (*)(void *))(ROUTINE), \\
+    .arg = (void *)(ARG), \\
   }; \\
   __relibc_internal_pthread_cleanup_push(&__relibc_internal_pthread_ll_entry);
 
-#define pthread_cleanup_pop(execute) \\
-  __relibc_internal_pthread_cleanup_pop((execute)); \\
+#define pthread_cleanup_pop(EXECUTE) \\
+  __relibc_internal_pthread_cleanup_pop((EXECUTE)); \\
 } while(0)
 
 """
