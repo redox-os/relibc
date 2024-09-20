@@ -99,7 +99,7 @@ impl PalSignal for Sys {
         .map(|_| ())
     }
 
-    unsafe fn sigsuspend(set: *const sigset_t) -> c_int {
+    fn sigsuspend(set: &sigset_t) -> c_int {
         e(syscall!(RT_SIGSUSPEND, set, NSIG / 8)) as c_int
     }
 

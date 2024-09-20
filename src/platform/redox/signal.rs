@@ -243,9 +243,20 @@ impl PalSignal for Sys {
         })
     }
 
-    unsafe fn sigsuspend(set: *const sigset_t) -> c_int {
-        ERRNO.set(ENOSYS);
-        -1
+    fn sigsuspend(set: &sigset_t) -> c_int {
+        //TODO: correct implementation
+        let mut oset = sigset_t::default();
+        if let Err(err) = redox_rt::signal::set_sigmask(Some(*set), Some(&mut oset)) {
+            Errno::from(err).sync();
+            return -1;
+        }
+        //TODO: wait for signal
+        Self::sched_yield();
+        if let Err(err) = redox_rt::signal::set_sigmask(Some(oset), None) {
+            Errno::from(err).sync();
+            return -1;
+        }
+        0
     }
 
     unsafe fn sigtimedwait(

@@ -248,7 +248,7 @@ pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
     sigprocmask(0, ptr::null_mut(), pset.as_mut_ptr());
     let mut set = pset.assume_init();
     sigdelset(&mut set, sig);
-    sigsuspend(&mut set)
+    sigsuspend(&set)
 }
 
 #[no_mangle]
@@ -343,7 +343,7 @@ pub unsafe extern "C" fn sigset(
 
 #[no_mangle]
 pub unsafe extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
-    Sys::sigsuspend(sigmask)
+    Sys::sigsuspend(&*sigmask)
 }
 
 #[no_mangle]
