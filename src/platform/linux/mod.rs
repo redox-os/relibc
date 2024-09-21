@@ -340,7 +340,7 @@ impl Pal for Sys {
     }
 
     fn getrusage(who: c_int, r_usage: &mut rusage) -> c_int {
-        e(unsafe { syscall!(GETRUSAGE, who, r_usage) }) as c_int
+        e(unsafe { syscall!(GETRUSAGE, who, r_usage as *mut rusage) }) as c_int
     }
 
     fn getsid(pid: pid_t) -> pid_t {

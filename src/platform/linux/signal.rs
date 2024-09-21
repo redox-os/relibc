@@ -100,7 +100,7 @@ impl PalSignal for Sys {
     }
 
     fn sigsuspend(set: &sigset_t) -> c_int {
-        e(syscall!(RT_SIGSUSPEND, set, NSIG / 8)) as c_int
+        unsafe { e(syscall!(RT_SIGSUSPEND, set as *const sigset_t, NSIG / 8)) as c_int }
     }
 
     unsafe fn sigtimedwait(
