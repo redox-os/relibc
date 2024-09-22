@@ -1,11 +1,12 @@
 //! string implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/string.h.html
 
-use core::{mem, ptr, slice, usize};
+use core::{iter::once, mem, ptr, slice, usize};
 
 use cbitset::BitSet256;
 
 use crate::{
     header::{errno::*, signal},
+    iter::{NulTerminated, SrcDstPtrIter},
     platform::{self, types::*},
 };
 
@@ -154,17 +155,10 @@ pub unsafe extern "C" fn strcoll(s1: *const c_char, s2: *const c_char) -> c_int 
 
 #[no_mangle]
 pub unsafe extern "C" fn strcpy(dst: *mut c_char, src: *const c_char) -> *mut c_char {
-    let mut i = 0;
-
-    loop {
-        let byte = *src.offset(i);
-        *dst.offset(i) = byte;
-
-        if byte == 0 {
-            break;
-        }
-
-        i += 1;
+    let src_iter = unsafe { NulTerminated::new(src) };
+    let src_dest_iter = unsafe { SrcDstPtrIter::new(src_iter.chain(once(&0)), dst) };
+    for (src_item, dst_item) in src_dest_iter {
+        dst_item.write(*src_item);
     }
 
     dst
@@ -262,19 +256,12 @@ pub unsafe extern "C" fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: siz
 
 #[no_mangle]
 pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
-    strnlen(s, usize::MAX)
+    unsafe { NulTerminated::new(s) }.count()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn strnlen(s: *const c_char, size: size_t) -> size_t {
-    let mut i = 0;
-    while i < size {
-        if *s.add(i) == 0 {
-            break;
-        }
-        i += 1;
-    }
-    i as size_t
+    unsafe { NulTerminated::new(s) }.take(size).count()
 }
 
 #[no_mangle]

@@ -12,6 +12,7 @@ use crate::{
         time::*,
         wctype::*,
     },
+    iter::NulTerminated,
     platform::{self, types::*, ERRNO},
 };
 
@@ -497,13 +498,7 @@ pub extern "C" fn wcsftime(
 
 #[no_mangle]
 pub unsafe extern "C" fn wcslen(ws: *const wchar_t) -> size_t {
-    let mut i = 0;
-    loop {
-        if *ws.add(i) == 0 {
-            return i;
-        }
-        i += 1;
-    }
+    unsafe { NulTerminated::new(ws) }.count()
 }
 
 #[no_mangle]
