@@ -25,30 +25,32 @@ mod signal;
 pub use self::socket::PalSocket;
 mod socket;
 
+type Result<T, E = Errno> = core::result::Result<T, E>;
+
 pub trait Pal {
-    fn access(path: CStr, mode: c_int) -> c_int;
+    fn access(path: CStr, mode: c_int) -> Result<()>;
 
-    fn brk(addr: *mut c_void) -> *mut c_void;
+    unsafe fn brk(addr: *mut c_void) -> *mut c_void;
 
-    fn chdir(path: CStr) -> c_int;
+    fn chdir(path: CStr) -> Result<()>;
 
     fn set_default_scheme(scheme: CStr) -> Result<(), Errno>;
 
-    fn chmod(path: CStr, mode: mode_t) -> c_int;
+    fn chmod(path: CStr, mode: mode_t) -> Result<()>;
 
-    fn chown(path: CStr, owner: uid_t, group: gid_t) -> c_int;
+    fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()>;
 
-    fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> c_int;
+    unsafe fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> Result<()>;
 
-    fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> c_int;
+    unsafe fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> Result<()>;
 
-    fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> c_int;
+    unsafe fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> Result<()>;
 
-    fn close(fildes: c_int) -> c_int;
+    fn close(fildes: c_int) -> Result<()>;
 
-    fn dup(fildes: c_int) -> c_int;
+    fn dup(fildes: c_int) -> Result<c_int>;
 
-    fn dup2(fildes: c_int, fildes2: c_int) -> c_int;
+    fn dup2(fildes: c_int, fildes2: c_int) -> Result<c_int>;
 
     unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int;
     unsafe fn fexecve(fildes: c_int, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int;
@@ -57,13 +59,13 @@ pub trait Pal {
 
     unsafe fn exit_thread(stack_base: *mut (), stack_size: usize) -> !;
 
-    fn fchdir(fildes: c_int) -> c_int;
+    fn fchdir(fildes: c_int) -> Result<()>;
 
-    fn fchmod(fildes: c_int, mode: mode_t) -> c_int;
+    fn fchmod(fildes: c_int, mode: mode_t) -> Result<()>;
 
-    fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int;
+    fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<()>;
 
-    fn fdatasync(fildes: c_int) -> c_int;
+    fn fdatasync(fildes: c_int) -> Result<()>;
 
     fn flock(fd: c_int, operation: c_int) -> c_int;
 
@@ -139,7 +141,7 @@ pub trait Pal {
 
     fn getuid() -> uid_t;
 
-    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> c_int;
+    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<(), Errno>;
 
     fn link(path1: CStr, path2: CStr) -> c_int;
 
@@ -202,9 +204,9 @@ pub trait Pal {
 
     fn readlink(pathname: CStr, out: &mut [u8]) -> ssize_t;
 
-    fn rename(old: CStr, new: CStr) -> c_int;
+    fn rename(old: CStr, new: CStr) -> Result<()>;
 
-    fn rmdir(path: CStr) -> c_int;
+    fn rmdir(path: CStr) -> Result<()>;
 
     fn sched_yield() -> c_int;
 
@@ -222,13 +224,13 @@ pub trait Pal {
 
     fn symlink(path1: CStr, path2: CStr) -> c_int;
 
-    fn sync() -> c_int;
+    fn sync() -> Result<()>;
 
     fn umask(mask: mode_t) -> mode_t;
 
     fn uname(utsname: *mut utsname) -> c_int;
 
-    fn unlink(path: CStr) -> c_int;
+    fn unlink(path: CStr) -> Result<()>;
 
     fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t;
 

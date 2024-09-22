@@ -46,10 +46,7 @@ impl File {
     }
 
     pub fn try_clone(&self) -> io::Result<Self> {
-        match Sys::dup(self.fd) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(Self::new(ok)),
-        }
+        Ok(Self::new(Sys::dup(self.fd)?))
     }
 
     /// Create a new file pointing to the same underlying descriptor. This file

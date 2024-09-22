@@ -68,12 +68,12 @@ pub struct stat {
 #[no_mangle]
 pub unsafe extern "C" fn chmod(path: *const c_char, mode: mode_t) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::chmod(path, mode)
+    Sys::chmod(path, mode).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
-    Sys::fchmod(fildes, mode)
+    Sys::fchmod(fildes, mode).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
