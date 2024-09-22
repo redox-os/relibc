@@ -985,7 +985,8 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
         };
 
         let len = out.len();
-        let read = Sys::fpath(*file, &mut out[..len - 1]);
+        // TODO: better error handling
+        let read = Sys::fpath(*file, &mut out[..len - 1]).or_minus_one_errno();
         if read < 0 {
             return ptr::null_mut();
         }

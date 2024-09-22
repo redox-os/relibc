@@ -682,7 +682,7 @@ pub unsafe fn fseek_locked(stream: &mut FILE, mut off: off_t, whence: c_int) -> 
         return -1;
     }
 
-    let err = Sys::lseek(*stream.file, off, whence);
+    let err = Sys::lseek(*stream.file, off, whence).or_minus_one_errno();
     if err < 0 {
         return err as c_int;
     }
@@ -713,7 +713,7 @@ pub unsafe extern "C" fn ftello(stream: *mut FILE) -> off_t {
     ftell_locked(&mut *stream)
 }
 pub unsafe extern "C" fn ftell_locked(stream: &mut FILE) -> off_t {
-    let pos = Sys::lseek(*stream.file, 0, SEEK_CUR);
+    let pos = Sys::lseek(*stream.file, 0, SEEK_CUR).or_minus_one_errno();
     if pos < 0 {
         return -1;
     }

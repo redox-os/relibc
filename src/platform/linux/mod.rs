@@ -17,7 +17,7 @@ use crate::{
 };
 // use header::sys_times::tms;
 use crate::{
-    error::Errno,
+    error::{Errno, Result},
     header::{sys_utsname::utsname, time::timespec},
 };
 
@@ -57,7 +57,7 @@ struct linux_statfs {
 // TODO
 const ERRNO_MAX: usize = 4095;
 
-pub fn e_raw(sys: usize) -> Result<usize, Errno> {
+pub fn e_raw(sys: usize) -> Result<usize> {
     if sys > ERRNO_MAX.wrapping_neg() {
         Err(Errno(sys.wrapping_neg() as _))
     } else {
@@ -88,7 +88,7 @@ impl Sys {
 }
 
 impl Pal for Sys {
-    fn access(path: CStr, mode: c_int) -> Result<(), Errno> {
+    fn access(path: CStr, mode: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(ACCESS, path.as_ptr(), mode) }).map(|_| ())
     }
 
@@ -96,18 +96,18 @@ impl Pal for Sys {
         unsafe { syscall!(BRK, addr) as *mut c_void }
     }
 
-    fn chdir(path: CStr) -> Result<(), Errno> {
+    fn chdir(path: CStr) -> Result<()> {
         e_raw(unsafe { syscall!(CHDIR, path.as_ptr()) }).map(|_| ())
     }
-
-    fn set_default_scheme(scheme: CStr) -> Result<(), Errno> {
+    fn set_default_scheme(scheme: CStr) -> Result<()> {
         Err(Errno(EOPNOTSUPP))
     }
-    fn chmod(path: CStr, mode: mode_t) -> Result<(), Errno> {
+
+    fn chmod(path: CStr, mode: mode_t) -> Result<()> {
         e_raw(unsafe { syscall!(FCHMODAT, AT_FDCWD, path.as_ptr(), mode, 0) }).map(|_| ())
     }
 
-    fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<(), Errno> {
+    fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
         e_raw(unsafe {
             syscall!(
                 FCHOWNAT,
@@ -120,27 +120,27 @@ impl Pal for Sys {
         .map(|_| ())
     }
 
-    unsafe fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> Result<(), Errno> {
+    unsafe fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> Result<()> {
         e_raw(syscall!(CLOCK_GETRES, clk_id, tp)).map(|_| ())
     }
 
-    unsafe fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> Result<(), Errno> {
+    unsafe fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> Result<()> {
         e_raw(syscall!(CLOCK_GETTIME, clk_id, tp)).map(|_| ())
     }
 
-    unsafe fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> Result<(), Errno> {
+    unsafe fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> Result<()> {
         e_raw(syscall!(CLOCK_SETTIME, clk_id, tp)).map(|_| ())
     }
 
-    fn close(fildes: c_int) -> Result<(), Errno> {
+    fn close(fildes: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(CLOSE, fildes) }).map(|_| ())
     }
 
-    fn dup(fildes: c_int) -> Result<c_int, Errno> {
+    fn dup(fildes: c_int) -> Result<c_int> {
         e_raw(unsafe { syscall!(DUP, fildes) }).map(|f| f as c_int)
     }
 
-    fn dup2(fildes: c_int, fildes2: c_int) -> Result<c_int, Errno> {
+    fn dup2(fildes: c_int, fildes2: c_int) -> Result<c_int> {
         e_raw(unsafe { syscall!(DUP3, fildes, fildes2, 0) }).map(|f| f as c_int)
     }
 
@@ -162,19 +162,19 @@ impl Pal for Sys {
         Self::exit(0)
     }
 
-    fn fchdir(fildes: c_int) -> Result<(), Errno> {
+    fn fchdir(fildes: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(FCHDIR, fildes) }).map(|_| ())
     }
 
-    fn fchmod(fildes: c_int, mode: mode_t) -> Result<(), Errno> {
+    fn fchmod(fildes: c_int, mode: mode_t) -> Result<()> {
         e_raw(unsafe { syscall!(FCHMOD, fildes, mode) }).map(|_| ())
     }
 
-    fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<(), Errno> {
+    fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<()> {
         e_raw(unsafe { syscall!(FCHOWN, fildes, owner, group) }).map(|_| ())
     }
 
-    fn fdatasync(fildes: c_int) -> Result<(), Errno> {
+    fn fdatasync(fildes: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(FDATASYNC, fildes) }).map(|_| ())
     }
 
@@ -224,7 +224,7 @@ impl Pal for Sys {
         e(unsafe { syscall!(CLONE, SIGCHLD, 0, 0, 0, 0) }) as pid_t
     }
 
-    fn fpath(fildes: c_int, out: &mut [u8]) -> ssize_t {
+    fn fpath(fildes: c_int, out: &mut [u8]) -> Result<ssize_t> {
         let mut proc_path = b"/proc/self/fd/".to_vec();
         write!(proc_path, "{}", fildes).unwrap();
         proc_path.push(0);
@@ -232,20 +232,16 @@ impl Pal for Sys {
         Self::readlink(CStr::from_bytes_with_nul(&proc_path).unwrap(), out)
     }
 
-    fn fsync(fildes: c_int) -> Result<(), Errno> {
+    fn fsync(fildes: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(FSYNC, fildes) }).map(|_| ())
     }
 
-    fn ftruncate(fildes: c_int, length: off_t) -> Result<(), Errno> {
+    fn ftruncate(fildes: c_int, length: off_t) -> Result<()> {
         e_raw(unsafe { syscall!(FTRUNCATE, fildes, length) }).map(|_| ())
     }
 
     #[inline]
-    unsafe fn futex_wait(
-        addr: *mut u32,
-        val: u32,
-        deadline: Option<&timespec>,
-    ) -> Result<(), Errno> {
+    unsafe fn futex_wait(addr: *mut u32, val: u32, deadline: Option<&timespec>) -> Result<()> {
         let deadline = deadline.map_or(0, |d| d as *const _ as usize);
         e_raw(unsafe {
             syscall!(
@@ -260,7 +256,7 @@ impl Pal for Sys {
         .map(|_| ())
     }
     #[inline]
-    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32, Errno> {
+    unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
         e_raw(unsafe {
             syscall!(FUTEX, addr, 1 /* FUTEX_WAKE */, num)
         })
@@ -283,10 +279,10 @@ impl Pal for Sys {
         }
     }
 
-    fn getdents(fd: c_int, buf: &mut [u8], _off: u64) -> Result<usize, Errno> {
+    fn getdents(fd: c_int, buf: &mut [u8], _off: u64) -> Result<usize> {
         e_raw(unsafe { syscall!(GETDENTS64, fd, buf.as_mut_ptr(), buf.len()) })
     }
-    fn dir_seek(fd: c_int, off: u64) -> Result<(), Errno> {
+    fn dir_seek(fd: c_int, off: u64) -> Result<()> {
         e_raw(unsafe { syscall!(LSEEK, fd, off, SEEK_SET) })?;
         Ok(())
     }
@@ -335,12 +331,12 @@ impl Pal for Sys {
         e(unsafe { syscall!(GETRANDOM, buf.as_mut_ptr(), buf.len(), flags) }) as ssize_t
     }
 
-    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> c_int {
-        e(syscall!(GETRLIMIT, resource, rlim)) as c_int
+    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()> {
+        e_raw(syscall!(GETRLIMIT, resource, rlim)).map(|_| ())
     }
 
-    unsafe fn setrlimit(resource: c_int, rlimit: *const rlimit) -> c_int {
-        e(syscall!(SETRLIMIT, resource, rlimit)) as c_int
+    unsafe fn setrlimit(resource: c_int, rlimit: *const rlimit) -> Result<()> {
+        e_raw(syscall!(SETRLIMIT, resource, rlimit)).map(|_| ())
     }
 
     fn getrusage(who: c_int, r_usage: &mut rusage) -> c_int {
@@ -363,12 +359,12 @@ impl Pal for Sys {
         e(unsafe { syscall!(GETUID) }) as uid_t
     }
 
-    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<(), Errno> {
+    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
         e_raw(unsafe { syscall!(LCHOWN, path.as_ptr(), owner, group) }).map(|_| ())
     }
 
-    fn link(path1: CStr, path2: CStr) -> c_int {
-        e(unsafe {
+    fn link(path1: CStr, path2: CStr) -> Result<()> {
+        e_raw(unsafe {
             syscall!(
                 LINKAT,
                 AT_FDCWD,
@@ -377,33 +373,34 @@ impl Pal for Sys {
                 path2.as_ptr(),
                 0
             )
-        }) as c_int
+        })
+        .map(|_| ())
     }
 
-    fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
-        e(unsafe { syscall!(LSEEK, fildes, offset, whence) }) as off_t
+    fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t> {
+        e_raw(unsafe { syscall!(LSEEK, fildes, offset, whence) }).map(|o| o as off_t)
     }
 
-    fn mkdir(path: CStr, mode: mode_t) -> c_int {
-        e(unsafe { syscall!(MKDIRAT, AT_FDCWD, path.as_ptr(), mode) }) as c_int
+    fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
+        e_raw(unsafe { syscall!(MKDIRAT, AT_FDCWD, path.as_ptr(), mode) }).map(|_| ())
     }
 
-    fn mknodat(dir_fildes: c_int, path: CStr, mode: mode_t, dev: dev_t) -> c_int {
+    fn mknodat(dir_fildes: c_int, path: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
         // Note: dev_t is c_long (i64) and __kernel_dev_t is u32; So we need to cast it
         //       and check for overflow
         let k_dev: c_uint = dev as c_uint;
         if k_dev as dev_t != dev {
-            return e(EINVAL as usize) as c_int;
+            return Err(Errno(EINVAL));
         }
 
-        e(unsafe { syscall!(MKNODAT, dir_fildes, path.as_ptr(), mode, k_dev) }) as c_int
+        e_raw(unsafe { syscall!(MKNODAT, dir_fildes, path.as_ptr(), mode, k_dev) }).map(|_| ())
     }
 
-    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> c_int {
+    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
         Sys::mknodat(AT_FDCWD, path, mode, dev)
     }
 
-    fn mkfifo(path: CStr, mode: mode_t) -> c_int {
+    fn mkfifo(path: CStr, mode: mode_t) -> Result<()> {
         Sys::mknod(path, mode | S_IFIFO, 0)
     }
 
@@ -464,17 +461,17 @@ impl Pal for Sys {
         e(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }) as c_int
     }
 
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int, Errno> {
+    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
         e_raw(unsafe { syscall!(OPENAT, AT_FDCWD, path.as_ptr(), oflag, mode) })
             .map(|fd| fd as c_int)
     }
 
-    fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int {
-        e(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), flags) }) as c_int
+    fn pipe2(fildes: &mut [c_int], flags: c_int) -> Result<()> {
+        e_raw(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), flags) }).map(|_| ())
     }
 
     #[cfg(target_arch = "x86_64")]
-    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, Errno> {
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
         let pid;
         asm!("
@@ -527,7 +524,7 @@ impl Pal for Sys {
 
         Ok(crate::pthread::OsTid { thread_id: tid })
     }
-    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), Errno> {
+    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<()> {
         let tgid = Self::getpid();
         e_raw(unsafe { syscall!(TGKILL, tgid, os_tid.thread_id, signal) }).map(|_| ())
     }
@@ -537,18 +534,18 @@ impl Pal for Sys {
         }
     }
 
-    fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno> {
+    fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t> {
         Ok(e_raw(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) })? as ssize_t)
     }
-    fn pread(fildes: c_int, buf: &mut [u8], off: off_t) -> Result<ssize_t, Errno> {
+    fn pread(fildes: c_int, buf: &mut [u8], off: off_t) -> Result<ssize_t> {
         Ok(
             e_raw(unsafe { syscall!(PREAD64, fildes, buf.as_mut_ptr(), buf.len(), off) })?
                 as ssize_t,
         )
     }
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> ssize_t {
-        e(unsafe {
+    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<ssize_t> {
+        e_raw(unsafe {
             syscall!(
                 READLINKAT,
                 AT_FDCWD,
@@ -556,51 +553,52 @@ impl Pal for Sys {
                 out.as_mut_ptr(),
                 out.len()
             )
-        }) as ssize_t
+        })
+        .map(|b| b as ssize_t)
     }
 
-    fn rename(old: CStr, new: CStr) -> Result<(), Errno> {
+    fn rename(old: CStr, new: CStr) -> Result<()> {
         e_raw(unsafe { syscall!(RENAMEAT, AT_FDCWD, old.as_ptr(), AT_FDCWD, new.as_ptr()) })
             .map(|_| ())
     }
 
-    fn rmdir(path: CStr) -> Result<(), Errno> {
+    fn rmdir(path: CStr) -> Result<()> {
         e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), AT_REMOVEDIR) }).map(|_| ())
     }
 
-    fn sched_yield() -> c_int {
-        e(unsafe { syscall!(SCHED_YIELD) }) as c_int
+    fn sched_yield() -> Result<()> {
+        e_raw(unsafe { syscall!(SCHED_YIELD) }).map(|_| ())
     }
 
-    unsafe fn setgroups(size: size_t, list: *const gid_t) -> c_int {
-        e(unsafe { syscall!(SETGROUPS, size, list) }) as c_int
+    unsafe fn setgroups(size: size_t, list: *const gid_t) -> Result<()> {
+        e_raw(unsafe { syscall!(SETGROUPS, size, list) }).map(|_| ())
     }
 
-    fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
-        e(unsafe { syscall!(SETPGID, pid, pgid) }) as c_int
+    fn setpgid(pid: pid_t, pgid: pid_t) -> Result<()> {
+        e_raw(unsafe { syscall!(SETPGID, pid, pgid) }).map(|_| ())
     }
 
-    fn setpriority(which: c_int, who: id_t, prio: c_int) -> c_int {
-        e(unsafe { syscall!(SETPRIORITY, which, who, prio) }) as c_int
+    fn setpriority(which: c_int, who: id_t, prio: c_int) -> Result<()> {
+        e_raw(unsafe { syscall!(SETPRIORITY, which, who, prio) }).map(|_| ())
     }
 
-    fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int {
-        e(unsafe { syscall!(SETRESGID, rgid, egid, sgid) }) as c_int
+    fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {
+        e_raw(unsafe { syscall!(SETRESGID, rgid, egid, sgid) }).map(|_| ())
     }
 
-    fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int {
-        e(unsafe { syscall!(SETRESUID, ruid, euid, suid) }) as c_int
+    fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> Result<()> {
+        e_raw(unsafe { syscall!(SETRESUID, ruid, euid, suid) }).map(|_| ())
     }
 
-    fn setsid() -> c_int {
-        e(unsafe { syscall!(SETSID) }) as c_int
+    fn setsid() -> Result<()> {
+        e_raw(unsafe { syscall!(SETSID) }).map(|_| ())
     }
 
-    fn symlink(path1: CStr, path2: CStr) -> c_int {
-        e(unsafe { syscall!(SYMLINKAT, path1.as_ptr(), AT_FDCWD, path2.as_ptr()) }) as c_int
+    fn symlink(path1: CStr, path2: CStr) -> Result<()> {
+        e_raw(unsafe { syscall!(SYMLINKAT, path1.as_ptr(), AT_FDCWD, path2.as_ptr()) }).map(|_| ())
     }
 
-    fn sync() -> Result<(), Errno> {
+    fn sync() -> Result<()> {
         e_raw(unsafe { syscall!(SYNC) }).map(|_| ())
     }
 
@@ -608,11 +606,11 @@ impl Pal for Sys {
         unsafe { syscall!(UMASK, mask) as mode_t }
     }
 
-    fn uname(utsname: *mut utsname) -> c_int {
-        e(unsafe { syscall!(UNAME, utsname, 0) }) as c_int
+    unsafe fn uname(utsname: *mut utsname) -> Result<()> {
+        e_raw(syscall!(UNAME, utsname, 0)).map(|_| ())
     }
 
-    fn unlink(path: CStr) -> Result<(), Errno> {
+    fn unlink(path: CStr) -> Result<()> {
         e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), 0) }).map(|_| ())
     }
 
@@ -620,10 +618,10 @@ impl Pal for Sys {
         e(unsafe { syscall!(WAIT4, pid, stat_loc, options, 0) }) as pid_t
     }
 
-    fn write(fildes: c_int, buf: &[u8]) -> Result<ssize_t, Errno> {
+    fn write(fildes: c_int, buf: &[u8]) -> Result<ssize_t> {
         Ok(e_raw(unsafe { syscall!(WRITE, fildes, buf.as_ptr(), buf.len()) })? as ssize_t)
     }
-    fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<ssize_t, Errno> {
+    fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<ssize_t> {
         Ok(e_raw(unsafe { syscall!(PWRITE64, fildes, buf.as_ptr(), buf.len(), off) })? as ssize_t)
     }
 

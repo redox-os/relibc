@@ -1,4 +1,5 @@
 use crate::{
+    error::ResultExt,
     header::{fcntl, unistd},
     platform::types::*,
     Pal, Sys,
@@ -10,7 +11,8 @@ pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
         return Err(());
     }
 
-    let count = Sys::fpath(master, name);
+    // TODO: better error handling
+    let count = Sys::fpath(master, name).or_minus_one_errno();
     if count < 0 {
         unistd::close(master);
         return Err(());

@@ -90,10 +90,7 @@ impl io::Seek for &File {
             io::SeekFrom::End(end) => (end as off_t, SEEK_END),
         };
 
-        match Sys::lseek(self.fd, offset, whence) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(ok as u64),
-        }
+        Ok(Sys::lseek(self.fd, offset, whence)? as u64)
     }
 }
 

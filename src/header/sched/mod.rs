@@ -1,6 +1,7 @@
 //! sched.h implementation for Redox, following https://pubs.opengroup.org/onlinepubs/7908799/xsh/sched.h.html
 
 use crate::{
+    error::ResultExt,
     header::time::timespec,
     platform::{types::*, Pal, Sys},
 };
@@ -44,5 +45,5 @@ pub extern "C" fn sched_setscheduler(
 }
 #[no_mangle]
 pub extern "C" fn sched_yield() -> c_int {
-    Sys::sched_yield()
+    Sys::sched_yield().map(|()| 0).or_minus_one_errno()
 }

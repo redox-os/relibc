@@ -14,6 +14,8 @@ impl Errno {
     }
 }
 
+pub type Result<T, E = Errno> = core::result::Result<T, E>;
+
 #[cfg(target_os = "redox")]
 impl From<syscall::Error> for Errno {
     #[inline]

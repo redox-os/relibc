@@ -2,6 +2,7 @@
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysresource.h.html
 
 use crate::{
+    error::ResultExt,
     header::sys_time::timeval,
     platform::{types::*, Pal, Sys},
 };
@@ -77,16 +78,22 @@ pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn setpriority(which: c_int, who: id_t, nice: c_int) -> c_int {
     Sys::setpriority(which, who, nice)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
     Sys::getrlimit(resource, rlp)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int {
     Sys::setrlimit(resource, rlp)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
