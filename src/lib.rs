@@ -14,6 +14,7 @@
 #![feature(lang_items)]
 #![feature(let_chains)]
 #![feature(linkage)]
+#![feature(ptr_as_uninit)]
 #![feature(stmt_expr_attributes)]
 #![feature(str_internals)]
 #![feature(sync_unsafe_cell)]
@@ -52,6 +53,7 @@ pub mod error;
 pub mod fs;
 pub mod header;
 pub mod io;
+pub mod iter;
 pub mod ld_so;
 pub mod platform;
 pub mod pthread;
