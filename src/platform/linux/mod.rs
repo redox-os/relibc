@@ -1,5 +1,5 @@
-use crate::io::Write;
-use core::{arch::asm, mem::offset_of, ptr};
+use crate::{header::errno::EOPNOTSUPP, io::Write};
+use core::{arch::asm, ptr};
 
 use super::{types::*, Pal, ERRNO};
 use crate::{
@@ -98,6 +98,10 @@ impl Pal for Sys {
 
     fn chdir(path: CStr) -> c_int {
         e(unsafe { syscall!(CHDIR, path.as_ptr()) }) as c_int
+    }
+
+    fn set_default_scheme(scheme: CStr) -> Result<(), Errno> {
+        Err(Errno(EOPNOTSUPP))
     }
 
     fn chmod(path: CStr, mode: mode_t) -> c_int {

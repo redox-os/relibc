@@ -23,26 +23,19 @@ pub fn chdir(path: &str) -> Result<()> {
     let _siglock = tmp_disable_signals();
     let mut cwd_guard = CWD.lock();
 
-    let canonicalized =
-        canonicalize_using_cwd(cwd_guard.as_deref(), path).ok_or(Error::new(ENOENT))?;
+    let canon = canonicalize_using_cwd(cwd_guard.as_deref(), path).ok_or(Error::new(ENOENT))?;
+    let canon_with_scheme = canonicalize_with_cwd_internal(cwd_guard.as_deref(), path)?;
 
-    let fd = syscall::open(&canonicalized, O_STAT | O_CLOEXEC)?;
+    let fd = syscall::open(&canon_with_scheme, O_STAT | O_CLOEXEC)?;
     let mut stat = Stat::default();
     if syscall::fstat(fd, &mut stat).is_err() || (stat.st_mode & MODE_TYPE) != MODE_DIR {
         return Err(Error::new(ENOTDIR));
     }
     let _ = syscall::close(fd);
 
-    *cwd_guard = Some(canonicalized.into_boxed_str());
-
-    // TODO: Check that the dir exists and is a directory.
+    *cwd_guard = Some(canon.into_boxed_str());
 
     Ok(())
-}
-
-pub fn clone_cwd() -> Option<Box<str>> {
-    let _siglock = tmp_disable_signals();
-    CWD.lock().clone()
 }
 
 // TODO: MaybeUninit
@@ -62,18 +55,79 @@ pub fn getcwd(buf: &mut [u8]) -> Option<usize> {
     Some(cwd.len())
 }
 
+/// Sets the default scheme
+///
+/// By default absolute paths resolve to /scheme/file, calling this function
+/// allows a different scheme to be used as the root. This property is inherited
+/// by child processes.
+///
+/// Resets CWD to /.
+pub fn set_default_scheme(scheme: &str) -> Result<()> {
+    let _siglock = tmp_disable_signals();
+    let mut cwd_guard = CWD.lock();
+    let mut default_scheme_guard = DEFAULT_SCHEME.lock();
+
+    *cwd_guard = None;
+    *default_scheme_guard = Some(scheme.into());
+
+    Ok(())
+}
+
+// TODO: How much of this logic should be in redox-path?
+fn canonicalize_with_cwd_internal(cwd: Option<&str>, path: &str) -> Result<String> {
+    let path = canonicalize_using_cwd(cwd, path).ok_or(Error::new(ENOENT))?;
+
+    let standard_scheme = path == "/scheme" || path.starts_with("/scheme/");
+    let legacy_scheme = path
+        .split("/")
+        .next()
+        .map(|c| c.contains(":"))
+        .unwrap_or(false);
+
+    Ok(if standard_scheme || legacy_scheme {
+        path
+    } else {
+        let mut default_scheme_guard = DEFAULT_SCHEME.lock();
+        let default_scheme = default_scheme_guard.get_or_insert_with(|| Box::from("file"));
+        let mut result = format!("/scheme/{}{}", default_scheme, path);
+
+        // Trim trailing / to keep path canonical.
+        if result.as_bytes().last() == Some(&b'/') {
+            result.pop();
+        }
+
+        result
+    })
+}
+
 pub fn canonicalize(path: &str) -> Result<String> {
     let _siglock = tmp_disable_signals();
-    let cwd = CWD.lock();
-    canonicalize_using_cwd(cwd.as_deref(), path).ok_or(Error::new(ENOENT))
+    let cwd_guard = CWD.lock();
+    canonicalize_with_cwd_internal(cwd_guard.as_deref(), path)
 }
 
 // TODO: arraystring?
 static CWD: Mutex<Option<Box<str>>> = Mutex::new(None);
+static DEFAULT_SCHEME: Mutex<Option<Box<str>>> = Mutex::new(None);
 
-pub fn setcwd_manual(cwd: Box<str>) {
+pub fn set_cwd_manual(cwd: Box<str>) {
     let _siglock = tmp_disable_signals();
     *CWD.lock() = Some(cwd);
+}
+
+pub fn set_default_scheme_manual(scheme: Box<str>) {
+    let _siglock = tmp_disable_signals();
+    *DEFAULT_SCHEME.lock() = Some(scheme)
+}
+
+pub fn clone_cwd() -> Option<Box<str>> {
+    let _siglock = tmp_disable_signals();
+    CWD.lock().clone()
+}
+
+pub fn clone_default_scheme() -> Option<Box<str>> {
+    let _siglock = tmp_disable_signals();
+    DEFAULT_SCHEME.lock().clone()
 }
 
 pub fn open(path: &str, flags: usize) -> Result<usize> {
@@ -84,7 +138,7 @@ pub fn open(path: &str, flags: usize) -> Result<usize> {
     let mut path = path;
 
     for _ in 0..MAX_LEVEL {
-        let canon = canonicalize(path)?;
+        let canon = canonicalize_with_cwd_internal(CWD.lock().as_deref(), path)?;
 
         let open_res = if canon.starts_with(libcscheme::LIBC_SCHEME) {
             libcscheme::open(&canon, flags)

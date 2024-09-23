@@ -45,6 +45,8 @@ pub struct InterpOverride {
 
 pub struct ExtraInfo<'a> {
     pub cwd: Option<&'a [u8]>,
+    // Default scheme for the process
+    pub default_scheme: Option<&'a [u8]>,
     // POSIX states that while sigactions are reset, ignored sigactions will remain ignored.
     pub sigignmask: u64,
     // POSIX also states that the sigprocmask must be preserved across execs.
@@ -351,8 +353,9 @@ where
     )?;
     push(AT_PHENT)?;
 
-    let total_args_envs_auxvpointee_size =
-        total_args_envs_size + extrainfo.cwd.map_or(0, |s| s.len() + 1);
+    let total_args_envs_auxvpointee_size = total_args_envs_size
+        + extrainfo.cwd.map_or(0, |s| s.len() + 1)
+        + extrainfo.default_scheme.map_or(0, |s| s.len() + 1);
     let args_envs_size_aligned = total_args_envs_auxvpointee_size.next_multiple_of(PAGE_SIZE);
     let target_args_env_address =
         find_free_target_addr(&tree, args_envs_size_aligned).ok_or(Error::new(ENOMEM))?;
@@ -392,10 +395,18 @@ where
 
         if let Some(cwd) = extrainfo.cwd {
             push(append(cwd)?)?;
-            push(AT_REDOX_INITIALCWD_PTR)?;
+            push(AT_REDOX_INITIAL_CWD_PTR)?;
             push(cwd.len())?;
-            push(AT_REDOX_INITIALCWD_LEN)?;
+            push(AT_REDOX_INITIAL_CWD_LEN)?;
         }
+
+        if let Some(default_scheme) = extrainfo.default_scheme {
+            push(append(default_scheme)?)?;
+            push(AT_REDOX_INITIAL_DEFAULT_SCHEME_PTR)?;
+            push(default_scheme.len())?;
+            push(AT_REDOX_INITIAL_DEFAULT_SCHEME_LEN)?;
+        }
+
         #[cfg(target_pointer_width = "32")]
         {
             push((extrainfo.sigignmask >> 32) as usize)?;

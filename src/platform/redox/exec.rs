@@ -131,6 +131,9 @@ pub fn execve(
     let wants_setugid = stat.st_mode & ((S_ISUID | S_ISGID) as u16) != 0;
 
     let cwd: Box<[u8]> = super::path::clone_cwd().unwrap_or_default().into();
+    let default_scheme: Box<[u8]> = super::path::clone_default_scheme()
+        .unwrap_or_else(|| Box::from("file"))
+        .into();
 
     // Count arguments
     let mut len = 0;
@@ -295,6 +298,7 @@ pub fn execve(
         let _ = syscall::write(*escalate_fd, &flatten_with_nul(args))?;
         let _ = syscall::write(*escalate_fd, &flatten_with_nul(envs))?;
         let _ = syscall::write(*escalate_fd, &cwd)?;
+        let _ = syscall::write(*escalate_fd, &default_scheme)?;
 
         // Closing will notify the scheme, and from that point we will no longer have control
         // over this process (unless it fails). We do this manually since drop cannot handle
@@ -310,6 +314,7 @@ pub fn execve(
 
         let extrainfo = ExtraInfo {
             cwd: Some(&cwd),
+            default_scheme: Some(&default_scheme),
             sigignmask: 0,
             sigprocmask,
         };
