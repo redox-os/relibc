@@ -3,7 +3,6 @@ use crate::{
     c_str::CStr,
     error::Errno,
     header::{
-        dirent::dirent,
         sys_resource::{rlimit, rusage},
         sys_stat::stat,
         sys_statvfs::statvfs,
@@ -32,6 +31,8 @@ pub trait Pal {
     fn brk(addr: *mut c_void) -> *mut c_void;
 
     fn chdir(path: CStr) -> c_int;
+
+    fn set_default_scheme(scheme: CStr) -> Result<(), Errno>;
 
     fn chmod(path: CStr, mode: mode_t) -> c_int;
 
@@ -191,10 +192,10 @@ pub trait Pal {
 
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> c_int;
 
-    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid, Errno>;
-    unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<(), Errno>;
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<pthread::OsTid, Errno>;
+    unsafe fn rlct_kill(os_tid: pthread::OsTid, signal: usize) -> Result<(), Errno>;
 
-    fn current_os_tid() -> crate::pthread::OsTid;
+    fn current_os_tid() -> pthread::OsTid;
 
     fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t, Errno>;
     fn pread(fildes: c_int, buf: &mut [u8], offset: off_t) -> Result<ssize_t, Errno>;

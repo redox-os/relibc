@@ -287,13 +287,24 @@ pub fn init(auxvs: Box<[[usize; 2]]>) {
     use self::auxv_defs::*;
 
     if let (Some(cwd_ptr), Some(cwd_len)) = (
-        get_auxv(&auxvs, AT_REDOX_INITIALCWD_PTR),
-        get_auxv(&auxvs, AT_REDOX_INITIALCWD_LEN),
+        get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_PTR),
+        get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_LEN),
     ) {
         let cwd_bytes: &'static [u8] =
             unsafe { core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len) };
         if let Ok(cwd) = core::str::from_utf8(cwd_bytes) {
-            self::sys::path::setcwd_manual(cwd.into());
+            self::sys::path::set_cwd_manual(cwd.into());
+        }
+    }
+
+    if let (Some(scheme_ptr), Some(scheme_len)) = (
+        get_auxv(&auxvs, AT_REDOX_INITIAL_DEFAULT_SCHEME_PTR),
+        get_auxv(&auxvs, AT_REDOX_INITIAL_DEFAULT_SCHEME_LEN),
+    ) {
+        let scheme_bytes: &'static [u8] =
+            unsafe { core::slice::from_raw_parts(scheme_ptr as *const u8, scheme_len) };
+        if let Ok(scheme) = core::str::from_utf8(scheme_bytes) {
+            self::sys::path::set_default_scheme_manual(scheme.into());
         }
     }
 

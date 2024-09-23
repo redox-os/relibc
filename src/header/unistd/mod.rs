@@ -102,11 +102,19 @@ pub unsafe extern "C" fn chdir(path: *const c_char) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn chroot(path: *const c_char) -> c_int {
+pub unsafe extern "C" fn chroot(path: *const c_char) -> c_int {
     // TODO: Implement
     platform::ERRNO.set(crate::header::errno::EPERM);
 
     -1
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn set_default_scheme(scheme: *const c_char) -> c_int {
+    let scheme = CStr::from_ptr(scheme);
+    Sys::set_default_scheme(scheme)
+        .map(|_| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]

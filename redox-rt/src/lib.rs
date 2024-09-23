@@ -143,6 +143,7 @@ pub fn initialize_freestanding() {
     page.tcb_ptr = page;
     page.tcb_len = syscall::PAGE_SIZE;
     page.tls_end = (page as *mut Tcb).cast();
+    *page.os_specific.thr_fd.get_mut() = None;
 
     #[cfg(not(target_arch = "aarch64"))]
     unsafe {
