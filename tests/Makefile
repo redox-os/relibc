@@ -25,7 +25,6 @@ EXPECT_NAMES=\
 	locale \
 	math \
 	netdb/getaddrinfo \
-	psignal \
 	ptrace \
 	regex \
 	select \
@@ -160,6 +159,7 @@ NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
 	pty/forkpty \
+	psignal \
 	pwd \
 	sa_restart \
 	sigchld \
