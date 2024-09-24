@@ -470,7 +470,7 @@ impl Pal for Sys {
     }
 
     fn getpid() -> pid_t {
-        e(syscall::getpid()) as pid_t
+        redox_rt::sys::posix_getpid() as pid_t
     }
 
     fn getppid() -> pid_t {
@@ -1137,7 +1137,7 @@ impl Pal for Sys {
         (unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) }).is_ok()
     }
 
-    fn exit_thread() -> ! {
-        redox_rt::thread::exit_this_thread()
+    unsafe fn exit_thread(stack_base: *mut (), stack_size: usize) -> ! {
+        redox_rt::thread::exit_this_thread(stack_base, stack_size)
     }
 }

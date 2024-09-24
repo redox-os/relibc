@@ -159,10 +159,12 @@ NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
 	pty/forkpty \
+	psignal \
 	pwd \
 	sa_restart \
 	sigchld \
 	stdio/ctermid \
+	sigqueue \
 	stdio/tempnam \
 	stdio/tmpnam \
 	stdlib/bsearch \

@@ -1,6 +1,8 @@
+use core::ptr::addr_of;
+
 use syscall::{
     error::{Error, Result, EINTR},
-    TimeSpec,
+    RtSigInfo, TimeSpec,
 };
 
 use crate::{arch::manually_enter_trampoline, proc::FdGuard, signal::tmp_disable_signals, Tcb};
@@ -42,6 +44,26 @@ pub fn posix_kill(pid: usize, sig: usize) -> Result<()> {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
     }
+}
+#[inline]
+pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
+    let siginf = RtSigInfo {
+        arg,
+        code: -1, // TODO: SI_QUEUE constant
+        uid: 0,   // TODO
+        pid: posix_getpid(),
+    };
+    match wrapper(false, || unsafe {
+        syscall::syscall3(syscall::SYS_SIGENQUEUE, pid, sig, addr_of!(siginf) as usize)
+    }) {
+        Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+#[inline]
+pub fn posix_getpid() -> u32 {
+    // SAFETY: read-only except during program/fork child initialization
+    unsafe { crate::THIS_PID.get().read() }
 }
 #[inline]
 pub fn posix_killpg(pgrp: usize, sig: usize) -> Result<()> {

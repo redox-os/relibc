@@ -76,3 +76,6 @@ pub const SS_DISABLE: usize = 2;
 // Those two should be updated from kernel headers
 pub const MINSIGSTKSZ: usize = 2048;
 pub const SIGSTKSZ: usize = 8096;
+
+pub const SI_QUEUE: i32 = -1;
+pub const SI_USER: i32 = 0;

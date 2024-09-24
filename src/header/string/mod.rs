@@ -353,9 +353,9 @@ pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
 
 #[no_mangle]
 pub unsafe extern "C" fn strsignal(sig: c_int) -> *mut c_char {
-    signal::_signal_strings
+    signal::SIGNAL_STRINGS
         .get(sig as usize)
-        .unwrap_or(&signal::_signal_strings[0]) // Unknown signal message
+        .unwrap_or(&signal::SIGNAL_STRINGS[0]) // Unknown signal message
         .as_ptr() as *mut c_char
 }
 

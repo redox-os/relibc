@@ -2,7 +2,7 @@ use super::super::{types::*, Pal};
 use crate::{
     error::Errno,
     header::{
-        signal::{sigaction, siginfo_t, sigset_t, stack_t},
+        signal::{sigaction, siginfo_t, sigset_t, sigval, stack_t},
         sys_time::itimerval,
         time::timespec,
     },
@@ -12,6 +12,8 @@ pub trait PalSignal: Pal {
     unsafe fn getitimer(which: c_int, out: *mut itimerval) -> c_int;
 
     fn kill(pid: pid_t, sig: c_int) -> c_int;
+
+    fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<(), Errno>;
 
     fn killpg(pgrp: pid_t, sig: c_int) -> c_int;
 
@@ -35,8 +37,11 @@ pub trait PalSignal: Pal {
         oset: Option<&mut sigset_t>,
     ) -> Result<(), Errno>;
 
-    fn sigsuspend(set: &sigset_t) -> c_int;
+    fn sigsuspend(mask: &sigset_t) -> Errno; // always fails
 
-    unsafe fn sigtimedwait(set: *const sigset_t, sig: *mut siginfo_t, tp: *const timespec)
-        -> c_int;
+    fn sigtimedwait(
+        set: &sigset_t,
+        sig: Option<&mut siginfo_t>,
+        tp: Option<&timespec>,
+    ) -> Result<(), Errno>;
 }

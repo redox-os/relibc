@@ -1,10 +1,10 @@
-use core::mem::offset_of;
+use core::{mem::offset_of, ptr::NonNull};
 
 use syscall::{data::*, error::*};
 
 use crate::{
     proc::{fork_inner, FdGuard},
-    signal::{inner_c, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    signal::{inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     RtTcb, Tcb,
 };
 
@@ -19,11 +19,15 @@ pub struct SigArea {
     pub altstack_bottom: usize,
     pub tmp_x1_x2: [usize; 2],
     pub tmp_x3_x4: [usize; 2],
+    pub tmp_x5_x6: [usize; 2],
     pub tmp_sp: usize,
     pub onstack: u64,
     pub disable_signals_depth: u64,
     pub pctl: usize, // TODO: remove
     pub last_sig_was_restart: bool,
+    pub last_sigstack: Option<NonNull<SigStack>>,
+    pub tmp_rt_inf: RtSigInfo,
+    pub tmp_id_inf: u64,
 }
 #[repr(C)]
 #[derive(Debug, Default)]
@@ -150,74 +154,201 @@ asmfunction!(__relibc_internal_fork_ret: ["
     ret
 "] <= [child_hook = sym child_hook]);
 
+// https://devblogs.microsoft.com/oldnewthing/20220811-00/?p=106963
 asmfunction!(__relibc_internal_sigentry: ["
-    // old pc and x0 are saved in the sigcontrol struct
+    // Clear any active reservation.
+    clrex
+
+    // The old pc and x0 are saved in the sigcontrol struct.
     mrs x0, tpidr_el0 // ABI ptr
     ldr x0, [x0] // TCB ptr
 
-    // save x1-x3 and sp
+    // Save x1-x6 and sp
     stp x1, x2, [x0, #{tcb_sa_off} + {sa_tmp_x1_x2}]
     stp x3, x4, [x0, #{tcb_sa_off} + {sa_tmp_x3_x4}]
+    stp x5, x6, [x0, #{tcb_sa_off} + {sa_tmp_x5_x6}]
     mov x1, sp
     str x1, [x0, #{tcb_sa_off} + {sa_tmp_sp}]
 
-    sub x1, x1, 128
-    and x1, x1, -16
-    mov sp, x1
+    ldr x6, [x0, #{tcb_sa_off} + {sa_pctl}]
+1:
+    // Load x1 with the thread's bits
+    add x5, x0, #{tcb_sc_off} + {sc_word}
+    ldaxr x1, [x5]
 
-    ldr x3, [x0, #{tcb_sa_off} + {sa_pctl}]
+    // First check if there are standard thread signals,
+    and x4, x1, x1, lsr #32 // x4 := x1 & (x1 >> 32)
+    cbnz x4, 3f // jump if x4 != 0
+    clrex
 
-    // load x1 and x2 with each word (tearing between x1 and x2 can occur)
-    // acquire ordering
-    add x2, x0, #{tcb_sc_off} + {sc_word}
-    ldaxp x1, x2, [x2]
+    // and if not, load process pending bitset.
+    add x5, x6, #{pctl_pending}
+    ldaxr x2, [x5]
 
-    // reduce them by ANDing the upper and lower 32 bits
-    and x1, x1, x1, lsr #32 // put result in lo half
-    and x2, x2, x2, lsl #32 // put result in hi half
-    orr x1, x1, x2 // combine them into the set of pending unblocked
+    // Check if there are standard proc signals:
+    lsr x3, x1, #32 // mask
+    and w3, w2, w3 // pending unblocked proc
+    cbz w3, 4f // skip 'fetch_andn' step if zero
 
-    // count trailing zeroes, to find signal bit
-    rbit x1, x1
+    // If there was one, find which one, and try clearing the bit (last value in x3, addr in x6)
+    // this picks the MSB rather than the LSB, unlike x86. POSIX does not require any specific
+    // ordering though.
+    clz w3, w3
+    mov w4, #31
+    sub w3, w4, w3
+    // x3 now contains the sig_idx
+
+    mov x4, #1
+    lsl x4, x4, x3 // bit to remove
+
+    sub x4, x2, x4 // bit was certainly set, so sub is allowed
+    // x4 is now the new mask to be set
+    add x5, x6, #{pctl_pending}
+
+    add x2, x5, #{pctl_sender_infos}
+    add x2, x2, w3, uxtb 3
+    ldar x2, [x2]
+
+    // Try clearing the bit, retrying on failure.
+    stxr w1, x4, [x5] // try setting pending set to x4, set w1 := 0 on success
+    cbnz w1, 1b // retry everything if this fails
+    mov x1, x3
+    b 2f
+4:
+    // Check for realtime signals, thread/proc.
+    clrex
+
+    // Load the pending set again. TODO: optimize this?
+    add x1, x6, #{pctl_pending}
+    ldaxr x2, [x1]
+    lsr x2, x2, #32
+
+    add x5, x0, #{tcb_sc_off} + {sc_word} + 8
+    ldar x1, [x5]
+
+    orr x2, x1, x2
+    and x2, x2, x2, lsr #32
+    cbz x2, 7f
+
+    rbit x3, x2
+    clz x3, x3
+    mov x4, #31
+    sub x2, x4, x3
+    // x2 now contains sig_idx - 32
+
+    // If realtime signal was directed at thread, handle it as an idempotent signal.
+    lsr x3, x1, x2
+    tbnz x3, #0, 5f
+
+    mov x5, x0
+    mov x4, x8
+    mov x8, #{SYS_SIGDEQUEUE}
+    mov x0, x1
+    add x1, x0, #{tcb_sa_off} + {sa_tmp_rt_inf}
+    svc 0
+    mov x0, x5
+    mov x8, x4
+    cbnz x0, 1b
+
+    b 2f
+5:
+    // A realtime signal was sent to this thread, try clearing its bit.
+    // x3 contains last rt signal word, x2 contains rt_idx
+    clrex
+
+    // Calculate the absolute sig_idx
+    add x1, x3, 32
+
+    // Load si_pid and si_uid
+    add x2, x0, #{tcb_sc_off} + {sc_sender_infos}
+    add x2, x2, w1, uxtb #3
+    ldar x2, [x2]
+
+    add x3, x0, #{tcb_sc_off} + {sc_word} + 8
+    ldxr x2, [x3]
+
+    // Calculate new mask
+    mov x4, #1
+    lsl x4, x4, x2
+    sub x2, x2, x4 // remove bit
+
+    stxr w5, x2, [x3]
+    cbnz w5, 1b
+    str x2, [x0, #{tcb_sa_off} + {sa_tmp_id_inf}]
+    b 2f
+3:
+    // A standard signal was sent to this thread, try clearing its bit.
     clz x1, x1
-    mov x2, #32
+    mov x2, #31
     sub x1, x2, x1
 
-    // TODO: NOT ATOMIC!
+    // Load si_pid and si_uid
+    add x2, x0, #{tcb_sc_off} + {sc_sender_infos}
+    add x2, x2, w1, uxtb #3
+    ldar x2, [x2]
+
+    // Clear bit from mask
+    mov x3, #1
+    lsl x3, x3, x1
+    sub x4, x4, x3
+
+    // Try updating the mask
+    stxr w3, x1, [x5]
+    cbnz w3, 1b
+
+    str x2, [x0, #{tcb_sa_off} + {sa_tmp_id_inf}]
+2:
+    ldr x3, [x0, #{tcb_sa_off} + {sa_pctl}]
+    add x2, x2, {pctl_actions}
     add x2, x3, w1, uxtb #4 // actions_base + sig_idx * sizeof Action
+    // TODO: NOT ATOMIC (tearing allowed between regs)!
     ldxp x2, x3, [x2]
+    clrex
+
+    // Calculate new sp wrt redzone and alignment
+    mov x4, sp
+    sub x4, x4, {REDZONE_SIZE}
+    and x4, x4, -{STACK_ALIGN}
+    mov sp, x4
 
     // skip sigaltstack step if SA_ONSTACK is clear
-    // tbz x2, #57, 2f
-2:
+    // tbz x2, #{SA_ONSTACK_BIT}, 2f
+
     ldr x2, [x0, #{tcb_sc_off} + {sc_saved_pc}]
     ldr x3, [x0, #{tcb_sc_off} + {sc_saved_x0}]
-    stp x2, x3, [sp], #-16
+    stp x2, x3, [sp, #-16]!
 
     ldr x2, [x0, #{tcb_sa_off} + {sa_tmp_sp}]
     mrs x3, nzcv
-    stp x2, x3, [sp], #-16
+    stp x2, x3, [sp, #-16]!
 
     ldp x2, x3, [x0, #{tcb_sa_off} + {sa_tmp_x1_x2}]
-    stp x2, x3, [sp], #-16
+    stp x2, x3, [sp, #-16]!
     ldp x3, x4, [x0, #{tcb_sa_off} + {sa_tmp_x3_x4}]
-    stp x4, x3, [sp], #-16
-    stp x6, x5, [sp], #-16
-    stp x8, x7, [sp], #-16
-    stp x10, x9, [sp], #-16
-    stp x12, x11, [sp], #-16
-    stp x14, x13, [sp], #-16
-    stp x16, x15, [sp], #-16
-    stp x18, x17, [sp], #-16
-    stp x20, x19, [sp], #-16
-    stp x22, x21, [sp], #-16
-    stp x24, x23, [sp], #-16
-    stp x26, x25, [sp], #-16
-    stp x28, x27, [sp], #-16
-    stp x30, x29, [sp], #-16
+    stp x4, x3, [sp, #-16]!
+    ldp x5, x6, [x0, #{tcb_sa_off} + {sa_tmp_x5_x6}]
+    stp x6, x5, [sp, #-16]!
+
+    stp x8, x7, [sp, #-16]!
+    stp x10, x9, [sp, #-16]!
+    stp x12, x11, [sp, #-16]!
+    stp x14, x13, [sp, #-16]!
+    stp x16, x15, [sp, #-16]!
+    stp x18, x17, [sp, #-16]!
+    stp x20, x19, [sp, #-16]!
+    stp x22, x21, [sp, #-16]!
+    stp x24, x23, [sp, #-16]!
+    stp x26, x25, [sp, #-16]!
+    stp x28, x27, [sp, #-16]!
+    stp x30, x29, [sp, #-16]!
+
+    str w1, [sp, #-4]
+    sub sp, sp, #64
 
     mov x0, sp
     bl {inner}
+
+    add sp, sp, #64
 
     ldp x30, x29, [sp], #16
     ldp x28, x27, [sp], #16
@@ -234,28 +365,56 @@ asmfunction!(__relibc_internal_sigentry: ["
     ldp x6, x5, [sp], #16
     ldp x4, x3, [sp], #16
     ldp x2, x1, [sp], #16
+
     ldr x0, [sp, #8]
     msr nzcv, x0
 
+8:
     // x18 is reserved by ABI as 'platform register', so clobbering it should be safe.
     mov x18, sp
-    ldr x0, [sp], #16
+    ldr x0, [x18]
     mov sp, x0
-    mov x0, x18
 
-    ldp x18, x0, [x0]
+    ldp x18, x0, [x18, #16]
+    br x18
+7:
+    // Spurious signal, i.e. all bitsets were 0 at the time they were checked
+    clrex
+
+    ldr x1, [x0, #{tcb_sc_off} + {sc_flags}]
+    and x1, x1, ~1
+    str x1, [x0, #{tcb_sc_off} + {sc_flags}]
+
+    ldp x1, x2, [x0, #{tcb_sa_off} + {sa_tmp_x1_x2}]
+    ldp x3, x4, [x0, #{tcb_sa_off} + {sa_tmp_x3_x4}]
+    ldp x5, x6, [x0, #{tcb_sa_off} + {sa_tmp_x5_x6}]
+    ldr x18, [x0, #{tcb_sc_off} + {sc_saved_pc}]
+    ldr x0, [x0, #{tcb_sc_off} + {sc_saved_x0}]
     br x18
 "] <= [
+    pctl_pending = const (offset_of!(SigProcControl, pending)),
+    pctl_actions = const (offset_of!(SigProcControl, actions)),
+    pctl_sender_infos = const (offset_of!(SigProcControl, sender_infos)),
     tcb_sc_off = const (offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control)),
     tcb_sa_off = const (offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch)),
     sa_tmp_x1_x2 = const offset_of!(SigArea, tmp_x1_x2),
     sa_tmp_x3_x4 = const offset_of!(SigArea, tmp_x3_x4),
+    sa_tmp_x5_x6 = const offset_of!(SigArea, tmp_x5_x6),
     sa_tmp_sp = const offset_of!(SigArea, tmp_sp),
+    sa_tmp_rt_inf = const offset_of!(SigArea, tmp_rt_inf),
+    sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
     sa_pctl = const offset_of!(SigArea, pctl),
     sc_saved_pc = const offset_of!(Sigcontrol, saved_ip),
     sc_saved_x0 = const offset_of!(Sigcontrol, saved_archdep_reg),
+    sc_sender_infos = const offset_of!(Sigcontrol, sender_infos),
     sc_word = const offset_of!(Sigcontrol, word),
+    sc_flags = const offset_of!(Sigcontrol, control_flags),
     inner = sym inner_c,
+
+    SA_ONSTACK_BIT = const 58, // (1 << 58) >> 32 = 0x0400_0000
+    SYS_SIGDEQUEUE = const syscall::SYS_SIGDEQUEUE,
+    STACK_ALIGN = const 16,
+    REDZONE_SIZE = const 128,
 ]);
 
 asmfunction!(__relibc_internal_rlct_clone_ret: ["
@@ -294,4 +453,10 @@ pub unsafe fn manually_enter_trampoline() {
     ", inout("x0") ip_location => _, out("lr") _);
 }
 
-pub unsafe fn arch_pre(stack: &mut SigStack, os: &mut SigArea) {}
+pub unsafe fn arch_pre(stack: &mut SigStack, os: &mut SigArea) -> PosixStackt {
+    PosixStackt {
+        sp: core::ptr::null_mut(), // TODO
+        size: 0,                   // TODO
+        flags: 0,                  // TODO
+    }
+}

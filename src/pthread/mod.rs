@@ -2,7 +2,7 @@
 
 use core::{
     cell::{Cell, UnsafeCell},
-    mem::MaybeUninit,
+    mem::{offset_of, MaybeUninit},
     ptr::{addr_of, NonNull},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
@@ -21,8 +21,6 @@ use crate::{
 };
 
 use crate::sync::{waitval::Waitval, Mutex};
-
-const MAIN_PTHREAD_ID: usize = 1;
 
 /// Called only by the main thread, as part of relibc_start.
 pub unsafe fn init() {
@@ -269,7 +267,7 @@ pub unsafe fn join(thread: &Pthread) -> Result<Retval, Errno> {
 pub unsafe fn detach(thread: &Pthread) -> Result<(), Errno> {
     thread
         .flags
-        .fetch_or(PthreadFlags::DETACHED.bits(), Ordering::Release);
+        .fetch_or(PthreadFlags::DETACHED.bits(), Ordering::AcqRel);
     Ok(())
 }
 
@@ -294,6 +292,8 @@ pub unsafe fn exit_current_thread(retval: Retval) -> ! {
     header::tls::run_all_destructors();
 
     let this = current_thread().expect("failed to obtain current thread when exiting");
+    let stack_base = this.stack_base;
+    let stack_size = this.stack_size;
 
     if this.flags.load(Ordering::Acquire) & PthreadFlags::DETACHED.bits() != 0 {
         // When detached, the thread state no longer makes any sense, and can immediately be
@@ -304,12 +304,12 @@ pub unsafe fn exit_current_thread(retval: Retval) -> ! {
         this.waitval.post(retval);
     }
 
-    Sys::exit_thread()
+    Sys::exit_thread(stack_base.cast(), stack_size)
 }
 
 unsafe fn dealloc_thread(thread: &Pthread) {
+    // TODO: How should this be handled on Linux?
     OS_TID_TO_PTHREAD.lock().remove(&thread.os_tid.get().read());
-    //drop(Box::from_raw(thread as *const Pthread as *mut Pthread));
 }
 pub const SIGRT_RLCT_CANCEL: usize = 33;
 pub const SIGRT_RLCT_TIMER: usize = 34;
