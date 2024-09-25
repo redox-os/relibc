@@ -51,6 +51,8 @@ pub struct ExtraInfo<'a> {
     pub sigignmask: u64,
     // POSIX also states that the sigprocmask must be preserved across execs.
     pub sigprocmask: u64,
+    /// File mode creation mask (POSIX)
+    pub umask: u32,
 }
 
 pub fn fexec_impl<A, E>(
@@ -421,6 +423,9 @@ where
         }
         push(extrainfo.sigprocmask as usize)?;
         push(AT_REDOX_INHERITED_SIGPROCMASK)?;
+
+        push(extrainfo.umask as usize)?;
+        push(AT_REDOX_UMASK);
 
         push(0)?;
 

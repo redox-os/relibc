@@ -287,6 +287,10 @@ pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
 pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
     redox_rt::initialize();
 
+    use syscall::MODE_PERM;
+
+    use crate::header::sys_stat::S_ISVTX;
+
     use self::auxv_defs::*;
 
     if let (Some(cwd_ptr), Some(cwd_len)) = (
@@ -320,6 +324,11 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
         inherited_sigprocmask |= (mask as u64) << 32;
     }
     redox_rt::signal::set_sigmask(Some(inherited_sigprocmask), None).unwrap();
+
+    if let Some(umask) = get_auxv(&auxvs, AT_REDOX_UMASK) {
+        let _ =
+            redox_rt::sys::swap_umask((umask as u32) & u32::from(MODE_PERM) & !(S_ISVTX as u32));
+    }
 }
 #[cfg(not(target_os = "redox"))]
 pub fn init(auxvs: Box<[[usize; 2]]>) {}
