@@ -5,8 +5,8 @@ use core::{mem, ptr};
 use cbitset::BitSet;
 
 use crate::{
-    error::{Errno, ResultExt},
     c_str::CStr,
+    error::{Errno, ResultExt},
     header::{errno, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},
 };
