@@ -317,6 +317,7 @@ pub fn execve(
             default_scheme: Some(&default_scheme),
             sigignmask: 0,
             sigprocmask,
+            umask: redox_rt::sys::get_umask(),
         };
         fexec_impl(
             exec_fd_guard,
