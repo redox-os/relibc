@@ -130,6 +130,7 @@ pub fn clone_default_scheme() -> Option<Box<str>> {
     DEFAULT_SCHEME.lock().clone()
 }
 
+// TODO: Move to redox-rt, or maybe part of it?
 pub fn open(path: &str, flags: usize) -> Result<usize> {
     // TODO: SYMLOOP_MAX
     const MAX_LEVEL: usize = 64;

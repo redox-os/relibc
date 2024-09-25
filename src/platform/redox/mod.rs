@@ -8,7 +8,7 @@ use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
     dirent::{DirentHeader, DirentKind},
-    Error, PtraceEvent, Result, EMFILE,
+    Error, PtraceEvent, Result, EMFILE, MODE_PERM,
 };
 
 use crate::{
@@ -25,7 +25,7 @@ use crate::{
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, rusage, RLIM_INFINITY},
-        sys_stat::{stat, S_ISGID, S_ISUID},
+        sys_stat::{stat, S_ISGID, S_ISUID, S_ISVTX},
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
         sys_utsname::{utsname, UTSLENGTH},
@@ -784,7 +784,16 @@ impl Pal for Sys {
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int, Errno> {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
 
-        Ok(libredox::open(path, oflag, mode)? as c_int)
+        // POSIX states that umask should affect the following:
+        //
+        // open, openat (TODO), creat, mkdir, mkdirat (TODO),
+        // mkfifo, mkfifoat (TODO), mknod, mknodat (TODO),
+        // mq_open, and sem_open,
+        //
+        // all of which (the ones that exist thus far) currently call this function.
+        let effective_mode = mode & !(redox_rt::sys::get_umask() as mode_t);
+
+        Ok(libredox::open(path, oflag, effective_mode)? as c_int)
     }
 
     fn pipe2(fds: &mut [c_int], flags: c_int) -> c_int {
@@ -966,7 +975,8 @@ impl Pal for Sys {
     }
 
     fn umask(mask: mode_t) -> mode_t {
-        e(syscall::umask(mask as usize)) as mode_t
+        let new_effective_mask = mask & mode_t::from(MODE_PERM) & !S_ISVTX;
+        (redox_rt::sys::swap_umask(new_effective_mask as u32) as mode_t) & !S_ISVTX
     }
 
     fn uname(utsname: *mut utsname) -> c_int {

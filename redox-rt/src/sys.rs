@@ -1,4 +1,7 @@
-use core::ptr::addr_of;
+use core::{
+    ptr::addr_of,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 use syscall::{
     error::{Error, Result, EINTR},
@@ -113,4 +116,21 @@ pub fn posix_kill_thread(thread_fd: usize, signal: u32) -> Result<()> {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
     }
+}
+
+static UMASK: AtomicU32 = AtomicU32::new(0o022);
+
+/// Controls the set of bits removed from the `mode` mask when new file descriptors are created.
+///
+/// Must be validated by the caller
+//
+// TODO: validate here?
+#[inline]
+pub fn swap_umask(mask: u32) -> u32 {
+    UMASK.swap(mask, Ordering::AcqRel)
+}
+
+#[inline]
+pub fn get_umask() -> u32 {
+    UMASK.load(Ordering::Acquire)
 }
