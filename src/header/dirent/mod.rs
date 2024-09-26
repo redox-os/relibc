@@ -6,7 +6,7 @@ use core::{mem, ptr};
 use crate::{
     c_str::CStr,
     c_vec::CVec,
-    error::{Errno, ResultExtPtrMut},
+    error::{Errno, ResultExt, ResultExtPtrMut},
     fs::File,
     header::{fcntl, stdlib, string},
     platform::{self, types::*, Pal, Sys},
@@ -102,7 +102,7 @@ impl DIR {
         self.buf_offset = 0;
         self.opaque_offset = 0;
     }
-    fn close(mut self) -> c_int {
+    fn close(mut self) -> Result<(), Errno> {
         // Reference files aren't closed when dropped
         self.file.reference = true;
 
@@ -152,7 +152,7 @@ pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
 
 #[no_mangle]
 pub extern "C" fn closedir(dir: Box<DIR>) -> c_int {
-    dir.close()
+    dir.close().map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]

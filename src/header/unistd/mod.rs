@@ -72,7 +72,7 @@ pub extern "C" fn _exit(status: c_int) {
 #[no_mangle]
 pub unsafe extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::access(path, mode)
+    Sys::access(path, mode).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -98,7 +98,7 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
 #[no_mangle]
 pub unsafe extern "C" fn chdir(path: *const c_char) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::chdir(path)
+    Sys::chdir(path).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -121,11 +121,13 @@ pub unsafe extern "C" fn set_default_scheme(scheme: *const c_char) -> c_int {
 pub unsafe extern "C" fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::chown(path, owner, group)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn close(fildes: c_int) -> c_int {
-    Sys::close(fildes)
+    Sys::close(fildes).map(|()| 0).or_minus_one_errno()
 }
 
 // #[no_mangle]
@@ -142,7 +144,7 @@ pub unsafe extern "C" fn crypt(key: *const c_char, salt: *const c_char) -> *mut 
 #[no_mangle]
 pub extern "C" fn daemon(nochdir: c_int, noclose: c_int) -> c_int {
     if nochdir == 0 {
-        if Sys::chdir(c_str!("/")) < 0 {
+        if Sys::chdir(c_str!("/")).map(|()| 0).or_minus_one_errno() < 0 {
             return -1;
         }
     }
@@ -176,12 +178,12 @@ pub extern "C" fn daemon(nochdir: c_int, noclose: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn dup(fildes: c_int) -> c_int {
-    Sys::dup(fildes)
+    Sys::dup(fildes).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
-    Sys::dup2(fildes, fildes2)
+    Sys::dup2(fildes, fildes2).or_minus_one_errno()
 }
 
 // #[no_mangle]
@@ -327,16 +329,18 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
 #[no_mangle]
 pub extern "C" fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
     Sys::fchown(fildes, owner, group)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn fchdir(fildes: c_int) -> c_int {
-    Sys::fchdir(fildes)
+    Sys::fchdir(fildes).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
-    Sys::fdatasync(fildes)
+    Sys::fdatasync(fildes).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -449,7 +453,10 @@ pub extern "C" fn gethostid() -> c_long {
 #[no_mangle]
 pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> c_int {
     let mut uts = mem::MaybeUninit::<sys_utsname::utsname>::uninit();
-    let err = Sys::uname(uts.as_mut_ptr());
+    // TODO
+    let err = Sys::uname(uts.as_mut_ptr())
+        .map(|()| 0)
+        .or_minus_one_errno();
     if err < 0 {
         mem::forget(uts);
         return err;
@@ -546,13 +553,15 @@ pub extern "C" fn isatty(fd: c_int) -> c_int {
 pub unsafe extern "C" fn lchown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::lchown(path, owner, group)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     let path1 = CStr::from_ptr(path1);
     let path2 = CStr::from_ptr(path2);
-    Sys::link(path1, path2)
+    Sys::link(path1, path2).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -596,7 +605,7 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
 
 #[no_mangle]
 pub extern "C" fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
-    Sys::lseek(fildes, offset, whence)
+    Sys::lseek(fildes, offset, whence).or_minus_one_errno()
 }
 
 // #[no_mangle]
@@ -617,6 +626,8 @@ pub unsafe extern "C" fn pipe(fildes: *mut c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
     Sys::pipe2(slice::from_raw_parts_mut(fildes, 2), flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -688,28 +699,30 @@ pub unsafe extern "C" fn readlink(
 ) -> ssize_t {
     let path = CStr::from_ptr(path);
     let buf = slice::from_raw_parts_mut(buf as *mut u8, bufsize as usize);
-    Sys::readlink(path, buf)
+    Sys::readlink(path, buf).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn rmdir(path: *const c_char) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::rmdir(path)
+    Sys::rmdir(path).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn setgid(gid: gid_t) -> c_int {
     Sys::setresgid(gid, gid, -1)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn setgroups(size: size_t, list: *const gid_t) -> c_int {
-    Sys::setgroups(size, list)
+    Sys::setgroups(size, list).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
-    Sys::setpgid(pid, pgid)
+    Sys::setpgid(pid, pgid).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -720,29 +733,39 @@ pub extern "C" fn setpgrp() -> pid_t {
 #[no_mangle]
 pub extern "C" fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
     Sys::setresgid(rgid, egid, -1)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 #[no_mangle]
 pub extern "C" fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int {
     Sys::setresgid(rgid, egid, sgid)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
     Sys::setresuid(ruid, euid, -1)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn setsid() -> pid_t {
-    Sys::setsid()
+    Sys::setsid().map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn setuid(uid: uid_t) -> c_int {
     Sys::setresuid(uid, uid, -1)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 #[no_mangle]
 pub extern "C" fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int {
     Sys::setresuid(ruid, euid, suid)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -776,7 +799,7 @@ pub extern "C" fn swab(src: *const c_void, dest: *mut c_void, nbytes: ssize_t) {
 pub unsafe extern "C" fn symlink(path1: *const c_char, path2: *const c_char) -> c_int {
     let path1 = CStr::from_ptr(path1);
     let path2 = CStr::from_ptr(path2);
-    Sys::symlink(path1, path2)
+    Sys::symlink(path1, path2).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -834,7 +857,7 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
         return errno::ERANGE;
     }
 
-    let len = Sys::fpath(fildes, &mut name[..namesize - 1]);
+    let len = Sys::fpath(fildes, &mut name[..namesize - 1]).or_minus_one_errno();
     if len < 0 {
         return -platform::ERRNO.get();
     }
@@ -869,7 +892,7 @@ pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t 
 #[no_mangle]
 pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
     let path = CStr::from_ptr(path);
-    Sys::unlink(path)
+    Sys::unlink(path).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]

@@ -50,7 +50,9 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
         let dns_addr = unsafe { mem::transmute::<[u8; 4], u32>(dns_arr) };
 
         let mut timespec = timespec::default();
-        Sys::clock_gettime(time::constants::CLOCK_REALTIME, &mut timespec);
+        unsafe {
+            Sys::clock_gettime(time::constants::CLOCK_REALTIME, &mut timespec);
+        }
         let tid = (timespec.tv_nsec >> 16) as u16;
 
         let packet = Dns {
@@ -162,7 +164,7 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
 
     if dns_vec.len() == 4 {
         let mut timespec = timespec::default();
-        Sys::clock_gettime(time::constants::CLOCK_REALTIME, &mut timespec);
+        unsafe { Sys::clock_gettime(time::constants::CLOCK_REALTIME, &mut timespec) };
         let tid = (timespec.tv_nsec >> 16) as u16;
 
         let packet = Dns {

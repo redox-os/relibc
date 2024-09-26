@@ -10,7 +10,7 @@ use rand_xorshift::XorShiftRng;
 
 use crate::{
     c_str::CStr,
-    error::ResultExt,
+    error::{Errno, ResultExt},
     fs::File,
     header::{
         ctype,
@@ -649,7 +649,7 @@ where
 pub unsafe extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
     if inner_mktemp(name, 0, || {
         let name = CStr::from_ptr(name);
-        if Sys::access(name, 0) != 0 && platform::ERRNO.get() == ENOENT {
+        if Sys::access(name, 0) == Err(Errno(ENOENT)) {
             Some(())
         } else {
             None
@@ -663,9 +663,11 @@ pub unsafe extern "C" fn mktemp(name: *mut c_char) -> *mut c_char {
 }
 
 fn get_nstime() -> u64 {
-    let mut ts = mem::MaybeUninit::uninit();
-    Sys::clock_gettime(CLOCK_MONOTONIC, ts.as_mut_ptr());
-    unsafe { ts.assume_init() }.tv_nsec as u64
+    unsafe {
+        let mut ts = mem::MaybeUninit::uninit();
+        Sys::clock_gettime(CLOCK_MONOTONIC, ts.as_mut_ptr());
+        ts.assume_init().tv_nsec as u64
+    }
 }
 
 #[no_mangle]
@@ -983,7 +985,8 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
         };
 
         let len = out.len();
-        let read = Sys::fpath(*file, &mut out[..len - 1]);
+        // TODO: better error handling
+        let read = Sys::fpath(*file, &mut out[..len - 1]).or_minus_one_errno();
         if read < 0 {
             return ptr::null_mut();
         }

@@ -17,6 +17,7 @@ use core::{
 use crate::{
     c_str::CStr,
     c_vec::CVec,
+    error::ResultExt,
     fs::File,
     header::{
         errno::{self, STR_ERROR},
@@ -326,7 +327,8 @@ pub unsafe extern "C" fn fclose(stream: *mut FILE) -> c_int {
     flockfile(stream);
 
     let mut r = stream.flush().is_err();
-    let close = Sys::close(*stream.file) < 0;
+    // TODO: better error handling
+    let close = Sys::close(*stream.file).map(|()| 0).or_minus_one_errno() == -1;
     r = r || close;
 
     if stream.flags & constants::F_PERM == 0 {
@@ -635,7 +637,7 @@ pub unsafe extern "C" fn freopen(
         let new = &mut *new; // Should be safe, new is not null
         if *new.file == *stream.file {
             new.file.fd = -1;
-        } else if Sys::dup2(*new.file, *stream.file) < 0
+        } else if Sys::dup2(*new.file, *stream.file).or_minus_one_errno() == -1
             || fcntl::fcntl(
                 *stream.file,
                 fcntl::F_SETFL,
@@ -680,7 +682,7 @@ pub unsafe fn fseek_locked(stream: &mut FILE, mut off: off_t, whence: c_int) -> 
         return -1;
     }
 
-    let err = Sys::lseek(*stream.file, off, whence);
+    let err = Sys::lseek(*stream.file, off, whence).or_minus_one_errno();
     if err < 0 {
         return err as c_int;
     }
@@ -711,7 +713,7 @@ pub unsafe extern "C" fn ftello(stream: *mut FILE) -> off_t {
     ftell_locked(&mut *stream)
 }
 pub unsafe extern "C" fn ftell_locked(stream: &mut FILE) -> off_t {
-    let pos = Sys::lseek(*stream.file, 0, SEEK_CUR);
+    let pos = Sys::lseek(*stream.file, 0, SEEK_CUR).or_minus_one_errno();
     if pos < 0 {
         return -1;
     }
@@ -1007,12 +1009,10 @@ pub unsafe extern "C" fn putw(w: c_int, stream: *mut FILE) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn remove(path: *const c_char) -> c_int {
     let path = CStr::from_ptr(path);
-    let r = Sys::unlink(path);
-    if r == -errno::EISDIR {
-        Sys::rmdir(path)
-    } else {
-        r
-    }
+    Sys::unlink(path)
+        .or_else(|_err| Sys::rmdir(path))
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -1020,6 +1020,8 @@ pub unsafe extern "C" fn rename(oldpath: *const c_char, newpath: *const c_char) 
     let oldpath = CStr::from_ptr(oldpath);
     let newpath = CStr::from_ptr(newpath);
     Sys::rename(oldpath, newpath)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// Rewind `stream` back to the beginning of it
