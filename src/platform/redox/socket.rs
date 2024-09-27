@@ -5,7 +5,7 @@ use syscall::{self, flag::*};
 
 use super::{
     super::{types::*, Pal, PalSocket, ERRNO},
-    e, Sys,
+    Sys,
 };
 use crate::{
     error::{Errno, Result, ResultExt},
