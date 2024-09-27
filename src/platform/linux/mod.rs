@@ -226,7 +226,7 @@ impl Pal for Sys {
         Ok(e_raw(unsafe { syscall!(CLONE, SIGCHLD, 0, 0, 0, 0) })? as pid_t)
     }
 
-    fn fpath(fildes: c_int, out: &mut [u8]) -> Result<ssize_t> {
+    fn fpath(fildes: c_int, out: &mut [u8]) -> Result<usize> {
         let mut proc_path = b"/proc/self/fd/".to_vec();
         write!(proc_path, "{}", fildes).unwrap();
         proc_path.push(0);
@@ -331,8 +331,8 @@ impl Pal for Sys {
         Ok(e_raw(unsafe { syscall!(GETPRIORITY, which, who) })? as c_int)
     }
 
-    fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<ssize_t> {
-        Ok(e_raw(unsafe { syscall!(GETRANDOM, buf.as_mut_ptr(), buf.len(), flags) })? as ssize_t)
+    fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize> {
+        e_raw(unsafe { syscall!(GETRANDOM, buf.as_mut_ptr(), buf.len(), flags) })
     }
 
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()> {
@@ -540,17 +540,14 @@ impl Pal for Sys {
         }
     }
 
-    fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t> {
-        Ok(e_raw(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) })? as ssize_t)
+    fn read(fildes: c_int, buf: &mut [u8]) -> Result<usize> {
+        e_raw(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) })
     }
-    fn pread(fildes: c_int, buf: &mut [u8], off: off_t) -> Result<ssize_t> {
-        Ok(
-            e_raw(unsafe { syscall!(PREAD64, fildes, buf.as_mut_ptr(), buf.len(), off) })?
-                as ssize_t,
-        )
+    fn pread(fildes: c_int, buf: &mut [u8], off: off_t) -> Result<usize> {
+        e_raw(unsafe { syscall!(PREAD64, fildes, buf.as_mut_ptr(), buf.len(), off) })
     }
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<ssize_t> {
+    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize> {
         e_raw(unsafe {
             syscall!(
                 READLINKAT,
@@ -560,7 +557,6 @@ impl Pal for Sys {
                 out.len()
             )
         })
-        .map(|b| b as ssize_t)
     }
 
     fn rename(old: CStr, new: CStr) -> Result<()> {
@@ -624,11 +620,11 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(WAIT4, pid, stat_loc, options, 0) }).map(|p| p as pid_t)
     }
 
-    fn write(fildes: c_int, buf: &[u8]) -> Result<ssize_t> {
-        Ok(e_raw(unsafe { syscall!(WRITE, fildes, buf.as_ptr(), buf.len()) })? as ssize_t)
+    fn write(fildes: c_int, buf: &[u8]) -> Result<usize> {
+        e_raw(unsafe { syscall!(WRITE, fildes, buf.as_ptr(), buf.len()) })
     }
-    fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<ssize_t> {
-        Ok(e_raw(unsafe { syscall!(PWRITE64, fildes, buf.as_ptr(), buf.len(), off) })? as ssize_t)
+    fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<usize> {
+        e_raw(unsafe { syscall!(PWRITE64, fildes, buf.as_ptr(), buf.len(), off) })
     }
 
     fn verify() -> bool {

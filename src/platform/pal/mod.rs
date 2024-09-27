@@ -79,7 +79,7 @@ pub trait Pal {
 
     unsafe fn fork() -> Result<pid_t>;
 
-    fn fpath(fildes: c_int, out: &mut [u8]) -> Result<ssize_t>;
+    fn fpath(fildes: c_int, out: &mut [u8]) -> Result<usize>;
 
     fn fsync(fildes: c_int) -> Result<()>;
 
@@ -128,7 +128,7 @@ pub trait Pal {
 
     fn getpriority(which: c_int, who: id_t) -> Result<c_int>;
 
-    fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<ssize_t>;
+    fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize>;
 
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()>;
 
@@ -203,10 +203,10 @@ pub trait Pal {
 
     fn current_os_tid() -> pthread::OsTid;
 
-    fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t>;
-    fn pread(fildes: c_int, buf: &mut [u8], offset: off_t) -> Result<ssize_t>;
+    fn read(fildes: c_int, buf: &mut [u8]) -> Result<usize>;
+    fn pread(fildes: c_int, buf: &mut [u8], offset: off_t) -> Result<usize>;
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<ssize_t>;
+    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize>;
 
     fn rename(old: CStr, new: CStr) -> Result<()>;
 
@@ -239,8 +239,8 @@ pub trait Pal {
 
     unsafe fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t>;
 
-    fn write(fildes: c_int, buf: &[u8]) -> Result<ssize_t>;
-    fn pwrite(fildes: c_int, buf: &[u8], offset: off_t) -> Result<ssize_t>;
+    fn write(fildes: c_int, buf: &[u8]) -> Result<usize>;
+    fn pwrite(fildes: c_int, buf: &[u8], offset: off_t) -> Result<usize>;
 
     fn verify() -> bool;
 }

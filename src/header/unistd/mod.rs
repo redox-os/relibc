@@ -647,6 +647,7 @@ pub unsafe extern "C" fn pread(
         slice::from_raw_parts_mut(buf.cast::<u8>(), nbyte),
         offset,
     )
+    .map(|read| read as ssize_t)
     .or_minus_one_errno()
 }
 
@@ -681,6 +682,7 @@ pub unsafe extern "C" fn pwrite(
         slice::from_raw_parts(buf.cast::<u8>(), nbyte),
         offset,
     )
+    .map(|read| read as ssize_t)
     .or_minus_one_errno()
 }
 
@@ -688,7 +690,9 @@ pub unsafe extern "C" fn pwrite(
 pub unsafe extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
     let buf = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte as usize) };
     trace_expr!(
-        Sys::read(fildes, buf).or_minus_one_errno(),
+        Sys::read(fildes, buf)
+            .map(|read| read as ssize_t)
+            .or_minus_one_errno(),
         "read({}, {:p}, {})",
         fildes,
         buf,
@@ -704,7 +708,9 @@ pub unsafe extern "C" fn readlink(
 ) -> ssize_t {
     let path = CStr::from_ptr(path);
     let buf = slice::from_raw_parts_mut(buf as *mut u8, bufsize as usize);
-    Sys::readlink(path, buf).or_minus_one_errno()
+    Sys::readlink(path, buf)
+        .map(|read| read as ssize_t)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -862,7 +868,9 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
         return errno::ERANGE;
     }
 
-    let len = Sys::fpath(fildes, &mut name[..namesize - 1]).or_minus_one_errno();
+    let len = Sys::fpath(fildes, &mut name[..namesize - 1])
+        .map(|read| read as ssize_t)
+        .or_minus_one_errno();
     if len < 0 {
         return -platform::ERRNO.get();
     }
@@ -920,5 +928,7 @@ pub extern "C" fn vfork() -> pid_t {
 #[no_mangle]
 pub unsafe extern "C" fn write(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
     let buf = slice::from_raw_parts(buf as *const u8, nbyte as usize);
-    Sys::write(fildes, buf).or_minus_one_errno()
+    Sys::write(fildes, buf)
+        .map(|bytes| bytes as ssize_t)
+        .or_minus_one_errno()
 }

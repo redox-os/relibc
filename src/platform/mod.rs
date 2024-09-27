@@ -86,7 +86,9 @@ pub struct FileWriter(pub c_int);
 
 impl FileWriter {
     pub fn write(&mut self, buf: &[u8]) -> isize {
-        Sys::write(self.0, buf).or_minus_one_errno()
+        Sys::write(self.0, buf)
+            .map(|u| u as isize)
+            .or_minus_one_errno()
     }
 }
 
@@ -107,14 +109,19 @@ impl WriteByte for FileWriter {
 pub struct FileReader(pub c_int);
 
 impl FileReader {
+    // TODO: This is a bad interface. Rustify
     pub fn read(&mut self, buf: &mut [u8]) -> isize {
-        Sys::read(self.0, buf).or_minus_one_errno()
+        Sys::read(self.0, buf)
+            .map(|u| u as isize)
+            .or_minus_one_errno()
     }
 }
 
 impl Read for FileReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let i = Sys::read(self.0, buf).or_minus_one_errno(); // TODO
+        let i = Sys::read(self.0, buf)
+            .map(|u| u as isize)
+            .or_minus_one_errno(); // TODO
         if i >= 0 {
             Ok(i as usize)
         } else {

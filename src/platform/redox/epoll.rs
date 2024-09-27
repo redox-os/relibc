@@ -69,6 +69,7 @@ impl PalEpoll for Sys {
                         data: unsafe { (*event).data.u64 as usize },
                     },
                 )
+                .map(|u| u as ssize_t)
                 .or_minus_one_errno()
                     < 0
                 {
@@ -87,6 +88,7 @@ impl PalEpoll for Sys {
                         data: 0,
                     },
                 )
+                .map(|u| u as ssize_t)
                 .or_minus_one_errno()
                     < 0
                 {
@@ -129,6 +131,7 @@ impl PalEpoll for Sys {
                             data: 0,
                         },
                     )
+                    .map(|u| u as ssize_t)
                     .or_minus_one_errno()
                         == -1
                     {
@@ -158,6 +161,7 @@ impl PalEpoll for Sys {
                 maxevents as usize * mem::size_of::<syscall::Event>(),
             )
         })
+        .map(|u| u as ssize_t)
         .or_minus_one_errno(); // TODO
         if bytes_read == -1 {
             return -1;

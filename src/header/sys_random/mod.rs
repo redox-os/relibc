@@ -14,5 +14,6 @@ pub unsafe extern "C" fn getrandom(buf: *mut c_void, buflen: size_t, flags: c_ui
         slice::from_raw_parts_mut(buf as *mut u8, buflen as usize),
         flags,
     )
+    .map(|read| read as ssize_t)
     .or_minus_one_errno()
 }

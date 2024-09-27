@@ -446,7 +446,7 @@ impl Pal for Sys {
         Err(Errno(ENOSYS))
     }
 
-    fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<ssize_t> {
+    fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize> {
         let path = if flags & sys_random::GRND_RANDOM != 0 {
             //TODO: /dev/random equivalent
             "/scheme/rand"
@@ -461,7 +461,7 @@ impl Pal for Sys {
 
         //TODO: store fd internally
         let fd = FdGuard::new(syscall::open(path, open_flags)?);
-        Ok(syscall::read(*fd, buf)? as ssize_t)
+        Ok(syscall::read(*fd, buf)?)
     }
 
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()> {
@@ -735,11 +735,11 @@ impl Pal for Sys {
         }
     }
 
-    fn read(fd: c_int, buf: &mut [u8]) -> Result<ssize_t> {
+    fn read(fd: c_int, buf: &mut [u8]) -> Result<usize> {
         let fd = usize::try_from(fd).map_err(|_| Errno(EBADF))?;
-        Ok(redox_rt::sys::posix_read(fd, buf)? as ssize_t)
+        Ok(redox_rt::sys::posix_read(fd, buf)?)
     }
-    fn pread(fd: c_int, buf: &mut [u8], offset: off_t) -> Result<ssize_t> {
+    fn pread(fd: c_int, buf: &mut [u8], offset: off_t) -> Result<usize> {
         unsafe {
             Ok(syscall::syscall5(
                 syscall::SYS_READ2,
@@ -748,11 +748,11 @@ impl Pal for Sys {
                 buf.len(),
                 offset as usize,
                 !0,
-            )? as ssize_t)
+            )?)
         }
     }
 
-    fn fpath(fildes: c_int, out: &mut [u8]) -> Result<ssize_t> {
+    fn fpath(fildes: c_int, out: &mut [u8]) -> Result<usize> {
         // Since this is used by realpath, it converts from the old format to the new one for
         // compatibility reasons
         let mut buf = [0; limits::PATH_MAX];
@@ -776,12 +776,12 @@ impl Pal for Sys {
             ),
         };
         match res {
-            Ok(()) => Ok(cursor.position() as ssize_t),
+            Ok(()) => Ok(cursor.position() as usize),
             Err(_err) => Err(Errno(ENAMETOOLONG)),
         }
     }
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<ssize_t> {
+    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize> {
         let file = File::open(
             pathname,
             fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
@@ -1017,11 +1017,11 @@ impl Pal for Sys {
         Ok(res? as pid_t)
     }
 
-    fn write(fd: c_int, buf: &[u8]) -> Result<ssize_t> {
+    fn write(fd: c_int, buf: &[u8]) -> Result<usize> {
         let fd = usize::try_from(fd).map_err(|_| Errno(EBADFD))?;
-        Ok(redox_rt::sys::posix_write(fd, buf)? as ssize_t)
+        Ok(redox_rt::sys::posix_write(fd, buf)?)
     }
-    fn pwrite(fd: c_int, buf: &[u8], offset: off_t) -> Result<ssize_t> {
+    fn pwrite(fd: c_int, buf: &[u8], offset: off_t) -> Result<usize> {
         unsafe {
             Ok(syscall::syscall5(
                 syscall::SYS_WRITE2,
@@ -1030,7 +1030,7 @@ impl Pal for Sys {
                 buf.len(),
                 offset as usize,
                 !0,
-            )? as ssize_t)
+            )?)
         }
     }
 
