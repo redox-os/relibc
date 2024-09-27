@@ -88,7 +88,7 @@ pub type stack_t = sigaltstack;
 
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
-    Sys::kill(pid, sig)
+    Sys::kill(pid, sig).map(|()| 0).or_minus_one_errno()
 }
 #[no_mangle]
 pub extern "C" fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> c_int {
@@ -99,7 +99,7 @@ pub extern "C" fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-    Sys::killpg(pgrp, sig)
+    Sys::killpg(pgrp, sig).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]

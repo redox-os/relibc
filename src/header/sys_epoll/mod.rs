@@ -3,6 +3,7 @@
 use core::ptr;
 
 use crate::{
+    error::ResultExt,
     header::signal::sigset_t,
     platform::{types::*, PalEpoll, Sys},
 };
@@ -64,13 +65,24 @@ pub extern "C" fn epoll_create(_size: c_int) -> c_int {
 
 #[no_mangle]
 pub extern "C" fn epoll_create1(flags: c_int) -> c_int {
-    trace_expr!(Sys::epoll_create1(flags), "epoll_create1({:#x})", flags)
+    trace_expr!(
+        Sys::epoll_create1(flags).or_minus_one_errno(),
+        "epoll_create1({:#x})",
+        flags
+    )
 }
 
 #[no_mangle]
-pub extern "C" fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> c_int {
+pub unsafe extern "C" fn epoll_ctl(
+    epfd: c_int,
+    op: c_int,
+    fd: c_int,
+    event: *mut epoll_event,
+) -> c_int {
     trace_expr!(
-        Sys::epoll_ctl(epfd, op, fd, event),
+        Sys::epoll_ctl(epfd, op, fd, event)
+            .map(|()| 0)
+            .or_minus_one_errno(),
         "epoll_ctl({}, {}, {}, {:p})",
         epfd,
         op,
@@ -80,7 +92,7 @@ pub extern "C" fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll
 }
 
 #[no_mangle]
-pub extern "C" fn epoll_wait(
+pub unsafe extern "C" fn epoll_wait(
     epfd: c_int,
     events: *mut epoll_event,
     maxevents: c_int,
@@ -90,7 +102,7 @@ pub extern "C" fn epoll_wait(
 }
 
 #[no_mangle]
-pub extern "C" fn epoll_pwait(
+pub unsafe extern "C" fn epoll_pwait(
     epfd: c_int,
     events: *mut epoll_event,
     maxevents: c_int,
@@ -98,7 +110,9 @@ pub extern "C" fn epoll_pwait(
     sigmask: *const sigset_t,
 ) -> c_int {
     trace_expr!(
-        Sys::epoll_pwait(epfd, events, maxevents, timeout, sigmask),
+        Sys::epoll_pwait(epfd, events, maxevents, timeout, sigmask)
+            .map(|e| e as c_int)
+            .or_minus_one_errno(),
         "epoll_pwait({}, {:p}, {}, {}, {:p})",
         epfd,
         events,

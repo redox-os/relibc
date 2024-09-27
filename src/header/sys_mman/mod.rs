@@ -1,7 +1,8 @@
 use crate::{
     c_str::{CStr, CString},
+    error::{Errno, ResultExt},
     header::{fcntl, unistd},
-    platform::{types::*, Pal, Sys},
+    platform::{types::*, Pal, Sys, ERRNO},
 };
 
 pub use self::sys::*;
@@ -45,12 +46,12 @@ pub const POSIX_MADV_WONTNEED: c_int = 4;
 
 #[no_mangle]
 pub unsafe extern "C" fn mlock(addr: *const c_void, len: usize) -> c_int {
-    Sys::mlock(addr, len)
+    Sys::mlock(addr, len).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
-pub extern "C" fn mlockall(flags: c_int) -> c_int {
-    Sys::mlockall(flags)
+pub unsafe extern "C" fn mlockall(flags: c_int) -> c_int {
+    Sys::mlockall(flags).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -62,7 +63,13 @@ pub unsafe extern "C" fn mmap(
     fildes: c_int,
     off: off_t,
 ) -> *mut c_void {
-    Sys::mmap(addr, len, prot, flags, fildes, off)
+    match Sys::mmap(addr, len, prot, flags, fildes, off) {
+        Ok(ptr) => ptr,
+        Err(Errno(errno)) => {
+            ERRNO.set(errno);
+            MAP_FAILED
+        }
+    }
 }
 
 #[no_mangle]
@@ -74,37 +81,49 @@ unsafe extern "C" fn mremap(
     mut __valist: ...
 ) -> *mut c_void {
     let new_address = __valist.arg::<*mut c_void>();
-    Sys::mremap(old_address, old_size, new_size, flags, new_address)
+    match Sys::mremap(old_address, old_size, new_size, flags, new_address) {
+        Ok(ptr) => ptr,
+        Err(Errno(errno)) => {
+            ERRNO.set(errno);
+            MAP_FAILED
+        }
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn mprotect(addr: *mut c_void, len: size_t, prot: c_int) -> c_int {
     Sys::mprotect(addr, len, prot)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn msync(addr: *mut c_void, len: size_t, flags: c_int) -> c_int {
     Sys::msync(addr, len, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn munlock(addr: *const c_void, len: usize) -> c_int {
-    Sys::munlock(addr, len)
+    Sys::munlock(addr, len).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
-pub extern "C" fn munlockall() -> c_int {
-    Sys::munlockall()
+pub unsafe extern "C" fn munlockall() -> c_int {
+    Sys::munlockall().map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
-    Sys::munmap(addr, len)
+    Sys::munmap(addr, len).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn madvise(addr: *mut c_void, len: size_t, flags: c_int) -> c_int {
     Sys::madvise(addr, len, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[cfg(target_os = "linux")]

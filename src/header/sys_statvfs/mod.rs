@@ -27,8 +27,8 @@ pub struct statvfs {
 }
 
 #[no_mangle]
-pub extern "C" fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
-    Sys::fstatvfs(fildes, buf)
+pub unsafe extern "C" fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
+    Sys::fstatvfs(fildes, buf).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -40,7 +40,7 @@ pub unsafe extern "C" fn statvfs(file: *const c_char, buf: *mut statvfs) -> c_in
         return -1;
     }
 
-    let res = Sys::fstatvfs(fd, buf);
+    let res = Sys::fstatvfs(fd, buf).map(|()| 0).or_minus_one_errno();
 
     Sys::close(fd);
 

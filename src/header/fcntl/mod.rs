@@ -55,7 +55,7 @@ pub unsafe extern "C" fn fcntl(fildes: c_int, cmd: c_int, mut __valist: ...) -> 
         _ => 0,
     };
 
-    Sys::fcntl(fildes, cmd, arg)
+    Sys::fcntl(fildes, cmd, arg).or_minus_one_errno()
 }
 
 #[no_mangle]

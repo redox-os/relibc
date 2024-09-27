@@ -986,7 +986,9 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
 
         let len = out.len();
         // TODO: better error handling
-        let read = Sys::fpath(*file, &mut out[..len - 1]).or_minus_one_errno();
+        let read = Sys::fpath(*file, &mut out[..len - 1])
+            .map(|read| read as ssize_t)
+            .or_minus_one_errno();
         if read < 0 {
             return ptr::null_mut();
         }
@@ -1320,7 +1322,7 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
         unreachable!();
     } else if child_pid > 0 {
         let mut wstatus = 0;
-        if Sys::waitpid(child_pid, &mut wstatus, 0) == !0 {
+        if Sys::waitpid(child_pid, &mut wstatus, 0).or_minus_one_errno() == -1 {
             return -1;
         }
 

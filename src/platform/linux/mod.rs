@@ -77,9 +77,9 @@ pub fn e(sys: usize) -> usize {
 pub struct Sys;
 
 impl Sys {
-    pub unsafe fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
+    pub unsafe fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c_int> {
         // TODO: Somehow support varargs to syscall??
-        e(syscall!(IOCTL, fd, request, out)) as c_int
+        Ok(e_raw(syscall!(IOCTL, fd, request, out))? as c_int)
     }
 
     // fn times(out: *mut tms) -> clock_t {
@@ -92,8 +92,8 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(ACCESS, path.as_ptr(), mode) }).map(|_| ())
     }
 
-    unsafe fn brk(addr: *mut c_void) -> *mut c_void {
-        unsafe { syscall!(BRK, addr) as *mut c_void }
+    unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void> {
+        Ok(e_raw(unsafe { syscall!(BRK, addr) })? as *mut c_void)
     }
 
     fn chdir(path: CStr) -> Result<()> {
@@ -144,10 +144,15 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(DUP3, fildes, fildes2, 0) }).map(|f| f as c_int)
     }
 
-    unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
-        e(syscall!(EXECVE, path.as_ptr(), argv, envp)) as c_int
+    unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> Result<()> {
+        e_raw(syscall!(EXECVE, path.as_ptr(), argv, envp))?;
+        unreachable!()
     }
-    unsafe fn fexecve(fildes: c_int, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
+    unsafe fn fexecve(
+        fildes: c_int,
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
+    ) -> Result<()> {
         todo!("not yet used by relibc")
     }
 
@@ -178,53 +183,50 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(FDATASYNC, fildes) }).map(|_| ())
     }
 
-    fn flock(fd: c_int, operation: c_int) -> c_int {
-        e(unsafe { syscall!(FLOCK, fd, operation) }) as c_int
+    fn flock(fd: c_int, operation: c_int) -> Result<()> {
+        e_raw(unsafe { syscall!(FLOCK, fd, operation) }).map(|_| ())
     }
 
-    fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
+    unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()> {
         let empty = b"\0";
         let empty_ptr = empty.as_ptr() as *const c_char;
-        e(unsafe { syscall!(NEWFSTATAT, fildes, empty_ptr, buf, AT_EMPTY_PATH) }) as c_int
+        e_raw(unsafe { syscall!(NEWFSTATAT, fildes, empty_ptr, buf, AT_EMPTY_PATH) }).map(|_| ())
     }
 
-    fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
+    unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()> {
         let mut kbuf = linux_statfs::default();
         let kbuf_ptr = &mut kbuf as *mut linux_statfs;
-        let res = e(unsafe { syscall!(FSTATFS, fildes, kbuf_ptr) }) as c_int;
-        if res == 0 {
-            unsafe {
-                if !buf.is_null() {
-                    (*buf).f_bsize = kbuf.f_bsize as c_ulong;
-                    (*buf).f_frsize = if kbuf.f_frsize != 0 {
-                        kbuf.f_frsize
-                    } else {
-                        kbuf.f_bsize
-                    } as c_ulong;
-                    (*buf).f_blocks = kbuf.f_blocks;
-                    (*buf).f_bfree = kbuf.f_bfree;
-                    (*buf).f_bavail = kbuf.f_bavail;
-                    (*buf).f_files = kbuf.f_files;
-                    (*buf).f_ffree = kbuf.f_ffree;
-                    (*buf).f_favail = kbuf.f_ffree;
-                    (*buf).f_fsid = kbuf.f_fsid as c_ulong;
-                    (*buf).f_flag = kbuf.f_flags as c_ulong;
-                    (*buf).f_namemax = kbuf.f_namelen as c_ulong;
-                }
-            }
+        e_raw(syscall!(FSTATFS, fildes, kbuf_ptr))?;
+
+        if !buf.is_null() {
+            (*buf).f_bsize = kbuf.f_bsize as c_ulong;
+            (*buf).f_frsize = if kbuf.f_frsize != 0 {
+                kbuf.f_frsize
+            } else {
+                kbuf.f_bsize
+            } as c_ulong;
+            (*buf).f_blocks = kbuf.f_blocks;
+            (*buf).f_bfree = kbuf.f_bfree;
+            (*buf).f_bavail = kbuf.f_bavail;
+            (*buf).f_files = kbuf.f_files;
+            (*buf).f_ffree = kbuf.f_ffree;
+            (*buf).f_favail = kbuf.f_ffree;
+            (*buf).f_fsid = kbuf.f_fsid as c_ulong;
+            (*buf).f_flag = kbuf.f_flags as c_ulong;
+            (*buf).f_namemax = kbuf.f_namelen as c_ulong;
         }
-        res
+        Ok(())
     }
 
-    fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> c_int {
-        e(unsafe { syscall!(FCNTL, fildes, cmd, arg) }) as c_int
+    fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> Result<c_int> {
+        Ok(e_raw(unsafe { syscall!(FCNTL, fildes, cmd, arg) })? as c_int)
     }
 
-    fn fork() -> pid_t {
-        e(unsafe { syscall!(CLONE, SIGCHLD, 0, 0, 0, 0) }) as pid_t
+    unsafe fn fork() -> Result<pid_t> {
+        Ok(e_raw(unsafe { syscall!(CLONE, SIGCHLD, 0, 0, 0, 0) })? as pid_t)
     }
 
-    fn fpath(fildes: c_int, out: &mut [u8]) -> Result<ssize_t> {
+    fn fpath(fildes: c_int, out: &mut [u8]) -> Result<usize> {
         let mut proc_path = b"/proc/self/fd/".to_vec();
         write!(proc_path, "{}", fildes).unwrap();
         proc_path.push(0);
@@ -263,20 +265,17 @@ impl Pal for Sys {
         .map(|n| n as u32)
     }
 
-    fn futimens(fd: c_int, times: *const timespec) -> c_int {
-        e(unsafe { syscall!(UTIMENSAT, fd, ptr::null::<c_char>(), times, 0) }) as c_int
+    unsafe fn futimens(fd: c_int, times: *const timespec) -> Result<()> {
+        e_raw(unsafe { syscall!(UTIMENSAT, fd, ptr::null::<c_char>(), times, 0) }).map(|_| ())
     }
 
-    fn utimens(path: CStr, times: *const timespec) -> c_int {
-        e(unsafe { syscall!(UTIMENSAT, AT_FDCWD, path.as_ptr(), times, 0) }) as c_int
+    unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()> {
+        e_raw(unsafe { syscall!(UTIMENSAT, AT_FDCWD, path.as_ptr(), times, 0) }).map(|_| ())
     }
 
-    fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
-        if e(unsafe { syscall!(GETCWD, buf, size) }) == !0 {
-            ptr::null_mut()
-        } else {
-            buf
-        }
+    unsafe fn getcwd(buf: *mut c_char, size: size_t) -> Result<()> {
+        e_raw(unsafe { syscall!(GETCWD, buf, size) })?;
+        Ok(())
     }
 
     fn getdents(fd: c_int, buf: &mut [u8], _off: u64) -> Result<usize> {
@@ -292,43 +291,48 @@ impl Pal for Sys {
     }
 
     fn getegid() -> gid_t {
-        e(unsafe { syscall!(GETEGID) }) as gid_t
+        // Always successful
+        unsafe { syscall!(GETEGID) as gid_t }
     }
 
     fn geteuid() -> uid_t {
-        e(unsafe { syscall!(GETEUID) }) as uid_t
+        // Always successful
+        unsafe { syscall!(GETEUID) as uid_t }
     }
 
     fn getgid() -> gid_t {
-        e(unsafe { syscall!(GETGID) }) as gid_t
+        // Always successful
+        unsafe { syscall!(GETGID) as gid_t }
     }
 
-    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
-        e(unsafe { syscall!(GETGROUPS, size, list) }) as c_int
+    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int> {
+        Ok(e_raw(unsafe { syscall!(GETGROUPS, size, list) })? as c_int)
     }
 
     fn getpagesize() -> usize {
         4096
     }
 
-    fn getpgid(pid: pid_t) -> pid_t {
-        e(unsafe { syscall!(GETPGID, pid) }) as pid_t
+    fn getpgid(pid: pid_t) -> Result<pid_t> {
+        Ok(e_raw(unsafe { syscall!(GETPGID, pid) })? as pid_t)
     }
 
     fn getpid() -> pid_t {
-        e(unsafe { syscall!(GETPID) }) as pid_t
+        // Always successful
+        unsafe { syscall!(GETPID) as pid_t }
     }
 
     fn getppid() -> pid_t {
-        e(unsafe { syscall!(GETPPID) }) as pid_t
+        // Always successful
+        unsafe { syscall!(GETPPID) as pid_t }
     }
 
-    fn getpriority(which: c_int, who: id_t) -> c_int {
-        e(unsafe { syscall!(GETPRIORITY, which, who) }) as c_int
+    fn getpriority(which: c_int, who: id_t) -> Result<c_int> {
+        Ok(e_raw(unsafe { syscall!(GETPRIORITY, which, who) })? as c_int)
     }
 
-    fn getrandom(buf: &mut [u8], flags: c_uint) -> ssize_t {
-        e(unsafe { syscall!(GETRANDOM, buf.as_mut_ptr(), buf.len(), flags) }) as ssize_t
+    fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize> {
+        e_raw(unsafe { syscall!(GETRANDOM, buf.as_mut_ptr(), buf.len(), flags) })
     }
 
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()> {
@@ -339,24 +343,26 @@ impl Pal for Sys {
         e_raw(syscall!(SETRLIMIT, resource, rlimit)).map(|_| ())
     }
 
-    fn getrusage(who: c_int, r_usage: &mut rusage) -> c_int {
-        e(unsafe { syscall!(GETRUSAGE, who, r_usage as *mut rusage) }) as c_int
+    fn getrusage(who: c_int, r_usage: &mut rusage) -> Result<()> {
+        e_raw(unsafe { syscall!(GETRUSAGE, who, r_usage as *mut rusage) })?;
+        Ok(())
     }
 
-    fn getsid(pid: pid_t) -> pid_t {
-        e(unsafe { syscall!(GETSID, pid) }) as pid_t
+    fn getsid(pid: pid_t) -> Result<pid_t> {
+        Ok(e_raw(unsafe { syscall!(GETSID, pid) })? as pid_t)
     }
 
     fn gettid() -> pid_t {
-        e(unsafe { syscall!(GETTID) }) as pid_t
+        // Always successful
+        unsafe { syscall!(GETTID) as pid_t }
     }
 
-    fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
-        e(unsafe { syscall!(GETTIMEOFDAY, tp, tzp) }) as c_int
+    unsafe fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> Result<()> {
+        e_raw(unsafe { syscall!(GETTIMEOFDAY, tp, tzp) }).map(|_| ())
     }
 
     fn getuid() -> uid_t {
-        e(unsafe { syscall!(GETUID) }) as uid_t
+        unsafe { syscall!(GETUID) as uid_t }
     }
 
     fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
@@ -404,12 +410,12 @@ impl Pal for Sys {
         Sys::mknod(path, mode | S_IFIFO, 0)
     }
 
-    unsafe fn mlock(addr: *const c_void, len: usize) -> c_int {
-        e(syscall!(MLOCK, addr, len)) as c_int
+    unsafe fn mlock(addr: *const c_void, len: usize) -> Result<()> {
+        e_raw(unsafe { syscall!(MLOCK, addr, len) }).map(|_| ())
     }
 
-    fn mlockall(flags: c_int) -> c_int {
-        e(unsafe { syscall!(MLOCKALL, flags) }) as c_int
+    unsafe fn mlockall(flags: c_int) -> Result<()> {
+        e_raw(unsafe { syscall!(MLOCKALL, flags) }).map(|_| ())
     }
 
     unsafe fn mmap(
@@ -419,8 +425,8 @@ impl Pal for Sys {
         flags: c_int,
         fildes: c_int,
         off: off_t,
-    ) -> *mut c_void {
-        e(syscall!(MMAP, addr, len, prot, flags, fildes, off)) as *mut c_void
+    ) -> Result<*mut c_void> {
+        Ok(e_raw(syscall!(MMAP, addr, len, prot, flags, fildes, off))? as *mut c_void)
     }
 
     unsafe fn mremap(
@@ -429,36 +435,36 @@ impl Pal for Sys {
         new_len: usize,
         flags: c_int,
         args: *mut c_void,
-    ) -> *mut c_void {
-        e(syscall!(MREMAP, addr, len, new_len, flags, args)) as *mut c_void
+    ) -> Result<*mut c_void> {
+        Ok(e_raw(syscall!(MREMAP, addr, len, new_len, flags, args))? as *mut c_void)
     }
 
-    unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
-        e(syscall!(MPROTECT, addr, len, prot)) as c_int
+    unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> Result<()> {
+        e_raw(syscall!(MPROTECT, addr, len, prot)).map(|_| ())
     }
 
-    unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
-        e(syscall!(MSYNC, addr, len, flags)) as c_int
+    unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> Result<()> {
+        e_raw(syscall!(MSYNC, addr, len, flags)).map(|_| ())
     }
 
-    unsafe fn munlock(addr: *const c_void, len: usize) -> c_int {
-        e(syscall!(MUNLOCK, addr, len)) as c_int
+    unsafe fn munlock(addr: *const c_void, len: usize) -> Result<()> {
+        e_raw(syscall!(MUNLOCK, addr, len)).map(|_| ())
     }
 
-    fn munlockall() -> c_int {
-        e(unsafe { syscall!(MUNLOCKALL) }) as c_int
+    unsafe fn munlockall() -> Result<()> {
+        e_raw(unsafe { syscall!(MUNLOCKALL) }).map(|_| ())
     }
 
-    unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
-        e(syscall!(MUNMAP, addr, len)) as c_int
+    unsafe fn munmap(addr: *mut c_void, len: usize) -> Result<()> {
+        e_raw(syscall!(MUNMAP, addr, len)).map(|_| ())
     }
 
-    unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
-        e(syscall!(MADVISE, addr, len, flags)) as c_int
+    unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> Result<()> {
+        e_raw(syscall!(MADVISE, addr, len, flags)).map(|_| ())
     }
 
-    fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
-        e(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }) as c_int
+    unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()> {
+        e_raw(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }).map(|_| ())
     }
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
@@ -534,17 +540,14 @@ impl Pal for Sys {
         }
     }
 
-    fn read(fildes: c_int, buf: &mut [u8]) -> Result<ssize_t> {
-        Ok(e_raw(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) })? as ssize_t)
+    fn read(fildes: c_int, buf: &mut [u8]) -> Result<usize> {
+        e_raw(unsafe { syscall!(READ, fildes, buf.as_mut_ptr(), buf.len()) })
     }
-    fn pread(fildes: c_int, buf: &mut [u8], off: off_t) -> Result<ssize_t> {
-        Ok(
-            e_raw(unsafe { syscall!(PREAD64, fildes, buf.as_mut_ptr(), buf.len(), off) })?
-                as ssize_t,
-        )
+    fn pread(fildes: c_int, buf: &mut [u8], off: off_t) -> Result<usize> {
+        e_raw(unsafe { syscall!(PREAD64, fildes, buf.as_mut_ptr(), buf.len(), off) })
     }
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<ssize_t> {
+    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize> {
         e_raw(unsafe {
             syscall!(
                 READLINKAT,
@@ -554,7 +557,6 @@ impl Pal for Sys {
                 out.len()
             )
         })
-        .map(|b| b as ssize_t)
     }
 
     fn rename(old: CStr, new: CStr) -> Result<()> {
@@ -614,19 +616,19 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), 0) }).map(|_| ())
     }
 
-    fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
-        e(unsafe { syscall!(WAIT4, pid, stat_loc, options, 0) }) as pid_t
+    unsafe fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t> {
+        e_raw(unsafe { syscall!(WAIT4, pid, stat_loc, options, 0) }).map(|p| p as pid_t)
     }
 
-    fn write(fildes: c_int, buf: &[u8]) -> Result<ssize_t> {
-        Ok(e_raw(unsafe { syscall!(WRITE, fildes, buf.as_ptr(), buf.len()) })? as ssize_t)
+    fn write(fildes: c_int, buf: &[u8]) -> Result<usize> {
+        e_raw(unsafe { syscall!(WRITE, fildes, buf.as_ptr(), buf.len()) })
     }
-    fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<ssize_t> {
-        Ok(e_raw(unsafe { syscall!(PWRITE64, fildes, buf.as_ptr(), buf.len(), off) })? as ssize_t)
+    fn pwrite(fildes: c_int, buf: &[u8], off: off_t) -> Result<usize> {
+        e_raw(unsafe { syscall!(PWRITE64, fildes, buf.as_ptr(), buf.len(), off) })
     }
 
     fn verify() -> bool {
         // GETPID on Linux is 39, which does not exist on Redox
-        e(unsafe { sc::syscall5(sc::nr::GETPID, !0, !0, !0, !0, !0) }) != !0
+        e_raw(unsafe { sc::syscall5(sc::nr::GETPID, !0, !0, !0, !0, !0) }).is_ok()
     }
 }

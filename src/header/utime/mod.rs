@@ -2,6 +2,7 @@
 
 use crate::{
     c_str::CStr,
+    error::ResultExt,
     header::time::timespec,
     platform::{types::*, Pal, Sys},
 };
@@ -27,4 +28,6 @@ pub unsafe extern "C" fn utime(filename: *const c_char, times: *const utimbuf) -
         },
     ];
     Sys::utimens(filename, times_spec.as_ptr())
+        .map(|()| 0)
+        .or_minus_one_errno()
 }

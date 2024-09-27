@@ -80,7 +80,7 @@ pub fn select_epoll(
                 data: epoll_data { fd },
                 ..Default::default()
             };
-            if epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) < 0 {
+            if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) } < 0 {
                 if platform::ERRNO.get() == errno::EPERM {
                     not_epoll += 1;
                 } else {
@@ -121,12 +121,14 @@ pub fn select_epoll(
             None => -1,
         }
     };
-    let res = epoll_wait(
-        *ep,
-        events.as_mut_ptr(),
-        events.len() as c_int,
-        epoll_timeout,
-    );
+    let res = unsafe {
+        epoll_wait(
+            *ep,
+            events.as_mut_ptr(),
+            events.len() as c_int,
+            epoll_timeout,
+        )
+    };
     if res < 0 {
         return -1;
     }

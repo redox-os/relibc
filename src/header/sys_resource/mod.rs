@@ -68,7 +68,7 @@ pub const PRIO_USER: c_int = 2;
 
 #[no_mangle]
 pub unsafe extern "C" fn getpriority(which: c_int, who: id_t) -> c_int {
-    let r = Sys::getpriority(which, who);
+    let r = Sys::getpriority(which, who).or_minus_one_errno();
     if r < 0 {
         return r;
     }
@@ -99,4 +99,6 @@ pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int
 #[no_mangle]
 pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
     Sys::getrusage(who, &mut *r_usage)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }

@@ -25,7 +25,7 @@ static LOCK: Mutex<()> = Mutex::new(());
 
 unsafe impl Allocator for System {
     fn alloc(&self, size: usize) -> (*mut u8, usize, u32) {
-        let addr = unsafe {
+        let Ok(addr) = (unsafe {
             Sys::mmap(
                 0 as *mut _,
                 size,
@@ -34,36 +34,33 @@ unsafe impl Allocator for System {
                 -1,
                 0,
             )
+        }) else {
+            return (ptr::null_mut(), 0, 0);
         };
-        if addr as *mut c_void == MAP_FAILED {
-            (ptr::null_mut(), 0, 0)
-        } else {
-            (addr as *mut u8, size, 0)
-        }
+        (addr as *mut u8, size, 0)
     }
 
     fn remap(&self, ptr: *mut u8, oldsize: usize, newsize: usize, can_move: bool) -> *mut u8 {
         let flags = if can_move { MREMAP_MAYMOVE } else { 0 };
-        let ptr = unsafe { Sys::mremap(ptr as *mut _, oldsize, newsize, flags, ptr::null_mut()) };
-        if ptr as *mut c_void == MAP_FAILED {
-            ptr::null_mut()
-        } else {
-            ptr as *mut u8
-        }
+        let Ok(ptr) =
+            (unsafe { Sys::mremap(ptr as *mut _, oldsize, newsize, flags, ptr::null_mut()) })
+        else {
+            return ptr::null_mut();
+        };
+        ptr as *mut u8
     }
 
     fn free_part(&self, ptr: *mut u8, oldsize: usize, newsize: usize) -> bool {
         unsafe {
-            let rc = Sys::mremap(ptr as *mut _, oldsize, newsize, 0, ptr::null_mut());
-            if rc as *mut c_void != MAP_FAILED {
+            if Sys::mremap(ptr as *mut _, oldsize, newsize, 0, ptr::null_mut()).is_ok() {
                 return true;
             }
-            Sys::munmap(ptr.offset(newsize as isize) as *mut _, oldsize - newsize) == 0
+            Sys::munmap(ptr.add(newsize) as *mut _, oldsize - newsize).is_ok()
         }
     }
 
     fn free(&self, ptr: *mut u8, size: usize) -> bool {
-        unsafe { Sys::munmap(ptr as *mut _, size) == 0 }
+        unsafe { Sys::munmap(ptr as *mut _, size).is_ok() }
     }
 
     fn can_release_part(&self, _flags: u32) -> bool {

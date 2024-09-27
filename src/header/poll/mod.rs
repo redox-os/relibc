@@ -3,6 +3,7 @@
 use core::{mem, slice};
 
 use crate::{
+    error::ResultExt,
     fs::File,
     header::sys_epoll::{
         epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR, EPOLLHUP, EPOLLIN,
@@ -77,13 +78,13 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
 
         pfd.revents = 0;
 
-        if epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &mut event) < 0 {
+        if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &mut event) } < 0 {
             return -1;
         }
     }
 
     let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
-    let res = epoll_wait(*ep, events.as_mut_ptr(), events.len() as c_int, timeout);
+    let res = unsafe { epoll_wait(*ep, events.as_mut_ptr(), events.len() as c_int, timeout) };
     if res < 0 {
         return -1;
     }

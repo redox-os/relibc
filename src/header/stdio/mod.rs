@@ -837,7 +837,7 @@ pub unsafe extern "C" fn pclose(stream: *mut FILE) -> c_int {
     fclose(stream);
 
     let mut wstatus = 0;
-    if Sys::waitpid(pid, &mut wstatus, 0) < 0 {
+    if Sys::waitpid(pid, &mut wstatus, 0).or_minus_one_errno() == -1 {
         return -1;
     }
 

@@ -306,7 +306,9 @@ impl PalSocket for Sys {
             return -1;
         }
         if address == ptr::null_mut() || address_len == ptr::null_mut() {
-            Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len)).or_minus_one_errno()
+            Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
+                .map(|u| u as ssize_t)
+                .or_minus_one_errno()
         } else {
             let fd = e(syscall::dup(socket as usize, b"listen"));
             if fd == !0 {
@@ -318,6 +320,7 @@ impl PalSocket for Sys {
             }
 
             let ret = Self::read(fd as c_int, slice::from_raw_parts_mut(buf as *mut u8, len))
+                .map(|u| u as ssize_t)
                 .or_minus_one_errno();
             let _ = syscall::close(fd);
             ret
@@ -351,10 +354,13 @@ impl PalSocket for Sys {
             return -1;
         }
         if dest_addr == ptr::null() || dest_len == 0 {
-            Self::write(socket, slice::from_raw_parts(buf as *const u8, len)).or_minus_one_errno()
+            Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
+                .map(|u| u as ssize_t)
+                .or_minus_one_errno()
         } else {
             let fd = bind_or_connect!(connect copy, socket, dest_addr, dest_len);
             let ret = Self::write(fd as c_int, slice::from_raw_parts(buf as *const u8, len))
+                .map(|u| u as ssize_t)
                 .or_minus_one_errno();
             let _ = syscall::close(fd);
             ret
@@ -389,7 +395,9 @@ impl PalSocket for Sys {
                 tv_nsec: timeval.tv_usec * 1000,
             };
 
-            let ret = Self::write(fd as c_int, &timespec).or_minus_one_errno();
+            let ret = Self::write(fd as c_int, &timespec)
+                .map(|u| u as ssize_t)
+                .or_minus_one_errno();
 
             let _ = syscall::close(fd);
 

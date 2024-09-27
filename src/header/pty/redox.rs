@@ -12,7 +12,9 @@ pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
     }
 
     // TODO: better error handling
-    let count = Sys::fpath(master, name).or_minus_one_errno();
+    let count = Sys::fpath(master, name)
+        .map(|u| u as ssize_t)
+        .or_minus_one_errno();
     if count < 0 {
         unistd::close(master);
         return Err(());
