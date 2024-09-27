@@ -1,16 +1,22 @@
 use core::{ptr, slice};
 
-use crate::platform::{sys::e, types::*};
+use crate::{
+    error::{Errno, ResultExt},
+    platform::types::*,
+};
 use syscall::{error::*, F_SETFD, F_SETFL};
 
 pub use redox_rt::proc::FdGuard;
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_fpath(fd: c_int, buf: *mut c_void, count: size_t) -> ssize_t {
-    e(syscall::fpath(
+    syscall::fpath(
         fd as usize,
         slice::from_raw_parts_mut(buf as *mut u8, count),
-    )) as ssize_t
+    )
+    .map_err(Errno::from)
+    .map(|l| l as ssize_t)
+    .or_minus_one_errno()
 }
 
 pub fn pipe2(fds: &mut [c_int], flags: usize) -> syscall::error::Result<()> {

@@ -1,15 +1,17 @@
 use alloc::vec::Vec;
 use core::{cmp, mem, ptr, slice, str};
-use syscall::{self, flag::*, Result};
+use redox_rt::proc::FdGuard;
+use syscall::{self, flag::*};
 
 use super::{
     super::{types::*, Pal, PalSocket, ERRNO},
-    e, Sys,
+    Sys,
 };
 use crate::{
-    error::ResultExt,
+    error::{Errno, Result, ResultExt},
     header::{
         arpa_inet::inet_aton,
+        errno::{EAFNOSUPPORT, EFAULT, EINVAL, ENOSYS, EOPNOTSUPP, EPROTONOSUPPORT},
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
         sys_socket::{constants::*, msghdr, sa_family_t, sockaddr, socklen_t},
@@ -26,26 +28,20 @@ macro_rules! bind_or_connect {
         $path
     };
     ($mode:ident into, $socket:expr, $address:expr, $address_len:expr) => {{
-        let fd = bind_or_connect!($mode copy, $socket, $address, $address_len);
+        let fd = bind_or_connect!($mode copy, $socket, $address, $address_len)?;
 
-        let result = syscall::dup2(fd, $socket as usize, &[]);
-        let _ = syscall::close(fd);
-        if (e(result) as c_int) < 0 {
-            return -1;
-        }
-        0
+        let _ = syscall::dup2(fd, $socket as usize, &[])?;
+        Result::<c_int, Errno>::Ok(0)
     }};
     ($mode:ident copy, $socket:expr, $address:expr, $address_len:expr) => {{
         if ($address_len as usize) < mem::size_of::<sa_family_t>() {
-            ERRNO.set(syscall::EINVAL);
-            return -1;
+            return Err(Errno(EINVAL));
         }
 
         let path = match (*$address).sa_family as c_int {
             AF_INET => {
                 if ($address_len as usize) != mem::size_of::<sockaddr_in>() {
-                    ERRNO.set(syscall::EINVAL);
-                    return -1;
+                    return Err(Errno(EINVAL));
                 }
                 let data = &*($address as *const sockaddr_in);
                 let addr = slice::from_raw_parts(
@@ -96,17 +92,12 @@ macro_rules! bind_or_connect {
                 path
             },
             _ => {
-                ERRNO.set(syscall::EAFNOSUPPORT);
-                return -1;
+                return Err(Errno(EAFNOSUPPORT));
             },
         };
 
         // Duplicate the socket, and then duplicate the copy back to the original fd
-        let fd = e(syscall::dup($socket as usize, path.as_bytes()));
-        if (fd as c_int) < 0 {
-            return -1;
-        }
-        fd
+        syscall::dup($socket as usize, path.as_bytes())
     }};
 }
 
@@ -175,7 +166,7 @@ unsafe fn inner_get_name(
     socket: c_int,
     address: *mut sockaddr,
     address_len: *mut socklen_t,
-) -> Result<usize> {
+) -> Result<()> {
     // Format: [udp|tcp:]remote/local, chan:path
     let mut buf = [0; 256];
     let len = syscall::fpath(socket as usize, &mut buf)?;
@@ -197,7 +188,7 @@ unsafe fn inner_get_name(
         );
     }
 
-    Ok(0)
+    Ok(())
 }
 
 fn socket_kind(mut kind: c_int) -> (c_int, usize) {
@@ -214,25 +205,28 @@ fn socket_kind(mut kind: c_int) -> (c_int, usize) {
 }
 
 impl PalSocket for Sys {
-    unsafe fn accept(socket: c_int, address: *mut sockaddr, address_len: *mut socklen_t) -> c_int {
-        let stream = e(syscall::dup(socket as usize, b"listen")) as c_int;
-        if stream < 0 {
-            return -1;
+    unsafe fn accept(
+        socket: c_int,
+        address: *mut sockaddr,
+        address_len: *mut socklen_t,
+    ) -> Result<c_int> {
+        let stream = syscall::dup(socket as usize, b"listen")? as c_int;
+        if address != ptr::null_mut() && address_len != ptr::null_mut() {
+            let _ = Self::getpeername(stream, address, address_len)?;
         }
-        if address != ptr::null_mut()
-            && address_len != ptr::null_mut()
-            && Self::getpeername(stream, address, address_len) < 0
-        {
-            return -1;
-        }
-        stream
+        Ok(stream)
     }
 
-    unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
-        bind_or_connect!(bind into, socket, address, address_len)
+    unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> Result<()> {
+        bind_or_connect!(bind into, socket, address, address_len)?;
+        Ok(())
     }
 
-    unsafe fn connect(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> c_int {
+    unsafe fn connect(
+        socket: c_int,
+        address: *const sockaddr,
+        address_len: socklen_t,
+    ) -> Result<c_int> {
         bind_or_connect!(connect into, socket, address, address_len)
     }
 
@@ -240,41 +234,41 @@ impl PalSocket for Sys {
         socket: c_int,
         address: *mut sockaddr,
         address_len: *mut socklen_t,
-    ) -> c_int {
-        e(inner_get_name(false, socket, address, address_len)) as c_int
+    ) -> Result<()> {
+        inner_get_name(false, socket, address, address_len)
     }
 
     unsafe fn getsockname(
         socket: c_int,
         address: *mut sockaddr,
         address_len: *mut socklen_t,
-    ) -> c_int {
-        e(inner_get_name(true, socket, address, address_len)) as c_int
+    ) -> Result<()> {
+        inner_get_name(true, socket, address, address_len)
     }
 
-    fn getsockopt(
+    unsafe fn getsockopt(
         socket: c_int,
         level: c_int,
         option_name: c_int,
         option_value: *mut c_void,
         option_len: *mut socklen_t,
-    ) -> c_int {
+    ) -> Result<()> {
         match level {
             SOL_SOCKET => match option_name {
                 SO_ERROR => {
                     if option_value.is_null() {
-                        return e(Err(syscall::Error::new(syscall::EFAULT))) as c_int;
+                        return Err(Errno(EFAULT));
                     }
 
                     if (option_len as usize) < mem::size_of::<c_int>() {
-                        return e(Err(syscall::Error::new(syscall::EINVAL))) as c_int;
+                        return Err(Errno(EINVAL));
                     }
 
                     let error = unsafe { &mut *(option_value as *mut c_int) };
                     //TODO: Socket nonblock connection error
                     *error = 0;
 
-                    return 0;
+                    return Ok(());
                 }
                 _ => (),
             },
@@ -285,12 +279,12 @@ impl PalSocket for Sys {
             "getsockopt({}, {}, {}, {:p}, {:p})",
             socket, level, option_name, option_value, option_len
         );
-        e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
+        Err(Errno(ENOSYS))
     }
 
-    fn listen(socket: c_int, backlog: c_int) -> c_int {
+    fn listen(socket: c_int, backlog: c_int) -> Result<()> {
         // Redox has no need to listen
-        0
+        Ok(())
     }
 
     unsafe fn recvfrom(
@@ -300,45 +294,30 @@ impl PalSocket for Sys {
         flags: c_int,
         address: *mut sockaddr,
         address_len: *mut socklen_t,
-    ) -> ssize_t {
+    ) -> Result<usize> {
         if flags != 0 {
-            ERRNO.set(syscall::EOPNOTSUPP);
-            return -1;
+            return Err(Errno(EOPNOTSUPP));
         }
         if address == ptr::null_mut() || address_len == ptr::null_mut() {
             Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
-                .map(|u| u as ssize_t)
-                .or_minus_one_errno()
         } else {
-            let fd = e(syscall::dup(socket as usize, b"listen"));
-            if fd == !0 {
-                return -1;
-            }
-            if Self::getpeername(fd as c_int, address, address_len) < 0 {
-                let _ = syscall::close(fd);
-                return -1;
-            }
+            let fd = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
+            Self::getpeername(*fd as c_int, address, address_len)?;
 
-            let ret = Self::read(fd as c_int, slice::from_raw_parts_mut(buf as *mut u8, len))
-                .map(|u| u as ssize_t)
-                .or_minus_one_errno();
-            let _ = syscall::close(fd);
-            ret
+            Self::read(*fd as c_int, slice::from_raw_parts_mut(buf as *mut u8, len))
         }
     }
 
-    unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> ssize_t {
+    unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> Result<usize> {
         //TODO: implement recvfrom with recvmsg
         eprintln!("recvmsg not implemented on redox");
-        ERRNO.set(syscall::ENOSYS);
-        return -1;
+        Err(Errno(ENOSYS))
     }
 
-    unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> ssize_t {
+    unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> Result<usize> {
         //TODO: implement sendto with sendmsg
         eprintln!("sendmsg not implemented on redox");
-        ERRNO.set(syscall::ENOSYS);
-        return -1;
+        Err(Errno(ENOSYS))
     }
 
     unsafe fn sendto(
@@ -348,64 +327,45 @@ impl PalSocket for Sys {
         flags: c_int,
         dest_addr: *const sockaddr,
         dest_len: socklen_t,
-    ) -> ssize_t {
+    ) -> Result<usize> {
         if flags != 0 {
-            ERRNO.set(syscall::EOPNOTSUPP);
-            return -1;
+            return Err(Errno(EOPNOTSUPP));
         }
         if dest_addr == ptr::null() || dest_len == 0 {
             Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
-                .map(|u| u as ssize_t)
-                .or_minus_one_errno()
         } else {
-            let fd = bind_or_connect!(connect copy, socket, dest_addr, dest_len);
-            let ret = Self::write(fd as c_int, slice::from_raw_parts(buf as *const u8, len))
-                .map(|u| u as ssize_t)
-                .or_minus_one_errno();
-            let _ = syscall::close(fd);
-            ret
+            let fd = FdGuard::new(bind_or_connect!(connect copy, socket, dest_addr, dest_len)?);
+            Self::write(*fd as c_int, slice::from_raw_parts(buf as *const u8, len))
         }
     }
 
-    fn setsockopt(
+    unsafe fn setsockopt(
         socket: c_int,
         level: c_int,
         option_name: c_int,
         option_value: *const c_void,
         option_len: socklen_t,
-    ) -> c_int {
-        let set_timeout = |timeout_name: &[u8]| -> c_int {
+    ) -> Result<()> {
+        let set_timeout = |timeout_name: &[u8]| -> Result<()> {
             if option_value.is_null() {
-                return e(Err(syscall::Error::new(syscall::EFAULT))) as c_int;
+                return Err(Errno(EFAULT));
             }
 
             if (option_len as usize) < mem::size_of::<timeval>() {
-                return e(Err(syscall::Error::new(syscall::EINVAL))) as c_int;
+                return Err(Errno(EINVAL));
             }
 
             let timeval = unsafe { &*(option_value as *const timeval) };
 
-            let fd = e(syscall::dup(socket as usize, timeout_name));
-            if fd == !0 {
-                return -1;
-            }
+            let fd = FdGuard::new(syscall::dup(socket as usize, timeout_name)?);
 
             let timespec = syscall::TimeSpec {
                 tv_sec: timeval.tv_sec as i64,
                 tv_nsec: timeval.tv_usec * 1000,
             };
 
-            let ret = Self::write(fd as c_int, &timespec)
-                .map(|u| u as ssize_t)
-                .or_minus_one_errno();
-
-            let _ = syscall::close(fd);
-
-            if ret >= 0 {
-                0
-            } else {
-                -1
-            }
+            Self::write(*fd as c_int, &timespec)?;
+            Ok(())
         };
 
         match level {
@@ -421,18 +381,17 @@ impl PalSocket for Sys {
             "setsockopt({}, {}, {}, {:p}, {}) - unknown option",
             socket, level, option_name, option_value, option_len
         );
-        0
+        Ok(())
     }
 
-    fn shutdown(socket: c_int, how: c_int) -> c_int {
+    fn shutdown(socket: c_int, how: c_int) -> Result<()> {
         eprintln!("shutdown({}, {})", socket, how);
-        e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
+        Err(Errno(ENOSYS))
     }
 
-    unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
+    unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> Result<c_int> {
         if domain != AF_INET && domain != AF_UNIX {
-            ERRNO.set(syscall::EAFNOSUPPORT);
-            return -1;
+            return Err(Errno(EAFNOSUPPORT));
         }
         // if protocol != 0 {
         //     ERRNO.set(syscall::EPROTONOSUPPORT);
@@ -443,47 +402,32 @@ impl PalSocket for Sys {
 
         // The tcp: and udp: schemes allow using no path,
         // and later specifying one using `dup`.
-        match (domain, kind) {
-            (AF_INET, SOCK_STREAM) => e(syscall::open("/scheme/tcp", flags)) as c_int,
-            (AF_INET, SOCK_DGRAM) => e(syscall::open("/scheme/udp", flags)) as c_int,
-            (AF_UNIX, SOCK_STREAM) => e(syscall::open("/scheme/chan", flags | O_CREAT)) as c_int,
-            _ => {
-                ERRNO.set(syscall::EPROTONOSUPPORT);
-                -1
-            }
-        }
+        Ok(match (domain, kind) {
+            (AF_INET, SOCK_STREAM) => syscall::open("/scheme/tcp", flags)? as c_int,
+            (AF_INET, SOCK_DGRAM) => syscall::open("/scheme/udp", flags)? as c_int,
+            (AF_UNIX, SOCK_STREAM) => syscall::open("/scheme/chan", flags | O_CREAT)? as c_int,
+            _ => return Err(Errno(EPROTONOSUPPORT)),
+        })
     }
 
-    fn socketpair(domain: c_int, kind: c_int, protocol: c_int, sv: &mut [c_int; 2]) -> c_int {
+    fn socketpair(domain: c_int, kind: c_int, protocol: c_int, sv: &mut [c_int; 2]) -> Result<()> {
         let (kind, flags) = socket_kind(kind);
 
         match (domain, kind) {
             (AF_UNIX, SOCK_STREAM) => {
-                let listener = e(syscall::open("/scheme/chan", flags | O_CREAT));
-                if listener == !0 {
-                    return -1;
-                }
+                let listener = FdGuard::new(syscall::open("/scheme/chan", flags | O_CREAT)?);
 
                 // For now, chan: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
                 // nonblocking.
 
-                let fd0 = e(syscall::dup(listener, b"connect"));
-                if fd0 == !0 {
-                    let _ = syscall::close(listener);
-                    return -1;
-                }
+                let mut fd0 = FdGuard::new(syscall::dup(*listener, b"connect")?);
 
-                let fd1 = e(syscall::dup(listener, b"listen"));
-                if fd1 == !0 {
-                    let _ = syscall::close(fd0);
-                    let _ = syscall::close(listener);
-                    return -1;
-                }
+                let mut fd1 = FdGuard::new(syscall::dup(*listener, b"listen")?);
 
-                sv[0] = fd0 as c_int;
-                sv[1] = fd1 as c_int;
-                0
+                sv[0] = fd0.take() as c_int;
+                sv[1] = fd1.take() as c_int;
+                Ok(())
             }
             _ => unsafe {
                 eprintln!(
@@ -493,8 +437,7 @@ impl PalSocket for Sys {
                     protocol,
                     sv.as_mut_ptr()
                 );
-                ERRNO.set(syscall::EPROTONOSUPPORT);
-                -1
+                Err(Errno(EPROTONOSUPPORT))
             },
         }
     }

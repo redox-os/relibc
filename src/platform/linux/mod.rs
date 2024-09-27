@@ -64,15 +64,6 @@ pub fn e_raw(sys: usize) -> Result<usize> {
         Ok(sys)
     }
 }
-pub fn e(sys: usize) -> usize {
-    match e_raw(sys) {
-        Ok(value) => value,
-        Err(Errno(errcode)) => {
-            ERRNO.set(errcode as c_int);
-            !0
-        }
-    }
-}
 
 pub struct Sys;
 

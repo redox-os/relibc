@@ -1,6 +1,6 @@
 use super::{
     super::{types::*, Pal, PalSignal},
-    e, Sys,
+    Sys,
 };
 use crate::{
     error::{Errno, Result},
