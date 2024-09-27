@@ -11,8 +11,12 @@ use crate::header::arch_aarch64_user::user_regs_struct;
 use crate::header::arch_x64_user::user_regs_struct;
 use crate::{
     c_str::{CStr, CString},
+    error::Errno,
     fs::File,
-    header::{errno as errnoh, fcntl, signal, sys_ptrace},
+    header::{
+        errno::{self as errnoh, EIO},
+        fcntl, signal, sys_ptrace,
+    },
     io::{self, prelude::*},
     sync::Mutex,
 };
@@ -104,7 +108,7 @@ pub fn get_session(
 }
 
 #[cfg(target_arch = "aarch64")]
-fn inner_ptrace(
+unsafe fn inner_ptrace(
     request: c_int,
     pid: pid_t,
     addr: *mut c_void,
@@ -115,7 +119,7 @@ fn inner_ptrace(
 }
 
 #[cfg(target_arch = "x86")]
-fn inner_ptrace(
+unsafe fn inner_ptrace(
     request: c_int,
     pid: pid_t,
     addr: *mut c_void,
@@ -126,7 +130,7 @@ fn inner_ptrace(
 }
 
 #[cfg(target_arch = "x86_64")]
-fn inner_ptrace(
+unsafe fn inner_ptrace(
     request: c_int,
     pid: pid_t,
     addr: *mut c_void,
@@ -253,7 +257,13 @@ fn inner_ptrace(
 }
 
 impl PalPtrace for Sys {
-    fn ptrace(request: c_int, pid: pid_t, addr: *mut c_void, data: *mut c_void) -> c_int {
-        inner_ptrace(request, pid, addr, data).unwrap_or(-1)
+    unsafe fn ptrace(
+        request: c_int,
+        pid: pid_t,
+        addr: *mut c_void,
+        data: *mut c_void,
+    ) -> Result<c_int, Errno> {
+        inner_ptrace(request, pid, addr, data)
+            .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))
     }
 }
