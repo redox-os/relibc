@@ -4,7 +4,7 @@ use super::{
 };
 
 use crate::{
-    error::ResultExt,
+    error::{Errno, ResultExt},
     fs::File,
     header::{errno::*, fcntl::*, signal::sigset_t, sys_epoll::*},
     io::prelude::*,
@@ -52,14 +52,19 @@ fn event_flags_to_epoll(flags: syscall::EventFlags) -> c_uint {
 }
 
 impl PalEpoll for Sys {
-    fn epoll_create1(flags: c_int) -> c_int {
-        Sys::open(c_str!("/scheme/event"), O_RDWR | flags, 0).or_minus_one_errno()
+    fn epoll_create1(flags: c_int) -> Result<c_int, Errno> {
+        Sys::open(c_str!("/scheme/event"), O_RDWR | flags, 0)
     }
 
-    fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut epoll_event) -> c_int {
+    unsafe fn epoll_ctl(
+        epfd: c_int,
+        op: c_int,
+        fd: c_int,
+        event: *mut epoll_event,
+    ) -> Result<(), Errno> {
         match op {
             EPOLL_CTL_ADD | EPOLL_CTL_MOD => {
-                if Sys::write(
+                Sys::write(
                     epfd,
                     &Event {
                         id: fd as usize,
@@ -68,18 +73,10 @@ impl PalEpoll for Sys {
                         // systems. If this is needed, use a box or something
                         data: unsafe { (*event).data.u64 as usize },
                     },
-                )
-                .map(|u| u as ssize_t)
-                .or_minus_one_errno()
-                    < 0
-                {
-                    -1
-                } else {
-                    0
-                }
+                )?;
             }
             EPOLL_CTL_DEL => {
-                if Sys::write(
+                Sys::write(
                     epfd,
                     &Event {
                         id: fd as usize,
@@ -87,70 +84,49 @@ impl PalEpoll for Sys {
                         //TODO: Is data required?
                         data: 0,
                     },
-                )
-                .map(|u| u as ssize_t)
-                .or_minus_one_errno()
-                    < 0
-                {
-                    -1
-                } else {
-                    0
-                }
+                )?;
             }
-            _ => {
-                platform::ERRNO.set(EINVAL);
-                -1
-            }
+            _ => return Err(Errno(EINVAL)),
         }
+        Ok(())
     }
 
-    fn epoll_pwait(
+    unsafe fn epoll_pwait(
         epfd: c_int,
         events: *mut epoll_event,
         maxevents: c_int,
         timeout: c_int,
         _sigset: *const sigset_t,
-    ) -> c_int {
+    ) -> Result<usize, Errno> {
         // TODO: sigset
         assert_eq!(mem::size_of::<epoll_event>(), mem::size_of::<Event>());
 
         if maxevents <= 0 {
-            platform::ERRNO.set(EINVAL);
-            return -1;
+            return Err(Errno(EINVAL));
         }
 
         let timer_opt = if timeout != -1 {
-            match File::open(c_str!("/scheme/time/4"), O_RDWR) {
-                Err(_) => return -1,
-                Ok(mut timer) => {
-                    if Sys::write(
-                        epfd,
-                        &Event {
-                            id: timer.fd as usize,
-                            flags: EVENT_READ,
-                            data: 0,
-                        },
-                    )
-                    .map(|u| u as ssize_t)
-                    .or_minus_one_errno()
-                        == -1
-                    {
-                        return -1;
-                    }
+            let mut timer = File::open(c_str!("/scheme/time/4"), O_RDWR)?;
+            Sys::write(
+                epfd,
+                &Event {
+                    id: timer.fd as usize,
+                    flags: EVENT_READ,
+                    data: 0,
+                },
+            )?;
 
-                    let mut time = TimeSpec::default();
-                    if let Err(err) = timer.read(&mut time) {
-                        return -1;
-                    }
-                    time.tv_sec += (timeout as i64) / 1000;
-                    time.tv_nsec += (timeout % 1000) * 1000000;
-                    if let Err(err) = timer.write(&time) {
-                        return -1;
-                    }
+            let mut time = TimeSpec::default();
+            let _ = timer
+                .read(&mut time)
+                .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
+            time.tv_sec += (timeout as i64) / 1000;
+            time.tv_nsec += (timeout % 1000) * 1000000;
+            let _ = timer
+                .write(&time)
+                .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
 
-                    Some(timer)
-                }
-            }
+            Some(timer)
         } else {
             None
         };
@@ -160,12 +136,7 @@ impl PalEpoll for Sys {
                 events as *mut u8,
                 maxevents as usize * mem::size_of::<syscall::Event>(),
             )
-        })
-        .map(|u| u as ssize_t)
-        .or_minus_one_errno(); // TODO
-        if bytes_read == -1 {
-            return -1;
-        }
+        })?;
         let read = bytes_read as usize / mem::size_of::<syscall::Event>();
 
         let mut count = 0;
@@ -191,6 +162,6 @@ impl PalEpoll for Sys {
             }
         }
 
-        count as c_int
+        Ok(count)
     }
 }
