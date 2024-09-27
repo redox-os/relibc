@@ -6,7 +6,7 @@ use super::{
     e, e_raw, Sys,
 };
 use crate::{
-    error::Errno,
+    error::{Errno, Result},
     header::{
         signal::{sigaction, siginfo_t, sigset_t, stack_t, NSIG, SA_RESTORER, SI_QUEUE},
         sys_time::itimerval,
@@ -57,14 +57,16 @@ pub struct mcontext_t {
 }
 
 impl PalSignal for Sys {
-    unsafe fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
-        e(syscall!(GETITIMER, which, out)) as c_int
+    unsafe fn getitimer(which: c_int, out: *mut itimerval) -> Result<()> {
+        e_raw(syscall!(GETITIMER, which, out))?;
+        Ok(())
     }
 
-    fn kill(pid: pid_t, sig: c_int) -> c_int {
-        e(unsafe { syscall!(KILL, pid, sig) }) as c_int
+    fn kill(pid: pid_t, sig: c_int) -> Result<()> {
+        e_raw(unsafe { syscall!(KILL, pid, sig) })?;
+        Ok(())
     }
-    fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<(), Errno> {
+    fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<()> {
         let info = siginfo_t {
             si_addr: core::ptr::null_mut(),
             si_code: SI_QUEUE,
@@ -78,18 +80,20 @@ impl PalSignal for Sys {
         e_raw(unsafe { syscall!(RT_SIGQUEUEINFO, pid, sig, addr_of!(info)) }).map(|_| ())
     }
 
-    fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-        e(unsafe { syscall!(KILL, -(pgrp as isize) as pid_t, sig) }) as c_int
+    fn killpg(pgrp: pid_t, sig: c_int) -> Result<()> {
+        e_raw(unsafe { syscall!(KILL, -(pgrp as isize) as pid_t, sig) })?;
+        Ok(())
     }
 
-    fn raise(sig: c_int) -> Result<(), Errno> {
+    fn raise(sig: c_int) -> Result<()> {
         let tid = e_raw(unsafe { syscall!(GETTID) })? as pid_t;
         e_raw(unsafe { syscall!(TKILL, tid, sig) })?;
         Ok(())
     }
 
-    unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
-        e(syscall!(SETITIMER, which, new, old)) as c_int
+    unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> Result<()> {
+        e_raw(unsafe { syscall!(SETITIMER, which, new, old) })?;
+        Ok(())
     }
 
     fn sigaction(
@@ -118,7 +122,7 @@ impl PalSignal for Sys {
         .map(|_| ())
     }
 
-    unsafe fn sigaltstack(ss: Option<&stack_t>, old_ss: Option<&mut stack_t>) -> Result<(), Errno> {
+    unsafe fn sigaltstack(ss: Option<&stack_t>, old_ss: Option<&mut stack_t>) -> Result<()> {
         e_raw(syscall!(
             SIGALTSTACK,
             ss.map_or_else(core::ptr::null, |x| x as *const _),
@@ -127,7 +131,7 @@ impl PalSignal for Sys {
         .map(|_| ())
     }
 
-    fn sigpending(set: &mut sigset_t) -> Result<(), Errno> {
+    fn sigpending(set: &mut sigset_t) -> Result<()> {
         e_raw(unsafe {
             syscall!(
                 RT_SIGPENDING,
@@ -138,11 +142,7 @@ impl PalSignal for Sys {
         .map(|_| ())
     }
 
-    fn sigprocmask(
-        how: c_int,
-        set: Option<&sigset_t>,
-        oset: Option<&mut sigset_t>,
-    ) -> Result<(), Errno> {
+    fn sigprocmask(how: c_int, set: Option<&sigset_t>, oset: Option<&mut sigset_t>) -> Result<()> {
         e_raw(unsafe {
             syscall!(
                 RT_SIGPROCMASK,
@@ -166,7 +166,7 @@ impl PalSignal for Sys {
         set: &sigset_t,
         sig: Option<&mut siginfo_t>,
         tp: Option<&timespec>,
-    ) -> Result<(), Errno> {
+    ) -> Result<()> {
         unsafe {
             e_raw(syscall!(
                 RT_SIGTIMEDWAIT,

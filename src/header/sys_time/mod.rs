@@ -40,6 +40,8 @@ pub struct fd_set {
 #[no_mangle]
 pub unsafe extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
     Sys::getitimer(which, value)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -49,6 +51,8 @@ pub unsafe extern "C" fn setitimer(
     ovalue: *mut itimerval,
 ) -> c_int {
     Sys::setitimer(which, value, ovalue)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
