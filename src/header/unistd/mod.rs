@@ -9,7 +9,7 @@ use core::{
 
 use crate::{
     c_str::CStr,
-    error::ResultExt,
+    error::{Errno, ResultExt},
     header::{
         crypt::{crypt_data, crypt_r},
         errno, fcntl, limits,
@@ -17,7 +17,7 @@ use crate::{
         sys_ioctl, sys_resource, sys_time, sys_utsname, termios,
         time::timespec,
     },
-    platform::{self, types::*, Pal, Sys},
+    platform::{self, types::*, Pal, Sys, ERRNO},
 };
 
 use alloc::collections::LinkedList;
@@ -163,7 +163,7 @@ pub extern "C" fn daemon(nochdir: c_int, noclose: c_int) -> c_int {
         }
     }
 
-    match fork() {
+    match unsafe { fork() } {
         0 => {}
         -1 => return -1,
         _ => _exit(0),
@@ -283,6 +283,8 @@ pub unsafe extern "C" fn execve(
 ) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::execve(path, argv, envp)
+        .map(|()| unreachable!())
+        .or_minus_one_errno()
 }
 
 #[cfg(target_os = "linux")]
@@ -344,12 +346,12 @@ pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn fork() -> pid_t {
-    let fork_hooks = unsafe { init_fork_hooks() };
+pub unsafe extern "C" fn fork() -> pid_t {
+    let fork_hooks = init_fork_hooks();
     for prepare in &fork_hooks[0] {
         prepare();
     }
-    let pid = Sys::fork();
+    let pid = Sys::fork().or_minus_one_errno();
     if pid == 0 {
         for child in &fork_hooks[2] {
             child();
@@ -375,7 +377,7 @@ pub extern "C" fn ftruncate(fildes: c_int, length: off_t) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char {
+pub unsafe extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char {
     let alloc = buf.is_null();
     let mut stack_buf = [0; limits::PATH_MAX];
     if alloc {
@@ -383,10 +385,13 @@ pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char 
         size = stack_buf.len();
     }
 
-    let ret = Sys::getcwd(buf, size);
-    if ret.is_null() {
-        return ptr::null_mut();
-    }
+    let ret = match Sys::getcwd(buf, size) {
+        Ok(()) => buf,
+        Err(Errno(errno)) => {
+            ERRNO.set(errno);
+            return ptr::null_mut();
+        }
+    };
 
     if alloc {
         let len = stack_buf
@@ -442,7 +447,7 @@ pub extern "C" fn getgid() -> gid_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
-    Sys::getgroups(size, list)
+    Sys::getgroups(size, list).or_minus_one_errno()
 }
 
 // #[no_mangle]
@@ -506,12 +511,12 @@ pub extern "C" fn getpagesize() -> c_int {
 
 #[no_mangle]
 pub extern "C" fn getpgid(pid: pid_t) -> pid_t {
-    Sys::getpgid(pid)
+    Sys::getpgid(pid).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn getpgrp() -> pid_t {
-    Sys::getpgid(Sys::getpid())
+    Sys::getpgid(Sys::getpid()).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -526,7 +531,7 @@ pub extern "C" fn getppid() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn getsid(pid: pid_t) -> pid_t {
-    Sys::getsid(pid)
+    Sys::getsid(pid).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -535,8 +540,8 @@ pub extern "C" fn getuid() -> uid_t {
 }
 
 #[no_mangle]
-pub extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
-    getcwd(path_name, limits::PATH_MAX)
+pub unsafe extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
+    unsafe { getcwd(path_name, limits::PATH_MAX) }
 }
 
 #[no_mangle]
@@ -642,6 +647,7 @@ pub unsafe extern "C" fn pread(
         slice::from_raw_parts_mut(buf.cast::<u8>(), nbyte),
         offset,
     )
+    .map(|read| read as ssize_t)
     .or_minus_one_errno()
 }
 
@@ -676,6 +682,7 @@ pub unsafe extern "C" fn pwrite(
         slice::from_raw_parts(buf.cast::<u8>(), nbyte),
         offset,
     )
+    .map(|read| read as ssize_t)
     .or_minus_one_errno()
 }
 
@@ -683,7 +690,9 @@ pub unsafe extern "C" fn pwrite(
 pub unsafe extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
     let buf = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte as usize) };
     trace_expr!(
-        Sys::read(fildes, buf).or_minus_one_errno(),
+        Sys::read(fildes, buf)
+            .map(|read| read as ssize_t)
+            .or_minus_one_errno(),
         "read({}, {:p}, {})",
         fildes,
         buf,
@@ -699,7 +708,9 @@ pub unsafe extern "C" fn readlink(
 ) -> ssize_t {
     let path = CStr::from_ptr(path);
     let buf = slice::from_raw_parts_mut(buf as *mut u8, bufsize as usize);
-    Sys::readlink(path, buf).or_minus_one_errno()
+    Sys::readlink(path, buf)
+        .map(|read| read as ssize_t)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -775,7 +786,7 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
         tv_nsec: 0,
     };
     let rmtp = ptr::null_mut();
-    Sys::nanosleep(&rqtp, rmtp);
+    unsafe { Sys::nanosleep(&rqtp, rmtp).map(|()| 0).or_minus_one_errno() };
     0
 }
 
@@ -857,7 +868,9 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
         return errno::ERANGE;
     }
 
-    let len = Sys::fpath(fildes, &mut name[..namesize - 1]).or_minus_one_errno();
+    let len = Sys::fpath(fildes, &mut name[..namesize - 1])
+        .map(|read| read as ssize_t)
+        .or_minus_one_errno();
     if len < 0 {
         return -platform::ERRNO.get();
     }
@@ -902,7 +915,9 @@ pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
         tv_nsec: ((useconds % 1_000_000) * 1000) as c_long,
     };
     let rmtp = ptr::null_mut();
-    Sys::nanosleep(&rqtp, rmtp)
+    unsafe { Sys::nanosleep(&rqtp, rmtp) }
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 // #[no_mangle]
@@ -913,5 +928,7 @@ pub extern "C" fn vfork() -> pid_t {
 #[no_mangle]
 pub unsafe extern "C" fn write(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
     let buf = slice::from_raw_parts(buf as *const u8, nbyte as usize);
-    Sys::write(fildes, buf).or_minus_one_errno()
+    Sys::write(fildes, buf)
+        .map(|bytes| bytes as ssize_t)
+        .or_minus_one_errno()
 }

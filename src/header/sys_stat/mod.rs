@@ -77,18 +77,18 @@ pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
-    Sys::fstat(fildes, buf)
+pub unsafe extern "C" fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
+    Sys::fstat(fildes, buf).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
-pub extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut stat) -> c_int {
+pub unsafe extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut stat) -> c_int {
     fstat(fildes, buf)
 }
 
 #[no_mangle]
-pub extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
-    Sys::futimens(fd, times)
+pub unsafe extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
+    Sys::futimens(fd, times).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -100,7 +100,8 @@ pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
         return -1;
     }
 
-    let res = Sys::fstat(fd, buf);
+    // TODO: Rustify
+    let res = Sys::fstat(fd, buf).map(|()| 0).or_minus_one_errno();
 
     Sys::close(fd);
 
@@ -147,7 +148,8 @@ pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
         return -1;
     }
 
-    let res = Sys::fstat(fd, buf);
+    // TODO: Rustify
+    let res = Sys::fstat(fd, buf).map(|()| 0).or_minus_one_errno();
 
     Sys::close(fd);
 

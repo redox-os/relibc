@@ -488,8 +488,8 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
 }
 
 #[no_mangle]
-pub extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
-    Sys::nanosleep(rqtp, rmtp)
+pub unsafe extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
+    Sys::nanosleep(rqtp, rmtp).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]

@@ -1,15 +1,9 @@
-use core::mem::{self, offset_of};
-use redox_rt::signal::{
-    PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
-};
-use syscall::{self, Result};
-
 use super::{
     super::{types::*, Pal, PalSignal},
     e, Sys,
 };
 use crate::{
-    error::Errno,
+    error::{Errno, Result},
     header::{
         errno::{EINVAL, ENOSYS},
         signal::{
@@ -20,6 +14,13 @@ use crate::{
         time::timespec,
     },
     platform::ERRNO,
+};
+use core::mem::{self, offset_of};
+use redox_rt::{
+    proc::FdGuard,
+    signal::{
+        PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
+    },
 };
 
 const _: () = {
@@ -45,41 +46,30 @@ const _: () = {
 };
 
 impl PalSignal for Sys {
-    unsafe fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
+    unsafe fn getitimer(which: c_int, out: *mut itimerval) -> Result<()> {
         let path = match which {
             ITIMER_REAL => "/scheme/itimer/1",
-            _ => {
-                ERRNO.set(EINVAL);
-                return -1;
-            }
+            _ => return Err(Errno(EINVAL)),
         };
 
-        let fd = e(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC));
-        if fd == !0 {
-            return -1;
-        }
+        let fd = FdGuard::new(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC)?);
 
         let mut spec = syscall::ITimerSpec::default();
-        let count = e(syscall::read(fd, &mut spec));
-
-        let _ = syscall::close(fd);
-
-        if count == !0 {
-            return -1;
-        }
+        let count = syscall::read(*fd, &mut spec)?;
 
         (*out).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
         (*out).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
         (*out).it_value.tv_sec = spec.it_value.tv_sec as time_t;
         (*out).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
 
-        0
+        Ok(())
     }
 
-    fn kill(pid: pid_t, sig: c_int) -> c_int {
-        e(redox_rt::sys::posix_kill(pid as usize, sig as usize).map(|()| 0)) as c_int
+    fn kill(pid: pid_t, sig: c_int) -> Result<()> {
+        redox_rt::sys::posix_kill(pid as usize, sig as usize)?;
+        Ok(())
     }
-    fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<(), Errno> {
+    fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<()> {
         Ok(redox_rt::sys::posix_sigqueue(
             pid as usize,
             sig as usize,
@@ -87,58 +77,44 @@ impl PalSignal for Sys {
         )?)
     }
 
-    fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-        e(redox_rt::sys::posix_killpg(pgrp as usize, sig as usize).map(|()| 0)) as c_int
+    fn killpg(pgrp: pid_t, sig: c_int) -> Result<()> {
+        redox_rt::sys::posix_killpg(pgrp as usize, sig as usize)?;
+        Ok(())
     }
 
-    fn raise(sig: c_int) -> Result<(), Errno> {
+    fn raise(sig: c_int) -> Result<()> {
         // TODO: Bypass kernel?
         unsafe { Self::rlct_kill(Self::current_os_tid(), sig as _) }
     }
 
-    unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
+    unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> Result<()> {
         let path = match which {
             ITIMER_REAL => "/scheme/itimer/1",
-            _ => {
-                ERRNO.set(EINVAL);
-                return -1;
-            }
+            _ => return Err(Errno(EINVAL)),
         };
 
-        let fd = e(syscall::open(path, syscall::O_RDWR | syscall::O_CLOEXEC));
-        if fd == !0 {
-            return -1;
-        }
+        let fd = FdGuard::new(syscall::open(path, syscall::O_RDWR | syscall::O_CLOEXEC)?);
 
         let mut spec = syscall::ITimerSpec::default();
 
-        let mut count = e(syscall::read(fd, &mut spec));
+        let _ = syscall::read(*fd, &mut spec)?;
 
-        if count != !0 {
-            unsafe {
-                if !old.is_null() {
-                    (*old).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
-                    (*old).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
-                    (*old).it_value.tv_sec = spec.it_value.tv_sec as time_t;
-                    (*old).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
-                }
-
-                spec.it_interval.tv_sec = (*new).it_interval.tv_sec as i64;
-                spec.it_interval.tv_nsec = (*new).it_interval.tv_usec * 1000;
-                spec.it_value.tv_sec = (*new).it_value.tv_sec as i64;
-                spec.it_value.tv_nsec = (*new).it_value.tv_usec * 1000;
+        unsafe {
+            if !old.is_null() {
+                (*old).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
+                (*old).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
+                (*old).it_value.tv_sec = spec.it_value.tv_sec as time_t;
+                (*old).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
             }
 
-            count = e(syscall::write(fd, &spec));
+            spec.it_interval.tv_sec = (*new).it_interval.tv_sec as i64;
+            spec.it_interval.tv_nsec = (*new).it_interval.tv_usec * 1000;
+            spec.it_value.tv_sec = (*new).it_value.tv_sec as i64;
+            spec.it_value.tv_nsec = (*new).it_value.tv_usec * 1000;
         }
 
-        let _ = syscall::close(fd);
-
-        if count == !0 {
-            return -1;
-        }
-
-        0
+        let _ = syscall::write(*fd, &spec)?;
+        Ok(())
     }
 
     fn sigaction(
