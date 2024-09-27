@@ -92,8 +92,8 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(ACCESS, path.as_ptr(), mode) }).map(|_| ())
     }
 
-    unsafe fn brk(addr: *mut c_void) -> *mut c_void {
-        unsafe { syscall!(BRK, addr) as *mut c_void }
+    unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void> {
+        Ok(e_raw(unsafe { syscall!(BRK, addr) })? as *mut c_void)
     }
 
     fn chdir(path: CStr) -> Result<()> {
@@ -273,12 +273,9 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(UTIMENSAT, AT_FDCWD, path.as_ptr(), times, 0) }).map(|_| ())
     }
 
-    fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
-        if e(unsafe { syscall!(GETCWD, buf, size) }) == !0 {
-            ptr::null_mut()
-        } else {
-            buf
-        }
+    unsafe fn getcwd(buf: *mut c_char, size: size_t) -> Result<()> {
+        e_raw(unsafe { syscall!(GETCWD, buf, size) })?;
+        Ok(())
     }
 
     fn getdents(fd: c_int, buf: &mut [u8], _off: u64) -> Result<usize> {

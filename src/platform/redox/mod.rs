@@ -74,6 +74,7 @@ macro_rules! path_from_c_str {
 
 use self::{exec::Executable, path::canonicalize};
 
+// TODO: Remove
 pub fn e(sys: syscall::error::Result<usize>) -> usize {
     match sys {
         Ok(ok) => ok,
@@ -118,27 +119,20 @@ impl Pal for Sys {
         Ok(())
     }
 
-    // TODO: Rustify
-    unsafe fn brk(addr: *mut c_void) -> *mut c_void {
+    unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void> {
         // On first invocation, allocate a buffer for brk
         if BRK_CUR.is_null() {
             // 4 megabytes of RAM ought to be enough for anybody
             const BRK_MAX_SIZE: usize = 4 * 1024 * 1024;
 
-            let allocated = match Self::mmap(
+            let allocated = Self::mmap(
                 ptr::null_mut(),
                 BRK_MAX_SIZE,
                 PROT_READ | PROT_WRITE,
                 MAP_ANONYMOUS,
                 0,
                 0,
-            ) {
-                Ok(allocated) => allocated,
-                Err(Errno(errno)) => {
-                    ERRNO.set(errno);
-                    return !0 as *mut c_void;
-                }
-            };
+            )?;
 
             BRK_CUR = allocated;
             BRK_END = (allocated as *mut u8).add(BRK_MAX_SIZE) as *mut c_void;
@@ -146,15 +140,14 @@ impl Pal for Sys {
 
         if addr.is_null() {
             // Lookup what previous brk() invocations have set the address to
-            BRK_CUR
+            Ok(BRK_CUR)
         } else if BRK_CUR <= addr && addr < BRK_END {
             // It's inside buffer, return
             BRK_CUR = addr;
-            addr
+            Ok(addr)
         } else {
             // It was outside of valid range
-            ERRNO.set(ENOMEM);
-            ptr::null_mut()
+            Err(Errno(ENOMEM))
         }
     }
 
@@ -325,22 +318,16 @@ impl Pal for Sys {
         Self::futimens(*file, times)
     }
 
-    // FIXME: unsound
-    fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char {
+    unsafe fn getcwd(buf: *mut c_char, size: size_t) -> Result<()> {
         // TODO: Not using MaybeUninit seems a little unsafe
 
         let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize) };
         if buf_slice.is_empty() {
-            ERRNO.set(EINVAL);
-            return ptr::null_mut();
+            return Err(Errno(EINVAL));
         }
 
-        if path::getcwd(buf_slice).is_none() {
-            ERRNO.set(ERANGE);
-            return ptr::null_mut();
-        }
-
-        buf
+        path::getcwd(buf_slice).ok_or(Errno(ERANGE))?;
+        Ok(())
     }
 
     fn getdents(fd: c_int, buf: &mut [u8], opaque: u64) -> Result<usize> {

@@ -9,7 +9,7 @@ use core::{
 
 use crate::{
     c_str::CStr,
-    error::ResultExt,
+    error::{Errno, ResultExt},
     header::{
         crypt::{crypt_data, crypt_r},
         errno, fcntl, limits,
@@ -17,7 +17,7 @@ use crate::{
         sys_ioctl, sys_resource, sys_time, sys_utsname, termios,
         time::timespec,
     },
-    platform::{self, types::*, Pal, Sys},
+    platform::{self, types::*, Pal, Sys, ERRNO},
 };
 
 use alloc::collections::LinkedList;
@@ -377,7 +377,7 @@ pub extern "C" fn ftruncate(fildes: c_int, length: off_t) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char {
+pub unsafe extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char {
     let alloc = buf.is_null();
     let mut stack_buf = [0; limits::PATH_MAX];
     if alloc {
@@ -385,10 +385,13 @@ pub extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char 
         size = stack_buf.len();
     }
 
-    let ret = Sys::getcwd(buf, size);
-    if ret.is_null() {
-        return ptr::null_mut();
-    }
+    let ret = match Sys::getcwd(buf, size) {
+        Ok(()) => buf,
+        Err(Errno(errno)) => {
+            ERRNO.set(errno);
+            return ptr::null_mut();
+        }
+    };
 
     if alloc {
         let len = stack_buf
@@ -537,8 +540,8 @@ pub extern "C" fn getuid() -> uid_t {
 }
 
 #[no_mangle]
-pub extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
-    getcwd(path_name, limits::PATH_MAX)
+pub unsafe extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
+    unsafe { getcwd(path_name, limits::PATH_MAX) }
 }
 
 #[no_mangle]

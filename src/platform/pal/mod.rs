@@ -28,7 +28,7 @@ mod socket;
 pub trait Pal {
     fn access(path: CStr, mode: c_int) -> Result<()>;
 
-    unsafe fn brk(addr: *mut c_void) -> *mut c_void;
+    unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void>;
 
     fn chdir(path: CStr) -> Result<()>;
 
@@ -92,7 +92,7 @@ pub trait Pal {
 
     unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()>;
 
-    fn getcwd(buf: *mut c_char, size: size_t) -> *mut c_char;
+    unsafe fn getcwd(buf: *mut c_char, size: size_t) -> Result<()>;
 
     fn getdents(fd: c_int, buf: &mut [u8], opaque_offset: u64) -> Result<usize>;
     fn dir_seek(fd: c_int, opaque_offset: u64) -> Result<()>;
@@ -102,10 +102,13 @@ pub trait Pal {
     // possible this_dent slice is safe (and will be validated).
     unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)>;
 
+    // Always successful
     fn getegid() -> gid_t;
 
+    // Always successful
     fn geteuid() -> uid_t;
 
+    // Always successful
     fn getgid() -> gid_t;
 
     unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int>;
@@ -117,8 +120,10 @@ pub trait Pal {
 
     fn getpgid(pid: pid_t) -> Result<pid_t>;
 
+    // Always successful
     fn getpid() -> pid_t;
 
+    // Always successful
     fn getppid() -> pid_t;
 
     fn getpriority(which: c_int, who: id_t) -> Result<c_int>;
@@ -133,6 +138,7 @@ pub trait Pal {
 
     fn getsid(pid: pid_t) -> Result<pid_t>;
 
+    // Always successful
     fn gettid() -> pid_t;
 
     unsafe fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> Result<()>;
@@ -224,6 +230,7 @@ pub trait Pal {
 
     fn sync() -> Result<()>;
 
+    // Always successful
     fn umask(mask: mode_t) -> mode_t;
 
     unsafe fn uname(utsname: *mut utsname) -> Result<()>;
