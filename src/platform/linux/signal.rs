@@ -3,7 +3,7 @@ use core::{mem, ptr::addr_of};
 
 use super::{
     super::{types::*, PalSignal},
-    e, e_raw, Sys,
+    e_raw, Sys,
 };
 use crate::{
     error::{Errno, Result},

@@ -74,17 +74,6 @@ macro_rules! path_from_c_str {
 
 use self::{exec::Executable, path::canonicalize};
 
-// TODO: Remove
-pub fn e(sys: syscall::error::Result<usize>) -> usize {
-    match sys {
-        Ok(ok) => ok,
-        Err(err) => {
-            ERRNO.set(err.errno as c_int);
-            !0
-        }
-    }
-}
-
 pub struct Sys;
 
 impl Pal for Sys {

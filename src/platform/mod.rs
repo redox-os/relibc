@@ -13,7 +13,7 @@ pub use self::pal::{Pal, PalEpoll, PalPtrace, PalSignal, PalSocket};
 
 mod pal;
 
-pub use self::sys::{e, Sys};
+pub use self::sys::Sys;
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
 #[path = "linux/mod.rs"]
