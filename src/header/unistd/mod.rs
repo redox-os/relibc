@@ -163,7 +163,7 @@ pub extern "C" fn daemon(nochdir: c_int, noclose: c_int) -> c_int {
         }
     }
 
-    match fork() {
+    match unsafe { fork() } {
         0 => {}
         -1 => return -1,
         _ => _exit(0),
@@ -283,6 +283,8 @@ pub unsafe extern "C" fn execve(
 ) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::execve(path, argv, envp)
+        .map(|()| unreachable!())
+        .or_minus_one_errno()
 }
 
 #[cfg(target_os = "linux")]
@@ -344,12 +346,12 @@ pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn fork() -> pid_t {
-    let fork_hooks = unsafe { init_fork_hooks() };
+pub unsafe extern "C" fn fork() -> pid_t {
+    let fork_hooks = init_fork_hooks();
     for prepare in &fork_hooks[0] {
         prepare();
     }
-    let pid = Sys::fork();
+    let pid = Sys::fork().or_minus_one_errno();
     if pid == 0 {
         for child in &fork_hooks[2] {
             child();
@@ -442,7 +444,7 @@ pub extern "C" fn getgid() -> gid_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
-    Sys::getgroups(size, list)
+    Sys::getgroups(size, list).or_minus_one_errno()
 }
 
 // #[no_mangle]
@@ -506,12 +508,12 @@ pub extern "C" fn getpagesize() -> c_int {
 
 #[no_mangle]
 pub extern "C" fn getpgid(pid: pid_t) -> pid_t {
-    Sys::getpgid(pid)
+    Sys::getpgid(pid).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn getpgrp() -> pid_t {
-    Sys::getpgid(Sys::getpid())
+    Sys::getpgid(Sys::getpid()).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -526,7 +528,7 @@ pub extern "C" fn getppid() -> pid_t {
 
 #[no_mangle]
 pub extern "C" fn getsid(pid: pid_t) -> pid_t {
-    Sys::getsid(pid)
+    Sys::getsid(pid).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -775,7 +777,7 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
         tv_nsec: 0,
     };
     let rmtp = ptr::null_mut();
-    Sys::nanosleep(&rqtp, rmtp);
+    unsafe { Sys::nanosleep(&rqtp, rmtp).map(|()| 0).or_minus_one_errno() };
     0
 }
 
@@ -902,7 +904,9 @@ pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
         tv_nsec: ((useconds % 1_000_000) * 1000) as c_long,
     };
     let rmtp = ptr::null_mut();
-    Sys::nanosleep(&rqtp, rmtp)
+    unsafe { Sys::nanosleep(&rqtp, rmtp) }
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 // #[no_mangle]

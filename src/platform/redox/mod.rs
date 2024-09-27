@@ -118,25 +118,27 @@ impl Pal for Sys {
         Ok(())
     }
 
+    // TODO: Rustify
     unsafe fn brk(addr: *mut c_void) -> *mut c_void {
         // On first invocation, allocate a buffer for brk
         if BRK_CUR.is_null() {
             // 4 megabytes of RAM ought to be enough for anybody
             const BRK_MAX_SIZE: usize = 4 * 1024 * 1024;
 
-            let allocated = Self::mmap(
+            let allocated = match Self::mmap(
                 ptr::null_mut(),
                 BRK_MAX_SIZE,
                 PROT_READ | PROT_WRITE,
                 MAP_ANONYMOUS,
                 0,
                 0,
-            );
-            if allocated == !0 as *mut c_void
-            /* MAP_FAILED */
-            {
-                return !0 as *mut c_void;
-            }
+            ) {
+                Ok(allocated) => allocated,
+                Err(Errno(errno)) => {
+                    ERRNO.set(errno);
+                    return !0 as *mut c_void;
+                }
+            };
 
             BRK_CUR = allocated;
             BRK_END = (allocated as *mut u8).add(BRK_MAX_SIZE) as *mut c_void;
@@ -214,22 +216,28 @@ impl Pal for Sys {
         loop {}
     }
 
-    unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
-        e(self::exec::execve(
+    unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> Result<()> {
+        self::exec::execve(
             Executable::AtPath(path),
             self::exec::ArgEnv::C { argv, envp },
             None,
-        )) as c_int
+        )?;
+        unreachable!()
     }
-    unsafe fn fexecve(fildes: c_int, argv: *const *mut c_char, envp: *const *mut c_char) -> c_int {
-        e(self::exec::execve(
+    unsafe fn fexecve(
+        fildes: c_int,
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
+    ) -> Result<()> {
+        self::exec::execve(
             Executable::InFd {
                 file: File::new(fildes),
                 arg0: CStr::from_ptr(argv.read()).to_bytes(),
             },
             self::exec::ArgEnv::C { argv, envp },
             None,
-        )) as c_int
+        )?;
+        unreachable!()
     }
 
     fn fchdir(fd: c_int) -> Result<()> {
@@ -251,8 +259,8 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn fcntl(fd: c_int, cmd: c_int, args: c_ulonglong) -> c_int {
-        e(syscall::fcntl(fd as usize, cmd as usize, args as usize)) as c_int
+    fn fcntl(fd: c_int, cmd: c_int, args: c_ulonglong) -> Result<c_int> {
+        Ok(syscall::fcntl(fd as usize, cmd as usize, args as usize)? as c_int)
     }
 
     fn fdatasync(fd: c_int) -> Result<()> {
@@ -261,25 +269,26 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn flock(_fd: c_int, _operation: c_int) -> c_int {
+    fn flock(_fd: c_int, _operation: c_int) -> Result<()> {
         // TODO: Redox does not have file locking yet
-        0
+        Ok(())
     }
 
-    fn fork() -> pid_t {
+    unsafe fn fork() -> Result<pid_t> {
+        // TODO: Find way to avoid lock.
         let _guard = clone::wrlock();
-        let res = clone::fork_impl();
-        e(res) as pid_t
+
+        Ok(clone::fork_impl()? as pid_t)
     }
 
-    // FIXME: unsound
-    fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
-        unsafe { e(libredox::fstat(fildes as usize, buf).map(|()| 0)) as c_int }
+    unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()> {
+        libredox::fstat(fildes as usize, buf)?;
+        Ok(())
     }
 
-    // FIXME: unsound
-    fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
-        unsafe { e(libredox::fstatvfs(fildes as usize, buf).map(|()| 0)) as c_int }
+    unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()> {
+        libredox::fstatvfs(fildes as usize, buf)?;
+        Ok(())
     }
 
     fn fsync(fd: c_int) -> Result<()> {
@@ -306,17 +315,14 @@ impl Pal for Sys {
         Ok(redox_rt::sys::sys_futex_wake(addr, num)?)
     }
 
-    // FIXME: unsound
-    fn futimens(fd: c_int, times: *const timespec) -> c_int {
-        unsafe { e(libredox::futimens(fd as usize, times).map(|()| 0)) as c_int }
+    unsafe fn futimens(fd: c_int, times: *const timespec) -> Result<()> {
+        libredox::futimens(fd as usize, times)?;
+        Ok(())
     }
 
-    // FIXME: unsound
-    fn utimens(path: CStr, times: *const timespec) -> c_int {
-        match File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC) {
-            Ok(file) => Self::futimens(*file, times),
-            Err(_) => -1,
-        }
+    unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()> {
+        let file = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
+        Self::futimens(*file, times)
     }
 
     // FIXME: unsound
@@ -414,30 +420,29 @@ impl Pal for Sys {
     }
 
     fn getegid() -> gid_t {
-        e(syscall::getegid()) as gid_t
+        syscall::getegid().unwrap() as gid_t
     }
 
     fn geteuid() -> uid_t {
-        e(syscall::geteuid()) as uid_t
+        syscall::geteuid().unwrap() as uid_t
     }
 
     fn getgid() -> gid_t {
-        e(syscall::getgid()) as gid_t
+        syscall::getgid().unwrap() as gid_t
     }
 
-    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
+    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int> {
         // TODO
         eprintln!("relibc getgroups({}, {:p}): not implemented", size, list);
-        ERRNO.set(ENOSYS);
-        -1
+        Err(Errno(ENOSYS))
     }
 
     fn getpagesize() -> usize {
         PAGE_SIZE
     }
 
-    fn getpgid(pid: pid_t) -> pid_t {
-        e(syscall::getpgid(pid as usize)) as pid_t
+    fn getpgid(pid: pid_t) -> Result<pid_t> {
+        Ok(syscall::getpgid(pid as usize)? as pid_t)
     }
 
     fn getpid() -> pid_t {
@@ -445,19 +450,16 @@ impl Pal for Sys {
     }
 
     fn getppid() -> pid_t {
-        e(syscall::getppid()) as pid_t
+        syscall::getppid().unwrap() as pid_t
     }
 
-    fn getpriority(which: c_int, who: id_t) -> c_int {
+    fn getpriority(which: c_int, who: id_t) -> Result<c_int> {
         // TODO
         eprintln!("getpriority({}, {}): not implemented", which, who);
-        ERRNO.set(ENOSYS);
-        -1
+        Err(Errno(ENOSYS))
     }
 
-    fn getrandom(buf: &mut [u8], flags: c_uint) -> ssize_t {
-        //TODO: make this a system call?
-
+    fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<ssize_t> {
         let path = if flags & sys_random::GRND_RANDOM != 0 {
             //TODO: /dev/random equivalent
             "/scheme/rand"
@@ -470,16 +472,9 @@ impl Pal for Sys {
             open_flags |= syscall::O_NONBLOCK;
         }
 
-        let fd = e(syscall::open(path, open_flags));
-        if fd == !0 {
-            return -1;
-        }
-
-        let res = e(syscall::read(fd, buf)) as ssize_t;
-
-        let _ = syscall::close(fd);
-
-        res
+        //TODO: store fd internally
+        let fd = FdGuard::new(syscall::open(path, open_flags)?);
+        Ok(syscall::read(*fd, buf)? as ssize_t)
     }
 
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()> {
@@ -504,13 +499,13 @@ impl Pal for Sys {
         Err(Errno(EPERM))
     }
 
-    fn getrusage(who: c_int, r_usage: &mut rusage) -> c_int {
+    fn getrusage(who: c_int, r_usage: &mut rusage) -> Result<()> {
         //TODO
         eprintln!("relibc getrusage({}, {:p}): not implemented", who, r_usage);
-        0
+        Ok(())
     }
 
-    fn getsid(pid: pid_t) -> pid_t {
+    fn getsid(pid: pid_t) -> Result<pid_t> {
         let mut buf = [0; mem::size_of::<usize>()];
         let path = if pid == 0 {
             format!("/scheme/thisproc/current/session_id")
@@ -518,29 +513,21 @@ impl Pal for Sys {
             format!("/scheme/proc/{}/session_id", pid)
         };
         let path_c = CString::new(path).unwrap();
-        match File::open(CStr::borrow(&path_c), fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
-            Ok(mut file) => match file.read(&mut buf) {
-                Ok(_) => usize::from_ne_bytes(buf).try_into().unwrap(),
-                Err(_) => -1,
-            },
-            Err(_) => -1,
-        }
+        let mut file = File::open(CStr::borrow(&path_c), fcntl::O_RDONLY | fcntl::O_CLOEXEC)?;
+        file.read(&mut buf)
+            .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
+        Ok(usize::from_ne_bytes(buf).try_into().unwrap())
     }
 
     fn gettid() -> pid_t {
-        //TODO
+        // TODO: TIDs do not exist on Redox, at least in a form where they can be sent to other
+        // processes and used in various syscalls from there. Should the fd be returned here?
         Self::getpid()
     }
 
-    fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
+    unsafe fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> Result<()> {
         let mut redox_tp = redox_timespec::default();
-        let err = e(syscall::clock_gettime(
-            syscall::CLOCK_REALTIME,
-            &mut redox_tp,
-        )) as c_int;
-        if err < 0 {
-            return err;
-        }
+        syscall::clock_gettime(syscall::CLOCK_REALTIME, &mut redox_tp)?;
         unsafe {
             (*tp).tv_sec = redox_tp.tv_sec as time_t;
             (*tp).tv_usec = (redox_tp.tv_nsec / 1000) as suseconds_t;
@@ -550,11 +537,11 @@ impl Pal for Sys {
                 (*tzp).tz_dsttime = 0;
             }
         }
-        0
+        Ok(())
     }
 
     fn getuid() -> uid_t {
-        e(syscall::getuid()) as pid_t
+        syscall::getuid().unwrap() as pid_t
     }
 
     fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
@@ -612,14 +599,14 @@ impl Pal for Sys {
         Ok(())
     }
 
-    unsafe fn mlock(addr: *const c_void, len: usize) -> c_int {
+    unsafe fn mlock(addr: *const c_void, len: usize) -> Result<()> {
         // Redox never swaps
-        0
+        Ok(())
     }
 
-    fn mlockall(flags: c_int) -> c_int {
+    unsafe fn mlockall(flags: c_int) -> Result<()> {
         // Redox never swaps
-        0
+        Ok(())
     }
 
     unsafe fn mmap(
@@ -629,7 +616,7 @@ impl Pal for Sys {
         flags: c_int,
         fildes: c_int,
         off: off_t,
-    ) -> *mut c_void {
+    ) -> Result<*mut c_void> {
         let map = Map {
             offset: off as usize,
             size: round_up_to_page_size(len),
@@ -639,11 +626,11 @@ impl Pal for Sys {
             address: addr as usize,
         };
 
-        if flags & MAP_ANONYMOUS == MAP_ANONYMOUS {
-            e(syscall::fmap(!0, &map)) as *mut c_void
+        Ok(if flags & MAP_ANONYMOUS == MAP_ANONYMOUS {
+            syscall::fmap(!0, &map)?
         } else {
-            e(syscall::fmap(fildes as usize, &map)) as *mut c_void
-        }
+            syscall::fmap(fildes as usize, &map)?
+        } as *mut c_void)
     }
 
     unsafe fn mremap(
@@ -652,60 +639,59 @@ impl Pal for Sys {
         new_len: usize,
         flags: c_int,
         args: *mut c_void,
-    ) -> *mut c_void {
-        MAP_FAILED
+    ) -> Result<*mut c_void> {
+        Err(Errno(ENOSYS))
     }
 
-    unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int {
-        e(syscall::mprotect(
+    unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> Result<()> {
+        syscall::mprotect(
             addr as usize,
             round_up_to_page_size(len),
             syscall::MapFlags::from_bits((prot as usize) << 16)
                 .expect("mprotect: invalid bit pattern"),
-        )) as c_int
+        )?;
+        Ok(())
     }
 
-    unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
+    unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> Result<()> {
         eprintln!(
             "relibc msync({:p}, 0x{:x}, 0x{:x}): not implemented",
             addr, len, flags
         );
-        e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
+        Err(Errno(ENOSYS))
         /* TODO
-        e(syscall::msync(
+        syscall::msync(
             addr as usize,
             round_up_to_page_size(len),
             flags
-        )) as c_int
+        )?;
         */
     }
 
-    unsafe fn munlock(addr: *const c_void, len: usize) -> c_int {
+    unsafe fn munlock(addr: *const c_void, len: usize) -> Result<()> {
         // Redox never swaps
-        0
+        Ok(())
     }
 
-    fn munlockall() -> c_int {
+    unsafe fn munlockall() -> Result<()> {
         // Redox never swaps
-        0
+        Ok(())
     }
 
-    unsafe fn munmap(addr: *mut c_void, len: usize) -> c_int {
-        if e(syscall::funmap(addr as usize, round_up_to_page_size(len))) == !0 {
-            return !0;
-        }
-        0
+    unsafe fn munmap(addr: *mut c_void, len: usize) -> Result<()> {
+        syscall::funmap(addr as usize, round_up_to_page_size(len))?;
+        Ok(())
     }
 
-    unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> c_int {
+    unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> Result<()> {
         eprintln!(
             "relibc madvise({:p}, 0x{:x}, 0x{:x}): not implemented",
             addr, len, flags
         );
-        e(Err(syscall::Error::new(syscall::ENOSYS))) as c_int
+        Err(Errno(ENOSYS))
     }
 
-    fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
+    unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()> {
         let redox_rqtp = unsafe { redox_timespec::from(&*rqtp) };
         let mut redox_rmtp: redox_timespec;
         if rmtp.is_null() {
@@ -713,18 +699,14 @@ impl Pal for Sys {
         } else {
             redox_rmtp = unsafe { redox_timespec::from(&*rmtp) };
         }
-        match e(syscall::nanosleep(&redox_rqtp, &mut redox_rmtp)) as c_int {
-            -1 => -1,
-            _ => {
-                unsafe {
-                    if !rmtp.is_null() {
-                        (*rmtp).tv_sec = redox_rmtp.tv_sec as time_t;
-                        (*rmtp).tv_nsec = redox_rmtp.tv_nsec as c_long;
-                    }
-                }
-                0
+        syscall::nanosleep(&redox_rqtp, &mut redox_rmtp)?;
+        unsafe {
+            if !rmtp.is_null() {
+                (*rmtp).tv_sec = redox_rmtp.tv_sec as time_t;
+                (*rmtp).tv_nsec = redox_rmtp.tv_nsec as c_long;
             }
         }
+        Ok(())
     }
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
@@ -989,7 +971,7 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn waitpid(mut pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
+    unsafe fn waitpid(mut pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t> {
         if pid == !0 {
             pid = 0;
         }
@@ -1009,16 +991,16 @@ impl Pal for Sys {
                 let mut _event = PtraceEvent::default();
                 let _ = (&mut &session.tracer).read(&mut _event);
 
-                res = Some(e(inner(
+                res = Some(inner(
                     &mut status,
                     options | sys_wait::WNOHANG | sys_wait::WUNTRACED,
-                )));
-                if res == Some(0) {
+                ));
+                if res == Some(Ok(0)) {
                     // WNOHANG, just pretend ptrace SIGSTOP:ped this
                     status = (syscall::SIGSTOP << 8) | 0x7f;
                     assert!(syscall::wifstopped(status));
                     assert_eq!(syscall::wstopsig(status), syscall::SIGSTOP);
-                    res = Some(pid as usize);
+                    res = Some(Ok(pid as usize));
                 }
             }
         }
@@ -1028,7 +1010,7 @@ impl Pal for Sys {
         // it if (and only if) a ptrace traceme was activated during
         // the wait.
         let res = res.unwrap_or_else(|| loop {
-            let res = e(inner(&mut status, options | sys_wait::WUNTRACED));
+            let res = inner(&mut status, options | sys_wait::WUNTRACED);
 
             // TODO: Also handle special PIDs here
             if !syscall::wifstopped(status)
@@ -1045,7 +1027,7 @@ impl Pal for Sys {
                 *stat_loc = status as c_int;
             }
         }
-        res as pid_t
+        Ok(res? as pid_t)
     }
 
     fn write(fd: c_int, buf: &[u8]) -> Result<ssize_t> {
