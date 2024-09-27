@@ -3,6 +3,7 @@
 use core::ptr;
 
 use crate::{
+    error::ResultExt,
     header::sys_uio::iovec,
     platform::{types::*, PalSocket, Sys},
 };
@@ -47,7 +48,7 @@ pub unsafe extern "C" fn accept(
     address_len: *mut socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::accept(socket, address, address_len),
+        Sys::accept(socket, address, address_len).or_minus_one_errno(),
         "accept({}, {:p}, {:p})",
         socket,
         address,
@@ -62,7 +63,9 @@ pub unsafe extern "C" fn bind(
     address_len: socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::bind(socket, address, address_len),
+        Sys::bind(socket, address, address_len)
+            .map(|()| 0)
+            .or_minus_one_errno(),
         "bind({}, {:p}, {})",
         socket,
         address,
@@ -77,7 +80,7 @@ pub unsafe extern "C" fn connect(
     address_len: socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::connect(socket, address, address_len),
+        Sys::connect(socket, address, address_len).or_minus_one_errno(),
         "connect({}, {:p}, {})",
         socket,
         address,
@@ -92,7 +95,9 @@ pub unsafe extern "C" fn getpeername(
     address_len: *mut socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::getpeername(socket, address, address_len),
+        Sys::getpeername(socket, address, address_len)
+            .map(|()| 0)
+            .or_minus_one_errno(),
         "getpeername({}, {:p}, {:p})",
         socket,
         address,
@@ -107,7 +112,9 @@ pub unsafe extern "C" fn getsockname(
     address_len: *mut socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::getsockname(socket, address, address_len),
+        Sys::getsockname(socket, address, address_len)
+            .map(|()| 0)
+            .or_minus_one_errno(),
         "getsockname({}, {:p}, {:p})",
         socket,
         address,
@@ -124,7 +131,9 @@ pub unsafe extern "C" fn getsockopt(
     option_len: *mut socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::getsockopt(socket, level, option_name, option_value, option_len),
+        Sys::getsockopt(socket, level, option_name, option_value, option_len)
+            .map(|()| 0)
+            .or_minus_one_errno(),
         "getsockopt({}, {}, {}, {:p}, {:p})",
         socket,
         level,
@@ -137,6 +146,8 @@ pub unsafe extern "C" fn getsockopt(
 #[no_mangle]
 pub unsafe extern "C" fn listen(socket: c_int, backlog: c_int) -> c_int {
     Sys::listen(socket, backlog)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -166,7 +177,9 @@ pub unsafe extern "C" fn recvfrom(
     address_len: *mut socklen_t,
 ) -> ssize_t {
     trace_expr!(
-        Sys::recvfrom(socket, buffer, length, flags, address, address_len),
+        Sys::recvfrom(socket, buffer, length, flags, address, address_len)
+            .map(|r| r as ssize_t)
+            .or_minus_one_errno(),
         "recvfrom({}, {:p}, {}, {:#x}, {:p}, {:p})",
         socket,
         buffer,
@@ -180,6 +193,8 @@ pub unsafe extern "C" fn recvfrom(
 #[no_mangle]
 pub unsafe extern "C" fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> ssize_t {
     Sys::recvmsg(socket, msg, flags)
+        .map(|r| r as ssize_t)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -195,6 +210,8 @@ pub unsafe extern "C" fn send(
 #[no_mangle]
 pub unsafe extern "C" fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> ssize_t {
     Sys::sendmsg(socket, msg, flags)
+        .map(|w| w as ssize_t)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -207,7 +224,9 @@ pub unsafe extern "C" fn sendto(
     dest_len: socklen_t,
 ) -> ssize_t {
     trace_expr!(
-        Sys::sendto(socket, message, length, flags, dest_addr, dest_len),
+        Sys::sendto(socket, message, length, flags, dest_addr, dest_len)
+            .map(|w| w as ssize_t)
+            .or_minus_one_errno(),
         "sendto({}, {:p}, {}, {:#x}, {:p}, {})",
         socket,
         message,
@@ -227,7 +246,9 @@ pub unsafe extern "C" fn setsockopt(
     option_len: socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::setsockopt(socket, level, option_name, option_value, option_len),
+        Sys::setsockopt(socket, level, option_name, option_value, option_len)
+            .map(|()| 0)
+            .or_minus_one_errno(),
         "setsockopt({}, {}, {}, {:p}, {})",
         socket,
         level,
@@ -239,13 +260,13 @@ pub unsafe extern "C" fn setsockopt(
 
 #[no_mangle]
 pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {
-    Sys::shutdown(socket, how)
+    Sys::shutdown(socket, how).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
     trace_expr!(
-        Sys::socket(domain, kind, protocol),
+        Sys::socket(domain, kind, protocol).or_minus_one_errno(),
         "socket({}, {}, {})",
         domain,
         kind,
@@ -261,7 +282,9 @@ pub unsafe extern "C" fn socketpair(
     sv: *mut c_int,
 ) -> c_int {
     trace_expr!(
-        Sys::socketpair(domain, kind, protocol, &mut *(sv as *mut [c_int; 2])),
+        Sys::socketpair(domain, kind, protocol, &mut *(sv as *mut [c_int; 2]))
+            .map(|()| 0)
+            .or_minus_one_errno(),
         "socketpair({}, {}, {}, {:p})",
         domain,
         kind,
