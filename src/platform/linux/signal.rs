@@ -14,48 +14,6 @@ use crate::{
     },
 };
 
-// Mirrors the ucontext_t struct from the libc crate on Linux.
-#[repr(C)]
-pub struct ucontext_t {
-    pub uc_flags: c_ulong,
-    pub uc_link: *mut ucontext_t,
-    pub uc_stack: stack_t,
-    pub uc_mcontext: mcontext_t,
-    pub uc_sigmask: sigset_t,
-    __private: [u8; 512],
-}
-#[repr(C)]
-pub struct _libc_fpstate {
-    pub cwd: u16,
-    pub swd: u16,
-    pub ftw: u16,
-    pub fop: u16,
-    pub rip: u64,
-    pub rdp: u64,
-    pub mxcsr: u32,
-    pub mxcr_mask: u32,
-    pub _st: [_libc_fpxreg; 8],
-    pub _xmm: [_libc_xmmreg; 16],
-    __private: [u64; 12],
-}
-#[repr(C)]
-pub struct _libc_fpxreg {
-    pub significand: [u16; 4],
-    pub exponent: u16,
-    __private: [u16; 3],
-}
-
-#[repr(C)]
-pub struct _libc_xmmreg {
-    pub element: [u32; 4],
-}
-#[repr(C)]
-pub struct mcontext_t {
-    pub gregs: [i64; 23], // TODO: greg_t?
-    pub fpregs: *mut _libc_fpstate,
-    __private: [u64; 8],
-}
-
 impl PalSignal for Sys {
     unsafe fn getitimer(which: c_int, out: *mut itimerval) -> Result<()> {
         e_raw(syscall!(GETITIMER, which, out))?;
