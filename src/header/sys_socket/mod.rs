@@ -35,6 +35,13 @@ pub struct msghdr {
 }
 
 #[repr(C)]
+pub struct cmsghdr {
+    pub cmsg_len: socklen_t,
+    pub cmsg_level: c_int,
+    pub cmsg_type: c_int,
+}
+
+#[repr(C)]
 #[derive(Default)]
 pub struct sockaddr {
     pub sa_family: sa_family_t,
