@@ -30,6 +30,7 @@ EXPECT_NAMES=\
 	select \
 	setjmp \
 	sigaction \
+	sigaltstack \
 	signal \
 	stdio/all \
 	stdio/buffer \
