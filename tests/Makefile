@@ -158,6 +158,7 @@ DYNAMIC_ONLY_NAMES=\
 NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
+	net/if \
 	pty/forkpty \
 	psignal \
 	pwd \

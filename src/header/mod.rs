@@ -22,6 +22,7 @@ pub mod inttypes;
 pub mod libgen;
 pub mod limits;
 pub mod locale;
+pub mod net_if;
 pub mod netdb;
 pub mod netinet_in;
 pub mod netinet_ip;
