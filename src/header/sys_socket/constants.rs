@@ -66,3 +66,5 @@ pub const PF_UNSPEC: c_int = 0;
 pub const SHUT_RD: c_int = 0;
 pub const SHUT_RDWR: c_int = 2;
 pub const SHUT_WR: c_int = 1;
+
+pub const SCM_RIGHTS: c_int = 1;
