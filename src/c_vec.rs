@@ -59,21 +59,25 @@ impl<T> CVec<T> {
         let ptr = if cap == 0 {
             NonNull::dangling()
         } else if self.cap > 0 {
-            NonNull::new(platform::realloc(self.ptr.as_ptr() as *mut c_void, size) as *mut T)
-                .ok_or(AllocError)?
+            NonNull::new(unsafe {
+                platform::realloc(self.ptr.as_ptr() as *mut c_void, size) as *mut T
+            })
+            .ok_or(AllocError)?
         } else {
-            NonNull::new((platform::alloc(size)) as *mut T).ok_or(AllocError)?
+            NonNull::new(unsafe { (platform::alloc(size)) as *mut T }).ok_or(AllocError)?
         };
         self.ptr = ptr;
         self.cap = cap;
         Ok(())
     }
     unsafe fn drop_range(&mut self, start: usize, end: usize) {
-        let mut start = self.ptr.as_ptr().add(start);
-        let end = self.ptr.as_ptr().add(end);
+        let mut start = unsafe { self.ptr.as_ptr().add(start) };
+        let end = unsafe { self.ptr.as_ptr().add(end) };
         while start < end {
-            ptr::drop_in_place(start);
-            start = start.add(1);
+            unsafe {
+                ptr::drop_in_place(start);
+                start = start.add(1);
+            }
         }
     }
 
