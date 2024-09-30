@@ -78,7 +78,7 @@ pub struct Sys;
 
 impl Pal for Sys {
     fn access(path: CStr, mode: c_int) -> Result<()> {
-        let fd = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
+        let fd = FdGuard::new(Sys::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC, 0)? as usize);
 
         if mode == F_OK {
             return Ok(());

@@ -113,7 +113,7 @@ fn resolve_path_name(
     name_or_path: &str,
     envs: &BTreeMap<String, String>,
 ) -> Option<(String, String)> {
-    if accessible(name_or_path, unistd::F_OK) == 0 {
+    if accessible(name_or_path, unistd::F_OK).is_ok() {
         return Some((
             name_or_path.to_string(),
             name_or_path
@@ -135,7 +135,7 @@ fn resolve_path_name(
         } else {
             format!("{}/{}", part, name_or_path)
         };
-        if accessible(&path, unistd::F_OK) == 0 {
+        if accessible(&path, unistd::F_OK).is_ok() {
             return Some((path.to_string(), name_or_path.to_string()));
         }
     }
