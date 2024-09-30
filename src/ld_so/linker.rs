@@ -266,7 +266,7 @@ impl Linker {
         parent_runpath: &Option<String>,
     ) -> Result<String> {
         let mut full_path = name.to_string();
-        if accessible(&full_path, F_OK) == 0 {
+        if accessible(&full_path, F_OK).is_ok() {
             return Ok(full_path);
         } else {
             let mut search_paths = Vec::new();
@@ -280,7 +280,7 @@ impl Linker {
             for part in search_paths.iter() {
                 full_path = format!("{}/{}", part, name);
                 trace!("trying path {}", full_path);
-                if accessible(&full_path, F_OK) == 0 {
+                if accessible(&full_path, F_OK).is_ok() {
                     return Ok(full_path);
                 }
             }
