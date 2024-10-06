@@ -1,6 +1,6 @@
 //! socket implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xns/syssocket.h.html
 
-use core::ptr;
+use core::ptr::{self, null};
 
 use crate::{
     error::ResultExt,
@@ -32,6 +32,13 @@ pub struct msghdr {
     pub msg_control: *mut c_void,
     pub msg_controllen: size_t,
     pub msg_flags: c_int,
+}
+
+#[repr(C)]
+pub struct cmsghdr {
+    pub cmsg_len: socklen_t,
+    pub cmsg_level: c_int,
+    pub cmsg_type: c_int,
 }
 
 #[repr(C)]
@@ -291,4 +298,10 @@ pub unsafe extern "C" fn socketpair(
         protocol,
         sv
     )
+}
+
+/// Always returning NULL: cmsghdr not implemented and mimicing no cmsghdr available.
+#[no_mangle]
+pub unsafe extern "C" fn cmsg_nxthdr(msg: *const msghdr, cmsg: *const cmsghdr) -> *const cmsghdr {
+    null::<cmsghdr>()
 }

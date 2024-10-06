@@ -13,4 +13,6 @@ struct ucred {
 	gid_t gid;
 };
 
+#define CMSG_NXTHDR(mhdr, cmsg) 0
+
 #endif // _BITS_SYS_SOCKET_H
