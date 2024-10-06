@@ -44,21 +44,37 @@ fn expected(bin: &str, kind: &str, generated: &[u8], status: ExitStatus) -> Resu
 }
 
 fn main() {
+    
+    let (status_only, bins) = {
+        let mut bins = vec![];
+        let mut status_only = false;
+        for name in env::args().skip(1) {
+            if name == "--status-only" {
+                status_only = true;
+            } else {
+                bins.push(name);
+            }
+        }
+        (status_only, bins)
+    };
+
     let mut failures = Vec::new();
 
-    for bin in env::args().skip(1) {
+    for bin in bins {
         println!("# {} #", bin);
 
         match Command::new(&bin).arg("test").arg("args").output() {
             Ok(output) => {
-                if let Err(failure) = expected(&bin, "stdout", &output.stdout, output.status) {
-                    println!("{}", failure);
-                    failures.push(failure);
-                }
+                if !status_only {
+                    if let Err(failure) = expected(&bin, "stdout", &output.stdout, output.status) {
+                        println!("{}", failure);
+                        failures.push(failure);
+                    }
 
-                if let Err(failure) = expected(&bin, "stderr", &output.stderr, output.status) {
-                    println!("{}", failure);
-                    failures.push(failure);
+                    if let Err(failure) = expected(&bin, "stderr", &output.stderr, output.status) {
+                        println!("{}", failure);
+                        failures.push(failure);
+                    }
                 }
             }
             Err(err) => {
