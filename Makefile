@@ -63,6 +63,7 @@ all: | headers libs
 
 # TODO: can sed be removed now that cbindgen iirc supports varargs?
 headers: $(HEADERS_DEPS)
+	set -e ; \
 	for header in $(HEADERS_UNPARSED); do \
 		echo "Header $$header"; \
 		if test -f "src/header/$$header/cbindgen.toml"; then \
