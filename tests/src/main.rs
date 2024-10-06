@@ -46,7 +46,6 @@ fn expected(bin: &str, kind: &str, generated: &[u8], status: ExitStatus) -> Resu
 const STATUS_ONLY: &str = "-s";
 
 fn main() {
-
     let mut failures = Vec::new();
 
     for bin in env::args().skip(1) {
