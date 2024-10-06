@@ -203,8 +203,6 @@ STATUS_NAMES=(\
     #	time/times
 
 EXPECT_BINS=(${EXPECT_NAMES[@]/#/.\/bins_static\/})
-STATUS_BINS=(${STATUS_NAMES[@]/#/.\/bins_static\/})
+STATUS_BINS=(${STATUS_NAMES[@]/#/-s.\/bins_static\/})
 
-bins_verify/relibc-tests --status-only ${STATUS_BINS[@]}
-
-bins_verify/relibc-tests ${EXPECT_BINS[@]}
+bins_verify/relibc-tests ${STATUS_BINS[@]} ${EXPECT_BINS[@]}

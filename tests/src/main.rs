@@ -43,24 +43,20 @@ fn expected(bin: &str, kind: &str, generated: &[u8], status: ExitStatus) -> Resu
     Ok(())
 }
 
+const STATUS_ONLY: &str = "-s";
+
 fn main() {
-    
-    let (status_only, bins) = {
-        let mut bins = vec![];
-        let mut status_only = false;
-        for name in env::args().skip(1) {
-            if name == "--status-only" {
-                status_only = true;
-            } else {
-                bins.push(name);
-            }
-        }
-        (status_only, bins)
-    };
 
     let mut failures = Vec::new();
 
-    for bin in bins {
+    for bin in env::args().skip(1) {
+        let status_only = bin.starts_with(STATUS_ONLY);
+        let bin = if bin.starts_with(STATUS_ONLY) {
+            bin.strip_prefix(STATUS_ONLY).unwrap().to_string()
+        } else {
+            bin
+        };
+
         println!("# {} #", bin);
 
         match Command::new(&bin).arg("test").arg("args").output() {
