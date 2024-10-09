@@ -671,6 +671,18 @@ fn get_nstime() -> u64 {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mkdtemp(name: *mut c_char) -> *mut c_char {
+    inner_mktemp(name, 0, || {
+        let name_c = CStr::from_ptr(name);
+        match Sys::mkdir(name_c, 0o700) {
+            Ok(()) => Some(name),
+            Err(_) => None,
+        }
+    })
+    .unwrap_or(ptr::null_mut())
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn mkostemps(
     name: *mut c_char,
     suffix_len: c_int,
