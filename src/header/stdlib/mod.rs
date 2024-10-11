@@ -313,7 +313,10 @@ pub unsafe extern "C" fn exit(status: c_int) {
         (*f)();
     }
 
-    _fini();
+    #[cfg(not(target_arch = "riscv64"))] // risc-v uses arrays exclusively
+    {
+        _fini();
+    }
 
     ld_so::fini();
 

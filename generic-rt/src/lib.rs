@@ -64,6 +64,21 @@ impl<Os> GenericTcb<Os> {
         value
     }
 
+    /// Architecture specific code to read a usize from the TCB - riscv64
+    #[inline(always)]
+    #[cfg(target_arch = "riscv64")]
+    unsafe fn arch_read(offset: usize) -> usize {
+        let value;
+        asm!(
+            "ld {value}, -8(tp)", // TCB
+            "add {value}, {value}, {offset}",
+            "ld {value}, 0({value})",
+            value = out(reg) value,
+            offset = in(reg) offset,
+        );
+        value
+    }
+
     pub unsafe fn current_ptr() -> Option<*mut Self> {
         let tcb_ptr = Self::arch_read(offset_of!(Self, tcb_ptr)) as *mut Self;
         let tcb_len = Self::arch_read(offset_of!(Self, tcb_len));

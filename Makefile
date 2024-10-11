@@ -1,4 +1,4 @@
-TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
+export TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
@@ -20,35 +20,54 @@ ifeq ($(TARGET),aarch64-unknown-linux-gnu)
 	export CC=aarch64-linux-gnu-gcc
 	export LD=aarch64-linux-gnu-ld
 	export AR=aarch64-linux-gnu-ar
+	export NM=aarch64-linux-gnu-nm
 	export OBJCOPY=aarch64-linux-gnu-objcopy
+	export CPPFLAGS=
 endif
 
 ifeq ($(TARGET),aarch64-unknown-redox)
 	export CC=aarch64-unknown-redox-gcc
 	export LD=aarch64-unknown-redox-ld
 	export AR=aarch64-unknown-redox-ar
+	export NM=aarch64-unknown-redox-nm
 	export OBJCOPY=aarch64-unknown-redox-objcopy
+	export CPPFLAGS=
 endif
 
 ifeq ($(TARGET),x86_64-unknown-linux-gnu)
 	export CC=x86_64-linux-gnu-gcc
 	export LD=x86_64-linux-gnu-ld
 	export AR=x86_64-linux-gnu-ar
+	export NM=x86_64-linux-gnu-nm
 	export OBJCOPY=x86_64-linux-gnu-objcopy
+	export CPPFLAGS=
 endif
 
 ifeq ($(TARGET),i686-unknown-redox)
 	export CC=i686-unknown-redox-gcc
 	export LD=i686-unknown-redox-ld
 	export AR=i686-unknown-redox-ar
+	export NM=i686-unknown-redox-nm
 	export OBJCOPY=i686-unknown-redox-objcopy
+	export CPPFLAGS=
 endif
 
 ifeq ($(TARGET),x86_64-unknown-redox)
 	export CC=x86_64-unknown-redox-gcc
 	export LD=x86_64-unknown-redox-ld
 	export AR=x86_64-unknown-redox-ar
+	export NM=x86_64-unknown-redox-nm
 	export OBJCOPY=x86_64-unknown-redox-objcopy
+	export CPPFLAGS=
+endif
+
+ifeq ($(TARGET),riscv64gc-unknown-redox)
+	export CC=riscv64-unknown-redox-gcc
+	export LD=riscv64-unknown-redox-ld
+	export AR=riscv64-unknown-redox-ar
+	export NM=riscv64-unknown-redox-nm
+	export OBJCOPY=riscv64-unknown-redox-objcopy
+	export CPPFLAGS=-march=rv64gc -mabi=lp64d
 endif
 
 SRC=\
@@ -158,7 +177,7 @@ $(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm
 
 $(BUILD)/debug/librelibc.a: $(SRC)
 	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
-	./renamesyms.sh $@ $(BUILD)/debug/deps/
+	./renamesyms.sh "$@" "$(BUILD)/debug/deps/"
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
@@ -198,7 +217,7 @@ $(BUILD)/release/librelibc.a: $(SRC)
 	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
 	# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
 	# use some cbindgen hook, specify them manually, or grep for #[no_mangle].
-	./renamesyms.sh $@ $(BUILD)/release/deps/
+	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
@@ -230,4 +249,4 @@ $(BUILD)/openlibm: openlibm
 	touch $@
 
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
-	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
+	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
