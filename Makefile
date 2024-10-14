@@ -13,6 +13,7 @@ CARGOFLAGS+="--target=$(TARGET)"
 TARGET_HEADERS?="$(BUILD)/include"
 
 HEADERS_UNPARSED=$(shell find src/header -mindepth 1 -maxdepth 1 -type d -not -name "_*" -printf "%f\n")
+MHEADERS_UNPARSED=$(shell find src/libm -mindepth 1 -maxdepth 1 -type d -not -name "src" -printf "%f\n")
 HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "*.rs" \))
 #HEADERS=$(patsubst %,%.h,$(subst _,/,$(HEADERS_UNPARSED)))
 
@@ -75,6 +76,15 @@ headers: $(HEADERS_DEPS)
 		fi \
 	done
 
+	for header in $(MHEADERS_UNPARSED); do \
+		out=`echo "$$header" | sed 's/_/\//g'`; \
+		out="$(TARGET_HEADERS)/$$out.h"; \
+		cbindgen --output "$$out" \
+			--config="src/libm/$$header/cbindgen.toml" \
+			"src/libm/$$header/mod.rs"; \
+		sed -i "s/va_list __valist/.../g" "$$out"; \
+	done
+
 clean:
 	$(CARGO) clean
 	$(MAKE) -C tests clean
@@ -90,12 +100,11 @@ install-headers: headers libs
 	mkdir -pv "$(DESTDIR)/include"
 	cp -rv "include"/* "$(DESTDIR)/include"
 	cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/include"
-	cp -v "openlibm/include"/*.h "$(DESTDIR)/include"
-	cp -v "openlibm/src"/*.h "$(DESTDIR)/include"
 
 libs: \
 	$(BUILD)/release/libc.a \
 	$(BUILD)/release/libc.so \
+	$(BUILD)/release/libm.o \
 	$(BUILD)/release/crt0.o \
 	$(BUILD)/release/crti.o \
 	$(BUILD)/release/crtn.o \
@@ -111,10 +120,11 @@ install-libs: headers libs
 	cp -v "$(BUILD)/release/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/release/ld_so" "$(DESTDIR)/lib/ld64.so.1"
-	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
+	cp -v "$(BUILD)/release/libm.o" "$(DESTDIR)/lib/"
 	# Empty libraries for dl, pthread, and rt
 	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
 	$(AR) -rcs "$(DESTDIR)/lib/libpthread.a"
+	$(AR) -rcs "$(DESTDIR)/lib/libm.a"
 	$(AR) -rcs "$(DESTDIR)/lib/librt.a"
 
 install-tests: tests
@@ -144,7 +154,7 @@ test: sysroot
 
 # Debug targets
 
-$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -153,12 +163,16 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
 
-$(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a
 	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -Wl,-soname,libc.so.6 -o $@
 
 $(BUILD)/debug/librelibc.a: $(SRC)
 	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
 	./renamesyms.sh $@ $(BUILD)/debug/deps/
+	touch $@
+
+$(BUILD)/debug/libm.o:
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
@@ -182,7 +196,7 @@ $(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debu
 
 # Release targets
 
-$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -191,7 +205,7 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenl
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
 
-$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a
 	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -Wl,-soname,libc.so.6 -o $@
 
 $(BUILD)/release/librelibc.a: $(SRC)
@@ -199,6 +213,10 @@ $(BUILD)/release/librelibc.a: $(SRC)
 	# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
 	# use some cbindgen hook, specify them manually, or grep for #[no_mangle].
 	./renamesyms.sh $@ $(BUILD)/release/deps/
+	touch $@
+
+$(BUILD)/release/libm.o:
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
@@ -222,12 +240,12 @@ $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD
 
 # Other targets
 
-$(BUILD)/openlibm: openlibm
-	rm -rf $@ $@.partial
-	mkdir -p $(BUILD)
-	cp -r $< $@.partial
-	mv $@.partial $@
-	touch $@
+# $(BUILD)/openlibm: openlibm
+# 	rm -rf $@ $@.partial
+# 	mkdir -p $(BUILD)
+# 	cp -r $< $@.partial
+# 	mv $@.partial $@
+# 	touch $@
 
-$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
-	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
+# $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
+# 	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
