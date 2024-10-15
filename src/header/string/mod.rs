@@ -256,7 +256,7 @@ pub unsafe extern "C" fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: siz
 
 #[no_mangle]
 pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
-    unsafe { NulTerminated::new(s) }.len_fast()
+    unsafe { NulTerminated::new(s) }.count()
 }
 
 #[no_mangle]
