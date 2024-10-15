@@ -1,5 +1,8 @@
 //! strings implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/strings.h.html
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::{
     arch,
     iter::{once, zip},
@@ -14,25 +17,33 @@ use crate::{
 
 #[no_mangle]
 pub unsafe extern "C" fn bcmp(first: *const c_void, second: *const c_void, n: size_t) -> c_int {
-    string::memcmp(first, second, n)
+    unsafe { string::memcmp(first, second, n) }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn bcopy(src: *const c_void, dst: *mut c_void, n: size_t) {
-    ptr::copy(src as *const u8, dst as *mut u8, n);
+    unsafe {
+        ptr::copy(src as *const u8, dst as *mut u8, n);
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn bzero(dst: *mut c_void, n: size_t) {
-    ptr::write_bytes(dst as *mut u8, 0, n);
+    unsafe {
+        ptr::write_bytes(dst as *mut u8, 0, n);
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn explicit_bzero(s: *mut c_void, n: size_t) {
     for i in 0..n {
-        *(s as *mut u8).add(i) = 0 as u8;
+        unsafe {
+            *(s as *mut u8).add(i) = 0 as u8;
+        }
     }
-    arch::asm!("");
+    unsafe {
+        arch::asm!("");
+    }
 }
 
 #[no_mangle]
@@ -45,12 +56,12 @@ pub extern "C" fn ffs(i: c_int) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn index(s: *const c_char, c: c_int) -> *mut c_char {
-    string::strchr(s, c)
+    unsafe { string::strchr(s, c) }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn rindex(s: *const c_char, c: c_int) -> *mut c_char {
-    string::strrchr(s, c)
+    unsafe { string::strrchr(s, c) }
 }
 
 #[no_mangle]
