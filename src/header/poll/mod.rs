@@ -1,5 +1,8 @@
 //! poll implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/poll.h.html
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::{mem, slice};
 
 use crate::{
@@ -113,7 +116,10 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
     trace_expr!(
-        poll_epoll(slice::from_raw_parts_mut(fds, nfds as usize), timeout),
+        poll_epoll(
+            unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
+            timeout
+        ),
         "poll({:p}, {}, {})",
         fds,
         nfds,
