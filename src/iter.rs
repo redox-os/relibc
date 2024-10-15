@@ -1,8 +1,6 @@
 //! Utilities to help use Rust iterators on C strings.
 
-use core::{iter::Iterator, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
-use core::mem;
-
+use core::{iter::Iterator, marker::PhantomData, mem, mem::MaybeUninit, ptr::NonNull};
 use crate::platform::types::*;
 
 /// A minimal alternative to the `Zero` trait from num-traits, for use in
@@ -77,7 +75,6 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
         }
     }
 
-
     // Faster len implementation. Checks 8 characters at a time
     // TODO Maybe able to implement with normal iterator trait? 
     pub fn len(&self) -> usize {
@@ -106,7 +103,6 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
             long_word_ptr = unsafe { long_word_ptr.add(1) };
             long_word = unsafe { *long_word_ptr };
             length += 8;
-
         }
         let mut cp = long_word_ptr as *const c_char;
         for i in 0..8 {
