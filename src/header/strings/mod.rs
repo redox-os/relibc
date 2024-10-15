@@ -22,20 +22,28 @@ pub unsafe extern "C" fn bcmp(first: *const c_void, second: *const c_void, n: si
 
 #[no_mangle]
 pub unsafe extern "C" fn bcopy(src: *const c_void, dst: *mut c_void, n: size_t) {
-    unsafe { ptr::copy(src as *const u8, dst as *mut u8, n); }
+    unsafe {
+        ptr::copy(src as *const u8, dst as *mut u8, n);
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn bzero(dst: *mut c_void, n: size_t) {
-    unsafe { ptr::write_bytes(dst as *mut u8, 0, n); }
+    unsafe {
+        ptr::write_bytes(dst as *mut u8, 0, n);
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn explicit_bzero(s: *mut c_void, n: size_t) {
     for i in 0..n {
-        unsafe { *(s as *mut u8).add(i) = 0 as u8; }
+        unsafe {
+            *(s as *mut u8).add(i) = 0 as u8;
+        }
     }
-    unsafe { arch::asm!(""); }
+    unsafe {
+        arch::asm!("");
+    }
 }
 
 #[no_mangle]
