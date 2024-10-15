@@ -1,6 +1,7 @@
 //! Utilities to help use Rust iterators on C strings.
 
 use core::{iter::Iterator, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
+use core::mem;
 
 use crate::platform::types::*;
 
