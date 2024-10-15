@@ -116,7 +116,10 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
     trace_expr!(
-        poll_epoll(unsafe { slice::from_raw_parts_mut(fds, nfds as usize) }, timeout),
+        poll_epoll(
+            unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
+            timeout
+        ),
         "poll({:p}, {}, {})",
         fds,
         nfds,
