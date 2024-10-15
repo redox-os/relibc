@@ -201,7 +201,10 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     }
 
     // Call init section
-    _init();
+    #[cfg(not(target_arch = "riscv64"))] // risc-v uses arrays exclusively
+    {
+        _init();
+    }
 
     // Run init array
     {

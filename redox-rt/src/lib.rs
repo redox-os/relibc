@@ -119,6 +119,20 @@ pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end_and_tcb_start: usize, _tls_len: 
     let _ = syscall::write(*file, &env).expect_notls("failed to write fsbase");
 }
 
+/// OS and architecture specific code to activate TLS - Redox riscv64
+#[cfg(target_arch = "riscv64")]
+pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
+    // tp points to static tls block
+    // FIXME limited to a single initial master
+    let tls_start = tls_end - tls_len;
+    let abi_ptr = tls_start - 8;
+    core::ptr::write(abi_ptr as *mut usize, tls_end);
+    core::arch::asm!(
+        "mv tp, {}",
+        in(reg) tls_start
+    );
+}
+
 /// Initialize redox-rt in situations where relibc is not used
 pub unsafe fn initialize_freestanding() {
     // TODO: This code is a hack! Integrate the ld_so TCB code into generic-rt, and then use that
@@ -145,7 +159,7 @@ pub unsafe fn initialize_freestanding() {
     page.tls_end = (page as *mut Tcb).cast();
     *page.os_specific.thr_fd.get_mut() = None;
 
-    #[cfg(not(target_arch = "aarch64"))]
+    #[cfg(not(any(target_arch = "aarch64", target_arch = "riscv64")))]
     unsafe {
         let tcb_addr = page as *mut Tcb as usize;
         tcb_activate(&page.os_specific, tcb_addr, 0)
@@ -154,6 +168,11 @@ pub unsafe fn initialize_freestanding() {
     unsafe {
         let abi_ptr = core::ptr::addr_of_mut!(page.tcb_ptr);
         core::arch::asm!("msr tpidr_el0, {}", in(reg) abi_ptr);
+    }
+    #[cfg(target_arch = "riscv64")]
+    unsafe {
+        let abi_ptr = core::ptr::addr_of_mut!(page.tcb_ptr) as usize;
+        core::arch::asm!("mv tp, {}", in(reg) (abi_ptr + 8));
     }
     initialize();
 }

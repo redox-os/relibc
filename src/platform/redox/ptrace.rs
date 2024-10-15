@@ -256,6 +256,17 @@ unsafe fn inner_ptrace(
     }
 }
 
+#[cfg(target_arch = "riscv64")]
+fn inner_ptrace(
+    request: c_int,
+    pid: pid_t,
+    addr: *mut c_void,
+    data: *mut c_void,
+) -> io::Result<c_int> {
+    //TODO: riscv64
+    unimplemented!("inner_ptrace not implemented on riscv64");
+}
+
 impl PalPtrace for Sys {
     unsafe fn ptrace(
         request: c_int,

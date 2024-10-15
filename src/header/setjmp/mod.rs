@@ -17,4 +17,5 @@ platform_specific! {
     "aarch64","aarch64", "s";
     "x86","i386","s";
     "x86_64","x86_64","s";
+    "riscv64", "riscv64", "S";
 }
