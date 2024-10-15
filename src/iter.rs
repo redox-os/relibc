@@ -96,7 +96,7 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
         let mut lomagic: u64 = 0x01010101;
         himagic = ((himagic << 16) << 16) | himagic;
         lomagic = ((lomagic << 16) << 16) | lomagic;
-        let mut long_word_ptr = self.ptr.as_ptr() as *const u64;
+        let mut long_word_ptr = c_ptr as *const u64;
         let mut long_word = unsafe { *long_word_ptr };
         while long_word.wrapping_sub(lomagic) & !long_word & himagic == 0 {
             long_word_ptr = unsafe { long_word_ptr.add(1) };
