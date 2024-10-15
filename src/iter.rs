@@ -75,6 +75,49 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
             phantom: PhantomData,
         }
     }
+
+
+    // Faster len implementation. Checks 8 characters at a time
+    // TODO Maybe able to implement with normal iterator trait? 
+    pub fn len(&self) -> usize {
+        let mut length = 0;
+        let mut c_ptr = self.ptr.as_ptr();
+        // Must first align on long word boundary
+        while (c_ptr as usize) % mem::size_of::<u64>() != 0 {
+            let val_ref = unsafe { self.ptr.as_ref() };
+            if val_ref.is_zero() {
+                return length;
+            }
+            c_ptr = unsafe { c_ptr.add(1) };
+            length += 1;
+        }
+        // Uses himagic and lomagic for NULL termination check
+        // Look at glibc implementation:
+        // https://github.com/lattera/glibc/blob/master/string/strlen.c
+        // Works Similarly
+        let mut himagic: u64 = 0x80808080;
+        let mut lomagic: u64 = 0x01010101;
+        himagic = ((himagic << 16) << 16) | himagic;
+        lomagic = ((lomagic << 16) << 16) | lomagic;
+        let mut long_word_ptr = self.ptr.as_ptr() as *const u64;
+        let mut long_word = unsafe { *long_word_ptr };
+        while long_word.wrapping_sub(lomagic) & !long_word & himagic == 0 {
+            long_word_ptr = unsafe { long_word_ptr.add(1) };
+            long_word = unsafe { *long_word_ptr };
+            length += 8;
+
+        }
+        let mut cp = long_word_ptr as *const c_char;
+        for i in 0..8 {
+            let val_ref = unsafe { cp.as_ref().unwrap() };
+            if val_ref.is_zero() {
+                length += i;
+                break;
+            }
+            cp = unsafe { cp.add(1) };
+        }
+        return length;
+    }
 }
 
 /// A zipped iterator mapping an input iterator to an "out" pointer.
