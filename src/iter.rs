@@ -80,7 +80,7 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
         let mut length = 0;
         let mut c_ptr = self.ptr.as_ptr();
         // Must first align on long word boundary
-        while (c_ptr as usize) % mem::size_of::<u64>() != 0 {
+        while (c_ptr as usize) % mem::size_of::<u32>() != 0 {
             let val_ref = unsafe { self.ptr.as_ref() };
             if val_ref.is_zero() {
                 return length;
@@ -92,19 +92,17 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
         // Look at glibc implementation:
         // https://github.com/lattera/glibc/blob/master/string/strlen.c
         // Works Similarly
-        let mut himagic: u64 = 0x80808080;
-        let mut lomagic: u64 = 0x01010101;
-        himagic = ((himagic << 16) << 16) | himagic;
-        lomagic = ((lomagic << 16) << 16) | lomagic;
-        let mut long_word_ptr = c_ptr as *const u64;
+        let mut himagic: u32 = 0x80808080;
+        let mut lomagic: u32 = 0x01010101;
+        let mut long_word_ptr = c_ptr as *const u32;
         let mut long_word = unsafe { *long_word_ptr };
         while long_word.wrapping_sub(lomagic) & !long_word & himagic == 0 {
             long_word_ptr = unsafe { long_word_ptr.add(1) };
             long_word = unsafe { *long_word_ptr };
-            length += 8;
+            length += 4;
         }
         let mut cp = long_word_ptr as *const c_char;
-        for i in 0..8 {
+        for i in 0..4 {
             let val_ref = unsafe { cp.as_ref().unwrap() };
             if val_ref.is_zero() {
                 length += i;
