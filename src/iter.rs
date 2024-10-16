@@ -76,7 +76,7 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
 
     // Faster len implementation. Checks 8 characters at a time
     // TODO Maybe able to implement with normal iterator trait?
-    pub fn len_fast(&self) -> usize {
+    pub fn len_fast(self) -> usize {
         let mut length = 0;
         let mut c_ptr = self.ptr.as_ptr();
         // Must first align on long word boundary
