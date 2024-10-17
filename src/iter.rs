@@ -80,6 +80,15 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
         let BLOCK_SIZE = 8;
         let mut length = 0;
         let mut c_ptr = self.ptr.as_ptr();
+        // Aligns memory first
+        while (c_ptr as usize) % BLOCK_SIZE != 0 {
+            let val_ref = unsafe { c_ptr.as_ref().unwrap() };
+            if val_ref.is_zero() {
+                return length;
+            }
+            c_ptr = unsafe { c_ptr.add(1) };
+            length += 1;
+        }
         // Uses himagic and lomagic for NULL termination check
         // Look at glibc implementation:
         // https://github.com/lattera/glibc/blob/master/string/strlen.c
