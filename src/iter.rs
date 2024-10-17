@@ -77,23 +77,24 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
     // Faster len implementation. Checks 8 characters at a time
     // TODO Maybe able to implement with normal iterator trait?
     pub fn len_fast(self) -> usize {
+        let BLOCK_SIZE = 8;
         let mut length = 0;
         let mut c_ptr = self.ptr.as_ptr();
         // Uses himagic and lomagic for NULL termination check
         // Look at glibc implementation:
         // https://github.com/lattera/glibc/blob/master/string/strlen.c
         // Works Similarly
-        let mut himagic: u32 = 0x80808080;
-        let mut lomagic: u32 = 0x01010101;
-        let mut long_word_ptr = c_ptr as *const u32;
+        let himagic: u64 = 0x8080808080808080;
+        let lomagic: u64 = 0x0101010101010101;
+        let mut long_word_ptr = c_ptr as *const u64;
         let mut long_word = unsafe { *long_word_ptr };
         while long_word.wrapping_sub(lomagic) & !long_word & himagic == 0 {
             long_word_ptr = unsafe { long_word_ptr.add(1) };
             long_word = unsafe { *long_word_ptr };
-            length += 4;
+            length += BLOCK_SIZE;
         }
         let mut cp = long_word_ptr as *const c_char;
-        for i in 0..4 {
+        for i in 0..BLOCK_SIZE {
             let val_ref = unsafe { cp.as_ref().unwrap() };
             if val_ref.is_zero() {
                 length += i;
