@@ -1,8 +1,6 @@
 //! Utilities to help use Rust iterators on C strings.
-
-use core::{iter::Iterator, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
-
 use crate::platform::types::*;
+use core::{iter::Iterator, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 /// A minimal alternative to the `Zero` trait from num-traits, for use in
 /// `NulTerminated`.
@@ -74,6 +72,46 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
             ptr: NonNull::new(ptr.cast_mut()).unwrap(),
             phantom: PhantomData,
         }
+    }
+
+    // Faster len implementation. Checks 8 characters at a time
+    // TODO Maybe able to implement with normal iterator trait?
+    pub fn len_fast(self) -> usize {
+        let BLOCK_SIZE = 8;
+        let mut length = 0;
+        let mut c_ptr = self.ptr.as_ptr();
+        // Aligns memory first
+        while (c_ptr as usize) % BLOCK_SIZE != 0 {
+            let val_ref = unsafe { c_ptr.as_ref().unwrap() };
+            if val_ref.is_zero() {
+                return length;
+            }
+            c_ptr = unsafe { c_ptr.add(1) };
+            length += 1;
+        }
+        // Uses himagic and lomagic for NULL termination check
+        // Look at glibc implementation:
+        // https://github.com/lattera/glibc/blob/master/string/strlen.c
+        // Works Similarly
+        let himagic: u64 = 0x8080808080808080;
+        let lomagic: u64 = 0x0101010101010101;
+        let mut long_word_ptr = c_ptr as *const u64;
+        let mut long_word = unsafe { *long_word_ptr };
+        while long_word.wrapping_sub(lomagic) & !long_word & himagic == 0 {
+            long_word_ptr = unsafe { long_word_ptr.add(1) };
+            long_word = unsafe { *long_word_ptr };
+            length += BLOCK_SIZE;
+        }
+        let mut cp = long_word_ptr as *const c_char;
+        for i in 0..BLOCK_SIZE {
+            let val_ref = unsafe { cp.as_ref().unwrap() };
+            if val_ref.is_zero() {
+                length += i;
+                break;
+            }
+            cp = unsafe { cp.add(1) };
+        }
+        return length;
     }
 }
 
