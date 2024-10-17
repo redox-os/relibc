@@ -1,6 +1,6 @@
 //! Utilities to help use Rust iterators on C strings.
 use crate::platform::types::*;
-use core::{iter::Iterator, marker::PhantomData, mem, mem::MaybeUninit, ptr::NonNull};
+use core::{iter::Iterator, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 /// A minimal alternative to the `Zero` trait from num-traits, for use in
 /// `NulTerminated`.
@@ -79,15 +79,6 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
     pub fn len_fast(self) -> usize {
         let mut length = 0;
         let mut c_ptr = self.ptr.as_ptr();
-        // Must first align on long word boundary
-        while (c_ptr as usize) % mem::size_of::<u32>() != 0 {
-            let val_ref = unsafe { self.ptr.as_ref() };
-            if val_ref.is_zero() {
-                return length;
-            }
-            c_ptr = unsafe { c_ptr.add(1) };
-            length += 1;
-        }
         // Uses himagic and lomagic for NULL termination check
         // Look at glibc implementation:
         // https://github.com/lattera/glibc/blob/master/string/strlen.c
