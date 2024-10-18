@@ -2,7 +2,7 @@ export TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
-CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-c
+CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins
 CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
 RUSTCFLAGS?=
 export OBJCOPY?=objcopy
