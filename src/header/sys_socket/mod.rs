@@ -1,8 +1,6 @@
 //! socket implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xns/syssocket.h.html
 
-use core::ptr;
-use core::mem;
-
+use core::{mem, ptr};
 
 use crate::{
     error::ResultExt,
@@ -51,18 +49,15 @@ pub struct sockaddr {
 }
 
 pub fn CMSG_ALIGN(len: size_t) -> size_t {
-    (len + mem::size_of::<size_t>() - 1)
-        & !(mem::size_of::<size_t>() - 1)
+    (len + mem::size_of::<size_t>() - 1) & !(mem::size_of::<size_t>() - 1)
 }
 
 pub fn CMSG_LEN(length: c_uint) -> c_uint {
-    (CMSG_ALIGN(mem::size_of::<cmsghdr>()) + length as usize)
-        as c_uint
+    (CMSG_ALIGN(mem::size_of::<cmsghdr>()) + length as usize) as c_uint
 }
 
 pub fn CMSG_SPACE(len: c_uint) -> c_uint {
-    (CMSG_ALIGN(len as size_t) + CMSG_ALIGN(mem::size_of::<cmsghdr>()))
-        as c_uint
+    (CMSG_ALIGN(len as size_t) + CMSG_ALIGN(mem::size_of::<cmsghdr>())) as c_uint
 }
 
 #[no_mangle]
