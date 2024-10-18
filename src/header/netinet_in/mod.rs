@@ -70,6 +70,19 @@ pub const INADDR_ALLHOSTS_GROUP: u32 = 0xE000_0001;
 pub const INADDR_ALLRTRS_GROUP: u32 = 0xE000_0002;
 pub const INADDR_MAX_LOCAL_GROUP: u32 = 0xE000_00FF;
 
+#[repr(C)]
+pub struct ip_mreq_source {
+    pub imr_multiaddr: in_addr,
+    pub imr_interface: in_addr,
+    pub imr_sourceaddr: in_addr,
+}
+
+#[repr(C)]
+pub struct ip_mreq {
+    pub imr_multiaddr: in_addr,
+    pub imr_interface: in_addr,
+}
+
 #[no_mangle]
 pub static in6addr_any: in6_addr = in6_addr {
     s6_addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],

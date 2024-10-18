@@ -7,7 +7,7 @@ no_includes = true
 cpp_compat = true
 
 [export]
-include = ["sockaddr_in6", "sockaddr_in", "ipv6_mreq"]
+include = ["sockaddr_in6", "sockaddr_in", "ipv6_mreq", "ip_mreq", "ip_mreq_source"]
 
 [enum]
 prefix_with_name = true
