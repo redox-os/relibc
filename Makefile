@@ -2,15 +2,16 @@ export TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
-CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins
+CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-c
 CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
 RUSTCFLAGS?=
 export OBJCOPY?=objcopy
 
-BUILD?="$(shell pwd)/target/$(TARGET)"
-CARGOFLAGS+="--target=$(TARGET)"
+BUILD?=$(shell pwd)/target/$(TARGET)
+CARGOFLAGS+=--target=$(TARGET)
 
-TARGET_HEADERS?="$(BUILD)/include"
+TARGET_HEADERS?=$(BUILD)/include
+export CFLAGS=-I$(TARGET_HEADERS)
 
 HEADERS_UNPARSED=$(shell find src/header -mindepth 1 -maxdepth 1 -type d -not -name "_*" -printf "%f\n")
 HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "*.rs" \))
@@ -82,6 +83,11 @@ all: | headers libs
 
 # TODO: can sed be removed now that cbindgen iirc supports varargs?
 headers: $(HEADERS_DEPS)
+	rm -rf $(TARGET_HEADERS)
+	mkdir -pv $(TARGET_HEADERS)
+	cp -rv include/* $(TARGET_HEADERS)
+	cp -v "openlibm/include"/*.h $(TARGET_HEADERS)
+	cp -v "openlibm/src"/*.h $(TARGET_HEADERS)
 	set -e ; \
 	for header in $(HEADERS_UNPARSED); do \
 		echo "Header $$header"; \
@@ -107,10 +113,7 @@ fmt:
 
 install-headers: headers libs
 	mkdir -pv "$(DESTDIR)/include"
-	cp -rv "include"/* "$(DESTDIR)/include"
 	cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/include"
-	cp -v "openlibm/include"/*.h "$(DESTDIR)/include"
-	cp -v "openlibm/src"/*.h "$(DESTDIR)/include"
 
 libs: \
 	$(BUILD)/release/libc.a \
@@ -250,3 +253,4 @@ $(BUILD)/openlibm: openlibm
 
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
 	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
+	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
