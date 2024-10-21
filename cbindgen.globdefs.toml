@@ -8,6 +8,9 @@
 "target_arch=x86" = "__i386__"
 "target_arch=x86_64" = "__x86_64__"
 "target_arch=aarch64" = "__aarch64__"
+# This is not exact. It should be `defined(__riscv) && defined(__LP64__)`, or `defined(__riscv) && __riscv_xlen==64`
+# This will do however, as long as we only support riscv64 and not riscv32
+"target_arch=riscv64" = "__riscv"
 
 # XXX: silences a warning
 "feature = no_std" = "__relibc__"

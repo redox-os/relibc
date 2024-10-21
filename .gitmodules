@@ -1,6 +1,7 @@
 [submodule "openlibm"]
 	path = openlibm
-	url = https://gitlab.redox-os.org/redox-os/openlibm.git
+	url = https://github.com/JuliaMath/openlibm.git
+	branch = master
 [submodule "posix-regex"]
 	path = posix-regex
 	url = https://gitlab.redox-os.org/redox-os/posix-regex.git

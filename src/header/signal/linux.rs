@@ -24,6 +24,16 @@ global_asm!(
 "
 );
 
+#[cfg(target_arch = "riscv64")]
+global_asm!(
+    "
+    .global __restore_rt
+    __restore_rt:
+        li a7, 139
+        ecall
+"
+);
+
 pub const SIGHUP: usize = 1;
 pub const SIGINT: usize = 2;
 pub const SIGQUIT: usize = 3;

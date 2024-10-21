@@ -28,7 +28,11 @@ pub fn sighandler_function() -> usize {
 /// ucontext_t representation
 #[repr(C)]
 pub struct SigStack {
-    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    #[cfg(any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "riscv64"
+    ))]
     _pad: [usize; 1], // pad from 7*8 to 64
 
     #[cfg(target_arch = "x86")]
@@ -45,6 +49,7 @@ pub struct SigStack {
     // x86_64: 864 bytes
     // i686: 512 bytes
     // aarch64: 272 bytes (SIMD TODO)
+    // riscv64: 520 bytes (vector extensions TODO)
     pub regs: ArchIntRegs,
 }
 #[repr(C)]
@@ -558,7 +563,7 @@ pub fn setup_sighandler(tcb: &RtTcb) {
         arch.altstack_top = usize::MAX;
         arch.altstack_bottom = 0;
         // TODO
-        #[cfg(any(target_arch = "x86", target_arch = "aarch64"))]
+        #[cfg(any(target_arch = "x86", target_arch = "aarch64", target_arch = "riscv64"))]
         {
             arch.pctl = core::ptr::addr_of!(PROC_CONTROL_STRUCT) as usize;
         }

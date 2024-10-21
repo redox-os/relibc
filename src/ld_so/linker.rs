@@ -62,7 +62,7 @@ impl Linker {
         Self {
             ld_library_path: ld_library_path,
             next_object_id: root_id,
-            next_tls_module_id: 0,
+            next_tls_module_id: 1,
             tls_size: 0,
             objects: BTreeMap::new(),
             name_to_object_id_map: BTreeMap::new(),
@@ -227,7 +227,7 @@ impl Linker {
         self.next_object_id += 1;
 
         if let Some(master) = tcb_master {
-            if self.next_tls_module_id == 0 {
+            if self.next_tls_module_id == 1 {
                 // Hack to allocate TCB on the first TLS module
                 unsafe {
                     if Tcb::current().is_none() {
