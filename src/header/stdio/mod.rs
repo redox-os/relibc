@@ -846,17 +846,20 @@ pub unsafe extern "C" fn pclose(stream: *mut FILE) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn perror(s: *const c_char) {
-    let s_cstr = CStr::from_ptr(s);
-    let s_str = str::from_utf8_unchecked(s_cstr.to_bytes());
-
-    let mut w = platform::FileWriter(2);
     let err = ERRNO.get();
-    if err >= 0 && err < STR_ERROR.len() as c_int {
-        w.write_fmt(format_args!("{}: {}\n", s_str, STR_ERROR[err as usize]))
-            .unwrap();
+    let err_str = if err >= 0 && err < STR_ERROR.len() as c_int {
+        STR_ERROR[err as usize]
     } else {
-        w.write_fmt(format_args!("{}: Unknown error {}\n", s_str, err))
-            .unwrap();
+        "Unknown error"
+    };
+    let mut w = platform::FileWriter(2);
+
+    // The prefix, `s`, is optional (empty or NULL) according to the spec
+    match CStr::from_nullable_ptr(s).and_then(|s_cstr| str::from_utf8(s_cstr.to_bytes()).ok()) {
+        Some(s_str) if !s_str.is_empty() => w
+            .write_fmt(format_args!("{}: {}\n", s_str, err_str))
+            .unwrap(),
+        _ => w.write_fmt(format_args!("{}\n", err_str)).unwrap(),
     }
 }
 
