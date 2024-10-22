@@ -106,6 +106,22 @@ pub unsafe extern "C" fn CMSG_DATA(cmsg: *const cmsghdr) -> *mut c_uchar {
 }
 
 #[no_mangle]
+pub fn __MHDR_END(mhdr: *const msghdr) -> *mut c_uchar {
+    unsafe { (*mhdr).msg_control.offset((*mhdr).msg_controllen as isize) }.cast()
+}
+
+#[no_mangle]
+pub fn __CMSG_LEN(cmsg: *const cmsghdr) -> ssize_t {
+    ((unsafe { (*cmsg).cmsg_len as size_t } + mem::size_of::<c_long>() - 1)
+        & !(mem::size_of::<c_long>() - 1)) as ssize_t
+}
+
+#[no_mangle]
+pub fn __CMSG_NEXT(cmsg: *const cmsghdr) -> *mut c_uchar {
+    (unsafe { cmsg.offset(__CMSG_LEN(cmsg)) }) as *mut c_uchar
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn accept(
     socket: c_int,
     address: *mut sockaddr,
