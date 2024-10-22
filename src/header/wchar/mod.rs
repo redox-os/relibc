@@ -12,7 +12,7 @@ use crate::{
         time::*,
         wctype::*,
     },
-    iter::NulTerminated,
+    iter::{NulTerminated, NulTerminatedInclusive},
     platform::{self, types::*, ERRNO},
 };
 
@@ -435,17 +435,24 @@ pub unsafe extern "C" fn wcscat(ws1: *mut wchar_t, ws2: *const wchar_t) -> *mut 
     wcsncat(ws1, ws2, usize::MAX)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/7908799/xsh/wcschr.html>.
+///
+/// # Safety
+/// The caller is required to ensure that `ws` is a valid pointer to a buffer
+/// containing at least one nul value. The pointed-to buffer must not be
+/// modified for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn wcschr(ws: *const wchar_t, wc: wchar_t) -> *mut wchar_t {
-    let mut i = 0;
-    loop {
-        if *ws.add(i) == wc {
-            return ws.add(i) as *mut wchar_t;
-        } else if *ws.add(i) == 0 {
-            return ptr::null_mut();
-        }
-        i += 1;
-    }
+    // We iterate over non-mut references and thus need to coerce the
+    // resulting reference via a *const pointer before we can get our *mut.
+    // SAFETY: the caller is required to ensure that ws points to a valid
+    // nul-terminated buffer.
+    let ptr: *const wchar_t =
+        match unsafe { NulTerminatedInclusive::new(ws) }.find(|&&wsc| wsc == wc) {
+            Some(wsc_ref) => wsc_ref,
+            None => ptr::null(),
+        };
+    ptr.cast_mut()
 }
 
 #[no_mangle]

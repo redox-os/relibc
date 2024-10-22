@@ -6,7 +6,7 @@ use cbitset::BitSet256;
 
 use crate::{
     header::{errno::*, signal},
-    iter::{NulTerminated, SrcDstPtrIter},
+    iter::{NulTerminated, NulTerminatedInclusive, SrcDstPtrIter},
     platform::{self, types::*},
 };
 
@@ -130,16 +130,26 @@ pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_v
     s
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/7908799/xsh/strchr.html>.
+///
+/// # Safety
+/// The caller is required to ensure that `s` is a valid pointer to a buffer
+/// containing at least one nul value. The pointed-to buffer must not be
+/// modified for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn strchr(mut s: *const c_char, c: c_int) -> *mut c_char {
-    let c = c as c_char;
-    while *s != 0 {
-        if *s == c {
-            return s as *mut c_char;
-        }
-        s = s.offset(1);
-    }
-    ptr::null_mut()
+    let c_as_c_char = c as c_char;
+
+    // We iterate over non-mut references and thus need to coerce the
+    // resulting reference via a *const pointer before we can get our *mut.
+    // SAFETY: the caller is required to ensure that s points to a valid
+    // nul-terminated buffer.
+    let ptr: *const c_char =
+        match unsafe { NulTerminatedInclusive::new(s) }.find(|&&sc| sc == c_as_c_char) {
+            Some(sc_ref) => sc_ref,
+            None => ptr::null(),
+        };
+    ptr.cast_mut()
 }
 
 #[no_mangle]
