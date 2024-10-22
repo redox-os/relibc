@@ -55,7 +55,7 @@ pub extern "C" fn sysconf(name: c_int) -> c_long {
         _SC_TTY_NAME_MAX => 32,
         _SC_SYMLOOP_MAX => -1,
         _SC_HOST_NAME_MAX => 64,
-        _SC_NPROCESSORS_ONLN => 58,
+        _SC_NPROCESSORS_ONLN => 1,
         _ => {
             platform::ERRNO.set(errno::EINVAL);
             -1
