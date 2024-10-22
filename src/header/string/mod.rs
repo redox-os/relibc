@@ -132,14 +132,24 @@ pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_v
 
 #[no_mangle]
 pub unsafe extern "C" fn strchr(mut s: *const c_char, c: c_int) -> *mut c_char {
-    let c = c as c_char;
-    while *s != 0 {
+    let c_as_c_char = c as c_char;
+
+    // We iterate over non-mut references and thus need to coerce the
+    // resulting reference via a *const pointer before we can get our *mut.
+    // SAFETY: the caller is required to ensure that s points to a valid
+    // nul-terminated buffer.
+    let ptr: *const c_char = match unsafe { NulTerminated::new(s) }.find(|&&sc| sc == c_as_c_char) {
+        Some(sc_ref) => sc_ref,
+        None => ptr::null(),
+    };
+    ptr.cast_mut()
+    /*while *s != 0 {
         if *s == c {
             return s as *mut c_char;
         }
         s = s.offset(1);
     }
-    ptr::null_mut()
+    ptr::null_mut()*/
 }
 
 #[no_mangle]
