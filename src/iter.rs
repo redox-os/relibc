@@ -77,6 +77,59 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
     }
 }
 
+/// An iterator over a nul-terminated buffer, including the terminating nul.
+///
+/// Similar to [`NulTerminated`], but includes the terminating nul.
+pub struct NulTerminatedInclusive<'a, T: Zero> {
+    ptr_opt: Option<NonNull<T>>,
+    phantom: PhantomData<&'a T>,
+}
+
+impl<'a, T: Zero> Iterator for NulTerminatedInclusive<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(old_ptr) = self.ptr_opt {
+            // SAFETY: the caller is required to ensure a valid pointer to a
+            // 0-terminated buffer is provided, and the zero-check below
+            // ensures that iteration and pointer increments will stop in
+            // time.
+            let val_ref = unsafe { old_ptr.as_ref() };
+            self.ptr_opt = if val_ref.is_zero() {
+                None
+            } else {
+                // SAFETY: if a terminating nul value has been encountered,
+                // this will not be called
+                Some(unsafe { old_ptr.add(1) })
+            };
+            Some(val_ref)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a, T: Zero> NulTerminatedInclusive<'a, T> {
+    /// Constructs a new iterator, starting at `ptr`, yielding elements of
+    /// type `&T` up to and including the terminating nul.
+    ///
+    /// The iterator returns `None` after the terminating nul has been
+    /// encountered.
+    ///
+    /// # Safety
+    /// The provided pointer must be a valid pointer to a buffer of contiguous
+    /// elements of type `T`, and the value 0 must be present within the
+    /// buffer at or after `ptr` (not necessarily at the end). The buffer must
+    /// not be written to for the lifetime of the iterator.
+    pub unsafe fn new(ptr: *const T) -> Self {
+        NulTerminatedInclusive {
+            // NonNull can only wrap only *mut pointers...
+            ptr_opt: NonNull::new(ptr.cast_mut()),
+            phantom: PhantomData,
+        }
+    }
+}
+
 /// A zipped iterator mapping an input iterator to an "out" pointer.
 ///
 /// This is intended to allow safe, iterative writing to an "out pointer".
