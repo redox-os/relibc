@@ -127,6 +127,7 @@ EXPECT_NAMES=\
 	wchar/wcrtomb \
 	wchar/wcpcpy \
 	wchar/wcpncpy \
+	wchar/wcschr \
 	wchar/wcscspn \
 	wchar/wcsdup \
 	wchar/wcsrchr \
