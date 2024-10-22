@@ -447,10 +447,11 @@ pub unsafe extern "C" fn wcschr(ws: *const wchar_t, wc: wchar_t) -> *mut wchar_t
     // resulting reference via a *const pointer before we can get our *mut.
     // SAFETY: the caller is required to ensure that ws points to a valid
     // nul-terminated buffer.
-    let ptr: *const wchar_t = match unsafe { NulTerminatedInclusive::new(ws) }.find(|&&wsc| wsc == wc) {
-        Some(wsc_ref) => wsc_ref,
-        None => ptr::null(),
-    };
+    let ptr: *const wchar_t =
+        match unsafe { NulTerminatedInclusive::new(ws) }.find(|&&wsc| wsc == wc) {
+            Some(wsc_ref) => wsc_ref,
+            None => ptr::null(),
+        };
     ptr.cast_mut()
 }
 

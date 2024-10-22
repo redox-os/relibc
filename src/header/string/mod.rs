@@ -144,10 +144,11 @@ pub unsafe extern "C" fn strchr(mut s: *const c_char, c: c_int) -> *mut c_char {
     // resulting reference via a *const pointer before we can get our *mut.
     // SAFETY: the caller is required to ensure that s points to a valid
     // nul-terminated buffer.
-    let ptr: *const c_char = match unsafe { NulTerminatedInclusive::new(s) }.find(|&&sc| sc == c_as_c_char) {
-        Some(sc_ref) => sc_ref,
-        None => ptr::null(),
-    };
+    let ptr: *const c_char =
+        match unsafe { NulTerminatedInclusive::new(s) }.find(|&&sc| sc == c_as_c_char) {
+            Some(sc_ref) => sc_ref,
+            None => ptr::null(),
+        };
     ptr.cast_mut()
 }
 
