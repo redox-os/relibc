@@ -19,6 +19,9 @@ pub const _SC_PAGESIZE: c_int = 30;
 pub const _SC_PAGE_SIZE: c_int = 30;
 // ...
 pub const _SC_RE_DUP_MAX: c_int = 44;
+
+pub const _SC_NPROCESSORS_ONLN: c_int = 58;
+
 // ...
 pub const _SC_GETGR_R_SIZE_MAX: c_int = 69;
 pub const _SC_GETPW_R_SIZE_MAX: c_int = 70;
@@ -52,6 +55,7 @@ pub extern "C" fn sysconf(name: c_int) -> c_long {
         _SC_TTY_NAME_MAX => 32,
         _SC_SYMLOOP_MAX => -1,
         _SC_HOST_NAME_MAX => 64,
+        _SC_NPROCESSORS_ONLN => 1,
         _ => {
             platform::ERRNO.set(errno::EINVAL);
             -1
