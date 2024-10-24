@@ -51,6 +51,11 @@ pub const MSG_TRUNC: c_int = 32;
 pub const MSG_DONTWAIT: c_int = 64;
 pub const MSG_WAITALL: c_int = 256;
 
+pub const IP_ADD_SOURCE_MEMBERSHIP: c_int = 70;
+pub const IP_DROP_SOURCE_MEMBERSHIP: c_int = 71;
+pub const MCAST_JOIN_SOURCE_GROUP: c_int = 46;
+pub const MCAST_LEAVE_SOURCE_GROUP: c_int = 47;
+
 pub const AF_INET: c_int = 2;
 pub const AF_INET6: c_int = 10;
 pub const AF_LOCAL: c_int = AF_UNIX;
@@ -66,3 +71,5 @@ pub const PF_UNSPEC: c_int = 0;
 pub const SHUT_RD: c_int = 0;
 pub const SHUT_RDWR: c_int = 2;
 pub const SHUT_WR: c_int = 1;
+
+pub const SCM_RIGHTS: c_int = 1;

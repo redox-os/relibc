@@ -1,6 +1,6 @@
 //! socket implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xns/syssocket.h.html
 
-use core::ptr;
+use core::{mem, ptr};
 
 use crate::{
     error::ResultExt,
@@ -35,10 +35,83 @@ pub struct msghdr {
 }
 
 #[repr(C)]
+pub struct cmsghdr {
+    pub cmsg_len: size_t,
+    pub cmsg_level: c_int,
+    pub cmsg_type: c_int,
+}
+
+#[repr(C)]
 #[derive(Default)]
 pub struct sockaddr {
     pub sa_family: sa_family_t,
     pub sa_data: [c_char; 14],
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn CMSG_ALIGN(len: size_t) -> size_t {
+    (len + mem::size_of::<size_t>() - 1) & !(mem::size_of::<size_t>() - 1)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn CMSG_LEN(length: c_uint) -> c_uint {
+    (CMSG_ALIGN(mem::size_of::<cmsghdr>()) + length as usize) as c_uint
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn CMSG_SPACE(len: c_uint) -> c_uint {
+    (CMSG_ALIGN(len as size_t) + CMSG_ALIGN(mem::size_of::<cmsghdr>())) as c_uint
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn CMSG_FIRSTHDR(mhdr: *const msghdr) -> *mut cmsghdr {
+    unsafe {
+        if (*mhdr).msg_controllen as usize >= mem::size_of::<cmsghdr>() {
+            (*mhdr).msg_control as *mut cmsghdr
+        } else {
+            0 as *mut cmsghdr
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn CMSG_NXTHDR(mhdr: *const msghdr, cmsg: *const cmsghdr) -> *mut cmsghdr {
+    if cmsg.is_null() {
+        return CMSG_FIRSTHDR(mhdr);
+    };
+
+    unsafe {
+        let next = cmsg as usize
+            + CMSG_ALIGN((*cmsg).cmsg_len as usize)
+            + CMSG_ALIGN(mem::size_of::<cmsghdr>());
+        let max = (*mhdr).msg_control as usize + (*mhdr).msg_controllen as usize;
+        if next > max {
+            0 as *mut cmsghdr
+        } else {
+            (cmsg as usize + CMSG_ALIGN((*cmsg).cmsg_len as usize)) as *mut cmsghdr
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn CMSG_DATA(cmsg: *const cmsghdr) -> *mut c_uchar {
+    unsafe { (cmsg as *mut c_uchar).offset(CMSG_ALIGN(mem::size_of::<cmsghdr>()) as isize) }
+}
+
+#[no_mangle]
+pub fn __MHDR_END(mhdr: *const msghdr) -> *mut c_uchar {
+    unsafe { (*mhdr).msg_control.offset((*mhdr).msg_controllen as isize) }.cast()
+}
+
+#[no_mangle]
+pub fn __CMSG_LEN(cmsg: *const cmsghdr) -> ssize_t {
+    ((unsafe { (*cmsg).cmsg_len as size_t } + mem::size_of::<c_long>() - 1)
+        & !(mem::size_of::<c_long>() - 1)) as ssize_t
+}
+
+#[no_mangle]
+pub fn __CMSG_NEXT(cmsg: *const cmsghdr) -> *mut c_uchar {
+    (unsafe { cmsg.offset(__CMSG_LEN(cmsg)) }) as *mut c_uchar
 }
 
 #[no_mangle]

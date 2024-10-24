@@ -22,3 +22,5 @@ pub const O_SYMLINK: c_int = 0x4000_0000;
 pub const O_NOFOLLOW: c_int = -0x8000_0000;
 
 pub const FD_CLOEXEC: c_int = 0x0100_0000;
+
+pub const O_NOCTTY: c_int = 0x00000200;
