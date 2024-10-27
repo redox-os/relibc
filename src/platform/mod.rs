@@ -1,3 +1,5 @@
+//! Platform abstractions and environment.
+
 use crate::{
     error::ResultExt,
     io::{self, Read, Write},
@@ -38,9 +40,11 @@ pub use redox_rt::auxv_defs;
 use self::types::*;
 pub mod types;
 
+/// The global `errno` variable used internally in relibc.
 #[thread_local]
 pub static ERRNO: Cell<c_int> = Cell::new(0);
 
+/// The `argv` argument available to a program's `main` function.
 #[allow(non_upper_case_globals)]
 pub static mut argv: *mut *mut c_char = ptr::null_mut();
 #[allow(non_upper_case_globals)]

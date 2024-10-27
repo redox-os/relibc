@@ -74,6 +74,7 @@ macro_rules! path_from_c_str {
 
 use self::{exec::Executable, path::canonicalize};
 
+/// Redox syscall implementation of the platform abstraction layer.
 pub struct Sys;
 
 impl Pal for Sys {

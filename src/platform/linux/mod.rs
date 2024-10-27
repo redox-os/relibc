@@ -65,6 +65,7 @@ pub fn e_raw(sys: usize) -> Result<usize> {
     }
 }
 
+/// Linux syscall implementation of the platform abstraction layer.
 pub struct Sys;
 
 impl Sys {
