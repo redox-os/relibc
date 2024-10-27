@@ -1,6 +1,11 @@
 //! Utilities to help use Rust iterators on C strings.
 
-use core::{iter::Iterator, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
+use core::{
+    iter::{FusedIterator, Iterator},
+    marker::PhantomData,
+    mem::MaybeUninit,
+    ptr::NonNull,
+};
 
 use crate::platform::types::*;
 
@@ -77,6 +82,10 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
     }
 }
 
+// Once the terminating nul has been encountered, the pointer will not advance
+// further and the iterator will thus keep returning None.
+impl<'a, T: Zero> FusedIterator for NulTerminated<'a, T> {}
+
 /// An iterator over a nul-terminated buffer, including the terminating nul.
 ///
 /// Similar to [`NulTerminated`], but includes the terminating nul.
@@ -129,6 +138,10 @@ impl<'a, T: Zero> NulTerminatedInclusive<'a, T> {
         }
     }
 }
+
+// Once the terminating nul has been encountered, the internal Option will be
+// set to None, ensuring that we will keep returning None.
+impl<'a, T: Zero> FusedIterator for NulTerminatedInclusive<'a, T> {}
 
 /// A zipped iterator mapping an input iterator to an "out" pointer.
 ///
