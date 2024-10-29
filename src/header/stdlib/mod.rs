@@ -263,6 +263,11 @@ pub extern "C" fn div(numer: c_int, denom: c_int) -> div_t {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/drand48.html>.
+///
+/// # Panics
+/// Panics if the function is unable to obtain a lock on the generator's global
+/// state.
 #[no_mangle]
 pub extern "C" fn drand48() -> c_double {
     let params = rand48::params_lock();
@@ -281,6 +286,15 @@ pub extern "C" fn ecvt(
     unimplemented!();
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/drand48.html>.
+///
+/// # Safety
+/// The caller must ensure that `xsubi` is convertible to a
+/// `&mut [c_ushort; 3]`.
+///
+/// # Panics
+/// Panics if the function is unable to obtain a lock on the generator's global
+/// state.
 #[no_mangle]
 pub unsafe extern "C" fn erand48(xsubi: *mut c_ushort) -> c_double {
     let params = rand48::params_lock();
@@ -445,6 +459,15 @@ pub unsafe extern "C" fn initstate(seed: c_uint, state: *mut c_char, size: size_
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/drand48.html>.
+///
+/// # Safety
+/// The caller must ensure that `xsubi` is convertible to a
+/// `&mut [c_ushort; 3]`.
+///
+/// # Panics
+/// Panics if the function is unable to obtain a lock on the generator's global
+/// state.
 #[no_mangle]
 pub unsafe extern "C" fn jrand48(xsubi: *mut c_ushort) -> c_long {
     let params = rand48::params_lock();
@@ -498,6 +521,15 @@ pub extern "C" fn labs(i: c_long) -> c_long {
     i.abs()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/drand48.html>.
+///
+/// # Safety
+/// The caller must ensure that `param` is convertible to a
+/// `&mut [c_ushort; 7]`.
+///
+/// # Panics
+/// Panics if the function is unable to obtain a lock on the generator's global
+/// state.
 #[no_mangle]
 pub unsafe extern "C" fn lcong48(param: *mut c_ushort) {
     let mut xsubi = rand48::xsubi_lock();
@@ -546,6 +578,11 @@ pub extern "C" fn lldiv(numer: c_longlong, denom: c_longlong) -> lldiv_t {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/drand48.html>.
+///
+/// # Panics
+/// Panics if the function is unable to obtain a lock on the generator's global
+/// state.
 #[no_mangle]
 pub extern "C" fn lrand48() -> c_long {
     let params = rand48::params_lock();
@@ -722,6 +759,11 @@ pub unsafe extern "C" fn mkstemps(name: *mut c_char, suffix_len: c_int) -> c_int
     mkostemps(name, suffix_len, 0)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/drand48.html>.
+///
+/// # Panics
+/// Panics if the function is unable to obtain a lock on the generator's global
+/// state.
 #[no_mangle]
 pub extern "C" fn mrand48() -> c_long {
     let params = rand48::params_lock();
@@ -730,6 +772,15 @@ pub extern "C" fn mrand48() -> c_long {
     xsubi.get_i32()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/drand48.html>.
+///
+/// # Safety
+/// The caller must ensure that `xsubi` is convertible to a
+/// `&mut [c_ushort; 3]`.
+///
+/// # Panics
+/// Panics if the function is unable to obtain a lock on the generator's global
+/// state.
 #[no_mangle]
 pub unsafe extern "C" fn nrand48(xsubi: *mut c_ushort) -> c_long {
     let params = rand48::params_lock();
@@ -1013,6 +1064,17 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
     ptr
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/drand48.html>.
+///
+/// # Safety
+/// The caller must ensure that `seed16v` is convertible to a `&[c_ushort; 3]`.
+/// Additionally, the caller must ensure that the function has exclusive access
+/// to the static buffer it returns; this includes avoiding simultaneous calls
+/// to this function.
+///
+/// # Panics
+/// Panics if the function is unable to obtain a lock on the generator's global
+/// state.
 #[no_mangle]
 pub unsafe extern "C" fn seed48(seed16v: *mut c_ushort) -> *mut c_ushort {
     static mut BUFFER: [c_ushort; 3] = [0; 3];
@@ -1101,6 +1163,11 @@ pub unsafe extern "C" fn srand(seed: c_uint) {
     RNG = Some(XorShiftRng::from_seed([seed as u8; 16]));
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/drand48.html>.
+///
+/// # Panics
+/// Panics if the function is unable to obtain a lock on the generator's global
+/// state.
 #[no_mangle]
 pub extern "C" fn srand48(seedval: c_long) {
     let mut params = rand48::params_lock();
