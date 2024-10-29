@@ -47,7 +47,7 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
         for (i, octet) in dns_vec.iter().enumerate() {
             dns_arr[i] = *octet;
         }
-        let dns_addr = unsafe { mem::transmute::<[u8; 4], u32>(dns_arr) };
+        let dns_addr = u32::from_ne_bytes(dns_arr);
 
         let mut timespec = timespec::default();
         unsafe {
@@ -112,14 +112,12 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
                     if answer.a_type == 0x0001 && answer.a_class == 0x0001 && answer.data.len() == 4
                     {
                         let addr = in_addr {
-                            s_addr: unsafe {
-                                mem::transmute::<[u8; 4], u32>([
-                                    answer.data[0],
-                                    answer.data[1],
-                                    answer.data[2],
-                                    answer.data[3],
-                                ])
-                            },
+                            s_addr: u32::from_ne_bytes([
+                                answer.data[0],
+                                answer.data[1],
+                                answer.data[2],
+                                answer.data[3],
+                            ]),
                         };
                         addrs.push(addr);
                     }
@@ -148,7 +146,7 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
         dns_arr[i] = *octet;
     }
 
-    let mut addr_vec: Vec<u8> = unsafe { mem::transmute::<u32, [u8; 4]>(addr.s_addr).to_vec() };
+    let mut addr_vec: Vec<u8> = addr.s_addr.to_ne_bytes().to_vec();
     addr_vec.reverse();
     let mut name: Vec<u8> = vec![];
     for octet in addr_vec {
@@ -187,7 +185,7 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
             sin_family: AF_INET as u16,
             sin_port: htons(53),
             sin_addr: in_addr {
-                s_addr: unsafe { mem::transmute::<[u8; 4], u32>(dns_arr) },
+                s_addr: u32::from_ne_bytes(dns_arr),
             },
             ..Default::default()
         };

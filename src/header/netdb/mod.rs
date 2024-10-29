@@ -229,11 +229,10 @@ pub unsafe extern "C" fn gethostbyaddr(
     host_aliases.push(ptr::null_mut());
     HOST_ALIASES = Some(_host_aliases);
 
-    match lookup_addr(addr) {
-        Ok(s) => {
-            _HOST_ADDR_LIST = mem::transmute::<u32, [u8; 4]>(addr.s_addr);
+    match lookup_addr(addr).map(|host_names| host_names.into_iter().next()) {
+        Ok(Some(host_name)) => {
+            _HOST_ADDR_LIST = addr.s_addr.to_ne_bytes();
             HOST_ADDR_LIST = [_HOST_ADDR_LIST.as_mut_ptr() as *mut c_char, ptr::null_mut()];
-            let host_name = s[0].to_vec();
             HOST_NAME = Some(host_name);
             HOST_ENTRY = hostent {
                 h_name: HOST_NAME.as_mut().unwrap().as_mut_ptr() as *mut c_char,
@@ -244,6 +243,13 @@ pub unsafe extern "C" fn gethostbyaddr(
             };
             &mut HOST_ENTRY
         }
+        // `glibc` sets errno if an address doesn't have a host name
+        // `musl` uses the address as the host name in said case
+        Ok(None) => {
+            // TODO: Set h_errno instead to match spec
+            platform::ERRNO.set(EIO);
+            ptr::null_mut()
+        }
         Err(e) => {
             platform::ERRNO.set(e);
             ptr::null_mut()
@@ -253,9 +259,18 @@ pub unsafe extern "C" fn gethostbyaddr(
 
 #[no_mangle]
 pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
-    // check if some idiot gave us an address instead of a name
-    let name_cstr = CStr::from_ptr(name);
-    let mut octets = str::from_utf8_unchecked(name_cstr.to_bytes()).split('.');
+    let name_cstr =
+        CStr::from_nullable_ptr(name).expect("gethostbyname() called with a NULL pointer");
+    let Ok(name_str) = str::from_utf8(name_cstr.to_bytes()) else {
+        // TODO Set h_errno instead of errno (spec)
+        platform::ERRNO.set(EINVAL);
+        return ptr::null_mut();
+    };
+
+    // Addresses and hostnames are both valid, so we'll check addresses first
+    // The standard doesn't define what to do when called with addresses
+    // Some implementations just skip resolution and copy the address to h_name
+    let mut octets = name_str.split('.');
     let mut s_addr = [0u8; 4];
     let mut is_addr = true;
     for item in &mut s_addr {
@@ -263,6 +278,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
             *item = n;
         } else {
             is_addr = false;
+            break;
         }
     }
     if octets.next() != None {
@@ -270,9 +286,8 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     }
 
     if is_addr {
-        let addr = in_addr {
-            s_addr: mem::transmute::<[u8; 4], u32>(s_addr),
-        };
+        let s_addr = u32::from_ne_bytes(s_addr);
+        let addr = in_addr { s_addr };
         return gethostbyaddr(&addr as *const _ as *const c_void, 4, AF_INET);
     }
 
@@ -303,9 +318,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
         }
     }
 
-    let name_cstr = CStr::from_ptr(name);
-
-    let mut host = match lookup_host(str::from_utf8_unchecked(name_cstr.to_bytes())) {
+    let mut host = match lookup_host(name_str) {
         Ok(lookuphost) => lookuphost,
         Err(e) => {
             platform::ERRNO.set(e);
@@ -322,7 +335,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
 
     let host_name: Vec<u8> = name_cstr.to_bytes().to_vec();
     HOST_NAME = Some(host_name);
-    _HOST_ADDR_LIST = mem::transmute::<u32, [u8; 4]>(host_addr.s_addr);
+    _HOST_ADDR_LIST = host_addr.s_addr.to_ne_bytes();
     HOST_ADDR_LIST = [_HOST_ADDR_LIST.as_mut_ptr() as *mut c_char, ptr::null_mut()];
     HOST_ADDR = Some(host_addr);
 
