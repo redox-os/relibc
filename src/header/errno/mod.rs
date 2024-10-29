@@ -1,4 +1,9 @@
-//! errno implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/errno.h.html
+//! `errno.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/errno.h.html>.
+
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
 
 use crate::platform::{self, types::*};
 
@@ -8,21 +13,38 @@ pub extern "C" fn __errno() -> *mut c_int {
     __errno_location()
 }
 
+/// Provide a pointer to relibc's internal `errno` variable.
+///
+/// This is the basis of the C-facing macro definition of `errno`, and should
+/// not be used directly.
 #[no_mangle]
 pub extern "C" fn __errno_location() -> *mut c_int {
     platform::ERRNO.as_ptr()
 }
 
+/// Get the name used to invoke the program, similar to `argv[0]`.
+///
+/// This provides the basis for the C-facing macro definition of
+/// `program_invocation_name`, and should not be used directly.
+///
+/// The `program_invocation_name` variable is a GNU extension.
 #[no_mangle]
 pub unsafe extern "C" fn __program_invocation_name() -> *mut *mut c_char {
-    &mut platform::program_invocation_name
+    unsafe { &mut platform::program_invocation_name }
 }
 
+/// Get the directory-less name used to invoke the program.
+///
+/// This provides the basis for the C-facing macro definition of
+/// `program_invocation_short_name`, and should not be used directly.
+///
+/// The `program_invocation_short_name` variable is a GNU extension.
 #[no_mangle]
 pub unsafe extern "C" fn __program_invocation_short_name() -> *mut *mut c_char {
-    &mut platform::program_invocation_short_name
+    unsafe { &mut platform::program_invocation_short_name }
 }
 
+// TODO: modern POSIX requires these to be defined as macros
 pub const EPERM: c_int = 1; /* Operation not permitted */
 pub const ENOENT: c_int = 2; /* No such file or directory */
 pub const ESRCH: c_int = 3; /* No such process */
@@ -155,6 +177,7 @@ pub const EKEYREJECTED: c_int = 129; /* Key was rejected by service */
 pub const EOWNERDEAD: c_int = 130; /* Owner died */
 pub const ENOTRECOVERABLE: c_int = 131; /* State not recoverable */
 
+/// String representations for the respective `errno` values.
 pub static STR_ERROR: [&'static str; 132] = [
     "Success",
     "Operation not permitted",
