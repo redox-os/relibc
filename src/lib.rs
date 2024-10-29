@@ -1,3 +1,11 @@
+//! POSIX C library, implemented in Rust.
+//!
+//! This crate exists to provide a standard libc as its public API. This is
+//! largely provided by automatically generated bindings to the functions and
+//! data structures in the [`header`] module.
+//!
+//! Currently, Linux and Redox syscall backends are supported.
+
 #![no_std]
 #![allow(warnings)]
 #![allow(non_camel_case_types)]

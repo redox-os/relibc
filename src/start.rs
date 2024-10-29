@@ -1,3 +1,5 @@
+//! Startup code.
+
 use alloc::{boxed::Box, vec::Vec};
 use core::{intrinsics, ptr};
 

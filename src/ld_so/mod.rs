@@ -1,3 +1,5 @@
+//! Dynamic loading and linking.
+
 use core::{mem, ptr};
 use goblin::elf::program_header::{self, program_header32, program_header64, ProgramHeader};
 

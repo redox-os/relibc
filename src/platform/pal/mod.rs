@@ -25,6 +25,7 @@ mod signal;
 pub use self::socket::PalSocket;
 mod socket;
 
+/// Platform abstraction layer, a platform-agnostic abstraction over syscalls.
 pub trait Pal {
     fn access(path: CStr, mode: c_int) -> Result<()>;
 

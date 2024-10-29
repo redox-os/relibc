@@ -1,3 +1,5 @@
+//! Equivalent of Rust's `Vec<T>`, but using relibc's own allocator.
+
 use crate::{
     io::{self, Write},
     platform::{self, types::*, WriteByte},
