@@ -85,7 +85,7 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
     inet_aton(addr_cstr, addr.as_mut_ptr());
     let addr = addr.assume_init();
 
-    _HOST_ADDR_LIST = mem::transmute::<u32, [u8; 4]>(addr.s_addr);
+    _HOST_ADDR_LIST = addr.s_addr.to_ne_bytes();
     HOST_ADDR_LIST = [_HOST_ADDR_LIST.as_mut_ptr() as *mut c_char, ptr::null_mut()];
 
     HOST_ADDR = Some(addr);
