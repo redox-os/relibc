@@ -71,6 +71,7 @@ pub mod sys_wait;
 pub mod termios;
 pub mod time;
 pub mod unistd;
+#[deprecated]
 pub mod utime;
 pub mod utmp;
 pub mod wchar;
