@@ -1,3 +1,7 @@
+//! `net/if.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/net_if.h.html>.
+
 use core::ptr::null;
 
 use alloc::ffi::CString;
@@ -9,12 +13,14 @@ use crate::{
 
 use super::errno::ENXIO;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/net_if.h.html>.
 #[repr(C)]
 pub struct if_nameindex {
     if_index: c_uint,
     if_name: *const c_char,
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/net_if.h.html>.
 pub const IF_NAMESIZE: usize = 16;
 
 const IF_STUB_INTERFACE: *const c_char = (c"stub").as_ptr();
@@ -30,6 +36,30 @@ const INTERFACES: &[if_nameindex] = &[
     },
 ];
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/if_freenameindex.html>.
+///
+/// # Safety
+/// this is a no-op: the list returned by if_nameindex() is a ref to a constant
+#[no_mangle]
+pub unsafe extern "C" fn if_freenameindex(s: *mut if_nameindex) {}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/if_indextoname.html>.
+///
+/// # Safety
+/// Returns only static lifetime references to const names, does not reuse the buf pointer.
+/// Returns NULL in case of not found + ERRNO being set to ENXIO.
+/// Currently only checks against inteface index 1.
+#[no_mangle]
+pub unsafe extern "C" fn if_indextoname(idx: c_uint, buf: *mut c_char) -> *const c_char {
+    if idx == 1 {
+        return IF_STUB_INTERFACE;
+    }
+    ERRNO.set(ENXIO);
+    null::<c_char>()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/if_nameindex.html>.
+///
 /// # Safety
 /// Returns a constant pointer to a pre defined const stub list
 /// The end of the list is determined by an if_nameindex struct having if_index 0 and if_name NULL
@@ -38,11 +68,8 @@ pub unsafe extern "C" fn if_nameindex() -> *const if_nameindex {
     &INTERFACES[0] as *const if_nameindex
 }
 
-/// # Safety
-/// this is a no-op: the list returned by if_nameindex() is a ref to a constant
-#[no_mangle]
-pub unsafe extern "C" fn if_freenameindex(s: *mut if_nameindex) {}
-
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/if_nametoindex.html>.
+///
 /// # Safety
 /// Compares the name to a constant string and only returns an int as a result.
 /// An invalid name string will return an index of 0
@@ -56,17 +83,4 @@ pub unsafe extern "C" fn if_nametoindex(name: *const c_char) -> c_uint {
         return 1;
     }
     0
-}
-
-/// # Safety
-/// Returns only static lifetime references to const names, does not reuse the buf pointer.
-/// Returns NULL in case of not found + ERRNO being set to ENXIO.
-/// Currently only checks against inteface index 1.
-#[no_mangle]
-pub unsafe extern "C" fn if_indextoname(idx: c_uint, buf: *mut c_char) -> *const c_char {
-    if idx == 1 {
-        return IF_STUB_INTERFACE;
-    }
-    ERRNO.set(ENXIO);
-    null::<c_char>()
 }
