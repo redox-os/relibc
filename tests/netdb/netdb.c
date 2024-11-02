@@ -26,6 +26,7 @@
 
 #include <netdb.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
@@ -36,6 +37,8 @@
 #include <errno.h>
 
 #include "test_helpers.h"
+
+#define ADDR_SIZE sizeof(uint8_t) * 4
 
 int error_count;
 static void
@@ -229,12 +232,38 @@ test_network (void)
   while (nptr != NULL);
   setnetent (0);
 }
+static void
+test_h_errno (void) {
+  const uint8_t addr[] = {0, 0, 0, 0};
+  struct hostent *host = gethostbyaddr(addr, ADDR_SIZE, AF_INET);
+  if (host) {
+    ++error_count;
+  }
+
+  int err = h_errno;
+  herror("Prefix test");
+  if (err != HOST_NOT_FOUND) {
+    ++error_count;
+  }
+
+  host = gethostbyname("");
+  if (host) {
+    ++error_count;
+  }
+
+  err = h_errno;
+  herror("");
+  if (err != HOST_NOT_FOUND) {
+    ++error_count;
+  }
+}
 static int
 do_test (void)
 {
   /*
     setdb ("db");
   */
+  test_h_errno ();
   test_hosts ();
   test_network ();
   test_protocols ();

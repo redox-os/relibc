@@ -3,6 +3,8 @@
 mod dns;
 
 use core::{
+    cell::Cell,
+    fmt::Write,
     mem, ptr, slice,
     str::{self, FromStr},
 };
@@ -132,13 +134,17 @@ pub static mut NET_ADDR: Option<u32> = None;
 static mut N_POS: usize = 0;
 static mut NET_STAYOPEN: c_int = 0;
 
-#[allow(non_upper_case_globals)]
-#[no_mangle]
-pub static mut h_errno: c_int = 0;
+#[thread_local]
+pub static H_ERRNO: Cell<c_int> = Cell::new(0);
+const H_UNSET: c_int = 0;
 pub const HOST_NOT_FOUND: c_int = 1;
 pub const NO_DATA: c_int = 2;
 pub const NO_RECOVERY: c_int = 3;
 pub const TRY_AGAIN: c_int = 4;
+
+// Expected length of addresses
+const SOCKLEN_AF_INET4: socklen_t = 4;
+const SOCKLEN_AF_INET6: socklen_t = 16;
 
 static mut PROTODB: c_int = 0;
 static mut PROTO_ENTRY: protoent = protoent {
@@ -188,12 +194,44 @@ pub unsafe extern "C" fn endservent() {
     SERVDB = 0;
 }
 
+/// Resolve a host name from a given network address.
+///
+/// # Arguments
+/// * `v` - Address to resolve as a non-null [`in_addr`]
+/// * `length` -
+/// * `format` - AF_INET or AF_INET6
+///
+/// # Safety
+/// * `v` must be a valid pointer.
+/// * `length` must correctly match the size of `v` as expected by `format` (usually 4 or 16).
+/// * This function is not reentrant and may modify static data.
+///
+/// # Panics
+/// Panics if `v` is a null pointer.
+///
+/// # Deprecation
+/// Deprecated as of POSIX.1-2001 and removed in POSIX.1-2008.
+/// New code should use [`getaddrinfo`] instead.
 #[no_mangle]
+#[deprecated]
 pub unsafe extern "C" fn gethostbyaddr(
     v: *const c_void,
     length: socklen_t,
     format: c_int,
 ) -> *mut hostent {
+    assert!(
+        !v.is_null(),
+        "`gethostbyaddr()` called with null `v` (in_addr)"
+    );
+    // Uncomment if optional IPv6 support is added
+    // if length != SOCKLEN_AF_INET4 || length != SOCKLEN_AF_INET6 {
+    //     H_ERRNO.set(NO_RECOVERY);
+    //     return ptr::null_mut();
+    // }
+    if length != SOCKLEN_AF_INET4 {
+        H_ERRNO.set(NO_RECOVERY);
+        return ptr::null_mut();
+    }
     let addr: in_addr = *(v as *mut in_addr);
 
     // check the hosts file first
@@ -246,24 +284,39 @@ pub unsafe extern "C" fn gethostbyaddr(
         // `glibc` sets errno if an address doesn't have a host name
         // `musl` uses the address as the host name in said case
         Ok(None) => {
-            // TODO: Set h_errno instead to match spec
-            platform::ERRNO.set(EIO);
+            H_ERRNO.set(HOST_NOT_FOUND);
             ptr::null_mut()
         }
         Err(e) => {
-            platform::ERRNO.set(e);
+            // TODO: Better error separation in lookup_addr
+            H_ERRNO.set(NO_RECOVERY);
             ptr::null_mut()
         }
     }
 }
 
+/// Resolve host information by name or IP address.
+///
+/// # Arguments
+/// * `name` - Host name or IP address.
+///
+/// # Safety
+/// `name` must be a valid string.
+/// This function is not reentrant and may modify static data.
+///
+/// # Panics
+/// Panics if `name` is a null pointer.
+///
+/// # Deprecation
+/// Deprecated as of POSIX.1-2001 and removed in POSIX.1-2008.
+/// New code should use [`getaddrinfo`] instead.
 #[no_mangle]
+#[deprecated]
 pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     let name_cstr =
         CStr::from_nullable_ptr(name).expect("gethostbyname() called with a NULL pointer");
     let Ok(name_str) = str::from_utf8(name_cstr.to_bytes()) else {
-        // TODO Set h_errno instead of errno (spec)
-        platform::ERRNO.set(EINVAL);
+        H_ERRNO.set(NO_RECOVERY);
         return ptr::null_mut();
     };
 
@@ -321,14 +374,14 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     let mut host = match lookup_host(name_str) {
         Ok(lookuphost) => lookuphost,
         Err(e) => {
-            platform::ERRNO.set(e);
+            H_ERRNO.set(NO_RECOVERY);
             return ptr::null_mut();
         }
     };
     let host_addr = match host.next() {
         Some(result) => result,
         None => {
-            platform::ERRNO.set(ENOENT);
+            H_ERRNO.set(HOST_NOT_FOUND);
             return ptr::null_mut();
         }
     };
@@ -902,9 +955,18 @@ pub extern "C" fn gai_strerror(errcode: c_int) -> *const c_char {
     .as_ptr()
 }
 
+/// Provide a pointer to relibc's internal [`H_ERRNO`].
 #[no_mangle]
+#[deprecated]
+pub extern "C" fn __h_errno_location() -> *mut c_int {
+    H_ERRNO.as_ptr()
+}
+
+#[no_mangle]
+#[deprecated]
 pub extern "C" fn hstrerror(errcode: c_int) -> *const c_char {
     match errcode {
+        H_UNSET => c_str!("Resolver error unset"),
         HOST_NOT_FOUND => c_str!("Unknown hostname"),
         NO_DATA => c_str!("No address for hostname"),
         NO_RECOVERY => c_str!("Unknown server error"),
@@ -912,4 +974,40 @@ pub extern "C" fn hstrerror(errcode: c_int) -> *const c_char {
         _ => c_str!("Unknown error"),
     }
     .as_ptr()
+}
+
+/// Print error message associated with [`H_ERRNO`] to stderr.
+///
+/// # Arguments
+/// * `prefix` - An optional prefix to prepend to the error message. May be null or an empty
+/// (`""`) C string.
+///
+/// # Safety
+/// Like [`crate::header::stdio::perror`], `prefix` should be a valid, NUL terminated C string if
+/// used. The caller may safely call this function with a null pointer.
+///
+/// # Deprecation
+/// [`H_ERRNO`], [`hstrerror`], [`herror`], and other functions are deprecated as of
+/// POSIX.1-2001 and removed as of POSIX.1-2008. These functions are provided for backwards
+/// compatibility but should not be used by new code.
+#[no_mangle]
+#[deprecated]
+pub extern "C" fn herror(prefix: *const c_char) {
+    let code = H_ERRNO.get();
+    // Safety: `hstrerror` handles every error code case and always returns a valid C string
+    let error = unsafe {
+        let msg_cstr = CStr::from_ptr(hstrerror(code));
+        str::from_utf8_unchecked(msg_cstr.to_bytes())
+    };
+
+    let mut writer = platform::FileWriter(2);
+    // Prefix is optional
+    match unsafe { CStr::from_nullable_ptr(prefix) }
+        .and_then(|prefix| str::from_utf8(prefix.to_bytes()).ok())
+    {
+        Some(prefix) if !prefix.is_empty() => writer
+            .write_fmt(format_args!("{prefix}: {error}\n"))
+            .unwrap(),
+        _ => writer.write_fmt(format_args!("{error}\n")).unwrap(),
+    }
 }
