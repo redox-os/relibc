@@ -262,7 +262,7 @@ pub unsafe extern "C" fn calloc(nelem: size_t, elsize: size_t) -> *mut c_void {
              * by malloc() */
             let ptr = malloc(size);
             if !ptr.is_null() {
-                intrinsics::write_bytes(ptr as *mut u8, 0, size);
+                ptr.write_bytes(0, size);
             }
             ptr
         }
