@@ -21,6 +21,7 @@ EXPECT_NAMES=\
 	fcntl/fcntl \
 	fnmatch \
 	futimens \
+	iso646 \
 	libgen \
 	locale \
 	math \
