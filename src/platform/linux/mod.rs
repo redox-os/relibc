@@ -219,10 +219,7 @@ impl Pal for Sys {
     }
 
     fn fpath(fildes: c_int, out: &mut [u8]) -> Result<usize> {
-        let mut proc_path = b"/proc/self/fd/".to_vec();
-        write!(proc_path, "{}", fildes).unwrap();
-        proc_path.push(0);
-
+        let proc_path = format!("/proc/self/fd/{}\0", fildes).into_bytes();
         Self::readlink(CStr::from_bytes_with_nul(&proc_path).unwrap(), out)
     }
 

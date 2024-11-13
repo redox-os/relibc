@@ -462,29 +462,24 @@ pub unsafe extern "C" fn getnetent() -> *mut netent {
 
     let mut iter: SplitWhitespace = r.split_whitespace();
 
-    let mut net_name = iter.next().unwrap().as_bytes().to_vec();
-    net_name.push(b'\0');
+    let net_name = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
     NET_NAME = Some(net_name);
 
-    let mut addr_vec = iter.next().unwrap().as_bytes().to_vec();
-    addr_vec.push(b'\0');
+    let addr_vec: Vec<u8> = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
     let addr_cstr = addr_vec.as_slice().as_ptr() as *const i8;
     let mut addr = mem::MaybeUninit::uninit();
     inet_aton(addr_cstr, addr.as_mut_ptr());
     let addr = addr.assume_init();
     NET_ADDR = Some(ntohl(addr.s_addr));
 
-    let mut _net_aliases: Vec<Vec<u8>> = Vec::new();
-    for s in iter {
-        let mut alias = s.as_bytes().to_vec();
-        alias.push(b'\0');
-        _net_aliases.push(alias);
-    }
+    let mut _net_aliases: Vec<Vec<u8>> = iter
+        .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
+        .collect();
     let mut net_aliases: Vec<*mut i8> = _net_aliases
         .iter_mut()
         .map(|x| x.as_mut_ptr() as *mut i8)
+        .chain(Some(ptr::null_mut()))
         .collect();
-    net_aliases.push(ptr::null_mut());
     NET_ALIASES = Some(_net_aliases);
 
     NET_ENTRY = netent {
@@ -583,17 +578,14 @@ pub unsafe extern "C" fn getprotoent() -> *mut protoent {
     num.push(b'\0');
     PROTO_NUM = Some(atoi(num.as_mut_slice().as_mut_ptr() as *mut i8));
 
-    let mut _proto_aliases: Vec<Vec<u8>> = Vec::new();
-    for s in iter {
-        let mut alias = s.as_bytes().to_vec();
-        alias.push(b'\0');
-        _proto_aliases.push(alias);
-    }
+    let mut _proto_aliases: Vec<Vec<u8>> = iter
+        .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
+        .collect();
     let mut proto_aliases: Vec<*mut i8> = _proto_aliases
         .iter_mut()
         .map(|x| x.as_mut_ptr() as *mut i8)
+        .chain(Some(ptr::null_mut()))
         .collect();
-    proto_aliases.push(ptr::null_mut());
 
     PROTO_ALIASES = Some(_proto_aliases);
     PROTO_NAME = Some(proto_name);
@@ -692,28 +684,25 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
         };
 
         let mut iter = r.split_whitespace();
-        let mut serv_name = match iter.next() {
-            Some(serv_name) => serv_name.as_bytes().to_vec(),
+        let serv_name = match iter.next() {
+            Some(serv_name) => serv_name.bytes().chain(Some(b'\0')).collect(),
             None => continue,
         };
-        serv_name.push(b'\0');
         let port_proto = match iter.next() {
             Some(port_proto) => port_proto,
             None => continue,
         };
         let mut split = port_proto.split('/');
-        let mut port = match split.next() {
-            Some(port) => port.as_bytes().to_vec(),
+        let mut port: Vec<u8> = match split.next() {
+            Some(port) => port.bytes().chain(Some(b'\0')).collect(),
             None => continue,
         };
-        port.push(b'\0');
         SERV_PORT =
             Some(htons(atoi(port.as_mut_slice().as_mut_ptr() as *mut i8) as u16) as u32 as i32);
-        let mut proto = match split.next() {
-            Some(proto) => proto.as_bytes().to_vec(),
+        let proto = match split.next() {
+            Some(proto) => proto.bytes().chain(Some(b'\0')).collect(),
             None => continue,
         };
-        proto.push(b'\0');
 
         rlb.next();
         S_POS = rlb.line_pos();

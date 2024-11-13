@@ -337,8 +337,7 @@ where
 {
     let mut vec = Vec::new();
     for item in iter {
-        vec.extend(item.as_ref());
-        vec.push(b'\0');
+        vec.extend(item.as_ref().iter().copied().chain(Some(b'\0')));
     }
     vec.into_boxed_slice()
 }
