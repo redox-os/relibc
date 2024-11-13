@@ -1,10 +1,13 @@
-//! utmp.h implementation, not POSIX specified
+//! `utmp.h` implementation.
+//!
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/openpty.3.html>.
 
 use crate::{
     header::{sys_ioctl, unistd},
     platform::types::*,
 };
 
+/// See <https://www.man7.org/linux/man-pages/man3/openpty.3.html>.
 #[no_mangle]
 pub unsafe extern "C" fn login_tty(fd: c_int) -> c_int {
     // Create a new session
