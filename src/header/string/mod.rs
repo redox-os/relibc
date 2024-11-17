@@ -88,6 +88,42 @@ pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -
     s1
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memmem.html>.
+///
+/// # Safety
+/// The caller must ensure that:
+/// - `haystack` is convertible to a `&[u8]` with length `haystacklen`, and
+/// - `needle` is convertible to a `&[u8]` with length `needlelen`.
+#[no_mangle]
+pub unsafe extern "C" fn memmem(
+    haystack: *const c_void,
+    haystacklen: size_t,
+    needle: *const c_void,
+    needlelen: size_t,
+) -> *mut c_void {
+    match needlelen {
+        // Required to satisfy spec (would otherwise cause .windows() to panic)
+        0 => haystack.cast_mut(),
+        _ => {
+            // SAFETY: the caller is required to ensure that the provided
+            // pointers are valid.
+            let haystack_slice =
+                unsafe { slice::from_raw_parts(haystack.cast::<u8>(), haystacklen) };
+            let needle_slice = unsafe { slice::from_raw_parts(needle.cast::<u8>(), needlelen) };
+
+            // At this point, .windows() will receive a nonzero `needlelen` and
+            // thus not panic.
+            match haystack_slice
+                .windows(needlelen)
+                .find(|&haystack_window| haystack_window == needle_slice)
+            {
+                Some(match_slice) => match_slice.as_ptr().cast_mut().cast(),
+                None => ptr::null_mut(),
+            }
+        }
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn memmove(s1: *mut c_void, s2: *const c_void, n: size_t) -> *mut c_void {
     if s2 < s1 as *const c_void {
