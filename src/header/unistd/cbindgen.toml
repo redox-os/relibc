@@ -1,4 +1,4 @@
-sys_includes = ["stddef.h", "stdint.h", "sys/types.h"]
+sys_includes = ["stddef.h", "stdint.h", "sys/types.h", "features.h"]
 include_guard = "_RELIBC_UNISTD_H"
 trailer = """
 #include <bits/fcntl.h>

@@ -18,7 +18,11 @@ int main(void) {
     exit(1);
   }
 
+
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   path = strncat(path, mktemp(temp), sizeof(temp));
+  #pragma GCC diagnostic pop
   path = strncat(path, file, sizeof(file));
   if (mkdir(temp, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0) {
     fprintf(stderr, "mkdir %s: %s\n", temp, strerror(errno));

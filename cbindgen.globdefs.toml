@@ -14,3 +14,11 @@
 
 # XXX: silences a warning
 "feature = no_std" = "__relibc__"
+
+# Ensure attributes are passed down from Rust
+# <features.h> must be included where attributes are used in relibc
+[fn]
+must_use = "__nodiscard"
+deprecated = "__deprecated"
+deprecated_with_note = "__deprecatedNote({})"
+no_return = "__noreturn"
