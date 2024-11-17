@@ -107,21 +107,28 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
 
         match Dns::parse(&buf[..count as usize]) {
             Ok(response) => {
-                let mut addrs = vec![];
-                for answer in response.answers.iter() {
-                    if answer.a_type == 0x0001 && answer.a_class == 0x0001 && answer.data.len() == 4
-                    {
-                        let addr = in_addr {
-                            s_addr: u32::from_ne_bytes([
-                                answer.data[0],
-                                answer.data[1],
-                                answer.data[2],
-                                answer.data[3],
-                            ]),
-                        };
-                        addrs.push(addr);
-                    }
-                }
+                let addrs: Vec<_> = response
+                    .answers
+                    .into_iter()
+                    .filter_map(|answer| {
+                        if answer.a_type == 0x0001
+                            && answer.a_class == 0x0001
+                            && answer.data.len() == 4
+                        {
+                            let addr = in_addr {
+                                s_addr: u32::from_ne_bytes([
+                                    answer.data[0],
+                                    answer.data[1],
+                                    answer.data[2],
+                                    answer.data[3],
+                                ]),
+                            };
+                            Some(addr)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
                 Ok(LookupHost(addrs.into_iter()))
             }
             Err(_err) => Err(EINVAL),
@@ -146,19 +153,12 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
         dns_arr[i] = *octet;
     }
 
-    let mut addr_vec: Vec<u8> = addr.s_addr.to_ne_bytes().to_vec();
-    addr_vec.reverse();
-    let mut name: Vec<u8> = vec![];
-    for octet in addr_vec {
-        for ch in format!("{}", octet).as_bytes() {
-            name.push(*ch);
-        }
-        name.push(b"."[0]);
-    }
-    name.pop();
-    for ch in b".IN-ADDR.ARPA" {
-        name.push(*ch);
-    }
+    let addr: [u8; 4] = addr.s_addr.to_ne_bytes();
+    // Address intentionally backwards for reverse lookup
+    let name = format!(
+        "{}.{}.{}.{}.in-addr.arpa",
+        addr[3], addr[2], addr[1], addr[0]
+    );
 
     if dns_vec.len() == 4 {
         let mut timespec = timespec::default();
@@ -169,7 +169,7 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
             transaction_id: tid,
             flags: 0x0100,
             queries: vec![DnsQuery {
-                name: String::from_utf8(name).unwrap(),
+                name,
                 q_type: 0x000C,
                 q_class: 0x0001,
             }],
@@ -221,18 +221,22 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
 
         match Dns::parse(&buf[..count as usize]) {
             Ok(response) => {
-                let mut names = vec![];
-                for answer in response.answers.iter() {
-                    if answer.a_type == 0x000C && answer.a_class == 0x0001 {
-                        // answer.data is encoded kinda weird.
-                        // Basically length-prefixed strings for each
-                        // subsection of the domain.
-                        // We need to parse this to insert periods where
-                        // they belong (ie at the end of each string)
-                        let data = parse_revdns_answer(&answer.data);
-                        names.push(data);
-                    }
-                }
+                let names = response
+                    .answers
+                    .into_iter()
+                    .filter_map(|answer| {
+                        if answer.a_type == 0x000C && answer.a_class == 0x0001 {
+                            // answer.data is encoded kinda weird.
+                            // Basically length-prefixed strings for each
+                            // subsection of the domain.
+                            // We need to parse this to insert periods where
+                            // they belong (ie at the end of each string)
+                            Some(parse_revdns_answer(&answer.data))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
                 Ok(names)
             }
             Err(_err) => Err(EINVAL),

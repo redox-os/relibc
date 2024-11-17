@@ -78,8 +78,7 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
 
     let mut iter: SplitWhitespace = r.split_whitespace();
 
-    let mut addr_vec = iter.next().unwrap().as_bytes().to_vec();
-    addr_vec.push(b'\0');
+    let addr_vec: Vec<u8> = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
     let addr_cstr = addr_vec.as_slice().as_ptr() as *const i8;
     let mut addr = mem::MaybeUninit::uninit();
     inet_aton(addr_cstr, addr.as_mut_ptr());
@@ -90,16 +89,11 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
 
     HOST_ADDR = Some(addr);
 
-    let mut host_name = iter.next().unwrap().as_bytes().to_vec();
-    host_name.push(b'\0');
+    let host_name = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
 
-    let mut _host_aliases: Vec<Vec<u8>> = Vec::new();
-
-    for s in iter {
-        let mut alias = s.as_bytes().to_vec();
-        alias.push(b'\0');
-        _host_aliases.push(alias);
-    }
+    let mut _host_aliases: Vec<Vec<u8>> = iter
+        .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
+        .collect();
     HOST_ALIASES = Some(_host_aliases);
 
     let mut host_aliases: Vec<*mut i8> = HOST_ALIASES
@@ -107,9 +101,8 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
         .unwrap()
         .iter_mut()
         .map(|x| x.as_mut_ptr() as *mut i8)
+        .chain([ptr::null_mut(), ptr::null_mut()])
         .collect();
-    host_aliases.push(ptr::null_mut());
-    host_aliases.push(ptr::null_mut());
 
     HOST_NAME = Some(host_name);
 

@@ -308,9 +308,12 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
         if !path_env.is_null() {
             let path_env = CStr::from_ptr(path_env);
             for path in path_env.to_bytes().split(|&b| b == PATH_SEPARATOR) {
-                let mut program = path.to_vec();
+                let file = file.to_bytes();
+                let length = file.len() + path.len() + 2;
+                let mut program = alloc::vec::Vec::with_capacity(length);
+                program.extend_from_slice(path);
                 program.push(b'/');
-                program.extend_from_slice(file.to_bytes());
+                program.extend_from_slice(file);
                 program.push(b'\0');
 
                 let program_c = CStr::from_bytes_with_nul(&program).unwrap();
