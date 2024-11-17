@@ -1,3 +1,7 @@
+//! `crypt.h` implementation.
+//!
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/crypt.3.html>.
+
 // TODO: set this for entire crate when possible
 #![deny(unsafe_op_in_unsafe_fn)]
 
@@ -29,6 +33,7 @@ use self::{
     sha::{crypt_sha, ShaType::*},
 };
 
+/// See <https://www.man7.org/linux/man-pages/man3/crypt.3.html>.
 #[repr(C)]
 pub struct crypt_data {
     initialized: c_int,
@@ -51,6 +56,7 @@ fn gen_salt() -> Option<String> {
     Some(SaltString::encode_b64(&bytes).ok()?.as_str().to_string())
 }
 
+/// See <https://www.man7.org/linux/man-pages/man3/crypt.3.html>.
 #[no_mangle]
 pub unsafe extern "C" fn crypt_r(
     key: *const c_char,
