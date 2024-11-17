@@ -44,7 +44,6 @@ pub unsafe extern "C" fn __program_invocation_short_name() -> *mut *mut c_char {
     unsafe { &mut platform::program_invocation_short_name }
 }
 
-// TODO: modern POSIX requires these to be defined as macros
 pub const EPERM: c_int = 1; /* Operation not permitted */
 pub const ENOENT: c_int = 2; /* No such file or directory */
 pub const ESRCH: c_int = 3; /* No such process */
@@ -140,6 +139,7 @@ pub const ENOPROTOOPT: c_int = 92; /* Protocol not available */
 pub const EPROTONOSUPPORT: c_int = 93; /* Protocol not supported */
 pub const ESOCKTNOSUPPORT: c_int = 94; /* Socket type not supported */
 pub const EOPNOTSUPP: c_int = 95; /* Operation not supported on transport endpoint */
+pub const ENOTSUP: c_int = EOPNOTSUPP; /* Not supported */
 pub const EPFNOSUPPORT: c_int = 96; /* Protocol family not supported */
 pub const EAFNOSUPPORT: c_int = 97; /* Address family not supported by protocol */
 pub const EADDRINUSE: c_int = 98; /* Address already in use */
