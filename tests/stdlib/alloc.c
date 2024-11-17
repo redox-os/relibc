@@ -182,6 +182,9 @@ int main(void) {
     test_cannot_alloc(ptr_reallocarray_maxsize, reallocarray_errno);
     free(ptr_reallocarray_maxsize);
     
+    // Warning for deprecated functions is expected so silence -Werror
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     errno = 0;
     char * ptr_memalign_size0 = (char *)memalign(aligned_alloc_alignment, zero_size);
     int memalign_size0_errno = errno;
@@ -219,6 +222,8 @@ int main(void) {
     printf("memalign (alignment 3): ");
     test_invalid_aligned(ptr_memalign_align3, memalign_align3_errno);
     free(ptr_memalign_align3);
+
+    #pragma GCC diagnostic pop
     
     errno = 0;
     char * ptr_aligned_alloc_goodsize = (char *)aligned_alloc(aligned_alloc_alignment, aligned_alloc_goodsize);
@@ -234,6 +239,10 @@ int main(void) {
     test_invalid_aligned(ptr_aligned_alloc_badsize, aligned_alloc_badsize_errno);
     free(ptr_aligned_alloc_badsize);
     
+    // Warning for deprecated functions is expected so silence -Werror
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
     errno = 0;
     char * ptr_valloc_size0 = (char *)valloc(zero_size);
     int valloc_size0_errno = errno;
@@ -289,4 +298,6 @@ int main(void) {
     printf("posix_memalign (SIZE_MAX): ");
     test_cannot_alloc(ptr_posix_memalign_maxsize, posix_memalign_maxsize_return);
     free(ptr_posix_memalign_maxsize);
+
+    #pragma GCC diagnostic pop
 }

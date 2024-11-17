@@ -1,4 +1,4 @@
-sys_includes = ["stddef.h", "alloca.h", "wchar.h"]
+sys_includes = ["stddef.h", "alloca.h", "wchar.h", "features.h"]
 include_guard = "_RELIBC_STDLIB_H"
 trailer = "#include <bits/stdlib.h>"
 language = "C"
@@ -8,6 +8,3 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
-
-[fn]
-no_return = "__attribute__((noreturn))"

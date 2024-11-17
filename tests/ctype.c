@@ -301,6 +301,8 @@ size_t num_test_cases = sizeof(test_cases) / sizeof(struct test_case);
 int main(void) {
     int retval = EXIT_SUCCESS;
 
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     for(size_t i = 0; i < num_test_cases; ++i) {
         struct test_case tc = test_cases[i];
         CHECK_TEST(tc, isalnum, retval);
@@ -320,6 +322,7 @@ int main(void) {
         CHECK_TEST(tc, tolower, retval);
         CHECK_TEST(tc, toupper, retval);
     }
+    #pragma GCC diagnostic pop
 
     if (retval == EXIT_SUCCESS) {
         printf("Success: %d\n", retval);

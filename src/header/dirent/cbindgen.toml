@@ -1,4 +1,4 @@
-sys_includes = ["sys/types.h"]
+sys_includes = ["sys/types.h", "features.h"]
 include_guard = "_RELIBC_DIRENT_H"
 language = "C"
 style = "Both"

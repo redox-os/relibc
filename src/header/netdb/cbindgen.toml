@@ -1,4 +1,4 @@
-sys_includes = ["sys/socket.h", "netinet/in.h"]
+sys_includes = ["sys/socket.h", "netinet/in.h", "features.h"]
 include_guard = "_RELIBC_NETDB_H"
 trailer = "#include <bits/netdb.h>"
 language = "C"

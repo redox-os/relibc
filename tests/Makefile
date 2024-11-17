@@ -19,6 +19,7 @@ EXPECT_NAMES=\
 	error \
 	fcntl/create \
 	fcntl/fcntl \
+	features \
 	fnmatch \
 	futimens \
 	libgen \
