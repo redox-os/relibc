@@ -1,4 +1,6 @@
-//! pty.h implementation, not POSIX specified
+//! `pty.h` implementation.
+//!
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/openpty.3.html>.
 
 use core::{mem, ptr, slice};
 
@@ -15,6 +17,7 @@ mod imp;
 #[path = "redox.rs"]
 mod imp;
 
+/// See <https://www.man7.org/linux/man-pages/man3/openpty.3.html>.
 #[no_mangle]
 pub unsafe extern "C" fn openpty(
     amaster: *mut c_int,
@@ -49,6 +52,7 @@ pub unsafe extern "C" fn openpty(
     return 0;
 }
 
+/// See <https://www.man7.org/linux/man-pages/man3/openpty.3.html>.
 #[no_mangle]
 pub unsafe extern "C" fn forkpty(
     pm: *mut c_int,
