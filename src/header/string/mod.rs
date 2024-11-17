@@ -103,7 +103,7 @@ pub unsafe extern "C" fn memmem(
 ) -> *mut c_void {
     match needlelen {
         // Required to satisfy spec (would otherwise cause .windows() to panic)
-        0 => haystack.cast_mut(),
+        0 => haystack,
         _ => {
             // SAFETY: the caller is required to ensure that the provided
             // pointers are valid.
@@ -117,11 +117,12 @@ pub unsafe extern "C" fn memmem(
                 .windows(needlelen)
                 .find(|&haystack_window| haystack_window == needle_slice)
             {
-                Some(match_slice) => match_slice.as_ptr().cast_mut().cast(),
-                None => ptr::null_mut(),
+                Some(match_slice) => match_slice.as_ptr().cast(),
+                None => ptr::null(),
             }
         }
     }
+    .cast_mut()
 }
 
 #[no_mangle]
