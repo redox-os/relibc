@@ -65,7 +65,7 @@ unsafe fn init_fork_hooks<'a>() -> &'a mut [LinkedList<extern "C" fn()>; 3] {
 }
 
 #[no_mangle]
-pub extern "C" fn _exit(status: c_int) {
+pub extern "C" fn _exit(status: c_int) -> ! {
     Sys::exit(status)
 }
 
