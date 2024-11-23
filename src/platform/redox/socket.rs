@@ -11,7 +11,7 @@ use crate::{
     error::{Errno, Result, ResultExt},
     header::{
         arpa_inet::inet_aton,
-        errno::{EAFNOSUPPORT, EFAULT, EINVAL, ENOSYS, EOPNOTSUPP, EPROTONOSUPPORT},
+        errno::{EAFNOSUPPORT, EDOM, EFAULT, EINVAL, ENOSYS, EOPNOTSUPP, EPROTONOSUPPORT},
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
         sys_socket::{constants::*, msghdr, sa_family_t, sockaddr, socklen_t},
@@ -359,9 +359,13 @@ impl PalSocket for Sys {
 
             let fd = FdGuard::new(syscall::dup(socket as usize, timeout_name)?);
 
+            let Some(tv_nsec) = timeval.tv_usec.checked_mul(1000) else {
+                return Err(Errno(EDOM));
+            };
+
             let timespec = syscall::TimeSpec {
                 tv_sec: timeval.tv_sec as i64,
-                tv_nsec: timeval.tv_usec * 1000,
+                tv_nsec,
             };
 
             Self::write(*fd as c_int, &timespec)?;
