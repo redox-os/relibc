@@ -62,7 +62,7 @@ fn rng_sampler() -> &'static Uniform<c_int> {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/_Exit.html>.
 #[no_mangle]
-pub extern "C" fn _Exit(status: c_int) {
+pub extern "C" fn _Exit(status: c_int) -> ! {
     unistd::_exit(status);
 }
 
@@ -339,7 +339,7 @@ pub unsafe extern "C" fn erand48(xsubi: *mut c_ushort) -> c_double {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exit.html>.
 #[no_mangle]
-pub unsafe extern "C" fn exit(status: c_int) {
+pub unsafe extern "C" fn exit(status: c_int) -> ! {
     extern "C" {
         static __fini_array_start: extern "C" fn();
         static __fini_array_end: extern "C" fn();
@@ -1041,7 +1041,7 @@ pub unsafe extern "C" fn qsort_r(
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/quick_exit.html>.
 // #[no_mangle]
-pub unsafe extern "C" fn quick_exit(status: c_int) {
+pub unsafe extern "C" fn quick_exit(status: c_int) -> ! {
     unimplemented!();
 }
 
