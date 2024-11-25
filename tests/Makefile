@@ -213,13 +213,12 @@ NAMES=\
 EXPECT_INPUT_NAMES=\
 	unistd/getpass
 
-#TODO: dynamic tests currently broken
 BINS=$(patsubst %,$(BUILD)/bins_static/%,$(NAMES))
-#BINS+=$(patsubst %,bins_dynamic/%,$(NAMES))
-#BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
+BINS+=$(patsubst %,bins_dynamic/%,$(NAMES))
+BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_BINS=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
-#EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(EXPECT_NAMES))
-#EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
+EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(EXPECT_NAMES))
+EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_INPUT_BINS=$(patsubst %,$(BUILD)/bins_expect_input/%,$(EXPECT_INPUT_NAMES))
 
 CARGO_TEST?=cargo
