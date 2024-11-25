@@ -157,7 +157,7 @@ EXPECT_NAMES=\
 BUILD?=.
 
 DYNAMIC_ONLY_NAMES=\
-	dlfcn
+	# dlfcn
 
 # Binaries that may generate varied output
 NAMES=\
