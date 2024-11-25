@@ -1,0 +1,20 @@
+--- Running: test --test0 -a
+getopt_long returned 1, argument test0=(null)
+Option -a with value (null)
+--- Running: test --test1 -a
+getopt_long returned 0, set flag to 2, argument test1=(null)
+Option -a with value (null)
+--- Running: test --test2 -a
+getopt_long returned 3, argument test2=(null)
+Option -a with value (null)
+--- Running: test --test2=arg -a
+getopt_long returned 3, argument test2=arg
+Option -a with value (null)
+--- Running: test --test3 -a
+getopt_long returned 4, argument test3=-a
+--- Running: test --test3=arg -a
+getopt_long returned 4, argument test3=arg
+Option -a with value (null)
+--- Running: test --test3 arg -a
+getopt_long returned 4, argument test3=arg
+Option -a with value (null)
