@@ -167,7 +167,7 @@ impl Linker {
         )?;
 
         unsafe {
-            let tcb = match Tcb::current() {
+            let tcb = match Tcb::current_slow() {
                 Some(some) => some,
                 None => Tcb::new(self.tls_size)?,
             };
@@ -230,7 +230,7 @@ impl Linker {
             if self.next_tls_module_id == 1 {
                 // Hack to allocate TCB on the first TLS module
                 unsafe {
-                    if Tcb::current().is_none() {
+                    if Tcb::current_slow().is_none() {
                         let tcb = Tcb::new(master.offset).expect_notls("failed to allocate TCB");
                         tcb.activate();
                     }

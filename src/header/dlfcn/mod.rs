@@ -47,7 +47,7 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
         ))
     };
 
-    let tcb = match Tcb::current() {
+    let tcb = match Tcb::current_slow() {
         Some(tcb) => tcb,
         None => {
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
@@ -83,7 +83,7 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
 
     let symbol_str = str::from_utf8_unchecked(CStr::from_ptr(symbol).to_bytes());
 
-    let tcb = match Tcb::current() {
+    let tcb = match Tcb::current_slow() {
         Some(tcb) => tcb,
         None => {
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
@@ -110,7 +110,7 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
 
 #[no_mangle]
 pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
-    let tcb = match Tcb::current() {
+    let tcb = match Tcb::current_slow() {
         Some(tcb) => tcb,
         None => {
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
