@@ -214,11 +214,11 @@ EXPECT_INPUT_NAMES=\
 	unistd/getpass
 
 BINS=$(patsubst %,$(BUILD)/bins_static/%,$(NAMES))
-BINS+=$(patsubst %,bins_dynamic/%,$(NAMES))
-BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
+BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(NAMES))
+BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_BINS=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
-EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(EXPECT_NAMES))
-EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
+EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(EXPECT_NAMES))
+EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_INPUT_BINS=$(patsubst %,$(BUILD)/bins_expect_input/%,$(EXPECT_INPUT_NAMES))
 
 CARGO_TEST?=cargo
@@ -299,7 +299,8 @@ DYNAMIC_FLAGS+=\
 	-Wl,-dynamic-linker=$(SYSROOT_LIB)/ld64.so.1 \
 	-Wl,-rpath=$(SYSROOT_LIB):\$$ORIGIN \
 	-L $(SYSROOT_LIB) \
-	-lc
+	-lc \
+	-fpic
 
 DEPS=../sysroot
 else

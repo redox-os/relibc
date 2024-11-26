@@ -130,8 +130,8 @@ EUSERS macro available
 EWOULDBLOCK macro available
 EXDEV macro available
 EXFULL macro available
-./bins_static/errno
-./bins_static/errno
+./bins_dynamic/errno
+./bins_dynamic/errno
 errno
 changed to argv[0]
 changed to program_invocation_name
