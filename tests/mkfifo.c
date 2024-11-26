@@ -11,7 +11,9 @@ int main(void) {
   char temp[] = "/tmp/stattest-XXXXXX";
   const char file[] = "/mkfifo_fifo";
   int len = sizeof(temp) + sizeof(file);
+
   char* path = malloc(len * sizeof(char));
+  path[0] = '\0';
 
   if (path == NULL) {
     fprintf(stderr, "Could not allocate: %s\n", strerror(errno));
