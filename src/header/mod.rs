@@ -6,8 +6,12 @@ pub mod arpa_inet;
 pub mod assert;
 pub mod bits_pthread;
 pub mod bits_sched;
+// complex.h implemented in C
+// TODO: cpio.h
 pub mod crypt;
 pub mod ctype;
+// TODO: curses.h (deprecated)
+// TODO: devctl.h
 pub mod dirent;
 #[path = "dl-tls/mod.rs"]
 pub mod dl_tls;
@@ -17,40 +21,68 @@ pub mod endian;
 pub mod errno;
 pub mod fcntl;
 pub mod float;
+// TODO: fmtmsg.h
 pub mod fnmatch;
+// TODO: ftw.h
 pub mod getopt;
+// TODO: glob.h
 pub mod grp;
+// TODO: iconv.h
 pub mod inttypes;
+// iso646.h implemented in C
+// TODO: langinfo.h
+// TODO: libintl.h
 pub mod libgen;
 pub mod limits;
 pub mod locale;
+// math.h implemented in C
+// TODO: monetary.h
+// TODO: mqueue.h
+// TODO: ndbm.h
 pub mod net_if;
 pub mod netdb;
 pub mod netinet_in;
 pub mod netinet_ip;
 pub mod netinet_tcp;
+// TODO: nl_types.h
 pub mod poll;
 pub mod pthread;
 pub mod pty;
 pub mod pwd;
+// TODO: re_comp.h (deprecated)
 pub mod regex;
+// TODO: regexp.h (deprecated)
 pub mod sched;
+// TODO: search.h
 pub mod semaphore;
 pub mod setjmp;
 pub mod sgtty;
 pub mod signal;
+// TODO: spawn.h
+// TODO: stdalign.h (likely C implementation)
+// stdarg.h implemented in C
+// stdatomic.h implemented in C
+// stdbool.h implemented in C
+// stddef.h implemented in C
+// stdint.h implemented in C
 pub mod stdio;
 pub mod stdlib;
+// TODO: stdnoreturn.h (likely C implementation)
 pub mod string;
 pub mod strings;
+// TODO: stropts.h (deprecated)
 pub mod sys_auxv;
 pub mod sys_epoll;
 pub mod sys_file;
 pub mod sys_ioctl;
+// TODO: sys/ipc.h
 pub mod sys_mman;
+// TODO: sys/msg.h
 pub mod sys_ptrace;
 pub mod sys_resource;
 pub mod sys_select;
+// TODO: sys/sem.h
+// TODO: sys/shm.h
 pub mod sys_socket;
 pub mod sys_stat;
 pub mod sys_statvfs;
@@ -69,11 +101,24 @@ pub mod sys_uio;
 pub mod sys_un;
 pub mod sys_utsname;
 pub mod sys_wait;
+// TODO: syslog.h
+// TODO: tar.h
+// TODO: term.h (deprecated)
 pub mod termios;
+// TODO: tgmath.h (likely C implementation)
+// TODO: threads.h
 pub mod time;
+// TODO: uchar.h
+// TODO: ucontext.h (deprecated)
+// TODO: ulimit.h (deprecated)
+// TODO: unctrl.h (deprecated)
 pub mod unistd;
 #[deprecated]
 pub mod utime;
 pub mod utmp;
+// TODO: utmpx.h
+// TODO: varargs.h (deprecated)
 pub mod wchar;
 pub mod wctype;
+// TODO: wordexp.h
+// TODO: xti.h (deprecated)
