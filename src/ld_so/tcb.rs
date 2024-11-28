@@ -112,46 +112,6 @@ impl Tcb {
         Some(&mut *GenericTcb::<OsSpecific>::current_ptr()?.cast())
     }
 
-    // FIXME(andypython): move to platform/
-    pub unsafe fn current_slow() -> Option<&'static mut Self> {
-        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-        {
-            use sc::nr::ARCH_PRCTL;
-            const ARCH_GET_FS: usize = 0x1003;
-
-            let mut fs_base = 0usize;
-            sc::syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut fs_base as *mut usize);
-
-            if fs_base == 0 {
-                None
-            } else {
-                Some(&mut *(fs_base as *mut Self))
-            }
-        }
-
-        #[cfg(all(target_os = "redox", target_arch = "x86_64"))]
-        {
-            let mut env = syscall::EnvRegisters::default();
-
-            let file = syscall::open(
-                "/scheme/thisproc/current/regs/env",
-                syscall::O_CLOEXEC | syscall::O_RDONLY,
-            )
-            .expect_notls("failed to open handle for process registers");
-
-            let _ = syscall::read(file, &mut env).expect_notls("failed to read fsbase");
-            let _ = syscall::close(file);
-
-            if env.fsbase == 0 {
-                return None;
-            } else {
-                return Some(&mut *(env.fsbase as *mut Self));
-            }
-        }
-
-        // FIXME(andypython): Implement and test on other platforms
-    }
-
     /// A slice for all of the TLS data
     pub unsafe fn tls(&self) -> Option<&'static mut [u8]> {
         if self.tls_end.is_null() || self.tls_len == 0 {
