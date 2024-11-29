@@ -163,13 +163,13 @@ pub extern "C" fn relibc_ld_so_start(
     // On Redox, we need the TCB to setup in order to do anything. Also, thread local's like
     // ERRNO may be accessed by the dynamic linker, so we need static TLS to be setup.
     unsafe {
-        let tls_size = self_tls_end - self_tls_start;
+        let tls_size = (self_tls_end - self_tls_start).next_multiple_of(4096); // alignment set in linker script
 
         let tcb = Tcb::new(tls_size).expect_notls("ld.so: failed to allocate bootstrap TCB");
 
         LDSO_MASTER.ptr = self_tls_start as *mut u8;
-        LDSO_MASTER.len = tls_size;
-        LDSO_MASTER.offset = tls_size.next_multiple_of(4096); // alignment set in linker script
+        LDSO_MASTER.len = self_tls_end - self_tls_start;
+        LDSO_MASTER.offset = tls_size;
 
         tcb.masters_ptr = &mut LDSO_MASTER;
         tcb.masters_len = core::mem::size_of::<Master>();
@@ -177,6 +177,9 @@ pub extern "C" fn relibc_ld_so_start(
         tcb.copy_masters()
             .expect_notls("ld.so: failed to copy TLS master data");
         tcb.activate();
+
+        #[cfg(target_os = "redox")]
+        redox_rt::signal::setup_sighandler(&tcb.os_specific);
     }
 
     // We get the arguments, the environment, and the auxilary vector
