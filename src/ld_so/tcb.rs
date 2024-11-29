@@ -20,7 +20,7 @@ use crate::{
 };
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Master {
     /// Pointer to initial data
     pub ptr: *const u8,
@@ -63,6 +63,7 @@ pub struct Tcb {
 
     // Dynamic TLS Vector
     pub dtv_ptr: *mut *mut u8,
+    // Number of DTV entries.
     pub dtv_len: usize,
 }
 
@@ -193,9 +194,11 @@ impl Tcb {
             self.masters_len = new_masters.len() * mem::size_of::<Master>();
             mem::forget(new_masters);
         } else {
-            let len = self.masters_len / mem::size_of::<Master>();
-            let mut masters = Vec::from_raw_parts(self.masters_ptr, len, len);
+            // XXX: [`Vec::from_raw_parts`] cannot be used here as the masters were originally
+            // allocated by the ld.so allocator and that would violate that function's invariants.
+            let mut masters = self.masters().unwrap().to_vec();
             masters.extend(new_masters.into_iter());
+
             self.masters_ptr = masters.as_mut_ptr();
             self.masters_len = masters.len() * mem::size_of::<Master>();
             mem::forget(masters);
@@ -210,17 +213,21 @@ impl Tcb {
     pub fn setup_dtv(&mut self, n: usize) {
         if self.dtv_ptr.is_null() {
             let mut dtv = vec![ptr::null_mut(); n];
-            self.dtv_ptr = dtv.as_mut_ptr();
-            self.dtv_len = dtv.len();
-            mem::forget(dtv);
+            let (ptr, len, cap) = dtv.into_raw_parts();
+
+            self.dtv_ptr = ptr;
+            self.dtv_len = len;
         } else {
             // Resize DTV.
-            let mut dtv = unsafe { Vec::from_raw_parts(self.dtv_ptr, self.dtv_len, self.dtv_len) };
+            //
+            // XXX: [`Vec::from_raw_parts`] cannot be used here as the DTV was originally allocated
+            // by the ld.so allocator and that would violate that function's invariants.
+            let mut dtv = self.dtv_mut().unwrap().to_vec();
             dtv.resize(n, ptr::null_mut());
-            self.dtv_ptr = dtv.as_mut_ptr();
-            self.dtv_len = dtv.len();
 
-            mem::forget(dtv);
+            let (ptr, len, _) = dtv.into_raw_parts();
+            self.dtv_ptr = ptr;
+            self.dtv_len = len;
         }
     }
 
