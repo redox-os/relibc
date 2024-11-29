@@ -101,12 +101,14 @@ SECTIONS
   .gcc_except_table   : ONLY_IF_RW { *(.gcc_except_table .gcc_except_table.*) }
   .exception_ranges   : ONLY_IF_RW { *(.exception_ranges*) }
   /* Thread Local Storage sections  */
-  .tdata          :
+  __relibc_ldso_tls_start = .;
+  .tdata          : ALIGN(4K)
    {
      PROVIDE_HIDDEN (__tdata_start = .);
      *(.tdata .tdata.* .gnu.linkonce.td.*)
    }
   .tbss           : { *(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon) }
+  __relibc_ldso_tls_end = .;
   .preinit_array    :
   {
     PROVIDE_HIDDEN (__preinit_array_start = .);

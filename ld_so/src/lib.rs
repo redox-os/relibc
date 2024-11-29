@@ -45,6 +45,8 @@ _start:
     # Call ld_so_start(stack, entry)
     mov rdi, rbp
     sub rsi, 5
+    lea rdx, __relibc_ldso_tls_start
+    lea rcx, __relibc_ldso_tls_end
     call relibc_ld_so_start
 
     # Restore original stack, clear registers, and jump to new start function

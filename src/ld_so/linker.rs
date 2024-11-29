@@ -60,7 +60,7 @@ const root_id: usize = 1;
 impl Linker {
     pub fn new(ld_library_path: Option<String>) -> Self {
         Self {
-            ld_library_path: ld_library_path,
+            ld_library_path,
             next_object_id: root_id,
             next_tls_module_id: 1,
             tls_size: 0,
@@ -70,6 +70,7 @@ impl Linker {
         }
     }
 
+    /// **Warning**: Switches to the program's TCB. Thread locals should not be accessed after this.
     pub fn load_program(&mut self, path: &str, base_addr: Option<usize>) -> Result<usize> {
         self.load_object(path, &None, base_addr, false)?;
         return Ok(self.objects.get(&root_id).unwrap().entry_point);
@@ -167,13 +168,41 @@ impl Linker {
         )?;
 
         unsafe {
-            let tcb = match Tcb::current() {
-                Some(some) => some,
-                None => Tcb::new(self.tls_size)?,
-            };
-            tcb.append_masters(tcb_masters);
-            tcb.copy_masters()?;
-            tcb.activate();
+            if !dlopened {
+                // We are now loading the main program or its dependencies. The TLS for all initially
+                // loaded objects reside in the static TLS block. Depending on the architecture, the
+                // static TLS block is either placed before the TP or after the TP.
+                let tcb = Tcb::new(self.tls_size)?;
+                let tcb_ptr = tcb as *mut Tcb;
+
+                // Setup the DTVs.
+                tcb.setup_dtv(tcb_masters.len());
+
+                for obj in new_objects.iter() {
+                    if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
+                        // Above the TP
+                        tcb.dtv_mut().unwrap()[obj.tls_module_id - 1] =
+                            tcb_ptr.cast::<u8>().sub(obj.tls_offset);
+                    } else {
+                        // Below the TP
+                        tcb.dtv_mut().unwrap()[obj.tls_module_id - 1] =
+                            tcb_ptr.add(1).cast::<u8>().add(obj.tls_offset);
+                    }
+                }
+
+                tcb.append_masters(tcb_masters);
+                // Copy the master data into the static TLS block.
+                tcb.copy_masters()?;
+
+                tcb.activate();
+                // XXX: Beyond this point, any thread local's for ld.so should not be accessed. Though, the
+                // TCB can still be accessed.
+            } else {
+                let tcb = Tcb::current().expect("failed to get current tcb");
+
+                // TLS variables for dlopen'ed objects are lazily allocated in `__tls_get_addr`.
+                tcb.append_masters(tcb_masters);
+            }
         }
 
         self.relocate(&new_objects, &objects_data)?;
@@ -222,23 +251,29 @@ impl Linker {
             self.next_tls_module_id,
             self.tls_size,
         )?;
+        trace!(
+            "[ldso] loading object: {} at {:#x}",
+            name,
+            obj.mmap.as_ptr() as usize
+        );
         new_objects.push(obj);
         objects_data.push(data);
+
         self.next_object_id += 1;
+        self.next_tls_module_id += 1;
 
         if let Some(master) = tcb_master {
-            if self.next_tls_module_id == 1 {
-                // Hack to allocate TCB on the first TLS module
-                unsafe {
-                    if Tcb::current().is_none() {
-                        let tcb = Tcb::new(master.offset).expect_notls("failed to allocate TCB");
-                        tcb.activate();
-                    }
-                }
+            if !dlopened {
+                self.tls_size += master.offset; // => aligned ph.p_memsz
             }
-            self.next_tls_module_id += 1;
-            self.tls_size = master.offset;
+
             tcb_masters.push(master);
+        } else {
+            tcb_masters.push(Master {
+                ptr: ptr::null_mut(),
+                len: 0,
+                offset: 0,
+            });
         }
 
         let (runpath, dependencies) = {

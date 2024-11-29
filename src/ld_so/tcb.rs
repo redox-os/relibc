@@ -60,6 +60,10 @@ pub struct Tcb {
     pub mspace: *const Mutex<Dlmalloc>,
     /// Underlying pthread_t struct, pthread_self() returns &self.pthread
     pub pthread: Pthread,
+
+    // Dynamic TLS Vector
+    pub dtv_ptr: *mut *mut u8,
+    pub dtv_len: usize,
 }
 
 #[cfg(target_os = "redox")]
@@ -71,6 +75,8 @@ const _: () = {
 
 impl Tcb {
     /// Create a new TCB
+    ///
+    /// `size` is the size of the TLS in bytes.
     pub unsafe fn new(size: usize) -> Result<&'static mut Self> {
         let page_size = Sys::getpagesize();
         let (abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
@@ -101,6 +107,9 @@ impl Tcb {
                     stack_size: 0,
                     os_tid: UnsafeCell::new(OsTid::default()),
                 },
+
+                dtv_ptr: ptr::null_mut(),
+                dtv_len: 0,
             },
         );
 
@@ -196,6 +205,31 @@ impl Tcb {
     /// Activate TLS
     pub unsafe fn activate(&mut self) {
         Self::os_arch_activate(&self.os_specific, self.tls_end as usize, self.tls_len);
+    }
+
+    pub fn setup_dtv(&mut self, n: usize) {
+        if self.dtv_ptr.is_null() {
+            let mut dtv = vec![ptr::null_mut(); n];
+            self.dtv_ptr = dtv.as_mut_ptr();
+            self.dtv_len = dtv.len();
+            mem::forget(dtv);
+        } else {
+            // Resize DTV.
+            let mut dtv = unsafe { Vec::from_raw_parts(self.dtv_ptr, self.dtv_len, self.dtv_len) };
+            dtv.resize(n, ptr::null_mut());
+            self.dtv_ptr = dtv.as_mut_ptr();
+            self.dtv_len = dtv.len();
+
+            mem::forget(dtv);
+        }
+    }
+
+    pub fn dtv_mut(&mut self) -> Option<&'static mut [*mut u8]> {
+        if self.dtv_len != 0 {
+            Some(unsafe { slice::from_raw_parts_mut(self.dtv_ptr, self.dtv_len) })
+        } else {
+            None
+        }
     }
 
     /// Mapping with correct flags for TCB and TLS

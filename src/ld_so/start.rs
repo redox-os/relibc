@@ -7,10 +7,12 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use generic_rt::ExpectTlsFree;
 
 use crate::{
     c_str::CStr,
     header::unistd,
+    ld_so::tcb::Master,
     platform::{get_auxv, get_auxvs, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
@@ -141,9 +143,42 @@ fn resolve_path_name(
     }
     None
 }
+
+static mut LDSO_MASTER: Master = Master {
+    ptr: core::ptr::null_mut(),
+    len: 0,
+    offset: 0,
+};
+
 // TODO: Make unsafe
 #[no_mangle]
-pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) -> usize {
+pub extern "C" fn relibc_ld_so_start(
+    sp: &'static mut Stack,
+    ld_entry: usize,
+    self_tls_start: usize,
+    self_tls_end: usize,
+) -> usize {
+    // Setup TLS and TCB for ourselves.
+    //
+    // On Redox, we need the TCB to setup in order to do anything. Also, thread local's like
+    // ERRNO may be accessed by the dynamic linker, so we need static TLS to be setup.
+    unsafe {
+        let tls_size = self_tls_end - self_tls_start;
+
+        let tcb = Tcb::new(tls_size).expect_notls("ld.so: failed to allocate bootstrap TCB");
+
+        LDSO_MASTER.ptr = self_tls_start as *mut u8;
+        LDSO_MASTER.len = tls_size;
+        LDSO_MASTER.offset = tls_size.next_multiple_of(4096); // alignment set in linker script
+
+        tcb.masters_ptr = &mut LDSO_MASTER;
+        tcb.masters_len = core::mem::size_of::<Master>();
+
+        tcb.copy_masters()
+            .expect_notls("ld.so: failed to copy TLS master data");
+        tcb.activate();
+    }
+
     // We get the arguments, the environment, and the auxilary vector
     let (argv, envs, auxv) = unsafe {
         let argv_start = sp.argv() as *mut usize;
