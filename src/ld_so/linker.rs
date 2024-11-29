@@ -180,11 +180,11 @@ impl Linker {
 
                 for obj in new_objects.iter() {
                     if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
-                        // Above the TP
+                        // Below the TP
                         tcb.dtv_mut().unwrap()[obj.tls_module_id - 1] =
                             tcb_ptr.cast::<u8>().sub(obj.tls_offset);
                     } else {
-                        // Below the TP
+                        // Above the TP
                         tcb.dtv_mut().unwrap()[obj.tls_module_id - 1] =
                             tcb_ptr.add(1).cast::<u8>().add(obj.tls_offset);
                     }
