@@ -44,8 +44,9 @@ static mut BRK_CUR: *mut c_void = ptr::null_mut();
 static mut BRK_END: *mut c_void = ptr::null_mut();
 
 const PAGE_SIZE: usize = 4096;
-fn round_up_to_page_size(val: usize) -> usize {
-    (val + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE
+fn round_up_to_page_size(val: usize) -> Option<usize> {
+    val.checked_add(PAGE_SIZE)
+        .map(|val| (val - 1) / PAGE_SIZE * PAGE_SIZE)
 }
 
 mod clone;
@@ -594,9 +595,17 @@ impl Pal for Sys {
         fildes: c_int,
         off: off_t,
     ) -> Result<*mut c_void> {
+        // 0 is invalid per spec
+        if len == 0 {
+            return Err(Errno(EINVAL));
+        }
+        let Some(size) = round_up_to_page_size(len) else {
+            return Err(Errno(ENOMEM));
+        };
+
         let map = Map {
             offset: off as usize,
-            size: round_up_to_page_size(len),
+            size,
             flags: syscall::MapFlags::from_bits_truncate(
                 ((prot as usize) << 16) | ((flags as usize) & 0xFFFF),
             ),
@@ -621,9 +630,12 @@ impl Pal for Sys {
     }
 
     unsafe fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> Result<()> {
+        let Some(len) = round_up_to_page_size(len) else {
+            return Err(Errno(ENOMEM));
+        };
         syscall::mprotect(
             addr as usize,
-            round_up_to_page_size(len),
+            len,
             syscall::MapFlags::from_bits((prot as usize) << 16)
                 .expect("mprotect: invalid bit pattern"),
         )?;
@@ -656,7 +668,14 @@ impl Pal for Sys {
     }
 
     unsafe fn munmap(addr: *mut c_void, len: usize) -> Result<()> {
-        syscall::funmap(addr as usize, round_up_to_page_size(len))?;
+        // 0 is invalid per spec
+        if len == 0 {
+            return Err(Errno(EINVAL));
+        }
+        let Some(len) = round_up_to_page_size(len) else {
+            return Err(Errno(ENOMEM));
+        };
+        syscall::funmap(addr as usize, len)?;
         Ok(())
     }
 
