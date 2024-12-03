@@ -11,7 +11,7 @@ use crate::{
 pub mod constants;
 
 pub type sa_family_t = u16;
-pub type socklen_t = u32;
+pub type socklen_t = size_t;
 
 #[repr(C)]
 #[derive(Default)]
@@ -30,13 +30,13 @@ pub struct msghdr {
     pub msg_iov: *mut iovec,
     pub msg_iovlen: size_t,
     pub msg_control: *mut c_void,
-    pub msg_controllen: size_t,
+    pub msg_controllen: socklen_t,
     pub msg_flags: c_int,
 }
 
 #[repr(C)]
 pub struct cmsghdr {
-    pub cmsg_len: size_t,
+    pub cmsg_len: socklen_t,
     pub cmsg_level: c_int,
     pub cmsg_type: c_int,
 }
@@ -46,6 +46,26 @@ pub struct cmsghdr {
 pub struct sockaddr {
     pub sa_family: sa_family_t,
     pub sa_data: [c_char; 14],
+}
+
+// Max size of [`sockaddr_storage`]
+const _SS_MAXSIZE: usize = 128;
+// Align to pointer width
+const _SS_PADDING: usize = _SS_MAXSIZE - mem::size_of::<sa_family_t>() - mem::size_of::<usize>();
+
+/// Opaque storage large enough to hold any protocol specific address structure.
+///
+/// ## Implementation notes
+/// * The total size of this struct is 128 bytes which is based off of `musl` and `glibc`
+/// * The underscore fields are implementation specific details for padding that may change
+/// * [`usize`] is used because it's the width of a pointer for a given platform
+/// * The order of the fields is important because the bytes in the padding will be cast to and
+/// from protocol structs in C
+#[repr(C)]
+pub struct sockaddr_storage {
+    pub ss_family: sa_family_t,
+    __ss_pad2: [u8; _SS_PADDING],
+    __ss_align: usize,
 }
 
 #[no_mangle]

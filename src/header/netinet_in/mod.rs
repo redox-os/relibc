@@ -1,6 +1,9 @@
 #![allow(non_camel_case_types)]
 
-use crate::{header::sys_socket::sa_family_t, platform::types::*};
+use crate::{
+    header::sys_socket::{sa_family_t, sockaddr_storage},
+    platform::types::*,
+};
 
 pub type in_addr_t = u32;
 pub type in_port_t = u16;
@@ -95,6 +98,19 @@ pub struct ip_mreq_source {
 pub struct ip_mreq {
     pub imr_multiaddr: in_addr,
     pub imr_interface: in_addr,
+}
+
+#[repr(C)]
+pub struct group_req {
+    pub gr_interface: u32,
+    pub gr_group: sockaddr_storage,
+}
+
+#[repr(C)]
+pub struct group_source_req {
+    pub gsr_interface: u32,
+    pub gsr_group: sockaddr_storage,
+    pub gsr_source: sockaddr_storage,
 }
 
 #[no_mangle]
