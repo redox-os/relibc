@@ -8,12 +8,12 @@ use alloc::{boxed::Box, collections::BTreeMap, vec};
 #[cfg(target_pointer_width = "32")]
 use goblin::elf32::{
     header::Header,
-    program_header::program_header32::{ProgramHeader, PF_W, PF_X, PT_INTERP, PT_LOAD, PT_TLS},
+    program_header::program_header32::{ProgramHeader, PF_W, PF_X, PT_INTERP, PT_LOAD},
 };
 #[cfg(target_pointer_width = "64")]
 use goblin::elf64::{
     header::Header,
-    program_header::program_header64::{ProgramHeader, PF_W, PF_X, PT_INTERP, PT_LOAD, PT_TLS},
+    program_header::program_header64::{ProgramHeader, PF_W, PF_X, PT_INTERP, PT_LOAD},
 };
 
 use syscall::{
@@ -147,7 +147,7 @@ where
                     },
                 });
             }
-            PT_LOAD | PT_TLS => {
+            PT_LOAD => {
                 let voff = segment.p_vaddr as usize % PAGE_SIZE;
                 let vaddr = segment.p_vaddr as usize - voff;
                 let filesz = segment.p_filesz as usize;
