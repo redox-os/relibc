@@ -260,7 +260,6 @@ impl Linker {
         objects_data.push(data);
 
         self.next_object_id += 1;
-        self.next_tls_module_id += 1;
 
         if let Some(master) = tcb_master {
             if !dlopened {
@@ -268,12 +267,7 @@ impl Linker {
             }
 
             tcb_masters.push(master);
-        } else {
-            tcb_masters.push(Master {
-                ptr: ptr::null_mut(),
-                len: 0,
-                offset: 0,
-            });
+            self.next_tls_module_id += 1;
         }
 
         let (runpath, dependencies) = {
