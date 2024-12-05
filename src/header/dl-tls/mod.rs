@@ -35,7 +35,7 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
 
     if tcb.dtv_mut().unwrap()[dtv_index].is_null() {
         // Allocate TLS for module.
-        let master = &tcb.masters().unwrap()[ti.ti_module as usize - 1];
+        let master = &tcb.masters().unwrap()[dtv_index];
 
         // FIXME(andypython): master.align
         let layout = unsafe {
