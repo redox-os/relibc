@@ -241,19 +241,16 @@ impl Tcb {
 
     /// Mapping with correct flags for TCB and TLS
     unsafe fn map(size: usize) -> Result<&'static mut [u8]> {
-        let ptr = sys_mman::mmap(
+        let ptr = Sys::mmap(
             ptr::null_mut(),
             size,
             sys_mman::PROT_READ | sys_mman::PROT_WRITE,
             sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
             -1,
             0,
-        );
-        if ptr as usize == !0
-        /* MAP_FAILED */
-        {
-            return Err(Error::Malformed(format!("failed to map tls")));
-        }
+        )
+        .map_err(|_| Error::Malformed(format!("failed to map tls")))?;
+
         ptr::write_bytes(ptr as *mut u8, 0, size);
         Ok(slice::from_raw_parts_mut(ptr as *mut u8, size))
     }

@@ -12,14 +12,17 @@ use goblin::{
 
 use crate::{
     c_str::{CStr, CString},
-    fs::File,
+    error::Errno,
     header::{
         dl_tls::{__tls_get_addr, dl_tls_index},
         fcntl, sys_mman,
         unistd::F_OK,
     },
-    io::Read,
-    platform::types::c_void,
+    io::{self, Read},
+    platform::{
+        types::{c_int, c_void},
+        Pal, Sys,
+    },
 };
 
 use super::{
@@ -30,6 +33,26 @@ use super::{
     tcb::{Master, Tcb},
     ExpectTlsFree, PATH_SEP,
 };
+
+/// Same as [`crate::fs::File`], but does not touch [`crate::platform::ERRNO`] as the dynamic
+/// linker does not have thread-local storage.
+struct File {
+    fd: c_int,
+}
+
+impl File {
+    pub fn open(path: CStr, oflag: c_int) -> core::result::Result<Self, Errno> {
+        Ok(Self {
+            fd: Sys::open(path, oflag, 0)?,
+        })
+    }
+}
+
+impl io::Read for File {
+    fn read(&mut self, buf: &mut [u8]) -> core::result::Result<usize, io::Error> {
+        Sys::read(self.fd, buf).map_err(|err| io::Error::from_raw_os_error(err.0))
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Symbol {
@@ -70,7 +93,6 @@ impl Linker {
         }
     }
 
-    /// **Warning**: Switches to the program's TCB. Thread locals should not be accessed after this.
     pub fn load_program(&mut self, path: &str, base_addr: Option<usize>) -> Result<usize> {
         self.load_object(path, &None, base_addr, false)?;
         return Ok(self.objects.get(&root_id).unwrap().entry_point);
@@ -193,10 +215,7 @@ impl Linker {
                 tcb.append_masters(tcb_masters);
                 // Copy the master data into the static TLS block.
                 tcb.copy_masters()?;
-
                 tcb.activate();
-                // XXX: Beyond this point, any thread local's for ld.so should not be accessed. Though, the
-                // TCB can still be accessed.
             } else {
                 let tcb = Tcb::current().expect("failed to get current tcb");
 
@@ -502,12 +521,10 @@ impl Linker {
                         vaddr as *const u8
                     };
                     trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
-                    sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
+                    Sys::mprotect(ptr as *mut c_void, vsize, prot).map_err(|_| {
+                        Error::Malformed(format!("failed to mprotect {}", obj.name))
+                    })?;
                 };
-
-                if res < 0 {
-                    return Err(Error::Malformed(format!("failed to mprotect {}", obj.name)));
-                }
             }
         }
 
