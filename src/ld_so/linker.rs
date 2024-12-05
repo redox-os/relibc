@@ -201,6 +201,11 @@ impl Linker {
                 tcb.setup_dtv(tcb_masters.len());
 
                 for obj in new_objects.iter() {
+                    if obj.tls_module_id == 0 {
+                        // No TLS for this object.
+                        continue;
+                    }
+
                     if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
                         // Below the TP
                         tcb.dtv_mut().unwrap()[obj.tls_module_id - 1] =

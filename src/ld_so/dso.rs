@@ -100,7 +100,11 @@ impl DSO {
             dependencies: elf.libraries.iter().map(|s| s.to_string()).collect(),
             init_array: init_array,
             fini_array: fini_array,
-            tls_module_id: tls_module_id,
+            tls_module_id: if tcb_master.is_some() {
+                tls_module_id
+            } else {
+                0
+            },
             tls_offset: tls_offset,
         };
         return Ok((dso, tcb_master));
