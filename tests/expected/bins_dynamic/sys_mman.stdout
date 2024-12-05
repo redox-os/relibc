@@ -1,0 +1,9 @@
+Page size: 4096
+Mapping 1 page of memory...
+Mapping 3 pages of memory...
+Randomizing mapping #1
+Randomizing mapping #2
+Unmapping page 2 of map2
+Randomizing page 1 of mapping #2
+Randomizing page 3 of mapping #2
+Unmapping it all at once!

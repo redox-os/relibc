@@ -1,0 +1,5 @@
+# mem #
+Correct memchr
+Correct memrchr
+Correct memccpy
+Correct memcmp

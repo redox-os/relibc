@@ -1,0 +1,41 @@
+  1: getline(NULL, NULL, stream)
+     => 22 (Invalid argument) - EINVAL
+  2: getline(NULL, &n, stream)
+     => 22 (Invalid argument) - EINVAL
+  3: getline(&lineptr, NULL, stream)
+     => 22 (Invalid argument) - EINVAL
+  4: getline(NULL, NULL, NULL)
+     => 22 (Invalid argument) - EINVAL
+  5: getline(&lineptr, NULL, NULL)
+     => 22 (Invalid argument) - EINVAL
+  6: getline(NULL, &n, NULL)
+     => 22 (Invalid argument) - EINVAL
+  7: getline(&lineptr, &n, NULL)
+     => 22 (Invalid argument) - EINVAL
+  8: getdelim(&lineptr, &n, 25600, stream)
+     => 22 (Invalid argument) - EINVAL
+
+  1: status = 27, strlen = 27, feof = 0, ferror = 0
+     |>Space: the final frontier.
+  2: status = 1, strlen = 1, feof = 0, ferror = 0
+     |>
+  3: status = 50, strlen = 50, feof = 0, ferror = 0
+     |>These are the voyages of the starship Enterprise.
+  4: status = 24, strlen = 24, feof = 0, ferror = 0
+     |>Its continuing mission:
+  5: status = 33, strlen = 33, feof = 0, ferror = 0
+     |>- to explore strange new worlds;
+  6: status = 46, strlen = 46, feof = 0, ferror = 0
+     |>- to seek out new life and new civilizations;
+  7: status = 45, strlen = 45, feof = 0, ferror = 0
+     |>- to boldly go where no one has gone before!
+
+overread 1, status = -1, feof = 1, ferror = 0
+|~- to boldly go where no one has gone before!
+
+overread 2, status = -1, feof = 1, ferror = 0
+|~- to boldly go where no one has gone before!
+
+overread 3, status = -1, feof = 1, ferror = 0
+|~- to boldly go where no one has gone before!
+

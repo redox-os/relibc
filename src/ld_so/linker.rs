@@ -12,14 +12,17 @@ use goblin::{
 
 use crate::{
     c_str::{CStr, CString},
-    fs::File,
+    error::Errno,
     header::{
         dl_tls::{__tls_get_addr, dl_tls_index},
         fcntl, sys_mman,
         unistd::F_OK,
     },
-    io::Read,
-    platform::types::c_void,
+    io::{self, Read},
+    platform::{
+        types::{c_int, c_void},
+        Pal, Sys,
+    },
 };
 
 use super::{
@@ -30,6 +33,26 @@ use super::{
     tcb::{Master, Tcb},
     ExpectTlsFree, PATH_SEP,
 };
+
+/// Same as [`crate::fs::File`], but does not touch [`crate::platform::ERRNO`] as the dynamic
+/// linker does not have thread-local storage.
+struct File {
+    fd: c_int,
+}
+
+impl File {
+    pub fn open(path: CStr, oflag: c_int) -> core::result::Result<Self, Errno> {
+        Ok(Self {
+            fd: Sys::open(path, oflag, 0)?,
+        })
+    }
+}
+
+impl io::Read for File {
+    fn read(&mut self, buf: &mut [u8]) -> core::result::Result<usize, io::Error> {
+        Sys::read(self.fd, buf).map_err(|err| io::Error::from_raw_os_error(err.0))
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Symbol {
@@ -60,7 +83,7 @@ const root_id: usize = 1;
 impl Linker {
     pub fn new(ld_library_path: Option<String>) -> Self {
         Self {
-            ld_library_path: ld_library_path,
+            ld_library_path,
             next_object_id: root_id,
             next_tls_module_id: 1,
             tls_size: 0,
@@ -167,13 +190,49 @@ impl Linker {
         )?;
 
         unsafe {
-            let tcb = match Tcb::current() {
-                Some(some) => some,
-                None => Tcb::new(self.tls_size)?,
-            };
-            tcb.append_masters(tcb_masters);
-            tcb.copy_masters()?;
-            tcb.activate();
+            if !dlopened {
+                // We are now loading the main program or its dependencies. The TLS for all initially
+                // loaded objects reside in the static TLS block. Depending on the architecture, the
+                // static TLS block is either placed before the TP or after the TP.
+                let tcb = Tcb::new(self.tls_size)?;
+                let tcb_ptr = tcb as *mut Tcb;
+
+                // Setup the DTVs.
+                tcb.setup_dtv(tcb_masters.len());
+
+                for obj in new_objects.iter() {
+                    if obj.tls_module_id == 0 {
+                        // No TLS for this object.
+                        continue;
+                    }
+
+                    let dtv_idx = obj.tls_module_id - 1;
+
+                    if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
+                        // Below the TP
+                        tcb.dtv_mut().unwrap()[dtv_idx] = tcb_ptr.cast::<u8>().sub(obj.tls_offset);
+                    } else {
+                        // FIMXE(andypython): Make it above the TP
+                        //
+                        // tcb.dtv_mut().unwrap()[obj.tls_module_id - 1] =
+                        //     tcb_ptr.add(1).cast::<u8>().add(obj.tls_offset);
+                        //
+                        // FIXME(andypython): https://gitlab.redox-os.org/redox-os/relibc/-/merge_requests/570#note_35788
+                        tcb.dtv_mut().unwrap()[dtv_idx] =
+                            tcb.tls_end.sub(tcb.tls_len).add(obj.tls_offset);
+                    }
+                }
+
+                tcb.append_masters(tcb_masters);
+                // Copy the master data into the static TLS block.
+                tcb.copy_masters()?;
+                tcb.activate();
+            } else {
+                let tcb = Tcb::current().expect("failed to get current tcb");
+
+                // TLS variables for dlopen'ed objects are lazily allocated in `__tls_get_addr`.
+                tcb.append_masters(tcb_masters);
+            }
         }
 
         self.relocate(&new_objects, &objects_data)?;
@@ -222,23 +281,23 @@ impl Linker {
             self.next_tls_module_id,
             self.tls_size,
         )?;
+        trace!(
+            "[ldso] loading object: {} at {:#x}",
+            name,
+            obj.mmap.as_ptr() as usize
+        );
         new_objects.push(obj);
         objects_data.push(data);
+
         self.next_object_id += 1;
 
         if let Some(master) = tcb_master {
-            if self.next_tls_module_id == 1 {
-                // Hack to allocate TCB on the first TLS module
-                unsafe {
-                    if Tcb::current().is_none() {
-                        let tcb = Tcb::new(master.offset).expect_notls("failed to allocate TCB");
-                        tcb.activate();
-                    }
-                }
+            if !dlopened {
+                self.tls_size += master.offset; // => aligned ph.p_memsz
             }
-            self.next_tls_module_id += 1;
-            self.tls_size = master.offset;
+
             tcb_masters.push(master);
+            self.next_tls_module_id += 1;
         }
 
         let (runpath, dependencies) = {
@@ -473,12 +532,10 @@ impl Linker {
                         vaddr as *const u8
                     };
                     trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
-                    sys_mman::mprotect(ptr as *mut c_void, vsize, prot)
+                    Sys::mprotect(ptr as *mut c_void, vsize, prot).map_err(|_| {
+                        Error::Malformed(format!("failed to mprotect {}", obj.name))
+                    })?;
                 };
-
-                if res < 0 {
-                    return Err(Error::Malformed(format!("failed to mprotect {}", obj.name)));
-                }
             }
         }
 

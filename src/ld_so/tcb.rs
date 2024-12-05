@@ -20,7 +20,7 @@ use crate::{
 };
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Master {
     /// Pointer to initial data
     pub ptr: *const u8,
@@ -60,6 +60,11 @@ pub struct Tcb {
     pub mspace: *const Mutex<Dlmalloc>,
     /// Underlying pthread_t struct, pthread_self() returns &self.pthread
     pub pthread: Pthread,
+
+    // Dynamic TLS Vector
+    pub dtv_ptr: *mut *mut u8,
+    // Number of DTV entries.
+    pub dtv_len: usize,
 }
 
 #[cfg(target_os = "redox")]
@@ -71,6 +76,8 @@ const _: () = {
 
 impl Tcb {
     /// Create a new TCB
+    ///
+    /// `size` is the size of the TLS in bytes.
     pub unsafe fn new(size: usize) -> Result<&'static mut Self> {
         let page_size = Sys::getpagesize();
         let (abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
@@ -101,6 +108,9 @@ impl Tcb {
                     stack_size: 0,
                     os_tid: UnsafeCell::new(OsTid::default()),
                 },
+
+                dtv_ptr: ptr::null_mut(),
+                dtv_len: 0,
             },
         );
 
@@ -184,9 +194,11 @@ impl Tcb {
             self.masters_len = new_masters.len() * mem::size_of::<Master>();
             mem::forget(new_masters);
         } else {
-            let len = self.masters_len / mem::size_of::<Master>();
-            let mut masters = Vec::from_raw_parts(self.masters_ptr, len, len);
+            // XXX: [`Vec::from_raw_parts`] cannot be used here as the masters were originally
+            // allocated by the ld.so allocator and that would violate that function's invariants.
+            let mut masters = self.masters().unwrap().to_vec();
             masters.extend(new_masters.into_iter());
+
             self.masters_ptr = masters.as_mut_ptr();
             self.masters_len = masters.len() * mem::size_of::<Master>();
             mem::forget(masters);
@@ -198,21 +210,47 @@ impl Tcb {
         Self::os_arch_activate(&self.os_specific, self.tls_end as usize, self.tls_len);
     }
 
+    pub fn setup_dtv(&mut self, n: usize) {
+        if self.dtv_ptr.is_null() {
+            let mut dtv = vec![ptr::null_mut(); n];
+            let (ptr, len, cap) = dtv.into_raw_parts();
+
+            self.dtv_ptr = ptr;
+            self.dtv_len = len;
+        } else {
+            // Resize DTV.
+            //
+            // XXX: [`Vec::from_raw_parts`] cannot be used here as the DTV was originally allocated
+            // by the ld.so allocator and that would violate that function's invariants.
+            let mut dtv = self.dtv_mut().unwrap().to_vec();
+            dtv.resize(n, ptr::null_mut());
+
+            let (ptr, len, _) = dtv.into_raw_parts();
+            self.dtv_ptr = ptr;
+            self.dtv_len = len;
+        }
+    }
+
+    pub fn dtv_mut(&mut self) -> Option<&'static mut [*mut u8]> {
+        if self.dtv_len != 0 {
+            Some(unsafe { slice::from_raw_parts_mut(self.dtv_ptr, self.dtv_len) })
+        } else {
+            None
+        }
+    }
+
     /// Mapping with correct flags for TCB and TLS
     unsafe fn map(size: usize) -> Result<&'static mut [u8]> {
-        let ptr = sys_mman::mmap(
+        let ptr = Sys::mmap(
             ptr::null_mut(),
             size,
             sys_mman::PROT_READ | sys_mman::PROT_WRITE,
             sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
             -1,
             0,
-        );
-        if ptr as usize == !0
-        /* MAP_FAILED */
-        {
-            return Err(Error::Malformed(format!("failed to map tls")));
-        }
+        )
+        .map_err(|_| Error::Malformed(format!("failed to map tls")))?;
+
         ptr::write_bytes(ptr as *mut u8, 0, size);
         Ok(slice::from_raw_parts_mut(ptr as *mut u8, size))
     }

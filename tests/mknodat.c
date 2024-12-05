@@ -12,7 +12,9 @@ int main(void) {
   const char separator[] = "/";
   const char file[] = "mknod"; // relative
   int len = sizeof(temp) + sizeof(file) + sizeof(separator);
+
   char* path = malloc(len * sizeof(char));
+  path[0] = '\0';
 
   if (path == NULL) {
     fprintf(stderr, "Could not allocate: %s\n", strerror(errno));

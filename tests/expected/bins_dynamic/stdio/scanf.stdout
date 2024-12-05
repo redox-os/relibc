@@ -1,0 +1,14 @@
+2, { sa: 12, ia: 345, ib: 0, ic: 0, fa: 0.000000, da: 0.000000, ptr: (nil), char: a, string1: , string2: , string3: , string4:  }
+3, { sa: 12, ia: 18, ib: 837, ic: 8, fa: 0.000000, da: 0.000000, ptr: (nil), char: a, string1: , string2: , string3: , string4:  }
+2, { sa: 12, ia: 18, ib: 837, ic: 8, fa: 0.100000, da: 0.200000, ptr: (nil), char: a, string1: , string2: , string3: , string4:  }
+1, { sa: 12, ia: 18, ib: 837, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: a, string1: , string2: , string3: , string4:  }
+1, { sa: 12, ia: 18, ib: 837, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: a, string1: Hello, string2: , string3: , string4:  }
+1, { sa: 12, ia: 15, ib: 837, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: a, string1: Hello, string2: , string3: , string4:  }
+2, { sa: 12, ia: 15, ib: 837, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: h, string1: elllo, string2: , string3: , string4:  }
+1, { sa: 12, ia: 0, ib: 8, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: h, string1: elllo, string2: , string3: , string4:  }
+0, { sa: 12, ia: 0, ib: 8, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: h, string1: elllo, string2: , string3: , string4:  }
+4, { sa: 12, ia: 0, ib: 8, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: h, string1: e, string2: o, string3: l, string4: d }
+4, { sa: 12, ia: 0, ib: 8, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: h, string1: a, string2: e, string3: f, string4: dddddd }
+4, { sa: 12, ia: 0, ib: 8, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: h, string1: a, string2: e, string3: f, string4: dddddd }
+1, { sa: 12, ia: 0, ib: 8, ic: 8, fa: 0.100000, da: 0.200000, ptr: 0xabcdef, char: h, string1: testbbbb, string2: e, string3: f, string4: dddddd }
+3 "https" "//" "redox-os.org" ""

@@ -989,7 +989,7 @@ pub extern "C" fn herror(prefix: *const c_char) {
         str::from_utf8_unchecked(msg_cstr.to_bytes())
     };
 
-    let mut writer = platform::FileWriter(2);
+    let mut writer = platform::FileWriter::new(2);
     // Prefix is optional
     match unsafe { CStr::from_nullable_ptr(prefix) }
         .and_then(|prefix| str::from_utf8(prefix.to_bytes()).ok())

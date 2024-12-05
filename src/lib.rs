@@ -78,7 +78,7 @@ static ALLOCATOR: Allocator = NEWALLOCATOR;
 pub extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {
     use core::fmt::Write;
 
-    let mut w = platform::FileWriter(2);
+    let mut w = platform::FileWriter::new(2);
     let _ = w.write_fmt(format_args!("RELIBC PANIC: {}\n", pi));
 
     Sys::exit(1);
@@ -105,7 +105,7 @@ pub extern "C" fn rust_eh_personality() {}
 pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
     use core::fmt::Write;
 
-    let mut w = platform::FileWriter(2);
+    let mut w = platform::FileWriter::new(2);
     let _ = w.write_fmt(format_args!(
         "RELIBC OOM: {} bytes aligned to {} bytes\n",
         layout.size(),
@@ -122,7 +122,7 @@ pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
 pub extern "C" fn _Unwind_Resume() -> ! {
     use core::fmt::Write;
 
-    let mut w = platform::FileWriter(2);
+    let mut w = platform::FileWriter::new(2);
     let _ = w.write_str("_Unwind_Resume\n");
 
     Sys::exit(1);

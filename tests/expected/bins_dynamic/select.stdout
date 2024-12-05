@@ -1,0 +1,8 @@
+Testing select on file
+Is set before? 1
+Amount of things ready: 1
+Is set after? 1
+Testing select on pipe
+Is set before? 1
+Amount of things ready: 1
+Is set after? 1

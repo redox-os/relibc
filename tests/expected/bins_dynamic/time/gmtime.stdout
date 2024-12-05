@@ -1,0 +1,168 @@
+Unix epoch:
+  tm_sec    = 0
+  tm_min    = 0
+  tm_hour   = 0
+  tm_mday   = 1
+  tm_mon    = 0
+  tm_year   = 70
+  tm_wday   = 4
+  tm_yday   = 0
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC
+
+1970-03-01 00:00:00:
+  tm_sec    = 0
+  tm_min    = 0
+  tm_hour   = 0
+  tm_mday   = 1
+  tm_mon    = 2
+  tm_year   = 70
+  tm_wday   = 0
+  tm_yday   = 59
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC
+
+1970-12-31 23:59:59:
+  tm_sec    = 59
+  tm_min    = 59
+  tm_hour   = 23
+  tm_mday   = 31
+  tm_mon    = 11
+  tm_year   = 70
+  tm_wday   = 4
+  tm_yday   = 364
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC
+
+1972-02-29 23:59:59:
+  tm_sec    = 59
+  tm_min    = 59
+  tm_hour   = 23
+  tm_mday   = 29
+  tm_mon    = 1
+  tm_year   = 72
+  tm_wday   = 2
+  tm_yday   = 59
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC
+
+1972-12-31 23:59:59:
+  tm_sec    = 59
+  tm_min    = 59
+  tm_hour   = 23
+  tm_mday   = 31
+  tm_mon    = 11
+  tm_year   = 72
+  tm_wday   = 0
+  tm_yday   = 365
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC
+
+2000-02-29 23:59:59:
+  tm_sec    = 59
+  tm_min    = 59
+  tm_hour   = 23
+  tm_mday   = 29
+  tm_mon    = 1
+  tm_year   = 100
+  tm_wday   = 2
+  tm_yday   = 59
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC
+
+2000-12-31 23:59:59:
+  tm_sec    = 59
+  tm_min    = 59
+  tm_hour   = 23
+  tm_mday   = 31
+  tm_mon    = 11
+  tm_year   = 100
+  tm_wday   = 0
+  tm_yday   = 365
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC
+
+2100-03-01 00:00:00:
+  tm_sec    = 0
+  tm_min    = 0
+  tm_hour   = 0
+  tm_mday   = 1
+  tm_mon    = 2
+  tm_year   = 200
+  tm_wday   = 1
+  tm_yday   = 59
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC
+
+2100-12-31 23:59:59:
+  tm_sec    = 59
+  tm_min    = 59
+  tm_hour   = 23
+  tm_mday   = 31
+  tm_mon    = 11
+  tm_year   = 200
+  tm_wday   = 5
+  tm_yday   = 364
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC
+
+Year 2038, pre-i32 overflow:
+  tm_sec    = 7
+  tm_min    = 14
+  tm_hour   = 3
+  tm_mday   = 19
+  tm_mon    = 0
+  tm_year   = 138
+  tm_wday   = 2
+  tm_yday   = 18
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC
+
+Year 2038, post-i32 overflow:
+  tm_sec    = 8
+  tm_min    = 14
+  tm_hour   = 3
+  tm_mday   = 19
+  tm_mon    = 0
+  tm_year   = 138
+  tm_wday   = 2
+  tm_yday   = 18
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC
+
+Year 2106, pre-u32 overflow:
+  tm_sec    = 15
+  tm_min    = 28
+  tm_hour   = 6
+  tm_mday   = 7
+  tm_mon    = 1
+  tm_year   = 206
+  tm_wday   = 0
+  tm_yday   = 37
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC
+
+Year 2106, post-u32 overflow:
+  tm_sec    = 16
+  tm_min    = 28
+  tm_hour   = 6
+  tm_mday   = 7
+  tm_mon    = 1
+  tm_year   = 206
+  tm_wday   = 0
+  tm_yday   = 37
+  tm_isdst  = 0
+  tm_gmtoff = 0
+  tm_zone   = UTC

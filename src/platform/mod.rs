@@ -1,7 +1,7 @@
 //! Platform abstractions and environment.
 
 use crate::{
-    error::ResultExt,
+    error::{Errno, ResultExt},
     io::{self, Read, Write},
 };
 use alloc::{boxed::Box, vec::Vec};
@@ -86,13 +86,19 @@ impl<'a, W: WriteByte> WriteByte for &'a mut W {
     }
 }
 
-pub struct FileWriter(pub c_int);
+pub struct FileWriter(pub c_int, Option<Errno>);
 
 impl FileWriter {
-    pub fn write(&mut self, buf: &[u8]) -> isize {
-        Sys::write(self.0, buf)
-            .map(|u| u as isize)
-            .or_minus_one_errno()
+    pub fn new(fd: c_int) -> Self {
+        Self(fd, None)
+    }
+
+    pub fn write(&mut self, buf: &[u8]) -> fmt::Result {
+        let _ = Sys::write(self.0, buf).map_err(|err| {
+            self.1 = Some(err);
+            fmt::Error
+        })?;
+        Ok(())
     }
 }
 

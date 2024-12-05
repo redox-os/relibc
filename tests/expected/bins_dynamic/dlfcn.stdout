@@ -1,0 +1,6 @@
+add(22, 33) = 55
+puts from dlopened libc
+sharedlib: global_var == 42
+sharedlib: tls_var == 21
+main: global_var == 42
+main: tls_var == 21

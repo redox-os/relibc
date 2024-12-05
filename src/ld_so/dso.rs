@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     header::{errno::STR_ERROR, sys_mman},
-    platform::{types::c_void, ERRNO},
+    platform::{types::c_void, Pal, Sys, ERRNO},
 };
 use alloc::{
     collections::BTreeMap,
@@ -100,7 +100,11 @@ impl DSO {
             dependencies: elf.libraries.iter().map(|s| s.to_string()).collect(),
             init_array: init_array,
             fini_array: fini_array,
-            tls_module_id: tls_module_id,
+            tls_module_id: if tcb_master.is_some() {
+                tls_module_id
+            } else {
+                0
+            },
             tls_offset: tls_offset,
         };
         return Ok((dso, tcb_master));
@@ -215,7 +219,7 @@ impl DSO {
                     flags |= sys_mman::MAP_FIXED_NOREPLACE;
                 }
                 trace!("  mmap({:#x}, {:x}, {:x})", start, size, flags);
-                let ptr = sys_mman::mmap(
+                let ptr = Sys::mmap(
                     start as *mut c_void,
                     size,
                     //TODO: Make it possible to not specify PROT_EXEC on Redox
@@ -223,16 +227,9 @@ impl DSO {
                     flags,
                     -1,
                     0,
-                );
-                if ptr as usize == !0
-                /* MAP_FAILED */
-                {
-                    return Err(Error::Malformed(format!(
-                        "failed to map {}. errno: {}",
-                        path,
-                        STR_ERROR[ERRNO.get() as usize]
-                    )));
-                }
+                )
+                .map_err(|e| Error::Malformed(format!("failed to map {}. errno: {}", path, e.0)))?;
+
                 if start as *mut c_void != ptr::null_mut() {
                     assert_eq!(
                         ptr, start as *mut c_void,
@@ -425,7 +422,7 @@ impl DSO {
 impl Drop for DSO {
     fn drop(&mut self) {
         self.run_fini();
-        unsafe { sys_mman::munmap(self.mmap.as_mut_ptr() as *mut c_void, self.mmap.len()) };
+        unsafe { Sys::munmap(self.mmap.as_mut_ptr() as *mut c_void, self.mmap.len()) };
     }
 }
 

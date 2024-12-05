@@ -7,10 +7,12 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use generic_rt::ExpectTlsFree;
 
 use crate::{
     c_str::CStr,
     header::unistd,
+    ld_so::tcb::Master,
     platform::{get_auxv, get_auxvs, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
@@ -141,9 +143,24 @@ fn resolve_path_name(
     }
     None
 }
+
 // TODO: Make unsafe
 #[no_mangle]
-pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) -> usize {
+pub extern "C" fn relibc_ld_so_start(
+    sp: &'static mut Stack,
+    ld_entry: usize,
+    self_tls_start: usize,
+    self_tls_end: usize,
+) -> usize {
+    // Setup TCB for ourselves.
+    unsafe {
+        let tcb = Tcb::new(0).expect_notls("ld.so: failed to allocate bootstrap TCB");
+        tcb.activate();
+
+        #[cfg(target_os = "redox")]
+        redox_rt::signal::setup_sighandler(&tcb.os_specific);
+    }
+
     // We get the arguments, the environment, and the auxilary vector
     let (argv, envs, auxv) = unsafe {
         let argv_start = sp.argv() as *mut usize;
