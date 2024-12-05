@@ -22,7 +22,7 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
         (*ti).ti_module,
         (*ti).ti_offset,
         tcb.masters().unwrap().len(),
-        tcb.dtv_mut().len()
+        tcb.dtv_mut().unwrap().len()
     );
 
     if tcb.dtv_mut().unwrap_or_default().len() < tcb.masters().unwrap().len() {
@@ -52,17 +52,17 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
 
     let mut ptr = tcb.dtv_mut().unwrap()[dtv_index];
 
-    if cfg!(target_arch = "riscv64") {
-        ptr = ptr.add(0x800 + ti.ti_offset as usize); // dynamic offsets are 0x800-based on risc-v
-    } else {
-        ptr = ptr.add(ti.ti_offset as usize);
-    }
-
     if ptr.is_null() {
         panic!(
             "__tls_get_addr({ti:p}: {:#x}, {:#x})",
             ti.ti_module, ti.ti_offset
         );
+    }
+
+    if cfg!(target_arch = "riscv64") {
+        ptr = ptr.add(0x800 + ti.ti_offset as usize); // dynamic offsets are 0x800-based on risc-v
+    } else {
+        ptr = ptr.add(ti.ti_offset as usize);
     }
 
     ptr.cast::<c_void>()
