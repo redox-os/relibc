@@ -206,14 +206,20 @@ impl Linker {
                         continue;
                     }
 
+                    let dtv_idx = obj.tls_module_id - 1;
+
                     if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
                         // Below the TP
-                        tcb.dtv_mut().unwrap()[obj.tls_module_id - 1] =
-                            tcb_ptr.cast::<u8>().sub(obj.tls_offset);
+                        tcb.dtv_mut().unwrap()[dtv_idx] = tcb_ptr.cast::<u8>().sub(obj.tls_offset);
                     } else {
-                        // Above the TP
-                        tcb.dtv_mut().unwrap()[obj.tls_module_id - 1] =
-                            tcb_ptr.add(1).cast::<u8>().add(obj.tls_offset);
+                        // FIMXE(andypython): Make it above the TP
+                        //
+                        // tcb.dtv_mut().unwrap()[obj.tls_module_id - 1] =
+                        //     tcb_ptr.add(1).cast::<u8>().add(obj.tls_offset);
+                        //
+                        // FIXME(andypython): https://gitlab.redox-os.org/redox-os/relibc/-/merge_requests/570#note_35788
+                        tcb.dtv_mut().unwrap()[dtv_idx] =
+                            tcb.tls_end.sub(tcb.tls_len).add(obj.tls_offset);
                     }
                 }
 
