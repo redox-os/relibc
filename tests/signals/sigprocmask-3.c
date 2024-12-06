@@ -1,0 +1,110 @@
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "signals_list.h"
+#include "../test_helpers.h"
+
+int handler_called = 0;
+
+void sig_handler(int signo)
+{
+	(void) signo;
+	handler_called = 1;
+}
+
+int sigprocmask_block(int signum)
+{
+    int defaultsig = SIGALRM;
+    if (signum == SIGALRM) {
+        defaultsig = SIGHUP;
+    }
+	struct sigaction act;
+	sigset_t set1, set2, pending_set;
+	sigemptyset(&set1);
+	sigemptyset(&set2);
+	sigaddset(&set1, defaultsig);
+	sigaddset(&set2, signum);
+
+	act.sa_handler = sig_handler;
+	act.sa_flags = 0;
+	sigemptyset(&act.sa_mask);
+
+	if (sigaction(signum,  &act, 0) == -1) {
+		perror("Unexpected error while attempting to setup test "
+		       "pre-conditions");
+		exit(EXIT_FAILURE);
+	}
+
+
+    if (sigaction(defaultsig,  &act, 0) == -1) {
+        perror("Unexpected error while attempting to setup test "
+            "pre-conditions");
+        exit(EXIT_FAILURE);
+    }
+
+	if (sigprocmask(SIG_SETMASK, &set1, NULL) == -1) {
+		perror("Unexpected error while attempting to use sigprocmask.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (sigprocmask(SIG_UNBLOCK, &set2, NULL) == -1) {
+		perror("Unexpected error while attempting to use sigprocmask.\n");
+		exit(EXIT_FAILURE);
+	}
+
+    if (raise(signum) == -1) {
+		perror("Unexpected error while attempting to setup test "
+		       "pre-conditions");
+		exit(EXIT_FAILURE);
+	}
+
+	if (!handler_called) {
+		printf("FAIL: Handler was not called while it should have been\n");
+		exit(EXIT_FAILURE);
+	}
+    handler_called = 0;
+
+     if (raise(defaultsig) == -1) {
+		perror("Unexpected error while attempting to setup test "
+		       "pre-conditions");
+		exit(EXIT_FAILURE);
+	}
+
+    if (handler_called) {
+		printf("FAIL: signal was not blocked\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (sigpending(&pending_set) == -1) {
+		perror("Unexpected error while attempting to use sigpending\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (sigismember(&pending_set, defaultsig) != 1) {
+		perror("FAIL: sigismember did not return 1\n");
+		exit(EXIT_FAILURE);
+	}
+
+    if (sigismember(&pending_set, signum) != 0) {
+		perror("FAIL: sigismember did not return 0\n");
+		exit(EXIT_FAILURE);
+	}
+
+	printf("Test PASSED: signal was added to the process's signal mask\n");
+    act.sa_handler = SIG_IGN;
+    sigaction(signum, &act, 0);
+    sigaction(defaultsig, &act, 0);
+
+	return EXIT_SUCCESS;
+}
+
+int main(){
+    for (int i=1; i<N_SIGNALS; i++){
+		if (i == SIGKILL || i == SIGSTOP){
+			continue;
+		}
+		sigprocmask_block(i);
+	}
+	return 0;
+}
+
