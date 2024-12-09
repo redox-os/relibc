@@ -1,5 +1,7 @@
 //! dlfcn implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/dlfcn.h.html
 
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::{
     ptr, str,
     sync::atomic::{AtomicUsize, Ordering},
@@ -28,10 +30,12 @@ pub struct Dl_info {
 #[no_mangle]
 pub unsafe extern "C" fn dladdr(addr: *mut c_void, info: *mut Dl_info) -> c_int {
     //TODO
-    (*info).dli_fname = ptr::null();
-    (*info).dli_fbase = ptr::null_mut();
-    (*info).dli_sname = ptr::null();
-    (*info).dli_saddr = ptr::null_mut();
+    unsafe {
+        (*info).dli_fname = ptr::null();
+        (*info).dli_fbase = ptr::null_mut();
+        (*info).dli_sname = ptr::null();
+        (*info).dli_saddr = ptr::null_mut();
+    }
     0
 }
 
@@ -42,12 +46,14 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
     let filename = if cfilename.is_null() {
         None
     } else {
-        Some(str::from_utf8_unchecked(
-            CStr::from_ptr(cfilename).to_bytes(),
-        ))
+        unsafe {
+            Some(str::from_utf8_unchecked(
+                CStr::from_ptr(cfilename).to_bytes(),
+            ))
+        }
     };
 
-    let tcb = match Tcb::current() {
+    let tcb = match unsafe { Tcb::current() } {
         Some(tcb) => tcb,
         None => {
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
@@ -58,7 +64,7 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
         ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
         return ptr::null_mut();
     }
-    let mut linker = (&*tcb.linker_ptr).lock();
+    let mut linker = unsafe { (&*tcb.linker_ptr).lock() };
 
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
@@ -81,9 +87,9 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
         return ptr::null_mut();
     }
 
-    let symbol_str = str::from_utf8_unchecked(CStr::from_ptr(symbol).to_bytes());
+    let symbol_str = unsafe { str::from_utf8_unchecked(CStr::from_ptr(symbol).to_bytes()) };
 
-    let tcb = match Tcb::current() {
+    let tcb = match unsafe { Tcb::current() } {
         Some(tcb) => tcb,
         None => {
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
@@ -96,7 +102,7 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
         return ptr::null_mut();
     }
 
-    let linker = (&*tcb.linker_ptr).lock();
+    let linker = unsafe { (&*tcb.linker_ptr).lock() };
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
     match (cbs.get_sym)(&linker, handle as usize, symbol_str) {
@@ -110,7 +116,7 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
 
 #[no_mangle]
 pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
-    let tcb = match Tcb::current() {
+    let tcb = match unsafe { Tcb::current() } {
         Some(tcb) => tcb,
         None => {
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
@@ -122,7 +128,7 @@ pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
         ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
         return -1;
     };
-    let mut linker = (&*tcb.linker_ptr).lock();
+    let mut linker = unsafe { (&*tcb.linker_ptr).lock() };
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
     (cbs.unload)(&mut linker, handle as usize);
