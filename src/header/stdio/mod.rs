@@ -852,7 +852,7 @@ pub unsafe extern "C" fn perror(s: *const c_char) {
     } else {
         "Unknown error"
     };
-    let mut w = platform::FileWriter(2);
+    let mut w = platform::FileWriter::new(2);
 
     // The prefix, `s`, is optional (empty or NULL) according to the spec
     match CStr::from_nullable_ptr(s).and_then(|s_cstr| str::from_utf8(s_cstr.to_bytes()).ok()) {

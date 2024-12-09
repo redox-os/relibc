@@ -1,0 +1,33 @@
+0 and 0: 0
+1 and 0: 0
+0 and 1: 0
+1 and 1: 1
+0 and_eq 0: 0
+1 and_eq 0: 0
+0 and_eq 1: 0
+1 and_eq 1: 1
+a bitand b: 8
+a bitor b: 14
+compl a: 245
+not 0: 1
+not 1: 0
+0 not_eq 0: 0
+1 not_eq 0: 1
+0 not_eq 1: 0
+1 not_eq 1: 1
+0 or 0: 0
+1 or 0: 1
+0 or 1: 1
+1 or 1: 1
+0 or_eq 0: 0
+1 or_eq 0: 1
+0 or_eq 1: 1
+1 or_eq 1: 1
+0 xor 0: 0
+1 xor 0: 1
+0 xor 1: 1
+1 xor 1: 0
+0 xor_eq 0: 0
+1 xor_eq 0: 1
+0 xor_eq 1: 1
+1 xor_eq 1: 0

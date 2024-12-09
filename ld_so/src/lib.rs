@@ -81,7 +81,7 @@ pub unsafe extern "C" fn main(_argc: isize, _argv: *const *const i8) -> usize {
 
 #[linkage = "weak"]
 #[no_mangle]
-extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {
+extern "C" fn relibc_panic(_pi: &::core::panic::PanicInfo) -> ! {
     loop {}
 }
 

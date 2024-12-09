@@ -13,7 +13,7 @@ macro_rules! c_str {
 macro_rules! print {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
-        let _ = write!($crate::platform::FileWriter(1), $($arg)*);
+        let _ = write!($crate::platform::FileWriter::new(1), $($arg)*);
     });
 }
 
@@ -30,7 +30,7 @@ macro_rules! println {
 macro_rules! eprint {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
-        let _ = write!($crate::platform::FileWriter(2), $($arg)*);
+        let _ = write!($crate::platform::FileWriter::new(2), $($arg)*);
     });
 }
 
