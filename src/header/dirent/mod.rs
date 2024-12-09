@@ -1,5 +1,7 @@
 //! dirent implementation following http://pubs.opengroup.org/onlinepubs/009695399/basedefs/dirent.h.html
 
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use alloc::{boxed::Box, vec::Vec};
 use core::{mem, ptr};
 
@@ -145,7 +147,7 @@ const _: () = {
 
 #[no_mangle]
 pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
-    let path = CStr::from_ptr(path);
+    let path = unsafe { CStr::from_ptr(path) };
 
     DIR::new(path).or_errno_null_mut()
 }
@@ -192,7 +194,7 @@ pub extern "C" fn rewinddir(dir: &mut DIR) {
 
 #[no_mangle]
 pub unsafe extern "C" fn alphasort(first: *mut *const dirent, second: *mut *const dirent) -> c_int {
-    string::strcoll((**first).d_name.as_ptr(), (**second).d_name.as_ptr())
+    unsafe { string::strcoll((**first).d_name.as_ptr(), (**second).d_name.as_ptr()) }
 }
 
 #[no_mangle]
@@ -202,7 +204,7 @@ pub unsafe extern "C" fn scandir(
     filter: Option<extern "C" fn(_: *const dirent) -> c_int>,
     compare: Option<extern "C" fn(_: *mut *const dirent, _: *mut *const dirent) -> c_int>,
 ) -> c_int {
-    let dir = opendir(dirp);
+    let dir = unsafe { opendir(dirp) };
     if dir.is_null() {
         return -1;
     }
@@ -216,7 +218,7 @@ pub unsafe extern "C" fn scandir(
     platform::ERRNO.set(0);
 
     loop {
-        let entry: *mut dirent = readdir(&mut *dir);
+        let entry: *mut dirent = readdir(unsafe { &mut *dir });
         if entry.is_null() {
             break;
         }
@@ -227,17 +229,17 @@ pub unsafe extern "C" fn scandir(
             }
         }
 
-        let copy = platform::alloc(mem::size_of::<dirent>()) as *mut dirent;
+        let copy = unsafe { platform::alloc(mem::size_of::<dirent>()) } as *mut dirent;
         if copy.is_null() {
             break;
         }
-        ptr::write(copy, (*entry).clone());
+        unsafe { ptr::write(copy, (*entry).clone()) };
         if let Err(_) = vec.push(copy) {
             break;
         }
     }
 
-    closedir(Box::from_raw(dir));
+    closedir(unsafe { Box::from_raw(dir) });
 
     let len = vec.len();
     if let Err(_) = vec.shrink_to_fit() {
@@ -246,19 +248,23 @@ pub unsafe extern "C" fn scandir(
 
     if platform::ERRNO.get() != 0 {
         for ptr in &mut vec {
-            platform::free(*ptr as *mut c_void);
+            unsafe { platform::free(*ptr as *mut c_void) };
         }
         -1
     } else {
-        *namelist = vec.leak();
+        unsafe {
+            *namelist = vec.leak();
+        }
 
         platform::ERRNO.set(old_errno);
-        stdlib::qsort(
-            *namelist as *mut c_void,
-            len as size_t,
-            mem::size_of::<*mut dirent>(),
-            mem::transmute(compare),
-        );
+        unsafe {
+            stdlib::qsort(
+                *namelist as *mut c_void,
+                len as size_t,
+                mem::size_of::<*mut dirent>(),
+                mem::transmute(compare),
+            )
+        };
 
         len as c_int
     }
