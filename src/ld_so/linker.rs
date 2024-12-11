@@ -191,10 +191,60 @@ impl Linker {
 
         unsafe {
             if !dlopened {
+                #[cfg(target_os = "redox")]
+                let tcb = {
+                    use super::tcb::OsSpecific;
+                    use redox_rt::signal::tmp_disable_signals;
+
+                    let old_tcb = Tcb::current().expect("failed to get bootstrap TCB");
+                    let new_tcb = Tcb::new(self.tls_size)?; // This actually allocates TCB, TLS and ABI page.
+
+                    // Stash
+                    let new_tls_end = new_tcb.generic.tls_end;
+                    let new_tls_len = new_tcb.generic.tls_len;
+                    let new_tcb_ptr = new_tcb.generic.tcb_ptr;
+                    let new_tcb_len = new_tcb.generic.tcb_len;
+
+                    // Unmap just the TCB page.
+                    Sys::munmap(new_tcb as *mut Tcb as *mut c_void, syscall::PAGE_SIZE).unwrap();
+
+                    let new_addr = ptr::addr_of!(*new_tcb) as usize;
+
+                    assert_eq!(
+                        syscall::syscall5(
+                            syscall::SYS_MREMAP,
+                            old_tcb as *mut Tcb as usize,
+                            syscall::PAGE_SIZE,
+                            new_addr,
+                            syscall::PAGE_SIZE,
+                            (syscall::MremapFlags::FIXED | syscall::MremapFlags::KEEP_OLD).bits()
+                                | (syscall::MapFlags::PROT_READ | syscall::MapFlags::PROT_WRITE)
+                                    .bits(),
+                        )
+                        .expect("mremap: failed to alias TCB"),
+                        new_addr,
+                    );
+
+                    // New TCB is now at the same physical address as the old TCB.
+                    drop(old_tcb);
+
+                    let _guard = tmp_disable_signals();
+                    // Restore
+                    new_tcb.generic.tls_end = new_tls_end;
+                    new_tcb.generic.tls_len = new_tls_len;
+                    new_tcb.generic.tcb_ptr = new_tcb_ptr;
+                    new_tcb.generic.tcb_len = new_tcb_len;
+
+                    drop(_guard);
+                    new_tcb
+                };
+
+                #[cfg(not(target_os = "redox"))]
+                let tcb = Tcb::new(self.tls_size)?;
+
                 // We are now loading the main program or its dependencies. The TLS for all initially
                 // loaded objects reside in the static TLS block. Depending on the architecture, the
                 // static TLS block is either placed before the TP or after the TP.
-                let tcb = Tcb::new(self.tls_size)?;
                 let tcb_ptr = tcb as *mut Tcb;
 
                 // Setup the DTVs.
