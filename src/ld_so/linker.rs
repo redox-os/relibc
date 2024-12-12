@@ -192,7 +192,7 @@ impl Linker {
         unsafe {
             if !dlopened {
                 #[cfg(target_os = "redox")]
-                let tcb = {
+                let (tcb, old_tcb) = {
                     use super::tcb::OsSpecific;
                     use redox_rt::signal::tmp_disable_signals;
 
@@ -224,9 +224,7 @@ impl Linker {
                         .expect("mremap: failed to alias TCB"),
                         new_addr,
                     );
-
-                    // New TCB is now at the same physical address as the old TCB.
-                    drop(old_tcb);
+                    // XXX: New TCB is now at the same physical address as the old TCB.
 
                     let _guard = tmp_disable_signals();
                     // Restore
@@ -236,7 +234,7 @@ impl Linker {
                     new_tcb.generic.tcb_len = new_tcb_len;
 
                     drop(_guard);
-                    new_tcb
+                    (new_tcb, old_tcb as *mut Tcb as *mut c_void)
                 };
 
                 #[cfg(not(target_os = "redox"))]
@@ -277,6 +275,12 @@ impl Linker {
                 // Copy the master data into the static TLS block.
                 tcb.copy_masters()?;
                 tcb.activate();
+
+                #[cfg(target_os = "redox")]
+                {
+                    // Unmap the old TCB.
+                    Sys::munmap(old_tcb, syscall::PAGE_SIZE).unwrap();
+                }
             } else {
                 let tcb = Tcb::current().expect("failed to get current tcb");
 
