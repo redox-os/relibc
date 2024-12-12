@@ -22,6 +22,7 @@ EXPECT_NAMES=\
 	features \
 	fnmatch \
 	futimens \
+	glob \
 	iso646 \
 	libgen \
 	locale \
