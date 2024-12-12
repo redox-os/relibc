@@ -193,7 +193,6 @@ impl Linker {
             if !dlopened {
                 #[cfg(target_os = "redox")]
                 let (tcb, old_tcb) = {
-                    use super::tcb::OsSpecific;
                     use redox_rt::signal::tmp_disable_signals;
 
                     let old_tcb = Tcb::current().expect("failed to get bootstrap TCB");
