@@ -1,5 +1,7 @@
 //! fnmatch implementation
 
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use alloc::{borrow::Cow, vec::Vec};
 use core::slice;
 
@@ -41,21 +43,21 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Vec<(Token, Range)> 
     let mut tokens = Vec::new();
     let mut leading = true;
 
-    while *pattern != 0 {
+    while unsafe { *pattern != 0 } {
         let was_leading = leading;
         leading = false;
 
-        let c = *pattern;
-        pattern = pattern.offset(1);
+        let c = unsafe { *pattern };
+        pattern = unsafe { pattern.offset(1) };
 
         tokens.push(match c {
             b'\\' if flags & FNM_NOESCAPE == FNM_NOESCAPE => {
-                let c = *pattern;
+                let c = unsafe { *pattern };
                 if c == 0 {
                     // Trailing backslash. Maybe error here?
                     break;
                 }
-                pattern = pattern.offset(1);
+                pattern = unsafe { pattern.offset(1) };
                 leading = is_leading(flags, c);
                 (Token::Char(c), ONCE)
             }
@@ -63,24 +65,24 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Vec<(Token, Range)> 
             b'*' => (any(was_leading, flags), Range(0, None)),
             b'[' => {
                 let mut list: Vec<Collation> = Vec::new();
-                let invert = if *pattern == b'!' {
-                    pattern = pattern.offset(1);
+                let invert = if unsafe { *pattern == b'!' } {
+                    pattern = unsafe { pattern.offset(1) };
                     true
                 } else {
                     false
                 };
 
                 loop {
-                    let mut c = *pattern;
+                    let mut c = unsafe { *pattern };
                     if c == 0 {
                         break;
                     }
-                    pattern = pattern.offset(1);
+                    pattern = unsafe { pattern.offset(1) };
                     match c {
                         b']' => break,
                         b'\\' => {
-                            c = *pattern;
-                            pattern = pattern.offset(1);
+                            c = unsafe { *pattern };
+                            pattern = unsafe { pattern.offset(1) };
                             if c == 0 {
                                 // Trailing backslash. Maybe error?
                                 break;
@@ -88,9 +90,9 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Vec<(Token, Range)> 
                         }
                         _ => (),
                     }
-                    if *pattern == b'-' && *pattern.offset(1) != 0 {
-                        let end = *pattern.offset(1);
-                        pattern = pattern.offset(2);
+                    if unsafe { *pattern == b'-' && *pattern.offset(1) != 0 } {
+                        let end = unsafe { *pattern.offset(1) };
+                        pattern = unsafe { pattern.offset(2) };
                         for c in c..=end {
                             if can_push(was_leading, flags, c) {
                                 list.push(Collation::Char(c));
@@ -121,12 +123,12 @@ pub unsafe extern "C" fn fnmatch(
     flags: c_int,
 ) -> c_int {
     let mut len = 0;
-    while *input.offset(len) != 0 {
+    while unsafe { *input.offset(len) != 0 } {
         len += 1;
     }
-    let input = slice::from_raw_parts(input as *const u8, len as usize);
+    let input = unsafe { slice::from_raw_parts(input as *const u8, len as usize) };
 
-    let mut tokens = tokenize(pattern as *const u8, flags);
+    let mut tokens = unsafe { tokenize(pattern as *const u8, flags) };
     tokens.push((Token::End, ONCE));
 
     if PosixRegex::new(Cow::Owned(vec![tokens]))
