@@ -25,7 +25,7 @@ pub mod float;
 pub mod fnmatch;
 // TODO: ftw.h
 pub mod getopt;
-// TODO: glob.h
+pub mod glob;
 pub mod grp;
 // TODO: iconv.h
 pub mod inttypes;

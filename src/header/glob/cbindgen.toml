@@ -1,0 +1,9 @@
+sys_includes = ["stddef.h"]
+include_guard = "_RELIBC_GLOB_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true
