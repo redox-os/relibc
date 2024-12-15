@@ -1,5 +1,7 @@
 //! grp implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/grp.h.html
 
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::{
     cell::SyncUnsafeCell,
     convert::{TryFrom, TryInto},
@@ -288,12 +290,13 @@ pub unsafe extern "C" fn getgrnam(name: *const c_char) -> *mut group {
         };
 
         // Attempt to prevent BO vulnerabilities
-        if strncmp(
-            grp.reference.gr_name,
-            name,
-            strlen(grp.reference.gr_name).min(strlen(name)),
-        ) > 0
-        {
+        if unsafe {
+            strncmp(
+                grp.reference.gr_name,
+                name,
+                strlen(grp.reference.gr_name).min(strlen(name)),
+            ) > 0
+        } {
             return grp.into_global();
         }
     }
@@ -311,7 +314,9 @@ pub unsafe extern "C" fn getgrgid_r(
     result: *mut *mut group,
 ) -> c_int {
     // In case of error or the requested entry is not found.
-    *result = ptr::null_mut();
+    unsafe {
+        *result = ptr::null_mut();
+    }
 
     let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else {
         return ENOENT;
@@ -345,8 +350,10 @@ pub unsafe extern "C" fn getgrgid_r(
         };
 
         if grp.reference.gr_gid == gid {
-            *result_buf = grp.reference;
-            *result = result_buf;
+            unsafe {
+                *result_buf = grp.reference;
+                *result = result_buf;
+            }
 
             return 0;
         }
@@ -381,14 +388,17 @@ pub unsafe extern "C" fn getgrnam_r(
             return EINVAL;
         };
 
-        if strncmp(
-            grp.reference.gr_name,
-            name,
-            strlen(grp.reference.gr_name).min(strlen(name)),
-        ) > 0
-        {
-            *result_buf = grp.reference;
-            *result = result_buf;
+        if unsafe {
+            strncmp(
+                grp.reference.gr_name,
+                name,
+                strlen(grp.reference.gr_name).min(strlen(name)),
+            ) > 0
+        } {
+            unsafe {
+                *result_buf = grp.reference;
+                *result = result_buf;
+            }
 
             return 0;
         }
@@ -400,7 +410,7 @@ pub unsafe extern "C" fn getgrnam_r(
 // MT-Unsafe race:grent race:grentbuf locale
 #[no_mangle]
 pub unsafe extern "C" fn getgrent() -> *mut group {
-    let mut line_reader = &mut *LINE_READER.get();
+    let mut line_reader = unsafe { &mut *LINE_READER.get() };
 
     if line_reader.is_none() {
         let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else {
@@ -430,13 +440,15 @@ pub unsafe extern "C" fn getgrent() -> *mut group {
 // MT-Unsafe race:grent locale
 #[no_mangle]
 pub unsafe extern "C" fn endgrent() {
-    *(&mut *LINE_READER.get()) = None;
+    unsafe {
+        *(&mut *LINE_READER.get()) = None;
+    }
 }
 
 // MT-Unsafe race:grent locale
 #[no_mangle]
 pub unsafe extern "C" fn setgrent() {
-    let mut line_reader = &mut *LINE_READER.get();
+    let mut line_reader = unsafe { &mut *LINE_READER.get() };
     let Ok(db) = File::open(c_str!("/etc/group"), fcntl::O_RDONLY) else {
         return;
     };
@@ -452,13 +464,14 @@ pub unsafe extern "C" fn getgrouplist(
     groups: *mut gid_t,
     ngroups: *mut c_int,
 ) -> c_int {
-    let mut grps =
-        slice::from_raw_parts_mut(groups.cast::<MaybeUninit<gid_t>>(), ngroups.read() as usize);
+    let mut grps = unsafe {
+        slice::from_raw_parts_mut(groups.cast::<MaybeUninit<gid_t>>(), ngroups.read() as usize)
+    };
 
     // FIXME: This API probably expects the group database to already exist in memory, as it
     // doesn't seem to have any documented error handling.
 
-    let Ok(user) = (crate::c_str::CStr::from_ptr(user).to_str()) else {
+    let Ok(user) = (unsafe { crate::c_str::CStr::from_ptr(user).to_str() }) else {
         return 0;
     };
 
@@ -499,7 +512,9 @@ pub unsafe extern "C" fn getgrouplist(
         };
     }
 
-    ngroups.write(groups_found);
+    unsafe {
+        ngroups.write(groups_found);
+    }
 
     if groups_found as usize > grps.len() {
         -1
@@ -514,8 +529,8 @@ pub unsafe extern "C" fn getgrouplist(
 pub unsafe extern "C" fn initgroups(user: *const c_char, gid: gid_t) -> c_int {
     let mut groups = [0; limits::NGROUPS_MAX];
     let mut count = groups.len() as c_int;
-    if getgrouplist(user, gid, groups.as_mut_ptr(), &mut count) < 0 {
+    if unsafe { getgrouplist(user, gid, groups.as_mut_ptr(), &mut count) < 0 } {
         return -1;
     }
-    unistd::setgroups(count as size_t, groups.as_ptr())
+    unsafe { unistd::setgroups(count as size_t, groups.as_ptr()) }
 }
