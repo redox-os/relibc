@@ -19,7 +19,13 @@ use crate::{
     ALLOCATOR,
 };
 
-use super::{access::accessible, debug::_r_debug, linker::Linker, tcb::Tcb, PATH_SEP};
+use super::{
+    access::accessible,
+    debug::_r_debug,
+    linker::{Config, Linker},
+    tcb::Tcb,
+    PATH_SEP,
+};
 use crate::header::sys_auxv::{AT_ENTRY, AT_PHDR};
 use goblin::elf::header::header64::SIZEOF_EHDR;
 
@@ -248,7 +254,7 @@ pub extern "C" fn relibc_ld_so_start(
         }
         base
     };
-    let mut linker = Linker::new(ld_library_path);
+    let mut linker = Linker::new(Config::from_env(&envs));
     let entry = match linker.load_program(&path, base_addr) {
         Ok(entry) => entry,
         Err(err) => {
