@@ -155,7 +155,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         // Set linker pointer if necessary
         if tcb.linker_ptr.is_null() {
             //TODO: get ld path
-            let linker = Linker::new(None);
+            let linker = Linker::new(ld_so::linker::Config::default());
             //TODO: load root object
             tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
         }

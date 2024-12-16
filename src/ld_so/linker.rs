@@ -68,8 +68,55 @@ impl Symbol {
     }
 }
 
+bitflags::bitflags! {
+    #[derive(Debug, Default)]
+    pub struct DebugFlags: u32 {
+        /// Displays what objects and where they are being loaded.
+        const BASE_ADDRESS = 1 << 1;
+        /// Displays library search paths.
+        const SEARCH = 1 << 2;
+    }
+}
+
+#[derive(Default)]
+pub struct Config {
+    debug_flags: DebugFlags,
+    library_path: Option<String>,
+}
+
+impl Config {
+    pub fn from_env(env: &BTreeMap<String, String>) -> Self {
+        let debug_flags = env
+            .get("LD_DEBUG")
+            .map(|value| {
+                let mut flags = DebugFlags::empty();
+                for opt in value.split(',') {
+                    flags |= match opt {
+                        "baseaddr" => DebugFlags::BASE_ADDRESS,
+                        "search" => DebugFlags::SEARCH,
+                        _ => {
+                            eprintln!("[ld.so]: unknown debug flag '{}'", opt);
+                            DebugFlags::empty()
+                        }
+                    };
+                }
+
+                flags
+            })
+            .unwrap_or(DebugFlags::empty());
+
+        let library_path = env.get("LD_LIBRARY_PATH").cloned();
+
+        Self {
+            debug_flags,
+            library_path,
+        }
+    }
+}
+
 pub struct Linker {
-    ld_library_path: Option<String>,
+    config: Config,
+
     next_object_id: usize,
     next_tls_module_id: usize,
     tls_size: usize,
@@ -81,9 +128,9 @@ pub struct Linker {
 const root_id: usize = 1;
 
 impl Linker {
-    pub fn new(ld_library_path: Option<String>) -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
-            ld_library_path,
+            config,
             next_object_id: root_id,
             next_tls_module_id: 1,
             tls_size: 0,
@@ -323,7 +370,7 @@ impl Linker {
             return Ok(());
         }
 
-        let path = Linker::search_object(name, &self.ld_library_path, parent_runpath)?;
+        let path = self.search_object(name, parent_runpath)?;
         let data = Linker::read_file(&path)?;
         let (obj, tcb_master) = DSO::new(
             &path,
@@ -334,11 +381,15 @@ impl Linker {
             self.next_tls_module_id,
             self.tls_size,
         )?;
-        trace!(
-            "[ldso] loading object: {} at {:#x}",
-            name,
-            obj.mmap.as_ptr() as usize
-        );
+
+        if self.config.debug_flags.contains(DebugFlags::BASE_ADDRESS) {
+            eprintln!(
+                "[ld.so]: loading object: {} at {:#x}",
+                name,
+                obj.mmap.as_ptr() as usize
+            );
+        }
+
         new_objects.push(obj);
         objects_data.push(data);
 
@@ -373,31 +424,45 @@ impl Linker {
     }
 
     fn search_object(
+        &self,
         name: &str,
-        ld_library_path: &Option<String>,
         parent_runpath: &Option<String>,
     ) -> Result<String> {
+        let debug = self.config.debug_flags.contains(DebugFlags::SEARCH);
+        if debug {
+            eprintln!("[ld.so]: looking for '{}'", name);
+        }
+
         let mut full_path = name.to_string();
         if accessible(&full_path, F_OK).is_ok() {
+            if debug {
+                eprintln!("[ld.so]: found at '{}'!", full_path);
+            }
             return Ok(full_path);
         } else {
             let mut search_paths = Vec::new();
             if let Some(runpath) = parent_runpath {
                 search_paths.extend(runpath.split(PATH_SEP));
             }
-            if let Some(ld_path) = ld_library_path {
+            if let Some(ld_path) = self.config.library_path.as_ref() {
                 search_paths.extend(ld_path.split(PATH_SEP));
             }
             search_paths.push("/lib");
             for part in search_paths.iter() {
                 full_path = format!("{}/{}", part, name);
-                trace!("trying path {}", full_path);
+                if debug {
+                    eprintln!("[ld.so]: trying path '{}'", full_path);
+                }
                 if accessible(&full_path, F_OK).is_ok() {
+                    if debug {
+                        eprintln!("[ld.so]: found at '{}'!", full_path);
+                    }
                     return Ok(full_path);
                 }
             }
         }
-        return Err(Error::Malformed(format!("failed to locate '{}'", name)));
+
+        Err(Error::Malformed(format!("failed to locate '{}'", name)))
     }
 
     fn read_file(path: &str) -> Result<Vec<u8>> {
