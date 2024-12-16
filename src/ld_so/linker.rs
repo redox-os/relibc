@@ -423,11 +423,7 @@ impl Linker {
         return Ok(());
     }
 
-    fn search_object(
-        &self,
-        name: &str,
-        parent_runpath: &Option<String>,
-    ) -> Result<String> {
+    fn search_object(&self, name: &str, parent_runpath: &Option<String>) -> Result<String> {
         let debug = self.config.debug_flags.contains(DebugFlags::SEARCH);
         if debug {
             eprintln!("[ld.so]: looking for '{}'", name);
