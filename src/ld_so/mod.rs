@@ -1,5 +1,9 @@
 //! Dynamic loading and linking.
 
+// FIXME(andypython): remove this when #![allow(warnings, unused_variables)] is
+// dropped from src/lib.rs.
+#![warn(warnings, unused_variables)]
+
 use core::{mem, ptr};
 use goblin::elf::program_header::{self, program_header32, program_header64, ProgramHeader};
 
