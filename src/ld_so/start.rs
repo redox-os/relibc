@@ -39,7 +39,6 @@ unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
             _ => {
                 eprintln!("ld.so: failed to parse argv[{}]", argv.len());
                 unistd::_exit(1);
-                loop {}
             }
         }
         ptr = ptr.add(1);
@@ -224,7 +223,6 @@ pub extern "C" fn relibc_ld_so_start(
         if sp.argc < 2 {
             eprintln!("ld.so [executable] [arguments...]");
             unistd::_exit(1);
-            loop {}
         }
         unsafe { adjust_stack(sp) };
         argv[1].to_string()
@@ -232,12 +230,11 @@ pub extern "C" fn relibc_ld_so_start(
         argv[0].to_string()
     };
 
-    let (path, name) = match resolve_path_name(&name_or_path, &envs) {
+    let (path, _name) = match resolve_path_name(&name_or_path, &envs) {
         Some((p, n)) => (p, n),
         None => {
             eprintln!("ld.so: failed to locate '{}'", name_or_path);
             unistd::_exit(1);
-            loop {}
         }
     };
 
@@ -260,7 +257,6 @@ pub extern "C" fn relibc_ld_so_start(
         Err(err) => {
             eprintln!("ld.so: failed to link '{}': {}", path, err);
             unistd::_exit(1);
-            loop {}
         }
     };
     if let Some(tcb) = unsafe { Tcb::current() } {
