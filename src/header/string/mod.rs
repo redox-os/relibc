@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/string.h.html>.
 
-use core::{iter::once, mem, ptr, slice, usize};
+use core::{iter::once, mem::{self, MaybeUninit}, ptr, slice, usize};
 
 use cbitset::BitSet256;
 
@@ -80,18 +80,20 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memcpy.html>.
+///
+/// # Safety
+/// The caller must ensure that:
+/// - `s1` is convertible to a `&mut [MaybeUninit<u8>]` with length `n`, and
+/// - `s2` is convertible to a `&[u8]` with length `n`.
 #[no_mangle]
 pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -> *mut c_void {
-    let mut i = 0;
-    while i + 7 < n {
-        *(s1.add(i) as *mut u64) = *(s2.add(i) as *const u64);
-        i += 8;
-    }
-    while i < n {
-        *(s1 as *mut u8).add(i) = *(s2 as *const u8).add(i);
-        i += 1;
-    }
-    s1
+    // SAFETY: the caller is required to ensure that the provided pointers are
+    // valid. The slices are required to have a length of at most isize::MAX;
+    // this implicitly ensured by requiring valid pointers to two
+    // nonoverlapping slices.
+    let s1_slice = unsafe { slice::from_raw_parts_mut(s1.cast::<MaybeUninit<u8>>(), n) };
+    let s2_slice = unsafe { slice::from_raw_parts(s2.cast::<u8>(), n) };
+    MaybeUninit::copy_from_slice(s1_slice, s2_slice).as_mut_ptr().cast()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memmem.html>.
