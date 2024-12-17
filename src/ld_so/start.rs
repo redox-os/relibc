@@ -12,7 +12,6 @@ use generic_rt::ExpectTlsFree;
 use crate::{
     c_str::CStr,
     header::unistd,
-    ld_so::tcb::Master,
     platform::{get_auxv, get_auxvs, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
@@ -207,12 +206,7 @@ pub extern "C" fn relibc_ld_so_start(
     }
 
     // TODO: Fix memory leak, although minimal.
-    unsafe {
-        crate::platform::init(auxv.clone());
-    }
-
-    // Some variables that will be overridden by environment and auxiliary vectors
-    let ld_library_path = envs.get("LD_LIBRARY_PATH").map(|s| s.to_owned());
+    crate::platform::init(auxv.clone());
 
     let name_or_path = if is_manual {
         // ld.so is run directly by user and not via execve() or similar systemcall
