@@ -150,12 +150,7 @@ fn resolve_path_name(
 
 // TODO: Make unsafe
 #[no_mangle]
-pub extern "C" fn relibc_ld_so_start(
-    sp: &'static mut Stack,
-    ld_entry: usize,
-    self_tls_start: usize,
-    self_tls_end: usize,
-) -> usize {
+pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) -> usize {
     // Setup TCB for ourselves.
     unsafe {
         let tcb = Tcb::new(0).expect_notls("ld.so: failed to allocate bootstrap TCB");
