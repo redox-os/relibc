@@ -1,4 +1,6 @@
-export TARGET?=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
+ifndef TARGET
+	export TARGET:=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
+endif
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
