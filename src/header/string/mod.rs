@@ -2,7 +2,11 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/string.h.html>.
 
-use core::{iter::once, mem::{self, MaybeUninit}, ptr, slice, usize};
+use core::{
+    iter::once,
+    mem::{self, MaybeUninit},
+    ptr, slice, usize,
+};
 
 use cbitset::BitSet256;
 
@@ -93,7 +97,9 @@ pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -
     // nonoverlapping slices.
     let s1_slice = unsafe { slice::from_raw_parts_mut(s1.cast::<MaybeUninit<u8>>(), n) };
     let s2_slice = unsafe { slice::from_raw_parts(s2.cast::<u8>(), n) };
-    MaybeUninit::copy_from_slice(s1_slice, s2_slice).as_mut_ptr().cast()
+    MaybeUninit::copy_from_slice(s1_slice, s2_slice)
+        .as_mut_ptr()
+        .cast()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memmem.html>.
