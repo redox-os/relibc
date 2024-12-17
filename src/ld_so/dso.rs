@@ -147,8 +147,8 @@ impl DSO {
                 Some(entry) => {
                     let runpath = elf
                         .dynstrtab
-                        .get(entry.d_val as usize)
-                        .ok_or(Error::Malformed("Missing RUNPATH in dynstrtab".to_string()))??;
+                        .get_at(entry.d_val as usize)
+                        .ok_or(Error::Malformed("Missing RUNPATH in dynstrtab".to_string()))?;
                     let base = dirname(path);
                     return Ok(Some(runpath.replace("$ORIGIN", &base)));
                 }
@@ -361,8 +361,8 @@ impl DSO {
             }
             let name: String;
             let value: Symbol;
-            if let Some(name_res) = elf.dynstrtab.get(sym.st_name) {
-                name = name_res?.to_string();
+            if let Some(name_res) = elf.dynstrtab.get_at(sym.st_name) {
+                name = name_res.to_string();
                 value = if is_pie_enabled(elf) {
                     Symbol {
                         base: mmap.as_ptr() as usize,

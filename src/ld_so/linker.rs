@@ -509,11 +509,11 @@ impl Linker {
                     let mut t = 0;
                     let name =
                         elf.dynstrtab
-                            .get(sym.st_name)
+                            .get_at(sym.st_name)
                             .ok_or(Error::Malformed(format!(
                                 "missing name for symbol {:?}",
                                 sym
-                            )))??;
+                            )))?;
                     let mut symbol = None;
                     let mut found = false;
                     let lookup_start = match rel.r_type {
