@@ -31,7 +31,7 @@ use super::{
     debug::{RTLDState, _dl_debug_state, _r_debug},
     dso::{is_pie_enabled, DSO},
     tcb::{Master, Tcb},
-    ExpectTlsFree, PATH_SEP,
+    PATH_SEP,
 };
 
 /// Same as [`crate::fs::File`], but does not touch [`crate::platform::ERRNO`] as the dynamic

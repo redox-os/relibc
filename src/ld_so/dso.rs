@@ -4,8 +4,8 @@ use super::{
     tcb::Master,
 };
 use crate::{
-    header::{errno::STR_ERROR, sys_mman},
-    platform::{types::c_void, Pal, Sys, ERRNO},
+    header::sys_mman,
+    platform::{types::c_void, Pal, Sys},
 };
 use alloc::{
     collections::BTreeMap,
