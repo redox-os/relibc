@@ -937,3 +937,36 @@ __plt_resolve_trampoline:
 ",
     __plt_resolve_inner = sym __plt_resolve_inner
 );
+
+#[cfg(target_arch = "x86")]
+core::arch::global_asm!(
+    "
+.global __plt_resolve_trampoline
+.hidden __plt_resolve_trampoline
+__plt_resolve_trampoline:
+    ud2
+.size __plt_resolve_trampoline, . - __plt_resolve_trampoline
+    "
+);
+
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    "
+.global __plt_resolve_trampoline
+.hidden __plt_resolve_trampoline
+__plt_resolve_trampoline:
+    udf #0
+.size __plt_resolve_trampoline, . - __plt_resolve_trampoline
+    "
+);
+
+#[cfg(target_arch = "riscv64")]
+core::arch::global_asm!(
+    "
+.global __plt_resolve_trampoline
+.hidden __plt_resolve_trampoline
+__plt_resolve_trampoline:
+    unimp
+.size __plt_resolve_trampoline, . - __plt_resolve_trampoline
+    "
+);
