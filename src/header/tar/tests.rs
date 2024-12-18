@@ -60,10 +60,8 @@ mod tests {
     #[test]
     fn test_invalid_checksum() {
         let mut header = TarHeader::default();
-
         // Set chksum to something invalid
         header.chksum = *b"99999999"; // Not a valid octal, likely fails
-        
         assert!(header.validate().is_err());
     }
 
