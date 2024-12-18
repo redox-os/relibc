@@ -1,10 +1,20 @@
-/// tar.h implementation for Redox, following https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/tar.h.html
+//! tar.h implementation for Redox, following POSIX.1-1990 specification
+//!  and https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/tar.h.html
+
+//!
+//! This module provides functionality for working with tar archives, including
+//! header creation, validation, and manipulation. It implements the POSIX.1-1990
+//! ustar format.
+
 use core::slice;
 
-/// Archive block size
-pub const BLOCKSIZE: usize = 512; // Block size in bytes
+#[cfg(test)]
+mod tests;
 
-/// Default record size (512 blocks)
+/// Block size for tar archives (512 bytes).
+pub const BLOCKSIZE: usize = 512;
+
+/// Default record size for tar archives (10KB, consisting of 20 blocks).
 pub const RECORDSIZE: usize = BLOCKSIZE * 20; // 10KB (default for tar archives)
 
 /// Field lengths in tar headers
@@ -67,31 +77,13 @@ pub const GNUTYPE_LONGNAME: u8 = b'L'; // Long file name
 pub const GNUTYPE_LONGLINK: u8 = b'K'; // Long link name
 pub const GNUTYPE_SPARSE: u8 = b'S'; // Sparse file
 
-pub struct TarHeaderBuilder {
-    header: TarHeader,
-}
-
-impl TarHeaderBuilder {
-    pub fn new() -> Self {
-        let mut header = TarHeader::default();
-        header.magic.copy_from_slice(TMAGIC.as_bytes());
-        header.version.copy_from_slice(TVERSION.as_bytes());
-        Self { header }
-    }
-
-    pub fn name(mut self, name: &str) -> Result<Self, TarError> {
-        self.header.name = TarHeader::to_null_terminated_field::<NAME_SIZE>(name)?;
-        Ok(self)
-    }
-
-    pub fn build(self) -> TarHeader {
-        self.header
-    }
-}
-
+/// Represents a tar archive header following the POSIX ustar format.
+///
+/// The header contains metadata about a file in a tar archive, including
+/// its name, size, permissions, and other attributes. All text fields are
+/// null-terminated.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-/// tar header structure, from POSIX 1003.1-1990.
 pub struct TarHeader {
     // Byte offset - usage
     pub name: [u8; NAME_SIZE],         // 0   - File name
@@ -113,9 +105,42 @@ pub struct TarHeader {
     pub padding: [u8; 12],             // 500 - Padding to make 512 bytes
 }
 
+pub struct TarHeaderBuilder {
+    header: TarHeader,
+}
+
+impl TarHeaderBuilder {
+    /// Creates a new `TarHeaderBuilder` with default values.
+    pub fn new() -> Self {
+        let mut header = TarHeader::default();
+        header.magic.copy_from_slice(TMAGIC.as_bytes());
+        header.version.copy_from_slice(TVERSION.as_bytes());
+        Self { header }
+    }
+
+    /// Sets the name field in the tar header.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - A string slice that holds the name of the file.
+    ///
+    /// # Errors
+    ///
+    /// Returns `TarError::FieldTooLong` if the name exceeds the maximum allowed length.
+    pub fn name(mut self, name: &str) -> Result<Self, TarError> {
+        self.header.name = TarHeader::to_null_terminated_field::<NAME_SIZE>(name)?;
+        Ok(self)
+    }
+
+    /// Builds and returns the `TarHeader`.
+    pub fn build(self) -> TarHeader {
+        self.header
+    }
+}
+
 impl Default for TarHeader {
     fn default() -> Self {
-        Self {
+        let mut header = Self {
             name: [0; NAME_SIZE],
             mode: [0; MODE_SIZE],
             uid: [0; UID_SIZE],
@@ -133,60 +158,114 @@ impl Default for TarHeader {
             devminor: [0; DEVMINOR_SIZE],
             prefix: [0; PREFIX_SIZE],
             padding: [0; 12],
+        };
+
+        // Set default magic and version
+        let magic_bytes = TMAGIC.as_bytes(); // "ustar"
+        header.magic[..magic_bytes.len()].copy_from_slice(magic_bytes);
+
+        // POSIX ustar magic expects a trailing null
+        // TMAGIC = "ustar" (5 chars) + '\0' = 6 chars total
+        if TMAGLEN == 6 {
+            header.magic[5] = 0;
         }
+
+        // Set the version field to "00"
+        let version_bytes = TVERSION.as_bytes(); // "00"
+        header.version[..version_bytes.len()].copy_from_slice(version_bytes);
+
+        header
     }
 }
 
 impl TarHeader {
-    /// Converts a byte array field to a string, trimming null bytes.
+    /// Converts a byte array field to a UTF-8 string, trimming null bytes.
+    ///
+    /// # Returns
+    ///
+    /// * `Some(&str)` - If the field contains valid UTF-8 data
+    /// * `None` - If the field contains invalid UTF-8 data
     pub fn to_str(field: &[u8]) -> Option<&str> {
         let end = field.iter().position(|&b| b == 0).unwrap_or(field.len());
         core::str::from_utf8(&field[..end]).ok()
     }
 
-    /// Converts a string to a null-terminated byte array for a field.
+    /// Converts a string to a null-terminated byte array suitable for a tar header field.
+    ///
+    /// # Arguments
+    ///
+    /// * `s` - The string to convert
+    ///
+    /// # Returns
+    ///
+    /// * `Ok([u8; N])` - The null-terminated byte array
+    /// * `Err(TarError)` - If the string is too long for the field
     pub fn to_null_terminated_field<const N: usize>(s: &str) -> Result<[u8; N], TarError> {
         let mut field = [0u8; N];
         let bytes = s.as_bytes();
-        if bytes.len() >= N {
+
+        // Reserve one byte for the null terminator
+        if bytes.len() + 1 > N {
             return Err(TarError::FieldTooLong);
         }
+
         field[..bytes.len()].copy_from_slice(bytes);
+        field[bytes.len()] = 0; // Null terminator
+
         Ok(field)
     }
 
-    /// Validate the checksum
+    /// Calculates the checksum of the header according to the POSIX specification.
+    ///
+    /// The checksum is calculated by summing all bytes in the header, with the
+    /// checksum field itself treated as eight spaces (ASCII 32).
+    ///
+    /// # Returns
+    ///
+    /// The calculated checksum value
+    pub fn calculate_checksum(&self) -> usize {
+        let mut header_copy = *self;
+        // Replace chksum field with spaces
+        header_copy.chksum.fill(b' ');
+
+        let bytes =
+            unsafe { slice::from_raw_parts(&header_copy as *const _ as *const u8, HEADER_SIZE) };
+
+        bytes.iter().map(|&b| b as usize).sum()
+    }
+
+    /// Validates the header's stored checksum against a calculated checksum.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` - If the checksum is valid
+    /// * `Err(TarError)` - If the checksum is invalid or malformed
     pub fn validate(&self) -> Result<(), TarError> {
-        let recorded_checksum = match TarHeader::to_str(&self.chksum) {
-            Some(cs) => {
-                usize::from_str_radix(cs.trim_end(), 8).map_err(|_| TarError::InvalidChecksum)?
-            }
+        let recorded_str = match TarHeader::to_str(&self.chksum) {
+            Some(cs) => cs.trim_end(),
             None => return Err(TarError::InvalidChecksum),
         };
 
-        // Calculate actual checksum
-        let mut header_copy = *self;
+        let recorded_checksum =
+            usize::from_str_radix(recorded_str, 8).map_err(|_| TarError::InvalidChecksum)?;
 
-        // Set checksum field to spaces for calculation
-        header_copy.chksum.fill(b' ');
-
-        let actual_checksum: usize = unsafe {
-            core::slice::from_raw_parts(&header_copy as *const _ as *const u8, HEADER_SIZE)
-        }
-        .iter()
-        .map(|&x| x as usize)
-        .sum();
-
+        let actual_checksum = self.calculate_checksum();
         if actual_checksum != recorded_checksum {
             return Err(TarError::InvalidChecksum);
         }
         Ok(())
     }
 
+    /// Creates a new TarHeaderBuilder for constructing a TarHeader.
     pub fn builder() -> TarHeaderBuilder {
         TarHeaderBuilder::new()
     }
 
+    /// Returns a human-readable description of the file type.
+    ///
+    /// # Returns
+    ///
+    /// A string slice describing the type of file represented by this header.
     pub fn file_type(&self) -> &'static str {
         match self.typeflag {
             REGTYPE | AREGTYPE => "Regular File",
@@ -200,17 +279,20 @@ impl TarHeader {
             _ => "Unknown",
         }
     }
-
-
 }
 
 #[derive(Debug)]
 pub enum TarError {
+    /// The checksum in the tar header is invalid.
     InvalidChecksum,
+    /// An I/O error occurred.
     IoError,
+    /// The tar header is invalid.
     InvalidHeader,
+    /// The type flag in the tar header is unknown.
     UnknownTypeFlag(u8),
-    InvalidEncoding, // Check for UTF-8 conversion errors
-    FieldTooLong,    // Checks when input strings exceed field sizes
+    /// An error occurred during UTF-8 conversion.
+    InvalidEncoding,
+    /// The input string exceeds the maximum allowed field size.
+    FieldTooLong,
 }
-
