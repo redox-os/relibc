@@ -7,7 +7,11 @@ use core::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::{c_str::CStr, ld_so::tcb::Tcb, platform::types::*};
+use crate::{
+    c_str::CStr,
+    ld_so::{linker::Resolve, tcb::Tcb},
+    platform::types::*,
+};
 
 pub const RTLD_LAZY: c_int = 0x0001;
 pub const RTLD_NOW: c_int = 0x0002;
@@ -42,6 +46,11 @@ pub unsafe extern "C" fn dladdr(addr: *mut c_void, info: *mut Dl_info) -> c_int 
 #[no_mangle]
 pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut c_void {
     //TODO support all sort of flags
+    let resolve = if flags & RTLD_NOW == RTLD_NOW {
+        Resolve::Now
+    } else {
+        Resolve::Lazy
+    };
 
     let filename = if cfilename.is_null() {
         None
@@ -69,7 +78,7 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
 
-    let id = match (cbs.load_library)(&mut linker, filename) {
+    let id = match (cbs.load_library)(&mut linker, filename, resolve) {
         Err(err) => {
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
             return ptr::null_mut();
