@@ -3,7 +3,7 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/string.h.html>.
 
 use core::{
-    iter::once,
+    iter::{once, zip},
     mem::{self, MaybeUninit},
     ptr, slice, usize,
 };
@@ -97,9 +97,16 @@ pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -
     // nonoverlapping slices.
     let s1_slice = unsafe { slice::from_raw_parts_mut(s1.cast::<MaybeUninit<u8>>(), n) };
     let s2_slice = unsafe { slice::from_raw_parts(s2.cast::<u8>(), n) };
-    MaybeUninit::copy_from_slice(s1_slice, s2_slice)
-        .as_mut_ptr()
-        .cast()
+
+    // It may seem tempting to use MaybeUninit::copy_from_slice() here, but
+    // memcpy is one of the handful of symbols whose existence is assumed by
+    // Rust's core library, and thus we need to be careful here not to rely on
+    // any function that calls memcpy internally.
+    // See https://doc.rust-lang.org/core/index.html for details.
+    for (s1_elem, s2_elem) in zip(s1_slice, s2_slice) {
+        s1_elem.write(*s2_elem);
+    }
+    s1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memmem.html>.
