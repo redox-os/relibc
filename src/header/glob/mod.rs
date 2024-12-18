@@ -1,5 +1,7 @@
 //! glob implementation, following https://pubs.opengroup.org/onlinepubs/9699919799/functions/glob.html
 
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::ptr;
 
 use alloc::{boxed::Box, vec::Vec};
@@ -58,23 +60,26 @@ pub unsafe extern "C" fn glob(
     pglob: *mut glob_t,
 ) -> c_int {
     if flags & GLOB_APPEND != GLOB_APPEND {
-        (*pglob).gl_pathc = 0;
-        (*pglob).gl_pathv = ptr::null_mut();
-        (*pglob).__opaque = ptr::null_mut();
+        unsafe {
+            (*pglob).gl_pathc = 0;
+            (*pglob).gl_pathv = ptr::null_mut();
+            (*pglob).__opaque = ptr::null_mut();
+        }
     }
 
-    let glob_expr = CStr::from_ptr(pattern);
+    let glob_expr = unsafe { CStr::from_ptr(pattern) };
 
     if glob_expr.to_bytes() == b"" {
         return GLOB_NOMATCH;
     }
 
-    let base_path =
+    let base_path = unsafe {
         CStr::from_bytes_with_nul_unchecked(if glob_expr.to_bytes().get(0) == Some(&b'/') {
             b"/\0"
         } else {
             b"\0"
-        });
+        })
+    };
 
     let errfunc = match errfunc {
         Some(f) => f,
@@ -103,32 +108,39 @@ pub unsafe extern "C" fn glob(
 
     // Set gl_pathc
     if flags & GLOB_APPEND == GLOB_APPEND {
-        (*pglob).gl_pathc += results.len();
+        unsafe {
+            (*pglob).gl_pathc += results.len();
+        }
     } else {
-        (*pglob).gl_pathc = results.len();
+        unsafe {
+            (*pglob).gl_pathc = results.len();
+        }
     }
 
     let mut pathv: Box<Vec<*mut c_char>>;
     if flags & GLOB_APPEND == GLOB_APPEND {
-        pathv = Box::from_raw((*pglob).__opaque as *mut _);
+        pathv = unsafe { Box::from_raw((*pglob).__opaque as *mut _) };
         pathv.pop(); // Remove NULL from end
     } else {
         pathv = Box::new(Vec::new());
         if flags & GLOB_DOOFFS == GLOB_DOOFFS {
-            for _ in 0..(*pglob).gl_offs {
+            let gl_offs = unsafe { (*pglob).gl_offs };
+            pathv.reserve(gl_offs);
+            for _ in 0..gl_offs {
                 pathv.push(ptr::null_mut());
             }
         }
     }
 
+    pathv.reserve_exact(results.len() + 1);
     pathv.extend(results.into_iter().map(|s| s.into_raw()));
 
     pathv.push(ptr::null_mut());
 
-    pathv.shrink_to_fit();
-
-    (*pglob).gl_pathv = pathv.as_ptr() as *mut *mut c_char;
-    (*pglob).__opaque = Box::into_raw(pathv) as *mut _;
+    unsafe {
+        (*pglob).gl_pathv = pathv.as_ptr() as *mut *mut c_char;
+        (*pglob).__opaque = Box::into_raw(pathv) as *mut _;
+    }
 
     0
 }
@@ -136,17 +148,21 @@ pub unsafe extern "C" fn glob(
 #[no_mangle]
 pub unsafe extern "C" fn globfree(pglob: *mut glob_t) {
     // Retake ownership
-    if !(*pglob).__opaque.is_null() {
-        let pathv: Box<Vec<*mut c_char>> = Box::from_raw((*pglob).__opaque as *mut _);
+    if unsafe { !(*pglob).__opaque.is_null() } {
+        let pathv: Box<Vec<*mut c_char>> = unsafe { Box::from_raw((*pglob).__opaque as *mut _) };
         for (idx, path) in pathv.into_iter().enumerate() {
-            if idx < (*pglob).gl_offs {
+            if unsafe { idx < (*pglob).gl_offs } {
                 continue;
             }
             if !path.is_null() {
-                CString::from_raw(path);
+                unsafe {
+                    CString::from_raw(path);
+                }
             }
         }
-        (*pglob).gl_pathv = ptr::null_mut();
+        unsafe {
+            (*pglob).gl_pathv = ptr::null_mut();
+        }
     }
 }
 
