@@ -98,6 +98,8 @@ bitflags::bitflags! {
 pub struct Config {
     debug_flags: DebugFlags,
     library_path: Option<String>,
+    /// Resolve symbols at program startup.
+    bind_now: bool,
 }
 
 impl Config {
@@ -121,11 +123,13 @@ impl Config {
             })
             .unwrap_or(DebugFlags::empty());
 
-        let library_path = env.get("LD_LIBRARY_PATH").cloned();
-
         Self {
             debug_flags,
-            library_path,
+            library_path: env.get("LD_LIBRARY_PATH").cloned(),
+            bind_now: env
+                .get("LD_BIND_NOW")
+                .map(|value| !value.is_empty())
+                .unwrap_or_default(),
         }
     }
 }
@@ -157,7 +161,17 @@ impl Linker {
     }
 
     pub fn load_program(&mut self, path: &str, base_addr: Option<usize>) -> Result<usize> {
-        self.load_object(path, &None, base_addr, false, Resolve::default())?;
+        self.load_object(
+            path,
+            &None,
+            base_addr,
+            false,
+            if self.config.bind_now {
+                Resolve::Now
+            } else {
+                Resolve::default()
+            },
+        )?;
         // TODO(andypython): make self.load_object() return a reference to the
         // loaded object, thereby remove the ugly unwrap().
         Ok(self.objects.get(&root_id).unwrap().entry_point)
@@ -176,7 +190,17 @@ impl Linker {
                         .get(&root_id)
                         .and_then(|parent| parent.runpath.clone());
                     let lib_id = self.next_object_id;
-                    self.load_object(name, parent_runpath, None, true, resolve)?;
+                    self.load_object(
+                        name,
+                        parent_runpath,
+                        None,
+                        true,
+                        if self.config.bind_now {
+                            Resolve::Now
+                        } else {
+                            resolve
+                        },
+                    )?;
 
                     Ok(lib_id)
                 }
