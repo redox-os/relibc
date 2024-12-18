@@ -105,10 +105,10 @@ pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -
         let s1_slice = unsafe { slice::from_raw_parts_mut(s1.cast::<MaybeUninit<u8>>(), n) };
         let s2_slice = unsafe { slice::from_raw_parts(s2.cast::<MaybeUninit<u8>>(), n) };
 
-        // It may seem tempting to use s1.copy_from_slice(s2) here, but memcpy
-        // is one of the handful of symbols whose existence is assumed by
-        // Rust's core library, and thus we need to be careful here not to rely
-        // on any function that calls memcpy internally.
+        // It may seem tempting to use s1_slice.copy_from_slice(s2_slice) here,
+        // but memcpy is one of the handful of symbols whose existence is
+        // assumed by Rust's core library, and thus we need to be careful here
+        // not to rely on any function that calls memcpy internally.
         // See https://doc.rust-lang.org/core/index.html for details.
         for (s1_elem, s2_elem) in zip(s1_slice, s2_slice) {
             *s1_elem = *s2_elem;
