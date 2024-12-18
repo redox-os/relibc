@@ -7,7 +7,7 @@ pub mod assert;
 pub mod bits_pthread;
 pub mod bits_sched;
 // complex.h implemented in C
-// TODO: cpio.h
+// cpio.h implemented in C
 pub mod crypt;
 pub mod ctype;
 // TODO: curses.h (deprecated)
