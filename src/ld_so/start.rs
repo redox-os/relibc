@@ -86,16 +86,6 @@ unsafe fn adjust_stack(sp: &'static mut Stack) {
         if arg == 0 {
             break;
         }
-        if let Ok(arg_str) = CStr::from_ptr(arg as *const c_char).to_str() {
-            let mut parts = arg_str.splitn(2, '=');
-            if let Some(key) = parts.next() {
-                if let Some(value) = parts.next() {
-                    if let "LD_LIBRARY_PATH" = key {
-                        //library_path = value
-                    }
-                }
-            }
-        }
     }
 
     // Move auxiliary vectors
