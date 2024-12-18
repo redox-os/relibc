@@ -855,7 +855,7 @@ extern "C" fn __plt_resolve_inner(object_id: usize, relocation_index: c_uint) ->
         .as_ptr();
 
     unsafe {
-        println!(
+        trace!(
             "@plt: {} -> *mut {:#x}",
             name.to_string_lossy(),
             resolved as usize
