@@ -1,3 +1,5 @@
+//! See <https://refspecs.linuxfoundation.org/elf/elf.pdf>.
+
 use super::{
     debug::{RTLDDebug, _r_debug},
     linker::Symbol,
@@ -33,9 +35,31 @@ use goblin::elf64::{
     sym,
 };
 use goblin::{
-    elf::Elf,
+    elf::{
+        sym::{STB_GLOBAL, STB_WEAK},
+        Dynamic, Elf,
+    },
     error::{Error, Result},
 };
+
+#[derive(Debug, PartialEq)]
+#[repr(u8)]
+pub enum SymbolBinding {
+    /// Global symbols are visible to all object files being combined. One
+    /// file's definition of a global symbol will satisfy another file's
+    /// undefined reference to the same global symbol.
+    Global = STB_GLOBAL,
+    /// Weak symbols resemble global symbols, but their definitions have lower
+    /// precedence.
+    Weak = STB_WEAK,
+}
+
+impl SymbolBinding {
+    #[inline]
+    pub fn is_global(&self) -> bool {
+        matches!(self, Self::Global)
+    }
+}
 
 /// Use to represent a library as well as all the symbols that is loaded withen it.
 #[derive(Default)]
@@ -57,6 +81,9 @@ pub struct DSO {
     pub tls_module_id: usize,
     pub tls_offset: usize,
     pub use_count: usize,
+
+    pub dynamic: Option<Dynamic>,
+    pub dynsyms: Vec<goblin::elf::sym::Sym>,
 }
 
 impl DSO {
@@ -106,15 +133,19 @@ impl DSO {
                 0
             },
             tls_offset: tls_offset,
+
+            dynamic: elf.dynamic.map(|dynamic| dynamic),
+            dynsyms: elf.dynsyms.iter().collect(),
         };
-        return Ok((dso, tcb_master));
+
+        Ok((dso, tcb_master))
     }
 
-    pub fn get_sym(&self, name: &str) -> Option<(Symbol, bool)> {
+    pub fn get_sym(&self, name: &str) -> Option<(Symbol, SymbolBinding)> {
         if let Some(value) = self.global_syms.get(name) {
-            Some((*value, true))
+            Some((*value, SymbolBinding::Global))
         } else if let Some(value) = self.weak_syms.get(name) {
-            Some((*value, false))
+            Some((*value, SymbolBinding::Weak))
         } else {
             None
         }
@@ -404,7 +435,7 @@ impl DSO {
             .iter()
             .filter(|s| s.sh_type == SHT_INIT_ARRAY || s.sh_type == SHT_FINI_ARRAY)
         {
-            let addr = if is_pie_enabled(&elf) {
+            let addr = if is_pie_enabled(elf) {
                 mmap_addr + section.vm_range().start
             } else {
                 section.vm_range().start

@@ -1,11 +1,11 @@
-use super::linker::Linker;
+use super::linker::{Linker, Resolve};
 use crate::platform::types::c_void;
 use alloc::boxed::Box;
 use goblin::error::Result;
 
 pub struct LinkerCallbacks {
     pub unload: Box<dyn Fn(&mut Linker, usize)>,
-    pub load_library: Box<dyn Fn(&mut Linker, Option<&str>) -> Result<usize>>,
+    pub load_library: Box<dyn Fn(&mut Linker, Option<&str>, Resolve) -> Result<usize>>,
     pub get_sym: Box<dyn Fn(&Linker, usize, &str) -> Option<*mut c_void>>,
 }
 
@@ -23,8 +23,8 @@ fn unload(linker: &mut Linker, lib_id: usize) {
     linker.unload(lib_id)
 }
 
-fn load_library(linker: &mut Linker, name: Option<&str>) -> Result<usize> {
-    linker.load_library(name)
+fn load_library(linker: &mut Linker, name: Option<&str>, resolve: Resolve) -> Result<usize> {
+    linker.load_library(name, resolve)
 }
 
 fn get_sym(linker: &Linker, lib_id: usize, name: &str) -> Option<*mut c_void> {
