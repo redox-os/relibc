@@ -195,7 +195,7 @@ impl Tcb {
             // XXX: [`Vec::from_raw_parts`] cannot be used here as the masters were originally
             // allocated by the ld.so allocator and that would violate that function's invariants.
             let mut masters = self.masters().unwrap().to_vec();
-            masters.extend(new_masters.into_iter());
+            masters.extend(new_masters);
 
             self.masters_ptr = masters.as_mut_ptr();
             self.masters_len = masters.len() * mem::size_of::<Master>();
