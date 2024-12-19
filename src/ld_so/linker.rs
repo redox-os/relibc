@@ -2,9 +2,10 @@ use alloc::{
     collections::BTreeMap,
     rc::Rc,
     string::{String, ToString},
+    sync::{Arc, Weak},
     vec::Vec,
 };
-use core::{cell::RefCell, mem::transmute, ptr};
+use core::{cell::RefCell, mem::transmute, ptr, sync::atomic::Ordering};
 use goblin::{
     elf::{
         dynamic::{DT_PLTGOT, DT_STRTAB},
@@ -29,6 +30,7 @@ use crate::{
         types::{c_char, c_int, c_uint, c_void},
         Pal, Sys,
     },
+    sync::Mutex,
 };
 
 use super::{
@@ -39,6 +41,9 @@ use super::{
     tcb::{Master, Tcb},
     PATH_SEP,
 };
+
+// TODO: rwlock?
+static GLOBAL_SCOPE: Mutex<Scope> = Mutex::new(Scope::new());
 
 /// Same as [`crate::fs::File`], but does not touch [`crate::platform::ERRNO`] as the dynamic
 /// linker does not have thread-local storage.
@@ -84,13 +89,65 @@ pub enum Resolve {
     Lazy,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ObjectScope {
+    Global,
+    Local,
+}
+
+pub struct Scope {
+    objs: Vec<Weak<DSO>>,
+}
+
+impl Scope {
+    #[inline]
+    pub const fn new() -> Self {
+        Self { objs: Vec::new() }
+    }
+
+    pub fn add(&mut self, obj: Weak<DSO>) {
+        for dso in self.objs.iter() {
+            if dso.ptr_eq(&obj) {
+                // Already in scope.
+                return;
+            }
+        }
+
+        self.objs.push(obj);
+    }
+
+    pub fn get_sym(&self, name: &str) -> Option<(Symbol, SymbolBinding, Arc<DSO>)> {
+        let mut res = None;
+
+        for obj in self.objs.iter() {
+            let obj = obj.upgrade().expect("in scope object was dropped");
+            if let Some((sym, binding)) = obj.get_sym(name) {
+                if binding.is_global() {
+                    return Some((sym, binding, obj));
+                }
+
+                res = Some((sym, binding, obj));
+            }
+        }
+
+        res
+    }
+
+    pub fn move_into(&self, other: &mut Self) {
+        // FIXME: move not copy? as afiak u cannot downgrade from a global to a local scope.
+        other.objs.extend(self.objs.iter().cloned());
+    }
+}
+
 bitflags::bitflags! {
     #[derive(Debug, Default)]
     pub struct DebugFlags: u32 {
-        /// Displays what objects and where they are being loaded.
+        /// Display what objects and where they are being loaded.
         const BASE_ADDRESS = 1 << 1;
-        /// Displays library search paths.
+        /// Display library search paths.
         const SEARCH = 1 << 2;
+        /// Display scope information.
+        const SCOPES = 1 << 3;
     }
 }
 
@@ -112,6 +169,7 @@ impl Config {
                     flags |= match opt {
                         "baseaddr" => DebugFlags::BASE_ADDRESS,
                         "search" => DebugFlags::SEARCH,
+                        "scopes" => DebugFlags::SCOPES,
                         _ => {
                             eprintln!("[ld.so]: unknown debug flag '{}'", opt);
                             DebugFlags::empty()
@@ -140,18 +198,18 @@ pub struct Linker {
     next_object_id: usize,
     next_tls_module_id: usize,
     tls_size: usize,
-    objects: BTreeMap<usize, DSO>,
+    objects: BTreeMap<usize, Arc<DSO>>,
     name_to_object_id_map: BTreeMap<String, usize>,
     pub cbs: Rc<RefCell<LinkerCallbacks>>,
 }
 
-const root_id: usize = 1;
+const ROOT_ID: usize = 1;
 
 impl Linker {
     pub fn new(config: Config) -> Self {
         Self {
             config,
-            next_object_id: root_id,
+            next_object_id: ROOT_ID,
             next_tls_module_id: 1,
             tls_size: 0,
             objects: BTreeMap::new(),
@@ -171,23 +229,45 @@ impl Linker {
             } else {
                 Resolve::default()
             },
+            ObjectScope::Global,
         )?;
         // TODO(andypython): make self.load_object() return a reference to the
         // loaded object, thereby remove the ugly unwrap().
-        Ok(self.objects.get(&root_id).unwrap().entry_point)
+        Ok(self.objects.get(&ROOT_ID).unwrap().entry_point)
     }
 
-    pub fn load_library(&mut self, name: Option<&str>, resolve: Resolve) -> Result<usize> {
+    pub fn load_library(
+        &mut self,
+        name: Option<&str>,
+        resolve: Resolve,
+        scope: ObjectScope,
+    ) -> Result<usize> {
         match name {
             Some(name) => {
                 if let Some(id) = self.name_to_object_id_map.get(name) {
                     let obj = self.objects.get_mut(id).unwrap();
-                    obj.use_count += 1;
+                    obj.use_count.fetch_add(1, Ordering::SeqCst);
+
+                    // We may be upgrading the object from a local scope to the
+                    // global scope.
+                    //
+                    // TODO(andypython): Only do it if RTLD_NOLOAD. Otherwise,
+                    // we should reload rather than just promoting.
+                    if scope == ObjectScope::Global {
+                        if self.config.debug_flags.contains(DebugFlags::SCOPES) {
+                            eprintln!("[ld.so]: moving {} into the global scope", obj.name);
+                        }
+
+                        let mut global_scope = GLOBAL_SCOPE.lock();
+                        global_scope.add(Arc::downgrade(obj));
+                        obj.scope.move_into(&mut global_scope);
+                    }
+
                     Ok(*id)
                 } else {
                     let parent_runpath = &self
                         .objects
-                        .get(&root_id)
+                        .get(&ROOT_ID)
                         .and_then(|parent| parent.runpath.clone());
                     let lib_id = self.next_object_id;
                     self.load_object(
@@ -200,37 +280,48 @@ impl Linker {
                         } else {
                             resolve
                         },
+                        scope,
                     )?;
 
                     Ok(lib_id)
                 }
             }
 
-            None => Ok(root_id),
+            None => Ok(ROOT_ID),
         }
     }
 
     pub fn get_sym(&self, lib_id: usize, name: &str) -> Option<*mut c_void> {
-        self.objects.get(&lib_id).and_then(|obj| {
-            obj.get_sym(name).map(|(s, _binding)| {
-                if s.sym_type != STT_TLS {
-                    s.as_ptr()
-                } else {
-                    let mut tls_index = dl_tls_index {
-                        ti_module: obj.tls_module_id as u64,
-                        ti_offset: s.value as u64,
-                    };
+        let guard;
 
-                    unsafe { __tls_get_addr(&mut tls_index) }
-                }
-            })
+        if lib_id == 0 {
+            guard = GLOBAL_SCOPE.lock();
+            &*guard
+        } else {
+            &self.objects.get(&lib_id)?.scope
+        }
+        .get_sym(name)
+        .map(|(symbol, _, obj)| {
+            if symbol.sym_type != STT_TLS {
+                symbol.as_ptr()
+            } else {
+                let mut tls_index = dl_tls_index {
+                    // TODO(andypython): instead of an ID, why don't we pass a
+                    // pointer to the object? Then we won't need to look it up.
+                    // This is what we already do for __plt_resolve_trampoline.
+                    ti_module: obj.tls_module_id as u64,
+                    ti_offset: symbol.value as u64,
+                };
+
+                unsafe { __tls_get_addr(&mut tls_index) }
+            }
         })
     }
 
     pub fn unload(&mut self, lib_id: usize) {
         if let Some(obj) = self.objects.get_mut(&lib_id) {
             if obj.dlopened {
-                if obj.use_count == 1 {
+                if obj.use_count.load(Ordering::SeqCst) == 1 {
                     let obj = self.objects.remove(&lib_id).unwrap();
                     for dep in obj.dependencies.iter() {
                         self.unload(*self.name_to_object_id_map.get(dep).unwrap());
@@ -238,7 +329,7 @@ impl Linker {
                     self.name_to_object_id_map.remove(&obj.name);
                     drop(obj);
                 } else {
-                    obj.use_count -= 1;
+                    obj.use_count.fetch_sub(1, Ordering::SeqCst);
                 }
             }
         }
@@ -257,6 +348,7 @@ impl Linker {
         base_addr: Option<usize>,
         dlopened: bool,
         resolve: Resolve,
+        scope: ObjectScope,
     ) -> Result<()> {
         unsafe { _r_debug.state = RTLDState::RT_ADD };
         _dl_debug_state();
@@ -272,6 +364,8 @@ impl Linker {
             &mut new_objects,
             &mut objects_data,
             &mut tcb_masters,
+            None,
+            scope,
         )?;
 
         unsafe {
@@ -373,18 +467,22 @@ impl Linker {
             }
         }
 
-        self.relocate(&new_objects, &objects_data, resolve)?;
-        self.run_init(&new_objects);
-
-        for obj in new_objects.into_iter() {
-            self.name_to_object_id_map.insert(obj.name.clone(), obj.id);
-            self.objects.insert(obj.id, obj);
+        // new_objects is already reversed.
+        for (i, obj) in new_objects.into_iter().enumerate() {
+            self.relocate(&obj, &objects_data[i], resolve)?;
+            self.run_init(&obj);
+            self.register_object(obj);
         }
 
         unsafe { _r_debug.state = RTLDState::RT_CONSISTENT };
         _dl_debug_state();
 
-        return Ok(());
+        Ok(())
+    }
+
+    fn register_object(&mut self, obj: Arc<DSO>) {
+        self.name_to_object_id_map.insert(obj.name.clone(), obj.id);
+        self.objects.insert(obj.id, obj);
     }
 
     fn load_objects_recursive(
@@ -393,24 +491,26 @@ impl Linker {
         parent_runpath: &Option<String>,
         base_addr: Option<usize>,
         dlopened: bool,
-        new_objects: &mut Vec<DSO>,
+        new_objects: &mut Vec<Arc<DSO>>,
         objects_data: &mut Vec<Vec<u8>>,
         tcb_masters: &mut Vec<Master>,
+        // The object that caused this object to be loaded.
+        dependent: Option<&mut DSO>,
+        scope: ObjectScope,
     ) -> Result<()> {
-        if let Some(obj) = {
-            if let Some(id) = self.name_to_object_id_map.get(name) {
-                self.objects.get_mut(id)
-            } else {
-                new_objects.iter_mut().find(|o| o.name == name)
+        if let Some(id) = self.name_to_object_id_map.get(name) {
+            if let Some(obj) = self.objects.get_mut(id) {
+                obj.use_count.fetch_add(1, Ordering::SeqCst);
+                return Ok(());
             }
-        } {
-            obj.use_count += 1;
+        } else if let Some(obj) = new_objects.iter_mut().find(|o| o.name == name) {
+            obj.use_count.fetch_add(1, Ordering::SeqCst);
             return Ok(());
         }
 
         let path = self.search_object(name, parent_runpath)?;
         let data = Linker::read_file(&path)?;
-        let (obj, tcb_master) = DSO::new(
+        let (mut obj, tcb_master) = DSO::new(
             &path,
             &data,
             base_addr,
@@ -428,9 +528,6 @@ impl Linker {
             );
         }
 
-        new_objects.push(obj);
-        objects_data.push(data);
-
         self.next_object_id += 1;
 
         if let Some(master) = tcb_master {
@@ -442,10 +539,9 @@ impl Linker {
             self.next_tls_module_id += 1;
         }
 
-        let (runpath, dependencies) = {
-            let parent = new_objects.last().unwrap();
-            (parent.runpath.clone(), parent.dependencies.clone())
-        };
+        let runpath = obj.runpath.clone();
+        let dependencies = obj.dependencies.clone();
+
         for dep_name in dependencies.iter() {
             self.load_objects_recursive(
                 dep_name,
@@ -455,8 +551,27 @@ impl Linker {
                 new_objects,
                 objects_data,
                 tcb_masters,
+                Some(&mut obj),
+                scope,
             )?;
         }
+
+        let obj = Arc::new_cyclic(|sref| {
+            obj.scope.add(sref.clone());
+            obj
+        });
+
+        if let Some(dependent) = dependent {
+            match scope {
+                ObjectScope::Local => dependent.scope.add(Arc::downgrade(&obj)),
+                ObjectScope::Global => GLOBAL_SCOPE.lock().add(Arc::downgrade(&obj)),
+            }
+        } else if let ObjectScope::Global = scope {
+            GLOBAL_SCOPE.lock().add(Arc::downgrade(&obj));
+        }
+
+        objects_data.push(data);
+        new_objects.push(obj);
 
         Ok(())
     }
@@ -509,36 +624,14 @@ impl Linker {
         file.read_to_end(&mut data)
             .map_err(|err| Error::Malformed(format!("failed to read '{}': {}", path, err)))?;
 
-        return Ok(data);
-    }
-
-    fn resolve_sym<'a>(name: &str, objs: impl Iterator<Item = &'a DSO>) -> Option<Symbol> {
-        let mut res = None;
-
-        for dso in objs {
-            if let Some((sym, binding)) = dso.get_sym(name) {
-                if binding.is_global() {
-                    return Some(sym);
-                }
-
-                res = Some(sym);
-            }
-        }
-
-        res
+        Ok(data)
     }
 
     /// Perform lazy relocations.
-    fn lazy_relocate<'a>(
-        &self,
-        obj: &DSO,
-        new_objects: &[DSO],
-        elf: &Elf,
-        resolve: Resolve,
-    ) -> Result<()> {
-        let object_base_addr = obj.mmap.as_ptr() as u64;
+    fn lazy_relocate(&self, obj: &Arc<DSO>, elf: &Elf, resolve: Resolve) -> Result<()> {
+        if let Some(dynamic) = obj.dynamic.as_ref() {
+            let object_base_addr = obj.mmap.as_ptr() as u64;
 
-        if let Some(dynamic) = elf.dynamic.as_ref() {
             // Global Offset Table
             let got = if let Some(ptr) = {
                 dynamic
@@ -554,7 +647,8 @@ impl Linker {
             };
 
             unsafe {
-                got.add(1).write(obj.id);
+                let obj = Arc::into_raw(obj.clone());
+                got.add(1).write(obj as usize);
                 got.add(2).write(__plt_resolve_trampoline as usize);
             }
 
@@ -578,13 +672,12 @@ impl Linker {
                                     sym
                                 )))?;
 
-                        // FIXME(andypython): warn on unresolved symbols?
-                        let resolved = Linker::resolve_sym(
-                            name,
-                            self.objects.values().chain(new_objects.iter()),
-                        )
-                        .map(|sym| sym.as_ptr())
-                        .unwrap_or(ptr::null_mut());
+                        let resolved = GLOBAL_SCOPE
+                            .lock()
+                            .get_sym(name)
+                            .or_else(|| obj.scope.get_sym(name))
+                            .map(|(sym, _, _)| sym.as_ptr())
+                            .expect("unresolved symbol");
 
                         let addend = rel.r_addend.unwrap_or(0) as u64;
 
@@ -602,224 +695,203 @@ impl Linker {
         Ok(())
     }
 
-    fn relocate(
-        &self,
-        new_objects: &Vec<DSO>,
-        objects_data: &Vec<Vec<u8>>,
-        resolve: Resolve,
-    ) -> Result<()> {
-        let symbols_lookup_objects: Vec<&DSO> =
-            self.objects.values().chain(new_objects.iter()).collect();
-
+    fn relocate(&self, obj: &Arc<DSO>, object_data: &[u8], resolve: Resolve) -> Result<()> {
         // Perform relocations
-        for i in (0..new_objects.len()).rev() {
-            let elf = Elf::parse(&objects_data[i])?;
-            let obj = &new_objects[i];
+        let elf = Elf::parse(object_data)?;
 
-            trace!("link {}", obj.name);
+        trace!("link {}", obj.name);
 
-            let mmap = &obj.mmap;
-            let b = mmap.as_ptr() as usize;
+        let mmap = &obj.mmap;
+        let b = mmap.as_ptr() as usize;
 
-            // Relocate
-            for rel in elf.dynrelas.iter().chain(elf.dynrels.iter()) {
-                trace!(
-                    "  rel {}: {:x?}",
-                    reloc::r_to_str(rel.r_type, elf.header.e_machine),
+        // Relocate
+        for rel in elf.dynrelas.iter().chain(elf.dynrels.iter()) {
+            trace!(
+                "  rel {}: {:x?}",
+                reloc::r_to_str(rel.r_type, elf.header.e_machine),
+                rel
+            );
+
+            let symbol = if rel.r_sym > 0 {
+                let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(format!(
+                    "missing symbol for relocation {:?}",
                     rel
-                );
-                let (symbol, t) = if rel.r_sym > 0 {
-                    let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(format!(
-                        "missing symbol for relocation {:?}",
-                        rel
+                )))?;
+
+                let name = elf
+                    .dynstrtab
+                    .get_at(sym.st_name)
+                    .ok_or(Error::Malformed(format!(
+                        "missing name for symbol {:?}",
+                        sym
                     )))?;
 
-                    let mut t = 0;
-                    let name =
-                        elf.dynstrtab
-                            .get_at(sym.st_name)
-                            .ok_or(Error::Malformed(format!(
-                                "missing name for symbol {:?}",
-                                sym
-                            )))?;
-                    let mut symbol = None;
-                    let mut found = false;
-                    let lookup_start = match rel.r_type {
-                        reloc::R_X86_64_COPY => 1,
-                        _ => 0,
-                    };
-                    for lookup_obj in symbols_lookup_objects.iter().skip(lookup_start) {
-                        if let Some((s, binding)) = lookup_obj.get_sym(name) {
-                            trace!(
-                                "symbol {} from {} found in {} ({:?})",
-                                name,
-                                obj.name,
-                                lookup_obj.name,
-                                binding
-                            );
-                            symbol = Some(s);
-                            t = lookup_obj.tls_offset;
-                            found = true;
-                            // Stop looking if any strong symbol is found
-                            if binding.is_global() {
-                                break;
-                            }
-                        }
-                    }
-                    // TODO: below doesn't work because of missing __preinit_array_{start,end} and __init_array_{start,end} symbols in dynamic linked programs
-                    /*
-                    if !found {
-                        return Err(Error::Malformed(format!("missing symbol for name {}", name)));
-                    }
-                    */
-                    (symbol, t)
-                } else {
-                    (None, 0)
-                };
+                let symbol = GLOBAL_SCOPE
+                    .lock()
+                    .get_sym(name)
+                    .or_else(|| obj.scope.get_sym(name))
+                    .map(|(sym, _, obj)| (sym, obj.tls_offset));
 
-                let s = symbol
-                    .as_ref()
-                    .map(|sym| sym.as_ptr() as usize)
-                    .unwrap_or(0);
+                // TODO: below doesn't work because of missing __preinit_array_{start,end} and __init_array_{start,end} symbols in dynamic linked programs
+                // TODO: found := symbol.is_some()
+                /*
+                if !found {
+                    return Err(Error::Malformed(format!("missing symbol for name {}", name)));
+                }
+                */
+                symbol
+            } else {
+                None
+            };
 
-                let a = rel.r_addend.unwrap_or(0) as usize;
+            let (s, t) = symbol
+                .as_ref()
+                .map(|(sym, t)| (sym.as_ptr() as usize, *t))
+                .unwrap_or((0, 0));
 
-                let ptr = if is_pie_enabled(&elf) {
-                    (b + rel.r_offset as usize) as *mut u8
-                } else {
-                    rel.r_offset as *mut u8
-                };
-                let set_u64 = |value| {
-                    trace!("    set_u64 {:#x}", value);
-                    unsafe {
-                        *(ptr as *mut u64) = value;
-                    }
-                };
+            let a = rel.r_addend.unwrap_or(0) as usize;
 
-                match rel.r_type {
-                    reloc::R_X86_64_64 => {
-                        set_u64((s + a) as u64);
-                    }
-                    reloc::R_X86_64_DTPMOD64 => {
-                        set_u64(obj.tls_module_id as u64);
-                    }
-                    reloc::R_X86_64_DTPOFF64 => {
-                        if s != 0 {
-                            set_u64((s - b) as u64);
-                        } else {
-                            set_u64(s as u64);
-                        }
-                    }
-                    reloc::R_X86_64_GLOB_DAT | reloc::R_X86_64_JUMP_SLOT => {
+            let ptr = if is_pie_enabled(&elf) {
+                (b + rel.r_offset as usize) as *mut u8
+            } else {
+                rel.r_offset as *mut u8
+            };
+            let set_u64 = |value| {
+                trace!(
+                    "    set_u64 r_type={} value={:#x} ptr={:p} base={:#x} mmap_len={:#x} a={:#x}",
+                    rel.r_type,
+                    value,
+                    ptr,
+                    b,
+                    mmap.len(),
+                    a
+                );
+                unsafe {
+                    *(ptr as *mut u64) = value;
+                }
+            };
+
+            match rel.r_type {
+                reloc::R_X86_64_64 => {
+                    set_u64((s + a) as u64);
+                }
+                reloc::R_X86_64_DTPMOD64 => {
+                    set_u64(obj.tls_module_id as u64);
+                }
+                reloc::R_X86_64_DTPOFF64 => {
+                    if s != 0 {
+                        set_u64((s - b) as u64);
+                    } else {
                         set_u64(s as u64);
                     }
-                    reloc::R_X86_64_RELATIVE => {
-                        set_u64((b + a) as u64);
-                    }
-                    reloc::R_X86_64_TPOFF64 => {
-                        if rel.r_sym > 0 {
-                            let sym = symbol
-                                .as_ref()
-                                .expect("R_X86_64_TPOFF64 called without valid symbol");
-                            set_u64((sym.value + a).wrapping_sub(t) as u64);
-                        } else {
-                            set_u64(a.wrapping_sub(t) as u64);
-                        }
-                    }
-                    reloc::R_X86_64_IRELATIVE => unsafe {
-                        let f: unsafe extern "C" fn() -> u64 = transmute(b + a);
-                        set_u64(f());
-                    },
-                    reloc::R_X86_64_COPY => unsafe {
-                        let sym = symbol
+                }
+                reloc::R_X86_64_GLOB_DAT | reloc::R_X86_64_JUMP_SLOT => {
+                    set_u64(s as u64);
+                }
+                reloc::R_X86_64_RELATIVE => {
+                    set_u64((b + a) as u64);
+                }
+                reloc::R_X86_64_TPOFF64 => {
+                    if rel.r_sym > 0 {
+                        let (sym, _) = symbol
                             .as_ref()
-                            .expect("R_X86_64_COPY called without valid symbol");
-                        ptr::copy_nonoverlapping(sym.as_ptr() as *const u8, ptr, sym.size);
-                    },
-                    _ => {
-                        panic!(
-                            "    {} unsupported",
-                            reloc::r_to_str(rel.r_type, elf.header.e_machine)
-                        );
+                            .expect("R_X86_64_TPOFF64 called without valid symbol");
+                        set_u64((sym.value + a).wrapping_sub(t) as u64);
+                    } else {
+                        set_u64(a.wrapping_sub(t) as u64);
                     }
                 }
-            }
-
-            // Protect pages
-            for ph in elf
-                .program_headers
-                .iter()
-                .filter(|ph| ph.p_type == program_header::PT_LOAD)
-            {
-                let voff = ph.p_vaddr % ph.p_align;
-                let vaddr = (ph.p_vaddr - voff) as usize;
-                let vsize = ((ph.p_memsz + voff) as usize).next_multiple_of(ph.p_align as usize);
-                let mut prot = 0;
-                if ph.p_flags & program_header::PF_R == program_header::PF_R {
-                    prot |= sys_mman::PROT_READ;
-                }
-
-                // W ^ X. If it is executable, do not allow it to be writable, even if requested
-                if ph.p_flags & program_header::PF_X == program_header::PF_X {
-                    prot |= sys_mman::PROT_EXEC;
-                } else if ph.p_flags & program_header::PF_W == program_header::PF_W {
-                    prot |= sys_mman::PROT_WRITE;
-                }
-
-                unsafe {
-                    let ptr = if is_pie_enabled(&elf) {
-                        mmap.as_ptr().add(vaddr)
-                    } else {
-                        vaddr as *const u8
-                    };
-                    trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
-                    Sys::mprotect(ptr as *mut c_void, vsize, prot).map_err(|_| {
-                        Error::Malformed(format!("failed to mprotect {}", obj.name))
-                    })?;
+                reloc::R_X86_64_IRELATIVE => unsafe {
+                    let f: unsafe extern "C" fn() -> u64 = transmute(b + a);
+                    set_u64(f());
+                },
+                reloc::R_X86_64_COPY => unsafe {
+                    let (sym, _) = symbol
+                        .as_ref()
+                        .expect("R_X86_64_COPY called without valid symbol");
+                    ptr::copy_nonoverlapping(sym.as_ptr() as *const u8, ptr, sym.size);
+                },
+                _ => {
+                    panic!(
+                        "    {} unsupported",
+                        reloc::r_to_str(rel.r_type, elf.header.e_machine)
+                    );
                 }
             }
         }
 
-        for (i, obj) in new_objects.iter().enumerate() {
-            self.lazy_relocate(obj, new_objects, &Elf::parse(&objects_data[i])?, resolve)?;
+        self.lazy_relocate(obj, &elf, resolve)?;
+
+        // Protect pages
+        for ph in elf
+            .program_headers
+            .iter()
+            .filter(|ph| ph.p_type == program_header::PT_LOAD)
+        {
+            let voff = ph.p_vaddr % ph.p_align;
+            let vaddr = (ph.p_vaddr - voff) as usize;
+            let vsize = ((ph.p_memsz + voff) as usize).next_multiple_of(ph.p_align as usize);
+            let mut prot = 0;
+            if ph.p_flags & program_header::PF_R == program_header::PF_R {
+                prot |= sys_mman::PROT_READ;
+            }
+
+            // W ^ X. If it is executable, do not allow it to be writable, even if requested
+            if ph.p_flags & program_header::PF_X == program_header::PF_X {
+                prot |= sys_mman::PROT_EXEC;
+            } else if ph.p_flags & program_header::PF_W == program_header::PF_W {
+                prot |= sys_mman::PROT_WRITE;
+            }
+
+            unsafe {
+                let ptr = if is_pie_enabled(&elf) {
+                    mmap.as_ptr().add(vaddr)
+                } else {
+                    vaddr as *const u8
+                };
+                trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
+                Sys::mprotect(ptr as *mut c_void, vsize, prot)
+                    .map_err(|_| Error::Malformed(format!("failed to mprotect {}", obj.name)))?;
+            }
         }
 
         Ok(())
     }
 
-    fn run_init(&self, objects: &Vec<DSO>) {
+    fn run_init(&self, obj: &DSO) {
         use crate::platform::{self, types::*};
 
-        for obj in objects.iter().rev() {
-            if let Some((symbol, SymbolBinding::Global)) = obj.get_sym("__relibc_init_environ") {
-                unsafe {
-                    symbol
-                        .as_ptr()
-                        .cast::<*mut *mut c_char>()
-                        .write(platform::environ);
-                }
+        if let Some((symbol, SymbolBinding::Global)) = obj.get_sym("__relibc_init_environ") {
+            unsafe {
+                symbol
+                    .as_ptr()
+                    .cast::<*mut *mut c_char>()
+                    .write(platform::environ);
             }
-
-            obj.run_init();
         }
+
+        obj.run_init();
     }
 }
 
 // GOT[1] = object_id
 // GOT[2] = __plt_resolve_trampoline
 //
-// The stubs in .plt will push the relocation index and the object ID onto the stack and jump to
-// [`__plt_resolve_trampoline`]. The trampoline will then call this function to resolve the symbol
-// and update the respective GOT entry. The trampoline will then jump to the resolved symbol.
+// The stubs in .plt will push the relocation index and the object pointer onto
+// the stack and jump to [`__plt_resolve_trampoline`]. The trampoline will then
+// call this function to resolve the symbol and update the respective GOT entry.
+// The trampoline will then jump to the resolved symbol.
 //
 // FIXME(andypython): 32-bit
-extern "C" fn __plt_resolve_inner(object_id: usize, relocation_index: c_uint) -> *mut c_void {
-    let tcb = unsafe { Tcb::current() }.unwrap();
-    assert!(!tcb.linker_ptr.is_null());
+extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> *mut c_void {
+    let resolve_sym = |name: &str, scopes: &[&Scope]| -> Option<Symbol> {
+        scopes
+            .iter()
+            .find_map(|scope| scope.get_sym(name))
+            .map(|(sym, _, _)| sym)
+    };
 
-    let linker = unsafe { &*tcb.linker_ptr }.lock();
-
-    let obj = linker.objects.get(&object_id).unwrap();
+    let obj = unsafe { &*obj };
     let obj_base = obj.mmap.as_ptr() as usize;
     let dynamic = obj.dynamic.as_ref().unwrap();
     let jmprel = dynamic.info.jmprel as usize;
@@ -850,8 +922,8 @@ extern "C" fn __plt_resolve_inner(object_id: usize, relocation_index: c_uint) ->
         CStr::from_ptr((strtab_offset + sym.st_name as u64 + obj_base as u64) as *const c_char)
     };
 
-    let resolved = Linker::resolve_sym(name.to_str().unwrap(), linker.objects.values())
-        .expect("symbol not found")
+    let resolved = resolve_sym(name.to_str().unwrap(), &[&GLOBAL_SCOPE.lock(), &obj.scope])
+        .expect(&format!("symbol '{}' not found", name.to_str().unwrap()))
         .as_ptr();
 
     unsafe {
