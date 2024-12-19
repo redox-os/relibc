@@ -2,7 +2,7 @@
 
 use super::{
     debug::{RTLDDebug, _r_debug},
-    linker::Symbol,
+    linker::{Scope, Symbol},
     tcb::Master,
 };
 use crate::{
@@ -17,6 +17,7 @@ use alloc::{
 use core::{
     mem::{size_of, transmute},
     ptr, slice,
+    sync::atomic::AtomicUsize,
 };
 #[cfg(target_pointer_width = "32")]
 use goblin::elf32::{
@@ -62,7 +63,6 @@ impl SymbolBinding {
 }
 
 /// Use to represent a library as well as all the symbols that is loaded withen it.
-#[derive(Default)]
 pub struct DSO {
     pub name: String,
     pub id: usize,
@@ -80,10 +80,12 @@ pub struct DSO {
     pub fini_array: (usize, usize),
     pub tls_module_id: usize,
     pub tls_offset: usize,
-    pub use_count: usize,
+    pub use_count: AtomicUsize,
 
     pub dynamic: Option<Dynamic>,
     pub dynsyms: Vec<goblin::elf::sym::Sym>,
+
+    pub scope: Scope,
 }
 
 impl DSO {
@@ -115,27 +117,29 @@ impl DSO {
             elf.header.e_entry as usize
         };
         let dso = DSO {
-            name: name,
-            id: id,
-            use_count: 1,
-            dlopened: dlopened,
-            entry_point: entry_point,
+            name,
+            id,
+            use_count: AtomicUsize::new(1),
+            dlopened,
+            entry_point,
             runpath: DSO::get_runpath(&path, &elf)?,
-            mmap: mmap,
-            global_syms: global_syms,
-            weak_syms: weak_syms,
+            mmap,
+            global_syms,
+            weak_syms,
             dependencies: elf.libraries.iter().map(|s| s.to_string()).collect(),
-            init_array: init_array,
-            fini_array: fini_array,
+            init_array,
+            fini_array,
             tls_module_id: if tcb_master.is_some() {
                 tls_module_id
             } else {
                 0
             },
-            tls_offset: tls_offset,
+            tls_offset,
 
             dynamic: elf.dynamic.map(|dynamic| dynamic),
             dynsyms: elf.dynsyms.iter().collect(),
+
+            scope: Scope::new(),
         };
 
         Ok((dso, tcb_master))
@@ -453,7 +457,7 @@ impl DSO {
 impl Drop for DSO {
     fn drop(&mut self) {
         self.run_fini();
-        unsafe { Sys::munmap(self.mmap.as_mut_ptr() as *mut c_void, self.mmap.len()) };
+        unsafe { Sys::munmap(self.mmap.as_mut_ptr() as *mut c_void, self.mmap.len()).unwrap() };
     }
 }
 

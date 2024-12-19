@@ -9,13 +9,17 @@ use core::{
 
 use crate::{
     c_str::CStr,
-    ld_so::{linker::Resolve, tcb::Tcb},
+    ld_so::{
+        linker::{ObjectScope, Resolve},
+        tcb::Tcb,
+    },
     platform::types::*,
 };
 
-pub const RTLD_LAZY: c_int = 0x0001;
-pub const RTLD_NOW: c_int = 0x0002;
-pub const RTLD_GLOBAL: c_int = 0x0100;
+pub const RTLD_LAZY: c_int = 1 << 0;
+pub const RTLD_NOW: c_int = 1 << 1;
+pub const RTLD_NOLOAD: c_int = 1 << 2;
+pub const RTLD_GLOBAL: c_int = 1 << 8;
 pub const RTLD_LOCAL: c_int = 0x0000;
 
 static ERROR_NOT_SUPPORTED: CStr = c_str!("dlfcn not supported");
@@ -52,6 +56,12 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
         Resolve::Lazy
     };
 
+    let scope = if flags & RTLD_GLOBAL == RTLD_GLOBAL {
+        ObjectScope::Global
+    } else {
+        ObjectScope::Local
+    };
+
     let filename = if cfilename.is_null() {
         None
     } else {
@@ -78,7 +88,7 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
 
-    let id = match (cbs.load_library)(&mut linker, filename, resolve) {
+    let id = match (cbs.load_library)(&mut linker, filename, resolve, scope) {
         Err(err) => {
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
             return ptr::null_mut();
