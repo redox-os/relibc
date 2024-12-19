@@ -35,6 +35,7 @@ EXPECT_NAMES=\
 	sigaction \
 	sigaltstack \
 	signal \
+	sigsetjmp \
 	stdio/all \
 	stdio/buffer \
 	stdio/dprintf \
