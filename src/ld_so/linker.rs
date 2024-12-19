@@ -6,7 +6,12 @@ use alloc::{
 };
 use core::{cell::RefCell, mem::transmute, ptr};
 use goblin::{
-    elf::{program_header, reloc, sym::STT_TLS, Elf},
+    elf::{
+        dynamic::{DT_PLTGOT, DT_STRTAB},
+        program_header, reloc,
+        sym::STT_TLS,
+        Elf,
+    },
     error::{Error, Result},
 };
 
@@ -19,8 +24,9 @@ use crate::{
         unistd::F_OK,
     },
     io::{self, Read},
+    ld_so::dso::SymbolBinding,
     platform::{
-        types::{c_int, c_void},
+        types::{c_char, c_int, c_uint, c_void},
         Pal, Sys,
     },
 };
@@ -31,7 +37,7 @@ use super::{
     debug::{RTLDState, _dl_debug_state, _r_debug},
     dso::{is_pie_enabled, DSO},
     tcb::{Master, Tcb},
-    ExpectTlsFree, PATH_SEP,
+    PATH_SEP,
 };
 
 /// Same as [`crate::fs::File`], but does not touch [`crate::platform::ERRNO`] as the dynamic
@@ -68,6 +74,16 @@ impl Symbol {
     }
 }
 
+#[derive(Debug, Default, Copy, Clone, PartialEq)]
+pub enum Resolve {
+    /// Resolve all undefined symbols immediately.
+    Now,
+    /// Perform lazy binding (i.e. symbols will be resolved when they are first
+    /// used).
+    #[default]
+    Lazy,
+}
+
 bitflags::bitflags! {
     #[derive(Debug, Default)]
     pub struct DebugFlags: u32 {
@@ -82,6 +98,8 @@ bitflags::bitflags! {
 pub struct Config {
     debug_flags: DebugFlags,
     library_path: Option<String>,
+    /// Resolve symbols at program startup.
+    bind_now: bool,
 }
 
 impl Config {
@@ -105,11 +123,13 @@ impl Config {
             })
             .unwrap_or(DebugFlags::empty());
 
-        let library_path = env.get("LD_LIBRARY_PATH").cloned();
-
         Self {
             debug_flags,
-            library_path,
+            library_path: env.get("LD_LIBRARY_PATH").cloned(),
+            bind_now: env
+                .get("LD_BIND_NOW")
+                .map(|value| !value.is_empty())
+                .unwrap_or_default(),
         }
     }
 }
@@ -141,53 +161,70 @@ impl Linker {
     }
 
     pub fn load_program(&mut self, path: &str, base_addr: Option<usize>) -> Result<usize> {
-        self.load_object(path, &None, base_addr, false)?;
-        return Ok(self.objects.get(&root_id).unwrap().entry_point);
+        self.load_object(
+            path,
+            &None,
+            base_addr,
+            false,
+            if self.config.bind_now {
+                Resolve::Now
+            } else {
+                Resolve::default()
+            },
+        )?;
+        // TODO(andypython): make self.load_object() return a reference to the
+        // loaded object, thereby remove the ugly unwrap().
+        Ok(self.objects.get(&root_id).unwrap().entry_point)
     }
 
-    pub fn load_library(&mut self, name: Option<&str>) -> Result<usize> {
+    pub fn load_library(&mut self, name: Option<&str>, resolve: Resolve) -> Result<usize> {
         match name {
             Some(name) => {
                 if let Some(id) = self.name_to_object_id_map.get(name) {
                     let obj = self.objects.get_mut(id).unwrap();
                     obj.use_count += 1;
-                    return Ok(*id);
+                    Ok(*id)
                 } else {
                     let parent_runpath = &self
                         .objects
                         .get(&root_id)
                         .and_then(|parent| parent.runpath.clone());
                     let lib_id = self.next_object_id;
-                    self.load_object(name, parent_runpath, None, true)?;
+                    self.load_object(
+                        name,
+                        parent_runpath,
+                        None,
+                        true,
+                        if self.config.bind_now {
+                            Resolve::Now
+                        } else {
+                            resolve
+                        },
+                    )?;
 
-                    return Ok(lib_id);
+                    Ok(lib_id)
                 }
             }
-            None => return Ok(root_id),
+
+            None => Ok(root_id),
         }
     }
 
     pub fn get_sym(&self, lib_id: usize, name: &str) -> Option<*mut c_void> {
-        match self.objects.get(&lib_id) {
-            Some(obj) => {
-                return obj.get_sym(name).map(|(s, strong)| {
-                    if s.sym_type != STT_TLS {
-                        s.as_ptr()
-                    } else {
-                        unsafe {
-                            let mut tls_index = dl_tls_index {
-                                ti_module: obj.tls_module_id as u64,
-                                ti_offset: s.value as u64,
-                            };
-                            __tls_get_addr(&mut tls_index)
-                        }
-                    }
-                });
-            }
-            _ => {
-                return None;
-            }
-        }
+        self.objects.get(&lib_id).and_then(|obj| {
+            obj.get_sym(name).map(|(s, _binding)| {
+                if s.sym_type != STT_TLS {
+                    s.as_ptr()
+                } else {
+                    let mut tls_index = dl_tls_index {
+                        ti_module: obj.tls_module_id as u64,
+                        ti_offset: s.value as u64,
+                    };
+
+                    unsafe { __tls_get_addr(&mut tls_index) }
+                }
+            })
+        })
     }
 
     pub fn unload(&mut self, lib_id: usize) {
@@ -219,6 +256,7 @@ impl Linker {
         runpath: &Option<String>,
         base_addr: Option<usize>,
         dlopened: bool,
+        resolve: Resolve,
     ) -> Result<()> {
         unsafe { _r_debug.state = RTLDState::RT_ADD };
         _dl_debug_state();
@@ -335,7 +373,7 @@ impl Linker {
             }
         }
 
-        self.relocate(&new_objects, &objects_data)?;
+        self.relocate(&new_objects, &objects_data, resolve)?;
         self.run_init(&new_objects);
 
         for obj in new_objects.into_iter() {
@@ -420,7 +458,7 @@ impl Linker {
             )?;
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn search_object(&self, name: &str, parent_runpath: &Option<String>) -> Result<String> {
@@ -474,7 +512,102 @@ impl Linker {
         return Ok(data);
     }
 
-    fn relocate(&self, new_objects: &Vec<DSO>, objects_data: &Vec<Vec<u8>>) -> Result<()> {
+    fn resolve_sym<'a>(name: &str, objs: impl Iterator<Item = &'a DSO>) -> Option<Symbol> {
+        let mut res = None;
+
+        for dso in objs {
+            if let Some((sym, binding)) = dso.get_sym(name) {
+                if binding.is_global() {
+                    return Some(sym);
+                }
+
+                res = Some(sym);
+            }
+        }
+
+        res
+    }
+
+    /// Perform lazy relocations.
+    fn lazy_relocate<'a>(
+        &self,
+        obj: &DSO,
+        new_objects: &[DSO],
+        elf: &Elf,
+        resolve: Resolve,
+    ) -> Result<()> {
+        let object_base_addr = obj.mmap.as_ptr() as u64;
+
+        if let Some(dynamic) = elf.dynamic.as_ref() {
+            // Global Offset Table
+            let got = if let Some(ptr) = {
+                dynamic
+                    .dyns
+                    .iter()
+                    .find(|r#dyn| r#dyn.d_tag == DT_PLTGOT)
+                    .map(|r#dyn| r#dyn.d_val)
+            } {
+                (object_base_addr + ptr) as *mut usize
+            } else {
+                assert_eq!(dynamic.info.jmprel, 0);
+                return Ok(());
+            };
+
+            unsafe {
+                got.add(1).write(obj.id);
+                got.add(2).write(__plt_resolve_trampoline as usize);
+            }
+
+            for rel in elf.pltrelocs.iter() {
+                match (rel.r_type, resolve) {
+                    (reloc::R_X86_64_JUMP_SLOT, Resolve::Lazy) => unsafe {
+                        *((object_base_addr + rel.r_offset) as *mut u64) += object_base_addr;
+                    },
+
+                    (reloc::R_X86_64_JUMP_SLOT, Resolve::Now) => {
+                        let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(format!(
+                            "missing symbol for relocation {:?}",
+                            rel
+                        )))?;
+
+                        let name =
+                            elf.dynstrtab
+                                .get_at(sym.st_name)
+                                .ok_or(Error::Malformed(format!(
+                                    "missing name for symbol {:?}",
+                                    sym
+                                )))?;
+
+                        // FIXME(andypython): warn on unresolved symbols?
+                        let resolved = Linker::resolve_sym(
+                            name,
+                            self.objects.values().chain(new_objects.iter()),
+                        )
+                        .map(|sym| sym.as_ptr())
+                        .unwrap_or(ptr::null_mut());
+
+                        let addend = rel.r_addend.unwrap_or(0) as u64;
+
+                        unsafe {
+                            *((object_base_addr + rel.r_offset) as *mut u64) =
+                                resolved as u64 + addend;
+                        }
+                    }
+
+                    _ => todo!("unsupported relocation type {:?}", rel.r_type),
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn relocate(
+        &self,
+        new_objects: &Vec<DSO>,
+        objects_data: &Vec<Vec<u8>>,
+        resolve: Resolve,
+    ) -> Result<()> {
         let symbols_lookup_objects: Vec<&DSO> =
             self.objects.values().chain(new_objects.iter()).collect();
 
@@ -489,12 +622,7 @@ impl Linker {
             let b = mmap.as_ptr() as usize;
 
             // Relocate
-            for rel in elf
-                .dynrelas
-                .iter()
-                .chain(elf.dynrels.iter())
-                .chain(elf.pltrelocs.iter())
-            {
+            for rel in elf.dynrelas.iter().chain(elf.dynrels.iter()) {
                 trace!(
                     "  rel {}: {:x?}",
                     reloc::r_to_str(rel.r_type, elf.header.e_machine),
@@ -509,32 +637,31 @@ impl Linker {
                     let mut t = 0;
                     let name =
                         elf.dynstrtab
-                            .get(sym.st_name)
+                            .get_at(sym.st_name)
                             .ok_or(Error::Malformed(format!(
                                 "missing name for symbol {:?}",
                                 sym
-                            )))??;
+                            )))?;
                     let mut symbol = None;
                     let mut found = false;
                     let lookup_start = match rel.r_type {
                         reloc::R_X86_64_COPY => 1,
                         _ => 0,
                     };
-                    for lookup_id in lookup_start..symbols_lookup_objects.len() {
-                        let lookup_obj = &symbols_lookup_objects[lookup_id];
-                        if let Some((s, strong)) = lookup_obj.get_sym(name) {
+                    for lookup_obj in symbols_lookup_objects.iter().skip(lookup_start) {
+                        if let Some((s, binding)) = lookup_obj.get_sym(name) {
                             trace!(
-                                "symbol {} from {} found in {} ({})",
+                                "symbol {} from {} found in {} ({:?})",
                                 name,
                                 obj.name,
                                 lookup_obj.name,
-                                if strong { "strong" } else { "weak" }
+                                binding
                             );
                             symbol = Some(s);
                             t = lookup_obj.tls_offset;
                             found = true;
                             // Stop looking if any strong symbol is found
-                            if strong {
+                            if binding.is_global() {
                                 break;
                             }
                         }
@@ -607,7 +734,7 @@ impl Linker {
                         let sym = symbol
                             .as_ref()
                             .expect("R_X86_64_COPY called without valid symbol");
-                        ptr::copy_nonoverlapping(sym.as_ptr() as *const u8, ptr, sym.size as usize);
+                        ptr::copy_nonoverlapping(sym.as_ptr() as *const u8, ptr, sym.size);
                     },
                     _ => {
                         panic!(
@@ -639,7 +766,7 @@ impl Linker {
                     prot |= sys_mman::PROT_WRITE;
                 }
 
-                let res = unsafe {
+                unsafe {
                     let ptr = if is_pie_enabled(&elf) {
                         mmap.as_ptr().add(vaddr)
                     } else {
@@ -649,18 +776,22 @@ impl Linker {
                     Sys::mprotect(ptr as *mut c_void, vsize, prot).map_err(|_| {
                         Error::Malformed(format!("failed to mprotect {}", obj.name))
                     })?;
-                };
+                }
             }
         }
 
-        return Ok(());
+        for (i, obj) in new_objects.iter().enumerate() {
+            self.lazy_relocate(obj, new_objects, &Elf::parse(&objects_data[i])?, resolve)?;
+        }
+
+        Ok(())
     }
 
     fn run_init(&self, objects: &Vec<DSO>) {
         use crate::platform::{self, types::*};
 
         for obj in objects.iter().rev() {
-            if let Some((symbol, true)) = obj.get_sym("__relibc_init_environ") {
+            if let Some((symbol, SymbolBinding::Global)) = obj.get_sym("__relibc_init_environ") {
                 unsafe {
                     symbol
                         .as_ptr()
@@ -673,3 +804,169 @@ impl Linker {
         }
     }
 }
+
+// GOT[1] = object_id
+// GOT[2] = __plt_resolve_trampoline
+//
+// The stubs in .plt will push the relocation index and the object ID onto the stack and jump to
+// [`__plt_resolve_trampoline`]. The trampoline will then call this function to resolve the symbol
+// and update the respective GOT entry. The trampoline will then jump to the resolved symbol.
+//
+// FIXME(andypython): 32-bit
+extern "C" fn __plt_resolve_inner(object_id: usize, relocation_index: c_uint) -> *mut c_void {
+    let tcb = unsafe { Tcb::current() }.unwrap();
+    assert!(!tcb.linker_ptr.is_null());
+
+    let linker = unsafe { &*tcb.linker_ptr }.lock();
+
+    let obj = linker.objects.get(&object_id).unwrap();
+    let obj_base = obj.mmap.as_ptr() as usize;
+    let dynamic = obj.dynamic.as_ref().unwrap();
+    let jmprel = dynamic.info.jmprel as usize;
+
+    let rela = unsafe {
+        &*((obj_base + jmprel) as *const reloc::reloc64::Rela).add(relocation_index as usize)
+    };
+
+    assert_eq!(
+        reloc::reloc64::r_type(rela.r_info),
+        reloc::R_X86_64_JUMP_SLOT
+    );
+
+    let sym = obj
+        .dynsyms
+        .get(reloc::reloc64::r_sym(rela.r_info) as usize)
+        .expect("symbol not found");
+    assert_ne!(sym.st_name, 0);
+
+    let strtab_offset = dynamic
+        .dyns
+        .iter()
+        .find(|r#dyn| r#dyn.d_tag == DT_STRTAB)
+        .unwrap()
+        .d_val;
+
+    let name = unsafe {
+        CStr::from_ptr((strtab_offset + sym.st_name as u64 + obj_base as u64) as *const c_char)
+    };
+
+    let resolved = Linker::resolve_sym(name.to_str().unwrap(), linker.objects.values())
+        .expect("symbol not found")
+        .as_ptr();
+
+    unsafe {
+        trace!(
+            "@plt: {} -> *mut {:#x}",
+            name.to_string_lossy(),
+            resolved as usize
+        );
+
+        *((obj_base as u64 + rela.r_offset) as *mut u64) = resolved as u64;
+    }
+
+    resolved
+}
+
+extern "C" {
+    fn __plt_resolve_trampoline() -> usize;
+}
+
+#[cfg(target_arch = "x86_64")]
+core::arch::global_asm!(
+    "
+.global __plt_resolve_trampoline
+.hidden __plt_resolve_trampoline
+__plt_resolve_trampoline:
+    push    rsi
+    push    rdi
+ 
+    mov     rdi, qword ptr [rsp + 0x10]
+    mov     rsi, qword ptr [rsp + 0x18]
+
+    // stash the floating point argument registers
+    sub     rsp, 128
+    movdqu  [rsp + 0x00], xmm0
+    movdqu  [rsp + 0x10], xmm1
+    movdqu  [rsp + 0x20], xmm2
+    movdqu  [rsp + 0x30], xmm3
+    movdqu  [rsp + 0x40], xmm4
+    movdqu  [rsp + 0x50], xmm5
+    movdqu  [rsp + 0x60], xmm6
+    movdqu  [rsp + 0x70], xmm7
+
+    push   rax
+    push   rcx
+    push   rdx
+    push   r8
+    push   r9
+    push   r10
+
+    push   rbp
+    mov    rbp, rsp
+    and    rsp, 0xfffffffffffffff0
+    call   {__plt_resolve_inner}
+    mov    r11, rax
+    mov    rsp, rbp
+    pop    rbp
+
+    pop    r10
+    pop    r9
+    pop    r8
+    pop    rdx
+    pop    rcx
+    pop    rax
+
+    movdqu  xmm7, [rsp + 0x70]
+    movdqu  xmm6, [rsp + 0x60]
+    movdqu  xmm5, [rsp + 0x50]
+    movdqu  xmm4, [rsp + 0x40]
+    movdqu  xmm3, [rsp + 0x30]
+    movdqu  xmm2, [rsp + 0x20]
+    movdqu  xmm1, [rsp + 0x10]
+    movdqu  xmm0, [rsp + 0x00]
+    add     rsp, 128
+
+    pop    rdi
+    pop    rsi
+
+    add    rsp, 0x10
+    jmp    r11
+
+    ud2
+.size __plt_resolve_trampoline, . - __plt_resolve_trampoline
+",
+    __plt_resolve_inner = sym __plt_resolve_inner
+);
+
+#[cfg(target_arch = "x86")]
+core::arch::global_asm!(
+    "
+.global __plt_resolve_trampoline
+.hidden __plt_resolve_trampoline
+__plt_resolve_trampoline:
+    ud2
+.size __plt_resolve_trampoline, . - __plt_resolve_trampoline
+    "
+);
+
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    "
+.global __plt_resolve_trampoline
+.hidden __plt_resolve_trampoline
+__plt_resolve_trampoline:
+    udf #0
+.size __plt_resolve_trampoline, . - __plt_resolve_trampoline
+    "
+);
+
+#[cfg(target_arch = "riscv64")]
+core::arch::global_asm!(
+    "
+.global __plt_resolve_trampoline
+.hidden __plt_resolve_trampoline
+__plt_resolve_trampoline:
+    unimp
+.size __plt_resolve_trampoline, . - __plt_resolve_trampoline
+    "
+);
