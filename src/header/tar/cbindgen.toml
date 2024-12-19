@@ -1,0 +1,10 @@
+sys_includes = ["sys/types.h"]
+include_guard = "_TAR_H"
+trailer = "#include <bits/tar.h>"
+language = "C"
+style = "Tag"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true

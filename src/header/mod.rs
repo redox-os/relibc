@@ -102,7 +102,7 @@ pub mod sys_un;
 pub mod sys_utsname;
 pub mod sys_wait;
 // TODO: syslog.h
-// TODO: tar.h
+pub mod tar;
 // TODO: term.h (deprecated)
 pub mod termios;
 // TODO: tgmath.h (likely C implementation)
