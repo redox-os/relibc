@@ -19,3 +19,9 @@ platform_specific! {
     "x86_64","x86_64","s";
     "riscv64", "riscv64", "S";
 }
+
+//Each platform has different sizes for sigjmp_buf, currently only x86_64 is supported
+extern "C" {
+    pub fn setjmp(jb: *mut u64) -> i32;
+    pub fn longjmp(jb: *mut u64, ret: i32);
+}
