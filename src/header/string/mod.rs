@@ -2,7 +2,11 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/string.h.html>.
 
-use core::{iter::once, mem, ptr, slice, usize};
+use core::{
+    iter::{once, zip},
+    mem::{self, MaybeUninit},
+    ptr, slice, usize,
+};
 
 use cbitset::BitSet256;
 
@@ -80,16 +84,35 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memcpy.html>.
+///
+/// # Safety
+/// The caller must ensure that *either*:
+/// - `n` is 0, *or*
+///     - `s1` is convertible to a `&mut [MaybeUninit<u8>]` with length `n`,
+///       and
+///     - `s2` is convertible to a `&[MaybeUninit<u8>]` with length `n`.
 #[no_mangle]
 pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -> *mut c_void {
-    let mut i = 0;
-    while i + 7 < n {
-        *(s1.add(i) as *mut u64) = *(s2.add(i) as *const u64);
-        i += 8;
-    }
-    while i < n {
-        *(s1 as *mut u8).add(i) = *(s2 as *const u8).add(i);
-        i += 1;
+    // Avoid creating slices for n == 0. This is because we are required to
+    // avoid UB for n == 0, even if either s1 or s2 is null, to comply with the
+    // expectations of Rust's core library, as well as C2y (N3322).
+    // See https://doc.rust-lang.org/core/index.html for details.
+    if n != 0 {
+        // SAFETY: the caller is required to ensure that the provided pointers
+        // are valid. The slices are required to have a length of at most
+        // isize::MAX; this implicitly ensured by requiring valid pointers to
+        // two nonoverlapping slices.
+        let s1_slice = unsafe { slice::from_raw_parts_mut(s1.cast::<MaybeUninit<u8>>(), n) };
+        let s2_slice = unsafe { slice::from_raw_parts(s2.cast::<MaybeUninit<u8>>(), n) };
+
+        // It may seem tempting to use s1_slice.copy_from_slice(s2_slice) here,
+        // but memcpy is one of the handful of symbols whose existence is
+        // assumed by Rust's core library, and thus we need to be careful here
+        // not to rely on any function that calls memcpy internally.
+        // See https://doc.rust-lang.org/core/index.html for details.
+        for (s1_elem, s2_elem) in zip(s1_slice, s2_slice) {
+            *s1_elem = *s2_elem;
+        }
     }
     s1
 }
