@@ -82,10 +82,11 @@ impl Symbol {
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub enum Resolve {
     /// Resolve all undefined symbols immediately.
+    #[cfg_attr(not(target_arch = "x86_64"), default)]
     Now,
     /// Perform lazy binding (i.e. symbols will be resolved when they are first
     /// used).
-    #[default]
+    #[cfg_attr(target_arch = "x86_64", default)]
     Lazy,
 }
 
@@ -350,6 +351,13 @@ impl Linker {
         resolve: Resolve,
         scope: ObjectScope,
     ) -> Result<()> {
+        let resolve = if cfg!(target_arch = "x86_64") {
+            resolve
+        } else {
+            // Lazy binding is not currently supported on non-x86_64 architectures.
+            Resolve::Now
+        };
+
         unsafe { _r_debug.state = RTLDState::RT_ADD };
         _dl_debug_state();
 
