@@ -191,7 +191,9 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     }
 
     // TODO: Fix memory leak, although minimal.
-    crate::platform::init(auxv.clone());
+    unsafe {
+        crate::platform::init(auxv.clone());
+    }
 
     let name_or_path = if is_manual {
         // ld.so is run directly by user and not via execve() or similar systemcall
@@ -242,8 +244,8 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
         tcb.mspace = ALLOCATOR.get();
     }
-    if is_manual {
-        eprintln!("ld.so: entry '{}': {:#x}", path, entry);
-    }
+    // if is_manual {
+    eprintln!("ld.so: entry '{}': {:#x}", path, entry);
+    // }
     entry
 }

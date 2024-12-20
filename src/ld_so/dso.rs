@@ -86,6 +86,8 @@ pub struct DSO {
     pub dynsyms: Vec<goblin::elf::sym::Sym>,
 
     pub scope: Scope,
+    /// Position Independent Executable.
+    pub pie: bool,
 }
 
 impl DSO {
@@ -136,6 +138,7 @@ impl DSO {
             },
             tls_offset,
 
+            pie: is_pie_enabled(&elf),
             dynamic: elf.dynamic.map(|dynamic| dynamic),
             dynsyms: elf.dynsyms.iter().collect(),
 
