@@ -1,11 +1,13 @@
+//! See <https://refspecs.linuxfoundation.org/elf/elf.pdf>.
+
 use super::{
     debug::{RTLDDebug, _r_debug},
-    linker::Symbol,
+    linker::{Scope, Symbol},
     tcb::Master,
 };
 use crate::{
-    header::{errno::STR_ERROR, sys_mman},
-    platform::{types::c_void, Pal, Sys, ERRNO},
+    header::sys_mman,
+    platform::{types::c_void, Pal, Sys},
 };
 use alloc::{
     collections::BTreeMap,
@@ -15,6 +17,7 @@ use alloc::{
 use core::{
     mem::{size_of, transmute},
     ptr, slice,
+    sync::atomic::AtomicUsize,
 };
 #[cfg(target_pointer_width = "32")]
 use goblin::elf32::{
@@ -33,12 +36,33 @@ use goblin::elf64::{
     sym,
 };
 use goblin::{
-    elf::Elf,
+    elf::{
+        sym::{STB_GLOBAL, STB_WEAK},
+        Dynamic, Elf,
+    },
     error::{Error, Result},
 };
 
+#[derive(Debug, PartialEq)]
+#[repr(u8)]
+pub enum SymbolBinding {
+    /// Global symbols are visible to all object files being combined. One
+    /// file's definition of a global symbol will satisfy another file's
+    /// undefined reference to the same global symbol.
+    Global = STB_GLOBAL,
+    /// Weak symbols resemble global symbols, but their definitions have lower
+    /// precedence.
+    Weak = STB_WEAK,
+}
+
+impl SymbolBinding {
+    #[inline]
+    pub fn is_global(&self) -> bool {
+        matches!(self, Self::Global)
+    }
+}
+
 /// Use to represent a library as well as all the symbols that is loaded withen it.
-#[derive(Default)]
 pub struct DSO {
     pub name: String,
     pub id: usize,
@@ -56,7 +80,14 @@ pub struct DSO {
     pub fini_array: (usize, usize),
     pub tls_module_id: usize,
     pub tls_offset: usize,
-    pub use_count: usize,
+    pub use_count: AtomicUsize,
+
+    pub dynamic: Option<Dynamic>,
+    pub dynsyms: Vec<goblin::elf::sym::Sym>,
+
+    pub scope: Scope,
+    /// Position Independent Executable.
+    pub pie: bool,
 }
 
 impl DSO {
@@ -88,33 +119,40 @@ impl DSO {
             elf.header.e_entry as usize
         };
         let dso = DSO {
-            name: name,
-            id: id,
-            use_count: 1,
-            dlopened: dlopened,
-            entry_point: entry_point,
+            name,
+            id,
+            use_count: AtomicUsize::new(1),
+            dlopened,
+            entry_point,
             runpath: DSO::get_runpath(&path, &elf)?,
-            mmap: mmap,
-            global_syms: global_syms,
-            weak_syms: weak_syms,
+            mmap,
+            global_syms,
+            weak_syms,
             dependencies: elf.libraries.iter().map(|s| s.to_string()).collect(),
-            init_array: init_array,
-            fini_array: fini_array,
+            init_array,
+            fini_array,
             tls_module_id: if tcb_master.is_some() {
                 tls_module_id
             } else {
                 0
             },
-            tls_offset: tls_offset,
+            tls_offset,
+
+            pie: is_pie_enabled(&elf),
+            dynamic: elf.dynamic.map(|dynamic| dynamic),
+            dynsyms: elf.dynsyms.iter().collect(),
+
+            scope: Scope::new(),
         };
-        return Ok((dso, tcb_master));
+
+        Ok((dso, tcb_master))
     }
 
-    pub fn get_sym(&self, name: &str) -> Option<(Symbol, bool)> {
+    pub fn get_sym(&self, name: &str) -> Option<(Symbol, SymbolBinding)> {
         if let Some(value) = self.global_syms.get(name) {
-            Some((*value, true))
+            Some((*value, SymbolBinding::Global))
         } else if let Some(value) = self.weak_syms.get(name) {
-            Some((*value, false))
+            Some((*value, SymbolBinding::Weak))
         } else {
             None
         }
@@ -147,8 +185,8 @@ impl DSO {
                 Some(entry) => {
                     let runpath = elf
                         .dynstrtab
-                        .get(entry.d_val as usize)
-                        .ok_or(Error::Malformed("Missing RUNPATH in dynstrtab".to_string()))??;
+                        .get_at(entry.d_val as usize)
+                        .ok_or(Error::Malformed("Missing RUNPATH in dynstrtab".to_string()))?;
                     let base = dirname(path);
                     return Ok(Some(runpath.replace("$ORIGIN", &base)));
                 }
@@ -361,8 +399,8 @@ impl DSO {
             }
             let name: String;
             let value: Symbol;
-            if let Some(name_res) = elf.dynstrtab.get(sym.st_name) {
-                name = name_res?.to_string();
+            if let Some(name_res) = elf.dynstrtab.get_at(sym.st_name) {
+                name = name_res.to_string();
                 value = if is_pie_enabled(elf) {
                     Symbol {
                         base: mmap.as_ptr() as usize,
@@ -404,7 +442,7 @@ impl DSO {
             .iter()
             .filter(|s| s.sh_type == SHT_INIT_ARRAY || s.sh_type == SHT_FINI_ARRAY)
         {
-            let addr = if is_pie_enabled(&elf) {
+            let addr = if is_pie_enabled(elf) {
                 mmap_addr + section.vm_range().start
             } else {
                 section.vm_range().start
@@ -422,7 +460,7 @@ impl DSO {
 impl Drop for DSO {
     fn drop(&mut self) {
         self.run_fini();
-        unsafe { Sys::munmap(self.mmap.as_mut_ptr() as *mut c_void, self.mmap.len()) };
+        unsafe { Sys::munmap(self.mmap.as_mut_ptr() as *mut c_void, self.mmap.len()).unwrap() };
     }
 }
 
