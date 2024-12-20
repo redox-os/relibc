@@ -629,7 +629,7 @@ impl Linker {
 
     /// Perform lazy relocations.
     fn lazy_relocate(&self, obj: &Arc<DSO>, elf: &Elf, resolve: Resolve) -> Result<()> {
-        if let Some(dynamic) = obj.dynamic.as_ref() {
+        if let Some(dynamic) = elf.dynamic.as_ref() {
             let object_base_addr = obj.mmap.as_ptr() as u64;
 
             // Global Offset Table
@@ -640,7 +640,11 @@ impl Linker {
                     .find(|r#dyn| r#dyn.d_tag == DT_PLTGOT)
                     .map(|r#dyn| r#dyn.d_val)
             } {
-                (object_base_addr + ptr) as *mut usize
+                if is_pie_enabled(&elf) {
+                    (object_base_addr + ptr) as *mut usize
+                } else {
+                    ptr as *mut usize
+                }
             } else {
                 assert_eq!(dynamic.info.jmprel, 0);
                 return Ok(());
@@ -653,10 +657,20 @@ impl Linker {
             }
 
             for rel in elf.pltrelocs.iter() {
+                let ptr = if is_pie_enabled(elf) {
+                    (object_base_addr + rel.r_offset) as *mut u64
+                } else {
+                    rel.r_offset as *mut u64
+                };
+
                 match (rel.r_type, resolve) {
-                    (reloc::R_X86_64_JUMP_SLOT, Resolve::Lazy) => unsafe {
-                        *((object_base_addr + rel.r_offset) as *mut u64) += object_base_addr;
+                    (reloc::R_X86_64_JUMP_SLOT, Resolve::Lazy) if is_pie_enabled(elf) => unsafe {
+                        *ptr += object_base_addr;
                     },
+
+                    (reloc::R_X86_64_JUMP_SLOT, Resolve::Lazy) => {
+                        // NOP.
+                    }
 
                     (reloc::R_X86_64_JUMP_SLOT, Resolve::Now) => {
                         let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(format!(
@@ -682,8 +696,7 @@ impl Linker {
                         let addend = rel.r_addend.unwrap_or(0) as u64;
 
                         unsafe {
-                            *((object_base_addr + rel.r_offset) as *mut u64) =
-                                resolved as u64 + addend;
+                            *ptr = resolved as u64 + addend;
                         }
                     }
 
@@ -696,7 +709,7 @@ impl Linker {
     }
 
     fn relocate(&self, obj: &Arc<DSO>, object_data: &[u8], resolve: Resolve) -> Result<()> {
-        // Perform relocations
+        // Perform static relocations.
         let elf = Elf::parse(object_data)?;
 
         trace!("link {}", obj.name);
@@ -919,23 +932,29 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
         .d_val;
 
     let name = unsafe {
-        CStr::from_ptr((strtab_offset + sym.st_name as u64 + obj_base as u64) as *const c_char)
+        CStr::from_ptr(
+            (strtab_offset + sym.st_name as u64 + if obj.pie { obj_base as u64 } else { 0u64 })
+                as *const c_char,
+        )
     };
 
     let resolved = resolve_sym(name.to_str().unwrap(), &[&GLOBAL_SCOPE.lock(), &obj.scope])
         .expect(&format!("symbol '{}' not found", name.to_str().unwrap()))
         .as_ptr();
 
-    unsafe {
-        trace!(
-            "@plt: {} -> *mut {:#x}",
-            name.to_string_lossy(),
-            resolved as usize
-        );
+    trace!(
+        "@plt: {} -> *mut {:#x}",
+        name.to_string_lossy(),
+        resolved as usize
+    );
 
-        *((obj_base as u64 + rela.r_offset) as *mut u64) = resolved as u64;
-    }
+    let ptr = if obj.pie {
+        (obj_base as u64 + rela.r_offset) as *mut u64
+    } else {
+        rela.r_offset as *mut u64
+    };
 
+    unsafe { *ptr = resolved as u64 }
     resolved
 }
 
