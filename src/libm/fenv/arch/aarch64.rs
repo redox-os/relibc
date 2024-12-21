@@ -120,7 +120,7 @@ pub mod native {
         fpcr &= !(ROUND_MASK << ROUND_SHIFT);
         fpcr |= (round as u32) << ROUND_SHIFT;
         asm!("msr fpcr, {}", in(reg) fpcr, options(nomem, nostack));
-        
+
         0
     }
 
