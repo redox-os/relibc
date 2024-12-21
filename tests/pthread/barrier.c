@@ -22,7 +22,9 @@ void *routine(void *arg_raw) {
   int status = pthread_barrier_wait(arg->barrier);
 
   arg->is_leader = status == PTHREAD_BARRIER_SERIAL_THREAD;
-  ERROR_IF(pthread_barrier_wait, status, != 0);
+
+  if (!arg->is_leader)
+    ERROR_IF(pthread_barrier_wait, status, != 0);
 
   // We can now modify the counter.
   atomic_fetch_add_explicit(arg->count, 1, memory_order_relaxed);

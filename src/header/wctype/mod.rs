@@ -1,4 +1,11 @@
-//! wchar implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/wctype.h.html
+//! `wctype.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/wctype.h.html>.
+
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
+// TODO: *_l functions
 
 use self::casecmp::casemap;
 use crate::{c_str::CStr, header::ctype, platform::types::*};
@@ -28,6 +35,36 @@ pub const WCTYPE_XDIGIT: wctype_t = 12;
 const WCTRANSUP: wctrans_t = 1 as wctrans_t;
 const WCTRANSLW: wctrans_t = 2 as wctrans_t;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswalnum.html>.
+#[no_mangle]
+pub extern "C" fn iswalnum(wc: wint_t) -> c_int {
+    c_int::from(iswdigit(wc) != 0 || iswalpha(wc) != 0)
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswalpha.html>.
+#[no_mangle]
+pub extern "C" fn iswalpha(wc: wint_t) -> c_int {
+    c_int::from(alpha::is(wc as usize))
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswblank.html>.
+#[no_mangle]
+pub extern "C" fn iswblank(wc: wint_t) -> c_int {
+    ctype::isblank(wc as c_int)
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswcntrl.html>.
+#[no_mangle]
+pub extern "C" fn iswcntrl(wc: wint_t) -> c_int {
+    c_int::from(
+        wc < 32
+            || wc.wrapping_sub(0x7f) < 33
+            || wc.wrapping_sub(0x2028) < 2
+            || wc.wrapping_sub(0xfff9) < 3,
+    )
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswctype.html>.
 #[no_mangle]
 pub extern "C" fn iswctype(wc: wint_t, desc: wctype_t) -> c_int {
     match desc {
@@ -47,66 +84,25 @@ pub extern "C" fn iswctype(wc: wint_t, desc: wctype_t) -> c_int {
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn wctype(name: *const c_char) -> wctype_t {
-    let name_cstr = CStr::from_ptr(name);
-    match name_cstr.to_bytes() {
-        b"alnum" => WCTYPE_ALNUM,
-        b"alpha" => WCTYPE_ALPHA,
-        b"blank" => WCTYPE_BLANK,
-        b"cntrl" => WCTYPE_CNTRL,
-        b"digit" => WCTYPE_DIGIT,
-        b"graph" => WCTYPE_GRAPH,
-        b"lower" => WCTYPE_LOWER,
-        b"print" => WCTYPE_PRINT,
-        b"punct" => WCTYPE_PUNCT,
-        b"space" => WCTYPE_SPACE,
-        b"upper" => WCTYPE_UPPER,
-        b"xdigit" => WCTYPE_XDIGIT,
-        _ => 0,
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn iswalnum(wc: wint_t) -> c_int {
-    c_int::from(iswdigit(wc) != 0 || iswalpha(wc) != 0)
-}
-
-#[no_mangle]
-pub extern "C" fn iswalpha(wc: wint_t) -> c_int {
-    c_int::from(alpha::is(wc as usize))
-}
-
-#[no_mangle]
-pub extern "C" fn iswblank(wc: wint_t) -> c_int {
-    ctype::isblank(wc as c_int)
-}
-
-#[no_mangle]
-pub extern "C" fn iswcntrl(wc: wint_t) -> c_int {
-    c_int::from(
-        wc < 32
-            || wc.wrapping_sub(0x7f) < 33
-            || wc.wrapping_sub(0x2028) < 2
-            || wc.wrapping_sub(0xfff9) < 3,
-    )
-}
-
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswdigit.html>.
 #[no_mangle]
 pub extern "C" fn iswdigit(wc: wint_t) -> c_int {
     c_int::from(wc.wrapping_sub('0' as wint_t) < 10)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswgraph.html>.
 #[no_mangle]
 pub extern "C" fn iswgraph(wc: wint_t) -> c_int {
     c_int::from(iswspace(wc) == 0 && iswprint(wc) != 0)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswlower.html>.
 #[no_mangle]
 pub extern "C" fn iswlower(wc: wint_t) -> c_int {
     c_int::from(towupper(wc) != wc)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswprint.html>.
 #[no_mangle]
 pub extern "C" fn iswprint(wc: wint_t) -> c_int {
     if wc < 0xff {
@@ -123,11 +119,13 @@ pub extern "C" fn iswprint(wc: wint_t) -> c_int {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswpunct.html>.
 #[no_mangle]
 pub extern "C" fn iswpunct(wc: wint_t) -> c_int {
     c_int::from(punct::is(wc as usize))
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswspace.html>.
 #[no_mangle]
 pub extern "C" fn iswspace(wc: wint_t) -> c_int {
     c_int::from(
@@ -158,28 +156,47 @@ pub extern "C" fn iswspace(wc: wint_t) -> c_int {
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswupper.html>.
 #[no_mangle]
 pub extern "C" fn iswupper(wc: wint_t) -> c_int {
     c_int::from(towlower(wc) != wc)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iswxdigit.html>.
 #[no_mangle]
 pub extern "C" fn iswxdigit(wc: wint_t) -> c_int {
     c_int::from(wc.wrapping_sub('0' as wint_t) < 10 || (wc | 32).wrapping_sub('a' as wint_t) < 6)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/towctrans.html>.
+#[no_mangle]
+pub extern "C" fn towctrans(wc: wint_t, trans: wctrans_t) -> wint_t {
+    match trans {
+        WCTRANSUP => towupper(wc),
+        WCTRANSLW => towlower(wc),
+        _ => wc,
+    }
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/towlower.html>.
 #[no_mangle]
 pub extern "C" fn towlower(wc: wint_t) -> wint_t {
     casemap(wc, 0)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/towupper.html>.
 #[no_mangle]
 pub extern "C" fn towupper(wc: wint_t) -> wint_t {
     casemap(wc, 1)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wctrans.html>.
+///
+/// # Safety
+/// The caller must ensure that `class` is convertible to a slice reference, up
+/// to and including a terminating nul.
 #[no_mangle]
-pub extern "C" fn wctrans(class: *const c_char) -> wctrans_t {
+pub unsafe extern "C" fn wctrans(class: *const c_char) -> wctrans_t {
     let class_cstr = unsafe { CStr::from_ptr(class) };
     match class_cstr.to_bytes() {
         b"toupper" => WCTRANSUP,
@@ -188,11 +205,27 @@ pub extern "C" fn wctrans(class: *const c_char) -> wctrans_t {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wctype.html>.
+///
+/// # Safety
+/// The caller must ensure that `name` is convertible to a slice reference, up
+/// to and including a terminating nul.
 #[no_mangle]
-pub extern "C" fn towctrans(wc: wint_t, trans: wctrans_t) -> wint_t {
-    match trans {
-        WCTRANSUP => towupper(wc),
-        WCTRANSLW => towlower(wc),
-        _ => wc,
+pub unsafe extern "C" fn wctype(name: *const c_char) -> wctype_t {
+    let name_cstr = unsafe { CStr::from_ptr(name) };
+    match name_cstr.to_bytes() {
+        b"alnum" => WCTYPE_ALNUM,
+        b"alpha" => WCTYPE_ALPHA,
+        b"blank" => WCTYPE_BLANK,
+        b"cntrl" => WCTYPE_CNTRL,
+        b"digit" => WCTYPE_DIGIT,
+        b"graph" => WCTYPE_GRAPH,
+        b"lower" => WCTYPE_LOWER,
+        b"print" => WCTYPE_PRINT,
+        b"punct" => WCTYPE_PUNCT,
+        b"space" => WCTYPE_SPACE,
+        b"upper" => WCTYPE_UPPER,
+        b"xdigit" => WCTYPE_XDIGIT,
+        _ => 0,
     }
 }

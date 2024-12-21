@@ -1,4 +1,4 @@
-sys_includes = ["sched.h", "time.h", "bits/pthread.h"]
+sys_includes = ["sched.h", "time.h", "bits/pthread.h", "features.h"]
 include_guard = "_RELIBC_PTHREAD_H"
 language = "C"
 style = "tag"

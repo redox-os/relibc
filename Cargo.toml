@@ -29,9 +29,9 @@ cbitset = "0.2"
 posix-regex = { path = "posix-regex", features = ["no_std"] }
 
 # TODO: For some reason, rand_jitter hasn't been updated to use the latest rand_core
-rand = { version = "0.7", default-features = false, features = ["small_rng"] }
-rand_xorshift = "0.2"
-rand_jitter = "0.3"
+rand = { version = "0.8", default-features = false, features = ["small_rng"] }
+rand_xorshift = "0.3"
+rand_jitter = "0.4"
 
 memchr = { version = "2.2.0", default-features = false }
 plain = "0.2"
@@ -65,7 +65,7 @@ features = ["c_api"]
 sc = "0.2.3"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-redox_syscall = "0.5.3"
+redox_syscall = "0.5.8"
 redox-rt = { path = "redox-rt" }
 redox-path = "0.2"
 redox_event = { git = "https://gitlab.redox-os.org/redox-os/event.git", default-features = false, features = ["redox_syscall"] }
@@ -80,3 +80,6 @@ panic = "abort"
 
 [profile.release]
 panic = "abort"
+
+[patch.crates-io]
+cc-11 = { git = "https://github.com/tea/cc-rs", branch="riscv-abi-arch-fix", package = "cc" }

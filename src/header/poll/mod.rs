@@ -1,8 +1,12 @@
 //! poll implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/poll.h.html
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::{mem, slice};
 
 use crate::{
+    error::ResultExt,
     fs::File,
     header::sys_epoll::{
         epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR, EPOLLHUP, EPOLLIN,
@@ -57,6 +61,12 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
     for i in 0..fds.len() {
         let mut pfd = &mut fds[i];
 
+        // Ignore the entry with negative fd, set the revents to 0
+        if pfd.fd < 0 {
+            pfd.revents = 0;
+            continue;
+        }
+
         let mut event = epoll_event {
             events: 0,
             data: epoll_data { u64: i as u64 },
@@ -71,13 +81,13 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
 
         pfd.revents = 0;
 
-        if epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &mut event) < 0 {
+        if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &mut event) } < 0 {
             return -1;
         }
     }
 
     let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
-    let res = epoll_wait(*ep, events.as_mut_ptr(), events.len() as c_int, timeout);
+    let res = unsafe { epoll_wait(*ep, events.as_mut_ptr(), events.len() as c_int, timeout) };
     if res < 0 {
         return -1;
     }
@@ -106,7 +116,10 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
     trace_expr!(
-        poll_epoll(slice::from_raw_parts_mut(fds, nfds as usize), timeout),
+        poll_epoll(
+            unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
+            timeout
+        ),
         "poll({:p}, {}, {})",
         fds,
         nfds,

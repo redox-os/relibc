@@ -7,17 +7,25 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use generic_rt::ExpectTlsFree;
 
 use crate::{
     c_str::CStr,
     header::unistd,
+    ld_so::tcb::Master,
     platform::{get_auxv, get_auxvs, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
     ALLOCATOR,
 };
 
-use super::{access::accessible, debug::_r_debug, linker::Linker, tcb::Tcb, PATH_SEP};
+use super::{
+    access::accessible,
+    debug::_r_debug,
+    linker::{Config, Linker},
+    tcb::Tcb,
+    PATH_SEP,
+};
 use crate::header::sys_auxv::{AT_ENTRY, AT_PHDR};
 use goblin::elf::header::header64::SIZEOF_EHDR;
 
@@ -113,7 +121,7 @@ fn resolve_path_name(
     name_or_path: &str,
     envs: &BTreeMap<String, String>,
 ) -> Option<(String, String)> {
-    if accessible(name_or_path, unistd::F_OK) == 0 {
+    if accessible(name_or_path, unistd::F_OK).is_ok() {
         return Some((
             name_or_path.to_string(),
             name_or_path
@@ -135,14 +143,30 @@ fn resolve_path_name(
         } else {
             format!("{}/{}", part, name_or_path)
         };
-        if accessible(&path, unistd::F_OK) == 0 {
+        if accessible(&path, unistd::F_OK).is_ok() {
             return Some((path.to_string(), name_or_path.to_string()));
         }
     }
     None
 }
+
+// TODO: Make unsafe
 #[no_mangle]
-pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) -> usize {
+pub extern "C" fn relibc_ld_so_start(
+    sp: &'static mut Stack,
+    ld_entry: usize,
+    self_tls_start: usize,
+    self_tls_end: usize,
+) -> usize {
+    // Setup TCB for ourselves.
+    unsafe {
+        let tcb = Tcb::new(0).expect_notls("ld.so: failed to allocate bootstrap TCB");
+        tcb.activate();
+
+        #[cfg(target_os = "redox")]
+        redox_rt::signal::setup_sighandler(&tcb.os_specific);
+    }
+
     // We get the arguments, the environment, and the auxilary vector
     let (argv, envs, auxv) = unsafe {
         let argv_start = sp.argv() as *mut usize;
@@ -184,7 +208,9 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     }
 
     // TODO: Fix memory leak, although minimal.
-    crate::platform::init(auxv.clone());
+    unsafe {
+        crate::platform::init(auxv.clone());
+    }
 
     // Some variables that will be overridden by environment and auxiliary vectors
     let ld_library_path = envs.get("LD_LIBRARY_PATH").map(|s| s.to_owned());
@@ -228,7 +254,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
         }
         base
     };
-    let mut linker = Linker::new(ld_library_path);
+    let mut linker = Linker::new(Config::from_env(&envs));
     let entry = match linker.load_program(&path, base_addr) {
         Ok(entry) => entry,
         Err(err) => {

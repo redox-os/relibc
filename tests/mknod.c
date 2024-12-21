@@ -11,17 +11,22 @@ int main(void) {
   char temp[] = "/tmp/stattest-XXXXXX";
   const char file[] = "/mknod";
   int len = sizeof(temp) + sizeof(file);
+
   char* path = malloc(len * sizeof(char));
+  path[0] = '\0';
 
   if (path == NULL) {
     fprintf(stderr, "Could not allocate: %s\n", strerror(errno));
     exit(1);
   }
 
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   if(!mktemp(temp)) {
     fprintf(stderr, "Unable to create a unique dir name %s: %s\n", temp, strerror(errno));
     exit(1);
   }
+  #pragma GCC diagnostic pop
 
   path = strncat(path, temp, strlen(temp));
   path = strncat(path, file, strlen(file));

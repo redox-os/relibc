@@ -1,3 +1,5 @@
+//! C data types for this platform.
+
 use core::i32;
 
 // Use repr(u8) as LLVM expects `void*` to be the same as `i8*` to help enable
@@ -62,7 +64,7 @@ pub type id_t = c_uint;
 pub type gid_t = c_int;
 pub type uid_t = c_int;
 pub type dev_t = c_long;
-pub type ino_t = c_ulong;
+pub type ino_t = c_ulonglong;
 pub type nlink_t = c_ulong;
 pub type blksize_t = c_long;
 pub type blkcnt_t = c_ulong;

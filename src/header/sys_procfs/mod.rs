@@ -1,5 +1,7 @@
 #[cfg(target_arch = "aarch64")]
 use crate::header::arch_aarch64_user::*;
+#[cfg(target_arch = "riscv64")]
+use crate::header::arch_riscv64_user::*;
 #[cfg(target_arch = "x86_64")]
 use crate::header::arch_x64_user::*;
 use crate::platform::types::*;
@@ -62,7 +64,7 @@ pub type prstatus_t = elf_prstatus;
 pub type prpsinfo_t = elf_prpsinfo;
 
 #[no_mangle]
-pub extern "C" fn _cbindgen_only_generates_structs_if_they_are_mentioned_which_is_dumb_procfs(
+pub extern "C" fn _cbindgen_export_procfs(
     a: psaddr_t,
     b: prgregset_t,
     c: prfpregset_t,

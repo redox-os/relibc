@@ -1,4 +1,4 @@
-sys_includes = ["stddef.h", "alloca.h", "wchar.h"]
+sys_includes = ["stddef.h", "alloca.h", "wchar.h", "features.h"]
 include_guard = "_RELIBC_STDLIB_H"
 trailer = "#include <bits/stdlib.h>"
 language = "C"
@@ -6,11 +6,5 @@ style = "Type"
 no_includes = true
 cpp_compat = true
 
-[defines]
-"target_pointer_width=64" = "__LP64__"
-
 [enum]
 prefix_with_name = true
-
-[fn]
-no_return = "__attribute__((noreturn))"

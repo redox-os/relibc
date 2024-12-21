@@ -11,6 +11,8 @@
 use alloc::{boxed::Box, string::String};
 use core::{fmt, result, str};
 
+use crate::platform::types::c_int;
+
 /// A specialized [`Result`](../result/enum.Result.html) type for I/O
 /// operations.
 ///
@@ -60,6 +62,17 @@ pub type Result<T> = result::Result<T, Error>;
 /// [`ErrorKind`]: enum.ErrorKind.html
 pub struct Error {
     repr: Repr,
+}
+
+// TODO?
+impl Error {
+    pub fn raw_os_error(&self) -> Option<c_int> {
+        if let Repr::Os(os) = self.repr {
+            Some(os)
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Debug for Error {

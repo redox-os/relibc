@@ -5,14 +5,15 @@ use core::{mem, ptr};
 use cbitset::BitSet;
 
 use crate::{
+    c_str::CStr,
+    error::{Errno, ResultExt},
     header::{errno, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},
-    pthread::{self, Errno, ResultExt},
 };
 
 pub use self::sys::*;
 
-use super::errno::EFAULT;
+use super::{errno::EFAULT, unistd};
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
@@ -33,6 +34,9 @@ pub const SIG_BLOCK: c_int = 0;
 pub const SIG_UNBLOCK: c_int = 1;
 pub const SIG_SETMASK: c_int = 2;
 
+pub const SI_QUEUE: c_int = -1;
+pub const SI_USER: c_int = 0;
+
 #[repr(C)]
 #[derive(Clone, Debug)]
 /// cbindgen:ignore
@@ -51,14 +55,28 @@ pub struct sigaltstack {
     pub ss_size: size_t,
 }
 
+// FIXME: This struct is wrong on Linux
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy)]
 pub struct siginfo {
     pub si_signo: c_int,
     pub si_errno: c_int,
     pub si_code: c_int,
-    _padding: [c_int; 29],
-    _si_align: [usize; 0],
+    pub si_pid: pid_t,
+    pub si_uid: uid_t,
+    pub si_addr: *mut c_void,
+    pub si_status: c_int,
+    pub si_value: sigval,
+}
+
+#[no_mangle]
+pub extern "C" fn _cbindgen_export_siginfo(a: siginfo) {}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub union sigval {
+    pub sival_int: c_int,
+    pub sival_ptr: *mut c_void,
 }
 
 /// cbindgen:ignore
@@ -70,18 +88,24 @@ pub type stack_t = sigaltstack;
 
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
-    Sys::kill(pid, sig)
+    Sys::kill(pid, sig).map(|()| 0).or_minus_one_errno()
+}
+#[no_mangle]
+pub extern "C" fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> c_int {
+    Sys::sigqueue(pid, sig, val)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-    Sys::killpg(pgrp, sig)
+    Sys::killpg(pgrp, sig).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
     let os_tid = {
-        let pthread = &*(thread as *const pthread::Pthread);
+        let pthread = &*(thread as *const crate::pthread::Pthread);
         pthread.os_tid.get().read()
     };
     crate::header::pthread::e(Sys::rlct_kill(os_tid, sig as usize))
@@ -120,7 +144,9 @@ pub unsafe extern "C" fn sigaction(
 
 #[no_mangle]
 pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize > NSIG {
+    if signo <= 0 || signo as usize > NSIG.max(SIGRTMAX)
+    /* TODO */
+    {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
     }
@@ -140,7 +166,9 @@ pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -
 
 #[no_mangle]
 pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize > NSIG {
+    if signo <= 0 || signo as usize > NSIG.max(SIGRTMAX)
+    /* TODO */
+    {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
     }
@@ -242,7 +270,7 @@ pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
     sigprocmask(0, ptr::null_mut(), pset.as_mut_ptr());
     let mut set = pset.assume_init();
     sigdelset(&mut set, sig);
-    sigsuspend(&mut set)
+    sigsuspend(&set)
 }
 
 #[no_mangle]
@@ -337,7 +365,7 @@ pub unsafe extern "C" fn sigset(
 
 #[no_mangle]
 pub unsafe extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
-    Sys::sigsuspend(sigmask)
+    Err(Sys::sigsuspend(&*sigmask)).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -354,13 +382,22 @@ pub unsafe extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int
 #[no_mangle]
 pub unsafe extern "C" fn sigtimedwait(
     set: *const sigset_t,
-    sig: *mut siginfo_t,
+    // s/siginfo_t/siginfo due to https://github.com/mozilla/cbindgen/issues/621
+    sig: *mut siginfo,
+    // POSIX leaves behavior unspecified if this is NULL, but on both Linux and Redox, NULL is used
+    // to differentiate between sigtimedwait and sigwaitinfo internally
     tp: *const timespec,
 ) -> c_int {
-    Sys::sigtimedwait(set, sig, tp)
+    Sys::sigtimedwait(&*set, sig.as_mut(), tp.as_ref())
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+#[no_mangle]
+pub unsafe extern "C" fn sigwaitinfo(set: *const sigset_t, sig: *mut siginfo_t) -> c_int {
+    sigtimedwait(set, sig, core::ptr::null())
 }
 
-pub const _signal_strings: [&str; 32] = [
+pub(crate) const SIGNAL_STRINGS: [&str; 32] = [
     "Unknown signal\0",
     "Hangup\0",
     "Interrupt\0",
@@ -394,3 +431,55 @@ pub const _signal_strings: [&str; 32] = [
     "Power failure\0",
     "Bad system call\0",
 ];
+#[no_mangle]
+pub unsafe extern "C" fn psignal(sig: c_int, prefix: *const c_char) {
+    let c_description = usize::try_from(sig)
+        .ok()
+        .and_then(|idx| SIGNAL_STRINGS.get(idx))
+        .unwrap_or(&SIGNAL_STRINGS[0]);
+    let description = &c_description[..c_description.len() - 1];
+    let prefix = CStr::from_ptr(prefix).to_string_lossy();
+    // TODO: stack vec or print directly?
+    let string = alloc::format!("{prefix}:{description}\n");
+    // TODO: better internal libc API?
+    let _ = unistd::write(
+        unistd::STDERR_FILENO,
+        string.as_bytes().as_ptr().cast(),
+        string.as_bytes().len(),
+    );
+}
+#[no_mangle]
+pub unsafe extern "C" fn psiginfo(info: *const siginfo_t, prefix: *const c_char) {
+    let siginfo_t {
+        si_code,
+        si_signo,
+        si_pid,
+        si_uid,
+        si_errno,
+        si_addr,
+        si_status,
+        si_value,
+    } = &*info;
+    let sival_ptr = si_value.sival_ptr;
+    let prefix = CStr::from_ptr(prefix).to_string_lossy();
+    // TODO: stack vec or print directly?
+    let string = alloc::format!(
+        "{prefix}:siginfo_t {{
+    si_code: {si_code}
+    si_signo: {si_signo}
+    si_pid: {si_pid}
+    si_uid: {si_uid}
+    si_errno: {si_errno}
+    si_addr: {si_addr:p}
+    si_status: {si_status}
+    si_value: {sival_ptr:p}
+}}
+"
+    );
+    // TODO: better internal libc API?
+    let _ = unistd::write(
+        unistd::STDERR_FILENO,
+        string.as_bytes().as_ptr().cast(),
+        string.as_bytes().len(),
+    );
+}

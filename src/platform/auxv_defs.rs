@@ -28,9 +28,9 @@ pub const AT_EXECFN: usize = 31; /* Filename of executable.  */
 
 #[cfg(target_os = "redox")]
 // XXX: The name AT_CWD is already used in openat... for a completely different purpose.
-pub const AT_REDOX_INITIALCWD_PTR: usize = 32;
+pub const AT_REDOX_INITIAL_CWD_PTR: usize = 32;
 #[cfg(target_os = "redox")]
-pub const AT_REDOX_INITIALCWD_LEN: usize = 33;
+pub const AT_REDOX_INITIAL_CWD_LEN: usize = 33;
 
 #[cfg(target_os = "redox")]
 pub const AT_REDOX_INHERITED_SIGIGNMASK: usize = 34;
@@ -40,3 +40,11 @@ pub const AT_REDOX_INHERITED_SIGIGNMASK_HI: usize = 35;
 pub const AT_REDOX_INHERITED_SIGPROCMASK: usize = 36;
 #[cfg(all(target_os = "redox", target_pointer_width = "32"))]
 pub const AT_REDOX_INHERITED_SIGPROCMASK_HI: usize = 37;
+
+#[cfg(target_os = "redox")]
+pub const AT_REDOX_INITIAL_DEFAULT_SCHEME_PTR: usize = 38;
+#[cfg(target_os = "redox")]
+pub const AT_REDOX_INITIAL_DEFAULT_SCHEME_LEN: usize = 39;
+
+#[cfg(target_os = "redox")]
+pub const AT_REDOX_UMASK: usize = 40;

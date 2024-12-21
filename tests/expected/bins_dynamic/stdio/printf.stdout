@@ -1,0 +1,68 @@
+percent: %
+string: String
+char: c
+char: þ
+int: -16
+uint: 32
+hex: beef
+HEX: C0FFEE
+string: end
+%n returned 51, total len of write: 94
+
+Padding madness:
+ 001   +2
+   c
+ 0x00000ff
+ 001
+0 0x1
+ 1
+(00123) (  123)
+(-0123) ( -123)
+(             )
+0xabcdef
+(nil)
+
+Positional madness:
+4 3 2
+00002
+|Fiz     |Buz     |     Fiz|     Tot|
+int:          5 double: 0.100000 0.200000 0.300000 0.400000
+-1717986918 0.100000
+-1717986918 0.200000
+
+Float madness:
+        1.234568e+02
+        1.000000E-05
+          123.456789
+            0.000010
+       -1.234568e+02
+-00000001.234568e+02
+%.5g: -123.46
+%.5f: -123.45679
+%.5e: -1.23457e+02
+%.*g: -1.2e+02
+%.*f: -123.46
+%.*e: -1.23e+02
+%.*2$g: -123.46
+%.*2$f: -123.45679
+%.*2$e: -1.23457e+02
+100000
+1e+06
+1.000000e+06
+0.0001
+1E-05
+1.000000E-05
+
+Non-finite float madness:
+%e: inf -inf nan -nan
+%E: INF -INF NAN -NAN
+%f: inf -inf nan -nan
+%F: INF -INF NAN -NAN
+%g: inf -inf nan -nan
+%G: INF -INF NAN -NAN
+Things that have been buggy
++05
+Testing asprintf...
+printed: test string, value: 11
+printed: test string 2, value: 13
+printed: test string 2, value: 13

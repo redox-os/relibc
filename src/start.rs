@@ -1,3 +1,5 @@
+//! Startup code.
+
 use alloc::{boxed::Box, vec::Vec};
 use core::{intrinsics, ptr};
 
@@ -153,7 +155,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         // Set linker pointer if necessary
         if tcb.linker_ptr.is_null() {
             //TODO: get ld path
-            let linker = Linker::new(None);
+            let linker = Linker::new(ld_so::linker::Config::default());
             //TODO: load root object
             tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
         }
@@ -201,7 +203,10 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     }
 
     // Call init section
-    _init();
+    #[cfg(not(target_arch = "riscv64"))] // risc-v uses arrays exclusively
+    {
+        _init();
+    }
 
     // Run init array
     {

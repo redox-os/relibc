@@ -2,6 +2,7 @@
 
 use crate::{
     c_str::CStr,
+    error::ResultExt,
     header::time::timespec,
     platform::{types::*, Pal, PalSignal, Sys},
 };
@@ -39,6 +40,8 @@ pub struct fd_set {
 #[no_mangle]
 pub unsafe extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
     Sys::getitimer(which, value)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -48,11 +51,13 @@ pub unsafe extern "C" fn setitimer(
     ovalue: *mut itimerval,
 ) -> c_int {
     Sys::setitimer(which, value, ovalue)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
-    Sys::gettimeofday(tp, tzp)
+    Sys::gettimeofday(tp, tzp).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -77,4 +82,6 @@ pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c
         .as_ptr()
     };
     Sys::utimens(path, times_spec)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }

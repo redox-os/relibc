@@ -1,3 +1,8 @@
+//! Synchronization primitives.
+
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 pub mod barrier;
 pub mod cond;
 // TODO: Merge with pthread_mutex
@@ -16,12 +21,12 @@ pub use self::{
 };
 
 use crate::{
+    error::Errno,
     header::{
         errno::{EAGAIN, ETIMEDOUT},
         time::timespec,
     },
     platform::{types::*, Pal, Sys},
-    pthread::Errno,
 };
 use core::{
     mem::MaybeUninit,
@@ -95,14 +100,14 @@ impl FutexAtomicTy for AtomicI32 {
 
 pub unsafe fn futex_wake_ptr(ptr: *mut impl FutexTy, n: i32) -> usize {
     // TODO: unwrap_unchecked?
-    Sys::futex_wake(ptr.cast(), n as u32).unwrap() as usize
+    unsafe { Sys::futex_wake(ptr.cast(), n as u32) }.unwrap() as usize
 }
 pub unsafe fn futex_wait_ptr<T: FutexTy>(
     ptr: *mut T,
     value: T,
     deadline_opt: Option<&timespec>,
 ) -> FutexWaitResult {
-    match Sys::futex_wait(ptr.cast(), value.conv(), deadline_opt) {
+    match unsafe { Sys::futex_wait(ptr.cast(), value.conv(), deadline_opt) } {
         Ok(()) => FutexWaitResult::Waited,
         Err(Errno(EAGAIN)) => FutexWaitResult::Stale,
         Err(Errno(ETIMEDOUT)) if deadline_opt.is_some() => FutexWaitResult::TimedOut,

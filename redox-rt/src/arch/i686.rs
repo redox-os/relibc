@@ -1,10 +1,10 @@
-use core::{mem::offset_of, sync::atomic::Ordering};
+use core::{mem::offset_of, ptr::NonNull, sync::atomic::Ordering};
 
 use syscall::*;
 
 use crate::{
     proc::{fork_inner, FdGuard},
-    signal::{inner_fastcall, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    signal::{inner_fastcall, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     RtTcb,
 };
 
@@ -22,9 +22,13 @@ pub struct SigArea {
     pub tmp_eax: usize,
     pub tmp_ecx: usize,
     pub tmp_edx: usize,
+    pub tmp_rt_inf: RtSigInfo,
+    pub tmp_id_inf: u64,
+    pub tmp_mm0: u64,
     pub pctl: usize, // TODO: reference pctl directly
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
+    pub last_sigstack: Option<NonNull<SigStack>>,
 }
 #[derive(Debug, Default)]
 #[repr(C, align(16))]
@@ -81,11 +85,7 @@ unsafe extern "cdecl" fn fork_impl(initial_rsp: *mut usize) -> usize {
 
 unsafe extern "cdecl" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
-    // TODO: Currently pidfd == threadfd, but this will not be the case later.
-    RtTcb::current()
-        .thr_fd
-        .get()
-        .write(Some(FdGuard::new(new_pid_fd)));
+    crate::child_hook_common(FdGuard::new(new_pid_fd));
 }
 
 asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
@@ -148,41 +148,67 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov ecx, gs:[{tcb_sa_off} + {sa_pctl}]
 
     // Read standard signal word - for the process
-    mov eax, [ecx + {pctl_word}]
+    mov eax, [ecx + {pctl_pending}]
     and eax, edx
-    jz 3f
     bsf eax, eax
+    jz 3f
+
+    // Read si_pid and si_uid, atomically.
+    movq gs:[{tcb_sa_off} + {sa_tmp_mm0}], mm0
+    movq mm0, [ecx + {pctl_sender_infos} + eax * 8]
+    movq gs:[{tcb_sa_off} + {sa_tmp_id_inf}], mm0
+    movq mm0, gs:[{tcb_sa_off} + {sa_tmp_mm0}]
 
     // Try clearing the pending bit, otherwise retry if another thread did that first
-    lock btr [ecx + {pctl_word}], eax
+    lock btr [ecx + {pctl_pending}], eax
     jnc 1b
     jmp 2f
 3:
     // Read realtime thread and process signal word together
-    mov edx, [ecx + {pctl_word} + 4]
+    mov edx, [ecx + {pctl_pending} + 4]
     mov eax, gs:[{tcb_sc_off} + {sc_word} + 8]
     or eax, edx
     and eax, gs:[{tcb_sc_off} + {sc_word} + 12]
     jz 7f // spurious signal
     bsf eax, eax
 
+    // If thread was specifically targeted, send the signal to it first.
     bt edx, eax
     jc 8f
 
-    lock btr [ecx + {pctl_word} + 4], eax
-    jnc 1b
-    add eax, 32
+    mov edx, ebx
+    lea ecx, [eax+32]
+    mov eax, {SYS_SIGDEQUEUE}
+    mov edx, gs:[0]
+    add edx, {tcb_sa_off} + {sa_tmp_rt_inf}
+    int 0x80
+    mov ebx, edx
+    test eax, eax
+    jnz 1b
+
+    mov eax, ecx
     jmp 2f
 8:
     add eax, 32
 9:
+    // Read si_pid and si_uid, atomically.
+    movq gs:[{tcb_sa_off} + {sa_tmp_mm0}], mm0
+    movq mm0, gs:[{tcb_sc_off} + {sc_sender_infos} + eax * 8]
+    movq gs:[{tcb_sa_off} + {sa_tmp_id_inf}], mm0
+    movq mm0, gs:[{tcb_sa_off} + {sa_tmp_mm0}]
+    mov edx, eax
+    shr edx, 5
+    mov ecx, eax
+    and ecx, 31
+    lock btr gs:[{tcb_sc_off} + {sc_word} + edx * 8], ecx
+
     add eax, 64
 2:
     and esp, -{STACK_ALIGN}
 
     mov edx, eax
     add edx, edx
-    bt dword ptr [{pctl} + {pctl_off_actions} + edx * 8 + 4], 28
+    bt dword ptr [{pctl} + {pctl_actions} + edx * 8 + 4], 28
     jnc 4f
 
     mov edx, gs:[{tcb_sa_off} + {sa_altstack_top}]
@@ -200,7 +226,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     push dword ptr gs:[{tcb_sc_off} + {sc_saved_eflags}]
 
     push dword ptr gs:[{tcb_sa_off} + {sa_tmp_edx}]
-    push ecx
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_ecx}]
     push dword ptr gs:[{tcb_sa_off} + {sa_tmp_eax}]
     push ebx
     push edi
@@ -210,14 +236,14 @@ asmfunction!(__relibc_internal_sigentry: ["
     sub esp, 2 * 4 + 29 * 16
     fxsave [esp]
 
-    push eax
-    sub esp, 3 * 4
+    mov [esp - 4], eax
+    sub esp, 48
 
     mov ecx, esp
     call {inner}
 
-    fxrstor [esp + 16]
-    add esp, 16 + 29 * 16 + 2 * 4
+    fxrstor [esp + 48]
+    add esp, 48 + 29 * 16 + 2 * 4
 
     pop ebp
     pop esi
@@ -262,6 +288,9 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_eax = const offset_of!(SigArea, tmp_eax),
     sa_tmp_ecx = const offset_of!(SigArea, tmp_ecx),
     sa_tmp_edx = const offset_of!(SigArea, tmp_edx),
+    sa_tmp_mm0 = const offset_of!(SigArea, tmp_mm0),
+    sa_tmp_rt_inf = const offset_of!(SigArea, tmp_rt_inf),
+    sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
     sa_pctl = const offset_of!(SigArea, pctl),
@@ -269,12 +298,15 @@ __relibc_internal_sigentry_crit_third:
     sc_saved_eflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
     sc_word = const offset_of!(Sigcontrol, word),
+    sc_sender_infos = const offset_of!(Sigcontrol, sender_infos),
     tcb_sa_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, arch),
     tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
-    pctl_off_actions = const offset_of!(SigProcControl, actions),
-    pctl_word = const offset_of!(SigProcControl, pending),
+    pctl_actions = const offset_of!(SigProcControl, actions),
+    pctl_sender_infos = const offset_of!(SigProcControl, sender_infos),
+    pctl_pending = const offset_of!(SigProcControl, pending),
     pctl = sym PROC_CONTROL_STRUCT,
     STACK_ALIGN = const 16,
+    SYS_SIGDEQUEUE = const syscall::SYS_SIGDEQUEUE,
 ]);
 
 asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
@@ -300,15 +332,20 @@ extern "C" {
     fn __relibc_internal_sigentry_crit_second();
     fn __relibc_internal_sigentry_crit_third();
 }
-pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) {
+pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt {
     if stack.regs.eip == __relibc_internal_sigentry_crit_first as usize {
         let stack_ptr = stack.regs.esp as *const usize;
         stack.regs.esp = stack_ptr.read();
         stack.regs.eip = stack_ptr.sub(1).read();
-    } else if stack.regs.eip == __relibc_internal_sigentry_crit_second as usize {
+    } else if stack.regs.eip == __relibc_internal_sigentry_crit_second as usize
+        || stack.regs.eip == __relibc_internal_sigentry_crit_third as usize
+    {
         stack.regs.eip = area.tmp_eip;
-    } else if stack.regs.eip == __relibc_internal_sigentry_crit_third as usize {
-        stack.regs.eip = area.tmp_eip;
+    }
+    PosixStackt {
+        sp: stack.regs.esp as *mut (),
+        size: 0,  // TODO
+        flags: 0, // TODO
     }
 }
 #[no_mangle]

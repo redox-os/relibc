@@ -15,7 +15,10 @@ void test_dlopen_null()
         printf("dlopen(NULL) failed\n");
         exit(1);
     }
-    int (*f)(int, int) = dlsym(handle, "add");
+
+    int (*f)(int, int);
+    *(void **)(&f) = dlsym(handle, "add");
+
     if (!f) {
         printf("dlsym(handle, add) failed\n");
         exit(2);
@@ -33,7 +36,10 @@ void test_dlopen_libc()
         printf("dlopen(libc.so.6) failed\n");
         exit(1);
     }
-    int (*f)(const char*) = dlsym(handle, "puts");
+    
+    int (*f)(const char*);
+    *(void **)(&f) = dlsym(handle, "puts");
+
     if (!f) {
         printf("dlsym(handle, puts) failed\n");
         exit(2);
@@ -50,7 +56,10 @@ void test_dlsym_function()
         printf("dlopen(sharedlib.so) failed\n");
         exit(1);
     }
-    void (*f)() = dlsym(handle, "print");
+
+    void (*f)();
+    *(void **)(&f) = dlsym(handle, "print");
+
     if (!f) {
         printf("dlsym(handle, print) failed\n");
         exit(2);

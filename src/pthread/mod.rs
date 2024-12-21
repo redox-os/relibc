@@ -2,7 +2,7 @@
 
 use core::{
     cell::{Cell, UnsafeCell},
-    mem::MaybeUninit,
+    mem::{offset_of, MaybeUninit},
     ptr::{addr_of, NonNull},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
@@ -10,6 +10,7 @@ use core::{
 use alloc::{boxed::Box, collections::BTreeMap};
 
 use crate::{
+    error::Errno,
     header::{errno::*, pthread as header, sched::sched_param, sys_mman},
     ld_so::{
         linker::Linker,
@@ -20,8 +21,6 @@ use crate::{
 };
 
 use crate::sync::{waitval::Waitval, Mutex};
-
-const MAIN_PTHREAD_ID: usize = 1;
 
 /// Called only by the main thread, as part of relibc_start.
 pub unsafe fn init() {
@@ -81,39 +80,6 @@ pub struct OsTid {
 
 unsafe impl Send for Pthread {}
 unsafe impl Sync for Pthread {}
-
-/// Positive error codes (EINVAL, not -EINVAL).
-#[derive(Debug, Eq, PartialEq)]
-// TODO: Move to a more generic place.
-pub struct Errno(pub c_int);
-
-#[cfg(target_os = "redox")]
-impl From<syscall::Error> for Errno {
-    fn from(value: syscall::Error) -> Self {
-        Errno(value.errno)
-    }
-}
-#[cfg(target_os = "redox")]
-impl From<Errno> for syscall::Error {
-    fn from(value: Errno) -> Self {
-        syscall::Error::new(value.0)
-    }
-}
-
-pub trait ResultExt<T> {
-    fn or_minus_one_errno(self) -> T;
-}
-impl<T: From<i8>> ResultExt<T> for Result<T, Errno> {
-    fn or_minus_one_errno(self) -> T {
-        match self {
-            Self::Ok(v) => v,
-            Self::Err(Errno(errno)) => unsafe {
-                crate::platform::ERRNO.set(errno);
-                T::from(-1)
-            },
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Retval(pub *mut c_void);
@@ -301,7 +267,7 @@ pub unsafe fn join(thread: &Pthread) -> Result<Retval, Errno> {
 pub unsafe fn detach(thread: &Pthread) -> Result<(), Errno> {
     thread
         .flags
-        .fetch_or(PthreadFlags::DETACHED.bits(), Ordering::Release);
+        .fetch_or(PthreadFlags::DETACHED.bits(), Ordering::AcqRel);
     Ok(())
 }
 
@@ -326,6 +292,8 @@ pub unsafe fn exit_current_thread(retval: Retval) -> ! {
     header::tls::run_all_destructors();
 
     let this = current_thread().expect("failed to obtain current thread when exiting");
+    let stack_base = this.stack_base;
+    let stack_size = this.stack_size;
 
     if this.flags.load(Ordering::Acquire) & PthreadFlags::DETACHED.bits() != 0 {
         // When detached, the thread state no longer makes any sense, and can immediately be
@@ -336,12 +304,12 @@ pub unsafe fn exit_current_thread(retval: Retval) -> ! {
         this.waitval.post(retval);
     }
 
-    Sys::exit_thread()
+    Sys::exit_thread(stack_base.cast(), stack_size)
 }
 
 unsafe fn dealloc_thread(thread: &Pthread) {
+    // TODO: How should this be handled on Linux?
     OS_TID_TO_PTHREAD.lock().remove(&thread.os_tid.get().read());
-    //drop(Box::from_raw(thread as *const Pthread as *mut Pthread));
 }
 pub const SIGRT_RLCT_CANCEL: usize = 33;
 pub const SIGRT_RLCT_TIMER: usize = 34;

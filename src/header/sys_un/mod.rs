@@ -1,5 +1,10 @@
+//! `sys/un.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_un.h.html>.
+
 use crate::{header::sys_socket::sa_family_t, platform::types::*};
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_un.h.html>.
 #[repr(C)]
 pub struct sockaddr_un {
     pub sun_family: sa_family_t,

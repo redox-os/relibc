@@ -1,5 +1,9 @@
 use core::arch::global_asm;
 
+use redox_rt::signal::SiginfoAbi;
+
+use super::{siginfo_t, sigset_t, stack_t};
+
 pub const SIGHUP: usize = 1;
 pub const SIGINT: usize = 2;
 pub const SIGQUIT: usize = 3;
@@ -48,6 +52,70 @@ pub const SA_NOCLDSTOP: usize = 0x4000_0000;
 pub const SS_ONSTACK: usize = 0x00000001;
 pub const SS_DISABLE: usize = 0x00000002;
 
-// TODO: It's just a guess based on Linux
+const _: () = {
+    if SS_ONSTACK != redox_rt::signal::SS_ONSTACK {
+        panic!();
+    }
+    if SS_DISABLE != redox_rt::signal::SS_DISABLE {
+        panic!();
+    }
+    if MINSIGSTKSZ != redox_rt::signal::MIN_SIGALTSTACK_SIZE {
+        panic!();
+    }
+};
+
+// should include both SigStack size, and some extra room for the libc handler
 pub const MINSIGSTKSZ: usize = 2048;
+
 pub const SIGSTKSZ: usize = 8096;
+
+pub const SI_QUEUE: i32 = -1;
+pub const SI_USER: i32 = 0;
+
+pub(crate) type ucontext_t = ucontext;
+pub(crate) type mcontext_t = mcontext;
+
+#[repr(C)]
+pub struct ucontext {
+    #[cfg(any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "riscv64"
+    ))]
+    _pad: [usize; 1], // pad from 7*8 to 64
+
+    #[cfg(target_arch = "x86")]
+    _pad: [usize; 3], // pad from 9*4 to 12*4
+
+    pub uc_link: *mut ucontext_t,
+    pub uc_stack: stack_t,
+    pub uc_sigmask: sigset_t,
+    _sival: usize,
+    _sigcode: u32,
+    _signum: u32,
+    pub uc_mcontext: mcontext_t,
+}
+
+#[repr(C)]
+pub struct mcontext {
+    #[cfg(target_arch = "x86")]
+    _opaque: [u8; 512],
+    #[cfg(target_arch = "x86_64")]
+    _opaque: [u8; 864],
+    #[cfg(target_arch = "aarch64")]
+    _opaque: [u8; 272],
+    #[cfg(target_arch = "riscv64")]
+    _opaque: [u8; 520],
+}
+#[no_mangle]
+pub extern "C" fn __completely_unused_cbindgen_workaround_fn_ucontext_mcontext(
+    a: *const ucontext_t,
+    b: *const mcontext_t,
+) {
+}
+
+impl From<SiginfoAbi> for siginfo_t {
+    fn from(value: SiginfoAbi) -> Self {
+        unsafe { core::mem::transmute(value) }
+    }
+}

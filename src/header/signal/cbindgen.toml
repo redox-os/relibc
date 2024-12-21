@@ -1,14 +1,10 @@
-sys_includes = ["bits/signal.h", "stdint.h", "sys/types.h", "time.h", "bits/pthread.h"]
+sys_includes = ["bits/signal.h", "stdint.h", "sys/types.h", "time.h", "bits/pthread.h", "features.h"]
 include_guard = "_RELIBC_SIGNAL_H"
 trailer = "#include <bits/signal.h>"
 language = "C"
 style = "Tag"
 no_includes = true
 cpp_compat = true
-
-[defines]
-"target_os=linux" = "__linux__"
-"target_os=redox" = "__redox__"
 
 [enum]
 prefix_with_name = true

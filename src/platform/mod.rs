@@ -1,6 +1,8 @@
+//! Platform abstractions and environment.
+
 use crate::{
+    error::{Errno, ResultExt},
     io::{self, Read, Write},
-    pthread::ResultExt,
 };
 use alloc::{boxed::Box, vec::Vec};
 use core::{cell::Cell, fmt, ptr};
@@ -13,7 +15,7 @@ pub use self::pal::{Pal, PalEpoll, PalPtrace, PalSignal, PalSocket};
 
 mod pal;
 
-pub use self::sys::{e, Sys};
+pub use self::sys::Sys;
 
 #[cfg(all(not(feature = "no_std"), target_os = "linux"))]
 #[path = "linux/mod.rs"]
@@ -38,9 +40,11 @@ pub use redox_rt::auxv_defs;
 use self::types::*;
 pub mod types;
 
+/// The global `errno` variable used internally in relibc.
 #[thread_local]
 pub static ERRNO: Cell<c_int> = Cell::new(0);
 
+/// The `argv` argument available to a program's `main` function.
 #[allow(non_upper_case_globals)]
 pub static mut argv: *mut *mut c_char = ptr::null_mut();
 #[allow(non_upper_case_globals)]
@@ -82,11 +86,19 @@ impl<'a, W: WriteByte> WriteByte for &'a mut W {
     }
 }
 
-pub struct FileWriter(pub c_int);
+pub struct FileWriter(pub c_int, Option<Errno>);
 
 impl FileWriter {
-    pub fn write(&mut self, buf: &[u8]) -> isize {
-        Sys::write(self.0, buf).or_minus_one_errno()
+    pub fn new(fd: c_int) -> Self {
+        Self(fd, None)
+    }
+
+    pub fn write(&mut self, buf: &[u8]) -> fmt::Result {
+        let _ = Sys::write(self.0, buf).map_err(|err| {
+            self.1 = Some(err);
+            fmt::Error
+        })?;
+        Ok(())
     }
 }
 
@@ -107,14 +119,19 @@ impl WriteByte for FileWriter {
 pub struct FileReader(pub c_int);
 
 impl FileReader {
+    // TODO: This is a bad interface. Rustify
     pub fn read(&mut self, buf: &mut [u8]) -> isize {
-        Sys::read(self.0, buf).or_minus_one_errno()
+        Sys::read(self.0, buf)
+            .map(|u| u as isize)
+            .or_minus_one_errno()
     }
 }
 
 impl Read for FileReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let i = Sys::read(self.0, buf).or_minus_one_errno(); // TODO
+        let i = Sys::read(self.0, buf)
+            .map(|u| u as isize)
+            .or_minus_one_errno(); // TODO
         if i >= 0 {
             Ok(i as usize)
         } else {
@@ -283,17 +300,34 @@ pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
 
 #[cold]
 #[cfg(target_os = "redox")]
-pub fn init(auxvs: Box<[[usize; 2]]>) {
+// SAFETY: Must only be called when only one thread exists.
+pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
+    redox_rt::initialize();
+
+    use syscall::MODE_PERM;
+
+    use crate::header::sys_stat::S_ISVTX;
+
     use self::auxv_defs::*;
 
     if let (Some(cwd_ptr), Some(cwd_len)) = (
-        get_auxv(&auxvs, AT_REDOX_INITIALCWD_PTR),
-        get_auxv(&auxvs, AT_REDOX_INITIALCWD_LEN),
+        get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_PTR),
+        get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_LEN),
     ) {
-        let cwd_bytes: &'static [u8] =
-            unsafe { core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len) };
+        let cwd_bytes: &'static [u8] = core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len);
         if let Ok(cwd) = core::str::from_utf8(cwd_bytes) {
-            self::sys::path::setcwd_manual(cwd.into());
+            self::sys::path::set_cwd_manual(cwd.into());
+        }
+    }
+
+    if let (Some(scheme_ptr), Some(scheme_len)) = (
+        get_auxv(&auxvs, AT_REDOX_INITIAL_DEFAULT_SCHEME_PTR),
+        get_auxv(&auxvs, AT_REDOX_INITIAL_DEFAULT_SCHEME_LEN),
+    ) {
+        let scheme_bytes: &'static [u8] =
+            unsafe { core::slice::from_raw_parts(scheme_ptr as *const u8, scheme_len) };
+        if let Ok(scheme) = core::str::from_utf8(scheme_bytes) {
+            self::sys::path::set_default_scheme_manual(scheme.into());
         }
     }
 
@@ -307,6 +341,11 @@ pub fn init(auxvs: Box<[[usize; 2]]>) {
         inherited_sigprocmask |= (mask as u64) << 32;
     }
     redox_rt::signal::set_sigmask(Some(inherited_sigprocmask), None).unwrap();
+
+    if let Some(umask) = get_auxv(&auxvs, AT_REDOX_UMASK) {
+        let _ =
+            redox_rt::sys::swap_umask((umask as u32) & u32::from(MODE_PERM) & !(S_ISVTX as u32));
+    }
 }
 #[cfg(not(target_os = "redox"))]
 pub fn init(auxvs: Box<[[usize; 2]]>) {}

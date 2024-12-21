@@ -1,3 +1,5 @@
+//! Nul-terminated byte strings.
+
 use core::{marker::PhantomData, ptr::NonNull, str::Utf8Error};
 
 use alloc::{

@@ -72,7 +72,7 @@ pub struct user {
 }
 
 #[no_mangle]
-pub extern "C" fn _cbindgen_only_generates_structs_if_they_are_mentioned_which_is_dumb_x86_user(
+pub extern "C" fn _cbindgen_export_x86_user(
     a: user_fpregs_struct,
     b: user_regs_struct,
     c: user,

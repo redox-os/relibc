@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
@@ -26,6 +27,7 @@ int main(void) {
     puts("--- Testing rewind ---");
     rewinddir(dir);
     entry = readdir(dir);
+    assert(entry != NULL);
     puts(entry->d_name);
 
     // puts("--- Testing seek ---");

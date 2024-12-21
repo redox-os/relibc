@@ -20,7 +20,7 @@ pub type elf_gregset_t = [c_ulong; 34];
 pub type elf_fpregset_t = user_fpsimd_struct;
 
 #[no_mangle]
-pub extern "C" fn _cbindgen_only_generates_structs_if_they_are_mentioned_which_is_dumb_aarch64_user(
+pub extern "C" fn _cbindgen_export_aarch64_user(
     a: user_regs_struct,
     b: user_fpsimd_struct,
     c: elf_gregset_t,

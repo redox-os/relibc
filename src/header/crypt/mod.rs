@@ -1,3 +1,10 @@
+//! `crypt.h` implementation.
+//!
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/crypt.3.html>.
+
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use ::scrypt::password_hash::{Salt, SaltString};
 use alloc::{
     ffi::CString,
@@ -26,6 +33,7 @@ use self::{
     sha::{crypt_sha, ShaType::*},
 };
 
+/// See <https://www.man7.org/linux/man-pages/man3/crypt.3.html>.
 #[repr(C)]
 pub struct crypt_data {
     initialized: c_int,
@@ -48,18 +56,21 @@ fn gen_salt() -> Option<String> {
     Some(SaltString::encode_b64(&bytes).ok()?.as_str().to_string())
 }
 
+/// See <https://www.man7.org/linux/man-pages/man3/crypt.3.html>.
 #[no_mangle]
 pub unsafe extern "C" fn crypt_r(
     key: *const c_char,
     setting: *const c_char,
     data: *mut crypt_data,
 ) -> *mut c_char {
-    if (*data).initialized == 0 {
-        *data = crypt_data::new();
+    if unsafe { (*data).initialized } == 0 {
+        unsafe { *data = crypt_data::new() };
     }
 
-    let key = CStr::from_ptr(key).to_str().expect("key must be utf-8");
-    let setting = CStr::from_ptr(setting)
+    let key = unsafe { CStr::from_ptr(key) }
+        .to_str()
+        .expect("key must be utf-8");
+    let setting = unsafe { CStr::from_ptr(setting) }
         .to_str()
         .expect("setting must be utf-8");
     let setting_bytes = setting.as_bytes();
@@ -89,8 +100,10 @@ pub unsafe extern "C" fn crypt_r(
         let len = inner.len();
         if let Ok(ret) = CString::new(inner) {
             let ret_ptr = ret.into_raw();
-            let dst = (*data).buff.as_mut_ptr();
-            ptr::copy_nonoverlapping(ret_ptr, dst.cast(), len);
+            let dst = unsafe { (*data).buff }.as_mut_ptr();
+            unsafe {
+                ptr::copy_nonoverlapping(ret_ptr, dst.cast(), len);
+            }
             ret_ptr.cast()
         } else {
             ptr::null_mut()

@@ -3,6 +3,8 @@
 mod dns;
 
 use core::{
+    cell::Cell,
+    fmt::Write,
     mem, ptr, slice,
     str::{self, FromStr},
 };
@@ -11,6 +13,7 @@ use alloc::{borrow::ToOwned, boxed::Box, str::SplitWhitespace, vec::Vec};
 
 use crate::{
     c_str::{CStr, CString},
+    error::ResultExt,
     header::{
         arpa_inet::{htons, inet_aton, ntohl},
         errno::*,
@@ -131,13 +134,17 @@ pub static mut NET_ADDR: Option<u32> = None;
 static mut N_POS: usize = 0;
 static mut NET_STAYOPEN: c_int = 0;
 
-#[allow(non_upper_case_globals)]
-#[no_mangle]
-pub static mut h_errno: c_int = 0;
+#[thread_local]
+pub static H_ERRNO: Cell<c_int> = Cell::new(0);
+const H_UNSET: c_int = 0;
 pub const HOST_NOT_FOUND: c_int = 1;
 pub const NO_DATA: c_int = 2;
 pub const NO_RECOVERY: c_int = 3;
 pub const TRY_AGAIN: c_int = 4;
+
+// Expected length of addresses
+const SOCKLEN_AF_INET4: socklen_t = 4;
+const SOCKLEN_AF_INET6: socklen_t = 16;
 
 static mut PROTODB: c_int = 0;
 static mut PROTO_ENTRY: protoent = protoent {
@@ -187,12 +194,44 @@ pub unsafe extern "C" fn endservent() {
     SERVDB = 0;
 }
 
+/// Resolve a host name from a given network address.
+///
+/// # Arguments
+/// * `v` - Address to resolve as a non-null [`in_addr`]
+/// * `length` -
+/// * `format` - AF_INET or AF_INET6
+///
+/// # Safety
+/// * `v` must be a valid pointer.
+/// * `length` must correctly match the size of `v` as expected by `format` (usually 4 or 16).
+/// * This function is not reentrant and may modify static data.
+///
+/// # Panics
+/// Panics if `v` is a null pointer.
+///
+/// # Deprecation
+/// Deprecated as of POSIX.1-2001 and removed in POSIX.1-2008.
+/// New code should use [`getaddrinfo`] instead.
 #[no_mangle]
+#[deprecated]
 pub unsafe extern "C" fn gethostbyaddr(
     v: *const c_void,
     length: socklen_t,
     format: c_int,
 ) -> *mut hostent {
+    assert!(
+        !v.is_null(),
+        "`gethostbyaddr()` called with null `v` (in_addr)"
+    );
+    // Uncomment if optional IPv6 support is added
+    // if length != SOCKLEN_AF_INET4 || length != SOCKLEN_AF_INET6 {
+    //     H_ERRNO.set(NO_RECOVERY);
+    //     return ptr::null_mut();
+    // }
+    if length != SOCKLEN_AF_INET4 {
+        H_ERRNO.set(NO_RECOVERY);
+        return ptr::null_mut();
+    }
     let addr: in_addr = *(v as *mut in_addr);
 
     // check the hosts file first
@@ -228,11 +267,10 @@ pub unsafe extern "C" fn gethostbyaddr(
     host_aliases.push(ptr::null_mut());
     HOST_ALIASES = Some(_host_aliases);
 
-    match lookup_addr(addr) {
-        Ok(s) => {
-            _HOST_ADDR_LIST = mem::transmute::<u32, [u8; 4]>(addr.s_addr);
+    match lookup_addr(addr).map(|host_names| host_names.into_iter().next()) {
+        Ok(Some(host_name)) => {
+            _HOST_ADDR_LIST = addr.s_addr.to_ne_bytes();
             HOST_ADDR_LIST = [_HOST_ADDR_LIST.as_mut_ptr() as *mut c_char, ptr::null_mut()];
-            let host_name = s[0].to_vec();
             HOST_NAME = Some(host_name);
             HOST_ENTRY = hostent {
                 h_name: HOST_NAME.as_mut().unwrap().as_mut_ptr() as *mut c_char,
@@ -243,18 +281,49 @@ pub unsafe extern "C" fn gethostbyaddr(
             };
             &mut HOST_ENTRY
         }
+        // `glibc` sets errno if an address doesn't have a host name
+        // `musl` uses the address as the host name in said case
+        Ok(None) => {
+            H_ERRNO.set(HOST_NOT_FOUND);
+            ptr::null_mut()
+        }
         Err(e) => {
-            platform::ERRNO.set(e);
+            // TODO: Better error separation in lookup_addr
+            H_ERRNO.set(NO_RECOVERY);
             ptr::null_mut()
         }
     }
 }
 
+/// Resolve host information by name or IP address.
+///
+/// # Arguments
+/// * `name` - Host name or IP address.
+///
+/// # Safety
+/// `name` must be a valid string.
+/// This function is not reentrant and may modify static data.
+///
+/// # Panics
+/// Panics if `name` is a null pointer.
+///
+/// # Deprecation
+/// Deprecated as of POSIX.1-2001 and removed in POSIX.1-2008.
+/// New code should use [`getaddrinfo`] instead.
 #[no_mangle]
+#[deprecated]
 pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
-    // check if some idiot gave us an address instead of a name
-    let name_cstr = CStr::from_ptr(name);
-    let mut octets = str::from_utf8_unchecked(name_cstr.to_bytes()).split('.');
+    let name_cstr =
+        CStr::from_nullable_ptr(name).expect("gethostbyname() called with a NULL pointer");
+    let Ok(name_str) = str::from_utf8(name_cstr.to_bytes()) else {
+        H_ERRNO.set(NO_RECOVERY);
+        return ptr::null_mut();
+    };
+
+    // Addresses and hostnames are both valid, so we'll check addresses first
+    // The standard doesn't define what to do when called with addresses
+    // Some implementations just skip resolution and copy the address to h_name
+    let mut octets = name_str.split('.');
     let mut s_addr = [0u8; 4];
     let mut is_addr = true;
     for item in &mut s_addr {
@@ -262,6 +331,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
             *item = n;
         } else {
             is_addr = false;
+            break;
         }
     }
     if octets.next() != None {
@@ -269,9 +339,8 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     }
 
     if is_addr {
-        let addr = in_addr {
-            s_addr: mem::transmute::<[u8; 4], u32>(s_addr),
-        };
+        let s_addr = u32::from_ne_bytes(s_addr);
+        let addr = in_addr { s_addr };
         return gethostbyaddr(&addr as *const _ as *const c_void, 4, AF_INET);
     }
 
@@ -302,26 +371,24 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
         }
     }
 
-    let name_cstr = CStr::from_ptr(name);
-
-    let mut host = match lookup_host(str::from_utf8_unchecked(name_cstr.to_bytes())) {
+    let mut host = match lookup_host(name_str) {
         Ok(lookuphost) => lookuphost,
         Err(e) => {
-            platform::ERRNO.set(e);
+            H_ERRNO.set(NO_RECOVERY);
             return ptr::null_mut();
         }
     };
     let host_addr = match host.next() {
         Some(result) => result,
         None => {
-            platform::ERRNO.set(ENOENT);
+            H_ERRNO.set(HOST_NOT_FOUND);
             return ptr::null_mut();
         }
     };
 
     let host_name: Vec<u8> = name_cstr.to_bytes().to_vec();
     HOST_NAME = Some(host_name);
-    _HOST_ADDR_LIST = mem::transmute::<u32, [u8; 4]>(host_addr.s_addr);
+    _HOST_ADDR_LIST = host_addr.s_addr.to_ne_bytes();
     HOST_ADDR_LIST = [_HOST_ADDR_LIST.as_mut_ptr() as *mut c_char, ptr::null_mut()];
     HOST_ADDR = Some(host_addr);
 
@@ -369,8 +436,10 @@ pub unsafe extern "C" fn getnetbyname(name: *const c_char) -> *mut netent {
 
 #[no_mangle]
 pub unsafe extern "C" fn getnetent() -> *mut netent {
+    // TODO: Rustify implementation
+
     if NETDB == 0 {
-        NETDB = Sys::open(c_str!("/etc/networks"), O_RDONLY, 0);
+        NETDB = Sys::open(c_str!("/etc/networks"), O_RDONLY, 0).or_minus_one_errno();
     }
 
     let mut rlb = RawLineBuffer::new(NETDB);
@@ -393,29 +462,24 @@ pub unsafe extern "C" fn getnetent() -> *mut netent {
 
     let mut iter: SplitWhitespace = r.split_whitespace();
 
-    let mut net_name = iter.next().unwrap().as_bytes().to_vec();
-    net_name.push(b'\0');
+    let net_name = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
     NET_NAME = Some(net_name);
 
-    let mut addr_vec = iter.next().unwrap().as_bytes().to_vec();
-    addr_vec.push(b'\0');
+    let addr_vec: Vec<u8> = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
     let addr_cstr = addr_vec.as_slice().as_ptr() as *const i8;
     let mut addr = mem::MaybeUninit::uninit();
     inet_aton(addr_cstr, addr.as_mut_ptr());
     let addr = addr.assume_init();
     NET_ADDR = Some(ntohl(addr.s_addr));
 
-    let mut _net_aliases: Vec<Vec<u8>> = Vec::new();
-    for s in iter {
-        let mut alias = s.as_bytes().to_vec();
-        alias.push(b'\0');
-        _net_aliases.push(alias);
-    }
+    let mut _net_aliases: Vec<Vec<u8>> = iter
+        .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
+        .collect();
     let mut net_aliases: Vec<*mut i8> = _net_aliases
         .iter_mut()
         .map(|x| x.as_mut_ptr() as *mut i8)
+        .chain(Some(ptr::null_mut()))
         .collect();
-    net_aliases.push(ptr::null_mut());
     NET_ALIASES = Some(_net_aliases);
 
     NET_ENTRY = netent {
@@ -484,7 +548,7 @@ pub unsafe extern "C" fn getprotobynumber(number: c_int) -> *mut protoent {
 #[no_mangle]
 pub unsafe extern "C" fn getprotoent() -> *mut protoent {
     if PROTODB == 0 {
-        PROTODB = Sys::open(c_str!("/etc/protocols"), O_RDONLY, 0);
+        PROTODB = Sys::open(c_str!("/etc/protocols"), O_RDONLY, 0).or_minus_one_errno();
     }
 
     let mut rlb = RawLineBuffer::new(PROTODB);
@@ -514,17 +578,14 @@ pub unsafe extern "C" fn getprotoent() -> *mut protoent {
     num.push(b'\0');
     PROTO_NUM = Some(atoi(num.as_mut_slice().as_mut_ptr() as *mut i8));
 
-    let mut _proto_aliases: Vec<Vec<u8>> = Vec::new();
-    for s in iter {
-        let mut alias = s.as_bytes().to_vec();
-        alias.push(b'\0');
-        _proto_aliases.push(alias);
-    }
+    let mut _proto_aliases: Vec<Vec<u8>> = iter
+        .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
+        .collect();
     let mut proto_aliases: Vec<*mut i8> = _proto_aliases
         .iter_mut()
         .map(|x| x.as_mut_ptr() as *mut i8)
+        .chain(Some(ptr::null_mut()))
         .collect();
-    proto_aliases.push(ptr::null_mut());
 
     PROTO_ALIASES = Some(_proto_aliases);
     PROTO_NAME = Some(proto_name);
@@ -603,7 +664,8 @@ pub unsafe extern "C" fn getservbyport(port: c_int, proto: *const c_char) -> *mu
 #[no_mangle]
 pub unsafe extern "C" fn getservent() -> *mut servent {
     if SERVDB == 0 {
-        SERVDB = Sys::open(c_str!("/etc/services"), O_RDONLY, 0);
+        // TODO: Rustify
+        SERVDB = Sys::open(c_str!("/etc/services"), O_RDONLY, 0).or_minus_one_errno();
     }
     let mut rlb = RawLineBuffer::new(SERVDB);
     rlb.seek(S_POS);
@@ -622,28 +684,25 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
         };
 
         let mut iter = r.split_whitespace();
-        let mut serv_name = match iter.next() {
-            Some(serv_name) => serv_name.as_bytes().to_vec(),
+        let serv_name = match iter.next() {
+            Some(serv_name) => serv_name.bytes().chain(Some(b'\0')).collect(),
             None => continue,
         };
-        serv_name.push(b'\0');
         let port_proto = match iter.next() {
             Some(port_proto) => port_proto,
             None => continue,
         };
         let mut split = port_proto.split('/');
-        let mut port = match split.next() {
-            Some(port) => port.as_bytes().to_vec(),
+        let mut port: Vec<u8> = match split.next() {
+            Some(port) => port.bytes().chain(Some(b'\0')).collect(),
             None => continue,
         };
-        port.push(b'\0');
         SERV_PORT =
             Some(htons(atoi(port.as_mut_slice().as_mut_ptr() as *mut i8) as u16) as u32 as i32);
-        let mut proto = match split.next() {
-            Some(proto) => proto.as_bytes().to_vec(),
+        let proto = match split.next() {
+            Some(proto) => proto.bytes().chain(Some(b'\0')).collect(),
             None => continue,
         };
-        proto.push(b'\0');
 
         rlb.next();
         S_POS = rlb.line_pos();
@@ -690,7 +749,7 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
 pub unsafe extern "C" fn setnetent(stayopen: c_int) {
     NET_STAYOPEN = stayopen;
     if NETDB == 0 {
-        NETDB = Sys::open(c_str!("/etc/networks"), O_RDONLY, 0)
+        NETDB = Sys::open(c_str!("/etc/networks"), O_RDONLY, 0).or_minus_one_errno()
     } else {
         Sys::lseek(NETDB, 0, SEEK_SET);
         N_POS = 0;
@@ -701,7 +760,7 @@ pub unsafe extern "C" fn setnetent(stayopen: c_int) {
 pub unsafe extern "C" fn setprotoent(stayopen: c_int) {
     PROTO_STAYOPEN = stayopen;
     if PROTODB == 0 {
-        PROTODB = Sys::open(c_str!("/etc/protocols"), O_RDONLY, 0)
+        PROTODB = Sys::open(c_str!("/etc/protocols"), O_RDONLY, 0).or_minus_one_errno()
     } else {
         Sys::lseek(PROTODB, 0, SEEK_SET);
         P_POS = 0;
@@ -712,7 +771,7 @@ pub unsafe extern "C" fn setprotoent(stayopen: c_int) {
 pub unsafe extern "C" fn setservent(stayopen: c_int) {
     SERV_STAYOPEN = stayopen;
     if SERVDB == 0 {
-        SERVDB = Sys::open(c_str!("/etc/services"), O_RDONLY, 0)
+        SERVDB = Sys::open(c_str!("/etc/services"), O_RDONLY, 0).or_minus_one_errno()
     } else {
         Sys::lseek(SERVDB, 0, SEEK_SET);
         S_POS = 0;
@@ -885,9 +944,18 @@ pub extern "C" fn gai_strerror(errcode: c_int) -> *const c_char {
     .as_ptr()
 }
 
+/// Provide a pointer to relibc's internal [`H_ERRNO`].
 #[no_mangle]
+#[deprecated]
+pub extern "C" fn __h_errno_location() -> *mut c_int {
+    H_ERRNO.as_ptr()
+}
+
+#[no_mangle]
+#[deprecated]
 pub extern "C" fn hstrerror(errcode: c_int) -> *const c_char {
     match errcode {
+        H_UNSET => c_str!("Resolver error unset"),
         HOST_NOT_FOUND => c_str!("Unknown hostname"),
         NO_DATA => c_str!("No address for hostname"),
         NO_RECOVERY => c_str!("Unknown server error"),
@@ -895,4 +963,40 @@ pub extern "C" fn hstrerror(errcode: c_int) -> *const c_char {
         _ => c_str!("Unknown error"),
     }
     .as_ptr()
+}
+
+/// Print error message associated with [`H_ERRNO`] to stderr.
+///
+/// # Arguments
+/// * `prefix` - An optional prefix to prepend to the error message. May be null or an empty
+/// (`""`) C string.
+///
+/// # Safety
+/// Like [`crate::header::stdio::perror`], `prefix` should be a valid, NUL terminated C string if
+/// used. The caller may safely call this function with a null pointer.
+///
+/// # Deprecation
+/// [`H_ERRNO`], [`hstrerror`], [`herror`], and other functions are deprecated as of
+/// POSIX.1-2001 and removed as of POSIX.1-2008. These functions are provided for backwards
+/// compatibility but should not be used by new code.
+#[no_mangle]
+#[deprecated]
+pub extern "C" fn herror(prefix: *const c_char) {
+    let code = H_ERRNO.get();
+    // Safety: `hstrerror` handles every error code case and always returns a valid C string
+    let error = unsafe {
+        let msg_cstr = CStr::from_ptr(hstrerror(code));
+        str::from_utf8_unchecked(msg_cstr.to_bytes())
+    };
+
+    let mut writer = platform::FileWriter::new(2);
+    // Prefix is optional
+    match unsafe { CStr::from_nullable_ptr(prefix) }
+        .and_then(|prefix| str::from_utf8(prefix.to_bytes()).ok())
+    {
+        Some(prefix) if !prefix.is_empty() => writer
+            .write_fmt(format_args!("{prefix}: {error}\n"))
+            .unwrap(),
+        _ => writer.write_fmt(format_args!("{error}\n")).unwrap(),
+    }
 }

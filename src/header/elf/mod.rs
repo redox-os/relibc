@@ -1,3 +1,7 @@
+//! `elf.h` implementation.
+//!
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
+
 use crate::platform::types::*;
 
 pub type Elf32_Half = uint16_t;
@@ -27,6 +31,7 @@ pub type Elf64_Versym = Elf64_Half;
 
 pub const EI_NIDENT: usize = 16;
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf32_Ehdr {
     pub e_ident: [c_uchar; EI_NIDENT],
@@ -45,6 +50,7 @@ pub struct Elf32_Ehdr {
     pub e_shstrndx: Elf32_Half,
 }
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf64_Ehdr {
     pub e_ident: [c_uchar; EI_NIDENT],
@@ -196,6 +202,7 @@ pub const EV_NONE: usize = 0;
 pub const EV_CURRENT: usize = 1;
 pub const EV_NUM: usize = 2;
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf32_Shdr {
     pub sh_name: Elf32_Word,
@@ -210,6 +217,7 @@ pub struct Elf32_Shdr {
     pub sh_entsize: Elf32_Word,
 }
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf64_Shdr {
     pub sh_name: Elf64_Word,
@@ -289,6 +297,7 @@ pub const SHF_ORDERED: usize = 1 << 30;
 pub const SHF_EXCLUDE: usize = 1 << 31;
 pub const GRP_COMDAT: usize = 0x1;
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf32_Sym {
     pub st_name: Elf32_Word,
@@ -299,6 +308,7 @@ pub struct Elf32_Sym {
     pub st_shndx: Elf32_Section,
 }
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf64_Sym {
     pub st_name: Elf64_Word,
@@ -361,18 +371,21 @@ pub const STV_INTERNAL: usize = 1;
 pub const STV_HIDDEN: usize = 2;
 pub const STV_PROTECTED: usize = 3;
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf32_Rel {
     pub r_offset: Elf32_Addr,
     pub r_info: Elf32_Word,
 }
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf64_Rel {
     pub r_offset: Elf64_Addr,
     pub r_info: Elf64_Xword,
 }
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf32_Rela {
     pub r_offset: Elf32_Addr,
@@ -380,6 +393,7 @@ pub struct Elf32_Rela {
     pub r_addend: Elf32_Sword,
 }
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf64_Rela {
     pub r_offset: Elf64_Addr,
@@ -387,6 +401,7 @@ pub struct Elf64_Rela {
     pub r_addend: Elf64_Sxword,
 }
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf32_Phdr {
     pub p_type: Elf32_Word,
@@ -399,6 +414,7 @@ pub struct Elf32_Phdr {
     pub p_align: Elf32_Word,
 }
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf64_Phdr {
     pub p_type: Elf64_Word,
@@ -487,6 +503,7 @@ pub union Elf32_Dyn_Union {
     d_ptr: Elf32_Addr,
 }
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf32_Dyn {
     pub d_tag: Elf32_Sword,
@@ -499,6 +516,7 @@ pub union Elf64_Dyn_Union {
     d_ptr: Elf64_Addr,
 }
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf64_Dyn {
     pub d_tag: Elf64_Sxword,
@@ -740,6 +758,7 @@ pub const AT_L1D_CACHESHAPE: usize = 35;
 pub const AT_L2_CACHESHAPE: usize = 36;
 pub const AT_L3_CACHESHAPE: usize = 37;
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf32_Nhdr {
     pub n_namesz: Elf32_Word,
@@ -747,6 +766,7 @@ pub struct Elf32_Nhdr {
     pub n_type: Elf32_Word,
 }
 
+/// See <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 #[repr(C)]
 pub struct Elf64_Nhdr {
     pub n_namesz: Elf64_Word,
@@ -944,7 +964,7 @@ pub const R_X86_64_RELATIVE64: usize = 38;
 pub const R_X86_64_NUM: usize = 39;
 
 #[no_mangle]
-pub extern "C" fn stupid_cbindgen_needs_a_function_that_holds_all_elf_structs(
+pub extern "C" fn _cbindgen_export_elf(
     a: Elf32_Ehdr,
     b: Elf64_Ehdr,
     c: Elf32_Shdr,

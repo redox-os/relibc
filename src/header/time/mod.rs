@@ -3,6 +3,7 @@
 use core::convert::{TryFrom, TryInto};
 
 use crate::{
+    error::ResultExt,
     header::errno::EOVERFLOW,
     platform::{self, types::*, Pal, Sys},
 };
@@ -228,7 +229,7 @@ pub unsafe extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_ch
 pub extern "C" fn clock() -> clock_t {
     let mut ts = core::mem::MaybeUninit::<timespec>::uninit();
 
-    if clock_gettime(CLOCK_PROCESS_CPUTIME_ID, ts.as_mut_ptr()) != 0 {
+    if unsafe { clock_gettime(CLOCK_PROCESS_CPUTIME_ID, ts.as_mut_ptr()) } != 0 {
         return -1;
     }
     let ts = unsafe { ts.assume_init() };
@@ -242,18 +243,24 @@ pub extern "C" fn clock() -> clock_t {
 }
 
 #[no_mangle]
-pub extern "C" fn clock_getres(clock_id: clockid_t, tp: *mut timespec) -> c_int {
+pub unsafe extern "C" fn clock_getres(clock_id: clockid_t, tp: *mut timespec) -> c_int {
     Sys::clock_getres(clock_id, tp)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
-pub extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -> c_int {
+pub unsafe extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -> c_int {
     Sys::clock_gettime(clock_id, tp)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
-pub extern "C" fn clock_settime(clock_id: clockid_t, tp: *const timespec) -> c_int {
+pub unsafe extern "C" fn clock_settime(clock_id: clockid_t, tp: *const timespec) -> c_int {
     Sys::clock_settime(clock_id, tp)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
@@ -481,8 +488,8 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
 }
 
 #[no_mangle]
-pub extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
-    Sys::nanosleep(rqtp, rmtp)
+pub unsafe extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
+    Sys::nanosleep(rqtp, rmtp).map(|()| 0).or_minus_one_errno()
 }
 
 #[no_mangle]

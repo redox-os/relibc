@@ -1,0 +1,24 @@
+
+# needs a leading newline
+[defines]
+"target_os=redox" = "__redox__"
+"target_os=linux" = "__linux__"
+"target_pointer_width=64" = "__LP64__"
+"target_pointer_width=32" = "__LP32__"
+"target_arch=x86" = "__i386__"
+"target_arch=x86_64" = "__x86_64__"
+"target_arch=aarch64" = "__aarch64__"
+# This is not exact. It should be `defined(__riscv) && defined(__LP64__)`, or `defined(__riscv) && __riscv_xlen==64`
+# This will do however, as long as we only support riscv64 and not riscv32
+"target_arch=riscv64" = "__riscv"
+
+# XXX: silences a warning
+"feature = no_std" = "__relibc__"
+
+# Ensure attributes are passed down from Rust
+# <features.h> must be included where attributes are used in relibc
+[fn]
+must_use = "__nodiscard"
+deprecated = "__deprecated"
+deprecated_with_note = "__deprecatedNote({})"
+no_return = "__noreturn"

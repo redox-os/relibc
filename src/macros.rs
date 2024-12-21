@@ -13,7 +13,7 @@ macro_rules! c_str {
 macro_rules! print {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
-        let _ = write!($crate::platform::FileWriter(1), $($arg)*);
+        let _ = write!($crate::platform::FileWriter::new(1), $($arg)*);
     });
 }
 
@@ -30,7 +30,7 @@ macro_rules! println {
 macro_rules! eprint {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
-        let _ = write!($crate::platform::FileWriter(2), $($arg)*);
+        let _ = write!($crate::platform::FileWriter::new(2), $($arg)*);
     });
 }
 
@@ -45,8 +45,12 @@ macro_rules! eprintln {
 /// Lifted from libstd
 #[macro_export]
 macro_rules! dbg {
+    // NOTE: We cannot use `concat!` to make a static string as a format argument
+    // of `eprintln!` because `file!` could contain a `{` or
+    // `$val` expression could be a block (`{ .. }`), in which case the `eprintln!`
+    // will be malformed.
     () => {
-        eprintln!("[{}:{}]", file!(), line!());
+        eprintln!("[{}:{}:{}]", file!(), line!(), column!());
     };
     ($val:expr) => {
         // Use of `match` here is intentional because it affects the lifetimes
@@ -54,15 +58,19 @@ macro_rules! dbg {
         match $val {
             tmp => {
                 eprintln!(
-                    "[{}:{}] {} = {:#?}",
+                    "[{}:{}:{}] {} = {:#?}",
                     file!(),
                     line!(),
+                    column!(),
                     stringify!($val),
                     &tmp
                 );
                 tmp
             }
         }
+    };
+    ($($val:expr),+ $(,)?) => {
+        ($(dbg!($val)),+,)
     };
 }
 

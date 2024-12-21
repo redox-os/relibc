@@ -3,8 +3,8 @@ use alloc::vec::Vec;
 use crate::platform::{types::*, Pal, Sys};
 
 use crate::{
+    error::ResultExt,
     header::unistd::{lseek, SEEK_SET},
-    pthread::ResultExt,
 };
 /// Implements an `Iterator` which returns on either newline or EOF.
 #[derive(Clone)]
@@ -61,7 +61,9 @@ impl RawLineBuffer {
                 self.buf.set_len(capacity);
             }
 
-            let read = Sys::read(self.fd, &mut self.buf[len..]).or_minus_one_errno();
+            let read = Sys::read(self.fd, &mut self.buf[len..])
+                .map(|u| u as isize)
+                .or_minus_one_errno();
 
             let read_usize = read.max(0) as usize;
 

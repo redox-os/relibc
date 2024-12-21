@@ -1,8 +1,8 @@
 // Used design from https://www.remlab.net/op/futex-condvar.shtml
 
 use crate::{
+    error::Errno,
     header::{pthread::*, time::timespec},
-    pthread::Errno,
 };
 
 use core::sync::atomic::{AtomicU32 as AtomicUint, Ordering};
@@ -12,7 +12,7 @@ pub struct Cond {
     prev: AtomicUint,
 }
 
-type Result<T, E = crate::pthread::Errno> = core::result::Result<T, E>;
+type Result<T, E = Errno> = core::result::Result<T, E>;
 
 impl Cond {
     pub fn new() -> Self {

@@ -1,3 +1,5 @@
+use super::{siginfo_t, sigset_t, stack_t};
+use crate::platform::types::*;
 use core::arch::global_asm;
 
 // Needs to be defined in assembly because it can't have a function prologue
@@ -19,6 +21,16 @@ global_asm!(
     __restore_rt:
         mov x8, #139
         svc 0
+"
+);
+
+#[cfg(target_arch = "riscv64")]
+global_asm!(
+    "
+    .global __restore_rt
+    __restore_rt:
+        li a7, 139
+        ecall
 "
 );
 
@@ -76,3 +88,53 @@ pub const SS_DISABLE: usize = 2;
 // Those two should be updated from kernel headers
 pub const MINSIGSTKSZ: usize = 2048;
 pub const SIGSTKSZ: usize = 8096;
+
+pub const SI_QUEUE: i32 = -1;
+pub const SI_USER: i32 = 0;
+
+// Mirrors the ucontext_t struct from the libc crate on Linux.
+
+pub(crate) type ucontext_t = ucontext;
+pub(crate) type mcontext_t = mcontext;
+
+#[repr(C)]
+pub struct ucontext {
+    pub uc_flags: c_ulong,
+    pub uc_link: *mut ucontext_t,
+    pub uc_stack: stack_t,
+    pub uc_mcontext: mcontext_t,
+    pub uc_sigmask: sigset_t,
+    __private: [u8; 512],
+}
+
+#[repr(C)]
+pub struct _libc_fpstate {
+    pub cwd: u16,
+    pub swd: u16,
+    pub ftw: u16,
+    pub fop: u16,
+    pub rip: u64,
+    pub rdp: u64,
+    pub mxcsr: u32,
+    pub mxcr_mask: u32,
+    pub _st: [_libc_fpxreg; 8],
+    pub _xmm: [_libc_xmmreg; 16],
+    __private: [u64; 12],
+}
+#[repr(C)]
+pub struct _libc_fpxreg {
+    pub significand: [u16; 4],
+    pub exponent: u16,
+    __private: [u16; 3],
+}
+
+#[repr(C)]
+pub struct _libc_xmmreg {
+    pub element: [u32; 4],
+}
+#[repr(C)]
+pub struct mcontext {
+    pub gregs: [i64; 23], // TODO: greg_t?
+    pub fpregs: *mut _libc_fpstate,
+    __private: [u64; 8],
+}

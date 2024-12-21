@@ -1,113 +1,120 @@
-use core::mem;
-use redox_rt::signal::{Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler};
-use syscall::{self, Result};
-
 use super::{
     super::{types::*, Pal, PalSignal},
-    e, Sys,
+    Sys,
 };
 use crate::{
+    error::{Errno, Result},
     header::{
         errno::{EINVAL, ENOSYS},
         signal::{
-            sigaction, siginfo_t, sigset_t, stack_t, SA_SIGINFO, SIG_BLOCK, SIG_DFL, SIG_IGN,
-            SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE, SS_ONSTACK,
+            sigaction, siginfo_t, sigset_t, sigval, stack_t, ucontext_t, SA_SIGINFO, SIG_BLOCK,
+            SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE, SS_ONSTACK,
         },
         sys_time::{itimerval, ITIMER_REAL},
         time::timespec,
     },
     platform::ERRNO,
-    pthread::Errno,
+};
+use core::mem::{self, offset_of};
+use redox_rt::{
+    proc::FdGuard,
+    signal::{
+        PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
+    },
+};
+
+const _: () = {
+    #[track_caller]
+    const fn assert_eq(a: usize, b: usize) {
+        if a != b {
+            panic!("compile-time struct verification failed");
+        }
+    }
+    assert_eq(offset_of!(ucontext_t, uc_link), offset_of!(SigStack, link));
+    assert_eq(
+        offset_of!(ucontext_t, uc_stack),
+        offset_of!(SigStack, old_stack),
+    );
+    assert_eq(
+        offset_of!(ucontext_t, uc_sigmask),
+        offset_of!(SigStack, old_mask),
+    );
+    assert_eq(
+        offset_of!(ucontext_t, uc_mcontext),
+        offset_of!(SigStack, regs),
+    );
 };
 
 impl PalSignal for Sys {
-    unsafe fn getitimer(which: c_int, out: *mut itimerval) -> c_int {
+    unsafe fn getitimer(which: c_int, out: *mut itimerval) -> Result<()> {
         let path = match which {
             ITIMER_REAL => "/scheme/itimer/1",
-            _ => {
-                ERRNO.set(EINVAL);
-                return -1;
-            }
+            _ => return Err(Errno(EINVAL)),
         };
 
-        let fd = e(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC));
-        if fd == !0 {
-            return -1;
-        }
+        let fd = FdGuard::new(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC)?);
 
         let mut spec = syscall::ITimerSpec::default();
-        let count = e(syscall::read(fd, &mut spec));
-
-        let _ = syscall::close(fd);
-
-        if count == !0 {
-            return -1;
-        }
+        let count = syscall::read(*fd, &mut spec)?;
 
         (*out).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
         (*out).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
         (*out).it_value.tv_sec = spec.it_value.tv_sec as time_t;
         (*out).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
 
-        0
+        Ok(())
     }
 
-    fn kill(pid: pid_t, sig: c_int) -> c_int {
-        e(redox_rt::sys::posix_kill(pid as usize, sig as usize).map(|()| 0)) as c_int
+    fn kill(pid: pid_t, sig: c_int) -> Result<()> {
+        redox_rt::sys::posix_kill(pid as usize, sig as usize)?;
+        Ok(())
+    }
+    fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<()> {
+        Ok(redox_rt::sys::posix_sigqueue(
+            pid as usize,
+            sig as usize,
+            unsafe { val.sival_ptr } as usize,
+        )?)
     }
 
-    fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
-        e(redox_rt::sys::posix_killpg(pgrp as usize, sig as usize).map(|()| 0)) as c_int
+    fn killpg(pgrp: pid_t, sig: c_int) -> Result<()> {
+        redox_rt::sys::posix_killpg(pgrp as usize, sig as usize)?;
+        Ok(())
     }
 
-    fn raise(sig: c_int) -> Result<(), Errno> {
+    fn raise(sig: c_int) -> Result<()> {
         // TODO: Bypass kernel?
         unsafe { Self::rlct_kill(Self::current_os_tid(), sig as _) }
     }
 
-    unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> c_int {
+    unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> Result<()> {
         let path = match which {
             ITIMER_REAL => "/scheme/itimer/1",
-            _ => {
-                ERRNO.set(EINVAL);
-                return -1;
-            }
+            _ => return Err(Errno(EINVAL)),
         };
 
-        let fd = e(syscall::open(path, syscall::O_RDWR | syscall::O_CLOEXEC));
-        if fd == !0 {
-            return -1;
-        }
+        let fd = FdGuard::new(syscall::open(path, syscall::O_RDWR | syscall::O_CLOEXEC)?);
 
         let mut spec = syscall::ITimerSpec::default();
 
-        let mut count = e(syscall::read(fd, &mut spec));
+        let _ = syscall::read(*fd, &mut spec)?;
 
-        if count != !0 {
-            unsafe {
-                if !old.is_null() {
-                    (*old).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
-                    (*old).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
-                    (*old).it_value.tv_sec = spec.it_value.tv_sec as time_t;
-                    (*old).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
-                }
-
-                spec.it_interval.tv_sec = (*new).it_interval.tv_sec as i64;
-                spec.it_interval.tv_nsec = (*new).it_interval.tv_usec * 1000;
-                spec.it_value.tv_sec = (*new).it_value.tv_sec as i64;
-                spec.it_value.tv_nsec = (*new).it_value.tv_usec * 1000;
+        unsafe {
+            if !old.is_null() {
+                (*old).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
+                (*old).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
+                (*old).it_value.tv_sec = spec.it_value.tv_sec as time_t;
+                (*old).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
             }
 
-            count = e(syscall::write(fd, &spec));
+            spec.it_interval.tv_sec = (*new).it_interval.tv_sec as i64;
+            spec.it_interval.tv_nsec = (*new).it_interval.tv_usec * 1000;
+            spec.it_value.tv_sec = (*new).it_value.tv_sec as i64;
+            spec.it_value.tv_nsec = (*new).it_value.tv_usec * 1000;
         }
 
-        let _ = syscall::close(fd);
-
-        if count == !0 {
-            return -1;
-        }
-
-        0
+        let _ = syscall::write(*fd, &spec)?;
+        Ok(())
     }
 
     fn sigaction(
@@ -204,28 +211,18 @@ impl PalSignal for Sys {
         redox_rt::signal::sigaltstack(new.as_ref(), old.as_mut())?;
 
         if let (Some(old_c_stack), Some(old)) = (old_c, old) {
-            *old_c_stack = match old {
-                Sigaltstack::Disabled => stack_t {
-                    ss_sp: core::ptr::null_mut(),
-                    ss_size: 0,
-                    ss_flags: SS_DISABLE.try_into().unwrap(),
-                },
-                Sigaltstack::Enabled {
-                    onstack,
-                    base,
-                    size,
-                } => stack_t {
-                    ss_sp: base.cast(),
-                    ss_size: size,
-                    ss_flags: SS_ONSTACK.try_into().unwrap(),
-                },
+            let c_stack = PosixStackt::from(old);
+            *old_c_stack = stack_t {
+                ss_sp: c_stack.sp.cast(),
+                ss_size: c_stack.size,
+                ss_flags: c_stack.flags,
             };
         }
         Ok(())
     }
 
     fn sigpending(set: &mut sigset_t) -> Result<(), Errno> {
-        *set = redox_rt::signal::currently_pending();
+        *set = redox_rt::signal::currently_pending_blocked();
         Ok(())
     }
 
@@ -243,17 +240,27 @@ impl PalSignal for Sys {
         })
     }
 
-    unsafe fn sigsuspend(set: *const sigset_t) -> c_int {
-        ERRNO.set(ENOSYS);
-        -1
+    fn sigsuspend(mask: &sigset_t) -> Errno {
+        match redox_rt::signal::await_signal_async(!*mask) {
+            Ok(_) => unreachable!(),
+            Err(err) => err.into(),
+        }
     }
 
-    unsafe fn sigtimedwait(
-        set: *const sigset_t,
-        sig: *mut siginfo_t,
-        tp: *const timespec,
-    ) -> c_int {
-        ERRNO.set(ENOSYS);
-        -1
+    fn sigtimedwait(
+        set: &sigset_t,
+        info_out: Option<&mut siginfo_t>,
+        timeout: Option<&timespec>,
+    ) -> Result<(), Errno> {
+        // TODO: deadline-based API
+        let timeout = timeout.map(|timeout| syscall::TimeSpec {
+            tv_sec: timeout.tv_sec,
+            tv_nsec: timeout.tv_nsec as _,
+        });
+        let info = redox_rt::signal::await_signal_sync(*set, timeout.as_ref())?.into();
+        if let Some(out) = info_out {
+            *out = info;
+        }
+        Ok(())
     }
 }

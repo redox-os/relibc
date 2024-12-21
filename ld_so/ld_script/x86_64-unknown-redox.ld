@@ -98,25 +98,25 @@ SECTIONS
   .gcc_except_table   : ONLY_IF_RW { *(.gcc_except_table .gcc_except_table.*) }
   .exception_ranges   : ONLY_IF_RW { *(.exception_ranges*) }
   /* Thread Local Storage sections  */
-  .tdata          :
+  /* .tdata          : ALIGN(4K)
    {
      PROVIDE_HIDDEN (__tdata_start = .);
      *(.tdata .tdata.* .gnu.linkonce.td.*)
    }
-  .tbss           : { *(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon) }
+  .tbss           : { *(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon) } */
   .preinit_array    :
   {
     PROVIDE_HIDDEN (__preinit_array_start = .);
     KEEP (*(.preinit_array))
     PROVIDE_HIDDEN (__preinit_array_end = .);
   }
-  .init_array    :
+  /* .init_array    :
   {
     PROVIDE_HIDDEN (__init_array_start = .);
     KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
     KEEP (*(.init_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .ctors))
     PROVIDE_HIDDEN (__init_array_end = .);
-  }
+  } */
   .fini_array    :
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
@@ -241,5 +241,16 @@ SECTIONS
   .debug_macro    0 : { *(.debug_macro) }
   .debug_addr     0 : { *(.debug_addr) }
   .gnu.attributes 0 : { KEEP (*(.gnu.attributes)) }
-  /DISCARD/ : { *(.note.GNU-stack) *(.gnu_debuglink) *(.gnu.lto_*) }
+  /DISCARD/ : { 
+    *(.note.GNU-stack) *(.gnu_debuglink) *(.gnu.lto_*) 
+    /*
+     * XXX: As of now, ld.so links with relibc which has the main functionality. In the next refactor,
+     * ld.so will be moved out of relibc. So, till that time, we have to discard any sections
+     * that may reference use thread local storage.
+     *
+     * .init_array also depends on TLS and is discarded as we don't need it.
+     */
+    *(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon)
+    *(.init_array)
+  }
 }

@@ -1,3 +1,5 @@
+//! Dynamic loading and linking.
+
 use core::{mem, ptr};
 use goblin::elf::program_header::{self, program_header32, program_header64, ProgramHeader};
 
@@ -152,6 +154,13 @@ pub unsafe fn init(sp: &'static Stack) {
         let _ = syscall::close(file);
 
         tp = env.fsbase as usize;
+    }
+    #[cfg(all(target_os = "redox", target_arch = "riscv64"))]
+    {
+        core::arch::asm!(
+            "mv {}, tp",
+            out(reg) tp,
+        );
     }
 
     if tp == 0 {

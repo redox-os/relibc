@@ -3,6 +3,7 @@ use core::{mem, ptr};
 
 use crate::{
     c_str::CString,
+    error::ResultExt,
     header::{
         arpa_inet::inet_aton, fcntl::O_RDONLY, netinet_in::in_addr, sys_socket::constants::AF_INET,
         unistd::SEEK_SET,
@@ -45,7 +46,7 @@ pub unsafe extern "C" fn endhostent() {
 pub unsafe extern "C" fn sethostent(stayopen: c_int) {
     HOST_STAYOPEN = stayopen;
     if HOSTDB < 0 {
-        HOSTDB = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0)
+        HOSTDB = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0).or_minus_one_errno()
     } else {
         Sys::lseek(HOSTDB, 0, SEEK_SET);
     }
@@ -55,7 +56,7 @@ pub unsafe extern "C" fn sethostent(stayopen: c_int) {
 #[no_mangle]
 pub unsafe extern "C" fn gethostent() -> *mut hostent {
     if HOSTDB < 0 {
-        HOSTDB = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0);
+        HOSTDB = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0).or_minus_one_errno();
     }
     let mut rlb = RawLineBuffer::new(HOSTDB);
     rlb.seek(H_POS);
@@ -77,28 +78,22 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
 
     let mut iter: SplitWhitespace = r.split_whitespace();
 
-    let mut addr_vec = iter.next().unwrap().as_bytes().to_vec();
-    addr_vec.push(b'\0');
+    let addr_vec: Vec<u8> = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
     let addr_cstr = addr_vec.as_slice().as_ptr() as *const i8;
     let mut addr = mem::MaybeUninit::uninit();
     inet_aton(addr_cstr, addr.as_mut_ptr());
     let addr = addr.assume_init();
 
-    _HOST_ADDR_LIST = mem::transmute::<u32, [u8; 4]>(addr.s_addr);
+    _HOST_ADDR_LIST = addr.s_addr.to_ne_bytes();
     HOST_ADDR_LIST = [_HOST_ADDR_LIST.as_mut_ptr() as *mut c_char, ptr::null_mut()];
 
     HOST_ADDR = Some(addr);
 
-    let mut host_name = iter.next().unwrap().as_bytes().to_vec();
-    host_name.push(b'\0');
+    let host_name = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
 
-    let mut _host_aliases: Vec<Vec<u8>> = Vec::new();
-
-    for s in iter {
-        let mut alias = s.as_bytes().to_vec();
-        alias.push(b'\0');
-        _host_aliases.push(alias);
-    }
+    let mut _host_aliases: Vec<Vec<u8>> = iter
+        .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
+        .collect();
     HOST_ALIASES = Some(_host_aliases);
 
     let mut host_aliases: Vec<*mut i8> = HOST_ALIASES
@@ -106,9 +101,8 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
         .unwrap()
         .iter_mut()
         .map(|x| x.as_mut_ptr() as *mut i8)
+        .chain([ptr::null_mut(), ptr::null_mut()])
         .collect();
-    host_aliases.push(ptr::null_mut());
-    host_aliases.push(ptr::null_mut());
 
     HOST_NAME = Some(host_name);
 

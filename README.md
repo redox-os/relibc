@@ -1,8 +1,10 @@
 # Redox C Library (relibc)
 
-relibc is a portable POSIX C standard library written in Rust. It is under heavy development, and currently supports Redox and Linux.
+relibc is a portable POSIX C standard library written in Rust and is under heavy development.
 
 The motivation for this project is twofold: Reduce issues that the Redox developers were having with [newlib](https://sourceware.org/newlib/), and create a safer alternative to a C standard library written in C. It is mainly designed to be used under Redox, as an alternative to newlib, but it also supports Linux system calls via the [sc](https://crates.io/crates/sc) crate.
+
+Currently Redox and Linux are supported.
 
 ## redox-rt
 
@@ -26,7 +28,61 @@ redox-rt is our equivalent for [vDSO](https://en.wikipedia.org/wiki/VDSO) from L
 - `src/sync` - Synchronization primitives
 - `tests` - C tests (each MR needs to give success in all of them)
 
-## Build On The Build System
+## Download the sources
+
+To download the relibc sources run the following command:
+
+```sh
+git clone --recursive https://gitlab.redox-os.org/redox-os/relibc
+```
+
+## Build Instructions
+
+To build relibc out of the Redox build system, do the following steps:
+
+### Dependencies
+
+- Install `cbindgen`
+
+```sh
+cargo install cbindgen
+```
+
+#### Install the `expect` tool
+
+- Debian, Ubuntu and PopOS:
+
+```sh
+sudo apt install expect
+```
+
+- Fedora:
+
+```sh
+sudo dnf install expect
+```
+
+- Arch Linux:
+
+```sh
+sudo pacman -S expect
+```
+
+### Build Relibc
+
+To build the relibc library objects, run the following command:
+
+```sh
+make all
+```
+
+- Clean old library objects and tests
+
+```sh
+make clean
+```
+
+## Build relibc inside the Redox build system
 
 Inside of your Redox build system, run:
 

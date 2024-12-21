@@ -19,8 +19,11 @@ EXPECT_NAMES=\
 	error \
 	fcntl/create \
 	fcntl/fcntl \
+	features \
 	fnmatch \
 	futimens \
+	glob \
+	iso646 \
 	libgen \
 	locale \
 	math \
@@ -30,6 +33,7 @@ EXPECT_NAMES=\
 	select \
 	setjmp \
 	sigaction \
+	sigaltstack \
 	signal \
 	stdio/all \
 	stdio/buffer \
@@ -72,6 +76,7 @@ EXPECT_NAMES=\
 	stdlib/strtoul \
 	stdlib/system \
 	string/mem \
+	string/memmem \
 	string/strcat \
 	string/strchr \
 	string/strcpy \
@@ -126,6 +131,7 @@ EXPECT_NAMES=\
 	wchar/wcrtomb \
 	wchar/wcpcpy \
 	wchar/wcpncpy \
+	wchar/wcschr \
 	wchar/wcscspn \
 	wchar/wcsdup \
 	wchar/wcsrchr \
@@ -158,11 +164,14 @@ DYNAMIC_ONLY_NAMES=\
 NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
+	net/if \
 	pty/forkpty \
+	psignal \
 	pwd \
 	sa_restart \
 	sigchld \
 	stdio/ctermid \
+	sigqueue \
 	stdio/tempnam \
 	stdio/tmpnam \
 	stdlib/bsearch \
@@ -213,14 +222,13 @@ EXPECT_NAMES+=\
 EXPECT_INPUT_NAMES=\
 	unistd/getpass
 
-#TODO: dynamic tests currently broken
 BINS=$(patsubst %,$(BUILD)/bins_static/%,$(NAMES))
 MBINS=$(patsubst %,$(BUILD)/bins_static/%,$(MNAMES))
 #BINS+=$(patsubst %,bins_dynamic/%,$(NAMES))
 #BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_BINS=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
-#EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(EXPECT_NAMES))
-#EXPECT_BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
+EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(EXPECT_NAMES))
+EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_INPUT_BINS=$(patsubst %,$(BUILD)/bins_expect_input/%,$(EXPECT_INPUT_NAMES))
 
 CARGO_TEST?=cargo
@@ -314,7 +322,8 @@ DYNAMIC_FLAGS+=\
 	-Wl,-dynamic-linker=$(SYSROOT_LIB)/ld64.so.1 \
 	-Wl,-rpath=$(SYSROOT_LIB):\$$ORIGIN \
 	-L $(SYSROOT_LIB) \
-	-lc
+	-lc \
+	-fpic
 
 DEPS=../sysroot
 else

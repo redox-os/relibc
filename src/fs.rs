@@ -1,12 +1,12 @@
 use crate::{
     c_str::CStr,
+    error::{Errno, ResultExt},
     header::{
         fcntl::O_CREAT,
         unistd::{SEEK_CUR, SEEK_END, SEEK_SET},
     },
     io,
     platform::{types::*, Pal, Sys},
-    pthread::ResultExt,
 };
 use core::ops::Deref;
 
@@ -25,39 +25,28 @@ impl File {
         }
     }
 
-    pub fn open(path: CStr, oflag: c_int) -> io::Result<Self> {
-        match Sys::open(path, oflag, 0) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(Self::new(ok)),
-        }
+    pub fn open(path: CStr, oflag: c_int) -> Result<Self, Errno> {
+        Sys::open(path, oflag, 0)
+            .map(Self::new)
+            .map_err(Errno::sync)
     }
 
-    pub fn create(path: CStr, oflag: c_int, mode: mode_t) -> io::Result<Self> {
-        match Sys::open(path, oflag | O_CREAT, mode) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(Self::new(ok)),
-        }
+    pub fn create(path: CStr, oflag: c_int, mode: mode_t) -> Result<Self, Errno> {
+        Sys::open(path, oflag | O_CREAT, mode)
+            .map(Self::new)
+            .map_err(Errno::sync)
     }
 
-    pub fn sync_all(&self) -> io::Result<()> {
-        match Sys::fsync(self.fd) {
-            -1 => Err(io::last_os_error()),
-            _ok => Ok(()),
-        }
+    pub fn sync_all(&self) -> Result<(), Errno> {
+        Sys::fsync(self.fd).map_err(Errno::sync)
     }
 
-    pub fn set_len(&self, size: u64) -> io::Result<()> {
-        match Sys::ftruncate(self.fd, size as off_t) {
-            -1 => Err(io::last_os_error()),
-            _ok => Ok(()),
-        }
+    pub fn set_len(&self, size: u64) -> Result<(), Errno> {
+        Sys::ftruncate(self.fd, size as off_t).map_err(Errno::sync)
     }
 
     pub fn try_clone(&self) -> io::Result<Self> {
-        match Sys::dup(self.fd) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(Self::new(ok)),
-        }
+        Ok(Self::new(Sys::dup(self.fd)?))
     }
 
     /// Create a new file pointing to the same underlying descriptor. This file
@@ -73,7 +62,7 @@ impl File {
 
 impl io::Read for &File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match Sys::read(self.fd, buf).or_minus_one_errno() /* TODO */ {
+        match Sys::read(self.fd, buf).map(|read| read as ssize_t).or_minus_one_errno() /* TODO */ {
             -1 => Err(io::last_os_error()),
             ok => Ok(ok as usize),
         }
@@ -82,7 +71,10 @@ impl io::Read for &File {
 
 impl io::Write for &File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match Sys::write(self.fd, buf).or_minus_one_errno() {
+        match Sys::write(self.fd, buf)
+            .map(|read| read as ssize_t)
+            .or_minus_one_errno()
+        {
             -1 => Err(io::last_os_error()),
             ok => Ok(ok as usize),
         }
@@ -101,10 +93,7 @@ impl io::Seek for &File {
             io::SeekFrom::End(end) => (end as off_t, SEEK_END),
         };
 
-        match Sys::lseek(self.fd, offset, whence) {
-            -1 => Err(io::last_os_error()),
-            ok => Ok(ok as u64),
-        }
+        Ok(Sys::lseek(self.fd, offset, whence)? as u64)
     }
 }
 

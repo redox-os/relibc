@@ -11,14 +11,20 @@ int main(void) {
   char temp[] = "/tmp/stattest-XXXXXX";
   const char file[] = "/mkfifo_fifo";
   int len = sizeof(temp) + sizeof(file);
+
   char* path = malloc(len * sizeof(char));
+  path[0] = '\0';
 
   if (path == NULL) {
     fprintf(stderr, "Could not allocate: %s\n", strerror(errno));
     exit(1);
   }
 
+
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   path = strncat(path, mktemp(temp), sizeof(temp));
+  #pragma GCC diagnostic pop
   path = strncat(path, file, sizeof(file));
   if (mkdir(temp, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0) {
     fprintf(stderr, "mkdir %s: %s\n", temp, strerror(errno));

@@ -10,6 +10,7 @@ pub const O_SHLOCK: c_int = 0x0010_0000;
 pub const O_EXLOCK: c_int = 0x0020_0000;
 pub const O_ASYNC: c_int = 0x0040_0000;
 pub const O_FSYNC: c_int = 0x0080_0000;
+pub const O_SYNC: c_int = O_FSYNC;
 pub const O_CLOEXEC: c_int = 0x0100_0000;
 pub const O_CREAT: c_int = 0x0200_0000;
 pub const O_TRUNC: c_int = 0x0400_0000;
@@ -21,3 +22,5 @@ pub const O_SYMLINK: c_int = 0x4000_0000;
 pub const O_NOFOLLOW: c_int = -0x8000_0000;
 
 pub const FD_CLOEXEC: c_int = 0x0100_0000;
+
+pub const O_NOCTTY: c_int = 0x00000200;

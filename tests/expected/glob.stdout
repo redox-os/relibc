@@ -1,0 +1,70 @@
+Pattern = eample_dir/*
+(NOMATCH)
+
+Pattern = eample_dir/*
+glob_err("eample_dir", "No such file or directory") -> 0
+(ABORTED)
+
+Pattern = ./example_dir/*
+(Matched 8)
+0 - ./example_dir/1-never-gonna-give-you-up
+1 - ./example_dir/2-never-gonna-let-you-down
+2 - ./example_dir/3-never-gonna-run-around
+3 - ./example_dir/4-and-desert-you
+4 - ./example_dir/5-never-gonna-make-you-cry
+5 - ./example_dir/6-never-gonna-say-goodbye
+6 - ./example_dir/7-never-gonna-tell-a-lie
+7 - ./example_dir/8-and-hurt-you
+
+Pattern = example_dir/*never*
+(Matched 6)
+0 - example_dir/1-never-gonna-give-you-up
+1 - example_dir/2-never-gonna-let-you-down
+2 - example_dir/3-never-gonna-run-around
+3 - example_dir/5-never-gonna-make-you-cry
+4 - example_dir/6-never-gonna-say-goodbye
+5 - example_dir/7-never-gonna-tell-a-lie
+
+Pattern = example_dir/?-and*
+(Matched 8)
+0 - example_dir/1-never-gonna-give-you-up
+1 - example_dir/2-never-gonna-let-you-down
+2 - example_dir/3-never-gonna-run-around
+3 - example_dir/5-never-gonna-make-you-cry
+4 - example_dir/6-never-gonna-say-goodbye
+5 - example_dir/7-never-gonna-tell-a-lie
+6 - example_dir/4-and-desert-you
+7 - example_dir/8-and-hurt-you
+
+Pattern = example_dir/*never*
+(Matched 6) (with 4 gl_offs)
+0 - NULL
+1 - NULL
+2 - NULL
+3 - NULL
+4 - example_dir/1-never-gonna-give-you-up
+5 - example_dir/2-never-gonna-let-you-down
+6 - example_dir/3-never-gonna-run-around
+7 - example_dir/5-never-gonna-make-you-cry
+8 - example_dir/6-never-gonna-say-goodbye
+9 - example_dir/7-never-gonna-tell-a-lie
+
+Pattern = example_dir/?-and*
+(Matched 8) (with 4 gl_offs)
+0 - <Saved gl_offs string>
+1 - NULL
+2 - NULL
+3 - NULL
+4 - example_dir/1-never-gonna-give-you-up
+5 - example_dir/2-never-gonna-let-you-down
+6 - example_dir/3-never-gonna-run-around
+7 - example_dir/5-never-gonna-make-you-cry
+8 - example_dir/6-never-gonna-say-goodbye
+9 - example_dir/7-never-gonna-tell-a-lie
+10 - example_dir/4-and-desert-you
+11 - example_dir/8-and-hurt-you
+
+Pattern = example_dir
+(Matched 1)
+0 - example_dir/
+
