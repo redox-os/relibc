@@ -138,143 +138,47 @@ pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -
         }
 
         if chunk_align_offset < n {
-            let s1_middle_and_suffix = &mut s1_slice[prefix_len..];
-            let s2_middle_and_suffix = &s2_slice[prefix_len..];
+            fn copy_chunks_and_remainder<const N: usize, T: Copy>(dst: &mut [MaybeUninit<u8>], src: &[MaybeUninit<u8>]) {
+                // Check sanity
+                assert_eq!(N, mem::align_of::<T>());
+                assert!(dst.as_mut_ptr().is_aligned_to(N));
+                assert!(src.as_ptr().is_aligned_to(N));
+
+                // Split into "middle" and "suffix"
+                let (dst_chunks, dst_remainder) = dst.as_chunks_mut::<N>();
+                let (src_chunks, src_remainder) = src.as_chunks::<N>();
+
+                // Copy "middle"
+                for (dst_chunk, src_chunk) in zip(dst_chunks, src_chunks) {
+                    // SAFETY: the chunks are safely subsliced from s1 and
+                    // s2. Alignment is ensured through the use of
+                    // "align_offset", while the size of the chunks is
+                    // explicitly taken to match the primitive size.
+                    let dst_chunk_primitive: &mut MaybeUninit<T> = unsafe { &mut *dst_chunk.as_mut_ptr().cast() };
+                    let src_chunk_primitive: &MaybeUninit<T> = unsafe { &*src_chunk.as_ptr().cast() };
+                    *dst_chunk_primitive = *src_chunk_primitive;
+                }
+
+                // Copy "suffix"
+                for (dst_elem, src_elem) in zip(dst_remainder, src_remainder) {
+                    *dst_elem = *src_elem;
+                }
+            }
 
             // Copy "middle" bytes (if length is sufficient) and any remaining
             // "suffix" bytes.
-            //
-            // TODO: deduplicate repeated code
+            let s1_middle_and_suffix = &mut s1_slice[prefix_len..];
+            let s2_middle_and_suffix = &s2_slice[prefix_len..];
             match chunk_size {
                 1 => {
                     for (s1_elem, s2_elem) in zip(s1_middle_and_suffix, s2_middle_and_suffix) {
                         *s1_elem = *s2_elem;
                     }
                 }
-                2 => {
-                    // Can't use `chunk_size` since we need a compile-time
-                    // constant.
-                    const CHUNK_SIZE: usize = 2;
-                    type ChunkPrimitiveType = u16;
-
-                    // Check sanity
-                    assert_eq!(CHUNK_SIZE, mem::align_of::<ChunkPrimitiveType>());
-                    assert!(s1_middle_and_suffix.as_mut_ptr().is_aligned_to(CHUNK_SIZE));
-                    assert!(s2_middle_and_suffix.as_ptr().is_aligned_to(CHUNK_SIZE));
-
-                    // Split into "middle" and "suffix"
-                    let (s1_chunks, s1_suffix) = s1_middle_and_suffix.as_chunks_mut::<CHUNK_SIZE>();
-                    let (s2_chunks, s2_suffix) = s2_middle_and_suffix.as_chunks::<CHUNK_SIZE>();
-
-                    // Copy "middle"
-                    for (s1_chunk, s2_chunk) in zip(s1_chunks, s2_chunks) {
-                        // SAFETY: the chunks are safely subsliced from s1 and
-                        // s2. Alignment is ensured through the use of
-                        // "align_offset", while the size of the chunks is
-                        // explicitly taken to match the primitive size.
-                        let s1_chunk_primitive: &mut MaybeUninit<ChunkPrimitiveType> = unsafe { &mut *s1_chunk.as_mut_ptr().cast() };
-                        let s2_chunk_primitive: &MaybeUninit<ChunkPrimitiveType> = unsafe { &*s2_chunk.as_ptr().cast() };
-                        *s1_chunk_primitive = *s2_chunk_primitive;
-                    }
-
-                    // Copy "suffix"
-                    for (s1_elem, s2_elem) in zip(s1_suffix, s2_suffix) {
-                        *s1_elem = *s2_elem;
-                    }
-                }
-                4 => {
-                    // Can't use `chunk_size` since we need a compile-time
-                    // constant.
-                    const CHUNK_SIZE: usize = 4;
-                    type ChunkPrimitiveType = u32;
-
-                    // Check sanity
-                    assert_eq!(CHUNK_SIZE, mem::align_of::<ChunkPrimitiveType>());
-                    assert!(s1_middle_and_suffix.as_mut_ptr().is_aligned_to(CHUNK_SIZE));
-                    assert!(s2_middle_and_suffix.as_ptr().is_aligned_to(CHUNK_SIZE));
-
-                    // Split into "middle" and "suffix"
-                    let (s1_chunks, s1_suffix) = s1_middle_and_suffix.as_chunks_mut::<CHUNK_SIZE>();
-                    let (s2_chunks, s2_suffix) = s2_middle_and_suffix.as_chunks::<CHUNK_SIZE>();
-
-                    // Copy "middle"
-                    for (s1_chunk, s2_chunk) in zip(s1_chunks, s2_chunks) {
-                        // SAFETY: the chunks are safely subsliced from s1 and
-                        // s2. Alignment is ensured through the use of
-                        // "align_offset", while the size of the chunks is
-                        // explicitly taken to match the primitive size.
-                        let s1_chunk_primitive: &mut MaybeUninit<ChunkPrimitiveType> = unsafe { &mut *s1_chunk.as_mut_ptr().cast() };
-                        let s2_chunk_primitive: &MaybeUninit<ChunkPrimitiveType> = unsafe { &*s2_chunk.as_ptr().cast() };
-                        *s1_chunk_primitive = *s2_chunk_primitive;
-                    }
-
-                    // Copy "suffix"
-                    for (s1_elem, s2_elem) in zip(s1_suffix, s2_suffix) {
-                        *s1_elem = *s2_elem;
-                    }
-                }
-                8 => {
-                    // Can't use `chunk_size` since we need a compile-time
-                    // constant.
-                    const CHUNK_SIZE: usize = 8;
-                    type ChunkPrimitiveType = u64;
-
-                    // Check sanity
-                    assert_eq!(CHUNK_SIZE, mem::align_of::<ChunkPrimitiveType>());
-                    assert!(s1_middle_and_suffix.as_mut_ptr().is_aligned_to(CHUNK_SIZE));
-                    assert!(s2_middle_and_suffix.as_ptr().is_aligned_to(CHUNK_SIZE));
-
-                    // Split into "middle" and "suffix"
-                    let (s1_chunks, s1_suffix) = s1_middle_and_suffix.as_chunks_mut::<CHUNK_SIZE>();
-                    let (s2_chunks, s2_suffix) = s2_middle_and_suffix.as_chunks::<CHUNK_SIZE>();
-
-                    // Copy "middle"
-                    for (s1_chunk, s2_chunk) in zip(s1_chunks, s2_chunks) {
-                        // SAFETY: the chunks are safely subsliced from s1 and
-                        // s2. Alignment is ensured through the use of
-                        // "align_offset", while the size of the chunks is
-                        // explicitly taken to match the primitive size.
-                        let s1_chunk_primitive: &mut MaybeUninit<ChunkPrimitiveType> = unsafe { &mut *s1_chunk.as_mut_ptr().cast() };
-                        let s2_chunk_primitive: &MaybeUninit<ChunkPrimitiveType> = unsafe { &*s2_chunk.as_ptr().cast() };
-                        *s1_chunk_primitive = *s2_chunk_primitive;
-                    }
-
-                    // Copy "suffix"
-                    for (s1_elem, s2_elem) in zip(s1_suffix, s2_suffix) {
-                        *s1_elem = *s2_elem;
-                    }
-                }
-                16 => {
-                    // Can't use `chunk_size` since we need a compile-time
-                    // constant.
-                    const CHUNK_SIZE: usize = 16;
-                    type ChunkPrimitiveType = u128;
-
-                    // Check sanity
-                    assert_eq!(CHUNK_SIZE, mem::align_of::<ChunkPrimitiveType>());
-                    assert!(s1_middle_and_suffix.as_mut_ptr().is_aligned_to(CHUNK_SIZE));
-                    assert!(s2_middle_and_suffix.as_ptr().is_aligned_to(CHUNK_SIZE));
-
-                    // Split into "middle" and "suffix"
-                    let (s1_chunks, s1_suffix) = s1_middle_and_suffix.as_chunks_mut::<CHUNK_SIZE>();
-                    let (s2_chunks, s2_suffix) = s2_middle_and_suffix.as_chunks::<CHUNK_SIZE>();
-
-                    // Copy "middle"
-                    for (s1_chunk, s2_chunk) in zip(s1_chunks, s2_chunks) {
-                        // SAFETY: the chunks are safely subsliced from s1 and
-                        // s2. Alignment is ensured through the use of
-                        // "align_offset", while the size of the chunks is
-                        // explicitly taken to match the primitive size.
-                        let s1_chunk_primitive: &mut MaybeUninit<ChunkPrimitiveType> = unsafe { &mut *s1_chunk.as_mut_ptr().cast() };
-                        let s2_chunk_primitive: &MaybeUninit<ChunkPrimitiveType> = unsafe { &*s2_chunk.as_ptr().cast() };
-                        *s1_chunk_primitive = *s2_chunk_primitive;
-                    }
-
-                    // Copy "suffix"
-                    for (s1_elem, s2_elem) in zip(s1_suffix, s2_suffix) {
-                        *s1_elem = *s2_elem;
-                    }
-                }
+                2 => copy_chunks_and_remainder::<2, u16>(s1_middle_and_suffix, s2_middle_and_suffix),
+                4 => copy_chunks_and_remainder::<4, u32>(s1_middle_and_suffix, s2_middle_and_suffix),
+                8 => copy_chunks_and_remainder::<8, u64>(s1_middle_and_suffix, s2_middle_and_suffix),
+                16 => copy_chunks_and_remainder::<16, u128>(s1_middle_and_suffix, s2_middle_and_suffix),
                 _ => unreachable!(),
             }
         }
