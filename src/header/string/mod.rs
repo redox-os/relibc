@@ -138,7 +138,10 @@ pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -
         }
 
         if chunk_align_offset < n {
-            fn copy_chunks_and_remainder<const N: usize, T: Copy>(dst: &mut [MaybeUninit<u8>], src: &[MaybeUninit<u8>]) {
+            fn copy_chunks_and_remainder<const N: usize, T: Copy>(
+                dst: &mut [MaybeUninit<u8>],
+                src: &[MaybeUninit<u8>],
+            ) {
                 // Check sanity
                 assert_eq!(0, N % mem::align_of::<T>());
                 assert!(dst.as_mut_ptr().is_aligned_to(N));
@@ -154,8 +157,10 @@ pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -
                     // s2. Alignment is ensured through the use of
                     // "align_offset", while the size of the chunks is
                     // explicitly taken to match the primitive size.
-                    let dst_chunk_primitive: &mut MaybeUninit<T> = unsafe { &mut *dst_chunk.as_mut_ptr().cast() };
-                    let src_chunk_primitive: &MaybeUninit<T> = unsafe { &*src_chunk.as_ptr().cast() };
+                    let dst_chunk_primitive: &mut MaybeUninit<T> =
+                        unsafe { &mut *dst_chunk.as_mut_ptr().cast() };
+                    let src_chunk_primitive: &MaybeUninit<T> =
+                        unsafe { &*src_chunk.as_ptr().cast() };
                     *dst_chunk_primitive = *src_chunk_primitive;
                 }
 
@@ -175,10 +180,19 @@ pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -
                         *s1_elem = *s2_elem;
                     }
                 }
-                2 => copy_chunks_and_remainder::<2, u16>(s1_middle_and_suffix, s2_middle_and_suffix),
-                4 => copy_chunks_and_remainder::<4, u32>(s1_middle_and_suffix, s2_middle_and_suffix),
-                8 => copy_chunks_and_remainder::<8, u64>(s1_middle_and_suffix, s2_middle_and_suffix),
-                16 => copy_chunks_and_remainder::<16, u128>(s1_middle_and_suffix, s2_middle_and_suffix),
+                2 => {
+                    copy_chunks_and_remainder::<2, u16>(s1_middle_and_suffix, s2_middle_and_suffix)
+                }
+                4 => {
+                    copy_chunks_and_remainder::<4, u32>(s1_middle_and_suffix, s2_middle_and_suffix)
+                }
+                8 => {
+                    copy_chunks_and_remainder::<8, u64>(s1_middle_and_suffix, s2_middle_and_suffix)
+                }
+                16 => copy_chunks_and_remainder::<16, u128>(
+                    s1_middle_and_suffix,
+                    s2_middle_and_suffix,
+                ),
                 _ => unreachable!(),
             }
         }
