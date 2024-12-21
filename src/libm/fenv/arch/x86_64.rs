@@ -59,6 +59,11 @@ pub mod native {
     #[no_mangle]
     pub unsafe extern "C" fn feraiseexcept(excepts: c_int) -> c_int {
         let excepts = excepts & FE_ALL_EXCEPT;
+        
+        if excepts == 0 {
+            return -1;
+        }
+
         fesetexceptflag(excepts as *const fexcept_t, excepts);
         asm!("fwait", options(preserves_flags));
         0

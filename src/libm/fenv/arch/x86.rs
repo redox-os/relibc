@@ -48,19 +48,19 @@ pub mod native {
         let excepts = excepts & FE_ALL_EXCEPT;
 
         // Store the current x87 floating-point environment
-        asm!("fnstenv [{0}]", in (reg) & mut fenv, options(preserves_flags));
+        asm!("fnstenv [{0}]", in(reg) &mut fenv, options(preserves_flags));
 
-        //  Clear the requested floating-point exceptions
+        // Clear the requested floating-point exceptions in the x87 FPU status word
         fenv.x87.status &= !(excepts as c_uint);
 
-        // Load the x87 floating-point environment
-        asm!("fldenv [{0}]", in (reg) & fenv, options(preserves_flags));
+        // Load the modified x87 floating-point environment
+        asm!("fldenv [{0}]", in(reg) &fenv, options(preserves_flags));
 
-        // Same for SSE environment
+        // Clear the requested floating-point exceptions in the SSE MXCSR register (if SSE is available)
         if has_sse() {
-            asm!("stmxcsr [{0}]", in (reg) & mut mxcsr, options(preserves_flags));
+            asm!("stmxcsr [{0}]", in(reg) &mut mxcsr, options(preserves_flags));
             mxcsr &= !excepts;
-            asm!("ldmxcsr [{0}]", in (reg) & mxcsr, options(preserves_flags));
+            asm!("ldmxcsr [{0}]", in(reg) &mxcsr, options(preserves_flags));
         }
         0
     }
@@ -74,8 +74,18 @@ pub mod native {
     #[no_mangle]
     pub unsafe extern "C" fn feraiseexcept(except: c_int) -> c_int {
         let excepts = except & FE_ALL_EXCEPT;
+
+        // Validate input to ensure only supported exceptions are raised
+        if excepts == 0 {
+            return -1;
+        }
+
+        // Set the exception flags using fesetexceptflag
         fesetexceptflag(excepts as *const fexcept_t, excepts);
+
+        // Ensure pending exceptions are handled
         asm!("fwait", options(preserves_flags));
+
         0
     }
 
@@ -87,21 +97,23 @@ pub mod native {
         let mut fenv: fenv_t = Default::default();
         let mut mxcsr = 0;
         let excepts = excepts & FE_ALL_EXCEPT;
-        // Store the current x87 floating-point environment
-        asm!("fnstenv [{0}]", in (reg) & mut fenv, options(preserves_flags));
 
-        // Set the requested status flags
+        // Store the current x87 floating-point environment
+        asm!("fnstenv [{0}]", in(reg) &mut fenv, options(preserves_flags));
+
+        // Set the requested status flags in the x87 FPU status word
         fenv.x87.status &= !(excepts as c_uint);
         fenv.x87.status |= *flagp & (excepts as c_uint);
-        // Load the x87 floating-point environment
-        asm!("fldenv [{0}]", in (reg) & fenv, options(preserves_flags));
 
-        // Same for SSE environment
+        // Load the modified x87 floating-point environment
+        asm!("fldenv [{0}]", in(reg) &fenv, options(preserves_flags));
+
+        // Set the requested status flags in the SSE MXCSR register (if SSE is available)
         if has_sse() {
-            asm!("stmxcsr [{0}]", in (reg) & mut mxcsr, options(preserves_flags));
+            asm!("stmxcsr [{0}]", in(reg) &mut mxcsr, options(preserves_flags));
             mxcsr &= !(excepts as c_uint);
             mxcsr |= *flagp & (excepts as c_uint);
-            asm!("ldmxcsr [{0}]", in (reg) & mxcsr, options(preserves_flags));
+            asm!("ldmxcsr [{0}]", in(reg) &mxcsr, options(preserves_flags));
         }
         0
     }
@@ -115,10 +127,11 @@ pub mod native {
     #[no_mangle]
     pub unsafe extern "C" fn fesetenv(envp: *const fenv_t) -> c_int {
         // Load the x87 floating-point environment
-        asm!("fldenv [{0}]", in (reg) & * envp, options(preserves_flags));
-        // Store the MXCSR register
+        asm!("fldenv [{0}]", in(reg) &*envp, options(preserves_flags));
+
+        // Load the MXCSR register (if SSE is available)
         if has_sse() {
-            asm!("ldmxcsr [{0}]", in (reg) & (* envp).mxcsr, options(preserves_flags));
+            asm!("ldmxcsr [{0}]", in(reg) &(*envp).mxcsr, options(preserves_flags));
         }
         0
     }
@@ -131,27 +144,27 @@ pub mod native {
         let mut control = 0;
         let mut mxcsr = 0;
 
-        // Check whether requested rounding direction is supported
+        // Check whether the requested rounding direction is supported
         if round & !ROUND_MASK != 0 {
-            return -(1 as c_int);
+            return -1;
         }
 
         // Store the current x87 control word register
-        asm!("fnstcw [{0}]", in (reg) & mut control, options(preserves_flags));
+        asm!("fnstcw [{0}]", in(reg) &mut control, options(preserves_flags));
 
-        // Set the rounding direction
-        control &= ROUND_MASK;
+        // Set the rounding direction in the x87 control word
+        control &= !ROUND_MASK;
         control |= round;
 
-        // Load the x87 control word register
-        asm!("fldcw [{0}]", in (reg) & control, options(preserves_flags));
+        // Load the modified x87 control word register
+        asm!("fldcw [{0}]", in(reg) &control, options(preserves_flags));
 
-        // Same for the SSE environment
+        // Set the rounding direction in the SSE MXCSR register (if SSE is available)
         if has_sse() {
-            asm!("stmxcsr [{0}]", in (reg) & mut mxcsr, options(preserves_flags));
+            asm!("stmxcsr [{0}]", in(reg) &mut mxcsr, options(preserves_flags));
             mxcsr &= !(ROUND_MASK << SSE_ROUND_SHIFT);
             mxcsr |= round << SSE_ROUND_SHIFT;
-            asm!("ldmxcsr [{0}]", in (reg) & mxcsr, options(preserves_flags));
+            asm!("ldmxcsr [{0}]", in(reg) &mxcsr, options(preserves_flags));
         }
         0
     }
@@ -161,11 +174,9 @@ pub mod native {
     pub unsafe extern "C" fn fegetround() -> c_int {
         let mut control = 0;
 
-        // We assume that the x87 and the SSE unit agree on the
-        // rounding mode.  Reading the control word on the x87 turns
-        // out to be about 5 times faster than reading it on the SSE
-        // unit on an Opteron 244.
-        asm!("fnstcw [{0}]", in (reg) & mut control, options(preserves_flags));
+        // Read the x87 control word to get the rounding mode
+        asm!("fnstcw [{0}]", in(reg) &mut control, options(preserves_flags));
+
         control & ROUND_MASK
     }
 
@@ -173,22 +184,16 @@ pub mod native {
     /// environment in the object pointed to by envp.
     #[no_mangle]
     pub unsafe extern "C" fn fegetenv(envp: *mut fenv_t) -> c_int {
-        //  Store the current x87 floating-point environment
-        asm!("fnstenv [{0}]", in (reg) & mut * envp, options(preserves_flags));
+        // Store the current x87 floating-point environment
+        asm!("fnstenv [{0}]", in(reg) &mut *envp, options(preserves_flags));
 
-        // Store the MXCSR register state
+        // Store the MXCSR register state (if SSE is available)
         if has_sse() {
-            asm!("stmxcsr [{0}]", in (reg) & mut (* envp).mxcsr, options(preserves_flags));
+            asm!("stmxcsr [{0}]", in(reg) &(*envp).mxcsr, options(preserves_flags));
         }
 
-        // When an FNSTENV instruction is executed, all pending exceptions are
-        // essentially lost (either the x87 FPU status register is cleared or
-        // all exceptions are masked).
-        //
-        // 8.6 X87 FPU EXCEPTION SYNCHRONIZATION -
-        // Intel(R) 64 and IA-32 Architectures Softare Developer's Manual - Vol1
-        //
-        asm!("fldcw [{0}]", in (reg) & (* envp).x87.control, options(preserves_flags));
+        // Ensure pending exceptions are handled by reloading the x87 control word
+        asm!("fldcw [{0}]", in(reg) &(*envp).x87.control, options(preserves_flags));
         0
     }
 
@@ -203,9 +208,12 @@ pub mod native {
 
         // Store the current x87 status register
         asm!("fnstsw [{}]", in(reg) &mut status);
+
+        // Store the MXCSR register state (if SSE is available)
         if has_sse() {
-            asm!("stmxcsr [{0}]", in (reg) & mut mxcsr, options(preserves_flags));
+            asm!("stmxcsr [{0}]", in(reg) &mut mxcsr, options(preserves_flags));
         }
+
         (status | mxcsr) & excepts
     }
 }

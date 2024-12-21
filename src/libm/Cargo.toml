@@ -4,5 +4,5 @@ version = "0.1.0"
 authors = ["Darley Barreto <darleybarreto@gmail.com>"]
 
 [lib]
-name = "libm"
+path = "src/lib.rs"
 crate-type = ["staticlib"]

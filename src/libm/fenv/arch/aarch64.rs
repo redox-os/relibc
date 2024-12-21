@@ -98,50 +98,49 @@ pub mod native {
     /// floating-point environment macro. The fesetenv() function does not raise
     /// floating-point exceptions, but only installs the state of the floating-point
     /// status flags represented through its argument.
-    #[no_mangle]
     pub unsafe extern "C" fn fesetenv(envp: *const fenv_t) -> c_int {
-        asm!("msr fpcr, {0:}", inlateout(reg) *envp & 0xffffffff => _, options(preserves_flags));
-        asm!("msr fpsr, {0:}", inlateout(reg) r => _, options(preserves_flags));
+        let env = *envp;
+        let fpcr = env as u32;
+        let fpsr = (env >> 32) as u32;
+        asm!("msr fpcr, {}", in(reg) fpcr, options(nomem, nostack));
+        asm!("msr fpsr, {}", in(reg) fpsr, options(nomem, nostack));
         0
     }
-
     /// The fesetround() function establishes the rounding direction represented by
     /// its argument `round'. If the argument is not equal to the value of a rounding
     /// direction macro, the rounding direction is not changed.
     #[no_mangle]
     pub unsafe extern "C" fn fesetround(round: c_int) -> c_int {
-        let mut r = 0;
         if (round & !ROUND_MASK) != 0 {
-            return -(1 as c_int);
+            return -1;
         }
 
-        asm!("mrs {0:}, fpcr", lateout(reg) r, options(preserves_flags));
-
-        r &= (!ROUND_MASK << ROUND_SHIFT) as fenv_t;
-        r |= (round << ROUND_SHIFT) as fenv_t;
-        asm!("msr fpcr, {0:}", inlateout(reg) r => _, options(preserves_flags));
-
+        let mut fpcr: u32;
+        asm!("mrs {}, fpcr", out(reg) fpcr, options(nomem, nostack));
+        fpcr &= !(ROUND_MASK << ROUND_SHIFT);
+        fpcr |= (round as u32) << ROUND_SHIFT;
+        asm!("msr fpcr, {}", in(reg) fpcr, options(nomem, nostack));
+        
         0
     }
 
     /// The fegetround() function gets the current rounding direction.
     #[no_mangle]
     pub unsafe extern "C" fn fegetround() -> c_int {
-        let r = 0;
-        asm!("mrs {0:}, fpcr", lateout(reg) r, options(preserves_flags));
-        (r as c_int >> ROUND_SHIFT) & ROUND_MASK
+        let fpcr: u32;
+        asm!("mrs {}, fpcr", out(reg) fpcr, options(nomem, nostack));
+        ((fpcr >> ROUND_SHIFT) & ROUND_MASK) as c_int
     }
 
     /// The fegetenv() function attempts to store the current floating-point
     /// environment in the object pointed to by envp.
     #[no_mangle]
     pub unsafe extern "C" fn fegetenv(envp: *mut fenv_t) -> c_int {
-        let r = 0;
-        asm!("mrs {0:}, fpcr", lateout(reg) r, options(preserves_flags));
-        *envp = r;
-        asm!("mrs {0:}, fpsr", lateout(reg) r, options(preserves_flags));
-        *envp |= r << 32;
-
+        let mut fpcr: u32;
+        let mut fpsr: u32;
+        asm!("mrs {}, fpcr", out(reg) fpcr, options(nomem, nostack));
+        asm!("mrs {}, fpsr", out(reg) fpsr, options(nomem, nostack));
+        *envp = ((fpsr as u64) << 32) | (fpcr as u64);
         0
     }
 
