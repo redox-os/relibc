@@ -25,6 +25,9 @@ EXPECT_NAMES=\
 	glob \
 	iso646 \
 	libgen \
+	libm/test-float \
+	libm/test-double \
+	libm/inf-torture \
 	locale \
 	math \
 	netdb/getaddrinfo \
@@ -209,23 +212,14 @@ NAMES=\
 #	resource/getrusage
 #	time/times
 
-MNAMES=\
-	libm/test-float \
-	libm/test-double \
-	libm/inf-torture
-
-EXPECT_NAMES+=\
-	$(MNAMES)
-
 # Tests run with `expect` (require a .c file and an .exp file
 # that takes the produced binary as the first argument)
 EXPECT_INPUT_NAMES=\
 	unistd/getpass
 
 BINS=$(patsubst %,$(BUILD)/bins_static/%,$(NAMES))
-MBINS=$(patsubst %,$(BUILD)/bins_static/%,$(MNAMES))
-#BINS+=$(patsubst %,bins_dynamic/%,$(NAMES))
-#BINS+=$(patsubst %,bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
+BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(NAMES))
+BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_BINS=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
