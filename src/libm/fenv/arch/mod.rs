@@ -28,6 +28,7 @@ pub mod x86_common {
 
     pub const ROUND_MASK: c_int = FE_TONEAREST | FE_DOWNWARD | FE_UPWARD | FE_TOWARDZERO;
     pub const SSE_ROUND_SHIFT: c_int = 3;
+    pub const SSE_MASK_SHIFT: c_int = 7;
 
     #[repr(C)]
     #[derive(Default)]

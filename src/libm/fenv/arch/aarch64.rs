@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! $OpenBSD: fenv.c,v 1.6 2022/12/27 17:10:07 jmc Exp $
 //! Copyright (c) 2004-2005 David Schultz <das@FreeBSD.ORG>
 //! All rights reserved.
@@ -115,7 +113,7 @@ pub mod native {
             return -1;
         }
 
-        let mut fpcr: u32;
+        let mut fpcr = 0;
         asm!("mrs {}, fpcr", out(reg) fpcr, options(nomem, nostack));
         fpcr &= !(ROUND_MASK << ROUND_SHIFT);
         fpcr |= (round as u32) << ROUND_SHIFT;
@@ -127,7 +125,7 @@ pub mod native {
     /// The fegetround() function gets the current rounding direction.
     #[no_mangle]
     pub unsafe extern "C" fn fegetround() -> c_int {
-        let fpcr: u32;
+        let fpcr = 0;
         asm!("mrs {}, fpcr", out(reg) fpcr, options(nomem, nostack));
         ((fpcr >> ROUND_SHIFT) & ROUND_MASK) as c_int
     }
@@ -136,8 +134,8 @@ pub mod native {
     /// environment in the object pointed to by envp.
     #[no_mangle]
     pub unsafe extern "C" fn fegetenv(envp: *mut fenv_t) -> c_int {
-        let mut fpcr: u32;
-        let mut fpsr: u32;
+        let mut fpcr = 0;
+        let mut fpsr = 0;
         asm!("mrs {}, fpcr", out(reg) fpcr, options(nomem, nostack));
         asm!("mrs {}, fpsr", out(reg) fpsr, options(nomem, nostack));
         *envp = ((fpsr as u64) << 32) | (fpcr as u64);

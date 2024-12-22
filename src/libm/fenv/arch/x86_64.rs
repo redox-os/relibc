@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //!	$OpenBSD: fenv.c,v 1.6 2022/12/27 17:10:07 jmc Exp $
 //!	$NetBSD: fenv.c,v 1.1 2010/07/31 21:47:53 joerg Exp $
 
@@ -16,7 +14,7 @@
 //! THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
 //! ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 //! IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-//! ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+//! ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
 //! FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 //! DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
 //! OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -35,7 +33,7 @@ pub mod native {
     #[no_mangle]
     pub unsafe extern "C" fn feclearexcept(excepts: c_int) -> c_int {
         let mut fenv: fenv_t = Default::default();
-        let mut mxcsr: c_uint = 0;
+        let mut mxcsr = 0;
 
         // Store the current x87 floating-point environment
         asm!("fnstenv [{0}]", in (reg) & mut fenv, options(preserves_flags));
@@ -142,7 +140,7 @@ pub mod native {
     pub unsafe extern "C" fn fegetround() -> c_int {
         let mut control = 0;
         // We assume that the x87 and the SSE unit agree on the
-        // rounding mode.  Reading the control word on the x87 turns
+        // rounding mode. Reading the control word on the x87 turns
         // out to be about 5 times faster than reading it on the SSE
         // unit on an Opteron 244.
         asm!("fnstcw [{0}]", in (reg) & mut control, options(preserves_flags));
@@ -179,5 +177,89 @@ pub mod native {
         // Store the MXCSR register state
         asm!("stmxcsr [{0}]", in(reg) & mut mxcsr, options(preserves_flags));
         (status | mxcsr) & excepts
+    }
+
+    /// The feholdexcept() function saves the current floating-point environment
+    /// in the object pointed to by envp, clears the floating-point status flags, and
+    /// then installs a non-stop (continue on floating-point exceptions) mode, if
+    /// available, for all floating-point exceptions.
+    #[no_mangle]
+    pub unsafe extern "C" fn feholdexcept(envp: *mut fenv_t) -> c_int {
+        let mut mxcsr = 0;
+
+        // Store the current x87 floating-point environment
+        asm!("fnstenv [{0}]", in(reg) &mut *envp, options(preserves_flags));
+
+        // Clear all exception flags in FPU
+        asm!("fnclex", options(preserves_flags));
+
+        // Store the MXCSR register state
+        asm!("stmxcsr [{0}]", in(reg) &mut mxcsr, options(preserves_flags));
+        (*envp).mxcsr = mxcsr; // Store the loaded value
+
+        // Clear exception flags in MXCSR
+        mxcsr &= !FE_ALL_EXCEPT as c_uint;
+
+        // Mask all exceptions
+        mxcsr |= (FE_ALL_EXCEPT << SSE_MASK_SHIFT) as c_uint;
+
+        // Store the MXCSR register
+        asm!("ldmxcsr [{0}]", in(reg) & mxcsr, options(preserves_flags));
+
+        0
+    }
+
+    /// The following functions are extensions to the standard
+    #[no_mangle]
+    pub unsafe extern "C" fn feenableexcept(mask: c_int) -> c_int {
+        let mut mxcsr = 0;
+        let mut omask = 0;
+        let mut control = 0;
+
+        let mask = mask & FE_ALL_EXCEPT;
+
+        asm!("fnstcw [{0}]", in(reg) &mut control, options(preserves_flags));
+        asm!("stmxcsr [{0}]", in(reg) &mut mxcsr, options(preserves_flags));
+
+        omask = (!(control as c_int | (mxcsr >> SSE_MASK_SHIFT) as c_int)) & FE_ALL_EXCEPT;
+        control &= !mask as c_ushort;
+        asm!("fldcw [{0}]", in(reg) & control, options(preserves_flags));
+
+        mxcsr &= !(mask << SSE_MASK_SHIFT) as c_uint;
+        asm!("ldmxcsr [{0}]", in(reg) & mxcsr, options(preserves_flags));
+
+        omask
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn fedisableexcept(mask: c_int) -> c_int {
+        let mut mxcsr = 0;
+        let mut omask = 0;
+        let mut control = 0;
+
+        let mask = mask & FE_ALL_EXCEPT;
+
+        asm!("fnstcw [{0}]", in(reg) &mut control, options(preserves_flags));
+        asm!("stmxcsr [{0}]", in(reg) &mut mxcsr, options(preserves_flags));
+
+        omask = (!(control as c_int | (mxcsr >> SSE_MASK_SHIFT) as c_int)) & FE_ALL_EXCEPT;
+        control |= mask as c_ushort;
+        asm!("fldcw [{0}]", in(reg) & control, options(preserves_flags));
+
+        mxcsr |= (mask << SSE_MASK_SHIFT) as c_uint;
+        asm!("ldmxcsr [{0}]", in(reg) & mxcsr, options(preserves_flags));
+
+        omask
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn fegetexcept() -> c_int {
+        let mut control = 0;
+
+        // We assume that the masks for the x87 and the SSE unit are
+        // the same.
+        asm!("fnstcw [{0}]", in(reg) &mut control, options(preserves_flags));
+
+        (!control as c_int) & FE_ALL_EXCEPT
     }
 }
