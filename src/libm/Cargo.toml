@@ -6,3 +6,7 @@ authors = ["Darley Barreto <darleybarreto@gmail.com>"]
 [lib]
 path = "lib.rs"
 crate-type = ["staticlib"]
+
+[profile.release]
+panic = "abort"
+opt-level = 3
