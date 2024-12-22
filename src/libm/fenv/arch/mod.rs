@@ -30,6 +30,9 @@ pub mod x86_common {
     pub const SSE_ROUND_SHIFT: c_int = 3;
     pub const SSE_MASK_SHIFT: c_int = 7;
 
+    pub const INITIAL_NPXCW: c_uint = 0x037f;
+    pub const INITIAL_MXCSR: c_uint = 0x1f80;
+
     #[repr(C)]
     #[derive(Default)]
     pub struct fenv_t {
@@ -47,6 +50,19 @@ pub mod x86_common {
     }
 
     pub type fexcept_t = c_uint;
+
+    /// The following constant represents the default floating-point environment
+    /// (that is, the one installed at program startup) and has type pointer to
+    /// const-qualified fenv_t.
+    pub static __fe_dfl_env: fenv_t = fenv_t {
+        x87: X87Reg {
+            control: 0xffff0000 | INITIAL_NPXCW,
+            status: 0xffff0000,
+            tag: 0xffffffff,
+            others: [0x00000000, 0x00000000, 0x00000000, 0xffff0000],
+        },
+        mxcsr: INITIAL_MXCSR,
+    };
 }
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]

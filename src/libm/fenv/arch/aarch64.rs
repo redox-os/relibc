@@ -12,7 +12,7 @@
 //! THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
 //! ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 //! IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-//! ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+//! ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
 //! FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 //! DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
 //! OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -48,6 +48,15 @@ pub mod native {
     pub type fenv_t = c_ulonglong;
     pub type fexcept_t = c_ulonglong;
 
+    /// The following constant represents the default floating-point environment
+    /// (that is, the one installed at program startup) and has type pointer to
+    /// const-qualified fenv_t.
+    ///
+    /// It can be used as an argument to the functions within the <fenv.h> header
+    /// that manage the floating-point environment, namely fesetenv() and
+    /// feupdateenv().
+    pub static __fe_dfl_env: fenv_t = 0;
+
     /// The feclearexcept() function clears the supported floating-point exceptions
     /// represented by `excepts'.
     #[no_mangle]
@@ -81,29 +90,36 @@ pub mod native {
     /// NOT raise any floating-point exceptions, but only sets the state of the flags.
     #[no_mangle]
     pub unsafe extern "C" fn fesetexceptflag(flagp: *const fexcept_t, excepts: c_int) -> c_int {
-        let mut r = 0;
-        let excepts = (excepts & FE_ALL_EXCEPT) as fexcept_t;
+        let mut r: fexcept_t = 0;
+        let excepts_mask = (excepts & FE_ALL_EXCEPT) as fexcept_t;
         asm!("mrs {0:}, fpsr", lateout(reg) r, options(preserves_flags));
-        r |= !excepts;
-        r |= *flagp & excepts;
+        // Clear the bits corresponding to 'excepts'
+        r &= !excepts_mask;
+        // Set the bits from flagp where 'excepts' is set
+        r |= *flagp & excepts_mask;
         asm!("msr fpsr, {0:}", inlateout(reg) r => _, options(preserves_flags));
         0
     }
 
-    /// The fesetenv() function attempts to establish the floating-point environment
-    /// represented by the object pointed to by envp. The argument `envp' points
-    /// to an object set by a call to fegetenv() or feholdexcept(), or equal a
-    /// floating-point environment macro. The fesetenv() function does not raise
-    /// floating-point exceptions, but only installs the state of the floating-point
-    /// status flags represented through its argument.
-    pub unsafe extern "C" fn fesetenv(envp: *const fenv_t) -> c_int {
-        let env = *envp;
-        let fpcr = env as u32;
-        let fpsr = (env >> 32) as u32;
-        asm!("msr fpcr, {}", in(reg) fpcr, options(nomem, nostack));
-        asm!("msr fpsr, {}", in(reg) fpsr, options(nomem, nostack));
-        0
+    /// The fetestexcept() function determines which of a specified subset of the
+    /// floating-point exception flags are currently set. The `excepts' argument
+    /// specifies the floating-point status flags to be queried.
+    #[no_mangle]
+    pub unsafe extern "C" fn fetestexcept(excepts: c_int) -> c_int {
+        let r = 0;
+        let excepts = excepts & FE_ALL_EXCEPT;
+        asm!("mrs {0:}, fpsr", lateout(reg) r, options(preserves_flags));
+        r as c_int & excepts
     }
+
+    /// The fegetround() function gets the current rounding direction.
+    #[no_mangle]
+    pub unsafe extern "C" fn fegetround() -> c_int {
+        let fpcr = 0;
+        asm!("mrs {}, fpcr", out(reg) fpcr, options(nomem, nostack));
+        ((fpcr >> ROUND_SHIFT) & ROUND_MASK) as c_int
+    }
+
     /// The fesetround() function establishes the rounding direction represented by
     /// its argument `round'. If the argument is not equal to the value of a rounding
     /// direction macro, the rounding direction is not changed.
@@ -122,14 +138,6 @@ pub mod native {
         0
     }
 
-    /// The fegetround() function gets the current rounding direction.
-    #[no_mangle]
-    pub unsafe extern "C" fn fegetround() -> c_int {
-        let fpcr = 0;
-        asm!("mrs {}, fpcr", out(reg) fpcr, options(nomem, nostack));
-        ((fpcr >> ROUND_SHIFT) & ROUND_MASK) as c_int
-    }
-
     /// The fegetenv() function attempts to store the current floating-point
     /// environment in the object pointed to by envp.
     #[no_mangle]
@@ -142,15 +150,61 @@ pub mod native {
         0
     }
 
-    /// The fetestexcept() function determines which of a specified subset of the
-    /// floating-point exception flags are currently set. The `excepts' argument
-    /// specifies the floating-point status flags to be queried.
+    /// The feholdexcept() function saves the current floating-point environment
+    /// in the object pointed to by envp, clears the floating-point status flags, and
+    /// then installs a non-stop (continue on floating-point exceptions) mode, if
+    /// available, for all floating-point exceptions.
     #[no_mangle]
-    pub unsafe extern "C" fn fetestexcept(excepts: c_int) -> c_int {
-        let r = 0;
+    pub unsafe extern "C" fn feholdexcept(envp: *mut fenv_t) -> c_int {
+        let mut fpcr = 0;
+        let mut fpsr = 0;
+        asm!("mrs {}, fpcr", out(reg) fpcr, options(nomem, nostack));
+        *envp = fpcr as u64;
+        let enable_mask = ENABLE_MASK as u32;
+        fpcr &= !enable_mask;
+        asm!("msr fpcr, {}", in(reg) fpcr, options(nomem, nostack));
 
-        let excepts = excepts & FE_ALL_EXCEPT;
-        asm!("mrs {0:}, fpsr", lateout(reg) r, options(preserves_flags));
-        r as c_int & excepts
+        asm!("mrs {}, fpsr", out(reg) fpsr, options(nomem, nostack));
+        *envp |= (fpsr as u64) << 32;
+        fpsr &= !FE_ALL_EXCEPT as u32;
+        asm!("msr fpsr, {}", in(reg) fpsr, options(nomem, nostack));
+        0
+    }
+
+    /// The fesetenv() function attempts to establish the floating-point environment
+    /// represented by the object pointed to by envp. The argument `envp' points
+    /// to an object set by a call to fegetenv() or feholdexcept(), or equal a
+    /// floating-point environment macro. The fesetenv() function does not raise
+    /// floating-point exceptions, but only installs the state of the floating-point
+    /// status flags represented through its argument.
+    #[no_mangle]
+    pub unsafe extern "C" fn fesetenv(envp: *const fenv_t) -> c_int {
+        let env = *envp;
+        let fpcr = env as u32;
+        let fpsr = (env >> 32) as u32;
+        asm!("msr fpcr, {}", in(reg) fpcr, options(nomem, nostack));
+        asm!("msr fpsr, {}", in(reg) fpsr, options(nomem, nostack));
+        0
+    }
+
+    /// The following functions are extensions to the standard
+    #[no_mangle]
+    pub unsafe extern "C" fn feenableexcept(mask: c_int) -> c_int {
+        // This is a simplified implementation mirroring the C code's behavior.
+        // A full implementation would involve modifying the FPCR to enable traps.
+        -1
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn fedisableexcept(mask: c_int) -> c_int {
+        // This is a simplified implementation mirroring the C code's behavior.
+        // A full implementation would involve modifying the FPCR to disable traps.
+        0
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn fegetexcept(void: ()) -> c_int {
+        // This is a simplified implementation mirroring the C code's behavior.
+        0
     }
 }
