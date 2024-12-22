@@ -89,8 +89,6 @@ headers: $(HEADERS_DEPS)
 	rm -rf $(TARGET_HEADERS)
 	mkdir -pv $(TARGET_HEADERS)
 	cp -rv include/* $(TARGET_HEADERS)
-	cp -v "openlibm/include"/*.h $(TARGET_HEADERS)
-	cp -v "openlibm/src"/*.h $(TARGET_HEADERS)
 	set -e ; \
 	for header in $(HEADERS_UNPARSED); do \
 		echo "Header $$header"; \
@@ -265,13 +263,3 @@ $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD
 	$(LD) --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections $^ -o $@
 
 # Other targets
-
-# $(BUILD)/openlibm: openlibm
-# 	rm -rf $@ $@.partial
-# 	mkdir -p $(BUILD)
-# 	cp -r $< $@.partial
-# 	mv $@.partial $@
-# 	touch $@
-
-# $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
-# 	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CPPFLAGS="-fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
