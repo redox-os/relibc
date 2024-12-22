@@ -143,6 +143,7 @@ pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -
                 src: &[MaybeUninit<u8>],
             ) {
                 // Check sanity
+                assert_eq!(N, mem::size_of::<T>());
                 assert_eq!(0, N % mem::align_of::<T>());
                 assert!(dst.as_mut_ptr().is_aligned_to(N));
                 assert!(src.as_ptr().is_aligned_to(N));
