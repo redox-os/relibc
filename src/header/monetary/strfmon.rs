@@ -12,9 +12,10 @@ use core::{ffi::CStr, ptr, slice, str};
    an optional left precision, an optional right precision, and a conversion specifier.
    The conversion specifier can be either 'i' or 'n'. The 'i' specifier formats the monetary value according to the
    locale-specific rules, while the 'n' specifier formats the monetary value according to the international rules.
-   
+
    The function returns the number of characters written to the buffer, excluding the null terminator, or -1 if an error occurred.
 
+   TODO : better handling error : always return -1 if an error occurred
 */
 pub unsafe extern "C" fn strfmon(
     s: *mut i8,        // char *
@@ -208,7 +209,7 @@ fn format_monetary(
     // Reverse the string to get the correct order
     let mut result = String::with_capacity(grouped.len() + 20);
 
-    // Add the sign
+    // Add the sign position
     let sign_posn = if is_negative {
         monetary.n_sign_posn
     } else {
@@ -226,7 +227,7 @@ fn format_monetary(
         ""
     };
 
-    // Add the sign
+    // Add the sign at the beginning
     if sign_posn == 0 {
         result.push('(');
     } else if sign_posn == 1 {
@@ -273,6 +274,7 @@ fn format_monetary(
     }
 
     if !cs_precedes {
+        // Add the currency symbol after the value
         if sep_by_space {
             result.push(' ');
         }
@@ -284,6 +286,7 @@ fn format_monetary(
     }
 
     if let Some(width) = flags.field_width {
+        // Check if the field width is specified
         if result.len() < width {
             let padding = " ".repeat(width - result.len());
             if flags.left_justify {

@@ -1,8 +1,7 @@
-
 /// monetary.h implementation for Redox, following the POSIX standard.
 /// Following https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/monetary.h.html
 ///
-/// We should provide a strfmon() implementation that formats a monetary value.
+/// We should provide a strfmon() implementation that formats a monetary value,
 /// according to the current locale (TODO).
 use alloc::string::{String, ToString};
 use core::{ffi::CStr, ptr, slice, str};
@@ -62,7 +61,7 @@ struct FormatFlags {
 }
 
 /// Use our own floating point implementation
-/// TODO : use num-traits crate
+/// TODO : maybe we can use num-traits crate
 #[inline]
 fn my_fabs(x: f64) -> f64 {
     if x < 0.0 {
@@ -105,32 +104,36 @@ fn my_pow10(n: usize) -> f64 {
     result
 }
 
-/// TODO : improve grouping implementation
+/// Formats a monetary value according to the current locale.
 fn apply_grouping(int_str: &str, monetary: &LocaleMonetaryInfo) -> String {
     let mut grouped = String::with_capacity(int_str.len() * 2);
     let mut count = 0;
     let mut group_idx = 0;
+    let current_grouping = &monetary.mon_grouping;
+    let separator = monetary.mon_thousands_sep;
 
-    // The grouping array can have up to 4 elements, but the last element is always 0
-    for c in int_str.chars().rev() {
-        if count > 0 && count % monetary.mon_grouping[group_idx] == 0 {
-            grouped.push_str(monetary.mon_thousands_sep);
-            // Move to next grouping size if available
-            if group_idx + 1 < monetary.mon_grouping.len() {
-                group_idx += 1;
+    for c in int_str.chars() {
+        if count > 0 {
+            let current_group = current_grouping[group_idx.min(current_grouping.len() - 1)];
+            if current_group > 0 && count % current_group == 0 {
+                grouped.push_str(separator);
+                if group_idx + 1 < current_grouping.len() {
+                    group_idx += 1;
+                }
             }
         }
         grouped.push(c);
         count += 1;
     }
-    // Reverse the string to get the correct order
-    grouped.chars().rev().collect()
+
+    grouped
 }
 
 /// Safe handling of large monetary values. Returns None if the value is too large to format
 fn format_value_parts(value: f64, frac_digits: usize) -> Option<(String, i64)> {
     let abs_value = my_fabs(value);
     if abs_value > (i64::MAX as f64) {
+        // Check if the value is too large to format
         return None;
     }
 
