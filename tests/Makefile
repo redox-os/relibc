@@ -76,6 +76,7 @@ EXPECT_NAMES=\
 	stdlib/strtoul \
 	stdlib/system \
 	string/mem \
+	string/memcpy \
 	string/memmem \
 	string/strcat \
 	string/strchr \
