@@ -11,21 +11,14 @@ int main()
 {
 	int pgrp;
 
- 	if ((pgrp = getpgrp()) == -1) {
-		printf("Could not get process group number\n");
-		exit(EXIT_FAILURE);
-	}
+	pgrp = getpgrp();
+	ERROR_IF(getpgrp, pgrp, == -1);
+ 	
+	int status;
+	status = killpg(pgrp, -1);
+	ERROR_IF(killpg, status, != -1);
 
- 	if (killpg(pgrp, -1) != -1) {
-		printf("killpg did not return -1 even though it was passed an invalid signal number.");
-		exit(EXIT_FAILURE);
-	}
+	ERROR_IF(killpg, errno, != EINVAL);
 
-	if (errno != EINVAL) {
-		printf("killpg did not set errno to EINVAL even though it was passed an invalid signal number.");
-		exit(EXIT_FAILURE);
-	}
-
-	printf("Test PASSED\n");
-	return 0;
+	return EXIT_SUCCESS;
 }

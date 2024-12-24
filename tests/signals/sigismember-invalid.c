@@ -9,17 +9,13 @@
 
 int main() {
   sigset_t sigset;
+  int status;
 
   sigfillset(&sigset);
-  if (sigismember(&sigset, -1)!=-1){
-    printf("sigismember didn't return -1");
-    exit(EXIT_FAILURE);
-  } else if (EINVAL != errno) {
-		printf("errno was not set to EINVAL\n");
-		exit(EXIT_FAILURE);
-	}
+  status = sigismember(&sigset, -1);
+  ERROR_IF(sigismember, status, != -1);
+  ERROR_IF(sigismember, errno, != EINVAL);
 
-    printf ("errno set to EINVAL and sigismember returned -1\n");
-	return 0;	
+  return EXIT_SUCCESS;	
 
 }

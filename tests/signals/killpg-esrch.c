@@ -10,16 +10,11 @@
 int main()
 {
 
- 	if (killpg(999999, 0) != -1) {
-		printf("killpg did not return -1 even though it was passed an invalid process group id.");
-		exit(EXIT_FAILURE);
-	}
+	int status;
+	status = killpg(999999, 0);
+	ERROR_IF(killpg, status, !=-1);
 
-	if (errno != ESRCH) {
-		printf("killpg did not set errno to ESRCH even though it was passed an invalid signal number.");
-		exit(EXIT_FAILURE);
-	}
+	ERROR_IF(killpg, errno, != ESRCH);
 
-	printf("Test PASSED\n");
-	return 0;
+	return EXIT_SUCCESS;
 }

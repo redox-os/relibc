@@ -10,11 +10,9 @@ int main()
 
 	main_thread=pthread_self();
 
-	if (pthread_kill(main_thread, 0) != 0) {
-		printf("Could not call pthread_kill with sig = 0\n");
-		exit(EXIT_FAILURE);
-	}
+	int status;
+	status = pthread_kill(main_thread, 0);
+	ERROR_IF(pthread_kill, status, != 0);
 
-	printf("Test PASSED\n");
-	return 0;
+	return EXIT_SUCCESS;
 }

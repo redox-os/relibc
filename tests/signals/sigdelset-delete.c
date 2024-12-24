@@ -15,16 +15,13 @@
 
 
 void delset_test(sigset_t *sigset, int signal){
-  if (sigismember(sigset, signal) !=1){
-    printf("the signal is already out of the set, %d\n", signal);
-  }
+  int status;
+  status = sigismember(sigset, signal);
+  ERROR_IF(sigismember, status, != 1);
+
   sigdelset(sigset, signal);
-  if (sigismember(sigset, signal) ==0){
-    printf("the signal was deleted successfully\n");
-  }
-  if (sigismember(sigset, signal) !=0){
-    printf("the signal remove failed\n");
-  }
+  status = sigismember(sigset, signal);
+  ERROR_IF(sigismember, status, != 0);
 
 }
 

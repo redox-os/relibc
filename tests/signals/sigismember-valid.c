@@ -10,11 +10,21 @@
 #include "signals_list.h"
 #include "../test_helpers.h"
 
-void check(sigset_t set, int signum) {
+void check_full(sigset_t set, int signum) {
+  if (!sigismember(&set, signum)) {
+    printf("%d was not added to the set", signum);
+    exit(EXIT_FAILURE);
+  }
+    
+}
+
+void check_empty(sigset_t set, int signum) {
   printf("%d is ", signum);
-  if (!sigismember(&set, signum))
-    printf("not ");
-  puts("in the set");
+    if (sigismember(&set, signum)) {
+      printf("%d was not removed from the set", signum);
+      exit(EXIT_FAILURE);
+    }
+
 }
 
 
@@ -24,12 +34,12 @@ int main() {
 
   sigfillset(&sigset);
   for (int i=1; i<N_SIGNALS; i++){
-    check(sigset, i);
+    check_full(sigset, i);
   }
 
   sigemptyset(&sigset);
   for (int i=1; i<N_SIGNALS; i++){
-    check(sigset, i);
+    check_empty(sigset, i);
   }
 
 }

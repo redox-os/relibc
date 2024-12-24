@@ -33,10 +33,8 @@ int main()
 	}
 
 	if (test_failed != 0) {
-		printf("Old set is missing a signal\n");
 		exit(EXIT_FAILURE);
 	}
 
-	printf("Test PASSED: oactl did contain all signals that were added to the signal mask.\n");
 	return EXIT_SUCCESS;
 }

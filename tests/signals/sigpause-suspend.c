@@ -44,35 +44,24 @@ int sigpause_suspend(int signum)
 	pthread_t new_th;
 	int j;
 
-	if(pthread_create(&new_th, NULL, b_thread_func, (void *)&signum) != 0)
-	{
-		perror("Error creating thread\n");
-		exit(EXIT_FAILURE);
-	}
+	int status;
+	status = pthread_create(&new_th, NULL, b_thread_func, (void *)&signum);
+	ERROR_IF(pthread_create, status, != 0);
 
 	for (j=0; j<10; j++) {
 		sleep(1);
-		if (returned == 1) {
-			printf ("Test FAILED: sigpause returned before it received a signal\n");
-			exit(EXIT_FAILURE);
-		}
+		ERROR_IF(sigpuase, returned, == 1);
 	}
 
-	if(pthread_kill(new_th, signum) != 0) 
-	{
-		printf("Test UNRESOLVED: Couldn't send signal to thread\n");
-		exit(EXIT_FAILURE);
-	}
+	status = pthread_kill(new_th, signum);
+	ERROR_IF(pthread_kill, status, != 0);
+
 	sleep(1);
 
-	if(returned != 1) {
-		printf("Test FAILED: signal was sent, but sigpause never returned.\n");
-		exit(EXIT_FAILURE);
-	}
+	ERROR_IF(sigpuase, returned, != 1);
 
 	returned = 0;
 
-	printf("test passed\n");
 	return EXIT_SUCCESS;
 }
 

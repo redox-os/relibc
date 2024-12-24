@@ -12,18 +12,9 @@ int main()
 	/*
 	 * ESRCH
 	 */
-	if (-1 == kill(999999, 0)) {
-		if (ESRCH == errno) {
-			printf("ESRCH error received\n");
-		} else {
-			printf("kill() failed on ESRCH errno not set correctly\n");
-			exit(EXIT_FAILURE);
-		}	
-	} else {
-		printf("kill() did not fail on ESRCH\n");
-		exit(EXIT_FAILURE);
-	}
-
-	
-	printf("test passed\n");
+	int status;
+	status = kill(999999, 0);
+	ERROR_IF(kill, status, != -1);
+	ERROR_IF(kill, errno, != ESRCH);
+	return EXIT_SUCCESS;
 }

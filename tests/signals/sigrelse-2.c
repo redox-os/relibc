@@ -6,11 +6,8 @@
 
 int main()
 {
-
-	if ((int)sigrelse(SIGABRT) != 0) {
-		perror("sigrelse failed -- returned -- test aborted");
-		exit(EXIT_FAILURE);
-	} 
-	printf("sigrelse passed\n");
+	int status;
+	status = (int)sigrelse(SIGABRT);
+	ERROR_IF(sigrelse, status, != 0);
 	return EXIT_SUCCESS;
 }

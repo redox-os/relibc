@@ -37,30 +37,20 @@ void *a_thread_func(void *sig)
 int sigpause_basic(int signum)
 {
 	pthread_t new_th;
-
-	if(pthread_create(&new_th, NULL, a_thread_func, (void *)&signum) != 0)
-	{
-		perror("Error creating thread\n");
-		exit(EXIT_FAILURE);
-	}
+	int status;
+	status = pthread_create(&new_th, NULL, a_thread_func, (void *)&signum);
+	ERROR_IF(pthread_create, status, != 0);
 
 	sleep(1);
 
-	if(pthread_kill(new_th, signum) != 0) 
-	{
-		printf("Test UNRESOLVED: Couldn't send signal to thread\n");
-		exit(EXIT_FAILURE);
-	}
+	status = pthread_kill(new_th, signum);
+	ERROR_IF(pthread_kill, status, != 0);
 
 	sleep(1);
 
-	if(handler_called != 1) {
-		printf("Test FAILED: signal wasn't removed from signal mask\n");
-		exit(EXIT_FAILURE);
-	}
+	ERROR_IF(pthread_kill, handler_called,, != 1);
 	handler_called = 0;
 
-	printf("Test PASSED\n");
 	return EXIT_SUCCESS;	
 }
 

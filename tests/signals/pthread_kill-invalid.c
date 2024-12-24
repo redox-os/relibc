@@ -12,10 +12,9 @@ int main()
 
 	main_thread = pthread_self();
 
-	if (EINVAL != pthread_kill(main_thread, -1)) {
-		printf("pthread_kill() did not fail on EINVAL\n");
-		exit(EXIT_FAILURE);
-	}
-    printf("test pass\n");
-	return 0;
+	int status;
+	status = pthread_kill(main_thread, -1);
+	ERROR_IF(pthread_kill, status, != EINVAL);
+
+	return EXIT_SUCCESS;
 }

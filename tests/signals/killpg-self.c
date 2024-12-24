@@ -19,26 +19,19 @@ int killpg_test1(int signum)
 
 	act.sa_handler=sig_handler;
 	act.sa_flags=0;
-	if (sigemptyset(&act.sa_mask) == -1) {
-		perror("Error calling sigemptyset\n");
-		exit(EXIT_FAILURE);
-	}
-	if (sigaction(signum, &act, 0) == -1) {
-		perror("Error calling sigaction\n");
-		exit(EXIT_FAILURE);
-	}
+	int status = sigemptyset(&act.sa_mask);
+	ERROR_IF(sigemptyset, status, == -1);
 
- 	if ((pgrp = getpgrp()) == -1) {
-		printf("Could not get process group number\n");
-		exit(EXIT_FAILURE);
-	}
+	status = sigaction(signum, &act, 0);
+	ERROR_IF(sigaction, status, == -1);
 
- 	if (killpg(pgrp, signum) != 0) {
-		printf("Could not raise signal being tested\n");
-		exit(EXIT_FAILURE);
-	}
+	pgrp = getpgrp()
+	ERROR_IF(getpgrp, pgrp, == -1);
 
-    return 0;
+	status = killpg(pgrp, signum);
+	ERROR_IF(killpg, status, != 0);
+
+    return EXIT_SUCCESS;
 }
 
 int main(){

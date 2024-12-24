@@ -1,6 +1,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "../test_helpers.h"
 
 int handler_called = 0;
 int sigprocmask_return_val = 1; /* some value that's not a 1 or 0 */
@@ -26,35 +27,22 @@ int main()
 	act.sa_flags = 0;
 	sigemptyset(&act.sa_mask);
 
-	if (sigaction(SIGABRT,  &act, 0) == -1) {
-		perror("Unexpected error while attempting to setup test "
-		       "pre-conditions");
-		exit(EXIT_FAILURE);
-	}
+	int status;
 
-	if (sigprocmask(SIG_SETMASK, &blocked_set1, NULL) == -1) {
-		perror("Unexpected error while attempting to use sigprocmask.\n");
-		exit(EXIT_FAILURE);
-	}
+	status = sigaction(SIGABRT,  &act, 0);
+	ERROR_IF(sigaction, status, == -1);
 
-	if ((raise(SIGABRT) == -1)) {
-		perror("Unexpected error while attempting to setup test "
-		       "pre-conditions");
-		exit(EXIT_FAILURE);
-	}
+	status = sigprocmask(SIG_SETMASK, &blocked_set1, NULL);
+	ERROR_IF(sigprocmask, status, == -1);
+
+	status = raise(SIGABRT);
+	ERROR_IF(raise, status, == -1); 
 
 	sigprocmask_return_val = sigprocmask(SIG_UNBLOCK, &blocked_set1, NULL);
 
-	if (sigprocmask_return_val != 0) {
-		perror("Unexpected error while attempting to use sigprocmask.\n");
-		exit(EXIT_FAILURE);
-	}
-	
-	if (handler_called != 1) {
-		perror("Handler wasn't called, implying signal was not delivered.\n");
-		exit(EXIT_FAILURE);
-	}	
+	ERROR_IF(sigprocmask, sigprocmask_return_val, != 0);
 
-	printf("Test PASSED: signal was delivered before the call to sigprocmask returned.\n");
+	ERROR_IF(raise, handler_called, != 1);	
+
 	return EXIT_SUCCESS;
 }

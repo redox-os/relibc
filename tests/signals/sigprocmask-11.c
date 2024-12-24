@@ -13,10 +13,8 @@ int main()
 	sigset_t set;
 	sigaddset (&set, SIGABRT);
 
-	if (sigprocmask(SIG_SETMASK, &set, NULL) != 0) {
-		perror("sigprocmask failed -- returned -- test aborted");
-		exit(EXIT_FAILURE);
-	} 
-	printf("sigignore passed\n");
+	int status;
+	status = sigprocmask(SIG_SETMASK, &set, NULL);
+	ERROR_IF(sigprocmask, status, != 0);
 	return EXIT_SUCCESS;
 }

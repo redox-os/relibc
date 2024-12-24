@@ -9,16 +9,14 @@ int main()
 {
 	int pgrp;
 
- 	if ((pgrp = getpgrp()) == -1) {
-		printf("Could not get process group number\n");
-		exit(EXIT_FAILURE);
-	}
+	pgrp = getpgrp();
+	ERROR_IF(getpgrp, pgrp, == -1);
 
- 	if (killpg(pgrp, 0) != 0) {
-		printf("killpg did not return success.\n");
-		exit(EXIT_FAILURE);
-	}
+	int status;
+	status = killpg(pgrp, 0);
+	ERROR_IF(killpg, status, != 0);
+
 
 	printf("Test PASSED\n");
-	return 0;
+	return EXIT_SUCCESS;
 }

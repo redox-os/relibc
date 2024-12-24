@@ -34,11 +34,7 @@ int kill_self(int sig)
 	status = kill(getpid(), sig);
 	ERROR_IF(kill, status, != 0);
 
-	if (handler_called == 0)
-	{
-		printf("Handler was not called\n");
-		exit(EXIT_FAILURE);
-	}
+	ERROR_IF(kill, handler_called, == 0);
 
 	return EXIT_SUCCESS;
 }

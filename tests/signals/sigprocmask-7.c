@@ -41,6 +41,5 @@ int main() {
 	if (is_changed(oactl, SIGABRT)) {
 		exit(EXIT_FAILURE);
 	}
-	printf("PASS: signal mask was not changed.\n");
 	return EXIT_SUCCESS;
 }
