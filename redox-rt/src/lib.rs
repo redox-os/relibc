@@ -63,7 +63,7 @@ impl RtTcb {
         unsafe {
             if (&*self.thr_fd.get()).is_none() {
                 self.thr_fd.get().write(Some(FdGuard::new(
-                    syscall::open("/scheme/thisproc/current/open_via_dup", O_CLOEXEC).unwrap(),
+                    syscall::open("/scheme/thisproc/current", O_CLOEXEC).unwrap(),
                 )));
             }
             (&*self.thr_fd.get()).as_ref().unwrap()
@@ -178,17 +178,31 @@ pub unsafe fn initialize_freestanding() {
     initialize();
 }
 pub unsafe fn initialize() {
+    #[cfg(feature = "proc")]
+    // Find the PID attached to this process
+    let pid = todo!("getpid");
+
+    #[cfg(not(feature = "proc"))]
+    // Bootstrap mode, don't associate proc fds with PIDs
+    let pid = 0;
+
     THIS_PID
         .get()
-        .write(Some(syscall::getpid().unwrap().try_into().unwrap()).unwrap());
+        .write(Some(pid).unwrap());
 }
 
 static THIS_PID: SyncUnsafeCell<u32> = SyncUnsafeCell::new(0);
 
 unsafe fn child_hook_common(new_pid_fd: FdGuard) {
+    // TODO: just pass PID to child rather than obtaining it via IPC?
+    #[cfg(feature = "proc")]
+    let pid = todo!("getpid");
+    #[cfg(not(feature = "proc"))]
+    let pid = 0;
+
     // TODO: Currently pidfd == threadfd, but this will not be the case later.
     RtTcb::current().thr_fd.get().write(Some(new_pid_fd));
     THIS_PID
         .get()
-        .write(Some(syscall::getpid().unwrap().try_into().unwrap()).unwrap());
+        .write(Some(pid).unwrap());
 }

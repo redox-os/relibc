@@ -43,7 +43,7 @@ pub fn posix_write(fd: usize, buf: &[u8]) -> Result<usize> {
 }
 #[inline]
 pub fn posix_kill(pid: usize, sig: usize) -> Result<()> {
-    match wrapper(false, || syscall::kill(pid, sig)) {
+    match wrapper(false, || Ok(todo!("kill"))) {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
     }
@@ -57,7 +57,8 @@ pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
         pid: posix_getpid(),
     };
     match wrapper(false, || unsafe {
-        syscall::syscall3(syscall::SYS_SIGENQUEUE, pid, sig, addr_of!(siginf) as usize)
+        //syscall::syscall3(syscall::SYS_SIGENQUEUE, pid, sig, addr_of!(siginf) as usize)
+        Ok(todo!("sigenqueue"))
     }) {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
@@ -70,7 +71,10 @@ pub fn posix_getpid() -> u32 {
 }
 #[inline]
 pub fn posix_killpg(pgrp: usize, sig: usize) -> Result<()> {
-    match wrapper(false, || syscall::kill(usize::wrapping_neg(pgrp), sig)) {
+    match wrapper(false, ||
+        //syscall::kill(usize::wrapping_neg(pgrp), sig)
+        Ok(todo!("killpg"))
+    ) {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
     }
@@ -103,11 +107,12 @@ pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
 }
 pub fn sys_waitpid(pid: usize, status: &mut usize, flags: usize) -> Result<usize> {
     wrapper(true, || {
-        syscall::waitpid(
+        /*syscall::waitpid(
             pid,
             status,
             syscall::WaitFlags::from_bits(flags).expect("waitpid: invalid bit pattern"),
-        )
+        )*/
+        todo!("waitpid")
     })
 }
 pub fn posix_kill_thread(thread_fd: usize, signal: u32) -> Result<()> {
@@ -133,4 +138,41 @@ pub fn swap_umask(mask: u32) -> u32 {
 #[inline]
 pub fn get_umask() -> u32 {
     UMASK.load(Ordering::Acquire)
+}
+
+pub fn posix_setresuid(ruid: Option<u32>, euid: Option<u32>, suid: Option<u32>) -> Result<()> {
+    todo!("posix_setresuid")
+}
+pub fn posix_setresgid(rgid: Option<u32>, egid: Option<u32>, sgid: Option<u32>) -> Result<()> {
+    todo!("posix_setresgid")
+}
+pub fn posix_getruid() -> u32 {
+    todo!("posix_getruid")
+}
+pub fn posix_getrgid() -> u32 {
+    todo!("posix_getrgid")
+}
+pub fn posix_geteuid() -> u32 {
+    todo!("posix_geteuid")
+}
+pub fn posix_getegid() -> u32 {
+    todo!("posix_getegid")
+}
+pub fn posix_getppid() -> usize {
+    todo!("posix_getppid")
+}
+pub fn posix_exit(status: i32) -> ! {
+    todo!("posix_exit")
+}
+pub fn setrens(rns: usize, ens: usize) -> Result<()> {
+    todo!("setrens")
+}
+pub fn posix_getpgid(pid: usize) -> Result<usize> {
+    todo!("posix_getpgid")
+}
+pub fn posix_setpgid(pid: usize, pgid: usize) -> Result<()> {
+    todo!("posix_setpgid")
+}
+pub fn posix_getsid(pid: usize) -> Result<usize> {
+    todo!("posix_getsid")
 }

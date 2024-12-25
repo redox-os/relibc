@@ -119,8 +119,8 @@ pub fn execve(
 
     let mut stat = Stat::default();
     syscall::fstat(*image_file as usize, &mut stat)?;
-    let uid = syscall::getuid()?;
-    let gid = syscall::getuid()?;
+    let uid = redox_rt::sys::posix_getruid() as usize;
+    let gid = redox_rt::sys::posix_getrgid() as usize;
 
     let mode = if uid == stat.st_uid as usize {
         (stat.st_mode >> 3 * 2) & 0o7

@@ -74,8 +74,7 @@ where
 {
     // Here, we do the minimum part of loading an application, which is what the kernel used to do.
     // We load the executable into memory (albeit at different offsets in this executable), fix
-    // some misalignments, and then execute the SYS_EXEC syscall to replace the program memory
-    // entirely.
+    // some misalignments, and then switch address space.
 
     let mut header_bytes = [0_u8; size_of::<Header>()];
     pread_all(*image_file, 0, &mut header_bytes)?;
@@ -695,10 +694,10 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
 
     {
         let cur_pid_fd = FdGuard::new(syscall::open(
-            "/scheme/thisproc/current/open_via_dup",
+            "/scheme/thisproc/current",
             O_CLOEXEC,
         )?);
-        (new_pid_fd, new_pid) = new_child_process()?;
+        (new_pid_fd, new_pid) = new_child_process(*cur_pid_fd)?;
 
         copy_str(*cur_pid_fd, *new_pid_fd, "name")?;
 
@@ -823,10 +822,10 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     Ok(new_pid)
 }
 
-pub fn new_child_process() -> Result<(FdGuard, usize)> {
+pub fn new_child_process(_cur_pid_fd: usize) -> Result<(FdGuard, usize)> {
     // Create a new context (fields such as uid/gid will be inherited from the current context).
     let fd = FdGuard::new(syscall::open(
-        "/scheme/thisproc/new/open_via_dup",
+        "/scheme/thisproc/new",
         O_CLOEXEC,
     )?);
 

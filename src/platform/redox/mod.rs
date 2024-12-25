@@ -50,6 +50,13 @@ fn round_up_to_page_size(val: usize) -> Option<usize> {
         .map(|val| (val - 1) / PAGE_SIZE * PAGE_SIZE)
 }
 
+fn cvt_uid(id: c_int) -> Result<Option<u32>> {
+    if id == -1 {
+        return Ok(None);
+    }
+    Ok(Some(id.try_into().map_err(|_| Errno(EINVAL))?))
+}
+
 mod clone;
 mod epoll;
 mod event;
@@ -93,8 +100,8 @@ impl Pal for Sys {
 
         syscall::fstat(*fd as usize, &mut stat)?;
 
-        let uid = syscall::getuid()?;
-        let gid = syscall::getgid()?;
+        let uid = redox_rt::sys::posix_getruid() as usize;
+        let gid = redox_rt::sys::posix_getrgid() as usize;
 
         let perms = if stat.st_uid as usize == uid {
             stat.st_mode >> (3 * 2 & 0o7)
@@ -199,7 +206,7 @@ impl Pal for Sys {
     }
 
     fn exit(status: c_int) -> ! {
-        let _ = syscall::exit((status as usize) << 8);
+        let _ = redox_rt::sys::posix_exit(status);
         loop {}
     }
 
@@ -401,15 +408,15 @@ impl Pal for Sys {
     }
 
     fn getegid() -> gid_t {
-        syscall::getegid().unwrap() as gid_t
+        redox_rt::sys::posix_getegid() as gid_t
     }
 
     fn geteuid() -> uid_t {
-        syscall::geteuid().unwrap() as uid_t
+        redox_rt::sys::posix_geteuid() as uid_t
     }
 
     fn getgid() -> gid_t {
-        syscall::getgid().unwrap() as gid_t
+        redox_rt::sys::posix_getrgid() as gid_t
     }
 
     unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int> {
@@ -423,7 +430,7 @@ impl Pal for Sys {
     }
 
     fn getpgid(pid: pid_t) -> Result<pid_t> {
-        Ok(syscall::getpgid(pid as usize)? as pid_t)
+        Ok(redox_rt::sys::posix_getpgid(pid as usize)? as pid_t)
     }
 
     fn getpid() -> pid_t {
@@ -431,7 +438,7 @@ impl Pal for Sys {
     }
 
     fn getppid() -> pid_t {
-        syscall::getppid().unwrap() as pid_t
+        redox_rt::sys::posix_getppid() as pid_t
     }
 
     fn getpriority(which: c_int, who: id_t) -> Result<c_int> {
@@ -487,17 +494,7 @@ impl Pal for Sys {
     }
 
     fn getsid(pid: pid_t) -> Result<pid_t> {
-        let mut buf = [0; mem::size_of::<usize>()];
-        let path = if pid == 0 {
-            format!("/scheme/thisproc/current/session_id")
-        } else {
-            format!("/scheme/proc/{}/session_id", pid)
-        };
-        let path_c = CString::new(path).unwrap();
-        let mut file = File::open(CStr::borrow(&path_c), fcntl::O_RDONLY | fcntl::O_CLOEXEC)?;
-        file.read(&mut buf)
-            .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
-        Ok(usize::from_ne_bytes(buf).try_into().unwrap())
+        Ok(redox_rt::sys::posix_getsid(pid as usize)? as _)
     }
 
     fn gettid() -> pid_t {
@@ -527,7 +524,7 @@ impl Pal for Sys {
     }
 
     fn getuid() -> uid_t {
-        syscall::getuid().unwrap() as pid_t
+        redox_rt::sys::posix_getruid() as uid_t
     }
 
     fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
@@ -838,8 +835,7 @@ impl Pal for Sys {
     }
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> Result<()> {
-        syscall::setpgid(pid as usize, pgid as usize)?;
-        Ok(())
+        Ok(redox_rt::sys::posix_setpgid(pid as usize, pgid as usize)?)
     }
 
     fn setpriority(which: c_int, who: id_t, prio: c_int) -> Result<()> {
@@ -864,19 +860,11 @@ impl Pal for Sys {
     }
 
     fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {
-        if sgid != -1 {
-            println!("TODO: suid");
-        }
-        syscall::setregid(rgid as usize, egid as usize)?;
-        Ok(())
+        Ok(redox_rt::sys::posix_setresgid(cvt_uid(rgid)?, cvt_uid(egid)?, cvt_uid(sgid)?)?)
     }
 
     fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> Result<()> {
-        if suid != -1 {
-            println!("TODO: suid");
-        }
-        syscall::setreuid(ruid as usize, euid as usize)?;
-        Ok(())
+        Ok(redox_rt::sys::posix_setresuid(cvt_uid(ruid)?, cvt_uid(euid)?, cvt_uid(suid)?)?)
     }
 
     fn symlink(path1: CStr, path2: CStr) -> Result<()> {
@@ -1057,8 +1045,8 @@ impl Pal for Sys {
     }
 
     fn verify() -> bool {
-        // GETPID on Redox is 20, which is WRITEV on Linux
-        (unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) }).is_ok()
+        // YIELD on Redox is 20, which is SYS_ARCH_PRCTL on Linux
+        (unsafe { syscall::syscall5(syscall::number::SYS_YIELD, !0, !0, !0, !0, !0) }).is_ok()
     }
 
     unsafe fn exit_thread(stack_base: *mut (), stack_size: usize) -> ! {
