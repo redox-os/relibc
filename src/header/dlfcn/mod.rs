@@ -21,12 +21,11 @@ use crate::{
 
 pub const RTLD_LAZY: c_int = 1 << 0;
 pub const RTLD_NOW: c_int = 1 << 1;
-// FIXME(andypython):
-// #ifdef _GNU_SOURCE
 pub const RTLD_NOLOAD: c_int = 1 << 2;
-// #endif
 pub const RTLD_GLOBAL: c_int = 1 << 8;
 pub const RTLD_LOCAL: c_int = 0x0000;
+
+pub const RTLD_DEFAULT: *mut c_void = 0 as *mut c_void; // XXX: cbindgen doesn't like ptr::null_mut()
 
 static ERROR_NOT_SUPPORTED: CStr = c_str!("dlfcn not supported");
 
