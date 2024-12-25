@@ -16,8 +16,8 @@ use alloc::{
 };
 use core::{
     mem::{size_of, transmute},
-    ptr, slice,
-    sync::atomic::AtomicUsize,
+    ptr::{self, NonNull},
+    slice,
 };
 #[cfg(target_pointer_width = "32")]
 use goblin::elf32::{
@@ -37,6 +37,7 @@ use goblin::elf64::{
 };
 use goblin::{
     elf::{
+        dynamic::DT_PLTGOT,
         sym::{STB_GLOBAL, STB_WEAK},
         Dynamic, Elf,
     },
@@ -80,7 +81,6 @@ pub struct DSO {
     pub fini_array: (usize, usize),
     pub tls_module_id: usize,
     pub tls_offset: usize,
-    pub use_count: AtomicUsize,
 
     pub dynamic: Option<Dynamic>,
     pub dynsyms: Vec<goblin::elf::sym::Sym>,
@@ -121,7 +121,6 @@ impl DSO {
         let dso = DSO {
             name,
             id,
-            use_count: AtomicUsize::new(1),
             dlopened,
             entry_point,
             runpath: DSO::get_runpath(&path, &elf)?,
@@ -142,10 +141,38 @@ impl DSO {
             dynamic: elf.dynamic.map(|dynamic| dynamic),
             dynsyms: elf.dynsyms.iter().collect(),
 
-            scope: Scope::new(),
+            scope: Scope::local(),
         };
 
         Ok((dso, tcb_master))
+    }
+
+    /// Global Offset Table
+    pub(super) fn got(&self) -> Option<NonNull<usize>> {
+        let Some(dynamic) = self.dynamic.as_ref() else {
+            return None;
+        };
+
+        let object_base_addr = self.mmap.as_ptr() as u64;
+
+        let got = if let Some(ptr) = {
+            dynamic
+                .dyns
+                .iter()
+                .find(|r#dyn| r#dyn.d_tag == DT_PLTGOT)
+                .map(|r#dyn| r#dyn.d_val)
+        } {
+            if self.pie {
+                (object_base_addr + ptr) as *mut usize
+            } else {
+                ptr as *mut usize
+            }
+        } else {
+            assert_eq!(dynamic.info.jmprel, 0);
+            return None;
+        };
+
+        Some(NonNull::new(got).expect("global offset table"))
     }
 
     pub fn get_sym(&self, name: &str) -> Option<(Symbol, SymbolBinding)> {
@@ -287,7 +314,7 @@ impl DSO {
         // Copy data
         for ph in elf.program_headers.iter() {
             let voff = ph.p_vaddr % ph.p_align;
-            let vaddr = (ph.p_vaddr - voff) as usize;
+            // let vaddr = (ph.p_vaddr - voff) as usize;
             let vsize = ((ph.p_memsz + voff) as usize).next_multiple_of(ph.p_align as usize);
 
             match ph.p_type {

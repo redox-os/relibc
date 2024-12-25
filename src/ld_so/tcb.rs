@@ -220,7 +220,7 @@ impl Tcb {
             //
             // XXX: [`Vec::from_raw_parts`] cannot be used here as the DTV was originally allocated
             // by the ld.so allocator and that would violate that function's invariants.
-            let mut dtv = self.dtv_mut().unwrap().to_vec();
+            let mut dtv = self.dtv_mut().to_vec();
             dtv.resize(n, ptr::null_mut());
 
             let (ptr, len, _) = dtv.into_raw_parts();
@@ -229,11 +229,11 @@ impl Tcb {
         }
     }
 
-    pub fn dtv_mut(&mut self) -> Option<&'static mut [*mut u8]> {
+    pub fn dtv_mut(&mut self) -> &'static mut [*mut u8] {
         if self.dtv_len != 0 {
-            Some(unsafe { slice::from_raw_parts_mut(self.dtv_ptr, self.dtv_len) })
+            unsafe { slice::from_raw_parts_mut(self.dtv_ptr, self.dtv_len) }
         } else {
-            None
+            &mut []
         }
     }
 
