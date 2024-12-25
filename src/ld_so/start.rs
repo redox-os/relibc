@@ -12,7 +12,6 @@ use generic_rt::ExpectTlsFree;
 use crate::{
     c_str::CStr,
     header::unistd,
-    ld_so::tcb::Master,
     platform::{get_auxv, get_auxvs, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
@@ -39,7 +38,6 @@ unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
             _ => {
                 eprintln!("ld.so: failed to parse argv[{}]", argv.len());
                 unistd::_exit(1);
-                loop {}
             }
         }
         ptr = ptr.add(1);
@@ -87,16 +85,6 @@ unsafe fn adjust_stack(sp: &'static mut Stack) {
         argv = next_argv;
         if arg == 0 {
             break;
-        }
-        if let Ok(arg_str) = CStr::from_ptr(arg as *const c_char).to_str() {
-            let mut parts = arg_str.splitn(2, '=');
-            if let Some(key) = parts.next() {
-                if let Some(value) = parts.next() {
-                    if let "LD_LIBRARY_PATH" = key {
-                        //library_path = value
-                    }
-                }
-            }
         }
     }
 
@@ -152,12 +140,7 @@ fn resolve_path_name(
 
 // TODO: Make unsafe
 #[no_mangle]
-pub extern "C" fn relibc_ld_so_start(
-    sp: &'static mut Stack,
-    ld_entry: usize,
-    self_tls_start: usize,
-    self_tls_end: usize,
-) -> usize {
+pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) -> usize {
     // Setup TCB for ourselves.
     unsafe {
         let tcb = Tcb::new(0).expect_notls("ld.so: failed to allocate bootstrap TCB");
@@ -212,9 +195,6 @@ pub extern "C" fn relibc_ld_so_start(
         crate::platform::init(auxv.clone());
     }
 
-    // Some variables that will be overridden by environment and auxiliary vectors
-    let ld_library_path = envs.get("LD_LIBRARY_PATH").map(|s| s.to_owned());
-
     let name_or_path = if is_manual {
         // ld.so is run directly by user and not via execve() or similar systemcall
         println!("argv: {:#?}", argv);
@@ -224,7 +204,6 @@ pub extern "C" fn relibc_ld_so_start(
         if sp.argc < 2 {
             eprintln!("ld.so [executable] [arguments...]");
             unistd::_exit(1);
-            loop {}
         }
         unsafe { adjust_stack(sp) };
         argv[1].to_string()
@@ -232,12 +211,11 @@ pub extern "C" fn relibc_ld_so_start(
         argv[0].to_string()
     };
 
-    let (path, name) = match resolve_path_name(&name_or_path, &envs) {
+    let (path, _name) = match resolve_path_name(&name_or_path, &envs) {
         Some((p, n)) => (p, n),
         None => {
             eprintln!("ld.so: failed to locate '{}'", name_or_path);
             unistd::_exit(1);
-            loop {}
         }
     };
 
@@ -260,7 +238,6 @@ pub extern "C" fn relibc_ld_so_start(
         Err(err) => {
             eprintln!("ld.so: failed to link '{}': {}", path, err);
             unistd::_exit(1);
-            loop {}
         }
     };
     if let Some(tcb) = unsafe { Tcb::current() } {

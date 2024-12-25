@@ -1,5 +1,9 @@
 //! Dynamic loading and linking.
 
+// FIXME(andypython): remove this when #![allow(warnings, unused_variables)] is
+// dropped from src/lib.rs.
+#![warn(warnings, unused_variables)]
+
 use core::{mem, ptr};
 use goblin::elf::program_header::{self, program_header32, program_header64, ProgramHeader};
 
@@ -73,7 +77,7 @@ pub fn static_init(sp: &'static Stack) {
 
         let page_size = Sys::getpagesize();
         let voff = ph.p_vaddr as usize % page_size;
-        let vaddr = ph.p_vaddr as usize - voff;
+        // let vaddr = ph.p_vaddr as usize - voff;
         let vsize = ((ph.p_memsz as usize + voff + page_size - 1) / page_size) * page_size;
 
         match ph.p_type {
@@ -170,7 +174,7 @@ pub unsafe fn init(sp: &'static Stack) {
 
 pub unsafe fn fini() {
     if let Some(tcb) = Tcb::current() {
-        if tcb.linker_ptr != ptr::null_mut() {
+        if !tcb.linker_ptr.is_null() {
             let linker = (&*tcb.linker_ptr).lock();
             linker.fini();
         }
