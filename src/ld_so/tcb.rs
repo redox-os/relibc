@@ -1,6 +1,5 @@
 use alloc::vec::Vec;
 use core::{
-    arch::asm,
     cell::UnsafeCell,
     mem,
     ops::{Deref, DerefMut},
@@ -10,7 +9,6 @@ use core::{
 use generic_rt::GenericTcb;
 use goblin::error::{Error, Result};
 
-use super::ExpectTlsFree;
 use crate::{
     header::sys_mman,
     ld_so::linker::Linker,
@@ -80,7 +78,7 @@ impl Tcb {
     /// `size` is the size of the TLS in bytes.
     pub unsafe fn new(size: usize) -> Result<&'static mut Self> {
         let page_size = Sys::getpagesize();
-        let (abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
+        let (_abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
 
         let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
         trace!("New TCB: {:p}", tcb_ptr);
@@ -197,7 +195,7 @@ impl Tcb {
             // XXX: [`Vec::from_raw_parts`] cannot be used here as the masters were originally
             // allocated by the ld.so allocator and that would violate that function's invariants.
             let mut masters = self.masters().unwrap().to_vec();
-            masters.extend(new_masters.into_iter());
+            masters.extend(new_masters);
 
             self.masters_ptr = masters.as_mut_ptr();
             self.masters_len = masters.len() * mem::size_of::<Master>();
@@ -212,8 +210,8 @@ impl Tcb {
 
     pub fn setup_dtv(&mut self, n: usize) {
         if self.dtv_ptr.is_null() {
-            let mut dtv = vec![ptr::null_mut(); n];
-            let (ptr, len, cap) = dtv.into_raw_parts();
+            let dtv = vec![ptr::null_mut(); n];
+            let (ptr, len, _) = dtv.into_raw_parts();
 
             self.dtv_ptr = ptr;
             self.dtv_len = len;
@@ -222,7 +220,7 @@ impl Tcb {
             //
             // XXX: [`Vec::from_raw_parts`] cannot be used here as the DTV was originally allocated
             // by the ld.so allocator and that would violate that function's invariants.
-            let mut dtv = self.dtv_mut().unwrap().to_vec();
+            let mut dtv = self.dtv_mut().to_vec();
             dtv.resize(n, ptr::null_mut());
 
             let (ptr, len, _) = dtv.into_raw_parts();
@@ -231,11 +229,11 @@ impl Tcb {
         }
     }
 
-    pub fn dtv_mut(&mut self) -> Option<&'static mut [*mut u8]> {
+    pub fn dtv_mut(&mut self) -> &'static mut [*mut u8] {
         if self.dtv_len != 0 {
-            Some(unsafe { slice::from_raw_parts_mut(self.dtv_ptr, self.dtv_len) })
+            unsafe { slice::from_raw_parts_mut(self.dtv_ptr, self.dtv_len) }
         } else {
-            None
+            &mut []
         }
     }
 
@@ -269,7 +267,7 @@ impl Tcb {
 
     /// OS and architecture specific code to activate TLS - Linux x86_64
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    unsafe fn os_arch_activate(os: &(), tls_end: usize, _tls_len: usize) {
+    unsafe fn os_arch_activate(_os: &(), tls_end: usize, _tls_len: usize) {
         const ARCH_SET_FS: usize = 0x1002;
         syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
     }
