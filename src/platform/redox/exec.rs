@@ -262,7 +262,7 @@ pub fn execve(
         }
     }
 
-    let this_context_fd = FdGuard::new(syscall::open("/scheme/thisproc/current/open_via_dup", 0)?);
+    let this_context_fd = FdGuard::new(syscall::open("/scheme/thisproc/current", 0)?);
     // TODO: Convert image_file to FdGuard earlier?
     let exec_fd_guard = FdGuard::new(image_file.fd as usize);
     core::mem::forget(image_file);

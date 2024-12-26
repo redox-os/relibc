@@ -67,7 +67,12 @@ pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
 #[inline]
 pub fn posix_getpid() -> u32 {
     // SAFETY: read-only except during program/fork child initialization
-    unsafe { crate::THIS_PID.get().read() }
+    unsafe { addr_of!((*crate::STATIC_PROC_INFO.get()).pid).read() }
+}
+#[inline]
+pub fn posix_getppid() -> u32 {
+    // SAFETY: read-only except during program/fork child initialization
+    unsafe { addr_of!((*crate::STATIC_PROC_INFO.get()).ppid).read() }
 }
 #[inline]
 pub fn posix_killpg(pgrp: usize, sig: usize) -> Result<()> {
@@ -157,9 +162,6 @@ pub fn posix_geteuid() -> u32 {
 }
 pub fn posix_getegid() -> u32 {
     todo!("posix_getegid")
-}
-pub fn posix_getppid() -> usize {
-    todo!("posix_getppid")
 }
 pub fn posix_exit(status: i32) -> ! {
     todo!("posix_exit")

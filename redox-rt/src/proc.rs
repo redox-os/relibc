@@ -1,6 +1,6 @@
 use core::{fmt::Debug, mem::size_of};
 
-use crate::{arch::*, auxv_defs::*};
+use crate::{arch::*, auxv_defs::*, DYNAMIC_PROC_INFO, STATIC_PROC_INFO};
 
 use alloc::{boxed::Box, collections::BTreeMap, vec};
 
@@ -822,33 +822,18 @@ pub fn fork_inner(initial_rsp: *mut usize) -> Result<usize> {
     Ok(new_pid)
 }
 
-pub fn new_child_process(_cur_pid_fd: usize) -> Result<(FdGuard, usize)> {
+pub fn new_child_process(cur_pid_fd: usize) -> Result<(FdGuard, usize)> {
     // Create a new context (fields such as uid/gid will be inherited from the current context).
     let fd = FdGuard::new(syscall::open(
         "/scheme/thisproc/new",
         O_CLOEXEC,
     )?);
 
-    // Extract pid.
-    let mut buffer = [0_u8; 64];
-    let len = syscall::fpath(*fd, &mut buffer)?;
-    let buffer = buffer.get(..len).ok_or(Error::new(ENAMETOOLONG))?;
+    #[cfg(feature = "proc")]
+    let pid = todo!("child pid");
 
-    let colon_idx = buffer
-        .iter()
-        .position(|c| *c == b':')
-        .ok_or(Error::new(EINVAL))?;
-    let slash_idx = buffer
-        .iter()
-        .skip(colon_idx)
-        .position(|c| *c == b'/')
-        .ok_or(Error::new(EINVAL))?
-        + colon_idx;
-    let pid_bytes = buffer
-        .get(colon_idx + 1..slash_idx)
-        .ok_or(Error::new(EINVAL))?;
-    let pid_str = core::str::from_utf8(pid_bytes).map_err(|_| Error::new(EINVAL))?;
-    let pid = pid_str.parse::<usize>().map_err(|_| Error::new(EINVAL))?;
+    #[cfg(not(feature = "proc"))]
+    let pid = 1;
 
     Ok((fd, pid))
 }
@@ -865,4 +850,15 @@ pub fn copy_str(cur_pid_fd: usize, new_pid_fd: usize, key: &str) -> Result<()> {
     syscall::write(*new_name_fd, &buf)?;
 
     Ok(())
+}
+
+pub unsafe fn make_init() {
+    STATIC_PROC_INFO.get().write(crate::StaticProcInfo { pid: 1, ppid: 1 });
+    *DYNAMIC_PROC_INFO.lock() = crate::DynamicProcInfo {
+        pgid: 1,
+        egid: 0,
+        euid: 0,
+        rgid: 0,
+        ruid: 0,
+    };
 }

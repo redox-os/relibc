@@ -15,6 +15,7 @@ use generic_rt::{ExpectTlsFree, GenericTcb};
 use syscall::{Sigcontrol, O_CLOEXEC};
 
 use self::proc::FdGuard;
+use self::sync::Mutex;
 
 extern crate alloc;
 
@@ -180,29 +181,50 @@ pub unsafe fn initialize_freestanding() {
 pub unsafe fn initialize() {
     #[cfg(feature = "proc")]
     // Find the PID attached to this process
-    let pid = todo!("getpid");
+    let (pid, ppid) = todo!("getpid");
 
     #[cfg(not(feature = "proc"))]
     // Bootstrap mode, don't associate proc fds with PIDs
-    let pid = 0;
+    let (pid, ppid): (u32, u32) = (0, 0);
 
-    THIS_PID
-        .get()
-        .write(Some(pid).unwrap());
+    STATIC_PROC_INFO.get().write(StaticProcInfo {
+        pid,
+        ppid,
+    });
 }
 
-static THIS_PID: SyncUnsafeCell<u32> = SyncUnsafeCell::new(0);
+struct StaticProcInfo {
+    pid: u32,
+    ppid: u32,
+    proc_fd: FdGuard,
+}
+struct DynamicProcInfo {
+    pgid: u32,
+    euid: u32,
+    ruid: u32,
+    egid: u32,
+    rgid: u32,
+}
+
+static STATIC_PROC_INFO: SyncUnsafeCell<StaticProcInfo> = SyncUnsafeCell::new(StaticProcInfo {
+    pid: 0,
+    ppid: 0,
+});
+static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
+    pgid: u32::MAX,
+    euid: u32::MAX,
+    egid: u32::MAX,
+    ruid: u32::MAX,
+    rgid: u32::MAX,
+});
 
 unsafe fn child_hook_common(new_pid_fd: FdGuard) {
     // TODO: just pass PID to child rather than obtaining it via IPC?
     #[cfg(feature = "proc")]
-    let pid = todo!("getpid");
+    let (pid, ppid): (u32, u32) = todo!("getpid");
     #[cfg(not(feature = "proc"))]
-    let pid = 0;
+    let (pid, ppid): (u32, u32) = (0, 0);
 
     // TODO: Currently pidfd == threadfd, but this will not be the case later.
     RtTcb::current().thr_fd.get().write(Some(new_pid_fd));
-    THIS_PID
-        .get()
-        .write(Some(pid).unwrap());
 }
