@@ -6,6 +6,8 @@
 use alloc::string::{String, ToString};
 use core::{ffi::CStr, ptr, slice, str};
 
+use libm::{fabs, floor, pow, round, trunc};
+
 extern crate alloc;
 
 mod strfmon;
@@ -60,50 +62,6 @@ struct FormatFlags {
     international: bool,
 }
 
-/// Use our own floating point implementation
-/// TODO : maybe we can use num-traits crate
-#[inline]
-fn my_fabs(x: f64) -> f64 {
-    if x < 0.0 {
-        -x
-    } else {
-        x
-    }
-}
-
-#[inline]
-fn my_floor(x: f64) -> f64 {
-    let i = x as i64;
-    if x < 0.0 && x != i as f64 {
-        (i - 1) as f64
-    } else {
-        i as f64
-    }
-}
-
-#[inline]
-fn my_trunc(x: f64) -> f64 {
-    if x < 0.0 {
-        -my_floor(-x)
-    } else {
-        my_floor(x)
-    }
-}
-
-#[inline]
-fn my_round(x: f64) -> f64 {
-    my_floor(x + 0.5)
-}
-
-#[inline]
-fn my_pow10(n: usize) -> f64 {
-    let mut result = 1.0;
-    for _ in 0..n {
-        result *= 10.0;
-    }
-    result
-}
-
 /// Formats a monetary value according to the current locale.
 fn apply_grouping(int_str: &str, monetary: &LocaleMonetaryInfo) -> String {
     let mut grouped = String::with_capacity(int_str.len() * 2);
@@ -131,15 +89,15 @@ fn apply_grouping(int_str: &str, monetary: &LocaleMonetaryInfo) -> String {
 
 /// Safe handling of large monetary values. Returns None if the value is too large to format
 fn format_value_parts(value: f64, frac_digits: usize) -> Option<(String, i64)> {
-    let abs_value = my_fabs(value);
+    let abs_value = fabs(value);
     if abs_value > (i64::MAX as f64) {
         // Check if the value is too large to format
         return None;
     }
 
-    let int_part = my_trunc(abs_value) as i64;
-    let scale = my_pow10(frac_digits);
-    let frac_part = my_round((abs_value - int_part as f64) * scale) as i64;
+    let int_part = trunc(abs_value) as i64;
+    let scale = pow(10.0, frac_digits as f64);
+    let frac_part = round((abs_value - int_part as f64) * scale) as i64;
 
     Some((int_part.to_string(), frac_part))
 }

@@ -1,8 +1,7 @@
-use super::{
-    my_fabs, my_pow10, my_round, my_trunc, FormatFlags, LocaleMonetaryInfo, DEFAULT_MONETARY,
-};
+use super::{FormatFlags, LocaleMonetaryInfo, DEFAULT_MONETARY};
 use alloc::string::{String, ToString};
 use core::{ffi::CStr, ptr, slice, str};
+use libm::{fabs, floor, pow, round, trunc};
 
 /*
    The strfmon() function formats a monetary value according to the format string format and writes the result to the character
@@ -156,8 +155,8 @@ fn format_monetary(
 ) -> Option<usize> {
     let mut pos = 0; // Initialize the position to 0
     let is_negative = value < 0.0; // Check if the value is negative
-    let abs_value = my_fabs(value); // Get the absolute value of the number
-                                    // Check if the international flag is set
+    let abs_value = fabs(value); // Get the absolute value of the number
+
     let frac_digits = if flags.international {
         flags
             .right_precision
@@ -168,9 +167,9 @@ fn format_monetary(
             .unwrap_or(monetary.frac_digits as usize)
     };
 
-    let scale = my_pow10(frac_digits);
-    let mut int_part = my_trunc(abs_value) as i64;
-    let mut frac_part = my_round((abs_value - int_part as f64) * scale) as i64;
+    let scale = pow(10.0, frac_digits as f64);
+    let mut int_part = trunc(abs_value) as i64;
+    let mut frac_part = round((abs_value - int_part as f64) * scale) as i64;
 
     // Ensure that the fractional part (frac_part) doesn’t overflow due to rounding
     // when abs_value is very close to the next integer value.
@@ -243,6 +242,7 @@ fn format_monetary(
 
     // Add a space between the currency symbol and the value
     let sep_by_space = if is_negative {
+        //let scale = my_pow10(frac_digits);
         monetary.n_sep_by_space
     } else {
         monetary.p_sep_by_space
