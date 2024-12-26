@@ -26,6 +26,9 @@ pub const AT_RANDOM: usize = 25; /* Address of 16 random bytes.  */
 pub const AT_HWCAP2: usize = 26; /* More machine-dependent hints about*/
 pub const AT_EXECFN: usize = 31; /* Filename of executable.  */
 
+// TODO: Downgrade aux vectors to getauxval constants on Redox, and use a regular struct for
+// passing important runtime info between exec (or posix_spawn in the future) calls.
+
 #[cfg(target_os = "redox")]
 // XXX: The name AT_CWD is already used in openat... for a completely different purpose.
 pub const AT_REDOX_INITIAL_CWD_PTR: usize = 32;
@@ -45,6 +48,12 @@ pub const AT_REDOX_INHERITED_SIGPROCMASK_HI: usize = 37;
 pub const AT_REDOX_INITIAL_DEFAULT_SCHEME_PTR: usize = 38;
 #[cfg(target_os = "redox")]
 pub const AT_REDOX_INITIAL_DEFAULT_SCHEME_LEN: usize = 39;
+
+#[cfg(target_os = "redox")]
+pub const AT_REDOX_PROC_FD: usize = 39;
+
+#[cfg(target_os = "redox")]
+pub const AT_REDOX_THR_FD: usize = 39;
 
 #[cfg(target_os = "redox")]
 pub const AT_REDOX_UMASK: usize = 40;

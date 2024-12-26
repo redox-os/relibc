@@ -11,8 +11,11 @@ use syscall::{
 };
 
 use crate::{
-    proc::{fork_inner, FdGuard},
-    signal::{get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    proc::{fork_inner, FdGuard, ForkArgs},
+    signal::{
+        get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack,
+        PROC_CONTROL_STRUCT,
+    },
     Tcb,
 };
 
@@ -92,16 +95,16 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
     Ok(())
 }
 
-unsafe extern "sysv64" fn fork_impl(initial_rsp: *mut usize) -> usize {
-    Error::mux(fork_inner(initial_rsp))
+unsafe extern "sysv64" fn fork_impl(initial_rsp: *mut usize, args: &ForkArgs) -> usize {
+    Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "sysv64" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
+unsafe extern "sysv64" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize, new_thr_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
-    crate::child_hook_common(FdGuard::new(new_pid_fd));
+    crate::child_hook_common(FdGuard::new(new_pid_fd), FdGuard::new(new_thr_fd));
 }
 
-asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
+asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     push rbp
     mov rbp, rsp
 
@@ -112,15 +115,16 @@ asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
     push r14
     push r15
 
-    sub rsp, 32
+    sub rsp, 48
 
-    stmxcsr [rsp+16]
-    fnstcw [rsp+24]
+    stmxcsr [rsp+32]
+    fnstcw [rsp+40]
 
     mov rdi, rsp
+    // rsi: &ForkArgs
     call {fork_impl}
 
-    add rsp, 80
+    add rsp, 96
 
     pop rbp
     ret
@@ -129,10 +133,11 @@ asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
 asmfunction!(__relibc_internal_fork_ret: ["
     mov rdi, [rsp]
     mov rsi, [rsp + 8]
+    mov rdx, [rsp + 16]
     call {child_hook}
 
-    ldmxcsr [rsp + 16]
-    fldcw [rsp + 24]
+    ldmxcsr [rsp + 32]
+    fldcw [rsp + 40]
 
     xor rax, rax
 

@@ -10,18 +10,20 @@
 #![forbid(unreachable_patterns)]
 
 use core::cell::{SyncUnsafeCell, UnsafeCell};
+use core::mem::size_of;
 
 use generic_rt::{ExpectTlsFree, GenericTcb};
 use syscall::{Sigcontrol, O_CLOEXEC};
 
 use self::proc::FdGuard;
+use self::protocol::ProcMeta;
 use self::sync::Mutex;
 
 extern crate alloc;
 
 #[macro_export]
 macro_rules! asmfunction(
-    ($name:ident $(-> $ret:ty)? : [$($asmstmt:expr),*$(,)?] <= [$($decl:ident = $(sym $symname:ident)?$(const $constval:expr)?),*$(,)?]$(,)? ) => {
+    ($name:ident $(($($arg:ty),*))? $(-> $ret:ty)? : [$($asmstmt:expr),*$(,)?] <= [$($decl:ident = $(sym $symname:ident)?$(const $constval:expr)?),*$(,)?]$(,)? ) => {
         ::core::arch::global_asm!(concat!("
             .p2align 4
             .section .text.", stringify!($name), ", \"ax\", @progbits
@@ -33,7 +35,7 @@ macro_rules! asmfunction(
         "), $($decl = $(sym $symname)?$(const $constval)?),*);
 
         extern "C" {
-            pub fn $name() $(-> $ret)?;
+            pub fn $name($($(_: $arg),*)?) $(-> $ret)?;
         }
     }
 );
@@ -45,6 +47,7 @@ pub mod proc;
 #[path = "../../src/platform/auxv_defs.rs"]
 pub mod auxv_defs;
 
+pub mod protocol;
 pub mod signal;
 pub mod sync;
 pub mod sys;
@@ -135,6 +138,7 @@ pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
 }
 
 /// Initialize redox-rt in situations where relibc is not used
+#[cfg(not(feature = "proc"))]
 pub unsafe fn initialize_freestanding() {
     // TODO: This code is a hack! Integrate the ld_so TCB code into generic-rt, and then use that
     // (this function will need pointers to the ELF structs normally passed in auxvs), so the TCB
@@ -178,24 +182,48 @@ pub unsafe fn initialize_freestanding() {
     }
     initialize();
 }
-pub unsafe fn initialize() {
+#[cfg(feature = "proc")]
+pub(crate) fn read_proc_meta(proc: &FdGuard) -> syscall::Result<ProcMeta> {
+    let mut bytes = [0_u8; size_of::<ProcMeta>()];
+    let _ = syscall::read(**proc, &mut bytes)?;
+    Ok(*plain::from_bytes::<ProcMeta>(&bytes).unwrap())
+}
+pub unsafe fn initialize(
     #[cfg(feature = "proc")]
-    // Find the PID attached to this process
-    let (pid, ppid) = todo!("getpid");
+    proc_fd: FdGuard,
+) {
+    #[cfg(feature = "proc")]
+    let metadata = read_proc_meta(&proc_fd).unwrap();
 
     #[cfg(not(feature = "proc"))]
     // Bootstrap mode, don't associate proc fds with PIDs
-    let (pid, ppid): (u32, u32) = (0, 0);
+    let metadata = ProcMeta::default();
 
     STATIC_PROC_INFO.get().write(StaticProcInfo {
-        pid,
-        ppid,
+        pid: metadata.pid,
+        ppid: metadata.ppid,
+
+        #[cfg(feature = "proc")]
+        proc_fd,
     });
+
+    #[cfg(feature = "proc")]
+    {
+        *DYNAMIC_PROC_INFO.lock() = DynamicProcInfo {
+            pgid: metadata.pgid,
+            egid: metadata.egid,
+            euid: metadata.euid,
+            ruid: metadata.ruid,
+            rgid: metadata.rgid,
+        };
+    }
 }
 
-struct StaticProcInfo {
+pub(crate) struct StaticProcInfo {
     pid: u32,
     ppid: u32,
+
+    #[cfg(feature = "proc")]
     proc_fd: FdGuard,
 }
 struct DynamicProcInfo {
@@ -209,6 +237,7 @@ struct DynamicProcInfo {
 static STATIC_PROC_INFO: SyncUnsafeCell<StaticProcInfo> = SyncUnsafeCell::new(StaticProcInfo {
     pid: 0,
     ppid: 0,
+    proc_fd: FdGuard::new(usize::MAX),
 });
 static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
     pgid: u32::MAX,
@@ -218,13 +247,24 @@ static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
     rgid: u32::MAX,
 });
 
-unsafe fn child_hook_common(new_pid_fd: FdGuard) {
+pub(crate) fn static_proc_info() -> &'static StaticProcInfo {
+    unsafe { &*STATIC_PROC_INFO.get() }
+}
+
+unsafe fn child_hook_common(new_proc_fd: FdGuard, new_thr_fd: FdGuard) {
     // TODO: just pass PID to child rather than obtaining it via IPC?
     #[cfg(feature = "proc")]
-    let (pid, ppid): (u32, u32) = todo!("getpid");
-    #[cfg(not(feature = "proc"))]
-    let (pid, ppid): (u32, u32) = (0, 0);
+    let metadata = read_proc_meta(&new_proc_fd).unwrap();
 
-    // TODO: Currently pidfd == threadfd, but this will not be the case later.
-    RtTcb::current().thr_fd.get().write(Some(new_pid_fd));
+    #[cfg(not(feature = "proc"))]
+    let metadata = ProcMeta::default();
+
+    STATIC_PROC_INFO.get().write(StaticProcInfo {
+        pid: metadata.pid,
+        ppid: metadata.ppid,
+        proc_fd: new_proc_fd,
+    });
+
+    // FIXME
+    RtTcb::current().thr_fd.get().write(Some(new_thr_fd));
 }
