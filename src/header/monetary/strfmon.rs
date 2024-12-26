@@ -1,4 +1,4 @@
-use super::{FormatFlags, LocaleMonetaryInfo, DEFAULT_MONETARY};
+use super::{apply_grouping, FormatFlags, LocaleMonetaryInfo, DEFAULT_MONETARY};
 use alloc::string::{String, ToString};
 use core::{ffi::CStr, ptr, result, slice, str};
 use libm::{fabs, floor, pow, round, trunc};
@@ -8,8 +8,8 @@ use libm::{fabs, floor, pow, round, trunc};
 /// The format string can contain plain characters and format specifiers.
 ///
 /// Returns:
-/// - The number of characters written (excluding the null terminator), or
-/// - -1 if an error occurs (e.g., invalid input, buffer overflow).
+/// - The number of characters written (excluding the null terminator), or -1 if
+/// an error occurs (e.g., invalid input, buffer overflow)
 pub unsafe extern "C" fn strfmon(
     s: *mut i8,        // Output buffer
     maxsize: usize,    // Maximum size of the buffer
@@ -149,16 +149,29 @@ pub unsafe extern "C" fn strfmon(
     pos as isize // Return the number of characters written
 }
 
+/// Formats a monetary value into the given `buffer` using locale-specific rules
+/// from `monetary` and formatting options from `flags`.
+/// Returns `Some(len)` if successful, where `len` is the number of bytes written,
+/// or `None` on error.
+///
+/// # Parameters
+/// - `buffer`: The output slice in which to write the formatted string
+/// - `value`: The numeric value to format as monetary
+/// - `monetary`: Locale-specific formatting rules, including symbols, separators,
+///   and grouping sizes
+/// - `flags`: Additional formatting options
+///
 fn format_monetary(
     buffer: &mut [u8],
     value: f64,
     monetary: &LocaleMonetaryInfo,
     flags: &FormatFlags,
 ) -> Option<usize> {
-    let mut pos = 0;
+    // 1) determine sign and absolute value
     let is_negative = value < 0.0;
     let abs_value = fabs(value);
 
+    // 2) figure out how many fractionals digits to use
     let frac_digits = if flags.international {
         flags
             .right_precision
@@ -169,90 +182,65 @@ fn format_monetary(
             .unwrap_or(monetary.frac_digits as usize)
     };
 
+    // 3) split the value into integer and fractional parts
     let scale = pow(10.0, frac_digits as f64);
     let mut int_part = trunc(abs_value) as i64;
     let mut frac_part = round((abs_value - int_part as f64) * scale) as i64;
 
-    // Ensure that the fractional part (frac_part) doesn’t overflow due to rounding
-    // when abs_value is very close to the next integer value.
+    // 4) handle carry-over if frac_part equals or exceeds scale after rounding
     if frac_part >= scale as i64 {
-        // Handle carry-over to the integer part
         int_part += 1;
         frac_part = 0;
     }
 
+    // 5) convert the integer part to string
     let mut int_str = int_part.to_string();
 
+    // 6) apply left precision if specified (padding with '0')
+    //    So if left_precision is 5 and int_str is "42", it becomes "00042".
     if let Some(left_prec) = flags.left_precision {
         if int_str.len() > left_prec {
+            // The integer part is too large to fit the precision
             return None;
         }
-        while int_str.len() < left_prec {
-            int_str.insert(0, '0');
-        }
+        // Right-align the number in a field of `left_prec` width, padded with '0'
+        int_str = format!("{:0>width$}", int_str, width = left_prec);
     }
 
-    // Apply grouping
-    let mut grouped = String::with_capacity(int_str.len() * 2);
-    let mut group_idx = 0;
-    let mut count = 0;
+    // 7) build the final formatted output in a temporary String
+    let mut result = String::with_capacity(int_str.len() * 2 + 20);
 
-    // The grouping array can have up to 4 elements, but the last element is always 0
-    for c in int_str.chars().rev() {
-        if count > 0 {
-            let current_group = monetary.mon_grouping.get(group_idx).copied().unwrap_or(0);
-            if current_group > 0 && count % current_group == 0 {
-                grouped.push_str(monetary.mon_thousands_sep);
-                group_idx += 1; // Move to the next grouping size
-            }
-        }
-        grouped.push(c);
-        count += 1;
-    }
-    // Reverse the string to get the correct order
-    let mut result = String::with_capacity(grouped.len() + 20);
-
-    // Add the sign position
-    let sign_posn = if is_negative {
-        monetary.n_sign_posn
+    // 7a) determine currency symbol placement and sign rules
+    let (cs_precedes, sep_by_space, sign_posn) = if is_negative {
+        (
+            monetary.n_cs_precedes,
+            monetary.n_sep_by_space,
+            monetary.n_sign_posn,
+        )
     } else {
-        monetary.p_sign_posn
+        (
+            monetary.p_cs_precedes,
+            monetary.p_sep_by_space,
+            monetary.p_sign_posn,
+        )
     };
 
-    // Add the sign
-    let sign = if is_negative {
-        monetary.negative_sign
-    } else if flags.force_sign {
-        monetary.positive_sign
-    } else if flags.space_sign {
-        " "
-    } else {
-        ""
+    // 7b) determine which sign to display
+    //     - negative sign if value is negative
+    //     - positive_sign if user forced sign
+    //     - space if space_sign is set and value is positive
+    //     - empty otherwise
+    let sign = match (is_negative, flags.force_sign, flags.space_sign) {
+        (true, _, _) => monetary.negative_sign,
+        (false, true, _) => monetary.positive_sign,
+        (false, false, true) => " ",
+        _ => "",
     };
 
-    // Add the sign at the beginning
-    if sign_posn == 0 {
-        result.push('(');
-    } else if sign_posn == 1 {
-        result.push_str(sign);
-    }
-
-    // Add the currency symbol
-    let cs_precedes = if is_negative {
-        monetary.n_cs_precedes
-    } else {
-        monetary.p_cs_precedes
-    };
-
-    // Add a space between the currency symbol and the value
-    let sep_by_space = if is_negative {
-        let scale = pow(10.0, frac_digits as f64);
-        monetary.n_sep_by_space
-    } else {
-        monetary.p_sep_by_space
-    };
-
-    // Add the currency symbol
+    // 7c) choose which currency symbol to display
+    //     - maybe empty if suppressed
+    //     - int_curr_symbol for international format
+    //     - currency_symbol for local format
     let symbol = if flags.suppress_symbol {
         ""
     } else if flags.international {
@@ -261,7 +249,14 @@ fn format_monetary(
         monetary.currency_symbol
     };
 
-    // Add the currency symbol
+    // 8) add opening parenthesis if sign position is 0
+    if sign_posn == 0 {
+        result.push('(');
+    } else if sign_posn == 1 {
+        result.push_str(sign);
+    }
+
+    // 9) add currency symbol if it precedes the amount
     if cs_precedes {
         result.push_str(symbol);
         if sep_by_space {
@@ -269,45 +264,53 @@ fn format_monetary(
         }
     }
 
-    // Add the value
-    result.push_str(&grouped.chars().rev().collect::<String>());
+    // 10) group the integer string and append it
+    let grouped = apply_grouping(&int_str, monetary);
+    result.push_str(&grouped);
 
+    // 11) append the fractional part, if any
     if frac_digits > 0 {
         result.push_str(monetary.mon_decimal_point);
-        result.push_str(&format!("{:0width$}", frac_part, width = frac_digits));
+        // Zero-pad fractional part to the specified width
+        result.push_str(&format!("{:0>width$}", frac_part, width = frac_digits));
     }
 
+    // 12) if the currency symbol follows the amount, add it now
     if !cs_precedes {
-        // Add the currency symbol after the value
         if sep_by_space {
             result.push(' ');
         }
         result.push_str(symbol);
     }
 
+    // 13) if sign_posn == 0, close the parenthesis
     if sign_posn == 0 {
         result.push(')');
     }
 
+    // 14) checks if the user specified a total field width
+    //     - if the final result is shorter, we padd it
+    //     - if `left_justify` is true, padd on the right otherwise padd on the left
     if let Some(width) = flags.field_width {
-        // Check if the field width is specified
         if result.len() < width {
             let padding = " ".repeat(width - result.len());
             if flags.left_justify {
+                // Left-justify: add padding at the end
                 result.push_str(&padding);
             } else {
+                // Right-justify: add padding at the beginning
                 result = padding + &result;
             }
         }
     }
 
-    // Write the formatted string to the buffer
-    for (i, &b) in result.as_bytes().iter().enumerate() {
-        if pos + i >= buffer.len() {
-            return None;
-        }
-        buffer[pos + i] = b;
+    // 15) write the final string to the buffer
+    if result.len() > buffer.len() {
+        // Not enough space in the output buffer
+        return None;
     }
+    buffer[..result.len()].copy_from_slice(result.as_bytes());
 
-    Some(pos + result.len())
+    // 16) return how many bytes we wrote
+    Some(result.len())
 }
