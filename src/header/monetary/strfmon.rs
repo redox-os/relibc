@@ -301,13 +301,11 @@ fn format_monetary(
     if let Some(width) = flags.field_width {
         if result.len() < width {
             let padding = " ".repeat(width - result.len());
-            if flags.left_justify {
-                // Left-justify: add padding at the end
-                result.push_str(&padding);
+            result = if flags.left_justify {
+                result + &padding
             } else {
-                // Right-justify: add padding at the beginning
-                result = padding + &result;
-            }
+                padding + &result
+            };
         }
     }
 
