@@ -184,6 +184,13 @@ fn format_monetary(
 
     // 3) split the value into integer and fractional parts
     let scale = pow(10.0, frac_digits as f64);
+
+    // Check for overflow
+    let max_safe_int = (i64::MAX as f64) / scale;
+    if abs_value >= max_safe_int {
+        return None;
+    }
+
     let mut int_part = trunc(abs_value) as i64;
     let mut frac_part = round((abs_value - int_part as f64) * scale) as i64;
 
