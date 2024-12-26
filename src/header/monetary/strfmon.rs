@@ -1,65 +1,64 @@
 use super::{FormatFlags, LocaleMonetaryInfo, DEFAULT_MONETARY};
 use alloc::string::{String, ToString};
-use core::{ffi::CStr, ptr, slice, str};
+use core::{ffi::CStr, ptr, result, slice, str};
 use libm::{fabs, floor, pow, round, trunc};
 
-/*
-   The strfmon() function formats a monetary value according to the format string format and writes the result to the character
-   array s of size maxsize.
-   The format string format is a string that can contain plain characters and format specifiers.
-   The format specifiers start with the character '%' and are followed by one or more flags, an optional field width,
-   an optional left precision, an optional right precision, and a conversion specifier.
-   The conversion specifier can be either 'i' or 'n'. The 'i' specifier formats the monetary value according to the
-   locale-specific rules, while the 'n' specifier formats the monetary value according to the international rules.
-
-   The function returns the number of characters written to the buffer, excluding the null terminator, or -1 if an error occurred.
-
-   TODO : better handling error : always return -1 if an error occurred
-*/
+/// The `strfmon()` function formats a monetary value according to the format string `format`
+/// and writes the result to the character array `s` of size `maxsize`.
+/// The format string can contain plain characters and format specifiers.
+///
+/// Returns:
+/// - The number of characters written (excluding the null terminator), or
+/// - -1 if an error occurs (e.g., invalid input, buffer overflow).
 pub unsafe extern "C" fn strfmon(
-    s: *mut i8,        // char *
-    maxsize: usize,    // size_t
-    format: *const i8, // const char *
-    mut args: ...
+    s: *mut i8,        // Output buffer
+    maxsize: usize,    // Maximum size of the buffer
+    format: *const i8, // Format string
+    mut args: ...      // Variadic arguments for monetary values
 ) -> isize {
+    // Validate input pointers and buffer size
     if s.is_null() || format.is_null() || maxsize == 0 {
-        // Check for null pointers and zero size
-        return -1;
+        return -1; // Invalid input
     }
 
+    // Convert the format string from C to string
     let format_str = match unsafe { CStr::from_ptr(format) }.to_str() {
-        Ok(s) => s,          // Convert the format string to a string
-        Err(_) => return -1, // Return -1 if the format string is not valid
+        Ok(s) => s,
+        Err(_) => return -1, // Invalid format string
     };
-    // Buffer to write the formatted string
+
+    // Create a mutable slice for the output buffer
     let buffer = unsafe { slice::from_raw_parts_mut(s as *mut u8, maxsize) };
     let mut pos = 0;
     let mut format_chars = format_str.chars().peekable();
 
+    // Parse the format string
     while let Some(c) = format_chars.next() {
+        // Handle plain characters (non-`%`)
         if c != '%' {
             if pos >= buffer.len() {
-                return -1;
+                return -1; // Buffer overflow
             }
-            // Write the character to the buffer
             buffer[pos] = c as u8; // Write the character to the buffer
-            pos += 1; // Move to the next position
-            continue; // Move to the next character
+            pos += 1;
+            continue;
         }
-        // Handle '%%' as an escape sequence
+
+        // Handle `%%` escape sequence
         if format_chars.peek() == Some(&'%') {
             if pos >= buffer.len() {
                 return -1; // Buffer overflow
             }
-            buffer[pos] = b'%'; // Write '%' to the buffer
-            pos += 1; // Move to the next position
-            format_chars.next(); // Skip the second '%'
+            buffer[pos] = b'%'; // Write a literal `%`
+            pos += 1;
+            format_chars.next(); // Skip the second `%`
             continue;
         }
 
+        // Parse format specifiers
         let mut flags = FormatFlags::default();
 
-        // Parse flags
+        // Parse flags (`+`, `(`, ...)
         while let Some(&next_char) = format_chars.peek() {
             match next_char {
                 '=' => flags.left_justify = true,
@@ -67,7 +66,7 @@ pub unsafe extern "C" fn strfmon(
                 ' ' => flags.space_sign = true,
                 '(' => flags.use_parens = true,
                 '!' => flags.suppress_symbol = true,
-                _ => break,
+                _ => break, // Stop when no more flags are found
             }
             format_chars.next();
         }
@@ -78,32 +77,31 @@ pub unsafe extern "C" fn strfmon(
             if !c.is_ascii_digit() {
                 break;
             }
-            num_str.push(c); // Add the character to the number string
-            format_chars.next(); // Move to the next character
+            num_str.push(c);
+            format_chars.next();
         }
         if !num_str.is_empty() {
-            flags.field_width = num_str.parse().ok(); // Parse the number string
+            flags.field_width = num_str.parse().ok(); // Parse as integer
         }
 
-        // Parse left precision
+        // Parse left precision (`#`)
         if format_chars.peek() == Some(&'#') {
-            format_chars.next(); // Skip the '#'
-            num_str.clear(); // Clear the number string
+            format_chars.next(); // Skip `#`
+            num_str.clear(); // Clear the string for precision
             while let Some(&c) = format_chars.peek() {
                 if !c.is_ascii_digit() {
-                    // Check if the character is a digit
                     break;
                 }
                 num_str.push(c);
                 format_chars.next();
             }
-            flags.left_precision = num_str.parse().ok();
+            flags.left_precision = num_str.parse().ok(); // Parse as integer
         }
 
-        // Parse right precision
+        // Parse right precision indicated by `.`
         if format_chars.peek() == Some(&'.') {
-            format_chars.next();
-            num_str.clear();
+            format_chars.next(); // Skip `.`
+            num_str.clear(); // Clear the string for precision
             while let Some(&c) = format_chars.peek() {
                 if !c.is_ascii_digit() {
                     break;
@@ -111,37 +109,41 @@ pub unsafe extern "C" fn strfmon(
                 num_str.push(c);
                 format_chars.next();
             }
-            flags.right_precision = num_str.parse().ok();
+            flags.right_precision = num_str.parse().ok(); // Parse as integer
         }
 
+        // Handle conversion specifiers (`i` or `n`)
         match format_chars.next() {
             Some('i') => {
+                // International formatting
                 flags.international = true;
-                let value = unsafe { args.arg::<f64>() };
+                let value = unsafe { args.arg::<f64>() }; // Get the argument as f64
                 if let Some(written) =
                     format_monetary(&mut buffer[pos..], value, &DEFAULT_MONETARY, &flags)
                 {
-                    pos += written;
+                    pos += written; // Update the position
                 } else {
-                    return -1;
+                    return -1; // Formatting failed
                 }
             }
             Some('n') => {
-                let value = unsafe { args.arg::<f64>() }; // Get the next argument as a f64
+                // Locale-specific formatting
+                let value = unsafe { args.arg::<f64>() }; // Get the argument as f64
                 if let Some(written) =
                     format_monetary(&mut buffer[pos..], value, &DEFAULT_MONETARY, &flags)
                 {
-                    pos += written; // Move the position by the number of characters written
+                    pos += written; // Update the position
                 } else {
-                    return -1;
+                    return -1; // Failed to format the value
                 }
             }
             _ => return -1,
         }
     }
 
+    // Ensure there is space for the null terminator
     if pos >= buffer.len() {
-        return -1;
+        return -1; // Buffer overflow
     }
     buffer[pos] = 0; // Null-terminate the buffer
     pos as isize // Return the number of characters written
@@ -153,9 +155,9 @@ fn format_monetary(
     monetary: &LocaleMonetaryInfo,
     flags: &FormatFlags,
 ) -> Option<usize> {
-    let mut pos = 0; // Initialize the position to 0
-    let is_negative = value < 0.0; // Check if the value is negative
-    let abs_value = fabs(value); // Get the absolute value of the number
+    let mut pos = 0;
+    let is_negative = value < 0.0;
+    let abs_value = fabs(value);
 
     let frac_digits = if flags.international {
         flags
@@ -197,10 +199,12 @@ fn format_monetary(
 
     // The grouping array can have up to 4 elements, but the last element is always 0
     for c in int_str.chars().rev() {
-        if count > 0
-            && count % monetary.mon_grouping[group_idx.min(monetary.mon_grouping.len() - 1)] == 0
-        {
-            grouped.push_str(monetary.mon_thousands_sep);
+        if count > 0 {
+            let current_group = monetary.mon_grouping.get(group_idx).copied().unwrap_or(0);
+            if current_group > 0 && count % current_group == 0 {
+                grouped.push_str(monetary.mon_thousands_sep);
+                group_idx += 1; // Move to the next grouping size
+            }
         }
         grouped.push(c);
         count += 1;
@@ -242,7 +246,7 @@ fn format_monetary(
 
     // Add a space between the currency symbol and the value
     let sep_by_space = if is_negative {
-        //let scale = my_pow10(frac_digits);
+        let scale = pow(10.0, frac_digits as f64);
         monetary.n_sep_by_space
     } else {
         monetary.p_sep_by_space
