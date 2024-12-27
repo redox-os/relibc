@@ -306,13 +306,18 @@ pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
 #[cfg(target_os = "redox")]
 // SAFETY: Must only be called when only one thread exists.
 pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
-    redox_rt::initialize();
-
+    use self::auxv_defs::*;
+    use crate::header::sys_stat::S_ISVTX;
+    use redox_rt::proc::FdGuard;
     use syscall::MODE_PERM;
 
-    use crate::header::sys_stat::S_ISVTX;
-
-    use self::auxv_defs::*;
+    let (Some(thr_fd), Some(proc_fd)) = (
+        get_auxv(&auxvs, AT_REDOX_THR_FD),
+        get_auxv(&auxvs, AT_REDOX_PROC_FD),
+    ) else {
+        panic!("Missing proc and thread fd!");
+    };
+    redox_rt::initialize(FdGuard::new(proc_fd), FdGuard::new(thr_fd));
 
     if let (Some(cwd_ptr), Some(cwd_len)) = (
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_PTR),

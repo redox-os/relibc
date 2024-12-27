@@ -272,7 +272,7 @@ impl Pal for Sys {
         // TODO: Find way to avoid lock.
         let _guard = CLONE_LOCK.write();
 
-        Ok(clone::fork_impl()? as pid_t)
+        Ok(clone::fork_impl(&redox_rt::proc::ForkArgs::Managed)? as pid_t)
     }
 
     unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()> {
@@ -860,11 +860,19 @@ impl Pal for Sys {
     }
 
     fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {
-        Ok(redox_rt::sys::posix_setresgid(cvt_uid(rgid)?, cvt_uid(egid)?, cvt_uid(sgid)?)?)
+        Ok(redox_rt::sys::posix_setresgid(
+            cvt_uid(rgid)?,
+            cvt_uid(egid)?,
+            cvt_uid(sgid)?,
+        )?)
     }
 
     fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> Result<()> {
-        Ok(redox_rt::sys::posix_setresuid(cvt_uid(ruid)?, cvt_uid(euid)?, cvt_uid(suid)?)?)
+        Ok(redox_rt::sys::posix_setresuid(
+            cvt_uid(ruid)?,
+            cvt_uid(euid)?,
+            cvt_uid(suid)?,
+        )?)
     }
 
     fn symlink(path1: CStr, path2: CStr) -> Result<()> {

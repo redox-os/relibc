@@ -99,9 +99,20 @@ unsafe extern "sysv64" fn fork_impl(initial_rsp: *mut usize, args: &ForkArgs) ->
     Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "sysv64" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize, new_thr_fd: usize) {
+unsafe extern "sysv64" fn child_hook(
+    cur_filetable_fd: usize,
+    new_proc_fd: usize,
+    new_thr_fd: usize,
+) {
     let _ = syscall::close(cur_filetable_fd);
-    crate::child_hook_common(FdGuard::new(new_pid_fd), FdGuard::new(new_thr_fd));
+    crate::child_hook_common(crate::ChildHookCommonArgs {
+        new_thr_fd: FdGuard::new(new_thr_fd),
+        new_proc_fd: if new_proc_fd == usize::MAX {
+            None
+        } else {
+            Some(FdGuard::new(new_proc_fd))
+        },
+    });
 }
 
 asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
@@ -141,7 +152,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
 
     xor rax, rax
 
-    add rsp, 32
+    add rsp, 48
     pop r15
     pop r14
     pop r13

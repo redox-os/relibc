@@ -14,12 +14,14 @@ use crate::{
     },
 };
 
-use redox_rt::proc::{ExtraInfo, FdGuard, FexecResult, InterpOverride};
+use redox_rt::{
+    proc::{ExtraInfo, FdGuard, FexecResult, InterpOverride},
+    RtTcb,
+};
 use syscall::{data::Stat, error::*, flag::*};
 
 fn fexec_impl(
     exec_file: FdGuard,
-    open_via_dup: FdGuard,
     path: &[u8],
     args: &[&[u8]],
     envs: &[&[u8]],
@@ -31,7 +33,8 @@ fn fexec_impl(
 
     let addrspace_selection_fd = match redox_rt::proc::fexec_impl(
         exec_file,
-        open_via_dup,
+        &RtTcb::current().thread_fd(),
+        redox_rt::current_proc_fd(),
         &memory,
         path,
         args.iter().rev(),
@@ -43,12 +46,10 @@ fn fexec_impl(
         FexecResult::Normal { addrspace_handle } => addrspace_handle,
         FexecResult::Interp {
             image_file,
-            open_via_dup,
             path,
             interp_override: new_interp_override,
         } => {
             drop(image_file);
-            drop(open_via_dup);
             drop(memory);
 
             // According to elf(5), PT_INTERP requires that the interpreter path be
@@ -262,7 +263,8 @@ pub fn execve(
         }
     }
 
-    let this_context_fd = FdGuard::new(syscall::open("/scheme/thisproc/current", 0)?);
+    let this_thr_fd = RtTcb::current().thread_fd();
+
     // TODO: Convert image_file to FdGuard earlier?
     let exec_fd_guard = FdGuard::new(image_file.fd as usize);
     core::mem::forget(image_file);
@@ -272,7 +274,10 @@ pub fn execve(
         let escalate_fd = FdGuard::new(syscall::open("/scheme/escalate", O_WRONLY)?);
 
         // First, send the context handle of this process to escalated.
-        send_fd_guard(*escalate_fd, this_context_fd)?;
+        send_fd_guard(
+            *escalate_fd,
+            FdGuard::new(syscall::dup(**this_thr_fd, &[])?),
+        )?;
 
         // Then, send the file descriptor containing the file descriptor to be executed.
         send_fd_guard(*escalate_fd, exec_fd_guard)?;
@@ -317,7 +322,6 @@ pub fn execve(
         };
         fexec_impl(
             exec_fd_guard,
-            this_context_fd,
             arg0,
             &args,
             &envs,

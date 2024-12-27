@@ -78,8 +78,8 @@ pub fn posix_getppid() -> u32 {
 pub fn posix_killpg(pgrp: usize, sig: usize) -> Result<()> {
     match wrapper(false, ||
         //syscall::kill(usize::wrapping_neg(pgrp), sig)
-        Ok(todo!("killpg"))
-    ) {
+        Ok(todo!("killpg")))
+    {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
     }

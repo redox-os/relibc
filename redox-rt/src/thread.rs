@@ -6,6 +6,7 @@ use crate::{arch::*, proc::*, signal::tmp_disable_signals, RtTcb};
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
 pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuard> {
+    // FIXME
     let cur_thr_fd = RtTcb::current().thread_fd();
     let new_thr_fd = FdGuard::new(syscall::open(
         "/scheme/thisproc/new-thread/open_via_dup",

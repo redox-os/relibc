@@ -1,6 +1,9 @@
 use core::{fmt::Debug, mem::size_of};
 
-use crate::{arch::*, auxv_defs::*, read_proc_meta, static_proc_info, RtTcb, DYNAMIC_PROC_INFO, STATIC_PROC_INFO};
+use crate::{
+    arch::*, auxv_defs::*, read_proc_meta, static_proc_info, RtTcb, DYNAMIC_PROC_INFO,
+    STATIC_PROC_INFO,
+};
 
 use alloc::{boxed::Box, collections::BTreeMap, vec};
 
@@ -19,18 +22,17 @@ use goblin::elf64::{
 use syscall::{
     error::*,
     flag::{MapFlags, SEEK_SET},
-    GrantDesc, GrantFlags, Map, SetSighandlerData, MAP_FIXED_NOREPLACE, MAP_SHARED, O_CLOEXEC,
-    PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE,
+    GrantDesc, GrantFlags, Map, ProcSchemeAttrs, SetSighandlerData, MAP_FIXED_NOREPLACE,
+    MAP_SHARED, O_CLOEXEC, PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE,
 };
 
-pub enum FexecResult<'a> {
+pub enum FexecResult {
     Normal {
         addrspace_handle: FdGuard,
     },
     Interp {
         path: Box<[u8]>,
         image_file: FdGuard,
-        thread_fd: &'a FdGuard,
         interp_override: InterpOverride,
     },
 }
@@ -55,9 +57,9 @@ pub struct ExtraInfo<'a> {
     pub umask: u32,
 }
 
-pub fn fexec_impl<'a, A, E>(
+pub fn fexec_impl<A, E>(
     image_file: FdGuard,
-    thread_fd: &'a FdGuard,
+    thread_fd: &FdGuard,
     proc_fd: &FdGuard,
     memory_scheme_fd: &FdGuard,
     path: &[u8],
@@ -66,7 +68,7 @@ pub fn fexec_impl<'a, A, E>(
     total_args_envs_size: usize,
     extrainfo: &ExtraInfo,
     mut interp_override: Option<InterpOverride>,
-) -> Result<FexecResult<'a>>
+) -> Result<FexecResult>
 where
     A: IntoIterator,
     E: IntoIterator,
@@ -135,7 +137,6 @@ where
                 return Ok(FexecResult::Interp {
                     path: interp.into_boxed_slice(),
                     image_file,
-                    thread_fd,
                     interp_override: InterpOverride {
                         at_entry: header.e_entry as usize,
                         at_phnum: phnum,
@@ -682,7 +683,11 @@ pub fn create_set_addr_space_buf(
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
 pub fn fork_impl(args: &ForkArgs<'_>) -> Result<usize> {
     let old_mask = crate::signal::get_sigmask()?;
-    let pid = unsafe { Error::demux(__relibc_internal_fork_wrapper(args as *const ForkArgs as usize))? };
+    let pid = unsafe {
+        Error::demux(__relibc_internal_fork_wrapper(
+            args as *const ForkArgs as usize,
+        ))?
+    };
 
     if pid == 0 {
         crate::signal::set_sigmask(Some(old_mask), None)?;
@@ -691,7 +696,10 @@ pub fn fork_impl(args: &ForkArgs<'_>) -> Result<usize> {
 }
 
 pub enum ForkArgs<'a> {
-    Init { this_thr_fd: &'a FdGuard, auth: &'a FdGuard },
+    Init {
+        this_thr_fd: &'a FdGuard,
+        auth: &'a FdGuard,
+    },
     Managed,
 }
 
@@ -703,7 +711,11 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             ForkArgs::Init { this_thr_fd, .. } => this_thr_fd,
             ForkArgs::Managed => RtTcb::current().thread_fd(),
         };
-        let NewChildProc { proc_fd, thr_fd, pid } = new_child_process(args)?;
+        let NewChildProc {
+            proc_fd,
+            thr_fd,
+            pid,
+        } = new_child_process(args)?;
         new_proc_fd = proc_fd;
         new_thr_fd = thr_fd;
         new_pid = pid;
@@ -718,7 +730,9 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             // This must be done before the address space is copied.
             unsafe {
                 initial_rsp.write(*cur_filetable_fd);
-                initial_rsp.add(1).write(*new_proc_fd);
+                initial_rsp
+                    .add(1)
+                    .write(new_proc_fd.as_ref().map_or(usize::MAX, |p| **p));
                 initial_rsp.add(2).write(*new_thr_fd);
             }
         }
@@ -833,36 +847,49 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
 }
 
 struct NewChildProc {
-    #[cfg(feature = "proc")]
-    proc_fd: FdGuard,
+    proc_fd: Option<FdGuard>,
 
     thr_fd: FdGuard,
     pid: usize,
 }
 
 pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
-    match args {
+    match *args {
         ForkArgs::Managed => {
-            let proc_fd = &static_proc_info().proc_fd;
-            let child_proc_fd = FdGuard::new(syscall::dup(**proc_fd, b"fork")?);
+            let this_proc_fd = crate::static_proc_info()
+                .proc_fd
+                .as_ref()
+                .expect("cannot use ForkArgs::Managed without an existing proc info");
+            let child_proc_fd = FdGuard::new(syscall::dup(**this_proc_fd, b"fork")?);
             let only_thread_fd = FdGuard::new(syscall::dup(*child_proc_fd, b"thread-0")?);
             let meta = read_proc_meta(&child_proc_fd)?;
             Ok(NewChildProc {
-                proc_fd: child_proc_fd,
+                proc_fd: Some(child_proc_fd),
                 thr_fd: only_thread_fd,
-                pid: meta.pid as usize
+                pid: meta.pid as usize,
             })
         }
         #[cfg(feature = "proc")]
         ForkArgs::Init { .. } => unreachable!(),
 
         #[cfg(not(feature = "proc"))]
-        #[cfg(feature = "proc")]
         ForkArgs::Init { this_thr_fd, auth } => {
-            let thr_fd = FdGuard::new(syscall::dup(*auth, b"new-context")?);
+            let thr_fd = FdGuard::new(syscall::dup(**auth, b"new-context")?);
+            let buf = ProcSchemeAttrs {
+                pid: 0,
+                euid: 0,
+                egid: 0,
+                ens: 1,
+            };
+            let attr_fd = FdGuard::new(syscall::dup(
+                *thr_fd,
+                alloc::format!("attrs-{}", **auth).as_bytes(),
+            )?);
+            let _ = syscall::write(*attr_fd, &buf)?;
             Ok(NewChildProc {
                 thr_fd,
-                pid: 0,
+                pid: 1, // dummy fd to distinguish child from parent
+                proc_fd: None,
             })
         }
     }
@@ -882,12 +909,23 @@ pub fn copy_str(cur_pid_fd: usize, new_proc_fd: usize, key: &str) -> Result<()> 
     Ok(())
 }
 
-pub unsafe fn make_init(this_thr_fd: FdGuard) -> (&'static FdGuard, &'static FdGuard) {
-    let this_thr_fd = &*(*RtTcb::current().thr_fd.get()).insert(this_thr_fd);
-    let proc_fd = FdGuard::new(syscall::open("/scheme/proc/init", syscall::O_CLOEXEC).expect("failed to create init"));
-    syscall::sendfd(*proc_fd, **this_thr_fd, 0, 0).expect("failed to assign current thread to init process");
+pub unsafe fn make_init() -> &'static FdGuard {
+    let proc_fd = FdGuard::new(
+        syscall::open("/scheme/proc/init", syscall::O_CLOEXEC).expect("failed to create init"),
+    );
+    syscall::sendfd(
+        *proc_fd,
+        syscall::dup(**RtTcb::current().thread_fd(), &[]).unwrap(),
+        0,
+        0,
+    )
+    .expect("failed to assign current thread to init process");
 
-    STATIC_PROC_INFO.get().write(crate::StaticProcInfo { pid: 1, ppid: 1, proc_fd });
+    STATIC_PROC_INFO.get().write(crate::StaticProcInfo {
+        pid: 1,
+        ppid: 1,
+        proc_fd: Some(proc_fd),
+    });
     *DYNAMIC_PROC_INFO.lock() = crate::DynamicProcInfo {
         pgid: 1,
         egid: 0,
@@ -895,5 +933,5 @@ pub unsafe fn make_init(this_thr_fd: FdGuard) -> (&'static FdGuard, &'static FdG
         rgid: 0,
         ruid: 0,
     };
-    (&(*STATIC_PROC_INFO.get()).proc_fd, this_thr_fd)
+    (*STATIC_PROC_INFO.get()).proc_fd.as_ref().unwrap()
 }
