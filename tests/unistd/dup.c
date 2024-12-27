@@ -27,7 +27,8 @@ int main(void) {
     ERROR_IF(close, c2, == -1);
     UNEXP_IF(close, c2, != 0);
 
-    int fd3 = open("dup.out", 0x0002, 0x1000);
+    int fd3 = open("dup.out", O_RDWR);
+
     ERROR_IF(open, fd3, == -1);
     UNEXP_IF(open, fd3, < 0);
 
@@ -35,7 +36,9 @@ int main(void) {
     ERROR_IF(dup2, fd4, == -1);
     UNEXP_IF(dup2, fd4, < 0);
 
-    printf("hello fd %d", fd3);
+    int p = printf("hello fd %d", fd3);
+    ERROR_IF(printf, p, == -1);
+    UNEXP_IF(printf, p, < 0);
 
     int c3 = close(fd3);
     ERROR_IF(close, c3, == -1);

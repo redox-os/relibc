@@ -7,9 +7,11 @@ int main(void) {
     FILE *fp = popen("ls -1 example_dir", "r");
     ERROR_IF(popen, fp, == NULL);
 
+    int lineno = 0;
     char path[256] = { 0 };
     while (fgets(path, 256, fp) != NULL) {
-        printf("%s", path);
+        lineno++;
+        printf("Line %d: %s", lineno, path);
     }
 
     int status = pclose(fp);
