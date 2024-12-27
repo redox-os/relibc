@@ -1,16 +1,17 @@
 use core::{
+    mem::size_of,
     ptr::addr_of,
     sync::atomic::{AtomicU32, Ordering},
 };
 
 use syscall::{
     error::{Error, Result, EINTR},
-    RtSigInfo, TimeSpec,
+    CallFlags, RtSigInfo, TimeSpec,
 };
 
 use crate::{
-    arch::manually_enter_trampoline, proc::FdGuard, signal::tmp_disable_signals, Tcb,
-    DYNAMIC_PROC_INFO,
+    arch::manually_enter_trampoline, proc::FdGuard, protocol::ProcCall,
+    signal::tmp_disable_signals, Tcb, DYNAMIC_PROC_INFO,
 };
 
 #[inline]
@@ -114,13 +115,16 @@ pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
     .map(|awoken| awoken as u32)
 }
 pub fn sys_waitpid(pid: usize, status: &mut usize, flags: usize) -> Result<usize> {
-    wrapper(true, || {
-        /*syscall::waitpid(
-            pid,
-            status,
-            syscall::WaitFlags::from_bits(flags).expect("waitpid: invalid bit pattern"),
-        )*/
-        todo!("waitpid")
+    wrapper(true, || unsafe {
+        let metadata = [ProcCall::Waitpid as usize, pid, flags];
+        syscall::syscall5(
+            syscall::SYS_CALL,
+            **crate::current_proc_fd(),
+            status as *mut usize as usize,
+            size_of::<usize>(),
+            metadata.len() | CallFlags::empty().bits(),
+            metadata.as_ptr() as usize,
+        )
     })
 }
 pub fn posix_kill_thread(thread_fd: usize, signal: u32) -> Result<()> {

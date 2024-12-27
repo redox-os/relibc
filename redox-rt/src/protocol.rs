@@ -11,3 +11,18 @@ pub struct ProcMeta {
     pub rns: u32,
 }
 unsafe impl plain::Plain for ProcMeta {}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(usize)]
+pub enum ProcCall {
+    Waitpid = 0,
+}
+
+impl ProcCall {
+    pub fn try_from_raw(raw: usize) -> Option<Self> {
+        Some(match raw {
+            0 => Self::Waitpid,
+            _ => return None,
+        })
+    }
+}
