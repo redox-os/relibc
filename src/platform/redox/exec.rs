@@ -244,7 +244,7 @@ pub fn execve(
         // threads, it could still be allowed by keeping certain file descriptors and instead
         // set the active file table.
         let files_fd =
-            File::new(syscall::open("/scheme/thisproc/current/filetable", O_RDONLY)? as c_int);
+            File::new(syscall::dup(**RtTcb::current().thread_fd(), b"filetable")? as c_int);
         for line in BufReader::new(files_fd).lines() {
             let line = match line {
                 Ok(l) => l,
