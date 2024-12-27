@@ -55,6 +55,10 @@ pub struct ExtraInfo<'a> {
     pub sigprocmask: u64,
     /// File mode creation mask (POSIX)
     pub umask: u32,
+    /// Thread handle
+    pub thr_fd: usize,
+    /// Process handle
+    pub proc_fd: usize,
 }
 
 pub fn fexec_impl<A, E>(
@@ -373,7 +377,12 @@ where
         push(AT_REDOX_INHERITED_SIGPROCMASK)?;
 
         push(extrainfo.umask as usize)?;
-        push(AT_REDOX_UMASK);
+        push(AT_REDOX_UMASK)?;
+
+        push(extrainfo.thr_fd as usize)?;
+        push(AT_REDOX_THR_FD)?;
+        push(extrainfo.proc_fd as usize)?;
+        push(AT_REDOX_PROC_FD)?;
 
         push(0)?;
 

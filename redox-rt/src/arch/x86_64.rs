@@ -95,7 +95,7 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
     Ok(())
 }
 
-unsafe extern "sysv64" fn fork_impl(initial_rsp: *mut usize, args: &ForkArgs) -> usize {
+unsafe extern "sysv64" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usize {
     Error::mux(fork_inner(initial_rsp, args))
 }
 
@@ -131,8 +131,8 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     stmxcsr [rsp+32]
     fnstcw [rsp+40]
 
-    mov rdi, rsp
-    // rsi: &ForkArgs
+    // rdi: &ForkArgs
+    mov rsi, rsp
     call {fork_impl}
 
     add rsp, 96

@@ -41,7 +41,10 @@ static mut STATIC_TCB_MASTER: Master = Master {
 };
 
 #[inline(never)]
-pub fn static_init(sp: &'static Stack) {
+pub fn static_init(
+    sp: &'static Stack,
+    #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuard,
+) {
     const SIZEOF_PHDR64: usize = mem::size_of::<ProgramHeader64<Endianness>>();
     const SIZEOF_PHDR32: usize = mem::size_of::<ProgramHeader32<Endianness>>();
 
@@ -120,7 +123,10 @@ pub fn static_init(sp: &'static Stack) {
                 tcb.masters_len = mem::size_of::<Master>();
                 tcb.copy_masters()
                     .expect_notls("failed to copy TLS master data");
-                tcb.activate();
+                tcb.activate(
+                    #[cfg(target_os = "redox")]
+                    thr_fd,
+                );
             }
 
             //TODO: Warning on multiple TLS sections?
@@ -130,7 +136,10 @@ pub fn static_init(sp: &'static Stack) {
 }
 
 #[cfg(any(target_os = "linux", target_os = "redox"))]
-pub unsafe fn init(sp: &'static Stack) {
+pub unsafe fn init(
+    sp: &'static Stack,
+    #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuard,
+) {
     let tp: usize;
 
     #[cfg(target_os = "linux")]
@@ -151,11 +160,8 @@ pub unsafe fn init(sp: &'static Stack) {
     {
         let mut env = syscall::EnvRegisters::default();
 
-        let file = syscall::open(
-            "/scheme/thisproc/current/regs/env",
-            syscall::O_CLOEXEC | syscall::O_RDONLY,
-        )
-        .expect_notls("failed to open handle for process registers");
+        let file = syscall::dup(*thr_fd, b"regs/env")
+            .expect_notls("failed to open handle for process registers");
 
         let _ = syscall::read(file, &mut env).expect_notls("failed to read gsbase");
 
@@ -167,11 +173,8 @@ pub unsafe fn init(sp: &'static Stack) {
     {
         let mut env = syscall::EnvRegisters::default();
 
-        let file = syscall::open(
-            "/scheme/thisproc/current/regs/env",
-            syscall::O_CLOEXEC | syscall::O_RDONLY,
-        )
-        .expect_notls("failed to open handle for process registers");
+        let file = syscall::dup(*thr_fd, b"regs/env")
+            .expect_notls("failed to open handle for process registers");
 
         let _ = syscall::read(file, &mut env).expect_notls("failed to read fsbase");
 
@@ -188,7 +191,11 @@ pub unsafe fn init(sp: &'static Stack) {
     }
 
     if tp == 0 {
-        static_init(sp);
+        static_init(
+            sp,
+            #[cfg(target_os = "redox")]
+            thr_fd,
+        );
     }
 }
 

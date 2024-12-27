@@ -50,10 +50,10 @@ pub const AT_REDOX_INITIAL_DEFAULT_SCHEME_PTR: usize = 38;
 pub const AT_REDOX_INITIAL_DEFAULT_SCHEME_LEN: usize = 39;
 
 #[cfg(target_os = "redox")]
-pub const AT_REDOX_PROC_FD: usize = 39;
-
-#[cfg(target_os = "redox")]
-pub const AT_REDOX_THR_FD: usize = 39;
-
-#[cfg(target_os = "redox")]
 pub const AT_REDOX_UMASK: usize = 40;
+
+#[cfg(target_os = "redox")]
+pub const AT_REDOX_PROC_FD: usize = 41;
+
+#[cfg(target_os = "redox")]
+pub const AT_REDOX_THR_FD: usize = 42;

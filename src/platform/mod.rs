@@ -280,20 +280,39 @@ impl<T: Write> Write for CountingWriter<T> {
 // get_auxv.
 
 #[cold]
-pub unsafe fn get_auxvs(mut ptr: *const usize) -> Box<[[usize; 2]]> {
-    //traverse the stack and collect argument environment variables
-    let mut auxvs = Vec::new();
+unsafe fn auxv_iter<'a>(ptr: *const usize) -> impl Iterator<Item = [usize; 2]> + 'a {
+    struct St(*const usize);
+    impl Iterator for St {
+        type Item = [usize; 2];
 
-    while *ptr != self::auxv_defs::AT_NULL {
-        let kind = ptr.read();
-        ptr = ptr.add(1);
-        let value = ptr.read();
-        ptr = ptr.add(1);
-        auxvs.push([kind, value]);
+        fn next(&mut self) -> Option<Self::Item> {
+            unsafe {
+                if self.0.read() == self::auxv_defs::AT_NULL {
+                    return None;
+                }
+                let kind = self.0.read();
+                let value = self.0.add(1).read();
+                self.0 = self.0.add(2);
+
+                Some([kind, value])
+            }
+        }
     }
+    St(ptr)
+}
+
+#[cold]
+pub unsafe fn get_auxvs(ptr: *const usize) -> Box<[[usize; 2]]> {
+    //traverse the stack and collect argument environment variables
+    let mut auxvs = auxv_iter(ptr).collect::<Vec<_>>();
 
     auxvs.sort_unstable_by_key(|[kind, _]| *kind);
     auxvs.into_boxed_slice()
+}
+// TODO: Find an auxv replacement for Redox's execv protocol
+#[cold]
+pub unsafe fn get_auxv_raw(ptr: *const usize, requested_kind: usize) -> Option<usize> {
+    auxv_iter(ptr).find_map(|[kind, value]| Some(value).filter(|_| kind == requested_kind))
 }
 pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
     auxvs
@@ -311,13 +330,10 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
     use redox_rt::proc::FdGuard;
     use syscall::MODE_PERM;
 
-    let (Some(thr_fd), Some(proc_fd)) = (
-        get_auxv(&auxvs, AT_REDOX_THR_FD),
-        get_auxv(&auxvs, AT_REDOX_PROC_FD),
-    ) else {
+    let Some(proc_fd) = get_auxv(&auxvs, AT_REDOX_PROC_FD) else {
         panic!("Missing proc and thread fd!");
     };
-    redox_rt::initialize(FdGuard::new(proc_fd), FdGuard::new(thr_fd));
+    redox_rt::initialize(FdGuard::new(proc_fd));
 
     if let (Some(cwd_ptr), Some(cwd_len)) = (
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_PTR),

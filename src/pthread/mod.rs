@@ -210,19 +210,16 @@ unsafe extern "C" fn new_thread_shim(
     mutex1: *const Mutex<MaybeUninit<OsTid>>,
     mutex2: *const Mutex<u64>,
 ) -> ! {
+    let tid = (*(&*mutex1).lock()).assume_init();
+
     if let Some(tcb) = tcb.as_mut() {
-        tcb.activate();
+        tcb.activate(
+            #[cfg(target_os = "redox")]
+            redox_rt::proc::FdGuard::new(tid.thread_fd),
+        );
     }
 
     let procmask = (&*mutex2).as_ptr().read();
-    let tid = (*(&*mutex1).lock()).assume_init();
-
-    #[cfg(target_os = "redox")]
-    (*tcb)
-        .os_specific
-        .thr_fd
-        .get()
-        .write(Some(redox_rt::proc::FdGuard::new(tid.thread_fd)));
 
     if let Some(tcb) = tcb.as_mut() {
         tcb.copy_masters().unwrap();

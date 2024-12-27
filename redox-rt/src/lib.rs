@@ -183,15 +183,9 @@ pub(crate) fn read_proc_meta(proc: &FdGuard) -> syscall::Result<ProcMeta> {
     let _ = syscall::read(**proc, &mut bytes)?;
     Ok(*plain::from_bytes::<ProcMeta>(&bytes).unwrap())
 }
-pub unsafe fn initialize(
-    #[cfg(feature = "proc")] proc_fd: FdGuard,
-    #[cfg(feature = "proc")] thr_fd: FdGuard,
-) {
+pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
     #[cfg(feature = "proc")]
-    let metadata = {
-        RtTcb::current().thr_fd.get().write(Some(thr_fd));
-        read_proc_meta(&proc_fd).unwrap()
-    };
+    let metadata = read_proc_meta(&proc_fd).unwrap();
 
     #[cfg(not(feature = "proc"))]
     // Bootstrap mode, don't associate proc fds with PIDs

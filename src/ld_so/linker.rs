@@ -692,7 +692,10 @@ impl Linker {
                 tcb.append_masters(tcb_masters);
                 // Copy the master data into the static TLS block.
                 tcb.copy_masters().map_err(|_| DlError::Malformed)?;
-                tcb.activate();
+                tcb.activate(
+                    #[cfg(target_os = "redox")]
+                    todo!(),
+                );
 
                 #[cfg(target_os = "redox")]
                 {
