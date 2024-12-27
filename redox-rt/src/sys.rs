@@ -114,16 +114,24 @@ pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
     )
     .map(|awoken| awoken as u32)
 }
-pub fn sys_waitpid(pid: usize, status: &mut usize, flags: usize) -> Result<usize> {
-    wrapper(true, || unsafe {
-        let metadata = [ProcCall::Waitpid as usize, pid, flags];
+fn proc_call(payload: &mut [u8], flags: CallFlags, metadata: &[usize]) -> Result<usize> {
+    unsafe {
         syscall::syscall5(
             syscall::SYS_CALL,
             **crate::current_proc_fd(),
-            status as *mut usize as usize,
-            size_of::<usize>(),
-            metadata.len() | CallFlags::empty().bits(),
+            payload.as_mut_ptr() as usize,
+            payload.len(),
+            metadata.len() | flags.bits(),
             metadata.as_ptr() as usize,
+        )
+    }
+}
+pub fn sys_waitpid(pid: usize, status: &mut usize, flags: usize) -> Result<usize> {
+    wrapper(true, || {
+        proc_call(
+            unsafe { plain::as_mut_bytes(status) },
+            CallFlags::empty(),
+            &[ProcCall::Waitpid as usize, pid, flags],
         )
     })
 }
@@ -171,10 +179,15 @@ pub fn posix_getegid() -> u32 {
     DYNAMIC_PROC_INFO.lock().egid
 }
 pub fn posix_exit(status: i32) -> ! {
-    todo!("posix_exit")
+    todo!()
 }
 pub fn setrens(rns: usize, ens: usize) -> Result<()> {
-    todo!("setrens")
+    proc_call(
+        &mut [],
+        CallFlags::empty(),
+        &[ProcCall::Setrens as usize, rns, ens],
+    )?;
+    Ok(())
 }
 pub fn posix_getpgid(pid: usize) -> Result<usize> {
     todo!("posix_getpgid")

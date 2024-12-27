@@ -245,12 +245,11 @@ pub(crate) fn static_proc_info() -> &'static StaticProcInfo {
     unsafe { &*STATIC_PROC_INFO.get() }
 }
 #[inline]
-#[cfg(feature = "proc")]
 pub fn current_proc_fd() -> &'static FdGuard {
     static_proc_info()
         .proc_fd
         .as_ref()
-        .expect("must be present with proc feature")
+        .expect("proc fd must be present")
 }
 
 struct ChildHookCommonArgs {

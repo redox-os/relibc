@@ -16,12 +16,14 @@ unsafe impl plain::Plain for ProcMeta {}
 #[repr(usize)]
 pub enum ProcCall {
     Waitpid = 0,
+    Setrens = 1,
 }
 
 impl ProcCall {
     pub fn try_from_raw(raw: usize) -> Option<Self> {
         Some(match raw {
             0 => Self::Waitpid,
+            1 => Self::Setrens,
             _ => return None,
         })
     }
