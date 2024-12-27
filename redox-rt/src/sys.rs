@@ -8,7 +8,10 @@ use syscall::{
     RtSigInfo, TimeSpec,
 };
 
-use crate::{arch::manually_enter_trampoline, proc::FdGuard, signal::tmp_disable_signals, Tcb};
+use crate::{
+    arch::manually_enter_trampoline, proc::FdGuard, signal::tmp_disable_signals, Tcb,
+    DYNAMIC_PROC_INFO,
+};
 
 #[inline]
 fn wrapper<T>(restart: bool, mut f: impl FnMut() -> Result<T>) -> Result<T> {
@@ -152,16 +155,16 @@ pub fn posix_setresgid(rgid: Option<u32>, egid: Option<u32>, sgid: Option<u32>) 
     todo!("posix_setresgid")
 }
 pub fn posix_getruid() -> u32 {
-    todo!("posix_getruid")
+    DYNAMIC_PROC_INFO.lock().ruid
 }
 pub fn posix_getrgid() -> u32 {
-    todo!("posix_getrgid")
+    DYNAMIC_PROC_INFO.lock().rgid
 }
 pub fn posix_geteuid() -> u32 {
-    todo!("posix_geteuid")
+    DYNAMIC_PROC_INFO.lock().euid
 }
 pub fn posix_getegid() -> u32 {
-    todo!("posix_getegid")
+    DYNAMIC_PROC_INFO.lock().egid
 }
 pub fn posix_exit(status: i32) -> ! {
     todo!("posix_exit")
