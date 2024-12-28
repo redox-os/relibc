@@ -80,6 +80,7 @@ EXPECT_NAMES=\
 	string/memmem \
 	string/strcat \
 	string/strchr \
+	string/strchrnul \
 	string/strcpy \
 	string/strcspn \
 	string/strlen \
@@ -90,7 +91,10 @@ EXPECT_NAMES=\
 	string/strstr \
 	string/strtok \
 	string/strtok_r \
+	string/strsep \
 	string/strsignal \
+	string/stpcpy \
+	string/stpncpy \
 	strings \
 	sys_mman \
 	time/asctime \
