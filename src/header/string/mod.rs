@@ -52,7 +52,8 @@ pub unsafe extern "C" fn memchr(
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memcmp.html>.
 #[no_mangle]
-pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t) -> c_int {
+#[no_mangle]
+pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> c_int {
     let (div, rem) = (n / mem::size_of::<usize>(), n % mem::size_of::<usize>());
     let mut a = s1 as *const usize;
     let mut b = s2 as *const usize;
@@ -285,15 +286,44 @@ pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_v
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcpy.html>.
-// #[no_mangle]
-pub extern "C" fn stpcpy(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn stpcpy(mut s1: *mut c_char, mut s2: *const c_char) -> *mut c_char {
+    loop {
+        *s1 = *s2;
+
+        if *s1 == 0 {
+            break;
+        }
+
+        s1 = s1.add(1);
+        s2 = s2.add(1);
+    }
+
+    s1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncpy.html>.
-// #[no_mangle]
-pub extern "C" fn stpncpy(s1: *mut c_char, s2: *const c_char, n: size_t) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn stpncpy(
+    mut s1: *mut c_char,
+    mut s2: *const c_char,
+    mut n: size_t,
+) -> *mut c_char {
+    while n > 0 {
+        *s1 = *s2;
+
+        if *s1 == 0 {
+            break;
+        }
+
+        n -= 1;
+        s1 = s1.add(1);
+        s2 = s2.add(1);
+    }
+
+    memset(s1.cast(), 0, n);
+
+    s1
 }
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/strstr.3.html>.
@@ -328,6 +358,22 @@ pub unsafe extern "C" fn strchr(mut s: *const c_char, c: c_int) -> *mut c_char {
             None => ptr::null(),
         };
     ptr.cast_mut()
+}
+
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man3/strchr.3.html>.
+#[no_mangle]
+pub unsafe extern "C" fn strchrnul(s: *const c_char, c: c_int) -> *mut c_char {
+    let mut s = s.cast_mut();
+    loop {
+        if *s == c as _ {
+            break;
+        }
+        if *s == 0 {
+            break;
+        }
+        s = s.add(1);
+    }
+    s
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcmp.html>.
@@ -443,6 +489,23 @@ pub unsafe extern "C" fn strlcat(dst: *mut c_char, src: *const c_char, n: size_t
     strlcpy(d, src, n)
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn strsep(str_: *mut *mut c_char, sep: *const c_char) -> *mut c_char {
+    let s = *str_;
+    if s.is_null() {
+        return ptr::null_mut();
+    }
+    let mut end = s.add(strcspn(s, sep));
+    if *end != 0 {
+        *end = 0;
+        end = end.add(1);
+    } else {
+        end = ptr::null_mut();
+    }
+    *str_ = end;
+    s
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strlcat.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strlcpy(dst: *mut c_char, src: *const c_char, n: size_t) -> size_t {
@@ -467,7 +530,7 @@ pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncat.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: size_t) -> *mut c_char {
-    let len = strlen(s1 as *const c_char);
+    let len = strlen(s1.cast());
     let mut i = 0;
     while i < n {
         let b = *s2.add(i);
@@ -486,8 +549,8 @@ pub unsafe extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: size_t) 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncmp.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: size_t) -> c_int {
-    let s1 = core::slice::from_raw_parts(s1 as *const c_uchar, n);
-    let s2 = core::slice::from_raw_parts(s2 as *const c_uchar, n);
+    let s1 = slice::from_raw_parts(s1 as *const c_uchar, n);
+    let s2 = slice::from_raw_parts(s2 as *const c_uchar, n);
 
     for (&a, &b) in s1.iter().zip(s2.iter()) {
         let val = (a as c_int) - (b as c_int);
@@ -501,19 +564,9 @@ pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: size_t
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncpy.html>.
 #[no_mangle]
-pub unsafe extern "C" fn strncpy(dst: *mut c_char, src: *const c_char, n: size_t) -> *mut c_char {
-    let mut i = 0;
-
-    while *src.add(i) != 0 && i < n {
-        *dst.add(i) = *src.add(i);
-        i += 1;
-    }
-
-    for i in i..n {
-        *dst.add(i) = 0;
-    }
-
-    dst
+pub unsafe extern "C" fn strncpy(s1: *mut c_char, s2: *const c_char, n: size_t) -> *mut c_char {
+    stpncpy(s1, s2, n);
+    s1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strdup.html>.
