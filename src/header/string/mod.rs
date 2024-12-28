@@ -3,7 +3,6 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/string.h.html>.
 
 use core::{
-    cmp::Ordering,
     iter::{once, zip},
     mem::{self, MaybeUninit},
     ptr, slice, usize,
