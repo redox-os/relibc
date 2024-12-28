@@ -50,7 +50,7 @@ pub unsafe extern "C" fn memchr(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memcmp.html>.
 #[no_mangle]
 #[no_mangle]
-pub unsafe extern "C" fn mycmp2(s1: *const c_void, s2: *const c_void, n: usize) -> c_int {
+pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> c_int {
     let (div, rem) = (n / mem::size_of::<usize>(), n % mem::size_of::<usize>());
     let mut a = s1 as *const usize;
     let mut b = s2 as *const usize;
@@ -180,8 +180,19 @@ pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_v
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcpy.html>.
 #[no_mangle]
-pub unsafe extern "C" fn stpcpy(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
-    strcpy(s1, s2)
+pub unsafe extern "C" fn stpcpy(mut s1: *mut c_char, mut s2: *const c_char) -> *mut c_char {
+    loop {
+        *s1 = *s2;
+
+        if *s1 == 0 {
+            break;
+        }
+
+        s1 = s1.add(1);
+        s2 = s2.add(1);
+    }
+
+    s1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncpy.html>.
