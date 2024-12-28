@@ -305,7 +305,11 @@ pub unsafe extern "C" fn stpcpy(mut s1: *mut c_char, mut s2: *const c_char) -> *
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncpy.html>.
 #[no_mangle]
-pub unsafe extern "C" fn stpncpy(mut s1: *mut c_char, mut s2: *const c_char, mut n: size_t) -> *mut c_char {
+pub unsafe extern "C" fn stpncpy(
+    mut s1: *mut c_char,
+    mut s2: *const c_char,
+    mut n: size_t,
+) -> *mut c_char {
     while n > 0 {
         *s1 = *s2;
 
