@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 # Binaries that should generate the same output every time
 EXPECT_NAMES=(\

@@ -348,4 +348,4 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
     }
 }
 #[cfg(not(target_os = "redox"))]
-pub fn init(auxvs: Box<[[usize; 2]]>) {}
+pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {}

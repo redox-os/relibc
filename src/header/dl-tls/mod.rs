@@ -29,14 +29,14 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
         tcb.dtv_mut().unwrap().len()
     );
 
-    if tcb.dtv_mut().unwrap_or_default().len() < masters.len() {
+    if tcb.dtv_mut().len() < masters.len() {
         // Reallocate DTV.
         tcb.setup_dtv(masters.len());
     }
 
     let dtv_index = ti.ti_module as usize - 1;
 
-    if tcb.dtv_mut().unwrap()[dtv_index].is_null() {
+    if tcb.dtv_mut()[dtv_index].is_null() {
         // Allocate TLS for module.
         let master = &masters[dtv_index];
 
@@ -50,10 +50,10 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
         unsafe { core::ptr::copy_nonoverlapping(master.ptr, module_tls, master.len) };
 
         // Set the DTV entry.
-        tcb.dtv_mut().unwrap()[dtv_index] = module_tls;
+        tcb.dtv_mut()[dtv_index] = module_tls;
     }
 
-    let mut ptr = tcb.dtv_mut().unwrap()[dtv_index];
+    let mut ptr = tcb.dtv_mut()[dtv_index];
 
     if ptr.is_null() {
         panic!(

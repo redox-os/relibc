@@ -3,16 +3,29 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use core::{
-    ptr, str,
+    ptr::{self, NonNull},
+    str,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::{c_str::CStr, ld_so::tcb::Tcb, platform::types::*};
+use alloc::sync::Arc;
 
-pub const RTLD_LAZY: c_int = 0x0001;
-pub const RTLD_NOW: c_int = 0x0002;
-pub const RTLD_GLOBAL: c_int = 0x0100;
+use crate::{
+    c_str::CStr,
+    ld_so::{
+        linker::{ObjectHandle, ObjectScope, Resolve},
+        tcb::Tcb,
+    },
+    platform::types::*,
+};
+
+pub const RTLD_LAZY: c_int = 1 << 0;
+pub const RTLD_NOW: c_int = 1 << 1;
+pub const RTLD_NOLOAD: c_int = 1 << 2;
+pub const RTLD_GLOBAL: c_int = 1 << 8;
 pub const RTLD_LOCAL: c_int = 0x0000;
+
+pub const RTLD_DEFAULT: *mut c_void = 0 as *mut c_void; // XXX: cbindgen doesn't like ptr::null_mut()
 
 static ERROR_NOT_SUPPORTED: CStr = c_str!("dlfcn not supported");
 
@@ -42,6 +55,19 @@ pub unsafe extern "C" fn dladdr(addr: *mut c_void, info: *mut Dl_info) -> c_int 
 #[no_mangle]
 pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut c_void {
     //TODO support all sort of flags
+    let resolve = if flags & RTLD_NOW == RTLD_NOW {
+        Resolve::Now
+    } else {
+        Resolve::Lazy
+    };
+
+    let scope = if flags & RTLD_GLOBAL == RTLD_GLOBAL {
+        ObjectScope::Global
+    } else {
+        ObjectScope::Local
+    };
+
+    let noload = flags & RTLD_NOLOAD == RTLD_NOLOAD;
 
     let filename = if cfilename.is_null() {
         None
@@ -69,19 +95,19 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
 
-    let id = match (cbs.load_library)(&mut linker, filename) {
-        Err(err) => {
+    match (cbs.load_library)(&mut linker, filename, resolve, scope, noload) {
+        Ok(handle) => handle.as_ptr().cast_mut(),
+        Err(error) => {
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
-            return ptr::null_mut();
+            ptr::null_mut()
         }
-        Ok(id) => id,
-    };
-
-    id as *mut c_void
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void {
+    let handle = ObjectHandle::from_ptr(handle);
+
     if symbol.is_null() {
         ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
         return ptr::null_mut();
@@ -89,6 +115,9 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
 
     let symbol_str = unsafe { str::from_utf8_unchecked(CStr::from_ptr(symbol).to_bytes()) };
 
+    // FIXME(andypython): just call obj.scope.get_sym() directly or search the
+    // global scope.  The rest is unnecessary as Linker::get_sym() does not
+    // depend on the Linker state.
     let tcb = match unsafe { Tcb::current() } {
         Some(tcb) => tcb,
         None => {
@@ -105,7 +134,7 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
     let linker = unsafe { (&*tcb.linker_ptr).lock() };
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
-    match (cbs.get_sym)(&linker, handle as usize, symbol_str) {
+    match (cbs.get_sym)(&linker, handle, symbol_str) {
         Some(sym) => sym,
         _ => {
             ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
@@ -128,10 +157,16 @@ pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
         ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
         return -1;
     };
+
+    let Some(handle) = ObjectHandle::from_ptr(handle) else {
+        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+        return -1;
+    };
+
     let mut linker = unsafe { (&*tcb.linker_ptr).lock() };
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
-    (cbs.unload)(&mut linker, handle as usize);
+    (cbs.unload)(&mut linker, handle);
     0
 }
 

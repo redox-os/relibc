@@ -76,6 +76,7 @@ EXPECT_NAMES=\
 	stdlib/strtoul \
 	stdlib/system \
 	string/mem \
+	string/memcpy \
 	string/memmem \
 	string/strcat \
 	string/strchr \
@@ -162,7 +163,8 @@ EXPECT_NAMES=\
 BUILD?=.
 
 DYNAMIC_ONLY_NAMES=\
-	dlfcn
+	dlfcn \
+	dlopen_scopes
 
 # Binaries that may generate varied output
 NAMES=\
@@ -326,7 +328,16 @@ $(BUILD)/bins_dynamic/%.so: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) "$<" -o "$@" -shared -fpic $(FLAGS) $(DYNAMIC_FLAGS)
 
+# foobar depends on foo
+$(BUILD)/bins_dynamic/libfoobar.so: libfoobar.c $(BUILD)/bins_dynamic/libfoo.so $(DEPS)
+	mkdir -p "$$(dirname "$@")"
+	$(CC) "$<" -o "$@" -shared -fpic $(FLAGS) $(DYNAMIC_FLAGS) -L $(BUILD)/bins_dynamic -lfoo
+
 $(BUILD)/bins_dynamic/dlfcn: dlfcn.c $(BUILD)/bins_dynamic/sharedlib.so $(DEPS)
+	mkdir -p "$$(dirname "$@")"
+	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
+
+$(BUILD)/bins_dynamic/dlopen_scopes: dlopen_scopes.c $(BUILD)/bins_dynamic/libfoobar.so $(BUILD)/bins_dynamic/libfoo.so $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
 
