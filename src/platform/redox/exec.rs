@@ -135,7 +135,7 @@ pub fn execve(
         .unwrap_or_else(|| Box::from("file"))
         .into();
 
-    // Count arguments
+    // Count arguments for `exec` which is different from the interpreter's args
     let mut len = 0;
 
     match arg_env {
@@ -180,10 +180,45 @@ pub fn execve(
         // TODO: Does this support prepending args to the interpreter? E.g.
         // #!/usr/bin/env python3
 
+        let mut reader = BufReader::new(&mut image_file);
+        // Skip prepended whitespace for interpreter
+        // Ex: #! /usr/bin/python
+        loop {
+            // Fail if the buffer is exhausted (in other words, it's all whitespace)
+            let buf = reader.fill_buf().map_err(|_| Error::new(ENOEXEC))?;
+            let mut skip = 0;
+            for byte in buf {
+                if !byte.is_ascii_whitespace() {
+                    break;
+                }
+                skip += 1;
+            }
+
+            match skip {
+                // Normal case: No whitespace
+                0 => break,
+                // Normal case: some whitespace; buffer isn't consumed
+                // Example: "#! /bin/sh"
+                n if n < buf.len() => {
+                    reader.consume(n);
+                    break;
+                }
+                // Edge case: entire internal buffer is whitespace.
+                // In this situation, we loop again until either the reader is exhausted or we
+                // find bytes that aren't whitespace
+                // Example: "#!          /bin/sh"
+                // With a buffer containing bytes [1, 11]
+                n => {
+                    reader.consume(n);
+                }
+            }
+        }
+
         // So, this file is interpreted.
-        // Then, read the actual interpreter:
+        // Then, read the actual interpreter and its args:
         let mut interpreter = Vec::new();
-        BufReader::new(&mut image_file)
+        // BufReader::new(&mut image_file)
+        reader
             .read_until(b'\n', &mut interpreter)
             .map_err(|_| Error::new(EIO))?;
         if interpreter.ends_with(&[b'\n']) {
