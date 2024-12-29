@@ -183,41 +183,22 @@ pub fn execve(
         let mut reader = BufReader::new(&mut image_file);
         // Skip prepended whitespace for interpreter
         // Ex: #! /usr/bin/python
-        loop {
-            // Fail if the buffer is exhausted (in other words, it's all whitespace)
-            let buf = reader.fill_buf().map_err(|_| Error::new(ENOEXEC))?;
-            let mut skip = 0;
-            for byte in buf {
-                if !byte.is_ascii_whitespace() {
-                    break;
-                }
-                skip += 1;
-            }
-
-            match skip {
-                // Normal case: No whitespace
-                0 => break,
-                // Normal case: some whitespace; buffer isn't consumed
-                // Example: "#! /bin/sh"
-                n if n < buf.len() => {
-                    reader.consume(n);
-                    break;
-                }
-                // Edge case: entire internal buffer is whitespace.
-                // In this situation, we loop again until either the reader is exhausted or we
-                // find bytes that aren't whitespace
-                // Example: "#!          /bin/sh"
-                // With a buffer containing bytes [1, 11]
-                n => {
-                    reader.consume(n);
-                }
-            }
-        }
+        let pos = (&mut reader)
+            .bytes()
+            .position(|byte| byte.ok().is_some_and(|byte| !byte.is_ascii_whitespace()))
+            .and_then(|pos| (pos + 2).try_into().ok())
+            // Fail if all whitespace or empty
+            .ok_or_else(|| Error::new(ENOEXEC))?;
+        // We read the non-whitespace character which sets reader position one past it.
+        // Seeking back to that position is essentially free since reads are buffered and it's
+        // unlikely that there was enough whitespace that we performed multiple reads.
+        reader
+            .seek(SeekFrom::Start(pos))
+            .map_err(|_| Error::new(EIO))?;
 
         // So, this file is interpreted.
         // Then, read the actual interpreter and its args:
         let mut interpreter = Vec::new();
-        // BufReader::new(&mut image_file)
         reader
             .read_until(b'\n', &mut interpreter)
             .map_err(|_| Error::new(EIO))?;
