@@ -1,12 +1,14 @@
 //! time implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/time.h.html
 
-use core::convert::{TryFrom, TryInto};
-
 use crate::{
+    c_str::CStr,
     error::ResultExt,
-    header::errno::EOVERFLOW,
+    header::{errno::EOVERFLOW, stdlib::getenv, unistd::readlink},
     platform::{self, types::*, Pal, Sys},
 };
+use chrono::{offset::LocalResult, Datelike, Offset, TimeZone, Timelike};
+use chrono_tz::Tz;
+use core::convert::{TryFrom, TryInto};
 
 pub use self::constants::*;
 
@@ -57,17 +59,17 @@ impl<'a> From<&'a timespec> for syscall::TimeSpec {
 
 #[repr(C)]
 pub struct tm {
-    pub tm_sec: c_int,
-    pub tm_min: c_int,
-    pub tm_hour: c_int,
-    pub tm_mday: c_int,
-    pub tm_mon: c_int,
-    pub tm_year: c_int,
-    pub tm_wday: c_int,
-    pub tm_yday: c_int,
-    pub tm_isdst: c_int,
-    pub tm_gmtoff: c_long,
-    pub tm_zone: *const c_char,
+    pub tm_sec: c_int,          // 0 - 60
+    pub tm_min: c_int,          // 0 - 59
+    pub tm_hour: c_int,         // 0 - 23
+    pub tm_mday: c_int,         // 1 - 31
+    pub tm_mon: c_int,          // 0 - 11
+    pub tm_year: c_int,         // years since 1900
+    pub tm_wday: c_int,         // 0 - 6 (Sunday - Saturday)
+    pub tm_yday: c_int,         // 0 - 365
+    pub tm_isdst: c_int,        // >0 if DST, 0 if not, <0 if unknown
+    pub tm_gmtoff: c_long,      // offset from UTC in seconds
+    pub tm_zone: *const c_char, // timezone abbreviation
 }
 
 unsafe impl Sync for tm {}
@@ -415,10 +417,87 @@ pub unsafe extern "C" fn localtime(clock: *const time_t) -> *mut tm {
     localtime_r(clock, &mut TM)
 }
 
+fn get_system_time_zone<'a>() -> Option<&'a str> {
+    // Resolve the symlink for localtime
+    const BSIZE: size_t = 64;
+    let mut buffer: [u8; BSIZE] = [0; BSIZE];
+
+    #[cfg(not(target_os = "redox"))]
+    let (localtime, prefix) = (c"/etc/localtime", "/usr/share/zoneinfo/");
+
+    #[cfg(target_os = "redox")]
+    let (localtime, prefix) = (c"/etc/localtime", "/usr/share/zoneinfo/");
+
+    if unsafe { readlink(localtime.as_ptr().cast(), buffer.as_mut_ptr().cast(), BSIZE) } == -1 {
+        return None;
+    }
+
+    let path = unsafe { CStr::from_ptr(buffer.as_mut_ptr().cast()) };
+
+    if let Ok(tz_name) = path.to_str() {
+        if let Some(stripped) = tz_name.strip_prefix(prefix) {
+            return Some(stripped);
+        }
+    }
+
+    None
+}
+
+fn get_current_time_zone<'a>() -> &'a str {
+    // Check the `TZ` environment variable
+    let tz_env = unsafe { getenv(b"TZ\0".as_ptr() as _) };
+    if !tz_env.is_null() {
+        if let Ok(tz) = unsafe { CStr::from_ptr(tz_env) }.to_str() {
+            return tz;
+        }
+    }
+
+    // Fallback to the system's default time zone
+    if let Some(tz) = get_system_time_zone() {
+        return tz;
+    }
+
+    // If all else fails, use UTC
+    "UTC"
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
-    // TODO: Change tm_isdst, tm_gmtoff, tm_zone
-    gmtime_r(clock, t)
+    let utc_time = *clock;
+    let tz_name = get_current_time_zone();
+
+    // Parse the time zone name
+    let tz: Tz = tz_name.parse().unwrap_or(Tz::UTC);
+
+    // Convert UTC time to local time
+    let local_time = match tz.timestamp_opt(utc_time, 0) {
+        LocalResult::Single(t) => t,
+        LocalResult::Ambiguous(t1, _) => t1,
+        LocalResult::None => return t,
+    };
+
+    // Populate the `tm` structure
+    (*t).tm_sec = local_time.second() as c_int;
+    (*t).tm_min = local_time.minute() as c_int;
+    (*t).tm_hour = local_time.hour() as c_int;
+    (*t).tm_mday = local_time.day() as c_int;
+    (*t).tm_mon = local_time.month0() as c_int; // 0-based month
+    (*t).tm_year = (local_time.year() - 1900) as c_int; // Years since 1900
+    (*t).tm_wday = local_time.weekday().num_days_from_sunday() as c_int;
+    (*t).tm_yday = local_time.ordinal0() as c_int; // 0-based day of year
+
+    // Determine if DST is in effect
+    // Check if abbreviation ends with "DT" (e.g., EDT, PDT)
+    let is_dst = local_time.timezone().name().ends_with("DT");
+    (*t).tm_isdst = if is_dst { 1 } else { 0 };
+
+    // Get the UTC offset in seconds
+    (*t).tm_gmtoff = local_time.offset().fix().local_minus_utc() as c_long;
+
+    // Set the time zone abbreviation
+    (*t).tm_zone = local_time.timezone().name().as_ptr().cast();
+
+    t
 }
 
 #[no_mangle]
