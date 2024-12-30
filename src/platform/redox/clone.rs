@@ -9,5 +9,4 @@ use syscall::{
 
 use redox_rt::{proc::FdGuard, signal::sighandler_function};
 
-pub use redox_rt::proc::*;
-pub use redox_rt::thread::*;
+pub use redox_rt::{proc::*, thread::*};

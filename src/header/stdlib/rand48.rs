@@ -2,7 +2,10 @@
 
 use crate::{
     platform::types::*,
-    sync::{rwlock::{self, RwLock}, Mutex, MutexGuard},
+    sync::{
+        rwlock::{self, RwLock},
+        Mutex, MutexGuard,
+    },
 };
 
 /// A 48-bit integer, used for the 48-bit arithmetic in these functions.

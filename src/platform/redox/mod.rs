@@ -15,7 +15,6 @@ use crate::{
     c_str::{CStr, CString},
     error::{self, Errno, Result, ResultExt},
     fs::File,
-    sync::rwlock::RwLock,
     header::{
         dirent::dirent,
         errno::{
@@ -35,6 +34,7 @@ use crate::{
         unistd::{F_OK, R_OK, W_OK, X_OK},
     },
     io::{self, prelude::*, BufReader},
+    sync::rwlock::RwLock,
 };
 
 pub use redox_rt::proc::FdGuard;
