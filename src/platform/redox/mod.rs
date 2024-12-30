@@ -15,6 +15,7 @@ use crate::{
     c_str::{CStr, CString},
     error::{self, Errno, Result, ResultExt},
     fs::File,
+    sync::rwlock::RwLock,
     header::{
         dirent::dirent,
         errno::{
@@ -74,6 +75,8 @@ macro_rules! path_from_c_str {
 }
 
 use self::{exec::Executable, path::canonicalize};
+
+static CLONE_LOCK: RwLock<()> = RwLock::new(());
 
 /// Redox syscall implementation of the platform abstraction layer.
 pub struct Sys;
@@ -260,7 +263,7 @@ impl Pal for Sys {
 
     unsafe fn fork() -> Result<pid_t> {
         // TODO: Find way to avoid lock.
-        let _guard = clone::wrlock();
+        let _guard = CLONE_LOCK.write();
 
         Ok(clone::fork_impl()? as pid_t)
     }
@@ -726,7 +729,7 @@ impl Pal for Sys {
     }
 
     unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
-        let _guard = clone::rdlock();
+        let _guard = CLONE_LOCK.read();
         let res = clone::rlct_clone_impl(stack);
 
         res.map(|mut fd| crate::pthread::OsTid {
