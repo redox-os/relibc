@@ -7,13 +7,13 @@ use syscall::{
     SetSighandlerData, SIGCONT,
 };
 
-use crate::sync::rwlock::Rwlock;
+use crate::sync::rwlock::RwLock;
 
 use redox_rt::{proc::FdGuard, signal::sighandler_function};
 
 pub use redox_rt::proc::*;
 
-static CLONE_LOCK: Rwlock = Rwlock::new(crate::pthread::Pshared::Private);
+static CLONE_LOCK: RwLock = RwLock::new(crate::pthread::Pshared::Private);
 
 struct Guard;
 impl Drop for Guard {
