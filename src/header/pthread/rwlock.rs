@@ -114,7 +114,7 @@ pub unsafe extern "C" fn pthread_rwlock_destroy(rwlock: *mut pthread_rwlock_t) -
     0
 }
 
-pub(crate) type RlctRwlock = crate::sync::rwlock::Rwlock;
+pub(crate) type RlctRwlock = crate::sync::rwlock::InnerRwLock;
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct RlctRwlockAttr {

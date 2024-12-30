@@ -32,6 +32,7 @@
 #![feature(sync_unsafe_cell)]
 #![feature(thread_local)]
 #![feature(vec_into_raw_parts)]
+#![feature(negative_impls)]
 #![allow(clippy::cast_lossless)]
 #![allow(clippy::cast_ptr_alignment)]
 #![allow(clippy::derive_hash_xor_eq)]
