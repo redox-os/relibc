@@ -101,6 +101,7 @@ EXPECT_NAMES=\
 	time/constants \
 	time/gmtime \
 	time/localtime \
+	time/localtime_r \
 	time/macros \
 	time/mktime \
 	time/strftime \
