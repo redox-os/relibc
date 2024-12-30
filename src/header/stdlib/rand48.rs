@@ -2,7 +2,10 @@
 
 use crate::{
     platform::types::*,
-    sync::{Mutex, MutexGuard},
+    sync::{
+        rwlock::{self, RwLock},
+        Mutex, MutexGuard,
+    },
 };
 
 /// A 48-bit integer, used for the 48-bit arithmetic in these functions.
@@ -119,13 +122,19 @@ impl Params {
     }
 }
 
-// TODO: consider using rwlock instead of mutex for more fine-grained access
-/// Immediately get the global Params lock, or panic if unsuccessful.
-pub fn params_lock<'a>() -> MutexGuard<'a, Params> {
-    static PARAMS: Mutex<Params> = Mutex::<Params>::new(Params::new());
+static PARAMS: RwLock<Params> = RwLock::<Params>::new(Params::new());
 
+/// Immediately get the global [`Params`] lock for reading, or panic if unsuccessful.
+pub fn params<'a>() -> rwlock::ReadGuard<'a, Params> {
     PARAMS
-        .try_lock()
+        .try_read()
+        .expect("unable to acquire LCG parameter lock")
+}
+
+/// Immediately get the global [`Params`] lock for writing, or panic if unsuccessful.
+pub fn params_mut<'a>() -> rwlock::WriteGuard<'a, Params> {
+    PARAMS
+        .try_write()
         .expect("unable to acquire LCG parameter lock")
 }
 

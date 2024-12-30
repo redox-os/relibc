@@ -29,7 +29,7 @@ use crate::{
         types::{c_char, c_int, c_uint, c_void},
         Pal, Sys,
     },
-    sync::Mutex,
+    sync::rwlock::RwLock,
 };
 
 use super::{
@@ -49,7 +49,7 @@ use super::{
 // do better errors than just goblin::Error::Malformed
 
 // TODO: rwlock?
-static GLOBAL_SCOPE: Mutex<Scope> = Mutex::new(Scope::global());
+static GLOBAL_SCOPE: RwLock<Scope> = RwLock::new(Scope::global());
 
 /// Same as [`crate::fs::File`], but does not touch [`crate::platform::ERRNO`] as the dynamic
 /// linker does not have thread-local storage.
@@ -371,7 +371,7 @@ impl Linker {
                             eprintln!("[ld.so]: moving {} into the global scope", obj.name);
                         }
 
-                        let mut global_scope = GLOBAL_SCOPE.lock();
+                        let mut global_scope = GLOBAL_SCOPE.write();
                         obj.scope.move_into(&mut global_scope);
                     }
 
@@ -419,8 +419,8 @@ impl Linker {
         if let Some(handle) = handle.as_ref() {
             &handle.as_ref().scope
         } else {
-            guard = GLOBAL_SCOPE.lock();
-            &*guard
+            guard = GLOBAL_SCOPE.read();
+            &guard
         }
         .get_sym(name)
         .map(|(symbol, _, obj)| {
@@ -454,7 +454,7 @@ impl Linker {
         // objects map.
         if Arc::strong_count(&obj) == 2 {
             // Remove from the global scope.
-            match *GLOBAL_SCOPE.lock() {
+            match *GLOBAL_SCOPE.write() {
                 Scope::Global { ref mut objs } => {
                     objs.retain(|o| !Weak::ptr_eq(o, &Arc::downgrade(&obj)));
                 }
@@ -713,10 +713,10 @@ impl Linker {
         if let Some(dependent) = dependent {
             match scope {
                 ObjectScope::Local => dependent.scope.add(&obj),
-                ObjectScope::Global => GLOBAL_SCOPE.lock().add(&obj),
+                ObjectScope::Global => GLOBAL_SCOPE.write().add(&obj),
             }
         } else if let ObjectScope::Global = scope {
-            GLOBAL_SCOPE.lock().add(&obj);
+            GLOBAL_SCOPE.write().add(&obj);
         }
 
         objects_data.push(data);
@@ -817,7 +817,7 @@ impl Linker {
                             )))?;
 
                     let resolved = GLOBAL_SCOPE
-                        .lock()
+                        .read()
                         .get_sym(name)
                         .or_else(|| obj.scope.get_sym(name))
                         .map(|(sym, _, _)| sym.as_ptr())
@@ -869,7 +869,7 @@ impl Linker {
                     )))?;
 
                 let symbol = GLOBAL_SCOPE
-                    .lock()
+                    .read()
                     .get_sym(name)
                     .or_else(|| obj.scope.get_sym(name))
                     .map(|(sym, _, obj)| (sym, obj.tls_offset));
@@ -1067,7 +1067,7 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
         )
     };
 
-    let resolved = resolve_sym(name.to_str().unwrap(), &[&GLOBAL_SCOPE.lock(), &obj.scope])
+    let resolved = resolve_sym(name.to_str().unwrap(), &[&GLOBAL_SCOPE.read(), &obj.scope])
         .expect(&format!("symbol '{}' not found", name.to_str().unwrap()))
         .as_ptr();
 
