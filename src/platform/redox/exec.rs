@@ -135,7 +135,7 @@ pub fn execve(
         .unwrap_or_else(|| Box::from("file"))
         .into();
 
-    // Count arguments
+    // Count arguments for `exec` which is different from the interpreter's args
     let mut len = 0;
 
     match arg_env {
@@ -180,10 +180,26 @@ pub fn execve(
         // TODO: Does this support prepending args to the interpreter? E.g.
         // #!/usr/bin/env python3
 
+        let mut reader = BufReader::new(&mut image_file);
+        // Skip prepended whitespace for interpreter
+        // Ex: #! /usr/bin/python
+        let pos = (&mut reader)
+            .bytes()
+            .position(|byte| byte.ok().is_some_and(|byte| !byte.is_ascii_whitespace()))
+            .and_then(|pos| (pos + 2).try_into().ok())
+            // Fail if all whitespace or empty
+            .ok_or_else(|| Error::new(ENOEXEC))?;
+        // We read the non-whitespace character which sets reader position one past it.
+        // Seeking back to that position is essentially free since reads are buffered and it's
+        // unlikely that there was enough whitespace that we performed multiple reads.
+        reader
+            .seek(SeekFrom::Start(pos))
+            .map_err(|_| Error::new(EIO))?;
+
         // So, this file is interpreted.
-        // Then, read the actual interpreter:
+        // Then, read the actual interpreter and its args:
         let mut interpreter = Vec::new();
-        BufReader::new(&mut image_file)
+        reader
             .read_until(b'\n', &mut interpreter)
             .map_err(|_| Error::new(EIO))?;
         if interpreter.ends_with(&[b'\n']) {
