@@ -176,6 +176,22 @@ impl<T: ?Sized> RwLock<T> {
         self.inner.acquire_write_lock(None);
         unsafe { WriteGuard::new(self) }
     }
+
+    pub fn try_read(&self) -> Option<ReadGuard<'_, T>> {
+        if self.inner.try_acquire_read_lock().is_ok() {
+            Some(unsafe { ReadGuard::new(self) })
+        } else {
+            None
+        }
+    }
+
+    pub fn try_write(&self) -> Option<WriteGuard<'_, T>> {
+        if self.inner.try_acquire_write_lock().is_ok() {
+            Some(unsafe { WriteGuard::new(self) })
+        } else {
+            None
+        }
+    }
 }
 
 pub struct ReadGuard<'a, T: ?Sized + 'a> {
