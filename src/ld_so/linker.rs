@@ -272,6 +272,7 @@ impl Config {
                         "baseaddr" => DebugFlags::BASE_ADDRESS,
                         "search" => DebugFlags::SEARCH,
                         "scopes" => DebugFlags::SCOPES,
+                        "all" => DebugFlags::all(),
                         _ => {
                             eprintln!("[ld.so]: unknown debug flag '{}'", opt);
                             DebugFlags::empty()
