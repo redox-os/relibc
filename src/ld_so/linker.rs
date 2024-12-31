@@ -10,10 +10,7 @@ use core::{
     mem::transmute,
     ptr::{self, NonNull},
 };
-use goblin::{
-    elf::{dynamic::DT_STRTAB, program_header, reloc, sym::STT_TLS, Elf},
-    error::{Error, Result},
-};
+use goblin::elf::{dynamic::DT_STRTAB, program_header, reloc, sym::STT_TLS, Elf};
 
 use crate::{
     c_str::{CStr, CString},
@@ -41,14 +38,37 @@ use super::{
     PATH_SEP,
 };
 
-// FIXME: ERROR HANDLING IS WRONG!
-// load_library may return an error which may have some variants heap allocated.
-// eg Error::Malformed(String::from("failed to locate 'libfoo.so'"))
-// therefore dropping it in dlopen would cause heap corruption as it was allocated
-// by the dynamic linker's and was freed by the program.
-// do better errors than just goblin::Error::Malformed
+#[derive(Debug, Copy, Clone)]
+pub enum DlError {
+    /// Failed to locate the requested DSO.
+    NotFound,
+    /// The DSO is malformed somehow.
+    Malformed,
+    /// Invalid DSO handle.
+    InvalidHandle,
+}
 
-// TODO: rwlock?
+impl DlError {
+    /// Returns a human-readable, null-terminated C string describing the error.
+    pub fn repr(&self) -> CStr<'static> {
+        match self {
+            DlError::NotFound => c_str!(
+                "Failed to locate the requested DSO. Set `LD_DEBUG=all` for more information."
+            ),
+
+            DlError::Malformed => {
+                c_str!("The DSO is malformed somehow. Set `LD_DEBUG=all` for more information.")
+            }
+
+            DlError::InvalidHandle => {
+                c_str!("Invalid DSO handle. Set `LD_DEBUG=all` for more information.")
+            }
+        }
+    }
+}
+
+pub type Result<T> = core::result::Result<T, DlError>;
+
 static GLOBAL_SCOPE: RwLock<Scope> = RwLock::new(Scope::global());
 
 /// Same as [`crate::fs::File`], but does not touch [`crate::platform::ERRNO`] as the dynamic
@@ -139,9 +159,9 @@ impl Scope {
     fn add(&mut self, target: &Arc<DSO>) {
         match self {
             Self::Global { objs } => {
-                let target = Arc::downgrade(&target);
+                let target = Arc::downgrade(target);
                 for obj in objs.iter() {
-                    if Weak::ptr_eq(&obj, &target) {
+                    if Weak::ptr_eq(obj, &target) {
                         return;
                     }
                 }
@@ -151,7 +171,7 @@ impl Scope {
 
             Self::Local { objs, .. } => {
                 for obj in objs.iter() {
-                    if Arc::ptr_eq(obj, &target) {
+                    if Arc::ptr_eq(obj, target) {
                         return;
                     }
                 }
@@ -190,7 +210,7 @@ impl Scope {
                     .find_map(get_sym)
             }
         }
-        .or_else(|| res)
+        .or(res)
     }
 
     fn move_into(&self, other: &mut Self) {
@@ -199,7 +219,7 @@ impl Scope {
             (Self::Local { owner, objs }, Self::Global { objs: other_objs }) => {
                 let owner = owner.as_ref().expect("local scope without owner");
                 other_objs.push(owner.clone());
-                other_objs.extend(objs.iter().map(|o| Arc::downgrade(o)));
+                other_objs.extend(objs.iter().map(Arc::downgrade));
             }
 
             _ => unreachable!(),
@@ -220,7 +240,7 @@ impl ObjectHandle {
     }
 
     #[inline]
-    fn into_inner(&self) -> Arc<DSO> {
+    fn into_inner(self) -> Arc<DSO> {
         unsafe { Arc::from_raw(self.0) }
     }
 
@@ -246,7 +266,7 @@ bitflags::bitflags! {
     #[derive(Debug, Default)]
     pub struct DebugFlags: u32 {
         /// Display what objects and where they are being loaded.
-        const BASE_ADDRESS = 1 << 1;
+        const LOAD = 1 << 1;
         /// Display library search paths.
         const SEARCH = 1 << 2;
         /// Display scope information.
@@ -270,9 +290,10 @@ impl Config {
                 let mut flags = DebugFlags::empty();
                 for opt in value.split(',') {
                     flags |= match opt {
-                        "baseaddr" => DebugFlags::BASE_ADDRESS,
+                        "load" => DebugFlags::LOAD,
                         "search" => DebugFlags::SEARCH,
                         "scopes" => DebugFlags::SCOPES,
+                        "all" => DebugFlags::all(),
                         _ => {
                             eprintln!("[ld.so]: unknown debug flag '{}'", opt);
                             DebugFlags::empty()
@@ -526,7 +547,7 @@ impl Linker {
                     use redox_rt::signal::tmp_disable_signals;
 
                     let old_tcb = Tcb::current().expect("failed to get bootstrap TCB");
-                    let new_tcb = Tcb::new(self.tls_size)?; // This actually allocates TCB, TLS and ABI page.
+                    let new_tcb = Tcb::new(self.tls_size).map_err(|_| DlError::Malformed)?; // This actually allocates TCB, TLS and ABI page.
 
                     // Stash
                     let new_tls_end = new_tcb.generic.tls_end;
@@ -567,7 +588,7 @@ impl Linker {
                 };
 
                 #[cfg(not(target_os = "redox"))]
-                let tcb = Tcb::new(self.tls_size)?;
+                let tcb = Tcb::new(self.tls_size).map_err(|_| DlError::Malformed)?;
 
                 // We are now loading the main program or its dependencies. The TLS for all initially
                 // loaded objects reside in the static TLS block. Depending on the architecture, the
@@ -601,7 +622,7 @@ impl Linker {
 
                 tcb.append_masters(tcb_masters);
                 // Copy the master data into the static TLS block.
-                tcb.copy_masters()?;
+                tcb.copy_masters().map_err(|_| DlError::Malformed)?;
                 tcb.activate();
 
                 #[cfg(target_os = "redox")]
@@ -657,8 +678,10 @@ impl Linker {
             return Ok(obj.clone());
         }
 
+        let debug = self.config.debug_flags.contains(DebugFlags::LOAD);
+
         let path = self.search_object(name, parent_runpath)?;
-        let data = Linker::read_file(&path)?;
+        let data = self.read_file(&path)?;
         let (mut obj, tcb_master) = DSO::new(
             &path,
             &data,
@@ -667,9 +690,16 @@ impl Linker {
             self.next_object_id,
             self.next_tls_module_id,
             self.tls_size,
-        )?;
+        )
+        .map_err(|err| {
+            if debug {
+                eprintln!("[ld.so]: failed to load '{}': {}", name, err)
+            }
 
-        if self.config.debug_flags.contains(DebugFlags::BASE_ADDRESS) {
+            DlError::Malformed
+        })?;
+
+        if debug {
             eprintln!(
                 "[ld.so]: loading object: {} at {:#x}",
                 name,
@@ -760,18 +790,41 @@ impl Linker {
             }
         }
 
-        Err(Error::Malformed(format!("failed to locate '{}'", name)))
+        if debug {
+            eprintln!("[ld.so]: failed to locate '{}'", name);
+        }
+
+        Err(DlError::NotFound)
     }
 
-    fn read_file(path: &str) -> Result<Vec<u8>> {
+    fn read_file(&self, path: &str) -> Result<Vec<u8>> {
+        let debug = self.config.debug_flags.contains(DebugFlags::SEARCH);
+
         let mut data = Vec::new();
-        let path_c = CString::new(path)
-            .map_err(|err| Error::Malformed(format!("invalid path '{}': {}", path, err)))?;
+        let path_c = CString::new(path).map_err(|err| {
+            if debug {
+                eprintln!("[ld.so]: invalid path '{}': {}", path, err)
+            }
+
+            DlError::NotFound
+        })?;
+
         let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
-        let mut file = File::open(CStr::borrow(&path_c), flags)
-            .map_err(|err| Error::Malformed(format!("failed to open '{}': {}", path, err)))?;
-        file.read_to_end(&mut data)
-            .map_err(|err| Error::Malformed(format!("failed to read '{}': {}", path, err)))?;
+        let mut file = File::open(CStr::borrow(&path_c), flags).map_err(|err| {
+            if debug {
+                eprintln!("[ld.so]: failed to open '{}': {}", path, err)
+            }
+
+            DlError::NotFound
+        })?;
+
+        file.read_to_end(&mut data).map_err(|err| {
+            if debug {
+                eprintln!("[ld.so]: failed to read '{}': {}", path, err)
+            }
+
+            DlError::NotFound
+        })?;
 
         Ok(data)
     }
@@ -780,6 +833,7 @@ impl Linker {
     fn lazy_relocate(&self, obj: &Arc<DSO>, elf: &Elf, resolve: Resolve) -> Result<()> {
         let Some(got) = obj.got() else { return Ok(()) };
         let object_base_addr = obj.mmap.as_ptr() as u64;
+        let debug = self.config.debug_flags.contains(DebugFlags::LOAD);
 
         unsafe {
             got.add(1).write(Arc::as_ptr(obj) as usize);
@@ -803,18 +857,21 @@ impl Linker {
                 }
 
                 (reloc::R_X86_64_JUMP_SLOT, Resolve::Now) => {
-                    let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(format!(
-                        "missing symbol for relocation {:?}",
-                        rel
-                    )))?;
+                    let sym = elf.dynsyms.get(rel.r_sym).ok_or_else(|| {
+                        if debug {
+                            eprintln!("missing symbol for relocation {:?}", rel)
+                        }
 
-                    let name =
-                        elf.dynstrtab
-                            .get_at(sym.st_name)
-                            .ok_or(Error::Malformed(format!(
-                                "missing name for symbol {:?}",
-                                sym
-                            )))?;
+                        DlError::Malformed
+                    })?;
+
+                    let name = elf.dynstrtab.get_at(sym.st_name).ok_or_else(|| {
+                        if debug {
+                            eprintln!("missing name for symbol {:?}", sym)
+                        }
+
+                        DlError::Malformed
+                    })?;
 
                     let resolved = GLOBAL_SCOPE
                         .read()
@@ -839,7 +896,8 @@ impl Linker {
 
     fn relocate(&self, obj: &Arc<DSO>, object_data: &[u8], resolve: Resolve) -> Result<()> {
         // Perform static relocations.
-        let elf = Elf::parse(object_data)?;
+        let elf = Elf::parse(object_data).or(Err(DlError::Malformed))?;
+        let debug = self.config.debug_flags.contains(DebugFlags::LOAD); // FIXME
 
         trace!("link {}", obj.name);
 
@@ -855,18 +913,21 @@ impl Linker {
             );
 
             let symbol = if rel.r_sym > 0 {
-                let sym = elf.dynsyms.get(rel.r_sym).ok_or(Error::Malformed(format!(
-                    "missing symbol for relocation {:?}",
-                    rel
-                )))?;
+                let sym = elf.dynsyms.get(rel.r_sym).ok_or_else(|| {
+                    if debug {
+                        eprintln!("[ld.so]: missing symbol for relocation {:?}", rel)
+                    }
 
-                let name = elf
-                    .dynstrtab
-                    .get_at(sym.st_name)
-                    .ok_or(Error::Malformed(format!(
-                        "missing name for symbol {:?}",
-                        sym
-                    )))?;
+                    DlError::Malformed
+                })?;
+
+                let name = elf.dynstrtab.get_at(sym.st_name).ok_or_else(|| {
+                    if debug {
+                        eprintln!("[ld.so]: missing name for symbol {:?}", sym)
+                    }
+
+                    DlError::Malformed
+                })?;
 
                 let symbol = GLOBAL_SCOPE
                     .read()
@@ -992,8 +1053,13 @@ impl Linker {
                     vaddr as *const u8
                 };
                 trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
-                Sys::mprotect(ptr as *mut c_void, vsize, prot)
-                    .map_err(|_| Error::Malformed(format!("failed to mprotect {}", obj.name)))?;
+                Sys::mprotect(ptr as *mut c_void, vsize, prot).map_err(|err| {
+                    if debug {
+                        eprintln!("[ld.so]: failed to mprotect: {}", err)
+                    }
+
+                    DlError::Malformed
+                })?;
             }
         }
 
@@ -1036,7 +1102,7 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
     let obj = unsafe { &*obj };
     let obj_base = obj.mmap.as_ptr() as usize;
     let dynamic = obj.dynamic.as_ref().unwrap();
-    let jmprel = dynamic.info.jmprel as usize;
+    let jmprel = dynamic.info.jmprel;
 
     let rela = unsafe {
         &*((obj_base + jmprel) as *const reloc::reloc64::Rela).add(relocation_index as usize)
@@ -1068,7 +1134,7 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
     };
 
     let resolved = resolve_sym(name.to_str().unwrap(), &[&GLOBAL_SCOPE.read(), &obj.scope])
-        .expect(&format!("symbol '{}' not found", name.to_str().unwrap()))
+        .unwrap_or_else(|| panic!("symbol '{}' not found", name.to_str().unwrap()))
         .as_ptr();
 
     trace!(
