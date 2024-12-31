@@ -1,19 +1,19 @@
 //! dlfcn implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/dlfcn.h.html
 
 #![deny(unsafe_op_in_unsafe_fn)]
+// FIXME(andypython): remove this when #![allow(warnings, unused_variables)] is
+// dropped from src/lib.rs.
+#![warn(warnings, unused_variables)]
 
 use core::{
-    ptr::{self, NonNull},
-    str,
+    ptr, str,
     sync::atomic::{AtomicUsize, Ordering},
 };
-
-use alloc::sync::Arc;
 
 use crate::{
     c_str::CStr,
     ld_so::{
-        linker::{ObjectHandle, ObjectScope, Resolve},
+        linker::{DlError, ObjectHandle, ObjectScope, Resolve},
         tcb::Tcb,
     },
     platform::types::*,
@@ -32,7 +32,12 @@ static ERROR_NOT_SUPPORTED: CStr = c_str!("dlfcn not supported");
 #[thread_local]
 static ERROR: AtomicUsize = AtomicUsize::new(0);
 
+fn set_last_error(error: DlError) {
+    ERROR.store(error.repr().as_ptr() as usize, Ordering::SeqCst);
+}
+
 #[repr(C)]
+#[allow(non_camel_case_types)]
 pub struct Dl_info {
     dli_fname: *const c_char,
     dli_fbase: *mut c_void,
@@ -41,7 +46,7 @@ pub struct Dl_info {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dladdr(addr: *mut c_void, info: *mut Dl_info) -> c_int {
+pub unsafe extern "C" fn dladdr(_addr: *mut c_void, info: *mut Dl_info) -> c_int {
     //TODO
     unsafe {
         (*info).dli_fname = ptr::null();
@@ -86,11 +91,13 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
             return ptr::null_mut();
         }
     };
+
     if tcb.linker_ptr.is_null() {
         ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
         return ptr::null_mut();
     }
-    let mut linker = unsafe { (&*tcb.linker_ptr).lock() };
+
+    let mut linker = unsafe { (*tcb.linker_ptr).lock() };
 
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
@@ -98,7 +105,7 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
     match (cbs.load_library)(&mut linker, filename, resolve, scope, noload) {
         Ok(handle) => handle.as_ptr().cast_mut(),
         Err(error) => {
-            ERROR.store(error.repr().as_ptr() as usize, Ordering::SeqCst);
+            set_last_error(error);
             ptr::null_mut()
         }
     }
@@ -131,7 +138,7 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
         return ptr::null_mut();
     }
 
-    let linker = unsafe { (&*tcb.linker_ptr).lock() };
+    let linker = unsafe { (*tcb.linker_ptr).lock() };
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
     match (cbs.get_sym)(&linker, handle, symbol_str) {
@@ -159,11 +166,11 @@ pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
     };
 
     let Some(handle) = ObjectHandle::from_ptr(handle) else {
-        ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+        set_last_error(DlError::InvalidHandle);
         return -1;
     };
 
-    let mut linker = unsafe { (&*tcb.linker_ptr).lock() };
+    let mut linker = unsafe { (*tcb.linker_ptr).lock() };
     let cbs_c = linker.cbs.clone();
     let cbs = cbs_c.borrow();
     (cbs.unload)(&mut linker, handle);

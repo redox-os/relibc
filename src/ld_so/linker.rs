@@ -44,6 +44,8 @@ pub enum DlError {
     NotFound,
     /// The DSO is malformed somehow.
     Malformed,
+    /// Invalid DSO handle.
+    InvalidHandle,
 }
 
 impl DlError {
@@ -56,6 +58,10 @@ impl DlError {
 
             DlError::Malformed => {
                 c_str!("The DSO is malformed somehow. Set `LD_DEBUG=all` for more information.")
+            }
+
+            DlError::InvalidHandle => {
+                c_str!("Invalid DSO handle. Set `LD_DEBUG=all` for more information.")
             }
         }
     }
