@@ -42,7 +42,8 @@ unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
         }
         ptr = ptr.add(1);
     }
-    return (argv, ptr);
+
+    (argv, ptr)
 }
 
 unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const usize) {
@@ -60,7 +61,8 @@ unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const us
         }
         ptr = ptr.add(1);
     }
-    return (envs, ptr);
+
+    (envs, ptr)
 }
 
 unsafe fn adjust_stack(sp: &'static mut Stack) {

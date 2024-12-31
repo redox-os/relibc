@@ -139,9 +139,9 @@ impl Scope {
     fn add(&mut self, target: &Arc<DSO>) {
         match self {
             Self::Global { objs } => {
-                let target = Arc::downgrade(&target);
+                let target = Arc::downgrade(target);
                 for obj in objs.iter() {
-                    if Weak::ptr_eq(&obj, &target) {
+                    if Weak::ptr_eq(obj, &target) {
                         return;
                     }
                 }
@@ -151,7 +151,7 @@ impl Scope {
 
             Self::Local { objs, .. } => {
                 for obj in objs.iter() {
-                    if Arc::ptr_eq(obj, &target) {
+                    if Arc::ptr_eq(obj, target) {
                         return;
                     }
                 }
@@ -190,7 +190,7 @@ impl Scope {
                     .find_map(get_sym)
             }
         }
-        .or_else(|| res)
+        .or(res)
     }
 
     fn move_into(&self, other: &mut Self) {
@@ -199,7 +199,7 @@ impl Scope {
             (Self::Local { owner, objs }, Self::Global { objs: other_objs }) => {
                 let owner = owner.as_ref().expect("local scope without owner");
                 other_objs.push(owner.clone());
-                other_objs.extend(objs.iter().map(|o| Arc::downgrade(o)));
+                other_objs.extend(objs.iter().map(Arc::downgrade));
             }
 
             _ => unreachable!(),
@@ -220,7 +220,7 @@ impl ObjectHandle {
     }
 
     #[inline]
-    fn into_inner(&self) -> Arc<DSO> {
+    fn into_inner(self) -> Arc<DSO> {
         unsafe { Arc::from_raw(self.0) }
     }
 
@@ -1036,7 +1036,7 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
     let obj = unsafe { &*obj };
     let obj_base = obj.mmap.as_ptr() as usize;
     let dynamic = obj.dynamic.as_ref().unwrap();
-    let jmprel = dynamic.info.jmprel as usize;
+    let jmprel = dynamic.info.jmprel;
 
     let rela = unsafe {
         &*((obj_base + jmprel) as *const reloc::reloc64::Rela).add(relocation_index as usize)
@@ -1068,7 +1068,7 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
     };
 
     let resolved = resolve_sym(name.to_str().unwrap(), &[&GLOBAL_SCOPE.read(), &obj.scope])
-        .expect(&format!("symbol '{}' not found", name.to_str().unwrap()))
+        .unwrap_or_else(|| panic!("symbol '{}' not found", name.to_str().unwrap()))
         .as_ptr();
 
     trace!(
