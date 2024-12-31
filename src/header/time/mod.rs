@@ -9,9 +9,10 @@ use crate::{
 };
 use alloc::collections::BTreeSet;
 use chrono::{
-    offset::LocalResult, DateTime, Datelike, FixedOffset, NaiveDate, Offset, TimeZone, Timelike,
+    offset::MappedLocalTime, DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset,
+    TimeZone, Timelike,
 };
-use chrono_tz::Tz;
+use chrono_tz::{OffsetName, Tz};
 use core::{
     cell::OnceCell,
     convert::{TryFrom, TryInto},
@@ -89,9 +90,7 @@ static mut TM: tm = blank_tm();
 static mut ASCTIME: [c_char; 26] = [0; 26];
 
 #[repr(transparent)]
-pub struct TzName {
-    tz: [*mut c_char; 2],
-}
+pub struct TzName([*mut c_char; 2]);
 
 unsafe impl Sync for TzName {}
 
@@ -103,9 +102,7 @@ static TIMEZONE_LOCK: Mutex<(Option<CString>, Option<CString>)> = Mutex::new((No
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static mut tzname: TzName = TzName {
-    tz: [ptr::null_mut(); 2],
-};
+pub static mut tzname: TzName = TzName([ptr::null_mut(); 2]);
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
@@ -372,17 +369,23 @@ pub unsafe extern "C" fn localtime(clock: *const time_t) -> *mut tm {
 
 #[no_mangle]
 pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
+    let mut lock = TIMEZONE_LOCK.lock();
+    clear_timezone(&mut lock);
+
     let utc_time = *clock;
     let tz = time_zone();
 
     // Convert UTC time to local time
-    let local_time = match tz.timestamp_opt(utc_time, 0) {
-        LocalResult::Single(t) => t,
-        LocalResult::Ambiguous(t1, _) => t1,
-        LocalResult::None => return t,
+    let (std_time, dst_time) = match tz.timestamp_opt(utc_time, 0) {
+        MappedLocalTime::Single(t) => (t, None),
+        // This variant contains the two possible results, in the order (earliest, latest).
+        MappedLocalTime::Ambiguous(t1, t2) => (t2, Some(t1)),
+        MappedLocalTime::None => return t,
     };
 
-    datetime_to_tm(local_time, t);
+    let ret = datetime_to_tm(std_time);
+    ptr::write(t, ret);
+    set_timezone(&mut lock, &std_time, dst_time);
     t
 }
 
@@ -412,7 +415,7 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
 
     // Create DateTime<FixedOffset>
     let datetime = match offset.from_local_datetime(&naive_local) {
-        LocalResult::Single(datetime) => datetime,
+        MappedLocalTime::Single(datetime) => datetime,
         _ => {
             platform::ERRNO.set(EOVERFLOW);
             return -1;
@@ -424,11 +427,18 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     let tz_datetime = datetime.with_timezone(&tz);
     let timestamp = tz_datetime.timestamp();
 
-    let mut tmpr = blank_tm();
-    datetime_to_tm(tz_datetime, &mut tmpr as *mut _);
+    let tmpr = datetime_to_tm(tz_datetime);
     ptr::write(timeptr, tmpr);
 
-    // set_timezone(&mut lock, std_time_type, dst_time_type);
+    // Convert UTC time to local time
+    if let (Some(std_time), dst_time) = match tz.timestamp_opt(timestamp, 0) {
+        MappedLocalTime::Single(t) => (Some(t), None),
+        // This variant contains the two possible results, in the order (earliest, latest).
+        MappedLocalTime::Ambiguous(t1, t2) => (Some(t2), Some(t1)),
+        MappedLocalTime::None => (None, None),
+    } {
+        set_timezone(&mut lock, &std_time, dst_time);
+    }
 
     timestamp
 }
@@ -498,13 +508,24 @@ pub extern "C" fn timer_delete(timerid: timer_t) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn tzset() {
+pub unsafe extern "C" fn tzset() {
     let mut lock = TIMEZONE_LOCK.lock();
     unsafe { clear_timezone(&mut lock) };
 
-    // TODO
+    let mut now = timespec::default();
+    unsafe {
+        Sys::clock_gettime(CLOCK_REALTIME, &mut now);
+    }
+    let tz = time_zone();
+    let datetime = NaiveDateTime::from_timestamp(now.tv_sec, now.tv_nsec as u32);
+    let (std_time, dst_time) = match tz.from_local_datetime(&datetime) {
+        MappedLocalTime::Single(t) => (t, None),
+        // This variant contains the two possible results, in the order (earliest, latest).
+        MappedLocalTime::Ambiguous(t1, t2) => (t2, Some(t1)),
+        MappedLocalTime::None => return,
+    };
 
-    // set_timezone(...);
+    set_timezone(&mut lock, &std_time, dst_time)
 }
 
 // #[no_mangle]
@@ -527,13 +548,15 @@ pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
     unimplemented!();
 }
 
-unsafe fn clear_timezone(guard: &mut MutexGuard<'_, (Option<CString>, Option<CString>)>) {
+fn clear_timezone(guard: &mut MutexGuard<'_, (Option<CString>, Option<CString>)>) {
     guard.0 = None;
     guard.1 = None;
-    tzname.tz[0] = ptr::null_mut();
-    tzname.tz[1] = ptr::null_mut();
-    timezone = 0;
-    daylight = 0;
+    unsafe {
+        tzname.0[0] = ptr::null_mut();
+        tzname.0[1] = ptr::null_mut();
+        timezone = 0;
+        daylight = 0;
+    }
 }
 
 fn get_system_time_zone<'a>() -> Option<&'a str> {
@@ -585,26 +608,26 @@ fn time_zone() -> Tz {
     get_current_time_zone().parse().unwrap_or(Tz::UTC)
 }
 
-unsafe fn datetime_to_tm(local_time: DateTime<Tz>, t: *mut tm) {
+unsafe fn datetime_to_tm(local_time: DateTime<Tz>) -> tm {
     let tz = local_time.timezone().name();
-
+    let mut t = blank_tm();
     // Populate the `tm` structure
-    (*t).tm_sec = local_time.second() as c_int;
-    (*t).tm_min = local_time.minute() as c_int;
-    (*t).tm_hour = local_time.hour() as c_int;
-    (*t).tm_mday = local_time.day() as c_int;
-    (*t).tm_mon = local_time.month0() as c_int; // 0-based month
-    (*t).tm_year = (local_time.year() - 1900) as c_int; // Years since 1900
-    (*t).tm_wday = local_time.weekday().num_days_from_sunday() as c_int;
-    (*t).tm_yday = local_time.ordinal0() as c_int; // 0-based day of year
+    t.tm_sec = local_time.second() as c_int;
+    t.tm_min = local_time.minute() as c_int;
+    t.tm_hour = local_time.hour() as c_int;
+    t.tm_mday = local_time.day() as c_int;
+    t.tm_mon = local_time.month0() as c_int; // 0-based month
+    t.tm_year = (local_time.year() - 1900) as c_int; // Years since 1900
+    t.tm_wday = local_time.weekday().num_days_from_sunday() as c_int;
+    t.tm_yday = local_time.ordinal0() as c_int; // 0-based day of year
 
     // Determine if DST is in effect
     // Check if abbreviation ends with "DT" (e.g., EDT, PDT)
     let is_dst = tz.ends_with("DT");
-    (*t).tm_isdst = if is_dst { 1 } else { 0 };
+    t.tm_isdst = if is_dst { 1 } else { 0 };
 
     // Get the UTC offset in seconds
-    (*t).tm_gmtoff = local_time.offset().fix().local_minus_utc() as c_long;
+    t.tm_gmtoff = local_time.offset().fix().local_minus_utc() as c_long;
 
     let tm_zone = {
         let mut timezone_names = TIMEZONE_NAMES.lock();
@@ -614,33 +637,34 @@ unsafe fn datetime_to_tm(local_time: DateTime<Tz>, t: *mut tm) {
         timezone_names.get().unwrap().get(&cstr).unwrap().as_ptr()
     };
 
-    // Set the time zone abbreviation
-    (*t).tm_zone = tm_zone.cast();
+    t.tm_zone = tm_zone.cast();
+    t
 }
 
 unsafe fn set_timezone(
     guard: &mut MutexGuard<'_, (Option<CString>, Option<CString>)>,
     std: &DateTime<Tz>,
-    dst: Option<&DateTime<Tz>>,
+    dst: Option<DateTime<Tz>>,
 ) {
-    guard.0 = Some(CString::new(std.timezone().name()).unwrap());
-    tzname.tz[0] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
+    let ut_offset = std.offset();
+
+    guard.0 = Some(CString::new(ut_offset.tz_id()).unwrap());
+    tzname.0[0] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
 
     match dst {
         Some(dst) => {
-            guard.1 = Some(CString::new(dst.timezone().name()).unwrap());
-            tzname.tz[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
+            guard.1 = Some(CString::new(dst.offset().tz_id()).unwrap());
+            tzname.0[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
             daylight = 1;
         }
         None => {
             guard.1 = None;
-            tzname.tz[1] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
+            tzname.0[1] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
             daylight = 0;
         }
     }
 
-    let ut_offset = std.offset().fix().local_minus_utc();
-    timezone = -c_long::from(ut_offset);
+    timezone = -c_long::from(ut_offset.fix().local_minus_utc());
 }
 
 const fn blank_tm() -> tm {
