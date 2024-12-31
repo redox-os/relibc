@@ -1,7 +1,6 @@
-use super::linker::{Linker, ObjectHandle, ObjectScope, Resolve};
+use super::linker::{Linker, ObjectHandle, ObjectScope, Resolve, Result};
 use crate::platform::types::c_void;
 use alloc::boxed::Box;
-use goblin::error::Result;
 
 pub struct LinkerCallbacks {
     pub unload: Box<dyn Fn(&mut Linker, ObjectHandle)>,

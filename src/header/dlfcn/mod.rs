@@ -98,7 +98,7 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
     match (cbs.load_library)(&mut linker, filename, resolve, scope, noload) {
         Ok(handle) => handle.as_ptr().cast_mut(),
         Err(error) => {
-            ERROR.store(ERROR_NOT_SUPPORTED.as_ptr() as usize, Ordering::SeqCst);
+            ERROR.store(error.repr().as_ptr() as usize, Ordering::SeqCst);
             ptr::null_mut()
         }
     }
