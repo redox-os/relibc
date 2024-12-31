@@ -547,7 +547,7 @@ impl Linker {
                     use redox_rt::signal::tmp_disable_signals;
 
                     let old_tcb = Tcb::current().expect("failed to get bootstrap TCB");
-                    let new_tcb = Tcb::new(self.tls_size)?; // This actually allocates TCB, TLS and ABI page.
+                    let new_tcb = Tcb::new(self.tls_size).map_err(|_| DlError::Malformed)?; // This actually allocates TCB, TLS and ABI page.
 
                     // Stash
                     let new_tls_end = new_tcb.generic.tls_end;
