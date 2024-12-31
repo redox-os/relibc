@@ -48,7 +48,6 @@ use super::{
 // by the dynamic linker's and was freed by the program.
 // do better errors than just goblin::Error::Malformed
 
-// TODO: rwlock?
 static GLOBAL_SCOPE: RwLock<Scope> = RwLock::new(Scope::global());
 
 /// Same as [`crate::fs::File`], but does not touch [`crate::platform::ERRNO`] as the dynamic
