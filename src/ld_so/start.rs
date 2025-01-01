@@ -42,7 +42,8 @@ unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
         }
         ptr = ptr.add(1);
     }
-    return (argv, ptr);
+
+    (argv, ptr)
 }
 
 unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const usize) {
@@ -60,7 +61,8 @@ unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const us
         }
         ptr = ptr.add(1);
     }
-    return (envs, ptr);
+
+    (envs, ptr)
 }
 
 unsafe fn adjust_stack(sp: &'static mut Stack) {
@@ -236,7 +238,8 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     let entry = match linker.load_program(&path, base_addr) {
         Ok(entry) => entry,
         Err(err) => {
-            eprintln!("ld.so: failed to link '{}': {}", path, err);
+            eprintln!("ld.so: failed to link '{}': {:?}", path, err);
+            eprintln!("ld.so: enable debug output with `LD_DEBUG=all` for more information");
             unistd::_exit(1);
         }
     };

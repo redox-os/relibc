@@ -93,7 +93,7 @@ pub struct DSO {
 impl DSO {
     pub fn new(
         path: &str,
-        data: &Vec<u8>,
+        data: &[u8],
         base_addr: Option<usize>,
         dlopened: bool,
         id: usize,
@@ -101,13 +101,13 @@ impl DSO {
         tls_offset: usize,
     ) -> Result<(DSO, Option<Master>)> {
         let elf = Elf::parse(data)?;
-        let (mmap, tcb_master) = DSO::mmap_and_copy(&path, &elf, &data, base_addr, tls_offset)?;
-        let (global_syms, weak_syms) = DSO::collect_syms(&elf, &mmap)?;
+        let (mmap, tcb_master) = DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset)?;
+        let (global_syms, weak_syms) = DSO::collect_syms(&elf, mmap)?;
         let (init_array, fini_array) = DSO::init_fini_arrays(&elf, mmap.as_ptr() as usize);
 
         let name = match elf.soname {
             Some(soname) => soname.to_string(),
-            _ => basename(&path),
+            _ => basename(path),
         };
         let tls_offset = match tcb_master {
             Some(ref master) => master.offset,
@@ -123,7 +123,7 @@ impl DSO {
             id,
             dlopened,
             entry_point,
-            runpath: DSO::get_runpath(&path, &elf)?,
+            runpath: DSO::get_runpath(path, &elf)?,
             mmap,
             global_syms,
             weak_syms,
@@ -138,7 +138,7 @@ impl DSO {
             tls_offset,
 
             pie: is_pie_enabled(&elf),
-            dynamic: elf.dynamic.map(|dynamic| dynamic),
+            dynamic: elf.dynamic,
             dynsyms: elf.dynsyms.iter().collect(),
 
             scope: Scope::local(),
@@ -149,10 +149,7 @@ impl DSO {
 
     /// Global Offset Table
     pub(super) fn got(&self) -> Option<NonNull<usize>> {
-        let Some(dynamic) = self.dynamic.as_ref() else {
-            return None;
-        };
-
+        let dynamic = self.dynamic.as_ref()?;
         let object_base_addr = self.mmap.as_ptr() as u64;
 
         let got = if let Some(ptr) = {
@@ -178,10 +175,10 @@ impl DSO {
     pub fn get_sym(&self, name: &str) -> Option<(Symbol, SymbolBinding)> {
         if let Some(value) = self.global_syms.get(name) {
             Some((*value, SymbolBinding::Global))
-        } else if let Some(value) = self.weak_syms.get(name) {
-            Some((*value, SymbolBinding::Weak))
         } else {
-            None
+            self.weak_syms
+                .get(name)
+                .map(|value| (*value, SymbolBinding::Weak))
         }
     }
 
@@ -190,7 +187,9 @@ impl DSO {
             let (addr, size) = self.init_array;
             for i in (0..size).step_by(8) {
                 let func = transmute::<usize, *const Option<extern "C" fn()>>(addr + i);
-                (*func).map(|x| x());
+                if let Some(f) = *func {
+                    f();
+                }
             }
         }
     }
@@ -200,7 +199,9 @@ impl DSO {
             let (addr, size) = self.fini_array;
             for i in (0..size).step_by(8).rev() {
                 let func = transmute::<usize, *const Option<extern "C" fn()>>(addr + i);
-                (*func).map(|x| x());
+                if let Some(f) = *func {
+                    f();
+                }
             }
         }
     }
@@ -220,13 +221,14 @@ impl DSO {
                 _ => return Ok(None),
             }
         }
-        return Ok(None);
+
+        Ok(None)
     }
 
     fn mmap_and_copy(
         path: &str,
         elf: &Elf,
-        data: &Vec<u8>,
+        data: &[u8],
         base_addr: Option<usize>,
         tls_offset: usize,
     ) -> Result<(&'static mut [u8], Option<Master>)> {
@@ -269,12 +271,12 @@ impl DSO {
         // Allocate memory
         let mmap = unsafe {
             if let Some(addr) = base_addr {
-                let size = if is_pie_enabled(&elf) {
+                let size = if is_pie_enabled(elf) {
                     bounds.1
                 } else {
                     bounds.1 - bounds.0
                 };
-                _r_debug.insert_first(addr as usize, path, addr + l_ld as usize);
+                _r_debug.insert_first(addr, path, addr + l_ld as usize);
                 slice::from_raw_parts_mut(addr as *mut u8, size)
             } else {
                 let (start, end) = bounds;
@@ -371,7 +373,7 @@ impl DSO {
                         }
                     };
                     tcb_master = Some(Master {
-                        ptr: ptr,
+                        ptr,
                         len: ph.p_filesz as usize,
                         offset: tls_offset + vsize,
                     });
@@ -384,13 +386,11 @@ impl DSO {
                     let mut debug_start = None;
                     // next we identify the location of DT_DEBUG in .dynamic section
                     if let Some(dynamic) = elf.dynamic.as_ref() {
-                        let mut i = 0;
-                        for entry in &dynamic.dyns {
+                        for (i, entry) in dynamic.dyns.iter().enumerate() {
                             if entry.d_tag == DT_DEBUG {
-                                debug_start = Some(i as usize);
+                                debug_start = Some(i);
                                 break;
                             }
-                            i += 1;
                         }
                     }
                     if let Some(i) = debug_start {
@@ -408,7 +408,8 @@ impl DSO {
                 _ => (),
             }
         }
-        return Ok((mmap, tcb_master));
+
+        Ok((mmap, tcb_master))
     }
 
     fn collect_syms(
@@ -458,7 +459,8 @@ impl DSO {
                 _ => unreachable!(),
             }
         }
-        return Ok((globals, weak_syms));
+
+        Ok((globals, weak_syms))
     }
 
     fn init_fini_arrays(elf: &Elf, mmap_addr: usize) -> ((usize, usize), (usize, usize)) {
@@ -480,7 +482,8 @@ impl DSO {
                 fini_array = (addr, section.sh_size as usize);
             }
         }
-        return (init_array, fini_array);
+
+        (init_array, fini_array)
     }
 }
 
@@ -492,15 +495,15 @@ impl Drop for DSO {
 }
 
 pub fn is_pie_enabled(elf: &Elf) -> bool {
-    return elf.header.e_type == ET_DYN;
+    elf.header.e_type == ET_DYN
 }
 
 fn basename(path: &str) -> String {
-    return path.split("/").last().unwrap_or(path).to_string();
+    path.split("/").last().unwrap_or(path).to_string()
 }
 
 fn dirname(path: &str) -> String {
     let mut parts: Vec<&str> = path.split("/").collect();
     parts.truncate(parts.len() - 1);
-    return parts.join("/");
+    parts.join("/")
 }
