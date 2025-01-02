@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{string::ToString, vec::Vec};
 use core::{
     cell::UnsafeCell,
     mem,
@@ -247,7 +247,7 @@ impl Tcb {
             -1,
             0,
         )
-        .map_err(|_| Error::Malformed(format!("failed to map tls")))?;
+        .map_err(|_| Error::Malformed("failed to map tls".to_string()))?;
 
         ptr::write_bytes(ptr as *mut u8, 0, size);
         Ok(slice::from_raw_parts_mut(ptr as *mut u8, size))
