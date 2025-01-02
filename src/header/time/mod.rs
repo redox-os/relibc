@@ -12,7 +12,7 @@ use chrono::{
     offset::MappedLocalTime, DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset,
     TimeZone, Timelike,
 };
-use chrono_tz::{OffsetName, Tz};
+use chrono_tz::{OffsetComponents, OffsetName, Tz};
 use core::{
     cell::OnceCell,
     convert::{TryFrom, TryInto},
@@ -383,8 +383,7 @@ pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut t
         MappedLocalTime::None => return t,
     };
 
-    let ret = datetime_to_tm(std_time);
-    ptr::write(t, ret);
+    ptr::write(t, datetime_to_tm(&std_time));
     set_timezone(&mut lock, &std_time, dst_time);
     t
 }
@@ -412,6 +411,7 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     };
 
     let offset = FixedOffset::east((*timeptr).tm_gmtoff as i32);
+    let tz = time_zone();
 
     // Create DateTime<FixedOffset>
     let datetime = match offset.from_local_datetime(&naive_local) {
@@ -423,11 +423,10 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     };
 
     // Convert to UTC and get timestamp
-    let tz = time_zone();
     let tz_datetime = datetime.with_timezone(&tz);
     let timestamp = tz_datetime.timestamp();
 
-    let tmpr = datetime_to_tm(tz_datetime);
+    let tmpr = datetime_to_tm(&tz_datetime);
     ptr::write(timeptr, tmpr);
 
     // Convert UTC time to local time
@@ -608,7 +607,7 @@ fn time_zone() -> Tz {
     get_current_time_zone().parse().unwrap_or(Tz::UTC)
 }
 
-unsafe fn datetime_to_tm(local_time: DateTime<Tz>) -> tm {
+unsafe fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
     let tz = local_time.timezone().name();
     let mut t = blank_tm();
     // Populate the `tm` structure
@@ -621,13 +620,10 @@ unsafe fn datetime_to_tm(local_time: DateTime<Tz>) -> tm {
     t.tm_wday = local_time.weekday().num_days_from_sunday() as c_int;
     t.tm_yday = local_time.ordinal0() as c_int; // 0-based day of year
 
-    // Determine if DST is in effect
-    // Check if abbreviation ends with "DT" (e.g., EDT, PDT)
-    let is_dst = tz.ends_with("DT");
-    t.tm_isdst = if is_dst { 1 } else { 0 };
-
+    let offset = local_time.offset();
+    t.tm_isdst = offset.dst_offset().num_hours() as _;
     // Get the UTC offset in seconds
-    t.tm_gmtoff = local_time.offset().fix().local_minus_utc() as c_long;
+    t.tm_gmtoff = offset.fix().local_minus_utc() as _;
 
     let tm_zone = {
         let mut timezone_names = TIMEZONE_NAMES.lock();
@@ -648,12 +644,13 @@ unsafe fn set_timezone(
 ) {
     let ut_offset = std.offset();
 
-    guard.0 = Some(CString::new(ut_offset.tz_id()).unwrap());
+    guard.0 = Some(CString::new(ut_offset.abbreviation().expect("Wrong timezone")).unwrap());
     tzname.0[0] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
 
     match dst {
         Some(dst) => {
-            guard.1 = Some(CString::new(dst.offset().tz_id()).unwrap());
+            guard.1 =
+                Some(CString::new(dst.offset().abbreviation().expect("Wrong timezone")).unwrap());
             tzname.0[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
             daylight = 1;
         }

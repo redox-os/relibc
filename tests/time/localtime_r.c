@@ -58,7 +58,7 @@ void test_localtime_r_large_time() {
 }
 
 void test_dst_transition() {
-    time_t t = 1615708800;  // March 14, 2021, 08:00:00 UTC
+    time_t t = 1615809600;  // March 15 2021, 08:00:00 UTC
     struct tm result;
 
     setenv("TZ", "America/New_York", 1); 
@@ -68,17 +68,15 @@ void test_dst_transition() {
 
     assert(result.tm_year == 121);  // Year 2021 - 1900 = 121
     assert(result.tm_mon == 2);     // March (0-based index)
-    assert(result.tm_mday == 14);   // 14th
-    assert(result.tm_hour == 4);    // 04:00:00 local time
+    assert(result.tm_mday == 15);    // 15th
+    assert(result.tm_hour == 8);    // 00:00:00 local time
     assert(result.tm_min == 0);
     assert(result.tm_sec == 0);
 
-    // TODO: Fix this
-    // assert(result.tm_isdst == 1);  // DST should be active
+    assert(result.tm_isdst == 1);  // DST should be active
     
-    // TODO: Fix this, tzname is wrong
-    // assert(strcmp(tzname[0], "EST") == 0 || strcmp(tzname[0], "EDT") == 0);  // Standard or DST name
-    // assert(strcmp(tzname[1], "EDT") == 0);  // Should be the DST version of the timezone
+    assert(strcmp(tzname[0], "EST") == 0 || strcmp(tzname[0], "EDT") == 0);  // Standard or DST name
+    assert(strcmp(tzname[1], "EDT") == 0);  // Should be the DST version of the timezone
 }
 
 void test_standard_time() {
@@ -99,9 +97,8 @@ void test_standard_time() {
 
     assert(result.tm_isdst == 0);  // DST should NOT be active
     
-    // TODO: Fix this, tzname is wrong
-    // assert(strcmp(tzname[0], "JST") == 0);  // Standard time name
-    // assert(strcmp(tzname[1], "EST") != 0);  // Should NOT be in DST
+    assert(strcmp(tzname[0], "JST") == 0);  // Standard time name
+    assert(strcmp(tzname[1], "EST") != 0);  // Should NOT be in DST
 }
 
 int main() {
@@ -111,6 +108,5 @@ int main() {
     test_localtime_r_large_time();
     test_dst_transition();
     test_standard_time();
-
     return 0;
 }
