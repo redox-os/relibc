@@ -1,4 +1,6 @@
-//! See <https://refspecs.linuxfoundation.org/elf/elf.pdf>.
+//! See:
+//! * <https://refspecs.linuxfoundation.org/elf/elf.pdf>
+//! * <https://www.akkadia.org/drepper/dsohowto.pdf>
 
 use super::{
     debug::{RTLDDebug, _r_debug},
@@ -32,16 +34,17 @@ use goblin::elf64::{
     dynamic::{Dyn, DT_DEBUG, DT_RUNPATH},
     header::ET_DYN,
     program_header,
-    section_header::{SHN_UNDEF, SHT_FINI_ARRAY, SHT_INIT_ARRAY},
+    section_header::{SHT_FINI_ARRAY, SHT_INIT_ARRAY},
     sym,
 };
 use goblin::{
     elf::{
-        dynamic::DT_PLTGOT,
+        dynamic::{DT_GNU_HASH, DT_PLTGOT},
         sym::{STB_GLOBAL, STB_WEAK},
-        Dynamic, Elf,
+        Dynamic, Elf, Sym,
     },
     error::{Error, Result},
+    strtab::Strtab,
 };
 
 #[derive(Debug, PartialEq)]
@@ -63,6 +66,94 @@ impl SymbolBinding {
     }
 }
 
+enum SymbolHashTable {
+    Gnu {
+        bloom_filter: NonNull<[u64]>,
+        buckets: NonNull<[u32]>,
+        chains: NonNull<u32>,
+        bloom_shift: u32,
+        symbol_off: u32,
+    },
+
+    Sysv,
+}
+
+impl SymbolHashTable {
+    fn find<'a>(&self, name: &str, dynsyms: &'a [Sym], dynstrtab: &'a Strtab) -> Option<&'a Sym> {
+        match self {
+            Self::Gnu {
+                bloom_filter,
+                buckets,
+                chains,
+                bloom_shift,
+                symbol_off,
+            } => {
+                #[cfg(target_pointer_width = "64")]
+                const BLOOM_WIDTH: u32 = 64;
+
+                let h1 = self.hash(name);
+                let h2 = h1 >> bloom_shift;
+
+                let bloom_filter = unsafe { bloom_filter.as_ref() };
+                let mask: u64 = (1 << (h1 & (BLOOM_WIDTH - 1))) | (1 << (h2 & (BLOOM_WIDTH - 1)));
+                let bloom_idx = (h1 / BLOOM_WIDTH) & (bloom_filter.len() as u32 - 1);
+                if bloom_filter.get(bloom_idx as usize)? & mask != mask {
+                    return None;
+                }
+
+                let buckets = unsafe { buckets.as_ref() };
+                let mut idx = *buckets.get(h1 as usize % buckets.len())?;
+                if idx == 0 {
+                    return None;
+                }
+
+                let chains = chains.as_ptr();
+                loop {
+                    let h2 = unsafe { chains.add((idx - symbol_off) as usize).read() };
+                    if let Some(sym) = dynsyms.get(idx as usize) {
+                        let n = dynstrtab.get_at(sym.st_name).unwrap();
+                        if n == name && [STB_GLOBAL, STB_WEAK].contains(&sym.st_bind()) {
+                            return Some(sym);
+                        }
+                    }
+                    if h2 & 1 != 0 {
+                        return None;
+                    }
+                    idx += 1;
+                }
+            }
+
+            Self::Sysv => unimplemented!(),
+        }
+    }
+
+    fn hash(&self, name: &str) -> u32 {
+        match self {
+            Self::Sysv => {
+                let mut h = 0u32;
+                let mut g;
+                for c in name.chars() {
+                    h = (h << 4) + c as u32;
+                    g = h & 0xf0000000;
+                    if g != 0 {
+                        h ^= g >> 24;
+                    }
+                    h &= !g;
+                }
+                h
+            }
+
+            Self::Gnu { .. } => {
+                let mut h = 5381;
+                for c in name.chars() {
+                    h = (h << 5) + h + c as u32;
+                }
+                h
+            }
+        }
+    }
+}
+
 /// Use to represent a library as well as all the symbols that is loaded withen it.
 pub struct DSO {
     pub name: String,
@@ -71,7 +162,7 @@ pub struct DSO {
     pub entry_point: usize,
     pub runpath: Option<String>,
     /// Loaded library in-memory data
-    pub mmap: &'static mut [u8],
+    pub mmap: &'static [u8],
     pub global_syms: BTreeMap<String, Symbol>,
     pub weak_syms: BTreeMap<String, Symbol>,
     pub dependencies: Vec<String>,
@@ -84,16 +175,22 @@ pub struct DSO {
 
     pub dynamic: Option<Dynamic>,
     pub dynsyms: Vec<goblin::elf::sym::Sym>,
+    pub dynstrtab: Strtab<'static>,
+
+    hash_table: SymbolHashTable,
 
     pub scope: Scope,
     /// Position Independent Executable.
     pub pie: bool,
 }
 
+unsafe impl Send for DSO {}
+unsafe impl Sync for DSO {}
+
 impl DSO {
     pub fn new(
         path: &str,
-        data: &[u8],
+        data: &'static [u8],
         base_addr: Option<usize>,
         dlopened: bool,
         id: usize,
@@ -102,7 +199,51 @@ impl DSO {
     ) -> Result<(DSO, Option<Master>)> {
         let elf = Elf::parse(data)?;
         let (mmap, tcb_master) = DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset)?;
-        let (global_syms, weak_syms) = DSO::collect_syms(&elf, mmap)?;
+
+        let dynamic = elf.dynamic.as_ref().unwrap();
+        let base = if is_pie_enabled(&elf) {
+            mmap.as_ptr() as usize
+        } else {
+            0
+        };
+
+        let mut hash_table = None;
+
+        for dynamic in dynamic.dyns.iter() {
+            if dynamic.d_tag == DT_GNU_HASH {
+                #[derive(Debug)]
+                #[repr(C)]
+                struct Header {
+                    n_buckets: u32,
+                    symbol_offset: u32,
+                    bloom_size: u32,
+                    bloom_shift: u32,
+                }
+
+                let (header, bloom_filter, buckets, chains);
+
+                unsafe {
+                    let ptr = NonNull::new(dynamic.d_val as *mut u8).unwrap().add(base);
+                    header = ptr.cast::<Header>().as_ref();
+                    assert!(header.bloom_size.is_power_of_two());
+                    bloom_filter = ptr.add(size_of::<Header>()).cast::<u64>();
+                    buckets = bloom_filter.add(header.bloom_size as usize).cast::<u32>();
+                    chains = buckets.add(header.n_buckets as usize);
+                }
+
+                hash_table = Some(SymbolHashTable::Gnu {
+                    bloom_filter: NonNull::slice_from_raw_parts(
+                        bloom_filter,
+                        header.bloom_size as usize,
+                    ),
+                    buckets: NonNull::slice_from_raw_parts(buckets, header.n_buckets as usize),
+                    chains,
+                    bloom_shift: header.bloom_shift,
+                    symbol_off: header.symbol_offset,
+                });
+            }
+        }
+
         let (init_array, fini_array) = DSO::init_fini_arrays(&elf, mmap.as_ptr() as usize);
 
         let name = match elf.soname {
@@ -125,8 +266,8 @@ impl DSO {
             entry_point,
             runpath: DSO::get_runpath(path, &elf)?,
             mmap,
-            global_syms,
-            weak_syms,
+            global_syms: BTreeMap::new(),
+            weak_syms: BTreeMap::new(),
             dependencies: elf.libraries.iter().map(|s| s.to_string()).collect(),
             init_array,
             fini_array,
@@ -139,9 +280,11 @@ impl DSO {
 
             pie: is_pie_enabled(&elf),
             dynamic: elf.dynamic,
-            dynsyms: elf.dynsyms.iter().collect(),
+            dynsyms: elf.dynsyms.to_vec(),
+            dynstrtab: elf.dynstrtab,
 
             scope: Scope::local(),
+            hash_table: hash_table.expect("required hash table not present"),
         };
 
         Ok((dso, tcb_master))
@@ -173,13 +316,26 @@ impl DSO {
     }
 
     pub fn get_sym(&self, name: &str) -> Option<(Symbol, SymbolBinding)> {
-        if let Some(value) = self.global_syms.get(name) {
-            Some((*value, SymbolBinding::Global))
-        } else {
-            self.weak_syms
-                .get(name)
-                .map(|value| (*value, SymbolBinding::Weak))
-        }
+        let sym = self.hash_table.find(name, &self.dynsyms, &self.dynstrtab)?;
+
+        Some((
+            Symbol {
+                base: if self.pie {
+                    self.mmap.as_ptr() as usize
+                } else {
+                    0
+                },
+                value: sym.st_value as usize,
+                size: sym.st_size as usize,
+                sym_type: sym::st_type(sym.st_info),
+            },
+            // TODO(andypython): move this into [`Symbol`]
+            match sym.st_bind() {
+                STB_GLOBAL => SymbolBinding::Global,
+                STB_WEAK => SymbolBinding::Weak,
+                bind => unreachable!("get_sym bind {bind}"),
+            },
+        ))
     }
 
     pub fn run_init(&self) {
@@ -297,7 +453,7 @@ impl DSO {
                 )
                 .map_err(|e| Error::Malformed(format!("failed to map {}. errno: {}", path, e.0)))?;
 
-                if start as *mut c_void != ptr::null_mut() {
+                if !(start as *mut c_void).is_null() {
                     assert_eq!(
                         ptr, start as *mut c_void,
                         "mmap must always map on the destination we requested"
@@ -412,57 +568,6 @@ impl DSO {
         Ok((mmap, tcb_master))
     }
 
-    fn collect_syms(
-        elf: &Elf,
-        mmap: &[u8],
-    ) -> Result<(BTreeMap<String, Symbol>, BTreeMap<String, Symbol>)> {
-        let mut globals = BTreeMap::new();
-        let mut weak_syms = BTreeMap::new();
-        for sym in elf.dynsyms.iter() {
-            let bind = sym.st_bind();
-            if sym.st_shndx == SHN_UNDEF as usize
-                || ![sym::STB_GLOBAL, sym::STB_WEAK].contains(&bind)
-            {
-                continue;
-            }
-            let name: String;
-            let value: Symbol;
-            if let Some(name_res) = elf.dynstrtab.get_at(sym.st_name) {
-                name = name_res.to_string();
-                value = if is_pie_enabled(elf) {
-                    Symbol {
-                        base: mmap.as_ptr() as usize,
-                        value: sym.st_value as usize,
-                        size: sym.st_size as usize,
-                        sym_type: sym::st_type(sym.st_info),
-                    }
-                } else {
-                    Symbol {
-                        base: 0,
-                        value: sym.st_value as usize,
-                        size: sym.st_size as usize,
-                        sym_type: sym::st_type(sym.st_info),
-                    }
-                };
-            } else {
-                continue;
-            }
-            match sym.st_bind() {
-                sym::STB_GLOBAL => {
-                    trace!("  global {}: {:x?} = {:p}", &name, sym, value.as_ptr());
-                    globals.insert(name, value);
-                }
-                sym::STB_WEAK => {
-                    trace!("  weak {}: {:x?} = {:p}", &name, sym, value.as_ptr());
-                    weak_syms.insert(name, value);
-                }
-                _ => unreachable!(),
-            }
-        }
-
-        Ok((globals, weak_syms))
-    }
-
     fn init_fini_arrays(elf: &Elf, mmap_addr: usize) -> ((usize, usize), (usize, usize)) {
         let mut init_array: (usize, usize) = (0, 0);
         let mut fini_array: (usize, usize) = (0, 0);
@@ -490,7 +595,7 @@ impl DSO {
 impl Drop for DSO {
     fn drop(&mut self) {
         self.run_fini();
-        unsafe { Sys::munmap(self.mmap.as_mut_ptr() as *mut c_void, self.mmap.len()).unwrap() };
+        unsafe { Sys::munmap(self.mmap.as_ptr() as *mut c_void, self.mmap.len()).unwrap() };
     }
 }
 
