@@ -511,12 +511,8 @@ pub unsafe extern "C" fn tzset() {
     let mut lock = TIMEZONE_LOCK.lock();
     unsafe { clear_timezone(&mut lock) };
 
-    let mut now = timespec::default();
-    unsafe {
-        Sys::clock_gettime(CLOCK_REALTIME, &mut now);
-    }
     let tz = time_zone();
-    let datetime = NaiveDateTime::from_timestamp(now.tv_sec, now.tv_nsec as u32);
+    let datetime = now();
     let (std_time, dst_time) = match tz.from_local_datetime(&datetime) {
         MappedLocalTime::Single(t) => (t, None),
         // This variant contains the two possible results, in the order (earliest, latest).
@@ -560,7 +556,7 @@ fn clear_timezone(guard: &mut MutexGuard<'_, (Option<CString>, Option<CString>)>
 
 fn get_system_time_zone<'a>() -> Option<&'a str> {
     // Resolve the symlink for localtime
-    const BSIZE: size_t = 64;
+    const BSIZE: size_t = 100;
     let mut buffer: [u8; BSIZE] = [0; BSIZE];
 
     #[cfg(not(target_os = "redox"))]
@@ -605,6 +601,15 @@ fn get_current_time_zone<'a>() -> &'a str {
 #[inline(always)]
 fn time_zone() -> Tz {
     get_current_time_zone().parse().unwrap_or(Tz::UTC)
+}
+
+#[inline(always)]
+fn now() -> NaiveDateTime {
+    let mut now = timespec::default();
+    unsafe {
+        Sys::clock_gettime(CLOCK_REALTIME, &mut now);
+    }
+    NaiveDateTime::from_timestamp(now.tv_sec, now.tv_nsec as u32)
 }
 
 unsafe fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
