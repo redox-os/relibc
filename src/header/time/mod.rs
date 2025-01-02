@@ -45,7 +45,7 @@ impl timespec {
         Some(if later_nsec > earlier_nsec {
             timespec {
                 tv_sec: later.tv_sec.checked_sub(earlier.tv_sec)?,
-                tv_nsec: (later_nsec - earlier_nsec) as c_long,
+                tv_nsec: (later_nsec - earlier_nsec) as _,
             }
         } else {
             timespec {
@@ -60,8 +60,8 @@ impl timespec {
 impl<'a> From<&'a timespec> for syscall::TimeSpec {
     fn from(tp: &timespec) -> Self {
         Self {
-            tv_sec: tp.tv_sec as i64,
-            tv_nsec: tp.tv_nsec as i32,
+            tv_sec: tp.tv_sec as _,
+            tv_nsec: tp.tv_nsec as _,
         }
     }
 }
@@ -254,7 +254,7 @@ pub unsafe extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut
 
 #[no_mangle]
 pub extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {
-    (time1 - time0) as c_double
+    (time1 - time0) as _
 }
 
 // #[no_mangle]
@@ -394,11 +394,11 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     clear_timezone(&mut lock);
 
     let year = (*timeptr).tm_year + 1900;
-    let month = ((*timeptr).tm_mon + 1) as u32;
-    let day = (*timeptr).tm_mday as u32;
-    let hour = (*timeptr).tm_hour as u32;
-    let minute = (*timeptr).tm_min as u32;
-    let second = (*timeptr).tm_sec as u32;
+    let month = ((*timeptr).tm_mon + 1) as _;
+    let day = (*timeptr).tm_mday as _;
+    let hour = (*timeptr).tm_hour as _;
+    let minute = (*timeptr).tm_min as _;
+    let second = (*timeptr).tm_sec as _;
 
     let naive_local = match NaiveDate::from_ymd_opt(year, month, day)
         .and_then(|date| date.and_hms_opt(hour, minute, second))
@@ -410,7 +410,7 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
         }
     };
 
-    let offset = FixedOffset::east((*timeptr).tm_gmtoff as i32);
+    let offset = FixedOffset::east((*timeptr).tm_gmtoff as _);
     let tz = time_zone();
 
     // Create DateTime<FixedOffset>
@@ -426,8 +426,7 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     let tz_datetime = datetime.with_timezone(&tz);
     let timestamp = tz_datetime.timestamp();
 
-    let tmpr = datetime_to_tm(&tz_datetime);
-    ptr::write(timeptr, tmpr);
+    ptr::write(timeptr, datetime_to_tm(&tz_datetime));
 
     // Convert UTC time to local time
     if let (Some(std_time), dst_time) = match tz.timestamp_opt(timestamp, 0) {
@@ -609,21 +608,21 @@ fn now() -> NaiveDateTime {
     unsafe {
         Sys::clock_gettime(CLOCK_REALTIME, &mut now);
     }
-    NaiveDateTime::from_timestamp(now.tv_sec, now.tv_nsec as u32)
+    NaiveDateTime::from_timestamp(now.tv_sec, now.tv_nsec as _)
 }
 
 unsafe fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
     let tz = local_time.timezone().name();
     let mut t = blank_tm();
     // Populate the `tm` structure
-    t.tm_sec = local_time.second() as c_int;
-    t.tm_min = local_time.minute() as c_int;
-    t.tm_hour = local_time.hour() as c_int;
-    t.tm_mday = local_time.day() as c_int;
-    t.tm_mon = local_time.month0() as c_int; // 0-based month
-    t.tm_year = (local_time.year() - 1900) as c_int; // Years since 1900
-    t.tm_wday = local_time.weekday().num_days_from_sunday() as c_int;
-    t.tm_yday = local_time.ordinal0() as c_int; // 0-based day of year
+    t.tm_sec = local_time.second() as _;
+    t.tm_min = local_time.minute() as _;
+    t.tm_hour = local_time.hour() as _;
+    t.tm_mday = local_time.day() as _;
+    t.tm_mon = local_time.month0() as _; // 0-based month
+    t.tm_year = (local_time.year() - 1900) as _; // Years since 1900
+    t.tm_wday = local_time.weekday().num_days_from_sunday() as _;
+    t.tm_yday = local_time.ordinal0() as _; // 0-based day of year
 
     let offset = local_time.offset();
     t.tm_isdst = offset.dst_offset().num_hours() as _;
