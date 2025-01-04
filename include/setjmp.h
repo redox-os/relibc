@@ -58,7 +58,8 @@ typedef unsigned long long jmp_buf[8];
 #endif
 
 #ifdef __x86_64__
-typedef unsigned long jmp_buf[8];
+typedef unsigned long jmp_buf[16];
+typedef jmp_buf sigjmp_buf;
 #endif
 
 #ifdef __riscv
