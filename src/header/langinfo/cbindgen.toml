@@ -1,0 +1,9 @@
+sys_includes = ["stddef.h", "stdint.h", "features.h"]
+include_guard = "_RELIBC_LANGINFO_H"
+language = "C"
+style = "tag"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true
