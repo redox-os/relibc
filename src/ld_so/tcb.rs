@@ -1,4 +1,4 @@
-use alloc::{string::ToString, vec::Vec};
+use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
     mem,
@@ -7,7 +7,6 @@ use core::{
     sync::atomic::AtomicBool,
 };
 use generic_rt::GenericTcb;
-use goblin::error::{Error, Result};
 
 use crate::{
     header::sys_mman,
@@ -16,6 +15,8 @@ use crate::{
     pthread::{OsTid, Pthread},
     sync::{mutex::Mutex, waitval::Waitval},
 };
+
+use super::linker::DlError;
 
 #[repr(C)]
 #[derive(Debug, Clone)]
@@ -76,7 +77,7 @@ impl Tcb {
     /// Create a new TCB
     ///
     /// `size` is the size of the TLS in bytes.
-    pub unsafe fn new(size: usize) -> Result<&'static mut Self> {
+    pub unsafe fn new(size: usize) -> Result<&'static mut Self, DlError> {
         let page_size = Sys::getpagesize();
         let (_abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
 
@@ -145,7 +146,7 @@ impl Tcb {
     }
 
     /// Copy data from masters
-    pub unsafe fn copy_masters(&mut self) -> Result<()> {
+    pub unsafe fn copy_masters(&mut self) -> Result<(), DlError> {
         //TODO: Complain if masters or tls exist without the other
         if let Some(tls) = self.tls() {
             if let Some(masters) = self.masters() {
@@ -175,7 +176,7 @@ impl Tcb {
                         );
                         tls_data.copy_from_slice(data);
                     } else {
-                        return Err(Error::Malformed(format!("failed to copy tls master {}", i)));
+                        return Err(DlError::Malformed);
                     }
                 }
                 self.num_copied_masters = masters.len();
@@ -238,7 +239,7 @@ impl Tcb {
     }
 
     /// Mapping with correct flags for TCB and TLS
-    unsafe fn map(size: usize) -> Result<&'static mut [u8]> {
+    unsafe fn map(size: usize) -> Result<&'static mut [u8], DlError> {
         let ptr = Sys::mmap(
             ptr::null_mut(),
             size,
@@ -247,7 +248,7 @@ impl Tcb {
             -1,
             0,
         )
-        .map_err(|_| Error::Malformed("failed to map tls".to_string()))?;
+        .map_err(|_| DlError::Oom)?;
 
         ptr::write_bytes(ptr as *mut u8, 0, size);
         Ok(slice::from_raw_parts_mut(ptr as *mut u8, size))
@@ -257,7 +258,7 @@ impl Tcb {
     #[cfg(any(target_os = "linux", target_os = "redox"))]
     unsafe fn os_new(
         size: usize,
-    ) -> Result<(&'static mut [u8], &'static mut [u8], &'static mut [u8])> {
+    ) -> Result<(&'static mut [u8], &'static mut [u8], &'static mut [u8]), DlError> {
         let page_size = Sys::getpagesize();
         let abi_tls_tcb = Self::map(page_size + size + page_size)?;
         let (abi, tls_tcb) = abi_tls_tcb.split_at_mut(page_size);

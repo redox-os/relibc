@@ -15,6 +15,8 @@ CARGOFLAGS+=--target=$(TARGET)
 TARGET_HEADERS?=$(BUILD)/include
 export CFLAGS=-I$(TARGET_HEADERS)
 
+PROFILE?=release
+
 HEADERS_UNPARSED=$(shell find src/header -mindepth 1 -maxdepth 1 -type d -not -name "_*" -printf "%f\n")
 HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "*.rs" \))
 #HEADERS=$(patsubst %,%.h,$(subst _,/,$(HEADERS_UNPARSED)))
@@ -42,7 +44,7 @@ ifeq ($(TARGET),x86_64-unknown-linux-gnu)
 	export LD=x86_64-linux-gnu-ld
 	export AR=x86_64-linux-gnu-ar
 	export NM=x86_64-linux-gnu-nm
-	export OBJCOPY=x86_64-linux-gnu-objcopy
+	export OBJCOPY=objcopy
 	export CPPFLAGS=
 endif
 
@@ -118,23 +120,23 @@ install-headers: headers libs
 	cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/include"
 
 libs: \
-	$(BUILD)/release/libc.a \
-	$(BUILD)/release/libc.so \
-	$(BUILD)/release/crt0.o \
-	$(BUILD)/release/crti.o \
-	$(BUILD)/release/crtn.o \
-	$(BUILD)/release/ld_so
+	$(BUILD)/$(PROFILE)/libc.a \
+	$(BUILD)/$(PROFILE)/libc.so \
+	$(BUILD)/$(PROFILE)/crt0.o \
+	$(BUILD)/$(PROFILE)/crti.o \
+	$(BUILD)/$(PROFILE)/crtn.o \
+	$(BUILD)/$(PROFILE)/ld_so
 
 install-libs: headers libs
 	mkdir -pv "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/release/libc.a" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/release/libc.so" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/$(PROFILE)/libc.a" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/$(PROFILE)/libc.so" "$(DESTDIR)/lib"
 	ln -vnfs libc.so "$(DESTDIR)/lib/libc.so.6"
-	cp -v "$(BUILD)/release/crt0.o" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/$(PROFILE)/crt0.o" "$(DESTDIR)/lib"
 	ln -vnfs crt0.o "$(DESTDIR)/lib/crt1.o"
-	cp -v "$(BUILD)/release/crti.o" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/release/crtn.o" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/release/ld_so" "$(DESTDIR)/lib/ld64.so.1"
+	cp -v "$(BUILD)/$(PROFILE)/crti.o" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/lib"
+	cp -v "$(BUILD)/$(PROFILE)/ld_so" "$(DESTDIR)/lib/ld64.so.1"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 	# Empty libraries for dl, pthread, and rt
 	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
@@ -181,7 +183,7 @@ $(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm
 	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -Wl,-soname,libc.so.6 -lgcc -o $@
 
 $(BUILD)/debug/librelibc.a: $(SRC)
-	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
+	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ -g -C debug-assertions=no $(RUSTCFLAGS)
 	./renamesyms.sh "$@" "$(BUILD)/debug/deps/"
 	touch $@
 
@@ -198,7 +200,7 @@ $(BUILD)/debug/crtn.o: $(SRC)
 	touch $@
 
 $(BUILD)/debug/ld_so.o: $(SRC)
-	$(CARGO) rustc --manifest-path ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+	$(CARGO) rustc --manifest-path ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort -g -C debug-assertions=no $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debug/libc.a $(BUILD)/debug/crtn.o

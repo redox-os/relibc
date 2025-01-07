@@ -3,18 +3,17 @@
 //! * <https://www.akkadia.org/drepper/dsohowto.pdf>
 
 use object::{
-    elf::{self, Dyn64, FileHeader64},
+    elf::{self, Sym64},
     read::elf::{
-        Dyn as _, ElfFile64, FileHeader, GnuHashTable, HashTable as SysVHashTable, ProgramHeader,
-        Sym, SymbolTable, Version, VersionTable,
+        Dyn as _, GnuHashTable, HashTable as SysVHashTable, ProgramHeader as _, Rel as _,
+        Rela as _, Sym as _, Version, VersionTable,
     },
-    Endianness, NativeEndian, Object, ObjectSection, ReadRef, SectionKind, StringTable,
-    SymbolIndex,
+    Endianness, NativeEndian, Object, StringTable, SymbolIndex,
 };
 
 use super::{
-    debug::_r_debug,
-    linker::{Scope, Symbol},
+    debug::{RTLDDebug, _r_debug},
+    linker::{Resolve, Scope, Symbol, __plt_resolve_trampoline, GLOBAL_SCOPE},
     tcb::Master,
 };
 use crate::{
@@ -27,69 +26,152 @@ use alloc::{
     vec::Vec,
 };
 use core::{
-    mem::transmute,
+    mem::size_of,
     ptr::{self, NonNull},
     slice,
 };
-#[cfg(target_pointer_width = "32")]
-use goblin::elf32::{
-    header::ET_DYN,
-    program_header,
-    section_header::{SHT_FINI_ARRAY, SHT_INIT_ARRAY},
-};
+
 #[cfg(target_pointer_width = "64")]
-use goblin::elf64::{
-    header::ET_DYN,
-    program_header,
-    section_header::{SHT_FINI_ARRAY, SHT_INIT_ARRAY},
-};
-use goblin::error::{Error, Result};
-
-type Dyn = Dyn64<NativeEndian>;
-
-enum HashTable<'a, Elf: FileHeader> {
-    Gnu(GnuHashTable<'a, Elf>),
-    Sysv(SysVHashTable<'a, Elf>),
+mod shim {
+    use object::{elf::*, read::elf::ElfFile64, NativeEndian};
+    pub type Dyn = Dyn64<NativeEndian>;
+    pub type Rel = Rel64<NativeEndian>;
+    pub type Rela = Rela64<NativeEndian>;
+    pub type Sym = Sym64<NativeEndian>;
+    pub type FileHeader = FileHeader64<NativeEndian>;
+    pub type ProgramHeader = ProgramHeader64<NativeEndian>;
+    pub type ElfFile<'a> = ElfFile64<'a, NativeEndian>;
 }
 
-impl<'a, Elf> HashTable<'a, Elf>
-where
-    Elf: FileHeader,
-{
+#[cfg(target_pointer_width = "64")]
+pub use shim::*;
+
+#[cfg(target_pointer_width = "32")]
+type Dyn = Dyn32<NativeEndian>;
+
+enum HashTable<'a> {
+    Gnu(GnuHashTable<'a, FileHeader>),
+    Sysv(SysVHashTable<'a, FileHeader>),
+}
+
+impl<'a> HashTable<'a> {
     /// Use the hash table to find the symbol table entry with the given name, hash, and version.
     #[inline]
-    pub fn find<R: ReadRef<'a>>(
+    pub fn find(
         &self,
-        endian: Elf::Endian,
         name: &str,
         version: Option<&Version<'_>>,
-        symbols: &SymbolTable<'a, Elf, R>,
-        versions: &VersionTable<'a, Elf>,
-    ) -> Option<(SymbolIndex, &'a Elf::Sym)> {
+        symbols: &'a [Sym],
+        strings: StringTable<'a>,
+        versions: &VersionTable<'a, FileHeader>,
+    ) -> Option<(SymbolIndex, &'a Sym)> {
         let name = name.as_bytes();
 
         match self {
             Self::Gnu(hash_table) => {
                 let hash = elf::gnu_hash(name);
-                hash_table.find(endian, name, hash, version, symbols, versions)
+                hash_table.find(
+                    NativeEndian,
+                    name,
+                    hash,
+                    version,
+                    symbols,
+                    strings,
+                    versions,
+                )
             }
 
             Self::Sysv(hash_table) => {
                 let hash = elf::hash(name);
-                hash_table.find(endian, name, hash, version, symbols, versions)
+                hash_table.find(
+                    NativeEndian,
+                    name,
+                    hash,
+                    version,
+                    symbols,
+                    strings,
+                    versions,
+                )
             }
+        }
+    }
+
+    fn symbol_table_length(&self) -> usize {
+        match self {
+            Self::Gnu(hash_table) => hash_table
+                .symbol_table_length(NativeEndian)
+                .expect("empty GNU symbol hash table")
+                as usize,
+            Self::Sysv(hash_table) => hash_table.symbol_table_length() as usize,
         }
     }
 }
 
-pub(super) struct Dynamic<'a> {
+type InitFn = unsafe extern "C" fn();
+
+pub(super) struct Dynamic<'data> {
     runpath: Option<String>,
     got: Option<NonNull<usize>>,
-    needed: Vec<&'a str>,
+    needed: Vec<&'data str>,
     pub(super) jmprel: usize,
-    hash_table: HashTable<'a, FileHeader64<Endianness>>,
-    pub(super) dynstrtab: StringTable<'a>,
-    soname: Option<&'a str>,
+    hash_table: HashTable<'data>,
+    pub(super) dynstrtab: StringTable<'data>,
+    soname: Option<&'data str>,
+    init_array: &'data [unsafe extern "C" fn()],
+    fini_array: &'data [unsafe extern "C" fn()],
+    rela: &'data [Rela],
+    rel: &'data [Rel],
+    symbols: &'data [Sym],
+    explicit_addend: bool,
+    pltrelsz: usize,
+}
+
+impl<'data> Dynamic<'data> {
+    pub fn symbol(&self, index: SymbolIndex) -> Option<&'data Sym> {
+        // Symbol table entry for index 0 is reserved.
+        assert!(index != SymbolIndex(0));
+        self.symbols.get(index.0)
+    }
+
+    fn symbol_name(&self, index: SymbolIndex) -> Option<&'data str> {
+        let sym = self.symbol(index)?;
+        let name = sym.name(NativeEndian, self.dynstrtab).ok()?;
+        Some(core::str::from_utf8(name).expect("non UTF-8 ELF symbol name"))
+    }
+}
+
+unsafe impl Send for Dynamic<'_> {}
+unsafe impl Sync for Dynamic<'_> {}
+
+#[derive(Debug)]
+struct Relocation {
+    offset: usize,
+    addend: usize,
+    sym: SymbolIndex,
+    kind: u32,
+}
+
+impl From<&Rela> for Relocation {
+    fn from(reloc: &Rela) -> Self {
+        let is_mips64el = cfg!(all(target_arch = "mips64", target_endian = "little"));
+        Self {
+            offset: reloc.r_offset(NativeEndian) as usize,
+            addend: reloc.r_addend(NativeEndian) as usize,
+            sym: SymbolIndex(reloc.r_sym(NativeEndian, is_mips64el) as usize),
+            kind: reloc.r_type(NativeEndian, is_mips64el),
+        }
+    }
+}
+
+impl From<&Rel> for Relocation {
+    fn from(reloc: &Rel) -> Self {
+        Self {
+            offset: reloc.r_offset(NativeEndian) as usize,
+            addend: 0,
+            sym: SymbolIndex(reloc.r_sym(NativeEndian) as usize),
+            kind: reloc.r_type(NativeEndian),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -121,47 +203,29 @@ pub struct DSO {
     pub mmap: &'static [u8],
     pub global_syms: BTreeMap<String, Symbol>,
     pub weak_syms: BTreeMap<String, Symbol>,
-    /// .init_array addr and len
-    pub init_array: (usize, usize),
-    /// .fini_array addr and len
-    pub fini_array: (usize, usize),
     pub tls_module_id: usize,
     pub tls_offset: usize,
 
     pub(super) dynamic: Dynamic<'static>,
-    pub(super) symbols: SymbolTable<'static, FileHeader64<Endianness>>,
 
     pub scope: Scope,
     /// Position Independent Executable.
     pub pie: bool,
 }
 
-unsafe impl Send for DSO {}
-unsafe impl Sync for DSO {}
-
 impl DSO {
-    pub fn new(
+    pub fn new<'a>(
         path: &str,
-        data: &'static [u8],
+        data: &'a [u8],
         base_addr: Option<usize>,
         dlopened: bool,
         id: usize,
         tls_module_id: usize,
         tls_offset: usize,
-    ) -> Result<(DSO, Option<Master>)> {
-        let elf = ElfFile64::<object::Endianness>::parse(data).unwrap();
+    ) -> object::Result<(DSO, Option<Master>, Vec<ProgramHeader>)> {
+        let elf = ElfFile::parse(data).unwrap();
         let (mmap, tcb_master, dynamic) =
             DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset).unwrap();
-
-        // dynamic.hash_table = HashTable::Gnu(
-        //     elf.elf_section_table()
-        //         .gnu_hash(Endianness::default(), data)
-        //         .unwrap()
-        //         .unwrap()
-        //         .0,
-        // );
-
-        let (init_array, fini_array) = DSO::init_fini_arrays(&elf, mmap.as_ptr() as usize);
 
         let name = match dynamic.soname {
             Some(soname) => soname.to_string(),
@@ -176,9 +240,7 @@ impl DSO {
         } else {
             elf.entry() as usize
         };
-        let endian = Endianness::default();
-        let sections = elf.elf_header().sections(endian, data).unwrap();
-        let symbols = sections.symbols(endian, data, elf::SHT_DYNSYM).unwrap();
+
         let dso = DSO {
             name,
             id,
@@ -187,8 +249,6 @@ impl DSO {
             mmap,
             global_syms: BTreeMap::new(),
             weak_syms: BTreeMap::new(),
-            init_array,
-            fini_array,
             tls_module_id: if tcb_master.is_some() {
                 tls_module_id
             } else {
@@ -197,12 +257,11 @@ impl DSO {
             tls_offset,
 
             pie: is_pie_enabled(&elf),
-            symbols,
             dynamic,
             scope: Scope::local(),
         };
 
-        Ok((dso, tcb_master))
+        Ok((dso, tcb_master, elf.elf_program_headers().to_vec()))
     }
 
     /// Global Offset Table
@@ -222,14 +281,17 @@ impl DSO {
     }
 
     pub fn get_sym(&self, name: &str) -> Option<(Symbol, SymbolBinding)> {
-        let endian = Endianness::default();
-        let (_index, sym) = self.dynamic.hash_table.find(
-            endian,
+        let (_, sym) = self.dynamic.hash_table.find(
             name,
             None,
-            &self.symbols,
+            &self.dynamic.symbols,
+            self.dynamic.dynstrtab,
             &VersionTable::default(),
         )?;
+
+        if sym.st_shndx(NativeEndian) == elf::SHN_UNDEF {
+            return None;
+        }
 
         Some((
             Symbol {
@@ -238,8 +300,8 @@ impl DSO {
                 } else {
                     0
                 },
-                value: sym.st_value(endian) as usize,
-                size: sym.st_size(endian) as usize,
+                value: sym.st_value(NativeEndian) as usize,
+                size: sym.st_size(NativeEndian) as usize,
                 sym_type: sym.st_type(),
             },
             // TODO(andypython): move this into [`Symbol`]
@@ -252,36 +314,24 @@ impl DSO {
     }
 
     pub fn run_init(&self) {
-        unsafe {
-            let (addr, size) = self.init_array;
-            for i in (0..size).step_by(8) {
-                let func = transmute::<usize, *const Option<extern "C" fn()>>(addr + i);
-                if let Some(f) = *func {
-                    f();
-                }
-            }
+        for f in self.dynamic.init_array {
+            unsafe { f() }
         }
     }
 
     pub fn run_fini(&self) {
-        unsafe {
-            let (addr, size) = self.fini_array;
-            for i in (0..size).step_by(8).rev() {
-                let func = transmute::<usize, *const Option<extern "C" fn()>>(addr + i);
-                if let Some(f) = *func {
-                    f();
-                }
-            }
+        for f in self.dynamic.fini_array.iter().rev() {
+            unsafe { f() }
         }
     }
 
     fn mmap_and_copy<'a>(
         path: &str,
-        elf: &ElfFile64<'a>,
+        elf: &ElfFile<'a>,
         data: &'a [u8],
         base_addr: Option<usize>,
         tls_offset: usize,
-    ) -> object::Result<(&'static [u8], Option<Master>, Dynamic<'a>)> {
+    ) -> object::Result<(&'static [u8], Option<Master>, Dynamic<'static>)> {
         let endian = elf.endian();
         trace!("# {}", path);
         // data for struct LinkMap
@@ -296,10 +346,10 @@ impl DSO {
                     .next_multiple_of(ph.p_align(endian) as usize);
 
                 match ph.p_type(endian) {
-                    program_header::PT_DYNAMIC => {
+                    elf::PT_DYNAMIC => {
                         l_ld = ph.p_vaddr(endian);
                     }
-                    program_header::PT_LOAD => {
+                    elf::PT_LOAD => {
                         trace!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
                         if let Some(ref mut bounds) = bounds_opt {
                             if vaddr < bounds.0 {
@@ -316,9 +366,7 @@ impl DSO {
                 }
             }
             bounds_opt
-                .ok_or(Error::Malformed(
-                    "Unable to find PT_LOAD section".to_string(),
-                ))
+                .ok_or("Unable to find PT_LOAD section".to_string())
                 .unwrap()
         };
         trace!("  bounds {:#x}, {:#x}", bounds.0, bounds.1);
@@ -349,7 +397,7 @@ impl DSO {
                     -1,
                     0,
                 )
-                .map_err(|e| Error::Malformed(format!("failed to map {}. errno: {}", path, e.0)))
+                .map_err(|e| format!("failed to map {}. errno: {}", path, e.0))
                 .unwrap();
 
                 if !(start as *mut c_void).is_null() {
@@ -368,12 +416,6 @@ impl DSO {
         let skip_load_segment_copy = base_addr.is_some();
         let mut tcb_master = None;
 
-        let base = if is_pie_enabled(elf) {
-            mmap.as_ptr() as usize
-        } else {
-            0
-        };
-
         // Copy data
         let mut dynamic = None;
         for ph in elf.elf_program_headers() {
@@ -383,7 +425,7 @@ impl DSO {
                 .next_multiple_of(ph.p_align(endian) as usize);
 
             match ph.p_type(endian) {
-                program_header::PT_LOAD => {
+                elf::PT_LOAD => {
                     if skip_load_segment_copy {
                         continue;
                     }
@@ -393,13 +435,7 @@ impl DSO {
                         let range = offset..(offset + size as usize);
                         match data.get(range.clone()) {
                             Some(some) => some,
-                            None => {
-                                return Err(Error::Malformed(format!(
-                                    "failed to read {:x?}",
-                                    range
-                                )))
-                                .unwrap()
-                            }
+                            None => return Err(format!("failed to read {:x?}", range)).unwrap(),
                         }
                     };
 
@@ -414,11 +450,7 @@ impl DSO {
                         match mmap.get_mut(range.clone()) {
                             Some(some) => some,
                             None => {
-                                return Err(Error::Malformed(format!(
-                                    "failed to write {:x?}",
-                                    range
-                                )))
-                                .unwrap();
+                                return Err(format!("failed to write {:x?}", range)).unwrap();
                             }
                         }
                     };
@@ -431,7 +463,7 @@ impl DSO {
                     );
                     mmap_data.copy_from_slice(obj_data);
                 }
-                program_header::PT_TLS => {
+                elf::PT_TLS => {
                     let ptr = unsafe {
                         if is_pie_enabled(elf) {
                             mmap.as_ptr().add(ph.p_vaddr(endian) as usize)
@@ -447,76 +479,130 @@ impl DSO {
                     trace!("  tcb master {:x?}", tcb_master);
                 }
 
-                program_header::PT_DYNAMIC => {
-                    dynamic = Some(ph.dynamic(endian, data).unwrap().unwrap())
-                }
+                elf::PT_DYNAMIC => dynamic = Some((ph, ph.dynamic(endian, data).unwrap().unwrap())),
                 _ => (),
             }
         }
 
-        Ok((
-            mmap,
-            tcb_master,
-            Self::parse_dynamic(path, base, endian, mmap, dynamic.unwrap())?,
-        ))
+        let (parsed_dynamic, debug) =
+            Self::parse_dynamic(path, mmap, is_pie_enabled(elf), dynamic.unwrap())?;
+
+        if let Some(i) = debug {
+            // FIXME: cleanup
+            let (ph, _) = dynamic.unwrap();
+            let vaddr = ph.p_vaddr(endian) as usize;
+            let bytes: [u8; size_of::<Dyn>() / 2] =
+                unsafe { core::mem::transmute((&_r_debug) as *const RTLDDebug as usize) };
+            let start = if is_pie_enabled(elf) {
+                vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
+            } else {
+                vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
+                    - mmap.as_ptr().cast_mut() as usize
+            };
+            unsafe {
+                ptr::copy_nonoverlapping(
+                    bytes.as_ptr(),
+                    mmap.as_ptr().cast_mut().add(start),
+                    bytes.len(),
+                );
+            }
+        }
+
+        Ok((mmap, tcb_master, parsed_dynamic))
     }
 
     fn parse_dynamic<'a>(
         path: &str,
-        base: usize,
-        endian: Endianness,
-        mmap: &'static [u8],
-        entries: &'a [Dyn64<Endianness>],
-    ) -> object::Result<Dynamic<'a>> {
+        mmap: &'a [u8],
+        is_pie: bool,
+        (_, entries): (&ProgramHeader, &[Dyn]),
+    ) -> object::Result<(Dynamic<'a>, Option<usize>)> {
         let mut runpath = None;
         let mut got = None;
         let mut needed = vec![];
         let mut jmprel = None;
         let mut soname = None;
         let mut hash_table = None;
+        let mut explicit_addend = None;
+        let mut pltrelsz = None;
+        let mut debug = None;
+        let mut symtab_ptr = None;
+        let (mut rel_ptr, mut rel_size) = (None, None);
         let (mut strtab_offset, mut strtab_size) = (None, None);
+        let (mut init_array_ptr, mut init_array_len) = (None, None);
+        let (mut fini_array_ptr, mut fini_array_len) = (None, None);
+        let (mut rela_offset, mut rela_size) = (None, None);
 
         for (i, entry) in entries.iter().enumerate() {
-            let val = entry.d_val(endian);
-            let tag = entry.d_tag(endian) as u32;
+            let val = entry.d_val(NativeEndian);
+            let relative_idx = val - if is_pie { 0 } else { mmap.as_ptr() as u64 };
+            let ptr = (val + if is_pie { mmap.as_ptr() as u64 } else { 0 }) as *const u8;
+            let tag = entry.d_tag(NativeEndian) as u32;
 
             match tag {
-                elf::DT_DEBUG => {
-                    // let vaddr = ph.p_vaddr(endian) as usize;
-                    // let bytes: [u8; size_of::<Dyn>() / 2] =
-                    //     unsafe { transmute((&_r_debug) as *const RTLDDebug as usize) };
-                    // let start = if is_pie_enabled(elf) {
-                    //     vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
-                    // } else {
-                    //     vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
-                    //         - mmap.as_mut_ptr() as usize
-                    // };
-                    // mmap[start..start + size_of::<Dyn>() / 2].clone_from_slice(&bytes);
-                }
+                elf::DT_DEBUG => debug = Some(i),
 
+                // {Gnu,SysV}HashTable::parse()
+                //
+                // > The header does not contain a length field, and so all of
+                // > `data` will be used as the hash table values. It does not
+                // > matter if this is longer than needed...
                 elf::DT_GNU_HASH => {
-                    let value = GnuHashTable::parse(endian, &mmap[val as usize..])?;
+                    let value = GnuHashTable::parse(NativeEndian, &mmap[relative_idx as usize..])?;
                     hash_table = Some(HashTable::Gnu(value));
                 }
 
+                // XXX: Both GNU_HASH and HASH may be present, we give priority
+                // to GNU_HASH as it is significantly faster.
                 elf::DT_HASH if hash_table.is_none() => {
-                    hash_table = Some(HashTable::Sysv(SysVHashTable::parse(
-                        endian,
-                        &mmap[val as usize..],
-                    )?));
+                    let value = SysVHashTable::parse(NativeEndian, &mmap[relative_idx as usize..])?;
+                    hash_table = Some(HashTable::Sysv(value));
                 }
 
                 elf::DT_PLTGOT => {
-                    let ptr = NonNull::new(val as *mut usize).expect("DT_PLTGOT is NULL");
-                    got = Some(unsafe { ptr.byte_add(base) });
+                    got = Some(NonNull::new(ptr as *mut usize).expect("DT_PLTGOT is NULL"));
                 }
 
                 elf::DT_NEEDED => needed.push(entry),
-                elf::DT_JMPREL => jmprel = Some(val as usize),
-                elf::DT_RUNPATH => runpath = Some(entry),
-                elf::DT_STRTAB => strtab_offset = Some(val),
+                elf::DT_JMPREL => jmprel = Some(ptr as usize),
+                elf::DT_RUNPATH => runpath = Some(entry), // FIXME(andypython): rpath
+                elf::DT_STRTAB => strtab_offset = Some(relative_idx),
                 elf::DT_STRSZ => strtab_size = Some(val),
                 elf::DT_SONAME => soname = Some(entry),
+
+                elf::DT_RELA => rela_offset = Some(ptr.cast::<Rela>()),
+                elf::DT_RELASZ => rela_size = Some(val as usize / size_of::<Rela>()),
+                elf::DT_RELAENT => {
+                    assert_eq!(val, size_of::<elf::Rela64<Endianness>>() as u64)
+                }
+
+                elf::DT_REL => rel_ptr = Some(ptr.cast::<Rel>()),
+                elf::DT_RELSZ => rel_size = Some(val as usize / size_of::<Rel>()),
+                elf::DT_RELENT => {
+                    assert_eq!(val, size_of::<elf::Rel64<Endianness>>() as u64)
+                }
+
+                elf::DT_PLTREL => {
+                    let val = val as u32;
+                    if val == elf::DT_RELA {
+                        explicit_addend = Some(true);
+                    } else {
+                        assert_eq!(val, elf::DT_REL);
+                        explicit_addend = Some(false);
+                    }
+                }
+                elf::DT_PLTRELSZ => pltrelsz = Some(val as usize),
+
+                elf::DT_INIT_ARRAY if val != 0 => init_array_ptr = Some(ptr.cast::<InitFn>()),
+                elf::DT_INIT_ARRAYSZ => init_array_len = Some(val as usize / size_of::<InitFn>()),
+
+                elf::DT_FINI_ARRAY if val != 0 => fini_array_ptr = Some(ptr.cast::<InitFn>()),
+                elf::DT_FINI_ARRAYSZ => fini_array_len = Some(val as usize / size_of::<InitFn>()),
+
+                elf::DT_SYMTAB => symtab_ptr = Some(ptr as *const Sym),
+                elf::DT_SYMENT => {
+                    assert_eq!(val, size_of::<Sym64<NativeEndian>>() as u64);
+                }
 
                 _ => {}
             }
@@ -525,13 +611,23 @@ impl DSO {
         let strtab_offset = strtab_offset.expect("mandatory DT_STRTAB not present");
         let strtab_size = strtab_size.expect("mandatory DT_STRSZ not present");
 
-        let dynstrtab = StringTable::new(mmap, strtab_offset, strtab_offset + strtab_size);
+        let dynstrtab = StringTable::new(&*mmap, strtab_offset, strtab_offset + strtab_size);
 
-        let get_str = |entry: &Dyn64<Endianness>| {
+        let get_str = |entry: &Dyn| {
             entry
-                .string(endian, dynstrtab)
+                .string(NativeEndian, dynstrtab)
                 .map(|bytes| core::str::from_utf8(bytes).expect("non utf-8 elf symbol name"))
         };
+
+        unsafe fn get_array<'a, T>(ptr: Option<*const T>, len: Option<usize>) -> &'a [T] {
+            if let Some(ptr) = ptr {
+                let len = len.expect("dynamic entry was present without it's corresponding size");
+                core::slice::from_raw_parts(ptr, len)
+            } else {
+                assert!(len.is_none());
+                &[]
+            }
+        }
 
         let needed = needed
             .into_iter()
@@ -550,39 +646,215 @@ impl DSO {
         let jmprel = jmprel.unwrap_or_default();
         let hash_table = hash_table.expect("either DT_GNU_HASH and/or DT_HASH mut be present");
 
-        Ok(Dynamic {
-            runpath,
-            got,
-            needed,
-            jmprel,
-            soname,
-            hash_table,
-            dynstrtab,
-        })
+        let init_array = unsafe { get_array(init_array_ptr, init_array_len) };
+        let fini_array = unsafe { get_array(fini_array_ptr, fini_array_len) };
+        let rela = unsafe { get_array(rela_offset, rela_size) };
+        let rel = unsafe { get_array(rel_ptr, rel_size) };
+
+        Ok((
+            Dynamic {
+                symbols: unsafe { get_array(symtab_ptr, Some(hash_table.symbol_table_length())) },
+                runpath,
+                got,
+                needed,
+                jmprel,
+                soname,
+                hash_table,
+                dynstrtab,
+                init_array,
+                fini_array,
+                rela,
+                rel,
+                explicit_addend: explicit_addend.unwrap_or_default(),
+                pltrelsz: pltrelsz.unwrap_or_default(),
+            },
+            debug,
+        ))
     }
 
-    fn init_fini_arrays(elf: &ElfFile64, mmap_addr: usize) -> ((usize, usize), (usize, usize)) {
-        let mut init_array: (usize, usize) = (0, 0);
-        let mut fini_array: (usize, usize) = (0, 0);
-        for section in elf.sections().filter(|s| {
-            matches!(
-                s.kind(),
-                SectionKind::Elf(SHT_INIT_ARRAY) | SectionKind::Elf(SHT_FINI_ARRAY)
-            )
-        }) {
-            let addr = if is_pie_enabled(elf) {
-                mmap_addr + section.address() as usize
+    fn static_relocate(&self, reloc: Relocation) -> object::Result<()> {
+        let b = self.mmap.as_ptr() as usize;
+
+        let sym = if reloc.sym.0 > 0 {
+            let name = self.dynamic.symbol_name(reloc.sym).unwrap();
+
+            GLOBAL_SCOPE
+                .read()
+                .get_sym(name)
+                .or_else(|| self.scope.get_sym(name))
+                .map(|(sym, _, obj)| (sym, obj.tls_offset))
+        } else {
+            None
+        };
+
+        let (s, t) = sym
+            .as_ref()
+            .map(|(sym, t)| (sym.as_ptr() as usize, *t))
+            .unwrap_or((0, 0));
+
+        let a = reloc.addend;
+        let ptr = if self.pie {
+            (b + reloc.offset) as *mut u8
+        } else {
+            reloc.offset as *mut u8
+        };
+
+        let set_u64 = |value| unsafe {
+            *(ptr as *mut u64) = value;
+        };
+
+        match reloc.kind {
+            elf::R_X86_64_64 => set_u64((s + a) as u64),
+            elf::R_X86_64_DTPMOD64 => set_u64(self.tls_module_id as u64),
+            elf::R_X86_64_DTPOFF64 => {
+                if s != 0 {
+                    set_u64((s - b) as u64);
+                } else {
+                    set_u64(s as u64);
+                }
+            }
+            elf::R_X86_64_GLOB_DAT => set_u64(s as u64),
+            elf::R_X86_64_RELATIVE => set_u64((b + a) as u64),
+            elf::R_X86_64_TPOFF64 => {
+                if reloc.sym.0 > 0 {
+                    let (sym, _) = sym
+                        .as_ref()
+                        .expect("R_X86_64_TPOFF64 called without valid symbol");
+                    set_u64((sym.value + a).wrapping_sub(t) as u64);
+                } else {
+                    set_u64(a.wrapping_sub(t) as u64);
+                }
+            }
+            elf::R_X86_64_IRELATIVE => unsafe {
+                let f: unsafe extern "C" fn() -> u64 = core::mem::transmute(b + a);
+                set_u64(f());
+            },
+            elf::R_X86_64_COPY => unsafe {
+                let (sym, _) = sym
+                    .as_ref()
+                    .expect("R_X86_64_COPY called without valid symbol");
+                ptr::copy_nonoverlapping(sym.as_ptr() as *const u8, ptr, sym.size);
+            },
+            _ => unimplemented!("relocation type {:#x}", reloc.kind),
+        }
+
+        Ok(())
+    }
+
+    fn lazy_relocate(&self, resolve: Resolve) -> object::Result<()> {
+        let Some(got) = self.got() else {
+            assert_eq!(self.dynamic.jmprel, 0);
+            return Ok(());
+        };
+
+        let object_base_addr = self.mmap.as_ptr() as usize;
+        let jmprel = self.dynamic.jmprel;
+        let pltrelsz = self.dynamic.pltrelsz;
+
+        unsafe {
+            got.add(1).write(core::ptr::addr_of!(*self) as usize);
+            got.add(2).write(__plt_resolve_trampoline as usize);
+        }
+
+        let relsz = if self.dynamic.explicit_addend {
+            size_of::<Rela>()
+        } else {
+            size_of::<Rel>()
+        };
+
+        for addr in (jmprel..(jmprel + pltrelsz)).step_by(relsz) {
+            let reloc: Relocation = if self.dynamic.explicit_addend {
+                unsafe { &*(addr as *const Rela) }.into()
             } else {
-                section.address() as usize
+                unsafe { &*(addr as *const Rel) }.into()
             };
-            if let SectionKind::Elf(SHT_INIT_ARRAY) = section.kind() {
-                init_array = (addr, section.size() as usize);
+
+            let ptr = if self.pie {
+                (object_base_addr + reloc.offset) as *mut usize
             } else {
-                fini_array = (addr, section.size() as usize);
+                reloc.offset as *mut usize
+            };
+
+            match (reloc.kind, resolve) {
+                (elf::R_X86_64_JUMP_SLOT, Resolve::Lazy) if self.pie => unsafe {
+                    *ptr += object_base_addr;
+                },
+
+                (elf::R_X86_64_JUMP_SLOT, Resolve::Lazy) => {
+                    // NOP.
+                }
+
+                (elf::R_X86_64_JUMP_SLOT, Resolve::Now) => {
+                    let name = self.dynamic.symbol_name(reloc.sym).unwrap();
+
+                    let resolved = GLOBAL_SCOPE
+                        .read()
+                        .get_sym(name)
+                        .or_else(|| self.scope.get_sym(name))
+                        .map(|(sym, _, _)| sym.as_ptr() as usize)
+                        .expect("unresolved symbol");
+
+                    unsafe {
+                        *ptr = resolved + reloc.addend;
+                    }
+                }
+
+                _ => {
+                    unimplemented!("relocation type {:#x}", reloc.kind)
+                }
             }
         }
 
-        (init_array, fini_array)
+        Ok(())
+    }
+
+    pub fn relocate(&self, ph: &[ProgramHeader], resolve: Resolve) -> object::Result<()> {
+        self.dynamic
+            .rela
+            .iter()
+            .try_for_each(|reloc| self.static_relocate(reloc.into()))?;
+
+        self.dynamic
+            .rel
+            .iter()
+            .try_for_each(|reloc| self.static_relocate(reloc.into()))?;
+
+        self.lazy_relocate(resolve)?;
+
+        // Protect pages
+        for ph in ph
+            .iter()
+            .filter(|ph| ph.p_type(NativeEndian) == elf::PT_LOAD)
+        {
+            let voff = ph.p_vaddr(NativeEndian) % ph.p_align(NativeEndian);
+            let vaddr = (ph.p_vaddr(NativeEndian) - voff) as usize;
+            let vsize = ((ph.p_memsz(NativeEndian) + voff) as usize)
+                .next_multiple_of(ph.p_align(NativeEndian) as usize);
+
+            let mut prot = 0;
+            if ph.p_flags(NativeEndian) & elf::PF_R == elf::PF_R {
+                prot |= sys_mman::PROT_READ;
+            }
+
+            // W ^ X. If it is executable, do not allow it to be writable, even if requested
+            if ph.p_flags(NativeEndian) & elf::PF_X == elf::PF_X {
+                prot |= sys_mman::PROT_EXEC;
+            } else if ph.p_flags(NativeEndian) & elf::PF_W == elf::PF_W {
+                prot |= sys_mman::PROT_WRITE;
+            }
+
+            unsafe {
+                let ptr = if self.pie {
+                    self.mmap.as_ptr().add(vaddr)
+                } else {
+                    vaddr as *const u8
+                };
+                trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
+                Sys::mprotect(ptr as *mut c_void, vsize, prot).expect("[ld.so]: mprotect failed");
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -593,8 +865,8 @@ impl Drop for DSO {
     }
 }
 
-pub fn is_pie_enabled(elf: &ElfFile64) -> bool {
-    elf.elf_header().e_type.get(elf.endian()) == ET_DYN
+pub fn is_pie_enabled(elf: &ElfFile) -> bool {
+    elf.elf_header().e_type.get(elf.endian()) == elf::ET_DYN
 }
 
 fn basename(path: &str) -> String {

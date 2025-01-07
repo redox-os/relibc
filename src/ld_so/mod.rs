@@ -5,7 +5,11 @@
 #![warn(warnings, unused_variables)]
 
 use core::{mem, ptr};
-use goblin::elf::program_header::{self, program_header32, program_header64, ProgramHeader};
+use object::{
+    elf::{self, ProgramHeader32, ProgramHeader64},
+    read::elf::ProgramHeader,
+    Endianness,
+};
 
 use self::tcb::{Master, Tcb};
 use crate::{
@@ -38,6 +42,9 @@ static mut STATIC_TCB_MASTER: Master = Master {
 
 #[inline(never)]
 pub fn static_init(sp: &'static Stack) {
+    const SIZEOF_PHDR64: usize = mem::size_of::<ProgramHeader64<Endianness>>();
+    const SIZEOF_PHDR32: usize = mem::size_of::<ProgramHeader32<Endianness>>();
+
     let mut phdr_opt = None;
     let mut phent_opt = None;
     let mut phnum_opt = None;
@@ -65,31 +72,47 @@ pub fn static_init(sp: &'static Stack) {
 
     for i in 0..phnum {
         let ph_addr = phdr + phent * i;
-        let ph: ProgramHeader = match phent {
-            program_header32::SIZEOF_PHDR => {
-                unsafe { *(ph_addr as *const program_header32::ProgramHeader) }.into()
-            }
-            program_header64::SIZEOF_PHDR => {
-                unsafe { *(ph_addr as *const program_header64::ProgramHeader) }.into()
-            }
+        let endian = Endianness::default();
+        let (p_align, p_filesz, p_memsz, p_type, p_vaddr) = match phent {
+            SIZEOF_PHDR64 => unsafe {
+                let ph = &*(ph_addr as *const ProgramHeader64<Endianness>);
+                (
+                    ph.p_align(endian) as usize,
+                    ph.p_filesz(endian) as usize,
+                    ph.p_memsz(endian) as usize,
+                    ph.p_type(endian),
+                    ph.p_vaddr(endian) as usize,
+                )
+            },
+
+            SIZEOF_PHDR32 => unsafe {
+                let ph = &*(ph_addr as *const ProgramHeader32<Endianness>);
+                (
+                    ph.p_align(endian) as usize,
+                    ph.p_filesz(endian) as usize,
+                    ph.p_memsz(endian) as usize,
+                    ph.p_type(endian),
+                    ph.p_vaddr(endian) as usize,
+                )
+            },
             _ => panic_notls(format_args!("unknown AT_PHENT size {}", phent)),
         };
 
         let page_size = Sys::getpagesize();
-        let voff = ph.p_vaddr as usize % page_size;
+        let voff = p_vaddr % page_size;
         // let vaddr = ph.p_vaddr as usize - voff;
-        let vsize = ((ph.p_memsz as usize + voff + page_size - 1) / page_size) * page_size;
+        let vsize = ((p_memsz + voff + page_size - 1) / page_size) * page_size;
 
-        if ph.p_type == program_header::PT_TLS {
-            let valign = if ph.p_align > 0 {
-                ((ph.p_memsz + (ph.p_align - 1)) / ph.p_align) * ph.p_align
+        if p_type == elf::PT_TLS {
+            let valign = if p_align > 0 {
+                ((p_memsz + (p_align - 1)) / p_align) * p_align
             } else {
-                ph.p_memsz
-            } as usize;
+                p_memsz
+            };
 
             unsafe {
-                STATIC_TCB_MASTER.ptr = ph.p_vaddr as usize as *const u8;
-                STATIC_TCB_MASTER.len = ph.p_filesz as usize;
+                STATIC_TCB_MASTER.ptr = p_vaddr as *const u8;
+                STATIC_TCB_MASTER.len = p_filesz;
                 STATIC_TCB_MASTER.offset = valign;
 
                 let tcb = Tcb::new(vsize).expect_notls("failed to allocate TCB");
