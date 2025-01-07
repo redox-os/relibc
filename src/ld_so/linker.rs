@@ -5,12 +5,19 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+use object::{
+    elf::Rela64,
+    read::elf::{Rela, Sym},
+    Endianness,
+};
+
 use core::{
     cell::RefCell,
     mem::transmute,
     ptr::{self, NonNull},
 };
-use goblin::elf::{dynamic::DT_STRTAB, program_header, reloc, sym::STT_TLS, Elf};
+
+use goblin::elf::{program_header, reloc, sym::STT_TLS, Elf};
 
 use crate::{
     c_str::{CStr, CString},
@@ -20,10 +27,10 @@ use crate::{
         fcntl, sys_mman,
         unistd::F_OK,
     },
-    io::{self, Read},
+    io,
     ld_so::dso::SymbolBinding,
     platform::{
-        types::{c_char, c_int, c_uint, c_void},
+        types::{c_int, c_uint, c_void},
         Pal, Sys,
     },
     sync::rwlock::RwLock,
@@ -33,7 +40,7 @@ use super::{
     access::accessible,
     callbacks::LinkerCallbacks,
     debug::{RTLDState, _dl_debug_state, _r_debug},
-    dso::{is_pie_enabled, DSO},
+    dso::DSO,
     tcb::{Master, Tcb},
     PATH_SEP,
 };
@@ -401,7 +408,7 @@ impl Linker {
                     let parent_runpath = &self
                         .objects
                         .get(&ROOT_ID)
-                        .and_then(|parent| parent.runpath.clone());
+                        .and_then(|parent| parent.runpath().map(|path| path.to_string()));
 
                     Ok(ObjectHandle::new(self.load_object(
                         name,
@@ -484,10 +491,10 @@ impl Linker {
             }
 
             let _ = self.objects.remove(&obj.id).unwrap();
-            for dep in obj.dependencies.iter() {
+            for dep in obj.dependencies() {
                 self.unload(ObjectHandle::new(
                     self.objects
-                        .get(self.name_to_object_id_map.get(dep).unwrap())
+                        .get(self.name_to_object_id_map.get(*dep).unwrap())
                         .unwrap()
                         .clone(),
                 ));
@@ -640,7 +647,7 @@ impl Linker {
 
         // new_objects is already reversed.
         for (i, obj) in new_objects.into_iter().enumerate() {
-            self.relocate(&obj, &objects_data[i], resolve)?;
+            self.relocate(&obj, objects_data[i], resolve)?;
             self.run_init(&obj);
             self.register_object(obj);
         }
@@ -663,7 +670,7 @@ impl Linker {
         base_addr: Option<usize>,
         dlopened: bool,
         new_objects: &mut Vec<Arc<DSO>>,
-        objects_data: &mut Vec<Vec<u8>>,
+        objects_data: &mut Vec<&[u8]>,
         tcb_masters: &mut Vec<Master>,
         // The object that caused this object to be loaded.
         dependent: Option<&mut DSO>,
@@ -718,8 +725,12 @@ impl Linker {
             self.next_tls_module_id += 1;
         }
 
-        let runpath = obj.runpath.clone();
-        let dependencies = obj.dependencies.clone();
+        let runpath = obj.runpath().map(|rpath| rpath.to_string());
+        let dependencies = obj
+            .dependencies()
+            .iter()
+            .map(|dep| dep.to_string())
+            .collect::<Vec<_>>();
 
         for dep_name in dependencies.iter() {
             self.load_objects_recursive(
@@ -797,10 +808,9 @@ impl Linker {
         Err(DlError::NotFound)
     }
 
-    fn read_file(&self, path: &str) -> Result<Vec<u8>> {
+    fn read_file(&self, path: &str) -> Result<&'static [u8]> {
         let debug = self.config.debug_flags.contains(DebugFlags::SEARCH);
 
-        let mut data = Vec::new();
         let path_c = CString::new(path).map_err(|err| {
             if debug {
                 eprintln!("[ld.so]: invalid path '{}': {}", path, err)
@@ -810,7 +820,7 @@ impl Linker {
         })?;
 
         let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
-        let mut file = File::open(CStr::borrow(&path_c), flags).map_err(|err| {
+        let file = File::open(CStr::borrow(&path_c), flags).map_err(|err| {
             if debug {
                 eprintln!("[ld.so]: failed to open '{}': {}", path, err)
             }
@@ -818,15 +828,24 @@ impl Linker {
             DlError::NotFound
         })?;
 
-        file.read_to_end(&mut data).map_err(|err| {
-            if debug {
-                eprintln!("[ld.so]: failed to read '{}': {}", path, err)
-            }
+        let mut stat = crate::header::sys_stat::stat::default();
+        unsafe {
+            Sys::fstat(file.fd, &mut stat).unwrap();
+        }
 
-            DlError::NotFound
-        })?;
+        let mmap_ptr = unsafe {
+            Sys::mmap(
+                ptr::null_mut(),
+                stat.st_size as usize,
+                sys_mman::PROT_READ,
+                sys_mman::MAP_PRIVATE,
+                file.fd,
+                0,
+            )
+        }
+        .unwrap();
 
-        Ok(data)
+        Ok(unsafe { core::slice::from_raw_parts(mmap_ptr as *const u8, stat.st_size as usize) })
     }
 
     /// Perform lazy relocations.
@@ -841,14 +860,14 @@ impl Linker {
         }
 
         for rel in elf.pltrelocs.iter() {
-            let ptr = if is_pie_enabled(elf) {
+            let ptr = if obj.pie {
                 (object_base_addr + rel.r_offset) as *mut u64
             } else {
                 rel.r_offset as *mut u64
             };
 
             match (rel.r_type, resolve) {
-                (reloc::R_X86_64_JUMP_SLOT, Resolve::Lazy) if is_pie_enabled(elf) => unsafe {
+                (reloc::R_X86_64_JUMP_SLOT, Resolve::Lazy) if obj.pie => unsafe {
                     *ptr += object_base_addr;
                 },
 
@@ -954,7 +973,7 @@ impl Linker {
 
             let a = rel.r_addend.unwrap_or(0) as usize;
 
-            let ptr = if is_pie_enabled(&elf) {
+            let ptr = if obj.pie {
                 (b + rel.r_offset as usize) as *mut u8
             } else {
                 rel.r_offset as *mut u8
@@ -1047,7 +1066,7 @@ impl Linker {
             }
 
             unsafe {
-                let ptr = if is_pie_enabled(&elf) {
+                let ptr = if obj.pie {
                     mmap.as_ptr().add(vaddr)
                 } else {
                     vaddr as *const u8
@@ -1101,52 +1120,35 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
 
     let obj = unsafe { &*obj };
     let obj_base = obj.mmap.as_ptr() as usize;
-    let dynamic = obj.dynamic.as_ref().unwrap();
-    let jmprel = dynamic.info.jmprel;
+    let jmprel = obj.dynamic.jmprel;
 
     let rela = unsafe {
-        &*((obj_base + jmprel) as *const reloc::reloc64::Rela).add(relocation_index as usize)
+        &*((obj_base + jmprel) as *const Rela64<Endianness>).add(relocation_index as usize)
     };
 
-    assert_eq!(
-        reloc::reloc64::r_type(rela.r_info),
-        reloc::R_X86_64_JUMP_SLOT
-    );
+    let endian = Endianness::default();
+
+    assert_eq!(rela.r_type(endian, false), reloc::R_X86_64_JUMP_SLOT);
 
     let sym = obj
-        .dynsyms
-        .get(reloc::reloc64::r_sym(rela.r_info) as usize)
+        .symbols
+        .symbol(rela.symbol(endian, false).unwrap())
         .expect("symbol not found");
-    assert_ne!(sym.st_name, 0);
+    assert_ne!(sym.st_name(endian), 0);
 
-    let strtab_offset = dynamic
-        .dyns
-        .iter()
-        .find(|r#dyn| r#dyn.d_tag == DT_STRTAB)
-        .unwrap()
-        .d_val;
+    let name = core::str::from_utf8(obj.dynamic.dynstrtab.get(sym.st_name(endian)).unwrap())
+        .expect("non utf8 symbol name");
 
-    let name = unsafe {
-        CStr::from_ptr(
-            (strtab_offset + sym.st_name as u64 + if obj.pie { obj_base as u64 } else { 0u64 })
-                as *const c_char,
-        )
-    };
-
-    let resolved = resolve_sym(name.to_str().unwrap(), &[&GLOBAL_SCOPE.read(), &obj.scope])
-        .unwrap_or_else(|| panic!("symbol '{}' not found", name.to_str().unwrap()))
+    let resolved = resolve_sym(name, &[&GLOBAL_SCOPE.read(), &obj.scope])
+        .unwrap_or_else(|| panic!("symbol '{name}' not found"))
         .as_ptr();
 
-    trace!(
-        "@plt: {} -> *mut {:#x}",
-        name.to_string_lossy(),
-        resolved as usize
-    );
+    trace!("@plt: {} -> *mut {:#x}", name, resolved as usize);
 
     let ptr = if obj.pie {
-        (obj_base as u64 + rela.r_offset) as *mut u64
+        (obj_base as u64 + rela.r_offset(endian)) as *mut u64
     } else {
-        rela.r_offset as *mut u64
+        rela.r_offset(endian) as *mut u64
     };
 
     unsafe { *ptr = resolved as u64 }

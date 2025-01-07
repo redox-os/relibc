@@ -80,31 +80,28 @@ pub fn static_init(sp: &'static Stack) {
         // let vaddr = ph.p_vaddr as usize - voff;
         let vsize = ((ph.p_memsz as usize + voff + page_size - 1) / page_size) * page_size;
 
-        match ph.p_type {
-            program_header::PT_TLS => {
-                let valign = if ph.p_align > 0 {
-                    ((ph.p_memsz + (ph.p_align - 1)) / ph.p_align) * ph.p_align
-                } else {
-                    ph.p_memsz
-                } as usize;
+        if ph.p_type == program_header::PT_TLS {
+            let valign = if ph.p_align > 0 {
+                ((ph.p_memsz + (ph.p_align - 1)) / ph.p_align) * ph.p_align
+            } else {
+                ph.p_memsz
+            } as usize;
 
-                unsafe {
-                    STATIC_TCB_MASTER.ptr = ph.p_vaddr as usize as *const u8;
-                    STATIC_TCB_MASTER.len = ph.p_filesz as usize;
-                    STATIC_TCB_MASTER.offset = valign;
+            unsafe {
+                STATIC_TCB_MASTER.ptr = ph.p_vaddr as usize as *const u8;
+                STATIC_TCB_MASTER.len = ph.p_filesz as usize;
+                STATIC_TCB_MASTER.offset = valign;
 
-                    let tcb = Tcb::new(vsize).expect_notls("failed to allocate TCB");
-                    tcb.masters_ptr = &mut STATIC_TCB_MASTER;
-                    tcb.masters_len = mem::size_of::<Master>();
-                    tcb.copy_masters()
-                        .expect_notls("failed to copy TLS master data");
-                    tcb.activate();
-                }
-
-                //TODO: Warning on multiple TLS sections?
-                return;
+                let tcb = Tcb::new(vsize).expect_notls("failed to allocate TCB");
+                tcb.masters_ptr = ptr::addr_of_mut!(STATIC_TCB_MASTER);
+                tcb.masters_len = mem::size_of::<Master>();
+                tcb.copy_masters()
+                    .expect_notls("failed to copy TLS master data");
+                tcb.activate();
             }
-            _ => (),
+
+            //TODO: Warning on multiple TLS sections?
+            return;
         }
     }
 }
@@ -175,7 +172,7 @@ pub unsafe fn init(sp: &'static Stack) {
 pub unsafe fn fini() {
     if let Some(tcb) = Tcb::current() {
         if !tcb.linker_ptr.is_null() {
-            let linker = (&*tcb.linker_ptr).lock();
+            let linker = (*tcb.linker_ptr).lock();
             linker.fini();
         }
     }

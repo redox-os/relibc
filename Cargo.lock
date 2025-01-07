@@ -275,6 +275,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "object"
+version = "0.36.7"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "parse-zoneinfo"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -484,11 +491,11 @@ dependencies = [
  "chrono-tz",
  "dlmalloc",
  "generic-rt",
- "goblin",
  "libc",
  "libm",
  "md-5",
  "memchr",
+ "object",
  "pbkdf2",
  "plain",
  "posix-regex",
