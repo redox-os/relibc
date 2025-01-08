@@ -22,7 +22,9 @@ use core::{
 pub use self::constants::*;
 
 pub mod constants;
+
 mod strftime;
+mod strptime;
 
 const YEARS_PER_ERA: time_t = 400;
 const DAYS_PER_ERA: time_t = 146097;
@@ -463,11 +465,6 @@ pub unsafe extern "C" fn strftime(
     } else {
         0
     }
-}
-
-// #[no_mangle]
-pub extern "C" fn strptime(buf: *const c_char, format: *const c_char, tm: *mut tm) -> *mut c_char {
-    unimplemented!();
 }
 
 #[no_mangle]

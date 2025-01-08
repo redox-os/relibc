@@ -30,7 +30,7 @@ pub mod grp;
 // TODO: iconv.h
 pub mod inttypes;
 // iso646.h implemented in C
-// TODO: langinfo.h
+pub mod langinfo;
 // TODO: libintl.h
 pub mod libgen;
 pub mod limits;
