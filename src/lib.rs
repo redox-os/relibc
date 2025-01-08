@@ -23,6 +23,7 @@
 #![feature(lang_items)]
 #![feature(let_chains)]
 #![feature(linkage)]
+#![feature(naked_functions)]
 #![feature(pointer_is_aligned_to)]
 #![feature(ptr_as_uninit)]
 #![feature(slice_as_chunks)]
@@ -44,7 +45,6 @@
 #[macro_use]
 extern crate alloc;
 extern crate cbitset;
-extern crate goblin;
 extern crate memchr;
 extern crate posix_regex;
 extern crate rand;

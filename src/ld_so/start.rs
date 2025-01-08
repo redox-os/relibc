@@ -26,7 +26,12 @@ use super::{
     PATH_SEP,
 };
 use crate::header::sys_auxv::{AT_ENTRY, AT_PHDR};
-use goblin::elf::header::header64::SIZEOF_EHDR;
+
+#[cfg(target_pointer_width = "32")]
+pub const SIZEOF_EHDR: usize = 52;
+
+#[cfg(target_pointer_width = "64")]
+pub const SIZEOF_EHDR: usize = 64;
 
 unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
     //traverse the stack and collect argument vector

@@ -275,6 +275,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "object"
+version = "0.36.7"
+source = "git+https://gitlab.redox-os.org/andypython/object#7270e3f0d06e5ef4c2b80abc6166d31f4ddf4fea"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "parse-zoneinfo"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -484,11 +492,11 @@ dependencies = [
  "chrono-tz",
  "dlmalloc",
  "generic-rt",
- "goblin",
  "libc",
  "libm",
  "md-5",
  "memchr",
+ "object",
  "pbkdf2",
  "plain",
  "posix-regex",

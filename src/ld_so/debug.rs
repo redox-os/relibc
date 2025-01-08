@@ -112,7 +112,7 @@ impl LinkMap {
         }
         unsafe {
             (*node).l_prev = last;
-            (*last).l_next = node;
+            last.l_next = node;
         }
     }
 }

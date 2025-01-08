@@ -49,11 +49,7 @@ generic-rt = { path = "generic-rt" }
 chrono-tz = {version = "0.10", default-features = false}
 chrono = {version = "0.4", default-features = false, features = ["alloc"]}
 libm = "0.2"
-
-[dependencies.goblin]
-version = "0.7"
-default-features = false
-features = ["elf32", "elf64", "endian_fd"]
+object = { version = "0.36.7", git = "https://gitlab.redox-os.org/andypython/object", default-features = false, features = ["elf", "read_core"] }
 
 [dependencies.dlmalloc]
 path = "dlmalloc-rs"
