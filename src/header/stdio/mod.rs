@@ -1050,6 +1050,12 @@ pub unsafe extern "C" fn setbuf(stream: *mut FILE, buf: *mut c_char) {
     );
 }
 
+/// Set buffering of `stream` to line buffered
+#[no_mangle]
+pub unsafe extern "C" fn setlinebuf(stream: *mut FILE) {
+    setvbuf(stream, NULL, _IOLBF, 0);
+}
+
 /// Reset `stream` to use buffer `buf` of size `size`
 /// If this isn't the meaning of unsafe, idk what is
 #[no_mangle]
