@@ -73,12 +73,12 @@ impl<'a, T: Zero> NulTerminated<'a, T> {
     /// elements of type `T`, and the value 0 must be present within the
     /// buffer at or after `ptr` (not necessarily at the end). The buffer must
     /// not be written to for the lifetime of the iterator.
-    pub unsafe fn new(ptr: *const T) -> Self {
-        NulTerminated {
+    pub unsafe fn new(ptr: *const T) -> Option<Self> {
+        Some(NulTerminated {
             // NonNull can only wrap only *mut pointers...
-            ptr: NonNull::new(ptr.cast_mut()).unwrap(),
+            ptr: NonNull::new(ptr.cast_mut())?,
             phantom: PhantomData,
-        }
+        })
     }
 }
 

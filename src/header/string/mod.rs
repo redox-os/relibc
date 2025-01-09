@@ -394,7 +394,7 @@ pub unsafe extern "C" fn strcoll(s1: *const c_char, s2: *const c_char) -> c_int 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcpy.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strcpy(dst: *mut c_char, src: *const c_char) -> *mut c_char {
-    let src_iter = unsafe { NulTerminated::new(src) };
+    let src_iter = unsafe { NulTerminated::new(src).unwrap() };
     let src_dest_iter = unsafe { SrcDstPtrIter::new(src_iter.chain(once(&0)), dst) };
     for (src_item, dst_item) in src_dest_iter {
         dst_item.write(*src_item);
@@ -524,7 +524,7 @@ pub unsafe extern "C" fn strlcpy(dst: *mut c_char, src: *const c_char, n: size_t
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strlen.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
-    unsafe { NulTerminated::new(s) }.count()
+    unsafe { NulTerminated::new(s).unwrap() }.count()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncat.html>.
@@ -592,7 +592,7 @@ pub unsafe extern "C" fn strndup(s1: *const c_char, size: size_t) -> *mut c_char
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strlen.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strnlen(s: *const c_char, size: size_t) -> size_t {
-    unsafe { NulTerminated::new(s) }.take(size).count()
+    unsafe { NulTerminated::new(s).unwrap() }.take(size).count()
 }
 
 /// Non-POSIX, see <https://en.cppreference.com/w/c/string/byte/strlen>.

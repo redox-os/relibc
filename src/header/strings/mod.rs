@@ -67,8 +67,8 @@ pub unsafe extern "C" fn rindex(s: *const c_char, c: c_int) -> *mut c_char {
 #[no_mangle]
 pub unsafe extern "C" fn strcasecmp(s1: *const c_char, s2: *const c_char) -> c_int {
     // SAFETY: the caller must ensure that s1 and s2 point to nul-terminated buffers.
-    let s1_iter = unsafe { NulTerminated::new(s1) }.chain(once(&0));
-    let s2_iter = unsafe { NulTerminated::new(s2) }.chain(once(&0));
+    let s1_iter = unsafe { NulTerminated::new(s1).unwrap() }.chain(once(&0));
+    let s2_iter = unsafe { NulTerminated::new(s2).unwrap() }.chain(once(&0));
 
     let zipped = zip(s1_iter, s2_iter);
     inner_casecmp(zipped)
@@ -77,8 +77,8 @@ pub unsafe extern "C" fn strcasecmp(s1: *const c_char, s2: *const c_char) -> c_i
 #[no_mangle]
 pub unsafe extern "C" fn strncasecmp(s1: *const c_char, s2: *const c_char, n: size_t) -> c_int {
     // SAFETY: the caller must ensure that s1 and s2 point to nul-terminated buffers.
-    let s1_iter = unsafe { NulTerminated::new(s1) }.chain(once(&0));
-    let s2_iter = unsafe { NulTerminated::new(s2) }.chain(once(&0));
+    let s1_iter = unsafe { NulTerminated::new(s1).unwrap() }.chain(once(&0));
+    let s2_iter = unsafe { NulTerminated::new(s2).unwrap() }.chain(once(&0));
 
     let zipped = zip(s1_iter, s2_iter).take(n);
     inner_casecmp(zipped)
