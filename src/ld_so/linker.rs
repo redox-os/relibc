@@ -396,7 +396,7 @@ impl Linker {
         noload: bool,
     ) -> Result<ObjectHandle> {
         trace!(
-            "[ld.so] dlopen({:?}, {:#?}, {:#?}, noload={})",
+            "[ld.so] load_library(name={:?}, resolve={:#?}, scope={:#?}, noload={})",
             name,
             resolve,
             scope,
@@ -455,12 +455,10 @@ impl Linker {
                 }
             }
 
-            None => Ok(ObjectHandle::new(
-                self.objects
-                    .get(&ROOT_ID)
-                    .expect("root object missing")
-                    .clone(),
-            )),
+            None => match self.objects.get(&ROOT_ID) {
+                Some(obj) => Ok(ObjectHandle::new(obj.clone())),
+                None => Err(DlError::NotFound),
+            },
         }
     }
 
