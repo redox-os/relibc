@@ -420,7 +420,6 @@ impl DSO {
         let mut dynamic = None;
         for ph in elf.elf_program_headers() {
             let voff = ph.p_vaddr(endian) % ph.p_align(endian);
-            // let vaddr = (ph.p_vaddr - voff) as usize;
             let vsize = ((ph.p_memsz(endian) + voff) as usize)
                 .next_multiple_of(ph.p_align(endian) as usize);
 
@@ -456,7 +455,7 @@ impl DSO {
                     };
                     trace!(
                         "  copy {:#x}, {:#x}: {:#x}, {:#x}",
-                        vaddr,
+                        ph.p_vaddr(endian) - voff,
                         vsize,
                         voff,
                         obj_data.len()

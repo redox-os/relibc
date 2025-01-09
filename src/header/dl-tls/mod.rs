@@ -26,7 +26,7 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
         ti.ti_module,
         ti.ti_offset,
         masters.len(),
-        tcb.dtv_mut().unwrap().len()
+        tcb.dtv_mut().len()
     );
 
     if tcb.dtv_mut().len() < masters.len() {
