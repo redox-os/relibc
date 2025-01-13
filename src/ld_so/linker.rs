@@ -24,7 +24,7 @@ use crate::{
         fcntl, sys_mman,
         unistd::F_OK,
     },
-    ld_so::dso::SymbolBinding,
+    ld_so::dso::{resolve_sym, SymbolBinding},
     platform::{
         types::{c_int, c_uint, c_void},
         Pal, Sys,
@@ -879,13 +879,6 @@ impl Linker {
 //
 // FIXME(andypython): 32-bit
 extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> *mut c_void {
-    let resolve_sym = |name: &str, scopes: &[&Scope]| -> Option<Symbol> {
-        scopes
-            .iter()
-            .find_map(|scope| scope.get_sym(name))
-            .map(|(sym, _, _)| sym)
-    };
-
     let obj = unsafe { &*obj };
     let obj_base = obj.mmap.as_ptr() as usize;
     let jmprel = obj.dynamic.jmprel;
@@ -908,6 +901,7 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
     .expect("non utf8 symbol name");
 
     let resolved = resolve_sym(name, &[&GLOBAL_SCOPE.read(), &obj.scope])
+        .map(|(sym, _, _)| sym)
         .unwrap_or_else(|| panic!("symbol '{name}' not found"))
         .as_ptr();
 
