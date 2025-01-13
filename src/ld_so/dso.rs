@@ -23,6 +23,7 @@ use crate::{
 use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
+    sync::Arc,
     vec::Vec,
 };
 use core::{
@@ -137,6 +138,13 @@ impl<'data> Dynamic<'data> {
         let sym = self.symbol(index)?;
         let name = sym.name(NativeEndian, self.dynstrtab).ok()?;
         Some(core::str::from_utf8(name).expect("non UTF-8 ELF symbol name"))
+    }
+
+    fn static_relocations(&self) -> impl Iterator<Item = Relocation> + '_ {
+        self.rela
+            .iter()
+            .map(Relocation::from)
+            .chain(self.rel.iter().map(Relocation::from))
     }
 }
 
@@ -671,16 +679,13 @@ impl DSO {
         ))
     }
 
-    fn static_relocate(&self, reloc: Relocation) -> object::Result<()> {
+    fn static_relocate(&self, global_scope: &Scope, reloc: Relocation) -> object::Result<()> {
         let b = self.mmap.as_ptr() as usize;
 
         let sym = if reloc.sym.0 > 0 {
             let name = self.dynamic.symbol_name(reloc.sym).unwrap();
 
-            GLOBAL_SCOPE
-                .read()
-                .get_sym(name)
-                .or_else(|| self.scope.get_sym(name))
+            resolve_sym(name, &[global_scope, &self.scope])
                 .map(|(sym, _, obj)| (sym, obj.tls_offset))
         } else {
             None
@@ -740,7 +745,7 @@ impl DSO {
         Ok(())
     }
 
-    fn lazy_relocate(&self, resolve: Resolve) -> object::Result<()> {
+    fn lazy_relocate(&self, global_scope: &Scope, resolve: Resolve) -> object::Result<()> {
         let Some(got) = self.got() else {
             assert_eq!(self.dynamic.jmprel, 0);
             return Ok(());
@@ -786,10 +791,7 @@ impl DSO {
                 (elf::R_X86_64_JUMP_SLOT, Resolve::Now) => {
                     let name = self.dynamic.symbol_name(reloc.sym).unwrap();
 
-                    let resolved = GLOBAL_SCOPE
-                        .read()
-                        .get_sym(name)
-                        .or_else(|| self.scope.get_sym(name))
+                    let resolved = resolve_sym(name, &[global_scope, &self.scope])
                         .map(|(sym, _, _)| sym.as_ptr() as usize)
                         .expect("unresolved symbol");
 
@@ -808,17 +810,13 @@ impl DSO {
     }
 
     pub fn relocate(&self, ph: &[ProgramHeader], resolve: Resolve) -> object::Result<()> {
-        self.dynamic
-            .rela
-            .iter()
-            .try_for_each(|reloc| self.static_relocate(reloc.into()))?;
+        let global_scope = GLOBAL_SCOPE.read();
 
         self.dynamic
-            .rel
-            .iter()
-            .try_for_each(|reloc| self.static_relocate(reloc.into()))?;
+            .static_relocations()
+            .try_for_each(|reloc| self.static_relocate(&global_scope, reloc))?;
 
-        self.lazy_relocate(resolve)?;
+        self.lazy_relocate(&global_scope, resolve)?;
 
         // Protect pages
         for ph in ph
@@ -864,7 +862,7 @@ impl Drop for DSO {
     }
 }
 
-pub fn is_pie_enabled(elf: &ElfFile) -> bool {
+fn is_pie_enabled(elf: &ElfFile) -> bool {
     elf.elf_header().e_type.get(elf.endian()) == elf::ET_DYN
 }
 
@@ -876,4 +874,8 @@ fn dirname(path: &str) -> String {
     let mut parts: Vec<&str> = path.split("/").collect();
     parts.truncate(parts.len() - 1);
     parts.join("/")
+}
+
+pub fn resolve_sym(name: &str, scopes: &[&Scope]) -> Option<(Symbol, SymbolBinding, Arc<DSO>)> {
+    scopes.iter().find_map(|scope| scope.get_sym(name))
 }
