@@ -218,7 +218,15 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenl
 	$(AR) -M < "$@.mri"
 
 $(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
-	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -Wl,-soname,libc.so.6 -lgcc -o $@
+	$(CC) -nostdlib -shared \
+		-Wl,--gc-sections \
+		-Wl,-z,pack-relative-relocs \
+		-Wl,--sort-common \
+		-Wl,--allow-multiple-definition \
+		-Wl,--whole-archive $^ -Wl,--no-whole-archive \
+		-Wl,-soname,libc.so.6 \
+		-lgcc \
+		-o $@
 
 $(BUILD)/release/librelibc.a: $(SRC)
 	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
