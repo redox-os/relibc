@@ -46,7 +46,9 @@ mod shim {
 
 #[cfg(target_pointer_width = "64")]
 mod shim {
+    use core::{ffi::c_char, mem::size_of};
     use object::{elf::*, read::elf::ElfFile64, NativeEndian};
+
     pub type Dyn = Dyn64<NativeEndian>;
     pub type Rel = Rel64<NativeEndian>;
     pub type Rela = Rela64<NativeEndian>;
@@ -54,6 +56,9 @@ mod shim {
     pub type FileHeader = FileHeader64<NativeEndian>;
     pub type ProgramHeader = ProgramHeader64<NativeEndian>;
     pub type ElfFile<'a> = ElfFile64<'a, NativeEndian>;
+    pub type Relr = u64;
+
+    pub const CHAR_BITS: usize = size_of::<c_char>() * 8;
 }
 
 pub use shim::*;
@@ -129,6 +134,7 @@ pub(super) struct Dynamic<'data> {
     init_array: &'data [unsafe extern "C" fn()],
     fini_array: &'data [unsafe extern "C" fn()],
     rela: &'data [Rela],
+    relr: &'data [Relr],
     rel: &'data [Rel],
     symbols: &'data [Sym],
     explicit_addend: bool,
@@ -545,6 +551,10 @@ impl DSO {
         is_pie: bool,
         (_, entries): (&ProgramHeader, &[Dyn]),
     ) -> object::Result<(Dynamic<'a>, Option<usize>)> {
+        const DT_RELRSZ: u32 = 35;
+        const DT_RELR: u32 = 36;
+        const DT_RELRENT: u32 = 37;
+
         let mut runpath = None;
         let mut got = None;
         let mut needed = vec![];
@@ -555,11 +565,12 @@ impl DSO {
         let mut pltrelsz = None;
         let mut debug = None;
         let mut symtab_ptr = None;
-        let (mut rel_ptr, mut rel_size) = (None, None);
+        let (mut rel_ptr, mut rel_len) = (None, None);
+        let (mut relr_ptr, mut relr_len) = (None, None);
         let (mut strtab_offset, mut strtab_size) = (None, None);
         let (mut init_array_ptr, mut init_array_len) = (None, None);
         let (mut fini_array_ptr, mut fini_array_len) = (None, None);
-        let (mut rela_offset, mut rela_size) = (None, None);
+        let (mut rela_offset, mut rela_len) = (None, None);
 
         for (i, entry) in entries.iter().enumerate() {
             let val = entry.d_val(NativeEndian);
@@ -599,15 +610,21 @@ impl DSO {
                 elf::DT_SONAME => soname = Some(entry),
 
                 elf::DT_RELA => rela_offset = Some(ptr.cast::<Rela>()),
-                elf::DT_RELASZ => rela_size = Some(val as usize / size_of::<Rela>()),
+                elf::DT_RELASZ => rela_len = Some(val as usize / size_of::<Rela>()),
                 elf::DT_RELAENT => {
-                    assert_eq!(val as usize, size_of::<elf::Rela64<Endianness>>())
+                    assert_eq!(val, size_of::<Rela>() as u64)
                 }
 
                 elf::DT_REL => rel_ptr = Some(ptr.cast::<Rel>()),
-                elf::DT_RELSZ => rel_size = Some(val as usize / size_of::<Rel>()),
+                elf::DT_RELSZ => rel_len = Some(val as usize / size_of::<Rel>()),
                 elf::DT_RELENT => {
-                    assert_eq!(val as usize, size_of::<elf::Rel64<Endianness>>())
+                    assert_eq!(val, size_of::<Rel>() as u64)
+                }
+
+                DT_RELR => relr_ptr = Some(ptr.cast::<Relr>()),
+                DT_RELRSZ => relr_len = Some(val as usize / size_of::<Relr>()),
+                DT_RELRENT => {
+                    assert_eq!(val, size_of::<Relr>() as u64)
                 }
 
                 elf::DT_PLTREL => {
@@ -680,8 +697,9 @@ impl DSO {
 
         let init_array = unsafe { get_array(init_array_ptr, init_array_len) };
         let fini_array = unsafe { get_array(fini_array_ptr, fini_array_len) };
-        let rela = unsafe { get_array(rela_offset, rela_size) };
-        let rel = unsafe { get_array(rel_ptr, rel_size) };
+        let rela = unsafe { get_array(rela_offset, rela_len) };
+        let relr = unsafe { get_array(relr_ptr, relr_len) };
+        let rel = unsafe { get_array(rel_ptr, rel_len) };
 
         Ok((
             Dynamic {
@@ -697,6 +715,7 @@ impl DSO {
                 fini_array,
                 rela,
                 rel,
+                relr,
                 explicit_addend: explicit_addend.unwrap_or_default(),
                 pltrelsz: pltrelsz.unwrap_or_default(),
             },
@@ -836,6 +855,37 @@ impl DSO {
 
     pub fn relocate(&self, ph: &[ProgramHeader], resolve: Resolve) -> object::Result<()> {
         let global_scope = GLOBAL_SCOPE.read();
+        let base = self.mmap.as_ptr();
+
+        // Apply DT_RELR relative relocations.
+        let mut addr = ptr::null_mut();
+        for &entry in self.dynamic.relr {
+            if entry & 1 == 0 {
+                // An even entry sets up `addr` for subsequent odd entries.
+                unsafe {
+                    addr = base.add(entry as usize) as *mut usize;
+                    *addr += base as usize;
+                    addr = addr.add(1);
+                }
+            } else {
+                // An odd entry indicates a bitmap describing at maximum 63
+                // (for 64-bit) or 31 (for 32-bit) locations following `addr`.
+                // Odd entries can be chained.
+                let mut entry = entry >> 1;
+                let mut i = 0;
+                while entry != 0 {
+                    if entry & 1 != 0 {
+                        unsafe {
+                            *addr.add(i) += base as usize;
+                        }
+                    }
+                    entry >>= 1;
+                    i += 1;
+                }
+
+                addr = unsafe { addr.add(CHAR_BITS * size_of::<Relr>() - 1) };
+            }
+        }
 
         self.dynamic
             .static_relocations()
