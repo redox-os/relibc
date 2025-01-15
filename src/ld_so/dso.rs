@@ -8,7 +8,7 @@ use object::{
         Dyn as _, GnuHashTable, HashTable as SysVHashTable, ProgramHeader as _, Rel as _,
         Rela as _, Sym as _, Version, VersionTable,
     },
-    Endianness, NativeEndian, Object, StringTable, SymbolIndex,
+    NativeEndian, Object, StringTable, SymbolIndex,
 };
 
 use super::{
@@ -27,10 +27,14 @@ use alloc::{
     vec::Vec,
 };
 use core::{
+    ffi::c_char,
     mem::size_of,
     ptr::{self, NonNull},
     slice,
 };
+
+pub const CHAR_BITS: usize = size_of::<c_char>() * 8;
+pub type Relr = usize;
 
 #[cfg(target_pointer_width = "32")]
 mod shim {
@@ -46,9 +50,7 @@ mod shim {
 
 #[cfg(target_pointer_width = "64")]
 mod shim {
-    use core::{ffi::c_char, mem::size_of};
     use object::{elf::*, read::elf::ElfFile64, NativeEndian};
-
     pub type Dyn = Dyn64<NativeEndian>;
     pub type Rel = Rel64<NativeEndian>;
     pub type Rela = Rela64<NativeEndian>;
@@ -56,9 +58,6 @@ mod shim {
     pub type FileHeader = FileHeader64<NativeEndian>;
     pub type ProgramHeader = ProgramHeader64<NativeEndian>;
     pub type ElfFile<'a> = ElfFile64<'a, NativeEndian>;
-    pub type Relr = u64;
-
-    pub const CHAR_BITS: usize = size_of::<c_char>() * 8;
 }
 
 pub use shim::*;
