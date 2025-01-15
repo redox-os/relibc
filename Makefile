@@ -168,6 +168,19 @@ test: sysroot
 	$(MAKE) -C tests run
 	$(MAKE) -C tests verify
 
+
+$(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+	$(CC) -nostdlib \
+		-shared \
+		-Wl,--gc-sections \
+		-Wl,-z,pack-relative-relocs \
+		-Wl,--sort-common \
+		-Wl,--allow-multiple-definition \
+		-Wl,--whole-archive $^ -Wl,--no-whole-archive \
+		-Wl,-soname,libc.so.6 \
+		-lgcc \
+		-o $@
+
 # Debug targets
 
 $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
@@ -178,9 +191,6 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.
 	echo "save" >> "$@.mri"
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
-
-$(BUILD)/debug/libc.so: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
-	$(CC) -nostdlib -shared -Wl,--allow-multiple-definition -Wl,--whole-archive $^ -Wl,--no-whole-archive -Wl,-soname,libc.so.6 -lgcc -o $@
 
 $(BUILD)/debug/librelibc.a: $(SRC)
 	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ -g -C debug-assertions=no $(RUSTCFLAGS)
@@ -216,17 +226,6 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenl
 	echo "save" >> "$@.mri"
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
-
-$(BUILD)/release/libc.so: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
-	$(CC) -nostdlib -shared \
-		-Wl,--gc-sections \
-		-Wl,-z,pack-relative-relocs \
-		-Wl,--sort-common \
-		-Wl,--allow-multiple-definition \
-		-Wl,--whole-archive $^ -Wl,--no-whole-archive \
-		-Wl,-soname,libc.so.6 \
-		-lgcc \
-		-o $@
 
 $(BUILD)/release/librelibc.a: $(SRC)
 	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
