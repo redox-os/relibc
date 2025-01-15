@@ -878,6 +878,7 @@ impl Linker {
 // The trampoline will then jump to the resolved symbol.
 //
 // FIXME(andypython): 32-bit
+#[cfg(target_pointer_width = "64")]
 extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> *mut c_void {
     let obj = unsafe { &*obj };
     let obj_base = obj.mmap.as_ptr() as usize;

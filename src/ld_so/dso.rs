@@ -32,6 +32,18 @@ use core::{
     slice,
 };
 
+#[cfg(target_pointer_width = "32")]
+mod shim {
+    use object::{elf::*, read::elf::ElfFile32, NativeEndian};
+    pub type Dyn = Dyn32<NativeEndian>;
+    pub type Rel = Rel32<NativeEndian>;
+    pub type Rela = Rela32<NativeEndian>;
+    pub type Sym = Sym32<NativeEndian>;
+    pub type FileHeader = FileHeader32<NativeEndian>;
+    pub type ProgramHeader = ProgramHeader32<NativeEndian>;
+    pub type ElfFile<'a> = ElfFile32<'a, NativeEndian>;
+}
+
 #[cfg(target_pointer_width = "64")]
 mod shim {
     use object::{elf::*, read::elf::ElfFile64, NativeEndian};
@@ -44,11 +56,7 @@ mod shim {
     pub type ElfFile<'a> = ElfFile64<'a, NativeEndian>;
 }
 
-#[cfg(target_pointer_width = "64")]
 pub use shim::*;
-
-#[cfg(target_pointer_width = "32")]
-type Dyn = Dyn32<NativeEndian>;
 
 enum HashTable<'a> {
     Gnu(GnuHashTable<'a, FileHeader>),
@@ -159,6 +167,19 @@ struct Relocation {
     kind: u32,
 }
 
+#[cfg(target_pointer_width = "32")]
+impl From<&Rela> for Relocation {
+    fn from(reloc: &Rela) -> Self {
+        Self {
+            offset: reloc.r_offset(NativeEndian) as usize,
+            addend: reloc.r_addend(NativeEndian) as usize,
+            sym: SymbolIndex(reloc.r_sym(NativeEndian) as usize),
+            kind: reloc.r_type(NativeEndian),
+        }
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
 impl From<&Rela> for Relocation {
     fn from(reloc: &Rela) -> Self {
         let is_mips64el = cfg!(all(target_arch = "mips64", target_endian = "little"));
@@ -542,8 +563,8 @@ impl DSO {
 
         for (i, entry) in entries.iter().enumerate() {
             let val = entry.d_val(NativeEndian);
-            let relative_idx = val - if is_pie { 0 } else { mmap.as_ptr() as u64 };
-            let ptr = (val + if is_pie { mmap.as_ptr() as u64 } else { 0 }) as *const u8;
+            let relative_idx = val as usize - if is_pie { 0 } else { mmap.as_ptr() as usize };
+            let ptr = (val as usize + if is_pie { mmap.as_ptr() as usize } else { 0 }) as *const u8;
             let tag = entry.d_tag(NativeEndian) as u32;
 
             match tag {
@@ -555,14 +576,14 @@ impl DSO {
                 // > `data` will be used as the hash table values. It does not
                 // > matter if this is longer than needed...
                 elf::DT_GNU_HASH => {
-                    let value = GnuHashTable::parse(NativeEndian, &mmap[relative_idx as usize..])?;
+                    let value = GnuHashTable::parse(NativeEndian, &mmap[relative_idx..])?;
                     hash_table = Some(HashTable::Gnu(value));
                 }
 
                 // XXX: Both GNU_HASH and HASH may be present, we give priority
                 // to GNU_HASH as it is significantly faster.
                 elf::DT_HASH if hash_table.is_none() => {
-                    let value = SysVHashTable::parse(NativeEndian, &mmap[relative_idx as usize..])?;
+                    let value = SysVHashTable::parse(NativeEndian, &mmap[relative_idx..])?;
                     hash_table = Some(HashTable::Sysv(value));
                 }
 
@@ -580,13 +601,13 @@ impl DSO {
                 elf::DT_RELA => rela_offset = Some(ptr.cast::<Rela>()),
                 elf::DT_RELASZ => rela_size = Some(val as usize / size_of::<Rela>()),
                 elf::DT_RELAENT => {
-                    assert_eq!(val, size_of::<elf::Rela64<Endianness>>() as u64)
+                    assert_eq!(val as usize, size_of::<elf::Rela64<Endianness>>())
                 }
 
                 elf::DT_REL => rel_ptr = Some(ptr.cast::<Rel>()),
                 elf::DT_RELSZ => rel_size = Some(val as usize / size_of::<Rel>()),
                 elf::DT_RELENT => {
-                    assert_eq!(val, size_of::<elf::Rel64<Endianness>>() as u64)
+                    assert_eq!(val as usize, size_of::<elf::Rel64<Endianness>>())
                 }
 
                 elf::DT_PLTREL => {
@@ -608,7 +629,7 @@ impl DSO {
 
                 elf::DT_SYMTAB => symtab_ptr = Some(ptr as *const Sym),
                 elf::DT_SYMENT => {
-                    assert_eq!(val, size_of::<Sym64<NativeEndian>>() as u64);
+                    assert_eq!(val as usize, size_of::<Sym64<NativeEndian>>());
                 }
 
                 _ => {}
@@ -618,7 +639,11 @@ impl DSO {
         let strtab_offset = strtab_offset.expect("mandatory DT_STRTAB not present");
         let strtab_size = strtab_size.expect("mandatory DT_STRSZ not present");
 
-        let dynstrtab = StringTable::new(&*mmap, strtab_offset, strtab_offset + strtab_size);
+        let dynstrtab = StringTable::new(
+            &*mmap,
+            strtab_offset as u64,
+            strtab_offset as u64 + strtab_size as u64,
+        );
 
         let get_str = |entry: &Dyn| {
             entry
