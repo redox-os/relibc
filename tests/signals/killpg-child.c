@@ -6,6 +6,8 @@
 #include "signals_list.h"
 #include "../test_helpers.h"
 
+// test killing a child process 
+
 void sig_handler (int signo) {
 	(void) signo;
 	exit(1);
@@ -36,21 +38,16 @@ int killpg_test2(int signum)
 		sigignore(signum);
 
 		sleep(1);
-		if ((child_pgid = getpgid(child_pid)) == -1) {
-			printf("Could not get pgid of child\n");
-			exit(EXIT_FAILURE);
-		}
+		
+		child_pgid = getpgid(child_pid);
+		ERROR_IF(getpgid, child_pgid, == -1);
 
+		int status;
+		status = killpg(child_pgid, signum);
+		ERROR_IF(killpg, status, != 0);
 
-		if (killpg(child_pgid, signum) != 0) {
-			printf("Could not raise signal being tested\n");
-            exit(EXIT_FAILURE);
-		}
-
-		if (wait(&i) == -1) {
-			perror("Error waiting for child to exit\n");
-			exit(EXIT_FAILURE);
-		}
+		status = wait(&i);
+		ERROR_IF(wait, status, == -1);
 
 		if (WEXITSTATUS(i)) {
 			printf("Child exited normally\n");
@@ -63,8 +60,6 @@ int killpg_test2(int signum)
 		}
 	}
 
-	printf("Should have exited from parent\n");
-	printf("Test FAILED\n");
 	return EXIT_FAILURE;
 }
 

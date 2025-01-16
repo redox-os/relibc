@@ -9,6 +9,9 @@
 #include "signals_list.h"
 #include "../test_helpers.h"
 
+//  This program verifies that sigpause() returns -1 and sets errno to EINTR
+//  when it returns.
+
 #define INMAIN 0
 #define INTHREAD 1
 
@@ -28,7 +31,7 @@ void *d_thread_func(void *sig)
 {
 
 	int signum = *(int *)sig;
-	printf("%d !!!\n", signum);
+	printf("%d Pausing signal \n", signum);
 	int return_value = 0;
 	struct sigaction act;
 	act.sa_flags = 0;
@@ -36,6 +39,9 @@ void *d_thread_func(void *sig)
 	sigemptyset(&act.sa_mask);
 	sigaction(signum, &act, 0);
 	return_value = sigpause(signum);
+	ERROR_IF(sigpause, return_value, != -1);
+	ERROR_IF(sigpause, errno, != EINTR);
+	result = 0;
 	if (return_value == -1) {
 		if (errno == EINTR) {
 			printf ("Test PASSED: sigpause returned -1 and set errno to EINTR\n");
@@ -59,21 +65,16 @@ void *d_thread_func(void *sig)
 
 
 int sigpause_error(int signum){
-		pthread_t new_th;
+	pthread_t new_th;
 
-	if ((pthread_create(&new_th, NULL, d_thread_func, (void *)&signum)) != 0)
-	{
-		perror("Error creating thread\n");
-		exit(EXIT_FAILURE);
-	}
+	int status;
+	status = pthread_create(&new_th, NULL, d_thread_func, (void *)&signum);
+	ERROR_IF(pthread_create, status, != 0);
 
 	sleep(1);
 
-	if(pthread_kill(new_th, signum) != 0) 
-	{
-		printf("Test UNRESOLVED: Couldn't send signal to thread\n");
-		exit(EXIT_FAILURE);
-	}
+	status = pthread_kill(new_th, signum);
+	ERROR_IF(pthread_kill, status, != 0);
 
 	sem = INTHREAD;
 	while (sem == INTHREAD)

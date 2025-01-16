@@ -4,8 +4,10 @@
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
+#include "../test_helpers.h"
 
-// I don't understand this test
+// sigprocmask( ) shall return 0, Upon successful completion; otherwise, it shall return -1
+// and errno shall be set to indicate the error, and the process' signal mask shall be unchanged.
 
 int main()
 {

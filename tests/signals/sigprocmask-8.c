@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include "../test_helpers.h"
 
+// After the call to sigprocmask(), if there are any pending unblocked signals, at least one of those
+// signals shall be delivered before the call to sigprocmask() returns.
+
 int handler_called = 0;
 int sigprocmask_return_val = 1; /* some value that's not a 1 or 0 */
 

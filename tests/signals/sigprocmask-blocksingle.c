@@ -14,11 +14,6 @@ void sig_handler(int signo)
 
 int sigprocmask_block(int signum)
 {
-    int defaultsig = SIGALRM;
-	(void) defaultsig;
-    if (signum == SIGALRM) {
-        defaultsig = SIGHUP;
-    }
 	struct sigaction act;
 	sigset_t blocked_set, pending_set;
 	sigemptyset(&blocked_set);
@@ -38,11 +33,10 @@ int sigprocmask_block(int signum)
 	status = raise(signum);
 	ERROR_IF(raise, status, == -1);
 
-	ERROR_IF(raise, handler_called, == 1);
-	// if (handler_called) {
-	// 	printf("FAIL: Signal was not blocked\n");
-	// 	exit(EXIT_FAILURE);
-	// }
+	if (handler_called) {
+		printf("FAIL: Signal was not blocked\n");
+		exit(EXIT_FAILURE);
+	}
 
 	status = sigpending(&pending_set);
 	ERROR_IF(sigpending, status, == -1);
@@ -58,10 +52,11 @@ int sigprocmask_block(int signum)
 
 int main(){
     for (int i=1; i<N_SIGNALS; i++){
-		if (i == SIGKILL || i == SIGSTOP){
+		int sig = signals_list[i-1].signal;
+		if (sig == SIGKILL || sig == SIGSTOP){
 			continue;
 		}
-		sigprocmask_block(i);
+		sigprocmask_block(sig);
 	}
 	return EXIT_SUCCESS;
 }

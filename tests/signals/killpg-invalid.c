@@ -1,5 +1,3 @@
-#define _XOPEN_SOURCE 600
-
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +5,7 @@
 #include <errno.h>
 #include "../test_helpers.h"
 
+// the test makes sure that if an invalid signal is passed it will return the EINVAL error 
 int main()
 {
 	int pgrp;

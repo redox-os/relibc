@@ -7,6 +7,8 @@
 #include "signals_list.h"
 #include "../test_helpers.h"
 
+//test pthread_kill on self
+
 # define INTHREAD 0
 # define INMAIN 1
 # define SIGTOTEST SIGABRT
@@ -20,7 +22,6 @@ struct signal {
 };
 
 void handler() {
-	printf("signal was called\n");
 	handler_called = 1;
 	return;
 }
@@ -55,37 +56,27 @@ int pthread_kill_test1(int signum)
 	struct signal arg;
 	arg.signum = signum;
 
-	if(pthread_create(&new_th, NULL, a_thread_func, &arg) != 0)
-	{
-		perror("Error creating thread\n");
-		exit(EXIT_FAILURE);
-	}
+	int status;
+	status = pthread_create(&new_th, NULL, a_thread_func, &arg);
+	ERROR_IF(pthread_create, status, != 0);
 
 	while(sem1==INTHREAD)
 		sleep(1);
 
-	if(pthread_kill(new_th, signum) != 0) 
-	{
-		printf("Test FAILED: Couldn't send signal to thread\n");
-		exit(EXIT_FAILURE);
-	}
+	status = pthread_kill(new_th, signum);
+	ERROR_IF(pthread_kill, status, != 0);
+
     sleep(2);
 	sem1=INTHREAD;
 	
 	while(handler_called==0)
 		sleep(1);
 
-	if(handler_called == -1) {
-		printf("Test FAILED: Kill request timed out\n");
-		exit(EXIT_FAILURE);
-	} else if (handler_called == 0) {
-		printf("Test FAILED: Thread did not recieve or handle\n");
-		exit(EXIT_FAILURE);
-	}
-
-	printf("Test PASSED for signal %d\n", signum);
-    handler_called = 0;
-	return 0;	
+	ERROR_IF(pthread_kill, handler_called, == -1);
+	ERROR_IF(pthread_kill, handler_called, == 0);
+	
+	handler_called = 0;
+	return EXIT_SUCCESS;	
 }
 
 int main(){

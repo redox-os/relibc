@@ -5,6 +5,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
+#include "../test_helpers.h"
+
+//test with pthread_kill making sure sending an invalid signal returns einval
 
 int main()
 {

@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// The value of the argument how is not significant and the process's signal mask shall be unchanged, and 
+// thus the call can be used to enquire about currently blocked signals, if the argument set is a null 
+// pointer.
 
 #define NUMSIGNALS 25
 

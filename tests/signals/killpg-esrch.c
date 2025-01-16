@@ -1,5 +1,3 @@
-#define _XOPEN_SOURCE 600
-
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +5,7 @@
 #include <errno.h>
 #include "../test_helpers.h"
 
+// if a user tries to kill a process that does not exist the esrch error will be returned
 int main()
 {
 

@@ -1,6 +1,9 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "../test_helpers.h"
+
+// The thread's signal mask shall not be changed, if sigprocmask( ) fails.
 
 #define NUMSIGNALS 24
 
@@ -43,23 +46,18 @@ int main() {
 	sigprocmask(SIG_SETMASK, &actl, NULL);
 
 	sigaddset(&actl, SIGALRM);
-	if (sigprocmask(r, &actl, NULL) != -1) {
-		perror("sigprocmask() did not fail even though invalid how parameter was passed to it.\n");
-		exit(EXIT_FAILURE);
-	}
+	int status;
+	status = sigprocmask(r, &actl, NULL);
+	ERROR_IF(sigprocmask, status, != -1);
 
 	sigprocmask(SIG_SETMASK, NULL, &oactl);
 
-	if (sigismember(&oactl, SIGABRT) != 1) {
-		printf("FAIL: signal mask was changed. \n");
-		exit(EXIT_FAILURE);
-	}
+	status = sigismember(&oactl, SIGABRT);
+	ERROR_IF(sigismember, status, != -1);
 
 	if (is_changed(oactl)) {
-		printf("FAIL: signal mask was changed. \n");
 		exit(EXIT_FAILURE);
 	}
 
-	printf("PASS: signal mask was not changed.\n");
 	return EXIT_SUCCESS;
 }

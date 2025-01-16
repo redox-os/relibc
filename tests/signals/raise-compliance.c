@@ -1,13 +1,12 @@
-// The raise() function shall send the signal sig to the executing [CX] [Option Start]  thread or process. [Option End] If a signal handler is called, the raise() function shall not return until after the signal handler does.
-
-// [CX] [Option Start] The effect of the raise() function shall be equivalent to calling: pthread_kill(pthread_self(), sig);
-
-
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "signals_list.h"
 #include "../test_helpers.h"
+
+// The raise() function shall send the signal sig to the executing [CX] [Option Start]  thread or process. [Option End] If a signal handler is called, the raise() function shall not return until after the signal handler does.
+
+// [CX] [Option Start] The effect of the raise() function shall be equivalent to calling: pthread_kill(pthread_self(), sig);
 
 void sig_hand(int i)
 

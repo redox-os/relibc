@@ -1,5 +1,3 @@
-#define _XOPEN_SOURCE 700
-
 #include <pthread.h>
 #include <stdio.h>
 #include <signal.h>
@@ -8,6 +6,9 @@
 #include <stdlib.h>
 #include "signals_list.h"
 #include "../test_helpers.h"
+
+// This program verifies that sigpause() suspends the calling process
+//  until it receives a signal.
 
 #define INMAIN 0
 #define INTHREAD 1
@@ -19,14 +20,13 @@ int result = 2;
 int sem = INMAIN;
 
 void handler() {
-	// printf("signal was called\n");
 	handler_called = 1;
 	return;
 }
 void *b_thread_func(void *sig)
 {
 	int signum = *(int *)sig;
-	printf("%d !!!\n", signum);
+	printf("Pausing signal %s\n", signum);
 	struct sigaction act;
 	act.sa_flags = 0;
 	act.sa_handler = handler;
@@ -50,7 +50,6 @@ int sigpause_suspend(int signum)
 
 	for (j=0; j<10; j++) {
 		sleep(1);
-		ERROR_IF(sigpuase, returned, == 1);
 	}
 
 	status = pthread_kill(new_th, signum);
@@ -59,6 +58,10 @@ int sigpause_suspend(int signum)
 	sleep(1);
 
 	ERROR_IF(sigpuase, returned, != 1);
+	if (returned != 1){
+		printf("returned != 1 \n");
+		exit(EXIT_FAILURE);
+	}
 
 	returned = 0;
 
@@ -68,10 +71,11 @@ int sigpause_suspend(int signum)
 
 int main(){
 	for (int i=1; i<N_SIGNALS; i++){
-		if (i == SIGKILL || i == SIGSTOP){
+		int sig = signals_list[i].signal;
+		if (sig == SIGKILL || sig == SIGSTOP){
 			continue;
 		}
-		sigpause_suspend(i);
+		sigpause_suspend(sig);
 	}
 	return EXIT_SUCCESS;
 }

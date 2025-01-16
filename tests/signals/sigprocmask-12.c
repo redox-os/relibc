@@ -5,6 +5,10 @@
 #include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include "../test_helpers.h"
+
+// An errno value of [EINVAL] shall be returned and the sigprocmask() function shall fail, if the value of 
+// the how argument is not equal to one of the defined values.
 
 int main(int argc, char *argv[])
 {
@@ -41,16 +45,19 @@ int main(int argc, char *argv[])
 
 	sigaddset(&set, SIGABRT);
 	
-	if (sigprocmask(r, &set, NULL) == -1) {
-		if (EINVAL == errno) {
-			printf ("errno set to EINVAL\n");
-			return EXIT_SUCCESS;
-		} else {
-			printf ("errno not set to EINVAL\n");
-			exit(EXIT_FAILURE);
-		}
-	}
+	int status;
+	status = sigprocmask(r, &set, NULL);
+	ERROR_IF(sigprocmask, status, != -1);
+	ERROR_IF(sigprocmask, errno, != EINVAL);
+	// if (sigprocmask(r, &set, NULL) == -1) {
+	// 	if (EINVAL == errno) {
+	// 		printf ("errno set to EINVAL\n");
+	// 		return EXIT_SUCCESS;
+	// 	} else {
+	// 		printf ("errno not set to EINVAL\n");
+	// 		exit(EXIT_FAILURE);
+	// 	}
+	// }
 	
-	printf("sighold did not return -1\n");
 	exit(EXIT_FAILURE);
 }

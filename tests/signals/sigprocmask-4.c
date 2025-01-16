@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// The previous mask shall be stored in the location pointed to by oset, if the argument oset is not a null pointer.
+
 
 #define NUMSIGNALS 26
 

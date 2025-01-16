@@ -19,8 +19,6 @@ void sig_handler(int signo)
 void child_proc(int signum)
 {
 	
-	int sig;
-	(void) sig;
 	sigset_t sig_set;
 	int status;
 
@@ -41,11 +39,7 @@ void child_proc(int signum)
 	status = sleep(10);
 	ERROR_IF(sleep, status, == 0);
 
-	if (sig_handled == 0)
-	{
-		printf("signal handler was not called");
-		exit(EXIT_FAILURE);
-	}
+	ERROR_IF(kill, sig_handled, == 0 );
 
 	exit(EXIT_SUCCESS);
 }
@@ -88,13 +82,14 @@ void kill_child(int signum)
 
 int main()
 {
-	for (int i = 1; i < N_SIGNALS; i++)
+	for (int i = 1; i <  sizeof(signals_list)/sizeof(signals_list[0]); i++)
 	{
-		if (i == SIGKILL || i == SIGSTOP)
+		int sig = signals_list[i].signal;
+		if (sig == SIGKILL || i == SIGSTOP)
 		{
 			continue;
 		}
-		kill_child(i);
+		kill_child(sig);
 	}
 	return EXIT_SUCCESS;
 }

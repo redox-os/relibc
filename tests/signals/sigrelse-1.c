@@ -25,40 +25,36 @@ int sigrelse_test(int signum)
 	act.sa_handler = sig_handler;
 	act.sa_flags = 0;
 	sigemptyset(&act.sa_mask);
-	if (sigaction(signum,  &act, 0) == -1) {
-		perror("Unexpected error while attempting to setup test "
-		       "pre-conditions");
-		exit(EXIT_FAILURE);
-	}
+
+	int status;
+	status = sigaction(signum,  &act, 0);
+	ERROR_IF(sigaction, status, == -1);
 
 	sighold(signum);
-	
-	if (raise(signum) == -1) {
-		perror("Unexpected error while attempting to setup test "
-		       "pre-conditions");
-		exit(EXIT_FAILURE);
-	}
 
-	if (handler_called) {
-		printf("UNRESOLVED. possible problem in sigrelse\n");
-		exit(EXIT_FAILURE);
-	}
+	status = raise(signum);
+	ERROR_IF(raise, status, == -1);	
 
-	if (sigrelse(signum) == -1) {
-		printf("UNRESOLVED. possible problem in sigrelse\n");
-		exit(EXIT_FAILURE);
-	}
+	ERROR_IF(raise, handler_called, == 1);
+	// if (handler_called) {
+	// 	printf("UNRESOLVED. possible problem in sigrelse\n");
+	// 	exit(EXIT_FAILURE);
+	// }
+
+	status = sigrelse(signum);
+	ERROR_IF(sigrelse, status, == -1);
 
 	sleep(1);
 
-	if (handler_called) {
-		printf("PASS: %d successfully removed from signal mask\n", signum);
-    handler_called = 0;
-		return EXIT_SUCCESS;
-	} 
-	printf("FAIL\n");
-	exit(EXIT_FAILURE);
-	return EXIT_FAILURE;
+	ERROR_IF(sigrelse, handler_called, != 1);
+	// if (handler_called) {
+	// 	printf("PASS: %d successfully removed from signal mask\n", signum);
+    // handler_called = 0;
+	// 	return EXIT_SUCCESS;
+	// } 
+	// printf("FAIL\n");
+	// exit(EXIT_FAILURE);
+	return EXIT_SUCCESS;
 }
 
 int main(){

@@ -9,6 +9,9 @@
 #include "signals_list.h"
 #include "../test_helpers.h"
 
+//  This program verifies that sigpause() restores sig to the signal mask before
+//  returning.
+
 #define INMAIN 0
 #define INTHREAD 1
 

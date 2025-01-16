@@ -1,8 +1,7 @@
-#define _XOPEN_SOURCE 700
-
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
+#include "../test_helpers.h"
 
 int main()
 {

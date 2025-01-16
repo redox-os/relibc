@@ -5,10 +5,13 @@
 #include "signals_list.h"
 #include "../test_helpers.h"
 
+// Test that the killpg() function shall send signal sig to the process 
+// group specified by prgp.
+
 void sig_handler(int signo)
 {
-	printf("Caught signal %d being tested!\n", signo);
-	printf("Test PASSED\n");
+	// printf("Caught signal %d being tested!\n", signo);
+	// printf("Test PASSED\n");
 	return;
 }
 
@@ -25,7 +28,7 @@ int killpg_test1(int signum)
 	status = sigaction(signum, &act, 0);
 	ERROR_IF(sigaction, status, == -1);
 
-	pgrp = getpgrp()
+	pgrp = getpgrp();
 	ERROR_IF(getpgrp, pgrp, == -1);
 
 	status = killpg(pgrp, signum);

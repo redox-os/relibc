@@ -7,6 +7,9 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+//  This program verifies that sigpause() returns -1 and sets errno to EINVAL
+//  if passed an invalid signal number.
+
 #define INMAIN 0
 #define INTHREAD 1
 
@@ -26,6 +29,8 @@ int sigpause_invalid(){
 	int return_value = 0;
 
 	return_value = sigpause(-1);
+	ERROR_IF(sigpause, return_value, != -1);
+	ERROR_IF(sigpause, errno, != EINVAL);
 	if (return_value == -1) {
 		if (errno == EINVAL) {
 			printf ("Test PASSED: sigpause returned -1 and set errno to EINVAL\n");

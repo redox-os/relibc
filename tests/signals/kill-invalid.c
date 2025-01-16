@@ -6,6 +6,8 @@
 #include <sys/types.h>
 #include "../test_helpers.h"
 
+//this test ensures that sending an invalid signal will set errno to esrch
+
 int main()
 {
 

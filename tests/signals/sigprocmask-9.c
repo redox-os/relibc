@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+//  Attempt to add SIGKILL and SIGSTOP to the process's signal mask and 
+//  verify that:
+//  - They do not get added.
+//  - sigprocmask() does not return -1.
+
 int main() {
 
 	sigset_t set1, set2;

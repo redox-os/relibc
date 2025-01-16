@@ -4,6 +4,9 @@
 #include "signals_list.h"
 #include "../test_helpers.h"
 
+// The resulting set shall be the union of the current set and the signal 
+//  set pointed to by set, if the value of the argument how is SIG_BLOCK.
+
 int handler_called = 0;
 
 void sig_handler(int signo)
@@ -34,7 +37,7 @@ int sigprocmask_block(int signum)
 	ERROR_IF(sigaction, status, == -1);
 
 	status = sigaction(defaultsig,  &act, 0);
-	ERROR_IF(sigaction, status, == -1);
+	ERROR_IF(sigaction, status, == -1);	
 
 	status = sigprocmask(SIG_SETMASK, &set1, NULL);
 	ERROR_IF(sigprocmask, status, == -1);
@@ -49,7 +52,7 @@ int sigprocmask_block(int signum)
     handler_called = 0;
 
 	status = raise(defaultsig);
-	ERROR_IF(raise, defualtsig, == -1);
+	ERROR_IF(raise, defaultsig, == -1);
 
 	ERROR_IF(raise, handler_called, == 1);
 
@@ -62,7 +65,7 @@ int sigprocmask_block(int signum)
 	status = sigismember(&pending_set, signum);
 	ERROR_IF(sigismemeber, status, != 0);
 
-	printf("Test PASSED: signal was added to the process's signal mask\n");
+	// printf("Test PASSED: signal was added to the process's signal mask\n");
     act.sa_handler = SIG_IGN;
     sigaction(signum, &act, 0);
     sigaction(defaultsig, &act, 0);
