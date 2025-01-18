@@ -235,8 +235,6 @@ pub struct DSO {
     pub entry_point: usize,
     /// Loaded library in-memory data
     pub mmap: &'static [u8],
-    pub global_syms: BTreeMap<String, Symbol>,
-    pub weak_syms: BTreeMap<String, Symbol>,
     pub tls_module_id: usize,
     pub tls_offset: usize,
 
@@ -281,8 +279,6 @@ impl DSO {
             dlopened,
             entry_point,
             mmap,
-            global_syms: BTreeMap::new(),
-            weak_syms: BTreeMap::new(),
             tls_module_id: if tcb_master.is_some() {
                 tls_module_id
             } else {
