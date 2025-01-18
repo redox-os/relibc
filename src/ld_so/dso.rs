@@ -21,7 +21,6 @@ use crate::{
     platform::{types::c_void, Pal, Sys},
 };
 use alloc::{
-    collections::BTreeMap,
     string::{String, ToString},
     sync::Arc,
     vec::Vec,
@@ -240,7 +239,7 @@ pub struct DSO {
 
     pub(super) dynamic: Dynamic<'static>,
 
-    pub scope: Scope,
+    pub scope: spin::Once<Scope>,
     /// Position Independent Executable.
     pub pie: bool,
 }
@@ -288,10 +287,15 @@ impl DSO {
 
             pie: is_pie_enabled(&elf),
             dynamic,
-            scope: Scope::local(),
+            scope: spin::Once::new(),
         };
 
         Ok((dso, tcb_master, elf.elf_program_headers().to_vec()))
+    }
+
+    #[inline]
+    pub fn scope(&self) -> &Scope {
+        self.scope.get().expect("scope not initialized")
     }
 
     /// Global Offset Table
@@ -310,7 +314,7 @@ impl DSO {
         &self.dynamic.needed
     }
 
-    pub fn get_sym(&self, name: &str) -> Option<(Symbol, SymbolBinding)> {
+    pub fn get_sym<'a>(&self, name: &'a str) -> Option<(Symbol<'a>, SymbolBinding)> {
         let (_, sym) = self.dynamic.hash_table.find(
             name,
             None,
@@ -325,6 +329,7 @@ impl DSO {
 
         Some((
             Symbol {
+                name,
                 base: if self.pie {
                     self.mmap.as_ptr() as usize
                 } else {
@@ -654,7 +659,7 @@ impl DSO {
         let dynstrtab = StringTable::new(
             &*mmap,
             strtab_offset as u64,
-            strtab_offset as u64 + strtab_size as u64,
+            strtab_offset as u64 + strtab_size,
         );
 
         let get_str = |entry: &Dyn| {
@@ -721,18 +726,27 @@ impl DSO {
     fn static_relocate(&self, global_scope: &Scope, reloc: Relocation) -> object::Result<()> {
         let b = self.mmap.as_ptr() as usize;
 
-        let sym = if reloc.sym.0 > 0 {
+        let (sym, my_sym) = if reloc.sym.0 > 0 {
             let name = self.dynamic.symbol_name(reloc.sym).unwrap();
 
-            resolve_sym(name, &[global_scope, &self.scope])
-                .map(|(sym, _, obj)| (sym, obj.tls_offset))
+            let lookup_scopes = [global_scope, self.scope()];
+            let sym = if reloc.kind == elf::R_X86_64_COPY {
+                lookup_scopes
+                    .iter()
+                    .find_map(|scope| scope._get_sym(name, 1))
+            } else {
+                resolve_sym(name, &lookup_scopes)
+            }
+            .map(|(sym, _, obj)| (sym, obj));
+
+            (sym, self.dynamic.symbol(reloc.sym))
         } else {
-            None
+            (None, None)
         };
 
         let (s, t) = sym
             .as_ref()
-            .map(|(sym, t)| (sym.as_ptr() as usize, *t))
+            .map(|(sym, obj)| (sym.as_ptr() as usize, obj.tls_offset))
             .unwrap_or((0, 0));
 
         let a = reloc.addend;
@@ -773,9 +787,18 @@ impl DSO {
                 set_u64(f());
             },
             elf::R_X86_64_COPY => unsafe {
-                let (sym, _) = sym
+                let (sym, obj) = sym
                     .as_ref()
                     .expect("R_X86_64_COPY called without valid symbol");
+                let my_sym = my_sym.expect("R_X86_64_COPY called without valid symbol");
+                assert!(
+                    sym.size == my_sym.st_size(NativeEndian) as usize,
+                    "R_X86_64_COPY failed: I was trying to use the symbol {} from {} for {} but they had different sizes. Please consider relinking.",
+                    sym.name,
+                    obj.name,
+                    self.name
+                );
+                // SAFETY: Both the source and destination have the same size.
                 ptr::copy_nonoverlapping(sym.as_ptr() as *const u8, ptr, sym.size);
             },
             _ => unimplemented!("relocation type {:#x}", reloc.kind),
@@ -830,9 +853,9 @@ impl DSO {
                 (elf::R_X86_64_JUMP_SLOT, Resolve::Now) => {
                     let name = self.dynamic.symbol_name(reloc.sym).unwrap();
 
-                    let resolved = resolve_sym(name, &[global_scope, &self.scope])
+                    let resolved = resolve_sym(name, &[global_scope, self.scope()])
                         .map(|(sym, _, _)| sym.as_ptr() as usize)
-                        .expect("unresolved symbol");
+                        .unwrap_or_else(|| panic!("unresolved symbol: {name}"));
 
                     unsafe {
                         *ptr = resolved + reloc.addend;
@@ -858,7 +881,7 @@ impl DSO {
             if entry & 1 == 0 {
                 // An even entry sets up `addr` for subsequent odd entries.
                 unsafe {
-                    addr = base.add(entry as usize) as *mut usize;
+                    addr = base.add(entry) as *mut usize;
                     *addr += base as usize;
                     addr = addr.add(1);
                 }
@@ -946,6 +969,9 @@ fn dirname(path: &str) -> String {
     parts.join("/")
 }
 
-pub fn resolve_sym(name: &str, scopes: &[&Scope]) -> Option<(Symbol, SymbolBinding, Arc<DSO>)> {
+pub fn resolve_sym<'a>(
+    name: &'a str,
+    scopes: &[&'a Scope],
+) -> Option<(Symbol<'a>, SymbolBinding, Arc<DSO>)> {
     scopes.iter().find_map(|scope| scope.get_sym(name))
 }

@@ -1,11 +1,11 @@
-use super::linker::{Linker, ObjectHandle, ObjectScope, Resolve, Result};
+use super::linker::{Linker, ObjectHandle, Resolve, Result, ScopeKind};
 use crate::platform::types::c_void;
 use alloc::boxed::Box;
 
 pub struct LinkerCallbacks {
     pub unload: Box<dyn Fn(&mut Linker, ObjectHandle)>,
     pub load_library:
-        Box<dyn Fn(&mut Linker, Option<&str>, Resolve, ObjectScope, bool) -> Result<ObjectHandle>>,
+        Box<dyn Fn(&mut Linker, Option<&str>, Resolve, ScopeKind, bool) -> Result<ObjectHandle>>,
     pub get_sym: Box<dyn Fn(&Linker, Option<ObjectHandle>, &str) -> Option<*mut c_void>>,
 }
 
@@ -27,7 +27,7 @@ fn load_library(
     linker: &mut Linker,
     name: Option<&str>,
     resolve: Resolve,
-    scope: ObjectScope,
+    scope: ScopeKind,
     noload: bool,
 ) -> Result<ObjectHandle> {
     linker.load_library(name, resolve, scope, noload)

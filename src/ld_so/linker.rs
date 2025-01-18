@@ -121,16 +121,17 @@ impl Drop for MmapFile {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct Symbol {
+#[derive(Clone, Debug)]
+pub struct Symbol<'a> {
+    pub name: &'a str,
     pub value: usize,
     pub base: usize,
     pub size: usize,
     pub sym_type: u8,
 }
 
-impl Symbol {
-    pub fn as_ptr(self) -> *mut c_void {
+impl Symbol<'_> {
+    pub fn as_ptr(&self) -> *mut c_void {
         (self.base + self.value) as *mut c_void
     }
 }
@@ -147,15 +148,16 @@ pub enum Resolve {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum ObjectScope {
+pub enum ScopeKind {
     Global,
     Local,
 }
 
 pub enum Scope {
-    Global {
-        objs: Vec<Weak<DSO>>,
-    },
+    /// The global scope initially contains the main program and all of its
+    /// dependencies. Additional objects will be added to this scope via
+    /// `dlopen(2)` if the `RTLD_GLOBAL` flag is set.
+    Global { objs: Vec<Weak<DSO>> },
     Local {
         owner: Option<Weak<DSO>>,
         objs: Vec<Arc<DSO>>,
@@ -169,7 +171,7 @@ impl Scope {
     }
 
     #[inline]
-    pub(super) const fn local() -> Self {
+    const fn local() -> Self {
         Self::Local {
             owner: None,
             objs: Vec::new(),
@@ -211,7 +213,18 @@ impl Scope {
         }
     }
 
-    pub(super) fn get_sym(&self, name: &str) -> Option<(Symbol, SymbolBinding, Arc<DSO>)> {
+    pub(super) fn get_sym<'a>(
+        &self,
+        name: &'a str,
+    ) -> Option<(Symbol<'a>, SymbolBinding, Arc<DSO>)> {
+        self._get_sym(name, 0)
+    }
+
+    pub(super) fn _get_sym<'a>(
+        &self,
+        name: &'a str,
+        skip: usize,
+    ) -> Option<(Symbol<'a>, SymbolBinding, Arc<DSO>)> {
         let mut res = None;
 
         let get_sym = |obj: Arc<DSO>| {
@@ -227,7 +240,7 @@ impl Scope {
         };
 
         match self {
-            Self::Global { objs } => objs.iter().map(|o| o.upgrade().unwrap()).find_map(get_sym),
+            Self::Global { objs } => objs.iter().skip(skip).map(|o| o.upgrade().unwrap()).find_map(get_sym),
             Self::Local { owner, objs } => {
                 let owner = owner
                     .as_ref()
@@ -237,22 +250,45 @@ impl Scope {
 
                 core::iter::once(owner)
                     .chain(objs.iter().cloned())
+                    .skip(skip)
                     .find_map(get_sym)
             }
         }
         .or(res)
     }
 
-    fn move_into(&self, other: &mut Self) {
-        // FIXME: move not copy? as afiak u cannot downgrade from a global to a local scope.
+    fn copy_into(&self, other: &mut Self) {
         match (self, other) {
             (Self::Local { owner, objs }, Self::Global { objs: other_objs }) => {
+                // FIXME: may have duplicates
                 let owner = owner.as_ref().expect("local scope without owner");
                 other_objs.push(owner.clone());
                 other_objs.extend(objs.iter().map(Arc::downgrade));
             }
 
             _ => unreachable!(),
+        }
+    }
+
+    fn debug(&self) {
+        match self {
+            Self::Global { objs } => {
+                println!(
+                    "[@global] {:?}",
+                    objs.iter()
+                        .map(|x| x.upgrade().unwrap().name.clone())
+                        .collect::<Vec<_>>()
+                );
+            }
+
+            Self::Local { owner, objs } => {
+                let owner = owner.as_ref().unwrap().upgrade().unwrap();
+                println!(
+                    "[{}] {:?}",
+                    owner.name,
+                    objs.iter().map(|x| x.name.clone()).collect::<Vec<_>>()
+                )
+            }
         }
     }
 }
@@ -383,7 +419,7 @@ impl Linker {
             } else {
                 Resolve::default()
             },
-            ObjectScope::Global,
+            ScopeKind::Global,
         )?;
         Ok(dso.entry_point)
     }
@@ -392,7 +428,7 @@ impl Linker {
         &mut self,
         name: Option<&str>,
         resolve: Resolve,
-        scope: ObjectScope,
+        scope: ScopeKind,
         noload: bool,
     ) -> Result<ObjectHandle> {
         trace!(
@@ -417,13 +453,13 @@ impl Linker {
 
                     // We may be upgrading the object from a local scope to the
                     // global scope.
-                    if scope == ObjectScope::Global {
+                    if scope == ScopeKind::Global {
                         if self.config.debug_flags.contains(DebugFlags::SCOPES) {
                             eprintln!("[ld.so]: moving {} into the global scope", obj.name);
                         }
 
                         let mut global_scope = GLOBAL_SCOPE.write();
-                        obj.scope.move_into(&mut global_scope);
+                        obj.scope().copy_into(&mut global_scope);
                     }
 
                     Ok(ObjectHandle::new(obj.clone()))
@@ -466,7 +502,7 @@ impl Linker {
         let guard;
 
         if let Some(handle) = handle.as_ref() {
-            &handle.as_ref().scope
+            handle.as_ref().scope()
         } else {
             guard = GLOBAL_SCOPE.read();
             &guard
@@ -541,7 +577,7 @@ impl Linker {
         base_addr: Option<usize>,
         dlopened: bool,
         resolve: Resolve,
-        scope: ObjectScope,
+        scope: ScopeKind,
     ) -> Result<Arc<DSO>> {
         let resolve = if cfg!(target_arch = "x86_64") {
             resolve
@@ -666,9 +702,11 @@ impl Linker {
             }
         }
 
-        // new_objects is already reversed.
-        for (i, obj) in new_objects.into_iter().enumerate() {
+        for (i, obj) in new_objects.iter().enumerate() {
             obj.relocate(&objects_data[i], resolve).unwrap();
+        }
+
+        for obj in new_objects.into_iter() {
             self.run_init(&obj);
             self.register_object(obj);
         }
@@ -684,6 +722,19 @@ impl Linker {
         self.objects.insert(obj.id, obj);
     }
 
+    /// Loads the specified object and all of its dependencies.
+    ///
+    /// `new_objects` contains any new objects that were loaded. Order is
+    /// reverse of how the scope is populated.
+    ///
+    /// The scope is populated such that the loaded objects are in breadth-first
+    /// order. This means that first the requested object is added to the scope,
+    /// and then its dependencies are added in the order of their respective
+    /// `DT_NEEDED` entries in the requested object. This is done recursively
+    /// until all dependencies have been loaded.
+    ///
+    /// If a dependency has already been loaded, it is *not* added to the scope
+    /// nor to `new_objects`.
     fn load_objects_recursive<'a>(
         &mut self,
         name: &str,
@@ -693,9 +744,9 @@ impl Linker {
         new_objects: &mut Vec<Arc<DSO>>,
         objects_data: &mut Vec<Vec<ProgramHeader>>,
         tcb_masters: &mut Vec<Master>,
-        // The object that caused this object to be loaded.
-        dependent: Option<&mut DSO>,
-        scope: ObjectScope,
+        // Scope of the object that caused this object to be loaded.
+        dependent_scope: Option<&mut Scope>,
+        scope_kind: ScopeKind,
     ) -> Result<Arc<DSO>> {
         // fixme: double lookup slow
         if let Some(id) = self.name_to_object_id_map.get(name) {
@@ -711,7 +762,7 @@ impl Linker {
         let path = self.search_object(name, parent_runpath)?;
         let file = self.read_file(&path)?;
         let data = file.data();
-        let (mut obj, tcb_master, elf) = DSO::new(
+        let (obj, tcb_master, elf) = DSO::new(
             &path,
             data,
             base_addr,
@@ -754,6 +805,18 @@ impl Linker {
             .map(|dep| dep.to_string())
             .collect::<Vec<_>>();
 
+        let obj = Arc::new(obj);
+        let mut scope = Scope::local();
+
+        if let Some(dependent_scope) = dependent_scope {
+            match scope_kind {
+                ScopeKind::Local => dependent_scope.add(&obj),
+                ScopeKind::Global => GLOBAL_SCOPE.write().add(&obj),
+            }
+        } else if let ScopeKind::Global = scope_kind {
+            GLOBAL_SCOPE.write().add(&obj);
+        }
+
         for dep_name in dependencies.iter() {
             self.load_objects_recursive(
                 dep_name,
@@ -763,27 +826,16 @@ impl Linker {
                 new_objects,
                 objects_data,
                 tcb_masters,
-                Some(&mut obj),
-                scope,
+                Some(&mut scope),
+                scope_kind,
             )?;
-        }
-
-        let obj = Arc::new_cyclic(|sref| {
-            obj.scope.set_owner(sref.clone());
-            obj
-        });
-
-        if let Some(dependent) = dependent {
-            match scope {
-                ObjectScope::Local => dependent.scope.add(&obj),
-                ObjectScope::Global => GLOBAL_SCOPE.write().add(&obj),
-            }
-        } else if let ObjectScope::Global = scope {
-            GLOBAL_SCOPE.write().add(&obj);
         }
 
         objects_data.push(elf);
         new_objects.push(obj.clone());
+
+        scope.set_owner(Arc::downgrade(&obj));
+        obj.scope.call_once(|| scope);
 
         Ok(obj)
     }
@@ -901,7 +953,7 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
     )
     .expect("non utf8 symbol name");
 
-    let resolved = resolve_sym(name, &[&GLOBAL_SCOPE.read(), &obj.scope])
+    let resolved = resolve_sym(name, &[&GLOBAL_SCOPE.read(), obj.scope()])
         .map(|(sym, _, _)| sym)
         .unwrap_or_else(|| panic!("symbol '{name}' not found"))
         .as_ptr();
