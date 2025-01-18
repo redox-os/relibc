@@ -240,7 +240,11 @@ impl Scope {
         };
 
         match self {
-            Self::Global { objs } => objs.iter().skip(skip).map(|o| o.upgrade().unwrap()).find_map(get_sym),
+            Self::Global { objs } => objs
+                .iter()
+                .skip(skip)
+                .map(|o| o.upgrade().unwrap())
+                .find_map(get_sym),
             Self::Local { owner, objs } => {
                 let owner = owner
                     .as_ref()
