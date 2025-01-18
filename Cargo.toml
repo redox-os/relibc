@@ -50,6 +50,7 @@ chrono-tz = {version = "0.10", default-features = false}
 chrono = {version = "0.4", default-features = false, features = ["alloc"]}
 libm = "0.2"
 object = { version = "0.36.7", git = "https://gitlab.redox-os.org/andypython/object", default-features = false, features = ["elf", "read_core"] }
+spin = "0.9.8"
 
 [dependencies.dlmalloc]
 path = "dlmalloc-rs"

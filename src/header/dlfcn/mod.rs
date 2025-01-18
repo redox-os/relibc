@@ -13,7 +13,7 @@ use core::{
 use crate::{
     c_str::CStr,
     ld_so::{
-        linker::{DlError, ObjectHandle, ObjectScope, Resolve},
+        linker::{DlError, ObjectHandle, Resolve, ScopeKind},
         tcb::Tcb,
     },
     platform::types::*,
@@ -67,9 +67,9 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
     };
 
     let scope = if flags & RTLD_GLOBAL == RTLD_GLOBAL {
-        ObjectScope::Global
+        ScopeKind::Global
     } else {
-        ObjectScope::Local
+        ScopeKind::Local
     };
 
     let noload = flags & RTLD_NOLOAD == RTLD_NOLOAD;
