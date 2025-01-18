@@ -453,7 +453,7 @@ impl Linker {
         match name {
             Some(name) => {
                 if let Some(id) = self.name_to_object_id_map.get(name) {
-                    let obj = self.objects.get_mut(id).unwrap();
+                    let obj = self.objects.get(id).unwrap();
 
                     // We may be upgrading the object from a local scope to the
                     // global scope.
@@ -464,6 +464,7 @@ impl Linker {
 
                         let mut global_scope = GLOBAL_SCOPE.write();
                         obj.scope().copy_into(&mut global_scope);
+                        self.scope_debug();
                     }
 
                     Ok(ObjectHandle::new(obj.clone()))
@@ -922,6 +923,17 @@ impl Linker {
         }
 
         obj.run_init();
+    }
+
+    fn scope_debug(&self) {
+        if self.config.debug_flags.contains(DebugFlags::SCOPES) {
+            println!("[ld.so]: =========== SCOPES ==========");
+            GLOBAL_SCOPE.read().debug();
+            for obj in self.objects.values() {
+                obj.scope().debug();
+            }
+            println!("[ld.so]: ==============================");
+        }
     }
 }
 
