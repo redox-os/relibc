@@ -10,8 +10,11 @@ use syscall::{
 };
 
 use crate::{
-    arch::manually_enter_trampoline, proc::FdGuard, protocol::ProcCall,
-    signal::tmp_disable_signals, Tcb, DYNAMIC_PROC_INFO,
+    arch::manually_enter_trampoline,
+    proc::FdGuard,
+    protocol::{ProcCall, WaitFlags},
+    signal::tmp_disable_signals,
+    Tcb, DYNAMIC_PROC_INFO,
 };
 
 #[inline]
@@ -126,12 +129,39 @@ fn proc_call(payload: &mut [u8], flags: CallFlags, metadata: &[usize]) -> Result
         )
     }
 }
-pub fn sys_waitpid(pid: usize, status: &mut usize, flags: usize) -> Result<usize> {
+
+#[derive(Clone, Copy, Debug)]
+pub enum WaitpidTarget {
+    AnyChild,
+    AnyGroupMember,
+    SingleProc { pid: usize },
+    ProcGroup { pgid: usize },
+}
+impl WaitpidTarget {
+    pub fn from_posix_arg(raw: isize) -> Self {
+        match raw {
+            0 => Self::AnyGroupMember,
+            -1 => Self::AnyChild,
+            1.. => Self::SingleProc { pid: raw as usize },
+            ..-1 => Self::ProcGroup {
+                pgid: -raw as usize,
+            },
+        }
+    }
+}
+
+pub fn sys_waitpid(target: WaitpidTarget, status: &mut usize, flags: WaitFlags) -> Result<usize> {
+    let (call, pid) = match target {
+        WaitpidTarget::AnyChild => (ProcCall::Waitpid, 0),
+        WaitpidTarget::SingleProc { pid } => (ProcCall::Waitpid, pid),
+        WaitpidTarget::AnyGroupMember => (ProcCall::Waitpgid, 0),
+        WaitpidTarget::ProcGroup { pgid } => (ProcCall::Waitpgid, pgid),
+    };
     wrapper(true, || {
         proc_call(
             unsafe { plain::as_mut_bytes(status) },
             CallFlags::empty(),
-            &[ProcCall::Waitpid as usize, pid, flags],
+            &[call as usize, pid, flags.bits() as usize],
         )
     })
 }
@@ -179,7 +209,13 @@ pub fn posix_getegid() -> u32 {
     DYNAMIC_PROC_INFO.lock().egid
 }
 pub fn posix_exit(status: i32) -> ! {
-    todo!()
+    proc_call(
+        &mut [],
+        CallFlags::empty(),
+        &[ProcCall::Exit as usize, status as usize],
+    )
+    .expect("failed to call proc mgr with Exit");
+    unreachable!()
 }
 pub fn setrens(rns: usize, ens: usize) -> Result<()> {
     proc_call(

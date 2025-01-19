@@ -1,7 +1,10 @@
 use core::{slice, str};
 
-use redox_rt::sys::{posix_read, posix_write};
-use syscall::{Error, Result, WaitFlags, EMFILE};
+use redox_rt::{
+    protocol::WaitFlags,
+    sys::{posix_read, posix_write, WaitpidTarget},
+};
+use syscall::{Error, Result, EMFILE};
 
 use crate::{
     header::{
@@ -246,9 +249,9 @@ pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {
 pub unsafe extern "C" fn redox_waitpid_v1(pid: usize, status: *mut i32, options: u32) -> RawResult {
     let mut sts = 0_usize;
     let res = Error::mux(redox_rt::sys::sys_waitpid(
-        pid,
+        WaitpidTarget::from_posix_arg(pid as isize),
         &mut sts,
-        WaitFlags::from_bits_truncate(options as usize).bits(),
+        WaitFlags::from_bits_truncate(options as usize),
     ));
     status.write(sts as i32);
     res

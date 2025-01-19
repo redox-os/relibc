@@ -3,7 +3,11 @@ use core::{
     mem::{self, size_of},
     ptr, slice, str,
 };
-use redox_rt::RtTcb;
+use redox_rt::{
+    protocol::{wifstopped, wstopsig, WaitFlags},
+    sys::WaitpidTarget,
+    RtTcb,
+};
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
@@ -977,14 +981,16 @@ impl Pal for Sys {
     }
 
     unsafe fn waitpid(mut pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t> {
-        if pid == !0 {
-            pid = 0;
-        }
         let mut res = None;
         let mut status = 0;
 
+        let options = usize::try_from(options)
+            .ok()
+            .and_then(WaitFlags::from_bits)
+            .ok_or(Errno(EINVAL))?;
+
         let inner = |status: &mut usize, flags| {
-            redox_rt::sys::sys_waitpid(pid as usize, status, flags as usize)
+            redox_rt::sys::sys_waitpid(WaitpidTarget::from_posix_arg(pid as isize), status, flags)
         };
 
         // First, allow ptrace to handle waitpid
@@ -992,19 +998,19 @@ impl Pal for Sys {
         let state = ptrace::init_state();
         let mut sessions = state.sessions.lock();
         if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
-            if options & sys_wait::WNOHANG != sys_wait::WNOHANG {
+            if !options.contains(WaitFlags::WNOHANG) {
                 let mut _event = PtraceEvent::default();
                 let _ = (&mut &session.tracer).read(&mut _event);
 
                 res = Some(inner(
                     &mut status,
-                    options | sys_wait::WNOHANG | sys_wait::WUNTRACED,
+                    options | WaitFlags::WNOHANG | WaitFlags::WUNTRACED,
                 ));
                 if res == Some(Ok(0)) {
                     // WNOHANG, just pretend ptrace SIGSTOP:ped this
                     status = (syscall::SIGSTOP << 8) | 0x7f;
-                    assert!(syscall::wifstopped(status));
-                    assert_eq!(syscall::wstopsig(status), syscall::SIGSTOP);
+                    assert!(wifstopped(status));
+                    assert_eq!(wstopsig(status), syscall::SIGSTOP);
                     res = Some(Ok(pid as usize));
                 }
             }
@@ -1015,11 +1021,11 @@ impl Pal for Sys {
         // it if (and only if) a ptrace traceme was activated during
         // the wait.
         let res = res.unwrap_or_else(|| loop {
-            let res = inner(&mut status, options | sys_wait::WUNTRACED);
+            let res = inner(&mut status, options | WaitFlags::WUNTRACED);
 
             // TODO: Also handle special PIDs here
-            if !syscall::wifstopped(status)
-                || options & sys_wait::WUNTRACED != 0
+            if !wifstopped(status)
+                || options.contains(WaitFlags::WUNTRACED)
                 || ptrace::is_traceme(pid)
             {
                 break res;

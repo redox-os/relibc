@@ -270,11 +270,16 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
     #[cfg(not(feature = "proc"))]
     let metadata = ProcMeta::default();
 
-    STATIC_PROC_INFO.get().write(StaticProcInfo {
-        pid: metadata.pid,
-        ppid: metadata.ppid,
-        proc_fd: args.new_proc_fd,
-    });
+    let old_proc_fd = STATIC_PROC_INFO
+        .get()
+        .replace(StaticProcInfo {
+            pid: metadata.pid,
+            ppid: metadata.ppid,
+            proc_fd: args.new_proc_fd,
+        })
+        .proc_fd;
+    drop(old_proc_fd);
 
-    RtTcb::current().thr_fd.get().write(Some(args.new_thr_fd));
+    let old_thr_fd = RtTcb::current().thr_fd.get().replace(Some(args.new_thr_fd));
+    drop(old_thr_fd);
 }
