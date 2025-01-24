@@ -5,10 +5,12 @@
 #include "signals_list.h"
 #include "../test_helpers.h"
 
+// this test is to make sure that when a negative pid is supplied to kill, all the processes in that group will be killed
+
+int handler_called = 0;
 void sig_handler(int signo)
 {
-	printf("Caught signal %d being tested!\n", signo);
-	printf("Test PASSED\n");
+	handler_called = 1;
 	return;
 }
 
@@ -24,18 +26,20 @@ int kill_group(int signum)
 	ERROR_IF(sigemptyset, status, == -1);
 
 	status = sigaction(signum, &act, 0);
-	ERROR_IF(sigaction, staus, == -1);
+	ERROR_IF(sigaction, status, == -1);
 
-	staus = getpgrp();
+	status = getpgrp();
 	ERROR_IF(getpgrp, status, == -1);
 
 	status = kill(-pgrp, signum);
-	ERROR_IF(kill, staus, != 0);
+	ERROR_IF(kill, status, != 0);
+
+	ERROR_IF(kill, handler_called, !=1);
+	handler_called = 0;
 
     return EXIT_SUCCESS;
 }
 
-// If pid is negative, but not -1, sig shall be sent to all processes (excluding an unspecified set of system processes) whose process group ID is equal to the absolute value of pid, and for which the process has permission to send a signal.
 int main()
 {
     for (unsigned int i = 0; i < sizeof(signals_list)/sizeof(signals_list[0]); i++)

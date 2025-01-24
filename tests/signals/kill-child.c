@@ -85,7 +85,7 @@ int main()
 	for (int i = 1; i <  sizeof(signals_list)/sizeof(signals_list[0]); i++)
 	{
 		int sig = signals_list[i].signal;
-		if (sig == SIGKILL || i == SIGSTOP)
+		if (sig == SIGKILL || sig == SIGSTOP)
 		{
 			continue;
 		}
