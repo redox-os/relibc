@@ -10,6 +10,7 @@
 int handler_called = 0;
 void sig_handler(int signo)
 {
+	(void) signo;
 	handler_called = 1;
 	return;
 }
@@ -29,6 +30,7 @@ int kill_group(int signum)
 	ERROR_IF(sigaction, status, == -1);
 
 	status = getpgrp();
+	pgrp = status;
 	ERROR_IF(getpgrp, status, == -1);
 
 	status = kill(-pgrp, signum);

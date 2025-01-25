@@ -12,6 +12,7 @@ void sig_handler(int signo)
 {
 	// printf("Caught signal %d being tested!\n", signo);
 	// printf("Test PASSED\n");
+	(void) signo;
 	return;
 }
 

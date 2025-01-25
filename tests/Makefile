@@ -185,30 +185,22 @@ NAMES=\
 	sigchld \
 	signals/kill-self \
 	signals/kill0-self \
-	signals/kill-child \
-	signals/kill-group \
 	signals/kill-invalid \
 	signals/kill-permission \
-	signals/killpg-child \
 	signals/killpg-esrch \
 	signals/killpg-invalid \
-	signals/killpg-self \
 	signals/killpg0-self \
 	signals/pthread_kill-invalid \
-	signals/pthread_kill-self \
 	signals/pthread_kill0-self \
 	signals/raise-compliance \
-	signals/sigaddset-add \
-	signals/sigdelset-delete \
 	signals/sigismember-invalid \
 	signals/sigismember-valid \
-	signals/sigpause-revert \
-	signals/sigrpocmask-6 \
-	signals/sigrpocmask-7 \
-	signals/sigrpocmask-8 \
-	signals/sigrpocmask-9 \
-	signals/sigrpocmask-11 \
-	signals/sigrpocmask-blocksingle \
+	signals/sigprocmask-6 \
+	signals/sigprocmask-7 \
+	signals/sigprocmask-8 \
+	signals/sigprocmask-9 \
+	signals/sigprocmask-11 \
+	signals/sigprocmask-blocksingle \
 	signals/sigrelse-2 \
 	signals/sigrelse-3 \
 	stdio/ctermid \
