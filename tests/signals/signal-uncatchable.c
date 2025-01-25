@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include "../test_helpers.h"
+
+//make sure you can't catch uncatchable signals
 
 void sig_handler(int signo)
 {
@@ -12,16 +15,11 @@ void sig_handler(int signo)
 int main()
 {
 	errno = -1;
+	void (*status) (int);
+	status = signal(SIGKILL, sig_handler);
+	ERROR_IF(signal, status, != SIG_ERR);
 
-	if (signal(SIGKILL, sig_handler) != SIG_ERR) {
-                printf("Test FAILED: signal() didn't return SIG_ERR even though a non-catchable signal was passed to it\n");
-               	exit(EXIT_FAILURE);
-        }
+	ERROR_IF(signal, errno, <= 0);
 
-	if (errno <= 0) {
-		printf("Test FAILED: errno wasn't set to a positive number even though a non-catchable signal was passed to the signal() function\n");
-               	exit(EXIT_FAILURE);
-        }
-    printf("test passed\n");
 	return EXIT_SUCCESS;
 } 

@@ -1,6 +1,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "../test_helpers.h"
 
 void SIGUSR1_handler(int signo)
 {
@@ -16,20 +17,19 @@ void SIGUSR2_handler(int signo)
 
 int main()
 {
-	if (signal(SIGUSR1, SIGUSR1_handler) == SIG_ERR) {
-                perror("Unexpected error while using signal()");
-               	exit(EXIT_FAILURE);
-        }
+	void (*status) (int);
+	status = signal(SIGUSR1, SIGUSR1_handler);
+	ERROR_IF(signal, status, == SIG_ERR);
 
-	if (signal(SIGUSR2, SIGUSR2_handler) == SIG_ERR) {
-                perror("Unexpected error while using signal()");
-               	exit(EXIT_FAILURE);
-        }
+	status = signal(SIGUSR2, SIGUSR2_handler);
+	ERROR_IF(signal, status, == SIG_ERR);
 
-        if (signal(SIGUSR1,SIG_IGN) != SIGUSR1_handler) {
-		printf("signal did not return the last handler that was associated with SIGUSR1\n");
-               	exit(EXIT_FAILURE);
-        }
-    printf("test passed\n");
+	status = signal(SIGUSR1,SIG_IGN);
+	// printf("status is %d\n", status);
+	// printf("SIGUSR1_handler is %d\n", SIGUSR1_handler);
+	ERROR_IF(signal, status, != SIGUSR1_handler);
+
+	//this seems to be a weird comparison error
+
 	return EXIT_SUCCESS;
 } 

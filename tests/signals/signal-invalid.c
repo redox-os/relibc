@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include "../test_helpers.h"
+
+// test to make sure sending an invalid signal sets errno
 
 void sig_handler(int signo)
 {
@@ -13,15 +16,10 @@ int main()
 {
 	errno = -1;
 
-	if (signal(-1, sig_handler) != SIG_ERR) {
-                printf("Test FAILED: signal() didn't return SIG_ERR even though invalid signal number was passed to it\n");
-               	exit(EXIT_FAILURE);
-        }
+	void (*status) (int);
+	status = signal(-1, sig_handler);
+	ERROR_IF(signal, status, != SIG_ERR);
+	ERROR_IF(signal, errno, <= 0);
 
-	if (errno <= 0) {
-		printf("Test FAILED: errno wasn't set to a positive number even though invalid signal number was passed to the signal() function\n");
-               	exit(EXIT_FAILURE);
-        }
-    printf("test passed\n");
 	return EXIT_SUCCESS;
 } 

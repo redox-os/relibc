@@ -14,34 +14,32 @@ void sig_handler(int signo)
 
 int signal_test2(int signum)
 {
-	if (signal(signum, sig_handler) == SIG_ERR) {
-                perror("Unexpected error while using signal()");
-               	exit(EXIT_FAILURE);
-        }
+	void (*status) (int);
+	status = signal(signum, sig_handler);
+	ERROR_IF(signal, status, == SIG_ERR);
+    
+	status = signal(signum, SIG_IGN);
+	ERROR_IF(signal, status, != sig_handler);
 
-        if (signal(signum,SIG_IGN) != sig_handler) {
-                perror("Unexpected error while using signal()");
-               	exit(EXIT_FAILURE);
-        }
+	// same issue as handle_return
 
 	raise(signum);
-	
-	if (handler_called == 1) {
-		printf("Test FAILED: handler was called even though ingore was expected\n");
-		exit(EXIT_FAILURE);
-	}		
-    printf("test %d passed\n", signum);
+
+	ERROR_IF(raise, handler_called, == 1);	
     handler_called = 0;
 	return EXIT_SUCCESS;
 } 
 
 int main(){
-    for (int i=1; i<N_SIGNALS; i++){
-		if (i == SIGKILL || i == SIGSTOP){
+    for (unsigned int i = 0; i < sizeof(signals_list)/sizeof(signals_list[0]); i++){
+		int sig = signals_list[i].signal;
+		if (sig == SIGKILL || sig == SIGSTOP){
 			continue;
 		}
-		signal_test2(i);
+		signal_test2(sig);
 	}
 	return EXIT_SUCCESS;
 }
+
+
 

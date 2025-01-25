@@ -8,35 +8,30 @@ int handler_called = 0;
 
 void sig_handler(int signo)
 {
-	printf("%d called. Inside handler\n", signo);
+	(void) signo;
+	// printf("%d called. Inside handler\n", signo);
 	handler_called = 1;
 }
 
 int signal_test3(int signum)
 {
-	if (signal(signum, sig_handler) == SIG_ERR) {
-                perror("Unexpected error while using signal()");
-               	exit(EXIT_FAILURE);
-        }
-
+	void (*status) (int);
+	status = signal(signum, sig_handler);
+	ERROR_IF(signal, status, == SIG_ERR);
+	
 	raise(signum);
 	
-	if (handler_called != 1) {
-		printf("Test FAILED: handler wasn't called even though it should have been\n");
-		exit(1);
-	}
-    printf("test %d passed\n", signum);		
+	ERROR_IF(raise, handler_called, != 1);
 	return EXIT_SUCCESS;
 }
 
 int main(){
-    for (int i=1; i<N_SIGNALS; i++){
-		if (i == SIGKILL || i == SIGSTOP){
+    for (unsigned int i = 0; i < sizeof(signals_list)/sizeof(signals_list[0]); i++){
+		int sig = signals_list[i].signal;
+		if (sig == SIGKILL || sig == SIGSTOP){
 			continue;
 		}
-		signal_test3(i);
+		signal_test3(sig);
 	}
 	return EXIT_SUCCESS;
 }
-
- 

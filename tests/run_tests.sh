@@ -180,6 +180,12 @@ STATUS_NAMES=(\
 	signals/raise-compliance \
 	signals/sigismember-invalid \
 	signals/sigismember-valid \
+	signals/signal-handle_return \
+	signals/signal-handler \
+	signals/signal-handler2 \
+	signals/signal-ignore \
+	signals/signal-invalid \
+	signals/signal-uncatchable \
 	signals/sigprocmask-6 \
 	signals/sigprocmask-7 \
 	signals/sigprocmask-8 \
