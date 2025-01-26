@@ -796,7 +796,7 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
     };
 
     // If sleep() returns because the requested time has elapsed, the value returned shall be 0.
-    // If sleep() returns due to delivery of a signal, the return value shall be the "unslept" amount 
+    // If sleep() returns due to delivery of a signal, the return value shall be the "unslept" amount
     // (the requested time minus the time actually slept) in seconds.
     match unsafe { Sys::nanosleep(&rqtp, &mut rmtp) } {
         Err(Errno(EINTR)) => rmtp.tv_sec as c_uint,
