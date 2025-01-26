@@ -2,7 +2,11 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/string.h.html>.
 
-use core::{iter::once, mem, ptr, slice, usize};
+use core::{
+    iter::{once, zip},
+    mem::{self, MaybeUninit},
+    ptr, slice, usize,
+};
 
 use cbitset::BitSet256;
 
@@ -48,7 +52,8 @@ pub unsafe extern "C" fn memchr(
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memcmp.html>.
 #[no_mangle]
-pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t) -> c_int {
+#[no_mangle]
+pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> c_int {
     let (div, rem) = (n / mem::size_of::<usize>(), n % mem::size_of::<usize>());
     let mut a = s1 as *const usize;
     let mut b = s2 as *const usize;
@@ -80,17 +85,121 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memcpy.html>.
+///
+/// # Safety
+/// The caller must ensure that *either*:
+/// - `n` is 0, *or*
+///     - `s1` is convertible to a `&mut [MaybeUninit<u8>]` with length `n`,
+///       and
+///     - `s2` is convertible to a `&[MaybeUninit<u8>]` with length `n`.
 #[no_mangle]
 pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -> *mut c_void {
-    let mut i = 0;
-    while i + 7 < n {
-        *(s1.add(i) as *mut u64) = *(s2.add(i) as *const u64);
-        i += 8;
+    // Avoid creating slices for n == 0. This is because we are required to
+    // avoid UB for n == 0, even if either s1 or s2 is null, to comply with the
+    // expectations of Rust's core library, as well as C2y (N3322).
+    // See https://doc.rust-lang.org/core/index.html for details.
+    if n != 0 {
+        // SAFETY: the caller is required to ensure that the provided pointers
+        // are valid. The slices are required to have a length of at most
+        // isize::MAX; this implicitly ensured by requiring valid pointers to
+        // two nonoverlapping slices.
+        let s1_slice = unsafe { slice::from_raw_parts_mut(s1.cast::<MaybeUninit<u8>>(), n) };
+        let s2_slice = unsafe { slice::from_raw_parts(s2.cast::<MaybeUninit<u8>>(), n) };
+
+        // At this point, it may seem tempting to use
+        // s1_slice.copy_from_slice(s2_slice) here, but memcpy is one of the
+        // handful of symbols whose existence is assumed by Rust's core
+        // library, and thus we need to be careful here not to rely on any
+        // function that calls memcpy internally.
+        // See https://doc.rust-lang.org/core/index.html for details.
+        //
+        // Instead, we check the alignment of the two slices and try to
+        // identify the largest Rust primitive type that is well-aligned for
+        // copying in chunks. s1_slice and s2_slice will be divided into
+        // (prefix, middle, suffix), where only the "middle" part is copyable
+        // using the larger primitive type.
+        let s1_addr = s1.addr();
+        let s2_addr = s2.addr();
+        // Find the number of similar trailing bits in the two addresses to let
+        // us find the largest possible chunk size
+        let equal_trailing_bits_count = (s1_addr ^ s2_addr).trailing_zeros();
+        let chunk_size = match equal_trailing_bits_count {
+            0 => 1,
+            1 => 2,
+            2 => 4,
+            3 => 8,
+            _ => 16, // use u128 chunks for any higher alignments
+        };
+        let chunk_align_offset = s1.align_offset(chunk_size);
+        let prefix_len = chunk_align_offset.min(n);
+
+        // Copy "prefix" bytes
+        for (s1_elem, s2_elem) in zip(&mut s1_slice[..prefix_len], &s2_slice[..prefix_len]) {
+            *s1_elem = *s2_elem;
+        }
+
+        if chunk_align_offset < n {
+            fn copy_chunks_and_remainder<const N: usize, T: Copy>(
+                dst: &mut [MaybeUninit<u8>],
+                src: &[MaybeUninit<u8>],
+            ) {
+                // Check sanity
+                assert_eq!(N, mem::size_of::<T>());
+                assert_eq!(0, N % mem::align_of::<T>());
+                assert!(dst.as_mut_ptr().is_aligned_to(N));
+                assert!(src.as_ptr().is_aligned_to(N));
+
+                // Split into "middle" and "suffix"
+                let (dst_chunks, dst_remainder) = dst.as_chunks_mut::<N>();
+                let (src_chunks, src_remainder) = src.as_chunks::<N>();
+
+                // Copy "middle"
+                for (dst_chunk, src_chunk) in zip(dst_chunks, src_chunks) {
+                    // SAFETY: the chunks are safely subsliced from s1 and
+                    // s2. Alignment is ensured through the use of
+                    // "align_offset", while the size of the chunks is
+                    // explicitly taken to match the primitive size.
+                    let dst_chunk_primitive: &mut MaybeUninit<T> =
+                        unsafe { &mut *dst_chunk.as_mut_ptr().cast() };
+                    let src_chunk_primitive: &MaybeUninit<T> =
+                        unsafe { &*src_chunk.as_ptr().cast() };
+                    *dst_chunk_primitive = *src_chunk_primitive;
+                }
+
+                // Copy "suffix"
+                for (dst_elem, src_elem) in zip(dst_remainder, src_remainder) {
+                    *dst_elem = *src_elem;
+                }
+            }
+
+            // Copy "middle" bytes (if length is sufficient) and any remaining
+            // "suffix" bytes.
+            let s1_middle_and_suffix = &mut s1_slice[prefix_len..];
+            let s2_middle_and_suffix = &s2_slice[prefix_len..];
+            match chunk_size {
+                1 => {
+                    for (s1_elem, s2_elem) in zip(s1_middle_and_suffix, s2_middle_and_suffix) {
+                        *s1_elem = *s2_elem;
+                    }
+                }
+                2 => {
+                    copy_chunks_and_remainder::<2, u16>(s1_middle_and_suffix, s2_middle_and_suffix)
+                }
+                4 => {
+                    copy_chunks_and_remainder::<4, u32>(s1_middle_and_suffix, s2_middle_and_suffix)
+                }
+                8 => {
+                    copy_chunks_and_remainder::<8, u64>(s1_middle_and_suffix, s2_middle_and_suffix)
+                }
+                16 => copy_chunks_and_remainder::<16, u128>(
+                    s1_middle_and_suffix,
+                    s2_middle_and_suffix,
+                ),
+                _ => unreachable!(),
+            }
+        }
     }
-    while i < n {
-        *(s1 as *mut u8).add(i) = *(s2 as *const u8).add(i);
-        i += 1;
-    }
+
     s1
 }
 
@@ -177,15 +286,44 @@ pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_v
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcpy.html>.
-// #[no_mangle]
-pub extern "C" fn stpcpy(s1: *mut c_char, s2: *const c_char) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn stpcpy(mut s1: *mut c_char, mut s2: *const c_char) -> *mut c_char {
+    loop {
+        *s1 = *s2;
+
+        if *s1 == 0 {
+            break;
+        }
+
+        s1 = s1.add(1);
+        s2 = s2.add(1);
+    }
+
+    s1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncpy.html>.
-// #[no_mangle]
-pub extern "C" fn stpncpy(s1: *mut c_char, s2: *const c_char, n: size_t) -> *mut c_char {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn stpncpy(
+    mut s1: *mut c_char,
+    mut s2: *const c_char,
+    mut n: size_t,
+) -> *mut c_char {
+    while n > 0 {
+        *s1 = *s2;
+
+        if *s1 == 0 {
+            break;
+        }
+
+        n -= 1;
+        s1 = s1.add(1);
+        s2 = s2.add(1);
+    }
+
+    memset(s1.cast(), 0, n);
+
+    s1
 }
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/strstr.3.html>.
@@ -222,6 +360,22 @@ pub unsafe extern "C" fn strchr(mut s: *const c_char, c: c_int) -> *mut c_char {
     ptr.cast_mut()
 }
 
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man3/strchr.3.html>.
+#[no_mangle]
+pub unsafe extern "C" fn strchrnul(s: *const c_char, c: c_int) -> *mut c_char {
+    let mut s = s.cast_mut();
+    loop {
+        if *s == c as _ {
+            break;
+        }
+        if *s == 0 {
+            break;
+        }
+        s = s.add(1);
+    }
+    s
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcmp.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
@@ -240,7 +394,7 @@ pub unsafe extern "C" fn strcoll(s1: *const c_char, s2: *const c_char) -> c_int 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcpy.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strcpy(dst: *mut c_char, src: *const c_char) -> *mut c_char {
-    let src_iter = unsafe { NulTerminated::new(src) };
+    let src_iter = unsafe { NulTerminated::new(src).unwrap() };
     let src_dest_iter = unsafe { SrcDstPtrIter::new(src_iter.chain(once(&0)), dst) };
     for (src_item, dst_item) in src_dest_iter {
         dst_item.write(*src_item);
@@ -335,6 +489,23 @@ pub unsafe extern "C" fn strlcat(dst: *mut c_char, src: *const c_char, n: size_t
     strlcpy(d, src, n)
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn strsep(str_: *mut *mut c_char, sep: *const c_char) -> *mut c_char {
+    let s = *str_;
+    if s.is_null() {
+        return ptr::null_mut();
+    }
+    let mut end = s.add(strcspn(s, sep));
+    if *end != 0 {
+        *end = 0;
+        end = end.add(1);
+    } else {
+        end = ptr::null_mut();
+    }
+    *str_ = end;
+    s
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strlcat.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strlcpy(dst: *mut c_char, src: *const c_char, n: size_t) -> size_t {
@@ -353,13 +524,13 @@ pub unsafe extern "C" fn strlcpy(dst: *mut c_char, src: *const c_char, n: size_t
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strlen.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
-    unsafe { NulTerminated::new(s) }.count()
+    unsafe { NulTerminated::new(s).unwrap() }.count()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncat.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: size_t) -> *mut c_char {
-    let len = strlen(s1 as *const c_char);
+    let len = strlen(s1.cast());
     let mut i = 0;
     while i < n {
         let b = *s2.add(i);
@@ -378,8 +549,8 @@ pub unsafe extern "C" fn strncat(s1: *mut c_char, s2: *const c_char, n: size_t) 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncmp.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: size_t) -> c_int {
-    let s1 = core::slice::from_raw_parts(s1 as *const c_uchar, n);
-    let s2 = core::slice::from_raw_parts(s2 as *const c_uchar, n);
+    let s1 = slice::from_raw_parts(s1 as *const c_uchar, n);
+    let s2 = slice::from_raw_parts(s2 as *const c_uchar, n);
 
     for (&a, &b) in s1.iter().zip(s2.iter()) {
         let val = (a as c_int) - (b as c_int);
@@ -393,19 +564,9 @@ pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: size_t
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncpy.html>.
 #[no_mangle]
-pub unsafe extern "C" fn strncpy(dst: *mut c_char, src: *const c_char, n: size_t) -> *mut c_char {
-    let mut i = 0;
-
-    while *src.add(i) != 0 && i < n {
-        *dst.add(i) = *src.add(i);
-        i += 1;
-    }
-
-    for i in i..n {
-        *dst.add(i) = 0;
-    }
-
-    dst
+pub unsafe extern "C" fn strncpy(s1: *mut c_char, s2: *const c_char, n: size_t) -> *mut c_char {
+    stpncpy(s1, s2, n);
+    s1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strdup.html>.
@@ -431,7 +592,7 @@ pub unsafe extern "C" fn strndup(s1: *const c_char, size: size_t) -> *mut c_char
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strlen.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strnlen(s: *const c_char, size: size_t) -> size_t {
-    unsafe { NulTerminated::new(s) }.take(size).count()
+    unsafe { NulTerminated::new(s).unwrap() }.take(size).count()
 }
 
 /// Non-POSIX, see <https://en.cppreference.com/w/c/string/byte/strlen>.

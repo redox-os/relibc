@@ -106,18 +106,14 @@ macro_rules! trace_expr {
 
         trace!("{}", format_args!($($arg)*));
 
-        #[allow(unused_unsafe)]
-        let trace_old_errno = unsafe { platform::errno };
-        #[allow(unused_unsafe)]
-        unsafe { platform::errno = 0; }
+        let trace_old_errno = platform::ERRNO.get();
+        platform::ERRNO.set(0);
 
         let ret = $expr;
 
-        #[allow(unused_unsafe)]
-        let trace_errno = unsafe { platform::errno } as isize;
+        let trace_errno = platform::ERRNO.get() as isize;
         if trace_errno == 0 {
-            #[allow(unused_unsafe)]
-            unsafe { platform::errno = trace_old_errno; }
+            platform::ERRNO.set(trace_old_errno);
         }
 
         let trace_strerror = if trace_errno >= 0 && trace_errno < STR_ERROR.len() as isize {

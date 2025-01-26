@@ -1,10 +1,45 @@
+// strftime implementation for Redox, following the POSIX standard.
+// Following https://pubs.opengroup.org/onlinepubs/7908799/xsh/strftime.html
 use alloc::string::String;
 
+use super::tm;
 use crate::platform::{self, types::*, WriteByte};
 
-use super::tm;
+// We use the langinfo constants
+use crate::header::langinfo::{
+    nl_item,
+    nl_langinfo,
+    ABDAY_1,
+    ABMON_1,
+    AM_STR,
+    DAY_1,
+    MON_1,
+    PM_STR,
+    // TODO : other constants if needed
+};
 
+/// A helper that calls `nl_langinfo(item)` and converts the returned pointer
+/// into a `&str`. If it fails or is null, returns an empty string "".
+unsafe fn langinfo_to_str(item: nl_item) -> &'static str {
+    use core::ffi::CStr;
+
+    let ptr = nl_langinfo(item);
+    if ptr.is_null() {
+        return "";
+    }
+    match CStr::from_ptr(ptr).to_str() {
+        Ok(s) => s,
+        Err(_) => "",
+    }
+}
+
+/// Formats time data according to the given `format` string.
+///
+/// Use `langinfo` for locale-based day/month names,
+/// but still hard-codes other aspects of the "C" locale (like numeric/date
+/// formats) and ignores `%E` / `%O` variations.
 pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const tm) -> size_t {
+    /// Helper that actually parses the format string and writes output.
     pub unsafe fn inner_strftime<W: WriteByte>(
         w: &mut W,
         mut format: *const c_char,
@@ -22,11 +57,11 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
                 }
             }};
             (recurse $fmt:expr) => {{
-                let mut fmt = String::with_capacity($fmt.len() + 1);
-                fmt.push_str($fmt);
-                fmt.push('\0');
+                let mut tmp = String::with_capacity($fmt.len() + 1);
+                tmp.push_str($fmt);
+                tmp.push('\0');
 
-                if !inner_strftime(w, fmt.as_ptr() as *mut c_char, t) {
+                if !inner_strftime(w, tmp.as_ptr() as *mut c_char, t) {
                     return false;
                 }
             }};
@@ -36,106 +71,178 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
                 }
             }};
             ($fmt:expr, $($args:expr),+) => {{
-                // Would use write!() if I could get the length written
+                // Could use write!() if we didn't need the exact count
                 if write!(w, $fmt, $($args),+).is_err() {
                     return false;
                 }
             }};
         }
-        const WDAYS: [&str; 7] = [
-            "Sunday",
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-        ];
-        const MONTHS: [&str; 12] = [
-            "January",
-            "Febuary",
-            "March",
-            "April",
-            "May",
-            "June",
-            "July",
-            "August",
-            "September",
-            "October",
-            "November",
-            "December",
-        ];
 
         while *format != 0 {
+            // If the character isn't '%', just copy it out.
             if *format as u8 != b'%' {
                 w!(byte * format as u8);
                 format = format.offset(1);
                 continue;
             }
 
+            // Skip '%'
             format = format.offset(1);
 
+            // POSIX says '%E' and '%O' can modify numeric formats for locales,
+            // but we ignore them in this minimal "C" locale approach.
             if *format as u8 == b'E' || *format as u8 == b'O' {
-                // Ignore because these do nothing without locale
                 format = format.offset(1);
             }
 
             match *format as u8 {
+                // Literal '%'
                 b'%' => w!(byte b'%'),
+
+                // Newline and tab expansions
                 b'n' => w!(byte b'\n'),
                 b't' => w!(byte b'\t'),
-                b'a' => w!(&WDAYS[(*t).tm_wday as usize][..3]),
-                b'A' => w!(WDAYS[(*t).tm_wday as usize]),
-                b'b' | b'h' => w!(&MONTHS[(*t).tm_mon as usize][..3]),
-                b'B' => w!(MONTHS[(*t).tm_mon as usize]),
+
+                // Abbreviated weekday name: %a
+                b'a' => {
+                    // `ABDAY_1 + tm_wday` is the correct langinfo ID for abbreviated weekdays
+                    let s = langinfo_to_str(ABDAY_1 + (*t).tm_wday as i32);
+                    w!(s);
+                }
+
+                // Full weekday name: %A
+                b'A' => {
+                    // `DAY_1 + tm_wday` is the correct langinfo ID for full weekdays
+                    let s = langinfo_to_str(DAY_1 + (*t).tm_wday as i32);
+                    w!(s);
+                }
+
+                // Abbreviated month name: %b or %h
+                b'b' | b'h' => {
+                    let s = langinfo_to_str(ABMON_1 + (*t).tm_mon as i32);
+                    w!(s);
+                }
+
+                // Full month name: %B
+                b'B' => {
+                    let s = langinfo_to_str(MON_1 + (*t).tm_mon as i32);
+                    w!(s);
+                }
+
+                // Century: %C
                 b'C' => {
                     let mut year = (*t).tm_year / 100;
-                    // Round up
                     if (*t).tm_year % 100 != 0 {
                         year += 1;
                     }
                     w!("{:02}", year + 19);
                 }
+
+                // Day of month: %d
                 b'd' => w!("{:02}", (*t).tm_mday),
+
+                // %D => same as %m/%d/%y
                 b'D' => w!(recurse "%m/%d/%y"),
+
+                // Day of month, space-padded: %e
                 b'e' => w!("{:2}", (*t).tm_mday),
+
+                // ISO 8601 date: %F => %Y-%m-%d
                 b'F' => w!(recurse "%Y-%m-%d"),
+
+                // Hour (00-23): %H
                 b'H' => w!("{:02}", (*t).tm_hour),
+
+                // Hour (01-12): %I
                 b'I' => w!("{:02}", ((*t).tm_hour + 12 - 1) % 12 + 1),
+
+                // Day of year: %j
                 b'j' => w!("{:03}", (*t).tm_yday),
+
+                // etc.
                 b'k' => w!("{:2}", (*t).tm_hour),
                 b'l' => w!("{:2}", ((*t).tm_hour + 12 - 1) % 12 + 1),
                 b'm' => w!("{:02}", (*t).tm_mon + 1),
                 b'M' => w!("{:02}", (*t).tm_min),
-                b'p' => w!(if (*t).tm_hour < 12 { "AM" } else { "PM" }),
-                b'P' => w!(if (*t).tm_hour < 12 { "am" } else { "pm" }),
+
+                // AM/PM (uppercase): %p
+                b'p' => {
+                    // Get "AM" / "PM" from langinfo
+                    if (*t).tm_hour < 12 {
+                        w!(langinfo_to_str(AM_STR));
+                    } else {
+                        w!(langinfo_to_str(PM_STR));
+                    }
+                }
+
+                // am/pm (lowercase): %P
+                b'P' => {
+                    // Convert the AM_STR / PM_STR to lowercase
+                    if (*t).tm_hour < 12 {
+                        let am = langinfo_to_str(AM_STR).to_ascii_lowercase();
+                        w!(&am);
+                    } else {
+                        let pm = langinfo_to_str(PM_STR).to_ascii_lowercase();
+                        w!(&pm);
+                    }
+                }
+
+                // 12-hour clock with seconds + AM/PM: %r => %I:%M:%S %p
                 b'r' => w!(recurse "%I:%M:%S %p"),
+
+                // 24-hour clock without seconds: %R => %H:%M
                 b'R' => w!(recurse "%H:%M"),
-                // Nothing is modified in mktime, but the C standard of course requires a mutable pointer ._.
+
+                // Seconds since the Epoch: %s => calls mktime() to convert tm to time_t
                 b's' => w!("{}", super::mktime(t as *mut tm)),
+
+                // Seconds (00-60): %S (unchanged)
                 b'S' => w!("{:02}", (*t).tm_sec),
+
+                // 24-hour clock with seconds: %T => %H:%M:%S
                 b'T' => w!(recurse "%H:%M:%S"),
+
+                // Weekday (1-7, Monday=1): %u
                 b'u' => w!("{}", ((*t).tm_wday + 7 - 1) % 7 + 1),
+
+                // Sunday-based week of year: %U
                 b'U' => w!("{}", ((*t).tm_yday + 7 - (*t).tm_wday) / 7),
+
+                // Weekday (0-6, Sunday=0): %w
                 b'w' => w!("{}", (*t).tm_wday),
+
+                // Monday-based week of year: %W
                 b'W' => w!("{}", ((*t).tm_yday + 7 - ((*t).tm_wday + 6) % 7) / 7),
+
+                // Last two digits of year: %y
                 b'y' => w!("{:02}", (*t).tm_year % 100),
+
+                // Full year: %Y
                 b'Y' => w!("{}", (*t).tm_year + 1900),
-                b'z' => w!("+0000"), // TODO
-                b'Z' => w!("UTC"),   // TODO
+
+                // Timezone offset: %z => currently hard-coded "+0000"
+                b'z' => w!("+0000"), // TODO: Add real timezone support
+
+                // Timezone name: %Z => currently "UTC"
+                b'Z' => w!("UTC"), // TODO: Add real timezone name support
+
+                // Date+time+TZ: %+
                 b'+' => w!(recurse "%a %b %d %T %Z %Y"),
+
+                // Unrecognized format specifier => fail
                 _ => return false,
             }
 
+            // Move past the format specifier
             format = format.offset(1);
         }
         true
     }
 
-    let mut w = platform::CountingWriter::new(w);
-    if !inner_strftime(&mut w, format, t) {
+    // Wrap the writer in a CountingWriter to return how many bytes were written.
+    let mut cw = platform::CountingWriter::new(w);
+    if !inner_strftime(&mut cw, format, t) {
         return 0;
     }
-
-    w.written
+    cw.written
 }

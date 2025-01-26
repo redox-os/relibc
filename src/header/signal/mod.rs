@@ -1,13 +1,13 @@
 //! signal implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/signal.h.html
 
-use core::{mem, ptr};
+use core::{arch::global_asm, mem, ptr};
 
 use cbitset::BitSet;
 
 use crate::{
     c_str::CStr,
     error::{Errno, ResultExt},
-    header::{errno, time::timespec},
+    header::{errno, setjmp, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},
 };
 
@@ -85,6 +85,43 @@ pub type sigset_t = c_ulonglong;
 pub type siginfo_t = siginfo;
 
 pub type stack_t = sigaltstack;
+
+// Macro based on setjmp, only x86_64 is supported at the moment
+macro_rules! sigsetjmp_platforms {
+    ($($rust_arch:expr,$c_arch:expr,$ext:expr;)+) => {
+        $(
+            #[cfg(target_arch = $rust_arch)]
+            global_asm!(include_str!(concat!("sigsetjmp/", $c_arch, "/sigsetjmp.", $ext)));
+        )+
+    }
+}
+
+//Insert more platforms here
+sigsetjmp_platforms! {
+    "x86_64","x86_64","s";
+}
+
+extern "C" {
+    pub fn sigsetjmp(jb: *mut u64, savemask: i32) -> i32;
+}
+
+//NOTE for the following two functions, to see why they're implemented slightly differently from their intended behavior, read
+//     https://git.musl-libc.org/cgit/musl/commit/?id=583e55122e767b1586286a0d9c35e2a4027998ab
+#[no_mangle]
+unsafe extern "C" fn __sigsetjmp_tail(jb: *mut u64, ret: i32) -> i32 {
+    let set = jb.wrapping_add(9);
+    if ret > 0 {
+        sigprocmask(SIG_SETMASK, set, ptr::null_mut());
+    } else {
+        sigprocmask(SIG_SETMASK, ptr::null_mut(), set);
+    }
+    ret
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn siglongjmp(jb: *mut u64, ret: i32) {
+    setjmp::longjmp(jb, ret);
+}
 
 #[no_mangle]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {

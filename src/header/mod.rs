@@ -29,13 +29,13 @@ pub mod grp;
 // TODO: iconv.h
 pub mod inttypes;
 // iso646.h implemented in C
-// TODO: langinfo.h
+pub mod langinfo;
 // TODO: libintl.h
 pub mod libgen;
 pub mod limits;
 pub mod locale;
 // math.h implemented in C
-// TODO: monetary.h
+pub mod monetary;
 // TODO: mqueue.h
 // TODO: ndbm.h
 pub mod net_if;

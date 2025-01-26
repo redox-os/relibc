@@ -41,8 +41,8 @@ pub const GLOB_ABORTED: c_int = 2;
 // Pattern does not match any existing pathname, and GLOB_NOCHECK was not set
 pub const GLOB_NOMATCH: c_int = 3;
 
-#[repr(C)]
 #[derive(Debug)]
+#[repr(C)]
 pub struct glob_t {
     pub gl_pathc: size_t, // Count of paths matched by pattern (POSIX required field)
     pub gl_offs: size_t,  // Slots to reserve at the beginning of gl_pathv (POSIX required field)
@@ -52,6 +52,7 @@ pub struct glob_t {
     __opaque: *mut c_void, // Vec<*mut c_char>
 }
 
+#[linkage = "weak"] // GNU prefers its own glob e.g. in Make
 #[no_mangle]
 pub unsafe extern "C" fn glob(
     pattern: *const c_char,
@@ -145,6 +146,7 @@ pub unsafe extern "C" fn glob(
     0
 }
 
+#[linkage = "weak"] // GNU prefers its own glob e.g. in Make
 #[no_mangle]
 pub unsafe extern "C" fn globfree(pglob: *mut glob_t) {
     // Retake ownership

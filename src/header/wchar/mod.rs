@@ -505,7 +505,7 @@ pub extern "C" fn wcsftime(
 
 #[no_mangle]
 pub unsafe extern "C" fn wcslen(ws: *const wchar_t) -> size_t {
-    unsafe { NulTerminated::new(ws) }.count()
+    unsafe { NulTerminated::new(ws).unwrap() }.count()
 }
 
 #[no_mangle]

@@ -917,9 +917,15 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
         //TODO: dup errors are ignored, should they be?
         {
             if write {
-                unistd::dup2(0, pipes[0]);
+                match unistd::dup2(pipes[0], 0) {
+                    0 => {}
+                    e => stdlib::exit(127),
+                }
             } else {
-                unistd::dup2(1, pipes[1]);
+                match unistd::dup2(pipes[1], 1) {
+                    1 => {}
+                    e => stdlib::exit(127),
+                }
             }
 
             unistd::close(pipes[0]);
@@ -1042,6 +1048,12 @@ pub unsafe extern "C" fn setbuf(stream: *mut FILE, buf: *mut c_char) {
         if buf.is_null() { _IONBF } else { _IOFBF },
         BUFSIZ as usize,
     );
+}
+
+/// Set buffering of `stream` to line buffered
+#[no_mangle]
+pub unsafe extern "C" fn setlinebuf(stream: *mut FILE) {
+    setvbuf(stream, ptr::null_mut(), _IOLBF, 0);
 }
 
 /// Reset `stream` to use buffer `buf` of size `size`

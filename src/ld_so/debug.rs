@@ -1,5 +1,6 @@
 use crate::{c_str::CString, platform::types::*};
 use alloc::boxed::Box;
+use core::ptr;
 
 #[repr(C)]
 pub enum RTLDState {
@@ -50,7 +51,6 @@ impl RTLDDebug {
         } else {
             unsafe { (*self.r_map).add_object(l_addr, name, l_ld) };
         }
-        return;
     }
     pub fn insert_first(&mut self, l_addr: usize, name: &str, l_ld: usize) {
         if self.r_map.is_null() {
@@ -60,7 +60,6 @@ impl RTLDDebug {
             self.r_map = LinkMap::new_with_args(l_addr, name, l_ld);
             unsafe { (*self.r_map).link(&mut *tmp) };
         }
-        return;
     }
 }
 
@@ -83,10 +82,10 @@ impl LinkMap {
     fn new() -> *mut Self {
         let map = Box::new(LinkMap {
             l_addr: 0,
-            l_name: 0 as *const c_char,
+            l_name: ptr::null(),
             l_ld: 0,
-            l_next: 0 as *mut LinkMap,
-            l_prev: 0 as *mut LinkMap,
+            l_next: ptr::null_mut(),
+            l_prev: ptr::null_mut(),
         });
         Box::into_raw(map)
     }
@@ -113,7 +112,7 @@ impl LinkMap {
         }
         unsafe {
             (*node).l_prev = last;
-            (*last).l_next = node;
+            last.l_next = node;
         }
     }
 }

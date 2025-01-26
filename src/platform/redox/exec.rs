@@ -1,7 +1,9 @@
+use core::num::{NonZeroU64, NonZeroUsize};
+
 use crate::{
     c_str::{CStr, CString},
     fs::File,
-    header::string::strlen,
+    header::{limits::PATH_MAX, string::strlen},
     io::{prelude::*, BufReader, SeekFrom},
     platform::{
         sys::{S_ISGID, S_ISUID},
@@ -135,9 +137,19 @@ pub fn execve(
         .unwrap_or_else(|| Box::from("file"))
         .into();
 
-    // Count arguments
-    let mut len = 0;
+    // Path to interpreter binary and args if found
+    let (interpreter_path, interpreter_args) = { parse_interpreter(&mut image_file)? };
 
+    // Total number of arguments which includes the interpreter if interpreted and its args
+    let mut len = 0;
+    if interpreter_path.is_some() {
+        len = 1;
+        if interpreter_args.is_some() {
+            len = 2;
+        }
+    }
+
+    // Count arguments for `exec` which is different from the interpreter's args
     match arg_env {
         ArgEnv::C { argv, .. } => unsafe {
             while !(*argv.add(len)).is_null() {
@@ -146,26 +158,8 @@ pub fn execve(
         },
         ArgEnv::Parsed { args, .. } => len = args.len(),
     }
-
     let mut args: Vec<&[u8]> = Vec::with_capacity(len);
 
-    // Read shebang (for example #!/bin/sh)
-    let mut _interpreter_path = None;
-    let is_interpreted = {
-        let mut read = 0;
-        let mut shebang = [0; 2];
-
-        while read < 2 {
-            match image_file
-                .read(&mut shebang)
-                .map_err(|_| Error::new(ENOEXEC))?
-            {
-                0 => break,
-                i => read += i,
-            }
-        }
-        shebang == *b"#!"
-    };
     // Since the fexec implementation is almost fully done in userspace, the kernel can no longer
     // set UID/GID accordingly, and this code checking for them before using interfaces to upgrade
     // UID/GID, can not be trusted. So we ask the `escalate:` scheme for help. Note that
@@ -176,27 +170,17 @@ pub fn execve(
     // executables and thereby simply keep the privileges as is. For compatibility we do that
     // too.
 
-    if is_interpreted {
-        // TODO: Does this support prepending args to the interpreter? E.g.
-        // #!/usr/bin/env python3
-
-        // So, this file is interpreted.
-        // Then, read the actual interpreter:
-        let mut interpreter = Vec::new();
-        BufReader::new(&mut image_file)
-            .read_until(b'\n', &mut interpreter)
-            .map_err(|_| Error::new(EIO))?;
-        if interpreter.ends_with(&[b'\n']) {
-            interpreter.pop().unwrap();
-        }
-        let cstring = CString::new(interpreter).map_err(|_| Error::new(ENOEXEC))?;
-        image_file = File::open(CStr::borrow(&cstring), O_RDONLY as c_int)
+    if let Some(interpreter) = &interpreter_path {
+        image_file = File::open(CStr::borrow(&interpreter), O_RDONLY as c_int)
             .map_err(|_| Error::new(ENOENT))?;
 
-        // Make sure path is kept alive long enough, and push it to the arguments
-        _interpreter_path = Some(cstring);
-        let path_ref = _interpreter_path.as_ref().unwrap();
-        args.push(path_ref.as_bytes());
+        // Push interpreter to arguments
+        args.push(interpreter.as_bytes());
+
+        // Push interpreter args, if any, to our main arguments
+        if let Some(args_ref) = interpreter_args.as_ref() {
+            args.push(args_ref.as_bytes());
+        }
     } else {
         image_file
             .seek(SeekFrom::Start(0))
@@ -280,7 +264,7 @@ pub fn execve(
     let exec_fd_guard = FdGuard::new(image_file.fd as usize);
     core::mem::forget(image_file);
 
-    if !is_interpreted && wants_setugid {
+    if interpreter_path.is_none() && wants_setugid {
         // We are now going to invoke `escalate:` rather than loading the program ourselves.
         let escalate_fd = FdGuard::new(syscall::open("/scheme/escalate", O_WRONLY)?);
 
@@ -331,6 +315,156 @@ pub fn execve(
         )
     }
 }
+
+// Parse the interpreter and its args if `reader` starts with a shebang (#!).
+//
+// # Return
+// * Path to the interpreter and its args, if any
+// * `None` if no shebang
+// * An error if parsing failed
+//
+// # Errors
+// * E2BIG: The full path of the shebang is greater than [`PATH_MAX`]
+// * ENOEXEC: Invalid shebang line, such as a line of all whitespace
+// * EIO: Failure reading from `reader`
+fn parse_interpreter<R>(image_file: &mut R) -> Result<(Option<CString>, Option<CString>)>
+where
+    R: Read + Seek,
+{
+    // Read shebang (for example #!/bin/sh)
+    let mut read = 0;
+    let mut shebang = [0; 2];
+
+    while read < 2 {
+        match image_file
+            .read(&mut shebang)
+            .map_err(|_| Error::new(ENOEXEC))?
+        {
+            0 => break,
+            i => read += i,
+        }
+    }
+    if shebang != *b"#!" {
+        return Ok((None, None));
+    }
+
+    // BufReader is created after parsing the shebang because it doesn't make sense to buffer
+    // bytes to read two bytes especially if `image_file` is NOT a script.
+    let mut reader_ = BufReader::new(image_file);
+    let reader = &mut reader_;
+
+    // Skip prepended whitespace for interpreter
+    // Ex: #! /usr/bin/python
+    let pos = reader
+        .bytes()
+        .position(|byte| byte.ok().is_some_and(|byte| !byte.is_ascii_whitespace()))
+        .and_then(|pos| (pos + 2).try_into().ok())
+        // Fail if all whitespace or empty
+        .ok_or_else(|| Error::new(ENOEXEC))?;
+    // We read the non-whitespace character which sets reader position one past it.
+    // Seeking back to that position is essentially free since reads are buffered and it's
+    // unlikely that there was enough whitespace that we performed multiple reads.
+    reader
+        .seek(SeekFrom::Start(pos))
+        .map_err(|_| Error::new(EIO))?;
+
+    // Scan the first line once for the mandatory interpreter and optional args.
+    // This is nicer than using `read_until` or `read_line` because it avoids having to scan the
+    // data twice to check if there are args.
+    let mut interp_offset = None;
+    let mut args_offset = None;
+    for (i, byte) in reader.bytes().enumerate() {
+        let byte = byte.map_err(|_| Error::new(EIO))?;
+
+        match (byte, interp_offset, args_offset) {
+            // No args; only interpreter
+            (b'\n', None, None) => {
+                interp_offset = NonZeroUsize::new(i);
+                break;
+            }
+            // Interpreter found, so we're scanning for where the args ends
+            (b'\n', Some(_), None) => {
+                args_offset = NonZeroUsize::new(i);
+                break;
+            }
+            // Found args so interpreter ends at `i`
+            (b' ', None, None) => {
+                interp_offset = NonZeroUsize::new(i);
+            }
+            _ => {}
+        }
+    }
+
+    // Interpreter is mandatory since we found #! earlier
+    let Some(interp_offset) = interp_offset.map(NonZeroUsize::get) else {
+        return Err(Error::new(ENOEXEC));
+    };
+    // We need u64s and usizes; converting them now is easier
+    let Ok(interp_offset_u64) = interp_offset.try_into() else {
+        return Err(Error::new(E2BIG));
+    };
+    let args_offset_u64: Option<NonZeroU64> = args_offset
+        .map(|offset| offset.try_into())
+        .transpose()
+        .map_err(|_| Error::new(E2BIG))?;
+
+    // Spec: full length of the shebang can't exceed max path length
+    let shebang_len = pos
+        .checked_add(interp_offset_u64)
+        .and_then(|len| len.checked_add(args_offset_u64.map(NonZeroU64::get).unwrap_or_default()))
+        .ok_or_else(|| Error::new(E2BIG))?;
+    // PATH_MAX is a small number that fits into u64 so `as` is okay
+    if shebang_len > PATH_MAX as u64 {
+        return Err(Error::new(E2BIG));
+    }
+
+    // Rewind to the beginning of the interpreter.
+    // As above, this is essentially free because the internal buf size is several times larger
+    // than PATH_MAX by default, and our shebang_len < PATH_MAX as checked above.
+    reader
+        .seek(SeekFrom::Start(pos))
+        .map_err(|_| Error::new(E2BIG))?;
+
+    let mut interpreter = Vec::with_capacity(interp_offset);
+    reader
+        .take(interp_offset_u64)
+        .read_to_end(&mut interpreter)
+        .map_err(|_| Error::new(EIO))?;
+
+    // Read args, but treat as an opaque block to pass to the interpreter.
+    // Linux and FreeBSD both pass the args as is to the interpreter whereas macOS splits
+    // the args similar to `/usr/bin/env -S`.
+    // POSIX leaves the behavior up to the implementation.
+    // It's simpler to rely on env because well behaved, portable scripts will use
+    // it to ensure correct operation on Linux/FreeBSD.
+    // Splitting args ourselves gains little while reinventing env -S
+    let interpreter_args = if let (Some(offset), Some(offset_u64)) = (
+        args_offset.map(NonZeroUsize::get),
+        args_offset_u64.map(NonZeroU64::get),
+    ) {
+        let len = offset - interp_offset - 1;
+        let len_u64 = offset_u64 - interp_offset_u64 - 1;
+        let mut args = Vec::with_capacity(len);
+
+        // Eat initial whitespace
+        reader.consume(1);
+        reader
+            .take(len_u64)
+            .read_to_end(&mut args)
+            .map_err(|_| Error::new(E2BIG))?;
+        // Eat '\n'
+        reader.consume(1);
+
+        let args = CString::new(args).map_err(|_| Error::new(ENOEXEC))?;
+        Some(args)
+    } else {
+        None
+    };
+
+    let interpreter = CString::new(interpreter).map_err(|_| Error::new(ENOEXEC))?;
+    Ok((Some(interpreter), interpreter_args))
+}
+
 fn flatten_with_nul<T>(iter: impl IntoIterator<Item = T>) -> Box<[u8]>
 where
     T: AsRef<[u8]>,
@@ -347,4 +481,186 @@ fn send_fd_guard(dst_socket: usize, fd: FdGuard) -> Result<()> {
     // The kernel closes file descriptors that are sent, so don't call SYS_CLOSE redundantly.
     core::mem::forget(fd);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::parse_interpreter;
+
+    // Shebangs without a script attached
+    const NO_FRILLS: &str = "#!/bin/sh\n";
+    const NO_FRILLS_EXPECTED: &str = "/bin/sh";
+
+    const SPACE_B4_INTERP: &str = "#! /bin/sh\n";
+    const SPACE_B4_INTERP_EXPECTED: &str = "/bin/sh";
+
+    const NO_FRILLS_ENV: &str = "#!/usr/bin/env sh\n";
+    const NO_FRILLS_ENV_EXPECTED: &str = "/usr/bin/env";
+    const NO_FRILLS_ENV_EXPECTED_ARGS: &str = "sh";
+
+    const SPACE_B4_ENV: &str = "#! /usr/bin/env sh\n";
+    const SPACE_B4_EXPECTED: &str = NO_FRILLS_ENV_EXPECTED;
+    const SPACE_B4_EXPECTED_ARGS: &str = NO_FRILLS_ENV_EXPECTED_ARGS;
+
+    const MULT_SPACES_B4: &str = "#!                        /usr/bin/env sh\n";
+    const MULT_SPACES_B4_EXPECTED: &str = NO_FRILLS_ENV_EXPECTED;
+    const MULT_SPACES_B4_EXPECTED_ARGS: &str = NO_FRILLS_ENV_EXPECTED_ARGS;
+
+    // Shebangs with a script attached
+    // These test that the parser doesn't run off the first line
+    const NO_FRILLS_W_SCRIPT: &str = r#"#!/bin/sh
+    echo "Hello from Redox""#;
+    const NO_FRILLS_W_SCRIPT_EXPECTED: &str = NO_FRILLS_EXPECTED;
+
+    const SPACE_B4_INTERP_W_SCRIPT: &str = r#"#! /bin/sh
+    echo "Doctor Eigenvalue""#;
+    const SPACE_B4_INTERP_W_SCRIPT_EXPECTED: &str = NO_FRILLS_EXPECTED;
+
+    const MULT_ARGUMENTS: &str = r#"#! /usr/bin/env -S python -OO
+    assert False
+    print("This totally works")
+    "#;
+    const MULT_ARGUMENTS_EXPECTED: &str = NO_FRILLS_ENV_EXPECTED;
+    const MULT_ARGUMENTS_EXPECTED_ARGS: &str = "-S python -OO";
+
+    // No hashbang conditions
+    const NO_SHEBANG: &str = "/bin/sh";
+    const EMPTY: &str = "";
+
+    // Error conditions
+    const SHEBANG_NO_INTERP: &str = "#!";
+    const SHEBANG_NO_INTERP_SPACE: &str = "#! ";
+    const SHEBANG_NO_INTERP_SCRIPT: &str = "#!\necho ${PATH}";
+
+    fn success(input: &str, expected_interp: &str, expected_args: Option<&str>) {
+        let mut reader = Cursor::new(input);
+        let (actual_interp, actual_args) = parse_interpreter(&mut reader)
+            .unwrap_or_else(|e| panic!("Shebang ({input}) should parse\n\t{e}"));
+
+        let actual_interp = actual_interp
+            .expect("Expected an interpreter")
+            .into_string()
+            .expect("Interpreter is ASCII (valid UTF-8)");
+        assert_eq!(expected_interp, actual_interp);
+
+        if let Some(expected_args) = expected_args {
+            let actual_args = actual_args
+                .expect("Expected arguments to interpreter")
+                .into_string()
+                .expect("Args string is ASCII (valid UTF-8)");
+            assert_eq!(expected_args, actual_args);
+        }
+    }
+
+    #[test]
+    fn parse_interpreter_without_space() {
+        success(NO_FRILLS, NO_FRILLS_EXPECTED, None);
+    }
+
+    #[test]
+    fn parse_interpreter_with_space() {
+        success(SPACE_B4_INTERP, SPACE_B4_INTERP_EXPECTED, None);
+    }
+
+    #[test]
+    fn parse_interpreter_with_arg() {
+        success(
+            NO_FRILLS_ENV,
+            NO_FRILLS_ENV_EXPECTED,
+            Some(NO_FRILLS_ENV_EXPECTED_ARGS),
+        );
+    }
+
+    #[test]
+    fn parse_interpreter_with_arg_and_space() {
+        success(
+            SPACE_B4_ENV,
+            SPACE_B4_EXPECTED,
+            Some(SPACE_B4_EXPECTED_ARGS),
+        );
+    }
+
+    #[test]
+    fn parse_interpreter_with_multiple_spaces() {
+        success(
+            MULT_SPACES_B4,
+            MULT_SPACES_B4_EXPECTED,
+            Some(MULT_SPACES_B4_EXPECTED_ARGS),
+        );
+    }
+
+    #[test]
+    fn parse_interpreter_with_script() {
+        success(NO_FRILLS_W_SCRIPT, NO_FRILLS_W_SCRIPT_EXPECTED, None);
+    }
+
+    #[test]
+    fn parse_interpreter_with_script_and_space() {
+        success(
+            SPACE_B4_INTERP_W_SCRIPT,
+            SPACE_B4_INTERP_W_SCRIPT_EXPECTED,
+            None,
+        );
+    }
+
+    #[test]
+    fn parse_interpreter_with_script_args_space() {
+        success(
+            MULT_ARGUMENTS,
+            MULT_ARGUMENTS_EXPECTED,
+            Some(MULT_ARGUMENTS_EXPECTED_ARGS),
+        );
+    }
+
+    #[test]
+    fn parse_interpreter_no_shebang() {
+        let mut reader = Cursor::new(NO_SHEBANG);
+        let (interpreter, args) =
+            parse_interpreter(&mut reader).expect("Shouldn't fail if file doesn't have a shebang");
+
+        assert!(
+            interpreter.is_none(),
+            "Interpreter should be `None` if shebang isn't present"
+        );
+        assert!(
+            args.is_none(),
+            "Args should be empty without an interpreter."
+        );
+    }
+
+    #[test]
+    fn parse_interpreter_empty() {
+        let mut reader = Cursor::new(EMPTY);
+        let (interpreter, args) =
+            parse_interpreter(&mut reader).expect("Shouldn't fail if file doesn't have a shebang");
+
+        assert!(
+            interpreter.is_none(),
+            "Interpreter should be `None` for empty image"
+        );
+        assert!(args.is_none(), "Args should be empty for empty image");
+    }
+
+    #[test]
+    fn parse_interpreter_no_interpreter_fail() {
+        let mut reader = Cursor::new(SHEBANG_NO_INTERP);
+        parse_interpreter(&mut reader)
+            .expect_err("A hashbang without an interpreter should return an error");
+    }
+
+    #[test]
+    fn parse_interpreter_no_interpreter_space_fail() {
+        let mut reader = Cursor::new(SHEBANG_NO_INTERP_SPACE);
+        parse_interpreter(&mut reader)
+            .expect_err("A hashbang without an interpreter should return an error");
+    }
+
+    #[test]
+    fn parse_interpreter_no_interpreter_script_fail() {
+        let mut reader = Cursor::new(SHEBANG_NO_INTERP_SCRIPT);
+        parse_interpreter(&mut reader)
+            .expect_err("A hashbang without an interpreter should return an error");
+    }
 }

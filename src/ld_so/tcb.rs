@@ -1,6 +1,5 @@
 use alloc::vec::Vec;
 use core::{
-    arch::asm,
     cell::UnsafeCell,
     mem,
     ops::{Deref, DerefMut},
@@ -8,9 +7,7 @@ use core::{
     sync::atomic::AtomicBool,
 };
 use generic_rt::GenericTcb;
-use goblin::error::{Error, Result};
 
-use super::ExpectTlsFree;
 use crate::{
     header::sys_mman,
     ld_so::linker::Linker,
@@ -18,6 +15,8 @@ use crate::{
     pthread::{OsTid, Pthread},
     sync::{mutex::Mutex, waitval::Waitval},
 };
+
+use super::linker::DlError;
 
 #[repr(C)]
 #[derive(Debug, Clone)]
@@ -78,9 +77,9 @@ impl Tcb {
     /// Create a new TCB
     ///
     /// `size` is the size of the TLS in bytes.
-    pub unsafe fn new(size: usize) -> Result<&'static mut Self> {
+    pub unsafe fn new(size: usize) -> Result<&'static mut Self, DlError> {
         let page_size = Sys::getpagesize();
-        let (abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
+        let (_abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
 
         let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
         trace!("New TCB: {:p}", tcb_ptr);
@@ -147,7 +146,7 @@ impl Tcb {
     }
 
     /// Copy data from masters
-    pub unsafe fn copy_masters(&mut self) -> Result<()> {
+    pub unsafe fn copy_masters(&mut self) -> Result<(), DlError> {
         //TODO: Complain if masters or tls exist without the other
         if let Some(tls) = self.tls() {
             if let Some(masters) = self.masters() {
@@ -177,7 +176,7 @@ impl Tcb {
                         );
                         tls_data.copy_from_slice(data);
                     } else {
-                        return Err(Error::Malformed(format!("failed to copy tls master {}", i)));
+                        return Err(DlError::Malformed);
                     }
                 }
                 self.num_copied_masters = masters.len();
@@ -197,7 +196,7 @@ impl Tcb {
             // XXX: [`Vec::from_raw_parts`] cannot be used here as the masters were originally
             // allocated by the ld.so allocator and that would violate that function's invariants.
             let mut masters = self.masters().unwrap().to_vec();
-            masters.extend(new_masters.into_iter());
+            masters.extend(new_masters);
 
             self.masters_ptr = masters.as_mut_ptr();
             self.masters_len = masters.len() * mem::size_of::<Master>();
@@ -212,8 +211,8 @@ impl Tcb {
 
     pub fn setup_dtv(&mut self, n: usize) {
         if self.dtv_ptr.is_null() {
-            let mut dtv = vec![ptr::null_mut(); n];
-            let (ptr, len, cap) = dtv.into_raw_parts();
+            let dtv = vec![ptr::null_mut(); n];
+            let (ptr, len, _) = dtv.into_raw_parts();
 
             self.dtv_ptr = ptr;
             self.dtv_len = len;
@@ -222,7 +221,7 @@ impl Tcb {
             //
             // XXX: [`Vec::from_raw_parts`] cannot be used here as the DTV was originally allocated
             // by the ld.so allocator and that would violate that function's invariants.
-            let mut dtv = self.dtv_mut().unwrap().to_vec();
+            let mut dtv = self.dtv_mut().to_vec();
             dtv.resize(n, ptr::null_mut());
 
             let (ptr, len, _) = dtv.into_raw_parts();
@@ -231,16 +230,16 @@ impl Tcb {
         }
     }
 
-    pub fn dtv_mut(&mut self) -> Option<&'static mut [*mut u8]> {
+    pub fn dtv_mut(&mut self) -> &'static mut [*mut u8] {
         if self.dtv_len != 0 {
-            Some(unsafe { slice::from_raw_parts_mut(self.dtv_ptr, self.dtv_len) })
+            unsafe { slice::from_raw_parts_mut(self.dtv_ptr, self.dtv_len) }
         } else {
-            None
+            &mut []
         }
     }
 
     /// Mapping with correct flags for TCB and TLS
-    unsafe fn map(size: usize) -> Result<&'static mut [u8]> {
+    unsafe fn map(size: usize) -> Result<&'static mut [u8], DlError> {
         let ptr = Sys::mmap(
             ptr::null_mut(),
             size,
@@ -249,7 +248,7 @@ impl Tcb {
             -1,
             0,
         )
-        .map_err(|_| Error::Malformed(format!("failed to map tls")))?;
+        .map_err(|_| DlError::Oom)?;
 
         ptr::write_bytes(ptr as *mut u8, 0, size);
         Ok(slice::from_raw_parts_mut(ptr as *mut u8, size))
@@ -259,7 +258,7 @@ impl Tcb {
     #[cfg(any(target_os = "linux", target_os = "redox"))]
     unsafe fn os_new(
         size: usize,
-    ) -> Result<(&'static mut [u8], &'static mut [u8], &'static mut [u8])> {
+    ) -> Result<(&'static mut [u8], &'static mut [u8], &'static mut [u8]), DlError> {
         let page_size = Sys::getpagesize();
         let abi_tls_tcb = Self::map(page_size + size + page_size)?;
         let (abi, tls_tcb) = abi_tls_tcb.split_at_mut(page_size);
@@ -269,7 +268,7 @@ impl Tcb {
 
     /// OS and architecture specific code to activate TLS - Linux x86_64
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    unsafe fn os_arch_activate(os: &(), tls_end: usize, _tls_len: usize) {
+    unsafe fn os_arch_activate(_os: &(), tls_end: usize, _tls_len: usize) {
         const ARCH_SET_FS: usize = 0x1002;
         syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
     }
