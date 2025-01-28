@@ -1,5 +1,3 @@
-#![feature(global_asm)]
-
 .global fegetround
 .type fegetround,%function
 fegetround:
