@@ -2,6 +2,7 @@
 name = "libm"
 version = "0.1.0"
 authors = ["Darley Barreto <darleybarreto@gmail.com>"]
+edition = "2021"
 
 [lib]
 path = "lib.rs"
