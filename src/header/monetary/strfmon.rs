@@ -1,7 +1,7 @@
 use super::{apply_grouping, FormatFlags, LocaleMonetaryInfo, DEFAULT_MONETARY};
 use alloc::string::{String, ToString};
 use core::{ffi::CStr, ptr, result, slice, str};
-use libm::{fabs, floor, pow, round, trunc};
+use rust_libm::{fabs, floor, pow, round, trunc};
 
 /// The `strfmon()` function formats a monetary value according to the format string `format`
 /// and writes the result to the character array `s` of size `maxsize`.

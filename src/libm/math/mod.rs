@@ -1,5 +1,5 @@
 use crate::platform::types::{c_char, c_double, c_float, c_int, c_long, c_longlong};
-use inner_libm;
+use rust_libm;
 
 #[no_mangle]
 pub static mut signgam: c_int = 0;
@@ -41,122 +41,122 @@ pub type double_t = c_double;
 
 #[no_mangle]
 pub unsafe extern "C" fn acos(x: c_double) -> c_double {
-    inner_libm::acos(x)
+    rust_libm::acos(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn acosf(x: c_float) -> c_float {
-    inner_libm::acosf(x)
+    rust_libm::acosf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn acosh(x: c_double) -> c_double {
-    inner_libm::acosh(x)
+    rust_libm::acosh(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn acoshf(x: c_float) -> c_float {
-    inner_libm::acoshf(x)
+    rust_libm::acoshf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn asin(x: c_double) -> c_double {
-    inner_libm::asin(x)
+    rust_libm::asin(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn asinf(x: c_float) -> c_float {
-    inner_libm::asinf(x)
+    rust_libm::asinf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn asinh(x: c_double) -> c_double {
-    inner_libm::asinh(x)
+    rust_libm::asinh(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn asinhf(x: c_float) -> c_float {
-    inner_libm::asinhf(x)
+    rust_libm::asinhf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn atan(x: c_double) -> c_double {
-    inner_libm::atan(x)
+    rust_libm::atan(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn atan2(x: c_double, y: c_double) -> c_double {
-    inner_libm::atan2(x, y)
+    rust_libm::atan2(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn atan2f(x: c_float, y: c_float) -> c_float {
-    inner_libm::atan2f(x, y)
+    rust_libm::atan2f(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn atanf(x: c_float) -> c_float {
-    inner_libm::atanf(x)
+    rust_libm::atanf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn atanh(x: c_double) -> c_double {
-    inner_libm::atanh(x)
+    rust_libm::atanh(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn atanhf(x: c_float) -> c_float {
-    inner_libm::atanhf(x)
+    rust_libm::atanhf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn cbrt(x: c_double) -> c_double {
-    inner_libm::cbrt(x)
+    rust_libm::cbrt(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn cbrtf(x: c_float) -> c_float {
-    inner_libm::cbrtf(x)
+    rust_libm::cbrtf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ceil(x: c_double) -> c_double {
-    inner_libm::ceil(x)
+    rust_libm::ceil(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ceilf(x: c_float) -> c_float {
-    inner_libm::ceilf(x)
+    rust_libm::ceilf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn copysign(x: c_double, y: c_double) -> c_double {
-    inner_libm::copysign(x, y)
+    rust_libm::copysign(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn copysignf(x: c_float, y: c_float) -> c_float {
-    inner_libm::copysignf(x, y)
+    rust_libm::copysignf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn cos(x: c_double) -> c_double {
-    inner_libm::cos(x)
+    rust_libm::cos(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn cosf(x: c_float) -> c_float {
-    inner_libm::cosf(x)
+    rust_libm::cosf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn cosh(x: c_double) -> c_double {
-    inner_libm::cosh(x)
+    rust_libm::cosh(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn coshf(x: c_float) -> c_float {
-    inner_libm::coshf(x)
+    rust_libm::coshf(x)
 }
 
 #[no_mangle]
@@ -171,228 +171,228 @@ pub unsafe extern "C" fn dremf(x: c_float, y: c_float) -> c_float {
 
 #[no_mangle]
 pub unsafe extern "C" fn erf(x: c_double) -> c_double {
-    inner_libm::erf(x)
+    rust_libm::erf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn erfc(x: c_double) -> c_double {
-    inner_libm::erfc(x)
+    rust_libm::erfc(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn erfcf(x: c_float) -> c_float {
-    inner_libm::erfcf(x)
+    rust_libm::erfcf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn erff(x: c_float) -> c_float {
-    inner_libm::erff(x)
+    rust_libm::erff(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn exp(x: c_double) -> c_double {
-    inner_libm::exp(x)
+    rust_libm::exp(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn exp2(x: c_double) -> c_double {
-    inner_libm::exp2(x)
+    rust_libm::exp2(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn exp2f(x: c_float) -> c_float {
-    inner_libm::exp2f(x)
+    rust_libm::exp2f(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn exp10(x: c_double) -> c_double {
-    inner_libm::exp10(x)
+    rust_libm::exp10(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn exp10f(x: c_float) -> c_float {
-    inner_libm::exp10f(x)
+    rust_libm::exp10f(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn expf(x: c_float) -> c_float {
-    inner_libm::expf(x)
+    rust_libm::expf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn expm1(x: c_double) -> c_double {
-    inner_libm::expm1(x)
+    rust_libm::expm1(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn expm1f(x: c_float) -> c_float {
-    inner_libm::expm1f(x)
+    rust_libm::expm1f(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fabs(x: c_double) -> c_double {
-    inner_libm::fabs(x)
+    rust_libm::fabs(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fabsf(x: c_float) -> c_float {
-    inner_libm::fabsf(x)
+    rust_libm::fabsf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fdim(x: c_double, y: c_double) -> c_double {
-    inner_libm::fdim(x, y)
+    rust_libm::fdim(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fdimf(x: c_float, y: c_float) -> c_float {
-    inner_libm::fdimf(x, y)
+    rust_libm::fdimf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn floor(x: c_double) -> c_double {
-    inner_libm::floor(x)
+    rust_libm::floor(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn floorf(x: c_float) -> c_float {
-    inner_libm::floorf(x)
+    rust_libm::floorf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fma(x: c_double, y: c_double, z: c_double) -> c_double {
-    inner_libm::fma(x, y, z)
+    rust_libm::fma(x, y, z)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fmaf(x: c_float, y: c_float, z: c_float) -> c_float {
-    inner_libm::fmaf(x, y, z)
+    rust_libm::fmaf(x, y, z)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fmax(x: c_double, y: c_double) -> c_double {
-    inner_libm::fmax(x, y)
+    rust_libm::fmax(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fmaxf(x: c_float, y: c_float) -> c_float {
-    inner_libm::fmaxf(x, y)
+    rust_libm::fmaxf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fmin(x: c_double, y: c_double) -> c_double {
-    inner_libm::fmin(x, y)
+    rust_libm::fmin(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fminf(x: c_float, y: c_float) -> c_float {
-    inner_libm::fminf(x, y)
+    rust_libm::fminf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fmod(x: c_double, y: c_double) -> c_double {
-    inner_libm::fmod(x, y)
+    rust_libm::fmod(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fmodf(x: c_float, y: c_float) -> c_float {
-    inner_libm::fmodf(x, y)
+    rust_libm::fmodf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn frexp(x: c_double, y: *mut c_int) -> c_double {
-    let (a, b) = inner_libm::frexp(x);
+    let (a, b) = rust_libm::frexp(x);
     *y = b;
     a
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn frexpf(x: c_float, y: *mut c_int) -> c_float {
-    let (a, b) = inner_libm::frexpf(x);
+    let (a, b) = rust_libm::frexpf(x);
     *y = b;
     a
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn hypot(x: c_double, y: c_double) -> c_double {
-    inner_libm::hypot(x, y)
+    rust_libm::hypot(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn hypotf(x: c_float, y: c_float) -> c_float {
-    inner_libm::hypotf(x, y)
+    rust_libm::hypotf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ilogb(x: c_double) -> c_int {
-    inner_libm::ilogb(x)
+    rust_libm::ilogb(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ilogbf(x: c_float) -> c_int {
-    inner_libm::ilogbf(x)
+    rust_libm::ilogbf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn j0(x: c_double) -> c_double {
-    inner_libm::j0(x)
+    rust_libm::j0(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn j0f(x: c_float) -> c_float {
-    inner_libm::j0f(x)
+    rust_libm::j0f(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn j1(x: c_double) -> c_double {
-    inner_libm::j1(x)
+    rust_libm::j1(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn j1f(x: c_float) -> c_float {
-    inner_libm::j1f(x)
+    rust_libm::j1f(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jn(x: c_int, y: c_double) -> c_double {
-    inner_libm::jn(x, y)
+    rust_libm::jn(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jnf(x: c_int, y: c_float) -> c_float {
-    inner_libm::jnf(x, y)
+    rust_libm::jnf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ldexp(x: c_double, y: c_int) -> c_double {
-    inner_libm::ldexp(x, y)
+    rust_libm::ldexp(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ldexpf(x: c_float, y: c_int) -> c_float {
-    inner_libm::ldexpf(x, y)
+    rust_libm::ldexpf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn lgamma(x: c_double) -> c_double {
-    inner_libm::lgamma(x)
+    rust_libm::lgamma(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn lgammaf(x: c_float) -> c_float {
-    inner_libm::lgammaf(x)
+    rust_libm::lgammaf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn lgamma_r(x: c_double, y: *mut c_int) -> c_double {
-    let (a, b) = inner_libm::lgamma_r(x);
+    let (a, b) = rust_libm::lgamma_r(x);
     *y = b;
     a
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn lgammaf_r(x: c_float, y: *mut c_int) -> c_float {
-    let (a, b) = inner_libm::lgammaf_r(x);
+    let (a, b) = rust_libm::lgammaf_r(x);
     *y = b;
     a
 }
@@ -419,37 +419,37 @@ pub unsafe extern "C" fn llroundf(x: c_float) -> c_longlong {
 
 #[no_mangle]
 pub unsafe extern "C" fn log(x: c_double) -> c_double {
-    inner_libm::log(x)
+    rust_libm::log(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn log1p(x: c_double) -> c_double {
-    inner_libm::log1p(x)
+    rust_libm::log1p(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn log1pf(x: c_float) -> c_float {
-    inner_libm::log1pf(x)
+    rust_libm::log1pf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn log2(x: c_double) -> c_double {
-    inner_libm::log2(x)
+    rust_libm::log2(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn log2f(x: c_float) -> c_float {
-    inner_libm::log2f(x)
+    rust_libm::log2f(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn log10(x: c_double) -> c_double {
-    inner_libm::log10(x)
+    rust_libm::log10(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn log10f(x: c_float) -> c_float {
-    inner_libm::log10f(x)
+    rust_libm::log10f(x)
 }
 
 #[no_mangle]
@@ -480,7 +480,7 @@ pub unsafe extern "C" fn logbf(x: c_float) -> c_float {
 
 #[no_mangle]
 pub unsafe extern "C" fn logf(x: c_float) -> c_float {
-    inner_libm::logf(x)
+    rust_libm::logf(x)
 }
 
 // TODO: We don't support floating-point exceptions,
@@ -508,14 +508,14 @@ pub unsafe extern "C" fn lroundf(x: c_float) -> c_long {
 
 #[no_mangle]
 pub unsafe extern "C" fn modf(x: c_double, y: *mut c_double) -> c_double {
-    let (a, b) = inner_libm::modf(x);
+    let (a, b) = rust_libm::modf(x);
     *y = b;
     a
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn modff(x: c_float, y: *mut c_float) -> c_float {
-    let (a, b) = inner_libm::modff(x);
+    let (a, b) = rust_libm::modff(x);
     *y = b;
     a
 }
@@ -532,56 +532,56 @@ pub unsafe extern "C" fn nanf(_x: *const c_char) -> c_float {
 
 #[no_mangle]
 pub unsafe extern "C" fn nextafter(x: c_double, y: c_double) -> c_double {
-    inner_libm::nextafter(x, y)
+    rust_libm::nextafter(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn nextafterf(x: c_float, y: c_float) -> c_float {
-    inner_libm::nextafterf(x, y)
+    rust_libm::nextafterf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pow(x: c_double, y: c_double) -> c_double {
-    inner_libm::pow(x, y)
+    rust_libm::pow(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn powf(x: c_float, y: c_float) -> c_float {
-    inner_libm::powf(x, y)
+    rust_libm::powf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn remainder(x: c_double, y: c_double) -> c_double {
-    inner_libm::remainder(x, y)
+    rust_libm::remainder(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn remainderf(x: c_float, y: c_float) -> c_float {
-    inner_libm::remainderf(x, y)
+    rust_libm::remainderf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn remquo(x: c_double, y: c_double, z: *mut c_int) -> c_double {
-    let (a, b) = inner_libm::remquo(x, y);
+    let (a, b) = rust_libm::remquo(x, y);
     *z = b;
     a
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn remquof(x: c_float, y: c_float, z: *mut c_int) -> c_float {
-    let (a, b) = inner_libm::remquof(x, y);
+    let (a, b) = rust_libm::remquof(x, y);
     *z = b;
     a
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn round(x: c_double) -> c_double {
-    inner_libm::round(x)
+    rust_libm::round(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn roundf(x: c_float) -> c_float {
-    inner_libm::roundf(x)
+    rust_libm::roundf(x)
 }
 
 #[no_mangle]
@@ -598,7 +598,7 @@ pub unsafe extern "C" fn scalblnf(x: c_float, y: c_long) -> c_float {
 
 #[no_mangle]
 pub unsafe extern "C" fn scalbn(x: c_double, y: c_int) -> c_double {
-    inner_libm::scalbn(x, y)
+    rust_libm::scalbn(x, y)
 }
 
 #[no_mangle]
@@ -649,131 +649,131 @@ pub unsafe extern "C" fn scalbf(x: c_float, exp: c_float) -> c_float {
 
 #[no_mangle]
 pub unsafe extern "C" fn scalbnf(x: c_float, y: c_int) -> c_float {
-    inner_libm::scalbnf(x, y)
+    rust_libm::scalbnf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sin(x: c_double) -> c_double {
-    inner_libm::sin(x)
+    rust_libm::sin(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sincos(x: c_double, y: *mut c_double, z: *mut c_double) {
-    let (a, b) = inner_libm::sincos(x);
+    let (a, b) = rust_libm::sincos(x);
     *y = a;
     *z = b;
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sincosf(x: c_float, y: *mut c_float, z: *mut c_float) {
-    let (a, b) = inner_libm::sincosf(x);
+    let (a, b) = rust_libm::sincosf(x);
     *y = a;
     *z = b;
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sinf(x: c_float) -> c_float {
-    inner_libm::sinf(x)
+    rust_libm::sinf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sinh(x: c_double) -> c_double {
-    inner_libm::sinh(x)
+    rust_libm::sinh(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sinhf(x: c_float) -> c_float {
-    inner_libm::sinhf(x)
+    rust_libm::sinhf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sqrt(x: c_double) -> c_double {
-    inner_libm::sqrt(x)
+    rust_libm::sqrt(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sqrtf(x: c_float) -> c_float {
-    inner_libm::sqrtf(x)
+    rust_libm::sqrtf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn tan(x: c_double) -> c_double {
-    inner_libm::tan(x)
+    rust_libm::tan(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn tanf(x: c_float) -> c_float {
-    inner_libm::tanf(x)
+    rust_libm::tanf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn tanh(x: c_double) -> c_double {
-    inner_libm::tanh(x)
+    rust_libm::tanh(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn tanhf(x: c_float) -> c_float {
-    inner_libm::tanhf(x)
+    rust_libm::tanhf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn tgamma(x: c_double) -> c_double {
-    inner_libm::tgamma(x)
+    rust_libm::tgamma(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn tgammaf(x: c_float) -> c_float {
-    inner_libm::tgammaf(x)
+    rust_libm::tgammaf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn trunc(x: c_double) -> c_double {
-    inner_libm::trunc(x)
+    rust_libm::trunc(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn truncf(x: c_float) -> c_float {
-    inner_libm::truncf(x)
+    rust_libm::truncf(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn y0(x: c_double) -> c_double {
-    inner_libm::y0(x)
+    rust_libm::y0(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn y0f(x: c_float) -> c_float {
-    inner_libm::y0f(x)
+    rust_libm::y0f(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn y1(x: c_double) -> c_double {
-    inner_libm::y1(x)
+    rust_libm::y1(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn y1f(x: c_float) -> c_float {
-    inner_libm::y1f(x)
+    rust_libm::y1f(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn yn(x: c_int, y: c_double) -> c_double {
-    inner_libm::yn(x, y)
+    rust_libm::yn(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ynf(x: c_int, y: c_float) -> c_float {
-    inner_libm::ynf(x, y)
+    rust_libm::ynf(x, y)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn rint(x: c_double) -> c_double {
-    inner_libm::rint(x)
+    rust_libm::rint(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn rintf(x: c_float) -> c_float {
-    inner_libm::rintf(x)
+    rust_libm::rintf(x)
 }
 
 // `nearbyint` differs from `rint` in that it doesn't raise
@@ -781,10 +781,10 @@ pub unsafe extern "C" fn rintf(x: c_float) -> c_float {
 // anyway, so don't worry about it.
 #[no_mangle]
 pub unsafe extern "C" fn nearbyint(x: c_double) -> c_double {
-    inner_libm::rint(x)
+    rust_libm::rint(x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn nearbyintf(x: c_float) -> c_float {
-    inner_libm::rintf(x)
+    rust_libm::rintf(x)
 }

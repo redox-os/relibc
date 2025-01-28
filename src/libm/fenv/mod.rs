@@ -25,11 +25,39 @@ use crate::platform::types::c_int;
 
 mod arch;
 
-pub use arch::*;
+#[cfg(target_arch = "aarch64")]
+pub use arch::aarch64::native::*;
+
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+pub use arch::x86::native::*;
+
+extern "C" {
+    pub fn feclearexcept(excepts: c_int) -> c_int;
+    pub fn feraiseexcept(excepts: c_int) -> c_int;
+    fn __fesetround(r: c_int) -> c_int;
+    pub fn fegetround() -> c_int;
+    pub fn fegetenv(envp: *mut fenv_t);
+    pub fn fesetenv(envp: *const fenv_t) -> c_int;
+    pub fn fetestexcept(excepts: c_int) -> c_int;
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn fegetexceptflag(flagp: *mut fexcept_t, excepts: c_int) -> c_int {
     *flagp = fetestexcept(excepts) as fexcept_t;
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn feholdexcept(envp: *mut fenv_t) -> c_int {
+    fegetenv(envp);
+    feclearexcept(FE_ALL_EXCEPT);
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fesetexceptflag(fp: *const fexcept_t, mask: c_int) -> c_int {
+    feclearexcept(!(*fp as c_int) & mask);
+    feraiseexcept(*fp as c_int & mask);
     0
 }
 
@@ -39,4 +67,12 @@ pub unsafe extern "C" fn feupdateenv(envp: *mut fenv_t) -> c_int {
     fesetenv(envp);
     feraiseexcept(ex);
     0
+}
+
+pub unsafe extern "C" fn fesetround(r: c_int) -> c_int {
+    if r != FE_TONEAREST && r != FE_DOWNWARD && r != FE_UPWARD && r != FE_TOWARDZERO {
+        return -1;
+    }
+
+    __fesetround(r)
 }

@@ -130,6 +130,7 @@ install-headers: headers libs
 libs: \
 	$(BUILD)/$(PROFILE)/libc.a \
 	$(BUILD)/$(PROFILE)/libc.so \
+	$(BUILD)/$(PROFILE)/libm.a \
 	$(BUILD)/$(PROFILE)/crt0.o \
 	$(BUILD)/$(PROFILE)/crti.o \
 	$(BUILD)/$(PROFILE)/crtn.o \
@@ -177,7 +178,7 @@ test: sysroot
 	$(MAKE) -C tests verify
 
 
-$(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a
 	$(CC) -nostdlib \
 		-shared \
 		-Wl,--gc-sections \
@@ -205,8 +206,8 @@ $(BUILD)/debug/librelibc.a: $(SRC)
 	./renamesyms.sh "$@" "$(BUILD)/debug/deps/"
 	touch $@
 
-$(BUILD)/debug/libm.o:
-	CARGO_INCREMENTAL=0 $(CARGO) rustc --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+$(BUILD)/debug/libm.a:
+	$(CARGO) rustc --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit link=$@ -g -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
@@ -246,8 +247,8 @@ $(BUILD)/release/librelibc.a: $(SRC)
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
 	touch $@
 
-$(BUILD)/release/libm.o:
-	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+$(BUILD)/release/libm.a:
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit link=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)

@@ -27,7 +27,7 @@ EXPECT_NAMES=\
 	libgen \
 	libm/test-float \
 	libm/test-double \
-	# libm/inf-torture \
+	libm/inf-torture \
 	locale \
 	math \
 	netdb/getaddrinfo \

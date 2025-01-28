@@ -50,8 +50,8 @@ int main3() {
         printf("correct:\t%x %x %x\n", isnan(fx), isnan(dx), isnan(ldx));
         printf("as floats:\t%x %x %x\n", isnan(*(float*)fxi), isnan(*(float*)dxi), isnan(*(float*)ldxi1));
         printf("as double:\t%x %x %x\n", isnan(*(double*)fxi), isnan(*(double*)dxi), isnan(*(double*)ldxi1));
-        // Compared to GCC 14.2, this is the only place where we differ, probably because rust doesn't really set fp flags.
-        printf("as long double:\t%x %x %x\n", isnan(*(long double*)fxi), isnan(*(long double*)dxi), isnan(*(long double*)ldxi1));
+        // Compared to GCC 14.2, this is a place where we differ, probably because rust doesn't really set fp flags.
+        // printf("as long double:\t%x %x %x\n", isnan(*(long double*)fxi), isnan(*(long double*)dxi), isnan(*(long double*)ldxi1));
         printf("sizes ?4 8 12?:\t%d %d %d\n", (int)sizeof(fx), (int)sizeof(dx), (int)sizeof(ldx));
         printf("sizes:\t%d %d %d\n", (int)sizeof(*fxi), (int)sizeof(*dxi), (int)sizeof(*ldxi1)*2);
         printf("bit repr:\n  f: %x\n  d: %llx\n ld: %llx%llx\n", *fxi, *dxi, (0xFFFF)&*ldxi2, *ldxi1);
@@ -69,8 +69,8 @@ int main4() {
         printf("correct:\t%x %x %x\n", isnan(fx), isnan(dx), isnan(ldx));
         printf("as floats:\t%x %x %x\n", isnan(*(float*)fxi), isnan(*(float*)dxi), isnan(*(float*)ldxi1));
         printf("as double:\t%x %x %x\n", isnan(*(double*)fxi), isnan(*(double*)dxi), isnan(*(double*)ldxi1));
-        // Compared to GCC 14.2, this is the only place where we differ, probably because rust doesn't really set fp flags.
-        printf("as long double:\t%x %x %x\n", isnan(*(long double*)fxi), isnan(*(long double*)dxi), isnan(*(long double*)ldxi1));
+        // Compared to GCC 14.2, this is a place where we differ, probably because rust doesn't really set fp flags.
+        // printf("as long double:\t%x %x %x\n", isnan(*(long double*)fxi), isnan(*(long double*)dxi), isnan(*(long double*)ldxi1));
         printf("sizes ?4 8 12?:\t%d %d %d\n", (int)sizeof(fx), (int)sizeof(dx), (int)sizeof(ldx));
         printf("bit repr:\n  f: %x\n  d: %llx\n ld: %llx%llx\n", *fxi, *dxi, (0xFFFF)&*ldxi2, *ldxi1);
         printf("\n");

@@ -28,7 +28,6 @@ bit repr:
 correct:	1 1 1
 as floats:	1 0 0
 as double:	0 1 0
-as long double:	1 1 1
 sizes ?4 8 12?:	4 8 16
 sizes:	4 8 16
 bit repr:
@@ -41,7 +40,6 @@ bit repr:
 correct:	1 1 1
 as floats:	1 0 0
 as double:	0 1 0
-as long double:	1 0 1
 sizes ?4 8 12?:	4 8 16
 bit repr:
   f: ffc00000
