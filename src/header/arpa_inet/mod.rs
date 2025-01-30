@@ -63,13 +63,13 @@ pub unsafe extern "C" fn inet_aton(cp: *const c_char, inp: *mut in_addr) -> c_in
 /// but not in the Open Group Base Specifications Issue 6 and later.
 #[deprecated]
 #[no_mangle]
-pub extern "C" fn inet_lnaof(input: in_addr) -> in_addr_t {
-    if input.s_addr >> 24 < 128 {
-        input.s_addr & 0xff_ffff
-    } else if input.s_addr >> 24 < 192 {
-        input.s_addr & 0xffff
+pub extern "C" fn inet_lnaof(r#in: in_addr) -> in_addr_t {
+    if r#in.s_addr >> 24 < 128 {
+        r#in.s_addr & 0xff_ffff
+    } else if r#in.s_addr >> 24 < 192 {
+        r#in.s_addr & 0xffff
     } else {
-        input.s_addr & 0xff
+        r#in.s_addr & 0xff
     }
 }
 
@@ -80,15 +80,15 @@ pub extern "C" fn inet_lnaof(input: in_addr) -> in_addr_t {
 /// 5, but not in the Open Group Base Specifications Issue 6 and later.
 #[deprecated]
 #[no_mangle]
-pub extern "C" fn inet_makeaddr(net: in_addr_t, host: in_addr_t) -> in_addr {
+pub extern "C" fn inet_makeaddr(net: in_addr_t, lna: in_addr_t) -> in_addr {
     let mut output: in_addr = in_addr { s_addr: 0 };
 
     if net < 256 {
-        output.s_addr = host | net << 24;
+        output.s_addr = lna | net << 24;
     } else if net < 65536 {
-        output.s_addr = host | net << 16;
+        output.s_addr = lna | net << 16;
     } else {
-        output.s_addr = host | net << 8;
+        output.s_addr = lna | net << 8;
     }
 
     output
@@ -101,13 +101,13 @@ pub extern "C" fn inet_makeaddr(net: in_addr_t, host: in_addr_t) -> in_addr {
 /// but not in the Open Group Base Specifications Issue 6 and later.
 #[deprecated]
 #[no_mangle]
-pub extern "C" fn inet_netof(input: in_addr) -> in_addr_t {
-    if input.s_addr >> 24 < 128 {
-        input.s_addr & 0xff_ffff
-    } else if input.s_addr >> 24 < 192 {
-        input.s_addr & 0xffff
+pub extern "C" fn inet_netof(r#in: in_addr) -> in_addr_t {
+    if r#in.s_addr >> 24 < 128 {
+        r#in.s_addr & 0xff_ffff
+    } else if r#in.s_addr >> 24 < 192 {
+        r#in.s_addr & 0xffff
     } else {
-        input.s_addr & 0xff
+        r#in.s_addr & 0xff
     }
 }
 
@@ -118,7 +118,7 @@ pub extern "C" fn inet_netof(input: in_addr) -> in_addr_t {
 /// but not in the Open Group Base Specifications Issue 6 and later.
 #[deprecated]
 #[no_mangle]
-pub unsafe extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
+pub unsafe extern "C" fn inet_network(cp: *const c_char) -> in_addr_t {
     ntohl(unsafe { inet_addr(cp) })
 }
 
@@ -129,13 +129,13 @@ pub unsafe extern "C" fn inet_network(cp: *mut c_char) -> in_addr_t {
 /// Specifications Issue 8.
 #[deprecated]
 #[no_mangle]
-pub unsafe extern "C" fn inet_ntoa(addr: in_addr) -> *const c_char {
+pub unsafe extern "C" fn inet_ntoa(r#in: in_addr) -> *const c_char {
     static mut NTOA_ADDR: [c_char; 16] = [0; 16];
 
     unsafe {
         inet_ntop(
             AF_INET,
-            &addr as *const in_addr as *const c_void,
+            &r#in as *const in_addr as *const c_void,
             NTOA_ADDR.as_mut_ptr(),
             16,
         )
@@ -145,12 +145,12 @@ pub unsafe extern "C" fn inet_ntoa(addr: in_addr) -> *const c_char {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/inet_ntop.html>.
 #[no_mangle]
 pub unsafe extern "C" fn inet_ntop(
-    domain: c_int,
+    af: c_int,
     src: *const c_void,
-    dest: *mut c_char,
+    dst: *mut c_char,
     size: socklen_t,
 ) -> *const c_char {
-    if domain != AF_INET {
+    if af != AF_INET {
         platform::ERRNO.set(EAFNOSUPPORT);
         ptr::null()
     } else if size < 16 {
@@ -165,22 +165,22 @@ pub unsafe extern "C" fn inet_ntop(
         };
         let addr = format!("{}.{}.{}.{}\0", s_addr[0], s_addr[1], s_addr[2], s_addr[3]);
         unsafe {
-            ptr::copy(addr.as_ptr() as *const c_char, dest, addr.len());
+            ptr::copy(addr.as_ptr() as *const c_char, dst, addr.len());
         }
-        dest
+        dst
     }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/inet_ntop.html>.
 #[no_mangle]
-pub unsafe extern "C" fn inet_pton(domain: c_int, src: *const c_char, dest: *mut c_void) -> c_int {
-    if domain != AF_INET {
+pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_void) -> c_int {
+    if af != AF_INET {
         platform::ERRNO.set(EAFNOSUPPORT);
         -1
     } else {
         let s_addr = unsafe {
             slice::from_raw_parts_mut(
-                &mut (*(dest as *mut in_addr)).s_addr as *mut _ as *mut u8,
+                &mut (*(dst as *mut in_addr)).s_addr as *mut _ as *mut u8,
                 4,
             )
         };
