@@ -177,7 +177,12 @@ pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_getdents.html>.
 // #[no_mangle]
-pub extern "C" fn posix_getdents(fildes: c_int, buf: *mut c_void, nbyte: size_t, flags: c_int) -> ssize_t {
+pub extern "C" fn posix_getdents(
+    fildes: c_int,
+    buf: *mut c_void,
+    nbyte: size_t,
+    flags: c_int,
+) -> ssize_t {
     unimplemented!();
 }
 
