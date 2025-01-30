@@ -149,12 +149,10 @@ const _: () = {
     }
 };
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fdopendir.html>.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alphasort.html>.
 #[no_mangle]
-pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
-    let path = unsafe { CStr::from_ptr(path) };
-
-    DIR::new(path).or_errno_null_mut()
+pub unsafe extern "C" fn alphasort(first: *mut *const dirent, second: *mut *const dirent) -> c_int {
+    unsafe { string::strcoll((**first).d_name.as_ptr(), (**second).d_name.as_ptr()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/closedir.html>.
@@ -167,6 +165,14 @@ pub extern "C" fn closedir(dir: Box<DIR>) -> c_int {
 #[no_mangle]
 pub extern "C" fn dirfd(dir: &mut DIR) -> c_int {
     *dir.file
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fdopendir.html>.
+#[no_mangle]
+pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
+    let path = unsafe { CStr::from_ptr(path) };
+
+    DIR::new(path).or_errno_null_mut()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readdir.html>.
@@ -190,31 +196,10 @@ pub extern "C" fn readdir_r(
     unimplemented!(); // plus, deprecated
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/telldir.html>.
-#[no_mangle]
-pub extern "C" fn telldir(dir: &mut DIR) -> c_long {
-    dir.opaque_offset as c_long
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/seekdir.html>.
-#[no_mangle]
-pub extern "C" fn seekdir(dir: &mut DIR, off: c_long) {
-    dir.seek(
-        off.try_into()
-            .expect("off must come from telldir, thus never negative"),
-    );
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/rewinddir.html>.
 #[no_mangle]
 pub extern "C" fn rewinddir(dir: &mut DIR) {
     dir.rewind();
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alphasort.html>.
-#[no_mangle]
-pub unsafe extern "C" fn alphasort(first: *mut *const dirent, second: *mut *const dirent) -> c_int {
-    unsafe { string::strcoll((**first).d_name.as_ptr(), (**second).d_name.as_ptr()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alphasort.html>.
@@ -289,4 +274,19 @@ pub unsafe extern "C" fn scandir(
 
         len as c_int
     }
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/seekdir.html>.
+#[no_mangle]
+pub extern "C" fn seekdir(dir: &mut DIR, off: c_long) {
+    dir.seek(
+        off.try_into()
+            .expect("off must come from telldir, thus never negative"),
+    );
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/telldir.html>.
+#[no_mangle]
+pub extern "C" fn telldir(dir: &mut DIR) -> c_long {
+    dir.opaque_offset as c_long
 }
