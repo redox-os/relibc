@@ -179,10 +179,7 @@ pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_vo
         -1
     } else {
         let s_addr = unsafe {
-            slice::from_raw_parts_mut(
-                &mut (*(dst as *mut in_addr)).s_addr as *mut _ as *mut u8,
-                4,
-            )
+            slice::from_raw_parts_mut(&mut (*(dst as *mut in_addr)).s_addr as *mut _ as *mut u8, 4)
         };
         let src_cstr = unsafe { CStr::from_ptr(src) };
         let mut octets = unsafe { str::from_utf8_unchecked(src_cstr.to_bytes()).split('.') };
