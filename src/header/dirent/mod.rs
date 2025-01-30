@@ -1,4 +1,6 @@
-//! dirent implementation following http://pubs.opengroup.org/onlinepubs/009695399/basedefs/dirent.h.html
+//! `dirent.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dirent.h.html>.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
@@ -18,6 +20,7 @@ use super::errno::{EINVAL, EIO, ENOMEM};
 
 const INITIAL_BUFSIZE: usize = 512;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dirent.h.html>.
 // No repr(C) needed, as this is a completely opaque struct. Being accessed as a pointer, in C it's
 // just defined as `struct DIR`.
 pub struct DIR {
@@ -113,6 +116,7 @@ impl DIR {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dirent.h.html>.
 #[repr(C)]
 #[derive(Clone)]
 pub struct dirent {
@@ -145,6 +149,25 @@ const _: () = {
     }
 };
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alphasort.html>.
+#[no_mangle]
+pub unsafe extern "C" fn alphasort(first: *mut *const dirent, second: *mut *const dirent) -> c_int {
+    unsafe { string::strcoll((**first).d_name.as_ptr(), (**second).d_name.as_ptr()) }
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/closedir.html>.
+#[no_mangle]
+pub extern "C" fn closedir(dir: Box<DIR>) -> c_int {
+    dir.close().map(|()| 0).or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dirfd.html>.
+#[no_mangle]
+pub extern "C" fn dirfd(dir: &mut DIR) -> c_int {
+    *dir.file
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fdopendir.html>.
 #[no_mangle]
 pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
     let path = unsafe { CStr::from_ptr(path) };
@@ -152,21 +175,29 @@ pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
     DIR::new(path).or_errno_null_mut()
 }
 
-#[no_mangle]
-pub extern "C" fn closedir(dir: Box<DIR>) -> c_int {
-    dir.close().map(|()| 0).or_minus_one_errno()
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_getdents.html>.
+// #[no_mangle]
+pub extern "C" fn posix_getdents(
+    fildes: c_int,
+    buf: *mut c_void,
+    nbyte: size_t,
+    flags: c_int,
+) -> ssize_t {
+    unimplemented!();
 }
 
-#[no_mangle]
-pub extern "C" fn dirfd(dir: &mut DIR) -> c_int {
-    *dir.file
-}
-
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readdir.html>.
 #[no_mangle]
 pub extern "C" fn readdir(dir: &mut DIR) -> *mut dirent {
     dir.next_dirent().or_errno_null_mut()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readdir.html>.
+///
+/// # Deprecation
+/// The `readdir_r()` function was marked obsolescent in the Open Group Base
+/// Specifications Issue 8.
+#[deprecated]
 // #[no_mangle]
 pub extern "C" fn readdir_r(
     _dir: *mut DIR,
@@ -176,27 +207,13 @@ pub extern "C" fn readdir_r(
     unimplemented!(); // plus, deprecated
 }
 
-#[no_mangle]
-pub extern "C" fn telldir(dir: &mut DIR) -> c_long {
-    dir.opaque_offset as c_long
-}
-#[no_mangle]
-pub extern "C" fn seekdir(dir: &mut DIR, off: c_long) {
-    dir.seek(
-        off.try_into()
-            .expect("off must come from telldir, thus never negative"),
-    );
-}
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/rewinddir.html>.
 #[no_mangle]
 pub extern "C" fn rewinddir(dir: &mut DIR) {
     dir.rewind();
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn alphasort(first: *mut *const dirent, second: *mut *const dirent) -> c_int {
-    unsafe { string::strcoll((**first).d_name.as_ptr(), (**second).d_name.as_ptr()) }
-}
-
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alphasort.html>.
 #[no_mangle]
 pub unsafe extern "C" fn scandir(
     dirp: *const c_char,
@@ -268,4 +285,19 @@ pub unsafe extern "C" fn scandir(
 
         len as c_int
     }
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/seekdir.html>.
+#[no_mangle]
+pub extern "C" fn seekdir(dir: &mut DIR, off: c_long) {
+    dir.seek(
+        off.try_into()
+            .expect("off must come from telldir, thus never negative"),
+    );
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/telldir.html>.
+#[no_mangle]
+pub extern "C" fn telldir(dir: &mut DIR) -> c_long {
+    dir.opaque_offset as c_long
 }
