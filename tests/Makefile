@@ -275,6 +275,7 @@ FLAGS=\
 	-Wall \
 	-Wextra \
 	-Werror \
+	-Wno-deprecated-declarations \
 	-pedantic \
 	-g \
 	-I .
