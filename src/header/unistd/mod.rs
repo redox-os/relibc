@@ -84,11 +84,13 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
         },
         ..Default::default()
     };
+    let mut otimer = sys_time::itimerval::default();
+
     let errno_backup = platform::ERRNO.get();
-    let secs = if unsafe { sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut timer) } < 0 {
+    let secs = if unsafe { sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut otimer) } < 0 {
         0
     } else {
-        timer.it_value.tv_sec as c_uint + if timer.it_value.tv_usec > 0 { 1 } else { 0 }
+        otimer.it_value.tv_sec as c_uint + if otimer.it_value.tv_usec > 0 { 1 } else { 0 }
     };
     platform::ERRNO.set(errno_backup);
 
@@ -788,9 +790,18 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
         tv_sec: seconds as time_t,
         tv_nsec: 0,
     };
-    let rmtp = ptr::null_mut();
-    unsafe { Sys::nanosleep(&rqtp, rmtp).map(|()| 0).or_minus_one_errno() };
-    0
+    let mut rmtp = timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+
+    // If sleep() returns because the requested time has elapsed, the value returned shall be 0.
+    // If sleep() returns due to delivery of a signal, the return value shall be the "unslept" amount
+    // (the requested time minus the time actually slept) in seconds.
+    match unsafe { Sys::nanosleep(&rqtp, &mut rmtp) } {
+        Err(Errno(EINTR)) => rmtp.tv_sec as c_uint,
+        r => 0,
+    }
 }
 
 #[no_mangle]
