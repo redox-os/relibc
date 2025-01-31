@@ -9,7 +9,6 @@ fn get_target() -> String {
 }
 
 fn main() {
-    let crate_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
     let target = get_target();
 
     println!("cargo:rerun-if-changed=src/c");
