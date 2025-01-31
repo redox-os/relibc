@@ -8,5 +8,4 @@
     target_arch = "x86_64"
 ))]
 pub mod complex;
-pub mod fenv;
 pub mod math;
