@@ -1,4 +1,6 @@
-//! unistd implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/unistd.h.html
+//! `unistd.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/unistd.h.html>.
 
 use core::{
     convert::TryFrom,
@@ -64,17 +66,20 @@ unsafe fn init_fork_hooks<'a>() -> &'a mut [LinkedList<extern "C" fn()>; 3] {
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/_Exit.html>.
 #[no_mangle]
 pub extern "C" fn _exit(status: c_int) -> ! {
     Sys::exit(status)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/access.html>.
 #[no_mangle]
 pub unsafe extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::access(path, mode).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alarm.html>.
 #[no_mangle]
 pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
     let mut timer = sys_time::itimerval {
@@ -97,12 +102,19 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
     secs
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/chdir.html>.
 #[no_mangle]
 pub unsafe extern "C" fn chdir(path: *const c_char) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::chdir(path).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/7908799/xsh/chroot.html>.
+///
+/// # Deprecation
+/// The `chroot()` function was marked legacy in the System Interface & Headers
+/// Issue 5, and removed in Issue 6.
+#[deprecated]
 #[no_mangle]
 pub unsafe extern "C" fn chroot(path: *const c_char) -> c_int {
     // TODO: Implement
@@ -119,6 +131,7 @@ pub unsafe extern "C" fn set_default_scheme(scheme: *const c_char) -> c_int {
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/chown.html>.
 #[no_mangle]
 pub unsafe extern "C" fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     let path = CStr::from_ptr(path);
@@ -127,22 +140,26 @@ pub unsafe extern "C" fn chown(path: *const c_char, owner: uid_t, group: gid_t) 
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/close.html>.
 #[no_mangle]
 pub extern "C" fn close(fildes: c_int) -> c_int {
     Sys::close(fildes).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/confstr.html>.
 // #[no_mangle]
 pub extern "C" fn confstr(name: c_int, buf: *mut c_char, len: size_t) -> size_t {
     unimplemented!();
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/crypt.html>.
 #[no_mangle]
 pub unsafe extern "C" fn crypt(key: *const c_char, salt: *const c_char) -> *mut c_char {
     let mut data = crypt_data::new();
     crypt_r(key, salt, &mut data as *mut _)
 }
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/daemon.3.html>.
 #[no_mangle]
 pub extern "C" fn daemon(nochdir: c_int, noclose: c_int) -> c_int {
     if nochdir == 0 {
@@ -178,16 +195,23 @@ pub extern "C" fn daemon(nochdir: c_int, noclose: c_int) -> c_int {
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dup.html>.
 #[no_mangle]
 pub extern "C" fn dup(fildes: c_int) -> c_int {
     Sys::dup(fildes).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dup.html>.
 #[no_mangle]
 pub extern "C" fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
     Sys::dup2(fildes, fildes2).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/encrypt.html>.
+///
+/// # Deprecation
+/// The `encrypt()` function was marked obsolescent in the Open Group Base Specifications Issue 8.
+#[deprecated]
 // #[no_mangle]
 pub extern "C" fn encrypt(block: [c_char; 64], edflag: c_int) {
     unimplemented!();
@@ -238,6 +262,7 @@ unsafe fn with_argv(
     -1
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
 #[no_mangle]
 pub unsafe extern "C" fn execl(
     path: *const c_char,
@@ -249,6 +274,7 @@ pub unsafe extern "C" fn execl(
     })
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
 #[no_mangle]
 pub unsafe extern "C" fn execle(
     path: *const c_char,
@@ -261,6 +287,7 @@ pub unsafe extern "C" fn execle(
     })
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
 #[no_mangle]
 pub unsafe extern "C" fn execlp(
     file: *const c_char,
@@ -272,11 +299,13 @@ pub unsafe extern "C" fn execlp(
     })
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
 #[no_mangle]
 pub unsafe extern "C" fn execv(path: *const c_char, argv: *const *mut c_char) -> c_int {
     execve(path, argv, platform::environ)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
 #[no_mangle]
 pub unsafe extern "C" fn execve(
     path: *const c_char,
@@ -295,6 +324,7 @@ const PATH_SEPARATOR: u8 = b':';
 #[cfg(target_os = "redox")]
 const PATH_SEPARATOR: u8 = b';';
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
 #[no_mangle]
 pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -> c_int {
     let file = CStr::from_ptr(file);
@@ -333,6 +363,7 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fchown.html>.
 #[no_mangle]
 pub extern "C" fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
     Sys::fchown(fildes, owner, group)
@@ -340,16 +371,19 @@ pub extern "C" fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fchdir.html>.
 #[no_mangle]
 pub extern "C" fn fchdir(fildes: c_int) -> c_int {
     Sys::fchdir(fildes).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fdatasync.html>.
 #[no_mangle]
 pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
     Sys::fdatasync(fildes).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html>.
 #[no_mangle]
 pub unsafe extern "C" fn fork() -> pid_t {
     let fork_hooks = init_fork_hooks();
@@ -369,11 +403,13 @@ pub unsafe extern "C" fn fork() -> pid_t {
     pid
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fsync.html>.
 #[no_mangle]
 pub extern "C" fn fsync(fildes: c_int) -> c_int {
     Sys::fsync(fildes).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ftruncate.html>.
 #[no_mangle]
 pub extern "C" fn ftruncate(fildes: c_int, length: off_t) -> c_int {
     Sys::ftruncate(fildes, length)
@@ -381,6 +417,7 @@ pub extern "C" fn ftruncate(fildes: c_int, length: off_t) -> c_int {
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getcwd.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut c_char {
     let alloc = buf.is_null();
@@ -416,6 +453,12 @@ pub unsafe extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut 
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/7908799/xsh/getdtablesize.html>.
+///
+/// # Deprecation
+/// The `getdtablesize()` function was marked legacy in the System Interface &
+/// Headers Issue 5, and removed in Issue 6.
+#[deprecated]
 #[no_mangle]
 pub extern "C" fn getdtablesize() -> c_int {
     let mut lim = mem::MaybeUninit::<sys_resource::rlimit>::uninit();
@@ -435,31 +478,37 @@ pub extern "C" fn getdtablesize() -> c_int {
     -1
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getegid.html>.
 #[no_mangle]
 pub extern "C" fn getegid() -> gid_t {
     Sys::getegid()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/geteuid.html>.
 #[no_mangle]
 pub extern "C" fn geteuid() -> uid_t {
     Sys::geteuid()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getgid.html>.
 #[no_mangle]
 pub extern "C" fn getgid() -> gid_t {
     Sys::getgid()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getgroups.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
     Sys::getgroups(size, list).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gethostid.html>.
 // #[no_mangle]
 pub extern "C" fn gethostid() -> c_long {
     unimplemented!();
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gethostname.html>.
 #[no_mangle]
 pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> c_int {
     let mut uts = mem::MaybeUninit::<sys_utsname::utsname>::uninit();
@@ -489,6 +538,7 @@ pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> 
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getlogin.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getlogin() -> *mut c_char {
     static mut LOGIN: [c_char; 256] = [0; 256];
@@ -499,6 +549,7 @@ pub unsafe extern "C" fn getlogin() -> *mut c_char {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getlogin.html>.
 #[no_mangle]
 pub extern "C" fn getlogin_r(name: *mut c_char, namesize: size_t) -> c_int {
     //TODO: Determine correct getlogin result on Redox
@@ -506,6 +557,12 @@ pub extern "C" fn getlogin_r(name: *mut c_char, namesize: size_t) -> c_int {
     -1
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/7908799/xsh/getpagesize.html>.
+///
+/// # Deprecation
+/// The `getpagesize()` function was marked legacy in the System Interface &
+/// Headers Issue 5, and removed in Issue 6.
+#[deprecated]
 #[no_mangle]
 pub extern "C" fn getpagesize() -> c_int {
     // Panic if we can't uphold the required behavior (no errors are specified for this function)
@@ -514,41 +571,54 @@ pub extern "C" fn getpagesize() -> c_int {
         .expect("page size not representable as type `int`")
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpgid.html>.
 #[no_mangle]
 pub extern "C" fn getpgid(pid: pid_t) -> pid_t {
     Sys::getpgid(pid).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpgrp.html>.
 #[no_mangle]
 pub extern "C" fn getpgrp() -> pid_t {
     Sys::getpgid(Sys::getpid()).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpid.html>.
 #[no_mangle]
 pub extern "C" fn getpid() -> pid_t {
     Sys::getpid()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getppid.html>.
 #[no_mangle]
 pub extern "C" fn getppid() -> pid_t {
     Sys::getppid()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getsid.html>.
 #[no_mangle]
 pub extern "C" fn getsid(pid: pid_t) -> pid_t {
     Sys::getsid(pid).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getuid.html>.
 #[no_mangle]
 pub extern "C" fn getuid() -> uid_t {
     Sys::getuid()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/getwd.html>.
+///
+/// # Deprecation
+/// The `getwd()` function was marked legacy in the Open Group Base
+/// Specifications Issue 6, and removed in Issue 7.
+#[deprecated]
 #[no_mangle]
 pub unsafe extern "C" fn getwd(path_name: *mut c_char) -> *mut c_char {
     unsafe { getcwd(path_name, limits::PATH_MAX) }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/isatty.html>.
 #[no_mangle]
 pub extern "C" fn isatty(fd: c_int) -> c_int {
     let mut t = termios::termios::default();
@@ -559,6 +629,7 @@ pub extern "C" fn isatty(fd: c_int) -> c_int {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lchown.html>.
 #[no_mangle]
 pub unsafe extern "C" fn lchown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
     let path = CStr::from_ptr(path);
@@ -567,6 +638,7 @@ pub unsafe extern "C" fn lchown(path: *const c_char, owner: uid_t, group: gid_t)
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/link.html>.
 #[no_mangle]
 pub unsafe extern "C" fn link(path1: *const c_char, path2: *const c_char) -> c_int {
     let path1 = CStr::from_ptr(path1);
@@ -574,6 +646,7 @@ pub unsafe extern "C" fn link(path1: *const c_char, path2: *const c_char) -> c_i
     Sys::link(path1, path2).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lockf.html>.
 #[no_mangle]
 pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c_int {
     let mut fl = fcntl::flock {
@@ -613,26 +686,31 @@ pub unsafe extern "C" fn lockf(fildes: c_int, function: c_int, size: off_t) -> c
     };
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lseek.html>.
 #[no_mangle]
 pub extern "C" fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> off_t {
     Sys::lseek(fildes, offset, whence).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nice.html>.
 // #[no_mangle]
 pub extern "C" fn nice(incr: c_int) -> c_int {
     unimplemented!();
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pause.html>.
 // #[no_mangle]
 pub extern "C" fn pause() -> c_int {
     unimplemented!();
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pipe.html>.
 #[no_mangle]
 pub unsafe extern "C" fn pipe(fildes: *mut c_int) -> c_int {
     pipe2(fildes, 0)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pipe.html>.
 #[no_mangle]
 pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
     Sys::pipe2(slice::from_raw_parts_mut(fildes, 2), flags)
@@ -640,6 +718,7 @@ pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/read.html>.
 #[no_mangle]
 pub unsafe extern "C" fn pread(
     fildes: c_int,
@@ -656,6 +735,9 @@ pub unsafe extern "C" fn pread(
     .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_atfork.html>.
+///
+/// TODO: specified in `pthread.h` in modern POSIX
 #[no_mangle]
 pub extern "C" fn pthread_atfork(
     prepare: Option<extern "C" fn()>,
@@ -675,6 +757,7 @@ pub extern "C" fn pthread_atfork(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/write.html>.
 #[no_mangle]
 pub unsafe extern "C" fn pwrite(
     fildes: c_int,
@@ -691,6 +774,7 @@ pub unsafe extern "C" fn pwrite(
     .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/read.html>.
 #[no_mangle]
 pub unsafe extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
     let buf = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte as usize) };
@@ -705,6 +789,7 @@ pub unsafe extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) 
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readlink.html>.
 #[no_mangle]
 pub unsafe extern "C" fn readlink(
     path: *const c_char,
@@ -718,12 +803,14 @@ pub unsafe extern "C" fn readlink(
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/rmdir.html>.
 #[no_mangle]
 pub unsafe extern "C" fn rmdir(path: *const c_char) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::rmdir(path).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setgid.html>.
 #[no_mangle]
 pub extern "C" fn setgid(gid: gid_t) -> c_int {
     Sys::setresgid(gid, gid, -1)
@@ -731,27 +818,40 @@ pub extern "C" fn setgid(gid: gid_t) -> c_int {
         .or_minus_one_errno()
 }
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/setgroups.2.html>.
+///
+/// TODO: specified in `grp.h`?
 #[no_mangle]
 pub unsafe extern "C" fn setgroups(size: size_t, list: *const gid_t) -> c_int {
     Sys::setgroups(size, list).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setpgid.html>.
 #[no_mangle]
 pub extern "C" fn setpgid(pid: pid_t, pgid: pid_t) -> c_int {
     Sys::setpgid(pid, pgid).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/setpgrp.html>.
+///
+/// # Deprecation
+/// The `setpgrp()` function was marked obsolescent in the Open Group Base
+/// Specifications Issue 7, and removed in Issue 8.
+#[deprecated]
 #[no_mangle]
 pub extern "C" fn setpgrp() -> pid_t {
     setpgid(0, 0)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setregid.html>.
 #[no_mangle]
 pub extern "C" fn setregid(rgid: gid_t, egid: gid_t) -> c_int {
     Sys::setresgid(rgid, egid, -1)
         .map(|()| 0)
         .or_minus_one_errno()
 }
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setresgid.html>.
 #[no_mangle]
 pub extern "C" fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int {
     Sys::setresgid(rgid, egid, sgid)
@@ -759,6 +859,7 @@ pub extern "C" fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int {
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setreuid.html>.
 #[no_mangle]
 pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
     Sys::setresuid(ruid, euid, -1)
@@ -766,17 +867,21 @@ pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setsid.html>.
 #[no_mangle]
 pub extern "C" fn setsid() -> pid_t {
     Sys::setsid().map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setuid.html>.
 #[no_mangle]
 pub extern "C" fn setuid(uid: uid_t) -> c_int {
     Sys::setresuid(uid, uid, -1)
         .map(|()| 0)
         .or_minus_one_errno()
 }
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setresuid.html>.
 #[no_mangle]
 pub extern "C" fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int {
     Sys::setresuid(ruid, euid, suid)
@@ -784,6 +889,7 @@ pub extern "C" fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int {
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sleep.html>.
 #[no_mangle]
 pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
     let rqtp = timespec {
@@ -804,6 +910,7 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/swab.html>.
 #[no_mangle]
 pub extern "C" fn swab(src: *const c_void, dest: *mut c_void, nbytes: ssize_t) {
     if nbytes <= 0 {
@@ -820,6 +927,7 @@ pub extern "C" fn swab(src: *const c_void, dest: *mut c_void, nbytes: ssize_t) {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/symlink.html>.
 #[no_mangle]
 pub unsafe extern "C" fn symlink(path1: *const c_char, path2: *const c_char) -> c_int {
     let path1 = CStr::from_ptr(path1);
@@ -827,11 +935,13 @@ pub unsafe extern "C" fn symlink(path1: *const c_char, path2: *const c_char) -> 
     Sys::symlink(path1, path2).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sync.html>.
 #[no_mangle]
 pub extern "C" fn sync() {
     Sys::sync();
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcgetpgrp.html>.
 #[no_mangle]
 pub extern "C" fn tcgetpgrp(fd: c_int) -> pid_t {
     let mut pgrp = 0;
@@ -841,6 +951,7 @@ pub extern "C" fn tcgetpgrp(fd: c_int) -> pid_t {
     pgrp
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcsetpgrp.html>.
 #[no_mangle]
 pub extern "C" fn tcsetpgrp(fd: c_int, pgrp: pid_t) -> c_int {
     if unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCSPGRP, &pgrp as *const pid_t as _) } < 0 {
@@ -849,6 +960,7 @@ pub extern "C" fn tcsetpgrp(fd: c_int, pgrp: pid_t) -> c_int {
     pgrp
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/truncate.html>.
 #[no_mangle]
 pub unsafe extern "C" fn truncate(path: *const c_char, length: off_t) -> c_int {
     let file = unsafe { CStr::from_ptr(path) };
@@ -865,6 +977,7 @@ pub unsafe extern "C" fn truncate(path: *const c_char, length: off_t) -> c_int {
     res
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ttyname.html>.
 #[no_mangle]
 pub unsafe extern "C" fn ttyname(fildes: c_int) -> *mut c_char {
     static mut TTYNAME: [c_char; 4096] = [0; 4096];
@@ -875,6 +988,7 @@ pub unsafe extern "C" fn ttyname(fildes: c_int) -> *mut c_char {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ttyname.html>.
 #[no_mangle]
 pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) -> c_int {
     let name = unsafe { slice::from_raw_parts_mut(name as *mut u8, namesize) };
@@ -893,6 +1007,12 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/ualarm.html>.
+///
+/// # Deprecation
+/// The `ualarm()` function was marked obsolescent in the Open Group Base
+/// Specifications Issue 6, and removed in Issue 7.
+#[deprecated]
 #[no_mangle]
 pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t {
     let mut timer = sys_time::itimerval {
@@ -916,12 +1036,19 @@ pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t 
     ret
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/unlink.html>.
 #[no_mangle]
 pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::unlink(path).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/usleep.html>.
+///
+/// # Deprecation
+/// The `usleep()` function was marked obsolescent in the Open Group Base
+/// Specifications Issue 6, and removed in Issue 7.
+#[deprecated]
 #[no_mangle]
 pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
     let rqtp = timespec {
@@ -934,11 +1061,18 @@ pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/vfork.html>.
+///
+/// # Deprecation
+/// The `vfork()` function was marked obsolescent in the Open Group Base
+/// Specifications Issue 6, and removed in Issue 7.
+#[deprecated]
 // #[no_mangle]
 pub extern "C" fn vfork() -> pid_t {
     unimplemented!();
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/write.html>.
 #[no_mangle]
 pub unsafe extern "C" fn write(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
     let buf = slice::from_raw_parts(buf as *const u8, nbyte as usize);
