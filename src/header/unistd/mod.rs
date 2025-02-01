@@ -109,6 +109,15 @@ pub unsafe extern "C" fn chdir(path: *const c_char) -> c_int {
     Sys::chdir(path).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/chown.html>.
+#[no_mangle]
+pub unsafe extern "C" fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
+    let path = CStr::from_ptr(path);
+    Sys::chown(path, owner, group)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/7908799/xsh/chroot.html>.
 ///
 /// # Deprecation
@@ -121,23 +130,6 @@ pub unsafe extern "C" fn chroot(path: *const c_char) -> c_int {
     platform::ERRNO.set(crate::header::errno::EPERM);
 
     -1
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn set_default_scheme(scheme: *const c_char) -> c_int {
-    let scheme = CStr::from_ptr(scheme);
-    Sys::set_default_scheme(scheme)
-        .map(|_| 0)
-        .or_minus_one_errno()
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/chown.html>.
-#[no_mangle]
-pub unsafe extern "C" fn chown(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
-    let path = CStr::from_ptr(path);
-    Sys::chown(path, owner, group)
-        .map(|()| 0)
-        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/close.html>.
@@ -215,51 +207,6 @@ pub extern "C" fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
 // #[no_mangle]
 pub extern "C" fn encrypt(block: [c_char; 64], edflag: c_int) {
     unimplemented!();
-}
-
-unsafe fn with_argv(
-    mut va: VaListImpl,
-    arg0: *const c_char,
-    f: impl FnOnce(&[*const c_char], VaListImpl) -> c_int,
-) -> c_int {
-    let argc = 1 + va.with_copy(|mut copy| {
-        core::iter::from_fn(|| Some(copy.arg::<*const c_char>()))
-            .position(|p| p.is_null())
-            .unwrap()
-    });
-
-    let mut stack: [MaybeUninit<*const c_char>; 32] = MaybeUninit::uninit_array();
-
-    let out = if argc < 32 {
-        stack.as_mut_slice()
-    } else if argc < 4096 {
-        // TODO: Use ARG_MAX, not this hardcoded constant
-        let ptr = crate::header::stdlib::malloc(argc * mem::size_of::<*const c_char>());
-        if ptr.is_null() {
-            platform::ERRNO.set(ENOMEM);
-            return -1;
-        }
-        slice::from_raw_parts_mut(ptr.cast::<MaybeUninit<*const c_char>>(), argc)
-    } else {
-        platform::ERRNO.set(E2BIG);
-        return -1;
-    };
-    out[0].write(arg0);
-
-    for i in 1..argc {
-        out[i].write(va.arg::<*const c_char>());
-    }
-    out[argc].write(core::ptr::null());
-    // NULL
-    va.arg::<*const c_char>();
-
-    f(MaybeUninit::slice_assume_init_ref(&*out), va);
-
-    // f only returns if it fails
-    if argc >= 32 {
-        crate::header::stdlib::free(out.as_mut_ptr().cast());
-    }
-    -1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
@@ -363,18 +310,18 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fchdir.html>.
+#[no_mangle]
+pub extern "C" fn fchdir(fildes: c_int) -> c_int {
+    Sys::fchdir(fildes).map(|()| 0).or_minus_one_errno()
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fchown.html>.
 #[no_mangle]
 pub extern "C" fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> c_int {
     Sys::fchown(fildes, owner, group)
         .map(|()| 0)
         .or_minus_one_errno()
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fchdir.html>.
-#[no_mangle]
-pub extern "C" fn fchdir(fildes: c_int) -> c_int {
-    Sys::fchdir(fildes).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fdatasync.html>.
@@ -810,6 +757,14 @@ pub unsafe extern "C" fn rmdir(path: *const c_char) -> c_int {
     Sys::rmdir(path).map(|()| 0).or_minus_one_errno()
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn set_default_scheme(scheme: *const c_char) -> c_int {
+    let scheme = CStr::from_ptr(scheme);
+    Sys::set_default_scheme(scheme)
+        .map(|_| 0)
+        .or_minus_one_errno()
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setgid.html>.
 #[no_mangle]
 pub extern "C" fn setgid(gid: gid_t) -> c_int {
@@ -859,6 +814,14 @@ pub extern "C" fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> c_int {
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setresuid.html>.
+#[no_mangle]
+pub extern "C" fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int {
+    Sys::setresuid(ruid, euid, suid)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setreuid.html>.
 #[no_mangle]
 pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
@@ -877,14 +840,6 @@ pub extern "C" fn setsid() -> pid_t {
 #[no_mangle]
 pub extern "C" fn setuid(uid: uid_t) -> c_int {
     Sys::setresuid(uid, uid, -1)
-        .map(|()| 0)
-        .or_minus_one_errno()
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setresuid.html>.
-#[no_mangle]
-pub extern "C" fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> c_int {
-    Sys::setresuid(ruid, euid, suid)
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -1070,6 +1025,51 @@ pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
 // #[no_mangle]
 pub extern "C" fn vfork() -> pid_t {
     unimplemented!();
+}
+
+unsafe fn with_argv(
+    mut va: VaListImpl,
+    arg0: *const c_char,
+    f: impl FnOnce(&[*const c_char], VaListImpl) -> c_int,
+) -> c_int {
+    let argc = 1 + va.with_copy(|mut copy| {
+        core::iter::from_fn(|| Some(copy.arg::<*const c_char>()))
+            .position(|p| p.is_null())
+            .unwrap()
+    });
+
+    let mut stack: [MaybeUninit<*const c_char>; 32] = MaybeUninit::uninit_array();
+
+    let out = if argc < 32 {
+        stack.as_mut_slice()
+    } else if argc < 4096 {
+        // TODO: Use ARG_MAX, not this hardcoded constant
+        let ptr = crate::header::stdlib::malloc(argc * mem::size_of::<*const c_char>());
+        if ptr.is_null() {
+            platform::ERRNO.set(ENOMEM);
+            return -1;
+        }
+        slice::from_raw_parts_mut(ptr.cast::<MaybeUninit<*const c_char>>(), argc)
+    } else {
+        platform::ERRNO.set(E2BIG);
+        return -1;
+    };
+    out[0].write(arg0);
+
+    for i in 1..argc {
+        out[i].write(va.arg::<*const c_char>());
+    }
+    out[argc].write(core::ptr::null());
+    // NULL
+    va.arg::<*const c_char>();
+
+    f(MaybeUninit::slice_assume_init_ref(&*out), va);
+
+    // f only returns if it fails
+    if argc >= 32 {
+        crate::header::stdlib::free(out.as_mut_ptr().cast());
+    }
+    -1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/write.html>.
