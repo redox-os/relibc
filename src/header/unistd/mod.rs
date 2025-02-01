@@ -31,6 +31,9 @@ pub use self::{brk::*, getopt::*, getpass::getpass, pathconf::*, sysconf::*};
 // cuserid() marked legacy in Issue 5.
 pub use crate::header::stdio::{ctermid, cuserid};
 
+// TODO: implement and reexport fcntl functions:
+//pub use crate::header::fcntl::{faccessat, fchownat, fexecve, linkat, readlinkat, symlinkat, unlinkat};
+
 use super::errno::{E2BIG, ENOMEM};
 
 mod brk;
@@ -69,6 +72,12 @@ unsafe fn init_fork_hooks<'a>() -> &'a mut [LinkedList<extern "C" fn()>; 3] {
         fork_hooks_static
             .get_or_insert_with(|| [LinkedList::new(), LinkedList::new(), LinkedList::new()]),
     )
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html>.
+// #[no_mangle]
+pub unsafe extern "C" fn _Fork() -> pid_t {
+    unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/_Exit.html>.
@@ -202,6 +211,12 @@ pub extern "C" fn dup(fildes: c_int) -> c_int {
 #[no_mangle]
 pub extern "C" fn dup2(fildes: c_int, fildes2: c_int) -> c_int {
     Sys::dup2(fildes, fildes2).or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dup.html>.
+// #[no_mangle]
+pub extern "C" fn dup3(fildes: c_int, fildes2: c_int, flag: c_int) -> c_int {
+    unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/encrypt.html>.
@@ -436,6 +451,12 @@ pub extern "C" fn getegid() -> gid_t {
     Sys::getegid()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getentropy.html>.
+// #[no_mangle]
+pub extern "C" fn getentropy(buffer: *mut c_void, length: size_t) -> c_int {
+    unimplemented!();
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/geteuid.html>.
 #[no_mangle]
 pub extern "C" fn geteuid() -> uid_t {
@@ -545,6 +566,18 @@ pub extern "C" fn getpid() -> pid_t {
 #[no_mangle]
 pub extern "C" fn getppid() -> pid_t {
     Sys::getppid()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresgid.html>.
+// #[no_mangle]
+pub extern "C" fn getresgid(rgid: *mut gid_t, egid: *mut gid_t, sgid: *mut gid_t) -> c_int {
+    unimplemented!();
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresuid.html>.
+// #[no_mangle]
+pub extern "C" fn getresuid(ruid: *mut uid_t, euid: *mut uid_t, suid: *mut uid_t) -> c_int {
+    unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getsid.html>.
@@ -670,6 +703,12 @@ pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/close.html>.
+// #[no_mangle]
+pub extern "C" fn posix_close(fildes: c_int, flag: c_int) -> c_int {
+    unimplemented!();
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/read.html>.
 #[no_mangle]
 pub unsafe extern "C" fn pread(
@@ -768,6 +807,18 @@ pub unsafe extern "C" fn set_default_scheme(scheme: *const c_char) -> c_int {
     Sys::set_default_scheme(scheme)
         .map(|_| 0)
         .or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setegid.html>.
+// #[no_mangle]
+pub extern "C" fn setegid(gid: gid_t) -> c_int {
+    unimplemented!();
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/seteuid.html>.
+// #[no_mangle]
+pub extern "C" fn seteuid(uid: uid_t) -> c_int {
+    unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setgid.html>.
