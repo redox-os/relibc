@@ -56,11 +56,13 @@ fn pc(name: c_int) -> c_long {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fpathconf.html>.
 #[no_mangle]
 pub extern "C" fn fpathconf(_fildes: c_int, name: c_int) -> c_long {
     pc(name)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fpathconf.html>.
 #[no_mangle]
 pub extern "C" fn pathconf(_path: *const c_char, name: c_int) -> c_long {
     pc(name)

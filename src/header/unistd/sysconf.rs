@@ -33,6 +33,7 @@ pub const _SC_SYMLOOP_MAX: c_int = 173;
 pub const _SC_HOST_NAME_MAX: c_int = 180;
 // } POSIX.1
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sysconf.html>.
 #[no_mangle]
 pub extern "C" fn sysconf(name: c_int) -> c_long {
     //TODO: Real values
