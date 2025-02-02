@@ -110,17 +110,17 @@ static TIMEZONE_LOCK: Mutex<(Option<CString>, Option<CString>)> = Mutex::new((No
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static mut tzname: TzName = TzName([ptr::null_mut(); 2]);
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
-#[allow(non_upper_case_globals)]
-#[no_mangle]
 pub static mut daylight: c_int = 0;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut timezone: c_long = 0;
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
+#[allow(non_upper_case_globals)]
+#[no_mangle]
+pub static mut tzname: TzName = TzName([ptr::null_mut(); 2]);
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[repr(C)]
@@ -527,17 +527,17 @@ pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
 }
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/timegm.3.html>.
+#[no_mangle]
+pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
+    mktime(tm)
+}
+
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/timegm.3.html>.
 #[deprecated]
 #[no_mangle]
 pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
     //TODO: timezone
     timegm(tm)
-}
-
-/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/timegm.3.html>.
-#[no_mangle]
-pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
-    mktime(tm)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_create.html>.
@@ -553,6 +553,29 @@ pub extern "C" fn timer_create(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_delete.html>.
 // #[no_mangle]
 pub extern "C" fn timer_delete(timerid: timer_t) -> c_int {
+    unimplemented!();
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
+// #[no_mangle]
+pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
+    unimplemented!();
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
+// #[no_mangle]
+pub extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> c_int {
+    unimplemented!();
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
+// #[no_mangle]
+pub extern "C" fn timer_settime(
+    timerid: timer_t,
+    flags: c_int,
+    value: *const itimerspec,
+    ovalue: *mut itimerspec,
+) -> c_int {
     unimplemented!();
 }
 
@@ -572,29 +595,6 @@ pub unsafe extern "C" fn tzset() {
     };
 
     set_timezone(&mut lock, &std_time, dst_time)
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
-// #[no_mangle]
-pub extern "C" fn timer_settime(
-    timerid: timer_t,
-    flags: c_int,
-    value: *const itimerspec,
-    ovalue: *mut itimerspec,
-) -> c_int {
-    unimplemented!();
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
-// #[no_mangle]
-pub extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> c_int {
-    unimplemented!();
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
-// #[no_mangle]
-pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
-    unimplemented!();
 }
 
 fn clear_timezone(guard: &mut MutexGuard<'_, (Option<CString>, Option<CString>)>) {
