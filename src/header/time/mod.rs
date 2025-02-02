@@ -244,6 +244,12 @@ pub extern "C" fn clock() -> clock_t {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getcpuclockid.html>.
+// #[no_mangle]
+pub extern "C" fn clock_getcpuclockid(pid: pid_t, clock_id: clockid_t) -> c_int {
+    unimplemented!();
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getres.html>.
 #[no_mangle]
 pub unsafe extern "C" fn clock_getres(clock_id: clockid_t, tp: *mut timespec) -> c_int {
@@ -258,6 +264,12 @@ pub unsafe extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -
     Sys::clock_gettime(clock_id, tp)
         .map(|()| 0)
         .or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_nanosleep.html>.
+// #[no_mangle]
+pub extern "C" fn clock_nanosleep(clock_id: clockid_t, flags: c_int, rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
+    unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getres.html>.
@@ -515,6 +527,13 @@ pub unsafe extern "C" fn strftime(
     }
 }
 
+// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strftime.html>.
+// TODO: needs locale_t
+// #[no_mangle]
+/*pub extern "C" fn strftime_l(s: *mut char, maxsize: size_t, format: *const c_char, timeptr: *const tm, locale: locale_t) -> size_t {
+    unimplemented!();
+}*/
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/time.html>.
 #[no_mangle]
 pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
@@ -576,6 +595,12 @@ pub extern "C" fn timer_settime(
     value: *const itimerspec,
     ovalue: *mut itimerspec,
 ) -> c_int {
+    unimplemented!();
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timespec_get.html>.
+// #[no_mangle]
+pub extern "C" fn timespec_get(ts: *mut timespec, base: c_int) -> c_int {
     unimplemented!();
 }
 
