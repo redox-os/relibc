@@ -268,7 +268,12 @@ pub unsafe extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_nanosleep.html>.
 // #[no_mangle]
-pub extern "C" fn clock_nanosleep(clock_id: clockid_t, flags: c_int, rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
+pub extern "C" fn clock_nanosleep(
+    clock_id: clockid_t,
+    flags: c_int,
+    rqtp: *const timespec,
+    rmtp: *mut timespec,
+) -> c_int {
     unimplemented!();
 }
 
