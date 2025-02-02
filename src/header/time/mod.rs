@@ -27,6 +27,7 @@ pub mod constants;
 
 mod strftime;
 mod strptime;
+pub use strptime::strptime;
 
 const YEARS_PER_ERA: time_t = 400;
 const DAYS_PER_ERA: time_t = 146097;
