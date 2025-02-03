@@ -79,13 +79,19 @@ pub extern "C" fn ffs(i: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ffs.html>.
 // #[no_mangle]
 pub extern "C" fn ffsl(i: c_long) -> c_int {
-    unimplemented!();
+    if i == 0 {
+        return 0;
+    }
+    1 + i.trailing_zeros() as c_int
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ffs.html>.
 // #[no_mangle]
 pub extern "C" fn ffsll(i: c_longlong) -> c_int {
-    unimplemented!();
+    if i == 0 {
+        return 0;
+    }
+    1 + i.trailing_zeros() as c_int
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/index.html>.
