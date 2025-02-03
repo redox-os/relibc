@@ -77,7 +77,7 @@ pub extern "C" fn ffs(i: c_int) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ffs.html>.
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn ffsl(i: c_long) -> c_int {
     if i == 0 {
         return 0;
@@ -86,7 +86,7 @@ pub extern "C" fn ffsl(i: c_long) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ffs.html>.
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn ffsll(i: c_longlong) -> c_int {
     if i == 0 {
         return 0;
