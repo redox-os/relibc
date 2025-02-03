@@ -42,6 +42,7 @@ static LONG_MONTHS: [&str; 12] = [
     "December",
 ];
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strptime.html>.
 #[no_mangle]
 pub unsafe extern "C" fn strptime(
     buf: *const c_char,
