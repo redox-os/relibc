@@ -246,7 +246,7 @@ pub extern "C" fn clock() -> clock_t {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getcpuclockid.html>.
 // #[no_mangle]
-pub extern "C" fn clock_getcpuclockid(pid: pid_t, clock_id: clockid_t) -> c_int {
+pub extern "C" fn clock_getcpuclockid(pid: pid_t, clock_id: *mut clockid_t) -> c_int {
     unimplemented!();
 }
 
