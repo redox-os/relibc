@@ -10,6 +10,7 @@ use crate::{
         stdlib::{malloc, MB_CUR_MAX, MB_LEN_MAX},
         string,
         time::*,
+        wchar::lookaheadreader::LookAheadReader,
         wctype::*,
     },
     iter::{NulTerminated, NulTerminatedInclusive},
@@ -1006,9 +1007,16 @@ pub unsafe extern "C" fn wmemset(ws: *mut wchar_t, wc: wchar_t, n: size_t) -> *m
     ws
 }
 
-// #[no_mangle]
-pub extern "C" fn wscanf(format: *const wchar_t, ap: va_list) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn wscanf(format: *const wchar_t, ap: va_list) -> c_int {
+    let mut file = (*stdin).lock();
+    if let Err(_) = file.try_set_byte_orientation_unlocked() {
+        return -1;
+    }
+
+    let f: &mut FILE = &mut *file;
+    let reader: LookAheadReader = f.into();
+    wscanf::scanf(reader, format, ap)
 }
 
 #[no_mangle]

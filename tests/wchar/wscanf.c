@@ -92,5 +92,9 @@ int main ()
 
     wprintf(L"%d \"%s\" \"%s\" \"%s\" \"%s\"\n", ret, &protobuf, &slashbuf, &hostbuf, &pathbuf);
 
+      // wchar_t str [80];
+      // wprintf(L"Enter your family name: ");
+      // wscanf(L"%ls",str);
+
   return 0;
 }
