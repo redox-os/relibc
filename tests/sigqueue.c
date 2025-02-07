@@ -118,7 +118,7 @@ int main(void)
     struct timespec t = (struct timespec){.tv_sec = 0, .tv_nsec = 100000000};
     status = nanosleep(&t, NULL);
     ERROR_IF(nanosleep, status, < 0);
-    
+
     for (int n = 0; n <= 31; n++)
     {
       status = sigqueue(child, THE_SIG, (union sigval){.sival_int = n});
