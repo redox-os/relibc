@@ -1,8 +1,14 @@
 use super::{fseek_locked, ftell_locked, FILE, SEEK_SET};
 use crate::{
+    header::{
+        wchar::{fgetwc, mbrtowc},
+        wctype::WEOF,
+    },
     io::Read,
-    platform::types::{off_t, wint_t},
+    platform::types::{c_char, off_t, wchar_t, wint_t},
 };
+use core::ptr;
+
 struct LookAheadBuffer {
     buf: *const wint_t,
     pos: isize,
@@ -12,6 +18,7 @@ struct LookAheadBuffer {
 impl LookAheadBuffer {
     fn look_ahead(&mut self) -> Result<Option<wint_t>, i32> {
         let wchar = unsafe { *self.buf.offset(self.look_ahead) };
+        println!("-> {}", wchar as wint_t);
         if wchar == 0 {
             Ok(None)
         } else {
@@ -41,6 +48,7 @@ struct LookAheadFile<'a> {
 }
 
 impl<'a> LookAheadFile<'a> {
+    /*
     fn look_ahead(&mut self) -> Result<Option<wint_t>, i32> {
         let buf = &mut [0];
         let seek = unsafe { ftell_locked(self.f) };
@@ -48,13 +56,77 @@ impl<'a> LookAheadFile<'a> {
         let ret = match self.f.read(buf) {
             Ok(0) => Ok(None),
             Ok(_) => Ok(Some(buf[0])),
-            Err(_) => Err(-1),
+            Err(_) => Err(-2),
         };
         unsafe { fseek_locked(self.f, seek, SEEK_SET) };
         self.look_ahead += 1;
 
         // TODO: This is a 8 bit char, wee need to read a wchar
         ret.map(|c| c.map(wint_t::from))
+    }*/
+
+    fn look_ahead(&mut self) -> Result<Option<wint_t>, i32> {
+        const BUFF_SIZE: usize = core::mem::size_of::<wint_t>();
+        let buf = &mut [0; BUFF_SIZE];
+
+        let seek = unsafe { ftell_locked(self.f) };
+        unsafe { fseek_locked(self.f, self.look_ahead as off_t, SEEK_SET) };
+        println!("BUF {:?}", buf);
+
+        // let ret = unsafe { fgetwc(self.f) };
+
+        let mut encoded_length = 0;
+
+        let mut bytes_read = 0;
+        loop {
+            match self.f.read(&mut buf[bytes_read..bytes_read + 1]) {
+                Ok(0) => {
+                    // ERRNO.set(EILSEQ);
+                    return Ok(Some(WEOF));
+                }
+                Ok(_) => {}
+                Err(_) => return Err(-1),
+            }
+
+            bytes_read += 1;
+
+            if bytes_read == 1 {
+                encoded_length = if buf[0] >> 7 == 0 {
+                    1
+                } else if buf[0] >> 5 == 6 {
+                    2
+                } else if buf[0] >> 4 == 0xe {
+                    3
+                } else if buf[0] >> 3 == 0x1e {
+                    4
+                } else {
+                    // ERRNO.set(EILSEQ);
+                    return Ok(Some(WEOF));
+                };
+            }
+
+            if bytes_read >= encoded_length {
+                break;
+            }
+        }
+
+        let mut wc: wchar_t = 0;
+        unsafe {
+            mbrtowc(
+                &mut wc,
+                buf.as_ptr() as *const c_char,
+                encoded_length,
+                ptr::null_mut(),
+            );
+        }
+
+        println!("BUF {:?}", buf);
+        // println!("{:?}", ret);
+        unsafe { fseek_locked(self.f, seek, SEEK_SET) };
+        // self.look_ahead += 1;
+        self.look_ahead += encoded_length as i64;
+
+        Ok(Some(wc as wint_t))
     }
 
     fn commit(&mut self) {
