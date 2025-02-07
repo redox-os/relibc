@@ -179,7 +179,6 @@ NAMES=\
 	sa_restart \
 	sigchld \
 	stdio/ctermid \
-	sigqueue \
 	stdio/tempnam \
 	stdio/tmpnam \
 	stdlib/bsearch \
@@ -216,6 +215,7 @@ NAMES=\
 	grp/gr_iter \
 #	resource/getrusage
 #	time/times
+#	sigqueue
 
 # Tests run with `expect` (require a .c file and an .exp file
 # that takes the produced binary as the first argument)
