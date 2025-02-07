@@ -86,7 +86,7 @@ int main(void)
   {
     assert(num == 0);
     siginfo_t info;
-    struct timespec t = (struct timespec){.tv_sec = 1, .tv_nsec = 0};
+    struct timespec t = (struct timespec){.tv_sec = 1, .tv_nsec = 200000000};
     status = sigtimedwait(&set, &info, &t);
     ERROR_IF(sigtimedwait, status, == -1);
     validate(THE_SIG, &info);
@@ -115,7 +115,10 @@ int main(void)
   }
   else
   {
-    sleep(1);
+    struct timespec t = (struct timespec){.tv_sec = 0, .tv_nsec = 100000000};
+    status = nanosleep(&t, NULL);
+    ERROR_IF(nanosleep, status, < 0);
+    
     for (int n = 0; n <= 31; n++)
     {
       status = sigqueue(child, THE_SIG, (union sigval){.sival_int = n});
