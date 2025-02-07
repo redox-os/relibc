@@ -1,11 +1,15 @@
 use super::{fseek_locked, ftell_locked, FILE, SEEK_SET};
 use crate::{
     header::{
-        wchar::{fgetwc, mbrtowc},
+        errno::EILSEQ,
+        wchar::{fgetwc, mbrtowc, MB_CUR_MAX},
         wctype::WEOF,
     },
     io::Read,
-    platform::types::{c_char, off_t, wchar_t, wint_t},
+    platform::{
+        types::{c_char, off_t, wchar_t, wint_t},
+        ERRNO,
+    },
 };
 use core::ptr;
 
@@ -48,40 +52,17 @@ struct LookAheadFile<'a> {
 }
 
 impl<'a> LookAheadFile<'a> {
-    /*
     fn look_ahead(&mut self) -> Result<Option<wint_t>, i32> {
-        let buf = &mut [0];
+        let buf = &mut [0; MB_CUR_MAX as usize];
         let seek = unsafe { ftell_locked(self.f) };
         unsafe { fseek_locked(self.f, self.look_ahead as off_t, SEEK_SET) };
-        let ret = match self.f.read(buf) {
-            Ok(0) => Ok(None),
-            Ok(_) => Ok(Some(buf[0])),
-            Err(_) => Err(-2),
-        };
-        unsafe { fseek_locked(self.f, seek, SEEK_SET) };
-        self.look_ahead += 1;
-
-        // TODO: This is a 8 bit char, wee need to read a wchar
-        ret.map(|c| c.map(wint_t::from))
-    }*/
-
-    fn look_ahead(&mut self) -> Result<Option<wint_t>, i32> {
-        const BUFF_SIZE: usize = core::mem::size_of::<wint_t>();
-        let buf = &mut [0; BUFF_SIZE];
-
-        let seek = unsafe { ftell_locked(self.f) };
-        unsafe { fseek_locked(self.f, self.look_ahead as off_t, SEEK_SET) };
-        println!("BUF {:?}", buf);
-
-        // let ret = unsafe { fgetwc(self.f) };
 
         let mut encoded_length = 0;
-
         let mut bytes_read = 0;
         loop {
             match self.f.read(&mut buf[bytes_read..bytes_read + 1]) {
                 Ok(0) => {
-                    // ERRNO.set(EILSEQ);
+                    ERRNO.set(EILSEQ);
                     return Ok(Some(WEOF));
                 }
                 Ok(_) => {}
@@ -100,7 +81,7 @@ impl<'a> LookAheadFile<'a> {
                 } else if buf[0] >> 3 == 0x1e {
                     4
                 } else {
-                    // ERRNO.set(EILSEQ);
+                    ERRNO.set(EILSEQ);
                     return Ok(Some(WEOF));
                 };
             }
@@ -120,10 +101,7 @@ impl<'a> LookAheadFile<'a> {
             );
         }
 
-        println!("BUF {:?}", buf);
-        // println!("{:?}", ret);
         unsafe { fseek_locked(self.f, seek, SEEK_SET) };
-        // self.look_ahead += 1;
         self.look_ahead += encoded_length as i64;
 
         Ok(Some(wc as wint_t))
