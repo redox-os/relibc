@@ -135,7 +135,8 @@ int main(void)
     UNEXP_IF(wait, wait_pid, != child);
     if (!WIFEXITED(wait_status) || WEXITSTATUS(wait_status) != EXIT_SUCCESS)
     {
-      fprintf(stderr, "Unexpected result, WIFEXITED %s, WEXITSTATUS %d\n", WIFEXITED(wait_status) ? "true" : "false", WEXITSTATUS(wait_status));
+      fprintf(stderr, "Unexpected result, WIFEXITED %s, WEXITSTATUS %d\n",
+              WIFEXITED(wait_status) ? "true" : "false", WEXITSTATUS(wait_status));
       return EXIT_FAILURE;
     }
   }
