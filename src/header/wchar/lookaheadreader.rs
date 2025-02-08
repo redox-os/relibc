@@ -2,7 +2,7 @@ use super::{fseek_locked, ftell_locked, FILE, SEEK_SET};
 use crate::{
     header::{
         errno::EILSEQ,
-        wchar::{fgetwc, mbrtowc, MB_CUR_MAX},
+        wchar::{fgetwc, get_char_encoded_length, mbrtowc, MB_CUR_MAX},
         wctype::WEOF,
     },
     io::Read,
@@ -22,7 +22,6 @@ struct LookAheadBuffer {
 impl LookAheadBuffer {
     fn look_ahead(&mut self) -> Result<Option<wint_t>, i32> {
         let wchar = unsafe { *self.buf.offset(self.look_ahead) };
-        println!("-> {}", wchar as wint_t);
         if wchar == 0 {
             Ok(None)
         } else {
@@ -72,17 +71,11 @@ impl<'a> LookAheadFile<'a> {
             bytes_read += 1;
 
             if bytes_read == 1 {
-                encoded_length = if buf[0] >> 7 == 0 {
-                    1
-                } else if buf[0] >> 5 == 6 {
-                    2
-                } else if buf[0] >> 4 == 0xe {
-                    3
-                } else if buf[0] >> 3 == 0x1e {
-                    4
+                encoded_length = if let Some(el) = get_char_encoded_length(buf[0]) {
+                    el
                 } else {
                     ERRNO.set(EILSEQ);
-                    return Ok(Some(WEOF));
+                    return Ok(WEOF);
                 };
             }
 
@@ -99,9 +92,10 @@ impl<'a> LookAheadFile<'a> {
                 encoded_length,
                 ptr::null_mut(),
             );
+
+            fseek_locked(self.f, seek, SEEK_SET);
         }
 
-        unsafe { fseek_locked(self.f, seek, SEEK_SET) };
         self.look_ahead += encoded_length as i64;
 
         Ok(Some(wc as wint_t))

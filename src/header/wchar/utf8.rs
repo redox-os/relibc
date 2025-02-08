@@ -91,3 +91,18 @@ pub unsafe fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t) -> usize 
 
     size
 }
+
+/// Gets the encoded length of a character. It is used to recognize wide characters
+pub fn get_char_encoded_length(first_byte: u8) -> Option<usize> {
+    if first_byte >> 7 == 0 {
+        Some(1)
+    } else if first_byte >> 5 == 6 {
+        Some(2)
+    } else if first_byte >> 4 == 0xe {
+        Some(3)
+    } else if first_byte >> 3 == 0x1e {
+        Some(4)
+    } else {
+        None
+    }
+}
