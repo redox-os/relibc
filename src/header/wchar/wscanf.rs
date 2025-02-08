@@ -26,7 +26,7 @@ unsafe fn next_char(string: &mut *const wchar_t) -> Result<wint_t, c_int> {
     let c = **string as wint_t;
     *string = string.offset(1);
     if c == 0 {
-        Err(-2)
+        Err(-1)
     } else {
         Ok(c)
     }
@@ -34,10 +34,7 @@ unsafe fn next_char(string: &mut *const wchar_t) -> Result<wint_t, c_int> {
 
 macro_rules! wc_as_char {
     ($c:ident) => {
-        char::try_from($c).map_err(|e| {
-            println!("{:?}", e);
-            -3
-        })?
+        char::try_from($c).map_err(|_| -1)?
     };
 }
 
@@ -75,7 +72,7 @@ unsafe fn inner_scanf(
         (inner $($placeholder:expr)*) => {
             if !skip_read && !read!() {
                 match matched {
-                    0 => return Ok(-4),
+                    0 => return Ok(-1),
                     a => return Ok(a),
                 }
             }
@@ -124,7 +121,7 @@ unsafe fn inner_scanf(
             } else {
                 match width.parse::<usize>() {
                     Ok(n) => Some(n),
-                    Err(_) => return Err(-5),
+                    Err(_) => return Err(-1),
                 }
             };
 
@@ -496,7 +493,7 @@ unsafe fn inner_scanf(
                         *ap.arg::<*mut c_int>() = count as c_int;
                     }
                 }
-                _ => return Err(-6),
+                _ => return Err(-1),
             }
 
             if eof {

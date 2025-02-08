@@ -115,11 +115,9 @@ impl<'a> From<&'a mut FILE> for LookAheadFile<'a> {
 
 enum LookAheadReaderEnum<'a> {
     FILE(LookAheadFile<'a>),
-    // (buffer, location)
     BUFFER(LookAheadBuffer),
 }
 
-// pub struct LookAheadReader(LookAheadBuffer);
 pub struct LookAheadReader<'a>(LookAheadReaderEnum<'a>);
 
 impl LookAheadReader<'_> {
@@ -138,7 +136,7 @@ impl LookAheadReader<'_> {
 }
 
 impl<'a> From<&'a mut FILE> for LookAheadReader<'a> {
-    fn from(f: &'a mut FILE) -> LookAheadReader {
+    fn from(f: &'a mut FILE) -> LookAheadReader<'a> {
         LookAheadReader(LookAheadReaderEnum::FILE(f.into()))
     }
 }
