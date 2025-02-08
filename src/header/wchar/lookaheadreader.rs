@@ -75,7 +75,7 @@ impl<'a> LookAheadFile<'a> {
                     el
                 } else {
                     ERRNO.set(EILSEQ);
-                    return Ok(WEOF);
+                    return Ok(Some(WEOF));
                 };
             }
 
