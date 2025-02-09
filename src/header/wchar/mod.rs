@@ -10,6 +10,7 @@ use crate::{
         stdlib::{malloc, MB_CUR_MAX, MB_LEN_MAX},
         string,
         time::*,
+        wchar::{lookaheadreader::LookAheadReader, utf8::get_char_encoded_length},
         wctype::*,
     },
     iter::{NulTerminated, NulTerminatedInclusive},
@@ -69,14 +70,8 @@ pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
         bytes_read += 1;
 
         if bytes_read == 1 {
-            encoded_length = if buf[0] >> 7 == 0 {
-                1
-            } else if buf[0] >> 5 == 6 {
-                2
-            } else if buf[0] >> 4 == 0xe {
-                3
-            } else if buf[0] >> 3 == 0x1e {
-                4
+            encoded_length = if let Some(el) = get_char_encoded_length(buf[0]) {
+                el
             } else {
                 ERRNO.set(EILSEQ);
                 return WEOF;
@@ -1006,9 +1001,21 @@ pub unsafe extern "C" fn wmemset(ws: *mut wchar_t, wc: wchar_t, n: size_t) -> *m
     ws
 }
 
-// #[no_mangle]
-pub extern "C" fn wscanf(format: *const wchar_t, ap: va_list) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn vwscanf(format: *const wchar_t, __valist: va_list) -> c_int {
+    let mut file = (*stdin).lock();
+    if let Err(_) = file.try_set_byte_orientation_unlocked() {
+        return -1;
+    }
+
+    let f: &mut FILE = &mut *file;
+    let reader: LookAheadReader = f.into();
+    wscanf::scanf(reader, format, __valist)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wscanf(format: *const wchar_t, mut __valist: ...) -> c_int {
+    vwscanf(format, __valist.as_va_list())
 }
 
 #[no_mangle]
