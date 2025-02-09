@@ -612,19 +612,19 @@ impl DSO {
                 elf::DT_RELA => rela_offset = Some(ptr.cast::<Rela>()),
                 elf::DT_RELASZ => rela_len = Some(val as usize / size_of::<Rela>()),
                 elf::DT_RELAENT => {
-                    assert_eq!(val, size_of::<Rela>() as u64)
+                    assert_eq!(val, size_of::<Rela>() as _)
                 }
 
                 elf::DT_REL => rel_ptr = Some(ptr.cast::<Rel>()),
                 elf::DT_RELSZ => rel_len = Some(val as usize / size_of::<Rel>()),
                 elf::DT_RELENT => {
-                    assert_eq!(val, size_of::<Rel>() as u64)
+                    assert_eq!(val, size_of::<Rel>() as _)
                 }
 
                 DT_RELR => relr_ptr = Some(ptr.cast::<Relr>()),
                 DT_RELRSZ => relr_len = Some(val as usize / size_of::<Relr>()),
                 DT_RELRENT => {
-                    assert_eq!(val, size_of::<Relr>() as u64)
+                    assert_eq!(val, size_of::<Relr>() as _)
                 }
 
                 elf::DT_PLTREL => {
@@ -659,7 +659,7 @@ impl DSO {
         let dynstrtab = StringTable::new(
             &*mmap,
             strtab_offset as u64,
-            strtab_offset as u64 + strtab_size,
+            strtab_offset as u64 + strtab_size as u64,
         );
 
         let get_str = |entry: &Dyn| {
