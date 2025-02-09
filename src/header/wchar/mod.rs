@@ -1002,7 +1002,7 @@ pub unsafe extern "C" fn wmemset(ws: *mut wchar_t, wc: wchar_t, n: size_t) -> *m
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wscanf(format: *const wchar_t, mut __valist: ...) -> c_int {
+pub unsafe extern "C" fn vwscanf(format: *const wchar_t, __valist: va_list) -> c_int {
     let mut file = (*stdin).lock();
     if let Err(_) = file.try_set_byte_orientation_unlocked() {
         return -1;
@@ -1010,7 +1010,12 @@ pub unsafe extern "C" fn wscanf(format: *const wchar_t, mut __valist: ...) -> c_
 
     let f: &mut FILE = &mut *file;
     let reader: LookAheadReader = f.into();
-    wscanf::scanf(reader, format, __valist.as_va_list())
+    wscanf::scanf(reader, format, __valist)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wscanf(format: *const wchar_t, mut __valist: ...) -> c_int {
+    vwscanf(format, __valist.as_va_list())
 }
 
 #[no_mangle]
