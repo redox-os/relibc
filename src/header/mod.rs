@@ -35,6 +35,7 @@ pub mod langinfo;
 pub mod libgen;
 pub mod limits;
 pub mod locale;
+pub mod malloc;
 // math.h implemented in C
 pub mod monetary;
 // TODO: mqueue.h

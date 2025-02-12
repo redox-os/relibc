@@ -1,4 +1,4 @@
-#include <malloc.h>
+#include <malloc.h> /* for pvalloc() */
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -298,6 +298,44 @@ int main(void) {
     printf("posix_memalign (SIZE_MAX): ");
     test_cannot_alloc(ptr_posix_memalign_maxsize, posix_memalign_maxsize_return);
     free(ptr_posix_memalign_maxsize);
+
+    errno = 0;
+    char * ptr_pvalloc_size0 = (char *)pvalloc(zero_size);
+    int pvalloc_size0_errno = errno;
+    printf("pvalloc (size 0): ");
+    test_size_zero(ptr_pvalloc_size0, page_size, pvalloc_size0_errno);
+    free(ptr_pvalloc_size0);
+
+    errno = 0;
+    char * ptr_pvalloc = (char *)pvalloc(sample_alloc_size);
+    int pvalloc_errno = errno;
+    printf("pvalloc: ");
+    test_valid_aligned(ptr_pvalloc, page_size, pvalloc_errno);
+    /* Check that the alloc size is rounded up to nearest page-size
+     * multiple */
+    for(i = 0; i < page_size; i++) {
+        ptr_pvalloc[i] = (char)i;
+    }
+    free(ptr_pvalloc);
+
+    errno = 0;
+    char * ptr_pvalloc_multipage = (char *)pvalloc(page_size + 1);
+    int pvalloc_multipage_errno = errno;
+    printf("pvalloc (2 pages): ");
+    test_valid_aligned(ptr_pvalloc_multipage, page_size, pvalloc_multipage_errno);
+    /* Check that the alloc size is rounded up to nearest page-size
+     * multiple */
+    for(i = 0; i < 2*page_size; i++) {
+        ptr_pvalloc_multipage[i] = (char)i;
+    }
+    free(ptr_pvalloc_multipage);
+
+    errno = 0;
+    char * ptr_pvalloc_maxsize = (char *)pvalloc(max_size);
+    int pvalloc_maxsize_errno = errno;
+    printf("pvalloc (SIZE_MAX): ");
+    test_cannot_alloc(ptr_pvalloc_maxsize, pvalloc_maxsize_errno);
+    free(ptr_pvalloc_maxsize);
 
     #pragma GCC diagnostic pop
 }

@@ -24,3 +24,7 @@ posix_memalign (alignment 0): pointer: (nil), error value: 22 = Invalid argument
 posix_memalign (non-power-of-two multiple of sizeof(void *)): pointer: (nil), error value: 22 = Invalid argument
 posix_memalign (size 0): (OK)
 posix_memalign (SIZE_MAX): pointer: (nil), error value: 12 = Out of memory
+pvalloc (size 0): (OK)
+pvalloc: pointer: (alignment OK), error value: 0 = Success
+pvalloc (2 pages): pointer: (alignment OK), error value: 0 = Success
+pvalloc (SIZE_MAX): pointer: (nil), error value: 12 = Out of memory
