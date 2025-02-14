@@ -38,18 +38,8 @@ pub const ITIMER_PROF: c_int = 2;
 ///
 /// TODO: specified for `sys/select.h` in modern POSIX?
 #[repr(C)]
-#[derive(Default)]
-pub struct timeval {
-    pub tv_sec: time_t,
-    pub tv_usec: suseconds_t,
-}
-
-/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/gettimeofday.2.html>.
-#[repr(C)]
-#[derive(Default)]
-pub struct timezone {
-    pub tz_minuteswest: c_int,
-    pub tz_dsttime: c_int,
+pub struct fd_set {
+    pub fds_bits: [c_long; 16usize],
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_time.h.html>.
@@ -69,8 +59,18 @@ pub struct itimerval {
 ///
 /// TODO: specified for `sys/select.h` in modern POSIX?
 #[repr(C)]
-pub struct fd_set {
-    pub fds_bits: [c_long; 16usize],
+#[derive(Default)]
+pub struct timeval {
+    pub tv_sec: time_t,
+    pub tv_usec: suseconds_t,
+}
+
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/gettimeofday.2.html>.
+#[repr(C)]
+#[derive(Default)]
+pub struct timezone {
+    pub tz_minuteswest: c_int,
+    pub tz_dsttime: c_int,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/getitimer.html>.
@@ -84,6 +84,20 @@ pub unsafe extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int
     Sys::getitimer(which, value)
         .map(|()| 0)
         .or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/gettimeofday.html>.
+///
+/// See also <https://www.man7.org/linux/man-pages/man2/gettimeofday.2.html>
+/// for further details on the `tzp` argument.
+///
+/// # Deprecation
+/// The `gettimeofday()` function was marked obsolescent in the Open Group Base
+/// Specifications Issue 7, and removed in Issue 8.
+#[deprecated]
+#[no_mangle]
+pub unsafe extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
+    Sys::gettimeofday(tp, tzp).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/getitimer.html>.
@@ -101,20 +115,6 @@ pub unsafe extern "C" fn setitimer(
     Sys::setitimer(which, value, ovalue)
         .map(|()| 0)
         .or_minus_one_errno()
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/gettimeofday.html>.
-///
-/// See also <https://www.man7.org/linux/man-pages/man2/gettimeofday.2.html>
-/// for further details on the `tzp` argument.
-///
-/// # Deprecation
-/// The `gettimeofday()` function was marked obsolescent in the Open Group Base
-/// Specifications Issue 7, and removed in Issue 8.
-#[deprecated]
-#[no_mangle]
-pub unsafe extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
-    Sys::gettimeofday(tp, tzp).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/utimes.html>.
