@@ -16,19 +16,19 @@ enum IntKind {
 }
 
 /// Helper function for progressing a C string
-unsafe fn next_byte(string: &mut *const c_char) -> Result<u8, c_int> {
-    let c = **string as u8;
-    *string = string.offset(1);
-    if c == 0 {
-        Err(-1)
-    } else {
-        Ok(c)
+unsafe fn next_byte(lar: &mut LookAheadReader) -> Result<u8, c_int> {
+    match lar.lookahead1() {
+        Ok(Some(b)) => {
+            lar.commit();
+            Ok(b)
+        }
+        Ok(None) | Err(_) => return Err(-1),
     }
 }
 
 unsafe fn inner_scanf(
     mut r: LookAheadReader,
-    mut format: *const c_char,
+    mut format: LookAheadReader,
     mut ap: va_list,
 ) -> Result<c_int, c_int> {
     let mut matched = 0;
@@ -71,7 +71,7 @@ unsafe fn inner_scanf(
         }
     }
 
-    while *format != 0 {
+    loop {
         let mut c = next_byte(&mut format)?;
 
         if c == b' ' {
@@ -455,7 +455,7 @@ unsafe fn inner_scanf(
     Ok(matched)
 }
 
-pub unsafe fn scanf(r: LookAheadReader, format: *const c_char, ap: va_list) -> c_int {
+pub unsafe fn scanf(r: LookAheadReader, format: LookAheadReader, ap: va_list) -> c_int {
     match inner_scanf(r, format, ap) {
         Ok(n) => n,
         Err(n) => n,

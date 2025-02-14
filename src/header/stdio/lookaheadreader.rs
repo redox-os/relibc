@@ -1,10 +1,15 @@
 use super::{fseek_locked, ftell_locked, FILE, SEEK_SET};
-use crate::{io::Read, platform::types::off_t};
+use crate::{
+    io::Read,
+    platform::types::{c_char, off_t},
+};
+
 struct LookAheadBuffer {
     buf: *const u8,
     pos: isize,
     look_ahead: isize,
 }
+
 impl LookAheadBuffer {
     fn look_ahead(&mut self) -> Result<Option<u8>, i32> {
         let byte = unsafe { *self.buf.offset(self.look_ahead) };
@@ -92,8 +97,8 @@ impl<'a> From<&'a mut FILE> for LookAheadReader<'a> {
     }
 }
 
-impl<'a> From<*const u8> for LookAheadReader<'a> {
-    fn from(buff: *const u8) -> LookAheadReader<'a> {
-        LookAheadReader(LookAheadReaderEnum::BUFFER(buff.into()))
+impl<'a> From<*const c_char> for LookAheadReader<'a> {
+    fn from(buff: *const c_char) -> LookAheadReader<'a> {
+        LookAheadReader(LookAheadReaderEnum::BUFFER((buff as *const u8).into()))
     }
 }

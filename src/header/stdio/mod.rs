@@ -1308,7 +1308,7 @@ pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_
 
         let f: &mut FILE = &mut *file;
         let reader: LookAheadReader = f.into();
-        scanf::scanf(reader, format, ap)
+        scanf::scanf(reader, format.into(), ap)
     };
     ret
 }
@@ -1336,8 +1336,7 @@ pub unsafe extern "C" fn vsscanf(
     format: *const c_char,
     __valist: va_list,
 ) -> c_int {
-    let reader = (s as *const u8).into();
-    scanf::scanf(reader, format, __valist)
+    scanf::scanf(s.into(), format.into(), __valist)
 }
 #[no_mangle]
 pub unsafe extern "C" fn sscanf(
@@ -1345,8 +1344,7 @@ pub unsafe extern "C" fn sscanf(
     format: *const c_char,
     mut __valist: ...
 ) -> c_int {
-    let reader = (s as *const u8).into();
-    scanf::scanf(reader, format, __valist.as_va_list())
+    scanf::scanf(s.into(), format.into(), __valist.as_va_list())
 }
 
 pub unsafe fn flush_io_streams() {
