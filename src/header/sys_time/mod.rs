@@ -100,6 +100,8 @@ pub unsafe extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c
     Sys::gettimeofday(tp, tzp).map(|()| 0).or_minus_one_errno()
 }
 
+// `select()` declared in `sys/select.h`, as specified in modern POSIX
+
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/getitimer.html>.
 ///
 /// # Deprecation
