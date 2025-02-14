@@ -22,13 +22,13 @@ enum CharKind {
 }
 
 /// Helper function for progressing a C string
-unsafe fn next_char(string: &mut *const wchar_t) -> Result<wint_t, c_int> {
-    let c = **string as wint_t;
-    *string = string.offset(1);
-    if c == 0 {
-        Err(-1)
-    } else {
-        Ok(c)
+unsafe fn next_char(lar: &mut LookAheadReader) -> Result<wint_t, c_int> {
+    match lar.lookahead1() {
+        Ok(Some(b)) => {
+            lar.commit();
+            Ok(b)
+        }
+        Ok(None) | Err(_) => return Err(-1),
     }
 }
 
@@ -40,7 +40,7 @@ macro_rules! wc_as_char {
 
 unsafe fn inner_scanf(
     mut r: LookAheadReader,
-    mut format: *const wchar_t,
+    mut format: LookAheadReader,
     mut ap: va_list,
 ) -> Result<c_int, c_int> {
     let mut matched = 0;
@@ -83,7 +83,7 @@ unsafe fn inner_scanf(
         }
     }
 
-    while *format != 0 {
+    loop {
         let mut c = next_char(&mut format)?;
 
         if c as u8 == b' ' {
@@ -510,7 +510,7 @@ unsafe fn inner_scanf(
     Ok(matched)
 }
 
-pub unsafe fn scanf(r: LookAheadReader, format: *const wchar_t, ap: va_list) -> c_int {
+pub unsafe fn scanf(r: LookAheadReader, format: LookAheadReader, ap: va_list) -> c_int {
     match inner_scanf(r, format, ap) {
         Ok(n) => n,
         Err(n) => n,

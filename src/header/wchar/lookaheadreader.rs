@@ -127,6 +127,7 @@ impl LookAheadReader<'_> {
             LookAheadReaderEnum::BUFFER(b) => b.look_ahead(),
         }
     }
+
     pub fn commit(&mut self) {
         match &mut self.0 {
             LookAheadReaderEnum::FILE(f) => f.commit(),
@@ -141,8 +142,8 @@ impl<'a> From<&'a mut FILE> for LookAheadReader<'a> {
     }
 }
 
-impl<'a> From<*const wint_t> for LookAheadReader<'a> {
-    fn from(buff: *const wint_t) -> LookAheadReader<'a> {
-        LookAheadReader(LookAheadReaderEnum::BUFFER(buff.into()))
+impl<'a> From<*const wchar_t> for LookAheadReader<'a> {
+    fn from(buff: *const wchar_t) -> LookAheadReader<'a> {
+        LookAheadReader(LookAheadReaderEnum::BUFFER((buff as *const wint_t).into()))
     }
 }

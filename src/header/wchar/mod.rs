@@ -281,8 +281,7 @@ pub unsafe extern "C" fn vswscanf(
     format: *const wchar_t,
     __valist: va_list,
 ) -> c_int {
-    let reader = (s as *const wint_t).into();
-    wscanf::scanf(reader, format, __valist)
+    wscanf::scanf(s.into(), format.into(), __valist)
 }
 
 #[no_mangle]
@@ -1010,7 +1009,7 @@ pub unsafe extern "C" fn vwscanf(format: *const wchar_t, __valist: va_list) -> c
 
     let f: &mut FILE = &mut *file;
     let reader: LookAheadReader = f.into();
-    wscanf::scanf(reader, format, __valist)
+    wscanf::scanf(reader, format.into(), __valist)
 }
 
 #[no_mangle]
