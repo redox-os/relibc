@@ -23,12 +23,11 @@ enum CharKind {
 
 /// Helper function for progressing a C string
 unsafe fn next_char(lar: &mut LookAheadReader) -> Result<wint_t, c_int> {
-    match lar.lookahead1() {
-        Ok(Some(b)) => {
-            lar.commit();
-            Ok(b)
-        }
-        Ok(None) | Err(_) => return Err(-1),
+    if let Some(c) = lar.lookahead1()? {
+        lar.commit();
+        Ok(c)
+    } else {
+        Ok(0)
     }
 }
 
@@ -83,7 +82,7 @@ unsafe fn inner_scanf(
         }
     }
 
-    loop {
+    while format.current().is_some() {
         let mut c = next_char(&mut format)?;
 
         if c as u8 == b' ' {

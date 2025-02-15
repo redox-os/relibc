@@ -19,6 +19,8 @@ struct LookAheadBuffer {
     look_ahead: isize,
 }
 
+// https://doc.rust-lang.org/std/primitive.pointer.html#method.read
+
 impl LookAheadBuffer {
     fn look_ahead(&mut self) -> Result<Option<wint_t>, i32> {
         let wchar = unsafe { *self.buf.offset(self.look_ahead) };
@@ -32,6 +34,15 @@ impl LookAheadBuffer {
 
     fn commit(&mut self) {
         self.pos = self.look_ahead;
+    }
+
+    fn current(&self) -> Option<wint_t> {
+        let wchar = unsafe { self.buf.read() };
+        if wchar == 0 {
+            None
+        } else {
+            Some(wchar)
+        }
     }
 }
 
@@ -104,6 +115,10 @@ impl<'a> LookAheadFile<'a> {
     fn commit(&mut self) {
         unsafe { fseek_locked(self.f, self.look_ahead as off_t, SEEK_SET) };
     }
+
+    fn current(&self) -> Option<wint_t> {
+        todo!();
+    }
 }
 
 impl<'a> From<&'a mut FILE> for LookAheadFile<'a> {
@@ -132,6 +147,13 @@ impl LookAheadReader<'_> {
         match &mut self.0 {
             LookAheadReaderEnum::FILE(f) => f.commit(),
             LookAheadReaderEnum::BUFFER(b) => b.commit(),
+        }
+    }
+
+    pub fn current(&self) -> Option<wint_t> {
+        match &self.0 {
+            LookAheadReaderEnum::FILE(f) => f.current(),
+            LookAheadReaderEnum::BUFFER(b) => b.current(),
         }
     }
 }

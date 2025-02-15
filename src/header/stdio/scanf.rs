@@ -17,12 +17,11 @@ enum IntKind {
 
 /// Helper function for progressing a C string
 unsafe fn next_byte(lar: &mut LookAheadReader) -> Result<u8, c_int> {
-    match lar.lookahead1() {
-        Ok(Some(b)) => {
-            lar.commit();
-            Ok(b)
-        }
-        Ok(None) | Err(_) => return Err(-1),
+    if let Some(b) = lar.lookahead1()? {
+        lar.commit();
+        Ok(b)
+    } else {
+        Ok(0)
     }
 }
 
