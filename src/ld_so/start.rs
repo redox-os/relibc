@@ -151,7 +151,7 @@ pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) ->
     // Setup TCB for ourselves.
     unsafe {
         let tcb = Tcb::new(0).expect_notls("ld.so: failed to allocate bootstrap TCB");
-        tcb.activate();
+        tcb.activate(todo!());
 
         #[cfg(target_os = "redox")]
         redox_rt::signal::setup_sighandler(&tcb.os_specific);
