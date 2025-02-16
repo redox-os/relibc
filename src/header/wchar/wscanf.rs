@@ -82,7 +82,7 @@ unsafe fn inner_scanf(
         }
     }
 
-    while format.current().is_some() {
+    while format.current()?.is_some() {
         let mut c = next_char(&mut format)?;
 
         if c as u8 == b' ' {

@@ -19,8 +19,6 @@ struct LookAheadBuffer {
     look_ahead: isize,
 }
 
-// https://doc.rust-lang.org/std/primitive.pointer.html#method.read
-
 impl LookAheadBuffer {
     fn look_ahead(&mut self) -> Result<Option<wint_t>, i32> {
         let wchar = unsafe { *self.buf.offset(self.look_ahead) };
@@ -28,20 +26,22 @@ impl LookAheadBuffer {
             Ok(None)
         } else {
             self.look_ahead += 1;
+            unsafe { *self.buf.sub((self.look_ahead - self.pos) as usize) };
             Ok(Some(wchar))
         }
     }
 
     fn commit(&mut self) {
         self.pos = self.look_ahead;
+        unsafe { *self.buf.offset(self.pos) };
     }
 
-    fn current(&self) -> Option<wint_t> {
+    fn current(&mut self) -> Result<Option<wint_t>, i32> {
         let wchar = unsafe { self.buf.read() };
         if wchar == 0 {
-            None
+            Ok(None)
         } else {
-            Some(wchar)
+            Ok(Some(wchar))
         }
     }
 }
@@ -63,18 +63,35 @@ struct LookAheadFile<'a> {
 
 impl<'a> LookAheadFile<'a> {
     fn look_ahead(&mut self) -> Result<Option<wint_t>, i32> {
-        let buf = &mut [0; MB_CUR_MAX as usize];
         let seek = unsafe { ftell_locked(self.f) };
         unsafe { fseek_locked(self.f, self.look_ahead as off_t, SEEK_SET) };
 
+        if let Some((wc, encoded_length)) = self.get_curret_wchar()? {
+            self.look_ahead += encoded_length as i64;
+            unsafe { fseek_locked(self.f, seek, SEEK_SET) };
+            Ok(Some(wc))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn commit(&mut self) {
+        unsafe { fseek_locked(self.f, self.look_ahead as off_t, SEEK_SET) };
+    }
+
+    fn current(&mut self) -> Result<Option<wint_t>, i32> {
+        Ok(self.get_curret_wchar()?.map(|(wc, _)| wc))
+    }
+
+    // Gets the wchar at the current position
+    fn get_curret_wchar(&mut self) -> Result<Option<(wint_t, usize)>, i32> {
+        let buf = &mut [0; MB_CUR_MAX as usize];
         let mut encoded_length = 0;
         let mut bytes_read = 0;
+
         loop {
             match self.f.read(&mut buf[bytes_read..bytes_read + 1]) {
-                Ok(0) => {
-                    ERRNO.set(EILSEQ);
-                    return Ok(Some(WEOF));
-                }
+                Ok(0) => return Ok(None),
                 Ok(_) => {}
                 Err(_) => return Err(-1),
             }
@@ -86,7 +103,7 @@ impl<'a> LookAheadFile<'a> {
                     el
                 } else {
                     ERRNO.set(EILSEQ);
-                    return Ok(Some(WEOF));
+                    return Ok(Some((WEOF, 0)));
                 };
             }
 
@@ -103,21 +120,9 @@ impl<'a> LookAheadFile<'a> {
                 encoded_length,
                 ptr::null_mut(),
             );
-
-            fseek_locked(self.f, seek, SEEK_SET);
         }
 
-        self.look_ahead += encoded_length as i64;
-
-        Ok(Some(wc as wint_t))
-    }
-
-    fn commit(&mut self) {
-        unsafe { fseek_locked(self.f, self.look_ahead as off_t, SEEK_SET) };
-    }
-
-    fn current(&self) -> Option<wint_t> {
-        todo!();
+        Ok(Some((wc as wint_t, encoded_length)))
     }
 }
 
@@ -150,8 +155,8 @@ impl LookAheadReader<'_> {
         }
     }
 
-    pub fn current(&self) -> Option<wint_t> {
-        match &self.0 {
+    pub fn current(&mut self) -> Result<Option<wint_t>, i32> {
+        match &mut self.0 {
             LookAheadReaderEnum::FILE(f) => f.current(),
             LookAheadReaderEnum::BUFFER(b) => b.current(),
         }
