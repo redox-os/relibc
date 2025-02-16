@@ -17,12 +17,23 @@ impl LookAheadBuffer {
             Ok(None)
         } else {
             self.look_ahead += 1;
+            unsafe { *self.buf.sub((self.look_ahead - self.pos) as usize) };
             Ok(Some(byte))
         }
     }
 
     fn commit(&mut self) {
         self.pos = self.look_ahead;
+        unsafe { *self.buf.offset(self.pos) };
+    }
+
+    fn current(&mut self) -> Result<Option<u8>, i32> {
+        let ch = unsafe { self.buf.read() };
+        if ch == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(ch))
+        }
     }
 }
 
@@ -43,14 +54,9 @@ struct LookAheadFile<'a> {
 
 impl<'a> LookAheadFile<'a> {
     fn look_ahead(&mut self) -> Result<Option<u8>, i32> {
-        let buf = &mut [0];
         let seek = unsafe { ftell_locked(self.f) };
         unsafe { fseek_locked(self.f, self.look_ahead as off_t, SEEK_SET) };
-        let ret = match self.f.read(buf) {
-            Ok(0) => Ok(None),
-            Ok(_) => Ok(Some(buf[0])),
-            Err(_) => Err(-1),
-        };
+        let ret = self.current();
         unsafe { fseek_locked(self.f, seek, SEEK_SET) };
         self.look_ahead += 1;
         ret
@@ -58,6 +64,15 @@ impl<'a> LookAheadFile<'a> {
 
     fn commit(&mut self) {
         unsafe { fseek_locked(self.f, self.look_ahead as off_t, SEEK_SET) };
+    }
+
+    fn current(&mut self) -> Result<Option<u8>, i32> {
+        let buf = &mut [0];
+        match self.f.read(buf) {
+            Ok(0) => Ok(None),
+            Ok(_) => Ok(Some(buf[0])),
+            Err(_) => Err(-1),
+        }
     }
 }
 
@@ -83,10 +98,18 @@ impl<'a> LookAheadReader<'a> {
             LookAheadReaderEnum::BUFFER(b) => b.look_ahead(),
         }
     }
+
     pub fn commit(&mut self) {
         match &mut self.0 {
             LookAheadReaderEnum::FILE(f) => f.commit(),
             LookAheadReaderEnum::BUFFER(b) => b.commit(),
+        }
+    }
+
+    pub fn current(&mut self) -> Result<Option<u8>, i32> {
+        match &mut self.0 {
+            LookAheadReaderEnum::FILE(f) => f.current(),
+            LookAheadReaderEnum::BUFFER(b) => b.current(),
         }
     }
 }

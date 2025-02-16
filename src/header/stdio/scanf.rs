@@ -16,6 +16,7 @@ enum IntKind {
 }
 
 /// Helper function for progressing a C string
+#[inline]
 unsafe fn next_byte(lar: &mut LookAheadReader) -> Result<u8, c_int> {
     if let Some(b) = lar.lookahead1()? {
         lar.commit();
@@ -70,7 +71,7 @@ unsafe fn inner_scanf(
         }
     }
 
-    loop {
+    while format.current()?.is_some() {
         let mut c = next_byte(&mut format)?;
 
         if c == b' ' {

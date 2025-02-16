@@ -66,13 +66,15 @@ impl<'a> LookAheadFile<'a> {
         let seek = unsafe { ftell_locked(self.f) };
         unsafe { fseek_locked(self.f, self.look_ahead as off_t, SEEK_SET) };
 
-        if let Some((wc, encoded_length)) = self.get_curret_wchar()? {
+        let ret = if let Some((wc, encoded_length)) = self.get_curret_wchar()? {
             self.look_ahead += encoded_length as i64;
-            unsafe { fseek_locked(self.f, seek, SEEK_SET) };
             Ok(Some(wc))
         } else {
             Ok(None)
-        }
+        };
+
+        unsafe { fseek_locked(self.f, seek, SEEK_SET) };
+        ret
     }
 
     fn commit(&mut self) {
