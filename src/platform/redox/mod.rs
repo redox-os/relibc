@@ -115,29 +115,33 @@ impl Pal for Sys {
 
     unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void> {
         // On first invocation, allocate a buffer for brk
-        if BRK_CUR.is_null() {
+        if unsafe { BRK_CUR.is_null() } {
             // 4 megabytes of RAM ought to be enough for anybody
             const BRK_MAX_SIZE: usize = 4 * 1024 * 1024;
 
-            let allocated = Self::mmap(
-                ptr::null_mut(),
-                BRK_MAX_SIZE,
-                PROT_READ | PROT_WRITE,
-                MAP_ANONYMOUS,
-                0,
-                0,
-            )?;
+            let allocated = unsafe {
+                Self::mmap(
+                    ptr::null_mut(),
+                    BRK_MAX_SIZE,
+                    PROT_READ | PROT_WRITE,
+                    MAP_ANONYMOUS,
+                    0,
+                    0,
+                )
+            }?;
 
-            BRK_CUR = allocated;
-            BRK_END = (allocated as *mut u8).add(BRK_MAX_SIZE) as *mut c_void;
+            unsafe {
+                BRK_CUR = allocated;
+                BRK_END = (allocated as *mut u8).add(BRK_MAX_SIZE) as *mut c_void
+            };
         }
 
         if addr.is_null() {
             // Lookup what previous brk() invocations have set the address to
-            Ok(BRK_CUR)
-        } else if BRK_CUR <= addr && addr < BRK_END {
+            Ok(unsafe { BRK_CUR })
+        } else if unsafe { BRK_CUR } <= addr && addr < unsafe { BRK_END } {
             // It's inside buffer, return
-            BRK_CUR = addr;
+            unsafe { BRK_CUR = addr };
             Ok(addr)
         } else {
             // It was outside of valid range
@@ -172,7 +176,7 @@ impl Pal for Sys {
     }
 
     unsafe fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> Result<()> {
-        libredox::clock_gettime(clk_id as usize, tp)?;
+        unsafe { libredox::clock_gettime(clk_id as usize, tp) }?;
         Ok(())
     }
 
@@ -219,7 +223,7 @@ impl Pal for Sys {
         self::exec::execve(
             Executable::InFd {
                 file: File::new(fildes),
-                arg0: CStr::from_ptr(argv.read()).to_bytes(),
+                arg0: unsafe { CStr::from_ptr(argv.read()).to_bytes() },
             },
             self::exec::ArgEnv::C { argv, envp },
             None,
@@ -269,12 +273,12 @@ impl Pal for Sys {
     }
 
     unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()> {
-        libredox::fstat(fildes as usize, buf)?;
+        unsafe { libredox::fstat(fildes as usize, buf) }?;
         Ok(())
     }
 
     unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()> {
-        libredox::fstatvfs(fildes as usize, buf)?;
+        unsafe { libredox::fstatvfs(fildes as usize, buf) }?;
         Ok(())
     }
 
@@ -294,22 +298,22 @@ impl Pal for Sys {
             tv_sec: d.tv_sec,
             tv_nsec: d.tv_nsec as i32,
         });
-        redox_rt::sys::sys_futex_wait(addr, val, deadline.as_ref())?;
+        unsafe { redox_rt::sys::sys_futex_wait(addr, val, deadline.as_ref()) }?;
         Ok(())
     }
     #[inline]
     unsafe fn futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
-        Ok(redox_rt::sys::sys_futex_wake(addr, num)?)
+        Ok(unsafe { redox_rt::sys::sys_futex_wake(addr, num) }?)
     }
 
     unsafe fn futimens(fd: c_int, times: *const timespec) -> Result<()> {
-        libredox::futimens(fd as usize, times)?;
+        unsafe { libredox::futimens(fd as usize, times) }?;
         Ok(())
     }
 
     unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()> {
         let file = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
-        Self::futimens(*file, times)
+        unsafe { Self::futimens(*file, times) }
     }
 
     unsafe fn getcwd(buf: *mut c_char, size: size_t) -> Result<()> {
@@ -465,8 +469,9 @@ impl Pal for Sys {
             resource, rlim
         );
         if !rlim.is_null() {
-            (*rlim).rlim_cur = RLIM_INFINITY;
-            (*rlim).rlim_max = RLIM_INFINITY;
+            let rlim = unsafe { &mut *rlim };
+            rlim.rlim_cur = RLIM_INFINITY;
+            rlim.rlim_max = RLIM_INFINITY;
         }
         Ok(())
     }
@@ -616,9 +621,9 @@ impl Pal for Sys {
         };
 
         Ok(if flags & MAP_ANONYMOUS == MAP_ANONYMOUS {
-            syscall::fmap(!0, &map)?
+            unsafe { syscall::fmap(!0, &map) }?
         } else {
-            syscall::fmap(fildes as usize, &map)?
+            unsafe { syscall::fmap(fildes as usize, &map) }?
         } as *mut c_void)
     }
 
@@ -636,12 +641,9 @@ impl Pal for Sys {
         let Some(len) = round_up_to_page_size(len) else {
             return Err(Errno(ENOMEM));
         };
-        syscall::mprotect(
-            addr as usize,
-            len,
-            syscall::MapFlags::from_bits((prot as usize) << 16)
-                .expect("mprotect: invalid bit pattern"),
-        )?;
+        let flags = syscall::MapFlags::from_bits((prot as usize) << 16)
+            .expect("mprotect: invalid bit pattern");
+        unsafe { syscall::mprotect(addr as usize, len, flags) }?;
         Ok(())
     }
 
@@ -678,7 +680,7 @@ impl Pal for Sys {
         let Some(len) = round_up_to_page_size(len) else {
             return Err(Errno(ENOMEM));
         };
-        syscall::funmap(addr as usize, len)?;
+        unsafe { syscall::funmap(addr as usize, len) }?;
         Ok(())
     }
 
@@ -735,7 +737,7 @@ impl Pal for Sys {
 
     unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
         let _guard = CLONE_LOCK.read();
-        let res = clone::rlct_clone_impl(stack);
+        let res = unsafe { clone::rlct_clone_impl(stack) };
 
         res.map(|mut fd| crate::pthread::OsTid {
             thread_fd: fd.take(),
@@ -1057,6 +1059,6 @@ impl Pal for Sys {
     }
 
     unsafe fn exit_thread(stack_base: *mut (), stack_size: usize) -> ! {
-        redox_rt::thread::exit_this_thread(stack_base, stack_size)
+        unsafe { redox_rt::thread::exit_this_thread(stack_base, stack_size) }
     }
 }

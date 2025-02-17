@@ -193,9 +193,9 @@ pub unsafe fn init(sp: &'static Stack) {
 }
 
 pub unsafe fn fini() {
-    if let Some(tcb) = Tcb::current() {
+    if let Some(tcb) = unsafe { Tcb::current() } {
         if !tcb.linker_ptr.is_null() {
-            let linker = (*tcb.linker_ptr).lock();
+            let linker = unsafe { &*tcb.linker_ptr }.lock();
             linker.fini();
         }
     }

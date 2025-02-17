@@ -25,7 +25,7 @@ pub unsafe extern "C" fn pvalloc(size: size_t) -> *mut c_void {
 
     match num_pages.checked_mul(page_size) {
         Some(alloc_size) => {
-            let ptr = platform::alloc_align(alloc_size, page_size);
+            let ptr = unsafe { platform::alloc_align(alloc_size, page_size) };
             if ptr.is_null() {
                 platform::ERRNO.set(ENOMEM);
             }

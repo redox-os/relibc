@@ -28,19 +28,23 @@ pub struct statvfs {
 
 #[no_mangle]
 pub unsafe extern "C" fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
-    Sys::fstatvfs(fildes, buf).map(|()| 0).or_minus_one_errno()
+    unsafe { Sys::fstatvfs(fildes, buf) }
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn statvfs(file: *const c_char, buf: *mut statvfs) -> c_int {
-    let file = CStr::from_ptr(file);
+    let file = unsafe { CStr::from_ptr(file) };
     // TODO: Rustify
     let fd = Sys::open(file, O_PATH, 0).or_minus_one_errno();
     if fd < 0 {
         return -1;
     }
 
-    let res = Sys::fstatvfs(fd, buf).map(|()| 0).or_minus_one_errno();
+    let res = unsafe { Sys::fstatvfs(fd, buf) }
+        .map(|()| 0)
+        .or_minus_one_errno();
 
     Sys::close(fd);
 

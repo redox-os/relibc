@@ -33,24 +33,29 @@ unsafe impl Send for State {}
 impl State {
     /// To be called in any function that may read from X_PTR
     pub unsafe fn ensure_x_ptr_init(&mut self) {
+        let default_x = unsafe { &DEFAULT_X };
         if self.x_ptr.is_null() {
-            let x_u32_ptr: *mut u32 = DEFAULT_X.get().cast::<u32>().add(1);
+            let default_x_ptr = default_x.get();
+            let x_u32_ptr: *mut u32 = unsafe { default_x_ptr.cast::<u32>().add(1) };
             self.x_ptr = x_u32_ptr.cast::<[u8; 4]>();
         }
     }
 
     pub unsafe fn save(&mut self) -> *mut [u8; 4] {
-        self.ensure_x_ptr_init();
+        unsafe { self.ensure_x_ptr_init() };
 
         let stash_value: u32 =
             (u32::from(self.n) << 16) | (u32::from(self.i) << 8) | u32::from(self.j);
-        *self.x_ptr.offset(-1) = stash_value.to_ne_bytes();
-        self.x_ptr.offset(-1)
+        let stash_value_bytes = stash_value.to_ne_bytes();
+        unsafe {
+            *self.x_ptr.offset(-1) = stash_value_bytes;
+            self.x_ptr.offset(-1)
+        }
     }
 
     pub unsafe fn load(&mut self, state_ptr: *mut [u8; 4]) {
-        let stash_value = u32::from_ne_bytes(*state_ptr);
-        self.x_ptr = state_ptr.offset(1);
+        let stash_value = u32::from_ne_bytes(unsafe { *state_ptr });
+        self.x_ptr = unsafe { state_ptr.offset(1) };
 
         /* This calculation of n does not have a bit mask in the musl
          * original, in principle resulting in a u16, but obtaining a value
@@ -63,12 +68,14 @@ impl State {
     }
 
     pub unsafe fn seed(&mut self, seed: c_uint) {
-        self.ensure_x_ptr_init();
+        unsafe { self.ensure_x_ptr_init() };
 
         let mut s = seed as u64;
 
+        let x_ptr = unsafe { &mut *self.x_ptr };
+
         if self.n == 0 {
-            *self.x_ptr = (s as u32).to_ne_bytes();
+            *x_ptr = (s as u32).to_ne_bytes();
         } else {
             self.i = if self.n == 31 || self.n == 7 { 3 } else { 1 };
 
@@ -79,11 +86,12 @@ impl State {
 
                 // Conversion will always succeed (value is a 32-bit right-
                 // shift of a 64-bit integer).
-                *self.x_ptr.add(k) = u32::try_from(s >> 32).unwrap().to_ne_bytes();
+                let x_ptr_off = unsafe { &mut *self.x_ptr.add(k) };
+                *x_ptr_off = u32::try_from(s >> 32).unwrap().to_ne_bytes();
             }
 
             // ensure X contains at least one odd number
-            *self.x_ptr = (u32::from_ne_bytes(*self.x_ptr) | 1).to_ne_bytes();
+            *x_ptr = (u32::from_ne_bytes(*x_ptr) | 1).to_ne_bytes();
         }
     }
 }

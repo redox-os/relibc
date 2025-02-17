@@ -16,9 +16,11 @@ static mut BRK: *mut c_void = ptr::null_mut();
 #[deprecated]
 #[no_mangle]
 pub unsafe extern "C" fn brk(addr: *mut c_void) -> c_int {
-    BRK = Sys::brk(addr).or_errno_null_mut();
+    let brk_val = unsafe { &mut BRK };
 
-    if BRK < addr {
+    *brk_val = unsafe { Sys::brk(addr) }.or_errno_null_mut();
+
+    if *brk_val < addr {
         platform::ERRNO.set(ENOMEM);
         return -1;
     }
@@ -34,18 +36,20 @@ pub unsafe extern "C" fn brk(addr: *mut c_void) -> c_int {
 #[deprecated]
 #[no_mangle]
 pub unsafe extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
-    if BRK.is_null() {
-        BRK = Sys::brk(ptr::null_mut()).or_errno_null_mut();
+    let brk_val = unsafe { &mut BRK };
+
+    if brk_val.is_null() {
+        *brk_val = unsafe { Sys::brk(ptr::null_mut()) }.or_errno_null_mut();
     }
 
-    let old_brk = BRK;
+    let old_brk = *brk_val;
 
     if incr != 0 {
-        let addr = old_brk.offset(incr);
+        let addr = unsafe { old_brk.offset(incr) };
 
-        BRK = Sys::brk(addr).or_errno_null_mut();
+        *brk_val = unsafe { Sys::brk(addr) }.or_errno_null_mut();
 
-        if BRK < addr {
+        if *brk_val < addr {
             platform::ERRNO.set(ENOMEM);
             return -1isize as *mut c_void;
         }

@@ -81,7 +81,7 @@ pub struct timezone {
 #[deprecated]
 #[no_mangle]
 pub unsafe extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
-    Sys::getitimer(which, value)
+    unsafe { Sys::getitimer(which, value) }
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -97,7 +97,9 @@ pub unsafe extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int
 #[deprecated]
 #[no_mangle]
 pub unsafe extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
-    Sys::gettimeofday(tp, tzp).map(|()| 0).or_minus_one_errno()
+    unsafe { Sys::gettimeofday(tp, tzp) }
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 // `select()` declared in `sys/select.h`, as specified in modern POSIX
@@ -114,7 +116,7 @@ pub unsafe extern "C" fn setitimer(
     value: *const itimerval,
     ovalue: *mut itimerval,
 ) -> c_int {
-    Sys::setitimer(which, value, ovalue)
+    unsafe { Sys::setitimer(which, value, ovalue) }
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -126,26 +128,28 @@ pub unsafe extern "C" fn setitimer(
 /// Specifications Issue 6, and then unmarked in Issue 7.
 #[no_mangle]
 pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c_int {
-    let path = CStr::from_ptr(path);
+    let path = unsafe { CStr::from_ptr(path) };
     // Nullptr is valid here, it means "use current time"
     let times_spec = if times.is_null() {
         null()
     } else {
         {
+            let times_0 = unsafe { &*times.offset(0) };
+            let times_1 = unsafe { &*times.offset(1) };
             [
                 timespec {
-                    tv_sec: (*times.offset(0)).tv_sec,
-                    tv_nsec: ((*times.offset(0)).tv_usec as c_long) * 1000,
+                    tv_sec: times_0.tv_sec,
+                    tv_nsec: (times_0.tv_usec as c_long) * 1000,
                 },
                 timespec {
-                    tv_sec: (*times.offset(1)).tv_sec,
-                    tv_nsec: ((*times.offset(1)).tv_usec as c_long) * 1000,
+                    tv_sec: times_1.tv_sec,
+                    tv_nsec: (times_1.tv_usec as c_long) * 1000,
                 },
             ]
         }
         .as_ptr()
     };
-    Sys::utimens(path, times_spec)
+    unsafe { Sys::utimens(path, times_spec) }
         .map(|()| 0)
         .or_minus_one_errno()
 }

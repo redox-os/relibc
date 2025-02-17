@@ -9,7 +9,7 @@ const LOCKED: c_int = 1;
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_spin_destroy(spinlock: *mut pthread_spinlock_t) -> c_int {
-    let _spinlock = &mut *spinlock.cast::<RlctSpinlock>();
+    let _spinlock = unsafe { &mut *spinlock.cast::<RlctSpinlock>() };
 
     // No-op
     0
@@ -22,15 +22,16 @@ pub unsafe extern "C" fn pthread_spin_init(
     // TODO: pshared doesn't matter in most situations, as memory is just memory, but this may be
     // different on some architectures...
 
-    spinlock.cast::<RlctSpinlock>().write(RlctSpinlock {
+    let spinlock_value = RlctSpinlock {
         inner: AtomicInt::new(UNLOCKED),
-    });
+    };
+    unsafe { spinlock.cast::<RlctSpinlock>().write(spinlock_value) };
 
     0
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_spin_lock(spinlock: *mut pthread_spinlock_t) -> c_int {
-    let spinlock = &*spinlock.cast::<RlctSpinlock>();
+    let spinlock = unsafe { &*spinlock.cast::<RlctSpinlock>() };
 
     loop {
         match spinlock.inner.compare_exchange_weak(
@@ -48,7 +49,7 @@ pub unsafe extern "C" fn pthread_spin_lock(spinlock: *mut pthread_spinlock_t) ->
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_spin_trylock(spinlock: *mut pthread_spinlock_t) -> c_int {
-    let spinlock = &*spinlock.cast::<RlctSpinlock>();
+    let spinlock = unsafe { &*spinlock.cast::<RlctSpinlock>() };
 
     match spinlock
         .inner
@@ -62,7 +63,7 @@ pub unsafe extern "C" fn pthread_spin_trylock(spinlock: *mut pthread_spinlock_t)
 }
 #[no_mangle]
 pub unsafe extern "C" fn pthread_spin_unlock(spinlock: *mut pthread_spinlock_t) -> c_int {
-    let spinlock = &*spinlock.cast::<RlctSpinlock>();
+    let spinlock = unsafe { &*spinlock.cast::<RlctSpinlock>() };
 
     spinlock.inner.store(UNLOCKED, Ordering::Release);
 

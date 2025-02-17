@@ -102,17 +102,18 @@ macro_rules! bind_or_connect {
 }
 
 unsafe fn inner_af_unix(buf: &[u8], address: *mut sockaddr, address_len: *mut socklen_t) {
-    let data = &mut *(address as *mut sockaddr_un);
+    let data = unsafe { &mut *(address as *mut sockaddr_un) };
 
     data.sun_family = AF_UNIX as c_ushort;
 
-    let path =
-        slice::from_raw_parts_mut(&mut data.sun_path as *mut _ as *mut u8, data.sun_path.len());
+    let sun_path = unsafe { &mut data.sun_path };
+    let sun_path_len = sun_path.len();
+    let path = unsafe { slice::from_raw_parts_mut(sun_path as *mut _ as *mut u8, sun_path_len) };
 
     let len = cmp::min(path.len(), buf.len());
     path[..len].copy_from_slice(&buf[..len]);
 
-    *address_len = len as socklen_t;
+    unsafe { *address_len = len as socklen_t };
 }
 
 unsafe fn inner_af_inet(
@@ -143,7 +144,7 @@ unsafe fn inner_af_inet(
 
     let mut addr = in_addr::default();
     assert_eq!(
-        inet_aton(raw_addr.as_ptr() as *mut i8, &mut addr),
+        unsafe { inet_aton(raw_addr.as_ptr() as *mut i8, &mut addr) },
         1,
         "inet_aton might be broken, failed to parse netstack address"
     );
@@ -155,10 +156,10 @@ unsafe fn inner_af_inet(
 
         ..sockaddr_in::default()
     };
-    let len = cmp::min(*address_len as usize, mem::size_of_val(&ret));
+    let len = cmp::min(unsafe { *address_len } as usize, mem::size_of_val(&ret));
 
-    ptr::copy_nonoverlapping(&ret as *const _ as *const u8, address as *mut u8, len);
-    *address_len = len as socklen_t;
+    unsafe { ptr::copy_nonoverlapping(&ret as *const _ as *const u8, address as *mut u8, len) };
+    unsafe { *address_len = len as socklen_t };
 }
 
 unsafe fn inner_get_name(
@@ -173,13 +174,13 @@ unsafe fn inner_get_name(
     let buf = &buf[..len];
 
     if buf.starts_with(b"tcp:") || buf.starts_with(b"udp:") {
-        inner_af_inet(local, &buf[4..], address, address_len);
+        unsafe { inner_af_inet(local, &buf[4..], address, address_len) };
     } else if buf.starts_with(b"/scheme/tcp/") || buf.starts_with(b"/scheme/udp/") {
-        inner_af_inet(local, &buf[12..], address, address_len);
+        unsafe { inner_af_inet(local, &buf[12..], address, address_len) };
     } else if buf.starts_with(b"chan:") {
-        inner_af_unix(&buf[5..], address, address_len);
+        unsafe { inner_af_unix(&buf[5..], address, address_len) };
     } else if buf.starts_with(b"/scheme/chan/") {
-        inner_af_unix(&buf[13..], address, address_len);
+        unsafe { inner_af_unix(&buf[13..], address, address_len) };
     } else {
         // Socket doesn't belong to any scheme
         panic!(
@@ -212,13 +213,13 @@ impl PalSocket for Sys {
     ) -> Result<c_int> {
         let stream = syscall::dup(socket as usize, b"listen")? as c_int;
         if address != ptr::null_mut() && address_len != ptr::null_mut() {
-            let _ = Self::getpeername(stream, address, address_len)?;
+            let _ = unsafe { Self::getpeername(stream, address, address_len) }?;
         }
         Ok(stream)
     }
 
     unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> Result<()> {
-        bind_or_connect!(bind into, socket, address, address_len)?;
+        unsafe { bind_or_connect!(bind into, socket, address, address_len) }?;
         Ok(())
     }
 
@@ -227,7 +228,7 @@ impl PalSocket for Sys {
         address: *const sockaddr,
         address_len: socklen_t,
     ) -> Result<c_int> {
-        bind_or_connect!(connect into, socket, address, address_len)
+        unsafe { bind_or_connect!(connect into, socket, address, address_len) }
     }
 
     unsafe fn getpeername(
@@ -235,7 +236,7 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<()> {
-        inner_get_name(false, socket, address, address_len)
+        unsafe { inner_get_name(false, socket, address, address_len) }
     }
 
     unsafe fn getsockname(
@@ -243,7 +244,7 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<()> {
-        inner_get_name(true, socket, address, address_len)
+        unsafe { inner_get_name(true, socket, address, address_len) }
     }
 
     unsafe fn getsockopt(
@@ -299,12 +300,16 @@ impl PalSocket for Sys {
             return Err(Errno(EOPNOTSUPP));
         }
         if address == ptr::null_mut() || address_len == ptr::null_mut() {
-            Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
+            Self::read(socket, unsafe {
+                slice::from_raw_parts_mut(buf as *mut u8, len)
+            })
         } else {
             let fd = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
-            Self::getpeername(*fd as c_int, address, address_len)?;
+            unsafe { Self::getpeername(*fd as c_int, address, address_len) }?;
 
-            Self::read(*fd as c_int, slice::from_raw_parts_mut(buf as *mut u8, len))
+            Self::read(*fd as c_int, unsafe {
+                slice::from_raw_parts_mut(buf as *mut u8, len)
+            })
         }
     }
 
@@ -332,10 +337,16 @@ impl PalSocket for Sys {
             return Err(Errno(EOPNOTSUPP));
         }
         if dest_addr == ptr::null() || dest_len == 0 {
-            Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
+            Self::write(socket, unsafe {
+                slice::from_raw_parts(buf as *const u8, len)
+            })
         } else {
-            let fd = FdGuard::new(bind_or_connect!(connect copy, socket, dest_addr, dest_len)?);
-            Self::write(*fd as c_int, slice::from_raw_parts(buf as *const u8, len))
+            let fd = FdGuard::new(unsafe {
+                bind_or_connect!(connect copy, socket, dest_addr, dest_len)
+            }?);
+            Self::write(*fd as c_int, unsafe {
+                slice::from_raw_parts(buf as *const u8, len)
+            })
         }
     }
 

@@ -7,7 +7,7 @@ pub unsafe extern "C" fn pthread_once(
     once: *mut pthread_once_t,
     constructor: extern "C" fn(),
 ) -> c_int {
-    let once = &*once.cast::<RlctOnce>();
+    let once = unsafe { &*once.cast::<RlctOnce>() };
 
     // TODO: Cancellation points
 

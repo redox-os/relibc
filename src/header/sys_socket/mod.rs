@@ -75,12 +75,17 @@ pub unsafe extern "C" fn CMSG_ALIGN(len: size_t) -> size_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn CMSG_LEN(length: c_uint) -> c_uint {
-    (CMSG_ALIGN(mem::size_of::<cmsghdr>()) + length as usize) as c_uint
+    let cmsghdr_len = mem::size_of::<cmsghdr>();
+    let cmsghdr_len_align = unsafe { CMSG_ALIGN(cmsghdr_len) };
+    (cmsghdr_len_align + length as usize) as c_uint
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn CMSG_SPACE(len: c_uint) -> c_uint {
-    (CMSG_ALIGN(len as size_t) + CMSG_ALIGN(mem::size_of::<cmsghdr>())) as c_uint
+    let len_align = unsafe { CMSG_ALIGN(len as size_t) };
+    let cmsghdr_len = mem::size_of::<cmsghdr>();
+    let cmsghdr_len_align = unsafe { CMSG_ALIGN(cmsghdr_len) };
+    (len_align + cmsghdr_len_align) as c_uint
 }
 
 #[no_mangle]
@@ -97,7 +102,7 @@ pub unsafe extern "C" fn CMSG_FIRSTHDR(mhdr: *const msghdr) -> *mut cmsghdr {
 #[no_mangle]
 pub unsafe extern "C" fn CMSG_NXTHDR(mhdr: *const msghdr, cmsg: *const cmsghdr) -> *mut cmsghdr {
     if cmsg.is_null() {
-        return CMSG_FIRSTHDR(mhdr);
+        return unsafe { CMSG_FIRSTHDR(mhdr) };
     };
 
     unsafe {
@@ -141,7 +146,7 @@ pub unsafe extern "C" fn accept(
     address_len: *mut socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::accept(socket, address, address_len).or_minus_one_errno(),
+        unsafe { Sys::accept(socket, address, address_len) }.or_minus_one_errno(),
         "accept({}, {:p}, {:p})",
         socket,
         address,
@@ -156,7 +161,7 @@ pub unsafe extern "C" fn bind(
     address_len: socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::bind(socket, address, address_len)
+        unsafe { Sys::bind(socket, address, address_len) }
             .map(|()| 0)
             .or_minus_one_errno(),
         "bind({}, {:p}, {})",
@@ -173,7 +178,7 @@ pub unsafe extern "C" fn connect(
     address_len: socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::connect(socket, address, address_len).or_minus_one_errno(),
+        unsafe { Sys::connect(socket, address, address_len) }.or_minus_one_errno(),
         "connect({}, {:p}, {})",
         socket,
         address,
@@ -188,7 +193,7 @@ pub unsafe extern "C" fn getpeername(
     address_len: *mut socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::getpeername(socket, address, address_len)
+        unsafe { Sys::getpeername(socket, address, address_len) }
             .map(|()| 0)
             .or_minus_one_errno(),
         "getpeername({}, {:p}, {:p})",
@@ -205,7 +210,7 @@ pub unsafe extern "C" fn getsockname(
     address_len: *mut socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::getsockname(socket, address, address_len)
+        unsafe { Sys::getsockname(socket, address, address_len) }
             .map(|()| 0)
             .or_minus_one_errno(),
         "getsockname({}, {:p}, {:p})",
@@ -224,7 +229,7 @@ pub unsafe extern "C" fn getsockopt(
     option_len: *mut socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::getsockopt(socket, level, option_name, option_value, option_len)
+        unsafe { Sys::getsockopt(socket, level, option_name, option_value, option_len) }
             .map(|()| 0)
             .or_minus_one_errno(),
         "getsockopt({}, {}, {}, {:p}, {:p})",
@@ -250,14 +255,16 @@ pub unsafe extern "C" fn recv(
     length: size_t,
     flags: c_int,
 ) -> ssize_t {
-    recvfrom(
-        socket,
-        buffer,
-        length,
-        flags,
-        ptr::null_mut(),
-        ptr::null_mut(),
-    )
+    unsafe {
+        recvfrom(
+            socket,
+            buffer,
+            length,
+            flags,
+            ptr::null_mut(),
+            ptr::null_mut(),
+        )
+    }
 }
 
 #[no_mangle]
@@ -270,7 +277,7 @@ pub unsafe extern "C" fn recvfrom(
     address_len: *mut socklen_t,
 ) -> ssize_t {
     trace_expr!(
-        Sys::recvfrom(socket, buffer, length, flags, address, address_len)
+        unsafe { Sys::recvfrom(socket, buffer, length, flags, address, address_len) }
             .map(|r| r as ssize_t)
             .or_minus_one_errno(),
         "recvfrom({}, {:p}, {}, {:#x}, {:p}, {:p})",
@@ -285,7 +292,7 @@ pub unsafe extern "C" fn recvfrom(
 
 #[no_mangle]
 pub unsafe extern "C" fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> ssize_t {
-    Sys::recvmsg(socket, msg, flags)
+    unsafe { Sys::recvmsg(socket, msg, flags) }
         .map(|r| r as ssize_t)
         .or_minus_one_errno()
 }
@@ -297,12 +304,12 @@ pub unsafe extern "C" fn send(
     length: size_t,
     flags: c_int,
 ) -> ssize_t {
-    sendto(socket, message, length, flags, ptr::null(), 0)
+    unsafe { sendto(socket, message, length, flags, ptr::null(), 0) }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> ssize_t {
-    Sys::sendmsg(socket, msg, flags)
+    unsafe { Sys::sendmsg(socket, msg, flags) }
         .map(|w| w as ssize_t)
         .or_minus_one_errno()
 }
@@ -317,7 +324,7 @@ pub unsafe extern "C" fn sendto(
     dest_len: socklen_t,
 ) -> ssize_t {
     trace_expr!(
-        Sys::sendto(socket, message, length, flags, dest_addr, dest_len)
+        unsafe { Sys::sendto(socket, message, length, flags, dest_addr, dest_len) }
             .map(|w| w as ssize_t)
             .or_minus_one_errno(),
         "sendto({}, {:p}, {}, {:#x}, {:p}, {})",
@@ -339,7 +346,7 @@ pub unsafe extern "C" fn setsockopt(
     option_len: socklen_t,
 ) -> c_int {
     trace_expr!(
-        Sys::setsockopt(socket, level, option_name, option_value, option_len)
+        unsafe { Sys::setsockopt(socket, level, option_name, option_value, option_len) }
             .map(|()| 0)
             .or_minus_one_errno(),
         "setsockopt({}, {}, {}, {:p}, {})",
@@ -359,7 +366,7 @@ pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
     trace_expr!(
-        Sys::socket(domain, kind, protocol).or_minus_one_errno(),
+        unsafe { Sys::socket(domain, kind, protocol) }.or_minus_one_errno(),
         "socket({}, {}, {})",
         domain,
         kind,
@@ -375,9 +382,11 @@ pub unsafe extern "C" fn socketpair(
     sv: *mut c_int,
 ) -> c_int {
     trace_expr!(
-        Sys::socketpair(domain, kind, protocol, &mut *(sv as *mut [c_int; 2]))
-            .map(|()| 0)
-            .or_minus_one_errno(),
+        Sys::socketpair(domain, kind, protocol, unsafe {
+            &mut *(sv as *mut [c_int; 2])
+        })
+        .map(|()| 0)
+        .or_minus_one_errno(),
         "socketpair({}, {}, {}, {:p})",
         domain,
         kind,
