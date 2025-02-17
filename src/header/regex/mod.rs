@@ -56,7 +56,8 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
         return REG_ENOSYS;
     }
 
-    let pat = slice::from_raw_parts(pat as *const u8, strlen(pat));
+    let pat_len = unsafe { strlen(pat) };
+    let pat = unsafe { slice::from_raw_parts(pat as *const u8, pat_len) };
     let res = PosixRegexBuilder::new(pat)
         .with_default_classes()
         .compile_tokens();
@@ -64,14 +65,14 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
     match res {
         Ok(mut branches) => {
             let re_nsub = PosixRegex::new(Cow::Borrowed(&branches)).count_groups();
-            *out = regex_t {
+            let reg = regex_t {
                 ptr: branches.as_mut_ptr() as *mut c_void,
                 length: branches.len(),
                 capacity: branches.capacity(),
-
                 cflags,
                 re_nsub,
             };
+            unsafe { *out = reg };
             mem::forget(branches);
             0
         }
@@ -89,11 +90,14 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
 #[no_mangle]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regfree(regex: *mut regex_t) {
-    Vec::from_raw_parts(
-        (*regex).ptr as *mut Vec<(Token, Range)>,
-        (*regex).length,
-        (*regex).capacity,
-    );
+    let regex = unsafe { &*regex };
+    unsafe {
+        Vec::from_raw_parts(
+            regex.ptr as *mut Vec<(Token, Range)>,
+            regex.length,
+            regex.capacity,
+        )
+    };
 }
 
 #[no_mangle]
@@ -109,14 +113,16 @@ pub unsafe extern "C" fn regexec(
         return REG_ENOSYS;
     }
 
-    let regex = &*regex;
+    let regex = unsafe { &*regex };
 
     // Allow specifying a compiler argument to the executor and vise versa
     // because why not?
     let flags = regex.cflags | eflags;
 
-    let input = slice::from_raw_parts(input as *const u8, strlen(input));
-    let branches = slice::from_raw_parts(regex.ptr as *const Vec<(Token, Range)>, regex.length);
+    let input_len = unsafe { strlen(input) };
+    let input = unsafe { slice::from_raw_parts(input as *const u8, input_len) };
+    let branches =
+        unsafe { slice::from_raw_parts(regex.ptr as *const Vec<(Token, Range)>, regex.length) };
 
     let matches = PosixRegex::new(Cow::Borrowed(&branches))
         .case_insensitive(flags & REG_ICASE == REG_ICASE)
@@ -130,10 +136,12 @@ pub unsafe extern "C" fn regexec(
 
         for i in 0..nmatch {
             let (start, end) = first.get(i).and_then(|&range| range).unwrap_or((!0, !0));
-            *pmatch.add(i) = regmatch_t {
+            let rmatch = regmatch_t {
                 rm_so: start,
                 rm_eo: end,
             };
+            let pmatch_next = unsafe { pmatch.add(i) };
+            unsafe { *pmatch_next = rmatch };
         }
     }
 

@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
-    let master = fcntl::open(c_str!("/scheme/pty").as_ptr(), fcntl::O_RDWR, 0);
+    let master = unsafe { fcntl::open(c_str!("/scheme/pty").as_ptr(), fcntl::O_RDWR, 0) };
     if master < 0 {
         return Err(());
     }
@@ -20,7 +20,7 @@ pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
         return Err(());
     }
 
-    let slave = fcntl::open(name.as_ptr() as *const c_char, fcntl::O_RDWR, 0);
+    let slave = unsafe { fcntl::open(name.as_ptr() as *const c_char, fcntl::O_RDWR, 0) };
     if slave < 0 {
         unistd::close(master);
         return Err(());

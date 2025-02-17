@@ -101,6 +101,7 @@ pub unsafe fn enable_alloc_after_fork() {
     // atfork must only be called once, to avoid a deadlock,
     // where the handler attempts to acquire the global lock twice
     static mut FORK_PROTECTED: bool = false;
+    let fork_protected = unsafe { &mut FORK_PROTECTED };
 
     extern "C" fn _acquire_global_lock() {
         acquire_global_lock()
@@ -115,13 +116,13 @@ pub unsafe fn enable_alloc_after_fork() {
     // it will acquire the lock before any other thread,
     // protecting it from deadlock,
     // due to the child being created with only the calling thread.
-    if !FORK_PROTECTED {
+    if !*fork_protected {
         pthread_atfork(
             Some(_acquire_global_lock),
             Some(_release_global_lock),
             Some(_release_global_lock),
         );
-        FORK_PROTECTED = true;
+        *fork_protected = true;
     }
     release_global_lock();
 }

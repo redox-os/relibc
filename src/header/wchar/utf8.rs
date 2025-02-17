@@ -42,7 +42,7 @@ fn utf8_char_width(b: u8) -> usize {
 
 //It's guaranteed that we don't have any nullpointers here
 pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, ps: *mut mbstate_t) -> usize {
-    let size = utf8_char_width(*s as u8);
+    let size = utf8_char_width(unsafe { *s } as u8);
     if size > n {
         platform::ERRNO.set(errno::EILSEQ);
         return -2isize as usize;
@@ -52,7 +52,7 @@ pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, ps: *mut mb
         return -1isize as usize;
     }
 
-    let slice = slice::from_raw_parts(s as *const u8, size);
+    let slice = unsafe { slice::from_raw_parts(s as *const u8, size) };
     let decoded = str::from_utf8(slice);
     if decoded.is_err() {
         platform::ERRNO.set(errno::EILSEQ);
@@ -64,7 +64,7 @@ pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, ps: *mut mb
     let result: wchar_t = wc.chars().next().unwrap() as wchar_t;
 
     if !pwc.is_null() {
-        *pwc = result;
+        unsafe { *pwc = result };
     }
 
     if result != 0 {
@@ -85,7 +85,7 @@ pub unsafe fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t) -> usize 
 
     let c = dc.unwrap();
     let size = c.len_utf8();
-    let slice = slice::from_raw_parts_mut(s as *mut u8, size);
+    let slice = unsafe { slice::from_raw_parts_mut(s as *mut u8, size) };
 
     c.encode_utf8(slice);
 

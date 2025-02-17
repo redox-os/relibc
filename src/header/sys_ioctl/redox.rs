@@ -71,7 +71,7 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
     match request {
         FIONBIO => {
             let mut flags = Sys::fcntl(fd, fcntl::F_GETFL, 0)?;
-            flags = if *(out as *mut c_int) == 0 {
+            flags = if unsafe { *(out as *mut c_int) } == 0 {
                 flags & !fcntl::O_NONBLOCK
             } else {
                 flags | fcntl::O_NONBLOCK
@@ -79,12 +79,12 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
             Sys::fcntl(fd, fcntl::F_SETFL, flags as c_ulonglong)?;
         }
         TCGETS => {
-            let termios = &mut *(out as *mut termios::termios);
+            let termios = unsafe { &mut *(out as *mut termios::termios) };
             dup_read(fd, "termios", termios)?;
         }
         // TODO: give these different behaviors
         TCSETS | TCSETSW | TCSETSF => {
-            let termios = &*(out as *const termios::termios);
+            let termios = unsafe { &*(out as *const termios::termios) };
             dup_write(fd, "termios", termios)?;
         }
         TCFLSH => {
@@ -95,19 +95,19 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
             eprintln!("TODO: ioctl TIOCSCTTY");
         }
         TIOCGPGRP => {
-            let pgrp = &mut *(out as *mut pid_t);
+            let pgrp = unsafe { &mut *(out as *mut pid_t) };
             dup_read(fd, "pgrp", pgrp)?;
         }
         TIOCSPGRP => {
-            let pgrp = &*(out as *const pid_t);
+            let pgrp = unsafe { &*(out as *const pid_t) };
             dup_write(fd, "pgrp", pgrp)?;
         }
         TIOCGWINSZ => {
-            let winsize = &mut *(out as *mut winsize);
+            let winsize = unsafe { &mut *(out as *mut winsize) };
             dup_read(fd, "winsize", winsize)?;
         }
         TIOCSWINSZ => {
-            let winsize = &*(out as *const winsize);
+            let winsize = unsafe { &*(out as *const winsize) };
             dup_write(fd, "winsize", winsize)?;
         }
         TIOCGPTLCK => {
@@ -134,5 +134,5 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
 
 #[no_mangle]
 pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
-    ioctl_inner(fd, request, out).or_minus_one_errno()
+    unsafe { ioctl_inner(fd, request, out) }.or_minus_one_errno()
 }

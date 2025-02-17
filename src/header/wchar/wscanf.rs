@@ -23,8 +23,8 @@ enum CharKind {
 
 /// Helper function for progressing a C string
 unsafe fn next_char(string: &mut *const wchar_t) -> Result<wint_t, c_int> {
-    let c = **string as wint_t;
-    *string = string.offset(1);
+    let c = unsafe { **string } as wint_t;
+    *string = unsafe { string.offset(1) };
     if c == 0 {
         Err(-1)
     } else {
@@ -83,8 +83,8 @@ unsafe fn inner_scanf(
         }
     }
 
-    while *format != 0 {
-        let mut c = next_char(&mut format)?;
+    while unsafe { *format } != 0 {
+        let mut c = unsafe { next_char(&mut format) }?;
 
         if c as u8 == b' ' {
             maybe_read!(noreset);
@@ -103,18 +103,18 @@ unsafe fn inner_scanf(
             }
             r.commit();
         } else {
-            c = next_char(&mut format)?;
+            c = unsafe { next_char(&mut format) }?;
 
             let mut ignore = false;
             if c as u8 == b'*' {
                 ignore = true;
-                c = next_char(&mut format)?;
+                c = unsafe { next_char(&mut format) }?;
             }
 
             let mut width = String::new();
             while c as u8 >= b'0' && c as u8 <= b'9' {
                 width.push(wc_as_char!(c));
-                c = next_char(&mut format)?;
+                c = unsafe { next_char(&mut format) }?;
             }
             let mut width = if width.is_empty() {
                 None
@@ -160,7 +160,7 @@ unsafe fn inner_scanf(
                     _ => break,
                 }
 
-                c = next_char(&mut format)?;
+                c = unsafe { next_char(&mut format) }?;
             }
 
             if c as u8 != b'n' {
@@ -258,7 +258,7 @@ unsafe fn inner_scanf(
                                 n.parse::<$type>().map_err(|_| 0)?
                             };
                             if !ignore {
-                                *ap.arg::<*mut $type>() = n;
+                                unsafe { *ap.arg::<*mut $type>() = n };
                                 matched += 1;
                             }
                         }};
@@ -278,7 +278,7 @@ unsafe fn inner_scanf(
                                 $type::from_str_radix(&n, radix).map_err(|_| 0)?
                             };
                             if !ignore {
-                                *ap.arg::<*mut $final>() = n as $final;
+                                unsafe { *ap.arg::<*mut $final>() = n as $final };
                                 matched += 1;
                             }
                         }};
@@ -362,15 +362,18 @@ unsafe fn inner_scanf(
                                 }
                             }
 
-                            let mut ptr: Option<*mut $type> =
-                                if ignore { None } else { Some(ap.arg()) };
+                            let mut ptr: Option<*mut $type> = if ignore {
+                                None
+                            } else {
+                                Some(unsafe { ap.arg() })
+                            };
 
                             while width.map(|w| w > 0).unwrap_or(true)
                                 && !(wc_as_char!(wchar)).is_whitespace()
                             {
                                 if let Some(ref mut ptr) = ptr {
-                                    **ptr = wchar as $type;
-                                    *ptr = ptr.offset(1);
+                                    unsafe { **ptr = wchar as $type };
+                                    *ptr = unsafe { ptr.offset(1) };
                                 }
                                 width = width.map(|w| w - 1);
                                 if width.map(|w| w > 0).unwrap_or(true) && !read!() {
@@ -380,7 +383,7 @@ unsafe fn inner_scanf(
                             }
 
                             if let Some(ptr) = ptr {
-                                *ptr = 0;
+                                unsafe { *ptr = 0 };
                                 matched += 1;
                                 r.commit();
                             }
@@ -397,12 +400,15 @@ unsafe fn inner_scanf(
                 b'c' => {
                     macro_rules! parse_char_type {
                         ($type:ident) => {
-                            let ptr: Option<*mut $type> =
-                                if ignore { None } else { Some(ap.arg()) };
+                            let ptr: Option<*mut $type> = if ignore {
+                                None
+                            } else {
+                                Some(unsafe { ap.arg() })
+                            };
 
                             for i in 0..width.unwrap_or(1) {
                                 if let Some(ptr) = ptr {
-                                    *ptr.add(i) = wchar as $type;
+                                    unsafe { *ptr.add(i) = wchar as $type };
                                 }
                                 width = width.map(|w| w - 1);
                                 if width.map(|w| w > 0).unwrap_or(true) && !read!() {
@@ -426,11 +432,11 @@ unsafe fn inner_scanf(
                 }
 
                 b'[' => {
-                    c = next_char(&mut format)?;
+                    c = unsafe { next_char(&mut format) }?;
 
                     let mut matches = Vec::new();
                     let invert = if c as u8 == b'^' {
-                        c = next_char(&mut format)?;
+                        c = unsafe { next_char(&mut format) }?;
                         true
                     } else {
                         false
@@ -440,12 +446,12 @@ unsafe fn inner_scanf(
                     loop {
                         matches.push(c);
                         prev = c;
-                        c = next_char(&mut format)?;
+                        c = unsafe { next_char(&mut format) }?;
                         if c as u8 == b'-' {
                             if prev as u8 == b']' {
                                 continue;
                             }
-                            c = next_char(&mut format)?;
+                            c = unsafe { next_char(&mut format) }?;
                             if c as u8 == b']' {
                                 matches.push('-' as wint_t);
                                 break;
@@ -460,7 +466,11 @@ unsafe fn inner_scanf(
                         }
                     }
 
-                    let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
+                    let mut ptr: Option<*mut c_char> = if ignore {
+                        None
+                    } else {
+                        Some(unsafe { ap.arg() })
+                    };
 
                     // While we haven't used up all the width, and it matches
                     let mut data_stored = false;
@@ -468,8 +478,8 @@ unsafe fn inner_scanf(
                         && !invert == matches.contains(&wchar)
                     {
                         if let Some(ref mut ptr) = ptr {
-                            **ptr = wchar as c_char;
-                            *ptr = ptr.offset(1);
+                            unsafe { **ptr = wchar as c_char };
+                            *ptr = unsafe { ptr.offset(1) };
                             data_stored = true;
                         }
                         r.commit();
@@ -484,13 +494,13 @@ unsafe fn inner_scanf(
                     }
 
                     if data_stored {
-                        *ptr.unwrap() = 0;
+                        unsafe { *ptr.unwrap() = 0 };
                         matched += 1;
                     }
                 }
                 b'n' => {
                     if !ignore {
-                        *ap.arg::<*mut c_int>() = count as c_int;
+                        unsafe { *ap.arg::<*mut c_int>() = count as c_int };
                     }
                 }
                 _ => return Err(-1),
@@ -511,7 +521,7 @@ unsafe fn inner_scanf(
 }
 
 pub unsafe fn scanf(r: LookAheadReader, format: *const wchar_t, ap: va_list) -> c_int {
-    match inner_scanf(r, format, ap) {
+    match unsafe { inner_scanf(r, format, ap) } {
         Ok(n) => n,
         Err(n) => n,
     }

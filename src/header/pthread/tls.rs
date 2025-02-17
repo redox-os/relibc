@@ -50,7 +50,7 @@ pub unsafe extern "C" fn pthread_key_create(
         },
     );
 
-    key_ptr.write(key);
+    unsafe { key_ptr.write(key) };
 
     0
 }

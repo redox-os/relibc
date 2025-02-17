@@ -32,7 +32,7 @@ pub struct Master {
 impl Master {
     /// The initial data for this TLS region
     pub unsafe fn data(&self) -> &'static [u8] {
-        slice::from_raw_parts(self.ptr, self.len)
+        unsafe { slice::from_raw_parts(self.ptr, self.len) }
     }
 }
 
@@ -79,46 +79,48 @@ impl Tcb {
     /// `size` is the size of the TLS in bytes.
     pub unsafe fn new(size: usize) -> Result<&'static mut Self, DlError> {
         let page_size = Sys::getpagesize();
-        let (_abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
+        let size = size.next_multiple_of(page_size);
+        let (_abi_page, tls, tcb_page) = unsafe { Self::os_new(size) }?;
 
         let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
         trace!("New TCB: {:p}", tcb_ptr);
-        ptr::write(
-            tcb_ptr,
-            Self {
-                generic: GenericTcb {
-                    tls_end: tls.as_mut_ptr().add(tls.len()),
-                    tls_len: tls.len(),
-                    tcb_ptr: tcb_ptr.cast(),
-                    tcb_len: tcb_page.len(),
-                    os_specific: OsSpecific::default(),
-                },
-                masters_ptr: ptr::null_mut(),
-                masters_len: 0,
-                num_copied_masters: 0,
-                linker_ptr: ptr::null(),
-                mspace: ptr::null(),
-                pthread: Pthread {
-                    waitval: Waitval::new(),
-                    flags: Default::default(),
-                    has_enabled_cancelation: AtomicBool::new(false),
-                    has_queued_cancelation: AtomicBool::new(false),
-                    stack_base: core::ptr::null_mut(),
-                    stack_size: 0,
-                    os_tid: UnsafeCell::new(OsTid::default()),
-                },
-
-                dtv_ptr: ptr::null_mut(),
-                dtv_len: 0,
+        let tls_ptr = tls.as_mut_ptr();
+        let tls_len = tls.len();
+        let tcb = Self {
+            generic: GenericTcb {
+                tls_end: unsafe { tls_ptr.add(tls_len) },
+                tls_len: tls.len(),
+                tcb_ptr: tcb_ptr.cast(),
+                tcb_len: tcb_page.len(),
+                os_specific: OsSpecific::default(),
             },
-        );
+            masters_ptr: ptr::null_mut(),
+            masters_len: 0,
+            num_copied_masters: 0,
+            linker_ptr: ptr::null(),
+            mspace: ptr::null(),
+            pthread: Pthread {
+                waitval: Waitval::new(),
+                flags: Default::default(),
+                has_enabled_cancelation: AtomicBool::new(false),
+                has_queued_cancelation: AtomicBool::new(false),
+                stack_base: core::ptr::null_mut(),
+                stack_size: 0,
+                os_tid: UnsafeCell::new(OsTid::default()),
+            },
 
-        Ok(&mut *tcb_ptr)
+            dtv_ptr: ptr::null_mut(),
+            dtv_len: 0,
+        };
+        unsafe { ptr::write(tcb_ptr, tcb) };
+
+        Ok(unsafe { &mut *tcb_ptr })
     }
 
     /// Get the current TCB
     pub unsafe fn current() -> Option<&'static mut Self> {
-        Some(&mut *GenericTcb::<OsSpecific>::current_ptr()?.cast())
+        let current_ptr = unsafe { GenericTcb::<OsSpecific>::current_ptr() }?;
+        Some(unsafe { &mut *current_ptr.cast() })
     }
 
     /// A slice for all of the TLS data
@@ -126,10 +128,8 @@ impl Tcb {
         if self.tls_end.is_null() || self.tls_len == 0 {
             None
         } else {
-            Some(slice::from_raw_parts_mut(
-                self.tls_end.offset(-(self.tls_len as isize)),
-                self.tls_len,
-            ))
+            let tls_end_off = unsafe { self.tls_end.offset(-(self.tls_len as isize)) };
+            Some(unsafe { slice::from_raw_parts_mut(tls_end_off, self.tls_len) })
         }
     }
 
@@ -138,18 +138,20 @@ impl Tcb {
         if self.masters_ptr.is_null() || self.masters_len == 0 {
             None
         } else {
-            Some(slice::from_raw_parts_mut(
-                self.masters_ptr,
-                self.masters_len / mem::size_of::<Master>(),
-            ))
+            Some(unsafe {
+                slice::from_raw_parts_mut(
+                    self.masters_ptr,
+                    self.masters_len / mem::size_of::<Master>(),
+                )
+            })
         }
     }
 
     /// Copy data from masters
     pub unsafe fn copy_masters(&mut self) -> Result<(), DlError> {
         //TODO: Complain if masters or tls exist without the other
-        if let Some(tls) = self.tls() {
-            if let Some(masters) = self.masters() {
+        if let Some(tls) = unsafe { self.tls() } {
+            if let Some(masters) = unsafe { self.masters() } {
                 for (i, master) in masters
                     .iter()
                     .skip(self.num_copied_masters)
@@ -165,7 +167,7 @@ impl Tcb {
                         0..master.len
                     };
                     if let Some(tls_data) = tls.get_mut(range) {
-                        let data = master.data();
+                        let data = unsafe { master.data() };
                         trace!(
                             "tls master {}: {:p}, {:#x}: {:p}, {:#x}",
                             i,
@@ -195,7 +197,7 @@ impl Tcb {
         } else {
             // XXX: [`Vec::from_raw_parts`] cannot be used here as the masters were originally
             // allocated by the ld.so allocator and that would violate that function's invariants.
-            let mut masters = self.masters().unwrap().to_vec();
+            let mut masters = unsafe { self.masters() }.unwrap().to_vec();
             masters.extend(new_masters);
 
             self.masters_ptr = masters.as_mut_ptr();
@@ -206,7 +208,7 @@ impl Tcb {
 
     /// Activate TLS
     pub unsafe fn activate(&mut self) {
-        Self::os_arch_activate(&self.os_specific, self.tls_end as usize, self.tls_len);
+        unsafe { Self::os_arch_activate(&self.os_specific, self.tls_end as usize, self.tls_len) };
     }
 
     pub fn setup_dtv(&mut self, n: usize) {
@@ -240,18 +242,20 @@ impl Tcb {
 
     /// Mapping with correct flags for TCB and TLS
     unsafe fn map(size: usize) -> Result<&'static mut [u8], DlError> {
-        let ptr = Sys::mmap(
-            ptr::null_mut(),
-            size,
-            sys_mman::PROT_READ | sys_mman::PROT_WRITE,
-            sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
-            -1,
-            0,
-        )
+        let ptr = unsafe {
+            Sys::mmap(
+                ptr::null_mut(),
+                size,
+                sys_mman::PROT_READ | sys_mman::PROT_WRITE,
+                sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE,
+                -1,
+                0,
+            )
+        }
         .map_err(|_| DlError::Oom)?;
 
-        ptr::write_bytes(ptr as *mut u8, 0, size);
-        Ok(slice::from_raw_parts_mut(ptr as *mut u8, size))
+        unsafe { ptr::write_bytes(ptr as *mut u8, 0, size) };
+        Ok(unsafe { slice::from_raw_parts_mut(ptr as *mut u8, size) })
     }
 
     /// OS specific code to create a new TLS and TCB - Linux and Redox
@@ -260,7 +264,7 @@ impl Tcb {
         size: usize,
     ) -> Result<(&'static mut [u8], &'static mut [u8], &'static mut [u8]), DlError> {
         let page_size = Sys::getpagesize();
-        let abi_tls_tcb = Self::map(page_size + size + page_size)?;
+        let abi_tls_tcb = unsafe { Self::map(page_size + size + page_size) }?;
         let (abi, tls_tcb) = abi_tls_tcb.split_at_mut(page_size);
         let (tls, tcb) = tls_tcb.split_at_mut(size);
         Ok((abi, tls, tcb))
@@ -275,7 +279,7 @@ impl Tcb {
 
     #[cfg(target_os = "redox")]
     unsafe fn os_arch_activate(os: &OsSpecific, tls_end: usize, tls_len: usize) {
-        redox_rt::tcb_activate(os, tls_end, tls_len)
+        unsafe { redox_rt::tcb_activate(os, tls_end, tls_len) }
     }
 }
 

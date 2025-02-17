@@ -275,7 +275,7 @@ impl<'a> Drop for LockGuard<'a> {
 /// Clears EOF and ERR indicators on a stream
 #[no_mangle]
 pub unsafe extern "C" fn clearerr(stream: *mut FILE) {
-    let mut stream = (*stream).lock();
+    let mut stream = unsafe { &mut *stream }.lock();
     stream.flags &= !(F_EOF | F_ERR);
 }
 
@@ -283,11 +283,12 @@ pub unsafe extern "C" fn clearerr(stream: *mut FILE) {
 pub unsafe extern "C" fn ctermid(s: *mut c_char) -> *mut c_char {
     static mut TERMID: [u8; L_ctermid] = *b"/dev/tty\0";
 
+    let termid_ptr = unsafe { TERMID.as_mut_ptr() } as *mut c_char;
     if s.is_null() {
-        return TERMID.as_mut_ptr() as *mut c_char;
+        return termid_ptr;
     }
 
-    strncpy(s, TERMID.as_mut_ptr() as *mut c_char, L_ctermid)
+    unsafe { strncpy(s, termid_ptr, L_ctermid) }
 }
 
 // #[no_mangle]
@@ -296,25 +297,23 @@ pub unsafe extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
     let mut pwd: pwd::passwd = unsafe { mem::zeroed() };
     let mut pwdbuf: *mut pwd::passwd = unsafe { mem::zeroed() };
     if s != ptr::null_mut() {
-        *s.add(0) = 0;
+        unsafe { *s.add(0) = 0 };
     }
-    pwd::getpwuid_r(
-        unistd::geteuid(),
-        &mut pwd,
-        buf.as_mut_ptr(),
-        buf.len(),
-        &mut pwdbuf,
-    );
+    let uid = unistd::geteuid();
+    let buf_ptr = buf.as_mut_ptr();
+    let buf_len = buf.len();
+    unsafe { pwd::getpwuid_r(uid, &mut pwd, buf_ptr, buf_len, &mut pwdbuf) };
     if pwdbuf == ptr::null_mut() {
         return s;
     }
 
+    let pwdbuf = unsafe { &*pwdbuf };
     if s != ptr::null_mut() {
-        strncpy(s, (*pwdbuf).pw_name, unistd::L_cuserid);
+        unsafe { strncpy(s, pwdbuf.pw_name, unistd::L_cuserid) };
         return s;
     }
 
-    (*pwdbuf).pw_name
+    pwdbuf.pw_name
 }
 
 /// Close a file
@@ -323,8 +322,8 @@ pub unsafe extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
 /// prior to using this function.
 #[no_mangle]
 pub unsafe extern "C" fn fclose(stream: *mut FILE) -> c_int {
-    let stream = &mut *stream;
-    flockfile(stream);
+    let stream = unsafe { &mut *stream };
+    unsafe { flockfile(stream) };
 
     let mut r = stream.flush().is_err();
     // TODO: better error handling
@@ -333,11 +332,11 @@ pub unsafe extern "C" fn fclose(stream: *mut FILE) -> c_int {
 
     if stream.flags & constants::F_PERM == 0 {
         // Not one of stdin, stdout or stderr
-        let mut stream = Box::from_raw(stream);
+        let mut stream = unsafe { Box::from_raw(stream) };
         // Reference files aren't closed on drop, so pretend to be a reference
         stream.file.reference = true;
     } else {
-        funlockfile(stream);
+        unsafe { funlockfile(stream) };
     }
 
     r as c_int
@@ -346,7 +345,7 @@ pub unsafe extern "C" fn fclose(stream: *mut FILE) -> c_int {
 /// Open a file from a file descriptor
 #[no_mangle]
 pub unsafe extern "C" fn fdopen(fildes: c_int, mode: *const c_char) -> *mut FILE {
-    if let Some(f) = helpers::_fdopen(fildes, mode) {
+    if let Some(f) = unsafe { helpers::_fdopen(fildes, mode) } {
         f
     } else {
         ptr::null_mut()
@@ -356,14 +355,14 @@ pub unsafe extern "C" fn fdopen(fildes: c_int, mode: *const c_char) -> *mut FILE
 /// Check for EOF
 #[no_mangle]
 pub unsafe extern "C" fn feof(stream: *mut FILE) -> c_int {
-    let stream = (*stream).lock();
+    let stream = unsafe { &mut *stream }.lock();
     stream.flags & F_EOF
 }
 
 /// Check for ERR
 #[no_mangle]
 pub unsafe extern "C" fn ferror(stream: *mut FILE) -> c_int {
-    let stream = (*stream).lock();
+    let stream = unsafe { &mut *stream }.lock();
     stream.flags & F_ERR
 }
 
@@ -375,15 +374,15 @@ pub unsafe extern "C" fn fflush(stream: *mut FILE) -> c_int {
     if stream.is_null() {
         //TODO: flush all files!
 
-        if fflush(stdout) != 0 {
+        if unsafe { fflush(stdout) } != 0 {
             return EOF;
         }
 
-        if fflush(stderr) != 0 {
+        if unsafe { fflush(stderr) } != 0 {
             return EOF;
         }
     } else {
-        let mut stream = (*stream).lock();
+        let mut stream = unsafe { &mut *stream }.lock();
         if stream.flush().is_err() {
             return EOF;
         }
@@ -395,22 +394,22 @@ pub unsafe extern "C" fn fflush(stream: *mut FILE) -> c_int {
 /// Get a single char from a stream
 #[no_mangle]
 pub unsafe extern "C" fn fgetc(stream: *mut FILE) -> c_int {
-    let mut stream = (*stream).lock();
+    let mut stream = unsafe { &mut *stream }.lock();
     if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
         return -1;
     }
 
-    getc_unlocked(&mut *stream)
+    unsafe { getc_unlocked(&mut *stream) }
 }
 
 /// Get the position of the stream and store it in pos
 #[no_mangle]
 pub unsafe extern "C" fn fgetpos(stream: *mut FILE, pos: *mut fpos_t) -> c_int {
-    let off = ftello(stream);
+    let off = unsafe { ftello(stream) };
     if off < 0 {
         return -1;
     }
-    *pos = off;
+    unsafe { *pos = off };
     0
 }
 
@@ -421,7 +420,7 @@ pub unsafe extern "C" fn fgets(
     max: c_int,
     stream: *mut FILE,
 ) -> *mut c_char {
-    let mut stream = (*stream).lock();
+    let mut stream = unsafe { &mut *stream }.lock();
     if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
         return ptr::null_mut();
     }
@@ -434,8 +433,9 @@ pub unsafe extern "C" fn fgets(
     if left >= 1 {
         let unget_read_size = cmp::min(left, stream.unget.len());
         for _ in 0..unget_read_size {
-            *out = stream.unget.pop().unwrap() as i8;
-            out = out.offset(1);
+            let byte = stream.unget.pop().unwrap() as i8;
+            unsafe { *out = byte };
+            out = unsafe { out.offset(1) };
         }
         left -= unget_read_size;
     }
@@ -460,14 +460,14 @@ pub unsafe extern "C" fn fgets(
             let newline = buf[..len].iter().position(|&c| c == b'\n');
             let len = newline.map(|i| i + 1).unwrap_or(len);
 
-            ptr::copy_nonoverlapping(buf.as_ptr(), out as *mut u8, len);
+            unsafe { ptr::copy_nonoverlapping(buf.as_ptr(), out as *mut u8, len) };
 
             (len, newline.is_some())
         };
 
         stream.consume(read);
 
-        out = out.add(read);
+        out = unsafe { out.add(read) };
         left -= read;
 
         if exit {
@@ -477,7 +477,7 @@ pub unsafe extern "C" fn fgets(
 
     if max >= 1 {
         // Write the NUL byte
-        *out = 0;
+        unsafe { *out = 0 };
     }
     if wrote {
         original
@@ -489,7 +489,7 @@ pub unsafe extern "C" fn fgets(
 /// Get the underlying file descriptor
 #[no_mangle]
 pub unsafe extern "C" fn fileno(stream: *mut FILE) -> c_int {
-    let stream = (*stream).lock();
+    let stream = unsafe { &mut *stream }.lock();
     *stream.file
 }
 
@@ -498,19 +498,20 @@ pub unsafe extern "C" fn fileno(stream: *mut FILE) -> c_int {
 /// locked
 #[no_mangle]
 pub unsafe extern "C" fn flockfile(file: *mut FILE) {
-    (*file).lock.manual_lock();
+    let file = unsafe { &*file };
+    unsafe { file.lock.manual_lock() };
 }
 
 /// Open the file in mode `mode`
 #[no_mangle]
 pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FILE {
-    let initial_mode = *mode;
+    let initial_mode = unsafe { *mode };
     if initial_mode != b'r' as i8 && initial_mode != b'w' as i8 && initial_mode != b'a' as i8 {
         platform::ERRNO.set(errno::EINVAL);
         return ptr::null_mut();
     }
 
-    let flags = helpers::parse_mode_flags(mode);
+    let flags = unsafe { helpers::parse_mode_flags(mode) };
 
     let new_mode = if flags & fcntl::O_CREAT == fcntl::O_CREAT {
         0o666
@@ -518,16 +519,16 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
         0
     };
 
-    let fd = fcntl::open(filename, flags, new_mode);
+    let fd = unsafe { fcntl::open(filename, flags, new_mode) };
     if fd < 0 {
         return ptr::null_mut();
     }
 
     if flags & fcntl::O_CLOEXEC > 0 {
-        fcntl::fcntl(fd, fcntl::F_SETFD, fcntl::FD_CLOEXEC as c_ulonglong);
+        unsafe { fcntl::fcntl(fd, fcntl::F_SETFD, fcntl::FD_CLOEXEC as c_ulonglong) };
     }
 
-    if let Some(f) = helpers::_fdopen(fd, mode) {
+    if let Some(f) = unsafe { helpers::_fdopen(fd, mode) } {
         f
     } else {
         Sys::close(fd);
@@ -541,7 +542,7 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
 #[no_mangle]
 pub unsafe extern "C" fn __fpurge(stream: *mut FILE) {
     if !stream.is_null() {
-        let mut stream = (*stream).lock();
+        let mut stream = unsafe { &mut *stream }.lock();
         stream.purge();
     }
 }
@@ -549,23 +550,24 @@ pub unsafe extern "C" fn __fpurge(stream: *mut FILE) {
 /// Insert a character into the stream
 #[no_mangle]
 pub unsafe extern "C" fn fputc(c: c_int, stream: *mut FILE) -> c_int {
-    let mut stream = (*stream).lock();
+    let mut stream = unsafe { &mut *stream }.lock();
     if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
         return -1;
     }
 
-    putc_unlocked(c, &mut *stream)
+    unsafe { putc_unlocked(c, &mut *stream) }
 }
 
 /// Insert a string into a stream
 #[no_mangle]
 pub unsafe extern "C" fn fputs(s: *const c_char, stream: *mut FILE) -> c_int {
-    let mut stream = (*stream).lock();
+    let mut stream = unsafe { &mut *stream }.lock();
     if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
         return -1;
     }
 
-    let buf = slice::from_raw_parts(s as *mut u8, strlen(s));
+    let s_len = unsafe { strlen(s) };
+    let buf = unsafe { slice::from_raw_parts(s as *mut u8, s_len) };
 
     if stream.write_all(&buf).is_ok() {
         0
@@ -586,12 +588,12 @@ pub unsafe extern "C" fn fread(
         return 0;
     }
 
-    let mut stream = (*stream).lock();
+    let mut stream = unsafe { &mut *stream }.lock();
     if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
         return 0;
     }
 
-    let buf = slice::from_raw_parts_mut(ptr as *mut u8, size as usize * nitems as usize);
+    let buf = unsafe { slice::from_raw_parts_mut(ptr as *mut u8, size as usize * nitems as usize) };
     let mut read = 0;
     while read < buf.len() {
         match stream.read(&mut buf[read..]) {
@@ -608,66 +610,71 @@ pub unsafe extern "C" fn freopen(
     mode: *const c_char,
     stream: &mut FILE,
 ) -> *mut FILE {
-    let mut flags = helpers::parse_mode_flags(mode);
-    flockfile(stream);
+    let mut flags = unsafe { helpers::parse_mode_flags(mode) };
+    unsafe { flockfile(stream) };
 
     let _ = stream.flush();
+    let filedes = *stream.file;
     if filename.is_null() {
         // Reopen stream in new mode
         if flags & fcntl::O_CLOEXEC > 0 {
-            fcntl::fcntl(
-                *stream.file,
-                fcntl::F_SETFD,
-                fcntl::FD_CLOEXEC as c_ulonglong,
-            );
+            unsafe { fcntl::fcntl(filedes, fcntl::F_SETFD, fcntl::FD_CLOEXEC as c_ulonglong) };
         }
         flags &= !(fcntl::O_CREAT | fcntl::O_EXCL | fcntl::O_CLOEXEC);
-        if fcntl::fcntl(*stream.file, fcntl::F_SETFL, flags as c_ulonglong) < 0 {
-            funlockfile(stream);
-            fclose(stream);
+        if unsafe { fcntl::fcntl(filedes, fcntl::F_SETFL, flags as c_ulonglong) } < 0 {
+            unsafe {
+                funlockfile(stream);
+                fclose(stream);
+            }
             return ptr::null_mut();
         }
     } else {
-        let new = fopen(filename, mode);
+        let new = unsafe { fopen(filename, mode) };
         if new.is_null() {
-            funlockfile(stream);
-            fclose(stream);
+            unsafe {
+                funlockfile(stream);
+                fclose(stream);
+            }
             return ptr::null_mut();
         }
-        let new = &mut *new; // Should be safe, new is not null
-        if *new.file == *stream.file {
+        let new = unsafe { &mut *new }; // Should be safe, new is not null
+        if *new.file == filedes {
             new.file.fd = -1;
-        } else if Sys::dup2(*new.file, *stream.file).or_minus_one_errno() == -1
-            || fcntl::fcntl(
-                *stream.file,
-                fcntl::F_SETFL,
-                (flags & fcntl::O_CLOEXEC) as c_ulonglong,
-            ) < 0
+        } else if Sys::dup2(*new.file, filedes).or_minus_one_errno() == -1
+            || unsafe {
+                fcntl::fcntl(
+                    filedes,
+                    fcntl::F_SETFL,
+                    (flags & fcntl::O_CLOEXEC) as c_ulonglong,
+                )
+            } < 0
         {
-            funlockfile(stream);
-            fclose(new);
-            fclose(stream);
+            unsafe {
+                funlockfile(stream);
+                fclose(new);
+                fclose(stream);
+            }
             return ptr::null_mut();
         }
         stream.flags = (stream.flags & constants::F_PERM) | new.flags;
-        fclose(new);
+        unsafe { fclose(new) };
     }
     stream.orientation = 0;
-    funlockfile(stream);
+    unsafe { funlockfile(stream) };
     stream
 }
 
 /// Seek to an offset `offset` from `whence`
 #[no_mangle]
 pub unsafe extern "C" fn fseek(stream: *mut FILE, offset: c_long, whence: c_int) -> c_int {
-    fseeko(stream, offset as off_t, whence)
+    unsafe { fseeko(stream, offset as off_t, whence) }
 }
 
 /// Seek to an offset `offset` from `whence`
 #[no_mangle]
 pub unsafe extern "C" fn fseeko(stream: *mut FILE, off: off_t, whence: c_int) -> c_int {
-    let mut stream = (*stream).lock();
-    fseek_locked(&mut *stream, off, whence)
+    let mut stream = unsafe { &mut *stream }.lock();
+    unsafe { fseek_locked(&mut *stream, off, whence) }
 }
 
 pub unsafe fn fseek_locked(stream: &mut FILE, mut off: off_t, whence: c_int) -> c_int {
@@ -697,20 +704,20 @@ pub unsafe fn fseek_locked(stream: &mut FILE, mut off: off_t, whence: c_int) -> 
 /// Seek to a position `pos` in the file from the beginning of the file
 #[no_mangle]
 pub unsafe extern "C" fn fsetpos(stream: *mut FILE, pos: *const fpos_t) -> c_int {
-    fseeko(stream, *pos, SEEK_SET)
+    unsafe { fseeko(stream, *pos, SEEK_SET) }
 }
 
 /// Get the current position of the cursor in the file
 #[no_mangle]
 pub unsafe extern "C" fn ftell(stream: *mut FILE) -> c_long {
-    ftello(stream) as c_long
+    unsafe { ftello(stream) as c_long }
 }
 
 /// Get the current position of the cursor in the file
 #[no_mangle]
 pub unsafe extern "C" fn ftello(stream: *mut FILE) -> off_t {
-    let mut stream = (*stream).lock();
-    ftell_locked(&mut *stream)
+    let mut stream = unsafe { &mut *stream }.lock();
+    unsafe { ftell_locked(&mut *stream) }
 }
 pub unsafe extern "C" fn ftell_locked(stream: &mut FILE) -> off_t {
     let pos = Sys::lseek(*stream.file, 0, SEEK_CUR).or_minus_one_errno();
@@ -724,7 +731,8 @@ pub unsafe extern "C" fn ftell_locked(stream: &mut FILE) -> off_t {
 /// Try to lock the file. Returns 0 for success, 1 for failure
 #[no_mangle]
 pub unsafe extern "C" fn ftrylockfile(file: *mut FILE) -> c_int {
-    if (*file).lock.manual_try_lock().is_ok() {
+    let file = unsafe { &*file };
+    if unsafe { file.lock.manual_try_lock() }.is_ok() {
         0
     } else {
         1
@@ -734,7 +742,8 @@ pub unsafe extern "C" fn ftrylockfile(file: *mut FILE) -> c_int {
 /// Unlock the file
 #[no_mangle]
 pub unsafe extern "C" fn funlockfile(file: *mut FILE) {
-    (*file).lock.manual_unlock();
+    let file = unsafe { &*file };
+    unsafe { file.lock.manual_unlock() };
 }
 
 /// Write `nitems` of size `size` from `ptr` to `stream`
@@ -748,12 +757,12 @@ pub unsafe extern "C" fn fwrite(
     if size == 0 || nitems == 0 {
         return 0;
     }
-    let mut stream = (*stream).lock();
+    let mut stream = unsafe { &mut *stream }.lock();
     if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
         return 0;
     }
 
-    let buf = slice::from_raw_parts(ptr as *const u8, size as usize * nitems as usize);
+    let buf = unsafe { slice::from_raw_parts(ptr as *const u8, size as usize * nitems as usize) };
     let mut written = 0;
     while written < buf.len() {
         match stream.write(&buf[written..]) {
@@ -767,26 +776,27 @@ pub unsafe extern "C" fn fwrite(
 /// Get a single char from a stream
 #[no_mangle]
 pub unsafe extern "C" fn getc(stream: *mut FILE) -> c_int {
-    let mut stream = (*stream).lock();
-    getc_unlocked(&mut *stream)
+    let mut stream = unsafe { &mut *stream }.lock();
+    unsafe { getc_unlocked(&mut *stream) }
 }
 
 /// Get a single char from `stdin`
 #[no_mangle]
 pub unsafe extern "C" fn getchar() -> c_int {
-    fgetc(&mut *stdin)
+    unsafe { fgetc(&mut *stdin) }
 }
 
 /// Get a char from a stream without locking the stream
 #[no_mangle]
 pub unsafe extern "C" fn getc_unlocked(stream: *mut FILE) -> c_int {
-    if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
+    let stream = unsafe { &mut *stream };
+    if let Err(_) = stream.try_set_byte_orientation_unlocked() {
         return -1;
     }
 
     let mut buf = [0];
 
-    match (*stream).read(&mut buf) {
+    match stream.read(&mut buf) {
         Ok(0) | Err(_) => EOF,
         Ok(_) => buf[0] as c_int,
     }
@@ -795,26 +805,22 @@ pub unsafe extern "C" fn getc_unlocked(stream: *mut FILE) -> c_int {
 /// Get a char from `stdin` without locking `stdin`
 #[no_mangle]
 pub unsafe extern "C" fn getchar_unlocked() -> c_int {
-    getc_unlocked(&mut *stdin)
+    unsafe { getc_unlocked(&mut *stdin) }
 }
 
 /// Get a string from `stdin`
 #[no_mangle]
 pub unsafe extern "C" fn gets(s: *mut c_char) -> *mut c_char {
-    fgets(s, c_int::max_value(), &mut *stdin)
+    unsafe { fgets(s, c_int::max_value(), &mut *stdin) }
 }
 
 /// Get an integer from `stream`
 #[no_mangle]
 pub unsafe extern "C" fn getw(stream: *mut FILE) -> c_int {
     let mut ret: c_int = 0;
-    if fread(
-        &mut ret as *mut _ as *mut c_void,
-        mem::size_of_val(&ret),
-        1,
-        stream,
-    ) > 0
-    {
+    let ret_ptr = &mut ret as *mut _ as *mut c_void;
+    let ret_size = mem::size_of_val(&ret);
+    if unsafe { fread(ret_ptr, ret_size, 1, stream) } > 0 {
         ret
     } else {
         -1
@@ -824,7 +830,7 @@ pub unsafe extern "C" fn getw(stream: *mut FILE) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn pclose(stream: *mut FILE) -> c_int {
     let pid = {
-        let mut stream = (*stream).lock();
+        let mut stream = unsafe { &mut *stream }.lock();
 
         if let Some(pid) = stream.pid.take() {
             pid
@@ -834,10 +840,10 @@ pub unsafe extern "C" fn pclose(stream: *mut FILE) -> c_int {
         }
     };
 
-    fclose(stream);
+    unsafe { fclose(stream) };
 
     let mut wstatus = 0;
-    if Sys::waitpid(pid, &mut wstatus, 0).or_minus_one_errno() == -1 {
+    if unsafe { Sys::waitpid(pid, &mut wstatus, 0) }.or_minus_one_errno() == -1 {
         return -1;
     }
 
@@ -855,7 +861,8 @@ pub unsafe extern "C" fn perror(s: *const c_char) {
     let mut w = platform::FileWriter::new(2);
 
     // The prefix, `s`, is optional (empty or NULL) according to the spec
-    match CStr::from_nullable_ptr(s).and_then(|s_cstr| str::from_utf8(s_cstr.to_bytes()).ok()) {
+    let ocs = unsafe { CStr::from_nullable_ptr(s) };
+    match ocs.and_then(|s_cstr| str::from_utf8(s_cstr.to_bytes()).ok()) {
         Some(s_str) if !s_str.is_empty() => w
             .write_fmt(format_args!("{}: {}\n", s_str, err_str))
             .unwrap(),
@@ -867,7 +874,7 @@ pub unsafe extern "C" fn perror(s: *const c_char) {
 pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *mut FILE {
     //TODO: share code with system
 
-    let mode = CStr::from_ptr(mode);
+    let mode = unsafe { CStr::from_ptr(mode) };
 
     let mut cloexec = false;
     let mut write_opt = None;
@@ -892,11 +899,11 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
     };
 
     let mut pipes = [-1, -1];
-    if unistd::pipe(pipes.as_mut_ptr()) != 0 {
+    if unsafe { unistd::pipe(pipes.as_mut_ptr()) } != 0 {
         return ptr::null_mut();
     }
 
-    let child_pid = unistd::fork();
+    let child_pid = unsafe { unistd::fork() };
     if child_pid == 0 {
         let command_nonnull = if command.is_null() {
             "exit 0\0".as_ptr()
@@ -919,12 +926,12 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
             if write {
                 match unistd::dup2(pipes[0], 0) {
                     0 => {}
-                    e => stdlib::exit(127),
+                    e => unsafe { stdlib::exit(127) },
                 }
             } else {
                 match unistd::dup2(pipes[1], 1) {
                     1 => {}
-                    e => stdlib::exit(127),
+                    e => unsafe { stdlib::exit(127) },
                 }
             }
 
@@ -932,9 +939,9 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
             unistd::close(pipes[1]);
         }
 
-        unistd::execv(shell as *const c_char, args.as_ptr() as *const *mut c_char);
+        unsafe { unistd::execv(shell as *const c_char, args.as_ptr() as *const *mut c_char) };
 
-        stdlib::exit(127);
+        unsafe { stdlib::exit(127) };
 
         unreachable!();
     } else if child_pid > 0 {
@@ -946,8 +953,8 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
             (pipes[0], if cloexec { c_str!("re") } else { c_str!("r") })
         };
 
-        if let Some(f) = helpers::_fdopen(fd, fd_mode.as_ptr()) {
-            (*f).pid = Some(child_pid);
+        if let Some(f) = unsafe { helpers::_fdopen(fd, fd_mode.as_ptr()) } {
+            unsafe { (*f).pid = Some(child_pid) };
             f
         } else {
             ptr::null_mut()
@@ -960,24 +967,25 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
 /// Put a character `c` into `stream`
 #[no_mangle]
 pub unsafe extern "C" fn putc(c: c_int, stream: *mut FILE) -> c_int {
-    let mut stream = (*stream).lock();
-    putc_unlocked(c, &mut *stream)
+    let mut stream = unsafe { &mut *stream }.lock();
+    unsafe { putc_unlocked(c, &mut *stream) }
 }
 
 /// Put a character `c` into `stdout`
 #[no_mangle]
 pub unsafe extern "C" fn putchar(c: c_int) -> c_int {
-    fputc(c, &mut *stdout)
+    unsafe { fputc(c, &mut *stdout) }
 }
 
 /// Put a character `c` into `stream` without locking `stream`
 #[no_mangle]
 pub unsafe extern "C" fn putc_unlocked(c: c_int, stream: *mut FILE) -> c_int {
-    if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
+    let stream = unsafe { &mut *stream };
+    if let Err(_) = stream.try_set_byte_orientation_unlocked() {
         return -1;
     }
 
-    match (*stream).write(&[c as u8]) {
+    match stream.write(&[c as u8]) {
         Ok(0) | Err(_) => EOF,
         Ok(_) => c,
     }
@@ -986,18 +994,19 @@ pub unsafe extern "C" fn putc_unlocked(c: c_int, stream: *mut FILE) -> c_int {
 /// Put a character `c` into `stdout` without locking `stdout`
 #[no_mangle]
 pub unsafe extern "C" fn putchar_unlocked(c: c_int) -> c_int {
-    putc_unlocked(c, stdout)
+    unsafe { putc_unlocked(c, stdout) }
 }
 
 /// Put a string `s` into `stdout`
 #[no_mangle]
 pub unsafe extern "C" fn puts(s: *const c_char) -> c_int {
-    let mut stream = (&mut *stdout).lock();
+    let mut stream = unsafe { &mut *stdout }.lock();
     if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
         return -1;
     }
 
-    let buf = slice::from_raw_parts(s as *mut u8, strlen(s));
+    let s_len = unsafe { strlen(s) };
+    let buf = unsafe { slice::from_raw_parts(s as *mut u8, s_len) };
 
     if stream.write_all(&buf).is_err() {
         return -1;
@@ -1011,13 +1020,15 @@ pub unsafe extern "C" fn puts(s: *const c_char) -> c_int {
 /// Put an integer `w` into `stream`
 #[no_mangle]
 pub unsafe extern "C" fn putw(w: c_int, stream: *mut FILE) -> c_int {
-    fwrite(&w as *const c_int as _, mem::size_of_val(&w), 1, stream) as i32 - 1
+    let w_ptr = &w as *const c_int as _;
+    let w_len = mem::size_of_val(&w);
+    unsafe { fwrite(w_ptr, w_len, 1, stream) as i32 - 1 }
 }
 
 /// Delete file or directory `path`
 #[no_mangle]
 pub unsafe extern "C" fn remove(path: *const c_char) -> c_int {
-    let path = CStr::from_ptr(path);
+    let path = unsafe { CStr::from_ptr(path) };
     Sys::unlink(path)
         .or_else(|_err| Sys::rmdir(path))
         .map(|()| 0)
@@ -1026,8 +1037,8 @@ pub unsafe extern "C" fn remove(path: *const c_char) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn rename(oldpath: *const c_char, newpath: *const c_char) -> c_int {
-    let oldpath = CStr::from_ptr(oldpath);
-    let newpath = CStr::from_ptr(newpath);
+    let oldpath = unsafe { CStr::from_ptr(oldpath) };
+    let newpath = unsafe { CStr::from_ptr(newpath) };
     Sys::rename(oldpath, newpath)
         .map(|()| 0)
         .or_minus_one_errno()
@@ -1036,24 +1047,26 @@ pub unsafe extern "C" fn rename(oldpath: *const c_char, newpath: *const c_char) 
 /// Rewind `stream` back to the beginning of it
 #[no_mangle]
 pub unsafe extern "C" fn rewind(stream: *mut FILE) {
-    fseeko(stream, 0, SEEK_SET);
+    unsafe { fseeko(stream, 0, SEEK_SET) };
 }
 
 /// Reset `stream` to use buffer `buf`. Buffer must be `BUFSIZ` in length
 #[no_mangle]
 pub unsafe extern "C" fn setbuf(stream: *mut FILE, buf: *mut c_char) {
-    setvbuf(
-        stream,
-        buf,
-        if buf.is_null() { _IONBF } else { _IOFBF },
-        BUFSIZ as usize,
-    );
+    unsafe {
+        setvbuf(
+            stream,
+            buf,
+            if buf.is_null() { _IONBF } else { _IOFBF },
+            BUFSIZ as usize,
+        )
+    };
 }
 
 /// Set buffering of `stream` to line buffered
 #[no_mangle]
 pub unsafe extern "C" fn setlinebuf(stream: *mut FILE) {
-    setvbuf(stream, ptr::null_mut(), _IOLBF, 0);
+    unsafe { setvbuf(stream, ptr::null_mut(), _IOLBF, 0) };
 }
 
 /// Reset `stream` to use buffer `buf` of size `size`
@@ -1065,7 +1078,7 @@ pub unsafe extern "C" fn setvbuf(
     mode: c_int,
     mut size: size_t,
 ) -> c_int {
-    let mut stream = (*stream).lock();
+    let mut stream = unsafe { &mut *stream }.lock();
     // Set a buffer of size `size` if no buffer is given
     stream.read_buf = if buf.is_null() || size == 0 {
         if size == 0 {
@@ -1077,7 +1090,7 @@ pub unsafe extern "C" fn setvbuf(
         Buffer::Owned(vec![0; size as usize])
     // }
     } else {
-        Buffer::Borrowed(slice::from_raw_parts_mut(buf as *mut u8, size))
+        Buffer::Borrowed(unsafe { slice::from_raw_parts_mut(buf as *mut u8, size) })
     };
     stream.flags |= F_SVB;
     0
@@ -1086,39 +1099,42 @@ pub unsafe extern "C" fn setvbuf(
 #[no_mangle]
 pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut c_char {
     unsafe fn is_appropriate(pos_dir: *const c_char) -> bool {
-        !pos_dir.is_null() && unistd::access(pos_dir, unistd::W_OK) == 0
+        !pos_dir.is_null() && unsafe { unistd::access(pos_dir, unistd::W_OK) } == 0
     }
 
     // directory search order is env!(TMPDIR), dir, P_tmpdir, "/tmp"
     let dirname = {
-        let tmpdir = stdlib::getenv(b"TMPDIR\0".as_ptr() as _);
+        let tmpdir = unsafe { stdlib::getenv(b"TMPDIR\0".as_ptr() as _) };
         [tmpdir, dir, P_tmpdir.as_ptr() as _]
             .iter()
             .copied()
-            .skip_while(|&d| !is_appropriate(d))
+            .skip_while(|&d| !unsafe { is_appropriate(d) })
             .next()
             .unwrap_or(b"/tmp\0".as_ptr() as _)
     };
-    let dirname_len = string::strlen(dirname);
+    let dirname_len = unsafe { string::strlen(dirname) };
 
-    let prefix_len = string::strnlen_s(pfx, 5);
+    let prefix_len = unsafe { string::strnlen_s(pfx, 5) };
 
     // allocate enough for dirname "/" prefix "XXXXXX\0"
     let mut out_buf =
-        platform::alloc(dirname_len + 1 + prefix_len + L_tmpnam as usize + 1) as *mut c_char;
+        unsafe { platform::alloc(dirname_len + 1 + prefix_len + L_tmpnam as usize + 1) }
+            as *mut c_char;
 
     if !out_buf.is_null() {
         // copy the directory name and prefix into the allocated buffer
-        out_buf.copy_from_nonoverlapping(dirname, dirname_len);
-        *out_buf.add(dirname_len) = b'/' as _;
-        out_buf
-            .add(dirname_len + 1)
-            .copy_from_nonoverlapping(pfx, prefix_len);
+        unsafe {
+            out_buf.copy_from_nonoverlapping(dirname, dirname_len);
+            *out_buf.add(dirname_len) = b'/' as _;
+            out_buf
+                .add(dirname_len + 1)
+                .copy_from_nonoverlapping(pfx, prefix_len);
+        }
 
         // use the same mechanism as tmpnam to get the file name
-        if tmpnam_inner(out_buf, dirname_len + 1 + prefix_len).is_null() {
+        if unsafe { tmpnam_inner(out_buf, dirname_len + 1 + prefix_len) }.is_null() {
             // failed to find a valid file name, so we need to free the buffer
-            platform::free(out_buf as _);
+            unsafe { platform::free(out_buf as _) };
             out_buf = ptr::null_mut();
         }
     }
@@ -1130,15 +1146,15 @@ pub unsafe extern "C" fn tempnam(dir: *const c_char, pfx: *const c_char) -> *mut
 pub unsafe extern "C" fn tmpfile() -> *mut FILE {
     let mut file_name = *b"/tmp/tmpfileXXXXXX\0";
     let file_name = file_name.as_mut_ptr() as *mut c_char;
-    let fd = stdlib::mkstemp(file_name);
+    let fd = unsafe { stdlib::mkstemp(file_name) };
 
     if fd < 0 {
         return ptr::null_mut();
     }
 
-    let fp = fdopen(fd, c_str!("w+").as_ptr());
+    let fp = unsafe { fdopen(fd, c_str!("w+").as_ptr()) };
     {
-        let file_name = CStr::from_ptr(file_name);
+        let file_name = unsafe { CStr::from_ptr(file_name) };
         Sys::unlink(file_name);
     }
 
@@ -1152,26 +1168,30 @@ pub unsafe extern "C" fn tmpfile() -> *mut FILE {
 #[no_mangle]
 pub unsafe extern "C" fn tmpnam(s: *mut c_char) -> *mut c_char {
     let buf = if s.is_null() {
-        TMPNAM_BUF.as_mut_ptr()
+        unsafe { TMPNAM_BUF.as_mut_ptr() }
     } else {
         s
     };
 
-    *buf = b'/' as _;
-    tmpnam_inner(buf, 1)
+    unsafe {
+        *buf = b'/' as _;
+        tmpnam_inner(buf, 1)
+    }
 }
 
 unsafe extern "C" fn tmpnam_inner(buf: *mut c_char, offset: usize) -> *mut c_char {
     const TEMPLATE: &[u8] = b"XXXXXX\0";
 
-    buf.add(offset)
-        .copy_from_nonoverlapping(TEMPLATE.as_ptr() as _, TEMPLATE.len());
+    unsafe {
+        buf.add(offset)
+            .copy_from_nonoverlapping(TEMPLATE.as_ptr() as _, TEMPLATE.len())
+    };
 
     let err = platform::ERRNO.get();
-    stdlib::mktemp(buf);
+    unsafe { stdlib::mktemp(buf) };
     platform::ERRNO.set(err);
 
-    if *buf == 0 {
+    if unsafe { *buf } == 0 {
         ptr::null_mut()
     } else {
         buf
@@ -1181,7 +1201,7 @@ unsafe extern "C" fn tmpnam_inner(buf: *mut c_char, offset: usize) -> *mut c_cha
 /// Push character `c` back onto `stream` so it'll be read next
 #[no_mangle]
 pub unsafe extern "C" fn ungetc(c: c_int, stream: *mut FILE) -> c_int {
-    let mut stream = (*stream).lock();
+    let mut stream = unsafe { &mut *stream }.lock();
     if let Err(_) = (*stream).try_set_byte_orientation_unlocked() {
         return -1;
     }
@@ -1192,12 +1212,12 @@ pub unsafe extern "C" fn ungetc(c: c_int, stream: *mut FILE) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn vfprintf(file: *mut FILE, format: *const c_char, ap: va_list) -> c_int {
-    let mut file = (*file).lock();
+    let mut file = unsafe { &mut *file }.lock();
     if let Err(_) = file.try_set_byte_orientation_unlocked() {
         return -1;
     }
 
-    printf::printf(&mut *file, format, ap)
+    unsafe { printf::printf(&mut *file, format, ap) }
 }
 #[no_mangle]
 pub unsafe extern "C" fn fprintf(
@@ -1205,7 +1225,8 @@ pub unsafe extern "C" fn fprintf(
     format: *const c_char,
     mut __valist: ...
 ) -> c_int {
-    vfprintf(file, format, __valist.as_va_list())
+    let va_list = __valist.as_va_list();
+    unsafe { vfprintf(file, format, va_list) }
 }
 
 #[no_mangle]
@@ -1216,20 +1237,22 @@ pub unsafe extern "C" fn vdprintf(fd: c_int, format: *const c_char, ap: va_list)
     // borrowing the file descriptor here
     f.reference = true;
 
-    printf::printf(f, format, ap)
+    unsafe { printf::printf(f, format, ap) }
 }
 #[no_mangle]
 pub unsafe extern "C" fn dprintf(fd: c_int, format: *const c_char, mut __valist: ...) -> c_int {
-    vdprintf(fd, format, __valist.as_va_list())
+    let va_list = __valist.as_va_list();
+    unsafe { vdprintf(fd, format, va_list) }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
-    vfprintf(&mut *stdout, format, ap)
+    unsafe { vfprintf(&mut *stdout, format, ap) }
 }
 #[no_mangle]
 pub unsafe extern "C" fn printf(format: *const c_char, mut __valist: ...) -> c_int {
-    vfprintf(&mut *stdout, format, __valist.as_va_list())
+    let va_list = __valist.as_va_list();
+    unsafe { vfprintf(&mut *stdout, format, va_list) }
 }
 
 #[no_mangle]
@@ -1239,10 +1262,11 @@ pub unsafe extern "C" fn vasprintf(
     ap: va_list,
 ) -> c_int {
     let mut alloc_writer = CVec::new();
-    let ret = printf::printf(&mut alloc_writer, format, ap);
+    let ret = unsafe { printf::printf(&mut alloc_writer, format, ap) };
     alloc_writer.push(0).unwrap();
     alloc_writer.shrink_to_fit().unwrap();
-    *strp = alloc_writer.leak() as *mut c_char;
+    let alloc_writer_ptr = alloc_writer.leak() as *mut c_char;
+    unsafe { *strp = alloc_writer_ptr };
     ret
 }
 #[no_mangle]
@@ -1251,7 +1275,8 @@ pub unsafe extern "C" fn asprintf(
     format: *const c_char,
     mut __valist: ...
 ) -> c_int {
-    vasprintf(strp, format, __valist.as_va_list())
+    let va_list = __valist.as_va_list();
+    unsafe { vasprintf(strp, format, va_list) }
 }
 
 #[no_mangle]
@@ -1261,11 +1286,8 @@ pub unsafe extern "C" fn vsnprintf(
     format: *const c_char,
     ap: va_list,
 ) -> c_int {
-    printf::printf(
-        &mut platform::StringWriter(s as *mut u8, n as usize),
-        format,
-        ap,
-    )
+    let writer = &mut platform::StringWriter(s as *mut u8, n as usize);
+    unsafe { printf::printf(writer, format, ap) }
 }
 #[no_mangle]
 pub unsafe extern "C" fn snprintf(
@@ -1274,16 +1296,15 @@ pub unsafe extern "C" fn snprintf(
     format: *const c_char,
     mut __valist: ...
 ) -> c_int {
-    printf::printf(
-        &mut platform::StringWriter(s as *mut u8, n as usize),
-        format,
-        __valist.as_va_list(),
-    )
+    let writer = &mut platform::StringWriter(s as *mut u8, n as usize);
+    let va_list = __valist.as_va_list();
+    unsafe { printf::printf(writer, format, va_list) }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_list) -> c_int {
-    printf::printf(&mut platform::UnsafeStringWriter(s as *mut u8), format, ap)
+    let writer = &mut platform::UnsafeStringWriter(s as *mut u8);
+    unsafe { printf::printf(writer, format, ap) }
 }
 #[no_mangle]
 pub unsafe extern "C" fn sprintf(
@@ -1291,24 +1312,22 @@ pub unsafe extern "C" fn sprintf(
     format: *const c_char,
     mut __valist: ...
 ) -> c_int {
-    printf::printf(
-        &mut platform::UnsafeStringWriter(s as *mut u8),
-        format,
-        __valist.as_va_list(),
-    )
+    let writer = &mut platform::UnsafeStringWriter(s as *mut u8);
+    let va_list = __valist.as_va_list();
+    unsafe { printf::printf(writer, format, va_list) }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_list) -> c_int {
     let ret = {
-        let mut file = (*file).lock();
+        let mut file = unsafe { &mut *file }.lock();
         if let Err(_) = file.try_set_byte_orientation_unlocked() {
             return -1;
         }
 
         let f: &mut FILE = &mut *file;
         let reader: LookAheadReader = f.into();
-        scanf::scanf(reader, format, ap)
+        unsafe { scanf::scanf(reader, format, ap) }
     };
     ret
 }
@@ -1318,16 +1337,18 @@ pub unsafe extern "C" fn fscanf(
     format: *const c_char,
     mut __valist: ...
 ) -> c_int {
-    vfscanf(file, format, __valist.as_va_list())
+    let va_list = __valist.as_va_list();
+    unsafe { vfscanf(file, format, va_list) }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
-    vfscanf(&mut *stdin, format, ap)
+    unsafe { vfscanf(&mut *stdin, format, ap) }
 }
 #[no_mangle]
 pub unsafe extern "C" fn scanf(format: *const c_char, mut __valist: ...) -> c_int {
-    vfscanf(&mut *stdin, format, __valist.as_va_list())
+    let va_list = __valist.as_va_list();
+    unsafe { vfscanf(&mut *stdin, format, va_list) }
 }
 
 #[no_mangle]
@@ -1337,7 +1358,7 @@ pub unsafe extern "C" fn vsscanf(
     __valist: va_list,
 ) -> c_int {
     let reader = (s as *const u8).into();
-    scanf::scanf(reader, format, __valist)
+    unsafe { scanf::scanf(reader, format, __valist) }
 }
 #[no_mangle]
 pub unsafe extern "C" fn sscanf(
@@ -1346,14 +1367,15 @@ pub unsafe extern "C" fn sscanf(
     mut __valist: ...
 ) -> c_int {
     let reader = (s as *const u8).into();
-    scanf::scanf(reader, format, __valist.as_va_list())
+    let va_list = __valist.as_va_list();
+    unsafe { scanf::scanf(reader, format, va_list) }
 }
 
 pub unsafe fn flush_io_streams() {
     let flush = |stream: *mut FILE| {
-        let stream = &mut *stream;
+        let stream = unsafe { &mut *stream };
         let _ = stream.flush();
     };
-    flush(stdout);
-    flush(stderr);
+    flush(unsafe { stdout });
+    flush(unsafe { stderr });
 }
