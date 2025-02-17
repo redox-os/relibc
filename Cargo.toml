@@ -16,6 +16,7 @@ members = [
     "redox-rt",
     "ld_so",
     "generic-rt",
+    "src/libm"
 ]
 exclude = ["tests", "dlmalloc-rs"]
 
@@ -33,7 +34,6 @@ rand_xorshift = "0.3"
 rand_jitter = "0.4"
 
 memchr = { version = "2.2.0", default-features = false }
-plain = "0.2"
 unicode-width = "0.1"
 __libc_only_for_layout_checks = { package = "libc", version = "0.2.149", optional = true }
 md5-crypto = { package = "md-5", version = "0.10.6", default-features = false }
@@ -48,7 +48,8 @@ sha2 = { version = "0.10", default-features = false }
 generic-rt = { path = "generic-rt" }
 chrono-tz = {version = "0.10", default-features = false}
 chrono = {version = "0.4", default-features = false, features = ["alloc"]}
-libm = "0.2"
+rust_libm = {package = "libm", version = "0.2.8"}
+num-complex = { version = "0.4.4", default-features = false, features = ["libm"] }
 object = { version = "0.36.7", git = "https://gitlab.redox-os.org/andypython/object", default-features = false, features = ["elf", "read_core"] }
 spin = "0.9.8"
 
