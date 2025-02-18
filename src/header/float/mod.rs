@@ -10,7 +10,7 @@ pub const FLT_RADIX: c_int = 2;
 
 #[no_mangle]
 pub unsafe extern "C" fn flt_rounds() -> c_int {
-    match fegetround() {
+    match unsafe { fegetround() } {
         FE_TONEAREST => 1,
         _ => -1,
     }

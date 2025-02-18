@@ -36,86 +36,93 @@ pub static mut HOST_STAYOPEN: c_int = 0;
 
 #[no_mangle]
 pub unsafe extern "C" fn endhostent() {
-    if HOSTDB >= 0 {
-        Sys::close(HOSTDB);
+    if unsafe { HOSTDB } >= 0 {
+        Sys::close(unsafe { HOSTDB });
     }
-    HOSTDB = -1;
+    unsafe { HOSTDB = -1 };
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn sethostent(stayopen: c_int) {
-    HOST_STAYOPEN = stayopen;
-    if HOSTDB < 0 {
-        HOSTDB = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0).or_minus_one_errno()
+    unsafe { HOST_STAYOPEN = stayopen };
+    if unsafe { HOSTDB } < 0 {
+        let fd = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0).or_minus_one_errno();
+        unsafe { HOSTDB = fd };
     } else {
-        Sys::lseek(HOSTDB, 0, SEEK_SET);
+        Sys::lseek(unsafe { HOSTDB }, 0, SEEK_SET);
     }
-    H_POS = 0;
+    unsafe { H_POS = 0 };
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn gethostent() -> *mut hostent {
-    if HOSTDB < 0 {
-        HOSTDB = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0).or_minus_one_errno();
+    if unsafe { HOSTDB } < 0 {
+        let fd = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0).or_minus_one_errno();
+        unsafe { HOSTDB = fd };
     }
-    let mut rlb = RawLineBuffer::new(HOSTDB);
-    rlb.seek(H_POS);
+    let mut rlb = RawLineBuffer::new(unsafe { HOSTDB });
+    rlb.seek(unsafe { H_POS });
 
     let mut r: Box<str> = Box::default();
     while r.is_empty() || r.split_whitespace().next() == None || r.starts_with('#') {
         r = match rlb.next() {
             Line::Some(s) => bytes_to_box_str(s),
             _ => {
-                if HOST_STAYOPEN == 0 {
-                    endhostent();
+                if unsafe { HOST_STAYOPEN } == 0 {
+                    unsafe { endhostent() };
                 }
                 return ptr::null_mut();
             }
         };
     }
     rlb.next();
-    H_POS = rlb.line_pos();
+    let line_pos = rlb.line_pos();
+    unsafe { H_POS = line_pos };
 
     let mut iter: SplitWhitespace = r.split_whitespace();
 
     let addr_vec: Vec<u8> = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
     let addr_cstr = addr_vec.as_slice().as_ptr() as *const i8;
     let mut addr = mem::MaybeUninit::uninit();
-    inet_aton(addr_cstr, addr.as_mut_ptr());
-    let addr = addr.assume_init();
+    unsafe { inet_aton(addr_cstr, addr.as_mut_ptr()) };
+    let addr = unsafe { addr.assume_init() };
 
-    _HOST_ADDR_LIST = addr.s_addr.to_ne_bytes();
-    HOST_ADDR_LIST = [_HOST_ADDR_LIST.as_mut_ptr() as *mut c_char, ptr::null_mut()];
-
-    HOST_ADDR = Some(addr);
+    let s_addr_bytes = addr.s_addr.to_ne_bytes();
+    unsafe {
+        _HOST_ADDR_LIST = s_addr_bytes;
+        HOST_ADDR_LIST = [_HOST_ADDR_LIST.as_mut_ptr() as *mut c_char, ptr::null_mut()];
+        HOST_ADDR = Some(addr);
+    }
 
     let host_name = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
 
     let mut _host_aliases: Vec<Vec<u8>> = iter
         .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
         .collect();
-    HOST_ALIASES = Some(_host_aliases);
+    unsafe { HOST_ALIASES = Some(_host_aliases) };
 
-    let mut host_aliases: Vec<*mut i8> = HOST_ALIASES
-        .as_mut()
+    let mut host_aliases: Vec<*mut i8> = unsafe { HOST_ALIASES.as_mut() }
         .unwrap()
         .iter_mut()
         .map(|x| x.as_mut_ptr() as *mut i8)
         .chain([ptr::null_mut(), ptr::null_mut()])
         .collect();
 
-    HOST_NAME = Some(host_name);
+    unsafe { HOST_NAME = Some(host_name) };
 
-    HOST_ENTRY = hostent {
-        h_name: HOST_NAME.as_mut().unwrap().as_mut_ptr() as *mut c_char,
+    let host_entry = hostent {
+        h_name: unsafe { HOST_NAME.as_mut() }.unwrap().as_mut_ptr() as *mut c_char,
         h_aliases: host_aliases.as_mut_slice().as_mut_ptr() as *mut *mut i8,
         h_addrtype: AF_INET,
         h_length: 4,
-        h_addr_list: HOST_ADDR_LIST.as_mut_ptr(),
+        h_addr_list: unsafe { HOST_ADDR_LIST.as_mut_ptr() },
     };
-    _HOST_ALIASES = Some(host_aliases);
-    if HOST_STAYOPEN == 0 {
-        endhostent();
+    unsafe {
+        HOST_ENTRY = host_entry;
+        _HOST_ALIASES = Some(host_aliases);
     }
-    &mut HOST_ENTRY as *mut hostent
+    if unsafe { HOST_STAYOPEN } == 0 {
+        unsafe { endhostent() };
+    }
+    unsafe { &mut HOST_ENTRY as *mut hostent }
 }

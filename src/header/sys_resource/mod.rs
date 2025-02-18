@@ -84,21 +84,21 @@ pub unsafe extern "C" fn setpriority(which: c_int, who: id_t, nice: c_int) -> c_
 
 #[no_mangle]
 pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
-    Sys::getrlimit(resource, rlp)
+    unsafe { Sys::getrlimit(resource, rlp) }
         .map(|()| 0)
         .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int {
-    Sys::setrlimit(resource, rlp)
+    unsafe { Sys::setrlimit(resource, rlp) }
         .map(|()| 0)
         .or_minus_one_errno()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-    Sys::getrusage(who, &mut *r_usage)
+    Sys::getrusage(who, unsafe { &mut *r_usage })
         .map(|()| 0)
         .or_minus_one_errno()
 }

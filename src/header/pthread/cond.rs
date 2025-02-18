@@ -6,13 +6,14 @@ use super::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_broadcast(cond: *mut pthread_cond_t) -> c_int {
-    e((&*cond.cast::<RlctCond>()).broadcast())
+    let cond = unsafe { &*cond.cast::<RlctCond>() };
+    e(cond.broadcast())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_destroy(cond: *mut pthread_cond_t) -> c_int {
     // No-op
-    core::ptr::drop_in_place(cond.cast::<RlctCond>());
+    unsafe { core::ptr::drop_in_place(cond.cast::<RlctCond>()) };
     0
 }
 
@@ -21,14 +22,16 @@ pub unsafe extern "C" fn pthread_cond_init(
     cond: *mut pthread_cond_t,
     _attr: *const pthread_condattr_t,
 ) -> c_int {
-    cond.cast::<RlctCond>().write(RlctCond::new());
+    let cond_value = RlctCond::new();
+    unsafe { cond.cast::<RlctCond>().write(cond_value) };
 
     0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cond_signal(cond: *mut pthread_cond_t) -> c_int {
-    e((&*cond.cast::<RlctCond>()).signal())
+    let cond = unsafe { &*cond.cast::<RlctCond>() };
+    e(cond.signal())
 }
 
 #[no_mangle]
@@ -37,7 +40,10 @@ pub unsafe extern "C" fn pthread_cond_timedwait(
     mutex: *mut pthread_mutex_t,
     timeout: *const timespec,
 ) -> c_int {
-    e((&*cond.cast::<RlctCond>()).timedwait(&*mutex.cast::<RlctMutex>(), &*timeout))
+    let cond = unsafe { &*cond.cast::<RlctCond>() };
+    let mutex = unsafe { &*mutex.cast::<RlctMutex>() };
+    let timeout = unsafe { &*timeout };
+    e(cond.timedwait(mutex, timeout))
 }
 
 #[no_mangle]
@@ -45,12 +51,14 @@ pub unsafe extern "C" fn pthread_cond_wait(
     cond: *mut pthread_cond_t,
     mutex: *mut pthread_mutex_t,
 ) -> c_int {
-    e((&*cond.cast::<RlctCond>()).wait(&*mutex.cast::<RlctMutex>()))
+    let cond = unsafe { &*cond.cast::<RlctCond>() };
+    let mutex = unsafe { &*mutex.cast::<RlctMutex>() };
+    e(cond.wait(mutex))
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_condattr_destroy(condattr: *mut pthread_condattr_t) -> c_int {
-    core::ptr::drop_in_place(condattr.cast::<RlctCondAttr>());
+    unsafe { core::ptr::drop_in_place(condattr.cast::<RlctCondAttr>()) };
     // No-op
     0
 }
@@ -60,7 +68,8 @@ pub unsafe extern "C" fn pthread_condattr_getclock(
     condattr: *const pthread_condattr_t,
     clock: *mut clockid_t,
 ) -> c_int {
-    core::ptr::write(clock, (*condattr.cast::<RlctCondAttr>()).clock);
+    let condattr = unsafe { &*condattr.cast::<RlctCondAttr>() };
+    unsafe { core::ptr::write(clock, condattr.clock) };
     0
 }
 
@@ -69,15 +78,15 @@ pub unsafe extern "C" fn pthread_condattr_getpshared(
     condattr: *const pthread_condattr_t,
     pshared: *mut c_int,
 ) -> c_int {
-    core::ptr::write(pshared, (*condattr.cast::<RlctCondAttr>()).pshared);
+    let condattr = unsafe { &*condattr.cast::<RlctCondAttr>() };
+    unsafe { core::ptr::write(pshared, condattr.pshared) };
     0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_condattr_init(condattr: *mut pthread_condattr_t) -> c_int {
-    condattr
-        .cast::<RlctCondAttr>()
-        .write(RlctCondAttr::default());
+    let condattr_value = RlctCondAttr::default();
+    unsafe { condattr.cast::<RlctCondAttr>().write(condattr_value) };
 
     0
 }
@@ -87,7 +96,8 @@ pub unsafe extern "C" fn pthread_condattr_setclock(
     condattr: *mut pthread_condattr_t,
     clock: clockid_t,
 ) -> c_int {
-    (*condattr.cast::<RlctCondAttr>()).clock = clock;
+    let condattr = unsafe { &mut *condattr.cast::<RlctCondAttr>() };
+    condattr.clock = clock;
     0
 }
 
@@ -96,7 +106,8 @@ pub unsafe extern "C" fn pthread_condattr_setpshared(
     condattr: *mut pthread_condattr_t,
     pshared: c_int,
 ) -> c_int {
-    (*condattr.cast::<RlctCondAttr>()).pshared = pshared;
+    let condattr = unsafe { &mut *condattr.cast::<RlctCondAttr>() };
+    condattr.pshared = pshared;
     0
 }
 

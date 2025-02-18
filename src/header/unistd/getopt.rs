@@ -36,5 +36,5 @@ pub unsafe extern "C" fn getopt(
     argv: *const *mut c_char,
     optstring: *const c_char,
 ) -> c_int {
-    getopt::getopt_long(argc, argv, optstring, ptr::null(), ptr::null_mut())
+    unsafe { getopt::getopt_long(argc, argv, optstring, ptr::null(), ptr::null_mut()) }
 }

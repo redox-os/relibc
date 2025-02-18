@@ -280,11 +280,11 @@ pub unsafe fn get_auxvs(mut ptr: *const usize) -> Box<[[usize; 2]]> {
     //traverse the stack and collect argument environment variables
     let mut auxvs = Vec::new();
 
-    while *ptr != self::auxv_defs::AT_NULL {
-        let kind = ptr.read();
-        ptr = ptr.add(1);
-        let value = ptr.read();
-        ptr = ptr.add(1);
+    while unsafe { *ptr } != self::auxv_defs::AT_NULL {
+        let kind = unsafe { ptr.read() };
+        ptr = unsafe { ptr.add(1) };
+        let value = unsafe { ptr.read() };
+        ptr = unsafe { ptr.add(1) };
         auxvs.push([kind, value]);
     }
 
@@ -302,7 +302,7 @@ pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
 #[cfg(target_os = "redox")]
 // SAFETY: Must only be called when only one thread exists.
 pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
-    redox_rt::initialize();
+    unsafe { redox_rt::initialize() };
 
     use syscall::MODE_PERM;
 
@@ -314,7 +314,8 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_PTR),
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_LEN),
     ) {
-        let cwd_bytes: &'static [u8] = core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len);
+        let cwd_bytes: &'static [u8] =
+            unsafe { core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len) };
         if let Ok(cwd) = core::str::from_utf8(cwd_bytes) {
             self::sys::path::set_cwd_manual(cwd.into());
         }

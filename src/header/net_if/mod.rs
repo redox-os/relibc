@@ -78,7 +78,7 @@ pub unsafe extern "C" fn if_nametoindex(name: *const c_char) -> c_uint {
     if name == null::<c_char>() {
         return 0;
     }
-    let name = CStr::from_ptr(name).to_str().unwrap_or("");
+    let name = unsafe { CStr::from_ptr(name) }.to_str().unwrap_or("");
     if name.eq("stub") {
         return 1;
     }

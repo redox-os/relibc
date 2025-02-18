@@ -17,7 +17,7 @@ pub unsafe extern "C" fn __cxa_atexit(
     arg: *mut c_void,
     dso: *mut c_void,
 ) -> c_int {
-    for item in &mut CXA_ATEXIT_FUNCS {
+    for item in unsafe { &mut CXA_ATEXIT_FUNCS } {
         if item.is_none() {
             *item = func_opt.map(|func| CxaAtExitFunc {} /*{ func, arg, dso }*/);
             return 0;

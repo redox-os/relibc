@@ -19,5 +19,5 @@ pub struct utsname {
 
 #[no_mangle]
 pub unsafe extern "C" fn uname(uts: *mut utsname) -> c_int {
-    Sys::uname(uts).map(|()| 0).or_minus_one_errno()
+    unsafe { Sys::uname(uts) }.map(|()| 0).or_minus_one_errno()
 }

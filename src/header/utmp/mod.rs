@@ -15,11 +15,13 @@ pub unsafe extern "C" fn login_tty(fd: c_int) -> c_int {
 
     // Set controlling terminal
     let mut arg: c_int = 0;
-    if sys_ioctl::ioctl(
-        fd,
-        sys_ioctl::TIOCSCTTY,
-        &mut arg as *mut c_int as *mut c_void,
-    ) != 0
+    if unsafe {
+        sys_ioctl::ioctl(
+            fd,
+            sys_ioctl::TIOCSCTTY,
+            &mut arg as *mut c_int as *mut c_void,
+        )
+    } != 0
     {
         return -1;
     }

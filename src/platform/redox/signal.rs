@@ -57,10 +57,11 @@ impl PalSignal for Sys {
         let mut spec = syscall::ITimerSpec::default();
         let count = syscall::read(*fd, &mut spec)?;
 
-        (*out).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
-        (*out).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
-        (*out).it_value.tv_sec = spec.it_value.tv_sec as time_t;
-        (*out).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
+        let out = unsafe { &mut *out };
+        out.it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
+        out.it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
+        out.it_value.tv_sec = spec.it_value.tv_sec as time_t;
+        out.it_value.tv_usec = spec.it_value.tv_nsec / 1000;
 
         Ok(())
     }
@@ -208,7 +209,7 @@ impl PalSignal for Sys {
             .transpose()?;
 
         let mut old = old_c.as_ref().map(|_| Sigaltstack::default());
-        redox_rt::signal::sigaltstack(new.as_ref(), old.as_mut())?;
+        unsafe { redox_rt::signal::sigaltstack(new.as_ref(), old.as_mut()) }?;
 
         if let (Some(old_c_stack), Some(old)) = (old_c, old) {
             let c_stack = PosixStackt::from(old);

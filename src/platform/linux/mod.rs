@@ -191,21 +191,22 @@ impl Pal for Sys {
         e_raw(syscall!(FSTATFS, fildes, kbuf_ptr))?;
 
         if !buf.is_null() {
-            (*buf).f_bsize = kbuf.f_bsize as c_ulong;
-            (*buf).f_frsize = if kbuf.f_frsize != 0 {
+            let buf = unsafe { &mut *buf };
+            buf.f_bsize = kbuf.f_bsize as c_ulong;
+            buf.f_frsize = if kbuf.f_frsize != 0 {
                 kbuf.f_frsize
             } else {
                 kbuf.f_bsize
             } as c_ulong;
-            (*buf).f_blocks = kbuf.f_blocks;
-            (*buf).f_bfree = kbuf.f_bfree;
-            (*buf).f_bavail = kbuf.f_bavail;
-            (*buf).f_files = kbuf.f_files;
-            (*buf).f_ffree = kbuf.f_ffree;
-            (*buf).f_favail = kbuf.f_ffree;
-            (*buf).f_fsid = kbuf.f_fsid as c_ulong;
-            (*buf).f_flag = kbuf.f_flags as c_ulong;
-            (*buf).f_namemax = kbuf.f_namelen as c_ulong;
+            buf.f_blocks = kbuf.f_blocks;
+            buf.f_bfree = kbuf.f_bfree;
+            buf.f_bavail = kbuf.f_bavail;
+            buf.f_files = kbuf.f_files;
+            buf.f_ffree = kbuf.f_ffree;
+            buf.f_favail = kbuf.f_ffree;
+            buf.f_fsid = kbuf.f_fsid as c_ulong;
+            buf.f_flag = kbuf.f_flags as c_ulong;
+            buf.f_namemax = kbuf.f_namelen as c_ulong;
         }
         Ok(())
     }
@@ -276,7 +277,8 @@ impl Pal for Sys {
     }
     unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)> {
         let dent = this_dent.as_ptr().cast::<dirent>();
-        Some(((*dent).d_reclen, (*dent).d_off as u64))
+        let dent_ref = unsafe { &*dent };
+        Some((dent_ref.d_reclen, dent_ref.d_off as u64))
     }
 
     fn getegid() -> gid_t {
@@ -469,7 +471,8 @@ impl Pal for Sys {
     unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
         let pid;
-        asm!("
+        unsafe {
+            asm!("
             # Call clone syscall
             syscall
 
@@ -500,21 +503,22 @@ impl Pal for Sys {
             # Return PID if parent
             2:
             ",
-            inout("rax") SYS_CLONE => pid,
-            inout("rdi") flags => _,
-            inout("rsi") stack => _,
-            inout("rdx") 0 => _,
-            inout("r10") 0 => _,
-            inout("r8") 0 => _,
-            //TODO: out("rbx") _,
-            out("rcx") _,
-            out("r9") _,
-            out("r11") _,
-            out("r12") _,
-            out("r13") _,
-            out("r14") _,
-            out("r15") _,
-        );
+                inout("rax") SYS_CLONE => pid,
+                inout("rdi") flags => _,
+                inout("rsi") stack => _,
+                inout("rdx") 0 => _,
+                inout("r10") 0 => _,
+                inout("r8") 0 => _,
+                //TODO: out("rbx") _,
+                out("rcx") _,
+                out("r9") _,
+                out("r11") _,
+                out("r12") _,
+                out("r13") _,
+                out("r14") _,
+                out("r15") _,
+            )
+        };
         let tid = e_raw(pid)?;
 
         Ok(crate::pthread::OsTid { thread_id: tid })

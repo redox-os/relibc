@@ -18,14 +18,14 @@ pub struct iovec {
 
 impl iovec {
     unsafe fn to_slice(&self) -> &mut [u8] {
-        slice::from_raw_parts_mut(self.iov_base as *mut u8, self.iov_len as usize)
+        unsafe { slice::from_raw_parts_mut(self.iov_base as *mut u8, self.iov_len as usize) }
     }
 }
 
 unsafe fn gather(iovs: &[iovec]) -> Vec<u8> {
     let mut vec = Vec::new();
     for iov in iovs.iter() {
-        vec.extend_from_slice(iov.to_slice());
+        vec.extend_from_slice(unsafe { iov.to_slice() });
     }
     vec
 }
@@ -33,7 +33,7 @@ unsafe fn gather(iovs: &[iovec]) -> Vec<u8> {
 unsafe fn scatter(iovs: &[iovec], vec: Vec<u8>) {
     let mut i = 0;
     for iov in iovs.iter() {
-        let slice = iov.to_slice();
+        let slice = unsafe { iov.to_slice() };
         slice.copy_from_slice(&vec[i..][..slice.len()]);
         i += slice.len();
     }
@@ -46,12 +46,14 @@ pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> s
         return -1;
     }
 
-    let iovs = slice::from_raw_parts(iov, iovcnt as usize);
-    let mut vec = gather(iovs);
+    let iovs = unsafe { slice::from_raw_parts(iov, iovcnt as usize) };
+    let mut vec = unsafe { gather(iovs) };
 
-    let ret = unistd::read(fd, vec.as_mut_ptr() as *mut c_void, vec.len());
+    let vec_ptr = vec.as_mut_ptr();
+    let vec_len = vec.len();
+    let ret = unsafe { unistd::read(fd, vec_ptr as *mut c_void, vec_len) };
 
-    scatter(iovs, vec);
+    unsafe { scatter(iovs, vec) };
 
     ret
 }
@@ -63,8 +65,10 @@ pub unsafe extern "C" fn writev(fd: c_int, iov: *const iovec, iovcnt: c_int) -> 
         return -1;
     }
 
-    let iovs = slice::from_raw_parts(iov, iovcnt as usize);
-    let vec = gather(iovs);
+    let iovs = unsafe { slice::from_raw_parts(iov, iovcnt as usize) };
+    let vec = unsafe { gather(iovs) };
 
-    unistd::write(fd, vec.as_ptr() as *const c_void, vec.len())
+    let vec_ptr = vec.as_ptr();
+    let vec_len = vec.len();
+    unsafe { unistd::write(fd, vec_ptr as *const c_void, vec_len) }
 }

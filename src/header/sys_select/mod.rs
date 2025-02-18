@@ -175,22 +175,22 @@ pub unsafe extern "C" fn select(
             if readfds.is_null() {
                 None
             } else {
-                Some(&mut *readfds)
+                Some(unsafe { &mut *readfds })
             },
             if writefds.is_null() {
                 None
             } else {
-                Some(&mut *writefds)
+                Some(unsafe { &mut *writefds })
             },
             if exceptfds.is_null() {
                 None
             } else {
-                Some(&mut *exceptfds)
+                Some(unsafe { &mut *exceptfds })
             },
             if timeout.is_null() {
                 None
             } else {
-                Some(&mut *timeout)
+                Some(unsafe { &mut *timeout })
             }
         ),
         "select({}, {:p}, {:p}, {:p}, {:p})",
