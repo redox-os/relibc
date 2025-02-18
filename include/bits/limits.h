@@ -26,7 +26,7 @@
 #define UINT_MAX 0xffffffff
 #define ULLONG_MAX 0xffffffffffffffff
 #define ULONG_MAX 0xffffffffffffffff
-#define USHRT_MAX 0xffffffffffffffff
+#define USHRT_MAX 0xffff
 #define WORD_BIT 32
 
 #endif
