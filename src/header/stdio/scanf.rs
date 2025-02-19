@@ -34,14 +34,14 @@ unsafe fn inner_scanf(mut r: Reader, mut format: Reader, mut ap: va_list) -> Res
 
     macro_rules! read {
         () => {{
-            match r.next().transpose() {
-                Ok(None) => false,
-                Ok(Some(b)) => {
+            match r.next() {
+                None => false,
+                Some(Ok(b)) => {
                     byte = b;
                     count += 1;
                     true
                 }
-                Err(x) => return Err(x),
+                Some(Err(x)) => return Err(x),
             }
         }};
     }
