@@ -29,6 +29,7 @@ use crate::{
     platform::{self, types::*, Pal, Sys, WriteByte, ERRNO},
     sync::Mutex,
 };
+use reader::Reader;
 
 pub use self::constants::*;
 mod constants;
@@ -41,10 +42,9 @@ mod getdelim;
 
 mod ext;
 mod helpers;
-mod lookaheadreader;
 mod printf;
+mod reader;
 mod scanf;
-use lookaheadreader::LookAheadReader;
 static mut TMPNAM_BUF: [c_char; L_tmpnam as usize + 1] = [0; L_tmpnam as usize + 1];
 
 enum Buffer<'a> {
@@ -1307,7 +1307,7 @@ pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_
         }
 
         let f: &mut FILE = &mut *file;
-        let reader: LookAheadReader = f.into();
+        let reader: Reader = f.into();
         scanf::scanf(reader, format.into(), ap)
     };
     ret
