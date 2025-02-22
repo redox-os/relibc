@@ -3,16 +3,11 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 
 use crate::{
-    c_str::{CStr, CString},
-    error::ResultExt,
-    header::{errno::EOVERFLOW, stdlib::getenv, unistd::readlink},
-    platform::{self, types::*, Pal, Sys},
-    sync::{Mutex, MutexGuard},
+    c_str::{CStr, CString}, error::ResultExt, fs::File, header::{errno::EOVERFLOW, fcntl::O_RDONLY, stdlib::getenv, unistd::readlink}, io::Read, platform::{self, types::*, Pal, Sys}, sync::{Mutex, MutexGuard}
 };
-use alloc::collections::BTreeSet;
+use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
 use chrono::{
-    offset::MappedLocalTime, DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset,
-    TimeZone, Timelike, Utc,
+    format::ParseErrorKind, offset::MappedLocalTime, DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, ParseError, TimeZone, Timelike, Utc
 };
 use chrono_tz::{OffsetComponents, OffsetName, Tz};
 use core::{
@@ -122,6 +117,10 @@ pub static mut timezone: c_long = 0;
 #[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut tzname: TzName = TzName([ptr::null_mut(); 2]);
+
+#[allow(non_upper_case_globals)]
+#[no_mangle]
+pub static mut getdate_err: c_int = 0;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[repr(C)]
@@ -313,14 +312,45 @@ pub unsafe extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/difftime.html>.
 #[no_mangle]
-pub extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {
+pub unsafe extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {
     (time1 - time0) as _
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getdate.html>.
-// #[no_mangle]
-pub extern "C" fn getdate(string: *const c_char) -> tm {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn getdate(string: *const c_char) -> *const tm {
+    let fmt_env = unsafe { getenv(c"DATEMSK".as_ptr() as _) };
+    if !fmt_env.is_null() {
+        let fmt = CStr::from_ptr(fmt_env);
+        if let Ok(mut file) = File::open(fmt, O_RDONLY) {
+            let mut buf = Vec::new();
+            file.read_to_end(&mut buf);
+            if let Ok(s) = String::from_utf8(buf ) && let Ok(fmt) = fmt.to_str() {
+               match DateTime::parse_from_str(&s, fmt) {
+                    Ok(t) => {
+                        let tz = time_zone();
+                        let dt = datetime_to_tm( &t.with_timezone(&tz));
+                        return Box::into_raw(Box::new(dt));
+                    },
+                    Err(e) => {
+                        match e.kind() {
+                            ParseErrorKind::Invalid => getdate_err = 8,
+                            _ => getdate_err = 7
+                        }
+                    },
+                }
+            } else {
+                getdate_err = 5;
+            }
+            
+        } else {
+            getdate_err = 5;
+        }
+    } else { 
+        getdate_err = 1;
+    }
+
+    return ptr::null();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gmtime.html>.
@@ -560,10 +590,10 @@ pub unsafe extern "C" fn tzset() {
 
 fn convert_tm_generic<Tz: TimeZone>(tz: &Tz, tm_val: &tm) -> Option<DateTime<Tz>> {
     // Adjust fields: tm_year is years since 1900; tm_mon is 0-indexed.
-    let year  = tm_val.tm_year + 1900;
+    let year = tm_val.tm_year + 1900;
     let month = tm_val.tm_mon + 1; // convert to 1-indexed
-    let day   = tm_val.tm_mday;
-    let hour  = tm_val.tm_hour;
+    let day = tm_val.tm_mday;
+    let hour = tm_val.tm_hour;
     let minute = tm_val.tm_min;
     let second = tm_val.tm_sec;
 
@@ -621,7 +651,7 @@ fn get_system_time_zone<'a>() -> Option<&'a str> {
 
 fn get_current_time_zone<'a>() -> &'a str {
     // Check the `TZ` environment variable
-    let tz_env = unsafe { getenv(b"TZ\0".as_ptr() as _) };
+    let tz_env = unsafe { getenv(c"TZ".as_ptr() as _) };
     if !tz_env.is_null() {
         if let Ok(tz) = unsafe { CStr::from_ptr(tz_env) }.to_str() {
             return tz;
