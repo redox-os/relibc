@@ -67,7 +67,6 @@ impl<'a> FileReader<'a> {
                 encoded_length = if let Some(el) = get_char_encoded_length(buf[0]) {
                     el
                 } else {
-                    // TODO: Ask if setting this here is ok
                     ERRNO.set(EILSEQ);
                     return Ok(Some((WEOF, 0)));
                 };
