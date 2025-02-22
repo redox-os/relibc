@@ -1331,12 +1331,8 @@ pub unsafe extern "C" fn scanf(format: *const c_char, mut __valist: ...) -> c_in
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vsscanf(
-    s: *const c_char,
-    format: *const c_char,
-    __valist: va_list,
-) -> c_int {
-    scanf::scanf(s.into(), format.into(), __valist)
+pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
+    scanf::scanf(reader.into(), format.into(), ap)
 }
 #[no_mangle]
 pub unsafe extern "C" fn sscanf(
