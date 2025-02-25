@@ -10,7 +10,7 @@
 
 void sig_handler (int signo) {
 	(void) signo;
-	exit(1);
+	exit(EXIT_SUCCESS);
 }
 
 int killpg_test2(int signum)
@@ -31,7 +31,7 @@ int killpg_test2(int signum)
 
 		sigpause(SIGABRT);
 
-		return 0;
+		return EXIT_FAILURE;
 	} else {
 		/* parent here */
 		int i;
@@ -49,10 +49,10 @@ int killpg_test2(int signum)
 		status = wait(&i);
 		ERROR_IF(wait, status, == -1);
 
-		if (WEXITSTATUS(i)) {
+		if (WEXITSTATUS(i) == EXIT_SUCCESS) {
 			printf("Child exited normally\n");
 			printf("Test PASSED\n");
-			return 0;
+			return EXIT_SUCCESS;
 		} else {
 			printf("Child did not exit normally.\n");
 			printf("Test FAILED\n");
@@ -73,11 +73,10 @@ int main(){
 			continue;
 		}
 		x = killpg_test2(sig);
-	}
-	if (x == EXIT_FAILURE){
-		return EXIT_FAILURE;
-	} else {
-		return EXIT_SUCCESS;
-	}
+		if (x == EXIT_FAILURE){
+			return EXIT_FAILURE;
+		}
+	} 
+	return EXIT_SUCCESS;
 }
 
