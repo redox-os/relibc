@@ -36,20 +36,25 @@ int sigset_test5(int signum)
 	sigemptyset(&mask);
 
 	sigprocmask(SIG_SETMASK, &mask, NULL);
+	void (*status) (int);
 
-	if (sigset(signum, sig_handler) == SIG_ERR) {
-                perror("Unexpected error while using sigset()");
-               	exit(EXIT_FAILURE);
-        }
+	status = sigset(signum, sig_handler);
+	ERROR_IF(sigset, status, == SIG_ERR);
+	// if (sigset(signum, sig_handler) == SIG_ERR) {
+    //             perror("Unexpected error while using sigset()");
+    //            	exit(EXIT_FAILURE);
+    //     }
 
 	raise(signum);
 	sigprocmask(SIG_SETMASK, NULL, &mask);
-
-	if (is_empty(&mask) != 1) {
-		printf("Test FAILED: signal mask should be empty\n");
-		exit(EXIT_FAILURE);
-	}
-    printf("sig %d was successfully removed from the mask when handler returned\n", signum);
+	int status1;
+	status1 = is_empty(&mask);
+	ERROR_IF(is_empty, status1, != 1);
+	// if (is_empty(&mask) != 1) {
+	// 	printf("Test FAILED: signal mask should be empty\n");
+	// 	exit(EXIT_FAILURE);
+	// }
+    // printf("sig %d was successfully removed from the mask when handler returned\n", signum);
 	return EXIT_SUCCESS;
 } 
 
