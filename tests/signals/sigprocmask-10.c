@@ -38,22 +38,27 @@ int main() {
 	
 	int r=get_rand();
 	sigset_t actl, oactl;
+	int status;
 
 	sigemptyset(&actl);
 	sigemptyset(&oactl);
-	sigaddset(&actl, SIGABRT);
+	status = sigaddset(&actl, SIGABRT);
+	ERROR_IF(sigaddset, status, != 0);
 
-	sigprocmask(SIG_SETMASK, &actl, NULL);
+	status = sigprocmask(SIG_SETMASK, &actl, NULL);
+	ERROR_IF(sigprocmask, status, != 0);
 
-	sigaddset(&actl, SIGALRM);
-	int status;
+	status = sigaddset(&actl, SIGALRM);
+	ERROR_IF(sigaddset, status, != 0);
+	
 	status = sigprocmask(r, &actl, NULL);
 	ERROR_IF(sigprocmask, status, != -1);
 
-	sigprocmask(SIG_SETMASK, NULL, &oactl);
+	status = sigprocmask(SIG_SETMASK, NULL, &oactl);
+	ERROR_IF(sigprocmask, status, != 0);
 
 	status = sigismember(&oactl, SIGABRT);
-	ERROR_IF(sigismember, status, != -1);
+	ERROR_IF(sigismember, status, != 1);
 
 	if (is_changed(oactl)) {
 		exit(EXIT_FAILURE);
