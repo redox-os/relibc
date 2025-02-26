@@ -5,14 +5,16 @@
 use crate::{
     c_str::{CStr, CString},
     error::ResultExt,
-    header::{errno::EOVERFLOW, stdlib::getenv, unistd::readlink},
+    fs::File,
+    header::{errno::EOVERFLOW, fcntl::O_RDONLY, stdlib::getenv, unistd::readlink},
+    io::Read,
     platform::{self, types::*, Pal, Sys},
     sync::{Mutex, MutexGuard},
 };
-use alloc::collections::BTreeSet;
+use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
 use chrono::{
-    offset::MappedLocalTime, DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset,
-    TimeZone, Timelike,
+    format::ParseErrorKind, offset::MappedLocalTime, DateTime, Datelike, FixedOffset, NaiveDate,
+    NaiveDateTime, Offset, ParseError, TimeZone, Timelike, Utc,
 };
 use chrono_tz::{OffsetComponents, OffsetName, Tz};
 use core::{
@@ -32,6 +34,7 @@ pub use strptime::strptime;
 const YEARS_PER_ERA: time_t = 400;
 const DAYS_PER_ERA: time_t = 146097;
 const SECS_PER_DAY: time_t = 24 * 60 * 60;
+const UTC_STR: &core::ffi::CStr = c"UTC";
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[repr(C)]
@@ -121,6 +124,10 @@ pub static mut timezone: c_long = 0;
 #[allow(non_upper_case_globals)]
 #[no_mangle]
 pub static mut tzname: TzName = TzName([ptr::null_mut(); 2]);
+
+#[allow(non_upper_case_globals)]
+#[no_mangle]
+pub static mut getdate_err: c_int = 0;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[repr(C)]
@@ -312,13 +319,13 @@ pub unsafe extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/difftime.html>.
 #[no_mangle]
-pub extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {
+pub unsafe extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {
     (time1 - time0) as _
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getdate.html>.
 // #[no_mangle]
-pub extern "C" fn getdate(string: *const c_char) -> tm {
+pub unsafe extern "C" fn getdate(string: *const c_char) -> *const tm {
     unimplemented!();
 }
 
@@ -331,97 +338,8 @@ pub unsafe extern "C" fn gmtime(timer: *const time_t) -> *mut tm {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gmtime.html>.
 #[no_mangle]
 pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut tm {
-    /* For the details of the algorithm used here, see
-     * http://howardhinnant.github.io/date_algorithms.html#civil_from_days
-     * Note that we need 0-based months here, though.
-     * Overall, this implementation should generate correct results as
-     * long as the tm_year value will fit in a c_int. */
-    let unix_secs = *clock;
-
-    /* Day number here is possibly negative, remainder will always be
-     * nonnegative when using Euclidean division */
-    let unix_days: time_t = unix_secs.div_euclid(SECS_PER_DAY);
-
-    /* In range [0, 86399]. Needs a u32 since this is larger (at least
-     * theoretically) than the guaranteed range of c_int */
-    let secs_of_day: u32 = unix_secs.rem_euclid(SECS_PER_DAY).try_into().unwrap();
-
-    /* Shift origin from 1970-01-01 to 0000-03-01 and find out where we
-     * are in terms of 400-year eras since then */
-    let days_since_origin = unix_days + 719468;
-    let era = days_since_origin.div_euclid(DAYS_PER_ERA);
-    let day_of_era = days_since_origin.rem_euclid(DAYS_PER_ERA);
-    let year_of_era =
-        (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146096) / 365;
-
-    /* "transformed" here refers to dates in a calendar where years
-     * start on March 1 */
-    let year_transformed = year_of_era + 400 * era; // retain large range, don't convert to c_int yet
-    let day_of_year_transformed: c_int = (day_of_era
-        - (365 * year_of_era + year_of_era / 4 - year_of_era / 100))
-        .try_into()
-        .unwrap();
-    let month_transformed: c_int = (5 * day_of_year_transformed + 2) / 153;
-
-    // Convert back to calendar with year starting on January 1
-    let month: c_int = (month_transformed + 2) % 12; // adapted to 0-based months
-    let year: time_t = if month < 2 {
-        year_transformed + 1
-    } else {
-        year_transformed
-    };
-
-    /* Subtract 1900 *before* converting down to c_int in order to
-     * maximize the range of input timestamps that will succeed */
-    match c_int::try_from(year - 1900) {
-        Ok(year_less_1900) => {
-            let mday: c_int = (day_of_year_transformed - (153 * month_transformed + 2) / 5 + 1)
-                .try_into()
-                .unwrap();
-
-            /* 1970-01-01 was a Thursday. Again, Euclidean division is
-             * used to ensure a nonnegative remainder (range [0, 6]). */
-            let wday: c_int = ((unix_days + 4).rem_euclid(7)).try_into().unwrap();
-
-            /* Yes, duplicated code for now (to work on non-c_int-values
-             * so that we are not constrained by the subtraction of
-             * 1900) */
-            let is_leap_year: bool = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
-
-            /* For dates in January or February, we use the fact that
-             * January 1 is always 306 days after March 1 in the
-             * previous year. */
-            let yday: c_int = if month < 2 {
-                day_of_year_transformed - 306
-            } else {
-                day_of_year_transformed + if is_leap_year { 60 } else { 59 }
-            };
-
-            let hour: c_int = (secs_of_day / (60 * 60)).try_into().unwrap();
-            let min: c_int = ((secs_of_day / 60) % 60).try_into().unwrap();
-            let sec: c_int = (secs_of_day % 60).try_into().unwrap();
-
-            *result = tm {
-                tm_sec: sec,
-                tm_min: min,
-                tm_hour: hour,
-                tm_mday: mday,
-                tm_mon: month,
-                tm_year: year_less_1900,
-                tm_wday: wday,
-                tm_yday: yday,
-                tm_isdst: 0,
-                tm_gmtoff: 0,
-                tm_zone: UTC,
-            };
-
-            result
-        }
-        Err(_) => {
-            platform::ERRNO.set(EOVERFLOW);
-            ptr::null_mut()
-        }
-    }
+    let _ = get_localtime(*clock, result);
+    result
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/localtime.html>.
@@ -435,20 +353,9 @@ pub unsafe extern "C" fn localtime(clock: *const time_t) -> *mut tm {
 pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
     let mut lock = TIMEZONE_LOCK.lock();
     clear_timezone(&mut lock);
-
-    let utc_time = *clock;
-    let tz = time_zone();
-
-    // Convert UTC time to local time
-    let (std_time, dst_time) = match tz.timestamp_opt(utc_time, 0) {
-        MappedLocalTime::Single(t) => (t, None),
-        // This variant contains the two possible results, in the order (earliest, latest).
-        MappedLocalTime::Ambiguous(t1, t2) => (t2, Some(t1)),
-        MappedLocalTime::None => return t,
-    };
-
-    ptr::write(t, datetime_to_tm(&std_time));
-    set_timezone(&mut lock, &std_time, dst_time);
+    if let (Some(std_time), dst_time) = get_localtime(*clock, t) {
+        set_timezone(&mut lock, &std_time, dst_time);
+    }
     t
 }
 
@@ -494,11 +401,11 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     ptr::write(timeptr, datetime_to_tm(&tz_datetime));
 
     // Convert UTC time to local time
-    if let (Some(std_time), dst_time) = match tz.timestamp_opt(timestamp, 0) {
-        MappedLocalTime::Single(t) => (Some(t), None),
+    if let (std_time, dst_time) = match tz.timestamp_opt(timestamp, 0) {
+        MappedLocalTime::Single(t) => (t, None),
         // This variant contains the two possible results, in the order (earliest, latest).
-        MappedLocalTime::Ambiguous(t1, t2) => (Some(t2), Some(t1)),
-        MappedLocalTime::None => (None, None),
+        MappedLocalTime::Ambiguous(t1, t2) => (t2, Some(t1)),
+        MappedLocalTime::None => return timestamp,
     } {
         set_timezone(&mut lock, &std_time, dst_time);
     }
@@ -553,15 +460,39 @@ pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/timegm.3.html>.
 #[no_mangle]
 pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
-    mktime(tm)
+    let tm_val = &mut *tm;
+    let dt = match convert_tm_generic(&Utc, tm_val) {
+        Some(dt) => dt,
+        None => return -1,
+    };
+
+    (*tm).tm_wday = dt.weekday().num_days_from_sunday() as _;
+    (*tm).tm_yday = dt.ordinal0() as _; // day of year starting at 0
+    (*tm).tm_isdst = 0; // UTC does not use DST
+    (*tm).tm_gmtoff = 0; // UTC offset is zero
+    (*tm).tm_zone = UTC_STR.as_ptr() as *const c_char;
+
+    dt.timestamp()
 }
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/timegm.3.html>.
 #[deprecated]
 #[no_mangle]
 pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
-    //TODO: timezone
-    timegm(tm)
+    let tm_val = &mut *tm;
+    let tz = time_zone();
+    let dt = match convert_tm_generic(&tz, tm_val) {
+        Some(dt) => dt,
+        None => return -1,
+    };
+
+    (*tm).tm_wday = dt.weekday().num_days_from_sunday() as _;
+    (*tm).tm_yday = dt.ordinal0() as _; // day of year starting at 0
+    (*tm).tm_isdst = dt.offset().dst_offset().num_hours() as _;
+    (*tm).tm_gmtoff = dt.offset().fix().local_minus_utc() as _;
+    (*tm).tm_zone = UTC_STR.as_ptr() as *const c_char;
+
+    dt.timestamp()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_create.html>.
@@ -627,6 +558,29 @@ pub unsafe extern "C" fn tzset() {
     set_timezone(&mut lock, &std_time, dst_time)
 }
 
+fn convert_tm_generic<Tz: TimeZone>(tz: &Tz, tm_val: &tm) -> Option<DateTime<Tz>> {
+    // Adjust fields: tm_year is years since 1900; tm_mon is 0-indexed.
+    let year = tm_val.tm_year + 1900;
+    let month = tm_val.tm_mon + 1; // convert to 1-indexed
+    let day = tm_val.tm_mday;
+    let hour = tm_val.tm_hour;
+    let minute = tm_val.tm_min;
+    let second = tm_val.tm_sec;
+
+    match tz.with_ymd_and_hms(
+        year,
+        month as u32,
+        day as u32,
+        hour as u32,
+        minute as u32,
+        second as u32,
+    ) {
+        MappedLocalTime::Single(dt) => Some(dt),
+        MappedLocalTime::Ambiguous(dt1, _dt2) => Some(dt1), // choose the earliest value
+        _ => None,
+    }
+}
+
 fn clear_timezone(guard: &mut MutexGuard<'_, (Option<CString>, Option<CString>)>) {
     guard.0 = None;
     guard.1 = None;
@@ -638,6 +592,7 @@ fn clear_timezone(guard: &mut MutexGuard<'_, (Option<CString>, Option<CString>)>
     }
 }
 
+#[inline(always)]
 fn get_system_time_zone<'a>() -> Option<&'a str> {
     // Resolve the symlink for localtime
     const BSIZE: size_t = 100;
@@ -666,7 +621,7 @@ fn get_system_time_zone<'a>() -> Option<&'a str> {
 
 fn get_current_time_zone<'a>() -> &'a str {
     // Check the `TZ` environment variable
-    let tz_env = unsafe { getenv(b"TZ\0".as_ptr() as _) };
+    let tz_env = unsafe { getenv(c"TZ".as_ptr() as _) };
     if !tz_env.is_null() {
         if let Ok(tz) = unsafe { CStr::from_ptr(tz_env) }.to_str() {
             return tz;
@@ -696,8 +651,26 @@ fn now() -> NaiveDateTime {
     NaiveDateTime::from_timestamp(now.tv_sec, now.tv_nsec as _)
 }
 
+#[inline(always)]
+fn get_localtime(clock: time_t, t: *mut tm) -> (Option<DateTime<Tz>>, Option<DateTime<Tz>>) {
+    let tz = time_zone();
+
+    // Convert UTC time to local time
+    let (std_time, dst_time) = match tz.timestamp_opt(clock, 0) {
+        MappedLocalTime::Single(t) => (Some(t), None),
+        // This variant contains the two possible results, in the order (earliest, latest).
+        MappedLocalTime::Ambiguous(t1, t2) => (Some(t2), Some(t1)),
+        MappedLocalTime::None => return (None, None),
+    };
+
+    unsafe { ptr::write(t, datetime_to_tm(&std_time.unwrap())) };
+    (std_time, dst_time)
+}
+
 unsafe fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
     let tz = local_time.timezone().name();
+    let tz = tz.strip_prefix("Etc/").or(Some(tz)).unwrap();
+
     let mut t = blank_tm();
     // Populate the `tm` structure
     t.tm_sec = local_time.second() as _;
