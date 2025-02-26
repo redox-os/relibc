@@ -669,6 +669,8 @@ fn get_localtime(clock: time_t, t: *mut tm) -> (Option<DateTime<Tz>>, Option<Dat
 
 unsafe fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
     let tz = local_time.timezone().name();
+    let tz = tz.strip_prefix("Etc/").or(Some(tz)).unwrap();
+
     let mut t = blank_tm();
     // Populate the `tm` structure
     t.tm_sec = local_time.second() as _;
