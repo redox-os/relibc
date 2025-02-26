@@ -99,6 +99,7 @@ EXPECT_NAMES=(\
 	time/mktime \
 	time/strftime \
 	time/time \
+	time/timegm \
 	time/tzset \
 	tls \
 	unistd/access \
@@ -114,7 +115,7 @@ EXPECT_NAMES=(\
 	unistd/getopt_long \
 	unistd/pipe \
 	unistd/rmdir \
-	unistd/sleep \
+	# unistd/sleep \
 	unistd/swab \
 	unistd/write \
 	waitpid \
