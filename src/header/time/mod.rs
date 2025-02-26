@@ -319,38 +319,7 @@ pub unsafe extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getdate.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getdate(string: *const c_char) -> *const tm {
-    let fmt_env = unsafe { getenv(c"DATEMSK".as_ptr() as _) };
-    if !fmt_env.is_null() {
-        let fmt = CStr::from_ptr(fmt_env);
-        if let Ok(mut file) = File::open(fmt, O_RDONLY) {
-            let mut buf = Vec::new();
-            file.read_to_end(&mut buf);
-            if let Ok(s) = String::from_utf8(buf ) && let Ok(fmt) = fmt.to_str() {
-               match DateTime::parse_from_str(&s, fmt) {
-                    Ok(t) => {
-                        let tz = time_zone();
-                        let dt = datetime_to_tm( &t.with_timezone(&tz));
-                        return Box::into_raw(Box::new(dt));
-                    },
-                    Err(e) => {
-                        match e.kind() {
-                            ParseErrorKind::Invalid => getdate_err = 8,
-                            _ => getdate_err = 7
-                        }
-                    },
-                }
-            } else {
-                getdate_err = 5;
-            }
-            
-        } else {
-            getdate_err = 5;
-        }
-    } else { 
-        getdate_err = 1;
-    }
-
-    return ptr::null();
+    unimplemented!()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gmtime.html>.
