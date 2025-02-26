@@ -324,9 +324,9 @@ pub unsafe extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getdate.html>.
-#[no_mangle]
+// #[no_mangle]
 pub unsafe extern "C" fn getdate(string: *const c_char) -> *const tm {
-    unimplemented!()
+    unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gmtime.html>.
@@ -460,19 +460,16 @@ pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/timegm.3.html>.
 #[no_mangle]
 pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
-    // Read the tm structure (we do not modify it)
     let tm_val = &mut *tm;
     let dt = match convert_tm_generic(&Utc, tm_val) {
         Some(dt) => dt,
         None => return -1,
     };
 
-    // Update additional fields in the provided tm structure.
     (*tm).tm_wday = dt.weekday().num_days_from_sunday() as _;
     (*tm).tm_yday = dt.ordinal0() as _; // day of year starting at 0
     (*tm).tm_isdst = 0; // UTC does not use DST
     (*tm).tm_gmtoff = 0; // UTC offset is zero
-                         // Use a static null-terminated string for the timezone abbreviation.
     (*tm).tm_zone = UTC_STR.as_ptr() as *const c_char;
 
     dt.timestamp()
@@ -482,7 +479,6 @@ pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
 #[deprecated]
 #[no_mangle]
 pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
-    // Read the tm structure (we do not modify it)
     let tm_val = &mut *tm;
     let tz = time_zone();
     let dt = match convert_tm_generic(&tz, tm_val) {
@@ -490,12 +486,10 @@ pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
         None => return -1,
     };
 
-    // Update additional fields in the provided tm structure.
     (*tm).tm_wday = dt.weekday().num_days_from_sunday() as _;
     (*tm).tm_yday = dt.ordinal0() as _; // day of year starting at 0
-    (*tm).tm_isdst = 0; // UTC does not use DST
-    (*tm).tm_gmtoff = 0; // UTC offset is zero
-                         // Use a static null-terminated string for the timezone abbreviation.
+    (*tm).tm_isdst = dt.offset().dst_offset().num_hours() as _;
+    (*tm).tm_gmtoff = dt.offset().fix().local_minus_utc() as _;
     (*tm).tm_zone = UTC_STR.as_ptr() as *const c_char;
 
     dt.timestamp()

@@ -123,6 +123,7 @@ EXPECT_NAMES=\
 	unistd/getopt_long \
 	unistd/pipe \
 	unistd/rmdir \
+	# unistd/sleep \
 	unistd/swab \
 	unistd/write \
 	waitpid \
