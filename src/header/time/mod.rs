@@ -3,11 +3,18 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 
 use crate::{
-    c_str::{CStr, CString}, error::ResultExt, fs::File, header::{errno::EOVERFLOW, fcntl::O_RDONLY, stdlib::getenv, unistd::readlink}, io::Read, platform::{self, types::*, Pal, Sys}, sync::{Mutex, MutexGuard}
+    c_str::{CStr, CString},
+    error::ResultExt,
+    fs::File,
+    header::{errno::EOVERFLOW, fcntl::O_RDONLY, stdlib::getenv, unistd::readlink},
+    io::Read,
+    platform::{self, types::*, Pal, Sys},
+    sync::{Mutex, MutexGuard},
 };
 use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
 use chrono::{
-    format::ParseErrorKind, offset::MappedLocalTime, DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, ParseError, TimeZone, Timelike, Utc
+    format::ParseErrorKind, offset::MappedLocalTime, DateTime, Datelike, FixedOffset, NaiveDate,
+    NaiveDateTime, Offset, ParseError, TimeZone, Timelike, Utc,
 };
 use chrono_tz::{OffsetComponents, OffsetName, Tz};
 use core::{
