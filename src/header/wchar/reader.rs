@@ -99,6 +99,7 @@ impl<'a> Iterator for FileReader<'a> {
 
         match self.get_curret_wchar() {
             Ok(Some((wc, encoded_length))) => {
+                unsafe { fseek_locked(self.f, self.position, SEEK_SET) };
                 self.position += encoded_length as off_t;
                 Some(Ok(wc))
             }
