@@ -48,6 +48,7 @@ impl<'a> Iterator for FileReader<'a> {
             Ok(0) => None,
             Ok(_) => {
                 self.position += 1;
+                unsafe { fseek_locked(self.f, self.position - 1, SEEK_SET) };
                 Some(Ok(buf[0]))
             }
             Err(_) => Some(Err(-1)),
