@@ -363,3 +363,9 @@ pub unsafe extern "C" fn redox_mkns_v1(
         syscall::mkns(core::slice::from_raw_parts(names.cast(), num_names))
     })())
 }
+
+// ABI-UNSTABLE
+#[no_mangle]
+pub unsafe extern "C" fn redox_cur_thrfd_v0() -> usize {
+    **redox_rt::RtTcb::current().thread_fd()
+}

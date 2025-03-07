@@ -1,17 +1,18 @@
 use core::mem::size_of;
 
-use syscall::{Result, O_CLOEXEC};
+use syscall::{Error, Result, ESRCH, O_CLOEXEC};
 
-use crate::{arch::*, proc::*, signal::tmp_disable_signals, RtTcb};
+use crate::{arch::*, proc::*, signal::tmp_disable_signals, static_proc_info, RtTcb};
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
 pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuard> {
-    // FIXME
+    let cur_proc_fd = static_proc_info()
+        .proc_fd
+        .as_ref()
+        .ok_or(Error::new(ESRCH))?;
+
     let cur_thr_fd = RtTcb::current().thread_fd();
-    let new_thr_fd = FdGuard::new(syscall::open(
-        "/scheme/thisproc/new-thread/open_via_dup",
-        O_CLOEXEC,
-    )?);
+    let new_thr_fd = FdGuard::new(syscall::dup(**cur_proc_fd, b"new-thread")?);
 
     copy_str(**cur_thr_fd, *new_thr_fd, "name")?;
 
