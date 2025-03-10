@@ -143,7 +143,7 @@ unsafe fn inner_af_inet(
 
     let mut addr = in_addr::default();
     assert_eq!(
-        inet_aton(raw_addr.as_ptr() as *mut i8, &mut addr),
+        inet_aton(raw_addr.as_ptr() as *mut c_char, &mut addr),
         1,
         "inet_aton might be broken, failed to parse netstack address"
     );

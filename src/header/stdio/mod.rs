@@ -301,7 +301,7 @@ pub unsafe extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
     pwd::getpwuid_r(
         unistd::geteuid(),
         &mut pwd,
-        buf.as_mut_ptr(),
+        buf.as_mut_ptr() as *mut c_char,
         buf.len(),
         &mut pwdbuf,
     );
@@ -434,7 +434,7 @@ pub unsafe extern "C" fn fgets(
     if left >= 1 {
         let unget_read_size = cmp::min(left, stream.unget.len());
         for _ in 0..unget_read_size {
-            *out = stream.unget.pop().unwrap() as i8;
+            *out = stream.unget.pop().unwrap() as c_char;
             out = out.offset(1);
         }
         left -= unget_read_size;
@@ -505,7 +505,10 @@ pub unsafe extern "C" fn flockfile(file: *mut FILE) {
 #[no_mangle]
 pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut FILE {
     let initial_mode = *mode;
-    if initial_mode != b'r' as i8 && initial_mode != b'w' as i8 && initial_mode != b'a' as i8 {
+    if initial_mode != b'r' as c_char
+        && initial_mode != b'w' as c_char
+        && initial_mode != b'a' as c_char
+    {
         platform::ERRNO.set(errno::EINVAL);
         return ptr::null_mut();
     }

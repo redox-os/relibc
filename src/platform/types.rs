@@ -42,7 +42,24 @@ pub type intptr_t = isize;
 pub type uintptr_t = usize;
 pub type ssize_t = isize;
 
+#[cfg(any(
+    target_arch = "aarch64",
+    target_arch = "arm",
+    target_arch = "riscv64",
+    target_arch = "riscv32",
+))]
+pub type c_char = u8;
+
+#[cfg(not(any(
+    target_arch = "aarch64",
+    target_arch = "arm",
+    target_arch = "riscv64",
+    target_arch = "riscv32",
+)))]
+// On every other target, c_char is signed.
 pub type c_char = i8;
+
+// pub type c_char = i8;
 #[cfg(target_pointer_width = "32")]
 pub type c_long = i32;
 #[cfg(target_pointer_width = "32")]
