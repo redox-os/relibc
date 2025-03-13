@@ -58,7 +58,7 @@ pub unsafe extern "C" fn getopt_long(
                     || *current_arg.offset(1) == 0
             } {
                 -1
-            } else if unsafe { string::strcmp(current_arg, c_str!("--").as_ptr()) == 0 } {
+            } else if unsafe { string::strcmp(current_arg, c"--".as_ptr()) == 0 } {
                 unsafe {
                     optind += 1;
                 }

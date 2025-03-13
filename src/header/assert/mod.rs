@@ -3,7 +3,9 @@
 // TODO: set this for entire crate when possible
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use crate::{c_str::CStr, platform::types::*};
+use core::ffi::CStr;
+
+use crate::platform::types::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn __assert_fail(

@@ -1,7 +1,8 @@
 //! statvfs implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysstatvfs.h.html
 
+use core::ffi::CStr;
+
 use crate::{
-    c_str::CStr,
     error::ResultExt,
     header::fcntl::O_PATH,
     platform::{types::*, Pal, Sys},

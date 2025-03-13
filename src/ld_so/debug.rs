@@ -1,6 +1,5 @@
-use crate::{c_str::CString, platform::types::*};
-use alloc::boxed::Box;
-use core::ptr;
+use alloc::{boxed::Box, ffi::CString};
+use core::{ffi::c_char, ptr};
 
 #[repr(C)]
 pub enum RTLDState {

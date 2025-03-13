@@ -7,7 +7,7 @@ use alloc::{
 };
 use core::{
     cmp,
-    ffi::VaList as va_list,
+    ffi::{CStr, VaList as va_list},
     fmt::{self, Write as WriteFmt},
     i32, mem,
     ops::{Deref, DerefMut},
@@ -15,7 +15,6 @@ use core::{
 };
 
 use crate::{
-    c_str::CStr,
     c_vec::CVec,
     error::ResultExt,
     fs::File,
@@ -855,7 +854,10 @@ pub unsafe extern "C" fn perror(s: *const c_char) {
     let mut w = platform::FileWriter::new(2);
 
     // The prefix, `s`, is optional (empty or NULL) according to the spec
-    match CStr::from_nullable_ptr(s).and_then(|s_cstr| str::from_utf8(s_cstr.to_bytes()).ok()) {
+    match (!s.is_null())
+        .then(|| CStr::from_ptr(s))
+        .and_then(|s_cstr| str::from_utf8(s_cstr.to_bytes()).ok())
+    {
         Some(s_str) if !s_str.is_empty() => w
             .write_fmt(format_args!("{}: {}\n", s_str, err_str))
             .unwrap(),
@@ -940,10 +942,10 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
     } else if child_pid > 0 {
         let (fd, fd_mode) = if write {
             unistd::close(pipes[0]);
-            (pipes[1], if cloexec { c_str!("we") } else { c_str!("w") })
+            (pipes[1], if cloexec { c"we" } else { c"w" })
         } else {
             unistd::close(pipes[1]);
-            (pipes[0], if cloexec { c_str!("re") } else { c_str!("r") })
+            (pipes[0], if cloexec { c"re" } else { c"r" })
         };
 
         if let Some(f) = helpers::_fdopen(fd, fd_mode.as_ptr()) {
@@ -1136,7 +1138,7 @@ pub unsafe extern "C" fn tmpfile() -> *mut FILE {
         return ptr::null_mut();
     }
 
-    let fp = fdopen(fd, c_str!("w+").as_ptr());
+    let fp = fdopen(fd, c"w+".as_ptr());
     {
         let file_name = CStr::from_ptr(file_name);
         Sys::unlink(file_name);

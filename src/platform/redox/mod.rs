@@ -1,5 +1,7 @@
+use alloc::ffi::CString;
 use core::{
     convert::TryFrom,
+    ffi::CStr,
     mem::{self, size_of},
     ptr, slice, str,
 };
@@ -12,7 +14,6 @@ use syscall::{
 };
 
 use crate::{
-    c_str::{CStr, CString},
     error::{self, Errno, Result, ResultExt},
     fs::File,
     header::{
@@ -82,7 +83,7 @@ static CLONE_LOCK: RwLock<()> = RwLock::new(());
 pub struct Sys;
 
 impl Pal for Sys {
-    fn access(path: CStr, mode: c_int) -> Result<()> {
+    fn access(path: &CStr, mode: c_int) -> Result<()> {
         let fd = FdGuard::new(Sys::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC, 0)? as usize);
 
         if mode == F_OK {
@@ -145,22 +146,22 @@ impl Pal for Sys {
         }
     }
 
-    fn chdir(path: CStr) -> Result<()> {
+    fn chdir(path: &CStr) -> Result<()> {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
         path::chdir(path)?;
         Ok(())
     }
-    fn set_default_scheme(path: CStr) -> Result<()> {
+    fn set_default_scheme(path: &CStr) -> Result<()> {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
         Ok(path::set_default_scheme(path)?)
     }
 
-    fn chmod(path: CStr, mode: mode_t) -> Result<()> {
+    fn chmod(path: &CStr, mode: mode_t) -> Result<()> {
         let file = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
         Self::fchmod(*file, mode)
     }
 
-    fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
+    fn chown(path: &CStr, owner: uid_t, group: gid_t) -> Result<()> {
         let file = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
         Self::fchown(*file, owner, group)
     }
@@ -203,7 +204,11 @@ impl Pal for Sys {
         loop {}
     }
 
-    unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> Result<()> {
+    unsafe fn execve(
+        path: &CStr,
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
+    ) -> Result<()> {
         self::exec::execve(
             Executable::AtPath(path),
             self::exec::ArgEnv::C { argv, envp },
@@ -307,7 +312,7 @@ impl Pal for Sys {
         Ok(())
     }
 
-    unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()> {
+    unsafe fn utimens(path: &CStr, times: *const timespec) -> Result<()> {
         let file = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
         Self::futimens(*file, times)
     }
@@ -494,7 +499,7 @@ impl Pal for Sys {
             format!("/scheme/proc/{}/session_id", pid)
         };
         let path_c = CString::new(path).unwrap();
-        let mut file = File::open(CStr::borrow(&path_c), fcntl::O_RDONLY | fcntl::O_CLOEXEC)?;
+        let mut file = File::open(path_c.as_c_str(), fcntl::O_RDONLY | fcntl::O_CLOEXEC)?;
         file.read(&mut buf)
             .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
         Ok(usize::from_ne_bytes(buf).try_into().unwrap())
@@ -525,7 +530,7 @@ impl Pal for Sys {
         syscall::getuid().unwrap() as pid_t
     }
 
-    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
+    fn lchown(path: &CStr, owner: uid_t, group: gid_t) -> Result<()> {
         // TODO: Is it correct for regular chown to use O_PATH? On Linux the meaning of that flag
         // is to forbid file operations, including fchown.
 
@@ -534,7 +539,7 @@ impl Pal for Sys {
         Self::fchown(*file, owner, group)
     }
 
-    fn link(path1: CStr, path2: CStr) -> Result<()> {
+    fn link(path1: &CStr, path2: &CStr) -> Result<()> {
         unsafe { syscall::link(path1.as_ptr() as *const u8, path2.as_ptr() as *const u8)? };
         Ok(())
     }
@@ -543,7 +548,7 @@ impl Pal for Sys {
         Ok(syscall::lseek(fd as usize, offset as isize, whence as usize)? as off_t)
     }
 
-    fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
+    fn mkdir(path: &CStr, mode: mode_t) -> Result<()> {
         File::create(
             path,
             fcntl::O_DIRECTORY | fcntl::O_EXCL | fcntl::O_CLOEXEC,
@@ -552,11 +557,11 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn mkfifo(path: CStr, mode: mode_t) -> Result<()> {
+    fn mkfifo(path: &CStr, mode: mode_t) -> Result<()> {
         Sys::mknod(path, syscall::MODE_FIFO as mode_t | (mode & 0o777), 0)
     }
 
-    fn mknodat(dir_fd: c_int, path_name: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
+    fn mknodat(dir_fd: c_int, path_name: &CStr, mode: mode_t, dev: dev_t) -> Result<()> {
         let mut dir_path_buf = [0; 4096];
         let res = Sys::fpath(dir_fd, &mut dir_path_buf)?;
 
@@ -569,13 +574,13 @@ impl Pal for Sys {
                 .ok_or(Errno(ENOENT))?;
 
         Sys::mknod(
-            CStr::borrow(&CString::new(resource_path.as_bytes()).unwrap()),
+            CString::new(resource_path.as_bytes()).unwrap().as_c_str(),
             mode,
             dev,
         )
     }
 
-    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> Result<(), Errno> {
+    fn mknod(path: &CStr, mode: mode_t, dev: dev_t) -> Result<(), Errno> {
         File::create(path, fcntl::O_CREAT | fcntl::O_CLOEXEC, mode)?;
         Ok(())
     }
@@ -713,7 +718,7 @@ impl Pal for Sys {
         }
     }
 
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
+    fn open(path: &CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
 
         // POSIX states that umask should affect the following:
@@ -798,7 +803,7 @@ impl Pal for Sys {
         }
     }
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize> {
+    fn readlink(pathname: &CStr, out: &mut [u8]) -> Result<usize> {
         let file = File::open(
             pathname,
             fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
@@ -806,7 +811,7 @@ impl Pal for Sys {
         Self::read(*file, out)
     }
 
-    fn rename(oldpath: CStr, newpath: CStr) -> Result<()> {
+    fn rename(oldpath: &CStr, newpath: &CStr) -> Result<()> {
         let newpath = newpath.to_str().map_err(|_| Errno(EINVAL))?;
 
         let file = File::open(oldpath, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
@@ -814,7 +819,7 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn rmdir(path: CStr) -> Result<()> {
+    fn rmdir(path: &CStr) -> Result<()> {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
         let canon = canonicalize(path)?;
         syscall::rmdir(&canon)?;
@@ -850,7 +855,7 @@ impl Pal for Sys {
         let session_id = Self::getpid();
         assert!(session_id >= 0);
         let mut file = File::open(
-            c_str!("/scheme/thisproc/current/session_id"),
+            c"/scheme/thisproc/current/session_id",
             fcntl::O_WRONLY | fcntl::O_CLOEXEC,
         )?;
         file.write(&usize::to_ne_bytes(session_id.try_into().unwrap()))
@@ -874,7 +879,7 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn symlink(path1: CStr, path2: CStr) -> Result<()> {
+    fn symlink(path1: &CStr, path2: &CStr) -> Result<()> {
         let mut file = File::create(
             path2,
             fcntl::O_WRONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
@@ -902,7 +907,7 @@ impl Pal for Sys {
                 return Ok(());
             }
 
-            let mut file = File::open(c_str!("/etc/hostname"), fcntl::O_RDONLY | fcntl::O_CLOEXEC)?;
+            let mut file = File::open(c"/etc/hostname", fcntl::O_RDONLY | fcntl::O_CLOEXEC)?;
 
             let mut read = 0;
             let name_len = name.len();
@@ -926,7 +931,7 @@ impl Pal for Sys {
             Err(_) => return Err(Errno(EIO)),
         }
 
-        let file_path = c_str!("/scheme/sys/uname");
+        let file_path = c"/scheme/sys/uname";
         let mut file = match File::open(file_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
             Ok(ok) => ok,
             Err(_) => return Err(Errno(EIO)),
@@ -968,7 +973,7 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn unlink(path: CStr) -> Result<()> {
+    fn unlink(path: &CStr) -> Result<()> {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
         let canon = canonicalize(path)?;
         syscall::unlink(&canon)?;

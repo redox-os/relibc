@@ -2,14 +2,11 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/net_if.h.html>.
 
-use core::ptr::null;
+use core::{ffi::CStr, ptr::null};
 
 use alloc::ffi::CString;
 
-use crate::{
-    c_str::CStr,
-    platform::{types::*, ERRNO},
-};
+use crate::platform::{types::*, ERRNO};
 
 use super::errno::ENXIO;
 
@@ -78,7 +75,7 @@ pub unsafe extern "C" fn if_nametoindex(name: *const c_char) -> c_uint {
     if name == null::<c_char>() {
         return 0;
     }
-    let name = CStr::from_ptr(name).to_str().unwrap_or("");
+    let name = CStr::from_ptr(name).to_str().unwrap_or_default();
     if name.eq("stub") {
         return 1;
     }

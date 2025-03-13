@@ -7,10 +7,10 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use core::ffi::CStr;
 use generic_rt::ExpectTlsFree;
 
 use crate::{
-    c_str::CStr,
     header::unistd,
     platform::{get_auxv, get_auxvs, types::c_char},
     start::Stack,

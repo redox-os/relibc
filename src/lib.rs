@@ -58,7 +58,6 @@ extern crate syscall;
 
 #[macro_use]
 mod macros;
-pub mod c_str;
 pub mod c_vec;
 pub mod cxa;
 pub mod db;

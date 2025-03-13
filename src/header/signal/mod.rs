@@ -1,11 +1,10 @@
 //! signal implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/signal.h.html
 
-use core::{arch::global_asm, mem, ptr};
+use core::{arch::global_asm, ffi::CStr, mem, ptr};
 
 use cbitset::BitSet;
 
 use crate::{
-    c_str::CStr,
     error::{Errno, ResultExt},
     header::{errno, setjmp, time::timespec},
     platform::{self, types::*, Pal, PalSignal, Sys},

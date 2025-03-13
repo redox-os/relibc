@@ -5,10 +5,9 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use alloc::{boxed::Box, vec::Vec};
-use core::{mem, ptr};
+use core::{ffi::CStr, mem, ptr};
 
 use crate::{
-    c_str::CStr,
     c_vec::CVec,
     error::{Errno, ResultExt, ResultExtPtrMut},
     fs::File,
@@ -32,7 +31,7 @@ pub struct DIR {
     opaque_offset: u64,
 }
 impl DIR {
-    pub fn new(path: CStr) -> Result<Box<Self>, Errno> {
+    pub fn new(path: &CStr) -> Result<Box<Self>, Errno> {
         Ok(Box::new(Self {
             file: File::open(
                 path,

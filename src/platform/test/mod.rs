@@ -11,11 +11,11 @@ fn access() {
     use crate::header::unistd;
 
     //TODO: create test files
-    assert_eq!(Sys::access(c_str!("not a file!"), unistd::F_OK), !0);
-    assert_eq!(Sys::access(c_str!("README.md"), unistd::F_OK), 0);
-    assert_eq!(Sys::access(c_str!("README.md"), unistd::R_OK), 0);
-    assert_eq!(Sys::access(c_str!("README.md"), unistd::W_OK), 0);
-    assert_eq!(Sys::access(c_str!("README.md"), unistd::X_OK), !0);
+    assert_eq!(Sys::access(c"not a file!", unistd::F_OK), !0);
+    assert_eq!(Sys::access(c"README.md", unistd::F_OK), 0);
+    assert_eq!(Sys::access(c"README.md", unistd::R_OK), 0);
+    assert_eq!(Sys::access(c"README.md", unistd::W_OK), 0);
+    assert_eq!(Sys::access(c"README.md", unistd::X_OK), !0);
 }
 
 #[test]
@@ -33,7 +33,7 @@ fn brk() {
 #[test]
 fn chdir() {
     //TODO: create test files
-    assert_eq!(Sys::chdir(c_str!("src")), 0);
+    assert_eq!(Sys::chdir(c"src"), 0);
 }
 
 //TODO: chmod

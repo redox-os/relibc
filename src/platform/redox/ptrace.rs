@@ -10,7 +10,6 @@ use crate::header::arch_aarch64_user::user_regs_struct;
 #[cfg(target_arch = "x86_64")]
 use crate::header::arch_x64_user::user_regs_struct;
 use crate::{
-    c_str::{CStr, CString},
     error::Errno,
     fs::File,
     header::{
@@ -21,8 +20,11 @@ use crate::{
     sync::Mutex,
 };
 
-use alloc::collections::{btree_map::Entry, BTreeMap};
-use core::mem;
+use alloc::{
+    collections::{btree_map::Entry, BTreeMap},
+    ffi::CString,
+};
+use core::{ffi::CStr, mem};
 use syscall;
 
 pub struct Session {
@@ -61,7 +63,9 @@ pub fn is_traceme(pid: pid_t) -> bool {
         return false;
     }
     File::open(
-        CStr::borrow(&CString::new(format!("/scheme/chan/ptrace-relibc/{}/traceme", pid)).unwrap()),
+        CString::new(format!("/scheme/chan/ptrace-relibc/{}/traceme", pid))
+            .unwrap()
+            .as_c_str(),
         fcntl::O_PATH,
     )
     .is_ok()
@@ -78,23 +82,27 @@ pub fn get_session(
                 Ok(entry.insert(Session {
                     first: true,
                     tracer: File::open(
-                        CStr::borrow(&CString::new(format!("/scheme/proc/{}/trace", pid)).unwrap()),
+                        CString::new(format!("/scheme/proc/{}/trace", pid))
+                            .unwrap()
+                            .as_c_str(),
                         NEW_FLAGS,
                     )?,
                     mem: File::open(
-                        CStr::borrow(&CString::new(format!("/scheme/proc/{}/mem", pid)).unwrap()),
+                        CString::new(format!("/scheme/proc/{}/mem", pid))
+                            .unwrap()
+                            .as_c_str(),
                         NEW_FLAGS,
                     )?,
                     regs: File::open(
-                        CStr::borrow(
-                            &CString::new(format!("/scheme/proc/{}/regs/int", pid)).unwrap(),
-                        ),
+                        CString::new(format!("/scheme/proc/{}/regs/int", pid))
+                            .unwrap()
+                            .as_c_str(),
                         NEW_FLAGS,
                     )?,
                     fpregs: File::open(
-                        CStr::borrow(
-                            &CString::new(format!("/scheme/proc/{}/regs/float", pid)).unwrap(),
-                        ),
+                        CString::new(format!("/scheme/proc/{}/regs/float", pid))
+                            .unwrap()
+                            .as_c_str(),
                         NEW_FLAGS,
                     )?,
                 }))
@@ -142,9 +150,9 @@ unsafe fn inner_ptrace(
         // Mark this child as traced, parent will check for this marker file
         let pid = Sys::getpid();
         mem::forget(File::open(
-            CStr::borrow(
-                &CString::new(format!("/scheme/chan/ptrace-relibc/{}/traceme", pid)).unwrap(),
-            ),
+            CString::new(format!("/scheme/chan/ptrace-relibc/{}/traceme", pid))
+                .unwrap()
+                .as_c_str(),
             fcntl::O_CREAT | fcntl::O_PATH | fcntl::O_EXCL,
         )?);
         return Ok(0);

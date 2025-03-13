@@ -2,8 +2,10 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_mman.h.html>.
 
+use alloc::ffi::CString;
+use core::ffi::CStr;
+
 use crate::{
-    c_str::{CStr, CString},
     error::{Errno, ResultExt},
     header::{fcntl, unistd},
     platform::{types::*, Pal, Sys, ERRNO},

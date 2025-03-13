@@ -1,7 +1,9 @@
+use alloc::ffi::CString;
+use core::ffi::CStr;
+
 #[cfg(target_os = "redox")]
 use crate::header::unistd::{F_OK, R_OK, W_OK, X_OK};
 use crate::{
-    c_str::{CStr, CString},
     error::Errno,
     platform::{types::*, Pal, Sys},
 };

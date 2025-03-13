@@ -2,8 +2,9 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+use core::ffi::CStr;
+
 use crate::{
-    c_str::CStr,
     error::ResultExt,
     platform::{types::*, Pal, Sys},
 };

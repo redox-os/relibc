@@ -3,7 +3,6 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 
 use crate::{
-    c_str::{CStr, CString},
     error::ResultExt,
     fs::File,
     header::{errno::EOVERFLOW, fcntl::O_RDONLY, stdlib::getenv, unistd::readlink},
@@ -11,7 +10,7 @@ use crate::{
     platform::{self, types::*, Pal, Sys},
     sync::{Mutex, MutexGuard},
 };
-use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeSet, ffi::CString, string::String, vec::Vec};
 use chrono::{
     format::ParseErrorKind, offset::MappedLocalTime, DateTime, Datelike, FixedOffset, NaiveDate,
     NaiveDateTime, Offset, ParseError, TimeZone, Timelike, Utc,
@@ -20,6 +19,7 @@ use chrono_tz::{OffsetComponents, OffsetName, Tz};
 use core::{
     cell::OnceCell,
     convert::{TryFrom, TryInto},
+    ffi::CStr,
     mem, ptr,
 };
 
@@ -34,7 +34,7 @@ pub use strptime::strptime;
 const YEARS_PER_ERA: time_t = 400;
 const DAYS_PER_ERA: time_t = 146097;
 const SECS_PER_DAY: time_t = 24 * 60 * 60;
-const UTC_STR: &core::ffi::CStr = c"UTC";
+const UTC_STR: &CStr = c"UTC";
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[repr(C)]

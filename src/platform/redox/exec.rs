@@ -1,7 +1,10 @@
-use core::num::{NonZeroU64, NonZeroUsize};
+use alloc::ffi::CString;
+use core::{
+    ffi::CStr,
+    num::{NonZeroU64, NonZeroUsize},
+};
 
 use crate::{
-    c_str::{CStr, CString},
     fs::File,
     header::{limits::PATH_MAX, string::strlen},
     io::{prelude::*, BufReader, SeekFrom},
@@ -83,7 +86,7 @@ pub enum ArgEnv<'a> {
 }
 
 pub enum Executable<'a> {
-    AtPath(CStr<'a>),
+    AtPath(&'a CStr),
     InFd { file: File, arg0: &'a [u8] },
 }
 
@@ -171,7 +174,7 @@ pub fn execve(
     // too.
 
     if let Some(interpreter) = &interpreter_path {
-        image_file = File::open(CStr::borrow(&interpreter), O_RDONLY as c_int)
+        image_file = File::open(interpreter.as_c_str(), O_RDONLY as c_int)
             .map_err(|_| Error::new(ENOENT))?;
 
         // Push interpreter to arguments
