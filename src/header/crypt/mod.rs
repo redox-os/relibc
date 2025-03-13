@@ -10,11 +10,10 @@ use alloc::{
     ffi::CString,
     string::{String, ToString},
 };
-use core::ptr;
+use core::{ffi::CStr, ptr};
 use rand::{rngs::SmallRng, RngCore, SeedableRng};
 
 use crate::{
-    c_str::CStr,
     header::{errno::EINVAL, stdlib::rand},
     platform::{self, types::*},
 };

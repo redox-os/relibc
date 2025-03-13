@@ -2,8 +2,9 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_time.h.html>.
 
+use core::ffi::CStr;
+
 use crate::{
-    c_str::CStr,
     error::ResultExt,
     header::time::timespec,
     platform::{types::*, Pal, PalSignal, Sys},

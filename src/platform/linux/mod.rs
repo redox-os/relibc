@@ -1,19 +1,16 @@
 use crate::{header::errno::EOPNOTSUPP, io::Write};
-use core::{arch::asm, ptr};
+use core::{arch::asm, ffi::CStr, ptr};
 
 use super::{types::*, Pal, ERRNO};
-use crate::{
-    c_str::CStr,
-    header::{
-        dirent::dirent,
-        errno::EINVAL,
-        signal::SIGCHLD,
-        sys_resource::{rlimit, rusage},
-        sys_stat::{stat, S_IFIFO},
-        sys_statvfs::statvfs,
-        sys_time::{timeval, timezone},
-        unistd::SEEK_SET,
-    },
+use crate::header::{
+    dirent::dirent,
+    errno::EINVAL,
+    signal::SIGCHLD,
+    sys_resource::{rlimit, rusage},
+    sys_stat::{stat, S_IFIFO},
+    sys_statvfs::statvfs,
+    sys_time::{timeval, timezone},
+    unistd::SEEK_SET,
 };
 // use header::sys_times::tms;
 use crate::{
@@ -80,7 +77,7 @@ impl Sys {
 }
 
 impl Pal for Sys {
-    fn access(path: CStr, mode: c_int) -> Result<()> {
+    fn access(path: &CStr, mode: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(ACCESS, path.as_ptr(), mode) }).map(|_| ())
     }
 
@@ -88,18 +85,18 @@ impl Pal for Sys {
         Ok(e_raw(unsafe { syscall!(BRK, addr) })? as *mut c_void)
     }
 
-    fn chdir(path: CStr) -> Result<()> {
+    fn chdir(path: &CStr) -> Result<()> {
         e_raw(unsafe { syscall!(CHDIR, path.as_ptr()) }).map(|_| ())
     }
-    fn set_default_scheme(scheme: CStr) -> Result<()> {
+    fn set_default_scheme(scheme: &CStr) -> Result<()> {
         Err(Errno(EOPNOTSUPP))
     }
 
-    fn chmod(path: CStr, mode: mode_t) -> Result<()> {
+    fn chmod(path: &CStr, mode: mode_t) -> Result<()> {
         e_raw(unsafe { syscall!(FCHMODAT, AT_FDCWD, path.as_ptr(), mode, 0) }).map(|_| ())
     }
 
-    fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
+    fn chown(path: &CStr, owner: uid_t, group: gid_t) -> Result<()> {
         e_raw(unsafe {
             syscall!(
                 FCHOWNAT,
@@ -136,7 +133,11 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(DUP3, fildes, fildes2, 0) }).map(|f| f as c_int)
     }
 
-    unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> Result<()> {
+    unsafe fn execve(
+        path: &CStr,
+        argv: *const *mut c_char,
+        envp: *const *mut c_char,
+    ) -> Result<()> {
         e_raw(syscall!(EXECVE, path.as_ptr(), argv, envp))?;
         unreachable!()
     }
@@ -258,7 +259,7 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(UTIMENSAT, fd, ptr::null::<c_char>(), times, 0) }).map(|_| ())
     }
 
-    unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()> {
+    unsafe fn utimens(path: &CStr, times: *const timespec) -> Result<()> {
         e_raw(unsafe { syscall!(UTIMENSAT, AT_FDCWD, path.as_ptr(), times, 0) }).map(|_| ())
     }
 
@@ -354,11 +355,11 @@ impl Pal for Sys {
         unsafe { syscall!(GETUID) as uid_t }
     }
 
-    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
+    fn lchown(path: &CStr, owner: uid_t, group: gid_t) -> Result<()> {
         e_raw(unsafe { syscall!(LCHOWN, path.as_ptr(), owner, group) }).map(|_| ())
     }
 
-    fn link(path1: CStr, path2: CStr) -> Result<()> {
+    fn link(path1: &CStr, path2: &CStr) -> Result<()> {
         e_raw(unsafe {
             syscall!(
                 LINKAT,
@@ -376,11 +377,11 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(LSEEK, fildes, offset, whence) }).map(|o| o as off_t)
     }
 
-    fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
+    fn mkdir(path: &CStr, mode: mode_t) -> Result<()> {
         e_raw(unsafe { syscall!(MKDIRAT, AT_FDCWD, path.as_ptr(), mode) }).map(|_| ())
     }
 
-    fn mknodat(dir_fildes: c_int, path: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
+    fn mknodat(dir_fildes: c_int, path: &CStr, mode: mode_t, dev: dev_t) -> Result<()> {
         // Note: dev_t is c_long (i64) and __kernel_dev_t is u32; So we need to cast it
         //       and check for overflow
         let k_dev: c_uint = dev as c_uint;
@@ -391,11 +392,11 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(MKNODAT, dir_fildes, path.as_ptr(), mode, k_dev) }).map(|_| ())
     }
 
-    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
+    fn mknod(path: &CStr, mode: mode_t, dev: dev_t) -> Result<()> {
         Sys::mknodat(AT_FDCWD, path, mode, dev)
     }
 
-    fn mkfifo(path: CStr, mode: mode_t) -> Result<()> {
+    fn mkfifo(path: &CStr, mode: mode_t) -> Result<()> {
         Sys::mknod(path, mode | S_IFIFO, 0)
     }
 
@@ -456,7 +457,7 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(NANOSLEEP, rqtp, rmtp) }).map(|_| ())
     }
 
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
+    fn open(path: &CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
         e_raw(unsafe { syscall!(OPENAT, AT_FDCWD, path.as_ptr(), oflag, mode) })
             .map(|fd| fd as c_int)
     }
@@ -536,7 +537,7 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(PREAD64, fildes, buf.as_mut_ptr(), buf.len(), off) })
     }
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize> {
+    fn readlink(pathname: &CStr, out: &mut [u8]) -> Result<usize> {
         e_raw(unsafe {
             syscall!(
                 READLINKAT,
@@ -548,12 +549,12 @@ impl Pal for Sys {
         })
     }
 
-    fn rename(old: CStr, new: CStr) -> Result<()> {
+    fn rename(old: &CStr, new: &CStr) -> Result<()> {
         e_raw(unsafe { syscall!(RENAMEAT, AT_FDCWD, old.as_ptr(), AT_FDCWD, new.as_ptr()) })
             .map(|_| ())
     }
 
-    fn rmdir(path: CStr) -> Result<()> {
+    fn rmdir(path: &CStr) -> Result<()> {
         e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), AT_REMOVEDIR) }).map(|_| ())
     }
 
@@ -585,7 +586,7 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(SETSID) }).map(|_| ())
     }
 
-    fn symlink(path1: CStr, path2: CStr) -> Result<()> {
+    fn symlink(path1: &CStr, path2: &CStr) -> Result<()> {
         e_raw(unsafe { syscall!(SYMLINKAT, path1.as_ptr(), AT_FDCWD, path2.as_ptr()) }).map(|_| ())
     }
 
@@ -601,7 +602,7 @@ impl Pal for Sys {
         e_raw(syscall!(UNAME, utsname, 0)).map(|_| ())
     }
 
-    fn unlink(path: CStr) -> Result<()> {
+    fn unlink(path: &CStr) -> Result<()> {
         e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), 0) }).map(|_| ())
     }
 

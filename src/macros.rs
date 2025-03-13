@@ -1,13 +1,3 @@
-#[macro_export]
-macro_rules! c_str {
-    ($lit:expr) => {
-        #[allow(unused_unsafe)]
-        unsafe {
-            $crate::c_str::CStr::from_bytes_with_nul_unchecked(concat!($lit, "\0").as_bytes())
-        }
-    };
-}
-
 /// Print to stdout
 #[macro_export]
 macro_rules! print {
@@ -258,7 +248,7 @@ macro_rules! strto_float_impl {
             _ => 1.0,
         };
 
-        let rust_s = CStr::from_ptr(s).to_string_lossy();
+        let rust_s = core::ffi::CStr::from_ptr(s).to_string_lossy();
 
         // detect NaN, Inf
         if rust_s.to_lowercase().starts_with("inf") {

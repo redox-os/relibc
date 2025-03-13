@@ -1,5 +1,6 @@
 use alloc::{
     collections::BTreeMap,
+    ffi::CString,
     rc::Rc,
     string::{String, ToString},
     sync::{Arc, Weak},
@@ -13,11 +14,11 @@ use object::{
 
 use core::{
     cell::RefCell,
+    ffi::CStr,
     ptr::{self, NonNull},
 };
 
 use crate::{
-    c_str::{CStr, CString},
     error::Errno,
     header::{
         dl_tls::{__tls_get_addr, dl_tls_index},
@@ -55,21 +56,20 @@ pub enum DlError {
 
 impl DlError {
     /// Returns a human-readable, null-terminated C string describing the error.
-    pub fn repr(&self) -> CStr<'static> {
+    pub const fn repr(&self) -> &'static CStr {
         match self {
-            DlError::NotFound => c_str!(
-                "Failed to locate the requested DSO. Set `LD_DEBUG=all` for more information."
-            ),
-
+            DlError::NotFound => {
+                c"Failed to locate the requested DSO. Set `LD_DEBUG=all` for more information."
+            }
             DlError::Malformed => {
-                c_str!("The DSO is malformed somehow. Set `LD_DEBUG=all` for more information.")
+                c"The DSO is malformed somehow. Set `LD_DEBUG=all` for more information."
             }
 
             DlError::InvalidHandle => {
-                c_str!("Invalid DSO handle. Set `LD_DEBUG=all` for more information.")
+                c"Invalid DSO handle. Set `LD_DEBUG=all` for more information."
             }
 
-            DlError::Oom => c_str!("Out of memory."),
+            DlError::Oom => c"Out of memory.",
         }
     }
 }
@@ -85,7 +85,7 @@ struct MmapFile {
 }
 
 impl MmapFile {
-    fn open(path: CStr, oflag: c_int) -> core::result::Result<Self, Errno> {
+    fn open(path: &CStr, oflag: c_int) -> core::result::Result<Self, Errno> {
         let fd = Sys::open(path, oflag, 0 /* mode */)?;
         let mut stat = crate::header::sys_stat::stat::default();
         unsafe {
@@ -899,7 +899,7 @@ impl Linker {
         })?;
 
         let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
-        let file = MmapFile::open(CStr::borrow(&path_c), flags).map_err(|err| {
+        let file = MmapFile::open(path_c.as_c_str(), flags).map_err(|err| {
             if debug {
                 eprintln!("[ld.so]: failed to open '{}': {}", path, err)
             }

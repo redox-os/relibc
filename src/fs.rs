@@ -1,5 +1,4 @@
 use crate::{
-    c_str::CStr,
     error::{Errno, ResultExt},
     header::{
         fcntl::O_CREAT,
@@ -8,7 +7,7 @@ use crate::{
     io,
     platform::{types::*, Pal, Sys},
 };
-use core::ops::Deref;
+use core::{ffi::CStr, ops::Deref};
 
 pub struct File {
     pub fd: c_int,
@@ -25,13 +24,13 @@ impl File {
         }
     }
 
-    pub fn open(path: CStr, oflag: c_int) -> Result<Self, Errno> {
+    pub fn open(path: &CStr, oflag: c_int) -> Result<Self, Errno> {
         Sys::open(path, oflag, 0)
             .map(Self::new)
             .map_err(Errno::sync)
     }
 
-    pub fn create(path: CStr, oflag: c_int, mode: mode_t) -> Result<Self, Errno> {
+    pub fn create(path: &CStr, oflag: c_int, mode: mode_t) -> Result<Self, Errno> {
         Sys::open(path, oflag | O_CREAT, mode)
             .map(Self::new)
             .map_err(Errno::sync)

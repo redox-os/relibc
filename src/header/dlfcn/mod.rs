@@ -6,12 +6,12 @@
 #![warn(warnings, unused_variables)]
 
 use core::{
+    ffi::CStr,
     ptr, str,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
 use crate::{
-    c_str::CStr,
     ld_so::{
         linker::{DlError, ObjectHandle, Resolve, ScopeKind},
         tcb::Tcb,
@@ -27,7 +27,7 @@ pub const RTLD_LOCAL: c_int = 0x0000;
 
 pub const RTLD_DEFAULT: *mut c_void = 0 as *mut c_void; // XXX: cbindgen doesn't like ptr::null_mut()
 
-static ERROR_NOT_SUPPORTED: CStr = c_str!("dlfcn not supported");
+static ERROR_NOT_SUPPORTED: &CStr = c"dlfcn not supported";
 
 #[thread_local]
 static ERROR: AtomicUsize = AtomicUsize::new(0);

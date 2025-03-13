@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stdlib.h.html>.
 
-use core::{convert::TryFrom, intrinsics, iter, mem, ptr, slice};
+use core::{convert::TryFrom, ffi::CStr, intrinsics, iter, mem, ptr, slice};
 use rand::{
     distributions::{Alphanumeric, Distribution, Uniform},
     Rng, SeedableRng,
@@ -11,7 +11,6 @@ use rand_jitter::JitterRng;
 use rand_xorshift::XorShiftRng;
 
 use crate::{
-    c_str::CStr,
     error::{Errno, ResultExt},
     fs::File,
     header::{

@@ -6,12 +6,12 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use core::{
+    ffi::CStr,
     ptr, slice,
     str::{self, FromStr},
 };
 
 use crate::{
-    c_str::CStr,
     header::{
         errno::*,
         netinet_in::{in_addr, in_addr_t, INADDR_NONE},

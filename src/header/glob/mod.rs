@@ -2,12 +2,11 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use core::ptr;
+use core::{ffi::CStr, ptr};
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{borrow::ToOwned, boxed::Box, ffi::CString, vec::Vec};
 
 use crate::{
-    c_str::{CStr, CString},
     header::{
         dirent::{closedir, opendir, readdir, DIR},
         errno::*,
@@ -96,7 +95,7 @@ pub unsafe extern "C" fn glob(
     // Handle GLOB_NOCHECK and no matches
     if results.is_empty() {
         if flags & GLOB_NOCHECK == GLOB_NOCHECK {
-            results.push(glob_expr.to_owned_cstring());
+            results.push(glob_expr.to_owned());
         } else {
             return GLOB_NOMATCH;
         }
@@ -215,7 +214,7 @@ fn list_dir(
             break;
         }
 
-        let name = unsafe { CStr::from_ptr((*entry).d_name.as_ptr()).to_owned_cstring() };
+        let name = unsafe { CStr::from_ptr((*entry).d_name.as_ptr()).to_owned() };
 
         if name.as_bytes() == b"." || name.as_bytes() == b".." {
             continue;
@@ -226,7 +225,7 @@ fn list_dir(
                 true
             } else if (*entry).d_type == DT_LNK {
                 // Resolve symbolic link
-                let mut full_path = path.to_owned_cstring().into_string().unwrap();
+                let mut full_path = path.to_str().unwrap().to_owned();
                 if !full_path.ends_with('/') {
                     full_path.push('/');
                 }
@@ -378,7 +377,7 @@ fn inner_glob(
         } == 0
         {
             if entry.is_dir && new_glob_expr.to_bytes() != b"" {
-                let new_matches = inner_glob(&CStr::borrow(&path), &new_glob_expr, flags, errfunc)?;
+                let new_matches = inner_glob(path.as_c_str(), &new_glob_expr, flags, errfunc)?;
                 matches.extend(new_matches);
             } else {
                 matches.push(path);

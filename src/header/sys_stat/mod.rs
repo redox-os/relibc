@@ -1,7 +1,8 @@
 //! stat implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysstat.h.html
 
+use core::ffi::CStr;
+
 use crate::{
-    c_str::CStr,
     error::ResultExt,
     header::{
         fcntl::{O_NOFOLLOW, O_PATH},

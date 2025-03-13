@@ -1,6 +1,7 @@
+use core::ffi::CStr;
+
 use super::types::*;
 use crate::{
-    c_str::CStr,
     error::{Errno, Result},
     header::{
         sys_resource::{rlimit, rusage},
@@ -27,17 +28,17 @@ mod socket;
 
 /// Platform abstraction layer, a platform-agnostic abstraction over syscalls.
 pub trait Pal {
-    fn access(path: CStr, mode: c_int) -> Result<()>;
+    fn access(path: &CStr, mode: c_int) -> Result<()>;
 
     unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void>;
 
-    fn chdir(path: CStr) -> Result<()>;
+    fn chdir(path: &CStr) -> Result<()>;
 
-    fn set_default_scheme(scheme: CStr) -> Result<(), Errno>;
+    fn set_default_scheme(scheme: &CStr) -> Result<(), Errno>;
 
-    fn chmod(path: CStr, mode: mode_t) -> Result<()>;
+    fn chmod(path: &CStr, mode: mode_t) -> Result<()>;
 
-    fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()>;
+    fn chown(path: &CStr, owner: uid_t, group: gid_t) -> Result<()>;
 
     unsafe fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> Result<()>;
 
@@ -51,7 +52,8 @@ pub trait Pal {
 
     fn dup2(fildes: c_int, fildes2: c_int) -> Result<c_int>;
 
-    unsafe fn execve(path: CStr, argv: *const *mut c_char, envp: *const *mut c_char) -> Result<()>;
+    unsafe fn execve(path: &CStr, argv: *const *mut c_char, envp: *const *mut c_char)
+        -> Result<()>;
     unsafe fn fexecve(
         fildes: c_int,
         argv: *const *mut c_char,
@@ -91,7 +93,7 @@ pub trait Pal {
 
     unsafe fn futimens(fd: c_int, times: *const timespec) -> Result<()>;
 
-    unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()>;
+    unsafe fn utimens(path: &CStr, times: *const timespec) -> Result<()>;
 
     unsafe fn getcwd(buf: *mut c_char, size: size_t) -> Result<()>;
 
@@ -146,19 +148,19 @@ pub trait Pal {
 
     fn getuid() -> uid_t;
 
-    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()>;
+    fn lchown(path: &CStr, owner: uid_t, group: gid_t) -> Result<()>;
 
-    fn link(path1: CStr, path2: CStr) -> Result<()>;
+    fn link(path1: &CStr, path2: &CStr) -> Result<()>;
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t>;
 
-    fn mkdir(path: CStr, mode: mode_t) -> Result<()>;
+    fn mkdir(path: &CStr, mode: mode_t) -> Result<()>;
 
-    fn mkfifo(path: CStr, mode: mode_t) -> Result<()>;
+    fn mkfifo(path: &CStr, mode: mode_t) -> Result<()>;
 
-    fn mknodat(fildes: c_int, path: CStr, mode: mode_t, dev: dev_t) -> Result<()>;
+    fn mknodat(fildes: c_int, path: &CStr, mode: mode_t, dev: dev_t) -> Result<()>;
 
-    fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> Result<()>;
+    fn mknod(path: &CStr, mode: mode_t, dev: dev_t) -> Result<()>;
 
     unsafe fn mlock(addr: *const c_void, len: usize) -> Result<()>;
 
@@ -195,7 +197,7 @@ pub trait Pal {
 
     unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()>;
 
-    fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
+    fn open(path: &CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
 
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> Result<()>;
 
@@ -207,11 +209,11 @@ pub trait Pal {
     fn read(fildes: c_int, buf: &mut [u8]) -> Result<usize>;
     fn pread(fildes: c_int, buf: &mut [u8], offset: off_t) -> Result<usize>;
 
-    fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize>;
+    fn readlink(pathname: &CStr, out: &mut [u8]) -> Result<usize>;
 
-    fn rename(old: CStr, new: CStr) -> Result<()>;
+    fn rename(old: &CStr, new: &CStr) -> Result<()>;
 
-    fn rmdir(path: CStr) -> Result<()>;
+    fn rmdir(path: &CStr) -> Result<()>;
 
     fn sched_yield() -> Result<()>;
 
@@ -227,7 +229,7 @@ pub trait Pal {
 
     fn setsid() -> Result<()>;
 
-    fn symlink(path1: CStr, path2: CStr) -> Result<()>;
+    fn symlink(path1: &CStr, path2: &CStr) -> Result<()>;
 
     fn sync() -> Result<()>;
 
@@ -236,7 +238,7 @@ pub trait Pal {
 
     unsafe fn uname(utsname: *mut utsname) -> Result<()>;
 
-    fn unlink(path: CStr) -> Result<()>;
+    fn unlink(path: &CStr) -> Result<()>;
 
     unsafe fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t>;
 
