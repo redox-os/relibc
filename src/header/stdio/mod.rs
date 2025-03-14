@@ -938,12 +938,12 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
 
         unreachable!();
     } else if child_pid > 0 {
-        let (fd, fd_mode) = if write {
+        let (fd, fd_mode): (_, CStr) = if write {
             unistd::close(pipes[0]);
-            (pipes[1], if cloexec { c_str!("we") } else { c_str!("w") })
+            (pipes[1], if cloexec { c"we".into() } else { c"w".into() })
         } else {
             unistd::close(pipes[1]);
-            (pipes[0], if cloexec { c_str!("re") } else { c_str!("r") })
+            (pipes[0], if cloexec { c"re".into() } else { c"r".into() })
         };
 
         if let Some(f) = helpers::_fdopen(fd, fd_mode.as_ptr()) {
@@ -1136,7 +1136,7 @@ pub unsafe extern "C" fn tmpfile() -> *mut FILE {
         return ptr::null_mut();
     }
 
-    let fp = fdopen(fd, c_str!("w+").as_ptr());
+    let fp = fdopen(fd, c"w+".as_ptr());
     {
         let file_name = CStr::from_ptr(file_name);
         Sys::unlink(file_name);

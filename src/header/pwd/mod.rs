@@ -181,7 +181,7 @@ fn pwd_lookup<F>(mut matches: F, destination: Option<DestBuffer>) -> Result<Owne
 where
     F: FnMut(&passwd) -> bool,
 {
-    let file = match File::open(c_str!("/etc/passwd"), fcntl::O_RDONLY) {
+    let file = match File::open(c"/etc/passwd".into(), fcntl::O_RDONLY) {
         Ok(file) => file,
         Err(_) => return Err(Cause::Other),
     };
@@ -233,7 +233,7 @@ pub extern "C" fn getpwent() -> *mut passwd {
     let reader = match unsafe { &mut READER } {
         Some(reader) => reader,
         None => {
-            let file = match File::open(c_str!("/etc/passwd"), fcntl::O_RDONLY) {
+            let file = match File::open(c"/etc/passwd".into(), fcntl::O_RDONLY) {
                 Ok(file) => file,
                 Err(_) => return ptr::null_mut(),
             };
