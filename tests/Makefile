@@ -97,6 +97,7 @@ EXPECT_NAMES=\
 	string/stpcpy \
 	string/stpncpy \
 	strings \
+	syslog/syslog \
 	sys_mman \
 	time/asctime \
 	time/constants \
