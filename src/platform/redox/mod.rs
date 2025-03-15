@@ -850,7 +850,7 @@ impl Pal for Sys {
         let session_id = Self::getpid();
         assert!(session_id >= 0);
         let mut file = File::open(
-            c_str!("/scheme/thisproc/current/session_id"),
+            c"/scheme/thisproc/current/session_id".into(),
             fcntl::O_WRONLY | fcntl::O_CLOEXEC,
         )?;
         file.write(&usize::to_ne_bytes(session_id.try_into().unwrap()))
@@ -902,7 +902,7 @@ impl Pal for Sys {
                 return Ok(());
             }
 
-            let mut file = File::open(c_str!("/etc/hostname"), fcntl::O_RDONLY | fcntl::O_CLOEXEC)?;
+            let mut file = File::open(c"/etc/hostname".into(), fcntl::O_RDONLY | fcntl::O_CLOEXEC)?;
 
             let mut read = 0;
             let name_len = name.len();
@@ -926,7 +926,7 @@ impl Pal for Sys {
             Err(_) => return Err(Errno(EIO)),
         }
 
-        let file_path = c_str!("/scheme/sys/uname");
+        let file_path = c"/scheme/sys/uname".into();
         let mut file = match File::open(file_path, fcntl::O_RDONLY | fcntl::O_CLOEXEC) {
             Ok(ok) => ok,
             Err(_) => return Err(Errno(EIO)),

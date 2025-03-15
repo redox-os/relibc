@@ -53,7 +53,7 @@ fn event_flags_to_epoll(flags: syscall::EventFlags) -> c_uint {
 
 impl PalEpoll for Sys {
     fn epoll_create1(flags: c_int) -> Result<c_int, Errno> {
-        Sys::open(c_str!("/scheme/event"), O_RDWR | flags, 0)
+        Sys::open(c"/scheme/event".into(), O_RDWR | flags, 0)
     }
 
     unsafe fn epoll_ctl(
@@ -106,7 +106,7 @@ impl PalEpoll for Sys {
         }
 
         let timer_opt = if timeout != -1 {
-            let mut timer = File::open(c_str!("/scheme/time/4"), O_RDWR)?;
+            let mut timer = File::open(c"/scheme/time/4".into(), O_RDWR)?;
             Sys::write(
                 epfd,
                 &Event {

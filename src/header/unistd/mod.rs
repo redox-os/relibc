@@ -169,13 +169,13 @@ pub unsafe extern "C" fn crypt(key: *const c_char, salt: *const c_char) -> *mut 
 #[no_mangle]
 pub extern "C" fn daemon(nochdir: c_int, noclose: c_int) -> c_int {
     if nochdir == 0 {
-        if Sys::chdir(c_str!("/")).map(|()| 0).or_minus_one_errno() < 0 {
+        if Sys::chdir(c"/".into()).map(|()| 0).or_minus_one_errno() < 0 {
             return -1;
         }
     }
 
     if noclose == 0 {
-        let fd = Sys::open(c_str!("/dev/null"), fcntl::O_RDWR, 0).or_minus_one_errno();
+        let fd = Sys::open(c"/dev/null".into(), fcntl::O_RDWR, 0).or_minus_one_errno();
         if fd < 0 {
             return -1;
         }
@@ -303,7 +303,7 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *mut c_char) -
     } else {
         let mut error = errno::ENOENT;
 
-        let path_env = getenv(c_str!("PATH\0").as_ptr());
+        let path_env = getenv(c"PATH".as_ptr());
         if !path_env.is_null() {
             let path_env = CStr::from_ptr(path_env);
             for path in path_env.to_bytes().split(|&b| b == PATH_SEPARATOR) {

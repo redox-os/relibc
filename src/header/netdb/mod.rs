@@ -439,7 +439,7 @@ pub unsafe extern "C" fn getnetent() -> *mut netent {
     // TODO: Rustify implementation
 
     if NETDB == 0 {
-        NETDB = Sys::open(c_str!("/etc/networks"), O_RDONLY, 0).or_minus_one_errno();
+        NETDB = Sys::open(c"/etc/networks".into(), O_RDONLY, 0).or_minus_one_errno();
     }
 
     let mut rlb = RawLineBuffer::new(NETDB);
@@ -548,7 +548,7 @@ pub unsafe extern "C" fn getprotobynumber(number: c_int) -> *mut protoent {
 #[no_mangle]
 pub unsafe extern "C" fn getprotoent() -> *mut protoent {
     if PROTODB == 0 {
-        PROTODB = Sys::open(c_str!("/etc/protocols"), O_RDONLY, 0).or_minus_one_errno();
+        PROTODB = Sys::open(c"/etc/protocols".into(), O_RDONLY, 0).or_minus_one_errno();
     }
 
     let mut rlb = RawLineBuffer::new(PROTODB);
@@ -665,7 +665,7 @@ pub unsafe extern "C" fn getservbyport(port: c_int, proto: *const c_char) -> *mu
 pub unsafe extern "C" fn getservent() -> *mut servent {
     if SERVDB == 0 {
         // TODO: Rustify
-        SERVDB = Sys::open(c_str!("/etc/services"), O_RDONLY, 0).or_minus_one_errno();
+        SERVDB = Sys::open(c"/etc/services".into(), O_RDONLY, 0).or_minus_one_errno();
     }
     let mut rlb = RawLineBuffer::new(SERVDB);
     rlb.seek(S_POS);
@@ -749,7 +749,7 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
 pub unsafe extern "C" fn setnetent(stayopen: c_int) {
     NET_STAYOPEN = stayopen;
     if NETDB == 0 {
-        NETDB = Sys::open(c_str!("/etc/networks"), O_RDONLY, 0).or_minus_one_errno()
+        NETDB = Sys::open(c"/etc/networks".into(), O_RDONLY, 0).or_minus_one_errno()
     } else {
         Sys::lseek(NETDB, 0, SEEK_SET);
         N_POS = 0;
@@ -760,7 +760,7 @@ pub unsafe extern "C" fn setnetent(stayopen: c_int) {
 pub unsafe extern "C" fn setprotoent(stayopen: c_int) {
     PROTO_STAYOPEN = stayopen;
     if PROTODB == 0 {
-        PROTODB = Sys::open(c_str!("/etc/protocols"), O_RDONLY, 0).or_minus_one_errno()
+        PROTODB = Sys::open(c"/etc/protocols".into(), O_RDONLY, 0).or_minus_one_errno()
     } else {
         Sys::lseek(PROTODB, 0, SEEK_SET);
         P_POS = 0;
@@ -771,7 +771,7 @@ pub unsafe extern "C" fn setprotoent(stayopen: c_int) {
 pub unsafe extern "C" fn setservent(stayopen: c_int) {
     SERV_STAYOPEN = stayopen;
     if SERVDB == 0 {
-        SERVDB = Sys::open(c_str!("/etc/services"), O_RDONLY, 0).or_minus_one_errno()
+        SERVDB = Sys::open(c"/etc/services".into(), O_RDONLY, 0).or_minus_one_errno()
     } else {
         Sys::lseek(SERVDB, 0, SEEK_SET);
         S_POS = 0;
@@ -925,21 +925,21 @@ pub unsafe extern "C" fn freeaddrinfo(res: *mut addrinfo) {
 }
 
 #[no_mangle]
-pub extern "C" fn gai_strerror(errcode: c_int) -> *const c_char {
+pub const extern "C" fn gai_strerror(errcode: c_int) -> *const c_char {
     match errcode {
-        EAI_BADFLAGS => c_str!("Invalid flags"),
-        EAI_NONAME => c_str!("Name does not resolve"),
-        EAI_AGAIN => c_str!("Try again"),
-        EAI_FAIL => c_str!("Non-recoverable error"),
-        EAI_NODATA => c_str!("Unknown error"),
-        EAI_FAMILY => c_str!("Unrecognized address family or invalid length"),
-        EAI_SOCKTYPE => c_str!("Unrecognized socket type"),
-        EAI_SERVICE => c_str!("Unrecognized service"),
-        EAI_ADDRFAMILY => c_str!("Address family for name not supported"),
-        EAI_MEMORY => c_str!("Out of memory"),
-        EAI_SYSTEM => c_str!("System error"),
-        EAI_OVERFLOW => c_str!("Overflow"),
-        _ => c_str!("Unknown error"),
+        EAI_BADFLAGS => c"Invalid flags",
+        EAI_NONAME => c"Name does not resolve",
+        EAI_AGAIN => c"Try again",
+        EAI_FAIL => c"Non-recoverable error",
+        EAI_NODATA => c"Unknown error",
+        EAI_FAMILY => c"Unrecognized address family or invalid length",
+        EAI_SOCKTYPE => c"Unrecognized socket type",
+        EAI_SERVICE => c"Unrecognized service",
+        EAI_ADDRFAMILY => c"Address family for name not supported",
+        EAI_MEMORY => c"Out of memory",
+        EAI_SYSTEM => c"System error",
+        EAI_OVERFLOW => c"Overflow",
+        _ => c"Unknown error",
     }
     .as_ptr()
 }
@@ -953,14 +953,14 @@ pub extern "C" fn __h_errno_location() -> *mut c_int {
 
 #[no_mangle]
 #[deprecated]
-pub extern "C" fn hstrerror(errcode: c_int) -> *const c_char {
+pub const extern "C" fn hstrerror(errcode: c_int) -> *const c_char {
     match errcode {
-        H_UNSET => c_str!("Resolver error unset"),
-        HOST_NOT_FOUND => c_str!("Unknown hostname"),
-        NO_DATA => c_str!("No address for hostname"),
-        NO_RECOVERY => c_str!("Unknown server error"),
-        TRY_AGAIN => c_str!("Hostname lookup failure"),
-        _ => c_str!("Unknown error"),
+        H_UNSET => c"Resolver error unset",
+        HOST_NOT_FOUND => c"Unknown hostname",
+        NO_DATA => c"No address for hostname",
+        NO_RECOVERY => c"Unknown server error",
+        TRY_AGAIN => c"Hostname lookup failure",
+        _ => c"Unknown error",
     }
     .as_ptr()
 }

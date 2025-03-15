@@ -46,7 +46,7 @@ pub unsafe extern "C" fn endhostent() {
 pub unsafe extern "C" fn sethostent(stayopen: c_int) {
     HOST_STAYOPEN = stayopen;
     if HOSTDB < 0 {
-        HOSTDB = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0).or_minus_one_errno()
+        HOSTDB = Sys::open(c"/etc/hosts".into(), O_RDONLY, 0).or_minus_one_errno()
     } else {
         Sys::lseek(HOSTDB, 0, SEEK_SET);
     }
@@ -56,7 +56,7 @@ pub unsafe extern "C" fn sethostent(stayopen: c_int) {
 #[no_mangle]
 pub unsafe extern "C" fn gethostent() -> *mut hostent {
     if HOSTDB < 0 {
-        HOSTDB = Sys::open(c_str!("/etc/hosts"), O_RDONLY, 0).or_minus_one_errno();
+        HOSTDB = Sys::open(c"/etc/hosts".into(), O_RDONLY, 0).or_minus_one_errno();
     }
     let mut rlb = RawLineBuffer::new(HOSTDB);
     rlb.seek(H_POS);

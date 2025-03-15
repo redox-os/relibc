@@ -14,7 +14,7 @@ use crate::{
 use crate::platform::types::*;
 
 fn getpass_rs(prompt: CStr, passbuff: &mut [u8]) -> Result<*mut c_char, io::Error> {
-    let mut f = File::open(c_str!("/dev/tty"), O_RDWR | O_CLOEXEC)?;
+    let mut f = File::open(c"/dev/tty".into(), O_RDWR | O_CLOEXEC)?;
 
     let mut term = termios::termios::default();
 
