@@ -97,7 +97,6 @@ EXPECT_NAMES=\
 	string/stpcpy \
 	string/stpncpy \
 	strings \
-	syslog/syslog \
 	sys_mman \
 	time/asctime \
 	time/constants \
@@ -163,6 +162,10 @@ EXPECT_NAMES=\
 	mknodat \
 	# TODO: Fix these
 	# netdb/netdb \
+
+ifeq ($(REDOX_TESTS),1)
+	EXPECT_NAMES+=syslog/syslog
+endif
 
 BUILD?=.
 
