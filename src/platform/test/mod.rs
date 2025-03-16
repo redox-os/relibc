@@ -11,13 +11,14 @@ fn access() {
     use crate::header::unistd;
 
     //TODO: create test files
-    assert_eq!(Sys::access(c_str!("not a file!"), unistd::F_OK), !0);
-    assert_eq!(Sys::access(c_str!("README.md"), unistd::F_OK), 0);
-    assert_eq!(Sys::access(c_str!("README.md"), unistd::R_OK), 0);
-    assert_eq!(Sys::access(c_str!("README.md"), unistd::W_OK), 0);
-    assert_eq!(Sys::access(c_str!("README.md"), unistd::X_OK), !0);
+    assert_eq!(Sys::access(c"not a file!".into(), unistd::F_OK), !0);
+    assert_eq!(Sys::access(c"README.md".into(), unistd::F_OK), 0);
+    assert_eq!(Sys::access(c"README.md".into(), unistd::R_OK), 0);
+    assert_eq!(Sys::access(c"README.md".into(), unistd::W_OK), 0);
+    assert_eq!(Sys::access(c"README.md".into(), unistd::X_OK), !0);
 }
 
+// FIXME: Test needs rewriting so it compiles
 #[test]
 fn brk() {
     use core::ptr;
@@ -33,7 +34,7 @@ fn brk() {
 #[test]
 fn chdir() {
     //TODO: create test files
-    assert_eq!(Sys::chdir(c_str!("src")), 0);
+    assert_eq!(Sys::chdir(c"src".into()), 0);
 }
 
 //TODO: chmod

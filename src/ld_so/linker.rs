@@ -55,21 +55,21 @@ pub enum DlError {
 
 impl DlError {
     /// Returns a human-readable, null-terminated C string describing the error.
-    pub fn repr(&self) -> CStr<'static> {
+    pub const fn repr(&self) -> &'static core::ffi::CStr {
         match self {
-            DlError::NotFound => c_str!(
-                "Failed to locate the requested DSO. Set `LD_DEBUG=all` for more information."
-            ),
+            DlError::NotFound => {
+                c"Failed to locate the requested DSO. Set `LD_DEBUG=all` for more information."
+            }
 
             DlError::Malformed => {
-                c_str!("The DSO is malformed somehow. Set `LD_DEBUG=all` for more information.")
+                c"The DSO is malformed somehow. Set `LD_DEBUG=all` for more information."
             }
 
             DlError::InvalidHandle => {
-                c_str!("Invalid DSO handle. Set `LD_DEBUG=all` for more information.")
+                c"Invalid DSO handle. Set `LD_DEBUG=all` for more information."
             }
 
-            DlError::Oom => c_str!("Out of memory."),
+            DlError::Oom => c"Out of memory.",
         }
     }
 }
