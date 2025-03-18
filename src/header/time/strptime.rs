@@ -14,8 +14,8 @@ use core::{
 };
 
 /// For convenience, we define some helper constants for the C-locale.
-static SHORT_DAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-static LONG_DAYS: [&str; 7] = [
+const SHORT_DAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const LONG_DAYS: [&str; 7] = [
     "Sunday",
     "Monday",
     "Tuesday",
@@ -24,10 +24,10 @@ static LONG_DAYS: [&str; 7] = [
     "Friday",
     "Saturday",
 ];
-static SHORT_MONTHS: [&str; 12] = [
+const SHORT_MONTHS: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
-static LONG_MONTHS: [&str; 12] = [
+const LONG_MONTHS: [&str; 12] = [
     "January",
     "February",
     "March",
@@ -168,6 +168,10 @@ pub unsafe extern "C" fn strptime(
                 };
                 unsafe {
                     (*tm).tm_mday = val as c_int;
+                    // Day of month is limited to [1,31] according to the standard
+                    if (*tm).tm_mday < 1 || (*tm).tm_mday > 31 {
+                        return ptr::null_mut();
+                    }
                 }
                 index_in_input += len;
             }
@@ -431,12 +435,22 @@ pub unsafe extern "C" fn strptime(
                     };
                 index_in_input += used;
             }
+            'T' => {
+                // Equivalent to %H:%M:%S
+                let subfmt = "%H:%M:%S";
+                let used =
+                    match unsafe { apply_subformat(&input_str[index_in_input..], subfmt, tm) } {
+                        Some(v) => v,
+                        None => return ptr::null_mut(),
+                    };
+                index_in_input += used;
+            }
 
             //////////////////////////////////////////////////////////
-            // TODO : not implemented: %x, %X, %c, %r, %R, %T, etc. //
+            // TODO : not implemented: %x, %X, %c, %r, %R, etc. //
             //////////////////////////////////////////////////////////
             // Hint : if you want to implement these, do similarly to %D / %F (or parse manually)
-            'x' | 'X' | 'c' | 'r' | 'R' | 'T' => {
+            'x' | 'X' | 'c' | 'r' | 'R' => {
                 // Return NULL if we don’t want to accept them :
                 return ptr::null_mut();
             }
@@ -504,14 +518,16 @@ fn parse_int(input: &str, width: usize, allow_variable: bool) -> Option<(i32, us
 /// Handle AM/PM. Returns (is_pm, length_consumed).
 /// Accepts "AM", "am", "PM", "pm" case-insensitively.
 fn parse_am_pm(s: &str) -> Option<(bool, usize)> {
-    // Trim leading whitespace?
-    // For simplicity, we do not. If needed, handle it.
-    let s_up = s.to_ascii_uppercase();
-    if s_up.starts_with("AM") {
-        return Some((false, 2));
+    let trimmed = s.trim_start();
+    // Amount of whitespace skipped; can be 0
+    let diff = s.len() - trimmed.len();
+    let s = trimmed.get(0..2)?;
+
+    if s.eq_ignore_ascii_case("AM") {
+        return Some((false, diff + 2));
     }
-    if s_up.starts_with("PM") {
-        return Some((true, 2));
+    if s.eq_ignore_ascii_case("PM") {
+        return Some((true, diff + 2));
     }
     None
 }
@@ -582,4 +598,37 @@ unsafe fn apply_subformat(input: &str, subfmt: &str, tm: *mut tm) -> Option<usiz
     // consumed_ptr - tmpbuf.as_ptr() => # of bytes consumed
     let diff = (consumed_ptr as usize) - (tmpbuf.as_ptr() as usize);
     Some(diff)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_am_pm;
+
+    #[test]
+    fn am_pm_parser_works() {
+        let am = "am";
+        let am_expected = Some((false, 2));
+        assert_eq!(am_expected, parse_am_pm(am));
+
+        let pm = "pm";
+        let pm_expected = Some((true, 2));
+        assert_eq!(pm_expected, parse_am_pm(pm));
+
+        let am_caps = "AM";
+        assert_eq!(am_expected, parse_am_pm(am_caps));
+
+        let pm_caps = "PM";
+        assert_eq!(pm_expected, parse_am_pm(pm_caps));
+
+        let am_weird = "aM";
+        assert_eq!(am_expected, parse_am_pm(am_weird));
+
+        let am_prefix = "        \tam";
+        let am_prefix_expected = Some((false, 11));
+        assert_eq!(am_prefix_expected, parse_am_pm(am_prefix));
+
+        let pm_spaces = "        pm        ";
+        let pm_spaces_expected = Some((true, 10));
+        assert_eq!(pm_spaces_expected, parse_am_pm(pm_spaces));
+    }
 }
