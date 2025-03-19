@@ -51,7 +51,7 @@ impl<'a> CStr<'a> {
     pub fn to_string_lossy(self) -> Cow<'a, str> {
         String::from_utf8_lossy(self.to_bytes())
     }
-    pub fn as_ptr(self) -> *const c_char {
+    pub const fn as_ptr(self) -> *const c_char {
         self.ptr.as_ptr()
     }
     pub const unsafe fn from_bytes_with_nul_unchecked(bytes: &'a [u8]) -> Self {
@@ -81,6 +81,15 @@ impl<'a> CStr<'a> {
 
 unsafe impl Send for CStr<'_> {}
 unsafe impl Sync for CStr<'_> {}
+
+impl From<&core::ffi::CStr> for CStr<'_> {
+    fn from(s: &core::ffi::CStr) -> Self {
+        // SAFETY:
+        // * We can assume that `s` is valid because the caller should have upheld its
+        // safety concerns when constructing it.
+        unsafe { Self::from_ptr(s.as_ptr()) }
+    }
+}
 
 #[derive(Debug)]
 pub struct FromBytesWithNulError;
