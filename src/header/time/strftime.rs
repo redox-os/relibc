@@ -208,6 +208,9 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
                 // Sunday-based week of year: %U
                 b'U' => w!("{}", ((*t).tm_yday + 7 - (*t).tm_wday) / 7),
 
+                // ISO-8601 week of year
+                b'V' => w!("{}", week_of_year(unsafe { &*t })),
+
                 // Weekday (0-6, Sunday=0): %w
                 b'w' => w!("{}", (*t).tm_wday),
 
@@ -245,4 +248,36 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
         return 0;
     }
     cw.written
+}
+
+/// Calculate number of weeks in a year as defined by ISO 8601
+///
+/// ## Source
+/// https://en.wikipedia.org/wiki/ISO_week_date
+fn weeks_per_year(year: c_int) -> c_int {
+    let year = year as f64;
+    // TODO: This function can be made const on newer Rust compilers but this line prevents it on
+    // our version in CI
+    let p_y = (year + (year / 4.) - (year / 100.) + (year / 400.)) as c_int % 7;
+    if p_y == 4 {
+        53
+    } else {
+        52
+    }
+}
+
+/// Calculate the week of the year accounting for leap weeks (ISO 8601)
+///
+/// ## Source
+/// https://en.wikipedia.org/wiki/ISO_week_date
+fn week_of_year(time: &tm) -> c_int {
+    let week = (10 + time.tm_yday - time.tm_wday) / 7;
+
+    if week <= 1 {
+        weeks_per_year(time.tm_year - 1)
+    } else if week > weeks_per_year(time.tm_year) {
+        1
+    } else {
+        week
+    }
 }
