@@ -86,7 +86,6 @@ BUILTINS_VERSION=0.1.70
 
 all: | headers libs
 
-# TODO: can sed be removed now that cbindgen iirc supports varargs?
 headers: $(HEADERS_DEPS)
 	rm -rf $(TARGET_HEADERS)
 	mkdir -pv $(TARGET_HEADERS)
@@ -99,7 +98,6 @@ headers: $(HEADERS_DEPS)
 			out="$(TARGET_HEADERS)/$$out.h"; \
 			cat "src/header/$$header/cbindgen.toml" cbindgen.globdefs.toml \
 				 | cbindgen "src/header/$$header/mod.rs" --config=/dev/stdin --output "$$out"; \
-			sed -i "s/va_list __valist/.../g" "$$out"; \
 		fi \
 	done
 

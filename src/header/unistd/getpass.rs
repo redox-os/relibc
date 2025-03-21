@@ -14,7 +14,7 @@ use crate::{
 use crate::platform::types::*;
 
 fn getpass_rs(prompt: CStr, passbuff: &mut [u8]) -> Result<*mut c_char, io::Error> {
-    let mut f = File::open(c_str!("/dev/tty"), O_RDWR | O_CLOEXEC)?;
+    let mut f = File::open(c"/dev/tty".into(), O_RDWR | O_CLOEXEC)?;
 
     let mut term = termios::termios::default();
 
@@ -60,6 +60,12 @@ fn getpass_rs(prompt: CStr, passbuff: &mut [u8]) -> Result<*mut c_char, io::Erro
     Ok(passbuff.as_mut_ptr() as *mut c_char)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/7908799/xsh/getpass.html>.
+///
+/// # Deprecation
+/// The `getpass()` function was marked legacy in the Open Group System
+/// Interface & Headers Issue 5, and removed in Issue 6.
+#[deprecated]
 #[no_mangle]
 pub unsafe extern "C" fn getpass(prompt: *const c_char) -> *mut c_char {
     static mut PASSBUFF: [u8; PASS_MAX] = [0; PASS_MAX];

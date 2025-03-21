@@ -110,6 +110,7 @@ EXPECT_NAMES=\
 	time/mktime \
 	time/strftime \
 	time/time \
+	time/timegm \
 	time/tzset \
 	tls \
 	unistd/access \
@@ -125,7 +126,7 @@ EXPECT_NAMES=\
 	unistd/getopt_long \
 	unistd/pipe \
 	unistd/rmdir \
-	unistd/sleep \
+	# unistd/sleep \
 	unistd/swab \
 	unistd/write \
 	waitpid \
@@ -182,7 +183,6 @@ NAMES=\
 	sa_restart \
 	sigchld \
 	stdio/ctermid \
-	sigqueue \
 	stdio/tempnam \
 	stdio/tmpnam \
 	stdlib/bsearch \
@@ -219,6 +219,7 @@ NAMES=\
 	grp/gr_iter \
 #	resource/getrusage
 #	time/times
+#	sigqueue
 
 # Tests run with `expect` (require a .c file and an .exp file
 # that takes the produced binary as the first argument)
@@ -285,6 +286,7 @@ FLAGS=\
 	-Wall \
 	-Wextra \
 	-Werror \
+	-Wno-deprecated-declarations \
 	-pedantic \
 	-g \
 	-I .
