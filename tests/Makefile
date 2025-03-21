@@ -183,6 +183,32 @@ NAMES=\
 	pwd \
 	sa_restart \
 	sigchld \
+	signals/kill-self \
+	signals/kill0-self \
+	signals/kill-invalid \
+	signals/kill-permission \
+	signals/killpg-esrch \
+	signals/killpg-invalid \
+	signals/killpg0-self \
+	signals/pthread_kill-invalid \
+	signals/pthread_kill0-self \
+	signals/raise-compliance \
+	signals/sigismember-invalid \
+	signals/sigismember-valid \
+	signals/signal-handle_return \
+	signals/signal-handler \
+	signals/signal-handler2 \
+	signals/signal-ignore \
+	signals/signal-invalid \
+	signals/signal-uncatchable \
+	signals/sigprocmask-6 \
+	signals/sigprocmask-7 \
+	signals/sigprocmask-8 \
+	signals/sigprocmask-9 \
+	signals/sigprocmask-11 \
+	signals/sigprocmask-blocksingle \
+	signals/sigrelse-2 \
+	signals/sigrelse-3 \
 	stdio/ctermid \
 	stdio/tempnam \
 	stdio/tmpnam \
