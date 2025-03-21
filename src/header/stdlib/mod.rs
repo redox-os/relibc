@@ -466,7 +466,7 @@ pub unsafe extern "C" fn getsubopt(
             i = i + 1;
             continue;
         }
-        if (*start.offset(len)) == b'=' as i8 {
+        if (*start.offset(len)) == b'=' as c_char {
             *valuep = start.offset(len + 1);
         } else if !start.offset(len).is_null() {
             i = i + 1;
