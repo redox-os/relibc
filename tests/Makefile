@@ -25,6 +25,9 @@ EXPECT_NAMES=\
 	glob \
 	iso646 \
 	libgen \
+	libm/test-float \
+	libm/test-double \
+	libm/inf-torture \
 	locale \
 	math \
 	netdb/getaddrinfo \
@@ -234,12 +237,19 @@ EXPECT_INPUT_BINS=$(patsubst %,$(BUILD)/bins_expect_input/%,$(EXPECT_INPUT_NAMES
 CARGO_TEST?=cargo
 TEST_RUNNER?=
 
-.PHONY: all clean run expected verify
+.PHONY: all clean run math expected verify
 
-all: $(BINS)
+all: $(BINS) $(MBINS)
 
 clean:
 	rm -rf bins_* gen *.out
+
+math:| $(MBINS)
+	for bin in $(MBINS); \
+	do \
+		echo "# $${bin} #"; \
+		"$${bin}" test args || exit $$?; \
+	done
 
 run: | $(BINS) $(EXPECT_INPUT_BINS)
 	for bin in $(BINS); \
@@ -306,6 +316,12 @@ SYSROOT_LIB=$(shell realpath ../sysroot/lib/)
 STATIC_FLAGS+=\
 	$(SYSROOT_LIB)/libc.a
 
+M_FLAGS=\
+	-Wl,-dynamic-linker=$(SYSROOT_LIB)/ld64.so.1 \
+	-Wl,-rpath=$(SYSROOT_LIB):\$$ORIGIN \
+	-lc \
+	$(SYSROOT_LIB)/libm.a
+
 DYNAMIC_FLAGS+=\
 	-Wl,-dynamic-linker=$(SYSROOT_LIB)/ld64.so.1 \
 	-Wl,-rpath=$(SYSROOT_LIB):\$$ORIGIN \
@@ -323,6 +339,10 @@ $(BUILD)/bins_static/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
 
+$(BUILD)/bins_static/libm/%: %.c $(DEPS)
+	mkdir -p "$$(dirname "$@")"
+	$(CC) "$<" -o "$@" $(FLAGS) $(M_FLAGS)
+	
 $(BUILD)/bins_expect_input/%: %.c %.exp $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
