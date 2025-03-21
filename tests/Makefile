@@ -163,6 +163,10 @@ EXPECT_NAMES=\
 	# TODO: Fix these
 	# netdb/netdb \
 
+ifeq ($(REDOX_TESTS),1)
+	EXPECT_NAMES+=syslog/syslog
+endif
+
 BUILD?=.
 
 DYNAMIC_ONLY_NAMES=\
