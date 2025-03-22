@@ -66,3 +66,9 @@ Testing asprintf...
 printed: test string, value: 11
 printed: test string 2, value: 13
 printed: test string 2, value: 13
+
+C23:
+Binary %b: 100
+Binary %b alternate: 0b100
+Binary %B: 100
+Binary %B alternate: 0B100

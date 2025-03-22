@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{char, cmp, f64, ffi::VaList, fmt, num::FpCategory, ops::Range, slice};
+use core::{cmp, ffi::VaList, fmt, num::FpCategory, ops::Range, slice};
 
 use crate::{
     header::errno::EILSEQ,
@@ -313,13 +313,14 @@ unsafe fn pop_int(format: &mut *const u8) -> Option<Number> {
 
 unsafe fn fmt_int<I>(fmt: u8, i: I) -> String
 where
-    I: fmt::Display + fmt::Octal + fmt::LowerHex + fmt::UpperHex,
+    I: fmt::Display + fmt::Octal + fmt::LowerHex + fmt::UpperHex + fmt::Binary,
 {
     match fmt {
         b'o' => format!("{:o}", i),
         b'u' => i.to_string(),
         b'x' => format!("{:x}", i),
         b'X' => format!("{:X}", i),
+        b'b' | b'B' => format!("{:b}", i),
         _ => panic!(
             "fmt_int should never be called with the fmt {:?}",
             fmt as char
@@ -579,7 +580,7 @@ impl Iterator for PrintfIter {
             let fmtkind = match fmt {
                 b'%' => FmtKind::Percent,
                 b'd' | b'i' => FmtKind::Signed,
-                b'o' | b'u' | b'x' | b'X' => FmtKind::Unsigned,
+                b'o' | b'u' | b'x' | b'X' | b'b' | b'B' => FmtKind::Unsigned,
                 b'e' | b'E' => FmtKind::Scientific,
                 b'f' | b'F' => FmtKind::Decimal,
                 b'g' | b'G' => FmtKind::AnyNotation,
@@ -685,8 +686,8 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
         let fmt = arg.fmt;
         let fmtkind = arg.fmtkind;
         let fmtcase = match fmt {
-            b'x' | b'f' | b'e' | b'g' => Some(FmtCase::Lower),
-            b'X' | b'F' | b'E' | b'G' => Some(FmtCase::Upper),
+            b'x' | b'b' | b'f' | b'e' | b'g' => Some(FmtCase::Lower),
+            b'X' | b'B' | b'F' | b'E' | b'G' => Some(FmtCase::Upper),
             _ => None,
         };
 
@@ -780,7 +781,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                         + if alternate && string != "0" {
                             match fmt {
                                 b'o' if no_precision => 1,
-                                b'x' | b'X' => 2,
+                                b'x' | b'X' | b'b' | b'B' => 2,
                                 _ => 0,
                             }
                         } else {
@@ -792,9 +793,11 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
 
                 if alternate && string != "0" {
                     match fmt {
-                        b'o' if no_precision => w.write_all(&[b'0'])?,
-                        b'x' => w.write_all(&[b'0', b'x'])?,
-                        b'X' => w.write_all(&[b'0', b'X'])?,
+                        b'o' if no_precision => w.write_all(b"0")?,
+                        b'x' => w.write_all(b"0x")?,
+                        b'X' => w.write_all(b"0X")?,
+                        b'b' => w.write_all(b"0b")?,
+                        b'B' => w.write_all(b"0B")?,
                         _ => (),
                     }
                 }
@@ -1136,7 +1139,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
 ///     characters written.
 ///   - The alternative representation includes a leading `0X`.
 ///   - The types are the same as `u`.
-/// - `b` | `B` (C23 ※): Writes the binary representation of a unsigned integer.
+/// - `b` | `B` (C23): Writes the binary representation of a unsigned integer.
 ///   - The [precision] specifies the minimal number to appear (defaults to `1`).
 ///   - If the precision is zero and the value to be written is also zero, the result is no
 ///     characters written.
