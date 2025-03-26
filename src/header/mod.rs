@@ -1,7 +1,6 @@
 //! POSIX header implementations.
 
 pub mod _aio;
-pub mod _fenv;
 pub mod arpa_inet;
 pub mod assert;
 pub mod bits_pthread;
@@ -20,6 +19,7 @@ pub mod elf;
 pub mod endian;
 pub mod errno;
 pub mod fcntl;
+pub mod fenv;
 pub mod float;
 // TODO: fmtmsg.h
 pub mod fnmatch;

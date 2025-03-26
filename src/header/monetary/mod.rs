@@ -6,7 +6,7 @@
 use alloc::string::{String, ToString};
 use core::{ffi::CStr, ptr, slice, str};
 
-use libm::{fabs, floor, pow, round, trunc};
+use rust_libm::{fabs, floor, pow, round, trunc};
 
 extern crate alloc;
 

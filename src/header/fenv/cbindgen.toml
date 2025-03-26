@@ -1,0 +1,27 @@
+sys_includes = ["stdint.h", "sys/types.h"]
+include_guard = "_RELIBC_FENV_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+after_includes = """
+
+#if defined(__x86__) || defined(__x86_64__)
+typedef struct {
+    struct {
+        unsigned int control;
+        unsigned int status;
+        unsigned int tag;
+        unsigned int others[4];
+    } x87;
+    unsigned int mxcsr;
+} fenv_t;
+#endif
+"""
+
+[enum]
+prefix_with_name = true
+
+
+[export]
+item_types = ["constants", "functions", "typedefs"]

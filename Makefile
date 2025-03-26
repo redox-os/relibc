@@ -18,6 +18,7 @@ export CFLAGS=-I$(TARGET_HEADERS)
 PROFILE?=release
 
 HEADERS_UNPARSED=$(shell find src/header -mindepth 1 -maxdepth 1 -type d -not -name "_*" -printf "%f\n")
+MHEADERS_UNPARSED=$(shell find src/libm -mindepth 1 -maxdepth 1 -type d -not -name "src" -printf "%f\n")
 HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "*.rs" \))
 #HEADERS=$(patsubst %,%.h,$(subst _,/,$(HEADERS_UNPARSED)))
 
@@ -89,8 +90,6 @@ headers: $(HEADERS_DEPS)
 	rm -rf $(TARGET_HEADERS)
 	mkdir -pv $(TARGET_HEADERS)
 	cp -rv include/* $(TARGET_HEADERS)
-	cp -v "openlibm/include"/*.h $(TARGET_HEADERS)
-	cp -v "openlibm/src"/*.h $(TARGET_HEADERS)
 	set -e ; \
 	for header in $(HEADERS_UNPARSED); do \
 		echo "Header $$header"; \
@@ -100,6 +99,15 @@ headers: $(HEADERS_DEPS)
 			cat "src/header/$$header/cbindgen.toml" cbindgen.globdefs.toml \
 				 | cbindgen "src/header/$$header/mod.rs" --config=/dev/stdin --output "$$out"; \
 		fi \
+	done
+
+	for header in $(MHEADERS_UNPARSED); do \
+		out=`echo "$$header" | sed 's/_/\//g'`; \
+		out="$(TARGET_HEADERS)/$$out.h"; \
+		cbindgen --output "$$out" \
+			--config="src/libm/$$header/cbindgen.toml" \
+			"src/libm/$$header/mod.rs"; \
+		sed -i "s/va_list __valist/.../g" "$$out"; \
 	done
 
 clean:
@@ -120,6 +128,7 @@ install-headers: headers libs
 libs: \
 	$(BUILD)/$(PROFILE)/libc.a \
 	$(BUILD)/$(PROFILE)/libc.so \
+	$(BUILD)/$(PROFILE)/libm.a \
 	$(BUILD)/$(PROFILE)/crt0.o \
 	$(BUILD)/$(PROFILE)/crti.o \
 	$(BUILD)/$(PROFILE)/crtn.o \
@@ -135,10 +144,10 @@ install-libs: headers libs
 	cp -v "$(BUILD)/$(PROFILE)/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/ld_so" "$(DESTDIR)/lib/ld64.so.1"
-	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 	# Empty libraries for dl, pthread, and rt
 	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
 	$(AR) -rcs "$(DESTDIR)/lib/libpthread.a"
+	$(AR) -rcs "$(DESTDIR)/lib/libm.a"
 	$(AR) -rcs "$(DESTDIR)/lib/librt.a"
 
 install-tests: tests
@@ -167,7 +176,7 @@ test: sysroot
 	$(MAKE) -C tests verify
 
 
-$(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a
 	$(CC) -nostdlib \
 		-shared \
 		-Wl,--gc-sections \
@@ -181,7 +190,7 @@ $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/l
 
 # Debug targets
 
-$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -193,6 +202,10 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.
 $(BUILD)/debug/librelibc.a: $(SRC)
 	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ -g -C debug-assertions=no $(RUSTCFLAGS)
 	./renamesyms.sh "$@" "$(BUILD)/debug/deps/"
+	touch $@
+
+$(BUILD)/debug/libm.a:
+	$(CARGO) rustc --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit link=$@ -g -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
@@ -216,7 +229,7 @@ $(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debu
 
 # Release targets
 
-$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -230,6 +243,10 @@ $(BUILD)/release/librelibc.a: $(SRC)
 	# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
 	# use some cbindgen hook, specify them manually, or grep for #[no_mangle].
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
+	touch $@
+
+$(BUILD)/release/libm.a:
+	CARGO_INCREMENTAL=0 $(CARGO) rustc --release --manifest-path src/libm/Cargo.toml $(CARGOFLAGS) -- --emit link=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
@@ -252,14 +269,3 @@ $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD
 	$(LD) --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections $^ -o $@
 
 # Other targets
-
-$(BUILD)/openlibm: openlibm
-	rm -rf $@ $@.partial
-	mkdir -p $(BUILD)
-	cp -r $< $@.partial
-	mv $@.partial $@
-	touch $@
-
-$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
-	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
-	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
