@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{char, cmp, f64, ffi::VaList, fmt, num::FpCategory, ops::Range, slice};
+use core::{cmp, ffi::VaList, fmt, num::FpCategory, ops::Range, slice};
 
 use crate::{
     header::errno::EILSEQ,
@@ -313,13 +313,14 @@ unsafe fn pop_int(format: &mut *const u8) -> Option<Number> {
 
 unsafe fn fmt_int<I>(fmt: u8, i: I) -> String
 where
-    I: fmt::Display + fmt::Octal + fmt::LowerHex + fmt::UpperHex,
+    I: fmt::Display + fmt::Octal + fmt::LowerHex + fmt::UpperHex + fmt::Binary,
 {
     match fmt {
         b'o' => format!("{:o}", i),
         b'u' => i.to_string(),
         b'x' => format!("{:x}", i),
         b'X' => format!("{:X}", i),
+        b'b' | b'B' => format!("{:b}", i),
         _ => panic!(
             "fmt_int should never be called with the fmt {:?}",
             fmt as char
@@ -579,7 +580,7 @@ impl Iterator for PrintfIter {
             let fmtkind = match fmt {
                 b'%' => FmtKind::Percent,
                 b'd' | b'i' => FmtKind::Signed,
-                b'o' | b'u' | b'x' | b'X' => FmtKind::Unsigned,
+                b'o' | b'u' | b'x' | b'X' | b'b' | b'B' => FmtKind::Unsigned,
                 b'e' | b'E' => FmtKind::Scientific,
                 b'f' | b'F' => FmtKind::Decimal,
                 b'g' | b'G' => FmtKind::AnyNotation,
@@ -685,8 +686,8 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
         let fmt = arg.fmt;
         let fmtkind = arg.fmtkind;
         let fmtcase = match fmt {
-            b'x' | b'f' | b'e' | b'g' => Some(FmtCase::Lower),
-            b'X' | b'F' | b'E' | b'G' => Some(FmtCase::Upper),
+            b'x' | b'b' | b'f' | b'e' | b'g' => Some(FmtCase::Lower),
+            b'X' | b'B' | b'F' | b'E' | b'G' => Some(FmtCase::Upper),
             _ => None,
         };
 
@@ -780,7 +781,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                         + if alternate && string != "0" {
                             match fmt {
                                 b'o' if no_precision => 1,
-                                b'x' | b'X' => 2,
+                                b'x' | b'X' | b'b' | b'B' => 2,
                                 _ => 0,
                             }
                         } else {
@@ -792,9 +793,11 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
 
                 if alternate && string != "0" {
                     match fmt {
-                        b'o' if no_precision => w.write_all(&[b'0'])?,
-                        b'x' => w.write_all(&[b'0', b'x'])?,
-                        b'X' => w.write_all(&[b'0', b'X'])?,
+                        b'o' if no_precision => w.write_all(b"0")?,
+                        b'x' => w.write_all(b"0x")?,
+                        b'X' => w.write_all(b"0X")?,
+                        b'b' => w.write_all(b"0b")?,
+                        b'B' => w.write_all(b"0B")?,
                         _ => (),
                     }
                 }
@@ -981,6 +984,275 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
     Ok(w.written as c_int)
 }
 
+/// Implementation of `printf` formatting function, generic over a `writer`
+///
+/// This implementation in currently compliant over C17 specification (lacking a few one from C23)
+/// and contains extensions as well.
+///
+/// # The Format Specification
+/// ```text
+/// %[conversion-flags][field-width][precision][length-modifier]<conversion-format>
+/// ```
+///
+/// <div class="warning">
+/// ※ : This symbol means it is not implemented yet, but it is defined in the C standard
+/// </div>
+///
+/// ## Conversion Flags
+/// Conversion flags are flags that modify the behavior of the [conversion
+/// format]. Each one can happen only once per format specifier. They are:
+///
+/// - `-`: The result of the conversion is left-justified within the field (by default it is
+///   right-justified).
+/// - `+`: The sign of signed conversions is always prepended to the result of the conversion (by
+///   default the result is preceded by minus **only** when it is negative).
+/// - ` `(space): If the result of a signed conversion does not start with a sign character, or is
+///   empty, space is prepended to the result.
+///   - It is ignored if `+` flag is present.
+/// - `#`: Alternative form of the conversion is performed. See the documentation for each
+///   [conversion format] for details.
+/// - `0`: For integer and floating-point number conversions, leading zeros are used to pad the
+///   field instead of space characters.
+///   - For integer numbers it is ignored if the precision is explicitly specified.
+///   - For other conversions using this flag results in undefined behavior.
+///   - It is ignored if `-` flag is present.
+///
+/// ## Field Width
+/// Specifies minimum field width. This makes the result to be padded (with spaces by default, with
+/// zeroes if `0` conversion flag is specified) if the converted value has fewer characters than the
+/// specified width. It can take three forms:
+///
+/// - `N` where N is a positive integer: Specifies the field width value of `N`.
+/// - `*`: The width is specified by an extra argument of type [`int`], which has to appear before
+///   the argument to be converted and the [precision] (if specified with `.*`).
+///   - If the value of e extra argument is negative, it is interpreted as with `-` [conversion
+///     flag], i.e. left-justified result.
+/// - `*P$` where P is a positive integer: The width is specified by an extra argument of type
+///   [`int`], which has to appear exactly at the position specified by `P`.
+///   - This is a popular extension of the C and POSIX standards.
+///   - If the value of e extra argument is negative, it is interpreted as with `-` [conversion
+///     flag], i.e. left-justified result.
+///
+/// ## Precision
+/// Specifies the precision of the conversion.
+///
+/// For integer [conversion formats], this specifies the number of digits to appear in the result.
+///
+/// For float point [conversion formats], this specifies the number of digits to appear after the
+/// decimal-point character.
+///
+/// It can take three forms:
+///
+/// - `.N` where N is a positive integer: Specifies the precision value of `N`.
+/// - `.*`: The precision is specified by an extra argument of type [`int`], which  has to appear
+///   before the argument to be converted and after the the [field width] (if specified with `*`).
+///   - If the value of e extra argument is negative, it is interpreted as if the precision were
+///     omitted.
+/// - `.*P$` where P is a positive integer: The precision is specified by an extra argument of type
+///   [`int`], which has to appear exactly at the position specified by `P`.
+///   - This is an popular extension of the C and POSIX standards.
+///   - If the value of e extra argument is negative, it is interpreted as if the precision were
+///     omitted.
+///
+/// ## Length Modifier
+/// Specifies the size of the argument. In combination with the [conversion format], it specifies
+/// the type of the corresponding argument.
+///
+/// - `hh`: Byte size
+///   - Works with integer conversion formats (`d`, `i`, `o`, `x`, `X`, `b`, `B`)
+///   - Works with written number conversion format (`n`)
+/// - `h`: Short size
+///   - Works with integer conversion formats (`d`, `i`, `o`, `x`, `X`, `b`, `B`)
+///   - Works with written number conversion format (`n`)
+/// - `l`: Long size
+///   - Works with integer conversion formats (`d`, `i`, `o`, `x`, `X`, `b`, `B`)
+///   - Works with character conversion format (`c`)
+///   - Works with string conversion format (`s`)
+///   - Works with written number conversion format (`n`)
+///   - Works with float conversion formats (`f`, `F`, `e`, `E`, `a`, `A`, `g`, `G`) (C99)
+/// - `ll`: Long long size
+///   - Works with integer conversion formats (`d`, `i`, `o`, `x`, `X`, `b`, `B`)
+///   - Works with written number conversion format (`n`)
+/// - `j`: Maximum width
+///   - Works with integer conversion formats (`d`, `i`, `o`, `x`, `X`, `b`, `B`)
+///   - Works with written number conversion format (`n`)
+/// - `z`: Pointer width size
+///   - Works with integer conversion formats (`d`, `i`, `o`, `x`, `X`, `b`, `B`)
+///   - Works with written number conversion format (`n`)
+/// - `t`: Pointer diff width
+///   - Works with integer conversion formats (`d`, `i`, `o`, `x`, `X`, `b`, `B`)
+///   - Works with written number conversion format (`n`)
+/// - `wN` (C23 ※): Specifies that the size should be N bits width version of the supported
+///   conversion format.
+///   - Works with integer conversion formats (`d`, `i`, `o`, `x`, `X`, `b`, `B`)
+///   - The supported values of `N` must be the same as the widths specified in `stdint.h`
+/// - `wfN` (C23 ※): Specifies that the size should be the fast N bits width version of the
+///   supported conversion format.
+///   - Works with integer conversion formats (`d`, `i`, `o`, `x`, `X`, `b`, `B`)
+///   - The supported values of `N` must be the same as the widths specified in `stdint.h`
+/// - `L`: Long double size
+///   - Works with float conversion formats (`f`, `F`, `e`, `E`, `a`, `A`, `g`, `G`)
+/// - `H` (C23 ※): _Decimal32 size
+///   - Works with float conversion formats (`f`, `F`, `e`, `E`, `a`, `A`, `g`, `G`)
+/// - `D` (C23 ※): _Decimal64 size
+///   - Works with float conversion formats (`f`, `F`, `e`, `E`, `a`, `A`, `g`, `G`)
+/// - `DD` (C23 ※): _Decimal128 size
+///   - Works with float conversion formats (`f`, `F`, `e`, `E`, `a`, `A`, `g`, `G`)
+///
+/// ## Conversion Format
+/// Specifies the conversion format as one of the following:
+///
+/// - `%`: Writes a percent symbol. The full conversion format must be `%%`.
+/// - `c`: Writes as single character
+///   - Without length modifier:
+///     - The argument is first converted to [`unsigned char`]
+///   - With `l` length modifier:
+///     - The argument is first converted to a character string as if by `%ls` with a array of 2
+///       [`wchar_t`] argument.
+/// - `s`: Writes a character string
+///   - The argument is a pointer to the first character
+///   - The [precision] specifies the maximum number of bytes to be written. If not specified,
+///     writes up to the first null character found.
+/// - `d` and `i`: Writes a decimal representation of a signed integer
+///   - The [precision] specifies the minimal number to appear (defaults to `1`).
+///   - If the precision is zero and the value to be written is also zero, the result is no
+///     characters written.
+/// - `u`: Writes the decimal representation of a unsigned integer
+///   - The [precision] specifies the minimal number to appear (defaults to `1`).
+///   - If the precision is zero and the value to be written is also zero, the result is no
+///     characters written.
+/// - `o`: Writes the octal representation of a unsigned integer.
+///   - The [precision] specifies the minimal number to appear (defaults to `1`).
+///   - If the precision is zero and the value to be written is also zero, the result is no
+///     characters written.
+///   - The alternative representation includes a leading `0`.
+///   - The types are the same as `u`
+/// - `x`: Writes the hexadecimal representation of a unsigned integer with lowercase characters.
+///   - The [precision] specifies the minimal number to appear (defaults to `1`).
+///   - If the precision is zero and the value to be written is also zero, the result is no
+///     characters written.
+///   - The alternative representation includes a leading `0x`.
+///   - The types are the same as `u`
+/// - `X`: Writes the hexadecimal representation of a unsigned integer with uppercase characters.
+///   - The [precision] specifies the minimal number to appear (defaults to `1`).
+///   - If the precision is zero and the value to be written is also zero, the result is no
+///     characters written.
+///   - The alternative representation includes a leading `0X`.
+///   - The types are the same as `u`.
+/// - `b` | `B` (C23): Writes the binary representation of a unsigned integer.
+///   - The [precision] specifies the minimal number to appear (defaults to `1`).
+///   - If the precision is zero and the value to be written is also zero, the result is no
+///     characters written.
+///   - The alternative representation includes a leading `0b` and `0B`, respectively.
+///   - The types are the same as `u`.
+/// - `f` | `F`: Writes the decimal representation of a float point number.
+///   - The [precision] specifies the exact number of digits to appear after the decimal point
+///     character (defaults to `6`).
+///   - The alternative representation, the decimal point character is written even if no digits
+///     follow it.
+/// - `e` | `E`: Writes the float point number with the decimal exponential notation (\[-\]d.ddd
+///   **e**±dd | \[-\]d.ddd **E**±dd)
+///   - The [precision] specifies the exact number of digits to appear after the decimal point
+///     character (defaults to `6`).
+///   - The exponent contains at least two digits, more digits are used only if necessary.
+///   - If the value is ​zero, the exponent is also ​zero​.
+///   - The alternative representation: decimal point character is written even if no digits follow
+///     it.
+/// - `a` | `A`: Writes the float point number with the hexadecimal exponential notation (\[-\]
+///   **0x**h.hhh **p**±d | \[-\] **0X**h.hhh **P**±d)
+///   - The [precision] specifies the exact number of digits to appear after the hexadecimal point
+///     character (defaults to `6`).
+///   - If the value is ​zero, the exponent is also ​zero​.
+///   - The alternative representation: decimal point character is written even if no digits follow
+///     it.
+/// - `g` | `G`: Writes the float point number to decimal or decimal exponent notation depending on
+///   the value and the [precision].
+///   - Let `P` equal the precision if nonzero, `6` if the precision is not specified, or `1` if the
+///     precision is `​0`​. Then, if a conversion with style `E` would have an exponent of `X`:
+///     - If `P > X ≥ −4`, the conversion is with the format `f` and precision `P − 1 − X`.
+///     - Otherwise, the conversion is with the format `e` or `E` and precision `P − 1`.
+///   - Unless alternative representation is requested, the trailing zeros are removed. Also the
+///     decimal point character is removed if no fractional part is left.
+/// - `n`: Writes the number of characters written in the call into the argument pointer
+///   - It can not contain any [conversion flag], [field width], or [precision].
+/// - `p`: Writes an implementation defined character sequence defining a pointer.
+///
+/// ### Types
+/// The types expected by the format string can change with the [length modifier].
+///
+/// For the `c`:
+/// - Without length modifier: [`int`]
+/// - With `l` length modifier: [`wint_t`]
+///
+/// For the `s`:
+/// - Without length modifier: pointer to [`char`] (`char*`, `const char*`)
+/// - With `l` length modifier: pointer to [`wchar_t`] (`wchar_t*`, `const wchar_t*`)
+///
+/// For the `d` and `i`:
+/// - Without length modifier: [`int`]
+/// - With `hh` length modifier: [`signed char`]
+/// - With `h` length modifier: [`short`]
+/// - With `l` length modifier: [`long`]
+/// - With `ll` length modifier: [`long long`]
+/// - With `j` length modifier: [`intmax_t`]
+/// - With `z` length modifier: [`ssize_t`]
+/// - With `t` length modifier: [`ptrdiff_t`]
+///
+/// For the `u`, `o`, `x`, `X`, `b`, `B`:
+/// - Without length modifier: [`unsigned int`]
+/// - With `hh` length modifier: [`unsigned char`]
+/// - With `h` length modifier: [`unsigned short`]
+/// - With `l` length modifier: [`unsigned long`]
+/// - With `ll` length modifier: [`unsigned long long`]
+/// - With `j` length modifier: [`uintmax_t`]
+/// - With `z` length modifier: [`size_t`]
+/// - With `t` length modifier: [`unsigned ptrdiff_t`]
+///
+/// For the `f`, `F`, `e`, `E`, `a`, `A`, `g`, `G`:
+/// - Without length modifier: [`double`]
+/// - With `l` length modifier: [`double`]
+/// - With `L` length modifier: `long double`
+/// - With `H` length modifier (C23 ※): `_Decimal32`
+/// - With `D` length modifier (C23 ※): `_Decimal64`
+/// - With `DD` length modifier (C23 ※): `_Decimal128`
+///
+/// For the `n`
+/// - Without length modifier: pointer to [`int`] (`int*`)
+/// - With `hh` length modifier: pointer to [`signed char`] (`signed char*`)
+/// - With `h` length modifier: pointer to [`short`] (`short*`)
+/// - With `l` length modifier: pointer to [`long`] (`long*`)
+/// - With `ll` length modifier: pointer to [`long long`] (`long long*`)
+/// - With `j` length modifier: pointer to [`intmax_t`] (`intmax_t*`)
+/// - With `z` length modifier: pointer to [`ssize_t`] (`ssize_t*`)
+/// - With `t` length modifier: pointer to [`ptrdiff_t`] (`ptrdiff_t*`)
+///
+/// For the `p`, it must always be a pointer to [`void`] (`void*` | `const void*`)
+///
+/// [precision]: #precision
+/// [field width]: #field-width
+/// [length modifier]: #length-modifier
+/// [conversion format]: #conversion-format
+/// [`int`]: c_int
+/// [`unsigned char`]: c_uchar
+/// [`unsigned short`]: c_ushort
+/// [`unsigned int`]: c_uint
+/// [`unsigned long`]: c_ulong
+/// [`unsigned long long`]: c_ulonglong
+/// [`unsigned ptrdiff_t`]: ptrdiff_t
+/// [`wchar_t`]: wchar_t
+/// [`char`]: c_char
+/// [`signed char`]: c_schar
+/// [`short`]: c_short
+/// [`long`]: c_long
+/// [`long long`]: c_longlong
+/// [`double`]: c_double
+/// [`long double`]: c_longdouble
+/// [`void`]: c_void
+///
+/// # Safety
+/// Behavior is undefined if any of the following conditions are violated:
+/// - `format` must point to valid null-terminated string.
+/// - `ap` must follow the safety contract of variable arguments of C.
 pub unsafe fn printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> c_int {
     inner_printf(w, format, ap).unwrap_or(-1)
 }
