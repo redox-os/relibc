@@ -42,7 +42,7 @@ mod getdelim;
 mod ext;
 mod helpers;
 mod lookaheadreader;
-mod printf;
+pub mod printf;
 mod scanf;
 use lookaheadreader::LookAheadReader;
 static mut TMPNAM_BUF: [c_char; L_tmpnam as usize + 1] = [0; L_tmpnam as usize + 1];
