@@ -1,7 +1,7 @@
 //! regex.h implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/regex.h.html
 
 use crate::{header::string::strlen, platform::types::*};
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, vec::Vec};
 use core::{mem, ptr, slice};
 use posix_regex::{
     compile::{Error as CompileError, Range, Token},
@@ -64,15 +64,22 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
     match res {
         Ok(mut branches) => {
             let re_nsub = PosixRegex::new(Cow::Borrowed(&branches)).count_groups();
+            let mut branches2: Vec<(Token, Range)> = branches
+                .arena
+                .iter()
+                .map(|n| (n.token.clone(), n.range))
+                .collect();
+
+            println!("{:?}", branches2);
             *out = regex_t {
-                ptr: branches.arena.as_mut_ptr() as *mut c_void,
-                length: branches.arena.len(),
-                capacity: (*branches.arena).len(),
+                ptr: branches2.as_mut_ptr() as *mut c_void,
+                length: branches2.len(),
+                capacity: branches2.capacity(),
 
                 cflags,
                 re_nsub,
             };
-            mem::forget(branches);
+            mem::forget(branches2);
             0
         }
         Err(CompileError::EmptyRepetition)

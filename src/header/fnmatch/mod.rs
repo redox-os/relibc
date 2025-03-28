@@ -41,7 +41,6 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
         c == b'/' && flags & FNM_PATHNAME == FNM_PATHNAME
     }
 
-    // let mut tokens = Vec::new();
     let mut leading = true;
 
     let mut builder = TreeBuilder::default();
