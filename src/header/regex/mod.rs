@@ -1,25 +1,20 @@
 //! regex.h implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/regex.h.html
 
 use crate::{header::string::strlen, platform::types::*};
-use alloc::{borrow::Cow, boxed::Box, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box};
 use core::{mem, ptr, slice};
-use posix_regex::{
-    compile::{Error as CompileError, Range, Token},
-    tree::Tree,
-    PosixRegex, PosixRegexBuilder,
-};
+use posix_regex::{compile::Error as CompileError, tree::Tree, PosixRegex, PosixRegexBuilder};
 
 pub type regoff_t = size_t;
 
 #[repr(C)]
 pub struct regex_t {
-    // Can't be a normal Vec<T> because then the struct size won't be known
-    // from C.
+    // Points to a posix_regex::Tree
     ptr: *mut c_void,
-
     cflags: c_int,
     re_nsub: size_t,
 }
+
 #[repr(C)]
 pub struct regmatch_t {
     rm_so: regoff_t,
