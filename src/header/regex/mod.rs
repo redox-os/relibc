@@ -5,6 +5,7 @@ use alloc::{borrow::Cow, boxed::Box, vec::Vec};
 use core::{mem, ptr, slice};
 use posix_regex::{
     compile::{Error as CompileError, Range, Token},
+    tree::Tree,
     PosixRegex, PosixRegexBuilder,
 };
 
@@ -64,22 +65,15 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
     match res {
         Ok(mut branches) => {
             let re_nsub = PosixRegex::new(Cow::Borrowed(&branches)).count_groups();
-            let mut branches2: Vec<(Token, Range)> = branches
-                .arena
-                .iter()
-                .map(|n| (n.token.clone(), n.range))
-                .collect();
-
-            println!("{:?}", branches2);
+            let branches = Box::leak(Box::new(branches));
             *out = regex_t {
-                ptr: branches2.as_mut_ptr() as *mut c_void,
-                length: branches2.len(),
-                capacity: branches2.capacity(),
+                ptr: branches as *mut Tree as *mut c_void,
+                length: 1,
+                capacity: 1,
 
                 cflags,
                 re_nsub,
             };
-            mem::forget(branches2);
             0
         }
         Err(CompileError::EmptyRepetition)
@@ -97,7 +91,7 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regfree(regex: *mut regex_t) {
     Vec::from_raw_parts(
-        (*regex).ptr as *mut Vec<(Token, Range)>,
+        (*regex).ptr as *mut Tree,
         (*regex).length,
         (*regex).capacity,
     );
@@ -118,21 +112,14 @@ pub unsafe extern "C" fn regexec(
 
     let regex = &*regex;
 
-    // Allow specifying a compiler argument to the executor and vise versa
+    // Allow specifying a compiler argument to the executor and viceversa
     // because why not?
     let flags = regex.cflags | eflags;
 
     let input = slice::from_raw_parts(input as *const u8, strlen(input));
-    let branches = slice::from_raw_parts(regex.ptr as *const u8, regex.length);
+    let branches = &*(regex.ptr as *mut Tree);
 
-    let Ok(regex) = PosixRegexBuilder::new(&branches)
-        .with_default_classes()
-        .compile()
-    else {
-        return -1;
-    };
-
-    let matches = regex
+    let matches = PosixRegex::new(Cow::Borrowed(&branches))
         .case_insensitive(flags & REG_ICASE == REG_ICASE)
         .newline(flags & REG_NEWLINE == REG_NEWLINE)
         .no_start(flags & REG_NOTBOL == REG_NOTBOL)
