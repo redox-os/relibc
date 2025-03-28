@@ -16,8 +16,6 @@ pub struct regex_t {
     // Can't be a normal Vec<T> because then the struct size won't be known
     // from C.
     ptr: *mut c_void,
-    length: size_t,
-    capacity: size_t,
 
     cflags: c_int,
     re_nsub: size_t,
@@ -68,8 +66,6 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
             let branches = Box::leak(Box::new(branches));
             *out = regex_t {
                 ptr: branches as *mut Tree as *mut c_void,
-                length: 1,
-                capacity: 1,
 
                 cflags,
                 re_nsub,
@@ -90,11 +86,7 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
 #[no_mangle]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regfree(regex: *mut regex_t) {
-    Vec::from_raw_parts(
-        (*regex).ptr as *mut Tree,
-        (*regex).length,
-        (*regex).capacity,
-    );
+    Box::from_raw((*regex).ptr);
 }
 
 #[no_mangle]
