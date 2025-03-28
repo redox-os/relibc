@@ -65,9 +65,9 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
         Ok(mut branches) => {
             let re_nsub = PosixRegex::new(Cow::Borrowed(&branches)).count_groups();
             *out = regex_t {
-                ptr: branches.as_mut_ptr() as *mut c_void,
-                length: branches.len(),
-                capacity: branches.capacity(),
+                ptr: branches.arena.as_mut_ptr() as *mut c_void,
+                length: branches.arena.len(),
+                capacity: (*branches.arena).len(),
 
                 cflags,
                 re_nsub,
@@ -116,9 +116,16 @@ pub unsafe extern "C" fn regexec(
     let flags = regex.cflags | eflags;
 
     let input = slice::from_raw_parts(input as *const u8, strlen(input));
-    let branches = slice::from_raw_parts(regex.ptr as *const Vec<(Token, Range)>, regex.length);
+    let branches = slice::from_raw_parts(regex.ptr as *const u8, regex.length);
 
-    let matches = PosixRegex::new(Cow::Borrowed(&branches))
+    let Ok(regex) = PosixRegexBuilder::new(&branches)
+        .with_default_classes()
+        .compile()
+    else {
+        return -1;
+    };
+
+    let matches = regex
         .case_insensitive(flags & REG_ICASE == REG_ICASE)
         .newline(flags & REG_NEWLINE == REG_NEWLINE)
         .no_start(flags & REG_NOTBOL == REG_NOTBOL)
