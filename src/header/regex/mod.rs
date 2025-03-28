@@ -58,9 +58,8 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
     match res {
         Ok(mut branches) => {
             let re_nsub = PosixRegex::new(Cow::Borrowed(&branches)).count_groups();
-            let branches = Box::leak(Box::new(branches));
             *out = regex_t {
-                ptr: branches as *mut Tree as *mut c_void,
+                ptr: Box::into_raw(Box::new(branches)) as *mut c_void,
 
                 cflags,
                 re_nsub,
