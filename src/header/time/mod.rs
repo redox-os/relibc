@@ -382,9 +382,8 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
         }
     };
 
-    let offset = FixedOffset::east((*timeptr).tm_gmtoff as _);
+    let offset = get_offset((*timeptr).tm_gmtoff).unwrap();
     let tz = time_zone();
-
     // Create DateTime<FixedOffset>
     let datetime = match offset.from_local_datetime(&naive_local) {
         MappedLocalTime::Single(datetime) => datetime,
@@ -486,11 +485,12 @@ pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
         None => return -1,
     };
 
+    let tz_name = CString::new(tz.name()).unwrap();
     (*tm).tm_wday = dt.weekday().num_days_from_sunday() as _;
     (*tm).tm_yday = dt.ordinal0() as _; // day of year starting at 0
     (*tm).tm_isdst = dt.offset().dst_offset().num_hours() as _;
     (*tm).tm_gmtoff = dt.offset().fix().local_minus_utc() as _;
-    (*tm).tm_zone = UTC_STR.as_ptr() as *const c_char;
+    (*tm).tm_zone = tz_name.into_raw().cast();
 
     dt.timestamp()
 }
@@ -724,6 +724,15 @@ unsafe fn set_timezone(
     }
 
     timezone = -c_long::from(ut_offset.fix().local_minus_utc());
+}
+
+#[inline(always)]
+pub const fn get_offset(off: c_long) -> Option<FixedOffset> {
+    if off < 0 {
+        FixedOffset::west_opt(off as _)
+    } else {
+        FixedOffset::east_opt(off as _)
+    }
 }
 
 const fn blank_tm() -> tm {
