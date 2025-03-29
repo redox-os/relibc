@@ -2,8 +2,11 @@
 // Following https://pubs.opengroup.org/onlinepubs/7908799/xsh/strftime.html
 use alloc::string::String;
 
-use super::tm;
-use crate::platform::{self, types::*, WriteByte};
+use super::{get_offset, tm};
+use crate::{
+    c_str::CStr,
+    platform::{self, types::*, WriteByte},
+};
 
 // We use the langinfo constants
 use crate::header::langinfo::{
@@ -157,7 +160,7 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
                 b'I' => w!("{:02}", ((*t).tm_hour + 12 - 1) % 12 + 1),
 
                 // Day of year: %j
-                b'j' => w!("{:03}", (*t).tm_yday),
+                b'j' => w!("{:03}", (*t).tm_yday + 1),
 
                 // etc.
                 b'k' => w!("{:2}", (*t).tm_hour),
@@ -223,11 +226,22 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
                 // Full year: %Y
                 b'Y' => w!("{}", (*t).tm_year + 1900),
 
-                // Timezone offset: %z => currently hard-coded "+0000"
-                b'z' => w!("+0000"), // TODO: Add real timezone support
+                // Timezone offset: %z
+                b'z' => {
+                    let offset = (*t).tm_gmtoff;
+                    let (sign, offset) = if offset < 0 {
+                        ('-', -offset)
+                    } else {
+                        ('+', offset)
+                    };
+                    let mins = offset.div_euclid(60);
+                    let min = mins.rem_euclid(60);
+                    let hour = mins.div_euclid(60);
+                    w!("{}{:02}{:02}", sign, hour, min)
+                }
 
-                // Timezone name: %Z => currently "UTC"
-                b'Z' => w!("UTC"), // TODO: Add real timezone name support
+                // Timezone name: %Z
+                b'Z' => w!("{}", CStr::from_ptr((*t).tm_zone).to_str().unwrap()),
 
                 // Date+time+TZ: %+
                 b'+' => w!(recurse "%a %b %d %T %Z %Y"),
@@ -256,8 +270,6 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
 /// https://en.wikipedia.org/wiki/ISO_week_date
 fn weeks_per_year(year: c_int) -> c_int {
     let year = year as f64;
-    // TODO: This function can be made const on newer Rust compilers but this line prevents it on
-    // our version in CI
     let p_y = (year + (year / 4.) - (year / 100.) + (year / 400.)) as c_int % 7;
     if p_y == 4 {
         53
