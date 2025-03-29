@@ -98,6 +98,7 @@ EXPECT_NAMES=(\
 	time/macros \
 	time/mktime \
 	time/strftime \
+    time/strptime \
 	time/time \
 	time/timegm \
 	time/tzset \
