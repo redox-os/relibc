@@ -190,22 +190,67 @@ pub fn get_umask() -> u32 {
     UMASK.load(Ordering::Acquire)
 }
 
-pub fn posix_setresuid(ruid: Option<u32>, euid: Option<u32>, suid: Option<u32>) -> Result<()> {
-    todo!("posix_setresuid")
-}
-pub fn posix_setresgid(rgid: Option<u32>, egid: Option<u32>, sgid: Option<u32>) -> Result<()> {
-    todo!("posix_setresgid")
+pub fn posix_setresugid(
+    ruid: Option<u32>,
+    euid: Option<u32>,
+    suid: Option<u32>,
+    rgid: Option<u32>,
+    egid: Option<u32>,
+    sgid: Option<u32>,
+) -> Result<()> {
+    // TODO: not sure how "tmp" an IPC call is?
+    let _sig_guard = tmp_disable_signals();
+    let mut guard = DYNAMIC_PROC_INFO.lock();
+
+    let mut buf = [0_u8; size_of::<u32>() * 6];
+    plain::slice_from_mut_bytes(&mut buf)
+        .unwrap()
+        .copy_from_slice(&[
+            ruid.unwrap_or(u32::MAX),
+            euid.unwrap_or(u32::MAX),
+            suid.unwrap_or(u32::MAX),
+            rgid.unwrap_or(u32::MAX),
+            egid.unwrap_or(u32::MAX),
+            sgid.unwrap_or(u32::MAX),
+        ]);
+
+    proc_call(
+        &mut buf,
+        CallFlags::empty(),
+        &[ProcCall::SetResugid as usize],
+    )?;
+
+    if let Some(ruid) = ruid {
+        guard.ruid = ruid;
+    }
+    if let Some(euid) = euid {
+        guard.euid = euid;
+    }
+    // TODO: suid?
+    if let Some(rgid) = rgid {
+        guard.rgid = rgid;
+    }
+    if let Some(egid) = egid {
+        guard.egid = egid;
+    }
+    // TODO: sgid?
+
+    Ok(())
 }
 pub fn posix_getruid() -> u32 {
+    let _guard = tmp_disable_signals();
     DYNAMIC_PROC_INFO.lock().ruid
 }
 pub fn posix_getrgid() -> u32 {
+    let _guard = tmp_disable_signals();
     DYNAMIC_PROC_INFO.lock().rgid
 }
 pub fn posix_geteuid() -> u32 {
+    let _guard = tmp_disable_signals();
     DYNAMIC_PROC_INFO.lock().euid
 }
 pub fn posix_getegid() -> u32 {
+    let _guard = tmp_disable_signals();
     DYNAMIC_PROC_INFO.lock().egid
 }
 pub fn posix_exit(status: i32) -> ! {

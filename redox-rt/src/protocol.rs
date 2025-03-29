@@ -21,6 +21,7 @@ pub enum ProcCall {
     Setrens = 1,
     Exit = 2,
     Waitpgid = 3,
+    SetResugid = 4,
 }
 
 impl ProcCall {

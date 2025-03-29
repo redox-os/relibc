@@ -864,7 +864,10 @@ impl Pal for Sys {
     }
 
     fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {
-        Ok(redox_rt::sys::posix_setresgid(
+        Ok(redox_rt::sys::posix_setresugid(
+            None,
+            None,
+            None,
             cvt_uid(rgid)?,
             cvt_uid(egid)?,
             cvt_uid(sgid)?,
@@ -872,10 +875,13 @@ impl Pal for Sys {
     }
 
     fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> Result<()> {
-        Ok(redox_rt::sys::posix_setresuid(
+        Ok(redox_rt::sys::posix_setresugid(
             cvt_uid(ruid)?,
             cvt_uid(euid)?,
             cvt_uid(suid)?,
+            None,
+            None,
+            None,
         )?)
     }
 
