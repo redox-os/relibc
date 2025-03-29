@@ -8,6 +8,7 @@ use core::slice;
 use crate::platform::types::*;
 use posix_regex::{
     compile::{Collation, Range, Token},
+    tree::{Tree, TreeBuilder},
     PosixRegex,
 };
 
@@ -21,7 +22,7 @@ pub const FNM_PERIOD: c_int = 4;
 pub const FNM_CASEFOLD: c_int = 8;
 // TODO: FNM_EXTMATCH
 
-unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Vec<(Token, Range)> {
+unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
     fn any(leading: bool, flags: c_int) -> Token {
         let mut list = Vec::new();
         if flags & FNM_PATHNAME == FNM_PATHNAME {
@@ -40,8 +41,11 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Vec<(Token, Range)> 
         c == b'/' && flags & FNM_PATHNAME == FNM_PATHNAME
     }
 
-    let mut tokens = Vec::new();
     let mut leading = true;
+
+    let mut builder = TreeBuilder::default();
+    builder.start_internal(Token::Root, Range(1, Some(1)));
+    builder.start_internal(Token::Alternative, Range(1, Some(1)));
 
     while unsafe { *pattern != 0 } {
         let was_leading = leading;
@@ -50,7 +54,7 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Vec<(Token, Range)> 
         let c = unsafe { *pattern };
         pattern = unsafe { pattern.offset(1) };
 
-        tokens.push(match c {
+        let (token, range) = match c {
             b'\\' if flags & FNM_NOESCAPE == FNM_NOESCAPE => {
                 let c = unsafe { *pattern };
                 if c == 0 {
@@ -110,9 +114,13 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Vec<(Token, Range)> 
                 leading = is_leading(flags, c);
                 (Token::Char(c), ONCE)
             }
-        })
+        };
+        builder.leaf(token, range);
     }
-    tokens
+    builder.leaf(Token::End, ONCE);
+    builder.finish_internal();
+    builder.finish_internal();
+    builder.finish()
 }
 
 #[no_mangle]
@@ -128,10 +136,9 @@ pub unsafe extern "C" fn fnmatch(
     }
     let input = unsafe { slice::from_raw_parts(input as *const u8, len as usize) };
 
-    let mut tokens = unsafe { tokenize(pattern as *const u8, flags) };
-    tokens.push((Token::End, ONCE));
+    let tokens = unsafe { tokenize(pattern as *const u8, flags) };
 
-    if PosixRegex::new(Cow::Owned(vec![tokens]))
+    if PosixRegex::new(Cow::Owned(tokens))
         .case_insensitive(flags & FNM_CASEFOLD == FNM_CASEFOLD)
         .matches_exact(input)
         .is_some()
