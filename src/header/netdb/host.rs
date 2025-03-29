@@ -79,7 +79,7 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
     let mut iter: SplitWhitespace = r.split_whitespace();
 
     let addr_vec: Vec<u8> = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
-    let addr_cstr = addr_vec.as_slice().as_ptr() as *const i8;
+    let addr_cstr = addr_vec.as_slice().as_ptr() as *const c_char;
     let mut addr = mem::MaybeUninit::uninit();
     inet_aton(addr_cstr, addr.as_mut_ptr());
     let addr = addr.assume_init();
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
 
     HOST_ENTRY = hostent {
         h_name: HOST_NAME.as_mut().unwrap().as_mut_ptr() as *mut c_char,
-        h_aliases: host_aliases.as_mut_slice().as_mut_ptr() as *mut *mut i8,
+        h_aliases: host_aliases.as_mut_slice().as_mut_ptr() as *mut *mut c_char,
         h_addrtype: AF_INET,
         h_length: 4,
         h_addr_list: HOST_ADDR_LIST.as_mut_ptr(),

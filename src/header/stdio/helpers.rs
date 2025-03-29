@@ -14,7 +14,7 @@ use alloc::vec::Vec;
 pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
     let mut flags = if !strchr(mode_str, b'+' as i32).is_null() {
         O_RDWR
-    } else if (*mode_str) == b'r' as i8 {
+    } else if (*mode_str) == b'r' as c_char {
         O_RDONLY
     } else {
         O_WRONLY
@@ -25,12 +25,12 @@ pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
     if !strchr(mode_str, b'e' as i32).is_null() {
         flags |= O_CLOEXEC;
     }
-    if (*mode_str) != b'r' as i8 {
+    if (*mode_str) != b'r' as c_char {
         flags |= O_CREAT;
     }
-    if (*mode_str) == b'w' as i8 {
+    if (*mode_str) == b'w' as c_char {
         flags |= O_TRUNC;
-    } else if (*mode_str) == b'a' as i8 {
+    } else if (*mode_str) == b'a' as c_char {
         flags |= O_APPEND;
     }
 
@@ -39,21 +39,25 @@ pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
 
 /// Open a file with the file descriptor `fd` in the mode `mode`
 pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
-    if *mode != b'r' as i8 && *mode != b'w' as i8 && *mode != b'a' as i8 {
+    if *mode != b'r' as c_char && *mode != b'w' as c_char && *mode != b'a' as c_char {
         platform::ERRNO.set(errno::EINVAL);
         return None;
     }
 
     let mut flags = 0;
     if strchr(mode, b'+' as i32).is_null() {
-        flags |= if *mode == b'r' as i8 { F_NOWR } else { F_NORD };
+        flags |= if *mode == b'r' as c_char {
+            F_NOWR
+        } else {
+            F_NORD
+        };
     }
 
     if !strchr(mode, b'e' as i32).is_null() {
         fcntl(fd, F_SETFD, FD_CLOEXEC as c_ulonglong);
     }
 
-    if *mode == 'a' as i8 {
+    if *mode == 'a' as c_char {
         let f = fcntl(fd, F_GETFL, 0);
         if (f & O_APPEND) == 0 {
             fcntl(fd, F_SETFL, (f | O_APPEND) as c_ulonglong);
