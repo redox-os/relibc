@@ -1,26 +1,20 @@
 //! regex.h implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/regex.h.html
 
 use crate::{header::string::strlen, platform::types::*};
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box};
 use core::{mem, ptr, slice};
-use posix_regex::{
-    compile::{Error as CompileError, Range, Token},
-    PosixRegex, PosixRegexBuilder,
-};
+use posix_regex::{compile::Error as CompileError, tree::Tree, PosixRegex, PosixRegexBuilder};
 
 pub type regoff_t = size_t;
 
 #[repr(C)]
 pub struct regex_t {
-    // Can't be a normal Vec<T> because then the struct size won't be known
-    // from C.
+    // Points to a posix_regex::Tree
     ptr: *mut c_void,
-    length: size_t,
-    capacity: size_t,
-
     cflags: c_int,
     re_nsub: size_t,
 }
+
 #[repr(C)]
 pub struct regmatch_t {
     rm_so: regoff_t,
@@ -65,14 +59,11 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
         Ok(mut branches) => {
             let re_nsub = PosixRegex::new(Cow::Borrowed(&branches)).count_groups();
             *out = regex_t {
-                ptr: branches.as_mut_ptr() as *mut c_void,
-                length: branches.len(),
-                capacity: branches.capacity(),
+                ptr: Box::into_raw(Box::new(branches)) as *mut c_void,
 
                 cflags,
                 re_nsub,
             };
-            mem::forget(branches);
             0
         }
         Err(CompileError::EmptyRepetition)
@@ -89,11 +80,7 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
 #[no_mangle]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regfree(regex: *mut regex_t) {
-    Vec::from_raw_parts(
-        (*regex).ptr as *mut Vec<(Token, Range)>,
-        (*regex).length,
-        (*regex).capacity,
-    );
+    Box::from_raw((*regex).ptr);
 }
 
 #[no_mangle]
@@ -111,12 +98,12 @@ pub unsafe extern "C" fn regexec(
 
     let regex = &*regex;
 
-    // Allow specifying a compiler argument to the executor and vise versa
+    // Allow specifying a compiler argument to the executor and viceversa
     // because why not?
     let flags = regex.cflags | eflags;
 
     let input = slice::from_raw_parts(input as *const u8, strlen(input));
-    let branches = slice::from_raw_parts(regex.ptr as *const Vec<(Token, Range)>, regex.length);
+    let branches = &*(regex.ptr as *mut Tree);
 
     let matches = PosixRegex::new(Cow::Borrowed(&branches))
         .case_insensitive(flags & REG_ICASE == REG_ICASE)
