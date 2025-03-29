@@ -268,7 +268,7 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
 ///
 /// ## Source
 /// https://en.wikipedia.org/wiki/ISO_week_date
-const fn weeks_per_year(year: c_int) -> c_int {
+fn weeks_per_year(year: c_int) -> c_int {
     let year = year as f64;
     let p_y = (year + (year / 4.) - (year / 100.) + (year / 400.)) as c_int % 7;
     if p_y == 4 {
@@ -282,7 +282,7 @@ const fn weeks_per_year(year: c_int) -> c_int {
 ///
 /// ## Source
 /// https://en.wikipedia.org/wiki/ISO_week_date
-const fn week_of_year(time: &tm) -> c_int {
+fn week_of_year(time: &tm) -> c_int {
     let week = (10 + time.tm_yday - time.tm_wday) / 7;
 
     if week <= 1 {
