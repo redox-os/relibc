@@ -727,7 +727,7 @@ unsafe fn set_timezone(
 }
 
 #[inline(always)]
-pub fn get_offset(off: c_long) -> Option<FixedOffset> {
+pub const fn get_offset(off: c_long) -> Option<FixedOffset> {
     if off < 0 {
         FixedOffset::west_opt(off as _)
     } else {
