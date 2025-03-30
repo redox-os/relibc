@@ -156,7 +156,8 @@ pub unsafe fn initialize_freestanding() {
     page.tcb_ptr = page;
     page.tcb_len = syscall::PAGE_SIZE;
     page.tls_end = (page as *mut Tcb).cast();
-    *page.os_specific.thr_fd.get_mut() = None;
+    // Make sure to use ptr::write to prevent dropping the existing FdGuard
+    core::ptr::write(page.os_specific.thr_fd.get(), None);
 
     #[cfg(not(any(target_arch = "aarch64", target_arch = "riscv64")))]
     unsafe {
