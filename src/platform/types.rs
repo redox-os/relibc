@@ -42,7 +42,7 @@ pub type intptr_t = isize;
 pub type uintptr_t = usize;
 pub type ssize_t = isize;
 
-pub type c_char = i8;
+pub type c_char = core::ffi::c_char;
 #[cfg(target_pointer_width = "32")]
 pub type c_long = i32;
 #[cfg(target_pointer_width = "32")]
