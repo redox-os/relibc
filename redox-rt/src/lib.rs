@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(
-    asm_const,
     array_chunks,
     int_roundings,
     let_chains,

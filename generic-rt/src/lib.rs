@@ -92,7 +92,7 @@ impl<Os> GenericTcb<Os> {
         Some(&mut *Self::current_ptr()?)
     }
 }
-pub fn panic_notls(msg: impl core::fmt::Display) -> ! {
+pub fn panic_notls(_msg: impl core::fmt::Display) -> ! {
     //eprintln!("panicked in ld.so: {}", msg);
 
     core::intrinsics::abort();

@@ -12,11 +12,8 @@ use syscall::{
 
 use crate::{
     proc::{fork_inner, FdGuard},
-    signal::{
-        get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack, Sigaltstack,
-        PROC_CONTROL_STRUCT,
-    },
-    RtTcb, Tcb,
+    signal::{get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    Tcb,
 };
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
