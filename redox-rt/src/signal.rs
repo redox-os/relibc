@@ -1,17 +1,9 @@
-use core::{
-    cell::{Cell, UnsafeCell},
-    ffi::{c_int, c_void},
-    mem::MaybeUninit,
-    ptr::NonNull,
-    sync::atomic::{AtomicU8, AtomicUsize, Ordering},
-};
+use core::{ffi::c_int, mem::MaybeUninit, ptr::NonNull, sync::atomic::Ordering};
 
 use syscall::{
-    data::AtomicU64, Error, NonatomicUsize, RawAction, Result, RtSigInfo, SenderInfo,
-    SetSighandlerData, SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, EAGAIN, EINTR,
-    EINVAL, ENOMEM, EPERM, SIGABRT, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGILL, SIGKILL, SIGQUIT,
-    SIGSEGV, SIGSTOP, SIGSYS, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH, SIGXCPU,
-    SIGXFSZ,
+    data::AtomicU64, Error, RawAction, Result, RtSigInfo, SenderInfo, SetSighandlerData,
+    SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, EAGAIN, EINTR, EINVAL, ENOMEM, EPERM,
+    SIGCHLD, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH,
 };
 
 use crate::{arch::*, proc::FdGuard, sync::Mutex, RtTcb, Tcb};

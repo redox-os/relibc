@@ -1,4 +1,7 @@
-use core::num::{NonZeroU64, NonZeroUsize};
+use core::{
+    convert::Infallible,
+    num::{NonZeroU64, NonZeroUsize},
+};
 
 use crate::{
     c_str::{CStr, CString},
@@ -23,7 +26,7 @@ fn fexec_impl(
     total_args_envs_size: usize,
     extrainfo: &ExtraInfo,
     interp_override: Option<InterpOverride>,
-) -> Result<usize> {
+) -> Result<Infallible> {
     let memory = FdGuard::new(syscall::open("/scheme/memory", 0)?);
 
     let addrspace_selection_fd = match redox_rt::proc::fexec_impl(
@@ -91,7 +94,7 @@ pub fn execve(
     exec: Executable<'_>,
     arg_env: ArgEnv,
     interp_override: Option<InterpOverride>,
-) -> Result<usize> {
+) -> Result<Infallible> {
     // NOTE: We must omit O_CLOEXEC and close manually, otherwise it will be closed before we
     // have even read it!
     let (mut image_file, arg0) = match exec {
