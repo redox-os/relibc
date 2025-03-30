@@ -76,7 +76,7 @@ global_asm!(
 
 #[linkage = "weak"]
 #[no_mangle]
-extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {
+extern "C" fn relibc_panic(_pi: &::core::panic::PanicInfo) -> ! {
     loop {}
 }
 
