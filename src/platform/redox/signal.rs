@@ -18,7 +18,7 @@ use crate::{
 use core::mem::{self, offset_of};
 use redox_rt::{
     proc::FdGuard,
-    protocol::KillTarget,
+    protocol::ProcKillTarget,
     signal::{
         PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
     },
@@ -66,7 +66,7 @@ impl PalSignal for Sys {
     }
 
     fn kill(pid: pid_t, sig: c_int) -> Result<()> {
-        redox_rt::sys::posix_kill(KillTarget::from_raw(pid as usize), sig as usize)?;
+        redox_rt::sys::posix_kill(ProcKillTarget::from_raw(pid as usize), sig as usize)?;
         Ok(())
     }
     fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<()> {

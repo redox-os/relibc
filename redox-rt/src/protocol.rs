@@ -95,12 +95,12 @@ pub fn wcoredump(status: usize) -> bool {
     (status & 0x80) != 0
 }
 #[derive(Clone, Copy, Debug)]
-pub enum KillTarget {
+pub enum ProcKillTarget {
     SingleProc(usize),
     ProcGroup(usize),
     All,
 }
-impl KillTarget {
+impl ProcKillTarget {
     pub fn raw(self) -> usize {
         match self {
             Self::SingleProc(p) => p,

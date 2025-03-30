@@ -12,7 +12,7 @@ use syscall::{
 use crate::{
     arch::manually_enter_trampoline,
     proc::FdGuard,
-    protocol::{KillTarget, ProcCall, WaitFlags},
+    protocol::{ProcCall, ProcKillTarget, WaitFlags},
     signal::tmp_disable_signals,
     Tcb, DYNAMIC_PROC_INFO,
 };
@@ -49,7 +49,7 @@ pub fn posix_write(fd: usize, buf: &[u8]) -> Result<usize> {
     wrapper(true, || syscall::write(fd, buf))
 }
 #[inline]
-pub fn posix_kill(target: KillTarget, sig: usize) -> Result<()> {
+pub fn posix_kill(target: ProcKillTarget, sig: usize) -> Result<()> {
     match wrapper(false, || {
         proc_call(
             &mut [],
