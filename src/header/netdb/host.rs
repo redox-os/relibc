@@ -27,7 +27,7 @@ pub static mut HOST_ENTRY: hostent = hostent {
 };
 pub static mut HOST_NAME: Option<Vec<u8>> = None;
 pub static mut HOST_ALIASES: Option<Vec<Vec<u8>>> = None;
-static mut _HOST_ALIASES: Option<Vec<*mut i8>> = None;
+static mut _HOST_ALIASES: Option<Vec<*mut c_char>> = None;
 pub static mut HOST_ADDR: Option<in_addr> = None;
 pub static mut HOST_ADDR_LIST: [*mut c_char; 2] = [ptr::null_mut(); 2];
 pub static mut _HOST_ADDR_LIST: [u8; 4] = [0u8; 4];
@@ -79,7 +79,7 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
     let mut iter: SplitWhitespace = r.split_whitespace();
 
     let addr_vec: Vec<u8> = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
-    let addr_cstr = addr_vec.as_slice().as_ptr() as *const i8;
+    let addr_cstr = addr_vec.as_slice().as_ptr() as *const c_char;
     let mut addr = mem::MaybeUninit::uninit();
     inet_aton(addr_cstr, addr.as_mut_ptr());
     let addr = addr.assume_init();
@@ -96,11 +96,11 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
         .collect();
     HOST_ALIASES = Some(_host_aliases);
 
-    let mut host_aliases: Vec<*mut i8> = HOST_ALIASES
+    let mut host_aliases: Vec<*mut c_char> = HOST_ALIASES
         .as_mut()
         .unwrap()
         .iter_mut()
-        .map(|x| x.as_mut_ptr() as *mut i8)
+        .map(|x| x.as_mut_ptr() as *mut c_char)
         .chain([ptr::null_mut(), ptr::null_mut()])
         .collect();
 
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
 
     HOST_ENTRY = hostent {
         h_name: HOST_NAME.as_mut().unwrap().as_mut_ptr() as *mut c_char,
-        h_aliases: host_aliases.as_mut_slice().as_mut_ptr() as *mut *mut i8,
+        h_aliases: host_aliases.as_mut_slice().as_mut_ptr(),
         h_addrtype: AF_INET,
         h_length: 4,
         h_addr_list: HOST_ADDR_LIST.as_mut_ptr(),

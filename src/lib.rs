@@ -19,7 +19,6 @@
 #![feature(core_intrinsics)]
 #![feature(int_roundings)]
 #![feature(maybe_uninit_slice)]
-#![feature(maybe_uninit_uninit_array)]
 #![feature(lang_items)]
 #![feature(let_chains)]
 #![feature(linkage)]

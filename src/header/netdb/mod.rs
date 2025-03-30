@@ -249,9 +249,9 @@ pub unsafe extern "C" fn gethostbyaddr(
             if (*cp).is_null() {
                 break;
             }
-            let mut cp_slice: [i8; 4] = [0i8; 4];
+            let mut cp_slice: [c_char; 4] = [0; 4];
             (*cp).copy_to(cp_slice.as_mut_ptr(), 4);
-            let cp_s_addr = mem::transmute::<[i8; 4], u32>(cp_slice);
+            let cp_s_addr = mem::transmute::<[c_char; 4], u32>(cp_slice);
             if cp_s_addr == addr.s_addr {
                 sethostent(HOST_STAYOPEN);
                 return p;
@@ -263,7 +263,7 @@ pub unsafe extern "C" fn gethostbyaddr(
     //TODO actually get aliases
     let mut _host_aliases: Vec<Vec<u8>> = Vec::new();
     _host_aliases.push(vec![b'\0']);
-    let mut host_aliases: Vec<*mut i8> = Vec::new();
+    let mut host_aliases: Vec<*mut c_char> = Vec::new();
     host_aliases.push(ptr::null_mut());
     HOST_ALIASES = Some(_host_aliases);
 
@@ -274,7 +274,7 @@ pub unsafe extern "C" fn gethostbyaddr(
             HOST_NAME = Some(host_name);
             HOST_ENTRY = hostent {
                 h_name: HOST_NAME.as_mut().unwrap().as_mut_ptr() as *mut c_char,
-                h_aliases: host_aliases.as_mut_slice().as_mut_ptr() as *mut *mut i8,
+                h_aliases: host_aliases.as_mut_slice().as_mut_ptr(),
                 h_addrtype: format,
                 h_length: length as i32,
                 h_addr_list: HOST_ADDR_LIST.as_mut_ptr(),
@@ -395,14 +395,14 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     //TODO actually get aliases
     let mut _host_aliases: Vec<Vec<u8>> = Vec::new();
     _host_aliases.push(vec![b'\0']);
-    let mut host_aliases: Vec<*mut i8> = Vec::new();
+    let mut host_aliases: Vec<*mut c_char> = Vec::new();
     host_aliases.push(ptr::null_mut());
     host_aliases.push(ptr::null_mut());
     HOST_ALIASES = Some(_host_aliases);
 
     HOST_ENTRY = hostent {
         h_name: HOST_NAME.as_mut().unwrap().as_mut_ptr() as *mut c_char,
-        h_aliases: host_aliases.as_mut_slice().as_mut_ptr() as *mut *mut i8,
+        h_aliases: host_aliases.as_mut_slice().as_mut_ptr(),
         h_addrtype: AF_INET,
         h_length: 4,
         h_addr_list: HOST_ADDR_LIST.as_mut_ptr(),
@@ -466,7 +466,7 @@ pub unsafe extern "C" fn getnetent() -> *mut netent {
     NET_NAME = Some(net_name);
 
     let addr_vec: Vec<u8> = iter.next().unwrap().bytes().chain(Some(b'\0')).collect();
-    let addr_cstr = addr_vec.as_slice().as_ptr() as *const i8;
+    let addr_cstr = addr_vec.as_slice().as_ptr() as *const c_char;
     let mut addr = mem::MaybeUninit::uninit();
     inet_aton(addr_cstr, addr.as_mut_ptr());
     let addr = addr.assume_init();
@@ -475,16 +475,16 @@ pub unsafe extern "C" fn getnetent() -> *mut netent {
     let mut _net_aliases: Vec<Vec<u8>> = iter
         .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
         .collect();
-    let mut net_aliases: Vec<*mut i8> = _net_aliases
+    let mut net_aliases: Vec<*mut c_char> = _net_aliases
         .iter_mut()
-        .map(|x| x.as_mut_ptr() as *mut i8)
+        .map(|x| x.as_mut_ptr() as *mut c_char)
         .chain(Some(ptr::null_mut()))
         .collect();
     NET_ALIASES = Some(_net_aliases);
 
     NET_ENTRY = netent {
         n_name: NET_NAME.as_mut().unwrap().as_mut_ptr() as *mut c_char,
-        n_aliases: net_aliases.as_mut_slice().as_mut_ptr() as *mut *mut i8,
+        n_aliases: net_aliases.as_mut_slice().as_mut_ptr(),
         n_addrtype: AF_INET,
         n_net: NET_ADDR.unwrap() as c_ulong,
     };
@@ -576,7 +576,7 @@ pub unsafe extern "C" fn getprotoent() -> *mut protoent {
 
     let mut num = iter.next().unwrap().as_bytes().to_vec();
     num.push(b'\0');
-    PROTO_NUM = Some(atoi(num.as_mut_slice().as_mut_ptr() as *mut i8));
+    PROTO_NUM = Some(atoi(num.as_mut_slice().as_mut_ptr() as *mut c_char));
 
     let mut _proto_aliases: Vec<Vec<u8>> = iter
         .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
@@ -592,7 +592,7 @@ pub unsafe extern "C" fn getprotoent() -> *mut protoent {
 
     PROTO_ENTRY = protoent {
         p_name: PROTO_NAME.as_mut().unwrap().as_mut_slice().as_mut_ptr() as *mut c_char,
-        p_aliases: proto_aliases.as_mut_slice().as_mut_ptr() as *mut *mut i8,
+        p_aliases: proto_aliases.as_mut_slice().as_mut_ptr() as *mut *mut c_char,
         p_proto: PROTO_NUM.unwrap(),
     };
     if PROTO_STAYOPEN == 0 {
@@ -698,7 +698,7 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
             None => continue,
         };
         SERV_PORT =
-            Some(htons(atoi(port.as_mut_slice().as_mut_ptr() as *mut i8) as u16) as u32 as i32);
+            Some(htons(atoi(port.as_mut_slice().as_mut_ptr() as *mut c_char) as u16) as u32 as i32);
         let proto = match split.next() {
             Some(proto) => proto.bytes().chain(Some(b'\0')).collect(),
             None => continue,
@@ -733,7 +733,7 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
 
         SERV_ENTRY = servent {
             s_name: SERV_NAME.as_mut().unwrap().as_mut_slice().as_mut_ptr() as *mut c_char,
-            s_aliases: serv_aliases.as_mut_slice().as_mut_ptr() as *mut *mut i8,
+            s_aliases: serv_aliases.as_mut_slice().as_mut_ptr() as *mut *mut c_char,
             s_port: SERV_PORT.unwrap(),
             s_proto: SERV_PROTO.as_mut().unwrap().as_mut_slice().as_mut_ptr() as *mut c_char,
         };

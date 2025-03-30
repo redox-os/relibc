@@ -1,3 +1,5 @@
+use crate::platform::types::c_char;
+
 use super::{apply_grouping, FormatFlags, LocaleMonetaryInfo, DEFAULT_MONETARY};
 use alloc::string::{String, ToString};
 use core::{ffi::CStr, ptr, result, slice, str};
@@ -11,10 +13,10 @@ use libm::{fabs, floor, pow, round, trunc};
 /// - The number of characters written (excluding the null terminator), or -1 if
 /// an error occurs (e.g., invalid input, buffer overflow)
 pub unsafe extern "C" fn strfmon(
-    s: *mut i8,        // Output buffer
-    maxsize: usize,    // Maximum size of the buffer
-    format: *const i8, // Format string
-    mut args: ...      // Variadic arguments for monetary values
+    s: *mut c_char,        // Output buffer
+    maxsize: usize,        // Maximum size of the buffer
+    format: *const c_char, // Format string
+    mut args: ...          // Variadic arguments for monetary values
 ) -> isize {
     // Validate input pointers and buffer size
     if s.is_null() || format.is_null() || maxsize == 0 {
