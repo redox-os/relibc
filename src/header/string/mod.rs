@@ -620,7 +620,7 @@ pub unsafe extern "C" fn strpbrk(s1: *const c_char, s2: *const c_char) -> *mut c
 #[no_mangle]
 pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
     let len = strlen(s) as isize;
-    let c = c as i8;
+    let c = c as c_char;
     let mut i = len - 1;
     while i >= 0 {
         if *s.offset(i) == c {

@@ -1094,7 +1094,7 @@ unsafe fn with_argv(
             .unwrap()
     });
 
-    let mut stack: [MaybeUninit<*const c_char>; 32] = MaybeUninit::uninit_array();
+    let mut stack: [MaybeUninit<*const c_char>; 32] = [MaybeUninit::uninit(); 32];
 
     let out = if argc < 32 {
         stack.as_mut_slice()
