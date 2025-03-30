@@ -22,6 +22,11 @@ pub enum ProcCall {
     Exit = 2,
     Waitpgid = 3,
     SetResugid = 4,
+    Setpgid = 5,
+    Getsid = 6,
+    Setsid = 7,
+    Kill = 8,
+    Sigq = 9,
 }
 
 impl ProcCall {
@@ -31,6 +36,12 @@ impl ProcCall {
             1 => Self::Setrens,
             2 => Self::Exit,
             3 => Self::Waitpgid,
+            4 => Self::SetResugid,
+            5 => Self::Setpgid,
+            6 => Self::Getsid,
+            7 => Self::Setsid,
+            8 => Self::Kill,
+            9 => Self::Sigq,
             _ => return None,
         })
     }
@@ -82,4 +93,29 @@ pub fn wexitstatus(status: usize) -> usize {
 /// True if status indicates a core dump was created.
 pub fn wcoredump(status: usize) -> bool {
     (status & 0x80) != 0
+}
+#[derive(Clone, Copy, Debug)]
+pub enum KillTarget {
+    SingleProc(usize),
+    ProcGroup(usize),
+    All,
+}
+impl KillTarget {
+    pub fn raw(self) -> usize {
+        match self {
+            Self::SingleProc(p) => p,
+            Self::ProcGroup(g) => usize::wrapping_neg(g),
+            Self::All => usize::wrapping_neg(1),
+        }
+    }
+    pub fn from_raw(raw: usize) -> Self {
+        let raw = raw as isize;
+        if raw == -1 {
+            Self::All
+        } else if raw < 0 {
+            Self::ProcGroup(raw as usize)
+        } else {
+            Self::SingleProc(raw as usize)
+        }
+    }
 }

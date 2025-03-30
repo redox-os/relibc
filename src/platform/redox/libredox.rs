@@ -1,7 +1,7 @@
 use core::{slice, str};
 
 use redox_rt::{
-    protocol::WaitFlags,
+    protocol::{KillTarget, WaitFlags},
     sys::{posix_read, posix_write, WaitpidTarget},
 };
 use syscall::{Error, Result, EMFILE};
@@ -259,7 +259,7 @@ pub unsafe extern "C" fn redox_waitpid_v1(pid: usize, status: *mut i32, options:
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_kill_v1(pid: usize, signal: u32) -> RawResult {
-    Error::mux(redox_rt::sys::posix_kill(pid, signal as usize).map(|()| 0))
+    Error::mux(redox_rt::sys::posix_kill(KillTarget::from_raw(pid), signal as usize).map(|()| 0))
 }
 
 #[no_mangle]

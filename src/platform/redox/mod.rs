@@ -839,7 +839,8 @@ impl Pal for Sys {
     }
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> Result<()> {
-        Ok(redox_rt::sys::posix_setpgid(pid as usize, pgid as usize)?)
+        redox_rt::sys::posix_setpgid(pid as usize, pgid as usize)?;
+        Ok(())
     }
 
     fn setpriority(which: c_int, who: id_t, prio: c_int) -> Result<()> {
@@ -852,37 +853,32 @@ impl Pal for Sys {
     }
 
     fn setsid() -> Result<()> {
-        let session_id = Self::getpid();
-        assert!(session_id >= 0);
-        let mut file = File::open(
-            c"/scheme/thisproc/current/session_id".into(),
-            fcntl::O_WRONLY | fcntl::O_CLOEXEC,
-        )?;
-        file.write(&usize::to_ne_bytes(session_id.try_into().unwrap()))
-            .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
+        redox_rt::sys::posix_setsid()?;
         Ok(())
     }
 
     fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {
-        Ok(redox_rt::sys::posix_setresugid(
+        redox_rt::sys::posix_setresugid(
             None,
             None,
             None,
             cvt_uid(rgid)?,
             cvt_uid(egid)?,
             cvt_uid(sgid)?,
-        )?)
+        )?;
+        Ok(())
     }
 
     fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> Result<()> {
-        Ok(redox_rt::sys::posix_setresugid(
+        redox_rt::sys::posix_setresugid(
             cvt_uid(ruid)?,
             cvt_uid(euid)?,
             cvt_uid(suid)?,
             None,
             None,
             None,
-        )?)
+        )?;
+        Ok(())
     }
 
     fn symlink(path1: CStr, path2: CStr) -> Result<()> {

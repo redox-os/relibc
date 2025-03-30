@@ -6,13 +6,13 @@ use core::{
 
 use syscall::{
     error::{Error, Result, EINTR},
-    CallFlags, RtSigInfo, TimeSpec,
+    CallFlags, RtSigInfo, TimeSpec, EINVAL,
 };
 
 use crate::{
     arch::manually_enter_trampoline,
     proc::FdGuard,
-    protocol::{ProcCall, WaitFlags},
+    protocol::{KillTarget, ProcCall, WaitFlags},
     signal::tmp_disable_signals,
     Tcb, DYNAMIC_PROC_INFO,
 };
@@ -49,23 +49,32 @@ pub fn posix_write(fd: usize, buf: &[u8]) -> Result<usize> {
     wrapper(true, || syscall::write(fd, buf))
 }
 #[inline]
-pub fn posix_kill(pid: usize, sig: usize) -> Result<()> {
-    match wrapper(false, || Ok(todo!("kill"))) {
+pub fn posix_kill(target: KillTarget, sig: usize) -> Result<()> {
+    match wrapper(false, || {
+        proc_call(
+            &mut [],
+            CallFlags::empty(),
+            &[ProcCall::Kill as usize, target.raw(), sig],
+        )
+    }) {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
     }
 }
 #[inline]
 pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
-    let siginf = RtSigInfo {
+    let mut siginf = RtSigInfo {
         arg,
         code: -1, // TODO: SI_QUEUE constant
         uid: 0,   // TODO
         pid: posix_getpid(),
     };
-    match wrapper(false, || unsafe {
-        //syscall::syscall3(syscall::SYS_SIGENQUEUE, pid, sig, addr_of!(siginf) as usize)
-        Ok(todo!("sigenqueue"))
+    match wrapper(false, || {
+        proc_call(
+            &mut siginf,
+            CallFlags::empty(),
+            &[ProcCall::Sigq as usize, pid, sig],
+        )
     }) {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
@@ -80,16 +89,6 @@ pub fn posix_getpid() -> u32 {
 pub fn posix_getppid() -> u32 {
     // SAFETY: read-only except during program/fork child initialization
     unsafe { addr_of!((*crate::STATIC_PROC_INFO.get()).ppid).read() }
-}
-#[inline]
-pub fn posix_killpg(pgrp: usize, sig: usize) -> Result<()> {
-    match wrapper(false, ||
-        //syscall::kill(usize::wrapping_neg(pgrp), sig)
-        Ok(todo!("killpg")))
-    {
-        Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
-        Err(error) => Err(error),
-    }
 }
 #[inline]
 pub unsafe fn sys_futex_wait(addr: *mut u32, val: u32, deadline: Option<&TimeSpec>) -> Result<()> {
@@ -271,11 +270,31 @@ pub fn setrens(rns: usize, ens: usize) -> Result<()> {
     Ok(())
 }
 pub fn posix_getpgid(pid: usize) -> Result<usize> {
-    todo!("posix_getpgid")
+    proc_call(
+        &mut [],
+        CallFlags::empty(),
+        &[ProcCall::Setpgid as usize, pid, usize::wrapping_neg(1)],
+    )
 }
 pub fn posix_setpgid(pid: usize, pgid: usize) -> Result<()> {
-    todo!("posix_setpgid")
+    if pgid == usize::wrapping_neg(1) {
+        return Err(Error::new(EINVAL));
+    }
+    proc_call(
+        &mut [],
+        CallFlags::empty(),
+        &[ProcCall::Setpgid as usize, pid, pgid],
+    )?;
+    Ok(())
 }
 pub fn posix_getsid(pid: usize) -> Result<usize> {
-    todo!("posix_getsid")
+    proc_call(
+        &mut [],
+        CallFlags::empty(),
+        &[ProcCall::Getsid as usize, pid],
+    )
+}
+pub fn posix_setsid() -> Result<()> {
+    proc_call(&mut [], CallFlags::empty(), &[ProcCall::Setsid as usize])?;
+    Ok(())
 }
