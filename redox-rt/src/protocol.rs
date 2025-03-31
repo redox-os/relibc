@@ -30,6 +30,16 @@ pub enum ProcCall {
     Setsid = 7,
     Kill = 8,
     Sigq = 9,
+
+    // TODO: replace with sendfd equivalent syscall for sending memory
+    SyncSigPctl = 10,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(usize)]
+pub enum ThreadCall {
+    // TODO: replace with sendfd equivalent syscall for sending memory, or force userspace to
+    // obtain its TCB memory from this server
+    SyncSigTctl = 0,
 }
 
 impl ProcCall {
@@ -45,6 +55,15 @@ impl ProcCall {
             7 => Self::Setsid,
             8 => Self::Kill,
             9 => Self::Sigq,
+            10 => Self::SyncSigPctl,
+            _ => return None,
+        })
+    }
+}
+impl ThreadCall {
+    pub fn try_from_raw(raw: usize) -> Option<Self> {
+        Some(match raw {
+            0 => Self::SyncSigTctl,
             _ => return None,
         })
     }

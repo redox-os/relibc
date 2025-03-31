@@ -10,11 +10,7 @@ use syscall::{
 };
 
 use crate::{
-    arch::manually_enter_trampoline,
-    proc::FdGuard,
-    protocol::{ProcCall, ProcKillTarget, WaitFlags},
-    signal::tmp_disable_signals,
-    DynamicProcInfo, Tcb, DYNAMIC_PROC_INFO,
+    arch::manually_enter_trampoline, proc::FdGuard, protocol::{ProcCall, ProcKillTarget, WaitFlags}, signal::tmp_disable_signals, DynamicProcInfo, RtTcb, Tcb, DYNAMIC_PROC_INFO
 };
 
 #[inline]
@@ -116,17 +112,23 @@ pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
     )
     .map(|awoken| awoken as u32)
 }
-fn proc_call(payload: &mut [u8], flags: CallFlags, metadata: &[usize]) -> Result<usize> {
+pub fn sys_call(fd: usize, payload: &mut [u8], flags: CallFlags, metadata: &[usize]) -> Result<usize> {
     unsafe {
         syscall::syscall5(
             syscall::SYS_CALL,
-            **crate::current_proc_fd(),
+            fd,
             payload.as_mut_ptr() as usize,
             payload.len(),
             metadata.len() | flags.bits(),
             metadata.as_ptr() as usize,
         )
     }
+}
+pub fn proc_call(payload: &mut [u8], flags: CallFlags, metadata: &[usize]) -> Result<usize> {
+    sys_call(**crate::current_proc_fd(), payload, flags, metadata)
+}
+pub fn thread_call(payload: &mut [u8], flags: CallFlags, metadata: &[usize]) -> Result<usize> {
+    sys_call(**RtTcb::current().thread_fd(), payload, flags, metadata)
 }
 
 #[derive(Clone, Copy, Debug)]

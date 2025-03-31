@@ -1,12 +1,12 @@
 use core::{ffi::c_int, mem::MaybeUninit, ptr::NonNull, sync::atomic::Ordering};
 
 use syscall::{
-    data::AtomicU64, Error, RawAction, Result, RtSigInfo, SenderInfo, SetSighandlerData,
+    data::AtomicU64, CallFlags, Error, RawAction, Result, RtSigInfo, SenderInfo, SetSighandlerData,
     SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, EAGAIN, EINTR, EINVAL, ENOMEM, EPERM,
     SIGCHLD, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH,
 };
 
-use crate::{arch::*, proc::FdGuard, sync::Mutex, RtTcb, Tcb};
+use crate::{arch::*, proc::FdGuard, protocol::{ProcCall, ThreadCall}, sync::Mutex, sys::{proc_call, thread_call}, RtTcb, Tcb};
 
 #[cfg(target_arch = "x86_64")]
 static CPUID_EAX1_ECX: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
@@ -576,6 +576,13 @@ pub fn setup_sighandler(tcb: &RtTcb) {
         syscall::dup(**tcb.thread_fd(), b"sighandler").expect("failed to open sighandler fd"),
     );
     let _ = syscall::write(*fd, &data).expect("failed to write to sighandler fd");
+    thread_call(&mut [], CallFlags::empty(), &[
+        ThreadCall::SyncSigTctl as usize,
+    ]);
+    // TODO: Only run for first thread
+    proc_call(&mut [], CallFlags::empty(), &[
+        ProcCall::SyncSigPctl as usize,
+    ]);
 
     // TODO: Inherited set of ignored signals
     set_sigmask(Some(0), None);
