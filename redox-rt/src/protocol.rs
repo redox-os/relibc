@@ -1,14 +1,17 @@
 use bitflags::bitflags;
 
 #[derive(Clone, Copy, Debug, Default)]
+#[repr(C)]
 pub struct ProcMeta {
     pub pid: u32,
     pub pgid: u32,
     pub ppid: u32,
-    pub euid: u32,
     pub ruid: u32,
-    pub egid: u32,
+    pub euid: u32,
+    pub suid: u32,
     pub rgid: u32,
+    pub egid: u32,
+    pub sgid: u32,
     pub ens: u32,
     pub rns: u32,
 }

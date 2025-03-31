@@ -5,7 +5,7 @@ use core::{
 };
 use redox_rt::{
     protocol::{wifstopped, wstopsig, WaitFlags},
-    sys::WaitpidTarget,
+    sys::{Resugid, WaitpidTarget},
     RtTcb,
 };
 use syscall::{
@@ -104,12 +104,11 @@ impl Pal for Sys {
 
         syscall::fstat(*fd as usize, &mut stat)?;
 
-        let uid = redox_rt::sys::posix_getruid() as usize;
-        let gid = redox_rt::sys::posix_getrgid() as usize;
+        let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
 
-        let perms = if stat.st_uid as usize == uid {
+        let perms = if stat.st_uid == ruid {
             stat.st_mode >> (3 * 2 & 0o7)
-        } else if stat.st_gid as usize == gid {
+        } else if stat.st_gid == rgid {
             stat.st_mode >> (3 * 1 & 0o7)
         } else {
             stat.st_mode & 0o7
@@ -412,15 +411,15 @@ impl Pal for Sys {
     }
 
     fn getegid() -> gid_t {
-        redox_rt::sys::posix_getegid() as gid_t
+        redox_rt::sys::posix_getresugid().egid as gid_t
     }
 
     fn geteuid() -> uid_t {
-        redox_rt::sys::posix_geteuid() as uid_t
+        redox_rt::sys::posix_getresugid().euid as uid_t
     }
 
     fn getgid() -> gid_t {
-        redox_rt::sys::posix_getrgid() as gid_t
+        redox_rt::sys::posix_getresugid().rgid as gid_t
     }
 
     unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int> {
@@ -528,7 +527,7 @@ impl Pal for Sys {
     }
 
     fn getuid() -> uid_t {
-        redox_rt::sys::posix_getruid() as uid_t
+        redox_rt::sys::posix_getresugid().ruid as uid_t
     }
 
     fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
@@ -858,26 +857,26 @@ impl Pal for Sys {
     }
 
     fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {
-        redox_rt::sys::posix_setresugid(
-            None,
-            None,
-            None,
-            cvt_uid(rgid)?,
-            cvt_uid(egid)?,
-            cvt_uid(sgid)?,
-        )?;
+        redox_rt::sys::posix_setresugid(&Resugid {
+            ruid: None,
+            euid: None,
+            suid: None,
+            rgid: cvt_uid(rgid)?,
+            egid: cvt_uid(egid)?,
+            sgid: cvt_uid(sgid)?,
+        })?;
         Ok(())
     }
 
     fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> Result<()> {
-        redox_rt::sys::posix_setresugid(
-            cvt_uid(ruid)?,
-            cvt_uid(euid)?,
-            cvt_uid(suid)?,
-            None,
-            None,
-            None,
-        )?;
+        redox_rt::sys::posix_setresugid(&Resugid {
+            ruid: cvt_uid(ruid)?,
+            euid: cvt_uid(euid)?,
+            suid: cvt_uid(suid)?,
+            rgid: None,
+            egid: None,
+            sgid: None,
+        })?;
         Ok(())
     }
 

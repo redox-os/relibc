@@ -227,19 +227,19 @@ pub unsafe extern "C" fn redox_get_pid_v1() -> RawResult {
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_get_euid_v1() -> RawResult {
-    redox_rt::sys::posix_geteuid() as _
+    redox_rt::sys::posix_getresugid().euid as _
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_get_ruid_v1() -> RawResult {
-    redox_rt::sys::posix_getruid() as _
+    redox_rt::sys::posix_getresugid().ruid as _
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_get_egid_v1() -> RawResult {
-    redox_rt::sys::posix_getegid() as _
+    redox_rt::sys::posix_getresugid().egid as _
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_get_rgid_v1() -> RawResult {
-    redox_rt::sys::posix_getrgid() as _
+    redox_rt::sys::posix_getresugid().rgid as _
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {

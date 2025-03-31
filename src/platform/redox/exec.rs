@@ -16,6 +16,7 @@ use crate::{
 
 use redox_rt::{
     proc::{ExtraInfo, FdGuard, FexecResult, InterpOverride},
+    sys::Resugid,
     RtTcb,
 };
 use syscall::{data::Stat, error::*, flag::*};
@@ -120,12 +121,11 @@ pub fn execve(
 
     let mut stat = Stat::default();
     syscall::fstat(*image_file as usize, &mut stat)?;
-    let uid = redox_rt::sys::posix_getruid() as usize;
-    let gid = redox_rt::sys::posix_getrgid() as usize;
+    let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
 
-    let mode = if uid == stat.st_uid as usize {
+    let mode = if ruid == stat.st_uid {
         (stat.st_mode >> 3 * 2) & 0o7
-    } else if gid == stat.st_gid as usize {
+    } else if rgid == stat.st_gid {
         (stat.st_mode >> 3 * 1) & 0o7
     } else {
         stat.st_mode & 0o7

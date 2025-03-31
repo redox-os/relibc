@@ -937,10 +937,12 @@ pub unsafe fn make_init() -> &'static FdGuard {
     });
     *DYNAMIC_PROC_INFO.lock() = crate::DynamicProcInfo {
         pgid: 1,
-        egid: 0,
-        euid: 0,
-        rgid: 0,
         ruid: 0,
+        euid: 0,
+        suid: 0,
+        rgid: 0,
+        egid: 0,
+        sgid: 0,
     };
     (*STATIC_PROC_INFO.get()).proc_fd.as_ref().unwrap()
 }

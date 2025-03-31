@@ -206,25 +206,29 @@ pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
     {
         *DYNAMIC_PROC_INFO.lock() = DynamicProcInfo {
             pgid: metadata.pgid,
-            egid: metadata.egid,
-            euid: metadata.euid,
             ruid: metadata.ruid,
+            euid: metadata.euid,
+            suid: metadata.suid,
+            egid: metadata.egid,
             rgid: metadata.rgid,
+            sgid: metadata.sgid,
         };
     }
 }
 
 pub(crate) struct StaticProcInfo {
     pid: u32,
-    ppid: u32,
+    ppid: u32, // TODO: dynamic
     proc_fd: Option<FdGuard>,
 }
 struct DynamicProcInfo {
     pgid: u32,
     euid: u32,
+    suid: u32,
     ruid: u32,
     egid: u32,
     rgid: u32,
+    sgid: u32,
 }
 
 static STATIC_PROC_INFO: SyncUnsafeCell<StaticProcInfo> = SyncUnsafeCell::new(StaticProcInfo {
@@ -234,10 +238,12 @@ static STATIC_PROC_INFO: SyncUnsafeCell<StaticProcInfo> = SyncUnsafeCell::new(St
 });
 static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
     pgid: u32::MAX,
-    euid: u32::MAX,
-    egid: u32::MAX,
     ruid: u32::MAX,
+    euid: u32::MAX,
+    suid: u32::MAX,
     rgid: u32::MAX,
+    egid: u32::MAX,
+    sgid: u32::MAX,
 });
 
 #[inline]

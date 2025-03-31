@@ -14,7 +14,7 @@ use crate::{
     proc::FdGuard,
     protocol::{ProcCall, ProcKillTarget, WaitFlags},
     signal::tmp_disable_signals,
-    Tcb, DYNAMIC_PROC_INFO,
+    DynamicProcInfo, Tcb, DYNAMIC_PROC_INFO,
 };
 
 #[inline]
@@ -189,14 +189,18 @@ pub fn get_umask() -> u32 {
     UMASK.load(Ordering::Acquire)
 }
 
-pub fn posix_setresugid(
-    ruid: Option<u32>,
-    euid: Option<u32>,
-    suid: Option<u32>,
-    rgid: Option<u32>,
-    egid: Option<u32>,
-    sgid: Option<u32>,
-) -> Result<()> {
+/// Real/Effective/Set-User/Group ID
+pub struct Resugid<T> {
+    pub ruid: T,
+    pub euid: T,
+    pub suid: T,
+    pub rgid: T,
+    pub egid: T,
+    pub sgid: T,
+}
+
+/// Sets [res][ug]id, fields that are None will be unchanged.
+pub fn posix_setresugid(ids: &Resugid<Option<u32>>) -> Result<()> {
     // TODO: not sure how "tmp" an IPC call is?
     let _sig_guard = tmp_disable_signals();
     let mut guard = DYNAMIC_PROC_INFO.lock();
@@ -205,12 +209,12 @@ pub fn posix_setresugid(
     plain::slice_from_mut_bytes(&mut buf)
         .unwrap()
         .copy_from_slice(&[
-            ruid.unwrap_or(u32::MAX),
-            euid.unwrap_or(u32::MAX),
-            suid.unwrap_or(u32::MAX),
-            rgid.unwrap_or(u32::MAX),
-            egid.unwrap_or(u32::MAX),
-            sgid.unwrap_or(u32::MAX),
+            ids.ruid.unwrap_or(u32::MAX),
+            ids.euid.unwrap_or(u32::MAX),
+            ids.suid.unwrap_or(u32::MAX),
+            ids.rgid.unwrap_or(u32::MAX),
+            ids.egid.unwrap_or(u32::MAX),
+            ids.sgid.unwrap_or(u32::MAX),
         ]);
 
     proc_call(
@@ -219,38 +223,46 @@ pub fn posix_setresugid(
         &[ProcCall::SetResugid as usize],
     )?;
 
-    if let Some(ruid) = ruid {
+    if let Some(ruid) = ids.ruid {
         guard.ruid = ruid;
     }
-    if let Some(euid) = euid {
+    if let Some(euid) = ids.euid {
         guard.euid = euid;
     }
-    // TODO: suid?
-    if let Some(rgid) = rgid {
+    if let Some(suid) = ids.suid {
+        guard.suid = suid;
+    }
+    if let Some(rgid) = ids.rgid {
         guard.rgid = rgid;
     }
-    if let Some(egid) = egid {
+    if let Some(egid) = ids.egid {
         guard.egid = egid;
     }
-    // TODO: sgid?
+    if let Some(sgid) = ids.sgid {
+        guard.sgid = sgid;
+    }
 
     Ok(())
 }
-pub fn posix_getruid() -> u32 {
-    let _guard = tmp_disable_signals();
-    DYNAMIC_PROC_INFO.lock().ruid
-}
-pub fn posix_getrgid() -> u32 {
-    let _guard = tmp_disable_signals();
-    DYNAMIC_PROC_INFO.lock().rgid
-}
-pub fn posix_geteuid() -> u32 {
-    let _guard = tmp_disable_signals();
-    DYNAMIC_PROC_INFO.lock().euid
-}
-pub fn posix_getegid() -> u32 {
-    let _guard = tmp_disable_signals();
-    DYNAMIC_PROC_INFO.lock().egid
+pub fn posix_getresugid() -> Resugid<u32> {
+    let _sig_guard = tmp_disable_signals();
+    let DynamicProcInfo {
+        ruid,
+        euid,
+        suid,
+        rgid,
+        egid,
+        sgid,
+        ..
+    } = *DYNAMIC_PROC_INFO.lock();
+    Resugid {
+        ruid,
+        euid,
+        suid,
+        rgid,
+        egid,
+        sgid,
+    }
 }
 pub fn posix_exit(status: i32) -> ! {
     proc_call(
