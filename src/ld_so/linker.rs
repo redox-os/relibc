@@ -612,10 +612,13 @@ impl Linker {
         unsafe {
             if !dlopened {
                 #[cfg(target_os = "redox")]
-                let (tcb, old_tcb) = {
+                let (tcb, old_tcb, thr_fd) = {
                     use redox_rt::signal::tmp_disable_signals;
 
                     let old_tcb = Tcb::current().expect("failed to get bootstrap TCB");
+                    let thr_fd = (&mut *old_tcb.os_specific.thr_fd.get())
+                        .take()
+                        .expect("no thread FD present");
                     let new_tcb = Tcb::new(self.tls_size)?; // This actually allocates TCB, TLS and ABI page.
 
                     // Stash
@@ -653,7 +656,7 @@ impl Linker {
                     new_tcb.generic.tcb_len = new_tcb_len;
 
                     drop(_guard);
-                    (new_tcb, old_tcb as *mut Tcb as *mut c_void)
+                    (new_tcb, old_tcb as *mut Tcb as *mut c_void, thr_fd)
                 };
 
                 #[cfg(not(target_os = "redox"))]
@@ -694,7 +697,7 @@ impl Linker {
                 tcb.copy_masters().map_err(|_| DlError::Malformed)?;
                 tcb.activate(
                     #[cfg(target_os = "redox")]
-                    todo!(),
+                    thr_fd,
                 );
 
                 #[cfg(target_os = "redox")]

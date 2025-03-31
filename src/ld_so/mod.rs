@@ -196,6 +196,10 @@ pub unsafe fn init(
             #[cfg(target_os = "redox")]
             thr_fd,
         );
+    } else {
+        // The thread fd must already be present in the already existing TCB. Don't close it.
+        #[cfg(target_os = "redox")]
+        core::mem::forget(thr_fd);
     }
 }
 
