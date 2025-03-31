@@ -96,6 +96,7 @@ pub fn wcoredump(status: usize) -> bool {
 }
 #[derive(Clone, Copy, Debug)]
 pub enum ProcKillTarget {
+    ThisGroup,
     SingleProc(usize),
     ProcGroup(usize),
     All,
@@ -103,6 +104,7 @@ pub enum ProcKillTarget {
 impl ProcKillTarget {
     pub fn raw(self) -> usize {
         match self {
+            Self::ThisGroup => 0,
             Self::SingleProc(p) => p,
             Self::ProcGroup(g) => usize::wrapping_neg(g),
             Self::All => usize::wrapping_neg(1),
@@ -110,7 +112,9 @@ impl ProcKillTarget {
     }
     pub fn from_raw(raw: usize) -> Self {
         let raw = raw as isize;
-        if raw == -1 {
+        if raw == 0 {
+            Self::ThisGroup
+        } else if raw == -1 {
             Self::All
         } else if raw < 0 {
             Self::ProcGroup(raw as usize)
