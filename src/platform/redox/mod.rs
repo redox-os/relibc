@@ -468,6 +468,45 @@ impl Pal for Sys {
         Ok(syscall::read(*fd, buf)?)
     }
 
+    fn getresgid(
+        rgid_out: Option<&mut gid_t>,
+        egid_out: Option<&mut gid_t>,
+        sgid_out: Option<&mut gid_t>,
+    ) -> Result<()> {
+        let Resugid {
+            rgid, egid, sgid, ..
+        } = redox_rt::sys::posix_getresugid();
+        if let Some(rgid_out) = rgid_out {
+            *rgid_out = rgid as _;
+        }
+        if let Some(egid_out) = egid_out {
+            *egid_out = egid as _;
+        }
+        if let Some(sgid_out) = sgid_out {
+            *sgid_out = sgid as _;
+        }
+        Ok(())
+    }
+    fn getresuid(
+        ruid_out: Option<&mut uid_t>,
+        euid_out: Option<&mut uid_t>,
+        suid_out: Option<&mut uid_t>,
+    ) -> Result<()> {
+        let Resugid {
+            ruid, euid, suid, ..
+        } = redox_rt::sys::posix_getresugid();
+        if let Some(ruid_out) = ruid_out {
+            *ruid_out = ruid as _;
+        }
+        if let Some(euid_out) = euid_out {
+            *euid_out = euid as _;
+        }
+        if let Some(suid_out) = suid_out {
+            *suid_out = suid as _;
+        }
+        Ok(())
+    }
+
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()> {
         //TODO
         eprintln!(
