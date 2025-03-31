@@ -335,6 +335,13 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
     };
     redox_rt::initialize(FdGuard::new(proc_fd));
 
+    // TODO: Is it safe to assume setup_sighandler has been called at this point?
+    redox_rt::sys::proc_call(
+        &mut [],
+        syscall::CallFlags::empty(),
+        &[redox_rt::protocol::ProcCall::SyncSigPctl as usize],
+    );
+
     if let (Some(cwd_ptr), Some(cwd_len)) = (
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_PTR),
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_LEN),

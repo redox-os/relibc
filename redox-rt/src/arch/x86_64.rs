@@ -12,10 +12,7 @@ use syscall::{
 
 use crate::{
     proc::{fork_inner, FdGuard, ForkArgs},
-    signal::{
-        get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack,
-        PROC_CONTROL_STRUCT,
-    },
+    signal::{get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     Tcb,
 };
 

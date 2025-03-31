@@ -10,7 +10,11 @@ use syscall::{
 };
 
 use crate::{
-    arch::manually_enter_trampoline, proc::FdGuard, protocol::{ProcCall, ProcKillTarget, WaitFlags}, signal::tmp_disable_signals, DynamicProcInfo, RtTcb, Tcb, DYNAMIC_PROC_INFO
+    arch::manually_enter_trampoline,
+    proc::FdGuard,
+    protocol::{ProcCall, ProcKillTarget, WaitFlags},
+    signal::tmp_disable_signals,
+    DynamicProcInfo, RtTcb, Tcb, DYNAMIC_PROC_INFO,
 };
 
 #[inline]
@@ -112,7 +116,12 @@ pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
     )
     .map(|awoken| awoken as u32)
 }
-pub fn sys_call(fd: usize, payload: &mut [u8], flags: CallFlags, metadata: &[usize]) -> Result<usize> {
+pub fn sys_call(
+    fd: usize,
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[usize],
+) -> Result<usize> {
     unsafe {
         syscall::syscall5(
             syscall::SYS_CALL,
