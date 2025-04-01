@@ -340,7 +340,8 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
         &mut [],
         syscall::CallFlags::empty(),
         &[redox_rt::protocol::ProcCall::SyncSigPctl as usize],
-    );
+    )
+    .expect("failed to sync signal pctl");
 
     if let (Some(cwd_ptr), Some(cwd_len)) = (
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_PTR),

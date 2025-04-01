@@ -892,7 +892,7 @@ pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
             };
             let attr_fd = FdGuard::new(syscall::dup(
                 *thr_fd,
-                alloc::format!("attrs-{}", **auth).as_bytes(),
+                alloc::format!("auth-{}-attrs", **auth).as_bytes(),
             )?);
             let _ = syscall::write(*attr_fd, &buf)?;
             Ok(NewChildProc {

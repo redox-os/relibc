@@ -582,7 +582,8 @@ pub fn setup_sighandler(tcb: &RtTcb) {
         &mut [],
         CallFlags::empty(),
         &[ThreadCall::SyncSigTctl as usize],
-    );
+    )
+    .expect("failed to sync signal tctl");
 
     // TODO: Inherited set of ignored signals
     set_sigmask(Some(0), None);
