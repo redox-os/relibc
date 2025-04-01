@@ -342,15 +342,6 @@ fn pad<W: Write>(
     Ok(())
 }
 
-fn abs(float: c_double) -> c_double {
-    // Don't ask me whe float.abs() seems absent...
-    if float.is_sign_negative() {
-        -float
-    } else {
-        float
-    }
-}
-
 fn float_string(float: c_double, precision: usize, trim: bool) -> String {
     let mut string = format!("{:.p$}", float, p = precision);
     if trim && string.contains('.') {
@@ -369,11 +360,11 @@ fn float_string(float: c_double, precision: usize, trim: bool) -> String {
 
 fn float_exp(mut float: c_double) -> (c_double, isize) {
     let mut exp: isize = 0;
-    while abs(float) >= 10.0 {
+    while float.abs() >= 10.0 {
         float /= 10.0;
         exp += 1;
     }
-    while f64::EPSILON < abs(float) && abs(float) < 1.0 {
+    while f64::EPSILON < float.abs() && float.abs() < 1.0 {
         float *= 10.0;
         exp -= 1;
     }
