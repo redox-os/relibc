@@ -99,22 +99,21 @@ int main(void) {
     );
 
     // TODO: Locale offset
-    // Also, this test is broken on Redox
-    /* const char redox[] = "Mon Oct 31 11:19:57 2016"; */
-    /* struct tm redox_expect = { */
-    /*     .tm_year = 116, */
-    /*     .tm_mon = 9, */
-    /*     .tm_mday = 31, */
-    /*     .tm_hour = 11, */
-    /*     .tm_min = 19, */
-    /*     .tm_sec = 57, */
-    /*     .tm_yday = 304, */
-    /*     .tm_wday = 1, */
-    /* }; */
-    /* strptime_test(redox, */
-    /*               "%a%t%b%t%d%t%T%t%Y", */
-    /*               redox_expect, */
-    /*               ""); */
+    const char redox[] = "Mon Oct 31 11:19:57 2016";
+    struct tm redox_expect = {
+        .tm_year = 116,
+        .tm_mon = 9,
+        .tm_mday = 31,
+        .tm_hour = 11,
+        .tm_min = 19,
+        .tm_sec = 57,
+        /* .tm_yday = 304, */
+        .tm_wday = 1,
+    };
+    strptime_test(redox,
+                  "%a%t%b%t%d%t%T%t%Y",
+                  redox_expect,
+                  "");
 
     // Roundtrip
     const char roundtrip[] = "2012-01-19 13:37:00";
