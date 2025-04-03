@@ -918,7 +918,7 @@ pub fn copy_str(cur_pid_fd: usize, new_proc_fd: usize, key: &str) -> Result<()> 
     Ok(())
 }
 
-pub unsafe fn make_init() -> &'static FdGuard {
+pub unsafe fn make_init() -> [&'static FdGuard; 2] {
     let proc_fd = FdGuard::new(
         syscall::open("/scheme/proc/init", syscall::O_CLOEXEC).expect("failed to create init"),
     );
@@ -929,6 +929,12 @@ pub unsafe fn make_init() -> &'static FdGuard {
         0,
     )
     .expect("failed to assign current thread to init process");
+
+    let managed_thr_fd = FdGuard::new(
+        syscall::dup(*proc_fd, b"thread-0").expect("failed to get managed thread for init"),
+    );
+
+    let managed_thr_fd = (*RtTcb::current().thr_fd.get()).insert(managed_thr_fd);
 
     STATIC_PROC_INFO.get().write(crate::StaticProcInfo {
         pid: 1,
@@ -944,5 +950,8 @@ pub unsafe fn make_init() -> &'static FdGuard {
         egid: 0,
         sgid: 0,
     };
-    (*STATIC_PROC_INFO.get()).proc_fd.as_ref().unwrap()
+    [
+        (*STATIC_PROC_INFO.get()).proc_fd.as_ref().unwrap(),
+        managed_thr_fd,
+    ]
 }
