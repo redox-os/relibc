@@ -1,8 +1,12 @@
 use core::{fmt::Debug, mem::size_of};
 
 use crate::{
-    arch::*, auxv_defs::*, read_proc_meta, static_proc_info, RtTcb, DYNAMIC_PROC_INFO,
-    STATIC_PROC_INFO,
+    arch::*,
+    auxv_defs::*,
+    protocol::{ProcCall, ThreadCall},
+    read_proc_meta, static_proc_info,
+    sys::{proc_call, thread_call},
+    RtTcb, DYNAMIC_PROC_INFO, STATIC_PROC_INFO,
 };
 
 use alloc::{boxed::Box, collections::BTreeMap, vec};
@@ -22,7 +26,7 @@ use goblin::elf64::{
 use syscall::{
     error::*,
     flag::{MapFlags, SEEK_SET},
-    GrantDesc, GrantFlags, Map, ProcSchemeAttrs, SetSighandlerData, MAP_FIXED_NOREPLACE,
+    CallFlags, GrantDesc, GrantFlags, Map, ProcSchemeAttrs, SetSighandlerData, MAP_FIXED_NOREPLACE,
     MAP_SHARED, O_CLOEXEC, PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE,
 };
 
@@ -410,6 +414,7 @@ where
                 proc_control_addr: 0,
             },
         );
+        // TODO: sync with procmgr
     }
 
     unsafe {
@@ -833,6 +838,20 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                     &crate::signal::current_setsighandler_struct(),
                 )?;
             }
+            if let Some(ref proc_fd) = new_proc_fd {
+                proc_call(
+                    **proc_fd,
+                    &mut [],
+                    CallFlags::empty(),
+                    &[ProcCall::SyncSigPctl as usize],
+                )?;
+            }
+            thread_call(
+                *new_thr_fd,
+                &mut [],
+                CallFlags::empty(),
+                &[ThreadCall::SyncSigTctl as usize],
+            )?;
         }
         copy_env_regs(**cur_thr_fd, *new_thr_fd)?;
     }

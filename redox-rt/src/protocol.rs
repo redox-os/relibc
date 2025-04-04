@@ -40,6 +40,7 @@ pub enum ThreadCall {
     // TODO: replace with sendfd equivalent syscall for sending memory, or force userspace to
     // obtain its TCB memory from this server
     SyncSigTctl = 0,
+    SignalThread = 1,
 }
 
 impl ProcCall {
@@ -64,6 +65,7 @@ impl ThreadCall {
     pub fn try_from_raw(raw: usize) -> Option<Self> {
         Some(match raw {
             0 => Self::SyncSigTctl,
+            1 => Self::SignalThread,
             _ => return None,
         })
     }

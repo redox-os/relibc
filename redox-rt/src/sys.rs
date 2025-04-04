@@ -12,7 +12,7 @@ use syscall::{
 use crate::{
     arch::manually_enter_trampoline,
     proc::FdGuard,
-    protocol::{ProcCall, ProcKillTarget, WaitFlags},
+    protocol::{ProcCall, ProcKillTarget, ThreadCall, WaitFlags},
     signal::tmp_disable_signals,
     DynamicProcInfo, RtTcb, Tcb, DYNAMIC_PROC_INFO,
 };
@@ -51,7 +51,7 @@ pub fn posix_write(fd: usize, buf: &[u8]) -> Result<usize> {
 #[inline]
 pub fn posix_kill(target: ProcKillTarget, sig: usize) -> Result<()> {
     match wrapper(false, || {
-        proc_call(
+        this_proc_call(
             &mut [],
             CallFlags::empty(),
             &[ProcCall::Kill as usize, target.raw(), sig],
@@ -70,7 +70,7 @@ pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
         pid: posix_getpid(),
     };
     match wrapper(false, || {
-        proc_call(
+        this_proc_call(
             &mut siginf,
             CallFlags::empty(),
             &[ProcCall::Sigq as usize, pid, sig],
@@ -133,11 +133,27 @@ pub fn sys_call(
         )
     }
 }
-pub fn proc_call(payload: &mut [u8], flags: CallFlags, metadata: &[usize]) -> Result<usize> {
-    sys_call(**crate::current_proc_fd(), payload, flags, metadata)
+pub fn this_proc_call(payload: &mut [u8], flags: CallFlags, metadata: &[usize]) -> Result<usize> {
+    proc_call(**crate::current_proc_fd(), payload, flags, metadata)
 }
-pub fn thread_call(payload: &mut [u8], flags: CallFlags, metadata: &[usize]) -> Result<usize> {
-    sys_call(**RtTcb::current().thread_fd(), payload, flags, metadata)
+pub fn proc_call(
+    proc_fd: usize,
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[usize],
+) -> Result<usize> {
+    sys_call(proc_fd, payload, flags, metadata)
+}
+pub fn thread_call(
+    thread_fd: usize,
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[usize],
+) -> Result<usize> {
+    sys_call(thread_fd, payload, flags, metadata)
+}
+pub fn this_thread_call(payload: &mut [u8], flags: CallFlags, metadata: &[usize]) -> Result<usize> {
+    thread_call(**RtTcb::current().thread_fd(), payload, flags, metadata)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -168,7 +184,7 @@ pub fn sys_waitpid(target: WaitpidTarget, status: &mut usize, flags: WaitFlags) 
         WaitpidTarget::ProcGroup { pgid } => (ProcCall::Waitpgid, pgid),
     };
     wrapper(true, || {
-        proc_call(
+        this_proc_call(
             unsafe { plain::as_mut_bytes(status) },
             CallFlags::empty(),
             &[call as usize, pid, flags.bits() as usize],
@@ -176,8 +192,14 @@ pub fn sys_waitpid(target: WaitpidTarget, status: &mut usize, flags: WaitFlags) 
     })
 }
 pub fn posix_kill_thread(thread_fd: usize, signal: u32) -> Result<()> {
-    let killfd = FdGuard::new(syscall::dup(thread_fd, b"signal")?);
-    match wrapper(false, || syscall::write(*killfd, &signal.to_ne_bytes())) {
+    match wrapper(false, || {
+        thread_call(
+            thread_fd,
+            &mut [],
+            CallFlags::empty(),
+            &[ThreadCall::SignalThread as usize, signal as usize],
+        )
+    }) {
         Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
         Err(error) => Err(error),
     }
@@ -228,7 +250,7 @@ pub fn posix_setresugid(ids: &Resugid<Option<u32>>) -> Result<()> {
             ids.sgid.unwrap_or(u32::MAX),
         ]);
 
-    proc_call(
+    this_proc_call(
         &mut buf,
         CallFlags::empty(),
         &[ProcCall::SetResugid as usize],
@@ -276,7 +298,7 @@ pub fn posix_getresugid() -> Resugid<u32> {
     }
 }
 pub fn posix_exit(status: i32) -> ! {
-    proc_call(
+    this_proc_call(
         &mut [],
         CallFlags::empty(),
         &[ProcCall::Exit as usize, status as usize],
@@ -285,7 +307,7 @@ pub fn posix_exit(status: i32) -> ! {
     unreachable!()
 }
 pub fn setrens(rns: usize, ens: usize) -> Result<()> {
-    proc_call(
+    this_proc_call(
         &mut [],
         CallFlags::empty(),
         &[ProcCall::Setrens as usize, rns, ens],
@@ -293,7 +315,7 @@ pub fn setrens(rns: usize, ens: usize) -> Result<()> {
     Ok(())
 }
 pub fn posix_getpgid(pid: usize) -> Result<usize> {
-    proc_call(
+    this_proc_call(
         &mut [],
         CallFlags::empty(),
         &[ProcCall::Setpgid as usize, pid, usize::wrapping_neg(1)],
@@ -303,7 +325,7 @@ pub fn posix_setpgid(pid: usize, pgid: usize) -> Result<()> {
     if pgid == usize::wrapping_neg(1) {
         return Err(Error::new(EINVAL));
     }
-    proc_call(
+    this_proc_call(
         &mut [],
         CallFlags::empty(),
         &[ProcCall::Setpgid as usize, pid, pgid],
@@ -311,13 +333,13 @@ pub fn posix_setpgid(pid: usize, pgid: usize) -> Result<()> {
     Ok(())
 }
 pub fn posix_getsid(pid: usize) -> Result<usize> {
-    proc_call(
+    this_proc_call(
         &mut [],
         CallFlags::empty(),
         &[ProcCall::Getsid as usize, pid],
     )
 }
 pub fn posix_setsid() -> Result<()> {
-    proc_call(&mut [], CallFlags::empty(), &[ProcCall::Setsid as usize])?;
+    this_proc_call(&mut [], CallFlags::empty(), &[ProcCall::Setsid as usize])?;
     Ok(())
 }

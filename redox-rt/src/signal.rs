@@ -7,7 +7,7 @@ use syscall::{
 };
 
 use crate::{
-    arch::*, proc::FdGuard, protocol::ThreadCall, sync::Mutex, sys::thread_call, RtTcb, Tcb,
+    arch::*, proc::FdGuard, protocol::ThreadCall, sync::Mutex, sys::this_thread_call, RtTcb, Tcb,
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -578,7 +578,7 @@ pub fn setup_sighandler(tcb: &RtTcb) {
         syscall::dup(**tcb.thread_fd(), b"sighandler").expect("failed to open sighandler fd"),
     );
     let _ = syscall::write(*fd, &data).expect("failed to write to sighandler fd");
-    thread_call(
+    this_thread_call(
         &mut [],
         CallFlags::empty(),
         &[ThreadCall::SyncSigTctl as usize],
