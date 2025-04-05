@@ -128,7 +128,19 @@ pub unsafe extern "C" fn redox_open_v1(
         mode as mode_t,
     ))
 }
-
+#[no_mangle]
+pub unsafe extern "C" fn redox_openat_v1(
+    fd: usize,
+    path_base: *const u8,
+    path_len: usize,
+    flags: u32,
+) -> RawResult {
+    Error::mux(syscall::openat(
+        fd,
+        str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
+        flags as usize,
+    ))
+}
 #[no_mangle]
 pub unsafe extern "C" fn redox_dup_v1(fd: usize, buf: *const u8, len: usize) -> RawResult {
     Error::mux(syscall::dup(fd, core::slice::from_raw_parts(buf, len)))
