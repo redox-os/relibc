@@ -291,7 +291,16 @@ pub fn execve(
         // over this process (unless it fails). We do this manually since drop cannot handle
         // errors.
         let fd = *escalate_fd as usize;
-        core::mem::forget(escalate_fd);
+        unsafe {
+            syscall::syscall5(
+                syscall::SYS_CALL,
+                fd,
+                0,
+                0,
+                syscall::CallFlags::CONSUME.bits(),
+                0,
+            )?;
+        }
 
         syscall::close(fd)?;
 
