@@ -65,12 +65,16 @@ pub fn environ_iter() -> impl Iterator<Item = *mut c_char> + 'static {
         let mut ptrs = environ;
 
         core::iter::from_fn(move || {
-            let ptr = ptrs.read();
-            if ptr.is_null() {
+            if ptrs.is_null() {
                 None
             } else {
-                ptrs = ptrs.add(1);
-                Some(ptr)
+                let ptr = ptrs.read();
+                if ptr.is_null() {
+                    None
+                } else {
+                    ptrs = ptrs.add(1);
+                    Some(ptr)
+                }
             }
         })
     }
