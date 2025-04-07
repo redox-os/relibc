@@ -845,13 +845,13 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                     CallFlags::empty(),
                     &[ProcCall::SyncSigPctl as usize],
                 )?;
+                thread_call(
+                    *new_thr_fd,
+                    &mut [],
+                    CallFlags::empty(),
+                    &[ThreadCall::SyncSigTctl as usize],
+                )?;
             }
-            thread_call(
-                *new_thr_fd,
-                &mut [],
-                CallFlags::empty(),
-                &[ThreadCall::SyncSigTctl as usize],
-            )?;
         }
         copy_env_regs(**cur_thr_fd, *new_thr_fd)?;
     }
