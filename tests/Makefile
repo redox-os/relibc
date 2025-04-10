@@ -125,10 +125,10 @@ EXPECT_NAMES=\
 	unistd/getopt_long \
 	unistd/pipe \
 	unistd/rmdir \
+	waitpid \
 	# unistd/sleep \
 	unistd/swab \
 	unistd/write \
-	waitpid \
 	wchar/fgetwc \
 	wchar/fwide \
 	wchar/mbrtowc \
