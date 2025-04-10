@@ -11,7 +11,7 @@ void *routine(void *arg) {
 
     sleep(1);
 
-    puts("Thread ");
+    puts("Thread succeeded");
 
     return NULL;
 }
