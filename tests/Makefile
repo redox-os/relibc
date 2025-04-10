@@ -204,6 +204,7 @@ NAMES=\
 	unistd/sysconf \
 	pthread/main \
 	pthread/cleanup \
+	pthread/exit \
 	pthread/extjoin \
 	pthread/once \
 	pthread/customstack \
