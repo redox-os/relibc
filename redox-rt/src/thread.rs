@@ -56,16 +56,16 @@ pub unsafe fn exit_this_thread(stack_base: *mut (), stack_size: usize) -> ! {
     let _guard = tmp_disable_signals();
 
     let tcb = RtTcb::current();
-    let thread_fd = tcb.thread_fd();
+    // TODO: modify interface so it writes directly to the thread fd?
+    let status_fd = syscall::dup(**tcb.thread_fd(), b"status").unwrap();
 
     let _ = syscall::funmap(tcb as *const RtTcb as usize, syscall::PAGE_SIZE);
 
-    // TODO: modify interface so it writes directly to the thread fd?
-    let status_fd = syscall::dup(**thread_fd, b"status").unwrap();
     let mut buf = [0; size_of::<usize>() * 3];
     plain::slice_from_mut_bytes(&mut buf)
         .unwrap()
         .copy_from_slice(&[usize::MAX, stack_base as usize, stack_size]);
+    // TODO: SYS_CALL w/CONSUME
     syscall::write(status_fd, &buf).unwrap();
     unreachable!()
 }
