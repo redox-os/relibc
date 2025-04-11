@@ -6,26 +6,26 @@ use core::{
 
 use syscall::{
     error::{Error, Result, EINTR},
-    CallFlags, RtSigInfo, TimeSpec, EINVAL,
+    CallFlags, RtSigInfo, TimeSpec, EINVAL, ERESTART,
 };
 
 use crate::{
     arch::manually_enter_trampoline,
-    proc::FdGuard,
     protocol::{ProcCall, ProcKillTarget, ThreadCall, WaitFlags},
     signal::tmp_disable_signals,
     DynamicProcInfo, RtTcb, Tcb, DYNAMIC_PROC_INFO,
 };
 
 #[inline]
-fn wrapper<T>(restart: bool, mut f: impl FnMut() -> Result<T>) -> Result<T> {
+fn wrapper<T>(restart: bool, erestart: bool, mut f: impl FnMut() -> Result<T>) -> Result<T> {
     loop {
         let _guard = tmp_disable_signals();
         let rt_sigarea = unsafe { &Tcb::current().unwrap().os_specific };
         let res = f();
+        let code = if erestart { ERESTART } else { EINTR };
 
         if let Err(err) = res
-            && err == Error::new(EINTR)
+            && err == Error::new(code)
         {
             unsafe {
                 manually_enter_trampoline();
@@ -42,22 +42,22 @@ fn wrapper<T>(restart: bool, mut f: impl FnMut() -> Result<T>) -> Result<T> {
 // TODO: uninitialized memory?
 #[inline]
 pub fn posix_read(fd: usize, buf: &mut [u8]) -> Result<usize> {
-    wrapper(true, || syscall::read(fd, buf))
+    wrapper(true, false, || syscall::read(fd, buf))
 }
 #[inline]
 pub fn posix_write(fd: usize, buf: &[u8]) -> Result<usize> {
-    wrapper(true, || syscall::write(fd, buf))
+    wrapper(true, false, || syscall::write(fd, buf))
 }
 #[inline]
 pub fn posix_kill(target: ProcKillTarget, sig: usize) -> Result<()> {
-    match wrapper(false, || {
+    match wrapper(false, true, || {
         this_proc_call(
             &mut [],
             CallFlags::empty(),
             &[ProcCall::Kill as usize, target.raw(), sig],
         )
     }) {
-        Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
+        Ok(_) | Err(Error { errno: ERESTART }) => Ok(()),
         Err(error) => Err(error),
     }
 }
@@ -69,7 +69,7 @@ pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
         uid: 0,   // TODO
         pid: posix_getpid(),
     };
-    match wrapper(false, || {
+    match wrapper(false, false, || {
         this_proc_call(
             &mut siginf,
             CallFlags::empty(),
@@ -92,7 +92,7 @@ pub fn posix_getppid() -> u32 {
 }
 #[inline]
 pub unsafe fn sys_futex_wait(addr: *mut u32, val: u32, deadline: Option<&TimeSpec>) -> Result<()> {
-    wrapper(true, || {
+    wrapper(true, false, || {
         syscall::syscall5(
             syscall::SYS_FUTEX,
             addr as usize,
@@ -183,7 +183,7 @@ pub fn sys_waitpid(target: WaitpidTarget, status: &mut usize, flags: WaitFlags) 
         WaitpidTarget::AnyGroupMember => (ProcCall::Waitpgid, 0),
         WaitpidTarget::ProcGroup { pgid } => (ProcCall::Waitpgid, pgid),
     };
-    wrapper(true, || {
+    wrapper(true, false, || {
         this_proc_call(
             unsafe { plain::as_mut_bytes(status) },
             CallFlags::empty(),
@@ -192,7 +192,7 @@ pub fn sys_waitpid(target: WaitpidTarget, status: &mut usize, flags: WaitFlags) 
     })
 }
 pub fn posix_kill_thread(thread_fd: usize, signal: u32) -> Result<()> {
-    match wrapper(false, || {
+    match wrapper(false, true, || {
         thread_call(
             thread_fd,
             &mut [],
@@ -200,7 +200,7 @@ pub fn posix_kill_thread(thread_fd: usize, signal: u32) -> Result<()> {
             &[ThreadCall::SignalThread as usize, signal as usize],
         )
     }) {
-        Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
+        Ok(_) | Err(Error { errno: ERESTART }) => Ok(()),
         Err(error) => Err(error),
     }
 }
