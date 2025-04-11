@@ -217,9 +217,9 @@ NAMES=\
 	grp/getgrgid_r \
 	grp/getgrnam_r \
 	grp/gr_iter \
+	sigqueue
 #	resource/getrusage
 #	time/times
-#	sigqueue
 
 # Tests run with `expect` (require a .c file and an .exp file
 # that takes the produced binary as the first argument)
