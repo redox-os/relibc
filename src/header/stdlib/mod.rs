@@ -144,7 +144,7 @@ pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut 
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/at_quick_exit.html>.
-#[no_mangle]
+// #[no_mangle]
 pub unsafe extern "C" fn at_quick_exit(func: Option<extern "C" fn()>) -> c_int {
     unimplemented!();
 }
