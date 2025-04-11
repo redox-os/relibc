@@ -50,9 +50,13 @@ typedef __UINT16_TYPE__ uint16_t;
 #endif
 #ifdef __UINT32_TYPE__
 typedef __UINT32_TYPE__ uint32_t;
+// Required by openlibm
+typedef __UINT32_TYPE__ __uint32_t;
 #endif
 #ifdef __UINT64_TYPE__
 typedef __UINT64_TYPE__ uint64_t;
+// Required by openlibm
+typedef __UINT64_TYPE__ __uint64_t;
 #endif
 
 /* 7.8.1.2 Minimum-width integer types */
