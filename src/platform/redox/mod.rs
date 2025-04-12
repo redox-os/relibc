@@ -503,7 +503,12 @@ impl Pal for Sys {
     fn gettid() -> pid_t {
         // This is used by pthread mutexes for reentrant checks and must be nonzero
         // and unique for each thread in the same process (but not cross-process)
-        Self::current_os_tid().thread_fd.checked_add(1).unwrap().try_into().unwrap()
+        Self::current_os_tid()
+            .thread_fd
+            .checked_add(1)
+            .unwrap()
+            .try_into()
+            .unwrap()
     }
 
     unsafe fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> Result<()> {
