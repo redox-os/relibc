@@ -646,32 +646,35 @@ impl Drop for MmapGuard {
     }
 }
 
+#[repr(transparent)]
 pub struct FdGuard {
     fd: usize,
-    taken: bool,
 }
 impl FdGuard {
+    #[inline]
     pub const fn new(fd: usize) -> Self {
-        Self { fd, taken: false }
+        Self { fd }
     }
-    pub fn take(&mut self) -> usize {
-        self.taken = true;
-        self.fd
+    #[inline]
+    pub fn take(self) -> usize {
+        let fd = self.fd;
+        core::mem::forget(self);
+        fd
     }
 }
 impl core::ops::Deref for FdGuard {
     type Target = usize;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.fd
     }
 }
 
 impl Drop for FdGuard {
+    #[inline]
     fn drop(&mut self) {
-        if !self.taken {
-            let _ = syscall::close(self.fd);
-        }
+        let _ = syscall::close(self.fd);
     }
 }
 impl Debug for FdGuard {
