@@ -93,10 +93,16 @@ global_asm!(include_str!("sigsetjmp/aarch64/sigsetjmp.s"));
 global_asm!(include_str!("sigsetjmp/riscv64/sigsetjmp.s"));
 
 #[cfg(target_arch = "x86")]
-global_asm!(include_str!("sigsetjmp/i386/sigsetjmp.s"), options(att_syntax));
+global_asm!(
+    include_str!("sigsetjmp/i386/sigsetjmp.s"),
+    options(att_syntax)
+);
 
 #[cfg(target_arch = "x86_64")]
-global_asm!(include_str!("sigsetjmp/x86_64/sigsetjmp.s"), options(att_syntax));
+global_asm!(
+    include_str!("sigsetjmp/x86_64/sigsetjmp.s"),
+    options(att_syntax)
+);
 
 extern "C" {
     pub fn sigsetjmp(jb: *mut u64, savemask: i32) -> i32;

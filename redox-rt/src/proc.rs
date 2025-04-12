@@ -8,12 +8,12 @@ use alloc::{boxed::Box, collections::BTreeMap, vec};
 #[cfg(target_pointer_width = "32")]
 use goblin::elf32::{
     header::Header,
-    program_header::program_header32::{ProgramHeader, PF_W, PF_X, PT_INTERP, PT_LOAD},
+    program_header::program_header32::{ProgramHeader, PF_R, PF_W, PF_X, PT_INTERP, PT_LOAD},
 };
 #[cfg(target_pointer_width = "64")]
 use goblin::elf64::{
     header::Header,
-    program_header::program_header64::{ProgramHeader, PF_W, PF_X, PT_INTERP, PT_LOAD},
+    program_header::program_header64::{ProgramHeader, PF_R, PF_W, PF_X, PT_INTERP, PT_LOAD},
 };
 
 use syscall::{
@@ -78,7 +78,7 @@ where
     // entirely.
 
     let mut header_bytes = [0_u8; size_of::<Header>()];
-    read_all(*image_file, Some(0), &mut header_bytes)?;
+    pread_all(*image_file, 0, &mut header_bytes)?;
     let header = Header::from_bytes(&header_bytes);
 
     let grants_fd = {
@@ -107,14 +107,17 @@ where
         |o| core::mem::take(&mut o.tree),
     );
 
-    read_all(*image_file as usize, Some(header.e_phoff as u64), phs)
-        .map_err(|_| Error::new(EIO))?;
+    pread_all(*image_file as usize, header.e_phoff, phs).map_err(|_| Error::new(EIO))?;
 
     for ph_idx in 0..phnum {
         let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
         let segment: &ProgramHeader =
             plain::from_bytes(ph_bytes).map_err(|_| Error::new(EINVAL))?;
-        let mut flags = syscall::PROT_READ;
+        let mut flags = if segment.p_flags & PF_R == PF_R {
+            syscall::PROT_READ
+        } else {
+            syscall::PROT_NONE
+        };
 
         // W ^ X. If it is executable, do not allow it to be writable, even if requested
         if segment.p_flags & PF_X == PF_X {
@@ -127,11 +130,7 @@ where
             // PT_INTERP must come before any PT_LOAD, so we don't have to iterate twice.
             PT_INTERP => {
                 let mut interp = vec![0_u8; segment.p_filesz as usize];
-                read_all(
-                    *image_file as usize,
-                    Some(segment.p_offset as u64),
-                    &mut interp,
-                )?;
+                pread_all(*image_file as usize, segment.p_offset, &mut interp)?;
 
                 return Ok(FexecResult::Interp {
                     path: interp.into_boxed_slice(),
@@ -168,74 +167,22 @@ where
                     total_page_count * PAGE_SIZE,
                     flags,
                 )?;
-                syscall::lseek(*image_file, segment.p_offset as isize, SEEK_SET)
-                    .map_err(|_| Error::new(EIO))?;
 
-                // If unaligned, read the head page separately.
-                let (first_aligned_page, remaining_filesz) = if voff > 0 {
-                    let bytes_to_next_page = PAGE_SIZE - voff;
+                // TODO: Attempt to mmap with MAP_PRIVATE directly from the image file instead.
 
-                    let (_guard, dst_page) =
-                        unsafe { MmapGuard::map_mut_anywhere(*grants_fd, vaddr, PAGE_SIZE)? };
-
-                    let length = core::cmp::min(bytes_to_next_page, filesz);
-
-                    read_all(*image_file, None, &mut dst_page[voff..][..length])?;
-
-                    (vaddr + PAGE_SIZE, filesz - length)
-                } else {
-                    (vaddr, filesz)
-                };
-
-                let remaining_page_count = remaining_filesz.div_floor(PAGE_SIZE);
-                let tail_bytes = remaining_filesz % PAGE_SIZE;
-
-                // TODO: Unless the calling process if *very* memory-constrained, the max amount of
-                // pages per iteration has no limit other than the time it takes to setup page
-                // tables.
-                //
-                // TODO: Reserve PAGES_PER_ITER "scratch pages" of virtual memory for that type of
-                // situation?
-                const PAGES_PER_ITER: usize = 64;
-
-                // TODO: Before this loop, attempt to mmap with MAP_PRIVATE directly from the image
-                // file.
-
-                for page_idx in (0..remaining_page_count).step_by(PAGES_PER_ITER) {
-                    // Use commented out lines to trigger kernel bug (FIXME).
-
-                    //let pages_in_this_group = core::cmp::min(PAGES_PER_ITER, file_page_count - page_idx * PAGES_PER_ITER);
-                    let pages_in_this_group =
-                        core::cmp::min(PAGES_PER_ITER, remaining_page_count - page_idx);
-
-                    if pages_in_this_group == 0 {
-                        break;
-                    }
-
-                    // TODO: MAP_FIXED to optimize away funmap?
+                if filesz > 0 {
                     let (_guard, dst_memory) = unsafe {
                         MmapGuard::map_mut_anywhere(
                             *grants_fd,
-                            first_aligned_page + page_idx * PAGE_SIZE, // offset
-                            pages_in_this_group * PAGE_SIZE,           // size
+                            vaddr,                                       // offset
+                            (voff + filesz).next_multiple_of(PAGE_SIZE), // size
                         )?
                     };
-
-                    // TODO: Are &mut [u8] and &mut [[u8; PAGE_SIZE]] interchangeable (if the
-                    // lengths are aligned, obviously)?
-
-                    read_all(*image_file, None, dst_memory)?;
-                }
-
-                if tail_bytes > 0 {
-                    let (_guard, dst_page) = unsafe {
-                        MmapGuard::map_mut_anywhere(
-                            *grants_fd,
-                            first_aligned_page + remaining_page_count * PAGE_SIZE,
-                            PAGE_SIZE,
-                        )?
-                    };
-                    read_all(*image_file, None, &mut dst_page[..tail_bytes])?;
+                    pread_all(
+                        *image_file,
+                        segment.p_offset,
+                        &mut dst_memory[voff..voff + filesz],
+                    )?;
                 }
 
                 // file_page_count..file_page_count + zero_page_count are already zero-initialized
@@ -579,10 +526,8 @@ pub fn munmap_transfer(
         ],
     )
 }
-fn read_all(fd: usize, offset: Option<u64>, buf: &mut [u8]) -> Result<()> {
-    if let Some(offset) = offset {
-        syscall::lseek(fd, offset as isize, SEEK_SET)?;
-    }
+fn pread_all(fd: usize, offset: u64, buf: &mut [u8]) -> Result<()> {
+    syscall::lseek(fd, offset as isize, SEEK_SET)?;
 
     let mut total_bytes_read = 0;
 
