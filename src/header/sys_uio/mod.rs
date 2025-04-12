@@ -40,7 +40,12 @@ unsafe fn scatter(iovs: &[iovec], vec: Vec<u8>) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn preadv(fd: c_int, iov: *const iovec, iovcnt: c_int, offset: off_t) -> ssize_t {
+pub unsafe extern "C" fn preadv(
+    fd: c_int,
+    iov: *const iovec,
+    iovcnt: c_int,
+    offset: off_t,
+) -> ssize_t {
     if iovcnt < 0 || iovcnt > IOV_MAX {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
@@ -57,7 +62,12 @@ pub unsafe extern "C" fn preadv(fd: c_int, iov: *const iovec, iovcnt: c_int, off
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pwritev(fd: c_int, iov: *const iovec, iovcnt: c_int, offset: off_t) -> ssize_t {
+pub unsafe extern "C" fn pwritev(
+    fd: c_int,
+    iov: *const iovec,
+    iovcnt: c_int,
+    offset: off_t,
+) -> ssize_t {
     if iovcnt < 0 || iovcnt > IOV_MAX {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
