@@ -277,7 +277,7 @@ where
         {
             page
         } else if let Some(ref mut stack_page) = stack_page {
-            stack_page.remap(new_page_no * PAGE_SIZE, PROT_WRITE)?;
+            stack_page.remap(new_page_no * PAGE_SIZE, PROT_READ | PROT_WRITE)?;
             stack_page
         } else {
             let new = MmapGuard::map(
@@ -285,7 +285,7 @@ where
                 &Map {
                     offset: new_page_no * PAGE_SIZE,
                     size: PAGE_SIZE,
-                    flags: PROT_WRITE,
+                    flags: PROT_READ | PROT_WRITE,
                     address: 0, // let kernel decide
                 },
             )?;
@@ -658,7 +658,7 @@ impl MmapGuard {
                 size,
                 offset,
                 address: 0,
-                flags: PROT_WRITE,
+                flags: PROT_READ | PROT_WRITE,
             },
         )?;
         let slice = &mut *this.as_mut_ptr_slice();
