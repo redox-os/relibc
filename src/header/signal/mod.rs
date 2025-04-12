@@ -86,20 +86,17 @@ pub type siginfo_t = siginfo;
 
 pub type stack_t = sigaltstack;
 
-// Macro based on setjmp, only x86_64 is supported at the moment
-macro_rules! sigsetjmp_platforms {
-    ($($rust_arch:expr,$c_arch:expr,$ext:expr;)+) => {
-        $(
-            #[cfg(target_arch = $rust_arch)]
-            global_asm!(include_str!(concat!("sigsetjmp/", $c_arch, "/sigsetjmp.", $ext)));
-        )+
-    }
-}
+#[cfg(target_arch = "aarch64")]
+global_asm!(include_str!("sigsetjmp/aarch64/sigsetjmp.s"));
 
-//Insert more platforms here
-sigsetjmp_platforms! {
-    "x86_64","x86_64","s";
-}
+#[cfg(target_arch = "riscv64gc")]
+global_asm!(include_str!("sigsetjmp/riscv64/sigsetjmp.s"));
+
+#[cfg(target_arch = "x86")]
+global_asm!(include_str!("sigsetjmp/i386/sigsetjmp.s"), options(att_syntax));
+
+#[cfg(target_arch = "x86_64")]
+global_asm!(include_str!("sigsetjmp/x86_64/sigsetjmp.s"), options(att_syntax));
 
 extern "C" {
     pub fn sigsetjmp(jb: *mut u64, savemask: i32) -> i32;
