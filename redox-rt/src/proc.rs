@@ -647,6 +647,10 @@ impl MmapGuard {
 
         Ok(())
     }
+
+    // Without this inline(never), UB somewhere causes the flags to be set to 0 on arm64.
+    // FIXME Find the UB and fix it
+    #[inline(never)]
     pub unsafe fn map_mut_anywhere<'a>(
         fd: usize,
         offset: usize,
