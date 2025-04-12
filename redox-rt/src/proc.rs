@@ -8,12 +8,12 @@ use alloc::{boxed::Box, collections::BTreeMap, vec};
 #[cfg(target_pointer_width = "32")]
 use goblin::elf32::{
     header::Header,
-    program_header::program_header32::{ProgramHeader, PF_W, PF_X, PT_INTERP, PT_LOAD},
+    program_header::program_header32::{ProgramHeader, PF_R, PF_W, PF_X, PT_INTERP, PT_LOAD},
 };
 #[cfg(target_pointer_width = "64")]
 use goblin::elf64::{
     header::Header,
-    program_header::program_header64::{ProgramHeader, PF_W, PF_X, PT_INTERP, PT_LOAD},
+    program_header::program_header64::{ProgramHeader, PF_R, PF_W, PF_X, PT_INTERP, PT_LOAD},
 };
 
 use syscall::{
@@ -114,7 +114,11 @@ where
         let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
         let segment: &ProgramHeader =
             plain::from_bytes(ph_bytes).map_err(|_| Error::new(EINVAL))?;
-        let mut flags = syscall::PROT_READ;
+        let mut flags = if segment.p_flags & PF_R == PF_R {
+            syscall::PROT_READ
+        } else {
+            syscall::PROT_NONE
+        };
 
         // W ^ X. If it is executable, do not allow it to be writable, even if requested
         if segment.p_flags & PF_X == PF_X {
