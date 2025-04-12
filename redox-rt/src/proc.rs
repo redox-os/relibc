@@ -78,7 +78,7 @@ where
     // entirely.
 
     let mut header_bytes = [0_u8; size_of::<Header>()];
-    read_all(*image_file, Some(0), &mut header_bytes)?;
+    pread_all(*image_file, 0, &mut header_bytes)?;
     let header = Header::from_bytes(&header_bytes);
 
     let grants_fd = {
@@ -107,8 +107,7 @@ where
         |o| core::mem::take(&mut o.tree),
     );
 
-    read_all(*image_file as usize, Some(header.e_phoff as u64), phs)
-        .map_err(|_| Error::new(EIO))?;
+    pread_all(*image_file as usize, header.e_phoff, phs).map_err(|_| Error::new(EIO))?;
 
     for ph_idx in 0..phnum {
         let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
@@ -131,11 +130,7 @@ where
             // PT_INTERP must come before any PT_LOAD, so we don't have to iterate twice.
             PT_INTERP => {
                 let mut interp = vec![0_u8; segment.p_filesz as usize];
-                read_all(
-                    *image_file as usize,
-                    Some(segment.p_offset as u64),
-                    &mut interp,
-                )?;
+                pread_all(*image_file as usize, segment.p_offset, &mut interp)?;
 
                 return Ok(FexecResult::Interp {
                     path: interp.into_boxed_slice(),
@@ -176,9 +171,6 @@ where
                 // TODO: Attempt to mmap with MAP_PRIVATE directly from the image file instead.
 
                 if filesz > 0 {
-                    syscall::lseek(*image_file, segment.p_offset as isize, SEEK_SET)
-                        .map_err(|_| Error::new(EIO))?;
-
                     let (_guard, dst_memory) = unsafe {
                         MmapGuard::map_mut_anywhere(
                             *grants_fd,
@@ -186,7 +178,11 @@ where
                             (voff + filesz).next_multiple_of(PAGE_SIZE), // size
                         )?
                     };
-                    read_all(*image_file, None, &mut dst_memory[voff..voff + filesz])?;
+                    pread_all(
+                        *image_file,
+                        segment.p_offset,
+                        &mut dst_memory[voff..voff + filesz],
+                    )?;
                 }
 
                 // file_page_count..file_page_count + zero_page_count are already zero-initialized
@@ -530,10 +526,8 @@ pub fn munmap_transfer(
         ],
     )
 }
-fn read_all(fd: usize, offset: Option<u64>, buf: &mut [u8]) -> Result<()> {
-    if let Some(offset) = offset {
-        syscall::lseek(fd, offset as isize, SEEK_SET)?;
-    }
+fn pread_all(fd: usize, offset: u64, buf: &mut [u8]) -> Result<()> {
+    syscall::lseek(fd, offset as isize, SEEK_SET)?;
 
     let mut total_bytes_read = 0;
 
