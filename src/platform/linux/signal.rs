@@ -15,8 +15,10 @@ use crate::{
 };
 
 impl PalSignal for Sys {
-    unsafe fn getitimer(which: c_int, out: *mut itimerval) -> Result<()> {
-        e_raw(syscall!(GETITIMER, which, out))?;
+    fn getitimer(which: c_int, out: &mut itimerval) -> Result<()> {
+        unsafe {
+            e_raw(syscall!(GETITIMER, which, out as *mut _))?;
+        }
         Ok(())
     }
 
@@ -49,8 +51,15 @@ impl PalSignal for Sys {
         Ok(())
     }
 
-    unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> Result<()> {
-        e_raw(unsafe { syscall!(SETITIMER, which, new, old) })?;
+    fn setitimer(which: c_int, new: &itimerval, old: Option<&mut itimerval>) -> Result<()> {
+        e_raw(unsafe {
+            syscall!(
+                SETITIMER,
+                which,
+                new as *const _,
+                old.map_or_else(core::ptr::null_mut, |r| r as *mut _)
+            )
+        })?;
         Ok(())
     }
 
