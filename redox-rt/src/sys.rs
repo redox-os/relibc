@@ -6,12 +6,12 @@ use core::{
 
 use syscall::{
     error::{Error, Result, EINTR},
-    CallFlags, RtSigInfo, TimeSpec, EINVAL, ERESTART,
+    CallFlags, TimeSpec, EINVAL, ERESTART,
 };
 
 use crate::{
     arch::manually_enter_trampoline,
-    protocol::{ProcCall, ProcKillTarget, ThreadCall, WaitFlags},
+    protocol::{ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags},
     signal::tmp_disable_signals,
     DynamicProcInfo, RtTcb, Tcb, DYNAMIC_PROC_INFO,
 };
@@ -69,9 +69,9 @@ pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
         uid: 0,   // TODO
         pid: posix_getpid(),
     };
-    match wrapper(false, false, || {
+    match wrapper(false, true, || {
         this_proc_call(
-            &mut siginf,
+            unsafe { plain::as_mut_bytes(&mut siginf) },
             CallFlags::empty(),
             &[ProcCall::Sigq as usize, pid, sig],
         )

@@ -33,6 +33,7 @@ pub enum ProcCall {
 
     // TODO: replace with sendfd equivalent syscall for sending memory
     SyncSigPctl = 10,
+    Sigdeq = 11,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]
@@ -57,6 +58,7 @@ impl ProcCall {
             8 => Self::Kill,
             9 => Self::Sigq,
             10 => Self::SyncSigPctl,
+            11 => Self::Sigdeq,
             _ => return None,
         })
     }
@@ -147,3 +149,12 @@ impl ProcKillTarget {
         }
     }
 }
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[repr(C)]
+pub struct RtSigInfo {
+    pub arg: usize,
+    pub code: i32,
+    pub uid: u32,
+    pub pid: u32, // TODO: usize?
+}
+unsafe impl plain::Plain for RtSigInfo {}

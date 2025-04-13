@@ -1,4 +1,5 @@
 use core::{
+    cell::SyncUnsafeCell,
     fmt::Debug,
     mem::{size_of, MaybeUninit},
 };
@@ -9,7 +10,7 @@ use crate::{
     protocol::{ProcCall, ThreadCall},
     read_proc_meta, static_proc_info,
     sys::{proc_call, thread_call},
-    RtTcb, DYNAMIC_PROC_INFO, STATIC_PROC_INFO,
+    RtTcb, StaticProcInfo, DYNAMIC_PROC_INFO,
 };
 
 use alloc::{boxed::Box, collections::BTreeMap, vec};
@@ -983,3 +984,10 @@ pub unsafe fn make_init() -> [&'static FdGuard; 2] {
         managed_thr_fd,
     ]
 }
+pub(crate) static STATIC_PROC_INFO: SyncUnsafeCell<StaticProcInfo> =
+    SyncUnsafeCell::new(StaticProcInfo {
+        pid: 0,
+        ppid: 0,
+        proc_fd: MaybeUninit::zeroed(),
+        has_proc_fd: false,
+    });

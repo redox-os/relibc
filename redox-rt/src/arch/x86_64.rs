@@ -7,11 +7,11 @@ use core::{
 use syscall::{
     data::{SigProcControl, Sigcontrol},
     error::*,
-    RtSigInfo,
 };
 
 use crate::{
     proc::{fork_inner, FdGuard, ForkArgs},
+    protocol::{ProcCall, RtSigInfo},
     signal::{get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     Tcb,
 };
@@ -29,6 +29,9 @@ pub struct SigArea {
     pub tmp_rdx: usize,
     pub tmp_rdi: usize,
     pub tmp_rsi: usize,
+    pub tmp_r8: usize,
+    pub tmp_r10: usize,
+    pub tmp_r12: usize,
     pub tmp_rt_inf: RtSigInfo,
     pub tmp_id_inf: u64,
 
@@ -37,6 +40,7 @@ pub struct SigArea {
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
     pub last_sigstack: Option<NonNull<SigStack>>,
+    pub proc_fd: usize, // TODO: use global variable instead, fix linker errors
 }
 
 #[repr(C, align(16))]
@@ -188,6 +192,9 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov fs:[{tcb_sa_off} + {sa_tmp_rdx}], rdx
     mov fs:[{tcb_sa_off} + {sa_tmp_rdi}], rdi
     mov fs:[{tcb_sa_off} + {sa_tmp_rsi}], rsi
+    mov fs:[{tcb_sa_off} + {sa_tmp_r12}], r8
+    mov fs:[{tcb_sa_off} + {sa_tmp_r12}], r10
+    mov fs:[{tcb_sa_off} + {sa_tmp_r12}], r12
 
     // First, select signal, always pick first available bit
 1:
@@ -225,14 +232,24 @@ asmfunction!(__relibc_internal_sigentry: ["
     jc 2f // if so, continue as usual
 
     // otherwise, try (competitively) dequeueing realtime signal
-    mov esi, eax
-    mov eax, {SYS_SIGDEQUEUE}
-    mov rdi, fs:[0]
-    add rdi, {tcb_sa_off} + {sa_tmp_rt_inf} // out pointer of dequeued realtime sig
+
+    // SYS_CALL(fd, payload_base, payload_len, metadata_base, metadata_len | (flags << 8))
+    // rax      rdi rsi           rdx          r10            r8
+
+    mov r12d, eax
+    mov rsi, fs:[0]
+    mov rdi, [rsi+{tcb_sa_off}+{sa_proc_fd}]
+    add rsi, {tcb_sa_off} + {sa_tmp_rt_inf} // out pointer of dequeued realtime sig
+    mov rdx, {RTINF_SIZE}
+    mov [rsi], eax
+    lea r10, [rip + {proc_call_sigdeq}]
+    mov r8, 1
+    mov eax, {SYS_CALL}
     syscall
+    ud2
     test eax, eax
     jnz 1b // assumes error can only be EAGAIN
-    lea eax, [esi + 32]
+    lea eax, [r12d + 32]
     jmp 9f
 2:
     mov edx, eax
@@ -285,13 +302,13 @@ asmfunction!(__relibc_internal_sigentry: ["
     push fs:[{tcb_sa_off} + {sa_tmp_rdx}]
     push rcx
     push fs:[{tcb_sa_off} + {sa_tmp_rax}]
-    push r8
+    push fs:[{tcb_sa_off} + {sa_tmp_r8}]
     push r9
-    push r10
+    push fs:[{tcb_sa_off} + {sa_tmp_r10}]
     push r11
     push rbx
     push rbp
-    push r12
+    push fs:[{tcb_sa_off} + {sa_tmp_r12}]
     push r13
     push r14
     push r15
@@ -418,10 +435,14 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_rdx = const offset_of!(SigArea, tmp_rdx),
     sa_tmp_rdi = const offset_of!(SigArea, tmp_rdi),
     sa_tmp_rsi = const offset_of!(SigArea, tmp_rsi),
+    sa_tmp_r8 = const offset_of!(SigArea, tmp_r8),
+    sa_tmp_r10 = const offset_of!(SigArea, tmp_r10),
+    sa_tmp_r12 = const offset_of!(SigArea, tmp_r12),
     sa_tmp_rt_inf = const offset_of!(SigArea, tmp_rt_inf),
     sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
+    sa_proc_fd = const offset_of!(SigArea, proc_fd),
     sc_saved_rflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
     sc_word = const offset_of!(Sigcontrol, word),
@@ -437,7 +458,9 @@ __relibc_internal_sigentry_crit_third:
     REDZONE_SIZE = const 128,
     STACK_ALIGN = const 16,
     SA_ONSTACK_BIT = const 58, // (1 << 58) >> 32 = 0x0400_0000
-    SYS_SIGDEQUEUE = const syscall::SYS_SIGDEQUEUE,
+    SYS_CALL = const syscall::SYS_CALL,
+    proc_call_sigdeq = sym PROC_CALL_SIGDEQ,
+    RTINF_SIZE = const size_of::<RtSigInfo>(),
 ]);
 
 extern "C" {
@@ -503,3 +526,5 @@ pub fn current_sp() -> usize {
     }
     sp
 }
+
+static PROC_CALL_SIGDEQ: u64 = ProcCall::Sigdeq as u64;

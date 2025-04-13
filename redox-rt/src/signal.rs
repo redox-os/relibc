@@ -1,13 +1,19 @@
-use core::{ffi::c_int, mem::MaybeUninit, ptr::NonNull, sync::atomic::Ordering};
+use core::{ffi::c_int, ptr::NonNull, sync::atomic::Ordering};
 
 use syscall::{
-    data::AtomicU64, CallFlags, Error, RawAction, Result, RtSigInfo, SenderInfo, SetSighandlerData,
+    data::AtomicU64, CallFlags, Error, RawAction, Result, SenderInfo, SetSighandlerData,
     SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, EAGAIN, EINTR, EINVAL, ENOMEM, EPERM,
     SIGCHLD, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH,
 };
 
 use crate::{
-    arch::*, proc::FdGuard, protocol::ThreadCall, sync::Mutex, sys::this_thread_call, RtTcb, Tcb,
+    arch::*,
+    proc::FdGuard,
+    protocol::{ProcCall, RtSigInfo, ThreadCall},
+    static_proc_info,
+    sync::Mutex,
+    sys::{proc_call, this_thread_call},
+    RtTcb, Tcb,
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -558,6 +564,11 @@ pub fn setup_sighandler(tcb: &RtTcb) {
         // equivalent to not using any altstack at all (the default).
         arch.altstack_top = usize::MAX;
         arch.altstack_bottom = 0;
+        /*#[cfg(target_arch = "x86_64")]
+        unsafe {
+            assert!(static_proc_info().has_proc_fd);
+            arch.proc_fd = **static_proc_info().proc_fd.assume_init_ref();
+        }*/
         // TODO
         #[cfg(any(target_arch = "x86", target_arch = "aarch64", target_arch = "riscv64"))]
         {
@@ -774,15 +785,17 @@ fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option
 
     if sig_group == 1 && thread_control.is_none() {
         // Queued (realtime) signal
-        let mut ret = MaybeUninit::<RtSigInfo>::uninit();
-        let rt_inf = unsafe {
-            syscall::syscall2(
-                syscall::SYS_SIGDEQUEUE,
-                ret.as_mut_ptr() as usize,
-                sig_idx as usize - 32,
+        let rt_inf: RtSigInfo = unsafe {
+            let mut buf = [0_u8; size_of::<RtSigInfo>()];
+            buf[..4].copy_from_slice(&(sig_idx - 32).to_ne_bytes());
+            proc_call(
+                **static_proc_info().proc_fd.assume_init_ref(),
+                &mut buf,
+                CallFlags::empty(),
+                &[ProcCall::Sigdeq as usize],
             )
             .ok()?;
-            ret.assume_init()
+            core::mem::transmute(buf)
         };
         Some(SiginfoAbi {
             si_signo: sig_idx as i32 + 1,

@@ -17,7 +17,11 @@ use core::{
 use generic_rt::{ExpectTlsFree, GenericTcb};
 use syscall::Sigcontrol;
 
-use self::{proc::FdGuard, protocol::ProcMeta, sync::Mutex};
+use self::{
+    proc::{FdGuard, STATIC_PROC_INFO},
+    protocol::ProcMeta,
+    sync::Mutex,
+};
 
 extern crate alloc;
 
@@ -235,12 +239,6 @@ struct DynamicProcInfo {
     sgid: u32,
 }
 
-static STATIC_PROC_INFO: SyncUnsafeCell<StaticProcInfo> = SyncUnsafeCell::new(StaticProcInfo {
-    pid: 0,
-    ppid: 0,
-    proc_fd: MaybeUninit::uninit(),
-    has_proc_fd: false,
-});
 static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
     pgid: u32::MAX,
     ruid: u32::MAX,
