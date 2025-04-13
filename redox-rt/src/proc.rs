@@ -1,4 +1,7 @@
-use core::{fmt::Debug, mem::size_of};
+use core::{
+    fmt::Debug,
+    mem::{size_of, MaybeUninit},
+};
 
 use crate::{
     arch::*,
@@ -887,10 +890,12 @@ struct NewChildProc {
 pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
     match *args {
         ForkArgs::Managed => {
-            let this_proc_fd = crate::static_proc_info()
-                .proc_fd
-                .as_ref()
-                .expect("cannot use ForkArgs::Managed without an existing proc info");
+            let proc_info = crate::static_proc_info();
+            assert!(
+                proc_info.has_proc_fd,
+                "cannot use ForkArgs::Managed without an existing proc info"
+            );
+            let this_proc_fd = unsafe { proc_info.proc_fd.assume_init_ref() };
             let child_proc_fd = FdGuard::new(syscall::dup(**this_proc_fd, b"fork")?);
             let only_thread_fd = FdGuard::new(syscall::dup(*child_proc_fd, b"thread-0")?);
             let meta = read_proc_meta(&child_proc_fd)?;
@@ -961,7 +966,8 @@ pub unsafe fn make_init() -> [&'static FdGuard; 2] {
     STATIC_PROC_INFO.get().write(crate::StaticProcInfo {
         pid: 1,
         ppid: 1,
-        proc_fd: Some(proc_fd),
+        proc_fd: MaybeUninit::new(proc_fd),
+        has_proc_fd: true,
     });
     *DYNAMIC_PROC_INFO.lock() = crate::DynamicProcInfo {
         pgid: 1,
@@ -973,7 +979,7 @@ pub unsafe fn make_init() -> [&'static FdGuard; 2] {
         sgid: 0,
     };
     [
-        (*STATIC_PROC_INFO.get()).proc_fd.as_ref().unwrap(),
+        (*STATIC_PROC_INFO.get()).proc_fd.assume_init_ref(),
         managed_thr_fd,
     ]
 }

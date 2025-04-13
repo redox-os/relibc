@@ -11,11 +11,11 @@
 
 use core::{
     cell::{SyncUnsafeCell, UnsafeCell},
-    mem::size_of,
+    mem::{size_of, MaybeUninit},
 };
 
 use generic_rt::{ExpectTlsFree, GenericTcb};
-use syscall::{Sigcontrol, O_CLOEXEC};
+use syscall::Sigcontrol;
 
 use self::{proc::FdGuard, protocol::ProcMeta, sync::Mutex};
 
@@ -196,10 +196,12 @@ pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
         ppid: metadata.ppid,
 
         #[cfg(feature = "proc")]
-        proc_fd: Some(proc_fd),
+        proc_fd: MaybeUninit::new(proc_fd),
 
         #[cfg(not(feature = "proc"))]
-        proc_fd: None,
+        proc_fd: MaybeUninit::uninit(),
+
+        has_proc_fd: cfg!(feature = "proc"),
     });
 
     #[cfg(feature = "proc")]
@@ -216,10 +218,12 @@ pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
     }
 }
 
+#[repr(C)] // TODO: is this required?
 pub(crate) struct StaticProcInfo {
     pid: u32,
     ppid: u32, // TODO: dynamic
-    proc_fd: Option<FdGuard>,
+    proc_fd: MaybeUninit<FdGuard>,
+    has_proc_fd: bool,
 }
 struct DynamicProcInfo {
     pgid: u32,
@@ -234,7 +238,8 @@ struct DynamicProcInfo {
 static STATIC_PROC_INFO: SyncUnsafeCell<StaticProcInfo> = SyncUnsafeCell::new(StaticProcInfo {
     pid: 0,
     ppid: 0,
-    proc_fd: None,
+    proc_fd: MaybeUninit::uninit(),
+    has_proc_fd: false,
 });
 static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
     pgid: u32::MAX,
@@ -252,10 +257,9 @@ pub(crate) fn static_proc_info() -> &'static StaticProcInfo {
 }
 #[inline]
 pub fn current_proc_fd() -> &'static FdGuard {
-    static_proc_info()
-        .proc_fd
-        .as_ref()
-        .expect("proc fd must be present")
+    let info = static_proc_info();
+    assert!(info.has_proc_fd);
+    unsafe { info.proc_fd.assume_init_ref() }
 }
 
 struct ChildHookCommonArgs {
@@ -281,7 +285,10 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
         .replace(StaticProcInfo {
             pid: metadata.pid,
             ppid: metadata.ppid,
-            proc_fd: args.new_proc_fd,
+            has_proc_fd: args.new_proc_fd.is_some(),
+            proc_fd: args
+                .new_proc_fd
+                .map_or_else(MaybeUninit::uninit, MaybeUninit::new),
         })
         .proc_fd;
     drop(old_proc_fd);
