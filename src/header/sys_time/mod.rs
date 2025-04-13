@@ -81,7 +81,7 @@ pub struct timezone {
 #[deprecated]
 #[no_mangle]
 pub unsafe extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
-    Sys::getitimer(which, value)
+    Sys::getitimer(which, &mut *value)
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -114,7 +114,7 @@ pub unsafe extern "C" fn setitimer(
     value: *const itimerval,
     ovalue: *mut itimerval,
 ) -> c_int {
-    Sys::setitimer(which, value, ovalue)
+    Sys::setitimer(which, &*value, ovalue.as_mut())
         .map(|()| 0)
         .or_minus_one_errno()
 }

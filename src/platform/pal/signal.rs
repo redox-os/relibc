@@ -9,7 +9,7 @@ use crate::{
 };
 
 pub trait PalSignal: Pal {
-    unsafe fn getitimer(which: c_int, out: *mut itimerval) -> Result<()>;
+    fn getitimer(which: c_int, out: &mut itimerval) -> Result<()>;
 
     fn kill(pid: pid_t, sig: c_int) -> Result<()>;
 
@@ -19,7 +19,7 @@ pub trait PalSignal: Pal {
 
     fn raise(sig: c_int) -> Result<()>;
 
-    unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> Result<()>;
+    fn setitimer(which: c_int, new: &itimerval, old: Option<&mut itimerval>) -> Result<()>;
 
     fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> Result<()>;
 
