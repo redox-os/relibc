@@ -195,6 +195,11 @@ pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
     // Bootstrap mode, don't associate proc fds with PIDs
     let metadata = ProcMeta::default();
 
+    #[cfg(feature = "proc")]
+    {
+        crate::arch::PROC_FD.get().write(*proc_fd);
+    }
+
     STATIC_PROC_INFO.get().write(StaticProcInfo {
         pid: metadata.pid,
         ppid: metadata.ppid,
@@ -277,6 +282,10 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
 
     #[cfg(not(feature = "proc"))]
     let metadata = ProcMeta::default();
+
+    if let Some(proc_fd) = &args.new_proc_fd {
+        crate::arch::PROC_FD.get().write(**proc_fd);
+    }
 
     let old_proc_fd = STATIC_PROC_INFO
         .get()

@@ -1,4 +1,5 @@
 use core::{
+    cell::SyncUnsafeCell,
     mem::offset_of,
     ptr::NonNull,
     sync::atomic::{AtomicU8, Ordering},
@@ -40,7 +41,6 @@ pub struct SigArea {
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
     pub last_sigstack: Option<NonNull<SigStack>>,
-    pub proc_fd: usize, // TODO: use global variable instead, fix linker errors
 }
 
 #[repr(C, align(16))]
@@ -233,20 +233,19 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     // otherwise, try (competitively) dequeueing realtime signal
 
-    // SYS_CALL(fd, payload_base, payload_len, metadata_base, metadata_len | (flags << 8))
-    // rax      rdi rsi           rdx          r10            r8
+    // SYS_CALL(fd, payload_base, payload_len, metadata_len, metadata_base | (flags << 8))
+    // rax      rdi rsi           rdx          r10           r8
 
     mov r12d, eax
     mov rsi, fs:[0]
-    mov rdi, [rsi+{tcb_sa_off}+{sa_proc_fd}]
+    mov rdi, [rip+{proc_fd}]
     add rsi, {tcb_sa_off} + {sa_tmp_rt_inf} // out pointer of dequeued realtime sig
     mov rdx, {RTINF_SIZE}
     mov [rsi], eax
-    lea r10, [rip + {proc_call_sigdeq}]
-    mov r8, 1
+    lea r8, [rip + {proc_call_sigdeq}]
+    mov r10, 1
     mov eax, {SYS_CALL}
     syscall
-    ud2
     test eax, eax
     jnz 1b // assumes error can only be EAGAIN
     lea eax, [r12d + 32]
@@ -442,7 +441,6 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
-    sa_proc_fd = const offset_of!(SigArea, proc_fd),
     sc_saved_rflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_rip = const offset_of!(Sigcontrol, saved_ip),
     sc_word = const offset_of!(Sigcontrol, word),
@@ -461,6 +459,7 @@ __relibc_internal_sigentry_crit_third:
     SYS_CALL = const syscall::SYS_CALL,
     proc_call_sigdeq = sym PROC_CALL_SIGDEQ,
     RTINF_SIZE = const size_of::<RtSigInfo>(),
+    proc_fd = sym PROC_FD,
 ]);
 
 extern "C" {
@@ -528,3 +527,4 @@ pub fn current_sp() -> usize {
 }
 
 static PROC_CALL_SIGDEQ: u64 = ProcCall::Sigdeq as u64;
+pub(crate) static PROC_FD: SyncUnsafeCell<usize> = SyncUnsafeCell::new(usize::MAX);
