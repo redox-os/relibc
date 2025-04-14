@@ -1,9 +1,10 @@
-use core::{mem::offset_of, ptr::NonNull};
+use core::{cell::SyncUnsafeCell, mem::offset_of, ptr::NonNull};
 
 use syscall::{data::*, error::*};
 
 use crate::{
-    proc::{fork_inner, FdGuard},
+    proc::{fork_inner, FdGuard, ForkArgs},
+    protocol::{ProcCall, RtSigInfo},
     signal::{inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     RtTcb, Tcb,
 };
@@ -20,6 +21,7 @@ pub struct SigArea {
     pub tmp_x1_x2: [usize; 2],
     pub tmp_x3_x4: [usize; 2],
     pub tmp_x5_x6: [usize; 2],
+    pub tmp_x7_x8: [usize; 2],
     pub tmp_sp: usize,
     pub onstack: u64,
     pub disable_signals_depth: u64,
@@ -97,8 +99,8 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
     Ok(())
 }
 
-unsafe extern "C" fn fork_impl(initial_rsp: *mut usize) -> usize {
-    Error::mux(fork_inner(initial_rsp))
+unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usize {
+    Error::mux(fork_inner(initial_rsp, args))
 }
 
 unsafe extern "C" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
@@ -110,7 +112,7 @@ unsafe extern "C" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
         .write(Some(FdGuard::new(new_pid_fd)));
 }
 
-asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
+asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     stp     x29, x30, [sp, #-16]!
     stp     x27, x28, [sp, #-16]!
     stp     x25, x26, [sp, #-16]!
@@ -122,7 +124,8 @@ asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
 
     //TODO: store floating point regs
 
-    mov x0, sp
+    // x0: &ForkArgs
+    mov x1, sp
     bl {fork_impl}
 
     add sp, sp, #32
@@ -167,6 +170,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     stp x1, x2, [x0, #{tcb_sa_off} + {sa_tmp_x1_x2}]
     stp x3, x4, [x0, #{tcb_sa_off} + {sa_tmp_x3_x4}]
     stp x5, x6, [x0, #{tcb_sa_off} + {sa_tmp_x5_x6}]
+    stp x7, x8, [x0, #{tcb_sa_off} + {sa_tmp_x7_x8}]
     mov x1, sp
     str x1, [x0, #{tcb_sa_off} + {sa_tmp_sp}]
 
@@ -240,14 +244,21 @@ asmfunction!(__relibc_internal_sigentry: ["
     lsr x3, x1, x2
     tbnz x3, #0, 5f
 
-    mov x5, x0
-    mov x4, x8
-    mov x8, #{SYS_SIGDEQUEUE}
-    mov x0, x1
-    add x1, x0, #{tcb_sa_off} + {sa_tmp_rt_inf}
+    // SYS_CALL(fd, payload_base, payload_len, metadata_len, metadata_base | (flags << 8))
+    // x8       x0  x1            x2           x3            x4
+
+    mov x5, x0 // save TCB pointer
+    ldr x8, ={SYS_CALL}
+    adrp x0, {proc_fd}
+    ldr x0, [x0, #:lo12:{proc_fd}]
+    add x1, x5, #{tcb_sa_off} + {sa_tmp_rt_inf}
+    str x2, [x1]
+    mov x2, #{RTINF_SIZE}
+    adrp x3, {proc_call}
+    add x3, x3, :lo12:{proc_call}
+    mov x4, #1
     svc 0
-    mov x0, x5
-    mov x8, x4
+    mov x0, x5 // restore TCB pointer
     cbnz x0, 1b
 
     b 2f
@@ -328,8 +339,9 @@ asmfunction!(__relibc_internal_sigentry: ["
     stp x4, x3, [sp, #-16]!
     ldp x5, x6, [x0, #{tcb_sa_off} + {sa_tmp_x5_x6}]
     stp x6, x5, [sp, #-16]!
-
+    ldp x7, x8, [x0, #{tcb_sa_off} + {sa_tmp_x7_x8}]
     stp x8, x7, [sp, #-16]!
+
     stp x10, x9, [sp, #-16]!
     stp x12, x11, [sp, #-16]!
     stp x14, x13, [sp, #-16]!
@@ -400,6 +412,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     sa_tmp_x1_x2 = const offset_of!(SigArea, tmp_x1_x2),
     sa_tmp_x3_x4 = const offset_of!(SigArea, tmp_x3_x4),
     sa_tmp_x5_x6 = const offset_of!(SigArea, tmp_x5_x6),
+    sa_tmp_x7_x8 = const offset_of!(SigArea, tmp_x7_x8),
     sa_tmp_sp = const offset_of!(SigArea, tmp_sp),
     sa_tmp_rt_inf = const offset_of!(SigArea, tmp_rt_inf),
     sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
@@ -409,12 +422,17 @@ asmfunction!(__relibc_internal_sigentry: ["
     sc_sender_infos = const offset_of!(Sigcontrol, sender_infos),
     sc_word = const offset_of!(Sigcontrol, word),
     sc_flags = const offset_of!(Sigcontrol, control_flags),
+    proc_fd = sym PROC_FD,
     inner = sym inner_c,
+    proc_call = sym PROC_CALL,
 
     SA_ONSTACK_BIT = const 58, // (1 << 58) >> 32 = 0x0400_0000
-    SYS_SIGDEQUEUE = const syscall::SYS_SIGDEQUEUE,
+
+    SYS_CALL = const syscall::SYS_CALL,
+
     STACK_ALIGN = const 16,
     REDZONE_SIZE = const 128,
+    RTINF_SIZE = const size_of::<RtSigInfo>(),
 ]);
 
 asmfunction!(__relibc_internal_rlct_clone_ret: ["
@@ -460,3 +478,5 @@ pub unsafe fn arch_pre(stack: &mut SigStack, os: &mut SigArea) -> PosixStackt {
         flags: 0,                  // TODO
     }
 }
+pub(crate) static PROC_FD: SyncUnsafeCell<usize> = SyncUnsafeCell::new(usize::MAX);
+static PROC_CALL: &[usize] = &[ProcCall::Sigdeq as usize];
