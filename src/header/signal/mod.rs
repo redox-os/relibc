@@ -23,7 +23,7 @@ pub mod sys;
 #[path = "redox.rs"]
 pub mod sys;
 
-type SigSet = BitSet<[c_ulong; 1]>;
+type SigSet = BitSet<[u64; 1]>;
 
 pub(crate) const SIG_DFL: usize = 0;
 pub(crate) const SIG_IGN: usize = 1;
