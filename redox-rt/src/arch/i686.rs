@@ -410,4 +410,4 @@ pub fn current_sp() -> usize {
 }
 
 pub static PROC_FD: SyncUnsafeCell<usize> = SyncUnsafeCell::new(usize::MAX);
-static PROC_CALL: [usize; 1] = [ProcCall::Sigdeq as usize];
+static PROC_CALL: u64 = ProcCall::Sigdeq as u64;

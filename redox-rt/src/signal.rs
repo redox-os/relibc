@@ -586,7 +586,7 @@ pub fn setup_sighandler(tcb: &RtTcb) {
     this_thread_call(
         &mut [],
         CallFlags::empty(),
-        &[ThreadCall::SyncSigTctl as usize],
+        &[ThreadCall::SyncSigTctl as u64],
     )
     .expect("failed to sync signal tctl");
 
@@ -786,7 +786,7 @@ fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option
                 **static_proc_info().proc_fd.assume_init_ref(),
                 &mut buf,
                 CallFlags::empty(),
-                &[ProcCall::Sigdeq as usize],
+                &[ProcCall::Sigdeq as u64],
             )
             .ok()?;
             core::mem::transmute(buf)

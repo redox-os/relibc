@@ -854,13 +854,13 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                     **proc_fd,
                     &mut [],
                     CallFlags::empty(),
-                    &[ProcCall::SyncSigPctl as usize],
+                    &[ProcCall::SyncSigPctl as u64],
                 )?;
                 thread_call(
                     *new_thr_fd,
                     &mut [],
                     CallFlags::empty(),
-                    &[ThreadCall::SyncSigTctl as usize],
+                    &[ThreadCall::SyncSigTctl as u64],
                 )?;
             }
         }
