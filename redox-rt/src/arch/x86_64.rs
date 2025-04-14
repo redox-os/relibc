@@ -233,8 +233,8 @@ asmfunction!(__relibc_internal_sigentry: ["
 
     // otherwise, try (competitively) dequeueing realtime signal
 
-    // SYS_CALL(fd, payload_base, payload_len, metadata_len, metadata_base | (flags << 8))
-    // rax      rdi rsi           rdx          r10           r8
+    // SYS_CALL(fd, payload_base, payload_len, metadata_len | (flags << 8), metadata_base)
+    // rax      rdi rsi           rdx          r10                          r8
 
     mov r12d, eax
     mov rsi, fs:[0]

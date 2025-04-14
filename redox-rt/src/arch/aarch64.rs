@@ -254,9 +254,9 @@ asmfunction!(__relibc_internal_sigentry: ["
     add x1, x5, #{tcb_sa_off} + {sa_tmp_rt_inf}
     str x2, [x1]
     mov x2, #{RTINF_SIZE}
-    adrp x3, {proc_call}
-    add x3, x3, :lo12:{proc_call}
-    mov x4, #1
+    adrp x4, {proc_call}
+    add x4, x4, :lo12:{proc_call}
+    mov x3, #1
     svc 0
     mov x0, x5 // restore TCB pointer
     cbnz x0, 1b
@@ -479,4 +479,4 @@ pub unsafe fn arch_pre(stack: &mut SigStack, os: &mut SigArea) -> PosixStackt {
     }
 }
 pub(crate) static PROC_FD: SyncUnsafeCell<usize> = SyncUnsafeCell::new(usize::MAX);
-static PROC_CALL: &[usize] = &[ProcCall::Sigdeq as usize];
+static PROC_CALL: [usize; 1] = [ProcCall::Sigdeq as usize];
