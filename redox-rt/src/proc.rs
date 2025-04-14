@@ -107,7 +107,7 @@ where
         |o| core::mem::take(&mut o.tree),
     );
 
-    pread_all(*image_file as usize, header.e_phoff, phs).map_err(|_| Error::new(EIO))?;
+    pread_all(*image_file as usize, header.e_phoff.into(), phs).map_err(|_| Error::new(EIO))?;
 
     for ph_idx in 0..phnum {
         let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
@@ -130,7 +130,7 @@ where
             // PT_INTERP must come before any PT_LOAD, so we don't have to iterate twice.
             PT_INTERP => {
                 let mut interp = vec![0_u8; segment.p_filesz as usize];
-                pread_all(*image_file as usize, segment.p_offset, &mut interp)?;
+                pread_all(*image_file as usize, segment.p_offset.into(), &mut interp)?;
 
                 return Ok(FexecResult::Interp {
                     path: interp.into_boxed_slice(),
@@ -180,7 +180,7 @@ where
                     };
                     pread_all(
                         *image_file,
-                        segment.p_offset,
+                        segment.p_offset.into(),
                         &mut dst_memory[voff..voff + filesz],
                     )?;
                 }
