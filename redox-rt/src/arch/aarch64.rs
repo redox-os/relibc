@@ -103,13 +103,16 @@ unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usiz
     Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "C" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
+unsafe extern "C" fn child_hook(cur_filetable_fd: usize, new_proc_fd: usize, new_thr_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
-    // TODO: Currently pidfd == threadfd, but this will not be the case later.
-    RtTcb::current()
-        .thr_fd
-        .get()
-        .write(Some(FdGuard::new(new_pid_fd)));
+    crate::child_hook_common(crate::ChildHookCommonArgs {
+        new_thr_fd: FdGuard::new(new_thr_fd),
+        new_proc_fd: if new_proc_fd == usize::MAX {
+            None
+        } else {
+            Some(FdGuard::new(new_proc_fd))
+        },
+    });
 }
 
 asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
@@ -139,14 +142,14 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
 "] <= [fork_impl = sym fork_impl]);
 
 asmfunction!(__relibc_internal_fork_ret: ["
-    ldp x0, x1, [sp]
+    ldp x0, x1, [sp], #16
+    ldp x2, x3, [sp], #16
     bl {child_hook}
 
     //TODO: load floating point regs
 
     mov x0, xzr
 
-    add sp, sp, #32
     ldp     x19, x20, [sp], #16
     ldp     x21, x22, [sp], #16
     ldp     x23, x24, [sp], #16
