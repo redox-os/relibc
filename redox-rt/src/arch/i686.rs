@@ -27,9 +27,9 @@ pub struct SigArea {
     pub tmp_edi: usize,
     pub tmp_esi: usize,
     pub tmp_rt_inf: RtSigInfo,
+    pub tmp_signo: usize,
     pub tmp_id_inf: u64,
     pub tmp_mm0: u64,
-    pub pctl: usize, // TODO: reference pctl directly
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
     pub last_sigstack: Option<NonNull<SigStack>>,
@@ -166,9 +166,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     bsf eax, eax
     jnz 9f
 
-    mov ecx, gs:[{tcb_sa_off} + {sa_pctl}]
-
     // Read standard signal word - for the process
+    lea ecx, [{pctl}]
     mov eax, [ecx + {pctl_pending}]
     and eax, edx
     bsf eax, eax
@@ -190,12 +189,12 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov eax, gs:[{tcb_sc_off} + {sc_word} + 8]
     or eax, edx
     and eax, gs:[{tcb_sc_off} + {sc_word} + 12]
-    jz 7f // spurious signal
     bsf eax, eax
+    jz 7f // spurious signal
 
-    // If thread was specifically targeted, send the signal to it first.
+    // If thread rather than process was specifically targeted, send the signal to it first.
     bt edx, eax
-    jc 8f
+    jnc 8f
 
     // SYS_CALL(fd, payload_base, payload_len, metadata_len, metadata_base)
     // eax      ebx ecx           edx          esi           edi
@@ -203,16 +202,18 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov ebx, [{proc_fd}]
     mov ecx, gs:[0]
     add ecx, {tcb_sa_off} + {sa_tmp_rt_inf}
-    lea edx, [eax+32]
-    mov [ecx], edx
+    mov [ecx], eax
+    mov gs:[{tcb_sa_off} + {sa_tmp_signo}], eax
+    mov edx, {RTINF_SIZE}
     mov esi, 1
-    mov edi, {proc_call}
+    lea edi, [{proc_call}]
     mov eax, {SYS_CALL}
     int 0x80
     test eax, eax
     jnz 1b
 
-    mov eax, ecx
+    mov eax, gs:[{tcb_sa_off} + {sa_tmp_signo}]
+    add eax, 32
     jmp 2f
 8:
     add eax, 32
@@ -300,8 +301,11 @@ __relibc_internal_sigentry_crit_second:
     mov gs:[{tcb_sa_off} + {sa_tmp_eip}], eax
 
     mov eax, gs:[{tcb_sa_off} + {sa_tmp_eax}]
+    mov ebx, gs:[{tcb_sa_off} + {sa_tmp_ebx}]
     mov ecx, gs:[{tcb_sa_off} + {sa_tmp_ecx}]
     mov edx, gs:[{tcb_sa_off} + {sa_tmp_edx}]
+    mov edi, gs:[{tcb_sa_off} + {sa_tmp_edi}]
+    mov esi, gs:[{tcb_sa_off} + {sa_tmp_esi}]
 
     and dword ptr gs:[{tcb_sc_off} + {sc_control}], ~1
     .globl __relibc_internal_sigentry_crit_third
@@ -320,9 +324,9 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_mm0 = const offset_of!(SigArea, tmp_mm0),
     sa_tmp_rt_inf = const offset_of!(SigArea, tmp_rt_inf),
     sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
+    sa_tmp_signo = const offset_of!(SigArea, tmp_signo),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
-    sa_pctl = const offset_of!(SigArea, pctl),
     sc_control = const offset_of!(Sigcontrol, control_flags),
     sc_saved_eflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
@@ -338,6 +342,7 @@ __relibc_internal_sigentry_crit_third:
     proc_call = sym PROC_CALL,
     STACK_ALIGN = const 16,
     SYS_CALL = const syscall::SYS_CALL,
+    RTINF_SIZE = const size_of::<RtSigInfo>(),
 ]);
 
 asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
