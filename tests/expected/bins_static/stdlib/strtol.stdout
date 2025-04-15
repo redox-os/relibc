@@ -1,13 +1,26 @@
 -42
+endptr ""
 555
+endptr ""
 1234567890
+endptr "    "
 -42
+endptr ""
 555
+endptr ""
 1234567890
+endptr "    "
 38acf
+endptr "g"
 abcdef12
+endptr ""
 cafebeef
+endptr ""
 731
+endptr "89"
 731
+endptr "89"
 0
+endptr "b"
 0
+endptr "b"
