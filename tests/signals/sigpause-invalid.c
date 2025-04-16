@@ -1,5 +1,6 @@
 #define _XOPEN_SOURCE 700
 
+#include "../test_helpers.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <signal.h>

@@ -8,6 +8,10 @@
 
 int main()
 {
+    // UB if pg == 1, so set it here first
+    int err = setpgid(0, 0);
+    ERROR_IF(setpgid, err, == -1);
+
 	int pgrp;
 
 	pgrp = getpgrp();

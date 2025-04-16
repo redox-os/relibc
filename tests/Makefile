@@ -199,20 +199,41 @@ NAMES=\
 	signals/raise-compliance \
 	signals/sigismember-invalid \
 	signals/sigismember-valid \
+	signals/sigaddset-add \
+	signals/sigdelset-delete \
+	signals/signal-h \
+	signals/signal-h-2 \
 	signals/signal-handle_return \
 	signals/signal-handler \
 	signals/signal-handler2 \
 	signals/signal-ignore \
 	signals/signal-invalid \
 	signals/signal-uncatchable \
+	signals/sigprocmask-3 \
+	signals/sigprocmask-4 \
+	signals/sigprocmask-5 \
 	signals/sigprocmask-6 \
 	signals/sigprocmask-7 \
 	signals/sigprocmask-8 \
 	signals/sigprocmask-9 \
+	signals/sigprocmask-10 \
 	signals/sigprocmask-11 \
+	signals/sigprocmask-12 \
+	signals/sigpause-invalid \
+	signals/sigpause-revert \
+	signals/sigpause-suspend \
 	signals/sigprocmask-blocksingle \
+	signals/sigprocmask-block \
+	signals/sigrelse-1 \
 	signals/sigrelse-2 \
 	signals/sigrelse-3 \
+	signals/sigset-1 \
+	signals/sigset-10 \
+	signals/sigset-2 \
+	signals/sigset-3 \
+	signals/sigset-4 \
+	signals/sigset-5 \
+	signals/sigset-9 \
 	stdio/ctermid \
 	stdio/tempnam \
 	stdio/tmpnam \

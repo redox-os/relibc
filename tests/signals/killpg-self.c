@@ -39,6 +39,10 @@ int killpg_test1(int signum)
 }
 
 int main(){
+    // UB if pg == 1, so set it here first
+    int status = setpgid(0, 0);
+    ERROR_IF(setpgid, status, == -1);
+
 	for (unsigned int i = 0; i < sizeof(signals_list)/sizeof(signals_list[0]); i++)
 	{
 		int sig = signals_list[i].signal;
