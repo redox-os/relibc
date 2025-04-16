@@ -296,7 +296,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     b 2f
 3:
     // A standard signal was sent to this thread, try clearing its bit.
-    clz x1, x1
+    clz w1, w1
     mov x2, #31
     sub x1, x2, x1
 
