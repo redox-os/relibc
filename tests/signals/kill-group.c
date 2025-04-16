@@ -44,6 +44,10 @@ int kill_group(int signum)
 
 int main()
 {
+    // Ensure we don't kill what was already in the process group.
+    int status = setpgid(0, 0);
+    ERROR_IF(setpgid, status, == -1);
+
     for (unsigned int i = 0; i < sizeof(signals_list)/sizeof(signals_list[0]); i++)
 	{
 		int sig = signals_list[i].signal;

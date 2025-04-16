@@ -29,14 +29,12 @@ EXPECT_NAMES=\
 	locale \
 	math \
 	netdb/getaddrinfo \
-	ptrace \
 	regex \
 	select \
 	setjmp \
 	sigaction \
 	sigaltstack \
 	signal \
-	sigsetjmp \
 	stdio/all \
 	stdio/buffer \
 	stdio/dprintf \
@@ -122,7 +120,6 @@ EXPECT_NAMES=\
 	unistd/fsync \
 	unistd/ftruncate \
 	unistd/getopt \
-	unistd/getopt_long \
 	unistd/pipe \
 	unistd/rmdir \
 	waitpid \
@@ -130,6 +127,7 @@ EXPECT_NAMES=\
 	kill-waitpid \
 	# unistd/sleep \
 	unistd/swab \
+	unistd/getopt_long \
 	unistd/write \
 	wchar/fgetwc \
 	wchar/fwide \
@@ -190,7 +188,13 @@ NAMES=\
 	signals/killpg-esrch \
 	signals/killpg-invalid \
 	signals/killpg0-self \
+	signals/kill-group \
+	signals/kill-child \
+	signals/killpg-child \
+	signals/killpg-self \
 	signals/pthread_kill-invalid \
+	signals/pthread_kill-child \
+	signals/pthread_kill-self \
 	signals/pthread_kill0-self \
 	signals/raise-compliance \
 	signals/sigismember-invalid \

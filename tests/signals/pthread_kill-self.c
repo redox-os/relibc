@@ -14,7 +14,7 @@
 # define SIGTOTEST SIGABRT
 
 int sem1;		/* Manual semaphore */
-int handler_called = 0;
+volatile sig_atomic_t handler_called = 0;
 int count = 1;
 
 struct signal {

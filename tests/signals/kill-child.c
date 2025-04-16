@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include "signals_list.h"
@@ -8,7 +9,7 @@
  * Skip SIGKILL and SIGSTOP as these are not catchable.
  */
 
-int sig_handled = 0;
+volatile sig_atomic_t sig_handled = 0;
 
 void sig_handler(int signo)
 {
@@ -18,7 +19,6 @@ void sig_handler(int signo)
 
 void child_proc(int signum)
 {
-	
 	sigset_t sig_set;
 	int status;
 
@@ -39,7 +39,7 @@ void child_proc(int signum)
 	status = sleep(10);
 	ERROR_IF(sleep, status, == 0);
 
-	ERROR_IF(kill, sig_handled, == 0 );
+	assert(sig_handled != 0);
 
 	exit(EXIT_SUCCESS);
 }
@@ -89,6 +89,7 @@ int main()
 		{
 			continue;
 		}
+        printf("Testing for signal %s (%d)\n", strsignal(sig), sig);
 		kill_child(sig);
 	}
 	return EXIT_SUCCESS;
