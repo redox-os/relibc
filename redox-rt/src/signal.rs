@@ -6,16 +6,10 @@ use syscall::{
 };
 
 use crate::{
-    arch::*,
-    proc::FdGuard,
-    protocol::{
+    arch::*, current_proc_fd, proc::FdGuard, protocol::{
         ProcCall, RtSigInfo, ThreadCall, SIGCHLD, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU,
         SIGURG, SIGWINCH,
-    },
-    static_proc_info,
-    sync::Mutex,
-    sys::{proc_call, this_thread_call},
-    RtTcb, Tcb,
+    }, static_proc_info, sync::Mutex, sys::{proc_call, this_thread_call}, RtTcb, Tcb
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -162,9 +156,13 @@ unsafe fn inner(stack: &mut SigStack) {
             panic!("ctl {:x?} signal {}", os.control, stack.sig_num)
         }
         SigactionKind::Default => {
-            //syscall::exit(stack.sig_num as usize);
-            todo!("exit");
-            unreachable!();
+            let sig = (stack.sig_num & 0x3f) as u8;
+
+            let _ = proc_call(**current_proc_fd(), &mut [], CallFlags::empty(), &[
+                ProcCall::Exit as u64,
+                u64::from(sig) << 8,
+            ]);
+            core::intrinsics::abort()
         }
         SigactionKind::Handled { handler } => handler,
     };
@@ -508,8 +506,7 @@ bitflags::bitflags! {
 const STORED_FLAGS: u32 = 0xfe00_0000;
 
 fn default_handler(sig: c_int) {
-    //syscall::exit(sig as usize);
-    todo!("exit")
+    unreachable!();
 }
 
 #[derive(Clone, Copy)]
