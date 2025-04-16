@@ -300,7 +300,8 @@ pub fn posix_exit(status: i32) -> ! {
         &[ProcCall::Exit as u64, status as u64],
     )
     .expect("failed to call proc mgr with Exit");
-    unreachable!()
+    let _ = syscall::write(1, b"redox-rt: ProcCall::Exit FAILED, abort()ing!\n");
+    core::intrinsics::abort();
 }
 pub fn setrens(rns: usize, ens: usize) -> Result<()> {
     this_proc_call(

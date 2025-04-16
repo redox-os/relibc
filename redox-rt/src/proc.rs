@@ -754,10 +754,12 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
 
             // This must be done before the address space is copied.
             unsafe {
+                let proc_fd = new_proc_fd.as_ref().map_or(usize::MAX, |p| **p);
+                //let _ = syscall::write(1, alloc::format!("P{}Q{}R{}\n", *cur_filetable_fd, proc_fd, *new_thr_fd).as_bytes());
                 initial_rsp.write(*cur_filetable_fd);
                 initial_rsp
                     .add(1)
-                    .write(new_proc_fd.as_ref().map_or(usize::MAX, |p| **p));
+                    .write(proc_fd);
                 initial_rsp.add(2).write(*new_thr_fd);
             }
         }
