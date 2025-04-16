@@ -126,6 +126,7 @@ EXPECT_NAMES=\
 	unistd/pipe \
 	unistd/rmdir \
 	waitpid \
+	waitpid_multiple \
 	# unistd/sleep \
 	unistd/swab \
 	unistd/write \

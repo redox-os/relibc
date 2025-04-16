@@ -104,7 +104,7 @@ unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usiz
 }
 
 unsafe extern "C" fn child_hook(cur_filetable_fd: usize, new_proc_fd: usize, new_thr_fd: usize) {
-    //let _ = syscall::write(1, alloc::format!("A{cur_filetable_fd}B{new_proc_fd}C{new_thr_fd}\n").as_bytes());
+    //let _ = syscall::write(1, alloc::format!("CUR{cur_filetable_fd}PROC{new_proc_fd}THR{new_thr_fd}\n").as_bytes());
     let _ = syscall::close(cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
         new_thr_fd: FdGuard::new(new_thr_fd),
