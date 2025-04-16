@@ -6,10 +6,17 @@ use syscall::{
 };
 
 use crate::{
-    arch::*, current_proc_fd, proc::FdGuard, protocol::{
+    arch::*,
+    current_proc_fd,
+    proc::FdGuard,
+    protocol::{
         ProcCall, RtSigInfo, ThreadCall, SIGCHLD, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU,
         SIGURG, SIGWINCH,
-    }, static_proc_info, sync::Mutex, sys::{proc_call, this_thread_call}, RtTcb, Tcb
+    },
+    static_proc_info,
+    sync::Mutex,
+    sys::{proc_call, this_thread_call},
+    RtTcb, Tcb,
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -158,10 +165,12 @@ unsafe fn inner(stack: &mut SigStack) {
         SigactionKind::Default => {
             let sig = (stack.sig_num & 0x3f) as u8;
 
-            let _ = proc_call(**current_proc_fd(), &mut [], CallFlags::empty(), &[
-                ProcCall::Exit as u64,
-                u64::from(sig) << 8,
-            ]);
+            let _ = proc_call(
+                **current_proc_fd(),
+                &mut [],
+                CallFlags::empty(),
+                &[ProcCall::Exit as u64, u64::from(sig) << 8],
+            );
             core::intrinsics::abort()
         }
         SigactionKind::Handled { handler } => handler,

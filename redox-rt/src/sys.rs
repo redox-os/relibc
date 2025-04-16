@@ -340,3 +340,7 @@ pub fn posix_setsid() -> Result<()> {
     this_proc_call(&mut [], CallFlags::empty(), &[ProcCall::Setsid as u64])?;
     Ok(())
 }
+pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {
+    wrapper(false, false, || syscall::nanosleep(rqtp, rmtp))?;
+    Ok(())
+}

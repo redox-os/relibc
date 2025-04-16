@@ -742,7 +742,7 @@ impl Pal for Sys {
         } else {
             redox_rmtp = unsafe { redox_timespec::from(&*rmtp) };
         }
-        match syscall::nanosleep(&redox_rqtp, &mut redox_rmtp) {
+        match redox_rt::sys::posix_nanosleep(&redox_rqtp, &mut redox_rmtp) {
             Ok(_) => Ok(()),
             Err(Error { errno: EINTR }) => {
                 unsafe {
