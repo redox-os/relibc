@@ -227,44 +227,47 @@ asmfunction!(__relibc_internal_sigentry: ["
     clrex
 
     // Load the pending set again. TODO: optimize this?
+    // Process pending - realtime
     add x1, x6, #{pctl_pending}
     ldaxr x2, [x1]
     lsr x2, x2, #32
 
+    // Thread pending - realtime and allowset
     add x5, x0, #{tcb_sc_off} + {sc_word} + 8
     ldar x1, [x5]
 
-    orr x2, x1, x2
-    and x2, x2, x2, lsr #32
-    cbz x2, 7f
+    orr x2, x1, x2 // combine proc and thread pending
+    and x2, x2, x2, lsr #32 // AND pending with allowset
+    cbz x2, 7f // spurious signal if realtime is clear
 
-    rbit x3, x2
-    clz x3, x3
-    mov x4, #31
-    sub x2, x4, x3
+    rbit x2, x2
+    clz x2, x2
     // x2 now contains sig_idx - 32
 
     // If realtime signal was directed at thread, handle it as an idempotent signal.
-    lsr x3, x1, x2
-    tbnz x3, #0, 5f
+    lsr x3, x1, x2 // x3 := x1 >> x2; x1 is thread pending
+    tbnz x3, #0, 5f // jump if bit is nonzero
 
     // SYS_CALL(fd, payload_base, payload_len, metadata_len, metadata_base | (flags << 8))
     // x8       x0  x1            x2           x3            x4
 
     mov x5, x0 // save TCB pointer
+    mov x6, x2
     ldr x8, ={SYS_CALL}
     adrp x0, {proc_fd}
     ldr x0, [x0, #:lo12:{proc_fd}]
     add x1, x5, #{tcb_sa_off} + {sa_tmp_rt_inf}
-    str x2, [x1]
+    str x6, [x1]
     mov x2, #{RTINF_SIZE}
     adrp x4, {proc_call}
     add x4, x4, :lo12:{proc_call}
     mov x3, #1
     svc 0
+    mov x3, x0
     mov x0, x5 // restore TCB pointer
-    cbnz x0, 1b
-
+    mov x2, x6 // restore signal number - 32
+    add x1, x2, #32 // signal number
+    cbnz x3, 1b
     b 2f
 5:
     // A realtime signal was sent to this thread, try clearing its bit.
@@ -314,7 +317,7 @@ asmfunction!(__relibc_internal_sigentry: ["
     str x2, [x0, #{tcb_sa_off} + {sa_tmp_id_inf}]
 2:
     ldr x3, [x0, #{tcb_sa_off} + {sa_pctl}]
-    add x2, x2, {pctl_actions}
+    add x3, x3, {pctl_actions}
     add x2, x3, w1, uxtb #4 // actions_base + sig_idx * sizeof Action
     // TODO: NOT ATOMIC (tearing allowed between regs)!
     ldxp x2, x3, [x2]

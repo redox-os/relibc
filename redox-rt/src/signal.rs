@@ -8,7 +8,10 @@ use syscall::{
 use crate::{
     arch::*,
     proc::FdGuard,
-    protocol::{ProcCall, RtSigInfo, ThreadCall, SIGCHLD, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH},
+    protocol::{
+        ProcCall, RtSigInfo, ThreadCall, SIGCHLD, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU,
+        SIGURG, SIGWINCH,
+    },
     static_proc_info,
     sync::Mutex,
     sys::{proc_call, this_thread_call},
