@@ -3,13 +3,12 @@ use core::{ffi::c_int, ptr::NonNull, sync::atomic::Ordering};
 use syscall::{
     data::AtomicU64, CallFlags, Error, RawAction, Result, SenderInfo, SetSighandlerData,
     SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, EAGAIN, EINTR, EINVAL, ENOMEM, EPERM,
-    SIGCHLD, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH,
 };
 
 use crate::{
     arch::*,
     proc::FdGuard,
-    protocol::{ProcCall, RtSigInfo, ThreadCall},
+    protocol::{ProcCall, RtSigInfo, ThreadCall, SIGCHLD, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH},
     static_proc_info,
     sync::Mutex,
     sys::{proc_call, this_thread_call},

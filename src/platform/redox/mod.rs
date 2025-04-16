@@ -1048,9 +1048,9 @@ impl Pal for Sys {
                 ));
                 if res == Some(Ok(0)) {
                     // WNOHANG, just pretend ptrace SIGSTOP:ped this
-                    status = (syscall::SIGSTOP << 8) | 0x7f;
+                    status = (redox_rt::protocol::SIGSTOP << 8) | 0x7f;
                     assert!(wifstopped(status));
-                    assert_eq!(wstopsig(status), syscall::SIGSTOP);
+                    assert_eq!(wstopsig(status), redox_rt::protocol::SIGSTOP);
                     res = Some(Ok(pid as usize));
                 }
             }
