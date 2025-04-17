@@ -397,8 +397,23 @@ fn convert_old(action: &RawAction) -> Sigaction {
 }
 
 pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction>) -> Result<()> {
-    if matches!(usize::from(signal), 0 | 32 | SIGKILL | SIGSTOP | 65..) {
+    if matches!(usize::from(signal), 0 | 32 | 65..) {
         return Err(Error::new(EINVAL));
+
+    }
+    if matches!(usize::from(signal), SIGKILL | SIGSTOP) {
+        if new.is_some() {
+            return Err(Error::new(EINVAL));
+        }
+        if let Some(old) = old {
+            // TODO: Is this the correct value to set it to?
+            *old = Sigaction {
+                kind: SigactionKind::Default,
+                mask: 0,
+                flags: SigactionFlags::empty(),
+            };
+        }
+        return Ok(());
     }
 
     let _sigguard = tmp_disable_signals();
