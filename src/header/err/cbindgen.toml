@@ -1,0 +1,5 @@
+sys_includes = ["stdarg.h", "stdio.h", "features.h"]
+include_guard = "_RELIBC_ERR_H"
+language = "C"
+no_includes = true
+cpp_compat = true

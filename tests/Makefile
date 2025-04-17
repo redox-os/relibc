@@ -15,6 +15,7 @@ EXPECT_NAMES=\
 	destructor \
 	dirent/scandir \
 	endian \
+	err \
 	errno \
 	error \
 	fcntl/create \
