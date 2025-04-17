@@ -288,7 +288,10 @@ fn get_allowset_raw(words: &[AtomicU64; 2]) -> u64 {
     (words[0].load(Ordering::Relaxed) >> 32) | ((words[1].load(Ordering::Relaxed) >> 32) << 32)
 }
 /// Sets mask from old to new, returning what was pending at the time.
-fn set_allowset_raw(words: &[AtomicU64; 2], old: u64, new: u64) -> u64 {
+fn set_allowset_raw(words: &[AtomicU64; 2], old: u64, new_raw: u64) -> u64 {
+    // TODO: should these bits always be set, or never be set?
+    let new = new_raw | ALLOWSET_ALWAYS;
+
     // This assumes *only this thread* can change the allowset. If this rule is broken, the use of
     // fetch_add will corrupt the words entirely. fetch_add is very efficient on x86, being
     // generated as LOCK XADD which is the fastest RMW instruction AFAIK.
@@ -303,6 +306,7 @@ fn set_allowset_raw(words: &[AtomicU64; 2], old: u64, new: u64) -> u64 {
 
     prev_w0 | (prev_w1 << 32)
 }
+const ALLOWSET_ALWAYS: u64 = sig_bit(SIGSTOP as u32) | sig_bit(SIGKILL as u32);
 fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnOnce(u64) -> u64>) -> Result<()> {
     let _guard = tmp_disable_signals();
     let ctl = current_sigctl();
