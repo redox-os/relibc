@@ -160,7 +160,7 @@ unsafe fn inner(stack: &mut SigStack) {
 
     let handler = match sigaction.kind {
         SigactionKind::Ignore => {
-            panic!("ctl {:x?} signal {}", os.control, stack.sig_num)
+            panic!("ctl {:#x?} signal {}", os.control, stack.sig_num)
         }
         SigactionKind::Default => {
             let sig = (stack.sig_num & 0x3f) as u8;
@@ -397,9 +397,14 @@ fn convert_old(action: &RawAction) -> Sigaction {
 }
 
 pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction>) -> Result<()> {
+    // TODO: Now that the goal of keeping logic out of the IPC backend, no longer holds when
+    // procmgr has taken over signal handling from the kernel, it would probably make sense to make
+    // parts of this function an IPC call, for synchronization purposes. Apart from SA_RESETHAND
+    // logic which may need to be fast, regular sigaction is typically in the 'configuration'
+    // category, allowed to be slower.
+
     if matches!(usize::from(signal), 0 | 32 | 65..) {
         return Err(Error::new(EINVAL));
-
     }
     if matches!(usize::from(signal), SIGKILL | SIGSTOP) {
         if new.is_some() {
@@ -435,8 +440,16 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
 
     let (mask, flags, handler) = match (usize::from(signal), new.kind) {
         (_, SigactionKind::Ignore) | (SIGURG | SIGWINCH, SigactionKind::Default) => {
-            // TODO: POSIX specifies that pending signals shall be discarded if set to SIG_IGN by
-            // sigaction.
+            let sig_group = (signal - 1) / 32;
+            let sig_idx = (signal - 1) % 32;
+
+            // TODO: relibc and the procmgr has access to all threads, redox_rt doesn't currently.
+            // Do this for all threads!
+            ctl.word[usize::from(sig_group)].fetch_and(!(1 << sig_idx), Ordering::Relaxed);
+            PROC_CONTROL_STRUCT
+                .pending
+                .fetch_and(!sig_bit(signal.into()), Ordering::Relaxed);
+
             // TODO: handle tmp_disable_signals
             (
                 MASK_DONTCARE,
