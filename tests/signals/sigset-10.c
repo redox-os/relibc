@@ -1,5 +1,6 @@
 #define _XOPEN_SOURCE 600
 
+#include <assert.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,8 +11,8 @@ int main()
 {
 	void (*status) (int);
 	status = sigset(SIGKILL,SIG_IGN);
-	ERROR_IF(sigset, status, == SIG_ERR);
-	ERROR_IF(sigset, errno, != EINVAL);
+	assert(status == SIG_ERR);
+	assert(errno == EINVAL);
 	// if (sigset(SIGKILL,SIG_IGN) == SIG_ERR) {
 	// 	if (errno != EINVAL) {
 	// 		printf("Test FAILED: sigset() returned SIG_ERR but didn't set errno to EINVAL\n");
@@ -23,4 +24,4 @@ int main()
 	// }
     // printf("test passed: error was set successfully\n");
 	return EXIT_SUCCESS;
-} 
+}

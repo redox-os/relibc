@@ -1,6 +1,8 @@
 #define _XOPEN_SOURCE 600
 
+#include <assert.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "signals_list.h"
@@ -8,21 +10,21 @@
 
 #define NUMSIGNALS 26
 
-int is_empty(sigset_t *set) {
+bool is_empty(sigset_t *set) {
 
         int i;
-        int siglist[] = {SIGABRT, SIGALRM, SIGBUS, SIGCHLD,
+        int siglist[25] = {SIGABRT, SIGALRM, SIGBUS, SIGCHLD,
                 SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT,
                 SIGPIPE, SIGQUIT, SIGSEGV,
                 SIGTERM, SIGTSTP, SIGTTIN, SIGTTOU,
                 SIGUSR1, SIGUSR2, SIGPROF, SIGSYS,
                 SIGTRAP, SIGURG, SIGVTALRM, SIGXCPU, SIGXFSZ };
 
-        for (i=0; i<NUMSIGNALS; i++) {
+        for (i=0; i<25; i++) {
 		if (sigismember(set, siglist[i]) != 0)
-			return 0;
+			return false;
         }
-        return 1;
+        return true;
 }
 
 void sig_handler(int signo)
@@ -47,9 +49,8 @@ int sigset_test5(int signum)
 
 	raise(signum);
 	sigprocmask(SIG_SETMASK, NULL, &mask);
-	int status1;
-	status1 = is_empty(&mask);
-	ERROR_IF(is_empty, status1, != 1);
+	bool status1 = is_empty(&mask);
+	assert(status1);
 	// if (is_empty(&mask) != 1) {
 	// 	printf("Test FAILED: signal mask should be empty\n");
 	// 	exit(EXIT_FAILURE);
@@ -60,6 +61,7 @@ int sigset_test5(int signum)
 
 int main(){
     for (int i=1; i<N_SIGNALS; i++){
+        printf("Testing for sig %s (%d)\n", strsignal(i), i);
 		if (i == SIGKILL || i == SIGSTOP){
 			continue;
 		}
