@@ -21,6 +21,9 @@ void sig_handler(int signo)
 
 int sigrelse_test(int signum)
 {
+    // needs to be reset
+    handler_called = 0;
+
 	struct sigaction act;
 	
 	act.sa_handler = sig_handler;
@@ -28,26 +31,23 @@ int sigrelse_test(int signum)
 	sigemptyset(&act.sa_mask);
 
 	int status;
-	status = sigaction(signum,  &act, 0);
+	status = sigaction(signum,  &act, NULL);
 	ERROR_IF(sigaction, status, == -1);
 
-	sighold(signum);
+	status = sighold(signum);
+    ERROR_IF(sighold, status, == -1);
+
+	assert(handler_called == 0);
 
 	status = raise(signum);
 	ERROR_IF(raise, status, == -1);	
 
 	assert(handler_called == 0);
-	// if (handler_called) {
-	// 	printf("UNRESOLVED. possible problem in sigrelse\n");
-	// 	exit(EXIT_FAILURE);
-	// }
 
 	status = sigrelse(signum);
 	ERROR_IF(sigrelse, status, == -1);
 
-	sleep(1);
-
-	ERROR_IF(sigrelse, handler_called, != 1);
+	assert(handler_called == 1);
 	// if (handler_called) {
 	// 	printf("PASS: %d successfully removed from signal mask\n", signum);
     // handler_called = 0;

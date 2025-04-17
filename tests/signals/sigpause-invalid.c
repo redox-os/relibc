@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 700
 
 #include "../test_helpers.h"
+#include <assert.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <signal.h>
@@ -14,7 +15,7 @@
 #define INMAIN 0
 #define INTHREAD 1
 
-int handler_called = 0;
+volatile sig_atomic_t handler_called = 0;
 int returned = 0;
 int return_value = 2;
 int result = 2;
@@ -30,8 +31,7 @@ int sigpause_invalid(){
 	int return_value = 0;
 
 	return_value = sigpause(-1);
-	ERROR_IF(sigpause, return_value, != -1);
-	ERROR_IF(sigpause, errno, != EINVAL);
+
 	if (return_value == -1) {
 		if (errno == EINVAL) {
 			printf ("Test PASSED: sigpause returned -1 and set errno to EINVAL\n");

@@ -13,7 +13,7 @@
 #define INMAIN 0
 #define INTHREAD 1
 
-int handler_called = 0;
+volatile sig_atomic_t handler_called = 0;
 int returned = 0;
 int return_value = 2;
 int result = 2;

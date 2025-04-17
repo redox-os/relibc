@@ -15,7 +15,7 @@
 #define INMAIN 0
 #define INTHREAD 1
 
-int handler_called = 0;
+volatile sig_atomic_t handler_called = 0;
 int returned = 0;
 int return_value = 2;
 int result = 2;
@@ -102,6 +102,7 @@ int main(){
 		if (i == SIGKILL || i == SIGSTOP){
 			continue;
 		}
+        printf("Testing signal %s\n", strsignal(i));
 		sigpause_revert(i);
 	}
 	return EXIT_SUCCESS;
