@@ -28,6 +28,7 @@ ifeq ($(TARGET),aarch64-unknown-linux-gnu)
 	export NM=aarch64-linux-gnu-nm
 	export OBJCOPY=aarch64-linux-gnu-objcopy
 	export CPPFLAGS=
+	LD_SO_PATH=lib/ld.so.1
 endif
 
 ifeq ($(TARGET),aarch64-unknown-redox)
@@ -37,15 +38,7 @@ ifeq ($(TARGET),aarch64-unknown-redox)
 	export NM=aarch64-unknown-redox-nm
 	export OBJCOPY=aarch64-unknown-redox-objcopy
 	export CPPFLAGS=
-endif
-
-ifeq ($(TARGET),x86_64-unknown-linux-gnu)
-	export CC=x86_64-linux-gnu-gcc
-	export LD=x86_64-linux-gnu-ld
-	export AR=x86_64-linux-gnu-ar
-	export NM=x86_64-linux-gnu-nm
-	export OBJCOPY=objcopy
-	export CPPFLAGS=
+	LD_SO_PATH=lib/ld.so.1
 endif
 
 ifeq ($(TARGET),i686-unknown-redox)
@@ -55,6 +48,17 @@ ifeq ($(TARGET),i686-unknown-redox)
 	export NM=i686-unknown-redox-nm
 	export OBJCOPY=i686-unknown-redox-objcopy
 	export CPPFLAGS=
+	LD_SO_PATH=lib/libc.so.1
+endif
+
+ifeq ($(TARGET),x86_64-unknown-linux-gnu)
+	export CC=x86_64-linux-gnu-gcc
+	export LD=x86_64-linux-gnu-ld
+	export AR=x86_64-linux-gnu-ar
+	export NM=x86_64-linux-gnu-nm
+	export OBJCOPY=objcopy
+	export CPPFLAGS=
+	LD_SO_PATH=lib/ld64.so.1
 endif
 
 ifeq ($(TARGET),x86_64-unknown-redox)
@@ -64,6 +68,7 @@ ifeq ($(TARGET),x86_64-unknown-redox)
 	export NM=x86_64-unknown-redox-nm
 	export OBJCOPY=x86_64-unknown-redox-objcopy
 	export CPPFLAGS=
+	LD_SO_PATH=lib/ld64.so.1
 endif
 
 ifeq ($(TARGET),riscv64gc-unknown-redox)
@@ -73,6 +78,7 @@ ifeq ($(TARGET),riscv64gc-unknown-redox)
 	export NM=riscv64-unknown-redox-nm
 	export OBJCOPY=riscv64-unknown-redox-objcopy
 	export CPPFLAGS=-march=rv64gc -mabi=lp64d
+	LD_SO_PATH=lib/ld.so.1
 endif
 
 SRC=\
@@ -134,7 +140,7 @@ install-libs: headers libs
 	ln -vnfs crt0.o "$(DESTDIR)/lib/crt1.o"
 	cp -v "$(BUILD)/$(PROFILE)/crti.o" "$(DESTDIR)/lib"
 	cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/$(PROFILE)/ld_so" "$(DESTDIR)/lib/ld64.so.1"
+	cp -v "$(BUILD)/$(PROFILE)/ld_so" "$(DESTDIR)/$(LD_SO_PATH)"
 	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
 	# Empty libraries for dl, pthread, and rt
 	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
