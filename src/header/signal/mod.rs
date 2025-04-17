@@ -309,7 +309,9 @@ pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
     sigprocmask(0, ptr::null_mut(), pset.as_mut_ptr());
     let mut set = pset.assume_init();
-    sigdelset(&mut set, sig);
+    if sigdelset(&mut set, sig) == -1 {
+        return -1;
+    }
     sigsuspend(&set)
 }
 

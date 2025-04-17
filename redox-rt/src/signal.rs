@@ -579,8 +579,8 @@ const fn sig_bit(sig: u32) -> u64 {
     1 << (sig - 1)
 }
 
-pub fn setup_sighandler(tcb: &RtTcb) {
-    {
+pub fn setup_sighandler(tcb: &RtTcb, first_thread: bool) {
+    if first_thread {
         let _guard = SIGACTIONS_LOCK.lock();
         for (sig_idx, action) in PROC_CONTROL_STRUCT.actions.iter().enumerate() {
             let sig = sig_idx + 1;
@@ -739,17 +739,25 @@ pub fn await_signal_async(inner_allowset: u64) -> Result<Unreachable> {
         },
         &mut TimeSpec::default(),
     );
-    set_allowset_raw(&control.word, inner_allowset, old_allowset);
 
     if res == Err(Error::new(EINTR)) {
         unsafe {
             manually_enter_trampoline();
         }
     }
+    // POSIX says it shall restore the mask to what it was prior to the call, which is interpreted
+    // as allowing any changes to sigprocmask inside the signal handler, to be discarded.
+    set_allowset_raw(&control.word, inner_allowset, old_allowset);
 
     res?;
     unreachable!()
 }
+/*#[no_mangle]
+pub extern "C" fn __redox_rt_debug_sigctl() {
+    let tcb = &RtTcb::current().control;
+    let _ = syscall::write(1, alloc::format!("SIGCTL: {tcb:#x?}\n").as_bytes());
+}*/
+
 // TODO: deadline-based API
 pub fn await_signal_sync(inner_allowset: u64, timeout: Option<&TimeSpec>) -> Result<SiginfoAbi> {
     let _guard = tmp_disable_signals();

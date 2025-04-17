@@ -213,10 +213,15 @@ unsafe extern "C" fn new_thread_shim(
     let tid = (*(&*mutex1).lock()).assume_init();
 
     if let Some(tcb) = tcb.as_mut() {
-        tcb.activate(
-            #[cfg(target_os = "redox")]
-            redox_rt::proc::FdGuard::new(tid.thread_fd),
-        );
+        #[cfg(not(target_os = "redox"))]
+        {
+            tcb.activate();
+        }
+        #[cfg(target_os = "redox")]
+        {
+            tcb.activate(redox_rt::proc::FdGuard::new(tid.thread_fd));
+            redox_rt::signal::setup_sighandler(&tcb.os_specific, false);
+        }
     }
 
     let procmask = (&*mutex2).as_ptr().read();
