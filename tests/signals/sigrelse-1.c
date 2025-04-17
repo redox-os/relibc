@@ -1,5 +1,6 @@
 // The sigrelse() function shall remove sig from the signal mask of the calling process.
 
+#include <assert.h>
 #include <sys/types.h>
 #include <signal.h>
 #include <stdio.h>
@@ -10,7 +11,7 @@
 
 #define _XOPEN_SOURCE 700
 
-int handler_called = 0;
+volatile sig_atomic_t handler_called = 0;
 
 void sig_handler(int signo)
 {
@@ -35,7 +36,7 @@ int sigrelse_test(int signum)
 	status = raise(signum);
 	ERROR_IF(raise, status, == -1);	
 
-	ERROR_IF(raise, handler_called, == 1);
+	assert(handler_called == 0);
 	// if (handler_called) {
 	// 	printf("UNRESOLVED. possible problem in sigrelse\n");
 	// 	exit(EXIT_FAILURE);
@@ -62,6 +63,7 @@ int main(){
 		if (i == SIGKILL || i == SIGSTOP){
 			continue;
 		}
+        printf("For signal %s\n", strsignal(i));
 		sigrelse_test(i);
 	}
 	return 0;

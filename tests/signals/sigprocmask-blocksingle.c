@@ -56,6 +56,7 @@ int main(){
 		if (sig == SIGKILL || sig == SIGSTOP){
 			continue;
 		}
+        printf("Testing signal %s (%d)\n", strsignal(i), i);
 		sigprocmask_block(sig);
 	}
 	return EXIT_SUCCESS;

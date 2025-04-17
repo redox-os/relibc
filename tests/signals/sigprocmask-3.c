@@ -7,7 +7,7 @@
 // The resulting set shall be the union of the current set and the signal 
 //  set pointed to by set, if the value of the argument how is SIG_BLOCK.
 
-int handler_called = 0;
+volatile sig_atomic_t handler_called = 0;
 
 void sig_handler(int signo)
 {
@@ -45,12 +45,14 @@ int sigprocmask_block(int signum)
 	status = sigprocmask(SIG_UNBLOCK, &set2, NULL);
 	ERROR_IF(sigprocmask, status, == -1);
 
+    printf("Raising %s\n", strsignal(signum));
 	status = raise(signum);
 	ERROR_IF(raise, status, == -1);
 
 	ERROR_IF(raise, handler_called, != 1);
     handler_called = 0;
 
+    printf("Raising %s\n", strsignal(defaultsig));
 	status = raise(defaultsig);
 	ERROR_IF(raise, defaultsig, == -1);
 
@@ -78,6 +80,7 @@ int main(){
 		if (i == SIGKILL || i == SIGSTOP){
 			continue;
 		}
+        printf("Testing signal %s (%d)\n", strsignal(i), i);
 		sigprocmask_block(i);
 	}
 	return 0;
