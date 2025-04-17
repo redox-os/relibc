@@ -1,10 +1,12 @@
 #define _XOPEN_SOURCE 700
 
+#include <assert.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <signal.h>
 #include <errno.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include "signals_list.h"
 #include "../test_helpers.h"
@@ -12,18 +14,10 @@
 //  This program verifies that sigpause() restores sig to the signal mask before
 //  returning.
 
-#define INMAIN 0
-#define INTHREAD 1
-
-volatile sig_atomic_t handler_called = 0;
-int returned = 0;
-int return_value = 2;
-int result = 2;
-int sem = INMAIN;
+volatile sig_atomic_t handler_called = false;
 
 void handler() {
-	// printf("signal was called\n");
-	handler_called = 1;
+    handler_called = true;
 	return;
 }
 
@@ -31,67 +25,73 @@ void *c_thread_func(void *sig)
 {
 	int signum = *(int *)sig;
 	printf("%d !!!\n", signum);
-	struct sigaction act;
+
 	sigset_t pendingset;
 
-	act.sa_flags = 0;
-	act.sa_handler = handler;
-	sigemptyset(&act.sa_mask);
-	sigaction(signum, &act, 0);
-	sighold(signum);
-	printf("after sigpause\n");
+	puts("before sigpause");
+
+    assert(!handler_called);
 
 	if ((sigpause(signum) != -1) || (errno != EINTR)) {
-		printf ("Test UNRESOLVED: sigpause didn't return -1 and/or didn't set errno correctly.");
-		return_value = 2;
+		puts("Test UNRESOLVED: sigpause didn't return -1 and/or didn't set errno correctly.");
+        exit(2);
 		return NULL;
 	}
+    assert(handler_called);
+    handler_called = false;
 
-	sleep(1);
+	int status = raise(signum);
+    ERROR_IF(raise, status, == -1);
 
-	raise (signum);
+    assert(!handler_called);
+
 	sigpending(&pendingset);
 	if (sigismember(&pendingset, signum) == 1) {
-		printf("Test PASSED: signal mask was restored when sigpause returned.");
-		return_value = 0;
+		puts("Test PASSED: signal mask was restored when sigpause returned.");
 	}
 	
-	sem = INMAIN;
 	return NULL;
 
 }
 
-int sigpause_revert(int signum){
+int sigpause_revert(int signum) {
 	pthread_t new_th;
+    int status;
+	struct sigaction act;
 
-	if(pthread_create(&new_th, NULL, c_thread_func, (void *)&signum) != 0)
+    // Ensure thread inherits mask with signum blocked.
+	status = sighold(signum);
+    ERROR_IF(sighold, status, == -1);
+
+	act.sa_flags = 0;
+	act.sa_handler = handler;
+	status = sigemptyset(&act.sa_mask);
+    ERROR_IF(sigemptyset, status, == -1);
+	status = sigaction(signum, &act, NULL);
+    ERROR_IF(sigaction, status, == -1);
+
+	if((status = pthread_create(&new_th, NULL, c_thread_func, (void *)&signum)) != 0)
 	{
-		perror("Error creating thread\n");
+        errno = status;
+		perror("Error creating thread");
 		exit(EXIT_FAILURE);
 	}
 
 	sleep(1);
-
-	if(pthread_kill(new_th, signum) != 0)
+    
+	if((status = pthread_kill(new_th, signum)) != 0)
 	{
-		printf("Test UNRESOLVED: Couldn't send signal to thread\n");
+        errno = status;
+		perror("Test UNRESOLVED: Couldn't send signal to thread");
 		exit(EXIT_FAILURE);
 	}
+    if ((status = pthread_join(new_th, NULL)) != 0) {
+        errno = status;
+        perror("failed to join thread");
+        return EXIT_FAILURE;
+    }
 
-	sem = INTHREAD;
-	while (sem == INTHREAD)
-		sleep(1);
-	
-	if(handler_called != 1) {
-		printf("Test UNRESOLVED: signal wasn't removed from signal mask\n");
-		exit(EXIT_FAILURE);
-	}
-
-	if (return_value != 0) {
-		exit(EXIT_FAILURE);
-	}
-	
-	printf("Test PASSED\n");
+	puts("Test PASSED");
 	return EXIT_SUCCESS;
 }
 
