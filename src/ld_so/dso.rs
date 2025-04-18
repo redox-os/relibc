@@ -3,7 +3,7 @@
 //! * <https://www.akkadia.org/drepper/dsohowto.pdf>
 
 use object::{
-    elf::{self, Sym64},
+    elf,
     read::elf::{
         Dyn as _, GnuHashTable, HashTable as SysVHashTable, ProgramHeader as _, Rel as _,
         Rela as _, Sym as _, Version, VersionTable,
@@ -203,6 +203,89 @@ impl From<&Rel> for Relocation {
             addend: 0,
             sym: SymbolIndex(reloc.r_sym(NativeEndian) as usize),
             kind: reloc.r_type(NativeEndian),
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug)]
+pub enum R {
+    COPY,
+    DIRECT,
+    DTPMOD,
+    DTPOFF,
+    GLOB_DAT,
+    IRELATIVE,
+    JUMP_SLOT,
+    RELATIVE,
+    PC,
+    TPOFF,
+    UNKNOWN(u32),
+}
+
+impl R {
+    #[cfg(target_arch = "aarch64")]
+    pub fn new(kind: u32) -> Self {
+        //WARNING: Only use R_AARCH64_* constants here!
+        match kind {
+            elf::R_AARCH64_COPY => R::COPY,
+            elf::R_AARCH64_ABS64 => R::DIRECT,
+            elf::R_AARCH64_GLOB_DAT => R::GLOB_DAT,
+            elf::R_AARCH64_IRELATIVE => R::IRELATIVE,
+            elf::R_AARCH64_JUMP_SLOT => R::JUMP_SLOT,
+            elf::R_AARCH64_RELATIVE => R::RELATIVE,
+            _ => R::UNKNOWN(kind),
+        }
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    pub fn new(kind: u32) -> Self {
+        //WARNING: Only use R_RISCV_* constants here!
+        match kind {
+            elf::R_RISCV_COPY => R::COPY,
+            elf::R_RISCV_64 => R::DIRECT,
+            elf::R_RISCV_TLS_DTPMOD64 => R::DTPMOD,
+            elf::R_RISCV_TLS_DTPREL64 => R::DTPOFF,
+            elf::R_RISCV_IRELATIVE => R::IRELATIVE,
+            elf::R_RISCV_JUMP_SLOT => R::JUMP_SLOT,
+            elf::R_RISCV_RELATIVE => R::RELATIVE,
+            elf::R_RISCV_TLS_TPREL64 => R::TPOFF,
+            _ => R::UNKNOWN(kind),
+        }
+    }
+
+    #[cfg(target_arch = "x86")]
+    pub fn new(kind: u32) -> Self {
+        //WARNING: Only use R_386_* constants here!
+        match kind {
+            elf::R_386_COPY => R::COPY,
+            elf::R_386_32 => R::DIRECT,
+            elf::R_386_TLS_DTPMOD32 => R::DTPMOD,
+            elf::R_386_TLS_DTPOFF32 => R::DTPOFF,
+            elf::R_386_GLOB_DAT => R::GLOB_DAT,
+            elf::R_386_IRELATIVE => R::IRELATIVE,
+            elf::R_386_JMP_SLOT => R::JUMP_SLOT,
+            elf::R_386_PC32 => R::PC,
+            elf::R_386_RELATIVE => R::RELATIVE,
+            elf::R_386_TLS_TPOFF32 => R::TPOFF,
+            _ => R::UNKNOWN(kind),
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    pub fn new(kind: u32) -> Self {
+        //WARNING: Only use R_X86_64_* constants here!
+        match kind {
+            elf::R_X86_64_COPY => R::COPY,
+            elf::R_X86_64_64 => R::DIRECT,
+            elf::R_X86_64_DTPMOD64 => R::DTPMOD,
+            elf::R_X86_64_DTPOFF64 => R::DTPOFF,
+            elf::R_X86_64_GLOB_DAT => R::GLOB_DAT,
+            elf::R_X86_64_IRELATIVE => R::IRELATIVE,
+            elf::R_X86_64_JUMP_SLOT => R::JUMP_SLOT,
+            elf::R_X86_64_RELATIVE => R::RELATIVE,
+            elf::R_X86_64_TPOFF64 => R::TPOFF,
+            _ => R::UNKNOWN(kind),
         }
     }
 }
@@ -726,11 +809,12 @@ impl DSO {
     fn static_relocate(&self, global_scope: &Scope, reloc: Relocation) -> object::Result<()> {
         let b = self.mmap.as_ptr() as usize;
 
+        let r = R::new(reloc.kind);
         let (sym, my_sym) = if reloc.sym.0 > 0 {
             let name = self.dynamic.symbol_name(reloc.sym).unwrap();
 
             let lookup_scopes = [global_scope, self.scope()];
-            let sym = if reloc.kind == elf::R_X86_64_COPY {
+            let sym = if matches!(r, R::COPY) {
                 lookup_scopes
                     .iter()
                     .find_map(|scope| scope._get_sym(name, 1))
@@ -755,45 +839,44 @@ impl DSO {
         } else {
             reloc.offset as *mut u8
         };
+        let p = ptr as usize;
 
-        let set_u64 = |value| unsafe {
-            *(ptr as *mut u64) = value;
+        //TODO: support different sizes?
+        let set_usize = |value| unsafe {
+            *(ptr as *mut usize) = value;
         };
 
-        match reloc.kind {
-            elf::R_X86_64_64 => set_u64((s + a) as u64),
-            elf::R_X86_64_DTPMOD64 => set_u64(self.tls_module_id as u64),
-            elf::R_X86_64_DTPOFF64 => {
+        match r {
+            R::DIRECT => set_usize(s + a),
+            R::DTPMOD => set_usize(self.tls_module_id),
+            R::DTPOFF => {
                 if s != 0 {
-                    set_u64((s - b) as u64);
+                    set_usize(s - b);
                 } else {
-                    set_u64(s as u64);
+                    set_usize(s);
                 }
             }
-            elf::R_X86_64_GLOB_DAT => set_u64(s as u64),
-            elf::R_X86_64_RELATIVE => set_u64((b + a) as u64),
-            elf::R_X86_64_TPOFF64 => {
+            R::GLOB_DAT => set_usize(s),
+            R::PC => set_usize((s + a).wrapping_sub(p)),
+            R::RELATIVE => set_usize(b + a),
+            R::TPOFF => {
                 if reloc.sym.0 > 0 {
-                    let (sym, _) = sym
-                        .as_ref()
-                        .expect("R_X86_64_TPOFF64 called without valid symbol");
-                    set_u64((sym.value + a).wrapping_sub(t) as u64);
+                    let (sym, _) = sym.as_ref().expect("R::TPOFF called without valid symbol");
+                    set_usize((sym.value + a).wrapping_sub(t));
                 } else {
-                    set_u64(a.wrapping_sub(t) as u64);
+                    set_usize(a.wrapping_sub(t));
                 }
             }
-            elf::R_X86_64_IRELATIVE => unsafe {
-                let f: unsafe extern "C" fn() -> u64 = core::mem::transmute(b + a);
-                set_u64(f());
+            R::IRELATIVE => unsafe {
+                let f: unsafe extern "C" fn() -> usize = core::mem::transmute(b + a);
+                set_usize(f());
             },
-            elf::R_X86_64_COPY => unsafe {
-                let (sym, obj) = sym
-                    .as_ref()
-                    .expect("R_X86_64_COPY called without valid symbol");
-                let my_sym = my_sym.expect("R_X86_64_COPY called without valid symbol");
+            R::COPY => unsafe {
+                let (sym, obj) = sym.as_ref().expect("R::COPY called without valid symbol");
+                let my_sym = my_sym.expect("R::COPY called without valid symbol");
                 assert!(
                     sym.size == my_sym.st_size(NativeEndian) as usize,
-                    "R_X86_64_COPY failed: I was trying to use the symbol {} from {} for {} but they had different sizes. Please consider relinking.",
+                    "R::COPY failed: I was trying to use the symbol {} from {} for {} but they had different sizes. Please consider relinking.",
                     sym.name,
                     obj.name,
                     self.name
@@ -801,7 +884,7 @@ impl DSO {
                 // SAFETY: Both the source and destination have the same size.
                 ptr::copy_nonoverlapping(sym.as_ptr() as *const u8, ptr, sym.size);
             },
-            _ => unimplemented!("relocation type {:#x}", reloc.kind),
+            _ => unimplemented!("relocation type {:?}", r),
         }
 
         Ok(())
@@ -841,16 +924,17 @@ impl DSO {
                 reloc.offset as *mut usize
             };
 
-            match (reloc.kind, resolve) {
-                (elf::R_X86_64_JUMP_SLOT, Resolve::Lazy) if self.pie => unsafe {
+            let r = R::new(reloc.kind);
+            match (r, resolve) {
+                (R::JUMP_SLOT, Resolve::Lazy) if self.pie => unsafe {
                     *ptr += object_base_addr;
                 },
 
-                (elf::R_X86_64_JUMP_SLOT, Resolve::Lazy) => {
+                (R::JUMP_SLOT, Resolve::Lazy) => {
                     // NOP.
                 }
 
-                (elf::R_X86_64_JUMP_SLOT, Resolve::Now) => {
+                (R::JUMP_SLOT, Resolve::Now) => {
                     let name = self.dynamic.symbol_name(reloc.sym).unwrap();
 
                     let resolved = resolve_sym(name, &[global_scope, self.scope()])
@@ -863,7 +947,7 @@ impl DSO {
                 }
 
                 _ => {
-                    unimplemented!("relocation type {:#x}", reloc.kind)
+                    unimplemented!("relocation type {:?} with resolve {:?}", r, resolve)
                 }
             }
         }
