@@ -1,5 +1,8 @@
+use core::cell::SyncUnsafeCell;
+
 use crate::{
-    proc::{fork_inner, FdGuard},
+    proc::{fork_inner, FdGuard, ForkArgs},
+    protocol::{ProcCall, RtSigInfo},
     signal::{get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack},
     RtTcb, Tcb,
 };
@@ -70,16 +73,23 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
     Ok(())
 }
 
-unsafe extern "C" fn fork_impl(initial_rsp: *mut usize) -> usize {
-    Error::mux(fork_inner(initial_rsp))
+unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usize {
+    Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "C" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
+unsafe extern "C" fn child_hook(cur_filetable_fd: usize, new_proc_fd: usize, new_thr_fd: usize) {
     let _ = syscall::close(cur_filetable_fd);
-    crate::child_hook_common(FdGuard::new(new_pid_fd));
+    crate::child_hook_common(crate::ChildHookCommonArgs {
+        new_thr_fd: FdGuard::new(new_thr_fd),
+        new_proc_fd: if new_proc_fd == usize::MAX {
+            None
+        } else {
+            Some(FdGuard::new(new_proc_fd))
+        },
+    });
 }
 
-asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
+asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     .attribute arch, \"rv64gc\"  # rust bug 80608
     addi sp, sp, -200
     sd   s0, 0(sp)
@@ -263,7 +273,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     sd   a1, ({tcb_sa_off} + {sa_tmp_a1})(t0)
     sd   a2, ({tcb_sa_off} + {sa_tmp_a2})(t0)
     sd   a7, ({tcb_sa_off} + {sa_tmp_a7})(t0)
-    li   a0, {SYS_SIGDEQUEUE}
+    // FIXME: the following is wrong
+    li   a0, {SYS_CALL}
     addi a1, t3, -32
     add  a2, t0, {tcb_sa_off} + {sa_tmp_rt_inf} // out pointer of dequeued realtime sig
     ecall
@@ -531,7 +542,7 @@ __relibc_internal_sigentry_crit_fifth:
     inner = sym inner_c,
     pctl_off_pending = const offset_of!(SigProcControl, pending),
     pctl_off_sender_infos = const offset_of!(SigProcControl, sender_infos),
-    SYS_SIGDEQUEUE = const syscall::SYS_SIGDEQUEUE,
+    SYS_CALL = const syscall::SYS_CALL,
 ]);
 
 asmfunction!(__relibc_internal_rlct_clone_ret: ["
@@ -620,3 +631,5 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
 
     get_sigaltstack(area, stack.regs.int_regs[1] as usize).into()
 }
+pub(crate) static PROC_FD: SyncUnsafeCell<usize> = SyncUnsafeCell::new(usize::MAX);
+static PROC_CALL: [usize; 1] = [ProcCall::Sigdeq as usize];
