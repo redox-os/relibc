@@ -34,6 +34,7 @@ pub enum ProcCall {
     // TODO: replace with sendfd equivalent syscall for sending memory
     SyncSigPctl = 10,
     Sigdeq = 11,
+    Getppid = 12,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]
@@ -59,6 +60,7 @@ impl ProcCall {
             9 => Self::Sigq,
             10 => Self::SyncSigPctl,
             11 => Self::Sigdeq,
+            12 => Self::Getppid,
             _ => return None,
         })
     }

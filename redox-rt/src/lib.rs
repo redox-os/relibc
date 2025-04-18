@@ -203,7 +203,6 @@ pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
 
     STATIC_PROC_INFO.get().write(StaticProcInfo {
         pid: metadata.pid,
-        ppid: metadata.ppid,
 
         #[cfg(feature = "proc")]
         proc_fd: MaybeUninit::new(proc_fd),
@@ -228,10 +227,9 @@ pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
     }
 }
 
-#[repr(C)] // TODO: is this required?
+#[repr(C)] // TODO: is repr(C) required?
 pub(crate) struct StaticProcInfo {
     pid: u32,
-    ppid: u32, // TODO: dynamic
     proc_fd: MaybeUninit<FdGuard>,
     has_proc_fd: bool,
 }
@@ -292,7 +290,6 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
         .get()
         .replace(StaticProcInfo {
             pid: metadata.pid,
-            ppid: metadata.ppid,
             has_proc_fd: args.new_proc_fd.is_some(),
             proc_fd: args
                 .new_proc_fd

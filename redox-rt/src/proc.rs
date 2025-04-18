@@ -970,7 +970,6 @@ pub unsafe fn make_init() -> [&'static FdGuard; 2] {
 
     STATIC_PROC_INFO.get().write(crate::StaticProcInfo {
         pid: 1,
-        ppid: 1,
         proc_fd: MaybeUninit::new(proc_fd),
         has_proc_fd: true,
     });
@@ -991,7 +990,6 @@ pub unsafe fn make_init() -> [&'static FdGuard; 2] {
 pub(crate) static STATIC_PROC_INFO: SyncUnsafeCell<StaticProcInfo> =
     SyncUnsafeCell::new(StaticProcInfo {
         pid: 0,
-        ppid: 0,
         proc_fd: MaybeUninit::zeroed(),
         has_proc_fd: false,
     });

@@ -5,7 +5,7 @@ use core::{
 };
 
 use syscall::{
-    error::{Error, Result, EINTR},
+    error::{self, Error, Result, EINTR},
     CallFlags, TimeSpec, EINVAL, ERESTART,
 };
 
@@ -76,7 +76,10 @@ pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
             &[ProcCall::Sigq as u64, pid as u64, sig as u64],
         )
     }) {
-        Ok(_) | Err(Error { errno: EINTR }) => Ok(()),
+        Ok(_)
+        | Err(Error {
+            errno: error::EINTR,
+        }) => Ok(()),
         Err(error) => Err(error),
     }
 }
@@ -87,8 +90,8 @@ pub fn posix_getpid() -> u32 {
 }
 #[inline]
 pub fn posix_getppid() -> u32 {
-    // SAFETY: read-only except during program/fork child initialization
-    unsafe { addr_of!((*crate::STATIC_PROC_INFO.get()).ppid).read() }
+    this_proc_call(&mut [], CallFlags::empty(), &[ProcCall::Getppid as u64]).expect("cannot fail")
+        as u32
 }
 #[inline]
 pub unsafe fn sys_futex_wait(addr: *mut u32, val: u32, deadline: Option<&TimeSpec>) -> Result<()> {
