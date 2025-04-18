@@ -447,15 +447,13 @@ pub unsafe extern "C" fn strdup(s1: *const c_char) -> *mut c_char {
 pub unsafe extern "C" fn strerror(errnum: c_int) -> *mut c_char {
     use core::fmt::Write;
 
-    static mut strerror_buf: [u8; 256] = [0; 256];
-
+    static mut strerror_buf: [u8; STRERROR_MAX] = [0; STRERROR_MAX];
     let mut w = platform::StringWriter(strerror_buf.as_mut_ptr(), strerror_buf.len());
 
-    if errnum >= 0 && errnum < STR_ERROR.len() as c_int {
-        let _ = w.write_str(STR_ERROR[errnum as usize]);
-    } else {
-        let _ = w.write_fmt(format_args!("Unknown error {}", errnum));
-    }
+    let _ = match STR_ERROR.get(errnum as usize) {
+        Some(e) => w.write_str(e),
+        None => w.write_fmt(format_args!("Unknown error {}", errnum)),
+    };
 
     strerror_buf.as_mut_ptr() as *mut c_char
 }
