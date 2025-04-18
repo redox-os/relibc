@@ -430,8 +430,19 @@ where
     }
 
     // TODO: Restore old name if exec failed?
-    if let Ok(name_fd) = syscall::dup(**thread_fd, b"name").map(FdGuard::new) {
-        let _ = syscall::write(*name_fd, interp_override.as_ref().map_or(path, |o| &o.name));
+    {
+        let mut buf = [0; 32];
+        let new_name = interp_override.as_ref().map_or(path, |o| &o.name);
+        let len = new_name.len().min(32);
+        buf[..len].copy_from_slice(&new_name[..len]);
+        // XXX: takes &mut [] since it can mutate, but we could unsafe{}ly pass it directly
+        // otherwise
+        let _ = proc_call(
+            **proc_fd,
+            &mut buf,
+            CallFlags::empty(),
+            &[ProcCall::Rename as u64],
+        );
     }
     if interp_override.is_some() {
         let mmap_min_fd = FdGuard::new(syscall::dup(*grants_fd, b"mmap-min-addr")?);
@@ -745,8 +756,6 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         new_thr_fd = thr_fd;
         new_pid = pid;
 
-        copy_str(**cur_thr_fd, *new_thr_fd, "name")?;
-
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new
         // parent FDs will not show up for the child).
         {
@@ -921,6 +930,12 @@ pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
                 euid: 0,
                 egid: 0,
                 ens: 1,
+                debug_name: {
+                    let mut buf = [0; 32];
+                    let src = b"[init]";
+                    buf[..src.len()].copy_from_slice(src);
+                    buf
+                },
             };
             let attr_fd = FdGuard::new(syscall::dup(
                 *thr_fd,
@@ -934,20 +949,6 @@ pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
             })
         }
     }
-}
-
-pub fn copy_str(cur_pid_fd: usize, new_proc_fd: usize, key: &str) -> Result<()> {
-    let cur_name_fd = FdGuard::new(syscall::dup(cur_pid_fd, key.as_bytes())?);
-    let new_name_fd = FdGuard::new(syscall::dup(new_proc_fd, key.as_bytes())?);
-
-    // TODO: Max path size?
-    let mut buf = [0_u8; 256];
-    let len = syscall::read(*cur_name_fd, &mut buf)?;
-    let buf = buf.get(..len).ok_or(Error::new(ENAMETOOLONG))?;
-
-    syscall::write(*new_name_fd, &buf)?;
-
-    Ok(())
 }
 
 pub unsafe fn make_init() -> [&'static FdGuard; 2] {

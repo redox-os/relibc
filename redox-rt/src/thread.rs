@@ -13,8 +13,6 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuard> {
     let cur_thr_fd = RtTcb::current().thread_fd();
     let new_thr_fd = FdGuard::new(syscall::dup(**cur_proc_fd, b"new-thread")?);
 
-    copy_str(**cur_thr_fd, *new_thr_fd, "name")?;
-
     // Inherit existing address space
     {
         let cur_addr_space_fd = FdGuard::new(syscall::dup(**cur_thr_fd, b"addrspace")?);

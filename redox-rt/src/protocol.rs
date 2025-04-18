@@ -35,6 +35,7 @@ pub enum ProcCall {
     SyncSigPctl = 10,
     Sigdeq = 11,
     Getppid = 12,
+    Rename = 13,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]
@@ -61,6 +62,7 @@ impl ProcCall {
             10 => Self::SyncSigPctl,
             11 => Self::Sigdeq,
             12 => Self::Getppid,
+            13 => Self::Rename,
             _ => return None,
         })
     }
