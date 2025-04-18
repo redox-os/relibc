@@ -646,7 +646,7 @@ impl DSO {
 
                 elf::DT_SYMTAB => symtab_ptr = Some(ptr as *const Sym),
                 elf::DT_SYMENT => {
-                    assert_eq!(val as usize, size_of::<Sym64<NativeEndian>>());
+                    assert_eq!(val as usize, size_of::<Sym>());
                 }
 
                 _ => {}
