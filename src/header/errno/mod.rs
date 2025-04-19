@@ -178,7 +178,7 @@ pub const EOWNERDEAD: c_int = 130; /* Owner died */
 pub const ENOTRECOVERABLE: c_int = 131; /* State not recoverable */
 
 /// String representations for the respective `errno` values.
-pub static STR_ERROR: [&'static str; 132] = [
+pub const STR_ERROR: [&str; 132] = [
     "Success",
     "Operation not permitted",
     "No such file or directory",
@@ -312,3 +312,20 @@ pub static STR_ERROR: [&'static str; 132] = [
     "Owner died",
     "State not recoverable",
 ];
+
+/// Longest error message length
+pub const STRERROR_MAX: usize = {
+    let mut longest: usize = 0;
+
+    let mut i = 0;
+    while i < STR_ERROR.len() {
+        let len = STR_ERROR[i].len() + 1;
+        if len > longest {
+            longest = len;
+        }
+
+        i += 1;
+    }
+
+    longest
+};
