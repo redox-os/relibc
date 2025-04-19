@@ -662,8 +662,7 @@ impl Linker {
                 // We are now loading the main program or its dependencies. The TLS for all initially
                 // loaded objects reside in the static TLS block. Depending on the architecture, the
                 // static TLS block is either placed before the TP or after the TP.
-                let tcb_ptr = tcb as *mut Tcb;
-
+                //
                 // Setup the DTVs.
                 tcb.setup_dtv(tcb_masters.len());
 
@@ -677,7 +676,7 @@ impl Linker {
 
                     if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
                         // Below the TP
-                        tcb.dtv_mut()[dtv_idx] = tcb_ptr.cast::<u8>().sub(obj.tls_offset);
+                        tcb.dtv_mut()[dtv_idx] = tcb.tls_end.sub(obj.tls_offset);
                     } else {
                         // FIMXE(andypython): Make it above the TP
                         //
@@ -685,7 +684,8 @@ impl Linker {
                         //     tcb_ptr.add(1).cast::<u8>().add(obj.tls_offset);
                         //
                         // FIXME(andypython): https://gitlab.redox-os.org/redox-os/relibc/-/merge_requests/570#note_35788
-                        tcb.dtv_mut()[dtv_idx] = tcb.tls_end.sub(tcb.tls_len).add(obj.tls_offset);
+                        let tls_start = tcb.tls_end.sub(tcb.tls_len);
+                        tcb.dtv_mut()[dtv_idx] = tls_start.add(obj.tls_offset);
                     }
                 }
 
