@@ -14,12 +14,15 @@ use crate::{
     },
 };
 
-use redox_rt::proc::{ExtraInfo, FdGuard, FexecResult, InterpOverride};
+use redox_rt::{
+    proc::{ExtraInfo, FdGuard, FexecResult, InterpOverride},
+    sys::Resugid,
+    RtTcb,
+};
 use syscall::{data::Stat, error::*, flag::*};
 
 fn fexec_impl(
     exec_file: FdGuard,
-    open_via_dup: FdGuard,
     path: &[u8],
     args: &[&[u8]],
     envs: &[&[u8]],
@@ -31,7 +34,8 @@ fn fexec_impl(
 
     let addrspace_selection_fd = match redox_rt::proc::fexec_impl(
         exec_file,
-        open_via_dup,
+        &RtTcb::current().thread_fd(),
+        redox_rt::current_proc_fd(),
         &memory,
         path,
         args.iter().rev(),
@@ -43,12 +47,10 @@ fn fexec_impl(
         FexecResult::Normal { addrspace_handle } => addrspace_handle,
         FexecResult::Interp {
             image_file,
-            open_via_dup,
             path,
             interp_override: new_interp_override,
         } => {
             drop(image_file);
-            drop(open_via_dup);
             drop(memory);
 
             // According to elf(5), PT_INTERP requires that the interpreter path be
@@ -119,12 +121,11 @@ pub fn execve(
 
     let mut stat = Stat::default();
     syscall::fstat(*image_file as usize, &mut stat)?;
-    let uid = syscall::getuid()?;
-    let gid = syscall::getuid()?;
+    let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
 
-    let mode = if uid == stat.st_uid as usize {
+    let mode = if ruid == stat.st_uid {
         (stat.st_mode >> 3 * 2) & 0o7
-    } else if gid == stat.st_gid as usize {
+    } else if rgid == stat.st_gid {
         (stat.st_mode >> 3 * 1) & 0o7
     } else {
         stat.st_mode & 0o7
@@ -243,7 +244,7 @@ pub fn execve(
         // threads, it could still be allowed by keeping certain file descriptors and instead
         // set the active file table.
         let files_fd =
-            File::new(syscall::open("/scheme/thisproc/current/filetable", O_RDONLY)? as c_int);
+            File::new(syscall::dup(**RtTcb::current().thread_fd(), b"filetable")? as c_int);
         for line in BufReader::new(files_fd).lines() {
             let line = match line {
                 Ok(l) => l,
@@ -262,7 +263,8 @@ pub fn execve(
         }
     }
 
-    let this_context_fd = FdGuard::new(syscall::open("/scheme/thisproc/current/open_via_dup", 0)?);
+    let this_thr_fd = RtTcb::current().thread_fd();
+
     // TODO: Convert image_file to FdGuard earlier?
     let exec_fd_guard = FdGuard::new(image_file.fd as usize);
     core::mem::forget(image_file);
@@ -272,7 +274,10 @@ pub fn execve(
         let escalate_fd = FdGuard::new(syscall::open("/scheme/escalate", O_WRONLY)?);
 
         // First, send the context handle of this process to escalated.
-        send_fd_guard(*escalate_fd, this_context_fd)?;
+        send_fd_guard(
+            *escalate_fd,
+            FdGuard::new(syscall::dup(**this_thr_fd, &[])?),
+        )?;
 
         // Then, send the file descriptor containing the file descriptor to be executed.
         send_fd_guard(*escalate_fd, exec_fd_guard)?;
@@ -314,10 +319,11 @@ pub fn execve(
             sigignmask: 0,
             sigprocmask,
             umask: redox_rt::sys::get_umask(),
+            thr_fd: **RtTcb::current().thread_fd(),
+            proc_fd: **redox_rt::current_proc_fd(),
         };
         fexec_impl(
             exec_fd_guard,
-            this_context_fd,
             arg0,
             &args,
             &envs,

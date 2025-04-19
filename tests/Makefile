@@ -125,10 +125,12 @@ EXPECT_NAMES=\
 	unistd/getopt_long \
 	unistd/pipe \
 	unistd/rmdir \
+	waitpid \
+	waitpid_multiple \
+	kill-waitpid \
 	# unistd/sleep \
 	unistd/swab \
 	unistd/write \
-	waitpid \
 	wchar/fgetwc \
 	wchar/fwide \
 	wchar/mbrtowc \
@@ -204,6 +206,7 @@ NAMES=\
 	unistd/sysconf \
 	pthread/main \
 	pthread/cleanup \
+	pthread/exit \
 	pthread/extjoin \
 	pthread/once \
 	pthread/customstack \
@@ -216,9 +219,9 @@ NAMES=\
 	grp/getgrgid_r \
 	grp/getgrnam_r \
 	grp/gr_iter \
+	sigqueue
 #	resource/getrusage
 #	time/times
-#	sigqueue
 
 # Tests run with `expect` (require a .c file and an .exp file
 # that takes the produced binary as the first argument)

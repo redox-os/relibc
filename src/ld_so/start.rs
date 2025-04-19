@@ -145,16 +145,31 @@ fn resolve_path_name(
     None
 }
 
-// TODO: Make unsafe
 #[no_mangle]
-pub extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) -> usize {
+pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) -> usize {
     // Setup TCB for ourselves.
     unsafe {
-        let tcb = Tcb::new(0).expect_notls("ld.so: failed to allocate bootstrap TCB");
-        tcb.activate();
-
         #[cfg(target_os = "redox")]
-        redox_rt::signal::setup_sighandler(&tcb.os_specific);
+        let thr_fd =
+            crate::platform::get_auxv_raw(sp.auxv().cast(), redox_rt::auxv_defs::AT_REDOX_THR_FD)
+                .expect_notls("no thread fd present");
+
+        let tcb = Tcb::new(0).expect_notls("ld.so: failed to allocate bootstrap TCB");
+        tcb.activate(
+            #[cfg(target_os = "redox")]
+            redox_rt::proc::FdGuard::new(thr_fd),
+        );
+        #[cfg(target_os = "redox")]
+        {
+            let proc_fd = crate::platform::get_auxv_raw(
+                sp.auxv().cast(),
+                redox_rt::auxv_defs::AT_REDOX_PROC_FD,
+            )
+            .expect_notls("no proc fd present");
+
+            redox_rt::initialize(redox_rt::proc::FdGuard::new(proc_fd));
+            redox_rt::signal::setup_sighandler(&tcb.os_specific, true);
+        }
     }
 
     // We get the arguments, the environment, and the auxilary vector

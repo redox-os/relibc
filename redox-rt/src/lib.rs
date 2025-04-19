@@ -2,6 +2,7 @@
 #![feature(
     asm_const,
     array_chunks,
+    core_intrinsics,
     int_roundings,
     let_chains,
     slice_ptr_get,
@@ -9,18 +10,25 @@
 )]
 #![forbid(unreachable_patterns)]
 
-use core::cell::{SyncUnsafeCell, UnsafeCell};
+use core::{
+    cell::{SyncUnsafeCell, UnsafeCell},
+    mem::{size_of, MaybeUninit},
+};
 
 use generic_rt::{ExpectTlsFree, GenericTcb};
-use syscall::{Sigcontrol, O_CLOEXEC};
+use syscall::Sigcontrol;
 
-use self::proc::FdGuard;
+use self::{
+    proc::{FdGuard, STATIC_PROC_INFO},
+    protocol::ProcMeta,
+    sync::Mutex,
+};
 
 extern crate alloc;
 
 #[macro_export]
 macro_rules! asmfunction(
-    ($name:ident $(-> $ret:ty)? : [$($asmstmt:expr),*$(,)?] <= [$($decl:ident = $(sym $symname:ident)?$(const $constval:expr)?),*$(,)?]$(,)? ) => {
+    ($name:ident $(($($arg:ty),*))? $(-> $ret:ty)? : [$($asmstmt:expr),*$(,)?] <= [$($decl:ident = $(sym $symname:ident)?$(const $constval:expr)?),*$(,)?]$(,)? ) => {
         ::core::arch::global_asm!(concat!("
             .p2align 4
             .section .text.", stringify!($name), ", \"ax\", @progbits
@@ -32,7 +40,7 @@ macro_rules! asmfunction(
         "), $($decl = $(sym $symname)?$(const $constval)?),*);
 
         extern "C" {
-            pub fn $name() $(-> $ret)?;
+            pub fn $name($($(_: $arg),*)?) $(-> $ret)?;
         }
     }
 );
@@ -44,6 +52,7 @@ pub mod proc;
 #[path = "../../src/platform/auxv_defs.rs"]
 pub mod auxv_defs;
 
+pub mod protocol;
 pub mod signal;
 pub mod sync;
 pub mod sys;
@@ -60,14 +69,7 @@ impl RtTcb {
         unsafe { &Tcb::current().unwrap().os_specific }
     }
     pub fn thread_fd(&self) -> &FdGuard {
-        unsafe {
-            if (&*self.thr_fd.get()).is_none() {
-                self.thr_fd.get().write(Some(FdGuard::new(
-                    syscall::open("/scheme/thisproc/current/open_via_dup", O_CLOEXEC).unwrap(),
-                )));
-            }
-            (&*self.thr_fd.get()).as_ref().unwrap()
-        }
+        unsafe { (&*self.thr_fd.get()).as_ref().unwrap() }
     }
 }
 
@@ -134,7 +136,8 @@ pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
 }
 
 /// Initialize redox-rt in situations where relibc is not used
-pub unsafe fn initialize_freestanding() {
+#[cfg(not(feature = "proc"))]
+pub unsafe fn initialize_freestanding(this_thr_fd: FdGuard) -> &'static FdGuard {
     // TODO: This code is a hack! Integrate the ld_so TCB code into generic-rt, and then use that
     // (this function will need pointers to the ELF structs normally passed in auxvs), so the TCB
     // is initialized properly.
@@ -157,8 +160,9 @@ pub unsafe fn initialize_freestanding() {
     page.tcb_ptr = page;
     page.tcb_len = syscall::PAGE_SIZE;
     page.tls_end = (page as *mut Tcb).cast();
+
     // Make sure to use ptr::write to prevent dropping the existing FdGuard
-    core::ptr::write(page.os_specific.thr_fd.get(), None);
+    page.os_specific.thr_fd.get().write(Some(this_thr_fd));
 
     #[cfg(not(any(target_arch = "aarch64", target_arch = "riscv64")))]
     unsafe {
@@ -176,19 +180,124 @@ pub unsafe fn initialize_freestanding() {
         core::arch::asm!("mv tp, {}", in(reg) (abi_ptr + 8));
     }
     initialize();
+
+    (*page.os_specific.thr_fd.get()).as_ref().unwrap()
 }
-pub unsafe fn initialize() {
-    THIS_PID
-        .get()
-        .write(Some(syscall::getpid().unwrap().try_into().unwrap()).unwrap());
+pub(crate) fn read_proc_meta(proc: &FdGuard) -> syscall::Result<ProcMeta> {
+    let mut bytes = [0_u8; size_of::<ProcMeta>()];
+    let _ = syscall::read(**proc, &mut bytes)?;
+    Ok(*plain::from_bytes::<ProcMeta>(&bytes).unwrap())
+}
+pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
+    #[cfg(feature = "proc")]
+    let metadata = read_proc_meta(&proc_fd).unwrap();
+
+    #[cfg(not(feature = "proc"))]
+    // Bootstrap mode, don't associate proc fds with PIDs
+    let metadata = ProcMeta::default();
+
+    #[cfg(feature = "proc")]
+    {
+        crate::arch::PROC_FD.get().write(*proc_fd);
+    }
+
+    STATIC_PROC_INFO.get().write(StaticProcInfo {
+        pid: metadata.pid,
+
+        #[cfg(feature = "proc")]
+        proc_fd: MaybeUninit::new(proc_fd),
+
+        #[cfg(not(feature = "proc"))]
+        proc_fd: MaybeUninit::uninit(),
+
+        has_proc_fd: cfg!(feature = "proc"),
+    });
+
+    #[cfg(feature = "proc")]
+    {
+        *DYNAMIC_PROC_INFO.lock() = DynamicProcInfo {
+            pgid: metadata.pgid,
+            ruid: metadata.ruid,
+            euid: metadata.euid,
+            suid: metadata.suid,
+            egid: metadata.egid,
+            rgid: metadata.rgid,
+            sgid: metadata.sgid,
+        };
+    }
 }
 
-static THIS_PID: SyncUnsafeCell<u32> = SyncUnsafeCell::new(0);
+#[repr(C)] // TODO: is repr(C) required?
+pub(crate) struct StaticProcInfo {
+    pid: u32,
+    proc_fd: MaybeUninit<FdGuard>,
+    has_proc_fd: bool,
+}
+struct DynamicProcInfo {
+    pgid: u32,
+    euid: u32,
+    suid: u32,
+    ruid: u32,
+    egid: u32,
+    rgid: u32,
+    sgid: u32,
+}
 
-unsafe fn child_hook_common(new_pid_fd: FdGuard) {
-    // TODO: Currently pidfd == threadfd, but this will not be the case later.
-    RtTcb::current().thr_fd.get().write(Some(new_pid_fd));
-    THIS_PID
+static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
+    pgid: u32::MAX,
+    ruid: u32::MAX,
+    euid: u32::MAX,
+    suid: u32::MAX,
+    rgid: u32::MAX,
+    egid: u32::MAX,
+    sgid: u32::MAX,
+});
+
+#[inline]
+pub(crate) fn static_proc_info() -> &'static StaticProcInfo {
+    unsafe { &*STATIC_PROC_INFO.get() }
+}
+#[inline]
+pub fn current_proc_fd() -> &'static FdGuard {
+    let info = static_proc_info();
+    assert!(info.has_proc_fd);
+    unsafe { info.proc_fd.assume_init_ref() }
+}
+
+struct ChildHookCommonArgs {
+    new_thr_fd: FdGuard,
+    new_proc_fd: Option<FdGuard>,
+}
+
+unsafe fn child_hook_common(args: ChildHookCommonArgs) {
+    // TODO: just pass PID to child rather than obtaining it via IPC?
+    #[cfg(feature = "proc")]
+    let metadata = read_proc_meta(
+        args.new_proc_fd
+            .as_ref()
+            .expect("must be present with proc feature"),
+    )
+    .unwrap();
+
+    #[cfg(not(feature = "proc"))]
+    let metadata = ProcMeta::default();
+
+    if let Some(proc_fd) = &args.new_proc_fd {
+        crate::arch::PROC_FD.get().write(**proc_fd);
+    }
+
+    let old_proc_fd = STATIC_PROC_INFO
         .get()
-        .write(Some(syscall::getpid().unwrap().try_into().unwrap()).unwrap());
+        .replace(StaticProcInfo {
+            pid: metadata.pid,
+            has_proc_fd: args.new_proc_fd.is_some(),
+            proc_fd: args
+                .new_proc_fd
+                .map_or_else(MaybeUninit::uninit, MaybeUninit::new),
+        })
+        .proc_fd;
+    drop(old_proc_fd);
+
+    let old_thr_fd = RtTcb::current().thr_fd.get().replace(Some(args.new_thr_fd));
+    drop(old_thr_fd);
 }
