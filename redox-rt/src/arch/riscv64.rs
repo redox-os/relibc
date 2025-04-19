@@ -24,6 +24,8 @@ pub struct SigArea {
     pub tmp_a0: u64,
     pub tmp_a1: u64,
     pub tmp_a2: u64,
+    pub tmp_a3: u64,
+    pub tmp_a4: u64,
     pub tmp_a7: u64,
 
     pub pctl: usize, // TODO: remove
@@ -269,15 +271,30 @@ asmfunction!(__relibc_internal_sigentry: ["
     bnez t1, 10f // thread signal
 
     // otherwise, try (competitively) dequeueing realtime signal
+
+    // SYS_CALL(fd, payload_base, payload_len, metadata_len, metadata_base)
+    // a7       a0  a1            a2           a3            a4
+
+    // TODO: This SYS_CALL invocation has not yet been tested due to toolchain issues.
+
     sd   a0, ({tcb_sa_off} + {sa_tmp_a0})(t0)
     sd   a1, ({tcb_sa_off} + {sa_tmp_a1})(t0)
     sd   a2, ({tcb_sa_off} + {sa_tmp_a2})(t0)
+    sd   a3, ({tcb_sa_off} + {sa_tmp_a3})(t0)
+    sd   a4, ({tcb_sa_off} + {sa_tmp_a4})(t0)
     sd   a7, ({tcb_sa_off} + {sa_tmp_a7})(t0)
-    // FIXME: the following is wrong
-    li   a0, {SYS_CALL}
-    addi a1, t3, -32
-    add  a2, t0, {tcb_sa_off} + {sa_tmp_rt_inf} // out pointer of dequeued realtime sig
+    li   a7, {SYS_CALL}
+    addi a2, t3, -32
+    add  a1, t0, {tcb_sa_off} + {sa_tmp_rt_inf} // out pointer of dequeued realtime sig
+    sd a2, (a1)
+    li a2, {RTINF_SIZE}
+    li a3, 1
+1337:
+    auipc a4, %pcrel_hi({proc_fd})
+    addi a4, a4, %pcrel_lo(1337b)
     ecall
+    ld   a3, ({tcb_sa_off} + {sa_tmp_a3})(t0)
+    ld   a4, ({tcb_sa_off} + {sa_tmp_a4})(t0)
     bnez a0, 99b // assumes error can only be EAGAIN
     j   9f
 
@@ -531,6 +548,8 @@ __relibc_internal_sigentry_crit_fifth:
     sa_tmp_a0 = const offset_of!(SigArea, tmp_a0),
     sa_tmp_a1 = const offset_of!(SigArea, tmp_a1),
     sa_tmp_a2 = const offset_of!(SigArea, tmp_a2),
+    sa_tmp_a3 = const offset_of!(SigArea, tmp_a3),
+    sa_tmp_a4 = const offset_of!(SigArea, tmp_a4),
     sa_tmp_a7 = const offset_of!(SigArea, tmp_a7),
     sa_tmp_ip = const offset_of!(SigArea, tmp_ip),
     sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
@@ -543,6 +562,8 @@ __relibc_internal_sigentry_crit_fifth:
     pctl_off_pending = const offset_of!(SigProcControl, pending),
     pctl_off_sender_infos = const offset_of!(SigProcControl, sender_infos),
     SYS_CALL = const syscall::SYS_CALL,
+    RTINF_SIZE = const size_of::<RtSigInfo>(),
+    proc_fd = sym PROC_FD,
 ]);
 
 asmfunction!(__relibc_internal_rlct_clone_ret: ["
