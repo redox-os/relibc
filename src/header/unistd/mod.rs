@@ -569,15 +569,21 @@ pub extern "C" fn getppid() -> pid_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresgid.html>.
-// #[no_mangle]
-pub extern "C" fn getresgid(rgid: *mut gid_t, egid: *mut gid_t, sgid: *mut gid_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn getresgid(rgid: *mut gid_t, egid: *mut gid_t, sgid: *mut gid_t) -> c_int {
+    // TODO: Out<T> write-only wrapper?
+    Sys::getresgid(rgid.as_mut(), egid.as_mut(), sgid.as_mut())
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresuid.html>.
-// #[no_mangle]
-pub extern "C" fn getresuid(ruid: *mut uid_t, euid: *mut uid_t, suid: *mut uid_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn getresuid(ruid: *mut uid_t, euid: *mut uid_t, suid: *mut uid_t) -> c_int {
+    // TODO: Out<T> write-only wrapper?
+    Sys::getresuid(ruid.as_mut(), euid.as_mut(), suid.as_mut())
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getsid.html>.
@@ -812,13 +818,13 @@ pub unsafe extern "C" fn set_default_scheme(scheme: *const c_char) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setegid.html>.
 // #[no_mangle]
 pub extern "C" fn setegid(gid: gid_t) -> c_int {
-    unimplemented!();
+    Sys::setresgid(-1, gid, -1).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/seteuid.html>.
 // #[no_mangle]
 pub extern "C" fn seteuid(uid: uid_t) -> c_int {
-    unimplemented!();
+    Sys::setresuid(-1, uid, -1).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setgid.html>.

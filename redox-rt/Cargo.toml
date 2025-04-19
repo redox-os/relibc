@@ -15,3 +15,7 @@ plain = "0.2"
 redox_syscall = "0.5.8"
 
 generic-rt = { path = "../generic-rt" }
+
+[features]
+proc = []
+default = ["proc"]

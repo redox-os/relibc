@@ -202,8 +202,14 @@ impl Tcb {
     }
 
     /// Activate TLS
-    pub unsafe fn activate(&mut self) {
-        Self::os_arch_activate(&self.os_specific, self.tls_end as usize, self.tls_len);
+    pub unsafe fn activate(&mut self, #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuard) {
+        Self::os_arch_activate(
+            &self.os_specific,
+            self.tls_end as usize,
+            self.tls_len,
+            #[cfg(target_os = "redox")]
+            thr_fd,
+        );
     }
 
     pub fn setup_dtv(&mut self, n: usize) {
@@ -327,7 +333,13 @@ impl Tcb {
     }
 
     #[cfg(target_os = "redox")]
-    unsafe fn os_arch_activate(os: &OsSpecific, tls_end: usize, tls_len: usize) {
+    unsafe fn os_arch_activate(
+        os: &OsSpecific,
+        tls_end: usize,
+        tls_len: usize,
+        thr_fd: redox_rt::proc::FdGuard,
+    ) {
+        os.thr_fd.get().write(Some(thr_fd));
         redox_rt::tcb_activate(os, tls_end, tls_len)
     }
 }

@@ -1,18 +1,17 @@
 use core::mem::size_of;
 
-use syscall::{Result, O_CLOEXEC};
+use syscall::Result;
 
-use crate::{arch::*, proc::*, signal::tmp_disable_signals, RtTcb};
+use crate::{arch::*, proc::*, signal::tmp_disable_signals, static_proc_info, RtTcb};
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
 pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuard> {
-    let cur_thr_fd = RtTcb::current().thread_fd();
-    let new_thr_fd = FdGuard::new(syscall::open(
-        "/scheme/thisproc/new-thread/open_via_dup",
-        O_CLOEXEC,
-    )?);
+    let proc_info = static_proc_info();
+    assert!(proc_info.has_proc_fd);
+    let cur_proc_fd = proc_info.proc_fd.assume_init_ref();
 
-    copy_str(**cur_thr_fd, *new_thr_fd, "name")?;
+    let cur_thr_fd = RtTcb::current().thread_fd();
+    let new_thr_fd = FdGuard::new(syscall::dup(**cur_proc_fd, b"new-thread")?);
 
     // Inherit existing address space
     {
@@ -54,16 +53,16 @@ pub unsafe fn exit_this_thread(stack_base: *mut (), stack_size: usize) -> ! {
     let _guard = tmp_disable_signals();
 
     let tcb = RtTcb::current();
-    let thread_fd = tcb.thread_fd();
+    // TODO: modify interface so it writes directly to the thread fd?
+    let status_fd = syscall::dup(**tcb.thread_fd(), b"status").unwrap();
 
     let _ = syscall::funmap(tcb as *const RtTcb as usize, syscall::PAGE_SIZE);
 
-    // TODO: modify interface so it writes directly to the thread fd?
-    let status_fd = syscall::dup(**thread_fd, b"status").unwrap();
     let mut buf = [0; size_of::<usize>() * 3];
     plain::slice_from_mut_bytes(&mut buf)
         .unwrap()
         .copy_from_slice(&[usize::MAX, stack_base as usize, stack_size]);
+    // TODO: SYS_CALL w/CONSUME
     syscall::write(status_fd, &buf).unwrap();
     unreachable!()
 }

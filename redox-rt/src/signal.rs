@@ -1,12 +1,23 @@
-use core::{ffi::c_int, mem::MaybeUninit, ptr::NonNull, sync::atomic::Ordering};
+use core::{ffi::c_int, ptr::NonNull, sync::atomic::Ordering};
 
 use syscall::{
-    data::AtomicU64, Error, RawAction, Result, RtSigInfo, SenderInfo, SetSighandlerData,
+    data::AtomicU64, CallFlags, Error, RawAction, Result, SenderInfo, SetSighandlerData,
     SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, EAGAIN, EINTR, EINVAL, ENOMEM, EPERM,
-    SIGCHLD, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGWINCH,
 };
 
-use crate::{arch::*, proc::FdGuard, sync::Mutex, RtTcb, Tcb};
+use crate::{
+    arch::*,
+    current_proc_fd,
+    proc::FdGuard,
+    protocol::{
+        ProcCall, RtSigInfo, ThreadCall, SIGCHLD, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU,
+        SIGURG, SIGWINCH,
+    },
+    static_proc_info,
+    sync::Mutex,
+    sys::{proc_call, this_thread_call},
+    RtTcb, Tcb,
+};
 
 #[cfg(target_arch = "x86_64")]
 static CPUID_EAX1_ECX: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
@@ -149,11 +160,18 @@ unsafe fn inner(stack: &mut SigStack) {
 
     let handler = match sigaction.kind {
         SigactionKind::Ignore => {
-            panic!("ctl {:x?} signal {}", os.control, stack.sig_num)
+            panic!("ctl {:#x?} signal {}", os.control, stack.sig_num)
         }
         SigactionKind::Default => {
-            syscall::exit(stack.sig_num as usize);
-            unreachable!();
+            let sig = (stack.sig_num & 0x3f) as u8;
+
+            let _ = proc_call(
+                **current_proc_fd(),
+                &mut [],
+                CallFlags::empty(),
+                &[ProcCall::Exit as u64, u64::from(sig) << 8],
+            );
+            core::intrinsics::abort()
         }
         SigactionKind::Handled { handler } => handler,
     };
@@ -270,7 +288,10 @@ fn get_allowset_raw(words: &[AtomicU64; 2]) -> u64 {
     (words[0].load(Ordering::Relaxed) >> 32) | ((words[1].load(Ordering::Relaxed) >> 32) << 32)
 }
 /// Sets mask from old to new, returning what was pending at the time.
-fn set_allowset_raw(words: &[AtomicU64; 2], old: u64, new: u64) -> u64 {
+fn set_allowset_raw(words: &[AtomicU64; 2], old: u64, new_raw: u64) -> u64 {
+    // TODO: should these bits always be set, or never be set?
+    let new = new_raw | ALLOWSET_ALWAYS;
+
     // This assumes *only this thread* can change the allowset. If this rule is broken, the use of
     // fetch_add will corrupt the words entirely. fetch_add is very efficient on x86, being
     // generated as LOCK XADD which is the fastest RMW instruction AFAIK.
@@ -285,6 +306,7 @@ fn set_allowset_raw(words: &[AtomicU64; 2], old: u64, new: u64) -> u64 {
 
     prev_w0 | (prev_w1 << 32)
 }
+const ALLOWSET_ALWAYS: u64 = sig_bit(SIGSTOP as u32) | sig_bit(SIGKILL as u32);
 fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnOnce(u64) -> u64>) -> Result<()> {
     let _guard = tmp_disable_signals();
     let ctl = current_sigctl();
@@ -375,8 +397,28 @@ fn convert_old(action: &RawAction) -> Sigaction {
 }
 
 pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction>) -> Result<()> {
-    if matches!(usize::from(signal), 0 | 32 | SIGKILL | SIGSTOP | 65..) {
+    // TODO: Now that the goal of keeping logic out of the IPC backend, no longer holds when
+    // procmgr has taken over signal handling from the kernel, it would probably make sense to make
+    // parts of this function an IPC call, for synchronization purposes. Apart from SA_RESETHAND
+    // logic which may need to be fast, regular sigaction is typically in the 'configuration'
+    // category, allowed to be slower.
+
+    if matches!(usize::from(signal), 0 | 32 | 65..) {
         return Err(Error::new(EINVAL));
+    }
+    if matches!(usize::from(signal), SIGKILL | SIGSTOP) {
+        if new.is_some() {
+            return Err(Error::new(EINVAL));
+        }
+        if let Some(old) = old {
+            // TODO: Is this the correct value to set it to?
+            *old = Sigaction {
+                kind: SigactionKind::Default,
+                mask: 0,
+                flags: SigactionFlags::empty(),
+            };
+        }
+        return Ok(());
     }
 
     let _sigguard = tmp_disable_signals();
@@ -398,8 +440,16 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
 
     let (mask, flags, handler) = match (usize::from(signal), new.kind) {
         (_, SigactionKind::Ignore) | (SIGURG | SIGWINCH, SigactionKind::Default) => {
-            // TODO: POSIX specifies that pending signals shall be discarded if set to SIG_IGN by
-            // sigaction.
+            let sig_group = (signal - 1) / 32;
+            let sig_idx = (signal - 1) % 32;
+
+            // TODO: relibc and the procmgr has access to all threads, redox_rt doesn't currently.
+            // Do this for all threads!
+            ctl.word[usize::from(sig_group)].fetch_and(!(1 << sig_idx), Ordering::Relaxed);
+            PROC_CONTROL_STRUCT
+                .pending
+                .fetch_and(!sig_bit(signal.into()), Ordering::Relaxed);
+
             // TODO: handle tmp_disable_signals
             (
                 MASK_DONTCARE,
@@ -497,7 +547,7 @@ bitflags::bitflags! {
 const STORED_FLAGS: u32 = 0xfe00_0000;
 
 fn default_handler(sig: c_int) {
-    syscall::exit(sig as usize);
+    unreachable!();
 }
 
 #[derive(Clone, Copy)]
@@ -529,8 +579,8 @@ const fn sig_bit(sig: u32) -> u64 {
     1 << (sig - 1)
 }
 
-pub fn setup_sighandler(tcb: &RtTcb) {
-    {
+pub fn setup_sighandler(tcb: &RtTcb, first_thread: bool) {
+    if first_thread {
         let _guard = SIGACTIONS_LOCK.lock();
         for (sig_idx, action) in PROC_CONTROL_STRUCT.actions.iter().enumerate() {
             let sig = sig_idx + 1;
@@ -554,8 +604,7 @@ pub fn setup_sighandler(tcb: &RtTcb) {
         // equivalent to not using any altstack at all (the default).
         arch.altstack_top = usize::MAX;
         arch.altstack_bottom = 0;
-        // TODO
-        #[cfg(any(target_arch = "x86", target_arch = "aarch64", target_arch = "riscv64"))]
+        #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
         {
             arch.pctl = core::ptr::addr_of!(PROC_CONTROL_STRUCT) as usize;
         }
@@ -574,6 +623,12 @@ pub fn setup_sighandler(tcb: &RtTcb) {
         syscall::dup(**tcb.thread_fd(), b"sighandler").expect("failed to open sighandler fd"),
     );
     let _ = syscall::write(*fd, &data).expect("failed to write to sighandler fd");
+    this_thread_call(
+        &mut [],
+        CallFlags::empty(),
+        &[ThreadCall::SyncSigTctl as u64],
+    )
+    .expect("failed to sync signal tctl");
 
     // TODO: Inherited set of ignored signals
     set_sigmask(Some(0), None);
@@ -684,17 +739,25 @@ pub fn await_signal_async(inner_allowset: u64) -> Result<Unreachable> {
         },
         &mut TimeSpec::default(),
     );
-    set_allowset_raw(&control.word, inner_allowset, old_allowset);
 
     if res == Err(Error::new(EINTR)) {
         unsafe {
             manually_enter_trampoline();
         }
     }
+    // POSIX says it shall restore the mask to what it was prior to the call, which is interpreted
+    // as allowing any changes to sigprocmask inside the signal handler, to be discarded.
+    set_allowset_raw(&control.word, inner_allowset, old_allowset);
 
     res?;
     unreachable!()
 }
+/*#[no_mangle]
+pub extern "C" fn __redox_rt_debug_sigctl() {
+    let tcb = &RtTcb::current().control;
+    let _ = syscall::write(1, alloc::format!("SIGCTL: {tcb:#x?}\n").as_bytes());
+}*/
+
 // TODO: deadline-based API
 pub fn await_signal_sync(inner_allowset: u64, timeout: Option<&TimeSpec>) -> Result<SiginfoAbi> {
     let _guard = tmp_disable_signals();
@@ -764,15 +827,17 @@ fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option
 
     if sig_group == 1 && thread_control.is_none() {
         // Queued (realtime) signal
-        let mut ret = MaybeUninit::<RtSigInfo>::uninit();
-        let rt_inf = unsafe {
-            syscall::syscall2(
-                syscall::SYS_SIGDEQUEUE,
-                ret.as_mut_ptr() as usize,
-                sig_idx as usize - 32,
+        let rt_inf: RtSigInfo = unsafe {
+            let mut buf = [0_u8; size_of::<RtSigInfo>()];
+            buf[..4].copy_from_slice(&(sig_idx - 32).to_ne_bytes());
+            proc_call(
+                **static_proc_info().proc_fd.assume_init_ref(),
+                &mut buf,
+                CallFlags::empty(),
+                &[ProcCall::Sigdeq as u64],
             )
             .ok()?;
-            ret.assume_init()
+            core::mem::transmute(buf)
         };
         Some(SiginfoAbi {
             si_signo: sig_idx as i32 + 1,

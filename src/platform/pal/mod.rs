@@ -131,6 +131,18 @@ pub trait Pal {
 
     fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize>;
 
+    fn getresgid(
+        rgid: Option<&mut gid_t>,
+        egid: Option<&mut gid_t>,
+        sgid: Option<&mut gid_t>,
+    ) -> Result<()>;
+
+    fn getresuid(
+        ruid: Option<&mut uid_t>,
+        euid: Option<&mut uid_t>,
+        suid: Option<&mut uid_t>,
+    ) -> Result<()>;
+
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()>;
 
     unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> Result<()>;

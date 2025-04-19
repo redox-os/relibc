@@ -2,7 +2,7 @@
 #define _BITS_SYS_WAIT_H
 
 #define WEXITSTATUS(s) (((s) >> 8) & 0xff)
-#define WTERMSIG(s) (((s) & 0x7f) != 0)
+#define WTERMSIG(s) ((s) & 0x7f)
 #define WSTOPSIG(s) WEXITSTATUS(s)
 #define WCOREDUMP(s) (((s) & 0x80) != 0)
 #define WIFEXITED(s) (((s) & 0x7f) == 0)

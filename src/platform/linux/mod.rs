@@ -328,6 +328,37 @@ impl Pal for Sys {
         e_raw(syscall!(GETRLIMIT, resource, rlim)).map(|_| ())
     }
 
+    fn getresgid(
+        rgid: Option<&mut gid_t>,
+        egid: Option<&mut gid_t>,
+        sgid: Option<&mut gid_t>,
+    ) -> Result<()> {
+        unsafe {
+            e_raw(syscall!(
+                GETRESGID,
+                rgid.map_or(0, |r| r as *const _ as usize),
+                egid.map_or(0, |r| r as *const _ as usize),
+                sgid.map_or(0, |r| r as *const _ as usize)
+            ))
+            .map(|_| ())
+        }
+    }
+    fn getresuid(
+        ruid: Option<&mut uid_t>,
+        euid: Option<&mut uid_t>,
+        suid: Option<&mut uid_t>,
+    ) -> Result<()> {
+        unsafe {
+            e_raw(syscall!(
+                GETRESUID,
+                ruid.map_or(0, |r| r as *const _ as usize),
+                euid.map_or(0, |r| r as *const _ as usize),
+                suid.map_or(0, |r| r as *const _ as usize)
+            ))
+            .map(|_| ())
+        }
+    }
+
     unsafe fn setrlimit(resource: c_int, rlimit: *const rlimit) -> Result<()> {
         e_raw(syscall!(SETRLIMIT, resource, rlimit)).map(|_| ())
     }
