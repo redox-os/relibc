@@ -122,7 +122,8 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     fsd  fs11, 192(sp)
 
     addi sp, sp, -32
-    mv   a0, sp
+    // a0 is forwarded from this function
+    mv   a1, sp
     jal  {fork_impl}
 
     addi sp, sp, 32
@@ -160,8 +161,9 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
 
 asmfunction!(__relibc_internal_fork_ret: ["
     .attribute arch, \"rv64gc\"  # rust bug 80608
-    ld   a0, 0(sp)
-    ld   a1, 8(sp)
+    ld   a0, 0(sp) // cur_filetable_fd
+    ld   a1, 8(sp) // new_proc_fd
+    ld a2, 16(sp) // new_thr_fd
     jal  {child_hook}
 
     mv   a0, x0
