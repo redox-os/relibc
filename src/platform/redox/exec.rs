@@ -273,14 +273,23 @@ pub fn execve(
         // We are now going to invoke `escalate:` rather than loading the program ourselves.
         let escalate_fd = FdGuard::new(syscall::open("/scheme/escalate", O_WRONLY)?);
 
-        // First, send the context handle of this process to escalated.
+        // First, send the proc handle of this process to escalated.
+        let proc_fd = **redox_rt::current_proc_fd();
+        send_fd_guard(
+            *escalate_fd,
+            FdGuard::new(syscall::dup(proc_fd, &[])?),
+            proc_fd as u64,
+        )?;
+
+        // Then, send the thread handle of this process to escalated.
         send_fd_guard(
             *escalate_fd,
             FdGuard::new(syscall::dup(**this_thr_fd, &[])?),
+            **this_thr_fd as u64,
         )?;
 
         // Then, send the file descriptor containing the file descriptor to be executed.
-        send_fd_guard(*escalate_fd, exec_fd_guard)?;
+        send_fd_guard(*escalate_fd, exec_fd_guard, 0)?;
 
         // Then, write the path (argv[0]).
         let _ = syscall::write(*escalate_fd, arg0);
@@ -494,8 +503,8 @@ where
     vec.into_boxed_slice()
 }
 
-fn send_fd_guard(dst_socket: usize, fd: FdGuard) -> Result<()> {
-    syscall::sendfd(dst_socket, *fd, 0, 0)?;
+fn send_fd_guard(dst_socket: usize, fd: FdGuard, meta: u64) -> Result<()> {
+    syscall::sendfd(dst_socket, *fd, 0, meta)?;
     // The kernel closes file descriptors that are sent, so don't call SYS_CLOSE redundantly.
     core::mem::forget(fd);
     Ok(())
