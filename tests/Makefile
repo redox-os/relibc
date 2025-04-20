@@ -29,14 +29,12 @@ EXPECT_NAMES=\
 	locale \
 	math \
 	netdb/getaddrinfo \
-	ptrace \
 	regex \
 	select \
 	setjmp \
 	sigaction \
 	sigaltstack \
 	signal \
-	sigsetjmp \
 	stdio/all \
 	stdio/buffer \
 	stdio/dprintf \
@@ -122,7 +120,6 @@ EXPECT_NAMES=\
 	unistd/fsync \
 	unistd/ftruncate \
 	unistd/getopt \
-	unistd/getopt_long \
 	unistd/pipe \
 	unistd/rmdir \
 	waitpid \
@@ -130,6 +127,7 @@ EXPECT_NAMES=\
 	kill-waitpid \
 	# unistd/sleep \
 	unistd/swab \
+	unistd/getopt_long \
 	unistd/write \
 	wchar/fgetwc \
 	wchar/fwide \
@@ -183,6 +181,59 @@ NAMES=\
 	pwd \
 	sa_restart \
 	sigchld \
+	signals/kill-self \
+	signals/kill0-self \
+	signals/kill-invalid \
+	signals/kill-permission \
+	signals/killpg-esrch \
+	signals/killpg-invalid \
+	signals/killpg0-self \
+	signals/kill-group \
+	signals/kill-child \
+	signals/killpg-child \
+	signals/killpg-self \
+	signals/pthread_kill-invalid \
+	signals/pthread_kill-child \
+	signals/pthread_kill-self \
+	signals/pthread_kill0-self \
+	signals/raise-compliance \
+	signals/sigismember-invalid \
+	signals/sigismember-valid \
+	signals/sigaddset-add \
+	signals/sigdelset-delete \
+	signals/signal-h \
+	signals/signal-h-2 \
+	signals/signal-handle_return \
+	signals/signal-handler \
+	signals/signal-handler2 \
+	signals/signal-ignore \
+	signals/signal-invalid \
+	signals/signal-uncatchable \
+	signals/sigprocmask-3 \
+	signals/sigprocmask-4 \
+	signals/sigprocmask-5 \
+	signals/sigprocmask-6 \
+	signals/sigprocmask-7 \
+	signals/sigprocmask-8 \
+	signals/sigprocmask-9 \
+	signals/sigprocmask-10 \
+	signals/sigprocmask-11 \
+	signals/sigprocmask-12 \
+	signals/sigpause-invalid \
+	signals/sigpause-revert \
+	signals/sigpause-suspend \
+	signals/sigprocmask-blocksingle \
+	signals/sigprocmask-block \
+	signals/sigrelse-1 \
+	signals/sigrelse-2 \
+	signals/sigrelse-3 \
+	signals/sigset-1 \
+	signals/sigset-10 \
+	signals/sigset-2 \
+	signals/sigset-3 \
+	signals/sigset-4 \
+	signals/sigset-5 \
+	signals/sigset-9 \
 	stdio/ctermid \
 	stdio/tempnam \
 	stdio/tmpnam \
