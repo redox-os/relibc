@@ -36,6 +36,7 @@ pub enum ProcCall {
     Sigdeq = 11,
     Getppid = 12,
     Rename = 13,
+    DisableSetpgid = 14,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]
@@ -63,6 +64,7 @@ impl ProcCall {
             11 => Self::Sigdeq,
             12 => Self::Getppid,
             13 => Self::Rename,
+            14 => Self::DisableSetpgid,
             _ => return None,
         })
     }

@@ -444,6 +444,15 @@ where
             &[ProcCall::Rename as u64],
         );
     }
+
+    // TODO: Error handling
+    let _ = proc_call(
+        **proc_fd,
+        &mut [],
+        CallFlags::empty(),
+        &[ProcCall::DisableSetpgid as u64],
+    );
+
     if interp_override.is_some() {
         let mmap_min_fd = FdGuard::new(syscall::dup(*grants_fd, b"mmap-min-addr")?);
         let last_addr = tree.iter().rev().nth(1).map_or(0, |(off, len)| *off + *len);
