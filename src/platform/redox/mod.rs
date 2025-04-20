@@ -890,9 +890,8 @@ impl Pal for Sys {
         Err(Errno(ENOSYS))
     }
 
-    fn setsid() -> Result<()> {
-        redox_rt::sys::posix_setsid()?;
-        Ok(())
+    fn setsid() -> Result<c_int> {
+        Ok(redox_rt::sys::posix_setsid()? as c_int)
     }
 
     fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {

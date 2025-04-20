@@ -895,7 +895,7 @@ pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setsid.html>.
 #[no_mangle]
 pub extern "C" fn setsid() -> pid_t {
-    Sys::setsid().map(|()| 0).or_minus_one_errno()
+    Sys::setsid().or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setuid.html>.

@@ -612,8 +612,8 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(SETRESUID, ruid, euid, suid) }).map(|_| ())
     }
 
-    fn setsid() -> Result<()> {
-        e_raw(unsafe { syscall!(SETSID) }).map(|_| ())
+    fn setsid() -> Result<c_int> {
+        e_raw(unsafe { syscall!(SETSID) }).map(|s| s as c_int)
     }
 
     fn symlink(path1: CStr, path2: CStr) -> Result<()> {

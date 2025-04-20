@@ -237,7 +237,7 @@ pub trait Pal {
 
     fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> Result<()>;
 
-    fn setsid() -> Result<()>;
+    fn setsid() -> Result<c_int>;
 
     fn symlink(path1: CStr, path2: CStr) -> Result<()>;
 
