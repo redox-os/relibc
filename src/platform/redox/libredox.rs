@@ -368,6 +368,11 @@ pub unsafe extern "C" fn redox_mkns_v1(
 
 // ABI-UNSTABLE
 #[no_mangle]
+pub unsafe extern "C" fn redox_cur_procfd_v0() -> usize {
+    **redox_rt::current_proc_fd()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn redox_cur_thrfd_v0() -> usize {
     **redox_rt::RtTcb::current().thread_fd()
 }
