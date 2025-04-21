@@ -116,8 +116,7 @@ pub fn execve(
     // executed by accident.
     //
     // TODO: At some point we might have capabilities limiting the ability to allocate
-    // executable memory, and in that case we might use the `escalate:` scheme as we already do
-    // when the binary needs setuid/setgid.
+    // executable memory.
 
     let mut stat = Stat::default();
     syscall::fstat(*image_file as usize, &mut stat)?;
@@ -134,7 +133,6 @@ pub fn execve(
     if mode & 0o1 == 0o0 {
         return Err(Error::new(EPERM));
     }
-    let wants_setugid = stat.st_mode & ((S_ISUID | S_ISGID) as u16) != 0;
 
     let cwd: Box<[u8]> = super::path::clone_cwd().unwrap_or_default().into();
     let default_scheme: Box<[u8]> = super::path::clone_default_scheme()
@@ -163,16 +161,6 @@ pub fn execve(
         ArgEnv::Parsed { args, .. } => len = args.len(),
     }
     let mut args: Vec<&[u8]> = Vec::with_capacity(len);
-
-    // Since the fexec implementation is almost fully done in userspace, the kernel can no longer
-    // set UID/GID accordingly, and this code checking for them before using interfaces to upgrade
-    // UID/GID, can not be trusted. So we ask the `escalate:` scheme for help. Note that
-    // `escalate:` can be deliberately excluded from the scheme namespace to deny privilege
-    // escalation (such as su/sudo/doas) for untrusted processes.
-    //
-    // According to execve(2), Linux and most other UNIXes ignore setuid/setgid for interpreted
-    // executables and thereby simply keep the privileges as is. For compatibility we do that
-    // too.
 
     if let Some(interpreter) = &interpreter_path {
         image_file = File::open(CStr::borrow(&interpreter), O_RDONLY as c_int)
@@ -263,84 +251,30 @@ pub fn execve(
         }
     }
 
-    let this_thr_fd = RtTcb::current().thread_fd();
-
     // TODO: Convert image_file to FdGuard earlier?
     let exec_fd_guard = FdGuard::new(image_file.fd as usize);
     core::mem::forget(image_file);
 
-    if interpreter_path.is_none() && wants_setugid {
-        // We are now going to invoke `escalate:` rather than loading the program ourselves.
-        let escalate_fd = FdGuard::new(syscall::open("/scheme/escalate", O_WRONLY)?);
+    let sigprocmask = redox_rt::signal::get_sigmask().unwrap();
 
-        // First, send the proc handle of this process to escalated.
-        let proc_fd = **redox_rt::current_proc_fd();
-        send_fd_guard(
-            *escalate_fd,
-            FdGuard::new(syscall::dup(proc_fd, &[])?),
-            proc_fd as u64,
-        )?;
-
-        // Then, send the thread handle of this process to escalated.
-        send_fd_guard(
-            *escalate_fd,
-            FdGuard::new(syscall::dup(**this_thr_fd, &[])?),
-            **this_thr_fd as u64,
-        )?;
-
-        // Then, send the file descriptor containing the file descriptor to be executed.
-        send_fd_guard(*escalate_fd, exec_fd_guard, 0)?;
-
-        // Then, write the path (argv[0]).
-        let _ = syscall::write(*escalate_fd, arg0);
-
-        // Second, we write the flattened args and envs with NUL characters separating
-        // individual items. This can be copied directly into the new executable's memory.
-        let _ = syscall::write(*escalate_fd, &flatten_with_nul(args))?;
-        let _ = syscall::write(*escalate_fd, &flatten_with_nul(envs))?;
-        let _ = syscall::write(*escalate_fd, &cwd)?;
-        let _ = syscall::write(*escalate_fd, &default_scheme)?;
-
-        // Closing will notify the scheme, and from that point we will no longer have control
-        // over this process (unless it fails). We do this manually since drop cannot handle
-        // errors.
-        let fd = *escalate_fd as usize;
-        unsafe {
-            syscall::syscall5(
-                syscall::SYS_CALL,
-                fd,
-                0,
-                0,
-                syscall::CallFlags::CONSUME.bits(),
-                0,
-            )?;
-        }
-
-        syscall::close(fd)?;
-
-        unreachable!()
-    } else {
-        let sigprocmask = redox_rt::signal::get_sigmask().unwrap();
-
-        let extrainfo = ExtraInfo {
-            cwd: Some(&cwd),
-            default_scheme: Some(&default_scheme),
-            sigignmask: 0,
-            sigprocmask,
-            umask: redox_rt::sys::get_umask(),
-            thr_fd: **RtTcb::current().thread_fd(),
-            proc_fd: **redox_rt::current_proc_fd(),
-        };
-        fexec_impl(
-            exec_fd_guard,
-            arg0,
-            &args,
-            &envs,
-            total_args_envs_size,
-            &extrainfo,
-            interp_override,
-        )
-    }
+    let extrainfo = ExtraInfo {
+        cwd: Some(&cwd),
+        default_scheme: Some(&default_scheme),
+        sigignmask: 0,
+        sigprocmask,
+        umask: redox_rt::sys::get_umask(),
+        thr_fd: **RtTcb::current().thread_fd(),
+        proc_fd: **redox_rt::current_proc_fd(),
+    };
+    fexec_impl(
+        exec_fd_guard,
+        arg0,
+        &args,
+        &envs,
+        total_args_envs_size,
+        &extrainfo,
+        interp_override,
+    )
 }
 
 // Parse the interpreter and its args if `reader` starts with a shebang (#!).
@@ -490,24 +424,6 @@ where
 
     let interpreter = CString::new(interpreter).map_err(|_| Error::new(ENOEXEC))?;
     Ok((Some(interpreter), interpreter_args))
-}
-
-fn flatten_with_nul<T>(iter: impl IntoIterator<Item = T>) -> Box<[u8]>
-where
-    T: AsRef<[u8]>,
-{
-    let mut vec = Vec::new();
-    for item in iter {
-        vec.extend(item.as_ref().iter().copied().chain(Some(b'\0')));
-    }
-    vec.into_boxed_slice()
-}
-
-fn send_fd_guard(dst_socket: usize, fd: FdGuard, meta: u64) -> Result<()> {
-    syscall::sendfd(dst_socket, *fd, 0, meta)?;
-    // The kernel closes file descriptors that are sent, so don't call SYS_CLOSE redundantly.
-    core::mem::forget(fd);
-    Ok(())
 }
 
 #[cfg(test)]
