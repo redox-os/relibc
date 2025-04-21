@@ -10,8 +10,8 @@ use crate::{
     current_proc_fd,
     proc::FdGuard,
     protocol::{
-        ProcCall, RtSigInfo, ThreadCall, SIGCHLD, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU,
-        SIGURG, SIGWINCH,
+        ProcCall, RtSigInfo, ThreadCall, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN,
+        SIGTTOU, SIGURG, SIGWINCH,
     },
     static_proc_info,
     sync::Mutex,
@@ -157,14 +157,14 @@ unsafe fn inner(stack: &mut SigStack) {
         action
     };
     let shall_restart = sigaction.flags.contains(SigactionFlags::RESTART);
+    let sig = (stack.sig_num & 0x3f) as u8;
 
     let handler = match sigaction.kind {
         SigactionKind::Ignore => {
             panic!("ctl {:#x?} signal {}", os.control, stack.sig_num)
         }
+        SigactionKind::Default if usize::from(sig) == SIGCONT => SignalHandler { handler: None },
         SigactionKind::Default => {
-            let sig = (stack.sig_num & 0x3f) as u8;
-
             let _ = proc_call(
                 **current_proc_fd(),
                 &mut [],
