@@ -114,6 +114,7 @@ pub unsafe extern "C" fn setitimer(
     value: *const itimerval,
     ovalue: *mut itimerval,
 ) -> c_int {
+    // TODO setitimer is unimplemented on Redox
     Sys::setitimer(which, &*value, ovalue.as_mut())
         .map(|()| 0)
         .or_minus_one_errno()

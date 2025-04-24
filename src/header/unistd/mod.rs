@@ -96,6 +96,7 @@ pub unsafe extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alarm.html>.
 #[no_mangle]
 pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
+    // TODO setitimer is unimplemented on Redox and obsolete
     let mut timer = sys_time::itimerval {
         it_value: sys_time::timeval {
             tv_sec: seconds as time_t,
@@ -1032,6 +1033,7 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
 #[deprecated]
 #[no_mangle]
 pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t {
+    // TODO setitimer is unimplemented on Redox and obsolete
     let mut timer = sys_time::itimerval {
         it_value: sys_time::timeval {
             tv_sec: 0,
