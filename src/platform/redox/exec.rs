@@ -1,4 +1,7 @@
-use core::num::{NonZeroU64, NonZeroUsize};
+use core::{
+    convert::Infallible,
+    num::{NonZeroU64, NonZeroUsize},
+};
 
 use crate::{
     c_str::{CStr, CString},
@@ -11,24 +14,28 @@ use crate::{
     },
 };
 
-use redox_rt::proc::{ExtraInfo, FdGuard, FexecResult, InterpOverride};
+use redox_rt::{
+    proc::{ExtraInfo, FdGuard, FexecResult, InterpOverride},
+    sys::Resugid,
+    RtTcb,
+};
 use syscall::{data::Stat, error::*, flag::*};
 
 fn fexec_impl(
     exec_file: FdGuard,
-    open_via_dup: FdGuard,
     path: &[u8],
     args: &[&[u8]],
     envs: &[&[u8]],
     total_args_envs_size: usize,
     extrainfo: &ExtraInfo,
     interp_override: Option<InterpOverride>,
-) -> Result<usize> {
+) -> Result<Infallible> {
     let memory = FdGuard::new(syscall::open("/scheme/memory", 0)?);
 
     let addrspace_selection_fd = match redox_rt::proc::fexec_impl(
         exec_file,
-        open_via_dup,
+        &RtTcb::current().thread_fd(),
+        redox_rt::current_proc_fd(),
         &memory,
         path,
         args.iter().rev(),
@@ -40,12 +47,10 @@ fn fexec_impl(
         FexecResult::Normal { addrspace_handle } => addrspace_handle,
         FexecResult::Interp {
             image_file,
-            open_via_dup,
             path,
             interp_override: new_interp_override,
         } => {
             drop(image_file);
-            drop(open_via_dup);
             drop(memory);
 
             // According to elf(5), PT_INTERP requires that the interpreter path be
@@ -91,7 +96,7 @@ pub fn execve(
     exec: Executable<'_>,
     arg_env: ArgEnv,
     interp_override: Option<InterpOverride>,
-) -> Result<usize> {
+) -> Result<Infallible> {
     // NOTE: We must omit O_CLOEXEC and close manually, otherwise it will be closed before we
     // have even read it!
     let (mut image_file, arg0) = match exec {
@@ -111,17 +116,15 @@ pub fn execve(
     // executed by accident.
     //
     // TODO: At some point we might have capabilities limiting the ability to allocate
-    // executable memory, and in that case we might use the `escalate:` scheme as we already do
-    // when the binary needs setuid/setgid.
+    // executable memory.
 
     let mut stat = Stat::default();
     syscall::fstat(*image_file as usize, &mut stat)?;
-    let uid = syscall::getuid()?;
-    let gid = syscall::getuid()?;
+    let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
 
-    let mode = if uid == stat.st_uid as usize {
+    let mode = if ruid == stat.st_uid {
         (stat.st_mode >> 3 * 2) & 0o7
-    } else if gid == stat.st_gid as usize {
+    } else if rgid == stat.st_gid {
         (stat.st_mode >> 3 * 1) & 0o7
     } else {
         stat.st_mode & 0o7
@@ -130,7 +133,6 @@ pub fn execve(
     if mode & 0o1 == 0o0 {
         return Err(Error::new(EPERM));
     }
-    let wants_setugid = stat.st_mode & ((S_ISUID | S_ISGID) as u16) != 0;
 
     let cwd: Box<[u8]> = super::path::clone_cwd().unwrap_or_default().into();
     let default_scheme: Box<[u8]> = super::path::clone_default_scheme()
@@ -159,16 +161,6 @@ pub fn execve(
         ArgEnv::Parsed { args, .. } => len = args.len(),
     }
     let mut args: Vec<&[u8]> = Vec::with_capacity(len);
-
-    // Since the fexec implementation is almost fully done in userspace, the kernel can no longer
-    // set UID/GID accordingly, and this code checking for them before using interfaces to upgrade
-    // UID/GID, can not be trusted. So we ask the `escalate:` scheme for help. Note that
-    // `escalate:` can be deliberately excluded from the scheme namespace to deny privilege
-    // escalation (such as su/sudo/doas) for untrusted processes.
-    //
-    // According to execve(2), Linux and most other UNIXes ignore setuid/setgid for interpreted
-    // executables and thereby simply keep the privileges as is. For compatibility we do that
-    // too.
 
     if let Some(interpreter) = &interpreter_path {
         image_file = File::open(CStr::borrow(&interpreter), O_RDONLY as c_int)
@@ -240,7 +232,7 @@ pub fn execve(
         // threads, it could still be allowed by keeping certain file descriptors and instead
         // set the active file table.
         let files_fd =
-            File::new(syscall::open("/scheme/thisproc/current/filetable", O_RDONLY)? as c_int);
+            File::new(syscall::dup(**RtTcb::current().thread_fd(), b"filetable")? as c_int);
         for line in BufReader::new(files_fd).lines() {
             let line = match line {
                 Ok(l) => l,
@@ -259,61 +251,30 @@ pub fn execve(
         }
     }
 
-    let this_context_fd = FdGuard::new(syscall::open("/scheme/thisproc/current/open_via_dup", 0)?);
     // TODO: Convert image_file to FdGuard earlier?
     let exec_fd_guard = FdGuard::new(image_file.fd as usize);
     core::mem::forget(image_file);
 
-    if interpreter_path.is_none() && wants_setugid {
-        // We are now going to invoke `escalate:` rather than loading the program ourselves.
-        let escalate_fd = FdGuard::new(syscall::open("/scheme/escalate", O_WRONLY)?);
+    let sigprocmask = redox_rt::signal::get_sigmask().unwrap();
 
-        // First, send the context handle of this process to escalated.
-        send_fd_guard(*escalate_fd, this_context_fd)?;
-
-        // Then, send the file descriptor containing the file descriptor to be executed.
-        send_fd_guard(*escalate_fd, exec_fd_guard)?;
-
-        // Then, write the path (argv[0]).
-        let _ = syscall::write(*escalate_fd, arg0);
-
-        // Second, we write the flattened args and envs with NUL characters separating
-        // individual items. This can be copied directly into the new executable's memory.
-        let _ = syscall::write(*escalate_fd, &flatten_with_nul(args))?;
-        let _ = syscall::write(*escalate_fd, &flatten_with_nul(envs))?;
-        let _ = syscall::write(*escalate_fd, &cwd)?;
-        let _ = syscall::write(*escalate_fd, &default_scheme)?;
-
-        // Closing will notify the scheme, and from that point we will no longer have control
-        // over this process (unless it fails). We do this manually since drop cannot handle
-        // errors.
-        let fd = *escalate_fd as usize;
-        core::mem::forget(escalate_fd);
-
-        syscall::close(fd)?;
-
-        unreachable!()
-    } else {
-        let sigprocmask = redox_rt::signal::get_sigmask().unwrap();
-
-        let extrainfo = ExtraInfo {
-            cwd: Some(&cwd),
-            default_scheme: Some(&default_scheme),
-            sigignmask: 0,
-            sigprocmask,
-            umask: redox_rt::sys::get_umask(),
-        };
-        fexec_impl(
-            exec_fd_guard,
-            this_context_fd,
-            arg0,
-            &args,
-            &envs,
-            total_args_envs_size,
-            &extrainfo,
-            interp_override,
-        )
-    }
+    let extrainfo = ExtraInfo {
+        cwd: Some(&cwd),
+        default_scheme: Some(&default_scheme),
+        sigignmask: 0,
+        sigprocmask,
+        umask: redox_rt::sys::get_umask(),
+        thr_fd: **RtTcb::current().thread_fd(),
+        proc_fd: **redox_rt::current_proc_fd(),
+    };
+    fexec_impl(
+        exec_fd_guard,
+        arg0,
+        &args,
+        &envs,
+        total_args_envs_size,
+        &extrainfo,
+        interp_override,
+    )
 }
 
 // Parse the interpreter and its args if `reader` starts with a shebang (#!).
@@ -463,24 +424,6 @@ where
 
     let interpreter = CString::new(interpreter).map_err(|_| Error::new(ENOEXEC))?;
     Ok((Some(interpreter), interpreter_args))
-}
-
-fn flatten_with_nul<T>(iter: impl IntoIterator<Item = T>) -> Box<[u8]>
-where
-    T: AsRef<[u8]>,
-{
-    let mut vec = Vec::new();
-    for item in iter {
-        vec.extend(item.as_ref().iter().copied().chain(Some(b'\0')));
-    }
-    vec.into_boxed_slice()
-}
-
-fn send_fd_guard(dst_socket: usize, fd: FdGuard) -> Result<()> {
-    syscall::sendfd(dst_socket, *fd, 0, 0)?;
-    // The kernel closes file descriptors that are sent, so don't call SYS_CLOSE redundantly.
-    core::mem::forget(fd);
-    Ok(())
 }
 
 #[cfg(test)]

@@ -50,6 +50,7 @@ pub const MB_CUR_MAX: c_int = 4;
 pub const MB_LEN_MAX: c_int = 4;
 
 static mut ATEXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
+static mut AT_QUICK_EXIT_FUNCS: [Option<extern "C" fn()>; 32] = [None; 32];
 static mut L64A_BUFFER: [c_char; 7] = [0; 7]; // up to 6 digits plus null terminator
 static mut RNG: Option<XorShiftRng> = None;
 
@@ -146,7 +147,14 @@ pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/at_quick_exit.html>.
 #[no_mangle]
 pub unsafe extern "C" fn at_quick_exit(func: Option<extern "C" fn()>) -> c_int {
-    unimplemented!();
+    for i in 0..AT_QUICK_EXIT_FUNCS.len() {
+        if AT_QUICK_EXIT_FUNCS[i] == None {
+            AT_QUICK_EXIT_FUNCS[i] = func;
+            return 0;
+        }
+    }
+
+    1
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/atexit.html>.
@@ -466,7 +474,7 @@ pub unsafe extern "C" fn getsubopt(
             i = i + 1;
             continue;
         }
-        if (*start.offset(len)) == b'=' as i8 {
+        if (*start.offset(len)) == b'=' as c_char {
             *valuep = start.offset(len + 1);
         } else if !start.offset(len).is_null() {
             i = i + 1;
@@ -1040,9 +1048,15 @@ pub unsafe extern "C" fn qsort_r(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/quick_exit.html>.
-// #[no_mangle]
+#[no_mangle]
 pub unsafe extern "C" fn quick_exit(status: c_int) -> ! {
-    unimplemented!();
+    for i in (0..AT_QUICK_EXIT_FUNCS.len()).rev() {
+        if let Some(func) = AT_QUICK_EXIT_FUNCS[i] {
+            (func)();
+        }
+    }
+
+    Sys::exit(status);
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/rand.html>.

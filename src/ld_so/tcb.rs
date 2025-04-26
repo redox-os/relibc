@@ -126,22 +126,22 @@ impl Tcb {
         if self.tls_end.is_null() || self.tls_len == 0 {
             None
         } else {
-            Some(slice::from_raw_parts_mut(
-                self.tls_end.offset(-(self.tls_len as isize)),
-                self.tls_len,
-            ))
+            let tls_start = self.tls_end.sub(self.tls_len);
+            Some(slice::from_raw_parts_mut(tls_start, self.tls_len))
         }
     }
 
     /// The initial images for TLS
-    pub unsafe fn masters(&self) -> Option<&'static mut [Master]> {
+    pub fn masters(&self) -> Option<&'static mut [Master]> {
         if self.masters_ptr.is_null() || self.masters_len == 0 {
             None
         } else {
-            Some(slice::from_raw_parts_mut(
-                self.masters_ptr,
-                self.masters_len / mem::size_of::<Master>(),
-            ))
+            Some(unsafe {
+                slice::from_raw_parts_mut(
+                    self.masters_ptr,
+                    self.masters_len / mem::size_of::<Master>(),
+                )
+            })
         }
     }
 
@@ -150,19 +150,16 @@ impl Tcb {
         //TODO: Complain if masters or tls exist without the other
         if let Some(tls) = self.tls() {
             if let Some(masters) = self.masters() {
-                for (i, master) in masters
+                for master in masters
                     .iter()
                     .skip(self.num_copied_masters)
-                    .filter(|m| m.len > 0)
-                    .enumerate()
+                    .filter(|master| master.len != 0)
                 {
                     let range = if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
-                        // x86 TLS layout is backwards
+                        // x86{_64} TLS layout is backwards
                         self.tls_len - master.offset..self.tls_len - master.offset + master.len
                     } else {
-                        //TODO: fix aarch64 TLS layout when there is more than one master
-                        assert_eq!(i, 0, "aarch64 TLS layout only supports one master");
-                        0..master.len
+                        master.offset..master.offset + master.len
                     };
                     if let Some(tls_data) = tls.get_mut(range) {
                         let data = master.data();
@@ -205,13 +202,34 @@ impl Tcb {
     }
 
     /// Activate TLS
-    pub unsafe fn activate(&mut self) {
-        Self::os_arch_activate(&self.os_specific, self.tls_end as usize, self.tls_len);
+    pub unsafe fn activate(&mut self, #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuard) {
+        Self::os_arch_activate(
+            &self.os_specific,
+            self.tls_end as usize,
+            self.tls_len,
+            #[cfg(target_os = "redox")]
+            thr_fd,
+        );
     }
 
     pub fn setup_dtv(&mut self, n: usize) {
         if self.dtv_ptr.is_null() {
-            let dtv = vec![ptr::null_mut(); n];
+            let mut dtv = vec![ptr::null_mut(); n];
+
+            if let Some(masters) = self.masters() {
+                for (i, master) in masters.iter().enumerate() {
+                    let tls = unsafe { self.tls().unwrap() };
+                    let offset = if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
+                        // x86{_64} TLS layout is backwards
+                        self.tls_len - master.offset
+                    } else {
+                        master.offset
+                    };
+
+                    dtv[i] = unsafe { tls.as_mut_ptr().add(offset) };
+                }
+            }
+
             let (ptr, len, _) = dtv.into_raw_parts();
 
             self.dtv_ptr = ptr;
@@ -255,6 +273,47 @@ impl Tcb {
     }
 
     /// OS specific code to create a new TLS and TCB - Linux and Redox
+    ///
+    /// Memory layout:
+    ///
+    /// ```text
+    /// 0          page_size                   size       (size + page_size * 2)
+    /// |----------|---------------------------|----------|
+    /// +++++++++++++++++++++++++++++++++++++++++++++++++++
+    /// | ABI Page | TLS                       | TCB Page |
+    /// +++++++++++++++++++++++++++++++++++++++++++++++++++
+    ///     ^ $tp (aarch64)                    ^ $tp (x86_64)
+    /// ```
+    ///
+    /// `$tp` refers to the architecture specific thread pointer.
+    ///
+    /// **Note**: On x86{_64}, the TLS layout is backwards (i.e. the first byte of the TLS is at
+    /// the end of the TLS region).
+    ///
+    /// ABI page layout for aarch64:
+    /// ```text
+    /// 0                     4096
+    /// +---------------------+
+    /// | ABI Page            |
+    /// +---------------------+
+    ///                     ^
+    ///                     |
+    ///                     +-------> (page_size - 16): pointer to the start of the TCB page
+    /// ```
+    ///
+    /// ABI page layout for riscv64:
+    ///
+    /// ```text
+    /// 0                     4096
+    /// +---------------------+
+    /// | ABI Page            |
+    /// +---------------------+
+    ///                      ^
+    ///                      |
+    ///                      +-------> (page_size - 8): pointer to the start of the TCB page
+    /// ```
+    ///
+    /// For x86_64, the ABI page is not used.
     #[cfg(any(target_os = "linux", target_os = "redox"))]
     unsafe fn os_new(
         size: usize,
@@ -274,7 +333,13 @@ impl Tcb {
     }
 
     #[cfg(target_os = "redox")]
-    unsafe fn os_arch_activate(os: &OsSpecific, tls_end: usize, tls_len: usize) {
+    unsafe fn os_arch_activate(
+        os: &OsSpecific,
+        tls_end: usize,
+        tls_len: usize,
+        thr_fd: redox_rt::proc::FdGuard,
+    ) {
+        os.thr_fd.get().write(Some(thr_fd));
         redox_rt::tcb_activate(os, tls_end, tls_len)
     }
 }

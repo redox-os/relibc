@@ -1,4 +1,5 @@
 use core::{
+    cell::SyncUnsafeCell,
     mem::offset_of,
     ptr::NonNull,
     sync::atomic::{AtomicU8, Ordering},
@@ -7,16 +8,13 @@ use core::{
 use syscall::{
     data::{SigProcControl, Sigcontrol},
     error::*,
-    RtSigInfo,
 };
 
 use crate::{
-    proc::{fork_inner, FdGuard},
-    signal::{
-        get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack, Sigaltstack,
-        PROC_CONTROL_STRUCT,
-    },
-    RtTcb, Tcb,
+    proc::{fork_inner, FdGuard, ForkArgs},
+    protocol::{ProcCall, RtSigInfo},
+    signal::{get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
+    Tcb,
 };
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
@@ -32,6 +30,9 @@ pub struct SigArea {
     pub tmp_rdx: usize,
     pub tmp_rdi: usize,
     pub tmp_rsi: usize,
+    pub tmp_r8: usize,
+    pub tmp_r10: usize,
+    pub tmp_r12: usize,
     pub tmp_rt_inf: RtSigInfo,
     pub tmp_id_inf: u64,
 
@@ -95,16 +96,27 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
     Ok(())
 }
 
-unsafe extern "sysv64" fn fork_impl(initial_rsp: *mut usize) -> usize {
-    Error::mux(fork_inner(initial_rsp))
+unsafe extern "sysv64" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usize {
+    Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "sysv64" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
+unsafe extern "sysv64" fn child_hook(
+    cur_filetable_fd: usize,
+    new_proc_fd: usize,
+    new_thr_fd: usize,
+) {
     let _ = syscall::close(cur_filetable_fd);
-    crate::child_hook_common(FdGuard::new(new_pid_fd));
+    crate::child_hook_common(crate::ChildHookCommonArgs {
+        new_thr_fd: FdGuard::new(new_thr_fd),
+        new_proc_fd: if new_proc_fd == usize::MAX {
+            None
+        } else {
+            Some(FdGuard::new(new_proc_fd))
+        },
+    });
 }
 
-asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
+asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     push rbp
     mov rbp, rsp
 
@@ -115,15 +127,16 @@ asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
     push r14
     push r15
 
-    sub rsp, 32
+    sub rsp, 48
 
-    stmxcsr [rsp+16]
-    fnstcw [rsp+24]
+    stmxcsr [rsp+32]
+    fnstcw [rsp+40]
 
-    mov rdi, rsp
+    // rdi: &ForkArgs
+    mov rsi, rsp
     call {fork_impl}
 
-    add rsp, 80
+    add rsp, 96
 
     pop rbp
     ret
@@ -132,14 +145,15 @@ asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
 asmfunction!(__relibc_internal_fork_ret: ["
     mov rdi, [rsp]
     mov rsi, [rsp + 8]
+    mov rdx, [rsp + 16]
     call {child_hook}
 
-    ldmxcsr [rsp + 16]
-    fldcw [rsp + 24]
+    ldmxcsr [rsp + 32]
+    fldcw [rsp + 40]
 
     xor rax, rax
 
-    add rsp, 32
+    add rsp, 48
     pop r15
     pop r14
     pop r13
@@ -178,6 +192,9 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov fs:[{tcb_sa_off} + {sa_tmp_rdx}], rdx
     mov fs:[{tcb_sa_off} + {sa_tmp_rdi}], rdi
     mov fs:[{tcb_sa_off} + {sa_tmp_rsi}], rsi
+    mov fs:[{tcb_sa_off} + {sa_tmp_r12}], r8
+    mov fs:[{tcb_sa_off} + {sa_tmp_r12}], r10
+    mov fs:[{tcb_sa_off} + {sa_tmp_r12}], r12
 
     // First, select signal, always pick first available bit
 1:
@@ -215,14 +232,23 @@ asmfunction!(__relibc_internal_sigentry: ["
     jc 2f // if so, continue as usual
 
     // otherwise, try (competitively) dequeueing realtime signal
-    mov esi, eax
-    mov eax, {SYS_SIGDEQUEUE}
-    mov rdi, fs:[0]
-    add rdi, {tcb_sa_off} + {sa_tmp_rt_inf} // out pointer of dequeued realtime sig
+
+    // SYS_CALL(fd, payload_base, payload_len, metadata_len | (flags << 8), metadata_base)
+    // rax      rdi rsi           rdx          r10                          r8
+
+    mov r12d, eax
+    mov rsi, fs:[0]
+    mov rdi, [rip+{proc_fd}]
+    add rsi, {tcb_sa_off} + {sa_tmp_rt_inf} // out pointer of dequeued realtime sig
+    mov rdx, {RTINF_SIZE}
+    mov [rsi], eax
+    lea r8, [rip + {proc_call_sigdeq}]
+    mov r10, 1
+    mov eax, {SYS_CALL}
     syscall
     test eax, eax
     jnz 1b // assumes error can only be EAGAIN
-    lea eax, [esi + 32]
+    lea eax, [r12d + 32]
     jmp 9f
 2:
     mov edx, eax
@@ -275,13 +301,13 @@ asmfunction!(__relibc_internal_sigentry: ["
     push fs:[{tcb_sa_off} + {sa_tmp_rdx}]
     push rcx
     push fs:[{tcb_sa_off} + {sa_tmp_rax}]
-    push r8
+    push fs:[{tcb_sa_off} + {sa_tmp_r8}]
     push r9
-    push r10
+    push fs:[{tcb_sa_off} + {sa_tmp_r10}]
     push r11
     push rbx
     push rbp
-    push r12
+    push fs:[{tcb_sa_off} + {sa_tmp_r12}]
     push r13
     push r14
     push r15
@@ -408,6 +434,9 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_rdx = const offset_of!(SigArea, tmp_rdx),
     sa_tmp_rdi = const offset_of!(SigArea, tmp_rdi),
     sa_tmp_rsi = const offset_of!(SigArea, tmp_rsi),
+    sa_tmp_r8 = const offset_of!(SigArea, tmp_r8),
+    sa_tmp_r10 = const offset_of!(SigArea, tmp_r10),
+    sa_tmp_r12 = const offset_of!(SigArea, tmp_r12),
     sa_tmp_rt_inf = const offset_of!(SigArea, tmp_rt_inf),
     sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
@@ -427,7 +456,10 @@ __relibc_internal_sigentry_crit_third:
     REDZONE_SIZE = const 128,
     STACK_ALIGN = const 16,
     SA_ONSTACK_BIT = const 58, // (1 << 58) >> 32 = 0x0400_0000
-    SYS_SIGDEQUEUE = const syscall::SYS_SIGDEQUEUE,
+    SYS_CALL = const syscall::SYS_CALL,
+    proc_call_sigdeq = sym PROC_CALL_SIGDEQ,
+    RTINF_SIZE = const size_of::<RtSigInfo>(),
+    proc_fd = sym PROC_FD,
 ]);
 
 extern "C" {
@@ -493,3 +525,6 @@ pub fn current_sp() -> usize {
     }
     sp
 }
+
+static PROC_CALL_SIGDEQ: u64 = ProcCall::Sigdeq as u64;
+pub(crate) static PROC_FD: SyncUnsafeCell<usize> = SyncUnsafeCell::new(usize::MAX);

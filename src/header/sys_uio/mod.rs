@@ -40,6 +40,46 @@ unsafe fn scatter(iovs: &[iovec], vec: Vec<u8>) {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn preadv(
+    fd: c_int,
+    iov: *const iovec,
+    iovcnt: c_int,
+    offset: off_t,
+) -> ssize_t {
+    if iovcnt < 0 || iovcnt > IOV_MAX {
+        platform::ERRNO.set(errno::EINVAL);
+        return -1;
+    }
+
+    let iovs = slice::from_raw_parts(iov, iovcnt as usize);
+    let mut vec = gather(iovs);
+
+    let ret = unistd::pread(fd, vec.as_mut_ptr() as *mut c_void, vec.len(), offset);
+
+    scatter(iovs, vec);
+
+    ret
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pwritev(
+    fd: c_int,
+    iov: *const iovec,
+    iovcnt: c_int,
+    offset: off_t,
+) -> ssize_t {
+    if iovcnt < 0 || iovcnt > IOV_MAX {
+        platform::ERRNO.set(errno::EINVAL);
+        return -1;
+    }
+
+    let iovs = slice::from_raw_parts(iov, iovcnt as usize);
+    let vec = gather(iovs);
+
+    unistd::pwrite(fd, vec.as_ptr() as *const c_void, vec.len(), offset)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> ssize_t {
     if iovcnt < 0 || iovcnt > IOV_MAX {
         platform::ERRNO.set(errno::EINVAL);

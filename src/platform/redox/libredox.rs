@@ -1,7 +1,10 @@
 use core::{slice, str};
 
-use redox_rt::sys::{posix_read, posix_write};
-use syscall::{Error, Result, WaitFlags, EMFILE};
+use redox_rt::{
+    protocol::{ProcKillTarget, WaitFlags},
+    sys::{posix_read, posix_write, WaitpidTarget},
+};
+use syscall::{Error, Result, EMFILE};
 
 use crate::{
     header::{
@@ -128,7 +131,19 @@ pub unsafe extern "C" fn redox_open_v1(
         mode as mode_t,
     ))
 }
-
+#[no_mangle]
+pub unsafe extern "C" fn redox_openat_v1(
+    fd: usize,
+    path_base: *const u8,
+    path_len: usize,
+    flags: u32,
+) -> RawResult {
+    Error::mux(syscall::openat(
+        fd,
+        str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
+        flags as usize,
+    ))
+}
 #[no_mangle]
 pub unsafe extern "C" fn redox_dup_v1(fd: usize, buf: *const u8, len: usize) -> RawResult {
     Error::mux(syscall::dup(fd, core::slice::from_raw_parts(buf, len)))
@@ -207,34 +222,34 @@ pub unsafe extern "C" fn redox_close_v1(fd: usize) -> RawResult {
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_get_pid_v1() -> RawResult {
-    Error::mux(syscall::getpid())
+    redox_rt::sys::posix_getpid() as _
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_get_euid_v1() -> RawResult {
-    Error::mux(syscall::geteuid())
+    redox_rt::sys::posix_getresugid().euid as _
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_get_ruid_v1() -> RawResult {
-    Error::mux(syscall::getuid())
+    redox_rt::sys::posix_getresugid().ruid as _
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_get_egid_v1() -> RawResult {
-    Error::mux(syscall::getegid())
+    redox_rt::sys::posix_getresugid().egid as _
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_get_rgid_v1() -> RawResult {
-    Error::mux(syscall::getgid())
+    redox_rt::sys::posix_getresugid().rgid as _
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {
-    Error::mux(syscall::setrens(rns, ens))
+    Error::mux(redox_rt::sys::setrens(rns, ens).map(|()| 0))
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_waitpid_v1(pid: usize, status: *mut i32, options: u32) -> RawResult {
     let mut sts = 0_usize;
-    let res = Error::mux(syscall::waitpid(
-        pid,
+    let res = Error::mux(redox_rt::sys::sys_waitpid(
+        WaitpidTarget::from_posix_arg(pid as isize),
         &mut sts,
         WaitFlags::from_bits_truncate(options as usize),
     ));
@@ -244,7 +259,9 @@ pub unsafe extern "C" fn redox_waitpid_v1(pid: usize, status: *mut i32, options:
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_kill_v1(pid: usize, signal: u32) -> RawResult {
-    Error::mux(syscall::kill(pid, signal as usize))
+    Error::mux(
+        redox_rt::sys::posix_kill(ProcKillTarget::from_raw(pid), signal as usize).map(|()| 0),
+    )
 }
 
 #[no_mangle]
@@ -347,4 +364,15 @@ pub unsafe extern "C" fn redox_mkns_v1(
         // Kernel does the UTF-8 validation.
         syscall::mkns(core::slice::from_raw_parts(names.cast(), num_names))
     })())
+}
+
+// ABI-UNSTABLE
+#[no_mangle]
+pub unsafe extern "C" fn redox_cur_procfd_v0() -> usize {
+    **redox_rt::current_proc_fd()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn redox_cur_thrfd_v0() -> usize {
+    **redox_rt::RtTcb::current().thread_fd()
 }

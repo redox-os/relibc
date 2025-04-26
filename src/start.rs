@@ -2,6 +2,7 @@
 
 use alloc::{boxed::Box, vec::Vec};
 use core::{intrinsics, ptr};
+use generic_rt::ExpectTlsFree;
 
 use crate::{
     header::{libgen, stdio, stdlib},
@@ -141,8 +142,18 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
     // Ensure correct host system before executing more system calls
     relibc_verify_host();
 
+    #[cfg(target_os = "redox")]
+    let thr_fd = redox_rt::proc::FdGuard::new(
+        crate::platform::get_auxv_raw(sp.auxv().cast(), redox_rt::auxv_defs::AT_REDOX_THR_FD)
+            .expect_notls("no thread fd present"),
+    );
+
     // Initialize TLS, if necessary
-    ld_so::init(sp);
+    ld_so::init(
+        sp,
+        #[cfg(target_os = "redox")]
+        thr_fd,
+    );
 
     // Set up the right allocator...
     // if any memory rust based memory allocation happen before this step .. we are doomed.
@@ -160,7 +171,7 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
             tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
         }
         #[cfg(target_os = "redox")]
-        redox_rt::signal::setup_sighandler(&tcb.os_specific);
+        redox_rt::signal::setup_sighandler(&tcb.os_specific, true);
     }
 
     // Set up argc and argv

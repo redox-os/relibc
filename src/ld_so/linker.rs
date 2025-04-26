@@ -612,10 +612,13 @@ impl Linker {
         unsafe {
             if !dlopened {
                 #[cfg(target_os = "redox")]
-                let (tcb, old_tcb) = {
+                let (tcb, old_tcb, thr_fd) = {
                     use redox_rt::signal::tmp_disable_signals;
 
                     let old_tcb = Tcb::current().expect("failed to get bootstrap TCB");
+                    let thr_fd = (&mut *old_tcb.os_specific.thr_fd.get())
+                        .take()
+                        .expect("no thread FD present");
                     let new_tcb = Tcb::new(self.tls_size)?; // This actually allocates TCB, TLS and ABI page.
 
                     // Stash
@@ -653,7 +656,7 @@ impl Linker {
                     new_tcb.generic.tcb_len = new_tcb_len;
 
                     drop(_guard);
-                    (new_tcb, old_tcb as *mut Tcb as *mut c_void)
+                    (new_tcb, old_tcb as *mut Tcb as *mut c_void, thr_fd)
                 };
 
                 #[cfg(not(target_os = "redox"))]
@@ -662,8 +665,7 @@ impl Linker {
                 // We are now loading the main program or its dependencies. The TLS for all initially
                 // loaded objects reside in the static TLS block. Depending on the architecture, the
                 // static TLS block is either placed before the TP or after the TP.
-                let tcb_ptr = tcb as *mut Tcb;
-
+                //
                 // Setup the DTVs.
                 tcb.setup_dtv(tcb_masters.len());
 
@@ -677,7 +679,7 @@ impl Linker {
 
                     if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
                         // Below the TP
-                        tcb.dtv_mut()[dtv_idx] = tcb_ptr.cast::<u8>().sub(obj.tls_offset);
+                        tcb.dtv_mut()[dtv_idx] = tcb.tls_end.sub(obj.tls_offset);
                     } else {
                         // FIMXE(andypython): Make it above the TP
                         //
@@ -685,14 +687,18 @@ impl Linker {
                         //     tcb_ptr.add(1).cast::<u8>().add(obj.tls_offset);
                         //
                         // FIXME(andypython): https://gitlab.redox-os.org/redox-os/relibc/-/merge_requests/570#note_35788
-                        tcb.dtv_mut()[dtv_idx] = tcb.tls_end.sub(tcb.tls_len).add(obj.tls_offset);
+                        let tls_start = tcb.tls_end.sub(tcb.tls_len);
+                        tcb.dtv_mut()[dtv_idx] = tls_start.add(obj.tls_offset);
                     }
                 }
 
                 tcb.append_masters(tcb_masters);
                 // Copy the master data into the static TLS block.
                 tcb.copy_masters().map_err(|_| DlError::Malformed)?;
-                tcb.activate();
+                tcb.activate(
+                    #[cfg(target_os = "redox")]
+                    thr_fd,
+                );
 
                 #[cfg(target_os = "redox")]
                 {

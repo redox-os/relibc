@@ -3,7 +3,7 @@
 //! * <https://www.akkadia.org/drepper/dsohowto.pdf>
 
 use object::{
-    elf::{self, Sym64},
+    elf,
     read::elf::{
         Dyn as _, GnuHashTable, HashTable as SysVHashTable, ProgramHeader as _, Rel as _,
         Rela as _, Sym as _, Version, VersionTable,
@@ -166,9 +166,9 @@ unsafe impl Sync for Dynamic<'_> {}
 #[derive(Debug)]
 struct Relocation {
     offset: usize,
-    addend: usize,
+    addend: Option<usize>,
     sym: SymbolIndex,
-    kind: u32,
+    kind: RelocationKind,
 }
 
 #[cfg(target_pointer_width = "32")]
@@ -176,9 +176,9 @@ impl From<&Rela> for Relocation {
     fn from(reloc: &Rela) -> Self {
         Self {
             offset: reloc.r_offset(NativeEndian) as usize,
-            addend: reloc.r_addend(NativeEndian) as usize,
+            addend: Some(reloc.r_addend(NativeEndian) as usize),
             sym: SymbolIndex(reloc.r_sym(NativeEndian) as usize),
-            kind: reloc.r_type(NativeEndian),
+            kind: RelocationKind::new(reloc.r_type(NativeEndian)),
         }
     }
 }
@@ -189,9 +189,9 @@ impl From<&Rela> for Relocation {
         let is_mips64el = cfg!(all(target_arch = "mips64", target_endian = "little"));
         Self {
             offset: reloc.r_offset(NativeEndian) as usize,
-            addend: reloc.r_addend(NativeEndian) as usize,
+            addend: Some(reloc.r_addend(NativeEndian) as usize),
             sym: SymbolIndex(reloc.r_sym(NativeEndian, is_mips64el) as usize),
-            kind: reloc.r_type(NativeEndian, is_mips64el),
+            kind: RelocationKind::new(reloc.r_type(NativeEndian, is_mips64el)),
         }
     }
 }
@@ -200,9 +200,101 @@ impl From<&Rel> for Relocation {
     fn from(reloc: &Rel) -> Self {
         Self {
             offset: reloc.r_offset(NativeEndian) as usize,
-            addend: 0,
+            addend: None,
             sym: SymbolIndex(reloc.r_sym(NativeEndian) as usize),
-            kind: reloc.r_type(NativeEndian),
+            kind: RelocationKind::new(reloc.r_type(NativeEndian)),
+        }
+    }
+}
+
+// This is matched up to REL_* constants used by musl for ease of comparison
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug)]
+pub enum RelocationKind {
+    COPY,
+    DTPMOD,
+    DTPOFF,
+    GOT,
+    IRELATIVE,
+    OFFSET,
+    PLT,
+    RELATIVE,
+    SYMBOLIC,
+    TLSDESC,
+    TPOFF,
+    UNKNOWN(u32),
+}
+
+impl RelocationKind {
+    #[cfg(target_arch = "aarch64")]
+    pub fn new(kind: u32) -> Self {
+        //WARNING: Only use R_AARCH64_* constants here!
+        match kind {
+            elf::R_AARCH64_COPY => Self::COPY,
+            elf::R_AARCH64_TLS_DTPMOD => Self::DTPMOD,
+            elf::R_AARCH64_TLS_DTPREL => Self::DTPOFF,
+            elf::R_AARCH64_GLOB_DAT => Self::GOT,
+            elf::R_AARCH64_IRELATIVE => Self::IRELATIVE,
+            elf::R_AARCH64_JUMP_SLOT => Self::PLT,
+            elf::R_AARCH64_RELATIVE => Self::RELATIVE,
+            elf::R_AARCH64_ABS64 => Self::SYMBOLIC,
+            elf::R_AARCH64_TLSDESC => Self::TLSDESC,
+            elf::R_AARCH64_TLS_TPREL => Self::TPOFF,
+            _ => Self::UNKNOWN(kind),
+        }
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    pub fn new(kind: u32) -> Self {
+        //WARNING: Only use R_RISCV_* constants here!
+        match kind {
+            elf::R_RISCV_COPY => Self::COPY,
+            elf::R_RISCV_TLS_DTPMOD64 => Self::DTPMOD,
+            elf::R_RISCV_TLS_DTPREL64 => Self::DTPOFF,
+            elf::R_RISCV_IRELATIVE => Self::IRELATIVE,
+            elf::R_RISCV_JUMP_SLOT => Self::PLT,
+            elf::R_RISCV_RELATIVE => Self::RELATIVE,
+            elf::R_RISCV_64 => Self::SYMBOLIC,
+            //TODO: not defined, should be 12: elf::R_RISCV_TLSDESC => Self::TLSDESC,
+            elf::R_RISCV_TLS_TPREL64 => Self::TPOFF,
+            _ => Self::UNKNOWN(kind),
+        }
+    }
+
+    #[cfg(target_arch = "x86")]
+    pub fn new(kind: u32) -> Self {
+        //WARNING: Only use R_386_* constants here!
+        match kind {
+            elf::R_386_COPY => Self::COPY,
+            elf::R_386_TLS_DTPMOD32 => Self::DTPMOD,
+            elf::R_386_TLS_DTPOFF32 => Self::DTPOFF,
+            elf::R_386_GLOB_DAT => Self::GOT,
+            elf::R_386_IRELATIVE => Self::IRELATIVE,
+            elf::R_386_JMP_SLOT => Self::PLT,
+            elf::R_386_PC32 => Self::OFFSET,
+            elf::R_386_RELATIVE => Self::RELATIVE,
+            elf::R_386_32 => Self::SYMBOLIC,
+            elf::R_386_TLS_DESC => Self::TLSDESC,
+            elf::R_386_TLS_TPOFF => Self::TPOFF,
+            _ => Self::UNKNOWN(kind),
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    pub fn new(kind: u32) -> Self {
+        //WARNING: Only use R_X86_64_* constants here!
+        match kind {
+            elf::R_X86_64_COPY => Self::COPY,
+            elf::R_X86_64_DTPMOD64 => Self::DTPMOD,
+            elf::R_X86_64_DTPOFF64 => Self::DTPOFF,
+            elf::R_X86_64_GLOB_DAT => Self::GOT,
+            elf::R_X86_64_IRELATIVE => Self::IRELATIVE,
+            elf::R_X86_64_JUMP_SLOT => Self::PLT,
+            elf::R_X86_64_RELATIVE => Self::RELATIVE,
+            elf::R_X86_64_64 => Self::SYMBOLIC,
+            elf::R_X86_64_TLSDESC => Self::TLSDESC,
+            elf::R_X86_64_TPOFF64 => Self::TPOFF,
+            _ => Self::UNKNOWN(kind),
         }
     }
 }
@@ -646,7 +738,7 @@ impl DSO {
 
                 elf::DT_SYMTAB => symtab_ptr = Some(ptr as *const Sym),
                 elf::DT_SYMENT => {
-                    assert_eq!(val as usize, size_of::<Sym64<NativeEndian>>());
+                    assert_eq!(val as usize, size_of::<Sym>());
                 }
 
                 _ => {}
@@ -730,7 +822,7 @@ impl DSO {
             let name = self.dynamic.symbol_name(reloc.sym).unwrap();
 
             let lookup_scopes = [global_scope, self.scope()];
-            let sym = if reloc.kind == elf::R_X86_64_COPY {
+            let sym = if matches!(reloc.kind, RelocationKind::COPY) {
                 lookup_scopes
                     .iter()
                     .find_map(|scope| scope._get_sym(name, 1))
@@ -749,51 +841,60 @@ impl DSO {
             .map(|(sym, obj)| (sym.as_ptr() as usize, obj.tls_offset))
             .unwrap_or((0, 0));
 
-        let a = reloc.addend;
         let ptr = if self.pie {
             (b + reloc.offset) as *mut u8
         } else {
             reloc.offset as *mut u8
         };
+        let p = ptr as usize;
+        let a = match reloc.addend {
+            Some(some) => some,
+            None => match reloc.kind {
+                RelocationKind::COPY | RelocationKind::GOT | RelocationKind::PLT => 0,
+                _ => unsafe { *(ptr as *mut usize) },
+            },
+        };
 
-        let set_u64 = |value| unsafe {
-            *(ptr as *mut u64) = value;
+        //TODO: support different sizes?
+        let set_usize = |value| unsafe {
+            *(ptr as *mut usize) = value;
         };
 
         match reloc.kind {
-            elf::R_X86_64_64 => set_u64((s + a) as u64),
-            elf::R_X86_64_DTPMOD64 => set_u64(self.tls_module_id as u64),
-            elf::R_X86_64_DTPOFF64 => {
+            RelocationKind::DTPMOD => set_usize(self.tls_module_id),
+            RelocationKind::DTPOFF => {
                 if s != 0 {
-                    set_u64((s - b) as u64);
+                    set_usize(s - b);
                 } else {
-                    set_u64(s as u64);
+                    set_usize(s);
                 }
             }
-            elf::R_X86_64_GLOB_DAT => set_u64(s as u64),
-            elf::R_X86_64_RELATIVE => set_u64((b + a) as u64),
-            elf::R_X86_64_TPOFF64 => {
+            RelocationKind::GOT => set_usize(s),
+            RelocationKind::OFFSET => set_usize((s + a).wrapping_sub(p)),
+            RelocationKind::RELATIVE => set_usize(b + a),
+            RelocationKind::SYMBOLIC => set_usize(s + a),
+            RelocationKind::TPOFF => {
                 if reloc.sym.0 > 0 {
                     let (sym, _) = sym
                         .as_ref()
-                        .expect("R_X86_64_TPOFF64 called without valid symbol");
-                    set_u64((sym.value + a).wrapping_sub(t) as u64);
+                        .expect("RelocationKind::TPOFF called without valid symbol");
+                    set_usize((sym.value + a).wrapping_sub(t));
                 } else {
-                    set_u64(a.wrapping_sub(t) as u64);
+                    set_usize(a.wrapping_sub(t));
                 }
             }
-            elf::R_X86_64_IRELATIVE => unsafe {
-                let f: unsafe extern "C" fn() -> u64 = core::mem::transmute(b + a);
-                set_u64(f());
+            RelocationKind::IRELATIVE => unsafe {
+                let f: unsafe extern "C" fn() -> usize = core::mem::transmute(b + a);
+                set_usize(f());
             },
-            elf::R_X86_64_COPY => unsafe {
+            RelocationKind::COPY => unsafe {
                 let (sym, obj) = sym
                     .as_ref()
-                    .expect("R_X86_64_COPY called without valid symbol");
-                let my_sym = my_sym.expect("R_X86_64_COPY called without valid symbol");
+                    .expect("RelocationKind::COPY called without valid symbol");
+                let my_sym = my_sym.expect("RelocationKind::COPY called without valid symbol");
                 assert!(
                     sym.size == my_sym.st_size(NativeEndian) as usize,
-                    "R_X86_64_COPY failed: I was trying to use the symbol {} from {} for {} but they had different sizes. Please consider relinking.",
+                    "RelocationKind::COPY failed: I was trying to use the symbol {} from {} for {} but they had different sizes. Please consider relinking.",
                     sym.name,
                     obj.name,
                     self.name
@@ -801,7 +902,7 @@ impl DSO {
                 // SAFETY: Both the source and destination have the same size.
                 ptr::copy_nonoverlapping(sym.as_ptr() as *const u8, ptr, sym.size);
             },
-            _ => unimplemented!("relocation type {:#x}", reloc.kind),
+            _ => unimplemented!("relocation type {:?}", reloc.kind),
         }
 
         Ok(())
@@ -842,15 +943,15 @@ impl DSO {
             };
 
             match (reloc.kind, resolve) {
-                (elf::R_X86_64_JUMP_SLOT, Resolve::Lazy) if self.pie => unsafe {
+                (RelocationKind::PLT, Resolve::Lazy) if self.pie => unsafe {
                     *ptr += object_base_addr;
                 },
 
-                (elf::R_X86_64_JUMP_SLOT, Resolve::Lazy) => {
+                (RelocationKind::PLT, Resolve::Lazy) => {
                     // NOP.
                 }
 
-                (elf::R_X86_64_JUMP_SLOT, Resolve::Now) => {
+                (RelocationKind::PLT, Resolve::Now) => {
                     let name = self.dynamic.symbol_name(reloc.sym).unwrap();
 
                     let resolved = resolve_sym(name, &[global_scope, self.scope()])
@@ -858,12 +959,16 @@ impl DSO {
                         .unwrap_or_else(|| panic!("unresolved symbol: {name}"));
 
                     unsafe {
-                        *ptr = resolved + reloc.addend;
+                        *ptr = resolved + reloc.addend.unwrap_or(0);
                     }
                 }
 
                 _ => {
-                    unimplemented!("relocation type {:#x}", reloc.kind)
+                    unimplemented!(
+                        "relocation type {:?} with resolve {:?}",
+                        reloc.kind,
+                        resolve
+                    )
                 }
             }
         }

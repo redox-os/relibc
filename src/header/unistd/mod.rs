@@ -96,6 +96,7 @@ pub unsafe extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alarm.html>.
 #[no_mangle]
 pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
+    // TODO setitimer is unimplemented on Redox and obsolete
     let mut timer = sys_time::itimerval {
         it_value: sys_time::timeval {
             tv_sec: seconds as time_t,
@@ -569,15 +570,21 @@ pub extern "C" fn getppid() -> pid_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresgid.html>.
-// #[no_mangle]
-pub extern "C" fn getresgid(rgid: *mut gid_t, egid: *mut gid_t, sgid: *mut gid_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn getresgid(rgid: *mut gid_t, egid: *mut gid_t, sgid: *mut gid_t) -> c_int {
+    // TODO: Out<T> write-only wrapper?
+    Sys::getresgid(rgid.as_mut(), egid.as_mut(), sgid.as_mut())
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresuid.html>.
-// #[no_mangle]
-pub extern "C" fn getresuid(ruid: *mut uid_t, euid: *mut uid_t, suid: *mut uid_t) -> c_int {
-    unimplemented!();
+#[no_mangle]
+pub unsafe extern "C" fn getresuid(ruid: *mut uid_t, euid: *mut uid_t, suid: *mut uid_t) -> c_int {
+    // TODO: Out<T> write-only wrapper?
+    Sys::getresuid(ruid.as_mut(), euid.as_mut(), suid.as_mut())
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getsid.html>.
@@ -812,13 +819,13 @@ pub unsafe extern "C" fn set_default_scheme(scheme: *const c_char) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setegid.html>.
 // #[no_mangle]
 pub extern "C" fn setegid(gid: gid_t) -> c_int {
-    unimplemented!();
+    Sys::setresgid(-1, gid, -1).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/seteuid.html>.
 // #[no_mangle]
 pub extern "C" fn seteuid(uid: uid_t) -> c_int {
-    unimplemented!();
+    Sys::setresuid(-1, uid, -1).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setgid.html>.
@@ -889,7 +896,7 @@ pub extern "C" fn setreuid(ruid: uid_t, euid: uid_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setsid.html>.
 #[no_mangle]
 pub extern "C" fn setsid() -> pid_t {
-    Sys::setsid().map(|()| 0).or_minus_one_errno()
+    Sys::setsid().or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setuid.html>.
@@ -1026,6 +1033,7 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
 #[deprecated]
 #[no_mangle]
 pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t {
+    // TODO setitimer is unimplemented on Redox and obsolete
     let mut timer = sys_time::itimerval {
         it_value: sys_time::timeval {
             tv_sec: 0,
@@ -1094,7 +1102,7 @@ unsafe fn with_argv(
             .unwrap()
     });
 
-    let mut stack: [MaybeUninit<*const c_char>; 32] = MaybeUninit::uninit_array();
+    let mut stack: [MaybeUninit<*const c_char>; 32] = [MaybeUninit::uninit(); 32];
 
     let out = if argc < 32 {
         stack.as_mut_slice()

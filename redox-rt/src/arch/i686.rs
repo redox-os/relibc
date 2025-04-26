@@ -1,9 +1,10 @@
-use core::{mem::offset_of, ptr::NonNull, sync::atomic::Ordering};
+use core::{cell::SyncUnsafeCell, mem::offset_of, ptr::NonNull, sync::atomic::Ordering};
 
 use syscall::*;
 
 use crate::{
-    proc::{fork_inner, FdGuard},
+    proc::{fork_inner, FdGuard, ForkArgs},
+    protocol::{ProcCall, RtSigInfo},
     signal::{inner_fastcall, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     RtTcb,
 };
@@ -20,12 +21,15 @@ pub struct SigArea {
     pub tmp_eip: usize,
     pub tmp_esp: usize,
     pub tmp_eax: usize,
+    pub tmp_ebx: usize,
     pub tmp_ecx: usize,
     pub tmp_edx: usize,
+    pub tmp_edi: usize,
+    pub tmp_esi: usize,
     pub tmp_rt_inf: RtSigInfo,
+    pub tmp_signo: usize,
     pub tmp_id_inf: u64,
     pub tmp_mm0: u64,
-    pub pctl: usize, // TODO: reference pctl directly
     pub disable_signals_depth: u64,
     pub last_sig_was_restart: bool,
     pub last_sigstack: Option<NonNull<SigStack>>,
@@ -79,16 +83,30 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
     Ok(())
 }
 
-unsafe extern "cdecl" fn fork_impl(initial_rsp: *mut usize) -> usize {
-    Error::mux(fork_inner(initial_rsp))
+unsafe extern "fastcall" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usize {
+    Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "cdecl" fn child_hook(cur_filetable_fd: usize, new_pid_fd: usize) {
+// TODO: duplicate code with x86_64
+unsafe extern "cdecl" fn child_hook(
+    cur_filetable_fd: usize,
+    new_proc_fd: usize,
+    new_thr_fd: usize,
+) {
     let _ = syscall::close(cur_filetable_fd);
-    crate::child_hook_common(FdGuard::new(new_pid_fd));
+    crate::child_hook_common(crate::ChildHookCommonArgs {
+        new_thr_fd: FdGuard::new(new_thr_fd),
+        new_proc_fd: if new_proc_fd == usize::MAX {
+            None
+        } else {
+            Some(FdGuard::new(new_proc_fd))
+        },
+    });
 }
 
-asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
+asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
+    mov ecx, [esp+4]
+
     push ebp
     mov ebp, esp
 
@@ -103,9 +121,9 @@ asmfunction!(__relibc_internal_fork_wrapper -> usize: ["
     //TODO stmxcsr [esp+16]
     fnstcw [esp+24]
 
-    push esp
+    mov edx, esp
     call {fork_impl}
-    pop esp
+
     jmp 2f
 "] <= [fork_impl = sym fork_impl]);
 
@@ -137,6 +155,9 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov gs:[{tcb_sa_off} + {sa_tmp_eax}], eax
     mov gs:[{tcb_sa_off} + {sa_tmp_edx}], edx
     mov gs:[{tcb_sa_off} + {sa_tmp_ecx}], ecx
+    mov gs:[{tcb_sa_off} + {sa_tmp_ebx}], ebx
+    mov gs:[{tcb_sa_off} + {sa_tmp_edi}], edi
+    mov gs:[{tcb_sa_off} + {sa_tmp_esi}], esi
 1:
     // Read standard signal word - first for this thread
     mov edx, gs:[{tcb_sc_off} + {sc_word} + 4]
@@ -145,9 +166,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     bsf eax, eax
     jnz 9f
 
-    mov ecx, gs:[{tcb_sa_off} + {sa_pctl}]
-
     // Read standard signal word - for the process
+    lea ecx, [{pctl}]
     mov eax, [ecx + {pctl_pending}]
     and eax, edx
     bsf eax, eax
@@ -169,24 +189,31 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov eax, gs:[{tcb_sc_off} + {sc_word} + 8]
     or eax, edx
     and eax, gs:[{tcb_sc_off} + {sc_word} + 12]
-    jz 7f // spurious signal
     bsf eax, eax
+    jz 7f // spurious signal
 
-    // If thread was specifically targeted, send the signal to it first.
+    // If thread rather than process was specifically targeted, send the signal to it first.
     bt edx, eax
-    jc 8f
+    jnc 8f
 
-    mov edx, ebx
-    lea ecx, [eax+32]
-    mov eax, {SYS_SIGDEQUEUE}
-    mov edx, gs:[0]
-    add edx, {tcb_sa_off} + {sa_tmp_rt_inf}
+    // SYS_CALL(fd, payload_base, payload_len, metadata_len, metadata_base)
+    // eax      ebx ecx           edx          esi           edi
+
+    mov ebx, [{proc_fd}]
+    mov ecx, gs:[0]
+    add ecx, {tcb_sa_off} + {sa_tmp_rt_inf}
+    mov [ecx], eax
+    mov gs:[{tcb_sa_off} + {sa_tmp_signo}], eax
+    mov edx, {RTINF_SIZE}
+    mov esi, 1
+    lea edi, [{proc_call}]
+    mov eax, {SYS_CALL}
     int 0x80
-    mov ebx, edx
     test eax, eax
     jnz 1b
 
-    mov eax, ecx
+    mov eax, gs:[{tcb_sa_off} + {sa_tmp_signo}]
+    add eax, 32
     jmp 2f
 8:
     add eax, 32
@@ -228,9 +255,9 @@ asmfunction!(__relibc_internal_sigentry: ["
     push dword ptr gs:[{tcb_sa_off} + {sa_tmp_edx}]
     push dword ptr gs:[{tcb_sa_off} + {sa_tmp_ecx}]
     push dword ptr gs:[{tcb_sa_off} + {sa_tmp_eax}]
-    push ebx
-    push edi
-    push esi
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_ebx}]
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_edi}]
+    push dword ptr gs:[{tcb_sa_off} + {sa_tmp_esi}]
     push ebp
 
     sub esp, 2 * 4 + 29 * 16
@@ -274,8 +301,11 @@ __relibc_internal_sigentry_crit_second:
     mov gs:[{tcb_sa_off} + {sa_tmp_eip}], eax
 
     mov eax, gs:[{tcb_sa_off} + {sa_tmp_eax}]
+    mov ebx, gs:[{tcb_sa_off} + {sa_tmp_ebx}]
     mov ecx, gs:[{tcb_sa_off} + {sa_tmp_ecx}]
     mov edx, gs:[{tcb_sa_off} + {sa_tmp_edx}]
+    mov edi, gs:[{tcb_sa_off} + {sa_tmp_edi}]
+    mov esi, gs:[{tcb_sa_off} + {sa_tmp_esi}]
 
     and dword ptr gs:[{tcb_sc_off} + {sc_control}], ~1
     .globl __relibc_internal_sigentry_crit_third
@@ -286,14 +316,17 @@ __relibc_internal_sigentry_crit_third:
     sa_tmp_eip = const offset_of!(SigArea, tmp_eip),
     sa_tmp_esp = const offset_of!(SigArea, tmp_esp),
     sa_tmp_eax = const offset_of!(SigArea, tmp_eax),
+    sa_tmp_ebx = const offset_of!(SigArea, tmp_ebx),
     sa_tmp_ecx = const offset_of!(SigArea, tmp_ecx),
     sa_tmp_edx = const offset_of!(SigArea, tmp_edx),
+    sa_tmp_edi = const offset_of!(SigArea, tmp_edi),
+    sa_tmp_esi = const offset_of!(SigArea, tmp_esi),
     sa_tmp_mm0 = const offset_of!(SigArea, tmp_mm0),
     sa_tmp_rt_inf = const offset_of!(SigArea, tmp_rt_inf),
     sa_tmp_id_inf = const offset_of!(SigArea, tmp_id_inf),
+    sa_tmp_signo = const offset_of!(SigArea, tmp_signo),
     sa_altstack_top = const offset_of!(SigArea, altstack_top),
     sa_altstack_bottom = const offset_of!(SigArea, altstack_bottom),
-    sa_pctl = const offset_of!(SigArea, pctl),
     sc_control = const offset_of!(Sigcontrol, control_flags),
     sc_saved_eflags = const offset_of!(Sigcontrol, saved_archdep_reg),
     sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
@@ -305,8 +338,11 @@ __relibc_internal_sigentry_crit_third:
     pctl_sender_infos = const offset_of!(SigProcControl, sender_infos),
     pctl_pending = const offset_of!(SigProcControl, pending),
     pctl = sym PROC_CONTROL_STRUCT,
+    proc_fd = sym PROC_FD,
+    proc_call = sym PROC_CALL,
     STACK_ALIGN = const 16,
-    SYS_SIGDEQUEUE = const syscall::SYS_SIGDEQUEUE,
+    SYS_CALL = const syscall::SYS_CALL,
+    RTINF_SIZE = const size_of::<RtSigInfo>(),
 ]);
 
 asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
@@ -377,3 +413,6 @@ pub fn current_sp() -> usize {
     }
     sp
 }
+
+pub static PROC_FD: SyncUnsafeCell<usize> = SyncUnsafeCell::new(usize::MAX);
+static PROC_CALL: u64 = ProcCall::Sigdeq as u64;

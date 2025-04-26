@@ -100,8 +100,10 @@ pub const IPV6_MULTICAST_HOPS: c_int = 18;
 pub const IPV6_MULTICAST_LOOP: c_int = 19;
 /// Non-POSIX.
 pub const IPV6_ADD_MEMBERSHIP: c_int = 20;
+pub const IPV6_JOIN_GROUP: c_int = 20;
 /// Non-POSIX.
 pub const IPV6_DROP_MEMBERSHIP: c_int = 21;
+pub const IPV6_LEAVE_GROUP: c_int = 21;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
 pub const IPV6_V6ONLY: c_int = 26;
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man7/ip.7.html>.

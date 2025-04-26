@@ -59,12 +59,13 @@ typedef unsigned long long jmp_buf[8];
 
 #ifdef __x86_64__
 typedef unsigned long jmp_buf[16];
-typedef jmp_buf sigjmp_buf;
 #endif
 
 #ifdef __riscv
 typedef unsigned long jmp_buf[26];
 #endif
+
+typedef jmp_buf sigjmp_buf;
 
 #ifdef __cplusplus
 extern "C" {

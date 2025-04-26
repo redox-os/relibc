@@ -89,12 +89,6 @@ pub unsafe extern "C" fn strptime(
         }
     };
 
-    // Zero-initialize the output `tm` structure
-    // (equivalent to: tm_sec=0, tm_min=0, tm_hour=0...)
-    unsafe {
-        ptr::write_bytes(tm, 0, 1);
-    }
-
     // We parse the format specifiers in a loop
     let mut fmt_chars = fmt_str.chars().peekable();
     let mut index_in_input = 0;

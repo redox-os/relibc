@@ -18,6 +18,7 @@ use crate::{
 use core::mem::{self, offset_of};
 use redox_rt::{
     proc::FdGuard,
+    protocol::ProcKillTarget,
     signal::{
         PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
     },
@@ -46,27 +47,26 @@ const _: () = {
 };
 
 impl PalSignal for Sys {
-    unsafe fn getitimer(which: c_int, out: *mut itimerval) -> Result<()> {
+    fn getitimer(which: c_int, out: &mut itimerval) -> Result<()> {
         let path = match which {
             ITIMER_REAL => "/scheme/itimer/1",
             _ => return Err(Errno(EINVAL)),
         };
-
-        let fd = FdGuard::new(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC)?);
+        // TODO: implement setitimer
+        // let fd = FdGuard::new(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC)?);
+        // let count = syscall::read(*fd, &mut spec)?;
 
         let mut spec = syscall::ITimerSpec::default();
-        let count = syscall::read(*fd, &mut spec)?;
-
-        (*out).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
-        (*out).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
-        (*out).it_value.tv_sec = spec.it_value.tv_sec as time_t;
-        (*out).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
+        out.it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
+        out.it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
+        out.it_value.tv_sec = spec.it_value.tv_sec as time_t;
+        out.it_value.tv_usec = spec.it_value.tv_nsec / 1000;
 
         Ok(())
     }
 
     fn kill(pid: pid_t, sig: c_int) -> Result<()> {
-        redox_rt::sys::posix_kill(pid as usize, sig as usize)?;
+        redox_rt::sys::posix_kill(ProcKillTarget::from_raw(pid as usize), sig as usize)?;
         Ok(())
     }
     fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> Result<()> {
@@ -78,8 +78,10 @@ impl PalSignal for Sys {
     }
 
     fn killpg(pgrp: pid_t, sig: c_int) -> Result<()> {
-        redox_rt::sys::posix_killpg(pgrp as usize, sig as usize)?;
-        Ok(())
+        if pgrp == 1 {
+            return Err(Errno(EINVAL));
+        }
+        Self::kill(-pgrp, sig)
     }
 
     fn raise(sig: c_int) -> Result<()> {
@@ -87,25 +89,34 @@ impl PalSignal for Sys {
         unsafe { Self::rlct_kill(Self::current_os_tid(), sig as _) }
     }
 
-    unsafe fn setitimer(which: c_int, new: *const itimerval, old: *mut itimerval) -> Result<()> {
-        let path = match which {
+    fn setitimer(which: c_int, _new: &itimerval, old: Option<&mut itimerval>) -> Result<()> {
+        // TODO: setitimer is no longer part of POSIX and should not be implemented in Redox
+        // Change the platform-independent implementation to use POSIX timers.
+        // For Redox, the timer should probably use "/scheme/time"
+        unimplemented!();
+        let _path = match which {
             ITIMER_REAL => "/scheme/itimer/1",
             _ => return Err(Errno(EINVAL)),
         };
-
-        let fd = FdGuard::new(syscall::open(path, syscall::O_RDWR | syscall::O_CLOEXEC)?);
+        // TODO
+        eprintln!("relibc: todo: implement setitimer");
 
         let mut spec = syscall::ITimerSpec::default();
+
+        if let Some(old) = old {
+            old.it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
+            old.it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
+            old.it_value.tv_sec = spec.it_value.tv_sec as time_t;
+            old.it_value.tv_usec = spec.it_value.tv_nsec / 1000;
+        }
+
+        /*
+        let fd = FdGuard::new(syscall::open(path, syscall::O_RDWR | syscall::O_CLOEXEC)?);
+
 
         let _ = syscall::read(*fd, &mut spec)?;
 
         unsafe {
-            if !old.is_null() {
-                (*old).it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
-                (*old).it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
-                (*old).it_value.tv_sec = spec.it_value.tv_sec as time_t;
-                (*old).it_value.tv_usec = spec.it_value.tv_nsec / 1000;
-            }
 
             spec.it_interval.tv_sec = (*new).it_interval.tv_sec as i64;
             spec.it_interval.tv_nsec = (*new).it_interval.tv_usec * 1000;
@@ -114,6 +125,7 @@ impl PalSignal for Sys {
         }
 
         let _ = syscall::write(*fd, &spec)?;
+        */
         Ok(())
     }
 

@@ -3,7 +3,11 @@ use core::{
     mem::{self, size_of},
     ptr, slice, str,
 };
-use redox_rt::RtTcb;
+use redox_rt::{
+    protocol::{wifstopped, wstopsig, WaitFlags},
+    sys::{Resugid, WaitpidTarget},
+    RtTcb,
+};
 use syscall::{
     self,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
@@ -50,6 +54,13 @@ fn round_up_to_page_size(val: usize) -> Option<usize> {
         .map(|val| (val - 1) / PAGE_SIZE * PAGE_SIZE)
 }
 
+fn cvt_uid(id: c_int) -> Result<Option<u32>> {
+    if id == -1 {
+        return Ok(None);
+    }
+    Ok(Some(id.try_into().map_err(|_| Errno(EINVAL))?))
+}
+
 mod clone;
 mod epoll;
 mod event;
@@ -93,12 +104,11 @@ impl Pal for Sys {
 
         syscall::fstat(*fd as usize, &mut stat)?;
 
-        let uid = syscall::getuid()?;
-        let gid = syscall::getgid()?;
+        let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
 
-        let perms = if stat.st_uid as usize == uid {
+        let perms = if stat.st_uid == ruid {
             stat.st_mode >> (3 * 2 & 0o7)
-        } else if stat.st_gid as usize == gid {
+        } else if stat.st_gid == rgid {
             stat.st_mode >> (3 * 1 & 0o7)
         } else {
             stat.st_mode & 0o7
@@ -199,7 +209,7 @@ impl Pal for Sys {
     }
 
     fn exit(status: c_int) -> ! {
-        let _ = syscall::exit((status as usize) << 8);
+        let _ = redox_rt::sys::posix_exit(status);
         loop {}
     }
 
@@ -265,7 +275,7 @@ impl Pal for Sys {
         // TODO: Find way to avoid lock.
         let _guard = CLONE_LOCK.write();
 
-        Ok(clone::fork_impl()? as pid_t)
+        Ok(clone::fork_impl(&redox_rt::proc::ForkArgs::Managed)? as pid_t)
     }
 
     unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()> {
@@ -401,15 +411,15 @@ impl Pal for Sys {
     }
 
     fn getegid() -> gid_t {
-        syscall::getegid().unwrap() as gid_t
+        redox_rt::sys::posix_getresugid().egid as gid_t
     }
 
     fn geteuid() -> uid_t {
-        syscall::geteuid().unwrap() as uid_t
+        redox_rt::sys::posix_getresugid().euid as uid_t
     }
 
     fn getgid() -> gid_t {
-        syscall::getgid().unwrap() as gid_t
+        redox_rt::sys::posix_getresugid().rgid as gid_t
     }
 
     unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int> {
@@ -423,7 +433,7 @@ impl Pal for Sys {
     }
 
     fn getpgid(pid: pid_t) -> Result<pid_t> {
-        Ok(syscall::getpgid(pid as usize)? as pid_t)
+        Ok(redox_rt::sys::posix_getpgid(pid as usize)? as pid_t)
     }
 
     fn getpid() -> pid_t {
@@ -431,7 +441,7 @@ impl Pal for Sys {
     }
 
     fn getppid() -> pid_t {
-        syscall::getppid().unwrap() as pid_t
+        redox_rt::sys::posix_getppid() as pid_t
     }
 
     fn getpriority(which: c_int, who: id_t) -> Result<c_int> {
@@ -456,6 +466,45 @@ impl Pal for Sys {
         //TODO: store fd internally
         let fd = FdGuard::new(syscall::open(path, open_flags)?);
         Ok(syscall::read(*fd, buf)?)
+    }
+
+    fn getresgid(
+        rgid_out: Option<&mut gid_t>,
+        egid_out: Option<&mut gid_t>,
+        sgid_out: Option<&mut gid_t>,
+    ) -> Result<()> {
+        let Resugid {
+            rgid, egid, sgid, ..
+        } = redox_rt::sys::posix_getresugid();
+        if let Some(rgid_out) = rgid_out {
+            *rgid_out = rgid as _;
+        }
+        if let Some(egid_out) = egid_out {
+            *egid_out = egid as _;
+        }
+        if let Some(sgid_out) = sgid_out {
+            *sgid_out = sgid as _;
+        }
+        Ok(())
+    }
+    fn getresuid(
+        ruid_out: Option<&mut uid_t>,
+        euid_out: Option<&mut uid_t>,
+        suid_out: Option<&mut uid_t>,
+    ) -> Result<()> {
+        let Resugid {
+            ruid, euid, suid, ..
+        } = redox_rt::sys::posix_getresugid();
+        if let Some(ruid_out) = ruid_out {
+            *ruid_out = ruid as _;
+        }
+        if let Some(euid_out) = euid_out {
+            *euid_out = euid as _;
+        }
+        if let Some(suid_out) = suid_out {
+            *suid_out = suid as _;
+        }
+        Ok(())
     }
 
     unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()> {
@@ -487,23 +536,18 @@ impl Pal for Sys {
     }
 
     fn getsid(pid: pid_t) -> Result<pid_t> {
-        let mut buf = [0; mem::size_of::<usize>()];
-        let path = if pid == 0 {
-            format!("/scheme/thisproc/current/session_id")
-        } else {
-            format!("/scheme/proc/{}/session_id", pid)
-        };
-        let path_c = CString::new(path).unwrap();
-        let mut file = File::open(CStr::borrow(&path_c), fcntl::O_RDONLY | fcntl::O_CLOEXEC)?;
-        file.read(&mut buf)
-            .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
-        Ok(usize::from_ne_bytes(buf).try_into().unwrap())
+        Ok(redox_rt::sys::posix_getsid(pid as usize)? as _)
     }
 
     fn gettid() -> pid_t {
-        // TODO: TIDs do not exist on Redox, at least in a form where they can be sent to other
-        // processes and used in various syscalls from there. Should the fd be returned here?
-        Self::getpid()
+        // This is used by pthread mutexes for reentrant checks and must be nonzero
+        // and unique for each thread in the same process (but not cross-process)
+        Self::current_os_tid()
+            .thread_fd
+            .checked_add(1)
+            .unwrap()
+            .try_into()
+            .unwrap()
     }
 
     unsafe fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> Result<()> {
@@ -522,7 +566,7 @@ impl Pal for Sys {
     }
 
     fn getuid() -> uid_t {
-        syscall::getuid().unwrap() as pid_t
+        redox_rt::sys::posix_getresugid().ruid as uid_t
     }
 
     fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
@@ -698,7 +742,7 @@ impl Pal for Sys {
         } else {
             redox_rmtp = unsafe { redox_timespec::from(&*rmtp) };
         }
-        match syscall::nanosleep(&redox_rqtp, &mut redox_rmtp) {
+        match redox_rt::sys::posix_nanosleep(&redox_rqtp, &mut redox_rmtp) {
             Ok(_) => Ok(()),
             Err(Error { errno: EINTR }) => {
                 unsafe {
@@ -833,7 +877,7 @@ impl Pal for Sys {
     }
 
     fn setpgid(pid: pid_t, pgid: pid_t) -> Result<()> {
-        syscall::setpgid(pid as usize, pgid as usize)?;
+        redox_rt::sys::posix_setpgid(pid as usize, pgid as usize)?;
         Ok(())
     }
 
@@ -846,31 +890,31 @@ impl Pal for Sys {
         Err(Errno(ENOSYS))
     }
 
-    fn setsid() -> Result<()> {
-        let session_id = Self::getpid();
-        assert!(session_id >= 0);
-        let mut file = File::open(
-            c"/scheme/thisproc/current/session_id".into(),
-            fcntl::O_WRONLY | fcntl::O_CLOEXEC,
-        )?;
-        file.write(&usize::to_ne_bytes(session_id.try_into().unwrap()))
-            .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))?;
-        Ok(())
+    fn setsid() -> Result<c_int> {
+        Ok(redox_rt::sys::posix_setsid()? as c_int)
     }
 
     fn setresgid(rgid: gid_t, egid: gid_t, sgid: gid_t) -> Result<()> {
-        if sgid != -1 {
-            println!("TODO: suid");
-        }
-        syscall::setregid(rgid as usize, egid as usize)?;
+        redox_rt::sys::posix_setresugid(&Resugid {
+            ruid: None,
+            euid: None,
+            suid: None,
+            rgid: cvt_uid(rgid)?,
+            egid: cvt_uid(egid)?,
+            sgid: cvt_uid(sgid)?,
+        })?;
         Ok(())
     }
 
     fn setresuid(ruid: uid_t, euid: uid_t, suid: uid_t) -> Result<()> {
-        if suid != -1 {
-            println!("TODO: suid");
-        }
-        syscall::setreuid(ruid as usize, euid as usize)?;
+        redox_rt::sys::posix_setresugid(&Resugid {
+            ruid: cvt_uid(ruid)?,
+            euid: cvt_uid(euid)?,
+            suid: cvt_uid(suid)?,
+            rgid: None,
+            egid: None,
+            sgid: None,
+        })?;
         Ok(())
     }
 
@@ -976,14 +1020,16 @@ impl Pal for Sys {
     }
 
     unsafe fn waitpid(mut pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t> {
-        if pid == !0 {
-            pid = 0;
-        }
         let mut res = None;
         let mut status = 0;
 
+        let options = usize::try_from(options)
+            .ok()
+            .and_then(WaitFlags::from_bits)
+            .ok_or(Errno(EINVAL))?;
+
         let inner = |status: &mut usize, flags| {
-            redox_rt::sys::sys_waitpid(pid as usize, status, flags as usize)
+            redox_rt::sys::sys_waitpid(WaitpidTarget::from_posix_arg(pid as isize), status, flags)
         };
 
         // First, allow ptrace to handle waitpid
@@ -991,19 +1037,19 @@ impl Pal for Sys {
         let state = ptrace::init_state();
         let mut sessions = state.sessions.lock();
         if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
-            if options & sys_wait::WNOHANG != sys_wait::WNOHANG {
+            if !options.contains(WaitFlags::WNOHANG) {
                 let mut _event = PtraceEvent::default();
                 let _ = (&mut &session.tracer).read(&mut _event);
 
                 res = Some(inner(
                     &mut status,
-                    options | sys_wait::WNOHANG | sys_wait::WUNTRACED,
+                    options | WaitFlags::WNOHANG | WaitFlags::WUNTRACED,
                 ));
                 if res == Some(Ok(0)) {
                     // WNOHANG, just pretend ptrace SIGSTOP:ped this
-                    status = (syscall::SIGSTOP << 8) | 0x7f;
-                    assert!(syscall::wifstopped(status));
-                    assert_eq!(syscall::wstopsig(status), syscall::SIGSTOP);
+                    status = (redox_rt::protocol::SIGSTOP << 8) | 0x7f;
+                    assert!(wifstopped(status));
+                    assert_eq!(wstopsig(status), redox_rt::protocol::SIGSTOP);
                     res = Some(Ok(pid as usize));
                 }
             }
@@ -1014,11 +1060,11 @@ impl Pal for Sys {
         // it if (and only if) a ptrace traceme was activated during
         // the wait.
         let res = res.unwrap_or_else(|| loop {
-            let res = inner(&mut status, options | sys_wait::WUNTRACED);
+            let res = inner(&mut status, options | WaitFlags::WUNTRACED);
 
             // TODO: Also handle special PIDs here
-            if !syscall::wifstopped(status)
-                || options & sys_wait::WUNTRACED != 0
+            if !wifstopped(status)
+                || options.contains(WaitFlags::WUNTRACED)
                 || ptrace::is_traceme(pid)
             {
                 break res;
@@ -1052,8 +1098,8 @@ impl Pal for Sys {
     }
 
     fn verify() -> bool {
-        // GETPID on Redox is 20, which is WRITEV on Linux
-        (unsafe { syscall::syscall5(syscall::number::SYS_GETPID, !0, !0, !0, !0, !0) }).is_ok()
+        // YIELD on Redox is 20, which is SYS_ARCH_PRCTL on Linux
+        (unsafe { syscall::syscall5(syscall::number::SYS_YIELD, !0, !0, !0, !0, !0) }).is_ok()
     }
 
     unsafe fn exit_thread(stack_base: *mut (), stack_size: usize) -> ! {

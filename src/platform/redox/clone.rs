@@ -4,7 +4,7 @@ use syscall::{
     data::Map,
     error::Result,
     flag::{MapFlags, O_CLOEXEC},
-    SetSighandlerData, SIGCONT,
+    SetSighandlerData,
 };
 
 use redox_rt::{proc::FdGuard, signal::sighandler_function};

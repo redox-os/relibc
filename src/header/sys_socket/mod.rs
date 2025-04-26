@@ -30,13 +30,13 @@ pub struct msghdr {
     pub msg_iov: *mut iovec,
     pub msg_iovlen: size_t,
     pub msg_control: *mut c_void,
-    pub msg_controllen: socklen_t,
+    pub msg_controllen: size_t,
     pub msg_flags: c_int,
 }
 
 #[repr(C)]
 pub struct cmsghdr {
-    pub cmsg_len: socklen_t,
+    pub cmsg_len: size_t,
     pub cmsg_level: c_int,
     pub cmsg_type: c_int,
 }
