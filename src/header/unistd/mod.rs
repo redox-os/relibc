@@ -817,13 +817,13 @@ pub unsafe extern "C" fn set_default_scheme(scheme: *const c_char) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setegid.html>.
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn setegid(gid: gid_t) -> c_int {
     Sys::setresgid(-1, gid, -1).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/seteuid.html>.
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn seteuid(uid: uid_t) -> c_int {
     Sys::setresuid(-1, uid, -1).map(|()| 0).or_minus_one_errno()
 }
