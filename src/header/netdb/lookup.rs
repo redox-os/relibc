@@ -8,9 +8,8 @@ use core::mem;
 use crate::platform::{types::*, Pal, Sys};
 
 use crate::header::{
-    arpa_inet::htons,
     errno::*,
-    netinet_in::{in_addr, sockaddr_in, IPPROTO_UDP},
+    netinet_in::{htons, in_addr, sockaddr_in, IPPROTO_UDP},
     sys_socket::{
         self,
         constants::{AF_INET, SOCK_DGRAM},

@@ -15,10 +15,10 @@ use crate::{
     c_str::{CStr, CString},
     error::ResultExt,
     header::{
-        arpa_inet::{htons, inet_aton, ntohl},
+        arpa_inet::inet_aton,
         errno::*,
         fcntl::O_RDONLY,
-        netinet_in::{in_addr, sockaddr_in, sockaddr_in6},
+        netinet_in::{htons, in_addr, ntohl, sockaddr_in, sockaddr_in6},
         stdlib::atoi,
         strings::strcasecmp,
         sys_socket::{constants::AF_INET, sa_family_t, sockaddr, socklen_t},
