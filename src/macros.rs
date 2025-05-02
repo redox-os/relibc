@@ -171,8 +171,10 @@ macro_rules! strto_impl {
         // convert the string to a number
         let num_str = $s.offset(idx);
         let res = match $base {
-            0 => detect_base(num_str)
-                .and_then(|($base, i)| convert_integer(num_str.offset(i), $base)),
+            0 => detect_base(num_str).and_then(|($base, i)| {
+                idx += i;
+                convert_integer(num_str.offset(i), $base)
+            }),
             8 => convert_octal(num_str),
             16 => convert_hex(num_str),
             _ => convert_integer(num_str, $base),
