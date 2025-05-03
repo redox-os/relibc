@@ -1,29 +1,20 @@
 use crate::{
     c_str::CString,
+    error::Errno,
     fs::File,
-    header::fcntl,
+    header::{errno, fcntl},
     io::{BufRead, BufReader},
 };
 use alloc::string::String;
 
-pub fn get_dns_server() -> String {
-    let file = match File::open(c"/etc/resolv.conf".into(), fcntl::O_RDONLY) {
-        Ok(file) => file,
-        Err(_) => return String::new(), // TODO: better error handling
-    };
-    let file = BufReader::new(file);
+pub fn get_dns_server() -> Result<String, Errno> {
+    let file = File::open(c"/etc/resolv.conf".into(), fcntl::O_RDONLY).map(BufReader::new)?;
 
-    for line in file.split(b'\n') {
-        let mut line = match line {
-            Ok(line) => line,
-            Err(_) => return String::new(), // TODO: pls handle errors
-        };
-        if line.starts_with(b"nameserver ") {
-            line.drain(..11);
-            return String::from_utf8(line).unwrap_or_default();
+    for line in file.lines().map_while(Result::ok) {
+        if let Some(dns) = line.strip_prefix("nameserver ") {
+            return Ok(dns.into());
         }
     }
 
-    // TODO: better error handling
-    String::new()
+    Err(Errno(errno::EIO).sync())
 }
