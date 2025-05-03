@@ -578,8 +578,11 @@ impl Pal for Sys {
         Self::fchown(*file, owner, group)
     }
 
-    fn link(path1: CStr, path2: CStr) -> Result<()> {
-        unsafe { syscall::link(path1.as_ptr() as *const u8, path2.as_ptr() as *const u8)? };
+    fn link(oldpath: CStr, newpath: CStr) -> Result<()> {
+        let newpath = newpath.to_str().map_err(|_| Errno(EINVAL))?;
+
+        let file = File::open(oldpath, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
+        syscall::flink(*file as usize, newpath)?;
         Ok(())
     }
 
