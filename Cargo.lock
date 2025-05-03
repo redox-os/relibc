@@ -373,7 +373,9 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
 name = "posix-regex"
-version = "0.1.2"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66df580334caab2f744839ab1be85493d7ec731a92d6cf928008ab0b212bf3bc"
 
 [[package]]
 name = "proc-macro2"

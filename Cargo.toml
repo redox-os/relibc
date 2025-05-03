@@ -25,7 +25,7 @@ cc = "1"
 [dependencies]
 bitflags = "2"
 cbitset = "0.2"
-posix-regex = { path = "posix-regex", features = ["no_std"] }
+posix-regex = { version = "0.1.4", features = ["no_std"] }
 
 # TODO: For some reason, rand_jitter hasn't been updated to use the latest rand_core
 rand = { version = "0.8", default-features = false, features = ["small_rng"] }
