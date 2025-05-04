@@ -24,6 +24,7 @@ pub struct linger {
 pub extern "C" fn _cbindgen_export_linger(linger: linger) {}
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct msghdr {
     pub msg_name: *mut c_void,
     pub msg_namelen: socklen_t,
@@ -35,6 +36,7 @@ pub struct msghdr {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct cmsghdr {
     pub cmsg_len: size_t,
     pub cmsg_level: c_int,
@@ -70,6 +72,65 @@ pub struct sockaddr_storage {
     __ss_pad2: [u8; _SS_PADDING],
     __ss_align: usize,
 }
+
+// These must match C macros in include/bits/sys/socket.h {
+pub unsafe extern "C" fn __CMSG_LEN(cmsg: *const cmsghdr) -> ssize_t {
+    ((unsafe { (*cmsg).cmsg_len as size_t } + mem::size_of::<c_long>() - 1)
+        & !(mem::size_of::<c_long>() - 1)) as ssize_t
+}
+
+pub unsafe extern "C" fn __CMSG_NEXT(cmsg: *const cmsghdr) -> *mut c_uchar {
+    unsafe { (cmsg as *mut c_uchar).offset(__CMSG_LEN(cmsg)) }
+}
+
+pub unsafe extern "C" fn __MHDR_END(mhdr: *const msghdr) -> *mut c_uchar {
+    unsafe { ((*mhdr).msg_control as *mut c_uchar).offset((*mhdr).msg_controllen as isize) }
+}
+
+pub unsafe extern "C" fn CMSG_DATA(cmsg: *const cmsghdr) -> *mut c_uchar {
+    unsafe { (cmsg as *mut c_uchar).offset(CMSG_ALIGN(mem::size_of::<cmsghdr>()) as isize) }
+}
+
+pub unsafe extern "C" fn CMSG_NXTHDR(mhdr: *const msghdr, cmsg: *const cmsghdr) -> *mut cmsghdr {
+    if cmsg.is_null() {
+        return CMSG_FIRSTHDR(mhdr);
+    };
+
+    unsafe {
+        let next = cmsg as usize
+            + CMSG_ALIGN((*cmsg).cmsg_len as usize)
+            + CMSG_ALIGN(mem::size_of::<cmsghdr>());
+        let max = (*mhdr).msg_control as usize + (*mhdr).msg_controllen as usize;
+        if next > max {
+            0 as *mut cmsghdr
+        } else {
+            (cmsg as usize + CMSG_ALIGN((*cmsg).cmsg_len as usize)) as *mut cmsghdr
+        }
+    }
+}
+
+pub unsafe extern "C" fn CMSG_FIRSTHDR(mhdr: *const msghdr) -> *mut cmsghdr {
+    unsafe {
+        if (*mhdr).msg_controllen as usize >= mem::size_of::<cmsghdr>() {
+            (*mhdr).msg_control as *mut cmsghdr
+        } else {
+            0 as *mut cmsghdr
+        }
+    }
+}
+
+pub unsafe extern "C" fn CMSG_ALIGN(len: size_t) -> size_t {
+    (len + mem::size_of::<size_t>() - 1) & !(mem::size_of::<size_t>() - 1)
+}
+
+pub unsafe extern "C" fn CMSG_SPACE(len: c_uint) -> c_uint {
+    (CMSG_ALIGN(len as size_t) + CMSG_ALIGN(mem::size_of::<cmsghdr>())) as c_uint
+}
+
+pub unsafe extern "C" fn CMSG_LEN(length: c_uint) -> c_uint {
+    (CMSG_ALIGN(mem::size_of::<cmsghdr>()) + length as usize) as c_uint
+}
+// } These must match C macros in include/bits/sys/socket.h
 
 #[no_mangle]
 pub unsafe extern "C" fn accept(
