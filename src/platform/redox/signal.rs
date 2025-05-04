@@ -93,40 +93,8 @@ impl PalSignal for Sys {
         // TODO: setitimer is no longer part of POSIX and should not be implemented in Redox
         // Change the platform-independent implementation to use POSIX timers.
         // For Redox, the timer should probably use "/scheme/time"
-        unimplemented!();
-        let _path = match which {
-            ITIMER_REAL => "/scheme/itimer/1",
-            _ => return Err(Errno(EINVAL)),
-        };
-        // TODO
-        eprintln!("relibc: todo: implement setitimer");
-
-        let mut spec = syscall::ITimerSpec::default();
-
-        if let Some(old) = old {
-            old.it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
-            old.it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
-            old.it_value.tv_sec = spec.it_value.tv_sec as time_t;
-            old.it_value.tv_usec = spec.it_value.tv_nsec / 1000;
-        }
-
-        /*
-        let fd = FdGuard::new(syscall::open(path, syscall::O_RDWR | syscall::O_CLOEXEC)?);
-
-
-        let _ = syscall::read(*fd, &mut spec)?;
-
-        unsafe {
-
-            spec.it_interval.tv_sec = (*new).it_interval.tv_sec as i64;
-            spec.it_interval.tv_nsec = (*new).it_interval.tv_usec * 1000;
-            spec.it_value.tv_sec = (*new).it_value.tv_sec as i64;
-            spec.it_value.tv_nsec = (*new).it_value.tv_usec * 1000;
-        }
-
-        let _ = syscall::write(*fd, &spec)?;
-        */
-        Ok(())
+        eprintln!("relibc: setitimer not implemented");
+        Err(Errno(ENOSYS))
     }
 
     fn sigaction(
