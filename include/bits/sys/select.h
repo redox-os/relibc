@@ -1,23 +1,23 @@
 #ifndef _BITS_SYS_SELECT_H
 #define _BITS_SYS_SELECT_H
 
+// from musl license MIT {
 #define FD_SETSIZE 1024
-#define NFDBITS (8 * sizeof(unsigned long))
 
-typedef struct fd_set {
-    unsigned long fds_bits[FD_SETSIZE / NFDBITS];
+typedef unsigned long fd_mask;
+
+typedef struct {
+	unsigned long fds_bits[FD_SETSIZE / 8 / sizeof(long)];
 } fd_set;
 
-#define _FD_INDEX(fd) ((fd) / NFDBITS)
-#define _FD_BITMASK(fd) (1UL << ((fd) & NFDBITS))
+#define FD_ZERO(s) do { int __i; unsigned long *__b=(s)->fds_bits; for(__i=sizeof (fd_set)/sizeof (long); __i; __i--) *__b++=0; } while(0)
+#define FD_SET(d, s)   ((s)->fds_bits[(d)/(8*sizeof(long))] |= (1UL<<((d)%(8*sizeof(long)))))
+#define FD_CLR(d, s)   ((s)->fds_bits[(d)/(8*sizeof(long))] &= ~(1UL<<((d)%(8*sizeof(long)))))
+#define FD_ISSET(d, s) !!((s)->fds_bits[(d)/(8*sizeof(long))] & (1UL<<((d)%(8*sizeof(long)))))
 
-#define FD_ZERO(set) for (int i = 0; i < sizeof((set)->fds_bits) / sizeof(unsigned long); i += 1) { \
-                         (set)->fds_bits[i] = 0; \
-                     }
-
-#define FD_SET(fd, set) ((set)->fds_bits[_FD_INDEX(fd)] |= _FD_BITMASK(fd))
-#define FD_CLR(fd, set) ((set)->fds_bits[_FD_INDEX(fd)] &= ~(_FD_BITMASK(fd)))
-
-#define FD_ISSET(fd, set) (((set)->fds_bits[_FD_INDEX(fd)] & _FD_BITMASK(fd)) == _FD_BITMASK(fd))
+#if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
+#define NFDBITS (8*(int)sizeof(long))
+#endif
+// } from musl license MIT
 
 #endif
