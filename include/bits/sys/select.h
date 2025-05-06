@@ -2,13 +2,14 @@
 #define _BITS_SYS_SELECT_H
 
 #define FD_SETSIZE 1024
+#define NFDBITS (8 * sizeof(unsigned long))
 
 typedef struct fd_set {
-    unsigned long fds_bits[FD_SETSIZE / (8 * sizeof(unsigned long))];
+    unsigned long fds_bits[FD_SETSIZE / NFDBITS];
 } fd_set;
 
-#define _FD_INDEX(fd) ((fd) / (8 * sizeof(unsigned long)))
-#define _FD_BITMASK(fd) (1UL << ((fd) & (8 * sizeof(unsigned long) - 1)))
+#define _FD_INDEX(fd) ((fd) / NFDBITS)
+#define _FD_BITMASK(fd) (1UL << ((fd) & NFDBITS))
 
 #define FD_ZERO(set) for (int i = 0; i < sizeof((set)->fds_bits) / sizeof(unsigned long); i += 1) { \
                          (set)->fds_bits[i] = 0; \
