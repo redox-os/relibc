@@ -1,13 +1,16 @@
 use crate::platform::types::*;
 
-pub fn introsort(
+pub unsafe fn introsort(
     base: *mut c_char,
     nel: size_t,
     width: size_t,
     comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
 ) {
+    /*TODO: introsort is much faster than insertion sort, but is currently broken
     let maxdepth = 2 * log2(nel);
     introsort_helper(base, nel, width, maxdepth, comp);
+    */
+    insertion_sort(base, nel, width, comp);
 }
 
 // NOTE: if num is 0, the result should be considered undefined
@@ -24,7 +27,7 @@ fn log2(num: size_t) -> size_t {
     max_bits - num.to_le().leading_zeros() as size_t
 }
 
-fn introsort_helper(
+unsafe fn introsort_helper(
     mut base: *mut c_char,
     mut nel: size_t,
     width: size_t,
@@ -62,7 +65,7 @@ fn introsort_helper(
     }
 }
 
-fn insertion_sort(
+unsafe fn insertion_sort(
     base: *mut c_char,
     nel: size_t,
     width: size_t,
@@ -81,7 +84,7 @@ fn insertion_sort(
     }
 }
 
-fn heapsort(
+unsafe fn heapsort(
     base: *mut c_char,
     nel: size_t,
     width: size_t,
@@ -98,7 +101,7 @@ fn heapsort(
     }
 }
 
-fn heapify(
+unsafe fn heapify(
     base: *mut c_char,
     nel: size_t,
     width: size_t,
@@ -112,7 +115,7 @@ fn heapify(
     }
 }
 
-fn heap_sift_down(
+unsafe fn heap_sift_down(
     base: *mut c_char,
     start: size_t,
     end: size_t,
@@ -152,7 +155,7 @@ fn heap_sift_down(
 }
 
 #[inline]
-fn partition(
+unsafe fn partition(
     base: *mut c_char,
     nel: size_t,
     width: size_t,
@@ -195,7 +198,7 @@ fn partition(
     (i, n)
 }
 
-fn median_of_three(
+unsafe fn median_of_three(
     base: *mut c_char,
     nel: size_t,
     width: size_t,
@@ -219,7 +222,7 @@ fn median_of_three(
 }
 
 #[inline]
-fn swap(mut ptr1: *mut c_char, mut ptr2: *mut c_char, mut width: size_t) {
+unsafe fn swap(mut ptr1: *mut c_char, mut ptr2: *mut c_char, mut width: size_t) {
     use core::mem;
 
     const BUFSIZE: usize = 128;
