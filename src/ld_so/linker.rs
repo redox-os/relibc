@@ -462,8 +462,10 @@ impl Linker {
                             eprintln!("[ld.so]: moving {} into the global scope", obj.name);
                         }
 
-                        let mut global_scope = GLOBAL_SCOPE.write();
-                        obj.scope().copy_into(&mut global_scope);
+                        {
+                            let mut global_scope = GLOBAL_SCOPE.write();
+                            obj.scope().copy_into(&mut global_scope);
+                        }
                         self.scope_debug();
                     }
 
