@@ -611,6 +611,10 @@ impl Linker {
             scope,
         )?;
 
+        for (i, obj) in new_objects.iter().enumerate() {
+            obj.relocate(&objects_data[i], resolve).unwrap();
+        }
+
         unsafe {
             if !dlopened {
                 #[cfg(target_os = "redox")]
@@ -713,10 +717,6 @@ impl Linker {
                 // TLS variables for dlopen'ed objects are lazily allocated in `__tls_get_addr`.
                 tcb.append_masters(tcb_masters);
             }
-        }
-
-        for (i, obj) in new_objects.iter().enumerate() {
-            obj.relocate(&objects_data[i], resolve).unwrap();
         }
 
         for obj in new_objects.into_iter() {
