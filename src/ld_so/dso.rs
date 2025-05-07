@@ -956,7 +956,7 @@ impl DSO {
 
                     let resolved = resolve_sym(name, &[global_scope, self.scope()])
                         .map(|(sym, _, _)| sym.as_ptr() as usize)
-                        .unwrap_or_else(|| panic!("unresolved symbol: {name}"));
+                        .unwrap_or_else(|| panic!("unresolved symbol: {name} for soname {:?}", self.dynamic.soname));
 
                     unsafe {
                         *ptr = resolved + reloc.addend.unwrap_or(0);
