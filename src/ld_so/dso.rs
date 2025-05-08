@@ -862,13 +862,17 @@ impl DSO {
 
         match reloc.kind {
             RelocationKind::DTPMOD => set_usize(self.tls_module_id),
+            //TODO: Subtract DTP_OFFSET, which is 0x800 on riscv64, 0 on x86?
             RelocationKind::DTPOFF => {
-                if s != 0 {
-                    set_usize(s - b);
+                if reloc.sym.0 > 0 {
+                    let (sym, _) = sym
+                        .as_ref()
+                        .expect("RelocationKind::DTPOFF called without valid symbol");
+                    set_usize(sym.value + a);
                 } else {
-                    set_usize(s);
+                    set_usize(a);
                 }
-            }
+            },
             RelocationKind::GOT => set_usize(s),
             RelocationKind::OFFSET => set_usize((s + a).wrapping_sub(p)),
             RelocationKind::RELATIVE => set_usize(b + a),
