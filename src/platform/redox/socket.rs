@@ -425,7 +425,10 @@ impl PalSocket for Sys {
         Ok(match (domain, kind) {
             (AF_INET, SOCK_STREAM) => syscall::open("/scheme/tcp", flags)? as c_int,
             (AF_INET, SOCK_DGRAM) => syscall::open("/scheme/udp", flags)? as c_int,
-            (AF_UNIX, SOCK_STREAM) => syscall::open("/scheme/chan", flags | O_CREAT)? as c_int,
+            (AF_UNIX, SOCK_STREAM) => {
+                syscall::open("/scheme/uds_stream", flags | O_CREAT)? as c_int
+            }
+            (AF_UNIX, SOCK_DGRAM) => syscall::open("/scheme/uds_dgram", flags | O_CREAT)? as c_int,
             _ => return Err(Errno(EPROTONOSUPPORT)),
         })
     }
@@ -435,7 +438,7 @@ impl PalSocket for Sys {
 
         match (domain, kind) {
             (AF_UNIX, SOCK_STREAM) => {
-                let listener = FdGuard::new(syscall::open("/scheme/chan", flags | O_CREAT)?);
+                let listener = FdGuard::new(syscall::open("/scheme/uds_stream", flags | O_CREAT)?);
 
                 // For now, chan: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
@@ -447,6 +450,19 @@ impl PalSocket for Sys {
 
                 sv[0] = fd0.take() as c_int;
                 sv[1] = fd1.take() as c_int;
+                Ok(())
+            }
+            (AF_UNIX, SOCK_DGRAM) => {
+                let listener = FdGuard::new(syscall::open("/scheme/uds_dgram", flags | O_CREAT)?);
+
+                // For now, chan: lets connects be instant, and instead blocks
+                // on any I/O performed. So we don't need to mark this as
+                // nonblocking.
+
+                let mut fd0 = FdGuard::new(syscall::dup(*listener, b"connect")?);
+
+                sv[0] = fd0.take() as c_int;
+                sv[1] = listener.take() as c_int;
                 Ok(())
             }
             _ => unsafe {
