@@ -19,6 +19,7 @@ pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
         unistd::close(master);
         return Err(());
     }
+    name[count as usize] = 0;
 
     let slave = fcntl::open(name.as_ptr() as *const c_char, fcntl::O_RDWR, 0);
     if slave < 0 {

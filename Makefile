@@ -9,7 +9,8 @@ CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
 RUSTCFLAGS?=
 export OBJCOPY?=objcopy
 
-BUILD?=$(shell pwd)/target/$(TARGET)
+export CARGO_TARGET_DIR?=$(shell pwd)/target
+BUILD?=$(CARGO_TARGET_DIR)/$(TARGET)
 CARGOFLAGS+=--target=$(TARGET)
 
 TARGET_HEADERS?=$(BUILD)/include

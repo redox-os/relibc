@@ -75,6 +75,7 @@ pub const SI_USER: i32 = 0;
 pub(crate) type ucontext_t = ucontext;
 pub(crate) type mcontext_t = mcontext;
 
+//TODO: share definition with SigStack?
 #[repr(C)]
 pub struct ucontext {
     #[cfg(any(
@@ -96,17 +97,51 @@ pub struct ucontext {
     pub uc_mcontext: mcontext_t,
 }
 
+#[cfg(target_arch = "x86")]
 #[repr(C)]
 pub struct mcontext {
-    #[cfg(target_arch = "x86")]
     _opaque: [u8; 512],
-    #[cfg(target_arch = "x86_64")]
-    _opaque: [u8; 864],
-    #[cfg(target_arch = "aarch64")]
+}
+
+//TODO: share definition with ArchIntRegs?
+//TODO: repr(align(16))?
+#[cfg(target_arch = "x86_64")]
+#[repr(C)]
+pub struct mcontext {
+    pub ymm_upper: [[u64; 2]; 16],
+    pub fxsave: [[u64; 2]; 29],
+    pub r15: usize, // fxsave "available" +0
+    pub r14: usize, // available +8
+    pub r13: usize, // available +16
+    pub r12: usize, // available +24
+    pub rbp: usize, // available +32
+    pub rbx: usize, // available +40
+    pub r11: usize, // outside fxsave, and so on
+    pub r10: usize,
+    pub r9: usize,
+    pub r8: usize,
+    pub rax: usize,
+    pub rcx: usize,
+    pub rdx: usize,
+    pub rsi: usize,
+    pub rdi: usize,
+    pub rflags: usize,
+    pub rip: usize,
+    pub rsp: usize,
+}
+
+#[cfg(target_arch = "aarch64")]
+#[repr(C)]
+pub struct mcontext {
     _opaque: [u8; 272],
-    #[cfg(target_arch = "riscv64")]
+}
+
+#[cfg(target_arch = "riscv64")]
+#[repr(C)]
+pub struct mcontext {
     _opaque: [u8; 520],
 }
+
 #[no_mangle]
 pub extern "C" fn __completely_unused_cbindgen_workaround_fn_ucontext_mcontext(
     a: *const ucontext_t,

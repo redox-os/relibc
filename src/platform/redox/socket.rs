@@ -14,7 +14,9 @@ use crate::{
         errno::{EAFNOSUPPORT, EDOM, EFAULT, EINVAL, ENOSYS, EOPNOTSUPP, EPROTONOSUPPORT},
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
-        sys_socket::{constants::*, msghdr, sa_family_t, sockaddr, socklen_t},
+        sys_socket::{
+            constants::*, msghdr, sa_family_t, sockaddr, socklen_t, CMSG_FIRSTHDR, CMSG_NXTHDR,
+        },
         sys_time::timeval,
         sys_un::sockaddr_un,
     },
@@ -310,7 +312,21 @@ impl PalSocket for Sys {
 
     unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> Result<usize> {
         //TODO: implement recvfrom with recvmsg
-        eprintln!("recvmsg not implemented on redox");
+        eprintln!(
+            "recvmsg({}, {:p}, {:#x}) not implemented on redox",
+            socket, msg, flags
+        );
+        if !msg.is_null() {
+            let msg = &*msg;
+            eprintln!("{:#x?}", msg);
+            if !msg.msg_control.is_null() {
+                let mut cmsg = CMSG_FIRSTHDR(msg);
+                while !cmsg.is_null() {
+                    eprintln!("{:#x?}", *cmsg);
+                    cmsg = CMSG_NXTHDR(msg, cmsg);
+                }
+            }
+        }
         Err(Errno(ENOSYS))
     }
 

@@ -270,7 +270,12 @@ pub unsafe extern "C" fn scandir(
         -1
     } else {
         unsafe {
-            *namelist = vec.leak();
+            // Empty CVecs use a dangling pointer which cannot be freed, return null instead
+            if vec.is_empty() {
+                *namelist = ptr::null_mut();
+            } else {
+                *namelist = vec.leak();
+            }
         }
 
         platform::ERRNO.set(old_errno);

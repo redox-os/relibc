@@ -33,7 +33,7 @@ impl Iterator for LookupHost {
 }
 
 pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
-    let dns_string = get_dns_server();
+    let dns_string = get_dns_server().map_err(|e| e.0)?;
 
     let dns_vec: Vec<u8> = dns_string
         .trim()
@@ -138,7 +138,7 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
 }
 
 pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
-    let dns_string = get_dns_server();
+    let dns_string = get_dns_server().map_err(|e| e.0)?;
 
     let dns_vec: Vec<u8> = dns_string
         .trim()

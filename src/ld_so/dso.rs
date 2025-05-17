@@ -836,10 +836,11 @@ impl DSO {
             (None, None)
         };
 
-        let (s, t) = sym
+        let (s, t, tls_id) = sym
             .as_ref()
-            .map(|(sym, obj)| (sym.as_ptr() as usize, obj.tls_offset))
-            .unwrap_or((0, 0));
+            .map(|(sym, obj)| (sym.as_ptr() as usize, obj.tls_offset, obj.tls_module_id))
+            //TODO: is self.tls_module_id the right fallback?
+            .unwrap_or((0, 0, self.tls_module_id));
 
         let ptr = if self.pie {
             (b + reloc.offset) as *mut u8
@@ -861,12 +862,16 @@ impl DSO {
         };
 
         match reloc.kind {
-            RelocationKind::DTPMOD => set_usize(self.tls_module_id),
+            RelocationKind::DTPMOD => set_usize(tls_id),
+            //TODO: Subtract DTP_OFFSET, which is 0x800 on riscv64, 0 on x86?
             RelocationKind::DTPOFF => {
-                if s != 0 {
-                    set_usize(s - b);
+                if reloc.sym.0 > 0 {
+                    let (sym, _) = sym
+                        .as_ref()
+                        .expect("RelocationKind::DTPOFF called without valid symbol");
+                    set_usize(sym.value + a);
                 } else {
-                    set_usize(s);
+                    set_usize(a);
                 }
             }
             RelocationKind::GOT => set_usize(s),
@@ -956,7 +961,12 @@ impl DSO {
 
                     let resolved = resolve_sym(name, &[global_scope, self.scope()])
                         .map(|(sym, _, _)| sym.as_ptr() as usize)
-                        .unwrap_or_else(|| panic!("unresolved symbol: {name}"));
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "unresolved symbol: {name} for soname {:?}",
+                                self.dynamic.soname
+                            )
+                        });
 
                     unsafe {
                         *ptr = resolved + reloc.addend.unwrap_or(0);

@@ -128,7 +128,14 @@ fn io_init() {
 
 #[inline(never)]
 #[no_mangle]
-pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
+pub unsafe extern "C" fn relibc_start_v1(
+    sp: &'static Stack,
+    main: unsafe extern "C" fn(
+        argc: isize,
+        argv: *mut *mut c_char,
+        envp: *mut *mut c_char,
+    ) -> c_int,
+) -> ! {
     extern "C" {
         static __preinit_array_start: extern "C" fn();
         static __preinit_array_end: extern "C" fn();
@@ -136,7 +143,6 @@ pub unsafe extern "C" fn relibc_start(sp: &'static Stack) -> ! {
         static __init_array_end: extern "C" fn();
 
         fn _init();
-        fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
     }
 
     // Ensure correct host system before executing more system calls

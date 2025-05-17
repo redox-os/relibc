@@ -196,7 +196,8 @@ unsafe fn inner_scanf(mut r: Reader, mut format: Reader, mut ap: va_list) -> Res
                             }
                             width = width.map(|w| w - 1);
                             if !read!() {
-                                return Ok(matched);
+                                // 0 by itself, will be handled below
+                                break;
                             }
                             if width.map(|w| w > 0).unwrap_or(true)
                                 && (byte == b'x' || byte == b'X')

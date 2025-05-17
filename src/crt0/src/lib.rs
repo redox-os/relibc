@@ -3,7 +3,10 @@
 #![no_std]
 #![feature(linkage)]
 
-use core::arch::global_asm;
+use core::{
+    arch::global_asm,
+    ffi::{c_char, c_int},
+};
 
 #[cfg(target_arch = "aarch64")]
 global_asm!(
@@ -12,7 +15,7 @@ global_asm!(
 _start:
     mov x0, sp
     and sp, x0, #0xfffffffffffffff0 //align sp
-    bl relibc_start
+    bl relibc_crt0
 "
 );
 
@@ -32,7 +35,7 @@ _start:
     add esp, 8
 
     push esp
-    call relibc_start
+    call relibc_crt0
     .size _start, . - _start
 "
 );
@@ -55,7 +58,7 @@ _start:
 
     add rsp, 8
 
-    call relibc_start
+    call relibc_crt0
     .size _start, . - _start
 "
 );
@@ -66,14 +69,32 @@ global_asm!(
     .globl _start
 _start:
     mv a0, sp
-    la t0, relibc_start
+    la t0, relibc_crt0
     jalr ra, t0
 "
 );
 
+#[no_mangle]
+pub unsafe extern "C" fn relibc_crt0(sp: usize) -> ! {
+    // This wrapper ensures a dynamic libc.so can access a hidden main function
+    //TODO: common definition of types
+    extern "C" {
+        fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
+        fn relibc_start_v1(
+            sp: usize,
+            main: unsafe extern "C" fn(
+                argc: isize,
+                argv: *mut *mut c_char,
+                envp: *mut *mut c_char,
+            ) -> c_int,
+        ) -> !;
+    }
+    relibc_start_v1(sp, main)
+}
+
 #[linkage = "weak"]
 #[no_mangle]
-extern "C" fn relibc_panic(_pi: &::core::panic::PanicInfo) -> ! {
+pub extern "C" fn relibc_panic(_pi: &::core::panic::PanicInfo) -> ! {
     loop {}
 }
 
