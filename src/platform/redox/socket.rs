@@ -348,8 +348,8 @@ impl PalSocket for Sys {
                 match (cmsg_level, cmsg_type) {
                     (SOL_SOCKET, SCM_RIGHTS) => {
                         let mut received_fds: Vec<c_int> = Vec::new();
-                        let count_bytes = ancillary_data_buffer[cursor..cursor + 4];
-                        let fd_count = u32::from_le_bytes(count_bytes);
+                        let count_bytes = &ancillary_data_buffer[cursor..cursor + 4];
+                        let fd_count = u32::from_le_bytes(count_bytes.try_into().unwrap());
                         cursor += 4;
 
                         for _ in 0..fd_count {
