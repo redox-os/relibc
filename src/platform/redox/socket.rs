@@ -449,14 +449,12 @@ impl PalSocket for Sys {
         if mhdr.msg_iovlen > 0 {
             let iovs = slice::from_raw_parts_mut(mhdr.msg_iov, mhdr.msg_iovlen as usize);
             for iov in iovs {
-                if !iov.iov_base.is_null() && iov.iov_len > 0 {
-                    let data_slice =
-                        slice::from_raw_parts_mut(iov.iov_base as *mut u8, iov.iov_len);
-                    let read = Self::read(socket, data_slice)?;
-                    bytes_read_to_iov += read;
-                    if read < iov.iov_len {
-                        break;
-                    }
+                let data_slice = iov.to_slice();
+                let data_len = data_slice.len();
+                let read = Self::read(socket, data_slice)?;
+                bytes_read_to_iov += read;
+                if read < data_len {
+                    break;
                 }
             }
         }
@@ -545,11 +543,9 @@ impl PalSocket for Sys {
         if mhdr.msg_iovlen > 0 {
             let iovs = slice::from_raw_parts(mhdr.msg_iov, mhdr.msg_iovlen as usize);
             for iov in iovs {
-                if !iov.iov_base.is_null() && iov.iov_len > 0 {
-                    let data_slice = slice::from_raw_parts(iov.iov_base as *const u8, iov.iov_len);
-                    let written = Self::write(socket, data_slice)?;
-                    bytes_sent_from_iov += written;
-                }
+                let data_slice = iov.to_slice();
+                let written = Self::write(socket, data_slice)?;
+                bytes_sent_from_iov += written;
             }
         }
 
