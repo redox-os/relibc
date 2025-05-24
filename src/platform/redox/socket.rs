@@ -15,8 +15,8 @@ use crate::{
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
         sys_socket::{
-            constants::*, msghdr, sa_family_t, sockaddr, socklen_t, ucred, CMSG_ALIGN, CMSG_DATA,
-            CMSG_FIRSTHDR, CMSG_NXTHDR,
+            cmsghdr, constants::*, msghdr, sa_family_t, sockaddr, socklen_t, ucred, CMSG_ALIGN,
+            CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE,
         },
         sys_time::timeval,
         sys_un::sockaddr_un,
@@ -330,7 +330,7 @@ impl PalSocket for Sys {
             Rights(Vec<c_int>),
             Credentials(ucred),
         }
-        let mut ancillary_data: VecDeque<AncillaryType> = VecDeque::new();
+        let mut ancillary_data: Vec<AncillaryType> = Vec::new();
 
         // 2. Read and parse the serialized ancillary data.
         if ancillary_len > 0 {
@@ -339,12 +339,8 @@ impl PalSocket for Sys {
 
             let mut cursor = 0;
             while cursor < ancillary_len {
-                let level_bytes = ancillary_data_buffer[cursor..cursor + 4]
-                    .try_into()
-                    .unwrap();
-                let type_bytes = ancillary_data_buffer[cursor + 4..cursor + 8]
-                    .try_into()
-                    .unwrap();
+                let level_bytes = ancillary_data_buffer[cursor..cursor + 4];
+                let type_bytes = ancillary_data_buffer[cursor + 4..cursor + 8];
                 let cmsg_level = u32::from_le_bytes(level_bytes) as c_int;
                 let cmsg_type = u32::from_le_bytes(type_bytes) as c_int;
                 cursor += 8;
@@ -352,9 +348,7 @@ impl PalSocket for Sys {
                 match (cmsg_level, cmsg_type) {
                     (SOL_SOCKET, SCM_RIGHTS) => {
                         let mut received_fds: Vec<c_int> = Vec::new();
-                        let count_bytes = ancillary_data_buffer[cursor..cursor + 4]
-                            .try_into()
-                            .unwrap();
+                        let count_bytes = ancillary_data_buffer[cursor..cursor + 4];
                         let fd_count = u32::from_le_bytes(count_bytes);
                         cursor += 4;
 
@@ -362,7 +356,7 @@ impl PalSocket for Sys {
                             let new_fd = syscall::dup(socket as usize, b"recvfd")?;
                             received_fds.push(new_fd as c_int);
                         }
-                        ancillary_data.push_back(AncillaryType::Rights(received_fds));
+                        ancillary_data.push(AncillaryType::Rights(received_fds));
                     }
                     (SOL_SOCKET, SCM_CREDENTIALS) => {
                         let cred_id = FdGuard::new(syscall::dup(socket as usize, b"cred")?);
@@ -371,25 +365,17 @@ impl PalSocket for Sys {
                         let mut cred_buf =
                             vec![0u8; mem::size_of::<usize>() + mem::size_of::<u32>() * 2];
                         Self::read(*cred_id as c_int, &mut cred_buf)?;
-                        Self::close(*cred_id)?;
+                        Self::close(*cred_id as c_int)?;
 
-                        let pid = usize::from_le_bytes(
-                            cred_buf[0..mem::size_of::<usize>()].try_into().unwrap(),
-                        );
+                        let pid =
+                            usize::from_le_bytes(cred_buf[0..mem::size_of::<usize>()]) as pid_t;
                         let uid = u32::from_le_bytes(
-                            cred_buf[mem::size_of::<usize>()..mem::size_of::<usize>() + 4]
-                                .try_into()
-                                .unwrap(),
-                        );
-                        let gid = u32::from_le_bytes(
-                            cred_buf[mem::size_of::<usize>() + 4..].try_into().unwrap(),
-                        );
+                            cred_buf[mem::size_of::<usize>()..mem::size_of::<usize>() + 4],
+                        ) as uid_t;
+                        let gid =
+                            u32::from_le_bytes(cred_buf[mem::size_of::<usize>() + 4..]) as gid_t;
 
-                        ancillary_data.push_back(AncillaryType::Credentials(ucred {
-                            pid,
-                            uid,
-                            gid,
-                        }));
+                        ancillary_data.push(AncillaryType::Credentials(ucred { pid, uid, gid }));
                     }
                     _ => {
                         // Unknown type, skip.
@@ -407,8 +393,8 @@ impl PalSocket for Sys {
             let mut current_cmsg = CMSG_FIRSTHDR(mhdr);
             let mut written_len = 0;
 
-            while let Some(ancillary_data) = ancillary_data.pop_front() {
-                match ancillary_data {
+            for ancillary_datum in ancillary_data {
+                match ancillary_datum {
                     AncillaryType::Rights(received_fds) => {
                         // Reconstruct SCM_RIGHTS
                         let data_len = mem::size_of::<c_int>() * received_fds.len();
@@ -421,7 +407,7 @@ impl PalSocket for Sys {
                             cmsg.cmsg_type = SCM_RIGHTS;
 
                             let data_ptr = CMSG_DATA(cmsg);
-                            std::ptr::copy_nonoverlapping(
+                            ptr::copy_nonoverlapping(
                                 received_fds.as_ptr(),
                                 data_ptr as *mut c_int,
                                 received_fds.len(),
@@ -480,7 +466,7 @@ impl PalSocket for Sys {
         }
         let mhdr = &*msg;
 
-        let mut fds_to_send: Vec<FdGuard<c_int>> = Vec::new();
+        let mut fds_to_send: Vec<c_int> = Vec::new();
         let mut ancillary_data_buffer: Vec<u8> = Vec::new();
 
         // 1. Process Control Messages from msghdr and serialize them.
@@ -508,7 +494,7 @@ impl PalSocket for Sys {
                         if fd_count > 0 {
                             let fds_ptr = CMSG_DATA(cmsg) as *const c_int;
                             let fds_slice = slice::from_raw_parts(fds_ptr, fd_count);
-                            fds_to_send.extend_from_slice(FdGuard::new(fds_slice));
+                            fds_to_send.extend_from_slice(fds_slice);
                         }
 
                         // Serialize: [cmsg_level, cmsg_type, number of fds]
@@ -537,7 +523,7 @@ impl PalSocket for Sys {
 
         // 2. Send FDs using the special syscall.
         for &fd in &fds_to_send {
-            syscall::sendfd(socket as usize, *fd as usize)?;
+            syscall::sendfd(socket as usize, *fd as usize, 0, 0)?;
         }
 
         // 3. Send the serialized ancillary data.
