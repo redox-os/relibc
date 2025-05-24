@@ -339,10 +339,10 @@ impl PalSocket for Sys {
 
             let mut cursor = 0;
             while cursor < ancillary_len {
-                let level_bytes = ancillary_data_buffer[cursor..cursor + 4];
-                let type_bytes = ancillary_data_buffer[cursor + 4..cursor + 8];
-                let cmsg_level = u32::from_le_bytes(level_bytes) as c_int;
-                let cmsg_type = u32::from_le_bytes(type_bytes) as c_int;
+                let level_bytes = &ancillary_data_buffer[cursor..cursor + 4];
+                let type_bytes = &ancillary_data_buffer[cursor + 4..cursor + 8];
+                let cmsg_level = u32::from_le_bytes(level_bytes.try_into().unwrap()) as c_int;
+                let cmsg_type = u32::from_le_bytes(type_bytes.try_into().unwrap()) as c_int;
                 cursor += 8;
 
                 match (cmsg_level, cmsg_type) {
@@ -367,13 +367,17 @@ impl PalSocket for Sys {
                         Self::read(*cred_id as c_int, &mut cred_buf)?;
                         Self::close(*cred_id as c_int)?;
 
-                        let pid =
-                            usize::from_le_bytes(cred_buf[0..mem::size_of::<usize>()]) as pid_t;
+                        let pid = usize::from_le_bytes(
+                            cred_buf[0..mem::size_of::<usize>()].try_into().unwrap(),
+                        ) as pid_t;
                         let uid = u32::from_le_bytes(
-                            cred_buf[mem::size_of::<usize>()..mem::size_of::<usize>() + 4],
+                            cred_buf[mem::size_of::<usize>()..mem::size_of::<usize>() + 4]
+                                .try_into()
+                                .unwrap(),
                         ) as uid_t;
-                        let gid =
-                            u32::from_le_bytes(cred_buf[mem::size_of::<usize>() + 4..]) as gid_t;
+                        let gid = u32::from_le_bytes(
+                            cred_buf[mem::size_of::<usize>() + 4..].try_into().unwrap(),
+                        ) as gid_t;
 
                         ancillary_data.push(AncillaryType::Credentials(ucred { pid, uid, gid }));
                     }
