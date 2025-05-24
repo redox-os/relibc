@@ -19,6 +19,7 @@ use crate::{
             CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE,
         },
         sys_time::timeval,
+        sys_uio::{readv, writev},
         sys_un::sockaddr_un,
     },
 };
@@ -445,21 +446,12 @@ impl PalSocket for Sys {
         }
 
         // 4. Read the message body into iov.
-        let mut bytes_read_to_iov = 0;
-        if mhdr.msg_iovlen > 0 {
-            let iovs = slice::from_raw_parts_mut(mhdr.msg_iov, mhdr.msg_iovlen as usize);
-            for iov in iovs {
-                let data_slice = iov.to_slice();
-                let data_len = data_slice.len();
-                let read = Self::read(socket, data_slice)?;
-                bytes_read_to_iov += read;
-                if read < data_len {
-                    break;
-                }
-            }
+        let read = readv(socket, mhdr.msg_iov, mhdr.msg_iovlen);
+        if read < 0 {
+            return Err(Errno(EINVAL));
         }
 
-        Ok(bytes_read_to_iov)
+        Ok(read)
     }
 
     unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> Result<usize> {
@@ -539,17 +531,12 @@ impl PalSocket for Sys {
         }
 
         // 4. Send the actual message data from iov.
-        let mut bytes_sent_from_iov = 0;
-        if mhdr.msg_iovlen > 0 {
-            let iovs = slice::from_raw_parts(mhdr.msg_iov, mhdr.msg_iovlen as usize);
-            for iov in iovs {
-                let data_slice = iov.to_slice();
-                let written = Self::write(socket, data_slice)?;
-                bytes_sent_from_iov += written;
-            }
+        let wrote = writev(socket, mhdr.msg_iov, mhdr.msg_iovlen);
+        if wrote < 0 {
+            return Err(Errno(EINVAL));
         }
 
-        Ok(bytes_sent_from_iov)
+        Ok(wrote)
     }
 
     unsafe fn sendto(
