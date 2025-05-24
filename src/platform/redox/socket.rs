@@ -526,8 +526,8 @@ impl PalSocket for Sys {
         }
 
         // 2. Send FDs using the special syscall.
-        for &fd in &fds_to_send {
-            syscall::sendfd(socket as usize, *fd as usize, 0, 0)?;
+        for fd in fds_to_send {
+            syscall::sendfd(socket as usize, fd as usize, 0, 0)?;
         }
 
         // 3. Send the serialized ancillary data.
