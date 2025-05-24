@@ -43,6 +43,14 @@ pub struct cmsghdr {
     pub cmsg_type: c_int,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct ucred {
+    pub pid: pid_t,
+    pub uid: uid_t,
+    pub gid: gid_t,
+}
+
 #[no_mangle]
 pub extern "C" fn _cbindgen_export_cmsghdr(cmsghdr: cmsghdr) {}
 
