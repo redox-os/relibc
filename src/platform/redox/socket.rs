@@ -446,12 +446,12 @@ impl PalSocket for Sys {
         }
 
         // 4. Read the message body into iov.
-        let read = readv(socket, mhdr.msg_iov, mhdr.msg_iovlen);
+        let read = readv(socket, mhdr.msg_iov, mhdr.msg_iovlen.try_into().unwrap());
         if read < 0 {
             return Err(Errno(EINVAL));
         }
 
-        Ok(read)
+        Ok(read.try_into().unwrap())
     }
 
     unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> Result<usize> {
@@ -531,12 +531,12 @@ impl PalSocket for Sys {
         }
 
         // 4. Send the actual message data from iov.
-        let wrote = writev(socket, mhdr.msg_iov, mhdr.msg_iovlen);
+        let wrote = writev(socket, mhdr.msg_iov, mhdr.msg_iovlen.try_into().unwrap());
         if wrote < 0 {
             return Err(Errno(EINVAL));
         }
 
-        Ok(wrote)
+        Ok(wrote.try_into().unwrap())
     }
 
     unsafe fn sendto(
