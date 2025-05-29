@@ -617,7 +617,6 @@ unsafe fn deserialize_stream_to_ancillary_data(
         let cmsg_data_from_stream = &msg_stream[*cursor..*cursor + cmsg_data_len_in_stream];
         *cursor += cmsg_data_len_in_stream;
 
-        // POSIX cmsghdr をユーザーバッファに再構築
         let mut actual_posix_cmsg_data_len: usize = 0;
         let mut temp_posix_cmsg_data_buf: Vec<u8> = Vec::new();
 
@@ -880,12 +879,10 @@ impl PalSocket for Sys {
             .map_err(|_| Errno(ENOMEM))?;
 
         // 3. Read the message stream.
-        let mut command_bytes = [0u8; 16];
-        command_bytes[..14].copy_from_slice(b"recv_ancillary");
-        let metadata = [
-            u64::from_le_bytes(command_bytes[0..8].try_into().unwrap()),
-            u64::from_le_bytes(command_bytes[8..16].try_into().unwrap()),
-        ];
+        let mut command_bytes = [0u8; 8];
+        let command = b"recvmsg";
+        command_bytes[..command.len()].copy_from_slice(command);
+        let metadata = [u64::from_le_bytes(command_bytes.try_into().unwrap())];
         let call_flags = CallFlags::empty();
         eprintln!(
             "[DEBUG] recvmsg: Calling sys_call for socket {}",
@@ -1044,15 +1041,10 @@ impl PalSocket for Sys {
         }
 
         // 5. Prepare command.
-        let mut command_bytes = [0u8; 16];
-        let command = b"send_ancillary";
+        let mut command_bytes = [0u8; 8];
+        let command = b"sendmsg";
         command_bytes[..command.len()].copy_from_slice(command);
-
-        let metadata = [
-            u64::from_le_bytes(command_bytes[0..8].try_into().unwrap()),
-            u64::from_le_bytes(command_bytes[8..16].try_into().unwrap()),
-        ];
-
+        let metadata = [u64::from_le_bytes(command_bytes.try_into().unwrap())];
         let call_flags = CallFlags::empty();
 
         // 6. Send the message stream.
