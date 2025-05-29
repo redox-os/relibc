@@ -578,7 +578,8 @@ unsafe fn deserialize_stream_to_ancillary_data(
             "[DEBUG] deserialize_stream_to_ancillary_data: Loop start, cursor = {}",
             *cursor
         );
-        let cmsg_header_len_in_stream = mem::size_of::<c_int>() * 2 + mem::size_of::<usize>();
+        const CMSG_HEADER_LEN_IN_STREAM: usize =
+            mem::size_of::<c_int>() * 2 + mem::size_of::<usize>();
         if *cursor + cmsg_header_len_in_stream > msg_stream.len() {
             eprintln!("[DEBUG] deserialize_stream_to_ancillary_data: Not enough data for cmsg header, breaking.");
             break;
