@@ -930,7 +930,7 @@ impl PalSocket for Sys {
             if cursor < msg_stream.len() {
                 deserialize_stream_to_ancillary_data(
                     mhdr,
-                    socket_to_use,
+                    &socket_to_use,
                     &msg_stream,
                     &mut cursor,
                     cmsg_space_provided_by_user as usize,
