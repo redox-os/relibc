@@ -95,10 +95,12 @@ pub unsafe extern "C" fn __MHDR_END(mhdr: *const msghdr) -> *mut c_uchar {
     unsafe { ((*mhdr).msg_control as *mut c_uchar).offset((*mhdr).msg_controllen as isize) }
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn CMSG_DATA(cmsg: *const cmsghdr) -> *mut c_uchar {
     unsafe { (cmsg as *mut c_uchar).offset(CMSG_ALIGN(mem::size_of::<cmsghdr>()) as isize) }
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn CMSG_NXTHDR(mhdr: *const msghdr, cmsg: *const cmsghdr) -> *mut cmsghdr {
     if cmsg.is_null() {
         return CMSG_FIRSTHDR(mhdr);
@@ -117,6 +119,7 @@ pub unsafe extern "C" fn CMSG_NXTHDR(mhdr: *const msghdr, cmsg: *const cmsghdr) 
     }
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn CMSG_FIRSTHDR(mhdr: *const msghdr) -> *mut cmsghdr {
     unsafe {
         if (*mhdr).msg_controllen as usize >= mem::size_of::<cmsghdr>() {
@@ -127,14 +130,17 @@ pub unsafe extern "C" fn CMSG_FIRSTHDR(mhdr: *const msghdr) -> *mut cmsghdr {
     }
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn CMSG_ALIGN(len: size_t) -> size_t {
     (len + mem::size_of::<size_t>() - 1) & !(mem::size_of::<size_t>() - 1)
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn CMSG_SPACE(len: c_uint) -> c_uint {
     (CMSG_ALIGN(len as size_t) + CMSG_ALIGN(mem::size_of::<cmsghdr>())) as c_uint
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn CMSG_LEN(length: c_uint) -> c_uint {
     (CMSG_ALIGN(mem::size_of::<cmsghdr>()) + length as usize) as c_uint
 }
