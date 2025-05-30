@@ -11,7 +11,10 @@ use crate::{
     error::{Errno, Result, ResultExt},
     header::{
         arpa_inet::inet_aton,
-        errno::{EAFNOSUPPORT, EDOM, EFAULT, EINVAL, ENOSYS, EOPNOTSUPP, EPROTONOSUPPORT},
+        errno::{
+            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EISCONN, EMSGSIZE, ENOMEM, ENOSYS, EOPNOTSUPP,
+            EPROTONOSUPPORT,
+        },
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
         sys_socket::{
@@ -19,6 +22,7 @@ use crate::{
             CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE,
         },
         sys_time::timeval,
+        sys_uio::iovec,
         sys_un::sockaddr_un,
     },
 };
@@ -462,7 +466,7 @@ unsafe fn deserialize_stream_to_name(
                 Errno(EINVAL)
             })?,
     );
-    cursor += mem::size_of::<usize>();
+    *cursor += mem::size_of::<usize>();
     eprintln!(
         "[DEBUG] deserialize_stream_to_name: name_len = {}",
         name_len
@@ -474,7 +478,7 @@ unsafe fn deserialize_stream_to_name(
             return Err(Errno(EMSGSIZE));
         }
         if !mhdr.msg_name.is_null() && mhdr.msg_namelen > 0 {
-            let name_buffer = &msg_stream[cursor..cursor + name_len];
+            let name_buffer = &msg_stream[*cursor..*cursor + name_len];
             eprintln!("[DEBUG] deserialize_stream_to_name: User provided msg_name buffer (cap: {}), trying to fill with '{}'", mhdr.msg_namelen, str::from_utf8(name_buffer).unwrap_or("invalid_utf8"));
             inner_get_name_inner(
                 false,
@@ -483,7 +487,7 @@ unsafe fn deserialize_stream_to_name(
                 name_buffer,
             );
         }
-        cursor += name_len;
+        *cursor += name_len;
     }
     eprintln!(
         "[DEBUG] deserialize_stream_to_name: cursor_end = {}",
@@ -527,12 +531,12 @@ unsafe fn deserialize_stream_to_payload(
     let payload_data_from_stream = &msg_stream[*cursor..*cursor + actual_payload_in_stream_len];
 
     // Advance cursor by the length *declared* in the stream, even if truncated
-    *cursor += payload_len_from_stream;
+    *cursor += actual_payload_in_stream_len;
     // Ensure cursor does not go beyond msg_stream.len() after this conceptual advance
     *cursor = cmp::min(*cursor, msg_stream.len());
 
     let mut bytes_scattered: usize = 0;
-    if !mhdr.msg_iov.is_null() && mhdr.msg_iovlen > 0 && payload_len_from_stream > 0 {
+    if !mhdr.msg_iov.is_null() && mhdr.msg_iovlen > 0 && actual_payload_in_stream_len > 0 {
         // Pass iovs_slice as &[iovec] if scatter_data_into_iovs expects that
         bytes_scattered = scatter_data_into_iovs(iovs_slice, payload_data_from_stream)?;
         eprintln!(
@@ -541,8 +545,8 @@ unsafe fn deserialize_stream_to_payload(
         );
     }
 
-    if payload_len_from_stream > bytes_scattered {
-        eprintln!("[DEBUG] deserialize_stream_to_payload: MSG_TRUNC set. payload_len_from_stream={}, bytes_scattered={}", payload_len_from_stream, bytes_scattered);
+    if actual_payload_in_stream_len > bytes_scattered {
+        eprintln!("[DEBUG] deserialize_stream_to_payload: MSG_TRUNC set. actual_payload_in_stream_len={}, bytes_scattered={}", actual_payload_in_stream_len, bytes_scattered);
         mhdr.msg_flags |= MSG_TRUNC;
     }
     eprintln!(
@@ -580,7 +584,7 @@ unsafe fn deserialize_stream_to_ancillary_data(
         );
         const CMSG_HEADER_LEN_IN_STREAM: usize =
             mem::size_of::<c_int>() * 2 + mem::size_of::<usize>();
-        if *cursor + cmsg_header_len_in_stream > msg_stream.len() {
+        if *cursor + CMSG_HEADER_LEN_IN_STREAM > msg_stream.len() {
             eprintln!("[DEBUG] deserialize_stream_to_ancillary_data: Not enough data for cmsg header, breaking.");
             break;
         }
@@ -834,7 +838,7 @@ impl PalSocket for Sys {
         msg.msg_iov = &mut iov;
         msg.msg_iovlen = 1;
 
-        let read = recvmsg(socket, &mut msg, flags)?;
+        let read = Self::recvmsg(socket, &mut msg, flags)?;
 
         if !address.is_null() && !address_len.is_null() {
             // Update the address length
@@ -849,14 +853,14 @@ impl PalSocket for Sys {
         if msg.is_null() {
             return Err(Errno(EINVAL));
         }
+        let mut mhdr = &mut *msg;
         // 1. accept the socket
         let mut fd_guard: Option<FdGuard> = None;
         if !mhdr.msg_name.is_null() || mhdr.msg_namelen != 0 {
             fd_guard = Some(FdGuard::new(syscall::dup(socket as usize, b"listen")?));
         }
-        let socket_to_use = fd_guard.as_ref().map_or(socket, |fd| *fd as c_int);
+        let socket_to_use = fd_guard.as_ref().map_or(socket, |fd| (*fd) as c_int);
 
-        let mut mhdr = &mut *msg;
         let mut msg_stream: Vec<u8> = Vec::new();
         let (iovs_slice, whole_iov_size): (&[iovec], usize) =
             if mhdr.msg_iov.is_null() || mhdr.msg_iovlen == 0 {
@@ -877,7 +881,7 @@ impl PalSocket for Sys {
                 + mhdr.msg_namelen as usize    // name_buffer
                 + mem::size_of::<usize>()      // payload_len
                 + whole_iov_size               // payload_data_buffer
-                + msg.msg_controllen as usize, // ancillary_stream_buffer
+                + mhdr.msg_controllen as usize, // ancillary_stream_buffer
             )
             .map_err(|_| Errno(ENOMEM))?;
 
@@ -899,7 +903,7 @@ impl PalSocket for Sys {
         )?;
         msg_stream.truncate(actual_read_len);
         eprintln!(
-            "[DEBUG] recvmsg: sys_call read {} bytes into msg_stream_buffer",
+            "[DEBUG] recvmsg: sys_call read {} bytes into msg_stream",
             actual_read_len
         );
 
@@ -922,17 +926,17 @@ impl PalSocket for Sys {
         // 6. Reconstruct the ancillary data in the user-provided buffer.
         // cmsg entry format: [level(i32)][type(i32)][data_len(usize)][data]
         if !mhdr.msg_control.is_null() && cmsg_space_provided_by_user > 0 {
-            if cursor < msg_stream_buffer.len() {
+            if cursor < msg_stream.len() {
                 deserialize_stream_to_ancillary_data(
                     mhdr,
                     socket_to_use,
-                    &msg_stream_buffer,
+                    &msg_stream,
                     &mut cursor,
                     cmsg_space_provided_by_user as usize,
                 )?;
                 eprintln!("[DEBUG] recvmsg: After deserialize_stream_to_ancillary_data, cursor = {}, mhdr.msg_controllen = {}", cursor, mhdr.msg_controllen);
             } else {
-                eprintln!("[DEBUG] recvmsg: No ancillary data found in stream after payload (cursor={}, stream_len={})", cursor, msg_stream_buffer.len());
+                eprintln!("[DEBUG] recvmsg: No ancillary data found in stream after payload (cursor={}, stream_len={})", cursor, msg_stream.len());
                 mhdr.msg_controllen = 0;
             }
         } else {
@@ -971,16 +975,15 @@ impl PalSocket for Sys {
                     );
                     fd_guard = Some(FdGuard::new(new_fd));
                 }
-                Err(err) if err.0 == libc::EISCONN => {
+                Err(err) if err.errno == EISCONN => {
                     eprintln!(
                         "[DEBUG] sendmsg: connect copy returned EISCONN, using original socket {}",
                         socket
                     );
-                    socket
                 }
                 Err(err) => {
                     eprintln!("[ERROR] sendmsg: connect copy failed with error: {:?}", err);
-                    return Err(err);
+                    return Err(err.into());
                 }
             };
         } else {
@@ -989,7 +992,7 @@ impl PalSocket for Sys {
                 socket
             );
         };
-        let socket_to_use = fd_guard.as_ref().map_or(socket, |fd| *fd as c_int);
+        let socket_to_use = fd_guard.as_ref().map_or(socket, |fd| (*fd) as c_int);
 
         // 2. Reserve space for the message stream.
         // [payload_len(usize)][payload_data_buffer]
@@ -1005,7 +1008,7 @@ impl PalSocket for Sys {
                 let whole_iov_size = iovs_slice.iter().map(|iov| iov.iov_len).sum();
                 eprintln!(
                     "[DEBUG] sendmsg: Found {} iovecs, total payload size calculated = {}",
-                    iov_slice.len(),
+                    iovs_slice.len(),
                     whole_iov_size
                 );
                 (iovs_slice, whole_iov_size)
@@ -1014,7 +1017,7 @@ impl PalSocket for Sys {
             .try_reserve_exact(
                 mem::size_of::<usize>()     // payload_len
             + whole_iov_size                // payload_data_buffer
-            + msgh.msg_controllen as usize, // ancillary_stream_buffer
+            + mhdr.msg_controllen as usize, // ancillary_stream_buffer
             )
             .map_err(|_| Errno(ENOMEM))?;
         // write a placeholder for payload_len
