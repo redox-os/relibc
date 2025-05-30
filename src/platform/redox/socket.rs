@@ -855,11 +855,12 @@ impl PalSocket for Sys {
         }
         let mut mhdr = &mut *msg;
         // 1. accept the socket
-        let mut fd_guard: Option<FdGuard> = None;
+        let socket_to_use: FdGuard;
         if !mhdr.msg_name.is_null() || mhdr.msg_namelen != 0 {
-            fd_guard = Some(FdGuard::new(syscall::dup(socket as usize, b"listen")?));
+            socket_to_use = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
+        } else {
+            socket_to_use = FdGuard::new(socket.try_into().map_err(|_| Errno(EINVAL))?);
         }
-        let socket_to_use = fd_guard.as_ref().map_or(FdGuard::new(socket), |fd| fd);
 
         let mut msg_stream: Vec<u8> = Vec::new();
         let (iovs_slice, whole_iov_size): (&[iovec], usize) =
@@ -960,7 +961,7 @@ impl PalSocket for Sys {
         let mhdr = &*msg;
 
         // 1. Determine if the socket is connected or needs to be bound.
-        let mut fd_guard: Option<FdGuard> = None;
+        let socket_to_use: FdGuard;
         if !mhdr.msg_name.is_null() || mhdr.msg_namelen != 0 {
             eprintln!(
                 "[DEBUG] sendmsg: msg_name is set, attempting connect copy for socket {}",
@@ -973,13 +974,14 @@ impl PalSocket for Sys {
                         "[DEBUG] sendmsg: connect copy successful, using new_fd = {}",
                         new_fd
                     );
-                    fd_guard = Some(FdGuard::new(new_fd));
+                    socket_to_use = FdGuard::new(new_fd);
                 }
                 Err(err) if err.errno == EISCONN => {
                     eprintln!(
                         "[DEBUG] sendmsg: connect copy returned EISCONN, using original socket {}",
                         socket
                     );
+                    socket_to_use = FdGuard::new(socket.try_into().map_err(|_| Errno(EINVAL))?);
                 }
                 Err(err) => {
                     eprintln!("[ERROR] sendmsg: connect copy failed with error: {:?}", err);
@@ -991,8 +993,8 @@ impl PalSocket for Sys {
                 "[DEBUG] sendmsg: msg_name not set, using original socket {}",
                 socket
             );
+            socket_to_use = FdGuard::new(socket.try_into().map_err(|_| Errno(EINVAL))?);
         };
-        let socket_to_use = fd_guard.as_ref().map_or(FdGuard::new(socket), |fd| fd);
 
         // 2. Reserve space for the message stream.
         // [payload_len(usize)][payload_data_buffer]
