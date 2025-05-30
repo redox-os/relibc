@@ -362,7 +362,7 @@ unsafe fn serialize_payload_to_stream(
 unsafe fn serialize_ancillary_data_to_stream(
     msg: *const msghdr,
     mhdr: &msghdr,
-    socket_to_use: FdGuard,
+    socket_to_use: &FdGuard,
     msg_stream: &mut Vec<u8>,
 ) -> Result<()> {
     eprintln!(
@@ -409,8 +409,8 @@ unsafe fn serialize_ancillary_data_to_stream(
                     let fds_ptr = CMSG_DATA(cmsg) as *const c_int;
                     let fds_slice = slice::from_raw_parts(fds_ptr, fd_count);
                     for (i, &fd) in fds_slice.iter().enumerate() {
-                        eprintln!("[DEBUG] serialize_ancillary_data_to_stream: Sending fd #{} (value: {}) via sendfd on socket {}", i, fd, *socket_to_use);
-                        syscall::sendfd(*socket_to_use as usize, fd as usize, 0, 0)?;
+                        eprintln!("[DEBUG] serialize_ancillary_data_to_stream: Sending fd #{} (value: {}) via sendfd on socket {}", i, fd, **socket_to_use);
+                        syscall::sendfd(**socket_to_use as usize, fd as usize, 0, 0)?;
                     }
                 }
 
@@ -558,7 +558,7 @@ unsafe fn deserialize_stream_to_payload(
 
 unsafe fn deserialize_stream_to_ancillary_data(
     mhdr: &mut msghdr,
-    socket_to_use: FdGuard,
+    socket_to_use: &FdGuard,
     msg_stream: &[u8],
     cursor: &mut usize,
     cmsg_space_provided: usize,
@@ -639,7 +639,7 @@ unsafe fn deserialize_stream_to_ancillary_data(
                 eprintln!("[DEBUG] deserialize_stream_to_ancillary_data: SCM_RIGHTS, fd_count from stream = {}", fd_count);
 
                 for _ in 0..fd_count {
-                    let new_fd = syscall::dup(*socket_to_use as usize, b"recvfd")?;
+                    let new_fd = syscall::dup(**socket_to_use as usize, b"recvfd")?;
                     temp_posix_cmsg_data_buf.extend_from_slice(&(new_fd as c_int).to_le_bytes());
                 }
                 actual_posix_cmsg_data_len = temp_posix_cmsg_data_buf.len();
@@ -921,7 +921,7 @@ impl PalSocket for Sys {
 
         // 5. Get payload data.
         let actual_payload_bytes_written_to_iov =
-            deserialize_stream_to_payload(&mut mhdr, &msg_stream, &mut iovs_slice, &mut cursor)?;
+            deserialize_stream_to_payload(&mut mhdr, &msg_stream, iovs_slice, &mut cursor)?;
         eprintln!("[DEBUG] recvmsg: After deserialize_stream_to_payload, cursor = {}, payload_bytes_written_to_iov = {}", cursor, actual_payload_bytes_written_to_iov);
 
         // 6. Reconstruct the ancillary data in the user-provided buffer.
@@ -1039,7 +1039,7 @@ impl PalSocket for Sys {
 
         // 4. Process Control Messages from msghdr and serialize them.
         if mhdr.msg_controllen > 0 {
-            serialize_ancillary_data_to_stream(msg, mhdr, socket_to_use, &mut msg_stream)?;
+            serialize_ancillary_data_to_stream(msg, mhdr, &socket_to_use, &mut msg_stream)?;
             eprintln!(
                 "[DEBUG] sendmsg: Ancillary data serialized. msg_stream.len() = {}",
                 msg_stream.len()
