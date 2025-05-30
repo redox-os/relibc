@@ -641,7 +641,9 @@ unsafe fn deserialize_stream_to_ancillary_data(
                 actual_posix_cmsg_data_len = temp_posix_cmsg_data_buf.len();
             }
             (SOL_SOCKET, SCM_CREDENTIALS) => {
-                if cmsg_data_len_in_stream != mem::size_of::<ucred>() {
+                if cmsg_data_len_in_stream
+                    != mem::size_of::<pid_t>() + mem::size_of::<uid_t>() + mem::size_of::<gid_t>()
+                {
                     eprintln!("[ERROR] deserialize_stream_to_ancillary_data: SCM_CREDENTIALS data_len mismatch.");
                     return Err(Errno(EINVAL));
                 }
