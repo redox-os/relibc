@@ -1161,7 +1161,7 @@ impl PalSocket for Sys {
                     let mut payload = SO_PASSCRED.to_ne_bytes().to_vec();
                     let call_flags = CallFlags::empty();
                     redox_rt::sys::sys_call(
-                        socket_fd as usize,
+                        socket as usize,
                         payload.as_mut_slice(),
                         CallFlags::empty(),
                         &metadata,
