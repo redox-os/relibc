@@ -1151,7 +1151,7 @@ impl PalSocket for Sys {
                 SO_RCVTIMEO => return set_timeout(b"read_timeout"),
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
                 SO_PASSCRED => {
-                    let mut command_bytes = [0u8; 16];
+                    let mut command_bytes = [0u8; 8];
                     let command = b"setopt";
                     command_bytes[..command.len()].copy_from_slice(command);
                     let metadata = [u64::from_le_bytes(command_bytes.try_into().unwrap())];
