@@ -1150,6 +1150,24 @@ impl PalSocket for Sys {
             SOL_SOCKET => match option_name {
                 SO_RCVTIMEO => return set_timeout(b"read_timeout"),
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
+                SO_PASSCRED => {
+                    let mut command_bytes = [0u8; 16];
+                    let command = b"setsockopt";
+                    command_bytes[..command.len()].copy_from_slice(command);
+                    let metadata = [
+                        u64::from_le_bytes(command_bytes[0..8].try_into().unwrap()),
+                        u64::from_le_bytes(command_bytes[8..16].try_into().unwrap()),
+                    ];
+                    let mut payload = SO_PASSCRED.to_ne_bytes().to_vec();
+                    let call_flags = CallFlags::empty();
+                    redox_rt::sys::sys_call(
+                        socket_fd as usize,
+                        payload.as_mut_slice(),
+                        CallFlags::empty(),
+                        &metadata,
+                    )?;
+                    return Ok(());
+                }
                 _ => (),
             },
             _ => (),
