@@ -1146,11 +1146,16 @@ impl PalSocket for Sys {
             Ok(())
         };
 
+        println!(
+            "setsockopt({}, {}, {}, {:p}, {})",
+            socket, level, option_name, option_value, option_len
+        );
         match level {
             SOL_SOCKET => match option_name {
                 SO_RCVTIMEO => return set_timeout(b"read_timeout"),
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
                 SO_PASSCRED => {
+                    println!("setsockopt: Setting SO_PASSCRED on socket {}", socket);
                     let mut command_bytes = [0u8; 8];
                     let command = b"setopt";
                     command_bytes[..command.len()].copy_from_slice(command);
