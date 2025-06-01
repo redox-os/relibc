@@ -891,6 +891,15 @@ impl PalSocket for Sys {
             "[DEBUG] recvmsg: Prepared msg_stream with expected size {} bytes",
             expected_stream_size
         );
+        let mut cursor: usize = 0;
+        msg_stream[cursor..cursor + mem::size_of::<usize>()]
+            .copy_from_slice(&(mhdr.msg_namelen as usize).to_le_bytes());
+        cursor += mem::size_of::<usize>();
+        msg_stream[cursor..cursor + mem::size_of::<usize>()]
+            .copy_from_slice(&(whole_iov_size).to_le_bytes());
+        cursor += mem::size_of::<usize>();
+        msg_stream[cursor..cursor + mem::size_of::<usize>()]
+            .copy_from_slice(&(mhdr.msg_controllen as usize).to_le_bytes());
 
         // 3. Read the message stream.
         let mut command_bytes = [0u8; 8];
@@ -914,7 +923,7 @@ impl PalSocket for Sys {
             actual_read_len
         );
 
-        let mut cursor: usize = 0;
+        cursor = 0;
         let cmsg_space_provided_by_user = mhdr.msg_controllen;
         mhdr.msg_flags = 0;
 
