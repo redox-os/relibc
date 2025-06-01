@@ -458,7 +458,7 @@ unsafe fn deserialize_stream_to_name(
         eprintln!("[ERROR] deserialize_stream_to_name: Not enough data for name_len.");
         return Err(Errno(EMSGSIZE));
     }
-    let name_len = usize::from_le_bytes(
+    let name_len_in_stream = usize::from_le_bytes(
         msg_stream[*cursor..*cursor + mem::size_of::<usize>()]
             .try_into()
             .map_err(|_| {
@@ -466,10 +466,11 @@ unsafe fn deserialize_stream_to_name(
                 Errno(EINVAL)
             })?,
     );
+    let name_len = cmp::min(name_len_in_stream, mhdr.msg_namelen as usize);
     *cursor += mem::size_of::<usize>();
     eprintln!(
-        "[DEBUG] deserialize_stream_to_name: name_len = {}",
-        name_len
+        "[DEBUG] deserialize_stream_to_name: name_len = {}, msg_namelen = {}",
+        name_len_in_stream, mhdr.msg_namelen
     );
 
     if name_len > 0 {
@@ -500,6 +501,7 @@ unsafe fn deserialize_stream_to_payload(
     mhdr: &mut msghdr,
     msg_stream: &[u8],
     iovs_slice: &[iovec],
+    whole_iov_size: usize,
     cursor: &mut usize,
 ) -> Result<usize> {
     eprintln!(
@@ -511,7 +513,7 @@ unsafe fn deserialize_stream_to_payload(
         eprintln!("[ERROR] deserialize_stream_to_payload: Not enough data for payload_len.");
         return Err(Errno(EMSGSIZE));
     }
-    let payload_len = usize::from_le_bytes(
+    let actual_payload_len_in_stream = usize::from_le_bytes(
         msg_stream[*cursor..*cursor + mem::size_of::<usize>()]
             .try_into()
             .map_err(|_| {
@@ -524,19 +526,16 @@ unsafe fn deserialize_stream_to_payload(
         "[DEBUG] deserialize_stream_to_payload: payload_len = {}",
         payload_len
     );
-
     // Determine actual payload data available in the stream
-    let actual_payload_in_stream_len =
-        cmp::min(payload_len, msg_stream.len().saturating_sub(*cursor));
-    let payload_data_from_stream = &msg_stream[*cursor..*cursor + actual_payload_in_stream_len];
+    let payload_len_to_read = cmp::min(actual_payload_len_in_stream, whole_iov_size);
+    let payload_data_from_stream = &msg_stream[*cursor..*cursor + payload_len_to_read];
+    *cursor += payload_len_to_read;
 
-    // Advance cursor by the length *declared* in the stream, even if truncated
-    *cursor += actual_payload_in_stream_len;
     // Ensure cursor does not go beyond msg_stream.len() after this conceptual advance
     *cursor = cmp::min(*cursor, msg_stream.len());
 
     let mut bytes_scattered: usize = 0;
-    if !mhdr.msg_iov.is_null() && mhdr.msg_iovlen > 0 && actual_payload_in_stream_len > 0 {
+    if !mhdr.msg_iov.is_null() && mhdr.msg_iovlen > 0 && payload_len_to_read > 0 {
         // Pass iovs_slice as &[iovec] if scatter_data_into_iovs expects that
         bytes_scattered = scatter_data_into_iovs(iovs_slice, payload_data_from_stream)?;
         eprintln!(
@@ -545,10 +544,13 @@ unsafe fn deserialize_stream_to_payload(
         );
     }
 
-    if actual_payload_in_stream_len > bytes_scattered {
+    if actual_payload_len_in_stream > whole_iov_size {
         eprintln!("[DEBUG] deserialize_stream_to_payload: MSG_TRUNC set. actual_payload_in_stream_len={}, bytes_scattered={}", actual_payload_in_stream_len, bytes_scattered);
         mhdr.msg_flags |= MSG_TRUNC;
     }
+
+    // Advance cursor by the scatterd bytes len.
+    *cursor += bytes_scattered;
     eprintln!(
         "[DEBUG] deserialize_stream_to_payload: cursor_end = {}",
         *cursor
@@ -935,8 +937,13 @@ impl PalSocket for Sys {
         );
 
         // 5. Get payload data.
-        let actual_payload_bytes_written_to_iov =
-            deserialize_stream_to_payload(&mut mhdr, &msg_stream, iovs_slice, &mut cursor)?;
+        let actual_payload_bytes_written_to_iov = deserialize_stream_to_payload(
+            &mut mhdr,
+            &msg_stream,
+            iovs_slice,
+            whole_iov_size,
+            &mut cursor,
+        )?;
         eprintln!("[DEBUG] recvmsg: After deserialize_stream_to_payload, cursor = {}, payload_bytes_written_to_iov = {}", cursor, actual_payload_bytes_written_to_iov);
 
         // 6. Reconstruct the ancillary data in the user-provided buffer.
