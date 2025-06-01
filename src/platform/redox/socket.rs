@@ -872,19 +872,21 @@ impl PalSocket for Sys {
                 let whole_iov_size = iovs_slice.iter().map(|iov| iov.iov_len).sum();
                 (iovs_slice, whole_iov_size)
             };
-        // 2. Reserve space for the message stream.
+        // 2. Prepare space for the message stream.
         // [name_len(usize)][name_buffer]
         // [payload_len(usize)][payload_data_buffer]
         // [ancillary_stream_buffer]
+        let expected_stream_size = {
+            mem::size_of::<usize>()         // name_len
+            + mhdr.msg_namelen as usize     // name_buffer
+            + mem::size_of::<usize>()       // payload_len
+            + whole_iov_size                // payload_data_buffer
+            + mhdr.msg_controllen as usize // ancillary_stream_buffer
+        };
         msg_stream
-            .try_reserve_exact(
-                mem::size_of::<usize>()        // name_len
-                + mhdr.msg_namelen as usize    // name_buffer
-                + mem::size_of::<usize>()      // payload_len
-                + whole_iov_size               // payload_data_buffer
-                + mhdr.msg_controllen as usize, // ancillary_stream_buffer
-            )
+            .try_reserve_exact(expected_stream_size)
             .map_err(|_| Errno(ENOMEM))?;
+        msg_stream.resize(expected_stream_size, 0);
 
         // 3. Read the message stream.
         let mut command_bytes = [0u8; 8];
