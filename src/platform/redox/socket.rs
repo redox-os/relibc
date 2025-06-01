@@ -887,6 +887,10 @@ impl PalSocket for Sys {
             .try_reserve_exact(expected_stream_size)
             .map_err(|_| Errno(ENOMEM))?;
         msg_stream.resize(expected_stream_size, 0);
+        println!(
+            "[DEBUG] recvmsg: Prepared msg_stream with expected size {} bytes",
+            expected_stream_size
+        );
 
         // 3. Read the message stream.
         let mut command_bytes = [0u8; 8];
