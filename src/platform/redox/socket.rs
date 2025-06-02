@@ -503,6 +503,7 @@ unsafe fn deserialize_stream_to_payload(
     iovs_slice: &[iovec],
     whole_iov_size: usize,
     cursor: &mut usize,
+    test: u8,
 ) -> Result<usize> {
     eprintln!(
         "[DEBUG] deserialize_stream_to_payload: cursor_start = {}",
@@ -942,6 +943,7 @@ impl PalSocket for Sys {
             iovs_slice,
             whole_iov_size,
             &mut cursor,
+            0u8,
         )?;
         eprintln!("[DEBUG] recvmsg: After deserialize_stream_to_payload, cursor = {}, payload_bytes_written_to_iov = {}", cursor, actual_payload_bytes_written_to_iov);
 
