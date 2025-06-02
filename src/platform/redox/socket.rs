@@ -342,11 +342,11 @@ unsafe fn serialize_payload_to_stream(
     );
 
     if bytes_written != whole_iov_size {
-        return Err(Errno(EFAULT));
         eprintln!(
             "[ERROR] serialize_payload_to_stream: gathered_bytes ({}) != whole_iov_size ({})",
             bytes_written, whole_iov_size
         );
+        return Err(Errno(EFAULT));
     }
 
     assert!(
