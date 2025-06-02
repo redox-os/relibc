@@ -523,8 +523,8 @@ unsafe fn deserialize_stream_to_payload(
     );
     *cursor += mem::size_of::<usize>();
     eprintln!(
-        "[DEBUG] deserialize_stream_to_payload: payload_len = {}",
-        actual_payload_len_in_stream
+        "[DEBUG] deserialize_stream_to_payload: payload_len = {}, whole_iov_size = {}",
+        actual_payload_len_in_stream, whole_iov_size
     );
     // Determine actual payload data available in the stream
     let payload_len_to_read = cmp::min(actual_payload_len_in_stream, whole_iov_size);
