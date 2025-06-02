@@ -524,7 +524,7 @@ unsafe fn deserialize_stream_to_payload(
     *cursor += mem::size_of::<usize>();
     eprintln!(
         "[DEBUG] deserialize_stream_to_payload: payload_len = {}",
-        payload_len
+        actual_payload_len_in_stream
     );
     // Determine actual payload data available in the stream
     let payload_len_to_read = cmp::min(actual_payload_len_in_stream, whole_iov_size);
@@ -545,7 +545,7 @@ unsafe fn deserialize_stream_to_payload(
     }
 
     if actual_payload_len_in_stream > whole_iov_size {
-        eprintln!("[DEBUG] deserialize_stream_to_payload: MSG_TRUNC set. actual_payload_in_stream_len={}, bytes_scattered={}", actual_payload_in_stream_len, bytes_scattered);
+        eprintln!("[DEBUG] deserialize_stream_to_payload: MSG_TRUNC set. actual_payload_in_stream_len={}, bytes_scattered={}", actual_payload_len_in_stream, bytes_scattered);
         mhdr.msg_flags |= MSG_TRUNC;
     }
 
