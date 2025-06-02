@@ -528,11 +528,12 @@ unsafe fn deserialize_stream_to_payload(
     );
     // Determine actual payload data available in the stream
     let payload_len_to_read = cmp::min(actual_payload_len_in_stream, whole_iov_size);
+    eprintln!(
+        "[DEBUG] deserialize_stream_to_payload: payload_len_to_read = {}",
+        payload_len_to_read
+    );
     let payload_data_from_stream = &msg_stream[*cursor..*cursor + payload_len_to_read];
     *cursor += payload_len_to_read;
-
-    // Ensure cursor does not go beyond msg_stream.len() after this conceptual advance
-    *cursor = cmp::min(*cursor, msg_stream.len());
 
     let mut bytes_scattered: usize = 0;
     if !mhdr.msg_iov.is_null() && mhdr.msg_iovlen > 0 && payload_len_to_read > 0 {
@@ -549,8 +550,6 @@ unsafe fn deserialize_stream_to_payload(
         mhdr.msg_flags |= MSG_TRUNC;
     }
 
-    // Advance cursor by the scatterd bytes len.
-    *cursor += bytes_scattered;
     eprintln!(
         "[DEBUG] deserialize_stream_to_payload: cursor_end = {}",
         *cursor
