@@ -37,6 +37,9 @@ pub enum ProcCall {
     Getppid = 12,
     Rename = 13,
     DisableSetpgid = 14,
+
+    // Temporary calls for getting process credentials
+    GetProcCredentials = 15,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]
