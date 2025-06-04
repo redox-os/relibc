@@ -68,6 +68,7 @@ impl ProcCall {
             12 => Self::Getppid,
             13 => Self::Rename,
             14 => Self::DisableSetpgid,
+            15 => Self::GetProcCredentials,
             _ => return None,
         })
     }
