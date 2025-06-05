@@ -841,8 +841,8 @@ impl PalSocket for Sys {
         msg.msg_iovlen = 1;
 
         // 1. accept the socket
-        let read = if !mhdr.msg_name.is_null() || mhdr.msg_namelen != 0 {
-            fd = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
+        let read = if !msg.msg_name.is_null() || msg.msg_namelen != 0 {
+            let fd = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
             Self::recvmsg(*fd as c_int, &mut msg, flags)?
         } else {
             Self::recvmsg(socket, &mut msg, flags)?
@@ -1040,7 +1040,7 @@ impl PalSocket for Sys {
             msg_stream.len()
         );
         let written = redox_rt::sys::sys_call(
-            socke as usize,
+            socket as usize,
             msg_stream.as_mut_slice(),
             call_flags,
             &metadata,
