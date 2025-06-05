@@ -362,7 +362,7 @@ unsafe fn serialize_payload_to_stream(
 unsafe fn serialize_ancillary_data_to_stream(
     msg: *const msghdr,
     mhdr: &msghdr,
-    socket_to_use: &FdGuard,
+    socket: c_int,
     msg_stream: &mut Vec<u8>,
 ) -> Result<()> {
     eprintln!(
@@ -409,8 +409,8 @@ unsafe fn serialize_ancillary_data_to_stream(
                     let fds_ptr = CMSG_DATA(cmsg) as *const c_int;
                     let fds_slice = slice::from_raw_parts(fds_ptr, fd_count);
                     for (i, &fd) in fds_slice.iter().enumerate() {
-                        eprintln!("[DEBUG] serialize_ancillary_data_to_stream: Sending fd #{} (value: {}) via sendfd on socket {}", i, fd, **socket_to_use);
-                        syscall::sendfd(**socket_to_use as usize, fd as usize, 0, 0)?;
+                        eprintln!("[DEBUG] serialize_ancillary_data_to_stream: Sending fd #{} (value: {}) via sendfd on socket {}", i, fd, socket);
+                        syscall::sendfd(socket as usize, fd as usize, 0, 0)?;
                     }
                 }
 
@@ -560,7 +560,7 @@ unsafe fn deserialize_stream_to_payload(
 
 unsafe fn deserialize_stream_to_ancillary_data(
     mhdr: &mut msghdr,
-    socket_to_use: &FdGuard,
+    socket: c_int,
     msg_stream: &[u8],
     cursor: &mut usize,
     cmsg_space_provided: usize,
@@ -641,7 +641,7 @@ unsafe fn deserialize_stream_to_ancillary_data(
                 eprintln!("[DEBUG] deserialize_stream_to_ancillary_data: SCM_RIGHTS, fd_count from stream = {}", fd_count);
 
                 for _ in 0..fd_count {
-                    let new_fd = syscall::dup(**socket_to_use as usize, b"recvfd")?;
+                    let new_fd = syscall::dup(socket as usize, b"recvfd")?;
                     temp_posix_cmsg_data_buf.extend_from_slice(&(new_fd as c_int).to_le_bytes());
                 }
                 actual_posix_cmsg_data_len = temp_posix_cmsg_data_buf.len();
@@ -840,7 +840,13 @@ impl PalSocket for Sys {
         msg.msg_iov = &mut iov;
         msg.msg_iovlen = 1;
 
-        let read = Self::recvmsg(socket, &mut msg, flags)?;
+        // 1. accept the socket
+        let read = if !mhdr.msg_name.is_null() || mhdr.msg_namelen != 0 {
+            fd = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
+            Self::recvmsg(*fd as c_int, &mut msg, flags)?
+        } else {
+            Self::recvmsg(socket, &mut msg, flags)?
+        };
 
         if !address.is_null() && !address_len.is_null() {
             // Update the address length
@@ -856,14 +862,6 @@ impl PalSocket for Sys {
             return Err(Errno(EINVAL));
         }
         let mut mhdr = &mut *msg;
-        // 1. accept the socket
-        let socket_to_use: FdGuard;
-        if !mhdr.msg_name.is_null() || mhdr.msg_namelen != 0 {
-            socket_to_use = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
-        } else {
-            socket_to_use = FdGuard::new(socket.try_into().map_err(|_| Errno(EINVAL))?);
-        }
-
         let mut msg_stream: Vec<u8> = Vec::new();
         let (iovs_slice, whole_iov_size): (&[iovec], usize) =
             if mhdr.msg_iov.is_null() || mhdr.msg_iovlen == 0 {
@@ -909,16 +907,9 @@ impl PalSocket for Sys {
         command_bytes[..command.len()].copy_from_slice(command);
         let metadata = [u64::from_le_bytes(command_bytes.try_into().unwrap())];
         let call_flags = CallFlags::empty();
-        eprintln!(
-            "[DEBUG] recvmsg: Calling sys_call for socket {}",
-            *socket_to_use
-        );
-        let actual_read_len = redox_rt::sys::sys_call(
-            *socket_to_use as usize,
-            &mut msg_stream,
-            call_flags,
-            &metadata,
-        )?;
+        eprintln!("[DEBUG] recvmsg: Calling sys_call for socket {}", socket,);
+        let actual_read_len =
+            redox_rt::sys::sys_call(socket as usize, &mut msg_stream, call_flags, &metadata)?;
         msg_stream.truncate(actual_read_len);
         eprintln!(
             "[DEBUG] recvmsg: sys_call read {} bytes into msg_stream",
@@ -953,7 +944,7 @@ impl PalSocket for Sys {
             if cursor < msg_stream.len() {
                 deserialize_stream_to_ancillary_data(
                     mhdr,
-                    &socket_to_use,
+                    socket,
                     &msg_stream,
                     &mut cursor,
                     cmsg_space_provided_by_user as usize,
@@ -982,42 +973,6 @@ impl PalSocket for Sys {
             return Err(Errno(EINVAL));
         }
         let mhdr = &*msg;
-
-        // 1. Determine if the socket is connected or needs to be bound.
-        let socket_to_use: FdGuard;
-        if !mhdr.msg_name.is_null() || mhdr.msg_namelen != 0 {
-            eprintln!(
-                "[DEBUG] sendmsg: msg_name is set, attempting connect copy for socket {}",
-                socket
-            );
-            match bind_or_connect!(connect copy, socket, mhdr.msg_name as *const sockaddr, mhdr.msg_namelen)
-            {
-                Ok(new_fd) => {
-                    eprintln!(
-                        "[DEBUG] sendmsg: connect copy successful, using new_fd = {}",
-                        new_fd
-                    );
-                    socket_to_use = FdGuard::new(new_fd);
-                }
-                Err(err) if err.errno == EISCONN => {
-                    eprintln!(
-                        "[DEBUG] sendmsg: connect copy returned EISCONN, using original socket {}",
-                        socket
-                    );
-                    socket_to_use = FdGuard::new(socket.try_into().map_err(|_| Errno(EINVAL))?);
-                }
-                Err(err) => {
-                    eprintln!("[ERROR] sendmsg: connect copy failed with error: {:?}", err);
-                    return Err(err.into());
-                }
-            };
-        } else {
-            eprintln!(
-                "[DEBUG] sendmsg: msg_name not set, using original socket {}",
-                socket
-            );
-            socket_to_use = FdGuard::new(socket.try_into().map_err(|_| Errno(EINVAL))?);
-        };
 
         // 2. Reserve space for the message stream.
         // [payload_len(usize)][payload_data_buffer]
@@ -1062,7 +1017,7 @@ impl PalSocket for Sys {
 
         // 4. Process Control Messages from msghdr and serialize them.
         if mhdr.msg_controllen > 0 {
-            serialize_ancillary_data_to_stream(msg, mhdr, &socket_to_use, &mut msg_stream)?;
+            serialize_ancillary_data_to_stream(msg, mhdr, socket, &mut msg_stream)?;
             eprintln!(
                 "[DEBUG] sendmsg: Ancillary data serialized. msg_stream.len() = {}",
                 msg_stream.len()
@@ -1081,11 +1036,11 @@ impl PalSocket for Sys {
         // 6. Send the message stream.
         eprintln!(
             "[DEBUG] sendmsg: Calling sys_call for socket {}, msg_stream.len() = {}",
-            *socket_to_use,
+            socket,
             msg_stream.len()
         );
         let written = redox_rt::sys::sys_call(
-            *socket_to_use as usize,
+            socke as usize,
             msg_stream.as_mut_slice(),
             call_flags,
             &metadata,
@@ -1133,7 +1088,12 @@ impl PalSocket for Sys {
         msg.msg_control = ptr::null_mut();
         msg.msg_controllen = 0;
 
-        Self::sendmsg(socket, &msg, flags)
+        if dest_addr == ptr::null() || dest_len == 0 {
+            Self::sendmsg(socket, &msg, flags)
+        } else {
+            let fd = FdGuard::new(bind_or_connect!(connect copy, socket, dest_addr, dest_len)?);
+            Self::sendmsg(*fd as c_int, &msg, flags)
+        }
     }
 
     unsafe fn setsockopt(
