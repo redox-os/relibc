@@ -590,7 +590,7 @@ unsafe fn deserialize_stream_to_ancillary_data(
             eprintln!("[DEBUG] deserialize_stream_to_ancillary_data: Not enough data for cmsg header, breaking.");
             println!(
                 "[DEBUG] deserialize_stream_to_ancillary_data: remaining msg_stream {:?}",
-                msg_stream[*cursor..]
+                &msg_stream[*cursor..]
             );
             if msg_stream[*cursor..].iter().any(|&b| b != 0) {
                 eprintln!(
