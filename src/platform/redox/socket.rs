@@ -588,12 +588,20 @@ unsafe fn deserialize_stream_to_ancillary_data(
             mem::size_of::<c_int>() * 2 + mem::size_of::<usize>();
         if *cursor + CMSG_HEADER_LEN_IN_STREAM > msg_stream.len() {
             eprintln!("[DEBUG] deserialize_stream_to_ancillary_data: Not enough data for cmsg header, breaking.");
+            println!(
+                "[DEBUG] deserialize_stream_to_ancillary_data: remaining msg_stream {:?}",
+                msg_stream[*cursor..]
+            );
             if msg_stream[*cursor..].iter().any(|&b| b != 0) {
                 eprintln!(
                     "[ERROR] deserialize_stream_to_ancillary_data: Incomplete cmsg header found"
                 );
                 mhdr.msg_flags |= MSG_CTRUNC;
                 cmsg_truncated_flag_set = true;
+            } else {
+                eprintln!(
+                    "[DEBUG] deserialize_stream_to_ancillary_data: There is no Imcomplete cmsg header."
+                );
             }
             break;
         }
