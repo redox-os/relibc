@@ -592,17 +592,19 @@ unsafe fn deserialize_stream_to_ancillary_data(
                 "[DEBUG] deserialize_stream_to_ancillary_data: remaining msg_stream {:?}",
                 &msg_stream[*cursor..]
             );
-            let _ = if msg_stream[*cursor..].iter().any(|&b| b != 0) {
+            if msg_stream[*cursor..].iter().any(|&b| b != 0) {
                 eprintln!(
                     "[ERROR] deserialize_stream_to_ancillary_data: Incomplete cmsg header found"
                 );
                 mhdr.msg_flags |= MSG_CTRUNC;
                 cmsg_truncated_flag_set = true;
+                // compile error!
+                cursor += 0;
             } else {
                 eprintln!(
                     "[DEBUG] deserialize_stream_to_ancillary_data: There is no Imcomplete cmsg header."
                 );
-            };
+            }
             break;
         }
 
