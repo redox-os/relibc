@@ -598,8 +598,6 @@ unsafe fn deserialize_stream_to_ancillary_data(
                 );
                 mhdr.msg_flags |= MSG_CTRUNC;
                 cmsg_truncated_flag_set = true;
-                // compile error!
-                cursor += 0;
             } else {
                 eprintln!(
                     "[DEBUG] deserialize_stream_to_ancillary_data: There is no Imcomplete cmsg header."
