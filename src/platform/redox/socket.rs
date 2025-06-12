@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use core::{cmp, mem, ptr, slice, str};
-use redox_rt::proc::FdGuard;
+use redox_rt::{proc::FdGuard, protocol::SocketCall};
 use syscall::{self, flag::*};
 
 use super::{
@@ -917,10 +917,7 @@ impl PalSocket for Sys {
             .copy_from_slice(&(mhdr.msg_controllen as usize).to_le_bytes());
 
         // 3. Read the message stream.
-        let mut command_bytes = [0u8; 8];
-        let command = b"recvmsg";
-        command_bytes[..command.len()].copy_from_slice(command);
-        let metadata = [u64::from_le_bytes(command_bytes.try_into().unwrap())];
+        let metadata = [SocketCall::RecvMsg as u64];
         let call_flags = CallFlags::empty();
         eprintln!("[DEBUG] recvmsg: Calling sys_call for socket {}", socket,);
         let actual_read_len =
@@ -1042,10 +1039,7 @@ impl PalSocket for Sys {
         }
 
         // 5. Prepare command.
-        let mut command_bytes = [0u8; 8];
-        let command = b"sendmsg";
-        command_bytes[..command.len()].copy_from_slice(command);
-        let metadata = [u64::from_le_bytes(command_bytes.try_into().unwrap())];
+        let metadata = [SocketCall::SendMsg as u64];
         let call_flags = CallFlags::empty();
 
         // 6. Send the message stream.
@@ -1154,11 +1148,9 @@ impl PalSocket for Sys {
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
                 SO_PASSCRED => {
                     println!("setsockopt: Setting SO_PASSCRED on socket {}", socket);
-                    let mut command_bytes = [0u8; 8];
-                    let command = b"setopt";
-                    command_bytes[..command.len()].copy_from_slice(command);
-                    let metadata = [u64::from_le_bytes(command_bytes.try_into().unwrap())];
-                    let mut payload = SO_PASSCRED.to_ne_bytes().to_vec();
+                    let metadata = [SocketCall::SetSockOpt as u64, option_name as u64];
+                    let payload =
+                        slice::from_raw_parts_mut(option_value as *const u8, option_len as usize);
                     let call_flags = CallFlags::empty();
                     redox_rt::sys::sys_call(
                         socket as usize,
