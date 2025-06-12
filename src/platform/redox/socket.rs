@@ -1150,11 +1150,11 @@ impl PalSocket for Sys {
                     println!("setsockopt: Setting SO_PASSCRED on socket {}", socket);
                     let metadata = [SocketCall::SetSockOpt as u64, option_name as u64];
                     let payload =
-                        slice::from_raw_parts_mut(option_value as *const u8, option_len as usize);
+                        slice::from_raw_parts_mut(option_value as *mut u8, option_len as usize);
                     let call_flags = CallFlags::empty();
                     redox_rt::sys::sys_call(
                         socket as usize,
-                        payload.as_mut_slice(),
+                        payload,
                         CallFlags::empty(),
                         &metadata,
                     )?;
