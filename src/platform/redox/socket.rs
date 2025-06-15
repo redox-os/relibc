@@ -701,38 +701,14 @@ impl PalSocket for Sys {
         if flags != 0 {
             return Err(Errno(EOPNOTSUPP));
         }
-        // 1. Prepare iovec
-        let mut iov = iovec {
-            iov_base: buf,
-            iov_len: len,
-        };
-
-        // 2. Prepare msghdr
-        let mut msg: msghdr = mem::zeroed();
-
-        // 3. Setting destination address
-        if !address.is_null() && !address_len.is_null() {
-            msg.msg_name = address as *mut c_void;
-            msg.msg_namelen = *address_len;
-        }
-        // 4. Setting data for receiving
-        msg.msg_iov = &mut iov;
-        msg.msg_iovlen = 1;
-
-        // 1. accept the socket
-        let read = if !msg.msg_name.is_null() || msg.msg_namelen != 0 {
-            let fd = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
-            Self::recvmsg(*fd as c_int, &mut msg, flags)?
+        if address == ptr::null_mut() || address_len == ptr::null_mut() {
+            Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
         } else {
-            Self::recvmsg(socket, &mut msg, flags)?
-        };
+            let fd = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
+            Self::getpeername(*fd as c_int, address, address_len)?;
 
-        if !address.is_null() && !address_len.is_null() {
-            // Update the address length
-            *address_len = msg.msg_namelen;
+            Self::read(*fd as c_int, slice::from_raw_parts_mut(buf as *mut u8, len))
         }
-
-        Ok(read)
     }
 
     unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> Result<usize> {
@@ -916,34 +892,11 @@ impl PalSocket for Sys {
         if flags != 0 {
             return Err(Errno(EOPNOTSUPP));
         }
-        // 1. Prepare iovec
-        let iov = iovec {
-            iov_base: buf as *mut c_void,
-            iov_len: len,
-        };
-
-        // 2.prepare msghdr
-        let mut msg: msghdr = mem::zeroed();
-
-        // 3. setting destination address
-        if dest_addr != ptr::null() || dest_len != 0 {
-            msg.msg_name = dest_addr as *mut c_void;
-            msg.msg_namelen = dest_len;
-        }
-
-        // 4. setting data for sending
-        msg.msg_iov = &iov as *const iovec as *mut iovec;
-        msg.msg_iovlen = 1;
-
-        // 5. sendto does not support control messages
-        msg.msg_control = ptr::null_mut();
-        msg.msg_controllen = 0;
-
         if dest_addr == ptr::null() || dest_len == 0 {
-            Self::sendmsg(socket, &msg, flags)
+            Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
         } else {
             let fd = FdGuard::new(bind_or_connect!(connect copy, socket, dest_addr, dest_len)?);
-            Self::sendmsg(*fd as c_int, &msg, flags)
+            Self::write(*fd as c_int, slice::from_raw_parts(buf as *const u8, len))
         }
     }
 
