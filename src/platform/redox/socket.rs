@@ -331,6 +331,9 @@ unsafe fn deserialize_name_from_stream(
             );
         }
         *cursor += name_len;
+    } else {
+        // If name_len is 0, we set msg_name to null
+        mhdr.msg_namelen = 0;
     }
     Ok(())
 }
@@ -396,10 +399,6 @@ unsafe fn deserialize_ancillary_data_from_stream(
     cursor: &mut usize,
     cmsg_space_provided: usize,
 ) -> Result<()> {
-    eprintln!(
-        "[DEBUG] deserialize_ancillary_data_from_stream: cursor_start={}, cmsg_space_provided={}",
-        *cursor, cmsg_space_provided
-    );
     let mut current_cmsg_ptr_in_user_buf = if !mhdr.msg_control.is_null() && cmsg_space_provided > 0
     {
         CMSG_FIRSTHDR(mhdr)
@@ -408,31 +407,13 @@ unsafe fn deserialize_ancillary_data_from_stream(
     };
     let mut remaining_user_cmsg_buf_len = cmsg_space_provided;
     let mut total_csmg_bytes_written_to_user_buf: usize = 0;
-    let mut cmsg_truncated_flag_set = false;
 
     while *cursor < msg_stream.len() {
-        eprintln!(
-            "[DEBUG] deserialize_ancillary_data_from_stream: Loop start, cursor = {}",
-            *cursor
-        );
         const CMSG_HEADER_LEN_IN_STREAM: usize =
             mem::size_of::<c_int>() * 2 + mem::size_of::<usize>();
         if *cursor + CMSG_HEADER_LEN_IN_STREAM > msg_stream.len() {
-            eprintln!("[DEBUG] deserialize_ancillary_data_from_stream: Not enough data for cmsg header, breaking.");
-            eprintln!(
-                "[DEBUG] deserialize_ancillary_data_from_stream: remaining msg_stream {:?}",
-                &msg_stream[*cursor..]
-            );
             if msg_stream[*cursor..].iter().any(|&b| b != 0) {
-                eprintln!(
-                    "[ERROR] deserialize_ancillary_data_from_stream: Incomplete cmsg header found"
-                );
                 mhdr.msg_flags |= MSG_CTRUNC;
-                cmsg_truncated_flag_set = true;
-            } else {
-                eprintln!(
-                    "[DEBUG] deserialize_ancillary_data_from_stream: There is no Imcomplete cmsg header."
-                );
             }
             break;
         }
@@ -446,13 +427,9 @@ unsafe fn deserialize_ancillary_data_from_stream(
 
         let cmsg_data_len_in_stream = read_num::<usize>(&msg_stream[*cursor..])?;
         *cursor += mem::size_of::<usize>();
-        eprintln!("[DEBUG] deserialize_ancillary_data_from_stream: Parsed CMSG from stream: level={}, type={}, data_len_in_stream={}",
-            cmsg_level, cmsg_type, cmsg_data_len_in_stream);
 
         if *cursor + cmsg_data_len_in_stream > msg_stream.len() {
-            eprintln!("[ERROR] deserialize_ancillary_data_from_stream: Stream ended prematurely for cmsg data (expected {} bytes).", cmsg_data_len_in_stream);
             mhdr.msg_flags |= MSG_CTRUNC;
-            cmsg_truncated_flag_set = true;
             break;
         }
         let cmsg_data_from_stream = &msg_stream[*cursor..*cursor + cmsg_data_len_in_stream];
@@ -464,11 +441,9 @@ unsafe fn deserialize_ancillary_data_from_stream(
         match (cmsg_level, cmsg_type) {
             (SOL_SOCKET, SCM_RIGHTS) => {
                 if cmsg_data_len_in_stream != mem::size_of::<usize>() {
-                    eprintln!("[ERROR] deserialize_ancillary_data_from_stream: SCM_RIGHTS data_len mismatch.");
                     return Err(Errno(EINVAL));
                 }
                 let fd_count = read_num::<usize>(&cmsg_data_from_stream)?;
-                eprintln!("[DEBUG] deserialize_ancillary_data_from_stream: SCM_RIGHTS, fd_count from stream = {}", fd_count);
 
                 for _ in 0..fd_count {
                     let new_fd = syscall::dup(socket as usize, b"recvfd")?;
@@ -480,7 +455,6 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 if cmsg_data_len_in_stream
                     != mem::size_of::<pid_t>() + mem::size_of::<uid_t>() + mem::size_of::<gid_t>()
                 {
-                    eprintln!("[ERROR] deserialize_ancillary_data_from_stream: SCM_CREDENTIALS data_len mismatch.");
                     return Err(Errno(EINVAL));
                 }
                 let pid = read_num::<pid_t>(&cmsg_data_from_stream)?;
@@ -489,7 +463,6 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 let gid_offset = uid_offset + mem::size_of::<uid_t>();
                 let gid = read_num::<gid_t>(&cmsg_data_from_stream[gid_offset..])?;
                 let cred = ucred { pid, uid, gid };
-                eprintln!("[DEBUG] deserialize_ancillary_data_from_stream: SCM_CREDENTIALS, pid={}, uid={}, gid={}", pid, uid, gid);
 
                 temp_posix_cmsg_data_buf.extend_from_slice(unsafe {
                     slice::from_raw_parts(
@@ -500,13 +473,11 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 actual_posix_cmsg_data_len = temp_posix_cmsg_data_buf.len();
             }
             _ => {
-                eprintln!("[ERROR] deserialize_ancillary_data_from_stream: Unsupported cmsg: level={}, type={}", cmsg_level, cmsg_type);
                 return Err(Errno(EINVAL));
             }
         }
 
         let space_needed_for_posix_cmsg = CMSG_SPACE(actual_posix_cmsg_data_len as u32) as usize;
-        eprintln!("[DEBUG] deserialize_ancillary_data_from_stream: POSIX cmsg will need {} bytes. User buffer has {} remaining.", space_needed_for_posix_cmsg, remaining_user_cmsg_buf_len);
 
         if !current_cmsg_ptr_in_user_buf.is_null()
             && remaining_user_cmsg_buf_len >= space_needed_for_posix_cmsg
@@ -527,22 +498,12 @@ unsafe fn deserialize_ancillary_data_from_stream(
             total_csmg_bytes_written_to_user_buf += aligned_len_written;
             remaining_user_cmsg_buf_len -= aligned_len_written;
             current_cmsg_ptr_in_user_buf = CMSG_NXTHDR(mhdr, current_cmsg_ptr_in_user_buf);
-            eprintln!("[DEBUG] deserialize_ancillary_data_from_stream: Wrote POSIX cmsg. total_written={}, remaining_space={}", total_csmg_bytes_written_to_user_buf, remaining_user_cmsg_buf_len);
         } else {
-            eprintln!("[DEBUG] deserialize_ancillary_data_from_stream: Not enough space in user cmsg_control, or cmsg_control is null. Setting MSG_CTRUNC.");
             mhdr.msg_flags |= MSG_CTRUNC;
-            cmsg_truncated_flag_set = true; // Mark that truncation occurred
             break; // Stop processing further cmsgs
         }
     }
     mhdr.msg_controllen = total_csmg_bytes_written_to_user_buf;
-    eprintln!(
-        "[DEBUG] deserialize_ancillary_data_from_stream: Final mhdr.msg_controllen = {}",
-        mhdr.msg_controllen
-    );
-    if cmsg_truncated_flag_set {
-        eprintln!("[DEBUG] deserialize_ancillary_data_from_stream: MSG_CTRUNC was set.");
-    }
     Ok(())
 }
 
@@ -835,16 +796,11 @@ impl PalSocket for Sys {
             Ok(())
         };
 
-        println!(
-            "setsockopt({}, {}, {}, {:p}, {})",
-            socket, level, option_name, option_value, option_len
-        );
         match level {
             SOL_SOCKET => match option_name {
                 SO_RCVTIMEO => return set_timeout(b"read_timeout"),
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
                 SO_PASSCRED => {
-                    println!("setsockopt: Setting SO_PASSCRED on socket {}", socket);
                     let metadata = [SocketCall::SetSockOpt as u64, option_name as u64];
                     let payload =
                         slice::from_raw_parts_mut(option_value as *mut u8, option_len as usize);
