@@ -746,7 +746,7 @@ impl PalSocket for Sys {
         } else {
             unsafe { slice::from_raw_parts(mhdr.msg_iov, mhdr.msg_iovlen as usize) }
         };
-        let whole_iov_size = iovs_slice.iter().map(|iov| iov.iov_len).sum();
+        let whole_iov_size: usize = iovs_slice.iter().map(|iov| iov.iov_len).sum();
 
         let mut msg_stream: Vec<u8> = Vec::new();
         // 2. Prepare space for the message stream.
@@ -848,7 +848,7 @@ impl PalSocket for Sys {
         };
 
         let mut msg_stream: Vec<u8> = Vec::new();
-        let whole_iov_size = iovs_slice.iter().map(|iov| iov.iov_len).sum();
+        let whole_iov_size: usize = iovs_slice.iter().map(|iov| iov.iov_len).sum();
         msg_stream
             .try_reserve_exact(
                 mem::size_of::<usize>()     // payload_len
