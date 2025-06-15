@@ -275,7 +275,7 @@ unsafe fn serialize_ancillary_data_to_stream(
                 }
                 let fd_count = data_len / mem::size_of::<c_int>();
 
-                // 3.1. Call syscall::sendfd for each fd.
+                // Call syscall::sendfd for each fd.
                 if fd_count > 0 {
                     let fds_ptr = CMSG_DATA(cmsg) as *const c_int;
                     let fds_slice = slice::from_raw_parts(fds_ptr, fd_count);
@@ -284,19 +284,18 @@ unsafe fn serialize_ancillary_data_to_stream(
                     }
                 }
 
-                // 3.2. Serialize to ancillary_data_stream.
+                // Serialize to ancillary_data_stream.
                 // Our intermediate format: data_len is size of fd_count (usize), data is fd_count (usize)
                 let data_for_stream_len = mem::size_of::<usize>();
                 let data_for_stream_payload = (fd_count as usize).to_le_bytes();
 
-                msg_stream.extend_from_slice(&(data_for_stream_len as usize).to_le_bytes()); // data_len field
-                msg_stream.extend_from_slice(&data_for_stream_payload); // data field (fd_count)
+                msg_stream.extend_from_slice(&(data_for_stream_len as usize).to_le_bytes());
+                msg_stream.extend_from_slice(&data_for_stream_payload);
             }
             (SOL_SOCKET, SCM_CREDENTIALS) => {
                 // Our intermediate format: data_len is 0, no data payload
                 let data_for_stream_len = 0usize;
                 msg_stream.extend_from_slice(&(data_for_stream_len as usize).to_le_bytes());
-                // data_len field (0)
             }
             _ => {
                 return Err(Errno(EOPNOTSUPP));
@@ -332,7 +331,7 @@ unsafe fn deserialize_name_from_stream(
         }
         *cursor += name_len;
     } else {
-        // If name_len is 0, we set msg_name to null
+        // If name_len is 0, set msg_namelen to 0
         mhdr.msg_namelen = 0;
     }
     Ok(())
@@ -421,10 +420,8 @@ unsafe fn deserialize_ancillary_data_from_stream(
         // cmsg entry format: [level(i32)][type(i32)][data_len(usize)][data]
         let cmsg_level = read_num::<c_int>(&msg_stream[*cursor..])?;
         *cursor += mem::size_of::<c_int>();
-
         let cmsg_type = read_num::<c_int>(&msg_stream[*cursor..])?;
         *cursor += mem::size_of::<c_int>();
-
         let cmsg_data_len_in_stream = read_num::<usize>(&msg_stream[*cursor..])?;
         *cursor += mem::size_of::<usize>();
 
@@ -432,6 +429,7 @@ unsafe fn deserialize_ancillary_data_from_stream(
             mhdr.msg_flags |= MSG_CTRUNC;
             break;
         }
+
         let cmsg_data_from_stream = &msg_stream[*cursor..*cursor + cmsg_data_len_in_stream];
         *cursor += cmsg_data_len_in_stream;
 
@@ -446,6 +444,7 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 let fd_count = read_num::<usize>(&cmsg_data_from_stream)?;
 
                 for _ in 0..fd_count {
+                    // Call syscall::dup to duplicate the fd
                     let new_fd = syscall::dup(socket as usize, b"recvfd")?;
                     temp_posix_cmsg_data_buf.extend_from_slice(&(new_fd as c_int).to_le_bytes());
                 }
@@ -457,6 +456,7 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 {
                     return Err(Errno(EINVAL));
                 }
+
                 let pid = read_num::<pid_t>(&cmsg_data_from_stream)?;
                 let uid_offset = mem::size_of::<pid_t>();
                 let uid = read_num::<uid_t>(&cmsg_data_from_stream[uid_offset..])?;
@@ -500,7 +500,7 @@ unsafe fn deserialize_ancillary_data_from_stream(
             current_cmsg_ptr_in_user_buf = CMSG_NXTHDR(mhdr, current_cmsg_ptr_in_user_buf);
         } else {
             mhdr.msg_flags |= MSG_CTRUNC;
-            break; // Stop processing further cmsgs
+            break;
         }
     }
     mhdr.msg_controllen = total_csmg_bytes_written_to_user_buf;
@@ -624,7 +624,8 @@ impl PalSocket for Sys {
         let whole_iov_size: usize = iovs_slice.iter().map(|iov| iov.iov_len).sum();
 
         let mut msg_stream: Vec<u8> = Vec::new();
-        // 2. Prepare space for the message stream.
+
+        // Prepare space for the message stream.
         // [name_len(usize)][name_buffer]
         // [payload_len(usize)][payload_data_buffer]
         // [ancillary_stream_buffer]
@@ -640,7 +641,7 @@ impl PalSocket for Sys {
             .map_err(|_| Errno(ENOMEM))?;
         msg_stream.resize(expected_stream_size, 0);
 
-        // 3. Write the information about the msghdr
+        // Write the information about the msghdr
         let mut cursor: usize = 0;
         msg_stream[cursor..cursor + mem::size_of::<usize>()]
             .copy_from_slice(&(mhdr.msg_namelen as usize).to_le_bytes());
@@ -651,7 +652,7 @@ impl PalSocket for Sys {
         msg_stream[cursor..cursor + mem::size_of::<usize>()]
             .copy_from_slice(&(mhdr.msg_controllen as usize).to_le_bytes());
 
-        // 3. Read the message stream.
+        // Read the message stream.
         let metadata = [SocketCall::RecvMsg as u64];
         let call_flags = CallFlags::empty();
         let actual_read_len =
@@ -662,10 +663,10 @@ impl PalSocket for Sys {
         let cmsg_space_provided_by_user = mhdr.msg_controllen;
         mhdr.msg_flags = 0;
 
-        // 4. Get remote name.
+        // Read sender name.
         deserialize_name_from_stream(&mut mhdr, &msg_stream, &mut cursor)?;
 
-        // 5. Get payload data.
+        // Read payload data.
         let actual_payload_bytes_written_to_iov = deserialize_payload_from_stream(
             &mut mhdr,
             &msg_stream,
@@ -675,8 +676,7 @@ impl PalSocket for Sys {
             0u8,
         )?;
 
-        // 6. Reconstruct the ancillary data in the user-provided buffer.
-        // cmsg entry format: [level(i32)][type(i32)][data_len(usize)][data]
+        // Reconstruct the ancillary data in the user-provided buffer.
         let has_cmsg_buffer = !mhdr.msg_control.is_null() && cmsg_space_provided_by_user > 0;
         let has_ancillary_data = cursor < msg_stream.len();
         if has_cmsg_buffer && has_ancillary_data {
@@ -699,7 +699,7 @@ impl PalSocket for Sys {
         }
         let mhdr = &*msg;
 
-        // 2. Reserve space for the message stream.
+        // Reserve space for the message stream.
         // [payload_len(usize)][payload_data_buffer]
         // [ancillary_stream_buffer]
         let iovs_slice: &[iovec] = if mhdr.msg_iov.is_null() || mhdr.msg_iovlen == 0 {
@@ -718,22 +718,20 @@ impl PalSocket for Sys {
             )
             .map_err(|_| Errno(ENOMEM))?;
 
-        // 3. Write the message to the msg_stream.
+        // Write the message to the msg_stream.
         let mut actual_payload_bytes_serialized = 0;
         if !mhdr.msg_iov.is_null() && mhdr.msg_iovlen > 0 {
             actual_payload_bytes_serialized =
                 serialize_payload_to_stream(&mut msg_stream, &iovs_slice, whole_iov_size)?;
         }
-        // 4. Process Control Messages from msghdr and serialize them.
+        // Process Control Messages from msghdr and serialize them.
         if mhdr.msg_controllen > 0 {
             serialize_ancillary_data_to_stream(msg, mhdr, socket, &mut msg_stream)?;
         }
 
-        // 5. Prepare command.
+        // Send the message stream.
         let metadata = [SocketCall::SendMsg as u64];
         let call_flags = CallFlags::empty();
-
-        // 6. Send the message stream.
         let written = redox_rt::sys::sys_call(
             socket as usize,
             msg_stream.as_mut_slice(),
