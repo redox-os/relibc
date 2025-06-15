@@ -225,13 +225,13 @@ fn socket_kind(mut kind: c_int) -> (c_int, usize) {
 
 unsafe fn serialize_payload_to_stream(
     msg_stream: &mut Vec<u8>,
-    iovs_slice: &[iovec],
+    iovs: &[iovec],
     whole_iov_size: usize,
 ) -> Result<usize> {
     eprintln!(
         "[DEBUG] serialize_payload_to_stream: target_len = {}, num_iovs = {}",
         whole_iov_size,
-        iovs_slice.len()
+        iovs.len()
     );
     msg_stream.extend_from_slice(&whole_iov_size.to_le_bytes());
 
@@ -403,7 +403,7 @@ unsafe fn deserialize_payload_from_stream(
     *cursor += payload_len_to_read;
 
     let mut total_bytes_written: usize = 0;
-    if !iovs.empty() && payload_len_to_read > 0 {
+    if !iovs.is_empty() && payload_len_to_read > 0 {
         let mut source_bytes_consumed: usize = 0;
         for iov in iovs {
             if iov.iov_len == 0 {
@@ -425,8 +425,8 @@ unsafe fn deserialize_payload_from_stream(
                 let dest_slice: &mut [u8] =
                     unsafe { slice::from_raw_parts_mut(iov.iov_base as *mut u8, iov.iov_len) };
 
-                let source_sub_slice =
-                    &source_data[source_bytes_consumed..source_bytes_consumed + bytes_to_write];
+                let source_sub_slice = &payload_data_from_stream
+                    [source_bytes_consumed..source_bytes_consumed + bytes_to_write];
                 dest_slice[..bytes_to_write].copy_from_slice(source_sub_slice);
                 total_bytes_written += bytes_to_write;
                 source_bytes_consumed += bytes_to_write;
@@ -435,7 +435,7 @@ unsafe fn deserialize_payload_from_stream(
     }
 
     if full_payload_len_from_scheme > whole_iov_size {
-        eprintln!("[DEBUG] deserialize_payload_from_stream: MSG_TRUNC set. actual_payload_in_stream_len={}, bytes_scattered={}", full_payload_len_from_scheme, bytes_scattered);
+        eprintln!("[DEBUG] deserialize_payload_from_stream: MSG_TRUNC set. full_payload_len_from_scheme={}, total_bytes_written={}", full_payload_len_from_scheme, total_bytes_written);
         mhdr.msg_flags |= MSG_TRUNC;
     }
 
@@ -524,11 +524,7 @@ unsafe fn deserialize_ancillary_data_from_stream(
                     eprintln!("[ERROR] deserialize_ancillary_data_from_stream: SCM_RIGHTS data_len mismatch.");
                     return Err(Errno(EINVAL));
                 }
-                let fd_count = usize::from_le_bytes(
-                    cmsg_data_from_stream
-                        .try_into()
-                        .map_err(|_| Errno(EINVAL))?,
-                );
+                let fd_count = read_num::<usize>(&cmsg_data_from_stream)?;
                 eprintln!("[DEBUG] deserialize_ancillary_data_from_stream: SCM_RIGHTS, fd_count from stream = {}", fd_count);
 
                 for _ in 0..fd_count {
@@ -544,14 +540,14 @@ unsafe fn deserialize_ancillary_data_from_stream(
                     eprintln!("[ERROR] deserialize_ancillary_data_from_stream: SCM_CREDENTIALS data_len mismatch.");
                     return Err(Errno(EINVAL));
                 }
-                let pid = read_num::<pid_t>(cmsg_data_from_stream[0..mem::size_of::<pid_t>()])?;
+                let pid = read_num::<pid_t>(&cmsg_data_from_stream[0..mem::size_of::<pid_t>()])?;
                 let uid_offset = mem::size_of::<pid_t>();
                 let uid = read_num::<uid_t>(
-                    cmsg_data_from_stream[uid_offset..uid_offset + mem::size_of::<uid_t>()],
+                    &cmsg_data_from_stream[uid_offset..uid_offset + mem::size_of::<uid_t>()],
                 )?;
                 let gid_offset = uid_offset + mem::size_of::<uid_t>();
                 let gid = read_num::<gid_t>(
-                    cmsg_data_from_stream[gid_offset..gid_offset + mem::size_of::<gid_t>()],
+                    &cmsg_data_from_stream[gid_offset..gid_offset + mem::size_of::<gid_t>()],
                 )?;
                 let cred = ucred { pid, uid, gid };
                 eprintln!("[DEBUG] deserialize_ancillary_data_from_stream: SCM_CREDENTIALS, pid={}, uid={}, gid={}", pid, uid, gid);
@@ -752,6 +748,7 @@ impl PalSocket for Sys {
         };
         let whole_iov_size = iovs_slice.iter().map(|iov| iov.iov_len).sum();
 
+        let mut msg_stream: Vec<u8> = Vec::new();
         // 2. Prepare space for the message stream.
         // [name_len(usize)][name_buffer]
         // [payload_len(usize)][payload_data_buffer]
@@ -773,7 +770,6 @@ impl PalSocket for Sys {
         );
 
         // 3. Write the information about the msghdr
-        let mut msg_stream: Vec<u8> = Vec::new();
         let mut cursor: usize = 0;
         msg_stream[cursor..cursor + mem::size_of::<usize>()]
             .copy_from_slice(&(mhdr.msg_namelen as usize).to_le_bytes());
@@ -1093,14 +1089,14 @@ impl PalSocket for Sys {
     }
 }
 
-fn read_num<T>(buffer: &[u8]) -> Result<T, Error>
+fn read_num<T>(buffer: &[u8]) -> Result<T>
 where
     T: NumFromBytes,
 {
     T::from_le_bytes_slice(buffer)
 }
 trait NumFromBytes: Sized {
-    fn from_le_bytes_slice(buffer: &[u8]) -> Result<Self, Error>;
+    fn from_le_bytes_slice(buffer: &[u8]) -> Result<Self>;
 }
 impl NumFromBytes for i32 {
     fn from_le_bytes_slice(buffer: &[u8]) -> Result<Self> {
@@ -1108,13 +1104,7 @@ impl NumFromBytes for i32 {
             buffer
                 .get(..mem::size_of::<i32>())
                 .and_then(|slice| slice.try_into().ok())
-                .ok_or_else(|| {
-                    log::error!(
-                        "read_num: buffer is too short to read num len: {}",
-                        buffer.len()
-                    );
-                    Error::new(EINVAL)
-                })?,
+                .ok_or_else(|| Errno(EFAULT))?,
         ))
     }
 }
@@ -1124,13 +1114,7 @@ impl NumFromBytes for usize {
             buffer
                 .get(..mem::size_of::<usize>())
                 .and_then(|slice| slice.try_into().ok())
-                .ok_or_else(|| {
-                    log::error!(
-                        "read_num: buffer is too short to read num len: {}",
-                        buffer.len()
-                    );
-                    Error::new(EINVAL)
-                })?,
+                .ok_or_else(|| Errno(EFAULT))?,
         ))
     }
 }
