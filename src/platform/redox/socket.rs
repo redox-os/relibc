@@ -228,11 +228,6 @@ unsafe fn serialize_payload_to_stream(
     iovs: &[iovec],
     whole_iov_size: usize,
 ) -> Result<usize> {
-    eprintln!(
-        "[DEBUG] serialize_payload_to_stream: target_len = {}, num_iovs = {}",
-        whole_iov_size,
-        iovs.len()
-    );
     msg_stream.extend_from_slice(&whole_iov_size.to_le_bytes());
 
     for iov in iovs {
@@ -254,12 +249,7 @@ unsafe fn serialize_ancillary_data_to_stream(
     socket: c_int,
     msg_stream: &mut Vec<u8>,
 ) -> Result<()> {
-    eprintln!(
-        "[DEBUG] serialize_ancillary_data_to_stream: msg_controllen = {}",
-        mhdr.msg_controllen
-    );
     if mhdr.msg_control.is_null() {
-        eprintln!("[DEBUG] serialize_ancillary_data_to_stream: No control message.");
         return Err(Errno(EINVAL));
     }
 
@@ -269,10 +259,7 @@ unsafe fn serialize_ancillary_data_to_stream(
         cmsg_count += 1;
         let current_cmsg = &*cmsg;
         let min_cmsg_len = CMSG_ALIGN(mem::size_of::<cmsghdr>());
-        eprintln!("[DEBUG] serialize_ancillary_data_to_stream: Processing cmsg #{}: ptr={:p}, cmsg_len={}, level={}, type={}",
-            cmsg_count, cmsg, current_cmsg.cmsg_len, current_cmsg.cmsg_level, current_cmsg.cmsg_type);
         if current_cmsg.cmsg_len < min_cmsg_len {
-            eprintln!("[ERROR] serialize_ancillary_data_to_stream: cmsg_len is too small.");
             return Err(Errno(EINVAL));
         }
 
@@ -284,21 +271,15 @@ unsafe fn serialize_ancillary_data_to_stream(
             (SOL_SOCKET, SCM_RIGHTS) => {
                 let data_len = current_cmsg.cmsg_len - min_cmsg_len;
                 if data_len % mem::size_of::<c_int>() != 0 {
-                    eprintln!("[ERROR] serialize_ancillary_data_to_stream: SCM_RIGHTS data_len not multiple of c_int size.");
                     return Err(Errno(EINVAL));
                 }
                 let fd_count = data_len / mem::size_of::<c_int>();
-                eprintln!(
-                    "[DEBUG] serialize_ancillary_data_to_stream: SCM_RIGHTS, fd_count = {}",
-                    fd_count
-                );
 
                 // 3.1. Call syscall::sendfd for each fd.
                 if fd_count > 0 {
                     let fds_ptr = CMSG_DATA(cmsg) as *const c_int;
                     let fds_slice = slice::from_raw_parts(fds_ptr, fd_count);
                     for (i, &fd) in fds_slice.iter().enumerate() {
-                        eprintln!("[DEBUG] serialize_ancillary_data_to_stream: Sending fd #{} (value: {}) via sendfd on socket {}", i, fd, socket);
                         syscall::sendfd(socket as usize, fd as usize, 0, 0)?;
                     }
                 }
@@ -310,21 +291,14 @@ unsafe fn serialize_ancillary_data_to_stream(
 
                 msg_stream.extend_from_slice(&(data_for_stream_len as usize).to_le_bytes()); // data_len field
                 msg_stream.extend_from_slice(&data_for_stream_payload); // data field (fd_count)
-                eprintln!("[DEBUG] serialize_ancillary_data_to_stream: Wrote SCM_RIGHTS: level={}, type={}, data_len={}, fd_count={}",
-                    current_cmsg.cmsg_level, current_cmsg.cmsg_type, data_for_stream_len, fd_count);
             }
             (SOL_SOCKET, SCM_CREDENTIALS) => {
                 // Our intermediate format: data_len is 0, no data payload
                 let data_for_stream_len = 0usize;
-                msg_stream.extend_from_slice(&(data_for_stream_len as usize).to_le_bytes()); // data_len field (0)
-                eprintln!("[DEBUG] serialize_ancillary_data_to_stream: Wrote SCM_CREDENTIALS: level={}, type={}, data_len=0",
-                    current_cmsg.cmsg_level, current_cmsg.cmsg_type);
+                msg_stream.extend_from_slice(&(data_for_stream_len as usize).to_le_bytes());
+                // data_len field (0)
             }
             _ => {
-                eprintln!(
-                    "[ERROR] sendmsg: Unsupported cmsg level {} or type {}",
-                    current_cmsg.cmsg_level, current_cmsg.cmsg_type
-                );
                 return Err(Errno(EOPNOTSUPP));
             }
         }
@@ -338,27 +312,17 @@ unsafe fn deserialize_name_from_stream(
     msg_stream: &[u8],
     cursor: &mut usize,
 ) -> Result<()> {
-    eprintln!(
-        "[DEBUG] deserialize_name_from_stream: cursor_start = {}",
-        *cursor
-    );
     // Read name_len from stream
     let name_len_in_stream = read_num::<usize>(&msg_stream[*cursor..])?;
     let name_len = cmp::min(name_len_in_stream, mhdr.msg_namelen as usize);
     *cursor += mem::size_of::<usize>();
-    eprintln!(
-        "[DEBUG] deserialize_name_from_stream: name_len = {}, msg_namelen = {}",
-        name_len_in_stream, mhdr.msg_namelen
-    );
 
     if name_len > 0 {
         if *cursor + name_len > msg_stream.len() {
-            eprintln!("[ERROR] deserialize_name_from_stream: Not enough data for name_buffer (expected {}).", name_len);
             return Err(Errno(EMSGSIZE));
         }
         if !mhdr.msg_name.is_null() && mhdr.msg_namelen > 0 {
             let name_buffer = &msg_stream[*cursor..*cursor + name_len];
-            eprintln!("[DEBUG] deserialize_name_from_stream: User provided msg_name buffer (cap: {}), trying to fill with '{}'", mhdr.msg_namelen, str::from_utf8(name_buffer).unwrap_or("invalid_utf8"));
             inner_get_name_inner(
                 false,
                 mhdr.msg_name as *mut sockaddr,
@@ -368,10 +332,6 @@ unsafe fn deserialize_name_from_stream(
         }
         *cursor += name_len;
     }
-    eprintln!(
-        "[DEBUG] deserialize_name_from_stream: cursor_end = {}",
-        *cursor
-    );
     Ok(())
 }
 
@@ -383,22 +343,10 @@ unsafe fn deserialize_payload_from_stream(
     cursor: &mut usize,
     test: u8,
 ) -> Result<usize> {
-    eprintln!(
-        "[DEBUG] deserialize_payload_from_stream: cursor_start = {}",
-        *cursor
-    );
     let full_payload_len_from_scheme = read_num::<usize>(&msg_stream[*cursor..])?;
     *cursor += mem::size_of::<usize>();
-    eprintln!(
-        "[DEBUG] deserialize_payload_from_stream: payload_len = {}, whole_iov_size = {}",
-        full_payload_len_from_scheme, whole_iov_size
-    );
     // Determine actual payload data available in the stream
     let payload_len_to_read = cmp::min(full_payload_len_from_scheme, whole_iov_size);
-    eprintln!(
-        "[DEBUG] deserialize_payload_from_stream: payload_len_to_read = {}",
-        payload_len_to_read
-    );
     let payload_data_from_stream = &msg_stream[*cursor..*cursor + payload_len_to_read];
     *cursor += payload_len_to_read;
 
@@ -435,14 +383,9 @@ unsafe fn deserialize_payload_from_stream(
     }
 
     if full_payload_len_from_scheme > whole_iov_size {
-        eprintln!("[DEBUG] deserialize_payload_from_stream: MSG_TRUNC set. full_payload_len_from_scheme={}, total_bytes_written={}", full_payload_len_from_scheme, total_bytes_written);
         mhdr.msg_flags |= MSG_TRUNC;
     }
 
-    eprintln!(
-        "[DEBUG] deserialize_payload_from_stream: cursor_end = {}",
-        *cursor
-    );
     Ok(total_bytes_written)
 }
 
@@ -540,15 +483,11 @@ unsafe fn deserialize_ancillary_data_from_stream(
                     eprintln!("[ERROR] deserialize_ancillary_data_from_stream: SCM_CREDENTIALS data_len mismatch.");
                     return Err(Errno(EINVAL));
                 }
-                let pid = read_num::<pid_t>(&cmsg_data_from_stream[0..mem::size_of::<pid_t>()])?;
+                let pid = read_num::<pid_t>(&cmsg_data_from_stream)?;
                 let uid_offset = mem::size_of::<pid_t>();
-                let uid = read_num::<uid_t>(
-                    &cmsg_data_from_stream[uid_offset..uid_offset + mem::size_of::<uid_t>()],
-                )?;
+                let uid = read_num::<uid_t>(&cmsg_data_from_stream[uid_offset..])?;
                 let gid_offset = uid_offset + mem::size_of::<uid_t>();
-                let gid = read_num::<gid_t>(
-                    &cmsg_data_from_stream[gid_offset..gid_offset + mem::size_of::<gid_t>()],
-                )?;
+                let gid = read_num::<gid_t>(&cmsg_data_from_stream[gid_offset..])?;
                 let cred = ucred { pid, uid, gid };
                 eprintln!("[DEBUG] deserialize_ancillary_data_from_stream: SCM_CREDENTIALS, pid={}, uid={}, gid={}", pid, uid, gid);
 
@@ -712,7 +651,6 @@ impl PalSocket for Sys {
     }
 
     unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> Result<usize> {
-        eprintln!("[DEBUG] recvmsg: socket={}, flags={}", socket, flags);
         if msg.is_null() {
             return Err(Errno(EINVAL));
         }
@@ -740,10 +678,6 @@ impl PalSocket for Sys {
             .try_reserve_exact(expected_stream_size)
             .map_err(|_| Errno(ENOMEM))?;
         msg_stream.resize(expected_stream_size, 0);
-        eprintln!(
-            "[DEBUG] recvmsg: Prepared msg_stream with expected size {} bytes",
-            expected_stream_size
-        );
 
         // 3. Write the information about the msghdr
         let mut cursor: usize = 0;
@@ -759,14 +693,9 @@ impl PalSocket for Sys {
         // 3. Read the message stream.
         let metadata = [SocketCall::RecvMsg as u64];
         let call_flags = CallFlags::empty();
-        eprintln!("[DEBUG] recvmsg: Calling sys_call for socket {}", socket,);
         let actual_read_len =
             redox_rt::sys::sys_call(socket as usize, &mut msg_stream, call_flags, &metadata)?;
         msg_stream.truncate(actual_read_len);
-        eprintln!(
-            "[DEBUG] recvmsg: sys_call read {} bytes into msg_stream",
-            actual_read_len
-        );
 
         cursor = 0;
         let cmsg_space_provided_by_user = mhdr.msg_controllen;
@@ -774,10 +703,6 @@ impl PalSocket for Sys {
 
         // 4. Get remote name.
         deserialize_name_from_stream(&mut mhdr, &msg_stream, &mut cursor)?;
-        eprintln!(
-            "[DEBUG] recvmsg: After deserialize_name_from_stream, cursor = {}, mhdr.msg_namelen = {}",
-            cursor, mhdr.msg_namelen
-        );
 
         // 5. Get payload data.
         let actual_payload_bytes_written_to_iov = deserialize_payload_from_stream(
@@ -788,27 +713,26 @@ impl PalSocket for Sys {
             &mut cursor,
             0u8,
         )?;
-        eprintln!("[DEBUG] recvmsg: After deserialize_payload_from_stream, cursor = {}, payload_bytes_written_to_iov = {}", cursor, actual_payload_bytes_written_to_iov);
 
         // 6. Reconstruct the ancillary data in the user-provided buffer.
         // cmsg entry format: [level(i32)][type(i32)][data_len(usize)][data]
-        mhdr.msg_controllen = 0;
-        deserialize_ancillary_data_from_stream(
-            mhdr,
-            socket,
-            &msg_stream,
-            &mut cursor,
-            cmsg_space_provided_by_user as usize,
-        )?;
-        eprintln!(
-            "[DEBUG] recvmsg: Returning Ok({})",
-            actual_payload_bytes_written_to_iov
-        );
+        let has_cmsg_buffer = !mhdr.msg_control.is_null() && cmsg_space_provided_by_user > 0;
+        let has_ancillary_data = cursor < msg_stream.len();
+        if has_cmsg_buffer && has_ancillary_data {
+            deserialize_ancillary_data_from_stream(
+                mhdr,
+                socket,
+                &msg_stream,
+                &mut cursor,
+                cmsg_space_provided_by_user as usize,
+            )?;
+        } else {
+            mhdr.msg_controllen = 0; // No ancillary data
+        }
         Ok(actual_payload_bytes_written_to_iov)
     }
 
     unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> Result<usize> {
-        eprintln!("[DEBUG] sendmsg: socket={}, flags={}", socket, flags);
         if msg.is_null() {
             return Err(Errno(EINVAL));
         }
@@ -838,22 +762,10 @@ impl PalSocket for Sys {
         if !mhdr.msg_iov.is_null() && mhdr.msg_iovlen > 0 {
             actual_payload_bytes_serialized =
                 serialize_payload_to_stream(&mut msg_stream, &iovs_slice, whole_iov_size)?;
-        } else {
-            eprintln!(
-                "[DEBUG] sendmsg: No payload, wrote 0 length prefix. msg_stream.len() = {}",
-                msg_stream.len()
-            );
         }
-
         // 4. Process Control Messages from msghdr and serialize them.
         if mhdr.msg_controllen > 0 {
             serialize_ancillary_data_to_stream(msg, mhdr, socket, &mut msg_stream)?;
-            eprintln!(
-                "[DEBUG] sendmsg: Ancillary data serialized. msg_stream.len() = {}",
-                msg_stream.len()
-            );
-        } else {
-            eprintln!("[DEBUG] sendmsg: No ancillary data to serialize.");
         }
 
         // 5. Prepare command.
@@ -861,22 +773,12 @@ impl PalSocket for Sys {
         let call_flags = CallFlags::empty();
 
         // 6. Send the message stream.
-        eprintln!(
-            "[DEBUG] sendmsg: Calling sys_call for socket {}, msg_stream.len() = {}",
-            socket,
-            msg_stream.len()
-        );
         let written = redox_rt::sys::sys_call(
             socket as usize,
             msg_stream.as_mut_slice(),
             call_flags,
             &metadata,
         )?;
-
-        eprintln!(
-            "[DEBUG] sendmsg: Returning Ok({})",
-            actual_payload_bytes_serialized
-        );
 
         Ok(actual_payload_bytes_serialized)
     }
