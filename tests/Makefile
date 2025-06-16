@@ -31,6 +31,9 @@ EXPECT_NAMES=\
 	netdb/getaddrinfo \
 	regex \
 	select \
+	socket/uds_client_server \
+	socket/uds_dgram_sendrecvmsg \
+	socket/uds_stream_sendrecvmsg \
 	setjmp \
 	sigaction \
 	sigaltstack \
