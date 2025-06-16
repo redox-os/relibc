@@ -263,10 +263,10 @@ unsafe fn serialize_ancillary_data_to_stream(
             return Err(Errno(EINVAL));
         }
 
+        // cmsg entry format: [level(i32)][type(i32)][data_len(usize)][data]
         msg_stream.extend_from_slice(&current_cmsg.cmsg_level.to_le_bytes());
         msg_stream.extend_from_slice(&current_cmsg.cmsg_type.to_le_bytes());
 
-        // cmsg entry format: [level(i32)][type(i32)][data_len(usize)][data]
         match (current_cmsg.cmsg_level, current_cmsg.cmsg_type) {
             (SOL_SOCKET, SCM_RIGHTS) => {
                 let data_len = current_cmsg.cmsg_len - min_cmsg_len;
