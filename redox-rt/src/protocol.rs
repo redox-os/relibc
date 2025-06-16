@@ -37,6 +37,9 @@ pub enum ProcCall {
     Getppid = 12,
     Rename = 13,
     DisableSetpgid = 14,
+
+    // Temporary calls for getting process credentials
+    GetProcCredentials = 15,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]
@@ -45,6 +48,15 @@ pub enum ThreadCall {
     // obtain its TCB memory from this server
     SyncSigTctl = 0,
     SignalThread = 1,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(usize)]
+pub enum SocketCall {
+    SetSockOpt = 0,
+    GetSockOpt = 1,
+    SendMsg = 2,
+    RecvMsg = 3,
 }
 
 impl ProcCall {
@@ -65,6 +77,7 @@ impl ProcCall {
             12 => Self::Getppid,
             13 => Self::Rename,
             14 => Self::DisableSetpgid,
+            15 => Self::GetProcCredentials,
             _ => return None,
         })
     }
@@ -74,6 +87,18 @@ impl ThreadCall {
         Some(match raw {
             0 => Self::SyncSigTctl,
             1 => Self::SignalThread,
+            _ => return None,
+        })
+    }
+}
+
+impl SocketCall {
+    pub fn try_from_raw(raw: usize) -> Option<Self> {
+        Some(match raw {
+            0 => Self::SetSockOpt,
+            1 => Self::GetSockOpt,
+            2 => Self::SendMsg,
+            3 => Self::RecvMsg,
             _ => return None,
         })
     }
