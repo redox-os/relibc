@@ -68,35 +68,11 @@ macro_rules! bind_or_connect {
                 path
             },
             AF_UNIX => {
-                let data = &*($address as *const sockaddr_un);
-
-                // NOTE: It's UB to access data in given address that exceeds
-                // the given address length.
-
-                let maxlen = cmp::min(
-                    // Max path length of the full-sized struct
-                    data.sun_path.len(),
-                    // Length inferred from given addrlen
-                    $address_len as usize - data.path_offset()
+                // NOTE: bind/connect with AF_UNIX were replaced with SYS_CALL.
+                eprintln!(
+                    "bind/connect with AF_UNIX were replaced with SYS_CALL."
                 );
-                let len = cmp::min(
-                    // The maximum length of the address
-                    maxlen,
-                    // The first NUL byte, if any
-                    strnlen(&data.sun_path as *const _, maxlen as size_t),
-                );
-
-                let addr = slice::from_raw_parts(
-                    &data.sun_path as *const _ as *const u8,
-                    len,
-                );
-                let path = format!(
-                    "{}",
-                    str::from_utf8(addr).unwrap()
-                );
-                trace!("path: {:?}", path);
-
-                path
+                return Err(Errno(EAFNOSUPPORT));
             },
             _ => {
                 return Err(Errno(EAFNOSUPPORT));
@@ -521,7 +497,45 @@ impl PalSocket for Sys {
     }
 
     unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> Result<()> {
-        bind_or_connect!(bind into, socket, address, address_len)?;
+        match (*address).sa_family as c_int {
+            AF_INET => {
+                bind_or_connect!(bind into, socket, address, address_len)?;
+            }
+            AF_UNIX => {
+                let data = &*(address as *const sockaddr_un);
+
+                // NOTE: It's UB to access data in given address that exceeds
+                // the given address length.
+
+                let maxlen = cmp::min(
+                    // Max path length of the full-sized struct
+                    data.sun_path.len(),
+                    // Length inferred from given addrlen
+                    address_len as usize - data.path_offset(),
+                );
+                let len = cmp::min(
+                    // The maximum length of the address
+                    maxlen,
+                    // The first NUL byte, if any
+                    strnlen(&data.sun_path as *const _, maxlen as size_t),
+                );
+
+                let addr = slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len);
+                let mut path = format!("{}", str::from_utf8(addr).unwrap());
+                trace!("path: {:?}", path);
+
+                redox_rt::sys::sys_call(
+                    socket as usize,
+                    path.as_bytes_mut(),
+                    CallFlags::empty(),
+                    &[SocketCall::Bind as u64],
+                )?;
+            }
+            _ => {
+                return Err(Errno(EAFNOSUPPORT));
+            }
+        };
+
         Ok(())
     }
 
@@ -530,7 +544,43 @@ impl PalSocket for Sys {
         address: *const sockaddr,
         address_len: socklen_t,
     ) -> Result<c_int> {
-        bind_or_connect!(connect into, socket, address, address_len)
+        match (*address).sa_family as c_int {
+            AF_INET => bind_or_connect!(bind into, socket, address, address_len),
+            AF_UNIX => {
+                let data = &*(address as *const sockaddr_un);
+
+                // NOTE: It's UB to access data in given address that exceeds
+                // the given address length.
+
+                let maxlen = cmp::min(
+                    // Max path length of the full-sized struct
+                    data.sun_path.len(),
+                    // Length inferred from given addrlen
+                    address_len as usize - data.path_offset(),
+                );
+                let len = cmp::min(
+                    // The maximum length of the address
+                    maxlen,
+                    // The first NUL byte, if any
+                    strnlen(&data.sun_path as *const _, maxlen as size_t),
+                );
+
+                let addr = slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len);
+                let mut path = format!("{}", str::from_utf8(addr).unwrap());
+                trace!("path: {:?}", path);
+
+                redox_rt::sys::sys_call(
+                    socket as usize,
+                    path.as_bytes_mut(),
+                    CallFlags::empty(),
+                    &[SocketCall::Connect as u64],
+                )?;
+                Ok(())
+            }
+            _ => {
+                Err(Errno(EAFNOSUPPORT));
+            }
+        }
     }
 
     unsafe fn getpeername(
