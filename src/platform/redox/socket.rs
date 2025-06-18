@@ -575,7 +575,7 @@ impl PalSocket for Sys {
                     CallFlags::empty(),
                     &[SocketCall::Connect as u64],
                 )?;
-                Ok(())
+                Result::<c_int, Errno>::Ok(0)
             }
             _ => {
                 Err(Errno(EAFNOSUPPORT));
