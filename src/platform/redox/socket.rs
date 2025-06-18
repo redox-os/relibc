@@ -577,9 +577,7 @@ impl PalSocket for Sys {
                 )?;
                 Result::<c_int, Errno>::Ok(0)
             }
-            _ => {
-                Err(Errno(EAFNOSUPPORT));
-            }
+            _ => Err(Errno(EAFNOSUPPORT)),
         }
     }
 
