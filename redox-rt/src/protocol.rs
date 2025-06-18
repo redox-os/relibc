@@ -53,10 +53,12 @@ pub enum ThreadCall {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]
 pub enum SocketCall {
-    SetSockOpt = 0,
-    GetSockOpt = 1,
-    SendMsg = 2,
-    RecvMsg = 3,
+    Bind = 0,
+    Connect = 1,
+    SetSockOpt = 2,
+    GetSockOpt = 3,
+    SendMsg = 4,
+    RecvMsg = 5,
 }
 
 impl ProcCall {
@@ -95,10 +97,12 @@ impl ThreadCall {
 impl SocketCall {
     pub fn try_from_raw(raw: usize) -> Option<Self> {
         Some(match raw {
-            0 => Self::SetSockOpt,
-            1 => Self::GetSockOpt,
-            2 => Self::SendMsg,
-            3 => Self::RecvMsg,
+            0 => Self::Bind,
+            1 => Self::Connect,
+            2 => Self::SetSockOpt,
+            3 => Self::GetSockOpt,
+            4 => Self::SendMsg,
+            5 => Self::RecvMsg,
             _ => return None,
         })
     }
