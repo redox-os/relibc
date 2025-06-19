@@ -242,6 +242,14 @@ pub unsafe extern "C" fn redox_get_rgid_v1() -> RawResult {
     redox_rt::sys::posix_getresugid().rgid as _
 }
 #[no_mangle]
+pub unsafe extern "C" fn redox_get_proc_credentials_v0(
+    target_pid: usize,
+    buf: &mut [u8],
+) -> RawResult {
+    Error::mux(redox_rt::sys::get_proc_credentials(target_pid, buf))
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {
     Error::mux(redox_rt::sys::setrens(rns, ens).map(|()| 0))
 }
