@@ -855,6 +855,7 @@ impl Pal for Sys {
 
     fn rename(oldpath: CStr, newpath: CStr) -> Result<()> {
         let newpath = newpath.to_str().map_err(|_| Errno(EINVAL))?;
+        let newpath = canonicalize(newpath).map_err(|_| Errno(EINVAL))?;
 
         let file = File::open(oldpath, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
         syscall::frename(*file as usize, newpath)?;
