@@ -982,17 +982,11 @@ pub extern "C" fn tcsetpgrp(fd: c_int, pgrp: pid_t) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn truncate(path: *const c_char, length: off_t) -> c_int {
     let file = unsafe { CStr::from_ptr(path) };
-    // TODO: Rustify
-    let fd = Sys::open(file, fcntl::O_WRONLY, 0).or_minus_one_errno();
-    if fd < 0 {
-        return -1;
-    }
-
-    let res = ftruncate(fd, length);
-
-    Sys::close(fd);
-
-    res
+    Sys::open(file, fcntl::O_WRONLY, 0).map_or(-1, |fd| {
+        let res = ftruncate(fd, length);
+        Sys::close(fd);
+        res
+    })
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ttyname.html>.
