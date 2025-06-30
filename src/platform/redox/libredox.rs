@@ -376,3 +376,20 @@ pub unsafe extern "C" fn redox_cur_procfd_v0() -> usize {
 pub unsafe extern "C" fn redox_cur_thrfd_v0() -> usize {
     **redox_rt::RtTcb::current().thread_fd()
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn redox_sys_call_v0(
+    fd: usize,
+    payload: *mut u8,
+    payload_len: usize,
+    flags: usize,
+    metadata: *const u64,
+    metadata_len: usize,
+) -> RawResult {
+    Error::mux(redox_rt::sys::sys_call(
+        fd,
+        slice::from_raw_parts_mut(payload, payload_len),
+        syscall::CallFlags::from_bits_retain(flags),
+        slice::from_raw_parts(metadata, metadata_len),
+    ))
+}
