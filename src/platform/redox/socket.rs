@@ -1,10 +1,11 @@
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::{cmp, mem, ptr, slice, str};
 use redox_rt::{proc::FdGuard, protocol::SocketCall};
 use syscall::{self, flag::*};
 
 use super::{
     super::{types::*, Pal, PalSocket, ERRNO},
+    path::dir_path_and_fd_path,
     Sys,
 };
 use crate::{
@@ -521,15 +522,24 @@ impl PalSocket for Sys {
                 );
 
                 let addr = slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len);
-                let mut path = format!("{}", str::from_utf8(addr).unwrap());
+                let path = format!("{}", str::from_utf8(addr).unwrap());
                 trace!("path: {:?}", path);
+
+                let (dir_path, mut fd_path) = dir_path_and_fd_path(&path)?;
 
                 redox_rt::sys::sys_call(
                     socket as usize,
-                    path.as_bytes_mut(),
+                    fd_path.as_bytes_mut(),
                     CallFlags::empty(),
                     &[SocketCall::Bind as u64],
                 )?;
+
+                let dirfd = Self::open(
+                    &dir_path,
+                    syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+                )?;
+                let fd_to_send = Sys::dup(socket)?;
+                let _ = syscall::sendfd(dirfd as usize, fd_to_send as usize, 0, 0)?;
             }
             _ => {
                 return Err(Errno(EAFNOSUPPORT));
