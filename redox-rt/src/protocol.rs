@@ -61,6 +61,12 @@ pub enum SocketCall {
     RecvMsg = 5,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(usize)]
+pub enum FsCall {
+    Connect = 0,
+}
+
 impl ProcCall {
     pub fn try_from_raw(raw: usize) -> Option<Self> {
         Some(match raw {
@@ -103,6 +109,15 @@ impl SocketCall {
             3 => Self::GetSockOpt,
             4 => Self::SendMsg,
             5 => Self::RecvMsg,
+            _ => return None,
+        })
+    }
+}
+
+impl FsCall {
+    pub fn try_from_raw(raw: usize) -> Option<Self> {
+        Some(match raw {
+            0 => Self::Connect,
             _ => return None,
         })
     }
