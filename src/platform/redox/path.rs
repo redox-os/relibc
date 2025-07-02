@@ -1,4 +1,9 @@
-use alloc::{borrow::ToOwned, boxed::Box, string::String, vec::Vec};
+use alloc::{
+    borrow::ToOwned,
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 use redox_rt::signal::tmp_disable_signals;
 use syscall::{data::Stat, error::*, flag::*};
 
@@ -178,12 +183,13 @@ pub fn dir_path_and_fd_path(socket_path: &str) -> Result<(String, String)> {
 
     let redox_path = RedoxPath::from_absolute(&full_path).ok_or(Error::new(EINVAL))?;
     let (scheme, ref_path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
-    if ref_path.is_empty() {
+    if ref_path.as_ref().is_empty() {
         return Err(Error::new(EINVAL));
     }
     let dir_to_open: String;
-    if redox_path.is_default_scheme() {
-        dir_to_open = String::from(get_parent_path(&redox_path).ok_or(Error::new(EINVAL))?);
+    // TODO: Use is_default_scheme() after updating redox-path to ^0.3
+    if scheme.as_ref() == "file" {
+        dir_to_open = String::from(get_parent_path(redox_path.as_ref()).ok_or(Error::new(EINVAL))?);
     } else {
         dir_to_open = canonicalize_with_cwd_internal(cwd_guard.as_deref(), ".")?;
     }
