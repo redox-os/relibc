@@ -534,11 +534,11 @@ impl PalSocket for Sys {
                     &[SocketCall::Bind as u64],
                 )?;
 
-                let dirfd = Self::open(
+                let dirfd = syscall::open(
                     &dir_path,
                     syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
                 )?;
-                let fd_to_send = Sys::dup(socket)?;
+                let fd_to_send = Self::dup(socket)?;
                 let _ = syscall::sendfd(dirfd as usize, fd_to_send as usize, 0, 0)?;
             }
             _ => {
