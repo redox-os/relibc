@@ -110,7 +110,7 @@ pub unsafe extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_i
 fn __openlog(logfile: &mut LogFile) {
     match &mut logfile.status {
         LogStatus::Closed => {
-            let log_file = File::open(c_str!("/scheme/log"), fcntl::O_WRONLY);
+            let log_file = File::open(c"/scheme/log".into(), fcntl::O_WRONLY);
             match log_file {
                 Ok(file) => logfile.status = LogStatus::Open { filehandle: file },
                 Err(e) => {}
