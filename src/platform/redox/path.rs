@@ -187,8 +187,7 @@ pub fn dir_path_and_fd_path(socket_path: &str) -> Result<(String, String)> {
         return Err(Error::new(EINVAL));
     }
     let dir_to_open: String;
-    // TODO: Use is_default_scheme() after updating redox-path to ^0.3
-    if scheme.as_ref() == "file" {
+    if redox_path.is_default_scheme() {
         dir_to_open = String::from(get_parent_path(redox_path.as_ref()).ok_or(Error::new(EINVAL))?);
     } else {
         dir_to_open = canonicalize_with_cwd_internal(cwd_guard.as_deref(), ".")?;
