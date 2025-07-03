@@ -612,7 +612,7 @@ impl PalSocket for Sys {
                 let mut ott_buf = [0u8; OTT_BUF_SIZE];
 
                 redox_rt::sys::sys_call(
-                    socket_file_fd as usize,
+                    *socket_file_fd,
                     &mut ott_buf,
                     CallFlags::empty(),
                     &[FsCall::Connect as u64],
