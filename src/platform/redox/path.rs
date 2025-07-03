@@ -186,17 +186,16 @@ pub fn dir_path_and_fd_path(socket_path: &str) -> Result<(String, String)> {
     if ref_path.as_ref().is_empty() {
         return Err(Error::new(EINVAL));
     }
-    let dir_to_open: String;
     if redox_path.is_default_scheme() {
-        dir_to_open = String::from(get_parent_path(&full_path).ok_or(Error::new(EINVAL))?);
+        let dir_to_open = String::from(get_parent_path(&full_path).ok_or(Error::new(EINVAL))?);
+        Ok((dir_to_open, ref_path.as_ref().to_string()))
     } else {
         let full_path = canonicalize_with_cwd_internal(cwd_guard.as_deref(), ref_path.as_ref())?;
         let redox_path = RedoxPath::from_absolute(&full_path).ok_or(Error::new(EINVAL))?;
         let (_, path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
-        ref_path = path;
-        dir_to_open = String::from(get_parent_path(&full_path).ok_or(Error::new(EINVAL))?);
+        let dir_to_open = String::from(get_parent_path(&full_path).ok_or(Error::new(EINVAL))?);
+        Ok((dir_to_open, path.as_ref().to_string()))
     }
-    Ok((dir_to_open, ref_path.as_ref().to_string()))
 }
 
 fn get_parent_path(path: &str) -> Option<&str> {
