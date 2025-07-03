@@ -52,6 +52,7 @@ pub enum ThreadCall {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]
+#[non_exhaustive]
 pub enum SocketCall {
     Bind = 0,
     Connect = 1,
@@ -64,6 +65,7 @@ pub enum SocketCall {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]
+#[non_exhaustive]
 pub enum FsCall {
     Connect = 0,
 }
