@@ -190,7 +190,7 @@ pub fn dir_path_and_fd_path(socket_path: &str) -> Result<(String, String)> {
     if redox_path.is_default_scheme() {
         dir_to_open = String::from(get_parent_path(&full_path).ok_or(Error::new(EINVAL))?);
     } else {
-        let full_path = canonicalize_with_cwd_internal(cwd_guard.as_deref(), ref_path)?;
+        let full_path = canonicalize_with_cwd_internal(cwd_guard.as_deref(), ref_path.as_ref())?;
         let redox_path = RedoxPath::from_absolute(&full_path).ok_or(Error::new(EINVAL))?;
         let (_, path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
         ref_path = path;
