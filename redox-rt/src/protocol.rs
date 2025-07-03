@@ -61,6 +61,7 @@ pub enum SocketCall {
     SendMsg = 4,
     RecvMsg = 5,
     Unbind = 6,
+    GetOtt = 7,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -113,6 +114,7 @@ impl SocketCall {
             4 => Self::SendMsg,
             5 => Self::RecvMsg,
             6 => Self::Unbind,
+            7 => Self::GetOtt,
             _ => return None,
         })
     }
