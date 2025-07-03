@@ -2,7 +2,7 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use core::alloc::Layout;
+use core::{alloc::Layout, arch::global_asm};
 
 use alloc::alloc::alloc_zeroed;
 
@@ -10,8 +10,8 @@ use crate::{ld_so::tcb::Tcb, platform::types::*};
 
 #[repr(C)]
 pub struct dl_tls_index {
-    pub ti_module: u64,
-    pub ti_offset: u64,
+    pub ti_module: usize,
+    pub ti_offset: usize,
 }
 
 #[no_mangle]
@@ -71,9 +71,20 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
     ptr.cast::<c_void>()
 }
 
-// x86 can define a version that does not require stack alignment
+// x86 can define a version that passes a pointer to dl_tls_index in eax
 #[cfg(target_arch = "x86")]
-#[no_mangle]
-pub unsafe extern "C" fn ___tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
-    unsafe { __tls_get_addr(ti) }
-}
+global_asm!(
+    "
+    .globl ___tls_get_addr
+    .type ___tls_get_addr, @function
+___tls_get_addr:
+    push ebp
+    mov ebp, esp
+    push eax
+    call __tls_get_addr
+    add esp, 4
+    pop ebp
+    ret
+    .size ___tls_get_addr, . - ___tls_get_addr
+"
+);
