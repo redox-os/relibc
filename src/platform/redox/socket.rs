@@ -1,6 +1,9 @@
 use alloc::{string::String, vec::Vec};
 use core::{cmp, mem, ptr, slice, str};
-use redox_rt::{proc::FdGuard, protocol::SocketCall};
+use redox_rt::{
+    proc::FdGuard,
+    protocol::{FsCall, SocketCall},
+};
 use syscall::{self, flag::*};
 
 use super::{
@@ -595,9 +598,29 @@ impl PalSocket for Sys {
                 let mut path = format!("{}", str::from_utf8(addr).unwrap());
                 trace!("path: {:?}", path);
 
+                let (_, fd_path) = dir_path_and_fd_path(&path)?;
+
+                let target_path = format!("/{fd_path}");
+                println!("target_path: {:?}", target_path);
+                let socket_file_fd = FdGuard::new(syscall::open(
+                    &target_path,
+                    syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+                )?);
+
+                const OTT_BUF_SIZE: usize = 16;
+
+                let mut ott_buf = [0u8; OTT_BUF_SIZE];
+
+                redox_rt::sys::sys_call(
+                    socket_file_fd as usize,
+                    &mut ott_buf,
+                    CallFlags::empty(),
+                    &[FsCall::Connect as u64],
+                )?;
+
                 redox_rt::sys::sys_call(
                     socket as usize,
-                    path.as_bytes_mut(),
+                    &mut ott_buf,
                     CallFlags::empty(),
                     &[SocketCall::Connect as u64],
                 )?;
