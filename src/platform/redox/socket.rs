@@ -602,10 +602,7 @@ impl PalSocket for Sys {
 
                 let target_path = format!("/{fd_path}");
                 println!("target_path: {:?}", target_path);
-                let socket_file_fd = FdGuard::new(syscall::open(
-                    &target_path,
-                    syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
-                )?);
+                let socket_file_fd = FdGuard::new(syscall::open(&target_path, syscall::O_RDWR)?);
 
                 const OTT_BUF_SIZE: usize = 16;
 
