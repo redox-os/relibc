@@ -94,18 +94,12 @@ pub unsafe extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = CStr::from_ptr(path);
-    // TODO: Rustify
-    let fd = Sys::open(path, O_PATH | O_NOFOLLOW, 0).or_minus_one_errno();
-    if fd < 0 {
-        return -1;
-    }
 
-    // TODO: Rustify
-    let res = Sys::fstat(fd, buf).map(|()| 0).or_minus_one_errno();
-
-    Sys::close(fd);
-
-    res
+    Sys::open(path, O_PATH | O_NOFOLLOW, 0).map_or(-1, |fd| {
+        let res = Sys::fstat(fd, buf).map(|()| 0).or_minus_one_errno();
+        Sys::close(fd);
+        res
+    })
 }
 
 #[no_mangle]
@@ -142,18 +136,12 @@ pub unsafe extern "C" fn mknodat(
 #[no_mangle]
 pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     let file = CStr::from_ptr(file);
-    // TODO: Rustify
-    let fd = Sys::open(file, O_PATH, 0).or_minus_one_errno();
-    if fd < 0 {
-        return -1;
-    }
 
-    // TODO: Rustify
-    let res = Sys::fstat(fd, buf).map(|()| 0).or_minus_one_errno();
-
-    Sys::close(fd);
-
-    res
+    Sys::open(file, O_PATH, 0).map_or(-1, |fd| {
+        let res = Sys::fstat(fd, buf).map(|()| 0).or_minus_one_errno();
+        Sys::close(fd);
+        res
+    })
 }
 
 #[no_mangle]
