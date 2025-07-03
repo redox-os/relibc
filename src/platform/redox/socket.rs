@@ -534,12 +534,28 @@ impl PalSocket for Sys {
                     &[SocketCall::Bind as u64],
                 )?;
 
-                let dirfd = syscall::open(
-                    &dir_path,
-                    syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
-                )?;
-                let fd_to_send = Self::dup(socket)?;
-                let _ = syscall::sendfd(dirfd as usize, fd_to_send as usize, 0, 0)?;
+                let fs_bind_transaction_result = (|| -> Result<()> {
+                    let dirfd = FdGuard::new(syscall::open(
+                        &dir_path,
+                        syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+                    )?);
+                    let fd_to_send = FdGuard::new(Self::dup(socket)?);
+                    let _ = syscall::sendfd(*dirfd as usize, *fd_to_send as usize, 0, 0)?;
+                    Ok(())
+                })();
+
+                if let Err(original_error) = fs_bind_transaction_result {
+                    if let Err(unbind_error) = redox_rt::sys::sys_call(
+                        socket as usize,
+                        &mut [],
+                        CallFlags::empty(),
+                        &[SocketCall::Unbind as u64],
+                    ) {
+                        eprintln!("bind: CRITICAL: failed to unbind socket after a failed transaction: {:?}", unbind_error);
+                    }
+
+                    return Err(original_error);
+                }
             }
             _ => {
                 return Err(Errno(EAFNOSUPPORT));
