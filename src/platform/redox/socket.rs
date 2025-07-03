@@ -539,8 +539,8 @@ impl PalSocket for Sys {
                         &dir_path,
                         syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
                     )?);
-                    let fd_to_send = FdGuard::new(Self::dup(socket)?);
-                    let _ = syscall::sendfd(*dirfd as usize, *fd_to_send as usize, 0, 0)?;
+                    let fd_to_send = FdGuard::new(syscall::dup(socket as usize, &[])?);
+                    let _ = syscall::sendfd(*dirfd, *fd_to_send, 0, 0)?;
                     Ok(())
                 })();
 
