@@ -525,7 +525,6 @@ impl PalSocket for Sys {
                 );
 
                 let addr = slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len);
-                let path = format!("{}", str::from_utf8(addr).unwrap());
                 trace!("path: {:?}", path);
 
                 let (dir_path, mut fd_path) = dir_path_and_fd_path(&path)?;
@@ -537,7 +536,7 @@ impl PalSocket for Sys {
                     &[SocketCall::Bind as u64],
                 )?;
 
-                let fs_bind_transaction_result = (|| -> Result<()> {
+                let fs_bind_result = (|| -> Result<()> {
                     let dirfd = FdGuard::new(syscall::open(
                         &dir_path,
                         syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
@@ -547,7 +546,7 @@ impl PalSocket for Sys {
                     Ok(())
                 })();
 
-                if let Err(original_error) = fs_bind_transaction_result {
+                if let Err(original_error) = fs_bind_result {
                     if let Err(unbind_error) = redox_rt::sys::sys_call(
                         socket as usize,
                         &mut [],
@@ -601,24 +600,19 @@ impl PalSocket for Sys {
                 let (_, fd_path) = dir_path_and_fd_path(&path)?;
 
                 let target_path = format!("/{fd_path}");
-                println!("target_path: {:?}", target_path);
                 let socket_file_fd = FdGuard::new(syscall::open(&target_path, syscall::O_RDWR)?);
-                println!("opened socket_file_fd: {:?}", socket_file_fd);
 
                 const OTT_BUF_SIZE: usize = 16;
 
                 let mut ott_buf = [0u8; OTT_BUF_SIZE];
 
-                println!("getting socket One-Time Token (OTT)");
                 redox_rt::sys::sys_call(
                     *socket_file_fd,
                     &mut ott_buf,
                     CallFlags::empty(),
                     &[FsCall::Connect as u64],
                 )?;
-                println!("got socket OTT: {:?}", ott_buf);
 
-                println!("connecting socket {} to {}", socket, target_path);
                 redox_rt::sys::sys_call(
                     socket as usize,
                     &mut ott_buf,
