@@ -73,4 +73,3 @@ pub const SHUT_RDWR: c_int = 2;
 pub const SHUT_WR: c_int = 1;
 
 pub const SCM_RIGHTS: c_int = 1;
-pub const SCM_CREDENTIALS: c_int = 2;
