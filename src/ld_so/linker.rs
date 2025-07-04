@@ -520,8 +520,8 @@ impl Linker {
                 symbol.as_ptr()
             } else {
                 let mut tls_index = dl_tls_index {
-                    ti_module: obj.tls_module_id as u64,
-                    ti_offset: symbol.value as u64,
+                    ti_module: obj.tls_module_id,
+                    ti_offset: symbol.value,
                 };
 
                 unsafe { __tls_get_addr(&mut tls_index) }
