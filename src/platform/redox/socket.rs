@@ -525,6 +525,7 @@ impl PalSocket for Sys {
                 );
 
                 let addr = slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len);
+                let path = format!("{}", str::from_utf8(addr).unwrap());
                 trace!("path: {:?}", path);
 
                 let (dir_path, mut fd_path) = dir_path_and_fd_path(&path)?;
