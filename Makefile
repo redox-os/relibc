@@ -6,6 +6,7 @@ CARGO?=cargo
 CARGO_TEST?=$(CARGO)
 CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins
 CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
+CC_WRAPPER?=
 RUSTCFLAGS?=
 export OBJCOPY?=objcopy
 
@@ -23,7 +24,7 @@ HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "
 #HEADERS=$(patsubst %,%.h,$(subst _,/,$(HEADERS_UNPARSED)))
 
 ifeq ($(TARGET),aarch64-unknown-linux-gnu)
-	export CC=aarch64-linux-gnu-gcc
+	export CC=$(CC_WRAPPER) aarch64-linux-gnu-gcc
 	export LD=aarch64-linux-gnu-ld
 	export AR=aarch64-linux-gnu-ar
 	export NM=aarch64-linux-gnu-nm
@@ -33,7 +34,7 @@ ifeq ($(TARGET),aarch64-unknown-linux-gnu)
 endif
 
 ifeq ($(TARGET),aarch64-unknown-redox)
-	export CC=aarch64-unknown-redox-gcc
+	export CC=$(CC_WRAPPER) aarch64-unknown-redox-gcc
 	export LD=aarch64-unknown-redox-ld
 	export AR=aarch64-unknown-redox-ar
 	export NM=aarch64-unknown-redox-nm
@@ -43,7 +44,7 @@ ifeq ($(TARGET),aarch64-unknown-redox)
 endif
 
 ifeq ($(TARGET),i686-unknown-redox)
-	export CC=i686-unknown-redox-gcc
+	export CC=$(CC_WRAPPER) i686-unknown-redox-gcc
 	export LD=i686-unknown-redox-ld
 	export AR=i686-unknown-redox-ar
 	export NM=i686-unknown-redox-nm
@@ -53,7 +54,7 @@ ifeq ($(TARGET),i686-unknown-redox)
 endif
 
 ifeq ($(TARGET),x86_64-unknown-linux-gnu)
-	export CC=x86_64-linux-gnu-gcc
+	export CC=$(CC_WRAPPER) x86_64-linux-gnu-gcc
 	export LD=x86_64-linux-gnu-ld
 	export AR=x86_64-linux-gnu-ar
 	export NM=x86_64-linux-gnu-nm
@@ -63,7 +64,7 @@ ifeq ($(TARGET),x86_64-unknown-linux-gnu)
 endif
 
 ifeq ($(TARGET),x86_64-unknown-redox)
-	export CC=x86_64-unknown-redox-gcc
+	export CC=$(CC_WRAPPER) x86_64-unknown-redox-gcc
 	export LD=x86_64-unknown-redox-ld
 	export AR=x86_64-unknown-redox-ar
 	export NM=x86_64-unknown-redox-nm
@@ -73,7 +74,7 @@ ifeq ($(TARGET),x86_64-unknown-redox)
 endif
 
 ifeq ($(TARGET),riscv64gc-unknown-redox)
-	export CC=riscv64-unknown-redox-gcc
+	export CC=$(CC_WRAPPER) riscv64-unknown-redox-gcc
 	export LD=riscv64-unknown-redox-ld
 	export AR=riscv64-unknown-redox-ar
 	export NM=riscv64-unknown-redox-nm
@@ -268,5 +269,5 @@ $(BUILD)/openlibm: openlibm
 	touch $@
 
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
-	$(MAKE) AR=$(AR) CC=$(CC) LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
+	$(MAKE) AR=$(AR) CC="$(CC)" LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
