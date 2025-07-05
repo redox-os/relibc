@@ -137,11 +137,13 @@ pub unsafe extern "C" fn redox_openat_v1(
     path_base: *const u8,
     path_len: usize,
     flags: u32,
+    fcntl_flags: u32,
 ) -> RawResult {
     Error::mux(syscall::openat(
         fd,
         str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
         flags as usize,
+        fcntl_flags as usize,
     ))
 }
 #[no_mangle]

@@ -775,6 +775,14 @@ impl Pal for Sys {
         Ok(libredox::open(path, oflag, effective_mode)? as c_int)
     }
 
+    fn openat(fd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
+        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
+
+        let effective_mode = mode & !(redox_rt::sys::get_umask() as mode_t);
+
+        Ok(libredox::openat(fd as _, path, oflag, effective_mode)? as c_int)
+    }
+
     fn pipe2(fds: &mut [c_int], flags: c_int) -> Result<()> {
         extra::pipe2(fds, flags as usize)?;
         Ok(())
