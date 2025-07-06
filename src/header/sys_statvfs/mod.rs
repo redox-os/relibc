@@ -34,9 +34,15 @@ pub unsafe extern "C" fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn statvfs(file: *const c_char, buf: *mut statvfs) -> c_int {
     let file = CStr::from_ptr(file);
-    Sys::open(file, O_PATH, 0).map_or(-1, |fd| {
-        let res = Sys::fstatvfs(fd, buf).map(|()| 0).or_minus_one_errno();
-        Sys::close(fd);
-        res
-    })
+    // TODO: Rustify
+    let fd = Sys::open(file, O_PATH, 0).or_minus_one_errno();
+    if fd < 0 {
+        return -1;
+    }
+
+    let res = Sys::fstatvfs(fd, buf).map(|()| 0).or_minus_one_errno();
+
+    Sys::close(fd);
+
+    res
 }
