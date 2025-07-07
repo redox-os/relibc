@@ -765,7 +765,7 @@ impl Pal for Sys {
 
         // POSIX states that umask should affect the following:
         //
-        // open, openat (TODO), creat, mkdir, mkdirat (TODO),
+        // open, openat, creat, mkdir, mkdirat (TODO),
         // mkfifo, mkfifoat (TODO), mknod, mknodat (TODO),
         // mq_open, and sem_open,
         //
@@ -780,7 +780,7 @@ impl Pal for Sys {
 
         let effective_mode = mode & !(redox_rt::sys::get_umask() as mode_t);
 
-        Ok(libredox::openat(fd as _, path, oflag, effective_mode)? as c_int)
+        Ok(libredox::openat(fd as _, path, oflag, effective_mode as _)? as c_int)
     }
 
     fn pipe2(fds: &mut [c_int], flags: c_int) -> Result<()> {
