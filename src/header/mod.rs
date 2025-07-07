@@ -104,6 +104,7 @@ pub mod sys_un;
 pub mod sys_utsname;
 pub mod sys_wait;
 // TODO: syslog.h
+pub mod syslog;
 pub mod tar;
 // TODO: term.h (deprecated)
 pub mod termios;
