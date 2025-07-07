@@ -791,12 +791,20 @@ pub unsafe extern "C" fn mkostemps(
     suffix_len: c_int,
     mut flags: c_int,
 ) -> c_int {
+    // TODO: Rustify impl
+
     flags &= !O_ACCMODE;
     flags |= O_RDWR | O_CREAT | O_EXCL;
 
     inner_mktemp(name, suffix_len, || {
         let name = CStr::from_ptr(name);
-        Sys::open(name, flags, 0o600).ok()
+        let fd = Sys::open(name, flags, 0o600).or_minus_one_errno();
+
+        if fd >= 0 {
+            Some(fd)
+        } else {
+            None
+        }
     })
     .unwrap_or(-1)
 }
