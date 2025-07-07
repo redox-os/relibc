@@ -38,6 +38,7 @@ pub const SI_QUEUE: c_int = -1;
 pub const SI_USER: c_int = 0;
 
 pub const CLD_STOPPED: c_int = 5;
+pub const CLD_CONTINUED: c_int = 6;
 
 #[repr(C)]
 #[derive(Clone, Debug)]
