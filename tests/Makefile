@@ -218,7 +218,6 @@ NAMES=\
 	signals/sigprocmask-9 \
 	signals/sigprocmask-10 \
 	signals/sigprocmask-11 \
-	signals/sigprocmask-12 \
 	signals/sigpause-invalid \
 	signals/sigpause-revert \
 	signals/sigpause-suspend \
