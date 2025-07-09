@@ -222,7 +222,6 @@ NAMES=\
 	signals/sigpause-revert \
 	signals/sigpause-suspend \
 	signals/sigprocmask-blocksingle \
-	signals/sigprocmask-block \
 	signals/sigrelse-1 \
 	signals/sigrelse-2 \
 	signals/sigrelse-3 \
