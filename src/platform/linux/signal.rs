@@ -140,7 +140,7 @@ impl PalSignal for Sys {
                 set as *const _,
                 sig.map_or_else(core::ptr::null_mut, |s| s as *mut _),
                 tp.map_or_else(core::ptr::null, |t| t as *const _),
-                NSIG / 8
+                size_of::<sigset_t>()
             ))
             .map(|_| ())
         }
