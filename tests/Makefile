@@ -125,7 +125,7 @@ EXPECT_NAMES=\
 	waitpid \
 	waitpid_multiple \
 	kill-waitpid \
-	# unistd/sleep \
+	unistd/sleep \
 	unistd/swab \
 	unistd/getopt_long \
 	unistd/write \
