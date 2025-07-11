@@ -9,8 +9,8 @@
 
 // Applications should call either sigemptyset() or sigfillset() at least once for each object of type sigset_t prior to any other use of that object. If such an object is not initialized in this way, but is nonetheless supplied as an argument to any of pthread_sigmask(), sigaction(), sigaddset(), sigdelset(), sigismember(), sigpending(), sigprocmask(), sigsuspend(), sigtimedwait(), sigwait(), or sigwaitinfo(), the results are undefined.
 
-
-void delset_test(sigset_t *sigset, int signal){
+void delset_test(sigset_t *sigset, int signal)
+{
   int status;
   status = sigismember(sigset, signal);
   ERROR_IF(sigismember, status, != 1);
@@ -20,17 +20,17 @@ void delset_test(sigset_t *sigset, int signal){
 
   status = sigismember(sigset, signal);
   ERROR_IF(sigismember, status, != 0);
-
 }
 
-int main() {
+int main()
+{
   sigset_t sigset;
 
-  sigfillset(&sigset);
+  for (int i = 1; i < N_SIGNALS; i++)
+  {
+    sigfillset(&sigset);
 
-  for (int i = 1; i < N_SIGNALS; i++){
-    int sig = signals_list[i-1].signal;
-        delset_test(&sigset, sig);
-    }
-  
+    int sig = signals_list[i - 1].signal;
+    delset_test(&sigset, sig);
+  }
 }
