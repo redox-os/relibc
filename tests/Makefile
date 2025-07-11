@@ -122,7 +122,6 @@ EXPECT_NAMES=\
 	unistd/getopt \
 	unistd/pipe \
 	unistd/rmdir \
-	waitpid \
 	waitpid_multiple \
 	kill-waitpid \
 	unistd/sleep \
@@ -268,6 +267,7 @@ NAMES=\
 	grp/getgrgid_r \
 	grp/getgrnam_r \
 	grp/gr_iter \
+	waitpid \
 	sigqueue
 #	resource/getrusage
 #	time/times
