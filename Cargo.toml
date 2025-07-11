@@ -38,7 +38,7 @@ unicode-width = "0.1"
 __libc_only_for_layout_checks = { package = "libc", version = "0.2.149", optional = true }
 md5-crypto = { package = "md-5", version = "0.10.6", default-features = false }
 sha-crypt = { version = "0.5", default-features = false }
-base64ct = { version = "1.6", default-features = false, features = ["alloc"] }
+base64ct = { version = "=1.6", default-features = false, features = ["alloc"] }
 bcrypt-pbkdf = { version = "0.10", default-features = false, features = [
     "alloc",
 ] }

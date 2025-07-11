@@ -25,8 +25,7 @@ build:redox:
     variables:
         TARGET: x86_64-unknown-redox
     script:
-        # TODO: Update toolchain in docker container
-        - rm -rf $HOME/.redoxer/$TARGET/toolchain
+        - rustup show # Check container toolchain version
         - ./redoxer.sh -j "$(nproc)" all
 
 test:linux:
