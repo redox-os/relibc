@@ -124,8 +124,12 @@ impl PalSignal for Sys {
 
     fn sigsuspend(mask: &sigset_t) -> Errno {
         unsafe {
-            e_raw(syscall!(RT_SIGSUSPEND, mask as *const sigset_t, size_of::<sigset_t>()))
-                .expect_err("must fail")
+            e_raw(syscall!(
+                RT_SIGSUSPEND,
+                mask as *const sigset_t,
+                size_of::<sigset_t>()
+            ))
+            .expect_err("must fail")
         }
     }
 
