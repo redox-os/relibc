@@ -7,7 +7,7 @@ then
     cargo install redoxer
 fi
 
-if [ ! -d "$HOME/.redoxer/toolchain" ]
+if [ ! -d "$HOME/.redoxer/$TARGET/toolchain" ]
 then
     redoxer toolchain
 fi
