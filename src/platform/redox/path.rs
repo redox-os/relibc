@@ -5,7 +5,7 @@ use syscall::{data::Stat, error::*, flag::*};
 use super::{libcscheme, FdGuard};
 use crate::sync::Mutex;
 
-pub use redox_path::{canonicalize_using_cwd, canonicalize_using_scheme, RedoxPath};
+pub use redox_path::canonicalize_using_cwd;
 
 // TODO: Define in syscall
 const PATH_MAX: usize = 4096;
@@ -77,16 +77,27 @@ pub fn set_default_scheme(scheme: &str) -> Result<()> {
 fn canonicalize_with_cwd_internal(cwd: Option<&str>, path: &str) -> Result<String> {
     let path = canonicalize_using_cwd(cwd, path).ok_or(Error::new(ENOENT))?;
 
-    if RedoxPath::from_absolute(&path)
-        .map(|rpath| rpath.is_legacy() || path.starts_with("/scheme/"))
-        .unwrap_or_default()
-    {
-        Ok(path)
+    let standard_scheme = path == "/scheme" || path.starts_with("/scheme/");
+    let legacy_scheme = path
+        .split("/")
+        .next()
+        .map(|c| c.contains(":"))
+        .unwrap_or(false);
+
+    Ok(if standard_scheme || legacy_scheme {
+        path
     } else {
         let mut default_scheme_guard = DEFAULT_SCHEME.lock();
         let default_scheme = default_scheme_guard.get_or_insert_with(|| Box::from("file"));
-        canonicalize_using_scheme(default_scheme, &path).ok_or(Error::new(ENOENT))
-    }
+        let mut result = format!("/scheme/{}{}", default_scheme, path);
+
+        // Trim trailing / to keep path canonical.
+        if result.as_bytes().last() == Some(&b'/') {
+            result.pop();
+        }
+
+        result
+    })
 }
 
 pub fn canonicalize(path: &str) -> Result<String> {
