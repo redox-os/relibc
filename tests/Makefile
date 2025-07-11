@@ -122,8 +122,6 @@ EXPECT_NAMES=\
 	unistd/getopt \
 	unistd/pipe \
 	unistd/rmdir \
-	waitpid_multiple \
-	kill-waitpid \
 	unistd/sleep \
 	unistd/swab \
 	unistd/getopt_long \
@@ -174,6 +172,7 @@ DYNAMIC_ONLY_NAMES=\
 NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
+	kill-waitpid \
 	net/if \
 	pty/forkpty \
 	psignal \
@@ -268,6 +267,7 @@ NAMES=\
 	grp/getgrnam_r \
 	grp/gr_iter \
 	waitpid \
+	waitpid_multiple \
 	sigqueue
 #	resource/getrusage
 #	time/times
