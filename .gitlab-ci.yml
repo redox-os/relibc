@@ -25,6 +25,8 @@ build:redox:
     variables:
         TARGET: x86_64-unknown-redox
     script:
+        # TODO: Update toolchain
+        - rm -rf $HOME/.redoxer/toolchain
         - ./redoxer.sh -j "$(nproc)" all
 
 test:linux:
