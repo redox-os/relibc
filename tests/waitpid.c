@@ -33,4 +33,6 @@ int main(void) {
     for_code(42);
     for_code(255);
     // TODO: Also add coverage for e.g. WIFSTOPPED, WSTOPSIG, WTERMSIG, etc
+
+    return EXIT_SUCCESS;
 }
