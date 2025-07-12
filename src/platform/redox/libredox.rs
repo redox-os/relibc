@@ -35,6 +35,17 @@ pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
         .map(|f| f as usize)
 }
 
+pub fn openat(fd: usize, path: &str, flags: c_int, fcntl_flags: c_int) -> Result<usize> {
+    let new_fd = syscall::openat(fd, path, flags as _, fcntl_flags as _)?;
+
+    c_int::try_from(new_fd)
+        .map_err(|_| {
+            let _ = syscall::close(new_fd);
+            Error::new(EMFILE)
+        })
+        .map(|f| f as usize)
+}
+
 pub unsafe fn fstat(fd: usize, buf: *mut crate::header::sys_stat::stat) -> syscall::Result<()> {
     let mut redox_buf: syscall::Stat = Default::default();
     syscall::fstat(fd, &mut redox_buf)?;
@@ -142,8 +153,8 @@ pub unsafe extern "C" fn redox_openat_v1(
     Error::mux(syscall::openat(
         fd,
         str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
-        flags as usize,
-        fcntl_flags as usize,
+        flags as _,
+        fcntl_flags as _,
     ))
 }
 #[no_mangle]
