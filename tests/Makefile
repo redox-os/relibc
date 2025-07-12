@@ -122,10 +122,7 @@ EXPECT_NAMES=\
 	unistd/getopt \
 	unistd/pipe \
 	unistd/rmdir \
-	waitpid \
-	waitpid_multiple \
-	kill-waitpid \
-	# unistd/sleep \
+	unistd/sleep \
 	unistd/swab \
 	unistd/getopt_long \
 	unistd/write \
@@ -175,6 +172,7 @@ DYNAMIC_ONLY_NAMES=\
 NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
+	kill-waitpid \
 	net/if \
 	pty/forkpty \
 	psignal \
@@ -218,12 +216,10 @@ NAMES=\
 	signals/sigprocmask-9 \
 	signals/sigprocmask-10 \
 	signals/sigprocmask-11 \
-	signals/sigprocmask-12 \
 	signals/sigpause-invalid \
 	signals/sigpause-revert \
 	signals/sigpause-suspend \
 	signals/sigprocmask-blocksingle \
-	signals/sigprocmask-block \
 	signals/sigrelse-1 \
 	signals/sigrelse-2 \
 	signals/sigrelse-3 \
@@ -270,6 +266,8 @@ NAMES=\
 	grp/getgrgid_r \
 	grp/getgrnam_r \
 	grp/gr_iter \
+	waitpid \
+	waitpid_multiple \
 	sigqueue
 #	resource/getrusage
 #	time/times

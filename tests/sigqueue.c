@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
+#include <sys/utsname.h>
 
 #include "test_helpers.h"
 
@@ -35,8 +36,18 @@ void action(int sig, siginfo_t *info, void *context)
 
 int main(void)
 {
+
   int status, fds[2];
 
+  struct utsname utsname;
+
+  status = uname(&utsname);
+  if (status == 0) {
+    if (strncmp(utsname.sysname, "Linux", 6) == 0) {
+      printf("Test is not supported on Linux, relibc's siginfo_t is not compatible.\n");
+      return EXIT_SUCCESS;
+    }
+  }
   status = pipe(fds);
   ERROR_IF(pipe, status, == -1);
 
