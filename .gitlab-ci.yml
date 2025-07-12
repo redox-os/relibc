@@ -25,6 +25,7 @@ build:redox:
     variables:
         TARGET: x86_64-unknown-redox
     script:
+        - rustup show # Check container toolchain version
         - ./redoxer.sh -j "$(nproc)" all
 
 test:linux:

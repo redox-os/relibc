@@ -4,7 +4,7 @@ endif
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
-CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins
+CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins --release --locked
 CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
 CC_WRAPPER?=
 RUSTCFLAGS?=
@@ -234,26 +234,26 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenl
 	$(AR) -M < "$@.mri"
 
 $(BUILD)/release/librelibc.a: $(SRC)
-	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
+	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
 	# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
 	# use some cbindgen hook, specify them manually, or grep for #[no_mangle].
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
-	$(CARGO) rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+	$(CARGO) rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/crti.o: $(SRC)
-	$(CARGO) rustc --release --manifest-path src/crti/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+	$(CARGO) rustc --manifest-path src/crti/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/crtn.o: $(SRC)
-	$(CARGO) rustc --release --manifest-path src/crtn/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+	$(CARGO) rustc --manifest-path src/crtn/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/ld_so.o: $(SRC)
-	$(CARGO) rustc --release --manifest-path ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
+	$(CARGO) rustc --manifest-path ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
 $(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD)/release/libc.a $(BUILD)/release/crtn.o
