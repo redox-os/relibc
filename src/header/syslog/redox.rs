@@ -13,7 +13,7 @@ use crate::{
         time::time,
     },
     platform::types::*,
-    sync::rwlock::{ReadGuard, WriteGuard, RwLock},
+    sync::{Once, rwlock::{ReadGuard, WriteGuard, RwLock}},
 };
 use core:: {
     ffi::VaList,
@@ -85,7 +85,11 @@ impl LogParams {
 }
 
 static LOGFILELOCK: RwLock<Option<File>> = RwLock::new(None);
-static PARAMSLOCK: RwLock<LogParams> = RwLock::new(LogParams::new());
+static PARAMSLOCK: Once<RwLock<LogParams>> = Once::new();
+
+fn paramslock() -> &'static RwLock<LogParams> {
+    PARAMSLOCK.call_once(|| RwLock::new(LogParams::new()))
+}
 
 fn logfile<'a>() -> ReadGuard<'a, Option<File>> {
     LOGFILELOCK.read()
@@ -96,11 +100,11 @@ fn logfile_mut<'a>() -> WriteGuard<'a, Option<File>> {
 }
 
 fn logparams<'a>() -> ReadGuard<'a, LogParams> {
-    PARAMSLOCK.read()
+    paramslock().read()
 }
 
 fn logparams_mut<'a>() -> WriteGuard<'a, LogParams> {
-    PARAMSLOCK.write()
+    paramslock().write()
 }
 
 
