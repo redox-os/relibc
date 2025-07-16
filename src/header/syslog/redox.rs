@@ -1,24 +1,24 @@
-use chrono::{DateTime, Utc};
-use alloc::string::String;
 use crate::{
     c_str::CStr,
     error::Errno,
     fs::File,
-    io::Write,
     header::{
         fcntl,
         stdio::printf::printf,
         string::{strlen, strncpy},
-        unistd::{getpid},
         time::time,
+        unistd::getpid,
     },
+    io::Write,
     platform::types::*,
-    sync::{Once, rwlock::{ReadGuard, WriteGuard, RwLock}},
+    sync::{
+        rwlock::{ReadGuard, RwLock, WriteGuard},
+        Once,
+    },
 };
-use core:: {
-    ffi::VaList,
-    ptr::null_mut,
-};
+use alloc::string::String;
+use chrono::{DateTime, Utc};
+use core::{ffi::VaList, ptr::null_mut};
 
 // Values for logopt
 pub const LOG_PID: c_int = 0x01;
@@ -32,26 +32,26 @@ pub const LOG_NOWAIT: c_int = 0x10;
 // as it appears there were some Linux-specific facilities
 // Which could be used by programs we want to port over
 // And GNU Libc had these too
-pub const LOG_KERN: c_int = 0<<3;
-pub const LOG_USER: c_int = 1<<3;
-pub const LOG_MAIL: c_int = 2<<3;
-pub const LOG_DAEMON: c_int = 3<<3;
-pub const LOG_AUTH: c_int = 4<<3;
-pub const LOG_SYSLOG: c_int = 5<<3;
-pub const LOG_LPR: c_int = 6<<3;
-pub const LOG_NEWS: c_int = 7<<3;
-pub const LOG_UUCP: c_int = 8<<3;
-pub const LOG_CRON: c_int = 9<<3;
-pub const LOG_AUTHPRIV: c_int = 10<<3;
-pub const LOG_FTP: c_int = 11<<3;
-pub const LOG_LOCAL0: c_int = 16<<3;
-pub const LOG_LOCAL1: c_int = 17<<3;
-pub const LOG_LOCAL2: c_int = 18<<3;
-pub const LOG_LOCAL3: c_int = 19<<3;
-pub const LOG_LOCAL4: c_int = 20<<3;
-pub const LOG_LOCAL5: c_int = 21<<3;
-pub const LOG_LOCAL6: c_int = 22<<3;
-pub const LOG_LOCAL7: c_int = 23<<3;
+pub const LOG_KERN: c_int = 0 << 3;
+pub const LOG_USER: c_int = 1 << 3;
+pub const LOG_MAIL: c_int = 2 << 3;
+pub const LOG_DAEMON: c_int = 3 << 3;
+pub const LOG_AUTH: c_int = 4 << 3;
+pub const LOG_SYSLOG: c_int = 5 << 3;
+pub const LOG_LPR: c_int = 6 << 3;
+pub const LOG_NEWS: c_int = 7 << 3;
+pub const LOG_UUCP: c_int = 8 << 3;
+pub const LOG_CRON: c_int = 9 << 3;
+pub const LOG_AUTHPRIV: c_int = 10 << 3;
+pub const LOG_FTP: c_int = 11 << 3;
+pub const LOG_LOCAL0: c_int = 16 << 3;
+pub const LOG_LOCAL1: c_int = 17 << 3;
+pub const LOG_LOCAL2: c_int = 18 << 3;
+pub const LOG_LOCAL3: c_int = 19 << 3;
+pub const LOG_LOCAL4: c_int = 20 << 3;
+pub const LOG_LOCAL5: c_int = 21 << 3;
+pub const LOG_LOCAL6: c_int = 22 << 3;
+pub const LOG_LOCAL7: c_int = 23 << 3;
 pub const LOG_NFACILITIES: c_int = 24;
 
 // Priorities
@@ -107,7 +107,6 @@ fn logparams_mut<'a>() -> WriteGuard<'a, LogParams> {
     paramslock().write()
 }
 
-
 #[no_mangle]
 pub extern "C" fn setlogmask(maskpri: c_int) -> c_int {
     let mut params = logparams_mut();
@@ -124,7 +123,7 @@ pub extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_int) {
     unsafe {
         let conv_ident = CStr::from_ptr(ident);
         new_ident = conv_ident.to_str().unwrap();
-}
+    }
     let mut params = logparams_mut();
     if !new_ident.is_empty() {
         params.log_ident = new_ident.into();
@@ -135,8 +134,11 @@ pub extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_int) {
         let mut guard = logfile_mut();
         match *guard {
             None => {
-                *guard = Some(File::open(c"/scheme/log".into(), fcntl::O_WRONLY).expect("Could not open file"));
-            },
+                *guard = Some(
+                    File::open(c"/scheme/log".into(), fcntl::O_WRONLY)
+                        .expect("Could not open file"),
+                );
+            }
             _ => (),
         }
     }
@@ -147,24 +149,38 @@ fn _vsyslog(mut priority: i32, message: *const c_char, mut ap: VaList) {
         let mut guard = logfile_mut();
         match *guard {
             None => {
-                *guard = Some(File::open(c"/scheme/log".into(), fcntl::O_WRONLY).expect("Could not open file"));
-            },
+                *guard = Some(
+                    File::open(c"/scheme/log".into(), fcntl::O_WRONLY)
+                        .expect("Could not open file"),
+                );
+            }
             _ => (),
         }
     }
     //Note: trait Local not available due to a dependency loop, so we have to query the time differently
     let mut epoch: i64 = 0;
-    unsafe { epoch = time(null_mut()); }
-    let currtime: DateTime<Utc> = DateTime::from_timestamp(epoch, 0).expect("Couldn't retrieve broken-down time.");
+    unsafe {
+        epoch = time(null_mut());
+    }
+    let currtime: DateTime<Utc> =
+        DateTime::from_timestamp(epoch, 0).expect("Couldn't retrieve broken-down time.");
     let currtime_s = currtime.format("%b %e %T %Y");
     let mut params = logparams_mut();
-    let pid = if (params.log_opt & LOG_PID) != 0 { getpid() } else { 0 };
-    if ((priority & LOG_FACMASK) == 0) {priority |= params.log_facility};
+    let pid = if (params.log_opt & LOG_PID) != 0 {
+        getpid()
+    } else {
+        0
+    };
+    if ((priority & LOG_FACMASK) == 0) {
+        priority |= params.log_facility
+    };
     let mut final_logmsg = format!("<{}>{} {}{}: ", priority, currtime_s, params.log_ident, pid);
     let mut guard = logfile_mut();
     if let Some(filehandle) = guard.as_mut() {
         filehandle.write(final_logmsg.as_bytes());
-        unsafe { let _ = printf(&mut *filehandle, message, ap); }
+        unsafe {
+            let _ = printf(&mut *filehandle, message, ap);
+        }
         filehandle.write("\n".as_bytes());
     }
 }
@@ -173,7 +189,9 @@ fn _vsyslog(mut priority: i32, message: *const c_char, mut ap: VaList) {
 pub extern "C" fn vsyslog(priority: c_int, message: *const c_char, mut ap: VaList) {
     {
         let params = logparams();
-        if (((params.log_mask & (1<<(priority&7))) == 0) || ((priority&!0x3ff) != 0)) {return ()};
+        if (((params.log_mask & (1 << (priority & 7))) == 0) || ((priority & !0x3ff) != 0)) {
+            return ();
+        };
     }
     _vsyslog(priority, message, ap);
 }
