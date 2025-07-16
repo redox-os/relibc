@@ -136,7 +136,7 @@ pub extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_int) {
             None => {
                 *guard = Some(
                     File::open(c"/scheme/log".into(), fcntl::O_WRONLY)
-                        .expect("Could not open file"),
+                        .expect("Could not open log file"),
                 );
             }
             _ => (),
@@ -151,7 +151,7 @@ fn _vsyslog(mut priority: i32, message: *const c_char, mut ap: VaList) {
             None => {
                 *guard = Some(
                     File::open(c"/scheme/log".into(), fcntl::O_WRONLY)
-                        .expect("Could not open file"),
+                        .expect("Could not open log file"),
                 );
             }
             _ => (),
