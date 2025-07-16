@@ -143,12 +143,14 @@ pub extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_int) {
 }
 
 fn _vsyslog(mut priority: i32, message: *const c_char, mut ap: VaList) {
-    let mut guard = logfile_mut();
-    match *guard {
-        None => {
-            *guard = Some(File::open(c"/scheme/log".into(), fcntl::O_WRONLY).expect("Could not open file"));
-        },
-        _ => (),
+    {
+        let mut guard = logfile_mut();
+        match *guard {
+            None => {
+                *guard = Some(File::open(c"/scheme/log".into(), fcntl::O_WRONLY).expect("Could not open file"));
+            },
+            _ => (),
+        }
     }
     //Note: trait Local not available due to a dependency loop, so we have to query the time differently
     let mut epoch: i64 = 0;
@@ -169,8 +171,10 @@ fn _vsyslog(mut priority: i32, message: *const c_char, mut ap: VaList) {
 
 #[no_mangle]
 pub extern "C" fn vsyslog(priority: c_int, message: *const c_char, mut ap: VaList) {
-    let params = logparams();
-    if (((params.log_mask & (1<<(priority&7))) == 0) || ((priority&!0x3ff) != 0)) {return ()};
+    {
+        let params = logparams();
+        if (((params.log_mask & (1<<(priority&7))) == 0) || ((priority&!0x3ff) != 0)) {return ()};
+    }
     _vsyslog(priority, message, ap);
 }
 
