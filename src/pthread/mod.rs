@@ -19,7 +19,7 @@ use crate::{
     },
     platform::{types::*, Pal, Sys},
 };
-
+use crate::header::pthread::PTHREAD_MAX_NAME_LENGTH;
 use crate::sync::{waitval::Waitval, Mutex};
 
 /// Called only by the main thread, as part of relibc_start.
@@ -39,6 +39,9 @@ pub unsafe fn init() {
         stack_size: 0,
 
         os_tid: UnsafeCell::new(Sys::current_os_tid()),
+        
+        // Initialize thread name to empty string (null-terminated)
+        name: UnsafeCell::new([0; PTHREAD_MAX_NAME_LENGTH]),
     };
 }
 
@@ -52,7 +55,7 @@ pub unsafe fn terminate_from_main_thread() {
 }
 
 bitflags::bitflags! {
-    struct PthreadFlags: usize {
+    pub (crate) struct PthreadFlags: usize {
         const DETACHED = 1;
     }
 }
@@ -68,6 +71,9 @@ pub struct Pthread {
     pub(crate) stack_size: usize,
 
     pub os_tid: UnsafeCell<OsTid>,
+    
+    // Thread name for debugging purposes, limited to 16 bytes including null terminator
+    pub(crate) name: UnsafeCell<[u8; PTHREAD_MAX_NAME_LENGTH]>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Ord, Eq, PartialOrd, PartialEq)]
@@ -155,6 +161,9 @@ pub(crate) unsafe fn create(
     new_tcb.pthread.flags = flags.bits().into();
     new_tcb.pthread.stack_base = stack_base;
     new_tcb.pthread.stack_size = stack_size;
+    
+    // Initialize thread name to empty string
+    unsafe { (*new_tcb.pthread.name.get()).fill(0); }
 
     new_tcb.masters_ptr = current_tcb.masters_ptr;
     new_tcb.masters_len = current_tcb.masters_len;
@@ -393,6 +402,49 @@ pub fn get_cpu_clkid(thread: &Pthread) -> Result<clockid_t, Errno> {
 }
 pub fn get_sched_param(thread: &Pthread) -> Result<(clockid_t, sched_param), Errno> {
     todo!()
+}
+
+/// Sets the thread name for the specified thread.
+/// The name is a null-terminated string up to 15 characters (16th byte is always 0).
+/// 
+/// Returns:
+/// - Ok(()) on success
+/// - Err(EINVAL) if name is too long or thread is invalid
+/// - Err(ESRCH) if thread not found
+pub fn set_thread_name(thread: &Pthread, name: &[u8]) -> Result<(), Errno> {
+    // Check if the name is too long (must leave room for null terminator)
+    if name.len() >= 16 {
+        return Err(Errno(EINVAL));
+    }
+    
+    // Copy the name to the thread's name field
+    let thread_name = unsafe { &mut *thread.name.get() };
+    
+    // Zero out the entire buffer first
+    thread_name.fill(0);
+    
+    // Copy the name bytes
+    thread_name[..name.len()].copy_from_slice(name);
+    
+    Ok(())
+}
+
+/// Gets the thread name for the specified thread.
+/// 
+/// Returns:
+/// - Ok(&[u8]) - Slice of bytes representing the thread name (null-terminated)
+/// - Err(ESRCH) if thread not found
+pub fn get_thread_name(thread: &Pthread) -> Result<&[u8], Errno> {
+    // Check if the thread is valid
+    // Note: In the current implementation, we always have a valid thread reference,
+    // but we could add more validation if needed
+    
+    let thread_name = unsafe { &*thread.name.get() };
+    
+    // Find the end of the string (null terminator)
+    let len = thread_name.iter().position(|&b| b == 0).unwrap_or(16);
+    
+    Ok(&thread_name[..len])
 }
 
 // TODO: Hash map?
