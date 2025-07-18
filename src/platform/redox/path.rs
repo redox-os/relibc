@@ -1,11 +1,16 @@
-use alloc::{borrow::ToOwned, boxed::Box, string::String, vec::Vec};
+use alloc::{
+    borrow::ToOwned,
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 use redox_rt::signal::tmp_disable_signals;
 use syscall::{data::Stat, error::*, flag::*};
 
 use super::{libcscheme, FdGuard};
 use crate::sync::Mutex;
 
-pub use redox_path::canonicalize_using_cwd;
+pub use redox_path::{canonicalize_using_cwd, RedoxPath};
 
 // TODO: Define in syscall
 const PATH_MAX: usize = 4096;
@@ -168,4 +173,41 @@ pub fn open(path: &str, flags: usize) -> Result<usize> {
         }
     }
     Err(Error::new(ELOOP))
+}
+
+pub fn dir_path_and_fd_path(socket_path: &str) -> Result<(String, String)> {
+    let _siglock = tmp_disable_signals();
+    let cwd_guard = CWD.lock();
+
+    let full_path = canonicalize_with_cwd_internal(cwd_guard.as_deref(), socket_path)?;
+
+    let redox_path = RedoxPath::from_absolute(&full_path).ok_or(Error::new(EINVAL))?;
+    let (_, mut ref_path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
+    if ref_path.as_ref().is_empty() {
+        return Err(Error::new(EINVAL));
+    }
+    if redox_path.is_default_scheme() {
+        let dir_to_open = String::from(get_parent_path(&full_path).ok_or(Error::new(EINVAL))?);
+        Ok((dir_to_open, ref_path.as_ref().to_string()))
+    } else {
+        let full_path = canonicalize_with_cwd_internal(cwd_guard.as_deref(), ref_path.as_ref())?;
+        let redox_path = RedoxPath::from_absolute(&full_path).ok_or(Error::new(EINVAL))?;
+        let (_, path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
+        let dir_to_open = String::from(get_parent_path(&full_path).ok_or(Error::new(EINVAL))?);
+        Ok((dir_to_open, path.as_ref().to_string()))
+    }
+}
+
+fn get_parent_path(path: &str) -> Option<&str> {
+    path.rfind('/').and_then(|index| {
+        if index == 0 {
+            // Path is something like "/file.txt" or the root "/".
+            // The parent is the root directory "/".
+            Some("/")
+        } else {
+            // Path is something like "/a/b/c.txt".
+            // Take the slice from the beginning up to the last '/'.
+            Some(&path[..index])
+        }
+    })
 }

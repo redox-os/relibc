@@ -296,11 +296,12 @@ pub fn posix_getresugid() -> Resugid<u32> {
         sgid,
     }
 }
-pub fn get_proc_credentials(target_pid: usize, buf: &mut [u8]) -> Result<usize> {
+pub fn get_proc_credentials(cap_fd: usize, target_pid: usize, buf: &mut [u8]) -> Result<usize> {
     if buf.len() < size_of::<crate::protocol::ProcMeta>() {
         return Err(Error::new(EINVAL));
     }
-    this_proc_call(
+    proc_call(
+        cap_fd,
         buf,
         CallFlags::empty(),
         &[ProcCall::GetProcCredentials as u64, target_pid as u64],
