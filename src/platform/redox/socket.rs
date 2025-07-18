@@ -1,10 +1,14 @@
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::{cmp, mem, ptr, slice, str};
-use redox_rt::{proc::FdGuard, protocol::SocketCall};
+use redox_rt::{
+    proc::FdGuard,
+    protocol::{FsCall, SocketCall},
+};
 use syscall::{self, flag::*};
 
 use super::{
     super::{types::*, Pal, PalSocket, ERRNO},
+    path::dir_path_and_fd_path,
     Sys,
 };
 use crate::{
@@ -522,15 +526,40 @@ impl PalSocket for Sys {
                 );
 
                 let addr = slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len);
-                let mut path = format!("{}", str::from_utf8(addr).unwrap());
+                let path = format!("{}", str::from_utf8(addr).unwrap());
                 trace!("path: {:?}", path);
+
+                let (dir_path, mut fd_path) = dir_path_and_fd_path(&path)?;
 
                 redox_rt::sys::sys_call(
                     socket as usize,
-                    path.as_bytes_mut(),
+                    fd_path.as_bytes_mut(),
                     CallFlags::empty(),
                     &[SocketCall::Bind as u64],
                 )?;
+
+                let fs_bind_result = (|| -> Result<()> {
+                    let dirfd = FdGuard::new(syscall::open(
+                        &dir_path,
+                        syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+                    )?);
+                    let fd_to_send = FdGuard::new(syscall::dup(socket as usize, &[])?);
+                    let _ = syscall::sendfd(*dirfd, *fd_to_send, 0, 0)?;
+                    Ok(())
+                })();
+
+                if let Err(original_error) = fs_bind_result {
+                    if let Err(unbind_error) = redox_rt::sys::sys_call(
+                        socket as usize,
+                        &mut [],
+                        CallFlags::empty(),
+                        &[SocketCall::Unbind as u64],
+                    ) {
+                        eprintln!("bind: CRITICAL: failed to unbind socket after a failed transaction: {:?}", unbind_error);
+                    }
+
+                    return Err(original_error);
+                }
             }
             _ => {
                 return Err(Errno(EAFNOSUPPORT));
@@ -570,9 +599,25 @@ impl PalSocket for Sys {
                 let mut path = format!("{}", str::from_utf8(addr).unwrap());
                 trace!("path: {:?}", path);
 
+                let (_, fd_path) = dir_path_and_fd_path(&path)?;
+
+                let target_path = format!("/{fd_path}");
+                let socket_file_fd = FdGuard::new(syscall::open(&target_path, syscall::O_RDWR)?);
+
+                const TOKEN_BUF_SIZE: usize = 16;
+
+                let mut token_buf = [0u8; TOKEN_BUF_SIZE];
+
+                redox_rt::sys::sys_call(
+                    *socket_file_fd,
+                    &mut token_buf,
+                    CallFlags::empty(),
+                    &[FsCall::Connect as u64],
+                )?;
+
                 redox_rt::sys::sys_call(
                     socket as usize,
-                    path.as_bytes_mut(),
+                    &mut token_buf,
                     CallFlags::empty(),
                     &[SocketCall::Connect as u64],
                 )?;

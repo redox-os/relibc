@@ -52,6 +52,7 @@ pub enum ThreadCall {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]
+#[non_exhaustive]
 pub enum SocketCall {
     Bind = 0,
     Connect = 1,
@@ -59,6 +60,15 @@ pub enum SocketCall {
     GetSockOpt = 3,
     SendMsg = 4,
     RecvMsg = 5,
+    Unbind = 6,
+    GetToken = 7,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(usize)]
+#[non_exhaustive]
+pub enum FsCall {
+    Connect = 0,
 }
 
 impl ProcCall {
@@ -103,6 +113,17 @@ impl SocketCall {
             3 => Self::GetSockOpt,
             4 => Self::SendMsg,
             5 => Self::RecvMsg,
+            6 => Self::Unbind,
+            7 => Self::GetToken,
+            _ => return None,
+        })
+    }
+}
+
+impl FsCall {
+    pub fn try_from_raw(raw: usize) -> Option<Self> {
+        Some(match raw {
+            0 => Self::Connect,
             _ => return None,
         })
     }
