@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use core::{cmp, mem, ptr, slice, str};
-use redox_rt::proc::FdGuard;
+use redox_rt::{proc::FdGuard, protocol::SocketCall};
 use syscall::{self, flag::*};
 
 use super::{
@@ -11,13 +11,18 @@ use crate::{
     error::{Errno, Result, ResultExt},
     header::{
         arpa_inet::inet_aton,
-        errno::{EAFNOSUPPORT, EDOM, EFAULT, EINVAL, ENOSYS, EOPNOTSUPP, EPROTONOSUPPORT},
+        errno::{
+            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EISCONN, EMSGSIZE, ENOMEM, ENOSYS, EOPNOTSUPP,
+            EPROTONOSUPPORT,
+        },
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
         sys_socket::{
-            constants::*, msghdr, sa_family_t, sockaddr, socklen_t, CMSG_FIRSTHDR, CMSG_NXTHDR,
+            cmsghdr, constants::*, msghdr, sa_family_t, sockaddr, socklen_t, ucred, CMSG_ALIGN,
+            CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE,
         },
         sys_time::timeval,
+        sys_uio::iovec,
         sys_un::sockaddr_un,
     },
 };
@@ -63,35 +68,11 @@ macro_rules! bind_or_connect {
                 path
             },
             AF_UNIX => {
-                let data = &*($address as *const sockaddr_un);
-
-                // NOTE: It's UB to access data in given address that exceeds
-                // the given address length.
-
-                let maxlen = cmp::min(
-                    // Max path length of the full-sized struct
-                    data.sun_path.len(),
-                    // Length inferred from given addrlen
-                    $address_len as usize - data.path_offset()
+                // NOTE: bind/connect with AF_UNIX were replaced with SYS_CALL.
+                eprintln!(
+                    "bind/connect with AF_UNIX were replaced with SYS_CALL."
                 );
-                let len = cmp::min(
-                    // The maximum length of the address
-                    maxlen,
-                    // The first NUL byte, if any
-                    strnlen(&data.sun_path as *const _, maxlen as size_t),
-                );
-
-                let addr = slice::from_raw_parts(
-                    &data.sun_path as *const _ as *const u8,
-                    len,
-                );
-                let path = format!(
-                    "{}",
-                    str::from_utf8(addr).unwrap()
-                );
-                trace!("path: {:?}", path);
-
-                path
+                return Err(Errno(EAFNOSUPPORT));
             },
             _ => {
                 return Err(Errno(EAFNOSUPPORT));
@@ -172,8 +153,18 @@ unsafe fn inner_get_name(
     // Format: [udp|tcp:]remote/local, chan:path
     let mut buf = [0; 256];
     let len = syscall::fpath(socket as usize, &mut buf)?;
-    let buf = &buf[..len];
 
+    inner_get_name_inner(local, address, address_len, &buf[..len]);
+
+    Ok(())
+}
+
+unsafe fn inner_get_name_inner(
+    local: bool,
+    address: *mut sockaddr,
+    address_len: *mut socklen_t,
+    buf: &[u8],
+) {
     if buf.starts_with(b"tcp:") || buf.starts_with(b"udp:") {
         inner_af_inet(local, &buf[4..], address, address_len);
     } else if buf.starts_with(b"/scheme/tcp/") || buf.starts_with(b"/scheme/udp/") {
@@ -182,6 +173,10 @@ unsafe fn inner_get_name(
         inner_af_unix(&buf[5..], address, address_len);
     } else if buf.starts_with(b"/scheme/chan/") {
         inner_af_unix(&buf[13..], address, address_len);
+    } else if buf.starts_with(b"/scheme/uds_stream/") {
+        inner_af_unix(&buf[19..], address, address_len);
+    } else if buf.starts_with(b"/scheme/uds_dgram/") {
+        inner_af_unix(&buf[18..], address, address_len);
     } else {
         // Socket doesn't belong to any scheme
         panic!(
@@ -189,8 +184,6 @@ unsafe fn inner_get_name(
             str::from_utf8(buf)
         );
     }
-
-    Ok(())
 }
 
 fn socket_kind(mut kind: c_int) -> (c_int, usize) {
@@ -204,6 +197,291 @@ fn socket_kind(mut kind: c_int) -> (c_int, usize) {
         flags |= O_CLOEXEC;
     }
     (kind, flags)
+}
+
+unsafe fn serialize_payload_to_stream(
+    msg_stream: &mut Vec<u8>,
+    iovs: &[iovec],
+    whole_iov_size: usize,
+) -> Result<usize> {
+    msg_stream.extend_from_slice(&whole_iov_size.to_le_bytes());
+
+    for iov in iovs {
+        if iov.iov_len > 0 {
+            if iov.iov_base.is_null() {
+                return Err(Errno(EFAULT));
+            }
+            let source_slice: &[u8] =
+                unsafe { slice::from_raw_parts(iov.iov_base as *const u8, iov.iov_len) };
+            msg_stream.extend_from_slice(source_slice);
+        }
+    }
+    Ok(whole_iov_size)
+}
+
+unsafe fn serialize_ancillary_data_to_stream(
+    msg: *const msghdr,
+    mhdr: &msghdr,
+    socket: c_int,
+    msg_stream: &mut Vec<u8>,
+) -> Result<()> {
+    if mhdr.msg_control.is_null() {
+        return Err(Errno(EINVAL));
+    }
+
+    let mut cmsg: *mut cmsghdr = CMSG_FIRSTHDR(msg);
+    let mut cmsg_count = 0;
+    while !cmsg.is_null() {
+        cmsg_count += 1;
+        let current_cmsg = &*cmsg;
+        let min_cmsg_len = CMSG_ALIGN(mem::size_of::<cmsghdr>());
+        if current_cmsg.cmsg_len < min_cmsg_len {
+            return Err(Errno(EINVAL));
+        }
+
+        // cmsg entry format: [level(i32)][type(i32)][data_len(usize)][data]
+        msg_stream.extend_from_slice(&current_cmsg.cmsg_level.to_le_bytes());
+        msg_stream.extend_from_slice(&current_cmsg.cmsg_type.to_le_bytes());
+
+        match (current_cmsg.cmsg_level, current_cmsg.cmsg_type) {
+            (SOL_SOCKET, SCM_RIGHTS) => {
+                let data_len = current_cmsg.cmsg_len - min_cmsg_len;
+                if data_len % mem::size_of::<c_int>() != 0 {
+                    return Err(Errno(EINVAL));
+                }
+                let fd_count = data_len / mem::size_of::<c_int>();
+
+                // Call syscall::sendfd for each fd.
+                if fd_count > 0 {
+                    let fds_ptr = CMSG_DATA(cmsg) as *const c_int;
+                    let fds_slice = slice::from_raw_parts(fds_ptr, fd_count);
+                    for &fd in fds_slice.iter() {
+                        let fd_to_send = FdGuard::new(syscall::dup(fd as usize, b"")?);
+                        syscall::sendfd(socket as usize, *fd_to_send as usize, 0, 0)?;
+                    }
+                }
+
+                // Serialize to ancillary_data_stream.
+                // Our intermediate format: data_len is size of fd_count (usize), data is fd_count (usize)
+                let data_for_stream_len = mem::size_of::<usize>();
+                let data_for_stream_payload = (fd_count as usize).to_le_bytes();
+
+                msg_stream.extend_from_slice(&(data_for_stream_len as usize).to_le_bytes());
+                msg_stream.extend_from_slice(&data_for_stream_payload);
+            }
+            (SOL_SOCKET, SCM_CREDENTIALS) => {
+                // Our intermediate format: data_len is 0, no data payload
+                let data_for_stream_len = 0usize;
+                msg_stream.extend_from_slice(&(data_for_stream_len as usize).to_le_bytes());
+            }
+            _ => {
+                return Err(Errno(EOPNOTSUPP));
+            }
+        }
+        cmsg = CMSG_NXTHDR(msg, cmsg);
+    }
+    Ok(())
+}
+
+unsafe fn deserialize_name_from_stream(
+    mhdr: &mut msghdr,
+    msg_stream: &[u8],
+    cursor: &mut usize,
+) -> Result<()> {
+    // Read name_len from stream
+    let name_len_in_stream = read_num::<usize>(&msg_stream[*cursor..])?;
+    let name_len = cmp::min(name_len_in_stream, mhdr.msg_namelen as usize);
+    *cursor += mem::size_of::<usize>();
+
+    if name_len > 0 {
+        if *cursor + name_len > msg_stream.len() {
+            return Err(Errno(EMSGSIZE));
+        }
+        if !mhdr.msg_name.is_null() && mhdr.msg_namelen > 0 {
+            let name_buffer = &msg_stream[*cursor..*cursor + name_len];
+            inner_get_name_inner(
+                false,
+                mhdr.msg_name as *mut sockaddr,
+                &mut mhdr.msg_namelen,
+                name_buffer,
+            );
+        }
+        *cursor += name_len;
+    } else {
+        // If name_len is 0, set msg_namelen to 0
+        mhdr.msg_namelen = 0;
+    }
+    Ok(())
+}
+
+unsafe fn deserialize_payload_from_stream(
+    mhdr: &mut msghdr,
+    msg_stream: &[u8],
+    iovs: &[iovec],
+    whole_iov_size: usize,
+    cursor: &mut usize,
+    test: u8,
+) -> Result<usize> {
+    let full_payload_len_from_scheme = read_num::<usize>(&msg_stream[*cursor..])?;
+    *cursor += mem::size_of::<usize>();
+    // Determine actual payload data available in the stream
+    let payload_len_to_read = cmp::min(full_payload_len_from_scheme, whole_iov_size);
+    let payload_data_from_stream = &msg_stream[*cursor..*cursor + payload_len_to_read];
+    *cursor += payload_len_to_read;
+
+    let mut total_bytes_written: usize = 0;
+    if !iovs.is_empty() && payload_len_to_read > 0 {
+        let mut source_bytes_consumed: usize = 0;
+        for iov in iovs {
+            if iov.iov_len == 0 {
+                continue;
+            }
+            if iov.iov_base.is_null() {
+                return Err(Errno(EFAULT));
+            }
+
+            let source_bytes_remaining = payload_data_from_stream
+                .len()
+                .saturating_sub(source_bytes_consumed);
+            if source_bytes_remaining == 0 {
+                break;
+            }
+
+            let bytes_to_write = cmp::min(iov.iov_len, source_bytes_remaining);
+            if bytes_to_write > 0 {
+                let dest_slice: &mut [u8] =
+                    unsafe { slice::from_raw_parts_mut(iov.iov_base as *mut u8, iov.iov_len) };
+
+                let source_sub_slice = &payload_data_from_stream
+                    [source_bytes_consumed..source_bytes_consumed + bytes_to_write];
+                dest_slice[..bytes_to_write].copy_from_slice(source_sub_slice);
+                total_bytes_written += bytes_to_write;
+                source_bytes_consumed += bytes_to_write;
+            }
+        }
+    }
+
+    if full_payload_len_from_scheme > whole_iov_size {
+        mhdr.msg_flags |= MSG_TRUNC;
+    }
+
+    Ok(total_bytes_written)
+}
+
+unsafe fn deserialize_ancillary_data_from_stream(
+    mhdr: &mut msghdr,
+    socket: c_int,
+    msg_stream: &[u8],
+    cursor: &mut usize,
+    cmsg_space_provided: usize,
+) -> Result<()> {
+    let mut current_cmsg_ptr_in_user_buf = if !mhdr.msg_control.is_null() && cmsg_space_provided > 0
+    {
+        CMSG_FIRSTHDR(mhdr)
+    } else {
+        ptr::null_mut()
+    };
+    let mut remaining_user_cmsg_buf_len = cmsg_space_provided;
+    let mut total_csmg_bytes_written_to_user_buf: usize = 0;
+
+    while *cursor < msg_stream.len() {
+        const CMSG_HEADER_LEN_IN_STREAM: usize =
+            mem::size_of::<c_int>() * 2 + mem::size_of::<usize>();
+        if *cursor + CMSG_HEADER_LEN_IN_STREAM > msg_stream.len() {
+            if msg_stream[*cursor..].iter().any(|&b| b != 0) {
+                mhdr.msg_flags |= MSG_CTRUNC;
+            }
+            break;
+        }
+
+        // cmsg entry format: [level(i32)][type(i32)][data_len(usize)][data]
+        let cmsg_level = read_num::<c_int>(&msg_stream[*cursor..])?;
+        *cursor += mem::size_of::<c_int>();
+        let cmsg_type = read_num::<c_int>(&msg_stream[*cursor..])?;
+        *cursor += mem::size_of::<c_int>();
+        let cmsg_data_len_in_stream = read_num::<usize>(&msg_stream[*cursor..])?;
+        *cursor += mem::size_of::<usize>();
+
+        if *cursor + cmsg_data_len_in_stream > msg_stream.len() {
+            mhdr.msg_flags |= MSG_CTRUNC;
+            break;
+        }
+
+        let cmsg_data_from_stream = &msg_stream[*cursor..*cursor + cmsg_data_len_in_stream];
+        *cursor += cmsg_data_len_in_stream;
+
+        let mut actual_posix_cmsg_data_len: usize = 0;
+        let mut temp_posix_cmsg_data_buf: Vec<u8> = Vec::new();
+
+        match (cmsg_level, cmsg_type) {
+            (SOL_SOCKET, SCM_RIGHTS) => {
+                if cmsg_data_len_in_stream != mem::size_of::<usize>() {
+                    return Err(Errno(EINVAL));
+                }
+                let fd_count = read_num::<usize>(&cmsg_data_from_stream)?;
+
+                for _ in 0..fd_count {
+                    // Call syscall::dup to duplicate the fd
+                    let new_fd = syscall::dup(socket as usize, b"recvfd")?;
+                    temp_posix_cmsg_data_buf.extend_from_slice(&(new_fd as c_int).to_le_bytes());
+                }
+                actual_posix_cmsg_data_len = temp_posix_cmsg_data_buf.len();
+            }
+            (SOL_SOCKET, SCM_CREDENTIALS) => {
+                if cmsg_data_len_in_stream
+                    != mem::size_of::<pid_t>() + mem::size_of::<uid_t>() + mem::size_of::<gid_t>()
+                {
+                    return Err(Errno(EINVAL));
+                }
+
+                let pid = read_num::<pid_t>(&cmsg_data_from_stream)?;
+                let uid_offset = mem::size_of::<pid_t>();
+                let uid = read_num::<uid_t>(&cmsg_data_from_stream[uid_offset..])?;
+                let gid_offset = uid_offset + mem::size_of::<uid_t>();
+                let gid = read_num::<gid_t>(&cmsg_data_from_stream[gid_offset..])?;
+                let cred = ucred { pid, uid, gid };
+
+                temp_posix_cmsg_data_buf.extend_from_slice(unsafe {
+                    slice::from_raw_parts(
+                        &cred as *const ucred as *const u8,
+                        mem::size_of::<ucred>(),
+                    )
+                });
+                actual_posix_cmsg_data_len = temp_posix_cmsg_data_buf.len();
+            }
+            _ => {
+                return Err(Errno(EINVAL));
+            }
+        }
+
+        let space_needed_for_posix_cmsg = CMSG_SPACE(actual_posix_cmsg_data_len as u32) as usize;
+
+        if !current_cmsg_ptr_in_user_buf.is_null()
+            && remaining_user_cmsg_buf_len >= space_needed_for_posix_cmsg
+        {
+            let cmsg_ref = &mut *current_cmsg_ptr_in_user_buf;
+            cmsg_ref.cmsg_len = CMSG_LEN(actual_posix_cmsg_data_len as u32) as usize;
+            cmsg_ref.cmsg_level = cmsg_level;
+            cmsg_ref.cmsg_type = cmsg_type;
+
+            let data_ptr_in_user_cmsg = CMSG_DATA(cmsg_ref);
+            ptr::copy_nonoverlapping(
+                temp_posix_cmsg_data_buf.as_ptr(),
+                data_ptr_in_user_cmsg as *mut u8,
+                actual_posix_cmsg_data_len,
+            );
+
+            let aligned_len_written = CMSG_ALIGN(cmsg_ref.cmsg_len);
+            total_csmg_bytes_written_to_user_buf += aligned_len_written;
+            remaining_user_cmsg_buf_len -= aligned_len_written;
+            current_cmsg_ptr_in_user_buf = CMSG_NXTHDR(mhdr, current_cmsg_ptr_in_user_buf);
+        } else {
+            mhdr.msg_flags |= MSG_CTRUNC;
+            break;
+        }
+    }
+    mhdr.msg_controllen = total_csmg_bytes_written_to_user_buf;
+    Ok(())
 }
 
 impl PalSocket for Sys {
@@ -220,7 +498,45 @@ impl PalSocket for Sys {
     }
 
     unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> Result<()> {
-        bind_or_connect!(bind into, socket, address, address_len)?;
+        match (*address).sa_family as c_int {
+            AF_INET => {
+                bind_or_connect!(bind into, socket, address, address_len)?;
+            }
+            AF_UNIX => {
+                let data = &*(address as *const sockaddr_un);
+
+                // NOTE: It's UB to access data in given address that exceeds
+                // the given address length.
+
+                let maxlen = cmp::min(
+                    // Max path length of the full-sized struct
+                    data.sun_path.len(),
+                    // Length inferred from given addrlen
+                    address_len as usize - data.path_offset(),
+                );
+                let len = cmp::min(
+                    // The maximum length of the address
+                    maxlen,
+                    // The first NUL byte, if any
+                    strnlen(&data.sun_path as *const _, maxlen as size_t),
+                );
+
+                let addr = slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len);
+                let mut path = format!("{}", str::from_utf8(addr).unwrap());
+                trace!("path: {:?}", path);
+
+                redox_rt::sys::sys_call(
+                    socket as usize,
+                    path.as_bytes_mut(),
+                    CallFlags::empty(),
+                    &[SocketCall::Bind as u64],
+                )?;
+            }
+            _ => {
+                return Err(Errno(EAFNOSUPPORT));
+            }
+        };
+
         Ok(())
     }
 
@@ -229,7 +545,41 @@ impl PalSocket for Sys {
         address: *const sockaddr,
         address_len: socklen_t,
     ) -> Result<c_int> {
-        bind_or_connect!(connect into, socket, address, address_len)
+        match (*address).sa_family as c_int {
+            AF_INET => bind_or_connect!(bind into, socket, address, address_len),
+            AF_UNIX => {
+                let data = &*(address as *const sockaddr_un);
+
+                // NOTE: It's UB to access data in given address that exceeds
+                // the given address length.
+
+                let maxlen = cmp::min(
+                    // Max path length of the full-sized struct
+                    data.sun_path.len(),
+                    // Length inferred from given addrlen
+                    address_len as usize - data.path_offset(),
+                );
+                let len = cmp::min(
+                    // The maximum length of the address
+                    maxlen,
+                    // The first NUL byte, if any
+                    strnlen(&data.sun_path as *const _, maxlen as size_t),
+                );
+
+                let addr = slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len);
+                let mut path = format!("{}", str::from_utf8(addr).unwrap());
+                trace!("path: {:?}", path);
+
+                redox_rt::sys::sys_call(
+                    socket as usize,
+                    path.as_bytes_mut(),
+                    CallFlags::empty(),
+                    &[SocketCall::Connect as u64],
+                )?;
+                Result::<c_int, Errno>::Ok(0)
+            }
+            _ => Err(Errno(EAFNOSUPPORT)),
+        }
     }
 
     unsafe fn getpeername(
@@ -311,29 +661,134 @@ impl PalSocket for Sys {
     }
 
     unsafe fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> Result<usize> {
-        //TODO: implement recvfrom with recvmsg
-        eprintln!(
-            "recvmsg({}, {:p}, {:#x}) not implemented on redox",
-            socket, msg, flags
-        );
-        if !msg.is_null() {
-            let msg = &*msg;
-            eprintln!("{:#x?}", msg);
-            if !msg.msg_control.is_null() {
-                let mut cmsg = CMSG_FIRSTHDR(msg);
-                while !cmsg.is_null() {
-                    eprintln!("{:#x?}", *cmsg);
-                    cmsg = CMSG_NXTHDR(msg, cmsg);
-                }
-            }
+        if msg.is_null() {
+            return Err(Errno(EINVAL));
         }
-        Err(Errno(ENOSYS))
+        let mut mhdr = &mut *msg;
+        let iovs_slice: &[iovec] = if mhdr.msg_iov.is_null() || mhdr.msg_iovlen == 0 {
+            &[]
+        } else {
+            unsafe { slice::from_raw_parts(mhdr.msg_iov, mhdr.msg_iovlen as usize) }
+        };
+        let whole_iov_size: usize = iovs_slice.iter().map(|iov| iov.iov_len).sum();
+
+        let mut msg_stream: Vec<u8> = Vec::new();
+
+        // Prepare space for the message stream.
+        // [name_len(usize)][name_buffer]
+        // [payload_len(usize)][payload_data_buffer]
+        // [ancillary_stream_buffer]
+        let expected_stream_size = {
+            mem::size_of::<usize>()         // name_len
+            + mhdr.msg_namelen as usize     // name_buffer
+            + mem::size_of::<usize>()       // payload_len
+            + whole_iov_size                // payload_data_buffer
+            + mhdr.msg_controllen as usize // ancillary_stream_buffer
+        };
+        msg_stream
+            .try_reserve_exact(expected_stream_size)
+            .map_err(|_| Errno(ENOMEM))?;
+        msg_stream.resize(expected_stream_size, 0);
+
+        // Write the information about the msghdr
+        let mut cursor: usize = 0;
+        msg_stream[cursor..cursor + mem::size_of::<usize>()]
+            .copy_from_slice(&(mhdr.msg_namelen as usize).to_le_bytes());
+        cursor += mem::size_of::<usize>();
+        msg_stream[cursor..cursor + mem::size_of::<usize>()]
+            .copy_from_slice(&(whole_iov_size).to_le_bytes());
+        cursor += mem::size_of::<usize>();
+        msg_stream[cursor..cursor + mem::size_of::<usize>()]
+            .copy_from_slice(&(mhdr.msg_controllen as usize).to_le_bytes());
+
+        // Read the message stream.
+        let metadata = [SocketCall::RecvMsg as u64];
+        let call_flags = CallFlags::empty();
+        let actual_read_len =
+            redox_rt::sys::sys_call(socket as usize, &mut msg_stream, call_flags, &metadata)?;
+        msg_stream.truncate(actual_read_len);
+
+        cursor = 0;
+        let cmsg_space_provided_by_user = mhdr.msg_controllen;
+        mhdr.msg_flags = 0;
+
+        // Read sender name.
+        deserialize_name_from_stream(&mut mhdr, &msg_stream, &mut cursor)?;
+
+        // Read payload data.
+        let actual_payload_bytes_written_to_iov = deserialize_payload_from_stream(
+            &mut mhdr,
+            &msg_stream,
+            iovs_slice,
+            whole_iov_size,
+            &mut cursor,
+            0u8,
+        )?;
+
+        // Reconstruct the ancillary data in the user-provided buffer.
+        let has_cmsg_buffer = !mhdr.msg_control.is_null() && cmsg_space_provided_by_user > 0;
+        let has_ancillary_data = cursor < msg_stream.len();
+        if has_cmsg_buffer && has_ancillary_data {
+            deserialize_ancillary_data_from_stream(
+                mhdr,
+                socket,
+                &msg_stream,
+                &mut cursor,
+                cmsg_space_provided_by_user as usize,
+            )?;
+        } else {
+            mhdr.msg_controllen = 0; // No ancillary data
+        }
+        Ok(actual_payload_bytes_written_to_iov)
     }
 
     unsafe fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> Result<usize> {
-        //TODO: implement sendto with sendmsg
-        eprintln!("sendmsg not implemented on redox");
-        Err(Errno(ENOSYS))
+        if msg.is_null() {
+            return Err(Errno(EINVAL));
+        }
+        let mhdr = &*msg;
+
+        // Reserve space for the message stream.
+        // [payload_len(usize)][payload_data_buffer]
+        // [ancillary_stream_buffer]
+        let iovs_slice: &[iovec] = if mhdr.msg_iov.is_null() || mhdr.msg_iovlen == 0 {
+            &[]
+        } else {
+            unsafe { slice::from_raw_parts(mhdr.msg_iov, mhdr.msg_iovlen as usize) }
+        };
+
+        let mut msg_stream: Vec<u8> = Vec::new();
+        let whole_iov_size: usize = iovs_slice.iter().map(|iov| iov.iov_len).sum();
+        msg_stream
+            .try_reserve_exact(
+                mem::size_of::<usize>()     // payload_len
+            + whole_iov_size                // payload_data_buffer
+            + mhdr.msg_controllen as usize, // ancillary_stream_buffer
+            )
+            .map_err(|_| Errno(ENOMEM))?;
+
+        // Write the message to the msg_stream.
+        let mut actual_payload_bytes_serialized = 0;
+        if !mhdr.msg_iov.is_null() && mhdr.msg_iovlen > 0 {
+            actual_payload_bytes_serialized =
+                serialize_payload_to_stream(&mut msg_stream, &iovs_slice, whole_iov_size)?;
+        }
+        // Process Control Messages from msghdr and serialize them.
+        if mhdr.msg_controllen > 0 {
+            serialize_ancillary_data_to_stream(msg, mhdr, socket, &mut msg_stream)?;
+        }
+
+        // Send the message stream.
+        let metadata = [SocketCall::SendMsg as u64];
+        let call_flags = CallFlags::empty();
+        let written = redox_rt::sys::sys_call(
+            socket as usize,
+            msg_stream.as_mut_slice(),
+            call_flags,
+            &metadata,
+        )?;
+
+        Ok(actual_payload_bytes_serialized)
     }
 
     unsafe fn sendto(
@@ -392,6 +847,19 @@ impl PalSocket for Sys {
             SOL_SOCKET => match option_name {
                 SO_RCVTIMEO => return set_timeout(b"read_timeout"),
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
+                SO_PASSCRED => {
+                    let metadata = [SocketCall::SetSockOpt as u64, option_name as u64];
+                    let payload =
+                        slice::from_raw_parts_mut(option_value as *mut u8, option_len as usize);
+                    let call_flags = CallFlags::empty();
+                    redox_rt::sys::sys_call(
+                        socket as usize,
+                        payload,
+                        CallFlags::empty(),
+                        &metadata,
+                    )?;
+                    return Ok(());
+                }
                 _ => (),
             },
             _ => (),
@@ -425,7 +893,10 @@ impl PalSocket for Sys {
         Ok(match (domain, kind) {
             (AF_INET, SOCK_STREAM) => syscall::open("/scheme/tcp", flags)? as c_int,
             (AF_INET, SOCK_DGRAM) => syscall::open("/scheme/udp", flags)? as c_int,
-            (AF_UNIX, SOCK_STREAM) => syscall::open("/scheme/chan", flags | O_CREAT)? as c_int,
+            (AF_UNIX, SOCK_STREAM) => {
+                syscall::open("/scheme/uds_stream", flags | O_CREAT)? as c_int
+            }
+            (AF_UNIX, SOCK_DGRAM) => syscall::open("/scheme/uds_dgram", flags | O_CREAT)? as c_int,
             _ => return Err(Errno(EPROTONOSUPPORT)),
         })
     }
@@ -435,9 +906,9 @@ impl PalSocket for Sys {
 
         match (domain, kind) {
             (AF_UNIX, SOCK_STREAM) => {
-                let listener = FdGuard::new(syscall::open("/scheme/chan", flags | O_CREAT)?);
+                let listener = FdGuard::new(syscall::open("/scheme/uds_stream", flags | O_CREAT)?);
 
-                // For now, chan: lets connects be instant, and instead blocks
+                // For now, uds_stream: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
                 // nonblocking.
 
@@ -447,6 +918,19 @@ impl PalSocket for Sys {
 
                 sv[0] = fd0.take() as c_int;
                 sv[1] = fd1.take() as c_int;
+                Ok(())
+            }
+            (AF_UNIX, SOCK_DGRAM) => {
+                let listener = FdGuard::new(syscall::open("/scheme/uds_dgram", flags | O_CREAT)?);
+
+                // For now, uds_dgram: lets connects be instant, and instead blocks
+                // on any I/O performed. So we don't need to mark this as
+                // nonblocking.
+
+                let mut fd0 = FdGuard::new(syscall::dup(*listener, b"connect")?);
+
+                sv[0] = fd0.take() as c_int;
+                sv[1] = listener.take() as c_int;
                 Ok(())
             }
             _ => unsafe {
@@ -460,5 +944,35 @@ impl PalSocket for Sys {
                 Err(Errno(EPROTONOSUPPORT))
             },
         }
+    }
+}
+
+fn read_num<T>(buffer: &[u8]) -> Result<T>
+where
+    T: NumFromBytes,
+{
+    T::from_le_bytes_slice(buffer)
+}
+trait NumFromBytes: Sized {
+    fn from_le_bytes_slice(buffer: &[u8]) -> Result<Self>;
+}
+impl NumFromBytes for i32 {
+    fn from_le_bytes_slice(buffer: &[u8]) -> Result<Self> {
+        Ok(i32::from_le_bytes(
+            buffer
+                .get(..mem::size_of::<i32>())
+                .and_then(|slice| slice.try_into().ok())
+                .ok_or_else(|| Errno(EFAULT))?,
+        ))
+    }
+}
+impl NumFromBytes for usize {
+    fn from_le_bytes_slice(buffer: &[u8]) -> Result<Self> {
+        Ok(usize::from_le_bytes(
+            buffer
+                .get(..mem::size_of::<usize>())
+                .and_then(|slice| slice.try_into().ok())
+                .ok_or_else(|| Errno(EFAULT))?,
+        ))
     }
 }
