@@ -259,8 +259,9 @@ unsafe fn serialize_ancillary_data_to_stream(
                 if fd_count > 0 {
                     let fds_ptr = CMSG_DATA(cmsg) as *const c_int;
                     let fds_slice = slice::from_raw_parts(fds_ptr, fd_count);
-                    for (i, &fd) in fds_slice.iter().enumerate() {
-                        syscall::sendfd(socket as usize, fd as usize, 0, 0)?;
+                    for &fd in fds_slice.iter() {
+                        let fd_to_send = FdGuard::new(syscall::dup(fd as usize, b"")?);
+                        syscall::sendfd(socket as usize, *fd_to_send as usize, 0, 0)?;
                     }
                 }
 
