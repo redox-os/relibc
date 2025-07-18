@@ -50,6 +50,10 @@ pub fn posix_write(fd: usize, buf: &[u8]) -> Result<usize> {
 }
 #[inline]
 pub fn posix_kill(target: ProcKillTarget, sig: usize) -> Result<()> {
+    if sig > 64 {
+        return Err(Error::new(EINVAL));
+    }
+
     match wrapper(false, true, || {
         this_proc_call(
             &mut [],
@@ -195,6 +199,11 @@ pub fn sys_waitpid(target: WaitpidTarget, status: &mut usize, flags: WaitFlags) 
     })
 }
 pub fn posix_kill_thread(thread_fd: usize, signal: u32) -> Result<()> {
+    // TODO: don't hardcode?
+    if signal > 64 {
+        return Err(Error::new(EINVAL));
+    }
+
     match wrapper(false, true, || {
         thread_call(
             thread_fd,
