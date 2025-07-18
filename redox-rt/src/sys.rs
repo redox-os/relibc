@@ -296,6 +296,16 @@ pub fn posix_getresugid() -> Resugid<u32> {
         sgid,
     }
 }
+pub fn get_proc_credentials(target_pid: usize, buf: &mut [u8]) -> Result<usize> {
+    if buf.len() < size_of::<crate::protocol::ProcMeta>() {
+        return Err(Error::new(EINVAL));
+    }
+    this_proc_call(
+        buf,
+        CallFlags::empty(),
+        &[ProcCall::GetProcCredentials as u64, target_pid as u64],
+    )
+}
 pub fn posix_exit(status: i32) -> ! {
     this_proc_call(
         &mut [],
