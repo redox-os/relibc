@@ -603,20 +603,20 @@ impl PalSocket for Sys {
                 let target_path = format!("/{fd_path}");
                 let socket_file_fd = FdGuard::new(syscall::open(&target_path, syscall::O_RDWR)?);
 
-                const OTT_BUF_SIZE: usize = 16;
+                const TOKEN_BUF_SIZE: usize = 16;
 
-                let mut ott_buf = [0u8; OTT_BUF_SIZE];
+                let mut token_buf = [0u8; TOKEN_BUF_SIZE];
 
                 redox_rt::sys::sys_call(
                     *socket_file_fd,
-                    &mut ott_buf,
+                    &mut token_buf,
                     CallFlags::empty(),
                     &[FsCall::Connect as u64],
                 )?;
 
                 redox_rt::sys::sys_call(
                     socket as usize,
-                    &mut ott_buf,
+                    &mut token_buf,
                     CallFlags::empty(),
                     &[SocketCall::Connect as u64],
                 )?;
