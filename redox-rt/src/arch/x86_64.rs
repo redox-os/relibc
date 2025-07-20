@@ -229,8 +229,11 @@ asmfunction!(__relibc_internal_sigentry: ["
     jz 7f
 
     bt edx, eax // check if signal was sent to thread specifically
-    jc 2f // if so, continue as usual
-
+    jnc 81f
+    // if so, continue as usual
+    add eax, 32
+    jmp 2f
+81:
     // otherwise, try (competitively) dequeueing realtime signal
 
     // SYS_CALL(fd, payload_base, payload_len, metadata_len | (flags << 8), metadata_base)

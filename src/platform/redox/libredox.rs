@@ -1,7 +1,7 @@
 use core::{slice, str};
 
 use redox_rt::{
-    protocol::{ProcKillTarget, WaitFlags},
+    protocol::{ProcKillTarget, SocketCall, WaitFlags},
     sys::{posix_read, posix_write, WaitpidTarget},
 };
 use syscall::{Error, Result, EMFILE};
@@ -255,6 +255,15 @@ pub unsafe extern "C" fn redox_get_rgid_v1() -> RawResult {
     redox_rt::sys::posix_getresugid().rgid as _
 }
 #[no_mangle]
+pub unsafe extern "C" fn redox_get_proc_credentials_v1(
+    cap_fd: usize,
+    target_pid: usize,
+    buf: &mut [u8],
+) -> RawResult {
+    Error::mux(redox_rt::sys::get_proc_credentials(cap_fd, target_pid, buf))
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {
     Error::mux(redox_rt::sys::setrens(rns, ens).map(|()| 0))
 }
@@ -404,5 +413,20 @@ pub unsafe extern "C" fn redox_sys_call_v0(
         slice::from_raw_parts_mut(payload, payload_len),
         syscall::CallFlags::from_bits_retain(flags),
         slice::from_raw_parts(metadata, metadata_len),
+    ))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn redox_get_socket_token_v0(
+    fd: usize,
+    payload: *mut u8,
+    payload_len: usize,
+) -> RawResult {
+    let metadata = [SocketCall::GetToken as u64];
+    Error::mux(redox_rt::sys::sys_call(
+        fd,
+        slice::from_raw_parts_mut(payload, payload_len),
+        syscall::CallFlags::empty(),
+        &metadata,
     ))
 }

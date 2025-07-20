@@ -50,6 +50,10 @@ pub fn posix_write(fd: usize, buf: &[u8]) -> Result<usize> {
 }
 #[inline]
 pub fn posix_kill(target: ProcKillTarget, sig: usize) -> Result<()> {
+    if sig > 64 {
+        return Err(Error::new(EINVAL));
+    }
+
     match wrapper(false, true, || {
         this_proc_call(
             &mut [],
@@ -195,6 +199,11 @@ pub fn sys_waitpid(target: WaitpidTarget, status: &mut usize, flags: WaitFlags) 
     })
 }
 pub fn posix_kill_thread(thread_fd: usize, signal: u32) -> Result<()> {
+    // TODO: don't hardcode?
+    if signal > 64 {
+        return Err(Error::new(EINVAL));
+    }
+
     match wrapper(false, true, || {
         thread_call(
             thread_fd,
@@ -295,6 +304,17 @@ pub fn posix_getresugid() -> Resugid<u32> {
         egid,
         sgid,
     }
+}
+pub fn get_proc_credentials(cap_fd: usize, target_pid: usize, buf: &mut [u8]) -> Result<usize> {
+    if buf.len() < size_of::<crate::protocol::ProcMeta>() {
+        return Err(Error::new(EINVAL));
+    }
+    proc_call(
+        cap_fd,
+        buf,
+        CallFlags::empty(),
+        &[ProcCall::GetProcCredentials as u64, target_pid as u64],
+    )
 }
 pub fn posix_exit(status: i32) -> ! {
     this_proc_call(
