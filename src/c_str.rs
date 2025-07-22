@@ -77,6 +77,12 @@ impl<'a> CStr<'a> {
     pub fn borrow(string: &'a CString) -> Self {
         unsafe { Self::from_ptr(string.as_ptr()) }
     }
+    pub fn count_bytes(&self) -> usize {
+        self.to_bytes().len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.count_bytes() == 0
+    }
 }
 
 unsafe impl Send for CStr<'_> {}
