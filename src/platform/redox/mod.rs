@@ -41,6 +41,8 @@ use crate::{
     sync::rwlock::RwLock,
 };
 
+use crate::alloc::string::ToString;
+use redox_path::RedoxPath;
 pub use redox_rt::proc::FdGuard;
 
 use super::{types::*, Pal, Read, ERRNO};
@@ -778,16 +780,33 @@ impl Pal for Sys {
     fn openat(fd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
 
-        // Is legacy like `file:/path/to/file`
-        let final_path = if let Some((prefix, rest)) = path.split_once(":/") {
-            &format!("/scheme/{}/{}", prefix, rest)
-        } else {
-            path
-        };
-
         let effective_mode = mode & !(redox_rt::sys::get_umask() as mode_t);
 
-        Ok(libredox::openat(fd as _, final_path, oflag, effective_mode as _)? as c_int)
+        // Absolute path
+        if path.starts_with('/') {
+            if let Some(redox_path) = RedoxPath::from_absolute(&path) {
+                let canon = redox_path.to_string();
+                return Ok(libredox::open(&canon, oflag, effective_mode)? as c_int);
+            } else {
+                return Err(Errno(EINVAL));
+            }
+        }
+
+        // Legacy path (prefix before ':' does not contain '/')
+        if let Some((prefix, rest)) = path.split_once(':') {
+            if !prefix.contains('/') {
+                let legacy_path = format!("/scheme/{}/{}", prefix, rest.trim_start_matches('/'));
+                if let Some(redox_path) = RedoxPath::from_absolute(&legacy_path) {
+                    let canon = redox_path.to_string();
+                    return Ok(libredox::open(&canon, oflag, effective_mode)? as c_int);
+                } else {
+                    return Err(Errno(EINVAL));
+                }
+            }
+        }
+
+        // Relative path
+        Ok(libredox::openat(fd as _, path, oflag, effective_mode as _)? as c_int)
     }
 
     fn pipe2(fds: &mut [c_int], flags: c_int) -> Result<()> {
@@ -839,7 +858,7 @@ impl Pal for Sys {
 
         let redox_path = str::from_utf8(&buf[..count])
             .ok()
-            .and_then(|x| redox_path::RedoxPath::from_absolute(x))
+            .and_then(|x| RedoxPath::from_absolute(x))
             .ok_or(Errno(EINVAL))?;
 
         let (scheme, reference) = redox_path.as_parts().ok_or(Errno(EINVAL))?;
