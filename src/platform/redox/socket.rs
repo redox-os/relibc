@@ -575,7 +575,7 @@ impl PalSocket for Sys {
         address_len: socklen_t,
     ) -> Result<c_int> {
         match (*address).sa_family as c_int {
-            AF_INET => bind_or_connect!(bind into, socket, address, address_len),
+            AF_INET => bind_or_connect!(connect into, socket, address, address_len),
             AF_UNIX => {
                 let data = &*(address as *const sockaddr_un);
 
