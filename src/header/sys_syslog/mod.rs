@@ -14,21 +14,21 @@ pub mod logger;
 use core::ffi::VaList;
 
 use crate::{c_str::CStr, platform::types::*};
-use logger::LOGGER;
+use logger::{Priority, LOGGER};
 
-// Values for logopt
+/// Record the caller's PID in log messages.
 pub const LOG_PID: c_int = 0x01;
+/// Write to /dev/console if [`syslog`] fails.
 pub const LOG_CONS: c_int = 0x02;
+/// Open the log on the first call to [`syslog`] rather than opening it early.
+/// This is the default behavior and setting or unsetting this option does nothing.
 pub const LOG_ODELAY: c_int = 0x04;
+/// Open the log file immediately.
 pub const LOG_NDELAY: c_int = 0x08;
 pub const LOG_NOWAIT: c_int = 0x10;
+/// Print log message to stderr as well as the log.
 pub const LOG_PERROR: c_int = 0x20;
 
-// Facilities
-// Note: in this case I relied more on MUSL than on POSIX1.2017
-// as it appears there were some Linux-specific facilities
-// Which could be used by programs we want to port over
-// And GNU Libc had these too
 pub const LOG_KERN: c_int = 0 << 3;
 pub const LOG_USER: c_int = 1 << 3;
 pub const LOG_MAIL: c_int = 2 << 3;
@@ -41,6 +41,7 @@ pub const LOG_UUCP: c_int = 8 << 3;
 pub const LOG_CRON: c_int = 9 << 3;
 pub const LOG_AUTHPRIV: c_int = 10 << 3;
 pub const LOG_FTP: c_int = 11 << 3;
+
 pub const LOG_LOCAL0: c_int = 16 << 3;
 pub const LOG_LOCAL1: c_int = 17 << 3;
 pub const LOG_LOCAL2: c_int = 18 << 3;
@@ -61,18 +62,28 @@ pub const LOG_NOTICE: c_int = 5;
 pub const LOG_INFO: c_int = 6;
 pub const LOG_DEBUG: c_int = 7;
 
-// Internal constant for extracting facility from a packed facility-priority bitfield.
-// TODO: Remove or use a packed i32 like musl.
-const LOG_FACMASK: c_int = 0x3f8;
+/// Create a mask that includes all levels up to a certain priority.
+#[no_mangle]
+pub const extern "C" fn LOG_UPTO(p: c_int) -> c_int {
+    (1 << (p + 1)) - 1
+}
+
+/// Create a mask that enables a single priority.
+#[no_mangle]
+pub const extern "C" fn LOG_MASK(p: c_int) -> c_int {
+    1 << p
+}
 
 #[no_mangle]
-pub extern "C" fn setlogmask(maskpri: c_int) -> c_int {
+pub extern "C" fn setlogmask(mask: c_int) -> c_int {
     let mut params = LOGGER.lock();
-    let ret = params.mask;
-    if (maskpri != 0) {
-        params.mask = maskpri;
+    let old = params.mask.bits();
+    if (mask != 0) {
+        if let Some(mask) = params.mask.with_mask(mask) {
+            params.mask = mask;
+        }
     }
-    ret
+    old
 }
 
 #[no_mangle]
@@ -83,7 +94,12 @@ pub unsafe extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_i
     let mut params = LOGGER.lock();
     params.set_identity_cstr(ident);
     params.opt = conf;
-    params.facility = facility;
+    params.mask = params.mask.with_facility(facility).unwrap_or(
+        params
+            .mask
+            .with_facility(Priority::User.bits())
+            .expect("`User` is a valid syslog facility"),
+    );
 
     // Ensure log is ready to write now instead of checking on the first message.
     if conf.contains(logger::Config::NoDelay) {
@@ -93,11 +109,17 @@ pub unsafe extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_i
 
 #[no_mangle]
 pub unsafe extern "C" fn vsyslog(priority: c_int, message: *const c_char, mut ap: VaList) {
-    let mut logger = LOGGER.lock();
-    if (((logger.mask & (1 << (priority & 7))) == 0) || ((priority & !0x3ff) != 0)) {
+    let Some(message) = CStr::from_nullable_ptr(message) else {
         return;
     };
-    logger.write_log(priority, message, ap);
+    let Some(priority) = Priority::from_bits(priority) else {
+        return;
+    };
+
+    let mut logger = LOGGER.lock();
+    if logger.mask.should_log(priority) {
+        logger.write_log(priority, message, ap);
+    }
 }
 
 #[no_mangle]
