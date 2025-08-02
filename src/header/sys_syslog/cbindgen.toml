@@ -1,4 +1,3 @@
-sys_includes = ["bits/syslog.h"]
 include_guard = "_RELIBC_SYS_SYSLOG_H"
 language = "C"
 style = "Type"
