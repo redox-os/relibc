@@ -32,6 +32,9 @@ pub const _SC_TTY_NAME_MAX: c_int = 72;
 pub const _SC_SYMLOOP_MAX: c_int = 173;
 // ...
 pub const _SC_HOST_NAME_MAX: c_int = 180;
+// ...
+pub const _SC_SIGQUEUE_MAX: c_int = 190;
+pub const _SC_REALTIME_SIGNALS: c_int = 191;
 // } POSIX.1
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sysconf.html>.
@@ -59,6 +62,8 @@ pub extern "C" fn sysconf(name: c_int) -> c_long {
         _SC_HOST_NAME_MAX => 64,
         _SC_NPROCESSORS_CONF => 1,
         _SC_NPROCESSORS_ONLN => 1,
+        _SC_SIGQUEUE_MAX => 32,
+        _SC_REALTIME_SIGNALS => 202405,
         _ => {
             platform::ERRNO.set(errno::EINVAL);
             -1

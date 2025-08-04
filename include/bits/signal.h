@@ -4,6 +4,7 @@
 #define SIG_DFL ((void (*)(int))0)
 #define SIG_IGN ((void (*)(int))1)
 #define SIG_ERR ((void (*)(int))-1)
+#define SIG_HOLD ((void (*)(int))2)
 
 typedef struct siginfo siginfo_t;
 typedef unsigned long long sigset_t;
