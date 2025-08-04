@@ -1039,25 +1039,26 @@ impl Pal for Sys {
         // First, allow ptrace to handle waitpid
         // TODO: Handle special PIDs here (such as -1)
         let state = ptrace::init_state();
-        let mut sessions = state.sessions.lock();
-        if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
-            if !options.contains(WaitFlags::WNOHANG) {
-                let mut _event = PtraceEvent::default();
-                let _ = (&mut &session.tracer).read(&mut _event);
+        // TODO: Fix ptrace deadlock seen during openposixtestsuite signals tests
+        // let mut sessions = state.sessions.lock();
+        // if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
+        //     if !options.contains(WaitFlags::WNOHANG) {
+        //         let mut _event = PtraceEvent::default();
+        //         let _ = (&mut &session.tracer).read(&mut _event);
 
-                res = Some(inner(
-                    &mut status,
-                    options | WaitFlags::WNOHANG | WaitFlags::WUNTRACED,
-                ));
-                if res == Some(Ok(0)) {
-                    // WNOHANG, just pretend ptrace SIGSTOP:ped this
-                    status = (redox_rt::protocol::SIGSTOP << 8) | 0x7f;
-                    assert!(wifstopped(status));
-                    assert_eq!(wstopsig(status), redox_rt::protocol::SIGSTOP);
-                    res = Some(Ok(pid as usize));
-                }
-            }
-        }
+        //         res = Some(inner(
+        //             &mut status,
+        //             options | WaitFlags::WNOHANG | WaitFlags::WUNTRACED,
+        //         ));
+        //         if res == Some(Ok(0)) {
+        //             // WNOHANG, just pretend ptrace SIGSTOP:ped this
+        //             status = (redox_rt::protocol::SIGSTOP << 8) | 0x7f;
+        //             assert!(wifstopped(status));
+        //             assert_eq!(wstopsig(status), redox_rt::protocol::SIGSTOP);
+        //             res = Some(Ok(pid as usize));
+        //         }
+        //     }
+        // }
 
         // If ptrace didn't impact this waitpid, proceed *almost* as
         // normal: We still need to add WUNTRACED, but we only return
