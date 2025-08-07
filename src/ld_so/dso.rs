@@ -509,15 +509,14 @@ impl DSO {
                 slice::from_raw_parts_mut(addr as *mut u8, size)
             } else {
                 let (start, end) = bounds;
-                let size = end - start;
                 let mut flags = sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE;
                 if start != 0 {
                     flags |= sys_mman::MAP_FIXED_NOREPLACE;
                 }
-                trace!("  mmap({:#x}, {:x}, {:x})", start, size, flags);
+                trace!("  mmap({:#x}, {:x}, {:x})", start, end, flags);
                 let ptr = Sys::mmap(
                     start as *mut c_void,
-                    size,
+                    end,
                     //TODO: Make it possible to not specify PROT_EXEC on Redox
                     sys_mman::PROT_READ | sys_mman::PROT_WRITE,
                     flags,
@@ -534,9 +533,9 @@ impl DSO {
                     );
                 }
                 trace!("    = {:p}", ptr);
-                ptr::write_bytes(ptr as *mut u8, 0, size);
+                ptr::write_bytes(ptr as *mut u8, 0, end);
                 _r_debug.insert(ptr as usize, path, ptr as usize + l_ld as usize);
-                slice::from_raw_parts_mut(ptr as *mut u8, size)
+                slice::from_raw_parts_mut(ptr as *mut u8, end)
             }
         };
 
