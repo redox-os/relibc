@@ -61,6 +61,7 @@ pub unsafe fn fstat(fd: usize, buf: *mut crate::header::sys_stat::stat) -> sysca
         buf.st_rdev = 0;
         buf.st_size = redox_buf.st_size as off_t;
         buf.st_blksize = redox_buf.st_blksize as blksize_t;
+        buf.st_blocks = redox_buf.st_blocks as blkcnt_t;
         buf.st_atim = timespec {
             tv_sec: redox_buf.st_atime as time_t,
             tv_nsec: redox_buf.st_atime_nsec as c_long,

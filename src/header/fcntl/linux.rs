@@ -15,3 +15,6 @@ pub const O_CLOEXEC: c_int = 0x8_0000;
 pub const O_PATH: c_int = 0x20_0000;
 
 pub const FD_CLOEXEC: c_int = 0x8_0000;
+
+// Defined for compatibility
+pub const O_NDELAY: c_int = O_NONBLOCK;
