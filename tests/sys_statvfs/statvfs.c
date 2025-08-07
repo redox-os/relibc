@@ -4,14 +4,14 @@
 #include <errno.h>
 #include <sys/statvfs.h>
 
-void test_statvfs(const char *path) {
+int test_statvfs(const char *path) {
     struct statvfs buf;
 
     printf("Testing statvfs on: %s\n", path);
 
     if (statvfs(path, &buf) != 0) {
         perror("statvfs failed");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     printf("  Filesystem block size: %lu\n", buf.f_bsize);
@@ -24,25 +24,19 @@ void test_statvfs(const char *path) {
 
     if (buf.f_bsize == 0 || buf.f_frsize == 0) {
         fprintf(stderr, "ERROR: Block size or fragment size is zero.\n");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     if (buf.f_blocks == 0) {
         fprintf(stderr, "ERROR: Total number of blocks is zero.\n");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
-
-    printf("Test passed: statvfs returned valid values.\n");
-}
-
-int main(int argc, char *argv[]) {
-    const char *test_path = "/";
-
-    if (argc > 1) {
-        test_path = argv[1];
-    }
-
-    test_statvfs(test_path);
 
     return 0;
+}
+
+int main(void) {
+    const char *test_path = "/";
+
+    return test_statvfs(test_path);
 }
