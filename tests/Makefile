@@ -239,6 +239,7 @@ NAMES=\
 	stdlib/realpath \
 	sys_epoll/epoll \
 	sys_resource/constants \
+	sys_statvfs/statvfs \
 	sys_utsname/uname \
 	time/gettimeofday \
 	unistd/chdir \
