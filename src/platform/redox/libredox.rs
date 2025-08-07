@@ -18,9 +18,9 @@ use crate::{
 };
 
 use super::Sys;
-use redox_rt::proc::FdGuard;
-use redox_path::RedoxPath;
 use crate::alloc::string::ToString;
+use redox_path::RedoxPath;
+use redox_rt::proc::FdGuard;
 pub type RawResult = usize;
 
 pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
@@ -43,7 +43,6 @@ pub fn openat(fd: usize, path: &str, flags: c_int, mode: mode_t) -> Result<usize
     if let Some(redox_path) = RedoxPath::from_absolute(&path) {
         let canon = redox_path.to_string();
         open(&canon, flags, effective_mode)
-
     } else {
         let new_fd = syscall::openat(fd, path, flags as _, effective_mode as _)?;
         Ok(FdGuard::new(new_fd).take())
