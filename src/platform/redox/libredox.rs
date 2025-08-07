@@ -18,7 +18,9 @@ use crate::{
 };
 
 use super::Sys;
-
+use redox_rt::proc::FdGuard;
+use redox_path::RedoxPath;
+use crate::alloc::string::ToString;
 pub type RawResult = usize;
 
 pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
@@ -35,15 +37,17 @@ pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
         .map(|f| f as usize)
 }
 
-pub fn openat(fd: usize, path: &str, flags: c_int, fcntl_flags: c_int) -> Result<usize> {
-    let new_fd = syscall::openat(fd, path, flags as _, fcntl_flags as _)?;
+pub fn openat(fd: usize, path: &str, flags: c_int, mode: mode_t) -> Result<usize> {
+    let effective_mode = mode & !(redox_rt::sys::get_umask() as mode_t);
 
-    c_int::try_from(new_fd)
-        .map_err(|_| {
-            let _ = syscall::close(new_fd);
-            Error::new(EMFILE)
-        })
-        .map(|f| f as usize)
+    if let Some(redox_path) = RedoxPath::from_absolute(&path) {
+        let canon = redox_path.to_string();
+        open(&canon, flags, effective_mode)
+
+    } else {
+        let new_fd = syscall::openat(fd, path, flags as _, effective_mode as _)?;
+        Ok(FdGuard::new(new_fd).take())
+    }
 }
 
 pub unsafe fn fstat(fd: usize, buf: *mut crate::header::sys_stat::stat) -> syscall::Result<()> {
@@ -151,7 +155,7 @@ pub unsafe extern "C" fn redox_openat_v1(
     flags: u32,
     fcntl_flags: u32,
 ) -> RawResult {
-    Error::mux(syscall::openat(
+    Error::mux(openat(
         fd,
         str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
         flags as _,
