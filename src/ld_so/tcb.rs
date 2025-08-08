@@ -82,7 +82,6 @@ impl Tcb {
         let (_abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
 
         let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
-        trace!("New TCB: {:p}", tcb_ptr);
         ptr::write(
             tcb_ptr,
             Self {
@@ -164,8 +163,7 @@ impl Tcb {
                     if let Some(tls_data) = tls.get_mut(range) {
                         let data = master.data();
                         trace!(
-                            "tls master {}: {:p}, {:#x}: {:p}, {:#x}",
-                            i,
+                            "tls master: {:p}, {:#x}: {:p}, {:#x}",
                             data.as_ptr(),
                             data.len(),
                             tls_data.as_mut_ptr(),

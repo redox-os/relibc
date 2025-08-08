@@ -74,7 +74,6 @@ macro_rules! trace {
 #[cfg(feature = "trace")]
 macro_rules! trace {
     ($($arg:tt)*) => ({
-        use $crate::{Pal, Sys};
         eprintln!($($arg)*);
     });
 }
