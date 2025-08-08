@@ -121,12 +121,13 @@ impl<'a> HashTable<'a> {
 
 type InitFn = unsafe extern "C" fn();
 
+#[derive(Default)]
 pub(super) struct Dynamic<'data> {
     runpath: Option<String>,
     got: Option<NonNull<usize>>,
     needed: Vec<&'data str>,
     pub(super) jmprel: usize,
-    hash_table: HashTable<'data>,
+    hash_table: Option<HashTable<'data>>,
     pub(super) dynstrtab: StringTable<'data>,
     soname: Option<&'data str>,
     init_array: &'data [unsafe extern "C" fn()],
@@ -369,7 +370,11 @@ impl DSO {
             elf.entry() as usize
         };
 
-        trace!("  entry point: {:x?}", entry_point);
+        trace!(
+            "  entry point: {:x?}, {:x?}",
+            entry_point,
+            elf.entry() as usize
+        );
 
         let dso = DSO {
             name,
@@ -415,7 +420,11 @@ impl DSO {
     }
 
     pub fn get_sym<'a>(&self, name: &'a str) -> Option<(Symbol<'a>, SymbolBinding)> {
-        let (_, sym) = self.dynamic.hash_table.find(
+        if self.dynamic.hash_table.is_none() {
+            return None;
+        }
+
+        let (_, sym) = self.dynamic.hash_table.as_ref().unwrap().find(
             name,
             None,
             &self.dynamic.symbols,
@@ -516,14 +525,8 @@ impl DSO {
                 let (start, end) = bounds;
                 let size = end - start;
                 let mut flags = sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE;
-                // dynamic libs always start from 0 and marked as PIE
-                if start == 0 && pie {
-                    flags |= sys_mman::MAP_FIXED_NOREPLACE;
-                }
-                // PIE binaries can start > 0 but it must not be fixed
-                // Non PIE binaries always start > 0
-                if start != 0 && !pie {
-                    flags |= sys_mman::MAP_FIXED_NOREPLACE;
+                if !pie {
+                    flags |= sys_mman::MAP_FIXED;
                 }
                 trace!("  mmap({:#x}, {:x}, {:x})", start, size, flags);
                 let ptr = Sys::mmap(
@@ -620,8 +623,11 @@ impl DSO {
             }
         }
 
-        let (parsed_dynamic, debug) =
-            Self::parse_dynamic(path, mmap, pie, bounds.0, dynamic.unwrap())?;
+        let (parsed_dynamic, debug) = if let Some(dynamic_head) = dynamic {
+            Self::parse_dynamic(path, mmap, pie, bounds.0, dynamic_head)?
+        } else {
+            (Dynamic::default(), None)
+        };
 
         if let Some(i) = debug {
             // FIXME: cleanup
@@ -815,8 +821,13 @@ impl DSO {
         let soname = soname.map(get_str).transpose()?;
 
         let jmprel = jmprel.unwrap_or_default();
-        let hash_table = hash_table.expect("either DT_GNU_HASH and/or DT_HASH mut be present");
 
+        let symbols = unsafe {
+            get_array(
+                symtab_ptr,
+                hash_table.as_ref().map(|h| h.symbol_table_length()),
+            )
+        };
         let init_array = unsafe { get_array(init_array_ptr, init_array_len) };
         let fini_array = unsafe { get_array(fini_array_ptr, fini_array_len) };
         let rela = unsafe { get_array(rela_offset, rela_len) };
@@ -825,7 +836,7 @@ impl DSO {
 
         Ok((
             Dynamic {
-                symbols: unsafe { get_array(symtab_ptr, Some(hash_table.symbol_table_length())) },
+                symbols,
                 runpath,
                 got,
                 needed,
