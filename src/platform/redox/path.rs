@@ -29,7 +29,7 @@ pub fn chdir(path: &str) -> Result<()> {
     let mut cwd_guard = CWD.lock();
 
     let canon = canonicalize_using_cwd(cwd_guard.as_deref(), path).ok_or(Error::new(ENOENT))?;
-    let canon_with_scheme = canonicalize_scheme_internal(path)?;
+    let canon_with_scheme = canonicalize_scheme_internal(canon);
 
     let fd = syscall::open(&canon_with_scheme, O_STAT | O_CLOEXEC)?;
     let mut stat = Stat::default();
