@@ -29,7 +29,7 @@ pub fn chdir(path: &str) -> Result<()> {
     let mut cwd_guard = CWD.lock();
 
     let canon = canonicalize_using_cwd(cwd_guard.as_deref(), path).ok_or(Error::new(ENOENT))?;
-    let canon_with_scheme = canonicalize_with_cwd_internal(cwd_guard.as_deref(), path)?;
+    let canon_with_scheme = canonicalize_scheme_internal(path)?;
 
     let fd = syscall::open(&canon_with_scheme, O_STAT | O_CLOEXEC)?;
     let mut stat = Stat::default();
@@ -78,10 +78,14 @@ pub fn set_default_scheme(scheme: &str) -> Result<()> {
     Ok(())
 }
 
-// TODO: How much of this logic should be in redox-path?
-fn canonicalize_with_cwd_internal(cwd: Option<&str>, path: &str) -> Result<String> {
-    let path = canonicalize_using_cwd(cwd, path).ok_or(Error::new(ENOENT))?;
+fn canonicalize_with_cwd_internal(path: &str) -> Result<String> {
+    let cwd = CWD.lock().clone();
+    let path = canonicalize_using_cwd(cwd.as_deref(), path).ok_or(Error::new(ENOENT))?;
+    Ok(canonicalize_scheme_internal(path))
+}
 
+// TODO: How much of this logic should be in redox-path?
+fn canonicalize_scheme_internal(path: String) -> String {
     let standard_scheme = path == "/scheme" || path.starts_with("/scheme/");
     let legacy_scheme = path
         .split("/")
@@ -89,12 +93,14 @@ fn canonicalize_with_cwd_internal(cwd: Option<&str>, path: &str) -> Result<Strin
         .map(|c| c.contains(":"))
         .unwrap_or(false);
 
-    Ok(if standard_scheme || legacy_scheme {
+    if standard_scheme || legacy_scheme {
         path
     } else {
-        let mut default_scheme_guard = DEFAULT_SCHEME.lock();
-        let default_scheme = default_scheme_guard.get_or_insert_with(|| Box::from("file"));
-        let mut result = format!("/scheme/{}{}", default_scheme, path);
+        let mut result = {
+            let mut default_scheme_guard = DEFAULT_SCHEME.lock();
+            let default_scheme = default_scheme_guard.get_or_insert_with(|| Box::from("file"));
+            format!("/scheme/{}{}", default_scheme, path)
+        };
 
         // Trim trailing / to keep path canonical.
         if result.as_bytes().last() == Some(&b'/') {
@@ -102,13 +108,12 @@ fn canonicalize_with_cwd_internal(cwd: Option<&str>, path: &str) -> Result<Strin
         }
 
         result
-    })
+    }
 }
 
 pub fn canonicalize(path: &str) -> Result<String> {
     let _siglock = tmp_disable_signals();
-    let cwd_guard = CWD.lock();
-    canonicalize_with_cwd_internal(cwd_guard.as_deref(), path)
+    canonicalize_with_cwd_internal(path)
 }
 
 // TODO: arraystring?
@@ -144,7 +149,7 @@ pub fn open(path: &str, flags: usize) -> Result<usize> {
     let mut path = path;
 
     for _ in 0..MAX_LEVEL {
-        let canon = canonicalize_with_cwd_internal(CWD.lock().as_deref(), path)?;
+        let canon = canonicalize_with_cwd_internal(path)?;
 
         let open_res = if canon.starts_with(libcscheme::LIBC_SCHEME) {
             libcscheme::open(&canon, flags)
@@ -177,9 +182,8 @@ pub fn open(path: &str, flags: usize) -> Result<usize> {
 
 pub fn dir_path_and_fd_path(socket_path: &str) -> Result<(String, String)> {
     let _siglock = tmp_disable_signals();
-    let cwd_guard = CWD.lock();
 
-    let full_path = canonicalize_with_cwd_internal(cwd_guard.as_deref(), socket_path)?;
+    let full_path = canonicalize_with_cwd_internal(socket_path)?;
 
     let redox_path = RedoxPath::from_absolute(&full_path).ok_or(Error::new(EINVAL))?;
     let (_, mut ref_path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
@@ -190,7 +194,7 @@ pub fn dir_path_and_fd_path(socket_path: &str) -> Result<(String, String)> {
         let dir_to_open = String::from(get_parent_path(&full_path).ok_or(Error::new(EINVAL))?);
         Ok((dir_to_open, ref_path.as_ref().to_string()))
     } else {
-        let full_path = canonicalize_with_cwd_internal(cwd_guard.as_deref(), ref_path.as_ref())?;
+        let full_path = canonicalize_with_cwd_internal(ref_path.as_ref())?;
         let redox_path = RedoxPath::from_absolute(&full_path).ok_or(Error::new(EINVAL))?;
         let (_, path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
         let dir_to_open = String::from(get_parent_path(&full_path).ok_or(Error::new(EINVAL))?);
