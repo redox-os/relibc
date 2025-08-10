@@ -222,6 +222,20 @@ pub unsafe extern "C" fn redox_close_v1(fd: usize) -> RawResult {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn redox_getdents_v0(
+    fd: usize,
+    buf: *mut u8,
+    len: usize,
+    opaque: u64,
+) -> RawResult {
+    Error::mux(Sys::getdents(
+        fd,
+        slice::from_raw_parts_mut(buf, len),
+        opaque,
+    ))
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn redox_get_pid_v1() -> RawResult {
     redox_rt::sys::posix_getpid() as _
 }
