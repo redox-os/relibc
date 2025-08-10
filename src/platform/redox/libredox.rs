@@ -14,7 +14,7 @@ use crate::{
         sys_uio::iovec,
         time::timespec,
     },
-    platform::{types::*, PalSignal},
+    platform::{types::*, Pal, PalSignal},
 };
 
 use super::Sys;
