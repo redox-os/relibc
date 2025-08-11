@@ -36,19 +36,16 @@ test:linux:
     script:
         - make test
 
-#TODO: fix redoxer exec hangs
-# test:redox:
-#     stage: test
-#     needs:
-#         - build:redox
-#     dependencies:
-#         - build:redox
-#     variables:
-#         TARGET: x86_64-unknown-redox
-#     script:
-#         - ./redoxer.sh test
-#     # TODO: Out of memory
-#     allow_failure: true
+test:redox:
+    stage: test
+    needs:
+        - build:redox
+    dependencies:
+        - build:redox
+    variables:
+        TARGET: x86_64-unknown-redox
+    script:
+        - ./redoxer.sh test SKIP_REDOX=1
 
 fmt:
     stage: test
