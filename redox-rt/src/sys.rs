@@ -307,7 +307,7 @@ pub fn posix_getresugid() -> Resugid<u32> {
     }
 }
 pub fn getens() -> Result<usize> {
-    read_proc_meta(crate::current_proc_fd()).map(|meta| meta.ens)
+    read_proc_meta(crate::current_proc_fd()).map(|meta| meta.ens as usize)
 }
 pub fn get_proc_credentials(cap_fd: usize, target_pid: usize, buf: &mut [u8]) -> Result<usize> {
     if buf.len() < size_of::<crate::protocol::ProcMeta>() {
