@@ -254,7 +254,7 @@ pub unsafe extern "C" fn redox_get_egid_v1() -> RawResult {
 pub unsafe extern "C" fn redox_get_rgid_v1() -> RawResult {
     redox_rt::sys::posix_getresugid().rgid as _
 }
-#[no_mandle]
+#[no_mangle]
 pub unsafe extern "C" fn redox_get_ens_v0() -> RawResult {
     redox_rt::sys::getens() as _
 }
