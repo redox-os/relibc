@@ -67,6 +67,8 @@ printed: test string, value: 11
 printed: test string 2, value: 13
 printed: test string 2, value: 13
 
+%m: Owner died
+
 C23:
 Binary %b: 100
 Binary %b alternate: 0b100
