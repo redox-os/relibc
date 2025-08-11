@@ -256,8 +256,9 @@ pub unsafe extern "C" fn redox_get_rgid_v1() -> RawResult {
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_get_ens_v0() -> RawResult {
-    redox_rt::sys::getens() as _
+    Error::mux(redox_rt::sys::getens())
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn redox_get_proc_credentials_v1(
     cap_fd: usize,
