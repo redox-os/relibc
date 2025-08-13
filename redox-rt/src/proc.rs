@@ -991,6 +991,7 @@ pub unsafe fn make_init() -> [&'static FdGuard; 2] {
         rgid: 0,
         egid: 0,
         sgid: 0,
+        namespace_fd: usize::MAX,
     };
     [
         (*STATIC_PROC_INFO.get()).proc_fd.assume_init_ref(),

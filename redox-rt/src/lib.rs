@@ -223,6 +223,7 @@ pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
             egid: metadata.egid,
             rgid: metadata.rgid,
             sgid: metadata.sgid,
+            namespace_fd: usize::MAX, // Not used in initialization
         };
     }
 }
@@ -241,6 +242,7 @@ struct DynamicProcInfo {
     egid: u32,
     rgid: u32,
     sgid: u32,
+    namespace_fd: usize,
 }
 
 static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
@@ -251,6 +253,7 @@ static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
     rgid: u32::MAX,
     egid: u32::MAX,
     sgid: u32::MAX,
+    namespace_fd: usize::MAX,
 });
 
 #[inline]
@@ -262,6 +265,10 @@ pub fn current_proc_fd() -> &'static FdGuard {
     let info = static_proc_info();
     assert!(info.has_proc_fd);
     unsafe { info.proc_fd.assume_init_ref() }
+}
+#[inline]
+pub fn current_namespace_fd() -> FdGuard {
+    FdGuard::new(DYNAMIC_PROC_INFO.lock().namespace_fd)
 }
 
 struct ChildHookCommonArgs {
