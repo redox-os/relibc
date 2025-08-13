@@ -371,3 +371,10 @@ pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {
     wrapper(false, false, || syscall::nanosleep(rqtp, rmtp))?;
     Ok(())
 }
+pub fn set_namespace_fd(fd: usize) {
+    let mut info = DYNAMIC_PROC_INFO.lock();
+    info.namespace_fd = fd;
+}
+pub fn nsopen(path: &str, flags: u32, mode: u16) -> Result<usize> {
+    syscall::openat(*crate::current_namespace_fd(), path, flags, mode)
+}
