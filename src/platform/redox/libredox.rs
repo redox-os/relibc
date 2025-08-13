@@ -435,3 +435,21 @@ pub unsafe extern "C" fn redox_get_socket_token_v0(
         &metadata,
     ))
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn redox_set_namespace_fd_v0(fd: usize) {
+    redox_rt::sys::set_namespace_fd(fd)
+}
+#[no_mangle]
+pub unsafe extern "C" fn redox_nsopen_v0(
+    path_base: *const u8,
+    path_len: usize,
+    flags: u32,
+    mode: u16,
+) -> RawResult {
+    Error::mux(redox_rt::sys::nsopen(
+        str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
+        flags,
+        mode,
+    ))
+}
