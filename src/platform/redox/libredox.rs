@@ -143,6 +143,7 @@ pub unsafe extern "C" fn redox_openat_v1(
         fd,
         str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
         flags as usize,
+        0,
     ))
 }
 #[no_mangle]
