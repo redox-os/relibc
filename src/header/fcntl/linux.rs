@@ -6,6 +6,7 @@ pub const O_RDWR: c_int = 0x0002;
 pub const O_ACCMODE: c_int = 0x0003;
 pub const O_CREAT: c_int = 0x0040;
 pub const O_EXCL: c_int = 0x0080;
+pub const O_NOCTTY: c_int = 0x0100;
 pub const O_TRUNC: c_int = 0x0200;
 pub const O_APPEND: c_int = 0x0400;
 pub const O_NONBLOCK: c_int = 0x0800;

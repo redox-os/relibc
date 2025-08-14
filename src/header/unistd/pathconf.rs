@@ -1,5 +1,5 @@
 use crate::{
-    header::errno,
+    header::{errno, termios::_POSIX_VDISABLE},
     platform::{self, types::*},
 };
 
@@ -11,6 +11,7 @@ pub const _PC_PATH_MAX: c_int = 4;
 pub const _PC_PIPE_BUF: c_int = 5;
 pub const _PC_CHOWN_RESTRICTED: c_int = 6;
 pub const _PC_NO_TRUNC: c_int = 7;
+/// Check if file (terminal) supports disabling control chars (CC)
 pub const _PC_VDISABLE: c_int = 8;
 pub const _PC_SYNC_IO: c_int = 9;
 pub const _PC_ASYNC_IO: c_int = 10;
@@ -36,7 +37,7 @@ fn pc(name: c_int) -> c_long {
         _PC_PIPE_BUF => 4096,
         _PC_CHOWN_RESTRICTED => 1,
         _PC_NO_TRUNC => 1,
-        _PC_VDISABLE => 0,
+        _PC_VDISABLE => _POSIX_VDISABLE.into(),
         _PC_SYNC_IO => 1,
         _PC_ASYNC_IO => -1,
         _PC_PRIO_IO => -1,
