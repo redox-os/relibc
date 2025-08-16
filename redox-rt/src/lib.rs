@@ -267,8 +267,8 @@ pub fn current_proc_fd() -> &'static FdGuard {
     unsafe { info.proc_fd.assume_init_ref() }
 }
 #[inline]
-pub fn current_namespace_fd() -> FdGuard {
-    FdGuard::new(DYNAMIC_PROC_INFO.lock().namespace_fd)
+pub fn current_namespace_fd() -> usize {
+    DYNAMIC_PROC_INFO.lock().namespace_fd
 }
 
 struct ChildHookCommonArgs {
