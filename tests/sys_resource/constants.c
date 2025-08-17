@@ -15,13 +15,13 @@ int main(void) {
     printf("RUSAGE_SELF: %lld\n", RUSAGE_SELF);
     printf("RUSAGE_CHILDREN: %lld\n", RUSAGE_CHILDREN);
 
-    printf("RLIMIT_CORE: %lld\n", RLIMIT_CORE);
-    printf("RLIMIT_CPU: %lld\n", RLIMIT_CPU);
-    printf("RLIMIT_DATA: %lld\n", RLIMIT_DATA);
-    printf("RLIMIT_FSIZE: %lld\n", RLIMIT_FSIZE);
-    printf("RLIMIT_NOFILE: %lld\n", RLIMIT_NOFILE);
-    printf("RLIMIT_STACK: %lld\n", RLIMIT_STACK);
-    printf("RLIMIT_AS: %lld\n", RLIMIT_AS);
+    printf("RLIMIT_CORE: %d\n", RLIMIT_CORE);
+    printf("RLIMIT_CPU: %d\n", RLIMIT_CPU);
+    printf("RLIMIT_DATA: %d\n", RLIMIT_DATA);
+    printf("RLIMIT_FSIZE: %d\n", RLIMIT_FSIZE);
+    printf("RLIMIT_NOFILE: %d\n", RLIMIT_NOFILE);
+    printf("RLIMIT_STACK: %d\n", RLIMIT_STACK);
+    printf("RLIMIT_AS: %d\n", RLIMIT_AS);
 
     return 0;
 }
