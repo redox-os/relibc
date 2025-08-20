@@ -35,9 +35,12 @@ impl Iterator for LookupHost {
 pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
     if let Some(host_direct_addr) = parse_ipv4_string(host) {
         // already an ip address
-        return Ok(LookupHost(vec![in_addr {
-            s_addr: host_direct_addr,
-        }].into_iter()));
+        return Ok(LookupHost(
+            vec![in_addr {
+                s_addr: host_direct_addr,
+            }]
+            .into_iter(),
+        ));
     }
 
     let dns_string = get_dns_server().map_err(|e| e.0)?;
