@@ -31,6 +31,7 @@ pub const IGNCR: usize = 0o000_200;
 pub const ICRNL: usize = 0o000_400;
 pub const IXON: usize = 0o001_000;
 pub const IXOFF: usize = 0o002_000;
+pub const IXANY: usize = 0o004_000;
 /* } c_iflag */
 
 /* c_oflag { */
