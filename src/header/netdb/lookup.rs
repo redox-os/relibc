@@ -33,21 +33,19 @@ impl Iterator for LookupHost {
 }
 
 pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
+    if let Some(host_direct_addr) = parse_ipv4_string(host) {
+        // already an ip address
+        return Ok(LookupHost(
+            vec![in_addr {
+                s_addr: host_direct_addr,
+            }]
+            .into_iter(),
+        ));
+    }
+
     let dns_string = get_dns_server().map_err(|e| e.0)?;
 
-    let dns_vec: Vec<u8> = dns_string
-        .trim()
-        .split('.')
-        .map(|octet| octet.parse::<u8>().unwrap_or(0))
-        .collect();
-
-    if dns_vec.len() == 4 {
-        let mut dns_arr = [0u8; 4];
-        for (i, octet) in dns_vec.iter().enumerate() {
-            dns_arr[i] = *octet;
-        }
-        let dns_addr = u32::from_ne_bytes(dns_arr);
-
+    if let Some(dns_addr) = parse_ipv4_string(&dns_string) {
         let mut timespec = timespec::default();
         unsafe {
             Sys::clock_gettime(time::constants::CLOCK_REALTIME, &mut timespec);
@@ -140,26 +138,14 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
 pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
     let dns_string = get_dns_server().map_err(|e| e.0)?;
 
-    let dns_vec: Vec<u8> = dns_string
-        .trim()
-        .split('.')
-        .map(|octet| octet.parse::<u8>().unwrap_or(0))
-        .collect();
+    if let Some(dns_addr) = parse_ipv4_string(&dns_string) {
+        let addr: [u8; 4] = addr.s_addr.to_ne_bytes();
+        // Address intentionally backwards for reverse lookup
+        let name = format!(
+            "{}.{}.{}.{}.in-addr.arpa",
+            addr[3], addr[2], addr[1], addr[0]
+        );
 
-    let mut dns_arr = [0u8; 4];
-
-    for (i, octet) in dns_vec.iter().enumerate() {
-        dns_arr[i] = *octet;
-    }
-
-    let addr: [u8; 4] = addr.s_addr.to_ne_bytes();
-    // Address intentionally backwards for reverse lookup
-    let name = format!(
-        "{}.{}.{}.{}.in-addr.arpa",
-        addr[3], addr[2], addr[1], addr[0]
-    );
-
-    if dns_vec.len() == 4 {
         let mut timespec = timespec::default();
         unsafe { Sys::clock_gettime(time::constants::CLOCK_REALTIME, &mut timespec) };
         let tid = (timespec.tv_nsec >> 16) as u16;
@@ -183,9 +169,7 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
         let dest = sockaddr_in {
             sin_family: AF_INET as u16,
             sin_port: htons(53),
-            sin_addr: in_addr {
-                s_addr: u32::from_ne_bytes(dns_arr),
-            },
+            sin_addr: in_addr { s_addr: dns_addr },
             ..Default::default()
         };
 
@@ -276,6 +260,26 @@ fn parse_revdns_answer(data: &[u8]) -> Vec<u8> {
         }
     }
     output
+}
+
+pub fn parse_ipv4_string(ip_string: &str) -> Option<u32> {
+    let dns_vec: Vec<u8> = ip_string
+        .trim()
+        .split('.')
+        .map(|octet| octet.parse::<u8>().unwrap_or(0))
+        .collect();
+
+    if dns_vec.len() != 4 {
+        return None;
+    }
+
+    let mut dns_arr = [0u8; 4];
+
+    for (i, octet) in dns_vec.iter().enumerate() {
+        dns_arr[i] = *octet;
+    }
+
+    Some(u32::from_ne_bytes(dns_arr))
 }
 
 #[cfg(test)]
