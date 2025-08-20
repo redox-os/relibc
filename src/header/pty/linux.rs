@@ -5,10 +5,8 @@ use crate::{
 };
 
 pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
-    const O_NOCTTY: c_int = 0x100;
-
     //TODO: wrap in auto-close struct
-    let master = fcntl::open(c"/dev/ptmx".as_ptr(), fcntl::O_RDWR | O_NOCTTY, 0);
+    let master = fcntl::open(c"/dev/ptmx".as_ptr(), fcntl::O_RDWR | fcntl::O_NOCTTY, 0);
     if master < 0 {
         return Err(());
     }
@@ -40,7 +38,7 @@ pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
 
     let slave = fcntl::open(
         cursor.get_ref().as_ptr() as *const c_char,
-        fcntl::O_RDWR | O_NOCTTY,
+        fcntl::O_RDWR | fcntl::O_NOCTTY,
         0,
     );
     if slave < 0 {
