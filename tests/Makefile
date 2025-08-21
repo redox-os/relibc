@@ -124,6 +124,7 @@ EXPECT_NAMES=\
 	unistd/access \
 	unistd/brk \
 	unistd/constants \
+	unistd/confstr \
 	unistd/dup \
 	unistd/exec \
 	unistd/fchdir \
