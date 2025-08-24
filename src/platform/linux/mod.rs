@@ -185,6 +185,15 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(NEWFSTATAT, fildes, empty_ptr, buf, AT_EMPTY_PATH) }).map(|_| ())
     }
 
+    unsafe fn fstatat(
+        fildes: c_int,
+        path: *const c_char,
+        buf: *mut stat,
+        flags: c_int,
+    ) -> Result<()> {
+        e_raw(unsafe { syscall!(NEWFSTATAT, fildes, path, buf, flags) })
+    }
+
     unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()> {
         let mut kbuf = linux_statfs::default();
         let kbuf_ptr = &mut kbuf as *mut linux_statfs;
