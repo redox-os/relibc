@@ -7,6 +7,7 @@ use crate::{
     header::{
         dirent::dirent,
         errno::EINVAL,
+        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW},
         signal::SIGCHLD,
         sys_resource::{rlimit, rusage},
         sys_stat::{stat, S_IFIFO},
@@ -25,10 +26,6 @@ mod epoll;
 mod ptrace;
 mod signal;
 mod socket;
-
-const AT_FDCWD: c_int = -100;
-const AT_EMPTY_PATH: c_int = 0x1000;
-const AT_REMOVEDIR: c_int = 0x200;
 
 const SYS_CLONE: usize = 56;
 const CLONE_VM: usize = 0x0100;
@@ -183,6 +180,15 @@ impl Pal for Sys {
         let empty = b"\0";
         let empty_ptr = empty.as_ptr() as *const c_char;
         e_raw(unsafe { syscall!(NEWFSTATAT, fildes, empty_ptr, buf, AT_EMPTY_PATH) }).map(|_| ())
+    }
+
+    unsafe fn fstatat(
+        fildes: c_int,
+        path: *const c_char,
+        buf: *mut stat,
+        flags: c_int,
+    ) -> Result<()> {
+        e_raw(unsafe { syscall!(NEWFSTATAT, fildes, path, buf, flags) }).map(|_| ())
     }
 
     unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()> {

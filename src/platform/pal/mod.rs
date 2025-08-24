@@ -74,6 +74,13 @@ pub trait Pal {
 
     unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()>;
 
+    unsafe fn fstatat(
+        fildes: c_int,
+        path: *const c_char,
+        buf: *mut stat,
+        flags: c_int,
+    ) -> Result<()>;
+
     unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()>;
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> Result<c_int>;

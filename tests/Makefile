@@ -250,6 +250,8 @@ NAMES=\
 	stdlib/realpath \
 	sys_epoll/epoll \
 	sys_resource/constants \
+	sys_stat/fstatat \
+	sys_stat/stat \
 	sys_statvfs/statvfs \
 	sys_utsname/uname \
 	time/gettimeofday \
@@ -262,7 +264,6 @@ NAMES=\
 	unistd/link \
 	unistd/pathconf \
 	unistd/setid \
-	unistd/stat \
 	unistd/sysconf \
 	pthread/main \
 	pthread/cleanup \
