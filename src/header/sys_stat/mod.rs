@@ -87,6 +87,18 @@ pub unsafe extern "C" fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn fstatat(
+    fildes: c_int,
+    path: *const c_char,
+    buf: *mut stat,
+    flags: c_int,
+) -> c_int {
+    Sys::fstatat(fildes, path, buf, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut stat) -> c_int {
     fstat(fildes, buf)
 }
