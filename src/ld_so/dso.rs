@@ -121,12 +121,13 @@ impl<'a> HashTable<'a> {
 
 type InitFn = unsafe extern "C" fn();
 
+#[derive(Default)]
 pub(super) struct Dynamic<'data> {
     runpath: Option<String>,
     got: Option<NonNull<usize>>,
     needed: Vec<&'data str>,
     pub(super) jmprel: usize,
-    hash_table: HashTable<'data>,
+    hash_table: Option<HashTable<'data>>,
     pub(super) dynstrtab: StringTable<'data>,
     soname: Option<&'data str>,
     init_array: &'data [unsafe extern "C" fn()],
@@ -334,6 +335,7 @@ pub struct DSO {
     pub scope: spin::Once<Scope>,
     /// Position Independent Executable.
     pub pie: bool,
+    pub pie_offset: usize,
 }
 
 impl DSO {
@@ -347,7 +349,8 @@ impl DSO {
         tls_offset: usize,
     ) -> object::Result<(DSO, Option<Master>, Vec<ProgramHeader>)> {
         let elf = ElfFile::parse(data).unwrap();
-        let (mmap, tcb_master, dynamic) =
+
+        let (mmap, pie_offset, tcb_master, dynamic) =
             DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset).unwrap();
 
         let name = match dynamic.soname {
@@ -358,11 +361,20 @@ impl DSO {
             Some(ref master) => master.offset,
             _ => 0,
         };
+
+        trace!("  tls offset: {:x?}", tls_offset);
+
         let entry_point = if is_pie_enabled(&elf) {
-            mmap.as_ptr() as usize + elf.entry() as usize
+            mmap.as_ptr() as usize - pie_offset + elf.entry() as usize
         } else {
             elf.entry() as usize
         };
+
+        trace!(
+            "  entry point: {:x?}, {:x?}",
+            entry_point,
+            elf.entry() as usize
+        );
 
         let dso = DSO {
             name,
@@ -378,6 +390,7 @@ impl DSO {
             tls_offset,
 
             pie: is_pie_enabled(&elf),
+            pie_offset,
             dynamic,
             scope: spin::Once::new(),
         };
@@ -407,7 +420,11 @@ impl DSO {
     }
 
     pub fn get_sym<'a>(&self, name: &'a str) -> Option<(Symbol<'a>, SymbolBinding)> {
-        let (_, sym) = self.dynamic.hash_table.find(
+        if self.dynamic.hash_table.is_none() {
+            return None;
+        }
+
+        let (_, sym) = self.dynamic.hash_table.as_ref().unwrap().find(
             name,
             None,
             &self.dynamic.symbols,
@@ -458,9 +475,10 @@ impl DSO {
         data: &'a [u8],
         base_addr: Option<usize>,
         tls_offset: usize,
-    ) -> object::Result<(&'static [u8], Option<Master>, Dynamic<'static>)> {
+    ) -> object::Result<(&'static [u8], usize, Option<Master>, Dynamic<'static>)> {
         let endian = elf.endian();
-        trace!("# {}", path);
+        let pie = is_pie_enabled(elf);
+        trace!("# {} (pie: {})", path, pie);
         // data for struct LinkMap
         let mut l_ld = 0;
         // Calculate virtual memory bounds
@@ -500,19 +518,15 @@ impl DSO {
         // Allocate memory
         let mmap = unsafe {
             if let Some(addr) = base_addr {
-                let size = if is_pie_enabled(elf) {
-                    bounds.1
-                } else {
-                    bounds.1 - bounds.0
-                };
+                let size = if pie { bounds.1 } else { bounds.1 - bounds.0 };
                 _r_debug.insert_first(addr, path, addr + l_ld as usize);
                 slice::from_raw_parts_mut(addr as *mut u8, size)
             } else {
                 let (start, end) = bounds;
                 let size = end - start;
                 let mut flags = sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE;
-                if start != 0 {
-                    flags |= sys_mman::MAP_FIXED_NOREPLACE;
+                if !pie {
+                    flags |= sys_mman::MAP_FIXED;
                 }
                 trace!("  mmap({:#x}, {:x}, {:x})", start, size, flags);
                 let ptr = Sys::mmap(
@@ -527,13 +541,7 @@ impl DSO {
                 .map_err(|e| format!("failed to map {}. errno: {}", path, e.0))
                 .unwrap();
 
-                if !(start as *mut c_void).is_null() {
-                    assert_eq!(
-                        ptr, start as *mut c_void,
-                        "mmap must always map on the destination we requested"
-                    );
-                }
-                trace!("    = {:p}", ptr);
+                trace!("    = {:p}, {:x?}", ptr, start);
                 ptr::write_bytes(ptr as *mut u8, 0, size);
                 _r_debug.insert(ptr as usize, path, ptr as usize + l_ld as usize);
                 slice::from_raw_parts_mut(ptr as *mut u8, size)
@@ -559,19 +567,31 @@ impl DSO {
                         let (offset, size) = ph.file_range(endian);
                         let offset = offset as usize;
                         let range = offset..(offset + size as usize);
+                        trace!(" read {:x?}", range);
                         match data.get(range.clone()) {
                             Some(some) => some,
                             None => return Err(format!("failed to read {:x?}", range)).unwrap(),
                         }
                     };
 
+                    trace!(
+                        "  copy {:#x}, {:#x}: {:#x}, {:#x}",
+                        ph.p_vaddr(endian) - voff,
+                        vsize,
+                        voff,
+                        obj_data.len()
+                    );
                     let mmap_data = {
-                        let range = if is_pie_enabled(elf) {
-                            let addr = ph.p_vaddr(endian) as usize;
-                            addr..addr + obj_data.len()
+                        let range = if pie {
+                            let addr = ph.p_vaddr(endian) as usize - bounds.0;
+                            let end = addr + obj_data.len();
+                            trace!(" write pie {:x?}..{:x?}", addr, end,);
+                            addr..end
                         } else {
                             let addr = ph.p_vaddr(endian) as usize - mmap.as_ptr() as usize;
-                            addr..addr + obj_data.len()
+                            let end = addr + obj_data.len();
+                            trace!(" write {:x?}..{:x?}", addr, end,);
+                            addr..end
                         };
                         match mmap.get_mut(range.clone()) {
                             Some(some) => some,
@@ -580,19 +600,12 @@ impl DSO {
                             }
                         }
                     };
-                    trace!(
-                        "  copy {:#x}, {:#x}: {:#x}, {:#x}",
-                        ph.p_vaddr(endian) - voff,
-                        vsize,
-                        voff,
-                        obj_data.len()
-                    );
                     mmap_data.copy_from_slice(obj_data);
                 }
                 elf::PT_TLS => {
                     let ptr = unsafe {
-                        if is_pie_enabled(elf) {
-                            mmap.as_ptr().add(ph.p_vaddr(endian) as usize)
+                        if pie {
+                            mmap.as_ptr().add(ph.p_vaddr(endian) as usize - bounds.0)
                         } else {
                             ph.p_vaddr(endian) as *const u8
                         }
@@ -610,8 +623,11 @@ impl DSO {
             }
         }
 
-        let (parsed_dynamic, debug) =
-            Self::parse_dynamic(path, mmap, is_pie_enabled(elf), dynamic.unwrap())?;
+        let (parsed_dynamic, debug) = if let Some(dynamic_head) = dynamic {
+            Self::parse_dynamic(path, mmap, pie, bounds.0, dynamic_head)?
+        } else {
+            (Dynamic::default(), None)
+        };
 
         if let Some(i) = debug {
             // FIXME: cleanup
@@ -619,13 +635,20 @@ impl DSO {
             let vaddr = ph.p_vaddr(endian) as usize;
             let bytes: [u8; size_of::<Dyn>() / 2] =
                 unsafe { core::mem::transmute((&_r_debug) as *const RTLDDebug as usize) };
-            let start = if is_pie_enabled(elf) {
-                vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
+            let start = if pie {
+                vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2 - bounds.0
             } else {
                 vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
                     - mmap.as_ptr().cast_mut() as usize
             };
             unsafe {
+                trace!(
+                    "  copy nonoverlap {:x?} {:x?} {:x?}",
+                    bytes.as_ptr(),
+                    mmap.as_ptr().cast_mut().add(start),
+                    bytes.len()
+                );
+
                 ptr::copy_nonoverlapping(
                     bytes.as_ptr(),
                     mmap.as_ptr().cast_mut().add(start),
@@ -634,13 +657,14 @@ impl DSO {
             }
         }
 
-        Ok((mmap, tcb_master, parsed_dynamic))
+        Ok((mmap, bounds.0, tcb_master, parsed_dynamic))
     }
 
     fn parse_dynamic<'a>(
         path: &str,
         mmap: &'a [u8],
         is_pie: bool,
+        pie_offset: usize,
         (_, entries): (&ProgramHeader, &[Dyn]),
     ) -> object::Result<(Dynamic<'a>, Option<usize>)> {
         const DT_RELRSZ: u32 = 35;
@@ -666,9 +690,21 @@ impl DSO {
 
         for (i, entry) in entries.iter().enumerate() {
             let val = entry.d_val(NativeEndian);
-            let relative_idx = val as usize - if is_pie { 0 } else { mmap.as_ptr() as usize };
-            let ptr = (val as usize + if is_pie { mmap.as_ptr() as usize } else { 0 }) as *const u8;
+            let relative_idx = val as usize
+                - if is_pie {
+                    pie_offset
+                } else {
+                    mmap.as_ptr() as usize
+                };
+            let ptr = (val as usize
+                + if is_pie {
+                    mmap.as_ptr() as usize - pie_offset
+                } else {
+                    0
+                }) as *const u8;
             let tag = entry.d_tag(NativeEndian) as u32;
+
+            // trace!("  parse obj rel {:x?} {:x?} {:x?} {:x?}", tag, val, relative_idx, ptr);
 
             match tag {
                 elf::DT_DEBUG => debug = Some(i),
@@ -785,8 +821,13 @@ impl DSO {
         let soname = soname.map(get_str).transpose()?;
 
         let jmprel = jmprel.unwrap_or_default();
-        let hash_table = hash_table.expect("either DT_GNU_HASH and/or DT_HASH mut be present");
 
+        let symbols = unsafe {
+            get_array(
+                symtab_ptr,
+                hash_table.as_ref().map(|h| h.symbol_table_length()),
+            )
+        };
         let init_array = unsafe { get_array(init_array_ptr, init_array_len) };
         let fini_array = unsafe { get_array(fini_array_ptr, fini_array_len) };
         let rela = unsafe { get_array(rela_offset, rela_len) };
@@ -795,7 +836,7 @@ impl DSO {
 
         Ok((
             Dynamic {
-                symbols: unsafe { get_array(symtab_ptr, Some(hash_table.symbol_table_length())) },
+                symbols,
                 runpath,
                 got,
                 needed,
@@ -819,7 +860,9 @@ impl DSO {
         let b = self.mmap.as_ptr() as usize;
 
         let (sym, my_sym) = if reloc.sym.0 > 0 {
-            let name = self.dynamic.symbol_name(reloc.sym).unwrap();
+            let name = self.dynamic.symbol_name(reloc.sym).unwrap_or_else(|| {
+                panic!("no symbol name found for relocation: {:x?}", reloc);
+            });
 
             let lookup_scopes = [global_scope, self.scope()];
             let sym = if matches!(reloc.kind, RelocationKind::COPY) {
@@ -843,7 +886,7 @@ impl DSO {
             .unwrap_or((0, 0, self.tls_module_id));
 
         let ptr = if self.pie {
-            (b + reloc.offset) as *mut u8
+            (b - self.pie_offset + reloc.offset) as *mut u8
         } else {
             reloc.offset as *mut u8
         };
@@ -942,7 +985,7 @@ impl DSO {
             };
 
             let ptr = if self.pie {
-                (object_base_addr + reloc.offset) as *mut usize
+                (object_base_addr - self.pie_offset + reloc.offset) as *mut usize
             } else {
                 reloc.offset as *mut usize
             };
@@ -957,7 +1000,9 @@ impl DSO {
                 }
 
                 (RelocationKind::PLT, Resolve::Now) => {
-                    let name = self.dynamic.symbol_name(reloc.sym).unwrap();
+                    let name = self.dynamic.symbol_name(reloc.sym).unwrap_or_else(|| {
+                        panic!("no symbol name found for relocation: {:x?}", reloc);
+                    });
 
                     let resolved = resolve_sym(name, &[global_scope, self.scope()])
                         .map(|(sym, _, _)| sym.as_ptr() as usize)
@@ -997,7 +1042,7 @@ impl DSO {
                 // An even entry sets up `addr` for subsequent odd entries.
                 unsafe {
                     addr = base.add(entry) as *mut usize;
-                    *addr += base as usize;
+                    *addr += base as usize - self.pie_offset;
                     addr = addr.add(1);
                 }
             } else {
@@ -1009,7 +1054,7 @@ impl DSO {
                 while entry != 0 {
                     if entry & 1 != 0 {
                         unsafe {
-                            *addr.add(i) += base as usize;
+                            *addr.add(i) += base as usize - self.pie_offset;
                         }
                     }
                     entry >>= 1;
@@ -1050,11 +1095,17 @@ impl DSO {
 
             unsafe {
                 let ptr = if self.pie {
-                    self.mmap.as_ptr().add(vaddr)
+                    self.mmap.as_ptr().add(vaddr - self.pie_offset)
                 } else {
                     vaddr as *const u8
                 };
-                trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
+                trace!(
+                    "  protect {:#x}, {:#x}: {:p}, {:#x}",
+                    vaddr,
+                    vsize,
+                    ptr,
+                    prot
+                );
                 Sys::mprotect(ptr as *mut c_void, vsize, prot).expect("[ld.so]: mprotect failed");
             }
         }
