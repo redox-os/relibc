@@ -17,7 +17,7 @@ pub unsafe extern "C" fn redox_event_queue_create_v1(flags: u32) -> RawResult {
         if flags != 0 {
             return Err(Error::new(EINVAL));
         }
-        Ok(super::libredox::open("/scheme/event", O_CLOEXEC | O_CREAT | O_RDWR, 0o700)? as usize)
+        Ok(super::libredox::open("/scheme/event", O_CLOEXEC | O_CREAT | O_RDWR, 0o700)?.take())
     })())
 }
 #[no_mangle]

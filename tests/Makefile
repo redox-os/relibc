@@ -132,6 +132,7 @@ EXPECT_NAMES=\
 	unistd/fsync \
 	unistd/ftruncate \
 	unistd/getopt \
+	unistd/openat \
 	unistd/pipe \
 	unistd/rmdir \
 	unistd/sleep \
