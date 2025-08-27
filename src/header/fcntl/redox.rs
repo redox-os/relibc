@@ -27,3 +27,6 @@ pub const O_NOCTTY: c_int = 0x00000200;
 
 // Defined for compatibility
 pub const O_NDELAY: c_int = O_NONBLOCK;
+
+// Flags for capability based "at" functions
+pub const AT_FDCWD: c_int = -100;
