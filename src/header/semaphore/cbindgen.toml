@@ -1,4 +1,4 @@
-sys_includes = []
+sys_includes = ["time.h"]
 include_guard = "_RELIBC_SEMAPHORE_H"
 language = "C"
 style = "Type"
