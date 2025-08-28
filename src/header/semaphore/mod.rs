@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/semaphore.h.html>.
 
-use crate::{header::time::timespec, platform::types::*};
+use crate::{header::time::{timespec, CLOCK_MONOTONIC, CLOCK_REALTIME}, platform::types::*};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/semaphore.h.html>.
 // TODO: Statically verify size and align
@@ -78,7 +78,15 @@ pub unsafe extern "C" fn sem_unlink(name: *const c_char) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_trywait.html>.
 #[no_mangle]
 pub unsafe extern "C" fn sem_wait(sem: *mut sem_t) -> c_int {
-    get(sem).wait(None);
+    get(sem).wait(None, CLOCK_MONOTONIC);
+
+    0
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_clockwait.html>.
+#[no_mangle]
+pub unsafe extern "C" fn sem_clockwait(sem: *mut sem_t, clock_id: clockid_t, abstime: *const timespec) -> c_int {
+    get(sem).wait(Some(&*abstime), clock_id);
 
     0
 }
@@ -86,7 +94,7 @@ pub unsafe extern "C" fn sem_wait(sem: *mut sem_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_timedwait.html>.
 #[no_mangle]
 pub unsafe extern "C" fn sem_timedwait(sem: *mut sem_t, abstime: *const timespec) -> c_int {
-    get(sem).wait(Some(&*abstime));
+    get(sem).wait(Some(&*abstime), CLOCK_REALTIME);
 
     0
 }
