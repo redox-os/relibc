@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/semaphore.h.html>.
 
-use crate::platform::types::*;
+use crate::{header::time::timespec, platform::types::*};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/semaphore.h.html>.
 // TODO: Statically verify size and align
@@ -79,6 +79,14 @@ pub unsafe extern "C" fn sem_unlink(name: *const c_char) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn sem_wait(sem: *mut sem_t) -> c_int {
     get(sem).wait(None);
+
+    0
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_timedwait.html>.
+#[no_mangle]
+pub unsafe extern "C" fn sem_timedwait(sem: *mut sem_t, abstime: *const timespec) -> c_int {
+    get(sem).wait(Some(&*abstime));
 
     0
 }
