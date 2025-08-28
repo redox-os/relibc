@@ -216,6 +216,8 @@ pub trait Pal {
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
 
+    fn openat(fd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
+
     fn pipe2(fildes: &mut [c_int], flags: c_int) -> Result<()>;
 
     unsafe fn rlct_clone(stack: *mut usize) -> Result<pthread::OsTid, Errno>;

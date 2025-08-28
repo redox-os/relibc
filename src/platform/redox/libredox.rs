@@ -18,21 +18,35 @@ use crate::{
 };
 
 use super::Sys;
-
+use crate::alloc::string::ToString;
+use redox_path::RedoxPath;
+use redox_rt::proc::FdGuard;
 pub type RawResult = usize;
 
-pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
+#[inline(always)]
+fn map_fd(new_fd: usize) -> Result<FdGuard> {
+    let fd = c_int::try_from(new_fd).map_err(|_| Error::new(EMFILE))?;
+    Ok(FdGuard::new(fd as _))
+}
+
+pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<FdGuard> {
     let usize_fd = super::path::open(
         path,
         ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF),
     )?;
 
-    c_int::try_from(usize_fd)
-        .map_err(|_| {
-            let _ = syscall::close(usize_fd);
-            Error::new(EMFILE)
-        })
-        .map(|f| f as usize)
+    map_fd(usize_fd)
+}
+
+pub fn openat(fd: usize, path: &str, flags: c_int, mode: mode_t) -> Result<FdGuard> {
+    let effective_mode = mode & !(redox_rt::sys::get_umask() as mode_t);
+
+    if let Some(redox_path) = RedoxPath::from_absolute(&path) {
+        let canon = redox_path.to_string();
+        open(&canon, flags, effective_mode)
+    } else {
+        map_fd(syscall::openat(fd, path, flags as _, effective_mode as _)?)
+    }
 }
 
 pub unsafe fn fstat(fd: usize, buf: *mut crate::header::sys_stat::stat) -> syscall::Result<()> {
@@ -126,11 +140,14 @@ pub unsafe extern "C" fn redox_open_v1(
     flags: u32,
     mode: u16,
 ) -> RawResult {
-    Error::mux(open(
-        str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
-        flags as c_int,
-        mode as mode_t,
-    ))
+    Error::mux(
+        open(
+            str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
+            flags as c_int,
+            mode as mode_t,
+        )
+        .map(FdGuard::take),
+    )
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_openat_v1(
@@ -138,12 +155,17 @@ pub unsafe extern "C" fn redox_openat_v1(
     path_base: *const u8,
     path_len: usize,
     flags: u32,
+    fcntl_flags: u32,
 ) -> RawResult {
-    Error::mux(syscall::openat(
-        fd,
-        str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
-        flags as usize,
-    ))
+    Error::mux(
+        openat(
+            fd,
+            str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
+            flags as _,
+            fcntl_flags as _,
+        )
+        .map(FdGuard::take),
+    )
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_dup_v1(fd: usize, buf: *const u8, len: usize) -> RawResult {
