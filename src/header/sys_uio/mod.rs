@@ -11,9 +11,10 @@ use crate::{
 pub const IOV_MAX: c_int = 1024;
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct iovec {
-    iov_base: *mut c_void,
-    iov_len: size_t,
+    pub iov_base: *mut c_void,
+    pub iov_len: size_t,
 }
 
 impl iovec {

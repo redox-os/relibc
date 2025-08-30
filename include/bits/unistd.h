@@ -2,13 +2,7 @@
 #define _BITS_UNISTD_H
 
 #define _POSIX_VERSION 200809L
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
+#define _POSIX_REALTIME_SIGNALS 202405L
+#define _XOPEN_VERSION 700L
 
 #endif

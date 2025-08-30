@@ -42,8 +42,8 @@ mod getdelim;
 
 mod ext;
 mod helpers;
-mod printf;
 mod reader;
+pub mod printf;
 mod scanf;
 static mut TMPNAM_BUF: [c_char; L_tmpnam as usize + 1] = [0; L_tmpnam as usize + 1];
 

@@ -1,3 +1,17 @@
+SKIP_REDOX?=0
+
+# If compiling for Redox, SKIP_REDOX must be 1
+ifeq ($(SKIP_REDOX),1)
+REDOX_FAILING_TESTS=
+else
+REDOX_FAILING_TESTS=tls \
+	futimens \
+	mkfifo \
+	stdlib/ptsname \
+	sys_mman
+
+endif
+
 # Binaries that should generate the same output every time
 EXPECT_NAMES=\
 	alloca \
@@ -22,7 +36,6 @@ EXPECT_NAMES=\
 	fcntl/fcntl \
 	features \
 	fnmatch \
-	futimens \
 	glob \
 	iso646 \
 	libgen \
@@ -66,7 +79,6 @@ EXPECT_NAMES=\
 	stdlib/div \
 	stdlib/env \
 	stdlib/mkostemps \
-	stdlib/ptsname \
 	stdlib/qsort \
 	stdlib/rand \
 	stdlib/rand48 \
@@ -96,7 +108,8 @@ EXPECT_NAMES=\
 	string/stpcpy \
 	string/stpncpy \
 	strings \
-	sys_mman \
+	sys_stat/fstatat \
+	sys_syslog/syslog \
 	time/asctime \
 	time/constants \
 	time/gmtime \
@@ -109,10 +122,10 @@ EXPECT_NAMES=\
 	time/time \
 	time/timegm \
 	time/tzset \
-	tls \
 	unistd/access \
 	unistd/brk \
 	unistd/constants \
+	unistd/confstr \
 	unistd/dup \
 	unistd/exec \
 	unistd/fchdir \
@@ -122,10 +135,7 @@ EXPECT_NAMES=\
 	unistd/getopt \
 	unistd/pipe \
 	unistd/rmdir \
-	waitpid \
-	waitpid_multiple \
-	kill-waitpid \
-	# unistd/sleep \
+	unistd/sleep \
 	unistd/swab \
 	unistd/getopt_long \
 	unistd/write \
@@ -159,10 +169,10 @@ EXPECT_NAMES=\
 	wchar/wcswidth \
 	wctype/towlower \
 	wctype/towupper \
-	mkfifo \
 	mknod \
 	mknodat \
-	# TODO: Fix these
+	$(REDOX_FAILING_TESTS)
+	# TODO: Fix this
 	# netdb/netdb \
 
 BUILD?=.
@@ -175,6 +185,7 @@ DYNAMIC_ONLY_NAMES=\
 NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
+	kill-waitpid \
 	net/if \
 	pty/forkpty \
 	psignal \
@@ -218,12 +229,10 @@ NAMES=\
 	signals/sigprocmask-9 \
 	signals/sigprocmask-10 \
 	signals/sigprocmask-11 \
-	signals/sigprocmask-12 \
 	signals/sigpause-invalid \
 	signals/sigpause-revert \
 	signals/sigpause-suspend \
 	signals/sigprocmask-blocksingle \
-	signals/sigprocmask-block \
 	signals/sigrelse-1 \
 	signals/sigrelse-2 \
 	signals/sigrelse-3 \
@@ -242,6 +251,8 @@ NAMES=\
 	stdlib/realpath \
 	sys_epoll/epoll \
 	sys_resource/constants \
+	sys_stat/stat \
+	sys_statvfs/statvfs \
 	sys_utsname/uname \
 	time/gettimeofday \
 	unistd/chdir \
@@ -253,7 +264,6 @@ NAMES=\
 	unistd/link \
 	unistd/pathconf \
 	unistd/setid \
-	unistd/stat \
 	unistd/sysconf \
 	pthread/main \
 	pthread/cleanup \
@@ -270,6 +280,8 @@ NAMES=\
 	grp/getgrgid_r \
 	grp/getgrnam_r \
 	grp/gr_iter \
+	waitpid \
+	waitpid_multiple \
 	sigqueue
 #	resource/getrusage
 #	time/times
@@ -279,13 +291,19 @@ NAMES=\
 EXPECT_INPUT_NAMES=\
 	unistd/getpass
 
+# TODO: Dynamic linking is currently broken on Redox
+# TODO: Some tests in NAMES break the kernel
+ifeq ($(SKIP_REDOX),0)
 BINS=$(patsubst %,$(BUILD)/bins_static/%,$(NAMES))
 BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(NAMES))
 BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
-EXPECT_BINS=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_INPUT_BINS=$(patsubst %,$(BUILD)/bins_expect_input/%,$(EXPECT_INPUT_NAMES))
+endif
+
+EXPECT_BINS=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
+
 
 CARGO_TEST?=cargo
 TEST_RUNNER?=

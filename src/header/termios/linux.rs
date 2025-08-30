@@ -111,3 +111,7 @@ pub const NOFLSH: usize = 0o000_200;
 pub const TOSTOP: usize = 0o000_400;
 pub const IEXTEN: usize = 0o100_000;
 /* } c_lflag */
+
+// POSIX extensions
+/// Sentinel value to disable a control char.
+pub const _POSIX_VDISABLE: u8 = 0;

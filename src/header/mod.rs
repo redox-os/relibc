@@ -47,6 +47,8 @@ pub mod netinet_in;
 pub mod netinet_ip;
 pub mod netinet_tcp;
 // TODO: nl_types.h
+// TODO: Remove C header paths.h when cbindgen can export C/Rust strs
+// pub mod paths;
 pub mod poll;
 pub mod pthread;
 pub mod pty;
@@ -98,12 +100,12 @@ pub mod arch_x64_user;
 #[cfg(not(target_arch = "x86"))] // TODO: x86
 pub mod sys_procfs;
 pub mod sys_random;
+pub mod sys_syslog;
 pub mod sys_types;
 pub mod sys_uio;
 pub mod sys_un;
 pub mod sys_utsname;
 pub mod sys_wait;
-// TODO: syslog.h
 pub mod tar;
 // TODO: term.h (deprecated)
 pub mod termios;

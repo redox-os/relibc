@@ -51,7 +51,7 @@ impl Semaphore {
         }
     }
 
-    pub fn wait(&self, timeout_opt: Option<&timespec>) -> Result<(), ()> {
+    pub fn wait(&self, timeout_opt: Option<&timespec>, clock_id: clockid_t) -> Result<(), ()> {
         loop {
             let value = self.try_wait();
 
@@ -61,7 +61,7 @@ impl Semaphore {
 
             if let Some(timeout) = timeout_opt {
                 let mut time = timespec::default();
-                unsafe { clock_gettime(CLOCK_MONOTONIC, &mut time) };
+                unsafe { clock_gettime(clock_id, &mut time) };
                 if (time.tv_sec > timeout.tv_sec)
                     || (time.tv_sec == timeout.tv_sec && time.tv_nsec >= timeout.tv_nsec)
                 {

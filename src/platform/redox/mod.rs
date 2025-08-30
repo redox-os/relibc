@@ -25,7 +25,8 @@ use crate::{
             EBADF, EBADFD, EBADR, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS,
             EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl, limits,
+        fcntl::{self, AT_FDCWD, O_RDONLY},
+        limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, rusage, RLIM_INFINITY},
@@ -281,6 +282,56 @@ impl Pal for Sys {
     unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()> {
         libredox::fstat(fildes as usize, buf)?;
         Ok(())
+    }
+
+    unsafe fn fstatat(
+        fildes: c_int,
+        path: *const c_char,
+        buf: *mut stat,
+        flags: c_int,
+    ) -> Result<()> {
+        let path =
+            match CStr::from_nullable_ptr(path).and_then(|cs| str::from_utf8(cs.to_bytes()).ok()) {
+                // TODO: AT_EMPTY_PATH
+                Some(path) if !path.is_empty() => Ok(path),
+                None | Some(_) => Err(Errno(ENOENT)),
+            }?;
+        // TODO: We need an AT_SYMLINK_NOFOLLOW constant for Redox. Unlike AT_FDCWD, it varies
+        // across OSes, so I don't want to define it here myself.
+        // O_NOFOLLOW may be incorrect too (see the rename.c unit test).
+        // let oflags = if flags & AT_SYMLINK_NOFOLLOW {
+        //     O_RDONLY | O_NOFOLLOW
+        // } else {
+        //     O_RDONLY
+        // };
+        let oflags = O_RDONLY;
+
+        // Absolute paths are passed to fstat without processing.
+        // canonicalize_using_cwd checks that path is absolute so a third branch that does so here
+        // isn't needed.
+        let path = if fildes == AT_FDCWD {
+            // The special constant AT_FDCWD indicates that we should use the cwd.
+            let mut buf = [0; limits::PATH_MAX];
+            let len = path::getcwd(&mut buf).ok_or(Errno(ENAMETOOLONG))?;
+            // SAFETY: Redox's cwd is stored as a str.
+            let cwd = unsafe { str::from_utf8_unchecked(&buf[..len]) };
+
+            path::canonicalize_using_cwd(Some(cwd), path).ok_or(Errno(EBADF))?
+        } else {
+            let mut buf = [0; limits::PATH_MAX];
+            let len = Sys::fpath(fildes, &mut buf)?;
+            // SAFETY: fpath checks then copies valid UTF8.
+            let dir = unsafe { str::from_utf8_unchecked(&buf[..len]) };
+
+            path::canonicalize_using_cwd(Some(dir), path).ok_or(Errno(EBADF))?
+        };
+        let path = CString::new(path).map_err(|_| Errno(ENOENT))?;
+
+        // TODO:
+        // * If AT_SYMLINK_NOFOLLOW is set, call lstat instead.
+        // * Switch open to openat.
+        let file = File::open(path.as_c_str().into(), oflags)?;
+        Sys::fstat(*file, buf)
     }
 
     unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()> {
@@ -1039,25 +1090,26 @@ impl Pal for Sys {
         // First, allow ptrace to handle waitpid
         // TODO: Handle special PIDs here (such as -1)
         let state = ptrace::init_state();
-        let mut sessions = state.sessions.lock();
-        if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
-            if !options.contains(WaitFlags::WNOHANG) {
-                let mut _event = PtraceEvent::default();
-                let _ = (&mut &session.tracer).read(&mut _event);
+        // TODO: Fix ptrace deadlock seen during openposixtestsuite signals tests
+        // let mut sessions = state.sessions.lock();
+        // if let Ok(session) = ptrace::get_session(&mut sessions, pid) {
+        //     if !options.contains(WaitFlags::WNOHANG) {
+        //         let mut _event = PtraceEvent::default();
+        //         let _ = (&mut &session.tracer).read(&mut _event);
 
-                res = Some(inner(
-                    &mut status,
-                    options | WaitFlags::WNOHANG | WaitFlags::WUNTRACED,
-                ));
-                if res == Some(Ok(0)) {
-                    // WNOHANG, just pretend ptrace SIGSTOP:ped this
-                    status = (redox_rt::protocol::SIGSTOP << 8) | 0x7f;
-                    assert!(wifstopped(status));
-                    assert_eq!(wstopsig(status), redox_rt::protocol::SIGSTOP);
-                    res = Some(Ok(pid as usize));
-                }
-            }
-        }
+        //         res = Some(inner(
+        //             &mut status,
+        //             options | WaitFlags::WNOHANG | WaitFlags::WUNTRACED,
+        //         ));
+        //         if res == Some(Ok(0)) {
+        //             // WNOHANG, just pretend ptrace SIGSTOP:ped this
+        //             status = (redox_rt::protocol::SIGSTOP << 8) | 0x7f;
+        //             assert!(wifstopped(status));
+        //             assert_eq!(wstopsig(status), redox_rt::protocol::SIGSTOP);
+        //             res = Some(Ok(pid as usize));
+        //         }
+        //     }
+        // }
 
         // If ptrace didn't impact this waitpid, proceed *almost* as
         // normal: We still need to add WUNTRACED, but we only return

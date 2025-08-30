@@ -25,6 +25,11 @@ pub const S_IRUSR: c_int = 0o0_400;
 pub const S_IWUSR: c_int = 0o0_200;
 pub const S_IXUSR: c_int = 0o0_100;
 
+// Defined for compatibility
+pub const S_IREAD: c_int = S_IRUSR;
+pub const S_IWRITE: c_int = S_IWUSR;
+pub const S_IEXEC: c_int = S_IXUSR;
+
 pub const S_IRWXG: c_int = 0o0_070;
 pub const S_IRGRP: c_int = 0o0_040;
 pub const S_IWGRP: c_int = 0o0_020;
@@ -79,6 +84,18 @@ pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
     Sys::fstat(fildes, buf).map(|()| 0).or_minus_one_errno()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fstatat(
+    fildes: c_int,
+    path: *const c_char,
+    buf: *mut stat,
+    flags: c_int,
+) -> c_int {
+    Sys::fstatat(fildes, path, buf, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 #[no_mangle]

@@ -103,7 +103,7 @@ pub unsafe extern "C" fn pthread_attr_getstack(
 #[no_mangle]
 pub unsafe extern "C" fn pthread_attr_getstacksize(
     attr: *const pthread_attr_t,
-    stacksize: *mut c_int,
+    stacksize: *mut size_t,
 ) -> c_int {
     core::ptr::write(stacksize, (*attr.cast::<RlctAttr>()).stacksize as _);
     0
