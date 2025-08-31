@@ -61,7 +61,7 @@
 
 // Analogous to Rust's Never type
 //TODO: clang fails to compile C with [[noreturn]]
-#if defined(__cplusplus) && __HAS_ATTRIBUTE(noreturn)
+#if defined(__cplusplus) && __HAS_ATTRIBUTE(noreturn) && !(__clang__)
     #define __noreturn [[noreturn]]
 // #elif __STDC_VERSION__ >= 201112L
 // FIXME: cbindgen incorrectly places _Noreturn
