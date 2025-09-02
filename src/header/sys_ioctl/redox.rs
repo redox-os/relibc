@@ -92,7 +92,7 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
             dup_write(fd, "flush", &queue)?;
         }
         TIOCSCTTY => {
-            eprintln!("TODO: ioctl TIOCSCTTY");
+            debug!("TODO: ioctl TIOCSCTTY");
         }
         TIOCGPGRP => {
             let pgrp = &mut *(out as *mut pid_t);
@@ -111,19 +111,19 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
             dup_write(fd, "winsize", winsize)?;
         }
         TIOCGPTLCK => {
-            eprintln!("TODO: ioctl TIOCGPTLCK");
+            debug!("TODO: ioctl TIOCGPTLCK");
         }
         TIOCSPTLCK => {
-            eprintln!("TODO: ioctl TIOCSPTLCK");
+            debug!("TODO: ioctl TIOCSPTLCK");
         }
         TCSBRK => {
-            eprintln!("TODO: ioctl TCSBRK");
+            debug!("TODO: ioctl TCSBRK");
         }
         TCXONC => {
-            eprintln!("TODO: ioctl TCXONC");
+            debug!("TODO: ioctl TCXONC");
         }
         SIOCATMARK => {
-            eprintln!("TODO: ioctl SIOCATMARK");
+            debug!("TODO: ioctl SIOCATMARK");
         }
         _ => {
             return Err(Errno(EINVAL));
