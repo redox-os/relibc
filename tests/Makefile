@@ -132,6 +132,7 @@ EXPECT_NAMES=\
 	unistd/exec \
 	unistd/fchdir \
 	unistd/fork \
+	unistd/fork_alloc \
 	unistd/fsync \
 	unistd/ftruncate \
 	unistd/getopt \
