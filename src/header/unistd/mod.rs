@@ -22,9 +22,8 @@ use crate::{
     platform::{self, types::*, Pal, Sys, ERRNO},
 };
 
-use alloc::collections::LinkedList;
-
 pub use self::{brk::*, getopt::*, getpass::getpass, pathconf::*, sysconf::*};
+pub use crate::header::pthread::fork_hooks;
 
 // Inclusion of ctermid() prototype marked as obsolescent since Issue 7, cf.
 // <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/unistd.h.html>.
@@ -104,16 +103,15 @@ pub const _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS: c_int = 1145;
 pub const _CS_POSIX_V7_LPBIG_OFFBIG_LIBS: c_int = 1146;
 pub const _CS_POSIX_V7_LPBIG_OFFBIG_LINTFLAGS: c_int = 1147;
 
-#[thread_local]
-pub static mut fork_hooks_static: Option<[LinkedList<extern "C" fn()>; 3]> = None;
-
-unsafe fn init_fork_hooks<'a>() -> &'a mut [LinkedList<extern "C" fn()>; 3] {
-    // Transmute the lifetime so we can return here. Should be safe as
-    // long as one does not access the original fork_hooks.
-    mem::transmute(
-        fork_hooks_static
-            .get_or_insert_with(|| [LinkedList::new(), LinkedList::new(), LinkedList::new()]),
-    )
+// Re-exported from pthread.h. `pthread_atfork` should be in pthread.h according to the
+// standard, but glibc exports it here as well. We ONLY exported it in unistd.h till recently.
+extern "C" {
+    #[no_mangle]
+    pub fn pthread_atfork(
+        prepare: Option<extern "C" fn()>,
+        parent: Option<extern "C" fn()>,
+        child: Option<extern "C" fn()>,
+    ) -> c_int;
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html>.
@@ -413,7 +411,6 @@ pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html>.
 #[no_mangle]
 pub unsafe extern "C" fn fork() -> pid_t {
-    let fork_hooks = init_fork_hooks();
     for prepare in &fork_hooks[0] {
         prepare();
     }
@@ -790,28 +787,6 @@ pub unsafe extern "C" fn pread(
     )
     .map(|read| read as ssize_t)
     .or_minus_one_errno()
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_atfork.html>.
-///
-/// TODO: specified in `pthread.h` in modern POSIX
-#[no_mangle]
-pub extern "C" fn pthread_atfork(
-    prepare: Option<extern "C" fn()>,
-    parent: Option<extern "C" fn()>,
-    child: Option<extern "C" fn()>,
-) -> c_int {
-    let fork_hooks = unsafe { init_fork_hooks() };
-    if let Some(prepare) = prepare {
-        fork_hooks[0].push_back(prepare);
-    }
-    if let Some(parent) = parent {
-        fork_hooks[1].push_back(parent);
-    }
-    if let Some(child) = child {
-        fork_hooks[2].push_back(child);
-    }
-    0
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/write.html>.

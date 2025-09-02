@@ -1,5 +1,6 @@
 //! pthread.h implementation for Redox, following https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/pthread.h.html
 
+use alloc::collections::LinkedList;
 use core::{cell::Cell, ptr::NonNull};
 
 use crate::{
@@ -72,6 +73,12 @@ pub use self::attr::*;
 pub mod barrier;
 pub use self::barrier::*;
 
+pub mod cond;
+pub use self::cond::*;
+
+#[thread_local]
+pub static mut fork_hooks: [LinkedList<extern "C" fn()>; 3] = [const { LinkedList::new() }; 3];
+
 #[no_mangle]
 pub unsafe extern "C" fn pthread_cancel(thread: pthread_t) -> c_int {
     match pthread::cancel(&*thread.cast()) {
@@ -79,9 +86,6 @@ pub unsafe extern "C" fn pthread_cancel(thread: pthread_t) -> c_int {
         Err(Errno(error)) => error,
     }
 }
-
-pub mod cond;
-pub use self::cond::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_create(
@@ -112,6 +116,31 @@ pub unsafe extern "C" fn pthread_detach(pthread: pthread_t) -> c_int {
 #[no_mangle]
 pub extern "C" fn pthread_equal(pthread1: pthread_t, pthread2: pthread_t) -> c_int {
     core::ptr::eq(pthread1, pthread2).into()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_atfork.html>.
+#[no_mangle]
+pub extern "C" fn pthread_atfork(
+    prepare: Option<extern "C" fn()>,
+    parent: Option<extern "C" fn()>,
+    child: Option<extern "C" fn()>,
+) -> c_int {
+    if let Some(prepare) = prepare {
+        unsafe {
+            fork_hooks[0].push_back(prepare);
+        }
+    }
+    if let Some(parent) = parent {
+        unsafe {
+            fork_hooks[1].push_back(parent);
+        }
+    }
+    if let Some(child) = child {
+        unsafe {
+            fork_hooks[2].push_back(child);
+        }
+    }
+    0
 }
 
 #[no_mangle]
