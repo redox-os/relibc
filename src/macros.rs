@@ -80,6 +80,20 @@ macro_rules! trace {
 
 #[macro_export]
 #[cfg(not(feature = "trace"))]
+macro_rules! debug {
+    ($($arg:tt)*) => {};
+}
+
+#[macro_export]
+#[cfg(feature = "trace")]
+macro_rules! debug {
+    ($($arg:tt)*) => ({
+        eprintln!($($arg)*);
+    });
+}
+
+#[macro_export]
+#[cfg(not(feature = "trace"))]
 macro_rules! trace_expr {
     ($expr:expr, $($arg:tt)*) => {
         $expr
