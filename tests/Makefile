@@ -108,6 +108,7 @@ EXPECT_NAMES=\
 	string/stpcpy \
 	string/stpncpy \
 	strings \
+	sys_stat/lstat \
 	sys_stat/fstatat \
 	sys_syslog/syslog \
 	time/asctime \
