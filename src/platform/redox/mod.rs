@@ -908,7 +908,10 @@ impl Pal for Sys {
         let newpath = newpath.to_str().map_err(|_| Errno(EINVAL))?;
         let newpath = canonicalize(newpath).map_err(|_| Errno(EINVAL))?;
 
-        let file = File::open(oldpath, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
+        let file = File::open(
+            oldpath,
+            fcntl::O_NOFOLLOW | fcntl::O_PATH | fcntl::O_CLOEXEC,
+        )?;
         syscall::frename(*file as usize, newpath)?;
         Ok(())
     }
