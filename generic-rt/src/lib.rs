@@ -107,8 +107,7 @@ impl<T, E: core::fmt::Debug> ExpectTlsFree for Result<T, E> {
         match self {
             Ok(t) => t,
             Err(err) => panic_notls(format_args!(
-                "{}: expect failed for Result with err: {:?}",
-                msg, err
+                "{msg}: expect failed for Result with err: {err:?}",
             )),
         }
     }
@@ -119,7 +118,7 @@ impl<T> ExpectTlsFree for Option<T> {
     fn expect_notls(self, msg: &str) -> T {
         match self {
             Some(t) => t,
-            None => panic_notls(format_args!("{}: expect failed for Option", msg)),
+            None => panic_notls(format_args!("{msg}: expect failed for Option")),
         }
     }
 }
