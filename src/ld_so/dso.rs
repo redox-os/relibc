@@ -618,7 +618,7 @@ impl DSO {
             let (ph, _) = dynamic.unwrap();
             let vaddr = ph.p_vaddr(endian) as usize;
             let bytes: [u8; size_of::<Dyn>() / 2] =
-                unsafe { core::mem::transmute((&_r_debug) as *const RTLDDebug as usize) };
+                ((&raw const _r_debug).cast::<*const RTLDDebug>() as usize).to_ne_bytes();
             let start = if is_pie_enabled(elf) {
                 vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
             } else {
