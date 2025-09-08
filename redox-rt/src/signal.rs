@@ -172,7 +172,7 @@ unsafe fn inner(stack: &mut SigStack) {
                 CallFlags::empty(),
                 &[ProcCall::Exit as u64, u64::from(sig) << 8],
             );
-            core::intrinsics::abort()
+            panic!()
         }
         SigactionKind::Handled { handler } => handler,
     };

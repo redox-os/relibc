@@ -1,16 +1,9 @@
 #![no_std]
-#![feature(
-    asm_const,
-    core_intrinsics,
-    int_roundings,
-    let_chains,
-    slice_ptr_get,
-    sync_unsafe_cell
-)]
+#![feature(int_roundings, let_chains, slice_ptr_get, sync_unsafe_cell)]
 #![forbid(unreachable_patterns)]
 
 use core::{
-    cell::{SyncUnsafeCell, UnsafeCell},
+    cell::UnsafeCell,
     mem::{size_of, MaybeUninit},
 };
 
@@ -232,14 +225,14 @@ pub(crate) struct StaticProcInfo {
     proc_fd: MaybeUninit<FdGuard>,
     has_proc_fd: bool,
 }
-struct DynamicProcInfo {
-    pgid: u32,
-    euid: u32,
-    suid: u32,
-    ruid: u32,
-    egid: u32,
-    rgid: u32,
-    sgid: u32,
+pub struct DynamicProcInfo {
+    pub pgid: u32,
+    pub euid: u32,
+    pub suid: u32,
+    pub ruid: u32,
+    pub egid: u32,
+    pub rgid: u32,
+    pub sgid: u32,
 }
 
 static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
