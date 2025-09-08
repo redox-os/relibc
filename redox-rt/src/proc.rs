@@ -715,11 +715,10 @@ pub fn create_set_addr_space_buf(
     ip: usize,
     sp: usize,
 ) -> [u8; size_of::<usize>() * 3] {
-    let mut buf = [0_u8; 3 * size_of::<usize>()];
-    let mut chunks = buf.array_chunks_mut::<{ size_of::<usize>() }>();
-    *chunks.next().unwrap() = usize::to_ne_bytes(space);
-    *chunks.next().unwrap() = usize::to_ne_bytes(sp);
-    *chunks.next().unwrap() = usize::to_ne_bytes(ip);
+    let mut buf = [0u8; size_of::<usize>() * 3];
+
+    buf.copy_from_slice([space, sp, ip].map(usize::to_ne_bytes).as_flattened());
+
     buf
 }
 

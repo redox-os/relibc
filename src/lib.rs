@@ -13,7 +13,6 @@
 #![allow(unused_variables)]
 #![feature(alloc_error_handler)]
 #![feature(allocator_api)]
-#![feature(array_chunks)]
 #![feature(asm_const)]
 #![feature(c_variadic)]
 #![feature(core_intrinsics)]
