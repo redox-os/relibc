@@ -1,4 +1,4 @@
-#include <errno.h>
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -9,9 +9,9 @@
 int main(void) {
     printf("sizeof(struct stat): %ld\n", sizeof(struct stat));
 
-    struct stat buf;
+    struct stat buf = {0};
 
-    int stat_status = stat("unistd/stat.c", &buf);
+    int stat_status = stat("sys_stat/stat.c", &buf);
     ERROR_IF(stat, stat_status, == -1);
     UNEXP_IF(stat, stat_status, != 0);
 
@@ -23,4 +23,9 @@ int main(void) {
     printf("st_nlink: %lu\n", buf.st_nlink);
     printf("st_uid: %u\n", buf.st_uid);
     printf("st_gid: %u\n", buf.st_gid);
+
+    assert(buf.st_size > 600);
+    assert(buf.st_nlink == 1);
+
+    return EXIT_SUCCESS;
 }

@@ -7,7 +7,7 @@ use alloc::{
 use core::{cmp, ffi::VaList, fmt, num::FpCategory, ops::Range, slice};
 
 use crate::{
-    header::errno::EILSEQ,
+    header::errno::{self, EILSEQ},
     platform::{self, types::*},
 };
 
@@ -588,6 +588,18 @@ impl Iterator for PrintfIter {
                 b'c' => FmtKind::Char,
                 b'p' => FmtKind::Pointer,
                 b'n' => FmtKind::GetWritten,
+                b'm' => {
+                    // %m is technically for syslog only, but musl and glibc implement it for
+                    // printf because it is difficult and error prone to implement a format
+                    // specifier for just *one* function.
+                    self.format = self.format.add(1);
+                    return Some(Ok(PrintfFmt::Plain(
+                        errno::STR_ERROR
+                            .get(platform::ERRNO.get() as usize)
+                            .map(|e| e.as_bytes())
+                            .unwrap_or(b"unknown error"),
+                    )));
+                }
                 _ => return Some(Err(())),
             };
             self.format = self.format.add(1);

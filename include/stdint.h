@@ -44,17 +44,21 @@ typedef __INT64_TYPE__ int64_t;
 #endif
 #ifdef __UINT8_TYPE__
 typedef __UINT8_TYPE__ uint8_t;
+typedef __UINT8_TYPE__ u_int8_t;
 #endif
 #ifdef __UINT16_TYPE__
 typedef __UINT16_TYPE__ uint16_t;
+typedef __UINT16_TYPE__ u_int16_t;
 #endif
 #ifdef __UINT32_TYPE__
 typedef __UINT32_TYPE__ uint32_t;
+typedef __UINT32_TYPE__ u_int32_t;
 // Required by openlibm
 typedef __UINT32_TYPE__ __uint32_t;
 #endif
 #ifdef __UINT64_TYPE__
 typedef __UINT64_TYPE__ uint64_t;
+typedef __UINT64_TYPE__ u_int64_t;
 // Required by openlibm
 typedef __UINT64_TYPE__ __uint64_t;
 #endif

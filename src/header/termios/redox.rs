@@ -31,6 +31,7 @@ pub const IGNCR: usize = 0o000_200;
 pub const ICRNL: usize = 0o000_400;
 pub const IXON: usize = 0o001_000;
 pub const IXOFF: usize = 0o002_000;
+pub const IXANY: usize = 0o004_000;
 /* } c_iflag */
 
 /* c_oflag { */
@@ -104,3 +105,7 @@ pub const NOFLSH: usize = 0x8000_0000;
 pub const TOSTOP: usize = 0x0040_0000;
 pub const IEXTEN: usize = 0x0000_0400;
 /* } c_lflag */
+
+// POSIX extensions
+/// Sentinel value to disable a control char.
+pub const _POSIX_VDISABLE: u8 = 0;

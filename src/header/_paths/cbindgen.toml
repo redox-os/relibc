@@ -1,0 +1,5 @@
+include_guard = "_RELIBC_PATHS_H"
+language = "C"
+style = "Type"
+no_includes = true
+cpp_compat = true
