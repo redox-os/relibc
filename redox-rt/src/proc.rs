@@ -8,7 +8,7 @@ use crate::{
     arch::*,
     auxv_defs::*,
     protocol::{ProcCall, ThreadCall},
-    read_proc_meta, static_proc_info,
+    read_proc_meta,
     sys::{proc_call, thread_call},
     RtTcb, StaticProcInfo, DYNAMIC_PROC_INFO,
 };
@@ -30,8 +30,8 @@ use goblin::elf64::{
 use syscall::{
     error::*,
     flag::{MapFlags, SEEK_SET},
-    CallFlags, GrantDesc, GrantFlags, Map, ProcSchemeAttrs, SetSighandlerData, MAP_FIXED_NOREPLACE,
-    MAP_SHARED, O_CLOEXEC, PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE,
+    CallFlags, GrantDesc, GrantFlags, Map, SetSighandlerData, MAP_FIXED_NOREPLACE, MAP_SHARED,
+    PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE,
 };
 
 pub enum FexecResult {
@@ -902,7 +902,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
     Ok(new_pid)
 }
 
-struct NewChildProc {
+pub struct NewChildProc {
     proc_fd: Option<FdGuard>,
 
     thr_fd: FdGuard,

@@ -208,9 +208,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
     };
 
     // we might need global lock for this kind of stuff
-    unsafe {
-        _r_debug.r_ldbase = ld_entry;
-    }
+    _r_debug.lock().r_ldbase = ld_entry;
 
     // TODO: Fix memory leak, although minimal.
     unsafe {

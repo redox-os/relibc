@@ -152,7 +152,8 @@ unsafe fn inner(stack: &mut SigStack) {
                     flags: SigactionFlags::empty(),
                 }),
                 None,
-            );
+            )
+            .ok();
         }
         action
     };
@@ -171,7 +172,7 @@ unsafe fn inner(stack: &mut SigStack) {
                 CallFlags::empty(),
                 &[ProcCall::Exit as u64, u64::from(sig) << 8],
             );
-            core::intrinsics::abort()
+            panic!()
         }
         SigactionKind::Handled { handler } => handler,
     };
@@ -546,7 +547,7 @@ bitflags::bitflags! {
 
 const STORED_FLAGS: u32 = 0xfe00_0000;
 
-fn default_handler(sig: c_int) {
+fn default_handler(_sig: c_int) {
     unreachable!();
 }
 
@@ -568,10 +569,6 @@ pub(crate) static PROC_CONTROL_STRUCT: SigProcControl = SigProcControl {
     }; 64],
     sender_infos: [const { AtomicU64::new(0) }; 32],
 };
-
-fn combine_allowset([lo, hi]: [u64; 2]) -> u64 {
-    (lo >> 32) | ((hi >> 32) << 32)
-}
 
 const fn sig_bit(sig: u32) -> u64 {
     //assert_ne!(sig, 32);
@@ -631,7 +628,7 @@ pub fn setup_sighandler(tcb: &RtTcb, first_thread: bool) {
     .expect("failed to sync signal tctl");
 
     // TODO: Inherited set of ignored signals
-    set_sigmask(Some(0), None);
+    set_sigmask(Some(0), None).ok();
 }
 pub type RtSigarea = RtTcb; // TODO
 pub fn current_setsighandler_struct() -> SetSighandlerData {
