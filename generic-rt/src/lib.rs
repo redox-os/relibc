@@ -1,4 +1,6 @@
 #![no_std]
+#![allow(internal_features)]
+#![feature(core_intrinsics)]
 
 use core::{
     arch::asm,
@@ -91,8 +93,10 @@ impl<Os> GenericTcb<Os> {
         Some(&mut *Self::current_ptr()?)
     }
 }
-pub fn panic_notls(msg: impl core::fmt::Display) -> ! {
-    panic!("panicked in ld.so: {msg}");
+pub fn panic_notls(_msg: impl core::fmt::Display) -> ! {
+    // TODO: actually print _msg, perhaps by having panic_notls take a `T: DebugBackend` that can
+    // propagate until called by e.g. relibc start
+    core::intrinsics::abort();
 }
 
 pub trait ExpectTlsFree {

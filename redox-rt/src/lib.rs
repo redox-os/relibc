@@ -1,5 +1,12 @@
 #![no_std]
-#![feature(int_roundings, let_chains, slice_ptr_get, sync_unsafe_cell)]
+#![allow(internal_features)]
+#![feature(
+    core_intrinsics,
+    int_roundings,
+    let_chains,
+    slice_ptr_get,
+    sync_unsafe_cell
+)]
 #![forbid(unreachable_patterns)]
 
 use core::{

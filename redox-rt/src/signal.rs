@@ -144,7 +144,8 @@ unsafe fn inner(stack: &mut SigStack) {
         let action = convert_old(&PROC_CONTROL_STRUCT.actions[stack.sig_num as usize - 1]);
         if action.flags.contains(SigactionFlags::RESETHAND) {
             drop(guard);
-            sigaction(
+            // TODO: handle error?
+            let _ = sigaction(
                 stack.sig_num as u8,
                 Some(&Sigaction {
                     kind: SigactionKind::Default,
@@ -152,8 +153,7 @@ unsafe fn inner(stack: &mut SigStack) {
                     flags: SigactionFlags::empty(),
                 }),
                 None,
-            )
-            .ok();
+            );
         }
         action
     };
@@ -628,7 +628,8 @@ pub fn setup_sighandler(tcb: &RtTcb, first_thread: bool) {
     .expect("failed to sync signal tctl");
 
     // TODO: Inherited set of ignored signals
-    set_sigmask(Some(0), None).ok();
+    // TODO: handle error
+    let _ = set_sigmask(Some(0), None);
 }
 pub type RtSigarea = RtTcb; // TODO
 pub fn current_setsighandler_struct() -> SetSighandlerData {
