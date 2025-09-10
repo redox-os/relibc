@@ -324,7 +324,7 @@ pub fn posix_exit(status: i32) -> ! {
     this_proc_call(
         &mut [],
         CallFlags::empty(),
-        &[ProcCall::Exit as u64, status as u64],
+        &[ProcCall::Exit as u64, (status & 0xFF) as u64],
     )
     .expect("failed to call proc mgr with Exit");
     let _ = syscall::write(1, b"redox-rt: ProcCall::Exit FAILED, abort()ing!\n");
