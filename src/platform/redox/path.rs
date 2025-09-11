@@ -15,15 +15,8 @@ pub use redox_path::{canonicalize_using_cwd, RedoxPath};
 // TODO: Define in syscall
 const PATH_MAX: usize = 4096;
 
-// XXX: chdir is not marked thread-safe (MT-safe) by POSIX. But on Linux it is simply run as a
-// syscall and is therefore atomic, which is presumably why Rust's libstd doesn't synchronize
-// access to this.
-//
-// https://internals.rust-lang.org/t/synchronized-ffi-access-to-posix-environment-variable-functions/15475
-//
-// chdir is however signal-safe, forbidding the use of locks. We therefore call sigprocmask before
-// and after acquiring the locks. (TODO: ArcSwap? That will need to be ported to no_std first,
-// though).
+// POSIX states chdir is both thread-safe and signal-safe. Thus we need to synchronize access to CWD, but at the
+// same time forbid signal handlers from running in the meantime, to avoid reentrant deadlock.
 pub fn chdir(path: &str) -> Result<()> {
     let _siglock = tmp_disable_signals();
     let mut cwd_guard = CWD.lock();
@@ -43,6 +36,7 @@ pub fn chdir(path: &str) -> Result<()> {
     Ok(())
 }
 
+// getcwd is similarly both thread-safe and signal-safe.
 // TODO: MaybeUninit
 pub fn getcwd(buf: &mut [u8]) -> Option<usize> {
     let _siglock = tmp_disable_signals();
