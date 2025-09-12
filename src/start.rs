@@ -201,8 +201,8 @@ pub unsafe extern "C" fn relibc_start_v1(
         while !(*envp.add(len)).is_null() {
             len += 1;
         }
-        platform::OUR_ENVIRON.unsafe_set(copy_string_array(envp, len));
-        platform::environ = platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr();
+        platform::OUR_ENVIRON.replace(copy_string_array(envp, len));
+        platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
     }
 
     let auxvs = get_auxvs(sp.auxv().cast());
