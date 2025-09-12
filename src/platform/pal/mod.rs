@@ -228,6 +228,8 @@ pub trait Pal {
 
     fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize>;
 
+    fn readlinkat(dirfd: c_int, pathname: CStr, out: &mut [u8]) -> Result<usize>;
+
     fn rename(old: CStr, new: CStr) -> Result<()>;
 
     fn rmdir(path: CStr) -> Result<()>;
