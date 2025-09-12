@@ -5,7 +5,11 @@ use crate::{
     io::{self, Read, Write},
 };
 use alloc::{boxed::Box, vec::Vec};
-use core::{cell::Cell, fmt, ptr};
+use core::{
+    cell::Cell,
+    fmt, ptr,
+    sync::atomic::{AtomicPtr, Ordering},
+};
 
 pub use self::allocator::*;
 
@@ -58,7 +62,62 @@ pub static mut program_invocation_short_name: *mut c_char = ptr::null_mut();
 #[no_mangle]
 pub static mut environ: *mut *mut c_char = ptr::null_mut();
 
-pub static mut OUR_ENVIRON: Vec<*mut c_char> = Vec::new();
+pub static OUR_ENVIRON: EnvArgs = EnvArgs::new();
+
+/// Represents environment arguments passed to the program, potentially from C code.
+#[repr(transparent)]
+pub struct EnvArgs(pub spin::Mutex<Vec<AtomicPtr<c_char>>>);
+
+impl EnvArgs {
+    /// Creates a new [EnvArgs].
+    pub const fn new() -> Self {
+        Self(spin::Mutex::new(Vec::new()))
+    }
+
+    /// Gets a mutable lock over the inner pointer collection.
+    fn lock(&self) -> spin::MutexGuard<'_, Vec<AtomicPtr<c_char>>> {
+        self.0.lock()
+    }
+
+    /// Replaces the last item in the [EnvArgs].
+    ///
+    /// Returns `None` if [EnvArgs] is empty.
+    pub fn replace_last(&self, val: *mut c_char) -> Option<()> {
+        self.lock().last_mut().map(|p| *p = AtomicPtr::new(val))
+    }
+
+    /// Pushes an argument to the end of [EnvArgs].
+    pub fn push(&self, val: *mut c_char) {
+        self.lock().push(AtomicPtr::new(val));
+    }
+
+    /// Removes an argument at index `i` from [EnvArgs].
+    pub fn remove(&self, i: usize) {
+        self.lock().remove(i);
+    }
+
+    /// Clears the [EnvArgs] list.
+    pub fn clear(&self) {
+        self.lock().clear();
+    }
+
+    /// Extends the [EnvArgs] list from an iterator-like parameter.
+    pub fn extend<I: IntoIterator<Item = *mut c_char>>(&self, val: I) {
+        self.lock().extend(val.into_iter().map(AtomicPtr::new));
+    }
+
+    /// Replaces the [EnvArgs] list with an iterator-like parameter.
+    pub fn replace<V: IntoIterator<Item = *mut c_char>>(&self, val: V) {
+        let mut v = self.lock();
+        v.clear();
+        v.extend(val.into_iter().map(AtomicPtr::new));
+    }
+
+    /// Gets a mutable pointer to the [EnvArgs] list.
+    pub fn as_mut_ptr(&self) -> *mut *mut c_char {
+        self.lock().as_mut_ptr().cast::<*mut c_char>()
+    }
+}
 
 pub fn environ_iter() -> impl Iterator<Item = *mut c_char> + 'static {
     unsafe {

@@ -200,7 +200,7 @@ pub unsafe extern "C" fn relibc_start_v1(
         while !(*envp.add(len)).is_null() {
             len += 1;
         }
-        platform::OUR_ENVIRON = copy_string_array(envp, len);
+        platform::OUR_ENVIRON.replace(copy_string_array(envp, len));
         platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
     }
 

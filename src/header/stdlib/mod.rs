@@ -989,7 +989,7 @@ unsafe fn put_new_env(insert: *mut c_char) {
     // XXX: Another problem is that `environ` can be set to any pointer, which means there is a
     // chance of a memory leak. But we can check if it was the same as before, like musl does.
     if platform::environ == platform::OUR_ENVIRON.as_mut_ptr() {
-        *platform::OUR_ENVIRON.last_mut().unwrap() = insert;
+        platform::OUR_ENVIRON.replace_last(insert);
         platform::OUR_ENVIRON.push(core::ptr::null_mut());
         // Likely a no-op but is needed due to Stacked Borrows.
         platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
