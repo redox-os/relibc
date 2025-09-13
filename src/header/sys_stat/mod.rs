@@ -7,6 +7,7 @@ use crate::{
         fcntl::{O_NOFOLLOW, O_PATH},
         time::timespec,
     },
+    out::Out,
     platform::{types::*, Pal, Sys},
 };
 
@@ -83,6 +84,7 @@ pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
+    let buf = Out::new(buf).expect("buf==NULL in fstat");
     Sys::fstat(fildes, buf).map(|()| 0).or_minus_one_errno()
 }
 
@@ -93,6 +95,8 @@ pub unsafe extern "C" fn fstatat(
     buf: *mut stat,
     flags: c_int,
 ) -> c_int {
+    let path = CStr::from_nullable_ptr(path);
+    let buf = Out::new(buf).expect("buf==NULL in fstatat");
     Sys::fstatat(fildes, path, buf, flags)
         .map(|()| 0)
         .or_minus_one_errno()
@@ -111,6 +115,8 @@ pub unsafe extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = CStr::from_ptr(path);
+    let buf = Out::new(buf).expect("buf==NULL in lstat");
+
     // TODO: Rustify
     let fd = Sys::open(path, O_PATH | O_NOFOLLOW, 0).or_minus_one_errno();
     if fd < 0 {
@@ -159,6 +165,8 @@ pub unsafe extern "C" fn mknodat(
 #[no_mangle]
 pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     let file = CStr::from_ptr(file);
+    let buf = Out::new(buf).expect("buf==NULL in stat");
+
     // TODO: Rustify
     let fd = Sys::open(file, O_PATH, 0).or_minus_one_errno();
     if fd < 0 {

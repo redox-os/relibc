@@ -282,26 +282,30 @@ impl Pal for Sys {
         Ok(clone::fork_impl(&redox_rt::proc::ForkArgs::Managed)? as pid_t)
     }
 
-    unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()> {
-        libredox::fstat(fildes as usize, buf)?;
+    fn fstat(fildes: c_int, mut buf: Out<stat>) -> Result<()> {
+        unsafe {
+            libredox::fstat(fildes as usize, buf.as_mut_ptr())?;
+        }
         Ok(())
     }
 
-    unsafe fn fstatat(
+    fn fstatat(
         dirfd: c_int,
-        path: *const c_char,
-        buf: *mut stat,
+        path: Option<CStr>,
+        buf: Out<stat>,
         flags: c_int,
     ) -> Result<()> {
-        let path = CStr::from_nullable_ptr(path)
+        let path = path
             .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
             .ok_or(Errno(ENOENT))?;
         let file = cap_path_at(dirfd, path, flags, 0)?;
         Sys::fstat(*file, buf)
     }
 
-    unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()> {
-        libredox::fstatvfs(fildes as usize, buf)?;
+    fn fstatvfs(fildes: c_int, mut buf: Out<statvfs>) -> Result<()> {
+        unsafe {
+            libredox::fstatvfs(fildes as usize, buf.as_mut_ptr())?;
+        }
         Ok(())
     }
 
@@ -486,54 +490,54 @@ impl Pal for Sys {
     }
 
     fn getresgid(
-        rgid_out: Option<&mut gid_t>,
-        egid_out: Option<&mut gid_t>,
-        sgid_out: Option<&mut gid_t>,
+        rgid_out: Option<Out<gid_t>>,
+        egid_out: Option<Out<gid_t>>,
+        sgid_out: Option<Out<gid_t>>,
     ) -> Result<()> {
         let Resugid {
             rgid, egid, sgid, ..
         } = redox_rt::sys::posix_getresugid();
-        if let Some(rgid_out) = rgid_out {
-            *rgid_out = rgid as _;
+        if let Some(mut rgid_out) = rgid_out {
+            rgid_out.write(rgid as _);
         }
-        if let Some(egid_out) = egid_out {
-            *egid_out = egid as _;
+        if let Some(mut egid_out) = egid_out {
+            egid_out.write(egid as _);
         }
-        if let Some(sgid_out) = sgid_out {
-            *sgid_out = sgid as _;
+        if let Some(mut sgid_out) = sgid_out {
+            sgid_out.write(sgid as _);
         }
         Ok(())
     }
     fn getresuid(
-        ruid_out: Option<&mut uid_t>,
-        euid_out: Option<&mut uid_t>,
-        suid_out: Option<&mut uid_t>,
+        ruid_out: Option<Out<uid_t>>,
+        euid_out: Option<Out<uid_t>>,
+        suid_out: Option<Out<uid_t>>,
     ) -> Result<()> {
         let Resugid {
             ruid, euid, suid, ..
         } = redox_rt::sys::posix_getresugid();
-        if let Some(ruid_out) = ruid_out {
-            *ruid_out = ruid as _;
+        if let Some(mut ruid_out) = ruid_out {
+            ruid_out.write(ruid as _);
         }
-        if let Some(euid_out) = euid_out {
-            *euid_out = euid as _;
+        if let Some(mut euid_out) = euid_out {
+            euid_out.write(euid as _);
         }
-        if let Some(suid_out) = suid_out {
-            *suid_out = suid as _;
+        if let Some(mut suid_out) = suid_out {
+            suid_out.write(suid as _);
         }
         Ok(())
     }
 
-    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()> {
+    fn getrlimit(resource: c_int, mut rlim: Out<rlimit>) -> Result<()> {
         //TODO
         eprintln!(
             "relibc getrlimit({}, {:p}): not implemented",
             resource, rlim
         );
-        if !rlim.is_null() {
-            (*rlim).rlim_cur = RLIM_INFINITY;
-            (*rlim).rlim_max = RLIM_INFINITY;
-        }
+        rlim.write(rlimit {
+            rlim_cur: RLIM_INFINITY,
+            rlim_max: RLIM_INFINITY,
+        });
         Ok(())
     }
 

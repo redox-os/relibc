@@ -4,6 +4,7 @@
 use crate::{
     error::ResultExt,
     header::sys_time::timeval,
+    out::Out,
     platform::{types::*, Pal, Sys},
 };
 
@@ -84,6 +85,8 @@ pub unsafe extern "C" fn setpriority(which: c_int, who: id_t, nice: c_int) -> c_
 
 #[no_mangle]
 pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
+    let rlp = Out::new(rlp).expect("rlp==NULL in getrlimit");
+
     Sys::getrlimit(resource, rlp)
         .map(|()| 0)
         .or_minus_one_errno()

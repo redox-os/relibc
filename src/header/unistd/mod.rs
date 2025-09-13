@@ -20,6 +20,7 @@ use crate::{
         sys_ioctl, sys_resource, sys_time, sys_utsname, termios,
         time::timespec,
     },
+    out::Out,
     platform::{self, types::*, Pal, Sys, ERRNO},
 };
 
@@ -637,8 +638,7 @@ pub extern "C" fn getppid() -> pid_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresgid.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getresgid(rgid: *mut gid_t, egid: *mut gid_t, sgid: *mut gid_t) -> c_int {
-    // TODO: Out<T> write-only wrapper?
-    Sys::getresgid(rgid.as_mut(), egid.as_mut(), sgid.as_mut())
+    Sys::getresgid(Out::new(rgid), Out::new(egid), Out::new(sgid))
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -646,8 +646,7 @@ pub unsafe extern "C" fn getresgid(rgid: *mut gid_t, egid: *mut gid_t, sgid: *mu
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresuid.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getresuid(ruid: *mut uid_t, euid: *mut uid_t, suid: *mut uid_t) -> c_int {
-    // TODO: Out<T> write-only wrapper?
-    Sys::getresuid(ruid.as_mut(), euid.as_mut(), suid.as_mut())
+    Sys::getresuid(Out::new(ruid), Out::new(euid), Out::new(suid))
         .map(|()| 0)
         .or_minus_one_errno()
 }

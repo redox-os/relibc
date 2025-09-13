@@ -73,16 +73,11 @@ pub trait Pal {
 
     fn flock(fd: c_int, operation: c_int) -> Result<()>;
 
-    unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()>;
+    fn fstat(fildes: c_int, buf: Out<stat>) -> Result<()>;
 
-    unsafe fn fstatat(
-        fildes: c_int,
-        path: *const c_char,
-        buf: *mut stat,
-        flags: c_int,
-    ) -> Result<()>;
+    fn fstatat(fildes: c_int, path: Option<CStr>, buf: Out<stat>, flags: c_int) -> Result<()>;
 
-    unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()>;
+    fn fstatvfs(fildes: c_int, buf: Out<statvfs>) -> Result<()>;
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> Result<c_int>;
 
@@ -140,18 +135,18 @@ pub trait Pal {
     fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize>;
 
     fn getresgid(
-        rgid: Option<&mut gid_t>,
-        egid: Option<&mut gid_t>,
-        sgid: Option<&mut gid_t>,
+        rgid: Option<Out<gid_t>>,
+        egid: Option<Out<gid_t>>,
+        sgid: Option<Out<gid_t>>,
     ) -> Result<()>;
 
     fn getresuid(
-        ruid: Option<&mut uid_t>,
-        euid: Option<&mut uid_t>,
-        suid: Option<&mut uid_t>,
+        ruid: Option<Out<uid_t>>,
+        euid: Option<Out<uid_t>>,
+        suid: Option<Out<uid_t>>,
     ) -> Result<()>;
 
-    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()>;
+    fn getrlimit(resource: c_int, rlim: Out<rlimit>) -> Result<()>;
 
     unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> Result<()>;
 

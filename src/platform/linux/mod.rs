@@ -176,42 +176,50 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(FLOCK, fd, operation) }).map(|_| ())
     }
 
-    unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()> {
+    fn fstat(fildes: c_int, mut buf: Out<stat>) -> Result<()> {
         let empty = b"\0";
         let empty_ptr = empty.as_ptr() as *const c_char;
-        e_raw(unsafe { syscall!(NEWFSTATAT, fildes, empty_ptr, buf, AT_EMPTY_PATH) }).map(|_| ())
+        e_raw(unsafe {
+            syscall!(
+                NEWFSTATAT,
+                fildes,
+                empty_ptr,
+                buf.as_mut_ptr(),
+                AT_EMPTY_PATH
+            )
+        })
+        .map(|_| ())
     }
 
-    unsafe fn fstatat(
-        fildes: c_int,
-        path: *const c_char,
-        buf: *mut stat,
-        flags: c_int,
-    ) -> Result<()> {
-        e_raw(unsafe { syscall!(NEWFSTATAT, fildes, path, buf, flags) }).map(|_| ())
+    fn fstatat(fildes: c_int, path: Option<CStr>, mut buf: Out<stat>, flags: c_int) -> Result<()> {
+        e_raw(unsafe { syscall!(NEWFSTATAT, fildes, path.map_or(0, |p| p.as_ptr() as usize), buf.as_mut_ptr(), flags) }).map(|_| ())
     }
 
-    unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()> {
+    fn fstatvfs(fildes: c_int, mut buf: Out<statvfs>) -> Result<()> {
+        let buf = buf.as_mut_ptr();
+
         let mut kbuf = linux_statfs::default();
         let kbuf_ptr = &mut kbuf as *mut linux_statfs;
-        e_raw(syscall!(FSTATFS, fildes, kbuf_ptr))?;
+        e_raw(unsafe { syscall!(FSTATFS, fildes, kbuf_ptr) })?;
 
         if !buf.is_null() {
-            (*buf).f_bsize = kbuf.f_bsize as c_ulong;
-            (*buf).f_frsize = if kbuf.f_frsize != 0 {
-                kbuf.f_frsize
-            } else {
-                kbuf.f_bsize
-            } as c_ulong;
-            (*buf).f_blocks = kbuf.f_blocks;
-            (*buf).f_bfree = kbuf.f_bfree;
-            (*buf).f_bavail = kbuf.f_bavail;
-            (*buf).f_files = kbuf.f_files;
-            (*buf).f_ffree = kbuf.f_ffree;
-            (*buf).f_favail = kbuf.f_ffree;
-            (*buf).f_fsid = kbuf.f_fsid as c_ulong;
-            (*buf).f_flag = kbuf.f_flags as c_ulong;
-            (*buf).f_namemax = kbuf.f_namelen as c_ulong;
+            unsafe {
+                (*buf).f_bsize = kbuf.f_bsize as c_ulong;
+                (*buf).f_frsize = if kbuf.f_frsize != 0 {
+                    kbuf.f_frsize
+                } else {
+                    kbuf.f_bsize
+                } as c_ulong;
+                (*buf).f_blocks = kbuf.f_blocks;
+                (*buf).f_bfree = kbuf.f_bfree;
+                (*buf).f_bavail = kbuf.f_bavail;
+                (*buf).f_files = kbuf.f_files;
+                (*buf).f_ffree = kbuf.f_ffree;
+                (*buf).f_favail = kbuf.f_ffree;
+                (*buf).f_fsid = kbuf.f_fsid as c_ulong;
+                (*buf).f_flag = kbuf.f_flags as c_ulong;
+                (*buf).f_namemax = kbuf.f_namelen as c_ulong;
+            }
         }
         Ok(())
     }
@@ -330,36 +338,36 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(GETRANDOM, buf.as_mut_ptr(), buf.len(), flags) })
     }
 
-    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()> {
-        e_raw(syscall!(GETRLIMIT, resource, rlim)).map(|_| ())
+    fn getrlimit(resource: c_int, mut rlim: Out<rlimit>) -> Result<()> {
+        e_raw(unsafe { syscall!(GETRLIMIT, resource, rlim.as_mut_ptr()) }).map(|_| ())
     }
 
     fn getresgid(
-        rgid: Option<&mut gid_t>,
-        egid: Option<&mut gid_t>,
-        sgid: Option<&mut gid_t>,
+        rgid: Option<Out<gid_t>>,
+        egid: Option<Out<gid_t>>,
+        sgid: Option<Out<gid_t>>,
     ) -> Result<()> {
         unsafe {
             e_raw(syscall!(
                 GETRESGID,
-                rgid.map_or(0, |r| r as *const _ as usize),
-                egid.map_or(0, |r| r as *const _ as usize),
-                sgid.map_or(0, |r| r as *const _ as usize)
+                rgid.map_or(0, |mut r| r.as_mut_ptr() as usize),
+                egid.map_or(0, |mut r| r.as_mut_ptr() as usize),
+                sgid.map_or(0, |mut r| r.as_mut_ptr() as usize)
             ))
             .map(|_| ())
         }
     }
     fn getresuid(
-        ruid: Option<&mut uid_t>,
-        euid: Option<&mut uid_t>,
-        suid: Option<&mut uid_t>,
+        ruid: Option<Out<uid_t>>,
+        euid: Option<Out<uid_t>>,
+        suid: Option<Out<uid_t>>,
     ) -> Result<()> {
         unsafe {
             e_raw(syscall!(
                 GETRESUID,
-                ruid.map_or(0, |r| r as *const _ as usize),
-                euid.map_or(0, |r| r as *const _ as usize),
-                suid.map_or(0, |r| r as *const _ as usize)
+                ruid.map_or(0, |mut r| r.as_mut_ptr() as usize),
+                euid.map_or(0, |mut r| r.as_mut_ptr() as usize),
+                suid.map_or(0, |mut r| r.as_mut_ptr() as usize)
             ))
             .map(|_| ())
         }

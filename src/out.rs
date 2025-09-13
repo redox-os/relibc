@@ -9,7 +9,7 @@
 //! requirement that `&mut` references are never aliased, which can typically not be assumed when
 //! getting pointers from C.
 
-use core::{cell::UnsafeCell, marker::PhantomData, ptr::NonNull};
+use core::{cell::UnsafeCell, fmt, marker::PhantomData, ptr::NonNull};
 
 /// Wrapper for write-only "out pointers" that are safe to write to
 #[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -51,5 +51,10 @@ impl<'a, T> Out<'a, T> {
         unsafe {
             self.ptr.as_ptr().write(t);
         }
+    }
+}
+impl<T> fmt::Pointer for Out<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:p}", self.ptr)
     }
 }
