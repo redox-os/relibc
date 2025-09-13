@@ -10,6 +10,7 @@ use crate::{
         sys_utsname::utsname,
         time::timespec,
     },
+    out::Out,
     pthread,
 };
 
@@ -259,7 +260,7 @@ pub trait Pal {
 
     fn unlink(path: CStr) -> Result<()>;
 
-    unsafe fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t>;
+    fn waitpid(pid: pid_t, stat_loc: Option<Out<c_int>>, options: c_int) -> Result<pid_t>;
 
     fn write(fildes: c_int, buf: &[u8]) -> Result<usize>;
     fn pwrite(fildes: c_int, buf: &[u8], offset: off_t) -> Result<usize>;

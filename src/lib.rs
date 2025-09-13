@@ -63,6 +63,7 @@ pub mod header;
 pub mod io;
 pub mod iter;
 pub mod ld_so;
+pub mod out;
 pub mod platform;
 pub mod pthread;
 pub mod start;

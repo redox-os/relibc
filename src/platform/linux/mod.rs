@@ -1,4 +1,4 @@
-use crate::{header::errno::EOPNOTSUPP, io::Write};
+use crate::{header::errno::EOPNOTSUPP, io::Write, out::Out};
 use core::{arch::asm, ptr};
 
 use super::{types::*, Pal, ERRNO};
@@ -647,15 +647,24 @@ impl Pal for Sys {
     }
 
     unsafe fn uname(utsname: *mut utsname) -> Result<()> {
-        e_raw(syscall!(UNAME, utsname, 0)).map(|_| ())
+        e_raw(unsafe { syscall!(UNAME, utsname, 0) }).map(|_| ())
     }
 
     fn unlink(path: CStr) -> Result<()> {
         e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), 0) }).map(|_| ())
     }
 
-    unsafe fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t> {
-        e_raw(unsafe { syscall!(WAIT4, pid, stat_loc, options, 0) }).map(|p| p as pid_t)
+    fn waitpid(pid: pid_t, stat_loc: Option<Out<c_int>>, options: c_int) -> Result<pid_t> {
+        e_raw(unsafe {
+            syscall!(
+                WAIT4,
+                pid,
+                stat_loc.map_or(core::ptr::null_mut(), |mut o| o.as_mut_ptr()),
+                options,
+                0
+            )
+        })
+        .map(|p| p as pid_t)
     }
 
     fn write(fildes: c_int, buf: &[u8]) -> Result<usize> {

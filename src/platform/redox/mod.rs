@@ -38,6 +38,7 @@ use crate::{
         unistd::{F_OK, R_OK, W_OK, X_OK},
     },
     io::{self, prelude::*, BufReader},
+    out::Out,
     sync::rwlock::RwLock,
 };
 
@@ -1048,7 +1049,7 @@ impl Pal for Sys {
         Ok(())
     }
 
-    unsafe fn waitpid(mut pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t> {
+    fn waitpid(mut pid: pid_t, stat_loc: Option<Out<'_, c_int>>, options: c_int) -> Result<pid_t> {
         let mut res = None;
         let mut status = 0;
 
@@ -1102,11 +1103,10 @@ impl Pal for Sys {
         });
 
         // If stat_loc is non-null, set that and the return
-        unsafe {
-            if !stat_loc.is_null() {
-                *stat_loc = status as c_int;
-            }
+        if let Some(mut stat_loc) = stat_loc {
+            stat_loc.write(status as c_int);
         }
+
         Ok(res? as pid_t)
     }
 

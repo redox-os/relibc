@@ -27,6 +27,7 @@ use crate::{
         wchar::*,
     },
     ld_so,
+    out::Out,
     platform::{self, types::*, Pal, Sys},
     sync::Once,
 };
@@ -1523,6 +1524,7 @@ pub unsafe extern "C" fn strtoull(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/system.html>.
 #[no_mangle]
 pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
+    // TODO: rusty error handling?
     //TODO: share code with popen
 
     // handle shell detection on command == NULL
@@ -1555,7 +1557,8 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
         unreachable!();
     } else if child_pid > 0 {
         let mut wstatus = 0;
-        if Sys::waitpid(child_pid, &mut wstatus, 0).or_minus_one_errno() == -1 {
+        if Sys::waitpid(child_pid, Some(Out::from_ref(&mut wstatus)), 0).or_minus_one_errno() == -1
+        {
             return -1;
         }
 
