@@ -150,7 +150,7 @@ pub trait Pal {
 
     unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> Result<()>;
 
-    fn getrusage(who: c_int, r_usage: &mut rusage) -> Result<()>;
+    fn getrusage(who: c_int, r_usage: Out<rusage>) -> Result<()>;
 
     fn getsid(pid: pid_t) -> Result<pid_t>;
 
@@ -212,7 +212,7 @@ pub trait Pal {
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
 
-    fn pipe2(fildes: &mut [c_int], flags: c_int) -> Result<()>;
+    fn pipe2(fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()>;
 
     unsafe fn rlct_clone(stack: *mut usize) -> Result<pthread::OsTid, Errno>;
     unsafe fn rlct_kill(os_tid: pthread::OsTid, signal: usize) -> Result<()>;

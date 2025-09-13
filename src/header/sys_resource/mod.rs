@@ -101,7 +101,7 @@ pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int
 
 #[no_mangle]
 pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-    Sys::getrusage(who, &mut *r_usage)
+    Sys::getrusage(who, Out::new(r_usage).unwrap())
         .map(|()| 0)
         .or_minus_one_errno()
 }

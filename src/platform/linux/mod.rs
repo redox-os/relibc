@@ -192,7 +192,16 @@ impl Pal for Sys {
     }
 
     fn fstatat(fildes: c_int, path: Option<CStr>, mut buf: Out<stat>, flags: c_int) -> Result<()> {
-        e_raw(unsafe { syscall!(NEWFSTATAT, fildes, path.map_or(0, |p| p.as_ptr() as usize), buf.as_mut_ptr(), flags) }).map(|_| ())
+        e_raw(unsafe {
+            syscall!(
+                NEWFSTATAT,
+                fildes,
+                path.map_or(core::ptr::null(), |s| s.as_ptr()),
+                buf.as_mut_ptr(),
+                flags
+            )
+        })
+        .map(|_| ())
     }
 
     fn fstatvfs(fildes: c_int, mut buf: Out<statvfs>) -> Result<()> {
@@ -377,8 +386,8 @@ impl Pal for Sys {
         e_raw(syscall!(SETRLIMIT, resource, rlimit)).map(|_| ())
     }
 
-    fn getrusage(who: c_int, r_usage: &mut rusage) -> Result<()> {
-        e_raw(unsafe { syscall!(GETRUSAGE, who, r_usage as *mut rusage) })?;
+    fn getrusage(who: c_int, mut r_usage: Out<rusage>) -> Result<()> {
+        e_raw(unsafe { syscall!(GETRUSAGE, who, r_usage.as_mut_ptr()) })?;
         Ok(())
     }
 
@@ -506,7 +515,7 @@ impl Pal for Sys {
             .map(|fd| fd as c_int)
     }
 
-    fn pipe2(fildes: &mut [c_int], flags: c_int) -> Result<()> {
+    fn pipe2(mut fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), flags) }).map(|_| ())
     }
 

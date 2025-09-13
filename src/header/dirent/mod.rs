@@ -8,7 +8,13 @@ use alloc::{boxed::Box, vec::Vec};
 use core::{mem, ptr};
 
 use crate::{
-    c_str::CStr, c_vec::CVec, error::{Errno, ResultExt, ResultExtPtrMut}, fs::File, header::{fcntl, stdlib, string}, out::Out, platform::{self, types::*, Pal, Sys}
+    c_str::CStr,
+    c_vec::CVec,
+    error::{Errno, ResultExt, ResultExtPtrMut},
+    fs::File,
+    header::{fcntl, stdlib, string},
+    out::Out,
+    platform::{self, types::*, Pal, Sys},
 };
 
 use super::{

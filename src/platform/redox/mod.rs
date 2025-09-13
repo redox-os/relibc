@@ -289,12 +289,7 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn fstatat(
-        dirfd: c_int,
-        path: Option<CStr>,
-        buf: Out<stat>,
-        flags: c_int,
-    ) -> Result<()> {
+    fn fstatat(dirfd: c_int, path: Option<CStr>, buf: Out<stat>, flags: c_int) -> Result<()> {
         let path = path
             .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
             .ok_or(Errno(ENOENT))?;
@@ -550,7 +545,7 @@ impl Pal for Sys {
         Err(Errno(EPERM))
     }
 
-    fn getrusage(who: c_int, r_usage: &mut rusage) -> Result<()> {
+    fn getrusage(who: c_int, r_usage: Out<rusage>) -> Result<()> {
         //TODO
         eprintln!("relibc getrusage({}, {:p}): not implemented", who, r_usage);
         Ok(())
@@ -796,8 +791,8 @@ impl Pal for Sys {
         Ok(libredox::open(path, oflag, effective_mode)? as c_int)
     }
 
-    fn pipe2(fds: &mut [c_int], flags: c_int) -> Result<()> {
-        extra::pipe2(fds, flags as usize)?;
+    fn pipe2(mut fds: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
+        fds.write(extra::pipe2(flags as usize)?);
         Ok(())
     }
 

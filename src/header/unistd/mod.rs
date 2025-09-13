@@ -769,7 +769,7 @@ pub unsafe extern "C" fn pipe(fildes: *mut c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pipe.html>.
 #[no_mangle]
 pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
-    Sys::pipe2(slice::from_raw_parts_mut(fildes, 2), flags)
+    Sys::pipe2(Out::new(fildes.cast::<[c_int; 2]>()).unwrap(), flags)
         .map(|()| 0)
         .or_minus_one_errno()
 }
