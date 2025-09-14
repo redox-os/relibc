@@ -25,4 +25,6 @@ int main(void) {
     SC(TTY_NAME_MAX);
     SC(SYMLOOP_MAX);
     SC(HOST_NAME_MAX);
+    SC(NPROCESSORS_CONF);
+    SC(NPROCESSORS_ONLN);
 }
