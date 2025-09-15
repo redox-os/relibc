@@ -6,7 +6,7 @@ use crate::{
 };
 use alloc::{boxed::Box, vec::Vec};
 use core::{
-    cell::Cell,
+    cell::{Cell, UnsafeCell},
     fmt, ptr,
     sync::atomic::{AtomicPtr, Ordering},
 };
@@ -60,9 +60,79 @@ pub static mut program_invocation_short_name: *mut c_char = ptr::null_mut();
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static mut environ: *mut *mut c_char = ptr::null_mut();
+pub static environ: EnvPtr = EnvPtr::new();
 
 pub static OUR_ENVIRON: EnvArgs = EnvArgs::new();
+
+/// Convenience structure to provide interior mutability for the global `environ` pointer.
+#[repr(transparent)]
+pub struct EnvPtr(pub UnsafeCell<*mut *mut c_char>);
+
+impl EnvPtr {
+    /// Creates a new [EnvPtr].
+    pub const fn new() -> Self {
+        Self(UnsafeCell::new(ptr::null_mut()))
+    }
+
+    /// Gets whether the inner pointer is null.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure the pointer references valid memory.
+    ///
+    /// Caller must have exclusive access to the [EnvPtr].
+    ///
+    /// Caller must **not** access [EnvPtr] concurrently.
+    pub const unsafe fn is_null(&self) -> bool {
+        // SAFETY: UnsafeCell is guaranteed non-null, and is initialized properly.
+        unsafe { (&*self.0.get()) }.is_null()
+    }
+
+    /// Replaces the inner pointer.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure the pointer references valid memory, or is null.
+    ///
+    /// Caller must have exclusive access to the [EnvPtr].
+    ///
+    /// Caller must **not** access [EnvPtr] concurrently.
+    pub const unsafe fn set(&self, val: *mut *mut c_char) {
+        unsafe {
+            *self.0.get() = val;
+        };
+    }
+
+    /// Gets the inner mutable pointer.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure the pointer references valid memory before dereferencing.
+    ///
+    /// Caller must have exclusive access to the [EnvPtr].
+    ///
+    /// Caller must **not** access [EnvPtr] concurrently.
+    pub const unsafe fn get(&self) -> *mut *mut c_char {
+        // SAFETY: UnsafeCell is guaranteed non-null, and is initialized properly.
+        unsafe { *self.0.get() }
+    }
+}
+
+impl Default for EnvPtr {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// # Safety
+///
+/// Contentious access across threads is undefined behavior.
+///
+/// Use across the FFI boundary through a mutable pointer is somewhat unavoidable,
+/// and the POSIX API is inherently unsound.
+///
+/// See the discussion in <https://gitlab.redox-os.org/redox-os/relibc/-/merge_requests/706#note_43741> for reference.
+unsafe impl Sync for EnvPtr {}
 
 /// Represents environment arguments passed to the program, potentially from C code.
 #[repr(transparent)]
@@ -119,9 +189,15 @@ impl EnvArgs {
     }
 }
 
+impl Default for EnvArgs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn environ_iter() -> impl Iterator<Item = *mut c_char> + 'static {
     unsafe {
-        let mut ptrs = environ;
+        let mut ptrs = environ.get();
 
         core::iter::from_fn(move || {
             if ptrs.is_null() {

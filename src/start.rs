@@ -107,7 +107,7 @@ extern "C" fn init_array() {
 
     unsafe {
         if platform::environ.is_null() {
-            platform::environ = __relibc_init_environ;
+            platform::environ.set(__relibc_init_environ);
         }
     }
 
@@ -201,7 +201,7 @@ pub unsafe extern "C" fn relibc_start_v1(
             len += 1;
         }
         platform::OUR_ENVIRON.replace(copy_string_array(envp, len));
-        platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
+        platform::environ.set(platform::OUR_ENVIRON.as_mut_ptr());
     }
 
     let auxvs = get_auxvs(sp.auxv().cast());
@@ -236,7 +236,7 @@ pub unsafe extern "C" fn relibc_start_v1(
     }
 
     // not argv or envp, because programs like bash try to modify this *const* pointer :|
-    stdlib::exit(main(argc, platform::argv, platform::environ));
+    stdlib::exit(main(argc, platform::argv, platform::environ.get()));
 
     unreachable!();
 }

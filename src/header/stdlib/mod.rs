@@ -988,17 +988,17 @@ unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
 unsafe fn put_new_env(insert: *mut c_char) {
     // XXX: Another problem is that `environ` can be set to any pointer, which means there is a
     // chance of a memory leak. But we can check if it was the same as before, like musl does.
-    if platform::environ == platform::OUR_ENVIRON.as_mut_ptr() {
+    if platform::environ.get() == platform::OUR_ENVIRON.as_mut_ptr() {
         platform::OUR_ENVIRON.replace_last(insert);
         platform::OUR_ENVIRON.push(core::ptr::null_mut());
         // Likely a no-op but is needed due to Stacked Borrows.
-        platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
+        platform::environ.set(platform::OUR_ENVIRON.as_mut_ptr());
     } else {
         platform::OUR_ENVIRON.clear();
         platform::OUR_ENVIRON.extend(platform::environ_iter());
         platform::OUR_ENVIRON.push(insert);
         platform::OUR_ENVIRON.push(core::ptr::null_mut());
-        platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
+        platform::environ.set(platform::OUR_ENVIRON.as_mut_ptr());
     }
 }
 
@@ -1010,7 +1010,7 @@ pub unsafe extern "C" fn putenv(insert: *mut c_char) -> c_int {
         // XXX: The POSIX manual states that environment variables can be *set* via the `environ`
         // global variable. While we can check if a pointer belongs to our allocator, or check
         // `environ` against a vector which we control, it is likely not worth the effort.
-        platform::environ.add(i).write(insert);
+        platform::environ.get().add(i).write(insert);
     } else {
         put_new_env(insert);
     }
@@ -1260,7 +1260,7 @@ pub unsafe extern "C" fn setenv(
             // Reuse platform::environ slot, but allocate a new pointer.
             let ptr = platform::alloc(key_len as usize + 1 + value_len as usize + 1) as *mut c_char;
             copy_kv(ptr, key, value, key_len, value_len);
-            platform::environ.add(i).write(ptr);
+            platform::environ.get().add(i).write(ptr);
         }
     } else {
         // Expand platform::environ and allocate a new pointer.
@@ -1587,13 +1587,13 @@ pub unsafe extern "C" fn unlockpt(fildes: c_int) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn unsetenv(key: *const c_char) -> c_int {
     if let Some((i, _)) = find_env(key) {
-        if platform::environ == platform::OUR_ENVIRON.as_mut_ptr() {
+        if platform::environ.get() == platform::OUR_ENVIRON.as_mut_ptr() {
             // No need to worry about updating the pointer, this does not
             // reallocate in any way. And the final null is already shifted back.
             platform::OUR_ENVIRON.remove(i);
 
             // My UB paranoia.
-            platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
+            platform::environ.set(platform::OUR_ENVIRON.as_mut_ptr());
         } else {
             platform::OUR_ENVIRON.clear();
             platform::OUR_ENVIRON.extend(
@@ -1603,7 +1603,7 @@ pub unsafe extern "C" fn unsetenv(key: *const c_char) -> c_int {
                     .map(|(_, v)| v),
             );
             platform::OUR_ENVIRON.push(core::ptr::null_mut());
-            platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
+            platform::environ.set(platform::OUR_ENVIRON.as_mut_ptr());
         }
     }
     0

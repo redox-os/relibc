@@ -198,7 +198,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
                 .chain(core::iter::once(core::ptr::null_mut())),
         );
 
-        crate::platform::environ = crate::platform::OUR_ENVIRON.as_mut_ptr();
+        crate::platform::environ.set(crate::platform::OUR_ENVIRON.as_mut_ptr());
     }
 
     let is_manual = if let Some(img_entry) = get_auxv(&auxv, AT_ENTRY) {
