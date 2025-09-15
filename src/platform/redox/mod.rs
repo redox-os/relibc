@@ -25,7 +25,7 @@ use crate::{
             EBADF, EBADFD, EBADR, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS,
             EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl::{self, AT_FDCWD, O_RDONLY},
+        fcntl::{self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW, O_NOFOLLOW, O_PATH, O_RDONLY},
         limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
@@ -292,19 +292,16 @@ impl Pal for Sys {
     ) -> Result<()> {
         let path =
             match CStr::from_nullable_ptr(path).and_then(|cs| str::from_utf8(cs.to_bytes()).ok()) {
-                // TODO: AT_EMPTY_PATH
                 Some(path) if !path.is_empty() => Ok(path),
-                None | Some(_) => Err(Errno(ENOENT)),
+                _ if flags & AT_EMPTY_PATH == AT_EMPTY_PATH => return Sys::fstat(fildes, buf),
+                _ => Err(Errno(ENOENT)),
             }?;
-        // TODO: We need an AT_SYMLINK_NOFOLLOW constant for Redox. Unlike AT_FDCWD, it varies
-        // across OSes, so I don't want to define it here myself.
-        // O_NOFOLLOW may be incorrect too (see the rename.c unit test).
-        // let oflags = if flags & AT_SYMLINK_NOFOLLOW {
-        //     O_RDONLY | O_NOFOLLOW
-        // } else {
-        //     O_RDONLY
-        // };
-        let oflags = O_RDONLY;
+
+        let oflags = if flags & AT_SYMLINK_NOFOLLOW == AT_SYMLINK_NOFOLLOW {
+            O_RDONLY | O_PATH | O_NOFOLLOW
+        } else {
+            O_RDONLY
+        };
 
         // Absolute paths are passed to fstat without processing.
         // canonicalize_using_cwd checks that path is absolute so a third branch that does so here
@@ -328,7 +325,6 @@ impl Pal for Sys {
         let path = CString::new(path).map_err(|_| Errno(ENOENT))?;
 
         // TODO:
-        // * If AT_SYMLINK_NOFOLLOW is set, call lstat instead.
         // * Switch open to openat.
         let file = File::open(path.as_c_str().into(), oflags)?;
         Sys::fstat(*file, buf)
