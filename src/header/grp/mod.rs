@@ -169,11 +169,7 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
         let mut vec: Vec<u8> = Vec::new();
 
         let gr_name = buffer.next().ok_or(Error::EOF)?.to_vec();
-        let gr_passwd = if cfg!(target_os = "redox") {
-            Vec::new()
-        } else {
-            buffer.next().ok_or(Error::EOF)?.to_vec()
-        };
+        let gr_passwd = buffer.next().ok_or(Error::EOF)?.to_vec();
         gr_gid = String::from_utf8(buffer.next().ok_or(Error::EOF)?.to_vec())
             .map_err(|err| Error::FromUtf8Error(err))?
             .parse::<gid_t>()
@@ -295,7 +291,7 @@ pub unsafe extern "C" fn getgrnam(name: *const c_char) -> *mut group {
                 grp.reference.gr_name,
                 name,
                 strlen(grp.reference.gr_name).min(strlen(name)),
-            ) > 0
+            ) == 0
         } {
             return grp.into_global();
         }

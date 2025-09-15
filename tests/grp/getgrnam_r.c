@@ -8,7 +8,7 @@ void test_getgrnam(const char *gr_name) {
     struct group* out = getgrnam(gr_name);
     
     if (out == NULL) {
-        printf("Did not find a group '%s'", gr_name);
+        printf("Did not find a group '%s'\n", gr_name);
         return;
     }
     
