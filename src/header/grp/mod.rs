@@ -515,7 +515,7 @@ pub unsafe extern "C" fn getgrouplist(
     if groups_found as usize > grps.len() {
         -1
     } else {
-        grps.len() as c_int
+        groups_found
     }
 }
 
