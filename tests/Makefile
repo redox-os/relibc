@@ -27,6 +27,7 @@ EXPECT_NAMES=\
 	crypt/sha256 \
 	crypt/sha512 \
 	destructor \
+	dirent/fdopendir \
 	dirent/scandir \
 	endian \
 	err \
