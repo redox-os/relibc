@@ -73,7 +73,7 @@ macro_rules! bind_or_connect {
             },
             AF_UNIX => {
                 // NOTE: bind/connect with AF_UNIX were replaced with SYS_CALL.
-                eprintln!(
+                debug!(
                     "bind/connect with AF_UNIX were replaced with SYS_CALL."
                 );
                 return Err(Errno(EAFNOSUPPORT));
@@ -673,7 +673,7 @@ impl PalSocket for Sys {
         }
 
         eprintln!(
-            "getsockopt({}, {}, {}, {:p}, {:p})",
+            "getsockopt({}, {}, {}, {:p}, {:p}) - unknown option",
             socket, level, option_name, option_value, option_len
         );
         Err(Errno(ENOSYS))
@@ -918,7 +918,7 @@ impl PalSocket for Sys {
     }
 
     fn shutdown(socket: c_int, how: c_int) -> Result<()> {
-        eprintln!("shutdown({}, {})", socket, how);
+        debug!("shutdown({}, {})", socket, how);
         Err(Errno(ENOSYS))
     }
 
