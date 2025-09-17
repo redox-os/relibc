@@ -4,6 +4,8 @@
 
 #include "test_helpers.h"
 
+extern char **environ;
+
 int main(void) {
     //puts(getenv("SHELL"));
     //puts(getenv("CC"));
@@ -40,6 +42,52 @@ int main(void) {
     } else {
         puts("Value deleted successfully!");
     }
+
+    free(owned);
+
+    setenv("TEST", "Reset environment variable", 1);
+
+    // manually unset the environ pointers
+    environ = NULL;
+
+    env = getenv("TEST");
+    if (env) {
+      puts("Value should be null");
+      exit(EXIT_FAILURE);
+    } else {
+      puts("environ unset successfully!");
+    }
+
+    owned = malloc(26);
+    if (owned == NULL) {
+      puts("Error allocating owned!");
+      exit(EXIT_FAILURE);
+    } else {
+      strcpy(owned, "TEST=Updates accordingly.");
+      putenv(owned);
+    }
+
+    env = getenv("TEST");
+    if (env == NULL) {
+      puts("putenv failed to set the environment");
+      exit(EXIT_FAILURE);
+    } else {
+      puts("putenv call successful!");
+      puts(env);
+    }
+
+    setenv("TEST1", "Set environ before manual.", 1);
+    *(environ + 2) = "TEST2=Manual set environment.";
+    *(environ + 3) = NULL;
+
+    size_t i = 0;
+    while (environ && environ[i]) {
+      puts(environ[i++]);
+    }
+
+    unsetenv("TEST2");
+    unsetenv("TEST1");
+    unsetenv("TEST");
 
     free(owned);
 }

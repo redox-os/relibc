@@ -66,6 +66,7 @@ EXPECT_NAMES=(\
 	stdlib/atoi \
 	stdlib/div \
 	stdlib/env \
+	stdlib/extern_env \
 	stdlib/mkostemps \
 	stdlib/ptsname \
 	stdlib/qsort \
