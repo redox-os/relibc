@@ -33,7 +33,7 @@ impl<'a, T: ?Sized> Out<'a, T> {
         }
     }
     #[inline]
-    pub fn from_ref(r: &'a mut T) -> Self {
+    pub fn from_mut(r: &'a mut T) -> Self {
         // SAFETY:
         //
         // - `r` will obviously have the same lifetime as Self

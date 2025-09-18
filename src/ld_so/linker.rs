@@ -89,7 +89,7 @@ impl MmapFile {
     fn open(path: CStr, oflag: c_int) -> core::result::Result<Self, Errno> {
         let fd = Sys::open(path, oflag, 0 /* mode */)?;
         let mut stat = crate::header::sys_stat::stat::default();
-        Sys::fstat(fd, Out::from_ref(&mut stat))?;
+        Sys::fstat(fd, Out::from_mut(&mut stat))?;
 
         let size = stat.st_size as usize;
         let ptr = unsafe {
