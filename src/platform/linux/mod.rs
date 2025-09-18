@@ -285,8 +285,14 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(UTIMENSAT, AT_FDCWD, path.as_ptr(), times, 0) }).map(|_| ())
     }
 
-    unsafe fn getcwd(buf: *mut c_char, size: size_t) -> Result<()> {
-        e_raw(unsafe { syscall!(GETCWD, buf, size) })?;
+    fn getcwd(mut buf: Out<[u8]>) -> Result<()> {
+        e_raw(unsafe {
+            syscall!(
+                GETCWD,
+                buf.as_mut_ptr().as_mut_ptr(),
+                buf.as_mut_ptr().len()
+            )
+        })?;
         Ok(())
     }
 
@@ -400,8 +406,15 @@ impl Pal for Sys {
         unsafe { syscall!(GETTID) as pid_t }
     }
 
-    unsafe fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> Result<()> {
-        e_raw(unsafe { syscall!(GETTIMEOFDAY, tp, tzp) }).map(|_| ())
+    fn gettimeofday(mut tp: Out<timeval>, tzp: Option<Out<timezone>>) -> Result<()> {
+        e_raw(unsafe {
+            syscall!(
+                GETTIMEOFDAY,
+                tp.as_mut_ptr(),
+                tzp.map_or(0, |mut p| p.as_mut_ptr() as usize)
+            )
+        })
+        .map(|_| ())
     }
 
     fn getuid() -> uid_t {

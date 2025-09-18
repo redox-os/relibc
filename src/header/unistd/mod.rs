@@ -461,7 +461,7 @@ pub unsafe extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut 
         size = stack_buf.len();
     }
 
-    let ret = match Sys::getcwd(buf, size) {
+    let ret = match Sys::getcwd(Out::from_raw_parts(buf.cast(), size)) {
         Ok(()) => buf,
         Err(Errno(errno)) => {
             ERRNO.set(errno);

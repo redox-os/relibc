@@ -25,7 +25,8 @@ use crate::{
             EBADF, EBADFD, EBADR, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS,
             EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl, limits,
+        fcntl::{self, AT_FDCWD, O_RDONLY},
+        limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, rusage, RLIM_INFINITY},
@@ -289,11 +290,47 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn fstatat(dirfd: c_int, path: Option<CStr>, buf: Out<stat>, flags: c_int) -> Result<()> {
-        let path = path
-            .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
-            .ok_or(Errno(ENOENT))?;
-        let file = cap_path_at(dirfd, path, flags, 0)?;
+    fn fstatat(fildes: c_int, path: Option<CStr>, buf: Out<stat>, flags: c_int) -> Result<()> {
+        let path = match path.and_then(|cs| str::from_utf8(cs.to_bytes()).ok()) {
+            // TODO: AT_EMPTY_PATH
+            Some(path) if !path.is_empty() => Ok(path),
+            None | Some(_) => Err(Errno(ENOENT)),
+        }?;
+        // TODO: We need an AT_SYMLINK_NOFOLLOW constant for Redox. Unlike AT_FDCWD, it varies
+        // across OSes, so I don't want to define it here myself.
+        // O_NOFOLLOW may be incorrect too (see the rename.c unit test).
+        // let oflags = if flags & AT_SYMLINK_NOFOLLOW {
+        //     O_RDONLY | O_NOFOLLOW
+        // } else {
+        //     O_RDONLY
+        // };
+        let oflags = O_RDONLY;
+
+        // Absolute paths are passed to fstat without processing.
+        // canonicalize_using_cwd checks that path is absolute so a third branch that does so here
+        // isn't needed.
+        let path = if fildes == AT_FDCWD {
+            // The special constant AT_FDCWD indicates that we should use the cwd.
+            let mut buf = [0; limits::PATH_MAX];
+            let len = path::getcwd(Out::from_mut(&mut buf)).ok_or(Errno(ENAMETOOLONG))?;
+            // SAFETY: Redox's cwd is stored as a str.
+            let cwd = unsafe { str::from_utf8_unchecked(&buf[..len]) };
+
+            path::canonicalize_using_cwd(Some(cwd), path).ok_or(Errno(EBADF))?
+        } else {
+            let mut buf = [0; limits::PATH_MAX];
+            let len = Sys::fpath(fildes, &mut buf)?;
+            // SAFETY: fpath checks then copies valid UTF8.
+            let dir = unsafe { str::from_utf8_unchecked(&buf[..len]) };
+
+            path::canonicalize_using_cwd(Some(dir), path).ok_or(Errno(EBADF))?
+        };
+        let path = CString::new(path).map_err(|_| Errno(ENOENT))?;
+
+        // TODO:
+        // * If AT_SYMLINK_NOFOLLOW is set, call lstat instead.
+        // * Switch open to openat.
+        let file = File::open(path.as_c_str().into(), oflags)?;
         Sys::fstat(*file, buf)
     }
 
@@ -338,15 +375,8 @@ impl Pal for Sys {
         Self::futimens(*file, times)
     }
 
-    unsafe fn getcwd(buf: *mut c_char, size: size_t) -> Result<()> {
-        // TODO: Not using MaybeUninit seems a little unsafe
-
-        let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize) };
-        if buf_slice.is_empty() {
-            return Err(Errno(EINVAL));
-        }
-
-        path::getcwd(buf_slice).ok_or(Errno(ERANGE))?;
+    fn getcwd(buf: Out<[u8]>) -> Result<()> {
+        path::getcwd(buf).ok_or(Errno(ERANGE))?;
         Ok(())
     }
 
@@ -566,16 +596,20 @@ impl Pal for Sys {
             .unwrap()
     }
 
-    unsafe fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> Result<()> {
+    fn gettimeofday(mut tp: Out<timeval>, tzp: Option<Out<timezone>>) -> Result<()> {
         let mut redox_tp = redox_timespec::default();
         syscall::clock_gettime(syscall::CLOCK_REALTIME, &mut redox_tp)?;
         unsafe {
-            (*tp).tv_sec = redox_tp.tv_sec as time_t;
-            (*tp).tv_usec = (redox_tp.tv_nsec / 1000) as suseconds_t;
+            tp.write(timeval {
+                tv_sec: redox_tp.tv_sec as time_t,
+                tv_usec: (redox_tp.tv_nsec / 1000) as suseconds_t,
+            });
 
-            if !tzp.is_null() {
-                (*tzp).tz_minuteswest = 0;
-                (*tzp).tz_dsttime = 0;
+            if let Some(mut tzp) = tzp {
+                tzp.write(timezone {
+                    tz_minuteswest: 0,
+                    tz_dsttime: 0,
+                });
             }
         }
         Ok(())

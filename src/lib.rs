@@ -23,6 +23,7 @@
 #![feature(pointer_is_aligned_to)]
 #![feature(ptr_as_uninit)]
 #![feature(slice_as_chunks)]
+#![feature(slice_ptr_get)]
 #![feature(stmt_expr_attributes)]
 #![feature(strict_provenance)]
 #![feature(sync_unsafe_cell)]

@@ -96,7 +96,7 @@ pub trait Pal {
 
     unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()>;
 
-    unsafe fn getcwd(buf: *mut c_char, size: size_t) -> Result<()>;
+    fn getcwd(buf: Out<[u8]>) -> Result<()>;
 
     fn getdents(fd: c_int, buf: &mut [u8], opaque_offset: u64) -> Result<usize>;
     fn dir_seek(fd: c_int, opaque_offset: u64) -> Result<()>;
@@ -157,7 +157,7 @@ pub trait Pal {
     // Always successful
     fn gettid() -> pid_t;
 
-    unsafe fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> Result<()>;
+    fn gettimeofday(tp: Out<timeval>, tzp: Option<Out<timezone>>) -> Result<()>;
 
     fn getuid() -> uid_t;
 
