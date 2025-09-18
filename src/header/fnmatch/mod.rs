@@ -22,7 +22,7 @@ pub const FNM_NOESCAPE: c_int = 1;
 pub const FNM_PATHNAME: c_int = 2;
 pub const FNM_PERIOD: c_int = 4;
 pub const FNM_CASEFOLD: c_int = 8;
-pub const FNM_IGNORECASE: FNM_CASEFOLD;
+pub const FNM_IGNORECASE: c_int = FNM_CASEFOLD;
 // TODO: FNM_EXTMATCH
 
 unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
