@@ -25,8 +25,7 @@ use crate::{
             EBADF, EBADFD, EBADR, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS,
             EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl::{self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW, O_NOFOLLOW, O_PATH, O_RDONLY},
-        limits,
+        fcntl, limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, rusage, RLIM_INFINITY},
@@ -86,7 +85,10 @@ macro_rules! path_from_c_str {
     }};
 }
 
-use self::{exec::Executable, path::canonicalize};
+use self::{
+    exec::Executable,
+    path::{canonicalize, cap_path_at},
+};
 
 static CLONE_LOCK: RwLock<()> = RwLock::new(());
 
@@ -285,48 +287,15 @@ impl Pal for Sys {
     }
 
     unsafe fn fstatat(
-        fildes: c_int,
+        dirfd: c_int,
         path: *const c_char,
         buf: *mut stat,
         flags: c_int,
     ) -> Result<()> {
-        let path =
-            match CStr::from_nullable_ptr(path).and_then(|cs| str::from_utf8(cs.to_bytes()).ok()) {
-                Some(path) if !path.is_empty() => Ok(path),
-                _ if flags & AT_EMPTY_PATH == AT_EMPTY_PATH => return Sys::fstat(fildes, buf),
-                _ => Err(Errno(ENOENT)),
-            }?;
-
-        let oflags = if flags & AT_SYMLINK_NOFOLLOW == AT_SYMLINK_NOFOLLOW {
-            O_RDONLY | O_PATH | O_NOFOLLOW
-        } else {
-            O_RDONLY
-        };
-
-        // Absolute paths are passed to fstat without processing.
-        // canonicalize_using_cwd checks that path is absolute so a third branch that does so here
-        // isn't needed.
-        let path = if fildes == AT_FDCWD {
-            // The special constant AT_FDCWD indicates that we should use the cwd.
-            let mut buf = [0; limits::PATH_MAX];
-            let len = path::getcwd(&mut buf).ok_or(Errno(ENAMETOOLONG))?;
-            // SAFETY: Redox's cwd is stored as a str.
-            let cwd = unsafe { str::from_utf8_unchecked(&buf[..len]) };
-
-            path::canonicalize_using_cwd(Some(cwd), path).ok_or(Errno(EBADF))?
-        } else {
-            let mut buf = [0; limits::PATH_MAX];
-            let len = Sys::fpath(fildes, &mut buf)?;
-            // SAFETY: fpath checks then copies valid UTF8.
-            let dir = unsafe { str::from_utf8_unchecked(&buf[..len]) };
-
-            path::canonicalize_using_cwd(Some(dir), path).ok_or(Errno(EBADF))?
-        };
-        let path = CString::new(path).map_err(|_| Errno(ENOENT))?;
-
-        // TODO:
-        // * Switch open to openat.
-        let file = File::open(path.as_c_str().into(), oflags)?;
+        let path = CStr::from_nullable_ptr(path)
+            .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
+            .ok_or(Errno(ENOENT))?;
+        let file = cap_path_at(dirfd, path, flags, 0)?;
         Sys::fstat(*file, buf)
     }
 
@@ -568,7 +537,7 @@ impl Pal for Sys {
     }
 
     unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> Result<()> {
-        //TOOD
+        // TODO
         eprintln!(
             "relibc setrlimit({}, {:p}): not implemented",
             resource, rlim
@@ -898,6 +867,12 @@ impl Pal for Sys {
             fcntl::O_RDONLY | fcntl::O_SYMLINK | fcntl::O_CLOEXEC,
         )?;
         Self::read(*file, out)
+    }
+
+    fn readlinkat(dirfd: c_int, path: CStr, out: &mut [u8]) -> Result<usize> {
+        let path = str::from_utf8(path.to_bytes()).map_err(|_| Errno(ENOENT))?;
+        let file = cap_path_at(dirfd, path, 0, fcntl::O_SYMLINK)?;
+        Sys::read(*file, out)
     }
 
     fn rename(oldpath: CStr, newpath: CStr) -> Result<()> {

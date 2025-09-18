@@ -14,7 +14,8 @@ use crate::{
     error::{Errno, ResultExt},
     header::{
         crypt::{crypt_data, crypt_r},
-        errno, fcntl, limits,
+        errno::{self, ENAMETOOLONG},
+        fcntl, limits,
         stdlib::getenv,
         sys_ioctl, sys_resource, sys_time, sys_utsname, termios,
         time::timespec,
@@ -832,6 +833,25 @@ pub unsafe extern "C" fn readlink(
     let buf = slice::from_raw_parts_mut(buf as *mut u8, bufsize as usize);
     Sys::readlink(path, buf)
         .map(|read| read as ssize_t)
+        .or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readlink.html>.
+#[no_mangle]
+pub unsafe extern "C" fn readlinkat(
+    dirfd: c_int,
+    pathname: *const c_char,
+    buf: *mut c_char,
+    len: size_t,
+) -> ssize_t {
+    let pathname = CStr::from_ptr(pathname);
+    let mut buf = slice::from_raw_parts_mut(buf.cast(), len);
+    Sys::readlinkat(dirfd, pathname, &mut buf)
+        .map(|read| {
+            read.try_into()
+                .map_err(|_| Errno(ENAMETOOLONG))
+                .or_minus_one_errno()
+        })
         .or_minus_one_errno()
 }
 

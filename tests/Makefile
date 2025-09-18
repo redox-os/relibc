@@ -135,11 +135,12 @@ EXPECT_NAMES=\
 	unistd/fsync \
 	unistd/ftruncate \
 	unistd/getopt \
+	unistd/getopt_long \
 	unistd/pipe \
+	unistd/readlinkat \
 	unistd/rmdir \
 	unistd/sleep \
 	unistd/swab \
-	unistd/getopt_long \
 	unistd/write \
 	wchar/fgetwc \
 	wchar/fwide \

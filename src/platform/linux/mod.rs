@@ -585,6 +585,18 @@ impl Pal for Sys {
         })
     }
 
+    fn readlinkat(dirfd: c_int, pathname: CStr, out: &mut [u8]) -> Result<usize> {
+        e_raw(unsafe {
+            syscall!(
+                READLINKAT,
+                dirfd,
+                pathname.as_ptr(),
+                out.as_mut_ptr(),
+                out.len()
+            )
+        })
+    }
+
     fn rename(old: CStr, new: CStr) -> Result<()> {
         e_raw(unsafe { syscall!(RENAMEAT, AT_FDCWD, old.as_ptr(), AT_FDCWD, new.as_ptr()) })
             .map(|_| ())
