@@ -344,6 +344,18 @@ pub unsafe extern "C" fn execve(
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
+#[no_mangle]
+pub unsafe extern "C" fn fexecve(
+    fd: c_int,
+    argv: *const *mut c_char,
+    envp: *const *mut c_char,
+) -> c_int {
+    Sys::fexecve(fd, argv, envp)
+        .map(|()| unreachable!())
+        .or_minus_one_errno()
+}
+
 #[cfg(target_os = "linux")]
 const PATH_SEPARATOR: u8 = b':';
 
