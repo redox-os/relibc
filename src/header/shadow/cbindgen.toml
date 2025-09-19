@@ -1,4 +1,4 @@
-sys_includes = ["sys/types.h", "stdint.h"]
+sys_includes = ["sys/types.h", "stdint.h", "stdio.h"]
 include_guard = "_RELIBC_SHADOW_H"
 language = "C"
 style = "Tag"
