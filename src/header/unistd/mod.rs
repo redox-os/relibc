@@ -356,11 +356,7 @@ pub unsafe extern "C" fn fexecve(
         .or_minus_one_errno()
 }
 
-#[cfg(target_os = "linux")]
 const PATH_SEPARATOR: u8 = b':';
-
-#[cfg(target_os = "redox")]
-const PATH_SEPARATOR: u8 = b';';
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
 #[no_mangle]
