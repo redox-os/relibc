@@ -638,17 +638,25 @@ pub extern "C" fn getppid() -> pid_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresgid.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getresgid(rgid: *mut gid_t, egid: *mut gid_t, sgid: *mut gid_t) -> c_int {
-    Sys::getresgid(Out::new(rgid), Out::new(egid), Out::new(sgid))
-        .map(|()| 0)
-        .or_minus_one_errno()
+    Sys::getresgid(
+        Out::nullable(rgid),
+        Out::nullable(egid),
+        Out::nullable(sgid),
+    )
+    .map(|()| 0)
+    .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresuid.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getresuid(ruid: *mut uid_t, euid: *mut uid_t, suid: *mut uid_t) -> c_int {
-    Sys::getresuid(Out::new(ruid), Out::new(euid), Out::new(suid))
-        .map(|()| 0)
-        .or_minus_one_errno()
+    Sys::getresuid(
+        Out::nullable(ruid),
+        Out::nullable(euid),
+        Out::nullable(suid),
+    )
+    .map(|()| 0)
+    .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getsid.html>.
@@ -769,7 +777,7 @@ pub unsafe extern "C" fn pipe(fildes: *mut c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pipe.html>.
 #[no_mangle]
 pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
-    Sys::pipe2(Out::new(fildes.cast::<[c_int; 2]>()).unwrap(), flags)
+    Sys::pipe2(Out::nonnull(fildes.cast::<[c_int; 2]>()), flags)
         .map(|()| 0)
         .or_minus_one_errno()
 }

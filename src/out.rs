@@ -20,17 +20,26 @@ pub struct Out<'a, T: ?Sized> {
     _marker: PhantomData<&'a UnsafeCell<T>>,
 }
 impl<'a, T: ?Sized> Out<'a, T> {
+    /// # Safety
+    ///
+    /// - pointer must either be NULL, or be valid for the duration of lifetime `'a`
     #[inline]
-    pub unsafe fn new(ptr: *mut T) -> Option<Self> {
-        Some(Self::from_nonnull(NonNull::new(ptr)?))
+    pub unsafe fn nullable(ptr: *mut T) -> Option<Self> {
+        Some(Self {
+            ptr: NonNull::new(ptr)?,
+            _marker: PhantomData,
+        })
     }
     /// # Safety
     ///
     /// - pointer must be valid for the duration of lifetime `'a`
     #[inline]
-    pub unsafe fn from_nonnull(ptr: NonNull<T>) -> Self {
+    pub unsafe fn nonnull(ptr: *mut T) -> Self {
+        if cfg!(debug_assertions) {
+            assert!(!ptr.is_null());
+        }
         Self {
-            ptr,
+            ptr: NonNull::new_unchecked(ptr),
             _marker: PhantomData,
         }
     }
@@ -39,7 +48,9 @@ impl<'a, T: ?Sized> Out<'a, T> {
         // SAFETY:
         //
         // - `r` will obviously have the same lifetime as Self
-        unsafe { Self::from_nonnull(r.into()) }
+        // - a Rust reference is obviously valid as a pointer, and the lifetime is tied to that of
+        // this struct
+        unsafe { Self::nonnull(r) }
     }
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut T {
@@ -59,9 +70,7 @@ impl<'a, T> Out<'a, [T]> {
     ///
     /// Must be valid for lifetime `'a` and writable.
     pub unsafe fn from_raw_parts(ptr: *mut T, len: usize) -> Self {
-        Self::from_nonnull(NonNull::new_unchecked(core::slice::from_raw_parts_mut(
-            ptr, len,
-        )))
+        Self::nonnull(core::slice::from_raw_parts_mut(ptr, len))
     }
     pub fn len(&self) -> usize {
         self.ptr.as_ptr().len()
