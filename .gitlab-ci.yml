@@ -45,6 +45,7 @@ test:redox:
     variables:
         TARGET: x86_64-unknown-redox
     script:
+        - kvm-ok
         - ./redoxer.sh test SKIP_REDOX=1
 
 fmt:
