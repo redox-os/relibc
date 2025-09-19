@@ -9,12 +9,12 @@
 //! requirement that `&mut` references are never aliased, which can typically not be assumed when
 //! getting pointers from C.
 
-use core::{cell::UnsafeCell, fmt, marker::PhantomData, ptr::NonNull};
+use core::{cell::UnsafeCell, fmt, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 /// Wrapper for write-only "out pointers" that are safe to write to
 // TODO: We may want to change this to &mut MaybeUninit, or have a generic parameter deciding
 // whether it should be noalias or not
-#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Out<'a, T: ?Sized> {
     ptr: NonNull<T>,
     _marker: PhantomData<&'a UnsafeCell<T>>,
@@ -59,6 +59,14 @@ impl<'a, T: ?Sized> Out<'a, T> {
 }
 impl<'a, T> Out<'a, T> {
     #[inline]
+    pub fn from_uninit_mut(r: &'a mut MaybeUninit<T>) -> Self {
+        // SAFETY:
+        //
+        // Same as for from_mut. It's fine if *r is uninitialized, as this wrapper only allows
+        // writes.
+        unsafe { Self::nonnull(r.as_mut_ptr()) }
+    }
+    #[inline]
     pub fn write(&mut self, t: T) {
         unsafe {
             self.ptr.as_ptr().write(t);
@@ -68,8 +76,15 @@ impl<'a, T> Out<'a, T> {
 impl<'a, T> Out<'a, [T]> {
     /// # Safety
     ///
-    /// Must be valid for lifetime `'a` and writable.
+    /// If `len > 0`, `ptr` be valid for `len` elements of `T`, during lifetime `'a`.
     pub unsafe fn from_raw_parts(ptr: *mut T, len: usize) -> Self {
+        // Empty slices must be non-NULL in Rust, but C typically does not force this for
+        // pointer-length pairs.
+        let ptr = if len == 0 {
+            core::ptr::dangling_mut::<T>()
+        } else {
+            ptr
+        };
         Self::nonnull(core::slice::from_raw_parts_mut(ptr, len))
     }
     pub fn len(&self) -> usize {
@@ -140,8 +155,13 @@ impl<T: plain::Plain> Out<'_, [T]> {
         }
     }
 }
-impl<T> fmt::Pointer for Out<'_, T> {
+impl<T: ?Sized> fmt::Pointer for Out<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:p}", self.ptr)
+    }
+}
+impl<T: ?Sized> fmt::Debug for Out<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[Out: {:p}]", self.ptr)
     }
 }

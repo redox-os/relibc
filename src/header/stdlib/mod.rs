@@ -761,7 +761,7 @@ where
 fn get_nstime() -> u64 {
     unsafe {
         let mut ts = mem::MaybeUninit::uninit();
-        Sys::clock_gettime(CLOCK_MONOTONIC, ts.as_mut_ptr());
+        Sys::clock_gettime(CLOCK_MONOTONIC, Out::from_uninit_mut(&mut ts));
         ts.assume_init().tv_nsec as u64
     }
 }

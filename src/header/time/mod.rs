@@ -8,6 +8,7 @@ use crate::{
     fs::File,
     header::{errno::EOVERFLOW, fcntl::O_RDONLY, stdlib::getenv, unistd::readlink},
     io::Read,
+    out::Out,
     platform::{self, types::*, Pal, Sys},
     sync::{Mutex, MutexGuard},
 };
@@ -259,8 +260,8 @@ pub extern "C" fn clock_getcpuclockid(pid: pid_t, clock_id: *mut clockid_t) -> c
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getres.html>.
 #[no_mangle]
-pub unsafe extern "C" fn clock_getres(clock_id: clockid_t, tp: *mut timespec) -> c_int {
-    Sys::clock_getres(clock_id, tp)
+pub unsafe extern "C" fn clock_getres(clock_id: clockid_t, res: *mut timespec) -> c_int {
+    Sys::clock_getres(clock_id, Out::nullable(res))
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -268,7 +269,7 @@ pub unsafe extern "C" fn clock_getres(clock_id: clockid_t, tp: *mut timespec) ->
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getres.html>.
 #[no_mangle]
 pub unsafe extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -> c_int {
-    Sys::clock_gettime(clock_id, tp)
+    Sys::clock_gettime(clock_id, Out::nonnull(tp))
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -449,7 +450,7 @@ pub unsafe extern "C" fn strftime(
 #[no_mangle]
 pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
     let mut ts = timespec::default();
-    Sys::clock_gettime(CLOCK_REALTIME, &mut ts);
+    Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut ts));
     if !tloc.is_null() {
         *tloc = ts.tv_sec
     };
@@ -646,7 +647,7 @@ fn time_zone() -> Tz {
 fn now() -> NaiveDateTime {
     let mut now = timespec::default();
     unsafe {
-        Sys::clock_gettime(CLOCK_REALTIME, &mut now);
+        Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut now));
     }
     NaiveDateTime::from_timestamp(now.tv_sec, now.tv_nsec as _)
 }

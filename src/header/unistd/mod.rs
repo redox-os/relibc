@@ -36,7 +36,7 @@ pub use crate::header::stdio::{ctermid, cuserid};
 //pub use crate::header::fcntl::{faccessat, fchownat, fexecve, linkat, readlinkat, symlinkat, unlinkat};
 
 use super::{
-    errno::{E2BIG, ENOMEM},
+    errno::{E2BIG, EINVAL, ENOMEM},
     stdio::snprintf,
 };
 
@@ -539,7 +539,17 @@ pub extern "C" fn getgid() -> gid_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getgroups.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
-    Sys::getgroups(size, list).or_minus_one_errno()
+    (|| {
+        let size = usize::try_from(size)
+            // fails for negative size, but EINVAL required if size != 0 && size < actual size,
+            // where the actual number of entries in the group list is obviously nonnegative
+            .map_err(|_| Errno(EINVAL))?;
+
+        let list = Out::from_raw_parts(list, size);
+
+        Sys::getgroups(list)
+    })()
+    .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gethostid.html>.

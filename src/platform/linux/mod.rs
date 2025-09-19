@@ -109,12 +109,19 @@ impl Pal for Sys {
         .map(|_| ())
     }
 
-    unsafe fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> Result<()> {
-        e_raw(syscall!(CLOCK_GETRES, clk_id, tp)).map(|_| ())
+    fn clock_getres(clk_id: clockid_t, res: Option<Out<timespec>>) -> Result<()> {
+        e_raw(unsafe {
+            syscall!(
+                CLOCK_GETRES,
+                clk_id,
+                res.map_or(core::ptr::null_mut(), |mut p| p.as_mut_ptr())
+            )
+        })
+        .map(|_| ())
     }
 
-    unsafe fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> Result<()> {
-        e_raw(syscall!(CLOCK_GETTIME, clk_id, tp)).map(|_| ())
+    fn clock_gettime(clk_id: clockid_t, mut tp: Out<timespec>) -> Result<()> {
+        e_raw(unsafe { syscall!(CLOCK_GETTIME, clk_id, tp.as_mut_ptr()) }).map(|_| ())
     }
 
     unsafe fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> Result<()> {
@@ -323,8 +330,14 @@ impl Pal for Sys {
         unsafe { syscall!(GETGID) as gid_t }
     }
 
-    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int> {
-        Ok(e_raw(unsafe { syscall!(GETGROUPS, size, list) })? as c_int)
+    fn getgroups(mut list: Out<[gid_t]>) -> Result<c_int> {
+        Ok(e_raw(unsafe {
+            syscall!(
+                GETGROUPS,
+                list.len() as c_int,
+                list.as_mut_ptr().as_mut_ptr()
+            )
+        })? as c_int)
     }
 
     fn getpagesize() -> usize {

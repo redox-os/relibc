@@ -180,13 +180,16 @@ impl Pal for Sys {
         Self::fchown(*file, owner, group)
     }
 
-    unsafe fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> Result<()> {
+    fn clock_getres(clk_id: clockid_t, res: Option<Out<timespec>>) -> Result<()> {
         // TODO
-        eprintln!("relibc clock_getres({}, {:p}): not implemented", clk_id, tp);
+        eprintln!(
+            "relibc clock_getres({}, {:?}): not implemented",
+            clk_id, res
+        );
         Err(Errno(ENOSYS))
     }
 
-    unsafe fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> Result<()> {
+    fn clock_gettime(clk_id: clockid_t, tp: Out<timespec>) -> Result<()> {
         libredox::clock_gettime(clk_id as usize, tp)?;
         Ok(())
     }
@@ -468,9 +471,13 @@ impl Pal for Sys {
         redox_rt::sys::posix_getresugid().rgid as gid_t
     }
 
-    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int> {
+    fn getgroups(list: Out<[gid_t]>) -> Result<c_int> {
         // TODO
-        eprintln!("relibc getgroups({}, {:p}): not implemented", size, list);
+        eprintln!(
+            "relibc getgroups({}, {:p}): not implemented",
+            list.len(),
+            list
+        );
         Err(Errno(ENOSYS))
     }
 

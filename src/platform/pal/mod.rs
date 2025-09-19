@@ -40,9 +40,10 @@ pub trait Pal {
 
     fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()>;
 
-    unsafe fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> Result<()>;
+    fn clock_getres(clk_id: clockid_t, tp: Option<Out<timespec>>) -> Result<()>;
 
-    unsafe fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> Result<()>;
+    // TODO: maybe remove tp and change signature to -> Result<timespec>?
+    fn clock_gettime(clk_id: clockid_t, tp: Out<timespec>) -> Result<()>;
 
     unsafe fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> Result<()>;
 
@@ -115,7 +116,7 @@ pub trait Pal {
     // Always successful
     fn getgid() -> gid_t;
 
-    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int>;
+    fn getgroups(list: Out<[gid_t]>) -> Result<c_int>;
 
     /* Note that this is distinct from the legacy POSIX function
      * getpagesize(), which returns a c_int. On some Linux platforms,
