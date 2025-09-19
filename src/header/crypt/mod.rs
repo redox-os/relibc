@@ -19,6 +19,7 @@ use crate::{
     platform::{self, types::*},
 };
 
+mod argon2;
 mod blowfish;
 mod md5;
 mod pbkdf2;
@@ -26,6 +27,7 @@ mod scrypt;
 mod sha;
 
 use self::{
+    argon2::crypt_argon2,
     blowfish::crypt_blowfish,
     md5::crypt_md5,
     pbkdf2::crypt_pbkdf2,
@@ -73,21 +75,22 @@ pub unsafe extern "C" fn crypt_r(
     let setting = unsafe { CStr::from_ptr(setting) }
         .to_str()
         .expect("setting must be utf-8");
-    let setting_bytes = setting.as_bytes();
 
-    let encoded = if setting_bytes[0] == b'$' && setting_bytes[1] != 0 && setting_bytes[2] != 0 {
-        if setting_bytes[1] == b'1' && setting_bytes[2] == b'$' {
+    let encoded = if setting.starts_with('$') {
+        if setting.starts_with("$1$") {
             crypt_md5(key, setting)
-        } else if setting_bytes[1] == b'2' && setting_bytes[3] == b'$' {
+        } else if setting.starts_with("$2") && setting.as_bytes().get(3) == Some(&b'$') {
             crypt_blowfish(key, setting)
-        } else if setting_bytes[1] == b'5' && setting_bytes[2] == b'$' {
+        } else if setting.starts_with("$5$") {
             crypt_sha(key, setting, Sha256)
-        } else if setting_bytes[1] == b'6' && setting_bytes[2] == b'$' {
+        } else if setting.starts_with("$6$") {
             crypt_sha(key, setting, Sha512)
-        } else if setting_bytes[1] == b'7' && setting_bytes[2] == b'$' {
+        } else if setting.starts_with("$7$") {
             crypt_scrypt(key, setting)
-        } else if setting_bytes[1] == b'8' && setting_bytes[2] == b'$' {
+        } else if setting.starts_with("$8$") {
             crypt_pbkdf2(key, setting)
+        } else if setting.starts_with("$argon2") {
+            crypt_argon2(key, setting)
         } else {
             platform::ERRNO.set(EINVAL);
             return ptr::null_mut();
