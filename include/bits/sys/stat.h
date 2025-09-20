@@ -13,4 +13,10 @@
 #define st_mtime st_mtim.tv_sec
 #define st_ctime st_ctim.tv_sec
 
+#if defined (_LARGEFILE64_SOURCE)
+#define fstat64(int fd, struct stat* buf) fstat(fd, buf)
+#define lstat64(const char* path, struct stat* buf) lstat(path, buf)
+#define stat64(const char* path, struct stat* buf) stat(path, buf)
+#endif
+
 #endif

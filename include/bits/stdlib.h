@@ -11,4 +11,8 @@ long double strtold(const char *nptr, char **endptr);
 } // extern "C"
 #endif
 
+#if defined (_LARGEFILE64_SOURCE)
+#define mkstemp64 mkstemp
+#endif
+
 #endif /* _BITS_STDLIB_H */
