@@ -161,9 +161,18 @@ unsafe fn inner(stack: &mut SigStack) {
     let sig = (stack.sig_num & 0x3f) as u8;
 
     let handler = match sigaction.kind {
+        // TODO: Since sigaction may be called while procmgr is checking the IGNORED bit, it is
+        // likely possible there can be a race condition resulting in the signal trampoline running
+        // and reaching this code. If so, we do already know whether the signal is IGNORED *now*,
+        // and so we should return early ideally without even temporarily touching the signal mask.
         SigactionKind::Ignore => {
             panic!("ctl {:#x?} signal {}", os.control, stack.sig_num)
         }
+        // this case should be treated equally as the one above
+        //
+        // _ if sigaction.flags.contains(SigactionFlags::IGNORED) => {
+        //     panic!("ctl2 {:#x?} signal {}", os.control, stack.sig_num)
+        // }
         SigactionKind::Default if usize::from(sig) == SIGCONT => SignalHandler { handler: None },
         SigactionKind::Default => {
             let _ = proc_call(
@@ -383,6 +392,7 @@ fn convert_old(action: &RawAction) -> Sigaction {
     let kind = if handler == default_handler as usize {
         SigactionKind::Default
     } else if flags.contains(SigactionFlags::IGNORED) {
+        // TODO: Should IGNORED always shortcut to Ignore even if handler == default_handler?
         SigactionKind::Ignore
     } else {
         SigactionKind::Handled {
@@ -439,12 +449,12 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
 
     let explicit_handler = new.ip();
 
+    let sig_group = (signal - 1) / 32;
+    let sig_idx = (signal - 1) % 32;
+
     let (mask, flags, handler) = match (usize::from(signal), new.kind) {
         (_, SigactionKind::Ignore) | (SIGURG | SIGWINCH, SigactionKind::Default) => {
-            let sig_group = (signal - 1) / 32;
-            let sig_idx = (signal - 1) % 32;
-
-            // TODO: relibc and the procmgr has access to all threads, redox_rt doesn't currently.
+            // TODO: relibc and procmgr have access to all threads, redox_rt doesn't currently.
             // Do this for all threads!
             ctl.word[usize::from(sig_group)].fetch_and(!(1 << sig_idx), Ordering::Relaxed);
             PROC_CONTROL_STRUCT
@@ -470,6 +480,16 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
         ),
         (SIGCHLD, SigactionKind::Default) => {
             let nocldstop_bit = new.flags & SigactionFlags::SIG_SPECIFIC;
+
+            // Default action is to ignore. Hence all pending SIGCHLD signals should be discarded.
+
+            // TODO: relibc and procmgr have access to all threads, redox_rt doesn't currently.
+            // Do this for all threads!
+            ctl.word[usize::from(sig_group)].fetch_and(!(1 << sig_idx), Ordering::Relaxed);
+            PROC_CONTROL_STRUCT
+                .pending
+                .fetch_and(!sig_bit(signal.into()), Ordering::Relaxed);
+
             (
                 MASK_DONTCARE,
                 SigactionFlags::IGNORED | nocldstop_bit,
