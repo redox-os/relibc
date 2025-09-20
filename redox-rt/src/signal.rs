@@ -688,7 +688,7 @@ pub(crate) fn get_sigaltstack(tcb: &SigArea, sp: usize) -> Sigaltstack {
         Sigaltstack::Enabled {
             base: tcb.altstack_bottom as *mut (),
             size: tcb.altstack_top - tcb.altstack_bottom,
-            onstack: (tcb.altstack_bottom..tcb.altstack_top).contains(&sp),
+            onstack: (tcb.altstack_bottom..=tcb.altstack_top).contains(&sp),
         }
     }
 }
@@ -702,7 +702,9 @@ pub unsafe fn sigaltstack(
 
     let old = get_sigaltstack(tcb, crate::arch::current_sp());
 
-    if matches!(old, Sigaltstack::Enabled { onstack: true, .. }) && new != Some(&old) {
+    if matches!(old, Sigaltstack::Enabled { onstack: true, .. })
+        && new.is_some_and(|new| *new != old)
+    {
         return Err(Error::new(EPERM));
     }
 
@@ -921,7 +923,7 @@ pub fn apply_inherited_sigignmask(inherited: u64) {
     // usual.
     for bit in (0..64).filter(|b| inherited & (1 << b) != 0) {
         let sig = u8::try_from(bit + 1).unwrap();
-        sigaction_inner(
+        let _ = sigaction_inner(
             ctl,
             sig,
             Some(&Sigaction {
@@ -947,7 +949,7 @@ pub fn get_sigignmask_to_inherit() -> u64 {
     for bit in 0..64 {
         let sig = u8::try_from(bit + 1).unwrap();
         let mut old = Sigaction::default();
-        sigaction_inner(ctl, sig, None, Some(&mut old));
+        let _ = sigaction_inner(ctl, sig, None, Some(&mut old));
         if matches!(old.kind, SigactionKind::Ignore) {
             mask |= 1 << bit;
         }
