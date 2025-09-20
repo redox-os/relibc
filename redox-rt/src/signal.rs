@@ -392,7 +392,6 @@ fn convert_old(action: &RawAction) -> Sigaction {
     let kind = if handler == default_handler as usize {
         SigactionKind::Default
     } else if flags.contains(SigactionFlags::IGNORED) {
-        // TODO: Should IGNORED always shortcut to Ignore even if handler == default_handler?
         SigactionKind::Ignore
     } else {
         SigactionKind::Handled {
@@ -408,6 +407,18 @@ fn convert_old(action: &RawAction) -> Sigaction {
 }
 
 pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction>) -> Result<()> {
+    let _sigguard = tmp_disable_signals();
+    let ctl = current_sigctl();
+
+    let _guard = SIGACTIONS_LOCK.lock();
+    sigaction_inner(ctl, signal, new, old)
+}
+fn sigaction_inner(
+    ctl: &Sigcontrol,
+    signal: u8,
+    new: Option<&Sigaction>,
+    old: Option<&mut Sigaction>,
+) -> Result<()> {
     // TODO: Now that the goal of keeping logic out of the IPC backend, no longer holds when
     // procmgr has taken over signal handling from the kernel, it would probably make sense to make
     // parts of this function an IPC call, for synchronization purposes. Apart from SA_RESETHAND
@@ -431,11 +442,6 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
         }
         return Ok(());
     }
-
-    let _sigguard = tmp_disable_signals();
-    let ctl = current_sigctl();
-
-    let _guard = SIGACTIONS_LOCK.lock();
 
     let action = &PROC_CONTROL_STRUCT.actions[usize::from(signal) - 1];
 
@@ -903,4 +909,49 @@ fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option
             si_addr: core::ptr::null_mut(),
         })
     }
+}
+pub fn apply_inherited_sigignmask(inherited: u64) {
+    let _sig_guard = tmp_disable_signals();
+    let _guard = SIGACTIONS_LOCK.lock();
+    let ctl = current_sigctl();
+
+    // Set all signals in the inherited set that have explicitly been set to SIG_IGN. Those whose
+    // (default) effective action is to ignore but are set to SIG_DFL, are not in this set, and the
+    // initial SIG_DFL state would be "Ignore" anyway but still return SIG_DFL when asked, as
+    // usual.
+    for bit in (0..64).filter(|b| inherited & (1 << b) != 0) {
+        let sig = u8::try_from(bit + 1).unwrap();
+        sigaction_inner(
+            ctl,
+            sig,
+            Some(&Sigaction {
+                // TODO: correct fields?
+                flags: SigactionFlags::IGNORED,
+                kind: SigactionKind::Ignore,
+                mask: 0,
+            }),
+            None,
+        );
+    }
+}
+pub fn get_sigignmask_to_inherit() -> u64 {
+    let _sig_guard = tmp_disable_signals();
+    let _guard = SIGACTIONS_LOCK.lock();
+    let ctl = current_sigctl();
+
+    let mut mask = 0_u64;
+    // Fill the mask with the set of the inherited signals that have explicitly been set to
+    // SIG_IGN. Again this excludes signals that would have returned SIG_DFL from sigaction,
+    // despite their default action being "Ignore".
+
+    for bit in 0..64 {
+        let sig = u8::try_from(bit + 1).unwrap();
+        let mut old = Sigaction::default();
+        sigaction_inner(ctl, sig, None, Some(&mut old));
+        if matches!(old.kind, SigactionKind::Ignore) {
+            mask |= 1 << bit;
+        }
+    }
+
+    mask
 }
