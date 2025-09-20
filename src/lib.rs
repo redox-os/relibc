@@ -23,6 +23,7 @@
 #![feature(pointer_is_aligned_to)]
 #![feature(ptr_as_uninit)]
 #![feature(slice_as_chunks)]
+#![feature(slice_ptr_get)]
 #![feature(stmt_expr_attributes)]
 #![feature(strict_provenance)]
 #![feature(sync_unsafe_cell)]
@@ -63,6 +64,7 @@ pub mod header;
 pub mod io;
 pub mod iter;
 pub mod ld_so;
+pub mod out;
 pub mod platform;
 pub mod pthread;
 pub mod start;

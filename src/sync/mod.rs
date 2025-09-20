@@ -26,6 +26,7 @@ use crate::{
         errno::{EAGAIN, ETIMEDOUT},
         time::timespec,
     },
+    out::Out,
     platform::{types::*, Pal, Sys},
 };
 use core::{
@@ -140,7 +141,10 @@ pub fn rttime() -> timespec {
         let mut time = MaybeUninit::uninit();
 
         // TODO: Handle error
-        Sys::clock_gettime(crate::header::time::CLOCK_REALTIME, time.as_mut_ptr());
+        Sys::clock_gettime(
+            crate::header::time::CLOCK_REALTIME,
+            Out::from_uninit_mut(&mut time),
+        );
 
         time.assume_init()
     }

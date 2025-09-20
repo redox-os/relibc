@@ -25,7 +25,8 @@ use crate::{
             EBADF, EBADFD, EBADR, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS,
             EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl, limits,
+        fcntl::{self, AT_FDCWD, O_RDONLY},
+        limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{rlimit, rusage, RLIM_INFINITY},
@@ -38,6 +39,7 @@ use crate::{
         unistd::{F_OK, R_OK, W_OK, X_OK},
     },
     io::{self, prelude::*, BufReader},
+    out::Out,
     sync::rwlock::RwLock,
 };
 
@@ -178,13 +180,16 @@ impl Pal for Sys {
         Self::fchown(*file, owner, group)
     }
 
-    unsafe fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> Result<()> {
+    fn clock_getres(clk_id: clockid_t, res: Option<Out<timespec>>) -> Result<()> {
         // TODO
-        eprintln!("relibc clock_getres({}, {:p}): not implemented", clk_id, tp);
+        eprintln!(
+            "relibc clock_getres({}, {:?}): not implemented",
+            clk_id, res
+        );
         Err(Errno(ENOSYS))
     }
 
-    unsafe fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> Result<()> {
+    fn clock_gettime(clk_id: clockid_t, tp: Out<timespec>) -> Result<()> {
         libredox::clock_gettime(clk_id as usize, tp)?;
         Ok(())
     }
@@ -281,26 +286,25 @@ impl Pal for Sys {
         Ok(clone::fork_impl(&redox_rt::proc::ForkArgs::Managed)? as pid_t)
     }
 
-    unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()> {
-        libredox::fstat(fildes as usize, buf)?;
+    fn fstat(fildes: c_int, mut buf: Out<stat>) -> Result<()> {
+        unsafe {
+            libredox::fstat(fildes as usize, buf.as_mut_ptr())?;
+        }
         Ok(())
     }
 
-    unsafe fn fstatat(
-        dirfd: c_int,
-        path: *const c_char,
-        buf: *mut stat,
-        flags: c_int,
-    ) -> Result<()> {
-        let path = CStr::from_nullable_ptr(path)
+    fn fstatat(dirfd: c_int, path: Option<CStr>, buf: Out<stat>, flags: c_int) -> Result<()> {
+        let path = path
             .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
             .ok_or(Errno(ENOENT))?;
         let file = cap_path_at(dirfd, path, flags, 0)?;
         Sys::fstat(*file, buf)
     }
 
-    unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()> {
-        libredox::fstatvfs(fildes as usize, buf)?;
+    fn fstatvfs(fildes: c_int, mut buf: Out<statvfs>) -> Result<()> {
+        unsafe {
+            libredox::fstatvfs(fildes as usize, buf.as_mut_ptr())?;
+        }
         Ok(())
     }
 
@@ -338,15 +342,8 @@ impl Pal for Sys {
         Self::futimens(*file, times)
     }
 
-    unsafe fn getcwd(buf: *mut c_char, size: size_t) -> Result<()> {
-        // TODO: Not using MaybeUninit seems a little unsafe
-
-        let buf_slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, size as usize) };
-        if buf_slice.is_empty() {
-            return Err(Errno(EINVAL));
-        }
-
-        path::getcwd(buf_slice).ok_or(Errno(ERANGE))?;
+    fn getcwd(buf: Out<[u8]>) -> Result<()> {
+        path::getcwd(buf).ok_or(Errno(ERANGE))?;
         Ok(())
     }
 
@@ -438,9 +435,13 @@ impl Pal for Sys {
         redox_rt::sys::posix_getresugid().rgid as gid_t
     }
 
-    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int> {
+    fn getgroups(list: Out<[gid_t]>) -> Result<c_int> {
         // TODO
-        eprintln!("relibc getgroups({}, {:p}): not implemented", size, list);
+        eprintln!(
+            "relibc getgroups({}, {:p}): not implemented",
+            list.len(),
+            list
+        );
         Err(Errno(ENOSYS))
     }
 
@@ -485,54 +486,54 @@ impl Pal for Sys {
     }
 
     fn getresgid(
-        rgid_out: Option<&mut gid_t>,
-        egid_out: Option<&mut gid_t>,
-        sgid_out: Option<&mut gid_t>,
+        rgid_out: Option<Out<gid_t>>,
+        egid_out: Option<Out<gid_t>>,
+        sgid_out: Option<Out<gid_t>>,
     ) -> Result<()> {
         let Resugid {
             rgid, egid, sgid, ..
         } = redox_rt::sys::posix_getresugid();
-        if let Some(rgid_out) = rgid_out {
-            *rgid_out = rgid as _;
+        if let Some(mut rgid_out) = rgid_out {
+            rgid_out.write(rgid as _);
         }
-        if let Some(egid_out) = egid_out {
-            *egid_out = egid as _;
+        if let Some(mut egid_out) = egid_out {
+            egid_out.write(egid as _);
         }
-        if let Some(sgid_out) = sgid_out {
-            *sgid_out = sgid as _;
+        if let Some(mut sgid_out) = sgid_out {
+            sgid_out.write(sgid as _);
         }
         Ok(())
     }
     fn getresuid(
-        ruid_out: Option<&mut uid_t>,
-        euid_out: Option<&mut uid_t>,
-        suid_out: Option<&mut uid_t>,
+        ruid_out: Option<Out<uid_t>>,
+        euid_out: Option<Out<uid_t>>,
+        suid_out: Option<Out<uid_t>>,
     ) -> Result<()> {
         let Resugid {
             ruid, euid, suid, ..
         } = redox_rt::sys::posix_getresugid();
-        if let Some(ruid_out) = ruid_out {
-            *ruid_out = ruid as _;
+        if let Some(mut ruid_out) = ruid_out {
+            ruid_out.write(ruid as _);
         }
-        if let Some(euid_out) = euid_out {
-            *euid_out = euid as _;
+        if let Some(mut euid_out) = euid_out {
+            euid_out.write(euid as _);
         }
-        if let Some(suid_out) = suid_out {
-            *suid_out = suid as _;
+        if let Some(mut suid_out) = suid_out {
+            suid_out.write(suid as _);
         }
         Ok(())
     }
 
-    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()> {
+    fn getrlimit(resource: c_int, mut rlim: Out<rlimit>) -> Result<()> {
         //TODO
         eprintln!(
             "relibc getrlimit({}, {:p}): not implemented",
             resource, rlim
         );
-        if !rlim.is_null() {
-            (*rlim).rlim_cur = RLIM_INFINITY;
-            (*rlim).rlim_max = RLIM_INFINITY;
-        }
+        rlim.write(rlimit {
+            rlim_cur: RLIM_INFINITY,
+            rlim_max: RLIM_INFINITY,
+        });
         Ok(())
     }
 
@@ -545,7 +546,7 @@ impl Pal for Sys {
         Err(Errno(EPERM))
     }
 
-    fn getrusage(who: c_int, r_usage: &mut rusage) -> Result<()> {
+    fn getrusage(who: c_int, r_usage: Out<rusage>) -> Result<()> {
         //TODO
         eprintln!("relibc getrusage({}, {:p}): not implemented", who, r_usage);
         Ok(())
@@ -566,16 +567,20 @@ impl Pal for Sys {
             .unwrap()
     }
 
-    unsafe fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> Result<()> {
+    fn gettimeofday(mut tp: Out<timeval>, tzp: Option<Out<timezone>>) -> Result<()> {
         let mut redox_tp = redox_timespec::default();
         syscall::clock_gettime(syscall::CLOCK_REALTIME, &mut redox_tp)?;
         unsafe {
-            (*tp).tv_sec = redox_tp.tv_sec as time_t;
-            (*tp).tv_usec = (redox_tp.tv_nsec / 1000) as suseconds_t;
+            tp.write(timeval {
+                tv_sec: redox_tp.tv_sec as time_t,
+                tv_usec: (redox_tp.tv_nsec / 1000) as suseconds_t,
+            });
 
-            if !tzp.is_null() {
-                (*tzp).tz_minuteswest = 0;
-                (*tzp).tz_dsttime = 0;
+            if let Some(mut tzp) = tzp {
+                tzp.write(timezone {
+                    tz_minuteswest: 0,
+                    tz_dsttime: 0,
+                });
             }
         }
         Ok(())
@@ -791,8 +796,8 @@ impl Pal for Sys {
         Ok(libredox::open(path, oflag, effective_mode)? as c_int)
     }
 
-    fn pipe2(fds: &mut [c_int], flags: c_int) -> Result<()> {
-        extra::pipe2(fds, flags as usize)?;
+    fn pipe2(mut fds: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
+        fds.write(extra::pipe2(flags as usize)?);
         Ok(())
     }
 
@@ -1048,7 +1053,7 @@ impl Pal for Sys {
         Ok(())
     }
 
-    unsafe fn waitpid(mut pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t> {
+    fn waitpid(mut pid: pid_t, stat_loc: Option<Out<'_, c_int>>, options: c_int) -> Result<pid_t> {
         let mut res = None;
         let mut status = 0;
 
@@ -1102,11 +1107,10 @@ impl Pal for Sys {
         });
 
         // If stat_loc is non-null, set that and the return
-        unsafe {
-            if !stat_loc.is_null() {
-                *stat_loc = status as c_int;
-            }
+        if let Some(mut stat_loc) = stat_loc {
+            stat_loc.write(status as c_int);
         }
+
         Ok(res? as pid_t)
     }
 

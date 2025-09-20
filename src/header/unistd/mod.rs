@@ -20,6 +20,7 @@ use crate::{
         sys_ioctl, sys_resource, sys_time, sys_utsname, termios,
         time::timespec,
     },
+    out::Out,
     platform::{self, types::*, Pal, Sys, ERRNO},
 };
 
@@ -35,7 +36,7 @@ pub use crate::header::stdio::{ctermid, cuserid};
 //pub use crate::header::fcntl::{faccessat, fchownat, fexecve, linkat, readlinkat, symlinkat, unlinkat};
 
 use super::{
-    errno::{E2BIG, ENOMEM},
+    errno::{E2BIG, EINVAL, ENOMEM},
     stdio::snprintf,
 };
 
@@ -460,7 +461,7 @@ pub unsafe extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut 
         size = stack_buf.len();
     }
 
-    let ret = match Sys::getcwd(buf, size) {
+    let ret = match Sys::getcwd(Out::from_raw_parts(buf.cast(), size)) {
         Ok(()) => buf,
         Err(Errno(errno)) => {
             ERRNO.set(errno);
@@ -538,7 +539,17 @@ pub extern "C" fn getgid() -> gid_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getgroups.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
-    Sys::getgroups(size, list).or_minus_one_errno()
+    (|| {
+        let size = usize::try_from(size)
+            // fails for negative size, but EINVAL required if size != 0 && size < actual size,
+            // where the actual number of entries in the group list is obviously nonnegative
+            .map_err(|_| Errno(EINVAL))?;
+
+        let list = Out::from_raw_parts(list, size);
+
+        Sys::getgroups(list)
+    })()
+    .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gethostid.html>.
@@ -637,19 +648,25 @@ pub extern "C" fn getppid() -> pid_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresgid.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getresgid(rgid: *mut gid_t, egid: *mut gid_t, sgid: *mut gid_t) -> c_int {
-    // TODO: Out<T> write-only wrapper?
-    Sys::getresgid(rgid.as_mut(), egid.as_mut(), sgid.as_mut())
-        .map(|()| 0)
-        .or_minus_one_errno()
+    Sys::getresgid(
+        Out::nullable(rgid),
+        Out::nullable(egid),
+        Out::nullable(sgid),
+    )
+    .map(|()| 0)
+    .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresuid.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getresuid(ruid: *mut uid_t, euid: *mut uid_t, suid: *mut uid_t) -> c_int {
-    // TODO: Out<T> write-only wrapper?
-    Sys::getresuid(ruid.as_mut(), euid.as_mut(), suid.as_mut())
-        .map(|()| 0)
-        .or_minus_one_errno()
+    Sys::getresuid(
+        Out::nullable(ruid),
+        Out::nullable(euid),
+        Out::nullable(suid),
+    )
+    .map(|()| 0)
+    .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getsid.html>.
@@ -770,7 +787,7 @@ pub unsafe extern "C" fn pipe(fildes: *mut c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pipe.html>.
 #[no_mangle]
 pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
-    Sys::pipe2(slice::from_raw_parts_mut(fildes, 2), flags)
+    Sys::pipe2(Out::nonnull(fildes.cast::<[c_int; 2]>()), flags)
         .map(|()| 0)
         .or_minus_one_errno()
 }

@@ -13,6 +13,7 @@ use crate::{
     error::{Errno, ResultExt, ResultExtPtrMut},
     fs::File,
     header::{fcntl, stdlib, string},
+    out::Out,
     platform::{self, types::*, Pal, Sys},
 };
 
@@ -49,7 +50,7 @@ impl DIR {
     pub fn from_fd(fd: c_int) -> Result<Box<Self>, Errno> {
         let mut stat = sys_stat::stat::default();
         unsafe {
-            Sys::fstat(fd, &mut stat)?;
+            Sys::fstat(fd, Out::from_mut(&mut stat))?;
         }
         if (stat.st_mode & sys_stat::S_IFMT) != sys_stat::S_IFDIR {
             return Err(Errno(ENOTDIR));
