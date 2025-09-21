@@ -171,6 +171,19 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(FCHMOD, fildes, mode) }).map(|_| ())
     }
 
+    fn fchmodat(dirfd: c_int, path: Option<CStr>, mode: mode_t, flags: c_int) -> Result<()> {
+        e_raw(unsafe {
+            syscall!(
+                FCHMODAT,
+                dirfd,
+                path.map_or(core::ptr::null(), |p| p.as_ptr()),
+                mode,
+                flags
+            )
+        })
+        .map(|_| ())
+    }
+
     fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<()> {
         e_raw(unsafe { syscall!(FCHOWN, fildes, owner, group) }).map(|_| ())
     }

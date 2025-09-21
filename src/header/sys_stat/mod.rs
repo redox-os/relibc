@@ -83,6 +83,19 @@ pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn fchmodat(
+    dirfd: c_int,
+    path: *const c_char,
+    mode: mode_t,
+    flags: c_int,
+) -> c_int {
+    let path = CStr::from_nullable_ptr(path);
+    Sys::fchmodat(dirfd, path, mode, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
     let buf = Out::nonnull(buf);
     Sys::fstat(fildes, buf).map(|()| 0).or_minus_one_errno()

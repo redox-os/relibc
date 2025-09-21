@@ -67,6 +67,7 @@ pub trait Pal {
     fn fchdir(fildes: c_int) -> Result<()>;
 
     fn fchmod(fildes: c_int, mode: mode_t) -> Result<()>;
+    fn fchmodat(dirfd: c_int, path: Option<CStr>, mode: mode_t, flags: c_int) -> Result<()>;
 
     fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<()>;
 
