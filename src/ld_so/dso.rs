@@ -509,14 +509,13 @@ impl DSO {
         // Allocate memory
         let mmap = unsafe {
             if let Some(addr) = base_addr {
-                let size = if pie { bounds.1 } else { bounds.1 - bounds.0 };
-                _r_debug.insert_first(addr, path, addr + l_ld as usize);
                 let size = if is_pie_enabled(elf) {
                     bounds.1
                 } else {
                     bounds.1 - bounds.0
                 };
                 _r_debug
+                    .lock()
                     .insert_first(addr, path, addr + l_ld as usize);
                 slice::from_raw_parts_mut(addr as *mut u8, size)
             } else {
@@ -637,7 +636,7 @@ impl DSO {
             let (ph, _) = dynamic.unwrap();
             let vaddr = ph.p_vaddr(endian) as usize;
             let bytes: [u8; size_of::<Dyn>() / 2] =
-                unsafe { core::mem::transmute((&_r_debug) as *const RTLDDebug as usize) };
+                ((&raw const _r_debug).cast::<*const RTLDDebug>() as usize).to_ne_bytes();
             let start = if is_pie_enabled(elf) {
                 vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
             } else {
