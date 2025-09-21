@@ -259,6 +259,19 @@ impl Pal for Sys {
         Ok(())
     }
 
+    fn fchmodat(dirfd: c_int, path: Option<CStr>, mode: mode_t, flags: c_int) -> Result<()> {
+        const MASK: c_int = !(fcntl::AT_SYMLINK_NOFOLLOW | fcntl::AT_EMPTY_PATH);
+        if MASK & flags != 0 {
+            return Err(Errno(EOPNOTSUPP));
+        }
+        let path = path
+            .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
+            .ok_or(Errno(ENOENT))?;
+        let file = cap_path_at(dirfd, path, flags, 0)?;
+        syscall::fchmod(*file as usize, mode as u16)?;
+        Ok(())
+    }
+
     fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> Result<()> {
         syscall::fchown(fd as usize, owner as u32, group as u32)?;
         Ok(())
