@@ -593,7 +593,7 @@ impl Linker {
             Resolve::Now
         };
 
-        unsafe { _r_debug.state = RTLDState::RT_ADD };
+        _r_debug.lock().state = RTLDState::RT_ADD;
         _dl_debug_state();
 
         let mut new_objects = Vec::new();
@@ -724,7 +724,7 @@ impl Linker {
             self.register_object(obj);
         }
 
-        unsafe { _r_debug.state = RTLDState::RT_CONSISTENT };
+        _r_debug.lock().state = RTLDState::RT_CONSISTENT;
         _dl_debug_state();
 
         Ok(loaded_dso)

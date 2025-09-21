@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h> // free()
 #include <math.h> // INFINITY, NAN constants
@@ -91,9 +92,14 @@ int main(void) {
     printf("printed: %s, value: %d\n", s, res);
     free(s);
 
+    errno = EOWNERDEAD;
+    printf("\n%%m: %m\n");
+
     puts("\nC23:");
     printf("Binary %%b: %b\n", 4);
     printf("Binary %%b alternate: %#b\n", 4);
     printf("Binary %%B: %B\n", 4);
     printf("Binary %%B alternate: %#B\n", 4);
+
+    return EXIT_SUCCESS;
 }

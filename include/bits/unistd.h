@@ -3,13 +3,6 @@
 
 #define _POSIX_VERSION 200809L
 #define _POSIX_REALTIME_SIGNALS 202405L
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
+#define _XOPEN_VERSION 700L
 
 #endif

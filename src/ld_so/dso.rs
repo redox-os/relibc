@@ -511,6 +511,13 @@ impl DSO {
             if let Some(addr) = base_addr {
                 let size = if pie { bounds.1 } else { bounds.1 - bounds.0 };
                 _r_debug.insert_first(addr, path, addr + l_ld as usize);
+                let size = if is_pie_enabled(elf) {
+                    bounds.1
+                } else {
+                    bounds.1 - bounds.0
+                };
+                _r_debug
+                    .insert_first(addr, path, addr + l_ld as usize);
                 slice::from_raw_parts_mut(addr as *mut u8, size)
             } else {
                 let (start, end) = bounds;
@@ -540,7 +547,9 @@ impl DSO {
 
                 trace!("    = {:p}, {:x?}", ptr, start);
                 ptr::write_bytes(ptr as *mut u8, 0, size);
-                _r_debug.insert(ptr as usize, path, ptr as usize + l_ld as usize);
+                _r_debug
+                    .lock()
+                    .insert(ptr as usize, path, ptr as usize + l_ld as usize);
                 slice::from_raw_parts_mut(ptr as *mut u8, size)
             }
         };
@@ -629,8 +638,8 @@ impl DSO {
             let vaddr = ph.p_vaddr(endian) as usize;
             let bytes: [u8; size_of::<Dyn>() / 2] =
                 unsafe { core::mem::transmute((&_r_debug) as *const RTLDDebug as usize) };
-            let start = if pie {
-                vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2 - bounds.0
+            let start = if is_pie_enabled(elf) {
+                vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
             } else {
                 vaddr + i * size_of::<Dyn>() + size_of::<Dyn>() / 2
                     - mmap.as_ptr().cast_mut() as usize

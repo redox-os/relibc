@@ -6,6 +6,7 @@ pub const O_RDWR: c_int = 0x0002;
 pub const O_ACCMODE: c_int = 0x0003;
 pub const O_CREAT: c_int = 0x0040;
 pub const O_EXCL: c_int = 0x0080;
+pub const O_NOCTTY: c_int = 0x0100;
 pub const O_TRUNC: c_int = 0x0200;
 pub const O_APPEND: c_int = 0x0400;
 pub const O_NONBLOCK: c_int = 0x0800;
@@ -18,3 +19,9 @@ pub const FD_CLOEXEC: c_int = 0x8_0000;
 
 // Defined for compatibility
 pub const O_NDELAY: c_int = O_NONBLOCK;
+
+// Flags for capability based "at" functions
+pub const AT_FDCWD: c_int = -100;
+pub const AT_SYMLINK_NOFOLLOW: c_int = 0x100;
+pub const AT_REMOVEDIR: c_int = 0x200;
+pub const AT_EMPTY_PATH: c_int = 0x1000;

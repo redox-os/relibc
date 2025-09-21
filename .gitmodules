@@ -1,6 +1,6 @@
 [submodule "openlibm"]
 	path = openlibm
-	url = https://github.com/JuliaMath/openlibm.git
+    url = https://gitlab.redox-os.org/redox-os/openlibm.git
 	branch = master
 [submodule "compiler-builtins"]
 	path = compiler-builtins

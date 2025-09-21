@@ -11,14 +11,17 @@ pub struct Mutex<T> {
     pub inner: UnsafeCell<T>,
 }
 
-const UNLOCKED: u32 = 0;
-const LOCKED: u32 = 1;
-const WAITING: u32 = 2;
-
 unsafe impl<T: Send> Send for Mutex<T> {}
 unsafe impl<T: Send> Sync for Mutex<T> {}
 
 impl<T> Mutex<T> {
+    /// Represents an unlocked [Mutex].
+    pub const UNLOCKED: u32 = 0;
+    /// Represents a locked [Mutex].
+    pub const LOCKED: u32 = 1;
+    /// Represents a waiting [Mutex].
+    pub const WAITING: u32 = 2;
+
     pub const fn new(t: T) -> Self {
         Self {
             lockword: AtomicU32::new(0),
@@ -28,7 +31,12 @@ impl<T> Mutex<T> {
     pub fn lock(&self) -> MutexGuard<'_, T> {
         while self
             .lockword
-            .compare_exchange(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed)
+            .compare_exchange(
+                Self::UNLOCKED,
+                Self::LOCKED,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
             .is_err()
         {
             core::hint::spin_loop();
@@ -53,6 +61,8 @@ impl<T> DerefMut for MutexGuard<'_, T> {
 }
 impl<T> Drop for MutexGuard<'_, T> {
     fn drop(&mut self) {
-        self.lock.lockword.store(UNLOCKED, Ordering::Release);
+        self.lock
+            .lockword
+            .store(Mutex::<T>::UNLOCKED, Ordering::Release);
     }
 }

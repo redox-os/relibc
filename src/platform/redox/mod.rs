@@ -85,7 +85,10 @@ macro_rules! path_from_c_str {
     }};
 }
 
-use self::{exec::Executable, path::canonicalize};
+use self::{
+    exec::Executable,
+    path::{canonicalize, cap_path_at},
+};
 
 static CLONE_LOCK: RwLock<()> = RwLock::new(());
 
@@ -281,6 +284,19 @@ impl Pal for Sys {
     unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()> {
         libredox::fstat(fildes as usize, buf)?;
         Ok(())
+    }
+
+    unsafe fn fstatat(
+        dirfd: c_int,
+        path: *const c_char,
+        buf: *mut stat,
+        flags: c_int,
+    ) -> Result<()> {
+        let path = CStr::from_nullable_ptr(path)
+            .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
+            .ok_or(Errno(ENOENT))?;
+        let file = cap_path_at(dirfd, path, flags, 0)?;
+        Sys::fstat(*file, buf)
     }
 
     unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()> {
@@ -521,7 +537,7 @@ impl Pal for Sys {
     }
 
     unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> Result<()> {
-        //TOOD
+        // TODO
         eprintln!(
             "relibc setrlimit({}, {:p}): not implemented",
             resource, rlim
@@ -853,11 +869,20 @@ impl Pal for Sys {
         Self::read(*file, out)
     }
 
+    fn readlinkat(dirfd: c_int, path: CStr, out: &mut [u8]) -> Result<usize> {
+        let path = str::from_utf8(path.to_bytes()).map_err(|_| Errno(ENOENT))?;
+        let file = cap_path_at(dirfd, path, 0, fcntl::O_SYMLINK)?;
+        Sys::read(*file, out)
+    }
+
     fn rename(oldpath: CStr, newpath: CStr) -> Result<()> {
         let newpath = newpath.to_str().map_err(|_| Errno(EINVAL))?;
         let newpath = canonicalize(newpath).map_err(|_| Errno(EINVAL))?;
 
-        let file = File::open(oldpath, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
+        let file = File::open(
+            oldpath,
+            fcntl::O_NOFOLLOW | fcntl::O_PATH | fcntl::O_CLOEXEC,
+        )?;
         syscall::frename(*file as usize, newpath)?;
         Ok(())
     }

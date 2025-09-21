@@ -47,6 +47,8 @@ pub mod netinet_in;
 pub mod netinet_ip;
 pub mod netinet_tcp;
 // TODO: nl_types.h
+// TODO: Remove C header paths.h when cbindgen can export C/Rust strs
+// pub mod paths;
 pub mod poll;
 pub mod pthread;
 pub mod pty;
@@ -59,6 +61,7 @@ pub mod sched;
 pub mod semaphore;
 pub mod setjmp;
 pub mod sgtty;
+pub mod shadow;
 pub mod signal;
 // TODO: spawn.h
 // TODO: stdalign.h (likely C implementation)

@@ -16,8 +16,8 @@ use crate::{
     header::{
         arpa_inet::inet_aton,
         errno::{
-            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EISCONN, EMSGSIZE, ENOMEM, ENOSYS, EOPNOTSUPP,
-            EPROTONOSUPPORT,
+            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EISCONN, EMSGSIZE, ENOMEM, ENOSYS, ENOTSOCK,
+            EOPNOTSUPP, EPROTONOSUPPORT,
         },
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
@@ -188,6 +188,24 @@ unsafe fn inner_get_name_inner(
             str::from_utf8(buf)
         );
     }
+}
+
+fn socket_domain_type(socket: c_int) -> Result<(c_int, c_int)> {
+    let mut buf = [0; 256];
+    let len = syscall::fpath(socket as usize, &mut buf)?;
+    Ok(
+        if buf.starts_with(b"tcp:") || buf.starts_with(b"/scheme/tcp/") {
+            (AF_INET, SOCK_STREAM)
+        } else if buf.starts_with(b"udp:") || buf.starts_with(b"/scheme/udp/") {
+            (AF_INET, SOCK_DGRAM)
+        } else if buf.starts_with(b"/scheme/uds_stream/") {
+            (AF_UNIX, SOCK_STREAM)
+        } else if buf.starts_with(b"/scheme/uds_dgram/") {
+            (AF_UNIX, SOCK_DGRAM)
+        } else {
+            return Err(Errno(ENOTSOCK));
+        },
+    )
 }
 
 fn socket_kind(mut kind: c_int) -> (c_int, usize) {
@@ -650,21 +668,34 @@ impl PalSocket for Sys {
         option_value: *mut c_void,
         option_len: *mut socklen_t,
     ) -> Result<()> {
+        let option_c_int = || -> Result<&mut c_int> {
+            if option_value.is_null() {
+                return Err(Errno(EFAULT));
+            }
+
+            if (option_len as usize) < mem::size_of::<c_int>() {
+                return Err(Errno(EINVAL));
+            }
+
+            Ok(unsafe { &mut *(option_value as *mut c_int) })
+        };
+
         match level {
             SOL_SOCKET => match option_name {
+                SO_DOMAIN => {
+                    let option = option_c_int()?;
+                    *option = socket_domain_type(socket)?.0;
+                    return Ok(());
+                }
                 SO_ERROR => {
-                    if option_value.is_null() {
-                        return Err(Errno(EFAULT));
-                    }
-
-                    if (option_len as usize) < mem::size_of::<c_int>() {
-                        return Err(Errno(EINVAL));
-                    }
-
-                    let error = unsafe { &mut *(option_value as *mut c_int) };
+                    let option = option_c_int()?;
                     //TODO: Socket nonblock connection error
-                    *error = 0;
-
+                    *option = 0;
+                    return Ok(());
+                }
+                SO_TYPE => {
+                    let option = option_c_int()?;
+                    *option = socket_domain_type(socket)?.1;
                     return Ok(());
                 }
                 _ => (),

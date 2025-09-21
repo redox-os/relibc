@@ -5,11 +5,13 @@ mod dns;
 use core::{
     cell::Cell,
     fmt::Write,
-    mem, ptr, slice,
+    mem,
+    net::Ipv4Addr,
+    ptr, slice,
     str::{self, FromStr},
 };
 
-use alloc::{borrow::ToOwned, boxed::Box, str::SplitWhitespace, vec::Vec};
+use alloc::{borrow::ToOwned, boxed::Box, str::SplitWhitespace, string::ToString, vec::Vec};
 
 use crate::{
     c_str::{CStr, CString},
@@ -323,23 +325,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     // Addresses and hostnames are both valid, so we'll check addresses first
     // The standard doesn't define what to do when called with addresses
     // Some implementations just skip resolution and copy the address to h_name
-    let mut octets = name_str.split('.');
-    let mut s_addr = [0u8; 4];
-    let mut is_addr = true;
-    for item in &mut s_addr {
-        if let Some(n) = octets.next().and_then(|x| u8::from_str(x).ok()) {
-            *item = n;
-        } else {
-            is_addr = false;
-            break;
-        }
-    }
-    if octets.next() != None {
-        is_addr = false;
-    }
-
-    if is_addr {
-        let s_addr = u32::from_ne_bytes(s_addr);
+    if let Some(s_addr) = parse_ipv4_string(name_str) {
         let addr = in_addr { s_addr };
         return gethostbyaddr(&addr as *const _ as *const c_void, 4, AF_INET);
     }
@@ -785,7 +771,6 @@ pub unsafe extern "C" fn getaddrinfo(
     hints: *const addrinfo,
     res: *mut *mut addrinfo,
 ) -> c_int {
-    //TODO: getaddrinfo
     let node_opt = CStr::from_nullable_ptr(node);
     let service_opt = CStr::from_nullable_ptr(service);
 
@@ -814,55 +799,71 @@ pub unsafe extern "C" fn getaddrinfo(
             Err(_err) => (),
         }
     }
+    let node = node_opt.unwrap_or_else(|| {
+        //TODO: Optimize by bypassing string parsing
+        if ai_flags & AI_PASSIVE > 0 {
+            c"0.0.0.0".into()
+        } else {
+            c"127.0.0.1".into()
+        }
+    });
 
-    //TODO: Check hosts file
-    if let Some(node) = node_opt {
-        //TODO: Support AI_NUMERICHOST
-        let lookuphost = match lookup_host(str::from_utf8_unchecked(node.to_bytes())) {
+    let lookuphost = if ai_flags & AI_NUMERICHOST > 0 {
+        match parse_ipv4_string(str::from_utf8_unchecked(node.to_bytes())) {
+            Some(s_addr) => s_addr.into(),
+            None => {
+                return EAI_NONAME;
+            }
+        }
+    } else {
+        match lookup_host(str::from_utf8_unchecked(node.to_bytes())) {
             Ok(lookuphost) => lookuphost,
             Err(e) => {
                 platform::ERRNO.set(e);
                 return EAI_SYSTEM;
             }
+        }
+    };
+
+    for in_addr in lookuphost {
+        ai_family = AF_INET;
+        ai_protocol = 0;
+
+        let ai_addr = Box::into_raw(Box::new(sockaddr_in {
+            sin_family: ai_family as sa_family_t,
+            sin_port: htons(port),
+            sin_addr: in_addr,
+            sin_zero: [0; 8],
+        })) as *mut sockaddr;
+
+        let ai_addrlen = mem::size_of::<sockaddr_in>();
+
+        let ai_canonname = if ai_flags & AI_CANONNAME > 0 {
+            if node_opt.is_none() {
+                return EAI_BADFLAGS;
+            }
+            ai_flags &= !AI_CANONNAME;
+            node.to_owned_cstring().into_raw()
+        } else {
+            ptr::null_mut()
         };
 
-        for in_addr in lookuphost {
-            ai_family = AF_INET;
-            ai_protocol = 0;
+        let addrinfo = Box::new(addrinfo {
+            ai_flags: 0,
+            ai_family,
+            ai_socktype,
+            ai_protocol,
+            ai_addrlen,
+            ai_canonname,
+            ai_addr,
+            ai_next: ptr::null_mut(),
+        });
 
-            let ai_addr = Box::into_raw(Box::new(sockaddr_in {
-                sin_family: ai_family as sa_family_t,
-                sin_port: htons(port),
-                sin_addr: in_addr,
-                sin_zero: [0; 8],
-            })) as *mut sockaddr;
-
-            let ai_addrlen = mem::size_of::<sockaddr_in>();
-
-            let ai_canonname = if ai_flags & AI_CANONNAME > 0 {
-                ai_flags &= !AI_CANONNAME;
-                node.to_owned_cstring().into_raw()
-            } else {
-                ptr::null_mut()
-            };
-
-            let addrinfo = Box::new(addrinfo {
-                ai_flags: 0,
-                ai_family,
-                ai_socktype,
-                ai_protocol,
-                ai_addrlen,
-                ai_canonname,
-                ai_addr,
-                ai_next: ptr::null_mut(),
-            });
-
-            let mut indirect = res;
-            while !(*indirect).is_null() {
-                indirect = &mut (**indirect).ai_next;
-            }
-            *indirect = Box::into_raw(addrinfo);
+        let mut indirect = res;
+        while !(*indirect).is_null() {
+            indirect = &mut (**indirect).ai_next;
         }
+        *indirect = Box::into_raw(addrinfo);
     }
 
     0
@@ -878,29 +879,81 @@ pub unsafe extern "C" fn getnameinfo(
     servlen: socklen_t,
     flags: c_int,
 ) -> c_int {
-    //TODO: getnameinfo
-    if addrlen as usize != mem::size_of::<sockaddr_in>() {
+    if addr.is_null() || addrlen as usize != mem::size_of::<sockaddr_in>() {
         return EAI_FAMILY;
     }
 
-    let addr = &*(addr as *const sockaddr_in);
+    let sa = &*(addr as *const sockaddr_in);
 
-    let host_opt = if host.is_null() {
-        None
-    } else {
-        Some(slice::from_raw_parts_mut(host, hostlen as usize))
-    };
+    if !serv.is_null() && servlen > 0 {
+        if flags & NI_NUMERICSERV != 0 {
+            let port_str = sa.sin_port.to_be().to_string();
+            let port_bytes = port_str.as_bytes();
+            if (servlen as usize) <= port_bytes.len() {
+                return EAI_MEMORY; // Buffer too small
+            }
+            ptr::copy_nonoverlapping(port_bytes.as_ptr() as *const c_char, serv, port_bytes.len());
+            *serv.add(port_bytes.len()) = 0;
+        } else {
+            // TODO: Implement service name lookup (e.g., from /etc/services)
+            *serv = 0;
+        }
+    }
 
-    let serv_opt = if serv.is_null() {
-        None
-    } else {
-        Some(slice::from_raw_parts_mut(serv, servlen as usize))
-    };
+    if !host.is_null() && hostlen > 0 {
+        if flags & NI_NUMERICHOST != 0 {
+            let ip_addr = Ipv4Addr::from(sa.sin_addr.s_addr.to_be());
+            let ip_str = ip_addr.to_string();
+            let ip_bytes = ip_str.as_bytes();
+            if (hostlen as usize) <= ip_bytes.len() {
+                return EAI_MEMORY; // Buffer too small
+            }
+            ptr::copy_nonoverlapping(ip_bytes.as_ptr() as *const c_char, host, ip_bytes.len());
+            *host.add(ip_bytes.len()) = 0;
+        } else {
+            match lookup_addr(sa.sin_addr.clone()).map(|host_names| host_names.into_iter().next()) {
+                Ok(Some(hostname)) => {
+                    if (hostlen as usize) <= hostname.len() {
+                        return EAI_MEMORY; // Buffer too small
+                    }
+                    unsafe {
+                        ptr::copy_nonoverlapping(
+                            hostname.as_ptr() as *const c_char,
+                            host,
+                            hostname.len(),
+                        );
+                        *host.add(hostname.len()) = 0;
+                    }
+                }
+                Ok(None) => {
+                    if flags & NI_NAMEREQD != 0 {
+                        return EAI_NONAME;
+                    }
+                }
+                Err(_) => {
+                    if flags & NI_NAMEREQD != 0 {
+                        return EAI_NONAME;
+                    }
+                    let ip_addr = Ipv4Addr::from(sa.sin_addr.s_addr.to_be());
+                    let ip_str = ip_addr.to_string();
+                    let ip_bytes = ip_str.as_bytes();
+                    if (hostlen as usize) <= ip_bytes.len() {
+                        return EAI_MEMORY;
+                    }
+                    unsafe {
+                        ptr::copy_nonoverlapping(
+                            ip_bytes.as_ptr() as *const c_char,
+                            host,
+                            ip_bytes.len(),
+                        );
+                        *host.add(ip_bytes.len()) = 0;
+                    }
+                }
+            }
+        }
+    }
 
-    eprintln!("getnameinfo({:p}, {}, {:#x})", addr, addrlen, flags);
-
-    platform::ERRNO.set(ENOSYS);
-    EAI_SYSTEM
+    0
 }
 
 #[no_mangle]

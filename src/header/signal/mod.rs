@@ -89,7 +89,7 @@ pub type stack_t = sigaltstack;
 #[cfg(target_arch = "aarch64")]
 global_asm!(include_str!("sigsetjmp/aarch64/sigsetjmp.s"));
 
-#[cfg(target_arch = "riscv64gc")]
+#[cfg(target_arch = "riscv64")]
 global_asm!(include_str!("sigsetjmp/riscv64/sigsetjmp.s"));
 
 #[cfg(target_arch = "x86")]
