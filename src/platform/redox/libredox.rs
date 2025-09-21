@@ -14,6 +14,7 @@ use crate::{
         sys_uio::iovec,
         time::timespec,
     },
+    out::Out,
     platform::{types::*, PalSignal},
 };
 
@@ -111,11 +112,13 @@ pub unsafe fn futimens(fd: usize, times: *const timespec) -> syscall::Result<()>
     syscall::futimens(fd as usize, &times)?;
     Ok(())
 }
-pub unsafe fn clock_gettime(clock: usize, tp: *mut timespec) -> syscall::Result<()> {
-    let mut redox_tp = syscall::TimeSpec::from(&*tp);
+pub fn clock_gettime(clock: usize, mut tp: Out<timespec>) -> syscall::Result<()> {
+    let mut redox_tp = syscall::TimeSpec::default();
     syscall::clock_gettime(clock as usize, &mut redox_tp)?;
-    (*tp).tv_sec = redox_tp.tv_sec as time_t;
-    (*tp).tv_nsec = redox_tp.tv_nsec as c_long;
+    tp.write(timespec {
+        tv_sec: redox_tp.tv_sec as time_t,
+        tv_nsec: redox_tp.tv_nsec as c_long,
+    });
     Ok(())
 }
 
@@ -331,7 +334,7 @@ pub unsafe extern "C" fn redox_munmap_v1(addr: *mut (), unaligned_len: usize) ->
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_clock_gettime_v1(clock: usize, ts: *mut timespec) -> RawResult {
-    Error::mux(clock_gettime(clock, ts).map(|()| 0))
+    Error::mux(clock_gettime(clock, Out::nonnull(ts)).map(|()| 0))
 }
 
 #[no_mangle]

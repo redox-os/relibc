@@ -5,7 +5,10 @@ use alloc::{
 };
 use core::mem;
 
-use crate::platform::{types::*, Pal, Sys};
+use crate::{
+    out::Out,
+    platform::{types::*, Pal, Sys},
+};
 
 use crate::header::{
     errno::*,
@@ -50,7 +53,10 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
     if let Some(dns_addr) = parse_ipv4_string(&dns_string) {
         let mut timespec = timespec::default();
         unsafe {
-            Sys::clock_gettime(time::constants::CLOCK_REALTIME, &mut timespec);
+            Sys::clock_gettime(
+                time::constants::CLOCK_REALTIME,
+                Out::from_mut(&mut timespec),
+            );
         }
         let tid = (timespec.tv_nsec >> 16) as u16;
 
@@ -149,7 +155,12 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
         );
 
         let mut timespec = timespec::default();
-        unsafe { Sys::clock_gettime(time::constants::CLOCK_REALTIME, &mut timespec) };
+        unsafe {
+            Sys::clock_gettime(
+                time::constants::CLOCK_REALTIME,
+                Out::from_mut(&mut timespec),
+            )
+        };
         let tid = (timespec.tv_nsec >> 16) as u16;
 
         let packet = Dns {
