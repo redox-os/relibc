@@ -14,6 +14,7 @@ use crate::{
     error::Errno,
     fs::File,
     header::{fcntl, limits},
+    out::Out,
     sync::Mutex,
 };
 
@@ -44,19 +45,15 @@ pub fn chdir(path: &str) -> Result<()> {
 }
 
 // getcwd is similarly both thread-safe and signal-safe.
-// TODO: MaybeUninit
-pub fn getcwd(buf: &mut [u8]) -> Option<usize> {
+pub fn getcwd(mut buf: Out<[u8]>) -> Option<usize> {
     let _siglock = tmp_disable_signals();
     let cwd_guard = CWD.lock();
     let cwd = cwd_guard.as_deref().unwrap_or("").as_bytes();
 
-    // But is already checked not to be empty.
-    if buf.len() - 1 < cwd.len() {
-        return None;
-    }
+    let [mut before, mut after] = buf.split_at_checked(cwd.len())?;
 
-    buf[..cwd.len()].copy_from_slice(&cwd);
-    buf[cwd.len()..].fill(0_u8);
+    before.copy_from_slice(&cwd);
+    after.zero();
 
     Some(cwd.len())
 }
@@ -238,7 +235,7 @@ pub fn cap_path_at(
     let path = if dirfd == fcntl::AT_FDCWD {
         // The special constant AT_FDCWD indicates that we should use the cwd.
         let mut buf = [0; limits::PATH_MAX];
-        let len = getcwd(&mut buf).ok_or(Errno(ENAMETOOLONG))?;
+        let len = getcwd(Out::from_mut(&mut buf)).ok_or(Errno(ENAMETOOLONG))?;
         // SAFETY: Redox's cwd is stored as a str.
         let cwd = unsafe { str::from_utf8_unchecked(&buf[..len]) };
 
