@@ -2,8 +2,13 @@ use alloc::boxed::Box;
 
 use super::{constants::*, Buffer, FILE};
 use crate::{
+    c_str::CStr,
+    error::Errno,
     fs::File,
-    header::{errno, fcntl::*, string::strchr},
+    header::{
+        errno::{self, EINVAL},
+        fcntl::*,
+    },
     io::BufWriter,
     platform::{self, types::*},
     sync::Mutex,
@@ -11,26 +16,26 @@ use crate::{
 use alloc::vec::Vec;
 
 /// Parse mode flags as a string and output a mode flags integer
-pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
-    let mut flags = if !strchr(mode_str, b'+' as i32).is_null() {
+pub fn parse_mode_flags(mode_str: CStr) -> i32 {
+    let mut flags = if mode_str.contains(b'+') {
         O_RDWR
-    } else if (*mode_str) == b'r' as c_char {
+    } else if mode_str.first() == b'r' {
         O_RDONLY
     } else {
         O_WRONLY
     };
-    if !strchr(mode_str, b'x' as i32).is_null() {
+    if mode_str.contains(b'x') {
         flags |= O_EXCL;
     }
-    if !strchr(mode_str, b'e' as i32).is_null() {
+    if mode_str.contains(b'e') {
         flags |= O_CLOEXEC;
     }
-    if (*mode_str) != b'r' as c_char {
+    if mode_str.first() != b'r' {
         flags |= O_CREAT;
     }
-    if (*mode_str) == b'w' as c_char {
+    if mode_str.first() == b'w' {
         flags |= O_TRUNC;
-    } else if (*mode_str) == b'a' as c_char {
+    } else if mode_str.first() == b'a' {
         flags |= O_APPEND;
     }
 
@@ -38,37 +43,34 @@ pub unsafe fn parse_mode_flags(mode_str: *const c_char) -> i32 {
 }
 
 /// Open a file with the file descriptor `fd` in the mode `mode`
-pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
-    if *mode != b'r' as c_char && *mode != b'w' as c_char && *mode != b'a' as c_char {
-        platform::ERRNO.set(errno::EINVAL);
-        return None;
+pub fn _fdopen(fd: c_int, mode: CStr) -> Result<Box<FILE>, Errno> {
+    if mode.first() != b'r' && mode.first() != b'w' && mode.first() != b'a' {
+        return Err(Errno(EINVAL));
     }
 
     let mut flags = 0;
-    if strchr(mode, b'+' as i32).is_null() {
-        flags |= if *mode == b'r' as c_char {
-            F_NOWR
-        } else {
-            F_NORD
-        };
+    if !mode.contains(b'+') {
+        flags |= if mode.first() == b'r' { F_NOWR } else { F_NORD };
     }
 
-    if !strchr(mode, b'e' as i32).is_null() {
-        fcntl(fd, F_SETFD, FD_CLOEXEC as c_ulonglong);
+    if mode.contains(b'e') {
+        unsafe {
+            fcntl(fd, F_SETFD, FD_CLOEXEC as c_ulonglong);
+        }
     }
 
-    if *mode == 'a' as c_char {
-        let f = fcntl(fd, F_GETFL, 0);
+    if mode.first() == b'a' {
+        let f = unsafe { fcntl(fd, F_GETFL, 0) };
         if (f & O_APPEND) == 0 {
-            fcntl(fd, F_SETFL, (f | O_APPEND) as c_ulonglong);
+            unsafe { fcntl(fd, F_SETFL, (f | O_APPEND) as c_ulonglong) };
         }
         flags |= F_APP;
     }
 
     let file = File::new(fd);
-    let writer = Box::new(BufWriter::new(file.get_ref()));
+    let writer = Box::new(BufWriter::new(unsafe { file.get_ref() }));
 
-    Some(Box::into_raw(Box::new(FILE {
+    Ok(Box::new(FILE {
         lock: Mutex::new(()),
 
         file,
@@ -82,5 +84,5 @@ pub unsafe fn _fdopen(fd: c_int, mode: *const c_char) -> Option<*mut FILE> {
         pid: None,
 
         orientation: 0,
-    })))
+    }))
 }

@@ -27,6 +27,7 @@ EXPECT_NAMES=\
 	crypt/sha256 \
 	crypt/sha512 \
 	destructor \
+	dirent/fdopendir \
 	dirent/scandir \
 	endian \
 	err \
@@ -108,6 +109,8 @@ EXPECT_NAMES=\
 	string/stpcpy \
 	string/stpncpy \
 	strings \
+	sys_stat/chmod \
+	sys_stat/lstat \
 	sys_stat/fstatat \
 	sys_syslog/syslog \
 	time/asctime \
@@ -133,11 +136,12 @@ EXPECT_NAMES=\
 	unistd/fsync \
 	unistd/ftruncate \
 	unistd/getopt \
+	unistd/getopt_long \
 	unistd/pipe \
+	unistd/readlinkat \
 	unistd/rmdir \
 	unistd/sleep \
 	unistd/swab \
-	unistd/getopt_long \
 	unistd/write \
 	wchar/fgetwc \
 	wchar/fwide \

@@ -6,6 +6,7 @@ use crate::{
     c_str::CStr,
     error::ResultExt,
     header::time::timespec,
+    out::Out,
     platform::{types::*, Pal, PalSignal, Sys},
 };
 use core::ptr::null;
@@ -97,7 +98,9 @@ pub unsafe extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int
 #[deprecated]
 #[no_mangle]
 pub unsafe extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
-    Sys::gettimeofday(tp, tzp).map(|()| 0).or_minus_one_errno()
+    Sys::gettimeofday(Out::nonnull(tp), Out::nullable(tzp))
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 // `select()` declared in `sys/select.h`, as specified in modern POSIX

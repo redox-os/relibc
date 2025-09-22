@@ -1,7 +1,7 @@
 //! sys/wait.h implementation for Redox, following
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/syswait.h.html
 
-use crate::error::ResultExt;
+use crate::{error::ResultExt, out::Out};
 //use header::sys_resource::rusage;
 use crate::platform::{types::*, Pal, Sys};
 
@@ -48,5 +48,5 @@ pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {
 
 #[no_mangle]
 pub unsafe extern "C" fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
-    Sys::waitpid(pid, stat_loc, options).or_minus_one_errno()
+    Sys::waitpid(pid, Out::nullable(stat_loc), options).or_minus_one_errno()
 }

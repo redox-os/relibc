@@ -364,6 +364,16 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
         }
     }
 
+    let mut inherited_sigignmask = 0_u64;
+    if let Some(mask) = get_auxv(&auxvs, AT_REDOX_INHERITED_SIGIGNMASK) {
+        inherited_sigignmask |= mask as u64;
+    }
+    #[cfg(target_pointer_width = "32")]
+    if let Some(mask) = get_auxv(&auxvs, AT_REDOX_INHERITED_SIGIGNMASK_HI) {
+        inherited_sigignmask |= (mask as u64) << 32;
+    }
+    redox_rt::signal::apply_inherited_sigignmask(inherited_sigignmask);
+
     let mut inherited_sigprocmask = 0_u64;
 
     if let Some(mask) = get_auxv(&auxvs, AT_REDOX_INHERITED_SIGPROCMASK) {

@@ -25,6 +25,7 @@ use crate::{
         unistd::F_OK,
     },
     ld_so::dso::{resolve_sym, SymbolBinding},
+    out::Out,
     platform::{
         types::{c_int, c_uint, c_void},
         Pal, Sys,
@@ -88,9 +89,7 @@ impl MmapFile {
     fn open(path: CStr, oflag: c_int) -> core::result::Result<Self, Errno> {
         let fd = Sys::open(path, oflag, 0 /* mode */)?;
         let mut stat = crate::header::sys_stat::stat::default();
-        unsafe {
-            Sys::fstat(fd, &mut stat)?;
-        }
+        Sys::fstat(fd, Out::from_mut(&mut stat))?;
 
         let size = stat.st_size as usize;
         let ptr = unsafe {
@@ -593,7 +592,7 @@ impl Linker {
             Resolve::Now
         };
 
-        unsafe { _r_debug.state = RTLDState::RT_ADD };
+        _r_debug.lock().state = RTLDState::RT_ADD;
         _dl_debug_state();
 
         let mut new_objects = Vec::new();
@@ -724,7 +723,7 @@ impl Linker {
             self.register_object(obj);
         }
 
-        unsafe { _r_debug.state = RTLDState::RT_CONSISTENT };
+        _r_debug.lock().state = RTLDState::RT_CONSISTENT;
         _dl_debug_state();
 
         Ok(loaded_dso)

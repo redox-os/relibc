@@ -10,6 +10,7 @@ use crate::{
         sys_utsname::utsname,
         time::timespec,
     },
+    out::Out,
     pthread,
 };
 
@@ -39,9 +40,10 @@ pub trait Pal {
 
     fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()>;
 
-    unsafe fn clock_getres(clk_id: clockid_t, tp: *mut timespec) -> Result<()>;
+    fn clock_getres(clk_id: clockid_t, tp: Option<Out<timespec>>) -> Result<()>;
 
-    unsafe fn clock_gettime(clk_id: clockid_t, tp: *mut timespec) -> Result<()>;
+    // TODO: maybe remove tp and change signature to -> Result<timespec>?
+    fn clock_gettime(clk_id: clockid_t, tp: Out<timespec>) -> Result<()>;
 
     unsafe fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> Result<()>;
 
@@ -65,6 +67,7 @@ pub trait Pal {
     fn fchdir(fildes: c_int) -> Result<()>;
 
     fn fchmod(fildes: c_int, mode: mode_t) -> Result<()>;
+    fn fchmodat(dirfd: c_int, path: Option<CStr>, mode: mode_t, flags: c_int) -> Result<()>;
 
     fn fchown(fildes: c_int, owner: uid_t, group: gid_t) -> Result<()>;
 
@@ -72,16 +75,11 @@ pub trait Pal {
 
     fn flock(fd: c_int, operation: c_int) -> Result<()>;
 
-    unsafe fn fstat(fildes: c_int, buf: *mut stat) -> Result<()>;
+    fn fstat(fildes: c_int, buf: Out<stat>) -> Result<()>;
 
-    unsafe fn fstatat(
-        fildes: c_int,
-        path: *const c_char,
-        buf: *mut stat,
-        flags: c_int,
-    ) -> Result<()>;
+    fn fstatat(fildes: c_int, path: Option<CStr>, buf: Out<stat>, flags: c_int) -> Result<()>;
 
-    unsafe fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> Result<()>;
+    fn fstatvfs(fildes: c_int, buf: Out<statvfs>) -> Result<()>;
 
     fn fcntl(fildes: c_int, cmd: c_int, arg: c_ulonglong) -> Result<c_int>;
 
@@ -100,7 +98,7 @@ pub trait Pal {
 
     unsafe fn utimens(path: CStr, times: *const timespec) -> Result<()>;
 
-    unsafe fn getcwd(buf: *mut c_char, size: size_t) -> Result<()>;
+    fn getcwd(buf: Out<[u8]>) -> Result<()>;
 
     fn getdents(fd: c_int, buf: &mut [u8], opaque_offset: u64) -> Result<usize>;
     fn dir_seek(fd: c_int, opaque_offset: u64) -> Result<()>;
@@ -119,7 +117,7 @@ pub trait Pal {
     // Always successful
     fn getgid() -> gid_t;
 
-    unsafe fn getgroups(size: c_int, list: *mut gid_t) -> Result<c_int>;
+    fn getgroups(list: Out<[gid_t]>) -> Result<c_int>;
 
     /* Note that this is distinct from the legacy POSIX function
      * getpagesize(), which returns a c_int. On some Linux platforms,
@@ -139,29 +137,29 @@ pub trait Pal {
     fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize>;
 
     fn getresgid(
-        rgid: Option<&mut gid_t>,
-        egid: Option<&mut gid_t>,
-        sgid: Option<&mut gid_t>,
+        rgid: Option<Out<gid_t>>,
+        egid: Option<Out<gid_t>>,
+        sgid: Option<Out<gid_t>>,
     ) -> Result<()>;
 
     fn getresuid(
-        ruid: Option<&mut uid_t>,
-        euid: Option<&mut uid_t>,
-        suid: Option<&mut uid_t>,
+        ruid: Option<Out<uid_t>>,
+        euid: Option<Out<uid_t>>,
+        suid: Option<Out<uid_t>>,
     ) -> Result<()>;
 
-    unsafe fn getrlimit(resource: c_int, rlim: *mut rlimit) -> Result<()>;
+    fn getrlimit(resource: c_int, rlim: Out<rlimit>) -> Result<()>;
 
     unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> Result<()>;
 
-    fn getrusage(who: c_int, r_usage: &mut rusage) -> Result<()>;
+    fn getrusage(who: c_int, r_usage: Out<rusage>) -> Result<()>;
 
     fn getsid(pid: pid_t) -> Result<pid_t>;
 
     // Always successful
     fn gettid() -> pid_t;
 
-    unsafe fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> Result<()>;
+    fn gettimeofday(tp: Out<timeval>, tzp: Option<Out<timezone>>) -> Result<()>;
 
     fn getuid() -> uid_t;
 
@@ -216,7 +214,7 @@ pub trait Pal {
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
 
-    fn pipe2(fildes: &mut [c_int], flags: c_int) -> Result<()>;
+    fn pipe2(fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()>;
 
     unsafe fn rlct_clone(stack: *mut usize) -> Result<pthread::OsTid, Errno>;
     unsafe fn rlct_kill(os_tid: pthread::OsTid, signal: usize) -> Result<()>;
@@ -227,6 +225,8 @@ pub trait Pal {
     fn pread(fildes: c_int, buf: &mut [u8], offset: off_t) -> Result<usize>;
 
     fn readlink(pathname: CStr, out: &mut [u8]) -> Result<usize>;
+
+    fn readlinkat(dirfd: c_int, pathname: CStr, out: &mut [u8]) -> Result<usize>;
 
     fn rename(old: CStr, new: CStr) -> Result<()>;
 
@@ -257,7 +257,7 @@ pub trait Pal {
 
     fn unlink(path: CStr) -> Result<()>;
 
-    unsafe fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> Result<pid_t>;
+    fn waitpid(pid: pid_t, stat_loc: Option<Out<c_int>>, options: c_int) -> Result<pid_t>;
 
     fn write(fildes: c_int, buf: &[u8]) -> Result<usize>;
     fn pwrite(fildes: c_int, buf: &[u8], offset: off_t) -> Result<usize>;

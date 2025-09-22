@@ -14,17 +14,18 @@ use crate::{
     error::{Errno, ResultExt},
     header::{
         crypt::{crypt_data, crypt_r},
-        errno, fcntl, limits,
+        errno::{self, ENAMETOOLONG},
+        fcntl, limits,
         stdlib::getenv,
         sys_ioctl, sys_resource, sys_time, sys_utsname, termios,
         time::timespec,
     },
+    out::Out,
     platform::{self, types::*, Pal, Sys, ERRNO},
 };
 
-use alloc::collections::LinkedList;
-
 pub use self::{brk::*, getopt::*, getpass::getpass, pathconf::*, sysconf::*};
+pub use crate::header::pthread::fork_hooks;
 
 // Inclusion of ctermid() prototype marked as obsolescent since Issue 7, cf.
 // <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/unistd.h.html>.
@@ -35,7 +36,7 @@ pub use crate::header::stdio::{ctermid, cuserid};
 //pub use crate::header::fcntl::{faccessat, fchownat, fexecve, linkat, readlinkat, symlinkat, unlinkat};
 
 use super::{
-    errno::{E2BIG, ENOMEM},
+    errno::{E2BIG, EINVAL, ENOMEM},
     stdio::snprintf,
 };
 
@@ -104,16 +105,15 @@ pub const _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS: c_int = 1145;
 pub const _CS_POSIX_V7_LPBIG_OFFBIG_LIBS: c_int = 1146;
 pub const _CS_POSIX_V7_LPBIG_OFFBIG_LINTFLAGS: c_int = 1147;
 
-#[thread_local]
-pub static mut fork_hooks_static: Option<[LinkedList<extern "C" fn()>; 3]> = None;
-
-unsafe fn init_fork_hooks<'a>() -> &'a mut [LinkedList<extern "C" fn()>; 3] {
-    // Transmute the lifetime so we can return here. Should be safe as
-    // long as one does not access the original fork_hooks.
-    mem::transmute(
-        fork_hooks_static
-            .get_or_insert_with(|| [LinkedList::new(), LinkedList::new(), LinkedList::new()]),
-    )
+// Re-exported from pthread.h. `pthread_atfork` should be in pthread.h according to the
+// standard, but glibc exports it here as well. We ONLY exported it in unistd.h till recently.
+extern "C" {
+    #[no_mangle]
+    pub fn pthread_atfork(
+        prepare: Option<extern "C" fn()>,
+        parent: Option<extern "C" fn()>,
+        child: Option<extern "C" fn()>,
+    ) -> c_int;
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html>.
@@ -345,11 +345,19 @@ pub unsafe extern "C" fn execve(
         .or_minus_one_errno()
 }
 
-#[cfg(target_os = "linux")]
-const PATH_SEPARATOR: u8 = b':';
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
+#[no_mangle]
+pub unsafe extern "C" fn fexecve(
+    fd: c_int,
+    argv: *const *mut c_char,
+    envp: *const *mut c_char,
+) -> c_int {
+    Sys::fexecve(fd, argv, envp)
+        .map(|()| unreachable!())
+        .or_minus_one_errno()
+}
 
-#[cfg(target_os = "redox")]
-const PATH_SEPARATOR: u8 = b';';
+const PATH_SEPARATOR: u8 = b':';
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
 #[no_mangle]
@@ -413,7 +421,6 @@ pub extern "C" fn fdatasync(fildes: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html>.
 #[no_mangle]
 pub unsafe extern "C" fn fork() -> pid_t {
-    let fork_hooks = init_fork_hooks();
     for prepare in &fork_hooks[0] {
         prepare();
     }
@@ -454,7 +461,7 @@ pub unsafe extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut 
         size = stack_buf.len();
     }
 
-    let ret = match Sys::getcwd(buf, size) {
+    let ret = match Sys::getcwd(Out::from_raw_parts(buf.cast(), size)) {
         Ok(()) => buf,
         Err(Errno(errno)) => {
             ERRNO.set(errno);
@@ -532,7 +539,17 @@ pub extern "C" fn getgid() -> gid_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getgroups.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getgroups(size: c_int, list: *mut gid_t) -> c_int {
-    Sys::getgroups(size, list).or_minus_one_errno()
+    (|| {
+        let size = usize::try_from(size)
+            // fails for negative size, but EINVAL required if size != 0 && size < actual size,
+            // where the actual number of entries in the group list is obviously nonnegative
+            .map_err(|_| Errno(EINVAL))?;
+
+        let list = Out::from_raw_parts(list, size);
+
+        Sys::getgroups(list)
+    })()
+    .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gethostid.html>.
@@ -631,19 +648,25 @@ pub extern "C" fn getppid() -> pid_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresgid.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getresgid(rgid: *mut gid_t, egid: *mut gid_t, sgid: *mut gid_t) -> c_int {
-    // TODO: Out<T> write-only wrapper?
-    Sys::getresgid(rgid.as_mut(), egid.as_mut(), sgid.as_mut())
-        .map(|()| 0)
-        .or_minus_one_errno()
+    Sys::getresgid(
+        Out::nullable(rgid),
+        Out::nullable(egid),
+        Out::nullable(sgid),
+    )
+    .map(|()| 0)
+    .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getresuid.html>.
 #[no_mangle]
 pub unsafe extern "C" fn getresuid(ruid: *mut uid_t, euid: *mut uid_t, suid: *mut uid_t) -> c_int {
-    // TODO: Out<T> write-only wrapper?
-    Sys::getresuid(ruid.as_mut(), euid.as_mut(), suid.as_mut())
-        .map(|()| 0)
-        .or_minus_one_errno()
+    Sys::getresuid(
+        Out::nullable(ruid),
+        Out::nullable(euid),
+        Out::nullable(suid),
+    )
+    .map(|()| 0)
+    .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getsid.html>.
@@ -764,7 +787,7 @@ pub unsafe extern "C" fn pipe(fildes: *mut c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pipe.html>.
 #[no_mangle]
 pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
-    Sys::pipe2(slice::from_raw_parts_mut(fildes, 2), flags)
+    Sys::pipe2(Out::nonnull(fildes.cast::<[c_int; 2]>()), flags)
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -790,28 +813,6 @@ pub unsafe extern "C" fn pread(
     )
     .map(|read| read as ssize_t)
     .or_minus_one_errno()
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_atfork.html>.
-///
-/// TODO: specified in `pthread.h` in modern POSIX
-#[no_mangle]
-pub extern "C" fn pthread_atfork(
-    prepare: Option<extern "C" fn()>,
-    parent: Option<extern "C" fn()>,
-    child: Option<extern "C" fn()>,
-) -> c_int {
-    let fork_hooks = unsafe { init_fork_hooks() };
-    if let Some(prepare) = prepare {
-        fork_hooks[0].push_back(prepare);
-    }
-    if let Some(parent) = parent {
-        fork_hooks[1].push_back(parent);
-    }
-    if let Some(child) = child {
-        fork_hooks[2].push_back(child);
-    }
-    0
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/write.html>.
@@ -857,6 +858,25 @@ pub unsafe extern "C" fn readlink(
     let buf = slice::from_raw_parts_mut(buf as *mut u8, bufsize as usize);
     Sys::readlink(path, buf)
         .map(|read| read as ssize_t)
+        .or_minus_one_errno()
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readlink.html>.
+#[no_mangle]
+pub unsafe extern "C" fn readlinkat(
+    dirfd: c_int,
+    pathname: *const c_char,
+    buf: *mut c_char,
+    len: size_t,
+) -> ssize_t {
+    let pathname = CStr::from_ptr(pathname);
+    let mut buf = slice::from_raw_parts_mut(buf.cast(), len);
+    Sys::readlinkat(dirfd, pathname, &mut buf)
+        .map(|read| {
+            read.try_into()
+                .map_err(|_| Errno(ENAMETOOLONG))
+                .or_minus_one_errno()
+        })
         .or_minus_one_errno()
 }
 

@@ -13,21 +13,18 @@
 #![allow(unused_variables)]
 #![feature(alloc_error_handler)]
 #![feature(allocator_api)]
-#![feature(array_chunks)]
 #![feature(asm_const)]
 #![feature(c_variadic)]
 #![feature(core_intrinsics)]
-#![feature(int_roundings)]
 #![feature(maybe_uninit_slice)]
 #![feature(lang_items)]
 #![feature(let_chains)]
 #![feature(linkage)]
-#![feature(naked_functions)]
 #![feature(pointer_is_aligned_to)]
 #![feature(ptr_as_uninit)]
 #![feature(slice_as_chunks)]
+#![feature(slice_ptr_get)]
 #![feature(stmt_expr_attributes)]
-#![feature(str_internals)]
 #![feature(strict_provenance)]
 #![feature(sync_unsafe_cell)]
 #![feature(thread_local)]
@@ -67,6 +64,7 @@ pub mod header;
 pub mod io;
 pub mod iter;
 pub mod ld_so;
+pub mod out;
 pub mod platform;
 pub mod pthread;
 pub mod start;

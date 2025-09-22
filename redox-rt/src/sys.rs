@@ -12,6 +12,7 @@ use syscall::{
 use crate::{
     arch::manually_enter_trampoline,
     protocol::{ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags},
+    read_proc_meta,
     signal::tmp_disable_signals,
     DynamicProcInfo, RtTcb, Tcb, DYNAMIC_PROC_INFO,
 };
@@ -305,6 +306,9 @@ pub fn posix_getresugid() -> Resugid<u32> {
         sgid,
     }
 }
+pub fn getens() -> Result<usize> {
+    read_proc_meta(crate::current_proc_fd()).map(|meta| meta.ens as usize)
+}
 pub fn get_proc_credentials(cap_fd: usize, target_pid: usize, buf: &mut [u8]) -> Result<usize> {
     if buf.len() < size_of::<crate::protocol::ProcMeta>() {
         return Err(Error::new(EINVAL));
@@ -320,7 +324,7 @@ pub fn posix_exit(status: i32) -> ! {
     this_proc_call(
         &mut [],
         CallFlags::empty(),
-        &[ProcCall::Exit as u64, status as u64],
+        &[ProcCall::Exit as u64, (status & 0xFF) as u64],
     )
     .expect("failed to call proc mgr with Exit");
     let _ = syscall::write(1, b"redox-rt: ProcCall::Exit FAILED, abort()ing!\n");

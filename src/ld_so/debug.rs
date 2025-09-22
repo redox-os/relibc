@@ -63,6 +63,15 @@ impl RTLDDebug {
     }
 }
 
+/// SAFETY: safe as long as caller wraps the instance in a mutex,
+/// or similar structure that guarantees exclusive mutable access.
+/// Separate instances must not contain pointers to the same LinkMap instance.
+unsafe impl Send for RTLDDebug {}
+/// SAFETY: safe as long as caller wraps the instance in a mutex,
+/// or similar structure that guarantees exclusive mutable access.
+/// Separate instances must not contain pointers to the same LinkMap instance.
+unsafe impl Sync for RTLDDebug {}
+
 #[repr(C)]
 struct LinkMap {
     /* These members are part of the protocol with the debugger.
@@ -126,4 +135,4 @@ impl LinkMap {
 pub extern "C" fn _dl_debug_state() {}
 
 #[no_mangle]
-pub static mut _r_debug: RTLDDebug = RTLDDebug::NEW;
+pub static _r_debug: spin::Mutex<RTLDDebug> = spin::Mutex::new(RTLDDebug::NEW);
