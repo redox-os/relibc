@@ -216,6 +216,8 @@ pub trait Pal {
 
     fn pipe2(fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()>;
 
+    fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize>;
+
     unsafe fn rlct_clone(stack: *mut usize) -> Result<pthread::OsTid, Errno>;
     unsafe fn rlct_kill(os_tid: pthread::OsTid, signal: usize) -> Result<()>;
 
