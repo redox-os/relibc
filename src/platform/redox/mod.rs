@@ -36,7 +36,7 @@ use crate::{
         sys_utsname::{utsname, UTSLENGTH},
         sys_wait,
         time::timespec,
-        unistd::{F_OK, R_OK, W_OK, X_OK},
+        unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, prelude::*, BufReader},
     out::Out,
@@ -419,6 +419,7 @@ impl Pal for Sys {
 
         Ok(record_len.into())
     }
+
     fn dir_seek(_fd: c_int, _off: u64) -> Result<()> {
         // Redox getdents takes an explicit (opaque) offset, so this is a no-op.
         Ok(())
@@ -812,6 +813,32 @@ impl Pal for Sys {
     fn pipe2(mut fds: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
         fds.write(extra::pipe2(flags as usize)?);
         Ok(())
+    }
+
+    fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize> {
+        let current_offset = Self::lseek(fildes, 0, SEEK_CUR)? as u64;
+        let bytes_read = Self::getdents(fildes, buf, current_offset)?;
+        if bytes_read == 0 {
+            return Ok(0);
+        }
+        let mut bytes_processed = 0;
+        let mut next_offset = current_offset;
+
+        while bytes_processed < bytes_read {
+            let remaining_slice = &buf[bytes_processed..];
+            let (reclen, opaque_next) =
+                unsafe { Self::dent_reclen_offset(remaining_slice, bytes_processed) }
+                    .ok_or(Errno(EIO))?;
+            if reclen == 0 {
+                return Err(Errno(EIO));
+            }
+
+            bytes_processed += reclen as usize;
+            next_offset = opaque_next;
+        }
+
+        Self::lseek(fildes, next_offset as off_t, SEEK_SET)?;
+        Ok(bytes_read)
     }
 
     unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
