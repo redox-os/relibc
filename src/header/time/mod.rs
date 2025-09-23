@@ -6,7 +6,9 @@ use crate::{
     c_str::{CStr, CString},
     error::ResultExt,
     fs::File,
-    header::{errno::EOVERFLOW, fcntl::O_RDONLY, stdlib::getenv, unistd::readlink},
+    header::{
+        errno::EOVERFLOW, fcntl::O_RDONLY, stdlib::getenv, sys_time::timeval, unistd::readlink,
+    },
     io::Read,
     out::Out,
     platform::{self, Pal, Sys, types::*},
@@ -63,6 +65,15 @@ impl timespec {
                 tv_nsec: 1_000_000_000 - (earlier_nsec - later_nsec) as c_long,
             }
         })
+    }
+}
+
+impl From<timeval> for timespec {
+    fn from(timeval { tv_sec, tv_usec }: timeval) -> Self {
+        Self {
+            tv_sec,
+            tv_nsec: tv_usec as i64 * 1000,
+        }
     }
 }
 

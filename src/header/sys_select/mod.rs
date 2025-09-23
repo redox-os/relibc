@@ -1,18 +1,21 @@
 //! sys/select.h implementation
 
-use core::mem;
+use core::{mem, ptr};
 
 use cbitset::BitSet;
+use redox_rt::{arch::manually_enter_trampoline, signal::tmp_disable_signals};
 
 use crate::{
     fs::File,
     header::{
         errno,
+        signal::{sigprocmask, sigset_t, SIG_SETMASK},
         sys_epoll::{
             EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLIN, EPOLLOUT, epoll_create1, epoll_ctl,
             epoll_data, epoll_event, epoll_wait,
         },
         sys_time::timeval,
+        time::timespec,
     },
     platform::{self, types::*},
 };
@@ -200,4 +203,46 @@ pub unsafe extern "C" fn select(
         exceptfds,
         timeout
     )
+}
+
+#[no_mangle]
+#[allow(unsafe_op_in_unsafe_fn)]
+pub unsafe fn pselect(
+    nfds: c_int,
+    readfds: *mut fd_set,
+    writefds: *mut fd_set,
+    exceptfds: *mut fd_set,
+    timeout: *const timespec,
+    sigmask: *const sigset_t,
+) -> c_int {
+    let guard = tmp_disable_signals();
+
+    // Null pointers are valid for both pselect and sigprocmask.
+    // A null sigmask means pselect acts like select.
+    let mut saved_mask = 0;
+    if (!sigmask.is_null() && sigprocmask(SIG_SETMASK, sigmask, &mut saved_mask) == -1) {
+        return -1;
+    }
+
+    // select's timeout is a timeval whereas pselect's is a timespec.
+    // pselect doesn't modify the timeout with the remaining time so the result is ignored below
+    // and we don't need to convert timeval back to timespec.
+    let mut timeout: Option<timeval> = (!timeout.is_null()).then(|| (*timeout).into());
+
+    let result = select(
+        nfds,
+        readfds,
+        writefds,
+        exceptfds,
+        timeout.map_or(ptr::null_mut(), |mut t| &mut t),
+    );
+    if result == -1 && platform::ERRNO.get() == errno::EINTR {
+        manually_enter_trampoline();
+    }
+
+    if (!sigmask.is_null() && sigprocmask(SIG_SETMASK, &saved_mask, ptr::null_mut()) == -1) {
+        -1
+    } else {
+        result
+    }
 }
