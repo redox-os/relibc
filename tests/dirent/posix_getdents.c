@@ -1,5 +1,3 @@
-#define _GNU_SOURCE // Glibc
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -36,7 +34,7 @@ void read_and_print_directory(int fd) {
 }
 
 int main(void) {
-    int fd = open("/usr", O_RDONLY | O_DIRECTORY);
+    int fd = open("example_dir/", O_RDONLY | O_DIRECTORY);
     ERROR_IF(open, fd, == -1);
     read_and_print_directory(fd);
 

@@ -189,6 +189,7 @@ DYNAMIC_ONLY_NAMES=\
 NAMES=\
 	$(EXPECT_NAMES) \
 	dirent/main \
+	dirent/posix_getdents \
 	kill-waitpid \
 	net/if \
 	pty/forkpty \
