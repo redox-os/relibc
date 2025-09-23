@@ -4,8 +4,12 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+use crate::{
+    header::unistd::{SEEK_CUR, SEEK_SET},
+    platform::types::{c_int, c_void, off_t, size_t, ssize_t},
+};
 use alloc::{boxed::Box, vec::Vec};
-use core::{mem, ptr};
+use core::{mem, ptr, slice};
 
 use crate::{
     c_str::CStr,
@@ -219,14 +223,18 @@ pub extern "C" fn fdopendir(fd: c_int) -> *mut DIR {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_getdents.html>.
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn posix_getdents(
     fildes: c_int,
     buf: *mut c_void,
     nbyte: size_t,
-    flags: c_int,
+    _flags: c_int,
 ) -> ssize_t {
-    unimplemented!();
+    let slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte) };
+
+    Sys::posix_getdents(fildes, slice)
+        .map(|s| s as ssize_t)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readdir.html>.
