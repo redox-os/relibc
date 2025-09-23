@@ -1,4 +1,3 @@
-use crate::{header::errno::EOPNOTSUPP, io::Write, out::Out};
 use core::{arch::asm, ptr};
 
 use super::{types::*, Pal, ERRNO};
@@ -6,15 +5,16 @@ use crate::{
     c_str::CStr,
     header::{
         dirent::dirent,
-        errno::EINVAL,
+        errno::{EINVAL, EIO, EOPNOTSUPP},
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW},
         signal::SIGCHLD,
         sys_resource::{rlimit, rusage},
         sys_stat::{stat, S_IFIFO},
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
-        unistd::SEEK_SET,
+        unistd::{SEEK_CUR, SEEK_SET},
     },
+    io::Write,
 };
 // use header::sys_times::tms;
 use crate::{
@@ -556,6 +556,32 @@ impl Pal for Sys {
 
     fn pipe2(mut fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), flags) }).map(|_| ())
+    }
+
+    fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize> {
+        let current_offset = Self::lseek(fildes, 0, SEEK_CUR)? as u64;
+        let bytes_read = Self::getdents(fildes, buf, current_offset)?;
+        if bytes_read == 0 {
+            return Ok(0);
+        }
+        let mut bytes_processed = 0;
+        let mut next_offset = current_offset;
+
+        while bytes_processed < bytes_read {
+            let remaining_slice = &buf[bytes_processed..];
+            let (reclen, opaque_next) =
+                unsafe { Self::dent_reclen_offset(remaining_slice, bytes_processed) }
+                    .ok_or(Errno(EIO))?;
+            if reclen == 0 {
+                return Err(Errno(EIO));
+            }
+
+            bytes_processed += reclen as usize;
+            next_offset = opaque_next;
+        }
+
+        Self::lseek(fildes, next_offset as off_t, SEEK_SET)?;
+        Ok(bytes_read)
     }
 
     #[cfg(target_arch = "x86_64")]
