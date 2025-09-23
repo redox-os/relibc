@@ -1,4 +1,3 @@
-use crate::{header::errno::EOPNOTSUPP, io::Write, out::Out};
 use core::{arch::asm, ptr};
 
 use super::{types::*, Pal, ERRNO};
@@ -6,15 +5,16 @@ use crate::{
     c_str::CStr,
     header::{
         dirent::dirent,
-        errno::EINVAL,
+        errno::{EINVAL, EIO, EOPNOTSUPP},
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW},
         signal::SIGCHLD,
         sys_resource::{rlimit, rusage},
         sys_stat::{stat, S_IFIFO},
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
-        unistd::SEEK_SET,
+        unistd::{SEEK_CUR, SEEK_SET},
     },
+    io::Write,
 };
 // use header::sys_times::tms;
 use crate::{
