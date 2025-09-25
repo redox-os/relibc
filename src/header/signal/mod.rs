@@ -324,7 +324,7 @@ pub unsafe extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
 
 const BELOW_SIGRTMIN_MASK: sigset_t = (1 << SIGRTMIN) - 1;
 const STANDARD_SIG_MASK: sigset_t = (1 << 32) - 1;
-const RLCT_SIGNAL_MASK: sigset_t = BELOW_SIGRTMIN_MASK & !STANDARD_SIG_MASK;
+pub const RLCT_SIGNAL_MASK: sigset_t = BELOW_SIGRTMIN_MASK & !STANDARD_SIG_MASK;
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigprocmask(

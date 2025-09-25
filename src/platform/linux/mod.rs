@@ -3,24 +3,23 @@ use core::{arch::asm, ptr};
 use super::{ERRNO, Pal, types::*};
 use crate::{
     c_str::CStr,
+    error::{Errno, Result},
     header::{
         dirent::dirent,
         errno::{EINVAL, EIO, EOPNOTSUPP},
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW},
-        signal::SIGCHLD,
+        signal::{SIGCHLD, sigset_t},
         sys_resource::{rlimit, rusage},
+        sys_select,
         sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
+        sys_utsname::utsname,
+        time::timespec,
         unistd::{SEEK_CUR, SEEK_SET},
     },
     io::Write,
     out::Out,
-};
-// use header::sys_times::tms;
-use crate::{
-    error::{Errno, Result},
-    header::{sys_utsname::utsname, time::timespec},
 };
 
 mod epoll;
@@ -583,6 +582,41 @@ impl Pal for Sys {
 
         Self::lseek(fildes, next_offset as off_t, SEEK_SET)?;
         Ok(bytes_read)
+    }
+
+    fn pselect(
+        nfds: usize,
+        readfds: Option<&mut sys_select::fd_set>,
+        writefds: Option<&mut sys_select::fd_set>,
+        exceptfds: Option<&mut sys_select::fd_set>,
+        timeout: Option<&mut timespec>,
+        sigmask: Option<sigset_t>,
+    ) -> Result<usize> {
+        // The last argument of PSELECT6 isn't a pointer to sigset_t because many architectures
+        // only allow passing six args to syscalls. Instead, a pointer to data containing a pointer
+        // to sigset_t and the size of the signal set in bytes is used instead.
+        // TODO: The calculation below isn't right yet.
+        let sigset_data = if let Some(sigmask) = sigmask.as_ref() {
+            [
+                sigmask as *const sigset_t as size_t,
+                size_of::<sigset_t>() as size_t,
+            ]
+        } else {
+            [0, size_of::<sigset_t>() as size_t]
+        };
+        let nfds: c_int = nfds.try_into().map_err(|_| Errno(EINVAL))?;
+
+        e_raw(unsafe {
+            syscall!(
+                PSELECT6,
+                nfds,
+                readfds.map_or(ptr::null_mut(), |mut fds| &mut fds),
+                writefds.map_or(ptr::null_mut(), |mut fds| &mut fds),
+                exceptfds.map_or(ptr::null_mut(), |mut fds| &mut fds),
+                timeout.map_or(ptr::null_mut(), |mut timeout| &mut timeout),
+                sigset_data.as_ptr()
+            )
+        })
     }
 
     #[cfg(target_arch = "x86_64")]

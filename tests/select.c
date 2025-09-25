@@ -1,11 +1,16 @@
+#define _GNU_SOURCE
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/select.h>
 #include <unistd.h>
 
-#include "test_helpers.h"
+const struct timeval TIMEOUT = {
+    .tv_sec = 5,
+    .tv_usec = 0
+};
 
-int file_test(void) {
+static int file_test(void) {
     int fd = open("select.c", 0, 0);
     if (fd < 0) {
         perror("open");
@@ -20,7 +25,12 @@ int file_test(void) {
 
     printf("Is set before? %d\n", FD_ISSET(fd, &read));
 
-    int nfds = select(fd + 1, &read, NULL, NULL, NULL);
+    struct timeval timeout = TIMEOUT;
+    int nfds = select(fd + 1, &read, NULL, NULL, &timeout);
+    if (timeout.tv_sec == 0) {
+        fputs("Timeout hit for file test\n", stderr);
+        return 1;
+    }
     if (nfds < 0) {
         perror("select");
         return 1;
@@ -34,7 +44,7 @@ int file_test(void) {
     return 0;
 }
 
-int pipe_test(void) {
+static int pipe_test(void) {
     int pipefd[2];
     if (pipe2(pipefd, O_NONBLOCK) < 0) {
         perror("pipe");
@@ -55,7 +65,12 @@ int pipe_test(void) {
 
     printf("Is set before? %d\n", FD_ISSET(pipefd[0], &read));
 
-    int nfds = select(pipefd[0] + 1, &read, NULL, NULL, NULL);
+    struct timeval timeout = TIMEOUT;
+    int nfds = select(pipefd[0] + 1, &read, NULL, NULL, &timeout);
+    if (timeout.tv_sec == 0) {
+        fputs("Timeout hit for pipe test\n", stderr);
+        return 1;
+    }
     if (nfds < 0) {
         perror("select");
         return 1;
