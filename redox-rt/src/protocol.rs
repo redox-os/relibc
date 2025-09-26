@@ -14,6 +14,7 @@ pub struct ProcMeta {
     pub sgid: u32,
     pub ens: u32,
     pub rns: u32,
+    pub namespace_fd: usize,
 }
 unsafe impl plain::Plain for ProcMeta {}
 
@@ -40,6 +41,8 @@ pub enum ProcCall {
 
     // Temporary calls for getting process credentials
     GetProcCredentials = 15,
+
+    SetNamespace = 16,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]

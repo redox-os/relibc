@@ -191,8 +191,6 @@ pub(crate) fn read_proc_meta(proc: &FdGuard) -> syscall::Result<ProcMeta> {
 pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
     #[cfg(feature = "proc")]
     let metadata = read_proc_meta(&proc_fd).unwrap();
-    #[cfg(feature = "proc")]
-    let namespace_fd = current_namespace_fd();
 
     #[cfg(not(feature = "proc"))]
     // Bootstrap mode, don't associate proc fds with PIDs
@@ -225,7 +223,7 @@ pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
             egid: metadata.egid,
             rgid: metadata.rgid,
             sgid: metadata.sgid,
-            namespace_fd, // Not used in initialization
+            namespace_fd: metadata.namespace_fd,
         };
     }
 }
