@@ -15,6 +15,7 @@ use crate::{
         unistd::{SEEK_CUR, SEEK_SET},
     },
     io::Write,
+    out::Out,
 };
 // use header::sys_times::tms;
 use crate::{
