@@ -187,7 +187,7 @@ unsafe fn inner_get_name_inner(
             "socket {:?} doesn't match either tcp, udp or chan schemes",
             str::from_utf8(buf)
         );
-        return Err(Errno(ENOTSOCK))
+        return Err(Errno(ENOTSOCK));
     }
     Ok(())
 }
