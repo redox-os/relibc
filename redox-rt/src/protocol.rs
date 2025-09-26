@@ -93,6 +93,7 @@ impl ProcCall {
             13 => Self::Rename,
             14 => Self::DisableSetpgid,
             15 => Self::GetProcCredentials,
+            16 => Self::SetNamespace,
             _ => return None,
         })
     }
