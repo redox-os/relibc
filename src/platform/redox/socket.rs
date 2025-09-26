@@ -158,7 +158,7 @@ unsafe fn inner_get_name(
     let mut buf = [0; 256];
     let len = syscall::fpath(socket as usize, &mut buf)?;
 
-    inner_get_name_inner(local, address, address_len, &buf[..len]);
+    inner_get_name_inner(local, address, address_len, &buf[..len])?;
 
     Ok(())
 }
@@ -168,7 +168,7 @@ unsafe fn inner_get_name_inner(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
     buf: &[u8],
-) {
+) -> Result<()> {
     if buf.starts_with(b"tcp:") || buf.starts_with(b"udp:") {
         inner_af_inet(local, &buf[4..], address, address_len);
     } else if buf.starts_with(b"/scheme/tcp/") || buf.starts_with(b"/scheme/udp/") {
@@ -183,11 +183,13 @@ unsafe fn inner_get_name_inner(
         inner_af_unix(&buf[18..], address, address_len);
     } else {
         // Socket doesn't belong to any scheme
-        panic!(
+        trace!(
             "socket {:?} doesn't match either tcp, udp or chan schemes",
             str::from_utf8(buf)
         );
+        return Err(Errno(ENOTSOCK));
     }
+    Ok(())
 }
 
 fn socket_domain_type(socket: c_int) -> Result<(c_int, c_int)> {
@@ -326,7 +328,7 @@ unsafe fn deserialize_name_from_stream(
                 mhdr.msg_name as *mut sockaddr,
                 &mut mhdr.msg_namelen,
                 name_buffer,
-            );
+            )?;
         }
         *cursor += name_len;
     } else {
