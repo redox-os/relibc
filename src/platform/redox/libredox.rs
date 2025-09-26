@@ -438,8 +438,8 @@ pub unsafe extern "C" fn redox_get_socket_token_v0(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn redox_set_namespace_fd_v0(fd: usize) {
-    redox_rt::sys::set_namespace_fd(fd)
+pub unsafe extern "C" fn redox_set_namespace_fd_v0(fd: usize) -> RawResult {
+    Error::mux(redox_rt::sys::set_namespace_fd(fd))
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_nsopen_v0(
