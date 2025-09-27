@@ -40,8 +40,6 @@ pub enum ProcCall {
 
     // Temporary calls for getting process credentials
     GetProcCredentials = 15,
-
-    SetNamespace = 16,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(usize)]
@@ -92,7 +90,6 @@ impl ProcCall {
             13 => Self::Rename,
             14 => Self::DisableSetpgid,
             15 => Self::GetProcCredentials,
-            16 => Self::SetNamespace,
             _ => return None,
         })
     }

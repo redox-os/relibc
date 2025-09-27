@@ -372,11 +372,6 @@ pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {
     Ok(())
 }
 pub fn set_namespace_fd(fd: usize) -> Result<()> {
-    this_proc_call(
-        &mut [],
-        CallFlags::empty(),
-        &[ProcCall::SetNamespace as u64, fd as u64],
-    )?;
     let mut info = DYNAMIC_PROC_INFO.lock();
     info.ns_fd = fd;
     Ok(())
