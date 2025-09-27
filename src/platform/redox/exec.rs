@@ -36,6 +36,7 @@ fn fexec_impl(
         exec_file,
         &RtTcb::current().thread_fd(),
         redox_rt::current_proc_fd(),
+        Some(redox_rt::current_namespace_fd()),
         &memory,
         path,
         args.iter().rev(),

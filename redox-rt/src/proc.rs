@@ -76,7 +76,7 @@ pub fn fexec_impl<A, E>(
     image_file: FdGuard,
     thread_fd: &FdGuard,
     proc_fd: &FdGuard,
-    ns_fd: Option<&FdGuard>,
+    ns_fd: Option<usize>,
     memory_scheme_fd: &FdGuard,
     path: &[u8],
     args: A,
