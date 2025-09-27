@@ -384,6 +384,6 @@ pub fn nsopen(path: &str, flags: u32, mode: u16) -> Result<usize> {
         mode as usize,
     )
 }
-pub fn mkns(names: &mut [u8]) -> Result<usize> {
+pub fn mkns(names: &[u8]) -> Result<usize> {
     syscall::dup(crate::current_namespace_fd(), names)
 }
