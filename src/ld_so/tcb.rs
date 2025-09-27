@@ -15,7 +15,7 @@ use crate::{
     pthread::{OsTid, Pthread},
     sync::{mutex::Mutex, waitval::Waitval},
 };
-
+use crate::header::pthread::PTHREAD_MAX_NAME_LENGTH;
 use super::linker::DlError;
 
 #[repr(C)]
@@ -105,6 +105,7 @@ impl Tcb {
                     stack_base: core::ptr::null_mut(),
                     stack_size: 0,
                     os_tid: UnsafeCell::new(OsTid::default()),
+                    name: UnsafeCell::new([0; PTHREAD_MAX_NAME_LENGTH]),
                 },
 
                 dtv_ptr: ptr::null_mut(),

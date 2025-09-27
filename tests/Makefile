@@ -281,6 +281,8 @@ NAMES=\
 	pthread/rwlock_randtest \
 	pthread/mutex_recursive \
 	pthread/timeout \
+	pthread/getattr_np \
+	pthread/setname_np \
 	grp/getgrouplist \
 	grp/getgrgid_r \
 	grp/getgrnam_r \

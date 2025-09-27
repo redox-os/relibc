@@ -67,6 +67,8 @@ pub const PTHREAD_PROCESS_PRIVATE: c_int = 1;
 pub const PTHREAD_SCOPE_PROCESS: c_int = 0;
 pub const PTHREAD_SCOPE_SYSTEM: c_int = 1;
 
+pub const PTHREAD_MAX_NAME_LENGTH: usize = 64;
+
 pub mod attr;
 pub use self::attr::*;
 
@@ -187,6 +189,8 @@ pub unsafe extern "C" fn pthread_getschedparam(
 
 pub mod tls;
 pub use tls::*;
+use crate::header::errno::{EINVAL, ESRCH};
+use crate::pthread::Pthread;
 
 #[no_mangle]
 pub unsafe extern "C" fn pthread_join(thread: pthread_t, retval: *mut *mut c_void) -> c_int {
@@ -268,6 +272,73 @@ pub use self::spin::*;
 #[no_mangle]
 pub unsafe extern "C" fn pthread_testcancel() {
     pthread::testcancel();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pthread_setname_np(thread: pthread_t, name: *const c_char) -> c_int {
+    // Check for null pointers
+    if thread.is_null() || name.is_null() {
+        return EINVAL;
+    }
+
+    // Check if the name is too long by looking for the null terminator
+    let mut name_len = 0;
+    while *name.add(name_len) != 0 {
+        name_len += 1;
+        // If we reach PTHREAD_MAX_NAME_LENGTH bytes without finding a null terminator, name is too long
+        if name_len >= PTHREAD_MAX_NAME_LENGTH {
+            return EINVAL;
+        }
+    }
+
+    // Convert C string to bytes (we know it's valid length now)
+    let name_bytes = core::slice::from_raw_parts(name as *const u8, name_len);
+    
+    // Try to get a reference to the thread
+    let thread_ref = match NonNull::new(thread.cast::<Pthread>()).map(|p| p.as_ref()) {
+        Some(thread_ref) => thread_ref,
+        None => return ESRCH,
+    };
+
+    match pthread::set_thread_name(thread_ref, name_bytes) {
+        Ok(()) => 0,
+        Err(Errno(code)) => code,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pthread_getname_np(thread: pthread_t, name: *mut c_char, len: size_t) -> c_int {
+    // Check for null pointers and zero length
+    if thread.is_null() || name.is_null() || len == 0 {
+        return EINVAL;
+    }
+
+    // Try to get a reference to the thread
+    let thread_ref = match NonNull::new(thread.cast::<Pthread>()).map(|p| p.as_ref()) {
+        Some(thread_ref) => thread_ref,
+        None => return ESRCH,
+    };
+
+    match pthread::get_thread_name(thread_ref) {
+        Ok(thread_name) => {
+            // Ensure we have enough space (including null terminator)
+            let copy_len = core::cmp::min(thread_name.len(), len - 1);
+            
+            // Copy the bytes to the output buffer
+            core::ptr::copy_nonoverlapping(
+                thread_name.as_ptr(), 
+                name as *mut u8, 
+                copy_len
+            );
+            
+            // Add null terminator
+            *name.add(copy_len) = 0;
+            
+            // Return success
+            0
+        },
+        Err(Errno(code)) => code,
+    }
 }
 
 // Must be the same struct as defined in the pthread_cleanup_push macro.

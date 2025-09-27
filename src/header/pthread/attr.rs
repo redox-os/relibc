@@ -1,6 +1,7 @@
 use super::*;
 
 use crate::header::bits_pthread::pthread_attr_t;
+use crate::pthread::Pthread;
 
 impl Default for RlctAttr {
     fn default() -> Self {
@@ -106,6 +107,36 @@ pub unsafe extern "C" fn pthread_attr_getstacksize(
     stacksize: *mut size_t,
 ) -> c_int {
     core::ptr::write(stacksize, (*attr.cast::<RlctAttr>()).stacksize as _);
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pthread_getattr_np(
+    pthread: pthread_t,
+    attr: *mut pthread_attr_t,
+) -> c_int {
+    // Initialize the attribute structure first
+    core::ptr::write(attr.cast::<RlctAttr>(), RlctAttr::default());
+    
+    // Convert the pthread_t to a Pthread reference
+    let thread: &Pthread = &*(pthread.cast::<crate::pthread::Pthread>());
+    
+    // Fill in the stack information from the thread
+    let attr_ref = &mut *(attr.cast::<RlctAttr>());
+    attr_ref.stack = thread.stack_base as usize;
+    attr_ref.stacksize = thread.stack_size;
+
+    // Get the detachstate based on the thread flags
+    let flags = thread.flags.load(core::sync::atomic::Ordering::Acquire);
+    if flags & crate::pthread::PthreadFlags::DETACHED.bits() != 0 {
+        attr_ref.detachstate = PTHREAD_CREATE_DETACHED as _;
+    } else {
+        attr_ref.detachstate = PTHREAD_CREATE_JOINABLE as _;
+    }
+    
+    // Other attributes could be extracted from the thread here
+    // We keep the defaults for now
+    
     0
 }
 
