@@ -79,7 +79,12 @@ unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usiz
     Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "C" fn child_hook(cur_filetable_fd: usize, new_proc_fd: usize, new_thr_fd: usize) {
+unsafe extern "C" fn child_hook(
+    cur_filetable_fd: usize,
+    new_proc_fd: usize,
+    new_thr_fd: usize,
+    new_ns_fd: usize,
+) {
     let _ = syscall::close(cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
         new_thr_fd: FdGuard::new(new_thr_fd),
@@ -87,6 +92,11 @@ unsafe extern "C" fn child_hook(cur_filetable_fd: usize, new_proc_fd: usize, new
             None
         } else {
             Some(FdGuard::new(new_proc_fd))
+        },
+        new_ns_fd: if new_ns_fd == usize::MAX {
+            None
+        } else {
+            Some(new_ns_fd)
         },
     });
 }
@@ -164,6 +174,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
     ld   a0, 0(sp) // cur_filetable_fd
     ld   a1, 8(sp) // new_proc_fd
     ld a2, 16(sp) // new_thr_fd
+    ld a3, 24(sp) // new_ns_fd
     jal  {child_hook}
 
     mv   a0, x0

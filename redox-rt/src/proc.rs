@@ -7,6 +7,7 @@ use core::{
 use crate::{
     arch::*,
     auxv_defs::*,
+    current_namespace_fd,
     protocol::{ProcCall, ThreadCall},
     read_proc_meta, static_proc_info,
     sys::{proc_call, thread_call},
@@ -67,12 +68,15 @@ pub struct ExtraInfo<'a> {
     pub thr_fd: usize,
     /// Process handle
     pub proc_fd: usize,
+    /// Namespace handle
+    pub ns_fd: Option<usize>,
 }
 
 pub fn fexec_impl<A, E>(
     image_file: FdGuard,
     thread_fd: &FdGuard,
     proc_fd: &FdGuard,
+    ns_fd: Option<&FdGuard>,
     memory_scheme_fd: &FdGuard,
     path: &[u8],
     args: A,
@@ -395,6 +399,8 @@ where
         push(AT_REDOX_THR_FD)?;
         push(extrainfo.proc_fd as usize)?;
         push(AT_REDOX_PROC_FD)?;
+        push(extrainfo.ns_fd.unwrap_or(usize::MAX))?;
+        push(AT_REDOX_NS_FD)?;
 
         push(0)?;
 
@@ -777,6 +783,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                 initial_rsp.write(*cur_filetable_fd);
                 initial_rsp.add(1).write(proc_fd);
                 initial_rsp.add(2).write(*new_thr_fd);
+                initial_rsp.add(3).write(current_namespace_fd());
             }
         }
 
@@ -991,7 +998,7 @@ pub unsafe fn make_init(proc_cap: usize) -> [&'static FdGuard; 2] {
         rgid: 0,
         egid: 0,
         sgid: 0,
-        namespace_fd: usize::MAX,
+        ns_fd: usize::MAX,
     };
     [
         (*STATIC_PROC_INFO.get()).proc_fd.assume_init_ref(),

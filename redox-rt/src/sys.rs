@@ -378,7 +378,7 @@ pub fn set_namespace_fd(fd: usize) -> Result<()> {
         &[ProcCall::SetNamespace as u64, fd as u64],
     )?;
     let mut info = DYNAMIC_PROC_INFO.lock();
-    info.namespace_fd = fd;
+    info.ns_fd = fd;
     Ok(())
 }
 pub fn nsopen(path: &str, flags: u32, mode: u16) -> Result<usize> {
@@ -388,4 +388,7 @@ pub fn nsopen(path: &str, flags: u32, mode: u16) -> Result<usize> {
         flags as usize,
         mode as usize,
     )
+}
+pub fn mkns(names: &mut [u8]) -> Result<usize> {
+    syscall::dup(crate::current_namespace_fd(), names)
 }

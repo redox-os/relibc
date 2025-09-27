@@ -394,6 +394,16 @@ pub unsafe extern "C" fn redox_mkns_v1(
     })())
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn redox_mkns2_v1(names: *const u8, names_len: usize) -> RawResult {
+    Error::mux(|| {
+        if flags != 0 {
+            return Err(Error::new(EINVAL));
+        }
+        redox_rt::sys::mkns(core::slice::from_raw_parts(names, names_len))
+    })
+}
+
 // ABI-UNSTABLE
 #[no_mangle]
 pub unsafe extern "C" fn redox_cur_procfd_v0() -> usize {
