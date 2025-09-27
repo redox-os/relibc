@@ -8,7 +8,10 @@ use core::{
 
 mod sys;
 use super::types::*;
-use crate::{sync::Mutex, ALLOCATOR};
+use crate::{
+    sync::{Mutex, MutexGuard},
+    ALLOCATOR,
+};
 use dlmalloc::DlmallocCApi;
 
 pub type Dlmalloc = DlmallocCApi<sys::System>;
@@ -26,6 +29,10 @@ impl Allocator {
 
     pub fn get(&self) -> *mut Mutex<Dlmalloc> {
         self.0.get()
+    }
+
+    pub fn lock(&self) -> MutexGuard<'_, Dlmalloc> {
+        unsafe { &*self.get() }.lock()
     }
 }
 

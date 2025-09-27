@@ -424,12 +424,18 @@ pub unsafe extern "C" fn fork() -> pid_t {
     for prepare in &fork_hooks[0] {
         prepare();
     }
+    // Hold the allocator lock before forking to ensure a consistent state.
+    let lock = crate::ALLOCATOR.lock();
     let pid = Sys::fork().or_minus_one_errno();
     if pid == 0 {
+        // Unlock the allocator before any hooks in case they alloc.
+        core::mem::drop(lock);
         for child in &fork_hooks[2] {
             child();
         }
     } else if pid != -1 {
+        // Same as above.
+        core::mem::drop(lock);
         for parent in &fork_hooks[1] {
             parent();
         }
