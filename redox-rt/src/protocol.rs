@@ -14,7 +14,6 @@ pub struct ProcMeta {
     pub sgid: u32,
     pub ens: u32,
     pub rns: u32,
-    pub namespace_fd: usize,
 }
 unsafe impl plain::Plain for ProcMeta {}
 
