@@ -387,3 +387,13 @@ pub fn nsopen(path: &str, flags: u32, mode: u16) -> Result<usize> {
 pub fn mkns(names: &[u8]) -> Result<usize> {
     syscall::dup(crate::current_namespace_fd(), names)
 }
+pub fn register_scheme(cap_fd: usize) -> Result<()> {
+    let mut cap_bytes = cap_fd.to_ne_bytes();
+    sys_call(
+        crate::current_namespace_fd(),
+        &mut cap_bytes,
+        CallFlags::WRITE | CallFlags::FD,
+        &[],
+    )
+    .map(|_| ())
+}
