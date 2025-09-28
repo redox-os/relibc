@@ -461,3 +461,7 @@ pub unsafe extern "C" fn redox_nsopen_v0(
         mode,
     ))
 }
+#[no_mangle]
+pub unsafe extern "C" fn redox_register_scheme_v0(cap_fd: usize) -> RawResult {
+    Error::mux(redox_rt::sys::register_scheme(cap_fd).map(|()| 0))
+}
