@@ -18,8 +18,6 @@ use crate::{
     platform::{types::*, PalSignal},
 };
 
-use super::Sys;
-
 pub type RawResult = usize;
 
 pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
@@ -223,18 +221,6 @@ pub unsafe extern "C" fn redox_futimens_v1(fd: usize, times: *const timespec) ->
 #[no_mangle]
 pub unsafe extern "C" fn redox_close_v1(fd: usize) -> RawResult {
     Error::mux(syscall::close(fd))
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn redox_getdents_v0(
-    fd: usize,
-    buf: *mut u8,
-    len: usize,
-    opaque: u64,
-) -> RawResult {
-    Error::mux(
-        Sys::getdents(fd as c_int, slice::from_raw_parts_mut(buf, len), opaque).map_err(Into::into),
-    )
 }
 
 #[no_mangle]
