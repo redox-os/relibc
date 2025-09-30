@@ -61,6 +61,7 @@ pub mod sched;
 pub mod semaphore;
 pub mod setjmp;
 pub mod sgtty;
+pub mod shadow;
 pub mod signal;
 // TODO: spawn.h
 // TODO: stdalign.h (likely C implementation)

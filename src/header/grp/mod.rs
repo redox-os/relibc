@@ -38,6 +38,8 @@ const SEPARATOR: char = ':';
 #[cfg(target_os = "redox")]
 const SEPARATOR: char = ';';
 
+const GROUP_FILE: &core::ffi::CStr = c"/etc/group";
+
 #[derive(Clone, Copy, Debug)]
 struct DestBuffer {
     ptr: *mut u8,
@@ -169,11 +171,7 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
         let mut vec: Vec<u8> = Vec::new();
 
         let gr_name = buffer.next().ok_or(Error::EOF)?.to_vec();
-        let gr_passwd = if cfg!(target_os = "redox") {
-            Vec::new()
-        } else {
-            buffer.next().ok_or(Error::EOF)?.to_vec()
-        };
+        let gr_passwd = buffer.next().ok_or(Error::EOF)?.to_vec();
         gr_gid = String::from_utf8(buffer.next().ok_or(Error::EOF)?.to_vec())
             .map_err(|err| Error::FromUtf8Error(err))?
             .parse::<gid_t>()
@@ -253,7 +251,7 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
 // MT-Unsafe race:grgid locale
 #[no_mangle]
 pub unsafe extern "C" fn getgrgid(gid: gid_t) -> *mut group {
-    let Ok(db) = File::open(c"/etc/group".into(), fcntl::O_RDONLY) else {
+    let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
         return ptr::null_mut();
     };
 
@@ -276,7 +274,7 @@ pub unsafe extern "C" fn getgrgid(gid: gid_t) -> *mut group {
 // MT-Unsafe race:grnam locale
 #[no_mangle]
 pub unsafe extern "C" fn getgrnam(name: *const c_char) -> *mut group {
-    let Ok(db) = File::open(c"/etc/group".into(), fcntl::O_RDONLY) else {
+    let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
         return ptr::null_mut();
     };
 
@@ -295,7 +293,7 @@ pub unsafe extern "C" fn getgrnam(name: *const c_char) -> *mut group {
                 grp.reference.gr_name,
                 name,
                 strlen(grp.reference.gr_name).min(strlen(name)),
-            ) > 0
+            ) == 0
         } {
             return grp.into_global();
         }
@@ -318,7 +316,7 @@ pub unsafe extern "C" fn getgrgid_r(
         *result = ptr::null_mut();
     }
 
-    let Ok(db) = File::open(c"/etc/group".into(), fcntl::O_RDONLY) else {
+    let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
         return ENOENT;
     };
 
@@ -372,7 +370,7 @@ pub unsafe extern "C" fn getgrnam_r(
     buflen: usize,
     result: *mut *mut group,
 ) -> c_int {
-    let Ok(db) = File::open(c"/etc/group".into(), fcntl::O_RDONLY) else {
+    let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
         return ENOENT;
     };
 
@@ -413,7 +411,7 @@ pub unsafe extern "C" fn getgrent() -> *mut group {
     let mut line_reader = unsafe { &mut *LINE_READER.get() };
 
     if line_reader.is_none() {
-        let Ok(db) = File::open(c"/etc/group".into(), fcntl::O_RDONLY) else {
+        let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
             return ptr::null_mut();
         };
         *line_reader = Some(BufReader::new(db).lines());
@@ -449,7 +447,7 @@ pub unsafe extern "C" fn endgrent() {
 #[no_mangle]
 pub unsafe extern "C" fn setgrent() {
     let mut line_reader = unsafe { &mut *LINE_READER.get() };
-    let Ok(db) = File::open(c"/etc/group".into(), fcntl::O_RDONLY) else {
+    let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
         return;
     };
     *line_reader = Some(BufReader::new(db).lines());
@@ -475,7 +473,7 @@ pub unsafe extern "C" fn getgrouplist(
         return 0;
     };
 
-    let Ok(db) = File::open(c"/etc/group".into(), fcntl::O_RDONLY) else {
+    let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
         return 0;
     };
 
@@ -519,7 +517,7 @@ pub unsafe extern "C" fn getgrouplist(
     if groups_found as usize > grps.len() {
         -1
     } else {
-        grps.len() as c_int
+        groups_found
     }
 }
 

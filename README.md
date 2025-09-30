@@ -6,9 +6,10 @@ The motivation for this project is twofold: Reduce issues that the Redox develop
 
 Currently Redox and Linux are supported.
 
-## redox-rt
+## `redox-rt`
 
-redox-rt is our equivalent for [vDSO](https://en.wikipedia.org/wiki/VDSO) from Linux.
+`redox-rt` is a runtime library that provides much of the code that enables POSIX on Redox, like `fork`, `exec`, signal handling, etc.
+Relibc uses it as backend in `src/platform/redox`, and it's intended to eventually be usable independently, without relibc.
 
 ## Repository Layout
 

@@ -4,8 +4,12 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+use crate::{
+    header::unistd::{SEEK_CUR, SEEK_SET},
+    platform::types::{c_int, c_void, off_t, size_t, ssize_t},
+};
 use alloc::{boxed::Box, vec::Vec};
-use core::{mem, ptr};
+use core::{mem, ptr, slice};
 
 use crate::{
     c_str::CStr,
@@ -13,10 +17,14 @@ use crate::{
     error::{Errno, ResultExt, ResultExtPtrMut},
     fs::File,
     header::{fcntl, stdlib, string},
+    out::Out,
     platform::{self, types::*, Pal, Sys},
 };
 
-use super::errno::{EINVAL, EIO, ENOMEM};
+use super::{
+    errno::{self, EINVAL, EIO, ENOMEM, ENOTDIR},
+    sys_stat,
+};
 
 const INITIAL_BUFSIZE: usize = 512;
 
@@ -42,6 +50,26 @@ impl DIR {
             buf_offset: 0,
             opaque_offset: 0,
         }))
+    }
+    pub fn from_fd(fd: c_int) -> Result<Box<Self>, Errno> {
+        let mut stat = sys_stat::stat::default();
+        unsafe {
+            Sys::fstat(fd, Out::from_mut(&mut stat))?;
+        }
+        if (stat.st_mode & sys_stat::S_IFMT) != sys_stat::S_IFDIR {
+            return Err(Errno(ENOTDIR));
+        }
+        Sys::fcntl(fd, fcntl::F_SETFD, fcntl::FD_CLOEXEC as _)?;
+
+        // Take ownership now but not earlier so we don't close the fd on error.
+        let file = File::new(fd);
+        Ok(Self {
+            file,
+            buf: Vec::with_capacity(INITIAL_BUFSIZE),
+            buf_offset: 0,
+            opaque_offset: 0,
+        }
+        .into())
     }
     fn next_dirent(&mut self) -> Result<*mut dirent, Errno> {
         let mut this_dent = self.buf.get(self.buf_offset..).ok_or(Errno(EIO))?;
@@ -161,6 +189,19 @@ pub extern "C" fn closedir(dir: Box<DIR>) -> c_int {
     dir.close().map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://man.freebsd.org/cgi/man.cgi?query=fdopendir&sektion=3>
+///
+/// FreeBSD extension that transfers ownership of the directory file descriptor to the user.
+///
+/// It doesn't matter if DIR was opened with [`opendir`] or [`fdopendir`].
+#[no_mangle]
+pub extern "C" fn fdclosedir(dir: Box<DIR>) -> c_int {
+    let mut file = dir.file;
+    file.reference = true;
+
+    *file
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dirfd.html>.
 #[no_mangle]
 pub extern "C" fn dirfd(dir: &mut DIR) -> c_int {
@@ -175,15 +216,25 @@ pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
     DIR::new(path).or_errno_null_mut()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fdopendir.html>.
+#[no_mangle]
+pub extern "C" fn fdopendir(fd: c_int) -> *mut DIR {
+    DIR::from_fd(fd).or_errno_null_mut()
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_getdents.html>.
-// #[no_mangle]
+#[no_mangle]
 pub extern "C" fn posix_getdents(
     fildes: c_int,
     buf: *mut c_void,
     nbyte: size_t,
-    flags: c_int,
+    _flags: c_int,
 ) -> ssize_t {
-    unimplemented!();
+    let slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte) };
+
+    Sys::posix_getdents(fildes, slice)
+        .map(|s| s as ssize_t)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readdir.html>.

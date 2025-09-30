@@ -771,7 +771,6 @@ pub unsafe extern "C" fn getaddrinfo(
     hints: *const addrinfo,
     res: *mut *mut addrinfo,
 ) -> c_int {
-    //TODO: getaddrinfo
     let node_opt = CStr::from_nullable_ptr(node);
     let service_opt = CStr::from_nullable_ptr(service);
 
@@ -800,55 +799,71 @@ pub unsafe extern "C" fn getaddrinfo(
             Err(_err) => (),
         }
     }
+    let node = node_opt.unwrap_or_else(|| {
+        //TODO: Optimize by bypassing string parsing
+        if ai_flags & AI_PASSIVE > 0 {
+            c"0.0.0.0".into()
+        } else {
+            c"127.0.0.1".into()
+        }
+    });
 
-    //TODO: Check hosts file
-    if let Some(node) = node_opt {
-        //TODO: Support AI_NUMERICHOST
-        let lookuphost = match lookup_host(str::from_utf8_unchecked(node.to_bytes())) {
+    let lookuphost = if ai_flags & AI_NUMERICHOST > 0 {
+        match parse_ipv4_string(str::from_utf8_unchecked(node.to_bytes())) {
+            Some(s_addr) => s_addr.into(),
+            None => {
+                return EAI_NONAME;
+            }
+        }
+    } else {
+        match lookup_host(str::from_utf8_unchecked(node.to_bytes())) {
             Ok(lookuphost) => lookuphost,
             Err(e) => {
                 platform::ERRNO.set(e);
                 return EAI_SYSTEM;
             }
+        }
+    };
+
+    for in_addr in lookuphost {
+        ai_family = AF_INET;
+        ai_protocol = 0;
+
+        let ai_addr = Box::into_raw(Box::new(sockaddr_in {
+            sin_family: ai_family as sa_family_t,
+            sin_port: htons(port),
+            sin_addr: in_addr,
+            sin_zero: [0; 8],
+        })) as *mut sockaddr;
+
+        let ai_addrlen = mem::size_of::<sockaddr_in>();
+
+        let ai_canonname = if ai_flags & AI_CANONNAME > 0 {
+            if node_opt.is_none() {
+                return EAI_BADFLAGS;
+            }
+            ai_flags &= !AI_CANONNAME;
+            node.to_owned_cstring().into_raw()
+        } else {
+            ptr::null_mut()
         };
 
-        for in_addr in lookuphost {
-            ai_family = AF_INET;
-            ai_protocol = 0;
+        let addrinfo = Box::new(addrinfo {
+            ai_flags: 0,
+            ai_family,
+            ai_socktype,
+            ai_protocol,
+            ai_addrlen,
+            ai_canonname,
+            ai_addr,
+            ai_next: ptr::null_mut(),
+        });
 
-            let ai_addr = Box::into_raw(Box::new(sockaddr_in {
-                sin_family: ai_family as sa_family_t,
-                sin_port: htons(port),
-                sin_addr: in_addr,
-                sin_zero: [0; 8],
-            })) as *mut sockaddr;
-
-            let ai_addrlen = mem::size_of::<sockaddr_in>();
-
-            let ai_canonname = if ai_flags & AI_CANONNAME > 0 {
-                ai_flags &= !AI_CANONNAME;
-                node.to_owned_cstring().into_raw()
-            } else {
-                ptr::null_mut()
-            };
-
-            let addrinfo = Box::new(addrinfo {
-                ai_flags: 0,
-                ai_family,
-                ai_socktype,
-                ai_protocol,
-                ai_addrlen,
-                ai_canonname,
-                ai_addr,
-                ai_next: ptr::null_mut(),
-            });
-
-            let mut indirect = res;
-            while !(*indirect).is_null() {
-                indirect = &mut (**indirect).ai_next;
-            }
-            *indirect = Box::into_raw(addrinfo);
+        let mut indirect = res;
+        while !(*indirect).is_null() {
+            indirect = &mut (**indirect).ai_next;
         }
+        *indirect = Box::into_raw(addrinfo);
     }
 
     0

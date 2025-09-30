@@ -1,3 +1,5 @@
+#define _GNU_SOURCE // Linux for CI
+
 #include <assert.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -49,7 +51,7 @@ static const char* mktestfile(
     return path;
 }
 
-// Create a link, `dir/name`, to `target` and return its path.
+// Create a symlink, `dir/name`, to `target` and return its path.
 __attribute__((nonnull))
 static const char* mktestlink(
     const char dir[],
@@ -66,8 +68,8 @@ static const char* mktestlink(
     strcat(path, "/");
     strcat(path, name);
 
-    if (link(target, path) == -1) {
-        perror("link");
+    if (symlink(target, path) == -1) {
+        perror("symlink");
         free(path);
         return NULL;
     }
@@ -81,14 +83,15 @@ static int run_test(
     int flags,
     const char name[],
     const char path[],
-    size_t expected
+    size_t expected,
+    mode_t mode
 ) {
     struct stat stat = {0};
-
     if (fstatat(fd, name, &stat, flags) == -1) {
         perror("fstatat");
         return -1;
     }
+
     if ((size_t) stat.st_size != expected) {
         fprintf(
             stderr,
@@ -98,6 +101,32 @@ static int run_test(
             stat.st_size
         );
         return -1;
+    }
+    if ((stat.st_mode & S_IFMT) != mode) {
+        fprintf(
+            stderr,
+            "fstatat invalid mode\n\tFile: %s\n",
+            path
+        );
+        return -1;
+    }
+
+    // We create the temp dirs/files therefore we should own them.
+    uid_t uid = getuid();
+    gid_t gid = getgid();
+    if (stat.st_uid != uid || stat.st_gid != gid) {
+        fputs("fstatat invalid UID or GID", stderr);
+        fprintf(
+            stderr, 
+            "\n\tExpected UID: %u\n\tActual UID: %u\n",
+            uid, stat.st_uid
+        );
+        fprintf(
+            stderr, 
+            "\n\tExpected GID: %u\n\tActual GID: %u\n",
+            gid, stat.st_gid
+        );
+
     }
 
     return 0;
@@ -157,24 +186,37 @@ int main(void) {
 
     // fstatat works (basic)
     size_t len_cont_A = strlen(cont_A);
-    if (run_test(dir_a_fd, 0, name, file_A, len_cont_A) == -1) {
+    if (run_test(dir_a_fd, 0, name, file_A, len_cont_A, S_IFREG) == -1) {
         goto close_dir_a_fd;
     }
     
     // fstatat follows symlinks (same dir)
-    if (run_test(dir_a_fd, 0, link_A_name, link_A, len_cont_A) == -1) {
+    if (run_test(dir_a_fd, 0, link_A_name, link_A, len_cont_A, S_IFREG) == -1) {
         fprintf(stderr, "Context: link %s -> %s\n", link_A, file_A);
         goto close_dir_a_fd;
     }
 
     // fstatat follows symlinks (to diff dir)
     size_t len_cont_B = strlen(cont_B);
-    if (run_test(dir_a_fd, 0, link_B_name, link_B, len_cont_B) == -1) {
+    if (run_test(dir_a_fd, 0, link_B_name, link_B, len_cont_B, S_IFREG) == -1) {
         fprintf(stderr, "Context: link %s -> %s\n", link_B, file_B);
         goto close_dir_a_fd;
     }
 
-    // TODO: AT_SYMLINK_NOFOLLOW (no Redox support)
+    // AT_SYMLINK_NOFOLLOW
+    if (
+        run_test(
+            dir_a_fd,
+            AT_SYMLINK_NOFOLLOW,
+            link_A_name,
+            link_A,
+            strlen(file_A),
+            S_IFLNK
+        ) == -1
+    ) {
+        fprintf(stderr, "Context: link %s (no follow)\n", link_A);
+        goto close_dir_a_fd;
+    }
 
     // TODO: O_SEARCH (no Redox support)
 
@@ -188,7 +230,7 @@ int main(void) {
         perror("chdir");
         goto close_dir_a_fd;
     }
-    if (run_test(AT_FDCWD, 0, name, "./", len_cont_A) == -1) {
+    if (run_test(AT_FDCWD, 0, name, "./", len_cont_A, S_IFREG) == -1) {
         fputs("Context: AT_FDCWD\n", stderr);
         goto close_dir_a_fd;
     }
@@ -198,7 +240,7 @@ int main(void) {
     }
 
     // Absolute path
-    if (run_test(dir_a_fd, 0, file_A, file_A, len_cont_A) == -1) {
+    if (run_test(dir_a_fd, 0, file_A, file_A, len_cont_A, S_IFREG) == -1) {
         fprintf(stderr, "Context: absolute path %s\n", file_A);
         goto close_dir_a_fd;
     }
@@ -228,7 +270,16 @@ int main(void) {
     }
     char rel_nested[sizeof(name) + 5] = "../";
     strcat(rel_nested, name);
-    if (run_test(nested_fd, 0, rel_nested, rel_nested, len_cont_A) == -1) {
+    if (
+        run_test(
+            nested_fd,
+            0,
+            rel_nested,
+            rel_nested,
+            len_cont_A,
+            S_IFREG
+        ) == -1
+    ) {
         fprintf(
             stderr,
             "Context: relative path from %s to ../%s\n",
@@ -240,13 +291,37 @@ int main(void) {
 
     // TODO: AT_RESOLVE_BENEATH
 
-    // TODO: AT_EMPTY_PATH
+    // AT_EMPTY_PATH (empty path)
+    struct stat stat = {0};
+    if (fstatat(dir_a_fd, "", &stat, AT_EMPTY_PATH) == -1) {
+        fputs("Context: AT_EMPTY_PATH with empty path\n", stderr);
+        goto close_dir_a_fd;
+    }
+    if ((stat.st_mode & S_IFMT) != S_IFDIR) {
+        fputs("Context: AT_EMPTY_PATH should stat dir (empty path)\n", stderr);
+        goto close_dir_a_fd;
+    }
+    
+    // AT_EMPTY_PATH (non-empty path)
+    if (
+        run_test(
+            dir_a_fd,
+            AT_EMPTY_PATH,
+            link_A_name,
+            link_A,
+            len_cont_A,
+            S_IFREG
+        ) == -1
+    ) {
+        fputs("Context: AT_EMPTY_PATH with path should stat path\n", stderr);
+        goto close_dir_a_fd;
+    }
 
     // TODO: Swapped directories resolves correctly
 
     // Failure conditions:
-    // Empty path
-    struct stat stat = {0};
+    // Empty path without AT_EMPTY_PATH
+    stat = (struct stat) {0};
     if (fstatat(dir_a_fd, "", &stat, 0) == 0) {
         fputs("Context: empty path should fail\n", stderr);
         goto close_dir_a_fd;

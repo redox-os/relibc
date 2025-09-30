@@ -9,7 +9,7 @@ use crate::{
     auxv_defs::*,
     current_namespace_fd,
     protocol::{ProcCall, ThreadCall},
-    read_proc_meta, static_proc_info,
+    read_proc_meta,
     sys::{proc_call, thread_call},
     RtTcb, StaticProcInfo, DYNAMIC_PROC_INFO,
 };
@@ -31,8 +31,8 @@ use goblin::elf64::{
 use syscall::{
     error::*,
     flag::{MapFlags, SEEK_SET},
-    CallFlags, GrantDesc, GrantFlags, Map, ProcSchemeAttrs, SetSighandlerData, MAP_FIXED_NOREPLACE,
-    MAP_SHARED, O_CLOEXEC, PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE,
+    CallFlags, GrantDesc, GrantFlags, Map, SetSighandlerData, MAP_FIXED_NOREPLACE, MAP_SHARED,
+    PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE,
 };
 
 pub enum FexecResult {
@@ -720,11 +720,10 @@ pub fn create_set_addr_space_buf(
     ip: usize,
     sp: usize,
 ) -> [u8; size_of::<usize>() * 3] {
-    let mut buf = [0_u8; 3 * size_of::<usize>()];
-    let mut chunks = buf.array_chunks_mut::<{ size_of::<usize>() }>();
-    *chunks.next().unwrap() = usize::to_ne_bytes(space);
-    *chunks.next().unwrap() = usize::to_ne_bytes(sp);
-    *chunks.next().unwrap() = usize::to_ne_bytes(ip);
+    let mut buf = [0u8; size_of::<usize>() * 3];
+
+    buf.copy_from_slice([space, sp, ip].map(usize::to_ne_bytes).as_flattened());
+
     buf
 }
 
@@ -909,7 +908,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
     Ok(new_pid)
 }
 
-struct NewChildProc {
+pub struct NewChildProc {
     proc_fd: Option<FdGuard>,
 
     thr_fd: FdGuard,

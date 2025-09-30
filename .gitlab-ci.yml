@@ -45,7 +45,8 @@ test:redox:
     variables:
         TARGET: x86_64-unknown-redox
     script:
-        - ./redoxer.sh test SKIP_REDOX=1
+        # TODO: sigaction and sigaltstack sometimes hangs with multi core
+        - REDOXER_QEMU_ARGS="-smp 1" ./redoxer.sh test SKIP_REDOX=1
 
 fmt:
     stage: test

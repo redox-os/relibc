@@ -1,4 +1,6 @@
 //! fnmatch implementation
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fnmatch.h.html>.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
@@ -20,6 +22,7 @@ pub const FNM_NOESCAPE: c_int = 1;
 pub const FNM_PATHNAME: c_int = 2;
 pub const FNM_PERIOD: c_int = 4;
 pub const FNM_CASEFOLD: c_int = 8;
+pub const FNM_IGNORECASE: c_int = FNM_CASEFOLD;
 // TODO: FNM_EXTMATCH
 
 unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {

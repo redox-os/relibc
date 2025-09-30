@@ -144,7 +144,8 @@ unsafe fn inner(stack: &mut SigStack) {
         let action = convert_old(&PROC_CONTROL_STRUCT.actions[stack.sig_num as usize - 1]);
         if action.flags.contains(SigactionFlags::RESETHAND) {
             drop(guard);
-            sigaction(
+            // TODO: handle error?
+            let _ = sigaction(
                 stack.sig_num as u8,
                 Some(&Sigaction {
                     kind: SigactionKind::Default,
@@ -160,9 +161,18 @@ unsafe fn inner(stack: &mut SigStack) {
     let sig = (stack.sig_num & 0x3f) as u8;
 
     let handler = match sigaction.kind {
+        // TODO: Since sigaction may be called while procmgr is checking the IGNORED bit, it is
+        // likely possible there can be a race condition resulting in the signal trampoline running
+        // and reaching this code. If so, we do already know whether the signal is IGNORED *now*,
+        // and so we should return early ideally without even temporarily touching the signal mask.
         SigactionKind::Ignore => {
             panic!("ctl {:#x?} signal {}", os.control, stack.sig_num)
         }
+        // this case should be treated equally as the one above
+        //
+        // _ if sigaction.flags.contains(SigactionFlags::IGNORED) => {
+        //     panic!("ctl2 {:#x?} signal {}", os.control, stack.sig_num)
+        // }
         SigactionKind::Default if usize::from(sig) == SIGCONT => SignalHandler { handler: None },
         SigactionKind::Default => {
             let _ = proc_call(
@@ -171,7 +181,7 @@ unsafe fn inner(stack: &mut SigStack) {
                 CallFlags::empty(),
                 &[ProcCall::Exit as u64, u64::from(sig) << 8],
             );
-            core::intrinsics::abort()
+            panic!()
         }
         SigactionKind::Handled { handler } => handler,
     };
@@ -397,6 +407,18 @@ fn convert_old(action: &RawAction) -> Sigaction {
 }
 
 pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction>) -> Result<()> {
+    let _sigguard = tmp_disable_signals();
+    let ctl = current_sigctl();
+
+    let _guard = SIGACTIONS_LOCK.lock();
+    sigaction_inner(ctl, signal, new, old)
+}
+fn sigaction_inner(
+    ctl: &Sigcontrol,
+    signal: u8,
+    new: Option<&Sigaction>,
+    old: Option<&mut Sigaction>,
+) -> Result<()> {
     // TODO: Now that the goal of keeping logic out of the IPC backend, no longer holds when
     // procmgr has taken over signal handling from the kernel, it would probably make sense to make
     // parts of this function an IPC call, for synchronization purposes. Apart from SA_RESETHAND
@@ -421,11 +443,6 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
         return Ok(());
     }
 
-    let _sigguard = tmp_disable_signals();
-    let ctl = current_sigctl();
-
-    let _guard = SIGACTIONS_LOCK.lock();
-
     let action = &PROC_CONTROL_STRUCT.actions[usize::from(signal) - 1];
 
     if let Some(old) = old {
@@ -438,12 +455,12 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
 
     let explicit_handler = new.ip();
 
+    let sig_group = (signal - 1) / 32;
+    let sig_idx = (signal - 1) % 32;
+
     let (mask, flags, handler) = match (usize::from(signal), new.kind) {
         (_, SigactionKind::Ignore) | (SIGURG | SIGWINCH, SigactionKind::Default) => {
-            let sig_group = (signal - 1) / 32;
-            let sig_idx = (signal - 1) % 32;
-
-            // TODO: relibc and the procmgr has access to all threads, redox_rt doesn't currently.
+            // TODO: relibc and procmgr have access to all threads, redox_rt doesn't currently.
             // Do this for all threads!
             ctl.word[usize::from(sig_group)].fetch_and(!(1 << sig_idx), Ordering::Relaxed);
             PROC_CONTROL_STRUCT
@@ -469,6 +486,16 @@ pub fn sigaction(signal: u8, new: Option<&Sigaction>, old: Option<&mut Sigaction
         ),
         (SIGCHLD, SigactionKind::Default) => {
             let nocldstop_bit = new.flags & SigactionFlags::SIG_SPECIFIC;
+
+            // Default action is to ignore. Hence all pending SIGCHLD signals should be discarded.
+
+            // TODO: relibc and procmgr have access to all threads, redox_rt doesn't currently.
+            // Do this for all threads!
+            ctl.word[usize::from(sig_group)].fetch_and(!(1 << sig_idx), Ordering::Relaxed);
+            PROC_CONTROL_STRUCT
+                .pending
+                .fetch_and(!sig_bit(signal.into()), Ordering::Relaxed);
+
             (
                 MASK_DONTCARE,
                 SigactionFlags::IGNORED | nocldstop_bit,
@@ -546,7 +573,7 @@ bitflags::bitflags! {
 
 const STORED_FLAGS: u32 = 0xfe00_0000;
 
-fn default_handler(sig: c_int) {
+fn default_handler(_sig: c_int) {
     unreachable!();
 }
 
@@ -568,10 +595,6 @@ pub(crate) static PROC_CONTROL_STRUCT: SigProcControl = SigProcControl {
     }; 64],
     sender_infos: [const { AtomicU64::new(0) }; 32],
 };
-
-fn combine_allowset([lo, hi]: [u64; 2]) -> u64 {
-    (lo >> 32) | ((hi >> 32) << 32)
-}
 
 const fn sig_bit(sig: u32) -> u64 {
     //assert_ne!(sig, 32);
@@ -631,7 +654,8 @@ pub fn setup_sighandler(tcb: &RtTcb, first_thread: bool) {
     .expect("failed to sync signal tctl");
 
     // TODO: Inherited set of ignored signals
-    set_sigmask(Some(0), None);
+    // TODO: handle error
+    let _ = set_sigmask(Some(0), None);
 }
 pub type RtSigarea = RtTcb; // TODO
 pub fn current_setsighandler_struct() -> SetSighandlerData {
@@ -664,7 +688,7 @@ pub(crate) fn get_sigaltstack(tcb: &SigArea, sp: usize) -> Sigaltstack {
         Sigaltstack::Enabled {
             base: tcb.altstack_bottom as *mut (),
             size: tcb.altstack_top - tcb.altstack_bottom,
-            onstack: (tcb.altstack_bottom..tcb.altstack_top).contains(&sp),
+            onstack: (tcb.altstack_bottom..=tcb.altstack_top).contains(&sp),
         }
     }
 }
@@ -678,7 +702,9 @@ pub unsafe fn sigaltstack(
 
     let old = get_sigaltstack(tcb, crate::arch::current_sp());
 
-    if matches!(old, Sigaltstack::Enabled { onstack: true, .. }) && new != Some(&old) {
+    if matches!(old, Sigaltstack::Enabled { onstack: true, .. })
+        && new.is_some_and(|new| *new != old)
+    {
         return Err(Error::new(EPERM));
     }
 
@@ -885,4 +911,49 @@ fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option
             si_addr: core::ptr::null_mut(),
         })
     }
+}
+pub fn apply_inherited_sigignmask(inherited: u64) {
+    let _sig_guard = tmp_disable_signals();
+    let _guard = SIGACTIONS_LOCK.lock();
+    let ctl = current_sigctl();
+
+    // Set all signals in the inherited set that have explicitly been set to SIG_IGN. Those whose
+    // (default) effective action is to ignore but are set to SIG_DFL, are not in this set, and the
+    // initial SIG_DFL state would be "Ignore" anyway but still return SIG_DFL when asked, as
+    // usual.
+    for bit in (0..64).filter(|b| inherited & (1 << b) != 0) {
+        let sig = u8::try_from(bit + 1).unwrap();
+        let _ = sigaction_inner(
+            ctl,
+            sig,
+            Some(&Sigaction {
+                // TODO: correct fields?
+                flags: SigactionFlags::IGNORED,
+                kind: SigactionKind::Ignore,
+                mask: 0,
+            }),
+            None,
+        );
+    }
+}
+pub fn get_sigignmask_to_inherit() -> u64 {
+    let _sig_guard = tmp_disable_signals();
+    let _guard = SIGACTIONS_LOCK.lock();
+    let ctl = current_sigctl();
+
+    let mut mask = 0_u64;
+    // Fill the mask with the set of the inherited signals that have explicitly been set to
+    // SIG_IGN. Again this excludes signals that would have returned SIG_DFL from sigaction,
+    // despite their default action being "Ignore".
+
+    for bit in 0..64 {
+        let sig = u8::try_from(bit + 1).unwrap();
+        let mut old = Sigaction::default();
+        let _ = sigaction_inner(ctl, sig, None, Some(&mut old));
+        if matches!(old.kind, SigactionKind::Ignore) {
+            mask |= 1 << bit;
+        }
+    }
+
+    mask
 }

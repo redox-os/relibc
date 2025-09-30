@@ -1,29 +1,30 @@
 use alloc::{
     borrow::ToOwned,
     boxed::Box,
+    ffi::CString,
     string::{String, ToString},
     vec::Vec,
 };
+use core::{ffi::c_int, str};
 use redox_rt::signal::tmp_disable_signals;
 use syscall::{data::Stat, error::*, flag::*};
 
-use super::{libcscheme, FdGuard};
-use crate::sync::Mutex;
+use super::{libcscheme, FdGuard, Pal, Sys};
+use crate::{
+    error::Errno,
+    fs::File,
+    header::{fcntl, limits},
+    out::Out,
+    sync::Mutex,
+};
 
 pub use redox_path::{canonicalize_using_cwd, RedoxPath};
 
 // TODO: Define in syscall
 const PATH_MAX: usize = 4096;
 
-// XXX: chdir is not marked thread-safe (MT-safe) by POSIX. But on Linux it is simply run as a
-// syscall and is therefore atomic, which is presumably why Rust's libstd doesn't synchronize
-// access to this.
-//
-// https://internals.rust-lang.org/t/synchronized-ffi-access-to-posix-environment-variable-functions/15475
-//
-// chdir is however signal-safe, forbidding the use of locks. We therefore call sigprocmask before
-// and after acquiring the locks. (TODO: ArcSwap? That will need to be ported to no_std first,
-// though).
+// POSIX states chdir is both thread-safe and signal-safe. Thus we need to synchronize access to CWD, but at the
+// same time forbid signal handlers from running in the meantime, to avoid reentrant deadlock.
 pub fn chdir(path: &str) -> Result<()> {
     let _siglock = tmp_disable_signals();
     let mut cwd_guard = CWD.lock();
@@ -43,19 +44,16 @@ pub fn chdir(path: &str) -> Result<()> {
     Ok(())
 }
 
-// TODO: MaybeUninit
-pub fn getcwd(buf: &mut [u8]) -> Option<usize> {
+// getcwd is similarly both thread-safe and signal-safe.
+pub fn getcwd(mut buf: Out<[u8]>) -> Option<usize> {
     let _siglock = tmp_disable_signals();
     let cwd_guard = CWD.lock();
     let cwd = cwd_guard.as_deref().unwrap_or("").as_bytes();
 
-    // But is already checked not to be empty.
-    if buf.len() - 1 < cwd.len() {
-        return None;
-    }
+    let [mut before, mut after] = buf.split_at_checked(cwd.len())?;
 
-    buf[..cwd.len()].copy_from_slice(&cwd);
-    buf[cwd.len()..].fill(0_u8);
+    before.copy_from_slice(&cwd);
+    after.zero();
 
     Some(cwd.len())
 }
@@ -210,4 +208,49 @@ fn get_parent_path(path: &str) -> Option<&str> {
             Some(&path[..index])
         }
     })
+}
+
+// TODO: Fold into openat or something.
+pub fn cap_path_at(
+    dirfd: c_int,
+    path: &str,
+    at_flags: c_int,
+    oflags: c_int,
+) -> Result<File, Errno> {
+    // Ideally, the function calling this fn would check AT_EMPTY_PATH and just call fstat or
+    // whatever with the fd.
+    if path.is_empty() && at_flags & fcntl::AT_EMPTY_PATH != fcntl::AT_EMPTY_PATH {
+        return Err(Errno(ENOENT));
+    }
+
+    let oflags = if at_flags & fcntl::AT_SYMLINK_NOFOLLOW == fcntl::AT_SYMLINK_NOFOLLOW {
+        fcntl::O_CLOEXEC | fcntl::O_NOFOLLOW | fcntl::O_PATH | fcntl::O_SYMLINK | oflags
+    } else {
+        fcntl::O_CLOEXEC | fcntl::O_RDONLY | oflags
+    };
+
+    // Absolute paths are passed without processing unless RESOLVE_BENEATH is used.
+    // canonicalize_using_cwd checks that path is absolute so a third branch that does so here
+    // isn't needed.
+    let path = if dirfd == fcntl::AT_FDCWD {
+        // The special constant AT_FDCWD indicates that we should use the cwd.
+        let mut buf = [0; limits::PATH_MAX];
+        let len = getcwd(Out::from_mut(&mut buf)).ok_or(Errno(ENAMETOOLONG))?;
+        // SAFETY: Redox's cwd is stored as a str.
+        let cwd = unsafe { str::from_utf8_unchecked(&buf[..len]) };
+
+        canonicalize_using_cwd(Some(cwd), path).ok_or(Errno(EBADF))?
+    } else {
+        let mut buf = [0; limits::PATH_MAX];
+        let len = Sys::fpath(dirfd, &mut buf)?;
+        // SAFETY: fpath checks then copies valid UTF8.
+        let dir = unsafe { str::from_utf8_unchecked(&buf[..len]) };
+
+        canonicalize_using_cwd(Some(dir), path).ok_or(Errno(EBADF))?
+    };
+    let path = CString::new(path).map_err(|_| Errno(ENOENT))?;
+
+    // TODO:
+    // * Switch open to openat.
+    File::open(path.as_c_str().into(), oflags)
 }

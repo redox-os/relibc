@@ -260,7 +260,7 @@ pub fn execve(
     let extrainfo = ExtraInfo {
         cwd: Some(&cwd),
         default_scheme: Some(&default_scheme),
-        sigignmask: 0,
+        sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
         sigprocmask,
         umask: redox_rt::sys::get_umask(),
         thr_fd: **RtTcb::current().thread_fd(),

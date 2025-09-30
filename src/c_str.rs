@@ -7,7 +7,10 @@ use alloc::{
     string::String,
 };
 
-use crate::{header::string::strlen, platform::types::c_char};
+use crate::{
+    header::string::{strchr, strlen},
+    platform::types::c_char,
+};
 
 /// C string wrapper, guaranteed to be
 #[derive(Clone, Copy)]
@@ -32,6 +35,30 @@ impl<'a> CStr<'a> {
             None
         } else {
             Some(Self::from_ptr(ptr))
+        }
+    }
+    #[doc(alias = "strchr")]
+    #[inline]
+    pub fn find(self, c: u8) -> Option<Self> {
+        unsafe {
+            // SAFETY: the only requirement is for self.as_ptr() to be valid up to and including
+            // the nearest NUL byte, which this type requires
+            let ret = strchr(self.as_ptr(), c.into());
+            // SAFETY: strchr must either return NULL (not found) or a substring of self, which can
+            // never exceed the nearest NUL byte of self
+            Self::from_nullable_ptr(ret)
+        }
+    }
+    #[inline]
+    pub fn contains(self, c: u8) -> bool {
+        self.find(c).is_some()
+    }
+    #[inline]
+    pub fn first(self) -> u8 {
+        unsafe {
+            // SAFETY: Self must be valid up to and including its nearest NUL byte, which certainly
+            // implies its readable length is nonzero (string is empty if this first byte is 0).
+            self.ptr.read() as u8
         }
     }
     pub fn to_bytes_with_nul(self) -> &'a [u8] {
@@ -77,6 +104,7 @@ impl<'a> CStr<'a> {
     pub fn borrow(string: &'a CString) -> Self {
         unsafe { Self::from_ptr(string.as_ptr()) }
     }
+    #[doc(alias = "strlen")]
     pub fn count_bytes(&self) -> usize {
         self.to_bytes().len()
     }

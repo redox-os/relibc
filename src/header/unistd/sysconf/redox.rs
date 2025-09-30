@@ -1,7 +1,12 @@
 use core::convert::TryInto;
 
+use alloc::string::String;
+
 use crate::{
-    header::{errno, limits},
+    error::Errno,
+    fs::File,
+    header::{errno, fcntl, limits},
+    io::Read,
     platform::{self, types::*, Pal, Sys},
 };
 
@@ -56,8 +61,8 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
         _SC_TTY_NAME_MAX => 32,
         _SC_SYMLOOP_MAX => -1,
         _SC_HOST_NAME_MAX => 64,
-        _SC_NPROCESSORS_CONF => 1,
-        _SC_NPROCESSORS_ONLN => 1,
+        _SC_NPROCESSORS_CONF => get_cpu_count().unwrap_or(None).unwrap_or(1),
+        _SC_NPROCESSORS_ONLN => get_cpu_count().unwrap_or(None).unwrap_or(1),
         _SC_SIGQUEUE_MAX => 32,
         _SC_REALTIME_SIGNALS => 202405,
         _ => {
@@ -65,4 +70,17 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
             -1
         }
     }
+}
+
+pub fn get_cpu_count() -> Result<Option<c_long>, Errno> {
+    let mut string = String::new();
+    let mut file = File::open(c"/scheme/sys/cpu".into(), fcntl::O_RDONLY)?;
+    file.read_to_string(&mut string)
+        .map_err(|_| Errno(errno::EIO).sync())?;
+
+    Ok(string
+        .lines()
+        .find(|line| line.starts_with("CPUs:"))
+        .and_then(|line| line.split(':').nth(1))
+        .and_then(|num_str| num_str.trim().parse::<c_long>().ok()))
 }

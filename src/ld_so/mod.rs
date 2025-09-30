@@ -18,10 +18,6 @@ use crate::{
     start::Stack,
 };
 
-#[cfg(target_os = "redox")]
-pub const PATH_SEP: char = ';';
-
-#[cfg(target_os = "linux")]
 pub const PATH_SEP: char = ':';
 
 mod access;

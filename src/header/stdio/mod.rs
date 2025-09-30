@@ -17,7 +17,7 @@ use core::{
 use crate::{
     c_str::CStr,
     c_vec::CVec,
-    error::ResultExt,
+    error::{ResultExt, ResultExtPtrMut},
     fs::File,
     header::{
         errno::{self, STR_ERROR},
@@ -26,6 +26,7 @@ use crate::{
         unistd,
     },
     io::{self, BufRead, BufWriter, LineWriter, Read, Write},
+    out::Out,
     platform::{self, types::*, Pal, Sys, WriteByte, ERRNO},
     sync::Mutex,
 };
@@ -346,11 +347,9 @@ pub unsafe extern "C" fn fclose(stream: *mut FILE) -> c_int {
 /// Open a file from a file descriptor
 #[no_mangle]
 pub unsafe extern "C" fn fdopen(fildes: c_int, mode: *const c_char) -> *mut FILE {
-    if let Some(f) = helpers::_fdopen(fildes, mode) {
-        f
-    } else {
-        ptr::null_mut()
-    }
+    helpers::_fdopen(fildes, CStr::from_ptr(mode))
+        .map(|f| Box::into_raw(f))
+        .or_errno_null_mut()
 }
 
 /// Check for EOF
@@ -513,7 +512,7 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
         return ptr::null_mut();
     }
 
-    let flags = helpers::parse_mode_flags(mode);
+    let flags = helpers::parse_mode_flags(CStr::from_ptr(mode));
 
     let new_mode = if flags & fcntl::O_CREAT == fcntl::O_CREAT {
         0o666
@@ -530,12 +529,14 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
         fcntl::fcntl(fd, fcntl::F_SETFD, fcntl::FD_CLOEXEC as c_ulonglong);
     }
 
-    if let Some(f) = helpers::_fdopen(fd, mode) {
-        f
-    } else {
-        Sys::close(fd);
-        ptr::null_mut()
-    }
+    helpers::_fdopen(fd, CStr::from_ptr(mode))
+        .map(|f| Box::into_raw(f))
+        .map_err(|err| {
+            // TODO: guard type
+            Sys::close(fd);
+            err
+        })
+        .or_errno_null_mut()
 }
 
 /// Clear the buffers of a stream
@@ -611,7 +612,7 @@ pub unsafe extern "C" fn freopen(
     mode: *const c_char,
     stream: &mut FILE,
 ) -> *mut FILE {
-    let mut flags = helpers::parse_mode_flags(mode);
+    let mut flags = helpers::parse_mode_flags(CStr::from_ptr(mode));
     flockfile(stream);
 
     let _ = stream.flush();
@@ -826,6 +827,7 @@ pub unsafe extern "C" fn getw(stream: *mut FILE) -> c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn pclose(stream: *mut FILE) -> c_int {
+    // TODO: rusty error handling?
     let pid = {
         let mut stream = (*stream).lock();
 
@@ -840,7 +842,7 @@ pub unsafe extern "C" fn pclose(stream: *mut FILE) -> c_int {
     fclose(stream);
 
     let mut wstatus = 0;
-    if Sys::waitpid(pid, &mut wstatus, 0).or_minus_one_errno() == -1 {
+    if Sys::waitpid(pid, Some(Out::from_mut(&mut wstatus)), 0).or_minus_one_errno() == -1 {
         return -1;
     }
 
@@ -949,12 +951,12 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
             (pipes[0], if cloexec { c"re".into() } else { c"r".into() })
         };
 
-        if let Some(f) = helpers::_fdopen(fd, fd_mode.as_ptr()) {
-            (*f).pid = Some(child_pid);
-            f
-        } else {
-            ptr::null_mut()
-        }
+        helpers::_fdopen(fd, fd_mode)
+            .map(|mut f| {
+                f.pid = Some(child_pid);
+                Box::into_raw(f)
+            })
+            .or_errno_null_mut()
     } else {
         ptr::null_mut()
     }
