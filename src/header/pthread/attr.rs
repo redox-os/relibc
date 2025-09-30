@@ -1,6 +1,11 @@
+use core::{ptr, sync::atomic::Ordering};
+
 use super::*;
 
-use crate::header::bits_pthread::pthread_attr_t;
+use crate::{
+    header::bits_pthread::{pthread_attr_t, pthread_t},
+    pthread::{Pthread, PthreadFlags},
+};
 
 impl Default for RlctAttr {
     fn default() -> Self {
@@ -183,5 +188,23 @@ pub unsafe extern "C" fn pthread_attr_setstacksize(
     stacksize: size_t,
 ) -> c_int {
     (*attr.cast::<RlctAttr>()).stacksize = stacksize;
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pthread_getattr_np(
+    thread_ptr: pthread_t,
+    attr_ptr: *mut pthread_attr_t,
+) -> c_int {
+    let thread = &*thread_ptr.cast::<Pthread>();
+    let attr_ptr = attr_ptr.cast::<RlctAttr>();
+    ptr::write(attr_ptr, RlctAttr::default());
+    let attr = &mut *attr_ptr;
+    if thread.flags.load(Ordering::Acquire) & PthreadFlags::DETACHED.bits() != 0 {
+        attr.detachstate = PTHREAD_CREATE_DETACHED as _;
+    }
+    attr.stack = thread.stack_base as usize;
+    attr.stacksize = thread.stack_size;
+    //TODO: more values?
     0
 }
