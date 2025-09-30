@@ -18,6 +18,8 @@ use crate::{
     platform::{types::*, PalSignal},
 };
 
+use super::Sys;
+
 pub type RawResult = usize;
 
 pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
