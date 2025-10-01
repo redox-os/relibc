@@ -182,23 +182,23 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
     };
 
     unsafe {
-        crate::platform::OUR_ENVIRON = envs
-            .iter()
-            .map(|(k, v)| {
-                let mut var = Vec::with_capacity(k.len() + v.len() + 2);
-                var.extend(k.as_bytes());
-                var.push(b'=');
-                var.extend(v.as_bytes());
-                var.push(b'\0');
-                let mut var = var.into_boxed_slice();
-                let ptr = var.as_mut_ptr();
-                core::mem::forget(var);
-                ptr.cast()
-            })
-            .chain(core::iter::once(core::ptr::null_mut()))
-            .collect::<Vec<_>>();
+        crate::platform::OUR_ENVIRON.replace(
+            envs.iter()
+                .map(|(k, v)| {
+                    let mut var = Vec::with_capacity(k.len() + v.len() + 2);
+                    var.extend(k.as_bytes());
+                    var.push(b'=');
+                    var.extend(v.as_bytes());
+                    var.push(b'\0');
+                    let mut var = var.into_boxed_slice();
+                    let ptr = var.as_mut_ptr();
+                    core::mem::forget(var);
+                    ptr.cast()
+                })
+                .chain(core::iter::once(core::ptr::null_mut())),
+        );
 
-        crate::platform::environ = crate::platform::OUR_ENVIRON.as_mut_ptr();
+        crate::platform::environ.set(crate::platform::OUR_ENVIRON.as_mut_ptr());
     }
 
     let is_manual = if let Some(img_entry) = get_auxv(&auxv, AT_ENTRY) {

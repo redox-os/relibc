@@ -329,7 +329,7 @@ pub unsafe extern "C" fn execlp(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
 #[no_mangle]
 pub unsafe extern "C" fn execv(path: *const c_char, argv: *const *mut c_char) -> c_int {
-    execve(path, argv, platform::environ)
+    execve(path, argv, platform::environ.get())
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
