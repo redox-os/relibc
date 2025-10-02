@@ -383,12 +383,19 @@ pub unsafe extern "C" fn redox_mkns_v1(
         syscall::mkns(core::slice::from_raw_parts(names.cast(), num_names))
     })())
 }
-
 #[no_mangle]
-pub unsafe extern "C" fn redox_mkns2_v1(names: *const u8, names_len: usize) -> RawResult {
-    Error::mux(redox_rt::sys::mkns(core::slice::from_raw_parts(
-        names, names_len,
-    )))
+pub unsafe extern "C" fn redox_mkns2_v0(
+    names: *const iovec,
+    names_len: usize,
+    flags: u32,
+) -> RawResult {
+    Error::mux((|| {
+        if flags != 0 {
+            return Err(Error::new(EINVAL));
+        }
+        // Kernel does the UTF-8 validation.
+        redox_rt::sys::mkns(core::slice::from_raw_parts(names.cast(), num_names))
+    })())
 }
 
 // ABI-UNSTABLE

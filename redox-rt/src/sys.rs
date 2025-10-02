@@ -16,6 +16,7 @@ use crate::{
     signal::tmp_disable_signals,
     DynamicProcInfo, RtTcb, Tcb, DYNAMIC_PROC_INFO,
 };
+use alloc::vec::Vec;
 
 #[inline]
 fn wrapper<T>(restart: bool, erestart: bool, mut f: impl FnMut() -> Result<T>) -> Result<T> {
@@ -384,8 +385,15 @@ pub fn nsopen(path: &str, flags: u32, mode: u16) -> Result<usize> {
         mode as usize,
     )
 }
-pub fn mkns(names: &[u8]) -> Result<usize> {
-    syscall::dup(crate::current_namespace_fd(), names)
+pub fn mkns(names: &[[usize; 2]]) -> Result<usize> {
+    let mut buf = Vec::new();
+    for name in names {
+        let name_bytes = unsafe { core::slice::from_raw_parts(name[0] as *const u8, name[1]) };
+        let scheme_name = core::str::from_utf8(name_bytes).map_err(|_| Error::new(EINVAL))?;
+        buf.extend_from_slice(&name[1].to_le_bytes());
+        buf.extend_from_slice(scheme_name.as_bytes());
+    }
+    syscall::dup(crate::current_namespace_fd(), &buf)
 }
 pub fn register_scheme(cap_fd: usize) -> Result<()> {
     let mut cap_bytes = cap_fd.to_ne_bytes();
