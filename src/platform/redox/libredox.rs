@@ -386,7 +386,7 @@ pub unsafe extern "C" fn redox_mkns_v1(
 #[no_mangle]
 pub unsafe extern "C" fn redox_mkns2_v0(
     names: *const iovec,
-    names_len: usize,
+    num_names: usize,
     flags: u32,
 ) -> RawResult {
     Error::mux((|| {
