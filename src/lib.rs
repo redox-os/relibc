@@ -67,6 +67,7 @@ pub mod ld_so;
 pub mod out;
 pub mod platform;
 pub mod pthread;
+pub mod raw_cell;
 pub mod start;
 pub mod sync;
 
