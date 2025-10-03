@@ -2,13 +2,13 @@ use crate::header::signal::sigval;
 use core::{mem, ptr::addr_of};
 
 use super::{
-    super::{types::*, PalSignal},
-    e_raw, Sys,
+    super::{PalSignal, types::*},
+    Sys, e_raw,
 };
 use crate::{
     error::{Errno, Result},
     header::{
-        signal::{sigaction, siginfo_t, sigset_t, stack_t, NSIG, SA_RESTORER, SI_QUEUE},
+        signal::{NSIG, SA_RESTORER, SI_QUEUE, sigaction, siginfo_t, sigset_t, stack_t},
         sys_time::itimerval,
         time::timespec,
     },
@@ -68,7 +68,7 @@ impl PalSignal for Sys {
         act: Option<&sigaction>,
         oact: Option<&mut sigaction>,
     ) -> Result<(), Errno> {
-        extern "C" {
+        unsafe extern "C" {
             fn __restore_rt();
         }
         let act = act.map(|act| {

@@ -71,7 +71,7 @@ pub struct user {
     pub u_debugreg: [c_ulong; 8],
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn _cbindgen_export_x86_user(
     a: user_fpregs_struct,
     b: user_regs_struct,

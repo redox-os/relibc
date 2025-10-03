@@ -11,10 +11,10 @@ use syscall::{
 };
 
 use crate::{
-    proc::{fork_inner, FdGuard, ForkArgs},
-    protocol::{ProcCall, RtSigInfo},
-    signal::{get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     Tcb,
+    proc::{FdGuard, ForkArgs, fork_inner},
+    protocol::{ProcCall, RtSigInfo},
+    signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, get_sigaltstack, inner_c},
 };
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
@@ -465,7 +465,7 @@ __relibc_internal_sigentry_crit_third:
     proc_fd = sym PROC_FD,
 ]);
 
-extern "C" {
+unsafe extern "C" {
     fn __relibc_internal_sigentry_crit_first();
     fn __relibc_internal_sigentry_crit_second();
     fn __relibc_internal_sigentry_crit_third();
@@ -499,7 +499,7 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
 pub(crate) static SUPPORTS_AVX: AtomicU8 = AtomicU8::new(0);
 
 // __relibc will be prepended to the name, so no_mangle is fine
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe fn manually_enter_trampoline() {
     let c = &Tcb::current().unwrap().os_specific.control;
     c.control_flags.store(

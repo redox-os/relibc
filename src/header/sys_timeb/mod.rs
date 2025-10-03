@@ -32,7 +32,7 @@ pub struct timeb {
 /// # Safety
 /// The caller must ensure that `tp` is convertible to a `&mut
 /// MaybeUninit<timeb>`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ftime(tp: *mut timeb) -> c_int {
     // SAFETY: the caller is required to ensure that the pointer is valid.
     let tp_maybe_uninit = unsafe { NonNull::new_unchecked(tp).as_uninit_mut() };

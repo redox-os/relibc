@@ -1,6 +1,6 @@
 use core::{arch::asm, ptr};
 
-use super::{types::*, Pal, ERRNO};
+use super::{ERRNO, Pal, types::*};
 use crate::{
     c_str::CStr,
     header::{
@@ -9,7 +9,7 @@ use crate::{
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW},
         signal::SIGCHLD,
         sys_resource::{rlimit, rusage},
-        sys_stat::{stat, S_IFIFO},
+        sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
         unistd::{SEEK_CUR, SEEK_SET},

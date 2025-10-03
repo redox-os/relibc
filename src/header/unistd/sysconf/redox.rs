@@ -7,7 +7,7 @@ use crate::{
     fs::File,
     header::{errno, fcntl, limits},
     io::Read,
-    platform::{self, types::*, Pal, Sys},
+    platform::{self, Pal, Sys, types::*},
 };
 
 // POSIX.1 {

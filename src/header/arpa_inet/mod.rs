@@ -14,10 +14,11 @@ use crate::{
     c_str::CStr,
     header::{
         errno::*,
-        netinet_in::{in_addr, in_addr_t, ntohl, INADDR_NONE},
+        netinet_in::{INADDR_NONE, in_addr, in_addr_t, ntohl},
         sys_socket::{constants::*, socklen_t},
     },
     platform::{self, types::*},
+    raw_cell::RawCell,
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/inet_addr.html>.
@@ -26,7 +27,7 @@ use crate::{
 /// The `inet_addr()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 8.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
     let mut val: in_addr = in_addr { s_addr: 0 };
 
@@ -38,7 +39,7 @@ pub unsafe extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
 }
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/inet_aton.3.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_aton(cp: *const c_char, inp: *mut in_addr) -> c_int {
     // TODO: octal/hex
     unsafe { inet_pton(AF_INET, cp, inp as *mut c_void) }
@@ -50,7 +51,7 @@ pub unsafe extern "C" fn inet_aton(cp: *const c_char, inp: *mut in_addr) -> c_in
 /// The `inet_lnaof()` function was specified in Networking Services Issue 5,
 /// but not in the Open Group Base Specifications Issue 6 and later.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn inet_lnaof(r#in: in_addr) -> in_addr_t {
     if r#in.s_addr >> 24 < 128 {
         r#in.s_addr & 0xff_ffff
@@ -67,7 +68,7 @@ pub extern "C" fn inet_lnaof(r#in: in_addr) -> in_addr_t {
 /// The `inet_makeaddr()` function was specified in Networking Services Issue
 /// 5, but not in the Open Group Base Specifications Issue 6 and later.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn inet_makeaddr(net: in_addr_t, lna: in_addr_t) -> in_addr {
     let mut output: in_addr = in_addr { s_addr: 0 };
 
@@ -88,7 +89,7 @@ pub extern "C" fn inet_makeaddr(net: in_addr_t, lna: in_addr_t) -> in_addr {
 /// The `inet_netof()` function was specified in Networking Services Issue 5,
 /// but not in the Open Group Base Specifications Issue 6 and later.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn inet_netof(r#in: in_addr) -> in_addr_t {
     if r#in.s_addr >> 24 < 128 {
         r#in.s_addr & 0xff_ffff
@@ -105,7 +106,7 @@ pub extern "C" fn inet_netof(r#in: in_addr) -> in_addr_t {
 /// The `inet_network()` function was specified in Networking Services Issue 5,
 /// but not in the Open Group Base Specifications Issue 6 and later.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_network(cp: *const c_char) -> in_addr_t {
     ntohl(unsafe { inet_addr(cp) })
 }
@@ -116,22 +117,22 @@ pub unsafe extern "C" fn inet_network(cp: *const c_char) -> in_addr_t {
 /// The `inet_ntoa()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 8.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_ntoa(r#in: in_addr) -> *const c_char {
-    static mut NTOA_ADDR: [c_char; 16] = [0; 16];
+    static NTOA_ADDR: RawCell<[c_char; 16]> = RawCell::new([0; 16]);
 
     unsafe {
         inet_ntop(
             AF_INET,
             &r#in as *const in_addr as *const c_void,
-            NTOA_ADDR.as_mut_ptr(),
-            16,
+            NTOA_ADDR.unsafe_mut().as_mut_ptr(),
+            NTOA_ADDR.unsafe_ref().len(),
         )
     }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/inet_ntop.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_ntop(
     af: c_int,
     src: *const c_void,
@@ -160,7 +161,7 @@ pub unsafe extern "C" fn inet_ntop(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/inet_ntop.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_void) -> c_int {
     if af != AF_INET {
         platform::ERRNO.set(EAFNOSUPPORT);

@@ -40,7 +40,7 @@ unsafe fn scatter(iovs: &[iovec], vec: Vec<u8>) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn preadv(
     fd: c_int,
     iov: *const iovec,
@@ -62,7 +62,7 @@ pub unsafe extern "C" fn preadv(
     ret
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pwritev(
     fd: c_int,
     iov: *const iovec,
@@ -80,7 +80,7 @@ pub unsafe extern "C" fn pwritev(
     unistd::pwrite(fd, vec.as_ptr() as *const c_void, vec.len(), offset)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> ssize_t {
     if iovcnt < 0 || iovcnt > IOV_MAX {
         platform::ERRNO.set(errno::EINVAL);
@@ -97,7 +97,7 @@ pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> s
     ret
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn writev(fd: c_int, iov: *const iovec, iovcnt: c_int) -> ssize_t {
     if iovcnt < 0 || iovcnt > IOV_MAX {
         platform::ERRNO.set(errno::EINVAL);

@@ -14,14 +14,6 @@ impl<T> RawCell<T> {
         }
     }
     #[inline]
-    pub unsafe fn get(&self) -> T {
-        self.inner.get().read()
-    }
-    #[inline]
-    pub unsafe fn set(&self, t: T) {
-        self.inner.get().write(t)
-    }
-    #[inline]
     pub fn as_mut_ptr(&self) -> *mut T {
         self.inner.get()
     }
@@ -32,6 +24,14 @@ impl<T> RawCell<T> {
     #[inline]
     pub fn into_inner(self) -> T {
         self.inner.into_inner()
+    }
+    #[inline]
+    pub unsafe fn unsafe_ref(&self) -> &T {
+        &*self.inner.get()
+    }
+    #[inline]
+    pub unsafe fn unsafe_mut(&self) -> &mut T {
+        &mut *self.inner.get()
     }
 }
 

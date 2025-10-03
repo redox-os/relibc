@@ -4,18 +4,18 @@ use crate::error::Errno;
 
 // PTHREAD_MUTEX_INITIALIZER is defined in bits_pthread/cbindgen.toml
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_consistent(mutex: *mut pthread_mutex_t) -> c_int {
     e((&*mutex.cast::<RlctMutex>()).make_consistent())
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_destroy(mutex: *mut pthread_mutex_t) -> c_int {
     // No-op
     core::ptr::drop_in_place(mutex.cast::<RlctMutex>());
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_getprioceiling(
     mutex: *const pthread_mutex_t,
     prioceiling: *mut c_int,
@@ -29,7 +29,7 @@ pub unsafe extern "C" fn pthread_mutex_getprioceiling(
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_init(
     mutex: *mut pthread_mutex_t,
     attr: *const pthread_mutexattr_t,
@@ -49,12 +49,12 @@ pub unsafe extern "C" fn pthread_mutex_init(
         Err(Errno(errno)) => errno,
     }
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_lock(mutex: *mut pthread_mutex_t) -> c_int {
     e((&*mutex.cast::<RlctMutex>()).lock())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_setprioceiling(
     mutex: *mut pthread_mutex_t,
     prioceiling: c_int,
@@ -69,30 +69,30 @@ pub unsafe extern "C" fn pthread_mutex_setprioceiling(
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_timedlock(
     mutex: *mut pthread_mutex_t,
     timespec: *const timespec,
 ) -> c_int {
     e((&*mutex.cast::<RlctMutex>()).lock_with_timeout(&*timespec))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_trylock(mutex: *mut pthread_mutex_t) -> c_int {
     e((&*mutex.cast::<RlctMutex>()).try_lock())
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_unlock(mutex: *mut pthread_mutex_t) -> c_int {
     e((&*mutex.cast::<RlctMutex>()).unlock())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_destroy(attr: *mut pthread_mutexattr_t) -> c_int {
     // No-op
     core::ptr::drop_in_place(attr.cast::<RlctMutexAttr>());
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_getprioceiling(
     attr: *const pthread_mutexattr_t,
     prioceiling: *mut c_int,
@@ -101,7 +101,7 @@ pub unsafe extern "C" fn pthread_mutexattr_getprioceiling(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_getprotocol(
     attr: *const pthread_mutexattr_t,
     protocol: *mut c_int,
@@ -110,7 +110,7 @@ pub unsafe extern "C" fn pthread_mutexattr_getprotocol(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_getpshared(
     attr: *const pthread_mutexattr_t,
     pshared: *mut c_int,
@@ -119,7 +119,7 @@ pub unsafe extern "C" fn pthread_mutexattr_getpshared(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_getrobust(
     attr: *const pthread_mutexattr_t,
     robust: *mut c_int,
@@ -127,7 +127,7 @@ pub unsafe extern "C" fn pthread_mutexattr_getrobust(
     robust.write((*attr.cast::<RlctMutexAttr>()).robust);
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_gettype(
     attr: *const pthread_mutexattr_t,
     ty: *mut c_int,
@@ -135,13 +135,13 @@ pub unsafe extern "C" fn pthread_mutexattr_gettype(
     ty.write((*attr.cast::<RlctMutexAttr>()).ty);
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_init(attr: *mut pthread_mutexattr_t) -> c_int {
     attr.cast::<RlctMutexAttr>().write(RlctMutexAttr::default());
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_setprioceiling(
     attr: *mut pthread_mutexattr_t,
     prioceiling: c_int,
@@ -150,7 +150,7 @@ pub unsafe extern "C" fn pthread_mutexattr_setprioceiling(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_setprotocol(
     attr: *mut pthread_mutexattr_t,
     protocol: c_int,
@@ -159,7 +159,7 @@ pub unsafe extern "C" fn pthread_mutexattr_setprotocol(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_setpshared(
     attr: *mut pthread_mutexattr_t,
     pshared: c_int,
@@ -168,7 +168,7 @@ pub unsafe extern "C" fn pthread_mutexattr_setpshared(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_setrobust(
     attr: *mut pthread_mutexattr_t,
     robust: c_int,
@@ -176,7 +176,7 @@ pub unsafe extern "C" fn pthread_mutexattr_setrobust(
     (*attr.cast::<RlctMutexAttr>()).robust = robust;
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_settype(
     attr: *mut pthread_mutexattr_t,
     ty: c_int,

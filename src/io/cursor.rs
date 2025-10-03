@@ -10,7 +10,7 @@
 
 use core::cmp;
 
-use crate::io::{self, prelude::*, Error, ErrorKind, Initializer, SeekFrom};
+use crate::io::{self, Error, ErrorKind, Initializer, SeekFrom, prelude::*};
 
 /// A `Cursor` wraps an in-memory buffer and provides it with a
 /// [`Seek`] implementation.
@@ -356,7 +356,7 @@ impl Write for Cursor<::alloc::boxed::Box<[u8]>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::io::{prelude::*, Cursor, SeekFrom};
+    use crate::io::{Cursor, SeekFrom, prelude::*};
 
     #[test]
     fn test_vec_writer() {

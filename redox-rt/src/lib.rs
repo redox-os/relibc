@@ -11,7 +11,7 @@
 
 use core::{
     cell::UnsafeCell,
-    mem::{size_of, MaybeUninit},
+    mem::{MaybeUninit, size_of},
 };
 
 use generic_rt::{ExpectTlsFree, GenericTcb};
@@ -38,7 +38,7 @@ macro_rules! asmfunction(
             .size ", stringify!($name), ", . - ", stringify!($name), "
         "), $($decl = $(sym $symname)?$(const $constval)?),*);
 
-        extern "C" {
+        unsafe extern "C" {
             pub fn $name($($(_: $arg),*)?) $(-> $ret)?;
         }
     }

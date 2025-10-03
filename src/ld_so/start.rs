@@ -10,20 +10,20 @@ use alloc::{
 use generic_rt::ExpectTlsFree;
 
 use crate::{
+    ALLOCATOR,
     c_str::CStr,
     header::unistd,
     platform::{get_auxv, get_auxvs, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
-    ALLOCATOR,
 };
 
 use super::{
+    PATH_SEP,
     access::accessible,
     debug::_r_debug,
     linker::{Config, Linker},
     tcb::Tcb,
-    PATH_SEP,
 };
 use crate::header::sys_auxv::{AT_ENTRY, AT_PHDR};
 
@@ -145,7 +145,7 @@ fn resolve_path_name(
     None
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) -> usize {
     // Setup TCB for ourselves.
     unsafe {
@@ -182,7 +182,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
     };
 
     unsafe {
-        crate::platform::OUR_ENVIRON = envs
+        *crate::platform::OUR_ENVIRON.as_mut_ptr() = envs
             .iter()
             .map(|(k, v)| {
                 let mut var = Vec::with_capacity(k.len() + v.len() + 2);
@@ -198,7 +198,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
             .chain(core::iter::once(core::ptr::null_mut()))
             .collect::<Vec<_>>();
 
-        crate::platform::environ = crate::platform::OUR_ENVIRON.as_mut_ptr();
+        crate::platform::environ = crate::platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr();
     }
 
     let is_manual = if let Some(img_entry) = get_auxv(&auxv, AT_ENTRY) {

@@ -11,7 +11,7 @@ use alloc::{
     string::{String, ToString},
 };
 use core::ptr;
-use rand::{rngs::SmallRng, RngCore, SeedableRng};
+use rand::{RngCore, SeedableRng, rngs::SmallRng};
 
 use crate::{
     c_str::CStr,
@@ -32,7 +32,7 @@ use self::{
     md5::crypt_md5,
     pbkdf2::crypt_pbkdf2,
     scrypt::crypt_scrypt,
-    sha::{crypt_sha, ShaType::*},
+    sha::{ShaType::*, crypt_sha},
 };
 
 /// See <https://www.man7.org/linux/man-pages/man3/crypt.3.html>.
@@ -59,7 +59,7 @@ fn gen_salt() -> Option<String> {
 }
 
 /// See <https://www.man7.org/linux/man-pages/man3/crypt.3.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn crypt_r(
     key: *const c_char,
     setting: *const c_char,

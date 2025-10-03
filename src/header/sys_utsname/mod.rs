@@ -2,7 +2,7 @@
 
 use crate::{
     error::ResultExt,
-    platform::{types::*, Pal, Sys},
+    platform::{Pal, Sys, types::*},
 };
 
 pub const UTSLENGTH: usize = 65;
@@ -17,7 +17,7 @@ pub struct utsname {
     pub domainname: [c_char; UTSLENGTH],
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn uname(uts: *mut utsname) -> c_int {
     Sys::uname(uts).map(|()| 0).or_minus_one_errno()
 }

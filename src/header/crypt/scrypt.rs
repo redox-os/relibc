@@ -3,7 +3,7 @@ use crate::platform::types::*;
 use alloc::string::{String, ToString};
 use base64ct::{Base64Bcrypt, Encoding};
 use core::{str, u32};
-use scrypt::{scrypt, Params};
+use scrypt::{Params, scrypt};
 
 /// Map for encoding and decoding
 #[inline(always)]

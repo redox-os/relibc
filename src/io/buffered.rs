@@ -13,7 +13,7 @@
 use core::{cmp, fmt};
 
 use crate::io::{
-    self, prelude::*, Error, ErrorKind, Initializer, SeekFrom, Write, DEFAULT_BUF_SIZE,
+    self, DEFAULT_BUF_SIZE, Error, ErrorKind, Initializer, SeekFrom, Write, prelude::*,
 };
 
 /// The `BufReader` struct adds buffering to any reader.
@@ -713,7 +713,7 @@ impl<W: Write> Write for LineWriter<W> {
 mod tests {
     use alloc::string::String;
 
-    use crate::io::{self, prelude::*, BufReader, BufWriter, LineWriter, SeekFrom};
+    use crate::io::{self, BufReader, BufWriter, LineWriter, SeekFrom, prelude::*};
     use test;
     // use crate::sync::atomic::{AtomicUsize, Ordering};
 

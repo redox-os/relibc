@@ -4,7 +4,7 @@
 //! we are NOT going to bend our API for the sake of
 //! compatibility. So, this module will be a hellhole.
 
-use super::super::{types::*, Pal, PalPtrace, PalSignal, Sys, ERRNO};
+use super::super::{ERRNO, Pal, PalPtrace, PalSignal, Sys, types::*};
 #[cfg(target_arch = "aarch64")]
 use crate::header::arch_aarch64_user::user_regs_struct;
 #[cfg(target_arch = "x86_64")]
@@ -18,10 +18,11 @@ use crate::{
         fcntl, signal, sys_ptrace,
     },
     io::{self, prelude::*},
+    raw_cell::RawCell,
     sync::Mutex,
 };
 
-use alloc::collections::{btree_map::Entry, BTreeMap};
+use alloc::collections::{BTreeMap, btree_map::Entry};
 use core::mem;
 use syscall;
 
@@ -44,15 +45,16 @@ impl State {
 }
 
 #[thread_local]
-static mut STATE: Option<State> = None;
+static STATE: RawCell<Option<State>> = RawCell::new(None);
 
 pub fn init_state() -> &'static State {
-    // Safe due to STATE being thread_local
+    // Safe due to STATE being thread_local (TODO: is it though?)
     unsafe {
-        if STATE.is_none() {
-            STATE = Some(State::new())
+        if STATE.unsafe_ref().is_none() {
+            *STATE.as_mut_ptr() = Some(State::new())
         }
-        STATE.as_ref().unwrap()
+        let state_ptr = STATE.unsafe_ref().as_ref().unwrap() as *const State;
+        &*state_ptr
     }
 }
 pub fn is_traceme(pid: pid_t) -> bool {

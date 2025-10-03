@@ -9,9 +9,9 @@ use core::slice;
 
 use crate::platform::types::*;
 use posix_regex::{
+    PosixRegex,
     compile::{Collation, Range, Token},
     tree::{Tree, TreeBuilder},
-    PosixRegex,
 };
 
 const ONCE: Range = Range(1, Some(1));
@@ -126,7 +126,7 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
     builder.finish()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "weak"] // often redefined in GNU programs
 pub unsafe extern "C" fn fnmatch(
     pattern: *const c_char,

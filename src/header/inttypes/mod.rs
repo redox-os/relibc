@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/imaxabs.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn imaxabs(i: intmax_t) -> intmax_t {
     i.abs()
 }
@@ -23,7 +23,7 @@ pub struct imaxdiv_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/imaxdiv.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn imaxdiv(i: intmax_t, j: intmax_t) -> imaxdiv_t {
     imaxdiv_t {
         quot: i / j,
@@ -32,7 +32,7 @@ pub extern "C" fn imaxdiv(i: intmax_t, j: intmax_t) -> imaxdiv_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtoimax.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtoimax(
     s: *const c_char,
     endptr: *mut *mut c_char,
@@ -52,7 +52,7 @@ pub unsafe extern "C" fn strtoimax(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtoimax.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtoumax(
     s: *const c_char,
     endptr: *mut *mut c_char,
