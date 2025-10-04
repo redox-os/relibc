@@ -211,44 +211,45 @@ fn get_parent_path(path: &str) -> Option<&str> {
 }
 
 // TODO: Fold into openat or something.
-pub fn cap_path_at(
-    dirfd: c_int,
-    path: &str,
-    at_flags: c_int,
-    oflags: c_int,
-) -> Result<File, Errno> {
+pub fn openat2_path(dirfd: c_int, path: &str, at_flags: c_int) -> Result<String, Errno> {
     // Ideally, the function calling this fn would check AT_EMPTY_PATH and just call fstat or
     // whatever with the fd.
     if path.is_empty() && at_flags & fcntl::AT_EMPTY_PATH != fcntl::AT_EMPTY_PATH {
         return Err(Errno(ENOENT));
     }
 
-    let oflags = if at_flags & fcntl::AT_SYMLINK_NOFOLLOW == fcntl::AT_SYMLINK_NOFOLLOW {
-        fcntl::O_CLOEXEC | fcntl::O_NOFOLLOW | fcntl::O_PATH | fcntl::O_SYMLINK | oflags
-    } else {
-        fcntl::O_CLOEXEC | fcntl::O_RDONLY | oflags
-    };
-
     // Absolute paths are passed without processing unless RESOLVE_BENEATH is used.
     // canonicalize_using_cwd checks that path is absolute so a third branch that does so here
     // isn't needed.
-    let path = if dirfd == fcntl::AT_FDCWD {
+    if dirfd == fcntl::AT_FDCWD {
         // The special constant AT_FDCWD indicates that we should use the cwd.
         let mut buf = [0; limits::PATH_MAX];
         let len = getcwd(Out::from_mut(&mut buf)).ok_or(Errno(ENAMETOOLONG))?;
         // SAFETY: Redox's cwd is stored as a str.
         let cwd = unsafe { str::from_utf8_unchecked(&buf[..len]) };
 
-        canonicalize_using_cwd(Some(cwd), path).ok_or(Errno(EBADF))?
+        canonicalize_using_cwd(Some(cwd), path).ok_or(Errno(EBADF))
     } else {
         let mut buf = [0; limits::PATH_MAX];
         let len = Sys::fpath(dirfd, &mut buf)?;
         // SAFETY: fpath checks then copies valid UTF8.
         let dir = unsafe { str::from_utf8_unchecked(&buf[..len]) };
 
-        canonicalize_using_cwd(Some(dir), path).ok_or(Errno(EBADF))?
-    };
+        canonicalize_using_cwd(Some(dir), path).ok_or(Errno(EBADF))
+    }
+}
+
+// Basically openat2.
+pub fn openat2(dirfd: c_int, path: &str, at_flags: c_int, oflags: c_int) -> Result<File, Errno> {
+    let path = cap_file_at(path, at_flags, oflags)?;
     let path = CString::new(path).map_err(|_| Errno(ENOENT))?;
+
+    // Translate at flags into open flags; openat will do this on its own most likely.
+    let oflags = if at_flags & fcntl::AT_SYMLINK_NOFOLLOW == fcntl::AT_SYMLINK_NOFOLLOW {
+        fcntl::O_CLOEXEC | fcntl::O_NOFOLLOW | fcntl::O_PATH | fcntl::O_SYMLINK | oflags
+    } else {
+        fcntl::O_CLOEXEC | fcntl::O_RDONLY | oflags
+    };
 
     // TODO:
     // * Switch open to openat.
