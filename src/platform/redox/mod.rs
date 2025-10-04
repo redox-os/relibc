@@ -34,6 +34,7 @@ use crate::{
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
         sys_utsname::{utsname, UTSLENGTH},
+        stdio::RENAME_NOREPLACE,
         sys_wait,
         time::timespec,
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
@@ -930,6 +931,23 @@ impl Pal for Sys {
         )?;
         syscall::frename(*file as usize, newpath)?;
         Ok(())
+    }
+
+    fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()> {
+        Sys::renameat2(old_dir, old_path, new_dir, new_path, 0);
+    }
+
+    fn renameat2(
+        old_dir: c_int,
+        old_path: CStr,
+        new_dir: c_int,
+        new_path: CStr,
+        flags: c_uint,
+    ) -> Result<()> {
+        const MASK: c_uint = !RENAME_NOREPLACE;
+        if MASK & flags != 0 {
+            return Err(Errno(EOPNOTSUPP));
+        }
     }
 
     fn rmdir(path: CStr) -> Result<()> {
