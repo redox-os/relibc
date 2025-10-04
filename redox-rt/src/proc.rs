@@ -933,7 +933,7 @@ pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
         #[cfg(not(feature = "proc"))]
         ForkArgs::Init { this_thr_fd, auth } => {
             let thr_fd = FdGuard::new(syscall::dup(**auth, b"new-context")?);
-            let buf = ProcSchemeAttrs {
+            let buf = syscall::ProcSchemeAttrs {
                 pid: 0,
                 euid: 0,
                 egid: 0,
