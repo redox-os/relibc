@@ -548,7 +548,7 @@ pub unsafe extern "C" fn l64a(value: c_long) -> *mut c_char {
     let num_output_digits = usize::try_from(6 - (value_as_i32.leading_zeros() + 4) / 6).unwrap();
 
     // Reset buffer (and have null terminator in place for any result)
-    *L64A_BUFFER.as_mut_ptr() = [0; 7];
+    L64A_BUFFER.unsafe_set([0; 7]);
 
     for i in 0..num_output_digits {
         // Conversion to c_char always succeeds for the range 0..=63

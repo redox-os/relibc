@@ -104,7 +104,7 @@ impl OwnedPwd {
     fn into_global(self) -> *mut passwd {
         unsafe {
             PASSWD_BUF = Some(self.buffer);
-            *PASSWD.as_mut_ptr() = self.reference;
+            PASSWD.unsafe_set(self.reference);
             PASSWD.as_mut_ptr()
         }
     }
@@ -224,7 +224,7 @@ unsafe fn mux(
 #[unsafe(no_mangle)]
 pub extern "C" fn endpwent() {
     unsafe {
-        *READER.as_mut_ptr() = None;
+        READER.unsafe_set(None);
     }
 }
 
@@ -240,7 +240,7 @@ pub extern "C" fn getpwent() -> *mut passwd {
             };
             let reader = BufReader::new(file);
             unsafe {
-                *READER.as_mut_ptr() = Some(reader);
+                READER.unsafe_set(Some(reader));
                 READER.unsafe_mut().as_mut().unwrap()
             }
         }

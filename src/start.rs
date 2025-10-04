@@ -184,7 +184,7 @@ pub unsafe extern "C" fn relibc_start_v1(
     // Set up argc and argv
     let argc = sp.argc;
     let argv = sp.argv();
-    *platform::inner_argv.as_mut_ptr() = copy_string_array(argv, argc as usize);
+    platform::inner_argv.unsafe_set(copy_string_array(argv, argc as usize));
     platform::argv = platform::inner_argv.unsafe_mut().as_mut_ptr();
     // Special code for program_invocation_name and program_invocation_short_name
     if let Some(arg) = platform::inner_argv.unsafe_ref().get(0) {
@@ -201,7 +201,7 @@ pub unsafe extern "C" fn relibc_start_v1(
         while !(*envp.add(len)).is_null() {
             len += 1;
         }
-        *platform::OUR_ENVIRON.as_mut_ptr() = copy_string_array(envp, len);
+        platform::OUR_ENVIRON.unsafe_set(copy_string_array(envp, len));
         platform::environ = platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr();
     }
 

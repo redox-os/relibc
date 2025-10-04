@@ -30,6 +30,10 @@ impl<T> RawCell<T> {
         &*self.inner.get()
     }
     #[inline]
+    pub unsafe fn unsafe_set(&self, t: T) {
+        *self.inner.get() = t;
+    }
+    #[inline]
     pub unsafe fn unsafe_mut(&self) -> &mut T {
         &mut *self.inner.get()
     }

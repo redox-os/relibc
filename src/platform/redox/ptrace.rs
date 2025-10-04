@@ -51,7 +51,7 @@ pub fn init_state() -> &'static State {
     // Safe due to STATE being thread_local (TODO: is it though?)
     unsafe {
         if STATE.unsafe_ref().is_none() {
-            *STATE.as_mut_ptr() = Some(State::new())
+            STATE.unsafe_set(Some(State::new()));
         }
         let state_ptr = STATE.unsafe_ref().as_ref().unwrap() as *const State;
         &*state_ptr

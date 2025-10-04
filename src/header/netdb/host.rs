@@ -95,7 +95,7 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
     let mut _host_aliases: Vec<Vec<u8>> = iter
         .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
         .collect();
-    *HOST_ALIASES.as_mut_ptr() = Some(_host_aliases);
+    HOST_ALIASES.unsafe_set(Some(_host_aliases));
 
     let mut host_aliases: Vec<*mut c_char> = HOST_ALIASES
         .unsafe_mut()
@@ -106,7 +106,7 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
         .chain([ptr::null_mut(), ptr::null_mut()])
         .collect();
 
-    *HOST_NAME.as_mut_ptr() = Some(host_name);
+    HOST_NAME.unsafe_set(Some(host_name));
 
     HOST_ENTRY = hostent {
         h_name: HOST_NAME.unsafe_mut().as_mut().unwrap().as_mut_ptr() as *mut c_char,
@@ -115,7 +115,7 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
         h_length: 4,
         h_addr_list: &raw mut HOST_ADDR_LIST as *mut _,
     };
-    *_HOST_ALIASES.as_mut_ptr() = Some(host_aliases);
+    _HOST_ALIASES.unsafe_set(Some(host_aliases));
     if HOST_STAYOPEN == 0 {
         endhostent();
     }
