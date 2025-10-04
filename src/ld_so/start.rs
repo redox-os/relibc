@@ -166,8 +166,13 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
                 redox_rt::auxv_defs::AT_REDOX_PROC_FD,
             )
             .expect_notls("no proc fd present");
+            let ns_fd = crate::platform::get_auxv_raw(
+                sp.auxv().cast(),
+                redox_rt::auxv_defs::AT_REDOX_NS_FD,
+            )
+            .unwrap_or(usize::MAX);
 
-            redox_rt::initialize(redox_rt::proc::FdGuard::new(proc_fd));
+            redox_rt::initialize(redox_rt::proc::FdGuard::new(proc_fd), ns_fd);
             redox_rt::signal::setup_sighandler(&tcb.os_specific, true);
         }
     }

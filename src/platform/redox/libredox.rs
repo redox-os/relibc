@@ -146,6 +146,7 @@ pub unsafe extern "C" fn redox_openat_v1(
         fd,
         str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
         flags as usize,
+        0,
     ))
 }
 #[unsafe(no_mangle)]
@@ -382,6 +383,20 @@ pub unsafe extern "C" fn redox_mkns_v1(
         syscall::mkns(core::slice::from_raw_parts(names.cast(), num_names))
     })())
 }
+#[no_mangle]
+pub unsafe extern "C" fn redox_mkns2_v0(
+    names: *const iovec,
+    num_names: usize,
+    flags: u32,
+) -> RawResult {
+    Error::mux((|| {
+        if flags != 0 {
+            return Err(Error::new(EINVAL));
+        }
+        // Kernel does the UTF-8 validation.
+        redox_rt::sys::mkns(core::slice::from_raw_parts(names.cast(), num_names))
+    })())
+}
 
 // ABI-UNSTABLE
 #[unsafe(no_mangle)]
@@ -424,4 +439,26 @@ pub unsafe extern "C" fn redox_get_socket_token_v0(
         syscall::CallFlags::empty(),
         &metadata,
     ))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn redox_set_namespace_fd_v0(fd: usize) -> RawResult {
+    Error::mux(redox_rt::sys::set_namespace_fd(fd).map(|()| 0))
+}
+#[no_mangle]
+pub unsafe extern "C" fn redox_nsopen_v0(
+    path_base: *const u8,
+    path_len: usize,
+    flags: u32,
+    mode: u16,
+) -> RawResult {
+    Error::mux(redox_rt::sys::nsopen(
+        str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
+        flags,
+        mode,
+    ))
+}
+#[no_mangle]
+pub unsafe extern "C" fn redox_register_scheme_v0(cap_fd: usize) -> RawResult {
+    Error::mux(redox_rt::sys::register_scheme(cap_fd).map(|()| 0))
 }

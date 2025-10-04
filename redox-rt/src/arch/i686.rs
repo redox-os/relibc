@@ -92,6 +92,7 @@ unsafe extern "cdecl" fn child_hook(
     cur_filetable_fd: usize,
     new_proc_fd: usize,
     new_thr_fd: usize,
+    new_ns_fd: usize,
 ) {
     let _ = syscall::close(cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
@@ -100,6 +101,11 @@ unsafe extern "cdecl" fn child_hook(
             None
         } else {
             Some(FdGuard::new(new_proc_fd))
+        },
+        new_ns_fd: if new_ns_fd == usize::MAX {
+            None
+        } else {
+            Some(new_ns_fd)
         },
     });
 }

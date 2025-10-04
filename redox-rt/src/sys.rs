@@ -16,6 +16,7 @@ use crate::{
     read_proc_meta,
     signal::tmp_disable_signals,
 };
+use alloc::vec::Vec;
 
 #[inline]
 fn wrapper<T>(restart: bool, erestart: bool, mut f: impl FnMut() -> Result<T>) -> Result<T> {
@@ -370,4 +371,37 @@ pub fn posix_setsid() -> Result<u32> {
 pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {
     wrapper(false, false, || syscall::nanosleep(rqtp, rmtp))?;
     Ok(())
+}
+pub fn set_namespace_fd(fd: usize) -> Result<()> {
+    let mut info = DYNAMIC_PROC_INFO.lock();
+    info.ns_fd = fd;
+    Ok(())
+}
+pub fn nsopen(path: &str, flags: u32, mode: u16) -> Result<usize> {
+    syscall::openat(
+        crate::current_namespace_fd(),
+        path,
+        flags as usize,
+        mode as usize,
+    )
+}
+pub fn mkns(names: &[[usize; 2]]) -> Result<usize> {
+    let mut buf = Vec::new();
+    for name in names {
+        let name_bytes = unsafe { core::slice::from_raw_parts(name[0] as *const u8, name[1]) };
+        let scheme_name = core::str::from_utf8(name_bytes).map_err(|_| Error::new(EINVAL))?;
+        buf.extend_from_slice(&name[1].to_le_bytes());
+        buf.extend_from_slice(scheme_name.as_bytes());
+    }
+    syscall::dup(crate::current_namespace_fd(), &buf)
+}
+pub fn register_scheme(cap_fd: usize) -> Result<()> {
+    let mut cap_bytes = cap_fd.to_ne_bytes();
+    sys_call(
+        crate::current_namespace_fd(),
+        &mut cap_bytes,
+        CallFlags::WRITE | CallFlags::FD,
+        &[],
+    )
+    .map(|_| ())
 }
