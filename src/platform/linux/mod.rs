@@ -686,6 +686,39 @@ impl Pal for Sys {
             .map(|_| ())
     }
 
+    fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()> {
+        e_raw(unsafe {
+            syscall!(
+                RENAMEAT,
+                old_dir,
+                old_path.as_ptr(),
+                new_dir,
+                new_path.as_ptr()
+            )
+        })
+        .map(|_| ())
+    }
+
+    fn renameat2(
+        old_dir: c_int,
+        old_path: CStr,
+        new_dir: c_int,
+        new_path: CStr,
+        flags: c_uint,
+    ) -> Result<()> {
+        e_raw(unsafe {
+            syscall!(
+                RENAMEAT2,
+                old_dir,
+                old_path.as_ptr(),
+                new_dir,
+                new_path.as_ptr(),
+                flags
+            )
+        })
+        .map(|_| ())
+    }
+
     fn rmdir(path: CStr) -> Result<()> {
         e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), AT_REMOVEDIR) }).map(|_| ())
     }
