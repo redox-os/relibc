@@ -932,6 +932,20 @@ impl Pal for Sys {
         Ok(())
     }
 
+    fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()> {
+        todo!()
+    }
+
+    fn renameat2(
+        old_dir: c_int,
+        old_path: CStr,
+        new_dir: c_int,
+        new_path: CStr,
+        flags: c_uint,
+    ) -> Result<()> {
+        todo!()
+    }
+
     fn rmdir(path: CStr) -> Result<()> {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
         let canon = canonicalize(path)?;
