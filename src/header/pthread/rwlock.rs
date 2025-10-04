@@ -4,7 +4,7 @@ use crate::header::errno::EBUSY;
 
 use crate::pthread::Pshared;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_init(
     rwlock: *mut pthread_rwlock_t,
     attr: *const pthread_rwlockattr_t,
@@ -21,13 +21,13 @@ pub unsafe extern "C" fn pthread_rwlock_init(
 
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_rdlock(rwlock: *mut pthread_rwlock_t) -> c_int {
     get(rwlock).acquire_read_lock(None);
 
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_timedrdlock(
     rwlock: *mut pthread_rwlock_t,
     timeout: *const timespec,
@@ -36,7 +36,7 @@ pub unsafe extern "C" fn pthread_rwlock_timedrdlock(
 
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_timedwrlock(
     rwlock: *mut pthread_rwlock_t,
     timeout: *const timespec,
@@ -45,34 +45,34 @@ pub unsafe extern "C" fn pthread_rwlock_timedwrlock(
 
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_tryrdlock(rwlock: *mut pthread_rwlock_t) -> c_int {
     match get(rwlock).try_acquire_read_lock() {
         Ok(()) => 0,
         Err(_) => EBUSY,
     }
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_trywrlock(rwlock: *mut pthread_rwlock_t) -> c_int {
     match get(rwlock).try_acquire_write_lock() {
         Ok(()) => 0,
         Err(_) => EBUSY,
     }
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_unlock(rwlock: *mut pthread_rwlock_t) -> c_int {
     get(rwlock).unlock();
 
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_wrlock(rwlock: *mut pthread_rwlock_t) -> c_int {
     get(rwlock).acquire_write_lock(None);
 
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlockattr_init(attr: *mut pthread_rwlockattr_t) -> c_int {
     attr.cast::<RlctRwlockAttr>()
         .write(RlctRwlockAttr::default());
@@ -80,7 +80,7 @@ pub unsafe extern "C" fn pthread_rwlockattr_init(attr: *mut pthread_rwlockattr_t
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlockattr_getpshared(
     attr: *const pthread_rwlockattr_t,
     pshared_out: *mut c_int,
@@ -90,7 +90,7 @@ pub unsafe extern "C" fn pthread_rwlockattr_getpshared(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlockattr_setpshared(
     attr: *mut pthread_rwlockattr_t,
     pshared: c_int,
@@ -101,13 +101,13 @@ pub unsafe extern "C" fn pthread_rwlockattr_setpshared(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlockattr_destroy(attr: *mut pthread_rwlockattr_t) -> c_int {
     core::ptr::drop_in_place(attr);
 
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_destroy(rwlock: *mut pthread_rwlock_t) -> c_int {
     core::ptr::drop_in_place(rwlock);
 

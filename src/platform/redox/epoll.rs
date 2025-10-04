@@ -1,5 +1,5 @@
 use super::{
-    super::{types::*, Pal, PalEpoll},
+    super::{Pal, PalEpoll, types::*},
     Sys,
 };
 

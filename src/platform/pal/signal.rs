@@ -1,4 +1,4 @@
-use super::super::{types::*, Pal};
+use super::super::{Pal, types::*};
 use crate::{
     error::{Errno, Result},
     header::{

@@ -2,7 +2,7 @@ use core::mem::size_of;
 
 use syscall::Result;
 
-use crate::{arch::*, proc::*, signal::tmp_disable_signals, static_proc_info, RtTcb};
+use crate::{RtTcb, arch::*, proc::*, signal::tmp_disable_signals, static_proc_info};
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
 pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuard> {

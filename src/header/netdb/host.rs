@@ -9,10 +9,11 @@ use crate::{
         unistd::SEEK_SET,
     },
     platform::{
+        Pal, Sys,
         rlb::{Line, RawLineBuffer},
         types::*,
-        Pal, Sys,
     },
+    raw_cell::RawCell,
 };
 
 use super::{bytes_to_box_str, hostent};
@@ -25,16 +26,16 @@ pub static mut HOST_ENTRY: hostent = hostent {
     h_length: 0,
     h_addr_list: ptr::null_mut(),
 };
-pub static mut HOST_NAME: Option<Vec<u8>> = None;
-pub static mut HOST_ALIASES: Option<Vec<Vec<u8>>> = None;
-static mut _HOST_ALIASES: Option<Vec<*mut c_char>> = None;
+pub static HOST_NAME: RawCell<Option<Vec<u8>>> = RawCell::new(None);
+pub static HOST_ALIASES: RawCell<Option<Vec<Vec<u8>>>> = RawCell::new(None);
+static _HOST_ALIASES: RawCell<Option<Vec<*mut c_char>>> = RawCell::new(None);
 pub static mut HOST_ADDR: Option<in_addr> = None;
 pub static mut HOST_ADDR_LIST: [*mut c_char; 2] = [ptr::null_mut(); 2];
 pub static mut _HOST_ADDR_LIST: [u8; 4] = [0u8; 4];
 static mut H_POS: usize = 0;
 pub static mut HOST_STAYOPEN: c_int = 0;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn endhostent() {
     if HOSTDB >= 0 {
         Sys::close(HOSTDB);
@@ -42,7 +43,7 @@ pub unsafe extern "C" fn endhostent() {
     HOSTDB = -1;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sethostent(stayopen: c_int) {
     HOST_STAYOPEN = stayopen;
     if HOSTDB < 0 {
@@ -53,7 +54,7 @@ pub unsafe extern "C" fn sethostent(stayopen: c_int) {
     H_POS = 0;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn gethostent() -> *mut hostent {
     if HOSTDB < 0 {
         HOSTDB = Sys::open(c"/etc/hosts".into(), O_RDONLY, 0).or_minus_one_errno();
@@ -85,7 +86,7 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
     let addr = addr.assume_init();
 
     _HOST_ADDR_LIST = addr.s_addr.to_ne_bytes();
-    HOST_ADDR_LIST = [_HOST_ADDR_LIST.as_mut_ptr() as *mut c_char, ptr::null_mut()];
+    HOST_ADDR_LIST = [&raw mut _HOST_ADDR_LIST as *mut c_char, ptr::null_mut()];
 
     HOST_ADDR = Some(addr);
 
@@ -94,9 +95,10 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
     let mut _host_aliases: Vec<Vec<u8>> = iter
         .map(|alias| alias.bytes().chain(Some(b'\0')).collect())
         .collect();
-    HOST_ALIASES = Some(_host_aliases);
+    HOST_ALIASES.unsafe_set(Some(_host_aliases));
 
     let mut host_aliases: Vec<*mut c_char> = HOST_ALIASES
+        .unsafe_mut()
         .as_mut()
         .unwrap()
         .iter_mut()
@@ -104,18 +106,18 @@ pub unsafe extern "C" fn gethostent() -> *mut hostent {
         .chain([ptr::null_mut(), ptr::null_mut()])
         .collect();
 
-    HOST_NAME = Some(host_name);
+    HOST_NAME.unsafe_set(Some(host_name));
 
     HOST_ENTRY = hostent {
-        h_name: HOST_NAME.as_mut().unwrap().as_mut_ptr() as *mut c_char,
+        h_name: HOST_NAME.unsafe_mut().as_mut().unwrap().as_mut_ptr() as *mut c_char,
         h_aliases: host_aliases.as_mut_slice().as_mut_ptr(),
         h_addrtype: AF_INET,
         h_length: 4,
-        h_addr_list: HOST_ADDR_LIST.as_mut_ptr(),
+        h_addr_list: &raw mut HOST_ADDR_LIST as *mut _,
     };
-    _HOST_ALIASES = Some(host_aliases);
+    _HOST_ALIASES.unsafe_set(Some(host_aliases));
     if HOST_STAYOPEN == 0 {
         endhostent();
     }
-    &mut HOST_ENTRY as *mut hostent
+    &raw mut HOST_ENTRY as *mut hostent
 }

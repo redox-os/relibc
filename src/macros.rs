@@ -200,11 +200,7 @@ macro_rules! strto_impl {
         let num = if overflow {
             platform::ERRNO.set(ERANGE);
             if CHECK_SIGN {
-                if positive {
-                    MAX_VAL
-                } else {
-                    MIN_VAL
-                }
+                if positive { MAX_VAL } else { MIN_VAL }
             } else {
                 MAX_VAL
             }

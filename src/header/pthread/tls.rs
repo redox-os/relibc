@@ -10,7 +10,7 @@ use crate::{header::errno::EINVAL, sync::Mutex};
 // TODO: What should this limit be?
 pub const PTHREAD_KEYS_MAX: u32 = 4096 * 32;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_getspecific(key: pthread_key_t) -> *mut c_void {
     //print!("pthread_getspecific key={:#0x}: ", key);
 
@@ -28,7 +28,7 @@ pub unsafe extern "C" fn pthread_getspecific(key: pthread_key_t) -> *mut c_void 
 
     data
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_key_create(
     key_ptr: *mut pthread_key_t,
     destructor: Option<extern "C" fn(value: *mut c_void)>,
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn pthread_key_create(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_key_delete(key: pthread_key_t) -> c_int {
     if KEYS.lock().remove(&key).is_none() || VALUES.borrow_mut().remove(&key).is_none() {
         // We don't have to return anything, but it's not less expensive to ignore it.
@@ -66,7 +66,7 @@ pub unsafe extern "C" fn pthread_key_delete(key: pthread_key_t) -> c_int {
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_setspecific(key: pthread_key_t, value: *const c_void) -> c_int {
     if !KEYS.lock().contains_key(&key) {
         // We don't have to return anything, but it's not less expensive to ignore it.
@@ -76,12 +76,12 @@ pub unsafe extern "C" fn pthread_setspecific(key: pthread_key_t, value: *const c
 
     let mut guard = VALUES.borrow_mut();
 
-    let Record { ref mut data, .. } = guard.entry(key).or_insert(Record {
+    let mut record = guard.entry(key).or_insert(Record {
         data: core::ptr::null_mut(),
     });
-    //println!("Valid key for pthread_setspecific key {:#0x} value {:p} (was {:p})", key, value, *data);
+    //println!("Valid key for pthread_setspecific key {:#0x} value {:p} (was {:p})", key, value, record.data);
 
-    *data = value as *mut c_void;
+    record.data = value as *mut c_void;
 
     0
 }

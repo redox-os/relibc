@@ -5,16 +5,16 @@ use core::{
 };
 
 use syscall::{
-    error::{self, Error, Result, EINTR},
-    CallFlags, TimeSpec, EINVAL, ERESTART,
+    CallFlags, EINVAL, ERESTART, TimeSpec,
+    error::{self, EINTR, Error, Result},
 };
 
 use crate::{
+    DYNAMIC_PROC_INFO, DynamicProcInfo, RtTcb, Tcb,
     arch::manually_enter_trampoline,
     protocol::{ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags},
     read_proc_meta,
     signal::tmp_disable_signals,
-    DynamicProcInfo, RtTcb, Tcb, DYNAMIC_PROC_INFO,
 };
 
 #[inline]

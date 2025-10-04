@@ -963,7 +963,7 @@ pub const R_X86_64_IRELATIVE: usize = 37;
 pub const R_X86_64_RELATIVE64: usize = 38;
 pub const R_X86_64_NUM: usize = 39;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn _cbindgen_export_elf(
     a: Elf32_Ehdr,
     b: Elf64_Ehdr,

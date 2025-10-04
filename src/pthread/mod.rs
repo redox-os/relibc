@@ -2,8 +2,8 @@
 
 use core::{
     cell::{Cell, UnsafeCell},
-    mem::{offset_of, MaybeUninit},
-    ptr::{self, addr_of, NonNull},
+    mem::{MaybeUninit, offset_of},
+    ptr::{self, NonNull, addr_of},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
@@ -13,14 +13,14 @@ use crate::{
     error::Errno,
     header::{errno::*, pthread as header, sched::sched_param, sys_mman},
     ld_so::{
+        ExpectTlsFree,
         linker::Linker,
         tcb::{Master, Tcb},
-        ExpectTlsFree,
     },
-    platform::{types::*, Pal, Sys},
+    platform::{Pal, Sys, types::*},
 };
 
-use crate::sync::{waitval::Waitval, Mutex};
+use crate::sync::{Mutex, waitval::Waitval};
 
 /// Called only by the main thread, as part of relibc_start.
 pub unsafe fn init() {

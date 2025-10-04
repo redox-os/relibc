@@ -5,7 +5,7 @@
 
 use crate::{c_str::CStr, platform::types::*};
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __assert_fail(
     func: *const c_char,
     file: *const c_char,

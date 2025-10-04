@@ -1,7 +1,7 @@
 use alloc::string::{String, ToString};
 use argon2::{
-    password_hash::{PasswordHash, PasswordVerifier},
     Argon2,
+    password_hash::{PasswordHash, PasswordVerifier},
 };
 
 pub fn crypt_argon2(key: &str, setting: &str) -> Option<String> {

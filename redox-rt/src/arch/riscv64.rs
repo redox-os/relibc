@@ -1,10 +1,10 @@
 use core::cell::SyncUnsafeCell;
 
 use crate::{
-    proc::{fork_inner, FdGuard, ForkArgs},
-    protocol::{ProcCall, RtSigInfo},
-    signal::{get_sigaltstack, inner_c, PosixStackt, RtSigarea, SigStack},
     RtTcb, Tcb,
+    proc::{FdGuard, ForkArgs, fork_inner},
+    protocol::{ProcCall, RtSigInfo},
+    signal::{PosixStackt, RtSigarea, SigStack, get_sigaltstack, inner_c},
 };
 use core::{mem::offset_of, ptr::NonNull, sync::atomic::Ordering};
 use syscall::{data::*, error::*};
@@ -614,7 +614,7 @@ pub unsafe fn manually_enter_trampoline() {
     ", inout("t0") ip_location => _, out("ra") _);
 }
 
-extern "C" {
+unsafe extern "C" {
     fn __relibc_internal_sigentry_crit_first();
     fn __relibc_internal_sigentry_crit_second();
     fn __relibc_internal_sigentry_crit_third();

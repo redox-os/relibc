@@ -6,7 +6,7 @@ use core::{cell::Cell, ptr::NonNull};
 use crate::{
     error::Errno,
     header::{sched::*, time::timespec},
-    platform::{types::*, Pal, Sys},
+    platform::{Pal, Sys, types::*},
     pthread,
 };
 
@@ -79,7 +79,7 @@ pub use self::cond::*;
 #[thread_local]
 pub static mut fork_hooks: [LinkedList<extern "C" fn()>; 3] = [const { LinkedList::new() }; 3];
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cancel(thread: pthread_t) -> c_int {
     match pthread::cancel(&*thread.cast()) {
         Ok(()) => 0,
@@ -87,7 +87,7 @@ pub unsafe extern "C" fn pthread_cancel(thread: pthread_t) -> c_int {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_create(
     pthread: *mut pthread_t,
     attr: *const pthread_attr_t,
@@ -105,7 +105,7 @@ pub unsafe extern "C" fn pthread_create(
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_detach(pthread: pthread_t) -> c_int {
     match pthread::detach(&*pthread.cast()) {
         Ok(()) => 0,
@@ -113,13 +113,13 @@ pub unsafe extern "C" fn pthread_detach(pthread: pthread_t) -> c_int {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn pthread_equal(pthread1: pthread_t, pthread2: pthread_t) -> c_int {
     core::ptr::eq(pthread1, pthread2).into()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_atfork.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn pthread_atfork(
     prepare: Option<extern "C" fn()>,
     parent: Option<extern "C" fn()>,
@@ -143,18 +143,18 @@ pub extern "C" fn pthread_atfork(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_exit(retval: *mut c_void) -> ! {
     pthread::exit_current_thread(pthread::Retval(retval))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_getconcurrency() -> c_int {
     // Redox and Linux threads are 1:1, not M:N.
     1
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_getcpuclockid(
     thread: pthread_t,
     clock_out: *mut clockid_t,
@@ -168,7 +168,7 @@ pub unsafe extern "C" fn pthread_getcpuclockid(
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_getschedparam(
     thread: pthread_t,
     policy_out: *mut c_int,
@@ -188,7 +188,7 @@ pub unsafe extern "C" fn pthread_getschedparam(
 pub mod tls;
 pub use tls::*;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_join(thread: pthread_t, retval: *mut *mut c_void) -> c_int {
     match pthread::join(&*thread.cast()) {
         Ok(pthread::Retval(ret)) => {
@@ -210,11 +210,11 @@ pub use self::once::*;
 pub mod rwlock;
 pub use self::rwlock::*;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_self() -> pthread_t {
     pthread::current_thread().unwrap_unchecked() as *const _ as *mut _
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_setcancelstate(state: c_int, oldstate: *mut c_int) -> c_int {
     match pthread::set_cancel_state(state) {
         Ok(old) => {
@@ -228,7 +228,7 @@ pub unsafe extern "C" fn pthread_setcancelstate(state: c_int, oldstate: *mut c_i
         Err(Errno(error)) => error,
     }
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_setcanceltype(ty: c_int, oldty: *mut c_int) -> c_int {
     match pthread::set_cancel_type(ty) {
         Ok(old) => {
@@ -243,13 +243,13 @@ pub unsafe extern "C" fn pthread_setcanceltype(ty: c_int, oldty: *mut c_int) -> 
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn pthread_setconcurrency(concurrency: c_int) -> c_int {
     // Redox and Linux threads are 1:1, not M:N.
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_setschedparam(
     thread: pthread_t,
     policy: c_int,
@@ -257,7 +257,7 @@ pub unsafe extern "C" fn pthread_setschedparam(
 ) -> c_int {
     e(pthread::set_sched_param(&*thread.cast(), policy, &*param))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_setschedprio(thread: pthread_t, prio: c_int) -> c_int {
     e(pthread::set_sched_priority(&*thread.cast(), prio))
 }
@@ -265,7 +265,7 @@ pub unsafe extern "C" fn pthread_setschedprio(thread: pthread_t, prio: c_int) ->
 pub mod spin;
 pub use self::spin::*;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_testcancel() {
     pthread::testcancel();
 }
@@ -284,14 +284,14 @@ pub(crate) static CLEANUP_LL_HEAD: Cell<*const CleanupLinkedListEntry> =
 
 // TODO: unwind? setjmp/longjmp?
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __relibc_internal_pthread_cleanup_push(new_entry: *mut c_void) {
     let new_entry = &mut *new_entry.cast::<CleanupLinkedListEntry>();
 
     new_entry.prev = CLEANUP_LL_HEAD.get().cast();
     CLEANUP_LL_HEAD.set(new_entry);
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __relibc_internal_pthread_cleanup_pop(execute: c_int) {
     let prev_head = CLEANUP_LL_HEAD.get().read();
     CLEANUP_LL_HEAD.set(prev_head.prev.cast());

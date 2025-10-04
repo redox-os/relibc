@@ -3,8 +3,8 @@
 use crate::{
     platform::types::*,
     sync::{
-        rwlock::{self, RwLock},
         Mutex, MutexGuard,
+        rwlock::{self, RwLock},
     },
 };
 

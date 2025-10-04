@@ -7,7 +7,7 @@ use crate::{
     c_str::{CStr, CString},
     fs::File,
     header::{limits::PATH_MAX, string::strlen},
-    io::{prelude::*, BufReader, SeekFrom},
+    io::{BufReader, SeekFrom, prelude::*},
     platform::{
         sys::{S_ISGID, S_ISUID},
         types::*,
@@ -15,9 +15,9 @@ use crate::{
 };
 
 use redox_rt::{
+    RtTcb,
     proc::{ExtraInfo, FdGuard, FexecResult, InterpOverride},
     sys::Resugid,
-    RtTcb,
 };
 use syscall::{data::Stat, error::*, flag::*};
 

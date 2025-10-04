@@ -14,7 +14,7 @@ pub mod logger;
 use core::ffi::VaList;
 
 use crate::{c_str::CStr, platform::types::*};
-use logger::{Priority, LOGGER};
+use logger::{LOGGER, Priority};
 
 /// Record the caller's PID in log messages.
 pub const LOG_PID: c_int = 0x01;
@@ -63,18 +63,18 @@ pub const LOG_INFO: c_int = 6;
 pub const LOG_DEBUG: c_int = 7;
 
 /// Create a mask that includes all levels up to a certain priority.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub const extern "C" fn LOG_UPTO(p: c_int) -> c_int {
     (1 << (p + 1)) - 1
 }
 
 /// Create a mask that enables a single priority.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub const extern "C" fn LOG_MASK(p: c_int) -> c_int {
     1 << p
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setlogmask(mask: c_int) -> c_int {
     let mut params = LOGGER.lock();
     let old = params.mask.bits();
@@ -86,7 +86,7 @@ pub extern "C" fn setlogmask(mask: c_int) -> c_int {
     old
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_int) {
     let ident = unsafe { CStr::from_nullable_ptr(ident) };
     let conf = logger::Config::from_bits_truncate(opt);
@@ -107,7 +107,7 @@ pub unsafe extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_i
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vsyslog(priority: c_int, message: *const c_char, mut ap: VaList) {
     let Some(message) = CStr::from_nullable_ptr(message) else {
         return;
@@ -122,12 +122,12 @@ pub unsafe extern "C" fn vsyslog(priority: c_int, message: *const c_char, mut ap
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn syslog(priority: c_int, message: *const c_char, mut __valist: ...) {
     vsyslog(priority, message, __valist.as_va_list());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn closelog() {
     LOGGER.lock().close();
 }

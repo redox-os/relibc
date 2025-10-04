@@ -61,14 +61,13 @@ global_asm!(
 // risc-v has no _init / _fini functions; it exclusively uses init/fini arrays
 
 #[linkage = "weak"]
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn relibc_panic(_pi: &::core::panic::PanicInfo) -> ! {
     loop {}
 }
 
 #[panic_handler]
 #[linkage = "weak"]
-#[no_mangle]
 pub unsafe fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
     relibc_panic(pi)
 }

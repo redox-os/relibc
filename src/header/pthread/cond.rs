@@ -4,19 +4,19 @@ use super::*;
 
 // PTHREAD_COND_INITIALIZER is defined manually in bits_pthread/cbindgen.toml
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_broadcast(cond: *mut pthread_cond_t) -> c_int {
     e((&*cond.cast::<RlctCond>()).broadcast())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_destroy(cond: *mut pthread_cond_t) -> c_int {
     // No-op
     core::ptr::drop_in_place(cond.cast::<RlctCond>());
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_init(
     cond: *mut pthread_cond_t,
     _attr: *const pthread_condattr_t,
@@ -26,12 +26,12 @@ pub unsafe extern "C" fn pthread_cond_init(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_signal(cond: *mut pthread_cond_t) -> c_int {
     e((&*cond.cast::<RlctCond>()).signal())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_timedwait(
     cond: *mut pthread_cond_t,
     mutex: *mut pthread_mutex_t,
@@ -40,7 +40,7 @@ pub unsafe extern "C" fn pthread_cond_timedwait(
     e((&*cond.cast::<RlctCond>()).timedwait(&*mutex.cast::<RlctMutex>(), &*timeout))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_wait(
     cond: *mut pthread_cond_t,
     mutex: *mut pthread_mutex_t,
@@ -48,14 +48,14 @@ pub unsafe extern "C" fn pthread_cond_wait(
     e((&*cond.cast::<RlctCond>()).wait(&*mutex.cast::<RlctMutex>()))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_condattr_destroy(condattr: *mut pthread_condattr_t) -> c_int {
     core::ptr::drop_in_place(condattr.cast::<RlctCondAttr>());
     // No-op
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_condattr_getclock(
     condattr: *const pthread_condattr_t,
     clock: *mut clockid_t,
@@ -64,7 +64,7 @@ pub unsafe extern "C" fn pthread_condattr_getclock(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_condattr_getpshared(
     condattr: *const pthread_condattr_t,
     pshared: *mut c_int,
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn pthread_condattr_getpshared(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_condattr_init(condattr: *mut pthread_condattr_t) -> c_int {
     condattr
         .cast::<RlctCondAttr>()
@@ -82,7 +82,7 @@ pub unsafe extern "C" fn pthread_condattr_init(condattr: *mut pthread_condattr_t
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_condattr_setclock(
     condattr: *mut pthread_condattr_t,
     clock: clockid_t,
@@ -91,7 +91,7 @@ pub unsafe extern "C" fn pthread_condattr_setclock(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_condattr_setpshared(
     condattr: *mut pthread_condattr_t,
     pshared: c_int,

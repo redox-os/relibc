@@ -3,7 +3,7 @@
 use crate::{header::string::strlen, platform::types::*};
 use alloc::{borrow::Cow, boxed::Box};
 use core::{mem, ptr, slice};
-use posix_regex::{compile::Error as CompileError, tree::Tree, PosixRegex, PosixRegexBuilder};
+use posix_regex::{PosixRegex, PosixRegexBuilder, compile::Error as CompileError, tree::Tree};
 
 pub type regoff_t = size_t;
 
@@ -43,7 +43,7 @@ pub const REG_ERANGE: c_int = 12;
 pub const REG_ESPACE: c_int = 13;
 pub const REG_BADRPT: c_int = 14;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: c_int) -> c_int {
     let pat = slice::from_raw_parts(pat as *const u8, strlen(pat));
@@ -74,13 +74,13 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regfree(regex: *mut regex_t) {
     Box::from_raw((*regex).ptr);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regexec(
     regex: *const regex_t,
@@ -117,14 +117,10 @@ pub unsafe extern "C" fn regexec(
         }
     }
 
-    if matches.is_empty() {
-        REG_NOMATCH
-    } else {
-        0
-    }
+    if matches.is_empty() { REG_NOMATCH } else { 0 }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "weak"] // redefined in GIT
 pub extern "C" fn regerror(
     code: c_int,

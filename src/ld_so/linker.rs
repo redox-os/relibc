@@ -6,9 +6,8 @@ use alloc::{
     vec::Vec,
 };
 use object::{
-    elf,
+    NativeEndian, elf,
     read::elf::{Rela as _, Sym},
-    NativeEndian,
 };
 
 use core::{
@@ -24,22 +23,22 @@ use crate::{
         fcntl, sys_mman,
         unistd::F_OK,
     },
-    ld_so::dso::{resolve_sym, SymbolBinding},
+    ld_so::dso::{SymbolBinding, resolve_sym},
     out::Out,
     platform::{
-        types::{c_int, c_uint, c_void},
         Pal, Sys,
+        types::{c_int, c_uint, c_void},
     },
     sync::rwlock::RwLock,
 };
 
 use super::{
+    PATH_SEP,
     access::accessible,
     callbacks::LinkerCallbacks,
-    debug::{RTLDState, _dl_debug_state, _r_debug},
-    dso::{ProgramHeader, Rela, DSO},
+    debug::{_dl_debug_state, _r_debug, RTLDState},
+    dso::{DSO, ProgramHeader, Rela},
     tcb::{Master, Tcb},
-    PATH_SEP,
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -180,7 +179,7 @@ impl Scope {
     fn set_owner(&mut self, obj: Weak<DSO>) {
         match self {
             Self::Global { .. } => panic!("attempted to set global scope owner"),
-            Self::Local { ref mut owner, .. } => {
+            Self::Local { owner, .. } => {
                 assert!(owner.is_none(), "attempted to change local scope owner");
                 *owner = Some(obj);
             }
@@ -436,10 +435,7 @@ impl Linker {
     ) -> Result<ObjectHandle> {
         trace!(
             "[ld.so] load_library(name={:?}, resolve={:#?}, scope={:#?}, noload={})",
-            name,
-            resolve,
-            scope,
-            noload
+            name, resolve, scope, noload
         );
 
         if noload && resolve == Resolve::Now {
@@ -994,7 +990,7 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
     resolved
 }
 
-extern "C" {
+unsafe extern "C" {
     pub(super) fn __plt_resolve_trampoline() -> usize;
 }
 

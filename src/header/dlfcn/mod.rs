@@ -45,7 +45,7 @@ pub struct Dl_info {
     dli_saddr: *mut c_void,
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn dladdr(_addr: *mut c_void, info: *mut Dl_info) -> c_int {
     //TODO
     unsafe {
@@ -57,7 +57,7 @@ pub unsafe extern "C" fn dladdr(_addr: *mut c_void, info: *mut Dl_info) -> c_int
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut c_void {
     //TODO support all sort of flags
     let resolve = if flags & RTLD_NOW == RTLD_NOW {
@@ -111,7 +111,7 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void {
     let handle = ObjectHandle::from_ptr(handle);
 
@@ -150,7 +150,7 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
     let tcb = match unsafe { Tcb::current() } {
         Some(tcb) => tcb,
@@ -177,7 +177,7 @@ pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn dlerror() -> *mut c_char {
     ERROR.swap(0, Ordering::SeqCst) as *mut c_char
 }

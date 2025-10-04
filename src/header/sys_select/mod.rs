@@ -9,8 +9,8 @@ use crate::{
     header::{
         errno,
         sys_epoll::{
-            epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR, EPOLLIN,
-            EPOLLOUT, EPOLL_CLOEXEC, EPOLL_CTL_ADD,
+            EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLIN, EPOLLOUT, epoll_create1, epoll_ctl,
+            epoll_data, epoll_event, epoll_wait,
         },
         sys_time::timeval,
     },
@@ -161,7 +161,7 @@ pub fn select_epoll(
     count
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn select(
     nfds: c_int,
     readfds: *mut fd_set,

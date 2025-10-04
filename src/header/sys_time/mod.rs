@@ -7,7 +7,7 @@ use crate::{
     error::ResultExt,
     header::time::timespec,
     out::Out,
-    platform::{types::*, Pal, PalSignal, Sys},
+    platform::{Pal, PalSignal, Sys, types::*},
 };
 use core::ptr::null;
 
@@ -80,7 +80,7 @@ pub struct timezone {
 /// The `getitimer()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 7, and removed in Issue 8.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int {
     Sys::getitimer(which, &mut *value)
         .map(|()| 0)
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn getitimer(which: c_int, value: *mut itimerval) -> c_int
 /// The `gettimeofday()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 7, and removed in Issue 8.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c_int {
     Sys::gettimeofday(Out::nonnull(tp), Out::nullable(tzp))
         .map(|()| 0)
@@ -111,7 +111,7 @@ pub unsafe extern "C" fn gettimeofday(tp: *mut timeval, tzp: *mut timezone) -> c
 /// The `setitimer()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 7, and removed in Issue 8.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn setitimer(
     which: c_int,
     value: *const itimerval,
@@ -128,7 +128,7 @@ pub unsafe extern "C" fn setitimer(
 /// # Deprecation
 /// The `utimes()` function was marked legacy in the Open Group Base
 /// Specifications Issue 6, and then unmarked in Issue 7.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c_int {
     let path = CStr::from_ptr(path);
     // Nullptr is valid here, it means "use current time"

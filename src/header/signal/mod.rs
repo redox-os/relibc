@@ -8,7 +8,7 @@ use crate::{
     c_str::CStr,
     error::{Errno, ResultExt},
     header::{errno, setjmp, time::timespec},
-    platform::{self, types::*, Pal, PalSignal, Sys},
+    platform::{self, Pal, PalSignal, Sys, types::*},
 };
 
 pub use self::sys::*;
@@ -69,7 +69,7 @@ pub struct siginfo {
     pub si_value: sigval,
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn _cbindgen_export_siginfo(a: siginfo) {}
 
 #[derive(Clone, Copy)]
@@ -104,13 +104,13 @@ global_asm!(
     options(att_syntax)
 );
 
-extern "C" {
+unsafe extern "C" {
     pub fn sigsetjmp(jb: *mut u64, savemask: i32) -> i32;
 }
 
 //NOTE for the following two functions, to see why they're implemented slightly differently from their intended behavior, read
 //     https://git.musl-libc.org/cgit/musl/commit/?id=583e55122e767b1586286a0d9c35e2a4027998ab
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn __sigsetjmp_tail(jb: *mut u64, ret: i32) -> i32 {
     let set = jb.wrapping_add(9);
     if ret > 0 {
@@ -121,28 +121,28 @@ unsafe extern "C" fn __sigsetjmp_tail(jb: *mut u64, ret: i32) -> i32 {
     ret
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn siglongjmp(jb: *mut u64, ret: i32) {
     setjmp::longjmp(jb, ret);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
     Sys::kill(pid, sig).map(|()| 0).or_minus_one_errno()
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> c_int {
     Sys::sigqueue(pid, sig, val)
         .map(|()| 0)
         .or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
     Sys::killpg(pgrp, sig).map(|()| 0).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
     let os_tid = {
         let pthread = &*(thread as *const crate::pthread::Pthread);
@@ -151,7 +151,7 @@ pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
     crate::header::pthread::e(Sys::rlct_kill(os_tid, sig as usize))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_sigmask(
     how: c_int,
     set: *const sigset_t,
@@ -166,12 +166,12 @@ pub unsafe extern "C" fn pthread_sigmask(
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn raise(sig: c_int) -> c_int {
     Sys::raise(sig).map(|()| 0).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigaction(
     sig: c_int,
     act: *const sigaction,
@@ -182,7 +182,7 @@ pub unsafe extern "C" fn sigaction(
         .or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG.max(SIGRTMAX)
     /* TODO */
@@ -197,14 +197,14 @@ pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
     Sys::sigaltstack(ss.as_ref(), old_ss.as_mut())
         .map(|()| 0)
         .or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG.max(SIGRTMAX)
     /* TODO */
@@ -219,7 +219,7 @@ pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
     if let Some(set) = (set as *mut SigSet).as_mut() {
         set.clear();
@@ -227,7 +227,7 @@ pub unsafe extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
     if let Some(set) = (set as *mut SigSet).as_mut() {
         set.fill(.., true);
@@ -235,7 +235,7 @@ pub unsafe extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sighold(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
     unsafe { sigemptyset(pset.as_mut_ptr()) };
@@ -246,7 +246,7 @@ pub unsafe extern "C" fn sighold(sig: c_int) -> c_int {
     sigprocmask(SIG_BLOCK, &set, ptr::null_mut())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sigignore(sig: c_int) -> c_int {
     let mut psa = mem::MaybeUninit::<sigaction>::uninit();
     unsafe { sigemptyset(&mut (*psa.as_mut_ptr()).sa_mask) };
@@ -256,7 +256,7 @@ pub extern "C" fn sigignore(sig: c_int) -> c_int {
     unsafe { sigaction(sig, &mut sa, ptr::null_mut()) }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
     let mut psa = mem::MaybeUninit::<sigaction>::uninit();
     unsafe { sigaction(sig, ptr::null_mut(), psa.as_mut_ptr()) };
@@ -270,7 +270,7 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
     unsafe { sigaction(sig, &mut sa, ptr::null_mut()) }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG {
         platform::ERRNO.set(errno::EINVAL);
@@ -285,7 +285,7 @@ pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_in
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn signal(
     sig: c_int,
     func: Option<extern "C" fn(c_int)>,
@@ -304,7 +304,7 @@ pub extern "C" fn signal(
     unsafe { old_sa.assume_init() }.sa_handler
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
     sigprocmask(0, ptr::null_mut(), pset.as_mut_ptr());
@@ -315,7 +315,7 @@ pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
     sigsuspend(&set)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
     (|| Sys::sigpending(set.as_mut().ok_or(Errno(EFAULT))?))()
         .map(|()| 0)
@@ -326,7 +326,7 @@ const BELOW_SIGRTMIN_MASK: sigset_t = (1 << SIGRTMIN) - 1;
 const STANDARD_SIG_MASK: sigset_t = (1 << 32) - 1;
 const RLCT_SIGNAL_MASK: sigset_t = BELOW_SIGRTMIN_MASK & !STANDARD_SIG_MASK;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigprocmask(
     how: c_int,
     set: *const sigset_t,
@@ -351,7 +351,7 @@ pub unsafe extern "C" fn sigprocmask(
     .or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigrelse(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
     sigemptyset(pset.as_mut_ptr());
@@ -362,7 +362,7 @@ pub unsafe extern "C" fn sigrelse(sig: c_int) -> c_int {
     sigprocmask(SIG_UNBLOCK, &mut set, ptr::null_mut())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigset(
     sig: c_int,
     func: Option<extern "C" fn(c_int)>,
@@ -405,12 +405,12 @@ pub unsafe extern "C" fn sigset(
     old_sa.assume_init().sa_handler
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
     Err(Sys::sigsuspend(&*sigmask)).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int {
     let mut pinfo = mem::MaybeUninit::<siginfo_t>::uninit();
     if sigtimedwait(set, pinfo.as_mut_ptr(), ptr::null_mut()) < 0 {
@@ -421,7 +421,7 @@ pub unsafe extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigtimedwait(
     set: *const sigset_t,
     // s/siginfo_t/siginfo due to https://github.com/mozilla/cbindgen/issues/621
@@ -434,7 +434,7 @@ pub unsafe extern "C" fn sigtimedwait(
         .map(|()| 0)
         .or_minus_one_errno()
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigwaitinfo(set: *const sigset_t, sig: *mut siginfo_t) -> c_int {
     sigtimedwait(set, sig, core::ptr::null())
 }
@@ -473,7 +473,7 @@ pub(crate) const SIGNAL_STRINGS: [&str; 32] = [
     "Power failure\0",
     "Bad system call\0",
 ];
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn psignal(sig: c_int, prefix: *const c_char) {
     let c_description = usize::try_from(sig)
         .ok()
@@ -490,7 +490,7 @@ pub unsafe extern "C" fn psignal(sig: c_int, prefix: *const c_char) {
         string.as_bytes().len(),
     );
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn psiginfo(info: *const siginfo_t, prefix: *const c_char) {
     let siginfo_t {
         si_code,

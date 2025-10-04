@@ -8,7 +8,7 @@ use core::{
 
 mod sys;
 use super::types::*;
-use crate::{sync::Mutex, ALLOCATOR};
+use crate::{ALLOCATOR, sync::Mutex};
 use dlmalloc::DlmallocCApi;
 
 pub type Dlmalloc = DlmallocCApi<sys::System>;

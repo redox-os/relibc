@@ -5,7 +5,7 @@
 use crate::{
     c_str::CStr,
     error::ResultExt,
-    platform::{types::*, Pal, Sys},
+    platform::{Pal, Sys, types::*},
 };
 
 pub use self::sys::*;
@@ -36,7 +36,7 @@ pub const F_LOCK: c_int = 1;
 pub const F_TLOCK: c_int = 2;
 pub const F_TEST: c_int = 3;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn creat(path: *const c_char, mode: mode_t) -> c_int {
     unsafe { open(path, O_WRONLY | O_CREAT | O_TRUNC, mode) }
 }
@@ -49,7 +49,7 @@ pub struct flock {
     pub l_len: off_t,
     pub l_pid: pid_t,
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fcntl(fildes: c_int, cmd: c_int, mut __valist: ...) -> c_int {
     // c_ulonglong
     let arg = match cmd {
@@ -62,7 +62,7 @@ pub unsafe extern "C" fn fcntl(fildes: c_int, cmd: c_int, mut __valist: ...) -> 
     Sys::fcntl(fildes, cmd, arg).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: ...) -> c_int {
     let mode = if oflag & O_CREAT == O_CREAT
     /* || oflag & O_TMPFILE == O_TMPFILE */
@@ -76,5 +76,5 @@ pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: .
     Sys::open(path, oflag, mode).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_fcntl(a: flock) {}

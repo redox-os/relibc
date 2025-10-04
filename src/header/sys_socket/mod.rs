@@ -5,7 +5,7 @@ use core::{mem, ptr};
 use crate::{
     error::ResultExt,
     header::sys_uio::iovec,
-    platform::{types::*, PalSocket, Sys},
+    platform::{PalSocket, Sys, types::*},
 };
 
 pub mod constants;
@@ -20,7 +20,7 @@ pub struct linger {
     pub l_linger: c_int,
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn _cbindgen_export_linger(linger: linger) {}
 
 #[repr(C)]
@@ -51,7 +51,7 @@ pub struct ucred {
     pub gid: gid_t,
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn _cbindgen_export_cmsghdr(cmsghdr: cmsghdr) {}
 
 #[repr(C)]
@@ -95,12 +95,12 @@ pub unsafe extern "C" fn __MHDR_END(mhdr: *const msghdr) -> *mut c_uchar {
     unsafe { ((*mhdr).msg_control as *mut c_uchar).offset((*mhdr).msg_controllen as isize) }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_DATA(cmsg: *const cmsghdr) -> *mut c_uchar {
     unsafe { (cmsg as *mut c_uchar).offset(CMSG_ALIGN(mem::size_of::<cmsghdr>()) as isize) }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_NXTHDR(mhdr: *const msghdr, cmsg: *const cmsghdr) -> *mut cmsghdr {
     if cmsg.is_null() {
         return CMSG_FIRSTHDR(mhdr);
@@ -119,7 +119,7 @@ pub unsafe extern "C" fn CMSG_NXTHDR(mhdr: *const msghdr, cmsg: *const cmsghdr) 
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_FIRSTHDR(mhdr: *const msghdr) -> *mut cmsghdr {
     unsafe {
         if (*mhdr).msg_controllen as usize >= mem::size_of::<cmsghdr>() {
@@ -130,23 +130,23 @@ pub unsafe extern "C" fn CMSG_FIRSTHDR(mhdr: *const msghdr) -> *mut cmsghdr {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_ALIGN(len: size_t) -> size_t {
     (len + mem::size_of::<size_t>() - 1) & !(mem::size_of::<size_t>() - 1)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_SPACE(len: c_uint) -> c_uint {
     (CMSG_ALIGN(len as size_t) + CMSG_ALIGN(mem::size_of::<cmsghdr>())) as c_uint
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_LEN(length: c_uint) -> c_uint {
     (CMSG_ALIGN(mem::size_of::<cmsghdr>()) + length as usize) as c_uint
 }
 // } These must match C macros in include/bits/sys/socket.h
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn accept(
     socket: c_int,
     address: *mut sockaddr,
@@ -161,7 +161,7 @@ pub unsafe extern "C" fn accept(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn bind(
     socket: c_int,
     address: *const sockaddr,
@@ -178,7 +178,7 @@ pub unsafe extern "C" fn bind(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn connect(
     socket: c_int,
     address: *const sockaddr,
@@ -193,7 +193,7 @@ pub unsafe extern "C" fn connect(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getpeername(
     socket: c_int,
     address: *mut sockaddr,
@@ -210,7 +210,7 @@ pub unsafe extern "C" fn getpeername(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getsockname(
     socket: c_int,
     address: *mut sockaddr,
@@ -227,7 +227,7 @@ pub unsafe extern "C" fn getsockname(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getsockopt(
     socket: c_int,
     level: c_int,
@@ -248,14 +248,14 @@ pub unsafe extern "C" fn getsockopt(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn listen(socket: c_int, backlog: c_int) -> c_int {
     Sys::listen(socket, backlog)
         .map(|()| 0)
         .or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn recv(
     socket: c_int,
     buffer: *mut c_void,
@@ -272,7 +272,7 @@ pub unsafe extern "C" fn recv(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn recvfrom(
     socket: c_int,
     buffer: *mut c_void,
@@ -295,14 +295,14 @@ pub unsafe extern "C" fn recvfrom(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> ssize_t {
     Sys::recvmsg(socket, msg, flags)
         .map(|r| r as ssize_t)
         .or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn send(
     socket: c_int,
     message: *const c_void,
@@ -312,14 +312,14 @@ pub unsafe extern "C" fn send(
     sendto(socket, message, length, flags, ptr::null(), 0)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> ssize_t {
     Sys::sendmsg(socket, msg, flags)
         .map(|w| w as ssize_t)
         .or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sendto(
     socket: c_int,
     message: *const c_void,
@@ -342,7 +342,7 @@ pub unsafe extern "C" fn sendto(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn setsockopt(
     socket: c_int,
     level: c_int,
@@ -363,12 +363,12 @@ pub unsafe extern "C" fn setsockopt(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {
     Sys::shutdown(socket, how).map(|()| 0).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
     trace_expr!(
         Sys::socket(domain, kind, protocol).or_minus_one_errno(),
@@ -379,7 +379,7 @@ pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> 
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn socketpair(
     domain: c_int,
     kind: c_int,

@@ -9,7 +9,7 @@ use crate::{
     pthread::*,
 };
 
-use crate::platform::{types::*, Pal, Sys};
+use crate::platform::{Pal, Sys, types::*};
 
 use super::FutexWaitResult;
 

@@ -2,7 +2,7 @@
 
 use crate::{
     io::{self, Write},
-    platform::{self, types::*, WriteByte},
+    platform::{self, WriteByte, types::*},
 };
 use core::{
     cmp, fmt,

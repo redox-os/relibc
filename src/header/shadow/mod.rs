@@ -16,7 +16,7 @@ use crate::{
     c_str::CStr,
     fs::File,
     header::{errno, fcntl, string::strlen},
-    io::{prelude::*, BufReader, Lines},
+    io::{BufReader, Lines, prelude::*},
     platform,
     platform::types::*,
 };
@@ -112,7 +112,7 @@ impl OwnedSpwd {
         unsafe {
             SHADOW_BUF = Some(self.buffer);
             SHADOW = self.reference;
-            &mut SHADOW
+            &raw mut SHADOW
         }
     }
 }
@@ -181,7 +181,7 @@ fn parse_spwd(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedSpwd, Er
     Ok(OwnedSpwd { buffer, reference })
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getspnam(name: *const c_char) -> *mut spwd {
     let Ok(db) = File::open(SHADOW_FILE.into(), fcntl::O_RDONLY) else {
         return ptr::null_mut();
@@ -199,7 +199,7 @@ pub unsafe extern "C" fn getspnam(name: *const c_char) -> *mut spwd {
     ptr::null_mut()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getspnam_r(
     name: *const c_char,
     result_buf: *mut spwd,
@@ -237,7 +237,7 @@ pub unsafe extern "C" fn getspnam_r(
     ENOENT
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn setspent() {
     let mut line_reader = unsafe { &mut *LINE_READER.get() };
     if let Ok(db) = File::open(SHADOW_FILE.into(), fcntl::O_RDONLY) {
@@ -245,14 +245,14 @@ pub unsafe extern "C" fn setspent() {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn endspent() {
     unsafe {
         *LINE_READER.get() = None;
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getspent() -> *mut spwd {
     let line_reader = unsafe { &mut *LINE_READER.get() };
     if line_reader.is_none() {

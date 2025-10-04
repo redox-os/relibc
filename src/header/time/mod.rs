@@ -9,13 +9,13 @@ use crate::{
     header::{errno::EOVERFLOW, fcntl::O_RDONLY, stdlib::getenv, unistd::readlink},
     io::Read,
     out::Out,
-    platform::{self, types::*, Pal, Sys},
+    platform::{self, Pal, Sys, types::*},
     sync::{Mutex, MutexGuard},
 };
 use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
 use chrono::{
-    format::ParseErrorKind, offset::MappedLocalTime, DateTime, Datelike, FixedOffset, NaiveDate,
-    NaiveDateTime, Offset, ParseError, TimeZone, Timelike, Utc,
+    DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, ParseError, TimeZone,
+    Timelike, Utc, format::ParseErrorKind, offset::MappedLocalTime,
 };
 use chrono_tz::{OffsetComponents, OffsetName, Tz};
 use core::{
@@ -113,21 +113,21 @@ static TIMEZONE_LOCK: Mutex<(Option<CString>, Option<CString>)> = Mutex::new((No
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[allow(non_upper_case_globals)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut daylight: c_int = 0;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[allow(non_upper_case_globals)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut timezone: c_long = 0;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[allow(non_upper_case_globals)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut tzname: TzName = TzName([ptr::null_mut(); 2]);
 
 #[allow(non_upper_case_globals)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut getdate_err: c_int = 0;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
@@ -146,9 +146,9 @@ pub struct sigevent;
 /// The `asctime()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 7.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
-    asctime_r(timeptr, ASCTIME.as_mut_ptr().cast())
+    asctime_r(timeptr, &raw mut ASCTIME as *mut _)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/asctime.html>.
@@ -157,7 +157,7 @@ pub unsafe extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
 /// The `asctime_r()` was marked obsolescent in the Open Group Base
 /// Specifications Issue 7, and removed in Issue 8.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_char {
     let tm_sec = (*tm).tm_sec;
     let tm_min = (*tm).tm_min;
@@ -235,7 +235,7 @@ pub unsafe extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_ch
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn clock() -> clock_t {
     let mut ts = mem::MaybeUninit::<timespec>::uninit();
 
@@ -253,13 +253,13 @@ pub extern "C" fn clock() -> clock_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getcpuclockid.html>.
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub extern "C" fn clock_getcpuclockid(pid: pid_t, clock_id: *mut clockid_t) -> c_int {
     unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getres.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn clock_getres(clock_id: clockid_t, res: *mut timespec) -> c_int {
     Sys::clock_getres(clock_id, Out::nullable(res))
         .map(|()| 0)
@@ -267,7 +267,7 @@ pub unsafe extern "C" fn clock_getres(clock_id: clockid_t, res: *mut timespec) -
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getres.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -> c_int {
     Sys::clock_gettime(clock_id, Out::nonnull(tp))
         .map(|()| 0)
@@ -275,7 +275,7 @@ pub unsafe extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_nanosleep.html>.
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub extern "C" fn clock_nanosleep(
     clock_id: clockid_t,
     flags: c_int,
@@ -286,7 +286,7 @@ pub extern "C" fn clock_nanosleep(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getres.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn clock_settime(clock_id: clockid_t, tp: *const timespec) -> c_int {
     Sys::clock_settime(clock_id, tp)
         .map(|()| 0)
@@ -299,7 +299,7 @@ pub unsafe extern "C" fn clock_settime(clock_id: clockid_t, tp: *const timespec)
 /// The `ctime()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 7.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ctime(clock: *const time_t) -> *mut c_char {
     asctime(localtime(clock))
 }
@@ -310,7 +310,7 @@ pub unsafe extern "C" fn ctime(clock: *const time_t) -> *mut c_char {
 /// The `ctime_r()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 7, and removed in Issue 8.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut c_char {
     // Using MaybeUninit<tm> seems to cause a panic during the build process
     let mut tm1 = blank_tm();
@@ -319,38 +319,38 @@ pub unsafe extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/difftime.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn difftime(time1: time_t, time0: time_t) -> c_double {
     (time1 - time0) as _
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getdate.html>.
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getdate(string: *const c_char) -> *const tm {
     unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gmtime.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn gmtime(timer: *const time_t) -> *mut tm {
-    gmtime_r(timer, &mut TM)
+    gmtime_r(timer, &raw mut TM)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gmtime.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut tm {
     let _ = get_localtime(*clock, result);
     result
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/localtime.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn localtime(clock: *const time_t) -> *mut tm {
-    localtime_r(clock, &mut TM)
+    localtime_r(clock, &raw mut TM)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/localtime.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
     let mut lock = TIMEZONE_LOCK.lock();
     clear_timezone(&mut lock);
@@ -361,7 +361,7 @@ pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut t
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mktime.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     let mut lock = TIMEZONE_LOCK.lock();
     clear_timezone(&mut lock);
@@ -414,13 +414,13 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nanosleep.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
     Sys::nanosleep(rqtp, rmtp).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strftime.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn strftime(
     s: *mut c_char,
     maxsize: size_t,
@@ -432,22 +432,18 @@ pub unsafe extern "C" fn strftime(
         format,
         timeptr,
     );
-    if ret < maxsize {
-        ret
-    } else {
-        0
-    }
+    if ret < maxsize { ret } else { 0 }
 }
 
 // See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strftime.html>.
 // TODO: needs locale_t
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 /*pub extern "C" fn strftime_l(s: *mut char, maxsize: size_t, format: *const c_char, timeptr: *const tm, locale: locale_t) -> size_t {
     unimplemented!();
 }*/
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/time.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
     let mut ts = timespec::default();
     Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut ts));
@@ -458,7 +454,7 @@ pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
 }
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/timegm.3.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
     let tm_val = &mut *tm;
     let dt = match convert_tm_generic(&Utc, tm_val) {
@@ -477,7 +473,7 @@ pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/timegm.3.html>.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
     let tm_val = &mut *tm;
     let tz = time_zone();
@@ -497,7 +493,7 @@ pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_create.html>.
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub extern "C" fn timer_create(
     clock_id: clockid_t,
     evp: *mut sigevent,
@@ -507,25 +503,25 @@ pub extern "C" fn timer_create(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_delete.html>.
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub extern "C" fn timer_delete(timerid: timer_t) -> c_int {
     unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
     unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> c_int {
     unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub extern "C" fn timer_settime(
     timerid: timer_t,
     flags: c_int,
@@ -536,13 +532,13 @@ pub extern "C" fn timer_settime(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timespec_get.html>.
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub extern "C" fn timespec_get(ts: *mut timespec, base: c_int) -> c_int {
     unimplemented!();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tzset.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn tzset() {
     let mut lock = TIMEZONE_LOCK.lock();
     unsafe { clear_timezone(&mut lock) };

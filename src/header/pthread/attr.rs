@@ -34,13 +34,13 @@ impl Default for RlctAttr {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_destroy(attr: *mut pthread_attr_t) -> c_int {
     core::ptr::drop_in_place(attr);
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getdetachstate(
     attr: *const pthread_attr_t,
     detachstate: *mut c_int,
@@ -49,7 +49,7 @@ pub unsafe extern "C" fn pthread_attr_getdetachstate(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getguardsize(
     attr: *const pthread_attr_t,
     size: *mut size_t,
@@ -58,7 +58,7 @@ pub unsafe extern "C" fn pthread_attr_getguardsize(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getinheritsched(
     attr: *const pthread_attr_t,
     inheritsched: *mut c_int,
@@ -67,7 +67,7 @@ pub unsafe extern "C" fn pthread_attr_getinheritsched(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getschedparam(
     attr: *const pthread_attr_t,
     param: *mut sched_param,
@@ -76,7 +76,7 @@ pub unsafe extern "C" fn pthread_attr_getschedparam(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getschedpolicy(
     attr: *const pthread_attr_t,
     policy: *mut c_int,
@@ -85,7 +85,7 @@ pub unsafe extern "C" fn pthread_attr_getschedpolicy(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getscope(
     attr: *const pthread_attr_t,
     scope: *mut c_int,
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn pthread_attr_getscope(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getstack(
     attr: *const pthread_attr_t,
     stackaddr: *mut *mut c_void,
@@ -105,7 +105,7 @@ pub unsafe extern "C" fn pthread_attr_getstack(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_getstacksize(
     attr: *const pthread_attr_t,
     stacksize: *mut size_t,
@@ -114,13 +114,13 @@ pub unsafe extern "C" fn pthread_attr_getstacksize(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_init(attr: *mut pthread_attr_t) -> c_int {
     core::ptr::write(attr.cast::<RlctAttr>(), RlctAttr::default());
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setdetachstate(
     attr: *mut pthread_attr_t,
     detachstate: c_int,
@@ -129,7 +129,7 @@ pub unsafe extern "C" fn pthread_attr_setdetachstate(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setguardsize(
     attr: *mut pthread_attr_t,
     guardsize: c_int,
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn pthread_attr_setguardsize(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setinheritsched(
     attr: *mut pthread_attr_t,
     inheritsched: c_int,
@@ -147,7 +147,7 @@ pub unsafe extern "C" fn pthread_attr_setinheritsched(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setschedparam(
     attr: *mut pthread_attr_t,
     param: *const sched_param,
@@ -156,7 +156,7 @@ pub unsafe extern "C" fn pthread_attr_setschedparam(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setschedpolicy(
     attr: *mut pthread_attr_t,
     policy: c_int,
@@ -165,13 +165,13 @@ pub unsafe extern "C" fn pthread_attr_setschedpolicy(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setscope(attr: *mut pthread_attr_t, scope: c_int) -> c_int {
     (*attr.cast::<RlctAttr>()).scope = scope as u8;
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setstack(
     attr: *mut pthread_attr_t,
     stackaddr: *mut c_void,
@@ -182,7 +182,7 @@ pub unsafe extern "C" fn pthread_attr_setstack(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setstacksize(
     attr: *mut pthread_attr_t,
     stacksize: size_t,
@@ -191,7 +191,7 @@ pub unsafe extern "C" fn pthread_attr_setstacksize(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_getattr_np(
     thread_ptr: pthread_t,
     attr_ptr: *mut pthread_attr_t,

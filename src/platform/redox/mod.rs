@@ -4,15 +4,14 @@ use core::{
     ptr, slice, str,
 };
 use redox_rt::{
-    protocol::{wifstopped, wstopsig, WaitFlags},
-    sys::{Resugid, WaitpidTarget},
     RtTcb,
+    protocol::{WaitFlags, wifstopped, wstopsig},
+    sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
-    self,
+    self, EMFILE, Error, MODE_PERM, PtraceEvent,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
     dirent::{DirentHeader, DirentKind},
-    Error, PtraceEvent, EMFILE, MODE_PERM,
 };
 
 use crate::{
@@ -29,23 +28,23 @@ use crate::{
         limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
-        sys_resource::{rlimit, rusage, RLIM_INFINITY},
-        sys_stat::{stat, S_ISGID, S_ISUID, S_ISVTX},
+        sys_resource::{RLIM_INFINITY, rlimit, rusage},
+        sys_stat::{S_ISGID, S_ISUID, S_ISVTX, stat},
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
-        sys_utsname::{utsname, UTSLENGTH},
+        sys_utsname::{UTSLENGTH, utsname},
         sys_wait,
         time::timespec,
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
-    io::{self, prelude::*, BufReader},
+    io::{self, BufReader, prelude::*},
     out::Out,
     sync::rwlock::RwLock,
 };
 
 pub use redox_rt::proc::FdGuard;
 
-use super::{types::*, Pal, Read, ERRNO};
+use super::{ERRNO, Pal, Read, types::*};
 
 static mut BRK_CUR: *mut c_void = ptr::null_mut();
 static mut BRK_END: *mut c_void = ptr::null_mut();
@@ -1134,15 +1133,17 @@ impl Pal for Sys {
         // normal: We still need to add WUNTRACED, but we only return
         // it if (and only if) a ptrace traceme was activated during
         // the wait.
-        let res = res.unwrap_or_else(|| loop {
-            let res = inner(&mut status, options | WaitFlags::WUNTRACED);
+        let res = res.unwrap_or_else(|| {
+            loop {
+                let res = inner(&mut status, options | WaitFlags::WUNTRACED);
 
-            // TODO: Also handle special PIDs here
-            if !wifstopped(status)
-                || options.contains(WaitFlags::WUNTRACED)
-                || ptrace::is_traceme(pid)
-            {
-                break res;
+                // TODO: Also handle special PIDs here
+                if !wifstopped(status)
+                    || options.contains(WaitFlags::WUNTRACED)
+                    || ptrace::is_traceme(pid)
+                {
+                    break res;
+                }
             }
         });
 

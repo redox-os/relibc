@@ -7,9 +7,9 @@ use redox_rt::{
 use syscall::{self, flag::*};
 
 use super::{
-    super::{types::*, Pal, PalSocket, ERRNO},
-    path::dir_path_and_fd_path,
+    super::{ERRNO, Pal, PalSocket, types::*},
     Sys,
+    path::dir_path_and_fd_path,
 };
 use crate::{
     error::{Errno, Result, ResultExt},
@@ -22,8 +22,8 @@ use crate::{
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
         sys_socket::{
-            cmsghdr, constants::*, msghdr, sa_family_t, sockaddr, socklen_t, ucred, CMSG_ALIGN,
-            CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE,
+            CMSG_ALIGN, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE, cmsghdr,
+            constants::*, msghdr, sa_family_t, sockaddr, socklen_t, ucred,
         },
         sys_time::timeval,
         sys_uio::iovec,
@@ -575,7 +575,10 @@ impl PalSocket for Sys {
                         CallFlags::empty(),
                         &[SocketCall::Unbind as u64],
                     ) {
-                        eprintln!("bind: CRITICAL: failed to unbind socket after a failed transaction: {:?}", unbind_error);
+                        eprintln!(
+                            "bind: CRITICAL: failed to unbind socket after a failed transaction: {:?}",
+                            unbind_error
+                        );
                     }
 
                     return Err(original_error);

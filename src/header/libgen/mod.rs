@@ -6,7 +6,7 @@ use crate::platform::types::c_char;
 
 use crate::header::string::strlen;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn basename(str: *mut c_char) -> *mut c_char {
     if str.is_null() || unsafe { strlen(str) == 0 } {
         return ".\0".as_ptr() as *mut c_char;
@@ -28,7 +28,7 @@ pub unsafe extern "C" fn basename(str: *mut c_char) -> *mut c_char {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn dirname(str: *mut c_char) -> *mut c_char {
     if str.is_null() || unsafe { strlen(str) == 0 } {
         return ".\0".as_ptr() as *mut c_char;

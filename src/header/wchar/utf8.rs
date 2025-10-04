@@ -67,11 +67,7 @@ pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, ps: *mut mb
         *pwc = result;
     }
 
-    if result != 0 {
-        size
-    } else {
-        0
-    }
+    if result != 0 { size } else { 0 }
 }
 
 //It's guaranteed that we don't have any nullpointers here

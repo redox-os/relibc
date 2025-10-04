@@ -61,12 +61,12 @@ pub struct termios {
     pub c_cc: [cc_t; NCCS],
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
     sys_ioctl::ioctl(fd, sys_ioctl::TCGETS, out as *mut c_void)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *const termios) -> c_int {
     if act < 0 || act > 2 {
         platform::ERRNO.set(errno::EINVAL);
@@ -77,33 +77,33 @@ pub unsafe extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *const termios)
 }
 
 #[cfg(target_os = "linux")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cfgetispeed(termios_p: *const termios) -> speed_t {
     (*termios_p).__c_ispeed
 }
 
 #[cfg(target_os = "redox")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cfgetispeed(termios_p: *const termios) -> speed_t {
     //TODO
     0
 }
 
 #[cfg(target_os = "linux")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cfgetospeed(termios_p: *const termios) -> speed_t {
     (*termios_p).__c_ospeed
 }
 
 #[cfg(target_os = "redox")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cfgetospeed(termios_p: *const termios) -> speed_t {
     //TODO
     0
 }
 
 #[cfg(target_os = "linux")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) -> c_int {
     match speed as usize {
         B0..=B38400 | B57600..=B4000000 => {
@@ -118,7 +118,7 @@ pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) ->
 }
 
 #[cfg(target_os = "redox")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) -> c_int {
     //TODO
     platform::ERRNO.set(errno::EINVAL);
@@ -126,7 +126,7 @@ pub unsafe extern "C" fn cfsetispeed(termios_p: *mut termios, speed: speed_t) ->
 }
 
 #[cfg(target_os = "linux")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) -> c_int {
     match speed as usize {
         B0..=B38400 | B57600..=B4000000 => {
@@ -141,14 +141,14 @@ pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) ->
 }
 
 #[cfg(target_os = "redox")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cfsetospeed(termios_p: *mut termios, speed: speed_t) -> c_int {
     //TODO
     platform::ERRNO.set(errno::EINVAL);
     -1
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cfsetspeed(termios_p: *mut termios, speed: speed_t) -> c_int {
     let r = cfsetispeed(termios_p, speed);
     if r < 0 {
@@ -157,36 +157,36 @@ pub unsafe extern "C" fn cfsetspeed(termios_p: *mut termios, speed: speed_t) -> 
     cfsetospeed(termios_p, speed)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcflush(fd: c_int, queue: c_int) -> c_int {
     sys_ioctl::ioctl(fd, sys_ioctl::TCFLSH, queue as *mut c_void)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcdrain(fd: c_int) -> c_int {
     sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, 1 as *mut _)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcsendbreak(fd: c_int, _dur: c_int) -> c_int {
     // non-zero duration is ignored by musl due to it being
     // implementation-defined. we do the same.
     sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, 0 as *mut _)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcsetwinsize(fd: c_int, mut sws: winsize) -> c_int {
     sys_ioctl::ioctl(fd, sys_ioctl::TIOCSWINSZ, &mut sws as *mut _ as *mut c_void)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcflow(fd: c_int, action: c_int) -> c_int {
     // non-zero duration is ignored by musl due to it being
     // implementation-defined. we do the same.
     sys_ioctl::ioctl(fd, sys_ioctl::TCXONC, action as *mut _)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cfmakeraw(termios_p: *mut termios) {
     (*termios_p).c_iflag &=
         !(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON) as u32;

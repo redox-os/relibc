@@ -3,7 +3,7 @@ use core::ptr;
 use crate::{
     error::ResultExtPtrMut,
     header::errno::ENOMEM,
-    platform::{self, types::*, Pal, Sys},
+    platform::{self, Pal, Sys, types::*},
 };
 
 static mut BRK: *mut c_void = ptr::null_mut();
@@ -14,7 +14,7 @@ static mut BRK: *mut c_void = ptr::null_mut();
 /// The `brk()` function was marked legacy in the System Interface & Headers
 /// Issue 5, and removed in Issue 6.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn brk(addr: *mut c_void) -> c_int {
     BRK = Sys::brk(addr).or_errno_null_mut();
 
@@ -32,7 +32,7 @@ pub unsafe extern "C" fn brk(addr: *mut c_void) -> c_int {
 /// The `sbrk()` function was marked legacy in the System Interface & Headers
 /// Issue 5, and removed in Issue 6.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
     if BRK.is_null() {
         BRK = Sys::brk(ptr::null_mut()).or_errno_null_mut();
