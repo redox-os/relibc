@@ -181,7 +181,7 @@ pub struct mcontext {
     _opaque: [u8; 520],
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn __completely_unused_cbindgen_workaround_fn_ucontext_mcontext(
     a: *const ucontext_t,
     b: *const mcontext_t,

@@ -6,9 +6,9 @@
 
 use core::{mem, ptr};
 use object::{
+    Endianness,
     elf::{self, ProgramHeader32, ProgramHeader64},
     read::elf::ProgramHeader,
-    Endianness,
 };
 
 use self::tcb::{Master, Tcb};
@@ -28,7 +28,7 @@ pub mod linker;
 pub mod start;
 pub mod tcb;
 
-pub use generic_rt::{panic_notls, ExpectTlsFree};
+pub use generic_rt::{ExpectTlsFree, panic_notls};
 
 static mut STATIC_TCB_MASTER: Master = Master {
     ptr: ptr::null_mut(),

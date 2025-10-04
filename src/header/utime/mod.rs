@@ -12,7 +12,7 @@ use crate::{
     c_str::CStr,
     error::ResultExt,
     header::time::timespec,
-    platform::{types::*, Pal, Sys},
+    platform::{Pal, Sys, types::*},
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/utime.h.html>.
@@ -26,7 +26,7 @@ pub struct utimbuf {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/utime.html>.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn utime(filename: *const c_char, times: *const utimbuf) -> c_int {
     let filename_cstr = unsafe { CStr::from_ptr(filename) };
     let times_ref = unsafe { &*times };

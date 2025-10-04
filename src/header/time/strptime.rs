@@ -6,7 +6,7 @@ use crate::{
 };
 use alloc::{string::String, vec::Vec};
 use core::{
-    ffi::{c_char, c_int, c_void, CStr},
+    ffi::{CStr, c_char, c_int, c_void},
     mem::MaybeUninit,
     ptr,
     ptr::NonNull,
@@ -43,7 +43,7 @@ const LONG_MONTHS: [&str; 12] = [
 ];
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strptime.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn strptime(
     buf: *const c_char,
     format: *const c_char,
@@ -502,11 +502,7 @@ fn parse_int(input: &str, width: usize, allow_variable: bool) -> Option<(i32, us
         }
     }
 
-    if count == 0 {
-        None
-    } else {
-        Some((val, count))
-    }
+    if count == 0 { None } else { Some((val, count)) }
 }
 
 /// Handle AM/PM. Returns (is_pm, length_consumed).

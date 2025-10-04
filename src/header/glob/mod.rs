@@ -9,10 +9,10 @@ use alloc::{boxed::Box, vec::Vec};
 use crate::{
     c_str::{CStr, CString},
     header::{
-        dirent::{closedir, opendir, readdir, DIR},
+        dirent::{DIR, closedir, opendir, readdir},
         errno::*,
-        fnmatch::{fnmatch, FNM_NOESCAPE, FNM_PERIOD},
-        sys_stat::{stat, S_IFDIR, S_IFLNK, S_IFMT},
+        fnmatch::{FNM_NOESCAPE, FNM_PERIOD, fnmatch},
+        sys_stat::{S_IFDIR, S_IFLNK, S_IFMT, stat},
     },
     platform::{self, types::*},
 };
@@ -53,7 +53,7 @@ pub struct glob_t {
 }
 
 #[linkage = "weak"] // GNU prefers its own glob e.g. in Make
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn glob(
     pattern: *const c_char,
     flags: c_int,
@@ -147,7 +147,7 @@ pub unsafe extern "C" fn glob(
 }
 
 #[linkage = "weak"] // GNU prefers its own glob e.g. in Make
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn globfree(pglob: *mut glob_t) {
     // Retake ownership
     if unsafe { !(*pglob).__opaque.is_null() } {
@@ -331,12 +331,8 @@ fn inner_glob(
         let mut new_dir: Vec<u8> = Vec::new();
         new_dir.extend_from_slice(current_dir.to_bytes());
         new_dir.extend_from_slice(&pattern);
-        return inner_glob(
-            unsafe { &CStr::from_bytes_with_nul_unchecked(&new_dir) },
-            &new_glob_expr,
-            flags,
-            errfunc,
-        );
+        let new_dir_c = unsafe { CStr::from_bytes_with_nul_unchecked(&new_dir) };
+        return inner_glob(&new_dir_c, &new_glob_expr, flags, errfunc);
     }
 
     let mut fnmatch_flags = 0;

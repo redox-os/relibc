@@ -241,7 +241,7 @@ SECTIONS
      *
      * .init_array also depends on TLS and is discarded as we don't need it.
      */
-    *(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon)
+    *(.gnu.linkonce.tb.*) *(.tcommon)
     *(.init_array)
   }
 }

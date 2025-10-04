@@ -3,10 +3,10 @@ use core::{cell::SyncUnsafeCell, mem::offset_of, ptr::NonNull};
 use syscall::{data::*, error::*};
 
 use crate::{
-    proc::{fork_inner, FdGuard, ForkArgs},
-    protocol::{ProcCall, RtSigInfo},
-    signal::{inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     RtTcb, Tcb,
+    proc::{FdGuard, ForkArgs, fork_inner},
+    protocol::{ProcCall, RtSigInfo},
+    signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, inner_c},
 };
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.

@@ -3,22 +3,21 @@
 //! * <https://www.akkadia.org/drepper/dsohowto.pdf>
 
 use object::{
-    elf,
+    NativeEndian, Object, StringTable, SymbolIndex, elf,
     read::elf::{
         Dyn as _, GnuHashTable, HashTable as SysVHashTable, ProgramHeader as _, Rel as _,
         Rela as _, Sym as _, Version, VersionTable,
     },
-    NativeEndian, Object, StringTable, SymbolIndex,
 };
 
 use super::{
-    debug::{RTLDDebug, _r_debug},
-    linker::{Resolve, Scope, Symbol, __plt_resolve_trampoline, GLOBAL_SCOPE},
+    debug::{_r_debug, RTLDDebug},
+    linker::{__plt_resolve_trampoline, GLOBAL_SCOPE, Resolve, Scope, Symbol},
     tcb::Master,
 };
 use crate::{
     header::sys_mman,
-    platform::{types::c_void, Pal, Sys},
+    platform::{Pal, Sys, types::c_void},
 };
 use alloc::{
     string::{String, ToString},
@@ -37,7 +36,7 @@ pub type Relr = usize;
 
 #[cfg(target_pointer_width = "32")]
 mod shim {
-    use object::{elf::*, read::elf::ElfFile32, NativeEndian};
+    use object::{NativeEndian, elf::*, read::elf::ElfFile32};
     pub type Dyn = Dyn32<NativeEndian>;
     pub type Rel = Rel32<NativeEndian>;
     pub type Rela = Rela32<NativeEndian>;
@@ -49,7 +48,7 @@ mod shim {
 
 #[cfg(target_pointer_width = "64")]
 mod shim {
-    use object::{elf::*, read::elf::ElfFile64, NativeEndian};
+    use object::{NativeEndian, elf::*, read::elf::ElfFile64};
     pub type Dyn = Dyn64<NativeEndian>;
     pub type Rel = Rel64<NativeEndian>;
     pub type Rela = Rela64<NativeEndian>;

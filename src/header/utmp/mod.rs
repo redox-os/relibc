@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// See <https://www.man7.org/linux/man-pages/man3/openpty.3.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn login_tty(fd: c_int) -> c_int {
     // Create a new session
     unistd::setsid();

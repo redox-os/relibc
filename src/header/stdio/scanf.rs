@@ -19,11 +19,7 @@ enum IntKind {
 unsafe fn next_byte(string: &mut *const c_char) -> Result<u8, c_int> {
     let c = **string as u8;
     *string = string.offset(1);
-    if c == 0 {
-        Err(-1)
-    } else {
-        Ok(c)
-    }
+    if c == 0 { Err(-1) } else { Ok(c) }
 }
 
 unsafe fn inner_scanf(

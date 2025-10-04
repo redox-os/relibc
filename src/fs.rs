@@ -6,7 +6,7 @@ use crate::{
         unistd::{SEEK_CUR, SEEK_END, SEEK_SET},
     },
     io,
-    platform::{types::*, Pal, Sys},
+    platform::{Pal, Sys, types::*},
 };
 use core::ops::Deref;
 

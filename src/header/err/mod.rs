@@ -22,14 +22,14 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 
 use core::{
-    ffi::{c_char, c_int, VaList as va_list},
+    ffi::{VaList as va_list, c_char, c_int},
     ptr,
 };
 
 use crate::{
     c_str::CStr,
     header::{
-        stdio::{self, fprintf, fputc, fputs, vfprintf, FILE},
+        stdio::{self, FILE, fprintf, fputc, fputs, vfprintf},
         stdlib::exit,
         string::strerror,
     },
@@ -44,7 +44,7 @@ static mut on_exit: ExitCallback = None;
 static mut error_sink: *mut FILE = ptr::null_mut();
 
 /// Set global [`FILE`] sink to write errors and warnings.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn err_set_file(fp: *mut FILE) {
     if fp.is_null() {
         error_sink = stdio::stderr;
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn err_set_file(fp: *mut FILE) {
 }
 
 /// Set or remove a callback to invoke before exiting on error.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn err_set_exit(ef: ExitCallback) {
     on_exit = ef;
 }
@@ -65,7 +65,7 @@ pub unsafe extern "C" fn err_set_exit(ef: ExitCallback) {
 ///
 /// # Return
 /// Does not return. Exits with `eval` as an error code.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn err(eval: c_int, fmt: *const c_char, mut va_list: ...) -> ! {
     let code = Some(ERRNO.get());
     err_exit(eval, code, fmt, va_list.as_va_list())
@@ -77,7 +77,7 @@ pub unsafe extern "C" fn err(eval: c_int, fmt: *const c_char, mut va_list: ...) 
 ///
 /// # Return
 /// Exits with `eval` as an error code.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn errc(eval: c_int, code: c_int, fmt: *const c_char, mut va_list: ...) -> ! {
     err_exit(eval, Some(code), fmt, va_list.as_va_list())
 }
@@ -88,7 +88,7 @@ pub unsafe extern "C" fn errc(eval: c_int, code: c_int, fmt: *const c_char, mut 
 ///
 /// # Return
 /// Exits with `eval` as an error code.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn errx(eval: c_int, fmt: *const c_char, mut va_list: ...) -> ! {
     err_exit(eval, None, fmt, va_list.as_va_list())
 }
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn errx(eval: c_int, fmt: *const c_char, mut va_list: ...)
 /// Print a user message and then an error message for [`ERRNO`].
 ///
 /// The message format is `progname: fmt: strerror(ERRNO)`
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn warn(fmt: *const c_char, mut va_list: ...) {
     let code = Some(ERRNO.get());
     display_message(code, fmt, va_list.as_va_list());
@@ -105,7 +105,7 @@ pub unsafe extern "C" fn warn(fmt: *const c_char, mut va_list: ...) {
 /// Print a user message then an error message for `code`.
 ///
 /// The message format is `progname: fmt: strerror(code)`
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn warnc(code: c_int, fmt: *const c_char, mut va_list: ...) {
     display_message(Some(code), fmt, va_list.as_va_list());
 }
@@ -113,45 +113,45 @@ pub unsafe extern "C" fn warnc(code: c_int, fmt: *const c_char, mut va_list: ...
 /// Print a user message as a warning.
 ///
 /// The message format is `progname: fmt`
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn warnx(fmt: *const c_char, mut va_list: ...) {
     display_message(None, fmt, va_list.as_va_list());
 }
 
 /// See [`err`].
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn verr(eval: c_int, fmt: *const c_char, args: va_list) -> ! {
     let code = Some(ERRNO.get());
     err_exit(eval, code, fmt, args);
 }
 
 /// See [`errc`].
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn verrc(eval: c_int, code: c_int, fmt: *const c_char, args: va_list) -> ! {
     err_exit(eval, Some(code), fmt, args)
 }
 
 /// See [`errx`];
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn verrx(eval: c_int, fmt: *const c_char, args: va_list) -> ! {
     err_exit(eval, None, fmt, args)
 }
 
 /// See [`warn`].
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vwarn(fmt: *const c_char, args: va_list) {
     let code = Some(ERRNO.get());
     display_message(code, fmt, args);
 }
 
 /// See [`warnc`].
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vwarnc(code: c_int, fmt: *const c_char, args: va_list) {
     display_message(Some(code), fmt, args);
 }
 
 /// See [`warnx`].
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vwarnx(fmt: *const c_char, args: va_list) {
     display_message(None, fmt, args);
 }

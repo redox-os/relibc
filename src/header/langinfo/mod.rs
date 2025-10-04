@@ -139,7 +139,7 @@ pub const CRNCYSTR: nl_item = 56;
 /// # Safety
 /// - Caller must ensure `item` is a valid `nl_item` index.
 /// - Returns a pointer to a null-terminated string, or an empty string if the item is invalid.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nl_langinfo(item: nl_item) -> *const c_char {
     // Validate the item and perform the lookup
     if (item as usize) < STRING_TABLE.len() {

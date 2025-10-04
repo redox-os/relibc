@@ -5,13 +5,11 @@ use alloc::string::String;
 use super::{get_offset, tm};
 use crate::{
     c_str::CStr,
-    platform::{self, types::*, WriteByte},
+    platform::{self, WriteByte, types::*},
 };
 
 // We use the langinfo constants
 use crate::header::langinfo::{
-    nl_item,
-    nl_langinfo,
     ABDAY_1,
     ABMON_1,
     AM_STR,
@@ -19,6 +17,8 @@ use crate::header::langinfo::{
     MON_1,
     PM_STR,
     // TODO : other constants if needed
+    nl_item,
+    nl_langinfo,
 };
 
 /// A helper that calls `nl_langinfo(item)` and converts the returned pointer
@@ -271,11 +271,7 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
 fn weeks_per_year(year: c_int) -> c_int {
     let year = year as f64;
     let p_y = (year + (year / 4.) - (year / 100.) + (year / 400.)) as c_int % 7;
-    if p_y == 4 {
-        53
-    } else {
-        52
-    }
+    if p_y == 4 { 53 } else { 52 }
 }
 
 /// Calculate the week of the year accounting for leap weeks (ISO 8601)

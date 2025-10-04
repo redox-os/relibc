@@ -12,8 +12,9 @@ use core::{
 use crate::{
     fs::File,
     header::{errno, fcntl, string::strcmp},
-    io::{prelude::*, BufReader, SeekFrom},
+    io::{BufReader, SeekFrom, prelude::*},
     platform::{self, types::*},
+    raw_cell::RawCell,
 };
 
 #[cfg(target_os = "linux")]
@@ -49,7 +50,7 @@ pub struct passwd {
 }
 
 static mut PASSWD_BUF: Option<MaybeAllocated> = None;
-static mut PASSWD: passwd = passwd {
+static PASSWD: RawCell<passwd> = RawCell::new(passwd {
     pw_name: ptr::null_mut(),
     pw_passwd: ptr::null_mut(),
     pw_uid: 0,
@@ -57,7 +58,7 @@ static mut PASSWD: passwd = passwd {
     pw_gecos: ptr::null_mut(),
     pw_dir: ptr::null_mut(),
     pw_shell: ptr::null_mut(),
-};
+});
 
 #[derive(Clone, Copy, Debug)]
 struct DestBuffer {
@@ -103,8 +104,8 @@ impl OwnedPwd {
     fn into_global(self) -> *mut passwd {
         unsafe {
             PASSWD_BUF = Some(self.buffer);
-            PASSWD = self.reference;
-            &mut PASSWD
+            PASSWD.unsafe_set(self.reference);
+            PASSWD.as_mut_ptr()
         }
     }
 }
@@ -115,7 +116,7 @@ enum Cause {
     Other,
 }
 
-static mut READER: Option<BufReader<File>> = None;
+static READER: RawCell<Option<BufReader<File>>> = RawCell::new(None);
 
 fn parsed<I, O>(buf: Option<I>) -> Option<O>
 where
@@ -220,17 +221,17 @@ unsafe fn mux(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endpwent.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn endpwent() {
     unsafe {
-        READER = None;
+        READER.unsafe_set(None);
     }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endpwent.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn getpwent() -> *mut passwd {
-    let reader = match unsafe { &mut READER } {
+    let reader = match unsafe { &mut *READER.as_mut_ptr() } {
         Some(reader) => reader,
         None => {
             let file = match File::open(c"/etc/passwd".into(), fcntl::O_RDONLY) {
@@ -239,8 +240,8 @@ pub extern "C" fn getpwent() -> *mut passwd {
             };
             let reader = BufReader::new(file);
             unsafe {
-                READER = Some(reader);
-                READER.as_mut().unwrap()
+                READER.unsafe_set(Some(reader));
+                READER.unsafe_mut().as_mut().unwrap()
             }
         }
     };
@@ -250,7 +251,7 @@ pub extern "C" fn getpwent() -> *mut passwd {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpwnam.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn getpwnam(name: *const c_char) -> *mut passwd {
     pwd_lookup(|parts| unsafe { strcmp(parts.pw_name, name) } == 0, None)
         .map(|res| res.into_global())
@@ -258,7 +259,7 @@ pub extern "C" fn getpwnam(name: *const c_char) -> *mut passwd {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpwnam.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getpwnam_r(
     name: *const c_char,
     out: *mut passwd,
@@ -280,7 +281,7 @@ pub unsafe extern "C" fn getpwnam_r(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpwuid.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn getpwuid(uid: uid_t) -> *mut passwd {
     pwd_lookup(|parts| parts.pw_uid == uid, None)
         .map(|res| res.into_global())
@@ -288,7 +289,7 @@ pub extern "C" fn getpwuid(uid: uid_t) -> *mut passwd {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpwuid.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getpwuid_r(
     uid: uid_t,
     out: *mut passwd,
@@ -311,9 +312,9 @@ pub unsafe extern "C" fn getpwuid_r(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endpwent.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setpwent() {
-    if let Some(reader) = unsafe { &mut READER } {
+    if let Some(reader) = unsafe { &mut *READER.as_mut_ptr() } {
         let _ = reader.seek(SeekFrom::Start(0));
     }
 }

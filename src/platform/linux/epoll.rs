@@ -1,8 +1,8 @@
-use super::{e_raw, Sys};
+use super::{Sys, e_raw};
 use crate::{
     error::Result,
     header::{signal::sigset_t, sys_epoll::epoll_event},
-    platform::{types::*, PalEpoll},
+    platform::{PalEpoll, types::*},
 };
 
 impl PalEpoll for Sys {

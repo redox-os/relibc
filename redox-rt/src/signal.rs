@@ -1,22 +1,22 @@
 use core::{ffi::c_int, ptr::NonNull, sync::atomic::Ordering};
 
 use syscall::{
-    data::AtomicU64, CallFlags, Error, RawAction, Result, SenderInfo, SetSighandlerData,
-    SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, EAGAIN, EINTR, EINVAL, ENOMEM, EPERM,
+    CallFlags, EAGAIN, EINTR, EINVAL, ENOMEM, EPERM, Error, RawAction, Result, SenderInfo,
+    SetSighandlerData, SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, data::AtomicU64,
 };
 
 use crate::{
+    RtTcb, Tcb,
     arch::*,
     current_proc_fd,
     proc::FdGuard,
     protocol::{
-        ProcCall, RtSigInfo, ThreadCall, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN,
-        SIGTTOU, SIGURG, SIGWINCH,
+        ProcCall, RtSigInfo, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG,
+        SIGWINCH, ThreadCall,
     },
     static_proc_info,
     sync::Mutex,
     sys::{proc_call, this_thread_call},
-    RtTcb, Tcb,
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -133,7 +133,7 @@ unsafe fn inner(stack: &mut SigStack) {
             (area.tmp_rt_inf.pid, area.tmp_rt_inf.uid)
         } else {
             stack.sig_code = 0; // TODO: SI_USER constant?
-                                // TODO: Handle SIGCHLD. Maybe that should always be queued though?
+            // TODO: Handle SIGCHLD. Maybe that should always be queued though?
             let inf = SenderInfo::from_raw(area.tmp_id_inf);
             (inf.pid, inf.ruid)
         }
@@ -778,7 +778,7 @@ pub fn await_signal_async(inner_allowset: u64) -> Result<Unreachable> {
     res?;
     unreachable!()
 }
-/*#[no_mangle]
+/*#[unsafe(no_mangle)]
 pub extern "C" fn __redox_rt_debug_sigctl() {
     let tcb = &RtTcb::current().control;
     let _ = syscall::write(1, alloc::format!("SIGCTL: {tcb:#x?}\n").as_bytes());

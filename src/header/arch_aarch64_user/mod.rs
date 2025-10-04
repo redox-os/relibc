@@ -19,7 +19,7 @@ pub type elf_greg_t = c_ulong;
 pub type elf_gregset_t = [c_ulong; 34];
 pub type elf_fpregset_t = user_fpsimd_struct;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn _cbindgen_export_aarch64_user(
     a: user_regs_struct,
     b: user_fpsimd_struct,

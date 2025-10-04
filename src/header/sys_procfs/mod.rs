@@ -63,7 +63,7 @@ pub type lwpid_t = pid_t;
 pub type prstatus_t = elf_prstatus;
 pub type prpsinfo_t = elf_prpsinfo;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn _cbindgen_export_procfs(
     a: psaddr_t,
     b: prgregset_t,

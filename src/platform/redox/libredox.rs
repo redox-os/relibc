@@ -2,20 +2,20 @@ use core::{slice, str};
 
 use redox_rt::{
     protocol::{ProcKillTarget, SocketCall, WaitFlags},
-    sys::{posix_read, posix_write, WaitpidTarget},
+    sys::{WaitpidTarget, posix_read, posix_write},
 };
-use syscall::{Error, Result, EMFILE};
+use syscall::{EMFILE, Error, Result};
 
 use crate::{
     header::{
         errno::EINVAL,
-        signal::{sigaction, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK},
+        signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, sigaction},
         sys_stat::UTIME_NOW,
         sys_uio::iovec,
         time::timespec,
     },
     out::Out,
-    platform::{types::*, PalSignal},
+    platform::{PalSignal, types::*},
 };
 
 use super::Sys;
@@ -122,7 +122,7 @@ pub fn clock_gettime(clock: usize, mut tp: Out<timespec>) -> syscall::Result<()>
     Ok(())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_open_v1(
     path_base: *const u8,
     path_len: usize,
@@ -135,7 +135,7 @@ pub unsafe extern "C" fn redox_open_v1(
         mode as mode_t,
     ))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_openat_v1(
     fd: usize,
     path_base: *const u8,
@@ -148,11 +148,11 @@ pub unsafe extern "C" fn redox_openat_v1(
         flags as usize,
     ))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_dup_v1(fd: usize, buf: *const u8, len: usize) -> RawResult {
     Error::mux(syscall::dup(fd, core::slice::from_raw_parts(buf, len)))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_dup2_v1(
     old_fd: usize,
     new_fd: usize,
@@ -165,11 +165,11 @@ pub unsafe extern "C" fn redox_dup2_v1(
         core::slice::from_raw_parts(buf, len),
     ))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_read_v1(fd: usize, dst_base: *mut u8, dst_len: usize) -> RawResult {
     Error::mux(posix_read(fd, slice::from_raw_parts_mut(dst_base, dst_len)))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_write_v1(
     fd: usize,
     src_base: *const u8,
@@ -177,79 +177,79 @@ pub unsafe extern "C" fn redox_write_v1(
 ) -> RawResult {
     Error::mux(posix_write(fd, slice::from_raw_parts(src_base, src_len)))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fsync_v1(fd: usize) -> RawResult {
     Error::mux(syscall::fsync(fd))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fdatasync_v1(fd: usize) -> RawResult {
     // TODO
     Error::mux(syscall::fsync(fd))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fchmod_v1(fd: usize, new_mode: u16) -> RawResult {
     Error::mux(syscall::fchmod(fd, new_mode))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fchown_v1(fd: usize, new_uid: u32, new_gid: u32) -> RawResult {
     Error::mux(syscall::fchown(fd, new_uid, new_gid))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fpath_v1(fd: usize, dst_base: *mut u8, dst_len: usize) -> RawResult {
     Error::mux(syscall::fpath(
         fd,
         core::slice::from_raw_parts_mut(dst_base, dst_len),
     ))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fstat_v1(
     fd: usize,
     stat: *mut crate::header::sys_stat::stat,
 ) -> RawResult {
     Error::mux(fstat(fd, stat).map(|()| 0))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fstatvfs_v1(
     fd: usize,
     stat: *mut crate::header::sys_statvfs::statvfs,
 ) -> RawResult {
     Error::mux(fstatvfs(fd, stat).map(|()| 0))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_futimens_v1(fd: usize, times: *const timespec) -> RawResult {
     Error::mux(futimens(fd, times).map(|()| 0))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_close_v1(fd: usize) -> RawResult {
     Error::mux(syscall::close(fd))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_get_pid_v1() -> RawResult {
     redox_rt::sys::posix_getpid() as _
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_get_euid_v1() -> RawResult {
     redox_rt::sys::posix_getresugid().euid as _
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_get_ruid_v1() -> RawResult {
     redox_rt::sys::posix_getresugid().ruid as _
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_get_egid_v1() -> RawResult {
     redox_rt::sys::posix_getresugid().egid as _
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_get_rgid_v1() -> RawResult {
     redox_rt::sys::posix_getresugid().rgid as _
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_get_ens_v0() -> RawResult {
     Error::mux(redox_rt::sys::getens())
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_get_proc_credentials_v1(
     cap_fd: usize,
     target_pid: usize,
@@ -258,11 +258,11 @@ pub unsafe extern "C" fn redox_get_proc_credentials_v1(
     Error::mux(redox_rt::sys::get_proc_credentials(cap_fd, target_pid, buf))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {
     Error::mux(redox_rt::sys::setrens(rns, ens).map(|()| 0))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_waitpid_v1(pid: usize, status: *mut i32, options: u32) -> RawResult {
     let mut sts = 0_usize;
     let res = Error::mux(redox_rt::sys::sys_waitpid(
@@ -274,14 +274,14 @@ pub unsafe extern "C" fn redox_waitpid_v1(pid: usize, status: *mut i32, options:
     res
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_kill_v1(pid: usize, signal: u32) -> RawResult {
     Error::mux(
         redox_rt::sys::posix_kill(ProcKillTarget::from_raw(pid), signal as usize).map(|()| 0),
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_sigaction_v1(
     signal: u32,
     new: *const sigaction,
@@ -294,7 +294,7 @@ pub unsafe extern "C" fn redox_sigaction_v1(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_sigprocmask_v1(
     how: u32,
     new: *const u64,
@@ -306,7 +306,7 @@ pub unsafe extern "C" fn redox_sigprocmask_v1(
             .map_err(Into::into),
     )
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_mmap_v1(
     addr: *mut (),
     unaligned_len: usize,
@@ -327,17 +327,17 @@ pub unsafe extern "C" fn redox_mmap_v1(
         },
     ))
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_munmap_v1(addr: *mut (), unaligned_len: usize) -> RawResult {
     Error::mux(syscall::funmap(addr as usize, unaligned_len))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_clock_gettime_v1(clock: usize, ts: *mut timespec) -> RawResult {
     Error::mux(clock_gettime(clock, Out::nonnull(ts)).map(|()| 0))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_strerror_v1(
     buf: *mut u8,
     buflen: *mut usize,
@@ -368,7 +368,7 @@ pub unsafe extern "C" fn redox_strerror_v1(
     })())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_mkns_v1(
     names: *const iovec,
     num_names: usize,
@@ -384,17 +384,17 @@ pub unsafe extern "C" fn redox_mkns_v1(
 }
 
 // ABI-UNSTABLE
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_cur_procfd_v0() -> usize {
     **redox_rt::current_proc_fd()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_cur_thrfd_v0() -> usize {
     **redox_rt::RtTcb::current().thread_fd()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_sys_call_v0(
     fd: usize,
     payload: *mut u8,
@@ -411,7 +411,7 @@ pub unsafe extern "C" fn redox_sys_call_v0(
     ))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_get_socket_token_v0(
     fd: usize,
     payload: *mut u8,
