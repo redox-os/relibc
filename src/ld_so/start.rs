@@ -1,5 +1,7 @@
 // Start code adapted from https://gitlab.redox-os.org/redox-os/relibc/blob/master/src/start.rs
 
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use alloc::{
     borrow::ToOwned,
     boxed::Box,
@@ -7,12 +9,14 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use generic_rt::ExpectTlsFree;
 
 use crate::{
     ALLOCATOR,
     c_str::CStr,
-    header::unistd,
+    header::{
+        sys_auxv::{AT_ENTRY, AT_PHDR},
+        unistd,
+    },
     platform::{get_auxv, get_auxvs, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
@@ -25,7 +29,8 @@ use super::{
     linker::{Config, Linker},
     tcb::Tcb,
 };
-use crate::header::sys_auxv::{AT_ENTRY, AT_PHDR};
+
+use generic_rt::ExpectTlsFree;
 
 #[cfg(target_pointer_width = "32")]
 pub const SIZEOF_EHDR: usize = 52;
@@ -36,16 +41,16 @@ pub const SIZEOF_EHDR: usize = 64;
 unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
     //traverse the stack and collect argument vector
     let mut argv = Vec::new();
-    while *ptr != 0 {
-        let arg = *ptr;
-        match CStr::from_ptr(arg as *const c_char).to_str() {
+    while unsafe { *ptr != 0 } {
+        let arg = unsafe { *ptr };
+        match unsafe { CStr::from_ptr(arg as *const c_char).to_str() } {
             Ok(arg_str) => argv.push(arg_str.to_owned()),
             _ => {
                 eprintln!("ld.so: failed to parse argv[{}]", argv.len());
                 unistd::_exit(1);
             }
         }
-        ptr = ptr.add(1);
+        ptr = unsafe { ptr.add(1) };
     }
 
     (argv, ptr)
@@ -54,9 +59,9 @@ unsafe fn get_argv(mut ptr: *const usize) -> (Vec<String>, *const usize) {
 unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const usize) {
     //traverse the stack and collect argument environment variables
     let mut envs = BTreeMap::new();
-    while *ptr != 0 {
-        let env = *ptr;
-        if let Ok(arg_str) = CStr::from_ptr(env as *const c_char).to_str() {
+    while unsafe { *ptr != 0 } {
+        let env = unsafe { *ptr };
+        if let Ok(arg_str) = unsafe { CStr::from_ptr(env as *const c_char).to_str() } {
             let mut parts = arg_str.splitn(2, '=');
             if let Some(key) = parts.next() {
                 if let Some(value) = parts.next() {
@@ -64,12 +69,13 @@ unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const us
                 }
             }
         }
-        ptr = ptr.add(1);
+        ptr = unsafe { ptr.add(1) };
     }
 
     (envs, ptr)
 }
 
+#[allow(unsafe_op_in_unsafe_fn)]
 unsafe fn adjust_stack(sp: &'static mut Stack) {
     let mut argv = sp.argv() as *mut usize;
 
