@@ -201,6 +201,7 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.
 $(BUILD)/debug/librelibc.a: $(SRC)
 	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ -g -C debug-assertions=no $(RUSTCFLAGS)
 	./renamesyms.sh "$@" "$(BUILD)/debug/deps/"
+	./stripcore.sh "$@"
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
@@ -238,6 +239,7 @@ $(BUILD)/release/librelibc.a: $(SRC)
 	# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
 	# use some cbindgen hook, specify them manually, or grep for #[unsafe(no_mangle)].
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
+	./stripcore.sh "$@"
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
