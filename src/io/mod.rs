@@ -273,6 +273,8 @@ pub mod error;
 mod impls;
 pub mod prelude;
 
+use crate::out::Out;
+
 pub use self::{buffered::*, cursor::*, error::*};
 
 use self::prelude::*;
@@ -549,6 +551,12 @@ pub trait Read {
     /// }
     /// ```
     fn read(&mut self, buf: &mut [u8]) -> Result<usize>;
+
+    fn read_out(&mut self, mut out: Out<[u8]>) -> Result<usize> {
+        // XXX: Technically incorrect but hopefully not UB
+        let slice: &mut [u8] = unsafe { &mut *out.as_mut_ptr() };
+        self.read(slice)
+    }
 
     /// Determines if this `Read`er can work with buffers of uninitialized
     /// memory.

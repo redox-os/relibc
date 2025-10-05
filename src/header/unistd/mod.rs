@@ -563,7 +563,7 @@ pub extern "C" fn gethostid() -> c_long {
 pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> c_int {
     let mut uts = mem::MaybeUninit::<sys_utsname::utsname>::uninit();
     // TODO
-    let err = Sys::uname(uts.as_mut_ptr())
+    let err = Sys::uname(Out::from_uninit_mut(&mut uts))
         .map(|()| 0)
         .or_minus_one_errno();
     if err < 0 {

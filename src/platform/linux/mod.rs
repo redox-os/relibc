@@ -729,8 +729,8 @@ impl Pal for Sys {
         unsafe { syscall!(UMASK, mask) as mode_t }
     }
 
-    unsafe fn uname(utsname: *mut utsname) -> Result<()> {
-        e_raw(unsafe { syscall!(UNAME, utsname, 0) }).map(|_| ())
+    fn uname(mut utsname: Out<utsname>) -> Result<()> {
+        e_raw(unsafe { syscall!(UNAME, utsname.as_mut_ptr(), 0) }).map(|_| ())
     }
 
     fn unlink(path: CStr) -> Result<()> {
