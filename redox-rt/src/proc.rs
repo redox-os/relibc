@@ -649,7 +649,7 @@ impl MmapGuard {
                 flags: PROT_READ | PROT_WRITE,
             },
         )?;
-        let slice = &mut *this.as_mut_ptr_slice();
+        let slice = unsafe { &mut *this.as_mut_ptr_slice() };
 
         Ok((this, slice))
     }
@@ -975,13 +975,15 @@ pub unsafe fn make_init() -> [&'static FdGuard; 2] {
         syscall::dup(*proc_fd, b"thread-0").expect("failed to get managed thread for init"),
     );
 
-    let managed_thr_fd = (*RtTcb::current().thr_fd.get()).insert(managed_thr_fd);
+    let managed_thr_fd = unsafe { (*RtTcb::current().thr_fd.get()).insert(managed_thr_fd) };
 
-    STATIC_PROC_INFO.get().write(crate::StaticProcInfo {
-        pid: 1,
-        proc_fd: MaybeUninit::new(proc_fd),
-        has_proc_fd: true,
-    });
+    unsafe {
+        STATIC_PROC_INFO.get().write(crate::StaticProcInfo {
+            pid: 1,
+            proc_fd: MaybeUninit::new(proc_fd),
+            has_proc_fd: true,
+        })
+    };
     *DYNAMIC_PROC_INFO.lock() = crate::DynamicProcInfo {
         pgid: 1,
         ruid: 0,
@@ -992,7 +994,7 @@ pub unsafe fn make_init() -> [&'static FdGuard; 2] {
         sgid: 0,
     };
     [
-        (*STATIC_PROC_INFO.get()).proc_fd.assume_init_ref(),
+        unsafe { (*STATIC_PROC_INFO.get()).proc_fd.assume_init_ref() },
         managed_thr_fd,
     ]
 }

@@ -101,27 +101,31 @@ pub fn posix_getppid() -> u32 {
 #[inline]
 pub unsafe fn sys_futex_wait(addr: *mut u32, val: u32, deadline: Option<&TimeSpec>) -> Result<()> {
     wrapper(true, false, || {
-        syscall::syscall5(
-            syscall::SYS_FUTEX,
-            addr as usize,
-            syscall::FUTEX_WAIT,
-            val as usize,
-            deadline.map_or(0, |d| d as *const _ as usize),
-            0,
-        )
+        unsafe {
+            syscall::syscall5(
+                syscall::SYS_FUTEX,
+                addr as usize,
+                syscall::FUTEX_WAIT,
+                val as usize,
+                deadline.map_or(0, |d| d as *const _ as usize),
+                0,
+            )
+        }
         .map(|_| ())
     })
 }
 #[inline]
 pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
-    syscall::syscall5(
-        syscall::SYS_FUTEX,
-        addr as usize,
-        syscall::FUTEX_WAKE,
-        num as usize,
-        0,
-        0,
-    )
+    unsafe {
+        syscall::syscall5(
+            syscall::SYS_FUTEX,
+            addr as usize,
+            syscall::FUTEX_WAKE,
+            num as usize,
+            0,
+            0,
+        )
+    }
     .map(|awoken| awoken as u32)
 }
 pub fn sys_call(

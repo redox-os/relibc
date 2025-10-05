@@ -1,3 +1,5 @@
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
@@ -32,7 +34,7 @@ pub struct Master {
 impl Master {
     /// The initial data for this TLS region
     pub unsafe fn data(&self) -> &'static [u8] {
-        slice::from_raw_parts(self.ptr, self.len)
+        unsafe { slice::from_raw_parts(self.ptr, self.len) }
     }
 }
 
@@ -77,6 +79,7 @@ impl Tcb {
     /// Create a new TCB
     ///
     /// `size` is the size of the TLS in bytes.
+    #[allow(unsafe_op_in_unsafe_fn)]
     pub unsafe fn new(size: usize) -> Result<&'static mut Self, DlError> {
         let page_size = Sys::getpagesize();
         let (_abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
@@ -117,7 +120,7 @@ impl Tcb {
 
     /// Get the current TCB
     pub unsafe fn current() -> Option<&'static mut Self> {
-        Some(&mut *GenericTcb::<OsSpecific>::current_ptr()?.cast())
+        unsafe { Some(&mut *GenericTcb::<OsSpecific>::current_ptr()?.cast()) }
     }
 
     /// A slice for all of the TLS data
@@ -125,8 +128,10 @@ impl Tcb {
         if self.tls_end.is_null() || self.tls_len == 0 {
             None
         } else {
-            let tls_start = self.tls_end.sub(self.tls_len);
-            Some(slice::from_raw_parts_mut(tls_start, self.tls_len))
+            unsafe {
+                let tls_start = self.tls_end.sub(self.tls_len);
+                Some(slice::from_raw_parts_mut(tls_start, self.tls_len))
+            }
         }
     }
 
@@ -147,7 +152,7 @@ impl Tcb {
     /// Copy data from masters
     pub unsafe fn copy_masters(&mut self) -> Result<(), DlError> {
         //TODO: Complain if masters or tls exist without the other
-        if let Some(tls) = self.tls() {
+        if let Some(tls) = unsafe { self.tls() } {
             if let Some(masters) = self.masters() {
                 for master in masters
                     .iter()
@@ -161,7 +166,7 @@ impl Tcb {
                         master.offset..master.offset + master.len
                     };
                     if let Some(tls_data) = tls.get_mut(range) {
-                        let data = master.data();
+                        let data = unsafe { master.data() };
                         trace!(
                             "tls master: {:p}, {:#x}: {:p}, {:#x}",
                             data.as_ptr(),
@@ -201,13 +206,15 @@ impl Tcb {
 
     /// Activate TLS
     pub unsafe fn activate(&mut self, #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuard) {
-        Self::os_arch_activate(
-            &self.os_specific,
-            self.tls_end as usize,
-            self.tls_len,
-            #[cfg(target_os = "redox")]
-            thr_fd,
-        );
+        unsafe {
+            Self::os_arch_activate(
+                &self.os_specific,
+                self.tls_end as usize,
+                self.tls_len,
+                #[cfg(target_os = "redox")]
+                thr_fd,
+            )
+        };
     }
 
     pub fn setup_dtv(&mut self, n: usize) {
@@ -255,6 +262,7 @@ impl Tcb {
     }
 
     /// Mapping with correct flags for TCB and TLS
+    #[allow(unsafe_op_in_unsafe_fn)]
     unsafe fn map(size: usize) -> Result<&'static mut [u8], DlError> {
         let ptr = Sys::mmap(
             ptr::null_mut(),
@@ -317,7 +325,7 @@ impl Tcb {
         size: usize,
     ) -> Result<(&'static mut [u8], &'static mut [u8], &'static mut [u8]), DlError> {
         let page_size = Sys::getpagesize();
-        let abi_tls_tcb = Self::map(page_size + size + page_size)?;
+        let abi_tls_tcb = unsafe { Self::map(page_size + size + page_size)? };
         let (abi, tls_tcb) = abi_tls_tcb.split_at_mut(page_size);
         let (tls, tcb) = tls_tcb.split_at_mut(size);
         Ok((abi, tls, tcb))
@@ -327,7 +335,9 @@ impl Tcb {
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     unsafe fn os_arch_activate(_os: &(), tls_end: usize, _tls_len: usize) {
         const ARCH_SET_FS: usize = 0x1002;
-        syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
+        unsafe {
+            syscall!(ARCH_PRCTL, ARCH_SET_FS, tls_end);
+        }
     }
 
     #[cfg(target_os = "redox")]
@@ -337,8 +347,10 @@ impl Tcb {
         tls_len: usize,
         thr_fd: redox_rt::proc::FdGuard,
     ) {
-        os.thr_fd.get().write(Some(thr_fd));
-        redox_rt::tcb_activate(os, tls_end, tls_len)
+        unsafe {
+            os.thr_fd.get().write(Some(thr_fd));
+            redox_rt::tcb_activate(os, tls_end, tls_len)
+        }
     }
 }
 

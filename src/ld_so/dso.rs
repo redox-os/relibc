@@ -767,7 +767,7 @@ impl DSO {
         unsafe fn get_array<'a, T>(ptr: Option<*const T>, len: Option<usize>) -> &'a [T] {
             if let Some(ptr) = ptr {
                 let len = len.expect("dynamic entry was present without it's corresponding size");
-                core::slice::from_raw_parts(ptr, len)
+                unsafe { core::slice::from_raw_parts(ptr, len) }
             } else {
                 assert!(len.is_none());
                 &[]

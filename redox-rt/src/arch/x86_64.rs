@@ -100,6 +100,7 @@ unsafe extern "sysv64" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) ->
     Error::mux(fork_inner(initial_rsp, args))
 }
 
+#[allow(unsafe_op_in_unsafe_fn)]
 unsafe extern "sysv64" fn child_hook(
     cur_filetable_fd: usize,
     new_proc_fd: usize,
@@ -483,8 +484,8 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
         // since rsp has not been overwritten with the previous context's stack, just yet. At this
         // point, we know [rsp+0] contains the saved RSP, and [rsp-8] contains the saved RIP.
         let stack_ptr = stack.regs.rsp as *const usize;
-        stack.regs.rsp = stack_ptr.read();
-        stack.regs.rip = stack_ptr.sub(1).read();
+        stack.regs.rsp = unsafe { stack_ptr.read() };
+        stack.regs.rip = unsafe { stack_ptr.sub(1).read() };
     } else if stack.regs.rip == __relibc_internal_sigentry_crit_second as usize
         || stack.regs.rip == __relibc_internal_sigentry_crit_third as usize
     {
@@ -499,6 +500,7 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
 pub(crate) static SUPPORTS_AVX: AtomicU8 = AtomicU8::new(0);
 
 // __relibc will be prepended to the name, so no_mangle is fine
+#[allow(unsafe_op_in_unsafe_fn)]
 #[unsafe(no_mangle)]
 pub unsafe fn manually_enter_trampoline() {
     let c = &Tcb::current().unwrap().os_specific.control;

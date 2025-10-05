@@ -89,7 +89,7 @@ pub unsafe extern "C" fn relibc_crt0(sp: usize) -> ! {
             ) -> c_int,
         ) -> !;
     }
-    relibc_start_v1(sp, main)
+    unsafe { relibc_start_v1(sp, main) }
 }
 
 #[linkage = "weak"]
