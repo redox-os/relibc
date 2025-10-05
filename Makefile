@@ -175,20 +175,21 @@ test: sysroot
 	$(MAKE) -C tests verify
 
 
-$(BUILD)/$(PROFILE)/libc.so:  $(BUILD)/openlibm/libopenlibm.a $(BUILD)/$(PROFILE)/librelibc.a
+$(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	$(CC) -nostdlib \
 		-shared \
 		-Wl,--gc-sections \
 		-Wl,-z,pack-relative-relocs \
-		-Wl,--whole-archive $(BUILD)/openlibm/libopenlibm.a $(BUILD)/$(PROFILE)/librelibc.a \
-		-Wl,--no-whole-archive \
+		-Wl,--sort-common \
+		-Wl,--allow-multiple-definition \
+		-Wl,--whole-archive $^ -Wl,--no-whole-archive \
 		-Wl,-soname,libc.so.6 \
 		-lgcc \
 		-o $@
 
 # Debug targets
 
-$(BUILD)/debug/libc.a: $(BUILD)/openlibm/libopenlibm.a $(BUILD)/debug/librelibc.a
+$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
