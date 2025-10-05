@@ -96,7 +96,7 @@ unsafe extern "C" fn child_hook(
         new_ns_fd: if new_ns_fd == usize::MAX {
             None
         } else {
-            Some(new_ns_fd)
+            Some(FdGuard::new(new_ns_fd))
         },
     });
 }
