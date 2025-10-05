@@ -243,6 +243,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ioslice"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e571352c8a3b89074d12e3ee5173ffe162159105352aaaf1fc5764da747e31b"
+
+[[package]]
 name = "ld_so"
 version = "0.1.0"
 
@@ -464,6 +470,7 @@ dependencies = [
  "bitflags",
  "generic-rt",
  "goblin",
+ "ioslice",
  "plain",
  "redox_syscall",
 ]
@@ -529,6 +536,7 @@ dependencies = [
  "chrono-tz",
  "dlmalloc",
  "generic-rt",
+ "ioslice",
  "libc",
  "libm",
  "md-5",

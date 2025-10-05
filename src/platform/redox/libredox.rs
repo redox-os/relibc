@@ -1,5 +1,10 @@
-use core::{slice, str};
+use core::{
+    slice, str,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
+use alloc::vec::Vec;
+use ioslice::IoSlice;
 use redox_rt::{
     protocol::{ProcKillTarget, SocketCall, WaitFlags},
     sys::{posix_read, posix_write, WaitpidTarget},
@@ -129,11 +134,19 @@ pub unsafe extern "C" fn redox_open_v1(
     flags: u32,
     mode: u16,
 ) -> RawResult {
-    Error::mux(open(
-        str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
-        flags as c_int,
-        mode as mode_t,
-    ))
+    Error::mux(if !USE_NEW_NS_BACKEND.load(Ordering::Relaxed) {
+        redox_rt::sys::nsopen(
+            str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
+            flags,
+            mode,
+        )
+    } else {
+        open(
+            str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
+            flags as c_int,
+            mode as mode_t,
+        )
+    })
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_openat_v1(
@@ -379,22 +392,22 @@ pub unsafe extern "C" fn redox_mkns_v1(
         if flags != 0 {
             return Err(Error::new(EINVAL));
         }
-        // Kernel does the UTF-8 validation.
-        syscall::mkns(core::slice::from_raw_parts(names.cast(), num_names))
-    })())
-}
-#[no_mangle]
-pub unsafe extern "C" fn redox_mkns2_v0(
-    names: *const iovec,
-    num_names: usize,
-    flags: u32,
-) -> RawResult {
-    Error::mux((|| {
-        if flags != 0 {
-            return Err(Error::new(EINVAL));
+
+        if !USE_NEW_NS_BACKEND.load(Ordering::Relaxed) {
+            let raw_iovecs = slice::from_raw_parts(names, num_names);
+            let names_ioslice: Vec<IoSlice> = raw_iovecs
+                .iter()
+                .map(|iov| {
+                    IoSlice::new(unsafe {
+                        slice::from_raw_parts(iov.iov_base as *const u8, iov.iov_len)
+                    })
+                })
+                .collect();
+            redox_rt::sys::mkns(&names_ioslice)
+        } else {
+            // Kernel does the UTF-8 validation.
+            syscall::mkns(core::slice::from_raw_parts(names.cast(), num_names))
         }
-        // Kernel does the UTF-8 validation.
-        redox_rt::sys::mkns(core::slice::from_raw_parts(names.cast(), num_names))
     })())
 }
 
@@ -443,22 +456,19 @@ pub unsafe extern "C" fn redox_get_socket_token_v0(
 
 #[no_mangle]
 pub unsafe extern "C" fn redox_set_namespace_fd_v0(fd: usize) -> RawResult {
-    Error::mux(redox_rt::sys::set_namespace_fd(fd).map(|()| 0))
-}
-#[no_mangle]
-pub unsafe extern "C" fn redox_nsopen_v0(
-    path_base: *const u8,
-    path_len: usize,
-    flags: u32,
-    mode: u16,
-) -> RawResult {
-    Error::mux(redox_rt::sys::nsopen(
-        str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
-        flags,
-        mode,
-    ))
+    if fd == usize::wrapping_neg(1) {
+        USE_NEW_NS_BACKEND.store(true, Ordering::Relaxed);
+        return usize::MAX;
+    } else if fd == usize::wrapping_neg(2) {
+        USE_NEW_NS_BACKEND.store(false, Ordering::Relaxed);
+        return usize::MAX;
+    } else {
+        Error::mux(redox_rt::sys::set_namespace_fd(fd).map(|()| 0))
+    }
 }
 #[no_mangle]
 pub unsafe extern "C" fn redox_register_scheme_v0(cap_fd: usize) -> RawResult {
     Error::mux(redox_rt::sys::register_scheme(cap_fd).map(|()| 0))
 }
+
+static USE_NEW_NS_BACKEND: AtomicBool = AtomicBool::new(false);

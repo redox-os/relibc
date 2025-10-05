@@ -4,6 +4,7 @@ use core::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
+use ioslice::IoSlice;
 use syscall::{
     error::{self, Error, Result, EINTR},
     CallFlags, TimeSpec, EINVAL, ERESTART,
@@ -385,13 +386,14 @@ pub fn nsopen(path: &str, flags: u32, mode: u16) -> Result<usize> {
         mode as usize,
     )
 }
-pub fn mkns(names: &[[usize; 2]]) -> Result<usize> {
+pub fn mkns(names: &[IoSlice]) -> Result<usize> {
     let mut buf = Vec::new();
     for name in names {
-        let name_bytes = unsafe { core::slice::from_raw_parts(name[0] as *const u8, name[1]) };
-        let scheme_name = core::str::from_utf8(name_bytes).map_err(|_| Error::new(EINVAL))?;
-        buf.extend_from_slice(&name[1].to_le_bytes());
-        buf.extend_from_slice(scheme_name.as_bytes());
+        let name_bytes = name.as_slice();
+        let len = name_bytes.len();
+        let _scheme_name = core::str::from_utf8(name_bytes).map_err(|_| Error::new(EINVAL))?;
+        buf.extend_from_slice(&len.to_le_bytes());
+        buf.extend_from_slice(name_bytes);
     }
     syscall::dup(crate::current_namespace_fd(), &buf)
 }
