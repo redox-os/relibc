@@ -463,7 +463,7 @@ pub unsafe extern "C" fn redox_set_namespace_fd_v0(fd: usize) -> RawResult {
         USE_NEW_NS_BACKEND.store(false, Ordering::Relaxed);
         return usize::MAX;
     } else {
-        Error::mux(redox_rt::sys::set_namespace_fd(fd).map(|()| 0))
+        Error::mux(redox_rt::sys::set_namespace_fd(fd))
     }
 }
 #[no_mangle]
