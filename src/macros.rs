@@ -361,13 +361,18 @@ macro_rules! out_project {
         // - the case where there are unaligned fields where it would be UB to call ptr::write to
         // them (requiring packed structs)
         {
-            fn ensure_type<T, U: $crate::out::OutProject>(_t: &$crate::out::Out<U>) {}
-            ensure_type::<$crate::out::Out<$struct>, $struct>(&$src);
+            fn ensure_type<U: $crate::out::OutProject>(_t: &$crate::out::Out<U>) {}
+            ensure_type::<$struct>(&$src);
         }
         // Verify there are no duplicate struct fields. This is not strictly necessary as Out lacks
         // the noalias requirement, but forbidding the same field to occur multiple times would
         // allow both cases. The compiler will reject any struct that reuses the same identifier.
         const _: () = {
+            $(
+                if ::core::mem::offset_of!($struct, $field) % ::core::mem::align_of::<$fieldty>() != 0 {
+                    panic!(concat!("unaligned field ", stringify!($field), " of struct ", stringify!($struct), "."));
+                }
+            )*
             struct S {
                 $(
                     $field: $fieldty
