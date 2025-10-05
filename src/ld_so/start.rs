@@ -172,7 +172,14 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
             )
             .unwrap_or(usize::MAX);
 
-            redox_rt::initialize(redox_rt::proc::FdGuard::new(proc_fd), ns_fd);
+            redox_rt::initialize(
+                redox_rt::proc::FdGuard::new(proc_fd),
+                if ns_fd == usize::MAX {
+                    None
+                } else {
+                    Some(redox_rt::proc::FdGuard::new(ns_fd))
+                },
+            );
             redox_rt::signal::setup_sighandler(&tcb.os_specific, true);
         }
     }
