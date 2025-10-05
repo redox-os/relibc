@@ -147,7 +147,7 @@ pub unsafe fn init(
         tp = val;
     }
     #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
-    {
+    unsafe {
         core::arch::asm!(
             "mrs {}, tpidr_el0",
             out(reg) tp,
@@ -180,7 +180,7 @@ pub unsafe fn init(
         tp = env.fsbase as usize;
     }
     #[cfg(all(target_os = "redox", target_arch = "riscv64"))]
-    {
+    unsafe {
         core::arch::asm!(
             "mv {}, tp",
             out(reg) tp,
