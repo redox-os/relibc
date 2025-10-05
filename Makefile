@@ -175,21 +175,20 @@ test: sysroot
 	$(MAKE) -C tests verify
 
 
-$(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/$(PROFILE)/libc.so:  $(BUILD)/openlibm/libopenlibm.a $(BUILD)/$(PROFILE)/librelibc.a
 	$(CC) -nostdlib \
 		-shared \
 		-Wl,--gc-sections \
 		-Wl,-z,pack-relative-relocs \
-		-Wl,--sort-common \
-		-Wl,--allow-multiple-definition \
-		-Wl,--whole-archive $^ -Wl,--no-whole-archive \
+		-Wl,--whole-archive $(BUILD)/openlibm/libopenlibm.a $(BUILD)/$(PROFILE)/librelibc.a \
+		-Wl,--no-whole-archive \
 		-Wl,-soname,libc.so.6 \
 		-lgcc \
 		-o $@
 
 # Debug targets
 
-$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/debug/libc.a: $(BUILD)/openlibm/libopenlibm.a $(BUILD)/debug/librelibc.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -201,6 +200,7 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.
 $(BUILD)/debug/librelibc.a: $(SRC)
 	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ -g -C debug-assertions=no $(RUSTCFLAGS)
 	./renamesyms.sh "$@" "$(BUILD)/debug/deps/"
+	./stripcore.sh "$@"
 	touch $@
 
 $(BUILD)/debug/crt0.o: $(SRC)
@@ -238,6 +238,7 @@ $(BUILD)/release/librelibc.a: $(SRC)
 	# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
 	# use some cbindgen hook, specify them manually, or grep for #[unsafe(no_mangle)].
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
+	./stripcore.sh "$@"
 	touch $@
 
 $(BUILD)/release/crt0.o: $(SRC)
