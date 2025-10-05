@@ -255,7 +255,7 @@ pub trait Pal {
     // Always successful
     fn umask(mask: mode_t) -> mode_t;
 
-    unsafe fn uname(utsname: *mut utsname) -> Result<()>;
+    fn uname(utsname: Out<utsname>) -> Result<()>;
 
     fn unlink(path: CStr) -> Result<()>;
 
