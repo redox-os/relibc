@@ -11,6 +11,7 @@ if [ -z "$target" ]; then
     exit 1
 fi
 
-for sym in cbrt ceil copysign fabs fdim floor fmax fmaximum fmin fminimum fmod rint round roundeven sqrt trunc; do \
+for sym in cbrtf ceilf copysignf fabsf fdimf floorf fmaxf fminf fmofd rintf roundf sqrtf truncf \
+            cbrt ceil copysign fabs fdim floor fmax fmin fmod rint round sqrt trunc; do \
     objcopy --globalize-symbol=$sym --strip-symbol=$sym "$target"; \
 done
