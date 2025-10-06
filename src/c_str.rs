@@ -15,11 +15,11 @@ mod private {
 #[derive(Clone, Copy, Debug)]
 pub enum Thin {}
 
-//#[derive(Clone, Copy, Debug)]
-//pub enum Wide {}
+#[derive(Clone, Copy, Debug)]
+pub enum Wide {}
 
 impl private::Sealed for Thin {}
-//impl private::Sealed for Wide {}
+impl private::Sealed for Wide {}
 
 pub trait Kind: private::Sealed + Copy {
     /// c_char or wchar_t
@@ -58,6 +58,32 @@ impl Kind for Thin {
         c as _
     }
 }
+impl Kind for Wide {
+    type C = wchar_t;
+    type Char = u32;
+
+    const NUL: Self::Char = 0;
+
+    unsafe fn strlen(s: *const Self::C) -> usize {
+        crate::header::wchar::wcslen(s)
+    }
+    unsafe fn strchr(s: *const Self::C, c: Self::C) -> *const Self::C {
+        crate::header::wchar::wcschr(s, c)
+    }
+    unsafe fn strchrnul(mut s: *const Self::C, c: Self::C) -> *const Self::C {
+        // TODO: optimized function
+        while s.read() != c && s.read() != 0 {
+            s = s.add(1);
+        }
+        s
+    }
+    fn r2c(c: Self::Char) -> Self::C {
+        c as _
+    }
+    fn c2r(c: Self::C) -> Self::Char {
+        c as _
+    }
+}
 
 /// Safe wrapper for immutable borrowed C strings, guaranteed to be the same layout as `*const u8`.
 #[derive(Clone, Copy)]
@@ -67,7 +93,7 @@ pub struct NulStr<'a, T: Kind> {
     _marker: PhantomData<&'a [u8]>,
 }
 pub type CStr<'a> = NulStr<'a, Thin>;
-//pub type WStr<'a> = NulStr<'a, Wide>;
+pub type WStr<'a> = NulStr<'a, Wide>;
 
 impl<'a, T: Kind> NulStr<'a, T> {
     /// Safety
@@ -134,6 +160,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
     /// Look for the closest occurence of `c`, and return a new string starting at that byte if
     /// found.
     #[doc(alias = "strchr")]
+    #[doc(alias = "wcschr")]
     #[inline]
     pub fn find(self, c: T::Char) -> Option<Self> {
         unsafe {
@@ -202,6 +229,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
     }
     /// Scan the string to get its length.
     #[doc(alias = "strlen")]
+    #[doc(alias = "wcslen")]
     pub fn len(self) -> usize {
         self.to_chars().len()
     }
