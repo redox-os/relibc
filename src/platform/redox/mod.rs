@@ -1013,8 +1013,8 @@ impl Pal for Sys {
         (redox_rt::sys::swap_umask(new_effective_mask as u32) as mode_t) & !S_ISVTX
     }
 
-    unsafe fn uname(utsname: *mut utsname) -> Result<(), Errno> {
-        fn gethostname(name: &mut [u8]) -> io::Result<()> {
+    fn uname(mut utsname: Out<utsname>) -> Result<(), Errno> {
+        fn gethostname(mut name: Out<[u8]>) -> io::Result<()> {
             if name.is_empty() {
                 return Ok(());
             }
@@ -1024,21 +1024,26 @@ impl Pal for Sys {
             let mut read = 0;
             let name_len = name.len();
             loop {
-                match file.read(&mut name[read..name_len - 1])? {
+                match file.read_out(name.subslice(read, name_len - 1))? {
                     0 => break,
                     n => read += n,
                 }
             }
-            name[read] = 0;
+            name.index(read).write(0);
             Ok(())
         }
+        out_project! {
+            let utsname {
+                nodename: [c_char; UTSLENGTH],
+                sysname: [c_char; UTSLENGTH],
+                release: [c_char; UTSLENGTH],
+                machine: [c_char; UTSLENGTH],
+                version: [c_char; UTSLENGTH],
+                domainname: [c_char; UTSLENGTH],
+            } = utsname;
+        }
 
-        match gethostname(unsafe {
-            slice::from_raw_parts_mut(
-                (*utsname).nodename.as_mut_ptr() as *mut u8,
-                (*utsname).nodename.len(),
-            )
-        }) {
+        match gethostname(nodename.as_slice_mut().cast_slice_to::<u8>()) {
             Ok(_) => (),
             Err(_) => return Err(Errno(EIO)),
         }
@@ -1050,36 +1055,33 @@ impl Pal for Sys {
         };
         let mut lines = BufReader::new(&mut file).lines();
 
-        let mut read_line = |dst: &mut [c_char]| {
+        let mut read_line = |mut dst: Out<[u8]>| {
+            // TODO: set nul byte without allocating CString
             let line = match lines.next() {
-                Some(Ok(l)) => match CString::new(l) {
-                    Ok(l) => l,
-                    Err(_) => return Err(Errno(EIO)),
-                },
+                Some(Ok(l)) => CString::new(l).map_err(|_| Errno(EIO))?,
                 None | Some(Err(_)) => return Err(Errno(EIO)),
             };
 
-            let line_slice: &[c_char] = unsafe { mem::transmute(line.as_bytes_with_nul()) };
-
-            if line_slice.len() <= UTSLENGTH {
-                dst[..line_slice.len()].copy_from_slice(line_slice);
-                Ok(())
-            } else {
-                Err(Errno(EIO))
+            let line_slice: &[u8] = line.as_bytes_with_nul();
+            if line_slice.len() > UTSLENGTH {
+                return Err(Errno(EIO));
             }
+
+            dst.copy_common_length_from_slice(line_slice);
+            Ok(())
         };
 
         unsafe {
-            read_line(&mut (*utsname).sysname)?;
-            read_line(&mut (*utsname).release)?;
-            read_line(&mut (*utsname).machine)?;
+            read_line(sysname.as_slice_mut().cast_slice_to::<u8>())?;
+            read_line(release.as_slice_mut().cast_slice_to::<u8>())?;
+            read_line(machine.as_slice_mut().cast_slice_to::<u8>())?;
 
             // Version is not provided
-            ptr::write_bytes((*utsname).version.as_mut_ptr(), 0, UTSLENGTH);
+            version.as_slice_mut().zero();
 
             // Redox doesn't provide domainname in sys:uname
-            //read_line(&mut (*utsname).domainname)?;
-            ptr::write_bytes((*utsname).domainname.as_mut_ptr(), 0, UTSLENGTH);
+            //read_line(domainname.as_slice_mut())?;
+            domainname.as_slice_mut().zero();
         }
 
         Ok(())

@@ -343,3 +343,70 @@ macro_rules! strto_float_impl {
         }
     }};
 }
+
+/// Project an `Out<struct X { field: Type }>` to `struct X { field: Out<Type> }`.
+///
+/// It is allowed to include only a subset of the struct's fields. The struct must implement
+/// `OutProject`.
+#[macro_export]
+macro_rules! out_project {
+    {
+        let $struct:ty { $($field:ident : $fieldty:ty),*$(,)? } = $src:ident;
+    } => {
+        // Verify $src actually has type Out<$struct>. Also verify it implements `OutProject`. This
+        // excludes
+        //
+        // - the case where $src is Out<&Struct>, where it would be very UB to just construct a
+        // writable reference to $src.$field, or a smart pointer
+        // - the case where there are unaligned fields where it would be UB to call ptr::write to
+        // them (requiring packed structs)
+        {
+            fn ensure_type<U: $crate::out::OutProject>(_t: &$crate::out::Out<U>) {}
+            ensure_type::<$struct>(&$src);
+        }
+        // Verify there are no duplicate struct fields. This is not strictly necessary as Out lacks
+        // the noalias requirement, but forbidding the same field to occur multiple times would
+        // allow both cases. The compiler will reject any struct that reuses the same identifier.
+        const _: () = {
+            $(
+                if ::core::mem::offset_of!($struct, $field) % ::core::mem::align_of::<$fieldty>() != 0 {
+                    panic!(concat!("unaligned field ", stringify!($field), " of struct ", stringify!($struct), "."));
+                }
+            )*
+            struct S {
+                $(
+                    $field: $fieldty
+                ),*
+            }
+        };
+
+        // Finally, create an Out<$fieldty> for each field.
+        $(
+            // getting the pointer to $field is safe
+            let $field = unsafe { &raw mut (*$crate::out::Out::<_>::as_mut_ptr(&mut $src)).$field };
+        )*
+        $(
+            let mut $field: $crate::out::Out<$fieldty> = unsafe {
+                // SAFETY: the only guarantee is that the pointer is valid and writable for the
+                // duration of 'b where $src: Out<'b, T>. But if so, and T is a struct, that
+                // must also be true for all the struct fields.
+                $crate::out::Out::with_lifetime_of(
+                    $crate::out::Out::nonnull($field),
+                    &$src,
+                )
+            };
+        )*
+    }
+}
+#[macro_export]
+macro_rules! OutProject {
+    derive() { $(#[$($attrs:meta),*])* $v:vis struct $name:ident {
+        $(
+            $(#[$($fa:meta),*])* $fv:vis $field:ident : $type:ty
+        ),*$(,)?
+    } } => {
+        // SAFETY: As simple as it is, OutProject is valid for any struct, and the pattern we have
+        // matched above ensures $name is one.
+        unsafe impl $crate::out::OutProject for $name {}
+    }
+}
