@@ -393,7 +393,7 @@ pub unsafe extern "C" fn redox_mkns_v1(
             return Err(Error::new(EINVAL));
         }
 
-        if !USE_NEW_NS_BACKEND.load(Ordering::Relaxed) {
+        if USE_NEW_NS_BACKEND.load(Ordering::Relaxed) {
             let raw_iovecs = slice::from_raw_parts(names, num_names);
             let names_ioslice: Vec<IoSlice> = raw_iovecs
                 .iter()
