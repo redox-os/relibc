@@ -186,6 +186,16 @@ impl<'a, T: Kind> NulStr<'a, T> {
             T::c2r(self.ptr.read())
         }
     }
+    #[inline]
+    pub fn first_char(self) -> Option<char> {
+        char::from_u32(self.first().into())
+    }
+    /// Same as `split_first` except also requires that the first char be convertible into `char`
+    #[inline]
+    pub fn split_first_char(self) -> Option<(char, Self)> {
+        self.split_first()
+            .and_then(|(c, r)| Some((char::from_u32(c.into())?, r)))
+    }
     /// Split this string into `Some((first_byte, string_after_that))` or `None` if empty.
     #[inline]
     pub fn split_first(self) -> Option<(T::Char, Self)> {

@@ -1,5 +1,8 @@
 // TODO: generalize with printf impl
-use crate::io::{self, Write};
+use crate::{
+    c_str::WStr,
+    io::{self, Write},
+};
 use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
@@ -284,10 +287,13 @@ static INF_STR_UPPER: &str = "INF";
 static NAN_STR_LOWER: &str = "nan";
 static NAN_STR_UPPER: &str = "NAN";
 
-unsafe fn pop_int_raw(format: &mut *const u32) -> Option<usize> {
+fn pop_int_raw(format: &mut WStr) -> Option<usize> {
     let mut int = None;
-    while let Some(digit) = char::from_u32(**format).unwrap_or('\0').to_digit(10) {
-        *format = format.add(1);
+    while let Some((digit, rest)) = format
+        .split_first_char()
+        .and_then(|(c, r)| Some((c.to_digit(10)?, r)))
+    {
+        *format = rest;
         if int.is_none() {
             int = Some(0);
         }
@@ -296,27 +302,27 @@ unsafe fn pop_int_raw(format: &mut *const u32) -> Option<usize> {
     }
     int
 }
-unsafe fn pop_index(format: &mut *const u32) -> Option<usize> {
+fn pop_index(format: &mut WStr) -> Option<usize> {
     // Peek ahead for a positional argument:
     let mut format2 = *format;
     if let Some(i) = pop_int_raw(&mut format2) {
-        if char::from_u32(*format2) == Some('$') {
-            *format = format2.add(1);
+        if let Some(('$', rest)) = format2.split_first_char() {
+            *format = rest;
             return Some(i);
         }
     }
     None
 }
-unsafe fn pop_int(format: &mut *const u32) -> Option<Number> {
-    if char::from_u32(**format) == Some('*') {
-        *format = format.add(1);
+fn pop_int(format: &mut WStr) -> Option<Number> {
+    if let Some(('*', rest)) = format.split_first_char() {
+        *format = rest;
         Some(pop_index(format).map(Number::Index).unwrap_or(Number::Next))
     } else {
         pop_int_raw(format).map(Number::Static)
     }
 }
 
-unsafe fn fmt_int<I>(fmt: u32, i: I) -> String
+fn fmt_int<I>(fmt: u32, i: I) -> String
 where
     I: fmt::Display + fmt::Octal + fmt::LowerHex + fmt::UpperHex,
 {
@@ -476,8 +482,8 @@ fn fmt_float_nonfinite<W: Write>(w: &mut W, float: c_double, case: FmtCase) -> i
 }
 
 #[derive(Clone, Copy)]
-struct WPrintfIter {
-    format: *const u32,
+struct WPrintfIter<'a> {
+    format: WStr<'a>,
 }
 #[derive(Clone, Copy, Debug)]
 struct WPrintfArg {
@@ -494,31 +500,23 @@ struct WPrintfArg {
     fmtkind: FmtKind,
 }
 #[derive(Debug)]
-enum WPrintfFmt {
-    Plain(&'static [u32]),
+enum WPrintfFmt<'a> {
+    Plain(&'a [u32]),
     Arg(WPrintfArg),
 }
-impl Iterator for WPrintfIter {
-    type Item = Result<WPrintfFmt, ()>;
+impl<'a> Iterator for WPrintfIter<'a> {
+    type Item = Result<WPrintfFmt<'a>, ()>;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             // Send WPrintfFmt::Plain until the next %
-            let mut len = 0;
-            while *self.format.add(len) != 0 && char::from_u32(*self.format.add(len)) != Some('%') {
-                len += 1;
-            }
-            if len > 0 {
-                let slice = slice::from_raw_parts(self.format as *const u32, len);
-                self.format = self.format.add(len);
-                return Some(Ok(WPrintfFmt::Plain(slice)));
-            }
-            self.format = self.format.add(len);
-            if *self.format == 0 {
-                return None;
-            }
-
-            // *self.format is guaranteed to be '%' at this point
-            self.format = self.format.add(1);
+            let first_percent = match self.format.find_get_subslice_or_all(u32::from(b'%')) {
+                Err(([], _)) => return None,
+                Ok((chunk @ [_, ..], rest)) | Err((chunk @ [_, ..], rest)) => {
+                    self.format = rest;
+                    return Some(Ok(WPrintfFmt::Plain(chunk)));
+                }
+                Ok(([], rest)) => rest,
+            };
 
             let mut peekahead = self.format;
             let index = pop_index(&mut peekahead).map(|i| {
@@ -533,8 +531,8 @@ impl Iterator for WPrintfIter {
             let mut sign_reserve = false;
             let mut sign_always = false;
 
-            loop {
-                match char::from_u32(*self.format).unwrap_or('\0') {
+            while let Some((c, rest)) = self.format.split_first_char() {
+                match c {
                     '#' => alternate = true,
                     '0' => zero = true,
                     '-' => left = true,
@@ -542,13 +540,13 @@ impl Iterator for WPrintfIter {
                     '+' => sign_always = true,
                     _ => break,
                 }
-                self.format = self.format.add(1);
+                self.format = rest;
             }
 
             // Width and precision:
             let min_width = pop_int(&mut self.format).unwrap_or(Number::Static(0));
-            let precision = if char::from_u32(*self.format) == Some('.') {
-                self.format = self.format.add(1);
+            let precision = if let Some(('.', rest)) = self.format.split_first_char() {
+                self.format = rest;
                 match pop_int(&mut self.format) {
                     int @ Some(_) => int,
                     None => return Some(Err(())),
@@ -559,8 +557,8 @@ impl Iterator for WPrintfIter {
 
             // Integer size:
             let mut intkind = IntKind::Int;
-            loop {
-                intkind = match char::from_u32(*self.format).unwrap_or('\0') {
+            while let Some((char, rest)) = self.format.split_first_char() {
+                intkind = match char {
                     'h' => {
                         if intkind == IntKind::Short || intkind == IntKind::Byte {
                             IntKind::Byte
@@ -582,10 +580,12 @@ impl Iterator for WPrintfIter {
                     _ => break,
                 };
 
-                self.format = self.format.add(1);
+                self.format = rest;
             }
-            let fmt = *self.format;
-            let fmtkind = match char::from_u32(fmt).unwrap_or('\0') {
+            let Some((fmt, rest)) = self.format.split_first_char() else {
+                return Some(Err(()));
+            };
+            let fmtkind = match fmt {
                 '%' => FmtKind::Percent,
                 'd' | 'i' => FmtKind::Signed,
                 'o' | 'u' | 'x' | 'X' => FmtKind::Unsigned,
@@ -598,7 +598,7 @@ impl Iterator for WPrintfIter {
                 'n' => FmtKind::GetWritten,
                 _ => return Some(Err(())),
             };
-            self.format = self.format.add(1);
+            self.format = rest;
 
             Some(Ok(WPrintfFmt::Arg(WPrintfArg {
                 index,
@@ -610,23 +610,17 @@ impl Iterator for WPrintfIter {
                 min_width,
                 precision,
                 intkind,
-                fmt,
+                fmt: fmt as u32,
                 fmtkind,
             })))
         }
     }
 }
 
-unsafe fn inner_wprintf<W: Write>(
-    w: W,
-    format: *const wchar_t,
-    mut ap: VaList,
-) -> io::Result<c_int> {
+unsafe fn inner_wprintf<W: Write>(w: W, format: WStr, mut ap: VaList) -> io::Result<c_int> {
     let w = &mut platform::CountingWriter::new(w);
 
-    let iterator = WPrintfIter {
-        format: format as *const u32,
-    };
+    let iterator = WPrintfIter { format };
 
     // Pre-fetch vararg types
     let mut varargs = VaListCache::default();
@@ -998,6 +992,6 @@ unsafe fn inner_wprintf<W: Write>(
     Ok(w.written as c_int)
 }
 
-pub unsafe fn wprintf<W: Write>(w: W, format: *const wchar_t, ap: VaList) -> c_int {
+pub unsafe fn wprintf<W: Write>(w: W, format: WStr, ap: VaList) -> c_int {
     inner_wprintf(w, format, ap).unwrap_or(-1)
 }
