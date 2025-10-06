@@ -789,10 +789,11 @@ impl Linker {
 
         if debug {
             eprintln!(
-                "[ld.so]: loading object: {} at {:#x}:{:#x}",
+                "[ld.so]: loading object: {} at {:#x}:{:#x} (pie: {})",
                 name,
                 obj.mmap.as_ptr() as usize,
-                obj.mmap.as_ptr() as usize + obj.mmap.len()
+                obj.mmap.as_ptr() as usize + obj.mmap.len(),
+                obj.pie,
             );
         }
 
