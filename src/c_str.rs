@@ -8,11 +8,11 @@ use alloc::{
 };
 
 use crate::{
-    header::string::{strchr, strlen},
+    header::string::{strchr, strchrnul, strlen},
     platform::types::c_char,
 };
 
-/// C string wrapper, guaranteed to be
+/// Safe wrapper for immutable borrowed C strings, guaranteed to be the same layout as `*const u8`.
 #[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct CStr<'a> {
@@ -37,6 +37,50 @@ impl<'a> CStr<'a> {
             Some(Self::from_ptr(ptr))
         }
     }
+    /// Look for the closest occurence of `c`, and if found, split the string into a slice up to
+    /// that byte and a `CStr` starting at that byte.
+    #[inline]
+    #[doc(alias = "strchrnul")]
+    pub fn find_get_subslice_or_all(self, c: u8) -> Result<(&'a [u8], Self), (&'a [u8], Self)> {
+        // SAFETY: strchrnul expects self.as_ptr() to be valid up to and including its last NUL
+        // byte
+        let found = unsafe { strchrnul(self.as_ptr(), c.into()) };
+
+        // SAFETY: the pointer returned from strchrnul is always a substring of this string, and
+        // hence always valid as a CStr.
+        let found = unsafe { Self::from_ptr(found) };
+        let until = unsafe { self.slice_until_substr(found) };
+
+        if found.first() == 0 {
+            // The character was not found, and we got the end of the string instead.
+            Err((until, found))
+        } else {
+            Ok((until, found))
+        }
+    }
+    /// # Safety
+    ///
+    /// `substr` must be contained within `self`
+    #[inline]
+    pub unsafe fn slice_until_substr(self, substr: CStr<'_>) -> &'a [u8] {
+        let index = unsafe {
+            // SAFETY: the sub-pointer as returned by strchr must be derived from the same
+            // allocation
+            substr.as_ptr().offset_from(self.as_ptr()) as usize
+        };
+        unsafe { core::slice::from_raw_parts(self.as_ptr().cast::<u8>(), index) }
+    }
+    /// Look for the closest occurence of `c`, and if found, split the string into a slice up to
+    /// that byte and a `CStr` starting at that byte.
+    #[inline]
+    pub fn find_get_subslice(self, c: u8) -> Option<(&'a [u8], Self)> {
+        let rest = self.find(c)?;
+
+        // SAFETY: the output of strchr is obviously a substring if it doesn't return NULL
+        Some((unsafe { self.slice_until_substr(rest) }, rest))
+    }
+    /// Look for the closest occurence of `c`, and return a new string starting at that byte if
+    /// found.
     #[doc(alias = "strchr")]
     #[inline]
     pub fn find(self, c: u8) -> Option<Self> {
@@ -49,6 +93,8 @@ impl<'a> CStr<'a> {
             Self::from_nullable_ptr(ret)
         }
     }
+    // TODO: strrchr, strchrnul wrappers
+
     #[inline]
     pub fn contains(self, c: u8) -> bool {
         self.find(c).is_some()
@@ -60,6 +106,16 @@ impl<'a> CStr<'a> {
             // implies its readable length is nonzero (string is empty if this first byte is 0).
             self.ptr.read() as u8
         }
+    }
+    /// Split this string into `Some((first_byte, string_after_that))` or `None` if empty.
+    #[inline]
+    pub fn split_first(self) -> Option<(u8, CStr<'a>)> {
+        if self.first() == 0 {
+            return None;
+        }
+        Some((self.first(), unsafe {
+            CStr::from_ptr(self.as_ptr().add(1))
+        }))
     }
     pub fn to_bytes_with_nul(self) -> &'a [u8] {
         unsafe {
@@ -108,8 +164,9 @@ impl<'a> CStr<'a> {
     pub fn count_bytes(&self) -> usize {
         self.to_bytes().len()
     }
+    #[inline]
     pub fn is_empty(&self) -> bool {
-        self.count_bytes() == 0
+        self.first() == 0
     }
 }
 

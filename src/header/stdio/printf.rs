@@ -1,4 +1,8 @@
-use crate::io::{self, Write};
+// TODO: generalize with wprintf impl
+use crate::{
+    c_str::CStr,
+    io::{self, Write},
+};
 use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
@@ -283,10 +287,13 @@ static INF_STR_UPPER: &str = "INF";
 static NAN_STR_LOWER: &str = "nan";
 static NAN_STR_UPPER: &str = "NAN";
 
-unsafe fn pop_int_raw(format: &mut *const u8) -> Option<usize> {
+fn pop_int_raw(format: &mut CStr) -> Option<usize> {
     let mut int = None;
-    while let Some(digit) = (**format as char).to_digit(10) {
-        *format = format.add(1);
+    while let Some((digit, rest)) = format
+        .split_first()
+        .and_then(|(d, r)| Some(((d as char).to_digit(10)?, r)))
+    {
+        *format = rest;
         if int.is_none() {
             int = Some(0);
         }
@@ -295,27 +302,27 @@ unsafe fn pop_int_raw(format: &mut *const u8) -> Option<usize> {
     }
     int
 }
-unsafe fn pop_index(format: &mut *const u8) -> Option<usize> {
+fn pop_index(format: &mut CStr) -> Option<usize> {
     // Peek ahead for a positional argument:
     let mut format2 = *format;
     if let Some(i) = pop_int_raw(&mut format2) {
-        if *format2 == b'$' {
-            *format = format2.add(1);
+        if let Some((b'$', format2)) = format2.split_first() {
+            *format = format2;
             return Some(i);
         }
     }
     None
 }
-unsafe fn pop_int(format: &mut *const u8) -> Option<Number> {
-    if **format == b'*' {
-        *format = format.add(1);
+fn pop_int(format: &mut CStr) -> Option<Number> {
+    if let Some((b'*', rest)) = format.split_first() {
+        *format = rest;
         Some(pop_index(format).map(Number::Index).unwrap_or(Number::Next))
     } else {
         pop_int_raw(format).map(Number::Static)
     }
 }
 
-unsafe fn fmt_int<I>(fmt: u8, i: I) -> String
+fn fmt_int<I>(fmt: u8, i: I) -> String
 where
     I: fmt::Display + fmt::Octal + fmt::LowerHex + fmt::UpperHex + fmt::Binary,
 {
@@ -327,7 +334,7 @@ where
         b'b' | b'B' => format!("{:b}", i),
         _ => panic!(
             "fmt_int should never be called with the fmt {:?}",
-            fmt as char
+            fmt as char,
         ),
     }
 }
@@ -463,8 +470,8 @@ fn fmt_float_nonfinite<W: Write>(w: &mut W, float: c_double, case: FmtCase) -> i
 }
 
 #[derive(Clone, Copy)]
-struct PrintfIter {
-    format: *const u8,
+struct PrintfIter<'a> {
+    format: CStr<'a>,
 }
 #[derive(Clone, Copy, Debug)]
 struct PrintfArg {
@@ -481,147 +488,139 @@ struct PrintfArg {
     fmtkind: FmtKind,
 }
 #[derive(Debug)]
-enum PrintfFmt {
-    Plain(&'static [u8]),
+enum PrintfFmt<'a> {
+    Plain(&'a [u8]),
     Arg(PrintfArg),
 }
-impl Iterator for PrintfIter {
-    type Item = Result<PrintfFmt, ()>;
+impl<'a> Iterator for PrintfIter<'a> {
+    type Item = Result<PrintfFmt<'a>, ()>;
     fn next(&mut self) -> Option<Self::Item> {
-        unsafe {
-            // Send PrintfFmt::Plain until the next %
-            let mut len = 0;
-            while *self.format.add(len) != 0 && *self.format.add(len) != b'%' {
-                len += 1;
+        // Send PrintfFmt::Plain until the next %
+        let first_percent = match self.format.find_get_subslice_or_all(b'%') {
+            Err(([], _)) => return None,
+            Ok((chunk @ [_, ..], rest)) | Err((chunk @ [_, ..], rest)) => {
+                self.format = rest;
+                return Some(Ok(PrintfFmt::Plain(chunk)));
             }
-            if len > 0 {
-                let slice = slice::from_raw_parts(self.format as *const u8, len);
-                self.format = self.format.add(len);
-                return Some(Ok(PrintfFmt::Plain(slice)));
+            Ok(([], rest)) => rest,
+        };
+
+        // at this point the next char must be %
+        self.format = first_percent.split_first().expect("must be %").1;
+
+        let mut peekahead = self.format;
+        let index = pop_index(&mut peekahead).map(|i| {
+            self.format = peekahead;
+            i
+        });
+
+        // Flags:
+        let mut alternate = false;
+        let mut zero = false;
+        let mut left = false;
+        let mut sign_reserve = false;
+        let mut sign_always = false;
+
+        while let Some((c, rest)) = self.format.split_first() {
+            match c {
+                b'#' => alternate = true,
+                b'0' => zero = true,
+                b'-' => left = true,
+                b' ' => sign_reserve = true,
+                b'+' => sign_always = true,
+                _ => break,
             }
-            self.format = self.format.add(len);
-            if *self.format == 0 {
-                return None;
-            }
-
-            // *self.format is guaranteed to be '%' at this point
-            self.format = self.format.add(1);
-
-            let mut peekahead = self.format;
-            let index = pop_index(&mut peekahead).map(|i| {
-                self.format = peekahead;
-                i
-            });
-
-            // Flags:
-            let mut alternate = false;
-            let mut zero = false;
-            let mut left = false;
-            let mut sign_reserve = false;
-            let mut sign_always = false;
-
-            loop {
-                match *self.format {
-                    b'#' => alternate = true,
-                    b'0' => zero = true,
-                    b'-' => left = true,
-                    b' ' => sign_reserve = true,
-                    b'+' => sign_always = true,
-                    _ => break,
-                }
-                self.format = self.format.add(1);
-            }
-
-            // Width and precision:
-            let min_width = pop_int(&mut self.format).unwrap_or(Number::Static(0));
-            let precision = if *self.format == b'.' {
-                self.format = self.format.add(1);
-                match pop_int(&mut self.format) {
-                    int @ Some(_) => int,
-                    None => return Some(Err(())),
-                }
-            } else {
-                None
-            };
-
-            // Integer size:
-            let mut intkind = IntKind::Int;
-            loop {
-                intkind = match *self.format {
-                    b'h' => {
-                        if intkind == IntKind::Short || intkind == IntKind::Byte {
-                            IntKind::Byte
-                        } else {
-                            IntKind::Short
-                        }
-                    }
-                    b'j' => IntKind::IntMax,
-                    b'l' => {
-                        if intkind == IntKind::Long || intkind == IntKind::LongLong {
-                            IntKind::LongLong
-                        } else {
-                            IntKind::Long
-                        }
-                    }
-                    b'q' | b'L' => IntKind::LongLong,
-                    b't' => IntKind::PtrDiff,
-                    b'z' => IntKind::Size,
-                    _ => break,
-                };
-
-                self.format = self.format.add(1);
-            }
-            let fmt = *self.format;
-            let fmtkind = match fmt {
-                b'%' => FmtKind::Percent,
-                b'd' | b'i' => FmtKind::Signed,
-                b'o' | b'u' | b'x' | b'X' | b'b' | b'B' => FmtKind::Unsigned,
-                b'e' | b'E' => FmtKind::Scientific,
-                b'f' | b'F' => FmtKind::Decimal,
-                b'g' | b'G' => FmtKind::AnyNotation,
-                b's' => FmtKind::String,
-                b'c' => FmtKind::Char,
-                b'p' => FmtKind::Pointer,
-                b'n' => FmtKind::GetWritten,
-                b'm' => {
-                    // %m is technically for syslog only, but musl and glibc implement it for
-                    // printf because it is difficult and error prone to implement a format
-                    // specifier for just *one* function.
-                    self.format = self.format.add(1);
-                    return Some(Ok(PrintfFmt::Plain(
-                        errno::STR_ERROR
-                            .get(platform::ERRNO.get() as usize)
-                            .map(|e| e.as_bytes())
-                            .unwrap_or(b"unknown error"),
-                    )));
-                }
-                _ => return Some(Err(())),
-            };
-            self.format = self.format.add(1);
-
-            Some(Ok(PrintfFmt::Arg(PrintfArg {
-                index,
-                alternate,
-                zero,
-                left,
-                sign_reserve,
-                sign_always,
-                min_width,
-                precision,
-                intkind,
-                fmt,
-                fmtkind,
-            })))
+            self.format = rest;
         }
+
+        // Width and precision:
+        let min_width = pop_int(&mut self.format).unwrap_or(Number::Static(0));
+        let precision = if let Some((b'.', rest)) = self.format.split_first() {
+            self.format = rest;
+            match pop_int(&mut self.format) {
+                int @ Some(_) => int,
+                None => return Some(Err(())),
+            }
+        } else {
+            None
+        };
+
+        // Integer size:
+        let mut intkind = IntKind::Int;
+        while let Some((byte, rest)) = self.format.split_first() {
+            intkind = match byte {
+                b'h' => {
+                    if intkind == IntKind::Short || intkind == IntKind::Byte {
+                        IntKind::Byte
+                    } else {
+                        IntKind::Short
+                    }
+                }
+                b'j' => IntKind::IntMax,
+                b'l' => {
+                    if intkind == IntKind::Long || intkind == IntKind::LongLong {
+                        IntKind::LongLong
+                    } else {
+                        IntKind::Long
+                    }
+                }
+                b'q' | b'L' => IntKind::LongLong,
+                b't' => IntKind::PtrDiff,
+                b'z' => IntKind::Size,
+                _ => break,
+            };
+
+            self.format = rest;
+        }
+        let Some((fmt, rest)) = self.format.split_first() else {
+            return Some(Err(()));
+        };
+        self.format = rest;
+        let fmtkind = match fmt {
+            b'%' => FmtKind::Percent,
+            b'd' | b'i' => FmtKind::Signed,
+            b'o' | b'u' | b'x' | b'X' | b'b' | b'B' => FmtKind::Unsigned,
+            b'e' | b'E' => FmtKind::Scientific,
+            b'f' | b'F' => FmtKind::Decimal,
+            b'g' | b'G' => FmtKind::AnyNotation,
+            b's' => FmtKind::String,
+            b'c' => FmtKind::Char,
+            b'p' => FmtKind::Pointer,
+            b'n' => FmtKind::GetWritten,
+            b'm' => {
+                // %m is technically for syslog only, but musl and glibc implement it for
+                // printf because it is difficult and error prone to implement a format
+                // specifier for just *one* function.
+                return Some(Ok(PrintfFmt::Plain(
+                    errno::STR_ERROR
+                        .get(platform::ERRNO.get() as usize)
+                        .map(|e| e.as_bytes())
+                        .unwrap_or(b"unknown error"),
+                )));
+            }
+            _ => return Some(Err(())),
+        };
+
+        Some(Ok(PrintfFmt::Arg(PrintfArg {
+            index,
+            alternate,
+            zero,
+            left,
+            sign_reserve,
+            sign_always,
+            min_width,
+            precision,
+            intkind,
+            fmt,
+            fmtkind,
+        })))
     }
 }
 
-unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) -> io::Result<c_int> {
+unsafe fn inner_printf<W: Write>(w: W, format: CStr, mut ap: VaList) -> io::Result<c_int> {
     let w = &mut platform::CountingWriter::new(w);
 
-    let iterator = PrintfIter {
-        format: format as *const u8,
-    };
+    let iterator = PrintfIter { format };
 
     // Pre-fetch vararg types
     let mut varargs = VaListCache::default();
@@ -1258,8 +1257,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
 ///
 /// # Safety
 /// Behavior is undefined if any of the following conditions are violated:
-/// - `format` must point to valid null-terminated string.
 /// - `ap` must follow the safety contract of variable arguments of C.
-pub unsafe fn printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> c_int {
+pub unsafe fn printf<W: Write>(w: W, format: CStr, ap: VaList) -> c_int {
     inner_printf(w, format, ap).unwrap_or(-1)
 }

@@ -1,3 +1,4 @@
+// TODO: generalize with printf impl
 use crate::io::{self, Write};
 use alloc::{
     collections::BTreeMap,
