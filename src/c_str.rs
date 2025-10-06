@@ -21,16 +21,20 @@ pub enum Wide {}
 impl private::Sealed for Thin {}
 impl private::Sealed for Wide {}
 
-pub trait Kind: private::Sealed + Copy {
+pub trait Kind: private::Sealed + Copy + 'static {
     /// c_char or wchar_t
-    type C: Copy;
+    type C: Copy + 'static;
     // u8 or u32
-    type Char: Copy + Into<u32> + PartialEq;
+    type Char: Copy + From<u8> + Into<u32> + PartialEq + 'static;
 
     const NUL: Self::Char;
 
+    const IS_THIN_NOT_WIDE: bool;
+
     fn r2c(c: Self::Char) -> Self::C;
     fn c2r(c: Self::C) -> Self::Char;
+
+    fn chars_from_bytes(b: &[u8]) -> Option<&[Self::Char]>;
 
     unsafe fn strlen(s: *const Self::C) -> usize;
     unsafe fn strchr(s: *const Self::C, c: Self::C) -> *const Self::C;
@@ -41,6 +45,7 @@ impl Kind for Thin {
     type Char = u8;
 
     const NUL: Self::Char = 0;
+    const IS_THIN_NOT_WIDE: bool = true;
 
     unsafe fn strlen(s: *const c_char) -> usize {
         crate::header::string::strlen(s)
@@ -57,12 +62,16 @@ impl Kind for Thin {
     fn c2r(c: c_char) -> u8 {
         c as _
     }
+    fn chars_from_bytes(b: &[u8]) -> Option<&[Self::Char]> {
+        Some(b)
+    }
 }
 impl Kind for Wide {
     type C = wchar_t;
     type Char = u32;
 
     const NUL: Self::Char = 0;
+    const IS_THIN_NOT_WIDE: bool = false;
 
     unsafe fn strlen(s: *const Self::C) -> usize {
         crate::header::wchar::wcslen(s)
@@ -82,6 +91,9 @@ impl Kind for Wide {
     }
     fn c2r(c: Self::C) -> Self::Char {
         c as _
+    }
+    fn chars_from_bytes(b: &[u8]) -> Option<&[Self::Char]> {
+        None
     }
 }
 
@@ -118,8 +130,10 @@ impl<'a, T: Kind> NulStr<'a, T> {
     #[doc(alias = "strchrnul")]
     pub fn find_get_subslice_or_all(
         self,
-        c: T::Char,
+        c: impl Into<T::Char>,
     ) -> Result<(&'a [T::Char], Self), (&'a [T::Char], Self)> {
+        let c = c.into();
+
         // SAFETY: strchrnul expects self.as_ptr() to be valid up to and including its last NUL
         // byte
         let found = unsafe { T::strchrnul(self.as_ptr(), T::r2c(c)) };

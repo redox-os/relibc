@@ -1,6 +1,7 @@
-// TODO: generalize with printf impl
+// TODO: reuse more code with the thin printf impl
 use crate::{
-    c_str::WStr,
+    c_str::{self, WStr},
+    header::stdio::printf::{FmtKind, IntKind, Number, PrintfFmt, PrintfIter, VaArg, VaListCache},
     io::{self, Write},
 };
 use alloc::{
@@ -14,259 +15,6 @@ use crate::{
     header::errno::EILSEQ,
     platform::{self, types::*},
 };
-
-//  ____        _ _                 _       _
-// | __ )  ___ (_) | ___ _ __ _ __ | | __ _| |_ ___ _
-// |  _ \ / _ \| | |/ _ \ '__| '_ \| |/ _` | __/ _ (_)
-// | |_) | (_) | | |  __/ |  | |_) | | (_| | ||  __/_
-// |____/ \___/|_|_|\___|_|  | .__/|_|\__,_|\__\___(_)
-//                           |_|
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum IntKind {
-    Byte,
-    Short,
-    Int,
-    Long,
-    LongLong,
-    IntMax,
-    PtrDiff,
-    Size,
-}
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum FmtKind {
-    Percent,
-
-    Signed,
-    Unsigned,
-
-    Scientific,
-    Decimal,
-    AnyNotation,
-
-    String,
-    Char,
-    Pointer,
-    GetWritten,
-}
-#[derive(Clone, Copy, Debug)]
-enum Number {
-    Static(usize),
-    Index(usize),
-    Next,
-}
-impl Number {
-    unsafe fn resolve(self, varargs: &mut VaListCache, ap: &mut VaList) -> usize {
-        let arg = match self {
-            Number::Static(num) => return num,
-            Number::Index(i) => varargs.get(i - 1, ap, None),
-            Number::Next => {
-                let i = varargs.i;
-                varargs.i += 1;
-                varargs.get(i, ap, None)
-            }
-        };
-        match arg {
-            VaArg::c_char(i) => i as usize,
-            VaArg::c_double(i) => i as usize,
-            VaArg::c_int(i) => i as usize,
-            VaArg::c_long(i) => i as usize,
-            VaArg::c_longlong(i) => i as usize,
-            VaArg::c_short(i) => i as usize,
-            VaArg::intmax_t(i) => i as usize,
-            VaArg::pointer(i) => i as usize,
-            VaArg::ptrdiff_t(i) => i as usize,
-            VaArg::ssize_t(i) => i as usize,
-            VaArg::wint_t(i) => i as usize,
-        }
-    }
-}
-#[derive(Clone, Copy, Debug)]
-enum VaArg {
-    c_char(c_char),
-    c_double(c_double),
-    c_int(c_int),
-    c_long(c_long),
-    c_longlong(c_longlong),
-    c_short(c_short),
-    intmax_t(intmax_t),
-    pointer(*const c_void),
-    ptrdiff_t(ptrdiff_t),
-    ssize_t(ssize_t),
-    wint_t(wint_t),
-}
-impl VaArg {
-    unsafe fn arg_from(fmtkind: FmtKind, intkind: IntKind, ap: &mut VaList) -> VaArg {
-        // Per the C standard using va_arg with a type with a size
-        // less than that of an int for integers and double for floats
-        // is invalid. As a result any arguments smaller than an int or
-        // double passed to a function will be promoted to the smallest
-        // possible size. The VaList::arg function will handle this
-        // automagically.
-
-        match (fmtkind, intkind) {
-            (FmtKind::Percent, _) => panic!("Can't call arg_from on %"),
-
-            (FmtKind::Char, IntKind::Long) | (FmtKind::Char, IntKind::LongLong) => {
-                VaArg::wint_t(ap.arg::<wint_t>())
-            }
-
-            (FmtKind::Char, _)
-            | (FmtKind::Unsigned, IntKind::Byte)
-            | (FmtKind::Signed, IntKind::Byte) => {
-                // c_int is passed but truncated to c_char
-                VaArg::c_char(ap.arg::<c_int>() as c_char)
-            }
-            (FmtKind::Unsigned, IntKind::Short) | (FmtKind::Signed, IntKind::Short) => {
-                // c_int is passed but truncated to c_short
-                VaArg::c_short(ap.arg::<c_int>() as c_short)
-            }
-            (FmtKind::Unsigned, IntKind::Int) | (FmtKind::Signed, IntKind::Int) => {
-                VaArg::c_int(ap.arg::<c_int>())
-            }
-            (FmtKind::Unsigned, IntKind::Long) | (FmtKind::Signed, IntKind::Long) => {
-                VaArg::c_long(ap.arg::<c_long>())
-            }
-            (FmtKind::Unsigned, IntKind::LongLong) | (FmtKind::Signed, IntKind::LongLong) => {
-                VaArg::c_longlong(ap.arg::<c_longlong>())
-            }
-            (FmtKind::Unsigned, IntKind::IntMax) | (FmtKind::Signed, IntKind::IntMax) => {
-                VaArg::intmax_t(ap.arg::<intmax_t>())
-            }
-            (FmtKind::Unsigned, IntKind::PtrDiff) | (FmtKind::Signed, IntKind::PtrDiff) => {
-                VaArg::ptrdiff_t(ap.arg::<ptrdiff_t>())
-            }
-            (FmtKind::Unsigned, IntKind::Size) | (FmtKind::Signed, IntKind::Size) => {
-                VaArg::ssize_t(ap.arg::<ssize_t>())
-            }
-
-            (FmtKind::AnyNotation, _) | (FmtKind::Decimal, _) | (FmtKind::Scientific, _) => {
-                VaArg::c_double(ap.arg::<c_double>())
-            }
-
-            (FmtKind::GetWritten, _) | (FmtKind::Pointer, _) | (FmtKind::String, _) => {
-                VaArg::pointer(ap.arg::<*const c_void>())
-            }
-        }
-    }
-    unsafe fn transmute(&self, fmtkind: FmtKind, intkind: IntKind) -> VaArg {
-        // At this point, there are conflicting wprintf arguments. An
-        // example of this is:
-        // ```c
-        // wprintf(L"%1$d %1$lf\n", 5, 0.1);
-        // ```
-        // We handle it just like glibc: We read it from the VaList
-        // using the *last* argument type, but we transmute it when we
-        // try to access the other ones.
-        union Untyped {
-            c_char: c_char,
-            c_double: c_double,
-            c_int: c_int,
-            c_long: c_long,
-            c_longlong: c_longlong,
-            c_short: c_short,
-            intmax_t: intmax_t,
-            pointer: *const c_void,
-            ptrdiff_t: ptrdiff_t,
-            ssize_t: ssize_t,
-            wint_t: wint_t,
-        }
-        let untyped = match *self {
-            VaArg::c_char(i) => Untyped { c_char: i },
-            VaArg::c_double(i) => Untyped { c_double: i },
-            VaArg::c_int(i) => Untyped { c_int: i },
-            VaArg::c_long(i) => Untyped { c_long: i },
-            VaArg::c_longlong(i) => Untyped { c_longlong: i },
-            VaArg::c_short(i) => Untyped { c_short: i },
-            VaArg::intmax_t(i) => Untyped { intmax_t: i },
-            VaArg::pointer(i) => Untyped { pointer: i },
-            VaArg::ptrdiff_t(i) => Untyped { ptrdiff_t: i },
-            VaArg::ssize_t(i) => Untyped { ssize_t: i },
-            VaArg::wint_t(i) => Untyped { wint_t: i },
-        };
-        match (fmtkind, intkind) {
-            (FmtKind::Percent, _) => panic!("Can't call transmute on %"),
-
-            (FmtKind::Char, IntKind::Long) | (FmtKind::Char, IntKind::LongLong) => {
-                VaArg::wint_t(untyped.wint_t)
-            }
-
-            (FmtKind::Char, _)
-            | (FmtKind::Unsigned, IntKind::Byte)
-            | (FmtKind::Signed, IntKind::Byte) => VaArg::c_char(untyped.c_char),
-            (FmtKind::Unsigned, IntKind::Short) | (FmtKind::Signed, IntKind::Short) => {
-                VaArg::c_short(untyped.c_short)
-            }
-            (FmtKind::Unsigned, IntKind::Int) | (FmtKind::Signed, IntKind::Int) => {
-                VaArg::c_int(untyped.c_int)
-            }
-            (FmtKind::Unsigned, IntKind::Long) | (FmtKind::Signed, IntKind::Long) => {
-                VaArg::c_long(untyped.c_long)
-            }
-            (FmtKind::Unsigned, IntKind::LongLong) | (FmtKind::Signed, IntKind::LongLong) => {
-                VaArg::c_longlong(untyped.c_longlong)
-            }
-            (FmtKind::Unsigned, IntKind::IntMax) | (FmtKind::Signed, IntKind::IntMax) => {
-                VaArg::intmax_t(untyped.intmax_t)
-            }
-            (FmtKind::Unsigned, IntKind::PtrDiff) | (FmtKind::Signed, IntKind::PtrDiff) => {
-                VaArg::ptrdiff_t(untyped.ptrdiff_t)
-            }
-            (FmtKind::Unsigned, IntKind::Size) | (FmtKind::Signed, IntKind::Size) => {
-                VaArg::ssize_t(untyped.ssize_t)
-            }
-
-            (FmtKind::AnyNotation, _) | (FmtKind::Decimal, _) | (FmtKind::Scientific, _) => {
-                VaArg::c_double(untyped.c_double)
-            }
-
-            (FmtKind::GetWritten, _) | (FmtKind::Pointer, _) | (FmtKind::String, _) => {
-                VaArg::pointer(untyped.pointer)
-            }
-        }
-    }
-}
-#[derive(Default)]
-struct VaListCache {
-    args: Vec<VaArg>,
-    i: usize,
-}
-impl VaListCache {
-    unsafe fn get(
-        &mut self,
-        i: usize,
-        ap: &mut VaList,
-        default: Option<(FmtKind, IntKind)>,
-    ) -> VaArg {
-        if let Some(&arg) = self.args.get(i) {
-            // This value is already cached
-            let mut arg = arg;
-            if let Some((fmtkind, intkind)) = default {
-                // ...but as a different type
-                arg = arg.transmute(fmtkind, intkind);
-            }
-            return arg;
-        }
-
-        // Get all values before this value
-        while self.args.len() < i {
-            // We can't POSSIBLY know the type if we reach this
-            // point. Reaching here means there are unused gaps in the
-            // arguments. Ultimately we'll have to settle down with
-            // defaulting to c_int.
-            self.args.push(VaArg::c_int(ap.arg::<c_int>()))
-        }
-
-        // Add the value to the cache
-        self.args.push(match default {
-            Some((fmtkind, intkind)) => VaArg::arg_from(fmtkind, intkind, ap),
-            None => VaArg::c_int(ap.arg::<c_int>()),
-        });
-
-        // Return the value
-        self.args[i]
-    }
-}
 
 //  ___                 _                           _        _   _
 // |_ _|_ __ ___  _ __ | | ___ _ __ ___   ___ _ __ | |_ __ _| |_(_) ___  _ __  _
@@ -286,41 +34,6 @@ static INF_STR_UPPER: &str = "INF";
 
 static NAN_STR_LOWER: &str = "nan";
 static NAN_STR_UPPER: &str = "NAN";
-
-fn pop_int_raw(format: &mut WStr) -> Option<usize> {
-    let mut int = None;
-    while let Some((digit, rest)) = format
-        .split_first_char()
-        .and_then(|(c, r)| Some((c.to_digit(10)?, r)))
-    {
-        *format = rest;
-        if int.is_none() {
-            int = Some(0);
-        }
-        *int.as_mut().unwrap() *= 10;
-        *int.as_mut().unwrap() += digit as usize;
-    }
-    int
-}
-fn pop_index(format: &mut WStr) -> Option<usize> {
-    // Peek ahead for a positional argument:
-    let mut format2 = *format;
-    if let Some(i) = pop_int_raw(&mut format2) {
-        if let Some(('$', rest)) = format2.split_first_char() {
-            *format = rest;
-            return Some(i);
-        }
-    }
-    None
-}
-fn pop_int(format: &mut WStr) -> Option<Number> {
-    if let Some(('*', rest)) = format.split_first_char() {
-        *format = rest;
-        Some(pop_index(format).map(Number::Index).unwrap_or(Number::Next))
-    } else {
-        pop_int_raw(format).map(Number::Static)
-    }
-}
 
 fn fmt_int<I>(fmt: u32, i: I) -> String
 where
@@ -481,146 +194,10 @@ fn fmt_float_nonfinite<W: Write>(w: &mut W, float: c_double, case: FmtCase) -> i
     Ok(())
 }
 
-#[derive(Clone, Copy)]
-struct WPrintfIter<'a> {
-    format: WStr<'a>,
-}
-#[derive(Clone, Copy, Debug)]
-struct WPrintfArg {
-    index: Option<usize>,
-    alternate: bool,
-    zero: bool,
-    left: bool,
-    sign_reserve: bool,
-    sign_always: bool,
-    min_width: Number,
-    precision: Option<Number>,
-    intkind: IntKind,
-    fmt: u32,
-    fmtkind: FmtKind,
-}
-#[derive(Debug)]
-enum WPrintfFmt<'a> {
-    Plain(&'a [u32]),
-    Arg(WPrintfArg),
-}
-impl<'a> Iterator for WPrintfIter<'a> {
-    type Item = Result<WPrintfFmt<'a>, ()>;
-    fn next(&mut self) -> Option<Self::Item> {
-        unsafe {
-            // Send WPrintfFmt::Plain until the next %
-            let first_percent = match self.format.find_get_subslice_or_all(u32::from(b'%')) {
-                Err(([], _)) => return None,
-                Ok((chunk @ [_, ..], rest)) | Err((chunk @ [_, ..], rest)) => {
-                    self.format = rest;
-                    return Some(Ok(WPrintfFmt::Plain(chunk)));
-                }
-                Ok(([], rest)) => rest,
-            };
-
-            let mut peekahead = self.format;
-            let index = pop_index(&mut peekahead).map(|i| {
-                self.format = peekahead;
-                i
-            });
-
-            // Flags:
-            let mut alternate = false;
-            let mut zero = false;
-            let mut left = false;
-            let mut sign_reserve = false;
-            let mut sign_always = false;
-
-            while let Some((c, rest)) = self.format.split_first_char() {
-                match c {
-                    '#' => alternate = true,
-                    '0' => zero = true,
-                    '-' => left = true,
-                    ' ' => sign_reserve = true,
-                    '+' => sign_always = true,
-                    _ => break,
-                }
-                self.format = rest;
-            }
-
-            // Width and precision:
-            let min_width = pop_int(&mut self.format).unwrap_or(Number::Static(0));
-            let precision = if let Some(('.', rest)) = self.format.split_first_char() {
-                self.format = rest;
-                match pop_int(&mut self.format) {
-                    int @ Some(_) => int,
-                    None => return Some(Err(())),
-                }
-            } else {
-                None
-            };
-
-            // Integer size:
-            let mut intkind = IntKind::Int;
-            while let Some((char, rest)) = self.format.split_first_char() {
-                intkind = match char {
-                    'h' => {
-                        if intkind == IntKind::Short || intkind == IntKind::Byte {
-                            IntKind::Byte
-                        } else {
-                            IntKind::Short
-                        }
-                    }
-                    'j' => IntKind::IntMax,
-                    'l' => {
-                        if intkind == IntKind::Long || intkind == IntKind::LongLong {
-                            IntKind::LongLong
-                        } else {
-                            IntKind::Long
-                        }
-                    }
-                    'q' | 'L' => IntKind::LongLong,
-                    't' => IntKind::PtrDiff,
-                    'z' => IntKind::Size,
-                    _ => break,
-                };
-
-                self.format = rest;
-            }
-            let Some((fmt, rest)) = self.format.split_first_char() else {
-                return Some(Err(()));
-            };
-            let fmtkind = match fmt {
-                '%' => FmtKind::Percent,
-                'd' | 'i' => FmtKind::Signed,
-                'o' | 'u' | 'x' | 'X' => FmtKind::Unsigned,
-                'e' | 'E' => FmtKind::Scientific,
-                'f' | 'F' => FmtKind::Decimal,
-                'g' | 'G' => FmtKind::AnyNotation,
-                's' => FmtKind::String,
-                'c' => FmtKind::Char,
-                'p' => FmtKind::Pointer,
-                'n' => FmtKind::GetWritten,
-                _ => return Some(Err(())),
-            };
-            self.format = rest;
-
-            Some(Ok(WPrintfFmt::Arg(WPrintfArg {
-                index,
-                alternate,
-                zero,
-                left,
-                sign_reserve,
-                sign_always,
-                min_width,
-                precision,
-                intkind,
-                fmt: fmt as u32,
-                fmtkind,
-            })))
-        }
-    }
-}
-
 unsafe fn inner_wprintf<W: Write>(w: W, format: WStr, mut ap: VaList) -> io::Result<c_int> {
     let w = &mut platform::CountingWriter::new(w);
 
-    let iterator = WPrintfIter { format };
+    let iterator = PrintfIter::<c_str::Wide> { format };
 
     // Pre-fetch vararg types
     let mut varargs = VaListCache::default();
@@ -629,8 +206,8 @@ unsafe fn inner_wprintf<W: Write>(w: W, format: WStr, mut ap: VaList) -> io::Res
 
     for section in iterator {
         let arg = match section {
-            Ok(WPrintfFmt::Plain(text)) => continue,
-            Ok(WPrintfFmt::Arg(arg)) => arg,
+            Ok(PrintfFmt::Plain(text)) => continue,
+            Ok(PrintfFmt::Arg(arg)) => arg,
             Err(()) => return Ok(-1),
         };
         if arg.fmtkind == FmtKind::Percent {
@@ -663,7 +240,7 @@ unsafe fn inner_wprintf<W: Write>(w: W, format: WStr, mut ap: VaList) -> io::Res
     // Main loop
     for section in iterator {
         let arg = match section {
-            Ok(WPrintfFmt::Plain(text)) => {
+            Ok(PrintfFmt::Plain(text)) => {
                 for &wc in text.iter() {
                     if let Some(c) = char::from_u32(wc) {
                         write!(w, "{}", c)?;
@@ -671,7 +248,7 @@ unsafe fn inner_wprintf<W: Write>(w: W, format: WStr, mut ap: VaList) -> io::Res
                 }
                 continue;
             }
-            Ok(WPrintfFmt::Arg(arg)) => arg,
+            Ok(PrintfFmt::Arg(arg)) => arg,
             Err(()) => return Ok(-1),
         };
         let alternate = arg.alternate;
@@ -693,9 +270,10 @@ unsafe fn inner_wprintf<W: Write>(w: W, format: WStr, mut ap: VaList) -> io::Res
             signed_space as usize
         };
         let intkind = arg.intkind;
-        let fmt = arg.fmt;
+        let fmt_char = arg.fmt;
+        let fmt = fmt_char as u32;
         let fmtkind = arg.fmtkind;
-        let fmtcase = match char::from_u32(fmt).unwrap_or('\0') {
+        let fmtcase = match fmt_char {
             'x' | 'f' | 'e' | 'g' => Some(FmtCase::Lower),
             'X' | 'F' | 'E' | 'G' => Some(FmtCase::Upper),
             _ => None,

@@ -1,6 +1,6 @@
-// TODO: generalize with wprintf impl
+// TODO: reuse more code with the wide printf impl
 use crate::{
-    c_str::CStr,
+    c_str::{self, CStr, NulStr},
     io::{self, Write},
 };
 use alloc::{
@@ -23,7 +23,7 @@ use crate::{
 //                           |_|
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum IntKind {
+pub(crate) enum IntKind {
     Byte,
     Short,
     Int,
@@ -34,7 +34,7 @@ enum IntKind {
     Size,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum FmtKind {
+pub(crate) enum FmtKind {
     Percent,
 
     Signed,
@@ -50,13 +50,13 @@ enum FmtKind {
     GetWritten,
 }
 #[derive(Clone, Copy, Debug)]
-enum Number {
+pub(crate) enum Number {
     Static(usize),
     Index(usize),
     Next,
 }
 impl Number {
-    unsafe fn resolve(self, varargs: &mut VaListCache, ap: &mut VaList) -> usize {
+    pub(crate) unsafe fn resolve(self, varargs: &mut VaListCache, ap: &mut VaList) -> usize {
         let arg = match self {
             Number::Static(num) => return num,
             Number::Index(i) => varargs.get(i - 1, ap, None),
@@ -82,7 +82,7 @@ impl Number {
     }
 }
 #[derive(Clone, Copy, Debug)]
-enum VaArg {
+pub(crate) enum VaArg {
     c_char(c_char),
     c_double(c_double),
     c_int(c_int),
@@ -96,7 +96,7 @@ enum VaArg {
     wint_t(wint_t),
 }
 impl VaArg {
-    unsafe fn arg_from(fmtkind: FmtKind, intkind: IntKind, ap: &mut VaList) -> VaArg {
+    pub(crate) unsafe fn arg_from(fmtkind: FmtKind, intkind: IntKind, ap: &mut VaList) -> VaArg {
         // Per the C standard using va_arg with a type with a size
         // less than that of an int for integers and double for floats
         // is invalid. As a result any arguments smaller than an int or
@@ -227,12 +227,12 @@ impl VaArg {
     }
 }
 #[derive(Default)]
-struct VaListCache {
-    args: Vec<VaArg>,
-    i: usize,
+pub(crate) struct VaListCache {
+    pub(crate) args: Vec<VaArg>,
+    pub(crate) i: usize,
 }
 impl VaListCache {
-    unsafe fn get(
+    pub(crate) unsafe fn get(
         &mut self,
         i: usize,
         ap: &mut VaList,
@@ -287,11 +287,11 @@ static INF_STR_UPPER: &str = "INF";
 static NAN_STR_LOWER: &str = "nan";
 static NAN_STR_UPPER: &str = "NAN";
 
-fn pop_int_raw(format: &mut CStr) -> Option<usize> {
+fn pop_int_raw<T: c_str::Kind>(format: &mut NulStr<T>) -> Option<usize> {
     let mut int = None;
     while let Some((digit, rest)) = format
-        .split_first()
-        .and_then(|(d, r)| Some(((d as char).to_digit(10)?, r)))
+        .split_first_char()
+        .and_then(|(d, r)| Some((d.to_digit(10)?, r)))
     {
         *format = rest;
         if int.is_none() {
@@ -302,19 +302,19 @@ fn pop_int_raw(format: &mut CStr) -> Option<usize> {
     }
     int
 }
-fn pop_index(format: &mut CStr) -> Option<usize> {
+fn pop_index<T: c_str::Kind>(format: &mut NulStr<T>) -> Option<usize> {
     // Peek ahead for a positional argument:
     let mut format2 = *format;
     if let Some(i) = pop_int_raw(&mut format2) {
-        if let Some((b'$', format2)) = format2.split_first() {
+        if let Some(('$', format2)) = format2.split_first_char() {
             *format = format2;
             return Some(i);
         }
     }
     None
 }
-fn pop_int(format: &mut CStr) -> Option<Number> {
-    if let Some((b'*', rest)) = format.split_first() {
+fn pop_int<T: c_str::Kind>(format: &mut NulStr<T>) -> Option<Number> {
+    if let Some(('*', rest)) = format.split_first_char() {
         *format = rest;
         Some(pop_index(format).map(Number::Index).unwrap_or(Number::Next))
     } else {
@@ -470,30 +470,31 @@ fn fmt_float_nonfinite<W: Write>(w: &mut W, float: c_double, case: FmtCase) -> i
 }
 
 #[derive(Clone, Copy)]
-struct PrintfIter<'a> {
-    format: CStr<'a>,
+pub(crate) struct PrintfIter<'a, T: c_str::Kind> {
+    pub(crate) format: NulStr<'a, T>,
 }
 #[derive(Clone, Copy, Debug)]
-struct PrintfArg {
-    index: Option<usize>,
-    alternate: bool,
-    zero: bool,
-    left: bool,
-    sign_reserve: bool,
-    sign_always: bool,
-    min_width: Number,
-    precision: Option<Number>,
-    intkind: IntKind,
-    fmt: u8,
-    fmtkind: FmtKind,
+pub(crate) struct PrintfArg {
+    pub(crate) index: Option<usize>,
+    pub(crate) alternate: bool,
+    pub(crate) zero: bool,
+    pub(crate) left: bool,
+    pub(crate) sign_reserve: bool,
+    pub(crate) sign_always: bool,
+    pub(crate) min_width: Number,
+    pub(crate) precision: Option<Number>,
+    pub(crate) intkind: IntKind,
+    pub(crate) fmt: char,
+    pub(crate) fmtkind: FmtKind,
 }
 #[derive(Debug)]
-enum PrintfFmt<'a> {
-    Plain(&'a [u8]),
+pub(crate) enum PrintfFmt<'a, U> {
+    Plain(&'a [U]),
     Arg(PrintfArg),
 }
-impl<'a> Iterator for PrintfIter<'a> {
-    type Item = Result<PrintfFmt<'a>, ()>;
+impl<'a, T: c_str::Kind> Iterator for PrintfIter<'a, T> {
+    type Item = Result<PrintfFmt<'a, T::Char>, ()>;
+
     fn next(&mut self) -> Option<Self::Item> {
         // Send PrintfFmt::Plain until the next %
         let first_percent = match self.format.find_get_subslice_or_all(b'%') {
@@ -521,13 +522,13 @@ impl<'a> Iterator for PrintfIter<'a> {
         let mut sign_reserve = false;
         let mut sign_always = false;
 
-        while let Some((c, rest)) = self.format.split_first() {
+        while let Some((c, rest)) = self.format.split_first_char() {
             match c {
-                b'#' => alternate = true,
-                b'0' => zero = true,
-                b'-' => left = true,
-                b' ' => sign_reserve = true,
-                b'+' => sign_always = true,
+                '#' => alternate = true,
+                '0' => zero = true,
+                '-' => left = true,
+                ' ' => sign_reserve = true,
+                '+' => sign_always = true,
                 _ => break,
             }
             self.format = rest;
@@ -535,7 +536,7 @@ impl<'a> Iterator for PrintfIter<'a> {
 
         // Width and precision:
         let min_width = pop_int(&mut self.format).unwrap_or(Number::Static(0));
-        let precision = if let Some((b'.', rest)) = self.format.split_first() {
+        let precision = if let Some(('.', rest)) = self.format.split_first_char() {
             self.format = rest;
             match pop_int(&mut self.format) {
                 int @ Some(_) => int,
@@ -547,55 +548,59 @@ impl<'a> Iterator for PrintfIter<'a> {
 
         // Integer size:
         let mut intkind = IntKind::Int;
-        while let Some((byte, rest)) = self.format.split_first() {
+        while let Some((byte, rest)) = self.format.split_first_char() {
             intkind = match byte {
-                b'h' => {
+                'h' => {
                     if intkind == IntKind::Short || intkind == IntKind::Byte {
                         IntKind::Byte
                     } else {
                         IntKind::Short
                     }
                 }
-                b'j' => IntKind::IntMax,
-                b'l' => {
+                'j' => IntKind::IntMax,
+                'l' => {
                     if intkind == IntKind::Long || intkind == IntKind::LongLong {
                         IntKind::LongLong
                     } else {
                         IntKind::Long
                     }
                 }
-                b'q' | b'L' => IntKind::LongLong,
-                b't' => IntKind::PtrDiff,
-                b'z' => IntKind::Size,
+                'q' | 'L' => IntKind::LongLong,
+                't' => IntKind::PtrDiff,
+                'z' => IntKind::Size,
                 _ => break,
             };
 
             self.format = rest;
         }
-        let Some((fmt, rest)) = self.format.split_first() else {
+        let Some((fmt, rest)) = self.format.split_first_char() else {
             return Some(Err(()));
         };
         self.format = rest;
         let fmtkind = match fmt {
-            b'%' => FmtKind::Percent,
-            b'd' | b'i' => FmtKind::Signed,
-            b'o' | b'u' | b'x' | b'X' | b'b' | b'B' => FmtKind::Unsigned,
-            b'e' | b'E' => FmtKind::Scientific,
-            b'f' | b'F' => FmtKind::Decimal,
-            b'g' | b'G' => FmtKind::AnyNotation,
-            b's' => FmtKind::String,
-            b'c' => FmtKind::Char,
-            b'p' => FmtKind::Pointer,
-            b'n' => FmtKind::GetWritten,
-            b'm' => {
+            '%' => FmtKind::Percent,
+            'd' | 'i' => FmtKind::Signed,
+            'o' | 'u' | 'x' | 'X' => FmtKind::Unsigned,
+            'b' | 'B' if T::IS_THIN_NOT_WIDE => FmtKind::Unsigned,
+            'e' | 'E' => FmtKind::Scientific,
+            'f' | 'F' => FmtKind::Decimal,
+            'g' | 'G' => FmtKind::AnyNotation,
+            's' => FmtKind::String,
+            'c' => FmtKind::Char,
+            'p' => FmtKind::Pointer,
+            'n' => FmtKind::GetWritten,
+            'm' if T::IS_THIN_NOT_WIDE => {
                 // %m is technically for syslog only, but musl and glibc implement it for
                 // printf because it is difficult and error prone to implement a format
                 // specifier for just *one* function.
                 return Some(Ok(PrintfFmt::Plain(
-                    errno::STR_ERROR
-                        .get(platform::ERRNO.get() as usize)
-                        .map(|e| e.as_bytes())
-                        .unwrap_or(b"unknown error"),
+                    T::chars_from_bytes(
+                        errno::STR_ERROR
+                            .get(platform::ERRNO.get() as usize)
+                            .map(|e| e.as_bytes())
+                            .unwrap_or(b"unknown error"),
+                    )
+                    .expect("string must be thin"),
                 )));
             }
             _ => return Some(Err(())),
@@ -689,7 +694,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: CStr, mut ap: VaList) -> io::Resu
             signed_space as usize
         };
         let intkind = arg.intkind;
-        let fmt = arg.fmt;
+        let fmt = arg.fmt as u8;
         let fmtkind = arg.fmtkind;
         let fmtcase = match fmt {
             b'x' | b'b' | b'f' | b'e' | b'g' => Some(FmtCase::Lower),
