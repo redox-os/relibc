@@ -27,6 +27,8 @@ pub const _SC_RE_DUP_MAX: c_int = 44;
 
 pub const _SC_NPROCESSORS_CONF: c_int = 57;
 pub const _SC_NPROCESSORS_ONLN: c_int = 58;
+pub const _SC_PHYS_PAGES: c_int = 59;
+pub const _SC_AVPHYS_PAGES: c_int = 60;
 
 // ...
 pub const _SC_GETGR_R_SIZE_MAX: c_int = 69;
@@ -63,6 +65,8 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
         _SC_HOST_NAME_MAX => 64,
         _SC_NPROCESSORS_CONF => get_cpu_count().unwrap_or(None).unwrap_or(1),
         _SC_NPROCESSORS_ONLN => get_cpu_count().unwrap_or(None).unwrap_or(1),
+        _SC_PHYS_PAGES => 262144,
+        _SC_AVPHYS_PAGES => -1,
         _SC_SIGQUEUE_MAX => 32,
         _SC_REALTIME_SIGNALS => 202405,
         _ => {
