@@ -1194,7 +1194,7 @@ pub unsafe extern "C" fn vfprintf(file: *mut FILE, format: *const c_char, ap: va
         return -1;
     }
 
-    printf::printf(&mut *file, format, ap)
+    printf::printf(&mut *file, CStr::from_ptr(format), ap)
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fprintf(
@@ -1213,7 +1213,7 @@ pub unsafe extern "C" fn vdprintf(fd: c_int, format: *const c_char, ap: va_list)
     // borrowing the file descriptor here
     f.reference = true;
 
-    printf::printf(f, format, ap)
+    printf::printf(f, CStr::from_ptr(format), ap)
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dprintf(fd: c_int, format: *const c_char, mut __valist: ...) -> c_int {
@@ -1236,7 +1236,7 @@ pub unsafe extern "C" fn vasprintf(
     ap: va_list,
 ) -> c_int {
     let mut alloc_writer = CVec::new();
-    let ret = printf::printf(&mut alloc_writer, format, ap);
+    let ret = printf::printf(&mut alloc_writer, CStr::from_ptr(format), ap);
     alloc_writer.push(0).unwrap();
     alloc_writer.shrink_to_fit().unwrap();
     *strp = alloc_writer.leak() as *mut c_char;
@@ -1260,7 +1260,7 @@ pub unsafe extern "C" fn vsnprintf(
 ) -> c_int {
     printf::printf(
         &mut platform::StringWriter(s as *mut u8, n as usize),
-        format,
+        CStr::from_ptr(format),
         ap,
     )
 }
@@ -1273,14 +1273,18 @@ pub unsafe extern "C" fn snprintf(
 ) -> c_int {
     printf::printf(
         &mut platform::StringWriter(s as *mut u8, n as usize),
-        format,
+        CStr::from_ptr(format),
         __valist.as_va_list(),
     )
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vsprintf(s: *mut c_char, format: *const c_char, ap: va_list) -> c_int {
-    printf::printf(&mut platform::UnsafeStringWriter(s as *mut u8), format, ap)
+    printf::printf(
+        &mut platform::UnsafeStringWriter(s as *mut u8),
+        CStr::from_ptr(format),
+        ap,
+    )
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sprintf(
@@ -1290,7 +1294,7 @@ pub unsafe extern "C" fn sprintf(
 ) -> c_int {
     printf::printf(
         &mut platform::UnsafeStringWriter(s as *mut u8),
-        format,
+        CStr::from_ptr(format),
         __valist.as_va_list(),
     )
 }

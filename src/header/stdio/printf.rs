@@ -1,4 +1,8 @@
-use crate::io::{self, Write};
+// TODO: reuse more code with the wide printf impl
+use crate::{
+    c_str::{self, CStr, NulStr},
+    io::{self, Write},
+};
 use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
@@ -19,7 +23,7 @@ use crate::{
 //                           |_|
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum IntKind {
+pub(crate) enum IntKind {
     Byte,
     Short,
     Int,
@@ -30,7 +34,7 @@ enum IntKind {
     Size,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum FmtKind {
+pub(crate) enum FmtKind {
     Percent,
 
     Signed,
@@ -46,13 +50,13 @@ enum FmtKind {
     GetWritten,
 }
 #[derive(Clone, Copy, Debug)]
-enum Number {
+pub(crate) enum Number {
     Static(usize),
     Index(usize),
     Next,
 }
 impl Number {
-    unsafe fn resolve(self, varargs: &mut VaListCache, ap: &mut VaList) -> usize {
+    pub(crate) unsafe fn resolve(self, varargs: &mut VaListCache, ap: &mut VaList) -> usize {
         let arg = match self {
             Number::Static(num) => return num,
             Number::Index(i) => varargs.get(i - 1, ap, None),
@@ -78,7 +82,7 @@ impl Number {
     }
 }
 #[derive(Clone, Copy, Debug)]
-enum VaArg {
+pub(crate) enum VaArg {
     c_char(c_char),
     c_double(c_double),
     c_int(c_int),
@@ -92,7 +96,7 @@ enum VaArg {
     wint_t(wint_t),
 }
 impl VaArg {
-    unsafe fn arg_from(fmtkind: FmtKind, intkind: IntKind, ap: &mut VaList) -> VaArg {
+    pub(crate) unsafe fn arg_from(fmtkind: FmtKind, intkind: IntKind, ap: &mut VaList) -> VaArg {
         // Per the C standard using va_arg with a type with a size
         // less than that of an int for integers and double for floats
         // is invalid. As a result any arguments smaller than an int or
@@ -223,12 +227,12 @@ impl VaArg {
     }
 }
 #[derive(Default)]
-struct VaListCache {
-    args: Vec<VaArg>,
-    i: usize,
+pub(crate) struct VaListCache {
+    pub(crate) args: Vec<VaArg>,
+    pub(crate) i: usize,
 }
 impl VaListCache {
-    unsafe fn get(
+    pub(crate) unsafe fn get(
         &mut self,
         i: usize,
         ap: &mut VaList,
@@ -283,10 +287,13 @@ static INF_STR_UPPER: &str = "INF";
 static NAN_STR_LOWER: &str = "nan";
 static NAN_STR_UPPER: &str = "NAN";
 
-unsafe fn pop_int_raw(format: &mut *const u8) -> Option<usize> {
+fn pop_int_raw<T: c_str::Kind>(format: &mut NulStr<T>) -> Option<usize> {
     let mut int = None;
-    while let Some(digit) = (**format as char).to_digit(10) {
-        *format = format.add(1);
+    while let Some((digit, rest)) = format
+        .split_first_char()
+        .and_then(|(d, r)| Some((d.to_digit(10)?, r)))
+    {
+        *format = rest;
         if int.is_none() {
             int = Some(0);
         }
@@ -295,39 +302,39 @@ unsafe fn pop_int_raw(format: &mut *const u8) -> Option<usize> {
     }
     int
 }
-unsafe fn pop_index(format: &mut *const u8) -> Option<usize> {
+fn pop_index<T: c_str::Kind>(format: &mut NulStr<T>) -> Option<usize> {
     // Peek ahead for a positional argument:
     let mut format2 = *format;
     if let Some(i) = pop_int_raw(&mut format2) {
-        if *format2 == b'$' {
-            *format = format2.add(1);
+        if let Some(('$', format2)) = format2.split_first_char() {
+            *format = format2;
             return Some(i);
         }
     }
     None
 }
-unsafe fn pop_int(format: &mut *const u8) -> Option<Number> {
-    if **format == b'*' {
-        *format = format.add(1);
+fn pop_int<T: c_str::Kind>(format: &mut NulStr<T>) -> Option<Number> {
+    if let Some(('*', rest)) = format.split_first_char() {
+        *format = rest;
         Some(pop_index(format).map(Number::Index).unwrap_or(Number::Next))
     } else {
         pop_int_raw(format).map(Number::Static)
     }
 }
 
-unsafe fn fmt_int<I>(fmt: u8, i: I) -> String
+fn fmt_int<I, T: c_str::Kind>(fmt: char, i: I) -> String
 where
     I: fmt::Display + fmt::Octal + fmt::LowerHex + fmt::UpperHex + fmt::Binary,
 {
     match fmt {
-        b'o' => format!("{:o}", i),
-        b'u' => i.to_string(),
-        b'x' => format!("{:x}", i),
-        b'X' => format!("{:X}", i),
-        b'b' | b'B' => format!("{:b}", i),
+        'o' => format!("{:o}", i),
+        'u' => i.to_string(),
+        'x' => format!("{:x}", i),
+        'X' => format!("{:X}", i),
+        'b' | 'B' if T::IS_THIN_NOT_WIDE => format!("{:b}", i),
         _ => panic!(
             "fmt_int should never be called with the fmt {:?}",
-            fmt as char
+            fmt as char,
         ),
     }
 }
@@ -377,7 +384,7 @@ fn float_exp(mut float: c_double) -> (c_double, isize) {
 
 fn fmt_float_exp<W: Write>(
     w: &mut W,
-    exp_fmt: u8,
+    exp_fmt: char,
     trim: bool,
     precision: usize,
     float: c_double,
@@ -405,7 +412,7 @@ fn fmt_float_exp<W: Write>(
     };
     pad(w, !left, b'0', len..pad_zero)?;
     w.write_all(bytes)?;
-    write!(w, "{}{:+03}", exp_fmt as char, exp)?;
+    write!(w, "{}{:+03}", exp_fmt, exp)?;
     pad(w, left, b' ', len..pad_space)?;
 
     Ok(())
@@ -463,165 +470,166 @@ fn fmt_float_nonfinite<W: Write>(w: &mut W, float: c_double, case: FmtCase) -> i
 }
 
 #[derive(Clone, Copy)]
-struct PrintfIter {
-    format: *const u8,
+pub(crate) struct PrintfIter<'a, T: c_str::Kind> {
+    pub(crate) format: NulStr<'a, T>,
 }
 #[derive(Clone, Copy, Debug)]
-struct PrintfArg {
-    index: Option<usize>,
-    alternate: bool,
-    zero: bool,
-    left: bool,
-    sign_reserve: bool,
-    sign_always: bool,
-    min_width: Number,
-    precision: Option<Number>,
-    intkind: IntKind,
-    fmt: u8,
-    fmtkind: FmtKind,
+pub(crate) struct PrintfArg {
+    pub(crate) index: Option<usize>,
+    pub(crate) alternate: bool,
+    pub(crate) zero: bool,
+    pub(crate) left: bool,
+    pub(crate) sign_reserve: bool,
+    pub(crate) sign_always: bool,
+    pub(crate) min_width: Number,
+    pub(crate) precision: Option<Number>,
+    pub(crate) intkind: IntKind,
+    pub(crate) fmt: char,
+    pub(crate) fmtkind: FmtKind,
 }
 #[derive(Debug)]
-enum PrintfFmt {
-    Plain(&'static [u8]),
+pub(crate) enum PrintfFmt<'a, U> {
+    Plain(&'a [U]),
     Arg(PrintfArg),
 }
-impl Iterator for PrintfIter {
-    type Item = Result<PrintfFmt, ()>;
+impl<'a, T: c_str::Kind> Iterator for PrintfIter<'a, T> {
+    type Item = Result<PrintfFmt<'a, T::Char>, ()>;
+
     fn next(&mut self) -> Option<Self::Item> {
-        unsafe {
-            // Send PrintfFmt::Plain until the next %
-            let mut len = 0;
-            while *self.format.add(len) != 0 && *self.format.add(len) != b'%' {
-                len += 1;
+        // Send PrintfFmt::Plain until the next %
+        let first_percent = match self.format.find_get_subslice_or_all(b'%') {
+            Err(([], _)) => return None,
+            Ok((chunk @ [_, ..], rest)) | Err((chunk @ [_, ..], rest)) => {
+                self.format = rest;
+                return Some(Ok(PrintfFmt::Plain(chunk)));
             }
-            if len > 0 {
-                let slice = slice::from_raw_parts(self.format as *const u8, len);
-                self.format = self.format.add(len);
-                return Some(Ok(PrintfFmt::Plain(slice)));
+            Ok(([], rest)) => rest,
+        };
+
+        // at this point the next char must be %
+        self.format = first_percent.split_first().expect("must be %").1;
+
+        let mut peekahead = self.format;
+        let index = pop_index(&mut peekahead).map(|i| {
+            self.format = peekahead;
+            i
+        });
+
+        // Flags:
+        let mut alternate = false;
+        let mut zero = false;
+        let mut left = false;
+        let mut sign_reserve = false;
+        let mut sign_always = false;
+
+        while let Some((c, rest)) = self.format.split_first_char() {
+            match c {
+                '#' => alternate = true,
+                '0' => zero = true,
+                '-' => left = true,
+                ' ' => sign_reserve = true,
+                '+' => sign_always = true,
+                _ => break,
             }
-            self.format = self.format.add(len);
-            if *self.format == 0 {
-                return None;
+            self.format = rest;
+        }
+
+        // Width and precision:
+        let min_width = pop_int(&mut self.format).unwrap_or(Number::Static(0));
+        let precision = if let Some(('.', rest)) = self.format.split_first_char() {
+            self.format = rest;
+            match pop_int(&mut self.format) {
+                int @ Some(_) => int,
+                None => return Some(Err(())),
             }
+        } else {
+            None
+        };
 
-            // *self.format is guaranteed to be '%' at this point
-            self.format = self.format.add(1);
-
-            let mut peekahead = self.format;
-            let index = pop_index(&mut peekahead).map(|i| {
-                self.format = peekahead;
-                i
-            });
-
-            // Flags:
-            let mut alternate = false;
-            let mut zero = false;
-            let mut left = false;
-            let mut sign_reserve = false;
-            let mut sign_always = false;
-
-            loop {
-                match *self.format {
-                    b'#' => alternate = true,
-                    b'0' => zero = true,
-                    b'-' => left = true,
-                    b' ' => sign_reserve = true,
-                    b'+' => sign_always = true,
-                    _ => break,
+        // Integer size:
+        let mut intkind = IntKind::Int;
+        while let Some((byte, rest)) = self.format.split_first_char() {
+            intkind = match byte {
+                'h' => {
+                    if intkind == IntKind::Short || intkind == IntKind::Byte {
+                        IntKind::Byte
+                    } else {
+                        IntKind::Short
+                    }
                 }
-                self.format = self.format.add(1);
-            }
-
-            // Width and precision:
-            let min_width = pop_int(&mut self.format).unwrap_or(Number::Static(0));
-            let precision = if *self.format == b'.' {
-                self.format = self.format.add(1);
-                match pop_int(&mut self.format) {
-                    int @ Some(_) => int,
-                    None => return Some(Err(())),
+                'j' => IntKind::IntMax,
+                'l' => {
+                    if intkind == IntKind::Long || intkind == IntKind::LongLong {
+                        IntKind::LongLong
+                    } else {
+                        IntKind::Long
+                    }
                 }
-            } else {
-                None
+                'q' | 'L' => IntKind::LongLong,
+                't' => IntKind::PtrDiff,
+                'z' => IntKind::Size,
+                _ => break,
             };
 
-            // Integer size:
-            let mut intkind = IntKind::Int;
-            loop {
-                intkind = match *self.format {
-                    b'h' => {
-                        if intkind == IntKind::Short || intkind == IntKind::Byte {
-                            IntKind::Byte
-                        } else {
-                            IntKind::Short
-                        }
-                    }
-                    b'j' => IntKind::IntMax,
-                    b'l' => {
-                        if intkind == IntKind::Long || intkind == IntKind::LongLong {
-                            IntKind::LongLong
-                        } else {
-                            IntKind::Long
-                        }
-                    }
-                    b'q' | b'L' => IntKind::LongLong,
-                    b't' => IntKind::PtrDiff,
-                    b'z' => IntKind::Size,
-                    _ => break,
-                };
-
-                self.format = self.format.add(1);
-            }
-            let fmt = *self.format;
-            let fmtkind = match fmt {
-                b'%' => FmtKind::Percent,
-                b'd' | b'i' => FmtKind::Signed,
-                b'o' | b'u' | b'x' | b'X' | b'b' | b'B' => FmtKind::Unsigned,
-                b'e' | b'E' => FmtKind::Scientific,
-                b'f' | b'F' => FmtKind::Decimal,
-                b'g' | b'G' => FmtKind::AnyNotation,
-                b's' => FmtKind::String,
-                b'c' => FmtKind::Char,
-                b'p' => FmtKind::Pointer,
-                b'n' => FmtKind::GetWritten,
-                b'm' => {
-                    // %m is technically for syslog only, but musl and glibc implement it for
-                    // printf because it is difficult and error prone to implement a format
-                    // specifier for just *one* function.
-                    self.format = self.format.add(1);
-                    return Some(Ok(PrintfFmt::Plain(
+            self.format = rest;
+        }
+        let Some((fmt, rest)) = self.format.split_first_char() else {
+            return Some(Err(()));
+        };
+        self.format = rest;
+        let fmtkind = match fmt {
+            '%' => FmtKind::Percent,
+            'd' | 'i' => FmtKind::Signed,
+            'o' | 'u' | 'x' | 'X' => FmtKind::Unsigned,
+            'b' | 'B' if T::IS_THIN_NOT_WIDE => FmtKind::Unsigned,
+            'e' | 'E' => FmtKind::Scientific,
+            'f' | 'F' => FmtKind::Decimal,
+            'g' | 'G' => FmtKind::AnyNotation,
+            's' => FmtKind::String,
+            'c' => FmtKind::Char,
+            'p' => FmtKind::Pointer,
+            'n' => FmtKind::GetWritten,
+            'm' if T::IS_THIN_NOT_WIDE => {
+                // %m is technically for syslog only, but musl and glibc implement it for
+                // printf because it is difficult and error prone to implement a format
+                // specifier for just *one* function.
+                return Some(Ok(PrintfFmt::Plain(
+                    T::chars_from_bytes(
                         errno::STR_ERROR
                             .get(platform::ERRNO.get() as usize)
                             .map(|e| e.as_bytes())
                             .unwrap_or(b"unknown error"),
-                    )));
-                }
-                _ => return Some(Err(())),
-            };
-            self.format = self.format.add(1);
+                    )
+                    .expect("string must be thin"),
+                )));
+            }
+            _ => return Some(Err(())),
+        };
 
-            Some(Ok(PrintfFmt::Arg(PrintfArg {
-                index,
-                alternate,
-                zero,
-                left,
-                sign_reserve,
-                sign_always,
-                min_width,
-                precision,
-                intkind,
-                fmt,
-                fmtkind,
-            })))
-        }
+        Some(Ok(PrintfFmt::Arg(PrintfArg {
+            index,
+            alternate,
+            zero,
+            left,
+            sign_reserve,
+            sign_always,
+            min_width,
+            precision,
+            intkind,
+            fmt,
+            fmtkind,
+        })))
     }
 }
 
-unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) -> io::Result<c_int> {
+pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
+    w: impl Write,
+    format: NulStr<T>,
+    mut ap: VaList,
+) -> io::Result<c_int> {
     let w = &mut platform::CountingWriter::new(w);
 
-    let iterator = PrintfIter {
-        format: format as *const u8,
-    };
+    let iterator = PrintfIter { format };
 
     // Pre-fetch vararg types
     let mut varargs = VaListCache::default();
@@ -665,7 +673,15 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
     for section in iterator {
         let arg = match section {
             Ok(PrintfFmt::Plain(text)) => {
-                w.write_all(text)?;
+                if T::IS_THIN_NOT_WIDE {
+                    let bytes = T::chars_to_bytes(text).expect("is thin");
+                    w.write_all(bytes)?;
+                } else {
+                    // TODO: wcsrtombs wrapper
+                    for c in text.iter().filter_map(|u| char::from_u32((*u).into())) {
+                        write!(w, "{}", c);
+                    }
+                }
                 continue;
             }
             Ok(PrintfFmt::Arg(arg)) => arg,
@@ -693,8 +709,10 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
         let fmt = arg.fmt;
         let fmtkind = arg.fmtkind;
         let fmtcase = match fmt {
-            b'x' | b'b' | b'f' | b'e' | b'g' => Some(FmtCase::Lower),
-            b'X' | b'B' | b'F' | b'E' | b'G' => Some(FmtCase::Upper),
+            'b' if T::IS_THIN_NOT_WIDE => Some(FmtCase::Lower),
+            'B' if T::IS_THIN_NOT_WIDE => Some(FmtCase::Upper),
+            'x' | 'f' | 'e' | 'g' => Some(FmtCase::Lower),
+            'X' | 'F' | 'E' | 'G' => Some(FmtCase::Upper),
             _ => None,
         };
 
@@ -760,16 +778,16 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
             }
             FmtKind::Unsigned => {
                 let string = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
-                    VaArg::c_char(i) => fmt_int(fmt, i as c_uchar),
+                    VaArg::c_char(i) => fmt_int::<_, T>(fmt, i as c_uchar),
                     VaArg::c_double(i) => panic!("this should not be possible"),
-                    VaArg::c_int(i) => fmt_int(fmt, i as c_uint),
-                    VaArg::c_long(i) => fmt_int(fmt, i as c_ulong),
-                    VaArg::c_longlong(i) => fmt_int(fmt, i as c_ulonglong),
-                    VaArg::c_short(i) => fmt_int(fmt, i as c_ushort),
-                    VaArg::intmax_t(i) => fmt_int(fmt, i as uintmax_t),
-                    VaArg::pointer(i) => fmt_int(fmt, i as usize),
-                    VaArg::ptrdiff_t(i) => fmt_int(fmt, i as size_t),
-                    VaArg::ssize_t(i) => fmt_int(fmt, i as size_t),
+                    VaArg::c_int(i) => fmt_int::<_, T>(fmt, i as c_uint),
+                    VaArg::c_long(i) => fmt_int::<_, T>(fmt, i as c_ulong),
+                    VaArg::c_longlong(i) => fmt_int::<_, T>(fmt, i as c_ulonglong),
+                    VaArg::c_short(i) => fmt_int::<_, T>(fmt, i as c_ushort),
+                    VaArg::intmax_t(i) => fmt_int::<_, T>(fmt, i as uintmax_t),
+                    VaArg::pointer(i) => fmt_int::<_, T>(fmt, i as usize),
+                    VaArg::ptrdiff_t(i) => fmt_int::<_, T>(fmt, i as size_t),
+                    VaArg::ssize_t(i) => fmt_int::<_, T>(fmt, i as size_t),
                     VaArg::wint_t(_) => unreachable!("this should not be possible"),
                 };
                 let zero = precision == Some(0) && string == "0";
@@ -787,8 +805,9 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                     len.max(precision.unwrap_or(0))
                         + if alternate && string != "0" {
                             match fmt {
-                                b'o' if no_precision => 1,
-                                b'x' | b'X' | b'b' | b'B' => 2,
+                                'o' if no_precision => 1,
+                                'x' | 'X' => 2,
+                                'b' | 'B' if T::IS_THIN_NOT_WIDE => 2,
                                 _ => 0,
                             }
                         } else {
@@ -800,11 +819,11 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
 
                 if alternate && string != "0" {
                     match fmt {
-                        b'o' if no_precision => w.write_all(b"0")?,
-                        b'x' => w.write_all(b"0x")?,
-                        b'X' => w.write_all(b"0X")?,
-                        b'b' => w.write_all(b"0b")?,
-                        b'B' => w.write_all(b"0B")?,
+                        'o' if no_precision => w.write_all(b"0")?,
+                        'x' => w.write_all(b"0x")?,
+                        'X' => w.write_all(b"0X")?,
+                        'b' if T::IS_THIN_NOT_WIDE => w.write_all(b"0b")?,
+                        'B' if T::IS_THIN_NOT_WIDE => w.write_all(b"0B")?,
                         _ => (),
                     }
                 }
@@ -852,7 +871,8 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
                 };
                 if float.is_finite() {
                     let (log, exp) = float_exp(float);
-                    let exp_fmt = b'E' | (fmt & 32);
+                    // TODO: .is_uppercase()?
+                    let exp_fmt = if fmt as u32 & 32 == 32 { 'e' } else { 'E' };
                     let precision = precision.unwrap_or(6);
                     let use_exp_format = exp < -4 || exp >= precision as isize;
 
@@ -1258,8 +1278,7 @@ unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) ->
 ///
 /// # Safety
 /// Behavior is undefined if any of the following conditions are violated:
-/// - `format` must point to valid null-terminated string.
 /// - `ap` must follow the safety contract of variable arguments of C.
-pub unsafe fn printf<W: Write>(w: W, format: *const c_char, ap: VaList) -> c_int {
-    inner_printf(w, format, ap).unwrap_or(-1)
+pub unsafe fn printf(w: impl Write, format: CStr, ap: VaList) -> c_int {
+    inner_printf::<c_str::Thin>(w, format, ap).unwrap_or(-1)
 }

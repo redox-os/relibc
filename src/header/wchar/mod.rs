@@ -3,6 +3,7 @@
 use core::{char, ffi::VaList as va_list, mem, ptr, slice, usize};
 
 use crate::{
+    c_str::WStr,
     header::{
         ctype::isspace,
         errno::{EILSEQ, ENOMEM, ERANGE},
@@ -328,7 +329,7 @@ pub unsafe extern "C" fn vfwprintf(
         return -1;
     }
 
-    wprintf::wprintf(&mut *stream, format, arg)
+    wprintf::wprintf(&mut *stream, WStr::from_ptr(format), arg)
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwprintf(
