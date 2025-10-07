@@ -82,7 +82,7 @@ impl<L: LogSink> LogParams<L> {
         // SAFETY:
         // * Assumes caller passed in a valid C string; printf should handle that invariant.
         // * `buffer` grows to fit the formatted string.
-        unsafe { printf(&mut buffer, message.as_ptr(), ap) };
+        unsafe { printf(&mut buffer, message, ap) };
         buffer.extend(b"\n\0");
 
         if self.maybe_open_logger().is_ok() {
