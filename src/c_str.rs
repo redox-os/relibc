@@ -35,6 +35,7 @@ pub trait Kind: private::Sealed + Copy + 'static {
     fn c2r(c: Self::C) -> Self::Char;
 
     fn chars_from_bytes(b: &[u8]) -> Option<&[Self::Char]>;
+    fn chars_to_bytes(c: &[Self::Char]) -> Option<&[u8]>;
 
     unsafe fn strlen(s: *const Self::C) -> usize;
     unsafe fn strchr(s: *const Self::C, c: Self::C) -> *const Self::C;
@@ -65,6 +66,9 @@ impl Kind for Thin {
     fn chars_from_bytes(b: &[u8]) -> Option<&[Self::Char]> {
         Some(b)
     }
+    fn chars_to_bytes(c: &[Self::Char]) -> Option<&[u8]> {
+        Some(c)
+    }
 }
 impl Kind for Wide {
     type C = wchar_t;
@@ -93,6 +97,9 @@ impl Kind for Wide {
         c as _
     }
     fn chars_from_bytes(b: &[u8]) -> Option<&[Self::Char]> {
+        None
+    }
+    fn chars_to_bytes(c: &[Self::Char]) -> Option<&[u8]> {
         None
     }
 }

@@ -322,16 +322,16 @@ fn pop_int<T: c_str::Kind>(format: &mut NulStr<T>) -> Option<Number> {
     }
 }
 
-fn fmt_int<I>(fmt: u8, i: I) -> String
+fn fmt_int<I, T: c_str::Kind>(fmt: char, i: I) -> String
 where
     I: fmt::Display + fmt::Octal + fmt::LowerHex + fmt::UpperHex + fmt::Binary,
 {
     match fmt {
-        b'o' => format!("{:o}", i),
-        b'u' => i.to_string(),
-        b'x' => format!("{:x}", i),
-        b'X' => format!("{:X}", i),
-        b'b' | b'B' => format!("{:b}", i),
+        'o' => format!("{:o}", i),
+        'u' => i.to_string(),
+        'x' => format!("{:x}", i),
+        'X' => format!("{:X}", i),
+        'b' | 'B' if T::IS_THIN_NOT_WIDE => format!("{:b}", i),
         _ => panic!(
             "fmt_int should never be called with the fmt {:?}",
             fmt as char,
@@ -384,7 +384,7 @@ fn float_exp(mut float: c_double) -> (c_double, isize) {
 
 fn fmt_float_exp<W: Write>(
     w: &mut W,
-    exp_fmt: u8,
+    exp_fmt: char,
     trim: bool,
     precision: usize,
     float: c_double,
@@ -412,7 +412,7 @@ fn fmt_float_exp<W: Write>(
     };
     pad(w, !left, b'0', len..pad_zero)?;
     w.write_all(bytes)?;
-    write!(w, "{}{:+03}", exp_fmt as char, exp)?;
+    write!(w, "{}{:+03}", exp_fmt, exp)?;
     pad(w, left, b' ', len..pad_space)?;
 
     Ok(())
@@ -622,7 +622,11 @@ impl<'a, T: c_str::Kind> Iterator for PrintfIter<'a, T> {
     }
 }
 
-unsafe fn inner_printf<W: Write>(w: W, format: CStr, mut ap: VaList) -> io::Result<c_int> {
+pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
+    w: impl Write,
+    format: NulStr<T>,
+    mut ap: VaList,
+) -> io::Result<c_int> {
     let w = &mut platform::CountingWriter::new(w);
 
     let iterator = PrintfIter { format };
@@ -669,7 +673,15 @@ unsafe fn inner_printf<W: Write>(w: W, format: CStr, mut ap: VaList) -> io::Resu
     for section in iterator {
         let arg = match section {
             Ok(PrintfFmt::Plain(text)) => {
-                w.write_all(text)?;
+                if T::IS_THIN_NOT_WIDE {
+                    let bytes = T::chars_to_bytes(text).expect("is thin");
+                    w.write_all(bytes)?;
+                } else {
+                    // TODO: wcsrtombs wrapper
+                    for c in text.iter().filter_map(|u| char::from_u32((*u).into())) {
+                        write!(w, "{}", c);
+                    }
+                }
                 continue;
             }
             Ok(PrintfFmt::Arg(arg)) => arg,
@@ -694,11 +706,13 @@ unsafe fn inner_printf<W: Write>(w: W, format: CStr, mut ap: VaList) -> io::Resu
             signed_space as usize
         };
         let intkind = arg.intkind;
-        let fmt = arg.fmt as u8;
+        let fmt = arg.fmt;
         let fmtkind = arg.fmtkind;
         let fmtcase = match fmt {
-            b'x' | b'b' | b'f' | b'e' | b'g' => Some(FmtCase::Lower),
-            b'X' | b'B' | b'F' | b'E' | b'G' => Some(FmtCase::Upper),
+            'b' if T::IS_THIN_NOT_WIDE => Some(FmtCase::Lower),
+            'B' if T::IS_THIN_NOT_WIDE => Some(FmtCase::Upper),
+            'x' | 'f' | 'e' | 'g' => Some(FmtCase::Lower),
+            'X' | 'F' | 'E' | 'G' => Some(FmtCase::Upper),
             _ => None,
         };
 
@@ -764,16 +778,16 @@ unsafe fn inner_printf<W: Write>(w: W, format: CStr, mut ap: VaList) -> io::Resu
             }
             FmtKind::Unsigned => {
                 let string = match varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind))) {
-                    VaArg::c_char(i) => fmt_int(fmt, i as c_uchar),
+                    VaArg::c_char(i) => fmt_int::<_, T>(fmt, i as c_uchar),
                     VaArg::c_double(i) => panic!("this should not be possible"),
-                    VaArg::c_int(i) => fmt_int(fmt, i as c_uint),
-                    VaArg::c_long(i) => fmt_int(fmt, i as c_ulong),
-                    VaArg::c_longlong(i) => fmt_int(fmt, i as c_ulonglong),
-                    VaArg::c_short(i) => fmt_int(fmt, i as c_ushort),
-                    VaArg::intmax_t(i) => fmt_int(fmt, i as uintmax_t),
-                    VaArg::pointer(i) => fmt_int(fmt, i as usize),
-                    VaArg::ptrdiff_t(i) => fmt_int(fmt, i as size_t),
-                    VaArg::ssize_t(i) => fmt_int(fmt, i as size_t),
+                    VaArg::c_int(i) => fmt_int::<_, T>(fmt, i as c_uint),
+                    VaArg::c_long(i) => fmt_int::<_, T>(fmt, i as c_ulong),
+                    VaArg::c_longlong(i) => fmt_int::<_, T>(fmt, i as c_ulonglong),
+                    VaArg::c_short(i) => fmt_int::<_, T>(fmt, i as c_ushort),
+                    VaArg::intmax_t(i) => fmt_int::<_, T>(fmt, i as uintmax_t),
+                    VaArg::pointer(i) => fmt_int::<_, T>(fmt, i as usize),
+                    VaArg::ptrdiff_t(i) => fmt_int::<_, T>(fmt, i as size_t),
+                    VaArg::ssize_t(i) => fmt_int::<_, T>(fmt, i as size_t),
                     VaArg::wint_t(_) => unreachable!("this should not be possible"),
                 };
                 let zero = precision == Some(0) && string == "0";
@@ -791,8 +805,9 @@ unsafe fn inner_printf<W: Write>(w: W, format: CStr, mut ap: VaList) -> io::Resu
                     len.max(precision.unwrap_or(0))
                         + if alternate && string != "0" {
                             match fmt {
-                                b'o' if no_precision => 1,
-                                b'x' | b'X' | b'b' | b'B' => 2,
+                                'o' if no_precision => 1,
+                                'x' | 'X' => 2,
+                                'b' | 'B' if T::IS_THIN_NOT_WIDE => 2,
                                 _ => 0,
                             }
                         } else {
@@ -804,11 +819,11 @@ unsafe fn inner_printf<W: Write>(w: W, format: CStr, mut ap: VaList) -> io::Resu
 
                 if alternate && string != "0" {
                     match fmt {
-                        b'o' if no_precision => w.write_all(b"0")?,
-                        b'x' => w.write_all(b"0x")?,
-                        b'X' => w.write_all(b"0X")?,
-                        b'b' => w.write_all(b"0b")?,
-                        b'B' => w.write_all(b"0B")?,
+                        'o' if no_precision => w.write_all(b"0")?,
+                        'x' => w.write_all(b"0x")?,
+                        'X' => w.write_all(b"0X")?,
+                        'b' if T::IS_THIN_NOT_WIDE => w.write_all(b"0b")?,
+                        'B' if T::IS_THIN_NOT_WIDE => w.write_all(b"0B")?,
                         _ => (),
                     }
                 }
@@ -856,7 +871,8 @@ unsafe fn inner_printf<W: Write>(w: W, format: CStr, mut ap: VaList) -> io::Resu
                 };
                 if float.is_finite() {
                     let (log, exp) = float_exp(float);
-                    let exp_fmt = b'E' | (fmt & 32);
+                    // TODO: .is_uppercase()?
+                    let exp_fmt = if fmt as u32 & 32 == 32 { 'e' } else { 'E' };
                     let precision = precision.unwrap_or(6);
                     let use_exp_format = exp < -4 || exp >= precision as isize;
 
@@ -1263,6 +1279,6 @@ unsafe fn inner_printf<W: Write>(w: W, format: CStr, mut ap: VaList) -> io::Resu
 /// # Safety
 /// Behavior is undefined if any of the following conditions are violated:
 /// - `ap` must follow the safety contract of variable arguments of C.
-pub unsafe fn printf<W: Write>(w: W, format: CStr, ap: VaList) -> c_int {
-    inner_printf(w, format, ap).unwrap_or(-1)
+pub unsafe fn printf(w: impl Write, format: CStr, ap: VaList) -> c_int {
+    inner_printf::<c_str::Thin>(w, format, ap).unwrap_or(-1)
 }
