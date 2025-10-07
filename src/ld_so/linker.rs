@@ -923,7 +923,7 @@ impl Linker {
                 symbol
                     .as_ptr()
                     .cast::<*mut *mut c_char>()
-                    .write(platform::environ);
+                    .write(platform::environ.get());
             }
         }
 

@@ -188,7 +188,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
     };
 
     unsafe {
-        crate::platform::OUR_ENVIRON.unsafe_set(
+        crate::platform::OUR_ENVIRON.replace(
             envs.iter()
                 .map(|(k, v)| {
                     let mut var = Vec::with_capacity(k.len() + v.len() + 2);
@@ -201,11 +201,10 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
                     core::mem::forget(var);
                     ptr.cast()
                 })
-                .chain(core::iter::once(core::ptr::null_mut()))
-                .collect::<Vec<_>>(),
+                .chain(core::iter::once(core::ptr::null_mut())),
         );
 
-        crate::platform::environ = crate::platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr();
+        crate::platform::environ.set(crate::platform::OUR_ENVIRON.as_mut_ptr());
     }
 
     let is_manual = if let Some(img_entry) = get_auxv(&auxv, AT_ENTRY) {

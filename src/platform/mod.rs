@@ -6,7 +6,11 @@ use crate::{
     raw_cell::RawCell,
 };
 use alloc::{boxed::Box, vec::Vec};
-use core::{cell::Cell, fmt, ptr};
+use core::{
+    cell::{Cell, UnsafeCell},
+    fmt, ptr,
+    sync::atomic::{AtomicPtr, Ordering},
+};
 
 pub use self::allocator::*;
 
@@ -56,14 +60,145 @@ pub static mut program_invocation_name: *mut c_char = ptr::null_mut();
 pub static mut program_invocation_short_name: *mut c_char = ptr::null_mut();
 
 #[allow(non_upper_case_globals)]
-#[unsafe(no_mangle)]
-pub static mut environ: *mut *mut c_char = ptr::null_mut();
+#[no_mangle]
+pub static environ: EnvPtr = EnvPtr::new();
 
-pub static OUR_ENVIRON: RawCell<Vec<*mut c_char>> = RawCell::new(Vec::new());
+pub static OUR_ENVIRON: EnvArgs = EnvArgs::new();
+
+/// Convenience structure to provide interior mutability for the global `environ` pointer.
+#[repr(transparent)]
+pub struct EnvPtr(pub UnsafeCell<*mut *mut c_char>);
+
+impl EnvPtr {
+    /// Creates a new [EnvPtr].
+    pub const fn new() -> Self {
+        Self(UnsafeCell::new(ptr::null_mut()))
+    }
+
+    /// Gets whether the inner pointer is null.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure the pointer references valid memory.
+    ///
+    /// Caller must have exclusive access to the [EnvPtr].
+    ///
+    /// Caller must **not** access [EnvPtr] concurrently.
+    pub const unsafe fn is_null(&self) -> bool {
+        // SAFETY: UnsafeCell is guaranteed non-null, and is initialized properly.
+        unsafe { (&*self.0.get()) }.is_null()
+    }
+
+    /// Replaces the inner pointer.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure the pointer references valid memory, or is null.
+    ///
+    /// Caller must have exclusive access to the [EnvPtr].
+    ///
+    /// Caller must **not** access [EnvPtr] concurrently.
+    pub const unsafe fn set(&self, val: *mut *mut c_char) {
+        unsafe {
+            *self.0.get() = val;
+        };
+    }
+
+    /// Gets the inner mutable pointer.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure the pointer references valid memory before dereferencing.
+    ///
+    /// Caller must have exclusive access to the [EnvPtr].
+    ///
+    /// Caller must **not** access [EnvPtr] concurrently.
+    pub const unsafe fn get(&self) -> *mut *mut c_char {
+        // SAFETY: UnsafeCell is guaranteed non-null, and is initialized properly.
+        unsafe { *self.0.get() }
+    }
+}
+
+impl Default for EnvPtr {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// # Safety
+///
+/// Contentious access across threads is undefined behavior.
+///
+/// Use across the FFI boundary through a mutable pointer is somewhat unavoidable,
+/// and the POSIX API is inherently unsound.
+///
+/// See the discussion in <https://gitlab.redox-os.org/redox-os/relibc/-/merge_requests/706#note_43741> for reference.
+unsafe impl Sync for EnvPtr {}
+
+/// Represents environment arguments passed to the program, potentially from C code.
+#[repr(transparent)]
+pub struct EnvArgs(pub spin::Mutex<Vec<AtomicPtr<c_char>>>);
+
+impl EnvArgs {
+    /// Creates a new [EnvArgs].
+    pub const fn new() -> Self {
+        Self(spin::Mutex::new(Vec::new()))
+    }
+
+    /// Gets a mutable lock over the inner pointer collection.
+    fn lock(&self) -> spin::MutexGuard<'_, Vec<AtomicPtr<c_char>>> {
+        self.0.lock()
+    }
+
+    /// Replaces the last item in the [EnvArgs].
+    ///
+    /// Returns `None` if [EnvArgs] is empty.
+    pub fn replace_last(&self, val: *mut c_char) -> Option<()> {
+        self.lock().last_mut().map(|p| *p = AtomicPtr::new(val))
+    }
+
+    /// Pushes an argument to the end of [EnvArgs].
+    pub fn push(&self, val: *mut c_char) {
+        self.lock().push(AtomicPtr::new(val));
+    }
+
+    /// Removes an argument at index `i` from [EnvArgs].
+    pub fn remove(&self, i: usize) {
+        self.lock().remove(i);
+    }
+
+    /// Clears the [EnvArgs] list.
+    pub fn clear(&self) {
+        self.lock().clear();
+    }
+
+    /// Extends the [EnvArgs] list from an iterator-like parameter.
+    pub fn extend<I: IntoIterator<Item = *mut c_char>>(&self, val: I) {
+        self.lock().extend(val.into_iter().map(AtomicPtr::new));
+    }
+
+    /// Replaces the [EnvArgs] list with an iterator-like parameter.
+    pub fn replace<V: IntoIterator<Item = *mut c_char>>(&self, val: V) {
+        let mut v = self.lock();
+        v.clear();
+        v.extend(val.into_iter().map(AtomicPtr::new));
+    }
+
+    /// Gets a mutable pointer to the [EnvArgs] list.
+    pub fn as_mut_ptr(&self) -> *mut *mut c_char {
+        self.lock().as_mut_ptr().cast::<*mut c_char>()
+    }
+}
+
+impl Default for EnvArgs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 pub fn environ_iter() -> impl Iterator<Item = *mut c_char> + 'static {
     unsafe {
-        let mut ptrs = environ;
+        let mut ptrs = environ.get();
 
         core::iter::from_fn(move || {
             if ptrs.is_null() {
