@@ -1,8 +1,12 @@
 # Redox C Library (relibc)
 
-relibc is a portable POSIX C standard library written in Rust and is under heavy development.
+relibc is a portable C standard library written in Rust and is under heavy development, this library contain the following items:
 
-The motivation for this project is twofold: Reduce issues that the Redox developers were having with [newlib](https://sourceware.org/newlib/), and create a safer alternative to a C standard library written in C. It is mainly designed to be used under Redox, as an alternative to newlib, but it also supports Linux system calls via the [sc](https://crates.io/crates/sc) crate.
+- C, Linux, BSD functions and extensions
+- POSIX compatibility layer
+- Interfaces for system components
+
+The motivation for this project is twofold: Reduce issues that the Redox developers were having with [newlib](https://sourceware.org/newlib/), and create a more stable and safe alternative to C standard libraries written in C. It is mainly designed to be used under Redox, as an alternative to newlib, but it also supports Linux via the [sc](https://crates.io/crates/sc) crate.
 
 Currently Redox and Linux are supported.
 
