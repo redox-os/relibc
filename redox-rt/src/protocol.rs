@@ -246,3 +246,13 @@ pub const SIGWINCH: usize = 28;
 pub const SIGIO: usize = 29;
 pub const SIGPWR: usize = 30;
 pub const SIGSYS: usize = 31;
+
+// Namespace permissions
+/// List schemes in the namespace
+pub const NS_PERM_LIST: usize = 1 << 0;
+/// Register a new scheme in the namespace
+pub const NS_PERM_INSERT: usize = 1 << 1;
+/// Delete a scheme from the namespace
+pub const NS_PERM_DELETE: usize = 1 << 2;
+/// Get capabilities of the namespace
+pub const NS_PERM_GET_CAP: usize = 1 << 3;
