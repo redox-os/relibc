@@ -373,10 +373,11 @@ pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {
     wrapper(false, false, || syscall::nanosleep(rqtp, rmtp))?;
     Ok(())
 }
-pub fn set_namespace_fd(fd: usize) -> Result<()> {
+pub fn set_namespace_fd(fd: usize) -> Result<usize> {
     let mut info = DYNAMIC_PROC_INFO.lock();
+    let before_fd = info.ns_fd;
     info.ns_fd = fd;
-    Ok(())
+    Ok(before_fd)
 }
 pub fn nsopen(path: &str, flags: u32, mode: u16) -> Result<usize> {
     syscall::openat(

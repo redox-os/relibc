@@ -134,7 +134,7 @@ pub unsafe extern "C" fn redox_open_v1(
     flags: u32,
     mode: u16,
 ) -> RawResult {
-    Error::mux(if !USE_NEW_NS_BACKEND.load(Ordering::Relaxed) {
+    Error::mux(if USE_NEW_NS_BACKEND.load(Ordering::Relaxed) {
         redox_rt::sys::nsopen(
             str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
             flags,
@@ -393,7 +393,7 @@ pub unsafe extern "C" fn redox_mkns_v1(
             return Err(Error::new(EINVAL));
         }
 
-        if !USE_NEW_NS_BACKEND.load(Ordering::Relaxed) {
+        if USE_NEW_NS_BACKEND.load(Ordering::Relaxed) {
             let raw_iovecs = slice::from_raw_parts(names, num_names);
             let names_ioslice: Vec<IoSlice> = raw_iovecs
                 .iter()
@@ -463,7 +463,7 @@ pub unsafe extern "C" fn redox_set_namespace_fd_v0(fd: usize) -> RawResult {
         USE_NEW_NS_BACKEND.store(false, Ordering::Relaxed);
         return usize::MAX;
     } else {
-        Error::mux(redox_rt::sys::set_namespace_fd(fd).map(|()| 0))
+        Error::mux(redox_rt::sys::set_namespace_fd(fd))
     }
 }
 #[no_mangle]
