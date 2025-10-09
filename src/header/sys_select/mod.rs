@@ -1,167 +1,37 @@
 //! sys/select.h implementation
 
-use core::mem;
+use core::{mem, ptr};
 
 use cbitset::BitSet;
 
 use crate::{
+    error::{Errno, Result, ResultExt},
     fs::File,
     header::{
         errno,
+        signal::{SIG_SETMASK, sigprocmask, sigset_t},
         sys_epoll::{
             EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLIN, EPOLLOUT, epoll_create1, epoll_ctl,
             epoll_data, epoll_event, epoll_wait,
         },
         sys_time::timeval,
+        time::timespec,
     },
-    platform::{self, types::*},
+    platform::{self, Pal, Sys, types::*},
 };
 
 // fd_set is also defined in C because cbindgen is incompatible with mem::size_of booo
 
 pub const FD_SETSIZE: usize = 1024;
-type bitset = BitSet<[u64; FD_SETSIZE / (8 * mem::size_of::<u64>())]>;
+pub type bitset = BitSet<[u64; FD_SETSIZE / (8 * mem::size_of::<u64>())]>;
 
 #[repr(C)]
 pub struct fd_set {
     pub fds_bits: bitset,
 }
 
-pub fn select_epoll(
-    nfds: c_int,
-    readfds: Option<&mut fd_set>,
-    writefds: Option<&mut fd_set>,
-    exceptfds: Option<&mut fd_set>,
-    timeout: Option<&mut timeval>,
-) -> c_int {
-    if nfds < 0 || nfds > FD_SETSIZE as i32 {
-        platform::ERRNO.set(errno::EINVAL);
-        return -1;
-    };
-
-    let ep = {
-        let epfd = epoll_create1(EPOLL_CLOEXEC);
-        if epfd < 0 {
-            return -1;
-        }
-        File::new(epfd)
-    };
-
-    let mut read_bitset: Option<&mut bitset> = readfds.map(|fd_set| &mut fd_set.fds_bits);
-    let mut write_bitset: Option<&mut bitset> = writefds.map(|fd_set| &mut fd_set.fds_bits);
-    let mut except_bitset: Option<&mut bitset> = exceptfds.map(|fd_set| &mut fd_set.fds_bits);
-
-    // Keep track of the number of file descriptors that do not support epoll
-    let mut not_epoll = 0;
-    for fd in 0..nfds {
-        let mut events = 0;
-
-        if let Some(ref fd_set) = read_bitset {
-            if fd_set.contains(fd as usize) {
-                events |= EPOLLIN;
-            }
-        }
-
-        if let Some(ref fd_set) = write_bitset {
-            if fd_set.contains(fd as usize) {
-                events |= EPOLLOUT;
-            }
-        }
-
-        if let Some(ref fd_set) = except_bitset {
-            if fd_set.contains(fd as usize) {
-                events |= EPOLLERR;
-            }
-        }
-
-        if events > 0 {
-            let mut event = epoll_event {
-                events,
-                data: epoll_data { fd },
-                ..Default::default()
-            };
-            if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) } < 0 {
-                if platform::ERRNO.get() == errno::EPERM {
-                    not_epoll += 1;
-                } else {
-                    return -1;
-                }
-            } else {
-                if let Some(ref mut fd_set) = read_bitset {
-                    if fd_set.contains(fd as usize) {
-                        fd_set.remove(fd as usize);
-                    }
-                }
-
-                if let Some(ref mut fd_set) = write_bitset {
-                    if fd_set.contains(fd as usize) {
-                        fd_set.remove(fd as usize);
-                    }
-                }
-
-                if let Some(ref mut fd_set) = except_bitset {
-                    if fd_set.contains(fd as usize) {
-                        fd_set.remove(fd as usize);
-                    }
-                }
-            }
-        }
-    }
-
-    let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
-    let epoll_timeout = if not_epoll > 0 {
-        // Do not wait if any non-epoll file descriptors were found
-        0
-    } else {
-        match timeout {
-            Some(timeout) => {
-                //TODO: Check for overflow
-                ((timeout.tv_sec as c_int) * 1000) + ((timeout.tv_usec as c_int) / 1000)
-            }
-            None => -1,
-        }
-    };
-    let res = unsafe {
-        epoll_wait(
-            *ep,
-            events.as_mut_ptr(),
-            events.len() as c_int,
-            epoll_timeout,
-        )
-    };
-    if res < 0 {
-        return -1;
-    }
-
-    let mut count = not_epoll;
-    for event in events.iter().take(res as usize) {
-        let fd = unsafe { event.data.fd };
-        // TODO: Error status when fd does not match?
-        if fd >= 0 && fd < FD_SETSIZE as c_int {
-            if event.events & EPOLLIN > 0 {
-                if let Some(ref mut fd_set) = read_bitset {
-                    fd_set.insert(fd as usize);
-                    count += 1;
-                }
-            }
-            if event.events & EPOLLOUT > 0 {
-                if let Some(ref mut fd_set) = write_bitset {
-                    fd_set.insert(fd as usize);
-                    count += 1;
-                }
-            }
-            if event.events & EPOLLERR > 0 {
-                if let Some(ref mut fd_set) = except_bitset {
-                    fd_set.insert(fd as usize);
-                    count += 1;
-                }
-            }
-        }
-    }
-    count
-}
-
 #[unsafe(no_mangle)]
+#[allow(unsafe_op_in_unsafe_fn)]
 pub unsafe extern "C" fn select(
     nfds: c_int,
     readfds: *mut fd_set,
@@ -169,8 +39,17 @@ pub unsafe extern "C" fn select(
     exceptfds: *mut fd_set,
     timeout: *mut timeval,
 ) -> c_int {
-    trace_expr!(
-        select_epoll(
+    let Ok(nfds) = nfds.try_into() else {
+        return Err(Errno(errno::EINVAL)).or_minus_one_errno();
+    };
+
+    // select's timeout is a timeval whereas pselect's is a timespec.
+    // Like Linux, our pselect modifies the timespec with the remaining time.
+    let mut timeout = (!timeout.is_null()).then(|| &mut *timeout);
+    let mut timespec: Option<timespec> = timeout.as_ref().map(|&&mut timeval| timeval.into());
+
+    let result = trace_expr!(
+        Sys::pselect(
             nfds,
             if readfds.is_null() {
                 None
@@ -187,17 +66,128 @@ pub unsafe extern "C" fn select(
             } else {
                 Some(&mut *exceptfds)
             },
-            if timeout.is_null() {
-                None
-            } else {
-                Some(&mut *timeout)
-            }
-        ),
-        "select({}, {:p}, {:p}, {:p}, {:p})",
+            timespec.as_mut(),
+            None
+        )
+        .map(|fds| fds
+            .try_into()
+            .expect("nfds is bound between [0, {FD_SETSIZE}]"))
+        .or_minus_one_errno(),
+        "select({}, {:p}, {:p}, {:p}, {:?})",
         nfds,
         readfds,
         writefds,
         exceptfds,
         timeout
+    );
+
+    // Update remaining time
+    if result != 0
+        && let Some(timeout) = timeout
+        && let Some(timespec) = timespec
+    {
+        *timeout = timespec.into();
+    }
+
+    result
+}
+
+#[unsafe(no_mangle)]
+#[allow(unsafe_op_in_unsafe_fn)]
+pub unsafe fn pselect(
+    nfds: c_int,
+    readfds: *mut fd_set,
+    writefds: *mut fd_set,
+    exceptfds: *mut fd_set,
+    timeout: *const timespec,
+    sigmask: *const sigset_t,
+) -> c_int {
+    let Ok(nfds) = nfds.try_into() else {
+        return Err(Errno(errno::EINVAL)).or_minus_one_errno();
+    };
+
+    // POSIX compatible pselect doesn't modify the timeout.
+    // Redox's pselect, like Linux's and others', modifies the timeout so we have to make sure to
+    // be const-safe and not clobber timeout.
+    let mut timeout = (!timeout.is_null()).then(|| *timeout);
+
+    // Null pointers are valid for both pselect and sigprocmask.
+    // A null sigmask means pselect acts like select.
+    let sigmask = (!sigmask.is_null()).then(|| *sigmask);
+
+    trace_expr!(
+        Sys::pselect(
+            nfds,
+            if readfds.is_null() {
+                None
+            } else {
+                Some(&mut *readfds)
+            },
+            if writefds.is_null() {
+                None
+            } else {
+                Some(&mut *writefds)
+            },
+            if exceptfds.is_null() {
+                None
+            } else {
+                Some(&mut *exceptfds)
+            },
+            timeout.as_mut(),
+            sigmask
+        )
+        .map(|fds| fds
+            .try_into()
+            .expect("nfds is bound between [0, {FD_SETSIZE}]"))
+        .or_minus_one_errno(),
+        "pselect({}, {:p}, {:p}, {:p}, {:?} {})",
+        nfds,
+        readfds,
+        writefds,
+        exceptfds,
+        timeout,
+        sigmask
     )
 }
+
+// #[no_mangle]
+// #[allow(unsafe_op_in_unsafe_fn)]
+// pub unsafe fn pselect(
+//     nfds: c_int,
+//     readfds: *mut fd_set,
+//     writefds: *mut fd_set,
+//     exceptfds: *mut fd_set,
+//     timeout: *const timespec,
+//     sigmask: *const sigset_t,
+// ) -> c_int {
+//     let guard = tmp_disable_signals();
+//
+//     // Null pointers are valid for both pselect and sigprocmask.
+//     // A null sigmask means pselect acts like select.
+//     let mut saved_mask = 0;
+//     if (!sigmask.is_null() && sigprocmask(SIG_SETMASK, sigmask, &mut saved_mask) == -1) {
+//         return -1;
+//     }
+//
+//     // select's timeout is a timeval whereas pselect's is a timespec.
+//     // pselect doesn't modify the timeout with the remaining time so the result is ignored below
+//     // and we don't need to convert timeval back to timespec.
+//     let mut timeout: Option<timeval> = (!timeout.is_null()).then(|| (*timeout).into());
+//
+//     let result = select(
+//         nfds,
+//         readfds,
+//         writefds,
+//         exceptfds,
+//         timeout.map_or(ptr::null_mut(), |mut t| &mut t),
+//     );
+//     if result == -1 && platform::ERRNO.get() == errno::EINTR {
+//         manually_enter_trampoline();
+//     }
+//
+//     if (!sigmask.is_null() && sigprocmask(SIG_SETMASK, &saved_mask, ptr::null_mut()) == -1) {
+//         -1
+//     } else {
+//         result
+//     }
+// }

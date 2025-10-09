@@ -3,7 +3,9 @@ use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
+        signal::sigset_t,
         sys_resource::{rlimit, rusage},
+        sys_select::fd_set,
         sys_stat::stat,
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
@@ -215,6 +217,15 @@ pub trait Pal {
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
 
     fn pipe2(fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()>;
+
+    fn pselect(
+        nfds: usize,
+        readfds: Option<&mut fd_set>,
+        writefds: Option<&mut fd_set>,
+        exceptfds: Option<&mut fd_set>,
+        timeout: Option<&mut timespec>,
+        sigmask: Option<sigset_t>,
+    ) -> Result<usize>;
 
     fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize>;
 

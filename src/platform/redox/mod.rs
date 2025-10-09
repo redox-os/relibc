@@ -5,7 +5,9 @@ use core::{
 };
 use redox_rt::{
     RtTcb,
+    arch::manually_enter_trampoline,
     protocol::{WaitFlags, wifstopped, wstopsig},
+    signal::{TmpDisableSignalsGuard, tmp_disable_signals},
     sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
@@ -14,6 +16,7 @@ use syscall::{
     dirent::{DirentHeader, DirentKind},
 };
 
+use super::{ERRNO, Pal, PalEpoll, PalSignal, Read, types::*};
 use crate::{
     c_str::{CStr, CString},
     error::{self, Errno, Result, ResultExt},
@@ -26,9 +29,14 @@ use crate::{
         },
         fcntl::{self, AT_FDCWD, O_RDONLY},
         limits,
+        signal::{RLCT_SIGNAL_MASK, SIG_SETMASK, sigset_t},
+        sys_epoll::{
+            EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLIN, EPOLLOUT, epoll_data, epoll_event,
+        },
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{RLIM_INFINITY, rlimit, rusage},
+        sys_select,
         sys_stat::{S_ISGID, S_ISUID, S_ISVTX, stat},
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
@@ -43,8 +51,6 @@ use crate::{
 };
 
 pub use redox_rt::proc::FdGuard;
-
-use super::{ERRNO, Pal, Read, types::*};
 
 static mut BRK_CUR: *mut c_void = ptr::null_mut();
 static mut BRK_END: *mut c_void = ptr::null_mut();
@@ -840,6 +846,160 @@ impl Pal for Sys {
         Ok(bytes_read)
     }
 
+    fn pselect(
+        nfds: usize,
+        readfds: Option<&mut sys_select::fd_set>,
+        writefds: Option<&mut sys_select::fd_set>,
+        exceptfds: Option<&mut sys_select::fd_set>,
+        timeout: Option<&mut timespec>,
+        sigmask: Option<sigset_t>,
+    ) -> Result<usize> {
+        if nfds > sys_select::FD_SETSIZE {
+            return Err(Errno(EINVAL));
+        }
+
+        let mut guard = sigmask.map(SignalGuard::new).transpose()?;
+
+        // TODO: Select should modify the timeout with the remaining time
+        let timeout = timeout.map(|t| *t);
+
+        let ep = {
+            let epfd = Sys::epoll_create1(EPOLL_CLOEXEC)?;
+            File::new(epfd)
+        };
+
+        let mut read_bitset: Option<&mut sys_select::bitset> =
+            readfds.map(|fd_set| &mut fd_set.fds_bits);
+        let mut write_bitset: Option<&mut sys_select::bitset> =
+            writefds.map(|fd_set| &mut fd_set.fds_bits);
+        let mut except_bitset: Option<&mut sys_select::bitset> =
+            exceptfds.map(|fd_set| &mut fd_set.fds_bits);
+
+        // Keep track of the number of file descriptors that do not support epoll
+        let mut not_epoll = 0;
+        for fd in 0..nfds {
+            let mut events = 0;
+
+            if let Some(ref fd_set) = read_bitset {
+                if fd_set.contains(fd) {
+                    events |= EPOLLIN;
+                }
+            }
+
+            if let Some(ref fd_set) = write_bitset {
+                if fd_set.contains(fd) {
+                    events |= EPOLLOUT;
+                }
+            }
+
+            if let Some(ref fd_set) = except_bitset {
+                if fd_set.contains(fd) {
+                    events |= EPOLLERR;
+                }
+            }
+
+            if events > 0 {
+                let mut event = epoll_event {
+                    events,
+                    data: epoll_data {
+                        fd: fd.try_into().expect("nfds is within [0, {FD_SETSIZE}]"),
+                    },
+                    ..Default::default()
+                };
+                if let Err(e) = unsafe {
+                    Sys::epoll_ctl(
+                        *ep,
+                        EPOLL_CTL_ADD,
+                        fd.try_into().expect("nfds is within [0, {FD_SETSIZE}]"),
+                        &mut event,
+                    )
+                } {
+                    if e == Errno(EPERM) {
+                        not_epoll += 1;
+                    } else {
+                        Err(e)?;
+                    }
+                } else {
+                    if let Some(ref mut fd_set) = read_bitset {
+                        if fd_set.contains(fd) {
+                            fd_set.remove(fd);
+                        }
+                    }
+
+                    if let Some(ref mut fd_set) = write_bitset {
+                        if fd_set.contains(fd) {
+                            fd_set.remove(fd);
+                        }
+                    }
+
+                    if let Some(ref mut fd_set) = except_bitset {
+                        if fd_set.contains(fd) {
+                            fd_set.remove(fd);
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut events = [epoll_event::default(); 32];
+        let epoll_timeout = if not_epoll > 0 {
+            // Do not wait if any non-epoll file descriptors were found
+            0
+        } else {
+            match timeout {
+                Some(timeout) => timeout
+                    .tv_sec
+                    .checked_mul(1000)
+                    .and_then(|ms| ms.checked_add(time_t::from(timeout.tv_nsec) / 1000000))
+                    .and_then(|ms| ms.try_into().ok())
+                    .unwrap_or(c_int::MAX),
+                None => -1,
+            }
+        };
+        let res = unsafe {
+            Sys::epoll_pwait(
+                *ep,
+                events.as_mut_ptr(),
+                events.len() as c_int,
+                epoll_timeout,
+                // TODO: Sigmask is currently unused
+                ptr::null(),
+            )?
+        };
+
+        let mut count = not_epoll;
+        for event in events.iter().take(res) {
+            let fd = unsafe { event.data.fd };
+            // TODO: Error status when fd does not match?
+            if fd >= 0 && fd < sys_select::FD_SETSIZE as c_int {
+                if event.events & EPOLLIN > 0 {
+                    if let Some(ref mut fd_set) = read_bitset {
+                        fd_set.insert(fd as usize);
+                        count += 1;
+                    }
+                }
+                if event.events & EPOLLOUT > 0 {
+                    if let Some(ref mut fd_set) = write_bitset {
+                        fd_set.insert(fd as usize);
+                        count += 1;
+                    }
+                }
+                if event.events & EPOLLERR > 0 {
+                    if let Some(ref mut fd_set) = except_bitset {
+                        fd_set.insert(fd as usize);
+                        count += 1;
+                    }
+                }
+            }
+        }
+
+        // TODO: Better place(s) for this.
+        if let Some(guard) = guard.as_mut() {
+            guard.reset()?;
+        }
+        Ok(count)
+    }
+
     unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
         let _guard = CLONE_LOCK.read();
         let res = clone::rlct_clone_impl(stack);
@@ -1181,5 +1341,38 @@ impl Pal for Sys {
 
     unsafe fn exit_thread(stack_base: *mut (), stack_size: usize) -> ! {
         redox_rt::thread::exit_this_thread(stack_base, stack_size)
+    }
+}
+
+// Atomically set a signal mask then unset it on drop.
+struct SignalGuard {
+    old_mask: Option<sigset_t>,
+    guard: TmpDisableSignalsGuard,
+}
+
+impl SignalGuard {
+    fn new(mask: sigset_t) -> Result<Self> {
+        let guard = tmp_disable_signals();
+        let mask = mask & !RLCT_SIGNAL_MASK;
+
+        let mut old_mask = 0;
+        Sys::sigprocmask(SIG_SETMASK, Some(&mask), Some(&mut old_mask))?;
+        let old_mask = Some(old_mask & !RLCT_SIGNAL_MASK);
+
+        Ok(Self { old_mask, guard })
+    }
+
+    fn reset(&mut self) -> Result<()> {
+        if let Some(old_mask) = self.old_mask.take() {
+            return Sys::sigprocmask(SIG_SETMASK, Some(&old_mask), None);
+        }
+
+        Ok(())
+    }
+}
+
+impl Drop for SignalGuard {
+    fn drop(&mut self) {
+        let _ = self.reset();
     }
 }

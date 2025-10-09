@@ -60,10 +60,22 @@ pub struct itimerval {
 ///
 /// TODO: specified for `sys/select.h` in modern POSIX?
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct timeval {
     pub tv_sec: time_t,
     pub tv_usec: suseconds_t,
+}
+
+impl From<timespec> for timeval {
+    fn from(timespec { tv_sec, tv_nsec }: timespec) -> Self {
+        Self {
+            tv_sec,
+            tv_usec: tv_nsec
+                .saturating_div(1000)
+                .try_into()
+                .unwrap_or(suseconds_t::MAX),
+        }
+    }
 }
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/gettimeofday.2.html>.
