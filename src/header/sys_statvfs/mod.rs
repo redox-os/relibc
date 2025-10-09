@@ -7,7 +7,7 @@ use crate::{
     error::ResultExt,
     header::fcntl::O_PATH,
     out::Out,
-    platform::{Pal, Sys, types::*},
+    platform::{Pal, Sys, types::{c_char, c_int, c_ulong, fsblkcnt_t, fsfilcnt_t}},
 };
 
 //pub const ST_RDONLY
