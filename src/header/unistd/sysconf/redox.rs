@@ -66,7 +66,7 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
         _SC_HOST_NAME_MAX => 64,
         _SC_NPROCESSORS_CONF => get_cpu_count().unwrap_or(None).unwrap_or(1),
         _SC_NPROCESSORS_ONLN => get_cpu_count().unwrap_or(None).unwrap_or(1),
-        _SC_PHYS_PAGES => get_mem_stat().map(|s| s.f_bsize as c_long).unwrap_or(-1),
+        _SC_PHYS_PAGES => get_mem_stat().map(|s| s.f_blocks as c_long).unwrap_or(-1),
         _SC_AVPHYS_PAGES => get_mem_stat().map(|s| s.f_bfree as c_long).unwrap_or(-1),
         _SC_SIGQUEUE_MAX => 32,
         _SC_REALTIME_SIGNALS => 202405,
