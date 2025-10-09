@@ -27,4 +27,6 @@ int main(void) {
     SC(HOST_NAME_MAX);
     SC(NPROCESSORS_CONF);
     SC(NPROCESSORS_ONLN);
+    SC(PHYS_PAGES);
+    SC(AVPHYS_PAGES);
 }
