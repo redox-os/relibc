@@ -3,4 +3,8 @@
 
 #define MAP_FAILED ((void *) -1)
 
+#if defined (_LARGEFILE64_SOURCE)
+#define mmap64 mmap
+#endif
+
 #endif

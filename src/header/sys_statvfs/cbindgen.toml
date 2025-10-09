@@ -1,5 +1,6 @@
 sys_includes = ["sys/types.h"]
 include_guard = "_SYS_STATVFS_H"
+trailer = "#include <bits/sys/statvfs.h>"
 language = "C"
 style = "Tag"
 no_includes = true
