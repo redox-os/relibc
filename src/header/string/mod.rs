@@ -423,7 +423,9 @@ pub unsafe extern "C" fn strlcpy(dst: *mut c_char, src: *const c_char, n: size_t
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strlen.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strlen(s: *const c_char) -> size_t {
-    unsafe { NulTerminated::new(s).unwrap() }.count()
+    unsafe { NulTerminated::new(s) }
+        .map(|s| s.count())
+        .unwrap_or(0)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strncat.html>.
