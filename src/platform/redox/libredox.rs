@@ -471,4 +471,4 @@ pub unsafe extern "C" fn redox_register_scheme_v0(cap_fd: usize) -> RawResult {
     Error::mux(redox_rt::sys::register_scheme(cap_fd).map(|()| 0))
 }
 
-static USE_NEW_NS_BACKEND: AtomicBool = AtomicBool::new(false);
+static USE_NEW_NS_BACKEND: AtomicBool = AtomicBool::new(true);
