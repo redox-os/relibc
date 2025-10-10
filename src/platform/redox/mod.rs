@@ -14,6 +14,11 @@ use syscall::{
     dirent::{DirentHeader, DirentKind},
 };
 
+use self::{
+    exec::Executable,
+    path::{canonicalize, openat2, openat2_path},
+};
+use super::{ERRNO, Pal, Read, types::*};
 use crate::{
     c_str::{CStr, CString},
     error::{self, Errno, Result, ResultExt},
@@ -26,6 +31,7 @@ use crate::{
         },
         fcntl::{self, AT_FDCWD, O_RDONLY},
         limits,
+        stdio::RENAME_NOREPLACE,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{RLIM_INFINITY, rlimit, rusage},
@@ -43,8 +49,6 @@ use crate::{
 };
 
 pub use redox_rt::proc::FdGuard;
-
-use super::{ERRNO, Pal, Read, types::*};
 
 static mut BRK_CUR: *mut c_void = ptr::null_mut();
 static mut BRK_END: *mut c_void = ptr::null_mut();
@@ -85,11 +89,6 @@ macro_rules! path_from_c_str {
         }
     }};
 }
-
-use self::{
-    exec::Executable,
-    path::{canonicalize, cap_path_at},
-};
 
 static CLONE_LOCK: RwLock<()> = RwLock::new(());
 
@@ -266,7 +265,7 @@ impl Pal for Sys {
         let path = path
             .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
             .ok_or(Errno(ENOENT))?;
-        let file = cap_path_at(dirfd, path, flags, 0)?;
+        let file = openat2(dirfd, path, flags, 0)?;
         syscall::fchmod(*file as usize, mode as u16)?;
         Ok(())
     }
@@ -309,7 +308,7 @@ impl Pal for Sys {
         let path = path
             .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
             .ok_or(Errno(ENOENT))?;
-        let file = cap_path_at(dirfd, path, flags, 0)?;
+        let file = openat2(dirfd, path, flags, 0)?;
         Sys::fstat(*file, buf)
     }
 
@@ -915,7 +914,7 @@ impl Pal for Sys {
 
     fn readlinkat(dirfd: c_int, path: CStr, out: &mut [u8]) -> Result<usize> {
         let path = str::from_utf8(path.to_bytes()).map_err(|_| Errno(ENOENT))?;
-        let file = cap_path_at(dirfd, path, 0, fcntl::O_SYMLINK)?;
+        let file = openat2(dirfd, path, 0, fcntl::O_SYMLINK)?;
         Sys::read(*file, out)
     }
 
@@ -929,6 +928,35 @@ impl Pal for Sys {
         )?;
         syscall::frename(*file as usize, newpath)?;
         Ok(())
+    }
+
+    fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()> {
+        Sys::renameat2(old_dir, old_path, new_dir, new_path, 0);
+    }
+
+    fn renameat2(
+        old_dir: c_int,
+        old_path: CStr,
+        new_dir: c_int,
+        new_path: CStr,
+        flags: c_uint,
+    ) -> Result<()> {
+        const MASK: c_uint = !RENAME_NOREPLACE;
+        if MASK & flags != 0 {
+            return Err(Errno(EOPNOTSUPP));
+        }
+
+        let new_path = new_path.to_str().map_err(|_| Errno(EINVAL))?;
+        let target = openat2_path(new_dir, new_path, 0)?;
+        if flags & RENAME_NOREPLACE != 0 {
+            // Fail if the target exists.
+            todo!();
+        }
+
+        let old_path = old_path.to_str().map_err
+        let source = openat2(old_dir, old_path, AT_SYMLINK_NOFOLLOW, 0)?;
+
+        syscall::frename(*source as usize, target).map(|_| ())
     }
 
     fn rmdir(path: CStr) -> Result<()> {
