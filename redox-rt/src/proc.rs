@@ -29,6 +29,7 @@ use goblin::elf64::{
 };
 
 use syscall::{
+    data::ProcSchemeAttrs,
     error::*,
     flag::{MapFlags, SEEK_SET},
     CallFlags, GrantDesc, GrantFlags, Map, SetSighandlerData, MAP_FIXED_NOREPLACE, MAP_SHARED,
