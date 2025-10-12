@@ -14,7 +14,7 @@ void read_and_print_directory(int fd) {
     char buffer[BUFFER_SIZE];
     long nread;
     long bpos;
-    struct dirent *d;
+    struct posix_dent *d;
 
     for (;;) {
         nread = posix_getdents(fd, buffer, BUFFER_SIZE, 0);
@@ -26,7 +26,7 @@ void read_and_print_directory(int fd) {
         }
 
         for (bpos = 0; bpos < nread;) {
-            d = (struct dirent *) (buffer + bpos);
+            d = (struct posix_dent *) (buffer + bpos);
             printf("  ino = %-10lu  name = %s\n", (unsigned long)d->d_ino, d->d_name);
             bpos += d->d_reclen;
         }
