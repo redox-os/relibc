@@ -155,6 +155,19 @@ pub struct dirent {
     pub d_name: [c_char; 256],
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dirent.h.html>.
+/// must have the same struct layout as dirent
+#[repr(C)]
+#[derive(Clone)]
+pub struct posix_dent {
+    pub d_ino: ino_t,
+    pub __unused_d_off: off_t,
+    pub d_reclen: reclen_t,
+    pub d_type: c_uchar,
+    pub d_name: [c_char; 256],
+}
+
+
 #[cfg(target_os = "redox")]
 const _: () = {
     use core::mem::{offset_of, size_of};
@@ -357,3 +370,7 @@ pub extern "C" fn seekdir(dir: &mut DIR, off: c_long) {
 pub extern "C" fn telldir(dir: &mut DIR) -> c_long {
     dir.opaque_offset as c_long
 }
+
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_posix_dent(a: posix_dent) {}
