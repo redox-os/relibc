@@ -103,25 +103,20 @@ unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usiz
     Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "C" fn child_hook(
-    cur_filetable_fd: usize,
-    new_proc_fd: usize,
-    new_thr_fd: usize,
-    new_ns_fd: usize,
-) {
+unsafe extern "C" fn child_hook(scratchpad: &mut ForkScratchpad) {
     //let _ = syscall::write(1, alloc::format!("CUR{cur_filetable_fd}PROC{new_proc_fd}THR{new_thr_fd}\n").as_bytes());
-    let _ = syscall::close(cur_filetable_fd);
+    let _ = syscall::close(scratchpad.cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
-        new_thr_fd: FdGuard::new(new_thr_fd),
-        new_proc_fd: if new_proc_fd == usize::MAX {
+        new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
+        new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
             None
         } else {
-            Some(FdGuard::new(new_proc_fd))
+            Some(FdGuard::new(scratchpad.new_proc_fd))
         },
-        new_ns_fd: if new_ns_fd == usize::MAX {
+        new_ns_fd: if scratchpad.new_ns_fd == usize::MAX {
             None
         } else {
-            Some(new_ns_fd)
+            Some(scratchpad.new_ns_fd)
         },
     });
 }
@@ -153,8 +148,9 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
 "] <= [fork_impl = sym fork_impl]);
 
 asmfunction!(__relibc_internal_fork_ret: ["
-    ldp x0, x1, [sp], #16
-    ldp x2, x3, [sp], #16
+    # scratchpad is in x1, move to x0 for child_hook
+    mov x0, x1
+
     bl {child_hook}
 
     //TODO: load floating point regs

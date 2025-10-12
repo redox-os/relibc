@@ -17,6 +17,8 @@ use crate::{
     Tcb,
 };
 
+use super::ForkScratchpad;
+
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 47;
 pub(crate) const STACK_SIZE: usize = 1024 * 1024;
@@ -100,24 +102,19 @@ unsafe extern "sysv64" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) ->
     Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "sysv64" fn child_hook(
-    cur_filetable_fd: usize,
-    new_proc_fd: usize,
-    new_thr_fd: usize,
-    new_ns_fd: usize,
-) {
-    let _ = syscall::close(cur_filetable_fd);
+unsafe extern "sysv64" fn child_hook(scratchpad: &mut ForkScratchpad) {
+    let _ = syscall::close(scratchpad.cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
-        new_thr_fd: FdGuard::new(new_thr_fd),
-        new_proc_fd: if new_proc_fd == usize::MAX {
+        new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
+        new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
             None
         } else {
-            Some(FdGuard::new(new_proc_fd))
+            Some(FdGuard::new(scratchpad.new_proc_fd))
         },
-        new_ns_fd: if new_ns_fd == usize::MAX {
+        new_ns_fd: if scratchpad.new_ns_fd == usize::MAX {
             None
         } else {
-            Some(new_ns_fd)
+            Some(scratchpad.new_ns_fd)
         },
     });
 }
@@ -149,18 +146,18 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
 
 "] <= [fork_impl = sym fork_impl]);
 asmfunction!(__relibc_internal_fork_ret: ["
-    mov rdi, [rsp]
-    mov rsi, [rsp + 8]
-    mov rdx, [rsp + 16]
-    mov rcx, [rsp + 24]
+    # scratchpad is in rsi, move to rdi for child_hook
+    mov rdi, rsi
+
     call {child_hook}
 
-    ldmxcsr [rsp + 32]
-    fldcw [rsp + 40]
+    ldmxcsr [rsp]
+    fldcw [rsp + 8]
 
     xor rax, rax
 
-    add rsp, 48
+    add rsp, 16
+
     pop r15
     pop r14
     pop r13
@@ -168,7 +165,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
     pop rbp
     pop rbx
 
-    pop rbp
+    # pop rbp # already popped above
     ret
 "] <= [child_hook = sym child_hook]);
 asmfunction!(__relibc_internal_rlct_clone_ret: ["
