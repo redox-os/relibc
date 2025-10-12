@@ -21,10 +21,10 @@ use crate::{
     header::{
         dirent::dirent,
         errno::{
-            EBADF, EBADFD, EBADR, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS,
+            EBADF, EBADFD, EBADR, EFAULT, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS,
             EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl::{self, AT_FDCWD, O_RDONLY},
+        fcntl::{self, AT_FDCWD, O_CREAT, O_RDONLY, O_RDWR},
         limits,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
@@ -34,7 +34,7 @@ use crate::{
         sys_time::{timeval, timezone},
         sys_utsname::{UTSLENGTH, utsname},
         sys_wait,
-        time::timespec,
+        time::{itimerspec, sigevent, timespec},
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, BufReader, prelude::*},
@@ -863,6 +863,7 @@ impl Pal for Sys {
         let fd = usize::try_from(fd).map_err(|_| Errno(EBADF))?;
         Ok(redox_rt::sys::posix_read(fd, buf)?)
     }
+
     fn pread(fd: c_int, buf: &mut [u8], offset: off_t) -> Result<usize> {
         unsafe {
             Ok(syscall::syscall5(
@@ -1005,6 +1006,79 @@ impl Pal for Sys {
     }
 
     fn sync() -> Result<()> {
+        Ok(())
+    }
+
+    fn timer_create(clock_id: clockid_t, _evp: *mut sigevent, timerid: *mut timer_t) -> Result<()> {
+        let path = format!("/scheme/time/{clock_id}");
+
+        unsafe {
+            *timerid = libredox::open(&path, O_RDWR, 0)? as *mut c_void;
+        }
+        //FIXME: handle evp
+        Ok(())
+    }
+
+    fn timer_delete(timerid: timer_t) -> Result<()> {
+        syscall::close(timerid as usize)?;
+        Ok(())
+    }
+
+    fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> Result<()> {
+        if value.is_null() {
+            return Err(Errno(EFAULT));
+        }
+        let fd = timerid as usize;
+        let buf = unsafe {
+            let field_ptr = ptr::addr_of_mut!((*value).it_value);
+            slice::from_raw_parts_mut(field_ptr as *mut u8, mem::size_of::<timespec>())
+        };
+
+        let bytes_read = redox_rt::sys::posix_read(fd, buf)?;
+
+        if bytes_read != mem::size_of::<timespec>() {
+            return Err(Errno(EIO));
+        }
+
+        //FIXME it_interval
+        unsafe {
+            ptr::addr_of_mut!((*value).it_interval).write_bytes(0, 1);
+        }
+
+        Ok(())
+    }
+
+    fn timer_settime(
+        timerid: timer_t,
+        _flags: c_int, // flags are typically not used here but could be in other systems
+        value: *const itimerspec,
+        ovalue: *mut itimerspec,
+    ) -> Result<()> {
+        if value.is_null() {
+            return Err(Errno(EFAULT));
+        }
+
+        let fd = timerid as usize;
+
+        if !ovalue.is_null() {
+            let old_value_buf = unsafe {
+                slice::from_raw_parts_mut(ovalue as *mut u8, mem::size_of::<itimerspec>())
+            };
+            let bytes_read = redox_rt::sys::posix_read(fd, old_value_buf)?;
+            if bytes_read != 0 && bytes_read < mem::size_of::<timespec>() {
+                return Err(Errno(EIO));
+            }
+        }
+
+        let buf_to_write =
+            unsafe { slice::from_raw_parts(value as *const u8, mem::size_of::<itimerspec>()) };
+
+        let bytes_written = redox_rt::sys::posix_write(fd, buf_to_write)?;
+
+        if bytes_written < mem::size_of::<timespec>() {
+            return Err(Errno(EIO));
+        }
+
         Ok(())
     }
 

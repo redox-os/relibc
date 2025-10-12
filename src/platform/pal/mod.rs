@@ -8,7 +8,7 @@ use crate::{
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
         sys_utsname::utsname,
-        time::timespec,
+        time::{itimerspec, sigevent, timespec},
     },
     out::Out,
     pthread,
@@ -251,6 +251,19 @@ pub trait Pal {
     fn symlink(path1: CStr, path2: CStr) -> Result<()>;
 
     fn sync() -> Result<()>;
+
+    fn timer_create(clock_id: clockid_t, evp: *mut sigevent, timerid: *mut timer_t) -> Result<()>;
+
+    fn timer_delete(timerid: timer_t) -> Result<()>;
+
+    fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> Result<()>;
+
+    fn timer_settime(
+        timerid: timer_t,
+        flags: c_int,
+        value: *const itimerspec,
+        ovalue: *mut itimerspec,
+    ) -> Result<()>;
 
     // Always successful
     fn umask(mask: mode_t) -> mode_t;

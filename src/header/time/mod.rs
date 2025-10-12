@@ -493,19 +493,21 @@ pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_create.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn timer_create(
     clock_id: clockid_t,
     evp: *mut sigevent,
     timerid: *mut timer_t,
 ) -> c_int {
-    unimplemented!();
+    Sys::timer_create(clock_id, evp, timerid)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_delete.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn timer_delete(timerid: timer_t) -> c_int {
-    unimplemented!();
+    Sys::timer_delete(timerid).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
@@ -515,20 +517,24 @@ pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> c_int {
-    unimplemented!();
+    Sys::timer_gettime(timerid, value)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn timer_settime(
     timerid: timer_t,
     flags: c_int,
     value: *const itimerspec,
     ovalue: *mut itimerspec,
 ) -> c_int {
-    unimplemented!();
+    Sys::timer_settime(timerid, flags, value, ovalue)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timespec_get.html>.
