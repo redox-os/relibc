@@ -811,6 +811,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             }
             let new_sp = scratchpad_ptr as usize;
             let arg1 = scratchpad_ptr as usize;
+            (new_sp, arg1)
         };
         #[cfg(target_arch = "x86")]
         let new_sp = unsafe {
