@@ -473,6 +473,11 @@ where
         &create_set_addr_space_buf(*grants_fd, header.e_entry as usize, sp),
     );
 
+    let _ = syscall::write(
+        1,
+        alloc::format!("fexec_impl:entry={:#x}, sp={:#x}\n", header.e_entry, sp).as_bytes(),
+    );
+
     Ok(FexecResult::Normal {
         addrspace_handle: addrspace_selection_fd,
     })
@@ -488,6 +493,11 @@ fn allocate_remote(
     len: usize,
     flags: MapFlags,
 ) -> Result<()> {
+    let _ = syscall::write(
+        1,
+        alloc::format!("Allocating stack: {:x} - {:x}\n", dst_addr, dst_addr + len).as_bytes(),
+    );
+
     mmap_remote(addrspace_fd, memory_scheme_fd, 0, dst_addr, len, flags)
 }
 pub fn mmap_remote(
@@ -723,6 +733,17 @@ pub fn create_set_addr_space_buf(
 ) -> [u8; size_of::<usize>() * 3] {
     let mut buf = [0u8; size_of::<usize>() * 3];
 
+    let _ = syscall::write(
+        1,
+        alloc::format!(
+            "addr_space_buf: space: {:#x}, ip: {:#x}, sp: {:#x}\n",
+            space,
+            ip,
+            sp,
+        )
+        .as_bytes(),
+    );
+
     buf.copy_from_slice([space, sp, ip].map(usize::to_ne_bytes).as_flattened());
 
     buf
@@ -735,6 +756,18 @@ pub fn create_set_addr_space_buf_for_fork(
     arg1: usize,
 ) -> [u8; size_of::<usize>() * 4] {
     let mut buf = [0u8; size_of::<usize>() * 4];
+
+    let _ = syscall::write(
+        1,
+        alloc::format!(
+            "addr_space_buf: space: {:#x}, ip: {:#x}, sp: {:#x}, arg1: {:#x}\n",
+            space,
+            ip,
+            sp,
+            arg1
+        )
+        .as_bytes(),
+    );
 
     buf.copy_from_slice([space, sp, ip, arg1].map(usize::to_ne_bytes).as_flattened());
 
@@ -792,26 +825,30 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             let proc_fd = new_proc_fd.as_ref().map_or(usize::MAX, |p| **p);
             //let _ = syscall::write(1, alloc::format!("FDTBL{}PROC{}THR{}\n", *cur_filetable_fd, proc_fd, *new_thr_fd).as_bytes());
 
-            ForkScratchpad {
+            Box::new(ForkScratchpad {
                 cur_filetable_fd: *cur_filetable_fd,
                 new_proc_fd: proc_fd,
                 new_thr_fd: *new_thr_fd,
                 new_ns_fd: current_namespace_fd(),
-            }
+            })
         };
+        let _ = syscall::write(
+            1,
+            alloc::format!("ForkScratchpad: {:?}\n", scratchpad).as_bytes(),
+        );
         #[cfg(any(
             target_arch = "x86_64",
             target_arch = "aarch64",
             target_arch = "riscv64"
         ))]
         let (new_sp, arg1) = {
-            let scratchpad_ptr = unsafe { initial_rsp.cast::<ForkScratchpad>().sub(1) };
-            unsafe {
-                scratchpad_ptr.write(scratchpad);
-            }
-            let new_sp = scratchpad_ptr as usize;
-            let arg1 = scratchpad_ptr as usize;
-            (new_sp, arg1)
+            let new_sp = initial_rsp as usize;
+            let scratchpad_ptr: *const ForkScratchpad = &*scratchpad;
+            let _ = syscall::write(
+                1,
+                alloc::format!("new_sp: {:#x}, arg1: {:p}\n", new_sp, scratchpad_ptr).as_bytes(),
+            );
+            (new_sp, scratchpad_ptr as usize)
         };
         #[cfg(target_arch = "x86")]
         let new_sp = unsafe {

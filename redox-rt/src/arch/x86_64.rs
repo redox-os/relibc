@@ -102,7 +102,7 @@ unsafe extern "sysv64" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) ->
     Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "sysv64" fn child_hook(scratchpad: &mut ForkScratchpad) {
+unsafe extern "sysv64" fn child_hook(scratchpad: &ForkScratchpad) {
     let _ = syscall::close(scratchpad.cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
         new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
@@ -151,13 +151,12 @@ asmfunction!(__relibc_internal_fork_ret: ["
 
     call {child_hook}
 
-    ldmxcsr [rsp]
-    fldcw [rsp + 8]
+    ldmxcsr [rsp + 32]
+    mov rcx, [rsp + 40]
 
     xor rax, rax
 
-    add rsp, 16
-
+    add rsp, 48
     pop r15
     pop r14
     pop r13
@@ -165,7 +164,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
     pop rbp
     pop rbx
 
-    # pop rbp # already popped above
+    pop rbp
     ret
 "] <= [child_hook = sym child_hook]);
 asmfunction!(__relibc_internal_rlct_clone_ret: ["
