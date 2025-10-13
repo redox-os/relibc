@@ -124,37 +124,47 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     mov rbp, rsp
 
     push rbx
+    push rbp
     push r12
     push r13
     push r14
     push r15
 
     sub rsp, 48
+
     stmxcsr [rsp+32]
     fnstcw [rsp+40]
 
-    # rdi: &ForkArgs
+    // rdi: &ForkArgs
     mov rsi, rsp
     call {fork_impl}
 
-    ldmxcsr [rsp+32]
-    fldcw  [rsp+40]
-    add rsp, 48
+    add rsp, 96
 
+    pop rbp
+    ret
+
+"] <= [fork_impl = sym fork_impl]);
+asmfunction!(__relibc_internal_fork_ret: ["
+    # scratchpad is in rsi, move to rdi for child_hook
+    mov rdi, rsi
+
+    call {child_hook}
+
+    ldmxcsr [rsp + 32]
+    mov rcx, [rsp + 40]
+
+    xor rax, rax
+
+    add rsp, 48
     pop r15
     pop r14
     pop r13
     pop r12
-    pop rbx
     pop rbp
-    ret
-"] <= [fork_impl = sym fork_impl]);
-asmfunction!(__relibc_internal_fork_ret: ["
-    # rsi: scratchpad pointer
-    mov rdi, rsi
-    call {child_hook}
+    pop rbx
 
-    xor rax, rax
+    pop rbp # already popped above
     ret
 "] <= [child_hook = sym child_hook]);
 asmfunction!(__relibc_internal_rlct_clone_ret: ["
