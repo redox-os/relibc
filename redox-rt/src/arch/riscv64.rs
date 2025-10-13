@@ -79,24 +79,19 @@ unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usiz
     Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "C" fn child_hook(
-    cur_filetable_fd: usize,
-    new_proc_fd: usize,
-    new_thr_fd: usize,
-    new_ns_fd: usize,
-) {
-    let _ = syscall::close(cur_filetable_fd);
+unsafe extern "C" fn child_hook(scratchpad: &mut ForkScratchpad) {
+    let _ = syscall::close(scratchpad.cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
-        new_thr_fd: FdGuard::new(new_thr_fd),
-        new_proc_fd: if new_proc_fd == usize::MAX {
+        new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
+        new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
             None
         } else {
-            Some(FdGuard::new(new_proc_fd))
+            Some(FdGuard::new(scratchpad.new_proc_fd))
         },
-        new_ns_fd: if new_ns_fd == usize::MAX {
+        new_ns_fd: if scratchpad.new_ns_fd == usize::MAX {
             None
         } else {
-            Some(new_ns_fd)
+            Some(scratchpad.new_ns_fd)
         },
     });
 }
@@ -171,15 +166,13 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
 
 asmfunction!(__relibc_internal_fork_ret: ["
     .attribute arch, \"rv64gc\"  # rust bug 80608
-    ld   a0, 0(sp) // cur_filetable_fd
-    ld   a1, 8(sp) // new_proc_fd
-    ld a2, 16(sp) // new_thr_fd
-    ld a3, 24(sp) // new_ns_fd
+
+    # scratchpad is in a1, move to a0 for child_hook
+    mv a0, a1
+
     jal  {child_hook}
 
-    mv   a0, x0
-
-    addi sp, sp, 32
+    mv   a0, xzr
 
     ld   s0, 0(sp)
     ld   s1, 8(sp)

@@ -88,24 +88,19 @@ unsafe extern "fastcall" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) 
 }
 
 // TODO: duplicate code with x86_64
-unsafe extern "cdecl" fn child_hook(
-    cur_filetable_fd: usize,
-    new_proc_fd: usize,
-    new_thr_fd: usize,
-    new_ns_fd: usize,
-) {
-    let _ = syscall::close(cur_filetable_fd);
+unsafe extern "cdecl" fn child_hook(scratchpad: &mut ForkScratchpad) {
+    let _ = syscall::close(scratchpad.cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
-        new_thr_fd: FdGuard::new(new_thr_fd),
-        new_proc_fd: if new_proc_fd == usize::MAX {
+        new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
+        new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
             None
         } else {
-            Some(FdGuard::new(new_proc_fd))
+            Some(FdGuard::new(scratchpad.new_proc_fd))
         },
-        new_ns_fd: if new_ns_fd == usize::MAX {
+        new_ns_fd: if scratchpad.new_ns_fd == usize::MAX {
             None
         } else {
-            Some(new_ns_fd)
+            Some(scratchpad.new_ns_fd)
         },
     });
 }
@@ -144,7 +139,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
 
     .p2align 4
 2:
-    add esp, 32
+    add esp, 4
 
     // Pop preserved registers
     pop ebp
@@ -152,7 +147,8 @@ asmfunction!(__relibc_internal_fork_ret: ["
     pop edi
     pop ebx
 
-    pop ebp
+    # pop ebp # already popped above
+
     ret
 "] <= [child_hook = sym child_hook]);
 asmfunction!(__relibc_internal_sigentry: ["
