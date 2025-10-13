@@ -842,7 +842,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             target_arch = "riscv64"
         ))]
         let (new_sp, arg1) = {
-            let scratchpad_ptr = unsafe { initial_rsp.cast::<ForkScratchpad>().sub(1) };
+            let scratchpad_ptr = unsafe { initial_rsp.cast::<ForkScratchpad>() };
             unsafe {
                 scratchpad_ptr.write(scratchpad);
             }

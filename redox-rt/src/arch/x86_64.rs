@@ -158,12 +158,12 @@ asmfunction!(__relibc_internal_fork_ret: ["
 
     call {child_hook}
 
-    ldmxcsr [rsp]
-    fldcw [rsp + 8]
+    ldmxcsr [rsp + 32]
+    fldcw [rsp + 40]
 
     xor rax, rax
 
-    add rsp, 16
+    add rsp, 48
 
     pop r15
     pop r14
