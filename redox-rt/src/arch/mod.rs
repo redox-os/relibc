@@ -18,6 +18,7 @@ pub use self::riscv64::*;
 #[cfg(target_arch = "riscv64")]
 pub mod riscv64;
 
+#[derive(Debug)]
 #[repr(C)]
 pub struct ForkScratchpad {
     pub cur_filetable_fd: usize,
