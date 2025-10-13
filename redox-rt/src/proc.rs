@@ -843,7 +843,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         ))]
         let (new_sp, arg1) = {
             let new_sp = initial_rsp as usize;
-            arg1 = &scratchpad as *const ForkScratchpad as usize;
+            let arg1 = &scratchpad as *const ForkScratchpad as usize;
             let _ = syscall::write(
                 1,
                 alloc::format!("new_sp: {:#x}, arg1: {:#x}\n", new_sp, arg1).as_bytes(),
