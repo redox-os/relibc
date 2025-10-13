@@ -1040,7 +1040,7 @@ impl Pal for Sys {
             return Err(Errno(EIO));
         }
 
-        //FIXME it_interval
+        //TODO: intervals are not supported by the kernel yet
         unsafe {
             ptr::addr_of_mut!((*value).it_interval).write_bytes(0, 1);
         }
@@ -1070,8 +1070,18 @@ impl Pal for Sys {
             }
         }
 
-        let buf_to_write =
-            unsafe { slice::from_raw_parts(value as *const u8, mem::size_of::<itimerspec>()) };
+        unsafe {
+            //TODO: intervals are not supported by the kernel yet
+            let interval = (*value).it_interval;
+            if interval.tv_nsec != 0 || interval.tv_sec != 0 {
+                return Err(Errno(ENOSYS));
+            }
+        }
+
+        let buf_to_write = unsafe {
+            let field_ptr = ptr::addr_of!((*value).it_value);
+            slice::from_raw_parts(field_ptr as *const u8, mem::size_of::<itimerspec>())
+        };
 
         let bytes_written = redox_rt::sys::posix_write(fd, buf_to_write)?;
 
