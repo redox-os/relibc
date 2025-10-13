@@ -842,12 +842,8 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             target_arch = "riscv64"
         ))]
         let (new_sp, arg1) = {
-            let scratchpad_ptr = unsafe { initial_rsp.cast::<ForkScratchpad>() };
-            unsafe {
-                scratchpad_ptr.write(scratchpad);
-            }
-            let new_sp = scratchpad_ptr as usize;
-            let arg1 = scratchpad_ptr as usize;
+            let new_sp = initial_rsp as usize;
+            arg1 = &scratchpad as *const ForkScratchpad as usize;
             let _ = syscall::write(
                 1,
                 alloc::format!("new_sp: {:#x}, arg1: {:#x}\n", new_sp, arg1).as_bytes(),

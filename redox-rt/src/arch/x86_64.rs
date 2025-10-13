@@ -102,7 +102,7 @@ unsafe extern "sysv64" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) ->
     Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "sysv64" fn child_hook(scratchpad: &mut ForkScratchpad) {
+unsafe extern "sysv64" fn child_hook(scratchpad: &ForkScratchpad) {
     let _ = syscall::close(scratchpad.cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
         new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),

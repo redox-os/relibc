@@ -104,7 +104,7 @@ unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usiz
     Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "C" fn child_hook(scratchpad: &mut ForkScratchpad) {
+unsafe extern "C" fn child_hook(scratchpad: &ForkScratchpad) {
     //let _ = syscall::write(1, alloc::format!("CUR{cur_filetable_fd}PROC{new_proc_fd}THR{new_thr_fd}\n").as_bytes());
     let _ = syscall::close(scratchpad.cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
