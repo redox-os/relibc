@@ -473,6 +473,11 @@ where
         &create_set_addr_space_buf(*grants_fd, header.e_entry as usize, sp),
     );
 
+    let _ = syscall::write(
+        1,
+        alloc::format!("fexec_impl:entry={:#x}, sp={:#x}", header.e_entry, sp).as_bytes(),
+    );
+
     Ok(FexecResult::Normal {
         addrspace_handle: addrspace_selection_fd,
     })
@@ -488,6 +493,11 @@ fn allocate_remote(
     len: usize,
     flags: MapFlags,
 ) -> Result<()> {
+    let _ = syscall::write(
+        1,
+        alloc::format!("Allocating stack: {:x} - {:x}", dst_addr, dst_addr + len).as_bytes(),
+    );
+
     mmap_remote(addrspace_fd, memory_scheme_fd, 0, dst_addr, len, flags)
 }
 pub fn mmap_remote(
@@ -799,6 +809,10 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                 new_ns_fd: current_namespace_fd(),
             }
         };
+        let _ = syscall::write(
+            1,
+            alloc::format!("ForkScratchpad: {:?}", scratchpad).as_bytes(),
+        );
         #[cfg(any(
             target_arch = "x86_64",
             target_arch = "aarch64",
@@ -811,6 +825,10 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             }
             let new_sp = scratchpad_ptr as usize;
             let arg1 = scratchpad_ptr as usize;
+            let _ = syscall::write(
+                1,
+                alloc::format!("new_sp: {:#x}, arg1: {:#x}", new_sp, arg1).as_bytes(),
+            );
             (new_sp, arg1)
         };
         #[cfg(target_arch = "x86")]

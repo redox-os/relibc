@@ -19,6 +19,7 @@ pub use self::riscv64::*;
 pub mod riscv64;
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct ForkScratchpad {
     pub cur_filetable_fd: usize,
     pub new_proc_fd: usize,
