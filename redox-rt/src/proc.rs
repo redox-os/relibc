@@ -846,7 +846,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             let scratchpad_ptr: *const ForkScratchpad = &scratchpad;
             let _ = syscall::write(
                 1,
-                alloc::format!("new_sp: {:#x}, arg1: {:#x}\n", new_sp, scratchpad_ptr).as_bytes(),
+                alloc::format!("new_sp: {:#x}, arg1: {:p}\n", new_sp, scratchpad_ptr).as_bytes(),
             );
             (new_sp, scratchpad_ptr as usize)
         };
