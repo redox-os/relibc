@@ -475,7 +475,7 @@ where
 
     let _ = syscall::write(
         1,
-        alloc::format!("fexec_impl:entry={:#x}, sp={:#x}", header.e_entry, sp).as_bytes(),
+        alloc::format!("fexec_impl:entry={:#x}, sp={:#x}\n", header.e_entry, sp).as_bytes(),
     );
 
     Ok(FexecResult::Normal {
@@ -495,7 +495,7 @@ fn allocate_remote(
 ) -> Result<()> {
     let _ = syscall::write(
         1,
-        alloc::format!("Allocating stack: {:x} - {:x}", dst_addr, dst_addr + len).as_bytes(),
+        alloc::format!("Allocating stack: {:x} - {:x}\n", dst_addr, dst_addr + len).as_bytes(),
     );
 
     mmap_remote(addrspace_fd, memory_scheme_fd, 0, dst_addr, len, flags)
@@ -733,6 +733,17 @@ pub fn create_set_addr_space_buf(
 ) -> [u8; size_of::<usize>() * 3] {
     let mut buf = [0u8; size_of::<usize>() * 3];
 
+    let _ = syscall::write(
+        1,
+        alloc::format!(
+            "addr_space_buf: space: {:#x}, ip: {:#x}, sp: {:#x}\n",
+            space,
+            ip,
+            sp,
+        )
+        .as_bytes(),
+    );
+
     buf.copy_from_slice([space, sp, ip].map(usize::to_ne_bytes).as_flattened());
 
     buf
@@ -745,6 +756,18 @@ pub fn create_set_addr_space_buf_for_fork(
     arg1: usize,
 ) -> [u8; size_of::<usize>() * 4] {
     let mut buf = [0u8; size_of::<usize>() * 4];
+
+    let _ = syscall::write(
+        1,
+        alloc::format!(
+            "addr_space_buf: space: {:#x}, ip: {:#x}, sp: {:#x}, arg1: {:#x}\n",
+            space,
+            ip,
+            sp,
+            arg1
+        )
+        .as_bytes(),
+    );
 
     buf.copy_from_slice([space, sp, ip, arg1].map(usize::to_ne_bytes).as_flattened());
 
@@ -811,7 +834,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         };
         let _ = syscall::write(
             1,
-            alloc::format!("ForkScratchpad: {:?}", scratchpad).as_bytes(),
+            alloc::format!("ForkScratchpad: {:?}\n", scratchpad).as_bytes(),
         );
         #[cfg(any(
             target_arch = "x86_64",
@@ -827,7 +850,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             let arg1 = scratchpad_ptr as usize;
             let _ = syscall::write(
                 1,
-                alloc::format!("new_sp: {:#x}, arg1: {:#x}", new_sp, arg1).as_bytes(),
+                alloc::format!("new_sp: {:#x}, arg1: {:#x}\n", new_sp, arg1).as_bytes(),
             );
             (new_sp, arg1)
         };
