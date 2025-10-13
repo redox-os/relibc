@@ -139,14 +139,7 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     mov rsi, rsp
     call {fork_impl}
 
-    add rsp, 48
-
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop rbp
-    pop rbx
+    add rsp, 96
 
     pop rbp
     ret
@@ -159,10 +152,10 @@ asmfunction!(__relibc_internal_fork_ret: ["
     call {child_hook}
 
     ldmxcsr [rsp + 32]
-    fldcw [rsp + 40]
+    mov rcx, [rsp + 24]
+    call {child_hook}
 
-    xor rax, rax
-
+    add rsp, 48
     pop r15
     pop r14
     pop r13
@@ -170,7 +163,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
     pop rbp
     pop rbx
 
-    # pop rbp # already popped above
+    pop rbp # already popped above
     ret
 "] <= [child_hook = sym child_hook]);
 asmfunction!(__relibc_internal_rlct_clone_ret: ["
