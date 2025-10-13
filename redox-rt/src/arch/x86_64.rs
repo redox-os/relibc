@@ -139,7 +139,14 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     mov rsi, rsp
     call {fork_impl}
 
-    add rsp, 96
+    add rsp, 48
+
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    pop rbx
 
     pop rbp
     ret
