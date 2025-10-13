@@ -205,6 +205,8 @@ impl<T: plain::Plain> Out<'_, [T]> {
 pub unsafe trait CastSlice<U> {}
 unsafe impl CastSlice<i8> for u8 {}
 unsafe impl CastSlice<u8> for i8 {}
+unsafe impl CastSlice<u8> for u8 {}
+unsafe impl CastSlice<i8> for i8 {}
 
 impl<T: ?Sized> fmt::Pointer for Out<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
