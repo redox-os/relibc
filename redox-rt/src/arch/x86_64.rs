@@ -163,8 +163,6 @@ asmfunction!(__relibc_internal_fork_ret: ["
 
     xor rax, rax
 
-    add rsp, 48
-
     pop r15
     pop r14
     pop r13
