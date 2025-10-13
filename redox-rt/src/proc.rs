@@ -825,12 +825,12 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             let proc_fd = new_proc_fd.as_ref().map_or(usize::MAX, |p| **p);
             //let _ = syscall::write(1, alloc::format!("FDTBL{}PROC{}THR{}\n", *cur_filetable_fd, proc_fd, *new_thr_fd).as_bytes());
 
-            Box::new(ForkScratchpad {
+            ForkScratchpad {
                 cur_filetable_fd: *cur_filetable_fd,
                 new_proc_fd: proc_fd,
                 new_thr_fd: *new_thr_fd,
                 new_ns_fd: current_namespace_fd(),
-            })
+            }
         };
         let _ = syscall::write(
             1,
@@ -843,10 +843,10 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         ))]
         let (new_sp, arg1) = {
             let new_sp = initial_rsp as usize;
-            let scratchpad_ptr: *const ForkScratchpad = &*scratchpad;
+            let scratchpad_ptr: *const ForkScratchpad = &scratchpad;
             let _ = syscall::write(
                 1,
-                alloc::format!("new_sp: {:#x}, arg1: {:p}\n", new_sp, scratchpad_ptr).as_bytes(),
+                alloc::format!("new_sp: {:#x}, arg1: {:#x}\n", new_sp, scratchpad_ptr).as_bytes(),
             );
             (new_sp, scratchpad_ptr as usize)
         };
