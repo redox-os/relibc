@@ -1,9 +1,14 @@
-//! assert implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/assert.h.html
+//! `assert.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/assert.h.html>.
 
 // TODO: set this for entire crate when possible
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use crate::{c_str::CStr, platform::types::*};
+use crate::{
+    c_str::CStr,
+    platform::types::{c_char, c_int},
+};
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __assert_fail(
