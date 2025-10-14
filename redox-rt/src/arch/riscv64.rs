@@ -126,12 +126,9 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     fsd  fs10, 184(sp)
     fsd  fs11, 192(sp)
 
-    addi sp, sp, -32
     // a0 is forwarded from this function
     mv   a1, sp
     jal  {fork_impl}
-
-    addi sp, sp, 32
 
     ld   s0, 0(sp)
     ld   s1, 8(sp)

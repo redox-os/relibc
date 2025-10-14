@@ -130,15 +130,12 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     stp     x21, x22, [sp, #-16]!
     stp     x19, x20, [sp, #-16]!
 
-    sub sp, sp, #32
-
     //TODO: store floating point regs
 
     // x0: &ForkArgs
     mov x1, sp
     bl {fork_impl}
 
-    add sp, sp, #32
     ldp     x19, x20, [sp], #16
     ldp     x21, x22, [sp], #16
     ldp     x23, x24, [sp], #16
