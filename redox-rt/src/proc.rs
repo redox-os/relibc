@@ -29,6 +29,7 @@ use goblin::elf64::{
 };
 
 use syscall::{
+    data::ProcSchemeAttrs,
     error::*,
     flag::{MapFlags, SEEK_SET},
     CallFlags, GrantDesc, GrantFlags, Map, SetSighandlerData, MAP_FIXED_NOREPLACE, MAP_SHARED,
@@ -472,6 +473,11 @@ where
         &create_set_addr_space_buf(*grants_fd, header.e_entry as usize, sp),
     );
 
+    let _ = syscall::write(
+        1,
+        alloc::format!("fexec_impl:entry={:#x}, sp={:#x}\n", header.e_entry, sp).as_bytes(),
+    );
+
     Ok(FexecResult::Normal {
         addrspace_handle: addrspace_selection_fd,
     })
@@ -487,6 +493,11 @@ fn allocate_remote(
     len: usize,
     flags: MapFlags,
 ) -> Result<()> {
+    let _ = syscall::write(
+        1,
+        alloc::format!("Allocating stack: {:x} - {:x}\n", dst_addr, dst_addr + len).as_bytes(),
+    );
+
     mmap_remote(addrspace_fd, memory_scheme_fd, 0, dst_addr, len, flags)
 }
 pub fn mmap_remote(
@@ -722,7 +733,43 @@ pub fn create_set_addr_space_buf(
 ) -> [u8; size_of::<usize>() * 3] {
     let mut buf = [0u8; size_of::<usize>() * 3];
 
+    let _ = syscall::write(
+        1,
+        alloc::format!(
+            "addr_space_buf: space: {:#x}, ip: {:#x}, sp: {:#x}\n",
+            space,
+            ip,
+            sp,
+        )
+        .as_bytes(),
+    );
+
     buf.copy_from_slice([space, sp, ip].map(usize::to_ne_bytes).as_flattened());
+
+    buf
+}
+
+pub fn create_set_addr_space_buf_for_fork(
+    space: usize,
+    ip: usize,
+    sp: usize,
+    arg1: usize,
+) -> [u8; size_of::<usize>() * 4] {
+    let mut buf = [0u8; size_of::<usize>() * 4];
+
+    let _ = syscall::write(
+        1,
+        alloc::format!(
+            "addr_space_buf: space: {:#x}, ip: {:#x}, sp: {:#x}, arg1: {:#x}\n",
+            space,
+            ip,
+            sp,
+            arg1
+        )
+        .as_bytes(),
+    );
+
+    buf.copy_from_slice([space, sp, ip, arg1].map(usize::to_ne_bytes).as_flattened());
 
     buf
 }
@@ -771,19 +818,48 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
 
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new
         // parent FDs will not show up for the child).
-        {
+        let scratchpad = {
             cur_filetable_fd = FdGuard::new(syscall::dup(**cur_thr_fd, b"filetable")?);
 
             // This must be done before the address space is copied.
-            unsafe {
-                let proc_fd = new_proc_fd.as_ref().map_or(usize::MAX, |p| **p);
-                //let _ = syscall::write(1, alloc::format!("FDTBL{}PROC{}THR{}\n", *cur_filetable_fd, proc_fd, *new_thr_fd).as_bytes());
-                initial_rsp.write(*cur_filetable_fd);
-                initial_rsp.add(1).write(proc_fd);
-                initial_rsp.add(2).write(*new_thr_fd);
-                initial_rsp.add(3).write(current_namespace_fd());
+            let proc_fd = new_proc_fd.as_ref().map_or(usize::MAX, |p| **p);
+            //let _ = syscall::write(1, alloc::format!("FDTBL{}PROC{}THR{}\n", *cur_filetable_fd, proc_fd, *new_thr_fd).as_bytes());
+
+            ForkScratchpad {
+                cur_filetable_fd: *cur_filetable_fd,
+                new_proc_fd: proc_fd,
+                new_thr_fd: *new_thr_fd,
+                new_ns_fd: current_namespace_fd(),
             }
-        }
+        };
+        let _ = syscall::write(
+            1,
+            alloc::format!("ForkScratchpad: {:?}\n", scratchpad).as_bytes(),
+        );
+        #[cfg(any(
+            target_arch = "x86_64",
+            target_arch = "aarch64",
+            target_arch = "riscv64"
+        ))]
+        let (new_sp, arg1) = {
+            let new_sp = initial_rsp as usize;
+            let scratchpad_ptr: *const ForkScratchpad = &scratchpad;
+            let _ = syscall::write(
+                1,
+                alloc::format!("new_sp: {:#x}, arg1: {:p}\n", new_sp, scratchpad_ptr).as_bytes(),
+            );
+            (new_sp, scratchpad_ptr as usize)
+        };
+        #[cfg(target_arch = "x86")]
+        let new_sp = unsafe {
+            let scratchpad_ptr = initial_rsp.cast::<ForkScratchpad>().sub(1);
+            scratchpad_ptr.write(scratchpad);
+
+            let arg_ptr = scratchpad_ptr.cast::<usize>().sub(1);
+            arg_ptr.write(scratchpad_ptr as usize);
+
+            arg_ptr as usize
+        };
 
         // CoW-duplicate address space.
         {
@@ -853,10 +929,22 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                 }
             }
 
+            #[cfg(any(
+                target_arch = "x86_64",
+                target_arch = "aarch64",
+                target_arch = "riscv64"
+            ))]
+            let buf = create_set_addr_space_buf_for_fork(
+                *new_addr_space_fd,
+                __relibc_internal_fork_ret as usize,
+                new_sp,
+                arg1,
+            );
+            #[cfg(target_arch = "x86")]
             let buf = create_set_addr_space_buf(
                 *new_addr_space_fd,
                 __relibc_internal_fork_ret as usize,
-                initial_rsp as usize,
+                new_sp,
             );
             let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
         }
