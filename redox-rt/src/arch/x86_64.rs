@@ -130,16 +130,15 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     push r14
     push r15
 
-    sub rsp, 48
-
     stmxcsr [rsp+32]
     fnstcw [rsp+40]
 
     // rdi: &ForkArgs
+    // rsi: initial_rsp
     mov rsi, rsp
     call {fork_impl}
 
-    add rsp, 96
+    add rsp, 48
 
     pop rbp
     ret
@@ -156,7 +155,6 @@ asmfunction!(__relibc_internal_fork_ret: ["
 
     xor rax, rax
 
-    add rsp, 48
     pop r15
     pop r14
     pop r13
@@ -164,7 +162,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
     pop rbp
     pop rbx
 
-    pop rbp # already popped above
+    pop rbp
     ret
 "] <= [child_hook = sym child_hook]);
 asmfunction!(__relibc_internal_rlct_clone_ret: ["
