@@ -93,6 +93,7 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
 
         let mut env_regs = syscall::EnvRegisters::default();
         let _ = syscall::read(*cur_env_regs_fd, &mut env_regs)?;
+        let _ = syscall::write(1, alloc::format!("env_regs: {:?}\n", env_regs).as_bytes());
         let _ = syscall::write(*new_env_regs_fd, &env_regs)?;
     }
 
@@ -103,7 +104,7 @@ unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usiz
     Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "C" fn child_hook(scratchpad: &mut ForkScratchpad) {
+unsafe extern "C" fn child_hook(scratchpad: &ForkScratchpad) {
     //let _ = syscall::write(1, alloc::format!("CUR{cur_filetable_fd}PROC{new_proc_fd}THR{new_thr_fd}\n").as_bytes());
     let _ = syscall::close(scratchpad.cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
