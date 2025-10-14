@@ -93,6 +93,7 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
 
         let mut env_regs = syscall::EnvRegisters::default();
         let _ = syscall::read(*cur_env_regs_fd, &mut env_regs)?;
+        let _ = syscall::write(1, alloc::format!("env_regs: {:?}\n", env_regs).as_bytes());
         let _ = syscall::write(*new_env_regs_fd, &env_regs)?;
     }
 
@@ -103,25 +104,20 @@ unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usiz
     Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "C" fn child_hook(
-    cur_filetable_fd: usize,
-    new_proc_fd: usize,
-    new_thr_fd: usize,
-    new_ns_fd: usize,
-) {
+unsafe extern "C" fn child_hook(scratchpad: &ForkScratchpad) {
     //let _ = syscall::write(1, alloc::format!("CUR{cur_filetable_fd}PROC{new_proc_fd}THR{new_thr_fd}\n").as_bytes());
-    let _ = syscall::close(cur_filetable_fd);
+    let _ = syscall::close(scratchpad.cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
-        new_thr_fd: FdGuard::new(new_thr_fd),
-        new_proc_fd: if new_proc_fd == usize::MAX {
+        new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
+        new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
             None
         } else {
-            Some(FdGuard::new(new_proc_fd))
+            Some(FdGuard::new(scratchpad.new_proc_fd))
         },
-        new_ns_fd: if new_ns_fd == usize::MAX {
+        new_ns_fd: if scratchpad.new_ns_fd == usize::MAX {
             None
         } else {
-            Some(FdGuard::new(new_ns_fd))
+            Some(scratchpad.new_ns_fd)
         },
     });
 }
@@ -134,15 +130,12 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     stp     x21, x22, [sp, #-16]!
     stp     x19, x20, [sp, #-16]!
 
-    sub sp, sp, #32
-
     //TODO: store floating point regs
 
     // x0: &ForkArgs
     mov x1, sp
     bl {fork_impl}
 
-    add sp, sp, #32
     ldp     x19, x20, [sp], #16
     ldp     x21, x22, [sp], #16
     ldp     x23, x24, [sp], #16
@@ -153,8 +146,9 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
 "] <= [fork_impl = sym fork_impl]);
 
 asmfunction!(__relibc_internal_fork_ret: ["
-    ldp x0, x1, [sp], #16
-    ldp x2, x3, [sp], #16
+    # scratchpad is in x1, move to x0 for child_hook
+    mov x0, x1
+
     bl {child_hook}
 
     //TODO: load floating point regs
