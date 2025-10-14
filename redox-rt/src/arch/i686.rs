@@ -9,6 +9,8 @@ use crate::{
     RtTcb,
 };
 
+use super::ForkScratchpad;
+
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub(crate) const STACK_TOP: usize = 1 << 31;
 pub(crate) const STACK_SIZE: usize = 1024 * 1024;
