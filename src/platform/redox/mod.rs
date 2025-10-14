@@ -26,6 +26,8 @@ use crate::{
         },
         fcntl::{self, AT_FDCWD, O_CREAT, O_RDONLY, O_RDWR},
         limits,
+        pthread::{pthread_cancel, pthread_create},
+        signal::{SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, sigevent},
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{RLIM_INFINITY, rlimit, rusage},
@@ -34,11 +36,18 @@ use crate::{
         sys_time::{timeval, timezone},
         sys_utsname::{UTSLENGTH, utsname},
         sys_wait,
-        time::{itimerspec, sigevent, timespec},
+        time::{itimerspec, timer_internal_t, timespec},
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, BufReader, prelude::*},
     out::Out,
+    platform::sys::{
+        event::{
+            redox_event_queue_create_v1, redox_event_queue_ctl_v1, redox_event_queue_destroy_v1,
+        },
+        libredox::RawResult,
+        timer::timer_routine,
+    },
     sync::rwlock::RwLock,
 };
 
@@ -73,6 +82,7 @@ pub(crate) mod path;
 mod ptrace;
 pub(crate) mod signal;
 mod socket;
+mod timer;
 
 macro_rules! path_from_c_str {
     ($c_str:expr) => {{
@@ -1009,18 +1019,99 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn timer_create(clock_id: clockid_t, _evp: *mut sigevent, timerid: *mut timer_t) -> Result<()> {
+    fn timer_create(clock_id: clockid_t, evp: *mut sigevent, timerid: *mut timer_t) -> Result<()> {
+        if timerid.is_null() || evp.is_null() {
+            return Err(Errno(EFAULT));
+        }
+        let ev = unsafe { &*evp };
+        if ev.sigev_notify == SIGEV_THREAD && ev.sigev_notify_function.is_null() {
+            return Err(Errno(EINVAL));
+        }
+
         let path = format!("/scheme/time/{clock_id}");
+        let timerfd = libredox::open(&path, O_RDWR, 0)?;
 
         unsafe {
-            *timerid = libredox::open(&path, O_RDWR, 0)? as *mut c_void;
+            let eventfd = Error::demux(redox_event_queue_create_v1(0)).map_err(|e| {
+                let _ = syscall::close(timerfd);
+                e
+            })?;
+
+            fn closefds(timerfd: usize, eventfd: usize) {
+                let _ = syscall::close(timerfd);
+                let _ = syscall::close(eventfd);
+            }
+
+            let timer_buf = Self::mmap(
+                ptr::null_mut(),
+                size_of::<timer_internal_t>(),
+                PROT_READ | PROT_WRITE,
+                MAP_ANONYMOUS,
+                0,
+                0,
+            )
+            .map_err(|e| {
+                closefds(timerfd, eventfd);
+                e
+            })?;
+
+            let thread = match ev.sigev_notify {
+                SIGEV_THREAD => {
+                    let mut tid = pthread_t::default();
+                    let result = pthread_create(
+                        &mut tid as *mut _,
+                        ptr::null(),
+                        timer_routine,
+                        timer_buf as *mut c_void,
+                    );
+                    if result != 0 {
+                        closefds(timerfd, eventfd);
+                        Self::munmap(timer_buf, size_of::<timer_internal_t>());
+                        return Err(Errno(result));
+                    }
+                    tid
+                }
+                SIGEV_SIGNAL => {
+                    closefds(timerfd, eventfd);
+                    return Err(Errno(ENOSYS));
+                }
+                SIGEV_NONE => ptr::null_mut(),
+                _ => {
+                    closefds(timerfd, eventfd);
+                    return Err(Errno(EINVAL));
+                }
+            };
+
+            *timerid = timer_buf;
+
+            let timer_ptr = timer_buf as *mut timer_internal_t;
+            let timer_st = (&mut *timer_ptr);
+
+            timer_st.clockid = clock_id;
+            timer_st.timerfd = timerfd;
+            timer_st.eventfd = eventfd;
+            timer_st.evp = (*evp).clone();
+            timer_st.next_wake_time = itimerspec::default();
+            timer_st.thread = thread;
         }
-        //FIXME: handle evp
         Ok(())
     }
 
     fn timer_delete(timerid: timer_t) -> Result<()> {
-        syscall::close(timerid as usize)?;
+        if timerid.is_null() {
+            return Err(Errno(EFAULT));
+        }
+        unsafe {
+            let timer_ptr = timerid as *mut timer_internal_t;
+            let timer_st = (&mut *timer_ptr);
+            let _ = syscall::close(timer_st.timerfd);
+            let _ = syscall::close(timer_st.eventfd);
+            if !timer_st.thread.is_null() {
+                let _ = pthread_cancel(timer_st.thread);
+            }
+            Self::munmap(timer_ptr as *mut c_void, size_of::<timer_internal_t>())?;
+        }
+
         Ok(())
     }
 
@@ -1028,21 +1119,17 @@ impl Pal for Sys {
         if value.is_null() {
             return Err(Errno(EFAULT));
         }
-        let fd = timerid as usize;
-        let buf = unsafe {
-            let field_ptr = ptr::addr_of_mut!((*value).it_value);
-            slice::from_raw_parts_mut(field_ptr as *mut u8, mem::size_of::<timespec>())
-        };
 
-        let bytes_read = redox_rt::sys::posix_read(fd, buf)?;
+        let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
+        let mut now = timespec::default();
+        Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
 
-        if bytes_read != mem::size_of::<timespec>() {
-            return Err(Errno(EIO));
-        }
-
-        //TODO: intervals are not supported by the kernel yet
         unsafe {
-            ptr::addr_of_mut!((*value).it_interval).write_bytes(0, 1);
+            *value = itimerspec {
+                it_interval: timer_st.next_wake_time.it_interval,
+                it_value: timespec::subtract(timer_st.next_wake_time.it_value, now)
+                    .unwrap_or_default(),
+            };
         }
 
         Ok(())
@@ -1050,33 +1137,47 @@ impl Pal for Sys {
 
     fn timer_settime(
         timerid: timer_t,
-        _flags: c_int, // flags are typically not used here but could be in other systems
+        _flags: c_int,
         value: *const itimerspec,
         ovalue: *mut itimerspec,
     ) -> Result<()> {
-        if value.is_null() {
+        if timerid.is_null() || value.is_null() {
             return Err(Errno(EFAULT));
         }
+
+        let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
+        let mut now = timespec::default();
+        Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
 
         let fd = timerid as usize;
 
         if !ovalue.is_null() {
-            let old_value_buf = unsafe {
-                slice::from_raw_parts_mut(ovalue as *mut u8, mem::size_of::<itimerspec>())
+            let mut old_spec = itimerspec {
+                it_interval: timer_st.next_wake_time.it_interval,
+                it_value: timespec::subtract(timer_st.next_wake_time.it_value, now)
+                    .unwrap_or_default(),
             };
-            let bytes_read = redox_rt::sys::posix_read(fd, old_value_buf)?;
-            if bytes_read != 0 && bytes_read < mem::size_of::<timespec>() {
-                return Err(Errno(EIO));
+
+            unsafe {
+                *ovalue = old_spec;
             }
         }
 
-        unsafe {
-            //TODO: intervals are not supported by the kernel yet
-            let interval = (*value).it_interval;
-            if interval.tv_nsec != 0 || interval.tv_sec != 0 {
-                return Err(Errno(ENOSYS));
-            }
-        }
+        //FIXME: make these atomic?
+        timer_st.next_wake_time = unsafe {
+            let mut val = (*value).clone();
+            val.it_value = timespec::add(now, val.it_value).ok_or((Errno(EINVAL)))?;
+            val
+        };
+
+        // unsafe { redox_event_queue_ctl_v1(queue, fd, flags, user_data) }
+
+        let buf_to_write = unsafe {
+            slice::from_raw_parts(
+                &(*value).it_value as *const _ as *const u8,
+                mem::size_of::<timespec>(),
+            )
+        };
 
         let buf_to_write = unsafe {
             let field_ptr = ptr::addr_of!((*value).it_value);
