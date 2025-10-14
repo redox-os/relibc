@@ -88,7 +88,7 @@ unsafe extern "fastcall" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) 
 }
 
 // TODO: duplicate code with x86_64
-unsafe extern "cdecl" fn child_hook(scratchpad: &mut ForkScratchpad) {
+unsafe extern "cdecl" fn child_hook(scratchpad: &ForkScratchpad) {
     let _ = syscall::close(scratchpad.cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
         new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
