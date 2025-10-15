@@ -119,10 +119,10 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     push esi
     push ebp
 
-    sub esp, 32
+    sub esp, 48
 
-    //TODO stmxcsr [esp+16]
-    fnstcw [esp+24]
+    //TODO stmxcsr [esp+32]
+    fnstcw [esp+40]
 
     mov edx, esp
     call {fork_impl}
@@ -134,8 +134,8 @@ asmfunction!(__relibc_internal_fork_ret: ["
     // Arguments already on the stack
     call {child_hook}
 
-    //TODO ldmxcsr [esp+16]
-    fldcw [esp+24]
+    //TODO ldmxcsr [esp+32]
+    fldcw [esp+40]
 
     xor eax, eax
 
