@@ -852,13 +852,10 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         };
         #[cfg(target_arch = "x86")]
         let new_sp = unsafe {
-            let layout = core::alloc::Layout::new::<ForkScratchpad>();
-            let size = layout.size();
-            let align = layout.align();
+            let size = size_of::<ForkScratchpad>();
             let _ = syscall::write(
                 1,
-                alloc::format!("ForkScratchapd layout size: {}, align: {}\n", size, align)
-                    .as_bytes(),
+                alloc::format!("ForkScratchapd layout size: {}\n", size).as_bytes(),
             );
             let scratchpad_ptr = initial_rsp.add(size_of::<usize>() + size);
 

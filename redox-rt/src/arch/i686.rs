@@ -141,7 +141,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
 
     .p2align 4
 2:
-    add esp, 4
+    add esp, 48
 
     // Pop preserved registers
     pop ebp
