@@ -1,5 +1,5 @@
 use crate::{
-    header::time::{sigevent, timespec},
+    header::{signal::sigevent, time::timespec},
     platform::types::*,
 };
 

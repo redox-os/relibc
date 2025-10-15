@@ -21,11 +21,13 @@ use crate::{
     header::{
         dirent::dirent,
         errno::{
-            EBADF, EBADFD, EBADR, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS,
+            EBADF, EBADFD, EBADR, EFAULT, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS,
             EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl::{self, AT_FDCWD, O_RDONLY},
+        fcntl::{self, AT_FDCWD, O_CREAT, O_RDONLY, O_RDWR},
         limits,
+        pthread::{pthread_cancel, pthread_create},
+        signal::{SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, sigevent},
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{RLIM_INFINITY, rlimit, rusage},
@@ -34,11 +36,15 @@ use crate::{
         sys_time::{timeval, timezone},
         sys_utsname::{UTSLENGTH, utsname},
         sys_wait,
-        time::timespec,
+        time::{itimerspec, timer_internal_t, timespec},
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, BufReader, prelude::*},
     out::Out,
+    platform::sys::{
+        libredox::RawResult,
+        timer::{timer_routine, timer_update_wake_time},
+    },
     sync::rwlock::RwLock,
 };
 
@@ -73,6 +79,7 @@ pub(crate) mod path;
 mod ptrace;
 pub(crate) mod signal;
 mod socket;
+mod timer;
 
 macro_rules! path_from_c_str {
     ($c_str:expr) => {{
@@ -863,6 +870,7 @@ impl Pal for Sys {
         let fd = usize::try_from(fd).map_err(|_| Errno(EBADF))?;
         Ok(redox_rt::sys::posix_read(fd, buf)?)
     }
+
     fn pread(fd: c_int, buf: &mut [u8], offset: off_t) -> Result<usize> {
         unsafe {
             Ok(syscall::syscall5(
@@ -1005,6 +1013,178 @@ impl Pal for Sys {
     }
 
     fn sync() -> Result<()> {
+        Ok(())
+    }
+
+    fn timer_create(clock_id: clockid_t, evp: *mut sigevent, timerid: *mut timer_t) -> Result<()> {
+        if timerid.is_null() || evp.is_null() {
+            return Err(Errno(EFAULT));
+        }
+        let ev = unsafe { &*evp };
+        if ev.sigev_notify == SIGEV_THREAD && ev.sigev_notify_function.is_none() {
+            return Err(Errno(EINVAL));
+        }
+
+        let path = format!("/scheme/time/{clock_id}");
+        let timerfd = libredox::open(&path, O_RDWR, 0)?;
+
+        unsafe {
+            let eventfd = Error::demux(event::redox_event_queue_create_v1(0)).map_err(|e| {
+                let _ = syscall::close(timerfd);
+                e
+            })?;
+
+            let timer_buf = Self::mmap(
+                ptr::null_mut(),
+                size_of::<timer_internal_t>(),
+                PROT_READ | PROT_WRITE,
+                MAP_ANONYMOUS,
+                0,
+                0,
+            )
+            .map_err(|e| {
+                let _ = syscall::close(timerfd);
+                let _ = syscall::close(eventfd);
+                e
+            })?;
+
+            *timerid = timer_buf;
+
+            let timer_ptr = timer_buf as *mut timer_internal_t;
+            let timer_st = (&mut *timer_ptr);
+
+            timer_st.clockid = clock_id;
+            timer_st.timerfd = timerfd;
+            timer_st.eventfd = eventfd;
+            timer_st.evp = (*evp).clone();
+            timer_st.next_wake_time = itimerspec::default();
+            timer_st.thread = ptr::null_mut();
+        }
+        Ok(())
+    }
+
+    fn timer_delete(timerid: timer_t) -> Result<()> {
+        if timerid.is_null() {
+            return Err(Errno(EFAULT));
+        }
+        unsafe {
+            let timer_ptr = timerid as *mut timer_internal_t;
+            let timer_st = (&mut *timer_ptr);
+            let _ = syscall::close(timer_st.timerfd);
+            let _ = syscall::close(timer_st.eventfd);
+            if !timer_st.thread.is_null() {
+                let _ = pthread_cancel(timer_st.thread);
+            }
+            Self::munmap(timer_ptr as *mut c_void, size_of::<timer_internal_t>())?;
+        }
+
+        Ok(())
+    }
+
+    fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> Result<()> {
+        if value.is_null() {
+            return Err(Errno(EFAULT));
+        }
+
+        let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
+        let mut now = timespec::default();
+        Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
+
+        if timer_st.evp.sigev_notify == SIGEV_NONE {
+            if timespec::subtract(timer_st.next_wake_time.it_value, now).is_none() {
+                // error here means the timer is disarmed
+                let _ = timer_update_wake_time(timer_st);
+            }
+        }
+
+        unsafe {
+            *value = if timer_st.next_wake_time.it_value.is_default() {
+                // disarmed
+                itimerspec::default()
+            } else {
+                itimerspec {
+                    it_interval: timer_st.next_wake_time.it_interval,
+                    it_value: timespec::subtract(timer_st.next_wake_time.it_value, now)
+                        .unwrap_or_default(),
+                }
+            };
+        }
+
+        Ok(())
+    }
+
+    fn timer_settime(
+        timerid: timer_t,
+        _flags: c_int,
+        value: *const itimerspec,
+        ovalue: *mut itimerspec,
+    ) -> Result<()> {
+        if timerid.is_null() || value.is_null() {
+            return Err(Errno(EFAULT));
+        }
+
+        let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
+
+        if !ovalue.is_null() {
+            Self::timer_gettime(timerid, ovalue)?;
+        }
+
+        let mut now = timespec::default();
+        Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
+
+        //FIXME: make these atomic?
+        timer_st.next_wake_time = unsafe {
+            let mut val = (*value).clone();
+            val.it_value = timespec::add(now, val.it_value).ok_or((Errno(EINVAL)))?;
+            val
+        };
+
+        Error::demux(unsafe {
+            event::redox_event_queue_ctl_v1(timer_st.eventfd, timer_st.timerfd, 1, 0)
+        })?;
+
+        let buf_to_write = unsafe {
+            slice::from_raw_parts(
+                &timer_st.next_wake_time.it_value as *const _ as *const u8,
+                mem::size_of::<timespec>(),
+            )
+        };
+
+        let bytes_written = redox_rt::sys::posix_write(timer_st.timerfd, buf_to_write)?;
+
+        if bytes_written < mem::size_of::<timespec>() {
+            return Err(Errno(EIO));
+        }
+
+        if timer_st.thread.is_null() {
+            timer_st.thread = match timer_st.evp.sigev_notify {
+                SIGEV_THREAD => {
+                    let mut tid = pthread_t::default();
+
+                    let result = unsafe {
+                        pthread_create(
+                            &mut tid as *mut _,
+                            ptr::null(),
+                            timer_routine,
+                            timerid as *mut c_void,
+                        )
+                    };
+                    if result != 0 {
+                        return Err(Errno(result));
+                    }
+                    tid
+                }
+                //TODO
+                SIGEV_SIGNAL => {
+                    return Err(Errno(ENOSYS));
+                }
+                SIGEV_NONE => ptr::null_mut(),
+                _ => {
+                    return Err(Errno(EINVAL));
+                }
+            };
+        }
+
         Ok(())
     }
 
