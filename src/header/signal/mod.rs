@@ -37,6 +37,10 @@ pub const SIG_SETMASK: c_int = 2;
 pub const SI_QUEUE: c_int = -1;
 pub const SI_USER: c_int = 0;
 
+pub const SIGEV_SIGNAL: c_int = 0;
+pub const SIGEV_NONE: c_int = 1;
+pub const SIGEV_THREAD: c_int = 2;
+
 #[repr(C)]
 #[derive(Clone, Debug)]
 /// cbindgen:ignore
@@ -53,6 +57,16 @@ pub struct sigaltstack {
     pub ss_sp: *mut c_void,
     pub ss_flags: c_int,
     pub ss_size: size_t,
+}
+
+#[repr(C)]
+#[derive(Clone)]
+pub struct sigevent {
+    pub sigev_value: sigval,
+    pub sigev_signo: c_int,
+    pub sigev_notify: c_int,
+    pub sigev_notify_function: Option<extern "C" fn(sigval)>,
+    pub sigev_notify_attributes: *mut pthread_attr_t,
 }
 
 // FIXME: This struct is wrong on Linux
@@ -525,3 +539,6 @@ pub unsafe extern "C" fn psiginfo(info: *const siginfo_t, prefix: *const c_char)
         string.as_bytes().len(),
     );
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cbindgen_stupid_struct_sigevent_for_timer(a: sigevent) {}
