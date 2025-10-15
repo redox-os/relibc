@@ -7,11 +7,12 @@ use crate::{
         dirent::dirent,
         errno::{EINVAL, EIO, EOPNOTSUPP},
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW},
-        signal::SIGCHLD,
+        signal::{SIGCHLD, sigevent},
         sys_resource::{rlimit, rusage},
         sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
+        time::itimerspec,
         unistd::{SEEK_CUR, SEEK_SET},
     },
     io::Write,
@@ -723,6 +724,27 @@ impl Pal for Sys {
 
     fn sync() -> Result<()> {
         e_raw(unsafe { syscall!(SYNC) }).map(|_| ())
+    }
+
+    fn timer_create(clock_id: clockid_t, evp: *mut sigevent, timerid: *mut timer_t) -> Result<()> {
+        e_raw(unsafe { syscall!(TIMER_CREATE, clock_id, evp, timerid) }).map(|_| ())
+    }
+
+    fn timer_delete(timerid: timer_t) -> Result<()> {
+        e_raw(unsafe { syscall!(TIMER_DELETE, timerid) }).map(|_| ())
+    }
+
+    fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> Result<()> {
+        e_raw(unsafe { syscall!(TIMER_GETTIME, timerid, value) }).map(|_| ())
+    }
+
+    fn timer_settime(
+        timerid: timer_t,
+        flags: c_int,
+        value: *const itimerspec,
+        ovalue: *mut itimerspec,
+    ) -> Result<()> {
+        e_raw(unsafe { syscall!(TIMER_SETTIME, timerid, flags, value, ovalue) }).map(|_| ())
     }
 
     fn umask(mask: mode_t) -> mode_t {

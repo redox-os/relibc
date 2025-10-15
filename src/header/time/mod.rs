@@ -6,7 +6,9 @@ use crate::{
     c_str::{CStr, CString},
     error::ResultExt,
     fs::File,
-    header::{errno::EOVERFLOW, fcntl::O_RDONLY, stdlib::getenv, unistd::readlink},
+    header::{
+        errno::EOVERFLOW, fcntl::O_RDONLY, signal::sigevent, stdlib::getenv, unistd::readlink,
+    },
     io::Read,
     out::Out,
     platform::{self, Pal, Sys, types::*},
@@ -47,12 +49,28 @@ pub struct timespec {
 
 impl timespec {
     // TODO: Write test
+    pub fn add(base: timespec, interval: timespec) -> Option<timespec> {
+        let base_nsec = c_ulong::try_from(base.tv_nsec).ok()?;
+        let interval_nsec = c_ulong::try_from(interval.tv_nsec).ok()?;
+
+        Some(if base_nsec.checked_add(interval_nsec)? < 1_000_000_000 {
+            timespec {
+                tv_sec: base.tv_sec.checked_add(interval.tv_sec)?,
+                tv_nsec: (base_nsec + interval_nsec) as _,
+            }
+        } else {
+            timespec {
+                tv_sec: base.tv_sec.checked_add(interval.tv_sec)?.checked_add(1)?,
+                tv_nsec: ((interval_nsec + base_nsec) - 1_000_000_000) as c_long,
+            }
+        })
+    }
+    // TODO: Write test
     pub fn subtract(later: timespec, earlier: timespec) -> Option<timespec> {
-        // TODO: Can tv_nsec be negative?
         let later_nsec = c_ulong::try_from(later.tv_nsec).ok()?;
         let earlier_nsec = c_ulong::try_from(earlier.tv_nsec).ok()?;
 
-        Some(if later_nsec > earlier_nsec {
+        let time = if later_nsec > earlier_nsec {
             timespec {
                 tv_sec: later.tv_sec.checked_sub(earlier.tv_sec)?,
                 tv_nsec: (later_nsec - earlier_nsec) as _,
@@ -62,7 +80,18 @@ impl timespec {
                 tv_sec: later.tv_sec.checked_sub(earlier.tv_sec)?.checked_sub(1)?,
                 tv_nsec: 1_000_000_000 - (earlier_nsec - later_nsec) as c_long,
             }
-        })
+        };
+
+        if time.tv_sec < 0 {
+            // https://man7.org/linux/man-pages/man2/settimeofday.2.html
+            // caller should return EINVAL
+            return None;
+        }
+
+        Some(time)
+    }
+    pub fn is_default(&self) -> bool {
+        return self.tv_nsec == 0 && self.tv_sec == 0;
     }
 }
 
@@ -74,6 +103,20 @@ impl<'a> From<&'a timespec> for syscall::TimeSpec {
             tv_nsec: tp.tv_nsec as _,
         }
     }
+}
+
+/// timer_t internal data, ABI unstable
+#[repr(C)]
+#[derive(Clone)]
+#[cfg(target_os = "redox")]
+pub(crate) struct timer_internal_t {
+    pub clockid: clockid_t,
+    pub timerfd: usize,
+    pub eventfd: usize,
+    pub evp: sigevent,
+    pub thread: pthread_t,
+    // relibc handles it_interval, not the kernel
+    pub next_wake_time: itimerspec,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
@@ -132,13 +175,11 @@ pub static mut getdate_err: c_int = 0;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[repr(C)]
+#[derive(Clone, Default)]
 pub struct itimerspec {
     pub it_interval: timespec,
     pub it_value: timespec,
 }
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
-pub struct sigevent;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/asctime.html>.
 ///
@@ -493,19 +534,21 @@ pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_create.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn timer_create(
     clock_id: clockid_t,
     evp: *mut sigevent,
     timerid: *mut timer_t,
 ) -> c_int {
-    unimplemented!();
+    Sys::timer_create(clock_id, evp, timerid)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_delete.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn timer_delete(timerid: timer_t) -> c_int {
-    unimplemented!();
+    Sys::timer_delete(timerid).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
@@ -515,20 +558,24 @@ pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> c_int {
-    unimplemented!();
+    Sys::timer_gettime(timerid, value)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn timer_settime(
     timerid: timer_t,
     flags: c_int,
     value: *const itimerspec,
     ovalue: *mut itimerspec,
 ) -> c_int {
-    unimplemented!();
+    Sys::timer_settime(timerid, flags, value, ovalue)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timespec_get.html>.
