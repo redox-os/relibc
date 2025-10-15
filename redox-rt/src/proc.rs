@@ -860,6 +860,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                 alloc::format!("ForkScratchapd layout size: {}, align: {}\n", size, align)
                     .as_bytes(),
             );
+            let scratchpad_ptr: *const ForkScratchpad = &scratchpad;
             initial_rsp
                 .add(size_of::<usize>())
                 .write(scratchpad_ptr as usize);
