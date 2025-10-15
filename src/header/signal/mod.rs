@@ -62,10 +62,10 @@ pub struct sigaltstack {
 #[repr(C)]
 #[derive(Clone)]
 pub struct sigevent {
-    pub sigev_notify: c_int,
-    pub sigev_signo: c_int,
     pub sigev_value: sigval,
-    pub sigev_notify_function: *mut sigval,
+    pub sigev_signo: c_int,
+    pub sigev_notify: c_int,
+    pub sigev_notify_function: Option<extern "C" fn(sigval)>,
     pub sigev_notify_attributes: *mut pthread_attr_t,
 }
 

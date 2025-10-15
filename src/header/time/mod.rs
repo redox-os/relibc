@@ -83,6 +83,9 @@ impl timespec {
             }
         })
     }
+    pub fn is_default(&self) -> bool {
+        return self.tv_nsec == 0 && self.tv_sec == 0
+    }
 }
 
 #[cfg(target_os = "redox")]

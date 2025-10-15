@@ -41,13 +41,7 @@ use crate::{
     },
     io::{self, BufReader, prelude::*},
     out::Out,
-    platform::sys::{
-        event::{
-            redox_event_queue_create_v1, redox_event_queue_ctl_v1, redox_event_queue_destroy_v1,
-        },
-        libredox::RawResult,
-        timer::timer_routine,
-    },
+    platform::sys::{libredox::RawResult, timer::timer_routine},
     sync::rwlock::RwLock,
 };
 
@@ -1024,7 +1018,7 @@ impl Pal for Sys {
             return Err(Errno(EFAULT));
         }
         let ev = unsafe { &*evp };
-        if ev.sigev_notify == SIGEV_THREAD && ev.sigev_notify_function.is_null() {
+        if ev.sigev_notify == SIGEV_THREAD && ev.sigev_notify_function.is_none() {
             return Err(Errno(EINVAL));
         }
 
@@ -1032,7 +1026,7 @@ impl Pal for Sys {
         let timerfd = libredox::open(&path, O_RDWR, 0)?;
 
         unsafe {
-            let eventfd = Error::demux(redox_event_queue_create_v1(0)).map_err(|e| {
+            let eventfd = Error::demux(event::redox_event_queue_create_v1(0)).map_err(|e| {
                 let _ = syscall::close(timerfd);
                 e
             })?;
@@ -1071,6 +1065,7 @@ impl Pal for Sys {
                     }
                     tid
                 }
+                //TODO
                 SIGEV_SIGNAL => {
                     closefds(timerfd, eventfd);
                     return Err(Errno(ENOSYS));
@@ -1121,6 +1116,11 @@ impl Pal for Sys {
         }
 
         let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
+        if timer_st.next_wake_time.it_value.is_default() {
+            // disarmed
+            unsafe { *value = itimerspec::default() };
+            return Ok(());
+        }
         let mut now = timespec::default();
         Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
 
@@ -1149,17 +1149,19 @@ impl Pal for Sys {
         let mut now = timespec::default();
         Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
 
-        let fd = timerid as usize;
-
         if !ovalue.is_null() {
-            let mut old_spec = itimerspec {
-                it_interval: timer_st.next_wake_time.it_interval,
-                it_value: timespec::subtract(timer_st.next_wake_time.it_value, now)
-                    .unwrap_or_default(),
-            };
+            if timer_st.next_wake_time.it_value.is_default() {
+                unsafe { *ovalue = itimerspec::default() };
+            } else {
+                let mut old_spec = itimerspec {
+                    it_interval: timer_st.next_wake_time.it_interval,
+                    it_value: timespec::subtract(timer_st.next_wake_time.it_value, now)
+                        .unwrap_or_default(),
+                };
 
-            unsafe {
-                *ovalue = old_spec;
+                unsafe {
+                    *ovalue = old_spec;
+                }
             }
         }
 
@@ -1170,21 +1172,18 @@ impl Pal for Sys {
             val
         };
 
-        // unsafe { redox_event_queue_ctl_v1(queue, fd, flags, user_data) }
+        Error::demux(unsafe {
+            event::redox_event_queue_ctl_v1(timer_st.eventfd, timer_st.timerfd, 1, 0)
+        })?;
 
         let buf_to_write = unsafe {
             slice::from_raw_parts(
-                &(*value).it_value as *const _ as *const u8,
+                &timer_st.next_wake_time.it_value as *const _ as *const u8,
                 mem::size_of::<timespec>(),
             )
         };
 
-        let buf_to_write = unsafe {
-            let field_ptr = ptr::addr_of!((*value).it_value);
-            slice::from_raw_parts(field_ptr as *const u8, mem::size_of::<itimerspec>())
-        };
-
-        let bytes_written = redox_rt::sys::posix_write(fd, buf_to_write)?;
+        let bytes_written = redox_rt::sys::posix_write(timer_st.timerfd, buf_to_write)?;
 
         if bytes_written < mem::size_of::<timespec>() {
             return Err(Errno(EIO));
