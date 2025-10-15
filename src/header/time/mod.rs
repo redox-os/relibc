@@ -67,11 +67,10 @@ impl timespec {
     }
     // TODO: Write test
     pub fn subtract(later: timespec, earlier: timespec) -> Option<timespec> {
-        // TODO: Can tv_nsec be negative?
         let later_nsec = c_ulong::try_from(later.tv_nsec).ok()?;
         let earlier_nsec = c_ulong::try_from(earlier.tv_nsec).ok()?;
 
-        Some(if later_nsec > earlier_nsec {
+        let time = if later_nsec > earlier_nsec {
             timespec {
                 tv_sec: later.tv_sec.checked_sub(earlier.tv_sec)?,
                 tv_nsec: (later_nsec - earlier_nsec) as _,
@@ -81,10 +80,18 @@ impl timespec {
                 tv_sec: later.tv_sec.checked_sub(earlier.tv_sec)?.checked_sub(1)?,
                 tv_nsec: 1_000_000_000 - (earlier_nsec - later_nsec) as c_long,
             }
-        })
+        };
+
+        if time.tv_sec < 0 {
+            // https://man7.org/linux/man-pages/man2/settimeofday.2.html
+            // caller should return EINVAL
+            return None;
+        }
+
+        Some(time)
     }
     pub fn is_default(&self) -> bool {
-        return self.tv_nsec == 0 && self.tv_sec == 0
+        return self.tv_nsec == 0 && self.tv_sec == 0;
     }
 }
 
