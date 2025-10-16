@@ -1,6 +1,6 @@
 use core::{
     convert::TryFrom,
-    mem::{self, size_of},
+    mem::{self, MaybeUninit, size_of},
     ptr, slice, str,
 };
 use redox_rt::{
@@ -26,8 +26,8 @@ use crate::{
         },
         fcntl::{self, AT_FDCWD, O_CREAT, O_RDONLY, O_RDWR},
         limits,
-        pthread::{pthread_cancel, pthread_create},
-        signal::{SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, sigevent},
+        pthread::{pthread_cancel, pthread_create, pthread_self},
+        signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{RLIM_INFINITY, rlimit, rusage},
@@ -36,7 +36,7 @@ use crate::{
         sys_time::{timeval, timezone},
         sys_utsname::{UTSLENGTH, utsname},
         sys_wait,
-        time::{itimerspec, timer_internal_t, timespec},
+        time::{TIMER_ABSTIME, itimerspec, timer_internal_t, timespec},
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, BufReader, prelude::*},
@@ -1016,24 +1016,32 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn timer_create(clock_id: clockid_t, evp: *mut sigevent, timerid: *mut timer_t) -> Result<()> {
-        if timerid.is_null() || evp.is_null() {
-            return Err(Errno(EFAULT));
-        }
-        let ev = unsafe { &*evp };
-        if ev.sigev_notify == SIGEV_THREAD && ev.sigev_notify_function.is_none() {
-            return Err(Errno(EINVAL));
+    fn timer_create(clock_id: clockid_t, evp: &sigevent, mut timerid: Out<timer_t>) -> Result<()> {
+        if evp.sigev_notify == SIGEV_THREAD {
+            if evp.sigev_notify_function.is_none() {
+                return Err(Errno(EINVAL));
+            }
+        } else if evp.sigev_notify == SIGEV_SIGNAL {
+            const n_sig: i32 = NSIG as i32;
+            const rt_min: i32 = SIGRTMIN as i32;
+            const rt_max: i32 = SIGRTMIN as i32;
+            match evp.sigev_signo {
+                0..n_sig => {}
+                rt_min..=rt_max => {}
+                _ => {
+                    return Err(Errno(EINVAL));
+                }
+            }
         }
 
         let path = format!("/scheme/time/{clock_id}");
-        let timerfd = libredox::open(&path, O_RDWR, 0)?;
+        let timerfd = FdGuard::new(libredox::open(&path, O_RDWR, 0)?);
+        let eventfd = FdGuard::new(Error::demux(unsafe {
+            event::redox_event_queue_create_v1(0)
+        })?);
+        let caller_thread = Self::current_os_tid();
 
-        unsafe {
-            let eventfd = Error::demux(event::redox_event_queue_create_v1(0)).map_err(|e| {
-                let _ = syscall::close(timerfd);
-                e
-            })?;
-
+        let timer_buf = unsafe {
             let timer_buf = Self::mmap(
                 ptr::null_mut(),
                 size_of::<timer_internal_t>(),
@@ -1041,51 +1049,41 @@ impl Pal for Sys {
                 MAP_ANONYMOUS,
                 0,
                 0,
-            )
-            .map_err(|e| {
-                let _ = syscall::close(timerfd);
-                let _ = syscall::close(eventfd);
-                e
-            })?;
-
-            *timerid = timer_buf;
+            )?;
 
             let timer_ptr = timer_buf as *mut timer_internal_t;
             let timer_st = (&mut *timer_ptr);
 
             timer_st.clockid = clock_id;
-            timer_st.timerfd = timerfd;
-            timer_st.eventfd = eventfd;
+            timer_st.timerfd = timerfd.take();
+            timer_st.eventfd = eventfd.take();
             timer_st.evp = (*evp).clone();
             timer_st.next_wake_time = itimerspec::default();
             timer_st.thread = ptr::null_mut();
-        }
+            timer_st.caller_thread = caller_thread;
+            timer_buf
+        };
+
+        timerid.write(timer_buf);
+
         Ok(())
     }
 
     fn timer_delete(timerid: timer_t) -> Result<()> {
-        if timerid.is_null() {
-            return Err(Errno(EFAULT));
-        }
         unsafe {
-            let timer_ptr = timerid as *mut timer_internal_t;
-            let timer_st = (&mut *timer_ptr);
+            let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
             let _ = syscall::close(timer_st.timerfd);
             let _ = syscall::close(timer_st.eventfd);
             if !timer_st.thread.is_null() {
                 let _ = pthread_cancel(timer_st.thread);
             }
-            Self::munmap(timer_ptr as *mut c_void, size_of::<timer_internal_t>())?;
+            Self::munmap(timerid, size_of::<timer_internal_t>())?;
         }
 
         Ok(())
     }
 
-    fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> Result<()> {
-        if value.is_null() {
-            return Err(Errno(EFAULT));
-        }
-
+    fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
         let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
         let mut now = timespec::default();
         Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
@@ -1097,35 +1095,29 @@ impl Pal for Sys {
             }
         }
 
-        unsafe {
-            *value = if timer_st.next_wake_time.it_value.is_default() {
-                // disarmed
-                itimerspec::default()
-            } else {
-                itimerspec {
-                    it_interval: timer_st.next_wake_time.it_interval,
-                    it_value: timespec::subtract(timer_st.next_wake_time.it_value, now)
-                        .unwrap_or_default(),
-                }
-            };
-        }
+        value.write(if timer_st.next_wake_time.it_value.is_default() {
+            // disarmed
+            itimerspec::default()
+        } else {
+            itimerspec {
+                it_interval: timer_st.next_wake_time.it_interval,
+                it_value: timespec::subtract(timer_st.next_wake_time.it_value, now)
+                    .unwrap_or_default(),
+            }
+        });
 
         Ok(())
     }
 
     fn timer_settime(
         timerid: timer_t,
-        _flags: c_int,
-        value: *const itimerspec,
-        ovalue: *mut itimerspec,
+        flags: c_int,
+        value: &itimerspec,
+        ovalue: Option<Out<itimerspec>>,
     ) -> Result<()> {
-        if timerid.is_null() || value.is_null() {
-            return Err(Errno(EFAULT));
-        }
-
         let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
 
-        if !ovalue.is_null() {
+        if let Some(ovalue) = ovalue {
             Self::timer_gettime(timerid, ovalue)?;
         }
 
@@ -1133,9 +1125,11 @@ impl Pal for Sys {
         Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
 
         //FIXME: make these atomic?
-        timer_st.next_wake_time = unsafe {
-            let mut val = (*value).clone();
-            val.it_value = timespec::add(now, val.it_value).ok_or((Errno(EINVAL)))?;
+        timer_st.next_wake_time = {
+            let mut val = value.clone();
+            if flags & TIMER_ABSTIME == 0 {
+                val.it_value = timespec::add(now, val.it_value).ok_or((Errno(EINVAL)))?;
+            }
             val
         };
 
@@ -1158,9 +1152,8 @@ impl Pal for Sys {
 
         if timer_st.thread.is_null() {
             timer_st.thread = match timer_st.evp.sigev_notify {
-                SIGEV_THREAD => {
+                SIGEV_THREAD | SIGEV_SIGNAL => {
                     let mut tid = pthread_t::default();
-
                     let result = unsafe {
                         pthread_create(
                             &mut tid as *mut _,
@@ -1173,10 +1166,6 @@ impl Pal for Sys {
                         return Err(Errno(result));
                     }
                     tid
-                }
-                //TODO
-                SIGEV_SIGNAL => {
-                    return Err(Errno(ENOSYS));
                 }
                 SIGEV_NONE => ptr::null_mut(),
                 _ => {
