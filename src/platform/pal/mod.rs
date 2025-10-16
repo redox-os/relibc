@@ -253,17 +253,17 @@ pub trait Pal {
 
     fn sync() -> Result<()>;
 
-    fn timer_create(clock_id: clockid_t, evp: *mut sigevent, timerid: *mut timer_t) -> Result<()>;
+    fn timer_create(clock_id: clockid_t, evp: &sigevent, timerid: Out<timer_t>) -> Result<()>;
 
     fn timer_delete(timerid: timer_t) -> Result<()>;
 
-    fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> Result<()>;
+    fn timer_gettime(timerid: timer_t, value: Out<itimerspec>) -> Result<()>;
 
     fn timer_settime(
         timerid: timer_t,
         flags: c_int,
-        value: *const itimerspec,
-        ovalue: *mut itimerspec,
+        value: &itimerspec,
+        ovalue: Option<Out<itimerspec>>,
     ) -> Result<()>;
 
     // Always successful
