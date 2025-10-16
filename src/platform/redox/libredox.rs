@@ -481,4 +481,4 @@ pub unsafe extern "C" fn redox_register_scheme_v0(
     )
 }
 
-static USE_NEW_NS_BACKEND: AtomicBool = AtomicBool::new(false);
+static USE_NEW_NS_BACKEND: AtomicBool = AtomicBool::new(true);
