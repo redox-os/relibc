@@ -467,8 +467,18 @@ pub unsafe extern "C" fn redox_set_namespace_fd_v0(fd: usize) -> RawResult {
     }
 }
 #[no_mangle]
-pub unsafe extern "C" fn redox_register_scheme_v0(cap_fd: usize) -> RawResult {
-    Error::mux(redox_rt::sys::register_scheme(cap_fd).map(|()| 0))
+pub unsafe extern "C" fn redox_register_scheme_v0(
+    name_base: *const u8,
+    name_len: usize,
+    cap_fd: usize,
+) -> RawResult {
+    Error::mux(
+        redox_rt::sys::register_scheme(
+            str::from_utf8_unchecked(slice::from_raw_parts(name_base, name_len)),
+            cap_fd,
+        )
+        .map(|()| 0),
+    )
 }
 
 static USE_NEW_NS_BACKEND: AtomicBool = AtomicBool::new(false);

@@ -388,20 +388,25 @@ pub fn nsopen(path: &str, flags: u32, mode: u16) -> Result<usize> {
     )
 }
 pub fn mkns(names: &[IoSlice]) -> Result<usize> {
-    let mut buf = Vec::new();
+    let mut buf = Vec::from(TYPE_MKNS.to_ne_bytes());
+    const TYPE_MKNS: usize = 0; // namespace dup type.
     for name in names {
         let name_bytes = name.as_slice();
         let len = name_bytes.len();
         let _scheme_name = core::str::from_utf8(name_bytes).map_err(|_| Error::new(EINVAL))?;
-        buf.extend_from_slice(&len.to_le_bytes());
+        buf.extend_from_slice(&len.to_ne_bytes());
         buf.extend_from_slice(name_bytes);
     }
     syscall::dup(crate::current_namespace_fd(), &buf)
 }
-pub fn register_scheme(cap_fd: usize) -> Result<()> {
+pub fn register_scheme(name: &str, cap_fd: usize) -> Result<()> {
+    const TYPE_REGISTER: usize = 2; // namespace dup type.
+    let mut buf = Vec::from(TYPE_MKNS.to_ne_bytes());
+    buf.extend_from_slice(name.as_bytes());
+    let ns_this_scheme = syscall::dup(crate::current_namespace_fd(), buf)?;
     let mut cap_bytes = cap_fd.to_ne_bytes();
     sys_call(
-        crate::current_namespace_fd(),
+        ns_this_scheme,
         &mut cap_bytes,
         CallFlags::WRITE | CallFlags::FD,
         &[],
