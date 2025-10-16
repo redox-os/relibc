@@ -403,7 +403,7 @@ pub fn register_scheme(name: &str, cap_fd: usize) -> Result<()> {
     const TYPE_REGISTER: usize = 2; // namespace dup type.
     let mut buf = Vec::from(TYPE_REGISTER.to_ne_bytes());
     buf.extend_from_slice(name.as_bytes());
-    let ns_this_scheme = syscall::dup(crate::current_namespace_fd(), buf)?;
+    let ns_this_scheme = syscall::dup(crate::current_namespace_fd(), &buf)?;
     let mut cap_bytes = cap_fd.to_ne_bytes();
     sys_call(
         ns_this_scheme,
