@@ -4,16 +4,21 @@
 
 use crate::{
     c_str::{CStr, CString},
-    error::ResultExt,
+    error::{Errno, ResultExt},
     fs::File,
     header::{
-        errno::EOVERFLOW, fcntl::O_RDONLY, signal::sigevent, stdlib::getenv, unistd::readlink,
+        errno::{EFAULT, EOVERFLOW},
+        fcntl::O_RDONLY,
+        signal::sigevent,
+        stdlib::getenv,
+        unistd::readlink,
     },
     io::Read,
     out::Out,
     platform::{self, Pal, Sys, types::*},
     sync::{Mutex, MutexGuard},
 };
+use __libc_only_for_layout_checks::EINVAL;
 use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
 use chrono::{
     DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, ParseError, TimeZone,
@@ -115,6 +120,7 @@ pub(crate) struct timer_internal_t {
     pub eventfd: usize,
     pub evp: sigevent,
     pub thread: pthread_t,
+    pub caller_thread: crate::pthread::OsTid,
     // relibc handles it_interval, not the kernel
     pub next_wake_time: itimerspec,
 }
@@ -535,19 +541,26 @@ pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_create.html>.
 #[unsafe(no_mangle)]
-pub extern "C" fn timer_create(
+pub unsafe extern "C" fn timer_create(
     clock_id: clockid_t,
-    evp: *mut sigevent,
+    evp: *const sigevent,
     timerid: *mut timer_t,
 ) -> c_int {
-    Sys::timer_create(clock_id, evp, timerid)
+    if evp.is_null() || timerid.is_null() {
+        return Err(Errno(EFAULT)).or_minus_one_errno();
+    }
+    let (evp, timerid) = unsafe { (&*evp, Out::nonnull(timerid)) };
+    Sys::timer_create(clock_id, &evp, timerid)
         .map(|()| 0)
         .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_delete.html>.
 #[unsafe(no_mangle)]
-pub extern "C" fn timer_delete(timerid: timer_t) -> c_int {
+pub unsafe extern "C" fn timer_delete(timerid: timer_t) -> c_int {
+    if timerid.is_null() {
+        return Err(Errno(EFAULT)).or_minus_one_errno();
+    }
     Sys::timer_delete(timerid).map(|()| 0).or_minus_one_errno()
 }
 
@@ -559,7 +572,11 @@ pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
 #[unsafe(no_mangle)]
-pub extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> c_int {
+pub unsafe extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> c_int {
+    if timerid.is_null() || value.is_null() {
+        return Err(Errno(EFAULT)).or_minus_one_errno();
+    }
+    let value = unsafe { Out::nonnull(value) };
     Sys::timer_gettime(timerid, value)
         .map(|()| 0)
         .or_minus_one_errno()
@@ -567,12 +584,16 @@ pub extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec) -> c_i
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
 #[unsafe(no_mangle)]
-pub extern "C" fn timer_settime(
+pub unsafe extern "C" fn timer_settime(
     timerid: timer_t,
     flags: c_int,
     value: *const itimerspec,
     ovalue: *mut itimerspec,
 ) -> c_int {
+    if timerid.is_null() || value.is_null() {
+        return Err(Errno(EFAULT)).or_minus_one_errno();
+    }
+    let (value, ovalue) = unsafe { (&*value, Out::nullable(ovalue)) };
     Sys::timer_settime(timerid, flags, value, ovalue)
         .map(|()| 0)
         .or_minus_one_errno()
