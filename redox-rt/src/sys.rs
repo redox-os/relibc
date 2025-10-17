@@ -379,7 +379,7 @@ pub fn set_namespace_fd(fd: usize) -> Result<usize> {
     info.ns_fd = fd;
     Ok(before_fd)
 }
-pub fn nsopen(path: &str, flags: u32, mode: u16) -> Result<usize> {
+pub fn open(path: &str, flags: u32, mode: u16) -> Result<usize> {
     syscall::openat(
         crate::current_namespace_fd(),
         path,
