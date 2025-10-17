@@ -20,7 +20,7 @@ pub unsafe extern "C" fn redox_fpath(fd: c_int, buf: *mut c_void, count: size_t)
 }
 
 pub fn pipe2(flags: usize) -> syscall::error::Result<[c_int; 2]> {
-    let mut read_fd = FdGuard::new(syscall::open("/scheme/pipe", flags)?);
+    let mut read_fd = FdGuard::new(redox_rt::sys::open("/scheme/pipe", flags, 0)?);
     let mut write_fd = FdGuard::new(syscall::dup(*read_fd, b"write")?);
     syscall::fcntl(*write_fd, F_SETFL, flags)?;
     syscall::fcntl(*write_fd, F_SETFD, flags)?;

@@ -559,9 +559,10 @@ impl PalSocket for Sys {
                 )?;
 
                 let fs_bind_result = (|| -> Result<()> {
-                    let dirfd = FdGuard::new(syscall::open(
+                    let dirfd = FdGuard::new(redox_rt::sys::open(
                         &dir_path,
                         syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
+                        0,
                     )?);
                     let fd_to_send = FdGuard::new(syscall::dup(socket as usize, &[])?);
                     let _ = syscall::sendfd(*dirfd, *fd_to_send, 0, 0)?;
@@ -622,7 +623,8 @@ impl PalSocket for Sys {
                 let (_, fd_path) = dir_path_and_fd_path(&path)?;
 
                 let target_path = format!("/{fd_path}");
-                let socket_file_fd = FdGuard::new(syscall::open(&target_path, syscall::O_RDWR)?);
+                let socket_file_fd =
+                    FdGuard::new(redox_rt::sys::open(&target_path, syscall::O_RDWR, 0)?);
 
                 const TOKEN_BUF_SIZE: usize = 16;
 
@@ -969,12 +971,14 @@ impl PalSocket for Sys {
         // The tcp: and udp: schemes allow using no path,
         // and later specifying one using `dup`.
         Ok(match (domain, kind) {
-            (AF_INET, SOCK_STREAM) => syscall::open("/scheme/tcp", flags)? as c_int,
-            (AF_INET, SOCK_DGRAM) => syscall::open("/scheme/udp", flags)? as c_int,
+            (AF_INET, SOCK_STREAM) => redox_rt::sys::open("/scheme/tcp", flags, 0)? as c_int,
+            (AF_INET, SOCK_DGRAM) => redox_rt::sys::open("/scheme/udp", flags, 0)? as c_int,
             (AF_UNIX, SOCK_STREAM) => {
-                syscall::open("/scheme/uds_stream", flags | O_CREAT)? as c_int
+                redox_rt::sys::open("/scheme/uds_stream", flags | O_CREAT, 0)? as c_int
             }
-            (AF_UNIX, SOCK_DGRAM) => syscall::open("/scheme/uds_dgram", flags | O_CREAT)? as c_int,
+            (AF_UNIX, SOCK_DGRAM) => {
+                redox_rt::sys::open("/scheme/uds_dgram", flags | O_CREAT, 0)? as c_int
+            }
             _ => return Err(Errno(EPROTONOSUPPORT)),
         })
     }
@@ -984,7 +988,11 @@ impl PalSocket for Sys {
 
         match (domain, kind) {
             (AF_UNIX, SOCK_STREAM) => {
-                let listener = FdGuard::new(syscall::open("/scheme/uds_stream", flags | O_CREAT)?);
+                let listener = FdGuard::new(redox_rt::sys::open(
+                    "/scheme/uds_stream",
+                    flags | O_CREAT,
+                    0,
+                )?);
 
                 // For now, uds_stream: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
@@ -999,7 +1007,11 @@ impl PalSocket for Sys {
                 Ok(())
             }
             (AF_UNIX, SOCK_DGRAM) => {
-                let listener = FdGuard::new(syscall::open("/scheme/uds_dgram", flags | O_CREAT)?);
+                let listener = FdGuard::new(redox_rt::sys::open(
+                    "/scheme/uds_dgram",
+                    flags | O_CREAT,
+                    0,
+                )?);
 
                 // For now, uds_dgram: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
