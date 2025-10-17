@@ -861,7 +861,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                 initial_rsp.add(size / size_of::<usize>() + size % size_of::<usize>());
 
             scratchpad_ptr.cast::<ForkScratchpad>().write(scratchpad);
-            (initial_rsp as usize)
+            initial_rsp as usize
         };
 
         // CoW-duplicate address space.
