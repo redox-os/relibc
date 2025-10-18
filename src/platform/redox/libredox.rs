@@ -9,7 +9,7 @@ use redox_rt::{
     protocol::{ProcKillTarget, SocketCall, WaitFlags},
     sys::{posix_read, posix_write, WaitpidTarget},
 };
-use syscall::{Error, Result, EMFILE};
+use syscall::{Error, Result, EMFILE, ENOSYS};
 
 use crate::{
     header::{
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn redox_open_v1(
             1,
             b"Warning: using deprecated namespace backend for open_v1\n",
         );
-        Err(Errno(EAFNOSUPPORT))
+        Err(Error::new(ENOSYS))
     })
 }
 #[no_mangle]
