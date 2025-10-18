@@ -135,17 +135,17 @@ pub unsafe extern "C" fn redox_open_v1(
     mode: u16,
 ) -> RawResult {
     Error::mux(if USE_NEW_NS_BACKEND.load(Ordering::Relaxed) {
-        redox_rt::sys::open(
-            str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
-            flags,
-            mode,
-        )
-    } else {
         open(
             str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
             flags as c_int,
             mode as mode_t,
         )
+    } else {
+        syscall::write(
+            1,
+            b"Warning: using deprecated namespace backend for open_v1\n",
+        );
+        Err(Errno(EAFNOSUPPORT))
     })
 }
 #[no_mangle]

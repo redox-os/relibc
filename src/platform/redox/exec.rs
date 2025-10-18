@@ -30,7 +30,7 @@ fn fexec_impl(
     extrainfo: &ExtraInfo,
     interp_override: Option<InterpOverride>,
 ) -> Result<Infallible> {
-    let memory = FdGuard::new(redox_rt::sys::open("/scheme/memory", 0, 0)?);
+    let memory = FdGuard::new(redox_rt::sys::open("/scheme/memory", 0)?);
 
     let addrspace_selection_fd = match redox_rt::proc::fexec_impl(
         exec_file,

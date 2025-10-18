@@ -32,7 +32,7 @@ pub fn chdir(path: &str) -> Result<()> {
     let canon = canonicalize_using_cwd(cwd_guard.as_deref(), path).ok_or(Error::new(ENOENT))?;
     let canon_with_scheme = canonicalize_with_cwd_internal(cwd_guard.as_deref(), path)?;
 
-    let fd = redox_rt::sys::open(&canon_with_scheme, O_STAT | O_CLOEXEC, 0)?;
+    let fd = redox_rt::sys::open(&canon_with_scheme, O_STAT | O_CLOEXEC)?;
     let mut stat = Stat::default();
     if syscall::fstat(fd, &mut stat).is_err() || (stat.st_mode & MODE_TYPE) != MODE_DIR {
         return Err(Error::new(ENOTDIR));
@@ -147,7 +147,7 @@ pub fn open(path: &str, flags: usize) -> Result<usize> {
         let open_res = if canon.starts_with(libcscheme::LIBC_SCHEME) {
             libcscheme::open(&canon, flags)
         } else {
-            redox_rt::sys::open(&*canon, flags, 0)
+            redox_rt::sys::open(&*canon, flags)
         };
 
         match open_res {

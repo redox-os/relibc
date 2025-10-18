@@ -495,7 +495,7 @@ impl Pal for Sys {
         }
 
         //TODO: store fd internally
-        let fd = FdGuard::new(redox_rt::sys::open(path, open_flags, 0)?);
+        let fd = FdGuard::new(redox_rt::sys::open(path, open_flags)?);
         Ok(syscall::read(*fd, buf)?)
     }
 

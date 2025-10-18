@@ -44,7 +44,7 @@ pub fn open(path: &str, flags: usize) -> Result<usize> {
         "stdout" => syscall::dup(1, &[]),
         "tty" => {
             if let Some(tty) = env_str!("TTY") {
-                return redox_rt::sys::open(tty, flags, 0);
+                return redox_rt::sys::open(tty, flags);
             }
             Err(Error::new(ENOENT))
         }
