@@ -379,13 +379,8 @@ pub fn set_namespace_fd(fd: usize) -> Result<usize> {
     info.ns_fd = fd;
     Ok(before_fd)
 }
-pub fn open(path: &str, flags: u32, mode: u16) -> Result<usize> {
-    syscall::openat(
-        crate::current_namespace_fd(),
-        path,
-        flags as usize,
-        mode as usize,
-    )
+pub fn open(path: &str, flags: usize) -> Result<usize> {
+    syscall::openat(crate::current_namespace_fd(), path, flags, 0)
 }
 pub fn mkns(names: &[IoSlice]) -> Result<usize> {
     let mut buf = Vec::from(TYPE_MKNS.to_ne_bytes());
