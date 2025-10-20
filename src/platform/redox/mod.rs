@@ -296,16 +296,7 @@ impl Pal for Sys {
         // TODO: Find way to avoid lock.
         let _guard = CLONE_LOCK.write();
 
-        syscall::write(
-            1,
-            alloc::format!("platform::redox::mod::fork: forking").as_bytes(),
-        );
-        let pid = clone::fork_impl(&redox_rt::proc::ForkArgs::Managed)? as pid_t;
-        syscall::write(
-            1,
-            alloc::format!("platform::redox::mod::fork: pid {}", pid).as_bytes(),
-        );
-        Ok(pid)
+        Ok(clone::fork_impl(&redox_rt::proc::ForkArgs::Managed)? as pid_t)
     }
 
     fn fstat(fildes: c_int, mut buf: Out<stat>) -> Result<()> {
