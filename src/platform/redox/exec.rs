@@ -107,10 +107,7 @@ pub fn execve(
     // have even read it!
     let (mut image_file, arg0) = match exec {
         Executable::AtPath(path) => {
-            let _ = syscall::write(
-                1,
-                alloc::format!("\nOpening exec path: {:?}\n", path).as_bytes(),
-            );
+            let _ = syscall::write(1, b"\nExec AtPath\n");
             (
                 File::open(path, O_RDONLY as c_int).map_err(|_| Error::new(ENOENT))?,
                 path.to_bytes(),
