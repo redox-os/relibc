@@ -996,8 +996,17 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             &usize::to_ne_bytes(*new_filetable_fd),
         )?;
     }
+
+    syscall::write(
+        1,
+        alloc::format!("starting process {}\n", start_fd).as_bytes(),
+    );
     let start_fd = FdGuard::new(syscall::dup(*new_thr_fd, b"start")?);
     let _ = syscall::write(*start_fd, &[0])?;
+    syscall::write(
+        1,
+        alloc::format!("fork_impl: new_pid={}\n", new_pid).as_bytes(),
+    );
 
     Ok(new_pid)
 }
