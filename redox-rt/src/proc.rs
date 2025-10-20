@@ -1001,7 +1001,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
     let _ = syscall::write(*start_fd, &[0])?;
     syscall::write(
         1,
-        alloc::format!("fork_impl: new_pid={}\n", new_pid).as_bytes(),
+        alloc::format!("fork_inner: new_pid={}\n", new_pid).as_bytes(),
     );
 
     Ok(new_pid)
