@@ -91,6 +91,7 @@ where
     A::Item: AsRef<[u8]>,
     E::Item: AsRef<[u8]>,
 {
+    let _ = syscall::write(1, b"fexec_impl: started\n");
     // Here, we do the minimum part of loading an application, which is what the kernel used to do.
     // We load the executable into memory (albeit at different offsets in this executable), fix
     // some misalignments, and then switch address space.
@@ -778,6 +779,7 @@ pub fn create_set_addr_space_buf_for_fork(
 /// descriptors from other schemes are reobtained with `dup`, and grants referencing such file
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
 pub fn fork_impl(args: &ForkArgs<'_>) -> Result<usize> {
+    syscall::write(1, b"fork_impl: started\n");
     let old_mask = crate::signal::get_sigmask()?;
     let pid = unsafe {
         Error::demux(__relibc_internal_fork_wrapper(
@@ -788,6 +790,7 @@ pub fn fork_impl(args: &ForkArgs<'_>) -> Result<usize> {
     if pid == 0 {
         crate::signal::set_sigmask(Some(old_mask), None)?;
     }
+    syscall::write(1, alloc::format!("fork_impl: pid={}\n", pid).as_bytes());
     Ok(pid)
 }
 
