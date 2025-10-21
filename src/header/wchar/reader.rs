@@ -1,14 +1,14 @@
-use super::{fseek_locked, ftell_locked, FILE, SEEK_SET};
+use super::{FILE, SEEK_SET, fseek_locked, ftell_locked};
 use crate::{
     header::{
         errno::EILSEQ,
-        wchar::{fgetwc, get_char_encoded_length, mbrtowc, MB_CUR_MAX},
+        wchar::{MB_CUR_MAX, fgetwc, get_char_encoded_length, mbrtowc},
         wctype::WEOF,
     },
     io::Read,
     platform::{
-        types::{c_char, off_t, wchar_t, wint_t},
         ERRNO,
+        types::{c_char, off_t, wchar_t, wint_t},
     },
 };
 use core::{iter::Iterator, ptr};

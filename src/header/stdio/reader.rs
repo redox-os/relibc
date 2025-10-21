@@ -1,4 +1,4 @@
-use super::{fseek_locked, ftell_locked, FILE, SEEK_SET};
+use super::{FILE, SEEK_SET, fseek_locked, ftell_locked};
 use crate::{
     io::Read,
     platform::types::{c_char, off_t},
