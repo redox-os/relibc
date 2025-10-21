@@ -1,7 +1,7 @@
-use super::lookaheadreader::LookAheadReader;
+use super::reader::Reader;
 use crate::platform::types::*;
 use alloc::{string::String, vec::Vec};
-use core::ffi::VaList as va_list;
+use core::{ffi::VaList as va_list, iter::Peekable};
 
 #[derive(PartialEq, Eq)]
 enum IntKind {
@@ -21,11 +21,12 @@ enum CharKind {
     Wide,
 }
 
-/// Helper function for progressing a C string
-unsafe fn next_char(string: &mut *const wchar_t) -> Result<wint_t, c_int> {
-    let c = **string as wint_t;
-    *string = string.offset(1);
-    if c == 0 { Err(-1) } else { Ok(c) }
+unsafe fn next_char(lar: &mut Peekable<Reader<'_>>) -> Result<wint_t, c_int> {
+    if let Some(c) = lar.next().transpose()? {
+        Ok(c)
+    } else {
+        Ok(0)
+    }
 }
 
 macro_rules! wc_as_char {
@@ -34,26 +35,23 @@ macro_rules! wc_as_char {
     };
 }
 
-unsafe fn inner_scanf(
-    mut r: LookAheadReader,
-    mut format: *const wchar_t,
-    mut ap: va_list,
-) -> Result<c_int, c_int> {
+unsafe fn inner_scanf(mut r: Reader, mut format: Reader, mut ap: va_list) -> Result<c_int, c_int> {
     let mut matched = 0;
     let mut wchar = 0;
     let mut skip_read = false;
     let mut count = 0;
+    let mut format = format.peekable();
 
     macro_rules! read {
         () => {{
-            match r.lookahead1() {
-                Ok(None) => false,
-                Ok(Some(b)) => {
+            match r.next() {
+                None => false,
+                Some(Ok(b)) => {
                     wchar = b;
                     count += 1;
                     true
                 }
-                Err(x) => return Err(x),
+                Some(Err(x)) => return Err(x),
             }
         }};
     }
@@ -79,7 +77,7 @@ unsafe fn inner_scanf(
         }
     }
 
-    while *format != 0 {
+    while format.peek().is_some() {
         let mut c = next_char(&mut format)?;
 
         if c as u8 == b' ' {
@@ -97,7 +95,6 @@ unsafe fn inner_scanf(
             if c != wchar {
                 return Ok(matched);
             }
-            r.commit();
         } else {
             c = next_char(&mut format)?;
 
@@ -239,7 +236,6 @@ unsafe fn inner_scanf(
                             dot = true;
                         }
                         n.push(wc_as_char!(wchar));
-                        r.commit();
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
                             break;
@@ -378,7 +374,6 @@ unsafe fn inner_scanf(
                             if let Some(ptr) = ptr {
                                 *ptr = 0;
                                 matched += 1;
-                                r.commit();
                             }
                         };
                     }
@@ -409,7 +404,6 @@ unsafe fn inner_scanf(
 
                             if ptr.is_some() {
                                 matched += 1;
-                                r.commit();
                             }
                         };
                     }
@@ -468,7 +462,6 @@ unsafe fn inner_scanf(
                             *ptr = ptr.offset(1);
                             data_stored = true;
                         }
-                        r.commit();
                         // Decrease the width, and read a new character unless the width is 0
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
@@ -506,7 +499,7 @@ unsafe fn inner_scanf(
     Ok(matched)
 }
 
-pub unsafe fn scanf(r: LookAheadReader, format: *const wchar_t, ap: va_list) -> c_int {
+pub unsafe fn scanf(r: Reader, format: Reader, ap: va_list) -> c_int {
     match inner_scanf(r, format, ap) {
         Ok(n) => n,
         Err(n) => n,
