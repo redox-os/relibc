@@ -24,6 +24,16 @@ pub const _IOFBF: c_int = 0;
 pub const _IOLBF: c_int = 1;
 pub const _IONBF: c_int = 2;
 
+// renameat2
+// (uint instead of int is intentional)
+/// Rename but don't replace the target if it exists.
+pub const RENAME_NOREPLACE: c_uint = 0x01;
+/// Atomically swap two files.
+#[cfg(target_os = "linux")]
+pub const RENAME_EXCHANGE: c_uint = 0x02;
+#[cfg(target_os = "linux")]
+pub const RENAME_WHITEOUT: c_uint = 0x04;
+
 // /dev/tty + nul
 pub const L_ctermid: usize = 9;
 // form of name is /XXXXXX, so 7

@@ -64,6 +64,7 @@ EXPECT_NAMES=\
 	stdio/popen \
 	stdio/printf \
 	stdio/rename \
+	stdio/renameat \
 	stdio/scanf \
 	stdio/setvbuf \
 	stdio/sprintf \
