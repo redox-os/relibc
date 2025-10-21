@@ -95,7 +95,6 @@ pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
 
         let mut env_regs = syscall::EnvRegisters::default();
         let _ = syscall::read(*cur_env_regs_fd, &mut env_regs)?;
-        let _ = syscall::write(1, alloc::format!("env_regs: {:?}\n", env_regs).as_bytes());
         let _ = syscall::write(*new_env_regs_fd, &env_regs)?;
     }
 

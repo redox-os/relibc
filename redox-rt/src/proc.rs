@@ -91,7 +91,6 @@ where
     A::Item: AsRef<[u8]>,
     E::Item: AsRef<[u8]>,
 {
-    let _ = syscall::write(1, b"fexec_impl: started\n");
     // Here, we do the minimum part of loading an application, which is what the kernel used to do.
     // We load the executable into memory (albeit at different offsets in this executable), fix
     // some misalignments, and then switch address space.
@@ -474,11 +473,6 @@ where
         &create_set_addr_space_buf(*grants_fd, header.e_entry as usize, sp),
     );
 
-    let _ = syscall::write(
-        1,
-        alloc::format!("fexec_impl:entry={:#x}, sp={:#x}\n", header.e_entry, sp).as_bytes(),
-    );
-
     Ok(FexecResult::Normal {
         addrspace_handle: addrspace_selection_fd,
     })
@@ -494,11 +488,6 @@ fn allocate_remote(
     len: usize,
     flags: MapFlags,
 ) -> Result<()> {
-    let _ = syscall::write(
-        1,
-        alloc::format!("Allocating stack: {:x} - {:x}\n", dst_addr, dst_addr + len).as_bytes(),
-    );
-
     mmap_remote(addrspace_fd, memory_scheme_fd, 0, dst_addr, len, flags)
 }
 pub fn mmap_remote(
@@ -734,17 +723,6 @@ pub fn create_set_addr_space_buf(
 ) -> [u8; size_of::<usize>() * 3] {
     let mut buf = [0u8; size_of::<usize>() * 3];
 
-    let _ = syscall::write(
-        1,
-        alloc::format!(
-            "addr_space_buf: space: {:#x}, ip: {:#x}, sp: {:#x}\n",
-            space,
-            ip,
-            sp,
-        )
-        .as_bytes(),
-    );
-
     buf.copy_from_slice([space, sp, ip].map(usize::to_ne_bytes).as_flattened());
 
     buf
@@ -758,18 +736,6 @@ pub fn create_set_addr_space_buf_for_fork(
 ) -> [u8; size_of::<usize>() * 4] {
     let mut buf = [0u8; size_of::<usize>() * 4];
 
-    let _ = syscall::write(
-        1,
-        alloc::format!(
-            "addr_space_buf: space: {:#x}, ip: {:#x}, sp: {:#x}, arg1: {:#x}\n",
-            space,
-            ip,
-            sp,
-            arg1
-        )
-        .as_bytes(),
-    );
-
     buf.copy_from_slice([space, sp, ip, arg1].map(usize::to_ne_bytes).as_flattened());
 
     buf
@@ -779,7 +745,6 @@ pub fn create_set_addr_space_buf_for_fork(
 /// descriptors from other schemes are reobtained with `dup`, and grants referencing such file
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
 pub fn fork_impl(args: &ForkArgs<'_>) -> Result<usize> {
-    syscall::write(1, b"fork_impl: started\n");
     let old_mask = crate::signal::get_sigmask()?;
     let pid = unsafe {
         Error::demux(__relibc_internal_fork_wrapper(
@@ -790,7 +755,6 @@ pub fn fork_impl(args: &ForkArgs<'_>) -> Result<usize> {
     if pid == 0 {
         crate::signal::set_sigmask(Some(old_mask), None)?;
     }
-    syscall::write(1, alloc::format!("fork_impl: pid={}\n", pid).as_bytes());
     Ok(pid)
 }
 
@@ -835,10 +799,6 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                 new_ns_fd: current_namespace_fd(),
             }
         };
-        let _ = syscall::write(
-            1,
-            alloc::format!("ForkScratchpad: {:?}\n", scratchpad).as_bytes(),
-        );
         #[cfg(any(
             target_arch = "x86_64",
             target_arch = "aarch64",
@@ -847,19 +807,11 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         let (new_sp, arg1) = {
             let new_sp = initial_rsp as usize;
             let scratchpad_ptr: *const ForkScratchpad = &scratchpad;
-            let _ = syscall::write(
-                1,
-                alloc::format!("new_sp: {:#x}, arg1: {:p}\n", new_sp, scratchpad_ptr).as_bytes(),
-            );
             (new_sp, scratchpad_ptr as usize)
         };
         #[cfg(target_arch = "x86")]
         let new_sp = unsafe {
             let size = size_of::<ForkScratchpad>();
-            let _ = syscall::write(
-                1,
-                alloc::format!("ForkScratchapd layout size: {}\n", size).as_bytes(),
-            );
             let scratchpad_ptr =
                 initial_rsp.add(size / size_of::<usize>() + size % size_of::<usize>());
 
@@ -999,11 +951,6 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
 
     let start_fd = FdGuard::new(syscall::dup(*new_thr_fd, b"start")?);
     let _ = syscall::write(*start_fd, &[0])?;
-    syscall::write(
-        1,
-        alloc::format!("fork_inner: new_pid={}\n", new_pid).as_bytes(),
-    );
-
     Ok(new_pid)
 }
 

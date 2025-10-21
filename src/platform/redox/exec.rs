@@ -44,17 +44,12 @@ fn fexec_impl(
         extrainfo,
         interp_override,
     )? {
-        FexecResult::Normal { addrspace_handle } => {
-            let _ = syscall::write(1, b"\nExecuting new program (normal exec)...\n");
-
-            addrspace_handle
-        }
+        FexecResult::Normal { addrspace_handle } => addrspace_handle,
         FexecResult::Interp {
             image_file,
             path,
             interp_override: new_interp_override,
         } => {
-            let _ = syscall::write(1, b"\nExecuting new program (interpreter exec)...\n");
             drop(image_file);
             drop(memory);
 
@@ -102,17 +97,13 @@ pub fn execve(
     arg_env: ArgEnv,
     interp_override: Option<InterpOverride>,
 ) -> Result<Infallible> {
-    let _ = syscall::write(1, b"execve called\n");
     // NOTE: We must omit O_CLOEXEC and close manually, otherwise it will be closed before we
     // have even read it!
     let (mut image_file, arg0) = match exec {
-        Executable::AtPath(path) => {
-            let _ = syscall::write(1, b"\nExec AtPath\n");
-            (
-                File::open(path, O_RDONLY as c_int).map_err(|_| Error::new(ENOENT))?,
-                path.to_bytes(),
-            )
-        }
+        Executable::AtPath(path) => (
+            File::open(path, O_RDONLY as c_int).map_err(|_| Error::new(ENOENT))?,
+            path.to_bytes(),
+        ),
         Executable::InFd { file, arg0 } => (file, arg0),
     };
 
