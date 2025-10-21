@@ -11,7 +11,7 @@
 use alloc::string::String;
 use core::{cmp, fmt, mem};
 
-use crate::io::{self, prelude::*, Error, ErrorKind, Initializer, Seek, SeekFrom, Write};
+use crate::io::{self, Error, ErrorKind, Initializer, Seek, SeekFrom, Write, prelude::*};
 
 impl<'a, R: Read + ?Sized> Read for &'a mut R {
     #[inline]

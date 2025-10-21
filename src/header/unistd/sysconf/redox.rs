@@ -5,9 +5,10 @@ use alloc::string::String;
 use crate::{
     error::Errno,
     fs::File,
-    header::{errno, fcntl, limits},
+    header::{errno, fcntl, limits, sys_statvfs},
     io::Read,
-    platform::{self, types::*, Pal, Sys},
+    out::Out,
+    platform::{self, Pal, Sys, types::*},
 };
 
 // POSIX.1 {
@@ -27,6 +28,8 @@ pub const _SC_RE_DUP_MAX: c_int = 44;
 
 pub const _SC_NPROCESSORS_CONF: c_int = 57;
 pub const _SC_NPROCESSORS_ONLN: c_int = 58;
+pub const _SC_PHYS_PAGES: c_int = 59;
+pub const _SC_AVPHYS_PAGES: c_int = 60;
 
 // ...
 pub const _SC_GETGR_R_SIZE_MAX: c_int = 69;
@@ -63,6 +66,8 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
         _SC_HOST_NAME_MAX => 64,
         _SC_NPROCESSORS_CONF => get_cpu_count().unwrap_or(None).unwrap_or(1),
         _SC_NPROCESSORS_ONLN => get_cpu_count().unwrap_or(None).unwrap_or(1),
+        _SC_PHYS_PAGES => get_mem_stat().map(|s| s.f_blocks as c_long).unwrap_or(-1),
+        _SC_AVPHYS_PAGES => get_mem_stat().map(|s| s.f_bfree as c_long).unwrap_or(-1),
         _SC_SIGQUEUE_MAX => 32,
         _SC_REALTIME_SIGNALS => 202405,
         _ => {
@@ -83,4 +88,13 @@ pub fn get_cpu_count() -> Result<Option<c_long>, Errno> {
         .find(|line| line.starts_with("CPUs:"))
         .and_then(|line| line.split(':').nth(1))
         .and_then(|num_str| num_str.trim().parse::<c_long>().ok()))
+}
+
+pub fn get_mem_stat() -> Result<sys_statvfs::statvfs, Errno> {
+    let fd = Sys::open(c"/scheme/memory".into(), fcntl::O_PATH, 0)?;
+    let mut buf = sys_statvfs::statvfs::default();
+    let res = Sys::fstatvfs(fd, Out::from_mut(&mut buf));
+    Sys::close(fd);
+    let _ = res?;
+    return Ok(buf);
 }

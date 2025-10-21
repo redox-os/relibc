@@ -3,12 +3,13 @@
 // FIXME(andypython): remove this when #![allow(warnings, unused_variables)] is
 // dropped from src/lib.rs.
 #![warn(warnings, unused_variables)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 use core::{mem, ptr};
 use object::{
+    Endianness,
     elf::{self, ProgramHeader32, ProgramHeader64},
     read::elf::ProgramHeader,
-    Endianness,
 };
 
 use self::tcb::{Master, Tcb};
@@ -28,7 +29,7 @@ pub mod linker;
 pub mod start;
 pub mod tcb;
 
-pub use generic_rt::{panic_notls, ExpectTlsFree};
+pub use generic_rt::{ExpectTlsFree, panic_notls};
 
 static mut STATIC_TCB_MASTER: Master = Master {
     ptr: ptr::null_mut(),
@@ -146,7 +147,7 @@ pub unsafe fn init(
         tp = val;
     }
     #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
-    {
+    unsafe {
         core::arch::asm!(
             "mrs {}, tpidr_el0",
             out(reg) tp,
@@ -179,7 +180,7 @@ pub unsafe fn init(
         tp = env.fsbase as usize;
     }
     #[cfg(all(target_os = "redox", target_arch = "riscv64"))]
-    {
+    unsafe {
         core::arch::asm!(
             "mv {}, tp",
             out(reg) tp,
@@ -200,9 +201,9 @@ pub unsafe fn init(
 }
 
 pub unsafe fn fini() {
-    if let Some(tcb) = Tcb::current() {
+    if let Some(tcb) = unsafe { Tcb::current() } {
         if !tcb.linker_ptr.is_null() {
-            let linker = (*tcb.linker_ptr).lock();
+            let linker = unsafe { (*tcb.linker_ptr).lock() };
             linker.fini();
         }
     }

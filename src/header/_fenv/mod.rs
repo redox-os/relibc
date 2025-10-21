@@ -13,57 +13,57 @@ pub struct fenv_t {
     pub cw: u64,
 }
 
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn feclearexcept(excepts: c_int) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fegenenv(envp: *mut fenv_t) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fegetexceptflag(flagp: *mut fexcept_t, excepts: c_int) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fegetround() -> c_int {
     FE_TONEAREST
 }
 
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn feholdexcept(envp: *mut fenv_t) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn feraiseexcept(except: c_int) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fesetenv(envp: *const fenv_t) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fesetexceptflag(flagp: *const fexcept_t, excepts: c_int) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fesetround(round: c_int) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fetestexcept(excepts: c_int) -> c_int {
     unimplemented!();
 }
 
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn feupdateenv(envp: *const fenv_t) -> c_int {
     unimplemented!();
 }

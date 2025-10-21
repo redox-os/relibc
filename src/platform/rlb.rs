@@ -1,10 +1,10 @@
 use alloc::vec::Vec;
 
-use crate::platform::{types::*, Pal, Sys};
+use crate::platform::{Pal, Sys, types::*};
 
 use crate::{
     error::ResultExt,
-    header::unistd::{lseek, SEEK_SET},
+    header::unistd::{SEEK_SET, lseek},
 };
 /// Implements an `Iterator` which returns on either newline or EOF.
 #[derive(Clone)]

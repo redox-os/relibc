@@ -54,13 +54,13 @@ static mut CURRENT_LOCALE: lconv = lconv {
     thousands_sep: EMPTY_PTR,
 };
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn localeconv() -> *mut lconv {
-    &mut CURRENT_LOCALE as *mut _
+    &raw mut CURRENT_LOCALE as *mut _
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn setlocale(_option: c_int, _val: *const c_char) -> *mut c_char {
     // TODO actually implement
-    C_LOCALE.as_mut_ptr() as *mut c_char
+    &raw mut C_LOCALE as *mut c_char
 }

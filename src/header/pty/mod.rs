@@ -18,7 +18,7 @@ mod imp;
 mod imp;
 
 /// See <https://www.man7.org/linux/man-pages/man3/openpty.3.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn openpty(
     amaster: *mut c_int,
     aslave: *mut c_int,
@@ -53,7 +53,7 @@ pub unsafe extern "C" fn openpty(
 }
 
 /// See <https://www.man7.org/linux/man-pages/man3/openpty.3.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn forkpty(
     pm: *mut c_int,
     name: *mut c_char,

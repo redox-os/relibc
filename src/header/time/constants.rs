@@ -20,3 +20,5 @@ pub(crate) const MON_NAMES: [&str; 12] = [
 pub const CLOCK_PROCESS_CPUTIME_ID: clockid_t = 2;
 // Can't be time_t because cbindgen UGH
 pub const CLOCKS_PER_SEC: c_long = 1_000_000;
+
+pub const TIMER_ABSTIME: c_int = 1;

@@ -1,6 +1,6 @@
 use super::{
-    super::{types::*, PalPtrace},
-    e_raw, Sys,
+    super::{PalPtrace, types::*},
+    Sys, e_raw,
 };
 use crate::error::Result;
 

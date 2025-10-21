@@ -7,14 +7,14 @@ use super::*;
 const UNLOCKED: c_int = 0;
 const LOCKED: c_int = 1;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_spin_destroy(spinlock: *mut pthread_spinlock_t) -> c_int {
     let _spinlock = &mut *spinlock.cast::<RlctSpinlock>();
 
     // No-op
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_spin_init(
     spinlock: *mut pthread_spinlock_t,
     _pshared: c_int,
@@ -28,7 +28,7 @@ pub unsafe extern "C" fn pthread_spin_init(
 
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_spin_lock(spinlock: *mut pthread_spinlock_t) -> c_int {
     let spinlock = &*spinlock.cast::<RlctSpinlock>();
 
@@ -46,7 +46,7 @@ pub unsafe extern "C" fn pthread_spin_lock(spinlock: *mut pthread_spinlock_t) ->
 
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_spin_trylock(spinlock: *mut pthread_spinlock_t) -> c_int {
     let spinlock = &*spinlock.cast::<RlctSpinlock>();
 
@@ -60,7 +60,7 @@ pub unsafe extern "C" fn pthread_spin_trylock(spinlock: *mut pthread_spinlock_t)
 
     0
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_spin_unlock(spinlock: *mut pthread_spinlock_t) -> c_int {
     let spinlock = &*spinlock.cast::<RlctSpinlock>();
 

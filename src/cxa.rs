@@ -1,4 +1,4 @@
-use crate::platform::types::*;
+use crate::{platform::types::*, raw_cell::RawCell};
 
 // TODO: Implement cxa_finalize and uncomment this
 
@@ -9,17 +9,18 @@ struct CxaAtExitFunc {
     //dso: *mut c_void,
 }
 
-static mut CXA_ATEXIT_FUNCS: [Option<CxaAtExitFunc>; 32] = [None; 32];
+static CXA_ATEXIT_FUNCS: RawCell<[Option<CxaAtExitFunc>; 32]> = RawCell::new([None; 32]);
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __cxa_atexit(
     func_opt: Option<extern "C" fn(*mut c_void)>,
     arg: *mut c_void,
     dso: *mut c_void,
 ) -> c_int {
-    for item in &mut CXA_ATEXIT_FUNCS {
-        if item.is_none() {
-            *item = func_opt.map(|func| CxaAtExitFunc {} /*{ func, arg, dso }*/);
+    for i in 0..CXA_ATEXIT_FUNCS.unsafe_ref().len() {
+        if CXA_ATEXIT_FUNCS.unsafe_ref()[i].is_none() {
+            CXA_ATEXIT_FUNCS.unsafe_mut()[i] =
+                func_opt.map(|func| CxaAtExitFunc {} /*{ func, arg, dso }*/);
             return 0;
         }
     }

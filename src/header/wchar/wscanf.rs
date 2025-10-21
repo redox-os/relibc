@@ -25,11 +25,7 @@ enum CharKind {
 unsafe fn next_char(string: &mut *const wchar_t) -> Result<wint_t, c_int> {
     let c = **string as wint_t;
     *string = string.offset(1);
-    if c == 0 {
-        Err(-1)
-    } else {
-        Ok(c)
-    }
+    if c == 0 { Err(-1) } else { Ok(c) }
 }
 
 macro_rules! wc_as_char {

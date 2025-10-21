@@ -8,7 +8,7 @@ use crate::{
         errno::{self, EINVAL},
         fcntl, termios,
     },
-    platform::{self, types::*, Pal, Sys},
+    platform::{self, Pal, Sys, types::*},
 };
 
 use super::winsize;
@@ -132,7 +132,7 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
     Ok(0)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
     ioctl_inner(fd, request, out).or_minus_one_errno()
 }

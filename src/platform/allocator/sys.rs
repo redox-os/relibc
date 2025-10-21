@@ -3,7 +3,7 @@ use crate::{
         sys_mman::{self, MAP_FAILED, MREMAP_MAYMOVE},
         unistd::pthread_atfork,
     },
-    platform::{types::*, Pal, Sys},
+    platform::{Pal, Sys, types::*},
     sync::Mutex,
 };
 use core::ptr;

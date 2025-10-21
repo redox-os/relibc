@@ -18,15 +18,15 @@ use crate::{
     sync::Mutex,
 };
 
-use bitflags::{bitflags, Flags};
+use bitflags::{Flags, bitflags};
 use chrono::{DateTime, Utc};
 
 use super::{
-    sys::LogFile, LOG_ALERT, LOG_AUTH, LOG_AUTHPRIV, LOG_CONS, LOG_CRIT, LOG_CRON, LOG_DAEMON,
-    LOG_DEBUG, LOG_EMERG, LOG_ERR, LOG_FTP, LOG_INFO, LOG_KERN, LOG_LOCAL0, LOG_LOCAL1, LOG_LOCAL2,
+    LOG_ALERT, LOG_AUTH, LOG_AUTHPRIV, LOG_CONS, LOG_CRIT, LOG_CRON, LOG_DAEMON, LOG_DEBUG,
+    LOG_EMERG, LOG_ERR, LOG_FTP, LOG_INFO, LOG_KERN, LOG_LOCAL0, LOG_LOCAL1, LOG_LOCAL2,
     LOG_LOCAL3, LOG_LOCAL4, LOG_LOCAL5, LOG_LOCAL6, LOG_LOCAL7, LOG_LPR, LOG_MAIL, LOG_MASK,
     LOG_NDELAY, LOG_NEWS, LOG_NOTICE, LOG_NOWAIT, LOG_ODELAY, LOG_PERROR, LOG_PID, LOG_SYSLOG,
-    LOG_UPTO, LOG_USER, LOG_UUCP, LOG_WARNING,
+    LOG_UPTO, LOG_USER, LOG_UUCP, LOG_WARNING, sys::LogFile,
 };
 
 pub(super) static LOGGER: Mutex<LogParams<LogFile>> = Mutex::new(LogParams::new(None));
@@ -82,7 +82,7 @@ impl<L: LogSink> LogParams<L> {
         // SAFETY:
         // * Assumes caller passed in a valid C string; printf should handle that invariant.
         // * `buffer` grows to fit the formatted string.
-        unsafe { printf(&mut buffer, message.as_ptr(), ap) };
+        unsafe { printf(&mut buffer, message, ap) };
         buffer.extend(b"\n\0");
 
         if self.maybe_open_logger().is_ok() {

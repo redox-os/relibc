@@ -1,7 +1,7 @@
 use crate::platform::{Pal, Sys};
 
 // Stub for call used in exit
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn pthread_terminate() {}
 
 mod epoll;

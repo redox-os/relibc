@@ -24,7 +24,7 @@ use crate::{
     fs::File,
     header::{errno, fcntl, limits, string::strlen, unistd},
     io,
-    io::{prelude::*, BufReader, Lines},
+    io::{BufReader, Lines, prelude::*},
     platform,
     platform::types::*,
     sync::Mutex,
@@ -116,7 +116,7 @@ impl OwnedGrp {
         unsafe {
             GROUP_BUF = Some(self.buffer);
             GROUP = self.reference;
-            &mut GROUP
+            &raw mut GROUP
         }
     }
 }
@@ -249,7 +249,7 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
 }
 
 // MT-Unsafe race:grgid locale
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrgid(gid: gid_t) -> *mut group {
     let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
         return ptr::null_mut();
@@ -272,7 +272,7 @@ pub unsafe extern "C" fn getgrgid(gid: gid_t) -> *mut group {
 }
 
 // MT-Unsafe race:grnam locale
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrnam(name: *const c_char) -> *mut group {
     let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
         return ptr::null_mut();
@@ -303,7 +303,7 @@ pub unsafe extern "C" fn getgrnam(name: *const c_char) -> *mut group {
 }
 
 // MT-Safe locale
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrgid_r(
     gid: gid_t,
     result_buf: *mut group,
@@ -343,7 +343,7 @@ pub unsafe extern "C" fn getgrgid_r(
                         io::ErrorKind::NotFound => ENOENT,
                         _ => EIO,
                     },
-                }
+                };
             }
         };
 
@@ -362,7 +362,7 @@ pub unsafe extern "C" fn getgrgid_r(
 }
 
 // MT-Safe locale
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrnam_r(
     name: *const c_char,
     result_buf: *mut group,
@@ -406,7 +406,7 @@ pub unsafe extern "C" fn getgrnam_r(
 }
 
 // MT-Unsafe race:grent race:grentbuf locale
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrent() -> *mut group {
     let mut line_reader = unsafe { &mut *LINE_READER.get() };
 
@@ -436,7 +436,7 @@ pub unsafe extern "C" fn getgrent() -> *mut group {
 }
 
 // MT-Unsafe race:grent locale
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn endgrent() {
     unsafe {
         *(&mut *LINE_READER.get()) = None;
@@ -444,7 +444,7 @@ pub unsafe extern "C" fn endgrent() {
 }
 
 // MT-Unsafe race:grent locale
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn setgrent() {
     let mut line_reader = unsafe { &mut *LINE_READER.get() };
     let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
@@ -455,7 +455,7 @@ pub unsafe extern "C" fn setgrent() {
 
 // MT-Safe locale
 // Not POSIX
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrouplist(
     user: *const c_char,
     group: gid_t,
@@ -523,7 +523,7 @@ pub unsafe extern "C" fn getgrouplist(
 
 // MT-Safe locale
 // Not POSIX
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn initgroups(user: *const c_char, gid: gid_t) -> c_int {
     let mut groups = [0; limits::NGROUPS_MAX];
     let mut count = groups.len() as c_int;

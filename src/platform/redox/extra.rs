@@ -4,11 +4,11 @@ use crate::{
     error::{Errno, ResultExt},
     platform::types::*,
 };
-use syscall::{error::*, F_SETFD, F_SETFL};
+use syscall::{F_SETFD, F_SETFL, error::*};
 
 pub use redox_rt::proc::FdGuard;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fpath(fd: c_int, buf: *mut c_void, count: size_t) -> ssize_t {
     syscall::fpath(
         fd as usize,

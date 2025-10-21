@@ -9,9 +9,9 @@ use crate::{
     error::ResultExt,
     fs::File,
     header::sys_epoll::{
-        epoll_create1, epoll_ctl, epoll_data, epoll_event, epoll_wait, EPOLLERR, EPOLLHUP, EPOLLIN,
-        EPOLLNVAL, EPOLLOUT, EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM,
-        EPOLL_CLOEXEC, EPOLL_CTL_ADD,
+        EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLNVAL, EPOLLOUT, EPOLLPRI,
+        EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, epoll_create1, epoll_ctl, epoll_data,
+        epoll_event, epoll_wait,
     },
     platform::types::*,
 };
@@ -113,7 +113,7 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
     count
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
     trace_expr!(
         poll_epoll(

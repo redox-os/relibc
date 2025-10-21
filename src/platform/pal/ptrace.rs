@@ -1,6 +1,6 @@
 use crate::{
     error::Result,
-    platform::{types::*, Pal},
+    platform::{Pal, types::*},
 };
 
 pub trait PalPtrace: Pal {

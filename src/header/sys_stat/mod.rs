@@ -8,7 +8,7 @@ use crate::{
         time::timespec,
     },
     out::Out,
-    platform::{types::*, Pal, Sys},
+    platform::{Pal, Sys, types::*},
 };
 
 pub const S_IFMT: c_int = 0o0_170_000;
@@ -71,18 +71,18 @@ pub struct stat {
     pub _pad: [c_char; 24],
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn chmod(path: *const c_char, mode: mode_t) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::chmod(path, mode).map(|()| 0).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
     Sys::fchmod(fildes, mode).map(|()| 0).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fchmodat(
     dirfd: c_int,
     path: *const c_char,
@@ -95,13 +95,13 @@ pub unsafe extern "C" fn fchmodat(
         .or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
     let buf = Out::nonnull(buf);
     Sys::fstat(fildes, buf).map(|()| 0).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fstatat(
     fildes: c_int,
     path: *const c_char,
@@ -115,17 +115,17 @@ pub unsafe extern "C" fn fstatat(
         .or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut stat) -> c_int {
     fstat(fildes, buf)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
     Sys::futimens(fd, times).map(|()| 0).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = CStr::from_ptr(path);
     let buf = Out::nonnull(buf);
@@ -144,25 +144,25 @@ pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     res
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::mkdir(path, mode).map(|()| 0).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::mkfifo(path, mode).map(|()| 0).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::mknod(path, mode, dev).map(|()| 0).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn mknodat(
     dirfd: c_int,
     path: *const c_char,
@@ -175,7 +175,7 @@ pub unsafe extern "C" fn mknodat(
         .or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     let file = CStr::from_ptr(file);
     let buf = Out::nonnull(buf);
@@ -194,7 +194,7 @@ pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     res
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn umask(mask: mode_t) -> mode_t {
     Sys::umask(mask)
 }

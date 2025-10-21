@@ -2,7 +2,7 @@
 
 use crate::{
     error::ResultExt,
-    platform::{types::*, PalPtrace, Sys},
+    platform::{PalPtrace, Sys, types::*},
 };
 use core::ffi::VaList;
 
@@ -25,7 +25,7 @@ pub const PTRACE_SYSEMU: c_int = 31;
 pub const PTRACE_SYSEMU_SINGLESTEP: c_int = 32;
 
 // Can't use "params: ..." syntax, because... guess what? Cbingen again :(
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ptrace(request: c_int, mut __valist: ...) -> c_int {
     // Musl also just grabs the arguments from the varargs...
     Sys::ptrace(request, __valist.arg(), __valist.arg(), __valist.arg()).or_minus_one_errno()

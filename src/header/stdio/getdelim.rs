@@ -16,12 +16,12 @@ use crate::{
 };
 
 use crate::{
-    header::stdio::{default_stdout, feof, ferror, F_EOF, F_ERR},
+    header::stdio::{F_EOF, F_ERR, default_stdout, feof, ferror},
     platform::ERRNO,
 };
 
 /// see getdelim (getline is a special case of getdelim with delim == '\n')
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getline(
     lineptr: *mut *mut c_char,
     n: *mut size_t,
@@ -48,7 +48,7 @@ pub unsafe extern "C" fn getline(
 /// "If an error occurs, the error indicator for the stream shall be set, and the function shall
 /// return -1 and set errno to indicate the error." but in cases that produce EINVAL even glibc
 /// doesn't seem to set the error indicator, so we also don't.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getdelim(
     lineptr: *mut *mut c_char,
     n: *mut size_t,

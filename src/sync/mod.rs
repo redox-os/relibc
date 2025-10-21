@@ -27,7 +27,7 @@ use crate::{
         time::timespec,
     },
     out::Out,
-    platform::{types::*, Pal, Sys},
+    platform::{Pal, Sys, types::*},
 };
 use core::{
     mem::MaybeUninit,

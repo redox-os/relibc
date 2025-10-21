@@ -1,9 +1,9 @@
 use crate::{
     error::ResultExt,
-    platform::{types::*, Sys},
+    platform::{Sys, types::*},
 };
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
     // TODO: Somehow support varargs to syscall??
     Sys::ioctl(fd, request, out).or_minus_one_errno()

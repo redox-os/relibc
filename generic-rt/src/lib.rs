@@ -22,6 +22,7 @@ pub struct GenericTcb<Os> {
 }
 impl<Os> GenericTcb<Os> {
     /// Architecture specific code to read a usize from the TCB - aarch64
+    #[allow(unsafe_op_in_unsafe_fn)]
     #[inline(always)]
     #[cfg(target_arch = "aarch64")]
     pub unsafe fn arch_read(offset: usize) -> usize {
@@ -36,6 +37,7 @@ impl<Os> GenericTcb<Os> {
     }
 
     /// Architecture specific code to read a usize from the TCB - x86
+    #[allow(unsafe_op_in_unsafe_fn)]
     #[inline(always)]
     #[cfg(target_arch = "x86")]
     pub unsafe fn arch_read(offset: usize) -> usize {
@@ -51,6 +53,7 @@ impl<Os> GenericTcb<Os> {
     }
 
     /// Architecture specific code to read a usize from the TCB - x86_64
+    #[allow(unsafe_op_in_unsafe_fn)]
     #[inline(always)]
     #[cfg(target_arch = "x86_64")]
     pub unsafe fn arch_read(offset: usize) -> usize {
@@ -66,6 +69,7 @@ impl<Os> GenericTcb<Os> {
     }
 
     /// Architecture specific code to read a usize from the TCB - riscv64
+    #[allow(unsafe_op_in_unsafe_fn)]
     #[inline(always)]
     #[cfg(target_arch = "riscv64")]
     unsafe fn arch_read(offset: usize) -> usize {
@@ -81,8 +85,8 @@ impl<Os> GenericTcb<Os> {
     }
 
     pub unsafe fn current_ptr() -> Option<*mut Self> {
-        let tcb_ptr = Self::arch_read(offset_of!(Self, tcb_ptr)) as *mut Self;
-        let tcb_len = Self::arch_read(offset_of!(Self, tcb_len));
+        let tcb_ptr = unsafe { Self::arch_read(offset_of!(Self, tcb_ptr)) as *mut Self };
+        let tcb_len = unsafe { Self::arch_read(offset_of!(Self, tcb_len)) };
         if tcb_ptr.is_null() || tcb_len < mem::size_of::<Self>() {
             None
         } else {
@@ -90,7 +94,7 @@ impl<Os> GenericTcb<Os> {
         }
     }
     pub unsafe fn current() -> Option<&'static mut Self> {
-        Some(&mut *Self::current_ptr()?)
+        unsafe { Some(&mut *Self::current_ptr()?) }
     }
 }
 pub fn panic_notls(_msg: impl core::fmt::Display) -> ! {

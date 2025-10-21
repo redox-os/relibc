@@ -5,11 +5,12 @@ use core::{intrinsics, ptr};
 use generic_rt::ExpectTlsFree;
 
 use crate::{
+    ALLOCATOR,
     header::{libgen, stdio, stdlib},
     ld_so::{self, linker::Linker, tcb::Tcb},
-    platform::{self, get_auxvs, types::*, Pal, Sys},
+    platform::{self, Pal, Sys, get_auxvs, types::*},
+    raw_cell::RawCell,
     sync::mutex::Mutex,
-    ALLOCATOR,
 };
 
 #[repr(C)]
@@ -59,20 +60,20 @@ unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut
 
 // Since Redox and Linux are so similar, it is easy to accidentally run a binary from one on the
 // other. This will test that the current system is compatible with the current binary
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe fn relibc_verify_host() {
     if !Sys::verify() {
         intrinsics::abort();
     }
 }
-#[link_section = ".init_array"]
+#[unsafe(link_section = ".init_array")]
 #[used]
 static INIT_ARRAY: [extern "C" fn(); 1] = [init_array];
 
 static mut init_complete: bool = false;
 
 #[used]
-#[no_mangle]
+#[unsafe(no_mangle)]
 static mut __relibc_init_environ: *mut *mut c_char = ptr::null_mut();
 
 fn alloc_init() {
@@ -127,7 +128,7 @@ fn io_init() {
 }
 
 #[inline(never)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn relibc_start_v1(
     sp: &'static Stack,
     main: unsafe extern "C" fn(
@@ -136,7 +137,7 @@ pub unsafe extern "C" fn relibc_start_v1(
         envp: *mut *mut c_char,
     ) -> c_int,
 ) -> ! {
-    extern "C" {
+    unsafe extern "C" {
         static __preinit_array_start: extern "C" fn();
         static __preinit_array_end: extern "C" fn();
         static __init_array_start: extern "C" fn();
@@ -183,10 +184,10 @@ pub unsafe extern "C" fn relibc_start_v1(
     // Set up argc and argv
     let argc = sp.argc;
     let argv = sp.argv();
-    platform::inner_argv = copy_string_array(argv, argc as usize);
-    platform::argv = platform::inner_argv.as_mut_ptr();
+    platform::inner_argv.unsafe_set(copy_string_array(argv, argc as usize));
+    platform::argv = platform::inner_argv.unsafe_mut().as_mut_ptr();
     // Special code for program_invocation_name and program_invocation_short_name
-    if let Some(arg) = platform::inner_argv.get(0) {
+    if let Some(arg) = platform::inner_argv.unsafe_ref().get(0) {
         platform::program_invocation_name = *arg;
         platform::program_invocation_short_name = libgen::basename(*arg);
     }
@@ -200,8 +201,8 @@ pub unsafe extern "C" fn relibc_start_v1(
         while !(*envp.add(len)).is_null() {
             len += 1;
         }
-        platform::OUR_ENVIRON = copy_string_array(envp, len);
-        platform::environ = platform::OUR_ENVIRON.as_mut_ptr();
+        platform::OUR_ENVIRON.unsafe_set(copy_string_array(envp, len));
+        platform::environ = platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr();
     }
 
     let auxvs = get_auxvs(sp.auxv().cast());

@@ -34,6 +34,11 @@ special_syms=(
     __rust_dealloc
     __rust_no_alloc_shim_is_unstable
     __rust_realloc
+    _RNvCsdRcTtHUCxqF_7___rustc12___rust_alloc
+    _RNvCsdRcTtHUCxqF_7___rustc19___rust_alloc_zeroed
+    _RNvCsdRcTtHUCxqF_7___rustc14___rust_dealloc
+    _RNvCsdRcTtHUCxqF_7___rustc14___rust_realloc
+    _RNvCsdRcTtHUCxqF_7___rustc8___rg_oom
 )
 
 for dep in `find $deps_dir -type f -name "*.rlib"`; do

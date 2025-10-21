@@ -8,7 +8,7 @@
 use crate::platform::{self, types::*};
 
 //TODO: Consider removing, provided for compatibility with newlib
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn __errno() -> *mut c_int {
     __errno_location()
 }
@@ -17,7 +17,7 @@ pub extern "C" fn __errno() -> *mut c_int {
 ///
 /// This is the basis of the C-facing macro definition of `errno`, and should
 /// not be used directly.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn __errno_location() -> *mut c_int {
     platform::ERRNO.as_ptr()
 }
@@ -28,9 +28,9 @@ pub extern "C" fn __errno_location() -> *mut c_int {
 /// `program_invocation_name`, and should not be used directly.
 ///
 /// The `program_invocation_name` variable is a GNU extension.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __program_invocation_name() -> *mut *mut c_char {
-    unsafe { &mut platform::program_invocation_name }
+    unsafe { &raw mut platform::program_invocation_name }
 }
 
 /// Get the directory-less name used to invoke the program.
@@ -39,9 +39,9 @@ pub unsafe extern "C" fn __program_invocation_name() -> *mut *mut c_char {
 /// `program_invocation_short_name`, and should not be used directly.
 ///
 /// The `program_invocation_short_name` variable is a GNU extension.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __program_invocation_short_name() -> *mut *mut c_char {
-    unsafe { &mut platform::program_invocation_short_name }
+    unsafe { &raw mut platform::program_invocation_short_name }
 }
 
 pub const EPERM: c_int = 1; /* Operation not permitted */

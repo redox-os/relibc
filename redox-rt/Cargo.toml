@@ -2,7 +2,7 @@
 name = "redox-rt"
 authors = ["4lDO2 <4lDO2@protonmail.com>"]
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 description = "Libc-independent runtime for Redox"
 

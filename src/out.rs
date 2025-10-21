@@ -73,6 +73,15 @@ impl<'a, T> Out<'a, T> {
         }
     }
 }
+impl<'a, T, const N: usize> Out<'a, [T; N]> {
+    #[inline]
+    pub fn as_slice_mut<'b>(&'b mut self) -> Out<'b, [T]> {
+        unsafe {
+            let ptr: *mut [T; N] = self.as_mut_ptr();
+            Out::from_raw_parts(ptr.cast::<T>(), N)
+        }
+    }
+}
 impl<'a, T> Out<'a, [T]> {
     /// # Safety
     ///
@@ -89,6 +98,9 @@ impl<'a, T> Out<'a, [T]> {
     }
     pub fn len(&self) -> usize {
         self.ptr.as_ptr().len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
     // TODO: Maybe strengthen lifetimes?
     #[inline]
@@ -142,8 +154,26 @@ impl<'a, T> Out<'a, [T]> {
                 .copy_from_nonoverlapping(src.as_ptr(), src.len());
         }
     }
+    pub fn copy_common_length_from_slice(&mut self, src: &[T]) -> usize
+    where
+        T: Copy,
+    {
+        let l = src.len().min(self.len());
+        self.split_at_checked(l).unwrap()[0].copy_from_slice(&src[..l]);
+        l
+    }
+    // TODO: better API, impl RangeBounds, also fn get(usize) -> Out<T>
+    pub fn subslice<'b>(&'b mut self, start: usize, end: usize) -> Out<[T]> {
+        assert!(start <= end);
+        assert!(end <= self.len());
+        unsafe { Self::from_raw_parts(self.as_mut_ptr().as_mut_ptr().add(start), end - start) }
+    }
+    pub fn index<'b>(&'b mut self, i: usize) -> Out<T> {
+        assert!(i <= self.len());
+        unsafe { Out::nonnull(self.as_mut_ptr().as_mut_ptr().add(i)) }
+    }
 }
-// TODO: different trait?
+// TODO: use bytemuck
 impl<T: plain::Plain> Out<'_, [T]> {
     pub fn zero(&mut self) {
         let l = self.ptr.len();
@@ -154,7 +184,30 @@ impl<T: plain::Plain> Out<'_, [T]> {
             self.ptr.as_mut_ptr().write_bytes(0, l)
         }
     }
+    #[inline]
+    pub fn cast_slice_to<'b, U>(mut self) -> Out<'b, [U]>
+    where
+        T: CastSlice<U>,
+    {
+        assert_eq!(self.as_mut_ptr().as_mut_ptr() as usize % align_of::<U>(), 0);
+
+        let byte_length = self.as_mut_ptr().len() * size_of::<T>();
+
+        unsafe {
+            Out::from_raw_parts(
+                self.as_mut_ptr().as_mut_ptr().cast(),
+                byte_length / size_of::<U>(),
+            )
+        }
+    }
 }
+// TODO: use bytemuck
+pub unsafe trait CastSlice<U> {}
+unsafe impl CastSlice<i8> for u8 {}
+unsafe impl CastSlice<u8> for i8 {}
+unsafe impl CastSlice<u8> for u8 {}
+unsafe impl CastSlice<i8> for i8 {}
+
 impl<T: ?Sized> fmt::Pointer for Out<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:p}", self.ptr)
@@ -165,3 +218,16 @@ impl<T: ?Sized> fmt::Debug for Out<'_, T> {
         write!(f, "[Out: {:p}]", self.ptr)
     }
 }
+/// Marker trait for types where it is sound to turn `Out<struct { ... }>` into `struct { ...:
+/// Out<...> }` by simply referencing fields. This is safe for any struct but must not be
+/// implemented for `Deref` types so that `Out<&struct { ... }>` is never projected in a way that
+/// adds mutability.
+pub unsafe trait OutProject {}
+
+impl<'a, T: ?Sized> Out<'a, T> {
+    pub unsafe fn with_lifetime_of<'b, U: ?Sized>(mut self, u: &'b U) -> Out<'b, T> {
+        Out::nonnull(self.as_mut_ptr())
+    }
+}
+
+// TODO: unit tests

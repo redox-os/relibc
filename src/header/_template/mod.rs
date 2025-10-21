@@ -3,7 +3,7 @@
 use platform::types::*;
 
 /*
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn func(args) -> c_int {
     unimplemented!();
 }

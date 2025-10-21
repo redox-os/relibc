@@ -1,8 +1,8 @@
 use alloc::string::{String, ToString};
 
 use sha_crypt::{
-    sha256_crypt_b64, sha512_crypt_b64, Sha256Params, Sha512Params, ROUNDS_DEFAULT, ROUNDS_MAX,
-    ROUNDS_MIN,
+    ROUNDS_DEFAULT, ROUNDS_MAX, ROUNDS_MIN, Sha256Params, Sha512Params, sha256_crypt_b64,
+    sha512_crypt_b64,
 };
 
 use crate::platform::types::*;

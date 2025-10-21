@@ -12,7 +12,7 @@ pub struct tms {
     tms_cstime: clock_t,
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn times(out: *mut tms) -> clock_t {
     Sys::times(out)
 }

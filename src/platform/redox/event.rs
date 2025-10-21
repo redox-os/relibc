@@ -9,9 +9,9 @@ use crate::header::{
 use super::libredox::RawResult;
 
 use bitflags::Flags;
-use syscall::{Error, Result, EINVAL};
+use syscall::{EINVAL, Error, Result};
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_event_queue_create_v1(flags: u32) -> RawResult {
     Error::mux((|| {
         if flags != 0 {
@@ -20,7 +20,7 @@ pub unsafe extern "C" fn redox_event_queue_create_v1(flags: u32) -> RawResult {
         Ok(super::libredox::open("/scheme/event", O_CLOEXEC | O_CREAT | O_RDWR, 0o700)? as usize)
     })())
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_event_queue_get_events_v1(
     queue: usize,
     buf: *mut event::raw::RawEventV1,
@@ -49,7 +49,7 @@ pub unsafe extern "C" fn redox_event_queue_get_events_v1(
         Ok(1)
     })())
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_event_queue_ctl_v1(
     queue: usize,
     fd: usize,
@@ -75,7 +75,7 @@ pub unsafe extern "C" fn redox_event_queue_ctl_v1(
         Ok(0)
     })())
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_event_queue_destroy_v1(queue: usize) -> RawResult {
     Error::mux(syscall::close(queue))
 }
