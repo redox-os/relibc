@@ -1,6 +1,6 @@
 use crate::platform::types::c_char;
 
-use super::{apply_grouping, FormatFlags, LocaleMonetaryInfo, DEFAULT_MONETARY};
+use super::{DEFAULT_MONETARY, FormatFlags, LocaleMonetaryInfo, apply_grouping};
 use alloc::string::{String, ToString};
 use core::{ffi::CStr, ptr, result, slice, str};
 use libm::{fabs, floor, pow, round, trunc};

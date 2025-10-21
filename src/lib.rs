@@ -16,6 +16,7 @@
 #![feature(asm_const)]
 #![feature(c_variadic)]
 #![feature(core_intrinsics)]
+#![feature(macro_derive)]
 #![feature(maybe_uninit_slice)]
 #![feature(lang_items)]
 #![feature(let_chains)]
@@ -67,15 +68,16 @@ pub mod ld_so;
 pub mod out;
 pub mod platform;
 pub mod pthread;
+pub mod raw_cell;
 pub mod start;
 pub mod sync;
 
-use crate::platform::{Allocator, Pal, Sys, NEWALLOCATOR};
+use crate::platform::{Allocator, NEWALLOCATOR, Pal, Sys};
 
 #[global_allocator]
 static ALLOCATOR: Allocator = NEWALLOCATOR;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {
     use core::fmt::Write;
 
@@ -88,21 +90,19 @@ pub extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {
 #[cfg(not(test))]
 #[panic_handler]
 #[linkage = "weak"]
-#[no_mangle]
 pub fn rust_begin_unwind(pi: &::core::panic::PanicInfo) -> ! {
     relibc_panic(pi)
 }
 
 #[cfg(not(test))]
 #[lang = "eh_personality"]
-#[no_mangle]
 #[linkage = "weak"]
 pub extern "C" fn rust_eh_personality() {}
 
 #[cfg(not(test))]
 #[alloc_error_handler]
 #[linkage = "weak"]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
     use core::fmt::Write;
 
@@ -119,7 +119,7 @@ pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
 #[cfg(not(test))]
 #[allow(non_snake_case)]
 #[linkage = "weak"]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn _Unwind_Resume() -> ! {
     use core::fmt::Write;
 

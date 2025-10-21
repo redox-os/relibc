@@ -1,16 +1,16 @@
 use core::{
     cell::SyncUnsafeCell,
     fmt::Debug,
-    mem::{size_of, MaybeUninit},
+    mem::{MaybeUninit, size_of},
 };
 
 use crate::{
+    DYNAMIC_PROC_INFO, RtTcb, StaticProcInfo,
     arch::*,
     auxv_defs::*,
     protocol::{ProcCall, ThreadCall},
     read_proc_meta,
     sys::{proc_call, thread_call},
-    RtTcb, StaticProcInfo, DYNAMIC_PROC_INFO,
 };
 
 use alloc::{boxed::Box, collections::BTreeMap, vec};
@@ -19,19 +19,19 @@ use alloc::{boxed::Box, collections::BTreeMap, vec};
 #[cfg(target_pointer_width = "32")]
 use goblin::elf32::{
     header::Header,
-    program_header::program_header32::{ProgramHeader, PF_R, PF_W, PF_X, PT_INTERP, PT_LOAD},
+    program_header::program_header32::{PF_R, PF_W, PF_X, PT_INTERP, PT_LOAD, ProgramHeader},
 };
 #[cfg(target_pointer_width = "64")]
 use goblin::elf64::{
     header::Header,
-    program_header::program_header64::{ProgramHeader, PF_R, PF_W, PF_X, PT_INTERP, PT_LOAD},
+    program_header::program_header64::{PF_R, PF_W, PF_X, PT_INTERP, PT_LOAD, ProgramHeader},
 };
 
 use syscall::{
+    CallFlags, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map, PAGE_SIZE, PROT_EXEC,
+    PROT_READ, PROT_WRITE, SetSighandlerData,
     error::*,
     flag::{MapFlags, SEEK_SET},
-    CallFlags, GrantDesc, GrantFlags, Map, SetSighandlerData, MAP_FIXED_NOREPLACE, MAP_SHARED,
-    PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE,
 };
 
 pub enum FexecResult {
@@ -649,7 +649,7 @@ impl MmapGuard {
                 flags: PROT_READ | PROT_WRITE,
             },
         )?;
-        let slice = &mut *this.as_mut_ptr_slice();
+        let slice = unsafe { &mut *this.as_mut_ptr_slice() };
 
         Ok((this, slice))
     }
@@ -933,7 +933,7 @@ pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
         #[cfg(not(feature = "proc"))]
         ForkArgs::Init { this_thr_fd, auth } => {
             let thr_fd = FdGuard::new(syscall::dup(**auth, b"new-context")?);
-            let buf = ProcSchemeAttrs {
+            let buf = syscall::ProcSchemeAttrs {
                 pid: 0,
                 euid: 0,
                 egid: 0,
@@ -975,13 +975,15 @@ pub unsafe fn make_init() -> [&'static FdGuard; 2] {
         syscall::dup(*proc_fd, b"thread-0").expect("failed to get managed thread for init"),
     );
 
-    let managed_thr_fd = (*RtTcb::current().thr_fd.get()).insert(managed_thr_fd);
+    let managed_thr_fd = unsafe { (*RtTcb::current().thr_fd.get()).insert(managed_thr_fd) };
 
-    STATIC_PROC_INFO.get().write(crate::StaticProcInfo {
-        pid: 1,
-        proc_fd: MaybeUninit::new(proc_fd),
-        has_proc_fd: true,
-    });
+    unsafe {
+        STATIC_PROC_INFO.get().write(crate::StaticProcInfo {
+            pid: 1,
+            proc_fd: MaybeUninit::new(proc_fd),
+            has_proc_fd: true,
+        })
+    };
     *DYNAMIC_PROC_INFO.lock() = crate::DynamicProcInfo {
         pgid: 1,
         ruid: 0,
@@ -992,7 +994,7 @@ pub unsafe fn make_init() -> [&'static FdGuard; 2] {
         sgid: 0,
     };
     [
-        (*STATIC_PROC_INFO.get()).proc_fd.assume_init_ref(),
+        unsafe { (*STATIC_PROC_INFO.get()).proc_fd.assume_init_ref() },
         managed_thr_fd,
     ]
 }

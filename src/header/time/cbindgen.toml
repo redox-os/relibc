@@ -1,4 +1,4 @@
-sys_includes = ["sys/types.h", "stdint.h", "stddef.h", "features.h"]
+sys_includes = ["sys/types.h", "signal.h", "stdint.h", "stddef.h", "features.h"]
 include_guard = "_RELIBC_TIME_H"
 language = "C"
 style = "Tag"
@@ -7,3 +7,6 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
+
+[export.rename]
+"sigevent" = "struct sigevent"

@@ -1,11 +1,16 @@
-//! fcntl implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/fcntl.h.html
+//! `fcntl.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fcntl.h.html>.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use crate::{
     c_str::CStr,
     error::ResultExt,
-    platform::{types::*, Pal, Sys},
+    platform::{
+        Pal, Sys,
+        types::{c_char, c_int, c_short, c_ulonglong, mode_t, off_t, pid_t},
+    },
 };
 
 pub use self::sys::*;
@@ -36,10 +41,13 @@ pub const F_LOCK: c_int = 1;
 pub const F_TLOCK: c_int = 2;
 pub const F_TEST: c_int = 3;
 
-#[no_mangle]
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/creat.html>.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn creat(path: *const c_char, mode: mode_t) -> c_int {
     unsafe { open(path, O_WRONLY | O_CREAT | O_TRUNC, mode) }
 }
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fcntl.h.html>.
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct flock {
@@ -49,7 +57,9 @@ pub struct flock {
     pub l_len: off_t,
     pub l_pid: pid_t,
 }
-#[no_mangle]
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fcntl.html>.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fcntl(fildes: c_int, cmd: c_int, mut __valist: ...) -> c_int {
     // c_ulonglong
     let arg = match cmd {
@@ -62,7 +72,8 @@ pub unsafe extern "C" fn fcntl(fildes: c_int, cmd: c_int, mut __valist: ...) -> 
     Sys::fcntl(fildes, cmd, arg).or_minus_one_errno()
 }
 
-#[no_mangle]
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/open.html>.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: ...) -> c_int {
     let mode = if oflag & O_CREAT == O_CREAT
     /* || oflag & O_TMPFILE == O_TMPFILE */
@@ -76,5 +87,5 @@ pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: .
     Sys::open(path, oflag, mode).or_minus_one_errno()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_fcntl(a: flock) {}

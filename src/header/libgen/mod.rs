@@ -1,4 +1,6 @@
-//! libgen implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/libgen.h.html
+//! `libgen.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/libgen.h.html>.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
@@ -6,7 +8,8 @@ use crate::platform::types::c_char;
 
 use crate::header::string::strlen;
 
-#[no_mangle]
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/basename.html>.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn basename(str: *mut c_char) -> *mut c_char {
     if str.is_null() || unsafe { strlen(str) == 0 } {
         return ".\0".as_ptr() as *mut c_char;
@@ -28,7 +31,8 @@ pub unsafe extern "C" fn basename(str: *mut c_char) -> *mut c_char {
     }
 }
 
-#[no_mangle]
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dirname.html>.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn dirname(str: *mut c_char) -> *mut c_char {
     if str.is_null() || unsafe { strlen(str) == 0 } {
         return ".\0".as_ptr() as *mut c_char;

@@ -3,12 +3,13 @@ use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
+        signal::sigevent,
         sys_resource::{rlimit, rusage},
         sys_stat::stat,
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
         sys_utsname::utsname,
-        time::timespec,
+        time::{itimerspec, timespec},
     },
     out::Out,
     pthread,
@@ -216,6 +217,8 @@ pub trait Pal {
 
     fn pipe2(fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()>;
 
+    fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize>;
+
     unsafe fn rlct_clone(stack: *mut usize) -> Result<pthread::OsTid, Errno>;
     unsafe fn rlct_kill(os_tid: pthread::OsTid, signal: usize) -> Result<()>;
 
@@ -250,10 +253,23 @@ pub trait Pal {
 
     fn sync() -> Result<()>;
 
+    fn timer_create(clock_id: clockid_t, evp: &sigevent, timerid: Out<timer_t>) -> Result<()>;
+
+    fn timer_delete(timerid: timer_t) -> Result<()>;
+
+    fn timer_gettime(timerid: timer_t, value: Out<itimerspec>) -> Result<()>;
+
+    fn timer_settime(
+        timerid: timer_t,
+        flags: c_int,
+        value: &itimerspec,
+        ovalue: Option<Out<itimerspec>>,
+    ) -> Result<()>;
+
     // Always successful
     fn umask(mask: mode_t) -> mode_t;
 
-    unsafe fn uname(utsname: *mut utsname) -> Result<()>;
+    fn uname(utsname: Out<utsname>) -> Result<()>;
 
     fn unlink(path: CStr) -> Result<()>;
 

@@ -1,18 +1,17 @@
 use core::{
     convert::TryFrom,
-    mem::{self, size_of},
+    mem::{self, MaybeUninit, size_of},
     ptr, slice, str,
 };
 use redox_rt::{
-    protocol::{wifstopped, wstopsig, WaitFlags},
-    sys::{Resugid, WaitpidTarget},
     RtTcb,
+    protocol::{WaitFlags, wifstopped, wstopsig},
+    sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
-    self,
+    self, EMFILE, Error, MODE_PERM, PtraceEvent,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
     dirent::{DirentHeader, DirentKind},
-    Error, PtraceEvent, EMFILE, MODE_PERM,
 };
 
 use crate::{
@@ -22,30 +21,36 @@ use crate::{
     header::{
         dirent::dirent,
         errno::{
-            EBADF, EBADFD, EBADR, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS,
+            EBADF, EBADFD, EBADR, EFAULT, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS,
             EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl::{self, AT_FDCWD, O_RDONLY},
+        fcntl::{self, AT_FDCWD, O_CREAT, O_RDONLY, O_RDWR},
         limits,
+        pthread::{pthread_cancel, pthread_create, pthread_self},
+        signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
-        sys_resource::{rlimit, rusage, RLIM_INFINITY},
-        sys_stat::{stat, S_ISGID, S_ISUID, S_ISVTX},
+        sys_resource::{RLIM_INFINITY, rlimit, rusage},
+        sys_stat::{S_ISGID, S_ISUID, S_ISVTX, stat},
         sys_statvfs::statvfs,
         sys_time::{timeval, timezone},
-        sys_utsname::{utsname, UTSLENGTH},
+        sys_utsname::{UTSLENGTH, utsname},
         sys_wait,
-        time::timespec,
-        unistd::{F_OK, R_OK, W_OK, X_OK},
+        time::{TIMER_ABSTIME, itimerspec, timer_internal_t, timespec},
+        unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
-    io::{self, prelude::*, BufReader},
+    io::{self, BufReader, prelude::*},
     out::Out,
+    platform::sys::{
+        libredox::RawResult,
+        timer::{timer_routine, timer_update_wake_time},
+    },
     sync::rwlock::RwLock,
 };
 
 pub use redox_rt::proc::FdGuard;
 
-use super::{types::*, Pal, Read, ERRNO};
+use super::{ERRNO, Pal, Read, types::*};
 
 static mut BRK_CUR: *mut c_void = ptr::null_mut();
 static mut BRK_END: *mut c_void = ptr::null_mut();
@@ -74,6 +79,7 @@ pub(crate) mod path;
 mod ptrace;
 pub(crate) mod signal;
 mod socket;
+mod timer;
 
 macro_rules! path_from_c_str {
     ($c_str:expr) => {{
@@ -419,6 +425,7 @@ impl Pal for Sys {
 
         Ok(record_len.into())
     }
+
     fn dir_seek(_fd: c_int, _off: u64) -> Result<()> {
         // Redox getdents takes an explicit (opaque) offset, so this is a no-op.
         Ok(())
@@ -814,6 +821,32 @@ impl Pal for Sys {
         Ok(())
     }
 
+    fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize> {
+        let current_offset = Self::lseek(fildes, 0, SEEK_CUR)? as u64;
+        let bytes_read = Self::getdents(fildes, buf, current_offset)?;
+        if bytes_read == 0 {
+            return Ok(0);
+        }
+        let mut bytes_processed = 0;
+        let mut next_offset = current_offset;
+
+        while bytes_processed < bytes_read {
+            let remaining_slice = &buf[bytes_processed..];
+            let (reclen, opaque_next) =
+                unsafe { Self::dent_reclen_offset(remaining_slice, bytes_processed) }
+                    .ok_or(Errno(EIO))?;
+            if reclen == 0 {
+                return Err(Errno(EIO));
+            }
+
+            bytes_processed += reclen as usize;
+            next_offset = opaque_next;
+        }
+
+        Self::lseek(fildes, next_offset as off_t, SEEK_SET)?;
+        Ok(bytes_read)
+    }
+
     unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
         let _guard = CLONE_LOCK.read();
         let res = clone::rlct_clone_impl(stack);
@@ -837,6 +870,7 @@ impl Pal for Sys {
         let fd = usize::try_from(fd).map_err(|_| Errno(EBADF))?;
         Ok(redox_rt::sys::posix_read(fd, buf)?)
     }
+
     fn pread(fd: c_int, buf: &mut [u8], offset: off_t) -> Result<usize> {
         unsafe {
             Ok(syscall::syscall5(
@@ -982,13 +1016,174 @@ impl Pal for Sys {
         Ok(())
     }
 
+    fn timer_create(clock_id: clockid_t, evp: &sigevent, mut timerid: Out<timer_t>) -> Result<()> {
+        if evp.sigev_notify == SIGEV_THREAD {
+            if evp.sigev_notify_function.is_none() {
+                return Err(Errno(EINVAL));
+            }
+        } else if evp.sigev_notify == SIGEV_SIGNAL {
+            const n_sig: i32 = NSIG as i32;
+            const rt_min: i32 = SIGRTMIN as i32;
+            const rt_max: i32 = SIGRTMIN as i32;
+            match evp.sigev_signo {
+                0..n_sig => {}
+                rt_min..=rt_max => {}
+                _ => {
+                    return Err(Errno(EINVAL));
+                }
+            }
+        }
+
+        let path = format!("/scheme/time/{clock_id}");
+        let timerfd = FdGuard::new(libredox::open(&path, O_RDWR, 0)?);
+        let eventfd = FdGuard::new(Error::demux(unsafe {
+            event::redox_event_queue_create_v1(0)
+        })?);
+        let caller_thread = Self::current_os_tid();
+
+        let timer_buf = unsafe {
+            let timer_buf = Self::mmap(
+                ptr::null_mut(),
+                size_of::<timer_internal_t>(),
+                PROT_READ | PROT_WRITE,
+                MAP_ANONYMOUS,
+                0,
+                0,
+            )?;
+
+            let timer_ptr = timer_buf as *mut timer_internal_t;
+            let timer_st = (&mut *timer_ptr);
+
+            timer_st.clockid = clock_id;
+            timer_st.timerfd = timerfd.take();
+            timer_st.eventfd = eventfd.take();
+            timer_st.evp = (*evp).clone();
+            timer_st.next_wake_time = itimerspec::default();
+            timer_st.thread = ptr::null_mut();
+            timer_st.caller_thread = caller_thread;
+            timer_buf
+        };
+
+        timerid.write(timer_buf);
+
+        Ok(())
+    }
+
+    fn timer_delete(timerid: timer_t) -> Result<()> {
+        unsafe {
+            let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
+            let _ = syscall::close(timer_st.timerfd);
+            let _ = syscall::close(timer_st.eventfd);
+            if !timer_st.thread.is_null() {
+                let _ = pthread_cancel(timer_st.thread);
+            }
+            Self::munmap(timerid, size_of::<timer_internal_t>())?;
+        }
+
+        Ok(())
+    }
+
+    fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
+        let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
+        let mut now = timespec::default();
+        Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
+
+        if timer_st.evp.sigev_notify == SIGEV_NONE {
+            if timespec::subtract(timer_st.next_wake_time.it_value, now).is_none() {
+                // error here means the timer is disarmed
+                let _ = timer_update_wake_time(timer_st);
+            }
+        }
+
+        value.write(if timer_st.next_wake_time.it_value.is_default() {
+            // disarmed
+            itimerspec::default()
+        } else {
+            itimerspec {
+                it_interval: timer_st.next_wake_time.it_interval,
+                it_value: timespec::subtract(timer_st.next_wake_time.it_value, now)
+                    .unwrap_or_default(),
+            }
+        });
+
+        Ok(())
+    }
+
+    fn timer_settime(
+        timerid: timer_t,
+        flags: c_int,
+        value: &itimerspec,
+        ovalue: Option<Out<itimerspec>>,
+    ) -> Result<()> {
+        let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
+
+        if let Some(ovalue) = ovalue {
+            Self::timer_gettime(timerid, ovalue)?;
+        }
+
+        let mut now = timespec::default();
+        Self::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
+
+        //FIXME: make these atomic?
+        timer_st.next_wake_time = {
+            let mut val = value.clone();
+            if flags & TIMER_ABSTIME == 0 {
+                val.it_value = timespec::add(now, val.it_value).ok_or((Errno(EINVAL)))?;
+            }
+            val
+        };
+
+        Error::demux(unsafe {
+            event::redox_event_queue_ctl_v1(timer_st.eventfd, timer_st.timerfd, 1, 0)
+        })?;
+
+        let buf_to_write = unsafe {
+            slice::from_raw_parts(
+                &timer_st.next_wake_time.it_value as *const _ as *const u8,
+                mem::size_of::<timespec>(),
+            )
+        };
+
+        let bytes_written = redox_rt::sys::posix_write(timer_st.timerfd, buf_to_write)?;
+
+        if bytes_written < mem::size_of::<timespec>() {
+            return Err(Errno(EIO));
+        }
+
+        if timer_st.thread.is_null() {
+            timer_st.thread = match timer_st.evp.sigev_notify {
+                SIGEV_THREAD | SIGEV_SIGNAL => {
+                    let mut tid = pthread_t::default();
+                    let result = unsafe {
+                        pthread_create(
+                            &mut tid as *mut _,
+                            ptr::null(),
+                            timer_routine,
+                            timerid as *mut c_void,
+                        )
+                    };
+                    if result != 0 {
+                        return Err(Errno(result));
+                    }
+                    tid
+                }
+                SIGEV_NONE => ptr::null_mut(),
+                _ => {
+                    return Err(Errno(EINVAL));
+                }
+            };
+        }
+
+        Ok(())
+    }
+
     fn umask(mask: mode_t) -> mode_t {
         let new_effective_mask = mask & mode_t::from(MODE_PERM) & !S_ISVTX;
         (redox_rt::sys::swap_umask(new_effective_mask as u32) as mode_t) & !S_ISVTX
     }
 
-    unsafe fn uname(utsname: *mut utsname) -> Result<(), Errno> {
-        fn gethostname(name: &mut [u8]) -> io::Result<()> {
+    fn uname(mut utsname: Out<utsname>) -> Result<(), Errno> {
+        fn gethostname(mut name: Out<[u8]>) -> io::Result<()> {
             if name.is_empty() {
                 return Ok(());
             }
@@ -998,21 +1193,26 @@ impl Pal for Sys {
             let mut read = 0;
             let name_len = name.len();
             loop {
-                match file.read(&mut name[read..name_len - 1])? {
+                match file.read_out(name.subslice(read, name_len - 1))? {
                     0 => break,
                     n => read += n,
                 }
             }
-            name[read] = 0;
+            name.index(read).write(0);
             Ok(())
         }
+        out_project! {
+            let utsname {
+                nodename: [c_char; UTSLENGTH],
+                sysname: [c_char; UTSLENGTH],
+                release: [c_char; UTSLENGTH],
+                machine: [c_char; UTSLENGTH],
+                version: [c_char; UTSLENGTH],
+                domainname: [c_char; UTSLENGTH],
+            } = utsname;
+        }
 
-        match gethostname(unsafe {
-            slice::from_raw_parts_mut(
-                (*utsname).nodename.as_mut_ptr() as *mut u8,
-                (*utsname).nodename.len(),
-            )
-        }) {
+        match gethostname(nodename.as_slice_mut().cast_slice_to::<u8>()) {
             Ok(_) => (),
             Err(_) => return Err(Errno(EIO)),
         }
@@ -1024,36 +1224,33 @@ impl Pal for Sys {
         };
         let mut lines = BufReader::new(&mut file).lines();
 
-        let mut read_line = |dst: &mut [c_char]| {
+        let mut read_line = |mut dst: Out<[u8]>| {
+            // TODO: set nul byte without allocating CString
             let line = match lines.next() {
-                Some(Ok(l)) => match CString::new(l) {
-                    Ok(l) => l,
-                    Err(_) => return Err(Errno(EIO)),
-                },
+                Some(Ok(l)) => CString::new(l).map_err(|_| Errno(EIO))?,
                 None | Some(Err(_)) => return Err(Errno(EIO)),
             };
 
-            let line_slice: &[c_char] = unsafe { mem::transmute(line.as_bytes_with_nul()) };
-
-            if line_slice.len() <= UTSLENGTH {
-                dst[..line_slice.len()].copy_from_slice(line_slice);
-                Ok(())
-            } else {
-                Err(Errno(EIO))
+            let line_slice: &[u8] = line.as_bytes_with_nul();
+            if line_slice.len() > UTSLENGTH {
+                return Err(Errno(EIO));
             }
+
+            dst.copy_common_length_from_slice(line_slice);
+            Ok(())
         };
 
         unsafe {
-            read_line(&mut (*utsname).sysname)?;
-            read_line(&mut (*utsname).release)?;
-            read_line(&mut (*utsname).machine)?;
+            read_line(sysname.as_slice_mut().cast_slice_to::<u8>())?;
+            read_line(release.as_slice_mut().cast_slice_to::<u8>())?;
+            read_line(machine.as_slice_mut().cast_slice_to::<u8>())?;
 
             // Version is not provided
-            ptr::write_bytes((*utsname).version.as_mut_ptr(), 0, UTSLENGTH);
+            version.as_slice_mut().zero();
 
             // Redox doesn't provide domainname in sys:uname
-            //read_line(&mut (*utsname).domainname)?;
-            ptr::write_bytes((*utsname).domainname.as_mut_ptr(), 0, UTSLENGTH);
+            //read_line(domainname.as_slice_mut())?;
+            domainname.as_slice_mut().zero();
         }
 
         Ok(())
@@ -1107,15 +1304,17 @@ impl Pal for Sys {
         // normal: We still need to add WUNTRACED, but we only return
         // it if (and only if) a ptrace traceme was activated during
         // the wait.
-        let res = res.unwrap_or_else(|| loop {
-            let res = inner(&mut status, options | WaitFlags::WUNTRACED);
+        let res = res.unwrap_or_else(|| {
+            loop {
+                let res = inner(&mut status, options | WaitFlags::WUNTRACED);
 
-            // TODO: Also handle special PIDs here
-            if !wifstopped(status)
-                || options.contains(WaitFlags::WUNTRACED)
-                || ptrace::is_traceme(pid)
-            {
-                break res;
+                // TODO: Also handle special PIDs here
+                if !wifstopped(status)
+                    || options.contains(WaitFlags::WUNTRACED)
+                    || ptrace::is_traceme(pid)
+                {
+                    break res;
+                }
             }
         });
 

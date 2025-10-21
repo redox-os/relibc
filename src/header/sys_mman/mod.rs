@@ -6,7 +6,7 @@ use crate::{
     c_str::{CStr, CString},
     error::{Errno, ResultExt},
     header::{fcntl, unistd},
-    platform::{types::*, Pal, Sys, ERRNO},
+    platform::{ERRNO, Pal, Sys, types::*},
 };
 
 pub use self::sys::*;
@@ -49,7 +49,7 @@ pub const POSIX_MADV_WILLNEED: c_int = 3;
 pub const POSIX_MADV_WONTNEED: c_int = 4;
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/madvise.2.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn madvise(addr: *mut c_void, len: size_t, flags: c_int) -> c_int {
     Sys::madvise(addr, len, flags)
         .map(|()| 0)
@@ -57,19 +57,19 @@ pub unsafe extern "C" fn madvise(addr: *mut c_void, len: size_t, flags: c_int) -
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mlock.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn mlock(addr: *const c_void, len: usize) -> c_int {
     Sys::mlock(addr, len).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mlockall.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn mlockall(flags: c_int) -> c_int {
     Sys::mlockall(flags).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mmap.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn mmap(
     addr: *mut c_void,
     len: size_t,
@@ -88,7 +88,7 @@ pub unsafe extern "C" fn mmap(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mprotect.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn mprotect(addr: *mut c_void, len: size_t, prot: c_int) -> c_int {
     Sys::mprotect(addr, len, prot)
         .map(|()| 0)
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn mprotect(addr: *mut c_void, len: size_t, prot: c_int) -
 }
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/mremap.2.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn mremap(
     old_address: *mut c_void,
     old_size: usize,
@@ -115,7 +115,7 @@ pub unsafe extern "C" fn mremap(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/msync.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn msync(addr: *mut c_void, len: size_t, flags: c_int) -> c_int {
     Sys::msync(addr, len, flags)
         .map(|()| 0)
@@ -123,19 +123,19 @@ pub unsafe extern "C" fn msync(addr: *mut c_void, len: size_t, flags: c_int) -> 
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mlock.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn munlock(addr: *const c_void, len: usize) -> c_int {
     Sys::munlock(addr, len).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mlockall.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn munlockall() -> c_int {
     Sys::munlockall().map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/munmap.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
     Sys::munmap(addr, len).map(|()| 0).or_minus_one_errno()
 }
@@ -167,14 +167,14 @@ unsafe fn shm_path(name: *const c_char) -> CString {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/shm_open.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn shm_open(name: *const c_char, oflag: c_int, mode: mode_t) -> c_int {
     let path = shm_path(name);
     fcntl::open(path.as_ptr(), oflag, mode)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/shm_unlink.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn shm_unlink(name: *const c_char) -> c_int {
     let path = shm_path(name);
     unistd::unlink(path.as_ptr())

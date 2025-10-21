@@ -4,8 +4,12 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+use crate::{
+    header::unistd::{SEEK_CUR, SEEK_SET},
+    platform::types::{c_int, c_void, off_t, size_t, ssize_t},
+};
 use alloc::{boxed::Box, vec::Vec};
-use core::{mem, ptr};
+use core::{mem, ptr, slice};
 
 use crate::{
     c_str::CStr,
@@ -14,7 +18,7 @@ use crate::{
     fs::File,
     header::{fcntl, stdlib, string},
     out::Out,
-    platform::{self, types::*, Pal, Sys},
+    platform::{self, Pal, Sys, types::*},
 };
 
 use super::{
@@ -151,6 +155,18 @@ pub struct dirent {
     pub d_name: [c_char; 256],
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dirent.h.html>.
+/// must have the same struct layout as dirent
+#[repr(C)]
+#[derive(Clone)]
+pub struct posix_dent {
+    pub d_ino: ino_t,
+    pub d_off: off_t, // not specified by posix
+    pub d_reclen: reclen_t,
+    pub d_type: c_uchar,
+    pub d_name: [c_char; 256],
+}
+
 #[cfg(target_os = "redox")]
 const _: () = {
     use core::mem::{offset_of, size_of};
@@ -174,13 +190,13 @@ const _: () = {
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alphasort.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn alphasort(first: *mut *const dirent, second: *mut *const dirent) -> c_int {
     unsafe { string::strcoll((**first).d_name.as_ptr(), (**second).d_name.as_ptr()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/closedir.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn closedir(dir: Box<DIR>) -> c_int {
     dir.close().map(|()| 0).or_minus_one_errno()
 }
@@ -190,7 +206,7 @@ pub extern "C" fn closedir(dir: Box<DIR>) -> c_int {
 /// FreeBSD extension that transfers ownership of the directory file descriptor to the user.
 ///
 /// It doesn't matter if DIR was opened with [`opendir`] or [`fdopendir`].
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn fdclosedir(dir: Box<DIR>) -> c_int {
     let mut file = dir.file;
     file.reference = true;
@@ -199,13 +215,13 @@ pub extern "C" fn fdclosedir(dir: Box<DIR>) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dirfd.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn dirfd(dir: &mut DIR) -> c_int {
     *dir.file
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fdopendir.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
     let path = unsafe { CStr::from_ptr(path) };
 
@@ -213,24 +229,28 @@ pub unsafe extern "C" fn opendir(path: *const c_char) -> *mut DIR {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fdopendir.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn fdopendir(fd: c_int) -> *mut DIR {
     DIR::from_fd(fd).or_errno_null_mut()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_getdents.html>.
-// #[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn posix_getdents(
     fildes: c_int,
     buf: *mut c_void,
     nbyte: size_t,
-    flags: c_int,
+    _flags: c_int,
 ) -> ssize_t {
-    unimplemented!();
+    let slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte) };
+
+    Sys::posix_getdents(fildes, slice)
+        .map(|s| s as ssize_t)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readdir.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn readdir(dir: &mut DIR) -> *mut dirent {
     dir.next_dirent().or_errno_null_mut()
 }
@@ -241,7 +261,7 @@ pub extern "C" fn readdir(dir: &mut DIR) -> *mut dirent {
 /// The `readdir_r()` function was marked obsolescent in the Open Group Base
 /// Specifications Issue 8.
 #[deprecated]
-// #[no_mangle]
+// #[unsafe(no_mangle)]
 pub extern "C" fn readdir_r(
     _dir: *mut DIR,
     _entry: *mut dirent,
@@ -251,13 +271,13 @@ pub extern "C" fn readdir_r(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/rewinddir.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rewinddir(dir: &mut DIR) {
     dir.rewind();
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alphasort.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn scandir(
     dirp: *const c_char,
     namelist: *mut *mut *mut dirent,
@@ -336,7 +356,7 @@ pub unsafe extern "C" fn scandir(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/seekdir.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn seekdir(dir: &mut DIR, off: c_long) {
     dir.seek(
         off.try_into()
@@ -345,7 +365,10 @@ pub extern "C" fn seekdir(dir: &mut DIR, off: c_long) {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/telldir.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn telldir(dir: &mut DIR) -> c_long {
     dir.opaque_offset as c_long
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_posix_dent(a: posix_dent) {}

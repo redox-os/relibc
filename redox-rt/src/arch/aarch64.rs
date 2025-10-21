@@ -3,15 +3,15 @@ use core::{cell::SyncUnsafeCell, mem::offset_of, ptr::NonNull};
 use syscall::{data::*, error::*};
 
 use crate::{
-    proc::{fork_inner, FdGuard, ForkArgs},
-    protocol::{ProcCall, RtSigInfo},
-    signal::{inner_c, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     RtTcb, Tcb,
+    proc::{FdGuard, ForkArgs, fork_inner},
+    protocol::{ProcCall, RtSigInfo},
+    signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, inner_c},
 };
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
-pub(crate) const STACK_TOP: usize = 1 << 47;
-pub(crate) const STACK_SIZE: usize = 1024 * 1024;
+pub const STACK_TOP: usize = 1 << 47;
+pub const STACK_SIZE: usize = 1024 * 1024;
 
 #[derive(Debug, Default)]
 #[repr(C)]

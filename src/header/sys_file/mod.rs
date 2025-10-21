@@ -4,7 +4,7 @@
 
 use crate::{
     error::ResultExt,
-    platform::{types::*, Pal, Sys},
+    platform::{Pal, Sys, types::*},
 };
 
 pub const LOCK_SH: usize = 1;
@@ -17,7 +17,7 @@ pub const L_INCR: usize = 1;
 pub const L_XTND: usize = 2;
 
 /// See <https://man7.org/linux/man-pages/man2/flock.2.html>.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn flock(fd: c_int, operation: c_int) -> c_int {
     Sys::flock(fd, operation).map(|()| 0).or_minus_one_errno()
 }

@@ -9,6 +9,7 @@ use crate::{
         termios,
     },
     io::{self, Read, Write},
+    raw_cell::RawCell,
 };
 
 use crate::platform::types::*;
@@ -66,9 +67,11 @@ fn getpass_rs(prompt: CStr, passbuff: &mut [u8]) -> Result<*mut c_char, io::Erro
 /// The `getpass()` function was marked legacy in the Open Group System
 /// Interface & Headers Issue 5, and removed in Issue 6.
 #[deprecated]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn getpass(prompt: *const c_char) -> *mut c_char {
-    static mut PASSBUFF: [u8; PASS_MAX] = [0; PASS_MAX];
+    static PASSBUFF: RawCell<[u8; PASS_MAX]> = RawCell::new([0; PASS_MAX]);
 
-    unsafe { getpass_rs(CStr::from_ptr(prompt), &mut PASSBUFF).unwrap_or(ptr::null_mut()) }
+    unsafe {
+        getpass_rs(CStr::from_ptr(prompt), &mut *PASSBUFF.as_mut_ptr()).unwrap_or(ptr::null_mut())
+    }
 }

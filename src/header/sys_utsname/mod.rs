@@ -2,12 +2,14 @@
 
 use crate::{
     error::ResultExt,
-    platform::{types::*, Pal, Sys},
+    out::Out,
+    platform::{Pal, Sys, types::*},
 };
 
 pub const UTSLENGTH: usize = 65;
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, OutProject)]
 pub struct utsname {
     pub sysname: [c_char; UTSLENGTH],
     pub nodename: [c_char; UTSLENGTH],
@@ -17,7 +19,9 @@ pub struct utsname {
     pub domainname: [c_char; UTSLENGTH],
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn uname(uts: *mut utsname) -> c_int {
-    Sys::uname(uts).map(|()| 0).or_minus_one_errno()
+    Sys::uname(Out::nonnull(uts))
+        .map(|()| 0)
+        .or_minus_one_errno()
 }

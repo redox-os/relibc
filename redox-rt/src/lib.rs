@@ -11,7 +11,7 @@
 
 use core::{
     cell::UnsafeCell,
-    mem::{size_of, MaybeUninit},
+    mem::{MaybeUninit, size_of},
 };
 
 use generic_rt::{ExpectTlsFree, GenericTcb};
@@ -38,7 +38,7 @@ macro_rules! asmfunction(
             .size ", stringify!($name), ", . - ", stringify!($name), "
         "), $($decl = $(sym $symname)?$(const $constval)?),*);
 
-        extern "C" {
+        unsafe extern "C" {
             pub fn $name($($(_: $arg),*)?) $(-> $ret)?;
         }
     }
@@ -75,6 +75,7 @@ impl RtTcb {
 pub type Tcb = GenericTcb<RtTcb>;
 
 /// OS and architecture specific code to activate TLS - Redox aarch64
+#[allow(unsafe_op_in_unsafe_fn)]
 #[cfg(target_arch = "aarch64")]
 pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
     // Uses ABI page
@@ -87,6 +88,7 @@ pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
 }
 
 /// OS and architecture specific code to activate TLS - Redox x86
+#[allow(unsafe_op_in_unsafe_fn)]
 #[cfg(target_arch = "x86")]
 pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
     let mut env = syscall::EnvRegisters::default();
@@ -104,6 +106,7 @@ pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
 }
 
 /// OS and architecture specific code to activate TLS - Redox x86_64
+#[allow(unsafe_op_in_unsafe_fn)]
 #[cfg(target_arch = "x86_64")]
 pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end_and_tcb_start: usize, _tls_len: usize) {
     let mut env = syscall::EnvRegisters::default();
@@ -121,6 +124,7 @@ pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end_and_tcb_start: usize, _tls_len: 
 }
 
 /// OS and architecture specific code to activate TLS - Redox riscv64
+#[allow(unsafe_op_in_unsafe_fn)]
 #[cfg(target_arch = "riscv64")]
 pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
     // tp points to static tls block
@@ -135,6 +139,7 @@ pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
 }
 
 /// Initialize redox-rt in situations where relibc is not used
+#[allow(unsafe_op_in_unsafe_fn)]
 #[cfg(not(feature = "proc"))]
 pub unsafe fn initialize_freestanding(this_thr_fd: FdGuard) -> &'static FdGuard {
     // TODO: This code is a hack! Integrate the ld_so TCB code into generic-rt, and then use that
@@ -197,20 +202,22 @@ pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
 
     #[cfg(feature = "proc")]
     {
-        crate::arch::PROC_FD.get().write(*proc_fd);
+        unsafe { crate::arch::PROC_FD.get().write(*proc_fd) };
     }
 
-    STATIC_PROC_INFO.get().write(StaticProcInfo {
-        pid: metadata.pid,
+    unsafe {
+        STATIC_PROC_INFO.get().write(StaticProcInfo {
+            pid: metadata.pid,
 
-        #[cfg(feature = "proc")]
-        proc_fd: MaybeUninit::new(proc_fd),
+            #[cfg(feature = "proc")]
+            proc_fd: MaybeUninit::new(proc_fd),
 
-        #[cfg(not(feature = "proc"))]
-        proc_fd: MaybeUninit::uninit(),
+            #[cfg(not(feature = "proc"))]
+            proc_fd: MaybeUninit::uninit(),
 
-        has_proc_fd: cfg!(feature = "proc"),
-    });
+            has_proc_fd: cfg!(feature = "proc"),
+        })
+    };
 
     #[cfg(feature = "proc")]
     {
@@ -282,21 +289,23 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
     let metadata = ProcMeta::default();
 
     if let Some(proc_fd) = &args.new_proc_fd {
-        crate::arch::PROC_FD.get().write(**proc_fd);
+        unsafe { crate::arch::PROC_FD.get().write(**proc_fd) };
     }
 
-    let old_proc_fd = STATIC_PROC_INFO
-        .get()
-        .replace(StaticProcInfo {
-            pid: metadata.pid,
-            has_proc_fd: args.new_proc_fd.is_some(),
-            proc_fd: args
-                .new_proc_fd
-                .map_or_else(MaybeUninit::uninit, MaybeUninit::new),
-        })
-        .proc_fd;
+    let old_proc_fd = unsafe {
+        STATIC_PROC_INFO
+            .get()
+            .replace(StaticProcInfo {
+                pid: metadata.pid,
+                has_proc_fd: args.new_proc_fd.is_some(),
+                proc_fd: args
+                    .new_proc_fd
+                    .map_or_else(MaybeUninit::uninit, MaybeUninit::new),
+            })
+            .proc_fd
+    };
     drop(old_proc_fd);
 
-    let old_thr_fd = RtTcb::current().thr_fd.get().replace(Some(args.new_thr_fd));
+    let old_thr_fd = unsafe { RtTcb::current().thr_fd.get().replace(Some(args.new_thr_fd)) };
     drop(old_thr_fd);
 }

@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use super::{constants::*, Buffer, FILE};
+use super::{Buffer, FILE, constants::*};
 use crate::{
     c_str::CStr,
     error::Errno,

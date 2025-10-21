@@ -1,22 +1,22 @@
 use core::{ffi::c_int, ptr::NonNull, sync::atomic::Ordering};
 
 use syscall::{
-    data::AtomicU64, CallFlags, Error, RawAction, Result, SenderInfo, SetSighandlerData,
-    SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, EAGAIN, EINTR, EINVAL, ENOMEM, EPERM,
+    CallFlags, EAGAIN, EINTR, EINVAL, ENOMEM, EPERM, Error, RawAction, Result, SenderInfo,
+    SetSighandlerData, SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, data::AtomicU64,
 };
 
 use crate::{
+    RtTcb, Tcb,
     arch::*,
     current_proc_fd,
     proc::FdGuard,
     protocol::{
-        ProcCall, RtSigInfo, ThreadCall, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN,
-        SIGTTOU, SIGURG, SIGWINCH,
+        ProcCall, RtSigInfo, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG,
+        SIGWINCH, ThreadCall,
     },
     static_proc_info,
     sync::Mutex,
     sys::{proc_call, this_thread_call},
-    RtTcb, Tcb,
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -106,13 +106,16 @@ pub struct SiginfoAbi {
 
 #[inline(always)]
 unsafe fn inner(stack: &mut SigStack) {
-    let os = &Tcb::current().unwrap().os_specific;
+    let os = unsafe { &Tcb::current().unwrap().os_specific };
 
     let stack_ptr = NonNull::from(&mut *stack);
-    stack.link = core::mem::replace(&mut (*os.arch.get()).last_sigstack, Some(stack_ptr))
-        .map_or_else(core::ptr::null_mut, |x| x.as_ptr());
+    stack.link = core::mem::replace(
+        unsafe { &mut (*os.arch.get()).last_sigstack },
+        Some(stack_ptr),
+    )
+    .map_or_else(core::ptr::null_mut, |x| x.as_ptr());
 
-    let signals_were_disabled = (*os.arch.get()).disable_signals_depth > 0;
+    let signals_were_disabled = unsafe { (*os.arch.get()).disable_signals_depth > 0 };
 
     let targeted_thread_not_process = stack.sig_num >= 64;
     stack.sig_num %= 64;
@@ -121,19 +124,19 @@ unsafe fn inner(stack: &mut SigStack) {
     stack.sig_num += 1;
 
     let (sender_pid, sender_uid) = {
-        let area = &mut *os.arch.get();
+        let area = unsafe { &mut *os.arch.get() };
 
         // Undefined if the signal was not realtime
         stack.sival = area.tmp_rt_inf.arg;
 
-        stack.old_stack = arch_pre(stack, area);
+        stack.old_stack = unsafe { arch_pre(stack, area) };
 
         if (stack.sig_num - 1) / 32 == 1 && !targeted_thread_not_process {
             stack.sig_code = area.tmp_rt_inf.code as u32;
             (area.tmp_rt_inf.pid, area.tmp_rt_inf.uid)
         } else {
             stack.sig_code = 0; // TODO: SI_USER constant?
-                                // TODO: Handle SIGCHLD. Maybe that should always be queued though?
+            // TODO: Handle SIGCHLD. Maybe that should always be queued though?
             let inf = SenderInfo::from_raw(area.tmp_id_inf);
             (inf.pid, inf.ruid)
         }
@@ -210,7 +213,7 @@ unsafe fn inner(stack: &mut SigStack) {
 
     // Call handler, either sa_handler or sa_siginfo depending on flag.
     if sigaction.flags.contains(SigactionFlags::SIGINFO)
-        && let Some(sigaction) = handler.sigaction
+        && let Some(sigaction) = unsafe { handler.sigaction }
     {
         let info = SiginfoAbi {
             si_signo: stack.sig_num as c_int,
@@ -222,12 +225,14 @@ unsafe fn inner(stack: &mut SigStack) {
             si_uid: sender_uid as i32,
             si_value: stack.sival,
         };
-        sigaction(
-            stack.sig_num as c_int,
-            core::ptr::addr_of!(info).cast(),
-            stack as *mut SigStack as *mut (),
-        );
-    } else if let Some(handler) = handler.handler {
+        unsafe {
+            sigaction(
+                stack.sig_num as c_int,
+                core::ptr::addr_of!(info).cast(),
+                stack as *mut SigStack as *mut (),
+            )
+        };
+    } else if let Some(handler) = unsafe { handler.handler } {
         handler(stack.sig_num as c_int);
     }
 
@@ -248,10 +253,10 @@ unsafe fn inner(stack: &mut SigStack) {
     // TODO: If resetting the sigmask caused signals to be unblocked, then should they be delivered
     // here? And would it be possible to tail-call-optimize that?
 
-    (*os.arch.get()).last_sig_was_restart = shall_restart;
+    unsafe { (*os.arch.get()).last_sig_was_restart = shall_restart };
 
     // TODO: Support setting uc_link to jump back to a different context?
-    (*os.arch.get()).last_sigstack = NonNull::new(stack.link);
+    unsafe { (*os.arch.get()).last_sigstack = NonNull::new(stack.link) };
 
     // TODO: Support restoring uc_stack?
 
@@ -266,7 +271,7 @@ unsafe fn inner(stack: &mut SigStack) {
 }
 #[cfg(not(target_arch = "x86"))]
 pub(crate) unsafe extern "C" fn inner_c(stack: usize) {
-    inner(&mut *(stack as *mut SigStack))
+    unsafe { inner(&mut *(stack as *mut SigStack)) }
 }
 #[cfg(target_arch = "x86")]
 pub(crate) unsafe extern "fastcall" fn inner_fastcall(stack: usize) {
@@ -698,7 +703,7 @@ pub unsafe fn sigaltstack(
     old_out: Option<&mut Sigaltstack>,
 ) -> Result<()> {
     let _g = tmp_disable_signals();
-    let tcb = &mut *Tcb::current().unwrap().os_specific.arch.get();
+    let tcb = unsafe { &mut *Tcb::current().unwrap().os_specific.arch.get() };
 
     let old = get_sigaltstack(tcb, crate::arch::current_sp());
 
@@ -778,7 +783,7 @@ pub fn await_signal_async(inner_allowset: u64) -> Result<Unreachable> {
     res?;
     unreachable!()
 }
-/*#[no_mangle]
+/*#[unsafe(no_mangle)]
 pub extern "C" fn __redox_rt_debug_sigctl() {
     let tcb = &RtTcb::current().control;
     let _ = syscall::write(1, alloc::format!("SIGCTL: {tcb:#x?}\n").as_bytes());

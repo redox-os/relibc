@@ -7,12 +7,12 @@ use core::mem;
 
 use crate::{
     out::Out,
-    platform::{types::*, Pal, Sys},
+    platform::{Pal, Sys, types::*},
 };
 
 use crate::header::{
     errno::*,
-    netinet_in::{htons, in_addr, sockaddr_in, IPPROTO_UDP},
+    netinet_in::{IPPROTO_UDP, htons, in_addr, sockaddr_in},
     sys_socket::{
         self,
         constants::{AF_INET, SOCK_DGRAM},

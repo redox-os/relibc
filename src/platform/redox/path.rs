@@ -9,7 +9,7 @@ use core::{ffi::c_int, str};
 use redox_rt::signal::tmp_disable_signals;
 use syscall::{data::Stat, error::*, flag::*};
 
-use super::{libcscheme, FdGuard, Pal, Sys};
+use super::{FdGuard, Pal, Sys, libcscheme};
 use crate::{
     error::Errno,
     fs::File,
@@ -18,7 +18,7 @@ use crate::{
     sync::Mutex,
 };
 
-pub use redox_path::{canonicalize_using_cwd, RedoxPath};
+pub use redox_path::{RedoxPath, canonicalize_using_cwd};
 
 // TODO: Define in syscall
 const PATH_MAX: usize = 4096;

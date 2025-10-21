@@ -21,7 +21,7 @@ platform_specific! {
 }
 
 //Each platform has different sizes for sigjmp_buf, currently only x86_64 is supported
-extern "C" {
+unsafe extern "C" {
     pub fn setjmp(jb: *mut u64) -> i32;
     pub fn longjmp(jb: *mut u64, ret: i32);
 }

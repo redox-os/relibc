@@ -1,8 +1,8 @@
-use super::{e_raw, Sys};
+use super::{Sys, e_raw};
 use crate::{
     error::Result,
     header::sys_socket::{msghdr, sockaddr, socklen_t},
-    platform::{types::*, PalSocket},
+    platform::{PalSocket, types::*},
 };
 
 impl PalSocket for Sys {

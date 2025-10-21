@@ -3,15 +3,15 @@ use core::{cell::SyncUnsafeCell, mem::offset_of, ptr::NonNull, sync::atomic::Ord
 use syscall::*;
 
 use crate::{
-    proc::{fork_inner, FdGuard, ForkArgs},
-    protocol::{ProcCall, RtSigInfo},
-    signal::{inner_fastcall, PosixStackt, RtSigarea, SigStack, PROC_CONTROL_STRUCT},
     RtTcb,
+    proc::{FdGuard, ForkArgs, fork_inner},
+    protocol::{ProcCall, RtSigInfo},
+    signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, inner_fastcall},
 };
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
-pub(crate) const STACK_TOP: usize = 1 << 31;
-pub(crate) const STACK_SIZE: usize = 1024 * 1024;
+pub const STACK_TOP: usize = 1 << 31;
+pub const STACK_SIZE: usize = 1024 * 1024;
 
 #[derive(Debug, Default)]
 #[repr(C)]
@@ -363,7 +363,7 @@ asmfunction!(__relibc_internal_rlct_clone_ret -> usize: ["
 
     ret
 "] <= []);
-extern "C" {
+unsafe extern "C" {
     fn __relibc_internal_sigentry_crit_first();
     fn __relibc_internal_sigentry_crit_second();
     fn __relibc_internal_sigentry_crit_third();
@@ -384,7 +384,7 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
         flags: 0, // TODO
     }
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe fn manually_enter_trampoline() {
     let c = &crate::Tcb::current().unwrap().os_specific.control;
     c.control_flags.store(

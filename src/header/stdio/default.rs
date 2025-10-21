@@ -1,4 +1,4 @@
-use super::{constants, Buffer, BUFSIZ, FILE};
+use super::{BUFSIZ, Buffer, FILE, constants};
 use core::{cell::UnsafeCell, ptr};
 
 use crate::{
@@ -54,9 +54,9 @@ pub fn default_stderr() -> &'static GlobalFile {
     DEFAULT_STDERR.call_once(|| GlobalFile::new(2, constants::F_NORD))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut stdin: *mut FILE = ptr::null_mut();
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut stdout: *mut FILE = ptr::null_mut();
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut stderr: *mut FILE = ptr::null_mut();

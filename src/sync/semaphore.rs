@@ -2,7 +2,7 @@
 //TODO: improve implementation
 
 use crate::{
-    header::time::{clock_gettime, timespec, CLOCK_MONOTONIC},
+    header::time::{CLOCK_MONOTONIC, clock_gettime, timespec},
     platform::types::*,
 };
 

@@ -2,8 +2,8 @@
 
 use core::{
     cell::{Cell, UnsafeCell},
-    mem::{offset_of, MaybeUninit},
-    ptr::{addr_of, NonNull},
+    mem::{MaybeUninit, offset_of},
+    ptr::{self, NonNull, addr_of},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
@@ -13,20 +13,18 @@ use crate::{
     error::Errno,
     header::{errno::*, pthread as header, sched::sched_param, sys_mman},
     ld_so::{
+        ExpectTlsFree,
         linker::Linker,
         tcb::{Master, Tcb},
-        ExpectTlsFree,
     },
-    platform::{types::*, Pal, Sys},
+    platform::{Pal, Sys, types::*},
 };
 
-use crate::sync::{waitval::Waitval, Mutex};
+use crate::sync::{Mutex, waitval::Waitval};
 
 /// Called only by the main thread, as part of relibc_start.
 pub unsafe fn init() {
-    Tcb::current()
-        .expect_notls("no TCB present for main thread")
-        .pthread = Pthread {
+    let mut thread = Pthread {
         waitval: Waitval::new(),
         has_enabled_cancelation: AtomicBool::new(false),
         has_queued_cancelation: AtomicBool::new(false),
@@ -34,12 +32,24 @@ pub unsafe fn init() {
 
         //index: FIRST_THREAD_IDX,
 
-        // TODO
-        stack_base: core::ptr::null_mut(),
+        // TODO: set these values on Linux as well
+        stack_base: ptr::null_mut(),
         stack_size: 0,
 
         os_tid: UnsafeCell::new(Sys::current_os_tid()),
     };
+
+    #[cfg(target_os = "redox")]
+    {
+        //TODO: what is the best way to get these values?
+        use redox_rt::arch::{STACK_SIZE, STACK_TOP};
+        thread.stack_base = (STACK_TOP - STACK_SIZE) as *mut c_void;
+        thread.stack_size = STACK_SIZE;
+    }
+
+    Tcb::current()
+        .expect_notls("no TCB present for main thread")
+        .pthread = thread;
 }
 
 //static NEXT_INDEX: AtomicU32 = AtomicU32::new(FIRST_THREAD_IDX + 1);
@@ -52,7 +62,7 @@ pub unsafe fn terminate_from_main_thread() {
 }
 
 bitflags::bitflags! {
-    struct PthreadFlags: usize {
+    pub struct PthreadFlags: usize {
         const DETACHED = 1;
     }
 }
