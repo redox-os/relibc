@@ -1,4 +1,5 @@
 use core::{
+    cell::LazyCell,
     slice, str,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -468,8 +469,9 @@ pub unsafe extern "C" fn redox_set_namespace_fd_v0(fd: usize) -> RawResult {
         return usize::MAX;
     } else if fd == usize::wrapping_neg(3) {
         // Enter the null namespace
-        static NULL_NAMESPACE: [IoSlice; 2] = [IoSlice::new(b"memory"), IoSlice::new(b"pipe")];
-        match redox_rt::sys::mkns(&NULL_NAMESPACE) {
+        static NULL_NAMESPACE: LazyCell<[IoSlice; 2]> =
+            LazyCell::new(|| [IoSlice::new(b"memory"), IoSlice::new(b"pipe")]);
+        match redox_rt::sys::mkns(&*NULL_NAMESPACE) {
             Ok(new_ns_fd) => Error::mux(redox_rt::sys::set_namespace_fd(new_ns_fd)),
             Err(e) => Error::mux(Err(e)),
         }
