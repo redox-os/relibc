@@ -383,6 +383,14 @@ pub fn set_namespace_fd(fd: usize) -> Result<usize> {
     info.ns_fd = fd;
     Ok(before_fd)
 }
+pub fn getns() -> Result<usize> {
+    let cur_ns = crate::current_namespace_fd();
+    if cur_ns == usize::MAX {
+        Err(Error::new(EBADF))
+    } else {
+        Ok(cur_ns)
+    }
+}
 pub fn open(path: &str, flags: usize) -> Result<usize> {
     syscall::openat(crate::current_namespace_fd(), path, flags, 0)
 }
