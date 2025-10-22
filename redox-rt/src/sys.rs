@@ -380,8 +380,9 @@ pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {
 }
 pub fn set_namespace_fd(fd: usize) -> Result<usize> {
     let mut info = DYNAMIC_PROC_INFO.lock();
-    let before_fd = info.ns_fd;
-    info.ns_fd = fd;
+    let new_fd_guard = FdGuard::new(fd);
+    let old_fd_guard = replace(&mut info.ns_fd, Some(new_fd_guard));
+    let before_fd = old_fd_guard.map(|g| g.take()).unwrap_or(usize::MAX);
     Ok(before_fd)
 }
 pub fn getns() -> Result<usize> {
