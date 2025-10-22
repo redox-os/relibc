@@ -334,16 +334,19 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
     } else {
         let _ = syscall::write(1, b"ns_fd is not initialized");
     }
-    *lock = DynamicProcInfo {
-        pgid: metadata.pgid,
-        ruid: metadata.ruid,
-        euid: metadata.euid,
-        suid: metadata.suid,
-        rgid: metadata.rgid,
-        egid: metadata.egid,
-        sgid: metadata.sgid,
-        ns_fd: args.new_ns_fd,
-    };
+    lock.pgid = metadata.pgid;
+    lock.ruid = metadata.ruid;
+    lock.euid = metadata.euid;
+    lock.suid = metadata.suid;
+    lock.rgid = metadata.rgid;
+    lock.egid = metadata.egid;
+    lock.sgid = metadata.sgid;
+
+    let old_ns_fd_guard = core::mem::replace(&mut lock.ns_fd, args.new_ns_fd);
+
+    if let Some(old_guard) = old_ns_fd_guard {
+        old_guard.take();
+    }
 
     let old_thr_fd = unsafe { RtTcb::current().thr_fd.get().replace(Some(args.new_thr_fd)) };
     drop(old_thr_fd);
