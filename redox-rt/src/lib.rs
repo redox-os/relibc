@@ -326,6 +326,14 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
     drop(old_proc_fd);
 
     let mut lock = DYNAMIC_PROC_INFO.lock();
+    if let Some(ns_fd) = lock.ns_fd {
+        let _ = syscall::write(
+            1,
+            alloc::format!("ns_fd is already initialized: {}", *ns_fd),
+        );
+    } else {
+        let _ = syscall::write(1, b"ns_fd is not initialized");
+    }
     *lock = DynamicProcInfo {
         pgid: metadata.pgid,
         ruid: metadata.ruid,
