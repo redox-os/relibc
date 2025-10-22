@@ -7,7 +7,7 @@ use core::{
 use ioslice::IoSlice;
 use syscall::{
     CallFlags, EINVAL, ERESTART, TimeSpec,
-    error::{self, EINTR, Error, Result},
+    error::{self, EBADF, EINTR, Error, Result},
 };
 
 use crate::{
