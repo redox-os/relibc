@@ -115,7 +115,7 @@ unsafe extern "sysv64" fn child_hook(scratchpad: &ForkScratchpad) {
         new_ns_fd: if scratchpad.new_ns_fd == usize::MAX {
             None
         } else {
-            Some(scratchpad.new_ns_fd)
+            Some(FdGuard::new(scratchpad.new_ns_fd))
         },
     });
 }
