@@ -194,7 +194,7 @@ pub(crate) fn read_proc_meta(proc: &FdGuard) -> syscall::Result<ProcMeta> {
 }
 pub unsafe fn initialize(
     #[cfg(feature = "proc")] proc_fd: FdGuard,
-    #[cfg(feature = "proc")] ns_fd: usize,
+    #[cfg(feature = "proc")] ns_fd: Option<FdGuard>,
 ) {
     #[cfg(feature = "proc")]
     let metadata = read_proc_meta(&proc_fd).unwrap();
@@ -235,7 +235,7 @@ pub unsafe fn initialize(
             #[cfg(feature = "proc")]
             ns_fd,
             #[cfg(not(feature = "proc"))]
-            ns_fd: usize::MAX,
+            ns_fd: None,
         };
     }
 }
@@ -254,7 +254,7 @@ pub struct DynamicProcInfo {
     pub egid: u32,
     pub rgid: u32,
     pub sgid: u32,
-    pub ns_fd: usize,
+    pub ns_fd: Option<FdGuard>,
 }
 
 static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
@@ -265,7 +265,7 @@ static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
     rgid: u32::MAX,
     egid: u32::MAX,
     sgid: u32::MAX,
-    ns_fd: usize::MAX,
+    ns_fd: None,
 });
 
 #[inline]
@@ -280,13 +280,18 @@ pub fn current_proc_fd() -> &'static FdGuard {
 }
 #[inline]
 pub fn current_namespace_fd() -> usize {
-    DYNAMIC_PROC_INFO.lock().ns_fd
+    DYNAMIC_PROC_INFO
+        .lock()
+        .ns_fd
+        .as_ref()
+        .map(|g| **g)
+        .unwrap_or(usize::MAX)
 }
 
 struct ChildHookCommonArgs {
     new_thr_fd: FdGuard,
     new_proc_fd: Option<FdGuard>,
-    new_ns_fd: Option<usize>,
+    new_ns_fd: Option<FdGuard>,
 }
 
 unsafe fn child_hook_common(args: ChildHookCommonArgs) {
@@ -329,7 +334,7 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
         rgid: metadata.rgid,
         egid: metadata.egid,
         sgid: metadata.sgid,
-        ns_fd: args.new_ns_fd.unwrap_or(usize::MAX),
+        ns_fd: args.new_ns_fd,
     };
 
     let old_thr_fd = unsafe { RtTcb::current().thr_fd.get().replace(Some(args.new_thr_fd)) };

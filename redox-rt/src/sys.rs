@@ -1,5 +1,5 @@
 use core::{
-    mem::size_of,
+    mem::{replace, size_of},
     ptr::addr_of,
     sync::atomic::{AtomicU32, Ordering},
 };
@@ -13,6 +13,7 @@ use syscall::{
 use crate::{
     DYNAMIC_PROC_INFO, DynamicProcInfo, RtTcb, Tcb,
     arch::manually_enter_trampoline,
+    proc::FdGuard,
     protocol::{ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags},
     read_proc_meta,
     signal::tmp_disable_signals,
