@@ -264,6 +264,10 @@ pub unsafe extern "C" fn redox_get_ens_v0() -> RawResult {
     Error::mux(redox_rt::sys::getens())
 }
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_get_ns_v0() -> RawResult {
+    Error::mux(redox_rt::sys::getns())
+}
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_get_proc_credentials_v1(
     cap_fd: usize,
     target_pid: usize,
@@ -462,6 +466,13 @@ pub unsafe extern "C" fn redox_set_namespace_fd_v0(fd: usize) -> RawResult {
     } else if fd == usize::wrapping_neg(2) {
         USE_NEW_NS_BACKEND.store(false, Ordering::Relaxed);
         return usize::MAX;
+    } else if fd == usize::wrapping_neg(3) {
+        // Enter the null namespace
+        static NULL_NAMESPACE: [IoSlice; 2] = [IoSlice::new(b"memory"), IoSlice::new(b"pipe")];
+        match redox_rt::sys::mkns(&NULL_NAMESPACE) {
+            Ok(new_ns_fd) => Error::mux(redox_rt::sys::set_namespace_fd(new_ns_fd)),
+            Err(e) => Error::mux(Err(e)),
+        }
     } else {
         Error::mux(redox_rt::sys::set_namespace_fd(fd))
     }
