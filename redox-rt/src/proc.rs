@@ -1011,7 +1011,7 @@ pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
     }
 }
 
-pub unsafe fn make_init(proc_cap: usize) -> [&'static FdGuard; 2] {
+pub unsafe fn make_init(proc_cap: usize, initns_fd: usize) -> [&'static FdGuard; 2] {
     let proc_fd = FdGuard::new(
         syscall::openat(proc_cap, "init", syscall::O_CLOEXEC, 0).expect("failed to create init"),
     );
@@ -1044,7 +1044,7 @@ pub unsafe fn make_init(proc_cap: usize) -> [&'static FdGuard; 2] {
         rgid: 0,
         egid: 0,
         sgid: 0,
-        ns_fd: None,
+        ns_fd: Some(FdGuard::new(initns_fd)),
     };
     [
         unsafe { (*STATIC_PROC_INFO.get()).proc_fd.assume_init_ref() },
