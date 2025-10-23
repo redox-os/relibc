@@ -337,18 +337,6 @@ pub fn posix_exit(status: i32) -> ! {
     let _ = syscall::write(1, b"redox-rt: ProcCall::Exit FAILED, abort()ing!\n");
     core::intrinsics::abort();
 }
-pub fn setrens(rns: usize, ens: usize) -> Result<()> {
-    let _ = if ens == 0 {
-        let null_namespace: [IoSlice; 2] = [IoSlice::new(b"memory"), IoSlice::new(b"pipe")];
-        match mkns(&null_namespace) {
-            Ok(new_ns_fd) => setns(new_ns_fd),
-            Err(e) => return Err(e),
-        }
-    } else {
-        setns(ens)
-    };
-    Ok(())
-}
 pub fn posix_getpgid(pid: usize) -> Result<usize> {
     this_proc_call(
         &mut [],

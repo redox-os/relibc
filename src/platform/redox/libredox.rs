@@ -279,7 +279,16 @@ pub unsafe extern "C" fn redox_get_proc_credentials_v1(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {
-    Error::mux(redox_rt::sys::setrens(rns, ens))
+    let _ = if ens == 0 {
+        let null_namespace: [IoSlice; 2] = [IoSlice::new(b"memory"), IoSlice::new(b"pipe")];
+        match redox_rt::sys::mkns(&null_namespace) {
+            Ok(new_ns_fd) => redox_rt::sys::setns(new_ns_fd),
+            Err(e) => Error::mux(Err(e)),
+        }
+    } else {
+        redox_rt::sys::setns(ens)
+    };
+    0
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_waitpid_v1(pid: usize, status: *mut i32, options: u32) -> RawResult {
@@ -468,7 +477,7 @@ pub unsafe extern "C" fn redox_setns_v0(fd: usize) -> RawResult {
         USE_NEW_NS_BACKEND.store(false, Ordering::Relaxed);
         usize::MAX
     } else {
-        match Error::mux(redox_rt::sys::setns(fd)) {
+        match redox_rt::sys::setns(fd) {
             Some(guard) => guard.take(),
             None => usize::MAX,
         }
@@ -483,7 +492,7 @@ pub unsafe extern "C" fn redox_set_namespace_fd_v0(fd: usize) -> RawResult {
         USE_NEW_NS_BACKEND.store(false, Ordering::Relaxed);
         usize::MAX
     } else {
-        match Error::mux(redox_rt::sys::setns(fd)) {
+        match redox_rt::sys::setns(fd) {
             Some(guard) => guard.take(),
             None => usize::MAX,
         }
