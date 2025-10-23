@@ -338,11 +338,15 @@ pub fn posix_exit(status: i32) -> ! {
     core::intrinsics::abort();
 }
 pub fn setrens(rns: usize, ens: usize) -> Result<()> {
-    this_proc_call(
-        &mut [],
-        CallFlags::empty(),
-        &[ProcCall::Setrens as u64, rns as u64, ens as u64],
-    )?;
+    let _ = if ens == 0 {
+        let null_namespace: [IoSlice; 2] = [IoSlice::new(b"memory"), IoSlice::new(b"pipe")];
+        match redox_rt::sys::mkns(&null_namespace) {
+            Ok(new_ns_fd) => redox_rt::sys::setns(Some(new_ns_fd)),
+            Err(e) => return Error::mux(Err(e)),
+        }
+    } else {
+        redox_rt::sys::setns(Some(ens))
+    };
     Ok(())
 }
 pub fn posix_getpgid(pid: usize) -> Result<usize> {
@@ -378,12 +382,11 @@ pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {
     wrapper(false, false, || syscall::nanosleep(rqtp, rmtp))?;
     Ok(())
 }
-pub fn set_namespace_fd(fd: usize) -> Result<usize> {
+pub fn setns(fd: usize) -> Option<FdGuard> {
     let mut info = DYNAMIC_PROC_INFO.lock();
     let new_fd_guard = FdGuard::new(fd);
     let old_fd_guard = replace(&mut info.ns_fd, Some(new_fd_guard));
-    let before_fd = old_fd_guard.map(|g| g.take()).unwrap_or(usize::MAX);
-    Ok(before_fd)
+    old_fd_guard
 }
 pub fn getns() -> Result<usize> {
     let cur_ns = crate::current_namespace_fd();
