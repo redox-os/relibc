@@ -340,12 +340,12 @@ pub fn posix_exit(status: i32) -> ! {
 pub fn setrens(rns: usize, ens: usize) -> Result<()> {
     let _ = if ens == 0 {
         let null_namespace: [IoSlice; 2] = [IoSlice::new(b"memory"), IoSlice::new(b"pipe")];
-        match redox_rt::sys::mkns(&null_namespace) {
-            Ok(new_ns_fd) => redox_rt::sys::setns(Some(new_ns_fd)),
-            Err(e) => return Error::mux(Err(e)),
+        match mkns(&null_namespace) {
+            Ok(new_ns_fd) => setns(Some(new_ns_fd)),
+            Err(e) => return Err(e),
         }
     } else {
-        redox_rt::sys::setns(Some(ens))
+        setns(Some(ens))
     };
     Ok(())
 }
