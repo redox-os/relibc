@@ -283,7 +283,7 @@ pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {
         let null_namespace: [IoSlice; 2] = [IoSlice::new(b"memory"), IoSlice::new(b"pipe")];
         match redox_rt::sys::mkns(&null_namespace) {
             Ok(new_ns_fd) => redox_rt::sys::setns(new_ns_fd),
-            Err(e) => Error::mux(Err(e)),
+            Err(e) => return Error::mux(Err(e)),
         }
     } else {
         redox_rt::sys::setns(ens)
