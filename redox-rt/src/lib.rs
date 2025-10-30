@@ -3,7 +3,6 @@
 #![feature(
     core_intrinsics,
     int_roundings,
-    let_chains,
     slice_ptr_get,
     sync_unsafe_cell
 )]
