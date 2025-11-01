@@ -1,11 +1,6 @@
 #![no_std]
 #![allow(internal_features)]
-#![feature(
-    core_intrinsics,
-    int_roundings,
-    slice_ptr_get,
-    sync_unsafe_cell
-)]
+#![feature(core_intrinsics, int_roundings, slice_ptr_get, sync_unsafe_cell)]
 #![forbid(unreachable_patterns)]
 
 use core::{
