@@ -30,6 +30,7 @@ use crate::{
     platform::{self, ERRNO, Pal, Sys, WriteByte, types::*},
     sync::Mutex,
 };
+use reader::Reader;
 
 pub use self::constants::*;
 mod constants;
@@ -42,10 +43,9 @@ mod getdelim;
 
 mod ext;
 mod helpers;
-mod lookaheadreader;
 pub mod printf;
+mod reader;
 mod scanf;
-use lookaheadreader::LookAheadReader;
 static mut TMPNAM_BUF: [c_char; L_tmpnam as usize + 1] = [0; L_tmpnam as usize + 1];
 
 enum Buffer<'a> {
@@ -1337,8 +1337,8 @@ pub unsafe extern "C" fn vfscanf(file: *mut FILE, format: *const c_char, ap: va_
         }
 
         let f: &mut FILE = &mut *file;
-        let reader: LookAheadReader = f.into();
-        scanf::scanf(reader, format, ap)
+        let reader: Reader = f.into();
+        scanf::scanf(reader, format.into(), ap)
     };
     ret
 }
@@ -1362,8 +1362,7 @@ pub unsafe extern "C" fn scanf(format: *const c_char, mut __valist: ...) -> c_in
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vsscanf(s: *const c_char, format: *const c_char, ap: va_list) -> c_int {
-    let reader = (s as *const u8).into();
-    scanf::scanf(reader, format, ap)
+    scanf::scanf(s.into(), format.into(), ap)
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sscanf(
@@ -1371,8 +1370,7 @@ pub unsafe extern "C" fn sscanf(
     format: *const c_char,
     mut __valist: ...
 ) -> c_int {
-    let reader = (s as *const u8).into();
-    scanf::scanf(reader, format, __valist.as_va_list())
+    scanf::scanf(s.into(), format.into(), __valist.as_va_list())
 }
 
 pub unsafe fn flush_io_streams() {
