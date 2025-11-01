@@ -14,4 +14,13 @@
 #define IFTODT(x) ((x)>>12 & 017)
 #define DTTOIF(x) ((x)<<12)
 
+// Shamelessly stolen from musl again
+#if defined (_LARGEFILE64_SOURCE)
+#define dirent64 dirent
+#define readdir64 readdir
+#define scandir64 scandir
+#define alphasort64 alphasort
+#define getdents64 getdents
+#endif
+
 #endif /* _BITS_DIRENT_H */
