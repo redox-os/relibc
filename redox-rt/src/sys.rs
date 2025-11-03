@@ -385,7 +385,8 @@ pub fn getns() -> Result<usize> {
     }
 }
 pub fn open(path: &str, flags: usize) -> Result<usize> {
-    syscall::openat(crate::current_namespace_fd(), path, flags, 0)
+    let fcntl_flags = flags & !syscall::O_ACCMODE;
+    syscall::openat(crate::current_namespace_fd(), path, flags, fcntl_flags)
 }
 pub fn mkns(names: &[IoSlice]) -> Result<usize> {
     let mut buf = Vec::from(TYPE_MKNS.to_ne_bytes());
