@@ -729,7 +729,29 @@ impl PalSocket for Sys {
         address_len: *mut socklen_t,
     ) -> Result<usize> {
         if flags != 0 {
-            return Err(Errno(EOPNOTSUPP));
+            // Convert to recvmsg
+            let mut iov = iovec {
+                iov_base: buf,
+                iov_len: len,
+            };
+            let mut msg = msghdr {
+                msg_name: address as *mut c_void,
+                msg_namelen: if !address_len.is_null() {
+                    *address_len
+                } else {
+                    0
+                },
+                msg_iov: &mut iov,
+                msg_iovlen: 1,
+                msg_control: ptr::null_mut(),
+                msg_controllen: 0,
+                msg_flags: 0,
+            };
+            let count = Self::recvmsg(socket, &mut msg, flags)?;
+            if !address_len.is_null() {
+                *address_len = msg.msg_namelen;
+            }
+            return Ok(count);
         }
         if address == ptr::null_mut() || address_len == ptr::null_mut() {
             Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
@@ -881,7 +903,21 @@ impl PalSocket for Sys {
         dest_len: socklen_t,
     ) -> Result<usize> {
         if flags != 0 {
-            return Err(Errno(EOPNOTSUPP));
+            // Convert to sendmsg
+            let mut iov = iovec {
+                iov_base: buf as *mut c_void,
+                iov_len: len,
+            };
+            let msg = msghdr {
+                msg_name: dest_addr as *mut c_void,
+                msg_namelen: dest_len,
+                msg_iov: &mut iov,
+                msg_iovlen: 1,
+                msg_control: ptr::null_mut(),
+                msg_controllen: 0,
+                msg_flags: 0,
+            };
+            return Self::sendmsg(socket, &msg, flags);
         }
         if dest_addr == ptr::null() || dest_len == 0 {
             Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
