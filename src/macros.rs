@@ -412,7 +412,7 @@ macro_rules! OutProject {
 }
 #[macro_export]
 #[cfg(not(feature = "check_against_libc_crate"))]
-macro_rules! CheckEquals {
+macro_rules! CheckVsLibcCrate {
     derive() { $(#[$($attrs:meta),*])* $v:vis struct $name:ident {
         $(
             $(#[$($fa:meta),*])* $fv:vis $field:ident : $type:ty
