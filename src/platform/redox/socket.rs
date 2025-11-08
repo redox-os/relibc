@@ -674,14 +674,19 @@ impl PalSocket for Sys {
         level: c_int,
         option_name: c_int,
         option_value: *mut c_void,
-        option_len: *mut socklen_t,
+        option_len_ptr: *mut socklen_t,
     ) -> Result<()> {
+        if option_len_ptr.is_null() {
+            return Err(Errno(EFAULT));
+        }
+        let option_len = (*option_len_ptr) as usize;
+
         let option_c_int = || -> Result<&mut c_int> {
             if option_value.is_null() {
                 return Err(Errno(EFAULT));
             }
 
-            if (option_len as usize) < mem::size_of::<c_int>() {
+            if option_len < mem::size_of::<c_int>() {
                 return Err(Errno(EINVAL));
             }
 
@@ -693,27 +698,42 @@ impl PalSocket for Sys {
                 SO_DOMAIN => {
                     let option = option_c_int()?;
                     *option = socket_domain_type(socket)?.0;
+                    *option_len_ptr = mem::size_of::<c_int>() as socklen_t;
                     return Ok(());
                 }
                 SO_ERROR => {
                     let option = option_c_int()?;
                     //TODO: Socket nonblock connection error
                     *option = 0;
+                    *option_len_ptr = mem::size_of::<c_int>() as socklen_t;
                     return Ok(());
                 }
                 SO_TYPE => {
                     let option = option_c_int()?;
                     *option = socket_domain_type(socket)?.1;
+                    *option_len_ptr = mem::size_of::<c_int>() as socklen_t;
                     return Ok(());
                 }
-                _ => (),
+                _ => {
+                    let metadata = [SocketCall::GetSockOpt as u64, option_name as u64];
+                    let payload =
+                        slice::from_raw_parts_mut(option_value as *mut u8, option_len);
+                    let call_flags = CallFlags::empty();
+                    *option_len_ptr = redox_rt::sys::sys_call(
+                        socket as usize,
+                        payload,
+                        CallFlags::empty(),
+                        &metadata,
+                    )? as socklen_t;
+                    return Ok(());
+                }
             },
             _ => (),
         }
 
         eprintln!(
             "getsockopt({}, {}, {}, {:p}, {:p})",
-            socket, level, option_name, option_value, option_len
+            socket, level, option_name, option_value, option_len_ptr
         );
         Err(Errno(ENOSYS))
     }
@@ -968,7 +988,7 @@ impl PalSocket for Sys {
             SOL_SOCKET => match option_name {
                 SO_RCVTIMEO => return set_timeout(b"read_timeout"),
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
-                SO_PASSCRED => {
+                _ => {
                     let metadata = [SocketCall::SetSockOpt as u64, option_name as u64];
                     let payload =
                         slice::from_raw_parts_mut(option_value as *mut u8, option_len as usize);
@@ -981,7 +1001,6 @@ impl PalSocket for Sys {
                     )?;
                     return Ok(());
                 }
-                _ => (),
             },
             _ => (),
         }
