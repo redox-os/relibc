@@ -55,7 +55,7 @@ impl LogSink for LogFile {
             connect(
                 log_fd,
                 &raw const log_addr as *const sockaddr,
-                size_of::<sockaddr_un>(),
+                size_of::<sockaddr_un>() as u32,
             ) < 0
         } {
             // In case close sets ERRNO.
