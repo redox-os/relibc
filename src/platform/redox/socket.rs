@@ -514,7 +514,7 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<c_int> {
-        let stream = dbg!(syscall::dup(socket as usize, b"listen"))?;
+        let stream = syscall::dup(socket as usize, b"listen")?;
         if address != ptr::null_mut() && address_len != ptr::null_mut() {
             if let Err(err) = Self::getpeername(stream as c_int, address, address_len) {
                 let _ = syscall::close(stream);
