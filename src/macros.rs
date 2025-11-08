@@ -410,3 +410,86 @@ macro_rules! OutProject {
         unsafe impl $crate::out::OutProject for $name {}
     }
 }
+#[macro_export]
+#[cfg(not(feature = "check_against_libc_crate"))]
+macro_rules! CheckEquals {
+    derive() { $(#[$($attrs:meta),*])* $v:vis struct $name:ident {
+        $(
+            $(#[$($fa:meta),*])* $fv:vis $field:ident : $type:ty
+        ),*$(,)?
+    } } => {
+    }
+}
+
+// TODO: probably exists nice nightly features that allow conflicting impls. Then we wouldn't need
+// much of this redundant code just to say A == B -> B == A and say A == B -> *mut A == *mut B.
+pub trait LibcTypeEquals<A, B> {}
+//impl<A, B> LibcTypeEquals<A, B> for () {}
+impl<A, B> LibcTypeEquals<*mut A, *mut B> for () where (): LibcTypeEquals<A, B> {}
+impl<A, B> LibcTypeEquals<*const A, *const B> for () where (): LibcTypeEquals<A, B> {}
+impl<A, B, const N: usize> LibcTypeEquals<[A; N], [B; N]> for () where (): LibcTypeEquals<A, B> {}
+macro_rules! for_primitive_int(
+    ($i:ident) => {
+        impl LibcTypeEquals<$i, $i> for () {}
+    }
+);
+for_primitive_int!(u8);
+for_primitive_int!(u16);
+for_primitive_int!(u32);
+for_primitive_int!(u64);
+for_primitive_int!(u128);
+for_primitive_int!(usize);
+for_primitive_int!(i8);
+for_primitive_int!(i16);
+for_primitive_int!(i32);
+for_primitive_int!(i64);
+for_primitive_int!(i128);
+for_primitive_int!(isize);
+impl LibcTypeEquals<crate::platform::types::c_void, crate::platform::types::c_void> for () {}
+impl LibcTypeEquals<__libc_only_for_layout_checks::c_void, crate::platform::types::c_void> for () {}
+impl LibcTypeEquals<crate::platform::types::c_void, __libc_only_for_layout_checks::c_void> for () {}
+
+//impl LibcTypeEquals<__libc_only_for_layout_checks::c_void>
+
+/// Derive macro which checks that structs here are defined the same as in the libc crate. Perhaps
+/// not sufficiently rigorous to soundly cast between the types, but should catch most mistakes.
+#[macro_export]
+#[cfg(feature = "check_against_libc_crate")]
+macro_rules! CheckVsLibcCrate {
+    // XXX: not sure we can have the name be different from libc::$name without parameters to the
+    // derive macro
+    derive() { $(#[$($attrs:meta),*])* $v:vis struct $name:ident {
+        $(
+            $(#[$($fa:meta),*])* $fv:vis $field:ident : $type:ty
+        ),*$(,)?
+    } } => {
+        // TODO: check repr(C)? probably possible to match on $attrs
+        #[allow(dead_code)]
+        const _: () = {
+            if ::core::mem::size_of::<$name>() != ::core::mem::size_of::<::__libc_only_for_layout_checks::$name>() {
+                panic!("struct size mismatch");
+            }
+            if ::core::mem::align_of::<$name>() != ::core::mem::align_of::<::__libc_only_for_layout_checks::$name>() {
+                panic!("struct alignment mismatch");
+            }
+            $(
+                if ::core::mem::offset_of!($name, $field) != ::core::mem::offset_of!(__libc_only_for_layout_checks::$name, $field) {
+                    panic!("struct field offset mismatch");
+                }
+            )*
+        };
+        $(
+            // check all field types are equivalent
+            #[allow(dead_code)]
+            const _: () = {
+                fn ensure_ty<A, B>(a: A, b: B) where (): $crate::macros::LibcTypeEquals::<A, B> {}
+                fn for_libc(a: $name, b: __libc_only_for_layout_checks::$name) {
+                    let a: $type = panic!("never called");
+                    ensure_ty(a, b.$field);
+                }
+            };
+        )*
+        impl $crate::macros::LibcTypeEquals<$name, __libc_only_for_layout_checks::$name> for () {}
+        impl $crate::macros::LibcTypeEquals<__libc_only_for_layout_checks::$name, $name> for () {}
+    }
+}
