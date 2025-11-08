@@ -514,11 +514,14 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<c_int> {
-        let stream = syscall::dup(socket as usize, b"listen")? as c_int;
+        let stream = dbg!(syscall::dup(socket as usize, b"listen"))?;
         if address != ptr::null_mut() && address_len != ptr::null_mut() {
-            let _ = Self::getpeername(stream, address, address_len)?;
+            if let Err(err) = Self::getpeername(stream as c_int, address, address_len) {
+                let _ = syscall::close(stream);
+                return Err(err);
+            }
         }
-        Ok(stream)
+        Ok(stream as c_int)
     }
 
     unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> Result<()> {
