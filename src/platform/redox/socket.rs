@@ -716,8 +716,7 @@ impl PalSocket for Sys {
                 }
                 _ => {
                     let metadata = [SocketCall::GetSockOpt as u64, option_name as u64];
-                    let payload =
-                        slice::from_raw_parts_mut(option_value as *mut u8, option_len);
+                    let payload = slice::from_raw_parts_mut(option_value as *mut u8, option_len);
                     let call_flags = CallFlags::empty();
                     *option_len_ptr = redox_rt::sys::sys_call(
                         socket as usize,
@@ -810,7 +809,7 @@ impl PalSocket for Sys {
             + mem::size_of::<usize>()       // payload_len
             + whole_iov_size                // payload_data_buffer
             + mem::size_of::<usize>()       // control_len
-            + mhdr.msg_controllen as usize  // ancillary_stream_buffer
+            + mhdr.msg_controllen as usize // ancillary_stream_buffer
         };
         msg_stream
             .try_reserve_exact(expected_stream_size)

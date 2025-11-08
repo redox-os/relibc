@@ -14,7 +14,7 @@ pub type sa_family_t = u16;
 pub type socklen_t = u32;
 
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, CheckVsLibcCrate)]
 pub struct linger {
     pub l_onoff: c_int,
     pub l_linger: c_int,
@@ -24,7 +24,7 @@ pub struct linger {
 pub extern "C" fn _cbindgen_export_linger(linger: linger) {}
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, CheckVsLibcCrate)]
 pub struct msghdr {
     pub msg_name: *mut c_void,
     pub msg_namelen: socklen_t,
@@ -36,7 +36,7 @@ pub struct msghdr {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, CheckVsLibcCrate)]
 pub struct cmsghdr {
     pub cmsg_len: size_t,
     pub cmsg_level: c_int,
@@ -45,6 +45,7 @@ pub struct cmsghdr {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
+// FIXME: CheckVsLibcCrate
 pub struct ucred {
     pub pid: pid_t,
     pub uid: uid_t,
@@ -55,7 +56,7 @@ pub struct ucred {
 pub extern "C" fn _cbindgen_export_cmsghdr(cmsghdr: cmsghdr) {}
 
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, CheckVsLibcCrate)]
 pub struct sockaddr {
     pub sa_family: sa_family_t,
     pub sa_data: [c_char; 14],
@@ -75,6 +76,7 @@ const _SS_PADDING: usize = _SS_MAXSIZE - mem::size_of::<sa_family_t>() - mem::si
 /// * The order of the fields is important because the bytes in the padding will be cast to and
 /// from protocol structs in C
 #[repr(C)]
+//#[derive(CheckVsLibcCrate)] FIXME: can't ignore private fields yet
 pub struct sockaddr_storage {
     pub ss_family: sa_family_t,
     __ss_pad2: [u8; _SS_PADDING],
