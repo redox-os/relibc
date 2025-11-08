@@ -11,7 +11,7 @@ use crate::{
 pub mod constants;
 
 pub type sa_family_t = u16;
-pub type socklen_t = size_t;
+pub type socklen_t = u32;
 
 #[repr(C)]
 #[derive(Default)]
