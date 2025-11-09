@@ -4,7 +4,7 @@ use crate::{
     error::{Errno, ResultExt},
     platform::types::*,
 };
-use syscall::{F_SETFD, F_SETFL, error::*};
+use syscall::{F_SETFD, F_SETFL, O_RDONLY, O_WRONLY, error::*};
 
 pub use redox_rt::proc::FdGuard;
 
@@ -20,10 +20,12 @@ pub unsafe extern "C" fn redox_fpath(fd: c_int, buf: *mut c_void, count: size_t)
 }
 
 pub fn pipe2(flags: usize) -> syscall::error::Result<[c_int; 2]> {
-    let mut read_fd = FdGuard::new(syscall::open("/scheme/pipe", flags)?);
+    let read_flags = flags | O_RDONLY;
+    let write_flags = flags | O_WRONLY;
+    let mut read_fd = FdGuard::new(syscall::open("/scheme/pipe", read_flags)?);
     let mut write_fd = FdGuard::new(syscall::dup(*read_fd, b"write")?);
-    syscall::fcntl(*write_fd, F_SETFL, flags)?;
-    syscall::fcntl(*write_fd, F_SETFD, flags)?;
+    syscall::fcntl(*write_fd, F_SETFL, write_flags)?;
+    syscall::fcntl(*write_fd, F_SETFD, write_flags)?;
 
     let fds = [
         c_int::try_from(*read_fd).map_err(|_| Error::new(EMFILE))?,
