@@ -658,7 +658,37 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<()> {
-        inner_get_name(false, socket, address, address_len)
+        // This is needed until the netstack supports GetPeerName.
+        let (family, _) = socket_domain_type(socket)?;
+
+        match family {
+            AF_INET => inner_get_name(false, socket, address, address_len),
+            AF_UNIX => {
+                let mut buf = [0; 256];
+                let len = redox_rt::sys::sys_call(
+                    socket as usize,
+                    &mut buf,
+                    CallFlags::empty(),
+                    &[SocketCall::GetPeerName as u64],
+                )?;
+                if buf.starts_with(b"/scheme/uds_stream/") {
+                    inner_af_unix(&buf[19..len], address, address_len);
+                } else if buf.starts_with(b"/scheme/uds_dgram/") {
+                    inner_af_unix(&buf[18..len], address, address_len);
+                } else {
+                    // Socket doesn't belong to any scheme
+                    trace!(
+                        "socket {:?} doesn't match either tcp, udp or chan schemes",
+                        str::from_utf8(buf)
+                    );
+                    return Err(Errno(ENOTSOCK));
+                }
+                Ok(())
+            }
+            _ => {
+                return Err(Errno(EAFNOSUPPORT));
+            }
+        }
     }
 
     unsafe fn getsockname(
