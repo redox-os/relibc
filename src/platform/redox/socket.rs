@@ -682,6 +682,9 @@ impl PalSocket for Sys {
                 }
                 Ok(())
             }
+            _ => {
+                return Err(Errno(EAFNOSUPPORT));
+            }
         }
     }
 
