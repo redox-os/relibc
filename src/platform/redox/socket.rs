@@ -658,7 +658,31 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<()> {
-        inner_get_name(false, socket, address, address_len)
+        match (*address).sa_family as c_int {
+            AF_INET => inner_get_name(false, socket, address, address_len),
+            AF_UNIX => {
+                let mut buf = [0; 256];
+                let len = redox_rt::sys::sys_call(
+                    socket as usize,
+                    buf,
+                    CallFlags::READ,
+                    &[SocketCall::GetPeerName as u64],
+                )?;
+                if buf.starts_with(b"/scheme/uds_stream/") {
+                    inner_af_unix(&buf[19..len], address, address_len);
+                } else if buf.starts_with(b"/scheme/uds_dgram/") {
+                    inner_af_unix(&buf[18..len], address, address_len);
+                } else {
+                    // Socket doesn't belong to any scheme
+                    trace!(
+                        "socket {:?} doesn't match either tcp, udp or chan schemes",
+                        str::from_utf8(buf)
+                    );
+                    return Err(Errno(ENOTSOCK));
+                }
+                Ok(())
+            }
+        }
     }
 
     unsafe fn getsockname(
