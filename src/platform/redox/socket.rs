@@ -664,8 +664,8 @@ impl PalSocket for Sys {
                 let mut buf = [0; 256];
                 let len = redox_rt::sys::sys_call(
                     socket as usize,
-                    buf,
-                    CallFlags::READ,
+                    &mut buf,
+                    CallFlags::empty(),
                     &[SocketCall::GetPeerName as u64],
                 )?;
                 if buf.starts_with(b"/scheme/uds_stream/") {
