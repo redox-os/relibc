@@ -658,7 +658,10 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<()> {
-        match (*address).sa_family as c_int {
+        // This is needed until the netstack supports GetPeerName.
+        let (family, _) = socket_domain_type(socket)?;
+
+        match family {
             AF_INET => inner_get_name(false, socket, address, address_len),
             AF_UNIX => {
                 let mut buf = [0; 256];
