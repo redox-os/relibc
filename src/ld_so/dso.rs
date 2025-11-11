@@ -603,7 +603,8 @@ impl DSO {
                     tcb_master = Some(Master {
                         ptr,
                         len: ph.p_filesz(endian) as usize,
-                        offset: tls_offset + vsize,
+                        // Align offset to 16 for SSE
+                        offset: (tls_offset + vsize).next_multiple_of(16),
                     });
                     trace!("  tcb master {:x?}", tcb_master);
                 }
