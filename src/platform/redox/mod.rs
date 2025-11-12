@@ -116,13 +116,13 @@ impl Pal for Sys {
 
         let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
 
-        let perms = if stat.st_uid == ruid {
-            stat.st_mode >> (3 * 2 & 0o7)
+        let perms = (if stat.st_uid == ruid {
+            stat.st_mode >> (3 * 2)
         } else if stat.st_gid == rgid {
-            stat.st_mode >> (3 * 1 & 0o7)
+            stat.st_mode >> (3 * 1)
         } else {
-            stat.st_mode & 0o7
-        };
+            stat.st_mode
+        }) & 0o7;
         if (mode & R_OK == R_OK && perms & 0o4 != 0o4)
             || (mode & W_OK == W_OK && perms & 0o2 != 0o2)
             || (mode & X_OK == X_OK && perms & 0o1 != 0o1)
