@@ -1028,9 +1028,9 @@ impl PalSocket for Sys {
                         CallFlags::empty(),
                         &metadata,
                     ) {
-                        Err(e) if e.0 == EOPNOTSUPP => (),
-                        Err(e) => return Err(e),
-                        Ok(()) => return Ok(()),
+                        Err(e) if e.errno == EOPNOTSUPP as i32 => (),
+                        Err(e) => return Err(e.into()),
+                        Ok(_) => return Ok(()),
                     }
                 }
             },
