@@ -1022,13 +1022,16 @@ impl PalSocket for Sys {
                     let payload =
                         slice::from_raw_parts_mut(option_value as *mut u8, option_len as usize);
                     let call_flags = CallFlags::empty();
-                    redox_rt::sys::sys_call(
+                    match redox_rt::sys::sys_call(
                         socket as usize,
                         payload,
                         CallFlags::empty(),
                         &metadata,
-                    )?;
-                    return Ok(());
+                    ) {
+                        Err(e) if e.errno == EOPNOTSUPP as i32 => (),
+                        Err(e) => return Err(e.into()),
+                        Ok(_) => return Ok(()),
+                    }
                 }
             },
             _ => (),
