@@ -28,6 +28,7 @@ mod epoll;
 mod ptrace;
 mod signal;
 mod socket;
+mod timer;
 
 const SYS_CLONE: usize = 56;
 const CLONE_VM: usize = 0x0100;
@@ -757,47 +758,6 @@ impl Pal for Sys {
 
     fn sync() -> Result<()> {
         e_raw(unsafe { syscall!(SYNC) }).map(|_| ())
-    }
-
-    fn timer_create(clock_id: clockid_t, evp: &sigevent, mut timerid: Out<timer_t>) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                TIMER_CREATE,
-                clock_id,
-                ptr::addr_of!(evp),
-                timerid.as_mut_ptr()
-            )
-        })
-        .map(|_| ())
-    }
-
-    fn timer_delete(timerid: timer_t) -> Result<()> {
-        e_raw(unsafe { syscall!(TIMER_DELETE, timerid) }).map(|_| ())
-    }
-
-    fn timer_gettime(timerid: timer_t, mut value: Out<itimerspec>) -> Result<()> {
-        e_raw(unsafe { syscall!(TIMER_GETTIME, timerid, value.as_mut_ptr()) }).map(|_| ())
-    }
-
-    fn timer_settime(
-        timerid: timer_t,
-        flags: c_int,
-        value: &itimerspec,
-        mut ovalue: Option<Out<itimerspec>>,
-    ) -> Result<()> {
-        e_raw(unsafe {
-            syscall!(
-                TIMER_SETTIME,
-                timerid,
-                flags,
-                ptr::addr_of!(value),
-                match ovalue {
-                    None => ptr::null_mut(),
-                    Some(mut o) => o.as_mut_ptr(),
-                }
-            )
-        })
-        .map(|_| ())
     }
 
     fn umask(mask: mode_t) -> mode_t {

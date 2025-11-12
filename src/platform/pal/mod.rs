@@ -27,6 +27,9 @@ mod signal;
 pub use self::socket::PalSocket;
 mod socket;
 
+pub use self::timer::PalTimer;
+mod timer;
+
 /// Platform abstraction layer, a platform-agnostic abstraction over syscalls.
 pub trait Pal {
     fn access(path: CStr, mode: c_int) -> Result<()>;
@@ -260,19 +263,6 @@ pub trait Pal {
     fn symlink(path1: CStr, path2: CStr) -> Result<()>;
 
     fn sync() -> Result<()>;
-
-    fn timer_create(clock_id: clockid_t, evp: &sigevent, timerid: Out<timer_t>) -> Result<()>;
-
-    fn timer_delete(timerid: timer_t) -> Result<()>;
-
-    fn timer_gettime(timerid: timer_t, value: Out<itimerspec>) -> Result<()>;
-
-    fn timer_settime(
-        timerid: timer_t,
-        flags: c_int,
-        value: &itimerspec,
-        ovalue: Option<Out<itimerspec>>,
-    ) -> Result<()>;
 
     // Always successful
     fn umask(mask: mode_t) -> mode_t;

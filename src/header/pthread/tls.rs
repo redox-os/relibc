@@ -3,7 +3,10 @@ use super::*;
 // TODO: Hashmap?
 use alloc::collections::BTreeMap;
 
-use core::{cell::{Cell, RefCell}, sync::atomic::{AtomicUsize, Ordering}};
+use core::{
+    cell::{Cell, RefCell},
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use crate::{header::errno::EINVAL, sync::Mutex};
 
