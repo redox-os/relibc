@@ -858,7 +858,7 @@ impl PalSocket for Sys {
             .copy_from_slice(&(mhdr.msg_controllen as usize).to_le_bytes());
 
         // Read the message stream.
-        let metadata = [SocketCall::RecvMsg as u64];
+        let metadata = [SocketCall::RecvMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
         let actual_read_len =
             redox_rt::sys::sys_call(socket as usize, &mut msg_stream, call_flags, &metadata)?;
@@ -935,7 +935,7 @@ impl PalSocket for Sys {
         }
 
         // Send the message stream.
-        let metadata = [SocketCall::SendMsg as u64];
+        let metadata = [SocketCall::SendMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
         let written = redox_rt::sys::sys_call(
             socket as usize,
