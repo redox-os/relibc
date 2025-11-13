@@ -793,7 +793,8 @@ impl Linker {
             dlopened,
             self.next_object_id,
             self.next_tls_module_id,
-            self.tls_size,
+            // Ensure TLS is aligned to 16 bytes for SSE
+            self.tls_size.next_multiple_of(16),
         )
         .map_err(|err| {
             if debug {
