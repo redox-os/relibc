@@ -1,4 +1,4 @@
-sys_includes = []
+sys_includes = ["signal.h", "time.h"]
 include_guard = "_RELIBC_POLL_H"
 language = "C"
 style = "Tag"
@@ -7,3 +7,6 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
+
+[export.rename]
+"timespec" = "struct timespec"

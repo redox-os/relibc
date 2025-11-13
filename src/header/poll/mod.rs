@@ -3,15 +3,19 @@
 // TODO: set this for entire crate when possible
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use core::{mem, slice};
+use core::{mem, ptr, slice};
 
 use crate::{
     error::ResultExt,
     fs::File,
-    header::sys_epoll::{
-        EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLNVAL, EPOLLOUT, EPOLLPRI,
-        EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, epoll_create1, epoll_ctl, epoll_data,
-        epoll_event, epoll_wait,
+    header::{
+        signal::sigset_t,
+        sys_epoll::{
+            EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLNVAL, EPOLLOUT,
+            EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, epoll_create1, epoll_ctl,
+            epoll_data, epoll_event, epoll_pwait,
+        },
+        time::timespec,
     },
     platform::types::*,
 };
@@ -36,7 +40,7 @@ pub struct pollfd {
     pub revents: c_short,
 }
 
-pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
+pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) -> c_int {
     let event_map = [
         (POLLIN, EPOLLIN),
         (POLLPRI, EPOLLPRI),
@@ -87,7 +91,15 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
     }
 
     let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
-    let res = unsafe { epoll_wait(*ep, events.as_mut_ptr(), events.len() as c_int, timeout) };
+    let res = unsafe {
+        epoll_pwait(
+            *ep,
+            events.as_mut_ptr(),
+            events.len() as c_int,
+            timeout,
+            sigmask,
+        )
+    };
     if res < 0 {
         return -1;
     }
@@ -118,11 +130,40 @@ pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) ->
     trace_expr!(
         poll_epoll(
             unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
-            timeout
+            timeout,
+            ptr::null_mut()
         ),
         "poll({:p}, {}, {})",
         fds,
         nfds,
-        timeout
+        timeout,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ppoll(
+    fds: *mut pollfd,
+    nfds: nfds_t,
+    tmo_p: *const timespec,
+    sigmask: *const sigset_t,
+) -> c_int {
+    let timeout = if tmo_p.is_null() {
+        -1
+    } else {
+        let tmo = unsafe { &*tmo_p };
+        //TODO: handle overflow
+        ((tmo.tv_sec * 1000) + (tmo.tv_nsec / 1000000)) as c_int
+    };
+    trace_expr!(
+        poll_epoll(
+            unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
+            timeout,
+            sigmask
+        ),
+        "ppoll({:p}, {}, {:p}, {:p})",
+        fds,
+        nfds,
+        tmo_p,
+        sigmask
     )
 }
