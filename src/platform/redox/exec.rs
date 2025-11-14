@@ -16,13 +16,13 @@ use crate::{
 
 use redox_rt::{
     RtTcb,
-    proc::{ExtraInfo, FdGuard, FexecResult, InterpOverride},
+    proc::{ExtraInfo, FdGuard, FdGuardUpper, FexecResult, InterpOverride},
     sys::Resugid,
 };
 use syscall::{data::Stat, error::*, flag::*};
 
 fn fexec_impl(
-    exec_file: FdGuard,
+    exec_file: FdGuardUpper,
     path: &[u8],
     args: &[&[u8]],
     envs: &[&[u8]],
@@ -30,7 +30,7 @@ fn fexec_impl(
     extrainfo: &ExtraInfo,
     interp_override: Option<InterpOverride>,
 ) -> Result<Infallible> {
-    let memory = FdGuard::new(syscall::open("/scheme/memory", 0)?);
+    let memory = FdGuard::open("/scheme/memory", 0)?.to_upper()?;
 
     let addrspace_selection_fd = match redox_rt::proc::fexec_impl(
         exec_file,
@@ -231,8 +231,13 @@ pub fn execve(
         // scenarios. While execve() is undefined according to POSIX if there exist sibling
         // threads, it could still be allowed by keeping certain file descriptors and instead
         // set the active file table.
-        let files_fd =
-            File::new(syscall::dup(**RtTcb::current().thread_fd(), b"filetable")? as c_int);
+        let files_fd = File::new(
+            c_int::try_from(syscall::dup(
+                RtTcb::current().thread_fd().as_raw_fd(),
+                b"filetable",
+            )?)
+            .unwrap(),
+        );
         for line in BufReader::new(files_fd).lines() {
             let line = match line {
                 Ok(l) => l,
@@ -252,7 +257,7 @@ pub fn execve(
     }
 
     // TODO: Convert image_file to FdGuard earlier?
-    let exec_fd_guard = FdGuard::new(image_file.fd as usize);
+    let exec_fd_guard = FdGuard::new(image_file.fd as usize).to_upper().unwrap();
     core::mem::forget(image_file);
 
     let sigprocmask = redox_rt::signal::get_sigmask().unwrap();
@@ -263,8 +268,8 @@ pub fn execve(
         sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
         sigprocmask,
         umask: redox_rt::sys::get_umask(),
-        thr_fd: **RtTcb::current().thread_fd(),
-        proc_fd: **redox_rt::current_proc_fd(),
+        thr_fd: RtTcb::current().thread_fd().as_raw_fd(),
+        proc_fd: redox_rt::current_proc_fd().as_raw_fd(),
     };
     fexec_impl(
         exec_fd_guard,

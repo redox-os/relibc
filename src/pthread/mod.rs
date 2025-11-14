@@ -229,7 +229,11 @@ unsafe extern "C" fn new_thread_shim(
         }
         #[cfg(target_os = "redox")]
         {
-            tcb.activate(redox_rt::proc::FdGuard::new(tid.thread_fd));
+            tcb.activate(
+                redox_rt::proc::FdGuard::new(tid.thread_fd)
+                    .to_upper()
+                    .unwrap(),
+            );
             redox_rt::signal::setup_sighandler(&tcb.os_specific, false);
         }
     }

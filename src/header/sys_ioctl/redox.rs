@@ -41,17 +41,13 @@ pub const SIOCATMARK: c_ulong = 0x8905;
 // TODO: some of the structs passed as T have padding bytes, so casting to a byte slice is UB
 
 fn dup_read<T>(fd: c_int, name: &str, t: &mut T) -> syscall::Result<usize> {
-    let dup = syscall::dup(fd as usize, name.as_bytes())?;
+    let dup = FdGuard::new(syscall::dup(fd as usize, name.as_bytes())?);
 
     let size = mem::size_of::<T>();
 
-    let res = syscall::read(dup, unsafe {
-        slice::from_raw_parts_mut(t as *mut T as *mut u8, size)
-    });
+    let bytes = dup.read(unsafe { slice::from_raw_parts_mut(t as *mut T as *mut u8, size) })?;
 
-    let _ = syscall::close(dup);
-
-    res.map(|bytes| bytes / size)
+    Ok(bytes / size)
 }
 
 // FIXME: unsound
@@ -60,11 +56,9 @@ fn dup_write<T>(fd: c_int, name: &str, t: &T) -> Result<usize> {
 
     let size = mem::size_of::<T>();
 
-    let bytes_written = syscall::write(*dup, unsafe {
-        slice::from_raw_parts(t as *const T as *const u8, size)
-    })?;
+    let bytes = dup.write(unsafe { slice::from_raw_parts(t as *const T as *const u8, size) })?;
 
-    Ok(bytes_written / size)
+    Ok(bytes / size)
 }
 
 unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c_int> {

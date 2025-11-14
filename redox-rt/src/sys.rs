@@ -146,7 +146,12 @@ pub fn sys_call(
     }
 }
 pub fn this_proc_call(payload: &mut [u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
-    proc_call(**crate::current_proc_fd(), payload, flags, metadata)
+    proc_call(
+        crate::current_proc_fd().as_raw_fd(),
+        payload,
+        flags,
+        metadata,
+    )
 }
 pub fn proc_call(
     proc_fd: usize,
@@ -165,7 +170,12 @@ pub fn thread_call(
     sys_call(thread_fd, payload, flags, metadata)
 }
 pub fn this_thread_call(payload: &mut [u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
-    thread_call(**RtTcb::current().thread_fd(), payload, flags, metadata)
+    thread_call(
+        RtTcb::current().thread_fd().as_raw_fd(),
+        payload,
+        flags,
+        metadata,
+    )
 }
 
 #[derive(Clone, Copy, Debug)]

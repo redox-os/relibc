@@ -156,7 +156,7 @@ pub fn open(path: &str, flags: usize) -> Result<usize> {
                 let resolve_flags = O_CLOEXEC | O_SYMLINK | O_RDONLY;
                 let resolve_fd = FdGuard::new(syscall::open(&*canon, resolve_flags)?);
 
-                let bytes_read = syscall::read(*resolve_fd, &mut resolve_buf)?;
+                let bytes_read = resolve_fd.read(&mut resolve_buf)?;
                 // TODO: make resolve_buf PATH_MAX + 1 bytes?
                 if bytes_read == resolve_buf.len() {
                     return Err(Error::new(ENAMETOOLONG));

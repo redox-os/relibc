@@ -5,36 +5,33 @@ use syscall::Result;
 use crate::{RtTcb, arch::*, proc::*, signal::tmp_disable_signals, static_proc_info};
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
-pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuard> {
+pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuardUpper> {
     let proc_info = static_proc_info();
     assert!(proc_info.has_proc_fd);
     let cur_proc_fd = unsafe { proc_info.proc_fd.assume_init_ref() };
 
     let cur_thr_fd = RtTcb::current().thread_fd();
-    let new_thr_fd = FdGuard::new(syscall::dup(**cur_proc_fd, b"new-thread")?);
+    let new_thr_fd = cur_proc_fd.dup(b"new-thread")?.to_upper().unwrap();
 
     // Inherit existing address space
     {
-        let cur_addr_space_fd = FdGuard::new(syscall::dup(**cur_thr_fd, b"addrspace")?);
-        let new_addr_space_sel_fd = FdGuard::new(syscall::dup(*new_thr_fd, b"current-addrspace")?);
+        let cur_addr_space_fd = cur_thr_fd.dup(b"addrspace")?;
+        let new_addr_space_sel_fd = new_thr_fd.dup(b"current-addrspace")?;
 
         let buf = create_set_addr_space_buf(
-            *cur_addr_space_fd,
+            cur_addr_space_fd.as_raw_fd(),
             __relibc_internal_rlct_clone_ret as usize,
             stack as usize,
         );
-        let _ = syscall::write(*new_addr_space_sel_fd, &buf)?;
+        new_addr_space_sel_fd.write(&buf)?;
     }
 
     // Inherit reference to file table
     {
-        let cur_filetable_fd = FdGuard::new(syscall::dup(**cur_thr_fd, b"filetable")?);
-        let new_filetable_sel_fd = FdGuard::new(syscall::dup(*new_thr_fd, b"current-filetable")?);
+        let cur_filetable_fd = cur_thr_fd.dup(b"filetable")?;
+        let new_filetable_sel_fd = new_thr_fd.dup(b"current-filetable")?;
 
-        let _ = syscall::write(
-            *new_filetable_sel_fd,
-            &usize::to_ne_bytes(*cur_filetable_fd),
-        )?;
+        new_filetable_sel_fd.write(&usize::to_ne_bytes(cur_filetable_fd.as_raw_fd()))?;
     }
 
     // Since the signal handler is not yet initialized, signals specifically targeting the thread
@@ -43,8 +40,8 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuard> {
     // until it has initialized its own signal handler.
 
     // Unblock context.
-    let start_fd = FdGuard::new(syscall::dup(*new_thr_fd, b"start")?);
-    let _ = syscall::write(*start_fd, &[0])?;
+    let start_fd = new_thr_fd.dup(b"start")?;
+    start_fd.write(&[0])?;
 
     Ok(new_thr_fd)
 }
@@ -54,7 +51,7 @@ pub unsafe fn exit_this_thread(stack_base: *mut (), stack_size: usize) -> ! {
 
     let tcb = RtTcb::current();
     // TODO: modify interface so it writes directly to the thread fd?
-    let status_fd = syscall::dup(**tcb.thread_fd(), b"status").unwrap();
+    let status_fd = tcb.thread_fd().dup(b"status").unwrap();
 
     let _ = unsafe { syscall::funmap(tcb as *const RtTcb as usize, syscall::PAGE_SIZE) };
 
@@ -63,6 +60,6 @@ pub unsafe fn exit_this_thread(stack_base: *mut (), stack_size: usize) -> ! {
         .unwrap()
         .copy_from_slice(&[usize::MAX, stack_base as usize, stack_size]);
     // TODO: SYS_CALL w/CONSUME
-    syscall::write(status_fd, &buf).unwrap();
+    status_fd.write(&buf).unwrap();
     unreachable!()
 }
