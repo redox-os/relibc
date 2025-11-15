@@ -5,31 +5,23 @@
 use crate::{
     c_str::{CStr, CString},
     error::{Errno, ResultExt},
-    fs::File,
     header::{
         errno::{EFAULT, EOVERFLOW},
-        fcntl::O_RDONLY,
         signal::sigevent,
         stdlib::getenv,
         unistd::readlink,
     },
-    io::Read,
     out::Out,
-    platform::{self, Pal, Sys, types::*},
+    platform::{self, Pal, PalTimer, Sys, types::*},
     sync::{Mutex, MutexGuard},
 };
-use __libc_only_for_layout_checks::EINVAL;
-use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
+use alloc::collections::BTreeSet;
 use chrono::{
-    DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, ParseError, TimeZone,
-    Timelike, Utc, format::ParseErrorKind, offset::MappedLocalTime,
+    DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, TimeZone, Timelike, Utc,
+    offset::MappedLocalTime,
 };
 use chrono_tz::{OffsetComponents, OffsetName, Tz};
-use core::{
-    cell::OnceCell,
-    convert::{TryFrom, TryInto},
-    mem, ptr,
-};
+use core::{cell::OnceCell, convert::TryFrom, mem, ptr};
 
 pub use self::constants::*;
 
@@ -108,21 +100,6 @@ impl<'a> From<&'a timespec> for syscall::TimeSpec {
             tv_nsec: tp.tv_nsec as _,
         }
     }
-}
-
-/// timer_t internal data, ABI unstable
-#[repr(C)]
-#[derive(Clone)]
-#[cfg(target_os = "redox")]
-pub(crate) struct timer_internal_t {
-    pub clockid: clockid_t,
-    pub timerfd: usize,
-    pub eventfd: usize,
-    pub evp: sigevent,
-    pub thread: pthread_t,
-    pub caller_thread: crate::pthread::OsTid,
-    // relibc handles it_interval, not the kernel
-    pub next_wake_time: itimerspec,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
@@ -549,7 +526,7 @@ pub unsafe extern "C" fn timer_create(
     if evp.is_null() || timerid.is_null() {
         return Err(Errno(EFAULT)).or_minus_one_errno();
     }
-    let (evp, timerid) = unsafe { (&*evp, Out::nonnull(timerid)) };
+    let (evp, timerid) = unsafe { (&*evp, Out::nonnull(timerid.cast())) };
     Sys::timer_create(clock_id, &evp, timerid)
         .map(|()| 0)
         .or_minus_one_errno()
@@ -561,13 +538,20 @@ pub unsafe extern "C" fn timer_delete(timerid: timer_t) -> c_int {
     if timerid.is_null() {
         return Err(Errno(EFAULT)).or_minus_one_errno();
     }
-    Sys::timer_delete(timerid).map(|()| 0).or_minus_one_errno()
+    Sys::timer_delete(timerid.cast())
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
 // #[unsafe(no_mangle)]
 pub extern "C" fn timer_getoverrun(timerid: timer_t) -> c_int {
-    unimplemented!();
+    if timerid.is_null() {
+        return Err(Errno(EFAULT)).or_minus_one_errno();
+    }
+    Sys::timer_delete(timerid.cast())
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timer_getoverrun.html>.
@@ -577,7 +561,7 @@ pub unsafe extern "C" fn timer_gettime(timerid: timer_t, value: *mut itimerspec)
         return Err(Errno(EFAULT)).or_minus_one_errno();
     }
     let value = unsafe { Out::nonnull(value) };
-    Sys::timer_gettime(timerid, value)
+    Sys::timer_gettime(timerid.cast(), value)
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -594,7 +578,7 @@ pub unsafe extern "C" fn timer_settime(
         return Err(Errno(EFAULT)).or_minus_one_errno();
     }
     let (value, ovalue) = unsafe { (&*value, Out::nullable(ovalue)) };
-    Sys::timer_settime(timerid, flags, value, ovalue)
+    Sys::timer_settime(timerid.cast(), flags, value, ovalue)
         .map(|()| 0)
         .or_minus_one_errno()
 }
