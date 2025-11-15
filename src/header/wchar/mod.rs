@@ -11,14 +11,14 @@ use crate::{
         stdlib::{MB_CUR_MAX, MB_LEN_MAX, malloc},
         string,
         time::*,
-        wchar::{lookaheadreader::LookAheadReader, utf8::get_char_encoded_length},
+        wchar::{reader::Reader, utf8::get_char_encoded_length},
         wctype::*,
     },
     iter::{NulTerminated, NulTerminatedInclusive},
     platform::{self, ERRNO, types::*},
 };
 
-mod lookaheadreader;
+mod reader;
 mod utf8;
 mod wprintf;
 mod wscanf;
@@ -278,8 +278,7 @@ pub unsafe extern "C" fn vswscanf(
     format: *const wchar_t,
     __valist: va_list,
 ) -> c_int {
-    let reader = (s as *const wint_t).into();
-    wscanf::scanf(reader, format, __valist)
+    wscanf::scanf(s.into(), format.into(), __valist)
 }
 
 #[unsafe(no_mangle)]
@@ -1002,8 +1001,8 @@ pub unsafe extern "C" fn vwscanf(format: *const wchar_t, __valist: va_list) -> c
     }
 
     let f: &mut FILE = &mut *file;
-    let reader: LookAheadReader = f.into();
-    wscanf::scanf(reader, format, __valist)
+    let reader: Reader = f.into();
+    wscanf::scanf(reader, format.into(), __valist)
 }
 
 #[unsafe(no_mangle)]
