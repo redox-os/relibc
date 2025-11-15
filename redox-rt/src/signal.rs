@@ -9,7 +9,6 @@ use crate::{
     RtTcb, Tcb,
     arch::*,
     current_proc_fd,
-    proc::FdGuard,
     protocol::{
         ProcCall, RtSigInfo, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG,
         SIGWINCH, ThreadCall,
@@ -179,7 +178,7 @@ unsafe fn inner(stack: &mut SigStack) {
         SigactionKind::Default if usize::from(sig) == SIGCONT => SignalHandler { handler: None },
         SigactionKind::Default => {
             let _ = proc_call(
-                **current_proc_fd(),
+                current_proc_fd().as_raw_fd(),
                 &mut [],
                 CallFlags::empty(),
                 &[ProcCall::Exit as u64, u64::from(sig) << 8],
@@ -647,10 +646,11 @@ pub fn setup_sighandler(tcb: &RtTcb, first_thread: bool) {
 
     let data = current_setsighandler_struct();
 
-    let fd = FdGuard::new(
-        syscall::dup(**tcb.thread_fd(), b"sighandler").expect("failed to open sighandler fd"),
-    );
-    let _ = syscall::write(*fd, &data).expect("failed to write to sighandler fd");
+    let fd = tcb
+        .thread_fd()
+        .dup(b"sighandler")
+        .expect("failed to open sighandler fd");
+    fd.write(&data).expect("failed to write to sighandler fd");
     this_thread_call(
         &mut [],
         CallFlags::empty(),
@@ -862,7 +862,7 @@ fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option
             let mut buf = [0_u8; size_of::<RtSigInfo>()];
             buf[..4].copy_from_slice(&(sig_idx - 32).to_ne_bytes());
             proc_call(
-                **static_proc_info().proc_fd.assume_init_ref(),
+                static_proc_info().proc_fd.assume_init_ref().as_raw_fd(),
                 &mut buf,
                 CallFlags::empty(),
                 &[ProcCall::Sigdeq as u64],

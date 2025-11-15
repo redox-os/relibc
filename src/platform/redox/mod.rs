@@ -112,7 +112,7 @@ impl Pal for Sys {
 
         let mut stat = syscall::Stat::default();
 
-        syscall::fstat(*fd as usize, &mut stat)?;
+        fd.fstat(&mut stat)?;
 
         let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
 
@@ -500,8 +500,8 @@ impl Pal for Sys {
         }
 
         //TODO: store fd internally
-        let fd = FdGuard::new(syscall::open(path, open_flags)?);
-        Ok(syscall::read(*fd, buf)?)
+        let fd = FdGuard::open(path, open_flags)?;
+        Ok(fd.read(buf)?)
     }
 
     fn getresgid(
@@ -578,8 +578,8 @@ impl Pal for Sys {
     fn gettid() -> pid_t {
         // This is used by pthread mutexes for reentrant checks and must be nonzero
         // and unique for each thread in the same process (but not cross-process)
-        Self::current_os_tid()
-            .thread_fd
+        let thread_fd = Self::current_os_tid().thread_fd;
+        (thread_fd & !syscall::UPPER_FDTBL_TAG)
             .checked_add(1)
             .unwrap()
             .try_into()
@@ -861,7 +861,7 @@ impl Pal for Sys {
     }
     fn current_os_tid() -> crate::pthread::OsTid {
         crate::pthread::OsTid {
-            thread_fd: **RtTcb::current().thread_fd(),
+            thread_fd: RtTcb::current().thread_fd().as_raw_fd(),
         }
     }
 
@@ -1070,7 +1070,7 @@ impl Pal for Sys {
         }
 
         let path = format!("/scheme/time/{clock_id}");
-        let timerfd = FdGuard::new(libredox::open(&path, O_RDWR, 0)?);
+        let timerfd = FdGuard::open(&path, syscall::O_RDWR)?;
         let eventfd = FdGuard::new(Error::demux(unsafe {
             event::redox_event_queue_create_v1(0)
         })?);
