@@ -44,11 +44,11 @@ ifeq ($(TARGET),aarch64-unknown-redox)
 endif
 
 ifeq ($(TARGET),i586-unknown-redox)
-	export CC=i686-unknown-redox-gcc
-	export LD=i686-unknown-redox-ld
-	export AR=i686-unknown-redox-ar
-	export NM=i686-unknown-redox-nm
-	export OBJCOPY=i686-unknown-redox-objcopy
+	export CC=i586-unknown-redox-gcc
+	export LD=i586-unknown-redox-ld
+	export AR=i586-unknown-redox-ar
+	export NM=i586-unknown-redox-nm
+	export OBJCOPY=i586-unknown-redox-objcopy
 	export CPPFLAGS=
 	LD_SO_PATH=lib/libc.so.1
 endif
