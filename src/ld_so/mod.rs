@@ -40,7 +40,7 @@ static mut STATIC_TCB_MASTER: Master = Master {
 #[inline(never)]
 pub fn static_init(
     sp: &'static Stack,
-    #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuard,
+    #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuardUpper,
 ) {
     const SIZEOF_PHDR64: usize = mem::size_of::<ProgramHeader64<Endianness>>();
     const SIZEOF_PHDR32: usize = mem::size_of::<ProgramHeader32<Endianness>>();
@@ -135,7 +135,7 @@ pub fn static_init(
 #[cfg(any(target_os = "linux", target_os = "redox"))]
 pub unsafe fn init(
     sp: &'static Stack,
-    #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuard,
+    #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuardUpper,
 ) {
     let tp: usize;
 
@@ -157,12 +157,13 @@ pub unsafe fn init(
     {
         let mut env = syscall::EnvRegisters::default();
 
-        let file = syscall::dup(*thr_fd, b"regs/env")
-            .expect_notls("failed to open handle for process registers");
+        {
+            let file = thr_fd
+                .dup(b"regs/env")
+                .expect_notls("failed to open handle for process registers");
 
-        let _ = syscall::read(file, &mut env).expect_notls("failed to read gsbase");
-
-        let _ = syscall::close(file);
+            file.read(&mut env).expect_notls("failed to read gsbase");
+        }
 
         tp = env.gsbase as usize;
     }
@@ -170,12 +171,13 @@ pub unsafe fn init(
     {
         let mut env = syscall::EnvRegisters::default();
 
-        let file = syscall::dup(*thr_fd, b"regs/env")
-            .expect_notls("failed to open handle for process registers");
+        {
+            let file = thr_fd
+                .dup(b"regs/env")
+                .expect_notls("failed to open handle for process registers");
 
-        let _ = syscall::read(file, &mut env).expect_notls("failed to read fsbase");
-
-        let _ = syscall::close(file);
+            file.read(&mut env).expect_notls("failed to read fsbase");
+        }
 
         tp = env.fsbase as usize;
     }

@@ -12,7 +12,7 @@ use generic_rt::{ExpectTlsFree, GenericTcb};
 use syscall::Sigcontrol;
 
 use self::{
-    proc::{FdGuard, STATIC_PROC_INFO},
+    proc::{FdGuard, FdGuardUpper, STATIC_PROC_INFO},
     protocol::ProcMeta,
     sync::Mutex,
 };
@@ -55,13 +55,13 @@ pub mod thread;
 pub struct RtTcb {
     pub control: Sigcontrol,
     pub arch: UnsafeCell<crate::arch::SigArea>,
-    pub thr_fd: UnsafeCell<Option<FdGuard>>,
+    pub thr_fd: UnsafeCell<Option<FdGuardUpper>>,
 }
 impl RtTcb {
     pub fn current() -> &'static Self {
         unsafe { &Tcb::current().unwrap().os_specific }
     }
-    pub fn thread_fd(&self) -> &FdGuard {
+    pub fn thread_fd(&self) -> &FdGuardUpper {
         unsafe { (&*self.thr_fd.get()).as_ref().unwrap() }
     }
 }
@@ -87,16 +87,16 @@ pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
 pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
     let mut env = syscall::EnvRegisters::default();
 
-    let file = FdGuard::new(
-        syscall::dup(**tcb.thread_fd(), b"regs/env")
-            .expect_notls("failed to open handle for process registers"),
-    );
+    let file = tcb
+        .thread_fd()
+        .dup(b"regs/env")
+        .expect_notls("failed to open handle for process registers");
 
-    let _ = syscall::read(*file, &mut env).expect_notls("failed to read gsbase");
+    file.read(&mut env).expect_notls("failed to read gsbase");
 
     env.gsbase = tls_end as u32;
 
-    let _ = syscall::write(*file, &env).expect_notls("failed to write gsbase");
+    file.write(&env).expect_notls("failed to write gsbase");
 }
 
 /// OS and architecture specific code to activate TLS - Redox x86_64
@@ -105,16 +105,16 @@ pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end: usize, _tls_len: usize) {
 pub unsafe fn tcb_activate(tcb: &RtTcb, tls_end_and_tcb_start: usize, _tls_len: usize) {
     let mut env = syscall::EnvRegisters::default();
 
-    let file = FdGuard::new(
-        syscall::dup(**tcb.thread_fd(), b"regs/env")
-            .expect_notls("failed to open handle for process registers"),
-    );
+    let file = tcb
+        .thread_fd()
+        .dup(b"regs/env")
+        .expect_notls("failed to open handle for process registers");
 
-    let _ = syscall::read(*file, &mut env).expect_notls("failed to read fsbase");
+    file.read(&mut env).expect_notls("failed to read fsbase");
 
     env.fsbase = tls_end_and_tcb_start as u64;
 
-    let _ = syscall::write(*file, &env).expect_notls("failed to write fsbase");
+    file.write(&env).expect_notls("failed to write fsbase");
 }
 
 /// OS and architecture specific code to activate TLS - Redox riscv64
@@ -135,7 +135,7 @@ pub unsafe fn tcb_activate(_tcb: &RtTcb, tls_end: usize, tls_len: usize) {
 /// Initialize redox-rt in situations where relibc is not used
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cfg(not(feature = "proc"))]
-pub unsafe fn initialize_freestanding(this_thr_fd: FdGuard) -> &'static FdGuard {
+pub unsafe fn initialize_freestanding(this_thr_fd: FdGuardUpper) -> &'static FdGuardUpper {
     // TODO: This code is a hack! Integrate the ld_so TCB code into generic-rt, and then use that
     // (this function will need pointers to the ELF structs normally passed in auxvs), so the TCB
     // is initialized properly.
@@ -181,12 +181,12 @@ pub unsafe fn initialize_freestanding(this_thr_fd: FdGuard) -> &'static FdGuard 
 
     (*page.os_specific.thr_fd.get()).as_ref().unwrap()
 }
-pub(crate) fn read_proc_meta(proc: &FdGuard) -> syscall::Result<ProcMeta> {
+pub(crate) fn read_proc_meta(proc: &FdGuardUpper) -> syscall::Result<ProcMeta> {
     let mut bytes = [0_u8; size_of::<ProcMeta>()];
-    let _ = syscall::read(**proc, &mut bytes)?;
+    proc.read(&mut bytes)?;
     Ok(*plain::from_bytes::<ProcMeta>(&bytes).unwrap())
 }
-pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
+pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuardUpper) {
     #[cfg(feature = "proc")]
     let metadata = read_proc_meta(&proc_fd).unwrap();
 
@@ -196,7 +196,7 @@ pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
 
     #[cfg(feature = "proc")]
     {
-        unsafe { crate::arch::PROC_FD.get().write(*proc_fd) };
+        unsafe { crate::arch::PROC_FD.get().write(proc_fd.as_raw_fd()) };
     }
 
     unsafe {
@@ -230,7 +230,7 @@ pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuard) {
 #[repr(C)] // TODO: is repr(C) required?
 pub(crate) struct StaticProcInfo {
     pid: u32,
-    proc_fd: MaybeUninit<FdGuard>,
+    proc_fd: MaybeUninit<FdGuardUpper>,
     has_proc_fd: bool,
 }
 pub struct DynamicProcInfo {
@@ -258,7 +258,7 @@ pub(crate) fn static_proc_info() -> &'static StaticProcInfo {
     unsafe { &*STATIC_PROC_INFO.get() }
 }
 #[inline]
-pub fn current_proc_fd() -> &'static FdGuard {
+pub fn current_proc_fd() -> &'static FdGuardUpper {
     let info = static_proc_info();
     assert!(info.has_proc_fd);
     unsafe { info.proc_fd.assume_init_ref() }
@@ -270,10 +270,13 @@ struct ChildHookCommonArgs {
 }
 
 unsafe fn child_hook_common(args: ChildHookCommonArgs) {
+    let new_thr_fd = args.new_thr_fd.to_upper().unwrap();
+    let new_proc_fd = args.new_proc_fd.map(|x| x.to_upper().unwrap());
+
     // TODO: just pass PID to child rather than obtaining it via IPC?
     #[cfg(feature = "proc")]
     let metadata = read_proc_meta(
-        args.new_proc_fd
+        new_proc_fd
             .as_ref()
             .expect("must be present with proc feature"),
     )
@@ -282,8 +285,8 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
     #[cfg(not(feature = "proc"))]
     let metadata = ProcMeta::default();
 
-    if let Some(proc_fd) = &args.new_proc_fd {
-        unsafe { crate::arch::PROC_FD.get().write(**proc_fd) };
+    if let Some(proc_fd) = &new_proc_fd {
+        unsafe { crate::arch::PROC_FD.get().write(proc_fd.as_raw_fd()) };
     }
 
     let old_proc_fd = unsafe {
@@ -291,15 +294,13 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
             .get()
             .replace(StaticProcInfo {
                 pid: metadata.pid,
-                has_proc_fd: args.new_proc_fd.is_some(),
-                proc_fd: args
-                    .new_proc_fd
-                    .map_or_else(MaybeUninit::uninit, MaybeUninit::new),
+                has_proc_fd: new_proc_fd.is_some(),
+                proc_fd: new_proc_fd.map_or_else(MaybeUninit::uninit, MaybeUninit::new),
             })
             .proc_fd
     };
     drop(old_proc_fd);
 
-    let old_thr_fd = unsafe { RtTcb::current().thr_fd.get().replace(Some(args.new_thr_fd)) };
+    let old_thr_fd = unsafe { RtTcb::current().thr_fd.get().replace(Some(new_thr_fd)) };
     drop(old_thr_fd);
 }

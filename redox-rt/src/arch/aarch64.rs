@@ -4,7 +4,7 @@ use syscall::{data::*, error::*};
 
 use crate::{
     RtTcb, Tcb,
-    proc::{FdGuard, ForkArgs, fork_inner},
+    proc::{FdGuard, FdGuardUpper, ForkArgs, fork_inner},
     protocol::{ProcCall, RtSigInfo},
     signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, inner_c},
 };
@@ -74,28 +74,14 @@ pub struct ArchIntRegs {
 
 /// Deactive TLS, used before exec() on Redox to not trick target executable into thinking TLS
 /// is already initialized as if it was a thread.
-pub unsafe fn deactivate_tcb(open_via_dup: usize) -> Result<()> {
+pub unsafe fn deactivate_tcb(open_via_dup: &FdGuardUpper) -> Result<()> {
     let mut env = syscall::EnvRegisters::default();
 
-    let file = FdGuard::new(syscall::dup(open_via_dup, b"regs/env")?);
+    let file = open_via_dup.dup(b"regs/env")?;
 
     env.tpidr_el0 = 0;
 
-    let _ = syscall::write(*file, &mut env)?;
-    Ok(())
-}
-
-pub fn copy_env_regs(cur_pid_fd: usize, new_pid_fd: usize) -> Result<()> {
-    // Copy environment registers.
-    {
-        let cur_env_regs_fd = FdGuard::new(syscall::dup(cur_pid_fd, b"regs/env")?);
-        let new_env_regs_fd = FdGuard::new(syscall::dup(new_pid_fd, b"regs/env")?);
-
-        let mut env_regs = syscall::EnvRegisters::default();
-        let _ = syscall::read(*cur_env_regs_fd, &mut env_regs)?;
-        let _ = syscall::write(*new_env_regs_fd, &env_regs)?;
-    }
-
+    file.write(&mut env)?;
     Ok(())
 }
 
