@@ -152,7 +152,7 @@ pub unsafe extern "C" fn ppoll(
     } else {
         let tmo = unsafe { &*tmo_p };
         //TODO: handle overflow
-        ((tmo.tv_sec * 1000) + (tmo.tv_nsec / 1000000)) as c_int
+        ((tmo.tv_sec as c_int) * 1000) + ((tmo.tv_nsec as c_int) / 1000000)
     };
     trace_expr!(
         poll_epoll(
