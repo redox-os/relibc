@@ -177,9 +177,10 @@ Before starting to contribute, read [this](CONTRIBUTING.md) document.
 
 ## Supported architectures
 
-- i686 (Intel/AMD)
+- i586 (Intel/AMD)
 - x86_64 (Intel/AMD)
-- Aarch64 (ARM64)
+- aarch64 (ARM64)
+- riscv64gc (RISC-V)
 
 ## Funding - _Unix-style Signals and Process Management_
 
