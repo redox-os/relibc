@@ -281,7 +281,7 @@ unsafe fn serialize_ancillary_data_to_stream(
                     let fds_slice = slice::from_raw_parts(fds_ptr, fd_count);
                     for &fd in fds_slice.iter() {
                         let fd_to_send = FdGuard::new(syscall::dup(fd as usize, b"")?);
-                        syscall::sendfd(socket as usize, *fd_to_send as usize, 0, 0)?;
+                        syscall::sendfd(socket as usize, fd_to_send.as_raw_fd(), 0, 0)?;
                     }
                 }
 
@@ -562,12 +562,12 @@ impl PalSocket for Sys {
                 )?;
 
                 let fs_bind_result = (|| -> Result<()> {
-                    let dirfd = FdGuard::new(syscall::open(
+                    let dirfd = FdGuard::open(
                         &dir_path,
                         syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
-                    )?);
+                    )?;
                     let fd_to_send = FdGuard::new(syscall::dup(socket as usize, &[])?);
-                    let _ = syscall::sendfd(*dirfd, *fd_to_send, 0, 0)?;
+                    syscall::sendfd(dirfd.as_raw_fd(), fd_to_send.as_raw_fd(), 0, 0)?;
                     Ok(())
                 })();
 
@@ -628,14 +628,14 @@ impl PalSocket for Sys {
                 let (_, fd_path) = dir_path_and_fd_path(&path)?;
 
                 let target_path = format!("/{fd_path}");
-                let socket_file_fd = FdGuard::new(syscall::open(&target_path, syscall::O_RDWR)?);
+                let socket_file_fd = FdGuard::open(&target_path, syscall::O_RDWR)?;
 
                 const TOKEN_BUF_SIZE: usize = 16;
 
                 let mut token_buf = [0u8; TOKEN_BUF_SIZE];
 
                 redox_rt::sys::sys_call(
-                    *socket_file_fd,
+                    socket_file_fd.as_raw_fd(),
                     &mut token_buf,
                     CallFlags::empty(),
                     &[FsCall::Connect as u64],
@@ -809,9 +809,11 @@ impl PalSocket for Sys {
             Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
         } else {
             let fd = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
-            Self::getpeername(*fd as c_int, address, address_len)?;
-
-            Self::read(*fd as c_int, slice::from_raw_parts_mut(buf as *mut u8, len))
+            Self::getpeername(fd.as_c_fd().unwrap(), address, address_len)?;
+            Self::read(
+                fd.as_c_fd().unwrap(),
+                slice::from_raw_parts_mut(buf as *mut u8, len),
+            )
         }
     }
 
@@ -976,7 +978,10 @@ impl PalSocket for Sys {
             Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
         } else {
             let fd = FdGuard::new(bind_or_connect!(connect copy, socket, dest_addr, dest_len)?);
-            Self::write(*fd as c_int, slice::from_raw_parts(buf as *const u8, len))
+            Self::write(
+                fd.as_c_fd().unwrap(),
+                slice::from_raw_parts(buf as *const u8, len),
+            )
         }
     }
 
@@ -1009,7 +1014,7 @@ impl PalSocket for Sys {
                 tv_nsec,
             };
 
-            Self::write(*fd as c_int, &timespec)?;
+            Self::write(fd.as_c_fd().unwrap(), &timespec)?;
             Ok(())
         };
 
@@ -1078,28 +1083,27 @@ impl PalSocket for Sys {
 
         match (domain, kind) {
             (AF_UNIX, SOCK_STREAM) => {
-                let listener = FdGuard::new(syscall::open("/scheme/uds_stream", flags | O_CREAT)?);
+                let listener = FdGuard::open("/scheme/uds_stream", flags | O_CREAT)?;
 
                 // For now, uds_stream: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
                 // nonblocking.
 
-                let mut fd0 = FdGuard::new(syscall::dup(*listener, b"connect")?);
-
-                let mut fd1 = FdGuard::new(syscall::dup(*listener, b"listen")?);
+                let mut fd0 = listener.dup(b"connect")?;
+                let mut fd1 = listener.dup(b"listen")?;
 
                 sv[0] = fd0.take() as c_int;
                 sv[1] = fd1.take() as c_int;
                 Ok(())
             }
             (AF_UNIX, SOCK_DGRAM) => {
-                let listener = FdGuard::new(syscall::open("/scheme/uds_dgram", flags | O_CREAT)?);
+                let listener = FdGuard::open("/scheme/uds_dgram", flags | O_CREAT)?;
 
                 // For now, uds_dgram: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
                 // nonblocking.
 
-                let mut fd0 = FdGuard::new(syscall::dup(*listener, b"connect")?);
+                let mut fd0 = listener.dup(b"connect")?;
 
                 sv[0] = fd0.take() as c_int;
                 sv[1] = listener.take() as c_int;

@@ -579,14 +579,14 @@ impl DSO {
                             }
                         }
                     };
-                    let voff = ph.p_vaddr(endian) % ph.p_align(endian);
-                    let vsize = ((ph.p_memsz(endian) + voff) as usize)
+                    let _voff = ph.p_vaddr(endian) % ph.p_align(endian);
+                    let _vsize = ((ph.p_memsz(endian) + _voff) as usize)
                         .next_multiple_of(ph.p_align(endian) as usize);
                     trace!(
                         "  copy {:#x}, {:#x}: {:#x}, {:#x}",
-                        ph.p_vaddr(endian) - voff,
-                        vsize,
-                        voff,
+                        ph.p_vaddr(endian) - _voff,
+                        _vsize,
+                        _voff,
                         obj_data.len()
                     );
                     mmap_data.copy_from_slice(obj_data);

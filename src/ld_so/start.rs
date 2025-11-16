@@ -163,7 +163,9 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
         let tcb = Tcb::new(0).expect_notls("ld.so: failed to allocate bootstrap TCB");
         tcb.activate(
             #[cfg(target_os = "redox")]
-            redox_rt::proc::FdGuard::new(thr_fd),
+            redox_rt::proc::FdGuard::new(thr_fd)
+                .to_upper()
+                .expect_notls("failed to move thread fd to upper table"),
         );
         #[cfg(target_os = "redox")]
         {
@@ -173,7 +175,11 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
             )
             .expect_notls("no proc fd present");
 
-            redox_rt::initialize(redox_rt::proc::FdGuard::new(proc_fd));
+            redox_rt::initialize(
+                redox_rt::proc::FdGuard::new(proc_fd)
+                    .to_upper()
+                    .expect_notls("failed to move proc fd to upper table"),
+            );
             redox_rt::signal::setup_sighandler(&tcb.os_specific, true);
         }
     }

@@ -419,7 +419,10 @@ unsafe fn find_env(search: *const c_char) -> Option<(usize, *mut c_char)> {
         let mut search = search;
         loop {
             let end_of_query = *search == 0 || *search == b'=' as c_char;
-            assert_ne!(*item, 0, "environ has an item without value");
+            if *item == 0 {
+                //TODO: environ has an item without value, is this a problem?
+                break;
+            }
             if *item == b'=' as c_char || end_of_query {
                 if *item == b'=' as c_char && end_of_query {
                     // Both keys env here
