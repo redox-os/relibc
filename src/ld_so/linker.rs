@@ -1010,6 +1010,8 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
 
 unsafe extern "C" {
     pub(super) fn __plt_resolve_trampoline() -> usize;
+    #[cfg(target_arch = "aarch64")]
+    pub(super) unsafe fn __aarch64_tls_desc_resolver() -> usize;
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -1099,6 +1101,19 @@ __plt_resolve_trampoline:
     udf #0
 .size __plt_resolve_trampoline, . - __plt_resolve_trampoline
     "
+);
+
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    "
+.global __aarch64_tls_desc_resolver
+.hidden __aarch64_tls_desc_resolver
+__aarch64_tls_desc_resolver:
+ldr x1, [x0, #8]
+mrs x0, tpidr_el0
+add x0, x0, x1
+ret
+   ",
 );
 
 #[cfg(target_arch = "riscv64")]

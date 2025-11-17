@@ -440,15 +440,37 @@ impl DSO {
     }
 
     pub fn run_init(&self) {
-        for f in self.dynamic.init_array {
-            unsafe { f() }
+        eprintln!("[ld_so] run_init: start for {}", self.name);
+
+        for &f in self.dynamic.init_array {
+            let f_addr = f as *const () as usize;
+
+            if f_addr != 0 {
+                eprintln!("  [ld_so] run_init: calling function at 0x{:x}...", f_addr);
+                unsafe { f() };
+                eprintln!("  [ld_so] run_init: ...function at 0x{:x} returned", f_addr);
+            } else {
+                eprintln!("  [ld_so] run_init: skipping NULL function");
+            }
         }
+        eprintln!("[ld_so] run_init: end for {}", self.name);
     }
 
     pub fn run_fini(&self) {
-        for f in self.dynamic.fini_array.iter().rev() {
-            unsafe { f() }
+        eprintln!("[ld_so] run_fini: start for {}", self.name);
+        for &f in self.dynamic.fini_array.iter().rev() {
+            let f_addr = f as *const () as usize;
+            if f_addr != 0 {
+                unsafe {
+                    eprintln!("  [ld_so] run_fini: calling function at 0x{:x}...", f_addr);
+                    f();
+                    eprintln!("  [ld_so] run_fini: ...function at 0x{:x} returned", f_addr);
+                }
+            } else {
+                eprintln!("  [ld_so] run_fini: skipping NULL function");
+            }
         }
+        eprintln!("[ld_so] run_fini: end for {}", self.name);
     }
 
     fn mmap_and_copy<'a>(
@@ -832,7 +854,24 @@ impl DSO {
                 resolve_sym(name, &lookup_scopes)
             }
             .map(|(sym, _, obj)| (sym, obj));
-
+            if sym.is_none() {
+                match reloc.kind {
+                    RelocationKind::GOT
+                    | RelocationKind::SYMBOLIC
+                    | RelocationKind::PLT
+                    | RelocationKind::COPY
+                    | RelocationKind::DTPMOD
+                    | RelocationKind::DTPOFF
+                    | RelocationKind::TPOFF
+                    | RelocationKind::TLSDESC => {
+                        eprintln!(
+                            "!!!!!! [ld_so] static_reloc: FAILED TO FIND SYMBOL '{}' for '{}' !!!!!!",
+                            name, self.name
+                        );
+                    }
+                    _ => {}
+                }
+            }
             (sym, self.dynamic.symbol(reloc.sym))
         } else {
             (None, None)
@@ -853,7 +892,10 @@ impl DSO {
         let a = match reloc.addend {
             Some(some) => some,
             None => match reloc.kind {
-                RelocationKind::COPY | RelocationKind::GOT | RelocationKind::PLT => 0,
+                RelocationKind::COPY
+                | RelocationKind::GOT
+                | RelocationKind::PLT
+                | RelocationKind::TLSDESC => 0,
                 _ => unsafe { *(ptr as *mut usize) },
             },
         };
@@ -888,6 +930,34 @@ impl DSO {
                     set_usize((sym.value + a).wrapping_sub(t));
                 } else {
                     set_usize(a.wrapping_sub(t));
+                }
+            }
+            #[cfg(target_arch = "aarch64")]
+            RelocationKind::TLSDESC => {
+                let (sym_value, module_tls_offset);
+
+                if reloc.sym.0 > 0 {
+                    let (sym, obj) = sym
+                        .as_ref()
+                        .expect("TLSDESC relocation with non-zero symbol index not found");
+
+                    sym_value = sym.value;
+                    module_tls_offset = obj.tls_offset;
+                } else {
+                    sym_value = 0;
+                    module_tls_offset = self.tls_offset;
+                }
+
+                let tp_offset = (sym_value + a).wrapping_sub(module_tls_offset);
+                eprintln!(
+                    "  [ld_so] static_reloc: TLSDESC at 0x{:x} set to tp_offset 0x{:x}",
+                    ptr as usize, tp_offset
+                );
+                unsafe {
+                    use crate::ld_so::linker::__aarch64_tls_desc_resolver;
+                    let desc_ptr = ptr as *mut usize;
+                    desc_ptr.write(__aarch64_tls_desc_resolver() as usize);
+                    desc_ptr.add(1).write(tp_offset);
                 }
             }
             RelocationKind::IRELATIVE => unsafe {
@@ -974,7 +1044,11 @@ impl DSO {
                         *ptr = resolved + reloc.addend.unwrap_or(0);
                     }
                 }
-
+                // TODO: does this needed?
+                #[cfg(target_arch = "aarch64")]
+                (RelocationKind::TLSDESC, Resolve::Now) => {
+                    // NOP
+                }
                 _ => {
                     unimplemented!(
                         "relocation type {:?} with resolve {:?}",
