@@ -31,6 +31,7 @@ pub const F_SETFL: c_int = 4;
 pub const F_GETLK: c_int = 5;
 pub const F_SETLK: c_int = 6;
 pub const F_SETLKW: c_int = 7;
+pub cosnt F_DUPFD_CLOEXEC: c_int = 1030;
 
 pub const F_RDLCK: c_int = 0;
 pub const F_WRLCK: c_int = 1;
@@ -63,7 +64,7 @@ pub struct flock {
 pub unsafe extern "C" fn fcntl(fildes: c_int, cmd: c_int, mut __valist: ...) -> c_int {
     // c_ulonglong
     let arg = match cmd {
-        F_DUPFD | F_SETFD | F_SETFL | F_SETLK | F_SETLKW | F_GETLK => unsafe {
+        F_DUPFD | F_SETFD | F_SETFL | F_SETLK | F_SETLKW | F_GETLK | F_DUPFD_CLOEXEC => unsafe {
             __valist.arg::<c_ulonglong>()
         },
         _ => 0,
