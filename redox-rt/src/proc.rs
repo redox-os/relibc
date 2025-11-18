@@ -689,6 +689,7 @@ impl FdGuard<false> {
     pub fn to_upper(self) -> Result<FdGuardUpper> {
         // Move to upper table if necessary
         let fd = if self.fd & syscall::UPPER_FDTBL_TAG == 0 {
+            //TODO: use F_DUPFD_CLOEXEC?
             let fd = syscall::fcntl(self.fd, syscall::F_DUPFD, syscall::UPPER_FDTBL_TAG)?;
             drop(self);
             fd
