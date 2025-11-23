@@ -7,3 +7,4 @@ sysroot/
 *.swp
 *.swo
 /.vim
+/solution.md
