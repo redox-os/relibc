@@ -14,10 +14,9 @@ use crate::tls;
 use crate::linux_parity::{find_symbol_linux_style, LookupResult};
 use crate::versioning::{VersionReq, VersionData};
 
-/// Extra bytes allocated in the Static TLS block for runtime-loaded libraries.
+/// Default extra bytes allocated in the Static TLS block for runtime-loaded libraries.
 /// This allows `dlopen`'d libraries to use the Initial Exec (IE) model.
-/// glibc uses ~1664 bytes; we choose 2048 for safety/alignment.
-const STATIC_TLS_SURPLUS: usize = 2048;
+const DEFAULT_STATIC_TLS_SURPLUS: usize = 2048;
 
 extern "C" {
     fn open(path: *const i8, flags: i32, mode: i32) -> i32;
@@ -38,10 +37,14 @@ pub struct Linker {
     tls_offset: usize,
     /// Bytes remaining in the surplus.
     surplus_remaining: usize,
+    /// Configurable surplus size (from GLIBC_TUNABLES or default)
+    surplus_size: usize,
 }
 
 impl Linker {
-    pub fn new() -> Self {
+    pub fn new(envp: *const *const i8) -> Self {
+        let surplus_size = Self::parse_tunables(envp).unwrap_or(DEFAULT_STATIC_TLS_SURPLUS);
+
         Self {
             objects: Vec::new(),
             static_tls_size: 0,
@@ -49,7 +52,92 @@ impl Linker {
             static_tls_align: 16,
             tls_offset: 0,
             surplus_remaining: 0,
+            surplus_size,
         }
+    }
+
+    /// Basic parser for GLIBC_TUNABLES environment variable.
+    /// Looks for `glibc.rtld.optional_static_tls=SIZE`.
+    fn parse_tunables(envp: *const *const i8) -> Option<usize> {
+        if envp.is_null() { return None; }
+
+        unsafe {
+            let mut i = 0;
+            loop {
+                let entry_ptr = *envp.add(i);
+                if entry_ptr.is_null() { break; }
+
+                // Simple string checking (no CStr/CString available comfortably yet)
+                // We need to check if string starts with "GLIBC_TUNABLES="
+                let mut j = 0;
+                let key = b"GLIBC_TUNABLES=";
+                let mut match_key = true;
+
+                while key.get(j).is_some() {
+                    if *entry_ptr.add(j) as u8 != key[j] {
+                        match_key = false;
+                        break;
+                    }
+                    j += 1;
+                }
+
+                if match_key {
+                    // Parse the value string: "glibc.rtld.optional_static_tls=512"
+                    let value_ptr = entry_ptr.add(j);
+                    return Self::parse_surplus_from_tunable_string(value_ptr);
+                }
+                i += 1;
+            }
+        }
+        None
+    }
+
+    unsafe fn parse_surplus_from_tunable_string(ptr: *const i8) -> Option<usize> {
+        // We are looking for "glibc.rtld.optional_static_tls="
+        // The format handles multiple tunables separated by ':'.
+        // e.g. "glibc.malloc.check=1:glibc.rtld.optional_static_tls=4096"
+
+        let target = b"glibc.rtld.optional_static_tls=";
+        let mut cursor = ptr;
+
+        loop {
+            let mut p = cursor;
+            let mut t = 0;
+            let mut matches = true;
+
+            // Check if current tunable matches target
+            while t < target.len() {
+                if *p == 0 || *p == b':' as i8 {
+                    matches = false;
+                    break;
+                }
+                if *p as u8 != target[t] {
+                    matches = false;
+                    break;
+                }
+                p = p.add(1);
+                t += 1;
+            }
+
+            if matches {
+                // Found it. Parse number.
+                let mut size: usize = 0;
+                while *p >= b'0' as i8 && *p <= b'9' as i8 {
+                    size = size * 10 + (*p as u8 - b'0') as usize;
+                    p = p.add(1);
+                }
+                return Some(size);
+            }
+
+            // Advance to next tunable
+            while *cursor != 0 && *cursor != b':' as i8 {
+                cursor = cursor.add(1);
+            }
+            if *cursor == 0 { break; }
+            cursor = cursor.add(1); // Skip ':'
+        }
+
+        None
     }
 
     pub fn link(&mut self, mut main_dso: DSO) {
@@ -66,7 +154,7 @@ impl Linker {
 
         self.objects.push(main_dso);
         self.load_dependencies();
-        
+
         // 2. Calculate Layout for Static TLS + Surplus
         self.layout_static_tls();
 
@@ -107,7 +195,7 @@ impl Linker {
             self.tls_offset = (self.tls_offset + align_mask) & !align_mask;
             obj.tls_offset = self.tls_offset;
             self.tls_offset += obj.tls_size;
-            
+
             if obj.tls_align > self.static_tls_align {
                 self.static_tls_align = obj.tls_align;
             }
@@ -117,16 +205,16 @@ impl Linker {
         self.static_tls_end_offset = self.tls_offset;
 
         // 3. Add Surplus
-        // We add padding for runtime loaded libraries that might use IE model.
-        self.surplus_remaining = STATIC_TLS_SURPLUS;
-        self.static_tls_size = self.static_tls_end_offset + STATIC_TLS_SURPLUS;
+        // Use the size parsed from tunables or default
+        self.surplus_remaining = self.surplus_size;
+        self.static_tls_size = self.static_tls_end_offset + self.surplus_size;
     }
 
     /// Attempt to allocate from Static TLS Surplus (for dlopen).
     /// Returns Some(offset) if successful, None if surplus exhausted.
     pub fn try_allocate_static_tls(&mut self, size: usize, align: usize) -> Option<usize> {
         let current_end = self.static_tls_size - self.surplus_remaining;
-        
+
         // Calculate aligned address
         let align_mask = align - 1;
         let start = (current_end + align_mask) & !align_mask;
@@ -143,7 +231,7 @@ impl Linker {
 
     unsafe fn initialize_static_tls(&self, tcb: *mut Tcb) {
         let tcb_addr = tcb as usize;
-        
+
         #[cfg(target_arch = "x86_64")]
         // Variant II: Block starts at FS - TotalSize
         let block_start = tcb_addr.wrapping_sub(self.static_tls_size);
@@ -151,18 +239,14 @@ impl Linker {
         #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
         // Variant I: Block starts at TP + Aligned(TCB)
         let block_start = {
-             let tcb_size = mem::size_of::<Tcb>();
-             let tcb_aligned = (tcb_size + self.static_tls_align - 1) & !(self.static_tls_align - 1);
-             tcb_addr + tcb_aligned
+            let tcb_size = mem::size_of::<Tcb>();
+            let tcb_aligned = (tcb_size + self.static_tls_align - 1) & !(self.static_tls_align - 1);
+            tcb_addr + tcb_aligned
         };
 
         for obj in &self.objects {
             if obj.tls_size == 0 { continue; }
 
-            // Note: tls_offset here is relative to the very start of the allocated block
-            // which INCLUDES the surplus space if it's at the start (Variant II vs I details apply).
-            // Simplified: tls_offset is relative to `block_start`.
-            
             let dest_addr = block_start + obj.tls_offset;
             let dest = dest_addr as *mut u8;
 
@@ -177,21 +261,21 @@ impl Linker {
                 ptr::write_bytes(tbss_ptr, 0, tbss_size);
             }
         }
-        
-        // The surplus area (at the end) remains zero-initialized by Tcb::new
+
+        // The surplus area remains zeroed
     }
 
     fn relocate_single(&self, obj_idx: usize) {
         let obj = &self.objects[obj_idx];
-        let rels = obj.relocations(); 
-        
+        let rels = obj.relocations();
+
         for (r_type, sym_idx, offset, addend) in rels {
             let reloc_addr = obj.base_addr + offset;
 
             if unsafe { reloc::relocate(
-                r_type, 0, 0, reloc_addr, addend, obj.base_addr, 
+                r_type, 0, 0, reloc_addr, addend, obj.base_addr,
                 obj.tls_module_id,
-                obj.tls_offset, 
+                obj.tls_offset,
                 self.static_tls_size
             ) } {
                 continue;
@@ -199,7 +283,7 @@ impl Linker {
 
             let sym_name = match obj.get_sym_name(sym_idx) {
                 Some(s) => s,
-                None => continue, 
+                None => continue,
             };
 
             let ver_req = obj.get_version_req(sym_idx);
@@ -229,7 +313,7 @@ impl Linker {
         &'a self,
         name: &str,
         ver_req: Option<&VersionReq>,
-        skip_obj_idx: usize, 
+        skip_obj_idx: usize,
     ) -> Option<(LookupResult, usize, usize)> {
         for (i, dso) in self.objects.iter().enumerate() {
             if i == skip_obj_idx { continue; }
