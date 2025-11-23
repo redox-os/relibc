@@ -1,68 +1,98 @@
 // relibc/src/abi_types.rs
 #![no_std]
 
-//! ABI Types and Constants for Redox OS
+//! ABI Types and Constants for Redox OS (Phase 2: Symbol Resolution)
 //!
-//! This module defines the strict memory layout for ELF structures and system call definitions
-//! required to stabilize the interface between the kernel, the dynamic linker (ld.so),
-//! and user-space applications across x86-64, AArch64, and RISC-V.
+//! This module defines the strict memory layout for ELF structures, symbol tables,
+//! and relocation constants required for a functional dynamic linker.
 
 pub mod syscall_defs {
-    /// System call number for writing to a file descriptor.
-    /// Uses x86-64 Linux convention as the primary reference.
     #[cfg(target_arch = "x86_64")]
     pub const SYS_WRITE: u64 = 1;
-    
-    /// System call number for exiting the current process.
     #[cfg(target_arch = "x86_64")]
     pub const SYS_EXIT: u64 = 60;
 
-    // AArch64 Linux/Redox syscall constants
     #[cfg(target_arch = "aarch64")]
     pub const SYS_WRITE: u64 = 64;
     #[cfg(target_arch = "aarch64")]
     pub const SYS_EXIT: u64 = 93;
 
-    // RISC-V Linux/Redox syscall constants
     #[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))]
     pub const SYS_WRITE: u64 = 64;
     #[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))]
     pub const SYS_EXIT: u64 = 93;
 }
 
-// ELF 64-bit Type Definitions
 pub type Elf64_Addr = u64;
 pub type Elf64_Off = u64;
 pub type Elf64_Xword = u64;
 pub type Elf64_Sxword = i64;
 pub type Elf64_Word = u32;
+pub type Elf64_Half = u16;
 
 /// ELF Dynamic Section Entry
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct Elf64_Dyn {
-    pub d_tag: Elf64_Sxword, // Dynamic entry type tag
-    pub d_un: Elf64_Xword,   // Integer value or address
+    pub d_tag: Elf64_Sxword,
+    pub d_un: Elf64_Xword,
+}
+
+/// ELF Symbol Table Entry
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct Elf64_Sym {
+    pub st_name: Elf64_Word,  // Index into string table
+    pub st_info: u8,          // Type and Binding attributes
+    pub st_other: u8,         // Visibility
+    pub st_shndx: Elf64_Half, // Section index
+    pub st_value: Elf64_Addr, // Value (address)
+    pub st_size: Elf64_Xword, // Size of object
 }
 
 /// ELF Relocation Entry with Addend
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct Elf64_Rela {
-    pub r_offset: Elf64_Addr,  // Location at which to apply the action
-    pub r_info: Elf64_Xword,   // Symbol table index and type of relocation
-    pub r_addend: Elf64_Sxword,// Constant addend used to compute value
+    pub r_offset: Elf64_Addr,
+    pub r_info: Elf64_Xword,
+    pub r_addend: Elf64_Sxword,
 }
 
-// Critical Relocation Constants for Base Patching
-// These are the specific constants required for R_*_RELATIVE relocations
-// on the supported architectures.
+// Dynamic Section Tags
+pub const DT_NULL: Elf64_Sxword = 0;
+pub const DT_HASH: Elf64_Sxword = 4;
+pub const DT_STRTAB: Elf64_Sxword = 5;
+pub const DT_SYMTAB: Elf64_Sxword = 6;
+pub const DT_RELA: Elf64_Sxword = 7;
+pub const DT_RELASZ: Elf64_Sxword = 8;
+pub const DT_RELAENT: Elf64_Sxword = 9;
 
-/// AMD x86-64: B + A
+// Symbol Binding (st_info >> 4)
+pub const STB_LOCAL: u8 = 0;
+pub const STB_GLOBAL: u8 = 1;
+pub const STB_WEAK: u8 = 2;
+
+// Symbol Visibility (st_other & 0x3)
+pub const STV_DEFAULT: u8 = 0;
+pub const STV_INTERNAL: u8 = 1;
+pub const STV_HIDDEN: u8 = 2;
+pub const STV_PROTECTED: u8 = 3;
+
+// Relocation Constants
+// x86-64
+pub const R_X86_64_64: u32 = 1;
+pub const R_X86_64_GLOB_DAT: u32 = 6; // GOT entry
+pub const R_X86_64_JUMP_SLOT: u32 = 7; // PLT entry
 pub const R_X86_64_RELATIVE: u32 = 8;
 
-/// ARM AArch64: B + A
+// AArch64
+pub const R_AARCH64_ABS64: u32 = 257;
+pub const R_AARCH64_GLOB_DAT: u32 = 1025;
+pub const R_AARCH64_JUMP_SLOT: u32 = 1026;
 pub const R_AARCH64_RELATIVE: u32 = 1027;
 
-/// RISC-V: B + A
+// RISC-V
+pub const R_RISCV_64: u32 = 2;
 pub const R_RISCV_RELATIVE: u32 = 3;
+pub const R_RISCV_JUMP_SLOT: u32 = 5;
