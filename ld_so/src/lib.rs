@@ -20,6 +20,7 @@ pub mod linker;
 pub mod reloc;
 pub mod start;
 pub mod tcb;
+pub mod tls;
 pub mod verify;
 
 // --- Linux Parity Modules ---
@@ -32,23 +33,20 @@ use crate::linker::Linker;
 use crate::dso::DSO;
 
 // Define the entry point _start.
-// This symbol is jumped to by the kernel after mapping the interpreter.
-// We must capture the stack pointer (sp) which points to [argc, argv..., envp..., auxv...].
-
 #[cfg(target_arch = "x86_64")]
 global_asm!(
     ".globl _start",
     "_start:",
     "mov rdi, rsp", // Arg 1: Stack Pointer
     "call linker_entry",
-    "ud2" // Should not return
+    "ud2" 
 );
 
 #[cfg(target_arch = "aarch64")]
 global_asm!(
     ".globl _start",
     "_start:",
-    "mov x0, sp", // Arg 1: Stack Pointer
+    "mov x0, sp", 
     "bl linker_entry",
     "brk #1"
 );
@@ -57,74 +55,46 @@ global_asm!(
 global_asm!(
     ".globl _start",
     "_start:",
-    "mv a0, sp", // Arg 1: Stack Pointer
+    "mv a0, sp", 
     "call linker_entry",
     "unimp"
 );
 
 /// The Rust Entry Point.
-///
-/// # Safety
-/// This function is unsafe because it operates on raw stack pointers and relies on
-/// correct kernel initialization.
 #[no_mangle]
 pub unsafe extern "C" fn linker_entry(sp: *const usize) -> ! {
-    // 1. Calculate Load Base
-    // We need to know where ld.so is loaded in memory to handle self-relocation
-    // and find our own dynamic section.
-    // Ideally, we find AT_BASE from the aux vector on the stack, but we might need
-    // to calculate it manually if we haven't parsed auxv yet.
-    // For now, we assume we can get it from a helper or calculation.
     let load_base = get_load_base();
 
-    // 2. Self-Verification
-    // Ensure our own relocations (processed by asm or previous stage) are valid.
     if let Err(e) = verify::verify_self_integrity(load_base) {
-        // If we can't print (libc not ready), we might just have to crash or use a raw syscall write.
-        // debug::panic_raw(e); 
         core::intrinsics::abort();
     }
 
-    // 3. Initialize the Linker
-    let mut linker = Linker::new();
+    // Find envp to parse Tunables
+    // Stack Layout: [Argc] [Argv...] [0] [Envp...]
+    let argc = *sp;
+    let argv = sp.add(1);
+    let envp = argv.add(argc + 1) as *const *const i8;
 
-    // 4. Bootstrap Main Executable
-    // In a real implementation, we parse argv/envp/auxv here to find the executable path
-    // or file descriptor passed by the kernel.
-    // For this contract freeze, we construct a placeholder DSO for the main app.
-    
-    // This would typically be parsed from AT_PHDR / AT_ENTRY in the aux vector
+    // 3. Initialize Linker with Env vars
+    let mut linker = Linker::new(envp);
+
     let main_dso = DSO::new_executable(sp);
     
-    // 5. Perform Linking
     linker.link(main_dso);
 
-    // 6. Enter Application
-    // The linker.link() function handles initizers.
-    // Now we jump to the entry point of the main executable.
-    // We must restore the stack pointer to the state expected by the app's _start.
     enter_entry_point(sp, get_entry_point(sp));
 }
 
-/// Calculates the load base of the dynamic linker itself.
-/// Uses PC-relative addressing trickery or AUX vectors.
 #[inline(always)]
 unsafe fn get_load_base() -> usize {
-    // Simplified: On modern Linux/Redox, the kernel passes the interpreter base in AT_BASE (auxv[7]).
-    // However, accessing it requires walking `sp`.
-    // A robust impl would walk `sp` past argc, argv, envp to find auxv.
-    // Here we stub it for the contract.
-    0 // Placeholder: Implement auxv walker or PC-relative calculation
-}
-
-/// Helper to extract the entry point from the stack (AT_ENTRY).
-#[inline(always)]
-unsafe fn get_entry_point(sp: *const usize) -> usize {
-    // Placeholder: Walk sp to find AT_ENTRY
     0 
 }
 
-/// Jump to the application entry point.
+#[inline(always)]
+unsafe fn get_entry_point(sp: *const usize) -> usize {
+    0 
+}
+
 #[cfg(target_arch = "x86_64")]
 unsafe fn enter_entry_point(sp: *const usize, entry: usize) -> ! {
     core::arch::asm!(
@@ -158,7 +128,6 @@ unsafe fn enter_entry_point(sp: *const usize, entry: usize) -> ! {
     )
 }
 
-// Panic handler for no_std
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     core::intrinsics::abort()
@@ -169,15 +138,11 @@ pub extern "C" fn __dso_handle() {}
 
 #[no_mangle]
 pub extern "C" fn __rust_alloc(size: usize, align: usize) -> *mut u8 {
-    // Linker needs a simple bump allocator or similar since malloc isn't up yet.
-    // For now, return null to indicate strict no-alloc requirement in bootstrap.
     core::ptr::null_mut()
 }
 
 #[no_mangle]
-pub extern "C" fn __rust_dealloc(_ptr: *mut u8, _size: usize, _align: usize) {
-    // No-op
-}
+pub extern "C" fn __rust_dealloc(_ptr: *mut u8, _size: usize, _align: usize) {}
 
 #[no_mangle]
 pub extern "C" fn __rust_realloc(_ptr: *mut u8, _old_size: usize, _align: usize, _new_size: usize) -> *mut u8 {
