@@ -1,0 +1,13 @@
+*.o
+*~
+*.a
+*.dll*
+*.so*
+*.dylib*
+*.pc
+
+# code coverage
+openlibm-test
+cov-html/
+*.gcda
+*.gcno

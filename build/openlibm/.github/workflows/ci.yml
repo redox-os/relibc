@@ -1,0 +1,93 @@
+name: CI
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+    tags: '*'
+jobs:
+  test-unix:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: make
+      - run: make test
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { sys: mingw64, env: x86_64 }
+          - { sys: mingw32, env: i686 }
+          - { sys: ucrt64,  env: ucrt-x86_64 }  # Experimental!
+          - { sys: clang64, env: clang-x86_64 } # Experimental!
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up the desired MSYS2 environment
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{matrix.sys}}
+          install: base-devel mingw-w64-${{matrix.env}}-toolchain
+      - run: make
+      - run: make test
+  code-coverage-old:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup LCOV
+        uses: hrishikesh-kadam/setup-lcov@v1
+      - name: Build and Run tests
+        run: make coverage -j
+      # - name: Upload coverage to Codecov
+      #   uses: codecov/codecov-action@v5
+      #   with:
+      #     files: ./cov-html/libopenlibm.info
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: code-coverage-report-old
+          path: ./cov-html/
+  code-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Openlibm
+        uses: actions/checkout@v5
+      - name: Checkout Openlibm-test
+        uses: actions/checkout@v5
+        with:
+          repository: 'JuliaMath/openlibm-test'
+          path: 'openlibm-test'
+      - name: Setup LCOV
+        uses: hrishikesh-kadam/setup-lcov@v1
+      - name: Build Openlibm
+        run: make -j`nproc` CODE_COVERAGE=1
+      - name: Run Test
+        run: |
+          make -j`nproc` -C openlibm-test \
+            USE_OPENLIBM=1 OPENLIBM_HOME="$(pwd)" \
+            SKIP_FP_EXCEPT_TEST=1 \
+      - name: Show Test Result
+        run: cat openlibm-test/src/REPORT
+      - name: Gen Coverage Report
+        run: make gen-cov-report
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./cov-html/libopenlibm.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: code-coverage-report
+          path: ./cov-html/

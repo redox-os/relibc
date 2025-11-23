@@ -1034,7 +1034,7 @@ pub unsafe extern "C" fn qsort(
     }
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/qsort.html>.
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man3/qsort.3.html>.
 // #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qsort_r(
     base: *mut c_void,
@@ -1188,7 +1188,7 @@ pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char
     ptr
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getenv.html>.
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man3/secure_getenv.3.html>.
 // #[unsafe(no_mangle)]
 pub unsafe extern "C" fn secure_getenv(name: *const c_char) -> *mut c_char {
     unimplemented!();
@@ -1566,7 +1566,7 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
     }
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/7908799/xsh/ttyslot.html>.
+/// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/ttyslot.html>.
 ///
 /// # Deprecation
 /// The `ttyslot()` function was marked as obsolescent in the Open Group Base

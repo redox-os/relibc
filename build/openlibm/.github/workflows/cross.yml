@@ -1,0 +1,53 @@
+name: Cross
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+    tags: '*'
+
+jobs:
+  build-cross-qemu:
+    # TODO: We need Ubuntu 24.04 to use newer version of qemu,
+    #   switch to ubuntu-latest when `ubuntu-latest >= 24.04`
+    runs-on: ubuntu-24.04
+    name: build-cross-qemu-${{ matrix.config.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { arch: arm,      triple: arm-linux-gnueabihf }
+          - { arch: aarch64,  triple: aarch64-linux-gnu }
+          - { arch: ppc,      triple: powerpc-linux-gnu }
+          - { arch: ppc64,    triple: powerpc64-linux-gnu }
+          - { arch: ppc64le,  triple: powerpc64le-linux-gnu }
+          - { arch: mips,     triple: mips-linux-gnu }
+          - { arch: mipsel,   triple: mipsel-linux-gnu }
+          # Builds successfully, but tests fail.
+          # - { arch: mips64,   triple: mips64-linux-gnuabi64 }
+          # - { arch: mips64el, triple: mips64el-linux-gnuabi64 }
+          - { arch: riscv64,  triple: riscv64-linux-gnu }
+          - { arch: s390x,    triple: s390x-linux-gnu }
+    env:
+      ARCH: ${{ matrix.config.arch }}
+      TRIPLE: ${{ matrix.config.triple }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install qemu and toolchain gcc-${{ matrix.config.triple }}
+        run: |
+          sudo apt update
+          sudo apt install qemu-user qemu-user-binfmt gcc-$TRIPLE -y
+      - name: Build with ${{ matrix.config.triple }}-gcc
+        run: make ARCH=$ARCH TOOLPREFIX=$TRIPLE-
+      - name: Build tests
+        run: make -C test ARCH=$ARCH TOOLPREFIX=$TRIPLE-
+      - name: Run Tests
+        env:
+          QEMU_EXEC: qemu-${{ matrix.config.arch }}
+          CROSS_LIB: /usr/${{ matrix.config.triple }}
+        run: |
+          $QEMU_EXEC -L . -L $CROSS_LIB/  test/test-float
+          $QEMU_EXEC -L . -L $CROSS_LIB/  test/test-double

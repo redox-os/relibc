@@ -1,0 +1,6 @@
+Name: openlibm
+Version: ${version}
+URL: https://github.com/JuliaMath/openlibm
+Description: High quality system independent, open source libm.
+Cflags: -I${includedir}
+Libs: -L${libdir} -lopenlibm

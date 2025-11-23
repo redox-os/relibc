@@ -1,0 +1,54 @@
+# merge this file into cross.yml
+# when we can `sudo apt install gcc-loongarch64-linux-gnu` on ubuntu
+name: Cross
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+    tags: '*'
+
+jobs:
+  build-cross-qemu:
+    # TODO: We need Ubuntu 24.04 to use newer version of qemu,
+    #   switch to ubuntu-latest when `ubuntu-latest >= 24.04`
+    runs-on: ubuntu-24.04
+    name: build-cross-qemu-${{ matrix.config.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { arch: loongarch64, triple: loongarch64-linux-gnu }
+    env:
+      ARCH: ${{ matrix.config.arch }}
+      TRIPLE: ${{ matrix.config.triple }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install qemu
+        run: |
+          sudo apt update
+          sudo apt install -y qemu-user qemu-user-binfmt
+      - name: Install gcc-${{ matrix.config.triple }}
+        # package gcc-loongarch64-linux-gnu seems not exist
+        # https://packages.debian.org/sid/amd64/gcc-loongarch64-linux-gnu
+        run: sudo apt install -y gcc-14-loongarch64-linux-gnu
+      - name: Build with ${{ matrix.config.triple }}-gcc
+        run: |
+          make ARCH=$ARCH TOOLPREFIX=$TRIPLE- \
+            CC='loongarch64-linux-gnu-gcc-14' \
+            AR='loongarch64-linux-gnu-gcc-ar-14' \
+      - name: Build tests
+        run: |
+          make -C test ARCH=$ARCH TOOLPREFIX=$TRIPLE- \
+            CC='loongarch64-linux-gnu-gcc-14' \
+            AR='loongarch64-linux-gnu-gcc-ar-14' \
+      - name: Run Tests
+        env:
+          QEMU_EXEC: qemu-${{ matrix.config.arch }}
+          CROSS_LIB: /usr/${{ matrix.config.triple }}
+        run: |
+          $QEMU_EXEC -L . -L $CROSS_LIB/  test/test-float
+          $QEMU_EXEC -L . -L $CROSS_LIB/  test/test-double
