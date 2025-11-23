@@ -1,0 +1,11 @@
+# test_app/Cargo.toml
+[package]
+name = "test_app"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# In a real scenario, we might dynamically load lib_core.so.
+# For this verification harness, we link against it to force the OS loader 
+# (or our simulated loader) to resolve symbols.
+lib_core = { path = "../lib_core" }

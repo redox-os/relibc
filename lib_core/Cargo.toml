@@ -1,0 +1,12 @@
+# lib_core/Cargo.toml
+[package]
+name = "lib_core"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+# Compiles as a dynamic system library (.so / .dylib / .dll)
+crate-type = ["cdylib"]
+
+[dependencies]
+# Pure Rust: No external dependencies required for this core component.
