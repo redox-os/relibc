@@ -39,9 +39,9 @@ impl DSO {
     pub unsafe fn new_executable(sp: *const usize) -> Self {
         // In a real implementation, walk `sp` to find Aux Vector (AT_PHDR, AT_PHNUM, AT_BASE).
         // For this contract, we assume we can get these or have a bootstrap mechanism.
-        
+
         // Placeholder values for bootstrapping
-        let base_addr = 0; 
+        let base_addr = 0;
         let entry_point = 0;
         let name = String::from("main");
 
@@ -80,7 +80,7 @@ impl DSO {
     /// Returns (type, symbol_index, offset, addend).
     pub fn relocations(&self) -> impl Iterator<Item = (u32, usize, usize, Option<usize>)> {
         // Implementation would iterate .rela.dyn / .rel.dyn
-        core::iter::empty() 
+        core::iter::empty()
     }
 
     pub fn get_sym_name(&self, index: usize) -> Option<&str> {
@@ -103,7 +103,7 @@ impl DSO {
     pub fn gnu_hash(&self) -> Option<&GnuHash<'static>> { self.gnu_hash.as_ref() }
     pub fn sysv_hash(&self) -> Option<&[u32]> { self.sysv_hash }
     pub fn base_addr(&self) -> usize { self.base_addr }
-    
+
     pub fn version_data(&self) -> Option<VersionData<'static>> {
         if let (Some(versym), Some(str_tab)) = (self.versym, self.str_table) {
             Some(VersionData {

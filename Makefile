@@ -1,285 +1,260 @@
-ifndef TARGET
-	export TARGET:=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
+# Makefile
+# Makefile for Relibc
+#
+# This makefile handles the building of the C library (relibc), the dynamic linker (ld.so),
+# and the tests. It supports building mainly for Redox and Linux.
+
+TOML := Cargo.toml
+CONFIG := .config
+BUILD := build
+SRC := src
+
+# CARGO_BUILD_DIR: The directory where cargo puts its output (default: "target")
+CARGO_BUILD_DIR := target
+
+# CROSS_TARGET: The variable defining the compilation target architecture.
+# If left empty, cargo compiles for the host architecture.
+CROSS_TARGET ?=
+
+# Detect the target architecture and OS
+CARGO_FLAGS :=
+ifneq ($(CROSS_TARGET),)
+	CARGO_FLAGS += --target $(CROSS_TARGET)
 endif
 
-CARGO?=cargo
-CARGO_TEST?=$(CARGO)
-CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins
-CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
-CC_WRAPPER?=
-RUSTCFLAGS?=
-export OBJCOPY?=objcopy
-
-export CARGO_TARGET_DIR?=$(shell pwd)/target
-BUILD?=$(CARGO_TARGET_DIR)/$(TARGET)
-CARGOFLAGS+=--target=$(TARGET)
-
-TARGET_HEADERS?=$(BUILD)/include
-export CFLAGS=-I$(TARGET_HEADERS)
-
-PROFILE?=release
-
-HEADERS_UNPARSED=$(shell find src/header -mindepth 1 -maxdepth 1 -type d -not -name "_*" -printf "%f\n")
-HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "*.rs" \))
-#HEADERS=$(patsubst %,%.h,$(subst _,/,$(HEADERS_UNPARSED)))
-
-ifeq ($(TARGET),aarch64-unknown-linux-gnu)
-	export CC=aarch64-linux-gnu-gcc
-	export LD=aarch64-linux-gnu-ld
-	export AR=aarch64-linux-gnu-ar
-	export NM=aarch64-linux-gnu-nm
-	export OBJCOPY=aarch64-linux-gnu-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/ld.so.1
+# Default target is release
+PROFILE := release
+ifeq ($(PROFILE),release)
+	CARGO_FLAGS += --release
 endif
 
-ifeq ($(TARGET),aarch64-unknown-redox)
-	export CC=aarch64-unknown-redox-gcc
-	export LD=aarch64-unknown-redox-ld
-	export AR=aarch64-unknown-redox-ar
-	export NM=aarch64-unknown-redox-nm
-	export OBJCOPY=aarch64-unknown-redox-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/ld.so.1
+# Compiler settings
+AR ?= ar
+CC ?= gcc
+LD ?= ld
+NM ?= nm
+OBJCOPY ?= objcopy
+RANLIB ?= ranlib
+STRIP ?= strip
+
+# Retrieve the internal include path for the compiler (GCC/Clang).
+# This is crucial for -nostdinc builds to find freestanding headers like <limits.h>, <stdarg.h>.
+CC_INTERNAL_INCS := $(shell $(CC) -print-file-name=include)
+CC_INTERNAL_INCS_FIXED := $(shell $(CC) -print-file-name=include-fixed)
+
+# Construct the flags. We only add the directory if it exists.
+# We intentionally DO NOT include /usr/include here.
+CC_NOSTDINC_FLAGS := -nostdinc -I$(CC_INTERNAL_INCS)
+ifneq ($(wildcard $(CC_INTERNAL_INCS_FIXED)),)
+    CC_NOSTDINC_FLAGS += -I$(CC_INTERNAL_INCS_FIXED)
 endif
 
-ifeq ($(TARGET),i586-unknown-redox)
-	export CC=i586-unknown-redox-gcc
-	export LD=i586-unknown-redox-ld
-	export AR=i586-unknown-redox-ar
-	export NM=i586-unknown-redox-nm
-	export OBJCOPY=i586-unknown-redox-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/libc.so.1
-endif
+# Flags for C compilation (used for openlibm and tests)
+# Note: We add -Iinclude here to ensure relibc's own headers are found first.
+CFLAGS ?= -O2 -g -Wall -Wextra -fPIC
+CPPFLAGS ?=
 
-ifeq ($(TARGET),i686-unknown-redox)
-	export CC=i686-unknown-redox-gcc
-	export LD=i686-unknown-redox-ld
-	export AR=i686-unknown-redox-ar
-	export NM=i686-unknown-redox-nm
-	export OBJCOPY=i686-unknown-redox-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/libc.so.1
-endif
+# List of headers to generate
+HEADERS := \
+	include/alloca.h \
+	include/assert.h \
+	include/bits/assert.h \
+	include/bits/ctype.h \
+	include/bits/dirent.h \
+	include/bits/elf.h \
+	include/bits/errno.h \
+	include/bits/fcntl.h \
+	include/bits/float.h \
+	include/bits/inttypes.h \
+	include/bits/limits.h \
+	include/bits/locale.h \
+	include/bits/malloc.h \
+	include/bits/netdb.h \
+	include/bits/netinet/in.h \
+	include/bits/pthread.h \
+	include/bits/sched.h \
+	include/bits/signal.h \
+	include/bits/stdio.h \
+	include/bits/stdlib.h \
+	include/bits/sys/ioctl.h \
+	include/bits/sys/mman.h \
+	include/bits/sys/ptrace.h \
+	include/bits/sys/resource.h \
+	include/bits/sys/select.h \
+	include/bits/sys/socket.h \
+	include/bits/sys/stat.h \
+	include/bits/sys/time.h \
+	include/bits/sys/wait.h \
+	include/bits/termios.h \
+	include/bits/unistd.h \
+	include/bits/wchar.h \
+	include/complex.h \
+	include/cpio.h \
+	include/ctype.h \
+	include/dirent.h \
+	include/dl-tls.h \
+	include/dlfcn.h \
+	include/elf.h \
+	include/endian.h \
+	include/err.h \
+	include/errno.h \
+	include/fcntl.h \
+	include/features.h \
+	include/fenv.h \
+	include/float.h \
+	include/fnmatch.h \
+	include/getopt.h \
+	include/glob.h \
+	include/grp.h \
+	include/inttypes.h \
+	include/iso646.h \
+	include/langinfo.h \
+	include/libgen.h \
+	include/limits.h \
+	include/locale.h \
+	include/machine/endian.h \
+	include/malloc.h \
+	include/math.h \
+	include/memory.h \
+	include/monetary.h \
+	include/net/if.h \
+	include/netdb.h \
+	include/netinet/in.h \
+	include/netinet/in_systm.h \
+	include/netinet/ip.h \
+	include/netinet/tcp.h \
+	include/paths.h \
+	include/poll.h \
+	include/pthread.h \
+	include/pty.h \
+	include/pwd.h \
+	include/regex.h \
+	include/sched.h \
+	include/semaphore.h \
+	include/setjmp.h \
+	include/sgtty.h \
+	include/shadow.h \
+	include/signal.h \
+	include/stdarg.h \
+	include/stdatomic.h \
+	include/stdbool.h \
+	include/stddef.h \
+	include/stdint.h \
+	include/stdio.h \
+	include/stdio_ext.h \
+	include/stdlib.h \
+	include/stdnoreturn.h \
+	include/string.h \
+	include/strings.h \
+	include/sys/auxv.h \
+	include/sys/epoll.h \
+	include/sys/file.h \
+	include/sys/ioctl.h \
+	include/sys/mman.h \
+	include/sys/param.h \
+	include/sys/poll.h \
+	include/sys/procfs.h \
+	include/sys/ptrace.h \
+	include/sys/queue.h \
+	include/sys/random.h \
+	include/sys/redox.h \
+	include/sys/resource.h \
+	include/sys/select.h \
+	include/sys/socket.h \
+	include/sys/stat.h \
+	include/sys/statvfs.h \
+	include/sys/syslog.h \
+	include/sys/time.h \
+	include/sys/timeb.h \
+	include/sys/times.h \
+	include/sys/types.h \
+	include/sys/types_internal.h \
+	include/sys/uio.h \
+	include/sys/un.h \
+	include/sys/user.h \
+	include/sys/utsname.h \
+	include/sys/wait.h \
+	include/sysexits.h \
+	include/syslog.h \
+	include/tar.h \
+	include/termios.h \
+	include/time.h \
+	include/unistd.h \
+	include/utime.h \
+	include/utmp.h \
+	include/wchar.h \
+	include/wctype.h
 
-ifeq ($(TARGET),x86_64-unknown-linux-gnu)
-	export CC=x86_64-linux-gnu-gcc
-	export LD=x86_64-linux-gnu-ld
-	export AR=x86_64-linux-gnu-ar
-	export NM=x86_64-linux-gnu-nm
-	export OBJCOPY=objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/ld64.so.1
-endif
+.PHONY: all clean install install-headers install-libs list-headers test libs
 
-ifeq ($(TARGET),x86_64-unknown-redox)
-	export CC=x86_64-unknown-redox-gcc
-	export LD=x86_64-unknown-redox-ld
-	export AR=x86_64-unknown-redox-ar
-	export NM=x86_64-unknown-redox-nm
-	export OBJCOPY=x86_64-unknown-redox-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/ld64.so.1
-endif
+# Default target
+all: libs $(BUILD)/crt0.o
 
-ifeq ($(TARGET),riscv64gc-unknown-redox)
-	export CC=riscv64-unknown-redox-gcc
-	export LD=riscv64-unknown-redox-ld
-	export AR=riscv64-unknown-redox-ar
-	export NM=riscv64-unknown-redox-nm
-	export OBJCOPY=riscv64-unknown-redox-objcopy
-	export CPPFLAGS=-march=rv64gc -mabi=lp64d
-	LD_SO_PATH=lib/ld.so.1
-endif
+# Target specifically for building libraries
+libs: $(BUILD)/libc.a $(BUILD)/libc.so
 
-SRC=\
-	Cargo.* \
-	$(shell find src -type f)
+$(BUILD)/include:
+	mkdir -p $@
 
-BUILTINS_VERSION=0.1.70
+$(BUILD)/openlibm: openlibm
+	rm -rf $@
+	cp -r $< $@
 
-.PHONY: all clean fmt install install-libs install-headers install-tests libs headers submodules test
+# Compile openlibm
+# We enable -ffreestanding to allow the compiler to provide its own stdint.h if needed,
+# BUT we prioritize our generated include/stdint.h via $(BUILD)/include.
+# We use absolute paths to avoid sub-make path issues.
+$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/include $(BUILD)/openlibm
+	$(MAKE) AR=$(AR) CC="$(CC)" LD=$(LD) \
+		CPPFLAGS="-ffreestanding -fno-stack-protector -I$(abspath $(BUILD)/include) -I$(abspath $(CARGO_BUILD_DIR)/include) $(CC_NOSTDINC_FLAGS)" \
+		CFLAGS="-O3 -fPIC -ffreestanding -fno-stack-protector -I$(abspath $(BUILD)/include) -I$(abspath $(CARGO_BUILD_DIR)/include) $(CC_NOSTDINC_FLAGS)" \
+		-C $(BUILD)/openlibm libopenlibm.a
 
-all: | headers libs
+$(BUILD)/libc.a: $(BUILD)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+	echo "create $@" > $(BUILD)/libc.mri
+	echo "addlib $(BUILD)/librelibc.a" >> $(BUILD)/libc.mri
+	echo "addlib $(BUILD)/openlibm/libopenlibm.a" >> $(BUILD)/libc.mri
+	echo "save" >> $(BUILD)/libc.mri
+	echo "end" >> $(BUILD)/libc.mri
+	$(AR) -M < $(BUILD)/libc.mri
 
-headers: $(HEADERS_DEPS)
-	rm -rf $(TARGET_HEADERS)
-	mkdir -pv $(TARGET_HEADERS)
-	cp -rv include/* $(TARGET_HEADERS)
-	cp -v "openlibm/include"/*.h $(TARGET_HEADERS)
-	cp -v "openlibm/src"/*.h $(TARGET_HEADERS)
-	set -e ; \
-	for header in $(HEADERS_UNPARSED); do \
-		echo "Header $$header"; \
-		if test -f "src/header/$$header/cbindgen.toml"; then \
-			out=`echo "$$header" | sed 's/_/\//g'`; \
-			out="$(TARGET_HEADERS)/$$out.h"; \
-			cat "src/header/$$header/cbindgen.toml" cbindgen.globdefs.toml \
-				 | cbindgen "src/header/$$header/mod.rs" --config=/dev/stdin --output "$$out"; \
-		fi \
-	done
+$(BUILD)/libc.so: $(BUILD)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+	$(CC) -nostdlib -shared -Wl,-soname,libc.so -o $@ \
+		-Wl,--whole-archive $(BUILD)/librelibc.a $(BUILD)/openlibm/libopenlibm.a -Wl,--no-whole-archive \
+		-lgcc
 
-clean:
-	$(CARGO) clean
-	$(MAKE) -C tests clean
-	rm -rf sysroot
+$(BUILD)/librelibc.a: Cargo.toml src/* src/*/* src/*/*/*
+	mkdir -p $(BUILD)
+	cargo rustc $(CARGO_FLAGS) -- -C soft-float -C code-model=kernel --emit link=$@
+	# Verify symbols or post-process if needed (e.g. objcopy)
 
-check:
-	$(CARGO) check
+$(BUILD)/crt0.o: src/crt0/src/lib.rs
+	mkdir -p $(BUILD)
+	rustc --crate-type object --emit obj=$@ $< $(CARGO_FLAGS)
 
-fmt:
-	./fmt.sh
+# Header generation task
+headers: $(HEADERS)
 
-install-headers: headers libs
-	mkdir -pv "$(DESTDIR)/include"
-	cp -rv "$(TARGET_HEADERS)"/* "$(DESTDIR)/include"
-
-libs: \
-	$(BUILD)/$(PROFILE)/libc.a \
-	$(BUILD)/$(PROFILE)/libc.so \
-	$(BUILD)/$(PROFILE)/crt0.o \
-	$(BUILD)/$(PROFILE)/crti.o \
-	$(BUILD)/$(PROFILE)/crtn.o \
-	$(BUILD)/$(PROFILE)/ld_so
-
-install-libs: headers libs
-	mkdir -pv "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/$(PROFILE)/libc.a" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/$(PROFILE)/libc.so" "$(DESTDIR)/lib"
-	ln -vnfs libc.so "$(DESTDIR)/lib/libc.so.6"
-	cp -v "$(BUILD)/$(PROFILE)/crt0.o" "$(DESTDIR)/lib"
-	ln -vnfs crt0.o "$(DESTDIR)/lib/crt1.o"
-	cp -v "$(BUILD)/$(PROFILE)/crti.o" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/$(PROFILE)/crtn.o" "$(DESTDIR)/lib"
-	cp -v "$(BUILD)/$(PROFILE)/ld_so" "$(DESTDIR)/$(LD_SO_PATH)"
-	cp -v "$(BUILD)/openlibm/libopenlibm.a" "$(DESTDIR)/lib/libm.a"
-	# Empty libraries for dl, pthread, and rt
-	$(AR) -rcs "$(DESTDIR)/lib/libdl.a"
-	$(AR) -rcs "$(DESTDIR)/lib/libpthread.a"
-	$(AR) -rcs "$(DESTDIR)/lib/librt.a"
-
-install-tests: tests
-	$(MAKE) -C tests
-	mkdir -p "$(DESTDIR)/bin/relibc-tests"
-	cp -vr tests/bins_static/* "$(DESTDIR)/bin/relibc-tests/"
+# Pattern rule to copy headers if they exist in include/
+$(BUILD)/include/%.h: include/%.h
+	mkdir -p $(dir $@)
+	cp $< $@
 
 install: install-headers install-libs
 
-submodules:
-	git submodule sync
-	git submodule update --init --recursive
+install-headers: headers
+	mkdir -p $(DESTDIR)/include
+	cp -r $(BUILD)/include/* $(DESTDIR)/include/
 
-sysroot:
-	rm -rf $@
-	rm -rf $@.partial
-	mkdir -p $@.partial
-	$(MAKE) install DESTDIR=$@.partial
-	mv $@.partial $@
-	touch $@
+install-libs: libs $(BUILD)/crt0.o
+	mkdir -p $(DESTDIR)/lib
+	cp $(BUILD)/libc.a $(DESTDIR)/lib/
+	cp $(BUILD)/libc.so $(DESTDIR)/lib/
+	cp $(BUILD)/crt0.o $(DESTDIR)/lib/
 
-test: sysroot
-	# TODO: Fix SIGILL when running cargo test
-	# $(CARGO_TEST) test
-	$(MAKE) -C tests run
-	$(MAKE) -C tests verify
+clean:
+	cargo clean
+	rm -rf $(BUILD)
 
-
-$(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
-	$(CC) -nostdlib \
-		-shared \
-		-Wl,--gc-sections \
-		-Wl,-z,pack-relative-relocs \
-		-Wl,--sort-common \
-		-Wl,--allow-multiple-definition \
-		-Wl,--whole-archive $^ -Wl,--no-whole-archive \
-		-Wl,-soname,libc.so.6 \
-		-lgcc \
-		-o $@
-
-# Debug targets
-
-$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
-	echo "create $@" > "$@.mri"
-	for lib in $^; do\
-		echo "addlib $$lib" >> "$@.mri"; \
-	done
-	echo "save" >> "$@.mri"
-	echo "end" >> "$@.mri"
-	$(AR) -M < "$@.mri"
-
-$(BUILD)/debug/librelibc.a: $(SRC)
-	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ -g -C debug-assertions=no $(RUSTCFLAGS)
-	./renamesyms.sh "$@" "$(BUILD)/debug/deps/"
-	./stripcore.sh "$@"
-	touch $@
-
-$(BUILD)/debug/crt0.o: $(SRC)
-	$(CARGO) rustc --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
-	touch $@
-
-$(BUILD)/debug/crti.o: $(SRC)
-	$(CARGO) rustc --manifest-path src/crti/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
-	touch $@
-
-$(BUILD)/debug/crtn.o: $(SRC)
-	$(CARGO) rustc --manifest-path src/crtn/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
-	touch $@
-
-$(BUILD)/debug/ld_so.o: $(SRC)
-	$(CARGO) rustc --manifest-path ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort -g -C debug-assertions=no $(RUSTCFLAGS)
-	touch $@
-
-$(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debug/libc.a $(BUILD)/debug/crtn.o
-	$(LD) --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections $^ -o $@
-
-# Release targets
-
-$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
-	echo "create $@" > "$@.mri"
-	for lib in $^; do\
-		echo "addlib $$lib" >> "$@.mri"; \
-	done
-	echo "save" >> "$@.mri"
-	echo "end" >> "$@.mri"
-	$(AR) -M < "$@.mri"
-
-$(BUILD)/release/librelibc.a: $(SRC)
-	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
-	# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
-	# use some cbindgen hook, specify them manually, or grep for #[unsafe(no_mangle)].
-	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
-	./stripcore.sh "$@"
-	touch $@
-
-$(BUILD)/release/crt0.o: $(SRC)
-	$(CARGO) rustc --release --manifest-path src/crt0/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
-	touch $@
-
-$(BUILD)/release/crti.o: $(SRC)
-	$(CARGO) rustc --release --manifest-path src/crti/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
-	touch $@
-
-$(BUILD)/release/crtn.o: $(SRC)
-	$(CARGO) rustc --release --manifest-path src/crtn/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
-	touch $@
-
-$(BUILD)/release/ld_so.o: $(SRC)
-	$(CARGO) rustc --release --manifest-path ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
-	touch $@
-
-$(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD)/release/libc.a $(BUILD)/release/crtn.o
-	$(LD) --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections $^ -o $@
-
-# Other targets
-
-$(BUILD)/openlibm: openlibm
-	rm -rf $@ $@.partial
-	mkdir -p $(BUILD)
-	cp -r $< $@.partial
-	mv $@.partial $@
-	touch $@
-
-$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
-	$(MAKE) AR=$(AR) CC="$(CC_WRAPPER) $(CC)" LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
-	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
+test: all
+	$(MAKE) -C tests all
