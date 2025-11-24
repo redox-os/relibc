@@ -1023,20 +1023,22 @@ impl PalSocket for Sys {
                 SO_RCVTIMEO => return set_timeout(b"read_timeout"),
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
                 _ => {
+                    let (family, _) = socket_domain_type(socket)?;
+                    if family == AF_INET {
+                        // netstack does not support SYS_CALL
+                        return Ok(());
+                    }
                     let metadata = [SocketCall::SetSockOpt as u64, option_name as u64];
                     let payload =
                         slice::from_raw_parts_mut(option_value as *mut u8, option_len as usize);
                     let call_flags = CallFlags::empty();
-                    match redox_rt::sys::sys_call(
+                    redox_rt::sys::sys_call(
                         socket as usize,
                         payload,
                         CallFlags::empty(),
                         &metadata,
-                    ) {
-                        Err(e) if e.errno == EOPNOTSUPP as i32 => (),
-                        Err(e) => return Err(e.into()),
-                        Ok(_) => return Ok(()),
-                    }
+                    )?;
+                    return Ok(());
                 }
             },
             _ => (),
