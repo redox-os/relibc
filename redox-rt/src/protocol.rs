@@ -256,7 +256,7 @@ bitflags! {
         const INSERT = 1 << 1;
         /// Delete a scheme from the namespace
         const DELETE = 1 << 2;
-        /// Get capabilities of the namespace
-        const GET_CAP = 1 << 3;
+        /// Get scheme creation capabilities of the namespace
+        const SCHEME_CREATE = 1 << 3;
     }
 }
