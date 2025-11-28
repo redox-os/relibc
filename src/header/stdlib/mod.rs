@@ -454,35 +454,51 @@ pub unsafe extern "C" fn getenv(name: *const c_char) -> *mut c_char {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getsubopt(
     optionp: *mut *mut c_char,
-    tokens: *const *mut c_char,
+    keylistp: *const *mut c_char,
     valuep: *mut *mut c_char,
 ) -> c_int {
+    if optionp.is_null() || (*optionp).is_null() || keylistp.is_null() || valuep.is_null() {
+        return -1;
+    }
+
     let start = *optionp;
-    let max = strlen(start) as isize;
-    let mut i: usize = 0;
-    *valuep = ptr::null_mut();
-    *optionp = strchr(start, b',' as i32);
-    if !(*optionp).is_null() {
-        *(*optionp).add(0) = 0;
-        *optionp = *optionp.add(1);
-    } else {
-        *(optionp) = start.add(max as usize);
-    }
-    while !tokens.offset(i as isize).is_null() {
-        let cur = tokens.offset(i as isize) as *const _;
-        let len = strlen(cur) as isize;
-        if strncmp(cur, start, len as usize) != 0 {
-            i = i + 1;
-            continue;
+    let mut cursor = start;
+    let mut found_comma = false;
+
+    while *cursor != 0 {
+        if *cursor == b',' as c_char {
+            *cursor = 0;
+            *optionp = cursor.add(1);
+            found_comma = true;
+            break;
         }
-        if (*start.offset(len)) == b'=' as c_char {
-            *valuep = start.offset(len + 1);
-        } else if !start.offset(len).is_null() {
-            i = i + 1;
-            continue;
-        }
-        return i as c_int;
+        cursor = cursor.add(1);
     }
+
+    if !found_comma {
+        *optionp = cursor;
+    }
+
+    let mut i = 0;
+    while !(*keylistp.add(i)).is_null() {
+        let token = *keylistp.add(i);
+        let token_len = strlen(token);
+
+        if strncmp(start, token, token_len) == 0 {
+            let suffix_char = *start.add(token_len);
+
+            if suffix_char == b'=' as c_char {
+                *valuep = start.add(token_len + 1);
+                return i as c_int;
+            } else if suffix_char == 0 {
+                *valuep = ptr::null_mut();
+                return i as c_int;
+            }
+        }
+        i += 1;
+    }
+
+    *valuep = start;
     -1
 }
 

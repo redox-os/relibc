@@ -80,6 +80,7 @@ EXPECT_NAMES=\
 	stdlib/atoi \
 	stdlib/div \
 	stdlib/env \
+	stdlib/getsubopt \
 	stdlib/mkostemps \
 	stdlib/qsort \
 	stdlib/rand \
