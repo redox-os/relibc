@@ -43,7 +43,6 @@ EXPECT_NAMES=\
 	libgen \
 	locale \
 	math \
-	netdb/getaddrinfo \
 	regex \
 	select \
 	setjmp \
@@ -195,6 +194,8 @@ NAMES=\
 	dirent/posix_getdents \
 	kill-waitpid \
 	net/if \
+	netdb/getaddrinfo \
+	netdb/getaddrinfo_null \
 	pty/forkpty \
 	psignal \
 	pwd \
