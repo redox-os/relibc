@@ -45,6 +45,7 @@ pub unsafe extern "C" fn pthread_attr_getdetachstate(
     attr: *const pthread_attr_t,
     detachstate: *mut c_int,
 ) -> c_int {
+    guard_null!(attr);
     core::ptr::write(detachstate, (*attr.cast::<RlctAttr>()).detachstate as _);
     0
 }
@@ -54,6 +55,7 @@ pub unsafe extern "C" fn pthread_attr_getguardsize(
     attr: *const pthread_attr_t,
     size: *mut size_t,
 ) -> c_int {
+    guard_null!(attr);
     core::ptr::write(size, (*attr.cast::<RlctAttr>()).guardsize);
     0
 }
@@ -63,6 +65,7 @@ pub unsafe extern "C" fn pthread_attr_getinheritsched(
     attr: *const pthread_attr_t,
     inheritsched: *mut c_int,
 ) -> c_int {
+    guard_null!(attr);
     core::ptr::write(inheritsched, (*attr.cast::<RlctAttr>()).inheritsched as _);
     0
 }
@@ -72,6 +75,7 @@ pub unsafe extern "C" fn pthread_attr_getschedparam(
     attr: *const pthread_attr_t,
     param: *mut sched_param,
 ) -> c_int {
+    guard_null!(attr);
     param.write((*attr.cast::<RlctAttr>()).param);
     0
 }
@@ -90,6 +94,7 @@ pub unsafe extern "C" fn pthread_attr_getscope(
     attr: *const pthread_attr_t,
     scope: *mut c_int,
 ) -> c_int {
+    guard_null!(attr);
     core::ptr::write(scope, (*attr.cast::<RlctAttr>()).scope as _);
     0
 }
@@ -100,6 +105,7 @@ pub unsafe extern "C" fn pthread_attr_getstack(
     stackaddr: *mut *mut c_void,
     stacksize: *mut size_t,
 ) -> c_int {
+    guard_null!(attr);
     core::ptr::write(stackaddr, (*attr.cast::<RlctAttr>()).stack as _);
     core::ptr::write(stacksize, (*attr.cast::<RlctAttr>()).stacksize as _);
     0
@@ -110,6 +116,7 @@ pub unsafe extern "C" fn pthread_attr_getstacksize(
     attr: *const pthread_attr_t,
     stacksize: *mut size_t,
 ) -> c_int {
+    guard_null!(attr);
     core::ptr::write(stacksize, (*attr.cast::<RlctAttr>()).stacksize as _);
     0
 }
@@ -125,6 +132,7 @@ pub unsafe extern "C" fn pthread_attr_setdetachstate(
     attr: *mut pthread_attr_t,
     detachstate: c_int,
 ) -> c_int {
+    guard_null!(attr);
     (*attr.cast::<RlctAttr>()).detachstate = detachstate as _;
     0
 }
@@ -134,6 +142,7 @@ pub unsafe extern "C" fn pthread_attr_setguardsize(
     attr: *mut pthread_attr_t,
     guardsize: c_int,
 ) -> c_int {
+    guard_null!(attr);
     (*attr.cast::<RlctAttr>()).guardsize = guardsize as _;
     0
 }
@@ -143,6 +152,7 @@ pub unsafe extern "C" fn pthread_attr_setinheritsched(
     attr: *mut pthread_attr_t,
     inheritsched: c_int,
 ) -> c_int {
+    guard_null!(attr);
     (*attr.cast::<RlctAttr>()).inheritsched = inheritsched as _;
     0
 }
@@ -152,6 +162,7 @@ pub unsafe extern "C" fn pthread_attr_setschedparam(
     attr: *mut pthread_attr_t,
     param: *const sched_param,
 ) -> c_int {
+    guard_null!(attr);
     (*attr.cast::<RlctAttr>()).param = param.read();
     0
 }
@@ -161,12 +172,14 @@ pub unsafe extern "C" fn pthread_attr_setschedpolicy(
     attr: *mut pthread_attr_t,
     policy: c_int,
 ) -> c_int {
+    guard_null!(attr);
     (*attr.cast::<RlctAttr>()).schedpolicy = policy as u8;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setscope(attr: *mut pthread_attr_t, scope: c_int) -> c_int {
+    guard_null!(attr);
     (*attr.cast::<RlctAttr>()).scope = scope as u8;
     0
 }
@@ -177,6 +190,7 @@ pub unsafe extern "C" fn pthread_attr_setstack(
     stackaddr: *mut c_void,
     stacksize: size_t,
 ) -> c_int {
+    guard_null!(attr);
     (*attr.cast::<RlctAttr>()).stack = stackaddr as usize;
     (*attr.cast::<RlctAttr>()).stacksize = stacksize;
     0
@@ -187,6 +201,7 @@ pub unsafe extern "C" fn pthread_attr_setstacksize(
     attr: *mut pthread_attr_t,
     stacksize: size_t,
 ) -> c_int {
+    guard_null!(attr);
     (*attr.cast::<RlctAttr>()).stacksize = stacksize;
     0
 }
@@ -196,6 +211,8 @@ pub unsafe extern "C" fn pthread_getattr_np(
     thread_ptr: pthread_t,
     attr_ptr: *mut pthread_attr_t,
 ) -> c_int {
+    guard_null!(thread_ptr);
+    guard_null!(attr_ptr);
     let thread = &*thread_ptr.cast::<Pthread>();
     let attr_ptr = attr_ptr.cast::<RlctAttr>();
     ptr::write(attr_ptr, RlctAttr::default());

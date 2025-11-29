@@ -17,6 +17,15 @@ pub fn e(result: Result<(), Errno>) -> i32 {
     }
 }
 
+macro_rules! guard_null {
+    ($ptr:expr) => {
+        if $ptr.is_null() {
+            eprintln!("RELIBC: PTHREAD: pointer was null");
+            return e(Err(Errno(crate::header::errno::EINVAL)));
+        }
+    };
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct RlctAttr {
     pub detachstate: c_uchar,
