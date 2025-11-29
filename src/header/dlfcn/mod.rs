@@ -48,9 +48,12 @@ pub struct Dl_info {
     dli_saddr: *mut c_void,
 }
 
+/// alias as per spec update: https://www.austingroupbugs.net/view.php?id=1847
+pub type Dl_info_t = Dl_info;
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dladdr.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn dladdr(_addr: *mut c_void, info: *mut Dl_info) -> c_int {
+pub unsafe extern "C" fn dladdr(_addr: *mut c_void, info: *mut Dl_info_t) -> c_int {
     //TODO
     unsafe {
         (*info).dli_fname = ptr::null();
