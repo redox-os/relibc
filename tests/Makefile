@@ -39,6 +39,7 @@ EXPECT_NAMES=\
 	fnmatch \
 	glob \
 	iso646 \
+	largefile64 \
 	libgen \
 	locale \
 	math \
