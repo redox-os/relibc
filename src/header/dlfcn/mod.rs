@@ -1,4 +1,6 @@
-//! dlfcn implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/dlfcn.h.html
+//! `dlfcn.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dlfcn.h.html>.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 // FIXME(andypython): remove this when #![allow(warnings, unused_variables)] is
@@ -36,6 +38,7 @@ fn set_last_error(error: DlError) {
     ERROR.store(error.repr().as_ptr() as usize, Ordering::SeqCst);
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dlfcn.h.html>.
 #[repr(C)]
 #[allow(non_camel_case_types)]
 pub struct Dl_info {
@@ -45,6 +48,7 @@ pub struct Dl_info {
     dli_saddr: *mut c_void,
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dladdr.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dladdr(_addr: *mut c_void, info: *mut Dl_info) -> c_int {
     //TODO
@@ -57,6 +61,7 @@ pub unsafe extern "C" fn dladdr(_addr: *mut c_void, info: *mut Dl_info) -> c_int
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dlopen.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut c_void {
     //TODO support all sort of flags
@@ -111,6 +116,7 @@ pub unsafe extern "C" fn dlopen(cfilename: *const c_char, flags: c_int) -> *mut 
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dlsym.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void {
     let handle = ObjectHandle::from_ptr(handle);
@@ -150,6 +156,7 @@ pub unsafe extern "C" fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *m
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dlclose.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
     let tcb = match unsafe { Tcb::current() } {
@@ -177,6 +184,7 @@ pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dlerror.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn dlerror() -> *mut c_char {
     ERROR.swap(0, Ordering::SeqCst) as *mut c_char
