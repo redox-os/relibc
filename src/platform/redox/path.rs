@@ -13,7 +13,7 @@ use super::{FdGuard, Pal, Sys, libcscheme};
 use crate::{
     error::Errno,
     fs::File,
-    header::{fcntl, limits},
+    header::{fcntl, limits, sys_file},
     out::Out,
     sync::Mutex,
 };
@@ -210,6 +210,30 @@ fn get_parent_path(path: &str) -> Option<&str> {
     })
 }
 
+pub struct FileLock(c_int);
+
+impl FileLock {
+    pub fn lock(fd: c_int, op: c_int) -> Result<Self> {
+        if op & sys_file::LOCK_SH | sys_file::LOCK_EX == 0 {
+            return Err(Error::new(EINVAL));
+        }
+
+        Sys::flock(fd, op)?;
+        Ok(Self(fd))
+    }
+
+    pub fn unlock(self) -> Result<()> {
+        Sys::flock(self.0, sys_file::LOCK_UN).map_err(Into::into)
+    }
+}
+
+impl Drop for FileLock {
+    fn drop(&mut self) {
+        let fd = self.0;
+        self.0 = -1;
+        let _ = Sys::flock(self.0, sys_file::LOCK_UN);
+    }
+}
 /// Resolve `path` under `dirfd`.
 ///
 /// See [`openat2`] for more information.

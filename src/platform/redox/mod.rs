@@ -1,6 +1,7 @@
 use core::{
     convert::TryFrom,
     mem::{self, MaybeUninit, size_of},
+    num::NonZeroU64,
     ptr, slice, str,
 };
 use redox_rt::{
@@ -16,7 +17,7 @@ use syscall::{
 
 use self::{
     exec::Executable,
-    path::{canonicalize, openat2, openat2_path},
+    path::{FileLock, canonicalize, openat2, openat2_path},
 };
 use super::{ERRNO, Pal, Read, types::*};
 use crate::{
@@ -26,14 +27,15 @@ use crate::{
     header::{
         dirent::dirent,
         errno::{
-            EBADF, EBADFD, EBADR, EEXIST, EFAULT, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM,
-            ENOSYS, EOPNOTSUPP, EPERM, ERANGE,
+            EBADF, EBADFD, EBADR, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
+            ENOMEM, ENOSYS, EOPNOTSUPP, EPERM, ERANGE,
         },
         fcntl::{self, AT_FDCWD, AT_SYMLINK_NOFOLLOW, O_CREAT, O_RDONLY, O_RDWR},
         limits,
         pthread::{pthread_cancel, pthread_create},
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         stdio::RENAME_NOREPLACE,
+        sys_file,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{RLIM_INFINITY, rlimit, rusage},
@@ -56,6 +58,19 @@ use crate::{
 
 pub use redox_rt::proc::FdGuard;
 
+mod clone;
+mod epoll;
+mod event;
+mod exec;
+mod extra;
+mod libcscheme;
+mod libredox;
+pub(crate) mod path;
+mod ptrace;
+pub(crate) mod signal;
+mod socket;
+mod timer;
+
 static mut BRK_CUR: *mut c_void = ptr::null_mut();
 static mut BRK_END: *mut c_void = ptr::null_mut();
 
@@ -71,19 +86,6 @@ fn cvt_uid(id: c_int) -> Result<Option<u32>> {
     }
     Ok(Some(id.try_into().map_err(|_| Errno(EINVAL))?))
 }
-
-mod clone;
-mod epoll;
-mod event;
-mod exec;
-mod extra;
-mod libcscheme;
-mod libredox;
-pub(crate) mod path;
-mod ptrace;
-pub(crate) mod signal;
-mod socket;
-mod timer;
 
 macro_rules! path_from_c_str {
     ($c_str:expr) => {{
@@ -817,6 +819,36 @@ impl Pal for Sys {
 
     fn pipe2(mut fds: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
         fds.write(extra::pipe2(flags as usize)?);
+        Ok(())
+    }
+
+    fn posix_fallocate(fd: c_int, offset: u64, length: NonZeroU64) -> Result<()> {
+        // Redox doesn't actually have flock yet but presumably the file will need to be locked to
+        // avoid accidentally truncating it if the length changes.
+        let _guard = FileLock::lock(fd, sys_file::LOCK_EX)?;
+
+        // posix_fallocate is less nuanced than the Linux syscall fallocate.
+        // If the byte range is already allocated, posix_fallocate doesn't do any extra work.
+        // If the byte range is unallocated; free, uninitialized bytes are reserved.
+        // posix_fallocate does not shrink files.
+        //
+        // The main purpose of it is to ensure subsequent writes to a byte range don't fail.
+        let length = length.get();
+        let total_offset = offset.checked_add(length).ok_or(Errno(EFBIG))?;
+
+        let mut stat = syscall::Stat::default();
+        syscall::fstat(fd as usize, &mut stat)?;
+        // The difference between total_offset and the file size is the number of bytes to
+        // allocate. So, if it's negative then the file is already large enough and we don't
+        // need to do any extra work.
+        if let Some(total_len) = total_offset
+            .checked_sub(stat.st_size)
+            .and_then(|diff| stat.st_size.checked_add(diff))
+        {
+            let total_len: usize = total_len.try_into().map_err(|_| Errno(EFBIG))?;
+            syscall::ftruncate(fd as usize, total_len)?;
+        }
+
         Ok(())
     }
 

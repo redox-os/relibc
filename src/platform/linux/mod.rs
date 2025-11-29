@@ -1,4 +1,4 @@
-use core::{arch::asm, ptr};
+use core::{arch::asm, num::NonZeroU64, ptr};
 
 use super::{ERRNO, Pal, types::*};
 use crate::{
@@ -558,6 +558,11 @@ impl Pal for Sys {
 
     fn pipe2(mut fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), flags) }).map(|_| ())
+    }
+
+    fn posix_fallocate(fd: c_int, offset: u64, length: NonZeroU64) -> Result<()> {
+        let length = length.get();
+        e_raw(unsafe { syscall!(FALLOCATE, fd, 0, offset, length) }).map(|_| ())
     }
 
     fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize> {

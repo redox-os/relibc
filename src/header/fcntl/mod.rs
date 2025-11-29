@@ -4,6 +4,8 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+use core::num::NonZeroU64;
+
 use crate::{
     c_str::CStr,
     error::ResultExt,
@@ -14,6 +16,8 @@ use crate::{
 };
 
 pub use self::sys::*;
+
+use super::errno::EINVAL;
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
@@ -90,3 +94,20 @@ pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: .
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_fcntl(a: flock) {}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn posix_fallocate(fd: c_int, offset: off_t, length: off_t) -> c_int {
+    // Length can't be zero and offset must be positive.
+    let Ok(offset) = offset.try_into() else {
+        return EINVAL;
+    };
+    let Some(length) = length.try_into().ok().and_then(NonZeroU64::new) else {
+        return EINVAL;
+    };
+
+    // posix_fallocate does not set errno but instead returns it.
+    Sys::posix_fallocate(fd, offset, length)
+        .err()
+        .map(|e| e.0)
+        .unwrap_or_default()
+}
