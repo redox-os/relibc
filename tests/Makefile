@@ -35,6 +35,7 @@ EXPECT_NAMES=\
 	error \
 	fcntl/create \
 	fcntl/fcntl \
+	fcntl/posix_fallocate \
 	features \
 	fnmatch \
 	glob \
