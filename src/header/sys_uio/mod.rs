@@ -1,4 +1,6 @@
-//! sys/uio implementation for Redox, following http://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/uio.h.html
+//! `sys/uio.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_uio.h.html>.
 
 use alloc::vec::Vec;
 use core::slice;
@@ -10,6 +12,7 @@ use crate::{
 
 pub const IOV_MAX: c_int = 1024;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_uio.h.html>.
 #[repr(C)]
 #[derive(Debug, CheckVsLibcCrate)]
 pub struct iovec {
@@ -40,6 +43,7 @@ unsafe fn scatter(iovs: &[iovec], vec: Vec<u8>) {
     }
 }
 
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man2/readv.2.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn preadv(
     fd: c_int,
@@ -62,6 +66,7 @@ pub unsafe extern "C" fn preadv(
     ret
 }
 
+/// Non-POSIX, see <https://man7.org/linux/man-pages/man2/readv.2.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pwritev(
     fd: c_int,
@@ -80,6 +85,7 @@ pub unsafe extern "C" fn pwritev(
     unistd::pwrite(fd, vec.as_ptr() as *const c_void, vec.len(), offset)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/readv.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> ssize_t {
     if iovcnt < 0 || iovcnt > IOV_MAX {
@@ -97,6 +103,7 @@ pub unsafe extern "C" fn readv(fd: c_int, iov: *const iovec, iovcnt: c_int) -> s
     ret
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/writev.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn writev(fd: c_int, iov: *const iovec, iovcnt: c_int) -> ssize_t {
     if iovcnt < 0 || iovcnt > IOV_MAX {
