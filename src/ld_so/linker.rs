@@ -758,10 +758,26 @@ impl Linker {
     ) -> Result<Arc<DSO>> {
         // fixme: double lookup slow
         if let Some(id) = self.name_to_object_id_map.get(name) {
-            if let Some(obj) = self.objects.get_mut(id) {
+            if let Some(obj) = self.objects.get(id) {
+                if let Some(scope) = dependent_scope {
+                    match scope_kind {
+                        ScopeKind::Local => scope.add(obj),
+                        ScopeKind::Global => GLOBAL_SCOPE.write().add(obj),
+                    }
+                } else if scope_kind == ScopeKind::Global {
+                    GLOBAL_SCOPE.write().add(obj);
+                }
                 return Ok(obj.clone());
             }
-        } else if let Some(obj) = new_objects.iter_mut().find(|o| o.name == name) {
+        } else if let Some(obj) = new_objects.iter().find(|o| o.name == name) {
+            if let Some(scope) = dependent_scope {
+                match scope_kind {
+                    ScopeKind::Local => scope.add(obj),
+                    ScopeKind::Global => GLOBAL_SCOPE.write().add(obj),
+                }
+            } else if scope_kind == ScopeKind::Global {
+                GLOBAL_SCOPE.write().add(obj);
+            }
             return Ok(obj.clone());
         }
 
@@ -777,7 +793,8 @@ impl Linker {
             dlopened,
             self.next_object_id,
             self.next_tls_module_id,
-            self.tls_size,
+            // Ensure TLS is aligned to 16 bytes for SSE
+            self.tls_size.next_multiple_of(16),
         )
         .map_err(|err| {
             if debug {

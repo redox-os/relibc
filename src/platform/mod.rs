@@ -338,11 +338,11 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
         panic!("Missing namespace fd!");
     };
     redox_rt::initialize(
-        FdGuard::new(proc_fd),
+        FdGuard::new(proc_fd).to_upper().unwrap(),
         if ns_fd == usize::MAX {
             None
         } else {
-            Some(FdGuard::new(ns_fd))
+            Some(FdGuard::new(ns_fd).to_upper().unwrap())
         },
     );
 

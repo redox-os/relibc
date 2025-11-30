@@ -3,7 +3,10 @@ use super::*;
 // TODO: Hashmap?
 use alloc::collections::BTreeMap;
 
-use core::cell::{Cell, RefCell};
+use core::{
+    cell::{Cell, RefCell},
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use crate::{header::errno::EINVAL, sync::Mutex};
 
@@ -33,9 +36,8 @@ pub unsafe extern "C" fn pthread_key_create(
     key_ptr: *mut pthread_key_t,
     destructor: Option<extern "C" fn(value: *mut c_void)>,
 ) -> c_int {
-    let key = NEXTKEY.get();
-    NEXTKEY.set(key + 1);
-    //println!("pthread_key_create new key {:#0x}, dtor {:p}", key, destructor);
+    let key = NEXTKEY.fetch_add(1, Ordering::SeqCst) as pthread_key_t;
+    //println!("pthread_key_create new key {:#0x}, dtor {:?}", key, destructor);
 
     // TODO
     //if key >= PTHREAD_KEYS_MAX {
@@ -99,8 +101,7 @@ struct Record {
     data: *mut c_void,
 }
 
-#[thread_local]
-static NEXTKEY: Cell<pthread_key_t> = Cell::new(1);
+static NEXTKEY: AtomicUsize = AtomicUsize::new(1);
 
 pub(crate) unsafe fn run_all_destructors() {
     for (key, Record { data }) in VALUES.take() {

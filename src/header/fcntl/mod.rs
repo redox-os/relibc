@@ -4,6 +4,8 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+use core::num::NonZeroU64;
+
 use crate::{
     c_str::CStr,
     error::ResultExt,
@@ -14,6 +16,8 @@ use crate::{
 };
 
 pub use self::sys::*;
+
+use super::errno::EINVAL;
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
@@ -31,6 +35,7 @@ pub const F_SETFL: c_int = 4;
 pub const F_GETLK: c_int = 5;
 pub const F_SETLK: c_int = 6;
 pub const F_SETLKW: c_int = 7;
+pub const F_DUPFD_CLOEXEC: c_int = 1030;
 
 pub const F_RDLCK: c_int = 0;
 pub const F_WRLCK: c_int = 1;
@@ -63,7 +68,7 @@ pub struct flock {
 pub unsafe extern "C" fn fcntl(fildes: c_int, cmd: c_int, mut __valist: ...) -> c_int {
     // c_ulonglong
     let arg = match cmd {
-        F_DUPFD | F_SETFD | F_SETFL | F_SETLK | F_SETLKW | F_GETLK => unsafe {
+        F_DUPFD | F_SETFD | F_SETFL | F_SETLK | F_SETLKW | F_GETLK | F_DUPFD_CLOEXEC => unsafe {
             __valist.arg::<c_ulonglong>()
         },
         _ => 0,
@@ -89,3 +94,20 @@ pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: .
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_fcntl(a: flock) {}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn posix_fallocate(fd: c_int, offset: off_t, length: off_t) -> c_int {
+    // Length can't be zero and offset must be positive.
+    let Ok(offset) = offset.try_into() else {
+        return EINVAL;
+    };
+    let Some(length) = length.try_into().ok().and_then(NonZeroU64::new) else {
+        return EINVAL;
+    };
+
+    // posix_fallocate does not set errno but instead returns it.
+    Sys::posix_fallocate(fd, offset, length)
+        .err()
+        .map(|e| e.0)
+        .unwrap_or_default()
+}

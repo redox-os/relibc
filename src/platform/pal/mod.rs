@@ -1,3 +1,5 @@
+use core::num::NonZeroU64;
+
 use super::types::*;
 use crate::{
     c_str::CStr,
@@ -217,6 +219,8 @@ pub trait Pal {
 
     fn pipe2(fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()>;
 
+    fn posix_fallocate(fd: c_int, offset: u64, length: NonZeroU64) -> Result<()>;
+
     fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize>;
 
     unsafe fn rlct_clone(stack: *mut usize) -> Result<pthread::OsTid, Errno>;
@@ -232,6 +236,14 @@ pub trait Pal {
     fn readlinkat(dirfd: c_int, pathname: CStr, out: &mut [u8]) -> Result<usize>;
 
     fn rename(old: CStr, new: CStr) -> Result<()>;
+    fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()>;
+    fn renameat2(
+        old_dir: c_int,
+        old_path: CStr,
+        new_dir: c_int,
+        new_path: CStr,
+        flags: c_uint,
+    ) -> Result<()>;
 
     fn rmdir(path: CStr) -> Result<()>;
 

@@ -205,7 +205,10 @@ impl Tcb {
     }
 
     /// Activate TLS
-    pub unsafe fn activate(&mut self, #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuard) {
+    pub unsafe fn activate(
+        &mut self,
+        #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuardUpper,
+    ) {
         unsafe {
             Self::os_arch_activate(
                 &self.os_specific,
@@ -345,7 +348,7 @@ impl Tcb {
         os: &OsSpecific,
         tls_end: usize,
         tls_len: usize,
-        thr_fd: redox_rt::proc::FdGuard,
+        thr_fd: redox_rt::proc::FdGuardUpper,
     ) {
         unsafe {
             os.thr_fd.get().write(Some(thr_fd));

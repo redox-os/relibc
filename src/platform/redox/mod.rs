@@ -1,6 +1,7 @@
 use core::{
     convert::TryFrom,
     mem::{self, MaybeUninit, size_of},
+    num::NonZeroU64,
     ptr, slice, str,
 };
 use redox_rt::{
@@ -14,6 +15,11 @@ use syscall::{
     dirent::{DirentHeader, DirentKind},
 };
 
+use self::{
+    exec::Executable,
+    path::{FileLock, canonicalize, openat2, openat2_path},
+};
+use super::{ERRNO, Pal, Read, types::*};
 use crate::{
     c_str::{CStr, CString},
     error::{self, Errno, Result, ResultExt},
@@ -21,13 +27,15 @@ use crate::{
     header::{
         dirent::dirent,
         errno::{
-            EBADF, EBADFD, EBADR, EFAULT, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM, ENOSYS,
-            EOPNOTSUPP, EPERM, ERANGE,
+            EBADF, EBADFD, EBADR, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
+            ENOMEM, ENOSYS, EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl::{self, AT_FDCWD, O_CREAT, O_RDONLY, O_RDWR},
+        fcntl::{self, AT_FDCWD, AT_SYMLINK_NOFOLLOW, O_CREAT, O_RDONLY, O_RDWR},
         limits,
-        pthread::{pthread_cancel, pthread_create, pthread_self},
+        pthread::{pthread_cancel, pthread_create},
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
+        stdio::RENAME_NOREPLACE,
+        sys_file,
         sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{RLIM_INFINITY, rlimit, rusage},
@@ -50,7 +58,18 @@ use crate::{
 
 pub use redox_rt::proc::FdGuard;
 
-use super::{ERRNO, Pal, Read, types::*};
+mod clone;
+mod epoll;
+mod event;
+mod exec;
+mod extra;
+mod libcscheme;
+mod libredox;
+pub(crate) mod path;
+mod ptrace;
+pub(crate) mod signal;
+mod socket;
+mod timer;
 
 static mut BRK_CUR: *mut c_void = ptr::null_mut();
 static mut BRK_END: *mut c_void = ptr::null_mut();
@@ -68,19 +87,6 @@ fn cvt_uid(id: c_int) -> Result<Option<u32>> {
     Ok(Some(id.try_into().map_err(|_| Errno(EINVAL))?))
 }
 
-mod clone;
-mod epoll;
-mod event;
-mod exec;
-mod extra;
-mod libcscheme;
-mod libredox;
-pub(crate) mod path;
-mod ptrace;
-pub(crate) mod signal;
-mod socket;
-mod timer;
-
 macro_rules! path_from_c_str {
     ($c_str:expr) => {{
         match $c_str.to_str() {
@@ -92,11 +98,6 @@ macro_rules! path_from_c_str {
         }
     }};
 }
-
-use self::{
-    exec::Executable,
-    path::{canonicalize, cap_path_at},
-};
 
 static CLONE_LOCK: RwLock<()> = RwLock::new(());
 
@@ -113,17 +114,17 @@ impl Pal for Sys {
 
         let mut stat = syscall::Stat::default();
 
-        syscall::fstat(*fd as usize, &mut stat)?;
+        fd.fstat(&mut stat)?;
 
         let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
 
-        let perms = if stat.st_uid == ruid {
-            stat.st_mode >> (3 * 2 & 0o7)
+        let perms = (if stat.st_uid == ruid {
+            stat.st_mode >> (3 * 2)
         } else if stat.st_gid == rgid {
-            stat.st_mode >> (3 * 1 & 0o7)
+            stat.st_mode >> (3 * 1)
         } else {
-            stat.st_mode & 0o7
-        };
+            stat.st_mode
+        }) & 0o7;
         if (mode & R_OK == R_OK && perms & 0o4 != 0o4)
             || (mode & W_OK == W_OK && perms & 0o2 != 0o2)
             || (mode & X_OK == X_OK && perms & 0o1 != 0o1)
@@ -273,7 +274,7 @@ impl Pal for Sys {
         let path = path
             .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
             .ok_or(Errno(ENOENT))?;
-        let file = cap_path_at(dirfd, path, flags, 0)?;
+        let file = openat2(dirfd, path, flags, 0)?;
         syscall::fchmod(*file as usize, mode as u16)?;
         Ok(())
     }
@@ -316,7 +317,7 @@ impl Pal for Sys {
         let path = path
             .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
             .ok_or(Errno(ENOENT))?;
-        let file = cap_path_at(dirfd, path, flags, 0)?;
+        let file = openat2(dirfd, path, flags, 0)?;
         Sys::fstat(*file, buf)
     }
 
@@ -501,8 +502,8 @@ impl Pal for Sys {
         }
 
         //TODO: store fd internally
-        let fd = FdGuard::new(redox_rt::sys::open(path, open_flags)?);
-        Ok(syscall::read(*fd, buf)?)
+        let fd = FdGuard::open(path, open_flags)?;
+        Ok(fd.read(buf)?)
     }
 
     fn getresgid(
@@ -579,8 +580,8 @@ impl Pal for Sys {
     fn gettid() -> pid_t {
         // This is used by pthread mutexes for reentrant checks and must be nonzero
         // and unique for each thread in the same process (but not cross-process)
-        Self::current_os_tid()
-            .thread_fd
+        let thread_fd = Self::current_os_tid().thread_fd;
+        (thread_fd & !syscall::UPPER_FDTBL_TAG)
             .checked_add(1)
             .unwrap()
             .try_into()
@@ -821,6 +822,36 @@ impl Pal for Sys {
         Ok(())
     }
 
+    fn posix_fallocate(fd: c_int, offset: u64, length: NonZeroU64) -> Result<()> {
+        // Redox doesn't actually have flock yet but presumably the file will need to be locked to
+        // avoid accidentally truncating it if the length changes.
+        let _guard = FileLock::lock(fd, sys_file::LOCK_EX)?;
+
+        // posix_fallocate is less nuanced than the Linux syscall fallocate.
+        // If the byte range is already allocated, posix_fallocate doesn't do any extra work.
+        // If the byte range is unallocated; free, uninitialized bytes are reserved.
+        // posix_fallocate does not shrink files.
+        //
+        // The main purpose of it is to ensure subsequent writes to a byte range don't fail.
+        let length = length.get();
+        let total_offset = offset.checked_add(length).ok_or(Errno(EFBIG))?;
+
+        let mut stat = syscall::Stat::default();
+        syscall::fstat(fd as usize, &mut stat)?;
+        // The difference between total_offset and the file size is the number of bytes to
+        // allocate. So, if it's negative then the file is already large enough and we don't
+        // need to do any extra work.
+        if let Some(total_len) = total_offset
+            .checked_sub(stat.st_size)
+            .and_then(|diff| stat.st_size.checked_add(diff))
+        {
+            let total_len: usize = total_len.try_into().map_err(|_| Errno(EFBIG))?;
+            syscall::ftruncate(fd as usize, total_len)?;
+        }
+
+        Ok(())
+    }
+
     fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize> {
         let current_offset = Self::lseek(fildes, 0, SEEK_CUR)? as u64;
         let bytes_read = Self::getdents(fildes, buf, current_offset)?;
@@ -862,7 +893,7 @@ impl Pal for Sys {
     }
     fn current_os_tid() -> crate::pthread::OsTid {
         crate::pthread::OsTid {
-            thread_fd: **RtTcb::current().thread_fd(),
+            thread_fd: RtTcb::current().thread_fd().as_raw_fd(),
         }
     }
 
@@ -923,7 +954,7 @@ impl Pal for Sys {
 
     fn readlinkat(dirfd: c_int, path: CStr, out: &mut [u8]) -> Result<usize> {
         let path = str::from_utf8(path.to_bytes()).map_err(|_| Errno(ENOENT))?;
-        let file = cap_path_at(dirfd, path, 0, fcntl::O_SYMLINK)?;
+        let file = openat2(dirfd, path, 0, fcntl::O_RDONLY | fcntl::O_SYMLINK)?;
         Sys::read(*file, out)
     }
 
@@ -937,6 +968,42 @@ impl Pal for Sys {
         )?;
         syscall::frename(*file as usize, newpath)?;
         Ok(())
+    }
+
+    fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()> {
+        Sys::renameat2(old_dir, old_path, new_dir, new_path, 0)
+    }
+
+    fn renameat2(
+        old_dir: c_int,
+        old_path: CStr,
+        new_dir: c_int,
+        new_path: CStr,
+        flags: c_uint,
+    ) -> Result<()> {
+        const MASK: c_uint = !RENAME_NOREPLACE;
+        if MASK & flags != 0 {
+            return Err(Errno(EOPNOTSUPP));
+        }
+
+        let new_path = new_path.to_str().map_err(|_| Errno(EINVAL))?;
+        let target = openat2_path(new_dir, new_path, 0)?;
+        // Fail if the target exists with RENAME_NOREPLACE.
+        if flags & RENAME_NOREPLACE != 0
+            && let Ok(fd) =
+                libredox::open(&target, fcntl::O_PATH | fcntl::O_CLOEXEC, 0).map(FdGuard::new)
+        {
+            return Err(Errno(EEXIST));
+        }
+
+        let old_path = old_path.to_str().map_err(|_| Errno(EINVAL))?;
+        // oflags are the same as Sys::rename above.
+        let source = openat2(old_dir, old_path, 0, fcntl::O_NOFOLLOW | fcntl::O_PATH)?;
+
+        // I'm avoiding Sys::rename to avoid reallocating a CString from a String.
+        syscall::frename(*source as usize, target)
+            .map(|_| ())
+            .map_err(Into::into)
     }
 
     fn rmdir(path: CStr) -> Result<()> {
@@ -1035,7 +1102,7 @@ impl Pal for Sys {
         }
 
         let path = format!("/scheme/time/{clock_id}");
-        let timerfd = FdGuard::new(libredox::open(&path, O_RDWR, 0)?);
+        let timerfd = FdGuard::open(&path, syscall::O_RDWR)?;
         let eventfd = FdGuard::new(Error::demux(unsafe {
             event::redox_event_queue_create_v1(0)
         })?);

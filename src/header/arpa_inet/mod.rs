@@ -126,7 +126,7 @@ pub unsafe extern "C" fn inet_ntoa(r#in: in_addr) -> *const c_char {
             AF_INET,
             &r#in as *const in_addr as *const c_void,
             NTOA_ADDR.unsafe_mut().as_mut_ptr(),
-            NTOA_ADDR.unsafe_ref().len(),
+            NTOA_ADDR.unsafe_ref().len() as socklen_t,
         )
     }
 }

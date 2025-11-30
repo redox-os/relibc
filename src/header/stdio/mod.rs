@@ -1034,6 +1034,35 @@ pub unsafe extern "C" fn rename(oldpath: *const c_char, newpath: *const c_char) 
         .or_minus_one_errno()
 }
 
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn renameat(
+    old_dir: c_int,
+    old_path: *const c_char,
+    new_dir: c_int,
+    new_path: *const c_char,
+) -> c_int {
+    let old_path = CStr::from_ptr(old_path);
+    let new_path = CStr::from_ptr(new_path);
+    Sys::renameat(old_dir, old_path, new_dir, new_path)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn renameat2(
+    old_dir: c_int,
+    old_path: *const c_char,
+    new_dir: c_int,
+    new_path: *const c_char,
+    flags: c_uint,
+) -> c_int {
+    let old_path = CStr::from_ptr(old_path);
+    let new_path = CStr::from_ptr(new_path);
+    Sys::renameat2(old_dir, old_path, new_dir, new_path, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
 /// Rewind `stream` back to the beginning of it
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rewind(stream: *mut FILE) {

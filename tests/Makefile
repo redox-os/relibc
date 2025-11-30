@@ -35,6 +35,7 @@ EXPECT_NAMES=\
 	error \
 	fcntl/create \
 	fcntl/fcntl \
+	fcntl/posix_fallocate \
 	features \
 	fnmatch \
 	glob \
@@ -42,7 +43,6 @@ EXPECT_NAMES=\
 	libgen \
 	locale \
 	math \
-	netdb/getaddrinfo \
 	regex \
 	select \
 	setjmp \
@@ -64,6 +64,7 @@ EXPECT_NAMES=\
 	stdio/popen \
 	stdio/printf \
 	stdio/rename \
+	stdio/renameat \
 	stdio/scanf \
 	stdio/setvbuf \
 	stdio/sprintf \
@@ -79,6 +80,7 @@ EXPECT_NAMES=\
 	stdlib/atoi \
 	stdlib/div \
 	stdlib/env \
+	stdlib/getsubopt \
 	stdlib/mkostemps \
 	stdlib/qsort \
 	stdlib/rand \
@@ -192,6 +194,8 @@ NAMES=\
 	dirent/posix_getdents \
 	kill-waitpid \
 	net/if \
+	netdb/getaddrinfo \
+	netdb/getaddrinfo_null \
 	pty/forkpty \
 	psignal \
 	pwd \

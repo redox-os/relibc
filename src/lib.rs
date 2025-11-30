@@ -19,7 +19,6 @@
 #![feature(macro_derive)]
 #![feature(maybe_uninit_slice)]
 #![feature(lang_items)]
-#![feature(let_chains)]
 #![feature(linkage)]
 #![feature(pointer_is_aligned_to)]
 #![feature(ptr_as_uninit)]
@@ -84,7 +83,7 @@ pub extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {
     let mut w = platform::FileWriter::new(2);
     let _ = w.write_fmt(format_args!("RELIBC PANIC: {}\n", pi));
 
-    Sys::exit(1);
+    core::intrinsics::abort();
 }
 
 #[cfg(not(test))]
@@ -113,7 +112,7 @@ pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
         layout.align()
     ));
 
-    Sys::exit(1);
+    core::intrinsics::abort();
 }
 
 #[cfg(not(test))]
@@ -126,5 +125,5 @@ pub extern "C" fn _Unwind_Resume() -> ! {
     let mut w = platform::FileWriter::new(2);
     let _ = w.write_str("_Unwind_Resume\n");
 
-    Sys::exit(1);
+    core::intrinsics::abort();
 }

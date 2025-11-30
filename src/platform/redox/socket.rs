@@ -281,7 +281,7 @@ unsafe fn serialize_ancillary_data_to_stream(
                     let fds_slice = slice::from_raw_parts(fds_ptr, fd_count);
                     for &fd in fds_slice.iter() {
                         let fd_to_send = FdGuard::new(syscall::dup(fd as usize, b"")?);
-                        syscall::sendfd(socket as usize, *fd_to_send as usize, 0, 0)?;
+                        syscall::sendfd(socket as usize, fd_to_send.as_raw_fd(), 0, 0)?;
                     }
                 }
 
@@ -514,11 +514,14 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<c_int> {
-        let stream = syscall::dup(socket as usize, b"listen")? as c_int;
+        let stream = syscall::dup(socket as usize, b"listen")?;
         if address != ptr::null_mut() && address_len != ptr::null_mut() {
-            let _ = Self::getpeername(stream, address, address_len)?;
+            if let Err(err) = Self::getpeername(stream as c_int, address, address_len) {
+                let _ = syscall::close(stream);
+                return Err(err);
+            }
         }
-        Ok(stream)
+        Ok(stream as c_int)
     }
 
     unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> Result<()> {
@@ -559,12 +562,12 @@ impl PalSocket for Sys {
                 )?;
 
                 let fs_bind_result = (|| -> Result<()> {
-                    let dirfd = FdGuard::new(redox_rt::sys::open(
+                    let dirfd = FdGuard::open(
                         &dir_path,
                         syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
-                    )?);
+                    )?;
                     let fd_to_send = FdGuard::new(syscall::dup(socket as usize, &[])?);
-                    let _ = syscall::sendfd(*dirfd, *fd_to_send, 0, 0)?;
+                    syscall::sendfd(dirfd.as_raw_fd(), fd_to_send.as_raw_fd(), 0, 0)?;
                     Ok(())
                 })();
 
@@ -625,15 +628,19 @@ impl PalSocket for Sys {
                 let (_, fd_path) = dir_path_and_fd_path(&path)?;
 
                 let target_path = format!("/{fd_path}");
+<<<<<<< HEAD
                 let socket_file_fd =
                     FdGuard::new(redox_rt::sys::open(&target_path, syscall::O_RDWR)?);
+=======
+                let socket_file_fd = FdGuard::open(&target_path, syscall::O_RDWR)?;
+>>>>>>> master
 
                 const TOKEN_BUF_SIZE: usize = 16;
 
                 let mut token_buf = [0u8; TOKEN_BUF_SIZE];
 
                 redox_rt::sys::sys_call(
-                    *socket_file_fd,
+                    socket_file_fd.as_raw_fd(),
                     &mut token_buf,
                     CallFlags::empty(),
                     &[FsCall::Connect as u64],
@@ -656,7 +663,37 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<()> {
-        inner_get_name(false, socket, address, address_len)
+        // This is needed until the netstack supports GetPeerName.
+        let (family, _) = socket_domain_type(socket)?;
+
+        match family {
+            AF_INET => inner_get_name(false, socket, address, address_len),
+            AF_UNIX => {
+                let mut buf = [0; 256];
+                let len = redox_rt::sys::sys_call(
+                    socket as usize,
+                    &mut buf,
+                    CallFlags::empty(),
+                    &[SocketCall::GetPeerName as u64],
+                )?;
+                if buf.starts_with(b"/scheme/uds_stream/") {
+                    inner_af_unix(&buf[19..len], address, address_len);
+                } else if buf.starts_with(b"/scheme/uds_dgram/") {
+                    inner_af_unix(&buf[18..len], address, address_len);
+                } else {
+                    // Socket doesn't belong to any scheme
+                    trace!(
+                        "socket {:?} doesn't match either tcp, udp or chan schemes",
+                        str::from_utf8(buf)
+                    );
+                    return Err(Errno(ENOTSOCK));
+                }
+                Ok(())
+            }
+            _ => {
+                return Err(Errno(EAFNOSUPPORT));
+            }
+        }
     }
 
     unsafe fn getsockname(
@@ -672,14 +709,19 @@ impl PalSocket for Sys {
         level: c_int,
         option_name: c_int,
         option_value: *mut c_void,
-        option_len: *mut socklen_t,
+        option_len_ptr: *mut socklen_t,
     ) -> Result<()> {
+        if option_len_ptr.is_null() {
+            return Err(Errno(EFAULT));
+        }
+        let option_len = (*option_len_ptr) as usize;
+
         let option_c_int = || -> Result<&mut c_int> {
             if option_value.is_null() {
                 return Err(Errno(EFAULT));
             }
 
-            if (option_len as usize) < mem::size_of::<c_int>() {
+            if option_len < mem::size_of::<c_int>() {
                 return Err(Errno(EINVAL));
             }
 
@@ -691,27 +733,41 @@ impl PalSocket for Sys {
                 SO_DOMAIN => {
                     let option = option_c_int()?;
                     *option = socket_domain_type(socket)?.0;
+                    *option_len_ptr = mem::size_of::<c_int>() as socklen_t;
                     return Ok(());
                 }
                 SO_ERROR => {
                     let option = option_c_int()?;
                     //TODO: Socket nonblock connection error
                     *option = 0;
+                    *option_len_ptr = mem::size_of::<c_int>() as socklen_t;
                     return Ok(());
                 }
                 SO_TYPE => {
                     let option = option_c_int()?;
                     *option = socket_domain_type(socket)?.1;
+                    *option_len_ptr = mem::size_of::<c_int>() as socklen_t;
                     return Ok(());
                 }
-                _ => (),
+                _ => {
+                    let metadata = [SocketCall::GetSockOpt as u64, option_name as u64];
+                    let payload = slice::from_raw_parts_mut(option_value as *mut u8, option_len);
+                    let call_flags = CallFlags::empty();
+                    *option_len_ptr = redox_rt::sys::sys_call(
+                        socket as usize,
+                        payload,
+                        CallFlags::empty(),
+                        &metadata,
+                    )? as socklen_t;
+                    return Ok(());
+                }
             },
             _ => (),
         }
 
         eprintln!(
             "getsockopt({}, {}, {}, {:p}, {:p})",
-            socket, level, option_name, option_value, option_len
+            socket, level, option_name, option_value, option_len_ptr
         );
         Err(Errno(ENOSYS))
     }
@@ -730,15 +786,39 @@ impl PalSocket for Sys {
         address_len: *mut socklen_t,
     ) -> Result<usize> {
         if flags != 0 {
-            return Err(Errno(EOPNOTSUPP));
+            // Convert to recvmsg
+            let mut iov = iovec {
+                iov_base: buf,
+                iov_len: len,
+            };
+            let mut msg = msghdr {
+                msg_name: address as *mut c_void,
+                msg_namelen: if !address_len.is_null() {
+                    *address_len
+                } else {
+                    0
+                },
+                msg_iov: &mut iov,
+                msg_iovlen: 1,
+                msg_control: ptr::null_mut(),
+                msg_controllen: 0,
+                msg_flags: 0,
+            };
+            let count = Self::recvmsg(socket, &mut msg, flags)?;
+            if !address_len.is_null() {
+                *address_len = msg.msg_namelen;
+            }
+            return Ok(count);
         }
         if address == ptr::null_mut() || address_len == ptr::null_mut() {
             Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
         } else {
             let fd = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
-            Self::getpeername(*fd as c_int, address, address_len)?;
-
-            Self::read(*fd as c_int, slice::from_raw_parts_mut(buf as *mut u8, len))
+            Self::getpeername(fd.as_c_fd().unwrap(), address, address_len)?;
+            Self::read(
+                fd.as_c_fd().unwrap(),
+                slice::from_raw_parts_mut(buf as *mut u8, len),
+            )
         }
     }
 
@@ -765,6 +845,7 @@ impl PalSocket for Sys {
             + mhdr.msg_namelen as usize     // name_buffer
             + mem::size_of::<usize>()       // payload_len
             + whole_iov_size                // payload_data_buffer
+            + mem::size_of::<usize>()       // control_len
             + mhdr.msg_controllen as usize // ancillary_stream_buffer
         };
         msg_stream
@@ -784,7 +865,7 @@ impl PalSocket for Sys {
             .copy_from_slice(&(mhdr.msg_controllen as usize).to_le_bytes());
 
         // Read the message stream.
-        let metadata = [SocketCall::RecvMsg as u64];
+        let metadata = [SocketCall::RecvMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
         let actual_read_len =
             redox_rt::sys::sys_call(socket as usize, &mut msg_stream, call_flags, &metadata)?;
@@ -861,7 +942,7 @@ impl PalSocket for Sys {
         }
 
         // Send the message stream.
-        let metadata = [SocketCall::SendMsg as u64];
+        let metadata = [SocketCall::SendMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
         let written = redox_rt::sys::sys_call(
             socket as usize,
@@ -882,13 +963,30 @@ impl PalSocket for Sys {
         dest_len: socklen_t,
     ) -> Result<usize> {
         if flags != 0 {
-            return Err(Errno(EOPNOTSUPP));
+            // Convert to sendmsg
+            let mut iov = iovec {
+                iov_base: buf as *mut c_void,
+                iov_len: len,
+            };
+            let msg = msghdr {
+                msg_name: dest_addr as *mut c_void,
+                msg_namelen: dest_len,
+                msg_iov: &mut iov,
+                msg_iovlen: 1,
+                msg_control: ptr::null_mut(),
+                msg_controllen: 0,
+                msg_flags: 0,
+            };
+            return Self::sendmsg(socket, &msg, flags);
         }
         if dest_addr == ptr::null() || dest_len == 0 {
             Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
         } else {
             let fd = FdGuard::new(bind_or_connect!(connect copy, socket, dest_addr, dest_len)?);
-            Self::write(*fd as c_int, slice::from_raw_parts(buf as *const u8, len))
+            Self::write(
+                fd.as_c_fd().unwrap(),
+                slice::from_raw_parts(buf as *const u8, len),
+            )
         }
     }
 
@@ -921,7 +1019,7 @@ impl PalSocket for Sys {
                 tv_nsec,
             };
 
-            Self::write(*fd as c_int, &timespec)?;
+            Self::write(fd.as_c_fd().unwrap(), &timespec)?;
             Ok(())
         };
 
@@ -929,7 +1027,12 @@ impl PalSocket for Sys {
             SOL_SOCKET => match option_name {
                 SO_RCVTIMEO => return set_timeout(b"read_timeout"),
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
-                SO_PASSCRED => {
+                _ => {
+                    let (family, _) = socket_domain_type(socket)?;
+                    if family == AF_INET {
+                        // netstack does not support SYS_CALL
+                        return Ok(());
+                    }
                     let metadata = [SocketCall::SetSockOpt as u64, option_name as u64];
                     let payload =
                         slice::from_raw_parts_mut(option_value as *mut u8, option_len as usize);
@@ -942,7 +1045,6 @@ impl PalSocket for Sys {
                     )?;
                     return Ok(());
                 }
-                _ => (),
             },
             _ => (),
         }
@@ -990,30 +1092,37 @@ impl PalSocket for Sys {
 
         match (domain, kind) {
             (AF_UNIX, SOCK_STREAM) => {
+<<<<<<< HEAD
                 let listener =
                     FdGuard::new(redox_rt::sys::open("/scheme/uds_stream", flags | O_CREAT)?);
+=======
+                let listener = FdGuard::open("/scheme/uds_stream", flags | O_CREAT)?;
+>>>>>>> master
 
                 // For now, uds_stream: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
                 // nonblocking.
 
-                let mut fd0 = FdGuard::new(syscall::dup(*listener, b"connect")?);
-
-                let mut fd1 = FdGuard::new(syscall::dup(*listener, b"listen")?);
+                let mut fd0 = listener.dup(b"connect")?;
+                let mut fd1 = listener.dup(b"listen")?;
 
                 sv[0] = fd0.take() as c_int;
                 sv[1] = fd1.take() as c_int;
                 Ok(())
             }
             (AF_UNIX, SOCK_DGRAM) => {
+<<<<<<< HEAD
                 let listener =
                     FdGuard::new(redox_rt::sys::open("/scheme/uds_dgram", flags | O_CREAT)?);
+=======
+                let listener = FdGuard::open("/scheme/uds_dgram", flags | O_CREAT)?;
+>>>>>>> master
 
                 // For now, uds_dgram: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
                 // nonblocking.
 
-                let mut fd0 = FdGuard::new(syscall::dup(*listener, b"connect")?);
+                let mut fd0 = listener.dup(b"connect")?;
 
                 sv[0] = fd0.take() as c_int;
                 sv[1] = listener.take() as c_int;

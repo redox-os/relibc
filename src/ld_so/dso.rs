@@ -549,10 +549,6 @@ impl DSO {
         // Copy data
         let mut dynamic = None;
         for ph in elf.elf_program_headers() {
-            let voff = ph.p_vaddr(endian) % ph.p_align(endian);
-            let vsize = ((ph.p_memsz(endian) + voff) as usize)
-                .next_multiple_of(ph.p_align(endian) as usize);
-
             match ph.p_type(endian) {
                 elf::PT_LOAD => {
                     if skip_load_segment_copy {
@@ -583,11 +579,14 @@ impl DSO {
                             }
                         }
                     };
+                    let _voff = ph.p_vaddr(endian) % ph.p_align(endian);
+                    let _vsize = ((ph.p_memsz(endian) + _voff) as usize)
+                        .next_multiple_of(ph.p_align(endian) as usize);
                     trace!(
                         "  copy {:#x}, {:#x}: {:#x}, {:#x}",
-                        ph.p_vaddr(endian) - voff,
-                        vsize,
-                        voff,
+                        ph.p_vaddr(endian) - _voff,
+                        _vsize,
+                        _voff,
                         obj_data.len()
                     );
                     mmap_data.copy_from_slice(obj_data);
@@ -603,8 +602,7 @@ impl DSO {
                     tcb_master = Some(Master {
                         ptr,
                         len: ph.p_filesz(endian) as usize,
-                        //TODO: TLS is aligned manually to 16 bytes for SSE instruction safety
-                        offset: tls_offset + vsize.next_multiple_of(16),
+                        offset: tls_offset + ph.p_memsz(endian) as usize,
                     });
                     trace!("  tcb master {:x?}", tcb_master);
                 }

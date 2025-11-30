@@ -87,7 +87,7 @@ pub struct addrinfo {
     ai_family: c_int,          /* PF_xxx */
     ai_socktype: c_int,        /* SOCK_xxx */
     ai_protocol: c_int,        /* 0 or IPPROTO_xxx for IPv4 and IPv6 */
-    ai_addrlen: size_t,        /* length of ai_addr */
+    ai_addrlen: socklen_t,     /* length of ai_addr */
     ai_canonname: *mut c_char, /* canonical name for hostname */
     ai_addr: *mut sockaddr,    /* binary address */
     ai_next: *mut addrinfo,    /* next structure in linked list */
@@ -851,7 +851,7 @@ pub unsafe extern "C" fn getaddrinfo(
             sin_zero: [0; 8],
         })) as *mut sockaddr;
 
-        let ai_addrlen = mem::size_of::<sockaddr_in>();
+        let ai_addrlen = mem::size_of::<sockaddr_in>() as socklen_t;
 
         let ai_canonname = if ai_flags & AI_CANONNAME > 0 {
             if node_opt.is_none() {
@@ -980,9 +980,9 @@ pub unsafe extern "C" fn freeaddrinfo(res: *mut addrinfo) {
             drop(CString::from_raw(bai.ai_canonname));
         }
         if !bai.ai_addr.is_null() {
-            if bai.ai_addrlen == mem::size_of::<sockaddr_in>() {
+            if bai.ai_addrlen == mem::size_of::<sockaddr_in>() as socklen_t {
                 Box::from_raw(bai.ai_addr as *mut sockaddr_in);
-            } else if bai.ai_addrlen == mem::size_of::<sockaddr_in6>() {
+            } else if bai.ai_addrlen == mem::size_of::<sockaddr_in6>() as socklen_t {
                 Box::from_raw(bai.ai_addr as *mut sockaddr_in6);
             } else {
                 eprintln!("freeaddrinfo: unknown ai_addrlen {}", bai.ai_addrlen);

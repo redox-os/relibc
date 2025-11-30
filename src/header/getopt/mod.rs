@@ -26,7 +26,6 @@ pub struct option {
 }
 
 #[unsafe(no_mangle)]
-#[linkage = "weak"] // often redefined in GNU programs
 pub unsafe extern "C" fn getopt_long(
     argc: c_int,
     argv: *const *mut c_char,
