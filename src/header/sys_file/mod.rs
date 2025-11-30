@@ -7,14 +7,14 @@ use crate::{
     platform::{Pal, Sys, types::*},
 };
 
-pub const LOCK_SH: usize = 1;
-pub const LOCK_EX: usize = 2;
-pub const LOCK_NB: usize = 4;
-pub const LOCK_UN: usize = 8;
+pub const LOCK_SH: c_int = 1;
+pub const LOCK_EX: c_int = 2;
+pub const LOCK_NB: c_int = 4;
+pub const LOCK_UN: c_int = 8;
 
-pub const L_SET: usize = 0;
-pub const L_INCR: usize = 1;
-pub const L_XTND: usize = 2;
+pub const L_SET: c_int = 0;
+pub const L_INCR: c_int = 1;
+pub const L_XTND: c_int = 2;
 
 /// See <https://man7.org/linux/man-pages/man2/flock.2.html>.
 #[unsafe(no_mangle)]
