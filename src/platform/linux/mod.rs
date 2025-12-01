@@ -455,8 +455,24 @@ impl Pal for Sys {
         unsafe { syscall!(GETUID) as uid_t }
     }
 
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
         e_raw(unsafe { syscall!(LCHOWN, path.as_ptr(), owner, group) }).map(|_| ())
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
+        e_raw(unsafe {
+            syscall!(
+                FCHOWNAT,
+                AT_FDCWD,
+                path.as_ptr(),
+                owner as u32,
+                group as u32,
+                AT_SYMLINK_NOFOLLOW
+            )
+        })
+        .map(|_| ())
     }
 
     fn link(path1: CStr, path2: CStr) -> Result<()> {
