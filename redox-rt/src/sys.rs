@@ -13,7 +13,7 @@ use syscall::{
 use crate::{
     DYNAMIC_PROC_INFO, DynamicProcInfo, RtTcb, Tcb,
     arch::manually_enter_trampoline,
-    proc::FdGuard,
+    proc::{FdGuard, FdGuardUpper},
     protocol::{ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags},
     read_proc_meta,
     signal::tmp_disable_signals,
@@ -380,9 +380,9 @@ pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {
     wrapper(false, false, || syscall::nanosleep(rqtp, rmtp))?;
     Ok(())
 }
-pub fn setns(fd: usize) -> Option<FdGuard> {
+pub fn setns(fd: usize) -> Option<FdGuardUpper> {
     let mut info = DYNAMIC_PROC_INFO.lock();
-    let new_fd_guard = FdGuard::new(fd);
+    let new_fd_guard = FdGuard::new(fd).to_upper()?;
     let old_fd_guard = replace(&mut info.ns_fd, Some(new_fd_guard));
     old_fd_guard
 }
@@ -398,7 +398,7 @@ pub fn open(path: &str, flags: usize) -> Result<usize> {
     let fcntl_flags = flags & !syscall::O_ACCMODE;
     syscall::openat(crate::current_namespace_fd(), path, flags, fcntl_flags)
 }
-pub fn mkns(names: &[IoSlice]) -> Result<usize> {
+pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
     let mut buf = Vec::from(TYPE_MKNS.to_ne_bytes());
     const TYPE_MKNS: usize = 0; // namespace dup type.
     for name in names {
@@ -408,5 +408,5 @@ pub fn mkns(names: &[IoSlice]) -> Result<usize> {
         buf.extend_from_slice(&len.to_ne_bytes());
         buf.extend_from_slice(name_bytes);
     }
-    syscall::dup(crate::current_namespace_fd(), &buf)
+    FdGuard::new(syscall::dup(crate::current_namespace_fd(), &buf)?).to_upper()
 }

@@ -280,15 +280,16 @@ pub unsafe extern "C" fn redox_get_proc_credentials_v1(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {
-    let _ = if ens == 0 {
+    let fd = if ens == 0 {
         let null_namespace: [IoSlice; 2] = [IoSlice::new(b"memory"), IoSlice::new(b"pipe")];
         match redox_rt::sys::mkns(&null_namespace) {
-            Ok(new_ns_fd) => redox_rt::sys::setns(new_ns_fd),
+            Ok(new_ns_fd) => redox_rt::sys::setns(new_ns_fd.take()),
             Err(e) => return Error::mux(Err(e)),
         }
     } else {
         redox_rt::sys::setns(ens)
     };
+    let _ = syscall::close(fd);
     0
 }
 #[unsafe(no_mangle)]
@@ -418,7 +419,7 @@ pub unsafe extern "C" fn redox_mkns_v1(
                     })
                 })
                 .collect();
-            redox_rt::sys::mkns(&names_ioslice)
+            redox_rt::sys::mkns(&names_ioslice).map(|fd| fd.take())
         } else {
             // Kernel does the UTF-8 validation.
             syscall::mkns(core::slice::from_raw_parts(names.cast(), num_names))

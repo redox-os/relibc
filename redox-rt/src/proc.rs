@@ -840,16 +840,16 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new
         // parent FDs will not show up for the child).
         let scratchpad = {
-            cur_filetable_fd = FdGuard::new(syscall::dup(**cur_thr_fd, b"filetable")?);
+            cur_filetable_fd = FdGuard::new(syscall::dup(cur_thr_fd.as_raw_fd(), b"filetable")?);
 
             // This must be done before the address space is copied.
             let proc_fd = new_proc_fd.as_ref().map_or(usize::MAX, |p| p.as_raw_fd());
             //let _ = syscall::write(1, alloc::format!("FDTBL{}PROC{}THR{}\n", *cur_filetable_fd, proc_fd, *new_thr_fd).as_bytes());
 
             ForkScratchpad {
-                cur_filetable_fd: *cur_filetable_fd,
+                cur_filetable_fd: cur_filetable_fd.as_raw_fd(),
                 new_proc_fd: proc_fd,
-                new_thr_fd: *new_thr_fd,
+                new_thr_fd: new_thr_fd.as_raw_fd(),
                 new_ns_fd: current_namespace_fd(),
             }
         };
@@ -946,7 +946,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                 target_arch = "riscv64"
             ))]
             let buf = create_set_addr_space_buf_for_fork(
-                *new_addr_space_fd,
+                new_addr_space_fd.as_raw_fd(),
                 __relibc_internal_fork_ret as usize,
                 new_sp,
                 arg1,
