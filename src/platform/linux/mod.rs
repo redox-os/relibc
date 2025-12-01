@@ -79,8 +79,14 @@ impl Sys {
 }
 
 impl Pal for Sys {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn access(path: CStr, mode: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(ACCESS, path.as_ptr(), mode) }).map(|_| ())
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    fn access(path: CStr, mode: c_int) -> Result<()> {
+        e_raw(unsafe { syscall!(FACCESSAT, AT_FDCWD, path.as_ptr(), mode, 0) }).map(|_| ())
     }
 
     unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void> {
