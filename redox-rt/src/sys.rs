@@ -382,7 +382,7 @@ pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {
 }
 pub fn setns(fd: usize) -> Option<FdGuardUpper> {
     let mut info = DYNAMIC_PROC_INFO.lock();
-    let new_fd_guard = FdGuard::new(fd).to_upper()?;
+    let new_fd_guard = FdGuard::new(fd).to_upper().unwrap();
     let old_fd_guard = replace(&mut info.ns_fd, Some(new_fd_guard));
     old_fd_guard
 }
@@ -394,7 +394,7 @@ pub fn getns() -> Result<usize> {
         Ok(cur_ns)
     }
 }
-pub fn open(path: &str, flags: usize) -> Result<usize> {
+pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     let fcntl_flags = flags & !syscall::O_ACCMODE;
     syscall::openat(crate::current_namespace_fd(), path, flags, fcntl_flags)
 }
