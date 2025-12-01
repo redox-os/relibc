@@ -79,8 +79,14 @@ impl Sys {
 }
 
 impl Pal for Sys {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn access(path: CStr, mode: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(ACCESS, path.as_ptr(), mode) }).map(|_| ())
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    fn access(path: CStr, mode: c_int) -> Result<()> {
+        e_raw(unsafe { syscall!(FACCESSAT, AT_FDCWD, path.as_ptr(), mode, 0) }).map(|_| ())
     }
 
     unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void> {
@@ -449,8 +455,24 @@ impl Pal for Sys {
         unsafe { syscall!(GETUID) as uid_t }
     }
 
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
         e_raw(unsafe { syscall!(LCHOWN, path.as_ptr(), owner, group) }).map(|_| ())
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    fn lchown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
+        e_raw(unsafe {
+            syscall!(
+                FCHOWNAT,
+                AT_FDCWD,
+                path.as_ptr(),
+                owner as u32,
+                group as u32,
+                AT_SYMLINK_NOFOLLOW
+            )
+        })
+        .map(|_| ())
     }
 
     fn link(path1: CStr, path2: CStr) -> Result<()> {
@@ -645,10 +667,17 @@ impl Pal for Sys {
 
         Ok(crate::pthread::OsTid { thread_id: tid })
     }
+
+    #[cfg(target_arch = "aarch64")]
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
+        todo!("rlct_clone not implemented for aarch64 yet")
+    }
+
     unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<()> {
         let tgid = Self::getpid();
         e_raw(unsafe { syscall!(TGKILL, tgid, os_tid.thread_id, signal) }).map(|_| ())
     }
+
     fn current_os_tid() -> crate::pthread::OsTid {
         crate::pthread::OsTid {
             thread_id: unsafe { syscall!(GETTID) },
