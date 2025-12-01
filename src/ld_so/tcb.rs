@@ -343,6 +343,19 @@ impl Tcb {
         }
     }
 
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    unsafe fn os_arch_activate(_os: &(), tls_end: usize, tls_len: usize) {
+        // Uses ABI page
+        let abi_ptr = tls_end - tls_len - 16;
+        unsafe {
+            core::ptr::write(abi_ptr as *mut usize, tls_end);
+            core::arch::asm!(
+                "msr tpidr_el0, {}",
+                in(reg) abi_ptr,
+            );
+        }
+    }
+
     #[cfg(target_os = "redox")]
     unsafe fn os_arch_activate(
         os: &OsSpecific,
