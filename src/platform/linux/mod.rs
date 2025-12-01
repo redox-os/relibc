@@ -645,10 +645,17 @@ impl Pal for Sys {
 
         Ok(crate::pthread::OsTid { thread_id: tid })
     }
+
+    #[cfg(target_arch = "aarch64")]
+    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
+        todo!("rlct_clone not implemented for aarch64 yet")
+    }
+
     unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<()> {
         let tgid = Self::getpid();
         e_raw(unsafe { syscall!(TGKILL, tgid, os_tid.thread_id, signal) }).map(|_| ())
     }
+
     fn current_os_tid() -> crate::pthread::OsTid {
         crate::pthread::OsTid {
             thread_id: unsafe { syscall!(GETTID) },
