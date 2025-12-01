@@ -59,7 +59,7 @@ default-features = false
 features = ["c_api"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
-sc = "0.2.3"
+sc = "0.2.7"
 
 [target.'cfg(target_os = "redox")'.dependencies]
 redox_syscall = "0.5.13"
