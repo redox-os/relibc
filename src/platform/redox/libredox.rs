@@ -280,7 +280,7 @@ pub unsafe extern "C" fn redox_get_proc_credentials_v1(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {
-    let fd = if ens == 0 {
+    let _ = if ens == 0 {
         let null_namespace: [IoSlice; 2] = [IoSlice::new(b"memory"), IoSlice::new(b"pipe")];
         match redox_rt::sys::mkns(&null_namespace) {
             Ok(new_ns_fd) => redox_rt::sys::setns(new_ns_fd.take()),
@@ -289,7 +289,6 @@ pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {
     } else {
         redox_rt::sys::setns(ens)
     };
-    let _ = syscall::close(fd);
     0
 }
 #[unsafe(no_mangle)]
