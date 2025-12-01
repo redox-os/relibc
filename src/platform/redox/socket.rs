@@ -628,12 +628,7 @@ impl PalSocket for Sys {
                 let (_, fd_path) = dir_path_and_fd_path(&path)?;
 
                 let target_path = format!("/{fd_path}");
-<<<<<<< HEAD
-                let socket_file_fd =
-                    FdGuard::new(redox_rt::sys::open(&target_path, syscall::O_RDWR)?);
-=======
                 let socket_file_fd = FdGuard::open(&target_path, syscall::O_RDWR)?;
->>>>>>> master
 
                 const TOKEN_BUF_SIZE: usize = 16;
 
@@ -1092,12 +1087,7 @@ impl PalSocket for Sys {
 
         match (domain, kind) {
             (AF_UNIX, SOCK_STREAM) => {
-<<<<<<< HEAD
-                let listener =
-                    FdGuard::new(redox_rt::sys::open("/scheme/uds_stream", flags | O_CREAT)?);
-=======
                 let listener = FdGuard::open("/scheme/uds_stream", flags | O_CREAT)?;
->>>>>>> master
 
                 // For now, uds_stream: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
@@ -1111,12 +1101,7 @@ impl PalSocket for Sys {
                 Ok(())
             }
             (AF_UNIX, SOCK_DGRAM) => {
-<<<<<<< HEAD
-                let listener =
-                    FdGuard::new(redox_rt::sys::open("/scheme/uds_dgram", flags | O_CREAT)?);
-=======
                 let listener = FdGuard::open("/scheme/uds_dgram", flags | O_CREAT)?;
->>>>>>> master
 
                 // For now, uds_dgram: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
