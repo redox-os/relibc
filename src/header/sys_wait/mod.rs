@@ -2,7 +2,6 @@
 //! http://pubs.opengroup.org/onlinepubs/7908799/xsh/syswait.h.html
 
 use crate::{error::ResultExt, out::Out};
-//use header::sys_resource::rusage;
 use crate::platform::{Pal, Sys, types::*};
 
 pub const WNOHANG: c_int = 1;
@@ -22,15 +21,6 @@ pub const __WCLONE: c_int = 0x8000_0000;
 pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {
     waitpid(!0, stat_loc, 0)
 }
-
-// #[unsafe(no_mangle)]
-// pub unsafe extern "C" fn wait3(
-//     stat_loc: *mut c_int,
-//     options: c_int,
-//     resource_usage: *mut rusage,
-// ) -> pid_t {
-//     unimplemented!();
-// }
 
 /*
  * TODO: implement idtype_t, id_t, and siginfo_t
