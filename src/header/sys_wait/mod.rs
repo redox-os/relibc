@@ -1,5 +1,6 @@
-//! sys/wait.h implementation for Redox, following
-//! http://pubs.opengroup.org/onlinepubs/7908799/xsh/syswait.h.html
+//! `sys/wait.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_wait.h.html>.
 
 use crate::{error::ResultExt, out::Out};
 use crate::platform::{Pal, Sys, types::*};
@@ -17,6 +18,7 @@ pub const __WALL: c_int = 0x4000_0000;
 #[allow(overflowing_literals)]
 pub const __WCLONE: c_int = 0x8000_0000;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {
     waitpid(!0, stat_loc, 0)
@@ -36,6 +38,7 @@ pub unsafe extern "C" fn wait(stat_loc: *mut c_int) -> pid_t {
  *  }
  */
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/waitpid.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn waitpid(pid: pid_t, stat_loc: *mut c_int, options: c_int) -> pid_t {
     Sys::waitpid(pid, Out::nullable(stat_loc), options).or_minus_one_errno()
