@@ -2,8 +2,14 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_wait.h.html>.
 
-use crate::{error::ResultExt, out::Out};
-use crate::platform::{Pal, Sys, types::*};
+use crate::{
+    error::ResultExt,
+    out::Out,
+    platform::{
+        Pal, Sys,
+        types::{c_int, pid_t},
+    },
+};
 
 pub const WNOHANG: c_int = 1;
 pub const WUNTRACED: c_int = 2;
