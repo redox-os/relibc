@@ -18,7 +18,7 @@ use crate::{
         linker::{DlError, ObjectHandle, Resolve, ScopeKind},
         tcb::Tcb,
     },
-    platform::types::*,
+    platform::types::{c_char, c_int, c_void},
 };
 
 pub const RTLD_LAZY: c_int = 1 << 0;
