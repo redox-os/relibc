@@ -840,7 +840,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new
         // parent FDs will not show up for the child).
         let scratchpad = {
-            cur_filetable_fd = FdGuard::new(syscall::dup(cur_thr_fd.as_raw_fd(), b"filetable")?);
+            cur_filetable_fd = cur_thr_fd.dup(b"filetable")?;
 
             // This must be done before the address space is copied.
             let proc_fd = new_proc_fd.as_ref().map_or(usize::MAX, |p| p.as_raw_fd());
