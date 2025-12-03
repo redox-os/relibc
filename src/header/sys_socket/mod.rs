@@ -1,4 +1,6 @@
-//! socket implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xns/syssocket.h.html
+//! `sys/socket.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 
 use core::{mem, ptr};
 
@@ -13,6 +15,7 @@ pub mod constants;
 pub type sa_family_t = u16;
 pub type socklen_t = u32;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[repr(C)]
 #[derive(Default, CheckVsLibcCrate)]
 pub struct linger {
@@ -23,6 +26,7 @@ pub struct linger {
 #[unsafe(no_mangle)]
 pub extern "C" fn _cbindgen_export_linger(linger: linger) {}
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[repr(C)]
 #[derive(Debug, CheckVsLibcCrate)]
 pub struct msghdr {
@@ -35,6 +39,7 @@ pub struct msghdr {
     pub msg_flags: c_int,
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[repr(C)]
 #[derive(Debug, CheckVsLibcCrate)]
 pub struct cmsghdr {
@@ -55,6 +60,7 @@ pub struct ucred {
 #[unsafe(no_mangle)]
 pub extern "C" fn _cbindgen_export_cmsghdr(cmsghdr: cmsghdr) {}
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[repr(C)]
 #[derive(Default, CheckVsLibcCrate)]
 pub struct sockaddr {
@@ -67,6 +73,7 @@ const _SS_MAXSIZE: usize = 128;
 // Align to pointer width
 const _SS_PADDING: usize = _SS_MAXSIZE - mem::size_of::<sa_family_t>() - mem::size_of::<usize>();
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 /// Opaque storage large enough to hold any protocol specific address structure.
 ///
 /// ## Implementation notes
@@ -97,11 +104,13 @@ pub unsafe extern "C" fn __MHDR_END(mhdr: *const msghdr) -> *mut c_uchar {
     unsafe { ((*mhdr).msg_control as *mut c_uchar).offset((*mhdr).msg_controllen as isize) }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_DATA(cmsg: *const cmsghdr) -> *mut c_uchar {
     unsafe { (cmsg as *mut c_uchar).offset(CMSG_ALIGN(mem::size_of::<cmsghdr>()) as isize) }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_NXTHDR(mhdr: *const msghdr, cmsg: *const cmsghdr) -> *mut cmsghdr {
     if cmsg.is_null() {
@@ -121,6 +130,7 @@ pub unsafe extern "C" fn CMSG_NXTHDR(mhdr: *const msghdr, cmsg: *const cmsghdr) 
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_FIRSTHDR(mhdr: *const msghdr) -> *mut cmsghdr {
     unsafe {
@@ -137,17 +147,20 @@ pub unsafe extern "C" fn CMSG_ALIGN(len: size_t) -> size_t {
     (len + mem::size_of::<size_t>() - 1) & !(mem::size_of::<size_t>() - 1)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_SPACE(len: c_uint) -> c_uint {
     (CMSG_ALIGN(len as size_t) + CMSG_ALIGN(mem::size_of::<cmsghdr>())) as c_uint
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn CMSG_LEN(length: c_uint) -> c_uint {
     (CMSG_ALIGN(mem::size_of::<cmsghdr>()) + length as usize) as c_uint
 }
 // } These must match C macros in include/bits/sys/socket.h
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/accept.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn accept(
     socket: c_int,
@@ -163,6 +176,7 @@ pub unsafe extern "C" fn accept(
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/bind.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn bind(
     socket: c_int,
@@ -180,6 +194,7 @@ pub unsafe extern "C" fn bind(
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/connect.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn connect(
     socket: c_int,
@@ -195,6 +210,7 @@ pub unsafe extern "C" fn connect(
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpeername.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getpeername(
     socket: c_int,
@@ -212,6 +228,7 @@ pub unsafe extern "C" fn getpeername(
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getsockname.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getsockname(
     socket: c_int,
@@ -229,6 +246,7 @@ pub unsafe extern "C" fn getsockname(
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getsockopt.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getsockopt(
     socket: c_int,
@@ -250,6 +268,7 @@ pub unsafe extern "C" fn getsockopt(
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/listen.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn listen(socket: c_int, backlog: c_int) -> c_int {
     Sys::listen(socket, backlog)
@@ -257,6 +276,7 @@ pub unsafe extern "C" fn listen(socket: c_int, backlog: c_int) -> c_int {
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/recv.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn recv(
     socket: c_int,
@@ -274,6 +294,7 @@ pub unsafe extern "C" fn recv(
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/recvfrom.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn recvfrom(
     socket: c_int,
@@ -297,6 +318,7 @@ pub unsafe extern "C" fn recvfrom(
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/recvmsg.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) -> ssize_t {
     Sys::recvmsg(socket, msg, flags)
@@ -304,6 +326,7 @@ pub unsafe extern "C" fn recvmsg(socket: c_int, msg: *mut msghdr, flags: c_int) 
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/send.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn send(
     socket: c_int,
@@ -314,6 +337,7 @@ pub unsafe extern "C" fn send(
     sendto(socket, message, length, flags, ptr::null(), 0)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sendmsg.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int) -> ssize_t {
     Sys::sendmsg(socket, msg, flags)
@@ -321,6 +345,7 @@ pub unsafe extern "C" fn sendmsg(socket: c_int, msg: *const msghdr, flags: c_int
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sendto.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sendto(
     socket: c_int,
@@ -344,6 +369,7 @@ pub unsafe extern "C" fn sendto(
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setsockopt.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setsockopt(
     socket: c_int,
@@ -365,11 +391,13 @@ pub unsafe extern "C" fn setsockopt(
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/shutdown.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn shutdown(socket: c_int, how: c_int) -> c_int {
     Sys::shutdown(socket, how).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/socket.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> c_int {
     trace_expr!(
@@ -381,6 +409,7 @@ pub unsafe extern "C" fn socket(domain: c_int, kind: c_int, protocol: c_int) -> 
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/socketpair.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn socketpair(
     domain: c_int,
