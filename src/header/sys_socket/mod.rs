@@ -7,7 +7,12 @@ use core::{mem, ptr};
 use crate::{
     error::ResultExt,
     header::sys_uio::iovec,
-    platform::{PalSocket, Sys, types::*},
+    platform::{
+        PalSocket, Sys,
+        types::{
+            c_char, c_int, c_long, c_uchar, c_uint, c_void, gid_t, pid_t, size_t, ssize_t, uid_t,
+        },
+    },
 };
 
 pub mod constants;

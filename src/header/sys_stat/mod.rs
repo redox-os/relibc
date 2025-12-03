@@ -10,7 +10,13 @@ use crate::{
         time::timespec,
     },
     out::Out,
-    platform::{Pal, Sys, types::*},
+    platform::{
+        Pal, Sys,
+        types::{
+            blkcnt_t, blksize_t, c_char, c_int, dev_t, gid_t, ino_t, mode_t, nlink_t, off_t, uid_t,
+            useconds_t,
+        },
+    },
 };
 
 pub const S_IFMT: c_int = 0o0_170_000;
