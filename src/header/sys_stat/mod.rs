@@ -1,4 +1,6 @@
-//! stat implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysstat.h.html
+//! `sys/stat.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_stat.h.html>.
 
 use crate::{
     c_str::CStr,
@@ -8,7 +10,13 @@ use crate::{
         time::timespec,
     },
     out::Out,
-    platform::{Pal, Sys, types::*},
+    platform::{
+        Pal, Sys,
+        types::{
+            blkcnt_t, blksize_t, c_char, c_int, dev_t, gid_t, ino_t, mode_t, nlink_t, off_t, uid_t,
+            useconds_t,
+        },
+    },
 };
 
 pub const S_IFMT: c_int = 0o0_170_000;
@@ -47,6 +55,7 @@ pub const S_ISVTX: c_int = 0o1_000;
 pub const UTIME_NOW: useconds_t = (1 << 30) - 1;
 pub const UTIME_OMIT: useconds_t = (1 << 30) - 2;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_stat.h.html>.
 #[repr(C)]
 #[derive(Default)]
 pub struct stat {
@@ -71,17 +80,20 @@ pub struct stat {
     pub _pad: [c_char; 24],
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/chmod.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn chmod(path: *const c_char, mode: mode_t) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::chmod(path, mode).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fchmod.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn fchmod(fildes: c_int, mode: mode_t) -> c_int {
     Sys::fchmod(fildes, mode).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fchmodat.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fchmodat(
     dirfd: c_int,
@@ -95,12 +107,14 @@ pub unsafe extern "C" fn fchmodat(
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fstat.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fstat(fildes: c_int, buf: *mut stat) -> c_int {
     let buf = Out::nonnull(buf);
     Sys::fstat(fildes, buf).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fstatat.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fstatat(
     fildes: c_int,
@@ -120,11 +134,13 @@ pub unsafe extern "C" fn __fxstat(_ver: c_int, fildes: c_int, buf: *mut stat) ->
     fstat(fildes, buf)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/futimens.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn futimens(fd: c_int, times: *const timespec) -> c_int {
     Sys::futimens(fd, times).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/lstat.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     let path = CStr::from_ptr(path);
@@ -144,24 +160,28 @@ pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     res
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mkdir.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::mkdir(path, mode).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mkfifo.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::mkfifo(path, mode).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mknod.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mknod(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
     let path = CStr::from_ptr(path);
     Sys::mknod(path, mode, dev).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mknodat.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mknodat(
     dirfd: c_int,
@@ -175,6 +195,7 @@ pub unsafe extern "C" fn mknodat(
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/stat.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     let file = CStr::from_ptr(file);
@@ -194,6 +215,7 @@ pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     res
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/umask.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn umask(mask: mode_t) -> mode_t {
     Sys::umask(mask)
