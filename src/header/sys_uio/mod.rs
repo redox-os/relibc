@@ -7,10 +7,7 @@ use core::slice;
 
 use crate::{
     header::{errno, unistd},
-    platform::{
-        self,
-        types::{c_int, c_void, off_t, size_t, ssize_t},
-    },
+    platform::{self, types::*},
 };
 
 pub const IOV_MAX: c_int = 1024;

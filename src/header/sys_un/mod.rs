@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_un.h.html>.
 
-use crate::{header::sys_socket::sa_family_t, platform::types::c_char};
+use crate::{header::sys_socket::sa_family_t, platform::types::*};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_un.h.html>.
 #[repr(C)]

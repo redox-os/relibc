@@ -31,7 +31,7 @@ void runner(int argc, char *argv[]) {
     };
 
     int option_index = 0;
-    int c;
+    char c;
     while((c = getopt_long(argc, argv, ":a", long_options, &option_index)) != -1) {
         switch(c) {
             case 'a':
