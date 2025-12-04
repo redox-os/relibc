@@ -18,7 +18,7 @@ use crate::{
         linker::{DlError, ObjectHandle, Resolve, ScopeKind},
         tcb::Tcb,
     },
-    platform::types::*,
+    platform::types::{c_char, c_int, c_void},
 };
 
 pub const RTLD_LAZY: c_int = 1 << 0;
@@ -41,7 +41,7 @@ fn set_last_error(error: DlError) {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dlfcn.h.html>.
 #[repr(C)]
 #[allow(non_camel_case_types)]
-pub struct Dl_info {
+pub struct Dl_info_t {
     dli_fname: *const c_char,
     dli_fbase: *mut c_void,
     dli_sname: *const c_char,
@@ -49,7 +49,7 @@ pub struct Dl_info {
 }
 
 /// alias as per spec update: https://www.austingroupbugs.net/view.php?id=1847
-pub type Dl_info_t = Dl_info;
+pub type Dl_info = Dl_info_t;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dladdr.html>.
 #[unsafe(no_mangle)]

@@ -139,14 +139,14 @@ pub unsafe fn init(
 ) {
     let tp: usize;
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     {
         const ARCH_GET_FS: usize = 0x1003;
         let mut val = 0usize;
         syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut val as *mut usize);
         tp = val;
     }
-    #[cfg(all(target_os = "redox", target_arch = "aarch64"))]
+    #[cfg(target_arch = "aarch64")]
     unsafe {
         core::arch::asm!(
             "mrs {}, tpidr_el0",
