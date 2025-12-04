@@ -599,10 +599,27 @@ pub unsafe extern "C" fn timer_settime(
         .or_minus_one_errno()
 }
 
+/// ISO C equivalent to [`Sys::clock_gettime`].
+///
+/// The main differences are that this function:
+/// * returns `0` on error and `base` on success
+/// * only mandates TIME_UTC as a base
+///
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/timespec_get.html>.
-// #[unsafe(no_mangle)]
-pub extern "C" fn timespec_get(ts: *mut timespec, base: c_int) -> c_int {
-    unimplemented!();
+#[unsafe(no_mangle)]
+pub extern "C" fn timespec_get(tp: *mut timespec, base: c_int) -> c_int {
+    let tp = unsafe { Out::nonnull(tp) };
+    Sys::clock_gettime(base - 1, tp).map(|()| base).unwrap_or(0)
+}
+
+/// ISO C equivalent to [`Sys::clock_getres`].
+///
+/// The main differences are that this function:
+/// * returns `0` on error and `base` on success
+/// * only mandates TIME_UTC as a base
+pub extern "C" fn timespec_getres(res: *mut timespec, base: c_int) -> c_int {
+    let res = unsafe { Out::nullable(res) };
+    Sys::clock_getres(base - 1, res).map(|()| base).unwrap_or(0)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tzset.html>.
