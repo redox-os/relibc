@@ -273,13 +273,8 @@ pub fn current_proc_fd() -> &'static FdGuardUpper {
     unsafe { info.proc_fd.assume_init_ref() }
 }
 #[inline]
-pub fn current_namespace_fd() -> usize {
-    DYNAMIC_PROC_INFO
-        .lock()
-        .ns_fd
-        .as_ref()
-        .map(|g| g.as_raw_fd())
-        .unwrap_or(usize::MAX)
+pub fn current_namespace_fd() -> Option<&FdGuardUpper> {
+    DYNAMIC_PROC_INFO.lock().ns_fd.as_ref()
 }
 
 struct ChildHookCommonArgs {
