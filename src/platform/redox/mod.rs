@@ -10,7 +10,7 @@ use redox_rt::{
     sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
-    self, EMFILE, Error, MODE_PERM, PtraceEvent,
+    self, EILSEQ, EMFILE, Error, MODE_PERM, PtraceEvent,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
     dirent::{DirentHeader, DirentKind},
 };
@@ -30,7 +30,7 @@ use crate::{
             EBADF, EBADFD, EBADR, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
             ENOMEM, ENOSYS, EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl::{self, AT_FDCWD, AT_SYMLINK_NOFOLLOW, O_CREAT, O_RDONLY, O_RDWR},
+        fcntl::{self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW, O_CREAT, O_RDONLY, O_RDWR},
         limits,
         pthread::{pthread_cancel, pthread_create},
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
