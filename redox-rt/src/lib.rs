@@ -273,7 +273,7 @@ pub fn current_proc_fd() -> &'static FdGuardUpper {
     unsafe { info.proc_fd.assume_init_ref() }
 }
 #[inline]
-pub fn current_namespace_fd() -> Option<&FdGuardUpper> {
+pub fn current_namespace_fd() -> Option<&'static FdGuardUpper> {
     DYNAMIC_PROC_INFO.lock().ns_fd.as_ref()
 }
 
