@@ -5,7 +5,10 @@
 use crate::{
     error::ResultExt,
     header::time::timespec,
-    platform::{Pal, Sys, types::*},
+    platform::{
+        Pal, Sys,
+        types::{c_int, pid_t},
+    },
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.

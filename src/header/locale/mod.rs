@@ -4,7 +4,7 @@
 
 use core::ptr;
 
-use crate::platform::types::*;
+use crate::platform::types::{c_char, c_int};
 
 const EMPTY_PTR: *const c_char = "\0" as *const _ as *const c_char;
 // Can't use &str because of the mutability
