@@ -713,11 +713,6 @@ impl FdGuard<false> {
 }
 impl<const UPPER: bool> FdGuard<UPPER> {
     #[inline]
-    pub fn openat<T: AsRef<str>>(&self, path: T, flags: usize, fcntl_flags: usize) -> Result<Self> {
-        syscall::openat(self.fd, path, flags, fcntl_flags).map(Self::new)
-    }
-
-    #[inline]
     pub fn dup(&self, buf: &[u8]) -> Result<FdGuard<false>> {
         syscall::dup(self.fd, buf).map(FdGuard::new)
     }
@@ -855,7 +850,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                 cur_filetable_fd: cur_filetable_fd.as_raw_fd(),
                 new_proc_fd: proc_fd,
                 new_thr_fd: new_thr_fd.as_raw_fd(),
-                new_ns_fd: current_namespace_fd().map_or(usize::MAX, |p| p.as_raw_fd()),
+                new_ns_fd: current_namespace_fd(),
             }
         };
         #[cfg(any(

@@ -7,7 +7,7 @@ use core::{
 use ioslice::IoSlice;
 use syscall::{
     CallFlags, EINVAL, ERESTART, TimeSpec,
-    error::{self, EBADF, EINTR, ENODEV, Error, Result},
+    error::{self, EBADF, EINTR, Error, Result},
 };
 
 use crate::{
@@ -388,17 +388,15 @@ pub fn setns(fd: usize) -> Option<FdGuardUpper> {
 }
 pub fn getns() -> Result<usize> {
     let cur_ns = crate::current_namespace_fd();
-    match cur_ns.as_ref() {
-        Some(ns_fd) => Ok(ns_fd.as_raw_fd()),
-        None => Err(Error::new(ENODEV)),
+    if cur_ns == usize::MAX {
+        Err(Error::new(ENODEV))
+    } else {
+        Ok(cur_ns)
     }
 }
 pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     let fcntl_flags = flags & !syscall::O_ACCMODE;
-    match crate::current_namespace_fd().as_ref() {
-        Some(ns_fd) => ns_fd.openat(path, flags, fcntl_flags)?.take(),
-        None => Err(Error::new(ENODEV)),
-    }
+    syscall::openat(crate::current_namespace_fd(), path, flags, fcntl_flags)
 }
 pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
     let mut buf = Vec::from(TYPE_MKNS.to_ne_bytes());
@@ -410,8 +408,5 @@ pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
         buf.extend_from_slice(&len.to_ne_bytes());
         buf.extend_from_slice(name_bytes);
     }
-    match crate::current_namespace_fd().as_ref() {
-        Some(ns_fd) => ns_fd.dup(&buf)?.to_upper(),
-        None => Err(Error::new(ENODEV)),
-    }
+    FdGuard::new(syscall::dup(crate::current_namespace_fd(), &buf)?).to_upper()
 }
