@@ -398,6 +398,9 @@ pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     let fcntl_flags = flags & !syscall::O_ACCMODE;
     syscall::openat(crate::current_namespace_fd(), path, flags, fcntl_flags)
 }
+pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
+    syscall::unlinkat(crate::current_namespace_fd(), path, flags)
+}
 pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
     let mut buf = Vec::from(TYPE_MKNS.to_ne_bytes());
     const TYPE_MKNS: usize = 0; // namespace dup type.
