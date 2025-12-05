@@ -541,4 +541,4 @@ pub unsafe extern "C" fn psiginfo(info: *const siginfo_t, prefix: *const c_char)
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cbindgen_stupid_struct_sigevent_for_timer(a: sigevent) {}
+pub unsafe extern "C" fn cbindgen_stupid_struct_sigevent_for_timer(_: sigevent) {}

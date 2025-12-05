@@ -371,4 +371,4 @@ pub extern "C" fn telldir(dir: &mut DIR) -> c_long {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_posix_dent(a: posix_dent) {}
+pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_posix_dent(_: posix_dent) {}
