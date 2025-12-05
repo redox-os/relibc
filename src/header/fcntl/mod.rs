@@ -93,7 +93,7 @@ pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: .
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_fcntl(a: flock) {}
+pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_fcntl(_: flock) {}
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_fallocate(fd: c_int, offset: off_t, length: off_t) -> c_int {
