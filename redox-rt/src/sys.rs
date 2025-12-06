@@ -395,11 +395,18 @@ pub fn getns() -> Result<usize> {
     }
 }
 pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
-    let fcntl_flags = flags & !syscall::O_ACCMODE;
-    syscall::openat(crate::current_namespace_fd(), path, flags, fcntl_flags)
+    let fcntl_flags = flags & syscall::O_FCNTL_MASK;
+    syscall::openat(
+        crate::current_namespace_fd(),
+        path,
+        flags,
+        fcntl_flags,
+        0,
+        0,
+    )
 }
 pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
-    syscall::unlinkat(crate::current_namespace_fd(), path, flags)
+    syscall::unlinkat(crate::current_namespace_fd(), path, flags, 0, 0)
 }
 pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
     let mut buf = Vec::from(TYPE_MKNS.to_ne_bytes());
