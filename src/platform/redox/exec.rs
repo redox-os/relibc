@@ -26,7 +26,6 @@ fn fexec_impl(
     path: &[u8],
     args: &[&[u8]],
     envs: &[&[u8]],
-    total_args_envs_size: usize,
     extrainfo: &ExtraInfo,
     interp_override: Option<InterpOverride>,
 ) -> Result<Infallible> {
@@ -38,9 +37,8 @@ fn fexec_impl(
         redox_rt::current_proc_fd(),
         &memory,
         path,
-        args.iter().rev(),
-        envs.iter().rev(),
-        total_args_envs_size,
+        args,
+        envs,
         extrainfo,
         interp_override,
     )? {
@@ -59,11 +57,7 @@ fn fexec_impl(
 
             return execve(
                 Executable::AtPath(path_cstr),
-                ArgEnv::Parsed {
-                    total_args_envs_size,
-                    args,
-                    envs,
-                },
+                ArgEnv::Parsed { args, envs },
                 Some(new_interp_override),
             );
         }
@@ -83,7 +77,6 @@ pub enum ArgEnv<'a> {
     Parsed {
         args: &'a [&'a [u8]],
         envs: &'a [&'a [u8]],
-        total_args_envs_size: usize,
     },
 }
 
@@ -179,17 +172,14 @@ pub fn execve(
             .map_err(|_| Error::new(EIO))?;
     }
 
-    let (total_args_envs_size, args, envs): (usize, Vec<_>, Vec<_>) = match arg_env {
+    let (args, envs): (Vec<_>, Vec<_>) = match arg_env {
         ArgEnv::C { mut argv, mut envp } => unsafe {
-            let mut args_envs_size_without_nul = 0;
-
             // Arguments
             while !argv.read().is_null() {
                 let arg = argv.read();
 
                 let len = strlen(arg);
                 args.push(core::slice::from_raw_parts(arg as *const u8, len));
-                args_envs_size_without_nul += len;
                 argv = argv.add(1);
             }
 
@@ -205,23 +195,17 @@ pub fn execve(
 
                 let len = strlen(env);
                 envs.push(core::slice::from_raw_parts(env as *const u8, len));
-                args_envs_size_without_nul += len;
                 envp = envp.add(1);
             }
-            (
-                args_envs_size_without_nul + args.len() + envs.len(),
-                args,
-                envs,
-            )
+            (args, envs)
         },
         ArgEnv::Parsed {
             args: new_args,
             envs,
-            total_args_envs_size,
         } => {
             let prev_size: usize = args.iter().map(|a| a.len()).sum();
             args.extend(new_args);
-            (total_args_envs_size + prev_size, args, Vec::from(envs))
+            (args, Vec::from(envs))
         }
     };
 
@@ -276,7 +260,6 @@ pub fn execve(
         arg0,
         &args,
         &envs,
-        total_args_envs_size,
         &extrainfo,
         interp_override,
     )
