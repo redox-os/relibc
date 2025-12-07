@@ -10,7 +10,7 @@ use redox_rt::{
     sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
-    self, EMFILE, Error, MODE_PERM, PtraceEvent,
+    self, EILSEQ, EMFILE, Error, MODE_PERM, PtraceEvent,
     data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
     dirent::{DirentHeader, DirentKind},
 };
@@ -30,7 +30,7 @@ use crate::{
             EBADF, EBADFD, EBADR, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
             ENOMEM, ENOSYS, EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl::{self, AT_FDCWD, AT_SYMLINK_NOFOLLOW, O_CREAT, O_RDONLY, O_RDWR},
+        fcntl::{self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW, O_CREAT, O_RDONLY, O_RDWR},
         limits,
         pthread::{pthread_cancel, pthread_create},
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
@@ -314,11 +314,47 @@ impl Pal for Sys {
     }
 
     fn fstatat(dirfd: c_int, path: Option<CStr>, buf: Out<stat>, flags: c_int) -> Result<()> {
-        let path = path
-            .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
-            .ok_or(Errno(ENOENT))?;
-        let file = openat2(dirfd, path, flags, 0)?;
-        Sys::fstat(*file, buf)
+        // `path` should be non-null.
+        let path = path.ok_or(Errno(EFAULT))?;
+        let mut path = str::from_utf8(path.to_bytes()).ok().ok_or(Errno(EILSEQ))?;
+
+        if path.is_empty() {
+            if flags & AT_EMPTY_PATH == AT_EMPTY_PATH {
+                if dirfd == AT_FDCWD {
+                    path = ".";
+                } else {
+                    return Sys::fstat(dirfd, buf);
+                }
+            } else {
+                // If the path is empty but `AT_EMPTY_PATH` is **not** set, bail out.
+                return Err(Errno(ENOENT));
+            }
+        }
+
+        // Use `O_PATH` to obtain a file descriptor without actually *opening* the file. This
+        // bypasses permission checks and avoids cases where opening a file is blocking operation
+        // (e.g., FIFOs). This gives a file descriptor where fstat(2) can be performed (and some
+        // other meta operations) but nothing else (e.g. read/write).
+        //
+        // `O_CLOEXEC` is used to avoid leaking file descriptors to child processes on exec(2).
+        //
+        // FIXME: Ideally we would want the file descriptor to not leak on fork(2) too because
+        // fstatat(2) should not have side effects. However, Redox does not currently support that,
+        // so we use `CLOEXEC` as a compromise.
+        let mut open_flags = fcntl::O_PATH | fcntl::O_CLOEXEC;
+        if flags & AT_SYMLINK_NOFOLLOW == AT_SYMLINK_NOFOLLOW {
+            open_flags |= fcntl::O_NOFOLLOW;
+        }
+
+        let file = openat2(dirfd, path, open_flags, 0)?;
+        // Close the file descriptor after fstat(2) regardless of success or failure.
+        let fstat_res = Sys::fstat(*file, buf);
+        let close_res = syscall::close(file.fd as usize);
+        if let Err(err) = fstat_res {
+            return Err(err);
+        }
+        close_res?;
+        fstat_res
     }
 
     fn fstatvfs(fildes: c_int, mut buf: Out<statvfs>) -> Result<()> {

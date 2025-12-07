@@ -1,13 +1,16 @@
-//! locale implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/locale.h.html
+//! `locale.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/locale.h.html>.
 
 use core::ptr;
 
-use crate::platform::types::*;
+use crate::platform::types::{c_char, c_int};
 
 const EMPTY_PTR: *const c_char = "\0" as *const _ as *const c_char;
 // Can't use &str because of the mutability
 static mut C_LOCALE: [c_char; 2] = [b'C' as c_char, 0];
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/locale.h.html>.
 #[repr(C)]
 pub struct lconv {
     currency_symbol: *const c_char,
@@ -54,11 +57,13 @@ static mut CURRENT_LOCALE: lconv = lconv {
     thousands_sep: EMPTY_PTR,
 };
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/localeconv.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn localeconv() -> *mut lconv {
     &raw mut CURRENT_LOCALE as *mut _
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setlocale.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setlocale(_option: c_int, _val: *const c_char) -> *mut c_char {
     // TODO actually implement

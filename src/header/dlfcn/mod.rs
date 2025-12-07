@@ -192,3 +192,6 @@ pub unsafe extern "C" fn dlclose(handle: *mut c_void) -> c_int {
 pub extern "C" fn dlerror() -> *mut c_char {
     ERROR.swap(0, Ordering::SeqCst) as *mut c_char
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cbindgen_stupid_alias_dlinfo_for_dladdr(_: Dl_info) {}
