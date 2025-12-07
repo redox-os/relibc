@@ -16,7 +16,7 @@ use crate::{
         },
         sys_time::timeval,
     },
-    platform::{self, types::*},
+    platform::{self, types::c_int},
 };
 
 // fd_set is also defined in C because cbindgen is incompatible with mem::size_of booo

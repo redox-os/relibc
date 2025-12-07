@@ -5,7 +5,10 @@
 use crate::{
     error::ResultExt,
     out::Out,
-    platform::{Pal, Sys, types::*},
+    platform::{
+        Pal, Sys,
+        types::{c_char, c_int},
+    },
 };
 
 pub const UTSLENGTH: usize = 65;
