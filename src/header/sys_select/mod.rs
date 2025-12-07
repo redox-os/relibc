@@ -1,4 +1,6 @@
-//! sys/select.h implementation
+//! `sys/select.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
 
 use core::mem;
 
@@ -19,9 +21,11 @@ use crate::{
 
 // fd_set is also defined in C because cbindgen is incompatible with mem::size_of booo
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
 pub const FD_SETSIZE: usize = 1024;
 type bitset = BitSet<[u64; FD_SETSIZE / (8 * mem::size_of::<u64>())]>;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
 #[repr(C)]
 pub struct fd_set {
     pub fds_bits: bitset,
@@ -161,6 +165,7 @@ pub fn select_epoll(
     count
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pselect.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn select(
     nfds: c_int,
