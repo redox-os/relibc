@@ -308,8 +308,8 @@ pub fn fexec_impl(
     )?;
     push(AT_PHENT)?;
 
-    let total_args_envs_auxvpointee_size = args.iter().map(|arg| arg.len()).sum::<usize>()
-        + envs.iter().map(|env| env.len()).sum::<usize>()
+    let total_args_envs_auxvpointee_size = args.iter().map(|arg| arg.len() + 1).sum::<usize>()
+        + envs.iter().map(|env| env.len() + 1).sum::<usize>()
         + extrainfo.cwd.map_or(0, |s| s.len() + 1)
         + extrainfo.default_scheme.map_or(0, |s| s.len() + 1);
     let args_envs_size_aligned = total_args_envs_auxvpointee_size.next_multiple_of(PAGE_SIZE);
