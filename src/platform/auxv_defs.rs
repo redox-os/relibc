@@ -45,11 +45,6 @@ pub const AT_REDOX_INHERITED_SIGPROCMASK: usize = 36;
 pub const AT_REDOX_INHERITED_SIGPROCMASK_HI: usize = 37;
 
 #[cfg(target_os = "redox")]
-pub const AT_REDOX_INITIAL_DEFAULT_SCHEME_PTR: usize = 38;
-#[cfg(target_os = "redox")]
-pub const AT_REDOX_INITIAL_DEFAULT_SCHEME_LEN: usize = 39;
-
-#[cfg(target_os = "redox")]
 pub const AT_REDOX_UMASK: usize = 40;
 
 #[cfg(target_os = "redox")]

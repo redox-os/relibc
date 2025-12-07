@@ -354,17 +354,6 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
         }
     }
 
-    if let (Some(scheme_ptr), Some(scheme_len)) = (
-        get_auxv(&auxvs, AT_REDOX_INITIAL_DEFAULT_SCHEME_PTR),
-        get_auxv(&auxvs, AT_REDOX_INITIAL_DEFAULT_SCHEME_LEN),
-    ) {
-        let scheme_bytes: &'static [u8] =
-            unsafe { core::slice::from_raw_parts(scheme_ptr as *const u8, scheme_len) };
-        if let Ok(scheme) = core::str::from_utf8(scheme_bytes) {
-            self::sys::path::set_default_scheme_manual(scheme.into());
-        }
-    }
-
     let mut inherited_sigignmask = 0_u64;
     if let Some(mask) = get_auxv(&auxvs, AT_REDOX_INHERITED_SIGIGNMASK) {
         inherited_sigignmask |= mask as u64;

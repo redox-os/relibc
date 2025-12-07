@@ -128,9 +128,6 @@ pub fn execve(
     }
 
     let cwd: Box<[u8]> = super::path::clone_cwd().unwrap_or_default().into();
-    let default_scheme: Box<[u8]> = super::path::clone_default_scheme()
-        .unwrap_or_else(|| Box::from("file"))
-        .into();
 
     // Path to interpreter binary and args if found
     let (interpreter_path, interpreter_args) = { parse_interpreter(&mut image_file)? };
@@ -248,7 +245,6 @@ pub fn execve(
 
     let extrainfo = ExtraInfo {
         cwd: Some(&cwd),
-        default_scheme: Some(&default_scheme),
         sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
         sigprocmask,
         umask: redox_rt::sys::get_umask(),

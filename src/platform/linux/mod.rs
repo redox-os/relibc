@@ -96,9 +96,6 @@ impl Pal for Sys {
     fn chdir(path: CStr) -> Result<()> {
         e_raw(unsafe { syscall!(CHDIR, path.as_ptr()) }).map(|_| ())
     }
-    fn set_default_scheme(scheme: CStr) -> Result<()> {
-        Err(Errno(EOPNOTSUPP))
-    }
 
     fn chmod(path: CStr, mode: mode_t) -> Result<()> {
         e_raw(unsafe { syscall!(FCHMODAT, AT_FDCWD, path.as_ptr(), mode, 0) }).map(|_| ())
