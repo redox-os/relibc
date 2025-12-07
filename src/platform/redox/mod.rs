@@ -172,10 +172,6 @@ impl Pal for Sys {
         path::chdir(path)?;
         Ok(())
     }
-    fn set_default_scheme(path: CStr) -> Result<()> {
-        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
-        Ok(path::set_default_scheme(path)?)
-    }
 
     fn chmod(path: CStr, mode: mode_t) -> Result<()> {
         let file = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
