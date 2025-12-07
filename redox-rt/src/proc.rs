@@ -69,24 +69,17 @@ pub struct ExtraInfo<'a> {
     pub proc_fd: usize,
 }
 
-pub fn fexec_impl<A, E>(
+pub fn fexec_impl(
     image_file: FdGuardUpper,
     thread_fd: &FdGuardUpper,
     proc_fd: &FdGuardUpper,
     memory_scheme_fd: &FdGuardUpper,
     path: &[u8],
-    args: A,
-    envs: E,
-    total_args_envs_size: usize,
+    args: &[&[u8]],
+    envs: &[&[u8]],
     extrainfo: &ExtraInfo,
     mut interp_override: Option<InterpOverride>,
-) -> Result<FexecResult>
-where
-    A: IntoIterator,
-    E: IntoIterator,
-    A::Item: AsRef<[u8]>,
-    E::Item: AsRef<[u8]>,
-{
+) -> Result<FexecResult> {
     // Here, we do the minimum part of loading an application, which is what the kernel used to do.
     // We load the executable into memory (albeit at different offsets in this executable), fix
     // some misalignments, and then switch address space.
@@ -315,7 +308,8 @@ where
     )?;
     push(AT_PHENT)?;
 
-    let total_args_envs_auxvpointee_size = total_args_envs_size
+    let total_args_envs_auxvpointee_size = args.iter().map(|arg| arg.len()).sum::<usize>()
+        + envs.iter().map(|env| env.len()).sum::<usize>()
         + extrainfo.cwd.map_or(0, |s| s.len() + 1)
         + extrainfo.default_scheme.map_or(0, |s| s.len() + 1);
     let args_envs_size_aligned = total_args_envs_auxvpointee_size.next_multiple_of(PAGE_SIZE);
@@ -394,14 +388,14 @@ where
 
         push(0)?;
 
-        for env in envs {
-            push(append(env.as_ref())?)?;
+        for env in envs.iter().rev() {
+            push(append(env)?)?;
         }
 
         push(0)?;
 
-        for arg in args {
-            push(append(arg.as_ref())?)?;
+        for arg in args.iter().rev() {
+            push(append(arg)?)?;
             argc += 1;
         }
     }
