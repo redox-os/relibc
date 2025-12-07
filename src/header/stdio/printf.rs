@@ -693,7 +693,10 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
         let sign_reserve = arg.sign_reserve;
         let sign_always = arg.sign_always;
         let min_width = arg.min_width.resolve(&mut varargs, &mut ap);
-        let precision = arg.precision.map(|n| n.resolve(&mut varargs, &mut ap));
+        let precision = arg
+            .precision
+            .map(|n| n.resolve(&mut varargs, &mut ap))
+            .filter(|&n| (n as c_int) >= 0);
         let pad_zero = if zero { min_width } else { 0 };
         let signed_space = match pad_zero {
             0 => min_width as isize,
@@ -1073,7 +1076,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
 /// - `.N` where N is a positive integer: Specifies the precision value of `N`.
 /// - `.*`: The precision is specified by an extra argument of type [`int`], which  has to appear
 ///   before the argument to be converted and after the the [field width] (if specified with `*`).
-///   - If the value of e extra argument is negative, it is interpreted as if the precision were
+///   - If the value of the extra argument is negative, it is interpreted as if the precision were
 ///     omitted.
 /// - `.*P$` where P is a positive integer: The precision is specified by an extra argument of type
 ///   [`int`], which has to appear exactly at the position specified by `P`.
