@@ -37,8 +37,6 @@ pub trait Pal {
 
     fn chdir(path: CStr) -> Result<()>;
 
-    fn set_default_scheme(scheme: CStr) -> Result<(), Errno>;
-
     fn chmod(path: CStr, mode: mode_t) -> Result<()>;
 
     fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()>;
