@@ -157,7 +157,7 @@ asmfunction!(__relibc_internal_fork_ret: ["
 
     jal  {child_hook}
 
-    mv   a0, xzr
+    mv   a0, zero
 
     ld   s0, 0(sp)
     ld   s1, 8(sp)
