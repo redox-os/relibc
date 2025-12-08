@@ -438,7 +438,7 @@ dependencies = [
 [[package]]
 name = "redox_syscall"
 version = "0.5.19"
-source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=filter-uidgid#25b72a56bcfe757d7000d38171e3e81368dd771e"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=filter-uidgid#914c381e015aea2c84bddd75d4c4228478797024"
 dependencies = [
  "bitflags",
 ]
