@@ -1,7 +1,5 @@
 use crate::platform::types::*;
 
-pub use self::sys::*;
-
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
 pub mod sys;
@@ -9,6 +7,8 @@ pub mod sys;
 #[cfg(target_os = "redox")]
 #[path = "redox.rs"]
 pub mod sys;
+
+pub use self::sys::*;
 
 pub(crate) const UTC: *const c_char = b"UTC\0".as_ptr().cast();
 
@@ -28,6 +28,6 @@ pub const TIMER_ABSTIME: c_int = 1;
 // The values are offset by one for simplicity since zero represents an error.
 
 /// `TIME_UTC` returns the time since the Unix epoch.
-pub const TIME_UTC: c_int = sys::CLOCK_REALTIME + 1;
+pub const TIME_UTC: c_int = CLOCK_REALTIME + 1;
 /// `TIME_MONOTONIC` returns the time from the monotonically increasing clock.
-pub const TIME_MONOTONIC: c_int = sys::CLOCK_MONOTONIC + 1;
+pub const TIME_MONOTONIC: c_int = CLOCK_MONOTONIC + 1;

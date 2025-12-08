@@ -4,6 +4,9 @@
 #include <assert.h>
 
 int main(void) {
+    setenv("TZ", "UTC", 1);
+    tzset();
+
     struct {
         time_t timestamp;
         const char *expected_asctime;
