@@ -29,9 +29,13 @@ fn fexec_impl(
     extrainfo: &ExtraInfo,
     interp_override: Option<InterpOverride>,
 ) -> Result<Infallible> {
-    let memory = FdGuard::open("/scheme/memory", 0)?.to_upper()?;
+    let memory = FdGuard::open("/scheme/memory", O_CLOEXEC)?.to_upper()?;
 
-    let addrspace_selection_fd = match redox_rt::proc::fexec_impl(
+    let FexecResult::Interp {
+        image_file,
+        path,
+        interp_override: new_interp_override,
+    } = redox_rt::proc::fexec_impl(
         exec_file,
         &RtTcb::current().thread_fd(),
         redox_rt::current_proc_fd(),
@@ -41,34 +45,22 @@ fn fexec_impl(
         envs,
         extrainfo,
         interp_override,
-    )? {
-        FexecResult::Normal { addrspace_handle } => addrspace_handle,
-        FexecResult::Interp {
-            image_file,
-            path,
-            interp_override: new_interp_override,
-        } => {
-            drop(image_file);
-            drop(memory);
+    )?;
 
-            // According to elf(5), PT_INTERP requires that the interpreter path be
-            // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
-            let path_cstr = CStr::from_bytes_with_nul(&path).map_err(|_| Error::new(ENOEXEC))?;
-
-            return execve(
-                Executable::AtPath(path_cstr),
-                ArgEnv::Parsed { args, envs },
-                Some(new_interp_override),
-            );
-        }
-    };
+    drop(image_file);
     drop(memory);
 
-    // Dropping this FD will cause the address space switch.
-    drop(addrspace_selection_fd);
+    // According to elf(5), PT_INTERP requires that the interpreter path be
+    // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
+    let path_cstr = CStr::from_bytes_with_nul(&path).map_err(|_| Error::new(ENOEXEC))?;
 
-    unreachable!();
+    return execve(
+        Executable::AtPath(path_cstr),
+        ArgEnv::Parsed { args, envs },
+        Some(new_interp_override),
+    );
 }
+
 pub enum ArgEnv<'a> {
     C {
         argv: *const *mut c_char,
@@ -205,37 +197,6 @@ pub fn execve(
             (args, Vec::from(envs))
         }
     };
-
-    // Close all O_CLOEXEC file descriptors. TODO: close_range?
-    {
-        // NOTE: This approach of implementing O_CLOEXEC will not work in multithreaded
-        // scenarios. While execve() is undefined according to POSIX if there exist sibling
-        // threads, it could still be allowed by keeping certain file descriptors and instead
-        // set the active file table.
-        let files_fd = File::new(
-            c_int::try_from(syscall::dup(
-                RtTcb::current().thread_fd().as_raw_fd(),
-                b"filetable",
-            )?)
-            .unwrap(),
-        );
-        for line in BufReader::new(files_fd).lines() {
-            let line = match line {
-                Ok(l) => l,
-                Err(_) => break,
-            };
-            let fd = match line.parse::<usize>() {
-                Ok(f) => f,
-                Err(_) => continue,
-            };
-
-            let flags = syscall::fcntl(fd, F_GETFD, 0)?;
-
-            if flags & O_CLOEXEC == O_CLOEXEC {
-                let _ = syscall::close(fd);
-            }
-        }
-    }
 
     // TODO: Convert image_file to FdGuard earlier?
     let exec_fd_guard = FdGuard::new(image_file.fd as usize).to_upper().unwrap();
