@@ -1,4 +1,6 @@
-//! netdb implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xns/netdb.h.html
+//! `netdb.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netdb.h.html>.
 
 mod dns;
 
@@ -48,6 +50,7 @@ pub mod host;
 pub use self::lookup::*;
 pub mod lookup;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netdb.h.html>.
 #[repr(C)]
 pub struct hostent {
     h_name: *mut c_char,
@@ -57,6 +60,7 @@ pub struct hostent {
     h_addr_list: *mut *mut c_char,
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netdb.h.html>.
 #[repr(C)]
 pub struct netent {
     n_name: *mut c_char,         /* official name of net */
@@ -65,6 +69,7 @@ pub struct netent {
     n_net: c_ulong,              /* network # */
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netdb.h.html>.
 #[repr(C)]
 pub struct protoent {
     p_name: *mut c_char,         /* official protocol name */
@@ -72,6 +77,7 @@ pub struct protoent {
     p_proto: c_int,              /* protocol # */
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netdb.h.html>.
 #[repr(C)]
 pub struct servent {
     s_name: *mut c_char,         /* official service name */
@@ -80,6 +86,7 @@ pub struct servent {
     s_proto: *mut c_char,        /* protocol to use */
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netdb.h.html>.
 #[repr(C)]
 #[derive(Debug)]
 pub struct addrinfo {
@@ -178,24 +185,28 @@ fn bytes_to_box_str(bytes: &[u8]) -> Box<str> {
     Box::from(core::str::from_utf8(bytes).unwrap_or(""))
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endnetent() {
     Sys::close(NETDB);
     NETDB = 0;
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endprotoent() {
     Sys::close(PROTODB);
     PROTODB = 0;
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endservent() {
     Sys::close(SERVDB);
     SERVDB = 0;
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/009696799/functions/gethostbyaddr.html>.
 /// Resolve a host name from a given network address.
 ///
 /// # Arguments
@@ -297,6 +308,7 @@ pub unsafe extern "C" fn gethostbyaddr(
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/009696799/functions/gethostbyaddr.html>.
 /// Resolve host information by name or IP address.
 ///
 /// # Arguments
@@ -397,10 +409,12 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
     &raw mut HOST_ENTRY as *mut hostent
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
 pub unsafe extern "C" fn getnetbyaddr(net: u32, net_type: c_int) -> *mut netent {
     unimplemented!();
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getnetbyname(name: *const c_char) -> *mut netent {
     let mut n: *mut netent;
@@ -420,6 +434,7 @@ pub unsafe extern "C" fn getnetbyname(name: *const c_char) -> *mut netent {
     ptr::null_mut() as *mut netent
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getnetent() -> *mut netent {
     // TODO: Rustify implementation
@@ -477,6 +492,7 @@ pub unsafe extern "C" fn getnetent() -> *mut netent {
     &raw mut NET_ENTRY as *mut netent
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getprotobyname(name: *const c_char) -> *mut protoent {
     let mut p: *mut protoent;
@@ -513,6 +529,7 @@ pub unsafe extern "C" fn getprotobyname(name: *const c_char) -> *mut protoent {
     ptr::null_mut() as *mut protoent
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getprotobynumber(number: c_int) -> *mut protoent {
     setprotoent(PROTO_STAYOPEN);
@@ -531,6 +548,7 @@ pub unsafe extern "C" fn getprotobynumber(number: c_int) -> *mut protoent {
     ptr::null_mut() as *mut protoent
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getprotoent() -> *mut protoent {
     if PROTODB == 0 {
@@ -592,6 +610,7 @@ pub unsafe extern "C" fn getprotoent() -> *mut protoent {
     &raw mut PROTO_ENTRY as *mut protoent
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getservbyname(name: *const c_char, proto: *const c_char) -> *mut servent {
     setservent(SERV_STAYOPEN);
@@ -622,6 +641,7 @@ pub unsafe extern "C" fn getservbyname(name: *const c_char, proto: *const c_char
     ptr::null_mut() as *mut servent
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getservbyport(port: c_int, proto: *const c_char) -> *mut servent {
     setservent(SERV_STAYOPEN);
@@ -652,6 +672,7 @@ pub unsafe extern "C" fn getservbyport(port: c_int, proto: *const c_char) -> *mu
     ptr::null_mut()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getservent() -> *mut servent {
     if SERVDB == 0 {
@@ -746,6 +767,7 @@ pub unsafe extern "C" fn getservent() -> *mut servent {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setnetent(stayopen: c_int) {
     NET_STAYOPEN = stayopen;
@@ -757,6 +779,7 @@ pub unsafe extern "C" fn setnetent(stayopen: c_int) {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setprotoent(stayopen: c_int) {
     PROTO_STAYOPEN = stayopen;
@@ -768,6 +791,7 @@ pub unsafe extern "C" fn setprotoent(stayopen: c_int) {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setservent(stayopen: c_int) {
     SERV_STAYOPEN = stayopen;
@@ -779,6 +803,7 @@ pub unsafe extern "C" fn setservent(stayopen: c_int) {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/freeaddrinfo.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getaddrinfo(
     node: *const c_char,
@@ -884,6 +909,7 @@ pub unsafe extern "C" fn getaddrinfo(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getnameinfo.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getnameinfo(
     addr: *const sockaddr,
@@ -971,6 +997,7 @@ pub unsafe extern "C" fn getnameinfo(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/freeaddrinfo.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn freeaddrinfo(res: *mut addrinfo) {
     let mut ai = res;
@@ -992,6 +1019,7 @@ pub unsafe extern "C" fn freeaddrinfo(res: *mut addrinfo) {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gai_strerror.html>.
 #[unsafe(no_mangle)]
 pub const extern "C" fn gai_strerror(errcode: c_int) -> *const c_char {
     match errcode {

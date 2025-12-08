@@ -1,4 +1,6 @@
-//! poll implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/poll.h.html
+//! `poll.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/poll.h.html>.
 
 // TODO: set this for entire crate when possible
 #![deny(unsafe_op_in_unsafe_fn)]
@@ -33,6 +35,7 @@ pub const POLLWRBAND: c_short = 0x200;
 
 pub type nfds_t = c_ulong;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/poll.h.html>.
 #[repr(C)]
 pub struct pollfd {
     pub fd: c_int,
@@ -125,6 +128,7 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) 
     count
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/poll.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
     trace_expr!(
@@ -140,6 +144,7 @@ pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) ->
     )
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ppoll.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ppoll(
     fds: *mut pollfd,
