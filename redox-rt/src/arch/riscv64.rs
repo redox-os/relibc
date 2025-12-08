@@ -9,7 +9,7 @@ use crate::{
 use core::{mem::offset_of, ptr::NonNull, sync::atomic::Ordering};
 use syscall::{data::*, error::*};
 
-use super::arch::ForkScratchpad;
+use super::ForkScratchpad;
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub const STACK_TOP: usize = 1 << 47;

@@ -9,7 +9,7 @@ use crate::{
     signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, inner_c},
 };
 
-use super::arch::ForkScratchpad;
+use super::ForkScratchpad;
 
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub const STACK_TOP: usize = 1 << 47;
