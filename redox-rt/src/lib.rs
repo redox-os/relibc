@@ -218,19 +218,19 @@ pub unsafe fn initialize(
 
     #[cfg(feature = "proc")]
     {
-        *DYNAMIC_PROC_INFO.lock() = DynamicProcInfo {
-            pgid: metadata.pgid,
-            ruid: metadata.ruid,
-            euid: metadata.euid,
-            suid: metadata.suid,
-            egid: metadata.egid,
-            rgid: metadata.rgid,
-            sgid: metadata.sgid,
-            #[cfg(feature = "proc")]
-            ns_fd,
-            #[cfg(not(feature = "proc"))]
-            ns_fd: None,
-        };
+        let mut lock = DYNAMIC_PROC_INFO.lock();
+        lock.pgid = metadata.pgid;
+        lock.ruid = metadata.ruid;
+        lock.euid = metadata.euid;
+        lock.suid = metadata.suid;
+        lock.rgid = metadata.rgid;
+        lock.egid = metadata.egid;
+        lock.sgid = metadata.sgid;
+        let old_ns_fd_guard = core::mem::replace(&mut lock.ns_fd, ns_fd);
+
+        if let Some(old_guard) = old_ns_fd_guard {
+            old_guard.take();
+        }
     }
 }
 
