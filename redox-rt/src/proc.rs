@@ -28,16 +28,13 @@ use goblin::elf64::{
 };
 
 use syscall::{
-    CallFlags, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map, PAGE_SIZE, PROT_EXEC,
-    PROT_READ, PROT_WRITE, SetSighandlerData,
+    CallFlags, F_GETFD, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map, O_CLOEXEC,
+    PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE, SetSighandlerData,
     error::*,
     flag::{MapFlags, SEEK_SET},
 };
 
 pub enum FexecResult {
-    Normal {
-        addrspace_handle: FdGuardUpper,
-    },
     Interp {
         path: Box<[u8]>,
         image_file: FdGuardUpper,
@@ -441,9 +438,41 @@ pub fn fexec_impl(
         sp,
     ));
 
-    Ok(FexecResult::Normal {
-        addrspace_handle: addrspace_selection_fd,
-    })
+    // Close all O_CLOEXEC file descriptors. TODO: close_range?
+    {
+        // NOTE: This approach of implementing O_CLOEXEC will not work in multithreaded
+        // scenarios. While execve() is undefined according to POSIX if there exist sibling
+        // threads, it could still be allowed by keeping certain file descriptors and instead
+        // set the active file table.
+        let files_fd = syscall::dup(thread_fd.as_raw_fd(), b"filetable-binary")?;
+        let mut files_reader = FileBufReader::from_fd(files_fd);
+        loop {
+            let fd = match files_reader.read_le_u64()? {
+                None => break,
+                Some(fd) => fd,
+            };
+            let fd = usize::try_from(fd).unwrap();
+
+            if fd == addrspace_selection_fd.as_raw_fd() || fd == files_fd {
+                continue; // Will be closed below
+            }
+
+            let flags = syscall::fcntl(fd, F_GETFD, 0)?;
+
+            if flags & O_CLOEXEC == O_CLOEXEC {
+                let _ = syscall::close(fd);
+            }
+        }
+    }
+
+    unsafe {
+        deactivate_tcb(&thread_fd)?;
+    }
+
+    // Dropping this FD will cause the address space switch.
+    drop(addrspace_selection_fd);
+
+    unreachable!();
 }
 fn write_usizes<const N: usize>(fd: &FdGuardUpper, usizes: [usize; N]) -> Result<()> {
     fd.write(unsafe { plain::as_bytes(&usizes) })?;
@@ -646,6 +675,48 @@ impl<'a> Drop for MmapGuard<'a> {
         if self.size != 0 {
             let _ = unsafe { syscall::funmap(self.base, self.size) };
         }
+    }
+}
+
+struct FileBufReader {
+    fd: usize,
+    buf: [u8; 8192],
+    pos: usize,
+    cap: usize,
+}
+
+impl FileBufReader {
+    pub fn from_fd(fd: usize) -> FileBufReader {
+        FileBufReader {
+            fd,
+            buf: [0; 8192],
+            pos: 0,
+            cap: 0,
+        }
+    }
+}
+
+impl FileBufReader {
+    fn read_le_u64(&mut self) -> syscall::Result<Option<u64>> {
+        if self.pos >= self.cap {
+            debug_assert!(self.pos == self.cap);
+            self.cap = crate::sys::posix_read(self.fd, &mut self.buf)?;
+            self.pos = 0;
+        }
+
+        if self.cap == 0 {
+            return Ok(None);
+        }
+
+        if self.cap - self.pos < 8 {
+            unreachable!();
+        }
+
+        let num = u64::from_le_bytes(self.buf[self.pos..self.pos + 8].try_into().unwrap());
+
+        self.pos += 8;
+
+        Ok(Some(num))
     }
 }
 
