@@ -1075,6 +1075,7 @@ pub const extern "C" fn hstrerror(errcode: c_int) -> *const c_char {
 /// [`H_ERRNO`], [`hstrerror`], [`herror`], and other functions are deprecated as of
 /// POSIX.1-2001 and removed as of POSIX.1-2008. These functions are provided for backwards
 /// compatibility but should not be used by new code.
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 #[unsafe(no_mangle)]
 #[deprecated]
 pub extern "C" fn herror(prefix: *const c_char) {
