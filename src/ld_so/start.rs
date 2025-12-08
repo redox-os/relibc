@@ -122,70 +122,32 @@ fn resolve_path_name(
     name_or_path: &str,
     envs: &BTreeMap<String, String>,
 ) -> Option<(String, String)> {
-    eprintln!(
-        "[DEBUG] resolve_path_name called with: name_or_path='{}'",
-        name_or_path
-    );
-
-    // 1. 指定されたパスがそのまま存在するかチェック
-    eprintln!(
-        "[DEBUG] Checking if '{}' is directly accessible...",
-        name_or_path
-    );
-    match accessible(name_or_path, unistd::F_OK) {
-        Ok(_) => {
-            eprintln!("[DEBUG] Direct access OK. Returning '{}'", name_or_path);
-            return Some((
-                name_or_path.to_string(),
-                name_or_path
-                    .split("/")
-                    .collect::<Vec<&str>>()
-                    .last()
-                    .unwrap()
-                    .to_string(),
-            ));
-        }
-        Err(e) => {
-            eprintln!("[DEBUG] Direct access FAILED: {}", e);
-        }
+    if accessible(name_or_path, unistd::F_OK).is_ok() {
+        return Some((
+            name_or_path.to_string(),
+            name_or_path
+                .split("/")
+                .collect::<Vec<&str>>()
+                .last()
+                .unwrap()
+                .to_string(),
+        ));
     }
-
-    if name_or_path.split("/").count() != 1 {
-        eprintln!("[DEBUG] Name contains '/', but direct access failed. Returning None.");
+    if name_or_path.split("/").collect::<Vec<&str>>().len() != 1 {
         return None;
     }
 
-    let env_path = match envs.get("PATH") {
-        Some(p) => {
-            eprintln!("[DEBUG] PATH env found: '{}'", p);
-            p
-        }
-        None => {
-            eprintln!("[DEBUG] PATH env NOT found. Returning None.");
-            return None;
-        }
-    };
-
+    let env_path = envs.get("PATH")?;
     for part in env_path.split(PATH_SEP) {
         let path = if part.is_empty() {
             format!("./{}", name_or_path)
         } else {
             format!("{}/{}", part, name_or_path)
         };
-
-        eprintln!("[DEBUG] Checking candidate path: '{}'", path);
-        match accessible(&path, unistd::F_OK) {
-            Ok(_) => {
-                eprintln!("[DEBUG] Found executable at: '{}'. Returning.", path);
-                return Some((path.to_string(), name_or_path.to_string()));
-            }
-            Err(e) => {
-                eprintln!("[DEBUG] Executables not found: {}", e);
-            }
+        if accessible(&path, unistd::F_OK).is_ok() {
+            return Some((path.to_string(), name_or_path.to_string()));
         }
     }
-
-    eprintln!("[DEBUG] No matching executable found in PATH. Returning None.");
     None
 }
 
