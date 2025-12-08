@@ -19,7 +19,7 @@ use crate::{
         },
         time::timespec,
     },
-    platform::types::*,
+    platform::types::{c_int, c_short, c_ulong},
 };
 
 pub const POLLIN: c_short = 0x001;

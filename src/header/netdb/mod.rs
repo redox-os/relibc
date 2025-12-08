@@ -31,7 +31,7 @@ use crate::{
     platform::{
         self, Pal, Sys,
         rlb::{Line, RawLineBuffer},
-        types::*,
+        types::{c_char, c_int, c_ulong, c_void},
     },
     raw_cell::RawCell,
 };
