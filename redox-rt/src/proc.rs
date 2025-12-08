@@ -402,10 +402,6 @@ pub fn fexec_impl(
         // TODO: sync with procmgr
     }
 
-    unsafe {
-        deactivate_tcb(&thread_fd)?;
-    }
-
     // TODO: Restore old name if exec failed?
     {
         let mut buf = [0; 32];

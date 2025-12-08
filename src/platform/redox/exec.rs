@@ -64,6 +64,46 @@ fn fexec_impl(
     };
     drop(memory);
 
+    // Close all O_CLOEXEC file descriptors. TODO: close_range?
+    {
+        // NOTE: This approach of implementing O_CLOEXEC will not work in multithreaded
+        // scenarios. While execve() is undefined according to POSIX if there exist sibling
+        // threads, it could still be allowed by keeping certain file descriptors and instead
+        // set the active file table.
+        let files_fd = File::new(
+            c_int::try_from(syscall::dup(
+                RtTcb::current().thread_fd().as_raw_fd(),
+                b"filetable",
+            )?)
+            .unwrap(),
+        );
+        let files_fd_raw = files_fd.fd as usize;
+        for line in BufReader::new(files_fd).lines() {
+            let line = match line {
+                Ok(l) => l,
+                Err(_) => break,
+            };
+            let fd = match line.parse::<usize>() {
+                Ok(f) => f,
+                Err(_) => continue,
+            };
+
+            if fd == addrspace_selection_fd.as_raw_fd() || fd == files_fd_raw {
+                continue; // Will be closed below
+            }
+
+            let flags = syscall::fcntl(fd, F_GETFD, 0)?;
+
+            if flags & O_CLOEXEC == O_CLOEXEC {
+                let _ = syscall::close(fd);
+            }
+        }
+    }
+
+    unsafe {
+        redox_rt::arch::deactivate_tcb(&RtTcb::current().thread_fd())?;
+    }
+
     // Dropping this FD will cause the address space switch.
     drop(addrspace_selection_fd);
 
@@ -205,37 +245,6 @@ pub fn execve(
             (args, Vec::from(envs))
         }
     };
-
-    // Close all O_CLOEXEC file descriptors. TODO: close_range?
-    {
-        // NOTE: This approach of implementing O_CLOEXEC will not work in multithreaded
-        // scenarios. While execve() is undefined according to POSIX if there exist sibling
-        // threads, it could still be allowed by keeping certain file descriptors and instead
-        // set the active file table.
-        let files_fd = File::new(
-            c_int::try_from(syscall::dup(
-                RtTcb::current().thread_fd().as_raw_fd(),
-                b"filetable",
-            )?)
-            .unwrap(),
-        );
-        for line in BufReader::new(files_fd).lines() {
-            let line = match line {
-                Ok(l) => l,
-                Err(_) => break,
-            };
-            let fd = match line.parse::<usize>() {
-                Ok(f) => f,
-                Err(_) => continue,
-            };
-
-            let flags = syscall::fcntl(fd, F_GETFD, 0)?;
-
-            if flags & O_CLOEXEC == O_CLOEXEC {
-                let _ = syscall::close(fd);
-            }
-        }
-    }
 
     // TODO: Convert image_file to FdGuard earlier?
     let exec_fd_guard = FdGuard::new(image_file.fd as usize).to_upper().unwrap();
