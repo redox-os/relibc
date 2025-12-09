@@ -30,7 +30,6 @@ fn fexec_impl(
     interp_override: Option<InterpOverride>,
 ) -> Result<Infallible> {
     let FexecResult::Interp {
-        image_file,
         path,
         interp_override: new_interp_override,
     } = redox_rt::proc::fexec_impl(
@@ -43,8 +42,6 @@ fn fexec_impl(
         extrainfo,
         interp_override,
     )?;
-
-    drop(image_file);
 
     // According to elf(5), PT_INTERP requires that the interpreter path be
     // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
