@@ -29,8 +29,6 @@ fn fexec_impl(
     extrainfo: &ExtraInfo,
     interp_override: Option<InterpOverride>,
 ) -> Result<Infallible> {
-    let memory = FdGuard::open("/scheme/memory", O_CLOEXEC)?.to_upper()?;
-
     let FexecResult::Interp {
         image_file,
         path,
@@ -39,7 +37,6 @@ fn fexec_impl(
         exec_file,
         &RtTcb::current().thread_fd(),
         redox_rt::current_proc_fd(),
-        &memory,
         path,
         args,
         envs,
@@ -48,7 +45,6 @@ fn fexec_impl(
     )?;
 
     drop(image_file);
-    drop(memory);
 
     // According to elf(5), PT_INTERP requires that the interpreter path be
     // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
