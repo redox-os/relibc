@@ -38,7 +38,6 @@ use syscall::{
 pub enum FexecResult {
     Interp {
         path: Box<[u8]>,
-        image_file: FdGuardUpper,
         interp_override: InterpOverride,
     },
 }
@@ -135,7 +134,6 @@ pub fn fexec_impl(
 
                 return Ok(FexecResult::Interp {
                     path: interp.into_boxed_slice(),
-                    image_file,
                     interp_override: InterpOverride {
                         at_entry: header.e_entry as usize,
                         at_phnum: phnum,
