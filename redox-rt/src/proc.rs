@@ -1,5 +1,6 @@
 use core::{
     cell::SyncUnsafeCell,
+    cmp,
     fmt::Debug,
     mem::{MaybeUninit, size_of},
 };
@@ -13,7 +14,7 @@ use crate::{
     sys::{proc_call, thread_call},
 };
 
-use alloc::{boxed::Box, collections::BTreeMap, vec};
+use alloc::{boxed::Box, vec};
 
 //TODO: allow use of either 32-bit or 64-bit programs
 #[cfg(target_pointer_width = "32")]
@@ -47,7 +48,6 @@ pub struct InterpOverride {
     at_phnum: usize,
     at_phent: usize,
     name: Box<[u8]>,
-    tree: BTreeMap<usize, usize>,
 }
 
 pub struct ExtraInfo<'a> {
@@ -72,7 +72,7 @@ pub fn fexec_impl(
     args: &[&[u8]],
     envs: &[&[u8]],
     extrainfo: &ExtraInfo,
-    mut interp_override: Option<InterpOverride>,
+    interp_override: Option<InterpOverride>,
 ) -> Result<FexecResult> {
     // Here, we do the minimum part of loading an application, which is what the kernel used to do.
     // We load the executable into memory (albeit at different offsets in this executable), fix
@@ -103,10 +103,10 @@ pub fn fexec_impl(
     let phs = &mut phs_raw[size_of::<Header>()..];
 
     // TODO: Remove clone, but this would require more as_refs and as_muts
-    let mut tree = interp_override.as_mut().map_or_else(
-        || core::iter::once((0, PAGE_SIZE)).collect::<BTreeMap<_, _>>(),
-        |o| core::mem::take(&mut o.tree),
-    );
+    let mut min_mmap_addr = PAGE_SIZE;
+    let mut update_min_mmap_addr = |addr: usize, size: usize| {
+        min_mmap_addr = cmp::min(min_mmap_addr, (addr + size).next_multiple_of(PAGE_SIZE));
+    };
 
     pread_all(&image_file, u64::from(header.e_phoff), phs).map_err(|_| Error::new(EIO))?;
 
@@ -142,7 +142,6 @@ pub fn fexec_impl(
                         at_phent: phentsize,
                         phs: phs_raw.into_boxed_slice(),
                         name: path.into(),
-                        tree,
                     },
                 });
             }
@@ -185,17 +184,7 @@ pub fn fexec_impl(
                     )?;
                 }
 
-                // file_page_count..file_page_count + zero_page_count are already zero-initialized
-                // by the kernel.
-
-                if !tree
-                    .range(..=vaddr)
-                    .next_back()
-                    .filter(|(start, size)| **start + **size > vaddr)
-                    .is_some()
-                {
-                    tree.insert(vaddr, total_page_count * PAGE_SIZE);
-                }
+                update_min_mmap_addr(vaddr, total_page_count * PAGE_SIZE);
             }
             _ => continue,
         }
@@ -208,7 +197,7 @@ pub fn fexec_impl(
         STACK_SIZE,
         MapFlags::PROT_READ | MapFlags::PROT_WRITE | MapFlags::MAP_FIXED_NOREPLACE,
     )?;
-    tree.insert(STACK_TOP - STACK_SIZE, STACK_SIZE);
+    update_min_mmap_addr(STACK_TOP - STACK_SIZE, STACK_SIZE);
 
     let mut sp = STACK_TOP;
     let mut stack_page = Option::<MmapGuard>::None;
@@ -264,7 +253,7 @@ pub fn fexec_impl(
         pheaders_size_aligned,
         MapFlags::PROT_READ | MapFlags::PROT_WRITE,
     )?;
-    tree.insert(pheaders, pheaders_size_aligned);
+    update_min_mmap_addr(pheaders, pheaders_size_aligned);
     unsafe {
         let (_guard, memory) =
             MmapGuard::map_mut_anywhere(&grants_fd, pheaders, pheaders_size_aligned)?;
@@ -312,7 +301,7 @@ pub fn fexec_impl(
         args_envs_size_aligned,
         MapFlags::PROT_READ | MapFlags::PROT_WRITE,
     )?;
-    tree.insert(target_args_env_address, args_envs_size_aligned);
+    update_min_mmap_addr(target_args_env_address, args_envs_size_aligned);
 
     let mut offset = 0;
 
@@ -421,9 +410,7 @@ pub fn fexec_impl(
 
     if interp_override.is_some() {
         let mmap_min_fd = grants_fd.dup(b"mmap-min-addr")?;
-        let last_addr = tree.iter().rev().nth(1).map_or(0, |(off, len)| *off + *len);
-        let aligned_last_addr = last_addr.next_multiple_of(PAGE_SIZE);
-        let _ = mmap_min_fd.write(&usize::to_ne_bytes(aligned_last_addr));
+        let _ = mmap_min_fd.write(&usize::to_ne_bytes(min_mmap_addr));
     }
 
     let addrspace_selection_fd = thread_fd.dup(b"current-addrspace")?.to_upper()?;
