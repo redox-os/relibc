@@ -373,7 +373,7 @@ DYNAMIC_FLAGS=\
 	-Wl,--enable-new-dtags \
 	-Wl,-export-dynamic
 
-SYSROOT?=../sysroot/$(TARGET)/
+SYSROOT?=$(abspath ../sysroot/$(TARGET)/)
 
 $(SYSROOT):
 	$(MAKE) -C .. sysroot
@@ -394,7 +394,7 @@ STATIC_FLAGS+=\
 	$(SYSROOT_LIB)/libc.a
 
 DYNAMIC_FLAGS+=\
-	-Wl,-dynamic-linker=$(SYSROOT_LIB)/ld64.so.1 \
+	-Wl,-dynamic-linker=$(SYSROOT)/$(LD_SO_PATH) \
 	-Wl,-rpath=$(SYSROOT_LIB):\$$ORIGIN \
 	-L $(SYSROOT_LIB) \
 	-lc \
