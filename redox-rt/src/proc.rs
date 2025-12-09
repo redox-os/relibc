@@ -865,11 +865,8 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         };
         #[cfg(target_arch = "x86")]
         let new_sp = unsafe {
-            let size = size_of::<ForkScratchpad>();
-            let scratchpad_ptr =
-                initial_rsp.add(size / size_of::<usize>() + size % size_of::<usize>());
-
-            scratchpad_ptr.cast::<ForkScratchpad>().write(scratchpad);
+            let scratchpad_ptr = initial_rsp as *mut ForkScratchpad;
+            scratchpad_ptr.write(scratchpad);
             initial_rsp as usize
         };
 
