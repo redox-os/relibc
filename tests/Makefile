@@ -1,3 +1,5 @@
+include ../config.mk
+
 SKIP_REDOX?=0
 
 # If compiling for Redox, SKIP_REDOX must be 1
@@ -371,7 +373,9 @@ DYNAMIC_FLAGS=\
 	-Wl,--enable-new-dtags \
 	-Wl,-export-dynamic
 
-../sysroot:
+SYSROOT?=../sysroot/$(TARGET)/
+
+$(SYSROOT):
 	$(MAKE) -C .. sysroot
 
 NATIVE_RELIBC?=0
@@ -379,12 +383,12 @@ ifeq ($(NATIVE_RELIBC),0)
 FLAGS+=\
 	-nostdinc \
 	-nostdlib \
-	-isystem ../sysroot/include \
-	../sysroot/lib/crt0.o \
-	../sysroot/lib/crti.o \
-	../sysroot/lib/crtn.o
+	-isystem $(SYSROOT)/include \
+	$(SYSROOT)/lib/crt0.o \
+	$(SYSROOT)/lib/crti.o \
+	$(SYSROOT)/lib/crtn.o
 
-SYSROOT_LIB=$(shell realpath ../sysroot/lib/)
+SYSROOT_LIB=$(shell realpath ../sysroot/$(TARGET)/lib/)
 
 STATIC_FLAGS+=\
 	$(SYSROOT_LIB)/libc.a
@@ -396,7 +400,7 @@ DYNAMIC_FLAGS+=\
 	-lc \
 	-fpic
 
-DEPS=../sysroot
+DEPS=../sysroot/$(TARGET)
 else
 DYNAMIC_FLAGS+=\
 	-Wl,-rpath=\$$ORIGIN
