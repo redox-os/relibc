@@ -68,7 +68,6 @@ pub fn fexec_impl(
     image_file: FdGuardUpper,
     thread_fd: &FdGuardUpper,
     proc_fd: &FdGuardUpper,
-    memory_scheme_fd: &FdGuardUpper,
     path: &[u8],
     args: &[&[u8]],
     envs: &[&[u8]],
@@ -161,12 +160,12 @@ pub fn fexec_impl(
                     return Err(Error::new(ENOEXEC));
                 }
 
-                allocate_remote(
+                mmap_anon_remote(
                     &grants_fd,
-                    memory_scheme_fd,
+                    0,
                     vaddr,
                     total_page_count * PAGE_SIZE,
-                    flags,
+                    flags | MapFlags::MAP_FIXED_NOREPLACE,
                 )?;
 
                 // TODO: Attempt to mmap with MAP_PRIVATE directly from the image file instead.
@@ -202,12 +201,12 @@ pub fn fexec_impl(
         }
     }
 
-    allocate_remote(
+    mmap_anon_remote(
         &grants_fd,
-        memory_scheme_fd,
+        0,
         STACK_TOP - STACK_SIZE,
         STACK_SIZE,
-        MapFlags::PROT_READ | MapFlags::PROT_WRITE,
+        MapFlags::PROT_READ | MapFlags::PROT_WRITE | MapFlags::MAP_FIXED_NOREPLACE,
     )?;
     tree.insert(STACK_TOP - STACK_SIZE, STACK_SIZE);
 
@@ -258,15 +257,14 @@ pub fn fexec_impl(
         &*phs_raw
     };
     let pheaders_size_aligned = pheaders_to_convey.len().next_multiple_of(PAGE_SIZE);
-    let pheaders = find_free_target_addr(&tree, pheaders_size_aligned).ok_or(Error::new(ENOMEM))?;
-    tree.insert(pheaders, pheaders_size_aligned);
-    allocate_remote(
+    let pheaders = mmap_anon_remote(
         &grants_fd,
-        memory_scheme_fd,
-        pheaders,
+        0,
+        0,
         pheaders_size_aligned,
         MapFlags::PROT_READ | MapFlags::PROT_WRITE,
     )?;
+    tree.insert(pheaders, pheaders_size_aligned);
     unsafe {
         let (_guard, memory) =
             MmapGuard::map_mut_anywhere(&grants_fd, pheaders, pheaders_size_aligned)?;
@@ -307,12 +305,10 @@ pub fn fexec_impl(
         + envs.iter().map(|env| env.len() + 1).sum::<usize>()
         + extrainfo.cwd.map_or(0, |s| s.len() + 1);
     let args_envs_size_aligned = total_args_envs_auxvpointee_size.next_multiple_of(PAGE_SIZE);
-    let target_args_env_address =
-        find_free_target_addr(&tree, args_envs_size_aligned).ok_or(Error::new(ENOMEM))?;
-    allocate_remote(
+    let target_args_env_address = mmap_anon_remote(
         &grants_fd,
-        memory_scheme_fd,
-        target_args_env_address,
+        0,
+        0,
         args_envs_size_aligned,
         MapFlags::PROT_READ | MapFlags::PROT_WRITE,
     )?;
@@ -474,18 +470,8 @@ pub fn fexec_impl(
 
     unreachable!();
 }
-fn write_usizes<const N: usize>(fd: &FdGuardUpper, usizes: [usize; N]) -> Result<()> {
-    fd.write(unsafe { plain::as_bytes(&usizes) })?;
-    Ok(())
-}
-fn allocate_remote(
-    addrspace_fd: &FdGuardUpper,
-    memory_scheme_fd: &FdGuardUpper,
-    dst_addr: usize,
-    len: usize,
-    flags: MapFlags,
-) -> Result<()> {
-    mmap_remote(addrspace_fd, memory_scheme_fd, 0, dst_addr, len, flags)
+fn write_usizes<const N: usize>(fd: &FdGuardUpper, usizes: [usize; N]) -> Result<usize> {
+    fd.write(unsafe { plain::as_bytes(&usizes) })
 }
 pub fn mmap_remote(
     addrspace_fd: &FdGuardUpper,
@@ -494,7 +480,7 @@ pub fn mmap_remote(
     dst_addr: usize,
     len: usize,
     flags: MapFlags,
-) -> Result<()> {
+) -> Result<usize> {
     write_usizes(
         addrspace_fd,
         [
@@ -509,7 +495,32 @@ pub fn mmap_remote(
             // size
             len,
             // flags
-            (flags | MapFlags::MAP_FIXED_NOREPLACE).bits(),
+            flags.bits(),
+        ],
+    )
+}
+pub fn mmap_anon_remote(
+    addrspace_fd: &FdGuardUpper,
+    offset: usize,
+    dst_addr: usize,
+    len: usize,
+    flags: MapFlags,
+) -> Result<usize> {
+    write_usizes(
+        addrspace_fd,
+        [
+            // op
+            syscall::flag::ADDRSPACE_OP_MMAP,
+            // fd
+            !0,
+            // "offset"
+            offset,
+            // address
+            dst_addr,
+            // size
+            len,
+            // flags
+            flags.bits(),
         ],
     )
 }
@@ -531,7 +542,8 @@ pub fn mprotect_remote(
             // flags
             flags.bits(),
         ],
-    )
+    )?;
+    Ok(())
 }
 pub fn munmap_remote(addrspace_fd: &FdGuardUpper, addr: usize, len: usize) -> Result<()> {
     write_usizes(
@@ -544,7 +556,8 @@ pub fn munmap_remote(addrspace_fd: &FdGuardUpper, addr: usize, len: usize) -> Re
             // size
             len,
         ],
-    )
+    )?;
+    Ok(())
 }
 pub fn munmap_transfer(
     src: &FdGuardUpper,
@@ -570,7 +583,8 @@ pub fn munmap_transfer(
             // flags
             (flags | MapFlags::MAP_FIXED_NOREPLACE).bits(),
         ],
-    )
+    )?;
+    Ok(())
 }
 fn pread_all(fd: &FdGuardUpper, offset: u64, buf: &mut [u8]) -> Result<()> {
     fd.lseek(offset as isize, SEEK_SET)?;
@@ -584,27 +598,6 @@ fn pread_all(fd: &FdGuardUpper, offset: u64, buf: &mut [u8]) -> Result<()> {
         }
     }
     Ok(())
-}
-
-// TODO: With the introduction of remote mmaps, remove this and let the kernel handle address
-// allocation.
-fn find_free_target_addr(tree: &BTreeMap<usize, usize>, size: usize) -> Option<usize> {
-    let mut iterator = tree.iter().peekable();
-
-    // Ignore the space between zero and the first region, to avoid null pointers.
-    while let Some((cur_address, entry_size)) = iterator.next() {
-        let end = *cur_address + entry_size;
-
-        if let Some((next_address, _)) = iterator.peek() {
-            if **next_address - end > size {
-                return Some(end);
-            }
-        }
-        // No need to check last entry, since the stack will always be put at the highest
-        // possible address.
-    }
-
-    None
 }
 
 pub struct MmapGuard<'a> {
