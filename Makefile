@@ -1,6 +1,4 @@
-ifndef TARGET
-	export TARGET:=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
-endif
+include config.mk
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
@@ -22,76 +20,6 @@ PROFILE?=release
 HEADERS_UNPARSED=$(shell find src/header -mindepth 1 -maxdepth 1 -type d -not -name "_*" -printf "%f\n")
 HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "*.rs" \))
 #HEADERS=$(patsubst %,%.h,$(subst _,/,$(HEADERS_UNPARSED)))
-
-ifeq ($(TARGET),aarch64-unknown-linux-gnu)
-	export CC=aarch64-linux-gnu-gcc
-	export LD=aarch64-linux-gnu-ld
-	export AR=aarch64-linux-gnu-ar
-	export NM=aarch64-linux-gnu-nm
-	export OBJCOPY=aarch64-linux-gnu-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/ld.so.1
-endif
-
-ifeq ($(TARGET),aarch64-unknown-redox)
-	export CC=aarch64-unknown-redox-gcc
-	export LD=aarch64-unknown-redox-ld
-	export AR=aarch64-unknown-redox-ar
-	export NM=aarch64-unknown-redox-nm
-	export OBJCOPY=aarch64-unknown-redox-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/ld.so.1
-endif
-
-ifeq ($(TARGET),i586-unknown-redox)
-	export CC=i586-unknown-redox-gcc
-	export LD=i586-unknown-redox-ld
-	export AR=i586-unknown-redox-ar
-	export NM=i586-unknown-redox-nm
-	export OBJCOPY=i586-unknown-redox-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/libc.so.1
-endif
-
-ifeq ($(TARGET),i686-unknown-redox)
-	export CC=i686-unknown-redox-gcc
-	export LD=i686-unknown-redox-ld
-	export AR=i686-unknown-redox-ar
-	export NM=i686-unknown-redox-nm
-	export OBJCOPY=i686-unknown-redox-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/libc.so.1
-endif
-
-ifeq ($(TARGET),x86_64-unknown-linux-gnu)
-	export CC=x86_64-linux-gnu-gcc
-	export LD=x86_64-linux-gnu-ld
-	export AR=x86_64-linux-gnu-ar
-	export NM=x86_64-linux-gnu-nm
-	export OBJCOPY=objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/ld64.so.1
-endif
-
-ifeq ($(TARGET),x86_64-unknown-redox)
-	export CC=x86_64-unknown-redox-gcc
-	export LD=x86_64-unknown-redox-ld
-	export AR=x86_64-unknown-redox-ar
-	export NM=x86_64-unknown-redox-nm
-	export OBJCOPY=x86_64-unknown-redox-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/ld64.so.1
-endif
-
-ifeq ($(TARGET),riscv64gc-unknown-redox)
-	export CC=riscv64-unknown-redox-gcc
-	export LD=riscv64-unknown-redox-ld
-	export AR=riscv64-unknown-redox-ar
-	export NM=riscv64-unknown-redox-nm
-	export OBJCOPY=riscv64-unknown-redox-objcopy
-	export CPPFLAGS=-march=rv64gc -mabi=lp64d
-	LD_SO_PATH=lib/ld.so.1
-endif
 
 SRC=\
 	Cargo.* \
@@ -171,14 +99,18 @@ submodules:
 	git submodule update --init --recursive
 
 sysroot:
+	@mkdir -p $@
+
+.PHONY: sysroot/$(TARGET)
+sysroot/$(TARGET): | sysroot
 	rm -rf $@
 	rm -rf $@.partial
 	mkdir -p $@.partial
-	$(MAKE) install DESTDIR=$@.partial
+	$(MAKE) install DESTDIR=$(shell pwd)/$@.partial
 	mv $@.partial $@
 	touch $@
 
-test: sysroot
+test: sysroot/$(TARGET)
 	# TODO: Fix SIGILL when running cargo test
 	# $(CARGO_TEST) test
 	$(MAKE) -C tests run

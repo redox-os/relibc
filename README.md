@@ -153,17 +153,22 @@ tests/bins_static/test-name
 
 The Makefile expects GNU compiler tools prefixed with the platform specifier, as would be present when you installed a cross compiler. Since you are building for your own platform, some Linux distributions (like Manjaro) don't install/symlink the prefixed executables.
 
-An easy fix would be to replace the corresponding lines in the Makefile, e.g.
+An easy fix would be to replace the corresponding lines in `config.mk`, e.g.
 
 ```diff
- ifeq ($(TARGET),x86_64-unknown-linux-gnu)
-        export CC=x86_64-linux-gnu-gcc
--       export LD=x86_64-linux-gnu-ld
--       export AR=x86_64-linux-gnu-ar
+ifeq ($(TARGET),x86_64-unknown-linux-gnu)
+-	export CC=x86_64-linux-gnu-gcc
+-	export LD=x86_64-linux-gnu-ld
+-	export AR=x86_64-linux-gnu-ar
+-	export NM=x86_64-linux-gnu-nm
++       export CC=gcc
 +       export LD=ld
 +       export AR=ar
-        export OBJCOPY=x86_64-linux-gnu-objcopy
- endif
++       export NM=nm
+	export OBJCOPY=objcopy
+	export CPPFLAGS=
+	LD_SO_PATH=lib/ld64.so.1
+endif
 ```
 
 ## Contributing
