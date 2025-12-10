@@ -30,6 +30,7 @@ use core::{
     mem::{offset_of, size_of},
     ptr::{self, NonNull},
     slice,
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 pub const CHAR_BITS: usize = size_of::<c_char>() * 8;
@@ -334,6 +335,9 @@ pub struct DSO {
     pub scope: spin::Once<Scope>,
     /// Position Independent Executable.
     pub pie: bool,
+
+    /// Whether this DSO *and* its dependencies have been successfully loaded.
+    is_ready: AtomicBool,
 }
 
 impl DSO {
@@ -380,9 +384,15 @@ impl DSO {
             pie: is_pie_enabled(&elf),
             dynamic,
             scope: spin::Once::new(),
+            is_ready: AtomicBool::new(false),
         };
 
         Ok((dso, tcb_master, elf.elf_program_headers().to_vec()))
+    }
+
+    #[inline]
+    pub fn mark_ready(&self) {
+        self.is_ready.store(true, Ordering::SeqCst);
     }
 
     #[inline]
@@ -1120,7 +1130,11 @@ impl DSO {
 
 impl Drop for DSO {
     fn drop(&mut self) {
-        self.run_fini();
+        if self.is_ready.load(Ordering::SeqCst) {
+            // `run_fini` should not be called if we are being prematurely
+            // dropped (e.g. failed to satisfy dependencies).
+            self.run_fini();
+        }
         unsafe { Sys::munmap(self.mmap.as_ptr() as *mut c_void, self.mmap.len()).unwrap() };
     }
 }
