@@ -495,6 +495,7 @@ impl Pal for Sys {
         } else {
             "/scheme/rand"
         };
+        println!("getrandom: path: {}", path);
 
         let mut open_flags = syscall::O_RDONLY | syscall::O_CLOEXEC;
         if flags & sys_random::GRND_NONBLOCK != 0 {
@@ -502,7 +503,9 @@ impl Pal for Sys {
         }
 
         //TODO: store fd internally
+        println!("getrandom: opening path: {}", path);
         let fd = FdGuard::open(path, open_flags)?;
+        println!("getrandom: opening path: {} done.", path);
         Ok(fd.read(buf)?)
     }
 
