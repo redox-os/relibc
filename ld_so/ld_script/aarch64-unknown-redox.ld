@@ -110,13 +110,13 @@ SECTIONS
     KEEP (*(.preinit_array))
     PROVIDE_HIDDEN (__preinit_array_end = .);
   }
-  /* .init_array    :
+  .init_array    :
   {
     PROVIDE_HIDDEN (__init_array_start = .);
     KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
     KEEP (*(.init_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .ctors))
     PROVIDE_HIDDEN (__init_array_end = .);
-  } */
+  }
   .fini_array    :
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
@@ -248,9 +248,8 @@ SECTIONS
      * ld.so will be moved out of relibc. So, till that time, we have to discard any sections
      * that may reference use thread local storage.
      *
-     * .init_array also depends on TLS and is discarded as we don't need it.
+     * .init_array need to be not discarded unlike x86_64 linker variant
      */
     *(.gnu.linkonce.tb.*) *(.tcommon)
-    *(.init_array)
   }
 }
