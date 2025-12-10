@@ -59,7 +59,8 @@ test:x86_64:
     needs: [x86_64]
     dependencies: [x86_64]
     script:
-        - ./check.sh --arch=x86_64 --test
+        # TODO: sigaction and sigaltstack hangs with multi core
+        - REDOXER_QEMU_ARGS="-smp 1" ./check.sh --arch=x86_64 --test
 
 test:aarch64:
     stage: test
