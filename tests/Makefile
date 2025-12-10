@@ -327,9 +327,10 @@ clean:
 	rm -rf bins_* gen *.out
 
 run: | $(BINS) $(EXPECT_INPUT_BINS)
-	for bin in $(BINS); \
+	@echo "\033[1;36;49mRunning tests\033[0m"
+	@for bin in $(BINS); \
 	do \
-		echo "# $${bin} #"; \
+		echo "\033[0;96;49m# $${bin} #\033[0m"; \
 		${TEST_RUNNER} "$${bin}" test args || exit $$?; \
 	done
 	for exp in $(EXPECT_INPUT_BINS); \
@@ -408,30 +409,30 @@ endif
 
 $(BUILD)/bins_static/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
+	@$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
 
 $(BUILD)/bins_expect_input/%: %.c %.exp $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
+	@$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
 	cp $(word 2, "$^") $(addsuffix .exp,"$@")
 
 $(BUILD)/bins_dynamic/%.so: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" -shared -fpic $(FLAGS) $(DYNAMIC_FLAGS)
+	@$(CC) "$<" -o "$@" -shared -fpic $(FLAGS) $(DYNAMIC_FLAGS)
 
 # foobar depends on foo
 $(BUILD)/bins_dynamic/libfoobar.so: libfoobar.c $(BUILD)/bins_dynamic/libfoo.so $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" -shared -fpic $(FLAGS) $(DYNAMIC_FLAGS) -L $(BUILD)/bins_dynamic -lfoo
+	@$(CC) "$<" -o "$@" -shared -fpic $(FLAGS) $(DYNAMIC_FLAGS) -L $(BUILD)/bins_dynamic -lfoo
 
 $(BUILD)/bins_dynamic/dlfcn: dlfcn.c $(BUILD)/bins_dynamic/sharedlib.so $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
+	@$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
 
 $(BUILD)/bins_dynamic/dlopen_scopes: dlopen_scopes.c $(BUILD)/bins_dynamic/libfoobar.so $(BUILD)/bins_dynamic/libfoo.so $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
+	@$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
 
 $(BUILD)/bins_dynamic/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
+	@$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)

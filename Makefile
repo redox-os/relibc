@@ -33,20 +33,20 @@ all: | headers libs
 
 headers: $(HEADERS_DEPS)
 	rm -rf $(TARGET_HEADERS)
-	mkdir -pv $(TARGET_HEADERS)
-	cp -rv include/* $(TARGET_HEADERS)
-	cp -v "openlibm/include"/*.h $(TARGET_HEADERS)
-	cp -v "openlibm/src"/*.h $(TARGET_HEADERS)
-	set -e ; \
+	mkdir -p $(TARGET_HEADERS)
+	cp -r include/* $(TARGET_HEADERS)
+	cp "openlibm/include"/*.h $(TARGET_HEADERS)
+	cp "openlibm/src"/*.h $(TARGET_HEADERS)
+	@set -e ; \
 	for header in $(HEADERS_UNPARSED); do \
-		echo "Header $$header"; \
+		echo "\033[0;36;49mWriting Header $$header\033[0m"; \
 		if test -f "src/header/$$header/cbindgen.toml"; then \
 			out=`echo "$$header" | sed 's/_/\//g'`; \
 			out="$(TARGET_HEADERS)/$$out.h"; \
 			cat "src/header/$$header/cbindgen.toml" cbindgen.globdefs.toml \
 				 | cbindgen "src/header/$$header/mod.rs" --config=/dev/stdin --output "$$out"; \
 		fi \
-	done
+	done; echo "\033[0;36;49mAll headers written\033[0m";
 
 clean:
 	$(CARGO) clean
@@ -178,8 +178,8 @@ $(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenl
 
 $(BUILD)/release/librelibc.a: $(SRC)
 	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
-	# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
-	# use some cbindgen hook, specify them manually, or grep for #[unsafe(no_mangle)].
+	@# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
+	@# use some cbindgen hook, specify them manually, or grep for #[unsafe(no_mangle)].
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
 	./stripcore.sh "$@"
 	touch $@
