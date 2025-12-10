@@ -850,6 +850,11 @@ impl DSO {
         let descriptor = unsafe { &mut *ptr.add(1) };
 
         if self.dlopened {
+            #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+            {
+                unimplemented!("`TLSDESC` relocations are not yet implemented for riscv64 and x86");
+            }
+
             let mut tls_index = crate::header::dl_tls::dl_tls_index {
                 ti_module: tls_module_id,
                 ti_offset: reloc.addend.unwrap_or_default(),
@@ -1166,16 +1171,28 @@ struct TlsDescriptor {
     addend: usize,
 }
 
+#[cfg(target_arch = "x86_64")]
+#[unsafe(naked)]
+unsafe extern "C" fn __tlsdesc_static() {
+    core::arch::naked_asm!("mov rax, [rax + 8]", "ret")
+}
+
+#[cfg(target_arch = "x86")]
+#[unsafe(naked)]
+unsafe extern "C" fn __tlsdesc_static() {
+    core::arch::naked_asm!("mov eax, [eax + 4]", "ret")
+}
+
 #[cfg(target_arch = "aarch64")]
 #[unsafe(naked)]
 unsafe extern "C" fn __tlsdesc_static() {
     core::arch::naked_asm!("ldr x0, [x0, #8]", "ret")
 }
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(target_arch = "riscv64")]
 #[unsafe(naked)]
 unsafe extern "C" fn __tlsdesc_static() {
-    core::arch::naked_asm!("mov rax, [rax + 8]", "ret")
+    core::arch::naked_asm!("ld a0, 8(a0)", "ret");
 }
 
 unsafe extern "C" {
@@ -1212,6 +1229,16 @@ __tlsdesc_dynamic:
     TCB_SELF_PTR_OFF = const offset_of!(Tcb, generic.tcb_ptr),
 );
 
+#[cfg(target_arch = "x86")]
+core::arch::global_asm!(
+    "
+.global __tlsdesc_dynamic
+.hidden __tlsdesc_dynamic
+__tlsdesc_dynamic:
+    ud2
+"
+);
+
 #[cfg(target_arch = "aarch64")]
 core::arch::global_asm!(
     "
@@ -1239,4 +1266,14 @@ __tlsdesc_dynamic:
     ret
 ",
     DTV_PTR_OFF = const offset_of!(Tcb, dtv_ptr),
+);
+
+#[cfg(target_arch = "riscv64")]
+core::arch::global_asm!(
+    "
+.global __tlsdesc_dynamic
+.hidden __tlsdesc_dynamic
+__tlsdesc_dynamic:
+    unimp
+"
 );
