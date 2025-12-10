@@ -905,10 +905,7 @@ impl DSO {
         let a = match reloc.addend {
             Some(some) => some,
             None => match reloc.kind {
-                RelocationKind::COPY
-                | RelocationKind::GOT
-                | RelocationKind::PLT
-                | RelocationKind::TLSDESC => 0,
+                RelocationKind::COPY | RelocationKind::GOT | RelocationKind::PLT => 0,
                 _ => unsafe { *(ptr as *mut usize) },
             },
         };
