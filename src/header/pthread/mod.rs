@@ -302,6 +302,8 @@ pub unsafe extern "C" fn __relibc_internal_pthread_cleanup_pop(execute: c_int) {
 }
 
 pub(crate) unsafe fn run_destructor_stack() {
+    unsafe { crate::cxa::__cxa_thread_finalize() };
+
     let mut ptr = CLEANUP_LL_HEAD.get();
 
     while !ptr.is_null() {
