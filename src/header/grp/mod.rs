@@ -1,4 +1,6 @@
-//! grp implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/grp.h.html
+//! `grp.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/grp.h.html>.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
@@ -26,7 +28,7 @@ use crate::{
     io,
     io::{BufReader, Lines, prelude::*},
     platform,
-    platform::types::*,
+    platform::types::{c_char, c_int, c_void, gid_t, size_t},
     sync::Mutex,
 };
 
@@ -85,6 +87,7 @@ static mut GROUP: group = group {
 
 static LINE_READER: SyncUnsafeCell<Option<Lines<BufReader<File>>>> = SyncUnsafeCell::new(None);
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/grp.h.html>.
 #[repr(C)]
 #[derive(Debug)]
 pub struct group {
@@ -248,7 +251,9 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
     Ok(OwnedGrp { buffer, reference })
 }
 
-// MT-Unsafe race:grgid locale
+/// MT-Unsafe race:grgid locale
+///
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getgrgid.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrgid(gid: gid_t) -> *mut group {
     let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
@@ -271,7 +276,9 @@ pub unsafe extern "C" fn getgrgid(gid: gid_t) -> *mut group {
     ptr::null_mut()
 }
 
-// MT-Unsafe race:grnam locale
+/// MT-Unsafe race:grnam locale
+///
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getgrnam.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrnam(name: *const c_char) -> *mut group {
     let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
@@ -302,7 +309,9 @@ pub unsafe extern "C" fn getgrnam(name: *const c_char) -> *mut group {
     ptr::null_mut()
 }
 
-// MT-Safe locale
+/// MT-Safe locale
+///
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getgrgid_r.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrgid_r(
     gid: gid_t,
@@ -361,7 +370,9 @@ pub unsafe extern "C" fn getgrgid_r(
     0
 }
 
-// MT-Safe locale
+/// MT-Safe locale
+///
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getgrnam_r.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrnam_r(
     name: *const c_char,
@@ -405,7 +416,9 @@ pub unsafe extern "C" fn getgrnam_r(
     ENOENT
 }
 
-// MT-Unsafe race:grent race:grentbuf locale
+/// MT-Unsafe race:grent race:grentbuf locale
+///
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endgrent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrent() -> *mut group {
     let mut line_reader = unsafe { &mut *LINE_READER.get() };
@@ -435,7 +448,9 @@ pub unsafe extern "C" fn getgrent() -> *mut group {
     }
 }
 
-// MT-Unsafe race:grent locale
+/// MT-Unsafe race:grent locale
+///
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endgrent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endgrent() {
     unsafe {
@@ -443,7 +458,9 @@ pub unsafe extern "C" fn endgrent() {
     }
 }
 
-// MT-Unsafe race:grent locale
+/// MT-Unsafe race:grent locale
+///
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endgrent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setgrent() {
     let mut line_reader = unsafe { &mut *LINE_READER.get() };
@@ -453,8 +470,10 @@ pub unsafe extern "C" fn setgrent() {
     *line_reader = Some(BufReader::new(db).lines());
 }
 
-// MT-Safe locale
-// Not POSIX
+/// MT-Safe locale
+/// Not POSIX
+///
+/// See <https://www.man7.org/linux/man-pages/man3/getgrouplist.3.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getgrouplist(
     user: *const c_char,
@@ -521,8 +540,10 @@ pub unsafe extern "C" fn getgrouplist(
     }
 }
 
-// MT-Safe locale
-// Not POSIX
+/// MT-Safe locale
+/// Not POSIX
+///
+/// See <https://www.man7.org/linux/man-pages/man3/initgroups.3.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn initgroups(user: *const c_char, gid: gid_t) -> c_int {
     let mut groups = [0; limits::NGROUPS_MAX];
