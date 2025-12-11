@@ -28,7 +28,7 @@ use crate::{
     io,
     io::{BufReader, Lines, prelude::*},
     platform,
-    platform::types::*,
+    platform::types::{c_char, c_int, c_void, gid_t, size_t},
     sync::Mutex,
 };
 
