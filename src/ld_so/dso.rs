@@ -13,22 +13,24 @@ use object::{
 use super::{
     debug::{_r_debug, RTLDDebug},
     linker::{__plt_resolve_trampoline, GLOBAL_SCOPE, Resolve, Scope, Symbol},
-    tcb::Master,
+    tcb::{Master, Tcb},
 };
 use crate::{
-    header::sys_mman,
+    header::{dl_tls::__tls_get_addr, sys_mman},
     platform::{Pal, Sys, types::c_void},
 };
 use alloc::{
+    boxed::Box,
     string::{String, ToString},
     sync::Arc,
     vec::Vec,
 };
 use core::{
     ffi::c_char,
-    mem::size_of,
+    mem::{offset_of, size_of},
     ptr::{self, NonNull},
     slice,
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 pub const CHAR_BITS: usize = size_of::<c_char>() * 8;
@@ -208,7 +210,7 @@ impl From<&Rel> for Relocation {
 
 // This is matched up to REL_* constants used by musl for ease of comparison
 #[allow(dead_code)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum RelocationKind {
     COPY,
     DTPMOD,
@@ -333,6 +335,9 @@ pub struct DSO {
     pub scope: spin::Once<Scope>,
     /// Position Independent Executable.
     pub pie: bool,
+
+    /// Whether this DSO *and* its dependencies have been successfully loaded.
+    is_ready: AtomicBool,
 }
 
 impl DSO {
@@ -379,9 +384,15 @@ impl DSO {
             pie: is_pie_enabled(&elf),
             dynamic,
             scope: spin::Once::new(),
+            is_ready: AtomicBool::new(false),
         };
 
         Ok((dso, tcb_master, elf.elf_program_headers().to_vec()))
+    }
+
+    #[inline]
+    pub fn mark_ready(&self) {
+        self.is_ready.store(true, Ordering::SeqCst);
     }
 
     #[inline]
@@ -817,6 +828,52 @@ impl DSO {
         ))
     }
 
+    /// `TLSDESC` relocation being an extension to the original TLS ABI spec can
+    /// be present in either `.rela.plt` (handled in [`Self::static_relocate`])
+    /// or `.rela.dyn` (handled in [`Self::lazy_relocate`]) due to the lack of a
+    /// standard unfortunately.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `reloc.kind` is not `RelocationKind::TLSDESC`.
+    fn do_tlsdesc_reloc(&self, reloc: Relocation, ptr: *mut usize, global_scope: &Scope) {
+        assert!(reloc.kind == RelocationKind::TLSDESC);
+        let (sym, tls_module_id, tls_offset) = if reloc.sym != SymbolIndex(0) {
+            let sym_name = self.dynamic.symbol_name(reloc.sym).unwrap();
+            let (sym, _, obj) = resolve_sym(sym_name, &[global_scope, self.scope()]).unwrap();
+            (sym.value, obj.tls_module_id, obj.tls_offset)
+        } else {
+            (0, self.tls_module_id, self.tls_offset)
+        };
+
+        let resolver = unsafe { &mut *ptr };
+        let descriptor = unsafe { &mut *ptr.add(1) };
+
+        if self.dlopened {
+            #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+            {
+                unimplemented!("`TLSDESC` relocations are not yet implemented for riscv64 and x86");
+            }
+
+            let mut tls_index = crate::header::dl_tls::dl_tls_index {
+                ti_module: tls_module_id,
+                ti_offset: reloc.addend.unwrap_or_default(),
+            };
+
+            // Ensure the DTV entry is initialised.
+            unsafe { __tls_get_addr(&mut tls_index) };
+
+            *resolver = __tlsdesc_dynamic as *const () as usize;
+            *descriptor = Box::into_raw(Box::new(TlsDescriptor {
+                module_id: tls_module_id - 1,
+                addend: sym + reloc.addend.unwrap_or_default(),
+            })) as usize;
+        } else {
+            *resolver = __tlsdesc_static as *const () as usize;
+            *descriptor = sym + tls_offset + reloc.addend.unwrap_or_default();
+        }
+    }
+
     fn static_relocate(&self, global_scope: &Scope, reloc: Relocation) -> object::Result<()> {
         let b = self.mmap.as_ptr() as usize;
 
@@ -841,7 +898,7 @@ impl DSO {
         let (s, t, tls_id) = sym
             .as_ref()
             .map(|(sym, obj)| (sym.as_ptr() as usize, obj.tls_offset, obj.tls_module_id))
-            //TODO: is self.tls_module_id the right fallback?
+            // TODO: is self.tls_module_id the right fallback?
             .unwrap_or((0, 0, self.tls_module_id));
 
         let ptr = if self.pie {
@@ -858,14 +915,14 @@ impl DSO {
             },
         };
 
-        //TODO: support different sizes?
+        // TODO: support different sizes?
         let set_usize = |value| unsafe {
             *(ptr as *mut usize) = value;
         };
 
         match reloc.kind {
             RelocationKind::DTPMOD => set_usize(tls_id),
-            //TODO: Subtract DTP_OFFSET, which is 0x800 on riscv64, 0 on x86?
+            // TODO: Subtract DTP_OFFSET, which is 0x800 on riscv64, 0 on x86?
             RelocationKind::DTPOFF => {
                 if reloc.sym.0 > 0 {
                     let (sym, _) = sym
@@ -909,6 +966,9 @@ impl DSO {
                 // SAFETY: Both the source and destination have the same size.
                 ptr::copy_nonoverlapping(sym.as_ptr() as *const u8, ptr, sym.size);
             },
+            RelocationKind::TLSDESC => {
+                self.do_tlsdesc_reloc(reloc, ptr.cast::<usize>(), global_scope)
+            }
             _ => unimplemented!("relocation type {:?}", reloc.kind),
         }
 
@@ -927,7 +987,8 @@ impl DSO {
 
         unsafe {
             got.add(1).write(core::ptr::addr_of!(*self) as usize);
-            got.add(2).write(__plt_resolve_trampoline as usize);
+            got.add(2)
+                .write(__plt_resolve_trampoline as *const () as usize);
         }
 
         let relsz = if self.dynamic.explicit_addend {
@@ -973,6 +1034,13 @@ impl DSO {
                     unsafe {
                         *ptr = resolved + reloc.addend.unwrap_or(0);
                     }
+                }
+
+                (RelocationKind::TLSDESC, Resolve::Now) => {
+                    self.do_tlsdesc_reloc(reloc, ptr, global_scope);
+                }
+                (RelocationKind::TLSDESC, Resolve::Lazy) => {
+                    unreachable!("TLSDESC cannot be lazily resolved")
                 }
 
                 _ => {
@@ -1067,7 +1135,11 @@ impl DSO {
 
 impl Drop for DSO {
     fn drop(&mut self) {
-        self.run_fini();
+        if self.is_ready.load(Ordering::SeqCst) {
+            // `run_fini` should not be called if we are being prematurely
+            // dropped (e.g. failed to satisfy dependencies).
+            self.run_fini();
+        }
         unsafe { Sys::munmap(self.mmap.as_ptr() as *mut c_void, self.mmap.len()).unwrap() };
     }
 }
@@ -1092,3 +1164,116 @@ pub fn resolve_sym<'a>(
 ) -> Option<(Symbol<'a>, SymbolBinding, Arc<DSO>)> {
     scopes.iter().find_map(|scope| scope.get_sym(name))
 }
+
+#[repr(C)]
+struct TlsDescriptor {
+    module_id: usize,
+    addend: usize,
+}
+
+#[cfg(target_arch = "x86_64")]
+#[unsafe(naked)]
+unsafe extern "C" fn __tlsdesc_static() {
+    core::arch::naked_asm!("mov rax, [rax + 8]", "ret")
+}
+
+#[cfg(target_arch = "x86")]
+#[unsafe(naked)]
+unsafe extern "C" fn __tlsdesc_static() {
+    core::arch::naked_asm!("mov eax, [eax + 4]", "ret")
+}
+
+#[cfg(target_arch = "aarch64")]
+#[unsafe(naked)]
+unsafe extern "C" fn __tlsdesc_static() {
+    core::arch::naked_asm!("ldr x0, [x0, #8]", "ret")
+}
+
+#[cfg(target_arch = "riscv64")]
+#[unsafe(naked)]
+unsafe extern "C" fn __tlsdesc_static() {
+    core::arch::naked_asm!("ld a0, 8(a0)", "ret");
+}
+
+unsafe extern "C" {
+    fn __tlsdesc_dynamic();
+}
+
+#[cfg(target_arch = "x86_64")]
+core::arch::global_asm!(
+    "
+.global __tlsdesc_dynamic
+.hidden __tlsdesc_dynamic
+__tlsdesc_dynamic:
+    push rbx
+    push rcx
+
+    mov rax, [rax + 8] // TLS descriptor
+    mov rbx, [rax + {TLS_DESCRIPTOR_MODULE_ID_OFF}] // tls_descriptor.module_id
+    mov rcx, [rax + {TLS_DESCRIPTOR_ADDEND_OFF}] // tls_descriptor.addend
+    mov rax, qword ptr fs:[{DTV_PTR_OFF}] // tcb.dtv_ptr
+
+    // tcb.dtv_ptr[tls_descriptor.module_id] + tls_descriptor.addend
+    mov rax, [rax + rbx * 8]
+    add rax, rcx
+    sub rax, qword ptr fs:[{TCB_SELF_PTR_OFF}]
+
+    pop rcx
+    pop rbx
+
+    ret
+",
+    TLS_DESCRIPTOR_MODULE_ID_OFF = const offset_of!(TlsDescriptor, module_id),
+    TLS_DESCRIPTOR_ADDEND_OFF = const offset_of!(TlsDescriptor, addend),
+    DTV_PTR_OFF = const offset_of!(Tcb, dtv_ptr),
+    TCB_SELF_PTR_OFF = const offset_of!(Tcb, generic.tcb_ptr),
+);
+
+#[cfg(target_arch = "x86")]
+core::arch::global_asm!(
+    "
+.global __tlsdesc_dynamic
+.hidden __tlsdesc_dynamic
+__tlsdesc_dynamic:
+    ud2
+"
+);
+
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    "
+.global __tlsdesc_dynamic
+.hidden __tlsdesc_dynamic
+__tlsdesc_dynamic:
+    stp x1, x2, [sp, #-16]!
+
+    ldr x0, [x0, #8] // TLS descriptor
+
+    // x0 := tls_descriptor.module_id
+    // x1 := tls_descriptor.addend
+    ldp x0, x1, [x0]
+
+    mrs x2, tpidr_el0 // ABI ptr
+    ldr x2, [x2] // TCB ptr
+
+    sub x1, x1, x2 // tls_descriptor.addend -= tcb
+
+    ldr x2, [x2, {DTV_PTR_OFF}] // tcb.dtv_ptr
+    ldr x2, [x2, x0, lsl #3] // tcb.dtv_ptr[tls_descriptor.module_id]
+    add x0, x2, x1 // tcb.dtv_ptr[tls_descriptor.module_id] + tls_descriptor.addend
+
+    ldp x1, x2, [sp], #16
+    ret
+",
+    DTV_PTR_OFF = const offset_of!(Tcb, dtv_ptr),
+);
+
+#[cfg(target_arch = "riscv64")]
+core::arch::global_asm!(
+    "
+.global __tlsdesc_dynamic
+.hidden __tlsdesc_dynamic
+__tlsdesc_dynamic:
+    unimp
+"
+);

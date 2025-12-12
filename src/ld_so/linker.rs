@@ -715,6 +715,7 @@ impl Linker {
         }
 
         for obj in new_objects.into_iter() {
+            obj.mark_ready();
             self.run_init(&obj);
             self.register_object(obj);
         }

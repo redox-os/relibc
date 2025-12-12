@@ -58,24 +58,6 @@ pub fn getcwd(mut buf: Out<[u8]>) -> Option<usize> {
     Some(cwd.len())
 }
 
-/// Sets the default scheme
-///
-/// By default absolute paths resolve to /scheme/file, calling this function
-/// allows a different scheme to be used as the root. This property is inherited
-/// by child processes.
-///
-/// Resets CWD to /.
-pub fn set_default_scheme(scheme: &str) -> Result<()> {
-    let _siglock = tmp_disable_signals();
-    let mut cwd_guard = CWD.lock();
-    let mut default_scheme_guard = DEFAULT_SCHEME.lock();
-
-    *cwd_guard = None;
-    *default_scheme_guard = Some(scheme.into());
-
-    Ok(())
-}
-
 // TODO: How much of this logic should be in redox-path?
 fn canonicalize_with_cwd_internal(cwd: Option<&str>, path: &str) -> Result<String> {
     let path = canonicalize_using_cwd(cwd, path).ok_or(Error::new(ENOENT))?;
@@ -90,9 +72,7 @@ fn canonicalize_with_cwd_internal(cwd: Option<&str>, path: &str) -> Result<Strin
     Ok(if standard_scheme || legacy_scheme {
         path
     } else {
-        let mut default_scheme_guard = DEFAULT_SCHEME.lock();
-        let default_scheme = default_scheme_guard.get_or_insert_with(|| Box::from("file"));
-        let mut result = format!("/scheme/{}{}", default_scheme, path);
+        let mut result = format!("/scheme/file{}", path);
 
         // Trim trailing / to keep path canonical.
         if result.as_bytes().last() == Some(&b'/') {
@@ -111,26 +91,15 @@ pub fn canonicalize(path: &str) -> Result<String> {
 
 // TODO: arraystring?
 static CWD: Mutex<Option<Box<str>>> = Mutex::new(None);
-static DEFAULT_SCHEME: Mutex<Option<Box<str>>> = Mutex::new(None);
 
 pub fn set_cwd_manual(cwd: Box<str>) {
     let _siglock = tmp_disable_signals();
     *CWD.lock() = Some(cwd);
 }
 
-pub fn set_default_scheme_manual(scheme: Box<str>) {
-    let _siglock = tmp_disable_signals();
-    *DEFAULT_SCHEME.lock() = Some(scheme)
-}
-
 pub fn clone_cwd() -> Option<Box<str>> {
     let _siglock = tmp_disable_signals();
     CWD.lock().clone()
-}
-
-pub fn clone_default_scheme() -> Option<Box<str>> {
-    let _siglock = tmp_disable_signals();
-    DEFAULT_SCHEME.lock().clone()
 }
 
 // TODO: Move to redox-rt, or maybe part of it?

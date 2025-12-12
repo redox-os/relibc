@@ -888,14 +888,6 @@ pub unsafe extern "C" fn rmdir(path: *const c_char) -> c_int {
     Sys::rmdir(path).map(|()| 0).or_minus_one_errno()
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn set_default_scheme(scheme: *const c_char) -> c_int {
-    let scheme = CStr::from_ptr(scheme);
-    Sys::set_default_scheme(scheme)
-        .map(|_| 0)
-        .or_minus_one_errno()
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setegid.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn setegid(gid: gid_t) -> c_int {

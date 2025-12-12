@@ -201,7 +201,7 @@ impl ProcKillTarget {
         } else if raw == -1 {
             Self::All
         } else if raw < 0 {
-            Self::ProcGroup(raw as usize)
+            Self::ProcGroup(raw.wrapping_neg() as usize)
         } else {
             Self::SingleProc(raw as usize)
         }

@@ -1,5 +1,6 @@
 use core::{
     cell::SyncUnsafeCell,
+    cmp,
     fmt::Debug,
     mem::{MaybeUninit, size_of},
 };
@@ -14,7 +15,7 @@ use crate::{
     sys::{open, proc_call, thread_call},
 };
 
-use alloc::{boxed::Box, collections::BTreeMap, vec};
+use alloc::{boxed::Box, vec};
 
 //TODO: allow use of either 32-bit or 64-bit programs
 #[cfg(target_pointer_width = "32")]
@@ -29,20 +30,15 @@ use goblin::elf64::{
 };
 
 use syscall::{
-    CallFlags, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map, PAGE_SIZE, PROT_EXEC,
-    PROT_READ, PROT_WRITE, SetSighandlerData,
-    data::ProcSchemeAttrs,
+    CallFlags, F_GETFD, GrantDesc, GrantFlags, MAP_FIXED_NOREPLACE, MAP_SHARED, Map, O_CLOEXEC,
+    PAGE_SIZE, PROT_EXEC, PROT_READ, PROT_WRITE, SetSighandlerData,
     error::*,
     flag::{MapFlags, SEEK_SET},
 };
 
 pub enum FexecResult {
-    Normal {
-        addrspace_handle: FdGuardUpper,
-    },
     Interp {
         path: Box<[u8]>,
-        image_file: FdGuardUpper,
         interp_override: InterpOverride,
     },
 }
@@ -52,13 +48,10 @@ pub struct InterpOverride {
     at_phnum: usize,
     at_phent: usize,
     name: Box<[u8]>,
-    tree: BTreeMap<usize, usize>,
 }
 
 pub struct ExtraInfo<'a> {
     pub cwd: Option<&'a [u8]>,
-    // Default scheme for the process
-    pub default_scheme: Option<&'a [u8]>,
     // POSIX states that while sigactions are reset, ignored sigactions will remain ignored.
     pub sigignmask: u64,
     // POSIX also states that the sigprocmask must be preserved across execs.
@@ -73,24 +66,16 @@ pub struct ExtraInfo<'a> {
     pub ns_fd: Option<usize>,
 }
 
-pub fn fexec_impl<A, E>(
+pub fn fexec_impl(
     image_file: FdGuardUpper,
     thread_fd: &FdGuardUpper,
     proc_fd: &FdGuardUpper,
-    memory_scheme_fd: &FdGuardUpper,
     path: &[u8],
-    args: A,
-    envs: E,
-    total_args_envs_size: usize,
+    args: &[&[u8]],
+    envs: &[&[u8]],
     extrainfo: &ExtraInfo,
-    mut interp_override: Option<InterpOverride>,
-) -> Result<FexecResult>
-where
-    A: IntoIterator,
-    E: IntoIterator,
-    A::Item: AsRef<[u8]>,
-    E::Item: AsRef<[u8]>,
-{
+    interp_override: Option<InterpOverride>,
+) -> Result<FexecResult> {
     // Here, we do the minimum part of loading an application, which is what the kernel used to do.
     // We load the executable into memory (albeit at different offsets in this executable), fix
     // some misalignments, and then switch address space.
@@ -120,10 +105,10 @@ where
     let phs = &mut phs_raw[size_of::<Header>()..];
 
     // TODO: Remove clone, but this would require more as_refs and as_muts
-    let mut tree = interp_override.as_mut().map_or_else(
-        || core::iter::once((0, PAGE_SIZE)).collect::<BTreeMap<_, _>>(),
-        |o| core::mem::take(&mut o.tree),
-    );
+    let mut min_mmap_addr = PAGE_SIZE;
+    let mut update_min_mmap_addr = |addr: usize, size: usize| {
+        min_mmap_addr = cmp::min(min_mmap_addr, (addr + size).next_multiple_of(PAGE_SIZE));
+    };
 
     pread_all(&image_file, u64::from(header.e_phoff), phs).map_err(|_| Error::new(EIO))?;
 
@@ -152,14 +137,12 @@ where
 
                 return Ok(FexecResult::Interp {
                     path: interp.into_boxed_slice(),
-                    image_file,
                     interp_override: InterpOverride {
                         at_entry: header.e_entry as usize,
                         at_phnum: phnum,
                         at_phent: phentsize,
                         phs: phs_raw.into_boxed_slice(),
                         name: path.into(),
-                        tree,
                     },
                 });
             }
@@ -177,12 +160,12 @@ where
                     return Err(Error::new(ENOEXEC));
                 }
 
-                allocate_remote(
+                mmap_anon_remote(
                     &grants_fd,
-                    memory_scheme_fd,
+                    0,
                     vaddr,
                     total_page_count * PAGE_SIZE,
-                    flags,
+                    flags | MapFlags::MAP_FIXED_NOREPLACE,
                 )?;
 
                 // TODO: Attempt to mmap with MAP_PRIVATE directly from the image file instead.
@@ -202,30 +185,20 @@ where
                     )?;
                 }
 
-                // file_page_count..file_page_count + zero_page_count are already zero-initialized
-                // by the kernel.
-
-                if !tree
-                    .range(..=vaddr)
-                    .next_back()
-                    .filter(|(start, size)| **start + **size > vaddr)
-                    .is_some()
-                {
-                    tree.insert(vaddr, total_page_count * PAGE_SIZE);
-                }
+                update_min_mmap_addr(vaddr, total_page_count * PAGE_SIZE);
             }
             _ => continue,
         }
     }
 
-    allocate_remote(
+    mmap_anon_remote(
         &grants_fd,
-        memory_scheme_fd,
+        0,
         STACK_TOP - STACK_SIZE,
         STACK_SIZE,
-        MapFlags::PROT_READ | MapFlags::PROT_WRITE,
+        MapFlags::PROT_READ | MapFlags::PROT_WRITE | MapFlags::MAP_FIXED_NOREPLACE,
     )?;
-    tree.insert(STACK_TOP - STACK_SIZE, STACK_SIZE);
+    update_min_mmap_addr(STACK_TOP - STACK_SIZE, STACK_SIZE);
 
     let mut sp = STACK_TOP;
     let mut stack_page = Option::<MmapGuard>::None;
@@ -274,15 +247,14 @@ where
         &*phs_raw
     };
     let pheaders_size_aligned = pheaders_to_convey.len().next_multiple_of(PAGE_SIZE);
-    let pheaders = find_free_target_addr(&tree, pheaders_size_aligned).ok_or(Error::new(ENOMEM))?;
-    tree.insert(pheaders, pheaders_size_aligned);
-    allocate_remote(
+    let pheaders = mmap_anon_remote(
         &grants_fd,
-        memory_scheme_fd,
-        pheaders,
+        0,
+        0,
         pheaders_size_aligned,
         MapFlags::PROT_READ | MapFlags::PROT_WRITE,
     )?;
+    update_min_mmap_addr(pheaders, pheaders_size_aligned);
     unsafe {
         let (_guard, memory) =
             MmapGuard::map_mut_anywhere(&grants_fd, pheaders, pheaders_size_aligned)?;
@@ -319,20 +291,18 @@ where
     )?;
     push(AT_PHENT)?;
 
-    let total_args_envs_auxvpointee_size = total_args_envs_size
-        + extrainfo.cwd.map_or(0, |s| s.len() + 1)
-        + extrainfo.default_scheme.map_or(0, |s| s.len() + 1);
+    let total_args_envs_auxvpointee_size = args.iter().map(|arg| arg.len() + 1).sum::<usize>()
+        + envs.iter().map(|env| env.len() + 1).sum::<usize>()
+        + extrainfo.cwd.map_or(0, |s| s.len() + 1);
     let args_envs_size_aligned = total_args_envs_auxvpointee_size.next_multiple_of(PAGE_SIZE);
-    let target_args_env_address =
-        find_free_target_addr(&tree, args_envs_size_aligned).ok_or(Error::new(ENOMEM))?;
-    allocate_remote(
+    let target_args_env_address = mmap_anon_remote(
         &grants_fd,
-        memory_scheme_fd,
-        target_args_env_address,
+        0,
+        0,
         args_envs_size_aligned,
         MapFlags::PROT_READ | MapFlags::PROT_WRITE,
     )?;
-    tree.insert(target_args_env_address, args_envs_size_aligned);
+    update_min_mmap_addr(target_args_env_address, args_envs_size_aligned);
 
     let mut offset = 0;
 
@@ -366,13 +336,6 @@ where
             push(AT_REDOX_INITIAL_CWD_LEN)?;
         }
 
-        if let Some(default_scheme) = extrainfo.default_scheme {
-            push(append(default_scheme)?)?;
-            push(AT_REDOX_INITIAL_DEFAULT_SCHEME_PTR)?;
-            push(default_scheme.len())?;
-            push(AT_REDOX_INITIAL_DEFAULT_SCHEME_LEN)?;
-        }
-
         #[cfg(target_pointer_width = "32")]
         {
             push((extrainfo.sigignmask >> 32) as usize)?;
@@ -400,14 +363,14 @@ where
 
         push(0)?;
 
-        for env in envs {
-            push(append(env.as_ref())?)?;
+        for env in envs.iter().rev() {
+            push(append(env)?)?;
         }
 
         push(0)?;
 
-        for arg in args {
-            push(append(arg.as_ref())?)?;
+        for arg in args.iter().rev() {
+            push(append(arg)?)?;
             argc += 1;
         }
     }
@@ -422,10 +385,6 @@ where
             proc_control_addr: 0,
         });
         // TODO: sync with procmgr
-    }
-
-    unsafe {
-        deactivate_tcb(&thread_fd)?;
     }
 
     // TODO: Restore old name if exec failed?
@@ -454,9 +413,7 @@ where
 
     if interp_override.is_some() {
         let mmap_min_fd = grants_fd.dup(b"mmap-min-addr")?;
-        let last_addr = tree.iter().rev().nth(1).map_or(0, |(off, len)| *off + *len);
-        let aligned_last_addr = last_addr.next_multiple_of(PAGE_SIZE);
-        let _ = mmap_min_fd.write(&usize::to_ne_bytes(aligned_last_addr));
+        let _ = mmap_min_fd.write(&usize::to_ne_bytes(min_mmap_addr));
     }
 
     let addrspace_selection_fd = thread_fd.dup(b"current-addrspace")?.to_upper()?;
@@ -467,22 +424,44 @@ where
         sp,
     ));
 
-    Ok(FexecResult::Normal {
-        addrspace_handle: addrspace_selection_fd,
-    })
+    // Close all O_CLOEXEC file descriptors. TODO: close_range?
+    {
+        // NOTE: This approach of implementing O_CLOEXEC will not work in multithreaded
+        // scenarios. While execve() is undefined according to POSIX if there exist sibling
+        // threads, it could still be allowed by keeping certain file descriptors and instead
+        // set the active file table.
+        let files_fd = syscall::dup(thread_fd.as_raw_fd(), b"filetable-binary")?;
+        let mut files_reader = FileBufReader::from_fd(files_fd);
+        loop {
+            let fd = match files_reader.read_le_u64()? {
+                None => break,
+                Some(fd) => fd,
+            };
+            let fd = usize::try_from(fd).unwrap();
+
+            if fd == addrspace_selection_fd.as_raw_fd() || fd == files_fd {
+                continue; // Will be closed below
+            }
+
+            let flags = syscall::fcntl(fd, F_GETFD, 0)?;
+
+            if flags & O_CLOEXEC == O_CLOEXEC {
+                let _ = syscall::close(fd);
+            }
+        }
+    }
+
+    unsafe {
+        deactivate_tcb(&thread_fd)?;
+    }
+
+    // Dropping this FD will cause the address space switch.
+    drop(addrspace_selection_fd);
+
+    unreachable!();
 }
-fn write_usizes<const N: usize>(fd: &FdGuardUpper, usizes: [usize; N]) -> Result<()> {
-    fd.write(unsafe { plain::as_bytes(&usizes) })?;
-    Ok(())
-}
-fn allocate_remote(
-    addrspace_fd: &FdGuardUpper,
-    memory_scheme_fd: &FdGuardUpper,
-    dst_addr: usize,
-    len: usize,
-    flags: MapFlags,
-) -> Result<()> {
-    mmap_remote(addrspace_fd, memory_scheme_fd, 0, dst_addr, len, flags)
+fn write_usizes<const N: usize>(fd: &FdGuardUpper, usizes: [usize; N]) -> Result<usize> {
+    fd.write(unsafe { plain::as_bytes(&usizes) })
 }
 pub fn mmap_remote(
     addrspace_fd: &FdGuardUpper,
@@ -491,7 +470,7 @@ pub fn mmap_remote(
     dst_addr: usize,
     len: usize,
     flags: MapFlags,
-) -> Result<()> {
+) -> Result<usize> {
     write_usizes(
         addrspace_fd,
         [
@@ -506,7 +485,32 @@ pub fn mmap_remote(
             // size
             len,
             // flags
-            (flags | MapFlags::MAP_FIXED_NOREPLACE).bits(),
+            flags.bits(),
+        ],
+    )
+}
+pub fn mmap_anon_remote(
+    addrspace_fd: &FdGuardUpper,
+    offset: usize,
+    dst_addr: usize,
+    len: usize,
+    flags: MapFlags,
+) -> Result<usize> {
+    write_usizes(
+        addrspace_fd,
+        [
+            // op
+            syscall::flag::ADDRSPACE_OP_MMAP,
+            // fd
+            !0,
+            // "offset"
+            offset,
+            // address
+            dst_addr,
+            // size
+            len,
+            // flags
+            flags.bits(),
         ],
     )
 }
@@ -528,7 +532,8 @@ pub fn mprotect_remote(
             // flags
             flags.bits(),
         ],
-    )
+    )?;
+    Ok(())
 }
 pub fn munmap_remote(addrspace_fd: &FdGuardUpper, addr: usize, len: usize) -> Result<()> {
     write_usizes(
@@ -541,7 +546,8 @@ pub fn munmap_remote(addrspace_fd: &FdGuardUpper, addr: usize, len: usize) -> Re
             // size
             len,
         ],
-    )
+    )?;
+    Ok(())
 }
 pub fn munmap_transfer(
     src: &FdGuardUpper,
@@ -567,7 +573,8 @@ pub fn munmap_transfer(
             // flags
             (flags | MapFlags::MAP_FIXED_NOREPLACE).bits(),
         ],
-    )
+    )?;
+    Ok(())
 }
 fn pread_all(fd: &FdGuardUpper, offset: u64, buf: &mut [u8]) -> Result<()> {
     fd.lseek(offset as isize, SEEK_SET)?;
@@ -581,27 +588,6 @@ fn pread_all(fd: &FdGuardUpper, offset: u64, buf: &mut [u8]) -> Result<()> {
         }
     }
     Ok(())
-}
-
-// TODO: With the introduction of remote mmaps, remove this and let the kernel handle address
-// allocation.
-fn find_free_target_addr(tree: &BTreeMap<usize, usize>, size: usize) -> Option<usize> {
-    let mut iterator = tree.iter().peekable();
-
-    // Ignore the space between zero and the first region, to avoid null pointers.
-    while let Some((cur_address, entry_size)) = iterator.next() {
-        let end = *cur_address + entry_size;
-
-        if let Some((next_address, _)) = iterator.peek() {
-            if **next_address - end > size {
-                return Some(end);
-            }
-        }
-        // No need to check last entry, since the stack will always be put at the highest
-        // possible address.
-    }
-
-    None
 }
 
 pub struct MmapGuard<'a> {
@@ -672,6 +658,48 @@ impl<'a> Drop for MmapGuard<'a> {
         if self.size != 0 {
             let _ = unsafe { syscall::funmap(self.base, self.size) };
         }
+    }
+}
+
+struct FileBufReader {
+    fd: usize,
+    buf: [u8; 8192],
+    pos: usize,
+    cap: usize,
+}
+
+impl FileBufReader {
+    pub fn from_fd(fd: usize) -> FileBufReader {
+        FileBufReader {
+            fd,
+            buf: [0; 8192],
+            pos: 0,
+            cap: 0,
+        }
+    }
+}
+
+impl FileBufReader {
+    fn read_le_u64(&mut self) -> syscall::Result<Option<u64>> {
+        if self.pos >= self.cap {
+            debug_assert!(self.pos == self.cap);
+            self.cap = crate::sys::posix_read(self.fd, &mut self.buf)?;
+            self.pos = 0;
+        }
+
+        if self.cap == 0 {
+            return Ok(None);
+        }
+
+        if self.cap - self.pos < 8 {
+            unreachable!();
+        }
+
+        let num = u64::from_le_bytes(self.buf[self.pos..self.pos + 8].try_into().unwrap());
+
+        self.pos += 8;
+
+        Ok(Some(num))
     }
 }
 

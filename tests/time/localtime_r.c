@@ -7,6 +7,9 @@ void test_localtime_r_epoch() {
     time_t t = 0;  // Unix epoch (1970-01-01 00:00:00)
     struct tm result;
 
+    setenv("TZ", "UTC", 1);
+    tzset();
+
     assert(localtime_r(&t, &result) != NULL); 
     assert(result.tm_year == 70);   // Year 1970 - 1900
     assert(result.tm_mon == 0);     // January
@@ -22,6 +25,9 @@ void test_localtime_r_non_epoch() {
     time_t t = 1609459200;  // January 1, 2021 00:00:00 UTC (New Year 2021)
     struct tm result;
 
+    setenv("TZ", "UTC", 1);
+    tzset();
+
     assert(localtime_r(&t, &result) != NULL);
     assert(result.tm_year == 121);  // Year 2021 - 1900
     assert(result.tm_mon == 0);    // January
@@ -35,6 +41,9 @@ void test_localtime_r_dst() {
     time_t t = 1615708800;  // March 14 2021 08:00:00 UTC
     struct tm result;
 
+    setenv("TZ", "UTC", 1);
+    tzset();
+
     assert(localtime_r(&t, &result) != NULL);  // Ensure localtime_r does not fail
     assert(result.tm_year == 121);  // Year 2021 - 1900
     assert(result.tm_mon == 2);    // March
@@ -47,6 +56,9 @@ void test_localtime_r_dst() {
 void test_localtime_r_large_time() {
     time_t t = 32503680000;  // A large value: 1 January 3000 (UTC)
     struct tm result;
+
+    setenv("TZ", "UTC", 1);
+    tzset();
 
     assert(localtime_r(&t, &result) != NULL);  // Ensure localtime_r does not fail
     assert(result.tm_year == 1100);  // Year 3000 - 1900 = 1100
