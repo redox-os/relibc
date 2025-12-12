@@ -104,7 +104,7 @@ pub fn fexec_impl(
     // TODO: Remove clone, but this would require more as_refs and as_muts
     let mut min_mmap_addr = PAGE_SIZE;
     let mut update_min_mmap_addr = |addr: usize, size: usize| {
-        min_mmap_addr = cmp::min(min_mmap_addr, (addr + size).next_multiple_of(PAGE_SIZE));
+        min_mmap_addr = cmp::max(min_mmap_addr, (addr + size).next_multiple_of(PAGE_SIZE));
     };
 
     pread_all(&image_file, u64::from(header.e_phoff), phs).map_err(|_| Error::new(EIO))?;
@@ -195,7 +195,6 @@ pub fn fexec_impl(
         STACK_SIZE,
         MapFlags::PROT_READ | MapFlags::PROT_WRITE | MapFlags::MAP_FIXED_NOREPLACE,
     )?;
-    update_min_mmap_addr(STACK_TOP - STACK_SIZE, STACK_SIZE);
 
     let mut sp = STACK_TOP;
     let mut stack_page = Option::<MmapGuard>::None;
