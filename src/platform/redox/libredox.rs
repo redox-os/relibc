@@ -135,19 +135,11 @@ pub unsafe extern "C" fn redox_open_v1(
     flags: u32,
     mode: u16,
 ) -> RawResult {
-    Error::mux(if USE_NEW_NS_BACKEND.load(Ordering::Relaxed) {
-        open(
-            str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
-            flags as c_int,
-            mode as mode_t,
-        )
-    } else {
-        syscall::write(
-            1,
-            b"Warning: using deprecated namespace backend for open_v1\n",
-        );
-        Err(Error::new(ENOSYS))
-    })
+    Error::mux(open(
+        str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)),
+        flags as c_int,
+        mode as mode_t,
+    ))
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_openat_v1(
@@ -410,21 +402,16 @@ pub unsafe extern "C" fn redox_mkns_v1(
             return Err(Error::new(EINVAL));
         }
 
-        if USE_NEW_NS_BACKEND.load(Ordering::Relaxed) {
-            let raw_iovecs = slice::from_raw_parts(names, num_names);
-            let names_ioslice: Vec<IoSlice> = raw_iovecs
-                .iter()
-                .map(|iov| {
-                    IoSlice::new(unsafe {
-                        slice::from_raw_parts(iov.iov_base as *const u8, iov.iov_len)
-                    })
+        let raw_iovecs = slice::from_raw_parts(names, num_names);
+        let names_ioslice: Vec<IoSlice> = raw_iovecs
+            .iter()
+            .map(|iov| {
+                IoSlice::new(unsafe {
+                    slice::from_raw_parts(iov.iov_base as *const u8, iov.iov_len)
                 })
-                .collect();
-            redox_rt::sys::mkns(&names_ioslice).map(|fd| fd.take())
-        } else {
-            // Kernel does the UTF-8 validation.
-            syscall::mkns(core::slice::from_raw_parts(names.cast(), num_names))
-        }
+            })
+            .collect();
+        redox_rt::sys::mkns(&names_ioslice).map(|fd| fd.take())
     })())
 }
 
@@ -473,32 +460,8 @@ pub unsafe extern "C" fn redox_get_socket_token_v0(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_setns_v0(fd: usize) -> RawResult {
-    if fd == usize::wrapping_neg(1) {
-        USE_NEW_NS_BACKEND.store(true, Ordering::Relaxed);
-        usize::MAX
-    } else if fd == usize::wrapping_neg(2) {
-        USE_NEW_NS_BACKEND.store(false, Ordering::Relaxed);
-        usize::MAX
-    } else {
-        match redox_rt::sys::setns(fd) {
-            Some(guard) => guard.take(),
-            None => usize::MAX,
-        }
+    match redox_rt::sys::setns(fd) {
+        Some(guard) => guard.take(),
+        None => usize::MAX,
     }
 }
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn redox_set_namespace_fd_v0(fd: usize) -> RawResult {
-    if fd == usize::wrapping_neg(1) {
-        USE_NEW_NS_BACKEND.store(true, Ordering::Relaxed);
-        usize::MAX
-    } else if fd == usize::wrapping_neg(2) {
-        USE_NEW_NS_BACKEND.store(false, Ordering::Relaxed);
-        usize::MAX
-    } else {
-        match redox_rt::sys::setns(fd) {
-            Some(guard) => guard.take(),
-            None => usize::MAX,
-        }
-    }
-}
-static USE_NEW_NS_BACKEND: AtomicBool = AtomicBool::new(true);
