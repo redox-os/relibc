@@ -1358,7 +1358,7 @@ impl Pal for Sys {
     fn unlink(path: CStr) -> Result<()> {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
         let canon = canonicalize(path)?;
-        edox_rt::sys::unlink(&canon, 0)?;
+        redox_rt::sys::unlink(&canon, 0)?;
         Ok(())
     }
 
