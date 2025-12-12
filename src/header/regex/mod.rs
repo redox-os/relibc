@@ -2,7 +2,10 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/regex.h.html>.
 
-use crate::{header::string::strlen, platform::types::*};
+use crate::{
+    header::string::strlen,
+    platform::types::{c_char, c_int, c_void, size_t},
+};
 use alloc::{borrow::Cow, boxed::Box};
 use core::{mem, ptr, slice};
 use posix_regex::{PosixRegex, PosixRegexBuilder, compile::Error as CompileError, tree::Tree};
