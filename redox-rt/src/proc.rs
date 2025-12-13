@@ -9,9 +9,10 @@ use crate::{
     DYNAMIC_PROC_INFO, RtTcb, StaticProcInfo,
     arch::*,
     auxv_defs::*,
+    current_namespace_fd,
     protocol::{ProcCall, ThreadCall},
     read_proc_meta,
-    sys::{proc_call, thread_call},
+    sys::{open, proc_call, thread_call},
 };
 
 use alloc::{boxed::Box, vec};
@@ -61,6 +62,8 @@ pub struct ExtraInfo<'a> {
     pub thr_fd: usize,
     /// Process handle
     pub proc_fd: usize,
+    /// Namespace handle
+    pub ns_fd: Option<usize>,
 }
 
 pub fn fexec_impl(
@@ -354,6 +357,8 @@ pub fn fexec_impl(
         push(AT_REDOX_THR_FD)?;
         push(extrainfo.proc_fd as usize)?;
         push(AT_REDOX_PROC_FD)?;
+        push(extrainfo.ns_fd.unwrap_or(usize::MAX))?;
+        push(AT_REDOX_NS_FD)?;
 
         push(0)?;
 
@@ -710,7 +715,7 @@ impl FdGuard<false> {
 
     #[inline]
     pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<Self> {
-        syscall::open(path, flags).map(Self::new)
+        open(path, flags).map(Self::new)
     }
 
     #[inline]
@@ -804,6 +809,19 @@ pub fn create_set_addr_space_buf(
     buf
 }
 
+pub fn create_set_addr_space_buf_for_fork(
+    space: usize,
+    ip: usize,
+    sp: usize,
+    arg1: usize,
+) -> [u8; size_of::<usize>() * 4] {
+    let mut buf = [0u8; size_of::<usize>() * 4];
+
+    buf.copy_from_slice([space, sp, ip, arg1].map(usize::to_ne_bytes).as_flattened());
+
+    buf
+}
+
 /// Spawns a new context which will not share the same address space as the current one. File
 /// descriptors from other schemes are reobtained with `dup`, and grants referencing such file
 /// descriptors are reobtained through `fmap`. Other mappings are kept but duplicated using CoW.
@@ -848,18 +866,36 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
 
         // Copy existing files into new file table, but do not reuse the same file table (i.e. new
         // parent FDs will not show up for the child).
-        {
+        let scratchpad = {
             cur_filetable_fd = cur_thr_fd.dup(b"filetable")?;
 
             // This must be done before the address space is copied.
-            unsafe {
-                let proc_fd = new_proc_fd.as_ref().map_or(usize::MAX, |p| p.as_raw_fd());
-                //let _ = syscall::write(1, alloc::format!("FDTBL{}PROC{}THR{}\n", *cur_filetable_fd, proc_fd, *new_thr_fd).as_bytes());
-                initial_rsp.write(cur_filetable_fd.as_raw_fd());
-                initial_rsp.add(1).write(proc_fd);
-                initial_rsp.add(2).write(new_thr_fd.as_raw_fd());
+            let proc_fd = new_proc_fd.as_ref().map_or(usize::MAX, |p| p.as_raw_fd());
+            //let _ = syscall::write(1, alloc::format!("FDTBL{}PROC{}THR{}\n", *cur_filetable_fd, proc_fd, *new_thr_fd).as_bytes());
+
+            ForkScratchpad {
+                cur_filetable_fd: cur_filetable_fd.as_raw_fd(),
+                new_proc_fd: proc_fd,
+                new_thr_fd: new_thr_fd.as_raw_fd(),
+                new_ns_fd: current_namespace_fd(),
             }
-        }
+        };
+        #[cfg(any(
+            target_arch = "x86_64",
+            target_arch = "aarch64",
+            target_arch = "riscv64"
+        ))]
+        let (new_sp, arg1) = {
+            let new_sp = initial_rsp as usize;
+            let scratchpad_ptr: *const ForkScratchpad = &scratchpad;
+            (new_sp, scratchpad_ptr as usize)
+        };
+        #[cfg(target_arch = "x86")]
+        let new_sp = unsafe {
+            let scratchpad_ptr = initial_rsp as *mut ForkScratchpad;
+            scratchpad_ptr.write(scratchpad);
+            initial_rsp as usize
+        };
 
         // CoW-duplicate address space.
         {
@@ -928,10 +964,22 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                 }
             }
 
+            #[cfg(any(
+                target_arch = "x86_64",
+                target_arch = "aarch64",
+                target_arch = "riscv64"
+            ))]
+            let buf = create_set_addr_space_buf_for_fork(
+                new_addr_space_fd.as_raw_fd(),
+                __relibc_internal_fork_ret as usize,
+                new_sp,
+                arg1,
+            );
+            #[cfg(target_arch = "x86")]
             let buf = create_set_addr_space_buf(
                 new_addr_space_fd.as_raw_fd(),
                 __relibc_internal_fork_ret as usize,
-                initial_rsp as usize,
+                new_sp,
             );
             new_addr_space_sel_fd.write(&buf)?;
         }
@@ -981,7 +1029,6 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
     }
     let start_fd = new_thr_fd.dup(b"start")?;
     start_fd.write(&[0])?;
-
     Ok(new_pid)
 }
 
@@ -1040,12 +1087,14 @@ pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
     }
 }
 
-pub unsafe fn make_init() -> (&'static FdGuardUpper, &'static FdGuardUpper) {
+pub unsafe fn make_init(proc_cap: usize) -> (&'static FdGuardUpper, &'static FdGuardUpper) {
     let proc_fd = FdGuard::new(
-        syscall::open("/scheme/proc/init", syscall::O_CLOEXEC).expect("failed to create init"),
+        syscall::openat(proc_cap, "init", syscall::O_CLOEXEC, 0, 0, 0)
+            .expect("failed to create init"),
     )
     .to_upper()
     .unwrap();
+
     syscall::sendfd(
         proc_fd.as_raw_fd(),
         RtTcb::current().thread_fd().dup(&[]).unwrap().take(),
@@ -1077,6 +1126,7 @@ pub unsafe fn make_init() -> (&'static FdGuardUpper, &'static FdGuardUpper) {
         rgid: 0,
         egid: 0,
         sgid: 0,
+        ns_fd: None,
     };
     (
         unsafe { (*STATIC_PROC_INFO.get()).proc_fd.assume_init_ref() },

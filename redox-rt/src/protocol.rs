@@ -248,3 +248,17 @@ pub const SIGWINCH: usize = 28;
 pub const SIGIO: usize = 29;
 pub const SIGPWR: usize = 30;
 pub const SIGSYS: usize = 31;
+
+bitflags! {
+    #[derive(Clone, Copy, Debug, Default, Eq, Ord, Hash, PartialEq, PartialOrd)]
+    pub struct NsPermissions: usize {
+        /// List schemes in the namespace
+        const LIST = 1 << 0;
+        /// Register a new scheme in the namespace
+        const INSERT = 1 << 1;
+        /// Delete a scheme from the namespace
+        const DELETE = 1 << 2;
+        /// Get scheme creation capabilities of the namespace
+        const SCHEME_CREATE = 1 << 3;
+    }
+}
