@@ -1041,7 +1041,7 @@ impl Pal for Sys {
     fn rmdir(path: CStr) -> Result<()> {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
         let canon = canonicalize(path)?;
-        redox_rt::sys::unlink(&canon, fcntl::AT_REMOVEDIR)?;
+        redox_rt::sys::unlink(&canon, fcntl::AT_REMOVEDIR as usize)?;
         Ok(())
     }
 
