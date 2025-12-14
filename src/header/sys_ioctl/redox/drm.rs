@@ -1,5 +1,10 @@
 use alloc::vec::Vec;
 use core::{mem, slice};
+use drm_sys::{
+    drm_get_cap, drm_mode_card_res, drm_mode_crtc, drm_mode_fb_cmd, drm_mode_fb_cmd2,
+    drm_mode_get_connector, drm_mode_get_encoder, drm_mode_get_plane, drm_mode_get_plane_res,
+    drm_mode_obj_get_properties, drm_set_client_cap, drm_version,
+};
 
 use crate::{
     error::{Errno, Result},
@@ -82,7 +87,7 @@ impl Dev {
     }
 
     fn get_cap(&self, capability: u64) -> Result<u64> {
-        let mut cmd = ipc::GetCap {
+        let mut cmd = drm_get_cap {
             capability,
             value: 0,
         };
@@ -93,7 +98,7 @@ impl Dev {
     }
 
     fn set_client_cap(&self, capability: u64, value: u64) -> Result<()> {
-        let mut cmd = ipc::SetClientCap { capability, value };
+        let mut cmd = drm_set_client_cap { capability, value };
         unsafe {
             self.call(&mut cmd, ipc::SET_CLIENT_CAP)?;
         }
@@ -121,22 +126,6 @@ impl Dev {
     }
 }
 
-// Structs adapted from drm-sys bindings: https://docs.rs/drm-sys/0.8.0/src/drm_sys/bindings.rs.html
-//TODO: can we auto generate these from libdrm without causing dependency issues?
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-struct drm_version {
-    pub version_major: c_int,
-    pub version_minor: c_int,
-    pub version_patchlevel: c_int,
-    pub name_len: size_t,
-    pub name: *mut c_char,
-    pub date_len: size_t,
-    pub date: *mut c_char,
-    pub desc_len: size_t,
-    pub desc: *mut c_char,
-}
-
 unsafe fn version(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     let mut vers = buf.read::<drm_version>()?;
     let version = dev.version()?;
@@ -158,13 +147,6 @@ unsafe fn version(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     Ok(0)
 }
 
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct drm_get_cap {
-    pub capability: u64,
-    pub value: u64,
-}
-
 unsafe fn get_cap(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     let mut cap = buf.read::<drm_get_cap>()?;
     cap.value = dev.get_cap(cap.capability)?;
@@ -172,34 +154,10 @@ unsafe fn get_cap(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     Ok(0)
 }
 
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct drm_set_client_cap {
-    pub capability: u64,
-    pub value: u64,
-}
-
 unsafe fn set_client_cap(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     let mut cap = buf.read::<drm_set_client_cap>()?;
     dev.set_client_cap(cap.capability, cap.value)?;
     Ok(0)
-}
-
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct drm_mode_card_res {
-    pub fb_id_ptr: u64,
-    pub crtc_id_ptr: u64,
-    pub connector_id_ptr: u64,
-    pub encoder_id_ptr: u64,
-    pub count_fbs: u32,
-    pub count_crtcs: u32,
-    pub count_connectors: u32,
-    pub count_encoders: u32,
-    pub min_width: u32,
-    pub max_width: u32,
-    pub min_height: u32,
-    pub max_height: u32,
 }
 
 unsafe fn mode_card_res(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
@@ -239,40 +197,6 @@ unsafe fn mode_card_res(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     Ok(0)
 }
 
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct drm_mode_modeinfo {
-    pub clock: u32,
-    pub hdisplay: u16,
-    pub hsync_start: u16,
-    pub hsync_end: u16,
-    pub htotal: u16,
-    pub hskew: u16,
-    pub vdisplay: u16,
-    pub vsync_start: u16,
-    pub vsync_end: u16,
-    pub vtotal: u16,
-    pub vscan: u16,
-    pub vrefresh: u32,
-    pub flags: u32,
-    pub type_: u32,
-    pub name: [c_char; 32],
-}
-
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct drm_mode_crtc {
-    pub set_connectors_ptr: u64,
-    pub count_connectors: u32,
-    pub crtc_id: u32,
-    pub fb_id: u32,
-    pub x: u32,
-    pub y: u32,
-    pub gamma_size: u32,
-    pub mode_valid: u32,
-    pub mode: drm_mode_modeinfo,
-}
-
 unsafe fn mode_get_crtc(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     let mut crtc = buf.read::<drm_mode_crtc>()?;
     let i = id_index(crtc.crtc_id);
@@ -289,16 +213,6 @@ unsafe fn mode_get_crtc(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     Ok(0)
 }
 
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct drm_mode_get_encoder {
-    pub encoder_id: u32,
-    pub encoder_type: u32,
-    pub crtc_id: u32,
-    pub possible_crtcs: u32,
-    pub possible_clones: u32,
-}
-
 unsafe fn mode_get_encoder(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     let mut enc = buf.read::<drm_mode_get_encoder>()?;
     let i = id_index(enc.encoder_id);
@@ -308,27 +222,6 @@ unsafe fn mode_get_encoder(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     enc.possible_clones = (1 << i);
     buf.write(enc)?;
     Ok(0)
-}
-
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct drm_mode_get_connector {
-    pub encoders_ptr: u64,
-    pub modes_ptr: u64,
-    pub props_ptr: u64,
-    pub prop_values_ptr: u64,
-    pub count_modes: u32,
-    pub count_props: u32,
-    pub count_encoders: u32,
-    pub encoder_id: u32,
-    pub connector_id: u32,
-    pub connector_type: u32,
-    pub connector_type_id: u32,
-    pub connection: u32,
-    pub mm_width: u32,
-    pub mm_height: u32,
-    pub subpixel: u32,
-    pub pad: u32,
 }
 
 unsafe fn mode_get_connector(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
@@ -346,18 +239,6 @@ unsafe fn mode_get_connector(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     Ok(0)
 }
 
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct drm_mode_fb_cmd {
-    pub fb_id: u32,
-    pub width: u32,
-    pub height: u32,
-    pub pitch: u32,
-    pub bpp: u32,
-    pub depth: u32,
-    pub handle: u32,
-}
-
 unsafe fn mode_get_fb(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     let mut fb = buf.read::<drm_mode_fb_cmd>()?;
     let i = id_index(fb.fb_id);
@@ -370,13 +251,6 @@ unsafe fn mode_get_fb(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     fb.handle = fb_handle_id(i);
     buf.write(fb)?;
     Ok(0)
-}
-
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct drm_mode_get_plane_res {
-    pub plane_id_ptr: u64,
-    pub count_planes: u32,
 }
 
 unsafe fn mode_get_plane_res(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
@@ -395,18 +269,6 @@ unsafe fn mode_get_plane_res(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     Ok(0)
 }
 
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct drm_mode_get_plane {
-    pub plane_id: u32,
-    pub crtc_id: u32,
-    pub fb_id: u32,
-    pub possible_crtcs: u32,
-    pub gamma_size: u32,
-    pub count_format_types: u32,
-    pub format_type_ptr: u64,
-}
-
 unsafe fn mode_get_plane(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     let mut plane = buf.read::<drm_mode_get_plane>()?;
     let i = id_index(plane.plane_id);
@@ -423,36 +285,12 @@ unsafe fn mode_get_plane(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     Ok(0)
 }
 
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct drm_mode_obj_get_properties {
-    pub props_ptr: u64,
-    pub prop_values_ptr: u64,
-    pub count_props: u32,
-    pub obj_id: u32,
-    pub obj_type: u32,
-}
-
 unsafe fn mode_obj_get_properties(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     let mut props = buf.read::<drm_mode_obj_get_properties>()?;
     //TODO
     props.count_props = 0;
     buf.write(props)?;
     Ok(0)
-}
-
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct drm_mode_fb_cmd2 {
-    pub fb_id: u32,
-    pub width: u32,
-    pub height: u32,
-    pub pixel_format: u32,
-    pub flags: u32,
-    pub handles: [u32; 4],
-    pub pitches: [u32; 4],
-    pub offsets: [u32; 4],
-    pub modifier: [u64; 4],
 }
 
 unsafe fn mode_get_fb2(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
