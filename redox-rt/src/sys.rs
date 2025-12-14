@@ -40,9 +40,12 @@ fn wrapper<T>(restart: bool, erestart: bool, mut f: impl FnMut() -> Result<T>) -
     }
 }
 pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
+    let redox_path = redox_path::RedoxPath::from_absolute(path.as_ref())
+        .expect("path must be canonicalized beforehand");
+    let (scheme, _) = redox_path.as_parts().unwrap();
     // TODO: Temporary workaround to remove unlink and rmdir
     let root_fd = crate::proc::FdGuard::open(
-        "/scheme/file/",
+        &alloc::format!("/scheme/{}/", scheme),
         syscall::O_DIRECTORY | syscall::O_RDONLY | syscall::O_CLOEXEC,
     )?;
     let path = path.as_ref();

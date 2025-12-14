@@ -439,6 +439,7 @@ dependencies = [
  "generic-rt",
  "goblin",
  "plain",
+ "redox-path",
  "redox_syscall",
 ]
 
