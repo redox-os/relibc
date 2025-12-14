@@ -1,0 +1,425 @@
+use alloc::vec::Vec;
+use core::{mem, slice};
+
+use crate::{
+    error::{Errno, Result},
+    header::errno::EINVAL,
+    platform::types::*,
+};
+
+use super::{IoctlBuffer, graphics_ipc as ipc};
+
+const DRM_FORMAT_ARGB8888: u32 = 0x34325241; // 'AR24' fourcc code, for ARGB8888
+
+fn id_index(id: u32) -> u32 {
+    id & 0xFF
+}
+
+fn conn_id(i: u32) -> u32 {
+    id_index(i) | (1 << 8)
+}
+
+fn crtc_id(i: u32) -> u32 {
+    id_index(i) | (1 << 9)
+}
+
+fn enc_id(i: u32) -> u32 {
+    id_index(i) | (1 << 10)
+}
+
+fn fb_id(i: u32) -> u32 {
+    id_index(i) | (1 << 11)
+}
+
+fn fb_handle_id(i: u32) -> u32 {
+    id_index(i) | (1 << 12)
+}
+
+fn plane_id(i: u32) -> u32 {
+    id_index(i) | (1 << 13)
+}
+
+unsafe fn copy_array<T: Copy>(src: &[T], dst_ptr: *mut T, dst_len: usize) -> usize {
+    let dst = slice::from_raw_parts_mut(dst_ptr, dst_len);
+    dst.copy_from_slice(&src[..src.len().min(dst_len)]);
+    src.len()
+}
+
+struct Dev {
+    fd: c_int,
+}
+
+impl Dev {
+    fn new(fd: c_int) -> Result<Self> {
+        //TODO: check display scheme using fpath?
+        Ok(Self { fd })
+    }
+
+    unsafe fn call<T>(
+        &self,
+        payload: &mut T,
+        func: u64,
+    ) -> syscall::Result<usize> {
+        let bytes = slice::from_raw_parts_mut(
+            payload as *mut T as *mut u8,
+            mem::size_of::<T>(),
+        );
+        redox_rt::sys::sys_call(     
+            self.fd as usize,
+            bytes,
+            syscall::CallFlags::empty(),
+            &[func]
+        )
+    }
+
+    fn display_count(&self) -> Result<usize> {
+        let mut cmd = ipc::DisplayCount { count: 0 };
+        unsafe {
+            self.call(&mut cmd, ipc::DISPLAY_COUNT)?;
+        }
+        Ok(cmd.count)
+    }
+
+    fn display_size(&self, display_id: usize) -> Result<(u32, u32)> {
+        let mut cmd = ipc::DisplaySize { display_id, width: 0, height: 0 };
+        unsafe {
+            self.call(&mut cmd, ipc::DISPLAY_SIZE)?;
+        }
+        Ok((cmd.width, cmd.height))
+    }
+}
+
+// Structs adapted from drm-sys bindings: https://docs.rs/drm-sys/0.8.0/src/drm_sys/bindings.rs.html
+//TODO: can we auto generate these from libdrm without causing dependency issues?
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+struct drm_version {
+    pub version_major: c_int,
+    pub version_minor: c_int,
+    pub version_patchlevel: c_int,
+    pub name_len: size_t,
+    pub name: *mut c_char,
+    pub date_len: size_t,
+    pub date: *mut c_char,
+    pub desc_len: size_t,
+    pub desc: *mut c_char,
+}
+
+unsafe fn version(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
+    let mut vers = buf.read::<drm_version>()?;
+    vers.version_major = 1;
+    vers.version_minor = 0;
+    vers.version_patchlevel = 0;
+    vers.name_len = copy_array("redox".as_bytes(), vers.name as *mut u8, vers.name_len);
+    vers.date_len = copy_array("0".as_bytes(), vers.date as *mut u8, vers.date_len);
+    vers.desc_len = copy_array("Redox OS".as_bytes(), vers.desc as *mut u8, vers.desc_len);
+    buf.write(vers)?;
+    Ok(0)
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct drm_get_cap {
+    pub capability: u64,
+    pub value: u64,
+}
+
+unsafe fn get_cap(dev: Dev, buf: IoctlBuffer) -> Result<c_int> {
+    //TODO: get capabilities
+    Err(Errno(EINVAL))
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct drm_set_client_cap {
+    pub capability: u64,
+    pub value: u64,
+}
+
+unsafe fn set_client_cap(dev: Dev, buf: IoctlBuffer) -> Result<c_int> {
+    //TODO: set capabilities
+    Err(Errno(EINVAL))
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct drm_mode_card_res {
+    pub fb_id_ptr: u64,
+    pub crtc_id_ptr: u64,
+    pub connector_id_ptr: u64,
+    pub encoder_id_ptr: u64,
+    pub count_fbs: u32,
+    pub count_crtcs: u32,
+    pub count_connectors: u32,
+    pub count_encoders: u32,
+    pub min_width: u32,
+    pub max_width: u32,
+    pub min_height: u32,
+    pub max_height: u32,
+}
+
+unsafe fn mode_card_res(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
+    let mut res = buf.read::<drm_mode_card_res>()?;
+    let count = dev.display_count()?;
+    let mut conn_ids = Vec::with_capacity(count);
+    let mut crtc_ids = Vec::with_capacity(count);
+    let mut enc_ids = Vec::with_capacity(count);
+    let mut fb_ids = Vec::with_capacity(count);
+    for i in 0..(count as u32) {
+        conn_ids.push(conn_id(i));
+        crtc_ids.push(crtc_id(i));
+        enc_ids.push(enc_id(i));
+        fb_ids.push(fb_id(i));
+    }
+    res.count_fbs = copy_array(&fb_ids, res.fb_id_ptr as *mut u32, res.count_fbs as usize) as u32;
+    res.count_crtcs = copy_array(&crtc_ids, res.crtc_id_ptr as *mut u32, res.count_crtcs as usize) as u32;
+    res.count_connectors = copy_array(&conn_ids, res.connector_id_ptr as *mut u32, res.count_connectors as usize) as u32;
+    res.count_encoders = copy_array(&enc_ids, res.encoder_id_ptr as *mut u32, res.count_encoders as usize) as u32;
+    res.min_width = 0;
+    res.max_width = 16384;
+    res.min_height = 0;
+    res.max_height = 16384;
+    buf.write(res)?;
+    Ok(0)
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct drm_mode_modeinfo {
+    pub clock: u32,
+    pub hdisplay: u16,
+    pub hsync_start: u16,
+    pub hsync_end: u16,
+    pub htotal: u16,
+    pub hskew: u16,
+    pub vdisplay: u16,
+    pub vsync_start: u16,
+    pub vsync_end: u16,
+    pub vtotal: u16,
+    pub vscan: u16,
+    pub vrefresh: u32,
+    pub flags: u32,
+    pub type_: u32,
+    pub name: [c_char; 32],
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct drm_mode_crtc {
+    pub set_connectors_ptr: u64,
+    pub count_connectors: u32,
+    pub crtc_id: u32,
+    pub fb_id: u32,
+    pub x: u32,
+    pub y: u32,
+    pub gamma_size: u32,
+    pub mode_valid: u32,
+    pub mode: drm_mode_modeinfo,
+}
+
+unsafe fn mode_get_crtc(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
+    let mut crtc = buf.read::<drm_mode_crtc>()?;
+    let i = id_index(crtc.crtc_id);
+    let (width, height) = dev.display_size(i as usize)?;
+    //TOOD: connectors
+    crtc.fb_id = fb_id(i);
+    crtc.x = 0;
+    crtc.y = 0;
+    crtc.gamma_size = 0;
+    crtc.mode_valid = 0;
+    //TODO: mode
+    crtc.mode = Default::default();
+    buf.write(crtc)?;
+    Ok(0)
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct drm_mode_get_encoder {
+    pub encoder_id: u32,
+    pub encoder_type: u32,
+    pub crtc_id: u32,
+    pub possible_crtcs: u32,
+    pub possible_clones: u32,
+}
+
+unsafe fn mode_get_encoder(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
+    let mut enc = buf.read::<drm_mode_get_encoder>()?;
+    let i = id_index(enc.encoder_id);
+    let (width, height) = dev.display_size(i as usize)?;
+    enc.crtc_id = crtc_id(i);
+    enc.possible_crtcs = (1 << i);
+    enc.possible_clones = (1 << i);
+    buf.write(enc)?;
+    Ok(0)
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct drm_mode_get_connector {
+    pub encoders_ptr: u64,
+    pub modes_ptr: u64,
+    pub props_ptr: u64,
+    pub prop_values_ptr: u64,
+    pub count_modes: u32,
+    pub count_props: u32,
+    pub count_encoders: u32,
+    pub encoder_id: u32,
+    pub connector_id: u32,
+    pub connector_type: u32,
+    pub connector_type_id: u32,
+    pub connection: u32,
+    pub mm_width: u32,
+    pub mm_height: u32,
+    pub subpixel: u32,
+    pub pad: u32,
+}
+
+unsafe fn mode_get_connector(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
+    let mut conn = buf.read::<drm_mode_get_connector>()?;
+    let i = id_index(conn.connector_id);
+    let (width, height) = dev.display_size(i as usize)?;
+    conn.count_modes = 0;
+    conn.count_props = 0;
+    conn.count_encoders = copy_array(&[enc_id(i)], conn.encoders_ptr as *mut u32, conn.count_encoders as usize) as u32;
+    buf.write(conn)?;
+    Ok(0)
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct drm_mode_fb_cmd {
+    pub fb_id: u32,
+    pub width: u32,
+    pub height: u32,
+    pub pitch: u32,
+    pub bpp: u32,
+    pub depth: u32,
+    pub handle: u32,
+}
+
+unsafe fn mode_get_fb(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
+    let mut fb = buf.read::<drm_mode_fb_cmd>()?;
+    let i = id_index(fb.fb_id);
+    let (width, height) = dev.display_size(i as usize)?;
+    fb.width = width;
+    fb.height = height;
+    fb.pitch = width * 4; //TODO: stride
+    fb.bpp = 32;
+    fb.depth = 24;
+    fb.handle = fb_handle_id(i);
+    buf.write(fb)?;
+    Ok(0)
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct drm_mode_get_plane_res {
+    pub plane_id_ptr: u64,
+    pub count_planes: u32,
+}
+
+unsafe fn mode_get_plane_res(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
+    let mut res = buf.read::<drm_mode_get_plane_res>()?;
+    let count = dev.display_count()?;
+    let mut ids = Vec::with_capacity(count);
+    for i in 0..(count as u32) {
+        ids.push(plane_id(i));
+    }
+    res.count_planes = copy_array(&ids, res.plane_id_ptr as *mut u32, res.count_planes as usize) as u32;
+    buf.write(res)?;
+    Ok(0)
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct drm_mode_get_plane {
+    pub plane_id: u32,
+    pub crtc_id: u32,
+    pub fb_id: u32,
+    pub possible_crtcs: u32,
+    pub gamma_size: u32,
+    pub count_format_types: u32,
+    pub format_type_ptr: u64,
+}
+
+unsafe fn mode_get_plane(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
+    let mut plane = buf.read::<drm_mode_get_plane>()?;
+    let i = id_index(plane.plane_id);
+    let (width, height) = dev.display_size(i as usize)?;
+    plane.crtc_id = crtc_id(i);
+    plane.fb_id = fb_id(i);
+    plane.possible_crtcs = (1 << i);
+    plane.count_format_types = copy_array(&[DRM_FORMAT_ARGB8888], plane.format_type_ptr as *mut u32, plane.count_format_types as usize) as u32;
+    buf.write(plane)?;
+    Ok(0)
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct drm_mode_obj_get_properties {
+    pub props_ptr: u64,
+    pub prop_values_ptr: u64,
+    pub count_props: u32,
+    pub obj_id: u32,
+    pub obj_type: u32,
+}
+
+unsafe fn mode_obj_get_properties(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
+    let mut props = buf.read::<drm_mode_obj_get_properties>()?;
+    //TODO
+    props.count_props = 0;
+    buf.write(props)?;
+    Ok(0)
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct drm_mode_fb_cmd2 {
+    pub fb_id: u32,
+    pub width: u32,
+    pub height: u32,
+    pub pixel_format: u32,
+    pub flags: u32,
+    pub handles: [u32; 4],
+    pub pitches: [u32; 4],
+    pub offsets: [u32; 4],
+    pub modifier: [u64; 4],
+}
+
+unsafe fn mode_get_fb2(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
+    let mut fb = buf.read::<drm_mode_fb_cmd2>()?;
+    let i = id_index(fb.fb_id);
+    let (width, height) = dev.display_size(i as usize)?;
+    fb.width = width;
+    fb.height = height;
+    fb.pixel_format = DRM_FORMAT_ARGB8888;
+    fb.handles[0] = fb_handle_id(i);
+    fb.pitches[0] = width * 4;
+    fb.offsets[0] = 0;
+    fb.modifier[0] = 0;
+    buf.write(fb)?;
+    Ok(0)
+}
+
+pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_int> {
+    let dev = Dev::new(fd)?;
+    match func {
+        0x00 => version(dev, buf),
+        0x0C => get_cap(dev, buf),
+        0x0D => set_client_cap(dev, buf),
+        0xA0 => mode_card_res(dev, buf),
+        0xA1 => mode_get_crtc(dev, buf),
+        0xA6 => mode_get_encoder(dev, buf),
+        0xA7 => mode_get_connector(dev, buf),
+        0xAD => mode_get_fb(dev, buf),
+        0xB5 => mode_get_plane_res(dev, buf),
+        0xB6 => mode_get_plane(dev, buf),
+        0xB9 => mode_obj_get_properties(dev, buf),
+        0xCE => mode_get_fb2(dev, buf),
+        _ => {
+            eprintln!("unimplemented DRM ioctl({}, 0x{:02x}, {:?})", fd, func, buf);
+            Err(Errno(EINVAL))
+        },
+    }
+}
