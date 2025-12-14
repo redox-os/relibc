@@ -55,21 +55,49 @@ impl Dev {
         Ok(Self { fd })
     }
 
-    unsafe fn call<T>(
-        &self,
-        payload: &mut T,
-        func: u64,
-    ) -> syscall::Result<usize> {
-        let bytes = slice::from_raw_parts_mut(
-            payload as *mut T as *mut u8,
-            mem::size_of::<T>(),
-        );
-        redox_rt::sys::sys_call(     
+    unsafe fn call<T>(&self, payload: &mut T, func: u64) -> syscall::Result<usize> {
+        let bytes = slice::from_raw_parts_mut(payload as *mut T as *mut u8, mem::size_of::<T>());
+        redox_rt::sys::sys_call(
             self.fd as usize,
             bytes,
             syscall::CallFlags::empty(),
-            &[func]
+            &[func],
         )
+    }
+
+    fn version(&self) -> Result<ipc::Version> {
+        let mut cmd = ipc::Version {
+            version_major: 0,
+            version_minor: 0,
+            version_patchlevel: 0,
+            name_len: 0,
+            name: [0; 16],
+            desc_len: 0,
+            desc: [0; 16],
+        };
+        unsafe {
+            self.call(&mut cmd, ipc::VERSION)?;
+        }
+        Ok(cmd)
+    }
+
+    fn get_cap(&self, capability: u64) -> Result<u64> {
+        let mut cmd = ipc::GetCap {
+            capability,
+            value: 0,
+        };
+        unsafe {
+            self.call(&mut cmd, ipc::GET_CAP)?;
+        }
+        Ok(cmd.value)
+    }
+
+    fn set_client_cap(&self, capability: u64, value: u64) -> Result<()> {
+        let mut cmd = ipc::SetClientCap { capability, value };
+        unsafe {
+            self.call(&mut cmd, ipc::SET_CLIENT_CAP)?;
+        }
+        Ok(())
     }
 
     fn display_count(&self) -> Result<usize> {
@@ -81,7 +109,11 @@ impl Dev {
     }
 
     fn display_size(&self, display_id: usize) -> Result<(u32, u32)> {
-        let mut cmd = ipc::DisplaySize { display_id, width: 0, height: 0 };
+        let mut cmd = ipc::DisplaySize {
+            display_id,
+            width: 0,
+            height: 0,
+        };
         unsafe {
             self.call(&mut cmd, ipc::DISPLAY_SIZE)?;
         }
@@ -107,12 +139,21 @@ struct drm_version {
 
 unsafe fn version(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     let mut vers = buf.read::<drm_version>()?;
-    vers.version_major = 1;
-    vers.version_minor = 0;
-    vers.version_patchlevel = 0;
-    vers.name_len = copy_array("redox".as_bytes(), vers.name as *mut u8, vers.name_len);
+    let version = dev.version()?;
+    vers.version_major = version.version_major as i32;
+    vers.version_minor = version.version_minor as i32;
+    vers.version_patchlevel = version.version_patchlevel as i32;
+    vers.name_len = copy_array(
+        &version.name[..version.name_len],
+        vers.name as *mut u8,
+        vers.name_len,
+    );
     vers.date_len = copy_array("0".as_bytes(), vers.date as *mut u8, vers.date_len);
-    vers.desc_len = copy_array("Redox OS".as_bytes(), vers.desc as *mut u8, vers.desc_len);
+    vers.desc_len = copy_array(
+        &version.desc[..version.desc_len],
+        vers.desc as *mut u8,
+        vers.desc_len,
+    );
     buf.write(vers)?;
     Ok(0)
 }
@@ -124,9 +165,11 @@ pub struct drm_get_cap {
     pub value: u64,
 }
 
-unsafe fn get_cap(dev: Dev, buf: IoctlBuffer) -> Result<c_int> {
-    //TODO: get capabilities
-    Err(Errno(EINVAL))
+unsafe fn get_cap(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
+    let mut cap = buf.read::<drm_get_cap>()?;
+    cap.value = dev.get_cap(cap.capability)?;
+    buf.write(cap)?;
+    Ok(0)
 }
 
 #[repr(C)]
@@ -136,9 +179,10 @@ pub struct drm_set_client_cap {
     pub value: u64,
 }
 
-unsafe fn set_client_cap(dev: Dev, buf: IoctlBuffer) -> Result<c_int> {
-    //TODO: set capabilities
-    Err(Errno(EINVAL))
+unsafe fn set_client_cap(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
+    let mut cap = buf.read::<drm_set_client_cap>()?;
+    dev.set_client_cap(cap.capability, cap.value)?;
+    Ok(0)
 }
 
 #[repr(C)]
@@ -172,9 +216,21 @@ unsafe fn mode_card_res(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
         fb_ids.push(fb_id(i));
     }
     res.count_fbs = copy_array(&fb_ids, res.fb_id_ptr as *mut u32, res.count_fbs as usize) as u32;
-    res.count_crtcs = copy_array(&crtc_ids, res.crtc_id_ptr as *mut u32, res.count_crtcs as usize) as u32;
-    res.count_connectors = copy_array(&conn_ids, res.connector_id_ptr as *mut u32, res.count_connectors as usize) as u32;
-    res.count_encoders = copy_array(&enc_ids, res.encoder_id_ptr as *mut u32, res.count_encoders as usize) as u32;
+    res.count_crtcs = copy_array(
+        &crtc_ids,
+        res.crtc_id_ptr as *mut u32,
+        res.count_crtcs as usize,
+    ) as u32;
+    res.count_connectors = copy_array(
+        &conn_ids,
+        res.connector_id_ptr as *mut u32,
+        res.count_connectors as usize,
+    ) as u32;
+    res.count_encoders = copy_array(
+        &enc_ids,
+        res.encoder_id_ptr as *mut u32,
+        res.count_encoders as usize,
+    ) as u32;
     res.min_width = 0;
     res.max_width = 16384;
     res.min_height = 0;
@@ -281,7 +337,11 @@ unsafe fn mode_get_connector(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     let (width, height) = dev.display_size(i as usize)?;
     conn.count_modes = 0;
     conn.count_props = 0;
-    conn.count_encoders = copy_array(&[enc_id(i)], conn.encoders_ptr as *mut u32, conn.count_encoders as usize) as u32;
+    conn.count_encoders = copy_array(
+        &[enc_id(i)],
+        conn.encoders_ptr as *mut u32,
+        conn.count_encoders as usize,
+    ) as u32;
     buf.write(conn)?;
     Ok(0)
 }
@@ -326,7 +386,11 @@ unsafe fn mode_get_plane_res(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     for i in 0..(count as u32) {
         ids.push(plane_id(i));
     }
-    res.count_planes = copy_array(&ids, res.plane_id_ptr as *mut u32, res.count_planes as usize) as u32;
+    res.count_planes = copy_array(
+        &ids,
+        res.plane_id_ptr as *mut u32,
+        res.count_planes as usize,
+    ) as u32;
     buf.write(res)?;
     Ok(0)
 }
@@ -350,7 +414,11 @@ unsafe fn mode_get_plane(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
     plane.crtc_id = crtc_id(i);
     plane.fb_id = fb_id(i);
     plane.possible_crtcs = (1 << i);
-    plane.count_format_types = copy_array(&[DRM_FORMAT_ARGB8888], plane.format_type_ptr as *mut u32, plane.count_format_types as usize) as u32;
+    plane.count_format_types = copy_array(
+        &[DRM_FORMAT_ARGB8888],
+        plane.format_type_ptr as *mut u32,
+        plane.count_format_types as usize,
+    ) as u32;
     buf.write(plane)?;
     Ok(0)
 }
@@ -420,6 +488,6 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
         _ => {
             eprintln!("unimplemented DRM ioctl({}, 0x{:02x}, {:?})", fd, func, buf);
             Err(Errno(EINVAL))
-        },
+        }
     }
 }
