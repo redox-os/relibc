@@ -22,20 +22,10 @@ pub struct Version {
 }
 
 pub const GET_CAP: u64 = 0x0C;
-pub const CAP_DUMB_BUFFER: u64 = 0x1;
-#[repr(C, packed)]
-pub struct GetCap {
-    pub capability: u64,
-    pub value: u64,
-}
+pub use drm_sys::DRM_CAP_DUMB_BUFFER;
 
 pub const SET_CLIENT_CAP: u64 = 0x0D;
-pub const CLIENT_CAP_CURSOR_PLANE_HOTSPOT: u64 = 6;
-#[repr(C, packed)]
-pub struct SetClientCap {
-    pub capability: u64,
-    pub value: u64,
-}
+pub use drm_sys::DRM_CLIENT_CAP_CURSOR_PLANE_HOTSPOT;
 
 // FIXME replace these with proper drm interfaces
 pub const DISPLAY_COUNT: u64 = 1;
