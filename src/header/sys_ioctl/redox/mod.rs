@@ -67,15 +67,15 @@ fn dup_write<T>(fd: c_int, name: &str, t: &T) -> Result<usize> {
 #[derive(Debug)]
 enum IoctlBuffer {
     None,
-    Read(*const c_void, usize),
-    Write(*mut c_void, usize),
+    Read(*mut c_void, usize),    // read (write to userspace)
+    Write(*const c_void, usize), // write (read from userspace)
     ReadWrite(*mut c_void, usize),
 }
 
 impl IoctlBuffer {
     unsafe fn read<T>(&self) -> Result<T> {
         let (ptr, size) = match *self {
-            Self::Read(ptr, size) => (ptr, size),
+            Self::Write(ptr, size) => (ptr, size),
             Self::ReadWrite(ptr, size) => (ptr as *const c_void, size),
             _ => {
                 return Err(Errno(EINVAL));
@@ -91,7 +91,7 @@ impl IoctlBuffer {
 
     unsafe fn write<T>(&mut self, value: T) -> Result<()> {
         let (ptr, size) = match *self {
-            Self::Write(ptr, size) | Self::ReadWrite(ptr, size) => (ptr, size),
+            Self::Read(ptr, size) | Self::ReadWrite(ptr, size) => (ptr, size),
             _ => {
                 return Err(Errno(EINVAL));
             }
@@ -104,7 +104,6 @@ impl IoctlBuffer {
         }
     }
 }
-
 
 unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c_int> {
     match request {
@@ -179,7 +178,7 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
                         _ => IoctlBuffer::None,
                     };
                     return drm::ioctl(fd, func, buf);
-                },
+                }
                 _ => {
                     return Err(Errno(EINVAL));
                 }
