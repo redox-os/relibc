@@ -439,7 +439,7 @@ dependencies = [
  "generic-rt",
  "goblin",
  "plain",
- "redox_syscall 0.5.18",
+ "redox_syscall 0.6.0",
 ]
 
 [[package]]
