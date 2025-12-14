@@ -43,13 +43,13 @@ pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     // TODO: Temporary workaround to remove unlink and rmdir
     let root_fd = crate::proc::FdGuard::open(
         "/scheme/file/",
-        syscall::O_DIR | syscall::O_RDONLY | syscall::O_CLOEXEC,
+        syscall::O_DIRECTORY | syscall::O_RDONLY | syscall::O_CLOEXEC,
     )?;
     let path = path.as_ref();
     unsafe {
         syscall::syscall6(
             syscall::SYS_UNLINKAT,
-            root_fd,
+            root_fd.as_raw_fd(),
             path.as_ptr() as usize,
             path.len(),
             flags,
