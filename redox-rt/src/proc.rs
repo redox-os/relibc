@@ -884,7 +884,9 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
         #[cfg(target_arch = "x86")]
         {
             let scratchpad_ptr = initial_rsp as *mut ForkScratchpad;
-            scratchpad_ptr.write(scratchpad);
+            unsafe {
+                scratchpad_ptr.write(scratchpad);
+            }
         }
 
         // CoW-duplicate address space.
