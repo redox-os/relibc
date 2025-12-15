@@ -125,169 +125,23 @@ impl Dev {
     }
 }
 
-unsafe fn mode_card_res(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
-    let mut res = buf.read::<drm_mode_card_res>()?;
-    let count = dev.display_count()?;
-    let mut conn_ids = Vec::with_capacity(count);
-    let mut crtc_ids = Vec::with_capacity(count);
-    let mut enc_ids = Vec::with_capacity(count);
-    let mut fb_ids = Vec::with_capacity(count);
-    for i in 0..(count as u32) {
-        conn_ids.push(conn_id(i));
-        crtc_ids.push(crtc_id(i));
-        enc_ids.push(enc_id(i));
-        fb_ids.push(fb_id(i));
-    }
-    res.count_fbs = copy_array(&fb_ids, res.fb_id_ptr as *mut u32, res.count_fbs as usize) as u32;
-    res.count_crtcs = copy_array(
-        &crtc_ids,
-        res.crtc_id_ptr as *mut u32,
-        res.count_crtcs as usize,
-    ) as u32;
-    res.count_connectors = copy_array(
-        &conn_ids,
-        res.connector_id_ptr as *mut u32,
-        res.count_connectors as usize,
-    ) as u32;
-    res.count_encoders = copy_array(
-        &enc_ids,
-        res.encoder_id_ptr as *mut u32,
-        res.count_encoders as usize,
-    ) as u32;
-    res.min_width = 0;
-    res.max_width = 16384;
-    res.min_height = 0;
-    res.max_height = 16384;
-    buf.write(res)?;
-    Ok(0)
-}
-
-unsafe fn mode_get_crtc(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
-    let mut crtc = buf.read::<drm_mode_crtc>()?;
-    let i = id_index(crtc.crtc_id);
-    let (width, height) = dev.display_size(i as usize)?;
-    //TOOD: connectors
-    crtc.fb_id = fb_id(i);
-    crtc.x = 0;
-    crtc.y = 0;
-    crtc.gamma_size = 0;
-    crtc.mode_valid = 0;
-    //TODO: mode
-    crtc.mode = Default::default();
-    buf.write(crtc)?;
-    Ok(0)
-}
-
-unsafe fn mode_get_encoder(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
-    let mut enc = buf.read::<drm_mode_get_encoder>()?;
-    let i = id_index(enc.encoder_id);
-    let (width, height) = dev.display_size(i as usize)?;
-    enc.crtc_id = crtc_id(i);
-    enc.possible_crtcs = (1 << i);
-    enc.possible_clones = (1 << i);
-    buf.write(enc)?;
-    Ok(0)
-}
-
-unsafe fn mode_get_connector(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
-    let mut conn = buf.read::<drm_mode_get_connector>()?;
-    let i = id_index(conn.connector_id);
-    let (width, height) = dev.display_size(i as usize)?;
-    conn.count_modes = 0;
-    conn.count_props = 0;
-    conn.count_encoders = copy_array(
-        &[enc_id(i)],
-        conn.encoders_ptr as *mut u32,
-        conn.count_encoders as usize,
-    ) as u32;
-    buf.write(conn)?;
-    Ok(0)
-}
-
-unsafe fn mode_get_fb(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
-    let mut fb = buf.read::<drm_mode_fb_cmd>()?;
-    let i = id_index(fb.fb_id);
-    let (width, height) = dev.display_size(i as usize)?;
-    fb.width = width;
-    fb.height = height;
-    fb.pitch = width * 4; //TODO: stride
-    fb.bpp = 32;
-    fb.depth = 24;
-    fb.handle = fb_handle_id(i);
-    buf.write(fb)?;
-    Ok(0)
-}
-
-unsafe fn mode_get_plane_res(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
-    let mut res = buf.read::<drm_mode_get_plane_res>()?;
-    let count = dev.display_count()?;
-    let mut ids = Vec::with_capacity(count);
-    for i in 0..(count as u32) {
-        ids.push(plane_id(i));
-    }
-    res.count_planes = copy_array(
-        &ids,
-        res.plane_id_ptr as *mut u32,
-        res.count_planes as usize,
-    ) as u32;
-    buf.write(res)?;
-    Ok(0)
-}
-
-unsafe fn mode_get_plane(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
-    let mut plane = buf.read::<drm_mode_get_plane>()?;
-    let i = id_index(plane.plane_id);
-    let (width, height) = dev.display_size(i as usize)?;
-    plane.crtc_id = crtc_id(i);
-    plane.fb_id = fb_id(i);
-    plane.possible_crtcs = (1 << i);
-    plane.count_format_types = copy_array(
-        &[DRM_FORMAT_ARGB8888],
-        plane.format_type_ptr as *mut u32,
-        plane.count_format_types as usize,
-    ) as u32;
-    buf.write(plane)?;
-    Ok(0)
-}
-
-unsafe fn mode_obj_get_properties(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
-    let mut props = buf.read::<drm_mode_obj_get_properties>()?;
-    //TODO
-    props.count_props = 0;
-    buf.write(props)?;
-    Ok(0)
-}
-
-unsafe fn mode_get_fb2(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
-    let mut fb = buf.read::<drm_mode_fb_cmd2>()?;
-    let i = id_index(fb.fb_id);
-    let (width, height) = dev.display_size(i as usize)?;
-    fb.width = width;
-    fb.height = height;
-    fb.pixel_format = DRM_FORMAT_ARGB8888;
-    fb.handles[0] = fb_handle_id(i);
-    fb.pitches[0] = width * 4;
-    fb.offsets[0] = 0;
-    fb.modifier[0] = 0;
-    buf.write(fb)?;
-    Ok(0)
-}
-
 pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_int> {
     let dev = Dev::new(fd)?;
     match func {
         0x00 => dev.read_write_ioctl::<drm_version>(buf, ipc::VERSION),
         0x0C => dev.read_write_ioctl::<drm_get_cap>(buf, ipc::GET_CAP),
         0x0D => dev.write_ioctl::<drm_set_client_cap>(buf, ipc::SET_CLIENT_CAP),
-        0xA0 => mode_card_res(dev, buf),
-        0xA1 => mode_get_crtc(dev, buf),
-        0xA6 => mode_get_encoder(dev, buf),
-        0xA7 => mode_get_connector(dev, buf),
-        0xAD => mode_get_fb(dev, buf),
-        0xB5 => mode_get_plane_res(dev, buf),
-        0xB6 => mode_get_plane(dev, buf),
-        0xB9 => mode_obj_get_properties(dev, buf),
-        0xCE => mode_get_fb2(dev, buf),
+        0xA0 => dev.read_write_ioctl::<drm_mode_card_res>(buf, ipc::MODE_CARD_RES),
+        0xA1 => dev.read_write_ioctl::<drm_mode_crtc>(buf, ipc::MODE_GET_CRTC),
+        0xA6 => dev.read_write_ioctl::<drm_mode_get_encoder>(buf, ipc::MODE_GET_ENCODER),
+        0xA7 => dev.read_write_ioctl::<drm_mode_get_connector>(buf, ipc::MODE_GET_CONNECTOR),
+        0xAD => dev.read_write_ioctl::<drm_mode_fb_cmd>(buf, ipc::MODE_GET_FB),
+        0xB5 => dev.read_write_ioctl::<drm_mode_get_plane_res>(buf, ipc::MODE_GET_PLANE_RES),
+        0xB6 => dev.read_write_ioctl::<drm_mode_get_plane>(buf, ipc::MODE_GET_PLANE),
+        0xB9 => {
+            dev.read_write_ioctl::<drm_mode_obj_get_properties>(buf, ipc::MODE_OBJ_GET_PROPERTIES)
+        }
+        0xCE => dev.read_write_ioctl::<drm_mode_fb_cmd2>(buf, ipc::MODE_GET_FB2),
         _ => {
             eprintln!("unimplemented DRM ioctl({}, 0x{:02x}, {:?})", fd, func, buf);
             Err(Errno(EINVAL))
