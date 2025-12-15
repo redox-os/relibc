@@ -45,7 +45,7 @@ pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     let (scheme, reference) = redox_path.as_parts().unwrap();
     // TODO: Temporary workaround to remove unlink and rmdir
     let root_fd = crate::proc::FdGuard::open(
-        &alloc::format!("/scheme/{}/", scheme),
+        &alloc::format!("/scheme/{}", scheme),
         syscall::O_DIRECTORY | syscall::O_RDONLY | syscall::O_CLOEXEC,
     )?;
     let path = reference.as_ref();
