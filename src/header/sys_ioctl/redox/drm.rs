@@ -12,7 +12,7 @@ use crate::{
     platform::types::*,
 };
 
-use super::{IoctlBuffer, graphics_ipc as ipc};
+use super::{IoctlBuffer, graphics_ipc as ipc, graphics_ipc::IoctlData};
 
 const DRM_FORMAT_ARGB8888: u32 = 0x34325241; // 'AR24' fourcc code, for ARGB8888
 
@@ -70,39 +70,38 @@ impl Dev {
         )
     }
 
-    fn version(&self) -> Result<ipc::Version> {
-        let mut cmd = ipc::Version {
-            version_major: 0,
-            version_minor: 0,
-            version_patchlevel: 0,
-            name_len: 0,
-            name: [0; 16],
-            desc_len: 0,
-            desc: [0; 16],
-        };
-        unsafe {
-            self.call(&mut cmd, ipc::VERSION)?;
-        }
-        Ok(cmd)
+    unsafe fn read_write_ioctl<T: ipc::IoctlData>(
+        &self,
+        mut buf: IoctlBuffer,
+        func: u64,
+    ) -> Result<c_int> {
+        let mut data = buf.read::<T>()?;
+        let mut wire = data.write();
+        let res = redox_rt::sys::sys_call(
+            self.fd as usize,
+            &mut wire,
+            syscall::CallFlags::empty(),
+            &[func],
+        )?;
+        data.read_from(&wire);
+        buf.write(data)?;
+        Ok(res as c_int)
     }
 
-    fn get_cap(&self, capability: u64) -> Result<u64> {
-        let mut cmd = drm_get_cap {
-            capability,
-            value: 0,
-        };
-        unsafe {
-            self.call(&mut cmd, ipc::GET_CAP)?;
-        }
-        Ok(cmd.value)
-    }
-
-    fn set_client_cap(&self, capability: u64, value: u64) -> Result<()> {
-        let mut cmd = drm_set_client_cap { capability, value };
-        unsafe {
-            self.call(&mut cmd, ipc::SET_CLIENT_CAP)?;
-        }
-        Ok(())
+    unsafe fn write_ioctl<T: ipc::IoctlData>(
+        &self,
+        mut buf: IoctlBuffer,
+        func: u64,
+    ) -> Result<c_int> {
+        let mut data = buf.read::<T>()?;
+        let mut wire = data.write();
+        let res = redox_rt::sys::sys_call(
+            self.fd as usize,
+            &mut wire,
+            syscall::CallFlags::empty(),
+            &[func],
+        )?;
+        Ok(res as c_int)
     }
 
     fn display_count(&self) -> Result<usize> {
@@ -124,40 +123,6 @@ impl Dev {
         }
         Ok((cmd.width, cmd.height))
     }
-}
-
-unsafe fn version(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
-    let mut vers = buf.read::<drm_version>()?;
-    let version = dev.version()?;
-    vers.version_major = version.version_major as i32;
-    vers.version_minor = version.version_minor as i32;
-    vers.version_patchlevel = version.version_patchlevel as i32;
-    vers.name_len = copy_array(
-        &version.name[..version.name_len],
-        vers.name as *mut u8,
-        vers.name_len,
-    );
-    vers.date_len = copy_array("0".as_bytes(), vers.date as *mut u8, vers.date_len);
-    vers.desc_len = copy_array(
-        &version.desc[..version.desc_len],
-        vers.desc as *mut u8,
-        vers.desc_len,
-    );
-    buf.write(vers)?;
-    Ok(0)
-}
-
-unsafe fn get_cap(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
-    let mut cap = buf.read::<drm_get_cap>()?;
-    cap.value = dev.get_cap(cap.capability)?;
-    buf.write(cap)?;
-    Ok(0)
-}
-
-unsafe fn set_client_cap(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
-    let mut cap = buf.read::<drm_set_client_cap>()?;
-    dev.set_client_cap(cap.capability, cap.value)?;
-    Ok(0)
 }
 
 unsafe fn mode_card_res(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
@@ -311,9 +276,9 @@ unsafe fn mode_get_fb2(dev: Dev, mut buf: IoctlBuffer) -> Result<c_int> {
 pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_int> {
     let dev = Dev::new(fd)?;
     match func {
-        0x00 => version(dev, buf),
-        0x0C => get_cap(dev, buf),
-        0x0D => set_client_cap(dev, buf),
+        0x00 => dev.read_write_ioctl::<drm_version>(buf, ipc::VERSION),
+        0x0C => dev.read_write_ioctl::<drm_get_cap>(buf, ipc::GET_CAP),
+        0x0D => dev.write_ioctl::<drm_set_client_cap>(buf, ipc::SET_CLIENT_CAP),
         0xA0 => mode_card_res(dev, buf),
         0xA1 => mode_get_crtc(dev, buf),
         0xA6 => mode_get_encoder(dev, buf),
