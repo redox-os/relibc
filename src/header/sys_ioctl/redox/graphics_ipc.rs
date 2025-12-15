@@ -44,7 +44,7 @@ macro_rules! define_ioctl_data {
             );
         };
         (struct $ioctl_ty:ident, $mem_ty:ident {
-            $field:ident: $ty:ty [array<$el:ident, $counted_by:ident>],
+            $field:ident: $ty:ty [array<$el:ty, $counted_by:ident>],
             $($rest:tt)*
         } =>
             ($($ioctl_fields:tt)*),
@@ -60,7 +60,7 @@ macro_rules! define_ioctl_data {
         };
         (struct $ioctl_ty:ident, $mem_ty:ident {} =>
             ($($ioctl_field:ident: $ioctl_field_ty:ty,)*),
-            ($($counted_field:ident: $counted_ty:ty [array<$el:ident, $counted_by:ident>],)*),
+            ($($counted_field:ident: $counted_ty:ty [array<$el:ty, $counted_by:ident>],)*),
             ($($noncounted_field:ident: $noncounted_ty:ty,)*)
         ) => {
             pub use drm_sys::$ioctl_ty;
@@ -233,6 +233,114 @@ define_ioctl_data! {
         max_width: u32,
         min_height: u32,
         max_height: u32,
+    }
+}
+
+pub const MODE_GET_CRTC: u64 = 0xA1;
+define_ioctl_data! {
+    struct drm_mode_crtc, DrmModeCrtc {
+        set_connectors_ptr: u64,
+        count_connectors: u32,
+        crtc_id: u32,
+        fb_id: u32,
+        x: u32,
+        y: u32,
+        gamma_size: u32,
+        mode_valid: u32,
+        mode: drm_sys::drm_mode_modeinfo,
+    }
+}
+
+pub const MODE_GET_ENCODER: u64 = 0xA6;
+define_ioctl_data! {
+    struct drm_mode_get_encoder, DrmModeGetEncoder {
+        encoder_id: u32,
+        encoder_type: u32,
+        crtc_id: u32,
+        possible_crtcs: u32,
+        possible_clones: u32,
+    }
+}
+
+pub const MODE_GET_CONNECTOR: u64 = 0xA7;
+define_ioctl_data! {
+    struct drm_mode_get_connector, DrmModeGetConnector {
+        encoders_ptr: u64 [array<u32, count_encoders>],
+        modes_ptr: u64 [array<drm_sys::drm_mode_modeinfo, count_modes>],
+        props_ptr: u64 [array<u32, count_props>],
+        prop_values_ptr: u64 [array<u64, count_props>],
+        count_modes: u32,
+        count_props: u32,
+        count_encoders: u32,
+        encoder_id: u32,
+        connector_id: u32,
+        connector_type: u32,
+        connector_type_id: u32,
+        connection: u32,
+        mm_width: u32,
+        mm_height: u32,
+        subpixel: u32,
+        pad: u32,
+    }
+}
+
+pub const MODE_GET_FB: u64 = 0xAD;
+define_ioctl_data! {
+    struct drm_mode_fb_cmd, DrmModeFbCmd {
+        fb_id: u32,
+        width: u32,
+        height: u32,
+        pitch: u32,
+        bpp: u32,
+        depth: u32,
+        handle: u32,
+    }
+}
+
+pub const MODE_GET_PLANE_RES: u64 = 0xB5;
+define_ioctl_data! {
+    struct drm_mode_get_plane_res, DrmModeGetPlaneRes {
+        plane_id_ptr: u64 [array<u32, count_planes>],
+        count_planes: u32,
+    }
+}
+
+pub const MODE_GET_PLANE: u64 = 0xB6;
+define_ioctl_data! {
+    struct drm_mode_get_plane, DrmModeGetPlane {
+        plane_id: u32,
+        crtc_id: u32,
+        fb_id: u32,
+        possible_crtcs: u32,
+        gamma_size: u32,
+        count_format_types: u32,
+        format_type_ptr: u64 [array<u32, count_format_types>],
+    }
+}
+
+pub const MODE_OBJ_GET_PROPERTIES: u64 = 0xB9;
+define_ioctl_data! {
+    struct drm_mode_obj_get_properties, DrmModeObjGetProperties {
+        props_ptr: u64 [array<u32, count_props>],
+        prop_values_ptr: u64 [array<u64, count_props>],
+        count_props: u32,
+        obj_id: u32,
+        obj_type: u32,
+    }
+}
+
+pub const MODE_GET_FB2: u64 = 0xCE;
+define_ioctl_data! {
+    struct drm_mode_fb_cmd2, DrmModeFbCmd2 {
+        fb_id: u32,
+        width: u32,
+        height: u32,
+        pixel_format: u32,
+        flags: u32,
+        handles: [u32; 4],
+        pitches: [u32; 4],
+        offsets: [u32; 4],
+        modifier: [u64; 4],
     }
 }
 
