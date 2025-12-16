@@ -50,14 +50,12 @@ pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     )?;
     let path = reference.as_ref();
     unsafe {
-        syscall::syscall6(
+        syscall::syscall4(
             syscall::SYS_UNLINKAT,
             root_fd.as_raw_fd(),
             path.as_ptr() as usize,
             path.len(),
             flags,
-            0,
-            0,
         )
     }
 }
