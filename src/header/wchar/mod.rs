@@ -17,7 +17,13 @@ use crate::{
         wctype::*,
     },
     iter::{NulTerminated, NulTerminatedInclusive},
-    platform::{self, ERRNO, types::*},
+    platform::{
+        self, ERRNO,
+        types::{
+            c_char, c_double, c_int, c_long, c_longlong, c_uchar, c_ulong, c_ulonglong, c_void,
+            intmax_t, size_t, uintmax_t, wchar_t, wint_t,
+        },
+    },
 };
 
 mod lookaheadreader;
