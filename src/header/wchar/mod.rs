@@ -1113,7 +1113,11 @@ pub unsafe extern "C" fn wcscasecmp(mut s1: *const wchar_t, mut s2: *const wchar
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcsncasecmp.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn wcsncasecmp(mut s1: *const wchar_t, mut s2: *const wchar_t, n: size_t) -> c_int {
+pub unsafe extern "C" fn wcsncasecmp(
+    mut s1: *const wchar_t,
+    mut s2: *const wchar_t,
+    n: size_t,
+) -> c_int {
     if n == 0 {
         return 0;
     }
