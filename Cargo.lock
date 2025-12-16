@@ -180,6 +180,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "drm-sys"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bafb66c8dbc944d69e15cfcc661df7e703beffbaec8bd63151368b06c5f9858c"
+dependencies = [
+ "libc",
+ "linux-raw-sys",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -247,6 +257,12 @@ dependencies = [
  "bitflags",
  "libc",
 ]
+
+[[package]]
+name = "linux-raw-sys"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a385b1be4e5c3e362ad2ffa73c392e53f031eaa5b7d648e64cd87f27f6063d7"
 
 [[package]]
 name = "lock_api"
@@ -402,6 +418,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox-ioctl"
+version = "0.1.0"
+dependencies = [
+ "drm-sys",
+ "redox_syscall",
+]
+
+[[package]]
 name = "redox-path"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -461,6 +485,7 @@ dependencies = [
  "rand",
  "rand_jitter",
  "rand_xorshift",
+ "redox-ioctl",
  "redox-path",
  "redox-rt",
  "redox_event",
