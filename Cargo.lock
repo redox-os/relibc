@@ -445,8 +445,9 @@ dependencies = [
 
 [[package]]
 name = "redox_event"
-version = "0.4.1"
-source = "git+https://gitlab.redox-os.org/Ibuki.O/event.git?branch=update-syscall#eddf3b3cc0b3d0c1d90daa8d7964c343599f81e3"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8eafe403549fab08a0c0862769493ad992625bb5a694aae2df6901e7e4fd05a"
 dependencies = [
  "bitflags",
  "libredox",

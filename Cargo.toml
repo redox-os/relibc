@@ -65,7 +65,7 @@ sc = "0.2.7"
 redox_syscall = "0.6.0"
 redox-rt = { path = "redox-rt" }
 redox-path = "0.3"
-redox_event = { git = "https://gitlab.redox-os.org/Ibuki.O/event.git", branch = "update-syscall", default-features = false, features = [
+redox_event = { version = "0.4.2", default-features = false, features = [
     "redox_syscall",
 ] }
 redox-ioctl = { path = "redox-ioctl" }
