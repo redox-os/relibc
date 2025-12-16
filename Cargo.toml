@@ -68,6 +68,7 @@ redox-path = "0.3"
 redox_event = { git = "https://gitlab.redox-os.org/redox-os/event.git", default-features = false, features = [
     "redox_syscall",
 ] }
+redox-ioctl = { path = "redox-ioctl" }
 
 [features]
 default = ["check_against_libc_crate"]
