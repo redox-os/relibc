@@ -29,7 +29,10 @@ use crate::{
     },
     io::{self, BufRead, BufWriter, LineWriter, Read, Write},
     out::Out,
-    platform::{self, ERRNO, Pal, Sys, WriteByte, types::*},
+    platform::{
+        self, ERRNO, Pal, Sys, WriteByte,
+        types::{c_char, c_int, c_long, c_uint, c_ulonglong, c_void, off_t, size_t},
+    },
     sync::Mutex,
 };
 
