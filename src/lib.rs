@@ -17,7 +17,6 @@
 #![feature(c_variadic)]
 #![feature(core_intrinsics)]
 #![feature(macro_derive)]
-#![feature(macro_metavar_expr_concat)]
 #![feature(maybe_uninit_slice)]
 #![feature(lang_items)]
 #![feature(linkage)]
