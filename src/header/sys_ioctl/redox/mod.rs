@@ -14,7 +14,6 @@ use crate::{
 use super::winsize;
 
 mod drm;
-mod graphics_ipc;
 
 pub const TCGETS: c_ulong = 0x5401;
 pub const TCSETS: c_ulong = 0x5402;
