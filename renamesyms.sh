@@ -44,7 +44,7 @@ for special_sym in "${special_syms[@]}"; do
     echo "$special_sym __relibc_$special_sym" >> $symbols_file
 done
 
-mangled_alloc_syms=$("${NM}" --format=posix -g "$target" 2>/dev/null | awk '{print $1}' | grep "^_R" | grep -E "[0-9_]+(__rust_|__rg_)[a-z_]+" || true)
+mangled_alloc_syms=$("${NM}" --format=posix -g "$target" 2>/dev/null | awk '{print $1}' | grep "7___rustc" || true)
 for sym in $mangled_alloc_syms; do
     echo "$sym __relibc_$sym" >> $symbols_file
 done
