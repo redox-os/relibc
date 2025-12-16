@@ -1097,7 +1097,7 @@ pub unsafe extern "C" fn wscanf(format: *const wchar_t, mut __valist: ...) -> c_
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcscasecmp.html>.
 #[unsafe(no_mangle)]
-pub extern "C" fn wcscasecmp(mut s1: *const wchar_t, mut s2: *const wchar_t) -> c_int {
+pub unsafe extern "C" fn wcscasecmp(mut s1: *const wchar_t, mut s2: *const wchar_t) -> c_int {
     unsafe {
         while *s1 != 0 && *s2 != 0 {
             if towlower(*s1 as wint_t) != towlower(*s2 as wint_t) {
@@ -1113,7 +1113,7 @@ pub extern "C" fn wcscasecmp(mut s1: *const wchar_t, mut s2: *const wchar_t) -> 
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcsncasecmp.html>.
 #[unsafe(no_mangle)]
-pub extern "C" fn wcsncasecmp(mut s1: *const wchar_t, mut s2: *const wchar_t, n: size_t) -> c_int {
+pub unsafe extern "C" fn wcsncasecmp(mut s1: *const wchar_t, mut s2: *const wchar_t, n: size_t) -> c_int {
     if n == 0 {
         return 0;
     }
