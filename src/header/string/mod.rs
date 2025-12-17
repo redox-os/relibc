@@ -382,9 +382,9 @@ pub unsafe extern "C" fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: siz
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strlcat.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strlcat(dst: *mut c_char, src: *const c_char, dstsize: size_t) -> size_t {
-    let dst_len = unsafe { strlen(dst) };
+    let dst_len = unsafe { strnlen(dst, dstsize) };
     let d = unsafe { dst.offset(dst_len as isize) };
-    let src_len = unsafe { strlcpy(d, src, dstsize) };
+    let src_len = unsafe { strlcpy(d, src, dstsize - dst_len) };
     src_len + if dst_len > dstsize { dstsize } else { dst_len }
 }
 
@@ -410,14 +410,13 @@ pub unsafe extern "C" fn strsep(str_: *mut *mut c_char, sep: *const c_char) -> *
 pub unsafe extern "C" fn strlcpy(dst: *mut c_char, src: *const c_char, dstsize: size_t) -> size_t {
     let mut i = 0;
 
-    while unsafe { *src.add(i) } != 0 && i < dstsize {
-        unsafe {
-            *dst.add(i) = *src.add(i);
-        }
-        i += 1;
-    }
-
     if dstsize != 0 {
+        while unsafe { *src.add(i) } != 0 && i < dstsize - 1 {
+            unsafe {
+                *dst.add(i) = *src.add(i);
+            }
+            i += 1;
+        }
         unsafe {
             *dst.add(i) = 0;
         }
