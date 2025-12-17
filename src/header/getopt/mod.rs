@@ -86,7 +86,9 @@ pub unsafe extern "C" fn getopt_long(
                         if unsafe { string::strncmp(current_arg, opt.name, end as size_t) == 0 } {
                             unsafe {
                                 optind += 1;
-                                *longindex = i as c_int;
+                                if !longindex.is_null() {
+                                    *longindex = i as c_int;
+                                }
                             }
 
                             if opt.has_arg == optional_argument {
