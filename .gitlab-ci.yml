@@ -39,6 +39,7 @@ i586:
 
 aarch64:
     stage: cross-build
+    image: "redoxos/redoxer:aarch64"
     script:
         - ./check.sh --arch=aarch64
 
@@ -50,14 +51,12 @@ riscv64gc:
 test:linux:
     stage: test
     needs: [linux]
-    dependencies: [linux]
     script:
         - ./check.sh --host --test
 
 test:x86_64:
     stage: test
     needs: [x86_64]
-    dependencies: [x86_64]
     script:
         # TODO: sigaction and sigaltstack hangs with multi core
         - REDOXER_QEMU_ARGS="-smp 1" ./check.sh --arch=x86_64 --test
@@ -65,7 +64,7 @@ test:x86_64:
 test:aarch64:
     stage: test
     needs: [aarch64]
-    dependencies: [aarch64]
+    image: "redoxos/redoxer:aarch64"
     script:
         - ./check.sh --arch=aarch64 --test
 
