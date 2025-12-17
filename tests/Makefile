@@ -302,8 +302,9 @@ NAMES=\
 EXPECT_INPUT_NAMES=\
 	unistd/getpass
 
-# TODO: Dynamic linking is currently broken on Redox
+# TODO: Dynamic linking doesn't work with NATIVE_RELIBC=0
 # TODO: Some tests in NAMES break the kernel
+# TODO: Reduce bins_static tests?
 ifeq ($(SKIP_REDOX),0)
 BINS=$(patsubst %,$(BUILD)/bins_static/%,$(NAMES))
 BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(NAMES))
@@ -311,10 +312,10 @@ BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_INPUT_BINS=$(patsubst %,$(BUILD)/bins_expect_input/%,$(EXPECT_INPUT_NAMES))
+else
+EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(EXPECT_NAMES))
+EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 endif
-
-EXPECT_BINS=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
-
 
 CARGO_TEST?=cargo
 TEST_RUNNER?=

@@ -99,7 +99,7 @@ run_redoxer() {
         export CARGOFLAGS=""
         export CARGO_TEST="redoxer"
         export TEST_RUNNER="redoxer exec --folder . --"
-        MAKE_ACTION="$MAKE_ACTION SKIP_REDOX=1"
+        MAKE_ACTION="$MAKE_ACTION SKIP_REDOX=1 NATIVE_RELIBC=1"
     else
         REDOXER_ENV=""
     fi
