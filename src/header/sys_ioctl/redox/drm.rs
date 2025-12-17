@@ -56,16 +56,6 @@ impl Dev {
         Ok(Self { fd })
     }
 
-    unsafe fn call<T>(&self, payload: &mut T, func: u64) -> syscall::Result<usize> {
-        let bytes = slice::from_raw_parts_mut(payload as *mut T as *mut u8, size_of::<T>());
-        redox_rt::sys::sys_call(
-            self.fd as usize,
-            bytes,
-            syscall::CallFlags::empty(),
-            &[func],
-        )
-    }
-
     unsafe fn read_write_ioctl<T: IoctlData>(
         &self,
         mut buf: IoctlBuffer,
@@ -108,6 +98,9 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
         0xA6 => dev.read_write_ioctl::<drm_mode_get_encoder>(buf, MODE_GET_ENCODER),
         0xA7 => dev.read_write_ioctl::<drm_mode_get_connector>(buf, MODE_GET_CONNECTOR),
         0xAD => dev.read_write_ioctl::<drm_mode_fb_cmd>(buf, MODE_GET_FB),
+        0xB2 => dev.read_write_ioctl::<drm_mode_create_dumb>(buf, MODE_CREATE_DUMB),
+        0xB3 => dev.read_write_ioctl::<drm_mode_map_dumb>(buf, MODE_MAP_DUMB),
+        0xB4 => dev.read_write_ioctl::<drm_mode_destroy_dumb>(buf, MODE_DESTROY_DUMB),
         0xB5 => dev.read_write_ioctl::<drm_mode_get_plane_res>(buf, MODE_GET_PLANE_RES),
         0xB6 => dev.read_write_ioctl::<drm_mode_get_plane>(buf, MODE_GET_PLANE),
         0xB9 => dev.read_write_ioctl::<drm_mode_obj_get_properties>(buf, MODE_OBJ_GET_PROPERTIES),
