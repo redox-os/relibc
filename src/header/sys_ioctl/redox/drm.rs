@@ -56,16 +56,6 @@ impl Dev {
         Ok(Self { fd })
     }
 
-    unsafe fn call<T>(&self, payload: &mut T, func: u64) -> syscall::Result<usize> {
-        let bytes = slice::from_raw_parts_mut(payload as *mut T as *mut u8, size_of::<T>());
-        redox_rt::sys::sys_call(
-            self.fd as usize,
-            bytes,
-            syscall::CallFlags::empty(),
-            &[func],
-        )
-    }
-
     unsafe fn read_write_ioctl<T: IoctlData>(
         &self,
         mut buf: IoctlBuffer,
