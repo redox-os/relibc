@@ -6,10 +6,10 @@ use core::{
 };
 
 pub use drm_sys::{
-    __kernel_size_t, drm_get_cap, drm_mode_card_res, drm_mode_crtc, drm_mode_fb_cmd,
-    drm_mode_fb_cmd2, drm_mode_get_connector, drm_mode_get_encoder, drm_mode_get_plane,
-    drm_mode_get_plane_res, drm_mode_modeinfo, drm_mode_obj_get_properties, drm_set_client_cap,
-    drm_version,
+    __kernel_size_t, drm_get_cap, drm_mode_card_res, drm_mode_create_dumb, drm_mode_crtc,
+    drm_mode_destroy_dumb, drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_get_connector,
+    drm_mode_get_encoder, drm_mode_get_plane, drm_mode_get_plane_res, drm_mode_map_dumb,
+    drm_mode_modeinfo, drm_mode_obj_get_properties, drm_set_client_cap, drm_version,
 };
 
 pub const VERSION: u64 = 0;
@@ -120,6 +120,35 @@ define_ioctl_data! {
         pitch: u32,
         bpp: u32,
         depth: u32,
+        handle: u32,
+    }
+}
+
+pub const MODE_CREATE_DUMB: u64 = 0xB2;
+define_ioctl_data! {
+    struct drm_mode_create_dumb, DrmModeCreateDumb {
+        height: u32,
+        width: u32,
+        bpp: u32,
+        flags: u32,
+        handle: u32,
+        pitch: u32,
+        size: u64,
+    }
+}
+
+pub const MODE_MAP_DUMB: u64 = 0xB3;
+define_ioctl_data! {
+    struct drm_mode_map_dumb, DrmModeMapDumb {
+        handle: u32,
+        pad: u32,
+        offset: u64,
+    }
+}
+
+pub const MODE_DESTROY_DUMB: u64 = 0xB4;
+define_ioctl_data! {
+    struct drm_mode_destroy_dumb, DrmModeDestroyDumb {
         handle: u32,
     }
 }
