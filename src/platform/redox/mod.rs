@@ -1362,6 +1362,12 @@ impl Pal for Sys {
         Ok(())
     }
 
+    fn unlinkat(fd: c_int, path: CStr, flags: c_int) -> Result<()> {
+        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
+        syscall::unlinkat(fd as usize, &path, flags as usize)?;
+        Ok(())
+    }
+
     fn waitpid(mut pid: pid_t, stat_loc: Option<Out<'_, c_int>>, options: c_int) -> Result<pid_t> {
         let mut res = None;
         let mut status = 0;

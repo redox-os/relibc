@@ -92,6 +92,15 @@ pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: .
     Sys::open(path, oflag, mode).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/unlinkat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn unlinkat(fd: c_int, path: *const c_char, flags: c_int) -> c_int {
+    let path = unsafe { CStr::from_ptr(path) };
+    Sys::unlinkat(fd, path, flags)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_fcntl(_: flock) {}
 

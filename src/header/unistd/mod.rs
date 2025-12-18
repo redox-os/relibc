@@ -35,6 +35,8 @@ pub use crate::header::stdio::{ctermid, cuserid};
 // TODO: implement and reexport fcntl functions:
 //pub use crate::header::fcntl::{faccessat, fchownat, fexecve, linkat, readlinkat, symlinkat, unlinkat};
 
+pub use crate::header::fcntl::unlinkat;
+
 use super::{
     errno::{E2BIG, EINVAL, ENOMEM},
     stdio::snprintf,
