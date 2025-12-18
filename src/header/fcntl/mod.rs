@@ -96,7 +96,7 @@ pub unsafe extern "C" fn open(path: *const c_char, oflag: c_int, mut __valist: .
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn unlinkat(fd: c_int, path: *const c_char, flags: c_int) -> c_int {
     let path = unsafe { CStr::from_ptr(path) };
-    Sys::unlink(fd, path, flags)
+    Sys::unlinkat(fd, path, flags)
         .map(|()| 0)
         .or_minus_one_errno()
 }
