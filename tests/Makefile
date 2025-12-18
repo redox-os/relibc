@@ -10,7 +10,10 @@ REDOX_FAILING_TESTS=tls \
 	futimens \
 	mkfifo \
 	stdlib/ptsname \
-	sys_mman
+	sys_mman \
+#	resource/getrusage
+#	time/times
+#   netdb/netdb
 
 endif
 
@@ -178,10 +181,7 @@ EXPECT_NAMES=\
 	wctype/towlower \
 	wctype/towupper \
 	mknod \
-	mknodat \
-	$(REDOX_FAILING_TESTS)
-	# TODO: Fix this
-	# netdb/netdb \
+	mknodat
 
 BUILD?=.
 
@@ -190,8 +190,7 @@ DYNAMIC_ONLY_NAMES=\
 	dlopen_scopes
 
 # Binaries that may generate varied output
-NAMES=\
-	$(EXPECT_NAMES) \
+VARIED_NAMES=\
 	dirent/main \
 	dirent/posix_getdents \
 	kill-waitpid \
@@ -293,9 +292,8 @@ NAMES=\
 	grp/gr_iter \
 	waitpid \
 	waitpid_multiple \
-	sigqueue
-#	resource/getrusage
-#	time/times
+	sigqueue \
+	$(REDOX_FAILING_TESTS)
 
 # Tests run with `expect` (require a .c file and an .exp file
 # that takes the produced binary as the first argument)
@@ -303,18 +301,20 @@ EXPECT_INPUT_NAMES=\
 	unistd/getpass
 
 # TODO: Dynamic linking doesn't work with NATIVE_RELIBC=0
-# TODO: Some tests in NAMES break the kernel
-# TODO: Reduce bins_static tests?
+# TODO: Reduce bins_static tests, only execute it when static link difference matters
 ifeq ($(SKIP_REDOX),0)
-BINS=$(patsubst %,$(BUILD)/bins_static/%,$(NAMES))
-BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(NAMES))
-BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
+BINS+=$(patsubst %,$(BUILD)/bins_static/%,$(VARIED_NAMES))
+BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(VARIED_NAMES))
+EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_INPUT_BINS=$(patsubst %,$(BUILD)/bins_expect_input/%,$(EXPECT_INPUT_NAMES))
 else
+# TODO: Not compiling static tests, too heavy for redoxerd
+BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(VARIED_NAMES))
 EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
+# TODO: EXPECT_INPUT_BINS
 endif
 
 CARGO_TEST?=cargo
@@ -327,34 +327,17 @@ all: $(BINS)
 clean:
 	rm -rf bins_* gen *.out
 
-run: | $(BINS) $(EXPECT_INPUT_BINS)
+run: bins_verify/relibc-tests $(BINS) $(EXPECT_BINS) $(EXPECT_INPUT_BINS)
 	@echo "\033[1;36;49mRunning tests\033[0m"
-	@for bin in $(BINS); \
-	do \
-		echo "\033[0;96;49m# $${bin} #\033[0m"; \
-		${TEST_RUNNER} "$${bin}" test args || exit $$?; \
-	done
+	$(TEST_RUNNER) $< $(patsubst %,-s%,$(BINS)) $(EXPECT_BINS)
 	for exp in $(EXPECT_INPUT_BINS); \
 	do \
 		echo "# expect $$(readlink -e $${exp}.exp) $$(readlink -e $${exp}) #"; \
 		expect "$$(readlink -e $${exp}.exp)" "$$(readlink -e $${exp})" test args || exit $$?; \
 	done
 
-expected: | $(EXPECT_BINS)
-	rm -rf expected
-	mkdir -p expected
-	for bin in $(EXPECT_BINS); \
-	do \
-		echo "# $${bin} #"; \
-		mkdir -p expected/`dirname $${bin}`; \
-		"$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr" || exit $$?; \
-	done
-
 bins_verify/relibc-tests: src/main.rs
 	$(CARGO_TEST) build --release --bin relibc-tests --out-dir bins_verify -Z unstable-options
-
-verify: bins_verify/relibc-tests | $(EXPECT_BINS)
-	$(TEST_RUNNER) $< $(EXPECT_BINS)
 
 FLAGS=\
 	-std=c11 \
