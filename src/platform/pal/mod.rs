@@ -283,6 +283,8 @@ pub trait Pal {
 
     fn unlink(path: CStr) -> Result<()>;
 
+    fn unlinkat(fd: c_int, path: CStr, flags: c_int) -> Result<()>;
+
     fn waitpid(pid: pid_t, stat_loc: Option<Out<c_int>>, options: c_int) -> Result<pid_t>;
 
     fn write(fildes: c_int, buf: &[u8]) -> Result<usize>;
