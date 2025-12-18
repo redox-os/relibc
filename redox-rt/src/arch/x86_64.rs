@@ -179,8 +179,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov fs:[{tcb_sa_off} + {sa_tmp_rdx}], rdx
     mov fs:[{tcb_sa_off} + {sa_tmp_rdi}], rdi
     mov fs:[{tcb_sa_off} + {sa_tmp_rsi}], rsi
-    mov fs:[{tcb_sa_off} + {sa_tmp_r12}], r8
-    mov fs:[{tcb_sa_off} + {sa_tmp_r12}], r10
+    mov fs:[{tcb_sa_off} + {sa_tmp_r8}], r8
+    mov fs:[{tcb_sa_off} + {sa_tmp_r10}], r10
     mov fs:[{tcb_sa_off} + {sa_tmp_r12}], r12
 
     // First, select signal, always pick first available bit
