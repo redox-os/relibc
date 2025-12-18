@@ -843,7 +843,7 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), 0) }).map(|_| ())
     }
 
-    fn unlink(fd: c_int, path: CStr, flags: c_int) -> Result<()> {
+    fn unlinkat(fd: c_int, path: CStr, flags: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(UNLINKAT, fd, path.as_ptr(), flags) }).map(|_| ())
     }
 
