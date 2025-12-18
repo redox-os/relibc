@@ -12,7 +12,8 @@ description = "Libc-independent runtime for Redox"
 bitflags = "2"
 goblin = { version = "0.7", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
 plain = "0.2"
-redox_syscall = "0.5.8"
+redox_syscall = "0.6.0"
+redox-path = "0.3.0"
 
 generic-rt = { path = "../generic-rt" }
 

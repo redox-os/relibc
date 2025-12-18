@@ -34,11 +34,6 @@ special_syms=(
     __rust_dealloc
     __rust_no_alloc_shim_is_unstable
     __rust_realloc
-    _RNvCsdRcTtHUCxqF_7___rustc12___rust_alloc
-    _RNvCsdRcTtHUCxqF_7___rustc19___rust_alloc_zeroed
-    _RNvCsdRcTtHUCxqF_7___rustc14___rust_dealloc
-    _RNvCsdRcTtHUCxqF_7___rustc14___rust_realloc
-    _RNvCsdRcTtHUCxqF_7___rustc8___rg_oom
 )
 
 for dep in `find $deps_dir -type f -name "*.rlib"`; do
@@ -47,6 +42,11 @@ done
 
 for special_sym in "${special_syms[@]}"; do
     echo "$special_sym __relibc_$special_sym" >> $symbols_file
+done
+
+mangled_alloc_syms=$("${NM}" --format=posix -g "$target" 2>/dev/null | awk '{print $1}' | grep "7___rustc" || true)
+for sym in $mangled_alloc_syms; do
+    echo "$sym __relibc_$sym" >> $symbols_file
 done
 
 sorted_file=`mktemp`
