@@ -39,7 +39,31 @@ fn wrapper<T>(restart: bool, erestart: bool, mut f: impl FnMut() -> Result<T>) -
         return res;
     }
 }
-
+pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
+    let redox_path = redox_path::RedoxPath::from_absolute(path.as_ref())
+        .expect("path must be canonicalized beforehand");
+    let (scheme, reference) = redox_path.as_parts().unwrap();
+    let root_path = if scheme.as_ref().is_empty() {
+        alloc::string::String::from(":")
+    } else {
+        alloc::format!("/scheme/{}", scheme)
+    };
+    // TODO: Temporary workaround to remove unlink and rmdir
+    let root_fd = crate::proc::FdGuard::open(
+        &root_path,
+        syscall::O_DIRECTORY | syscall::O_RDONLY | syscall::O_CLOEXEC,
+    )?;
+    let path = reference.as_ref();
+    unsafe {
+        syscall::syscall4(
+            syscall::SYS_UNLINKAT,
+            root_fd.as_raw_fd(),
+            path.as_ptr() as usize,
+            path.len(),
+            flags,
+        )
+    }
+}
 // TODO: uninitialized memory?
 #[inline]
 pub fn posix_read(fd: usize, buf: &mut [u8]) -> Result<usize> {

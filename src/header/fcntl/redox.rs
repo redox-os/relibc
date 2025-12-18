@@ -32,3 +32,4 @@ pub const O_NDELAY: c_int = O_NONBLOCK;
 pub const AT_FDCWD: c_int = -100;
 pub const AT_SYMLINK_NOFOLLOW: c_int = 0x0200;
 pub const AT_EMPTY_PATH: c_int = 0x4000;
+pub const AT_REMOVEDIR: c_int = 0x200;
