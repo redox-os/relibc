@@ -10,7 +10,13 @@ use crate::{
     c_str::CStr,
     error::{Errno, ResultExt},
     header::{errno, setjmp, time::timespec},
-    platform::{self, Pal, PalSignal, Sys, types::*},
+    platform::{
+        self, Pal, PalSignal, Sys,
+        types::{
+            c_char, c_int, c_ulong, c_ulonglong, c_void, pid_t, pthread_attr_t, pthread_t, size_t,
+            uid_t,
+        },
+    },
 };
 
 pub use self::sys::*;
