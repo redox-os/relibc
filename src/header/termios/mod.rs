@@ -207,10 +207,16 @@ pub unsafe extern "C" fn tcsendbreak(fd: c_int, _dur: c_int) -> c_int {
     sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, 0 as *mut _)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcgetwinsize.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tcgetwinsize(fd: c_int, sws: *mut winsize) -> c_int {
+    sys_ioctl::ioctl(fd, sys_ioctl::TIOCGWINSZ, sws.cast())
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcsetwinsize.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn tcsetwinsize(fd: c_int, mut sws: winsize) -> c_int {
-    sys_ioctl::ioctl(fd, sys_ioctl::TIOCSWINSZ, &mut sws as *mut _ as *mut c_void)
+pub unsafe extern "C" fn tcsetwinsize(fd: c_int, sws: *const winsize) -> c_int {
+    sys_ioctl::ioctl(fd, sys_ioctl::TIOCSWINSZ, (sws as *mut winsize).cast())
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcflow.html>.
