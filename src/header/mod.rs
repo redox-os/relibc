@@ -29,6 +29,7 @@ pub mod getopt;
 pub mod glob;
 pub mod grp;
 // TODO: iconv.h
+pub mod ifaddrs;
 pub mod inttypes;
 // iso646.h implemented in C
 pub mod langinfo;

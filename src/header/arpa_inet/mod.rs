@@ -118,16 +118,18 @@ pub unsafe extern "C" fn inet_network(cp: *const c_char) -> in_addr_t {
 /// Specifications Issue 8.
 #[deprecated]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn inet_ntoa(r#in: in_addr) -> *const c_char {
+pub unsafe extern "C" fn inet_ntoa(r#in: in_addr) -> *mut c_char {
     static NTOA_ADDR: RawCell<[c_char; 16]> = RawCell::new([0; 16]);
 
     unsafe {
-        inet_ntop(
+        let ptr = inet_ntop(
             AF_INET,
             &r#in as *const in_addr as *const c_void,
             NTOA_ADDR.unsafe_mut().as_mut_ptr(),
             NTOA_ADDR.unsafe_ref().len() as socklen_t,
-        )
+        );
+        // Mutable pointer is required, inet_ntop returns destination as const pointer
+        ptr as *mut c_char
     }
 }
 

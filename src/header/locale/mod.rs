@@ -4,11 +4,14 @@
 
 use core::ptr;
 
-use crate::platform::types::{c_char, c_int};
+use crate::platform::types::{c_char, c_int, c_void};
 
 const EMPTY_PTR: *const c_char = "\0" as *const _ as *const c_char;
 // Can't use &str because of the mutability
 static mut C_LOCALE: [c_char; 2] = [b'C' as c_char, 0];
+
+//TODO: locale_t internals
+pub type locale_t = *mut c_void;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/locale.h.html>.
 #[repr(C)]

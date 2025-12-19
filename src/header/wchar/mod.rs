@@ -163,6 +163,16 @@ pub unsafe extern "C" fn fwide(stream: *mut FILE, mode: c_int) -> c_int {
     (*stream).try_set_orientation(mode)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fwscanf.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwscanf(
+    stream: *mut FILE,
+    format: *const wchar_t,
+    mut __valist: ...
+) -> c_int {
+    vfwscanf(stream, format, __valist.as_va_list())
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getwc.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getwc(stream: *mut FILE) -> wint_t {
@@ -1078,8 +1088,12 @@ pub unsafe extern "C" fn wmemset(ws: *mut wchar_t, wc: wchar_t, n: size_t) -> *m
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfwscanf.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn vwscanf(format: *const wchar_t, __valist: va_list) -> c_int {
-    let mut file = (*stdin).lock();
+pub unsafe extern "C" fn vfwscanf(
+    stream: *mut FILE,
+    format: *const wchar_t,
+    __valist: va_list,
+) -> c_int {
+    let mut file = (*stream).lock();
     if let Err(_) = file.try_set_byte_orientation_unlocked() {
         return -1;
     }
@@ -1089,10 +1103,16 @@ pub unsafe extern "C" fn vwscanf(format: *const wchar_t, __valist: va_list) -> c
     wscanf::scanf(reader, format, __valist)
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fwscanf.html>.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vwscanf.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vwscanf(format: *const wchar_t, __valist: va_list) -> c_int {
+    vfwscanf(stdin, format, __valist)
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wscanf.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wscanf(format: *const wchar_t, mut __valist: ...) -> c_int {
-    vwscanf(format, __valist.as_va_list())
+    vfwscanf(stdin, format, __valist.as_va_list())
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcscasecmp.html>.
