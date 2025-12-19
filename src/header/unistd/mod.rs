@@ -835,7 +835,7 @@ pub unsafe extern "C" fn pwrite(
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/read.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
+pub unsafe extern "C" fn read(fildes: c_int, buf: *mut c_void, nbyte: size_t) -> ssize_t {
     let buf = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte as usize) };
     trace_expr!(
         Sys::read(fildes, buf)

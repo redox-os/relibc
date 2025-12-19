@@ -543,7 +543,7 @@ pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn timer_create(
     clock_id: clockid_t,
-    evp: *const sigevent,
+    evp: *mut sigevent,
     timerid: *mut timer_t,
 ) -> c_int {
     if evp.is_null() || timerid.is_null() {
