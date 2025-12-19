@@ -1,4 +1,6 @@
-//! signal implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/signal.h.html
+//! `signal.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
 
 use core::{arch::global_asm, mem, ptr};
 
@@ -41,6 +43,7 @@ pub const SIGEV_SIGNAL: c_int = 0;
 pub const SIGEV_NONE: c_int = 1;
 pub const SIGEV_THREAD: c_int = 2;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
 #[repr(C)]
 #[derive(Clone, Debug)]
 /// cbindgen:ignore
@@ -59,6 +62,7 @@ pub struct sigaltstack {
     pub ss_size: size_t,
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
 #[repr(C)]
 #[derive(Clone)]
 pub struct sigevent {
@@ -86,6 +90,7 @@ pub struct siginfo {
 #[unsafe(no_mangle)]
 pub extern "C" fn _cbindgen_export_siginfo(a: siginfo) {}
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub union sigval {
@@ -95,9 +100,11 @@ pub union sigval {
 
 /// cbindgen:ignore
 pub type sigset_t = c_ulonglong;
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>.
 /// cbindgen:ignore
 pub type siginfo_t = siginfo;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html>
 pub type stack_t = sigaltstack;
 
 #[cfg(target_arch = "aarch64")]
@@ -140,10 +147,13 @@ pub unsafe extern "C" fn siglongjmp(jb: *mut u64, ret: i32) {
     setjmp::longjmp(jb, ret);
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/kill.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn kill(pid: pid_t, sig: c_int) -> c_int {
     Sys::kill(pid, sig).map(|()| 0).or_minus_one_errno()
 }
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigqueue.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> c_int {
     Sys::sigqueue(pid, sig, val)
@@ -151,11 +161,13 @@ pub extern "C" fn sigqueue(pid: pid_t, sig: c_int, val: sigval) -> c_int {
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/killpg.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn killpg(pgrp: pid_t, sig: c_int) -> c_int {
     Sys::killpg(pgrp, sig).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_kill.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
     let os_tid = {
@@ -165,6 +177,7 @@ pub unsafe extern "C" fn pthread_kill(thread: pthread_t, sig: c_int) -> c_int {
     crate::header::pthread::e(Sys::rlct_kill(os_tid, sig as usize))
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_sigmask.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_sigmask(
     how: c_int,
@@ -180,11 +193,13 @@ pub unsafe extern "C" fn pthread_sigmask(
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/raise.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn raise(sig: c_int) -> c_int {
     Sys::raise(sig).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaction.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigaction(
     sig: c_int,
@@ -196,6 +211,7 @@ pub unsafe extern "C" fn sigaction(
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaddset.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG.max(SIGRTMAX)
@@ -211,6 +227,7 @@ pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigaltstack.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -> c_int {
     Sys::sigaltstack(ss.as_ref(), old_ss.as_mut())
@@ -218,6 +235,7 @@ pub unsafe extern "C" fn sigaltstack(ss: *const stack_t, old_ss: *mut stack_t) -
         .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigdelset.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG.max(SIGRTMAX)
@@ -233,6 +251,7 @@ pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigemptyset.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
     if let Some(set) = (set as *mut SigSet).as_mut() {
@@ -241,6 +260,7 @@ pub unsafe extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigfillset.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
     if let Some(set) = (set as *mut SigSet).as_mut() {
@@ -249,6 +269,11 @@ pub unsafe extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
+///
+/// Present in issue 7. Removed in issue 8.
+///
+/// Use of this function is unspecified in a multi-threaded process.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sighold(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
@@ -260,6 +285,11 @@ pub unsafe extern "C" fn sighold(sig: c_int) -> c_int {
     sigprocmask(SIG_BLOCK, &set, ptr::null_mut())
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
+///
+/// Present in issue 7. Removed in issue 8.
+///
+/// Use of this function is unspecified in a multi-threaded process.
 #[unsafe(no_mangle)]
 pub extern "C" fn sigignore(sig: c_int) -> c_int {
     let mut psa = mem::MaybeUninit::<sigaction>::uninit();
@@ -270,6 +300,9 @@ pub extern "C" fn sigignore(sig: c_int) -> c_int {
     unsafe { sigaction(sig, &mut sa, ptr::null_mut()) }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/siginterrupt.html>.
+///
+/// Marked obsolescent in issue 7. Removed in issue 8.
 #[unsafe(no_mangle)]
 pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
     let mut psa = mem::MaybeUninit::<sigaction>::uninit();
@@ -284,6 +317,7 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
     unsafe { sigaction(sig, &mut sa, ptr::null_mut()) }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigismember.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
     if signo <= 0 || signo as usize > NSIG {
@@ -299,6 +333,7 @@ pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_in
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/signal.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn signal(
     sig: c_int,
@@ -318,6 +353,11 @@ pub extern "C" fn signal(
     unsafe { old_sa.assume_init() }.sa_handler
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
+///
+/// Present in issue 7. Removed in issue 8.
+///
+/// Use of this function is unspecified in a multi-threaded process.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
@@ -329,6 +369,7 @@ pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
     sigsuspend(&set)
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigpending.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
     (|| Sys::sigpending(set.as_mut().ok_or(Errno(EFAULT))?))()
@@ -340,6 +381,7 @@ const BELOW_SIGRTMIN_MASK: sigset_t = (1 << SIGRTMIN) - 1;
 const STANDARD_SIG_MASK: sigset_t = (1 << 32) - 1;
 const RLCT_SIGNAL_MASK: sigset_t = BELOW_SIGRTMIN_MASK & !STANDARD_SIG_MASK;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigprocmask.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigprocmask(
     how: c_int,
@@ -365,6 +407,11 @@ pub unsafe extern "C" fn sigprocmask(
     .or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
+///
+/// Present in issue 7. Removed in issue 8.
+///
+/// Use of this function is unspecified in a multi-threaded process.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigrelse(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
@@ -376,6 +423,11 @@ pub unsafe extern "C" fn sigrelse(sig: c_int) -> c_int {
     sigprocmask(SIG_UNBLOCK, &mut set, ptr::null_mut())
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
+///
+/// Present in issue 7. Removed in issue 8.
+///
+/// Use of this function is unspecified in a multi-threaded process.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigset(
     sig: c_int,
@@ -419,11 +471,13 @@ pub unsafe extern "C" fn sigset(
     old_sa.assume_init().sa_handler
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigsuspend.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigsuspend(sigmask: *const sigset_t) -> c_int {
     Err(Sys::sigsuspend(&*sigmask)).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigwait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int {
     let mut pinfo = mem::MaybeUninit::<siginfo_t>::uninit();
@@ -435,6 +489,7 @@ pub unsafe extern "C" fn sigwait(set: *const sigset_t, sig: *mut c_int) -> c_int
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigtimedwait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigtimedwait(
     set: *const sigset_t,
@@ -448,6 +503,8 @@ pub unsafe extern "C" fn sigtimedwait(
         .map(|()| 0)
         .or_minus_one_errno()
 }
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigwaitinfo.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigwaitinfo(set: *const sigset_t, sig: *mut siginfo_t) -> c_int {
     sigtimedwait(set, sig, core::ptr::null())
@@ -487,6 +544,8 @@ pub(crate) const SIGNAL_STRINGS: [&str; 32] = [
     "Power failure\0",
     "Bad system call\0",
 ];
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/psignal.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn psignal(sig: c_int, prefix: *const c_char) {
     let c_description = usize::try_from(sig)
@@ -504,6 +563,8 @@ pub unsafe extern "C" fn psignal(sig: c_int, prefix: *const c_char) {
         string.as_bytes().len(),
     );
 }
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/psiginfo.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn psiginfo(info: *const siginfo_t, prefix: *const c_char) {
     let siginfo_t {
