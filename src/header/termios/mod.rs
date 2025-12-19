@@ -85,7 +85,7 @@ pub unsafe extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *const termios)
     sys_ioctl::ioctl(fd, sys_ioctl::TCSETS + act as c_ulong, value as *mut c_void)
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/009695299/functions/tcgetsid.html>.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcgetsid.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcgetsid(fd: c_int) -> pid_t {
     let mut sid = 0;
