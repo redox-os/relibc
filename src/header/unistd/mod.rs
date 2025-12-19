@@ -117,9 +117,9 @@ unsafe extern "C" {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn _Fork() -> pid_t {
-    unimplemented!();
+    Sys::fork().or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/_Exit.html>.
