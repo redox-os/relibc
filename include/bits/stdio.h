@@ -10,4 +10,14 @@ typedef struct FILE FILE;
 // STDIO was loaded.
 #define FILE FILE
 
+#if defined (_LARGEFILE64_SOURCE)
+#define fgetpos64 fgetpos
+#define fopen64 fopen
+#define freopen64 freopen
+#define fseeko64 fseeko
+#define fsetpos64 fsetpos
+#define ftello64 ftello
+#define tmpfile64 tmpfile
+#endif
+
 #endif /* _BITS_STDIO_H */

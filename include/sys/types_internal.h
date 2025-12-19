@@ -32,4 +32,15 @@ typedef unsigned long u_long, ulong;
 typedef long long quad_t;
 typedef unsigned long long u_quad_t;
 typedef char *caddr_t;
+
+// _LARGEFILE64_SOURCE types for backwards compatibility
+#if defined (_LARGEFILE64_SOURCE)
+typedef blkcnt_t blkcnt64_t;
+typedef fsblkcnt_t fsblkcnt64_t;
+typedef fsfilcnt_t fsfiltcnt64_t;
+typedef ino_t ino64_t;
+typedef off_t off64_t;
+// TODO: rlim64_t, fpos64_t, glob64_t
+#endif
+
 #endif /* _SYS_TYPES_INTERNAL_H */
