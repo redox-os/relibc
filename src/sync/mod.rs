@@ -23,7 +23,7 @@ pub use self::{
 use crate::{
     error::Errno,
     header::{
-        errno::{EAGAIN, ETIMEDOUT},
+        errno::{EAGAIN, EINTR, ETIMEDOUT},
         time::timespec,
     },
     out::Out,
@@ -109,7 +109,7 @@ pub unsafe fn futex_wait_ptr<T: FutexTy>(
     deadline_opt: Option<&timespec>,
 ) -> FutexWaitResult {
     match unsafe { Sys::futex_wait(ptr.cast(), value.conv(), deadline_opt) } {
-        Ok(()) => FutexWaitResult::Waited,
+        Ok(()) | Err(Errno(EINTR)) => FutexWaitResult::Waited,
         Err(Errno(EAGAIN)) => FutexWaitResult::Stale,
         Err(Errno(ETIMEDOUT)) if deadline_opt.is_some() => FutexWaitResult::TimedOut,
         Err(other) => {
