@@ -6,11 +6,7 @@ use core::{
 };
 
 use crate::{
-    header::{
-        errno,
-        limits::*,
-        signal,
-    },
+    header::{errno, limits::*, signal},
     platform,
 };
 
