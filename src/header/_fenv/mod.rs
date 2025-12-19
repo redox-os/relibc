@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fenv.h.html>.
 
-use crate::platform::types::*;
+use crate::platform::types::c_int;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fenv.h.html>.
 pub const FE_ALL_EXCEPT: c_int = 0;

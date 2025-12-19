@@ -4,7 +4,7 @@
 
 use crate::{
     header::_fenv::{FE_TONEAREST, fegetround},
-    platform::types::*,
+    platform::types::c_int,
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/float.h.html>.
