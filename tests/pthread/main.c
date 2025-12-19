@@ -20,7 +20,7 @@ int main(void) {
     int status;
 
     puts("Start, sleeping 1 second");
-    sleep(1);
+    usleep(100);
     pthread_t thread;
     void *arg = NULL;
     if ((status = pthread_create(&thread, NULL, thread_main, arg)) != 0) {

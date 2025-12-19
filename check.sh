@@ -98,8 +98,8 @@ run_redoxer() {
         redoxer toolchain || { echo -e "${RED}Fail: redoxer toolchain for: $target.${NC}" && exit 1; }
         export CARGOFLAGS=""
         export CARGO_TEST="redoxer"
-        export TEST_RUNNER="redoxer exec --folder . --"
-        MAKE_ACTION="$MAKE_ACTION SKIP_REDOX=1"
+        export TEST_RUNNER="redoxer exec --folder ../sysroot/$TARGET:/usr --folder . --"
+        MAKE_ACTION="$MAKE_ACTION IS_REDOX=1"
     else
         REDOXER_ENV=""
     fi

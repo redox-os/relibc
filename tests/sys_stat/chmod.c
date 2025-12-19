@@ -34,7 +34,7 @@ static bool check_mode(
             stderr,
             "Mode mismatch\n\tExpected: %o\n\tActual: %o\n",
             expected,
-            stat.st_mode
+            stat.st_mode & 0777
         );
         return false;
     }

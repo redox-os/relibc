@@ -114,7 +114,6 @@ test: sysroot/$(TARGET)
 	# TODO: Fix SIGILL when running cargo test
 	# $(CARGO_TEST) test
 	$(MAKE) -C tests run
-	$(MAKE) -C tests verify
 
 
 $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a

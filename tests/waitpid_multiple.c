@@ -15,7 +15,7 @@ int main(void) {
 
     if (pid_samepgid == 0) {
         // child
-        sleep(2);
+        usleep(200);
         _Exit(2);
     }
     pid_t pid_diffpgids[2];
@@ -28,7 +28,7 @@ int main(void) {
             ERROR_IF(setpgid, ret, == -1);
 
             // child
-            sleep(1);
+            usleep(100);
             _Exit(i);
         }
     }

@@ -77,7 +77,7 @@ int sigpause_revert(int signum) {
 		exit(EXIT_FAILURE);
 	}
 
-	sleep(1);
+	usleep(100);
     
 	if((status = pthread_kill(new_th, signum)) != 0)
 	{
