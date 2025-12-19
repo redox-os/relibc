@@ -1,9 +1,12 @@
-sys_includes = ["sys/types.h", "signal.h", "stdint.h", "stddef.h", "features.h"]
+sys_includes = ["sys/types.h", "stdint.h", "stddef.h", "features.h"]
 include_guard = "_RELIBC_TIME_H"
 language = "C"
 style = "Tag"
 no_includes = true
 cpp_compat = true
+after_includes = """
+struct sigevent;
+"""
 
 [enum]
 prefix_with_name = true
