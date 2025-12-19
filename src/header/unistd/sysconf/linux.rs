@@ -8,21 +8,12 @@ use core::{
 use crate::{
     header::{
         errno,
-        limits::{HOST_NAME_MAX, PAGE_SIZE},
+        limits::*,
         signal,
     },
     platform,
 };
 
-pub const _POSIX2_BC_BASE_MAX: c_long = 99;
-pub const _POSIX2_BC_DIM_MAX: c_long = 2048;
-pub const _POSIX2_BC_SCALE_MAX: c_long = 99;
-pub const _POSIX2_BC_STRING_MAX: c_long = 1000;
-pub const _POSIX2_CHARCLASS_NAME_MAX: c_long = 14;
-pub const _POSIX2_COLL_WEIGHTS_MAX: c_long = 2;
-pub const _POSIX2_EXPR_NEST_MAX: c_long = 32;
-pub const _POSIX2_LINE_MAX: c_long = 2048;
-pub const _POSIX2_RE_DUP_MAX: c_long = 255;
 pub const _XOPEN_IOV_MAX: c_long = 16;
 pub const _XOPEN_NAME_MAX: c_long = 255;
 pub const _XOPEN_PATH_MAX: c_long = 1024;
@@ -182,7 +173,7 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
         _SC_CLK_TCK => 100,
         // TODO: getrlimit
         _SC_CHILD_MAX => -1,
-        _SC_NGROUPS_MAX => 32,
+        _SC_NGROUPS_MAX => NGROUPS_MAX as c_long,
         // TODO: getrlimit
         _SC_OPEN_MAX => -1,
         _SC_STREAM_MAX => -1,
@@ -223,14 +214,14 @@ pub(super) fn sysconf_impl(name: c_int) -> c_long {
         _SC_SEM_VALUE_MAX => -1,
         _SC_SIGQUEUE_MAX => -1,
         _SC_TIMER_MAX => -1,
-        _SC_BC_BASE_MAX => _POSIX2_BC_BASE_MAX,
-        _SC_BC_DIM_MAX => _POSIX2_BC_DIM_MAX,
-        _SC_BC_SCALE_MAX => _POSIX2_BC_SCALE_MAX,
-        _SC_BC_STRING_MAX => _POSIX2_BC_STRING_MAX,
-        _SC_COLL_WEIGHTS_MAX => _POSIX2_COLL_WEIGHTS_MAX,
-        _SC_EXPR_NEST_MAX => -1,
-        _SC_LINE_MAX => -1,
-        _SC_RE_DUP_MAX => _POSIX2_RE_DUP_MAX,
+        _SC_BC_BASE_MAX => BC_BASE_MAX,
+        _SC_BC_DIM_MAX => BC_DIM_MAX,
+        _SC_BC_SCALE_MAX => BC_SCALE_MAX,
+        _SC_BC_STRING_MAX => BC_STRING_MAX,
+        _SC_COLL_WEIGHTS_MAX => COLL_WEIGHTS_MAX,
+        _SC_EXPR_NEST_MAX => EXPR_NEST_MAX,
+        _SC_LINE_MAX => LINE_MAX,
+        _SC_RE_DUP_MAX => RE_DUP_MAX,
         _SC_2_VERSION => _POSIX_VERSION,
         _SC_2_C_BIND => _POSIX_VERSION,
         _SC_2_C_DEV => -1,
