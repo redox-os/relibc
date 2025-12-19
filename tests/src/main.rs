@@ -1,8 +1,11 @@
 use std::{
     env, fs,
-    io::{self, Write},
+    io::{self, Read, Write},
     path::PathBuf,
-    process::{self, Command, ExitStatus},
+    process::{self, Command, ExitStatus, Stdio},
+    sync::mpsc,
+    thread,
+    time::{Duration, Instant},
 };
 
 fn expected(bin: &str, kind: &str, generated: &[u8], status: ExitStatus) -> Result<(), String> {
@@ -47,6 +50,8 @@ const STATUS_ONLY: &str = "-s";
 
 fn main() {
     let mut failures = Vec::new();
+    let timeout = Duration::from_secs(10);
+    let slowtime = Duration::from_secs(1);
 
     for bin in env::args().skip(1) {
         let status_only = bin.starts_with(STATUS_ONLY);
@@ -58,30 +63,127 @@ fn main() {
 
         println!("# {} #", bin);
 
-        match Command::new(&bin).arg("test").arg("args").output() {
-            Ok(output) => {
+        let start_time = Instant::now();
+
+        let (tx, rx) = mpsc::channel();
+        let bin_for_spawn = bin.clone();
+
+        // There's an issue when pthread hangs, spawn() also hangs, so let's use separate thread to spawn
+        thread::spawn(move || {
+            let result = Command::new(&bin_for_spawn)
+                .arg("test")
+                .arg("args")
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn();
+            tx.send(result).expect("Can't send");
+        });
+
+        let mut status = None;
+        let mut child = None;
+
+        loop {
+            if start_time.elapsed() > timeout {
+                let failure = format!(
+                    "\x1b[0;91;49m{}: assumed hangs after {}ms\x1b[0m",
+                    bin,
+                    start_time.elapsed().as_millis()
+                );
+                println!("{}", failure);
+                failures.push(failure);
+                break;
+            }
+            // A pretty rare hang on pthread/barrier which also stops this loop :(
+            // https://gitlab.redox-os.org/redox-os/relibc/-/issues/238
+            if &bin == "./bins_dynamic/pthread/barrier"
+                || &bin == "./bins_dynamic/pthread/once"
+                || start_time.elapsed() > slowtime
+            {
+                println!("# waiting {}ms", start_time.elapsed().as_millis());
+            }
+
+            let c = match &mut child {
+                Some(child) => child,
+                None => match rx.try_recv() {
+                    Ok(Ok(c)) => {
+                        child = Some(c);
+                        continue;
+                    }
+                    Ok(Err(err)) => {
+                        let failure = format!("{}: failed to execute: {}", bin, err);
+                        println!("{}", failure);
+                        failures.push(failure);
+                        break;
+                    }
+                    Err(mpsc::TryRecvError::Disconnected) => {
+                        let failure = format!("{}: failed to execute: thread died", bin);
+                        println!("{}", failure);
+                        failures.push(failure);
+                        break;
+                    }
+                    Err(mpsc::TryRecvError::Empty) => {
+                        thread::sleep(Duration::from_millis(if start_time.elapsed() < slowtime {
+                            25
+                        } else {
+                            500
+                        }));
+                        continue;
+                    }
+                },
+            };
+
+            match c.try_wait() {
+                Ok(Some(s)) => {
+                    status = Some(s);
+                    break;
+                }
+                Ok(None) => {
+                    thread::sleep(Duration::from_millis(if start_time.elapsed() < slowtime {
+                        25
+                    } else {
+                        500
+                    }));
+                }
+                Err(e) => {
+                    failures.push(format!("{}: error waiting: {}", bin, e));
+                    break;
+                }
+            }
+        }
+
+        match (status, child) {
+            (Some(exit_status), Some(child)) => {
                 if !status_only {
-                    if let Err(failure) = expected(&bin, "stdout", &output.stdout, output.status) {
+                    let mut stdout = Vec::new();
+                    let mut stderr = Vec::new();
+                    child.stdout.unwrap().read_to_end(&mut stdout).unwrap();
+                    child.stderr.unwrap().read_to_end(&mut stderr).unwrap();
+
+                    if let Err(failure) = expected(&bin, "stdout", &stdout, exit_status) {
                         println!("{}", failure);
                         failures.push(failure);
                     }
-
-                    if let Err(failure) = expected(&bin, "stderr", &output.stderr, output.status) {
+                    if let Err(failure) = expected(&bin, "stderr", &stderr, exit_status) {
                         println!("{}", failure);
                         failures.push(failure);
                     }
                 }
             }
-            Err(err) => {
-                let failure = format!("{}: failed to execute: {}", bin, err);
-                println!("{}", failure);
-                failures.push(failure);
+            (_, _) => {
+                continue;
             }
+        }
+
+        if start_time.elapsed() > slowtime {
+            println!(
+                "\x1b[0;93;49m  test exection took too long: {}ms\x1b[0m",
+                start_time.elapsed().as_millis()
+            );
         }
     }
 
     if !failures.is_empty() {
-        println!("# FAILURES #");
+        println!("\x1b[1;91;49m# FAILURES #\x1b[0m");
         for failure in failures {
             println!("{}", failure);
         }
