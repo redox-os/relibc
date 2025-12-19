@@ -31,6 +31,9 @@ pub const TIOCSPGRP: c_ulong = 0x5410;
 pub const TIOCGWINSZ: c_ulong = 0x5413;
 pub const TIOCSWINSZ: c_ulong = 0x5414;
 
+//TODO: used by tcgetsid, not implemented yet on redox
+pub const TIOCGSID: c_ulong = 0x5429;
+
 pub const FIONREAD: c_ulong = 0x541B;
 
 pub const FIONBIO: c_ulong = 0x5421;

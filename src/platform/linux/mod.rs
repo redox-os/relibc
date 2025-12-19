@@ -102,13 +102,15 @@ impl Pal for Sys {
     }
 
     fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
+        let flags: c_int = 0;
         e_raw(unsafe {
             syscall!(
                 FCHOWNAT,
                 AT_FDCWD,
                 path.as_ptr(),
                 owner as u32,
-                group as u32
+                group as u32,
+                flags
             )
         })
         .map(|_| ())
@@ -154,7 +156,17 @@ impl Pal for Sys {
         argv: *const *mut c_char,
         envp: *const *mut c_char,
     ) -> Result<()> {
-        todo!("not yet used by relibc")
+        let empty = b"\0";
+        let empty_ptr = empty.as_ptr() as *const c_char;
+        e_raw(syscall!(
+            EXECVEAT,
+            fildes,
+            empty_ptr,
+            argv,
+            envp,
+            AT_EMPTY_PATH
+        ))?;
+        unreachable!()
     }
 
     fn exit(status: c_int) -> ! {

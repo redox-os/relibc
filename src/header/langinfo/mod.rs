@@ -139,13 +139,16 @@ pub const CRNCYSTR: nl_item = 56;
 /// # Safety
 /// - Caller must ensure `item` is a valid `nl_item` index.
 /// - Returns a pointer to a null-terminated string, or an empty string if the item is invalid.
+/// - Compatibility requires mutable pointer to be returned, but it should not be mutated!
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn nl_langinfo(item: nl_item) -> *const c_char {
+pub unsafe extern "C" fn nl_langinfo(item: nl_item) -> *mut c_char {
     // Validate the item and perform the lookup
-    if (item as usize) < STRING_TABLE.len() {
+    let ptr = if (item as usize) < STRING_TABLE.len() {
         STRING_TABLE[item as usize].as_ptr() as *const c_char
     } else {
         // Return a pointer to an empty string if the item is invalid
         b"\0".as_ptr() as *const c_char
-    }
+    };
+    // Mutable pointer is required (unsafe!)
+    ptr as *mut c_char
 }
