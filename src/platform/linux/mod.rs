@@ -102,13 +102,15 @@ impl Pal for Sys {
     }
 
     fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
+        let flags: c_int = 0;
         e_raw(unsafe {
             syscall!(
                 FCHOWNAT,
                 AT_FDCWD,
                 path.as_ptr(),
                 owner as u32,
-                group as u32
+                group as u32,
+                flags
             )
         })
         .map(|_| ())
