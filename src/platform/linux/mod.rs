@@ -156,7 +156,17 @@ impl Pal for Sys {
         argv: *const *mut c_char,
         envp: *const *mut c_char,
     ) -> Result<()> {
-        todo!("not yet used by relibc")
+        let empty = b"\0";
+        let empty_ptr = empty.as_ptr() as *const c_char;
+        e_raw(syscall!(
+            EXECVEAT,
+            fildes,
+            empty_ptr,
+            argv,
+            envp,
+            AT_EMPTY_PATH
+        ))?;
+        unreachable!()
     }
 
     fn exit(status: c_int) -> ! {
