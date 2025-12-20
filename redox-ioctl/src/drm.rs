@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use core::{
     cmp,
-    ffi::{c_char, c_int},
+    ffi::{c_char, c_int, c_uint},
     iter, mem, slice,
 };
 
@@ -112,6 +112,7 @@ define_ioctl_data! {
 }
 
 pub const MODE_GET_FB: u64 = 0xAD;
+pub const MODE_ADD_FB: u64 = 0xAE;
 define_ioctl_data! {
     struct drm_mode_fb_cmd, DrmModeFbCmd {
         fb_id: u32,
@@ -122,6 +123,19 @@ define_ioctl_data! {
         depth: u32,
         handle: u32,
     }
+}
+
+pub const MODE_RM_FB: u64 = 0xAF;
+define_ioctl_data! {
+    struct standin_for_uint, StandinForUint {
+        inner: c_uint,
+    }
+}
+
+#[repr(transparent)]
+#[allow(non_camel_case_types)]
+pub struct standin_for_uint {
+    pub inner: c_uint,
 }
 
 pub const MODE_CREATE_DUMB: u64 = 0xB2;

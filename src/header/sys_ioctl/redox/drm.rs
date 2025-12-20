@@ -98,6 +98,8 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
         0xA6 => dev.read_write_ioctl::<drm_mode_get_encoder>(buf, MODE_GET_ENCODER),
         0xA7 => dev.read_write_ioctl::<drm_mode_get_connector>(buf, MODE_GET_CONNECTOR),
         0xAD => dev.read_write_ioctl::<drm_mode_fb_cmd>(buf, MODE_GET_FB),
+        0xAE => dev.read_write_ioctl::<drm_mode_fb_cmd>(buf, MODE_ADD_FB),
+        0xAF => dev.read_write_ioctl::<standin_for_uint>(buf, MODE_RM_FB),
         0xB2 => dev.read_write_ioctl::<drm_mode_create_dumb>(buf, MODE_CREATE_DUMB),
         0xB3 => dev.read_write_ioctl::<drm_mode_map_dumb>(buf, MODE_MAP_DUMB),
         0xB4 => dev.read_write_ioctl::<drm_mode_destroy_dumb>(buf, MODE_DESTROY_DUMB),
