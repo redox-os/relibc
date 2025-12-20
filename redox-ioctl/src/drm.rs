@@ -66,7 +66,7 @@ define_ioctl_data! {
 pub const MODE_GET_CRTC: u64 = 0xA1;
 define_ioctl_data! {
     struct drm_mode_crtc, DrmModeCrtc {
-        set_connectors_ptr: u64,
+        set_connectors_ptr: u64 [array<u32, count_connectors>],
         count_connectors: u32,
         crtc_id: u32,
         fb_id: u32,
