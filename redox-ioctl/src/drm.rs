@@ -6,10 +6,12 @@ use core::{
 };
 
 pub use drm_sys::{
-    __kernel_size_t, drm_get_cap, drm_mode_card_res, drm_mode_create_dumb, drm_mode_crtc,
-    drm_mode_destroy_dumb, drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_get_connector,
-    drm_mode_get_encoder, drm_mode_get_plane, drm_mode_get_plane_res, drm_mode_map_dumb,
-    drm_mode_modeinfo, drm_mode_obj_get_properties, drm_set_client_cap, drm_version,
+    __kernel_size_t, DRM_PROP_NAME_LEN, drm_get_cap, drm_mode_card_res,
+    drm_mode_connector_set_property, drm_mode_create_dumb, drm_mode_crtc, drm_mode_destroy_dumb,
+    drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_get_blob, drm_mode_get_connector,
+    drm_mode_get_encoder, drm_mode_get_plane, drm_mode_get_plane_res, drm_mode_get_property,
+    drm_mode_map_dumb, drm_mode_modeinfo, drm_mode_obj_get_properties, drm_mode_property_enum,
+    drm_set_client_cap, drm_version,
 };
 
 pub const VERSION: u64 = 0;
@@ -108,6 +110,37 @@ define_ioctl_data! {
         mm_height: u32,
         subpixel: u32,
         pad: u32,
+    }
+}
+
+pub const MODE_GET_PROPERTY: u64 = 0xAA;
+define_ioctl_data! {
+    struct drm_mode_get_property, DrmModeGetProperty {
+        values_ptr: u64 [array<u64, count_values>],
+        enum_blob_ptr: u64 [array<drm_mode_property_enum, count_enum_blobs>],
+        prop_id: u32,
+        flags: u32,
+        name: [c_char; DRM_PROP_NAME_LEN as usize],
+        count_values: u32,
+        count_enum_blobs: u32,
+    }
+}
+
+pub const MODE_SET_PROPERTY: u64 = 0xAB;
+define_ioctl_data! {
+    struct drm_mode_connector_set_property, DrmModeConnectorSetProperty {
+        value: u64,
+        prop_id: u32,
+        connector_id: u32,
+    }
+}
+
+pub const MODE_GET_PROP_BLOB: u64 = 0xAC;
+define_ioctl_data! {
+    struct drm_mode_get_blob, DrmModeGetBlob {
+        blob_id: u32,
+        length: u32,
+        data: u64 [array<u8, length>],
     }
 }
 
