@@ -352,12 +352,13 @@ impl Pal for Sys {
         // FIXME: Ideally we would want the file descriptor to not leak on fork(2) too because
         // fstatat(2) should not have side effects. However, Redox does not currently support that,
         // so we use `CLOEXEC` as a compromise.
+        // FIXME: Should we handle AT_* flags here or in openat2?
         let mut open_flags = fcntl::O_PATH | fcntl::O_CLOEXEC;
         if flags & AT_SYMLINK_NOFOLLOW == AT_SYMLINK_NOFOLLOW {
-            open_flags |= fcntl::O_NOFOLLOW;
+            open_flags |= fcntl::O_SYMLINK | fcntl::O_NOFOLLOW;
         }
 
-        let file = openat2(dirfd, path, open_flags, 0)?;
+        let file = openat2(dirfd, path, 0, open_flags)?;
         // Close the file descriptor after fstat(2) regardless of success or failure.
         let fstat_res = Sys::fstat(*file, buf);
         let close_res = syscall::close(file.fd as usize);
