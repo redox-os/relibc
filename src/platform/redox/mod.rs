@@ -184,12 +184,27 @@ impl Pal for Sys {
     }
 
     fn clock_getres(clk_id: clockid_t, res: Option<Out<timespec>>) -> Result<()> {
-        // TODO
-        eprintln!(
-            "relibc clock_getres({}, {:?}): not implemented",
-            clk_id, res
-        );
-        Err(Errno(ENOSYS))
+        let path = format!("/scheme/time/{clk_id}/getres");
+        let timerfd = FdGuard::open(&path, syscall::O_RDONLY)?;
+        let mut redox_res = timespec::default();
+        let buffer = unsafe {
+            slice::from_raw_parts_mut(
+                &mut redox_res as *mut _ as *mut u8,
+                mem::size_of::<timespec>(),
+            )
+        };
+
+        let bytes_read = redox_rt::sys::posix_read(timerfd.as_raw_fd(), buffer)?;
+
+        if bytes_read < mem::size_of::<timespec>() {
+            return Err(Errno(EIO));
+        }
+
+        if let Some(mut res) = res {
+            res.write(redox_res);
+        }
+
+        Ok(())
     }
 
     fn clock_gettime(clk_id: clockid_t, tp: Out<timespec>) -> Result<()> {
