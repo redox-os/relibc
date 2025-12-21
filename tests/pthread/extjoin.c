@@ -15,7 +15,7 @@ struct arg2 {
 void *routine1(void *arg) {
     assert(arg == NULL);
     puts("Thread 1 spawned, waiting 1s.");
-    sleep(1);
+    usleep(100);
     puts("Thread 1 finished.");
     return strdup("message from thread 1");
 }

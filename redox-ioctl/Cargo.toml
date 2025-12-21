@@ -1,0 +1,13 @@
+[package]
+name = "redox-ioctl"
+authors = ["bjorn3 <bjorn3_gh@protonmail.com>"]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Ioctl definitions and (de)serialization for Redox"
+
+[dependencies]
+drm-sys = "0.8.0"
+redox_syscall = "0.6.0"
+
+[features]

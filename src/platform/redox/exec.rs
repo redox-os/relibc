@@ -26,55 +26,34 @@ fn fexec_impl(
     path: &[u8],
     args: &[&[u8]],
     envs: &[&[u8]],
-    total_args_envs_size: usize,
     extrainfo: &ExtraInfo,
     interp_override: Option<InterpOverride>,
 ) -> Result<Infallible> {
-    let memory = FdGuard::open("/scheme/memory", 0)?.to_upper()?;
-
-    let addrspace_selection_fd = match redox_rt::proc::fexec_impl(
+    let FexecResult::Interp {
+        path,
+        interp_override: new_interp_override,
+    } = redox_rt::proc::fexec_impl(
         exec_file,
         &RtTcb::current().thread_fd(),
         redox_rt::current_proc_fd(),
-        &memory,
         path,
-        args.iter().rev(),
-        envs.iter().rev(),
-        total_args_envs_size,
+        args,
+        envs,
         extrainfo,
         interp_override,
-    )? {
-        FexecResult::Normal { addrspace_handle } => addrspace_handle,
-        FexecResult::Interp {
-            image_file,
-            path,
-            interp_override: new_interp_override,
-        } => {
-            drop(image_file);
-            drop(memory);
+    )?;
 
-            // According to elf(5), PT_INTERP requires that the interpreter path be
-            // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
-            let path_cstr = CStr::from_bytes_with_nul(&path).map_err(|_| Error::new(ENOEXEC))?;
+    // According to elf(5), PT_INTERP requires that the interpreter path be
+    // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
+    let path_cstr = CStr::from_bytes_with_nul(&path).map_err(|_| Error::new(ENOEXEC))?;
 
-            return execve(
-                Executable::AtPath(path_cstr),
-                ArgEnv::Parsed {
-                    total_args_envs_size,
-                    args,
-                    envs,
-                },
-                Some(new_interp_override),
-            );
-        }
-    };
-    drop(memory);
-
-    // Dropping this FD will cause the address space switch.
-    drop(addrspace_selection_fd);
-
-    unreachable!();
+    return execve(
+        Executable::AtPath(path_cstr),
+        ArgEnv::Parsed { args, envs },
+        Some(new_interp_override),
+    );
 }
+
 pub enum ArgEnv<'a> {
     C {
         argv: *const *mut c_char,
@@ -83,7 +62,6 @@ pub enum ArgEnv<'a> {
     Parsed {
         args: &'a [&'a [u8]],
         envs: &'a [&'a [u8]],
-        total_args_envs_size: usize,
     },
 }
 
@@ -135,9 +113,6 @@ pub fn execve(
     }
 
     let cwd: Box<[u8]> = super::path::clone_cwd().unwrap_or_default().into();
-    let default_scheme: Box<[u8]> = super::path::clone_default_scheme()
-        .unwrap_or_else(|| Box::from("file"))
-        .into();
 
     // Path to interpreter binary and args if found
     let (interpreter_path, interpreter_args) = { parse_interpreter(&mut image_file)? };
@@ -179,17 +154,14 @@ pub fn execve(
             .map_err(|_| Error::new(EIO))?;
     }
 
-    let (total_args_envs_size, args, envs): (usize, Vec<_>, Vec<_>) = match arg_env {
+    let (args, envs): (Vec<_>, Vec<_>) = match arg_env {
         ArgEnv::C { mut argv, mut envp } => unsafe {
-            let mut args_envs_size_without_nul = 0;
-
             // Arguments
             while !argv.read().is_null() {
                 let arg = argv.read();
 
                 let len = strlen(arg);
                 args.push(core::slice::from_raw_parts(arg as *const u8, len));
-                args_envs_size_without_nul += len;
                 argv = argv.add(1);
             }
 
@@ -205,56 +177,19 @@ pub fn execve(
 
                 let len = strlen(env);
                 envs.push(core::slice::from_raw_parts(env as *const u8, len));
-                args_envs_size_without_nul += len;
                 envp = envp.add(1);
             }
-            (
-                args_envs_size_without_nul + args.len() + envs.len(),
-                args,
-                envs,
-            )
+            (args, envs)
         },
         ArgEnv::Parsed {
             args: new_args,
             envs,
-            total_args_envs_size,
         } => {
             let prev_size: usize = args.iter().map(|a| a.len()).sum();
             args.extend(new_args);
-            (total_args_envs_size + prev_size, args, Vec::from(envs))
+            (args, Vec::from(envs))
         }
     };
-
-    // Close all O_CLOEXEC file descriptors. TODO: close_range?
-    {
-        // NOTE: This approach of implementing O_CLOEXEC will not work in multithreaded
-        // scenarios. While execve() is undefined according to POSIX if there exist sibling
-        // threads, it could still be allowed by keeping certain file descriptors and instead
-        // set the active file table.
-        let files_fd = File::new(
-            c_int::try_from(syscall::dup(
-                RtTcb::current().thread_fd().as_raw_fd(),
-                b"filetable",
-            )?)
-            .unwrap(),
-        );
-        for line in BufReader::new(files_fd).lines() {
-            let line = match line {
-                Ok(l) => l,
-                Err(_) => break,
-            };
-            let fd = match line.parse::<usize>() {
-                Ok(f) => f,
-                Err(_) => continue,
-            };
-
-            let flags = syscall::fcntl(fd, F_GETFD, 0)?;
-
-            if flags & O_CLOEXEC == O_CLOEXEC {
-                let _ = syscall::close(fd);
-            }
-        }
-    }
 
     // TODO: Convert image_file to FdGuard earlier?
     let exec_fd_guard = FdGuard::new(image_file.fd as usize).to_upper().unwrap();
@@ -264,7 +199,6 @@ pub fn execve(
 
     let extrainfo = ExtraInfo {
         cwd: Some(&cwd),
-        default_scheme: Some(&default_scheme),
         sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
         sigprocmask,
         umask: redox_rt::sys::get_umask(),
@@ -276,7 +210,6 @@ pub fn execve(
         arg0,
         &args,
         &envs,
-        total_args_envs_size,
         &extrainfo,
         interp_override,
     )

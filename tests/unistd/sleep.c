@@ -15,7 +15,7 @@ void handler(int _s)
 int main(void)
 {
     // sleep has no error codes and doesn't set errno
-    unsigned int unslept = sleep(2);
+    unsigned int unslept = sleep(1);
     printf("unslept: %u\n", unslept);
 
     struct sigaction sa;
@@ -23,7 +23,7 @@ int main(void)
     sa.sa_handler = handler;
     sigaction(SIGALRM, &sa, NULL);
     // TODO: This test is unreliable, overlapping use of alarm and sleep is not recommended.
-    // alarm(2);
+    // alarm(1);
 
     // unslept = sleep(10);
     // if (unslept < 7)
@@ -32,7 +32,7 @@ int main(void)
     //     exit(EXIT_FAILURE);
     // }
 
-    int us_status = usleep(1000);
+    int us_status = usleep(100);
     ERROR_IF(usleep, us_status, == -1);
     UNEXP_IF(usleep, us_status, != 0);
 

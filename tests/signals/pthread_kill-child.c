@@ -36,7 +36,7 @@ int main()
 	// Now the child_thread exited, it is an invalid tid
 	memcpy(&invalid_tid, &child_thread, 
 			sizeof(pthread_t)); 
-    sleep(3);
+    usleep(300);
 
 	int status;
 	status = pthread_kill(invalid_tid, 0);

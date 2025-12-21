@@ -1,13 +1,19 @@
-//! sys/utsname implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/sysutsname.h.html
+//! `sys/utsname.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_utsname.h.html>.
 
 use crate::{
     error::ResultExt,
     out::Out,
-    platform::{Pal, Sys, types::*},
+    platform::{
+        Pal, Sys,
+        types::{c_char, c_int},
+    },
 };
 
 pub const UTSLENGTH: usize = 65;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_utsname.h.html>.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, OutProject)]
 pub struct utsname {
@@ -19,6 +25,7 @@ pub struct utsname {
     pub domainname: [c_char; UTSLENGTH],
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/uname.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uname(uts: *mut utsname) -> c_int {
     Sys::uname(Out::nonnull(uts))

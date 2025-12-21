@@ -96,22 +96,21 @@ impl Pal for Sys {
     fn chdir(path: CStr) -> Result<()> {
         e_raw(unsafe { syscall!(CHDIR, path.as_ptr()) }).map(|_| ())
     }
-    fn set_default_scheme(scheme: CStr) -> Result<()> {
-        Err(Errno(EOPNOTSUPP))
-    }
 
     fn chmod(path: CStr, mode: mode_t) -> Result<()> {
         e_raw(unsafe { syscall!(FCHMODAT, AT_FDCWD, path.as_ptr(), mode, 0) }).map(|_| ())
     }
 
     fn chown(path: CStr, owner: uid_t, group: gid_t) -> Result<()> {
+        let flags: c_int = 0;
         e_raw(unsafe {
             syscall!(
                 FCHOWNAT,
                 AT_FDCWD,
                 path.as_ptr(),
                 owner as u32,
-                group as u32
+                group as u32,
+                flags
             )
         })
         .map(|_| ())
@@ -157,7 +156,17 @@ impl Pal for Sys {
         argv: *const *mut c_char,
         envp: *const *mut c_char,
     ) -> Result<()> {
-        todo!("not yet used by relibc")
+        let empty = b"\0";
+        let empty_ptr = empty.as_ptr() as *const c_char;
+        e_raw(syscall!(
+            EXECVEAT,
+            fildes,
+            empty_ptr,
+            argv,
+            envp,
+            AT_EMPTY_PATH
+        ))?;
+        unreachable!()
     }
 
     fn exit(status: c_int) -> ! {

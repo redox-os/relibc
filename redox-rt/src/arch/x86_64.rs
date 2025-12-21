@@ -17,6 +17,8 @@ use crate::{
     signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, get_sigaltstack, inner_c},
 };
 
+use super::ForkScratchpad;
+
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub const STACK_TOP: usize = 1 << 47;
 pub const STACK_SIZE: usize = 1024 * 1024;
@@ -87,18 +89,14 @@ unsafe extern "sysv64" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) ->
 }
 
 #[allow(unsafe_op_in_unsafe_fn)]
-unsafe extern "sysv64" fn child_hook(
-    cur_filetable_fd: usize,
-    new_proc_fd: usize,
-    new_thr_fd: usize,
-) {
-    let _ = syscall::close(cur_filetable_fd);
+unsafe extern "sysv64" fn child_hook(scratchpad: &ForkScratchpad) {
+    let _ = syscall::close(scratchpad.cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
-        new_thr_fd: FdGuard::new(new_thr_fd),
-        new_proc_fd: if new_proc_fd == usize::MAX {
+        new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
+        new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
             None
         } else {
-            Some(FdGuard::new(new_proc_fd))
+            Some(FdGuard::new(scratchpad.new_proc_fd))
         },
     });
 }
@@ -114,33 +112,34 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     push r14
     push r15
 
-    sub rsp, 48
+    sub rsp, 16
 
-    stmxcsr [rsp+32]
-    fnstcw [rsp+40]
+    stmxcsr [rsp+16]
+    fnstcw [rsp+8]
 
     // rdi: &ForkArgs
+    // rsi: initial_rsp
     mov rsi, rsp
     call {fork_impl}
 
-    add rsp, 96
+    add rsp, 64
 
     pop rbp
     ret
 
 "] <= [fork_impl = sym fork_impl]);
 asmfunction!(__relibc_internal_fork_ret: ["
-    mov rdi, [rsp]
-    mov rsi, [rsp + 8]
-    mov rdx, [rsp + 16]
+    # scratchpad is in rsi, move to rdi for child_hook
+    mov rdi, rsi
+
     call {child_hook}
 
-    ldmxcsr [rsp + 32]
-    fldcw [rsp + 40]
+    ldmxcsr [rsp + 16]
+    mov rcx, [rsp + 8]
 
     xor rax, rax
 
-    add rsp, 48
+    add rsp, 16
     pop r15
     pop r14
     pop r13
@@ -179,8 +178,8 @@ asmfunction!(__relibc_internal_sigentry: ["
     mov fs:[{tcb_sa_off} + {sa_tmp_rdx}], rdx
     mov fs:[{tcb_sa_off} + {sa_tmp_rdi}], rdi
     mov fs:[{tcb_sa_off} + {sa_tmp_rsi}], rsi
-    mov fs:[{tcb_sa_off} + {sa_tmp_r12}], r8
-    mov fs:[{tcb_sa_off} + {sa_tmp_r12}], r10
+    mov fs:[{tcb_sa_off} + {sa_tmp_r8}], r8
+    mov fs:[{tcb_sa_off} + {sa_tmp_r10}], r10
     mov fs:[{tcb_sa_off} + {sa_tmp_r12}], r12
 
     // First, select signal, always pick first available bit

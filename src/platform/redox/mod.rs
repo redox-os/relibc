@@ -172,10 +172,6 @@ impl Pal for Sys {
         path::chdir(path)?;
         Ok(())
     }
-    fn set_default_scheme(path: CStr) -> Result<()> {
-        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
-        Ok(path::set_default_scheme(path)?)
-    }
 
     fn chmod(path: CStr, mode: mode_t) -> Result<()> {
         let file = File::open(path, fcntl::O_PATH | fcntl::O_CLOEXEC)?;
@@ -188,12 +184,27 @@ impl Pal for Sys {
     }
 
     fn clock_getres(clk_id: clockid_t, res: Option<Out<timespec>>) -> Result<()> {
-        // TODO
-        eprintln!(
-            "relibc clock_getres({}, {:?}): not implemented",
-            clk_id, res
-        );
-        Err(Errno(ENOSYS))
+        let path = format!("/scheme/time/{clk_id}/getres");
+        let timerfd = FdGuard::open(&path, syscall::O_RDONLY)?;
+        let mut redox_res = timespec::default();
+        let buffer = unsafe {
+            slice::from_raw_parts_mut(
+                &mut redox_res as *mut _ as *mut u8,
+                mem::size_of::<timespec>(),
+            )
+        };
+
+        let bytes_read = redox_rt::sys::posix_read(timerfd.as_raw_fd(), buffer)?;
+
+        if bytes_read < mem::size_of::<timespec>() {
+            return Err(Errno(EIO));
+        }
+
+        if let Some(mut res) = res {
+            res.write(redox_res);
+        }
+
+        Ok(())
     }
 
     fn clock_gettime(clk_id: clockid_t, tp: Out<timespec>) -> Result<()> {
@@ -1045,7 +1056,7 @@ impl Pal for Sys {
     fn rmdir(path: CStr) -> Result<()> {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
         let canon = canonicalize(path)?;
-        syscall::rmdir(&canon)?;
+        redox_rt::sys::unlink(&canon, fcntl::AT_REMOVEDIR as usize)?;
         Ok(())
     }
 
@@ -1362,7 +1373,7 @@ impl Pal for Sys {
     fn unlink(path: CStr) -> Result<()> {
         let path = path.to_str().map_err(|_| Errno(EINVAL))?;
         let canon = canonicalize(path)?;
-        syscall::unlink(&canon)?;
+        redox_rt::sys::unlink(&canon, 0)?;
         Ok(())
     }
 

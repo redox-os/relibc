@@ -1,14 +1,19 @@
-SKIP_REDOX?=0
+include ../config.mk
 
-# If compiling for Redox, SKIP_REDOX must be 1
-ifeq ($(SKIP_REDOX),1)
-REDOX_FAILING_TESTS=
+IS_REDOX?=0
+
+# If compiling for Redox, IS_REDOX must be 1
+ifeq ($(IS_REDOX),1)
+FAILING_TESTS=signals/killpg-child
 else
-REDOX_FAILING_TESTS=tls \
+FAILING_TESTS=tls \
 	futimens \
 	mkfifo \
 	stdlib/ptsname \
-	sys_mman
+	sys_mman \
+#	resource/getrusage
+#	time/times
+#   netdb/netdb
 
 endif
 
@@ -176,10 +181,7 @@ EXPECT_NAMES=\
 	wctype/towlower \
 	wctype/towupper \
 	mknod \
-	mknodat \
-	$(REDOX_FAILING_TESTS)
-	# TODO: Fix this
-	# netdb/netdb \
+	mknodat
 
 BUILD?=.
 
@@ -188,8 +190,7 @@ DYNAMIC_ONLY_NAMES=\
 	dlopen_scopes
 
 # Binaries that may generate varied output
-NAMES=\
-	$(EXPECT_NAMES) \
+VARIED_NAMES=\
 	dirent/main \
 	dirent/posix_getdents \
 	kill-waitpid \
@@ -210,7 +211,6 @@ NAMES=\
 	signals/killpg0-self \
 	signals/kill-group \
 	signals/kill-child \
-	signals/killpg-child \
 	signals/killpg-self \
 	signals/pthread_kill-invalid \
 	signals/pthread_kill-child \
@@ -291,28 +291,30 @@ NAMES=\
 	grp/gr_iter \
 	waitpid \
 	waitpid_multiple \
-	sigqueue
-#	resource/getrusage
-#	time/times
+	sigqueue \
+	$(FAILING_TESTS)
 
 # Tests run with `expect` (require a .c file and an .exp file
 # that takes the produced binary as the first argument)
 EXPECT_INPUT_NAMES=\
 	unistd/getpass
 
-# TODO: Dynamic linking is currently broken on Redox
-# TODO: Some tests in NAMES break the kernel
-ifeq ($(SKIP_REDOX),0)
-BINS=$(patsubst %,$(BUILD)/bins_static/%,$(NAMES))
-BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(NAMES))
-BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
+# TODO: Dynamic linking doesn't work with NATIVE_RELIBC=0
+# TODO: Reduce bins_static tests, only execute it when static link difference matters
+ifeq ($(IS_REDOX),0)
+BINS+=$(patsubst %,$(BUILD)/bins_static/%,$(VARIED_NAMES))
+BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(VARIED_NAMES))
+EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(EXPECT_NAMES))
 EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
 EXPECT_INPUT_BINS=$(patsubst %,$(BUILD)/bins_expect_input/%,$(EXPECT_INPUT_NAMES))
+else
+# TODO: Not compiling static tests, too heavy for redoxerd
+BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(VARIED_NAMES))
+EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(EXPECT_NAMES))
+EXPECT_BINS+=$(patsubst %,$(BUILD)/bins_dynamic/%,$(DYNAMIC_ONLY_NAMES))
+# TODO: EXPECT_INPUT_BINS
 endif
-
-EXPECT_BINS=$(patsubst %,$(BUILD)/bins_static/%,$(EXPECT_NAMES))
-
 
 CARGO_TEST?=cargo
 TEST_RUNNER?=
@@ -324,33 +326,17 @@ all: $(BINS)
 clean:
 	rm -rf bins_* gen *.out
 
-run: | $(BINS) $(EXPECT_INPUT_BINS)
-	for bin in $(BINS); \
-	do \
-		echo "# $${bin} #"; \
-		${TEST_RUNNER} "$${bin}" test args || exit $$?; \
-	done
+run: bins_verify/relibc-tests $(BINS) $(EXPECT_BINS) $(EXPECT_INPUT_BINS)
+	@echo "\033[1;36;49mRunning tests\033[0m"
+	$(TEST_RUNNER) $< $(patsubst %,-s%,$(BINS)) $(EXPECT_BINS)
 	for exp in $(EXPECT_INPUT_BINS); \
 	do \
 		echo "# expect $$(readlink -e $${exp}.exp) $$(readlink -e $${exp}) #"; \
 		expect "$$(readlink -e $${exp}.exp)" "$$(readlink -e $${exp})" test args || exit $$?; \
 	done
 
-expected: | $(EXPECT_BINS)
-	rm -rf expected
-	mkdir -p expected
-	for bin in $(EXPECT_BINS); \
-	do \
-		echo "# $${bin} #"; \
-		mkdir -p expected/`dirname $${bin}`; \
-		"$${bin}" test args > "expected/$${bin}.stdout" 2> "expected/$${bin}.stderr" || exit $$?; \
-	done
-
 bins_verify/relibc-tests: src/main.rs
 	$(CARGO_TEST) build --release --bin relibc-tests --out-dir bins_verify -Z unstable-options
-
-verify: bins_verify/relibc-tests | $(EXPECT_BINS)
-	$(TEST_RUNNER) $< $(EXPECT_BINS)
 
 FLAGS=\
 	-std=c11 \
@@ -371,7 +357,10 @@ DYNAMIC_FLAGS=\
 	-Wl,--enable-new-dtags \
 	-Wl,-export-dynamic
 
-../sysroot:
+SYSROOT?=$(abspath ../sysroot/$(TARGET)/)
+SYSROOT_TARGET?=$(SYSROOT)
+
+$(SYSROOT):
 	$(MAKE) -C .. sysroot
 
 NATIVE_RELIBC?=0
@@ -379,24 +368,31 @@ ifeq ($(NATIVE_RELIBC),0)
 FLAGS+=\
 	-nostdinc \
 	-nostdlib \
-	-isystem ../sysroot/include \
-	../sysroot/lib/crt0.o \
-	../sysroot/lib/crti.o \
-	../sysroot/lib/crtn.o
-
-SYSROOT_LIB=$(shell realpath ../sysroot/lib/)
+	-isystem $(SYSROOT)/include \
+	$(SYSROOT)/lib/crt0.o \
+	$(SYSROOT)/lib/crti.o \
+	$(SYSROOT)/lib/crtn.o
 
 STATIC_FLAGS+=\
-	$(SYSROOT_LIB)/libc.a
+	$(SYSROOT)/lib/libc.a
 
+ifeq ($(IS_REDOX),0)
 DYNAMIC_FLAGS+=\
-	-Wl,-dynamic-linker=$(SYSROOT_LIB)/ld64.so.1 \
-	-Wl,-rpath=$(SYSROOT_LIB):\$$ORIGIN \
-	-L $(SYSROOT_LIB) \
+	-Wl,-dynamic-linker=$(SYSROOT_TARGET)/$(LD_SO_PATH) \
+	-Wl,-rpath=$(SYSROOT_TARGET)/lib:\$$ORIGIN \
+	-L $(SYSROOT)/lib \
 	-lc \
 	-fpic
+else
+# TODO: Make -dynamic-linker works
+DYNAMIC_FLAGS+=\
+	-Wl,-rpath=$(SYSROOT_TARGET)/lib:\$$ORIGIN \
+	-L $(SYSROOT)/lib \
+	-lc \
+	-fpic
+endif
 
-DEPS=../sysroot
+DEPS=../sysroot/$(TARGET)
 else
 DYNAMIC_FLAGS+=\
 	-Wl,-rpath=\$$ORIGIN
@@ -404,30 +400,30 @@ endif
 
 $(BUILD)/bins_static/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
+	@$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
 
 $(BUILD)/bins_expect_input/%: %.c %.exp $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
+	@$(CC) "$<" -o "$@" $(FLAGS) $(STATIC_FLAGS)
 	cp $(word 2, "$^") $(addsuffix .exp,"$@")
 
 $(BUILD)/bins_dynamic/%.so: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" -shared -fpic $(FLAGS) $(DYNAMIC_FLAGS)
+	@$(CC) "$<" -o "$@" -shared -fpic $(FLAGS) $(DYNAMIC_FLAGS)
 
 # foobar depends on foo
 $(BUILD)/bins_dynamic/libfoobar.so: libfoobar.c $(BUILD)/bins_dynamic/libfoo.so $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" -shared -fpic $(FLAGS) $(DYNAMIC_FLAGS) -L $(BUILD)/bins_dynamic -lfoo
+	@$(CC) "$<" -o "$@" -shared -fpic $(FLAGS) $(DYNAMIC_FLAGS) -L $(BUILD)/bins_dynamic -lfoo
 
 $(BUILD)/bins_dynamic/dlfcn: dlfcn.c $(BUILD)/bins_dynamic/sharedlib.so $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
+	@$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
 
 $(BUILD)/bins_dynamic/dlopen_scopes: dlopen_scopes.c $(BUILD)/bins_dynamic/libfoobar.so $(BUILD)/bins_dynamic/libfoo.so $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
+	@$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
 
 $(BUILD)/bins_dynamic/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
-	$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
+	@$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)

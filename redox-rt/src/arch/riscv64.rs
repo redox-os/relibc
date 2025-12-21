@@ -9,6 +9,8 @@ use crate::{
 use core::{mem::offset_of, ptr::NonNull, sync::atomic::Ordering};
 use syscall::{data::*, error::*};
 
+use super::ForkScratchpad;
+
 // Setup a stack starting from the very end of the address space, and then growing downwards.
 pub const STACK_TOP: usize = 1 << 38;
 pub const STACK_SIZE: usize = 1024 * 1024;
@@ -65,14 +67,14 @@ unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usiz
     Error::mux(fork_inner(initial_rsp, args))
 }
 
-unsafe extern "C" fn child_hook(cur_filetable_fd: usize, new_proc_fd: usize, new_thr_fd: usize) {
-    let _ = syscall::close(cur_filetable_fd);
+unsafe extern "C" fn child_hook(scratchpad: &ForkScratchpad) {
+    let _ = syscall::close(scratchpad.cur_filetable_fd);
     crate::child_hook_common(crate::ChildHookCommonArgs {
-        new_thr_fd: FdGuard::new(new_thr_fd),
-        new_proc_fd: if new_proc_fd == usize::MAX {
+        new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
+        new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
             None
         } else {
-            Some(FdGuard::new(new_proc_fd))
+            Some(FdGuard::new(scratchpad.new_proc_fd))
         },
     });
 }
@@ -107,12 +109,9 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
     fsd  fs10, 184(sp)
     fsd  fs11, 192(sp)
 
-    addi sp, sp, -32
     // a0 is forwarded from this function
     mv   a1, sp
     jal  {fork_impl}
-
-    addi sp, sp, 32
 
     ld   s0, 0(sp)
     ld   s1, 8(sp)
@@ -147,14 +146,13 @@ asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
 
 asmfunction!(__relibc_internal_fork_ret: ["
     .attribute arch, \"rv64gc\"  # rust bug 80608
-    ld   a0, 0(sp) // cur_filetable_fd
-    ld   a1, 8(sp) // new_proc_fd
-    ld a2, 16(sp) // new_thr_fd
+
+    # scratchpad is in a1, move to a0 for child_hook
+    mv a0, a1
+
     jal  {child_hook}
 
-    mv   a0, x0
-
-    addi sp, sp, 32
+    mv   a0, zero
 
     ld   s0, 0(sp)
     ld   s1, 8(sp)

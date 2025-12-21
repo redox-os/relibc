@@ -6,12 +6,48 @@ use core::arch::global_asm;
 #[cfg(target_arch = "aarch64")]
 global_asm!(
     "
-.globl _start
+.global _start
 _start:
-    mov x0, sp
-    and sp, x0, #0xfffffffffffffff0 //align sp
+    mov x28, sp
+    // align stack to 16 bytes
+    and sp, x28, #0xfffffffffffffff0
+    adr x1, _start
+    mov x0, x28
+    // ld_so_start(stack=x0, ld_entry=x1)
     bl relibc_ld_so_start
-    # TODO: aarch64
+    // restore original stack, clear registers, and jump to the new start function
+    mov sp, x28
+    mov x1, xzr
+    mov x2, xzr
+    mov x3, xzr
+    mov x4, xzr
+    mov x5, xzr
+    mov x6, xzr
+    mov x7, xzr
+    mov x8, xzr
+    mov x9, xzr
+    mov x10, xzr
+    mov x11, xzr
+    mov x12, xzr
+    mov x13, xzr
+    mov x14, xzr
+    mov x15, xzr
+    mov x16, xzr
+    mov x17, xzr
+    mov x18, xzr
+    mov x19, xzr
+    mov x20, xzr
+    mov x21, xzr
+    mov x22, xzr
+    mov x23, xzr
+    mov x24, xzr
+    mov x25, xzr
+    mov x26, xzr
+    mov x27, xzr
+    mov x28, xzr
+    mov x29, xzr
+    mov x30, xzr
+    br x0
     udf #0
 "
 );
