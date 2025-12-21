@@ -19,7 +19,11 @@ fn main() {
     cc_builder = cc_builder.flag("-nostdinc").flag("-nostdlib");
 
     if target.starts_with("aarch64") {
-        cc_builder = cc_builder.flag("-mno-outline-atomics")
+        cc_builder = cc_builder.flag("-mno-outline-atomics");
+    }
+    if target.starts_with("riscv64gc") {
+        cc_builder = cc_builder.flag("-march=rv64gc");
+        cc_builder = cc_builder.flag("-mabi=lp64d");
     }
 
     cc_builder
