@@ -1,5 +1,6 @@
-/// monetary.h implementation for Redox, following the POSIX standard.
-/// Following https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/monetary.h.html
+/// `monetary.h` implementation.
+///
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/monetary.h.html>.
 ///
 /// We should provide a strfmon() implementation that formats a monetary value,
 /// according to the current locale (TODO).

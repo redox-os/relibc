@@ -5,6 +5,8 @@ use alloc::string::{String, ToString};
 use core::{ffi::CStr, ptr, result, slice, str};
 use libm::{fabs, floor, pow, round, trunc};
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strfmon.html>.
+///
 /// The `strfmon()` function formats a monetary value according to the format string `format`
 /// and writes the result to the character array `s` of size `maxsize`.
 /// The format string can contain plain characters and format specifiers.
