@@ -373,6 +373,10 @@ FLAGS+=\
 	$(SYSROOT)/lib/crti.o \
 	$(SYSROOT)/lib/crtn.o
 
+ifeq ($(TARGET),aarch64-unknown-redox)
+FLAGS+=-mno-outline-atomics
+endif
+
 STATIC_FLAGS+=\
 	$(SYSROOT)/lib/libc.a
 
