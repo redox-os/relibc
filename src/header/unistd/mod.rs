@@ -21,7 +21,13 @@ use crate::{
         time::timespec,
     },
     out::Out,
-    platform::{self, ERRNO, Pal, Sys, types::*},
+    platform::{
+        self, ERRNO, Pal, Sys,
+        types::{
+            c_char, c_int, c_long, c_short, c_uint, c_ulonglong, c_void, gid_t, off_t, pid_t,
+            size_t, ssize_t, suseconds_t, time_t, uid_t, useconds_t,
+        },
+    },
 };
 
 pub use self::{brk::*, getopt::*, getpass::getpass, pathconf::*, sysconf::*};
