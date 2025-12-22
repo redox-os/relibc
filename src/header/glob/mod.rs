@@ -16,7 +16,10 @@ use crate::{
         fnmatch::{FNM_NOESCAPE, FNM_PERIOD, fnmatch},
         sys_stat::{S_IFDIR, S_IFLNK, S_IFMT, stat},
     },
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, c_uchar, c_void, size_t},
+    },
 };
 
 // Cause glob() to return on error
