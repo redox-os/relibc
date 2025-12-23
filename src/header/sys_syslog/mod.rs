@@ -16,7 +16,10 @@ pub mod logger;
 
 use core::ffi::VaList;
 
-use crate::{c_str::CStr, platform::types::*};
+use crate::{
+    c_str::CStr,
+    platform::types::{c_char, c_int},
+};
 use logger::{LOGGER, Priority};
 
 /// Record the caller's PID in log messages.
