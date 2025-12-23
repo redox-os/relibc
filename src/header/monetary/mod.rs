@@ -1,9 +1,10 @@
-/// `monetary.h` implementation.
-///
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/monetary.h.html>.
-///
-/// We should provide a strfmon() implementation that formats a monetary value,
-/// according to the current locale (TODO).
+//! `monetary.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/monetary.h.html>.
+
+// We should provide a strfmon() implementation that formats a monetary value,
+// according to the current locale (TODO).
+
 use alloc::string::{String, ToString};
 use core::{ffi::CStr, ptr, slice, str};
 
