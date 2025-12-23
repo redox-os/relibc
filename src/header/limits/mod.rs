@@ -1,5 +1,6 @@
-//! limits.h implementation for relibc
-//! Following https://pubs.opengroup.org/onlinepubs/7908799/xsh/limits.h.html
+//! `limits.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/limits.h.html>.
 
 use core::ffi::c_long;
 
