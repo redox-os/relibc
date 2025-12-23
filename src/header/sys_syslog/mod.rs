@@ -1,5 +1,8 @@
-// This is syslog.h implemented based on POSIX.1-2017
-// https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/syslog.h.html
+//! `syslog.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/syslog.h.html>.
+
+// Exported as both syslog.h and sys/syslog.h.
 
 #[cfg(target_os = "redox")]
 #[path = "redox.rs"]
@@ -74,6 +77,7 @@ pub const extern "C" fn LOG_MASK(p: c_int) -> c_int {
     1 << p
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/closelog.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn setlogmask(mask: c_int) -> c_int {
     let mut params = LOGGER.lock();
@@ -86,6 +90,7 @@ pub extern "C" fn setlogmask(mask: c_int) -> c_int {
     old
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/closelog.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_int) {
     let ident = unsafe { CStr::from_nullable_ptr(ident) };
@@ -107,6 +112,9 @@ pub unsafe extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_i
     }
 }
 
+/// See <https://www.man7.org/linux/man-pages/man3/vsyslog.3.html>.
+///
+/// Non-POSIX, 4.3BSD-Reno.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vsyslog(priority: c_int, message: *const c_char, mut ap: VaList) {
     let Some(message) = CStr::from_nullable_ptr(message) else {
@@ -122,11 +130,13 @@ pub unsafe extern "C" fn vsyslog(priority: c_int, message: *const c_char, mut ap
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/closelog.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn syslog(priority: c_int, message: *const c_char, mut __valist: ...) {
     vsyslog(priority, message, __valist.as_va_list());
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/closelog.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn closelog() {
     LOGGER.lock().close();
