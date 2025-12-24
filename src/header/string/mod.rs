@@ -13,27 +13,38 @@ use cbitset::BitSet256;
 use crate::{
     header::{errno::*, signal},
     iter::{NulTerminated, NulTerminatedInclusive, SrcDstPtrIter},
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, c_void, size_t},
+    },
     raw_cell::RawCell,
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memccpy.html>.
+///
+/// # Safety
+/// The caller must ensure that:
+/// - `n` is not longer than the memory area pointed to by `s1`, and
+/// - `n` is not longer than the memory area pointed to by `s2`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memccpy(
-    dest: *mut c_void,
-    src: *const c_void,
+    s1: *mut c_void,
+    s2: *const c_void,
     c: c_int,
     n: size_t,
 ) -> *mut c_void {
-    let to = memchr(src, c, n);
+    let to = unsafe { memchr(s2, c, n) };
+    let dist = if to.is_null() {
+        n
+    } else {
+        ((to as usize) - (s2 as usize)) + 1
+    };
+    unsafe { memcpy(s1, s2, dist) };
     if to.is_null() {
-        return to;
+        ptr::null_mut()
+    } else {
+        unsafe { (s1 as *mut u8).add(dist) as *mut c_void }
     }
-    let dist = (to as usize) - (src as usize);
-    if memcpy(dest, src, dist).is_null() {
-        return ptr::null_mut();
-    }
-    (dest as *mut u8).add(dist + 1) as *mut c_void
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memchr.html>.
@@ -52,7 +63,6 @@ pub unsafe extern "C" fn memchr(
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memcmp.html>.
-#[unsafe(no_mangle)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> c_int {
     let (div, rem) = (n / mem::size_of::<usize>(), n % mem::size_of::<usize>());
