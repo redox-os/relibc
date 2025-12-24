@@ -30,8 +30,8 @@ pub unsafe extern "C" fn memccpy(
 ) -> *mut c_void {
     let to = unsafe { memchr(s2, c, n) };
     let dist = if to.is_null() {
-        let dest_len = unsafe { strlen(s1 as *const i8) };
-        let src_len = unsafe { strlen(s2 as *const i8) };
+        let dest_len = unsafe { strlen(s1 as *const c_char) };
+        let src_len = unsafe { strlen(s2 as *const c_char) };
         if n < dest_len && n < src_len {
             n
         } else if dest_len < src_len {
