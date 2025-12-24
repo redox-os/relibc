@@ -13,7 +13,10 @@ use cbitset::BitSet256;
 use crate::{
     header::{errno::*, signal},
     iter::{NulTerminated, NulTerminatedInclusive, SrcDstPtrIter},
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, c_void, size_t},
+    },
     raw_cell::RawCell,
 };
 
@@ -25,17 +28,17 @@ pub unsafe extern "C" fn memccpy(
     c: c_int,
     n: size_t,
 ) -> *mut c_void {
-    let to = unsafe {memchr(s2, c, n)};
+    let to = unsafe { memchr(s2, c, n) };
     let dist = if to.is_null() {
         n
     } else {
         ((to as usize) - (s2 as usize)) + 1
     };
-    unsafe {memcpy(s1, s2, dist)};
+    unsafe { memcpy(s1, s2, dist) };
     if to.is_null() {
         ptr::null_mut()
     } else {
-        unsafe {(s1 as *mut u8).add(dist) as *mut c_void}
+        unsafe { (s1 as *mut u8).add(dist) as *mut c_void }
     }
 }
 
