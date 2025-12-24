@@ -21,6 +21,11 @@ use crate::{
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memccpy.html>.
+///
+/// # Safety
+/// The caller must ensure that:
+/// - `n` is not longer than the memory area pointed to by `s1`, and
+/// - `n` is not longer than the memory area pointed to by `s2`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memccpy(
     s1: *mut c_void,
@@ -30,15 +35,7 @@ pub unsafe extern "C" fn memccpy(
 ) -> *mut c_void {
     let to = unsafe { memchr(s2, c, n) };
     let dist = if to.is_null() {
-        let dest_len = unsafe { strlen(s1 as *const c_char) };
-        let src_len = unsafe { strlen(s2 as *const c_char) };
-        if n < dest_len && n < src_len {
-            n
-        } else if dest_len < src_len {
-            dest_len
-        } else {
-            src_len
-        }
+        n
     } else {
         ((to as usize) - (s2 as usize)) + 1
     };
