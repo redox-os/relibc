@@ -803,9 +803,7 @@ pub fn create_set_addr_space_buf(
     sp: usize,
 ) -> [u8; size_of::<usize>() * 3] {
     let mut buf = [0u8; size_of::<usize>() * 3];
-
     buf.copy_from_slice([space, sp, ip].map(usize::to_ne_bytes).as_flattened());
-
     buf
 }
 pub fn create_set_addr_space_buf_for_fork(
@@ -816,19 +814,6 @@ pub fn create_set_addr_space_buf_for_fork(
 ) -> [u8; size_of::<usize>() * 4] {
     let mut buf = [0u8; size_of::<usize>() * 4];
     buf.copy_from_slice([space, sp, ip, arg1].map(usize::to_ne_bytes).as_flattened());
-    buf
-}
-
-pub fn create_set_addr_space_buf_for_fork(
-    space: usize,
-    ip: usize,
-    sp: usize,
-    arg1: usize,
-) -> [u8; size_of::<usize>() * 4] {
-    let mut buf = [0u8; size_of::<usize>() * 4];
-
-    buf.copy_from_slice([space, sp, ip, arg1].map(usize::to_ne_bytes).as_flattened());
-
     buf
 }
 
