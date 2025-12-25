@@ -45,12 +45,12 @@ int sigpause_basic(int signum)
 	status = pthread_create(&new_th, NULL, a_thread_func, (void *)&signum);
 	ERROR_IF(pthread_create, status, != 0);
 
-	sleep(1);
+	usleep(100);
 
 	status = pthread_kill(new_th, signum);
 	ERROR_IF(pthread_kill, status, != 0);
 
-	sleep(1);
+	usleep(100);
 
 	if (handler_called != 1){
 		prinft("handler wasn't called\n");

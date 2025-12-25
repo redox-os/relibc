@@ -21,7 +21,13 @@ use crate::{
         time::timespec,
     },
     out::Out,
-    platform::{self, ERRNO, Pal, Sys, types::*},
+    platform::{
+        self, ERRNO, Pal, Sys,
+        types::{
+            c_char, c_int, c_long, c_short, c_uint, c_ulonglong, c_void, gid_t, off_t, pid_t,
+            size_t, ssize_t, suseconds_t, time_t, uid_t, useconds_t,
+        },
+    },
 };
 
 pub use self::{brk::*, getopt::*, getpass::getpass, pathconf::*, sysconf::*};
@@ -117,9 +123,9 @@ unsafe extern "C" {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn _Fork() -> pid_t {
-    unimplemented!();
+    Sys::fork().or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/_Exit.html>.
@@ -197,7 +203,7 @@ pub extern "C" fn close(fildes: c_int) -> c_int {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/confstr.html>.
 #[unsafe(no_mangle)]
-pub extern "C" fn confstr(name: c_int, buf: *mut c_char, len: size_t) -> size_t {
+pub unsafe extern "C" fn confstr(name: c_int, buf: *mut c_char, len: size_t) -> size_t {
     // confstr returns the number of bytes required to hold the string INCLUDING the NUL
     // terminator. This is different from other C functions hence the + 1.
     match name {
@@ -835,7 +841,7 @@ pub unsafe extern "C" fn pwrite(
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/read.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn read(fildes: c_int, buf: *const c_void, nbyte: size_t) -> ssize_t {
+pub unsafe extern "C" fn read(fildes: c_int, buf: *mut c_void, nbyte: size_t) -> ssize_t {
     let buf = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte as usize) };
     trace_expr!(
         Sys::read(fildes, buf)
@@ -1002,7 +1008,7 @@ pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/swab.html>.
 #[unsafe(no_mangle)]
-pub extern "C" fn swab(src: *const c_void, dest: *mut c_void, nbytes: ssize_t) {
+pub unsafe extern "C" fn swab(src: *const c_void, dest: *mut c_void, nbytes: ssize_t) {
     if nbytes <= 0 {
         return;
     }

@@ -184,12 +184,27 @@ impl Pal for Sys {
     }
 
     fn clock_getres(clk_id: clockid_t, res: Option<Out<timespec>>) -> Result<()> {
-        // TODO
-        eprintln!(
-            "relibc clock_getres({}, {:?}): not implemented",
-            clk_id, res
-        );
-        Err(Errno(ENOSYS))
+        let path = format!("/scheme/time/{clk_id}/getres");
+        let timerfd = FdGuard::open(&path, syscall::O_RDONLY)?;
+        let mut redox_res = timespec::default();
+        let buffer = unsafe {
+            slice::from_raw_parts_mut(
+                &mut redox_res as *mut _ as *mut u8,
+                mem::size_of::<timespec>(),
+            )
+        };
+
+        let bytes_read = redox_rt::sys::posix_read(timerfd.as_raw_fd(), buffer)?;
+
+        if bytes_read < mem::size_of::<timespec>() {
+            return Err(Errno(EIO));
+        }
+
+        if let Some(mut res) = res {
+            res.write(redox_res);
+        }
+
+        Ok(())
     }
 
     fn clock_gettime(clk_id: clockid_t, tp: Out<timespec>) -> Result<()> {
@@ -337,12 +352,13 @@ impl Pal for Sys {
         // FIXME: Ideally we would want the file descriptor to not leak on fork(2) too because
         // fstatat(2) should not have side effects. However, Redox does not currently support that,
         // so we use `CLOEXEC` as a compromise.
+        // FIXME: Should we handle AT_* flags here or in openat2?
         let mut open_flags = fcntl::O_PATH | fcntl::O_CLOEXEC;
         if flags & AT_SYMLINK_NOFOLLOW == AT_SYMLINK_NOFOLLOW {
-            open_flags |= fcntl::O_NOFOLLOW;
+            open_flags |= fcntl::O_SYMLINK | fcntl::O_NOFOLLOW;
         }
 
-        let file = openat2(dirfd, path, open_flags, 0)?;
+        let file = openat2(dirfd, path, 0, open_flags)?;
         // Close the file descriptor after fstat(2) regardless of success or failure.
         let fstat_res = Sys::fstat(*file, buf);
         let close_res = syscall::close(file.fd as usize);

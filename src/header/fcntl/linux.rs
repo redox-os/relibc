@@ -23,5 +23,9 @@ pub const O_NDELAY: c_int = O_NONBLOCK;
 // Flags for capability based "at" functions
 pub const AT_FDCWD: c_int = -100;
 pub const AT_SYMLINK_NOFOLLOW: c_int = 0x100;
+// AT_EACCESS only used for faccessat
+pub const AT_EACCESS: c_int = 0x200;
+// AT_REMOVEDIR only used for unlinkat
 pub const AT_REMOVEDIR: c_int = 0x200;
+pub const AT_SYMLINK_FOLLOW: c_int = 0x400;
 pub const AT_EMPTY_PATH: c_int = 0x1000;

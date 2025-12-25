@@ -62,13 +62,14 @@ features = ["c_api"]
 sc = "0.2.3"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-redox_syscall = { git = "https://gitlab.redox-os.org/Ibuki.O/syscall.git", branch = "filter-uidgid" }
+redox_syscall = "0.6.0"
 redox-rt = { path = "redox-rt" }
 redox-path = "0.3"
-redox_event = { git = "https://gitlab.redox-os.org/redox-os/event.git", default-features = false, features = [
+redox_event = { version = "0.4.2", default-features = false, features = [
     "redox_syscall",
 ] }
 ioslice = { version = "0.6", default-features = false }
+redox-ioctl = { path = "redox-ioctl" }
 
 [features]
 default = ["check_against_libc_crate"]
@@ -83,4 +84,4 @@ panic = "abort"
 
 [patch.crates-io]
 cc-11 = { git = "https://github.com/tea/cc-rs", branch = "riscv-abi-arch-fix", package = "cc" }
-redox_syscall = { git = "https://gitlab.redox-os.org/Ibuki.O/syscall.git", branch = "filter-uidgid" }
+redox_syscall = { git = "https://gitlab.redox-os.org/Ibuki.O/syscall.git", branch = "namespace-improvement" }

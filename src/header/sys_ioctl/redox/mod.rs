@@ -1,4 +1,4 @@
-use core::{mem, slice};
+use core::{mem, ptr, slice};
 use redox_rt::proc::FdGuard;
 use syscall;
 
@@ -12,6 +12,8 @@ use crate::{
 };
 
 use super::winsize;
+
+mod drm;
 
 pub const TCGETS: c_ulong = 0x5401;
 pub const TCSETS: c_ulong = 0x5402;
@@ -28,6 +30,9 @@ pub const TIOCSPGRP: c_ulong = 0x5410;
 
 pub const TIOCGWINSZ: c_ulong = 0x5413;
 pub const TIOCSWINSZ: c_ulong = 0x5414;
+
+//TODO: used by tcgetsid, not implemented yet on redox
+pub const TIOCGSID: c_ulong = 0x5429;
 
 pub const FIONREAD: c_ulong = 0x541B;
 
@@ -59,6 +64,47 @@ fn dup_write<T>(fd: c_int, name: &str, t: &T) -> Result<usize> {
     let bytes = dup.write(unsafe { slice::from_raw_parts(t as *const T as *const u8, size) })?;
 
     Ok(bytes / size)
+}
+
+#[derive(Debug)]
+enum IoctlBuffer {
+    None,
+    Read(*mut c_void, usize),    // read (write to userspace)
+    Write(*const c_void, usize), // write (read from userspace)
+    ReadWrite(*mut c_void, usize),
+}
+
+impl IoctlBuffer {
+    unsafe fn read<T>(&self) -> Result<T> {
+        let (ptr, size) = match *self {
+            Self::Write(ptr, size) => (ptr, size),
+            Self::ReadWrite(ptr, size) => (ptr as *const c_void, size),
+            _ => {
+                return Err(Errno(EINVAL));
+            }
+        };
+        if size == mem::size_of::<T>() {
+            let value = unsafe { ptr::read(ptr as *const T) };
+            Ok(value)
+        } else {
+            Err(Errno(EINVAL))
+        }
+    }
+
+    unsafe fn write<T>(&mut self, value: T) -> Result<()> {
+        let (ptr, size) = match *self {
+            Self::Read(ptr, size) | Self::ReadWrite(ptr, size) => (ptr, size),
+            _ => {
+                return Err(Errno(EINVAL));
+            }
+        };
+        if size == mem::size_of::<T>() {
+            unsafe { ptr::write(ptr as *mut T, value) };
+            Ok(())
+        } else {
+            Err(Errno(EINVAL))
+        }
+    }
 }
 
 unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c_int> {
@@ -120,7 +166,25 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
             eprintln!("TODO: ioctl SIOCATMARK");
         }
         _ => {
-            return Err(Errno(EINVAL));
+            // See https://docs.kernel.org/userspace-api/ioctl/ioctl-decoding.html for details
+            let dir = (request >> 30) & 0b11;
+            let size = ((request >> 16) & 0x3FFF) as usize;
+            let name = (((request >> 8) & 0xFF) as u8) as char;
+            let func = (request & 0xFF) as u8;
+            match name {
+                'd' => {
+                    let buf = match dir {
+                        0b10 => IoctlBuffer::Read(out, size),
+                        0b01 => IoctlBuffer::Write(out, size),
+                        0b11 => IoctlBuffer::ReadWrite(out, size),
+                        _ => IoctlBuffer::None,
+                    };
+                    return drm::ioctl(fd, func, buf);
+                }
+                _ => {
+                    return Err(Errno(EINVAL));
+                }
+            }
         }
     }
     Ok(0)

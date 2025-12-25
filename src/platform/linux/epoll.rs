@@ -1,3 +1,5 @@
+use core::mem;
+
 use super::{Sys, e_raw};
 use crate::{
     error::Result,
@@ -24,6 +26,7 @@ impl PalEpoll for Sys {
         timeout: c_int,
         sigmask: *const sigset_t,
     ) -> Result<usize> {
+        let sigsetsize: size_t = mem::size_of::<sigset_t>();
         unsafe {
             e_raw(syscall!(
                 EPOLL_PWAIT,
@@ -31,7 +34,8 @@ impl PalEpoll for Sys {
                 events,
                 maxevents,
                 timeout,
-                sigmask
+                sigmask,
+                sigsetsize
             ))
         }
     }

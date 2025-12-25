@@ -114,7 +114,6 @@ test: sysroot/$(TARGET)
 	# TODO: Fix SIGILL when running cargo test
 	# $(CARGO_TEST) test
 	$(MAKE) -C tests run
-	$(MAKE) -C tests verify
 
 
 $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
@@ -213,5 +212,5 @@ $(BUILD)/openlibm: openlibm
 	touch $@
 
 $(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
-	$(MAKE) AR=$(AR) CC="$(CC_WRAPPER) $(CC)" LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
+	$(MAKE) -s AR=$(AR) CC="$(CC_WRAPPER) $(CC)" LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"

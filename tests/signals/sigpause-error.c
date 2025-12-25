@@ -71,14 +71,14 @@ int sigpause_error(int signum){
 	status = pthread_create(&new_th, NULL, d_thread_func, (void *)&signum);
 	ERROR_IF(pthread_create, status, != 0);
 
-	sleep(1);
+	usleep(100);
 
 	status = pthread_kill(new_th, signum);
 	ERROR_IF(pthread_kill, status, != 0);
 
 	sem = INTHREAD;
 	while (sem == INTHREAD)
-		sleep(1);
+		usleep(100);
 
 	if(result == 2) {
 		exit(EXIT_FAILURE);

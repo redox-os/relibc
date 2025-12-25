@@ -53,7 +53,7 @@ pub type Dl_info = Dl_info_t;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dladdr.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn dladdr(_addr: *mut c_void, info: *mut Dl_info_t) -> c_int {
+pub unsafe extern "C" fn dladdr(_addr: *const c_void, info: *mut Dl_info_t) -> c_int {
     //TODO
     unsafe {
         (*info).dli_fname = ptr::null();

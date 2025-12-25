@@ -1,5 +1,6 @@
-//! tar.h implementation for Redox, following POSIX.1-1990 specification
-//!  and https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/tar.h.html
+//! `tar.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/tar.h.html>.
 
 use core::slice;
 

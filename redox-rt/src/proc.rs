@@ -107,7 +107,7 @@ pub fn fexec_impl(
     // TODO: Remove clone, but this would require more as_refs and as_muts
     let mut min_mmap_addr = PAGE_SIZE;
     let mut update_min_mmap_addr = |addr: usize, size: usize| {
-        min_mmap_addr = cmp::min(min_mmap_addr, (addr + size).next_multiple_of(PAGE_SIZE));
+        min_mmap_addr = cmp::max(min_mmap_addr, (addr + size).next_multiple_of(PAGE_SIZE));
     };
 
     pread_all(&image_file, u64::from(header.e_phoff), phs).map_err(|_| Error::new(EIO))?;
@@ -198,7 +198,6 @@ pub fn fexec_impl(
         STACK_SIZE,
         MapFlags::PROT_READ | MapFlags::PROT_WRITE | MapFlags::MAP_FIXED_NOREPLACE,
     )?;
-    update_min_mmap_addr(STACK_TOP - STACK_SIZE, STACK_SIZE);
 
     let mut sp = STACK_TOP;
     let mut stack_page = Option::<MmapGuard>::None;
@@ -809,6 +808,16 @@ pub fn create_set_addr_space_buf(
 
     buf
 }
+pub fn create_set_addr_space_buf_for_fork(
+    space: usize,
+    ip: usize,
+    sp: usize,
+    arg1: usize,
+) -> [u8; size_of::<usize>() * 4] {
+    let mut buf = [0u8; size_of::<usize>() * 4];
+    buf.copy_from_slice([space, sp, ip, arg1].map(usize::to_ne_bytes).as_flattened());
+    buf
+}
 
 pub fn create_set_addr_space_buf_for_fork(
     space: usize,
@@ -964,7 +973,6 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
                     )?;
                 }
             }
-
             #[cfg(any(
                 target_arch = "x86_64",
                 target_arch = "aarch64",
@@ -973,7 +981,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             let buf = create_set_addr_space_buf_for_fork(
                 new_addr_space_fd.as_raw_fd(),
                 __relibc_internal_fork_ret as usize,
-                new_sp,
+                initial_rsp as usize,
                 arg1,
             );
             #[cfg(target_arch = "x86")]

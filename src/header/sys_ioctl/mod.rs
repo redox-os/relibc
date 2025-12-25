@@ -27,12 +27,14 @@ impl winsize {
     }
 }
 
-pub use self::sys::*;
+#[cfg(target_os = "linux")]
+pub use self::linux::*;
 
 #[cfg(target_os = "linux")]
-#[path = "linux.rs"]
-pub mod sys;
+pub mod linux;
 
 #[cfg(target_os = "redox")]
-#[path = "redox.rs"]
-pub mod sys;
+pub use self::redox::*;
+
+#[cfg(target_os = "redox")]
+pub mod redox;

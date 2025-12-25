@@ -1,12 +1,19 @@
-//! regex.h implementation, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/regex.h.html
+//! `regex.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/regex.h.html>.
 
-use crate::{header::string::strlen, platform::types::*};
+use crate::{
+    header::string::strlen,
+    platform::types::{c_char, c_int, c_void, size_t},
+};
 use alloc::{borrow::Cow, boxed::Box};
 use core::{mem, ptr, slice};
 use posix_regex::{PosixRegex, PosixRegexBuilder, compile::Error as CompileError, tree::Tree};
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/regex.h.html>.
 pub type regoff_t = size_t;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/regex.h.html>.
 #[repr(C)]
 pub struct regex_t {
     // Points to a posix_regex::Tree
@@ -15,6 +22,7 @@ pub struct regex_t {
     re_nsub: size_t,
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/regex.h.html>.
 #[repr(C)]
 pub struct regmatch_t {
     rm_so: regoff_t,
@@ -43,6 +51,7 @@ pub const REG_ERANGE: c_int = 12;
 pub const REG_ESPACE: c_int = 13;
 pub const REG_BADRPT: c_int = 14;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/regcomp.html>.
 #[unsafe(no_mangle)]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: c_int) -> c_int {
@@ -74,12 +83,14 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/regfree.html>.
 #[unsafe(no_mangle)]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regfree(regex: *mut regex_t) {
     Box::from_raw((*regex).ptr);
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/regexec.html>.
 #[unsafe(no_mangle)]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regexec(
@@ -120,6 +131,7 @@ pub unsafe extern "C" fn regexec(
     if matches.is_empty() { REG_NOMATCH } else { 0 }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/regerror.html>.
 #[unsafe(no_mangle)]
 #[linkage = "weak"] // redefined in GIT
 pub extern "C" fn regerror(

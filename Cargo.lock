@@ -180,6 +180,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "drm-sys"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bafb66c8dbc944d69e15cfcc661df7e703beffbaec8bd63151368b06c5f9858c"
+dependencies = [
+ "libc",
+ "linux-raw-sys",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -246,13 +256,19 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
 name = "libredox"
-version = "0.1.10"
+version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "416f7e718bdb06000964960ffa43b4335ad4012ae8b99060261aa4a8088d5ccb"
+checksum = "df15f6eac291ed1cf25865b1ee60399f57e7c227e7f51bdbd4c5270396a9ed50"
 dependencies = [
  "bitflags",
  "libc",
 ]
+
+[[package]]
+name = "linux-raw-sys"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a385b1be4e5c3e362ad2ffa73c392e53f031eaa5b7d648e64cd87f27f6063d7"
 
 [[package]]
 name = "lock_api"
@@ -408,6 +424,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox-ioctl"
+version = "0.1.0"
+dependencies = [
+ "drm-sys",
+ "redox_syscall",
+]
+
+[[package]]
 name = "redox-path"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -422,13 +446,15 @@ dependencies = [
  "goblin",
  "ioslice",
  "plain",
+ "redox-path",
  "redox_syscall",
 ]
 
 [[package]]
 name = "redox_event"
-version = "0.4.0"
-source = "git+https://gitlab.redox-os.org/redox-os/event.git#36ac5a57a8573f7546d7dc0893596ebe99bd2b7f"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8eafe403549fab08a0c0862769493ad992625bb5a694aae2df6901e7e4fd05a"
 dependencies = [
  "bitflags",
  "libredox",
@@ -437,8 +463,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.19"
-source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=filter-uidgid#914c381e015aea2c84bddd75d4c4228478797024"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec96166dafa0886eb81fe1c0a388bece180fbef2135f97c1e2cf8302e74b43b5"
 dependencies = [
  "bitflags",
 ]
@@ -469,6 +496,7 @@ dependencies = [
  "rand",
  "rand_jitter",
  "rand_xorshift",
+ "redox-ioctl",
  "redox-path",
  "redox-rt",
  "redox_event",
@@ -711,3 +739,8 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[patch.unused]]
+name = "redox_syscall"
+version = "0.7.0"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=namespace-improvement#e7e560f6ab2ee3006159b89526a072a76ccdf519"
