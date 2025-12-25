@@ -784,7 +784,9 @@ pub unsafe extern "C" fn ftell_locked(stream: &mut FILE) -> off_t {
         return -1;
     }
 
+    // Adjust for read buffer, ungetc, and write buffer
     pos - (stream.read_size - stream.read_pos) as off_t - stream.unget.len() as off_t
+        + stream.writer.pending() as off_t
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/flockfile.html>.
