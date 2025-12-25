@@ -16,6 +16,7 @@
 #![feature(asm_const)]
 #![feature(c_variadic)]
 #![feature(core_intrinsics)]
+#![feature(f128)]
 #![feature(macro_derive)]
 #![feature(maybe_uninit_slice)]
 #![feature(lang_items)]
