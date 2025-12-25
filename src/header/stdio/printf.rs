@@ -444,12 +444,15 @@ fn fmt_float_normal<W: Write>(
 }
 
 /// Write ±infinity or ±NaN representation for any floating-point style
-fn fmt_float_nonfinite<W: Write>(w: &mut W, float: c_double, case: FmtCase) -> io::Result<()> {
-    if float.is_sign_negative() {
-        w.write_all(&[b'-'])?;
-    }
-
-    let nonfinite_str = match float.classify() {
+fn fmt_float_nonfinite<W: Write>(
+    w: &mut W,
+    float: c_double,
+    case: FmtCase,
+    left: bool,
+    pad_space: usize,
+    pad_zero: usize,
+) -> io::Result<()> {
+    let string = match float.classify() {
         FpCategory::Infinite => match case {
             FmtCase::Lower => INF_STR_LOWER,
             FmtCase::Upper => INF_STR_UPPER,
@@ -460,11 +463,17 @@ fn fmt_float_nonfinite<W: Write>(w: &mut W, float: c_double, case: FmtCase) -> i
         },
         _ => {
             // This function should only be called with infinite or NaN value.
-            panic!("this should not be possible")
+            panic!("fmt_float_nonfinite called with finite float")
         }
     };
 
-    w.write_all(nonfinite_str.as_bytes())?;
+    // Infinity is always padded with spaces, rather than zeroes
+    pad(w, !left, b' ', string.len()..pad_space + pad_zero)?;
+    if float.is_sign_negative() {
+        w.write_all(&[b'-'])?;
+    }
+    w.write_all(string.as_bytes())?;
+    pad(w, left, b' ', string.len()..pad_space + pad_zero)?;
 
     Ok(())
 }
@@ -851,7 +860,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                         w, fmt, false, precision, float, exp, left, pad_space, pad_zero,
                     )?;
                 } else {
-                    fmt_float_nonfinite(w, float, fmtcase.unwrap())?;
+                    fmt_float_nonfinite(w, float, fmtcase.unwrap(), left, pad_space, pad_zero)?;
                 }
             }
             FmtKind::Decimal => {
@@ -864,7 +873,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
 
                     fmt_float_normal(w, false, precision, float, left, pad_space, pad_zero)?;
                 } else {
-                    fmt_float_nonfinite(w, float, fmtcase.unwrap())?;
+                    fmt_float_nonfinite(w, float, fmtcase.unwrap(), left, pad_space, pad_zero)?;
                 }
             }
             FmtKind::AnyNotation => {
@@ -896,7 +905,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                         fmt_float_normal(w, true, precision, float, left, pad_space, pad_zero)?;
                     }
                 } else {
-                    fmt_float_nonfinite(w, float, fmtcase.unwrap())?;
+                    fmt_float_nonfinite(w, float, fmtcase.unwrap(), left, pad_space, pad_zero)?;
                 }
             }
             FmtKind::String => {
