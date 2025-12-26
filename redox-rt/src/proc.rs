@@ -880,17 +880,15 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             target_arch = "aarch64",
             target_arch = "riscv64"
         ))]
-        let (new_sp, arg1) = {
-            let new_sp = initial_rsp as usize;
+        let arg1 = {
             let scratchpad_ptr: *const ForkScratchpad = &scratchpad;
-            (new_sp, scratchpad_ptr as usize)
+            scratchpad_ptr as usize
         };
         #[cfg(target_arch = "x86")]
-        let new_sp = unsafe {
+        unsafe {
             let scratchpad_ptr = initial_rsp as *mut ForkScratchpad;
             scratchpad_ptr.write(scratchpad);
-            initial_rsp as usize
-        };
+        }
 
         // CoW-duplicate address space.
         {
@@ -973,7 +971,7 @@ pub fn fork_inner(initial_rsp: *mut usize, args: &ForkArgs) -> Result<usize> {
             let buf = create_set_addr_space_buf(
                 new_addr_space_fd.as_raw_fd(),
                 __relibc_internal_fork_ret as usize,
-                new_sp,
+                initial_rsp as usize,
             );
             new_addr_space_sel_fd.write(&buf)?;
         }
