@@ -269,8 +269,8 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
     let entry = match linker.load_program(&path, base_addr) {
         Ok(entry) => entry,
         Err(err) => {
-            eprintln!("ld.so: failed to link '{}': {:?}", path, err);
-            eprintln!("ld.so: enable debug output with `LD_DEBUG=all` for more information");
+            eprintln!("[ld.so]: failed to link '{}': {:?}", path, err);
+            eprintln!("[ld.so]: enable debug output with `LD_DEBUG=all` for more information");
             unistd::_exit(1);
         }
     };
@@ -279,7 +279,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
         tcb.mspace = ALLOCATOR.get();
     }
     if is_manual {
-        eprintln!("ld.so: entry '{}': {:#x}", path, entry);
+        eprintln!("[ld.so]: entry '{}': {:#x}", path, entry);
     }
     entry
 }

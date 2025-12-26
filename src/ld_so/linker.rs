@@ -819,7 +819,7 @@ impl Linker {
 
         if let Some(master) = tcb_master {
             if !dlopened {
-                self.tls_size += master.offset; // => aligned ph.p_memsz
+                self.tls_size = master.offset; // => aligned ph.p_memsz
             }
 
             tcb_masters.push(master);
