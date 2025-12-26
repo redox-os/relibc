@@ -256,9 +256,8 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
 name = "libredox"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df15f6eac291ed1cf25865b1ee60399f57e7c227e7f51bdbd4c5270396a9ed50"
+version = "0.1.12"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/libredox.git?branch=nsmgr#c2c480cda6c56586bcf2d6075288b36195e599ed"
 dependencies = [
  "bitflags",
  "libc",
@@ -452,9 +451,8 @@ dependencies = [
 
 [[package]]
 name = "redox_event"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8eafe403549fab08a0c0862769493ad992625bb5a694aae2df6901e7e4fd05a"
+version = "0.4.3"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/event.git?branch=update-syscall#8419cd23d0055e3d1bfffd78d2c933f8bb1f1343"
 dependencies = [
  "bitflags",
  "libredox",
@@ -463,9 +461,8 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec96166dafa0886eb81fe1c0a388bece180fbef2135f97c1e2cf8302e74b43b5"
+version = "0.7.0"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=namespace-improvement#d747a4076f8e79ba13704da08473cffeef4abf7d"
 dependencies = [
  "bitflags",
 ]
@@ -739,8 +736,3 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
-
-[[patch.unused]]
-name = "redox_syscall"
-version = "0.7.0"
-source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=namespace-improvement#e7e560f6ab2ee3006159b89526a072a76ccdf519"
