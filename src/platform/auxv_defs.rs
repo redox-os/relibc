@@ -52,3 +52,6 @@ pub const AT_REDOX_PROC_FD: usize = 41;
 
 #[cfg(target_os = "redox")]
 pub const AT_REDOX_THR_FD: usize = 42;
+
+#[cfg(target_os = "redox")]
+pub const AT_REDOX_NS_FD: usize = 43;

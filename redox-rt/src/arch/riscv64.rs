@@ -76,6 +76,11 @@ unsafe extern "C" fn child_hook(scratchpad: &ForkScratchpad) {
         } else {
             Some(FdGuard::new(scratchpad.new_proc_fd))
         },
+        new_ns_fd: if scratchpad.new_ns_fd == usize::MAX {
+            None
+        } else {
+            Some(FdGuard::new(scratchpad.new_ns_fd))
+        },
     });
 }
 
