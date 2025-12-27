@@ -6,6 +6,7 @@ CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins
 CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
 CC_WRAPPER?=
 RUSTCFLAGS?=
+TESTBIN?=
 export OBJCOPY?=objcopy
 
 export CARGO_TARGET_DIR?=$(shell pwd)/target
@@ -114,6 +115,9 @@ test: sysroot/$(TARGET)
 	# TODO: Fix SIGILL when running cargo test
 	# $(CARGO_TEST) test
 	$(MAKE) -C tests run
+
+test-once: sysroot/$(TARGET)
+	$(MAKE) -C tests run-once TESTBIN=$(TESTBIN)
 
 
 $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
