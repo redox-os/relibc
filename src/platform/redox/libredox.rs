@@ -467,7 +467,7 @@ pub unsafe extern "C" fn redox_setns_v0(fd: usize) -> RawResult {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_register_scheme_to_ns_v0(
     ns_fd: usize,
-    name_base: *mut u8,
+    name_base: *const u8,
     name_len: usize,
     cap_fd: usize,
 ) -> RawResult {
