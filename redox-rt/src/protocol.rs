@@ -262,3 +262,21 @@ bitflags! {
         const SCHEME_CREATE = 1 << 3;
     }
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(usize)]
+pub enum NsDup {
+    ForkNs = 0,
+    ShrinkPermissions = 1,
+    IssueReister = 2,
+}
+impl NsDup {
+    pub fn try_from_raw(raw: usize) -> Option<Self> {
+        Some(match raw {
+            0 => Self::ForkNs,
+            1 => Self::ShrinkPermissions,
+            2 => Self::IssueReister,
+            _ => return None,
+        })
+    }
+}

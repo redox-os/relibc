@@ -14,7 +14,7 @@ use crate::{
     DYNAMIC_PROC_INFO, DynamicProcInfo, RtTcb, Tcb,
     arch::manually_enter_trampoline,
     proc::{FdGuard, FdGuardUpper},
-    protocol::{ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags},
+    protocol::{NsDup, ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags},
     read_proc_meta,
     signal::tmp_disable_signals,
 };
@@ -420,8 +420,7 @@ pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     }
 }
 pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
-    let mut buf = Vec::from(TYPE_MKNS.to_ne_bytes());
-    const TYPE_MKNS: usize = 0; // namespace dup type.
+    let mut buf = Vec::from((NsDup::ForkNs as usize).to_ne_bytes());
     for name in names {
         let name_bytes = name.as_slice();
         let len = name_bytes.len();
