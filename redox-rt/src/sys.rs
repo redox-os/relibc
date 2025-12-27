@@ -394,8 +394,18 @@ pub fn getns() -> Result<usize> {
     }
 }
 pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
+    let path = path.as_ref();
     let fcntl_flags = flags & syscall::O_FCNTL_MASK;
-    syscall::openat(crate::current_namespace_fd(), path, flags, fcntl_flags)
+    unsafe {
+        syscall::syscall5(
+            syscall::SYS_OPENAT,
+            crate::current_namespace_fd(),
+            path.as_ptr() as usize,
+            path.len(),
+            flags,
+            fcntl_flags,
+        )
+    }
 }
 pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     let path = path.as_ref();
