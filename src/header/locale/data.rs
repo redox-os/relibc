@@ -83,55 +83,55 @@ pub(crate) struct LocaleData {
     // Owned memory buffers
     pub decimal_point: CString,
     pub thousands_sep: CString,
-    pub grouping: Vec<u8>,
+    pub grouping: Vec<c_char>,
     pub int_curr_symbol: CString,
     pub currency_symbol: CString,
     pub mon_decimal_point: CString,
     pub mon_thousands_sep: CString,
-    pub mon_grouping: Vec<u8>,
+    pub mon_grouping: Vec<c_char>,
     pub positive_sign: CString,
     pub negative_sign: CString,
 }
 unsafe impl Sync for LocaleData {}
 
 impl LocaleData {
-    pub fn new(name: CString, toml: RawLocale) -> Box<Self> {
+    pub fn new(name: CString, defs: PosixLocaleDef) -> Box<Self> {
         let mut data = Box::new(LocaleData {
             name,
-            decimal_point: Self::to_cstring(toml.decimal_point),
-            thousands_sep: Self::to_cstring(toml.thousands_sep),
-            grouping: Self::to_grouping(toml.grouping),
-            int_curr_symbol: Self::to_cstring(toml.int_curr_symbol),
-            currency_symbol: Self::to_cstring(toml.currency_symbol),
-            mon_decimal_point: Self::to_cstring(toml.mon_decimal_point),
-            mon_thousands_sep: Self::to_cstring(toml.mon_thousands_sep),
-            mon_grouping: Self::to_grouping(toml.mon_grouping),
-            positive_sign: Self::to_cstring(toml.positive_sign),
-            negative_sign: Self::to_cstring(toml.negative_sign),
+            decimal_point: Self::to_cstring(defs.decimal_point),
+            thousands_sep: Self::to_cstring(defs.thousands_sep),
+            grouping: Self::to_grouping_char(defs.grouping),
+            int_curr_symbol: Self::to_cstring(defs.int_curr_symbol),
+            currency_symbol: Self::to_cstring(defs.currency_symbol),
+            mon_decimal_point: Self::to_cstring(defs.mon_decimal_point),
+            mon_thousands_sep: Self::to_cstring(defs.mon_thousands_sep),
+            mon_grouping: Self::to_grouping_char(defs.mon_grouping),
+            positive_sign: Self::to_cstring(defs.positive_sign),
+            negative_sign: Self::to_cstring(defs.negative_sign),
             lconv: unsafe { core::mem::zeroed() },
         });
 
-        data.lconv.int_frac_digits = toml.int_frac_digits.unwrap_or(c_char::MAX);
-        data.lconv.frac_digits = toml.frac_digits.unwrap_or(c_char::MAX);
-        data.lconv.p_cs_precedes = toml.p_cs_precedes.unwrap_or(c_char::MAX);
-        data.lconv.p_sep_by_space = toml.p_sep_by_space.unwrap_or(c_char::MAX);
-        data.lconv.n_cs_precedes = toml.n_cs_precedes.unwrap_or(c_char::MAX);
-        data.lconv.n_sep_by_space = toml.n_sep_by_space.unwrap_or(c_char::MAX);
-        data.lconv.p_sign_posn = toml.p_sign_posn.unwrap_or(c_char::MAX);
-        data.lconv.n_sign_posn = toml.n_sign_posn.unwrap_or(c_char::MAX);
-        data.lconv.int_p_cs_precedes = toml.int_p_cs_precedes.unwrap_or(c_char::MAX);
-        data.lconv.int_p_sep_by_space = toml.int_p_sep_by_space.unwrap_or(c_char::MAX);
-        data.lconv.int_n_cs_precedes = toml.int_n_cs_precedes.unwrap_or(c_char::MAX);
-        data.lconv.int_n_sep_by_space = toml.int_n_sep_by_space.unwrap_or(c_char::MAX);
-        data.lconv.int_p_sign_posn = toml.int_p_sign_posn.unwrap_or(c_char::MAX);
-        data.lconv.int_n_sign_posn = toml.int_n_sign_posn.unwrap_or(c_char::MAX);
+        data.lconv.int_frac_digits = defs.int_frac_digits.unwrap_or(c_char::MAX);
+        data.lconv.frac_digits = defs.frac_digits.unwrap_or(c_char::MAX);
+        data.lconv.p_cs_precedes = defs.p_cs_precedes.unwrap_or(c_char::MAX);
+        data.lconv.p_sep_by_space = defs.p_sep_by_space.unwrap_or(c_char::MAX);
+        data.lconv.n_cs_precedes = defs.n_cs_precedes.unwrap_or(c_char::MAX);
+        data.lconv.n_sep_by_space = defs.n_sep_by_space.unwrap_or(c_char::MAX);
+        data.lconv.p_sign_posn = defs.p_sign_posn.unwrap_or(c_char::MAX);
+        data.lconv.n_sign_posn = defs.n_sign_posn.unwrap_or(c_char::MAX);
+        data.lconv.int_p_cs_precedes = defs.int_p_cs_precedes.unwrap_or(c_char::MAX);
+        data.lconv.int_p_sep_by_space = defs.int_p_sep_by_space.unwrap_or(c_char::MAX);
+        data.lconv.int_n_cs_precedes = defs.int_n_cs_precedes.unwrap_or(c_char::MAX);
+        data.lconv.int_n_sep_by_space = defs.int_n_sep_by_space.unwrap_or(c_char::MAX);
+        data.lconv.int_p_sign_posn = defs.int_p_sign_posn.unwrap_or(c_char::MAX);
+        data.lconv.int_n_sign_posn = defs.int_n_sign_posn.unwrap_or(c_char::MAX);
 
         data.update_lconv_pointers();
         data
     }
 
     pub fn posix() -> Box<Self> {
-        LocaleData::new(CString::from_str("C").unwrap(), RawLocale::default())
+        LocaleData::new(CString::from_str("C").unwrap(), PosixLocaleDef::default())
     }
 
     fn update_lconv_pointers(&mut self) {
@@ -186,19 +186,18 @@ impl LocaleData {
         self.update_lconv_pointers();
     }
 
-    fn to_cstring(opt: Option<String>) -> CString {
-        opt.and_then(|s| CString::new(s).ok())
-            .unwrap_or_else(|| CString::new("").unwrap())
+    fn to_cstring(opt: Option<CString>) -> CString {
+        opt.unwrap_or_else(|| CString::new("").unwrap())
     }
 
-    fn to_grouping(opt: Option<Vec<c_char>>) -> Vec<u8> {
-        let mut v: Vec<u8> = opt
-            .unwrap_or_default()
-            .into_iter()
-            .map(|x| x as u8)
-            .collect();
+    fn to_grouping_char(opt: Vec<Option<c_char>>) -> Vec<c_char> {
+        let mut v: Vec<c_char> = opt.into_iter().map(Self::to_char).collect();
         v.push(0);
         v
+    }
+
+    fn to_char(opt: Option<c_char>) -> c_char {
+        opt.unwrap_or(c_char::MAX)
     }
 }
 
@@ -262,17 +261,17 @@ impl GlobalLocaleData {
 unsafe impl Sync for GlobalLocaleData {}
 
 #[derive(Default)]
-pub(crate) struct RawLocale {
-    pub decimal_point: Option<String>,
-    pub thousands_sep: Option<String>,
-    pub grouping: Option<Vec<c_char>>,
-    pub int_curr_symbol: Option<String>,
-    pub currency_symbol: Option<String>,
-    pub mon_decimal_point: Option<String>,
-    pub mon_thousands_sep: Option<String>,
-    pub mon_grouping: Option<Vec<c_char>>,
-    pub positive_sign: Option<String>,
-    pub negative_sign: Option<String>,
+pub(crate) struct PosixLocaleDef {
+    pub decimal_point: Option<CString>,
+    pub thousands_sep: Option<CString>,
+    pub grouping: Vec<Option<c_char>>,
+    pub int_curr_symbol: Option<CString>,
+    pub currency_symbol: Option<CString>,
+    pub mon_decimal_point: Option<CString>,
+    pub mon_thousands_sep: Option<CString>,
+    pub mon_grouping: Vec<Option<c_char>>,
+    pub positive_sign: Option<CString>,
+    pub negative_sign: Option<CString>,
     pub int_frac_digits: Option<c_char>,
     pub frac_digits: Option<c_char>,
     pub p_cs_precedes: Option<c_char>,
@@ -288,59 +287,109 @@ pub(crate) struct RawLocale {
     pub int_p_sign_posn: Option<c_char>,
     pub int_n_sign_posn: Option<c_char>,
 }
-impl RawLocale {
+impl PosixLocaleDef {
+    //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap07.html>
     pub fn parse(content: &str) -> Self {
-        let mut locale = RawLocale::default();
+        let mut locale = PosixLocaleDef::default();
 
-        for line in content.lines() {
+        let mut lines = content.lines();
+        loop {
+            let Some(line) = lines.next() else {
+                break;
+            };
+
             let trimmed = line.trim();
             if trimmed.is_empty() || trimmed.starts_with('#') {
                 continue;
             }
 
-            let mut parts = trimmed.splitn(2, '=');
-            let key = parts.next().unwrap_or("").trim();
-            let val = parts.next().unwrap_or("").trim();
+            let mut parts = trimmed.split_ascii_whitespace();
+            let Some(key) = parts.next() else {
+                continue;
+            };
+            let mut val: String = String::new();
+            loop {
+                let Some(chunk) = parts.next() else {
+                    break;
+                };
+                if !chunk.ends_with('\\') {
+                    val.push_str(chunk);
+                    break;
+                }
+                // multiline values
+                val.push_str(&chunk[0..chunk.len() - 1]);
+                let Some(next_line) = lines.next() else {
+                    break;
+                };
+                parts = next_line.split_ascii_whitespace();
+            }
 
             if key.is_empty() || val.is_empty() {
                 continue;
             }
 
             match key {
-                "decimal_point" => locale.decimal_point = Some(val.to_string()),
-                "thousands_sep" => locale.thousands_sep = Some(val.to_string()),
-                "int_curr_symbol" => locale.int_curr_symbol = Some(val.to_string()),
-                "currency_symbol" => locale.currency_symbol = Some(val.to_string()),
-                "mon_decimal_point" => locale.mon_decimal_point = Some(val.to_string()),
-                "mon_thousands_sep" => locale.mon_thousands_sep = Some(val.to_string()),
-                "positive_sign" => locale.positive_sign = Some(val.to_string()),
-                "negative_sign" => locale.negative_sign = Some(val.to_string()),
-                "grouping" => locale.grouping = Some(Self::parse_grouping(val)),
-                "mon_grouping" => locale.mon_grouping = Some(Self::parse_grouping(val)),
-                "int_frac_digits" => locale.int_frac_digits = val.parse().ok(),
-                "frac_digits" => locale.frac_digits = val.parse().ok(),
-                "p_cs_precedes" => locale.p_cs_precedes = val.parse().ok(),
-                "p_sep_by_space" => locale.p_sep_by_space = val.parse().ok(),
-                "n_cs_precedes" => locale.n_cs_precedes = val.parse().ok(),
-                "n_sep_by_space" => locale.n_sep_by_space = val.parse().ok(),
-                "p_sign_posn" => locale.p_sign_posn = val.parse().ok(),
-                "n_sign_posn" => locale.n_sign_posn = val.parse().ok(),
-                "int_p_cs_precedes" => locale.int_p_cs_precedes = val.parse().ok(),
-                "int_p_sep_by_space" => locale.int_p_sep_by_space = val.parse().ok(),
-                "int_n_cs_precedes" => locale.int_n_cs_precedes = val.parse().ok(),
-                "int_n_sep_by_space" => locale.int_n_sep_by_space = val.parse().ok(),
-                "int_p_sign_posn" => locale.int_p_sign_posn = val.parse().ok(),
-                "int_n_sign_posn" => locale.int_n_sign_posn = val.parse().ok(),
+                "decimal_point" => locale.decimal_point = Self::parse_str(&val),
+                "thousands_sep" => locale.thousands_sep = Self::parse_str(&val),
+                "int_curr_symbol" => locale.int_curr_symbol = Self::parse_str(&val),
+                "currency_symbol" => locale.currency_symbol = Self::parse_str(&val),
+                "mon_decimal_point" => locale.mon_decimal_point = Self::parse_str(&val),
+                "mon_thousands_sep" => locale.mon_thousands_sep = Self::parse_str(&val),
+                "positive_sign" => locale.positive_sign = Self::parse_str(&val),
+                "negative_sign" => locale.negative_sign = Self::parse_str(&val),
+                "grouping" => locale.grouping = Self::parse_int_group(&val),
+                "mon_grouping" => locale.mon_grouping = Self::parse_int_group(&val),
+                "int_frac_digits" => locale.int_frac_digits = Self::parse_int(&val),
+                "frac_digits" => locale.frac_digits = Self::parse_int(&val),
+                "p_cs_precedes" => locale.p_cs_precedes = Self::parse_int(&val),
+                "p_sep_by_space" => locale.p_sep_by_space = Self::parse_int(&val),
+                "n_cs_precedes" => locale.n_cs_precedes = Self::parse_int(&val),
+                "n_sep_by_space" => locale.n_sep_by_space = Self::parse_int(&val),
+                "p_sign_posn" => locale.p_sign_posn = Self::parse_int(&val),
+                "n_sign_posn" => locale.n_sign_posn = Self::parse_int(&val),
+                "int_p_cs_precedes" => locale.int_p_cs_precedes = Self::parse_int(&val),
+                "int_p_sep_by_space" => locale.int_p_sep_by_space = Self::parse_int(&val),
+                "int_n_cs_precedes" => locale.int_n_cs_precedes = Self::parse_int(&val),
+                "int_n_sep_by_space" => locale.int_n_sep_by_space = Self::parse_int(&val),
+                "int_p_sign_posn" => locale.int_p_sign_posn = Self::parse_int(&val),
+                "int_n_sign_posn" => locale.int_n_sign_posn = Self::parse_int(&val),
                 _ => {}
             }
         }
         locale
     }
 
-    /// parse e.g. "3,3,0"
-    fn parse_grouping(val: &str) -> Vec<c_char> {
-        val.split(',')
-            .filter_map(|s| s.trim().parse::<c_char>().ok())
-            .collect()
+    /// parse e.g. `3;3;0` -> [ 3,3,0 ], `-1` -> [ None ]
+    fn parse_int_group(val: &str) -> Vec<Option<c_char>> {
+        val.split(';').map(Self::parse_int).collect()
+    }
+
+    /// parse e.g. `-1` -> None, `1` -> Some(1)
+    fn parse_int(val: &str) -> Option<c_char> {
+        let r = val.trim().parse::<c_char>().ok();
+        if r.is_some_and(|i| i < 0) {
+            return None;
+        }
+        r
+    }
+
+    /// parse e.g. `""`
+    fn parse_str(val: &str) -> Option<CString> {
+        let mut r = String::new();
+        let mut v = val.chars();
+        if v.next() != Some('"') {
+            return None;
+        }
+        while let Some(c) = v.next() {
+            if c == '"' {
+                if v.next().is_some() {
+                    return None;
+                }
+                break;
+            }
+            // TODO: Parse <..>
+            r.push(c);
+        }
+        CString::new(r).ok()
     }
 }

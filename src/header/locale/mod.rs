@@ -1,7 +1,6 @@
 //! `locale.h` implementation.
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/locale.h.html>.
-//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap07.html>
 
 use alloc::{boxed::Box, ffi::CString, string::String};
 use core::{ptr, str::FromStr};
@@ -10,7 +9,7 @@ use crate::{
     c_str::CStr,
     error::{Errno, ResultExtPtrMut},
     fs::File,
-    header::errno,
+    header::{errno, fcntl},
     io::Read,
     platform::types::{c_char, c_int, c_void},
     sync::Once,
@@ -24,9 +23,6 @@ mod constants;
 use constants::*;
 mod data;
 use data::*;
-// TODO: No parsing implementation that's compatible with glibc
-mod redox;
-use redox::*;
 
 pub type locale_t = *mut c_void;
 /// constant struct to "C" or "POSIX" locale
@@ -157,4 +153,19 @@ pub unsafe extern "C" fn duplocale(loc: locale_t) -> locale_t {
         let loc = loc as *const _ as *const LocaleData;
         Box::into_raw(Box::from((*loc).clone())) as locale_t
     }
+}
+
+pub fn load_locale_file(name: &str) -> Result<Box<LocaleData>, Errno> {
+    let mut path = String::from("/usr/share/i18n/locales/");
+    path.push_str(name);
+
+    let path_c = CString::new(path).map_err(|_| Errno(errno::EINVAL))?;
+    let mut content = String::new();
+
+    let mut file = File::open(path_c.as_c_str().into(), fcntl::O_RDONLY)?;
+    file.read_to_string(&mut content)
+        .map_err(|_| Errno(errno::EIO))?;
+
+    let toml = PosixLocaleDef::parse(&content);
+    Ok(LocaleData::new(CString::from_str(name).unwrap(), toml))
 }

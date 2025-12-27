@@ -10,7 +10,11 @@ int main() {
     locale_t locale1 = newlocale(LC_ALL_MASK, "non-existent-locale", (locale_t)0);
     assert(locale1 == (locale_t)0);
 
-    // TODO: test with existing custom locale
+    // TODO: locale files inside redoxer?
+#ifndef __redox__
+    locale_t locale2 = newlocale(LC_ALL_MASK, "en_US", (locale_t)0);
+    assert(locale2 != (locale_t)0);
+#endif
 
     return 0;
 }
