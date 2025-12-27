@@ -6,6 +6,7 @@ CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins
 CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
 CC_WRAPPER?=
 RUSTCFLAGS?=
+LINKFLAGS?=-lgcc
 TESTBIN?=
 export OBJCOPY?=objcopy
 
@@ -129,7 +130,7 @@ $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/l
 		-Wl,--allow-multiple-definition \
 		-Wl,--whole-archive $^ -Wl,--no-whole-archive \
 		-Wl,-soname,libc.so.6 \
-		-lgcc \
+		$(LINKFLAGS) \
 		-o $@
 
 # Debug targets
