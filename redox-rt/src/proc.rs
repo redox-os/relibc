@@ -770,6 +770,21 @@ impl<const UPPER: bool> FdGuard<UPPER> {
     }
 
     #[inline]
+    pub fn call_ro(&self, payload: &mut [u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+        syscall::call_ro(self.fd, payload, flags, metadata)
+    }
+
+    #[inline]
+    pub fn call_wo(&self, payload: &[u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+        syscall::call_wo(self.fd, payload, flags, metadata)
+    }
+
+    #[inline]
+    pub fn call_rw(&self, payload: &mut [u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+        syscall::call_rw(self.fd, payload, flags, metadata)
+    }
+
+    #[inline]
     pub fn as_raw_fd(&self) -> usize {
         self.fd
     }

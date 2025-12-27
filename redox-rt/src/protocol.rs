@@ -268,14 +268,14 @@ bitflags! {
 pub enum NsDup {
     ForkNs = 0,
     ShrinkPermissions = 1,
-    IssueReister = 2,
+    IssueRegister = 2,
 }
 impl NsDup {
     pub fn try_from_raw(raw: usize) -> Option<Self> {
         Some(match raw {
             0 => Self::ForkNs,
             1 => Self::ShrinkPermissions,
-            2 => Self::IssueReister,
+            2 => Self::IssueRegister,
             _ => return None,
         })
     }

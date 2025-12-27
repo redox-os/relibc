@@ -430,3 +430,11 @@ pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
     }
     FdGuard::new(syscall::dup(crate::current_namespace_fd(), &buf)?).to_upper()
 }
+pub fn register_scheme_to_ns(ns_fd: usize, name: &str, cap_fd: usize) -> Result<()> {
+    let mut buf = alloc::vec::Vec::from((NsDup::IssueRegister as usize).to_ne_bytes());
+    buf.extend_from_slice(name.as_bytes());
+    let ns_this_scheme = FdGuard::new(syscall::dup(ns_fd, &buf)?);
+    let cap_bytes = cap_fd.to_ne_bytes();
+    ns_this_scheme.call_wo(&cap_bytes, CallFlags::FD, &[])?;
+    Ok(())
+}

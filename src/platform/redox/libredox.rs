@@ -463,3 +463,17 @@ pub unsafe extern "C" fn redox_setns_v0(fd: usize) -> RawResult {
         None => usize::MAX,
     }
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_register_scheme_to_ns_v0(
+    ns_fd: usize,
+    name_base: *mut u8,
+    name_len: usize,
+    cap_fd: usize,
+) -> RawResult {
+    Error::mux(redox_rt::sys::register_scheme_to_ns(
+        ns_fd,
+        str::from_utf8_unchecked(slice::from_raw_parts(name_base, name_len)),
+        cap_fd,
+    ))
+}
