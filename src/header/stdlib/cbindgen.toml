@@ -1,6 +1,5 @@
 sys_includes = ["stddef.h", "alloca.h", "wchar.h", "features.h"]
 include_guard = "_RELIBC_STDLIB_H"
-trailer = "#include <bits/stdlib.h>"
 language = "C"
 style = "Type"
 no_includes = true
