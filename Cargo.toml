@@ -84,4 +84,3 @@ panic = "abort"
 
 [patch.crates-io]
 cc-11 = { git = "https://github.com/tea/cc-rs", branch = "riscv-abi-arch-fix", package = "cc" }
-redox_syscall = { git = "https://gitlab.redox-os.org/Ibuki.O/syscall.git", branch = "namespace-improvement" }
