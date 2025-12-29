@@ -24,5 +24,4 @@ pub struct ForkScratchpad {
     pub cur_filetable_fd: usize,
     pub new_proc_fd: usize,
     pub new_thr_fd: usize,
-    pub new_ns_fd: usize,
 }

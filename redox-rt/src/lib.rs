@@ -285,13 +285,11 @@ pub fn current_namespace_fd() -> usize {
 struct ChildHookCommonArgs {
     new_thr_fd: FdGuard,
     new_proc_fd: Option<FdGuard>,
-    new_ns_fd: Option<FdGuard>,
 }
 
 unsafe fn child_hook_common(args: ChildHookCommonArgs) {
     let new_thr_fd = args.new_thr_fd.to_upper().unwrap();
     let new_proc_fd = args.new_proc_fd.map(|x| x.to_upper().unwrap());
-    let new_ns_fd = args.new_ns_fd.map(|x| x.to_upper().unwrap());
 
     // TODO: just pass PID to child rather than obtaining it via IPC?
     #[cfg(feature = "proc")]
@@ -320,21 +318,6 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
             .proc_fd
     };
     drop(old_proc_fd);
-
-    let mut lock = DYNAMIC_PROC_INFO.lock();
-    lock.pgid = metadata.pgid;
-    lock.ruid = metadata.ruid;
-    lock.euid = metadata.euid;
-    lock.suid = metadata.suid;
-    lock.rgid = metadata.rgid;
-    lock.egid = metadata.egid;
-    lock.sgid = metadata.sgid;
-
-    let old_ns_fd_guard = core::mem::replace(&mut lock.ns_fd, new_ns_fd);
-
-    if let Some(old_guard) = old_ns_fd_guard {
-        old_guard.take();
-    }
 
     let old_thr_fd = unsafe { RtTcb::current().thr_fd.get().replace(Some(new_thr_fd)) };
     drop(old_thr_fd);
