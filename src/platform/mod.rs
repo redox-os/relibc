@@ -400,5 +400,3 @@ pub unsafe fn init_inner(auxvs: Box<[[usize; 2]]>) {
 }
 #[cfg(not(target_os = "redox"))]
 pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {}
-#[cfg(not(target_os = "redox"))]
-pub unsafe fn init_inner(auxvs: Box<[[usize; 2]]>) {}

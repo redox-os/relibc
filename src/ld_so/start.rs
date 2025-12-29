@@ -236,6 +236,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
     _r_debug.lock().r_ldbase = ld_entry;
 
     // TODO: Fix memory leak, although minimal.
+    #[cfg(target_os = "redox")]
     unsafe {
         crate::platform::init_inner(auxv.clone());
     }
