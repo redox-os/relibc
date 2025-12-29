@@ -612,7 +612,8 @@ impl DSO {
                     };
                     tcb_master = Some(Master {
                         ptr,
-                        len: ph.p_filesz(endian) as usize,
+                        image_size: ph.p_filesz(endian) as usize,
+                        segment_size: ph.p_memsz(endian) as usize,
                         offset: tls_offset + ph.p_memsz(endian) as usize,
                     });
                     trace!("  tcb master {:x?}", tcb_master);
