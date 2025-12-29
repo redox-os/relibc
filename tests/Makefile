@@ -46,7 +46,9 @@ EXPECT_NAMES=\
 	glob \
 	iso646 \
 	libgen \
-	locale \
+	locale/duplocale \
+	locale/newlocale \
+	locale/setlocale \
 	math \
 	regex \
 	select \
