@@ -33,7 +33,8 @@ pub use generic_rt::{ExpectTlsFree, panic_notls};
 
 static mut STATIC_TCB_MASTER: Master = Master {
     ptr: ptr::null_mut(),
-    len: 0,
+    image_size: 0,
+    segment_size: 0,
     offset: 0,
 };
 
@@ -112,7 +113,7 @@ pub fn static_init(
 
             unsafe {
                 STATIC_TCB_MASTER.ptr = p_vaddr as *const u8;
-                STATIC_TCB_MASTER.len = p_filesz;
+                STATIC_TCB_MASTER.image_size = p_filesz;
                 STATIC_TCB_MASTER.offset = valign;
 
                 let tcb = Tcb::new(vsize).expect_notls("failed to allocate TCB");
