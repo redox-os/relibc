@@ -345,6 +345,14 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
             Some(FdGuard::new(ns_fd).to_upper().unwrap())
         },
     );
+    init_inner(auxvs)
+}
+#[cold]
+#[cfg(target_os = "redox")]
+pub unsafe fn init_inner(auxvs: Box<[[usize; 2]]>) {
+    use self::auxv_defs::*;
+    use crate::header::sys_stat::S_ISVTX;
+    use syscall::MODE_PERM;
 
     // TODO: Is it safe to assume setup_sighandler has been called at this point?
     redox_rt::sys::this_proc_call(
@@ -392,3 +400,5 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
 }
 #[cfg(not(target_os = "redox"))]
 pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {}
+#[cfg(not(target_os = "redox"))]
+pub unsafe fn init_inner(auxvs: Box<[[usize; 2]]>) {}

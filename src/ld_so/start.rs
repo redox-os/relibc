@@ -237,7 +237,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
 
     // TODO: Fix memory leak, although minimal.
     unsafe {
-        crate::platform::init(auxv.clone());
+        crate::platform::init_inner(auxv.clone());
     }
 
     let name_or_path = if is_manual {
