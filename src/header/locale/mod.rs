@@ -2,73 +2,170 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/locale.h.html>.
 
-use core::ptr;
+use alloc::{boxed::Box, ffi::CString, string::String};
+use core::{ptr, str::FromStr};
 
-use crate::platform::types::{c_char, c_int, c_void};
+use crate::{
+    c_str::CStr,
+    error::{Errno, ResultExtPtrMut},
+    fs::File,
+    header::{errno, fcntl},
+    io::Read,
+    platform::types::{c_char, c_int, c_void},
+    sync::Once,
+};
 
 const EMPTY_PTR: *const c_char = "\0" as *const _ as *const c_char;
 // Can't use &str because of the mutability
 static mut C_LOCALE: [c_char; 2] = [b'C' as c_char, 0];
 
-//TODO: locale_t internals
+mod constants;
+use constants::*;
+mod data;
+use data::*;
+
 pub type locale_t = *mut c_void;
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/locale.h.html>.
-#[repr(C)]
-pub struct lconv {
-    currency_symbol: *const c_char,
-    decimal_point: *const c_char,
-    frac_digits: c_char,
-    grouping: *const c_char,
-    int_curr_symbol: *const c_char,
-    int_frac_digits: c_char,
-    mon_decimal_point: *const c_char,
-    mon_grouping: *const c_char,
-    mon_thousands_sep: *const c_char,
-    negative_sign: *const c_char,
-    n_cs_precedes: c_char,
-    n_sep_by_space: c_char,
-    n_sign_posn: c_char,
-    positive_sign: *const c_char,
-    p_cs_precedes: c_char,
-    p_sep_by_space: c_char,
-    p_sign_posn: c_char,
-    thousands_sep: *const c_char,
-}
-unsafe impl Sync for lconv {}
-
-// Mutable because POSIX demands a mutable pointer, even though it warns
-// against mutating it
-static mut CURRENT_LOCALE: lconv = lconv {
-    currency_symbol: EMPTY_PTR,
-    decimal_point: ".\0" as *const _ as *const c_char,
-    frac_digits: c_char::max_value(),
-    grouping: EMPTY_PTR,
-    int_curr_symbol: EMPTY_PTR,
-    int_frac_digits: c_char::max_value(),
-    mon_decimal_point: EMPTY_PTR,
-    mon_grouping: EMPTY_PTR,
-    mon_thousands_sep: EMPTY_PTR,
-    negative_sign: EMPTY_PTR,
-    n_cs_precedes: c_char::max_value(),
-    n_sep_by_space: c_char::max_value(),
-    n_sign_posn: c_char::max_value(),
-    positive_sign: EMPTY_PTR,
-    p_cs_precedes: c_char::max_value(),
-    p_sep_by_space: c_char::max_value(),
-    p_sign_posn: c_char::max_value(),
-    thousands_sep: EMPTY_PTR,
-};
+/// constant struct to "C" or "POSIX" locale
+/// mutable because POSIX demands a mutable pointer
+static mut POSIX_LOCALE: lconv = posix_lconv();
+pub const LC_GLOBAL_LOCALE: locale_t = -1isize as locale_t;
+/// process-wide locale, used by setlocale() and localeconv()
+static mut GLOBAL_LOCALE: *mut GlobalLocaleData = ptr::null_mut();
+/// thread-wide locale, used by uselocale() and localeconv()
+#[thread_local]
+static mut THREAD_LOCALE: *mut LocaleData = ptr::null_mut();
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/localeconv.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn localeconv() -> *mut lconv {
-    &raw mut CURRENT_LOCALE as *mut _
+    let current = uselocale(ptr::null_mut());
+    if current == LC_GLOBAL_LOCALE || current.is_null() {
+        if !GLOBAL_LOCALE.is_null() {
+            // safety: GLOBAL_LOCALE is never set to null again
+            &raw mut (*GLOBAL_LOCALE).data.lconv
+        } else {
+            &raw mut POSIX_LOCALE
+        }
+    } else {
+        let current = current as *mut LocaleData;
+        &raw mut (*current).lconv
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setlocale.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn setlocale(_option: c_int, _val: *const c_char) -> *mut c_char {
-    // TODO actually implement
-    &raw mut C_LOCALE as *mut c_char
+pub unsafe extern "C" fn setlocale(category: c_int, locale: *const c_char) -> *mut c_char {
+    if GLOBAL_LOCALE.is_null() {
+        let new_global = GlobalLocaleData::new();
+        GLOBAL_LOCALE = Box::into_raw(new_global);
+    };
+    let Some(mut global) = GLOBAL_LOCALE.as_mut() else {
+        return ptr::null_mut();
+    };
+
+    if locale.is_null() {
+        let Some(name) = global.get_name(category) else {
+            return ptr::null_mut();
+        };
+        return name.as_ptr() as *mut c_char;
+    }
+
+    let name = CStr::from_ptr(locale).to_str().unwrap_or("C");
+
+    match load_locale_file(name) {
+        Ok(loc_ptr) => {
+            global.data.copy_category(&loc_ptr, category);
+            let Some(name) = global.set_name(category, CString::from_str(name).unwrap()) else {
+                return ptr::null_mut();
+            };
+            name.as_ptr() as *mut c_char
+        }
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn uselocale(newloc: locale_t) -> locale_t {
+    let old_loc = if THREAD_LOCALE.is_null() {
+        LC_GLOBAL_LOCALE
+    } else {
+        THREAD_LOCALE as locale_t
+    };
+
+    if !newloc.is_null() {
+        THREAD_LOCALE = if newloc == LC_GLOBAL_LOCALE {
+            ptr::null_mut()
+        } else {
+            newloc as *mut LocaleData
+        };
+    }
+
+    old_loc
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/newlocale.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn newlocale(mask: c_int, locale: *const c_char, base: locale_t) -> locale_t {
+    let name = CStr::from_ptr(locale).to_string_lossy().into_owned();
+    let name = name.as_str();
+    let mut new_locale = if name == "" || name == "C" || name == "POSIX" {
+        Ok(LocaleData::posix())
+    } else {
+        load_locale_file(name)
+    };
+    if base != LC_GLOBAL_LOCALE {
+        // borrowing here
+        let base = base as *const _ as *const LocaleData;
+        if let Ok(new_locale) = new_locale.as_mut() {
+            if let Some(base) = base.as_ref() {
+                // copy old values if not containing the mask
+                if (mask & LC_NUMERIC_MASK) == 0 {
+                    new_locale.copy_category(base, LC_NUMERIC);
+                }
+                if (mask & LC_MONETARY_MASK) == 0 {
+                    new_locale.copy_category(base, LC_MONETARY);
+                }
+                // TODO: other categories?
+            }
+        }
+    }
+    new_locale.or_errno_null_mut() as *mut _
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/freelocale.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn freelocale(loc: locale_t) {
+    if !loc.is_null() && loc != LC_GLOBAL_LOCALE {
+        drop(Box::from_raw(loc as *mut LocaleData));
+    }
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/duplocale.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duplocale(loc: locale_t) -> locale_t {
+    if loc.is_null() {
+        // TODO: errno?
+        loc
+    } else if loc == LC_GLOBAL_LOCALE {
+        Box::into_raw(LocaleData::posix()) as locale_t
+    } else {
+        // borrowing here
+        let loc = loc as *const _ as *const LocaleData;
+        Box::into_raw(Box::from((*loc).clone())) as locale_t
+    }
+}
+
+pub fn load_locale_file(name: &str) -> Result<Box<LocaleData>, Errno> {
+    let mut path = String::from("/usr/share/i18n/locales/");
+    path.push_str(name);
+
+    let path_c = CString::new(path).map_err(|_| Errno(errno::EINVAL))?;
+    let mut content = String::new();
+
+    let mut file = File::open(path_c.as_c_str().into(), fcntl::O_RDONLY)?;
+    file.read_to_string(&mut content)
+        .map_err(|_| Errno(errno::EIO))?;
+
+    let toml = PosixLocaleDef::parse(&content);
+    Ok(LocaleData::new(CString::from_str(name).unwrap(), toml))
 }
