@@ -1,4 +1,4 @@
-//! fnmatch implementation
+//! `fnmatch.h` implementation.
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fnmatch.h.html>.
 
@@ -7,7 +7,7 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::slice;
 
-use crate::platform::types::*;
+use crate::platform::types::{c_char, c_int};
 use posix_regex::{
     PosixRegex,
     compile::{Collation, Range, Token},
@@ -126,6 +126,7 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
     builder.finish()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fnmatch.html>.
 #[unsafe(no_mangle)]
 #[linkage = "weak"] // often redefined in GNU programs
 pub unsafe extern "C" fn fnmatch(

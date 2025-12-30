@@ -7,7 +7,7 @@
 
 // TODO: *_l functions
 
-use crate::platform::types::*;
+use crate::platform::types::c_int;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/isalnum.html>.
 #[unsafe(no_mangle)]
