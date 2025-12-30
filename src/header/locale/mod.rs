@@ -72,7 +72,14 @@ pub unsafe extern "C" fn setlocale(category: c_int, locale: *const c_char) -> *m
 
     let name = CStr::from_ptr(locale).to_str().unwrap_or("C");
 
-    match load_locale_file(name) {
+    let locale_file = if name == "" || name == "C" || name == "POSIX" {
+        // TODO: name == "" should read from LANG env
+        Ok(LocaleData::posix())
+    } else {
+        load_locale_file(name)
+    };
+
+    match locale_file {
         Ok(loc_ptr) => {
             global.data.copy_category(&loc_ptr, category);
             let Some(name) = global.set_name(category, CString::from_str(name).unwrap()) else {
@@ -110,6 +117,7 @@ pub unsafe extern "C" fn newlocale(mask: c_int, locale: *const c_char, base: loc
     let name = CStr::from_ptr(locale).to_string_lossy().into_owned();
     let name = name.as_str();
     let mut new_locale = if name == "" || name == "C" || name == "POSIX" {
+        // TODO: name == "" should read from LANG env
         Ok(LocaleData::posix())
     } else {
         load_locale_file(name)
