@@ -84,6 +84,7 @@ pub unsafe extern "C" fn setlocale(category: c_int, locale: *const c_char) -> *m
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/uselocale.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uselocale(newloc: locale_t) -> locale_t {
     let old_loc = if THREAD_LOCALE.is_null() {
