@@ -4,10 +4,6 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use crate::{
-    header::unistd::{SEEK_CUR, SEEK_SET},
-    platform::types::{c_int, c_void, off_t, size_t, ssize_t},
-};
 use alloc::{boxed::Box, vec::Vec};
 use core::{mem, ptr, slice};
 
@@ -16,14 +12,19 @@ use crate::{
     c_vec::CVec,
     error::{Errno, ResultExt, ResultExtPtrMut},
     fs::File,
-    header::{fcntl, stdlib, string},
+    header::{
+        errno::{self, EINVAL, EIO, ENOMEM, ENOTDIR},
+        fcntl, stdlib, string, sys_stat,
+        unistd::{SEEK_CUR, SEEK_SET},
+    },
     out::Out,
-    platform::{self, Pal, Sys, types::*},
-};
-
-use super::{
-    errno::{self, EINVAL, EIO, ENOMEM, ENOTDIR},
-    sys_stat,
+    platform::{
+        self, Pal, Sys,
+        types::{
+            c_char, c_int, c_long, c_uchar, c_ushort, c_void, ino_t, off_t, reclen_t, size_t,
+            ssize_t,
+        },
+    },
 };
 
 const INITIAL_BUFSIZE: usize = 512;
