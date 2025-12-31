@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_tcp.h.html>.
 
-use crate::platform::types::*;
+use crate::platform::types::c_int;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_tcp.h.html>.
 pub const TCP_NODELAY: c_int = 1;
