@@ -8,7 +8,10 @@ use alloc::ffi::CString;
 
 use crate::{
     c_str::CStr,
-    platform::{ERRNO, types::*},
+    platform::{
+        ERRNO,
+        types::{c_char, c_int, c_uint},
+    },
 };
 
 use super::errno::ENXIO;
