@@ -5,7 +5,7 @@ use sha_crypt::{
     sha512_crypt_b64,
 };
 
-use crate::platform::types::*;
+use crate::platform::types::c_ulong;
 
 // key limit is not part of the original design, added for DoS protection.
 // rounds limit has been lowered (versus the reference/spec), also for DoS
