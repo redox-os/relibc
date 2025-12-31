@@ -3,7 +3,7 @@
 
 use crate::{
     header::time::{CLOCK_MONOTONIC, clock_gettime, timespec},
-    platform::types::*,
+    platform::types::{c_uint, clockid_t},
 };
 
 use core::sync::atomic::{AtomicU32, Ordering};
