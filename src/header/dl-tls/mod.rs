@@ -5,6 +5,9 @@
 // dropped from src/lib.rs.
 #![warn(warnings, unused_variables)]
 
+#[cfg(target_arch = "x86")]
+use core::arch::global_asm;
+
 use alloc::alloc::alloc;
 use core::{alloc::Layout, ptr};
 
