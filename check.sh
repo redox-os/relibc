@@ -102,7 +102,6 @@ run_redoxer() {
     REDOXER_ENV="redoxer env"
     if [ "$IS_HOST" -eq 0 ]; then
         redoxer toolchain || { echo -e "${RED}Fail: redoxer toolchain for: $target.${NC}" && exit 1; }
-        export CARGOFLAGS=""
         export CARGO_TEST="redoxer"
         export TEST_RUNNER="redoxer exec --folder ../sysroot/$TARGET/:/usr --folder . --"
         MAKE_ACTION="$MAKE_ACTION IS_REDOX=1"
