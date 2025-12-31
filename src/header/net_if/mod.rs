@@ -84,3 +84,35 @@ pub unsafe extern "C" fn if_nametoindex(name: *const c_char) -> c_uint {
     }
     0
 }
+
+// Nonstandard, used alongside ifaddrs.h
+// See https://man7.org/linux/man-pages/man7/netdevice.7.html
+
+pub const IFF_UP: c_int = 0x1;
+pub const IFF_BROADCAST: c_int = 0x2;
+pub const IFF_DEBUG: c_int = 0x4;
+pub const IFF_LOOPBACK: c_int = 0x8;
+pub const IFF_POINTOPOINT: c_int = 0x10;
+pub const IFF_NOTRAILERS: c_int = 0x20;
+pub const IFF_RUNNING: c_int = 0x40;
+pub const IFF_NOARP: c_int = 0x80;
+pub const IFF_PROMISC: c_int = 0x100;
+pub const IFF_ALLMULTI: c_int = 0x200;
+pub const IFF_MASTER: c_int = 0x400;
+pub const IFF_SLAVE: c_int = 0x800;
+pub const IFF_MULTICAST: c_int = 0x1000;
+pub const IFF_PORTSEL: c_int = 0x2000;
+pub const IFF_AUTOMEDIA: c_int = 0x4000;
+pub const IFF_DYNAMIC: c_int = 0x8000;
+pub const IFF_LOWER_UP: c_int = 0x10000;
+pub const IFF_DORMANT: c_int = 0x20000;
+pub const IFF_ECHO: c_int = 0x40000;
+pub const IFF_VOLATILE: c_int = (IFF_LOOPBACK
+    | IFF_POINTOPOINT
+    | IFF_BROADCAST
+    | IFF_ECHO
+    | IFF_MASTER
+    | IFF_SLAVE
+    | IFF_RUNNING
+    | IFF_LOWER_UP
+    | IFF_DORMANT);
