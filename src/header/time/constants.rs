@@ -1,4 +1,4 @@
-use crate::platform::types::*;
+use crate::platform::types::{c_char, c_int, c_long, clockid_t};
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]

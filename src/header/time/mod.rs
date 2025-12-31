@@ -15,7 +15,13 @@ use crate::{
     },
     io::Read,
     out::Out,
-    platform::{self, Pal, Sys, types::*},
+    platform::{
+        self, Pal, Sys,
+        types::{
+            c_char, c_double, c_int, c_long, c_ulong, clock_t, clockid_t, pid_t, pthread_t, size_t,
+            time_t, timer_t,
+        },
+    },
     sync::{Mutex, MutexGuard},
 };
 use __libc_only_for_layout_checks::EINVAL;
