@@ -25,7 +25,7 @@ HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "
 
 SRC=\
 	Cargo.* \
-	$(shell find src -type f)
+	$(shell find src/ redox-rt/src/ ld_so/src/ redox-ioctl/src/ include/ -type f)
 
 BUILTINS_VERSION=0.1.70
 
