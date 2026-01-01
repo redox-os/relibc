@@ -66,13 +66,15 @@ pub unsafe extern "C" fn memchr(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> c_int {
     let (div, rem) = (n / mem::size_of::<usize>(), n % mem::size_of::<usize>());
-    let mut a = s1 as *const usize;
-    let mut b = s2 as *const usize;
+    let mut a = s1.cast::<usize>();
+    let mut b = s2.cast::<usize>();
     for _ in 0..div {
-        if *a != *b {
+        // SAFETY: `s1` and `s2` are `*const c_void`, which only guarantees byte
+        // alignment. Hence `a` and `b` may be unaligned.
+        if a.read_unaligned() != b.read_unaligned() {
             for i in 0..mem::size_of::<usize>() {
-                let c = *(a as *const u8).add(i);
-                let d = *(b as *const u8).add(i);
+                let c = *(a.cast::<u8>()).add(i);
+                let d = *(b.cast::<u8>()).add(i);
                 if c != d {
                     return c as c_int - d as c_int;
                 }
@@ -83,8 +85,8 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) 
         b = b.offset(1);
     }
 
-    let mut a = a as *const u8;
-    let mut b = b as *const u8;
+    let mut a = a.cast::<u8>();
+    let mut b = b.cast::<u8>();
     for _ in 0..rem {
         if *a != *b {
             return *a as c_int - *b as c_int;
