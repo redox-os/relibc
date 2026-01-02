@@ -1,8 +1,13 @@
-//! getopt implementation for Redox, following http://pubs.opengroup.org/onlinepubs/009695399/functions/getopt.html
+//! `getopt` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getopt.html>.
 
 use core::ptr;
 
-use crate::{header::getopt, platform::types::*};
+use crate::{
+    header::getopt,
+    platform::types::{c_char, c_int},
+};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getopt.html>.
 #[allow(non_upper_case_globals)]
