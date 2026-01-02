@@ -6,7 +6,10 @@ use core::slice;
 
 use crate::{
     error::ResultExt,
-    platform::{Pal, Sys, types::*},
+    platform::{
+        Pal, Sys,
+        types::{c_uint, c_void, size_t, ssize_t},
+    },
 };
 
 /// See <https://www.man7.org/linux/man-pages/man2/getrandom.2.html>.
