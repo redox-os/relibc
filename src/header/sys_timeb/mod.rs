@@ -14,7 +14,7 @@ use core::ptr::NonNull;
 
 use crate::{
     header::sys_time::{gettimeofday, timeval, timezone},
-    platform::types::*,
+    platform::types::{c_int, c_short, c_ushort, time_t},
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/timeb.h.html>.

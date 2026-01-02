@@ -7,7 +7,10 @@ use crate::{
     error::ResultExt,
     header::time::timespec,
     out::Out,
-    platform::{Pal, PalSignal, Sys, types::*},
+    platform::{
+        Pal, PalSignal, Sys,
+        types::{c_char, c_int, c_long, suseconds_t, time_t},
+    },
 };
 use core::ptr::null;
 
