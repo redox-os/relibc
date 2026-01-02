@@ -5,7 +5,10 @@
 // TODO: set this for entire crate when possible
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use crate::platform::{self, types::*};
+use crate::platform::{
+    self,
+    types::{c_char, c_int},
+};
 
 //TODO: Consider removing, provided for compatibility with newlib
 #[unsafe(no_mangle)]
