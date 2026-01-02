@@ -6,7 +6,10 @@ use crate::{
     c_str::{CStr, CString},
     error::{Errno, ResultExt},
     header::{fcntl, unistd},
-    platform::{ERRNO, Pal, Sys, types::*},
+    platform::{
+        ERRNO, Pal, Sys,
+        types::{c_char, c_int, c_void, mode_t, off_t, size_t},
+    },
 };
 
 pub use self::sys::*;
