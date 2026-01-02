@@ -3,8 +3,11 @@
 //! Non-POSIX, see <https://man7.org/linux/man-pages/man3/posix_memalign.3.html>.
 
 use crate::{
-    header::errno::*,
-    platform::{self, ERRNO, Pal, Sys, types::*},
+    header::errno::ENOMEM,
+    platform::{
+        self, ERRNO, Pal, Sys,
+        types::{c_void, size_t},
+    },
 };
 use core::ptr;
 
