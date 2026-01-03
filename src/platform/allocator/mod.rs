@@ -97,3 +97,10 @@ pub unsafe fn free(ptr: *mut c_void) {
     }
     (*ALLOCATOR.get()).lock().free(ptr.cast())
 }
+
+pub unsafe fn alloc_usable_size(ptr: *mut c_void) -> size_t {
+    if ptr.is_null() {
+        return 0;
+    }
+    (*ALLOCATOR.get()).lock().usable_size(ptr.cast())
+}
