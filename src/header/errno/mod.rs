@@ -5,7 +5,10 @@
 // TODO: set this for entire crate when possible
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use crate::platform::{self, types::*};
+use crate::platform::{
+    self,
+    types::{c_char, c_int},
+};
 
 //TODO: Consider removing, provided for compatibility with newlib
 #[unsafe(no_mangle)]
@@ -178,7 +181,7 @@ pub const EOWNERDEAD: c_int = 130; /* Owner died */
 pub const ENOTRECOVERABLE: c_int = 131; /* State not recoverable */
 
 /// String representations for the respective `errno` values.
-pub const STR_ERROR: [&str; 132] = [
+pub(crate) const STR_ERROR: [&str; 132] = [
     "Success",
     "Operation not permitted",
     "No such file or directory",
@@ -314,7 +317,7 @@ pub const STR_ERROR: [&str; 132] = [
 ];
 
 /// Longest error message length
-pub const STRERROR_MAX: usize = {
+pub(crate) const STRERROR_MAX: usize = {
     // Number of digits of the max value of this platform's c_int
     let digits = {
         let mut len = 0;

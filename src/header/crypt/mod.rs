@@ -16,7 +16,10 @@ use rand::{RngCore, SeedableRng, rngs::SmallRng};
 use crate::{
     c_str::CStr,
     header::{errno::EINVAL, stdlib::rand},
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int},
+    },
 };
 
 mod argon2;
@@ -32,7 +35,10 @@ use self::{
     md5::crypt_md5,
     pbkdf2::crypt_pbkdf2,
     scrypt::crypt_scrypt,
-    sha::{ShaType::*, crypt_sha},
+    sha::{
+        ShaType::{Sha256, Sha512},
+        crypt_sha,
+    },
 };
 
 /// See <https://www.man7.org/linux/man-pages/man3/crypt.3.html>.

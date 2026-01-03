@@ -1,4 +1,6 @@
-//! setjmp implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/setjmp.h.html
+//! `setjmp.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/setjmp.h.html>.
 
 use core::arch::global_asm;
 
@@ -22,6 +24,8 @@ platform_specific! {
 
 //Each platform has different sizes for sigjmp_buf, currently only x86_64 is supported
 unsafe extern "C" {
+    /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setjmp.html>.
     pub fn setjmp(jb: *mut u64) -> i32;
+    /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/longjmp.html>.
     pub fn longjmp(jb: *mut u64, ret: i32);
 }

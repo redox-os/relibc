@@ -1,4 +1,6 @@
-//! getopt implementation for relibc
+//! `getopt` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getopt.html>.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
@@ -7,7 +9,7 @@ use crate::{
         stdio, string,
         unistd::{optarg, opterr, optind, optopt},
     },
-    platform::types::*,
+    platform::types::{c_char, c_int, size_t},
 };
 use core::ptr;
 
@@ -25,6 +27,11 @@ pub struct option {
     val: c_int,
 }
 
+/// See <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
+///
+/// Non-POSIX.
+///
+/// Functions the same as `getopt` but also accepts long options.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getopt_long(
     argc: c_int,

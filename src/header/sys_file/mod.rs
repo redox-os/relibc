@@ -4,7 +4,7 @@
 
 use crate::{
     error::ResultExt,
-    platform::{Pal, Sys, types::*},
+    platform::{Pal, Sys, types::c_int},
 };
 
 pub const LOCK_SH: c_int = 1;

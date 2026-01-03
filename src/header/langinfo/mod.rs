@@ -1,10 +1,13 @@
-// langinfo.h implementation for Redox, following the POSIX standard.
-// Following https://pubs.opengroup.org/onlinepubs/7908799/xsh/langinfo.h.html
-//
+//! `langinfo.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/langinfo.h.html>.
+
 // TODO : involve loading locale data. Currently, the implementation only supports the "C" locale.
 
 use core::ffi::c_char;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/langinfo.h.html>.
+///
 /// POSIX type for items used with `nl_langinfo`
 /// In practice, this is an integer index into the string table.
 pub type nl_item = i32;
@@ -130,10 +133,12 @@ pub const RADIXCHAR: nl_item = 50;
 pub const THOUSEP: nl_item = 51;
 pub const YESEXPR: nl_item = 52;
 pub const NOEXPR: nl_item = 53;
-pub const YESSTR: nl_item = 54; // Legaxy
+pub const YESSTR: nl_item = 54; // Legacy
 pub const NOSTR: nl_item = 55; // Legacy
 pub const CRNCYSTR: nl_item = 56;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nl_langinfo.html>.
+///
 /// Get a string from the langinfo table
 ///
 /// # Safety

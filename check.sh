@@ -12,6 +12,7 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  --test              Run 'make test' instead of 'make all'"
+    echo "  --test=             Run single 'make test'"
     echo "  --cargo             Run 'cargo check' / 'cargo test' instead"
     echo "                         (note: cargo test is currently not maintained for relibc)"
     echo "  --host              Run the command on host (linux) target"
@@ -54,6 +55,7 @@ CHECK_ALL=false
 CMD_ACTION="make"
 CARGO_ACTION="check"
 MAKE_ACTION="all"
+TEST_BIN=""
 IS_HOST=0
 
 while [[ $# -gt 0 ]]; do
@@ -64,6 +66,10 @@ while [[ $# -gt 0 ]]; do
         --test)
             MAKE_ACTION="test"
             CARGO_ACTION="test"
+            ;;
+        --test=*)
+            TEST_BIN="${1#*=}"
+            MAKE_ACTION="test-once"
             ;;
         --cargo)
             CMD_ACTION="cargo"
@@ -96,12 +102,22 @@ run_redoxer() {
     REDOXER_ENV="redoxer env"
     if [ "$IS_HOST" -eq 0 ]; then
         redoxer toolchain || { echo -e "${RED}Fail: redoxer toolchain for: $target.${NC}" && exit 1; }
-        export CARGOFLAGS=""
         export CARGO_TEST="redoxer"
         export TEST_RUNNER="redoxer exec --folder ../sysroot/$TARGET/:/usr --folder . --"
+# TODO: Identify hang issue with pthread/barrier and pthread/once tests in multi core to get rid of this limit
+        export REDOXER_QEMU_ARGS="-smp 1"
+
         MAKE_ACTION="$MAKE_ACTION IS_REDOX=1"
     else
         REDOXER_ENV=""
+    fi
+
+    if [ "$TEST_BIN" != "" ]; then
+        if [ "$IS_HOST" -eq 0 ]; then
+            MAKE_ACTION="$MAKE_ACTION TESTBIN=bins_dynamic/$TEST_BIN"
+        else
+            MAKE_ACTION="$MAKE_ACTION TESTBIN=bins_static/$TEST_BIN"
+        fi
     fi
 
     if [ "$CMD_ACTION" == "make" ]; then

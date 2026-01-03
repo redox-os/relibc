@@ -4,7 +4,7 @@
 
 use crate::{
     header::time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec},
-    platform::types::*,
+    platform::types::{c_char, c_int, c_long, c_uint, clockid_t},
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/semaphore.h.html>.

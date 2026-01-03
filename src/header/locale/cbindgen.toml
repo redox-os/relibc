@@ -7,6 +7,3 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
-
-[export]
-include = ["locale_t"]

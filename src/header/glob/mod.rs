@@ -1,4 +1,6 @@
-//! glob implementation, following https://pubs.opengroup.org/onlinepubs/9699919799/functions/glob.html
+//! `glob.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/glob.h.html>.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
@@ -14,7 +16,10 @@ use crate::{
         fnmatch::{FNM_NOESCAPE, FNM_PERIOD, fnmatch},
         sys_stat::{S_IFDIR, S_IFLNK, S_IFMT, stat},
     },
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, c_uchar, c_void, size_t},
+    },
 };
 
 // Cause glob() to return on error
@@ -41,6 +46,7 @@ pub const GLOB_ABORTED: c_int = 2;
 // Pattern does not match any existing pathname, and GLOB_NOCHECK was not set
 pub const GLOB_NOMATCH: c_int = 3;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/glob.h.html>.
 #[derive(Debug)]
 #[repr(C)]
 pub struct glob_t {
@@ -52,6 +58,7 @@ pub struct glob_t {
     __opaque: *mut c_void, // Vec<*mut c_char>
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/glob.html>.
 #[linkage = "weak"] // GNU prefers its own glob e.g. in Make
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn glob(
@@ -146,6 +153,7 @@ pub unsafe extern "C" fn glob(
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/glob.html>.
 #[linkage = "weak"] // GNU prefers its own glob e.g. in Make
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn globfree(pglob: *mut glob_t) {

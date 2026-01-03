@@ -252,7 +252,7 @@ pub extern "C" fn getpwent() -> *mut passwd {
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpwnam.html>.
 #[unsafe(no_mangle)]
-pub extern "C" fn getpwnam(name: *const c_char) -> *mut passwd {
+pub unsafe extern "C" fn getpwnam(name: *const c_char) -> *mut passwd {
     pwd_lookup(|parts| unsafe { strcmp(parts.pw_name, name) } == 0, None)
         .map(|res| res.into_global())
         .unwrap_or(ptr::null_mut())

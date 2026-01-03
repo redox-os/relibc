@@ -46,7 +46,9 @@ EXPECT_NAMES=\
 	glob \
 	iso646 \
 	libgen \
-	locale \
+	locale/duplocale \
+	locale/newlocale \
+	locale/setlocale \
 	math \
 	regex \
 	select \
@@ -335,6 +337,12 @@ run: bins_verify/relibc-tests $(BINS) $(EXPECT_BINS) $(EXPECT_INPUT_BINS)
 		expect "$$(readlink -e $${exp}.exp)" "$$(readlink -e $${exp})" test args || exit $$?; \
 	done
 
+run-once: bins_verify/relibc-tests $(BUILD)/$(TESTBIN)
+	@echo "\033[1;36;49mRunning single test $(TESTBIN) $*\033[0m"
+	@if [ -f "expected/$(TESTBIN).stdout" ]; then \
+		$(TEST_RUNNER) $< $(TESTBIN); \
+	else $(TEST_RUNNER) $< -s$(TESTBIN); fi
+
 bins_verify/relibc-tests: src/main.rs
 	$(CARGO_TEST) build --release --bin relibc-tests --out-dir bins_verify -Z unstable-options
 
@@ -372,6 +380,10 @@ FLAGS+=\
 	$(SYSROOT)/lib/crt0.o \
 	$(SYSROOT)/lib/crti.o \
 	$(SYSROOT)/lib/crtn.o
+
+ifeq ($(TARGET),aarch64-unknown-redox)
+FLAGS+=-mno-outline-atomics
+endif
 
 STATIC_FLAGS+=\
 	$(SYSROOT)/lib/libc.a
