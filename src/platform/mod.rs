@@ -334,7 +334,25 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
     let Some(proc_fd) = get_auxv(&auxvs, AT_REDOX_PROC_FD) else {
         panic!("Missing proc and thread fd!");
     };
-    redox_rt::initialize(FdGuard::new(proc_fd).to_upper().unwrap());
+    let Some(ns_fd) = get_auxv(&auxvs, AT_REDOX_NS_FD) else {
+        panic!("Missing namespace fd!");
+    };
+    redox_rt::initialize(
+        FdGuard::new(proc_fd).to_upper().unwrap(),
+        if ns_fd == usize::MAX {
+            None
+        } else {
+            Some(FdGuard::new(ns_fd).to_upper().unwrap())
+        },
+    );
+    init_inner(auxvs)
+}
+#[cold]
+#[cfg(target_os = "redox")]
+pub unsafe fn init_inner(auxvs: Box<[[usize; 2]]>) {
+    use self::auxv_defs::*;
+    use crate::header::sys_stat::S_ISVTX;
+    use syscall::MODE_PERM;
 
     // TODO: Is it safe to assume setup_sighandler has been called at this point?
     redox_rt::sys::this_proc_call(
