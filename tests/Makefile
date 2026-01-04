@@ -49,6 +49,7 @@ EXPECT_NAMES=\
 	locale/duplocale \
 	locale/newlocale \
 	locale/setlocale \
+	malloc/usable_size \
 	math \
 	regex \
 	select \
