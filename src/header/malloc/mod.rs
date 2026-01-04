@@ -40,3 +40,9 @@ pub unsafe extern "C" fn pvalloc(size: size_t) -> *mut c_void {
         }
     }
 }
+
+/// See <https://man7.org/linux/man-pages/man3/malloc_usable_size.3.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn malloc_usable_size(ptr: *mut c_void) -> size_t {
+    platform::alloc_usable_size(ptr)
+}
