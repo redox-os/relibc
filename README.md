@@ -108,44 +108,22 @@ Note: Do not edit `relibc` inside `prefix` folder! Do your work on `relibc` fold
 
 ## Tests
 
-This section explain how to build and run the tests.
+Relibc has a test suite that also runs every time a new commit get pushed. You can see `.gitlab-ci.yml` to see how it's being executed. That being said, `./check.sh` is the recommended way to run tests. Here's few examples:
 
-### Build
++ `./check.sh` - Run build, without running the test
++ `./check.sh --test` - Run all tests in x86_64 Redox using Redoxer
++ `./check.sh --test --host` - Run all tests in host (Linux)
++ `./check.sh --test --arch=aarch64` - Run all tests in specified arch
+  - Arch can be `x86_64`, `aarch64`, `i586`, or `riscv64gc`
++ `./check.sh --test=stdio/printf` - Run a single test
+  - Can be combined with `--host` or `--arch`
+  - Will run statically linked test in Linux, dynamically linked in Redox
 
-To build the tests run `make all` on the `tests` folder, it will store the executables at `tests/bins_static`
+Couple of notes:
 
-If you did changes to your tests, run `make clean all` to rebuild the executables.
-
-### Redox OS Testing
-
-To test on Redox do the following steps:
-
-- Add the `relibc-tests` recipe on your filesystem configuration at `config/your-cpu/your-config.toml` (generally `desktop.toml`)
-- Run the following commands to rebuild relibc with your changes, update the `relibc-tests` recipe and update your QEMU image:
-
-```sh
-touch relibc
-```
-
-```sh
-make prefix cr.relibc-tests image
-```
-
-- Run the tests
-
-```sh
-/usr/share/relibc-tests/bins_static/test-name
-```
-
-### Linux Testing
-
-Run `make test` on the relibc directory.
-
-If you want to run one test, run the following command:
-
-```sh
-tests/bins_static/test-name
-```
+- Relibc and its tests will rebuild if files changed, however switching between arch or host requires you to run `make clean`
+- Redoxer is needed to run tests for Redox. You can install it using `cargo install redoxer`
+- Tests can hangs, the test runner can anticipate this, assuming the kernel doesn't hang too.
 
 ## Issues
 

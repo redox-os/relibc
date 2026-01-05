@@ -1,3 +1,5 @@
+#![feature(exit_status_error)]
+
 use std::{
     env, fs,
     io::{self, Read, Write},
@@ -48,12 +50,28 @@ fn expected(bin: &str, kind: &str, generated: &[u8], status: ExitStatus) -> Resu
 
 const STATUS_ONLY: &str = "-s";
 
+fn print_tabbed(output: Vec<u8>, name: &str) {
+    if let Ok(stdout) = String::from_utf8(output) {
+        let stdout: Vec<String> = stdout.trim().lines().map(|p| format!("  {}", p)).collect();
+        let stdout = stdout.join("\n");
+        if stdout.as_str() == "" {
+            println!("{name}: empty content");
+        } else {
+            println!("{name}:\n{}", stdout);
+        }
+    } else {
+        println!("can't print out {name}: not utf8");
+    }
+}
+
 fn main() {
     let mut failures = Vec::new();
     let timeout = Duration::from_secs(10);
     let slowtime = Duration::from_secs(1);
+    let bins: Vec<String> = env::args().skip(1).collect();
+    let single_test = bins.len() == 1;
 
-    for bin in env::args().skip(1) {
+    for bin in bins {
         let status_only = bin.starts_with(STATUS_ONLY);
         let bin = if bin.starts_with(STATUS_ONLY) {
             bin.strip_prefix(STATUS_ONLY).unwrap().to_string()
@@ -152,13 +170,30 @@ fn main() {
         }
 
         match (status, child) {
-            (Some(exit_status), Some(child)) => {
-                if !status_only {
-                    let mut stdout = Vec::new();
-                    let mut stderr = Vec::new();
-                    child.stdout.unwrap().read_to_end(&mut stdout).unwrap();
-                    child.stderr.unwrap().read_to_end(&mut stderr).unwrap();
+            (exit_status, Some(mut child)) => {
+                if exit_status.is_none() {
+                    match child.kill() {
+                        Ok(_) => {}
+                        Err(e) => {
+                            // if can't be killed then getting the output will hang
+                            println!("Unable to kill, can't get output: {:?}", e);
+                            continue;
+                        }
+                    }
+                }
+                let mut stdout = Vec::new();
+                let mut stderr = Vec::new();
+                child.stdout.unwrap().read_to_end(&mut stdout).unwrap();
+                child.stderr.unwrap().read_to_end(&mut stderr).unwrap();
 
+                let Some(exit_status) = exit_status else {
+                    // hangs
+                    print_tabbed(stdout, "stdout");
+                    print_tabbed(stderr, "stderr");
+                    continue;
+                };
+
+                if !status_only {
                     if let Err(failure) = expected(&bin, "stdout", &stdout, exit_status) {
                         println!("{}", failure);
                         failures.push(failure);
@@ -167,6 +202,17 @@ fn main() {
                         println!("{}", failure);
                         failures.push(failure);
                     }
+                }
+
+                if let Err(e) = exit_status.exit_ok() {
+                    let failure = format!("test return error: {}", e);
+                    println!("{}", failure);
+                    failures.push(failure);
+                }
+
+                if single_test {
+                    print_tabbed(stdout, "stdout");
+                    print_tabbed(stderr, "stderr");
                 }
             }
             (_, _) => {
