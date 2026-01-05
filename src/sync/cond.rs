@@ -2,23 +2,52 @@
 
 use crate::{
     error::Errno,
-    header::{pthread::*, time::timespec},
+    header::{
+        pthread::*,
+        time::{CLOCK_REALTIME, clock_gettime, timespec},
+    },
+    platform::types::clockid_t,
 };
 
 use core::sync::atomic::{AtomicU32 as AtomicUint, Ordering};
+pub struct CondAttr {
+    pub clock: clockid_t,
+    pub pshared: i32,
+}
+
+impl Default for CondAttr {
+    fn default() -> Self {
+        Self {
+            // defaults according to POSIX
+            clock: CLOCK_REALTIME,            // for timedwait
+            pshared: PTHREAD_PROCESS_PRIVATE, // TODO
+        }
+    }
+}
 
 pub struct Cond {
     cur: AtomicUint,
     prev: AtomicUint,
+    // based on CondAttr
+    pub clock: clockid_t,
+    pub pshared: i32,
 }
 
 type Result<T, E = Errno> = core::result::Result<T, E>;
 
+impl Default for Cond {
+    fn default() -> Self {
+        Self::new(&CondAttr::default())
+    }
+}
+
 impl Cond {
-    pub fn new() -> Self {
+    pub fn new(attr: &CondAttr) -> Self {
         Self {
             cur: AtomicUint::new(0),
             prev: AtomicUint::new(0),
+            clock: attr.clock,
+            pshared: attr.pshared,
         }
     }
     fn wake(&self, count: i32) -> Result<(), Errno> {
@@ -36,8 +65,38 @@ impl Cond {
         self.broadcast()
         //self.wake(1)
     }
+    pub fn clockwait(
+        &self,
+        mutex: &RlctMutex,
+        timeout: &timespec,
+        clock_id: clockid_t,
+    ) -> Result<(), Errno> {
+        // adjusted timeout similar in semaphore.rs
+
+        let mut time = timespec::default();
+        unsafe { clock_gettime(clock_id, &mut time) };
+        if (time.tv_sec > timeout.tv_sec)
+            || (time.tv_sec == timeout.tv_sec && time.tv_nsec >= timeout.tv_nsec)
+        {
+            //Timeout happened, return directly
+            return Ok(());
+        } else {
+            let mut relative = timespec {
+                tv_sec: timeout.tv_sec,
+                tv_nsec: timeout.tv_nsec,
+            };
+            while relative.tv_nsec < time.tv_nsec {
+                relative.tv_sec -= 1;
+                relative.tv_nsec += 1_000_000_000;
+            }
+            relative.tv_sec -= time.tv_sec;
+            relative.tv_nsec -= time.tv_nsec;
+
+            self.wait_inner(mutex, Some(&relative))
+        }
+    }
     pub fn timedwait(&self, mutex: &RlctMutex, timeout: &timespec) -> Result<(), Errno> {
-        self.wait_inner(mutex, Some(timeout))
+        self.clockwait(mutex, timeout, self.clock)
     }
     fn wait_inner(&self, mutex: &RlctMutex, timeout: Option<&timespec>) -> Result<(), Errno> {
         self.wait_inner_generic(

@@ -8,18 +8,7 @@ use super::*;
 
 pub(crate) type RlctBarrier = Barrier;
 
-#[derive(Clone, Copy)]
-pub(crate) struct RlctBarrierAttr {
-    pshared: c_int,
-}
-impl Default for RlctBarrierAttr {
-    fn default() -> Self {
-        // pshared = PTHREAD_PROCESS_PRIVATE is default according to POSIX.
-        Self {
-            pshared: PTHREAD_PROCESS_PRIVATE,
-        }
-    }
-}
+pub(crate) type RlctBarrierAttr = BarrierAttr;
 
 // Not async-signal-safe.
 #[unsafe(no_mangle)]
@@ -49,7 +38,9 @@ pub unsafe extern "C" fn pthread_barrier_init(
         return EINVAL;
     };
 
-    barrier.cast::<RlctBarrier>().write(RlctBarrier::new(count));
+    barrier
+        .cast::<RlctBarrier>()
+        .write(RlctBarrier::new(count, attr));
     0
 }
 

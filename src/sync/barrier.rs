@@ -1,13 +1,30 @@
 use core::num::NonZeroU32;
 
+use crate::header::pthread::PTHREAD_PROCESS_PRIVATE;
+
 pub struct Barrier {
     original_count: NonZeroU32,
     // 4
     lock: crate::sync::Mutex<Inner>,
     // 16
-    cvar: crate::header::pthread::RlctCond,
-    // 24
+    cvar: crate::sync::cond::Cond,
+    // 32
 }
+
+#[derive(Clone, Copy)]
+pub struct BarrierAttr {
+    pub pshared: i32,
+}
+
+impl Default for BarrierAttr {
+    fn default() -> Self {
+        // same default with CondAttr
+        Self {
+            pshared: PTHREAD_PROCESS_PRIVATE,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Inner {
     count: u32,
@@ -21,14 +38,18 @@ pub enum WaitResult {
 }
 
 impl Barrier {
-    pub fn new(count: NonZeroU32) -> Self {
+    pub fn new(count: NonZeroU32, attr: BarrierAttr) -> Self {
         Self {
             original_count: count,
             lock: crate::sync::Mutex::new(Inner {
                 count: 0,
                 gen_id: 0,
             }),
-            cvar: crate::header::pthread::RlctCond::new(),
+            cvar: crate::sync::cond::Cond::new(&super::cond::CondAttr {
+                // assuming clock never used
+                clock: 0,
+                pshared: attr.pshared,
+            }),
         }
     }
     pub fn wait(&self) -> WaitResult {
