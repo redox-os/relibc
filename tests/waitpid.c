@@ -12,7 +12,7 @@ void for_code(int code) {
     // Testing successful exit
     if (pid == 0) {
         // child
-        usleep(100);
+        usleep(100000);
         _Exit(code);
     }
     printf("Testing waitpid of child %d for code %d\n", pid, code);
