@@ -71,6 +71,7 @@ EXPECT_NAMES=\
 	stdio/mutex \
 	stdio/popen \
 	stdio/printf \
+	stdio/putc_unlocked \
 	stdio/rename \
 	stdio/renameat \
 	stdio/scanf \
