@@ -205,7 +205,7 @@ fn main() {
                 }
 
                 if let Err(e) = exit_status.exit_ok() {
-                    let failure = format!("test return error: {}", e);
+                    let failure = format!("# {}: {}", bin, e);
                     println!("{}", failure);
                     failures.push(failure);
                 }
