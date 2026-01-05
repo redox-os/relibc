@@ -26,7 +26,7 @@ int main() {
     if (pid == 0) {
         // Test behavior on Redox when TRACEME hasn't been activated
         // before waitpid is invoked!
-        usleep(100);
+        usleep(100000);
 
         int result = ptrace(PTRACE_TRACEME, 0, NULL, NULL);
         ERROR_IF(ptrace, result, == -1);
