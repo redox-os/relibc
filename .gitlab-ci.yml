@@ -66,6 +66,6 @@ test:aarch64:
     needs: [aarch64]
     image: "redoxos/redoxer:aarch64"
     script:
-        - ./check.sh --arch=aarch64 --test
+        - timeout -s KILL 9m ./check.sh --arch=aarch64 --test
 
 #TODO: Enable more arch once dynamic linker working

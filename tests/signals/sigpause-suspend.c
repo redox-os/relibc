@@ -55,7 +55,7 @@ int sigpause_suspend(int signum)
         perror("failed to create thread");
         return EXIT_FAILURE;
     }
-    usleep(100);
+    usleep(100000);
     assert(!atomic_load(&completed));
 
 	if ((status = pthread_kill(new_th, signum)) != 0) {

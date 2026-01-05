@@ -9,7 +9,7 @@
 void *routine(void *arg) {
     assert(arg == NULL);
 
-    usleep(100);
+    usleep(100000);
 
     puts("Thread succeeded");
 
