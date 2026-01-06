@@ -1,6 +1,9 @@
 use super::*;
 
-use crate::error::Errno;
+use crate::{
+    error::Errno,
+    header::errno::{EINVAL, ENOMEM, ETIMEDOUT},
+};
 
 // PTHREAD_MUTEX_INITIALIZER is defined in bits_pthread/cbindgen.toml
 
@@ -72,9 +75,25 @@ pub unsafe extern "C" fn pthread_mutex_setprioceiling(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_timedlock(
     mutex: *mut pthread_mutex_t,
-    timespec: *const timespec,
+    abstime: *const timespec,
 ) -> c_int {
-    e((&*mutex.cast::<RlctMutex>()).lock_with_timeout(&*timespec))
+    // convert REALTIME_CLOCK to MONOTONIC_CLOCK
+
+    let relative = {
+        let mut realtime = timespec::default();
+        unsafe { clock_gettime(CLOCK_REALTIME, &mut realtime) };
+        let mut monotonic = timespec::default();
+        unsafe { clock_gettime(CLOCK_MONOTONIC, &mut monotonic) };
+        let Some(delta) = timespec::subtract(*abstime.clone(), realtime) else {
+            return e(Err(Errno(ETIMEDOUT)));
+        };
+        let Some(relative) = timespec::add(monotonic, delta) else {
+            return e(Err(Errno(ENOMEM)));
+        };
+        relative
+    };
+
+    e((&*mutex.cast::<RlctMutex>()).lock_with_timeout(&relative))
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_trylock(mutex: *mut pthread_mutex_t) -> c_int {
