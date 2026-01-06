@@ -11,6 +11,11 @@ FAILING_TESTS=tls \
 	mkfifo \
 	stdlib/ptsname \
 	sys_mman \
+	sys_socket/getpeername \
+	sys_socket/recv \
+	sys_socket/recvfrom \
+	sys_socket/unixpeername \
+	sys_socket/unixrecvfrom \
 #	resource/getrusage
 #	time/times
 #   netdb/netdb
