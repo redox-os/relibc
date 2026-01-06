@@ -13,7 +13,10 @@ use crate::{
     fs::File,
     header::{errno, fcntl, string::strcmp},
     io::{BufReader, SeekFrom, prelude::*},
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, gid_t, size_t, uid_t},
+    },
     raw_cell::RawCell,
 };
 
@@ -128,6 +131,9 @@ where
     string.parse().ok()
 }
 
+/// See <https://www.man7.org/linux/man-pages/man3/getpwent_r.3.html>.
+///
+/// Non-POSIX
 fn getpwent_r(
     reader: &mut BufReader<File>,
     destination: Option<DestBuffer>,

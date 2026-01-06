@@ -6,7 +6,10 @@ use core::{mem, ptr, slice};
 
 use crate::{
     header::{fcntl, limits, pthread, signal, sys_ioctl, sys_wait, termios, unistd, utmp},
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, c_void},
+    },
 };
 
 #[cfg(target_os = "linux")]
