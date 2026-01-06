@@ -2,7 +2,7 @@
 // Licensed under the MIT license
 // Copyright 2005-2020 Rich Felker, et al.
 
-use crate::platform::types::*;
+use crate::platform::types::{c_int, c_uchar, c_uint, wint_t};
 
 const tab: [c_uchar; 2666] = [
     7, 8, 9, 10, 11, 12, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 13, 6, 6, 14, 6, 6, 6, 6, 6, 6, 6, 6, 15,

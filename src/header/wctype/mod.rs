@@ -8,7 +8,11 @@
 // TODO: *_l functions
 
 use self::casecmp::casemap;
-use crate::{c_str::CStr, header::ctype, platform::types::*};
+use crate::{
+    c_str::CStr,
+    header::ctype,
+    platform::types::{c_char, c_int, wint_t},
+};
 
 mod alpha;
 mod casecmp;
