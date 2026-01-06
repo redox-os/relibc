@@ -79,9 +79,7 @@ impl Cond {
                 unsafe { clock_gettime(CLOCK_REALTIME, &mut realtime) };
                 let mut monotonic = timespec::default();
                 unsafe { clock_gettime(CLOCK_MONOTONIC, &mut monotonic) };
-                let Some(delta) = timespec::subtract(timeout.clone(), realtime) else {
-                    return Err(Errno(ETIMEDOUT));
-                };
+                let delta = timespec::subtract(timeout.clone(), realtime).unwrap_or_default();
                 let Some(relative) = timespec::add(monotonic, delta) else {
                     return Err(Errno(ENOMEM));
                 };
@@ -151,20 +149,16 @@ impl Cond {
         let current = self.cur.load(Ordering::Relaxed);
         self.prev.store(current, Ordering::Relaxed);
 
+        // let other thread wake us upon futex_wait
         unlock();
 
         let futex_r = match deadline {
-            Some(deadline) => {
-                let r = crate::sync::futex_wait(&self.cur, current, Some(&deadline));
-                lock_with_timeout(deadline)?;
-                r
-            }
-            None => {
-                let r = crate::sync::futex_wait(&self.cur, current, None);
-                lock()?;
-                r
-            }
+            Some(deadline) => crate::sync::futex_wait(&self.cur, current, Some(&deadline)),
+            None => crate::sync::futex_wait(&self.cur, current, None),
         };
+
+        // get our lock back
+        lock()?;
 
         match futex_r {
             super::FutexWaitResult::Waited => Ok(()),
