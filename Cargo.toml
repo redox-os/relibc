@@ -71,7 +71,7 @@ redox_event = { version = "0.4.2", default-features = false, features = [
 redox-ioctl = { path = "redox-ioctl" }
 
 [features]
-default = ["check_against_libc_crate"]
+# default = ["check_against_libc_crate"]
 trace = []
 check_against_libc_crate = ["__libc_only_for_layout_checks"]
 

@@ -446,7 +446,9 @@ for_primitive_int!(i64);
 for_primitive_int!(i128);
 for_primitive_int!(isize);
 impl LibcTypeEquals<crate::platform::types::c_void, crate::platform::types::c_void> for () {}
+#[cfg(feature = "check_against_libc_crate")]
 impl LibcTypeEquals<__libc_only_for_layout_checks::c_void, crate::platform::types::c_void> for () {}
+#[cfg(feature = "check_against_libc_crate")]
 impl LibcTypeEquals<crate::platform::types::c_void, __libc_only_for_layout_checks::c_void> for () {}
 
 //impl LibcTypeEquals<__libc_only_for_layout_checks::c_void>

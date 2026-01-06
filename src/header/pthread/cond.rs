@@ -21,8 +21,13 @@ pub unsafe extern "C" fn pthread_cond_init(
     cond: *mut pthread_cond_t,
     attr: *const pthread_condattr_t,
 ) -> c_int {
-    let attr = &*attr.cast::<RlctCondAttr>();
-    cond.cast::<RlctCond>().write(RlctCond::new(attr));
+    let attr = attr
+        .cast::<RlctCondAttr>()
+        .as_ref()
+        .copied()
+        .unwrap_or_default();
+
+    cond.cast::<RlctCond>().write(RlctCond::new(&attr));
 
     0
 }

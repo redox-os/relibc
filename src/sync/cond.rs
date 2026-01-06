@@ -3,6 +3,7 @@
 use crate::{
     error::Errno,
     header::{
+        errno::ETIMEDOUT,
         pthread::*,
         time::{CLOCK_REALTIME, clock_gettime, timespec},
     },
@@ -10,6 +11,8 @@ use crate::{
 };
 
 use core::sync::atomic::{AtomicU32 as AtomicUint, Ordering};
+
+#[derive(Clone, Copy)]
 pub struct CondAttr {
     pub clock: clockid_t,
     pub pshared: i32,
@@ -79,7 +82,7 @@ impl Cond {
             || (time.tv_sec == timeout.tv_sec && time.tv_nsec >= timeout.tv_nsec)
         {
             //Timeout happened, return directly
-            return Ok(());
+            return Err(Errno(ETIMEDOUT));
         } else {
             let mut relative = timespec {
                 tv_sec: timeout.tv_sec,
