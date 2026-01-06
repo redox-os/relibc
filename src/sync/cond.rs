@@ -155,12 +155,14 @@ impl Cond {
 
         let futex_r = match deadline {
             Some(deadline) => {
+                let r = crate::sync::futex_wait(&self.cur, current, Some(&deadline));
                 lock_with_timeout(deadline)?;
-                crate::sync::futex_wait(&self.cur, current, Some(&deadline))
+                r
             }
             None => {
+                let r = crate::sync::futex_wait(&self.cur, current, None);
                 lock()?;
-                crate::sync::futex_wait(&self.cur, current, None)
+                r
             }
         };
 
