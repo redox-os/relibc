@@ -2,10 +2,31 @@
 
 use crate::{
     error::Errno,
-    header::{pthread::*, time::timespec},
+    header::{
+        errno::{EINVAL, ENOMEM, ETIMEDOUT},
+        pthread::*,
+        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, clock_gettime, timespec},
+    },
+    platform::types::clockid_t,
 };
 
 use core::sync::atomic::{AtomicU32 as AtomicUint, Ordering};
+
+#[derive(Clone, Copy)]
+pub struct CondAttr {
+    pub clock: clockid_t,
+    pub pshared: i32,
+}
+
+impl Default for CondAttr {
+    fn default() -> Self {
+        Self {
+            // defaults according to POSIX
+            clock: CLOCK_REALTIME,            // for timedwait
+            pshared: PTHREAD_PROCESS_PRIVATE, // TODO
+        }
+    }
+}
 
 pub struct Cond {
     cur: AtomicUint,
@@ -13,6 +34,12 @@ pub struct Cond {
 }
 
 type Result<T, E = Errno> = core::result::Result<T, E>;
+
+impl Default for Cond {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl Cond {
     pub fn new() -> Self {
@@ -36,8 +63,51 @@ impl Cond {
         self.broadcast()
         //self.wake(1)
     }
+    pub fn clockwait(
+        &self,
+        mutex: &RlctMutex,
+        timeout: &timespec,
+        clock_id: clockid_t,
+    ) -> Result<(), Errno> {
+        // adjusted timeout similar in semaphore.rs
+
+        let relative = match clock_id {
+            // FUTEX expect monotonic clock
+            CLOCK_MONOTONIC => timeout.clone(),
+            CLOCK_REALTIME => {
+                let mut realtime = timespec::default();
+                unsafe { clock_gettime(CLOCK_REALTIME, &mut realtime) };
+                let mut monotonic = timespec::default();
+                unsafe { clock_gettime(CLOCK_MONOTONIC, &mut monotonic) };
+                let Some(delta) = timespec::subtract(timeout.clone(), realtime) else {
+                    return Err(Errno(ETIMEDOUT));
+                };
+                let Some(relative) = timespec::add(monotonic, delta) else {
+                    return Err(Errno(ENOMEM));
+                };
+                relative
+            }
+            _ => return Err(Errno(EINVAL)),
+        };
+
+        match self.wait_inner(mutex, Some(&relative)) {
+            Err(Errno(ETIMEDOUT)) => {
+                // TODO: this is a workaround that SYS_FUTEX returns ETIMEDOUT but actually it signaled in time
+                let mut monotonic = timespec::default();
+                unsafe { clock_gettime(CLOCK_MONOTONIC, &mut monotonic) };
+
+                if timespec::subtract(relative, monotonic).is_some() {
+                    Ok(())
+                } else {
+                    Err(Errno(ETIMEDOUT))
+                }
+            }
+            r => r,
+        }
+    }
     pub fn timedwait(&self, mutex: &RlctMutex, timeout: &timespec) -> Result<(), Errno> {
-        self.wait_inner(mutex, Some(timeout))
+        // TODO: The clock can be other than CLOCK_REALTIME depends on CondAttr
+        self.clockwait(mutex, timeout, CLOCK_REALTIME)
     }
     fn wait_inner(&self, mutex: &RlctMutex, timeout: Option<&timespec>) -> Result<(), Errno> {
         self.wait_inner_generic(
@@ -83,17 +153,24 @@ impl Cond {
 
         unlock();
 
-        match deadline {
+        let futex_r = match deadline {
             Some(deadline) => {
-                crate::sync::futex_wait(&self.cur, current, Some(&deadline));
-                lock_with_timeout(deadline);
+                let r = crate::sync::futex_wait(&self.cur, current, Some(&deadline));
+                lock_with_timeout(deadline)?;
+                r
             }
             None => {
-                crate::sync::futex_wait(&self.cur, current, None);
-                lock();
+                let r = crate::sync::futex_wait(&self.cur, current, None);
+                lock()?;
+                r
             }
+        };
+
+        match futex_r {
+            super::FutexWaitResult::Waited => Ok(()),
+            super::FutexWaitResult::Stale => Ok(()),
+            super::FutexWaitResult::TimedOut => Err(Errno(ETIMEDOUT)),
         }
-        Ok(())
     }
     pub fn wait(&self, mutex: &RlctMutex) -> Result<(), Errno> {
         self.wait_inner(mutex, None)

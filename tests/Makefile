@@ -201,6 +201,7 @@ VARIED_NAMES=\
 	net/if \
 	netdb/getaddrinfo \
 	netdb/getaddrinfo_null \
+	pthread/timedwait \
 	pty/forkpty \
 	psignal \
 	pwd \
