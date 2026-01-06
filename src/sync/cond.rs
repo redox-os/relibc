@@ -5,7 +5,7 @@ use crate::{
     header::{
         errno::{EINVAL, ENOMEM, ETIMEDOUT},
         pthread::*,
-        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, clock_gettime, timespec},
+        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec, timespec_realtime_to_monotonic},
     },
     platform::types::clockid_t,
 };
@@ -69,24 +69,13 @@ impl Cond {
         timeout: &timespec,
         clock_id: clockid_t,
     ) -> Result<(), Errno> {
-        // adjusted timeout similar in semaphore.rs
-
         let relative = match clock_id {
             // FUTEX expect monotonic clock
             CLOCK_MONOTONIC => timeout.clone(),
-            CLOCK_REALTIME => {
-                let mut realtime = timespec::default();
-                unsafe { clock_gettime(CLOCK_REALTIME, &mut realtime) };
-                let mut monotonic = timespec::default();
-                unsafe { clock_gettime(CLOCK_MONOTONIC, &mut monotonic) };
-                let Some(delta) = timespec::subtract(timeout.clone(), realtime) else {
-                    return Err(Errno(ETIMEDOUT));
-                };
-                let Some(relative) = timespec::add(monotonic, delta) else {
-                    return Err(Errno(ENOMEM));
-                };
-                relative
-            }
+            CLOCK_REALTIME => match timespec_realtime_to_monotonic(timeout.clone()) {
+                Ok(relative) => relative,
+                Err(err) => return Err(err),
+            },
             _ => return Err(Errno(EINVAL)),
         };
 
