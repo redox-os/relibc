@@ -2,7 +2,7 @@
 // Licensed under the MIT license
 // Copyright 2005-2020 Rich Felker, et al.
 
-use crate::platform::types::*;
+use crate::platform::types::c_uchar;
 
 pub fn is(wc: usize) -> c_uchar {
     if wc < 0x20000 {
