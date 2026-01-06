@@ -19,9 +19,10 @@ pub unsafe extern "C" fn pthread_cond_destroy(cond: *mut pthread_cond_t) -> c_in
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_init(
     cond: *mut pthread_cond_t,
-    _attr: *const pthread_condattr_t,
+    attr: *const pthread_condattr_t,
 ) -> c_int {
-    cond.cast::<RlctCond>().write(RlctCond::new());
+    let attr = &*attr.cast::<RlctCondAttr>();
+    cond.cast::<RlctCond>().write(RlctCond::new(attr));
 
     0
 }
@@ -100,20 +101,6 @@ pub unsafe extern "C" fn pthread_condattr_setpshared(
     0
 }
 
-pub(crate) struct RlctCondAttr {
-    clock: clockid_t,
-    pshared: c_int,
-}
+pub(crate) type RlctCondAttr = crate::sync::cond::CondAttr;
 
 pub(crate) type RlctCond = crate::sync::cond::Cond;
-
-impl Default for RlctCondAttr {
-    fn default() -> Self {
-        Self {
-            // FIXME: system clock
-            clock: 0,
-            // Default
-            pshared: PTHREAD_PROCESS_PRIVATE,
-        }
-    }
-}
