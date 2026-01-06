@@ -11,9 +11,8 @@ int main(void)
     int c = 'c', r = 0;
     r = putc_unlocked(c, fp);
     ERROR_IF(putc_unlocked, r, == EOF);
-    // TODO: hang
-    // r = fflush(fp);
-    // ERROR_IF(fflush, r, == EOF);
+    r = fflush(fp);
+    ERROR_IF(fflush, r, == EOF);
     funlockfile(fp);
     // make sure unlock works
     r = putc(c, fp);

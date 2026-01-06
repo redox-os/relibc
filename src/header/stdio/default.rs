@@ -3,6 +3,7 @@ use core::{cell::UnsafeCell, ptr};
 
 use crate::{
     fs::File,
+    header::pthread,
     io::LineWriter,
     platform::types::*,
     sync::{Mutex, Once},
@@ -16,8 +17,12 @@ impl GlobalFile {
     fn new(file: c_int, flags: c_int) -> Self {
         let file = File::new(file);
         let writer = Box::new(LineWriter::new(unsafe { file.get_ref() }));
+        let mut mutex_attr = pthread::RlctMutexAttr {
+            ty: pthread::PTHREAD_MUTEX_RECURSIVE,
+            ..Default::default()
+        };
         GlobalFile(UnsafeCell::new(FILE {
-            lock: Mutex::new(()),
+            lock: pthread::RlctMutex::new(&mutex_attr).unwrap(),
 
             file,
             flags: constants::F_PERM | flags,
