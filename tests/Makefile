@@ -4,13 +4,22 @@ IS_REDOX?=0
 
 # If compiling for Redox, IS_REDOX must be 1
 ifeq ($(IS_REDOX),1)
-FAILING_TESTS=signals/killpg-child
+FAILING_TESTS=
 else
 FAILING_TESTS=tls \
 	futimens \
 	mkfifo \
+	sigchld \
 	stdlib/ptsname \
 	sys_mman \
+	signals/pthread_kill-child \
+	sys_socket/getpeername \
+	sys_socket/recv \
+	sys_socket/recvfrom \
+	sys_socket/unixpeername \
+	sys_socket/unixrecvfrom \
+	unistd/isatty \
+	unistd/link \
 #	resource/getrusage
 #	time/times
 #   netdb/netdb
@@ -206,7 +215,6 @@ VARIED_NAMES=\
 	psignal \
 	pwd \
 	sa_restart \
-	sigchld \
 	signals/kill-self \
 	signals/kill0-self \
 	signals/kill-invalid \
@@ -216,9 +224,9 @@ VARIED_NAMES=\
 	signals/killpg0-self \
 	signals/kill-group \
 	signals/kill-child \
+	signals/killpg-child \
 	signals/killpg-self \
 	signals/pthread_kill-invalid \
-	signals/pthread_kill-child \
 	signals/pthread_kill-self \
 	signals/pthread_kill0-self \
 	signals/raise-compliance \
@@ -274,8 +282,6 @@ VARIED_NAMES=\
 	unistd/gethostname \
 	unistd/getid \
 	unistd/getpagesize \
-	unistd/isatty \
-	unistd/link \
 	unistd/pathconf \
 	unistd/setid \
 	unistd/sysconf \
