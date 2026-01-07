@@ -5,7 +5,7 @@ use crate::{
     header::{
         errno::{EINVAL, ENOMEM, ETIMEDOUT},
         pthread::*,
-        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, clock_gettime, timespec},
+        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec, timespec_realtime_to_monotonic},
     },
     platform::types::clockid_t,
 };
@@ -69,53 +69,24 @@ impl Cond {
         timeout: &timespec,
         clock_id: clockid_t,
     ) -> Result<(), Errno> {
-        // adjusted timeout similar in semaphore.rs
-
         let relative = match clock_id {
             // FUTEX expect monotonic clock
             CLOCK_MONOTONIC => timeout.clone(),
-            CLOCK_REALTIME => {
-                let mut realtime = timespec::default();
-                unsafe { clock_gettime(CLOCK_REALTIME, &mut realtime) };
-                let mut monotonic = timespec::default();
-                unsafe { clock_gettime(CLOCK_MONOTONIC, &mut monotonic) };
-                let Some(delta) = timespec::subtract(timeout.clone(), realtime) else {
-                    return Err(Errno(ETIMEDOUT));
-                };
-                let Some(relative) = timespec::add(monotonic, delta) else {
-                    return Err(Errno(ENOMEM));
-                };
-                relative
-            }
+            CLOCK_REALTIME => match timespec_realtime_to_monotonic(timeout.clone()) {
+                Ok(relative) => relative,
+                Err(err) => return Err(err),
+            },
             _ => return Err(Errno(EINVAL)),
         };
 
-        match self.wait_inner(mutex, Some(&relative)) {
-            Err(Errno(ETIMEDOUT)) => {
-                // TODO: this is a workaround that SYS_FUTEX returns ETIMEDOUT but actually it signaled in time
-                let mut monotonic = timespec::default();
-                unsafe { clock_gettime(CLOCK_MONOTONIC, &mut monotonic) };
-
-                if timespec::subtract(relative, monotonic).is_some() {
-                    Ok(())
-                } else {
-                    Err(Errno(ETIMEDOUT))
-                }
-            }
-            r => r,
-        }
+        self.wait_inner(mutex, Some(&relative))
     }
     pub fn timedwait(&self, mutex: &RlctMutex, timeout: &timespec) -> Result<(), Errno> {
         // TODO: The clock can be other than CLOCK_REALTIME depends on CondAttr
         self.clockwait(mutex, timeout, CLOCK_REALTIME)
     }
     fn wait_inner(&self, mutex: &RlctMutex, timeout: Option<&timespec>) -> Result<(), Errno> {
-        self.wait_inner_generic(
-            || mutex.unlock(),
-            || mutex.lock(),
-            |timeout| mutex.lock_with_timeout(timeout),
-            timeout,
-        )
+        self.wait_inner_generic(|| mutex.unlock(), || mutex.lock(), timeout)
     }
     pub fn wait_inner_typedmutex<'lock, T>(
         &self,
@@ -132,7 +103,6 @@ impl Cond {
                 newguard = Some(lock.lock());
                 Ok(())
             },
-            |_| unreachable!(),
             None,
         )
         .unwrap();
@@ -143,7 +113,6 @@ impl Cond {
         &self,
         unlock: impl FnOnce() -> Result<()>,
         lock: impl FnOnce() -> Result<()>,
-        lock_with_timeout: impl FnOnce(&timespec) -> Result<()>,
         deadline: Option<&timespec>,
     ) -> Result<(), Errno> {
         // TODO: Error checking for certain types (i.e. robust and errorcheck) of mutexes, e.g. if the
@@ -151,20 +120,9 @@ impl Cond {
         let current = self.cur.load(Ordering::Relaxed);
         self.prev.store(current, Ordering::Relaxed);
 
-        unlock();
-
-        let futex_r = match deadline {
-            Some(deadline) => {
-                let r = crate::sync::futex_wait(&self.cur, current, Some(&deadline));
-                lock_with_timeout(deadline)?;
-                r
-            }
-            None => {
-                let r = crate::sync::futex_wait(&self.cur, current, None);
-                lock()?;
-                r
-            }
-        };
+        unlock()?;
+        let futex_r = crate::sync::futex_wait(&self.cur, current, deadline);
+        lock()?;
 
         match futex_r {
             super::FutexWaitResult::Waited => Ok(()),
