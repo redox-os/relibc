@@ -23,7 +23,9 @@ use crate::{
     fs::File,
     header::{
         errno::{self, STR_ERROR},
-        fcntl, pwd, stdlib,
+        fcntl,
+        pthread::RlctMutex,
+        pwd, stdlib,
         string::{self, strlen, strncpy},
         unistd,
     },
@@ -112,7 +114,7 @@ impl<W: crate::io::Write> Writer for LineWriter<W> {
 
 /// This struct gets exposed to the C API.
 pub struct FILE {
-    lock: Mutex<()>,
+    lock: RlctMutex,
 
     file: File,
     // pub for stdio_ext
@@ -535,7 +537,9 @@ pub unsafe extern "C" fn fileno(stream: *mut FILE) -> c_int {
 /// locked
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn flockfile(file: *mut FILE) {
-    (*file).lock.manual_lock();
+    if let Err(e) = (*file).lock.lock() {
+        println!("RELIBC: flockfile error {}", e)
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fopen.html>.
@@ -794,7 +798,7 @@ pub unsafe extern "C" fn ftell_locked(stream: &mut FILE) -> off_t {
 /// Try to lock the file. Returns 0 for success, 1 for failure
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ftrylockfile(file: *mut FILE) -> c_int {
-    if (*file).lock.manual_try_lock().is_ok() {
+    if (*file).lock.try_lock().is_ok() {
         0
     } else {
         1
@@ -806,7 +810,9 @@ pub unsafe extern "C" fn ftrylockfile(file: *mut FILE) -> c_int {
 /// Unlock the file
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn funlockfile(file: *mut FILE) {
-    (*file).lock.manual_unlock();
+    if let Err(e) = (*file).lock.unlock() {
+        println!("RELIBC: funlockfile error {}", e)
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fwrite.html>.
