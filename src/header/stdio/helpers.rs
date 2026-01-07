@@ -8,6 +8,7 @@ use crate::{
     header::{
         errno::{self, EINVAL},
         fcntl::*,
+        pthread,
     },
     io::BufWriter,
     platform::{self, types::*},
@@ -69,9 +70,12 @@ pub fn _fdopen(fd: c_int, mode: CStr) -> Result<Box<FILE>, Errno> {
 
     let file = File::new(fd);
     let writer = Box::new(BufWriter::new(unsafe { file.get_ref() }));
-
+    let mut mutex_attr = pthread::RlctMutexAttr {
+        ty: pthread::PTHREAD_MUTEX_RECURSIVE,
+        ..Default::default()
+    };
     Ok(Box::new(FILE {
-        lock: Mutex::new(()),
+        lock: pthread::RlctMutex::new(&mutex_attr).unwrap(),
 
         file,
         flags,
