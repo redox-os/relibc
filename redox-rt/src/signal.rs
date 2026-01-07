@@ -762,7 +762,7 @@ pub fn currently_pending_blocked() -> u64 {
     let w0 = control.word[0].load(Ordering::Relaxed);
     let w1 = control.word[1].load(Ordering::Relaxed);
     let allow = (w0 >> 32) | ((w1 >> 32) << 32);
-    let thread_pending = (w0 & 0xffff_ffff) | ((w1 >> 32) & 0xffff_ffff);
+    let thread_pending = (w0 & 0xffff_ffff) | ((w1 & 0xffff_ffff) << 32);
     let proc_pending = PROC_CONTROL_STRUCT.pending.load(Ordering::Relaxed);
 
     core::sync::atomic::fence(Ordering::Acquire); // TODO: Correct ordering?
