@@ -30,11 +30,15 @@ void print_timed(char* msg) {
 
 void* signaler_thread(void* arg) {
     (void)arg;
-
-    usleep(150000); // 150ms
+    print_timed("signaler_thread start");
+    usleep(440 * 1000);
+    print_timed("signaler_thread unsleep");
+    pthread_mutex_lock(&lock);
+    print_timed("signaler_thread gotlock");
     ready = 1;
-    print_timed("signaler_thread");
+    print_timed("signaler_thread end");
     pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&lock);
     return NULL;
 }
 
@@ -53,13 +57,15 @@ void test_success_case() {
     pthread_t thread;
     pthread_create(&thread, NULL, signaler_thread, NULL);
     pthread_mutex_lock(&lock);
-    struct timespec ts = get_timeout(50000);
     print_timed("test_success_case start");
+    int rc = -1;
+    struct timespec ts = get_timeout(100);
     while (!ready) {
+        // instant timeout after second loop
         print_timed("test_success_case waiting");
-        int rc = pthread_cond_timedwait(&cond, &lock, &ts);
-        UNEXP_IF(pthread_cond_timedwait, rc, != 0);
+        rc = pthread_cond_timedwait(&cond, &lock, &ts);
     }
+    UNEXP_IF(pthread_cond_timedwait, rc, != 0);
     print_timed("test_success_case end");
     pthread_mutex_unlock(&lock);
     pthread_join(thread, NULL);
