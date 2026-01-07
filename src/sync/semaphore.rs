@@ -2,7 +2,7 @@
 //TODO: improve implementation
 
 use crate::{
-    header::time::{CLOCK_MONOTONIC, CLOCK_REALTIME, clock_gettime, timespec},
+    header::time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec, timespec_realtime_to_monotonic},
     platform::types::{c_uint, clockid_t},
 };
 
@@ -63,27 +63,12 @@ impl Semaphore {
                 let relative = match clock_id {
                     // FUTEX expect monotonic clock
                     CLOCK_MONOTONIC => timeout.clone(),
-                    CLOCK_REALTIME => {
-                        let mut realtime = timespec::default();
-                        unsafe { clock_gettime(CLOCK_REALTIME, &mut realtime) };
-
-                        let mut monotonic = timespec::default();
-                        unsafe { clock_gettime(CLOCK_MONOTONIC, &mut monotonic) };
-
-                        let Some(delta) = timespec::subtract(timeout.clone(), realtime) else {
-                            //Timeout happened
-                            return Err(());
-                        };
-
-                        let Some(relative) = timespec::add(monotonic, delta) else {
-                            return Err(());
-                        };
-
-                        relative
-                    }
+                    CLOCK_REALTIME => match timespec_realtime_to_monotonic(timeout.clone()) {
+                        Ok(relative) => relative,
+                        Err(_) => return Err(()),
+                    },
                     _ => return Err(()),
                 };
-
                 crate::sync::futex_wait(&self.count, value, Some(&relative));
             } else {
                 // Use futex to wait for the next change, without a timeout

@@ -7,7 +7,7 @@ use crate::{
     error::{Errno, ResultExt},
     fs::File,
     header::{
-        errno::{EFAULT, EOVERFLOW},
+        errno::{EFAULT, ENOMEM, EOVERFLOW, ETIMEDOUT},
         fcntl::O_RDONLY,
         signal::sigevent,
         stdlib::getenv,
@@ -847,4 +847,18 @@ const fn blank_tm() -> tm {
         tm_gmtoff: 0,
         tm_zone: ptr::null_mut(),
     }
+}
+
+pub(crate) fn timespec_realtime_to_monotonic(abstime: timespec) -> Result<timespec, Errno> {
+    let mut realtime = timespec::default();
+    unsafe { clock_gettime(CLOCK_REALTIME, &mut realtime) };
+    let mut monotonic = timespec::default();
+    unsafe { clock_gettime(CLOCK_MONOTONIC, &mut monotonic) };
+    let Some(delta) = timespec::subtract(abstime, realtime) else {
+        return Err(Errno(ETIMEDOUT));
+    };
+    let Some(relative) = timespec::add(monotonic, delta) else {
+        return Err(Errno(ENOMEM));
+    };
+    Ok(relative)
 }
