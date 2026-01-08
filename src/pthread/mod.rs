@@ -124,7 +124,7 @@ pub(crate) unsafe fn create(
     let synchronization_mutex = Mutex::locked(current_sigmask);
     let synchronization_mutex = &synchronization_mutex;
 
-    let tid_mutex = Mutex::<MaybeUninit<OsTid>>::new(MaybeUninit::uninit());
+    let tid_mutex = spin::Mutex::<MaybeUninit<OsTid>>::new(MaybeUninit::uninit());
     let mut tid_guard = tid_mutex.lock();
 
     let stack_size = attrs.stacksize.next_multiple_of(Sys::getpagesize());
@@ -212,17 +212,23 @@ pub(crate) unsafe fn create(
 
     Ok((&new_tcb.pthread) as *const _ as *mut _)
 }
+
 /// A shim to wrap thread entry points in logic to set up TLS, for example
 unsafe extern "C" fn new_thread_shim(
     entry_point: unsafe extern "C" fn(*mut c_void) -> *mut c_void,
     arg: *mut c_void,
     tcb: *mut Tcb,
-    mutex1: *const Mutex<MaybeUninit<OsTid>>,
+    // XXX: [`OsTid`] is required to activate the TCB. [`sync::Mutex`] may call
+    // [`futex_wait`], which goes through [`redox_rt::sync::wrapper`] and
+    // therefore requires the TCB to be initialised. If the new thread starts
+    // before [`create`] has released the lock, calling [`futex_wait`] would
+    // result in a `SIGSEGV`. Hence, we use a spinlock.
+    mutex1: *const spin::Mutex<MaybeUninit<OsTid>>,
     mutex2: *const Mutex<u64>,
 ) -> ! {
     let tid = (*(&*mutex1).lock()).assume_init();
+    let tcb = tcb.as_mut().unwrap();
 
-    if let Some(tcb) = tcb.as_mut() {
         #[cfg(not(target_os = "redox"))]
         {
             tcb.activate();
@@ -236,13 +242,10 @@ unsafe extern "C" fn new_thread_shim(
             );
             redox_rt::signal::setup_sighandler(&tcb.os_specific, false);
         }
-    }
 
     let procmask = (&*mutex2).as_ptr().read();
 
-    if let Some(tcb) = tcb.as_mut() {
         tcb.copy_masters().unwrap();
-    }
 
     (*tcb).pthread.os_tid.get().write(Sys::current_os_tid());
 
