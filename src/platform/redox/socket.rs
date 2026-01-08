@@ -137,7 +137,7 @@ unsafe fn inner_af_inet(
 
     let ret = sockaddr_in {
         sin_family: AF_INET as sa_family_t,
-        sin_port: port,
+        sin_port: u16::to_be(port),
         sin_addr: addr,
 
         ..sockaddr_in::default()
@@ -808,12 +808,8 @@ impl PalSocket for Sys {
         if address == ptr::null_mut() || address_len == ptr::null_mut() {
             Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
         } else {
-            let fd = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
-            Self::getpeername(fd.as_c_fd().unwrap(), address, address_len)?;
-            Self::read(
-                fd.as_c_fd().unwrap(),
-                slice::from_raw_parts_mut(buf as *mut u8, len),
-            )
+            Self::getpeername(socket, address, address_len)?;
+            Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
         }
     }
 
