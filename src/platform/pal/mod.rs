@@ -171,6 +171,8 @@ pub trait Pal {
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t>;
 
+    fn mkdirat(fildes: c_int, path: CStr, mode: mode_t) -> Result<()>;
+
     fn mkdir(path: CStr, mode: mode_t) -> Result<()>;
 
     fn mkfifo(path: CStr, mode: mode_t) -> Result<()>;

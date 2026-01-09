@@ -504,8 +504,12 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(LSEEK, fildes, offset, whence) }).map(|o| o as off_t)
     }
 
+    fn mkdirat(dir_fildes: c_int, path: CStr, mode: mode_t) -> Result<()> {
+        e_raw(unsafe { syscall!(MKDIRAT, dir_fildes, path.as_ptr(), mode) }).map(|_| ())
+    }
+
     fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
-        e_raw(unsafe { syscall!(MKDIRAT, AT_FDCWD, path.as_ptr(), mode) }).map(|_| ())
+        Sys::mkdirat(AT_FDCWD, path, mode)
     }
 
     fn mknodat(dir_fildes: c_int, path: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
