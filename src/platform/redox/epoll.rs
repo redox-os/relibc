@@ -96,7 +96,7 @@ impl PalEpoll for Sys {
         events: *mut epoll_event,
         maxevents: c_int,
         timeout: c_int,
-        _sigset: *const sigset_t,
+        sigset: *const sigset_t,
     ) -> Result<usize, Errno> {
         // TODO: sigset
         assert_eq!(mem::size_of::<epoll_event>(), mem::size_of::<Event>());
@@ -131,12 +131,24 @@ impl PalEpoll for Sys {
             None
         };
 
-        let bytes_read = Sys::read(epfd, unsafe {
-            slice::from_raw_parts_mut(
-                events as *mut u8,
-                maxevents as usize * mem::size_of::<syscall::Event>(),
-            )
-        })?;
+        let callback = || {
+            let res = redox_rt::sys::posix_read(epfd as usize, unsafe {
+                slice::from_raw_parts_mut(
+                    events as *mut u8,
+                    maxevents as usize * mem::size_of::<syscall::Event>(),
+                )
+            });
+            res
+        };
+
+        let bytes_read = if sigset.is_null() {
+            callback()
+        } else {
+            // Allowset is inverse of sigset mask
+            let allowset = !*sigset;
+            redox_rt::signal::callback_or_signal_async(allowset, callback)
+        }?;
+
         let read = bytes_read as usize / mem::size_of::<syscall::Event>();
 
         let mut count = 0;

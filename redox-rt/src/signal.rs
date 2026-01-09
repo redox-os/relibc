@@ -783,6 +783,38 @@ pub fn await_signal_async(inner_allowset: u64) -> Result<Unreachable> {
     res?;
     unreachable!()
 }
+
+/// Run a callback with the specified signal mask, atomically
+pub fn callback_or_signal_async<T, F: FnOnce() -> Result<T>>(inner_allowset: u64, callback: F) -> Result<T> {
+    let _guard = tmp_disable_signals();
+    let control = &unsafe { Tcb::current().unwrap() }.os_specific.control;
+
+    let old_allowset = get_allowset_raw(&control.word);
+    let pending = set_allowset_raw(&control.word, old_allowset, inner_allowset);
+    let res = if pending == 0 {
+        // Run callback if no pending signals
+        callback()
+    } else {
+        // If pending signals, pretend callback returned EINTR
+        Err(Error::new(EINTR))
+    };
+
+    if let Err(err) = &res {
+        if err.errno == EINTR {
+            // Run trampoline if EINTR returned
+            unsafe {
+                manually_enter_trampoline();
+            }
+        }
+    }
+
+    // POSIX says it shall restore the mask to what it was prior to the call, which is interpreted
+    // as allowing any changes to sigprocmask inside the signal handler, to be discarded.
+    set_allowset_raw(&control.word, inner_allowset, old_allowset);
+
+    res
+}
+
 /*#[unsafe(no_mangle)]
 pub extern "C" fn __redox_rt_debug_sigctl() {
     let tcb = &RtTcb::current().control;
@@ -830,6 +862,7 @@ pub fn await_signal_sync(inner_allowset: u64, timeout: Option<&TimeSpec>) -> Res
         // Normally ETIMEDOUT but not for sigtimedwait.
         .ok_or(Error::new(EAGAIN))
 }
+
 fn try_claim_multiple(
     mut proc_pending: u64,
     mut thread_pending: u64,
