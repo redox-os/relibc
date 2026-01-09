@@ -48,6 +48,7 @@ use crate::{
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, BufReader, prelude::*},
+    ld_so::tcb::{OsSpecific, Tcb},
     out::Out,
     platform::sys::{
         libredox::RawResult,
@@ -926,15 +927,17 @@ impl Pal for Sys {
         Ok(bytes_read)
     }
 
-    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
+    unsafe fn rlct_clone(
+        stack: *mut usize,
+        os_specific: &mut OsSpecific,
+    ) -> Result<crate::pthread::OsTid> {
         let _guard = CLONE_LOCK.read();
-        let res = clone::rlct_clone_impl(stack);
+        let res = clone::rlct_clone_impl(stack, os_specific);
 
-        res.map(|mut fd| crate::pthread::OsTid {
-            thread_fd: fd.take(),
-        })
-        .map_err(|error| Errno(error.errno))
+        res.map(|thread_fd| crate::pthread::OsTid { thread_fd })
+            .map_err(|error| Errno(error.errno))
     }
+
     unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<()> {
         redox_rt::sys::posix_kill_thread(os_tid.thread_fd, signal as u32)?;
         Ok(())

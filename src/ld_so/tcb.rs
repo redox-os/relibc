@@ -40,10 +40,10 @@ impl Master {
 }
 
 #[cfg(target_os = "linux")]
-type OsSpecific = ();
+pub type OsSpecific = ();
 
 #[cfg(target_os = "redox")]
-type OsSpecific = redox_rt::signal::RtSigarea;
+pub type OsSpecific = redox_rt::signal::RtSigarea;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -209,7 +209,7 @@ impl Tcb {
     /// Activate TLS
     pub unsafe fn activate(
         &mut self,
-        #[cfg(target_os = "redox")] thr_fd: redox_rt::proc::FdGuardUpper,
+        #[cfg(target_os = "redox")] thr_fd: Option<redox_rt::proc::FdGuardUpper>,
     ) {
         unsafe {
             Self::os_arch_activate(
@@ -363,10 +363,12 @@ impl Tcb {
         os: &OsSpecific,
         tls_end: usize,
         tls_len: usize,
-        thr_fd: redox_rt::proc::FdGuardUpper,
+        thr_fd: Option<redox_rt::proc::FdGuardUpper>,
     ) {
         unsafe {
-            os.thr_fd.get().write(Some(thr_fd));
+            if let Some(thr_fd) = thr_fd {
+                os.thr_fd.get().write(Some(thr_fd));
+            }
             redox_rt::tcb_activate(os, tls_end, tls_len)
         }
     }

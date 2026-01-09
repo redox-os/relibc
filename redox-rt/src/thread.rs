@@ -5,7 +5,7 @@ use syscall::Result;
 use crate::{RtTcb, arch::*, proc::*, signal::tmp_disable_signals, static_proc_info};
 
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
-pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuardUpper> {
+pub unsafe fn rlct_clone_impl(stack: *mut usize, tcb: &RtTcb) -> Result<usize> {
     let proc_info = static_proc_info();
     assert!(proc_info.has_proc_fd);
     let cur_proc_fd = unsafe { proc_info.proc_fd.assume_init_ref() };
@@ -20,7 +20,7 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuardUpper> {
 
         let buf = create_set_addr_space_buf(
             cur_addr_space_fd.as_raw_fd(),
-            __relibc_internal_rlct_clone_ret as usize,
+            __relibc_internal_rlct_clone_ret as *const () as usize,
             stack as usize,
         );
         new_addr_space_sel_fd.write(&buf)?;
@@ -39,11 +39,17 @@ pub unsafe fn rlct_clone_impl(stack: *mut usize) -> Result<FdGuardUpper> {
     // the same process) will be discarded. Process-specific signals will ignore this new thread,
     // until it has initialized its own signal handler.
 
-    // Unblock context.
     let start_fd = new_thr_fd.dup(b"start")?;
+
+    let fd = new_thr_fd.as_raw_fd();
+    unsafe {
+        tcb.thr_fd.get().write(Some(new_thr_fd));
+    }
+
+    // Unblock context.
     start_fd.write(&[0])?;
 
-    Ok(new_thr_fd)
+    Ok(fd)
 }
 
 pub unsafe fn exit_this_thread(stack_base: *mut (), stack_size: usize) -> ! {
