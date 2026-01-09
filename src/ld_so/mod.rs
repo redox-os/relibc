@@ -123,7 +123,7 @@ pub fn static_init(
                     .expect_notls("failed to copy TLS master data");
                 tcb.activate(
                     #[cfg(target_os = "redox")]
-                    thr_fd,
+                    Some(thr_fd),
                 );
             }
 

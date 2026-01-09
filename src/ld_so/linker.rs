@@ -698,7 +698,7 @@ impl Linker {
                 tcb.copy_masters().map_err(|_| DlError::Malformed)?;
                 tcb.activate(
                     #[cfg(target_os = "redox")]
-                    thr_fd,
+                    Some(thr_fd),
                 );
 
                 #[cfg(target_os = "redox")]

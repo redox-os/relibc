@@ -160,12 +160,14 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
             crate::platform::get_auxv_raw(sp.auxv().cast(), redox_rt::auxv_defs::AT_REDOX_THR_FD)
                 .expect_notls("no thread fd present");
 
-        let tcb = Tcb::new(0).expect_notls("ld.so: failed to allocate bootstrap TCB");
+        let tcb = Tcb::new(0).expect_notls("[ld.so]: failed to allocate bootstrap TCB");
         tcb.activate(
             #[cfg(target_os = "redox")]
-            redox_rt::proc::FdGuard::new(thr_fd)
-                .to_upper()
-                .expect_notls("failed to move thread fd to upper table"),
+            Some(
+                redox_rt::proc::FdGuard::new(thr_fd)
+                    .to_upper()
+                    .expect_notls("failed to move thread fd to upper table"),
+            ),
         );
         #[cfg(target_os = "redox")]
         {

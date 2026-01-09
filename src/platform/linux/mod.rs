@@ -1,6 +1,8 @@
 use core::{arch::asm, num::NonZeroU64, ptr};
 
 use super::{ERRNO, Pal, types::*};
+#[cfg(target_arch = "x86_64")]
+use crate::ld_so::tcb::OsSpecific;
 use crate::{
     c_str::CStr,
     header::{
@@ -623,7 +625,10 @@ impl Pal for Sys {
     }
 
     #[cfg(target_arch = "x86_64")]
-    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
+    unsafe fn rlct_clone(
+        stack: *mut usize,
+        _os_specific: &mut OsSpecific,
+    ) -> Result<crate::pthread::OsTid> {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
         let pid;
         asm!("
@@ -678,7 +683,10 @@ impl Pal for Sys {
     }
 
     #[cfg(target_arch = "aarch64")]
-    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
+    unsafe fn rlct_clone(
+        stack: *mut usize,
+        _os_specific: &mut OsSpecific,
+    ) -> Result<crate::pthread::OsTid> {
         todo!("rlct_clone not implemented for aarch64 yet")
     }
 
