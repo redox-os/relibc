@@ -132,7 +132,7 @@ impl PalEpoll for Sys {
         };
 
         let callback = || {
-            let res = redox_rt::sys::posix_read(epfd as usize, unsafe {
+            let res = syscall::read(epfd as usize, unsafe {
                 slice::from_raw_parts_mut(
                     events as *mut u8,
                     maxevents as usize * mem::size_of::<syscall::Event>(),

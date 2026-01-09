@@ -790,15 +790,8 @@ pub fn callback_or_signal_async<T, F: FnOnce() -> Result<T>>(inner_allowset: u64
     let control = &unsafe { Tcb::current().unwrap() }.os_specific.control;
 
     let old_allowset = get_allowset_raw(&control.word);
-    let pending = set_allowset_raw(&control.word, old_allowset, inner_allowset);
-    let res = if pending == 0 {
-        // Run callback if no pending signals
-        callback()
-    } else {
-        // If pending signals, pretend callback returned EINTR
-        Err(Error::new(EINTR))
-    };
-
+    set_allowset_raw(&control.word, old_allowset, inner_allowset);
+    let res = callback();
     if let Err(err) = &res {
         if err.errno == EINTR {
             // Run trampoline if EINTR returned
