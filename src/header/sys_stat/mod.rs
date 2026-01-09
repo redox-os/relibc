@@ -160,6 +160,15 @@ pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     res
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mkdirat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mkdirat(dirfd: c_int, path: *const c_char, mode: mode_t) -> c_int {
+    let path = CStr::from_ptr(path);
+    Sys::mkdirat(dirfd, path, mode)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mkdir.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
