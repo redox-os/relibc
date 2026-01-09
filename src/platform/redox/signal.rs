@@ -223,13 +223,19 @@ impl PalSignal for Sys {
         set: Option<&sigset_t>,
         oset: Option<&mut sigset_t>,
     ) -> Result<(), Errno> {
-        Ok(match how {
+        match how {
+            _ if set.is_none() => {
+                if let Some(oset) = oset {
+                    *oset = redox_rt::signal::get_sigmask()?;
+                }
+            }
             SIG_SETMASK => redox_rt::signal::set_sigmask(set.copied(), oset)?,
             SIG_BLOCK => redox_rt::signal::or_sigmask(set.copied(), oset)?,
             SIG_UNBLOCK => redox_rt::signal::andn_sigmask(set.copied(), oset)?,
 
             _ => return Err(Errno(EINVAL)),
-        })
+        }
+        Ok(())
     }
 
     fn sigsuspend(mask: &sigset_t) -> Errno {
