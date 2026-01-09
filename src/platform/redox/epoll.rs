@@ -98,7 +98,6 @@ impl PalEpoll for Sys {
         timeout: c_int,
         sigset: *const sigset_t,
     ) -> Result<usize, Errno> {
-        // TODO: sigset
         assert_eq!(mem::size_of::<epoll_event>(), mem::size_of::<Event>());
 
         if maxevents <= 0 {
