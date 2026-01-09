@@ -785,7 +785,10 @@ pub fn await_signal_async(inner_allowset: u64) -> Result<Unreachable> {
 }
 
 /// Run a callback with the specified signal mask, atomically
-pub fn callback_or_signal_async<T, F: FnOnce() -> Result<T>>(inner_allowset: u64, callback: F) -> Result<T> {
+pub fn callback_or_signal_async<T, F: FnOnce() -> Result<T>>(
+    inner_allowset: u64,
+    callback: F,
+) -> Result<T> {
     let _guard = tmp_disable_signals();
     let control = &unsafe { Tcb::current().unwrap() }.os_specific.control;
 
