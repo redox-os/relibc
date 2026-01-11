@@ -16,6 +16,7 @@ use core::{
 };
 
 use crate::{
+    ALLOCATOR,
     c_str::{CStr, CString},
     error::Errno,
     header::{
@@ -700,6 +701,7 @@ impl Linker {
                     #[cfg(target_os = "redox")]
                     Some(thr_fd),
                 );
+                tcb.mspace = ALLOCATOR.get();
 
                 #[cfg(target_os = "redox")]
                 {

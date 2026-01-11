@@ -6,7 +6,8 @@ use core::{
     cell::SyncUnsafeCell,
     cmp,
     mem::align_of,
-    ptr::{copy_nonoverlapping, write_bytes},
+    ptr::{self, copy_nonoverlapping, write_bytes},
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
 mod sys;
@@ -18,17 +19,30 @@ pub type Dlmalloc = DlmallocCApi<sys::System>;
 
 pub const NEWALLOCATOR: Allocator = Allocator::new();
 
-pub struct Allocator(SyncUnsafeCell<Mutex<Dlmalloc>>);
+pub struct Allocator {
+    inner: SyncUnsafeCell<Mutex<Dlmalloc>>,
+    pub ptr: AtomicPtr<Mutex<Dlmalloc>>,
+}
 
 impl Allocator {
     pub const fn new() -> Self {
-        Allocator(SyncUnsafeCell::new(Mutex::new(Dlmalloc::new(
-            sys::System::new(),
-        ))))
+        Allocator {
+            inner: SyncUnsafeCell::new(Mutex::new(Dlmalloc::new(sys::System::new()))),
+            ptr: AtomicPtr::new(ptr::null_mut()),
+        }
     }
 
-    pub fn get(&self) -> *mut Mutex<Dlmalloc> {
-        self.0.get()
+    pub fn get(&self) -> *const Mutex<Dlmalloc> {
+        let ptr = self.ptr.load(Ordering::Acquire);
+        if !ptr.is_null() {
+            return ptr;
+        }
+
+        self.inner.get()
+    }
+
+    pub fn set(&self, mspace: *const Mutex<Dlmalloc>) {
+        self.ptr.store(mspace.cast_mut(), Ordering::Release);
     }
 }
 
