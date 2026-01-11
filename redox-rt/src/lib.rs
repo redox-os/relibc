@@ -186,7 +186,10 @@ pub(crate) fn read_proc_meta(proc: &FdGuardUpper) -> syscall::Result<ProcMeta> {
     proc.read(&mut bytes)?;
     Ok(*plain::from_bytes::<ProcMeta>(&bytes).unwrap())
 }
-pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuardUpper) {
+pub unsafe fn initialize(
+    #[cfg(feature = "proc")] proc_fd: FdGuardUpper,
+    #[cfg(feature = "proc")] ns_fd: Option<FdGuardUpper>,
+) {
     #[cfg(feature = "proc")]
     let metadata = read_proc_meta(&proc_fd).unwrap();
 
@@ -223,6 +226,7 @@ pub unsafe fn initialize(#[cfg(feature = "proc")] proc_fd: FdGuardUpper) {
             egid: metadata.egid,
             rgid: metadata.rgid,
             sgid: metadata.sgid,
+            ns_fd,
         };
     }
 }
@@ -241,6 +245,7 @@ pub struct DynamicProcInfo {
     pub egid: u32,
     pub rgid: u32,
     pub sgid: u32,
+    pub ns_fd: Option<FdGuardUpper>,
 }
 
 static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
@@ -251,6 +256,7 @@ static DYNAMIC_PROC_INFO: Mutex<DynamicProcInfo> = Mutex::new(DynamicProcInfo {
     rgid: u32::MAX,
     egid: u32::MAX,
     sgid: u32::MAX,
+    ns_fd: None,
 });
 
 #[inline]
@@ -262,6 +268,15 @@ pub fn current_proc_fd() -> &'static FdGuardUpper {
     let info = static_proc_info();
     assert!(info.has_proc_fd);
     unsafe { info.proc_fd.assume_init_ref() }
+}
+#[inline]
+pub fn current_namespace_fd() -> usize {
+    DYNAMIC_PROC_INFO
+        .lock()
+        .ns_fd
+        .as_ref()
+        .map(|g| g.as_raw_fd())
+        .unwrap_or(usize::MAX)
 }
 
 struct ChildHookCommonArgs {

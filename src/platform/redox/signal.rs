@@ -53,7 +53,7 @@ impl PalSignal for Sys {
             _ => return Err(Errno(EINVAL)),
         };
         // TODO: implement setitimer
-        // let fd = FdGuard::new(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC)?);
+        // let fd = FdGuard::new(redox_rt::sys::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC)?);
         // let count = syscall::read(*fd, &mut spec)?;
 
         let mut spec = syscall::ITimerSpec::default();
