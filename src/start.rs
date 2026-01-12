@@ -166,7 +166,9 @@ pub unsafe extern "C" fn relibc_start_v1(
 
     // Set up the right allocator...
     // if any memory rust based memory allocation happen before this step .. we are doomed.
-    alloc_init();
+    // The init_array also init the allocator, so call it instead to avoid
+    // call to alloc_init twice
+    init_array();
 
     if let Some(tcb) = ld_so::tcb::Tcb::current() {
         // Update TCB mspace
@@ -209,8 +211,6 @@ pub unsafe extern "C" fn relibc_start_v1(
 
     let auxvs = get_auxvs(sp.auxv().cast());
     crate::platform::init(auxvs);
-
-    init_array();
 
     // Run preinit array
     {
