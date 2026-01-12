@@ -607,7 +607,7 @@ pub unsafe extern "C" fn strtok_r(
     delimiter: *const c_char,
     lasts: *mut *mut c_char,
 ) -> *mut c_char {
-    // Loosely based on GLIBC implementation
+    // musl returns null if both s and lasts are null, it sets s to lasts otherwise
     let mut haystack = s;
     if haystack.is_null() {
         if (*lasts).is_null() {
@@ -619,7 +619,7 @@ pub unsafe extern "C" fn strtok_r(
     // Skip past any extra delimiter left over from previous call
     haystack = haystack.add(strspn(haystack, delimiter));
     if *haystack == 0 {
-        *lasts = ptr::null_mut();
+        *lasts = haystack;
         return ptr::null_mut();
     }
 
@@ -631,7 +631,7 @@ pub unsafe extern "C" fn strtok_r(
         haystack = haystack.add(1);
         *lasts = haystack;
     } else {
-        *lasts = ptr::null_mut();
+        *lasts = token.add(strlen(token));
     }
 
     token
