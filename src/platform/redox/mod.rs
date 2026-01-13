@@ -708,6 +708,23 @@ impl Pal for Sys {
         Ok(())
     }
 
+    fn mkfifoat(dir_fd: c_int, path_name: CStr, mode: mode_t) -> Result<()> {
+        let mut dir_path_buf = [0; 4096];
+        let res = Sys::fpath(dir_fd, &mut dir_path_buf)?;
+
+        let dir_path = str::from_utf8(&dir_path_buf[..res as usize]).map_err(|_| Errno(EBADR))?;
+
+        let resource_path =
+            path::canonicalize_using_cwd(Some(&dir_path), &path_name.to_string_lossy())
+                // Since parent_dir_path is resolved by fpath, it is more likely that
+                // the problem was with path.
+                .ok_or(Errno(ENOENT))?;
+        Sys::mkfifo(
+            CStr::borrow(&CString::new(resource_path.as_bytes()).unwrap()),
+            mode,
+        )
+    }
+
     fn mkfifo(path: CStr, mode: mode_t) -> Result<()> {
         Sys::mknod(path, syscall::MODE_FIFO as mode_t | (mode & 0o777), 0)
     }
@@ -874,8 +891,8 @@ impl Pal for Sys {
 
         // POSIX states that umask should affect the following:
         //
-        // open, openat (TODO), creat, mkdir, mkdirat (TODO),
-        // mkfifo, mkfifoat (TODO), mknod, mknodat (TODO),
+        // open, openat, creat, mkdir, mkdirat,
+        // mkfifo, mkfifoat, mknod, mknodat,
         // mq_open, and sem_open,
         //
         // all of which (the ones that exist thus far) currently call this function.
