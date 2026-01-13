@@ -253,6 +253,8 @@ pub trait Pal {
 
     fn rmdir(path: CStr) -> Result<()>;
 
+    fn sched_getparam(pid: pid_t, param: *const sched_param) -> Result<()>;
+
     fn sched_yield() -> Result<()>;
 
     unsafe fn setgroups(size: size_t, list: *const gid_t) -> Result<()>;
