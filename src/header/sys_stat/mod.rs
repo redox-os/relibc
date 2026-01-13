@@ -176,6 +176,15 @@ pub unsafe extern "C" fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
     Sys::mkdir(path, mode).map(|()| 0).or_minus_one_errno()
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mkfifoat.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mkfifoat(dirfd: c_int, path: *const c_char, mode: mode_t) -> c_int {
+    let path = CStr::from_ptr(path);
+    Sys::mkfifoat(dirfd, path, mode)
+        .map(|()| 0)
+        .or_minus_one_errno()
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mkfifo.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mkfifo(path: *const c_char, mode: mode_t) -> c_int {

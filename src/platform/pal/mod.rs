@@ -175,6 +175,8 @@ pub trait Pal {
 
     fn mkdir(path: CStr, mode: mode_t) -> Result<()>;
 
+    fn mkfifoat(dir_fd: c_int, path: CStr, mode: mode_t) -> Result<()>;
+
     fn mkfifo(path: CStr, mode: mode_t) -> Result<()>;
 
     fn mknodat(fildes: c_int, path: CStr, mode: mode_t, dev: dev_t) -> Result<()>;

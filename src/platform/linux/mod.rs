@@ -527,6 +527,10 @@ impl Pal for Sys {
         Sys::mknodat(AT_FDCWD, path, mode, dev)
     }
 
+    fn mkfifoat(dir_fd: c_int, path: CStr, mode: mode_t) -> Result<()> {
+        Sys::mknodat(dir_fd, path, mode | S_IFIFO, 0)
+    }
+
     fn mkfifo(path: CStr, mode: mode_t) -> Result<()> {
         Sys::mknod(path, mode | S_IFIFO, 0)
     }
