@@ -2,7 +2,7 @@
 //TODO: improve implementation
 
 use crate::{
-    header::time::{CLOCK_MONOTONIC, clock_gettime, timespec},
+    header::time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec, timespec_realtime_to_monotonic},
     platform::types::{c_uint, clockid_t},
 };
 
@@ -60,28 +60,16 @@ impl Semaphore {
             }
 
             if let Some(timeout) = timeout_opt {
-                let mut time = timespec::default();
-                unsafe { clock_gettime(clock_id, &mut time) };
-                if (time.tv_sec > timeout.tv_sec)
-                    || (time.tv_sec == timeout.tv_sec && time.tv_nsec >= timeout.tv_nsec)
-                {
-                    //Timeout happened, return error
-                    return Err(());
-                } else {
-                    // Use futex to wait for the next change, with a relative timeout
-                    let mut relative = timespec {
-                        tv_sec: timeout.tv_sec,
-                        tv_nsec: timeout.tv_nsec,
-                    };
-                    while relative.tv_nsec < time.tv_nsec {
-                        relative.tv_sec -= 1;
-                        relative.tv_nsec += 1_000_000_000;
-                    }
-                    relative.tv_sec -= time.tv_sec;
-                    relative.tv_nsec -= time.tv_nsec;
-
-                    crate::sync::futex_wait(&self.count, value, Some(&relative));
-                }
+                let relative = match clock_id {
+                    // FUTEX expect monotonic clock
+                    CLOCK_MONOTONIC => timeout.clone(),
+                    CLOCK_REALTIME => match timespec_realtime_to_monotonic(timeout.clone()) {
+                        Ok(relative) => relative,
+                        Err(_) => return Err(()),
+                    },
+                    _ => return Err(()),
+                };
+                crate::sync::futex_wait(&self.count, value, Some(&relative));
             } else {
                 // Use futex to wait for the next change, without a timeout
                 crate::sync::futex_wait(&self.count, value, None);

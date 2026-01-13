@@ -37,7 +37,7 @@ int killpg_test2(int signum)
 		int i;
 		sigignore(signum);
 
-		usleep(100);
+		usleep(100000);
 		
 		child_pgid = getpgid(child_pid);
 		ERROR_IF(getpgid, child_pgid, == -1);

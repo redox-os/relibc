@@ -48,6 +48,7 @@ use crate::{
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, BufReader, prelude::*},
+    ld_so::tcb::{OsSpecific, Tcb},
     out::Out,
     platform::sys::{
         libredox::RawResult,
@@ -680,6 +681,24 @@ impl Pal for Sys {
         Ok(syscall::lseek(fd as usize, offset as isize, whence as usize)? as off_t)
     }
 
+    fn mkdirat(dir_fd: c_int, path_name: CStr, mode: mode_t) -> Result<()> {
+        let mut dir_path_buf = [0; 4096];
+        let res = Sys::fpath(dir_fd, &mut dir_path_buf)?;
+
+        let dir_path = str::from_utf8(&dir_path_buf[..res as usize]).map_err(|_| Errno(EBADR))?;
+
+        let resource_path =
+            path::canonicalize_using_cwd(Some(&dir_path), &path_name.to_string_lossy())
+                // Since parent_dir_path is resolved by fpath, it is more likely that
+                // the problem was with path.
+                .ok_or(Errno(ENOENT))?;
+
+        Sys::mkdir(
+            CStr::borrow(&CString::new(resource_path.as_bytes()).unwrap()),
+            mode,
+        )
+    }
+
     fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
         File::create(
             path,
@@ -687,6 +706,23 @@ impl Pal for Sys {
             0o777,
         )?;
         Ok(())
+    }
+
+    fn mkfifoat(dir_fd: c_int, path_name: CStr, mode: mode_t) -> Result<()> {
+        let mut dir_path_buf = [0; 4096];
+        let res = Sys::fpath(dir_fd, &mut dir_path_buf)?;
+
+        let dir_path = str::from_utf8(&dir_path_buf[..res as usize]).map_err(|_| Errno(EBADR))?;
+
+        let resource_path =
+            path::canonicalize_using_cwd(Some(&dir_path), &path_name.to_string_lossy())
+                // Since parent_dir_path is resolved by fpath, it is more likely that
+                // the problem was with path.
+                .ok_or(Errno(ENOENT))?;
+        Sys::mkfifo(
+            CStr::borrow(&CString::new(resource_path.as_bytes()).unwrap()),
+            mode,
+        )
     }
 
     fn mkfifo(path: CStr, mode: mode_t) -> Result<()> {
@@ -855,8 +891,8 @@ impl Pal for Sys {
 
         // POSIX states that umask should affect the following:
         //
-        // open, openat (TODO), creat, mkdir, mkdirat (TODO),
-        // mkfifo, mkfifoat (TODO), mknod, mknodat (TODO),
+        // open, openat, creat, mkdir, mkdirat,
+        // mkfifo, mkfifoat, mknod, mknodat,
         // mq_open, and sem_open,
         //
         // all of which (the ones that exist thus far) currently call this function.
@@ -926,15 +962,17 @@ impl Pal for Sys {
         Ok(bytes_read)
     }
 
-    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
+    unsafe fn rlct_clone(
+        stack: *mut usize,
+        os_specific: &mut OsSpecific,
+    ) -> Result<crate::pthread::OsTid> {
         let _guard = CLONE_LOCK.read();
-        let res = clone::rlct_clone_impl(stack);
+        let res = clone::rlct_clone_impl(stack, os_specific);
 
-        res.map(|mut fd| crate::pthread::OsTid {
-            thread_fd: fd.take(),
-        })
-        .map_err(|error| Errno(error.errno))
+        res.map(|thread_fd| crate::pthread::OsTid { thread_fd })
+            .map_err(|error| Errno(error.errno))
     }
+
     unsafe fn rlct_kill(os_tid: crate::pthread::OsTid, signal: usize) -> Result<()> {
         redox_rt::sys::posix_kill_thread(os_tid.thread_fd, signal as u32)?;
         Ok(())

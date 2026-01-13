@@ -62,6 +62,9 @@ mod shim {
 
 pub use shim::*;
 
+/// Undefined Symbol Index
+pub const STN_UNDEF: SymbolIndex = SymbolIndex(0);
+
 enum HashTable<'a> {
     Gnu(GnuHashTable<'a, FileHeader>),
     Sysv(SysVHashTable<'a, FileHeader>),
@@ -878,7 +881,7 @@ impl DSO {
     fn static_relocate(&self, global_scope: &Scope, reloc: Relocation) -> object::Result<()> {
         let b = self.mmap.as_ptr() as usize;
 
-        let (sym, my_sym) = if reloc.sym.0 > 0 {
+        let (sym, my_sym) = if reloc.sym != STN_UNDEF {
             let name = self.dynamic.symbol_name(reloc.sym).unwrap();
 
             let lookup_scopes = [global_scope, self.scope()];
@@ -896,11 +899,18 @@ impl DSO {
             (None, None)
         };
 
-        let (s, t, tls_id) = sym
+        let (s, tls_obj) = sym
             .as_ref()
-            .map(|(sym, obj)| (sym.as_ptr() as usize, obj.tls_offset, obj.tls_module_id))
-            // TODO: is self.tls_module_id the right fallback?
-            .unwrap_or((0, 0, self.tls_module_id));
+            .map(|(sym, obj)| (sym.as_ptr() as usize, obj.as_ref()))
+            // (1) According to the System V gABI (Chapter 4, "Relocation"): if
+            // the symbol index (`reloc.sym`) is undefined, the symbol value
+            // (`s`) is defined as 0.
+            //
+            // (2) According to Drepper's ELF Handling For Thread-Local Storage
+            // (Section 4.2, "Local Dynamic TLS Model"): a relocation with
+            // undefined symbol index implies a reference to the current module
+            // itself. Hence we resolve the object to `self`.
+            .unwrap_or((0, self));
 
         let ptr = if self.pie {
             (b + reloc.offset) as *mut u8
@@ -922,7 +932,7 @@ impl DSO {
         };
 
         match reloc.kind {
-            RelocationKind::DTPMOD => set_usize(tls_id),
+            RelocationKind::DTPMOD => set_usize(tls_obj.tls_module_id),
             // TODO: Subtract DTP_OFFSET, which is 0x800 on riscv64, 0 on x86?
             RelocationKind::DTPOFF => {
                 if reloc.sym.0 > 0 {
@@ -939,13 +949,18 @@ impl DSO {
             RelocationKind::RELATIVE => set_usize(b + a),
             RelocationKind::SYMBOLIC => set_usize(s + a),
             RelocationKind::TPOFF => {
+                assert!(
+                    !tls_obj.dlopened,
+                    "The {{local/initial}}-exec access model is used for symbol '{}' in '{}', which requires a static TLS block. However, the definition in '{}' resides in the dynamic TLS block because the object was loaded via dlopen(2).",
+                    reloc.sym, self.name, tls_obj.name
+                );
                 if reloc.sym.0 > 0 {
                     let (sym, _) = sym
                         .as_ref()
                         .expect("RelocationKind::TPOFF called without valid symbol");
-                    set_usize((sym.value + a).wrapping_sub(t));
+                    set_usize((sym.value + a).wrapping_sub(tls_obj.tls_offset));
                 } else {
-                    set_usize(a.wrapping_sub(t));
+                    set_usize(a.wrapping_sub(tls_obj.tls_offset));
                 }
             }
             RelocationKind::IRELATIVE => unsafe {

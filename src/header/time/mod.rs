@@ -7,7 +7,7 @@ use crate::{
     error::{Errno, ResultExt},
     fs::File,
     header::{
-        errno::{EFAULT, EOVERFLOW},
+        errno::{EFAULT, ENOMEM, EOVERFLOW, ETIMEDOUT},
         fcntl::O_RDONLY,
         signal::sigevent,
         stdlib::getenv,
@@ -24,7 +24,6 @@ use crate::{
     },
     sync::{Mutex, MutexGuard},
 };
-use __libc_only_for_layout_checks::EINVAL;
 use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
 use chrono::{
     DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, ParseError, TimeZone,
@@ -34,6 +33,7 @@ use chrono_tz::{OffsetComponents, OffsetName, Tz};
 use core::{
     cell::OnceCell,
     convert::{TryFrom, TryInto},
+    fmt::Debug,
     mem, ptr,
 };
 
@@ -48,11 +48,12 @@ pub use strptime::strptime;
 const YEARS_PER_ERA: time_t = 400;
 const DAYS_PER_ERA: time_t = 146097;
 const SECS_PER_DAY: time_t = 24 * 60 * 60;
+const NANOSECONDS: c_long = 1_000_000_000;
 const UTC_STR: &core::ffi::CStr = c"UTC";
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
 #[repr(C)]
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Debug)]
 pub struct timespec {
     pub tv_sec: time_t,
     pub tv_nsec: c_long,
@@ -60,36 +61,44 @@ pub struct timespec {
 
 impl timespec {
     // TODO: Write test
-    pub fn add(base: timespec, interval: timespec) -> Option<timespec> {
-        let base_nsec = c_ulong::try_from(base.tv_nsec).ok()?;
-        let interval_nsec = c_ulong::try_from(interval.tv_nsec).ok()?;
 
-        Some(if base_nsec.checked_add(interval_nsec)? < 1_000_000_000 {
-            timespec {
-                tv_sec: base.tv_sec.checked_add(interval.tv_sec)?,
-                tv_nsec: (base_nsec + interval_nsec) as _,
-            }
-        } else {
-            timespec {
-                tv_sec: base.tv_sec.checked_add(interval.tv_sec)?.checked_add(1)?,
-                tv_nsec: ((interval_nsec + base_nsec) - 1_000_000_000) as c_long,
-            }
+    /// similar logic with timeradd
+    pub fn add(base: timespec, interval: timespec) -> Option<timespec> {
+        let Some(delta_sec) = base.tv_sec.checked_add(interval.tv_sec) else {
+            return None;
+        };
+        let Some(delta_nsec) = base.tv_nsec.checked_add(interval.tv_nsec) else {
+            return None;
+        };
+
+        if delta_sec < 0 || delta_nsec < 0 {
+            return None;
+        }
+
+        Some(Self {
+            tv_sec: delta_sec + (delta_nsec / NANOSECONDS) as time_t,
+            tv_nsec: delta_nsec % NANOSECONDS,
         })
     }
-    // TODO: Write test
+    /// similar logic with timersub
     pub fn subtract(later: timespec, earlier: timespec) -> Option<timespec> {
-        let later_nsec = c_ulong::try_from(later.tv_nsec).ok()?;
-        let earlier_nsec = c_ulong::try_from(earlier.tv_nsec).ok()?;
+        let Some(delta_sec) = later.tv_sec.checked_sub(earlier.tv_sec) else {
+            return None;
+        };
+        let Some(delta_nsec) = later.tv_nsec.checked_sub(earlier.tv_nsec) else {
+            return None;
+        };
 
-        let time = if later_nsec > earlier_nsec {
+        let time = if delta_nsec < 0 {
+            let roundup_sec = -delta_nsec / NANOSECONDS + 1;
             timespec {
-                tv_sec: later.tv_sec.checked_sub(earlier.tv_sec)?,
-                tv_nsec: (later_nsec - earlier_nsec) as _,
+                tv_sec: delta_sec - (roundup_sec as time_t),
+                tv_nsec: roundup_sec * NANOSECONDS - delta_nsec,
             }
         } else {
             timespec {
-                tv_sec: later.tv_sec.checked_sub(earlier.tv_sec)?.checked_sub(1)?,
-                tv_nsec: 1_000_000_000 - (earlier_nsec - later_nsec) as c_long,
+                tv_sec: delta_sec + (delta_nsec / NANOSECONDS) as time_t,
+                tv_nsec: delta_nsec % NANOSECONDS,
             }
         };
 
@@ -838,4 +847,18 @@ const fn blank_tm() -> tm {
         tm_gmtoff: 0,
         tm_zone: ptr::null_mut(),
     }
+}
+
+pub(crate) fn timespec_realtime_to_monotonic(abstime: timespec) -> Result<timespec, Errno> {
+    let mut realtime = timespec::default();
+    unsafe { clock_gettime(CLOCK_REALTIME, &mut realtime) };
+    let mut monotonic = timespec::default();
+    unsafe { clock_gettime(CLOCK_MONOTONIC, &mut monotonic) };
+    let Some(delta) = timespec::subtract(abstime, realtime) else {
+        return Err(Errno(ETIMEDOUT));
+    };
+    let Some(relative) = timespec::add(monotonic, delta) else {
+        return Err(Errno(ENOMEM));
+    };
+    Ok(relative)
 }

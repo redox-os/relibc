@@ -1,22 +1,18 @@
 //! Relibc Threads, or RLCT.
 
 use core::{
-    cell::{Cell, UnsafeCell},
-    mem::{MaybeUninit, offset_of},
-    ptr::{self, NonNull, addr_of},
+    cell::UnsafeCell,
+    mem::MaybeUninit,
+    ptr::{self, addr_of},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
-use alloc::{boxed::Box, collections::BTreeMap};
+use alloc::collections::BTreeMap;
 
 use crate::{
     error::Errno,
     header::{errno::*, pthread as header, sched::sched_param, sys_mman},
-    ld_so::{
-        ExpectTlsFree,
-        linker::Linker,
-        tcb::{Master, Tcb},
-    },
+    ld_so::{ExpectTlsFree, tcb::Tcb},
     platform::{Pal, Sys, types::*},
 };
 
@@ -124,9 +120,6 @@ pub(crate) unsafe fn create(
     let synchronization_mutex = Mutex::locked(current_sigmask);
     let synchronization_mutex = &synchronization_mutex;
 
-    let tid_mutex = Mutex::<MaybeUninit<OsTid>>::new(MaybeUninit::uninit());
-    let mut tid_guard = tid_mutex.lock();
-
     let stack_size = attrs.stacksize.next_multiple_of(Sys::getpagesize());
 
     let stack_base = if attrs.stack != 0 {
@@ -187,8 +180,8 @@ pub(crate) unsafe fn create(
             push(0);
         }
         push(0);
+        push(0);
         push(synchronization_mutex as *const _ as usize);
-        push(addr_of!(tid_mutex) as usize);
         push(new_tcb as *mut _ as usize);
 
         push(arg as usize);
@@ -197,13 +190,11 @@ pub(crate) unsafe fn create(
         push(new_thread_shim as usize);
     }
 
-    let Ok(os_tid) = Sys::rlct_clone(stack) else {
+    let Ok(os_tid) = Sys::rlct_clone(stack, &mut new_tcb.os_specific) else {
         return Err(Errno(EAGAIN));
     };
     core::mem::forget(stack_raii);
 
-    tid_guard.write(os_tid);
-    drop(tid_guard);
     let _ = synchronization_mutex.lock();
 
     OS_TID_TO_PTHREAD
@@ -212,41 +203,35 @@ pub(crate) unsafe fn create(
 
     Ok((&new_tcb.pthread) as *const _ as *mut _)
 }
+
 /// A shim to wrap thread entry points in logic to set up TLS, for example
 unsafe extern "C" fn new_thread_shim(
     entry_point: unsafe extern "C" fn(*mut c_void) -> *mut c_void,
     arg: *mut c_void,
     tcb: *mut Tcb,
-    mutex1: *const Mutex<MaybeUninit<OsTid>>,
-    mutex2: *const Mutex<u64>,
+    synchronization_mutex: *const Mutex<u64>,
 ) -> ! {
-    let tid = (*(&*mutex1).lock()).assume_init();
+    let tcb = tcb.as_mut().expect_notls("non-null TLS is required");
 
-    if let Some(tcb) = tcb.as_mut() {
-        #[cfg(not(target_os = "redox"))]
-        {
-            tcb.activate();
-        }
-        #[cfg(target_os = "redox")]
-        {
-            tcb.activate(
-                redox_rt::proc::FdGuard::new(tid.thread_fd)
-                    .to_upper()
-                    .unwrap(),
-            );
-            redox_rt::signal::setup_sighandler(&tcb.os_specific, false);
-        }
+    #[cfg(not(target_os = "redox"))]
+    {
+        tcb.activate();
+    }
+    #[cfg(target_os = "redox")]
+    {
+        // `thr_fd` in `tcb` is set by [`Sys::rlct_clone`] *before* jumping to
+        // the entry point of the new thread.
+        tcb.activate(None);
+        redox_rt::signal::setup_sighandler(&tcb.os_specific, false);
     }
 
-    let procmask = (&*mutex2).as_ptr().read();
+    let procmask = (&*synchronization_mutex).as_ptr().read();
 
-    if let Some(tcb) = tcb.as_mut() {
-        tcb.copy_masters().unwrap();
-    }
+    tcb.copy_masters().unwrap();
 
     (*tcb).pthread.os_tid.get().write(Sys::current_os_tid());
 
-    (&*mutex2).manual_unlock();
+    (&*synchronization_mutex).manual_unlock();
 
     #[cfg(target_os = "redox")]
     {

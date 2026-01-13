@@ -1,35 +1,41 @@
 /// Print to stdout
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ({
+    ($($arg:tt)*) => {{
         use core::fmt::Write;
-        let _ = write!($crate::platform::FileWriter::new(1), $($arg)*);
-    });
+        let _ = $crate::platform::FileWriter::new(1).write_fmt(format_args!($($arg)*));
+    }};
 }
 
 /// Print with new line to stdout
 #[macro_export]
 macro_rules! println {
-    () => (print!("\n"));
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+    () => {
+        $crate::print!("\n")
+    };
+    ($($arg:tt)*) => {
+        $crate::print!("{}\n", format_args!($($arg)*))
+    };
 }
 
 /// Print to stderr
 #[macro_export]
 macro_rules! eprint {
-    ($($arg:tt)*) => ({
+    ($($arg:tt)*) => {{
         use core::fmt::Write;
-        let _ = write!($crate::platform::FileWriter::new(2), $($arg)*);
-    });
+        let _ = $crate::platform::FileWriter::new(2).write_fmt(format_args!($($arg)*));
+    }};
 }
 
 /// Print with new line to stderr
 #[macro_export]
 macro_rules! eprintln {
-    () => (eprint!("\n"));
-    ($fmt:expr) => (eprint!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (eprint!(concat!($fmt, "\n"), $($arg)*));
+    () => {
+        $crate::eprint!("\n")
+    };
+    ($($arg:tt)*) => {
+        $crate::eprint!("{}\n", format_args!($($arg)*))
+    };
 }
 
 /// Lifted from libstd

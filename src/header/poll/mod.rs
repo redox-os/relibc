@@ -11,6 +11,7 @@ use crate::{
     error::ResultExt,
     fs::File,
     header::{
+        errno::EBADF,
         signal::sigset_t,
         sys_epoll::{
             EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLNVAL, EPOLLOUT,
@@ -19,7 +20,10 @@ use crate::{
         },
         time::timespec,
     },
-    platform::types::{c_int, c_short, c_ulong},
+    platform::{
+        self,
+        types::{c_int, c_short, c_ulong},
+    },
 };
 
 pub const POLLIN: c_short = 0x001;
@@ -65,12 +69,14 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) 
         File::new(epfd)
     };
 
+    let mut closed = 0;
     for i in 0..fds.len() {
         let mut pfd = &mut fds[i];
 
-        // Ignore the entry with negative fd, set the revents to 0
+        pfd.revents = 0;
+
+        // Ignore the entry with negative fd
         if pfd.fd < 0 {
-            pfd.revents = 0;
             continue;
         }
 
@@ -86,11 +92,19 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) 
             }
         }
 
-        pfd.revents = 0;
-
         if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &mut event) } < 0 {
-            return -1;
+            if platform::ERRNO.get() == EBADF {
+                pfd.revents |= POLLNVAL;
+                closed += 1;
+            } else {
+                return -1;
+            }
         }
+    }
+
+    // Early exit if there are fds, and all are closed (revents = POLLNVAL)
+    if closed > 0 && closed == fds.len() {
+        return closed as i32;
     }
 
     let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
