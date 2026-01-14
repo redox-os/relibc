@@ -87,8 +87,3 @@ pub use crate::header::{bits_pthread::*, bits_sched::*};
 pub struct max_align_t {
     _priv: [f64; 4],
 }
-
-#[repr(C, align(16))]
-pub struct sched_param {
-    sched_priority: c_long,
-}

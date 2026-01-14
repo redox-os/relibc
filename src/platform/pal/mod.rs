@@ -12,6 +12,7 @@ use crate::{
         sys_time::{timeval, timezone},
         sys_utsname::utsname,
         time::{itimerspec, timespec},
+        sched::sched_param
     },
     ld_so::tcb::OsSpecific,
     out::Out,

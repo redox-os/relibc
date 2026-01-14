@@ -5,8 +5,6 @@
 extern "C" {
 #endif
 
-#include <sys/types.h>
-
 /* Scheduling algorithms.  */
 #define SCHED_OTHER 0
 #define SCHED_FIFO  1

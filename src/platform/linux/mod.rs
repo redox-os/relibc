@@ -16,6 +16,7 @@ use crate::{
         sys_time::{timeval, timezone},
         time::itimerspec,
         unistd::{SEEK_CUR, SEEK_SET},
+        sched::sched_param
     },
     io::Write,
     out::Out,
