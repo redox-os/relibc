@@ -13,6 +13,8 @@ extern "C" {
 #define SCHED_IDLE  5
 #define SCHED_DEADLINE 6
 
+typedef int pid_t;
+
 struct sched_param {
     int sched_priority;
 };
