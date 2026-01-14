@@ -2,7 +2,7 @@
 #include <sched.h>
 
 int main() {
-    struct sched_param param = 0;
+    struct sched_param param = {0};
 
     // 0 = current process
     if (sched_getparam(0, &param) == 0) {
