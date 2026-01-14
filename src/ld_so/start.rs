@@ -11,7 +11,6 @@ use alloc::{
 };
 
 use crate::{
-    ALLOCATOR,
     c_str::CStr,
     header::{
         sys_auxv::{AT_ENTRY, AT_PHDR},
@@ -249,7 +248,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
     let (path, _name) = match resolve_path_name(&name_or_path, &envs) {
         Some((p, n)) => (p, n),
         None => {
-            eprintln!("ld.so: failed to locate '{}'", name_or_path);
+            eprintln!("[ld.so]: failed to locate '{name_or_path}'");
             unistd::_exit(1);
         }
     };
@@ -271,17 +270,16 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
     let entry = match linker.load_program(&path, base_addr) {
         Ok(entry) => entry,
         Err(err) => {
-            eprintln!("[ld.so]: failed to link '{}': {:?}", path, err);
+            eprintln!("[ld.so]: failed to link '{path}': {err:?}");
             eprintln!("[ld.so]: enable debug output with `LD_DEBUG=all` for more information");
             unistd::_exit(1);
         }
     };
     if let Some(tcb) = unsafe { Tcb::current() } {
         tcb.linker_ptr = Box::into_raw(Box::new(Mutex::new(linker)));
-        tcb.mspace = ALLOCATOR.get();
     }
     if is_manual {
-        eprintln!("[ld.so]: entry '{}': {:#x}", path, entry);
+        eprintln!("[ld.so]: entry '{path}': {entry:#x}");
     }
     entry
 }
