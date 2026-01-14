@@ -1,6 +1,7 @@
 use crate::platform::types::c_int;
 
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
 pub const SCHED_OTHER: c_int = 0;
 pub const SCHED_FIFO: c_int = 1;
 pub const SCHED_RR: c_int = 2;

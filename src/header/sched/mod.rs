@@ -7,8 +7,11 @@
 #[path = "linux.rs"]
 pub mod sys;
 
+#[cfg(target_os = "redox")]
+#[path = "redox.rs"]
+pub mod sys;
 
-mod linux;
+pub use self::sys::*;
 
 use crate::{
     error::ResultExt,
@@ -25,13 +28,6 @@ use crate::{
 pub struct sched_param {
     pub sched_priority: c_int,
 }
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
-pub const SCHED_FIFO: c_int = 0;
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
-pub const SCHED_RR: c_int = 1;
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
-pub const SCHED_OTHER: c_int = 2;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sched_get_priority_max.html>.
 // #[unsafe(no_mangle)]
