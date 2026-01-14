@@ -13,8 +13,6 @@ FAILING_TESTS=tls \
 	stdlib/ptsname \
 	sys_mman \
 	signals/pthread_kill-child \
-	sys_socket/unixpeername \
-	sys_socket/unixrecvfrom \
 	unistd/isatty \
 	unistd/link \
 #	resource/getrusage
@@ -273,6 +271,8 @@ VARIED_NAMES=\
 	sys_socket/getpeername \
 	sys_socket/recv \
 	sys_socket/recvfrom \
+	sys_socket/unixpeername \
+	sys_socket/unixrecvfrom \
 	sys_stat/stat \
 	sys_statvfs/statvfs \
 	sys_utsname/uname \
