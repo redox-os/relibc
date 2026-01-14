@@ -228,6 +228,7 @@ STATUS_NAMES=(\
 	grp/getgrgid_r \
 	grp/getgrnam_r \
 	grp/gr_iter \
+	sched \
 )
     #	resource/getrusage
     #	time/times

@@ -2,6 +2,12 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
 
+
+#[cfg(target_os = "linux")]
+#[path = "linux.rs"]
+pub mod sys;
+
+
 mod linux;
 
 use crate::{
@@ -40,7 +46,7 @@ pub extern "C" fn sched_get_priority_min(policy: c_int) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sched_getparam.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn sched_getparam(pid: pid_t, param: *const sched_param) -> c_int {
     Sys::sched_getparam(pid, param).map(|()| 0).or_minus_one_errno()
 }
