@@ -778,6 +778,9 @@ impl PalSocket for Sys {
             // TODO: in UDS dgram getpeername on listener always return ENOTCONN,
             // it probably the expected error on usual getpeername call, but not here.
             if let Err(e) = Self::getpeername(socket, address, address_len) {
+                if e.0 != ENOTCONN {
+                    return Err(e);
+                }
                 let data = &mut *(address as *mut sockaddr);
                 data.sa_family = AF_UNSPEC as u16;
                 *address_len = 0;
