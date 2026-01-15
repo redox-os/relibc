@@ -1,7 +1,7 @@
 use core::{arch::asm, num::NonZeroU64, ptr};
 
 use super::{ERRNO, Pal, types::*};
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 use crate::ld_so::tcb::OsSpecific;
 use crate::{
     c_str::CStr,
@@ -9,6 +9,7 @@ use crate::{
         dirent::dirent,
         errno::{EINVAL, EIO, EOPNOTSUPP},
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW},
+        sched::sched_param,
         signal::{SIGCHLD, sigevent},
         sys_resource::{rlimit, rusage},
         sys_stat::{S_IFIFO, stat},
@@ -780,6 +781,10 @@ impl Pal for Sys {
 
     fn rmdir(path: CStr) -> Result<()> {
         e_raw(unsafe { syscall!(UNLINKAT, AT_FDCWD, path.as_ptr(), AT_REMOVEDIR) }).map(|_| ())
+    }
+
+    fn sched_getparam(pid: pid_t, param: *const sched_param) -> Result<()> {
+        e_raw(unsafe { syscall!(SCHED_GETPARAM, pid, param) }).map(|_| ())
     }
 
     fn sched_yield() -> Result<()> {

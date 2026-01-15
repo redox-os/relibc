@@ -5,6 +5,7 @@ use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
+        sched::sched_param,
         signal::sigevent,
         sys_resource::{rlimit, rusage},
         sys_stat::stat,
@@ -252,6 +253,8 @@ pub trait Pal {
     ) -> Result<()>;
 
     fn rmdir(path: CStr) -> Result<()>;
+
+    fn sched_getparam(pid: pid_t, param: *const sched_param) -> Result<()>;
 
     fn sched_yield() -> Result<()>;
 

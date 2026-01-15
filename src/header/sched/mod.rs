@@ -2,6 +2,16 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
 
+#[cfg(target_os = "linux")]
+#[path = "linux.rs"]
+pub mod sys;
+
+#[cfg(target_os = "redox")]
+#[path = "redox.rs"]
+pub mod sys;
+
+pub use self::sys::*;
+
 use crate::{
     error::ResultExt,
     header::time::timespec,
@@ -12,17 +22,11 @@ use crate::{
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
+#[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct sched_param {
     pub sched_priority: c_int,
 }
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
-pub const SCHED_FIFO: c_int = 0;
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
-pub const SCHED_RR: c_int = 1;
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
-pub const SCHED_OTHER: c_int = 2;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sched_get_priority_max.html>.
 // #[unsafe(no_mangle)]
@@ -37,9 +41,11 @@ pub extern "C" fn sched_get_priority_min(policy: c_int) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sched_getparam.html>.
-// #[unsafe(no_mangle)]
-pub unsafe extern "C" fn sched_getparam(pid: pid_t, param: *mut sched_param) -> c_int {
-    todo!()
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sched_getparam(pid: pid_t, param: *const sched_param) -> c_int {
+    Sys::sched_getparam(pid, param)
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sched_rr_get_interval.html>.

@@ -33,6 +33,7 @@ use crate::{
         fcntl::{self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW, O_CREAT, O_RDONLY, O_RDWR},
         limits,
         pthread::{pthread_cancel, pthread_create},
+        sched::sched_param,
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         stdio::RENAME_NOREPLACE,
         sys_file,
@@ -1102,6 +1103,11 @@ impl Pal for Sys {
     fn sched_yield() -> Result<()> {
         syscall::sched_yield()?;
         Ok(())
+    }
+
+    fn sched_getparam(pid: pid_t, param: *const sched_param) -> Result<()> {
+        eprintln!("sched_getparam not implemented on redox (no scheduling priorities exist)");
+        Err(Errno(ENOSYS))
     }
 
     unsafe fn setgroups(size: size_t, list: *const gid_t) -> Result<()> {
