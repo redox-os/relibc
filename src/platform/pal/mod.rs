@@ -5,6 +5,7 @@ use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
+        sched::sched_param,
         signal::sigevent,
         sys_resource::{rlimit, rusage},
         sys_stat::stat,
@@ -12,7 +13,6 @@ use crate::{
         sys_time::{timeval, timezone},
         sys_utsname::utsname,
         time::{itimerspec, timespec},
-        sched::sched_param
     },
     ld_so::tcb::OsSpecific,
     out::Out,

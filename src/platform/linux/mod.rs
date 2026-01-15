@@ -9,6 +9,7 @@ use crate::{
         dirent::dirent,
         errno::{EINVAL, EIO, EOPNOTSUPP},
         fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW},
+        sched::sched_param,
         signal::{SIGCHLD, sigevent},
         sys_resource::{rlimit, rusage},
         sys_stat::{S_IFIFO, stat},
@@ -16,7 +17,6 @@ use crate::{
         sys_time::{timeval, timezone},
         time::itimerspec,
         unistd::{SEEK_CUR, SEEK_SET},
-        sched::sched_param
     },
     io::Write,
     out::Out,
@@ -784,7 +784,7 @@ impl Pal for Sys {
     }
 
     fn sched_getparam(pid: pid_t, param: *const sched_param) -> Result<()> {
-        e_raw(unsafe { syscall!(SCHED_GETPARAM, pid, param)}).map(|_| ())
+        e_raw(unsafe { syscall!(SCHED_GETPARAM, pid, param) }).map(|_| ())
     }
 
     fn sched_yield() -> Result<()> {
