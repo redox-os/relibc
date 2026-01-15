@@ -16,8 +16,8 @@ use crate::{
     header::{
         arpa_inet::inet_aton,
         errno::{
-            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EISCONN, EMSGSIZE, ENOMEM, ENOSYS, ENOTSOCK,
-            EOPNOTSUPP, EPROTONOSUPPORT,
+            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EISCONN, EMSGSIZE, ENOMEM, ENOSYS, ENOTCONN,
+            ENOTSOCK, EOPNOTSUPP, EPROTONOSUPPORT,
         },
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
@@ -96,6 +96,9 @@ unsafe fn inner_af_unix(buf: &[u8], address: *mut sockaddr, address_len: *mut so
 
     let len = cmp::min(path.len(), buf.len());
     path[..len].copy_from_slice(&buf[..len]);
+    if len < path.len() {
+        path[len] = 0;
+    }
 
     *address_len = len as socklen_t;
 }
@@ -772,7 +775,16 @@ impl PalSocket for Sys {
         if address.is_null() || address_len.is_null() {
             Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
         } else {
-            Self::getpeername(socket, address, address_len)?;
+            // TODO: in UDS dgram getpeername on listener always return ENOTCONN,
+            // it probably the expected error on usual getpeername call, but not here.
+            if let Err(e) = Self::getpeername(socket, address, address_len) {
+                if e.0 != ENOTCONN {
+                    return Err(e);
+                }
+                let data = &mut *(address as *mut sockaddr);
+                data.sa_family = AF_UNSPEC as u16;
+                *address_len = 0;
+            }
             Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
         }
     }
