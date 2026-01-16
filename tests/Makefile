@@ -124,6 +124,12 @@ EXPECT_NAMES=\
 	string/stpcpy \
 	string/stpncpy \
 	strings \
+	sys_socket/recv \
+	sys_socket/recvfrom \
+	sys_socket/unixpeername \
+	sys_socket/unixrecv \
+	sys_socket/unixrecvfrom \
+	sys_socket/unixsocketpair \
 	sys_stat/chmod \
 	sys_stat/lstat \
 	sys_stat/fstatat \
@@ -269,10 +275,6 @@ VARIED_NAMES=\
 	sys_epoll/epoll \
 	sys_resource/constants \
 	sys_socket/getpeername \
-	sys_socket/recv \
-	sys_socket/recvfrom \
-	sys_socket/unixpeername \
-	sys_socket/unixrecvfrom \
 	sys_stat/stat \
 	sys_statvfs/statvfs \
 	sys_utsname/uname \
