@@ -2,6 +2,9 @@
 //!
 //! Non-POSIX, see <https://man7.org/linux/man-pages/man3/posix_memalign.3.html>.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use crate::{
     header::errno::ENOMEM,
     platform::{
@@ -28,7 +31,7 @@ pub unsafe extern "C" fn pvalloc(size: size_t) -> *mut c_void {
 
     match num_pages.checked_mul(page_size) {
         Some(alloc_size) => {
-            let ptr = platform::alloc_align(alloc_size, page_size);
+            let ptr = unsafe { platform::alloc_align(alloc_size, page_size) };
             if ptr.is_null() {
                 platform::ERRNO.set(ENOMEM);
             }
@@ -44,5 +47,5 @@ pub unsafe extern "C" fn pvalloc(size: size_t) -> *mut c_void {
 /// See <https://man7.org/linux/man-pages/man3/malloc_usable_size.3.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn malloc_usable_size(ptr: *mut c_void) -> size_t {
-    platform::alloc_usable_size(ptr)
+    unsafe { platform::alloc_usable_size(ptr) }
 }

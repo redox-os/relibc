@@ -2,6 +2,9 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/locale.h.html>.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use alloc::{boxed::Box, ffi::CString, string::String};
 use core::{ptr, str::FromStr};
 
@@ -38,28 +41,28 @@ static mut THREAD_LOCALE: *mut LocaleData = ptr::null_mut();
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/localeconv.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn localeconv() -> *mut lconv {
-    let current = uselocale(ptr::null_mut());
+    let current = unsafe { uselocale(ptr::null_mut()) };
     if current == LC_GLOBAL_LOCALE || current.is_null() {
-        if !GLOBAL_LOCALE.is_null() {
+        if !unsafe { GLOBAL_LOCALE.is_null() } {
             // safety: GLOBAL_LOCALE is never set to null again
-            &raw mut (*GLOBAL_LOCALE).data.lconv
+            unsafe { &raw mut (*GLOBAL_LOCALE).data.lconv }
         } else {
             &raw mut POSIX_LOCALE
         }
     } else {
         let current = current as *mut LocaleData;
-        &raw mut (*current).lconv
+        unsafe { &raw mut (*current).lconv }
     }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setlocale.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setlocale(category: c_int, locale: *const c_char) -> *mut c_char {
-    if GLOBAL_LOCALE.is_null() {
+    if unsafe { GLOBAL_LOCALE.is_null() } {
         let new_global = GlobalLocaleData::new();
-        GLOBAL_LOCALE = Box::into_raw(new_global);
+        unsafe { GLOBAL_LOCALE = Box::into_raw(new_global) };
     };
-    let Some(mut global) = GLOBAL_LOCALE.as_mut() else {
+    let Some(mut global) = (unsafe { GLOBAL_LOCALE.as_mut() }) else {
         return ptr::null_mut();
     };
 
@@ -70,7 +73,7 @@ pub unsafe extern "C" fn setlocale(category: c_int, locale: *const c_char) -> *m
         return name.as_ptr() as *mut c_char;
     }
 
-    let name = CStr::from_ptr(locale).to_str().unwrap_or("C");
+    let name = unsafe { CStr::from_ptr(locale).to_str().unwrap_or("C") };
 
     let locale_file = if name == "" || name == "C" || name == "POSIX" {
         // TODO: name == "" should read from LANG env
@@ -94,17 +97,19 @@ pub unsafe extern "C" fn setlocale(category: c_int, locale: *const c_char) -> *m
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/uselocale.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uselocale(newloc: locale_t) -> locale_t {
-    let old_loc = if THREAD_LOCALE.is_null() {
+    let old_loc = if unsafe { THREAD_LOCALE.is_null() } {
         LC_GLOBAL_LOCALE
     } else {
-        THREAD_LOCALE as locale_t
+        (unsafe { THREAD_LOCALE }) as locale_t
     };
 
     if !newloc.is_null() {
-        THREAD_LOCALE = if newloc == LC_GLOBAL_LOCALE {
-            ptr::null_mut()
-        } else {
-            newloc as *mut LocaleData
+        unsafe {
+            THREAD_LOCALE = if newloc == LC_GLOBAL_LOCALE {
+                ptr::null_mut()
+            } else {
+                newloc as *mut LocaleData
+            }
         };
     }
 
@@ -114,7 +119,9 @@ pub unsafe extern "C" fn uselocale(newloc: locale_t) -> locale_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/newlocale.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn newlocale(mask: c_int, locale: *const c_char, base: locale_t) -> locale_t {
-    let name = CStr::from_ptr(locale).to_string_lossy().into_owned();
+    let name = unsafe { CStr::from_ptr(locale) }
+        .to_string_lossy()
+        .into_owned();
     let name = name.as_str();
     let mut new_locale = if name == "" || name == "C" || name == "POSIX" {
         // TODO: name == "" should read from LANG env
@@ -126,7 +133,7 @@ pub unsafe extern "C" fn newlocale(mask: c_int, locale: *const c_char, base: loc
         // borrowing here
         let base = base as *const _ as *const LocaleData;
         if let Ok(new_locale) = new_locale.as_mut() {
-            if let Some(base) = base.as_ref() {
+            if let Some(base) = unsafe { base.as_ref() } {
                 // copy old values if not containing the mask
                 if (mask & LC_NUMERIC_MASK) == 0 {
                     new_locale.copy_category(base, LC_NUMERIC);
@@ -145,7 +152,7 @@ pub unsafe extern "C" fn newlocale(mask: c_int, locale: *const c_char, base: loc
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn freelocale(loc: locale_t) {
     if !loc.is_null() && loc != LC_GLOBAL_LOCALE {
-        drop(Box::from_raw(loc as *mut LocaleData));
+        drop(unsafe { Box::from_raw(loc as *mut LocaleData) });
     }
 }
 
@@ -160,7 +167,7 @@ pub unsafe extern "C" fn duplocale(loc: locale_t) -> locale_t {
     } else {
         // borrowing here
         let loc = loc as *const _ as *const LocaleData;
-        Box::into_raw(Box::from((*loc).clone())) as locale_t
+        Box::into_raw(unsafe { Box::from((*loc).clone()) }) as locale_t
     }
 }
 

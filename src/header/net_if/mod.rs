@@ -2,6 +2,9 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/net_if.h.html>.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::ptr::null;
 
 use alloc::ffi::CString;
@@ -81,7 +84,7 @@ pub unsafe extern "C" fn if_nametoindex(name: *const c_char) -> c_uint {
     if name == null::<c_char>() {
         return 0;
     }
-    let name = CStr::from_ptr(name).to_str().unwrap_or("");
+    let name = unsafe { CStr::from_ptr(name).to_str().unwrap_or("") };
     if name.eq("stub") {
         return 1;
     }
