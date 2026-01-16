@@ -1,8 +1,6 @@
 use core::{arch::asm, num::NonZeroU64, ptr};
 
 use super::{ERRNO, Pal, types::*};
-#[cfg(target_arch = "x86_64")]
-use crate::ld_so::tcb::OsSpecific;
 use crate::{
     c_str::CStr,
     header::{
@@ -18,6 +16,7 @@ use crate::{
         unistd::{SEEK_CUR, SEEK_SET},
     },
     io::Write,
+    ld_so::tcb::OsSpecific,
     out::Out,
 };
 // use header::sys_times::tms;

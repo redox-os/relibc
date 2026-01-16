@@ -23,12 +23,17 @@ fn expected(bin: &str, kind: &str, generated: &[u8], status: ExitStatus) -> Resu
     let expected = match fs::read(&expected_file) {
         Ok(ok) => ok,
         Err(err) => {
-            return Err(format!(
-                "{} failed to read {}: {}",
-                bin,
-                expected_file.display(),
-                err
-            ));
+            if kind == "stderr" {
+                // missing stderr file, assume test expect none emitted
+                vec![]
+            } else {
+                return Err(format!(
+                    "{} failed to read {}: {}",
+                    bin,
+                    expected_file.display(),
+                    err
+                ));
+            }
         }
     };
 
