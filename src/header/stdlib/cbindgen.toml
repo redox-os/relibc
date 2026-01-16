@@ -5,8 +5,5 @@ style = "Type"
 no_includes = true
 cpp_compat = true
 
-[export.rename]
-"c_longdouble" = "long double"
-
 [enum]
 prefix_with_name = true
