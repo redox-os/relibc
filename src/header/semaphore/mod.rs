@@ -2,6 +2,9 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/semaphore.h.html>.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use crate::{
     header::time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec},
     platform::types::{c_char, c_int, c_long, c_uint, clockid_t},
@@ -26,14 +29,14 @@ pub unsafe extern "C" fn sem_close(sem: *mut sem_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_destroy.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_destroy(sem: *mut sem_t) -> c_int {
-    core::ptr::drop_in_place(sem.cast::<RlctSempahore>());
+    unsafe { core::ptr::drop_in_place(sem.cast::<RlctSempahore>()) };
     0
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_getvalue.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_getvalue(sem: *mut sem_t, sval: *mut c_int) -> c_int {
-    sval.write(get(sem).value() as c_int);
+    unsafe { sval.write(get(sem).value() as c_int) };
 
     0
 }
@@ -41,7 +44,7 @@ pub unsafe extern "C" fn sem_getvalue(sem: *mut sem_t, sval: *mut c_int) -> c_in
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_init.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_init(sem: *mut sem_t, _pshared: c_int, value: c_uint) -> c_int {
-    sem.cast::<RlctSempahore>().write(RlctSempahore::new(value));
+    unsafe { sem.cast::<RlctSempahore>().write(RlctSempahore::new(value)) };
 
     0
 }
@@ -59,7 +62,7 @@ pub unsafe extern "C" fn sem_open(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_post.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_post(sem: *mut sem_t) -> c_int {
-    get(sem).post(1);
+    unsafe { get(sem) }.post(1);
 
     0
 }
@@ -67,7 +70,7 @@ pub unsafe extern "C" fn sem_post(sem: *mut sem_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_trywait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_trywait(sem: *mut sem_t) -> c_int {
-    get(sem).try_wait();
+    unsafe { get(sem) }.try_wait();
 
     0
 }
@@ -81,7 +84,7 @@ pub unsafe extern "C" fn sem_unlink(name: *const c_char) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_trywait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_wait(sem: *mut sem_t) -> c_int {
-    get(sem).wait(None, CLOCK_MONOTONIC);
+    unsafe { get(sem) }.wait(None, CLOCK_MONOTONIC);
 
     0
 }
@@ -93,7 +96,7 @@ pub unsafe extern "C" fn sem_clockwait(
     clock_id: clockid_t,
     abstime: *const timespec,
 ) -> c_int {
-    get(sem).wait(Some(&*abstime), clock_id);
+    unsafe { get(sem) }.wait(Some(&unsafe { *abstime }), clock_id);
 
     0
 }
@@ -101,11 +104,11 @@ pub unsafe extern "C" fn sem_clockwait(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_timedwait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_timedwait(sem: *mut sem_t, abstime: *const timespec) -> c_int {
-    get(sem).wait(Some(&*abstime), CLOCK_REALTIME);
+    unsafe { get(sem) }.wait(Some(&unsafe { *abstime }), CLOCK_REALTIME);
 
     0
 }
 
 unsafe fn get<'any>(sem: *mut sem_t) -> &'any RlctSempahore {
-    &*sem.cast()
+    unsafe { &*sem.cast() }
 }
