@@ -1,5 +1,8 @@
 // https://pubs.opengroup.org/onlinepubs/9699919799/functions/getline.html
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use alloc::{string::String, vec::Vec};
 use core::{fmt::Write, intrinsics::unlikely, ops::Deref, ptr};
 
@@ -27,7 +30,7 @@ pub unsafe extern "C" fn getline(
     n: *mut size_t,
     stream: *mut FILE,
 ) -> ssize_t {
-    getdelim(lineptr, n, b'\n' as c_int, stream)
+    unsafe { getdelim(lineptr, n, b'\n' as c_int, stream) }
 }
 
 // One *could* read the standard as 'getdelim sets the stream error flag on *any* error, though
@@ -55,15 +58,17 @@ pub unsafe extern "C" fn getdelim(
     delim: c_int,
     stream: *mut FILE,
 ) -> ssize_t {
-    let (lineptr, n, stream) =
-        if let (Some(ptr), Some(n), Some(file)) = (lineptr.as_mut(), n.as_mut(), stream.as_mut()) {
-            (ptr, n, file)
-        } else {
-            ERRNO.set(EINVAL);
-            return -1 as ssize_t;
-        };
+    let (lineptr, n, stream) = if let (Some(ptr), Some(n), Some(file)) =
+        (unsafe { lineptr.as_mut() }, unsafe { n.as_mut() }, unsafe {
+            stream.as_mut()
+        }) {
+        (ptr, n, file)
+    } else {
+        ERRNO.set(EINVAL);
+        return -1 as ssize_t;
+    };
 
-    if feof(stream) != 0 || ferror(stream) != 0 {
+    if unsafe { feof(stream) } != 0 || unsafe { ferror(stream) } != 0 {
         return -1 as ssize_t;
     }
 
@@ -121,7 +126,7 @@ pub unsafe extern "C" fn getdelim(
         *n = count + 1;
         // The advantage in always realloc'ing is that even if the user supplies a wrong n, this
         // doesn't break
-        *lineptr = stdlib::realloc(*lineptr as *mut c_void, *n) as *mut c_char;
+        *lineptr = unsafe { stdlib::realloc(*lineptr as *mut c_void, *n) } as *mut c_char;
         if unlikely(lineptr.is_null() && *n != 0usize) {
             // memory error; realloc returns NULL on alloc'ing 0 bytes
             ERRNO.set(ENOMEM);
@@ -129,10 +134,10 @@ pub unsafe extern "C" fn getdelim(
         }
 
         // Copy buf to lineptr
-        ptr::copy(buf.as_ptr(), *lineptr as *mut u8, count);
+        unsafe { ptr::copy(buf.as_ptr(), *lineptr as *mut u8, count) };
 
         // NUL terminate lineptr
-        *lineptr.offset(count as isize) = 0;
+        unsafe { *lineptr.offset(count as isize) = 0 };
 
         // TODO remove
         /*eprintln!(

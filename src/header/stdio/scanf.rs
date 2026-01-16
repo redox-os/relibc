@@ -17,8 +17,8 @@ enum IntKind {
 
 /// Helper function for progressing a C string
 unsafe fn next_byte(string: &mut *const c_char) -> Result<u8, c_int> {
-    let c = **string as u8;
-    *string = string.offset(1);
+    let c = unsafe { **string } as u8;
+    *string = unsafe { string.offset(1) };
     if c == 0 { Err(-1) } else { Ok(c) }
 }
 
@@ -67,8 +67,8 @@ unsafe fn inner_scanf(
         }
     }
 
-    while *format != 0 {
-        let mut c = next_byte(&mut format)?;
+    while unsafe { *format } != 0 {
+        let mut c = unsafe { next_byte(&mut format) }?;
 
         if c == b' ' {
             maybe_read!(noreset);
@@ -87,18 +87,18 @@ unsafe fn inner_scanf(
             }
             r.commit();
         } else {
-            c = next_byte(&mut format)?;
+            c = unsafe { next_byte(&mut format) }?;
 
             let mut ignore = false;
             if c == b'*' {
                 ignore = true;
-                c = next_byte(&mut format)?;
+                c = unsafe { next_byte(&mut format) }?;
             }
 
             let mut width = String::new();
             while c >= b'0' && c <= b'9' {
                 width.push(c as char);
-                c = next_byte(&mut format)?;
+                c = unsafe { next_byte(&mut format) }?;
             }
             let mut width = if width.is_empty() {
                 None
@@ -137,7 +137,7 @@ unsafe fn inner_scanf(
                     _ => break,
                 };
 
-                c = next_byte(&mut format)?;
+                c = unsafe { next_byte(&mut format) }?;
             }
 
             if c != b'n' {
@@ -231,7 +231,7 @@ unsafe fn inner_scanf(
                                 n.parse::<$type>().map_err(|_| 0)?
                             };
                             if !ignore {
-                                *ap.arg::<*mut $type>() = n;
+                                unsafe { *ap.arg::<*mut $type>() = n };
                                 matched += 1;
                             }
                         }};
@@ -251,7 +251,7 @@ unsafe fn inner_scanf(
                                 $type::from_str_radix(&n, radix).map_err(|_| 0)?
                             };
                             if !ignore {
-                                *ap.arg::<*mut $final>() = n as $final;
+                                unsafe { *ap.arg::<*mut $final>() = n as $final};
                                 matched += 1;
                             }
                         }};
@@ -329,12 +329,16 @@ unsafe fn inner_scanf(
                         }
                     }
 
-                    let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
+                    let mut ptr: Option<*mut c_char> = if ignore {
+                        None
+                    } else {
+                        Some(unsafe { ap.arg() })
+                    };
 
                     while width.map(|w| w > 0).unwrap_or(true) && !(byte as char).is_whitespace() {
                         if let Some(ref mut ptr) = ptr {
-                            **ptr = byte as c_char;
-                            *ptr = ptr.offset(1);
+                            unsafe { **ptr = byte as c_char };
+                            *ptr = unsafe { ptr.offset(1) };
                         }
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
@@ -344,17 +348,21 @@ unsafe fn inner_scanf(
                     }
 
                     if let Some(ptr) = ptr {
-                        *ptr = 0;
+                        unsafe { *ptr = 0 };
                         matched += 1;
                         r.commit();
                     }
                 }
                 b'c' => {
-                    let ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
+                    let ptr: Option<*mut c_char> = if ignore {
+                        None
+                    } else {
+                        Some(unsafe { ap.arg() })
+                    };
 
                     for i in 0..width.unwrap_or(1) {
                         if let Some(ptr) = ptr {
-                            *ptr.add(i) = byte as c_char;
+                            unsafe { *ptr.add(i) = byte as c_char };
                         }
                         width = width.map(|w| w - 1);
                         if width.map(|w| w > 0).unwrap_or(true) && !read!() {
@@ -369,11 +377,11 @@ unsafe fn inner_scanf(
                     }
                 }
                 b'[' => {
-                    c = next_byte(&mut format)?;
+                    c = unsafe { next_byte(&mut format) }?;
 
                     let mut matches = Vec::new();
                     let invert = if c == b'^' {
-                        c = next_byte(&mut format)?;
+                        c = unsafe { next_byte(&mut format) }?;
                         true
                     } else {
                         false
@@ -383,12 +391,12 @@ unsafe fn inner_scanf(
                     loop {
                         matches.push(c);
                         prev = c;
-                        c = next_byte(&mut format)?;
+                        c = unsafe { next_byte(&mut format) }?;
                         if c == b'-' {
                             if prev == b']' {
                                 continue;
                             }
-                            c = next_byte(&mut format)?;
+                            c = unsafe { next_byte(&mut format) }?;
                             if c == b']' {
                                 matches.push(b'-');
                                 break;
@@ -403,15 +411,19 @@ unsafe fn inner_scanf(
                         }
                     }
 
-                    let mut ptr: Option<*mut c_char> = if ignore { None } else { Some(ap.arg()) };
+                    let mut ptr: Option<*mut c_char> = if ignore {
+                        None
+                    } else {
+                        Some(unsafe { ap.arg() })
+                    };
 
                     // While we haven't used up all the width, and it matches
                     let mut data_stored = false;
                     while width.map(|w| w > 0).unwrap_or(true) && !invert == matches.contains(&byte)
                     {
                         if let Some(ref mut ptr) = ptr {
-                            **ptr = byte as c_char;
-                            *ptr = ptr.offset(1);
+                            unsafe { **ptr = byte as c_char };
+                            *ptr = unsafe { ptr.offset(1) };
                             data_stored = true;
                         }
                         r.commit();
@@ -426,13 +438,13 @@ unsafe fn inner_scanf(
                     }
 
                     if data_stored {
-                        *ptr.unwrap() = 0;
+                        unsafe { *ptr.unwrap() = 0 };
                         matched += 1;
                     }
                 }
                 b'n' => {
                     if !ignore {
-                        *ap.arg::<*mut c_int>() = count as c_int;
+                        unsafe { *ap.arg::<*mut c_int>() = count as c_int };
                     }
                 }
                 _ => return Err(-1),
@@ -453,7 +465,7 @@ unsafe fn inner_scanf(
 }
 
 pub unsafe fn scanf(r: LookAheadReader, format: *const c_char, ap: va_list) -> c_int {
-    match inner_scanf(r, format, ap) {
+    match unsafe { inner_scanf(r, format, ap) } {
         Ok(n) => n,
         Err(n) => n,
     }

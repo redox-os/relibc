@@ -2,6 +2,9 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/pwd.h.html>.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use alloc::{boxed::Box, vec::Vec};
 use core::{
     ops::{Deref, DerefMut},
@@ -211,16 +214,16 @@ unsafe fn mux(
 ) -> c_int {
     match status {
         Ok(owned) => {
-            *out = owned.reference;
-            *result = out;
+            unsafe { *out = owned.reference };
+            unsafe { *result = out };
             0
         }
         Err(Cause::Eof) => {
-            *result = ptr::null_mut();
+            unsafe { *result = ptr::null_mut() };
             0
         }
         Err(Cause::Other) => {
-            *result = ptr::null_mut();
+            unsafe { *result = ptr::null_mut() };
             -1
         }
     }
@@ -273,17 +276,19 @@ pub unsafe extern "C" fn getpwnam_r(
     size: size_t,
     result: *mut *mut passwd,
 ) -> c_int {
-    mux(
-        pwd_lookup(
-            |parts| strcmp(parts.pw_name, name) == 0,
-            Some(DestBuffer {
-                ptr: buf as *mut u8,
-                len: size,
-            }),
-        ),
-        out,
-        result,
-    )
+    unsafe {
+        mux(
+            pwd_lookup(
+                |parts| strcmp(parts.pw_name, name) == 0,
+                Some(DestBuffer {
+                    ptr: buf as *mut u8,
+                    len: size,
+                }),
+            ),
+            out,
+            result,
+        )
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpwuid.html>.
@@ -303,18 +308,20 @@ pub unsafe extern "C" fn getpwuid_r(
     size: size_t,
     result: *mut *mut passwd,
 ) -> c_int {
-    let slice = core::slice::from_raw_parts_mut(buf as *mut u8, size);
-    mux(
-        pwd_lookup(
-            |part| part.pw_uid == uid,
-            Some(DestBuffer {
-                ptr: buf as *mut u8,
-                len: size,
-            }),
-        ),
-        out,
-        result,
-    )
+    let slice = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, size) };
+    unsafe {
+        mux(
+            pwd_lookup(
+                |part| part.pw_uid == uid,
+                Some(DestBuffer {
+                    ptr: buf as *mut u8,
+                    len: size,
+                }),
+            ),
+            out,
+            result,
+        )
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endpwent.html>.
