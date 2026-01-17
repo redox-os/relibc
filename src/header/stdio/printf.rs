@@ -908,7 +908,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                         // because that's how x/floor(log10(x)) works
                         let precision = precision.saturating_sub(1);
                         fmt_float_exp(
-                            w, exp_fmt, true, precision, log, exp, left, pad_space, pad_zero,
+                            w, exp_fmt, !alternate, precision, log, exp, left, pad_space, pad_zero,
                         )?;
                     } else {
                         // Length of integral part will be the exponent of
@@ -917,7 +917,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                         // of course be 0, 1 in length
                         let len = 1 + cmp::max(0, exp) as usize;
                         let precision = precision.saturating_sub(len);
-                        fmt_float_normal(w, true, precision, float, left, pad_space, pad_zero)?;
+                        fmt_float_normal(w, !alternate, precision, float, left, pad_space, pad_zero)?;
                     }
                 } else {
                     fmt_float_nonfinite(w, float, fmtcase.unwrap(), left, pad_space, pad_zero)?;
