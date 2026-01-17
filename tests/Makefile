@@ -208,6 +208,7 @@ VARIED_NAMES=\
 	dirent/main \
 	dirent/posix_getdents \
 	kill-waitpid \
+	limits \
 	net/if \
 	netdb/getaddrinfo \
 	netdb/getaddrinfo_null \
