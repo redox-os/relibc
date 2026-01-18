@@ -1,3 +1,6 @@
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use crate::{
     error::ResultExt,
     platform::{Sys, types::*},
@@ -6,7 +9,7 @@ use crate::{
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
     // TODO: Somehow support varargs to syscall??
-    Sys::ioctl(fd, request, out).or_minus_one_errno()
+    unsafe { Sys::ioctl(fd, request, out).or_minus_one_errno() }
 }
 
 pub const TCGETS: c_ulong = 0x5401;
