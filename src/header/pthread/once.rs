@@ -1,3 +1,6 @@
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use super::*;
 
 // PTHREAD_ONCE_INIT
@@ -7,7 +10,7 @@ pub unsafe extern "C" fn pthread_once(
     once: *mut pthread_once_t,
     constructor: extern "C" fn(),
 ) -> c_int {
-    let once = &*once.cast::<RlctOnce>();
+    let once = unsafe { &*once.cast::<RlctOnce>() };
 
     // TODO: Cancellation points
 

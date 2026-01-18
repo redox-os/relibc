@@ -1,3 +1,6 @@
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use super::*;
 
 // TODO: Hashmap?
@@ -52,7 +55,7 @@ pub unsafe extern "C" fn pthread_key_create(
         },
     );
 
-    key_ptr.write(key);
+    unsafe { key_ptr.write(key) };
 
     0
 }
