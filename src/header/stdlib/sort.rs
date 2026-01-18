@@ -1,3 +1,6 @@
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use crate::platform::types::*;
 
 pub unsafe fn introsort(
@@ -10,7 +13,7 @@ pub unsafe fn introsort(
     let maxdepth = 2 * log2(nel);
     introsort_helper(base, nel, width, maxdepth, comp);
     */
-    insertion_sort(base, nel, width, comp);
+    unsafe { insertion_sort(base, nel, width, comp) };
 }
 
 // NOTE: if num is 0, the result should be considered undefined
@@ -41,23 +44,23 @@ unsafe fn introsort_helper(
     // to introsort_helper()
     loop {
         if nel < THRESHOLD {
-            insertion_sort(base, nel, width, comp);
+            unsafe { insertion_sort(base, nel, width, comp) };
             break;
         } else if nel > 1 {
             if maxdepth == 0 {
-                heapsort(base, nel, width, comp);
+                unsafe { heapsort(base, nel, width, comp) };
                 break;
             } else {
-                let (left, right) = partition(base, nel, width, comp);
+                let (left, right) = unsafe { partition(base, nel, width, comp) };
                 let right_base = unsafe { base.add((right + 1) * width) };
                 let right_nel = nel - (right + 1);
                 maxdepth -= 1;
                 if left < nel - right {
-                    introsort_helper(base, left, width, maxdepth, comp);
+                    unsafe { introsort_helper(base, left, width, maxdepth, comp) };
                     base = right_base;
                     nel = right_nel;
                 } else {
-                    introsort_helper(right_base, right_nel, width, maxdepth, comp);
+                    unsafe { introsort_helper(right_base, right_nel, width, maxdepth, comp) };
                     nel = left;
                 }
             }
@@ -76,7 +79,7 @@ unsafe fn insertion_sort(
             let current = unsafe { base.add(j * width) };
             let prev = unsafe { base.add((j + 1) * width) };
             if comp(current as *const c_void, prev as *const c_void) > 0 {
-                swap(current, prev, width);
+                unsafe { swap(current, prev, width) };
             } else {
                 break;
             }
@@ -90,14 +93,14 @@ unsafe fn heapsort(
     width: size_t,
     comp: extern "C" fn(*const c_void, *const c_void) -> c_int,
 ) {
-    heapify(base, nel, width, comp);
+    unsafe { heapify(base, nel, width, comp) };
 
     let mut end = nel - 1;
     while end > 0 {
         let end_ptr = unsafe { base.add(end * width) };
-        swap(end_ptr, base, width);
+        unsafe { swap(end_ptr, base, width) };
         end -= 1;
-        heap_sift_down(base, 0, end, width, comp);
+        unsafe { heap_sift_down(base, 0, end, width, comp) };
     }
 }
 
@@ -111,7 +114,7 @@ unsafe fn heapify(
     let last_parent = (nel - 2) / 2;
 
     for start in (0..=last_parent).rev() {
-        heap_sift_down(base, start, nel - 1, width, comp);
+        unsafe { heap_sift_down(base, start, nel - 1, width, comp) };
     }
 }
 
@@ -148,7 +151,7 @@ unsafe fn heap_sift_down(
         if swap_idx == root {
             break;
         } else {
-            swap(root_ptr, swap_ptr, width);
+            unsafe { swap(root_ptr, swap_ptr, width) };
             root = swap_idx;
         }
     }
@@ -163,7 +166,7 @@ unsafe fn partition(
 ) -> (size_t, size_t) {
     // calculate the median of the first, middle, and last elements and use it as the pivot
     // to do fewer comparisons, also swap the elements into their correct positions
-    let mut pivot = median_of_three(base, nel, width, comp);
+    let mut pivot = unsafe { median_of_three(base, nel, width, comp) };
 
     let mut i = 1;
     let mut j = 1;
@@ -178,14 +181,14 @@ unsafe fn partition(
 
         let comparison = comp(j_ptr as *const c_void, pivot_ptr as *const c_void);
         if comparison < 0 {
-            swap(i_ptr, j_ptr, width);
+            unsafe { swap(i_ptr, j_ptr, width) };
             if i == pivot {
                 pivot = j;
             }
             i += 1;
             j += 1;
         } else if comparison > 0 {
-            swap(j_ptr, n_ptr, width);
+            unsafe { swap(j_ptr, n_ptr, width) };
             if n == pivot {
                 pivot = j;
             }
@@ -209,12 +212,12 @@ unsafe fn median_of_three(
     let mid = unsafe { base.add(pivot * width) };
     let last = unsafe { base.add((nel - 1) * width) };
     if comp(mid as *const c_void, base as *const c_void) < 0 {
-        swap(mid, base, width);
+        unsafe { swap(mid, base, width) };
     }
     if comp(last as *const c_void, mid as *const c_void) < 0 {
-        swap(mid, last, width);
+        unsafe { swap(mid, last, width) };
         if comp(mid as *const c_void, base as *const c_void) < 0 {
-            swap(mid, base, width);
+            unsafe { swap(mid, base, width) };
         }
     }
 
