@@ -1,5 +1,8 @@
 //! ptrace compatibility layer for Redox OS
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use crate::{
     error::ResultExt,
     platform::{PalPtrace, Sys, types::*},
@@ -28,5 +31,6 @@ pub const PTRACE_SYSEMU_SINGLESTEP: c_int = 32;
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ptrace(request: c_int, mut __valist: ...) -> c_int {
     // Musl also just grabs the arguments from the varargs...
-    Sys::ptrace(request, __valist.arg(), __valist.arg(), __valist.arg()).or_minus_one_errno()
+    unsafe { Sys::ptrace(request, __valist.arg(), __valist.arg(), __valist.arg()) }
+        .or_minus_one_errno()
 }
