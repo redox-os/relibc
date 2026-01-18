@@ -2,6 +2,9 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getopt.html>.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::ptr;
 
 use crate::{
@@ -36,5 +39,5 @@ pub unsafe extern "C" fn getopt(
     argv: *const *mut c_char,
     optstring: *const c_char,
 ) -> c_int {
-    getopt::getopt_long(argc, argv, optstring, ptr::null(), ptr::null_mut())
+    unsafe { getopt::getopt_long(argc, argv, optstring, ptr::null(), ptr::null_mut()) }
 }

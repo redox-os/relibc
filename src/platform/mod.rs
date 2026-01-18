@@ -1,5 +1,8 @@
 //! Platform abstractions and environment.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use crate::{
     error::{Errno, ResultExt},
     io::{self, Read, Write},
@@ -305,7 +308,7 @@ unsafe fn auxv_iter<'a>(ptr: *const usize) -> impl Iterator<Item = [usize; 2]> +
 #[cold]
 pub unsafe fn get_auxvs(ptr: *const usize) -> Box<[[usize; 2]]> {
     //traverse the stack and collect argument environment variables
-    let mut auxvs = auxv_iter(ptr).collect::<Vec<_>>();
+    let mut auxvs = unsafe { auxv_iter(ptr) }.collect::<Vec<_>>();
 
     auxvs.sort_unstable_by_key(|[kind, _]| *kind);
     auxvs.into_boxed_slice()
@@ -313,7 +316,8 @@ pub unsafe fn get_auxvs(ptr: *const usize) -> Box<[[usize; 2]]> {
 // TODO: Find an auxv replacement for Redox's execv protocol
 #[cold]
 pub unsafe fn get_auxv_raw(ptr: *const usize, requested_kind: usize) -> Option<usize> {
-    auxv_iter(ptr).find_map(|[kind, value]| Some(value).filter(|_| kind == requested_kind))
+    unsafe { auxv_iter(ptr) }
+        .find_map(|[kind, value]| Some(value).filter(|_| kind == requested_kind))
 }
 pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
     auxvs

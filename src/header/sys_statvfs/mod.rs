@@ -2,6 +2,9 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_statvfs.h.html>.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use crate::{
     c_str::CStr,
     error::ResultExt,
@@ -35,15 +38,15 @@ pub struct statvfs {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fstatvfs.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fstatvfs(fildes: c_int, buf: *mut statvfs) -> c_int {
-    let buf = Out::nonnull(buf);
+    let buf = unsafe { Out::nonnull(buf) };
     Sys::fstatvfs(fildes, buf).map(|()| 0).or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fstatvfs.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn statvfs(file: *const c_char, buf: *mut statvfs) -> c_int {
-    let file = CStr::from_ptr(file);
-    let buf = Out::nonnull(buf);
+    let file = unsafe { CStr::from_ptr(file) };
+    let buf = unsafe { Out::nonnull(buf) };
     // TODO: Rustify
     let fd = Sys::open(file, O_PATH, 0).or_minus_one_errno();
     if fd < 0 {

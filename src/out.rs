@@ -9,6 +9,9 @@
 //! requirement that `&mut` references are never aliased, which can typically not be assumed when
 //! getting pointers from C.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::{cell::UnsafeCell, fmt, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 /// Wrapper for write-only "out pointers" that are safe to write to
@@ -39,7 +42,7 @@ impl<'a, T: ?Sized> Out<'a, T> {
             assert!(!ptr.is_null());
         }
         Self {
-            ptr: NonNull::new_unchecked(ptr),
+            ptr: unsafe { NonNull::new_unchecked(ptr) },
             _marker: PhantomData,
         }
     }
@@ -94,7 +97,7 @@ impl<'a, T> Out<'a, [T]> {
         } else {
             ptr
         };
-        Self::nonnull(core::slice::from_raw_parts_mut(ptr, len))
+        unsafe { Self::nonnull(core::slice::from_raw_parts_mut(ptr, len)) }
     }
     pub fn len(&self) -> usize {
         self.ptr.as_ptr().len()
@@ -226,7 +229,7 @@ pub unsafe trait OutProject {}
 
 impl<'a, T: ?Sized> Out<'a, T> {
     pub unsafe fn with_lifetime_of<'b, U: ?Sized>(mut self, u: &'b U) -> Out<'b, T> {
-        Out::nonnull(self.as_mut_ptr())
+        unsafe { Out::nonnull(self.as_mut_ptr()) }
     }
 }
 

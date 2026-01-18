@@ -1,5 +1,8 @@
 //! Nul-terminated byte strings.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::{marker::PhantomData, ptr::NonNull, str::Utf8Error};
 
 use alloc::{
@@ -49,13 +52,13 @@ impl Kind for Thin {
     const IS_THIN_NOT_WIDE: bool = true;
 
     unsafe fn strlen(s: *const c_char) -> usize {
-        crate::header::string::strlen(s)
+        unsafe { crate::header::string::strlen(s) }
     }
     unsafe fn strchr(s: *const c_char, c: c_char) -> *const c_char {
-        crate::header::string::strchr(s, c.into())
+        unsafe { crate::header::string::strchr(s, c.into()) }
     }
     unsafe fn strchrnul(s: *const c_char, c: c_char) -> *const c_char {
-        crate::header::string::strchrnul(s, c.into())
+        unsafe { crate::header::string::strchrnul(s, c.into()) }
     }
     fn r2c(c: u8) -> c_char {
         c as _
@@ -78,15 +81,15 @@ impl Kind for Wide {
     const IS_THIN_NOT_WIDE: bool = false;
 
     unsafe fn strlen(s: *const Self::C) -> usize {
-        crate::header::wchar::wcslen(s)
+        unsafe { crate::header::wchar::wcslen(s) }
     }
     unsafe fn strchr(s: *const Self::C, c: Self::C) -> *const Self::C {
-        crate::header::wchar::wcschr(s, c)
+        unsafe { crate::header::wchar::wcschr(s, c) }
     }
     unsafe fn strchrnul(mut s: *const Self::C, c: Self::C) -> *const Self::C {
         // TODO: optimized function
-        while s.read() != c && s.read() != 0 {
-            s = s.add(1);
+        while unsafe { s.read() } != c && unsafe { s.read() } != 0 {
+            s = unsafe { s.add(1) };
         }
         s
     }
@@ -120,7 +123,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
     /// The ptr must be valid up to and including the first NUL byte from the base ptr.
     pub const unsafe fn from_ptr(ptr: *const T::C) -> Self {
         Self {
-            ptr: NonNull::new_unchecked(ptr as *mut T::C),
+            ptr: unsafe { NonNull::new_unchecked(ptr as *mut T::C) },
             _marker: PhantomData,
         }
     }
@@ -128,7 +131,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
         if ptr.is_null() {
             None
         } else {
-            Some(Self::from_ptr(ptr))
+            Some(unsafe { Self::from_ptr(ptr) })
         }
     }
     /// Look for the closest occurence of `c`, and if found, split the string into a slice up to
@@ -242,7 +245,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
         self.ptr.as_ptr()
     }
     pub const unsafe fn from_chars_with_nul_unchecked(chars: &'a [T::Char]) -> Self {
-        Self::from_ptr(chars.as_ptr().cast())
+        unsafe { Self::from_ptr(chars.as_ptr().cast()) }
     }
     pub fn from_chars_with_nul(chars: &'a [T::Char]) -> Result<Self, FromCharsWithNulError> {
         if chars.last() != Some(&T::NUL) || chars[..chars.len() - 1].contains(&T::NUL) {
@@ -292,7 +295,7 @@ impl<'a> CStr<'a> {
     }
     #[inline]
     pub const unsafe fn from_bytes_with_nul_unchecked(bytes: &'a [u8]) -> Self {
-        Self::from_chars_with_nul_unchecked(bytes)
+        unsafe { Self::from_chars_with_nul_unchecked(bytes) }
     }
     #[inline]
     pub fn from_bytes_with_nul(bytes: &'a [u8]) -> Result<Self, FromCharsWithNulError> {
