@@ -4,6 +4,9 @@
 
 // Exported as both syslog.h and sys/syslog.h.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 #[cfg(target_os = "redox")]
 #[path = "redox.rs"]
 pub mod sys;
@@ -120,7 +123,7 @@ pub unsafe extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_i
 /// Non-POSIX, 4.3BSD-Reno.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vsyslog(priority: c_int, message: *const c_char, mut ap: VaList) {
-    let Some(message) = CStr::from_nullable_ptr(message) else {
+    let Some(message) = (unsafe { CStr::from_nullable_ptr(message) }) else {
         return;
     };
     let Some(priority) = Priority::from_bits(priority) else {
@@ -136,7 +139,7 @@ pub unsafe extern "C" fn vsyslog(priority: c_int, message: *const c_char, mut ap
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/closelog.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn syslog(priority: c_int, message: *const c_char, mut __valist: ...) {
-    vsyslog(priority, message, __valist.as_va_list());
+    unsafe { vsyslog(priority, message, __valist.as_va_list()) };
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/closelog.html>.
