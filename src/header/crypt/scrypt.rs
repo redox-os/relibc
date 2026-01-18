@@ -1,5 +1,5 @@
 use super::gen_salt;
-use crate::platform::types::*;
+use crate::platform::types::{c_uchar, c_uint};
 use alloc::string::{String, ToString};
 use base64ct::{Base64Bcrypt, Encoding};
 use core::{str, u32};

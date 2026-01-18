@@ -698,7 +698,7 @@ impl Linker {
                 tcb.copy_masters().map_err(|_| DlError::Malformed)?;
                 tcb.activate(
                     #[cfg(target_os = "redox")]
-                    thr_fd,
+                    Some(thr_fd),
                 );
 
                 #[cfg(target_os = "redox")]
@@ -819,7 +819,7 @@ impl Linker {
 
         if let Some(master) = tcb_master {
             if !dlopened {
-                self.tls_size += master.offset; // => aligned ph.p_memsz
+                self.tls_size = master.offset; // => aligned ph.p_memsz
             }
 
             tcb_masters.push(master);

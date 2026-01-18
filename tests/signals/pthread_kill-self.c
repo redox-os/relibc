@@ -38,7 +38,7 @@ void *a_thread_func( void *arg)
 	sem1=INMAIN;
 
 	while(sem1==INMAIN)
-		usleep(100);
+		usleep(100000);
 
 	// sleep(50);
 
@@ -61,16 +61,16 @@ int pthread_kill_test1(int signum)
 	ERROR_IF(pthread_create, status, != 0);
 
 	while(sem1==INTHREAD)
-		usleep(100);
+		usleep(100000);
 
 	status = pthread_kill(new_th, signum);
 	ERROR_IF(pthread_kill, status, != 0);
 
-    usleep(200);
+    usleep(100000);
 	sem1=INTHREAD;
 	
 	while(handler_called==0)
-		usleep(100);
+		usleep(100000);
 
 	ERROR_IF(pthread_kill, handler_called, == -1);
 	ERROR_IF(pthread_kill, handler_called, == 0);

@@ -70,17 +70,14 @@ global_asm!(
     "
 .globl _start
 _start:
-    # rsi = _start + 5
-    call 2f
-2:  pop rsi
+    lea rsi, [rip + _start]
 
     # Save original stack and align stack to 16 bytes
     mov rbp, rsp
-    and rsp, 0xFFFFFFFFFFFFFFF0
+    and rsp, 0xfffffffffffffff0
 
-    # Call ld_so_start(stack, entry)
+    # Call ld_so_start(stack=rdi, ld_entry=rsi)
     mov rdi, rbp
-    sub rsi, 5
     call relibc_ld_so_start
 
     # Restore original stack, clear registers, and jump to new start function
@@ -95,6 +92,7 @@ _start:
     xor r11, r11
     fninit
     jmp rax
+    ud2
 "
 );
 

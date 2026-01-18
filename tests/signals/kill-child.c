@@ -36,7 +36,7 @@ void child_proc(int signum)
 	sigemptyset(&act.sa_mask);
 	sigaction(signum, &act, NULL);
 
-	status = usleep(200);
+	status = usleep(200000);
 	ERROR_IF(usleep, status, == 0);
 
 	assert(sig_handled != 0);
@@ -48,7 +48,7 @@ void parent(int signum, pid_t pid)
 {
 	int status;
 
-	usleep(100);
+	usleep(100000);
 	status = kill(pid, signum);
 	ERROR_IF(kill, status, != 0);
 

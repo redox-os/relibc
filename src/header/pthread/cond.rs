@@ -1,5 +1,7 @@
 // Used design from https://www.remlab.net/op/futex-condvar.shtml
 
+use crate::header::time::CLOCK_REALTIME;
+
 use super::*;
 
 // PTHREAD_COND_INITIALIZER is defined manually in bits_pthread/cbindgen.toml
@@ -19,8 +21,19 @@ pub unsafe extern "C" fn pthread_cond_destroy(cond: *mut pthread_cond_t) -> c_in
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_cond_init(
     cond: *mut pthread_cond_t,
-    _attr: *const pthread_condattr_t,
+    attr: *const pthread_condattr_t,
 ) -> c_int {
+    let attr = attr
+        .cast::<RlctCondAttr>()
+        .as_ref()
+        .copied()
+        .unwrap_or_default();
+
+    if attr.clock != CLOCK_REALTIME {
+        // As monotonic clock always smaller than realtime clock, this always result in instant timeout.
+        println!("TODO: pthread_cond_init with monotonic clock");
+    }
+
     cond.cast::<RlctCond>().write(RlctCond::new());
 
     0
@@ -38,6 +51,16 @@ pub unsafe extern "C" fn pthread_cond_timedwait(
     timeout: *const timespec,
 ) -> c_int {
     e((&*cond.cast::<RlctCond>()).timedwait(&*mutex.cast::<RlctMutex>(), &*timeout))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn pthread_cond_clockwait(
+    cond: *mut pthread_cond_t,
+    mutex: *mut pthread_mutex_t,
+    clock_id: clockid_t,
+    timeout: *const timespec,
+) -> c_int {
+    e((&*cond.cast::<RlctCond>()).clockwait(&*mutex.cast::<RlctMutex>(), &*timeout, clock_id))
 }
 
 #[unsafe(no_mangle)]
@@ -100,20 +123,6 @@ pub unsafe extern "C" fn pthread_condattr_setpshared(
     0
 }
 
-pub(crate) struct RlctCondAttr {
-    clock: clockid_t,
-    pshared: c_int,
-}
+pub(crate) type RlctCondAttr = crate::sync::cond::CondAttr;
 
 pub(crate) type RlctCond = crate::sync::cond::Cond;
-
-impl Default for RlctCondAttr {
-    fn default() -> Self {
-        Self {
-            // FIXME: system clock
-            clock: 0,
-            // Default
-            pshared: PTHREAD_PROCESS_PRIVATE,
-        }
-    }
-}

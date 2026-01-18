@@ -1,11 +1,16 @@
-// strftime implementation for Redox, following the POSIX standard.
-// Following https://pubs.opengroup.org/onlinepubs/7908799/xsh/strftime.html
+// `strftime` implementation.
+//
+// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strftime.html>.
+
 use alloc::string::String;
 
 use super::{get_offset, tm};
 use crate::{
     c_str::CStr,
-    platform::{self, WriteByte, types::*},
+    platform::{
+        self, WriteByte,
+        types::{c_char, c_int, size_t},
+    },
 };
 
 // We use the langinfo constants
@@ -36,6 +41,8 @@ unsafe fn langinfo_to_str(item: nl_item) -> &'static str {
     }
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strftime.html>.
+///
 /// Formats time data according to the given `format` string.
 ///
 /// Use `langinfo` for locale-based day/month names,

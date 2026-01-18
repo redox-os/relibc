@@ -6,7 +6,10 @@
 
 use crate::{
     header::{ctype, errno::*, stdlib::*},
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, c_long, intmax_t, uintmax_t},
+    },
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/imaxabs.html>.

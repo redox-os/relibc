@@ -1,0 +1,3 @@
+listen sockname [AF_UNIX]: root/unixpeername.sock
+client peername [AF_UNIX]: root/unixpeername.sock
+client sockname [AF_UNIX]: (unnamed)

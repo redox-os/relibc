@@ -13,6 +13,7 @@ use crate::{
         sys_utsname::utsname,
         time::{itimerspec, timespec},
     },
+    ld_so::tcb::OsSpecific,
     out::Out,
     pthread,
 };
@@ -170,7 +171,11 @@ pub trait Pal {
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t>;
 
+    fn mkdirat(fildes: c_int, path: CStr, mode: mode_t) -> Result<()>;
+
     fn mkdir(path: CStr, mode: mode_t) -> Result<()>;
+
+    fn mkfifoat(dir_fd: c_int, path: CStr, mode: mode_t) -> Result<()>;
 
     fn mkfifo(path: CStr, mode: mode_t) -> Result<()>;
 
@@ -221,7 +226,10 @@ pub trait Pal {
 
     fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize>;
 
-    unsafe fn rlct_clone(stack: *mut usize) -> Result<pthread::OsTid, Errno>;
+    unsafe fn rlct_clone(
+        stack: *mut usize,
+        os_specific: &mut OsSpecific,
+    ) -> Result<pthread::OsTid, Errno>;
     unsafe fn rlct_kill(os_tid: pthread::OsTid, signal: usize) -> Result<()>;
 
     fn current_os_tid() -> pthread::OsTid;

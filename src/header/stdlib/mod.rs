@@ -1479,11 +1479,7 @@ pub unsafe extern "C" fn strtol(s: *const c_char, endptr: *mut *mut c_char, base
     )
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtold.html>.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn strtold(s: *const c_char, endptr: *mut *mut c_char) -> c_longdouble {
-    strto_float_impl!(c_longdouble, s, endptr)
-}
+// TODO: strtold(), when long double is available
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtol.html>.
 #[unsafe(no_mangle)]

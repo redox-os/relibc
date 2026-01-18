@@ -1,5 +1,8 @@
 //! `ifaddrs.h` implementation
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::ptr;
 
 use crate::{
@@ -27,8 +30,8 @@ pub struct ifaddrs {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn freeifaddrs(mut ifa: *mut ifaddrs) {
     while !ifa.is_null() {
-        let next = (*ifa).ifa_next;
-        stdlib::free(ifa.cast());
+        let next = unsafe { (*ifa).ifa_next };
+        unsafe { stdlib::free(ifa.cast()) };
         ifa = next;
     }
 }

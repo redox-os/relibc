@@ -4,7 +4,7 @@
 
 use crate::{
     header::{sys_ioctl, unistd},
-    platform::types::*,
+    platform::types::{c_int, c_void},
 };
 
 /// See <https://www.man7.org/linux/man-pages/man3/openpty.3.html>.

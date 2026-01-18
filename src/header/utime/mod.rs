@@ -12,7 +12,10 @@ use crate::{
     c_str::CStr,
     error::ResultExt,
     header::time::timespec,
-    platform::{Pal, Sys, types::*},
+    platform::{
+        Pal, Sys,
+        types::{c_char, c_int, time_t},
+    },
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/utime.h.html>.

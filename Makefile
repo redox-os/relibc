@@ -6,6 +6,8 @@ CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins
 CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
 CC_WRAPPER?=
 RUSTCFLAGS?=
+LINKFLAGS?=-lgcc
+TESTBIN?=
 export OBJCOPY?=objcopy
 
 export CARGO_TARGET_DIR?=$(shell pwd)/target
@@ -23,7 +25,7 @@ HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "
 
 SRC=\
 	Cargo.* \
-	$(shell find src -type f)
+	$(shell find src/ redox-rt/src/ ld_so/src/ redox-ioctl/src/ include/ -type f)
 
 BUILTINS_VERSION=0.1.70
 
@@ -115,6 +117,9 @@ test: sysroot/$(TARGET)
 	# $(CARGO_TEST) test
 	$(MAKE) -C tests run
 
+test-once: sysroot/$(TARGET)
+	$(MAKE) -C tests run-once TESTBIN=$(TESTBIN)
+
 
 $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	$(CC) -nostdlib \
@@ -125,7 +130,7 @@ $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/l
 		-Wl,--allow-multiple-definition \
 		-Wl,--whole-archive $^ -Wl,--no-whole-archive \
 		-Wl,-soname,libc.so.6 \
-		-lgcc \
+		$(LINKFLAGS) \
 		-o $@
 
 # Debug targets

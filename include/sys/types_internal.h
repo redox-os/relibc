@@ -3,8 +3,8 @@
 #include <stddef.h>
 
 typedef long blksize_t;
-typedef long dev_t;
-typedef unsigned long ino_t;
+typedef unsigned long long dev_t;
+typedef unsigned long long ino_t;
 typedef unsigned short reclen_t;
 typedef int gid_t;
 typedef int uid_t;

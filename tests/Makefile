@@ -4,13 +4,17 @@ IS_REDOX?=0
 
 # If compiling for Redox, IS_REDOX must be 1
 ifeq ($(IS_REDOX),1)
-FAILING_TESTS=signals/killpg-child
+FAILING_TESTS=
 else
 FAILING_TESTS=tls \
 	futimens \
 	mkfifo \
+	sigchld \
 	stdlib/ptsname \
 	sys_mman \
+	signals/pthread_kill-child \
+	unistd/isatty \
+	unistd/link \
 #	resource/getrusage
 #	time/times
 #   netdb/netdb
@@ -46,7 +50,10 @@ EXPECT_NAMES=\
 	glob \
 	iso646 \
 	libgen \
-	locale \
+	locale/duplocale \
+	locale/newlocale \
+	locale/setlocale \
+	malloc/usable_size \
 	math \
 	regex \
 	select \
@@ -68,6 +75,7 @@ EXPECT_NAMES=\
 	stdio/mutex \
 	stdio/popen \
 	stdio/printf \
+	stdio/putc_unlocked \
 	stdio/rename \
 	stdio/renameat \
 	stdio/scanf \
@@ -116,6 +124,12 @@ EXPECT_NAMES=\
 	string/stpcpy \
 	string/stpncpy \
 	strings \
+	sys_socket/recv \
+	sys_socket/recvfrom \
+	sys_socket/unixpeername \
+	sys_socket/unixrecv \
+	sys_socket/unixrecvfrom \
+	sys_socket/unixsocketpair \
 	sys_stat/chmod \
 	sys_stat/lstat \
 	sys_stat/fstatat \
@@ -197,11 +211,11 @@ VARIED_NAMES=\
 	net/if \
 	netdb/getaddrinfo \
 	netdb/getaddrinfo_null \
+	pthread/timedwait \
 	pty/forkpty \
 	psignal \
 	pwd \
 	sa_restart \
-	sigchld \
 	signals/kill-self \
 	signals/kill0-self \
 	signals/kill-invalid \
@@ -211,9 +225,9 @@ VARIED_NAMES=\
 	signals/killpg0-self \
 	signals/kill-group \
 	signals/kill-child \
+	signals/killpg-child \
 	signals/killpg-self \
 	signals/pthread_kill-invalid \
-	signals/pthread_kill-child \
 	signals/pthread_kill-self \
 	signals/pthread_kill0-self \
 	signals/raise-compliance \
@@ -260,6 +274,7 @@ VARIED_NAMES=\
 	stdlib/realpath \
 	sys_epoll/epoll \
 	sys_resource/constants \
+	sys_socket/getpeername \
 	sys_stat/stat \
 	sys_statvfs/statvfs \
 	sys_utsname/uname \
@@ -269,8 +284,6 @@ VARIED_NAMES=\
 	unistd/gethostname \
 	unistd/getid \
 	unistd/getpagesize \
-	unistd/isatty \
-	unistd/link \
 	unistd/pathconf \
 	unistd/setid \
 	unistd/sysconf \
@@ -334,6 +347,12 @@ run: bins_verify/relibc-tests $(BINS) $(EXPECT_BINS) $(EXPECT_INPUT_BINS)
 		echo "# expect $$(readlink -e $${exp}.exp) $$(readlink -e $${exp}) #"; \
 		expect "$$(readlink -e $${exp}.exp)" "$$(readlink -e $${exp})" test args || exit $$?; \
 	done
+
+run-once: bins_verify/relibc-tests $(BUILD)/$(TESTBIN)
+	@echo "\033[1;36;49mRunning single test $(TESTBIN) $*\033[0m"
+	@if [ -f "expected/$(TESTBIN).stdout" ]; then \
+		$(TEST_RUNNER) $< $(TESTBIN); \
+	else $(TEST_RUNNER) $< -s$(TESTBIN); fi
 
 bins_verify/relibc-tests: src/main.rs
 	$(CARGO_TEST) build --release --bin relibc-tests --out-dir bins_verify -Z unstable-options

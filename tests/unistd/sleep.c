@@ -32,7 +32,7 @@ int main(void)
     //     exit(EXIT_FAILURE);
     // }
 
-    int us_status = usleep(100);
+    int us_status = usleep(100000);
     ERROR_IF(usleep, us_status, == -1);
     UNEXP_IF(usleep, us_status, != 0);
 

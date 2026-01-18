@@ -16,6 +16,7 @@ use crate::{
         unistd::{SEEK_CUR, SEEK_SET},
     },
     io::Write,
+    ld_so::tcb::OsSpecific,
     out::Out,
 };
 // use header::sys_times::tms;
@@ -502,8 +503,12 @@ impl Pal for Sys {
         e_raw(unsafe { syscall!(LSEEK, fildes, offset, whence) }).map(|o| o as off_t)
     }
 
+    fn mkdirat(dir_fildes: c_int, path: CStr, mode: mode_t) -> Result<()> {
+        e_raw(unsafe { syscall!(MKDIRAT, dir_fildes, path.as_ptr(), mode) }).map(|_| ())
+    }
+
     fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
-        e_raw(unsafe { syscall!(MKDIRAT, AT_FDCWD, path.as_ptr(), mode) }).map(|_| ())
+        Sys::mkdirat(AT_FDCWD, path, mode)
     }
 
     fn mknodat(dir_fildes: c_int, path: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
@@ -519,6 +524,10 @@ impl Pal for Sys {
 
     fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
         Sys::mknodat(AT_FDCWD, path, mode, dev)
+    }
+
+    fn mkfifoat(dir_fd: c_int, path: CStr, mode: mode_t) -> Result<()> {
+        Sys::mknodat(dir_fd, path, mode | S_IFIFO, 0)
     }
 
     fn mkfifo(path: CStr, mode: mode_t) -> Result<()> {
@@ -623,7 +632,10 @@ impl Pal for Sys {
     }
 
     #[cfg(target_arch = "x86_64")]
-    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
+    unsafe fn rlct_clone(
+        stack: *mut usize,
+        _os_specific: &mut OsSpecific,
+    ) -> Result<crate::pthread::OsTid> {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
         let pid;
         asm!("
@@ -678,7 +690,10 @@ impl Pal for Sys {
     }
 
     #[cfg(target_arch = "aarch64")]
-    unsafe fn rlct_clone(stack: *mut usize) -> Result<crate::pthread::OsTid> {
+    unsafe fn rlct_clone(
+        stack: *mut usize,
+        _os_specific: &mut OsSpecific,
+    ) -> Result<crate::pthread::OsTid> {
         todo!("rlct_clone not implemented for aarch64 yet")
     }
 

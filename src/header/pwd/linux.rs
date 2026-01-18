@@ -1,5 +1,5 @@
 use super::{parsed, passwd};
-use crate::platform::types::*;
+use crate::platform::types::c_char;
 
 pub fn split(line: &mut [u8]) -> Option<passwd> {
     let mut parts = line.split_mut(|&c| c == b'\0');

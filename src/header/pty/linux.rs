@@ -1,7 +1,7 @@
 use crate::{
     header::{fcntl, sys_ioctl, unistd},
     io::{Cursor, Write},
-    platform::types::*,
+    platform::types::{c_char, c_int, c_void},
 };
 
 pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {

@@ -6,7 +6,7 @@
 
 use crate::{
     header::sys_socket::{sa_family_t, sockaddr_storage},
-    platform::types::*,
+    platform::types::{c_char, c_int, uint16_t, uint32_t},
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.

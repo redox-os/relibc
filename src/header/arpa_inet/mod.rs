@@ -13,11 +13,14 @@ use core::{
 use crate::{
     c_str::CStr,
     header::{
-        errno::*,
+        errno::{EAFNOSUPPORT, ENOSPC},
         netinet_in::{INADDR_NONE, in_addr, in_addr_t, ntohl},
-        sys_socket::{constants::*, socklen_t},
+        sys_socket::{constants::AF_INET, socklen_t},
     },
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, c_void},
+    },
     raw_cell::RawCell,
 };
 
