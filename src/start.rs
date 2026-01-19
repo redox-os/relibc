@@ -1,5 +1,8 @@
 //! Startup code.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use alloc::{boxed::Box, vec::Vec};
 use core::{intrinsics, ptr};
 use generic_rt::ExpectTlsFree;
@@ -42,15 +45,15 @@ impl Stack {
 unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut c_char> {
     let mut vec = Vec::with_capacity(len + 1);
     for i in 0..len {
-        let item = *array.add(i);
+        let item = unsafe { *array.add(i) };
         let mut len = 0;
-        while *item.add(len) != 0 {
+        while unsafe { *item.add(len) } != 0 {
             len += 1;
         }
 
-        let buf = platform::alloc(len + 1) as *mut c_char;
+        let buf = unsafe { platform::alloc(len + 1) } as *mut c_char;
         for i in 0..=len {
-            *buf.add(i) = *item.add(i);
+            unsafe { *buf.add(i) = *item.add(i) };
         }
         vec.push(buf);
     }
@@ -147,7 +150,7 @@ pub unsafe extern "C" fn relibc_start_v1(
     }
 
     // Ensure correct host system before executing more system calls
-    relibc_verify_host();
+    unsafe { relibc_verify_host() };
 
     #[cfg(target_os = "redox")]
     let thr_fd = redox_rt::proc::FdGuard::new(
@@ -158,17 +161,19 @@ pub unsafe extern "C" fn relibc_start_v1(
     .expect_notls("failed to move thread fd to upper table");
 
     // Initialize TLS, if necessary
-    ld_so::init(
-        sp,
-        #[cfg(target_os = "redox")]
-        thr_fd,
-    );
+    unsafe {
+        ld_so::init(
+            sp,
+            #[cfg(target_os = "redox")]
+            thr_fd,
+        )
+    };
 
     // Set up the right allocator...
     // if any memory rust based memory allocation happen before this step .. we are doomed.
     alloc_init();
 
-    if let Some(tcb) = ld_so::tcb::Tcb::current() {
+    if let Some(tcb) = unsafe { ld_so::tcb::Tcb::current() } {
         // Update TCB mspace
         tcb.mspace = ALLOCATOR.get();
 
@@ -186,60 +191,60 @@ pub unsafe extern "C" fn relibc_start_v1(
     // Set up argc and argv
     let argc = sp.argc;
     let argv = sp.argv();
-    platform::inner_argv.unsafe_set(copy_string_array(argv, argc as usize));
-    platform::argv = platform::inner_argv.unsafe_mut().as_mut_ptr();
+    unsafe { platform::inner_argv.unsafe_set(copy_string_array(argv, argc as usize)) };
+    unsafe { platform::argv = platform::inner_argv.unsafe_mut().as_mut_ptr() };
     // Special code for program_invocation_name and program_invocation_short_name
-    if let Some(arg) = platform::inner_argv.unsafe_ref().get(0) {
-        platform::program_invocation_name = *arg;
-        platform::program_invocation_short_name = libgen::basename(*arg);
+    if let Some(arg) = unsafe { platform::inner_argv.unsafe_ref() }.get(0) {
+        unsafe { platform::program_invocation_name = *arg };
+        unsafe { platform::program_invocation_short_name = libgen::basename(*arg) };
     }
     // We check for NULL here since ld.so might already have initialized it for us, and we don't
     // want to overwrite it if constructors in .init_array of dependency libraries have called
     // setenv.
-    if platform::environ.is_null() {
+    if unsafe { platform::environ }.is_null() {
         // Set up envp
         let envp = sp.envp();
         let mut len = 0;
-        while !(*envp.add(len)).is_null() {
+        while !(unsafe { *envp.add(len) }).is_null() {
             len += 1;
         }
-        platform::OUR_ENVIRON.unsafe_set(copy_string_array(envp, len));
-        platform::environ = platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr();
+        unsafe { platform::OUR_ENVIRON.unsafe_set(copy_string_array(envp, len)) };
+        unsafe { platform::environ = platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr() };
     }
 
-    let auxvs = get_auxvs(sp.auxv().cast());
-    crate::platform::init(auxvs);
+    let auxvs = unsafe { get_auxvs(sp.auxv().cast()) };
+    unsafe { crate::platform::init(auxvs) };
 
     init_array();
 
     // Run preinit array
     {
-        let mut f = &__preinit_array_start as *const _;
+        let mut f = unsafe { &__preinit_array_start } as *const _;
         #[allow(clippy::op_ref)]
-        while f < &__preinit_array_end {
-            (*f)();
-            f = f.offset(1);
+        while f < unsafe { &__preinit_array_end } {
+            (unsafe { *f })();
+            f = unsafe { f.offset(1) };
         }
     }
 
     // Call init section
     #[cfg(not(target_arch = "riscv64"))] // risc-v uses arrays exclusively
     {
-        _init();
+        unsafe { _init() };
     }
 
     // Run init array
     {
-        let mut f = &__init_array_start as *const _;
+        let mut f = unsafe { &__init_array_start } as *const _;
         #[allow(clippy::op_ref)]
-        while f < &__init_array_end {
-            (*f)();
-            f = f.offset(1);
+        while f < unsafe { &__init_array_end } {
+            (unsafe { *f })();
+            f = unsafe { f.offset(1) };
         }
     }
 
     // not argv or envp, because programs like bash try to modify this *const* pointer :|
-    stdlib::exit(main(argc, platform::argv, platform::environ));
+    unsafe { stdlib::exit(main(argc, platform::argv, platform::environ)) };
 
     unreachable!();
 }

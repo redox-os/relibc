@@ -1,3 +1,6 @@
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::cell::UnsafeCell;
 
 /// Wrapper over `UnsafeCell` that can directly be used in statics, where all modifications require
@@ -27,15 +30,15 @@ impl<T> RawCell<T> {
     }
     #[inline]
     pub unsafe fn unsafe_ref(&self) -> &T {
-        &*self.inner.get()
+        unsafe { &*self.inner.get() }
     }
     #[inline]
     pub unsafe fn unsafe_set(&self, t: T) {
-        *self.inner.get() = t;
+        unsafe { *self.inner.get() = t };
     }
     #[inline]
     pub unsafe fn unsafe_mut(&self) -> &mut T {
-        &mut *self.inner.get()
+        unsafe { &mut *self.inner.get() }
     }
 }
 
