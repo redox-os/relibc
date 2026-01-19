@@ -917,7 +917,9 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                         // of course be 0, 1 in length
                         let len = 1 + cmp::max(0, exp) as usize;
                         let precision = precision.saturating_sub(len);
-                        fmt_float_normal(w, !alternate, precision, float, left, pad_space, pad_zero)?;
+                        fmt_float_normal(
+                            w, !alternate, precision, float, left, pad_space, pad_zero,
+                        )?;
                     }
                 } else {
                     fmt_float_nonfinite(w, float, fmtcase.unwrap(), left, pad_space, pad_zero)?;

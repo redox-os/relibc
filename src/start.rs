@@ -154,8 +154,10 @@ pub unsafe extern "C" fn relibc_start_v1(
 
     #[cfg(target_os = "redox")]
     let thr_fd = redox_rt::proc::FdGuard::new(
-        crate::platform::get_auxv_raw(sp.auxv().cast(), redox_rt::auxv_defs::AT_REDOX_THR_FD)
-            .expect_notls("no thread fd present"),
+        unsafe {
+            crate::platform::get_auxv_raw(sp.auxv().cast(), redox_rt::auxv_defs::AT_REDOX_THR_FD)
+        }
+        .expect_notls("no thread fd present"),
     )
     .to_upper()
     .expect_notls("failed to move thread fd to upper table");

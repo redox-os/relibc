@@ -226,7 +226,9 @@ unsafe extern "C" fn new_thread_shim(
     {
         // `thr_fd` in `tcb` is set by [`Sys::rlct_clone`] *before* jumping to
         // the entry point of the new thread.
-        tcb.activate(None);
+        unsafe {
+            tcb.activate(None);
+        }
         redox_rt::signal::setup_sighandler(&tcb.os_specific, false);
     }
 

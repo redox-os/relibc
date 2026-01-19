@@ -338,7 +338,9 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
     let Some(proc_fd) = get_auxv(&auxvs, AT_REDOX_PROC_FD) else {
         panic!("Missing proc and thread fd!");
     };
-    redox_rt::initialize(FdGuard::new(proc_fd).to_upper().unwrap());
+    unsafe {
+        redox_rt::initialize(FdGuard::new(proc_fd).to_upper().unwrap());
+    }
 
     // TODO: Is it safe to assume setup_sighandler has been called at this point?
     redox_rt::sys::this_proc_call(
@@ -352,7 +354,8 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_PTR),
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_LEN),
     ) {
-        let cwd_bytes: &'static [u8] = core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len);
+        let cwd_bytes: &'static [u8] =
+            unsafe { core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len) };
         if let Ok(cwd) = core::str::from_utf8(cwd_bytes) {
             self::sys::path::set_cwd_manual(cwd.into());
         }
