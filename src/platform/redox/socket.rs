@@ -1024,8 +1024,9 @@ impl PalSocket for Sys {
     }
 
     fn shutdown(socket: c_int, how: c_int) -> Result<()> {
-        eprintln!("shutdown({}, {})", socket, how);
-        Err(Errno(ENOSYS))
+        let metadata = [SocketCall::Shutdown as u64, how as u64];
+        redox_rt::sys::sys_call(socket as usize, &mut [], CallFlags::empty(), &metadata)?;
+        Ok(())
     }
 
     unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> Result<c_int> {
