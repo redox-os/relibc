@@ -20,6 +20,8 @@ use crate::{
     raw_cell::RawCell,
 };
 
+use super::locale::{THREAD_LOCALE, locale_t};
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memccpy.html>.
 ///
 /// # Safety
@@ -292,14 +294,18 @@ pub unsafe extern "C" fn strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
     unsafe { strncmp(s1, s2, usize::MAX) }
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcoll.html>.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcoll_l.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn strcoll(s1: *const c_char, s2: *const c_char) -> c_int {
+pub unsafe extern "C" fn strcoll_l(s1: *const c_char, s2: *const c_char, _loc: locale_t) -> c_int {
     // relibc has no locale stuff (yet)
     unsafe { strcmp(s1, s2) }
 }
 
-// TODO: strcoll_l
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcoll.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn strcoll(s1: *const c_char, s2: *const c_char) -> c_int {
+    strcoll_l(s1, s2, THREAD_LOCALE as locale_t)
+}
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcpy.html>.
 #[unsafe(no_mangle)]
@@ -352,9 +358,9 @@ pub unsafe extern "C" fn strdup(s1: *const c_char) -> *mut c_char {
     unsafe { strndup(s1, usize::MAX) }
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strerror.html>.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strerror_l.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn strerror(errnum: c_int) -> *mut c_char {
+pub unsafe extern "C" fn strerror_l(errnum: c_int, _loc: locale_t) -> *mut c_char {
     use core::fmt::Write;
 
     static strerror_buf: RawCell<[u8; STRERROR_MAX]> = RawCell::new([0; STRERROR_MAX]);
@@ -370,9 +376,13 @@ pub unsafe extern "C" fn strerror(errnum: c_int) -> *mut c_char {
     (unsafe { strerror_buf.unsafe_mut().as_mut_ptr() }) as *mut c_char
 }
 
-// TODO: strerror_l
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strerror.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn strerror(errnum: c_int) -> *mut c_char {
+    strerror_l(errnum, THREAD_LOCALE as locale_t)
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strerror_r.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
     let msg = unsafe { strerror(errnum) };
@@ -640,9 +650,14 @@ pub unsafe extern "C" fn strtok_r(
     token
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strxfrm.html>.
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strxfrm_l.html>.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn strxfrm(s1: *mut c_char, s2: *const c_char, n: size_t) -> size_t {
+pub unsafe extern "C" fn strxfrm_l(
+    s1: *mut c_char,
+    s2: *const c_char,
+    n: size_t,
+    _loc: locale_t,
+) -> size_t {
     // relibc has no locale stuff (yet)
     let len = unsafe { strlen(s2) };
     if len < n {
@@ -651,4 +666,8 @@ pub unsafe extern "C" fn strxfrm(s1: *mut c_char, s2: *const c_char, n: size_t) 
     len
 }
 
-// TODO: strxfrm_l
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strxfrm.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn strxfrm(s1: *mut c_char, s2: *const c_char, n: size_t) -> size_t {
+    strxfrm_l(s1, s2, n, THREAD_LOCALE as locale_t)
+}
