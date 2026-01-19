@@ -925,7 +925,7 @@ pub unsafe extern "C" fn posix_memalign(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
     #[cfg(target_os = "redox")]
-    let r = open((b"/scheme/pty\0" as *const u8).cast(), O_CREAT);
+    let r = unsafe { open((b"/scheme/pty\0" as *const u8).cast(), O_CREAT) };
 
     #[cfg(target_os = "linux")]
     let r = unsafe { open((b"/dev/ptmx\0" as *const u8).cast(), flags) };
@@ -963,10 +963,10 @@ pub unsafe extern "C" fn ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) 
 #[cfg(target_os = "redox")]
 #[inline(always)]
 unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
-    let tty_ptr = unistd::ttyname(fd);
+    let tty_ptr = unsafe { unistd::ttyname(fd) };
 
     if !tty_ptr.is_null() {
-        if let Ok(name) = CStr::from_ptr(tty_ptr).to_str() {
+        if let Ok(name) = unsafe { CStr::from_ptr(tty_ptr) }.to_str() {
             let len = name.len();
             if len > buflen {
                 platform::ERRNO.set(ERANGE);
@@ -975,7 +975,9 @@ unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
                 // we have checked the string will fit in the buffer
                 // so can use strcpy safely
                 let s = name.as_ptr().cast();
-                ptr::copy_nonoverlapping(s, buf, len);
+                unsafe {
+                    ptr::copy_nonoverlapping(s, buf, len);
+                }
                 return 0;
             }
         }
