@@ -2,8 +2,6 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/libgen.h.html>.
 
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::platform::types::c_char;
 
 use crate::header::string::strlen;

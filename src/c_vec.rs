@@ -1,8 +1,5 @@
 //! Equivalent of Rust's `Vec<T>`, but using relibc's own allocator.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::{
     io::{self, Write},
     platform::{self, WriteByte, types::*},

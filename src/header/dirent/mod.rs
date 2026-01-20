@@ -2,8 +2,6 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dirent.h.html>.
 
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use alloc::{boxed::Box, vec::Vec};
 use core::{mem, ptr, slice};
 

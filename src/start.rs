@@ -1,8 +1,5 @@
 //! Startup code.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use alloc::{boxed::Box, vec::Vec};
 use core::{intrinsics, ptr};
 use generic_rt::ExpectTlsFree;

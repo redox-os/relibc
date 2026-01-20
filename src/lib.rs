@@ -35,6 +35,7 @@
 #![allow(clippy::derive_hash_xor_eq)]
 #![allow(clippy::eval_order_dependence)]
 #![allow(clippy::mut_from_ref)]
+#![deny(unsafe_op_in_unsafe_fn)]
 // TODO: fix these
 #![warn(unaligned_references)]
 

@@ -40,11 +40,13 @@ pub unsafe extern "C" fn redox_event_queue_get_events_v1(
             size_of::<syscall::Event>(),
             "EOF not yet defined for event queue reads"
         );
-        buf.write(event::raw::RawEventV1 {
-            fd: event.id,
-            flags: event::raw::EventFlags::from(event.flags).bits(),
-            user_data: event.data,
-        });
+        unsafe {
+            buf.write(event::raw::RawEventV1 {
+                fd: event.id,
+                flags: event::raw::EventFlags::from(event.flags).bits(),
+                user_data: event.data,
+            })
+        };
 
         Ok(1)
     })())

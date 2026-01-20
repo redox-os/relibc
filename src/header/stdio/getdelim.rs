@@ -1,8 +1,5 @@
 // https://pubs.opengroup.org/onlinepubs/9699919799/functions/getline.html
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use alloc::{string::String, vec::Vec};
 use core::{fmt::Write, intrinsics::unlikely, ops::Deref, ptr};
 

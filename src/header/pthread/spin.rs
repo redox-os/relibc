@@ -1,6 +1,3 @@
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::sync::atomic::{AtomicI32 as AtomicInt, Ordering};
 
 use crate::header::errno::EBUSY;

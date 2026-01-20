@@ -13,7 +13,6 @@ use libm::{fabs, floor, pow, round, trunc};
 extern crate alloc;
 
 mod strfmon;
-#[deny(unsafe_op_in_unsafe_fn)]
 #[repr(C)]
 struct LocaleMonetaryInfo {
     int_curr_symbol: &'static str,

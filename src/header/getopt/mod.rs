@@ -2,8 +2,6 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getopt.html>.
 
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::{
     header::{
         stdio, string,
