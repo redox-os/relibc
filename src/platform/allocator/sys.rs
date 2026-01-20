@@ -1,6 +1,3 @@
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::{
     header::{
         sys_mman::{self, MAP_FAILED, MREMAP_MAYMOVE},

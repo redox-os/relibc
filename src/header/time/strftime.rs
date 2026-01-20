@@ -2,9 +2,6 @@
 //
 // See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strftime.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use alloc::string::String;
 
 use super::{get_offset, tm};

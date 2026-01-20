@@ -1,6 +1,3 @@
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 /// Print to stdout
 #[macro_export]
 macro_rules! print {

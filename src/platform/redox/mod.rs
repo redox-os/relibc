@@ -1,5 +1,3 @@
-#![allow(unsafe_op_in_unsafe_fn)]
-
 use core::{
     convert::TryFrom,
     mem::{self, MaybeUninit, size_of},

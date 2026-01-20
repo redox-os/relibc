@@ -1,5 +1,3 @@
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::{
     cell::SyncUnsafeCell,
     convert::TryInto,

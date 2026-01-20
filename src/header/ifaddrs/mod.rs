@@ -1,8 +1,5 @@
 //! `ifaddrs.h` implementation
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::ptr;
 
 use crate::{

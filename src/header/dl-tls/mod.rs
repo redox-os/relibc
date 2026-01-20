@@ -1,6 +1,5 @@
 //! dl-tls implementation for Redox
 
-#![deny(unsafe_op_in_unsafe_fn)]
 // FIXME(andypython): remove this when #![allow(warnings, unused_variables)] is
 // dropped from src/lib.rs.
 #![warn(warnings, unused_variables)]

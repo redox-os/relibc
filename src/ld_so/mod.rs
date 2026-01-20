@@ -3,7 +3,6 @@
 // FIXME(andypython): remove this when #![allow(warnings, unused_variables)] is
 // dropped from src/lib.rs.
 #![warn(warnings, unused_variables)]
-#![deny(unsafe_op_in_unsafe_fn)]
 
 use core::{mem, ptr};
 use object::{

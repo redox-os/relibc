@@ -1,8 +1,5 @@
 //! Synchronization primitives.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 pub mod barrier;
 pub mod cond;
 // TODO: Merge with pthread_mutex

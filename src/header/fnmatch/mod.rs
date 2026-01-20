@@ -2,8 +2,6 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fnmatch.h.html>.
 
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use alloc::{borrow::Cow, vec::Vec};
 use core::slice;
 

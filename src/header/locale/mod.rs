@@ -2,9 +2,6 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/locale.h.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use alloc::{boxed::Box, ffi::CString, string::String};
 use core::{ptr, str::FromStr};
 
