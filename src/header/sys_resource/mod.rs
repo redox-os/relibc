@@ -2,6 +2,9 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_resource.h.html>.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use crate::{
     error::ResultExt,
     header::sys_time::timeval,
@@ -92,7 +95,7 @@ pub unsafe extern "C" fn setpriority(which: c_int, who: id_t, nice: c_int) -> c_
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getrlimit.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
-    let rlp = Out::nonnull(rlp);
+    let rlp = unsafe { Out::nonnull(rlp) };
 
     Sys::getrlimit(resource, rlp)
         .map(|()| 0)
@@ -102,7 +105,7 @@ pub unsafe extern "C" fn getrlimit(resource: c_int, rlp: *mut rlimit) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setrlimit.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int {
-    Sys::setrlimit(resource, rlp)
+    unsafe { Sys::setrlimit(resource, rlp) }
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -110,7 +113,7 @@ pub unsafe extern "C" fn setrlimit(resource: c_int, rlp: *const rlimit) -> c_int
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getrusage.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getrusage(who: c_int, r_usage: *mut rusage) -> c_int {
-    Sys::getrusage(who, Out::nonnull(r_usage))
+    Sys::getrusage(who, unsafe { Out::nonnull(r_usage) })
         .map(|()| 0)
         .or_minus_one_errno()
 }

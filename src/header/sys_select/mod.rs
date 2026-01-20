@@ -2,6 +2,9 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::mem;
 
 use cbitset::BitSet;
@@ -180,22 +183,22 @@ pub unsafe extern "C" fn select(
             if readfds.is_null() {
                 None
             } else {
-                Some(&mut *readfds)
+                Some(unsafe { &mut *readfds })
             },
             if writefds.is_null() {
                 None
             } else {
-                Some(&mut *writefds)
+                Some(unsafe { &mut *writefds })
             },
             if exceptfds.is_null() {
                 None
             } else {
-                Some(&mut *exceptfds)
+                Some(unsafe { &mut *exceptfds })
             },
             if timeout.is_null() {
                 None
             } else {
-                Some(&mut *timeout)
+                Some(unsafe { &mut *timeout })
             }
         ),
         "select({}, {:p}, {:p}, {:p}, {:p})",

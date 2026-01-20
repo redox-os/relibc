@@ -1,3 +1,6 @@
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use crate::{
     header::{
         sys_mman::{self, MAP_FAILED, MREMAP_MAYMOVE},
@@ -115,13 +118,15 @@ pub unsafe fn enable_alloc_after_fork() {
     // it will acquire the lock before any other thread,
     // protecting it from deadlock,
     // due to the child being created with only the calling thread.
-    if !FORK_PROTECTED {
-        pthread_atfork(
-            Some(_acquire_global_lock),
-            Some(_release_global_lock),
-            Some(_release_global_lock),
-        );
-        FORK_PROTECTED = true;
+    unsafe {
+        if !FORK_PROTECTED {
+            pthread_atfork(
+                Some(_acquire_global_lock),
+                Some(_release_global_lock),
+                Some(_release_global_lock),
+            );
+            FORK_PROTECTED = true;
+        }
     }
     release_global_lock();
 }

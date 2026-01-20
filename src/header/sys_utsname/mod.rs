@@ -2,6 +2,9 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_utsname.h.html>.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use crate::{
     error::ResultExt,
     out::Out,
@@ -28,7 +31,7 @@ pub struct utsname {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/uname.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uname(uts: *mut utsname) -> c_int {
-    Sys::uname(Out::nonnull(uts))
+    Sys::uname(unsafe { Out::nonnull(uts) })
         .map(|()| 0)
         .or_minus_one_errno()
 }

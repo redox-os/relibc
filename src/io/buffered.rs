@@ -10,6 +10,9 @@
 
 //! Buffering wrappers for I/O traits
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::{cmp, fmt};
 
 use crate::io::{
@@ -172,7 +175,7 @@ impl<R: Read> Read for BufReader<R> {
 
     // we can't skip unconditionally because of the large buffer case in read.
     unsafe fn initializer(&self) -> Initializer {
-        self.inner.initializer()
+        unsafe { self.inner.initializer() }
     }
 }
 

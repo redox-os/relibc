@@ -1,3 +1,6 @@
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use core::sync::atomic::{AtomicI32 as AtomicInt, Ordering};
 
 use crate::header::errno::EBUSY;
@@ -9,7 +12,7 @@ const LOCKED: c_int = 1;
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_spin_destroy(spinlock: *mut pthread_spinlock_t) -> c_int {
-    let _spinlock = &mut *spinlock.cast::<RlctSpinlock>();
+    let _spinlock = unsafe { &mut *spinlock.cast::<RlctSpinlock>() };
 
     // No-op
     0
@@ -22,15 +25,17 @@ pub unsafe extern "C" fn pthread_spin_init(
     // TODO: pshared doesn't matter in most situations, as memory is just memory, but this may be
     // different on some architectures...
 
-    spinlock.cast::<RlctSpinlock>().write(RlctSpinlock {
-        inner: AtomicInt::new(UNLOCKED),
-    });
+    unsafe {
+        spinlock.cast::<RlctSpinlock>().write(RlctSpinlock {
+            inner: AtomicInt::new(UNLOCKED),
+        })
+    };
 
     0
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_spin_lock(spinlock: *mut pthread_spinlock_t) -> c_int {
-    let spinlock = &*spinlock.cast::<RlctSpinlock>();
+    let spinlock = unsafe { &*spinlock.cast::<RlctSpinlock>() };
 
     loop {
         match spinlock.inner.compare_exchange_weak(
@@ -48,7 +53,7 @@ pub unsafe extern "C" fn pthread_spin_lock(spinlock: *mut pthread_spinlock_t) ->
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_spin_trylock(spinlock: *mut pthread_spinlock_t) -> c_int {
-    let spinlock = &*spinlock.cast::<RlctSpinlock>();
+    let spinlock = unsafe { &*spinlock.cast::<RlctSpinlock>() };
 
     match spinlock
         .inner
@@ -62,7 +67,7 @@ pub unsafe extern "C" fn pthread_spin_trylock(spinlock: *mut pthread_spinlock_t)
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_spin_unlock(spinlock: *mut pthread_spinlock_t) -> c_int {
-    let spinlock = &*spinlock.cast::<RlctSpinlock>();
+    let spinlock = unsafe { &*spinlock.cast::<RlctSpinlock>() };
 
     spinlock.inner.store(UNLOCKED, Ordering::Release);
 

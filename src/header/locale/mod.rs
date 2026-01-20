@@ -36,7 +36,7 @@ pub const LC_GLOBAL_LOCALE: locale_t = -1isize as locale_t;
 static mut GLOBAL_LOCALE: *mut GlobalLocaleData = ptr::null_mut();
 /// thread-wide locale, used by uselocale() and localeconv()
 #[thread_local]
-static mut THREAD_LOCALE: *mut LocaleData = ptr::null_mut();
+pub(crate) static mut THREAD_LOCALE: *mut LocaleData = ptr::null_mut();
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/localeconv.html>.
 #[unsafe(no_mangle)]

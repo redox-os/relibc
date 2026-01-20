@@ -1,5 +1,8 @@
 //! Platform abstractions and environment.
 
+// TODO: set this for entire crate when possible
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use crate::{
     error::{Errno, ResultExt},
     io::{self, Read, Write},
@@ -305,7 +308,7 @@ unsafe fn auxv_iter<'a>(ptr: *const usize) -> impl Iterator<Item = [usize; 2]> +
 #[cold]
 pub unsafe fn get_auxvs(ptr: *const usize) -> Box<[[usize; 2]]> {
     //traverse the stack and collect argument environment variables
-    let mut auxvs = auxv_iter(ptr).collect::<Vec<_>>();
+    let mut auxvs = unsafe { auxv_iter(ptr) }.collect::<Vec<_>>();
 
     auxvs.sort_unstable_by_key(|[kind, _]| *kind);
     auxvs.into_boxed_slice()
@@ -313,7 +316,8 @@ pub unsafe fn get_auxvs(ptr: *const usize) -> Box<[[usize; 2]]> {
 // TODO: Find an auxv replacement for Redox's execv protocol
 #[cold]
 pub unsafe fn get_auxv_raw(ptr: *const usize, requested_kind: usize) -> Option<usize> {
-    auxv_iter(ptr).find_map(|[kind, value]| Some(value).filter(|_| kind == requested_kind))
+    unsafe { auxv_iter(ptr) }
+        .find_map(|[kind, value]| Some(value).filter(|_| kind == requested_kind))
 }
 pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
     auxvs
@@ -327,9 +331,7 @@ pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
 // SAFETY: Must only be called when only one thread exists.
 pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
     use self::auxv_defs::*;
-    use crate::header::sys_stat::S_ISVTX;
     use redox_rt::proc::FdGuard;
-    use syscall::MODE_PERM;
 
     let Some(proc_fd) = get_auxv(&auxvs, AT_REDOX_PROC_FD) else {
         panic!("Missing proc and thread fd!");
@@ -366,7 +368,8 @@ pub unsafe fn init_inner(auxvs: Box<[[usize; 2]]>) {
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_PTR),
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_LEN),
     ) {
-        let cwd_bytes: &'static [u8] = core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len);
+        let cwd_bytes: &'static [u8] =
+            unsafe { core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len) };
         if let Ok(cwd) = core::str::from_utf8(cwd_bytes) {
             self::sys::path::set_cwd_manual(cwd.into());
         }
