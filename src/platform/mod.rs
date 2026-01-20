@@ -339,15 +339,17 @@ pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
     let Some(ns_fd) = get_auxv(&auxvs, AT_REDOX_NS_FD) else {
         panic!("Missing namespace fd!");
     };
-    redox_rt::initialize(
-        FdGuard::new(proc_fd).to_upper().unwrap(),
-        if ns_fd == usize::MAX {
-            None
-        } else {
-            Some(FdGuard::new(ns_fd).to_upper().unwrap())
-        },
-    );
-    init_inner(auxvs)
+    unsafe {
+        redox_rt::initialize(
+            FdGuard::new(proc_fd).to_upper().unwrap(),
+            if ns_fd == usize::MAX {
+                None
+            } else {
+                Some(FdGuard::new(ns_fd).to_upper().unwrap())
+            },
+        );
+        init_inner(auxvs)
+    }
 }
 #[cold]
 #[cfg(target_os = "redox")]
