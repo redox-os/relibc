@@ -4,6 +4,8 @@ pub mod _aio;
 pub mod _fenv;
 pub mod arpa_inet;
 pub mod assert;
+#[path = "bits_locale-t/mod.rs"]
+pub mod bits_locale_t;
 pub mod bits_pthread;
 pub mod bits_sched;
 // complex.h implemented in C
