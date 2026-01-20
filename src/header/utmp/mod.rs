@@ -2,9 +2,6 @@
 //!
 //! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/openpty.3.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::{
     header::{sys_ioctl, unistd},
     platform::types::{c_int, c_void},

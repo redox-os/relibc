@@ -2,9 +2,6 @@
 //!
 //! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/crypt.3.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use ::scrypt::password_hash::{Salt, SaltString};
 use alloc::{
     ffi::CString,

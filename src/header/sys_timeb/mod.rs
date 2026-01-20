@@ -7,9 +7,6 @@
 //! Specifications Issue 6, and the entire `sys/timeb.h` header was removed in
 //! Issue 7.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::ptr::NonNull;
 
 use crate::{

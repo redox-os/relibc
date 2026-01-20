@@ -1,8 +1,5 @@
 // Used design from https://www.remlab.net/op/futex-condvar.shtml
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::header::time::CLOCK_REALTIME;
 
 use super::*;

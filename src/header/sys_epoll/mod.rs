@@ -1,8 +1,5 @@
 //! sys/epoll.h implementation for Redox, following http://man7.org/linux/man-pages/man7/epoll.7.html
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::ptr;
 
 use crate::{

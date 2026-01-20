@@ -41,7 +41,7 @@ fn plane_id(i: u32) -> u32 {
 }
 
 unsafe fn copy_array<T: Copy>(src: &[T], dst_ptr: *mut T, dst_len: usize) -> usize {
-    let dst = slice::from_raw_parts_mut(dst_ptr, dst_len);
+    let dst = unsafe { slice::from_raw_parts_mut(dst_ptr, dst_len) };
     dst.copy_from_slice(&src[..src.len().min(dst_len)]);
     src.len()
 }
@@ -61,22 +61,22 @@ impl Dev {
         mut buf: IoctlBuffer,
         func: u64,
     ) -> Result<c_int> {
-        let mut data = buf.read::<T>()?;
-        let mut wire = data.write();
+        let mut data = unsafe { buf.read::<T>() }?;
+        let mut wire = unsafe { data.write() };
         let res = redox_rt::sys::sys_call(
             self.fd as usize,
             &mut wire,
             syscall::CallFlags::empty(),
             &[func],
         )?;
-        data.read_from(&wire);
-        buf.write(data)?;
+        unsafe { data.read_from(&wire) };
+        (unsafe { buf.write(data) })?;
         Ok(res as c_int)
     }
 
     unsafe fn write_ioctl<T: IoctlData>(&self, mut buf: IoctlBuffer, func: u64) -> Result<c_int> {
-        let mut data = buf.read::<T>()?;
-        let mut wire = data.write();
+        let mut data = unsafe { buf.read::<T>() }?;
+        let mut wire = unsafe { data.write() };
         let res = redox_rt::sys::sys_call(
             self.fd as usize,
             &mut wire,
@@ -90,26 +90,30 @@ impl Dev {
 pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_int> {
     let dev = Dev::new(fd)?;
     match func {
-        0x00 => dev.read_write_ioctl::<drm_version>(buf, VERSION),
-        0x0C => dev.read_write_ioctl::<drm_get_cap>(buf, GET_CAP),
-        0x0D => dev.write_ioctl::<drm_set_client_cap>(buf, SET_CLIENT_CAP),
-        0xA0 => dev.read_write_ioctl::<drm_mode_card_res>(buf, MODE_CARD_RES),
-        0xA1 => dev.read_write_ioctl::<drm_mode_crtc>(buf, MODE_GET_CRTC),
-        0xA6 => dev.read_write_ioctl::<drm_mode_get_encoder>(buf, MODE_GET_ENCODER),
-        0xA7 => dev.read_write_ioctl::<drm_mode_get_connector>(buf, MODE_GET_CONNECTOR),
-        0xAA => dev.read_write_ioctl::<drm_mode_get_property>(buf, MODE_GET_PROPERTY),
-        0xAB => dev.read_write_ioctl::<drm_mode_connector_set_property>(buf, MODE_SET_PROPERTY),
-        0xAC => dev.read_write_ioctl::<drm_mode_get_blob>(buf, MODE_GET_PROP_BLOB),
-        0xAD => dev.read_write_ioctl::<drm_mode_fb_cmd>(buf, MODE_GET_FB),
-        0xAE => dev.read_write_ioctl::<drm_mode_fb_cmd>(buf, MODE_ADD_FB),
-        0xAF => dev.read_write_ioctl::<standin_for_uint>(buf, MODE_RM_FB),
-        0xB2 => dev.read_write_ioctl::<drm_mode_create_dumb>(buf, MODE_CREATE_DUMB),
-        0xB3 => dev.read_write_ioctl::<drm_mode_map_dumb>(buf, MODE_MAP_DUMB),
-        0xB4 => dev.read_write_ioctl::<drm_mode_destroy_dumb>(buf, MODE_DESTROY_DUMB),
-        0xB5 => dev.read_write_ioctl::<drm_mode_get_plane_res>(buf, MODE_GET_PLANE_RES),
-        0xB6 => dev.read_write_ioctl::<drm_mode_get_plane>(buf, MODE_GET_PLANE),
-        0xB9 => dev.read_write_ioctl::<drm_mode_obj_get_properties>(buf, MODE_OBJ_GET_PROPERTIES),
-        0xCE => dev.read_write_ioctl::<drm_mode_fb_cmd2>(buf, MODE_GET_FB2),
+        0x00 => unsafe { dev.read_write_ioctl::<drm_version>(buf, VERSION) },
+        0x0C => unsafe { dev.read_write_ioctl::<drm_get_cap>(buf, GET_CAP) },
+        0x0D => unsafe { dev.write_ioctl::<drm_set_client_cap>(buf, SET_CLIENT_CAP) },
+        0xA0 => unsafe { dev.read_write_ioctl::<drm_mode_card_res>(buf, MODE_CARD_RES) },
+        0xA1 => unsafe { dev.read_write_ioctl::<drm_mode_crtc>(buf, MODE_GET_CRTC) },
+        0xA6 => unsafe { dev.read_write_ioctl::<drm_mode_get_encoder>(buf, MODE_GET_ENCODER) },
+        0xA7 => unsafe { dev.read_write_ioctl::<drm_mode_get_connector>(buf, MODE_GET_CONNECTOR) },
+        0xAA => unsafe { dev.read_write_ioctl::<drm_mode_get_property>(buf, MODE_GET_PROPERTY) },
+        0xAB => unsafe {
+            dev.read_write_ioctl::<drm_mode_connector_set_property>(buf, MODE_SET_PROPERTY)
+        },
+        0xAC => unsafe { dev.read_write_ioctl::<drm_mode_get_blob>(buf, MODE_GET_PROP_BLOB) },
+        0xAD => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd>(buf, MODE_GET_FB) },
+        0xAE => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd>(buf, MODE_ADD_FB) },
+        0xAF => unsafe { dev.read_write_ioctl::<standin_for_uint>(buf, MODE_RM_FB) },
+        0xB2 => unsafe { dev.read_write_ioctl::<drm_mode_create_dumb>(buf, MODE_CREATE_DUMB) },
+        0xB3 => unsafe { dev.read_write_ioctl::<drm_mode_map_dumb>(buf, MODE_MAP_DUMB) },
+        0xB4 => unsafe { dev.read_write_ioctl::<drm_mode_destroy_dumb>(buf, MODE_DESTROY_DUMB) },
+        0xB5 => unsafe { dev.read_write_ioctl::<drm_mode_get_plane_res>(buf, MODE_GET_PLANE_RES) },
+        0xB6 => unsafe { dev.read_write_ioctl::<drm_mode_get_plane>(buf, MODE_GET_PLANE) },
+        0xB9 => unsafe {
+            dev.read_write_ioctl::<drm_mode_obj_get_properties>(buf, MODE_OBJ_GET_PROPERTIES)
+        },
+        0xCE => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd2>(buf, MODE_GET_FB2) },
         _ => {
             eprintln!("unimplemented DRM ioctl({}, 0x{:02x}, {:?})", fd, func, buf);
             Err(Errno(EINVAL))

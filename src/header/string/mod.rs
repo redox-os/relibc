@@ -304,7 +304,7 @@ pub unsafe extern "C" fn strcoll_l(s1: *const c_char, s2: *const c_char, _loc: l
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcoll.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strcoll(s1: *const c_char, s2: *const c_char) -> c_int {
-    strcoll_l(s1, s2, THREAD_LOCALE as locale_t)
+    unsafe { strcoll_l(s1, s2, THREAD_LOCALE as locale_t) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strcpy.html>.
@@ -379,7 +379,7 @@ pub unsafe extern "C" fn strerror_l(errnum: c_int, _loc: locale_t) -> *mut c_cha
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strerror.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strerror(errnum: c_int) -> *mut c_char {
-    strerror_l(errnum, THREAD_LOCALE as locale_t)
+    unsafe { strerror_l(errnum, THREAD_LOCALE as locale_t) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strerror_r.html>.
@@ -669,5 +669,5 @@ pub unsafe extern "C" fn strxfrm_l(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strxfrm.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strxfrm(s1: *mut c_char, s2: *const c_char, n: size_t) -> size_t {
-    strxfrm_l(s1, s2, n, THREAD_LOCALE as locale_t)
+    unsafe { strxfrm_l(s1, s2, n, THREAD_LOCALE as locale_t) }
 }

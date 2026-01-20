@@ -200,7 +200,7 @@ impl PalSignal for Sys {
             .transpose()?;
 
         let mut old = old_c.as_ref().map(|_| Sigaltstack::default());
-        redox_rt::signal::sigaltstack(new.as_ref(), old.as_mut())?;
+        (unsafe { redox_rt::signal::sigaltstack(new.as_ref(), old.as_mut()) })?;
 
         if let (Some(old_c_stack), Some(old)) = (old_c, old) {
             let c_stack = PosixStackt::from(old);

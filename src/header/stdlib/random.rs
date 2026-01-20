@@ -1,9 +1,6 @@
 //! Helper functions for random() and friends, see https://pubs.opengroup.org/onlinepubs/7908799/xsh/initstate.html
 // Ported from musl's implementation (src/prng/random.c)
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::{
     platform::types::c_uint,
     sync::{Mutex, MutexGuard},

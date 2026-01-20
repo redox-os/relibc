@@ -1,6 +1,3 @@
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::{
     header::{fcntl, sys_ioctl, unistd},
     io::{Cursor, Write},
