@@ -14,7 +14,7 @@ use core::{
 use crate::{
     header::{ctype, string},
     iter::NulTerminated,
-    platform::types::*,
+    platform::types::{c_char, c_int, c_long, c_longlong, c_void, size_t},
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/bcmp.html>.
