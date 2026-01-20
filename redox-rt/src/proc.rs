@@ -9,7 +9,6 @@ use crate::{
     DYNAMIC_PROC_INFO, RtTcb, StaticProcInfo,
     arch::*,
     auxv_defs::*,
-    current_namespace_fd,
     protocol::{ProcCall, ThreadCall},
     read_proc_meta,
     sys::{open, proc_call, thread_call},
