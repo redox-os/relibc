@@ -1,7 +1,7 @@
 //! Helper functions for pseudorandom number generation using LCG, see https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/functions/drand48.html
 
 use crate::{
-    platform::types::*,
+    platform::types::{c_double, c_long, c_ushort},
     sync::{
         Mutex, MutexGuard,
         rwlock::{self, RwLock},

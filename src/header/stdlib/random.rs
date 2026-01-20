@@ -5,7 +5,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use crate::{
-    platform::types::*,
+    platform::types::c_uint,
     sync::{Mutex, MutexGuard},
 };
 use core::{cell::SyncUnsafeCell, convert::TryFrom, ptr};
