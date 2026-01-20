@@ -1,7 +1,7 @@
 // TODO: set this for entire crate when possible
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use crate::platform::types::*;
+use crate::platform::types::{c_char, c_int, c_void, size_t};
 
 pub unsafe fn introsort(
     base: *mut c_char,
