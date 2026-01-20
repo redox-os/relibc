@@ -20,7 +20,7 @@ use crate::{
     raw_cell::RawCell,
 };
 
-use super::locale::{THREAD_LOCALE, locale_t};
+use super::{bits_locale_t::locale_t, locale::THREAD_LOCALE};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memccpy.html>.
 ///

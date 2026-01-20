@@ -27,7 +27,7 @@ use constants::*;
 mod data;
 use data::*;
 
-pub type locale_t = *mut c_void;
+use super::bits_locale_t::locale_t;
 /// constant struct to "C" or "POSIX" locale
 /// mutable because POSIX demands a mutable pointer
 static mut POSIX_LOCALE: lconv = posix_lconv();

@@ -1,0 +1,14 @@
+sys_includes = []
+include_guard = "_RELIBC_BITS_LOCALE_T_H"
+language = "C"
+style = "type"
+no_includes = true
+cpp_compat = true
+
+[export]
+include = [
+  "locale_t"
+]
+
+[enum]
+prefix_with_name = true
