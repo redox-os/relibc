@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/endian.h.html>.
 
-use crate::platform::types::*;
+use crate::platform::types::{uint16_t, uint32_t, uint64_t};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/be16toh.html>.
 #[unsafe(no_mangle)]

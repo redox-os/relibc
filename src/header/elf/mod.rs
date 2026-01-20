@@ -2,7 +2,7 @@
 //!
 //! Non-POSIX, see <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 
-use crate::platform::types::*;
+use crate::platform::types::{c_char, c_uchar, int32_t, int64_t, uint16_t, uint32_t, uint64_t};
 
 pub type Elf32_Half = uint16_t;
 pub type Elf64_Half = uint16_t;
