@@ -1069,12 +1069,14 @@ impl PalSocket for Sys {
         // The tcp: and udp: schemes allow using no path,
         // and later specifying one using `dup`.
         Ok(match (domain, kind) {
-            (AF_INET, SOCK_STREAM) => syscall::open("/scheme/tcp", flags)? as c_int,
-            (AF_INET, SOCK_DGRAM) => syscall::open("/scheme/udp", flags)? as c_int,
+            (AF_INET, SOCK_STREAM) => redox_rt::sys::open("/scheme/tcp", flags)? as c_int,
+            (AF_INET, SOCK_DGRAM) => redox_rt::sys::open("/scheme/udp", flags)? as c_int,
             (AF_UNIX, SOCK_STREAM) => {
-                syscall::open("/scheme/uds_stream", flags | O_CREAT)? as c_int
+                redox_rt::sys::open("/scheme/uds_stream", flags | O_CREAT)? as c_int
             }
-            (AF_UNIX, SOCK_DGRAM) => syscall::open("/scheme/uds_dgram", flags | O_CREAT)? as c_int,
+            (AF_UNIX, SOCK_DGRAM) => {
+                redox_rt::sys::open("/scheme/uds_dgram", flags | O_CREAT)? as c_int
+            }
             _ => return Err(Errno(EPROTONOSUPPORT)),
         })
     }

@@ -175,10 +175,22 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
             )
             .expect_notls("no proc fd present");
 
+            let ns_fd = crate::platform::get_auxv_raw(
+                sp.auxv().cast(),
+                redox_rt::auxv_defs::AT_REDOX_NS_FD,
+            )
+            .filter(|&fd| fd != usize::MAX)
+            .map(|fd| {
+                redox_rt::proc::FdGuard::new(fd)
+                    .to_upper()
+                    .expect_notls("failed to move ns fd to upper table")
+            });
+
             redox_rt::initialize(
                 redox_rt::proc::FdGuard::new(proc_fd)
                     .to_upper()
                     .expect_notls("failed to move proc fd to upper table"),
+                ns_fd,
             );
             redox_rt::signal::setup_sighandler(&tcb.os_specific, true);
         }
@@ -224,8 +236,9 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
     _r_debug.lock().r_ldbase = ld_entry;
 
     // TODO: Fix memory leak, although minimal.
+    #[cfg(target_os = "redox")]
     unsafe {
-        crate::platform::init(auxv.clone());
+        crate::platform::init_inner(auxv.clone());
     }
 
     let name_or_path = if is_manual {

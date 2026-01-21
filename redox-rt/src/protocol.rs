@@ -250,3 +250,35 @@ pub const SIGWINCH: usize = 28;
 pub const SIGIO: usize = 29;
 pub const SIGPWR: usize = 30;
 pub const SIGSYS: usize = 31;
+
+bitflags! {
+    #[derive(Clone, Copy, Debug, Default, Eq, Ord, Hash, PartialEq, PartialOrd)]
+    pub struct NsPermissions: usize {
+        /// List schemes in the namespace
+        const LIST = 1 << 0;
+        /// Register a new scheme in the namespace
+        const INSERT = 1 << 1;
+        /// Delete a scheme from the namespace
+        const DELETE = 1 << 2;
+        /// Get scheme creation capabilities of the namespace
+        const SCHEME_CREATE = 1 << 3;
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(usize)]
+pub enum NsDup {
+    ForkNs = 0,
+    ShrinkPermissions = 1,
+    IssueRegister = 2,
+}
+impl NsDup {
+    pub fn try_from_raw(raw: usize) -> Option<Self> {
+        Some(match raw {
+            0 => Self::ForkNs,
+            1 => Self::ShrinkPermissions,
+            2 => Self::IssueRegister,
+            _ => return None,
+        })
+    }
+}

@@ -1,21 +1,24 @@
 use core::{
-    mem::size_of,
+    mem::{replace, size_of},
     ptr::addr_of,
     sync::atomic::{AtomicU32, Ordering},
 };
 
+use ioslice::IoSlice;
 use syscall::{
     CallFlags, EINVAL, ERESTART, TimeSpec,
-    error::{self, EINTR, Error, Result},
+    error::{self, EINTR, ENODEV, Error, Result},
 };
 
 use crate::{
     DYNAMIC_PROC_INFO, DynamicProcInfo, RtTcb, Tcb,
     arch::manually_enter_trampoline,
-    protocol::{ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags},
+    proc::{FdGuard, FdGuardUpper},
+    protocol::{NsDup, ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags},
     read_proc_meta,
     signal::tmp_disable_signals,
 };
+use alloc::vec::Vec;
 
 #[inline]
 fn wrapper<T>(restart: bool, erestart: bool, mut f: impl FnMut() -> Result<T>) -> Result<T> {
@@ -37,31 +40,6 @@ fn wrapper<T>(restart: bool, erestart: bool, mut f: impl FnMut() -> Result<T>) -
         }
 
         return res;
-    }
-}
-pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
-    let redox_path = redox_path::RedoxPath::from_absolute(path.as_ref())
-        .expect("path must be canonicalized beforehand");
-    let (scheme, reference) = redox_path.as_parts().unwrap();
-    let root_path = if scheme.as_ref().is_empty() {
-        alloc::string::String::from(":")
-    } else {
-        alloc::format!("/scheme/{}", scheme)
-    };
-    // TODO: Temporary workaround to remove unlink and rmdir
-    let root_fd = crate::proc::FdGuard::open(
-        &root_path,
-        syscall::O_DIRECTORY | syscall::O_RDONLY | syscall::O_CLOEXEC,
-    )?;
-    let path = reference.as_ref();
-    unsafe {
-        syscall::syscall4(
-            syscall::SYS_UNLINKAT,
-            root_fd.as_raw_fd(),
-            path.as_ptr() as usize,
-            path.len(),
-            flags,
-        )
     }
 }
 // TODO: uninitialized memory?
@@ -368,14 +346,6 @@ pub fn posix_exit(status: i32) -> ! {
     let _ = syscall::write(1, b"redox-rt: ProcCall::Exit FAILED, abort()ing!\n");
     core::intrinsics::abort();
 }
-pub fn setrens(rns: usize, ens: usize) -> Result<()> {
-    this_proc_call(
-        &mut [],
-        CallFlags::empty(),
-        &[ProcCall::Setrens as u64, rns as u64, ens as u64],
-    )?;
-    Ok(())
-}
 pub fn posix_getpgid(pid: usize) -> Result<usize> {
     this_proc_call(
         &mut [],
@@ -407,5 +377,64 @@ pub fn posix_setsid() -> Result<u32> {
 }
 pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {
     wrapper(false, false, || syscall::nanosleep(rqtp, rmtp))?;
+    Ok(())
+}
+pub fn setns(fd: usize) -> Option<FdGuardUpper> {
+    let mut info = DYNAMIC_PROC_INFO.lock();
+    let new_fd_guard = FdGuard::new(fd).to_upper().unwrap();
+    let old_fd_guard = replace(&mut info.ns_fd, Some(new_fd_guard));
+    old_fd_guard
+}
+pub fn getns() -> Result<usize> {
+    let cur_ns = crate::current_namespace_fd();
+    if cur_ns == usize::MAX {
+        Err(Error::new(ENODEV))
+    } else {
+        Ok(cur_ns)
+    }
+}
+pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
+    let path = path.as_ref();
+    let fcntl_flags = flags & syscall::O_FCNTL_MASK;
+    unsafe {
+        syscall::syscall5(
+            syscall::SYS_OPENAT,
+            crate::current_namespace_fd(),
+            path.as_ptr() as usize,
+            path.len(),
+            flags,
+            fcntl_flags,
+        )
+    }
+}
+pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
+    let path = path.as_ref();
+    unsafe {
+        syscall::syscall4(
+            syscall::SYS_UNLINKAT,
+            crate::current_namespace_fd(),
+            path.as_ptr() as usize,
+            path.len(),
+            flags,
+        )
+    }
+}
+pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
+    let mut buf = Vec::from((NsDup::ForkNs as usize).to_ne_bytes());
+    for name in names {
+        let name_bytes = name.as_slice();
+        let len = name_bytes.len();
+        let _scheme_name = core::str::from_utf8(name_bytes).map_err(|_| Error::new(EINVAL))?;
+        buf.extend_from_slice(&len.to_ne_bytes());
+        buf.extend_from_slice(name_bytes);
+    }
+    FdGuard::new(syscall::dup(crate::current_namespace_fd(), &buf)?).to_upper()
+}
+pub fn register_scheme_to_ns(ns_fd: usize, name: &str, cap_fd: usize) -> Result<()> {
+    let mut buf = alloc::vec::Vec::from((NsDup::IssueRegister as usize).to_ne_bytes());
+    buf.extend_from_slice(name.as_bytes());
+    let ns_this_scheme = FdGuard::new(syscall::dup(ns_fd, &buf)?);
+    let cap_bytes = cap_fd.to_ne_bytes();
+    ns_this_scheme.call_wo(&cap_bytes, CallFlags::FD, &[])?;
     Ok(())
 }
