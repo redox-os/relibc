@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(linkage)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 use core::arch::global_asm;
 
