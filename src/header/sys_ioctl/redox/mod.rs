@@ -8,7 +8,10 @@ use crate::{
         errno::{self, EINVAL},
         fcntl, termios,
     },
-    platform::{self, Pal, Sys, types::*},
+    platform::{
+        self, Pal, Sys,
+        types::{c_int, c_ulong, c_ulonglong, c_void, pid_t},
+    },
 };
 
 use super::winsize;
