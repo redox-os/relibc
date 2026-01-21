@@ -1,10 +1,16 @@
-use core::{slice, str};
+use core::{
+    cell::LazyCell,
+    slice, str,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
+use alloc::vec::Vec;
+use ioslice::IoSlice;
 use redox_rt::{
     protocol::{ProcKillTarget, SocketCall, WaitFlags},
     sys::{WaitpidTarget, posix_read, posix_write},
 };
-use syscall::{EMFILE, Error, Result};
+use syscall::{EMFILE, ENOSYS, Error, Result};
 
 use crate::{
     header::{
@@ -140,12 +146,13 @@ pub unsafe extern "C" fn redox_openat_v1(
     path_base: *const u8,
     path_len: usize,
     flags: u32,
+    fcntl_flags: u32,
 ) -> RawResult {
     Error::mux(syscall::openat(
         fd,
         unsafe { str::from_utf8_unchecked(slice::from_raw_parts(path_base, path_len)) },
         flags as usize,
-        0, //TODO: openat fcntl_flags
+        fcntl_flags as usize,
     ))
 }
 #[unsafe(no_mangle)]
@@ -253,6 +260,10 @@ pub unsafe extern "C" fn redox_get_ens_v0() -> RawResult {
     Error::mux(redox_rt::sys::getens())
 }
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_get_ns_v0() -> RawResult {
+    Error::mux(redox_rt::sys::getns())
+}
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_get_proc_credentials_v1(
     cap_fd: usize,
     target_pid: usize,
@@ -263,7 +274,16 @@ pub unsafe extern "C" fn redox_get_proc_credentials_v1(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_setrens_v1(rns: usize, ens: usize) -> RawResult {
-    Error::mux(redox_rt::sys::setrens(rns, ens).map(|()| 0))
+    let _ = if ens == 0 {
+        let null_namespace: [IoSlice; 2] = [IoSlice::new(b"memory"), IoSlice::new(b"pipe")];
+        match redox_rt::sys::mkns(&null_namespace) {
+            Ok(new_ns_fd) => redox_rt::sys::setns(new_ns_fd.take()),
+            Err(e) => return Error::mux(Err(e)),
+        }
+    } else {
+        redox_rt::sys::setns(ens)
+    };
+    0
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_waitpid_v1(pid: usize, status: *mut i32, options: u32) -> RawResult {
@@ -387,8 +407,16 @@ pub unsafe extern "C" fn redox_mkns_v1(
         if flags != 0 {
             return Err(Error::new(EINVAL));
         }
-        // Kernel does the UTF-8 validation.
-        syscall::mkns(unsafe { core::slice::from_raw_parts(names.cast(), num_names) })
+        let raw_iovecs = unsafe { slice::from_raw_parts(names, num_names) };
+        let names_ioslice: Vec<IoSlice> = raw_iovecs
+            .iter()
+            .map(|iov| {
+                IoSlice::new(unsafe {
+                    slice::from_raw_parts(iov.iov_base as *const u8, iov.iov_len)
+                })
+            })
+            .collect();
+        redox_rt::sys::mkns(&names_ioslice).map(|fd| fd.take())
     })())
 }
 
@@ -433,4 +461,31 @@ pub unsafe extern "C" fn redox_get_socket_token_v0(
         syscall::CallFlags::empty(),
         &metadata,
     ))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_setns_v0(fd: usize) -> RawResult {
+    match redox_rt::sys::setns(fd) {
+        Some(guard) => guard.take(),
+        None => usize::MAX,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn redox_register_scheme_to_ns_v0(
+    ns_fd: usize,
+    name_base: *const u8,
+    name_len: usize,
+    cap_fd: usize,
+) -> RawResult {
+    Error::mux(
+        redox_rt::sys::register_scheme_to_ns(
+            ns_fd,
+            unsafe {
+                str::from_utf8_unchecked(unsafe { slice::from_raw_parts(name_base, name_len) })
+            },
+            cap_fd,
+        )
+        .map(|()| 0),
+    )
 }

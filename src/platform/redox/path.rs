@@ -32,7 +32,7 @@ pub fn chdir(path: &str) -> Result<()> {
     let canon = canonicalize_using_cwd(cwd_guard.as_deref(), path).ok_or(Error::new(ENOENT))?;
     let canon_with_scheme = canonicalize_with_cwd_internal(cwd_guard.as_deref(), path)?;
 
-    let fd = syscall::open(&canon_with_scheme, O_STAT | O_CLOEXEC)?;
+    let fd = redox_rt::sys::open(&canon_with_scheme, O_STAT | O_CLOEXEC)?;
     let mut stat = Stat::default();
     if syscall::fstat(fd, &mut stat).is_err() || (stat.st_mode & MODE_TYPE) != MODE_DIR {
         return Err(Error::new(ENOTDIR));
@@ -116,14 +116,14 @@ pub fn open(path: &str, flags: usize) -> Result<usize> {
         let open_res = if canon.starts_with(libcscheme::LIBC_SCHEME) {
             libcscheme::open(&canon, flags)
         } else {
-            syscall::open(&*canon, flags)
+            redox_rt::sys::open(&*canon, flags)
         };
 
         match open_res {
             Ok(fd) => return Ok(fd),
             Err(error) if error == Error::new(EXDEV) => {
                 let resolve_flags = O_CLOEXEC | O_SYMLINK | O_RDONLY;
-                let resolve_fd = FdGuard::new(syscall::open(&*canon, resolve_flags)?);
+                let resolve_fd = FdGuard::new(redox_rt::sys::open(&*canon, resolve_flags)?);
 
                 let bytes_read = resolve_fd.read(&mut resolve_buf)?;
                 // TODO: make resolve_buf PATH_MAX + 1 bytes?

@@ -233,6 +233,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ioslice"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e571352c8a3b89074d12e3ee5173ffe162159105352aaaf1fc5764da747e31b"
+
+[[package]]
 name = "ld_so"
 version = "0.1.0"
 
@@ -250,9 +256,9 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
 name = "libredox"
-version = "0.1.11"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df15f6eac291ed1cf25865b1ee60399f57e7c227e7f51bdbd4c5270396a9ed50"
+checksum = "3d0b95e02c851351f877147b7deea7b1afb1df71b63aa5f8270716e0c5720616"
 dependencies = [
  "bitflags",
  "libc",
@@ -438,6 +444,7 @@ dependencies = [
  "bitflags",
  "generic-rt",
  "goblin",
+ "ioslice",
  "plain",
  "redox-path",
  "redox_syscall",
@@ -445,9 +452,9 @@ dependencies = [
 
 [[package]]
 name = "redox_event"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8eafe403549fab08a0c0862769493ad992625bb5a694aae2df6901e7e4fd05a"
+checksum = "c30b73c93693667b5a8e6f54bddcc5a57449ef17c99f4b55c12d5bae4ab79e82"
 dependencies = [
  "bitflags",
  "libredox",
@@ -456,8 +463,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.6.0"
-source = "git+https://gitlab.redox-os.org/redox-os/syscall.git?branch=master#1cf631ce3f36838ababdbd2b0190d93a6b64a31b"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49f3fe0889e69e2ae9e41f4d6c4c0181701d00e4697b356fb1f74173a5e0ee27"
 dependencies = [
  "bitflags",
 ]
@@ -476,6 +484,7 @@ dependencies = [
  "chrono-tz",
  "dlmalloc",
  "generic-rt",
+ "ioslice",
  "libc",
  "libm",
  "md-5",
