@@ -16,7 +16,7 @@ use crate::{
     header::{errno, fcntl, string::strlen},
     io::{BufReader, Lines, prelude::*},
     platform,
-    platform::types::*,
+    platform::types::{c_char, c_int, c_long, c_ulong, size_t},
 };
 
 use super::errno::*;

@@ -1,10 +1,12 @@
 #[cfg(target_arch = "aarch64")]
-use crate::header::arch_aarch64_user::*;
+use crate::header::arch_aarch64_user::{elf_fpregset_t, elf_gregset_t};
 #[cfg(target_arch = "riscv64")]
-use crate::header::arch_riscv64_user::*;
+use crate::header::arch_riscv64_user::{elf_fpregset_t, elf_gregset_t};
 #[cfg(target_arch = "x86_64")]
-use crate::header::arch_x64_user::*;
-use crate::platform::types::*;
+use crate::header::arch_x64_user::{elf_fpregset_t, elf_gregset_t};
+use crate::platform::types::{
+    c_char, c_int, c_long, c_short, c_uint, c_ulong, c_void, pid_t, size_t,
+};
 
 pub const ELF_PRARGSZ: size_t = 80;
 
