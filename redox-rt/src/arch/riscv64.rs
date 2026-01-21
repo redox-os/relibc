@@ -69,14 +69,16 @@ unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usiz
 
 unsafe extern "C" fn child_hook(scratchpad: &ForkScratchpad) {
     let _ = syscall::close(scratchpad.cur_filetable_fd);
-    crate::child_hook_common(crate::ChildHookCommonArgs {
-        new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
-        new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
-            None
-        } else {
-            Some(FdGuard::new(scratchpad.new_proc_fd))
-        },
-    });
+    unsafe {
+        crate::child_hook_common(crate::ChildHookCommonArgs {
+            new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
+            new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
+                None
+            } else {
+                Some(FdGuard::new(scratchpad.new_proc_fd))
+            },
+        })
+    };
 }
 
 asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
@@ -578,7 +580,7 @@ pub fn current_sp() -> usize {
 }
 
 pub unsafe fn manually_enter_trampoline() {
-    let ctl = &Tcb::current().unwrap().os_specific.control;
+    let ctl = unsafe { &Tcb::current().unwrap().os_specific.control };
 
     ctl.control_flags.store(
         ctl.control_flags.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(),
@@ -587,15 +589,18 @@ pub unsafe fn manually_enter_trampoline() {
     ctl.saved_archdep_reg.set(0);
     let ip_location = &ctl.saved_ip as *const _ as usize;
 
-    core::arch::asm!("
-        jal 2f
-        j 3f
-    2:
-        sd ra, 0(t0)
-        la t0, __relibc_internal_sigentry
-        jalr x0, t0
-    3:
-    ", inout("t0") ip_location => _, out("ra") _);
+    unsafe {
+        core::arch::asm!("
+                jal 2f
+                j 3f
+            2:
+                sd ra, 0(t0)
+                la t0, __relibc_internal_sigentry
+                jalr x0, t0
+            3:
+            ",
+            inout("t0") ip_location => _, out("ra") _);
+    }
 }
 
 unsafe extern "C" {
@@ -614,7 +619,7 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
     if stack.regs.pc == __relibc_internal_sigentry_crit_first as u64 {
         // Reexecute 'ld sp, (1 * 8)(sp)'
         let stack_ptr = stack.regs.int_regs[1] as *const u64; // x2
-        stack.regs.int_regs[1] = stack_ptr.add(1).read();
+        stack.regs.int_regs[1] = unsafe { stack_ptr.add(1).read() };
         // and 'jr gp' steps.
         stack.regs.pc = stack.regs.int_regs[2];
     } else if stack.regs.pc == __relibc_internal_sigentry_crit_second as u64
