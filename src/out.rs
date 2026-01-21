@@ -9,9 +9,6 @@
 //! requirement that `&mut` references are never aliased, which can typically not be assumed when
 //! getting pointers from C.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::{cell::UnsafeCell, fmt, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 /// Wrapper for write-only "out pointers" that are safe to write to

@@ -1,6 +1,3 @@
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 // TODO: reuse more code with the thin printf impl
 use crate::{
     c_str::{self, WStr},

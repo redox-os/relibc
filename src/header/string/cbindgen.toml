@@ -1,5 +1,8 @@
-sys_includes = ["stddef.h", "stdint.h", "strings.h", "locale.h"]
+sys_includes = ["stddef.h", "stdint.h", "strings.h"]
 include_guard = "_RELIBC_STRING_H"
+after_includes = """
+#include <bits/locale-t.h> // for locale_t
+"""
 language = "C"
 style = "Tag"
 no_includes = true

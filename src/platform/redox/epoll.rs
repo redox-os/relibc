@@ -144,7 +144,7 @@ impl PalEpoll for Sys {
             callback()
         } else {
             // Allowset is inverse of sigset mask
-            let allowset = !*sigset;
+            let allowset = !unsafe { *sigset };
             redox_rt::signal::callback_or_signal_async(allowset, callback)
         }?;
 

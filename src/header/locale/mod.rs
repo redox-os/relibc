@@ -2,9 +2,6 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/locale.h.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use alloc::{boxed::Box, ffi::CString, string::String};
 use core::{ptr, str::FromStr};
 
@@ -27,7 +24,7 @@ use constants::*;
 mod data;
 use data::*;
 
-pub type locale_t = *mut c_void;
+use super::bits_locale_t::locale_t;
 /// constant struct to "C" or "POSIX" locale
 /// mutable because POSIX demands a mutable pointer
 static mut POSIX_LOCALE: lconv = posix_lconv();

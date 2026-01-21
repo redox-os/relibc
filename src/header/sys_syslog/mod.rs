@@ -4,9 +4,6 @@
 
 // Exported as both syslog.h and sys/syslog.h.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 #[cfg(target_os = "redox")]
 #[path = "redox.rs"]
 pub mod sys;

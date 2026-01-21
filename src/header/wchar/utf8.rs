@@ -1,9 +1,6 @@
 //UTF implementation parts for wchar.h.
 //Partially ported from the Sortix libc
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::{char, slice, str, usize};
 
 use crate::{

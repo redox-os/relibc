@@ -2,9 +2,6 @@
 //!
 //! Non-POSIX, see <https://man7.org/linux/man-pages/man3/posix_memalign.3.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::{
     header::errno::ENOMEM,
     platform::{

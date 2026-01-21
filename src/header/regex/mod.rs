@@ -2,9 +2,6 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/regex.h.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::{
     header::string::strlen,
     platform::types::{c_char, c_int, c_void, size_t},

@@ -2,9 +2,6 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/stdlib.h.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::{convert::TryFrom, intrinsics, iter, mem, ptr, slice};
 use rand::{
     Rng, SeedableRng,
@@ -31,7 +28,13 @@ use crate::{
     },
     ld_so,
     out::Out,
-    platform::{self, Pal, Sys, types::*},
+    platform::{
+        self, Pal, Sys,
+        types::{
+            c_char, c_double, c_float, c_int, c_long, c_longlong, c_uint, c_ulong, c_ulonglong,
+            c_ushort, c_void, size_t, ssize_t, uintptr_t, wchar_t,
+        },
+    },
     raw_cell::RawCell,
     sync::Once,
 };

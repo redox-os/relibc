@@ -1,7 +1,5 @@
 // Start code adapted from https://gitlab.redox-os.org/redox-os/relibc/blob/master/src/start.rs
 
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use alloc::{
     borrow::ToOwned,
     boxed::Box,

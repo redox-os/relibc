@@ -1,8 +1,5 @@
 //! Nul-terminated byte strings.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::{marker::PhantomData, ptr::NonNull, str::Utf8Error};
 
 use alloc::{

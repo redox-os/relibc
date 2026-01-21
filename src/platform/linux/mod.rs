@@ -1,6 +1,3 @@
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::{arch::asm, num::NonZeroU64, ptr};
 
 use super::{ERRNO, Pal, types::*};
