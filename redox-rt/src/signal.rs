@@ -274,7 +274,7 @@ pub(crate) unsafe extern "C" fn inner_c(stack: usize) {
 }
 #[cfg(target_arch = "x86")]
 pub(crate) unsafe extern "fastcall" fn inner_fastcall(stack: usize) {
-    inner(&mut *(stack as *mut SigStack))
+    unsafe { inner(&mut *(stack as *mut SigStack)) }
 }
 
 pub fn get_sigmask() -> Result<u64> {

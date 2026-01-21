@@ -1,5 +1,6 @@
 #![no_std]
 #![allow(internal_features)]
+#![deny(unsafe_op_in_unsafe_fn)]
 #![feature(core_intrinsics, int_roundings, slice_ptr_get, sync_unsafe_cell)]
 #![forbid(unreachable_patterns)]
 
