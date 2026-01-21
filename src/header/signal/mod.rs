@@ -11,7 +11,7 @@ use crate::{
     error::{Errno, ResultExt},
     header::{errno, setjmp, time::timespec},
     platform::{
-        self, Pal, PalSignal, Sys,
+        self, ERRNO, Pal, PalSignal, Sys,
         types::{
             c_char, c_int, c_ulong, c_ulonglong, c_void, pid_t, pthread_attr_t, pthread_t, size_t,
             uid_t,
@@ -21,7 +21,10 @@ use crate::{
 
 pub use self::sys::*;
 
-use super::{errno::EFAULT, unistd};
+use super::{
+    errno::EFAULT,
+    stdio::{fprintf, stderr},
+};
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
@@ -561,58 +564,30 @@ pub unsafe extern "C" fn psignal(sig: c_int, prefix: *const c_char) {
     let c_description = usize::try_from(sig)
         .ok()
         .and_then(|idx| SIGNAL_STRINGS.get(idx))
-        .unwrap_or(&SIGNAL_STRINGS[0]);
-    let description = &c_description[..c_description.len() - 1];
-    let prefix = unsafe { CStr::from_ptr(prefix).to_string_lossy() };
-    // TODO: stack vec or print directly?
-    let string = alloc::format!("{prefix}:{description}\n");
-    // TODO: better internal libc API?
-    let _ = unsafe {
-        unistd::write(
-            unistd::STDERR_FILENO,
-            string.as_bytes().as_ptr().cast(),
-            string.as_bytes().len(),
-        )
-    };
+        .unwrap_or(&SIGNAL_STRINGS[0])
+        .as_ptr();
+    // fprintf can affect errno, so we save errno and restore it
+    let old_errno = ERRNO.get();
+    // POSIX says that "prefix" shall be written if it isn't null or an empty string.
+    // Otherwise, only the signal description should be written
+    if prefix.is_null() {
+        unsafe {
+            fprintf(stderr, c"%s\n".as_ptr(), c_description);
+        }
+    } else {
+        unsafe {
+            fprintf(stderr, c"%s: %s\n".as_ptr(), prefix, c_description);
+        }
+    }
+    ERRNO.set(old_errno);
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/psiginfo.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn psiginfo(info: *const siginfo_t, prefix: *const c_char) {
-    let siginfo_t {
-        si_code,
-        si_signo,
-        si_pid,
-        si_uid,
-        si_errno,
-        si_addr,
-        si_status,
-        si_value,
-    } = unsafe { &*info };
-    let sival_ptr = unsafe { si_value.sival_ptr };
-    let prefix = unsafe { CStr::from_ptr(prefix).to_string_lossy() };
-    // TODO: stack vec or print directly?
-    let string = alloc::format!(
-        "{prefix}:siginfo_t {{
-    si_code: {si_code}
-    si_signo: {si_signo}
-    si_pid: {si_pid}
-    si_uid: {si_uid}
-    si_errno: {si_errno}
-    si_addr: {si_addr:p}
-    si_status: {si_status}
-    si_value: {sival_ptr:p}
-}}
-"
-    );
-    // TODO: better internal libc API?
-    let _ = unsafe {
-        unistd::write(
-            unistd::STDERR_FILENO,
-            string.as_bytes().as_ptr().cast(),
-            string.as_bytes().len(),
-        )
-    };
+    unsafe {
+        psignal(unsafe { &*info }.si_signo, prefix);
+    }
 }
 
 #[unsafe(no_mangle)]
