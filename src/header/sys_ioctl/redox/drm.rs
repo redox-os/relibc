@@ -5,7 +5,7 @@ use redox_ioctl::{IoctlData, drm::*};
 use crate::{
     error::{Errno, Result},
     header::errno::EINVAL,
-    platform::types::*,
+    platform::types::c_int,
 };
 
 use super::IoctlBuffer;

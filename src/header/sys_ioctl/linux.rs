@@ -1,6 +1,9 @@
 use crate::{
     error::ResultExt,
-    platform::{Sys, types::*},
+    platform::{
+        Sys,
+        types::{c_int, c_ulong, c_void},
+    },
 };
 
 #[unsafe(no_mangle)]
