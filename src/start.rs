@@ -85,7 +85,7 @@ fn alloc_init() {
     unsafe {
         if let Some(tcb) = ld_so::tcb::Tcb::current() {
             if !tcb.mspace.is_null() {
-                ALLOCATOR.get().write(tcb.mspace.read());
+                ALLOCATOR.set(tcb.mspace);
             }
         }
     }
@@ -174,7 +174,9 @@ pub unsafe extern "C" fn relibc_start_v1(
 
     if let Some(tcb) = unsafe { ld_so::tcb::Tcb::current() } {
         // Update TCB mspace
-        tcb.mspace = ALLOCATOR.get();
+        if tcb.mspace.is_null() {
+            tcb.mspace = ALLOCATOR.get();
+        }
 
         // Set linker pointer if necessary
         if tcb.linker_ptr.is_null() {
