@@ -482,6 +482,14 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
     get_sigaltstack(area, stack.regs.rsp).into()
 }
 
+/// Rearrange the restore-stack and sigarea in a way that makes it look like a new signal was
+/// immediately delivered after restoring the allowset to what it was prior to the original signal delivery.
+pub fn arch_ret_to_sig(stack: &mut SigStack, control: &Sigcontrol) {
+    let orig_rip = core::mem::replace(&mut stack.regs.rip, __relibc_internal_sigentry as usize);
+    control.saved_ip.set(orig_rip);
+    control.saved_archdep_reg.set(stack.regs.rflags);
+}
+
 pub(crate) static SUPPORTS_AVX: AtomicU8 = AtomicU8::new(0);
 
 // __relibc will be prepended to the name, so no_mangle is fine
