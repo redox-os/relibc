@@ -476,5 +476,10 @@ pub unsafe fn arch_pre(stack: &mut SigStack, os: &mut SigArea) -> PosixStackt {
         flags: 0,                  // TODO
     }
 }
+pub fn arch_ret_to_sig(stack: &mut SigStack, control: &Sigcontrol) {
+    let orig_pc = core::mem::replace(&mut stack.regs.pc, __relibc_internal_sigentry as usize);
+    control.saved_ip.set(orig_pc);
+    control.saved_archdep_reg.set(stack.regs.x0);
+}
 pub(crate) static PROC_FD: SyncUnsafeCell<usize> = SyncUnsafeCell::new(usize::MAX);
 static PROC_CALL: [usize; 1] = [ProcCall::Sigdeq as usize];

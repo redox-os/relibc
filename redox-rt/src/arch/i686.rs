@@ -371,6 +371,11 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
         flags: 0, // TODO
     }
 }
+pub fn arch_ret_to_sig(stack: &mut SigStack, control: &Sigcontrol) {
+    let orig_eip = core::mem::replace(&mut stack.regs.eip, __relibc_internal_sigentry as usize);
+    control.saved_ip.set(orig_eip);
+    control.saved_archdep_reg.set(stack.regs.eflags);
+}
 #[unsafe(no_mangle)]
 pub unsafe fn manually_enter_trampoline() {
     let c = unsafe { &crate::Tcb::current().unwrap().os_specific.control };
