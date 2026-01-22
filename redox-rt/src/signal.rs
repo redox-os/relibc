@@ -242,15 +242,20 @@ unsafe fn inner(stack: &mut SigStack) {
     );
     core::sync::atomic::compiler_fence(Ordering::Acquire);
 
-    // Update allowset again.
+    // Update allowset again, and obtain the set of pending unblocked signals with this new
+    // allowset. If this is nonempty, we must deliver the signal here rather than wait for it
+    // asynchronously, as shown e.g. in https://gitlab.redox-os.org/redox-os/relibc/-/issues/239.
+    // We do this even if signals_were_disabled beforehand (where the caller hence explicitly
+    // must have jumped to this trampoline).
 
     let new_mask = stack.old_mask;
     let old_mask = get_allowset_raw(&os.control.word);
 
-    let _pending_when_restored_mask = set_allowset_raw(&os.control.word, old_mask, new_mask);
-
-    // TODO: If resetting the sigmask caused signals to be unblocked, then should they be delivered
-    // here? And would it be possible to tail-call-optimize that?
+    let pending_unblocked = {
+        let thread_pending = set_allowset_raw(&os.control.word, old_mask, new_mask);
+        let proc_pending = PROC_CONTROL_STRUCT.pending.load(Ordering::Relaxed);
+        (thread_pending | proc_pending) & new_mask
+    };
 
     unsafe { (*os.arch.get()).last_sig_was_restart = shall_restart };
 
@@ -259,8 +264,18 @@ unsafe fn inner(stack: &mut SigStack) {
 
     // TODO: Support restoring uc_stack?
 
-    // And re-enable them again
-    if !signals_were_disabled {
+    if pending_unblocked > 0 {
+        // If there were signals visible at the time we checked (otherwise it can be considered
+        // "asynchronous" and will be delivered the next time an EINTR is seen, or after the
+        // post-preemption check in the kernel), we delay clearing the INHIBIT_DELIVERY bit, and
+        // rearrange the saved instr ptr field on the stack and the sc_saved_rip field, so that it
+        // returns to the start of the trampoline in a way that makes it look like a new signal was
+        // immediately delivered. There's no need to worry about the __crit_* sections since
+        // INHIBIT_DELIVERY is still set.
+        arch_ret_to_sig(stack, &os.control);
+    } else if !signals_were_disabled {
+        // Re-enable signals again, except in the case where they were disabled and the trampoline
+        // was explicitly jumped to when handling EINTR.
         core::sync::atomic::compiler_fence(Ordering::Release);
         control_flags.store(
             control_flags.load(Ordering::Relaxed) & !SigcontrolFlags::INHIBIT_DELIVERY.bits(),
@@ -747,7 +762,7 @@ pub fn currently_pending_blocked() -> u64 {
     let w0 = control.word[0].load(Ordering::Relaxed);
     let w1 = control.word[1].load(Ordering::Relaxed);
     let allow = (w0 >> 32) | ((w1 >> 32) << 32);
-    let thread_pending = (w0 & 0xffff_ffff) | ((w1 >> 32) & 0xffff_ffff);
+    let thread_pending = (w0 & 0xffff_ffff) | ((w1 & 0xffff_ffff) << 32);
     let proc_pending = PROC_CONTROL_STRUCT.pending.load(Ordering::Relaxed);
 
     core::sync::atomic::fence(Ordering::Acquire); // TODO: Correct ordering?
