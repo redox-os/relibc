@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/ctype.h.html>.
 
-use crate::platform::types::c_int;
+use crate::{header::bits_locale_t::locale_t, platform::types::c_int};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/isalnum.html>.
 #[unsafe(no_mangle)]
