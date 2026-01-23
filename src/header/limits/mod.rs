@@ -115,3 +115,7 @@ pub const COLL_WEIGHTS_MAX: c_long = _POSIX2_COLL_WEIGHTS_MAX;
 pub const EXPR_NEST_MAX: c_long = _POSIX2_EXPR_NEST_MAX;
 pub const LINE_MAX: c_long = _POSIX2_LINE_MAX;
 pub const RE_DUP_MAX: c_long = _POSIX2_RE_DUP_MAX;
+
+pub const PTHREAD_DESTRUCTOR_ITERATIONS: c_long = _POSIX_THREAD_DESTRUCTOR_ITERATIONS;
+// TODO: What should this limit be? Both glibc and musl have it as 1024
+pub const PTHREAD_KEYS_MAX: c_long = 4096 * 32;
