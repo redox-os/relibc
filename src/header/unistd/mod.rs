@@ -812,10 +812,14 @@ pub unsafe extern "C" fn pipe2(fildes: *mut c_int, flags: c_int) -> c_int {
         .or_minus_one_errno()
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/close.html>.
-// #[unsafe(no_mangle)]
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_close.html>.
+#[unsafe(no_mangle)]
 pub extern "C" fn posix_close(fildes: c_int, flag: c_int) -> c_int {
-    unimplemented!();
+    // Since we do not define `POSIX_CLOSE_RESTART`, this function is
+    // equivalent to `close`. In the future when we move file descriptors
+    // to userspace, it would only make sense to define `POSIX_CLOSE_RESTART`
+    // if `close` is not atomic.
+    close(fildes)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/read.html>.
