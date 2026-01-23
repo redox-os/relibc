@@ -1,5 +1,6 @@
 sys_includes = ["stddef.h", "stdint.h", "features.h"]
 include_guard = "_RELIBC_LANGINFO_H"
+after_includes = "#include <bits/locale-t.h> // locale_t"
 language = "C"
 style = "tag"
 no_includes = true
