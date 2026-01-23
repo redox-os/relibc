@@ -35,6 +35,7 @@ pub const REG_NOSUB: c_int = 4;
 pub const REG_NEWLINE: c_int = 8;
 pub const REG_NOTBOL: c_int = 16;
 pub const REG_NOTEOL: c_int = 32;
+pub const REG_MINIMAL: c_int = 64;
 
 pub const REG_NOMATCH: c_int = 1;
 pub const REG_BADPAT: c_int = 2;
