@@ -4,6 +4,7 @@
 
 // TODO : involve loading locale data. Currently, the implementation only supports the "C" locale.
 
+use crate::header::bits_locale_t::locale_t;
 use core::ffi::c_char;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/langinfo.h.html>.
@@ -13,7 +14,7 @@ use core::ffi::c_char;
 pub type nl_item = i32;
 
 // Static string table for langinfo constants
-static STRING_TABLE: [&[u8]; 57] = [
+static STRING_TABLE: [&[u8]; 81] = [
     b"UTF-8\0",                // CODESET
     b"%a %b %e %H:%M:%S %Y\0", // D_T_FMT
     b"%m/%d/%y\0",             // D_FMT
@@ -66,11 +67,37 @@ static STRING_TABLE: [&[u8]; 57] = [
     b"\0",                     // ALT_DIGITS
     b".\0",                    // RADIXCHAR
     b"\0",                     // THOUSEP
-    b".\0",                    // CRNCYSTR
     b"^[yY]\0",                // YESEXPR
     b"^[nN]\0",                // NOEXPR
     b"yes\0",                  // YESSTR
     b"no\0",                   // NOSTR
+    b".\0",                    // CRNCYSTR
+    // Some languages have alternative names for
+    // months. For the "C" locale, we just use one.
+    b"January\0",   // ALTMON_1
+    b"February\0",  // ALTMON_2
+    b"March\0",     // ALTMON_3
+    b"April\0",     // ALTMON_4
+    b"May\0",       // ALTMON_5
+    b"June\0",      // ALTMON_6
+    b"July\0",      // ALTMON_7
+    b"August\0",    // ALTMON_8
+    b"September\0", // ALTMON_9
+    b"October\0",   // ALTMON_10
+    b"November\0",  // ALTMON_11
+    b"December\0",  // ALTMON_12
+    b"Jan\0",       // ABALTMON_1
+    b"Feb\0",       // ABALTMON_2
+    b"Mar\0",       // ABALTMON_3
+    b"Apr\0",       // ABALTMON_4
+    b"May\0",       // ABALTMON_5
+    b"Jun\0",       // ABALTMON_6
+    b"Jul\0",       // ABALTMON_7
+    b"Aug\0",       // ABALTMON_8
+    b"Sep\0",       // ABALTMON_9
+    b"Oct\0",       // ABALTMON_10
+    b"Nov\0",       // ABALTMON_11
+    b"Dec\0",       // ABALTMON_12
 ];
 
 // Item constants
@@ -137,6 +164,32 @@ pub const YESSTR: nl_item = 54; // Legacy
 pub const NOSTR: nl_item = 55; // Legacy
 pub const CRNCYSTR: nl_item = 56;
 
+pub const ALTMON_1: nl_item = 57;
+pub const ALTMON_2: nl_item = 58;
+pub const ALTMON_3: nl_item = 59;
+pub const ALTMON_4: nl_item = 60;
+pub const ALTMON_5: nl_item = 61;
+pub const ALTMON_6: nl_item = 62;
+pub const ALTMON_7: nl_item = 63;
+pub const ALTMON_8: nl_item = 64;
+pub const ALTMON_9: nl_item = 65;
+pub const ALTMON_10: nl_item = 66;
+pub const ALTMON_11: nl_item = 67;
+pub const ALTMON_12: nl_item = 68;
+
+pub const ABALTMON_1: nl_item = 69;
+pub const ABALTMON_2: nl_item = 70;
+pub const ABALTMON_3: nl_item = 71;
+pub const ABALTMON_4: nl_item = 72;
+pub const ABALTMON_5: nl_item = 73;
+pub const ABALTMON_6: nl_item = 74;
+pub const ABALTMON_7: nl_item = 75;
+pub const ABALTMON_8: nl_item = 76;
+pub const ABALTMON_9: nl_item = 77;
+pub const ABALTMON_10: nl_item = 78;
+pub const ABALTMON_11: nl_item = 79;
+pub const ABALTMON_12: nl_item = 80;
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nl_langinfo.html>.
 ///
 /// Get a string from the langinfo table
@@ -156,4 +209,17 @@ pub unsafe extern "C" fn nl_langinfo(item: nl_item) -> *mut c_char {
     };
     // Mutable pointer is required (unsafe!)
     ptr as *mut c_char
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nl_langinfo_l.html>.
+///
+/// Get a string from the langinfo table
+///
+/// # Safety
+/// - Caller must ensure `item` is a valid `nl_item` index.
+/// - Returns a pointer to a null-terminated string, or an empty string if the item is invalid.
+/// - Compatibility requires mutable pointer to be returned, but it should not be mutated!
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nl_langinfo_l(item: nl_item, _loc: locale_t) -> *mut c_char {
+    unsafe { nl_langinfo(item) }
 }
