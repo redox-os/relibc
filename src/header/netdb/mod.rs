@@ -379,7 +379,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
             return ptr::null_mut();
         }
     };
-    let host_addr = match host.next() {
+    let host_addr = match host.into_iter().next() {
         Some(result) => result,
         None => {
             H_ERRNO.set(HOST_NOT_FOUND);
@@ -875,7 +875,7 @@ pub unsafe extern "C" fn getaddrinfo(
 
     let lookuphost = if ai_flags & AI_NUMERICHOST > 0 {
         match parse_ipv4_string(unsafe { str::from_utf8_unchecked(node.to_bytes()) }) {
-            Some(s_addr) => s_addr.into(),
+            Some(s_addr) => vec![in_addr { s_addr }],
             None => {
                 return EAI_NONAME;
             }
@@ -923,12 +923,13 @@ pub unsafe extern "C" fn getaddrinfo(
             ai_addr,
             ai_next: ptr::null_mut(),
         });
-
-        let mut indirect = res;
-        while !(unsafe { *indirect }).is_null() {
-            indirect = &mut unsafe { (**indirect).ai_next };
+        unsafe {
+            let mut indirect = res;
+            while !(*indirect).is_null() {
+                indirect = &mut (**indirect).ai_next;
+            }
+            *indirect = Box::into_raw(addrinfo)
         }
-        unsafe { *indirect = Box::into_raw(addrinfo) };
     }
 
     0
