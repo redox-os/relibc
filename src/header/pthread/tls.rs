@@ -122,8 +122,8 @@ pub(crate) unsafe fn run_all_destructors() {
     }
 
     // According to POSIX (issue 8): If even after
-    // [`PTHREAD_DESTRUCTOR_ITERATIONS`] there are still some non-NULL
-    // associated values with associated destructors, the behaviour is
+    // [`PTHREAD_DESTRUCTOR_ITERATIONS`] iterations there are still some
+    // non-NULL values with associated destructors, the behaviour is
     // implementation-defined. We can choose to stop calling them or continue
     // calling them until none are left. Both musl and glibc choose to stop
     // calling them so we do the same.
