@@ -24,6 +24,7 @@ void print_sockaddr(char *ctx, struct sockaddr *addr, socklen_t len) {
 int main(void)
 {
     int status;
+    // TODO: in linux the sockname shown exactly like this string, not the case with redox.
     const char* socket_path = "unixpeername.sock";
     unlink(socket_path);
 
