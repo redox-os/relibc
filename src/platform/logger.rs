@@ -26,7 +26,7 @@ pub unsafe fn init() {
                     trace_warn = true;
                 }
 
-                logger = logger.with_max_level_override(level);
+                logger = logger.with_output(OutputBuilder::stderr().with_filter(level).build());
             }
         }
     }
