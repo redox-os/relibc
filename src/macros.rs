@@ -57,9 +57,9 @@ macro_rules! todo_skip {
 // Recoverable error todo!(issue, fmt, err)
 #[macro_export]
 macro_rules! todo_error {
-    ($issue:expr, $($arg:tt)*, $err:expr) => {
+    ($issue:expr, $err:expr, $($arg:tt)*) => {
         if $issue != 0 {
-            log::error!("TODO ({}{}): {}: {:?}", crate::macros::ISSUE_URL, $issue, format_args!($($arg)*), $err)
+            log::error!("TODO ({}{}): {}: {}", crate::macros::ISSUE_URL, $issue, format_args!($($arg)*), $err)
         } else {
             log::error!("TODO: {}: {:?}", format_args!($($arg)*), $err)
         }

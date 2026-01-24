@@ -116,7 +116,7 @@ pub unsafe extern "C" fn a64l(s: *const c_char) -> c_long {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/abort.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn abort() -> ! {
-    eprintln!("Abort");
+    log::error!("Abort");
     intrinsics::abort();
 }
 

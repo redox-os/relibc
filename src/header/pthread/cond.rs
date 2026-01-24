@@ -29,7 +29,7 @@ pub unsafe extern "C" fn pthread_cond_init(
 
     if attr.clock != CLOCK_REALTIME {
         // As monotonic clock always smaller than realtime clock, this always result in instant timeout.
-        println!("TODO: pthread_cond_init with monotonic clock");
+        todo_skip!(0, "pthread_cond_init with monotonic clock");
     }
 
     unsafe { cond.cast::<RlctCond>().write(RlctCond::new()) };

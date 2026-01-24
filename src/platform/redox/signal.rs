@@ -105,7 +105,7 @@ impl PalSignal for Sys {
         // TODO: setitimer is no longer part of POSIX and should not be implemented in Redox
         // Change the platform-independent implementation to use POSIX timers.
         // For Redox, the timer should probably use "/scheme/time"
-        eprintln!("relibc: setitimer not implemented");
+        todo_skip!(0, "setitimer not implemented");
         Err(Errno(ENOSYS))
     }
 

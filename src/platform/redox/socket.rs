@@ -67,7 +67,7 @@ unsafe fn bind_or_connect(
             }
         }
         AF_UNIX => {
-            eprintln!("bind/connect with AF_UNIX were replaced with SYS_CALL.");
+            log::warn!("bind/connect with AF_UNIX were replaced with SYS_CALL.");
             return Err(Errno(EAFNOSUPPORT));
         }
         _ => return Err(Errno(EAFNOSUPPORT)),
@@ -576,9 +576,10 @@ impl PalSocket for Sys {
                         CallFlags::empty(),
                         &[SocketCall::Unbind as u64],
                     ) {
-                        eprintln!(
-                            "bind: CRITICAL: failed to unbind socket after a failed transaction: {:?}",
-                            unbind_error
+                        todo_error!(
+                            0,
+                            unbind_error,
+                            "bind: CRITICAL: failed to unbind socket after a failed transaction"
                         );
                     }
 
@@ -745,9 +746,14 @@ impl PalSocket for Sys {
             _ => (),
         }
 
-        eprintln!(
+        todo_skip!(
+            0,
             "getsockopt({}, {}, {}, {:p}, {:p})",
-            socket, level, option_name, option_value, option_len_ptr
+            socket,
+            level,
+            option_name,
+            option_value,
+            option_len_ptr
         );
         Err(Errno(ENOSYS))
     }
@@ -1042,9 +1048,14 @@ impl PalSocket for Sys {
             _ => (),
         }
 
-        eprintln!(
+        todo_skip!(
+            0,
             "setsockopt({}, {}, {}, {:p}, {}) - unknown option",
-            socket, level, option_name, option_value, option_len
+            socket,
+            level,
+            option_name,
+            option_value,
+            option_len
         );
         Ok(())
     }
@@ -1113,7 +1124,8 @@ impl PalSocket for Sys {
                 Ok(())
             }
             _ => unsafe {
-                eprintln!(
+                todo_skip!(
+                    0,
                     "socketpair({}, {}, {}, {:p})",
                     domain,
                     kind,

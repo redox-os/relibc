@@ -62,15 +62,15 @@ impl RlctMutex {
         })
     }
     pub fn prioceiling(&self) -> Result<c_int, Errno> {
-        println!("TODO: Implement pthread_getprioceiling");
+        todo_skip!(0, "pthread_getprioceiling: not implemented");
         Ok(0)
     }
     pub fn replace_prioceiling(&self, _: c_int) -> Result<c_int, Errno> {
-        println!("TODO: Implement pthread_setprioceiling");
+        todo_skip!(0, "pthread_setprioceiling: not implemented");
         Ok(0)
     }
     pub fn make_consistent(&self) -> Result<(), Errno> {
-        println!("TODO: Implement robust mutexes");
+        todo_skip!(0, "pthread robust mutexes: not implemented");
         Ok(())
     }
     fn lock_inner(&self, deadline: Option<&timespec>) -> Result<(), Errno> {

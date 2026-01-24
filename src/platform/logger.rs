@@ -36,8 +36,8 @@ pub unsafe fn init() {
 
     #[cfg(feature = "no_trace")]
     if trace_warn {
-        log::error!(
-            "the 'no_trace' feature is enabled but LOG_LEVEL=TRACE, there will be no trace logs"
+        log::warn!(
+            "The 'no_trace' feature is enabled but RELIBC_LOG_LEVEL=TRACE, there will be no trace logs"
         );
     }
 }
