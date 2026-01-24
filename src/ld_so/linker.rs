@@ -434,9 +434,12 @@ impl Linker {
         scope: ScopeKind,
         noload: bool,
     ) -> Result<ObjectHandle> {
-        trace!(
+        log::trace!(
             "[ld.so] load_library(name={:?}, resolve={:#?}, scope={:#?}, noload={})",
-            name, resolve, scope, noload
+            name,
+            resolve,
+            scope,
+            noload
         );
 
         if noload && resolve == Resolve::Now {
@@ -531,7 +534,7 @@ impl Linker {
             return;
         }
 
-        trace!(
+        log::trace!(
             "[ld.so] unloading {} (sc={}, wc={})",
             obj.name,
             Arc::strong_count(&obj),
@@ -1004,8 +1007,8 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
     } else {
         rela.r_offset(NativeEndian) as *mut u64
     };
-
-    trace!("@plt: {} -> *mut {:p}", name, ptr);
+    #[cfg(feature = "trace_tls")]
+    log::trace!("@plt: {} -> *mut {:p}", name, ptr);
 
     unsafe { *ptr = resolved as u64 }
     resolved

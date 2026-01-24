@@ -71,21 +71,7 @@ macro_rules! dbg {
 }
 
 #[macro_export]
-#[cfg(not(feature = "trace"))]
-macro_rules! trace {
-    ($($arg:tt)*) => {};
-}
-
-#[macro_export]
-#[cfg(feature = "trace")]
-macro_rules! trace {
-    ($($arg:tt)*) => ({
-        eprintln!($($arg)*);
-    });
-}
-
-#[macro_export]
-#[cfg(not(feature = "trace"))]
+#[cfg(feature = "no_trace")]
 macro_rules! trace_expr {
     ($expr:expr, $($arg:tt)*) => {
         $expr
@@ -93,13 +79,13 @@ macro_rules! trace_expr {
 }
 
 #[macro_export]
-#[cfg(feature = "trace")]
+#[cfg(not(feature = "no_trace"))]
 macro_rules! trace_expr {
     ($expr:expr, $($arg:tt)*) => ({
         use $crate::header::errno::STR_ERROR;
         use $crate::platform;
 
-        trace!("{}", format_args!($($arg)*));
+        log::trace!("{}", format_args!($($arg)*));
 
         let trace_old_errno = platform::ERRNO.get();
         platform::ERRNO.set(0);
@@ -117,7 +103,7 @@ macro_rules! trace_expr {
             "Unknown error"
         };
 
-        trace!("{} = {} ({}, {})", format_args!($($arg)*), ret, trace_errno, trace_strerror);
+        log::trace!("{} = {} ({}, {})", format_args!($($arg)*), ret, trace_errno, trace_strerror);
 
         ret
     });

@@ -130,7 +130,7 @@ unsafe fn inner_af_inet(
     // Make address be followed by a NUL-byte
     colon[0] = b'\0';
 
-    trace!("address: {:?}, port: {:?}", str::from_utf8(&raw_addr), port);
+    log::trace!("address: {:?}, port: {:?}", str::from_utf8(&raw_addr), port);
 
     let mut addr = in_addr::default();
     assert_eq!(
@@ -174,7 +174,7 @@ unsafe fn inner_get_name_inner(
         unsafe { inner_af_unix(&buf[18..], address, address_len) };
     } else {
         // Socket doesn't belong to any scheme
-        trace!(
+        log::trace!(
             "socket {:?} doesn't match either tcp, udp or chan schemes",
             str::from_utf8(buf)
         );
@@ -548,7 +548,7 @@ impl PalSocket for Sys {
                 let addr =
                     unsafe { slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len) };
                 let path = format!("{}", str::from_utf8(addr).unwrap());
-                trace!("path: {:?}", path);
+                log::trace!("bind(): path: {:?}", path);
 
                 let (dir_path, mut fd_path) = dir_path_and_fd_path(&path)?;
 
@@ -624,7 +624,7 @@ impl PalSocket for Sys {
                 let addr =
                     unsafe { slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len) };
                 let mut path = format!("{}", str::from_utf8(addr).unwrap());
-                trace!("path: {:?}", path);
+                log::trace!("connect(): path: {:?}", path);
 
                 let (_, fd_path) = dir_path_and_fd_path(&path)?;
 

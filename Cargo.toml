@@ -46,10 +46,10 @@ scrypt = { version = "0.11", default-features = false, features = ["simple"] }
 pbkdf2 = { version = "0.12", features = ["sha2"] }
 sha2 = { version = "0.10", default-features = false }
 generic-rt = { path = "generic-rt" }
-chrono-tz = {version = "0.10", default-features = false}
-chrono = {version = "0.4", default-features = false, features = ["alloc"]}
+chrono-tz = { version = "0.10", default-features = false }
+chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 libm = "0.2"
-object = { version = "0.36.7", git = "https://gitlab.redox-os.org/andypython/object", default-features = false, features = ["elf", "read_core"] }
+log = "0.4"
 spin = "0.9.8"
 argon2 = "0.5.3"
 
@@ -57,6 +57,12 @@ argon2 = "0.5.3"
 path = "dlmalloc-rs"
 default-features = false
 features = ["c_api"]
+
+[dependencies.object]
+version = "0.36.7"
+git = "https://gitlab.redox-os.org/andypython/object"
+default-features = false
+features = ["elf", "read_core"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
 sc = "0.2.7"
@@ -72,9 +78,12 @@ ioslice = { version = "0.6", default-features = false }
 redox-ioctl = { path = "redox-ioctl" }
 
 [features]
-default = ["check_against_libc_crate"]
-trace = []
+# to enable trace level, take out this `no_trace`
+default = ["check_against_libc_crate", "no_trace"]
 check_against_libc_crate = ["__libc_only_for_layout_checks"]
+no_trace = ["log/release_max_level_debug"]
+# for very verbose activity beyond trace level
+trace_tls = []
 
 [profile.dev]
 panic = "abort"

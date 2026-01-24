@@ -841,7 +841,7 @@ pub unsafe extern "C" fn getaddrinfo(
         Some(unsafe { &*hints })
     };
 
-    trace!(
+    log::trace!(
         "getaddrinfo({:?}, {:?}, {:?})",
         node_opt.map(|c| unsafe { str::from_utf8_unchecked(c.to_bytes()) }),
         service_opt.map(|c| unsafe { str::from_utf8_unchecked(c.to_bytes()) }),
