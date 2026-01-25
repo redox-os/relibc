@@ -841,7 +841,7 @@ pub unsafe extern "C" fn getaddrinfo(
         Some(unsafe { &*hints })
     };
 
-    trace!(
+    log::trace!(
         "getaddrinfo({:?}, {:?}, {:?})",
         node_opt.map(|c| unsafe { str::from_utf8_unchecked(c.to_bytes()) }),
         service_opt.map(|c| unsafe { str::from_utf8_unchecked(c.to_bytes()) }),
@@ -1046,7 +1046,7 @@ pub unsafe extern "C" fn freeaddrinfo(res: *mut addrinfo) {
             } else if bai.ai_addrlen == mem::size_of::<sockaddr_in6>() as socklen_t {
                 unsafe { Box::from_raw(bai.ai_addr as *mut sockaddr_in6) };
             } else {
-                eprintln!("freeaddrinfo: unknown ai_addrlen {}", bai.ai_addrlen);
+                todo_skip!(0, "freeaddrinfo: unknown ai_addrlen {}", bai.ai_addrlen);
             }
         }
         ai = bai.ai_next;

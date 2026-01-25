@@ -409,7 +409,7 @@ pub unsafe extern "C" fn vswprintf(
 ) -> c_int {
     //TODO: implement vswprintf. This is not as simple as wprintf, since the output is not UTF-8
     // but instead is a wchar array.
-    eprintln!("vswprintf not implemented");
+    todo_skip!(0, "vswprintf not implemented");
     -1
 }
 

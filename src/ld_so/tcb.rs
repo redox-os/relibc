@@ -167,7 +167,8 @@ impl Tcb {
                     };
                     if let Some(tls_data) = tls.get_mut(range) {
                         let data = unsafe { master.data() };
-                        trace!(
+                        #[cfg(feature = "trace_tls")]
+                        log::trace!(
                             "tls master: {:p}, {:#x}: {:p}, {:#x}",
                             data.as_ptr(),
                             data.len(),

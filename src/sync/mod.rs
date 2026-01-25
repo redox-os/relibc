@@ -109,8 +109,8 @@ pub unsafe fn futex_wait_ptr<T: FutexTy>(
         Ok(()) | Err(Errno(EINTR)) => FutexWaitResult::Waited,
         Err(Errno(EAGAIN)) => FutexWaitResult::Stale,
         Err(Errno(ETIMEDOUT)) if deadline_opt.is_some() => FutexWaitResult::TimedOut,
-        Err(other) => {
-            eprintln!("futex failed: {}", other.0);
+        Err(err) => {
+            todo_error!(0, err, "futex failed");
             FutexWaitResult::Waited
         }
     }

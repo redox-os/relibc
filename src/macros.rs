@@ -7,7 +7,8 @@ macro_rules! print {
     }};
 }
 
-/// Print with new line to stdout
+/// Print with new line to stdout.
+/// Deprecated, consider using log::info instead
 #[macro_export]
 macro_rules! println {
     () => {
@@ -27,7 +28,8 @@ macro_rules! eprint {
     }};
 }
 
-/// Print with new line to stderr
+/// Print with new line to stderr.
+/// Deprecated, consider using log::info instead
 #[macro_export]
 macro_rules! eprintln {
     () => {
@@ -38,54 +40,46 @@ macro_rules! eprintln {
     };
 }
 
-/// Lifted from libstd
+pub const ISSUE_URL: &str = "https://gitlab.redox-os.org/redox-os/relibc/-/issues/";
+
+// Skippable todo!(issue, fmt)
 #[macro_export]
-macro_rules! dbg {
-    // NOTE: We cannot use `concat!` to make a static string as a format argument
-    // of `eprintln!` because `file!` could contain a `{` or
-    // `$val` expression could be a block (`{ .. }`), in which case the `eprintln!`
-    // will be malformed.
-    () => {
-        eprintln!("[{}:{}:{}]", file!(), line!(), column!());
-    };
-    ($val:expr) => {
-        // Use of `match` here is intentional because it affects the lifetimes
-        // of temporaries - https://stackoverflow.com/a/48732525/1063961
-        match $val {
-            tmp => {
-                eprintln!(
-                    "[{}:{}:{}] {} = {:#?}",
-                    file!(),
-                    line!(),
-                    column!(),
-                    stringify!($val),
-                    &tmp
-                );
-                tmp
-            }
+macro_rules! todo_skip {
+    ($issue:expr, $($arg:tt)*) => {
+        if $issue != 0 {
+            log::info!("TODO ({}{}): {}", crate::macros::ISSUE_URL, $issue, format_args!($($arg)*))
+        } else {
+            log::info!("TODO: {}", format_args!($($arg)*))
         }
     };
-    ($($val:expr),+ $(,)?) => {
-        ($(dbg!($val)),+,)
+}
+
+// Recoverable error todo!(issue, fmt, err)
+#[macro_export]
+macro_rules! todo_error {
+    ($issue:expr, $err:expr, $($arg:tt)*) => {
+        if $issue != 0 {
+            log::error!("TODO ({}{}): {}: {}", crate::macros::ISSUE_URL, $issue, format_args!($($arg)*), $err)
+        } else {
+            log::error!("TODO: {}: {:?}", format_args!($($arg)*), $err)
+        }
+    };
+}
+
+// Unrecoverable error todo!(issue, fmt)
+#[macro_export]
+macro_rules! todo_panic {
+    ($issue:expr, $($arg:tt)*) => {
+        if $issue != 0 {
+            todo!("{} ({}{})", format_args!($($arg)*), crate::macros::ISSUE_URL, $issue)
+        } else {
+            todo!("{}", format_args!($($arg)*))
+        }
     };
 }
 
 #[macro_export]
-#[cfg(not(feature = "trace"))]
-macro_rules! trace {
-    ($($arg:tt)*) => {};
-}
-
-#[macro_export]
-#[cfg(feature = "trace")]
-macro_rules! trace {
-    ($($arg:tt)*) => ({
-        eprintln!($($arg)*);
-    });
-}
-
-#[macro_export]
-#[cfg(not(feature = "trace"))]
+#[cfg(feature = "no_trace")]
 macro_rules! trace_expr {
     ($expr:expr, $($arg:tt)*) => {
         $expr
@@ -93,13 +87,13 @@ macro_rules! trace_expr {
 }
 
 #[macro_export]
-#[cfg(feature = "trace")]
+#[cfg(not(feature = "no_trace"))]
 macro_rules! trace_expr {
     ($expr:expr, $($arg:tt)*) => ({
         use $crate::header::errno::STR_ERROR;
         use $crate::platform;
 
-        trace!("{}", format_args!($($arg)*));
+        log::trace!("{}", format_args!($($arg)*));
 
         let trace_old_errno = platform::ERRNO.get();
         platform::ERRNO.set(0);
@@ -117,7 +111,7 @@ macro_rules! trace_expr {
             "Unknown error"
         };
 
-        trace!("{} = {} ({}, {})", format_args!($($arg)*), ret, trace_errno, trace_strerror);
+        log::trace!("{} = {} ({}, {})", format_args!($($arg)*), ret, trace_errno, trace_strerror);
 
         ret
     });

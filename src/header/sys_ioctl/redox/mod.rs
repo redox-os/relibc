@@ -135,7 +135,7 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
             dup_write(fd, "flush", &queue)?;
         }
         TIOCSCTTY => {
-            eprintln!("TODO: ioctl TIOCSCTTY");
+            todo_skip!(0, "ioctl TIOCSCTTY");
         }
         TIOCGPGRP => {
             let pgrp = unsafe { &mut *(out as *mut pid_t) };
@@ -154,19 +154,19 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
             dup_write(fd, "winsize", winsize)?;
         }
         TIOCGPTLCK => {
-            eprintln!("TODO: ioctl TIOCGPTLCK");
+            todo_skip!(0, "ioctl TIOCGPTLCK");
         }
         TIOCSPTLCK => {
-            eprintln!("TODO: ioctl TIOCSPTLCK");
+            todo_skip!(0, "ioctl TIOCSPTLCK");
         }
         TCSBRK => {
-            eprintln!("TODO: ioctl TCSBRK");
+            todo_skip!(0, "ioctl TCSBRK");
         }
         TCXONC => {
-            eprintln!("TODO: ioctl TCXONC");
+            todo_skip!(0, "ioctl TCXONC");
         }
         SIOCATMARK => {
-            eprintln!("TODO: ioctl SIOCATMARK");
+            todo_skip!(0, "ioctl SIOCATMARK");
         }
         _ => {
             // See https://docs.kernel.org/userspace-api/ioctl/ioctl-decoding.html for details

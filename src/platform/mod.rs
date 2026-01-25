@@ -12,6 +12,8 @@ pub use self::allocator::*;
 
 mod allocator;
 
+pub mod logger;
+
 pub use self::pal::{Pal, PalEpoll, PalPtrace, PalSignal, PalSocket};
 
 mod pal;
