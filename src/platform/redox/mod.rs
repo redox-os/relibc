@@ -218,11 +218,7 @@ impl Pal for Sys {
     }
 
     unsafe fn clock_settime(clk_id: clockid_t, tp: *const timespec) -> Result<()> {
-        // TODO
-        eprintln!(
-            "relibc clock_settime({}, {:p}): not implemented",
-            clk_id, tp
-        );
+        todo_skip!(0, "clock_settime({}, {:p}): not implemented", clk_id, tp);
         Err(Errno(ENOSYS))
     }
 
@@ -511,11 +507,7 @@ impl Pal for Sys {
 
     fn getgroups(list: Out<[gid_t]>) -> Result<c_int> {
         // TODO
-        eprintln!(
-            "relibc getgroups({}, {:p}): not implemented",
-            list.len(),
-            list
-        );
+        todo_skip!(0, "getgroups({}, {:p}): not implemented", list.len(), list);
         Err(Errno(ENOSYS))
     }
 
@@ -536,8 +528,7 @@ impl Pal for Sys {
     }
 
     fn getpriority(which: c_int, who: id_t) -> Result<c_int> {
-        // TODO
-        eprintln!("getpriority({}, {}): not implemented", which, who);
+        todo_skip!(0, "getpriority({}, {}): not implemented", which, who);
         Err(Errno(ENOSYS))
     }
 
@@ -599,11 +590,7 @@ impl Pal for Sys {
     }
 
     fn getrlimit(resource: c_int, mut rlim: Out<rlimit>) -> Result<()> {
-        //TODO
-        eprintln!(
-            "relibc getrlimit({}, {:p}): not implemented",
-            resource, rlim
-        );
+        todo_skip!(0, "getrlimit({}, {:p}): not implemented", resource, rlim);
         rlim.write(rlimit {
             rlim_cur: RLIM_INFINITY,
             rlim_max: RLIM_INFINITY,
@@ -612,17 +599,12 @@ impl Pal for Sys {
     }
 
     unsafe fn setrlimit(resource: c_int, rlim: *const rlimit) -> Result<()> {
-        // TODO
-        eprintln!(
-            "relibc setrlimit({}, {:p}): not implemented",
-            resource, rlim
-        );
+        todo_skip!(0, "setrlimit({}, {:p}): not implemented", resource, rlim);
         Err(Errno(EPERM))
     }
 
     fn getrusage(who: c_int, r_usage: Out<rusage>) -> Result<()> {
-        //TODO
-        eprintln!("relibc getrusage({}, {:p}): not implemented", who, r_usage);
+        todo_skip!(0, "getrusage({}, {:p}): not implemented", who, r_usage);
         Ok(())
     }
 
@@ -825,9 +807,12 @@ impl Pal for Sys {
     }
 
     unsafe fn msync(addr: *mut c_void, len: usize, flags: c_int) -> Result<()> {
-        eprintln!(
-            "relibc msync({:p}, 0x{:x}, 0x{:x}): not implemented",
-            addr, len, flags
+        todo_skip!(
+            0,
+            "msync({:p}, 0x{:x}, 0x{:x}): not implemented",
+            addr,
+            len,
+            flags
         );
         Err(Errno(ENOSYS))
         /* TODO
@@ -862,9 +847,12 @@ impl Pal for Sys {
     }
 
     unsafe fn madvise(addr: *mut c_void, len: usize, flags: c_int) -> Result<()> {
-        eprintln!(
-            "relibc madvise({:p}, 0x{:x}, 0x{:x}): not implemented",
-            addr, len, flags
+        todo_skip!(
+            0,
+            "madvise({:p}, 0x{:x}, 0x{:x}): not implemented",
+            addr,
+            len,
+            flags
         );
         Err(Errno(ENOSYS))
     }
@@ -1112,7 +1100,7 @@ impl Pal for Sys {
 
     unsafe fn setgroups(size: size_t, list: *const gid_t) -> Result<()> {
         // TODO
-        eprintln!("relibc setgroups({}, {:p}): not implemented", size, list);
+        todo_skip!(0, "setgroups({}, {:p}): not implemented", size, list);
         Err(Errno(ENOSYS))
     }
 
@@ -1123,9 +1111,12 @@ impl Pal for Sys {
 
     fn setpriority(which: c_int, who: id_t, prio: c_int) -> Result<()> {
         // TODO
-        eprintln!(
-            "relibc setpriority({}, {}, {}): not implemented",
-            which, who, prio
+        todo_skip!(
+            0,
+            "setpriority({}, {}, {}): not implemented",
+            which,
+            who,
+            prio
         );
         Err(Errno(ENOSYS))
     }

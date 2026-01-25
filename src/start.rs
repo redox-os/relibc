@@ -114,9 +114,11 @@ extern "C" fn init_array() {
 
     unsafe {
         crate::pthread::init();
+        crate::platform::logger::init();
         init_complete = true
     }
 }
+
 fn io_init() {
     unsafe {
         // Initialize stdin/stdout/stderr.

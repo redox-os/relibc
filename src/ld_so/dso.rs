@@ -473,7 +473,7 @@ impl DSO {
         tls_offset: usize,
     ) -> object::Result<(&'static [u8], Option<Master>, Dynamic<'static>)> {
         let endian = elf.endian();
-        trace!("# {}", path);
+        log::trace!("# {}", path);
         // data for struct LinkMap
         let mut l_ld = 0;
         // Calculate virtual memory bounds
@@ -490,7 +490,7 @@ impl DSO {
                         l_ld = ph.p_vaddr(endian);
                     }
                     elf::PT_LOAD => {
-                        trace!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
+                        log::trace!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
                         if let Some(ref mut bounds) = bounds_opt {
                             if vaddr < bounds.0 {
                                 bounds.0 = vaddr;
@@ -509,7 +509,7 @@ impl DSO {
                 .ok_or("Unable to find PT_LOAD section".to_string())
                 .unwrap()
         };
-        trace!("  bounds {:#x}, {:#x}", bounds.0, bounds.1);
+        log::trace!("  bounds {:#x}, {:#x}", bounds.0, bounds.1);
         // Allocate memory
         let mmap = unsafe {
             if let Some(addr) = base_addr {
@@ -529,7 +529,7 @@ impl DSO {
                 if start != 0 {
                     flags |= sys_mman::MAP_FIXED_NOREPLACE;
                 }
-                trace!("  mmap({:#x}, {:x}, {:x})", start, size, flags);
+                log::trace!("  mmap({:#x}, {:x}, {:x})", start, size, flags);
                 let ptr = Sys::mmap(
                     start as *mut c_void,
                     size,
@@ -548,7 +548,7 @@ impl DSO {
                         "mmap must always map on the destination we requested"
                     );
                 }
-                trace!("    = {:p}", ptr);
+                log::trace!("    = {:p}", ptr);
                 ptr::write_bytes(ptr as *mut u8, 0, size);
                 _r_debug
                     .lock()
@@ -596,7 +596,7 @@ impl DSO {
                     let _voff = ph.p_vaddr(endian) % ph.p_align(endian);
                     let _vsize = ((ph.p_memsz(endian) + _voff) as usize)
                         .next_multiple_of(ph.p_align(endian) as usize);
-                    trace!(
+                    log::trace!(
                         "  copy {:#x}, {:#x}: {:#x}, {:#x}",
                         ph.p_vaddr(endian) - _voff,
                         _vsize,
@@ -619,7 +619,7 @@ impl DSO {
                         segment_size: ph.p_memsz(endian) as usize,
                         offset: tls_offset + ph.p_memsz(endian) as usize,
                     });
-                    trace!("  tcb master {:x?}", tcb_master);
+                    log::trace!("  tcb master {:x?}", tcb_master);
                 }
 
                 elf::PT_DYNAMIC => dynamic = Some((ph, ph.dynamic(endian, data).unwrap().unwrap())),
@@ -1140,7 +1140,7 @@ impl DSO {
                 } else {
                     vaddr as *const u8
                 };
-                trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
+                log::trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
                 Sys::mprotect(ptr as *mut c_void, vsize, prot).expect("[ld.so]: mprotect failed");
             }
         }

@@ -115,7 +115,13 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
         },
         0xCE => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd2>(buf, MODE_GET_FB2) },
         _ => {
-            eprintln!("unimplemented DRM ioctl({}, 0x{:02x}, {:?})", fd, func, buf);
+            todo_skip!(
+                0,
+                "unimplemented DRM ioctl({}, 0x{:02x}, {:?})",
+                fd,
+                func,
+                buf
+            );
             Err(Errno(EINVAL))
         }
     }

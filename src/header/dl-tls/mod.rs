@@ -25,7 +25,8 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
     let ti = unsafe { &*ti };
     let masters = tcb.masters().unwrap();
 
-    trace!(
+    #[cfg(feature = "trace_tls")]
+    log::trace!(
         "__tls_get_addr({:p}: {:#x}, {:#x}, masters_len={}, dtv_len={})",
         ti,
         ti.ti_module,

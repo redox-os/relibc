@@ -542,7 +542,7 @@ pub unsafe extern "C" fn fileno(stream: *mut FILE) -> c_int {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn flockfile(file: *mut FILE) {
     if let Err(e) = unsafe { (*file).lock.lock() } {
-        println!("RELIBC: flockfile error {}", e)
+        todo_error!(0, e, "flockfile error")
     }
 }
 
@@ -819,7 +819,7 @@ pub unsafe extern "C" fn ftrylockfile(file: *mut FILE) -> c_int {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn funlockfile(file: *mut FILE) {
     if let Err(e) = unsafe { (*file).lock.unlock() } {
-        println!("RELIBC: funlockfile error {}", e)
+        todo_error!(0, e, "RELIBC: funlockfile error")
     }
 }
 
