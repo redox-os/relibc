@@ -367,7 +367,11 @@ typedef __UINTMAX_TYPE__ uintmax_t;
 #undef WINT_WIDTH
 #define WINT_WIDTH __WINT_WIDTH__
 
+#ifdef __ILP32__
+#define SIZE_MAX UINT32_MAX
+#else
 #define SIZE_MAX UINT64_MAX
+#endif
 #endif
 
 typedef long sig_atomic_t;
