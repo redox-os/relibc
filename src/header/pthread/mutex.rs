@@ -1,12 +1,10 @@
-use super::*;
+// FIXME(andypython): remove this when #![allow(warnings, unused_variables)] is
+// dropped from src/lib.rs.
+#![warn(warnings, unused_variables)]
 
-use crate::{
-    error::Errno,
-    header::{
-        errno::{EINVAL, ENOMEM, ETIMEDOUT},
-        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec_realtime_to_monotonic},
-    },
-};
+use super::*;
+pub use crate::sync::pthread_mutex::RlctMutex;
+use crate::{error::Errno, header::time::timespec_realtime_to_monotonic};
 
 // PTHREAD_MUTEX_INITIALIZER is defined in bits_pthread/cbindgen.toml
 
@@ -76,9 +74,9 @@ pub unsafe extern "C" fn pthread_mutex_setprioceiling(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutex_timedlock(
     mutex: *mut pthread_mutex_t,
-    abstime: *const timespec,
+    abstime: &timespec,
 ) -> c_int {
-    let relative = match timespec_realtime_to_monotonic(unsafe { *abstime }) {
+    let relative = match timespec_realtime_to_monotonic(*abstime) {
         Ok(relative) => relative,
         Err(err) => return e(Err(err)),
     };
@@ -105,44 +103,44 @@ pub unsafe extern "C" fn pthread_mutexattr_destroy(attr: *mut pthread_mutexattr_
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_getprioceiling(
     attr: *const pthread_mutexattr_t,
-    prioceiling: *mut c_int,
+    prioceiling: &mut c_int,
 ) -> c_int {
-    unsafe { prioceiling.write((*attr.cast::<RlctMutexAttr>()).prioceiling) };
+    *prioceiling = unsafe { &*attr.cast::<RlctMutexAttr>() }.prioceiling;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_getprotocol(
     attr: *const pthread_mutexattr_t,
-    protocol: *mut c_int,
+    protocol: &mut c_int,
 ) -> c_int {
-    unsafe { protocol.write((*attr.cast::<RlctMutexAttr>()).protocol) };
+    *protocol = unsafe { &*attr.cast::<RlctMutexAttr>() }.protocol;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_getpshared(
     attr: *const pthread_mutexattr_t,
-    pshared: *mut c_int,
+    pshared: &mut c_int,
 ) -> c_int {
-    unsafe { pshared.write((*attr.cast::<RlctMutexAttr>()).pshared) };
+    *pshared = unsafe { &*attr.cast::<RlctMutexAttr>() }.pshared;
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_getrobust(
     attr: *const pthread_mutexattr_t,
-    robust: *mut c_int,
+    robust: &mut c_int,
 ) -> c_int {
-    unsafe { robust.write((*attr.cast::<RlctMutexAttr>()).robust) };
+    *robust = unsafe { &*attr.cast::<RlctMutexAttr>() }.robust;
     0
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_mutexattr_gettype(
     attr: *const pthread_mutexattr_t,
-    ty: *mut c_int,
+    ty: &mut c_int,
 ) -> c_int {
-    unsafe { ty.write((*attr.cast::<RlctMutexAttr>()).ty) };
+    *ty = unsafe { &*attr.cast::<RlctMutexAttr>() }.ty;
     0
 }
 #[unsafe(no_mangle)]
@@ -156,7 +154,7 @@ pub unsafe extern "C" fn pthread_mutexattr_setprioceiling(
     attr: *mut pthread_mutexattr_t,
     prioceiling: c_int,
 ) -> c_int {
-    unsafe { (*attr.cast::<RlctMutexAttr>()).prioceiling = prioceiling };
+    unsafe { &mut *attr.cast::<RlctMutexAttr>() }.prioceiling = prioceiling;
     0
 }
 
@@ -165,7 +163,7 @@ pub unsafe extern "C" fn pthread_mutexattr_setprotocol(
     attr: *mut pthread_mutexattr_t,
     protocol: c_int,
 ) -> c_int {
-    unsafe { (*attr.cast::<RlctMutexAttr>()).protocol = protocol };
+    unsafe { &mut *attr.cast::<RlctMutexAttr>() }.protocol = protocol;
     0
 }
 
@@ -174,7 +172,7 @@ pub unsafe extern "C" fn pthread_mutexattr_setpshared(
     attr: *mut pthread_mutexattr_t,
     pshared: c_int,
 ) -> c_int {
-    unsafe { (*attr.cast::<RlctMutexAttr>()).pshared = pshared };
+    unsafe { &mut *attr.cast::<RlctMutexAttr>() }.pshared = pshared;
     0
 }
 
@@ -183,7 +181,7 @@ pub unsafe extern "C" fn pthread_mutexattr_setrobust(
     attr: *mut pthread_mutexattr_t,
     robust: c_int,
 ) -> c_int {
-    unsafe { (*attr.cast::<RlctMutexAttr>()).robust = robust };
+    unsafe { &mut *attr.cast::<RlctMutexAttr>() }.robust = robust;
     0
 }
 #[unsafe(no_mangle)]
@@ -191,11 +189,9 @@ pub unsafe extern "C" fn pthread_mutexattr_settype(
     attr: *mut pthread_mutexattr_t,
     ty: c_int,
 ) -> c_int {
-    unsafe { (*attr.cast::<RlctMutexAttr>()).ty = ty };
+    unsafe { &mut *attr.cast::<RlctMutexAttr>() }.ty = ty;
     0
 }
-
-pub use crate::sync::pthread_mutex::RlctMutex;
 
 #[repr(C)]
 #[derive(Clone)]
