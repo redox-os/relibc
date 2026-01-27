@@ -41,7 +41,7 @@ pub unsafe extern "C" fn pthread_mutex_init(
     attr: *const pthread_mutexattr_t,
 ) -> c_int {
     let attr = unsafe { attr.cast::<RlctMutexAttr>().as_ref() }
-        .copied()
+        .cloned()
         .unwrap_or_default();
 
     match RlctMutex::new(&attr) {
@@ -156,7 +156,7 @@ pub unsafe extern "C" fn pthread_mutexattr_setprioceiling(
     attr: *mut pthread_mutexattr_t,
     prioceiling: c_int,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctMutexAttr>() }).prioceiling = prioceiling;
+    unsafe { (*attr.cast::<RlctMutexAttr>()).prioceiling = prioceiling };
     0
 }
 
@@ -165,7 +165,7 @@ pub unsafe extern "C" fn pthread_mutexattr_setprotocol(
     attr: *mut pthread_mutexattr_t,
     protocol: c_int,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctMutexAttr>() }).protocol = protocol;
+    unsafe { (*attr.cast::<RlctMutexAttr>()).protocol = protocol };
     0
 }
 
@@ -174,7 +174,7 @@ pub unsafe extern "C" fn pthread_mutexattr_setpshared(
     attr: *mut pthread_mutexattr_t,
     pshared: c_int,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctMutexAttr>() }).pshared = pshared;
+    unsafe { (*attr.cast::<RlctMutexAttr>()).pshared = pshared };
     0
 }
 
@@ -183,7 +183,7 @@ pub unsafe extern "C" fn pthread_mutexattr_setrobust(
     attr: *mut pthread_mutexattr_t,
     robust: c_int,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctMutexAttr>() }).robust = robust;
+    unsafe { (*attr.cast::<RlctMutexAttr>()).robust = robust };
     0
 }
 #[unsafe(no_mangle)]
@@ -191,14 +191,14 @@ pub unsafe extern "C" fn pthread_mutexattr_settype(
     attr: *mut pthread_mutexattr_t,
     ty: c_int,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctMutexAttr>() }).ty = ty;
+    unsafe { (*attr.cast::<RlctMutexAttr>()).ty = ty };
     0
 }
 
 pub use crate::sync::pthread_mutex::RlctMutex;
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(crate) struct RlctMutexAttr {
     pub prioceiling: c_int,
     pub protocol: c_int,
@@ -206,6 +206,7 @@ pub(crate) struct RlctMutexAttr {
     pub robust: c_int,
     pub ty: c_int,
 }
+
 impl Default for RlctMutexAttr {
     fn default() -> Self {
         Self {
