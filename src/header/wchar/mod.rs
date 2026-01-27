@@ -550,14 +550,15 @@ pub unsafe extern "C" fn wcscspn(wcs: *const wchar_t, set: *const wchar_t) -> si
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcsftime.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn wcsftime(
     wcs: *mut wchar_t,
     maxsize: size_t,
     format: *const wchar_t,
-    timptr: *mut tm,
+    timptr: *const tm,
 ) -> size_t {
-    unimplemented!();
+    todo_skip!(0, "wcsftime is not implemented");
+    0
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcslen.html>.
@@ -1014,9 +1015,10 @@ pub unsafe extern "C" fn wcswidth(pwcs: *const wchar_t, n: size_t) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcsxfrm.html>.
-// #[unsafe(no_mangle)]
+#[unsafe(no_mangle)]
 pub extern "C" fn wcsxfrm(ws1: *mut wchar_t, ws2: *const wchar_t, n: size_t) -> size_t {
-    unimplemented!();
+    todo_skip!(0, "wcsxfrm is not implemented");
+    0
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wctob.html>.

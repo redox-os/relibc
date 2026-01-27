@@ -1,9 +1,19 @@
-sys_includes = ["stddef.h", "stdint.h", "stdio.h", "time.h", "bits/wchar.h", "features.h"]
+sys_includes = [
+    "stddef.h",
+    "stdint.h",
+    "stdio.h",
+    "time.h",
+    "bits/wchar.h",
+    "features.h",
+]
 include_guard = "_RELIBC_WCHAR_H"
 language = "C"
 style = "Type"
 no_includes = true
 cpp_compat = true
+
+[export.rename]
+"tm" = "struct tm"
 
 [enum]
 prefix_with_name = true
