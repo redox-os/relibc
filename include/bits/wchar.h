@@ -6,10 +6,12 @@
 
 #ifndef _WCHAR_T
 #define _WCHAR_T
+#ifndef __cplusplus
     #ifndef __WCHAR_TYPE__
         #define __WCHAR_TYPE__ int32_t
     #endif
     typedef __WCHAR_TYPE__ wchar_t;
+#endif // __cplusplus
 #endif // _WCHAR_T
 
 #ifndef _WINT_T
