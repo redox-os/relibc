@@ -197,36 +197,36 @@ int main(int argc, char* argv[]) {
         goto clean_opened_file;
     }
 
-    // O_NOATIME
-    struct timespec atime_expected = stat.st_atim;
+    // O_NOATIME (disabled since Redox doesn't have it)
+    // struct timespec atime_expected = stat.st_atim;
 
     close(fd);
-    fd = open(file_path, O_NOATIME);
-    if (fd == -1) {
-        perror("open (O_NOATIME)");
-        close(fd);
-        goto clean_opened_file;
-    }
-
-    if (fstat(fd, &stat) == -1) {
-        perror("fstat (O_PATH)");
-        close(fd);
-        goto clean_opened_file;
-    }
-
-    struct timespec atime_actual = stat.st_atim;
-    if (
-        (atime_expected.tv_nsec != atime_actual.tv_nsec)
-        || (atime_expected.tv_sec != atime_actual.tv_sec)
-    ) {
-        fputs(
-            "Access time changed with O_NOATIME\n",
-            stderr
-        );
-        close(fd);
-        goto clean_opened_file;
-    }
-    close(fd);
+    /* fd = open(file_path, O_NOATIME); */
+    /* if (fd == -1) { */
+    /*     perror("open (O_NOATIME)"); */
+    /*     close(fd); */
+    /*     goto clean_opened_file; */
+    /* } */
+    /**/
+    /* if (fstat(fd, &stat) == -1) { */
+    /*     perror("fstat (O_PATH)"); */
+    /*     close(fd); */
+    /*     goto clean_opened_file; */
+    /* } */
+    /**/
+    /* struct timespec atime_actual = stat.st_atim; */
+    /* if ( */
+    /*     (atime_expected.tv_nsec != atime_actual.tv_nsec) */
+    /*     || (atime_expected.tv_sec != atime_actual.tv_sec) */
+    /* ) { */
+    /*     fputs( */
+    /*         "Access time changed with O_NOATIME\n", */
+    /*         stderr */
+    /*     ); */
+    /*     close(fd); */
+    /*     goto clean_opened_file; */
+    /* } */
+    /* close(fd); */
 
     // O_NOFOLLOW
     char sym_path[PATH_MAX] = {0};
