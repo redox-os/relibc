@@ -80,7 +80,9 @@ pub unsafe extern "C" fn pthread_barrierattr_setpshared(
     attr: *mut pthread_barrierattr_t,
     pshared: c_int,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctBarrierAttr>() }).pshared = pshared;
+    unsafe {
+        (*attr.cast::<RlctBarrierAttr>()).pshared = pshared;
+    }
     0
 }
 
