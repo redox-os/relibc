@@ -10,7 +10,7 @@ use core::arch::global_asm;
 use alloc::alloc::alloc;
 use core::{alloc::Layout, ptr};
 
-use crate::{ld_so::tcb::Tcb, platform::types::*};
+use crate::{ld_so::tcb::Tcb, platform::types::c_void};
 
 #[repr(C)]
 #[allow(non_camel_case_types)]
@@ -40,7 +40,7 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
         tcb.setup_dtv(masters.len());
     }
 
-    let dtv_index = ti.ti_module as usize - 1;
+    let dtv_index = ti.ti_module - 1;
 
     if tcb.dtv_mut()[dtv_index].is_null() {
         // Allocate TLS for module.
@@ -75,9 +75,9 @@ pub unsafe extern "C" fn __tls_get_addr(ti: *mut dl_tls_index) -> *mut c_void {
     }
 
     if cfg!(target_arch = "riscv64") {
-        ptr = unsafe { ptr.add(0x800 + ti.ti_offset as usize) }; // dynamic offsets are 0x800-based on risc-v
+        ptr = unsafe { ptr.add(0x800 + ti.ti_offset) }; // dynamic offsets are 0x800-based on risc-v
     } else {
-        ptr = unsafe { ptr.add(ti.ti_offset as usize) };
+        ptr = unsafe { ptr.add(ti.ti_offset) };
     }
 
     ptr.cast::<c_void>()
