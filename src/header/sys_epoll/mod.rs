@@ -1,11 +1,16 @@
-//! sys/epoll.h implementation for Redox, following http://man7.org/linux/man-pages/man7/epoll.7.html
+//! `sys/epoll.h` implementation.
+//!
+//! Non-POSIX, see: <http://man7.org/linux/man-pages/man7/epoll.7.html>.
 
 use core::ptr;
 
 use crate::{
     error::ResultExt,
     header::signal::sigset_t,
-    platform::{PalEpoll, Sys, types::*},
+    platform::{
+        PalEpoll, Sys,
+        types::{c_int, c_void},
+    },
 };
 
 pub use self::sys::*;
