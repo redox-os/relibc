@@ -813,18 +813,24 @@ unsafe fn set_timezone(
     let ut_offset = std.offset();
 
     guard.0 = Some(CString::new(ut_offset.abbreviation().expect("Wrong timezone")).unwrap());
-    (unsafe { tzname.0 })[0] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
+    unsafe {
+        tzname.0[0] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
+    }
 
     match dst {
         Some(dst) => {
             guard.1 =
                 Some(CString::new(dst.offset().abbreviation().expect("Wrong timezone")).unwrap());
-            (unsafe { tzname.0 })[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
+            unsafe {
+                tzname.0[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
+            }
             unsafe { daylight = 1 };
         }
         None => {
             guard.1 = None;
-            (unsafe { tzname.0 })[1] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
+            unsafe {
+                tzname.0[1] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
+            }
             unsafe { daylight = 0 };
         }
     }
