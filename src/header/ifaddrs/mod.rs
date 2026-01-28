@@ -1,10 +1,15 @@
-//! `ifaddrs.h` implementation
+//! `ifaddrs.h` implementation.
+//!
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getifaddrs.3.html>.
 
 use core::ptr;
 
 use crate::{
     header::{errno, stdlib, sys_socket::sockaddr},
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, c_uint, c_void},
+    },
 };
 
 #[repr(C)]

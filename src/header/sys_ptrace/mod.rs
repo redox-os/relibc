@@ -1,8 +1,10 @@
-//! ptrace compatibility layer for Redox OS
+//! `ptrace.h` implementation.
+//!
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/ptrace.2.html>.
 
 use crate::{
     error::ResultExt,
-    platform::{PalPtrace, Sys, types::*},
+    platform::{PalPtrace, Sys, types::c_int},
 };
 use core::ffi::VaList;
 
