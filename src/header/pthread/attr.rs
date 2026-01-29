@@ -177,8 +177,12 @@ pub unsafe extern "C" fn pthread_attr_setstack(
     stackaddr: *mut c_void,
     stacksize: size_t,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctAttr>() }).stack = stackaddr as usize;
-    (unsafe { *attr.cast::<RlctAttr>() }).stacksize = stacksize;
+    unsafe {
+        (*attr.cast::<RlctAttr>()).stack = stackaddr as usize;
+    }
+    unsafe {
+        (*attr.cast::<RlctAttr>()).stacksize = stacksize;
+    }
     0
 }
 
