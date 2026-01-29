@@ -125,7 +125,9 @@ pub unsafe extern "C" fn pthread_attr_setdetachstate(
     attr: *mut pthread_attr_t,
     detachstate: c_int,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctAttr>() }).detachstate = detachstate as _;
+    unsafe {
+        (*attr.cast::<RlctAttr>()).detachstate = detachstate as _;
+    }
     0
 }
 
@@ -134,7 +136,9 @@ pub unsafe extern "C" fn pthread_attr_setguardsize(
     attr: *mut pthread_attr_t,
     guardsize: c_int,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctAttr>() }).guardsize = guardsize as _;
+    unsafe {
+        (*attr.cast::<RlctAttr>()).guardsize = guardsize as _;
+    }
     0
 }
 
@@ -143,7 +147,9 @@ pub unsafe extern "C" fn pthread_attr_setinheritsched(
     attr: *mut pthread_attr_t,
     inheritsched: c_int,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctAttr>() }).inheritsched = inheritsched as _;
+    unsafe {
+        (*attr.cast::<RlctAttr>()).inheritsched = inheritsched as _;
+    }
     0
 }
 
@@ -152,7 +158,9 @@ pub unsafe extern "C" fn pthread_attr_setschedparam(
     attr: *mut pthread_attr_t,
     param: *const sched_param,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctAttr>() }).param = unsafe { param.read() };
+    unsafe {
+        (*attr.cast::<RlctAttr>()).param = unsafe { param.read() };
+    }
     0
 }
 
@@ -161,13 +169,17 @@ pub unsafe extern "C" fn pthread_attr_setschedpolicy(
     attr: *mut pthread_attr_t,
     policy: c_int,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctAttr>() }).schedpolicy = policy as u8;
+    unsafe {
+        (*attr.cast::<RlctAttr>()).schedpolicy = policy as u8;
+    }
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_setscope(attr: *mut pthread_attr_t, scope: c_int) -> c_int {
-    (unsafe { *attr.cast::<RlctAttr>() }).scope = scope as u8;
+    unsafe {
+        (*attr.cast::<RlctAttr>()).scope = scope as u8;
+    }
     0
 }
 
@@ -177,8 +189,12 @@ pub unsafe extern "C" fn pthread_attr_setstack(
     stackaddr: *mut c_void,
     stacksize: size_t,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctAttr>() }).stack = stackaddr as usize;
-    (unsafe { *attr.cast::<RlctAttr>() }).stacksize = stacksize;
+    unsafe {
+        (*attr.cast::<RlctAttr>()).stack = stackaddr as usize;
+    }
+    unsafe {
+        (*attr.cast::<RlctAttr>()).stacksize = stacksize;
+    }
     0
 }
 
@@ -187,7 +203,9 @@ pub unsafe extern "C" fn pthread_attr_setstacksize(
     attr: *mut pthread_attr_t,
     stacksize: size_t,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctAttr>() }).stacksize = stacksize;
+    unsafe {
+        (*attr.cast::<RlctAttr>()).stacksize = stacksize;
+    }
     0
 }
 
