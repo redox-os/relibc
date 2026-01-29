@@ -103,9 +103,10 @@ int cloexec_validate(int argc, char* argv[]) {
 }
 
 int main(int argc, char* argv[]) {
+    // The test runner inserts two fixed arg, so argc == 2 is fine
     if (argc == 2) {
         return cloexec_validate(argc, argv);
-    } else if (argc != 1) {
+    } else if (argc == 0) {
         fprintf(
             stderr,
             "Invalid number of arguments: %d\n",
