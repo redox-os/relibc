@@ -27,7 +27,7 @@ pub fn e(result: Result<(), Errno>) -> i32 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(crate) struct RlctAttr {
     pub detachstate: c_uchar,
     pub inheritsched: c_uchar,
