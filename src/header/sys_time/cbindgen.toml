@@ -1,4 +1,4 @@
-sys_includes = ["sys/types.h", "features.h"]
+sys_includes = ["sys/types.h", "features.h", "sys/select.h"]
 include_guard = "_SYS_TIME_H"
 language = "C"
 trailer = "#include <bits/sys/time.h>"
@@ -8,3 +8,6 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
+
+[export.rename]
+"timeval" = "struct timeval"
