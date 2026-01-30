@@ -10,7 +10,10 @@
 use core::ptr::NonNull;
 
 use crate::{
-    header::sys_time::{gettimeofday, timeval, timezone},
+    header::{
+        sys_select::timeval,
+        sys_time::{gettimeofday, timezone},
+    },
     platform::types::{c_int, c_short, c_ushort, time_t},
 };
 

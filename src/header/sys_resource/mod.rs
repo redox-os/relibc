@@ -4,7 +4,7 @@
 
 use crate::{
     error::ResultExt,
-    header::sys_time::timeval,
+    header::sys_select::timeval,
     out::Out,
     platform::{
         Pal, Sys,

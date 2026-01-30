@@ -17,7 +17,9 @@ use crate::{
         errno::{self, ENAMETOOLONG},
         fcntl, limits,
         stdlib::getenv,
-        sys_ioctl, sys_resource, sys_time, sys_utsname, termios,
+        sys_ioctl, sys_resource,
+        sys_select::timeval,
+        sys_time, sys_utsname, termios,
         time::timespec,
     },
     out::Out,
@@ -146,7 +148,7 @@ pub unsafe extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
 pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
     // TODO setitimer is unimplemented on Redox and obsolete
     let mut timer = sys_time::itimerval {
-        it_value: sys_time::timeval {
+        it_value: timeval {
             tv_sec: seconds as time_t,
             tv_usec: 0,
         },
@@ -1133,11 +1135,11 @@ pub extern "C" fn ttyname_r(fildes: c_int, name: *mut c_char, namesize: size_t) 
 pub extern "C" fn ualarm(usecs: useconds_t, interval: useconds_t) -> useconds_t {
     // TODO setitimer is unimplemented on Redox and obsolete
     let mut timer = sys_time::itimerval {
-        it_value: sys_time::timeval {
+        it_value: timeval {
             tv_sec: 0,
             tv_usec: usecs as suseconds_t,
         },
-        it_interval: sys_time::timeval {
+        it_interval: timeval {
             tv_sec: 0,
             tv_usec: interval as suseconds_t,
         },
