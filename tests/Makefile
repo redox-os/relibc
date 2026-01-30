@@ -208,6 +208,7 @@ DYNAMIC_ONLY_NAMES=\
 VARIED_NAMES=\
 	dirent/main \
 	dirent/posix_getdents \
+	includes \
 	kill-waitpid \
 	limits \
 	net/if \
@@ -452,3 +453,10 @@ $(BUILD)/bins_dynamic/dlopen_scopes: dlopen_scopes.c $(BUILD)/bins_dynamic/libfo
 $(BUILD)/bins_dynamic/%: %.c $(DEPS)
 	mkdir -p "$$(dirname "$@")"
 	@$(CC) "$<" -o "$@" $(FLAGS) $(DYNAMIC_FLAGS)
+
+$(BUILD)/gen/includes: includes.c $(DEPS)
+	rm -rf $@.tmp $@
+	mkdir -p $@.tmp
+	$(CC) "$<" -H $(FLAGS) $(DYNAMIC_FLAGS) 2> $@.tmp/graph.txt
+	sed -i 's|$(SYSROOT)/include/||g' $@.tmp/graph.txt
+	mv $@.tmp $@
