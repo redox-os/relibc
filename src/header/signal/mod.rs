@@ -513,7 +513,6 @@ pub unsafe extern "C" fn sigtimedwait(
     Sys::sigtimedwait(unsafe { &*set }, unsafe { sig.as_mut() }, unsafe {
         tp.as_ref()
     })
-    .map(|()| 0)
     .or_minus_one_errno()
 }
 

@@ -249,7 +249,7 @@ impl PalSignal for Sys {
         set: &sigset_t,
         info_out: Option<&mut siginfo_t>,
         timeout: Option<&timespec>,
-    ) -> Result<(), Errno> {
+    ) -> Result<c_int, Errno> {
         // TODO: deadline-based API
         let timeout = timeout.map(|timeout| syscall::TimeSpec {
             tv_sec: timeout.tv_sec,
@@ -259,6 +259,6 @@ impl PalSignal for Sys {
         if let Some(out) = info_out {
             *out = info;
         }
-        Ok(())
+        Ok(info.si_signo)
     }
 }
