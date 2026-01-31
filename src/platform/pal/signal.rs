@@ -35,5 +35,5 @@ pub trait PalSignal: Pal {
         set: &sigset_t,
         sig: Option<&mut siginfo_t>,
         tp: Option<&timespec>,
-    ) -> Result<()>;
+    ) -> Result<c_int>;
 }
