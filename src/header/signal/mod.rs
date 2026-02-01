@@ -328,7 +328,9 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigismember.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_int {
-    if signo <= 0 || signo as usize > NSIG {
+    if signo <= 0 || signo as usize > NSIG.max(SIGRTMAX)
+    /* TODO */
+    {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
     }
