@@ -2,7 +2,6 @@ use crate::platform::types::c_int;
 
 pub const CLOCK_REALTIME: c_int = 0;
 pub const CLOCK_MONOTONIC: c_int = 1;
-pub const CLOCK_PROCESS_CPUTIME_ID: c_int = 2;
 pub const CLOCK_THREAD_CPUTIME_ID: c_int = 3;
 pub const CLOCK_MONOTONIC_RAW: c_int = 4;
 pub const CLOCK_REALTIME_COARSE: c_int = 5;
