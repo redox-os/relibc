@@ -119,3 +119,4 @@ pub const RE_DUP_MAX: c_long = _POSIX2_RE_DUP_MAX;
 pub const PTHREAD_DESTRUCTOR_ITERATIONS: c_long = _POSIX_THREAD_DESTRUCTOR_ITERATIONS;
 // TODO: What should this limit be? Both glibc and musl have it as 1024
 pub const PTHREAD_KEYS_MAX: c_long = 4096 * 32;
+pub const PTHREAD_STACK_MIN: c_long = 65536;
