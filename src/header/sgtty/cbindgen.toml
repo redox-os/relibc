@@ -5,5 +5,8 @@ style = "Tag"
 no_includes = true
 cpp_compat = true
 
+[export.rename]
+"sgttyb" = "struct sgttyb"
+
 [enum]
 prefix_with_name = true

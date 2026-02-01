@@ -21,11 +21,11 @@ use crate::{
         },
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
+        sys_select::timeval,
         sys_socket::{
             CMSG_ALIGN, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE, cmsghdr,
             constants::*, msghdr, sa_family_t, sockaddr, socklen_t, ucred,
         },
-        sys_time::timeval,
         sys_uio::iovec,
         sys_un::sockaddr_un,
     },

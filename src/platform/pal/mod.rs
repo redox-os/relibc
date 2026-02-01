@@ -7,9 +7,10 @@ use crate::{
     header::{
         signal::sigevent,
         sys_resource::{rlimit, rusage},
+        sys_select::timeval,
         sys_stat::stat,
         sys_statvfs::statvfs,
-        sys_time::{timeval, timezone},
+        sys_time::timezone,
         sys_utsname::utsname,
         time::{itimerspec, timespec},
     },

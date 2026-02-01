@@ -5,7 +5,7 @@
 use crate::{
     c_str::CStr,
     error::ResultExt,
-    header::time::timespec,
+    header::{sys_select::timeval, time::timespec},
     out::Out,
     platform::{
         Pal, PalSignal, Sys,
@@ -57,16 +57,6 @@ pub struct fd_set {
 pub struct itimerval {
     pub it_interval: timeval,
     pub it_value: timeval,
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_time.h.html>.
-///
-/// TODO: specified for `sys/select.h` in modern POSIX?
-#[repr(C)]
-#[derive(Default)]
-pub struct timeval {
-    pub tv_sec: time_t,
-    pub tv_usec: suseconds_t,
 }
 
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/gettimeofday.2.html>.

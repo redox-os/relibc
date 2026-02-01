@@ -107,7 +107,7 @@ pub(crate) unsafe fn create(
     start_routine: extern "C" fn(arg: *mut c_void) -> *mut c_void,
     arg: *mut c_void,
 ) -> Result<pthread_t, Errno> {
-    let attrs = attrs.copied().unwrap_or_default();
+    let attrs = attrs.cloned().unwrap_or_default();
 
     let mut current_sigmask = 0_u64;
     #[cfg(target_os = "redox")]

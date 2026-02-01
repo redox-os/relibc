@@ -137,7 +137,7 @@ impl PalSignal for Sys {
         set: &sigset_t,
         sig: Option<&mut siginfo_t>,
         tp: Option<&timespec>,
-    ) -> Result<()> {
+    ) -> Result<c_int> {
         unsafe {
             e_raw(syscall!(
                 RT_SIGTIMEDWAIT,
@@ -146,7 +146,7 @@ impl PalSignal for Sys {
                 tp.map_or_else(core::ptr::null, |t| t as *const _),
                 size_of::<sigset_t>()
             ))
-            .map(|_| ())
+            .map(|s| s as c_int)
         }
     }
 }

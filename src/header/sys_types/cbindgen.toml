@@ -5,7 +5,6 @@ sys_includes = [
     "sys/types_internal.h",
 
     "stddef.h",
-    "sys/select.h",
     "bits/pthread.h",
     "features.h",
 ]
