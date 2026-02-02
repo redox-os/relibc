@@ -293,14 +293,11 @@ pub unsafe extern "C" fn getgrnam(name: *const c_char) -> *mut group {
         };
 
         // Attempt to prevent BO vulnerabilities
-        if unsafe {
-            strncmp(
-                grp.reference.gr_name,
-                name,
-                strlen(grp.reference.gr_name).min(strlen(name)),
-            ) == 0
-        } {
-            return grp.into_global();
+        unsafe {
+            let grp_len = strlen(grp.reference.gr_name);
+            if grp_len == strlen(name) && strncmp(grp.reference.gr_name, name, grp_len) == 0 {
+                return grp.into_global();
+            }
         }
     }
 
@@ -395,19 +392,16 @@ pub unsafe extern "C" fn getgrnam_r(
             return EINVAL;
         };
 
-        if unsafe {
-            strncmp(
-                grp.reference.gr_name,
-                name,
-                strlen(grp.reference.gr_name).min(strlen(name)),
-            ) > 0
-        } {
-            unsafe {
-                *result_buf = grp.reference;
-                *result = result_buf;
-            }
+        unsafe {
+            let grp_len = strlen(grp.reference.gr_name);
+            if grp_len == strlen(name) && strncmp(grp.reference.gr_name, name, grp_len) == 0 {
+                unsafe {
+                    *result_buf = grp.reference;
+                    *result = result_buf;
+                }
 
-            return 0;
+                return 0;
+            }
         }
     }
 

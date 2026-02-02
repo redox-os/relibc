@@ -8,13 +8,12 @@ void test_getgrgid(gid_t gid) {
     struct group *out = getgrgid(gid);
     
     if (out == NULL) {
+        // TODO: Check errno
         printf("Did not find a group %d\n", gid);
         return;
     }
     
-    printf("getgrgid\n");
-    
-    printf("    %d = %s, GID: %d\n", gid, out->gr_name, out->gr_gid);
+    printf("getgrgid:   %d = %s, GID: %d\n", gid, out->gr_name, out->gr_gid);
 }
 
 void test_getgrgid_r(gid_t gid) {
@@ -31,12 +30,12 @@ void test_getgrgid_r(gid_t gid) {
         return;
     }
     
-    printf("getgrgid_r\n");   
-    
-    printf("    %d = %s, GID: %d\n", gid, grp.gr_name, grp.gr_gid);
+    printf("getgrgid_r: %d = %s, GID: %d\n", gid, grp.gr_name, grp.gr_gid);
 }
 
 int main(void) {
-    test_getgrgid(1050);
-    test_getgrgid_r(1050);
+    test_getgrgid(9999);
+    test_getgrgid_r(9999);
+    test_getgrgid(0);
+    test_getgrgid_r(0);
 }

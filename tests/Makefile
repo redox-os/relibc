@@ -49,6 +49,8 @@ EXPECT_NAMES=\
 	features \
 	fnmatch \
 	glob \
+	grp/getgrgid_r \
+	grp/getgrnam_r \
 	iso646 \
 	libgen \
 	locale/duplocale \
@@ -301,8 +303,6 @@ VARIED_NAMES=\
 	pthread/mutex_recursive \
 	pthread/timeout \
 	grp/getgrouplist \
-	grp/getgrgid_r \
-	grp/getgrnam_r \
 	grp/gr_iter \
 	waitpid \
 	waitpid_multiple \
