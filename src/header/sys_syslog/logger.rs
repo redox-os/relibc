@@ -14,7 +14,10 @@ use crate::{
         unistd::getpid,
     },
     io::Write,
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int},
+    },
     sync::Mutex,
 };
 
