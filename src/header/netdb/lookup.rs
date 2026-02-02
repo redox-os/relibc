@@ -7,7 +7,10 @@ use core::mem;
 
 use crate::{
     out::Out,
-    platform::{Pal, Sys, types::*},
+    platform::{
+        Pal, Sys,
+        types::{c_int, c_void},
+    },
 };
 
 use crate::header::{

@@ -1,4 +1,4 @@
-use crate::platform::types::*;
+use crate::platform::types::c_int;
 
 pub const SOCK_STREAM: c_int = 1;
 pub const SOCK_DGRAM: c_int = 2;
