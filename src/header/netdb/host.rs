@@ -11,7 +11,7 @@ use crate::{
     platform::{
         Pal, Sys,
         rlb::{Line, RawLineBuffer},
-        types::*,
+        types::{c_char, c_int},
     },
     raw_cell::RawCell,
 };
