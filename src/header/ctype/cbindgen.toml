@@ -1,3 +1,9 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/ctype.h.html
+#
+# Spec quotations relating to includes:
+# - "The <ctype.h> header shall define the locale_t type as described in <locale.h>, representing a locale object."
+#
+# features.h included for #[deprecated] annotation
 sys_includes = ["bits/ctype.h", "features.h"]
 include_guard = "_RELIBC_CTYPE_H"
 after_includes = "#include <bits/locale-t.h> // for locale_t"
