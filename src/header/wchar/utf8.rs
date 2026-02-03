@@ -5,7 +5,7 @@ use core::{char, slice, str, usize};
 
 use crate::{
     header::errno,
-    platform::{self, types::*},
+    platform::{self, types::{c_char, wchar_t}},
 };
 
 use super::mbstate_t;
