@@ -1,6 +1,6 @@
 use crate::{
     header::stdio::{F_NORD, F_NOWR, FILE},
-    platform::types::*,
+    platform::types::{c_int, size_t},
 };
 
 #[unsafe(no_mangle)]
