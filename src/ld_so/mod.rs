@@ -143,7 +143,7 @@ pub unsafe fn init(
     {
         const ARCH_GET_FS: usize = 0x1003;
         let mut val = 0usize;
-        syscall!(ARCH_PRCTL, ARCH_GET_FS, &mut val as *mut usize);
+        syscall!(ARCH_PRCTL, ARCH_GET_FS, &raw mut val);
         tp = val;
     }
     #[cfg(target_arch = "aarch64")]
