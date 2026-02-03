@@ -1,4 +1,4 @@
-use crate::platform::types::*;
+use crate::platform::types::{c_int, c_uint, int32_t, off_t};
 
 pub const EOF: c_int = -1;
 pub const BUFSIZ: c_int = 1024;

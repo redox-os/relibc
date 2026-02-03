@@ -12,7 +12,14 @@ use core::{cmp, ffi::VaList, fmt, num::FpCategory, ops::Range, slice};
 
 use crate::{
     header::errno::{self, EILSEQ},
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{
+            c_char, c_double, c_int, c_long, c_longlong, c_short, c_uchar, c_uint, c_ulong,
+            c_ulonglong, c_ushort, c_void, intmax_t, ptrdiff_t, size_t, ssize_t, uintmax_t,
+            wchar_t, wint_t,
+        },
+    },
 };
 
 //  ____        _ _                 _       _

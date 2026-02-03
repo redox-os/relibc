@@ -1,17 +1,26 @@
 use alloc::boxed::Box;
 
-use super::{Buffer, FILE, constants::*};
+use super::{
+    Buffer, FILE,
+    constants::{BUFSIZ, F_APP, F_NORD, F_NOWR},
+};
 use crate::{
     c_str::CStr,
     error::Errno,
     fs::File,
     header::{
         errno::{self, EINVAL},
-        fcntl::*,
+        fcntl::{
+            F_GETFL, F_SETFD, F_SETFL, FD_CLOEXEC, O_APPEND, O_CLOEXEC, O_CREAT, O_EXCL, O_RDONLY,
+            O_RDWR, O_TRUNC, O_WRONLY, fcntl,
+        },
         pthread,
     },
     io::BufWriter,
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_int, c_ulonglong},
+    },
     sync::Mutex,
 };
 use alloc::vec::Vec;

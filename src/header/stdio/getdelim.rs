@@ -12,7 +12,7 @@ use crate::{
     },
     io::BufRead,
     platform,
-    platform::types::*,
+    platform::types::{c_char, c_int, c_void, size_t, ssize_t},
 };
 
 use crate::{

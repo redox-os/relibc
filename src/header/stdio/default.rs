@@ -5,7 +5,7 @@ use crate::{
     fs::File,
     header::pthread,
     io::LineWriter,
-    platform::types::*,
+    platform::types::c_int,
     sync::{Mutex, Once},
 };
 use alloc::{boxed::Box, vec::Vec};
