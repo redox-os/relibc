@@ -1,5 +1,22 @@
-sys_includes = ["stddef.h", "sys/socket.h", "netinet/in.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/arpa_inet.h.html
+#
+# Spec quotations relating to includes:
+# - "The <arpa/inet.h> header shall define the in_port_t and in_addr_t types as described in <netinet/in.h> and the socklen_t type as defined in <sys/socket.h>."
+# - "The <arpa/inet.h> header shall define the in_addr structure as described in <netinet/in.h>."
+# - "The <arpa/inet.h> header shall define the INET_ADDRSTRLEN [IP6] ￼  and INET6_ADDRSTRLEN ￼ macros as described in <netinet/in.h>."
+# - "The <arpa/inet.h> header shall define the uint32_t and uint16_t types as described in <inttypes.h>."
+# - "Inclusion of the <arpa/inet.h> header may also make visible all symbols from <netinet/in.h> and <inttypes.h>."
+#
+# features.h included for #[deprecated] annotation
+sys_includes = [
+  "inttypes.h",
+  "netinet/in.h",
+  "features.h"
+]
 include_guard = "_ARPA_INET_H"
+after_includes = """
+#include <bits/socklen-t.h> // for socklen_t
+"""
 language = "C"
 style = "Tag"
 no_includes = true
