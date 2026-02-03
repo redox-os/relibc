@@ -1,5 +1,5 @@
 use super::{siginfo_t, sigset_t, stack_t};
-use crate::platform::types::*;
+use crate::platform::types::c_ulong;
 use core::arch::global_asm;
 
 // Needs to be defined in assembly because it can't have a function prologue
