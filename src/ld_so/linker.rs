@@ -523,7 +523,7 @@ impl Linker {
                     ti_offset: symbol.value,
                 };
 
-                unsafe { __tls_get_addr(&mut tls_index) }
+                unsafe { __tls_get_addr(&raw mut tls_index) }
             }
         })
     }

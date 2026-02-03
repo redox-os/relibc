@@ -865,7 +865,7 @@ impl DSO {
             };
 
             // Ensure the DTV entry is initialised.
-            unsafe { __tls_get_addr(&mut tls_index) };
+            unsafe { __tls_get_addr(&raw mut tls_index) };
 
             *resolver = __tlsdesc_dynamic as *const () as usize;
             *descriptor = Box::into_raw(Box::new(TlsDescriptor {
