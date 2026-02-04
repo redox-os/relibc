@@ -116,12 +116,7 @@ fn main() {
                 failures.push(failure);
                 break;
             }
-            // A pretty rare hang on pthread/barrier which also stops this loop :(
-            // https://gitlab.redox-os.org/redox-os/relibc/-/issues/238
-            if &bin == "./bins_dynamic/pthread/barrier"
-                || &bin == "./bins_dynamic/pthread/once"
-                || start_time.elapsed() > slowtime
-            {
+            if start_time.elapsed() > slowtime {
                 println!("# waiting {}ms", start_time.elapsed().as_millis());
             }
 

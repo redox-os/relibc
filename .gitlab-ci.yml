@@ -58,7 +58,6 @@ test:x86_64:
     stage: test
     needs: [x86_64]
     script:
-        # timeout: https://gitlab.redox-os.org/redox-os/relibc/-/issues/238
         - timeout -s KILL 9m ./check.sh --arch=x86_64 --test
 
 test:aarch64:
