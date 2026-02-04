@@ -12,7 +12,7 @@ use crate::{
     raw_cell::RawCell,
 };
 
-use crate::platform::types::*;
+use crate::platform::types::c_char;
 
 fn getpass_rs(prompt: CStr, passbuff: &mut [u8]) -> Result<*mut c_char, io::Error> {
     let mut f = File::open(c"/dev/tty".into(), O_RDWR | O_CLOEXEC)?;

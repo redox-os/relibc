@@ -3,7 +3,10 @@ use core::ptr;
 use crate::{
     error::ResultExtPtrMut,
     header::errno::ENOMEM,
-    platform::{self, Pal, Sys, types::*},
+    platform::{
+        self, Pal, Sys,
+        types::{c_int, c_void, intptr_t},
+    },
 };
 
 static mut BRK: *mut c_void = ptr::null_mut();
