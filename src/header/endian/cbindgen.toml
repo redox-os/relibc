@@ -1,3 +1,8 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/endian.h.html
+#
+# Spec quotations relating to includes:
+# - "The <endian.h> header shall define the uint16_t, uint32_t, and uint64_t types as described in <stdint.h>."
+# - "Inclusion of the <endian.h> header may also make visible all symbols from <stdint.h>."
 sys_includes = ["stdint.h"]
 include_guard = "_RELIBC_ENDIAN_H"
 trailer = "#include <machine/endian.h>"
