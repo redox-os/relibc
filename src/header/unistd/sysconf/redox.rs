@@ -8,7 +8,10 @@ use crate::{
     header::{errno, fcntl, limits, sys_statvfs},
     io::Read,
     out::Out,
-    platform::{self, Pal, Sys, types::*},
+    platform::{
+        self, Pal, Sys,
+        types::{c_int, c_long},
+    },
 };
 
 // POSIX.1 {
