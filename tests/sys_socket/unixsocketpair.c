@@ -10,13 +10,6 @@
 
 #include "test_helpers.h"
 
-volatile sig_atomic_t signal_received = 0;
-
-void handle_sigusr1(int sig) {
-    (void)sig; 
-    signal_received = 1;
-}
-
 int main(void) {
     int sv[2]; 
     pid_t pid;
