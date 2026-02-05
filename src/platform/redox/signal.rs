@@ -7,8 +7,8 @@ use crate::{
     header::{
         errno::{EINVAL, ENOSYS},
         signal::{
-            NSIG, SA_SIGINFO, SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SIGRTMIN,
-            SS_DISABLE, SS_ONSTACK, sigaction, siginfo_t, sigset_t, sigval, stack_t, ucontext_t,
+            NSIG, SA_SIGINFO, SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE,
+            SS_ONSTACK, sigaction, siginfo_t, sigset_t, sigval, stack_t, ucontext_t,
         },
         sys_time::{ITIMER_REAL, itimerval},
         time::timespec,
@@ -86,18 +86,6 @@ impl PalSignal for Sys {
 
     fn raise(sig: c_int) -> Result<()> {
         // TODO: Bypass kernel?
-        const n_sig: c_int = NSIG as c_int;
-        const rt_min: c_int = SIGRTMIN as c_int;
-        const rt_max: c_int = SIGRTMIN as c_int;
-
-        match sig {
-            0..n_sig => {}
-            rt_min..=rt_max => {}
-            _ => {
-                return Err(Errno(EINVAL));
-            }
-        }
-
         unsafe { Self::rlct_kill(Self::current_os_tid(), sig as _) }
     }
 
