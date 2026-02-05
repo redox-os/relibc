@@ -351,11 +351,12 @@ fn modify_sigmask(old: Option<&mut u64>, op: Option<impl FnOnce(u64) -> u64>) ->
 
     let next = !op(!prev);
 
-    let pending = set_allowset_raw(&ctl.word, prev, next);
+    let thread_pending = set_allowset_raw(&ctl.word, prev, next);
+    let proc_pending = PROC_CONTROL_STRUCT.pending.load(Ordering::Relaxed);
 
     // POSIX requires that at least one pending unblocked signal be delivered before
     // pthread_sigmask returns, if there is one.
-    if pending != 0 {
+    if (thread_pending | proc_pending) & next != 0 {
         unsafe {
             manually_enter_trampoline();
         }
