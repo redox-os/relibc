@@ -7,7 +7,7 @@ use core::{
 use ioslice::IoSlice;
 use syscall::{
     CallFlags, EINVAL, ERESTART, TimeSpec,
-    error::{self, EINTR, ENODEV, Error, Result},
+    error::{self, EINTR, ENODEV, ESRCH, Error, Result},
 };
 
 use crate::{
@@ -70,6 +70,13 @@ pub fn posix_kill(target: ProcKillTarget, sig: usize) -> Result<()> {
 }
 #[inline]
 pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
+    let target = ProcKillTarget::from_raw(pid);
+    if !matches!(target, ProcKillTarget::SingleProc(_)) {
+        return Err(Error::new(ESRCH));
+    }
+    if sig <= 32 {
+        return posix_kill(target, sig);
+    }
     let mut siginf = RtSigInfo {
         arg,
         code: -1, // TODO: SI_QUEUE constant
