@@ -92,7 +92,7 @@ pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
     }) {
         Ok(_)
         | Err(Error {
-            errno: error::EINTR,
+            errno: error::ERESTART,
         }) => Ok(()),
         Err(error) => Err(error),
     }
