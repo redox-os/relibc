@@ -15,7 +15,6 @@ use crate::{
     sync::Once,
 };
 
-const EMPTY_PTR: *const c_char = "\0" as *const _ as *const c_char;
 // Can't use &str because of the mutability
 static mut C_LOCALE: [c_char; 2] = [b'C' as c_char, 0];
 
