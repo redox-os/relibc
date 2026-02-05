@@ -28,9 +28,6 @@ pub(crate) mod sys;
 #[path = "redox/mod.rs"]
 pub(crate) mod sys;
 
-#[cfg(test)]
-mod test;
-
 pub use self::rlb::{Line, RawLineBuffer};
 pub mod rlb;
 
