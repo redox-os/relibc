@@ -44,7 +44,7 @@ pub struct pollfd {
     pub revents: c_short,
 }
 
-pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) -> c_int {
+pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) -> c_int {
     let event_map = [
         (POLLIN, EPOLLIN),
         (POLLPRI, EPOLLPRI),
@@ -143,11 +143,13 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
     trace_expr!(
-        poll_epoll(
-            unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
-            timeout,
-            ptr::null_mut()
-        ),
+        unsafe {
+            poll_epoll(
+                unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
+                timeout,
+                ptr::null_mut(),
+            )
+        },
         "poll({:p}, {}, {})",
         fds,
         nfds,
@@ -174,11 +176,13 @@ pub unsafe extern "C" fn ppoll(
         }
     };
     trace_expr!(
-        poll_epoll(
-            unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
-            timeout,
-            sigmask
-        ),
+        unsafe {
+            poll_epoll(
+                unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
+                timeout,
+                sigmask,
+            )
+        },
         "ppoll({:p}, {}, {:p}, {:p})",
         fds,
         nfds,
