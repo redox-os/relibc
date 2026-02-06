@@ -59,7 +59,7 @@ pub unsafe extern "C" fn pthread_setspecific(key: pthread_key_t, value: *const c
     });
     //println!("Valid key for pthread_setspecific key {:#0x} value {:p} (was {:p})", key, value, record.data);
 
-    record.data = value as *mut c_void;
+    record.data = value.cast_mut();
     0
 }
 
