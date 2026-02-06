@@ -9,6 +9,9 @@
 
 #include "test_helpers.h"
 
+// similar to "unixrecv", but this test if write() works before accept().
+// "unixrecvfrom" is the similar test to this one, but using SOCK_DGRAM.
+// "unixrecvearly" is also the similar test to this one, but using recv().
 int main() {
     int status;
     const char* socket_path = "unix_write.sock";
@@ -35,9 +38,18 @@ int main() {
     ERROR_IF(connect, status, == -1);
 
     char *msg = "yes";
-    ssize_t ret = write(client_fd, msg, 3);
+    ssize_t ret = write(client_fd, msg, 4);
     ERROR_IF(write, ret, == -1);
+    UNEXP_IF(raise, ret, != 4);
 
+    int accepted_fd = accept(server_fd, NULL, NULL);
+    ERROR_IF(accept, accepted_fd, == -1);
+
+    char x[4];
+    ssize_t amount = read(accepted_fd, x, 4);
+    ERROR_IF(read, amount, == -1);
+
+    close(accepted_fd);
     close(client_fd);
     close(server_fd);
     return 0;
