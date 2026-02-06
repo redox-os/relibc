@@ -93,6 +93,7 @@ impl<R: Read> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
+    #[allow(clippy::uninit_vec)] // buffer initialized after set_len
     pub fn with_capacity(cap: usize, inner: R) -> BufReader<R> {
         unsafe {
             let mut buffer = Vec::with_capacity(cap);
