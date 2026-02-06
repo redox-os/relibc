@@ -10,14 +10,14 @@
 
 #include "test_helpers.h"
 
-int main(void) {
+void socketpair_test(int flags) {
     int sv[2]; 
     pid_t pid;
     char buf[64];
     const char *parent_msg = "ping";
     const char *child_msg = "pong";
 
-    int status = socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
+    int status = socketpair(AF_UNIX, flags, 0, sv);
     ERROR_IF(socketpair, status, == -1);
 
     pid = fork();
@@ -34,6 +34,7 @@ int main(void) {
         ERROR_IF(send, status, == -1);
 
         close(sv[1]);
+        exit(0);
     } else {
         close(sv[1]); 
 
@@ -47,6 +48,12 @@ int main(void) {
         close(sv[0]);
         wait(NULL); 
     }
+}
 
+int main(void) {
+    printf("SOCK_STREAM\n");
+    socketpair_test(SOCK_STREAM);
+    printf("SOCK_DGRAM\n");
+    socketpair_test(SOCK_DGRAM);
     return 0;
 }
