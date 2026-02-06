@@ -108,7 +108,7 @@ impl LinkMap {
             (*map).l_addr = l_addr;
             (*map).l_ld = l_ld;
             let c_name = CString::new(name).unwrap();
-            (*map).l_name = c_name.into_raw() as *const c_char;
+            (*map).l_name = c_name.into_raw().cast_const();
         }
         map
     }
