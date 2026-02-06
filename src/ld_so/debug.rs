@@ -99,8 +99,8 @@ impl LinkMap {
         Box::into_raw(map)
     }
     fn link(&mut self, map: &mut LinkMap) {
-        map.l_prev = self as *mut LinkMap;
-        self.l_next = map as *mut LinkMap;
+        map.l_prev = ptr::from_mut::<LinkMap>(self);
+        self.l_next = ptr::from_mut::<LinkMap>(map);
     }
     fn new_with_args(l_addr: usize, name: &str, l_ld: usize) -> *mut Self {
         let map = LinkMap::new();
