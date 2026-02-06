@@ -83,7 +83,7 @@ impl Tcb {
         let page_size = Sys::getpagesize();
         let (_abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
 
-        let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
+        let tcb_ptr = tcb_page.as_mut_ptr().cast::<Self>();
         ptr::write(
             tcb_ptr,
             Self {
@@ -278,8 +278,8 @@ impl Tcb {
         )
         .map_err(|_| DlError::Oom)?;
 
-        ptr::write_bytes(ptr as *mut u8, 0, size);
-        Ok(slice::from_raw_parts_mut(ptr as *mut u8, size))
+        ptr::write_bytes(ptr.cast::<u8>(), 0, size);
+        Ok(slice::from_raw_parts_mut(ptr.cast::<u8>(), size))
     }
 
     /// OS specific code to create a new TLS and TCB - Linux and Redox

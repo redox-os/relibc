@@ -20,9 +20,11 @@ members = [
 exclude = ["tests", "dlmalloc-rs"]
 
 [workspace.lints.clippy]
+ptr_as_ptr = "warn"
 ptr_cast_constness = "warn"
 
 [lints.clippy]
+ptr_as_ptr = "warn"
 ptr_cast_constness = "warn"
 
 [build-dependencies]

@@ -549,11 +549,11 @@ impl DSO {
                     );
                 }
                 log::trace!("    = {:p}", ptr);
-                ptr::write_bytes(ptr as *mut u8, 0, size);
+                ptr::write_bytes(ptr.cast::<u8>(), 0, size);
                 _r_debug
                     .lock()
                     .insert(ptr as usize, path, ptr as usize + l_ld as usize);
-                slice::from_raw_parts_mut(ptr as *mut u8, size)
+                slice::from_raw_parts_mut(ptr.cast::<u8>(), size)
             }
         };
 
@@ -753,7 +753,7 @@ impl DSO {
                 elf::DT_FINI_ARRAY if val != 0 => fini_array_ptr = Some(ptr.cast::<InitFn>()),
                 elf::DT_FINI_ARRAYSZ => fini_array_len = Some(val as usize / size_of::<InitFn>()),
 
-                elf::DT_SYMTAB => symtab_ptr = Some(ptr as *const Sym),
+                elf::DT_SYMTAB => symtab_ptr = Some(ptr.cast::<Sym>()),
                 elf::DT_SYMENT => {
                     assert_eq!(val as usize, size_of::<Sym>());
                 }
@@ -922,13 +922,13 @@ impl DSO {
             Some(some) => some,
             None => match reloc.kind {
                 RelocationKind::COPY | RelocationKind::GOT | RelocationKind::PLT => 0,
-                _ => unsafe { *(ptr as *mut usize) },
+                _ => unsafe { *ptr.cast::<usize>() },
             },
         };
 
         // TODO: support different sizes?
         let set_usize = |value| unsafe {
-            *(ptr as *mut usize) = value;
+            *ptr.cast::<usize>() = value;
         };
 
         match reloc.kind {
