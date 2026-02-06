@@ -930,12 +930,18 @@ fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option
         let info = SenderInfo::from_raw(match thread_control {
             Some(ctl) => {
                 // Only this thread can clear pending bits, so this will always succeed.
-                let info = ctl.sender_infos[sig_idx as usize].load(Ordering::Acquire);
-                // TODO: Ordering
+                let info = match ctl.sender_infos.get(sig_idx as usize) {
+                    Some(i) => i.load(Ordering::Relaxed),
+                    // TODO: Protocol will need to be extended in order to allow passing si_uid and
+                    // si_pid for per-thread (non-queued) realtime signals.
+                    None => 0,
+                };
+                // TODO: Ordering?
                 ctl.word[sig_group as usize].fetch_and(!(1 << (sig_idx % 32)), Ordering::Release);
                 info
             }
             None => {
+                // Must have sig_group == 0 here due to the above if stmt
                 let info =
                     PROC_CONTROL_STRUCT.sender_infos[sig_idx as usize].load(Ordering::Acquire);
                 if PROC_CONTROL_STRUCT
