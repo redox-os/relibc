@@ -26,7 +26,7 @@ mut_from_ref = "allow"
 ptr_as_ptr = "warn"
 ptr_cast_constness = "warn"
 ref_as_ptr = "warn"
-zero_ptr = "warn"
+zero_ptr = "warn" # must allow on public constants due to cbindgen issue
 
 [lints.clippy]
 cast_lossless = "warn"
@@ -35,13 +35,15 @@ mut_from_ref = "allow"
 ptr_as_ptr = "warn"
 ptr_cast_constness = "warn"
 ref_as_ptr = "warn"
-zero_ptr = "warn"
+zero_ptr = "warn" # must allow on public constants due to cbindgen issue
 
 [workspace.lints.rust]
+irrefutable_let_patterns = "deny"
 non_camel_case_types = "allow"
 unsafe_op_in_unsafe_fn = "deny"
 
 [lints.rust]
+irrefutable_let_patterns = "deny"
 non_camel_case_types = "allow"
 unsafe_op_in_unsafe_fn = "deny"
 
