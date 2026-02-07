@@ -39,7 +39,7 @@ pub struct RTLDDebug {
 impl RTLDDebug {
     const NEW: Self = RTLDDebug {
         r_version: 1,
-        r_map: 0 as *mut LinkMap,
+        r_map: ptr::null_mut::<LinkMap>(),
         r_brk: _dl_debug_state,
         state: RTLDState::RT_CONSISTENT,
         r_ldbase: 0,

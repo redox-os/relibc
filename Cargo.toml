@@ -20,14 +20,30 @@ members = [
 exclude = ["tests", "dlmalloc-rs"]
 
 [workspace.lints.clippy]
+cast_lossless = "warn"
+cast_ptr_alignment = "allow" # TODO change to warn or deny when ready to fix
+mut_from_ref = "allow"
 ptr_as_ptr = "warn"
 ptr_cast_constness = "warn"
 ref_as_ptr = "warn"
+zero_ptr = "warn"
 
 [lints.clippy]
+cast_lossless = "warn"
+cast_ptr_alignment = "allow" # TODO change to warn or deny when ready to fix
+mut_from_ref = "allow"
 ptr_as_ptr = "warn"
 ptr_cast_constness = "warn"
 ref_as_ptr = "warn"
+zero_ptr = "warn"
+
+[workspace.lints.rust]
+non_camel_case_types = "allow"
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.rust]
+non_camel_case_types = "allow"
+unsafe_op_in_unsafe_fn = "deny"
 
 [build-dependencies]
 cc = "1"
