@@ -128,18 +128,16 @@ pub unsafe extern "C" fn utimes(path: *const c_char, times: *const timeval) -> c
     let times_spec = if times.is_null() {
         null()
     } else {
-        {
-            [
-                timespec {
-                    tv_sec: unsafe { (*times.offset(0)).tv_sec },
-                    tv_nsec: (unsafe { (*times.offset(0)).tv_usec } as c_long) * 1000,
-                },
-                timespec {
-                    tv_sec: unsafe { (*times.offset(1)).tv_sec },
-                    tv_nsec: (unsafe { (*times.offset(1)).tv_usec } as c_long) * 1000,
-                },
-            ]
-        }
+        [
+            timespec {
+                tv_sec: unsafe { (*times.offset(0)).tv_sec },
+                tv_nsec: (unsafe { (*times.offset(0)).tv_usec } as c_long) * 1000,
+            },
+            timespec {
+                tv_sec: unsafe { (*times.offset(1)).tv_sec },
+                tv_nsec: (unsafe { (*times.offset(1)).tv_usec } as c_long) * 1000,
+            },
+        ]
         .as_ptr()
     };
     unsafe { Sys::utimens(path, times_spec) }
