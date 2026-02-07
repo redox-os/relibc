@@ -1,5 +1,41 @@
 use bitflags::bitflags;
 
+macro_rules! enum_tofrom {
+    {
+        //$(#[$tl_cfg:meta])*
+        $v:vis enum $e:ident : $r:ty {
+            $(
+                //$($var_cfg:meta)*
+                $var:ident = $c:literal
+            ),*
+            $(,)?
+        }
+    } => {
+        #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+        #[repr($r)]
+        //$(#[$tl_cfg])*
+        $v enum $e {
+            $(
+                //$(#[$var_cfg])*
+                $var = $c
+            ),*
+        }
+        impl $e {
+            pub const fn try_from_raw(raw: $r) -> Option<Self> {
+                Some(match raw {
+                    $(
+                        $c => Self::$var,
+                    )*
+                    _ => return None,
+                })
+            }
+            pub const fn raw(self) -> $r {
+                self as $r
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 #[repr(C)]
 pub struct ProcMeta {
@@ -17,37 +53,37 @@ pub struct ProcMeta {
 }
 unsafe impl plain::Plain for ProcMeta {}
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[repr(usize)]
-pub enum ProcCall {
-    Waitpid = 0,
-    Setrens = 1,
-    Exit = 2,
-    Waitpgid = 3,
-    SetResugid = 4,
-    Setpgid = 5,
-    Getsid = 6,
-    Setsid = 7,
-    Kill = 8,
-    Sigq = 9,
+enum_tofrom! {
+    pub enum ProcCall : usize {
+        Waitpid = 0,
+        Setrens = 1,
+        Exit = 2,
+        Waitpgid = 3,
+        SetResugid = 4,
+        Setpgid = 5,
+        Getsid = 6,
+        Setsid = 7,
+        Kill = 8,
+        Sigq = 9,
 
-    // TODO: replace with sendfd equivalent syscall for sending memory
-    SyncSigPctl = 10,
-    Sigdeq = 11,
-    Getppid = 12,
-    Rename = 13,
-    DisableSetpgid = 14,
+        // TODO: replace with sendfd equivalent syscall for sending memory
+        SyncSigPctl = 10,
+        Sigdeq = 11,
+        Getppid = 12,
+        Rename = 13,
+        DisableSetpgid = 14,
 
-    // Temporary calls for getting process credentials
-    GetProcCredentials = 15,
+        // Temporary calls for getting process credentials
+        GetProcCredentials = 15,
+    }
 }
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[repr(usize)]
-pub enum ThreadCall {
-    // TODO: replace with sendfd equivalent syscall for sending memory, or force userspace to
-    // obtain its TCB memory from this server
-    SyncSigTctl = 0,
-    SignalThread = 1,
+enum_tofrom! {
+    pub enum ThreadCall : usize {
+        // TODO: replace with sendfd equivalent syscall for sending memory, or force userspace to
+        // obtain its TCB memory from this server
+        SyncSigTctl = 0,
+        SignalThread = 1,
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -71,39 +107,6 @@ pub enum SocketCall {
 #[non_exhaustive]
 pub enum FsCall {
     Connect = 0,
-}
-
-impl ProcCall {
-    pub fn try_from_raw(raw: usize) -> Option<Self> {
-        Some(match raw {
-            0 => Self::Waitpid,
-            1 => Self::Setrens,
-            2 => Self::Exit,
-            3 => Self::Waitpgid,
-            4 => Self::SetResugid,
-            5 => Self::Setpgid,
-            6 => Self::Getsid,
-            7 => Self::Setsid,
-            8 => Self::Kill,
-            9 => Self::Sigq,
-            10 => Self::SyncSigPctl,
-            11 => Self::Sigdeq,
-            12 => Self::Getppid,
-            13 => Self::Rename,
-            14 => Self::DisableSetpgid,
-            15 => Self::GetProcCredentials,
-            _ => return None,
-        })
-    }
-}
-impl ThreadCall {
-    pub fn try_from_raw(raw: usize) -> Option<Self> {
-        Some(match raw {
-            0 => Self::SyncSigTctl,
-            1 => Self::SignalThread,
-            _ => return None,
-        })
-    }
 }
 
 impl SocketCall {
@@ -215,7 +218,7 @@ pub struct RtSigInfo {
     pub arg: usize,
     pub code: i32,
     pub uid: u32,
-    pub pid: u32, // TODO: usize?
+    pub pid: u32,
 }
 unsafe impl plain::Plain for RtSigInfo {}
 
@@ -235,12 +238,12 @@ pub const SIGPIPE: usize = 13;
 pub const SIGALRM: usize = 14;
 pub const SIGTERM: usize = 15;
 pub const SIGSTKFLT: usize = 16;
-pub const SIGCHLD: usize = syscall::SIGCHLD;
+pub const SIGCHLD: usize = 17;
 pub const SIGCONT: usize = 18;
 pub const SIGSTOP: usize = 19;
-pub const SIGTSTP: usize = syscall::SIGTSTP;
-pub const SIGTTIN: usize = syscall::SIGTTIN;
-pub const SIGTTOU: usize = syscall::SIGTTOU;
+pub const SIGTSTP: usize = 20;
+pub const SIGTTIN: usize = 21;
+pub const SIGTTOU: usize = 22;
 pub const SIGURG: usize = 23;
 pub const SIGXCPU: usize = 24;
 pub const SIGXFSZ: usize = 25;
@@ -250,6 +253,13 @@ pub const SIGWINCH: usize = 28;
 pub const SIGIO: usize = 29;
 pub const SIGPWR: usize = 30;
 pub const SIGSYS: usize = 31;
+
+// TODO: enforce equivalence with consts in header/signal/redox
+pub const SI_QUEUE: i32 = -1;
+pub const SI_USER: i32 = 0;
+pub const SI_TIMER: i32 = 1;
+pub const SI_ASYNCIO: i32 = 2;
+pub const SI_MESGQ: i32 = 3;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, Default, Eq, Ord, Hash, PartialEq, PartialOrd)]
@@ -265,20 +275,100 @@ bitflags! {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[repr(usize)]
-pub enum NsDup {
-    ForkNs = 0,
-    ShrinkPermissions = 1,
-    IssueRegister = 2,
+enum_tofrom! {
+    pub enum NsDup : usize {
+        ForkNs = 0,
+        ShrinkPermissions = 1,
+        IssueRegister = 2,
+    }
 }
-impl NsDup {
-    pub fn try_from_raw(raw: usize) -> Option<Self> {
-        Some(match raw {
-            0 => Self::ForkNs,
-            1 => Self::ShrinkPermissions,
-            2 => Self::IssueRegister,
-            _ => return None,
-        })
+
+/// Parts of the signal protocol only relevant between procmgr and redox-rt
+pub mod signal {
+    use super::*;
+    use core::sync::atomic::Ordering;
+    use syscall::SigProcControl;
+
+    enum_tofrom! {
+        // defined to match SI_ consts so compiler just needs to sign extend
+        pub enum Code: u8 {
+            User = 0,
+            Timer = 1,
+            AsyncIO = 2,
+            Mesgq = 3,
+            Queue = 15,
+        }
+    }
+    impl Code {
+        pub fn to_si_code(self) -> i32 {
+            match self {
+                Self::User => SI_USER,
+                Self::Timer => SI_TIMER,
+                Self::AsyncIO => SI_ASYNCIO,
+                Self::Mesgq => SI_MESGQ,
+                Self::Queue => SI_QUEUE,
+            }
+        }
+    }
+
+    /// Number of bits used to encode a PID, i.e. `log2(MAX_POSSIBLE_PID+1)`.
+    ///
+    /// This is fundamentally limited to 31 by being `int` in POSIX, and where -pid as a PGID in some
+    /// places. Further, 3 additional bits are reserved so that 4 bits can be used to encode `si_code`
+    /// for standard signals.
+    pub const PID_BITS: u32 = 28;
+
+    #[derive(Clone, Copy, Debug)]
+    pub struct SenderInfo {
+        pub pid: u32,
+        pub code: Option<Code>,
+        pub ruid: u32,
+    }
+    impl SenderInfo {
+        #[inline]
+        pub fn raw(self) -> u64 {
+            u64::from(self.pid)
+                | (u64::from(self.code.map_or(0, Code::raw)) << 28)
+                | (u64::from(self.ruid) << 32)
+        }
+        #[inline]
+        pub const fn from_raw(raw: u64) -> Self {
+            Self {
+                pid: (raw as u32) & ((1 << PID_BITS) - 1),
+                code: Code::try_from_raw(((raw as u32) >> PID_BITS) as u8),
+                ruid: (raw >> 32) as u32,
+            }
+        }
+    }
+    mod private {
+        pub trait Sealed {}
+    }
+    impl private::Sealed for SigProcControl {}
+
+    pub trait SigProcControlExt: private::Sealed {
+        /// Checks if `sig` should be ignored based on the current action flags.
+        ///
+        /// * `sig` - The signal to check (e.g. `SIGCHLD`).
+        ///
+        /// * `stop_or_continue` - Whether the signal is generated because a child
+        /// process stopped (`SIGSTOP`, `SIGTSTP`) or continued (`SIGCONT`). If
+        /// `true` and `sig` is `SIGCHLD`, the signal shall not be delivered if the
+        /// `SA_NOCLDSTOP` flag is set for `SIGCHLD`.
+        fn signal_will_ign(&self, sig: usize, stop_or_continue: bool) -> bool;
+        fn signal_will_stop(&self, sig: usize) -> bool;
+    }
+
+    impl SigProcControlExt for SigProcControl {
+        fn signal_will_ign(&self, sig: usize, stop_or_continue: bool) -> bool {
+            let flags = self.actions[sig - 1].first.load(Ordering::Relaxed);
+            let will_ign = flags & (1 << 63) != 0;
+            let sig_specific = flags & (1 << 62) != 0; // SA_NOCLDSTOP if sig == SIGCHLD
+
+            will_ign || (sig == SIGCHLD && stop_or_continue && sig_specific)
+        }
+        fn signal_will_stop(&self, sig: usize) -> bool {
+            matches!(sig, SIGTSTP | SIGTTIN | SIGTTOU)
+                && self.actions[sig - 1].first.load(Ordering::Relaxed) & (1 << 62) != 0
+        }
     }
 }
