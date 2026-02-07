@@ -106,8 +106,8 @@ pub unsafe extern "C" fn crypt_r(
         let len = inner.len();
         if let Ok(ret) = CString::new(inner) {
             let ret_ptr = ret.into_raw();
-            let dst = unsafe { (*data).buff }.as_mut_ptr();
             unsafe {
+                let dst = (*data).buff.as_mut_ptr();
                 ptr::copy_nonoverlapping(ret_ptr, dst.cast(), len);
             }
             ret_ptr.cast()
