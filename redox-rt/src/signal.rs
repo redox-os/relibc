@@ -92,6 +92,7 @@ impl From<Sigaltstack> for PosixStackt {
 #[repr(C)]
 // TODO: This struct is for practical reasons locked to Linux's ABI, but avoid redefining
 // it here. Alternatively, check at compile time that the structs are equivalent.
+#[derive(Clone, Copy, Debug)]
 pub struct SiginfoAbi {
     pub si_signo: i32,
     pub si_errno: i32,
