@@ -156,7 +156,7 @@ pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn at_quick_exit(func: Option<extern "C" fn()>) -> c_int {
     for i in 0..unsafe { AT_QUICK_EXIT_FUNCS.unsafe_ref().len() } {
-        if unsafe { AT_QUICK_EXIT_FUNCS.unsafe_ref() }[i] == None {
+        if unsafe { AT_QUICK_EXIT_FUNCS.unsafe_ref() }[i].is_none() {
             (unsafe { AT_QUICK_EXIT_FUNCS.unsafe_mut() })[i] = func;
             return 0;
         }
@@ -169,7 +169,7 @@ pub unsafe extern "C" fn at_quick_exit(func: Option<extern "C" fn()>) -> c_int {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn atexit(func: Option<extern "C" fn()>) -> c_int {
     for i in 0..unsafe { ATEXIT_FUNCS.unsafe_ref().len() } {
-        if unsafe { ATEXIT_FUNCS.unsafe_ref() }[i] == None {
+        if unsafe { ATEXIT_FUNCS.unsafe_ref() }[i].is_none() {
             (unsafe { ATEXIT_FUNCS.unsafe_mut() })[i] = func;
             return 0;
         }
@@ -219,7 +219,7 @@ macro_rules! dec_num_from_ascii {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/atoi.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn atoi(s: *const c_char) -> c_int {
-    unsafe { dec_num_from_ascii!(s, c_int) }
+    dec_num_from_ascii!(s, c_int)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/atol.html>.
@@ -792,7 +792,7 @@ where
 fn get_nstime() -> u64 {
     unsafe {
         let mut ts = mem::MaybeUninit::uninit();
-        Sys::clock_gettime(CLOCK_MONOTONIC, Out::from_uninit_mut(&mut ts));
+        if let Ok(_) = Sys::clock_gettime(CLOCK_MONOTONIC, Out::from_uninit_mut(&mut ts)) {}; // TODO what to do if Err?
         ts.assume_init().tv_nsec as u64
     }
 }
@@ -1018,7 +1018,7 @@ unsafe fn put_new_env(insert: *mut c_char) {
     // chance of a memory leak. But we can check if it was the same as before, like musl does.
     if unsafe { platform::environ } == unsafe { platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr() } {
         {
-            let mut our_environ = unsafe { &mut *platform::OUR_ENVIRON.as_mut_ptr() };
+            let our_environ = unsafe { &mut *platform::OUR_ENVIRON.as_mut_ptr() };
             *our_environ.last_mut().unwrap() = insert;
             our_environ.push(core::ptr::null_mut());
         }
@@ -1026,7 +1026,7 @@ unsafe fn put_new_env(insert: *mut c_char) {
         unsafe { platform::environ = platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr() };
     } else {
         {
-            let mut our_environ = unsafe { &mut *platform::OUR_ENVIRON.as_mut_ptr() };
+            let our_environ = unsafe { &mut *platform::OUR_ENVIRON.as_mut_ptr() };
             our_environ.clear();
             our_environ.extend(platform::environ_iter());
             our_environ.push(insert);
@@ -1640,7 +1640,7 @@ pub unsafe extern "C" fn unsetenv(key: *const c_char) -> c_int {
             // No need to worry about updating the pointer, this does not
             // reallocate in any way. And the final null is already shifted back.
             {
-                let mut our_environ = unsafe { &mut *platform::OUR_ENVIRON.as_mut_ptr() };
+                let our_environ = unsafe { &mut *platform::OUR_ENVIRON.as_mut_ptr() };
                 our_environ.remove(i);
             }
 
@@ -1648,7 +1648,7 @@ pub unsafe extern "C" fn unsetenv(key: *const c_char) -> c_int {
             unsafe { platform::environ = platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr() };
         } else {
             {
-                let mut our_environ = unsafe { &mut *platform::OUR_ENVIRON.as_mut_ptr() };
+                let our_environ = unsafe { &mut *platform::OUR_ENVIRON.as_mut_ptr() };
                 our_environ.clear();
                 our_environ.extend(
                     platform::environ_iter()

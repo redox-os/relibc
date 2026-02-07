@@ -456,7 +456,14 @@ pub unsafe extern "C" fn sigset(
     if unsafe { sigaddset(&mut set, sig) } < 0 {
         return sig_err;
     } else {
-        if func == sig_hold {
+        let is_equal = {
+            match (func, sig_hold) {
+                (None, None) => true,
+                (Some(_), None) | (None, Some(_)) => false,
+                (Some(f), Some(sh)) => ptr::fn_addr_eq(f, sh),
+            }
+        };
+        if is_equal {
             if unsafe { sigaction(sig, ptr::null_mut(), old_sa.as_mut_ptr()) } < 0
                 || unsafe { sigprocmask(SIG_BLOCK, &mut set, &mut set) } < 0
             {
@@ -588,7 +595,7 @@ pub unsafe extern "C" fn psignal(sig: c_int, prefix: *const c_char) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn psiginfo(info: *const siginfo_t, prefix: *const c_char) {
     unsafe {
-        psignal(unsafe { &*info }.si_signo, prefix);
+        psignal((*info).si_signo, prefix);
     }
 }
 
