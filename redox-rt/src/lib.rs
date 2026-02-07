@@ -4,10 +4,7 @@
 #![feature(core_intrinsics, int_roundings, slice_ptr_get, sync_unsafe_cell)]
 #![forbid(unreachable_patterns)]
 
-use core::{
-    cell::UnsafeCell,
-    mem::{MaybeUninit, size_of},
-};
+use core::cell::UnsafeCell;
 
 use generic_rt::{ExpectTlsFree, GenericTcb};
 use syscall::Sigcontrol;
@@ -208,12 +205,10 @@ pub unsafe fn initialize(
             pid: metadata.pid,
 
             #[cfg(feature = "proc")]
-            proc_fd: MaybeUninit::new(proc_fd),
+            proc_fd: Some(proc_fd),
 
             #[cfg(not(feature = "proc"))]
-            proc_fd: MaybeUninit::uninit(),
-
-            has_proc_fd: cfg!(feature = "proc"),
+            proc_fd: None,
         })
     };
 
@@ -232,11 +227,9 @@ pub unsafe fn initialize(
     }
 }
 
-#[repr(C)] // TODO: is repr(C) required?
 pub(crate) struct StaticProcInfo {
     pid: u32,
-    proc_fd: MaybeUninit<FdGuardUpper>,
-    has_proc_fd: bool,
+    proc_fd: Option<FdGuardUpper>,
 }
 pub struct DynamicProcInfo {
     pub pgid: u32,
@@ -267,8 +260,7 @@ pub(crate) fn static_proc_info() -> &'static StaticProcInfo {
 #[inline]
 pub fn current_proc_fd() -> &'static FdGuardUpper {
     let info = static_proc_info();
-    assert!(info.has_proc_fd);
-    unsafe { info.proc_fd.assume_init_ref() }
+    info.proc_fd.as_ref().unwrap()
 }
 #[inline]
 pub fn current_namespace_fd() -> usize {
@@ -310,8 +302,7 @@ unsafe fn child_hook_common(args: ChildHookCommonArgs) {
             .get()
             .replace(StaticProcInfo {
                 pid: metadata.pid,
-                has_proc_fd: new_proc_fd.is_some(),
-                proc_fd: new_proc_fd.map_or_else(MaybeUninit::uninit, MaybeUninit::new),
+                proc_fd: new_proc_fd,
             })
             .proc_fd
     };

@@ -907,7 +907,7 @@ fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option
             let mut buf = [0_u8; size_of::<RtSigInfo>()];
             buf[..4].copy_from_slice(&(sig_idx - 32).to_ne_bytes());
             proc_call(
-                static_proc_info().proc_fd.assume_init_ref().as_raw_fd(),
+                static_proc_info().proc_fd.as_ref().unwrap().as_raw_fd(),
                 &mut buf,
                 CallFlags::empty(),
                 &[ProcCall::Sigdeq as u64],

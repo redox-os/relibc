@@ -1,9 +1,4 @@
-use core::{
-    cell::SyncUnsafeCell,
-    cmp,
-    fmt::Debug,
-    mem::{MaybeUninit, size_of},
-};
+use core::{cell::SyncUnsafeCell, cmp, fmt::Debug};
 
 use crate::{
     DYNAMIC_PROC_INFO, RtTcb, StaticProcInfo,
@@ -1048,11 +1043,10 @@ pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
     match *args {
         ForkArgs::Managed => {
             let proc_info = crate::static_proc_info();
-            assert!(
-                proc_info.has_proc_fd,
-                "cannot use ForkArgs::Managed without an existing proc info"
-            );
-            let this_proc_fd = unsafe { proc_info.proc_fd.assume_init_ref() };
+            let this_proc_fd = proc_info
+                .proc_fd
+                .as_ref()
+                .expect("cannot use ForkArgs::Managed without an existing proc info");
             let child_proc_fd = this_proc_fd.dup(b"fork")?.to_upper()?;
             let only_thread_fd = child_proc_fd.dup(b"thread-0")?.to_upper()?;
             let meta = read_proc_meta(&child_proc_fd)?;
@@ -1118,8 +1112,7 @@ pub unsafe fn make_init(proc_cap: usize) -> (&'static FdGuardUpper, &'static FdG
     unsafe {
         STATIC_PROC_INFO.get().write(crate::StaticProcInfo {
             pid: 1,
-            proc_fd: MaybeUninit::new(proc_fd),
-            has_proc_fd: true,
+            proc_fd: Some(proc_fd),
         })
     };
     *DYNAMIC_PROC_INFO.lock() = crate::DynamicProcInfo {
@@ -1133,13 +1126,12 @@ pub unsafe fn make_init(proc_cap: usize) -> (&'static FdGuardUpper, &'static FdG
         ns_fd: None,
     };
     (
-        unsafe { (*STATIC_PROC_INFO.get()).proc_fd.assume_init_ref() },
+        unsafe { (*STATIC_PROC_INFO.get()).proc_fd.as_ref().unwrap() },
         managed_thr_fd,
     )
 }
 pub(crate) static STATIC_PROC_INFO: SyncUnsafeCell<StaticProcInfo> =
     SyncUnsafeCell::new(StaticProcInfo {
         pid: 0,
-        proc_fd: MaybeUninit::zeroed(),
-        has_proc_fd: false,
+        proc_fd: None,
     });
