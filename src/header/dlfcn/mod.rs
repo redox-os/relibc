@@ -26,7 +26,8 @@ pub const RTLD_NOLOAD: c_int = 1 << 2;
 pub const RTLD_GLOBAL: c_int = 1 << 8;
 pub const RTLD_LOCAL: c_int = 0x0000;
 
-pub const RTLD_DEFAULT: *mut c_void = 0 as *mut c_void; // XXX: cbindgen doesn't like ptr::null_mut()
+#[allow(clippy::zero_ptr)] // related cbindgen issue: https://github.com/mozilla/cbindgen/issues/948
+pub const RTLD_DEFAULT: *mut c_void = 0 as *mut c_void; // XXX: cbindgen doesn't like ptr::null_mut() for publically exported constants
 
 static ERROR_NOT_SUPPORTED: &core::ffi::CStr = c"dlfcn not supported";
 
