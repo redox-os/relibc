@@ -41,12 +41,14 @@ zero_ptr = "warn" # must allow on public constants due to cbindgen issue
 dangling_pointers_from_temporaries = "deny"
 irrefutable_let_patterns = "deny"
 non_camel_case_types = "allow"
+unpredictable_function_pointer_comparisons = "deny"
 unsafe_op_in_unsafe_fn = "deny"
 
 [lints.rust]
 dangling_pointers_from_temporaries = "deny"
 irrefutable_let_patterns = "deny"
 non_camel_case_types = "allow"
+unpredictable_function_pointer_comparisons = "deny"
 unsafe_op_in_unsafe_fn = "deny"
 
 [build-dependencies]
