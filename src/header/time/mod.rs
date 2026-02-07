@@ -5,7 +5,6 @@
 use crate::{
     c_str::{CStr, CString},
     error::{Errno, ResultExt},
-    fs::File,
     header::{
         errno::{EFAULT, ENOMEM, EOVERFLOW, ETIMEDOUT},
         fcntl::O_RDONLY,
@@ -13,7 +12,6 @@ use crate::{
         stdlib::getenv,
         unistd::readlink,
     },
-    io::Read,
     out::Out,
     platform::{
         self, Pal, Sys,
@@ -24,18 +22,13 @@ use crate::{
     },
     sync::{Mutex, MutexGuard},
 };
-use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
+use alloc::collections::BTreeSet;
 use chrono::{
     DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, ParseError, TimeZone,
     Timelike, Utc, format::ParseErrorKind, offset::MappedLocalTime,
 };
 use chrono_tz::{OffsetComponents, OffsetName, Tz};
-use core::{
-    cell::OnceCell,
-    convert::{TryFrom, TryInto},
-    fmt::Debug,
-    mem, ptr,
-};
+use core::{cell::OnceCell, convert::TryFrom, fmt::Debug, mem, ptr};
 
 pub use self::constants::*;
 
@@ -463,12 +456,13 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     unsafe { ptr::write(timeptr, datetime_to_tm(&tz_datetime)) };
 
     // Convert UTC time to local time
-    if let (std_time, dst_time) = match tz.timestamp_opt(timestamp, 0) {
+    let (std_time, dst_time) = match tz.timestamp_opt(timestamp, 0) {
         MappedLocalTime::Single(t) => (t, None),
         // This variant contains the two possible results, in the order (earliest, latest).
         MappedLocalTime::Ambiguous(t1, t2) => (t2, Some(t1)),
         MappedLocalTime::None => return timestamp,
-    } {
+    };
+    {
         unsafe { set_timezone(&mut lock, &std_time, dst_time) };
     }
 
@@ -512,7 +506,7 @@ pub unsafe extern "C" fn strftime(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
     let mut ts = timespec::default();
-    Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut ts));
+    if let Ok(_) = Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut ts)) {}; // TODO what to do if Err?
     if !tloc.is_null() {
         unsafe { *tloc = ts.tv_sec }
     };
@@ -650,7 +644,7 @@ pub unsafe extern "C" fn timespec_getres(res: *mut timespec, base: c_int) -> c_i
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tzset() {
     let mut lock = TIMEZONE_LOCK.lock();
-    unsafe { clear_timezone(&mut lock) };
+    clear_timezone(&mut lock);
 
     let tz = time_zone();
     let datetime = now();
@@ -751,9 +745,7 @@ fn time_zone() -> Tz {
 #[inline(always)]
 fn now() -> NaiveDateTime {
     let mut now = timespec::default();
-    unsafe {
-        Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut now));
-    }
+    if let Ok(_) = Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut now)) {}; // TODO what to do if Err?
     NaiveDateTime::from_timestamp(now.tv_sec, now.tv_nsec as _)
 }
 
