@@ -10,7 +10,7 @@ use redox_rt::{
     protocol::{ProcKillTarget, SocketCall, WaitFlags},
     sys::{WaitpidTarget, posix_read, posix_write},
 };
-use syscall::{EMFILE, ENOSYS, Error, Result};
+use syscall::{CallFlags, EMFILE, ENOSYS, Error, Result};
 
 use crate::{
     header::{
@@ -455,7 +455,7 @@ pub unsafe extern "C" fn redox_get_socket_token_v0(
     payload_len: usize,
 ) -> RawResult {
     let metadata = [SocketCall::GetToken as u64];
-    Error::mux(redox_rt::sys::sys_call(
+    Error::mux(redox_rt::sys::sys_call_ro(
         fd,
         unsafe { slice::from_raw_parts_mut(payload, payload_len) },
         syscall::CallFlags::empty(),
