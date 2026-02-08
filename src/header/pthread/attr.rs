@@ -159,7 +159,7 @@ pub unsafe extern "C" fn pthread_attr_setschedparam(
     param: *const sched_param,
 ) -> c_int {
     unsafe {
-        (*attr.cast::<RlctAttr>()).param = unsafe { param.read() };
+        (*attr.cast::<RlctAttr>()).param = param.read();
     }
     0
 }

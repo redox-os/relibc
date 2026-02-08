@@ -35,7 +35,6 @@ use crate::{
         self, ERRNO, Pal, Sys, WriteByte,
         types::{c_char, c_int, c_long, c_uint, c_ulonglong, c_void, off_t, size_t},
     },
-    sync::Mutex,
 };
 
 pub use self::constants::*;
@@ -420,7 +419,7 @@ pub unsafe extern "C" fn fflush(stream: *mut FILE) -> c_int {
             return EOF;
         }
     } else {
-        let mut stream = unsafe { unsafe { (*stream).lock() } };
+        let mut stream = unsafe { (*stream).lock() };
         if stream.flush().is_err() {
             return EOF;
         }

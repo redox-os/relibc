@@ -1102,7 +1102,7 @@ pub unsafe extern "C" fn rand() -> c_int {
             None => {
                 let mut rng = XorShiftRng::from_seed([1; 16]);
                 let ret = rng_sampler().sample(&mut rng);
-                unsafe { RNG = Some(rng) };
+                RNG = Some(rng);
                 ret
             }
         }

@@ -362,18 +362,15 @@ unsafe fn inner_scanf(
                                 }
                             }
 
-                            let mut ptr: Option<*mut $type> = if ignore {
-                                None
-                            } else {
-                                Some(unsafe { ap.arg() })
-                            };
+                            let mut ptr: Option<*mut $type> =
+                                if ignore { None } else { Some(ap.arg()) };
 
                             while width.map(|w| w > 0).unwrap_or(true)
                                 && !(wc_as_char!(wchar)).is_whitespace()
                             {
                                 if let Some(ref mut ptr) = ptr {
-                                    unsafe { **ptr = wchar as $type };
-                                    *ptr = unsafe { ptr.offset(1) };
+                                    **ptr = wchar as $type;
+                                    *ptr = ptr.offset(1);
                                 }
                                 width = width.map(|w| w - 1);
                                 if width.map(|w| w > 0).unwrap_or(true) && !read!() {

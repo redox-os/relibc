@@ -2,17 +2,13 @@
 //
 // See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strptime.html>.
 
-use crate::{
-    header::{string::strlen, time::tm},
-    platform::types::size_t,
-};
-use alloc::{string::String, vec::Vec};
+use crate::header::time::tm;
+use alloc::string::String;
 use core::{
     ffi::{CStr, c_char, c_int, c_void},
-    mem::MaybeUninit,
     ptr,
     ptr::NonNull,
-    slice, str,
+    str,
 };
 
 /// For convenience, we define some helper constants for the C-locale.
@@ -153,7 +149,7 @@ pub unsafe extern "C" fn strptime(
             'd' | 'e' => {
                 // parse a 2-digit day (with or without leading zero)
                 let (val, len) = match parse_int(&input_str[index_in_input..], 2, false) {
-                    Some(v) => unsafe { v },
+                    Some(v) => v,
                     None => return ptr::null_mut(),
                 };
                 unsafe {
