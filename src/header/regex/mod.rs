@@ -7,7 +7,7 @@ use crate::{
     platform::types::{c_char, c_int, c_void, size_t},
 };
 use alloc::{borrow::Cow, boxed::Box};
-use core::{mem, ptr, slice};
+use core::{ptr, slice};
 use posix_regex::{PosixRegex, PosixRegexBuilder, compile::Error as CompileError, tree::Tree};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/regex.h.html>.
@@ -63,7 +63,7 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
         .compile_tokens();
 
     match res {
-        Ok(mut branches) => {
+        Ok(branches) => {
             let re_nsub = PosixRegex::new(Cow::Borrowed(&branches)).count_groups();
             unsafe {
                 *out = regex_t {

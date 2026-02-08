@@ -1,7 +1,5 @@
 use core::{
     cell::SyncUnsafeCell,
-    convert::TryInto,
-    mem,
     ops::{Deref, DerefMut},
     pin::Pin,
     ptr,
@@ -13,7 +11,7 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use crate::{
     c_str::CStr,
     fs::File,
-    header::{errno, fcntl, string::strlen},
+    header::fcntl,
     io::{BufReader, Lines, prelude::*},
     platform,
     platform::types::{c_char, c_int, c_long, c_ulong, size_t},
@@ -237,7 +235,7 @@ pub unsafe extern "C" fn getspnam_r(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setspent() {
-    let mut line_reader = unsafe { &mut *LINE_READER.get() };
+    let line_reader = unsafe { &mut *LINE_READER.get() };
     if let Ok(db) = File::open(SHADOW_FILE.into(), fcntl::O_RDONLY) {
         *line_reader = Some(BufReader::new(db).lines());
     }

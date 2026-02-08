@@ -9,10 +9,10 @@ use alloc::{boxed::Box, vec::Vec};
 use crate::{
     c_str::{CStr, CString},
     header::{
-        dirent::{DIR, closedir, opendir, readdir},
+        dirent::{closedir, opendir, readdir},
         errno::*,
         fnmatch::{FNM_NOESCAPE, FNM_PERIOD, fnmatch},
-        sys_stat::{S_IFDIR, S_IFLNK, S_IFMT, stat},
+        sys_stat::{S_IFDIR, S_IFMT, stat},
     },
     platform::{
         self,
@@ -200,7 +200,7 @@ fn list_dir(
     } else {
         path
     };
-    let mut dir = unsafe { opendir(open_path.as_ptr()) };
+    let dir = unsafe { opendir(open_path.as_ptr()) };
 
     if dir.is_null() {
         let new_errno = platform::ERRNO.get();
@@ -295,7 +295,7 @@ fn inner_glob(
     };
 
     // Get the next section of the glob expression (up to non-escaped '/')
-    let mut glob_iter = glob_expr.to_bytes();
+    let glob_iter = glob_expr.to_bytes();
     let mut in_bracket = false;
     let mut escaped = false;
     let mut glob_consumed = 0;

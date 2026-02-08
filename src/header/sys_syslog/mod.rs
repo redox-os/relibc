@@ -119,7 +119,7 @@ pub unsafe extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_i
 ///
 /// Non-POSIX, 4.3BSD-Reno.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn vsyslog(priority: c_int, message: *const c_char, mut ap: VaList) {
+pub unsafe extern "C" fn vsyslog(priority: c_int, message: *const c_char, ap: VaList) {
     let Some(message) = (unsafe { CStr::from_nullable_ptr(message) }) else {
         return;
     };
