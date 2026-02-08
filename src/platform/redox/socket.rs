@@ -552,9 +552,9 @@ impl PalSocket for Sys {
 
                 let (dir_path, mut fd_path) = dir_path_and_fd_path(&path)?;
 
-                redox_rt::sys::sys_call(
+                redox_rt::sys::sys_call_wo(
                     socket as usize,
-                    unsafe { fd_path.as_bytes_mut() },
+                    fd_path.as_bytes(),
                     CallFlags::empty(),
                     &[SocketCall::Bind as u64],
                 )?;
@@ -570,9 +570,9 @@ impl PalSocket for Sys {
                 })();
 
                 if let Err(original_error) = fs_bind_result {
-                    if let Err(unbind_error) = redox_rt::sys::sys_call(
+                    if let Err(unbind_error) = redox_rt::sys::sys_call_wo(
                         socket as usize,
-                        &mut [],
+                        &[],
                         CallFlags::empty(),
                         &[SocketCall::Unbind as u64],
                     ) {
@@ -636,16 +636,16 @@ impl PalSocket for Sys {
 
                 let mut token_buf = [0u8; TOKEN_BUF_SIZE];
 
-                redox_rt::sys::sys_call(
+                redox_rt::sys::sys_call_ro(
                     socket_file_fd.as_raw_fd(),
                     &mut token_buf,
                     CallFlags::empty(),
                     &[FsCall::Connect as u64],
                 )?;
 
-                redox_rt::sys::sys_call(
+                redox_rt::sys::sys_call_wo(
                     socket as usize,
-                    &mut token_buf,
+                    &token_buf,
                     CallFlags::empty(),
                     &[SocketCall::Connect as u64],
                 )?;
@@ -661,7 +661,7 @@ impl PalSocket for Sys {
         address_len: *mut socklen_t,
     ) -> Result<()> {
         let mut buf = [0; 256];
-        let len = redox_rt::sys::sys_call(
+        let len = redox_rt::sys::sys_call_ro(
             socket as usize,
             &mut buf,
             CallFlags::empty(),
@@ -733,7 +733,7 @@ impl PalSocket for Sys {
                         unsafe { slice::from_raw_parts_mut(option_value as *mut u8, option_len) };
                     let call_flags = CallFlags::empty();
                     unsafe {
-                        *option_len_ptr = redox_rt::sys::sys_call(
+                        *option_len_ptr = redox_rt::sys::sys_call_ro(
                             socket as usize,
                             payload,
                             CallFlags::empty(),
@@ -863,7 +863,7 @@ impl PalSocket for Sys {
         let metadata = [SocketCall::RecvMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
         let actual_read_len =
-            redox_rt::sys::sys_call(socket as usize, &mut msg_stream, call_flags, &metadata)?;
+            redox_rt::sys::sys_call_rw(socket as usize, &mut msg_stream, call_flags, &metadata)?;
         msg_stream.truncate(actual_read_len);
 
         cursor = 0;
@@ -944,7 +944,7 @@ impl PalSocket for Sys {
         // Send the message stream.
         let metadata = [SocketCall::SendMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
-        let written = redox_rt::sys::sys_call(
+        let written = redox_rt::sys::sys_call_rw(
             socket as usize,
             msg_stream.as_mut_slice(),
             call_flags,
@@ -1036,7 +1036,7 @@ impl PalSocket for Sys {
                         slice::from_raw_parts_mut(option_value as *mut u8, option_len as usize)
                     };
                     let call_flags = CallFlags::empty();
-                    redox_rt::sys::sys_call(
+                    redox_rt::sys::sys_call_rw(
                         socket as usize,
                         payload,
                         CallFlags::empty(),
@@ -1062,7 +1062,7 @@ impl PalSocket for Sys {
 
     fn shutdown(socket: c_int, how: c_int) -> Result<()> {
         let metadata = [SocketCall::Shutdown as u64, how as u64];
-        redox_rt::sys::sys_call(socket as usize, &mut [], CallFlags::empty(), &metadata)?;
+        redox_rt::sys::sys_call_wo(socket as usize, &[], CallFlags::empty(), &metadata)?;
         Ok(())
     }
 

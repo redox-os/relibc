@@ -1,6 +1,7 @@
 use core::{
     mem::{replace, size_of},
     ptr::addr_of,
+    slice,
     sync::atomic::{AtomicU32, Ordering},
 };
 
@@ -136,6 +137,33 @@ pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
         )
     }
     .map(|awoken| awoken as u32)
+}
+pub fn sys_call_ro(
+    fd: usize,
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
+    sys_call(fd, payload, flags | CallFlags::READ, metadata)
+}
+pub fn sys_call_wo(fd: usize, payload: &[u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+    let payload_mut =
+        unsafe { slice::from_raw_parts_mut(payload.as_ptr() as *mut u8, payload.len()) };
+
+    sys_call(fd, payload_mut, flags | CallFlags::WRITE, metadata)
+}
+pub fn sys_call_rw(
+    fd: usize,
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
+    sys_call(
+        fd,
+        payload,
+        flags | CallFlags::READ | CallFlags::WRITE,
+        metadata,
+    )
 }
 pub fn sys_call(
     fd: usize,
