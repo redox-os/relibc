@@ -63,7 +63,7 @@ impl Dev {
     ) -> Result<c_int> {
         let mut data = unsafe { buf.read::<T>() }?;
         let mut wire = unsafe { data.write() };
-        let res = redox_rt::sys::sys_call(
+        let res = redox_rt::sys::sys_call_rw(
             self.fd as usize,
             &mut wire,
             syscall::CallFlags::empty(),
@@ -75,11 +75,11 @@ impl Dev {
     }
 
     unsafe fn write_ioctl<T: IoctlData>(&self, mut buf: IoctlBuffer, func: u64) -> Result<c_int> {
-        let mut data = unsafe { buf.read::<T>() }?;
-        let mut wire = unsafe { data.write() };
-        let res = redox_rt::sys::sys_call(
+        let data = unsafe { buf.read::<T>() }?;
+        let wire = unsafe { data.write() };
+        let res = redox_rt::sys::sys_call_wo(
             self.fd as usize,
-            &mut wire,
+            &wire,
             syscall::CallFlags::empty(),
             &[func],
         )?;
