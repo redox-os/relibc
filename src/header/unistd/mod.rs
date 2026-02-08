@@ -147,7 +147,7 @@ pub unsafe extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
 #[unsafe(no_mangle)]
 pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
     // TODO setitimer is unimplemented on Redox and obsolete
-    let mut timer = sys_time::itimerval {
+    let timer = sys_time::itimerval {
         it_value: timeval {
             tv_sec: seconds as time_t,
             tv_usec: 0,
@@ -1035,7 +1035,7 @@ pub unsafe extern "C" fn swab(src: *const c_void, dest: *mut c_void, nbytes: ssi
     }
     let number_of_swaps = nbytes / 2;
     let mut offset = 0;
-    for i in 0..number_of_swaps {
+    for _ in 0..number_of_swaps {
         unsafe {
             src.offset(offset).copy_to(dest.offset(offset + 1), 1);
             src.offset(offset + 1).copy_to(dest.offset(offset), 1);

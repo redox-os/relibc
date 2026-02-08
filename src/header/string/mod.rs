@@ -2,11 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/string.h.html>.
 
-use core::{
-    iter::once,
-    mem::{self, MaybeUninit},
-    ptr, slice, usize,
-};
+use core::{iter::once, mem, ptr, slice, usize};
 
 use cbitset::BitSet256;
 
@@ -257,7 +253,7 @@ pub unsafe extern "C" fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_ch
 /// containing at least one nul value. The pointed-to buffer must not be
 /// modified for the duration of the call.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn strchr(mut s: *const c_char, c: c_int) -> *mut c_char {
+pub unsafe extern "C" fn strchr(s: *const c_char, c: c_int) -> *mut c_char {
     let c_as_c_char = c as c_char;
 
     // We iterate over non-mut references and thus need to coerce the

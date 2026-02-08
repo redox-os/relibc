@@ -56,7 +56,7 @@ impl PalSignal for Sys {
         // let fd = FdGuard::new(redox_rt::sys::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC)?);
         // let count = syscall::read(*fd, &mut spec)?;
 
-        let mut spec = syscall::ITimerSpec::default();
+        let spec = syscall::ITimerSpec::default();
         out.it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
         out.it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
         out.it_value.tv_sec = spec.it_value.tv_sec as time_t;

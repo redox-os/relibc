@@ -5,7 +5,6 @@
 use core::{mem, ptr, slice};
 
 use crate::{
-    error::ResultExt,
     fs::File,
     header::{
         errno::EBADF,
@@ -68,7 +67,7 @@ pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sig
 
     let mut closed = 0;
     for i in 0..fds.len() {
-        let mut pfd = &mut fds[i];
+        let pfd = &mut fds[i];
 
         pfd.revents = 0;
 
@@ -145,7 +144,7 @@ pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) ->
     trace_expr!(
         unsafe {
             poll_epoll(
-                unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
+                slice::from_raw_parts_mut(fds, nfds as usize),
                 timeout,
                 ptr::null_mut(),
             )
@@ -178,7 +177,7 @@ pub unsafe extern "C" fn ppoll(
     trace_expr!(
         unsafe {
             poll_epoll(
-                unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
+                slice::from_raw_parts_mut(fds, nfds as usize),
                 timeout,
                 sigmask,
             )

@@ -149,7 +149,7 @@ pub fn dir_path_and_fd_path(socket_path: &str) -> Result<(String, String)> {
     let full_path = canonicalize_with_cwd_internal(cwd_guard.as_deref(), socket_path)?;
 
     let redox_path = RedoxPath::from_absolute(&full_path).ok_or(Error::new(EINVAL))?;
-    let (_, mut ref_path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
+    let (_, ref_path) = redox_path.as_parts().ok_or(Error::new(EINVAL))?;
     if ref_path.as_ref().is_empty() {
         return Err(Error::new(EINVAL));
     }

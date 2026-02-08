@@ -372,7 +372,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
         }
     }
 
-    let mut host = match lookup_host(name_str) {
+    let host = match lookup_host(name_str) {
         Ok(lookuphost) => lookuphost,
         Err(e) => {
             H_ERRNO.set(NO_RECOVERY);
@@ -403,7 +403,7 @@ pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut hostent {
 
     unsafe {
         HOST_ENTRY = hostent {
-            h_name: unsafe { HOST_NAME.unsafe_mut().as_mut().unwrap().as_mut_ptr() } as *mut c_char,
+            h_name: HOST_NAME.unsafe_mut().as_mut().unwrap().as_mut_ptr() as *mut c_char,
             h_aliases: host_aliases.as_mut_slice().as_mut_ptr(),
             h_addrtype: AF_INET,
             h_length: 4,
@@ -490,10 +490,7 @@ pub unsafe extern "C" fn getnetent() -> *mut netent {
 
     unsafe {
         NET_ENTRY = netent {
-            n_name: unsafe { NET_NAME.unsafe_mut() }
-                .as_mut()
-                .unwrap()
-                .as_mut_ptr() as *mut c_char,
+            n_name: NET_NAME.unsafe_mut().as_mut().unwrap().as_mut_ptr() as *mut c_char,
             n_aliases: net_aliases.as_mut_slice().as_mut_ptr(),
             n_addrtype: AF_INET,
             n_net: NET_ADDR.unwrap() as c_ulong,
@@ -606,16 +603,14 @@ pub unsafe extern "C" fn getprotoent() -> *mut protoent {
 
     unsafe {
         PROTO_ENTRY = protoent {
-            p_name: unsafe {
-                PROTO_NAME
-                    .unsafe_mut()
-                    .as_mut()
-                    .unwrap()
-                    .as_mut_slice()
-                    .as_mut_ptr()
-            } as *mut c_char,
+            p_name: PROTO_NAME
+                .unsafe_mut()
+                .as_mut()
+                .unwrap()
+                .as_mut_slice()
+                .as_mut_ptr() as *mut c_char,
             p_aliases: proto_aliases.as_mut_slice().as_mut_ptr() as *mut *mut c_char,
-            p_proto: unsafe { PROTO_NUM }.unwrap(),
+            p_proto: PROTO_NUM.unwrap(),
         }
     };
     if unsafe { PROTO_STAYOPEN } == 0 {

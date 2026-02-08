@@ -568,7 +568,7 @@ impl PalSocket for Sys {
                 let path = format!("{}", str::from_utf8(addr).unwrap());
                 log::trace!("bind(): path: {:?}", path);
 
-                let (dir_path, mut fd_path) = dir_path_and_fd_path(&path)?;
+                let (dir_path, fd_path) = dir_path_and_fd_path(&path)?;
 
                 redox_rt::sys::sys_call_wo(
                     socket as usize,
@@ -642,7 +642,7 @@ impl PalSocket for Sys {
 
                 let addr =
                     unsafe { slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len) };
-                let mut path = format!("{}", str::from_utf8(addr).unwrap());
+                let path = format!("{}", str::from_utf8(addr).unwrap());
                 log::trace!("connect(): path: {:?}", path);
 
                 let (_, fd_path) = dir_path_and_fd_path(&path)?;
@@ -1122,8 +1122,8 @@ impl PalSocket for Sys {
                 // on any I/O performed. So we don't need to mark this as
                 // nonblocking.
 
-                let mut fd0 = listener.dup(b"connect")?;
-                let mut fd1 = listener.dup(b"listen")?;
+                let fd0 = listener.dup(b"connect")?;
+                let fd1 = listener.dup(b"listen")?;
 
                 sv[0] = fd0.take() as c_int;
                 sv[1] = fd1.take() as c_int;
@@ -1136,7 +1136,7 @@ impl PalSocket for Sys {
                 // on any I/O performed. So we don't need to mark this as
                 // nonblocking.
 
-                let mut fd0 = listener.dup(b"connect")?;
+                let fd0 = listener.dup(b"connect")?;
 
                 sv[0] = fd0.take() as c_int;
                 sv[1] = listener.take() as c_int;
