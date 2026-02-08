@@ -30,7 +30,7 @@ pub extern "C" fn __errno_location() -> *mut c_int {
 /// The `program_invocation_name` variable is a GNU extension.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __program_invocation_name() -> *mut *mut c_char {
-    unsafe { &raw mut platform::program_invocation_name }
+    &raw mut platform::program_invocation_name
 }
 
 /// Get the directory-less name used to invoke the program.
@@ -41,7 +41,7 @@ pub unsafe extern "C" fn __program_invocation_name() -> *mut *mut c_char {
 /// The `program_invocation_short_name` variable is a GNU extension.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __program_invocation_short_name() -> *mut *mut c_char {
-    unsafe { &raw mut platform::program_invocation_short_name }
+    &raw mut platform::program_invocation_short_name
 }
 
 pub const EPERM: c_int = 1; /* Operation not permitted */

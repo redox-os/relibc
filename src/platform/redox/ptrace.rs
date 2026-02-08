@@ -270,6 +270,7 @@ fn inner_ptrace(
 }
 
 impl PalPtrace for Sys {
+    #[allow(unused_unsafe)] // keeping inner unsafe fails x86_64, removing fails riscv cross-build
     unsafe fn ptrace(
         request: c_int,
         pid: pid_t,

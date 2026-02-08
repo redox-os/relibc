@@ -1142,7 +1142,7 @@ impl PalSocket for Sys {
                 sv[1] = listener.take() as c_int;
                 Ok(())
             }
-            _ => unsafe {
+            _ => {
                 todo_skip!(
                     0,
                     "socketpair({}, {}, {}, {:p})",
@@ -1152,7 +1152,7 @@ impl PalSocket for Sys {
                     sv.as_mut_ptr()
                 );
                 Err(Errno(EPROTONOSUPPORT))
-            },
+            }
         }
     }
 }

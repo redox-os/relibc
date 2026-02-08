@@ -44,6 +44,8 @@ non_camel_case_types = "allow"
 unpredictable_function_pointer_comparisons = "deny"
 unsafe_op_in_unsafe_fn = "deny"
 unused_mut = "deny"
+unused_unsafe = "deny"
+unused_variables = "allow" # TODO review occurrences (too many for now)
 
 [lints.rust]
 dangling_pointers_from_temporaries = "deny"
@@ -52,6 +54,8 @@ non_camel_case_types = "allow"
 unpredictable_function_pointer_comparisons = "deny"
 unsafe_op_in_unsafe_fn = "deny"
 unused_mut = "deny"
+unused_unsafe = "deny"
+unused_variables = "allow" # TODO review occurrences (too many for now)
 
 [build-dependencies]
 cc = "1"
