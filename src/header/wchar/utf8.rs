@@ -52,7 +52,7 @@ pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, ps: *mut mb
     }
     if size == 0 {
         platform::ERRNO.set(errno::EILSEQ);
-        return unsafe { -1isize as usize };
+        return -1isize as usize;
     }
 
     let slice = unsafe { slice::from_raw_parts(s as *const u8, size) };
