@@ -844,7 +844,7 @@ impl Pal for Sys {
         timerid: timer_t,
         flags: c_int,
         value: &itimerspec,
-        mut ovalue: Option<Out<itimerspec>>,
+        ovalue: Option<Out<itimerspec>>,
     ) -> Result<()> {
         e_raw(unsafe {
             syscall!(
