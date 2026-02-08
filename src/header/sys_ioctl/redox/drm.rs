@@ -74,7 +74,7 @@ impl Dev {
         Ok(res as c_int)
     }
 
-    unsafe fn write_ioctl<T: IoctlData>(&self, mut buf: IoctlBuffer, func: u64) -> Result<c_int> {
+    unsafe fn write_ioctl<T: IoctlData>(&self, buf: IoctlBuffer, func: u64) -> Result<c_int> {
         let data = unsafe { buf.read::<T>() }?;
         let wire = unsafe { data.write() };
         let res = redox_rt::sys::sys_call_wo(

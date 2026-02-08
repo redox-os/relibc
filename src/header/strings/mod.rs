@@ -151,8 +151,7 @@ pub unsafe extern "C" fn strncasecmp(s1: *const c_char, s2: *const c_char, n: si
 
 /// Given two zipped `&c_char` iterators, either find the first comparison != 0, or return 0.
 fn inner_casecmp<'a>(iterator: impl Iterator<Item = (&'a c_char, &'a c_char)>) -> c_int {
-    let mut cmp_iter =
-        iterator.map(|(&c1, &c2)| ctype::tolower(c1.into()) - ctype::tolower(c2.into()));
+    let cmp_iter = iterator.map(|(&c1, &c2)| ctype::tolower(c1.into()) - ctype::tolower(c2.into()));
     let mut skip_iter = cmp_iter.skip_while(|&cmp| cmp == 0);
     skip_iter.next().or(Some(0)).unwrap()
 }

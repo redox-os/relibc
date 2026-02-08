@@ -11,8 +11,7 @@ use crate::{
     fs::File,
     header::{errno, fcntl},
     io::Read,
-    platform::types::{c_char, c_int, c_void},
-    sync::Once,
+    platform::types::{c_char, c_int},
 };
 
 // Can't use &str because of the mutability
@@ -58,7 +57,7 @@ pub unsafe extern "C" fn setlocale(category: c_int, locale: *const c_char) -> *m
         let new_global = GlobalLocaleData::new();
         unsafe { GLOBAL_LOCALE = Box::into_raw(new_global) };
     };
-    let Some(mut global) = (unsafe { GLOBAL_LOCALE.as_mut() }) else {
+    let Some(global) = (unsafe { GLOBAL_LOCALE.as_mut() }) else {
         return ptr::null_mut();
     };
 

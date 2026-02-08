@@ -1,8 +1,4 @@
-use alloc::{
-    borrow::ToOwned,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::ToOwned, string::String};
 use core::{ffi::VaList, ptr::null_mut};
 
 use crate::{
@@ -21,7 +17,7 @@ use crate::{
     sync::Mutex,
 };
 
-use bitflags::{Flags, bitflags};
+use bitflags::bitflags;
 use chrono::{DateTime, Utc};
 
 use super::{
@@ -53,7 +49,7 @@ impl<L: LogSink> LogParams<L> {
         }
     }
 
-    pub fn write_log(&mut self, priority: Priority, message: CStr<'_>, mut ap: VaList) {
+    pub fn write_log(&mut self, priority: Priority, message: CStr<'_>, ap: VaList) {
         if message.is_empty() {
             return;
         }

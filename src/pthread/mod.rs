@@ -19,6 +19,7 @@ use crate::{
 use crate::sync::{Mutex, waitval::Waitval};
 
 /// Called only by the main thread, as part of relibc_start.
+#[allow(unused_mut)]
 pub unsafe fn init() {
     let mut thread = Pthread {
         waitval: Waitval::new(),
@@ -102,6 +103,7 @@ impl Drop for MmapGuard {
     }
 }
 
+#[allow(unused_mut)]
 pub(crate) unsafe fn create(
     attrs: Option<&header::RlctAttr>,
     start_routine: extern "C" fn(arg: *mut c_void) -> *mut c_void,

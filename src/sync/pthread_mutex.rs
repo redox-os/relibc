@@ -76,7 +76,7 @@ impl RlctMutex {
     fn lock_inner(&self, deadline: Option<&timespec>) -> Result<(), Errno> {
         let this_thread = os_tid_invalid_after_fork();
 
-        let mut spins_left = SPIN_COUNT;
+        //let mut spins_left = SPIN_COUNT;
 
         loop {
             let result = self.inner.compare_exchange_weak(

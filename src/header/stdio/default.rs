@@ -1,13 +1,7 @@
 use super::{BUFSIZ, Buffer, FILE, constants};
 use core::{cell::UnsafeCell, ptr};
 
-use crate::{
-    fs::File,
-    header::pthread,
-    io::LineWriter,
-    platform::types::c_int,
-    sync::{Mutex, Once},
-};
+use crate::{fs::File, header::pthread, io::LineWriter, platform::types::c_int, sync::Once};
 use alloc::{boxed::Box, vec::Vec};
 
 // TODO: Change FILE to allow const fn initialization?
@@ -17,7 +11,7 @@ impl GlobalFile {
     fn new(file: c_int, flags: c_int) -> Self {
         let file = File::new(file);
         let writer = Box::new(LineWriter::new(unsafe { file.get_ref() }));
-        let mut mutex_attr = pthread::RlctMutexAttr {
+        let mutex_attr = pthread::RlctMutexAttr {
             ty: pthread::PTHREAD_MUTEX_RECURSIVE,
             ..Default::default()
         };

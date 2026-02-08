@@ -4,14 +4,12 @@
 
 use core::{
     cell::SyncUnsafeCell,
-    convert::{TryFrom, TryInto},
+    convert::TryInto,
     mem::{self, MaybeUninit},
     num::ParseIntError,
     ops::{Deref, DerefMut},
     pin::Pin,
-    primitive::str,
     ptr, slice,
-    str::Matches,
 };
 
 use alloc::{
@@ -20,14 +18,12 @@ use alloc::{
 };
 
 use crate::{
-    c_str::CStr,
     fs::File,
     header::{errno, fcntl, limits, string::strlen, unistd},
     io,
     io::{BufReader, Lines, prelude::*},
     platform,
     platform::types::{c_char, c_int, c_void, gid_t, size_t},
-    sync::Mutex,
 };
 
 use super::{errno::*, string::strncmp};
@@ -158,7 +154,7 @@ fn split(buf: &mut [u8]) -> Option<group> {
 }
 
 fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Error> {
-    let mut buffer = line.to_owned().into_bytes();
+    let buffer = line.to_owned().into_bytes();
 
     let mut buffer = buffer
         .into_iter()
@@ -385,7 +381,7 @@ pub unsafe extern "C" fn getgrnam_r(
 
     for line in BufReader::new(db).lines() {
         let Ok(line) = line else { return EINVAL };
-        let Ok(mut grp) = parse_grp(
+        let Ok(grp) = parse_grp(
             line,
             Some(DestBuffer {
                 ptr: buffer as *mut u8,
@@ -461,7 +457,7 @@ pub unsafe extern "C" fn endgrent() {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endgrent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setgrent() {
-    let mut line_reader = unsafe { &mut *LINE_READER.get() };
+    let line_reader = unsafe { &mut *LINE_READER.get() };
     let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
         return;
     };
@@ -479,7 +475,7 @@ pub unsafe extern "C" fn getgrouplist(
     groups: *mut gid_t,
     ngroups: *mut c_int,
 ) -> c_int {
-    let mut grps = unsafe {
+    let grps = unsafe {
         slice::from_raw_parts_mut(groups.cast::<MaybeUninit<gid_t>>(), ngroups.read() as usize)
     };
 

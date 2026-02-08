@@ -1414,8 +1414,8 @@ impl Pal for Sys {
         Ok(())
     }
 
-    fn waitpid(mut pid: pid_t, stat_loc: Option<Out<'_, c_int>>, options: c_int) -> Result<pid_t> {
-        let mut res = None;
+    fn waitpid(pid: pid_t, stat_loc: Option<Out<'_, c_int>>, options: c_int) -> Result<pid_t> {
+        let res = None;
         let mut status = 0;
 
         let options = usize::try_from(options)
