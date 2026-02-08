@@ -276,7 +276,7 @@ impl PalPtrace for Sys {
         addr: *mut c_void,
         data: *mut c_void,
     ) -> Result<c_int, Errno> {
-        unsafe { inner_ptrace(request, pid, addr, data) }
+        inner_ptrace(request, pid, addr, data)
             .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))
     }
 }
