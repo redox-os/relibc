@@ -3,6 +3,9 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::{intrinsics, ptr};
 
+#[cfg(target_os = "redox")]
+use generic_rt::ExpectTlsFree;
+
 use crate::{
     ALLOCATOR,
     header::{libgen, stdio, stdlib},
