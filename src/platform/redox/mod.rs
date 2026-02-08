@@ -796,14 +796,10 @@ impl Pal for Sys {
         let Some(len) = round_up_to_page_size(len) else {
             return Err(Errno(ENOMEM));
         };
-        (unsafe {
-            syscall::mprotect(
-                addr as usize,
-                len,
-                syscall::MapFlags::from_bits((prot as usize) << 16)
-                    .expect("mprotect: invalid bit pattern"),
-            )
-        })?;
+        let Some(prot) = syscall::MapFlags::from_bits((prot as usize) << 16) else {
+            return Err(Errno(EINVAL));
+        };
+        (unsafe { syscall::mprotect(addr as usize, len, prot) })?;
         Ok(())
     }
 
