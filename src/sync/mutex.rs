@@ -1,5 +1,5 @@
 use super::{AtomicLock, AttemptStatus};
-use crate::platform::types::*;
+use crate::platform::types::c_int;
 use core::{
     cell::UnsafeCell,
     ops::{Deref, DerefMut},
@@ -99,7 +99,7 @@ impl<T> Mutex<T> {
 
     /// Tries to lock the mutex and returns a guard that automatically unlocks
     /// the mutex when it falls out of scope.
-    pub fn try_lock(&self) -> Option<MutexGuard<T>> {
+    pub fn try_lock(&self) -> Option<MutexGuard<'_, T>> {
         unsafe {
             self.manual_try_lock().ok().map(|content| MutexGuard {
                 mutex: self,
@@ -109,7 +109,7 @@ impl<T> Mutex<T> {
     }
     /// Locks the mutex and returns a guard that automatically unlocks the
     /// mutex when it falls out of scope.
-    pub fn lock(&self) -> MutexGuard<T> {
+    pub fn lock(&self) -> MutexGuard<'_, T> {
         MutexGuard {
             mutex: self,
             content: unsafe { self.manual_lock() },
