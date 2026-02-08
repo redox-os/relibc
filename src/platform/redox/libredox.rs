@@ -481,9 +481,7 @@ pub unsafe extern "C" fn redox_register_scheme_to_ns_v0(
     Error::mux(
         redox_rt::sys::register_scheme_to_ns(
             ns_fd,
-            unsafe {
-                str::from_utf8_unchecked(unsafe { slice::from_raw_parts(name_base, name_len) })
-            },
+            unsafe { str::from_utf8_unchecked(slice::from_raw_parts(name_base, name_len)) },
             cap_fd,
         )
         .map(|()| 0),

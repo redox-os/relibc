@@ -627,18 +627,16 @@ impl Pal for Sys {
     fn gettimeofday(mut tp: Out<timeval>, tzp: Option<Out<timezone>>) -> Result<()> {
         let mut redox_tp = redox_timespec::default();
         syscall::clock_gettime(syscall::CLOCK_REALTIME, &mut redox_tp)?;
-        unsafe {
-            tp.write(timeval {
-                tv_sec: redox_tp.tv_sec as time_t,
-                tv_usec: (redox_tp.tv_nsec / 1000) as suseconds_t,
-            });
+        tp.write(timeval {
+            tv_sec: redox_tp.tv_sec as time_t,
+            tv_usec: (redox_tp.tv_nsec / 1000) as suseconds_t,
+        });
 
-            if let Some(mut tzp) = tzp {
-                tzp.write(timezone {
-                    tz_minuteswest: 0,
-                    tz_dsttime: 0,
-                });
-            }
+        if let Some(mut tzp) = tzp {
+            tzp.write(timezone {
+                tz_minuteswest: 0,
+                tz_dsttime: 0,
+            });
         }
         Ok(())
     }
@@ -1222,7 +1220,7 @@ impl Pal for Sys {
 
     fn timer_delete(timerid: timer_t) -> Result<()> {
         unsafe {
-            let timer_st = unsafe { &mut *(timerid as *mut timer_internal_t) };
+            let timer_st = &mut *(timerid as *mut timer_internal_t);
             let _ = syscall::close(timer_st.timerfd);
             let _ = syscall::close(timer_st.eventfd);
             if !timer_st.thread.is_null() {
@@ -1391,18 +1389,16 @@ impl Pal for Sys {
             Ok(())
         };
 
-        unsafe {
-            read_line(sysname.as_slice_mut().cast_slice_to::<u8>())?;
-            read_line(release.as_slice_mut().cast_slice_to::<u8>())?;
-            read_line(machine.as_slice_mut().cast_slice_to::<u8>())?;
+        read_line(sysname.as_slice_mut().cast_slice_to::<u8>())?;
+        read_line(release.as_slice_mut().cast_slice_to::<u8>())?;
+        read_line(machine.as_slice_mut().cast_slice_to::<u8>())?;
 
-            // Version is not provided
-            version.as_slice_mut().zero();
+        // Version is not provided
+        version.as_slice_mut().zero();
 
-            // Redox doesn't provide domainname in sys:uname
-            //read_line(domainname.as_slice_mut())?;
-            domainname.as_slice_mut().zero();
-        }
+        // Redox doesn't provide domainname in sys:uname
+        //read_line(domainname.as_slice_mut())?;
+        domainname.as_slice_mut().zero();
 
         Ok(())
     }
