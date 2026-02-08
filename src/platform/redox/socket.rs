@@ -394,6 +394,7 @@ unsafe fn deserialize_ancillary_data_from_stream(
     msg_stream: &[u8],
     cursor: &mut usize,
     cmsg_space_provided: usize,
+    flags: c_int,
 ) -> Result<()> {
     let mut current_cmsg_ptr_in_user_buf = if !mhdr.msg_control.is_null() && cmsg_space_provided > 0
     {
@@ -449,7 +450,12 @@ unsafe fn deserialize_ancillary_data_from_stream(
                     )
                 };
 
-                redox_rt::sys::sys_call_ro(socket as usize, fds_bytes, CallFlags::FD, &[])?;
+                let mut call_flags = CallFlags::FD;
+                if flags & MSG_CMSG_CLOEXEC == MSG_CMSG_CLOEXEC {
+                    call_flags |= CallFlags::FD_CLOEXEC;
+                }
+
+                redox_rt::sys::sys_call_ro(socket as usize, fds_bytes, call_flags, &[])?;
 
                 for fd in fds_usize {
                     temp_posix_cmsg_data_buf.extend_from_slice(&(fd as c_int).to_le_bytes());
@@ -908,6 +914,7 @@ impl PalSocket for Sys {
                     &msg_stream,
                     &mut cursor,
                     cmsg_space_provided_by_user as usize,
+                    flags,
                 )
             })?;
         } else {
