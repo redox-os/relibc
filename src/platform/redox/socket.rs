@@ -266,14 +266,17 @@ unsafe fn serialize_ancillary_data_to_stream(
                 }
                 let fd_count = data_len / mem::size_of::<c_int>();
 
-                // Call syscall::sendfd for each fd.
                 if fd_count > 0 {
                     let fds_ptr = unsafe { CMSG_DATA(cmsg) } as *const c_int;
-                    let fds_slice = unsafe { slice::from_raw_parts(fds_ptr, fd_count) };
-                    for &fd in fds_slice.iter() {
-                        let fd_to_send = FdGuard::new(syscall::dup(fd as usize, b"")?);
-                        syscall::sendfd(socket as usize, fd_to_send.as_raw_fd(), 0, 0)?;
-                    }
+                    let c_fds = unsafe { slice::from_raw_parts(fds_ptr, fd_count) };
+                    let fds_usize: Vec<usize> = c_fds.iter().map(|&fd| fd as usize).collect();
+                    let fds_slice = unsafe {
+                        slice::from_raw_parts(
+                            fds_usize.as_ptr() as *const u8,
+                            fds_usize.len() * mem::size_of::<usize>(),
+                        )
+                    };
+                    redox_rt::sys::sys_call_wo(socket as usize, &fds_slice, CallFlags::FD, &[])?;
                 }
 
                 // Serialize to ancillary_data_stream.
@@ -437,10 +440,19 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 }
                 let fd_count = read_num::<usize>(&cmsg_data_from_stream)?;
 
-                for _ in 0..fd_count {
-                    // Call syscall::dup to duplicate the fd
-                    let new_fd = syscall::dup(socket as usize, b"recvfd")?;
-                    temp_posix_cmsg_data_buf.extend_from_slice(&(new_fd as c_int).to_le_bytes());
+                let mut fds_usize = vec![0usize; fd_count];
+
+                let fds_bytes = unsafe {
+                    slice::from_raw_parts_mut(
+                        fds_usize.as_mut_ptr() as *mut u8,
+                        fds_usize.len() * mem::size_of::<usize>(),
+                    )
+                };
+
+                redox_rt::sys::sys_call_ro(socket as usize, fds_bytes, CallFlags::FD, &[])?;
+
+                for fd in fds_usize {
+                    temp_posix_cmsg_data_buf.extend_from_slice(&(fd as c_int).to_le_bytes());
                 }
                 actual_posix_cmsg_data_len = temp_posix_cmsg_data_buf.len();
             }
