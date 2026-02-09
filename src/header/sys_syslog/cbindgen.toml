@@ -1,3 +1,6 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/syslog.h.html
+#
+# There are no spec quotations relating to includes
 include_guard = "_RELIBC_SYS_SYSLOG_H"
 language = "C"
 style = "Type"
