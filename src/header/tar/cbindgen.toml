@@ -1,4 +1,6 @@
-sys_includes = ["sys/types.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/tar.h.html
+#
+# There are no spec quotations relating to includes
 include_guard = "_TAR_H"
 language = "C"
 style = "Tag"
