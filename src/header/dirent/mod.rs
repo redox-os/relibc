@@ -354,10 +354,12 @@ pub unsafe extern "C" fn scandir(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/seekdir.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn seekdir(dir: &mut DIR, off: c_long) {
-    dir.seek(
-        off.try_into()
-            .expect("off must come from telldir, thus never negative"),
-    );
+    let Ok(off) = off.try_into() else {
+        platform::ERRNO.set(EINVAL);
+        return;
+    };
+
+    dir.seek(off);
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/telldir.html>.
