@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::header::errno::EBUSY;
+use crate::header::errno::{EBUSY, EINVAL};
 
 use crate::pthread::Pshared;
 
@@ -97,9 +97,11 @@ pub unsafe extern "C" fn pthread_rwlockattr_setpshared(
     attr: *mut pthread_rwlockattr_t,
     pshared: c_int,
 ) -> c_int {
-    (unsafe { *attr.cast::<RlctRwlockAttr>() }).pshared =
-        Pshared::from_raw(pshared).expect("invalid pshared in pthread_rwlockattr_setpshared");
+    let Some(pshared) = Pshared::from_raw(pshared) else {
+        return EINVAL;
+    };
 
+    (unsafe { *attr.cast::<RlctRwlockAttr>() }).pshared = pshared;
     0
 }
 
