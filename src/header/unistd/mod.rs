@@ -48,6 +48,8 @@ use super::{
     stdio::snprintf,
 };
 
+use crate::header::signal::{sigprocmask, sigset_t, sigsuspend};
+
 mod brk;
 mod getopt;
 mod getpass;
@@ -795,9 +797,12 @@ pub extern "C" fn nice(incr: c_int) -> c_int {
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pause.html>.
-// #[unsafe(no_mangle)]
-pub extern "C" fn pause() -> c_int {
-    unimplemented!();
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn pause() -> c_int {
+    let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
+    unsafe { sigprocmask(0, ptr::null_mut(), pset.as_mut_ptr()) };
+    let set = unsafe { pset.assume_init() };
+    unsafe { sigsuspend(&set) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pipe.html>.
