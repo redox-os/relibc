@@ -8,10 +8,7 @@ use crate::{
     fs::File,
     header::{limits::PATH_MAX, string::strlen},
     io::{BufReader, SeekFrom, prelude::*},
-    platform::{
-        sys::{S_ISGID, S_ISUID},
-        types::*,
-    },
+    platform::types::*,
 };
 
 use redox_rt::{

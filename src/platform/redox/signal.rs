@@ -7,17 +7,15 @@ use crate::{
     header::{
         errno::{EINVAL, ENOSYS},
         signal::{
-            NSIG, SA_SIGINFO, SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE,
-            SS_ONSTACK, sigaction, siginfo_t, sigset_t, sigval, stack_t, ucontext_t,
+            SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE, SS_ONSTACK,
+            sigaction, siginfo_t, sigset_t, sigval, stack_t, ucontext_t,
         },
         sys_time::{ITIMER_REAL, itimerval},
         time::timespec,
     },
-    platform::ERRNO,
 };
-use core::mem::{self, offset_of};
+use core::mem::offset_of;
 use redox_rt::{
-    proc::FdGuard,
     protocol::ProcKillTarget,
     signal::{
         PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,

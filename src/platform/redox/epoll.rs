@@ -4,11 +4,10 @@ use super::{
 };
 
 use crate::{
-    error::{Errno, ResultExt},
+    error::Errno,
     fs::File,
     header::{errno::*, fcntl::*, signal::sigset_t, sys_epoll::*},
     io::prelude::*,
-    platform,
 };
 use core::{mem, slice};
 use syscall::{
