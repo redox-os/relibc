@@ -14,9 +14,9 @@ pub unsafe extern "C" fn __assert_fail(
     line: c_int,
     cond: *const c_char,
 ) -> ! {
-    let func = unsafe { CStr::from_ptr(func) }.to_str().unwrap();
-    let file = unsafe { CStr::from_ptr(file) }.to_str().unwrap();
-    let cond = unsafe { CStr::from_ptr(cond) }.to_str().unwrap();
+    let func = unsafe { CStr::from_ptr(func) }.to_string_lossy();
+    let file = unsafe { CStr::from_ptr(file) }.to_string_lossy();
+    let cond = unsafe { CStr::from_ptr(cond) }.to_string_lossy();
 
     eprintln!("{}: {}:{}: Assertion `{}` failed.", func, file, line, cond);
 
