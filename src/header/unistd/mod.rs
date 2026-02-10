@@ -16,18 +16,19 @@ use crate::{
         crypt::{crypt_data, crypt_r},
         errno::{self, ENAMETOOLONG},
         fcntl, limits,
+        signal::{SIGALRM, SIGEV_SIGNAL, sigevent},
         stdlib::getenv,
         sys_ioctl, sys_resource,
         sys_select::timeval,
         sys_time, sys_utsname, termios,
-        time::timespec,
+        time::{CLOCK_REALTIME, itimerspec, timer_create, timer_settime, timespec},
     },
     out::Out,
     platform::{
         self, ERRNO, Pal, Sys,
         types::{
             c_char, c_int, c_long, c_short, c_uint, c_ulonglong, c_void, gid_t, off_t, pid_t,
-            size_t, ssize_t, suseconds_t, time_t, uid_t, useconds_t,
+            size_t, ssize_t, suseconds_t, time_t, timer_t, uid_t, useconds_t,
         },
     },
 };
@@ -148,25 +149,41 @@ pub unsafe extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alarm.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
-    // TODO setitimer is unimplemented on Redox and obsolete
-    let timer = sys_time::itimerval {
-        it_value: timeval {
-            tv_sec: seconds as time_t,
-            tv_usec: 0,
-        },
-        ..Default::default()
-    };
-    let mut otimer = sys_time::itimerval::default();
+    static mut ALARM_TIMER: timer_t = ptr::null_mut();
+    static mut TIMER_INIT: bool = false;
 
-    let errno_backup = platform::ERRNO.get();
-    let secs = if unsafe { sys_time::setitimer(sys_time::ITIMER_REAL, &timer, &mut otimer) } < 0 {
-        0
-    } else {
-        otimer.it_value.tv_sec as c_uint + if otimer.it_value.tv_usec > 0 { 1 } else { 0 }
-    };
-    platform::ERRNO.set(errno_backup);
+    unsafe {
+        if !TIMER_INIT {
+            let mut sev: sigevent = mem::zeroed();
+            sev.sigev_notify = SIGEV_SIGNAL;
+            sev.sigev_signo = SIGALRM as i32;
+            if timer_create(CLOCK_REALTIME, &mut sev, &raw mut ALARM_TIMER) < 0 {
+                return 0;
+            }
+            TIMER_INIT = true;
+        }
 
-    secs
+        let new_value = itimerspec {
+            it_interval: Default::default(),
+            it_value: timespec {
+                tv_sec: seconds as i64,
+                tv_nsec: 0,
+            },
+        };
+
+        let mut old_value = itimerspec::default();
+
+        if timer_settime(ALARM_TIMER, 0, &new_value, &mut old_value) < 0 {
+            return 0;
+        }
+
+        let remaining = old_value.it_value.tv_sec as c_uint;
+        if remaining == 0 && old_value.it_value.tv_nsec > 0 {
+            0
+        } else {
+            remaining
+        }
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/chdir.html>.
