@@ -7,3 +7,6 @@ edition = "2024"
 [lib]
 name = "crt0"
 crate-type = ["staticlib"]
+
+[lints]
+workspace = true

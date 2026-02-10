@@ -8,4 +8,5 @@ edition = "2024"
 name = "crti"
 crate-type = ["staticlib"]
 
-[dependencies]
+[lints]
+workspace = true
