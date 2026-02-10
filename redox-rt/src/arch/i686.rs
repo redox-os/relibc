@@ -3,7 +3,6 @@ use core::{cell::SyncUnsafeCell, mem::offset_of, ptr::NonNull, sync::atomic::Ord
 use syscall::*;
 
 use crate::{
-    RtTcb,
     proc::{FdGuard, FdGuardUpper, ForkArgs, fork_inner},
     protocol::{ProcCall, RtSigInfo},
     signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, inner_fastcall},

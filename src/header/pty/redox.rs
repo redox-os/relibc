@@ -1,8 +1,10 @@
 use crate::{
-    Pal, Sys,
     error::ResultExt,
     header::{fcntl, unistd},
-    platform::types::{c_char, c_int, ssize_t},
+    platform::{
+        Pal, Sys,
+        types::{c_char, c_int, ssize_t},
+    },
 };
 
 pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {

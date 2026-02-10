@@ -5,6 +5,7 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+#[allow(unused_imports)] // i586: NativeEndian, Rela, Sym
 use object::{
     NativeEndian, elf,
     read::elf::{Rela as _, Sym},
@@ -15,6 +16,7 @@ use core::{
     ptr::{self, NonNull},
 };
 
+#[allow(unused_imports)] // i586: resolve_sym, c_uint
 use crate::{
     ALLOCATOR,
     c_str::{CStr, CString},
@@ -33,6 +35,7 @@ use crate::{
     sync::rwlock::RwLock,
 };
 
+#[allow(unused_imports)] // i586: Rela
 use super::{
     PATH_SEP,
     access::accessible,

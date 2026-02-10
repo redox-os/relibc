@@ -1,23 +1,17 @@
-use ::event::raw::RawEventV1;
 use syscall::Error;
 
 use crate::{
     error::{Errno, Result},
     header::{
         errno::EIO,
-        signal::{SIGEV_SIGNAL, SIGEV_THREAD, raise, sigevent, sigval},
+        signal::{SIGEV_SIGNAL, SIGEV_THREAD},
         time::{timer_internal_t, timespec},
     },
     out::Out,
-    platform::{
-        Pal, Sys,
-        sys::{event, libredox},
-        types::c_void,
-    },
+    platform::{Pal, Sys, sys::event, types::c_void},
 };
 use core::{
-    mem::{MaybeUninit, size_of, transmute},
-    ops::ControlFlow,
+    mem::{MaybeUninit, size_of},
     ptr, slice,
 };
 

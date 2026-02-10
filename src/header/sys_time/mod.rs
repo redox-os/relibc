@@ -9,7 +9,7 @@ use crate::{
     out::Out,
     platform::{
         Pal, PalSignal, Sys,
-        types::{c_char, c_int, c_long, suseconds_t, time_t},
+        types::{c_char, c_int, c_long},
     },
 };
 use core::ptr::null;

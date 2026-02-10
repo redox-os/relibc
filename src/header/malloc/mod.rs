@@ -5,7 +5,7 @@
 use crate::{
     header::errno::ENOMEM,
     platform::{
-        self, ERRNO, Pal, Sys,
+        self, Pal, Sys,
         types::{c_void, size_t},
     },
 };

@@ -3,7 +3,7 @@ use crate::{
     c_str::{self, WStr},
     header::stdio::printf::inner_printf,
     io::Write,
-    platform::{self, types::c_int},
+    platform::types::c_int,
 };
 use core::ffi::VaList;
 

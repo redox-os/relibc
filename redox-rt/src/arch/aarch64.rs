@@ -3,10 +3,10 @@ use core::{cell::SyncUnsafeCell, mem::offset_of, ptr::NonNull};
 use syscall::{data::*, error::*};
 
 use crate::{
-    RtTcb, Tcb,
+    Tcb,
     proc::{FdGuard, FdGuardUpper, ForkArgs, fork_inner},
     protocol::{ProcCall, RtSigInfo},
-    signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, inner_c},
+    signal::{PosixStackt, RtSigarea, SigStack, inner_c},
 };
 
 use super::ForkScratchpad;

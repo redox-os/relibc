@@ -1,22 +1,20 @@
 // https://pubs.opengroup.org/onlinepubs/9699919799/functions/getline.html
 
-use alloc::{string::String, vec::Vec};
-use core::{fmt::Write, intrinsics::unlikely, ops::Deref, ptr};
+use alloc::vec::Vec;
+use core::{intrinsics::unlikely, ptr};
 
 use crate::{
     header::{
-        errno::{EINVAL, ENOMEM, ENOSPC, EOVERFLOW},
-        stdio,
+        errno::{EINVAL, ENOMEM, EOVERFLOW},
         stdio::FILE,
         stdlib,
     },
     io::BufRead,
-    platform,
     platform::types::{c_char, c_int, c_void, size_t, ssize_t},
 };
 
 use crate::{
-    header::stdio::{F_EOF, F_ERR, default_stdout, feof, ferror},
+    header::stdio::{F_EOF, F_ERR, feof, ferror},
     platform::ERRNO,
 };
 

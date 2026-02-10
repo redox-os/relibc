@@ -1,8 +1,4 @@
-use core::{
-    cell::LazyCell,
-    slice, str,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use core::{slice, str};
 
 use alloc::vec::Vec;
 use ioslice::IoSlice;
@@ -10,15 +6,11 @@ use redox_rt::{
     protocol::{ProcKillTarget, SocketCall, WaitFlags},
     sys::{WaitpidTarget, posix_read, posix_write},
 };
-use syscall::{CallFlags, EMFILE, ENOSYS, Error, Result};
+use syscall::{EMFILE, Error, Result};
 
 use crate::{
     header::{
-        errno::EINVAL,
-        signal::{SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, sigaction},
-        sys_stat::UTIME_NOW,
-        sys_uio::iovec,
-        time::timespec,
+        errno::EINVAL, signal::sigaction, sys_stat::UTIME_NOW, sys_uio::iovec, time::timespec,
     },
     out::Out,
     platform::{PalSignal, types::*},

@@ -6,9 +6,9 @@
 // according to the current locale (TODO).
 
 use alloc::string::{String, ToString};
-use core::{ffi::CStr, ptr, slice, str};
+use core::str;
 
-use libm::{fabs, floor, pow, round, trunc};
+use libm::{fabs, pow, round, trunc};
 
 extern crate alloc;
 

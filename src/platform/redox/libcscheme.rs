@@ -1,7 +1,6 @@
-use super::libredox;
 use crate::{c_str::CStr, header::stdlib::getenv, platform::types::*};
-use core::{ptr, slice};
-use syscall::{EINVAL, EIO, ENOENT, Error, Result, flag::*};
+use core::ptr;
+use syscall::{EIO, ENOENT, Error, Result, flag::*};
 
 pub const LIBC_SCHEME: &'static str = "libc:";
 

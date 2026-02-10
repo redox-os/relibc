@@ -1,4 +1,4 @@
-use super::{siginfo_t, sigset_t, stack_t};
+use super::{sigset_t, stack_t};
 use crate::platform::types::c_ulong;
 use core::arch::global_asm;
 

@@ -3,7 +3,7 @@
 use crate::{
     error::Errno,
     header::{
-        errno::{EINVAL, ENOMEM, ETIMEDOUT},
+        errno::{EINVAL, ETIMEDOUT},
         pthread::*,
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec, timespec_realtime_to_monotonic},
     },

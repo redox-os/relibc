@@ -4,16 +4,9 @@
 
 mod dns;
 
-use core::{
-    cell::Cell,
-    fmt::Write,
-    mem,
-    net::Ipv4Addr,
-    ptr, slice,
-    str::{self, FromStr},
-};
+use core::{cell::Cell, fmt::Write, mem, net::Ipv4Addr, ptr, str};
 
-use alloc::{borrow::ToOwned, boxed::Box, str::SplitWhitespace, string::ToString, vec::Vec};
+use alloc::{boxed::Box, str::SplitWhitespace, string::ToString, vec::Vec};
 
 use crate::{
     c_str::{CStr, CString},

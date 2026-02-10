@@ -6,7 +6,9 @@
 
 use core::cell::UnsafeCell;
 
-use generic_rt::{ExpectTlsFree, GenericTcb};
+#[allow(unused_imports)] // ExpectTlsFree for aarch64 and riscv64gc
+use generic_rt::ExpectTlsFree;
+use generic_rt::GenericTcb;
 use syscall::Sigcontrol;
 
 use self::{

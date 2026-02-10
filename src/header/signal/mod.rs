@@ -7,7 +7,6 @@ use core::{arch::global_asm, mem, ptr};
 use cbitset::BitSet;
 
 use crate::{
-    c_str::CStr,
     error::{Errno, ResultExt},
     header::{errno, setjmp, time::timespec},
     platform::{

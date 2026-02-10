@@ -1,4 +1,4 @@
-use core::{ptr, slice};
+use core::slice;
 
 use crate::{
     error::{Errno, ResultExt},

@@ -1,7 +1,7 @@
 use core::cell::SyncUnsafeCell;
 
 use crate::{
-    RtTcb, Tcb,
+    Tcb,
     proc::{FdGuard, FdGuardUpper, ForkArgs, fork_inner},
     protocol::{ProcCall, RtSigInfo},
     signal::{PosixStackt, RtSigarea, SigStack, get_sigaltstack, inner_c},
