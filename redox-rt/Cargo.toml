@@ -21,3 +21,6 @@ generic-rt = { path = "../generic-rt" }
 [features]
 proc = []
 default = ["proc"]
+
+[lints]
+workspace = true
