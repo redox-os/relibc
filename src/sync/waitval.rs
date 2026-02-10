@@ -4,8 +4,6 @@ use core::{
     sync::atomic::{AtomicU32 as AtomicUint, Ordering},
 };
 
-use super::*;
-
 /// An unsafe "one thread to one thread" synchronization primitive. Used for and modeled after
 /// pthread_join only, at the moment.
 #[derive(Debug)]

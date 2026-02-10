@@ -6,10 +6,9 @@ use core::{
 use crate::{
     error::Errno,
     header::{errno::*, pthread::*, time::timespec},
-    pthread::*,
 };
 
-use crate::platform::{Pal, Sys, types::*};
+use crate::platform::{Pal, Sys, types::c_int};
 
 use super::FutexWaitResult;
 

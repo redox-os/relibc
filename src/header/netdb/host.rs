@@ -2,7 +2,6 @@ use alloc::{boxed::Box, str::SplitWhitespace, vec::Vec};
 use core::{mem, ptr};
 
 use crate::{
-    c_str::CString,
     error::ResultExt,
     header::{
         arpa_inet::inet_aton, fcntl::O_RDONLY, netinet_in::in_addr, sys_socket::constants::AF_INET,

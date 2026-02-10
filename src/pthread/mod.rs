@@ -2,8 +2,7 @@
 
 use core::{
     cell::UnsafeCell,
-    mem::MaybeUninit,
-    ptr::{self, addr_of},
+    ptr,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 

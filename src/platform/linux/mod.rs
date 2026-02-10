@@ -1,12 +1,12 @@
 use core::{arch::asm, num::NonZeroU64, ptr};
 
-use super::{ERRNO, Pal, types::*};
+use super::{Pal, types::*};
 use crate::{
     c_str::CStr,
     header::{
         dirent::dirent,
-        errno::{EINVAL, EIO, EOPNOTSUPP},
-        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW},
+        errno::{EINVAL, EIO},
+        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR},
         signal::{SIGCHLD, sigevent},
         sys_resource::{rlimit, rusage},
         sys_select::timeval,
@@ -16,7 +16,6 @@ use crate::{
         time::itimerspec,
         unistd::{SEEK_CUR, SEEK_SET},
     },
-    io::Write,
     ld_so::tcb::OsSpecific,
     out::Out,
 };
@@ -480,7 +479,7 @@ impl Pal for Sys {
                 path.as_ptr(),
                 owner as u32,
                 group as u32,
-                AT_SYMLINK_NOFOLLOW
+                crate::header::fcntl::AT_SYMLINK_NOFOLLOW
             )
         })
         .map(|_| ())

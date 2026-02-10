@@ -1,7 +1,6 @@
 use core::{
     cell::UnsafeCell,
     fmt, ops,
-    ptr::NonNull,
     sync::atomic::{AtomicU32, Ordering},
 };
 

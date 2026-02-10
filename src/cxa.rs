@@ -1,6 +1,6 @@
-use crate::platform::types::*;
+use crate::platform::types::{c_int, c_void};
 use alloc::vec::Vec;
-use core::{cell::RefCell, ptr};
+use core::cell::RefCell;
 use spin::Mutex;
 
 #[derive(Clone, Copy)]

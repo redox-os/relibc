@@ -2,12 +2,9 @@
 
 use core::{marker::PhantomData, ptr::NonNull, str::Utf8Error};
 
-use alloc::{
-    borrow::{Cow, ToOwned},
-    string::String,
-};
+use alloc::{borrow::Cow, string::String};
 
-use crate::platform::types::{c_char, c_int, wchar_t};
+use crate::platform::types::{c_char, wchar_t};
 
 mod private {
     pub trait Sealed {}

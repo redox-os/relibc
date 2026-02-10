@@ -1,12 +1,6 @@
 use core::{fmt, str::FromStr};
 
-use crate::{
-    c_str::CStr,
-    fs::{self, File},
-    header::fcntl,
-    io::{self, BufWriter, prelude::*},
-    sync::Mutex,
-};
+use crate::{c_str::CStr, io::prelude::*, sync::Mutex};
 
 use alloc::string::String;
 use log::{Metadata, Record};
@@ -243,8 +237,6 @@ impl RedoxLogger {
         process_name: Option<&str>,
         writer: &mut W,
     ) -> fmt::Result {
-        use log::Level;
-
         let target = record.module_path().unwrap_or(record.target());
         let level = record.level();
         let message = record.args();
