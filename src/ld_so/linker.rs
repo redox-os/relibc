@@ -1,3 +1,5 @@
+#[allow(unused_imports)]
+// i586 unused: object::NativeEndian, read::elf::Rela, ld_so::dso::resolve_sym, types::c_uint, dso::Rela, Sym
 use alloc::{
     collections::BTreeMap,
     rc::Rc,

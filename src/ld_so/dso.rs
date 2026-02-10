@@ -2,6 +2,8 @@
 //! * <https://refspecs.linuxfoundation.org/elf/elf.pdf>
 //! * <https://www.akkadia.org/drepper/dsohowto.pdf>
 
+#[allow(unused_imports)]
+// i586, riscv64gc: tcb::Tcb, mem::offset_of
 use object::{
     NativeEndian, Object, StringTable, SymbolIndex, elf,
     read::elf::{
