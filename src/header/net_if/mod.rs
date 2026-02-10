@@ -4,8 +4,6 @@
 
 use core::ptr::null;
 
-use alloc::ffi::CString;
-
 use crate::{
     c_str::CStr,
     platform::{
@@ -110,7 +108,7 @@ pub const IFF_DYNAMIC: c_int = 0x8000;
 pub const IFF_LOWER_UP: c_int = 0x10000;
 pub const IFF_DORMANT: c_int = 0x20000;
 pub const IFF_ECHO: c_int = 0x40000;
-pub const IFF_VOLATILE: c_int = (IFF_LOOPBACK
+pub const IFF_VOLATILE: c_int = IFF_LOOPBACK
     | IFF_POINTOPOINT
     | IFF_BROADCAST
     | IFF_ECHO
@@ -118,4 +116,4 @@ pub const IFF_VOLATILE: c_int = (IFF_LOOPBACK
     | IFF_SLAVE
     | IFF_RUNNING
     | IFF_LOWER_UP
-    | IFF_DORMANT);
+    | IFF_DORMANT;

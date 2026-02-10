@@ -163,12 +163,12 @@ impl<'a, T> Out<'a, [T]> {
         l
     }
     // TODO: better API, impl RangeBounds, also fn get(usize) -> Out<T>
-    pub fn subslice<'b>(&'b mut self, start: usize, end: usize) -> Out<[T]> {
+    pub fn subslice<'b>(&'b mut self, start: usize, end: usize) -> Out<'b, [T]> {
         assert!(start <= end);
         assert!(end <= self.len());
         unsafe { Self::from_raw_parts(self.as_mut_ptr().as_mut_ptr().add(start), end - start) }
     }
-    pub fn index<'b>(&'b mut self, i: usize) -> Out<T> {
+    pub fn index<'b>(&'b mut self, i: usize) -> Out<'b, T> {
         assert!(i <= self.len());
         unsafe { Out::nonnull(self.as_mut_ptr().as_mut_ptr().add(i)) }
     }

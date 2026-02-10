@@ -85,7 +85,7 @@ pub const extern "C" fn LOG_MASK(p: c_int) -> c_int {
 pub extern "C" fn setlogmask(mask: c_int) -> c_int {
     let mut params = LOGGER.lock();
     let old = params.mask.bits();
-    if (mask != 0) {
+    if mask != 0 {
         if let Some(mask) = params.mask.with_mask(mask) {
             params.mask = mask;
         }

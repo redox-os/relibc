@@ -218,7 +218,7 @@ impl WriteByte for FILE {
 }
 
 impl FILE {
-    pub fn lock(&mut self) -> LockGuard {
+    pub fn lock(&mut self) -> LockGuard<'_> {
         unsafe {
             flockfile(self);
         }
