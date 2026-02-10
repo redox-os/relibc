@@ -87,7 +87,7 @@ impl<'a> LookAheadReader<'a> {
 }
 
 impl<'a> From<&'a mut FILE> for LookAheadReader<'a> {
-    fn from(f: &'a mut FILE) -> LookAheadReader {
+    fn from(f: &'a mut FILE) -> LookAheadReader<'a> {
         LookAheadReader(LookAheadReaderEnum::FILE(f.into()))
     }
 }

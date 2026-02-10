@@ -28,34 +28,21 @@ ptr_cast_constness = "warn"
 ref_as_ptr = "warn"
 zero_ptr = "warn" # must allow on public constants due to cbindgen issue
 
-[lints.clippy]
-cast_lossless = "warn"
-cast_ptr_alignment = "allow" # TODO change to warn or deny when ready to fix
-mut_from_ref = "allow"
-ptr_as_ptr = "warn"
-ptr_cast_constness = "warn"
-ref_as_ptr = "warn"
-zero_ptr = "warn" # must allow on public constants due to cbindgen issue
-
 [workspace.lints.rust]
 dangling_pointers_from_temporaries = "deny"
 irrefutable_let_patterns = "deny"
+mismatched_lifetime_syntaxes = "deny"
 non_camel_case_types = "allow"
+non_snake_case = "allow"
+non_upper_case_globals = "allow"
 unpredictable_function_pointer_comparisons = "deny"
 unsafe_op_in_unsafe_fn = "deny"
 unused_mut = "deny"
 unused_unsafe = "deny"
 unused_variables = "allow" # TODO review occurrences (too many for now)
 
-[lints.rust]
-dangling_pointers_from_temporaries = "deny"
-irrefutable_let_patterns = "deny"
-non_camel_case_types = "allow"
-unpredictable_function_pointer_comparisons = "deny"
-unsafe_op_in_unsafe_fn = "deny"
-unused_mut = "deny"
-unused_unsafe = "deny"
-unused_variables = "allow" # TODO review occurrences (too many for now)
+[lints]
+workspace = true
 
 [build-dependencies]
 cc = "1"

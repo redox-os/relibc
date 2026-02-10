@@ -27,7 +27,6 @@ use core::{
 };
 
 use crate::{
-    c_str::CStr,
     header::{
         stdio::{self, FILE, fprintf, fputc, fputs, vfprintf},
         stdlib::exit,
@@ -158,9 +157,9 @@ pub unsafe extern "C" fn vwarnx(fmt: *const c_char, args: va_list) {
 
 // Write error messages for err and warn to the currently set sink.
 unsafe fn display_message(code: Option<c_int>, fmt: *const c_char, args: va_list) {
-    /// SAFETY:
-    /// * error_sink is only null once on start but otherwise always stderr or a user set file
-    /// * User is trusted to pass in a valid file pointer if err_set_file is used
+    // SAFETY:
+    // * error_sink is only null once on start but otherwise always stderr or a user set file
+    // * User is trusted to pass in a valid file pointer if err_set_file is used
     if error_sink.is_null() {
         error_sink = stdio::stderr;
     }

@@ -2,14 +2,15 @@
 
 use alloc::{boxed::Box, vec::Vec};
 use core::{intrinsics, ptr};
+
+#[cfg(target_os = "redox")]
 use generic_rt::ExpectTlsFree;
 
 use crate::{
     ALLOCATOR,
     header::{libgen, stdio, stdlib},
-    ld_so::{self, linker::Linker, tcb::Tcb},
+    ld_so::{self, linker::Linker},
     platform::{self, Pal, Sys, get_auxvs, types::*},
-    raw_cell::RawCell,
     sync::mutex::Mutex,
 };
 
