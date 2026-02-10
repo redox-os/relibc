@@ -1210,12 +1210,13 @@ unsafe fn with_argv(
         stack.as_mut_slice()
     } else if argc < 4096 {
         // TODO: Use ARG_MAX, not this hardcoded constant
-        let ptr = unsafe { crate::header::stdlib::malloc(argc * mem::size_of::<*const c_char>()) };
+        let ptr =
+            unsafe { crate::header::stdlib::malloc((argc + 1) * mem::size_of::<*const c_char>()) };
         if ptr.is_null() {
             platform::ERRNO.set(ENOMEM);
             return -1;
         }
-        unsafe { slice::from_raw_parts_mut(ptr.cast::<MaybeUninit<*const c_char>>(), argc) }
+        unsafe { slice::from_raw_parts_mut(ptr.cast::<MaybeUninit<*const c_char>>(), argc + 1) }
     } else {
         platform::ERRNO.set(E2BIG);
         return -1;
