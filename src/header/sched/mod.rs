@@ -12,6 +12,7 @@ use crate::{
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
+#[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct sched_param {
     pub sched_priority: c_int,
