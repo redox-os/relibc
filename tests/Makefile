@@ -11,7 +11,7 @@ FAILING_TESTS=tls \
 	mkfifo \
 	sigchld \
 	stdlib/ptsname \
-	sys_mman \
+	sys_mman/fmap \
 	signals/pthread_kill-child \
 	unistd/isatty \
 	unistd/link \
@@ -276,6 +276,7 @@ VARIED_NAMES=\
 	stdlib/mktemp \
 	stdlib/realpath \
 	sys_epoll/epoll \
+	sys_mman/mmap \
 	sys_resource/constants \
 	sys_socket/getpeername \
 	sys_stat/stat \
