@@ -2,8 +2,6 @@
 //! * <https://refspecs.linuxfoundation.org/elf/elf.pdf>
 //! * <https://www.akkadia.org/drepper/dsohowto.pdf>
 
-#[allow(unused_imports)]
-// i586, riscv64gc: tcb::Tcb, mem::offset_of
 use object::{
     NativeEndian, Object, StringTable, SymbolIndex, elf,
     read::elf::{
@@ -12,6 +10,7 @@ use object::{
     },
 };
 
+#[allow(unused_imports)] // i586, riscv64gc: tcb::Tcb
 use super::{
     debug::{_r_debug, RTLDDebug},
     linker::{__plt_resolve_trampoline, GLOBAL_SCOPE, Resolve, Scope, Symbol},
@@ -27,6 +26,7 @@ use alloc::{
     sync::Arc,
     vec::Vec,
 };
+#[allow(unused_imports)] // i586, riscv64gc: mem::offset_of
 use core::{
     ffi::c_char,
     mem::{offset_of, size_of},

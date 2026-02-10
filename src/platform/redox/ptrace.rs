@@ -7,10 +7,12 @@
 #[allow(unused_imports)]
 // i586, riscv64gc, aarch64: PalSignal, signal, sys_ptrace, core::mem, syscall, Pal, io::prelude
 use super::super::{ERRNO, Pal, PalPtrace, PalSignal, Sys, types::*};
+#[allow(unused_imports)]
 #[cfg(target_arch = "aarch64")]
 use crate::header::arch_aarch64_user::user_regs_struct; // unused
 #[cfg(target_arch = "x86_64")]
 use crate::header::arch_x64_user::user_regs_struct;
+#[allow(unused_imports)]
 use crate::{
     c_str::{CStr, CString},
     error::Errno,
@@ -25,7 +27,9 @@ use crate::{
 };
 
 use alloc::collections::{BTreeMap, btree_map::Entry};
+#[allow(unused_imports)]
 use core::mem;
+#[allow(unused_imports)]
 use syscall;
 
 pub struct Session {
