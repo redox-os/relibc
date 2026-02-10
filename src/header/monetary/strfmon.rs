@@ -2,8 +2,8 @@ use crate::platform::types::c_char;
 
 use super::{DEFAULT_MONETARY, FormatFlags, LocaleMonetaryInfo, apply_grouping};
 use alloc::string::{String, ToString};
-use core::{ffi::CStr, ptr, result, slice, str};
-use libm::{fabs, floor, pow, round, trunc};
+use core::{ffi::CStr, slice};
+use libm::{fabs, pow, round, trunc};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strfmon.html>.
 ///

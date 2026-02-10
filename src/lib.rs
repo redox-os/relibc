@@ -58,7 +58,7 @@ pub mod raw_cell;
 pub mod start;
 pub mod sync;
 
-use crate::platform::{Allocator, NEWALLOCATOR, Pal, Sys};
+use crate::platform::{Allocator, NEWALLOCATOR};
 
 #[global_allocator]
 static ALLOCATOR: Allocator = NEWALLOCATOR;

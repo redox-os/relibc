@@ -1,17 +1,17 @@
 use core::{
     convert::TryFrom,
-    mem::{self, MaybeUninit, size_of},
+    mem::{self, size_of},
     num::NonZeroU64,
     ptr, slice, str,
 };
 use redox_rt::{
     RtTcb,
-    protocol::{WaitFlags, wifstopped, wstopsig},
+    protocol::{WaitFlags, wifstopped},
     sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
-    self, EILSEQ, EMFILE, Error, MODE_PERM, PtraceEvent,
-    data::{Map, Stat as redox_stat, StatVfs as redox_statvfs, TimeSpec as redox_timespec},
+    self, EILSEQ, Error, MODE_PERM,
+    data::{Map, TimeSpec as redox_timespec},
     dirent::{DirentHeader, DirentKind},
 };
 
@@ -19,42 +19,37 @@ use self::{
     exec::Executable,
     path::{FileLock, canonicalize, openat2, openat2_path},
 };
-use super::{ERRNO, Pal, Read, types::*};
+use super::{Pal, Read, types::*};
 use crate::{
     c_str::{CStr, CString},
-    error::{self, Errno, Result, ResultExt},
+    error::{Errno, Result},
     fs::File,
     header::{
-        dirent::dirent,
         errno::{
             EBADF, EBADFD, EBADR, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
             ENOMEM, ENOSYS, EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl::{self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW, O_CREAT, O_RDONLY, O_RDWR},
+        fcntl::{self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW},
         limits,
         pthread::{pthread_cancel, pthread_create},
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
         stdio::RENAME_NOREPLACE,
         sys_file,
-        sys_mman::{MAP_ANONYMOUS, MAP_FAILED, PROT_READ, PROT_WRITE},
+        sys_mman::{MAP_ANONYMOUS, PROT_READ, PROT_WRITE},
         sys_random,
         sys_resource::{RLIM_INFINITY, rlimit, rusage},
         sys_select::timeval,
-        sys_stat::{S_ISGID, S_ISUID, S_ISVTX, stat},
+        sys_stat::{S_ISVTX, stat},
         sys_statvfs::statvfs,
         sys_time::timezone,
         sys_utsname::{UTSLENGTH, utsname},
-        sys_wait,
         time::{TIMER_ABSTIME, itimerspec, timer_internal_t, timespec},
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, BufReader, prelude::*},
-    ld_so::tcb::{OsSpecific, Tcb},
+    ld_so::tcb::OsSpecific,
     out::Out,
-    platform::sys::{
-        libredox::RawResult,
-        timer::{timer_routine, timer_update_wake_time},
-    },
+    platform::sys::timer::{timer_routine, timer_update_wake_time},
     sync::rwlock::RwLock,
 };
 

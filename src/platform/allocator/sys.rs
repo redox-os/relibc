@@ -1,9 +1,9 @@
 use crate::{
     header::{
-        sys_mman::{self, MAP_FAILED, MREMAP_MAYMOVE},
+        sys_mman::{self, MREMAP_MAYMOVE},
         unistd::pthread_atfork,
     },
-    platform::{Pal, Sys, types::*},
+    platform::{Pal, Sys},
     sync::Mutex,
 };
 use core::ptr;

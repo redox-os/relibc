@@ -8,7 +8,6 @@ use crate::header::{
 
 use super::libredox::RawResult;
 
-use bitflags::Flags;
 use syscall::{EINVAL, Error, Result};
 
 #[unsafe(no_mangle)]

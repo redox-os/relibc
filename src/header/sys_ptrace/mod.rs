@@ -6,7 +6,6 @@ use crate::{
     error::ResultExt,
     platform::{PalPtrace, Sys, types::c_int},
 };
-use core::ffi::VaList;
 
 pub const PTRACE_TRACEME: c_int = 0;
 pub const PTRACE_PEEKTEXT: c_int = 1;

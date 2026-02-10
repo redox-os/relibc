@@ -4,12 +4,9 @@ use syscall;
 
 use crate::{
     error::{Errno, Result, ResultExt},
-    header::{
-        errno::{self, EINVAL},
-        fcntl, termios,
-    },
+    header::{errno::EINVAL, fcntl, termios},
     platform::{
-        self, Pal, Sys,
+        Pal, Sys,
         types::{c_int, c_ulong, c_ulonglong, c_void, pid_t},
     },
 };

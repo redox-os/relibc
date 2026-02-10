@@ -1,4 +1,4 @@
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::{cmp, mem, ptr, slice, str};
 use redox_rt::{
     proc::FdGuard,
@@ -7,17 +7,17 @@ use redox_rt::{
 use syscall::{self, flag::*};
 
 use super::{
-    super::{ERRNO, Pal, PalSocket, types::*},
+    super::{Pal, PalSocket, types::*},
     Sys,
     path::dir_path_and_fd_path,
 };
 use crate::{
-    error::{Errno, Result, ResultExt},
+    error::{Errno, Result},
     header::{
         arpa_inet::inet_aton,
         errno::{
-            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EISCONN, EMSGSIZE, ENOMEM, ENOSYS, ENOTCONN,
-            ENOTSOCK, EOPNOTSUPP, EPROTONOSUPPORT,
+            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EMSGSIZE, ENOMEM, ENOSYS, ENOTCONN, ENOTSOCK,
+            EOPNOTSUPP, EPROTONOSUPPORT,
         },
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,

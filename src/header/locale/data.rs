@@ -1,11 +1,6 @@
 use core::str::FromStr;
 
-use alloc::{
-    boxed::Box,
-    ffi::CString,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{boxed::Box, ffi::CString, string::String, vec::Vec};
 
 use super::constants::*;
 use crate::platform::types::{c_char, c_int};

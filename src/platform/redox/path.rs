@@ -1,9 +1,7 @@
 use alloc::{
-    borrow::ToOwned,
     boxed::Box,
     ffi::CString,
     string::{String, ToString},
-    vec::Vec,
 };
 use core::{ffi::c_int, str};
 use redox_rt::signal::tmp_disable_signals;

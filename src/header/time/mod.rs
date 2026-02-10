@@ -7,7 +7,6 @@ use crate::{
     error::{Errno, ResultExt},
     header::{
         errno::{EFAULT, ENOMEM, EOVERFLOW, ETIMEDOUT},
-        fcntl::O_RDONLY,
         signal::sigevent,
         stdlib::getenv,
         unistd::readlink,
@@ -16,16 +15,15 @@ use crate::{
     platform::{
         self, Pal, Sys,
         types::{
-            c_char, c_double, c_int, c_long, c_ulong, clock_t, clockid_t, pid_t, pthread_t, size_t,
-            time_t, timer_t,
+            c_char, c_double, c_int, c_long, clock_t, clockid_t, pid_t, size_t, time_t, timer_t,
         },
     },
     sync::{Mutex, MutexGuard},
 };
 use alloc::collections::BTreeSet;
 use chrono::{
-    DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, ParseError, TimeZone,
-    Timelike, Utc, format::ParseErrorKind, offset::MappedLocalTime,
+    DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, TimeZone, Timelike, Utc,
+    offset::MappedLocalTime,
 };
 use chrono_tz::{OffsetComponents, OffsetName, Tz};
 use core::{cell::OnceCell, convert::TryFrom, fmt::Debug, mem, ptr};
@@ -127,7 +125,7 @@ pub(crate) struct timer_internal_t {
     pub timerfd: usize,
     pub eventfd: usize,
     pub evp: sigevent,
-    pub thread: pthread_t,
+    pub thread: platform::types::pthread_t,
     pub caller_thread: crate::pthread::OsTid,
     // relibc handles it_interval, not the kernel
     pub next_wake_time: itimerspec,
