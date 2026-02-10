@@ -39,7 +39,7 @@ use crate::{
         sys_random,
         sys_resource::{RLIM_INFINITY, rlimit, rusage},
         sys_select::timeval,
-        sys_stat::{S_ISGID, S_ISUID, S_ISVTX, stat},
+        sys_stat::{S_ISVTX, stat},
         sys_statvfs::statvfs,
         sys_time::timezone,
         sys_utsname::{UTSLENGTH, utsname},
