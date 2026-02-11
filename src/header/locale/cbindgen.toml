@@ -7,7 +7,6 @@ include_guard = "_RELIBC_LOCALE_H"
 after_includes = """
 #include <bits/locale-t.h> // for locale_t
 """
-trailer = "#include <bits/locale.h>"
 language = "C"
 style = "Tag"
 no_includes = true
