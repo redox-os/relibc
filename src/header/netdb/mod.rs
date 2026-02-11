@@ -181,21 +181,21 @@ fn bytes_to_box_str(bytes: &[u8]) -> Box<str> {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endnetent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endnetent() {
-    Sys::close(unsafe { NETDB });
+    if let Ok(()) = Sys::close(unsafe { NETDB }) {}; // TODO handle error
     unsafe { NETDB = 0 };
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endprotoent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endprotoent() {
-    Sys::close(unsafe { PROTODB });
+    if let Ok(()) = Sys::close(unsafe { PROTODB }) {}; // TODO handle error
     unsafe { PROTODB = 0 };
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endservent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endservent() {
-    Sys::close(unsafe { SERVDB });
+    if let Ok(()) = Sys::close(unsafe { SERVDB }) {}; // TODO handle error
     unsafe { SERVDB = 0 };
 }
 
@@ -783,7 +783,7 @@ pub unsafe extern "C" fn setnetent(stayopen: c_int) {
     if unsafe { NETDB } == 0 {
         unsafe { NETDB = Sys::open(c"/etc/networks".into(), O_RDONLY, 0).or_minus_one_errno() }
     } else {
-        Sys::lseek(unsafe { NETDB }, 0, SEEK_SET);
+        if let Ok(_) = Sys::lseek(unsafe { NETDB }, 0, SEEK_SET) {}; // TODO handle errror
         unsafe { N_POS = 0 };
     }
 }
@@ -795,7 +795,7 @@ pub unsafe extern "C" fn setprotoent(stayopen: c_int) {
     if unsafe { PROTODB } == 0 {
         unsafe { PROTODB = Sys::open(c"/etc/protocols".into(), O_RDONLY, 0).or_minus_one_errno() }
     } else {
-        Sys::lseek(unsafe { PROTODB }, 0, SEEK_SET);
+        if let Ok(_) = Sys::lseek(unsafe { PROTODB }, 0, SEEK_SET) {}; // TODO handle error
         unsafe { P_POS = 0 };
     }
 }
@@ -807,7 +807,7 @@ pub unsafe extern "C" fn setservent(stayopen: c_int) {
     if unsafe { SERVDB } == 0 {
         unsafe { SERVDB = Sys::open(c"/etc/services".into(), O_RDONLY, 0).or_minus_one_errno() }
     } else {
-        Sys::lseek(unsafe { SERVDB }, 0, SEEK_SET);
+        if let Ok(_) = Sys::lseek(unsafe { SERVDB }, 0, SEEK_SET) {}; // TODO handle error
         unsafe { S_POS = 0 };
     }
 }
@@ -1030,9 +1030,9 @@ pub unsafe extern "C" fn freeaddrinfo(res: *mut addrinfo) {
         }
         if !bai.ai_addr.is_null() {
             if bai.ai_addrlen == mem::size_of::<sockaddr_in>() as socklen_t {
-                unsafe { Box::from_raw(bai.ai_addr as *mut sockaddr_in) };
+                unsafe { drop(Box::from_raw(bai.ai_addr as *mut sockaddr_in)) };
             } else if bai.ai_addrlen == mem::size_of::<sockaddr_in6>() as socklen_t {
-                unsafe { Box::from_raw(bai.ai_addr as *mut sockaddr_in6) };
+                unsafe { drop(Box::from_raw(bai.ai_addr as *mut sockaddr_in6)) };
             } else {
                 todo_skip!(0, "freeaddrinfo: unknown ai_addrlen {}", bai.ai_addrlen);
             }

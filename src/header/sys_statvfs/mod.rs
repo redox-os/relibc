@@ -52,7 +52,7 @@ pub unsafe extern "C" fn statvfs(file: *const c_char, buf: *mut statvfs) -> c_in
 
     let res = Sys::fstatvfs(fd, buf).map(|()| 0).or_minus_one_errno();
 
-    Sys::close(fd);
+    if let Ok(()) = Sys::close(fd) {}; // TODO handle error
 
     res
 }

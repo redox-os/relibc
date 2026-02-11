@@ -97,7 +97,7 @@ pub fn get_mem_stat() -> Result<sys_statvfs::statvfs, Errno> {
     let fd = Sys::open(c"/scheme/memory".into(), fcntl::O_PATH, 0)?;
     let mut buf = sys_statvfs::statvfs::default();
     let res = Sys::fstatvfs(fd, Out::from_mut(&mut buf));
-    Sys::close(fd);
+    if let Ok(()) = Sys::close(fd) {}; // TODO handle error
     let _ = res?;
     return Ok(buf);
 }

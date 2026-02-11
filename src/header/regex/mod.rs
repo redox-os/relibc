@@ -90,7 +90,7 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
 #[unsafe(no_mangle)]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regfree(regex: *mut regex_t) {
-    unsafe { Box::from_raw((*regex).ptr) };
+    unsafe { drop(Box::from_raw((*regex).ptr)) };
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/regexec.html>.

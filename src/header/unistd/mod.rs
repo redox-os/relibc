@@ -1060,7 +1060,7 @@ pub unsafe extern "C" fn symlink(path1: *const c_char, path2: *const c_char) -> 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sync.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn sync() {
-    Sys::sync();
+    if let Ok(()) = Sys::sync() {}; // TODO handle error
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcgetpgrp.html>.
@@ -1094,7 +1094,7 @@ pub unsafe extern "C" fn truncate(path: *const c_char, length: off_t) -> c_int {
 
     let res = ftruncate(fd, length);
 
-    Sys::close(fd);
+    if let Ok(()) = Sys::close(fd) {}; // TODO handle error
 
     res
 }

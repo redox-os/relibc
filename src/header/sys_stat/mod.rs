@@ -157,7 +157,7 @@ pub unsafe extern "C" fn lstat(path: *const c_char, buf: *mut stat) -> c_int {
     // TODO: Rustify
     let res = Sys::fstat(fd, buf).map(|()| 0).or_minus_one_errno();
 
-    Sys::close(fd);
+    if let Ok(()) = Sys::close(fd) {}; // TODO handle error
 
     res
 }
@@ -230,7 +230,7 @@ pub unsafe extern "C" fn stat(file: *const c_char, buf: *mut stat) -> c_int {
     // TODO: Rustify
     let res = Sys::fstat(fd, buf).map(|()| 0).or_minus_one_errno();
 
-    Sys::close(fd);
+    if let Ok(()) = Sys::close(fd) {}; // TODO handle error
 
     res
 }
