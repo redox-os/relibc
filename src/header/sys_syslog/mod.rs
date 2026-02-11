@@ -111,7 +111,7 @@ pub unsafe extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_i
 
     // Ensure log is ready to write now instead of checking on the first message.
     if conf.contains(logger::Config::NoDelay) {
-        params.open_logger();
+        if let Ok(()) = params.open_logger() {}; // TODO handle error
     }
 }
 

@@ -137,11 +137,10 @@ pub fn rttime() -> timespec {
     unsafe {
         let mut time = MaybeUninit::uninit();
 
-        // TODO: Handle error
-        Sys::clock_gettime(
+        if let Ok(()) = Sys::clock_gettime(
             crate::header::time::CLOCK_REALTIME,
             Out::from_uninit_mut(&mut time),
-        );
+        ) {}; // TODO handle error
 
         time.assume_init()
     }

@@ -81,7 +81,7 @@ pub unsafe extern "C" fn sem_unlink(name: *const c_char) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_trywait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_wait(sem: *mut sem_t) -> c_int {
-    unsafe { get(sem) }.wait(None, CLOCK_MONOTONIC);
+    if let Ok(()) = unsafe { get(sem) }.wait(None, CLOCK_MONOTONIC) {}; // TODO handle error
 
     0
 }
@@ -93,7 +93,7 @@ pub unsafe extern "C" fn sem_clockwait(
     clock_id: clockid_t,
     abstime: *const timespec,
 ) -> c_int {
-    unsafe { get(sem) }.wait(Some(&unsafe { *abstime }), clock_id);
+    if let Ok(()) = unsafe { get(sem) }.wait(Some(&unsafe { *abstime }), clock_id) {}; // TODO handle error
 
     0
 }
@@ -101,7 +101,7 @@ pub unsafe extern "C" fn sem_clockwait(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sem_timedwait.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_timedwait(sem: *mut sem_t, abstime: *const timespec) -> c_int {
-    unsafe { get(sem) }.wait(Some(&unsafe { *abstime }), CLOCK_REALTIME);
+    if let Ok(()) = unsafe { get(sem) }.wait(Some(&unsafe { *abstime }), CLOCK_REALTIME) {}; // TODO handle error
 
     0
 }

@@ -697,7 +697,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                 } else {
                     // TODO: wcsrtombs wrapper
                     for c in text.iter().filter_map(|u| char::from_u32((*u).into())) {
-                        write!(w, "{}", c);
+                        if let Ok(()) = write!(w, "{}", c) {}; // TODO handle error
                     }
                 }
                 continue;

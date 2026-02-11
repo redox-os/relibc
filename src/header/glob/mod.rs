@@ -164,7 +164,7 @@ pub unsafe extern "C" fn globfree(pglob: *mut glob_t) {
             }
             if !path.is_null() {
                 unsafe {
-                    CString::from_raw(path);
+                    drop(CString::from_raw(path));
                 }
             }
         }

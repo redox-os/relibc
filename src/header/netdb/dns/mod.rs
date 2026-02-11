@@ -132,8 +132,8 @@ impl Dns {
         let flags = pop_n16!();
         let queries_len = pop_n16!();
         let answers_len = pop_n16!();
-        pop_n16!();
-        pop_n16!();
+        let _ = pop_n16!();
+        let _ = pop_n16!();
 
         let mut queries = Vec::new();
         for _query_i in 0..queries_len {

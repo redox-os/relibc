@@ -108,14 +108,14 @@ impl FileWriter {
 
 impl fmt::Write for FileWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write(s.as_bytes());
+        if let Ok(()) = self.write(s.as_bytes()) {}; // TODO handle error
         Ok(())
     }
 }
 
 impl WriteByte for FileWriter {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
-        self.write(&[byte]);
+        if let Ok(()) = self.write(&[byte]) {}; // TODO handle error
         Ok(())
     }
 }
