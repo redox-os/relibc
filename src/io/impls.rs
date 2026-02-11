@@ -24,13 +24,11 @@ impl<'a, R: Read + ?Sized> Read for &'a mut R {
         unsafe { (**self).initializer() }
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> io::Result<usize> {
         (**self).read_to_end(buf)
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
         (**self).read_to_string(buf)
@@ -103,13 +101,11 @@ impl<R: Read + ?Sized> Read for Box<R> {
         unsafe { (**self).initializer() }
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> io::Result<usize> {
         (**self).read_to_end(buf)
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
         (**self).read_to_string(buf)

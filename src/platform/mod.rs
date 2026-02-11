@@ -20,11 +20,11 @@ mod pal;
 
 pub use self::sys::Sys;
 
-#[cfg(all(not(feature = "no_std"), target_os = "linux"))]
+#[cfg(target_os = "linux")]
 #[path = "linux/mod.rs"]
 pub(crate) mod sys;
 
-#[cfg(all(not(feature = "no_std"), target_os = "redox"))]
+#[cfg(target_os = "redox")]
 #[path = "redox/mod.rs"]
 pub(crate) mod sys;
 
