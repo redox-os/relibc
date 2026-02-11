@@ -11,6 +11,7 @@ use crate::{
     },
 };
 
+// TODO: There are extensions, but adding more member is breaking ABI for pthread_attr_t
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html>.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -70,3 +71,6 @@ pub extern "C" fn sched_setscheduler(
 pub extern "C" fn sched_yield() -> c_int {
     Sys::sched_yield().map(|()| 0).or_minus_one_errno()
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cbindgen_stupid_struct_user_for_sched_param(_: sched_param) {}
