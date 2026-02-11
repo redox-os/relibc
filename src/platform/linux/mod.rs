@@ -1,4 +1,5 @@
-use core::{arch::asm, num::NonZeroU64, ptr};
+#[cfg(target_arch = "x86_64")]
+use core::arch::asm;
 
 use super::{Pal, types::*};
 use crate::{
@@ -19,6 +20,7 @@ use crate::{
     ld_so::tcb::OsSpecific,
     out::Out,
 };
+use core::{num::NonZeroU64, ptr};
 // use header::sys_times::tms;
 use crate::{
     error::{Errno, Result},
