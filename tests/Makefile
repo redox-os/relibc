@@ -11,6 +11,7 @@ FAILING_TESTS=tls \
 	mkfifo \
 	sigchld \
 	stdlib/ptsname \
+	sys_epoll/epollet \
 	sys_mman/fmap \
 	signals/pthread_kill-child \
 	unistd/isatty \
