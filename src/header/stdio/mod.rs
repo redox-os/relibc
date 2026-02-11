@@ -580,7 +580,7 @@ pub unsafe extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> 
         .map(|f| Box::into_raw(f))
         .map_err(|err| {
             // TODO: guard type
-            Sys::close(fd);
+            if let Ok(()) = Sys::close(fd) {}; // TODO handle error
             err
         })
         .or_errno_null_mut()
@@ -1320,11 +1320,11 @@ pub unsafe extern "C" fn tmpfile() -> *mut FILE {
     let fp = unsafe { fdopen(fd, c"w+".as_ptr()) };
     {
         let file_name = unsafe { CStr::from_ptr(file_name) };
-        Sys::unlink(file_name);
+        if let Ok(()) = Sys::unlink(file_name) {}; // TODO handle error
     }
 
     if fp.is_null() {
-        Sys::close(fd);
+        if let Ok(()) = Sys::close(fd) {}; // TODO handle error
     }
 
     fp

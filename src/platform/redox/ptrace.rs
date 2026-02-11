@@ -167,7 +167,7 @@ unsafe fn inner_ptrace(
         | sys_ptrace::PTRACE_SYSCALL
         | sys_ptrace::PTRACE_SYSEMU
         | sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => {
-            Sys::kill(pid, signal::SIGCONT as _);
+            if let Ok(()) = Sys::kill(pid, signal::SIGCONT as _) {}; // TODO handle error
 
             // TODO: Translate errors
             let syscall = syscall::PTRACE_STOP_PRE_SYSCALL | syscall::PTRACE_STOP_POST_SYSCALL;

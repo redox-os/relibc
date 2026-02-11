@@ -39,10 +39,10 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
 
     if let Some(dns_addr) = parse_ipv4_string(&dns_string) {
         let mut timespec = timespec::default();
-        Sys::clock_gettime(
+        if let Ok(()) = Sys::clock_gettime(
             time::constants::CLOCK_REALTIME,
             Out::from_mut(&mut timespec),
-        );
+        ) {}; // TODO handle error
         let tid = (timespec.tv_nsec >> 16) as u16;
 
         let packet = Dns {
@@ -76,14 +76,14 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
                 return Err(EIO);
             }
             if sys_socket::send(sock, packet_data_ptr, packet_data_len, 0) < 0 {
-                Box::from_raw(packet_data_ptr);
+                drop(Box::from_raw(packet_data_ptr));
                 return Err(EIO);
             }
             sock
         };
 
         unsafe {
-            Box::from_raw(packet_data_ptr);
+            drop(Box::from_raw(packet_data_ptr));
         }
 
         let i = 0 as socklen_t;
@@ -141,10 +141,10 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
         );
 
         let mut timespec = timespec::default();
-        Sys::clock_gettime(
+        if let Ok(()) = Sys::clock_gettime(
             time::constants::CLOCK_REALTIME,
             Out::from_mut(&mut timespec),
-        );
+        ) {}; // TODO handle error
         let tid = (timespec.tv_nsec >> 16) as u16;
 
         let packet = Dns {
@@ -187,7 +187,7 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
         }
 
         unsafe {
-            Box::from_raw(packet_data_ptr);
+            drop(Box::from_raw(packet_data_ptr));
         }
 
         let i = mem::size_of::<sockaddr_in>() as socklen_t;

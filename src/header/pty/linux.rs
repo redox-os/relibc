@@ -38,7 +38,7 @@ pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
     }
 
     let mut cursor = Cursor::new(name);
-    write!(cursor, "/dev/pts/{}\0", ptn);
+    if let Ok(()) = write!(cursor, "/dev/pts/{}\0", ptn) {}; // TODO handle error
 
     let slave = unsafe {
         fcntl::open(
