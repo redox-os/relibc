@@ -1,7 +1,6 @@
 use core::{
     mem::{replace, size_of},
     ptr::addr_of,
-    slice,
     sync::atomic::{AtomicU32, Ordering},
 };
 
@@ -138,36 +137,10 @@ pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
     }
     .map(|awoken| awoken as u32)
 }
-pub fn sys_call_ro(
+unsafe fn raw_sys_call(
     fd: usize,
-    payload: &mut [u8],
-    flags: CallFlags,
-    metadata: &[u64],
-) -> Result<usize> {
-    sys_call(fd, payload, flags | CallFlags::READ, metadata)
-}
-pub fn sys_call_wo(fd: usize, payload: &[u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
-    let payload_mut =
-        unsafe { slice::from_raw_parts_mut(payload.as_ptr() as *mut u8, payload.len()) };
-
-    sys_call(fd, payload_mut, flags | CallFlags::WRITE, metadata)
-}
-pub fn sys_call_rw(
-    fd: usize,
-    payload: &mut [u8],
-    flags: CallFlags,
-    metadata: &[u64],
-) -> Result<usize> {
-    sys_call(
-        fd,
-        payload,
-        flags | CallFlags::READ | CallFlags::WRITE,
-        metadata,
-    )
-}
-pub fn sys_call(
-    fd: usize,
-    payload: &mut [u8],
+    payload_ptr: *const u8,
+    len: usize,
     flags: CallFlags,
     metadata: &[u64],
 ) -> Result<usize> {
@@ -175,12 +148,63 @@ pub fn sys_call(
         syscall::syscall5(
             syscall::SYS_CALL,
             fd,
-            payload.as_mut_ptr() as usize,
-            payload.len(),
+            payload_ptr as usize,
+            len,
             metadata.len() | flags.bits(),
             metadata.as_ptr() as usize,
         )
     }
+}
+pub fn sys_call_ro(
+    fd: usize,
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
+    unsafe {
+        raw_sys_call(
+            fd,
+            payload.as_mut_ptr(),
+            payload.len(),
+            flags | CallFlags::READ,
+            metadata,
+        )
+    }
+}
+pub fn sys_call_wo(fd: usize, payload: &[u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+    unsafe {
+        raw_sys_call(
+            fd,
+            payload.as_ptr(),
+            payload.len(),
+            flags | CallFlags::WRITE,
+            metadata,
+        )
+    }
+}
+pub fn sys_call_rw(
+    fd: usize,
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
+    unsafe {
+        raw_sys_call(
+            fd,
+            payload.as_mut_ptr(),
+            payload.len(),
+            flags | CallFlags::READ | CallFlags::WRITE,
+            metadata,
+        )
+    }
+}
+pub fn sys_call(
+    fd: usize,
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
+    unsafe { raw_sys_call(fd, payload.as_mut_ptr(), payload.len(), flags, metadata) }
 }
 pub fn this_proc_call(payload: &mut [u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
     proc_call(
