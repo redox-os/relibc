@@ -18,8 +18,5 @@ style = "Tag"
 no_includes = true
 cpp_compat = true
 
-[export.rename]
-"timespec" = "struct timespec"
-
 [enum]
 prefix_with_name = true

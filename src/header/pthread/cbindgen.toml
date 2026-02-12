@@ -6,6 +6,7 @@ no_includes = true
 cpp_compat = true
 
 [export.rename]
+"timespec" = "struct timespec"
 "sched_param" = "struct sched_param"
 
 [enum]
