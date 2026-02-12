@@ -13,4 +13,5 @@ cpp_compat = true
 prefix_with_name = true
 
 [export.rename]
+"timespec" = "struct timespec"
 "timeval" = "struct timeval"

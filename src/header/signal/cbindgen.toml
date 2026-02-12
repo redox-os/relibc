@@ -14,3 +14,4 @@ prefix_with_name = true
 
 [export.rename]
 "sigaction" = "struct sigaction"
+"timespec" = "struct timespec"
