@@ -66,3 +66,6 @@ impl timespec {
         return self.tv_nsec == 0 && self.tv_sec == 0;
     }
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cbindgen_stupid_alias_timespec(_: timespec) {}
