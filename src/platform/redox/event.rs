@@ -1,9 +1,9 @@
 use core::mem::size_of;
 
 use crate::header::{
+    bits_time::timespec,
     fcntl::{O_CLOEXEC, O_CREAT, O_RDWR},
     signal::sigset_t,
-    time::timespec,
 };
 
 use super::libredox::RawResult;

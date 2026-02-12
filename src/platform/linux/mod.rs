@@ -24,7 +24,7 @@ use core::{num::NonZeroU64, ptr};
 // use header::sys_times::tms;
 use crate::{
     error::{Errno, Result},
-    header::{sys_utsname::utsname, time::timespec},
+    header::{bits_time::timespec, sys_utsname::utsname},
 };
 
 mod epoll;

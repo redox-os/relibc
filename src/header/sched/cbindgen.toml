@@ -1,5 +1,8 @@
-sys_includes = ["time.h", "bits/sched.h"]
+sys_includes = ["sys/types.h", "bits/sched.h"]
 include_guard = "_RELIBC_SCHED_H"
+after_includes = """
+#include <bits/time.h> // for timespec
+"""
 language = "C"
 style = "Tag"
 no_includes = true
@@ -7,3 +10,6 @@ cpp_compat = true
 
 [enum]
 prefix_with_name = true
+
+[export.rename]
+"timespec" = "struct timespec"

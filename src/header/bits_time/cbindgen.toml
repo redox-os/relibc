@@ -1,0 +1,22 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html
+#
+# The time header should define timespec but multiple headers make use of it.
+# This type is split out from the time header to avoid including all of time in the other headers.
+#
+# POSIX headers that require timespec:
+# - aio.h (all functions currently unimplemented but timespec imported)
+# - poll.h
+# - sched.h
+# - semaphore.h
+# - signal.h
+# - sys/select.h (not currently imported, needed for pselect, no TODO)
+# - sys/stat.h
+# - sys/time.h
+include_guard = "_RELIBC_BITS_TIME_H"
+language = "C"
+style = "Tag"
+no_includes = true
+cpp_compat = true
+
+[enum]
+prefix_with_name = true
