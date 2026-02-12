@@ -5,6 +5,7 @@ style = "Tag"
 no_includes = true
 cpp_compat = true
 after_includes = """
+#include <bits/time.h> // for timespec
 struct sigevent;
 """
 

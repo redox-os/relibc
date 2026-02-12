@@ -1,7 +1,10 @@
 sys_includes = ["sys/types.h", "features.h", "sys/select.h"]
 include_guard = "_SYS_TIME_H"
 language = "C"
-trailer = "#include <bits/sys/time.h>"
+after_includes = """
+#include <bits/time.h> // for timespec
+#include <bits/sys/time.h>
+"""
 style = "Tag"
 no_includes = true
 cpp_compat = true

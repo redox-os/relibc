@@ -7,7 +7,6 @@ cpp_compat = true
 
 [export.rename]
 "sched_param" = "struct sched_param"
-"timespec" = "struct timespec"
 
 [enum]
 prefix_with_name = true

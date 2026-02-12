@@ -13,6 +13,7 @@ use crate::{
     c_str::CStr,
     error::{Errno, ResultExt},
     header::{
+        bits_time::timespec,
         crypt::{crypt_data, crypt_r},
         errno::{self, ENAMETOOLONG},
         fcntl, limits,
@@ -20,7 +21,6 @@ use crate::{
         sys_ioctl, sys_resource,
         sys_select::timeval,
         sys_time, sys_utsname, termios,
-        time::timespec,
     },
     out::Out,
     platform::{

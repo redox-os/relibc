@@ -25,6 +25,7 @@ use crate::{
     error::{Errno, Result},
     fs::File,
     header::{
+        bits_time::timespec,
         errno::{
             EBADF, EBADFD, EBADR, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
             ENOMEM, ENOSYS, EOPNOTSUPP, EPERM, ERANGE,
@@ -43,7 +44,7 @@ use crate::{
         sys_statvfs::statvfs,
         sys_time::timezone,
         sys_utsname::{UTSLENGTH, utsname},
-        time::{TIMER_ABSTIME, itimerspec, timer_internal_t, timespec},
+        time::{TIMER_ABSTIME, itimerspec, timer_internal_t},
         unistd::{F_OK, R_OK, SEEK_CUR, SEEK_SET, W_OK, X_OK},
     },
     io::{self, BufReader, prelude::*},

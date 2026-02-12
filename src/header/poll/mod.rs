@@ -7,6 +7,7 @@ use core::{mem, ptr, slice};
 use crate::{
     fs::File,
     header::{
+        bits_time::timespec,
         errno::EBADF,
         signal::sigset_t,
         sys_epoll::{
@@ -14,7 +15,6 @@ use crate::{
             EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, epoll_create1, epoll_ctl,
             epoll_data, epoll_event, epoll_pwait,
         },
-        time::timespec,
     },
     platform::{
         self,
