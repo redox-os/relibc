@@ -241,9 +241,9 @@ impl PalSignal for Sys {
             tv_sec: timeout.tv_sec,
             tv_nsec: timeout.tv_nsec as _,
         });
-        let info = redox_rt::signal::await_signal_sync(*set, timeout.as_ref())?.into();
+        let info = redox_rt::signal::await_signal_sync(*set, timeout.as_ref())?;
         if let Some(out) = info_out {
-            *out = info;
+            *out = siginfo_t::from(info);
         }
         Ok(info.si_signo)
     }
