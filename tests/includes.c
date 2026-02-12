@@ -11,7 +11,6 @@
 #include <assert.h>
 #include <bits/locale-t.h>
 #include <bits/pthread.h>
-#include <bits/sched.h>
 #include <crypt.h>
 #include <ctype.h>
 #include <dirent.h>

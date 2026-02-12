@@ -1,4 +1,11 @@
-sys_includes = ["sys/types.h", "bits/sched.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sched.h.html
+#
+# Spec quotations relating to includes:
+# - "[PS] The <sched.h> header shall define the pid_t type as described in <sys/types.h>."
+# - "[SS|TSP] The <sched.h> header shall define the time_t type as described in <sys/types.h>."
+# - "The <sched.h> header shall define the timespec structure as described in <time.h>."
+# - "Inclusion of the <sched.h> header may make visible all symbols from the <time.h> header."
+sys_includes = ["sys/types.h"]
 include_guard = "_RELIBC_SCHED_H"
 after_includes = """
 #include <bits/time.h> // for timespec
