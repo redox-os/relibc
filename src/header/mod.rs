@@ -7,7 +7,6 @@ pub mod assert;
 #[path = "bits_locale-t/mod.rs"]
 pub mod bits_locale_t;
 pub mod bits_pthread;
-pub mod bits_sched;
 #[path = "bits_socklen-t/mod.rs"]
 pub mod bits_socklen_t;
 pub mod bits_time;
