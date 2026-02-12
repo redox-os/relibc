@@ -8,7 +8,7 @@ use cbitset::BitSet;
 
 use crate::{
     error::{Errno, ResultExt},
-    header::{errno, setjmp, time::timespec},
+    header::{bits_time::timespec, errno, setjmp},
     platform::{
         self, ERRNO, Pal, PalSignal, Sys,
         types::{

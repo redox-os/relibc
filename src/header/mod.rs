@@ -10,6 +10,7 @@ pub mod bits_pthread;
 pub mod bits_sched;
 #[path = "bits_socklen-t/mod.rs"]
 pub mod bits_socklen_t;
+pub mod bits_time;
 // complex.h implemented in C
 // cpio.h implemented in C
 pub mod crypt;

@@ -5,7 +5,7 @@ use core::{
 
 use crate::{
     error::Errno,
-    header::{errno::*, pthread::*, time::timespec},
+    header::{bits_time::timespec, errno::*, pthread::*},
 };
 
 use crate::platform::{Pal, Sys, types::c_int};

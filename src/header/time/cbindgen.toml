@@ -5,6 +5,7 @@ style = "Tag"
 no_includes = true
 cpp_compat = true
 after_includes = """
+#include <bits/time.h> // for timespec
 struct sigevent;
 """
 
@@ -12,4 +13,5 @@ struct sigevent;
 prefix_with_name = true
 
 [export.rename]
+"timespec" = "struct timespec"
 "sigevent" = "struct sigevent"

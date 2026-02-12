@@ -1,5 +1,8 @@
-sys_includes = ["time.h"]
+sys_includes = []
 include_guard = "_RELIBC_SEMAPHORE_H"
+after_includes = """
+#include <bits/time.h> // for timespec
+"""
 language = "C"
 style = "Type"
 no_includes = true

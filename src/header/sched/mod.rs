@@ -4,7 +4,7 @@
 
 use crate::{
     error::ResultExt,
-    header::time::timespec,
+    header::bits_time::timespec,
     platform::{
         Pal, Sys,
         types::{c_int, pid_t},

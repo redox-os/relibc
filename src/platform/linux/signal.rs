@@ -8,9 +8,9 @@ use super::{
 use crate::{
     error::{Errno, Result},
     header::{
+        bits_time::timespec,
         signal::{SA_RESTORER, SI_QUEUE, sigaction, siginfo_t, sigset_t, stack_t},
         sys_time::itimerval,
-        time::timespec,
     },
 };
 

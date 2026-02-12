@@ -10,6 +10,7 @@ use crate::{
 };
 
 use crate::header::{
+    bits_time::timespec,
     errno::*,
     netinet_in::{IPPROTO_UDP, htons, in_addr, sockaddr_in},
     sys_socket::{
@@ -17,7 +18,7 @@ use crate::header::{
         constants::{AF_INET, SOCK_DGRAM},
         sockaddr, socklen_t,
     },
-    time::{self, timespec},
+    time,
 };
 
 use super::{

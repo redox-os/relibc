@@ -10,7 +10,7 @@ use syscall::{EMFILE, Error, Result};
 
 use crate::{
     header::{
-        errno::EINVAL, signal::sigaction, sys_stat::UTIME_NOW, sys_uio::iovec, time::timespec,
+        bits_time::timespec, errno::EINVAL, signal::sigaction, sys_stat::UTIME_NOW, sys_uio::iovec,
     },
     out::Out,
     platform::{PalSignal, types::*},

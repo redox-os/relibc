@@ -2,7 +2,10 @@
 //TODO: improve implementation
 
 use crate::{
-    header::time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec, timespec_realtime_to_monotonic},
+    header::{
+        bits_time::timespec,
+        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec_realtime_to_monotonic},
+    },
     platform::types::{c_uint, clockid_t},
 };
 
