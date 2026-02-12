@@ -10,7 +10,7 @@ use redox_rt::{
     sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
-    self, EILSEQ, Error, MODE_PERM,
+    self, EILSEQ, Error, MODE_PERM, StdFsCallKind, StdFsCallMeta,
     data::{Map, TimeSpec as redox_timespec},
     dirent::{DirentHeader, DirentKind},
 };
@@ -30,7 +30,10 @@ use crate::{
             EBADF, EBADFD, EBADR, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
             ENOMEM, ENOSYS, EOPNOTSUPP, EPERM, ERANGE,
         },
-        fcntl::{self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW},
+        fcntl::{
+            self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW, F_GETLK, F_RDLCK, F_SETLK,
+            F_SETLKW, F_UNLCK, F_WRLCK, flock,
+        },
         limits,
         pthread::{pthread_cancel, pthread_create},
         signal::{NSIG, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGRTMIN, sigevent},
@@ -293,6 +296,62 @@ impl Pal for Sys {
     }
 
     fn fcntl(fd: c_int, cmd: c_int, args: c_ulonglong) -> Result<c_int> {
+        match cmd {
+            F_SETLK => {
+                let flock = unsafe { &mut *(args as *mut flock) };
+                // let file_off = Self::lseek(fd, 0, SEEK_SET)?;
+
+                // TODO: overflow checks
+                let (start, len) = match flock.l_whence as i32 {
+                    SEEK_SET => {
+                        let (start, len) = if flock.l_len < 0 {
+                            (flock.l_start + flock.l_len, -flock.l_len)
+                        } else {
+                            (flock.l_start, flock.l_len)
+                        };
+
+                        if start < 0 {
+                            return Err(Errno(EINVAL));
+                        }
+
+                        assert!(len >= 0);
+                        (start as u64, len as u64)
+                    }
+                    // FIXME: SEEK_CUR, SEEK_END
+                    c => unreachable!("{c}"),
+                };
+
+                match flock.l_type as i32 {
+                    F_UNLCK => {
+                        let meta = StdFsCallMeta::new(StdFsCallKind::Unlock, start, len);
+                        syscall::std_fs_call(fd as usize, &mut [], &meta)?;
+                        return Ok(0);
+                    }
+
+                    F_RDLCK | F_WRLCK => {
+                        let meta = StdFsCallMeta::new(
+                            StdFsCallKind::Lock,
+                            start,
+                            len | if flock.l_type as i32 == F_WRLCK {
+                                1 << 63
+                            } else {
+                                0
+                            },
+                        );
+                        syscall::std_fs_call(fd as usize, &mut [], &meta)?;
+                        return Ok(0);
+                    }
+
+                    _ => return Err(Errno(EINVAL)),
+                };
+            }
+
+            F_GETLK => log::warn!("F_GETLK: not yet implemented"),
+            F_SETLKW => log::warn!("F_SETLKW: not yet implemented"),
+
+            _ => {}
+        }
+
         Ok(syscall::fcntl(fd as usize, cmd as usize, args as usize)? as c_int)
     }
 
