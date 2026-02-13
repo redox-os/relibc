@@ -25,7 +25,7 @@ pub unsafe fn init() {
         }
         if let Some(name) = CStr::from_nullable_ptr(crate::platform::program_invocation_short_name)
         {
-            logger = logger.with_process_name(name.to_str().unwrap_or("x").to_string());
+            logger = logger.with_process_name(name.to_str().unwrap_or("").to_string());
         }
     }
     if logger.enable().is_err() {
