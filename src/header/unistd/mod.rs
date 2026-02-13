@@ -115,17 +115,6 @@ pub const _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS: c_int = 1145;
 pub const _CS_POSIX_V7_LPBIG_OFFBIG_LIBS: c_int = 1146;
 pub const _CS_POSIX_V7_LPBIG_OFFBIG_LINTFLAGS: c_int = 1147;
 
-// Re-exported from pthread.h. `pthread_atfork` should be in pthread.h according to the
-// standard, but glibc exports it here as well. We ONLY exported it in unistd.h till recently.
-unsafe extern "C" {
-    #[unsafe(no_mangle)]
-    pub fn pthread_atfork(
-        prepare: Option<extern "C" fn()>,
-        parent: Option<extern "C" fn()>,
-        child: Option<extern "C" fn()>,
-    ) -> c_int;
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn _Fork() -> pid_t {
@@ -583,7 +572,7 @@ pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> 
         .map(|()| 0)
         .or_minus_one_errno();
     if err < 0 {
-        mem::forget(uts);
+        mem::forget(uts); // forget does nothing with Copy types
         return err;
     }
     for c in unsafe { uts.assume_init() }.nodename.iter() {

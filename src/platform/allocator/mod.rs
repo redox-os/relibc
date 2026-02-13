@@ -82,7 +82,7 @@ unsafe impl GlobalAlloc for Allocator {
                 unsafe { copy_nonoverlapping(ptr, new, size) };
             }
 
-            drop((old_size, old_align));
+            drop((old_size, old_align)); // drop does nothing with Copy types
             unsafe { (*self.get()).lock().free(ptr) };
 
             new
