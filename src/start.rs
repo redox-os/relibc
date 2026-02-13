@@ -115,7 +115,6 @@ extern "C" fn init_array() {
 
     unsafe {
         crate::pthread::init();
-        crate::platform::logger::init();
         init_complete = true
     }
 }
@@ -218,8 +217,8 @@ pub unsafe extern "C" fn relibc_start_v1(
 
     let auxvs = unsafe { get_auxvs(sp.auxv().cast()) };
     unsafe { crate::platform::init(auxvs) };
-
     init_array();
+    unsafe { crate::platform::logger::init() };
 
     // Run preinit array
     {

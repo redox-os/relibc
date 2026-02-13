@@ -2,7 +2,7 @@ use core::{fmt, str::FromStr};
 
 use crate::{c_str::CStr, io::prelude::*, sync::Mutex};
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use log::{Metadata, Record};
 
 const DEFAULT_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
@@ -22,6 +22,10 @@ pub unsafe fn init() {
 
                 logger = logger.with_output(OutputBuilder::stderr().with_filter(level).build());
             }
+        }
+        if let Some(name) = CStr::from_nullable_ptr(crate::platform::program_invocation_short_name)
+        {
+            logger = logger.with_process_name(name.to_str().unwrap_or("").to_string());
         }
     }
     if logger.enable().is_err() {
