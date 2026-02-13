@@ -75,14 +75,12 @@ unsafe impl GlobalAlloc for Allocator {
             let new =
                 unsafe { self.alloc(Layout::from_size_align_unchecked(new_size, layout.align())) };
             let old_size = layout.size();
-            let old_align = layout.align();
 
             if !new.is_null() {
                 let size = cmp::min(old_size, new_size);
                 unsafe { copy_nonoverlapping(ptr, new, size) };
             }
 
-            drop((old_size, old_align)); // drop does nothing with Copy types
             unsafe { (*self.get()).lock().free(ptr) };
 
             new

@@ -572,7 +572,6 @@ pub unsafe extern "C" fn gethostname(mut name: *mut c_char, mut len: size_t) -> 
         .map(|()| 0)
         .or_minus_one_errno();
     if err < 0 {
-        mem::forget(uts); // forget does nothing with Copy types
         return err;
     }
     for c in unsafe { uts.assume_init() }.nodename.iter() {
