@@ -190,7 +190,7 @@ pub(crate) unsafe fn create(
         push(arg as usize);
         push(start_routine as usize);
 
-        push(new_thread_shim as usize);
+        push(new_thread_shim as *const () as usize);
     }
 
     let Ok(os_tid) = (unsafe { Sys::rlct_clone(stack, &mut new_tcb.os_specific) }) else {

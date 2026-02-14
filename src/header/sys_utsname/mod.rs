@@ -15,7 +15,7 @@ pub const UTSLENGTH: usize = 65;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_utsname.h.html>.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, OutProject)]
+#[derive(Clone, Debug, OutProject)]
 pub struct utsname {
     pub sysname: [c_char; UTSLENGTH],
     pub nodename: [c_char; UTSLENGTH],

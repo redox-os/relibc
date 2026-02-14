@@ -30,7 +30,7 @@ use super::{
 
 pub(super) static LOGGER: Mutex<LogParams<LogFile>> = Mutex::new(LogParams::new(None));
 
-pub struct LogParams<L: LogSink> {
+pub(super) struct LogParams<L: LogSink> {
     /// Identity prepended to each log message. POSIX does not specific what to do when it's empty,
     /// but the program name is a common default.
     ident: String,

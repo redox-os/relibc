@@ -1,7 +1,7 @@
 use crate::{
     header::{
+        pthread::pthread_atfork,
         sys_mman::{self, MREMAP_MAYMOVE},
-        unistd::pthread_atfork,
     },
     platform::{Pal, Sys},
     sync::Mutex,

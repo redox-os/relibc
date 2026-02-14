@@ -30,6 +30,7 @@ zero_ptr = "warn" # must allow on public constants due to cbindgen issue
 
 [workspace.lints.rust]
 dangling_pointers_from_temporaries = "deny"
+internal_features = "allow" # core_intrinsics and lang_items
 irrefutable_let_patterns = "deny"
 mismatched_lifetime_syntaxes = "deny"
 non_camel_case_types = "allow"
