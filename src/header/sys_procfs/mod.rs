@@ -59,7 +59,7 @@ pub struct elf_prpsinfo {
 }
 
 pub type psaddr_t = *mut c_void;
-pub type prgregset_t = elf_gregset_t;
+pub type prgregset_t = *mut elf_gregset_t;
 pub type prfpregset_t = elf_fpregset_t;
 pub type lwpid_t = pid_t;
 pub type prstatus_t = elf_prstatus;
