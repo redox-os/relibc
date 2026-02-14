@@ -282,11 +282,11 @@ pub extern "C" fn dup3(fildes: c_int, fildes2: c_int, flag: c_int) -> c_int {
 ///
 /// # Deprecation
 /// The `encrypt()` function was marked obsolescent in the Open Group Base Specifications Issue 8.
-#[deprecated]
+//#[deprecated]
 // #[unsafe(no_mangle)]
-pub extern "C" fn encrypt(block: [c_char; 64], edflag: c_int) {
-    unimplemented!();
-}
+//pub extern "C" fn encrypt(block: [c_char; 64], edflag: c_int) {
+//    unimplemented!();
+//}
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html>.
 #[unsafe(no_mangle)]

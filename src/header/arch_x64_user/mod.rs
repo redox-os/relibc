@@ -50,7 +50,7 @@ pub struct user_regs_struct {
 
 pub type elf_greg_t = c_ulong;
 
-pub type elf_gregset_t = [c_ulong; 27];
+pub type elf_gregset_t = *mut [c_ulong; 27];
 pub type elf_fpregset_t = user_fpregs_struct;
 #[repr(C)]
 pub struct user {
