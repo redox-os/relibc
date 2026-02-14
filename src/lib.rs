@@ -88,8 +88,10 @@ pub extern "C" fn rust_eh_personality() {}
 #[cfg(not(test))]
 #[alloc_error_handler]
 #[linkage = "weak"]
+#[allow(improper_ctypes_definitions)]
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
+    // Layout not FFI-safe?
     use core::fmt::Write;
 
     let mut w = platform::FileWriter::new(2);

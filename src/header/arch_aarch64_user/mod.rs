@@ -16,7 +16,7 @@ pub struct user_fpsimd_struct {
 }
 
 pub type elf_greg_t = c_ulong;
-pub type elf_gregset_t = [c_ulong; 34];
+pub type elf_gregset_t = *mut [c_ulong; 34];
 pub type elf_fpregset_t = user_fpsimd_struct;
 
 #[unsafe(no_mangle)]
