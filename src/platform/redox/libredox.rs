@@ -255,11 +255,12 @@ pub unsafe extern "C" fn redox_get_ens_v0() -> RawResult {
 pub unsafe extern "C" fn redox_get_ns_v0() -> RawResult {
     Error::mux(redox_rt::sys::getns())
 }
+#[allow(improper_ctypes_definitions)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_get_proc_credentials_v1(
     cap_fd: usize,
     target_pid: usize,
-    buf: &mut [u8],
+    buf: &mut [u8], // not FFI safe
 ) -> RawResult {
     Error::mux(redox_rt::sys::get_proc_credentials(cap_fd, target_pid, buf))
 }
