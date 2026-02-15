@@ -517,7 +517,7 @@ impl Pal for Sys {
         // Note: dev_t is c_long (i64) and __kernel_dev_t is u32; So we need to cast it
         //       and check for overflow
         let k_dev: c_uint = dev as c_uint;
-        if k_dev as dev_t != dev {
+        if dev_t::from(k_dev) != dev {
             return Err(Errno(EINVAL));
         }
 

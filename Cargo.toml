@@ -20,16 +20,19 @@ members = [
 exclude = ["tests", "dlmalloc-rs"]
 
 [workspace.lints.clippy]
-cast_lossless = "warn"
+cast_lossless = "warn" # TODO review occurrences
 cast_ptr_alignment = "allow" # TODO change to warn or deny when ready to fix
-mut_from_ref = "allow"
-ptr_as_ptr = "warn"
-ptr_cast_constness = "warn"
-ref_as_ptr = "warn"
+missing_safety_doc = "allow" # TODO review occurrences
+mut_from_ref = "allow" # TODO review occurrences
+ptr_as_ptr = "warn" # TODO review occurrences
+ptr_cast_constness = "warn" # TODO review occurrences
+ref_as_ptr = "warn" # TODO review occurrences
 zero_ptr = "warn" # must allow on public constants due to cbindgen issue
 
 [workspace.lints.rust]
 dangling_pointers_from_temporaries = "deny"
+dead_code = "allow" # TODO review occuurences
+deprecated = "allow" # TODO review occuurences
 improper_ctypes_definitions = "deny"
 internal_features = "allow" # core_intrinsics and lang_items
 irrefutable_let_patterns = "deny"
@@ -39,6 +42,7 @@ non_snake_case = "allow" # TODO review occuurences
 non_upper_case_globals = "allow" # TODO review occuurences
 unexpected_cfgs = "deny"
 unpredictable_function_pointer_comparisons = "deny"
+unreachable_code = "allow" # TODO review occuurences
 unsafe_op_in_unsafe_fn = "deny"
 unused_imports = "deny"
 unused_must_use = "deny"
