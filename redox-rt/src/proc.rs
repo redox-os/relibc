@@ -1,4 +1,4 @@
-use core::{cell::SyncUnsafeCell, cmp, fmt::Debug};
+use core::{cell::SyncUnsafeCell, cmp, fmt::Debug, ops::Range};
 
 use crate::{
     DYNAMIC_PROC_INFO, RtTcb, StaticProcInfo,
@@ -11,6 +11,7 @@ use crate::{
 
 use alloc::{boxed::Box, vec};
 
+use goblin::elf::header::ET_DYN;
 //TODO: allow use of either 32-bit or 64-bit programs
 #[cfg(target_pointer_width = "32")]
 use goblin::elf32::{
@@ -106,6 +107,37 @@ pub fn fexec_impl(
 
     pread_all(&image_file, u64::from(header.e_phoff), phs).map_err(|_| Error::new(EIO))?;
 
+    let mut span: Option<Range<usize>> = None;
+    for ph_idx in 0..phnum {
+        let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
+        let segment: &ProgramHeader =
+            plain::from_bytes(ph_bytes).map_err(|_| Error::new(EINVAL))?;
+        if segment.p_type != PT_LOAD {
+            continue;
+        }
+
+        let voff = segment.p_vaddr as usize % PAGE_SIZE;
+        let vaddr = segment.p_vaddr as usize - voff;
+        let vsize = (segment.p_memsz as usize + voff).next_multiple_of(segment.p_align as usize);
+        let b = vaddr..vaddr + vsize;
+
+        span = Some(if let Some(a) = span {
+            a.start.min(b.start)..a.end.max(b.end)
+        } else {
+            b
+        });
+    }
+    let span = span.expect("ELF executables must contain at least one `PT_LOAD` segment");
+    let base_addr = if header.e_type == ET_DYN {
+        // PIE
+        let size = (span.end - span.start).next_multiple_of(PAGE_SIZE);
+        let addr = mmap_anon_remote(&grants_fd, 0, 0, size, MapFlags::PROT_NONE)?;
+        update_min_mmap_addr(addr, size);
+        addr
+    } else {
+        0
+    };
+
     for ph_idx in 0..phnum {
         let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
         let segment: &ProgramHeader =
@@ -157,7 +189,7 @@ pub fn fexec_impl(
                 mmap_anon_remote(
                     &grants_fd,
                     0,
-                    vaddr,
+                    base_addr + vaddr,
                     total_page_count * PAGE_SIZE,
                     flags | MapFlags::MAP_FIXED_NOREPLACE,
                 )?;
@@ -168,7 +200,7 @@ pub fn fexec_impl(
                     let (_guard, dst_memory) = unsafe {
                         MmapGuard::map_mut_anywhere(
                             &grants_fd,
-                            vaddr,                                       // offset
+                            base_addr + vaddr,                           // offset
                             (voff + filesz).next_multiple_of(PAGE_SIZE), // size
                         )?
                     };
@@ -178,8 +210,6 @@ pub fn fexec_impl(
                         &mut dst_memory[voff..voff + filesz],
                     )?;
                 }
-
-                update_min_mmap_addr(vaddr, total_page_count * PAGE_SIZE);
             }
             _ => continue,
         }
@@ -263,12 +293,15 @@ pub fn fexec_impl(
 
     push(0)?;
     push(AT_NULL)?;
-    push(header.e_entry as usize)?;
     if let Some(ref r#override) = interp_override {
-        push(AT_BASE)?;
         push(r#override.at_entry)?;
+        push(AT_ENTRY)?;
+        push(base_addr)?;
+        push(AT_BASE)?;
+    } else {
+        push(header.e_entry as usize)?;
+        push(AT_ENTRY)?;
     }
-    push(AT_ENTRY)?;
     push(pheaders + size_of::<Header>())?;
     push(AT_PHDR)?;
     push(
@@ -413,7 +446,7 @@ pub fn fexec_impl(
 
     let _ = addrspace_selection_fd.write(&create_set_addr_space_buf(
         grants_fd.as_raw_fd(),
-        header.e_entry as usize,
+        base_addr + header.e_entry as usize,
         sp,
     ));
 

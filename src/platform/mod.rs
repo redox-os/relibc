@@ -280,7 +280,7 @@ impl<T: Write> Write for CountingWriter<T> {
 // get_auxv.
 
 #[cold]
-unsafe fn auxv_iter<'a>(ptr: *const usize) -> impl Iterator<Item = [usize; 2]> + 'a {
+pub unsafe fn auxv_iter<'a>(ptr: *const usize) -> impl Iterator<Item = [usize; 2]> + 'a {
     struct St(*const usize);
     impl Iterator for St {
         type Item = [usize; 2];
