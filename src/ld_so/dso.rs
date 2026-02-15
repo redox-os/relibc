@@ -527,8 +527,8 @@ impl DSO {
                 };
                 _r_debug
                     .lock()
-                    .insert_first(addr, path, addr + l_ld as usize);
-                slice::from_raw_parts_mut(addr as *mut u8, size)
+                    .insert_first(addr + bounds.0, path, addr + l_ld as usize);
+                slice::from_raw_parts_mut((addr + bounds.0) as *mut u8, size)
             } else {
                 let (start, end) = bounds;
                 let size = end - start;

@@ -15,10 +15,11 @@ _start:
     mov x28, sp
     // align stack to 16 bytes
     and sp, x28, #0xfffffffffffffff0
+    adr x1, _start
     mov x0, x28
-    adrp x1, _DYNAMIC
-    add x1, x1, #:lo12:_DYNAMIC
-    // ld_so_start(stack=x0, dynamic=x1)
+    adrp x2, _DYNAMIC
+    add x2, x2, #:lo12:_DYNAMIC
+    // ld_so_start(stack=x0, ld_entry=x1, dynamic=x2)
     bl relibc_ld_so_start
     // restore original stack, clear registers, and jump to the new start function
     mov sp, x28
@@ -78,13 +79,15 @@ global_asm!(
 
 .globl _start
 _start:
+    lea rsi, [rip + _start]
+
     # Save original stack and align stack to 16 bytes
     mov rbp, rsp
     and rsp, 0xfffffffffffffff0
 
-    # Call ld_so_start(stack=rdi, dynamic=rsi)
+    # Call ld_so_start(stack=rdi, ld_entry=rsi, dynamic=rdx)
     mov rdi, rbp
-    lea rsi, [rip + _DYNAMIC]
+    lea rdx, [rip + _DYNAMIC]
     call relibc_ld_so_start
 
     # Restore original stack, clear registers, and jump to new start function

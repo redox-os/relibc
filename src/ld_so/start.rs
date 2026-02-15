@@ -11,17 +11,20 @@ use alloc::{
 };
 use object::{
     NativeEndian,
-    elf::{self, PT_PHDR},
+    elf::{self, PT_DYNAMIC, PT_PHDR},
     read::elf::{Dyn as _, ProgramHeader as _, Rela as _},
 };
 
 use crate::{
     c_str::CStr,
     header::{
-        elf::{AT_BASE, AT_PHDR, AT_PHENT, AT_PHNUM, PT_DYNAMIC},
+        elf::{AT_BASE, AT_ENTRY, AT_PHDR, AT_PHENT, AT_PHNUM},
         unistd,
     },
-    ld_so::dso::{DT_RELR, DT_RELRENT, DT_RELRSZ, Dyn, ProgramHeader, Rela, Relr, apply_relr},
+    ld_so::{
+        dso::{DT_RELR, DT_RELRENT, DT_RELRSZ, Dyn, ProgramHeader, Rela, Relr, apply_relr},
+        linker::DebugFlags,
+    },
     platform::{auxv_iter, get_auxvs, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
@@ -157,17 +160,23 @@ fn resolve_path_name(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, dynamic: *const Dyn) -> usize {
+pub unsafe extern "C" fn relibc_ld_so_start(
+    sp: &'static mut Stack,
+    ld_entry: usize,
+    dynamic: *const Dyn,
+) -> usize {
     let mut at_phdr = None;
     let mut at_phnum = None;
     let mut at_phent = None;
     let mut at_base = None;
+    let mut at_entry = None;
     for [kind, value] in unsafe { auxv_iter(sp.auxv().cast::<usize>()) } {
         match kind {
             AT_PHDR => at_phdr = Some(value as *const ProgramHeader),
             AT_PHNUM => at_phnum = Some(value),
             AT_PHENT => at_phent = Some(value),
             AT_BASE => at_base = Some(value),
+            AT_ENTRY => at_entry = Some(value),
             _ => {}
         }
     }
@@ -178,23 +187,20 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, dynamic: *co
     assert!(!at_phdr.is_null() && at_phnum != 0 && at_phent == size_of::<ProgramHeader>());
     let phdrs = unsafe { slice::from_raw_parts(at_phdr, at_phnum) };
 
-    // [`AT_BASE`] is the base address at which the dynamic linker was loaded in memory. On Linux,
-    // this entry is always present. If the dynamic linker was not loaded (i.e. run as a command),
-    // its value is 0. On Redox, it is only present if the dynamic linker is loaded.
+    let at_entry = at_entry.unwrap();
     let at_base = at_base.unwrap_or_default();
 
-    let (is_manual, self_base) = if at_base != 0 {
-        (false, at_base)
+    let self_base = if at_base != 0 {
+        at_base
     } else {
-        // Dynamic linker was run as a command.
         let ph = phdrs
             .iter()
             .find(|ph| ph.p_type(NativeEndian) == PT_DYNAMIC as u32)
             .unwrap();
-        (true, unsafe {
-            dynamic.byte_sub(ph.p_vaddr(NativeEndian) as usize) as usize
-        })
+        unsafe { dynamic.byte_sub(ph.p_vaddr(NativeEndian) as usize) as usize }
     };
+
+    let is_manual = at_entry == ld_entry; // Whether the dynamic linker was invoked as a command.
 
     let mut i = dynamic;
     let mut rela_ptr = None;
@@ -253,12 +259,8 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, dynamic: *co
         apply_relr(self_base as *const u8, relr);
     }
 
-    println!(
-        "[ld.so]: relocated self at {self_base:#x} (DT_RELASZ={rela_len:?}, DT_RELRSZ={relr_len:?})"
-    );
-
     let mut base_addr = None;
-    if is_manual && cfg!(target_os = "linux") {
+    if !is_manual {
         // if we are not running in manual mode, then the main
         // program is already loaded by the kernel and we want
         // to use it. on redox, we treat it the same.
@@ -383,7 +385,15 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, dynamic: *co
         }
     };
 
-    let mut linker = Linker::new(Config::from_env(&envs));
+    let config = Config::from_env(&envs);
+    if config.debug_flags.contains(DebugFlags::LOAD) {
+        println!("[ld.so]: relocated self at {self_base:#x}!");
+        if let Some(base_addr) = base_addr {
+            println!("[ld.so]: executable has been already loaded at {base_addr:#x?}");
+        }
+    }
+
+    let mut linker = Linker::new(config);
     let entry = match linker.load_program(&path, base_addr) {
         Ok(entry) => entry,
         Err(err) => {
