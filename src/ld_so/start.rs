@@ -9,15 +9,19 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use object::{NativeEndian, elf::PT_PHDR, read::elf::ProgramHeader as _};
+use object::{
+    NativeEndian,
+    elf::{self, PT_PHDR},
+    read::elf::{Dyn as _, ProgramHeader as _, Rela as _},
+};
 
 use crate::{
     c_str::CStr,
     header::{
-        elf::{AT_ENTRY, AT_PHDR, AT_PHENT, AT_PHNUM},
+        elf::{AT_BASE, AT_PHDR, AT_PHENT, AT_PHNUM, PT_DYNAMIC},
         unistd,
     },
-    ld_so::dso::ProgramHeader,
+    ld_so::dso::{DT_RELR, DT_RELRENT, DT_RELRSZ, Dyn, ProgramHeader, Rela, Relr, apply_relr},
     platform::{auxv_iter, get_auxvs, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
@@ -153,35 +157,111 @@ fn resolve_path_name(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) -> usize {
+pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, dynamic: *const Dyn) -> usize {
     let mut at_phdr = None;
     let mut at_phnum = None;
     let mut at_phent = None;
-    let mut at_entry = None;
+    let mut at_base = None;
     for [kind, value] in unsafe { auxv_iter(sp.auxv().cast::<usize>()) } {
         match kind {
             AT_PHDR => at_phdr = Some(value as *const ProgramHeader),
             AT_PHNUM => at_phnum = Some(value),
             AT_PHENT => at_phent = Some(value),
-            AT_ENTRY => at_entry = Some(value),
+            AT_BASE => at_base = Some(value),
             _ => {}
         }
     }
 
-    let at_entry = at_entry.expect("`AT_ENTRY` must be present");
-    let (is_manual, base_addr) = if at_entry == ld_entry {
-        (true, None)
+    let at_phdr = at_phdr.unwrap();
+    let at_phnum = at_phnum.expect("`AT_PHNUM` must be present if `AT_PHDR` is");
+    let at_phent = at_phent.expect("`AT_PHENT` must be present if `AT_PHDR` is");
+    assert!(!at_phdr.is_null() && at_phnum != 0 && at_phent == size_of::<ProgramHeader>());
+    let phdrs = unsafe { slice::from_raw_parts(at_phdr, at_phnum) };
+
+    // [`AT_BASE`] is the base address at which the dynamic linker was loaded in memory. On Linux,
+    // this entry is always present. If the dynamic linker was not loaded (i.e. run as a command),
+    // its value is 0. On Redox, it is only present if the dynamic linker is loaded.
+    let at_base = at_base.unwrap_or_default();
+
+    let (is_manual, self_base) = if at_base != 0 {
+        (false, at_base)
     } else {
+        // Dynamic linker was run as a command.
+        let ph = phdrs
+            .iter()
+            .find(|ph| ph.p_type(NativeEndian) == PT_DYNAMIC as u32)
+            .unwrap();
+        (true, unsafe {
+            dynamic.byte_sub(ph.p_vaddr(NativeEndian) as usize) as usize
+        })
+    };
+
+    let mut i = dynamic;
+    let mut rela_ptr = None;
+    let mut rela_len = None;
+    let mut relr_ptr = None;
+    let mut relr_len = None;
+    loop {
+        let entry = unsafe { &*i };
+        let val = entry.d_val(NativeEndian);
+        let ptr = val as *const u8;
+        match entry.d_tag(NativeEndian) as u32 {
+            elf::DT_NULL => break,
+            elf::DT_RELA => rela_ptr = Some(ptr.cast::<Rela>()),
+            elf::DT_RELASZ => rela_len = Some(val as usize / size_of::<Rela>()),
+            elf::DT_RELAENT => {
+                assert_eq!(val as usize, size_of::<Rela>(),);
+            }
+            DT_RELR => relr_ptr = Some(ptr.cast::<Relr>()),
+            DT_RELRSZ => relr_len = Some(val as usize / size_of::<Relr>()),
+            DT_RELRENT => {
+                assert_eq!(val as usize, size_of::<Relr>());
+            }
+            _ => {}
+        }
+        i = unsafe { i.add(1) };
+    }
+
+    unsafe fn get_array<'a, T>(
+        ptr: Option<*const T>,
+        len: Option<usize>,
+        base_addr: usize,
+    ) -> &'a [T] {
+        if let Some(ptr) = ptr {
+            let len = len.expect("dynamic entry was present without it's corresponding size");
+            unsafe { core::slice::from_raw_parts(ptr.byte_add(base_addr), len) }
+        } else {
+            assert!(len.is_none());
+            &[]
+        }
+    }
+
+    for rela in unsafe { get_array(rela_ptr, rela_len, self_base) } {
+        let offset = rela.r_offset(NativeEndian);
+        let addend = rela.r_addend(NativeEndian) as isize;
+        let reloc_ptr = (offset + self_base as u64) as *mut usize;
+        match rela.r_type(NativeEndian, false) as u32 {
+            elf::R_X86_64_RELATIVE => {
+                unsafe { reloc_ptr.write((self_base as isize + addend) as usize) };
+            }
+            _ => {}
+        }
+    }
+
+    unsafe {
+        let relr = get_array(relr_ptr, relr_len, self_base);
+        apply_relr(self_base as *const u8, relr);
+    }
+
+    println!(
+        "[ld.so]: relocated self at {self_base:#x} (DT_RELASZ={rela_len:?}, DT_RELRSZ={relr_len:?})"
+    );
+
+    let mut base_addr = None;
+    if is_manual && cfg!(target_os = "linux") {
         // if we are not running in manual mode, then the main
         // program is already loaded by the kernel and we want
         // to use it. on redox, we treat it the same.
-        let at_phdr = at_phdr.unwrap();
-        let at_phnum = at_phnum.expect("`AT_PHNUM` must be present if `AT_PHDR` is");
-        let at_phent = at_phent.expect("`AT_PHENT` must be present if `AT_PHDR` is");
-        assert!(!at_phdr.is_null() && at_phnum != 0 && at_phent == size_of::<ProgramHeader>());
-        let phdrs = unsafe { slice::from_raw_parts(at_phdr, at_phnum) };
-
-        let mut base_addr = None;
         for ph in phdrs.iter() {
             if ph.p_type(NativeEndian) == PT_PHDR {
                 assert!(base_addr.is_none(), "`PT_PHDR` cannot occur more than once");
@@ -193,15 +273,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
                 } as usize);
             }
         }
-
-        (
-            false,
-            #[cfg(target_os = "redox")]
-            None,
-            #[cfg(target_os = "linux")]
-            Some(base_addr.expect("`PT_PHDR` must be present for executables")),
-        )
-    };
+    }
 
     // Setup TCB for ourselves.
     unsafe {
@@ -279,7 +351,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
     }
 
     // we might need global lock for this kind of stuff
-    _r_debug.lock().r_ldbase = ld_entry;
+    _r_debug.lock().r_ldbase = self_base;
 
     // TODO: Fix memory leak, although minimal.
     #[cfg(target_os = "redox")]

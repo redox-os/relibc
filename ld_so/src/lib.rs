@@ -7,14 +7,18 @@ use core::arch::global_asm;
 #[cfg(target_arch = "aarch64")]
 global_asm!(
     "
+.weak _DYNAMIC
+.hidden _DYNAMIC
+
 .global _start
 _start:
     mov x28, sp
     // align stack to 16 bytes
     and sp, x28, #0xfffffffffffffff0
-    adr x1, _start
     mov x0, x28
-    // ld_so_start(stack=x0, ld_entry=x1)
+    adrp x1, _DYNAMIC
+    add x1, x1, #:lo12:_DYNAMIC
+    // ld_so_start(stack=x0, dynamic=x1)
     bl relibc_ld_so_start
     // restore original stack, clear registers, and jump to the new start function
     mov sp, x28
@@ -69,16 +73,18 @@ _start:
 #[cfg(target_arch = "x86_64")]
 global_asm!(
     "
+.weak _DYNAMIC
+.hidden _DYNAMIC
+
 .globl _start
 _start:
-    lea rsi, [rip + _start]
-
     # Save original stack and align stack to 16 bytes
     mov rbp, rsp
     and rsp, 0xfffffffffffffff0
 
-    # Call ld_so_start(stack=rdi, ld_entry=rsi)
+    # Call ld_so_start(stack=rdi, dynamic=rsi)
     mov rdi, rbp
+    lea rsi, [rip + _DYNAMIC]
     call relibc_ld_so_start
 
     # Restore original stack, clear registers, and jump to new start function
