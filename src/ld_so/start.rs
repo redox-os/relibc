@@ -1,5 +1,7 @@
 // Start code adapted from https://gitlab.redox-os.org/redox-os/relibc/blob/master/src/start.rs
 
+use core::slice;
+
 use alloc::{
     borrow::ToOwned,
     boxed::Box,
@@ -7,14 +9,16 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use object::{NativeEndian, elf::PT_PHDR, read::elf::ProgramHeader as _};
 
 use crate::{
     c_str::CStr,
     header::{
-        sys_auxv::{AT_ENTRY, AT_PHDR},
+        elf::{AT_ENTRY, AT_PHDR, AT_PHENT, AT_PHNUM},
         unistd,
     },
-    platform::{get_auxv, get_auxvs, types::c_char},
+    ld_so::dso::ProgramHeader,
+    platform::{auxv_iter, get_auxvs, types::c_char},
     start::Stack,
     sync::mutex::Mutex,
 };
@@ -150,6 +154,55 @@ fn resolve_path_name(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: usize) -> usize {
+    let mut at_phdr = None;
+    let mut at_phnum = None;
+    let mut at_phent = None;
+    let mut at_entry = None;
+    for [kind, value] in unsafe { auxv_iter(sp.auxv().cast::<usize>()) } {
+        match kind {
+            AT_PHDR => at_phdr = Some(value as *const ProgramHeader),
+            AT_PHNUM => at_phnum = Some(value),
+            AT_PHENT => at_phent = Some(value),
+            AT_ENTRY => at_entry = Some(value),
+            _ => {}
+        }
+    }
+
+    let at_entry = at_entry.expect("`AT_ENTRY` must be present");
+    let (is_manual, base_addr) = if at_entry == ld_entry {
+        (true, None)
+    } else {
+        // if we are not running in manual mode, then the main
+        // program is already loaded by the kernel and we want
+        // to use it. on redox, we treat it the same.
+        let at_phdr = at_phdr.unwrap();
+        let at_phnum = at_phnum.expect("`AT_PHNUM` must be present if `AT_PHDR` is");
+        let at_phent = at_phent.expect("`AT_PHENT` must be present if `AT_PHDR` is");
+        assert!(!at_phdr.is_null() && at_phnum != 0 && at_phent == size_of::<ProgramHeader>());
+        let phdrs = unsafe { slice::from_raw_parts(at_phdr, at_phnum) };
+
+        let mut base_addr = None;
+        for ph in phdrs.iter() {
+            if ph.p_type(NativeEndian) == PT_PHDR {
+                assert!(base_addr.is_none(), "`PT_PHDR` cannot occur more than once");
+                base_addr = Some(unsafe {
+                    phdrs
+                        .as_ptr()
+                        .cast::<u8>()
+                        .sub(ph.p_vaddr(NativeEndian) as usize)
+                } as usize);
+            }
+        }
+
+        (
+            false,
+            #[cfg(target_os = "redox")]
+            None,
+            #[cfg(target_os = "linux")]
+            Some(base_addr.expect("`PT_PHDR` must be present for executables")),
+        )
+    };
+
     // Setup TCB for ourselves.
     unsafe {
         #[cfg(target_os = "redox")]
@@ -225,12 +278,6 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
         crate::platform::environ = crate::platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr();
     }
 
-    let is_manual = if let Some(img_entry) = get_auxv(&auxv, AT_ENTRY) {
-        img_entry == ld_entry
-    } else {
-        true
-    };
-
     // we might need global lock for this kind of stuff
     _r_debug.lock().r_ldbase = ld_entry;
 
@@ -264,19 +311,6 @@ pub unsafe extern "C" fn relibc_ld_so_start(sp: &'static mut Stack, ld_entry: us
         }
     };
 
-    // if we are not running in manual mode, then the main
-    // program is already loaded by the kernel and we want
-    // to use it. on redox, we treat it the same.
-    let base_addr = {
-        let mut base = None;
-        if !is_manual && cfg!(not(target_os = "redox")) {
-            let phdr = get_auxv(&auxv, AT_PHDR).unwrap();
-            if phdr != 0 {
-                base = Some(phdr - SIZEOF_EHDR);
-            }
-        }
-        base
-    };
     let mut linker = Linker::new(Config::from_env(&envs));
     let entry = match linker.load_program(&path, base_addr) {
         Ok(entry) => entry,
