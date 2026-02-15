@@ -127,15 +127,16 @@ pub fn fexec_impl(
             b
         });
     }
-    let span = span.expect("ELF must contain at least one `PT_LOAD` segment");
+    let span = span.expect("ELF executables must contain at least one `PT_LOAD` segment");
     let base_addr = if header.e_type == ET_DYN {
         // PIE
         let size = (span.end - span.start).next_multiple_of(PAGE_SIZE);
-        mmap_anon_remote(&grants_fd, 0, 0, size, MapFlags::PROT_NONE)?
+        let addr = mmap_anon_remote(&grants_fd, 0, 0, size, MapFlags::PROT_NONE)?;
+        update_min_mmap_addr(addr, size);
+        addr
     } else {
         0
     };
-    update_min_mmap_addr(base_addr + span.end, 0);
 
     for ph_idx in 0..phnum {
         let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
