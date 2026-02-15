@@ -1165,7 +1165,7 @@ pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
 pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
     let rqtp = timespec {
         tv_sec: time_t::from(useconds / 1_000_000),
-        tv_nsec: c_long::from((useconds % 1_000_000) * 1000),
+        tv_nsec: ((useconds % 1_000_000) * 1000) as c_long,
     };
     let rmtp = ptr::null_mut();
     unsafe { Sys::nanosleep(&rqtp, rmtp) }
