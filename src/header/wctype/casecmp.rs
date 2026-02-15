@@ -365,14 +365,14 @@ pub fn casemap(mut c: u32, dir: i32) -> wint_t {
     let x = c / 3;
     let y = c % 3;
     /* lookup entry in two-level base-6 table */
-    let mut v: c_uint = tab[(tab[b as usize] as u32 * 86 + x) as usize] as c_uint;
+    let mut v: c_uint = c_uint::from(tab[(u32::from(tab[b as usize]) * 86 + x) as usize]);
     let mt: [c_uint; 3] = [2048, 342, 57];
     v = (v * mt[y as usize] >> 11) % 6;
 
     /* use the bit vector out of the tables as an index into
      * a block-specific set of rules and decode the rule into
      * a type and a case-mapping delta. */
-    let mut r: c_int = rules[(rulebases[b as usize] as c_uint + v) as usize];
+    let mut r: c_int = rules[(c_uint::from(rulebases[b as usize]) + v) as usize];
     let mut rt: c_uint = (r & 255) as c_uint;
     let mut rd: c_int = r >> 8;
 
@@ -388,7 +388,7 @@ pub fn casemap(mut c: u32, dir: i32) -> wint_t {
     let mut xn: c_uint = (rd & 0xff) as c_uint;
     let mut xb: c_uint = rd as c_uint >> 8;
     while xn != 0 {
-        let attempt: c_uint = exceptions[(xb + xn / 2) as usize][0] as c_uint;
+        let attempt: c_uint = c_uint::from(exceptions[(xb + xn / 2) as usize][0]);
         if attempt == c {
             r = rules[exceptions[(xb + xn / 2) as usize][1] as usize];
             rt = r as c_uint & 255;

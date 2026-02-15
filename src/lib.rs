@@ -7,7 +7,6 @@
 //! Currently, Linux and Redox syscall backends are supported.
 
 #![no_std]
-#![allow(warnings)]
 #![feature(alloc_error_handler)]
 #![feature(allocator_api)]
 #![feature(c_variadic)]
