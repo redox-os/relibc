@@ -168,6 +168,14 @@ pub unsafe extern "C" fn relibc_ld_so_start(
     ld_entry: usize,
     dynamic: *const Dyn,
 ) -> usize {
+    // Relocate ourselves.
+    //
+    // This function is very delicate as it must **not** contain relocations itself. References to
+    // external symbols **cannot** be made until `__relibc_ld_stage2()` so, this function might not
+    // be very elegant.
+    //
+    // At this stage the TCB is not setup either so `expect_notls` must be used instead of `expect`
+    // and `unwrap`.
     let mut at_phdr = None;
     let mut at_phnum = None;
     let mut at_phent = None;
@@ -184,13 +192,13 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         }
     }
 
-    let at_phdr = at_phdr.unwrap();
-    let at_phnum = at_phnum.expect("`AT_PHNUM` must be present if `AT_PHDR` is");
-    let at_phent = at_phent.expect("`AT_PHENT` must be present if `AT_PHDR` is");
+    let at_phdr = at_phdr.expect_notls("`AT_PHDR` must be present");
+    let at_phnum = at_phnum.expect_notls("`AT_PHNUM` must be present if `AT_PHDR` is");
+    let at_phent = at_phent.expect_notls("`AT_PHENT` must be present if `AT_PHDR` is");
     assert!(!at_phdr.is_null() && at_phnum != 0 && at_phent == size_of::<ProgramHeader>());
     let phdrs = unsafe { slice::from_raw_parts(at_phdr, at_phnum) };
 
-    let at_entry = at_entry.unwrap();
+    let at_entry = at_entry.expect_notls("`AT_ENTRY` must be present");
     let at_base = at_base.unwrap_or_default();
 
     let self_base = if at_base != 0 {
@@ -244,31 +252,33 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         base_addr: usize,
     ) -> &'a [T] {
         if let Some(ptr) = ptr {
-            let len = len.expect("dynamic entry was present without it's corresponding size");
+            let len = len.expect_notls("dynamic entry was present without it's corresponding size");
             unsafe { core::slice::from_raw_parts(ptr.byte_add(base_addr), len) }
         } else {
-            assert!(len.is_none());
             &[]
         }
     }
 
-    for reloc in unsafe { get_array::<Rela>(rela_ptr, rela_len, self_base) }
-        .iter()
-        .map(Relocation::from)
-        .chain(
-            unsafe { get_array::<Rel>(rel_ptr, rel_len, self_base) }
-                .iter()
-                .map(Relocation::from),
-        )
+    fn do_relocs<'a, T>(relocs: &'a [T], self_base: usize)
+    where
+        Relocation: From<&'a T>,
     {
-        let ptr = (reloc.offset + self_base) as *mut usize;
-        match reloc.kind {
-            RelocationKind::RELATIVE => {
-                unsafe { ptr.write(self_base + reloc.addend.unwrap_or_default()) };
+        for reloc in relocs {
+            let reloc: Relocation = reloc.into();
+            let ptr = (reloc.offset + self_base) as *mut usize;
+            match reloc.kind {
+                RelocationKind::RELATIVE => {
+                    unsafe { *ptr = self_base + reloc.addend.unwrap_or_default() };
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
+
+    let rela = unsafe { get_array::<Rela>(rela_ptr, rela_len, self_base) };
+    let rel = unsafe { get_array::<Rel>(rel_ptr, rel_len, self_base) };
+    do_relocs(rela, self_base);
+    do_relocs(rel, self_base);
 
     unsafe {
         let relr = get_array(relr_ptr, relr_len, self_base);
@@ -293,10 +303,11 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         }
     }
 
-    stage2(sp, self_base, is_manual, base_addr)
+    __relibc_ld_stage2(sp, self_base, is_manual, base_addr)
 }
 
-fn stage2(
+#[unsafe(no_mangle)]
+fn __relibc_ld_stage2(
     sp: &'static mut Stack,
     self_base: usize,
     is_manual: bool,

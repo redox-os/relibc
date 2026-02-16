@@ -149,7 +149,7 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.
 	$(AR) -M < "$@.mri"
 
 $(BUILD)/debug/librelibc.a: $(SRC)
-	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ -g -C debug-assertions=no -C opt-level=2 $(RUSTCFLAGS)
+	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ -g -C debug-assertions=no $(RUSTCFLAGS)
 	./renamesyms.sh "$@" "$(BUILD)/debug/deps/"
 	./stripcore.sh "$@"
 	touch $@
@@ -214,6 +214,6 @@ $(BUILD)/openlibm: openlibm
 	mv $@.partial $@
 	touch $@
 
-$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
+$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/$(PROFILE)/librelibc.a
 	$(MAKE) -s AR=$(AR) CC="$(CC_WRAPPER) $(CC)" LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
