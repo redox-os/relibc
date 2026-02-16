@@ -12,7 +12,7 @@ use alloc::{
 use object::{
     NativeEndian,
     elf::{self, PT_DYNAMIC, PT_PHDR},
-    read::elf::{Dyn as _, ProgramHeader as _, Rela as _},
+    read::elf::{Dyn as _, ProgramHeader as _},
 };
 
 use crate::{
@@ -22,7 +22,10 @@ use crate::{
         unistd,
     },
     ld_so::{
-        dso::{DT_RELR, DT_RELRENT, DT_RELRSZ, Dyn, ProgramHeader, Rela, Relr, apply_relr},
+        dso::{
+            DT_RELR, DT_RELRENT, DT_RELRSZ, Dyn, ProgramHeader, Rel, Rela, Relocation,
+            RelocationKind, Relr, apply_relr,
+        },
         linker::DebugFlags,
     },
     platform::{auxv_iter, get_auxvs, types::c_char},
@@ -207,6 +210,8 @@ pub unsafe extern "C" fn relibc_ld_so_start(
     let mut rela_len = None;
     let mut relr_ptr = None;
     let mut relr_len = None;
+    let mut rel_ptr = None;
+    let mut rel_len = None;
     loop {
         let entry = unsafe { &*i };
         let val = entry.d_val(NativeEndian);
@@ -217,6 +222,11 @@ pub unsafe extern "C" fn relibc_ld_so_start(
             elf::DT_RELASZ => rela_len = Some(val as usize / size_of::<Rela>()),
             elf::DT_RELAENT => {
                 assert_eq!(val as usize, size_of::<Rela>(),);
+            }
+            elf::DT_REL => rel_ptr = Some(ptr.cast::<Rel>()),
+            elf::DT_RELSZ => rel_len = Some(val as usize / size_of::<Rel>()),
+            elf::DT_RELENT => {
+                assert_eq!(val as usize, size_of::<Rel>());
             }
             DT_RELR => relr_ptr = Some(ptr.cast::<Relr>()),
             DT_RELRSZ => relr_len = Some(val as usize / size_of::<Relr>()),
@@ -242,13 +252,19 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         }
     }
 
-    for rela in unsafe { get_array(rela_ptr, rela_len, self_base) } {
-        let offset = rela.r_offset(NativeEndian);
-        let addend = rela.r_addend(NativeEndian) as isize;
-        let reloc_ptr = (offset + self_base as u64) as *mut usize;
-        match rela.r_type(NativeEndian, false) as u32 {
-            elf::R_X86_64_RELATIVE => {
-                unsafe { reloc_ptr.write((self_base as isize + addend) as usize) };
+    for reloc in unsafe { get_array::<Rela>(rela_ptr, rela_len, self_base) }
+        .iter()
+        .map(Relocation::from)
+        .chain(
+            unsafe { get_array::<Rel>(rel_ptr, rel_len, self_base) }
+                .iter()
+                .map(Relocation::from),
+        )
+    {
+        let ptr = (reloc.offset + self_base) as *mut usize;
+        match reloc.kind {
+            RelocationKind::RELATIVE => {
+                unsafe { ptr.write(self_base + reloc.addend.unwrap_or_default()) };
             }
             _ => {}
         }
@@ -386,7 +402,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(
     };
 
     let config = Config::from_env(&envs);
-    if config.debug_flags.contains(DebugFlags::LOAD) {
+    if config.debug_flags.contains(DebugFlags::LOAD) || true {
         println!("[ld.so]: relocated self at {self_base:#x}!");
         if let Some(base_addr) = base_addr {
             println!("[ld.so]: executable has been already loaded at {base_addr:#x?}");

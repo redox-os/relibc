@@ -175,11 +175,11 @@ unsafe impl Send for Dynamic<'_> {}
 unsafe impl Sync for Dynamic<'_> {}
 
 #[derive(Debug)]
-struct Relocation {
-    offset: usize,
-    addend: Option<usize>,
-    sym: SymbolIndex,
-    kind: RelocationKind,
+pub(super) struct Relocation {
+    pub(super) offset: usize,
+    pub(super) addend: Option<usize>,
+    pub(super) sym: SymbolIndex,
+    pub(super) kind: RelocationKind,
 }
 
 #[cfg(target_pointer_width = "32")]
