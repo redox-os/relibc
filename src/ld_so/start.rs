@@ -293,6 +293,15 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         }
     }
 
+    stage2(sp, self_base, is_manual, base_addr)
+}
+
+fn stage2(
+    sp: &'static mut Stack,
+    self_base: usize,
+    is_manual: bool,
+    base_addr: Option<usize>,
+) -> usize {
     // Setup TCB for ourselves.
     unsafe {
         #[cfg(target_os = "redox")]
