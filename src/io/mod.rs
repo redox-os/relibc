@@ -1383,7 +1383,7 @@ impl<T: Read, U: Read> Read for Chain<T, U> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         if !self.done_first {
             match self.first.read(buf)? {
-                0 if buf.len() != 0 => {
+                0 if !buf.is_empty() => {
                     self.done_first = true;
                 }
                 n => return Ok(n),
@@ -1406,7 +1406,7 @@ impl<T: BufRead, U: BufRead> BufRead for Chain<T, U> {
     fn fill_buf(&mut self) -> Result<&[u8]> {
         if !self.done_first {
             match self.first.fill_buf()? {
-                buf if buf.len() == 0 => {
+                buf if buf.is_empty() => {
                     self.done_first = true;
                 }
                 buf => return Ok(buf),

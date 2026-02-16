@@ -163,13 +163,12 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
         .collect::<Vec<_>>();
     let mut buffer = buffer.split_mut(|i| *i == b'\0');
 
-    let mut gr_gid: gid_t = 0;
     let strings = {
         let mut vec: Vec<u8> = Vec::new();
 
         let gr_name = buffer.next().ok_or(Error::EOF)?.to_vec();
         let gr_passwd = buffer.next().ok_or(Error::EOF)?.to_vec();
-        gr_gid = String::from_utf8(buffer.next().ok_or(Error::EOF)?.to_vec())
+        let gr_gid = String::from_utf8(buffer.next().ok_or(Error::EOF)?.to_vec())
             .map_err(|err| Error::FromUtf8Error(err))?
             .parse::<gid_t>()
             .map_err(|err| Error::ParseIntError(err))?;

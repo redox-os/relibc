@@ -140,7 +140,7 @@ pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
     // TODO setitimer is unimplemented on Redox and obsolete
     let timer = sys_time::itimerval {
         it_value: timeval {
-            tv_sec: seconds as time_t,
+            tv_sec: time_t::from(seconds),
             tv_usec: 0,
         },
         ..Default::default()
@@ -1003,7 +1003,7 @@ pub extern "C" fn setuid(uid: uid_t) -> c_int {
 #[unsafe(no_mangle)]
 pub extern "C" fn sleep(seconds: c_uint) -> c_uint {
     let rqtp = timespec {
-        tv_sec: seconds as time_t,
+        tv_sec: time_t::from(seconds),
         tv_nsec: 0,
     };
     let mut rmtp = timespec {
@@ -1164,7 +1164,7 @@ pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
 #[unsafe(no_mangle)]
 pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
     let rqtp = timespec {
-        tv_sec: (useconds / 1_000_000) as time_t,
+        tv_sec: time_t::from(useconds / 1_000_000),
         tv_nsec: ((useconds % 1_000_000) * 1000) as c_long,
     };
     let rmtp = ptr::null_mut();
