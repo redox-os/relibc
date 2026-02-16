@@ -1,4 +1,4 @@
-use core::{cell::SyncUnsafeCell, cmp, fmt::Debug};
+use core::{cell::SyncUnsafeCell, cmp, fmt::Debug, ops::Range};
 
 use crate::{
     DYNAMIC_PROC_INFO, RtTcb, StaticProcInfo,
@@ -11,6 +11,7 @@ use crate::{
 
 use alloc::{boxed::Box, vec};
 
+use goblin::elf::header::ET_DYN;
 //TODO: allow use of either 32-bit or 64-bit programs
 #[cfg(target_pointer_width = "32")]
 use goblin::elf32::{
@@ -37,11 +38,13 @@ pub enum FexecResult {
     },
 }
 pub struct InterpOverride {
-    phs: Box<[u8]>,
+    phdrs_vaddr: usize,
     at_entry: usize,
     at_phnum: usize,
     at_phent: usize,
     name: Box<[u8]>,
+    min_mmap_addr: usize,
+    grants_fd: usize,
 }
 
 pub struct ExtraInfo<'a> {
@@ -78,7 +81,9 @@ pub fn fexec_impl(
     pread_all(&image_file, 0, &mut header_bytes)?;
     let header = Header::from_bytes(&header_bytes);
 
-    let grants_fd = {
+    let grants_fd = if let Some(interp) = interp_override.as_ref() {
+        FdGuard::new(interp.grants_fd).to_upper()?
+    } else {
         let current_addrspace_fd = thread_fd.dup(b"addrspace")?;
         current_addrspace_fd.dup(b"empty")?.to_upper()?
     };
@@ -99,12 +104,49 @@ pub fn fexec_impl(
     let phs = &mut phs_raw[size_of::<Header>()..];
 
     // TODO: Remove clone, but this would require more as_refs and as_muts
-    let mut min_mmap_addr = PAGE_SIZE;
+    let mut min_mmap_addr = interp_override
+        .as_ref()
+        .map(|interp| interp.min_mmap_addr)
+        .unwrap_or(PAGE_SIZE);
     let mut update_min_mmap_addr = |addr: usize, size: usize| {
         min_mmap_addr = cmp::max(min_mmap_addr, (addr + size).next_multiple_of(PAGE_SIZE));
     };
 
     pread_all(&image_file, u64::from(header.e_phoff), phs).map_err(|_| Error::new(EIO))?;
+
+    let mut span: Option<Range<usize>> = None;
+    for ph_idx in 0..phnum {
+        let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
+        let segment: &ProgramHeader =
+            plain::from_bytes(ph_bytes).map_err(|_| Error::new(EINVAL))?;
+        if segment.p_type != PT_LOAD {
+            continue;
+        }
+
+        let voff = segment.p_vaddr as usize % PAGE_SIZE;
+        let vaddr = segment.p_vaddr as usize - voff;
+        let vsize = (segment.p_memsz as usize + voff).next_multiple_of(segment.p_align as usize);
+        let b = vaddr..vaddr + vsize;
+
+        span = Some(if let Some(a) = span {
+            a.start.min(b.start)..a.end.max(b.end)
+        } else {
+            b
+        });
+    }
+    let span = span.expect("ELF executables must contain at least one `PT_LOAD` segment");
+    let base_addr = if header.e_type == ET_DYN {
+        // PIE
+        let span_size = (span.end - span.start).next_multiple_of(PAGE_SIZE);
+        let addr = mmap_anon_remote(&grants_fd, 0, 0, span_size, MapFlags::PROT_NONE)?;
+        update_min_mmap_addr(addr, span_size);
+        addr
+    } else {
+        0
+    };
+
+    let mut phdrs_vaddr = 0;
+    let mut interpreter = None;
 
     for ph_idx in 0..phnum {
         let ph_bytes = &phs[ph_idx * phentsize..(ph_idx + 1) * phentsize];
@@ -129,16 +171,7 @@ pub fn fexec_impl(
                 let mut interp = vec![0_u8; segment.p_filesz as usize];
                 pread_all(&image_file, u64::from(segment.p_offset), &mut interp)?;
 
-                return Ok(FexecResult::Interp {
-                    path: interp.into_boxed_slice(),
-                    interp_override: InterpOverride {
-                        at_entry: header.e_entry as usize,
-                        at_phnum: phnum,
-                        at_phent: phentsize,
-                        phs: phs_raw.into_boxed_slice(),
-                        name: path.into(),
-                    },
-                });
+                interpreter = Some(interp.into_boxed_slice());
             }
             PT_LOAD => {
                 let voff = segment.p_vaddr as usize % PAGE_SIZE;
@@ -157,10 +190,17 @@ pub fn fexec_impl(
                 mmap_anon_remote(
                     &grants_fd,
                     0,
-                    vaddr,
+                    base_addr + vaddr,
                     total_page_count * PAGE_SIZE,
-                    flags | MapFlags::MAP_FIXED_NOREPLACE,
+                    flags | MapFlags::MAP_FIXED,
                 )?;
+
+                if segment.p_offset <= header.e_phoff
+                    && header.e_phoff < segment.p_offset + segment.p_filesz
+                {
+                    phdrs_vaddr =
+                        (header.e_phoff - segment.p_offset + segment.p_vaddr) as usize + base_addr;
+                }
 
                 // TODO: Attempt to mmap with MAP_PRIVATE directly from the image file instead.
 
@@ -168,7 +208,7 @@ pub fn fexec_impl(
                     let (_guard, dst_memory) = unsafe {
                         MmapGuard::map_mut_anywhere(
                             &grants_fd,
-                            vaddr,                                       // offset
+                            base_addr + vaddr,                           // offset
                             (voff + filesz).next_multiple_of(PAGE_SIZE), // size
                         )?
                     };
@@ -178,11 +218,24 @@ pub fn fexec_impl(
                         &mut dst_memory[voff..voff + filesz],
                     )?;
                 }
-
-                update_min_mmap_addr(vaddr, total_page_count * PAGE_SIZE);
             }
             _ => continue,
         }
+    }
+
+    if let Some(interpreter_path) = interpreter {
+        return Ok(FexecResult::Interp {
+            path: interpreter_path,
+            interp_override: InterpOverride {
+                at_entry: header.e_entry as usize,
+                at_phnum: phnum,
+                at_phent: phentsize,
+                phdrs_vaddr,
+                name: path.into(),
+                min_mmap_addr,
+                grants_fd: grants_fd.take(),
+            },
+        });
     }
 
     mmap_anon_remote(
@@ -234,43 +287,21 @@ pub fn fexec_impl(
         Ok(())
     };
 
-    let pheaders_to_convey = if let Some(ref r#override) = interp_override {
-        &*r#override.phs
-    } else {
-        &*phs_raw
-    };
-    let pheaders_size_aligned = pheaders_to_convey.len().next_multiple_of(PAGE_SIZE);
-    let pheaders = mmap_anon_remote(
-        &grants_fd,
-        0,
-        0,
-        pheaders_size_aligned,
-        MapFlags::PROT_READ | MapFlags::PROT_WRITE,
-    )?;
-    update_min_mmap_addr(pheaders, pheaders_size_aligned);
-    unsafe {
-        let (_guard, memory) =
-            MmapGuard::map_mut_anywhere(&grants_fd, pheaders, pheaders_size_aligned)?;
-
-        memory[..pheaders_to_convey.len()].copy_from_slice(pheaders_to_convey);
-    }
-    mprotect_remote(
-        &grants_fd,
-        pheaders,
-        pheaders_size_aligned,
-        MapFlags::PROT_READ,
-    )?;
-
     push(0)?;
     push(AT_NULL)?;
-    push(header.e_entry as usize)?;
     if let Some(ref r#override) = interp_override {
-        push(AT_BASE)?;
         push(r#override.at_entry)?;
+        push(AT_ENTRY)?;
+        push(base_addr)?;
+        push(AT_BASE)?;
+        push(r#override.phdrs_vaddr)?;
+        push(AT_PHDR)?;
+    } else {
+        push(header.e_entry as usize)?;
+        push(AT_ENTRY)?;
+        push(phdrs_vaddr)?;
+        push(AT_PHDR)?;
     }
-    push(AT_ENTRY)?;
-    push(pheaders + size_of::<Header>())?;
-    push(AT_PHDR)?;
     push(
         interp_override
             .as_ref()
@@ -413,7 +444,7 @@ pub fn fexec_impl(
 
     let _ = addrspace_selection_fd.write(&create_set_addr_space_buf(
         grants_fd.as_raw_fd(),
-        header.e_entry as usize,
+        base_addr + header.e_entry as usize,
         sp,
     ));
 
