@@ -280,18 +280,18 @@ impl<T: Write> Write for CountingWriter<T> {
 // get_auxv.
 
 #[cold]
-unsafe fn auxv_iter<'a>(ptr: *const usize) -> impl Iterator<Item = [usize; 2]> + 'a {
+pub unsafe fn auxv_iter<'a>(ptr: *const usize) -> impl Iterator<Item = [usize; 2]> + 'a {
     struct St(*const usize);
     impl Iterator for St {
         type Item = [usize; 2];
 
         fn next(&mut self) -> Option<Self::Item> {
             unsafe {
-                if self.0.read() == self::auxv_defs::AT_NULL {
+                if *self.0 == self::auxv_defs::AT_NULL {
                     return None;
                 }
-                let kind = self.0.read();
-                let value = self.0.add(1).read();
+                let kind = *self.0;
+                let value = *self.0.add(1);
                 self.0 = self.0.add(2);
 
                 Some([kind, value])

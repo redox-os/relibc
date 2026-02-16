@@ -348,7 +348,7 @@ bitflags::bitflags! {
 
 #[derive(Default)]
 pub struct Config {
-    debug_flags: DebugFlags,
+    pub debug_flags: DebugFlags,
     library_path: Option<String>,
     /// Resolve symbols at program startup.
     bind_now: bool,

@@ -64,6 +64,11 @@ mod shim {
 
 pub use shim::*;
 
+// TODO: missing from the `object` crate
+pub const DT_RELRSZ: u32 = 35;
+pub const DT_RELR: u32 = 36;
+pub const DT_RELRENT: u32 = 37;
+
 /// Undefined Symbol Index
 pub const STN_UNDEF: SymbolIndex = SymbolIndex(0);
 
@@ -170,11 +175,11 @@ unsafe impl Send for Dynamic<'_> {}
 unsafe impl Sync for Dynamic<'_> {}
 
 #[derive(Debug)]
-struct Relocation {
-    offset: usize,
-    addend: Option<usize>,
-    sym: SymbolIndex,
-    kind: RelocationKind,
+pub(super) struct Relocation {
+    pub(super) offset: usize,
+    pub(super) addend: Option<usize>,
+    pub(super) sym: SymbolIndex,
+    pub(super) kind: RelocationKind,
 }
 
 #[cfg(target_pointer_width = "32")]
@@ -522,8 +527,8 @@ impl DSO {
                 };
                 _r_debug
                     .lock()
-                    .insert_first(addr, path, addr + l_ld as usize);
-                slice::from_raw_parts_mut(addr as *mut u8, size)
+                    .insert_first(addr + bounds.0, path, addr + l_ld as usize);
+                slice::from_raw_parts_mut((addr + bounds.0) as *mut u8, size)
             } else {
                 let (start, end) = bounds;
                 let size = end - start;
@@ -662,10 +667,6 @@ impl DSO {
         is_pie: bool,
         (_, entries): (&ProgramHeader, &[Dyn]),
     ) -> object::Result<(Dynamic<'a>, Option<usize>)> {
-        const DT_RELRSZ: u32 = 35;
-        const DT_RELR: u32 = 36;
-        const DT_RELRENT: u32 = 37;
-
         let mut runpath = None;
         let mut got = None;
         let mut needed = vec![];
@@ -1078,34 +1079,8 @@ impl DSO {
         let global_scope = GLOBAL_SCOPE.read();
         let base = self.mmap.as_ptr();
 
-        // Apply DT_RELR relative relocations.
-        let mut addr = ptr::null_mut();
-        for &entry in self.dynamic.relr {
-            if entry & 1 == 0 {
-                // An even entry sets up `addr` for subsequent odd entries.
-                unsafe {
-                    addr = base.add(entry) as *mut usize;
-                    *addr += base as usize;
-                    addr = addr.add(1);
-                }
-            } else {
-                // An odd entry indicates a bitmap describing at maximum 63
-                // (for 64-bit) or 31 (for 32-bit) locations following `addr`.
-                // Odd entries can be chained.
-                let mut entry = entry >> 1;
-                let mut i = 0;
-                while entry != 0 {
-                    if entry & 1 != 0 {
-                        unsafe {
-                            *addr.add(i) += base as usize;
-                        }
-                    }
-                    entry >>= 1;
-                    i += 1;
-                }
-
-                addr = unsafe { addr.add(CHAR_BITS * size_of::<Relr>() - 1) };
-            }
+        unsafe {
+            apply_relr(base, self.dynamic.relr);
         }
 
         self.dynamic
@@ -1295,3 +1270,35 @@ __tlsdesc_dynamic:
     unimp
 "
 );
+
+/// Applies [`DT_RELR`] relative relocations.
+pub unsafe fn apply_relr(base: *const u8, relr: &[Relr]) {
+    let mut addr = ptr::null_mut();
+    for &entry in relr {
+        if entry & 1 == 0 {
+            // An even entry sets up `addr` for subsequent odd entries.
+            unsafe {
+                addr = base.add(entry) as *mut usize;
+                *addr += base as usize;
+                addr = addr.add(1);
+            }
+        } else {
+            // An odd entry indicates a bitmap describing at maximum 63
+            // (for 64-bit) or 31 (for 32-bit) locations following `addr`.
+            // Odd entries can be chained.
+            let mut entry = entry >> 1;
+            let mut i = 0;
+            while entry != 0 {
+                if entry & 1 != 0 {
+                    unsafe {
+                        *addr.add(i) += base as usize;
+                    }
+                }
+                entry >>= 1;
+                i += 1;
+            }
+
+            addr = unsafe { addr.add(CHAR_BITS * size_of::<Relr>() - 1) };
+        }
+    }
+}
