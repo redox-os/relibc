@@ -402,7 +402,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(
     };
 
     let config = Config::from_env(&envs);
-    if config.debug_flags.contains(DebugFlags::LOAD) || true {
+    if config.debug_flags.contains(DebugFlags::LOAD) {
         println!("[ld.so]: relocated self at {self_base:#x}!");
         if let Some(base_addr) = base_addr {
             println!("[ld.so]: executable has been already loaded at {base_addr:#x?}");
