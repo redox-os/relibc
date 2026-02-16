@@ -171,8 +171,8 @@ pub unsafe extern "C" fn relibc_ld_so_start(
     // Relocate ourselves.
     //
     // This function is very delicate as it must **not** contain relocations itself. References to
-    // external symbols **cannot** be made until `__relibc_ld_stage2()` so, this function might not
-    // be very elegant.
+    // external symbols **cannot** be made until `stage2()` so, this function might not be very
+    // elegant.
     //
     // At this stage the TCB is not setup either so `expect_notls` must be used instead of `expect`
     // and `unwrap`.
@@ -303,11 +303,10 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         }
     }
 
-    __relibc_ld_stage2(sp, self_base, is_manual, base_addr)
+    stage2(sp, self_base, is_manual, base_addr)
 }
 
-#[unsafe(no_mangle)]
-fn __relibc_ld_stage2(
+fn stage2(
     sp: &'static mut Stack,
     self_base: usize,
     is_manual: bool,
