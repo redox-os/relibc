@@ -4,9 +4,9 @@
 //! we are NOT going to bend our API for the sake of
 //! compatibility. So, this module will be a hellhole.
 
-#[allow(unused_imports)]
-// i586, riscv64gc, aarch64: PalSignal, signal, sys_ptrace, core::mem, syscall, Pal, io::prelude
-use super::super::{ERRNO, Pal, PalPtrace, PalSignal, Sys, types::*};
+use super::super::{ERRNO, PalPtrace, Sys, types::*};
+#[cfg(target_arch = "x86_64")]
+use super::super::{Pal, PalSignal};
 #[allow(unused_imports)]
 #[cfg(target_arch = "aarch64")]
 use crate::header::arch_aarch64_user::user_regs_struct; // unused
@@ -19,17 +19,22 @@ use crate::{
     fs::File,
     header::{
         errno::{self as errnoh, EIO},
-        fcntl, signal, sys_ptrace,
+        fcntl,
     },
-    io::{self, prelude::*},
+    io,
     raw_cell::RawCell,
     sync::Mutex,
 };
+#[cfg(target_arch = "x86_64")]
+use crate::{
+    header::{signal, sys_ptrace},
+    io::prelude::*,
+};
 
 use alloc::collections::{BTreeMap, btree_map::Entry};
-#[allow(unused_imports)]
+#[cfg(target_arch = "x86_64")]
 use core::mem;
-#[allow(unused_imports)]
+#[cfg(target_arch = "x86_64")]
 use syscall;
 
 pub struct Session {

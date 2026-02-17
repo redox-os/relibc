@@ -10,11 +10,12 @@ use object::{
     },
 };
 
-#[allow(unused_imports)] // i586, riscv64gc: tcb::Tcb
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+use super::tcb::Tcb;
 use super::{
     debug::{_r_debug, RTLDDebug},
     linker::{__plt_resolve_trampoline, GLOBAL_SCOPE, Resolve, Scope, Symbol},
-    tcb::{Master, Tcb},
+    tcb::Master,
 };
 use crate::{
     header::{dl_tls::__tls_get_addr, sys_mman},
@@ -26,10 +27,11 @@ use alloc::{
     sync::Arc,
     vec::Vec,
 };
-#[allow(unused_imports)] // i586, riscv64gc: mem::offset_of
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+use core::mem::offset_of;
 use core::{
     ffi::c_char,
-    mem::{offset_of, size_of},
+    mem::size_of,
     ptr::{self, NonNull},
     slice,
     sync::atomic::{AtomicBool, Ordering},
