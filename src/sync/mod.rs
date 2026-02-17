@@ -29,6 +29,7 @@ use crate::{
 use core::{
     mem::MaybeUninit,
     ops::Deref,
+    ptr,
     sync::atomic::{self, AtomicI32, AtomicI32 as AtomicInt, AtomicU32},
 };
 
@@ -78,7 +79,7 @@ impl FutexAtomicTy for AtomicU32 {
 
         // AtomicU32::as_mut_ptr internally calls UnsafeCell::get, which itself simply does (&self
         // as *const Self as *mut Self).
-        self as *const AtomicU32 as *mut u32
+        ptr::from_ref::<AtomicU32>(self) as *mut u32
     }
 }
 impl FutexAtomicTy for AtomicI32 {
@@ -92,7 +93,7 @@ impl FutexAtomicTy for AtomicI32 {
         #[cfg(target_os = "linux")]
         return AtomicI32::as_mut_ptr(self);*/
 
-        self as *const AtomicI32 as *mut i32
+        ptr::from_ref::<AtomicI32>(self) as *mut i32
     }
 }
 
@@ -212,9 +213,9 @@ impl AtomicLock {
     /// A general way to efficiently wait for what might be a long time, using two closures:
     ///
     /// - `attempt` = Attempt to modify the atomic value to any
-    /// desired state.
+    ///   desired state.
     /// - `mark_long` = Attempt to modify the atomic value to sign
-    /// that it want's to get notified when waiting is done.
+    ///   that it want's to get notified when waiting is done.
     ///
     /// Both of these closures are allowed to spuriously give a
     /// non-success return value, they are used only as optimization

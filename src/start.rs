@@ -22,7 +22,7 @@ pub struct Stack {
 
 impl Stack {
     pub fn argv(&self) -> *const *const c_char {
-        &self.argv0 as *const _
+        ptr::from_ref(&self.argv0)
     }
 
     pub fn envp(&self) -> *const *const c_char {
@@ -35,7 +35,7 @@ impl Stack {
             while !(*envp).is_null() {
                 envp = envp.add(1);
             }
-            envp.add(1) as *const (usize, usize)
+            envp.add(1).cast::<(usize, usize)>()
         }
     }
 }
@@ -49,7 +49,7 @@ unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut
             len += 1;
         }
 
-        let buf = unsafe { platform::alloc(len + 1) } as *mut c_char;
+        let buf = unsafe { platform::alloc(len + 1) }.cast::<c_char>();
         for i in 0..=len {
             unsafe { *buf.add(i) = *item.add(i) };
         }
@@ -197,7 +197,7 @@ pub unsafe extern "C" fn relibc_start_v1(
     unsafe { platform::inner_argv.unsafe_set(copy_string_array(argv, argc as usize)) };
     unsafe { platform::argv = platform::inner_argv.unsafe_mut().as_mut_ptr() };
     // Special code for program_invocation_name and program_invocation_short_name
-    if let Some(arg) = unsafe { platform::inner_argv.unsafe_ref() }.get(0) {
+    if let Some(arg) = unsafe { platform::inner_argv.unsafe_ref() }.first() {
         unsafe { platform::program_invocation_name = *arg };
         unsafe { platform::program_invocation_short_name = libgen::basename(*arg) };
     }
