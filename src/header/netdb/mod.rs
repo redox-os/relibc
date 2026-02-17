@@ -257,7 +257,10 @@ pub unsafe extern "C" fn gethostbyaddr(
             }
             let mut cp_slice: [c_char; 4] = [0; 4];
             unsafe { (*cp).copy_to(cp_slice.as_mut_ptr(), 4) };
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             let cp_s_addr = unsafe { mem::transmute::<[c_char; 4], u32>(cp_slice) };
+            #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
+            let cp_s_addr = u32::from_ne_bytes(cp_slice);
             if cp_s_addr == addr.s_addr {
                 unsafe { sethostent(HOST_STAYOPEN) };
                 return p;
