@@ -137,9 +137,7 @@ $(BUILD)/$(PROFILE)/ld_so: $(BUILD)/$(PROFILE)/ld_so.o $(BUILD)/$(PROFILE)/crti.
 	# TODO: merge ld.so with libc.so: --dynamic-list=dynamic-list-file
 	$(LD) --shared -Bsymbolic --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections $^ -o $@
 
-# Debug targets
-
-$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/$(PROFILE)/libc.a: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -147,6 +145,8 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.
 	echo "save" >> "$@.mri"
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
+
+# Debug targets
 
 $(BUILD)/debug/librelibc.a: $(SRC)
 	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ -g -C debug-assertions=no $(RUSTCFLAGS)
@@ -171,15 +171,6 @@ $(BUILD)/debug/ld_so.o: $(SRC)
 	touch $@
 
 # Release targets
-
-$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
-	echo "create $@" > "$@.mri"
-	for lib in $^; do\
-		echo "addlib $$lib" >> "$@.mri"; \
-	done
-	echo "save" >> "$@.mri"
-	echo "end" >> "$@.mri"
-	$(AR) -M < "$@.mri"
 
 $(BUILD)/release/librelibc.a: $(SRC)
 	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
