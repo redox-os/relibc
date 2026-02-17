@@ -286,7 +286,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(
     }
 
     let mut base_addr = None;
-    if !is_manual {
+    if !is_manual && cfg!(not(target_os = "redox")) {
         // if we are not running in manual mode, then the main
         // program is already loaded by the kernel and we want
         // to use it. on redox, we treat it the same.
