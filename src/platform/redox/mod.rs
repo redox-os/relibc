@@ -1197,7 +1197,7 @@ impl Pal for Sys {
             )?;
 
             let timer_ptr = timer_buf as *mut timer_internal_t;
-            let timer_st = (&mut *timer_ptr);
+            let timer_st = &mut *timer_ptr;
 
             timer_st.clockid = clock_id;
             timer_st.timerfd = timerfd.take();
@@ -1273,7 +1273,7 @@ impl Pal for Sys {
         timer_st.next_wake_time = {
             let mut val = value.clone();
             if flags & TIMER_ABSTIME == 0 {
-                val.it_value = timespec::add(now, val.it_value).ok_or((Errno(EINVAL)))?;
+                val.it_value = timespec::add(now, val.it_value).ok_or(Errno(EINVAL))?;
             }
             val
         };
