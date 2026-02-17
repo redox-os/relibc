@@ -3,7 +3,7 @@
 #![no_std]
 #![feature(linkage)]
 
-#[allow(unused_imports)] // riscv64
+#[cfg(not(target_arch = "riscv64"))]
 use core::arch::global_asm;
 
 #[cfg(target_arch = "x86")]
