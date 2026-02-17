@@ -5,9 +5,10 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-#[allow(unused_imports)] // i586: NativeEndian, Rela, Sym
+use object::elf;
+#[cfg(not(target_arch = "x86"))]
 use object::{
-    NativeEndian, elf,
+    NativeEndian,
     read::elf::{Rela as _, Sym},
 };
 
@@ -16,7 +17,6 @@ use core::{
     ptr::{self, NonNull},
 };
 
-#[allow(unused_imports)] // i586: resolve_sym, c_uint
 use crate::{
     ALLOCATOR,
     c_str::{CStr, CString},
@@ -26,22 +26,25 @@ use crate::{
         fcntl, sys_mman,
         unistd::F_OK,
     },
-    ld_so::dso::{SymbolBinding, resolve_sym},
+    ld_so::dso::SymbolBinding,
     out::Out,
     platform::{
         Pal, Sys,
-        types::{c_int, c_uint, c_void},
+        types::{c_int, c_void},
     },
     sync::rwlock::RwLock,
 };
+#[cfg(not(target_arch = "x86"))]
+use crate::{ld_so::dso::resolve_sym, platform::types::c_uint};
 
-#[allow(unused_imports)] // i586: Rela
+#[cfg(not(target_arch = "x86"))]
+use super::dso::Rela;
 use super::{
     PATH_SEP,
     access::accessible,
     callbacks::LinkerCallbacks,
     debug::{_dl_debug_state, _r_debug, RTLDState},
-    dso::{DSO, ProgramHeader, Rela},
+    dso::{DSO, ProgramHeader},
     tcb::{Master, Tcb},
 };
 
