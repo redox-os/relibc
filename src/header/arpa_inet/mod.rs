@@ -42,7 +42,7 @@ pub unsafe extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_aton(cp: *const c_char, inp: *mut in_addr) -> c_int {
     // TODO: octal/hex
-    unsafe { inet_pton(AF_INET, cp, inp as *mut c_void) }
+    unsafe { inet_pton(AF_INET, cp, inp.cast::<c_void>()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/7908799/xns/inet_lnaof.html>.
@@ -124,12 +124,12 @@ pub unsafe extern "C" fn inet_ntoa(r#in: in_addr) -> *mut c_char {
     unsafe {
         let ptr = inet_ntop(
             AF_INET,
-            &r#in as *const in_addr as *const c_void,
+            ptr::from_ref::<in_addr>(&r#in).cast::<c_void>(),
             NTOA_ADDR.unsafe_mut().as_mut_ptr(),
             NTOA_ADDR.unsafe_ref().len() as socklen_t,
         );
         // Mutable pointer is required, inet_ntop returns destination as const pointer
-        ptr as *mut c_char
+        ptr.cast_mut()
     }
 }
 
@@ -150,13 +150,13 @@ pub unsafe extern "C" fn inet_ntop(
     } else {
         let s_addr = unsafe {
             slice::from_raw_parts(
-                &(*(src as *const in_addr)).s_addr as *const _ as *const u8,
+                ptr::from_ref(&(*(src.cast::<in_addr>())).s_addr).cast::<u8>(),
                 4,
             )
         };
         let addr = format!("{}.{}.{}.{}\0", s_addr[0], s_addr[1], s_addr[2], s_addr[3]);
         unsafe {
-            ptr::copy(addr.as_ptr() as *const c_char, dst, addr.len());
+            ptr::copy(addr.as_ptr().cast::<c_char>(), dst, addr.len());
         }
         dst
     }
@@ -170,7 +170,10 @@ pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_vo
         -1
     } else {
         let s_addr = unsafe {
-            slice::from_raw_parts_mut(&mut (*(dst as *mut in_addr)).s_addr as *mut _ as *mut u8, 4)
+            slice::from_raw_parts_mut(
+                ptr::from_mut(&mut (*dst.cast::<in_addr>()).s_addr).cast::<u8>(),
+                4,
+            )
         };
         let src_cstr = unsafe { CStr::from_ptr(src) };
         let mut octets = unsafe { str::from_utf8_unchecked(src_cstr.to_bytes()).split('.') };
@@ -181,7 +184,7 @@ pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_vo
                 return 0;
             }
         }
-        if octets.next() == None {
+        if octets.next().is_none() {
             1 // Success
         } else {
             0
