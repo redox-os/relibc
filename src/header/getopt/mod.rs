@@ -110,19 +110,19 @@ pub unsafe extern "C" fn getopt_long(
                                         optarg = *argv.offset(optind as isize);
                                         optind += 1;
                                     } else if *optstring == b':' as c_char {
-                                        return b':' as c_int;
+                                        return c_int::from(b':');
                                     } else {
-                                        stdio::fputs(*argv as _, &mut *stdio::stderr);
+                                        stdio::fputs((*argv).cast_const(), &mut *stdio::stderr);
                                         stdio::fputs(
-                                            ": option '--\0".as_ptr() as _,
+                                            c": option '--".as_ptr().cast(),
                                             &mut *stdio::stderr,
                                         );
                                         stdio::fputs(current_arg, &mut *stdio::stderr);
                                         stdio::fputs(
-                                            "' requires an argument\n\0".as_ptr() as _,
+                                            c"' requires an argument\n".as_ptr().cast(),
                                             &mut *stdio::stderr,
                                         );
-                                        return b'?' as c_int;
+                                        return c_int::from(b'?');
                                     }
                                 }
                             }
@@ -160,26 +160,26 @@ unsafe fn parse_arg(
 
     let print_error = |desc: &[u8]| unsafe {
         // NOTE: we don't use fprintf to get around the usage of va_list
-        stdio::fputs(*argv as _, &mut *stdio::stderr);
-        stdio::fputs(desc.as_ptr() as _, &mut *stdio::stderr);
-        stdio::fputc(*current_arg as _, &mut *stdio::stderr);
-        stdio::fputc(b'\n' as _, &mut *stdio::stderr);
+        stdio::fputs((*argv).cast_const(), &mut *stdio::stderr);
+        stdio::fputs(desc.as_ptr().cast(), &mut *stdio::stderr);
+        stdio::fputc((*current_arg).into(), &mut *stdio::stderr);
+        stdio::fputc(b'\n'.into(), &mut *stdio::stderr);
     };
 
     match unsafe { find_option(*current_arg, optstring) } {
         Some(GetoptOption::Flag) => {
             update_current_opt();
 
-            unsafe { *current_arg as c_int }
+            unsafe { c_int::from(*current_arg) }
         }
         Some(GetoptOption::OptArg) => unsafe {
-            CURRENT_OPT = b"\0".as_ptr() as _;
+            CURRENT_OPT = c"".as_ptr().cast_mut();
             if *current_arg.offset(1) == 0 {
                 optind += 2;
                 if optind > argc {
                     CURRENT_OPT = ptr::null_mut();
 
-                    optopt = *current_arg as c_int;
+                    optopt = c_int::from(*current_arg);
                     let errch = if *optstring == b':' as c_char {
                         b':'
                     } else {
@@ -189,17 +189,17 @@ unsafe fn parse_arg(
 
                         b'?'
                     };
-                    errch as c_int
+                    c_int::from(errch)
                 } else {
                     optarg = *argv.offset(optind as isize - 1);
 
-                    *current_arg as c_int
+                    c_int::from(*current_arg)
                 }
             } else {
                 optarg = current_arg.offset(1);
                 optind += 1;
 
-                *current_arg as c_int
+                c_int::from(*current_arg)
             }
         },
         None => {
@@ -211,9 +211,9 @@ unsafe fn parse_arg(
             update_current_opt();
 
             unsafe {
-                optopt = *current_arg as c_int;
+                optopt = c_int::from(*current_arg);
             }
-            b'?' as c_int
+            c_int::from(b'?')
         }
     }
 }

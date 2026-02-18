@@ -21,7 +21,7 @@ exclude = ["tests", "dlmalloc-rs"]
 
 [workspace.lints.clippy]
 cast_lossless = "warn" # TODO review occurrences
-cast_ptr_alignment = "allow" # TODO change to warn or deny when ready to fix
+cast_ptr_alignment = "warn" # TODO review occurrences
 missing_safety_doc = "allow" # TODO review occurrences
 mut_from_ref = "allow" # TODO review occurrences
 ptr_as_ptr = "warn" # TODO review occurrences
