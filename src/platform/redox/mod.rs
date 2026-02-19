@@ -6,7 +6,6 @@ use core::{
 };
 use redox_rt::{
     RtTcb,
-    proc::*,
     protocol::{WaitFlags, wifstopped},
     sys::{Resugid, WaitpidTarget},
 };
@@ -312,7 +311,7 @@ impl Pal for Sys {
         // TODO: Find way to avoid lock.
         let _guard = CLONE_LOCK.write();
 
-        Ok(fork_impl(&redox_rt::proc::ForkArgs::Managed)? as pid_t)
+        Ok(redox_rt::proc::fork_impl(&redox_rt::proc::ForkArgs::Managed)? as pid_t)
     }
 
     fn fstat(fildes: c_int, mut buf: Out<stat>) -> Result<()> {

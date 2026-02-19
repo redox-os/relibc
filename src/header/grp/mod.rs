@@ -129,9 +129,9 @@ fn split(buf: &mut [u8]) -> Option<group> {
 
     // We moved the gid to the beginning of the byte buffer so we can do this.
     let mut parts = buf[mem::size_of::<gid_t>()..].split_mut(|&c| c == b'\0');
-    let gr_name = parts.next()?.as_mut_ptr() as *mut c_char;
-    let gr_passwd = parts.next()?.as_mut_ptr() as *mut c_char;
-    let gr_mem = parts.next()?.as_mut_ptr() as *mut usize;
+    let gr_name = parts.next()?.as_mut_ptr().cast::<c_char>();
+    let gr_passwd = parts.next()?.as_mut_ptr().cast::<c_char>();
+    let gr_mem = parts.next()?.as_mut_ptr().cast::<usize>();
 
     // Adjust gr_mem address by buffer base address
     // TODO: max group members length?
@@ -149,7 +149,7 @@ fn split(buf: &mut [u8]) -> Option<group> {
         gr_name,
         gr_passwd,
         gr_gid,
-        gr_mem: gr_mem as *mut *mut c_char,
+        gr_mem: gr_mem.cast::<*mut c_char>(),
     })
 }
 
@@ -169,9 +169,9 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
         let gr_name = buffer.next().ok_or(Error::EOF)?.to_vec();
         let gr_passwd = buffer.next().ok_or(Error::EOF)?.to_vec();
         let gr_gid = String::from_utf8(buffer.next().ok_or(Error::EOF)?.to_vec())
-            .map_err(|err| Error::FromUtf8Error(err))?
+            .map_err(Error::FromUtf8Error)?
             .parse::<gid_t>()
-            .map_err(|err| Error::ParseIntError(err))?;
+            .map_err(Error::ParseIntError)?;
 
         // Place the gid at the beginning of the byte buffer to make getting it back out again later, much faster.
 
@@ -327,7 +327,7 @@ pub unsafe extern "C" fn getgrgid_r(
         let grp = match parse_grp(
             line,
             Some(DestBuffer {
-                ptr: buffer as *mut u8,
+                ptr: buffer.cast::<u8>(),
                 len: buflen,
             }),
         ) {
@@ -383,7 +383,7 @@ pub unsafe extern "C" fn getgrnam_r(
         let Ok(grp) = parse_grp(
             line,
             Some(DestBuffer {
-                ptr: buffer as *mut u8,
+                ptr: buffer.cast::<u8>(),
                 len: buflen,
             }),
         ) else {
@@ -508,7 +508,7 @@ pub unsafe extern "C" fn getgrouplist(
             .map(|i| i.trim())
             .collect::<Vec<_>>();
 
-        if !members.iter().any(|i| *i == user) {
+        if !members.contains(&user) {
             continue;
         }
 
