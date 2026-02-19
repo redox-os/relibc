@@ -56,7 +56,6 @@ use crate::{
 
 pub use redox_rt::proc::FdGuard;
 
-mod clone;
 mod epoll;
 mod event;
 mod exec;
