@@ -55,6 +55,7 @@ use crate::{
 };
 
 pub use redox_rt::proc::FdGuard;
+use redox_rt::{proc::*, thread::rlct_clone_impl};
 
 mod epoll;
 mod event;
