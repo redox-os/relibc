@@ -42,8 +42,8 @@ pub unsafe extern "C" fn strtoimax(
     strto_impl!(
         intmax_t,
         false,
-        intmax_t::max_value(),
-        intmax_t::min_value(),
+        intmax_t::MAX,
+        intmax_t::MIN,
         s,
         endptr,
         base
@@ -60,8 +60,8 @@ pub unsafe extern "C" fn strtoumax(
     strto_impl!(
         uintmax_t,
         false,
-        uintmax_t::max_value(),
-        uintmax_t::min_value(),
+        uintmax_t::MAX,
+        uintmax_t::MIN,
         s,
         endptr,
         base
