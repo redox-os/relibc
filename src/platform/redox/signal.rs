@@ -111,7 +111,7 @@ impl PalSignal for Sys {
                 SigactionKind::Ignore
             } else {
                 SigactionKind::Handled {
-                    handler: if c_act.sa_flags & crate::header::signal::SA_SIGINFO as c_ulong != 0 {
+                    handler: if c_act.sa_flags & crate::header::signal::SA_SIGINFO as c_int != 0 {
                         SignalHandler {
                             sigaction: unsafe { core::mem::transmute(c_act.sa_handler) },
                         }
@@ -154,7 +154,7 @@ impl PalSignal for Sys {
                         unsafe { handler.handler }
                     },
                     sa_restorer: None,
-                    sa_flags: old_action.flags.bits().into(),
+                    sa_flags: old_action.flags.bits() as c_int,
                     sa_mask: old_action.mask,
                 },
             };
