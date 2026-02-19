@@ -536,7 +536,7 @@ impl DSO {
                 let size = end - start;
                 let mut flags = sys_mman::MAP_ANONYMOUS | sys_mman::MAP_PRIVATE;
                 if start != 0 {
-                    flags |= sys_mman::MAP_FIXED;
+                    flags |= sys_mman::MAP_FIXED_NOREPLACE;
                 }
                 log::trace!("  mmap({:#x}, {:x}, {:x})", start, size, flags);
                 let ptr = Sys::mmap(
