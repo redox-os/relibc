@@ -41,17 +41,17 @@ unsafe impl Sync for lconv {}
 pub(crate) const fn posix_lconv() -> lconv {
     lconv {
         // numeric, non-monetary
-        decimal_point: b".\0".as_ptr() as *mut c_char,
-        thousands_sep: b"\0".as_ptr() as *mut c_char,
-        grouping: b"\0".as_ptr() as *mut c_char,
+        decimal_point: c".".as_ptr().cast_mut(),
+        thousands_sep: c"".as_ptr().cast_mut(),
+        grouping: c"".as_ptr().cast_mut(),
         // local monetary
-        int_curr_symbol: b"\0".as_ptr() as *mut c_char,
-        currency_symbol: b"\0".as_ptr() as *mut c_char,
-        mon_decimal_point: b"\0".as_ptr() as *mut c_char,
-        mon_thousands_sep: b"\0".as_ptr() as *mut c_char,
-        mon_grouping: b"\0".as_ptr() as *mut c_char,
-        positive_sign: b"\0".as_ptr() as *mut c_char,
-        negative_sign: b"\0".as_ptr() as *mut c_char,
+        int_curr_symbol: c"".as_ptr().cast_mut(),
+        currency_symbol: c"".as_ptr().cast_mut(),
+        mon_decimal_point: c"".as_ptr().cast_mut(),
+        mon_thousands_sep: c"".as_ptr().cast_mut(),
+        mon_grouping: c"".as_ptr().cast_mut(),
+        positive_sign: c"".as_ptr().cast_mut(),
+        negative_sign: c"".as_ptr().cast_mut(),
         // delimiters, unspecified
         int_frac_digits: c_char::MAX,
         frac_digits: c_char::MAX,
@@ -130,16 +130,16 @@ impl LocaleData {
     }
 
     fn update_lconv_pointers(&mut self) {
-        self.lconv.decimal_point = self.decimal_point.as_ptr() as *mut c_char;
-        self.lconv.thousands_sep = self.thousands_sep.as_ptr() as *mut c_char;
-        self.lconv.grouping = self.grouping.as_ptr() as *mut c_char;
-        self.lconv.int_curr_symbol = self.int_curr_symbol.as_ptr() as *mut c_char;
-        self.lconv.currency_symbol = self.currency_symbol.as_ptr() as *mut c_char;
-        self.lconv.mon_decimal_point = self.mon_decimal_point.as_ptr() as *mut c_char;
-        self.lconv.mon_thousands_sep = self.mon_thousands_sep.as_ptr() as *mut c_char;
-        self.lconv.mon_grouping = self.mon_grouping.as_ptr() as *mut c_char;
-        self.lconv.positive_sign = self.positive_sign.as_ptr() as *mut c_char;
-        self.lconv.negative_sign = self.negative_sign.as_ptr() as *mut c_char;
+        self.lconv.decimal_point = self.decimal_point.as_ptr().cast_mut();
+        self.lconv.thousands_sep = self.thousands_sep.as_ptr().cast_mut();
+        self.lconv.grouping = self.grouping.as_ptr().cast_mut();
+        self.lconv.int_curr_symbol = self.int_curr_symbol.as_ptr().cast_mut();
+        self.lconv.currency_symbol = self.currency_symbol.as_ptr().cast_mut();
+        self.lconv.mon_decimal_point = self.mon_decimal_point.as_ptr().cast_mut();
+        self.lconv.mon_thousands_sep = self.mon_thousands_sep.as_ptr().cast_mut();
+        self.lconv.mon_grouping = self.mon_grouping.as_ptr().cast_mut();
+        self.lconv.positive_sign = self.positive_sign.as_ptr().cast_mut();
+        self.lconv.negative_sign = self.negative_sign.as_ptr().cast_mut();
     }
 
     pub fn copy_category(&mut self, other: &Self, category: c_int) {
