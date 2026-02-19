@@ -9,7 +9,6 @@ use redox_rt::{
     proc::*,
     protocol::{WaitFlags, wifstopped},
     sys::{Resugid, WaitpidTarget},
-    thread::rlct_clone_impl,
 };
 use syscall::{
     self, EILSEQ, Error, MODE_PERM,
