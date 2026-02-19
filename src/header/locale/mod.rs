@@ -45,7 +45,7 @@ pub unsafe extern "C" fn localeconv() -> *mut lconv {
             &raw mut POSIX_LOCALE
         }
     } else {
-        let current = current as *mut LocaleData;
+        let current = current.cast::<LocaleData>();
         unsafe { &raw mut (*current).lconv }
     }
 }
@@ -65,12 +65,12 @@ pub unsafe extern "C" fn setlocale(category: c_int, locale: *const c_char) -> *m
         let Some(name) = global.get_name(category) else {
             return ptr::null_mut();
         };
-        return name.as_ptr() as *mut c_char;
+        return name.as_ptr().cast_mut();
     }
 
     let name = unsafe { CStr::from_ptr(locale).to_str().unwrap_or("C") };
 
-    let locale_file = if name == "" || name == "C" || name == "POSIX" {
+    let locale_file = if name.is_empty() || name == "C" || name == "POSIX" {
         // TODO: name == "" should read from LANG env
         Ok(LocaleData::posix())
     } else {
@@ -83,7 +83,7 @@ pub unsafe extern "C" fn setlocale(category: c_int, locale: *const c_char) -> *m
             let Some(name) = global.set_name(category, CString::from_str(name).unwrap()) else {
                 return ptr::null_mut();
             };
-            name.as_ptr() as *mut c_char
+            name.as_ptr().cast_mut()
         }
         Err(_) => ptr::null_mut(),
     }
@@ -103,7 +103,7 @@ pub unsafe extern "C" fn uselocale(newloc: locale_t) -> locale_t {
             THREAD_LOCALE = if newloc == LC_GLOBAL_LOCALE {
                 ptr::null_mut()
             } else {
-                newloc as *mut LocaleData
+                newloc.cast::<LocaleData>()
             }
         };
     }
@@ -118,7 +118,7 @@ pub unsafe extern "C" fn newlocale(mask: c_int, locale: *const c_char, base: loc
         .to_string_lossy()
         .into_owned();
     let name = name.as_str();
-    let mut new_locale = if name == "" || name == "C" || name == "POSIX" {
+    let mut new_locale = if name.is_empty() || name == "C" || name == "POSIX" {
         // TODO: name == "" should read from LANG env
         Ok(LocaleData::posix())
     } else {
@@ -126,7 +126,7 @@ pub unsafe extern "C" fn newlocale(mask: c_int, locale: *const c_char, base: loc
     };
     if base != LC_GLOBAL_LOCALE {
         // borrowing here
-        let base = base as *const _ as *const LocaleData;
+        let base = base.cast_const().cast::<LocaleData>();
         if let Ok(new_locale) = new_locale.as_mut() {
             if let Some(base) = unsafe { base.as_ref() } {
                 // copy old values if not containing the mask
@@ -140,14 +140,14 @@ pub unsafe extern "C" fn newlocale(mask: c_int, locale: *const c_char, base: loc
             }
         }
     }
-    new_locale.or_errno_null_mut() as *mut _
+    new_locale.or_errno_null_mut().cast()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/freelocale.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn freelocale(loc: locale_t) {
     if !loc.is_null() && loc != LC_GLOBAL_LOCALE {
-        drop(unsafe { Box::from_raw(loc as *mut LocaleData) });
+        drop(unsafe { Box::from_raw(loc.cast::<LocaleData>()) });
     }
 }
 
@@ -161,7 +161,7 @@ pub unsafe extern "C" fn duplocale(loc: locale_t) -> locale_t {
         Box::into_raw(LocaleData::posix()) as locale_t
     } else {
         // borrowing here
-        let loc = loc as *const _ as *const LocaleData;
+        let loc = loc.cast_const().cast::<LocaleData>();
         Box::into_raw(unsafe { Box::from((*loc).clone()) }) as locale_t
     }
 }
