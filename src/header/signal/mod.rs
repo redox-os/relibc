@@ -12,8 +12,7 @@ use crate::{
     platform::{
         self, ERRNO, Pal, PalSignal, Sys,
         types::{
-            c_char, c_int, c_ulong, c_ulonglong, c_void, pid_t, pthread_attr_t, pthread_t, size_t,
-            uid_t,
+            c_char, c_int, c_ulonglong, c_void, pid_t, pthread_attr_t, pthread_t, size_t, uid_t,
         },
     },
 };
@@ -54,7 +53,7 @@ pub const SIGEV_THREAD: c_int = 2;
 /// cbindgen:ignore
 pub struct sigaction {
     pub sa_handler: Option<extern "C" fn(c_int)>,
-    pub sa_flags: c_ulong,
+    pub sa_flags: c_int,
     pub sa_restorer: Option<unsafe extern "C" fn()>,
     pub sa_mask: sigset_t,
 }
@@ -316,9 +315,9 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
     unsafe { sigaction(sig, ptr::null_mut(), psa.as_mut_ptr()) };
     let mut sa = unsafe { psa.assume_init() };
     if flag != 0 {
-        sa.sa_flags &= !SA_RESTART as c_ulong;
+        sa.sa_flags &= !SA_RESTART as c_int;
     } else {
-        sa.sa_flags |= SA_RESTART as c_ulong;
+        sa.sa_flags |= SA_RESTART as c_int;
     }
 
     unsafe { sigaction(sig, &mut sa, ptr::null_mut()) }
@@ -472,7 +471,7 @@ pub unsafe extern "C" fn sigset(
         } else {
             let mut sa = sigaction {
                 sa_handler: func,
-                sa_flags: 0 as c_ulong,
+                sa_flags: c_int::from(0),
                 sa_restorer: None, // set by platform if applicable
                 sa_mask: sigset_t::default(),
             };
