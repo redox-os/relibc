@@ -154,7 +154,7 @@ impl PalSignal for Sys {
                         unsafe { handler.handler }
                     },
                     sa_restorer: None,
-                    sa_flags: old_action.flags.bits().into(),
+                    sa_flags: old_action.flags.bits() as c_int,
                     sa_mask: old_action.mask,
                 },
             };
