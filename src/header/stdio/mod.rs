@@ -1124,7 +1124,7 @@ pub unsafe extern "C" fn puts(s: *const c_char) -> c_int {
     if stream.write_all(&buf).is_err() {
         return -1;
     }
-    if stream.write(&[b'\n']).is_err() {
+    if stream.write(b"\n").is_err() {
         return -1;
     }
     0
