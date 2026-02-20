@@ -143,6 +143,13 @@ pub fn fexec_impl(
         update_min_mmap_addr(addr, span_size);
         addr
     } else {
+        mmap_anon_remote(
+            &grants_fd,
+            0,
+            span.start,
+            span_size,
+            MapFlags::MAP_FIXED_NOREPLACE,
+        )?;
         update_min_mmap_addr(span.start, span_size);
         0
     };
