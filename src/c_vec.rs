@@ -37,7 +37,7 @@ impl<T> CVec<T> {
         }
     }
     fn check_bounds(i: usize) -> Result<usize, AllocError> {
-        if i > core::isize::MAX as usize {
+        if i > isize::MAX as usize {
             Err(AllocError)
         } else {
             Ok(i)
@@ -53,7 +53,7 @@ impl<T> CVec<T> {
             return Ok(Self::new());
         }
         let size = Self::check_mul(cap, mem::size_of::<T>())?;
-        let ptr = NonNull::new(unsafe { platform::alloc(size) as *mut T }).ok_or(AllocError)?;
+        let ptr = NonNull::new(unsafe { platform::alloc(size).cast::<T>() }).ok_or(AllocError)?;
         Ok(Self { ptr, len: 0, cap })
     }
     unsafe fn resize(&mut self, cap: usize) -> Result<(), AllocError> {
@@ -62,11 +62,11 @@ impl<T> CVec<T> {
             NonNull::dangling()
         } else if self.cap > 0 {
             NonNull::new(
-                unsafe { platform::realloc(self.ptr.as_ptr() as *mut c_void, size) } as *mut T,
+                unsafe { platform::realloc(self.ptr.as_ptr().cast::<c_void>(), size) }.cast::<T>(),
             )
             .ok_or(AllocError)?
         } else {
-            NonNull::new((unsafe { platform::alloc(size) }) as *mut T).ok_or(AllocError)?
+            NonNull::new((unsafe { platform::alloc(size) }).cast::<T>()).ok_or(AllocError)?
         };
         self.ptr = ptr;
         self.cap = cap;
@@ -90,7 +90,7 @@ impl<T> CVec<T> {
             .ok_or(AllocError)
             .and_then(Self::check_bounds)?;
         if required_len > self.cap {
-            let new_cap = cmp::min(required_len.next_power_of_two(), core::isize::MAX as usize);
+            let new_cap = cmp::min(required_len.next_power_of_two(), isize::MAX as usize);
             unsafe {
                 self.resize(new_cap)?;
             }

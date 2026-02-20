@@ -154,10 +154,10 @@ pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
 }
 
 #[cfg(target_os = "linux")]
-static SHM_PATH: &'static [u8] = b"/dev/shm/";
+static SHM_PATH: &[u8] = b"/dev/shm/";
 
 #[cfg(target_os = "redox")]
-static SHM_PATH: &'static [u8] = b"/scheme/shm/";
+static SHM_PATH: &[u8] = b"/scheme/shm/";
 
 unsafe fn shm_path(name: *const c_char) -> CString {
     let name_c = unsafe { CStr::from_ptr(name) };
