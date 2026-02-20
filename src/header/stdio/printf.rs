@@ -412,7 +412,7 @@ fn fmt_float_exp<W: Write>(
 
     pad(w, !left, b' ', len..pad_space)?;
     let bytes = if string.starts_with('-') {
-        w.write_all(&[b'-'])?;
+        w.write_all(b"-")?;
         &string.as_bytes()[1..]
     } else {
         string.as_bytes()
@@ -438,7 +438,7 @@ fn fmt_float_normal<W: Write>(
 
     pad(w, !left, b' ', string.len()..pad_space)?;
     let bytes = if string.starts_with('-') {
-        w.write_all(&[b'-'])?;
+        w.write_all(b"-")?;
         &string.as_bytes()[1..]
     } else {
         string.as_bytes()
@@ -477,7 +477,7 @@ fn fmt_float_nonfinite<W: Write>(
     // Infinity is always padded with spaces, rather than zeroes
     pad(w, !left, b' ', string.len()..pad_space + pad_zero)?;
     if float.is_sign_negative() {
-        w.write_all(&[b'-'])?;
+        w.write_all(b"-")?;
     }
     w.write_all(string.as_bytes())?;
     pad(w, left, b' ', string.len()..pad_space + pad_zero)?;
@@ -748,7 +748,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
         });
 
         match fmtkind {
-            FmtKind::Percent => w.write_all(&[b'%'])?,
+            FmtKind::Percent => w.write_all(b"%")?,
             FmtKind::Signed => {
                 let string = match unsafe {
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
@@ -782,13 +782,13 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
 
                 let bytes = if positive {
                     if sign_reserve {
-                        w.write_all(&[b' '])?;
+                        w.write_all(b" ")?;
                     } else if sign_always {
-                        w.write_all(&[b'+'])?;
+                        w.write_all(b"+")?;
                     }
                     string.as_bytes()
                 } else {
-                    w.write_all(&[b'-'])?;
+                    w.write_all(b"-")?;
                     &string.as_bytes()[1..]
                 };
                 pad(w, true, b'0', len..precision.unwrap_or(pad_zero))?;
