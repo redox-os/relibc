@@ -53,7 +53,7 @@ pub extern "C" fn isblank_l(c: c_int, _loc: locale_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iscntrl.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn iscntrl(c: c_int) -> c_int {
-    c_int::from((c >= 0x00 && c <= 0x1f) || c == 0x7f)
+    c_int::from((0x00..=0x1f).contains(&c) || c == 0x7f)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/iscntrl_l.html>.
@@ -77,7 +77,7 @@ pub extern "C" fn isdigit_l(c: c_int, _loc: locale_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/isgraph.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn isgraph(c: c_int) -> c_int {
-    c_int::from(c >= 0x21 && c <= 0x7e)
+    c_int::from((0x21..=0x7e).contains(&c))
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/isgraph_l.html>.
@@ -101,7 +101,7 @@ pub extern "C" fn islower_l(c: c_int, _loc: locale_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/isprint.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn isprint(c: c_int) -> c_int {
-    c_int::from(c >= 0x20 && c < 0x7f)
+    c_int::from((0x20..0x7f).contains(&c))
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/isprint_l.html>.
