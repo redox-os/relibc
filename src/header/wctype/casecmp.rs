@@ -367,7 +367,7 @@ pub fn casemap(mut c: u32, dir: i32) -> wint_t {
     /* lookup entry in two-level base-6 table */
     let mut v: c_uint = c_uint::from(tab[(u32::from(tab[b as usize]) * 86 + x) as usize]);
     let mt: [c_uint; 3] = [2048, 342, 57];
-    v = (v * mt[y as usize] >> 11) % 6;
+    v = ((v * mt[y as usize]) >> 11) % 6;
 
     /* use the bit vector out of the tables as an index into
      * a block-specific set of rules and decode the rule into
