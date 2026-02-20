@@ -49,8 +49,8 @@ pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
     let mut ps: mbstate_t = mbstate_t;
     let mut wc: wchar_t = 0;
     let saved_errno = platform::ERRNO.get();
-    let status = unsafe { mbrtowc(&mut wc, &c as *const c_char, 1, &mut ps) };
-    if status == usize::max_value() || status == usize::max_value() - 1 {
+    let status = unsafe { mbrtowc(&mut wc, ptr::from_ref::<c_char>(&c), 1, &mut ps) };
+    if status == usize::MAX || status == usize::MAX - 1 {
         platform::ERRNO.set(saved_errno);
         return WEOF;
     }
@@ -69,7 +69,9 @@ pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
     loop {
         let nread = unsafe {
             fread(
-                buf[bytes_read..bytes_read + 1].as_mut_ptr() as *mut c_void,
+                buf[bytes_read..bytes_read + 1]
+                    .as_mut_ptr()
+                    .cast::<c_void>(),
                 1,
                 1,
                 stream,
@@ -100,7 +102,7 @@ pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
     unsafe {
         mbrtowc(
             &mut wc,
-            buf.as_ptr() as *const c_char,
+            buf.as_ptr().cast::<c_char>(),
             encoded_length,
             ptr::null_mut(),
         )
@@ -139,7 +141,7 @@ pub unsafe extern "C" fn fputwc(wc: wchar_t, stream: *mut FILE) -> wint_t {
     let amount = unsafe { wcrtomb(bytes.as_mut_ptr(), wc, &raw mut INTERNAL) };
 
     for i in 0..amount {
-        unsafe { fputc(bytes[i] as c_int, &mut *stream) };
+        unsafe { fputc(c_int::from(bytes[i]), &mut *stream) };
     }
 
     wc as wint_t
@@ -220,7 +222,7 @@ pub unsafe extern "C" fn mbrtowc(
     }
     if s.is_null() {
         let xs: [c_char; 1] = [0];
-        unsafe { utf8::mbrtowc(pwc, &xs[0] as *const c_char, 1, ps) }
+        unsafe { utf8::mbrtowc(pwc, ptr::from_ref::<c_char>(&xs[0]), 1, ps) }
     } else {
         unsafe { utf8::mbrtowc(pwc, s, n, ps) }
     }
@@ -297,7 +299,7 @@ pub unsafe extern "C" fn mbsrtowcs(
     len: size_t,
     ps: *mut mbstate_t,
 ) -> size_t {
-    unsafe { mbsnrtowcs(dst, src, size_t::max_value(), len, ps) }
+    unsafe { mbsnrtowcs(dst, src, size_t::MAX, len, ps) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/putwc.html>.
@@ -319,7 +321,7 @@ pub unsafe extern "C" fn vswscanf(
     format: *const wchar_t,
     __valist: va_list,
 ) -> c_int {
-    let reader = (s as *const wint_t).into();
+    let reader = (s.cast::<wint_t>()).into();
     unsafe { wscanf::scanf(reader, format, __valist) }
 }
 
@@ -356,7 +358,7 @@ pub unsafe extern "C" fn ungetwc(wc: wint_t, stream: &mut FILE) -> wint_t {
     If we called ungetc in the non-reversed order, we would get [167, 195]
     */
     for i in 0..amount {
-        unsafe { ungetc(bytes[amount - 1 - i] as c_int, &mut *stream) };
+        unsafe { ungetc(c_int::from(bytes[amount - 1 - i]), &mut *stream) };
     }
 
     wc
@@ -370,7 +372,7 @@ pub unsafe extern "C" fn vfwprintf(
     arg: va_list,
 ) -> c_int {
     let mut stream = unsafe { (*stream).lock() };
-    if let Err(_) = (*stream).try_set_wide_orientation_unlocked() {
+    if (*stream).try_set_wide_orientation_unlocked().is_err() {
         return -1;
     }
 
@@ -427,13 +429,13 @@ pub unsafe extern "C" fn swprintf(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcpcpy.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcpcpy(d: *mut wchar_t, s: *const wchar_t) -> *mut wchar_t {
-    return unsafe { (wcscpy(d, s)).offset(wcslen(s) as isize) };
+    unsafe { (wcscpy(d, s)).add(wcslen(s)) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcpncpy.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcpncpy(d: *mut wchar_t, s: *const wchar_t, n: size_t) -> *mut wchar_t {
-    return unsafe { (wcsncpy(d, s, n)).offset(wcsnlen(s, n) as isize) };
+    unsafe { (wcsncpy(d, s, n)).add(wcsnlen(s, n)) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcrtomb.html>.
@@ -456,7 +458,7 @@ pub unsafe extern "C" fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t
 pub unsafe extern "C" fn wcsdup(s: *const wchar_t) -> *mut wchar_t {
     let l = unsafe { wcslen(s) };
 
-    let d = unsafe { malloc((l + 1) * mem::size_of::<wchar_t>()) } as *mut wchar_t;
+    let d = unsafe { malloc((l + 1) * mem::size_of::<wchar_t>()) }.cast::<wchar_t>();
 
     if d.is_null() {
         ERRNO.set(ENOMEM);
@@ -637,11 +639,11 @@ pub unsafe extern "C" fn wcsnlen(mut s: *const wchar_t, maxlen: size_t) -> size_
             break;
         }
 
-        len = len + 1;
+        len += 1;
         s = unsafe { s.offset(1) };
     }
 
-    return len;
+    len
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcsnrtombs.html>.
@@ -702,14 +704,14 @@ pub unsafe extern "C" fn wcspbrk(mut wcs: *const wchar_t, set: *const wchar_t) -
     } else {
         // Once again, C wants us to transmute a const pointer to a
         // mutable one...
-        wcs as *mut _
+        wcs.cast_mut()
     }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcsrchr.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcsrchr(ws1: *const wchar_t, wc: wchar_t) -> *mut wchar_t {
-    let mut last_matching_wc = 0 as *const wchar_t;
+    let mut last_matching_wc = ptr::null::<wchar_t>();
     let mut i = 0;
 
     while unsafe { *ws1.add(i) } != 0 {
@@ -719,7 +721,7 @@ pub unsafe extern "C" fn wcsrchr(ws1: *const wchar_t, wc: wchar_t) -> *mut wchar
         i += 1;
     }
 
-    last_matching_wc as *mut wchar_t
+    last_matching_wc.cast_mut()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcsspn.html>.
@@ -736,7 +738,7 @@ pub unsafe extern "C" fn wcsstr(ws1: *const wchar_t, ws2: *const wchar_t) -> *mu
 
     // The standard says that we must return ws1 if ws2 has length 0
     if ws2_len == 0 {
-        ws1 as *mut wchar_t
+        ws1.cast_mut()
     } else {
         let ws1_len = unsafe { wcslen(ws1) };
 
@@ -751,7 +753,7 @@ pub unsafe extern "C" fn wcsstr(ws1: *const wchar_t, ws2: *const wchar_t) -> *mu
         /* Find the first offset into ws1 where the window is equal to
          * the ws2 contents. Return null pointer if no match is found. */
         match ws1_windows.position(|ws1_window| ws1_window == ws2_slice) {
-            Some(pos) => unsafe { ws1.add(pos) as *mut wchar_t },
+            Some(pos) => unsafe { ws1.add(pos).cast_mut() },
             None => ptr::null_mut(),
         }
     }
@@ -780,9 +782,9 @@ pub unsafe extern "C" fn wcstod(mut ptr: *const wchar_t, end: *mut *mut wchar_t)
     while let Some(digit) = char::from_u32(unsafe { *ptr } as _).and_then(|c| c.to_digit(RADIX)) {
         result *= 10.0;
         if negative {
-            result -= digit as c_double;
+            result -= c_double::from(digit);
         } else {
-            result += digit as c_double;
+            result += c_double::from(digit);
         }
         ptr = unsafe { ptr.add(1) };
     }
@@ -794,15 +796,15 @@ pub unsafe extern "C" fn wcstod(mut ptr: *const wchar_t, end: *mut *mut wchar_t)
         {
             scale /= 10.0;
             if negative {
-                result -= digit as c_double * scale;
+                result -= c_double::from(digit) * scale;
             } else {
-                result += digit as c_double * scale;
+                result += c_double::from(digit) * scale;
             }
             ptr = unsafe { ptr.add(1) };
         }
     }
     if !end.is_null() {
-        unsafe { *end = ptr as *mut _ };
+        unsafe { *end = ptr.cast_mut() };
     }
     result
 }
@@ -911,7 +913,7 @@ pub unsafe extern "C" fn wcstol(
     skipws!(ptr);
     let result = strto_impl!(c_long, ptr, base);
     if !end.is_null() {
-        unsafe { *end = ptr as *mut _ };
+        unsafe { *end = ptr.cast_mut() };
     }
     result
 }
@@ -926,7 +928,7 @@ pub unsafe extern "C" fn wcstoll(
     skipws!(ptr);
     let result = strto_impl!(c_longlong, ptr, base);
     if !end.is_null() {
-        unsafe { *end = ptr as *mut _ };
+        unsafe { *end = ptr.cast_mut() };
     }
     result
 }
@@ -941,7 +943,7 @@ pub unsafe extern "C" fn wcstoimax(
     skipws!(ptr);
     let result = strto_impl!(intmax_t, ptr, base);
     if !end.is_null() {
-        unsafe { *end = ptr as *mut _ };
+        unsafe { *end = ptr.cast_mut() };
     }
     result
 }
@@ -956,7 +958,7 @@ pub unsafe extern "C" fn wcstoul(
     skipws!(ptr);
     let result = strtou_impl!(c_ulong, ptr, base);
     if !end.is_null() {
-        unsafe { *end = ptr as *mut _ };
+        unsafe { *end = ptr.cast_mut() };
     }
     result
 }
@@ -971,7 +973,7 @@ pub unsafe extern "C" fn wcstoull(
     skipws!(ptr);
     let result = strtou_impl!(c_ulonglong, ptr, base);
     if !end.is_null() {
-        unsafe { *end = ptr as *mut _ };
+        unsafe { *end = ptr.cast_mut() };
     }
     result
 }
@@ -986,7 +988,7 @@ pub unsafe extern "C" fn wcstoumax(
     skipws!(ptr);
     let result = strtou_impl!(uintmax_t, ptr, base);
     if !end.is_null() {
-        unsafe { *end = ptr as *mut _ };
+        unsafe { *end = ptr.cast_mut() };
     }
     result
 }
@@ -1044,7 +1046,7 @@ pub extern "C" fn wcwidth(wc: wchar_t) -> c_int {
 pub unsafe extern "C" fn wmemchr(ws: *const wchar_t, wc: wchar_t, n: size_t) -> *mut wchar_t {
     for i in 0..n {
         if unsafe { *ws.add(i) } == wc {
-            return unsafe { ws.add(i) } as *mut wchar_t;
+            return unsafe { ws.add(i) }.cast_mut();
         }
     }
     ptr::null_mut()
@@ -1072,11 +1074,12 @@ pub unsafe extern "C" fn wmemcpy(
 ) -> *mut wchar_t {
     (unsafe {
         string::memcpy(
-            ws1 as *mut c_void,
-            ws2 as *const c_void,
+            ws1.cast::<c_void>(),
+            ws2.cast::<c_void>(),
             n * mem::size_of::<wchar_t>(),
         )
-    }) as *mut wchar_t
+    })
+    .cast::<wchar_t>()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wmemmove.html>.
@@ -1088,11 +1091,12 @@ pub unsafe extern "C" fn wmemmove(
 ) -> *mut wchar_t {
     (unsafe {
         string::memmove(
-            ws1 as *mut c_void,
-            ws2 as *const c_void,
+            ws1.cast::<c_void>(),
+            ws2.cast::<c_void>(),
             n * mem::size_of::<wchar_t>(),
         )
-    }) as *mut wchar_t
+    })
+    .cast::<wchar_t>()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wmemset.html>.
@@ -1112,11 +1116,11 @@ pub unsafe extern "C" fn vfwscanf(
     __valist: va_list,
 ) -> c_int {
     let mut file = unsafe { (*stream).lock() };
-    if let Err(_) = file.try_set_byte_orientation_unlocked() {
+    if file.try_set_byte_orientation_unlocked().is_err() {
         return -1;
     }
 
-    let f: &mut FILE = &mut *file;
+    let f: &mut FILE = &mut file;
     let reader: LookAheadReader = f.into();
     unsafe { wscanf::scanf(reader, format, __valist) }
 }
@@ -1145,7 +1149,7 @@ pub unsafe extern "C" fn wcscasecmp(mut s1: *const wchar_t, mut s2: *const wchar
             s2 = s2.add(1);
         }
         let result = towlower(*s1 as wint_t).wrapping_sub(towlower(*s2 as wint_t));
-        return result as c_int;
+        result as c_int
     }
 }
 
@@ -1167,6 +1171,6 @@ pub unsafe extern "C" fn wcsncasecmp(
             s1 = s1.add(1);
             s2 = s2.add(1);
         }
-        return 0;
+        0
     }
 }
