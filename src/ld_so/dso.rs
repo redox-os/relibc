@@ -558,7 +558,6 @@ impl DSO {
                     );
                 }
                 log::trace!("    = {:p}", ptr);
-                ptr::write_bytes(ptr.cast::<u8>(), 0, size);
                 _r_debug
                     .lock()
                     .insert(ptr as usize, path, ptr as usize + l_ld as usize);
