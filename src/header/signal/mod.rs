@@ -391,7 +391,7 @@ pub unsafe extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
 // 32 and 33 (same as NPTL reserves), whereas this on Redox is 33 and 34 (TODO: could this be
 // changed to 32 and 33 for Redox too, since there's currently no support for "sigqueue" targeting
 // specific threads).
-const RLCT_SIGNAL_MASK: sigset_t = (1 << ((SIGRTMIN - 1) - 1)) | (1 << (SIGRTMIN - 2) - 1);
+const RLCT_SIGNAL_MASK: sigset_t = (1 << ((SIGRTMIN - 1) - 1)) | (1 << ((SIGRTMIN - 2) - 1));
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigprocmask.html>.
 #[unsafe(no_mangle)]

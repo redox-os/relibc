@@ -107,7 +107,7 @@ pub unsafe extern "C" fn a64l(s: *const c_char) -> c_long {
             _ => return 0, // Early return for anything else
         };
 
-        l |= i32::from(digit_value) << 6 * i;
+        l |= i32::from(digit_value) << (6 * i);
     }
 
     c_long::from(l)
@@ -586,7 +586,7 @@ pub unsafe extern "C" fn l64a(value: c_long) -> *mut c_char {
 
     for i in 0..num_output_digits {
         // Conversion to c_char always succeeds for the range 0..=63
-        let digit_value = c_char::try_from((value_as_i32 >> 6 * i) & 63).unwrap();
+        let digit_value = c_char::try_from((value_as_i32 >> (6 * i)) & 63).unwrap();
 
         (unsafe { L64A_BUFFER.unsafe_mut() })[i] = match digit_value {
             0..=11 => {
