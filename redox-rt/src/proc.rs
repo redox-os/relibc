@@ -135,13 +135,22 @@ pub fn fexec_impl(
         });
     }
     let span = span.expect("ELF executables must contain at least one `PT_LOAD` segment");
+    let span_size = (span.end - span.start).next_multiple_of(PAGE_SIZE);
+
     let base_addr = if header.e_type == ET_DYN {
         // PIE
-        let span_size = (span.end - span.start).next_multiple_of(PAGE_SIZE);
         let addr = mmap_anon_remote(&grants_fd, 0, 0, span_size, MapFlags::PROT_NONE)?;
         update_min_mmap_addr(addr, span_size);
         addr
     } else {
+        mmap_anon_remote(
+            &grants_fd,
+            0,
+            span.start,
+            span_size,
+            MapFlags::MAP_FIXED_NOREPLACE,
+        )?;
+        update_min_mmap_addr(span.start, span_size);
         0
     };
 
@@ -227,7 +236,7 @@ pub fn fexec_impl(
         return Ok(FexecResult::Interp {
             path: interpreter_path,
             interp_override: InterpOverride {
-                at_entry: header.e_entry as usize,
+                at_entry: base_addr + header.e_entry as usize,
                 at_phnum: phnum,
                 at_phent: phentsize,
                 phdrs_vaddr,
@@ -297,7 +306,7 @@ pub fn fexec_impl(
         push(r#override.phdrs_vaddr)?;
         push(AT_PHDR)?;
     } else {
-        push(header.e_entry as usize)?;
+        push(base_addr + header.e_entry as usize)?;
         push(AT_ENTRY)?;
         push(phdrs_vaddr)?;
         push(AT_PHDR)?;
