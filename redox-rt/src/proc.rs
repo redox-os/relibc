@@ -227,7 +227,7 @@ pub fn fexec_impl(
         return Ok(FexecResult::Interp {
             path: interpreter_path,
             interp_override: InterpOverride {
-                at_entry: header.e_entry as usize,
+                at_entry: base_addr + header.e_entry as usize,
                 at_phnum: phnum,
                 at_phent: phentsize,
                 phdrs_vaddr,
@@ -297,7 +297,7 @@ pub fn fexec_impl(
         push(r#override.phdrs_vaddr)?;
         push(AT_PHDR)?;
     } else {
-        push(header.e_entry as usize)?;
+        push(base_addr + header.e_entry as usize)?;
         push(AT_ENTRY)?;
         push(phdrs_vaddr)?;
         push(AT_PHDR)?;
