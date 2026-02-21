@@ -201,7 +201,10 @@ pub fn execve(
         umask: redox_rt::sys::get_umask(),
         thr_fd: RtTcb::current().thread_fd().as_raw_fd(),
         proc_fd: redox_rt::current_proc_fd().as_raw_fd(),
-        ns_fd: Some(redox_rt::current_namespace_fd()),
+        ns_fd: redox_rt::current_namespace_fd().ok(),
+        cwd_fd: super::path::current_dir()
+            .ok()
+            .map(|fd| fd.as_ref().unwrap().fd.as_raw_fd()),
     };
 
     fexec_impl(

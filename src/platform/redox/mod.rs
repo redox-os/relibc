@@ -28,7 +28,7 @@ use crate::{
         bits_time::timespec,
         errno::{
             EBADF, EBADFD, EBADR, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
-            ENOMEM, ENOSYS, EOPNOTSUPP, EPERM, ERANGE,
+            ENOMEM, ENOSYS, EOPNOTSUPP, EPERM,
         },
         fcntl::{self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW},
         limits,
@@ -261,11 +261,7 @@ impl Pal for Sys {
     }
 
     fn fchdir(fd: c_int) -> Result<()> {
-        let mut buf = [0; 4096];
-        let res = syscall::fpath(fd as usize, &mut buf)?;
-
-        let path = str::from_utf8(&buf[..res]).map_err(|_| Errno(EINVAL))?;
-        path::chdir(path)?;
+        path::fchdir(fd)?;
         Ok(())
     }
 
@@ -408,7 +404,7 @@ impl Pal for Sys {
     }
 
     fn getcwd(buf: Out<[u8]>) -> Result<()> {
-        path::getcwd(buf).ok_or(Errno(ERANGE))?;
+        path::getcwd(buf)?;
         Ok(())
     }
 
@@ -662,16 +658,10 @@ impl Pal for Sys {
     }
 
     fn mkdirat(dir_fd: c_int, path_name: CStr, mode: mode_t) -> Result<()> {
-        let mut dir_path_buf = [0; 4096];
-        let res = Sys::fpath(dir_fd, &mut dir_path_buf)?;
-
-        let dir_path = str::from_utf8(&dir_path_buf[..res as usize]).map_err(|_| Errno(EBADR))?;
-
-        let resource_path =
-            path::canonicalize_using_cwd(Some(&dir_path), &path_name.to_string_lossy())
-                // Since parent_dir_path is resolved by fpath, it is more likely that
-                // the problem was with path.
-                .ok_or(Errno(ENOENT))?;
+        let (is_relative, resource_path) = path::normalize_path(&path_name.to_string_lossy())
+            // Since parent_dir_path is resolved by fpath, it is more likely that
+            // the problem was with path.
+            .ok_or(Errno(ENOENT))?;
 
         Sys::mkdir(
             CStr::borrow(&CString::new(resource_path.as_bytes()).unwrap()),

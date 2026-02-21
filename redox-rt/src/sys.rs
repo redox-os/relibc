@@ -445,7 +445,7 @@ pub fn setns(fd: usize) -> Option<FdGuardUpper> {
     old_fd_guard
 }
 pub fn getns() -> Result<usize> {
-    let cur_ns = crate::current_namespace_fd();
+    let cur_ns = crate::current_namespace_fd()?;
     if cur_ns == usize::MAX {
         Err(Error::new(ENODEV))
     } else {
@@ -458,7 +458,25 @@ pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     unsafe {
         syscall::syscall5(
             syscall::SYS_OPENAT,
-            crate::current_namespace_fd(),
+            crate::current_namespace_fd()?,
+            path.as_ptr() as usize,
+            path.len(),
+            flags,
+            fcntl_flags,
+        )
+    }
+}
+pub fn openat<T: AsRef<str>>(
+    fd: usize,
+    path: T,
+    flags: usize,
+    fcntl_flags: usize,
+) -> Result<usize> {
+    let path = path.as_ref();
+    unsafe {
+        syscall::syscall5(
+            syscall::SYS_OPENAT,
+            fd,
             path.as_ptr() as usize,
             path.len(),
             flags,
@@ -471,7 +489,7 @@ pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
     unsafe {
         syscall::syscall4(
             syscall::SYS_UNLINKAT,
-            crate::current_namespace_fd(),
+            crate::current_namespace_fd()?,
             path.as_ptr() as usize,
             path.len(),
             flags,
@@ -487,7 +505,7 @@ pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
         buf.extend_from_slice(&len.to_ne_bytes());
         buf.extend_from_slice(name_bytes);
     }
-    FdGuard::new(syscall::dup(crate::current_namespace_fd(), &buf)?).to_upper()
+    FdGuard::new(syscall::dup(crate::current_namespace_fd()?, &buf)?).to_upper()
 }
 pub fn register_scheme_to_ns(ns_fd: usize, name: &str, cap_fd: usize) -> Result<()> {
     let mut buf = alloc::vec::Vec::from((NsDup::IssueRegister as usize).to_ne_bytes());
