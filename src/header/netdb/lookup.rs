@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, string::ToString, vec::Vec};
-use core::mem;
+use core::{mem, ptr};
 
 use crate::{
     out::Out,
@@ -69,10 +69,10 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
             sin_addr: in_addr { s_addr: dns_addr },
             ..Default::default()
         };
-        let dest_ptr = &dest as *const _ as *const sockaddr;
+        let dest_ptr = ptr::from_ref(&dest).cast::<sockaddr>();
 
         let sock = unsafe {
-            let sock = sys_socket::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP as i32);
+            let sock = sys_socket::socket(AF_INET, SOCK_DGRAM, i32::from(IPPROTO_UDP));
             if sys_socket::connect(sock, dest_ptr, mem::size_of_val(&dest) as socklen_t) < 0 {
                 return Err(EIO);
             }
@@ -89,7 +89,7 @@ pub fn lookup_host(host: &str) -> Result<LookupHost, c_int> {
 
         let i = 0 as socklen_t;
         let mut buf = vec![0u8; 65536];
-        let buf_ptr = buf.as_mut_ptr() as *mut c_void;
+        let buf_ptr = buf.as_mut_ptr().cast::<c_void>();
 
         let count = unsafe { sys_socket::recv(sock, buf_ptr, 65536, 0) };
         if count < 0 {
@@ -171,10 +171,10 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
             ..Default::default()
         };
 
-        let dest_ptr = &dest as *const _ as *const sockaddr;
+        let dest_ptr = ptr::from_ref(&dest).cast::<sockaddr>();
 
         let sock = unsafe {
-            let sock = sys_socket::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP as i32);
+            let sock = sys_socket::socket(AF_INET, SOCK_DGRAM, i32::from(IPPROTO_UDP));
             if sys_socket::connect(sock, dest_ptr, mem::size_of_val(&dest) as socklen_t) < 0 {
                 return Err(EIO);
             }
@@ -193,7 +193,7 @@ pub fn lookup_addr(addr: in_addr) -> Result<Vec<Vec<u8>>, c_int> {
 
         let i = mem::size_of::<sockaddr_in>() as socklen_t;
         let mut buf = [0u8; 65536];
-        let buf_ptr = buf.as_mut_ptr() as *mut c_void;
+        let buf_ptr = buf.as_mut_ptr().cast::<c_void>();
 
         let count = unsafe { sys_socket::recv(sock, buf_ptr, 65536, 0) };
         if count < 0 {
