@@ -238,7 +238,7 @@ pub extern "C" fn posix_getdents(
     nbyte: size_t,
     _flags: c_int,
 ) -> ssize_t {
-    let slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, nbyte) };
+    let slice = unsafe { slice::from_raw_parts_mut(buf.cast::<u8>(), nbyte) };
 
     Sys::posix_getdents(fildes, slice)
         .map(|s| s as ssize_t)
@@ -299,18 +299,18 @@ pub unsafe extern "C" fn scandir(
             break;
         }
 
-        if let Some(filter) = filter {
-            if filter(entry) == 0 {
-                continue;
-            }
+        if let Some(filter) = filter
+            && filter(entry) == 0
+        {
+            continue;
         }
 
-        let copy = unsafe { platform::alloc(mem::size_of::<dirent>()) } as *mut dirent;
+        let copy = unsafe { platform::alloc(mem::size_of::<dirent>()) }.cast::<dirent>();
         if copy.is_null() {
             break;
         }
         unsafe { ptr::write(copy, (*entry).clone()) };
-        if let Err(_) = vec.push(copy) {
+        if vec.push(copy).is_err() {
             break;
         }
     }
@@ -318,13 +318,13 @@ pub unsafe extern "C" fn scandir(
     closedir(unsafe { Box::from_raw(dir) });
 
     let len = vec.len();
-    if let Err(_) = vec.shrink_to_fit() {
+    if vec.shrink_to_fit().is_err() {
         return -1;
     }
 
     if platform::ERRNO.get() != 0 {
         for ptr in &mut vec {
-            unsafe { platform::free(*ptr as *mut c_void) };
+            unsafe { platform::free((*ptr).cast::<c_void>()) };
         }
         -1
     } else {
@@ -340,7 +340,7 @@ pub unsafe extern "C" fn scandir(
         platform::ERRNO.set(old_errno);
         unsafe {
             stdlib::qsort(
-                *namelist as *mut c_void,
+                (*namelist).cast::<c_void>(),
                 len as size_t,
                 mem::size_of::<*mut dirent>(),
                 mem::transmute(compare),
