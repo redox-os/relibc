@@ -28,7 +28,7 @@ use crate::{
         bits_time::timespec,
         errno::{
             EBADF, EBADFD, EBADR, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
-            ENOMEM, ENOSYS, EOPNOTSUPP, EPERM, ERANGE,
+            ENOMEM, ENOSYS, EOPNOTSUPP, EPERM,
         },
         fcntl::{self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW},
         limits,
@@ -261,11 +261,7 @@ impl Pal for Sys {
     }
 
     fn fchdir(fd: c_int) -> Result<()> {
-        let mut buf = [0; 4096];
-        let res = syscall::fpath(fd as usize, &mut buf)?;
-
-        let path = str::from_utf8(&buf[..res]).map_err(|_| Errno(EINVAL))?;
-        path::chdir(path)?;
+        path::fchdir(fd)?;
         Ok(())
     }
 
@@ -408,7 +404,7 @@ impl Pal for Sys {
     }
 
     fn getcwd(buf: Out<[u8]>) -> Result<()> {
-        path::getcwd(buf).ok_or(Errno(ERANGE))?;
+        path::getcwd(buf)?;
         Ok(())
     }
 
