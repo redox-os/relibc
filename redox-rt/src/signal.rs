@@ -1,8 +1,8 @@
 use core::{ffi::c_int, ptr::NonNull, sync::atomic::Ordering};
 
 use syscall::{
-    CallFlags, EAGAIN, EINTR, EINVAL, ENOMEM, EPERM, Error, RawAction, Result, SenderInfo,
-    SetSighandlerData, SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, data::AtomicU64,
+    CallFlags, EAGAIN, EINTR, EINVAL, ENOMEM, EPERM, Error, RawAction, Result, SetSighandlerData,
+    SigProcControl, Sigcontrol, SigcontrolFlags, TimeSpec, data::AtomicU64,
 };
 
 use crate::{
@@ -10,8 +10,8 @@ use crate::{
     arch::*,
     current_proc_fd,
     protocol::{
-        ProcCall, RtSigInfo, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG,
-        SIGWINCH, ThreadCall,
+        ProcCall, RtSigInfo, SI_USER, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN,
+        SIGTTOU, SIGURG, SIGWINCH, ThreadCall, signal::SenderInfo,
     },
     static_proc_info,
     sync::Mutex,
@@ -92,6 +92,7 @@ impl From<Sigaltstack> for PosixStackt {
 #[repr(C)]
 // TODO: This struct is for practical reasons locked to Linux's ABI, but avoid redefining
 // it here. Alternatively, check at compile time that the structs are equivalent.
+#[derive(Clone, Copy, Debug)]
 pub struct SiginfoAbi {
     pub si_signo: i32,
     pub si_errno: i32,
@@ -134,9 +135,11 @@ unsafe fn inner(stack: &mut SigStack) {
             stack.sig_code = area.tmp_rt_inf.code as u32;
             (area.tmp_rt_inf.pid, area.tmp_rt_inf.uid)
         } else {
-            stack.sig_code = 0; // TODO: SI_USER constant?
-            // TODO: Handle SIGCHLD. Maybe that should always be queued though?
             let inf = SenderInfo::from_raw(area.tmp_id_inf);
+            stack.sig_code = inf.code.map_or(0, |c| c.to_si_code() as u32);
+            // TODO: Handle SIGCHLD, which probably means there should be a special case causing it
+            // to spinlock-synchronize another read of the si_status into say area.tmp_sigchld_inf
+            // (u64).
             (inf.pid, inf.ruid)
         }
     };
@@ -956,14 +959,21 @@ fn try_claim_single(sig_idx: u32, thread_control: Option<&Sigcontrol>) -> Option
                 info
             }
         });
+        let si_code = match info.code {
+            Some(c) => c.to_si_code(),
+            None => {
+                // TODO: print warning
+                SI_USER
+            }
+        };
         Some(SiginfoAbi {
             si_signo: sig_idx as i32 + 1,
             si_errno: 0,
-            si_code: 0, // TODO: SI_USER const?
+            si_code,
             si_pid: info.pid as i32,
             si_uid: info.ruid as i32,
-            si_status: 0,
-            si_value: 0, // undefined
+            si_status: 0, // TODO: needs info for SIGCHLD
+            si_value: 0,  // undefined
             si_addr: core::ptr::null_mut(),
         })
     }
