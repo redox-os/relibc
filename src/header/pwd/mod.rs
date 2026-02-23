@@ -278,7 +278,7 @@ pub unsafe extern "C" fn getpwnam_r(
             pwd_lookup(
                 |parts| strcmp(parts.pw_name, name) == 0,
                 Some(DestBuffer {
-                    ptr: buf as *mut u8,
+                    ptr: buf.cast::<u8>(),
                     len: size,
                 }),
             ),
@@ -305,13 +305,13 @@ pub unsafe extern "C" fn getpwuid_r(
     size: size_t,
     result: *mut *mut passwd,
 ) -> c_int {
-    let slice = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, size) };
+    let slice = unsafe { core::slice::from_raw_parts_mut(buf.cast::<u8>(), size) };
     unsafe {
         mux(
             pwd_lookup(
                 |part| part.pw_uid == uid,
                 Some(DestBuffer {
-                    ptr: buf as *mut u8,
+                    ptr: buf.cast::<u8>(),
                     len: size,
                 }),
             ),

@@ -1,3 +1,5 @@
+use core::ptr;
+
 use crate::{
     header::{fcntl, sys_ioctl, unistd},
     io::{Cursor, Write},
@@ -16,7 +18,7 @@ pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
         sys_ioctl::ioctl(
             master,
             sys_ioctl::TIOCSPTLCK,
-            &mut lock as *mut c_int as *mut c_void,
+            ptr::from_mut::<c_int>(&mut lock).cast::<c_void>(),
         )
     } != 0
     {
@@ -29,7 +31,7 @@ pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
         sys_ioctl::ioctl(
             master,
             sys_ioctl::TIOCGPTN,
-            &mut ptn as *mut c_int as *mut c_void,
+            ptr::from_mut::<c_int>(&mut ptn).cast::<c_void>(),
         )
     } != 0
     {
@@ -42,7 +44,7 @@ pub(super) unsafe fn openpty(name: &mut [u8]) -> Result<(c_int, c_int), ()> {
 
     let slave = unsafe {
         fcntl::open(
-            cursor.get_ref().as_ptr() as *const c_char,
+            cursor.get_ref().as_ptr().cast::<c_char>(),
             fcntl::O_RDWR | fcntl::O_NOCTTY,
             0,
         )
