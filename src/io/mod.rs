@@ -1403,7 +1403,7 @@ impl<T: BufRead, U: BufRead> BufRead for Chain<T, U> {
     fn fill_buf(&mut self) -> Result<&[u8]> {
         if !self.done_first {
             match self.first.fill_buf()? {
-                buf if buf.is_empty() => {
+                [] => {
                     self.done_first = true;
                 }
                 buf => return Ok(buf),
