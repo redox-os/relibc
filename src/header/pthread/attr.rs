@@ -36,7 +36,7 @@ impl Default for RlctAttr {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_destroy(attr: *mut pthread_attr_t) -> c_int {
-    unsafe { core::ptr::drop_in_place(attr) };
+    unsafe { ptr::drop_in_place(attr) };
     0
 }
 
@@ -45,7 +45,7 @@ pub unsafe extern "C" fn pthread_attr_getdetachstate(
     attr: *const pthread_attr_t,
     detachstate: *mut c_int,
 ) -> c_int {
-    unsafe { core::ptr::write(detachstate, (*attr.cast::<RlctAttr>()).detachstate as _) };
+    unsafe { ptr::write(detachstate, (*attr.cast::<RlctAttr>()).detachstate.into()) };
     0
 }
 
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn pthread_attr_getguardsize(
     attr: *const pthread_attr_t,
     size: *mut size_t,
 ) -> c_int {
-    unsafe { core::ptr::write(size, (*attr.cast::<RlctAttr>()).guardsize) };
+    unsafe { ptr::write(size, (*attr.cast::<RlctAttr>()).guardsize) };
     0
 }
 
@@ -63,7 +63,7 @@ pub unsafe extern "C" fn pthread_attr_getinheritsched(
     attr: *const pthread_attr_t,
     inheritsched: *mut c_int,
 ) -> c_int {
-    unsafe { core::ptr::write(inheritsched, (*attr.cast::<RlctAttr>()).inheritsched as _) };
+    unsafe { ptr::write(inheritsched, (*attr.cast::<RlctAttr>()).inheritsched.into()) };
     0
 }
 
@@ -81,7 +81,7 @@ pub unsafe extern "C" fn pthread_attr_getschedpolicy(
     attr: *const pthread_attr_t,
     policy: *mut c_int,
 ) -> c_int {
-    unsafe { core::ptr::write(policy, (*attr.cast::<RlctAttr>()).schedpolicy as _) };
+    unsafe { ptr::write(policy, (*attr.cast::<RlctAttr>()).schedpolicy.into()) };
     0
 }
 
@@ -90,7 +90,7 @@ pub unsafe extern "C" fn pthread_attr_getscope(
     attr: *const pthread_attr_t,
     scope: *mut c_int,
 ) -> c_int {
-    unsafe { core::ptr::write(scope, (*attr.cast::<RlctAttr>()).scope as _) };
+    unsafe { ptr::write(scope, (*attr.cast::<RlctAttr>()).scope.into()) };
     0
 }
 
@@ -100,8 +100,8 @@ pub unsafe extern "C" fn pthread_attr_getstack(
     stackaddr: *mut *mut c_void,
     stacksize: *mut size_t,
 ) -> c_int {
-    unsafe { core::ptr::write(stackaddr, (*attr.cast::<RlctAttr>()).stack as _) };
-    unsafe { core::ptr::write(stacksize, (*attr.cast::<RlctAttr>()).stacksize as _) };
+    unsafe { ptr::write(stackaddr, (*attr.cast::<RlctAttr>()).stack as _) };
+    unsafe { ptr::write(stacksize, (*attr.cast::<RlctAttr>()).stacksize as _) };
     0
 }
 
@@ -110,13 +110,13 @@ pub unsafe extern "C" fn pthread_attr_getstacksize(
     attr: *const pthread_attr_t,
     stacksize: *mut size_t,
 ) -> c_int {
-    unsafe { core::ptr::write(stacksize, (*attr.cast::<RlctAttr>()).stacksize as _) };
+    unsafe { ptr::write(stacksize, (*attr.cast::<RlctAttr>()).stacksize as _) };
     0
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_attr_init(attr: *mut pthread_attr_t) -> c_int {
-    unsafe { core::ptr::write(attr.cast::<RlctAttr>(), RlctAttr::default()) };
+    unsafe { ptr::write(attr.cast::<RlctAttr>(), RlctAttr::default()) };
     0
 }
 
