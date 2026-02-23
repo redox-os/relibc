@@ -202,13 +202,13 @@ pub const ABALTMON_12: nl_item = 80;
 pub unsafe extern "C" fn nl_langinfo(item: nl_item) -> *mut c_char {
     // Validate the item and perform the lookup
     let ptr = if (item as usize) < STRING_TABLE.len() {
-        STRING_TABLE[item as usize].as_ptr() as *const c_char
+        STRING_TABLE[item as usize].as_ptr().cast::<c_char>()
     } else {
         // Return a pointer to an empty string if the item is invalid
-        b"\0".as_ptr() as *const c_char
+        c"".as_ptr().cast::<c_char>()
     };
     // Mutable pointer is required (unsafe!)
-    ptr as *mut c_char
+    ptr.cast_mut()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nl_langinfo_l.html>.
