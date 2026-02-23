@@ -56,7 +56,7 @@ pub const REG_BADRPT: c_int = 14;
 #[unsafe(no_mangle)]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: c_int) -> c_int {
-    let pat = unsafe { slice::from_raw_parts(pat as *const u8, strlen(pat)) };
+    let pat = unsafe { slice::from_raw_parts(pat.cast::<u8>(), strlen(pat)) };
     let res = PosixRegexBuilder::new(pat)
         .with_default_classes()
         .extended(cflags & REG_EXTENDED == REG_EXTENDED)
@@ -67,7 +67,7 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
             let re_nsub = PosixRegex::new(Cow::Borrowed(&branches)).count_groups();
             unsafe {
                 *out = regex_t {
-                    ptr: Box::into_raw(Box::new(branches)) as *mut c_void,
+                    ptr: Box::into_raw(Box::new(branches)).cast::<c_void>(),
 
                     cflags,
                     re_nsub,
@@ -109,10 +109,10 @@ pub unsafe extern "C" fn regexec(
     // because why not?
     let flags = regex.cflags | eflags;
 
-    let input = unsafe { slice::from_raw_parts(input as *const u8, strlen(input)) };
-    let branches = unsafe { &*(regex.ptr as *mut Tree) };
+    let input = unsafe { slice::from_raw_parts(input.cast::<u8>(), strlen(input)) };
+    let branches = unsafe { &*(regex.ptr.cast::<Tree>()) };
 
-    let matches = PosixRegex::new(Cow::Borrowed(&branches))
+    let matches = PosixRegex::new(Cow::Borrowed(branches))
         .case_insensitive(flags & REG_ICASE == REG_ICASE)
         .newline(flags & REG_NEWLINE == REG_NEWLINE)
         .no_start(flags & REG_NOTBOL == REG_NOTBOL)
@@ -165,11 +165,7 @@ pub extern "C" fn regerror(
     };
 
     unsafe {
-        ptr::copy_nonoverlapping(
-            string.as_ptr(),
-            out as *mut u8,
-            string.len().min(max as usize),
-        );
+        ptr::copy_nonoverlapping(string.as_ptr(), out.cast::<u8>(), string.len().min(max));
     }
 
     string.len()
