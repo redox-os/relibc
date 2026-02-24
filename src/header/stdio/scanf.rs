@@ -99,7 +99,7 @@ unsafe fn inner_scanf(
             }
 
             let mut width = String::new();
-            while c >= b'0' && c <= b'9' {
+            while c.is_ascii_digit() {
                 width.push(c as char);
                 c = unsafe { next_byte(&mut format) }?;
             }
@@ -183,12 +183,12 @@ unsafe fn inner_scanf(
                     let mut dot = false;
 
                     while width.map(|w| w > 0).unwrap_or(true)
-                        && ((byte >= b'0' && byte <= b'7')
-                            || (radix >= 10 && (byte >= b'8' && byte <= b'9'))
+                        && ((b'0'..=b'7').contains(&byte)
+                            || (radix >= 10 && (b'8'..=b'9').contains(&byte))
                             || (float && !dot && byte == b'.')
                             || (radix == 16
-                                && ((byte >= b'a' && byte <= b'f')
-                                    || (byte >= b'A' && byte <= b'F'))))
+                                && ((b'a'..=b'f').contains(&byte)
+                                    || (b'A'..=b'F').contains(&byte))))
                     {
                         if auto
                             && n.is_empty()
@@ -422,7 +422,7 @@ unsafe fn inner_scanf(
 
                     // While we haven't used up all the width, and it matches
                     let mut data_stored = false;
-                    while width.map(|w| w > 0).unwrap_or(true) && !invert == matches.contains(&byte)
+                    while width.map(|w| w > 0).unwrap_or(true) && invert != matches.contains(&byte)
                     {
                         if let Some(ref mut ptr) = ptr {
                             unsafe { **ptr = byte as c_char };

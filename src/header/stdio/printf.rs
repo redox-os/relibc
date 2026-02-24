@@ -312,11 +312,11 @@ fn pop_int_raw<T: c_str::Kind>(format: &mut NulStr<T>) -> Option<usize> {
 fn pop_index<T: c_str::Kind>(format: &mut NulStr<T>) -> Option<usize> {
     // Peek ahead for a positional argument:
     let mut format2 = *format;
-    if let Some(i) = pop_int_raw(&mut format2) {
-        if let Some(('$', format2)) = format2.split_first_char() {
-            *format = format2;
-            return Some(i);
-        }
+    if let Some(i) = pop_int_raw(&mut format2)
+        && let Some(('$', format2)) = format2.split_first_char()
+    {
+        *format = format2;
+        return Some(i);
     }
     None
 }
@@ -339,10 +339,7 @@ where
         'x' => format!("{:x}", i),
         'X' => format!("{:X}", i),
         'b' | 'B' if T::IS_THIN_NOT_WIDE => format!("{:b}", i),
-        _ => panic!(
-            "fmt_int should never be called with the fmt {:?}",
-            fmt as char,
-        ),
+        _ => panic!("fmt_int should never be called with the fmt {:?}", fmt,),
     }
 }
 
@@ -935,16 +932,17 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                 } {
                     VaArg::pointer(p) => p,
                     _ => panic!("this should not be possible"),
-                } as *const c_char;
+                }
+                .cast::<c_char>();
 
                 if ptr.is_null() {
                     w.write_all(b"(null)")?;
                 } else {
-                    let max = precision.unwrap_or(::core::usize::MAX);
+                    let max = precision.unwrap_or(usize::MAX);
 
                     if intkind == IntKind::Long || intkind == IntKind::LongLong {
                         // Handle wchar_t
-                        let mut ptr = ptr as *const wchar_t;
+                        let mut ptr = ptr.cast::<wchar_t>();
                         let mut string = String::new();
 
                         while unsafe { *ptr } != 0 {
@@ -972,7 +970,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                         }
 
                         pad(w, !left, b' ', len..pad_space)?;
-                        w.write_all(unsafe { slice::from_raw_parts(ptr as *const u8, len) })?;
+                        w.write_all(unsafe { slice::from_raw_parts(ptr.cast::<u8>(), len) })?;
                         pad(w, left, b' ', len..pad_space)?;
                     }
                 }
