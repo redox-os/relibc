@@ -25,7 +25,7 @@ pub unsafe extern "C" fn getline(
     n: *mut size_t,
     stream: *mut FILE,
 ) -> ssize_t {
-    unsafe { getdelim(lineptr, n, b'\n' as c_int, stream) }
+    unsafe { getdelim(lineptr, n, c_int::from(b'\n'), stream) }
 }
 
 // One *could* read the standard as 'getdelim sets the stream error flag on *any* error, though
@@ -40,12 +40,12 @@ pub unsafe extern "C" fn getline(
 /// # Deviation from POSIX
 /// - **EINVAL is set on stream being NULL or delim not fitting into char** (POSIX allows UB)
 /// - **`*n` can contain invalid data.** The buffer size `n` is not read, instead realloc is called each time. That is in principle
-/// inefficent since the buffer is reallocated in memory for every call, but if `n` is by mistake
-/// bigger than the number of bytes allocated for the buffer, there can be no out-of-bounds write.
+///   inefficent since the buffer is reallocated in memory for every call, but if `n` is by mistake
+///   bigger than the number of bytes allocated for the buffer, there can be no out-of-bounds write.
 /// - On non-stream-related errors, the error indicator of the stream is *not* set. Posix states
-/// "If an error occurs, the error indicator for the stream shall be set, and the function shall
-/// return -1 and set errno to indicate the error." but in cases that produce EINVAL even glibc
-/// doesn't seem to set the error indicator, so we also don't.
+///   "If an error occurs, the error indicator for the stream shall be set, and the function shall
+///   return -1 and set errno to indicate the error." but in cases that produce EINVAL even glibc
+///   doesn't seem to set the error indicator, so we also don't.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getdelim(
     lineptr: *mut *mut c_char,
@@ -121,7 +121,7 @@ pub unsafe extern "C" fn getdelim(
         *n = count + 1;
         // The advantage in always realloc'ing is that even if the user supplies a wrong n, this
         // doesn't break
-        *lineptr = unsafe { stdlib::realloc(*lineptr as *mut c_void, *n) } as *mut c_char;
+        *lineptr = unsafe { stdlib::realloc((*lineptr).cast::<c_void>(), *n) }.cast::<c_char>();
         if unlikely(lineptr.is_null() && *n != 0usize) {
             // memory error; realloc returns NULL on alloc'ing 0 bytes
             ERRNO.set(ENOMEM);
@@ -129,10 +129,10 @@ pub unsafe extern "C" fn getdelim(
         }
 
         // Copy buf to lineptr
-        unsafe { ptr::copy(buf.as_ptr(), *lineptr as *mut u8, count) };
+        unsafe { ptr::copy(buf.as_ptr(), (*lineptr).cast::<u8>(), count) };
 
         // NUL terminate lineptr
-        unsafe { *lineptr.offset(count as isize) = 0 };
+        unsafe { *lineptr.add(count) = 0 };
 
         // TODO remove
         /*eprintln!(
