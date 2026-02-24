@@ -142,14 +142,13 @@ pub extern "C" fn abs(i: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/aligned_alloc.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void {
-    if size % alignment == 0 {
-        /* The size-is-multiple-of-alignment requirement is the only
-         * difference between aligned_alloc() and memalign(). */
-        unsafe { memalign(alignment, size) }
-    } else {
+    if alignment == 0 || size % alignment != 0 {
         platform::ERRNO.set(EINVAL);
-        ptr::null_mut()
+        return ptr::null_mut();
     }
+    /* The size-is-multiple-of-alignment requirement is the only
+     * difference between aligned_alloc() and memalign(). */
+    unsafe { memalign(alignment, size) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/at_quick_exit.html>.
