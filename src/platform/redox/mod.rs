@@ -31,8 +31,8 @@ use crate::{
             ENOMEM, ENOSYS, EOPNOTSUPP, EPERM, ERANGE,
         },
         fcntl::{
-            self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW, F_GETLK, F_RDLCK, F_SETLK,
-            F_SETLKW, F_UNLCK, F_WRLCK, flock,
+            self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW, F_GETLK, F_OFD_SETLK, F_RDLCK,
+            F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, flock,
         },
         limits,
         pthread::{pthread_cancel, pthread_create},
@@ -297,7 +297,8 @@ impl Pal for Sys {
 
     fn fcntl(fd: c_int, cmd: c_int, args: c_ulonglong) -> Result<c_int> {
         match cmd {
-            F_SETLK => {
+            F_SETLK | F_OFD_SETLK => {
+                let is_ofd = cmd == F_OFD_SETLK;
                 let flock = unsafe { &mut *(args as *mut flock) };
                 // let file_off = Self::lseek(fd, 0, SEEK_SET)?;
 
@@ -321,6 +322,7 @@ impl Pal for Sys {
                     c => unreachable!("{c}"),
                 };
 
+                let start = start | if is_ofd { 1 << 63 } else { 0 };
                 match flock.l_type as i32 {
                     F_UNLCK => {
                         let meta = StdFsCallMeta::new(StdFsCallKind::Unlock, start, len);
