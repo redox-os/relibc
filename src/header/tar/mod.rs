@@ -63,7 +63,7 @@ pub const TVERSLEN: usize = 2; // Length of the version string
 pub const XHDRTYPE: u8 = b'x'; // Extended header referring to the next file in the archive
 pub const XGLTYPE: u8 = b'g'; // Global extended header
 
-/// Reserved values for GNU tar extensions
+// Reserved values for GNU tar extensions
 // pub const GNUTYPE_DUMPDIR: u8 = b'D'; // Directory dump
 // pub const GNUTYPE_MULTIVOL: u8 = b'M'; // Multi-volume file
 // pub const GNUTYPE_LONGNAME: u8 = b'L'; // Long file name
