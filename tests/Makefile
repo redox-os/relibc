@@ -303,6 +303,7 @@ VARIED_NAMES=\
 	pthread/rwlock_randtest \
 	pthread/mutex_recursive \
 	pthread/timeout \
+	pthread/tls \
 	grp/getgrouplist \
 	grp/getgrgid_r \
 	grp/getgrnam_r \
