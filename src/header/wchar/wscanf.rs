@@ -475,8 +475,7 @@ unsafe fn inner_scanf(
 
                     // While we haven't used up all the width, and it matches
                     let mut data_stored = false;
-                    while width.map(|w| w > 0).unwrap_or(true)
-                        && !invert == matches.contains(&wchar)
+                    while width.map(|w| w > 0).unwrap_or(true) && invert != matches.contains(&wchar)
                     {
                         if let Some(ref mut ptr) = ptr {
                             unsafe { **ptr = wchar as c_char };

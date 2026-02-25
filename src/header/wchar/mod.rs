@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/wchar.h.html>.
 
-use core::{char, ffi::VaList as va_list, mem, ptr, slice, usize};
+use core::{char, ffi::VaList as va_list, mem, ptr, slice};
 
 use crate::{
     c_str::WStr,

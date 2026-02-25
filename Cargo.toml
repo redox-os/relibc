@@ -28,6 +28,7 @@ precedence = "deny"
 ptr_as_ptr = "warn" # TODO review occurrences
 ptr_cast_constness = "warn" # TODO review occurrences
 ref_as_ptr = "warn" # TODO review occurrences
+upper_case_acronyms = "allow" # TODO review occurrences
 zero_ptr = "warn" # must allow on public constants due to cbindgen issue
 
 [workspace.lints.rust]
