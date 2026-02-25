@@ -410,5 +410,5 @@ pub fn casemap(mut c: u32, dir: i32) -> wint_t {
             xn -= xn / 2;
         }
     }
-    return c0;
+    c0
 }
