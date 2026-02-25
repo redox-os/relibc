@@ -353,9 +353,9 @@ pub struct DSO {
 }
 
 impl DSO {
-    pub fn new<'a>(
+    pub fn new(
         path: &str,
-        data: &'a [u8],
+        data: &[u8],
         base_addr: Option<usize>,
         dlopened: bool,
         id: usize,

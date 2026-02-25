@@ -11,7 +11,7 @@ pub fn is(wc: usize) -> c_uchar {
     if wc < 0x2fffe {
         return 1;
     }
-    return 0;
+    0
 }
 
 const table: [c_uchar; 3904] = [

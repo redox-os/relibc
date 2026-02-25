@@ -1,7 +1,7 @@
 //UTF implementation parts for wchar.h.
 //Partially ported from the Sortix libc
 
-use core::{char, slice, str, usize};
+use core::{char, slice, str};
 
 use crate::{
     header::errno,
@@ -55,7 +55,7 @@ pub unsafe fn mbrtowc(pwc: *mut wchar_t, s: *const c_char, n: usize, ps: *mut mb
         return -1isize as usize;
     }
 
-    let slice = unsafe { slice::from_raw_parts(s as *const u8, size) };
+    let slice = unsafe { slice::from_raw_parts(s.cast::<u8>(), size) };
     let decoded = str::from_utf8(slice);
     if decoded.is_err() {
         platform::ERRNO.set(errno::EILSEQ);
@@ -84,7 +84,7 @@ pub unsafe fn wcrtomb(s: *mut c_char, wc: wchar_t, ps: *mut mbstate_t) -> usize 
 
     let c = dc.unwrap();
     let size = c.len_utf8();
-    let slice = unsafe { slice::from_raw_parts_mut(s as *mut u8, size) };
+    let slice = unsafe { slice::from_raw_parts_mut(s.cast::<u8>(), size) };
 
     c.encode_utf8(slice);
 
