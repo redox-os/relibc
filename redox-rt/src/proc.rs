@@ -4,10 +4,10 @@ use crate::{
     DYNAMIC_PROC_INFO, RtTcb, StaticProcInfo,
     arch::*,
     auxv_defs::*,
-    protocol::{ProcCall, ThreadCall},
     read_proc_meta,
     sys::{open, proc_call, thread_call},
 };
+use redox_protocols::protocol::{ProcCall, ThreadCall};
 
 use alloc::{boxed::Box, vec};
 

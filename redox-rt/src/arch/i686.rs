@@ -4,9 +4,9 @@ use syscall::*;
 
 use crate::{
     proc::{FdGuard, FdGuardUpper, ForkArgs, fork_inner},
-    protocol::{ProcCall, RtSigInfo},
     signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, inner_fastcall},
 };
+use redox_protocols::protocol::{ProcCall, RtSigInfo};
 
 use super::ForkScratchpad;
 

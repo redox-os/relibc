@@ -8,14 +8,14 @@ use syscall::{
 use crate::{
     RtTcb, Tcb,
     arch::*,
-    current_proc_fd,
-    protocol::{
-        ProcCall, RtSigInfo, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG,
-        SIGWINCH, ThreadCall,
-    },
-    static_proc_info,
+    current_proc_fd, static_proc_info,
     sync::Mutex,
     sys::{proc_call, this_thread_call},
+};
+
+use redox_protocols::protocol::{
+    ProcCall, RtSigInfo, SIGCHLD, SIGCONT, SIGKILL, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG,
+    SIGWINCH, ThreadCall,
 };
 
 #[cfg(target_arch = "x86_64")]

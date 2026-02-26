@@ -1,19 +1,22 @@
-use core::{slice, str};
+use core::{mem, slice, str};
 
 use alloc::vec::Vec;
 use ioslice::IoSlice;
-use redox_rt::{
-    protocol::{ProcKillTarget, SocketCall, WaitFlags},
-    sys::{WaitpidTarget, posix_read, posix_write},
+use redox_protocols::protocol::{ProcKillTarget, SocketCall, WaitFlags};
+use redox_rt::sys::{WaitpidTarget, posix_read, posix_write, std_fs_call_ro, std_fs_call_wo};
+use syscall::{
+    EMFILE, ENAMETOOLONG, ENOSYS, EOPNOTSUPP, Error, Result,
+    data::StdFsCallMeta,
+    dirent::{DirentHeader, DirentKind},
+    flag::StdFsCallKind,
 };
-use syscall::{EMFILE, Error, Result};
 
 use crate::{
     header::{
         bits_time::timespec, errno::EINVAL, signal::sigaction, sys_stat::UTIME_NOW, sys_uio::iovec,
     },
     out::Out,
-    platform::{PalSignal, types::*},
+    platform::{PalSignal, pal::Pal, types::*},
 };
 
 use super::Sys;
@@ -34,7 +37,7 @@ pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
         .map(|f| f as usize)
 }
 
-pub unsafe fn fstat(fd: usize, buf: *mut crate::header::sys_stat::stat) -> syscall::Result<()> {
+pub unsafe fn fstat(fd: usize, buf: *mut crate::header::sys_stat::stat) -> Result<()> {
     let mut redox_buf: syscall::Stat = Default::default();
     syscall::fstat(fd, &mut redox_buf)?;
 
