@@ -136,9 +136,9 @@ pub unsafe extern "C" fn fnmatch(
     while unsafe { *input.offset(len) != 0 } {
         len += 1;
     }
-    let input = unsafe { slice::from_raw_parts(input as *const u8, len as usize) };
+    let input = unsafe { slice::from_raw_parts(input.cast::<u8>(), len as usize) };
 
-    let tokens = unsafe { tokenize(pattern as *const u8, flags) };
+    let tokens = unsafe { tokenize(pattern.cast::<u8>(), flags) };
 
     if PosixRegex::new(Cow::Owned(tokens))
         .case_insensitive(flags & FNM_CASEFOLD == FNM_CASEFOLD)

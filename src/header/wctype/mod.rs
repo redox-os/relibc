@@ -107,7 +107,7 @@ pub extern "C" fn iswlower(wc: wint_t) -> c_int {
 #[unsafe(no_mangle)]
 pub extern "C" fn iswprint(wc: wint_t) -> c_int {
     if wc < 0xff {
-        c_int::from((wc + 1 & 0x7f) >= 0x21)
+        c_int::from(((wc + 1) & 0x7f) >= 0x21)
     } else if wc < 0x2028
         || wc.wrapping_sub(0x202a) < 0xd800 - 0x202a
         || wc.wrapping_sub(0xe000) < 0xfff9 - 0xe000

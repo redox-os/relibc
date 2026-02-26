@@ -20,7 +20,7 @@ typedef int suseconds_t;
 typedef long clock_t;
 typedef int clockid_t;
 typedef void* timer_t;
-typedef unsigned long int blkcnt_t;
+typedef long long blkcnt_t;
 
 typedef unsigned long int fsblkcnt_t;
 typedef unsigned long int fsfilcnt_t;

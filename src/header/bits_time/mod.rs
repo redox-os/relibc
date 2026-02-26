@@ -16,12 +16,8 @@ impl timespec {
 
     /// similar logic with timeradd
     pub fn add(base: timespec, interval: timespec) -> Option<timespec> {
-        let Some(delta_sec) = base.tv_sec.checked_add(interval.tv_sec) else {
-            return None;
-        };
-        let Some(delta_nsec) = base.tv_nsec.checked_add(interval.tv_nsec) else {
-            return None;
-        };
+        let delta_sec = base.tv_sec.checked_add(interval.tv_sec)?;
+        let delta_nsec = base.tv_nsec.checked_add(interval.tv_nsec)?;
 
         if delta_sec < 0 || delta_nsec < 0 {
             return None;
@@ -34,12 +30,8 @@ impl timespec {
     }
     /// similar logic with timersub
     pub fn subtract(later: timespec, earlier: timespec) -> Option<timespec> {
-        let Some(delta_sec) = later.tv_sec.checked_sub(earlier.tv_sec) else {
-            return None;
-        };
-        let Some(delta_nsec) = later.tv_nsec.checked_sub(earlier.tv_nsec) else {
-            return None;
-        };
+        let delta_sec = later.tv_sec.checked_sub(earlier.tv_sec)?;
+        let delta_nsec = later.tv_nsec.checked_sub(earlier.tv_nsec)?;
 
         let time = if delta_nsec < 0 {
             let roundup_sec = -delta_nsec / NANOSECONDS + 1;
@@ -63,7 +55,7 @@ impl timespec {
         Some(time)
     }
     pub fn is_default(&self) -> bool {
-        return self.tv_nsec == 0 && self.tv_sec == 0;
+        self.tv_nsec == 0 && self.tv_sec == 0
     }
 }
 

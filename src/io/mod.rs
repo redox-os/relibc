@@ -365,7 +365,7 @@ fn read_to_end_with_reservation<R: Read + ?Sized>(
     let start_len = buf.len();
     let mut g = Guard {
         len: buf.len(),
-        buf: buf,
+        buf,
     };
     let ret;
     loop {
@@ -916,10 +916,7 @@ pub trait Read {
     where
         Self: Sized,
     {
-        Take {
-            inner: self,
-            limit: limit,
-        }
+        Take { inner: self, limit }
     }
 }
 
@@ -1406,7 +1403,7 @@ impl<T: BufRead, U: BufRead> BufRead for Chain<T, U> {
     fn fill_buf(&mut self) -> Result<&[u8]> {
         if !self.done_first {
             match self.first.fill_buf()? {
-                buf if buf.is_empty() => {
+                [] => {
                     self.done_first = true;
                 }
                 buf => return Ok(buf),

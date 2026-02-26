@@ -19,7 +19,7 @@ pub unsafe extern "C" fn login_tty(fd: c_int) -> c_int {
         sys_ioctl::ioctl(
             fd,
             sys_ioctl::TIOCSCTTY,
-            &mut arg as *mut c_int as *mut c_void,
+            core::ptr::from_mut::<c_int>(&mut arg).cast::<c_void>(),
         )
     } != 0
     {

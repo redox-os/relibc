@@ -353,9 +353,9 @@ pub struct DSO {
 }
 
 impl DSO {
-    pub fn new<'a>(
+    pub fn new(
         path: &str,
-        data: &'a [u8],
+        data: &[u8],
         base_addr: Option<usize>,
         dlopened: bool,
         id: usize,
@@ -558,7 +558,6 @@ impl DSO {
                     );
                 }
                 log::trace!("    = {:p}", ptr);
-                ptr::write_bytes(ptr.cast::<u8>(), 0, size);
                 _r_debug
                     .lock()
                     .insert(ptr as usize, path, ptr as usize + l_ld as usize);

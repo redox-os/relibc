@@ -107,7 +107,7 @@ pub unsafe extern "C" fn a64l(s: *const c_char) -> c_long {
             _ => return 0, // Early return for anything else
         };
 
-        l |= i32::from(digit_value) << 6 * i;
+        l |= i32::from(digit_value) << (6 * i);
     }
 
     c_long::from(l)
@@ -142,14 +142,13 @@ pub extern "C" fn abs(i: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/aligned_alloc.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void {
-    if size % alignment == 0 {
-        /* The size-is-multiple-of-alignment requirement is the only
-         * difference between aligned_alloc() and memalign(). */
-        unsafe { memalign(alignment, size) }
-    } else {
+    if alignment == 0 || size % alignment != 0 {
         platform::ERRNO.set(EINVAL);
-        ptr::null_mut()
+        return ptr::null_mut();
     }
+    /* The size-is-multiple-of-alignment requirement is the only
+     * difference between aligned_alloc() and memalign(). */
+    unsafe { memalign(alignment, size) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/at_quick_exit.html>.
@@ -586,7 +585,7 @@ pub unsafe extern "C" fn l64a(value: c_long) -> *mut c_char {
 
     for i in 0..num_output_digits {
         // Conversion to c_char always succeeds for the range 0..=63
-        let digit_value = c_char::try_from((value_as_i32 >> 6 * i) & 63).unwrap();
+        let digit_value = c_char::try_from((value_as_i32 >> (6 * i)) & 63).unwrap();
 
         (unsafe { L64A_BUFFER.unsafe_mut() })[i] = match digit_value {
             0..=11 => {

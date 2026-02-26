@@ -66,7 +66,7 @@ pub unsafe extern "C" fn if_indextoname(idx: c_uint, buf: *mut c_char) -> *const
 /// The end of the list is determined by an if_nameindex struct having if_index 0 and if_name NULL
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn if_nameindex() -> *const if_nameindex {
-    &INTERFACES[0] as *const if_nameindex
+    core::ptr::from_ref::<if_nameindex>(&INTERFACES[0])
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/if_nametoindex.html>.
@@ -76,7 +76,7 @@ pub unsafe extern "C" fn if_nameindex() -> *const if_nameindex {
 /// An invalid name string will return an index of 0
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn if_nametoindex(name: *const c_char) -> c_uint {
-    if name == null::<c_char>() {
+    if name.is_null() {
         return 0;
     }
     let name = unsafe { CStr::from_ptr(name).to_str().unwrap_or("") };

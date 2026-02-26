@@ -73,7 +73,7 @@ pub fn crypt_blowfish(passw: &str, setting: &str) -> Option<String> {
 
         // We only consider the first 72 chars; truncate if necessary.
         let passw_t = if vec.len() > 72 { &vec[..72] } else { &vec };
-        let passw: &[c_uchar] = &passw_t;
+        let passw: &[c_uchar] = passw_t;
         let setting = setting.as_bytes();
         let mut output = vec![0; BHASH_OUTPUT_SIZE + 1];
 

@@ -232,7 +232,7 @@ pub use self::rwlock::*;
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_self.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_self() -> pthread_t {
-    (unsafe { pthread::current_thread().unwrap_unchecked() }) as *const _ as *mut _
+    core::ptr::from_ref(unsafe { pthread::current_thread().unwrap_unchecked() }) as *mut _
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_setcancelstate.html>.

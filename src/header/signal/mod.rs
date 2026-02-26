@@ -225,7 +225,7 @@ pub unsafe extern "C" fn sigaddset(set: *mut sigset_t, signo: c_int) -> c_int {
         return -1;
     }
 
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
+    if let Some(set) = unsafe { (set.cast::<SigSet>()).as_mut() } {
         set.insert(signo as usize - 1); // 0-indexed usize, please!
     }
     0
@@ -251,7 +251,7 @@ pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
         return -1;
     }
 
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
+    if let Some(set) = unsafe { (set.cast::<SigSet>()).as_mut() } {
         set.remove(signo as usize - 1); // 0-indexed usize, please!
     }
     0
@@ -260,7 +260,7 @@ pub unsafe extern "C" fn sigdelset(set: *mut sigset_t, signo: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigemptyset.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
+    if let Some(set) = unsafe { (set.cast::<SigSet>()).as_mut() } {
         set.clear();
     }
     0
@@ -269,7 +269,7 @@ pub unsafe extern "C" fn sigemptyset(set: *mut sigset_t) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigfillset.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigfillset(set: *mut sigset_t) -> c_int {
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
+    if let Some(set) = unsafe { (set.cast::<SigSet>()).as_mut() } {
         set.fill(.., true);
     }
     0
@@ -303,7 +303,7 @@ pub extern "C" fn sigignore(sig: c_int) -> c_int {
     let mut sa = unsafe { psa.assume_init() };
     sa.sa_handler = unsafe { mem::transmute(SIG_IGN) };
     sa.sa_flags = 0;
-    unsafe { sigaction(sig, &mut sa, ptr::null_mut()) }
+    unsafe { sigaction(sig, &sa, ptr::null_mut()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/siginterrupt.html>.
@@ -320,7 +320,7 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
         sa.sa_flags |= SA_RESTART as c_int;
     }
 
-    unsafe { sigaction(sig, &mut sa, ptr::null_mut()) }
+    unsafe { sigaction(sig, &sa, ptr::null_mut()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigismember.html>.
@@ -333,10 +333,10 @@ pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_in
         return -1;
     }
 
-    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() } {
-        if set.contains(signo as usize - 1) {
-            return 1;
-        }
+    if let Some(set) = unsafe { (set as *mut SigSet).as_mut() }
+        && set.contains(signo as usize - 1)
+    {
+        return 1;
     }
     0
 }
@@ -391,7 +391,7 @@ pub unsafe extern "C" fn sigpending(set: *mut sigset_t) -> c_int {
 // 32 and 33 (same as NPTL reserves), whereas this on Redox is 33 and 34 (TODO: could this be
 // changed to 32 and 33 for Redox too, since there's currently no support for "sigqueue" targeting
 // specific threads).
-const RLCT_SIGNAL_MASK: sigset_t = (1 << ((SIGRTMIN - 1) - 1)) | (1 << (SIGRTMIN - 2) - 1);
+const RLCT_SIGNAL_MASK: sigset_t = (1 << ((SIGRTMIN - 1) - 1)) | (1 << ((SIGRTMIN - 2) - 1));
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigprocmask.html>.
 #[unsafe(no_mangle)]
@@ -432,7 +432,7 @@ pub unsafe extern "C" fn sigrelse(sig: c_int) -> c_int {
     if unsafe { sigaddset(&mut set, sig) } < 0 {
         return -1;
     }
-    unsafe { sigprocmask(SIG_UNBLOCK, &mut set, ptr::null_mut()) }
+    unsafe { sigprocmask(SIG_UNBLOCK, &set, ptr::null_mut()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
@@ -463,7 +463,7 @@ pub unsafe extern "C" fn sigset(
         };
         if is_equal {
             if unsafe { sigaction(sig, ptr::null_mut(), old_sa.as_mut_ptr()) } < 0
-                || unsafe { sigprocmask(SIG_BLOCK, &mut set, &mut set) } < 0
+                || unsafe { sigprocmask(SIG_BLOCK, &set, &mut set) } < 0
             {
                 mem::forget(old_sa);
                 return sig_err;
@@ -477,14 +477,14 @@ pub unsafe extern "C" fn sigset(
             };
             unsafe { sigemptyset(&mut sa.sa_mask) };
             if unsafe { sigaction(sig, &sa, old_sa.as_mut_ptr()) } < 0
-                || unsafe { sigprocmask(SIG_UNBLOCK, &mut set, &mut set) } < 0
+                || unsafe { sigprocmask(SIG_UNBLOCK, &set, &mut set) } < 0
             {
                 mem::forget(old_sa);
                 return sig_err;
             }
         }
     }
-    if unsafe { sigismember(&mut set, sig) } == 1 {
+    if unsafe { sigismember(&set, sig) } == 1 {
         return sig_hold;
     }
     unsafe { old_sa.assume_init().sa_handler }

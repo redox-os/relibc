@@ -488,7 +488,10 @@ fn parse_am_pm(s: &str) -> Option<(bool, usize)> {
 fn parse_weekday(s: &str, abbrev: bool) -> Option<(usize, usize)> {
     let list = if abbrev { &SHORT_DAYS } else { &LONG_DAYS };
     for (i, name) in list.iter().enumerate() {
-        if s.len() >= name.len() && s[0..name.len()].eq_ignore_ascii_case(name) {
+        if s.len() >= name.len()
+            && s.get(0..name.len())
+                .map_or(false, |sub| sub.eq_ignore_ascii_case(name))
+        {
             return Some((i, name.len()));
         }
     }
@@ -502,7 +505,10 @@ fn parse_weekday(s: &str, abbrev: bool) -> Option<(usize, usize)> {
 fn parse_month(s: &str, abbrev: bool) -> Option<(usize, usize)> {
     let list = if abbrev { &SHORT_MONTHS } else { &LONG_MONTHS };
     for (i, name) in list.iter().enumerate() {
-        if s.len() >= name.len() && s[0..name.len()].eq_ignore_ascii_case(name) {
+        if s.len() >= name.len()
+            && s.get(0..name.len())
+                .map_or(false, |sub| sub.eq_ignore_ascii_case(name))
+        {
             return Some((i, name.len()));
         }
     }

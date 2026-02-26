@@ -117,7 +117,7 @@ impl<'a, T: Kind> NulStr<'a, T> {
     /// The ptr must be valid up to and including the first NUL byte from the base ptr.
     pub const unsafe fn from_ptr(ptr: *const T::C) -> Self {
         Self {
-            ptr: unsafe { NonNull::new_unchecked(ptr as *mut T::C) },
+            ptr: unsafe { NonNull::new_unchecked(ptr.cast_mut()) },
             _marker: PhantomData,
         }
     }
