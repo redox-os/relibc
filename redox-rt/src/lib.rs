@@ -265,15 +265,14 @@ pub fn current_proc_fd() -> &'static FdGuardUpper {
     info.proc_fd.as_ref().unwrap()
 }
 #[inline]
-pub fn current_namespace_fd() -> usize {
+pub fn current_namespace_fd() -> syscall::Result<usize> {
     DYNAMIC_PROC_INFO
         .lock()
         .ns_fd
         .as_ref()
         .map(|g| g.as_raw_fd())
-        .unwrap_or(usize::MAX)
+        .ok_or(syscall::Error::new(syscall::ENOENT))
 }
-
 struct ChildHookCommonArgs {
     new_thr_fd: FdGuard,
     new_proc_fd: Option<FdGuard>,
