@@ -7,6 +7,7 @@ use core::{
 use ioslice::IoSlice;
 use syscall::{
     CallFlags, EINVAL, ERESTART, TimeSpec,
+    data::StdFsCallMeta,
     error::{self, EINTR, ENODEV, ESRCH, Error, Result},
 };
 
@@ -516,4 +517,13 @@ pub fn register_scheme_to_ns(ns_fd: usize, name: &str, cap_fd: usize) -> Result<
     let cap_bytes = cap_fd.to_ne_bytes();
     ns_this_scheme.call_wo(&cap_bytes, CallFlags::FD, &[])?;
     Ok(())
+}
+pub fn std_fs_call_ro(fd: usize, payload: &mut [u8], metadata: &StdFsCallMeta) -> Result<usize> {
+    sys_call_ro(fd, payload, CallFlags::STD_FS, metadata)
+}
+pub fn std_fs_call_wo(fd: usize, payload: &[u8], metadata: &StdFsCallMeta) -> Result<usize> {
+    sys_call_wo(fd, payload, CallFlags::STD_FS, metadata)
+}
+pub fn std_fs_call_rw(fd: usize, payload: &mut [u8], metadata: &StdFsCallMeta) -> Result<usize> {
+    sys_call_rw(fd, payload, CallFlags::STD_FS, metadata)
 }

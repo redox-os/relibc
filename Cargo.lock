@@ -474,8 +474,8 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.7.2"
-source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=enable-all-stdfscall#09dacc245c4333fbedde744e299ec3a930f622dc"
+version = "0.7.3"
+source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=enable-all-stdfscall#68b511f7a08471ee25e11019c4002924178c4f80"
 dependencies = [
  "bitflags",
 ]
