@@ -35,10 +35,7 @@ unsafe fn langinfo_to_str(item: nl_item) -> &'static str {
     if ptr.is_null() {
         return "";
     }
-    match unsafe { CStr::from_ptr(ptr) }.to_str() {
-        Ok(s) => s,
-        Err(_) => "",
-    }
+    unsafe { CStr::from_ptr(ptr) }.to_str().unwrap_or_default()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strftime.html>.
@@ -116,26 +113,26 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
                 // Abbreviated weekday name: %a
                 b'a' => {
                     // `ABDAY_1 + tm_wday` is the correct langinfo ID for abbreviated weekdays
-                    let s = unsafe { langinfo_to_str(ABDAY_1 + (*t).tm_wday as i32) };
+                    let s = unsafe { langinfo_to_str(ABDAY_1 + (*t).tm_wday) };
                     w!(s);
                 }
 
                 // Full weekday name: %A
                 b'A' => {
                     // `DAY_1 + tm_wday` is the correct langinfo ID for full weekdays
-                    let s = unsafe { langinfo_to_str(DAY_1 + (*t).tm_wday as i32) };
+                    let s = unsafe { langinfo_to_str(DAY_1 + (*t).tm_wday) };
                     w!(s);
                 }
 
                 // Abbreviated month name: %b or %h
                 b'b' | b'h' => {
-                    let s = unsafe { langinfo_to_str(ABMON_1 + (*t).tm_mon as i32) };
+                    let s = unsafe { langinfo_to_str(ABMON_1 + (*t).tm_mon) };
                     w!(s);
                 }
 
                 // Full month name: %B
                 b'B' => {
-                    let s = unsafe { langinfo_to_str(MON_1 + (*t).tm_mon as i32) };
+                    let s = unsafe { langinfo_to_str(MON_1 + (*t).tm_mon) };
                     w!(s);
                 }
 
@@ -204,7 +201,7 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
                 b'R' => w!(recurse "%H:%M"),
 
                 // Seconds since the Epoch: %s => calls mktime() to convert tm to time_t
-                b's' => w!("{}", unsafe { super::mktime(t as *mut tm) }),
+                b's' => w!("{}", unsafe { super::mktime(t.cast_mut()) }),
 
                 // Seconds (00-60): %S (unchanged)
                 b'S' => w!("{:02}", unsafe { (*t).tm_sec }),
@@ -285,7 +282,7 @@ pub unsafe fn strftime<W: WriteByte>(w: &mut W, format: *const c_char, t: *const
 /// ## Source
 /// https://en.wikipedia.org/wiki/ISO_week_date
 fn weeks_per_year(year: c_int) -> c_int {
-    let year = year as f64;
+    let year = f64::from(year);
     let p_y = (year + (year / 4.) - (year / 100.) + (year / 400.)) as c_int % 7;
     if p_y == 4 { 53 } else { 52 }
 }
