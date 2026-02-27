@@ -361,10 +361,10 @@ impl DSO {
         id: usize,
         tls_module_id: usize,
         tls_offset: usize,
-    ) -> object::Result<(DSO, Option<Master>, Vec<ProgramHeader>)> {
-        let elf = ElfFile::parse(data).unwrap();
+    ) -> Result<(DSO, Option<Master>, Vec<ProgramHeader>), String> {
+        let elf = ElfFile::parse(data).map_err(|err| err.to_string())?;
         let (mmap, tcb_master, dynamic) =
-            DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset).unwrap();
+            DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset)?;
 
         let name = match dynamic.soname {
             Some(soname) => soname.to_string(),
@@ -480,7 +480,7 @@ impl DSO {
         data: &'a [u8],
         base_addr: Option<usize>,
         tls_offset: usize,
-    ) -> object::Result<(&'static [u8], Option<Master>, Dynamic<'static>)> {
+    ) -> Result<(&'static [u8], Option<Master>, Dynamic<'static>), String> {
         let endian = elf.endian();
         log::trace!("# {}", path);
         // data for struct LinkMap
@@ -514,9 +514,7 @@ impl DSO {
                     _ => (),
                 }
             }
-            bounds_opt
-                .ok_or("Unable to find PT_LOAD section".to_string())
-                .unwrap()
+            bounds_opt.ok_or_else(|| "Unable to find PT_LOAD section".to_string())?
         };
         log::trace!("  bounds {:#x}, {:#x}", bounds.0, bounds.1);
         // Allocate memory
@@ -548,8 +546,7 @@ impl DSO {
                     -1,
                     0,
                 )
-                .map_err(|e| format!("failed to map {}. errno: {}", path, e.0))
-                .unwrap();
+                .map_err(|e| format!("failed to map {}. errno: {}", path, e.0))?;
 
                 if !(start as *mut c_void).is_null() {
                     assert_eq!(
@@ -582,7 +579,7 @@ impl DSO {
                         let range = offset..(offset + size as usize);
                         match data.get(range.clone()) {
                             Some(some) => some,
-                            None => return Err(format!("failed to read {:x?}", range)).unwrap(),
+                            None => return Err(format!("failed to read {:x?}", range)),
                         }
                     };
 
@@ -597,7 +594,7 @@ impl DSO {
                         match mmap.get_mut(range.clone()) {
                             Some(some) => some,
                             None => {
-                                return Err(format!("failed to write {:x?}", range)).unwrap();
+                                return Err(format!("failed to write {:x?}", range));
                             }
                         }
                     };
@@ -630,17 +627,25 @@ impl DSO {
                     log::trace!("  tcb master {:x?}", tcb_master);
                 }
 
-                elf::PT_DYNAMIC => dynamic = Some((ph, ph.dynamic(endian, data).unwrap().unwrap())),
+                elf::PT_DYNAMIC => {
+                    let entries = ph
+                        .dynamic(endian, data)
+                        .map_err(|err| err.to_string())?
+                        .ok_or_else(|| "Unable to parse PT_DYNAMIC section".to_string())?;
+                    dynamic = Some((ph, entries));
+                }
                 _ => (),
             }
         }
 
-        let (parsed_dynamic, debug) =
-            Self::parse_dynamic(path, mmap, is_pie_enabled(elf), dynamic.unwrap())?;
+        let dynamic = dynamic.ok_or_else(|| "Unable to find PT_DYNAMIC section".to_string())?;
+
+        let (parsed_dynamic, debug) = Self::parse_dynamic(path, mmap, is_pie_enabled(elf), dynamic)
+            .map_err(|e| e.to_string())?;
 
         if let Some(i) = debug {
             // FIXME: cleanup
-            let (ph, _) = dynamic.unwrap();
+            let (ph, _) = dynamic;
             let vaddr = ph.p_vaddr(endian) as usize;
             let bytes: [u8; size_of::<Dyn>() / 2] =
                 ((&raw const _r_debug).cast::<*const RTLDDebug>() as usize).to_ne_bytes();
