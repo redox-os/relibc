@@ -15,7 +15,7 @@ pub unsafe fn introsort(
 
 // NOTE: if num is 0, the result should be considered undefined
 fn log2(num: size_t) -> size_t {
-    const IS_32_BIT: bool = size_t::max_value() as u32 as size_t == size_t::max_value();
+    const IS_32_BIT: bool = size_t::MAX as u32 as size_t == size_t::MAX;
 
     let max_bits = if IS_32_BIT {
         31
@@ -229,8 +229,8 @@ unsafe fn swap(mut ptr1: *mut c_char, mut ptr2: *mut c_char, mut width: size_t) 
 
     let mut buffer = mem::MaybeUninit::<[c_char; BUFSIZE]>::uninit();
     while width > 0 {
-        let copy_size = BUFSIZE.min(width as usize);
-        let buf = buffer.as_mut_ptr() as *mut c_char;
+        let copy_size = BUFSIZE.min(width);
+        let buf = buffer.as_mut_ptr().cast::<c_char>();
 
         unsafe {
             buf.copy_from_nonoverlapping(ptr1, copy_size);
