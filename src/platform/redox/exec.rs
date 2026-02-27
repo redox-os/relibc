@@ -368,21 +368,29 @@ where
         args_offset.map(NonZeroUsize::get),
         args_offset_u64.map(NonZeroU64::get),
     ) {
-        let len = offset - interp_offset - 1;
-        let len_u64 = offset_u64 - interp_offset_u64 - 1;
+        let len = offset - interp_offset;
+        let len_u64 = offset_u64 - interp_offset_u64;
         let mut args = Vec::with_capacity(len);
 
-        // Eat initial whitespace
-        reader.consume(1);
         reader
             .take(len_u64)
             .read_to_end(&mut args)
             .map_err(|_| Error::new(E2BIG))?;
+
         // Eat '\n'
         reader.consume(1);
 
-        let args = CString::new(args).map_err(|_| Error::new(ENOEXEC))?;
-        Some(args)
+        let mut arg_start = 0;
+        while arg_start < args.len() && (args[arg_start] == b' ' || args[arg_start] == b'\t') {
+            arg_start += 1;
+        }
+
+        if arg_start < args.len() {
+            let args = CString::new(&args[arg_start..]).map_err(|_| Error::new(ENOEXEC))?;
+            Some(args)
+        } else {
+            None
+        }
     } else {
         None
     };
