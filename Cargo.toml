@@ -20,6 +20,7 @@ members = [
 exclude = ["tests", "dlmalloc-rs"]
 
 [workspace.lints.clippy]
+borrow_as_ptr = "warn" # TODO review occurrences
 cast_lossless = "warn" # TODO review occurrences
 cast_ptr_alignment = "warn" # TODO review occurrences
 missing_safety_doc = "allow" # TODO review occurrences
