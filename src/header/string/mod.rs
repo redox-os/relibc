@@ -2,7 +2,7 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/string.h.html>.
 
-use core::{iter::once, mem, ptr, slice, usize};
+use core::{iter::once, mem, ptr, slice};
 
 use cbitset::BitSet256;
 
@@ -41,7 +41,7 @@ pub unsafe extern "C" fn memccpy(
     if to.is_null() {
         ptr::null_mut()
     } else {
-        unsafe { (s1 as *mut u8).add(dist) as *mut c_void }
+        unsafe { s1.cast::<u8>().add(dist).cast::<c_void>() }
     }
 }
 
@@ -52,7 +52,7 @@ pub unsafe extern "C" fn memchr(
     needle: c_int,
     len: size_t,
 ) -> *mut c_void {
-    let haystack = unsafe { slice::from_raw_parts(haystack as *const u8, len as usize) };
+    let haystack = unsafe { slice::from_raw_parts(haystack.cast::<u8>(), len) };
 
     match memchr::memchr(needle as u8, haystack) {
         Some(index) => haystack[index..].as_ptr() as *mut c_void,
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) 
                 let c = unsafe { *(a.cast::<u8>()).add(i) };
                 let d = unsafe { *(b.cast::<u8>()).add(i) };
                 if c != d {
-                    return c as c_int - d as c_int;
+                    return c_int::from(c) - c_int::from(d);
                 }
             }
             unreachable!()
@@ -87,7 +87,7 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) 
     let mut b = b.cast::<u8>();
     for _ in 0..rem {
         if unsafe { *a } != unsafe { *b } {
-            return unsafe { *a } as c_int - unsafe { *b } as c_int;
+            return c_int::from(unsafe { *a }) - c_int::from(unsafe { *b });
         }
         a = unsafe { a.offset(1) };
         b = unsafe { b.offset(1) };
@@ -106,7 +106,7 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -> *mut c_void {
     for i in 0..n {
-        unsafe { *(s1 as *mut u8).add(i) = *(s2 as *const u8).add(i) };
+        unsafe { *s1.cast::<u8>().add(i) = *s2.cast::<u8>().add(i) };
     }
     s1
 }
@@ -151,18 +151,18 @@ pub unsafe extern "C" fn memmem(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/memmove.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memmove(s1: *mut c_void, s2: *const c_void, n: size_t) -> *mut c_void {
-    if s2 < s1 as *const c_void {
+    if s2 < s1.cast_const() {
         // copy from end
         let mut i = n;
         while i != 0 {
             i -= 1;
-            unsafe { *(s1 as *mut u8).add(i) = *(s2 as *const u8).add(i) };
+            unsafe { *s1.cast::<u8>().add(i) = *s2.cast::<u8>().add(i) };
         }
     } else {
         // copy from beginning
         let mut i = 0;
         while i < n {
-            unsafe { *(s1 as *mut u8).add(i) = *(s2 as *const u8).add(i) };
+            unsafe { *s1.cast::<u8>().add(i) = *s2.cast::<u8>().add(i) };
             i += 1;
         }
     }
@@ -176,7 +176,7 @@ pub unsafe extern "C" fn memrchr(
     needle: c_int,
     len: size_t,
 ) -> *mut c_void {
-    let haystack = unsafe { slice::from_raw_parts(haystack as *const u8, len as usize) };
+    let haystack = unsafe { slice::from_raw_parts(haystack.cast::<u8>(), len) };
 
     match memchr::memrchr(needle as u8, haystack) {
         Some(index) => haystack[index..].as_ptr() as *mut c_void,
@@ -188,7 +188,7 @@ pub unsafe extern "C" fn memrchr(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_void {
     for i in 0..n {
-        unsafe { *(s as *mut u8).add(i) = c as u8 };
+        unsafe { *s.cast::<u8>().add(i) = c as u8 };
     }
     s
 }
@@ -316,8 +316,8 @@ pub unsafe extern "C" fn strcpy(dst: *mut c_char, src: *const c_char) -> *mut c_
 }
 
 pub unsafe fn inner_strspn(s1: *const c_char, s2: *const c_char, cmp: bool) -> size_t {
-    let mut s1 = s1 as *const u8;
-    let mut s2 = s2 as *const u8;
+    let mut s1 = s1.cast::<u8>();
+    let mut s2 = s2.cast::<u8>();
 
     // The below logic is effectively ripped from the musl implementation. It
     // works by placing each byte as it's own bit in an array of numbers. Each
@@ -369,7 +369,7 @@ pub unsafe extern "C" fn strerror_l(errnum: c_int, _loc: locale_t) -> *mut c_cha
         None => w.write_fmt(format_args!("Unknown error {}", errnum)),
     };
 
-    (unsafe { strerror_buf.unsafe_mut().as_mut_ptr() }) as *mut c_char
+    (unsafe { strerror_buf.unsafe_mut().as_mut_ptr() }).cast::<c_char>()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strerror.html>.
@@ -386,12 +386,12 @@ pub unsafe extern "C" fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: siz
 
     if len >= buflen {
         if buflen != 0 {
-            unsafe { memcpy(buf as *mut c_void, msg as *const c_void, buflen - 1) };
+            unsafe { memcpy(buf.cast::<c_void>(), msg as *const c_void, buflen - 1) };
             unsafe { *buf.add(buflen - 1) = 0 };
         }
         return ERANGE as c_int;
     }
-    unsafe { memcpy(buf as *mut c_void, msg as *const c_void, len + 1) };
+    unsafe { memcpy(buf.cast::<c_void>(), msg as *const c_void, len + 1) };
 
     0
 }
@@ -400,7 +400,7 @@ pub unsafe extern "C" fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: siz
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strlcat(dst: *mut c_char, src: *const c_char, dstsize: size_t) -> size_t {
     let dst_len = unsafe { strnlen(dst, dstsize) };
-    let d = unsafe { dst.offset(dst_len as isize) };
+    let d = unsafe { dst.add(dst_len) };
     let src_len = unsafe { strlcpy(d, src, dstsize - dst_len) };
     src_len + if dst_len > dstsize { dstsize } else { dst_len }
 }
@@ -481,7 +481,7 @@ pub unsafe extern "C" fn strncmp(s1: *const c_char, s2: *const c_char, n: size_t
         let a = unsafe { *s1.add(i) } as u8;
         let b = unsafe { *s2.add(i) } as u8;
         if a != b || a == 0 {
-            return (a as c_int) - (b as c_int);
+            return c_int::from(a) - c_int::from(b);
         }
     }
 
@@ -501,7 +501,7 @@ pub unsafe extern "C" fn strndup(s1: *const c_char, size: size_t) -> *mut c_char
     let len = unsafe { strnlen(s1, size) };
 
     // the "+ 1" is to account for the NUL byte
-    let buffer = unsafe { platform::alloc(len + 1) } as *mut c_char;
+    let buffer = unsafe { platform::alloc(len + 1) }.cast::<c_char>();
     if buffer.is_null() {
         platform::ERRNO.set(ENOMEM as c_int);
     } else {
@@ -536,7 +536,7 @@ pub unsafe extern "C" fn strnlen_s(s: *const c_char, size: size_t) -> size_t {
 pub unsafe extern "C" fn strpbrk(s1: *const c_char, s2: *const c_char) -> *mut c_char {
     let p = unsafe { s1.add(strcspn(s1, s2)) };
     if unsafe { *p } != 0 {
-        p as *mut c_char
+        p.cast_mut()
     } else {
         ptr::null_mut()
     }
@@ -550,7 +550,7 @@ pub unsafe extern "C" fn strrchr(s: *const c_char, c: c_int) -> *mut c_char {
     let mut i = len - 1;
     while i >= 0 {
         if unsafe { *s.offset(i) } == c {
-            return unsafe { s.offset(i) } as *mut c_char;
+            return unsafe { s.offset(i) }.cast_mut();
         }
         i -= 1;
     }
@@ -582,7 +582,7 @@ unsafe fn inner_strstr(
         loop {
             if unsafe { *needle.offset(i) } == 0 {
                 // We reached the end of the needle, everything matches this far
-                return haystack as *mut c_char;
+                return haystack.cast_mut();
             }
             if unsafe { *haystack.offset(i) } & mask != unsafe { *needle.offset(i) } & mask {
                 break;
