@@ -65,7 +65,7 @@ impl State {
     pub unsafe fn seed(&mut self, seed: c_uint) {
         unsafe { self.ensure_x_ptr_init() };
 
-        let mut s = seed as u64;
+        let mut s = u64::from(seed);
 
         if self.n == 0 {
             unsafe { *self.x_ptr = (s as u32).to_ne_bytes() };
