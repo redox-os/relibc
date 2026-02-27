@@ -41,19 +41,31 @@ impl Stack {
 }
 
 unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut c_char> {
+    use crate::header::string::strlen;
+
     let mut vec = Vec::with_capacity(len + 1);
+    let mut size = 0;
     for i in 0..len {
         let item = unsafe { *array.add(i) };
-        let mut len = 0;
-        while unsafe { *item.add(len) } != 0 {
-            len += 1;
+        size += unsafe { strlen(item) } + 1;
+    }
+
+    // Programs unfortunately rely on the strings being contiguous in memory. For example:
+    // https://github.com/libuv/libuv/blob/12d0dd48e3c6baf1e2f0d9f85f11f0ef58285d6f/src/unix/proctitle.c#L87
+    let mut offset = 0;
+    let buf = unsafe { platform::alloc(size).cast::<c_char>() };
+
+    for i in 0..len {
+        let dest_buf = unsafe { buf.add(offset) };
+        let item = unsafe { *array.add(i) };
+        let len = unsafe { strlen(item) } + 1;
+
+        unsafe {
+            ptr::copy_nonoverlapping(item, dest_buf, len);
         }
 
-        let buf = unsafe { platform::alloc(len + 1) }.cast::<c_char>();
-        for i in 0..=len {
-            unsafe { *buf.add(i) = *item.add(i) };
-        }
-        vec.push(buf);
+        vec.push(dest_buf);
+        offset += len;
     }
     vec.push(ptr::null_mut());
     vec
