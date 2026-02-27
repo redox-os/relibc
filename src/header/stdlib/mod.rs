@@ -1169,7 +1169,10 @@ pub unsafe extern "C" fn random() -> c_long {
 
     /* Both branches of this function result in a "u31", which will
      * always fit in a c_long. */
-    c_long::from(k)
+    #[cfg(not(target_arch = "x86"))]
+    return c_long::from(k);
+    #[cfg(target_arch = "x86")] // c_long on x86 is i32 so not infallible cast
+    c_long::try_from(k).unwrap()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/realloc.html>.
