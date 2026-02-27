@@ -160,7 +160,7 @@ impl Pal for Sys {
         envp: *const *mut c_char,
     ) -> Result<()> {
         let empty = b"\0";
-        let empty_ptr = empty.as_ptr() as *const c_char;
+        let empty_ptr = empty.as_ptr().cast::<c_char>();
         e_raw(syscall!(
             EXECVEAT,
             fildes,
@@ -218,7 +218,7 @@ impl Pal for Sys {
 
     fn fstat(fildes: c_int, mut buf: Out<stat>) -> Result<()> {
         let empty = b"\0";
-        let empty_ptr = empty.as_ptr() as *const c_char;
+        let empty_ptr = empty.as_ptr().cast::<c_char>();
         e_raw(unsafe {
             syscall!(
                 NEWFSTATAT,
@@ -248,7 +248,7 @@ impl Pal for Sys {
         let buf = buf.as_mut_ptr();
 
         let mut kbuf = linux_statfs::default();
-        let kbuf_ptr = &mut kbuf as *mut linux_statfs;
+        let kbuf_ptr = &raw mut kbuf;
         e_raw(unsafe { syscall!(FSTATFS, fildes, kbuf_ptr) })?;
 
         if !buf.is_null() {
@@ -296,7 +296,7 @@ impl Pal for Sys {
 
     #[inline]
     unsafe fn futex_wait(addr: *mut u32, val: u32, deadline: Option<&timespec>) -> Result<()> {
-        let deadline = deadline.map_or(0, |d| d as *const _ as usize);
+        let deadline = deadline.map_or(0, |d| ptr::from_ref(d) as usize);
         e_raw(unsafe {
             syscall!(
                 FUTEX, addr,       // uaddr

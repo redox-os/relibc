@@ -62,7 +62,7 @@ impl PalSignal for Sys {
                 SETITIMER,
                 which,
                 ptr::from_ref(new),
-                old.map_or_else(ptr::null_mut, |r| ptr::from_mut(r))
+                old.map_or_else(ptr::null_mut, ptr::from_mut)
             )
         })?;
         Ok(())
@@ -86,8 +86,8 @@ impl PalSignal for Sys {
             syscall!(
                 RT_SIGACTION,
                 sig,
-                act.as_ref().map_or_else(ptr::null, |x| ptr::from_ref(x)),
-                oact.map_or_else(ptr::null_mut, |x| ptr::from_mut(x)),
+                act.as_ref().map_or_else(ptr::null, ptr::from_ref),
+                oact.map_or_else(ptr::null_mut, ptr::from_mut),
                 mem::size_of::<sigset_t>()
             )
         })
@@ -97,8 +97,8 @@ impl PalSignal for Sys {
     unsafe fn sigaltstack(ss: Option<&stack_t>, old_ss: Option<&mut stack_t>) -> Result<()> {
         e_raw(syscall!(
             SIGALTSTACK,
-            ss.map_or_else(ptr::null, |x| ptr::from_ref(x)),
-            old_ss.map_or_else(ptr::null_mut, |x| ptr::from_mut(x))
+            ss.map_or_else(ptr::null, ptr::from_ref),
+            old_ss.map_or_else(ptr::null_mut, ptr::from_mut)
         ))
         .map(|_| ())
     }
@@ -119,8 +119,8 @@ impl PalSignal for Sys {
             syscall!(
                 RT_SIGPROCMASK,
                 how,
-                set.map_or_else(ptr::null, |x| ptr::from_ref(x)),
-                oset.map_or_else(ptr::null_mut, |x| ptr::from_mut(x)),
+                set.map_or_else(ptr::null, ptr::from_ref),
+                oset.map_or_else(ptr::null_mut, ptr::from_mut),
                 mem::size_of::<sigset_t>()
             )
         })
@@ -147,8 +147,8 @@ impl PalSignal for Sys {
             e_raw(syscall!(
                 RT_SIGTIMEDWAIT,
                 ptr::from_ref(set),
-                sig.map_or_else(ptr::null_mut, |s| ptr::from_mut(s)),
-                tp.map_or_else(ptr::null, |t| ptr::from_ref(t)),
+                sig.map_or_else(ptr::null_mut, ptr::from_mut),
+                tp.map_or_else(ptr::null, ptr::from_ref),
                 size_of::<sigset_t>()
             ))
             .map(|s| s as c_int)
