@@ -263,7 +263,7 @@ impl<T: Write> Write for CountingWriter<T> {
         res
     }
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        match self.inner.write_all(&buf) {
+        match self.inner.write_all(buf) {
             Ok(()) => (),
             Err(ref err) if err.kind() == io::ErrorKind::WriteZero => (),
             Err(err) => return Err(err),

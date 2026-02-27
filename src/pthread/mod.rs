@@ -168,7 +168,7 @@ pub(crate) unsafe fn create(
     new_tcb.mspace = current_tcb.mspace;
 
     let stack_end = unsafe { stack_base.add(stack_size) };
-    let mut stack = stack_end as *mut usize;
+    let mut stack = stack_end.cast::<usize>();
     {
         let mut push = |value: usize| {
             stack = unsafe { stack.sub(1) };
@@ -184,8 +184,8 @@ pub(crate) unsafe fn create(
         }
         push(0);
         push(0);
-        push(synchronization_mutex as *const _ as usize);
-        push(new_tcb as *mut _ as usize);
+        push(ptr::from_ref(synchronization_mutex) as usize);
+        push(ptr::from_mut(new_tcb) as usize);
 
         push(arg as usize);
         push(start_routine as usize);
@@ -204,7 +204,7 @@ pub(crate) unsafe fn create(
         .lock()
         .insert(os_tid, ForceSendSync(new_tcb));
 
-    Ok((&new_tcb.pthread) as *const _ as *mut _)
+    Ok(&raw const new_tcb.pthread as *mut _)
 }
 
 /// A shim to wrap thread entry points in logic to set up TLS, for example
