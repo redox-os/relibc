@@ -142,7 +142,7 @@ impl TarHeader {
         let mut header_copy = *self;
         header_copy.chksum.fill(b' ');
         let bytes =
-            unsafe { slice::from_raw_parts(&header_copy as *const _ as *const u8, HEADER_SIZE) };
+            unsafe { slice::from_raw_parts((&raw const header_copy).cast::<u8>(), HEADER_SIZE) };
         bytes.iter().map(|&b| b as usize).sum()
     }
 }
