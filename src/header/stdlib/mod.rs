@@ -142,7 +142,7 @@ pub extern "C" fn abs(i: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/aligned_alloc.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void {
-    if alignment == 0 || size % alignment != 0 {
+    if alignment == 0 || !size.is_multiple_of(alignment) {
         platform::ERRNO.set(EINVAL);
         return ptr::null_mut();
     }
@@ -234,7 +234,7 @@ pub unsafe extern "C" fn atoll(s: *const c_char) -> c_longlong {
 }
 
 unsafe extern "C" fn void_cmp(a: *const c_void, b: *const c_void) -> c_int {
-    (unsafe { *(a as *const i32) }) - unsafe { *(b as *const i32) } as c_int
+    (unsafe { *(a.cast::<i32>()) }) - unsafe { *(b.cast::<i32>()) } as c_int
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/bsearch.html>.
@@ -253,7 +253,7 @@ pub unsafe extern "C" fn bsearch(
         let med = (start as size_t + (len >> 1) * width) as *const c_void;
         let diff = unsafe { cmp_fn(key, med) };
         if diff == 0 {
-            return med as *mut c_void;
+            return med.cast_mut();
         } else if diff > 0 {
             start = (med as usize + width) as *const c_void;
             len -= 1;
@@ -791,7 +791,7 @@ where
 fn get_nstime() -> u64 {
     unsafe {
         let mut ts = mem::MaybeUninit::uninit();
-        if let Ok(_) = Sys::clock_gettime(CLOCK_MONOTONIC, Out::from_uninit_mut(&mut ts)) {}; // TODO what to do if Err?
+        if Sys::clock_gettime(CLOCK_MONOTONIC, Out::from_uninit_mut(&mut ts)).is_ok() {}; // TODO what to do if Err?
         ts.assume_init().tv_nsec as u64
     }
 }
@@ -913,7 +913,7 @@ pub unsafe extern "C" fn posix_memalign(
 ) -> c_int {
     const VOID_PTR_SIZE: usize = mem::size_of::<*mut c_void>();
 
-    if alignment % VOID_PTR_SIZE == 0 && alignment.is_power_of_two() {
+    if alignment.is_multiple_of(VOID_PTR_SIZE) && alignment.is_power_of_two() {
         let ptr = unsafe { platform::alloc_align(size, alignment) };
         unsafe { *memptr = ptr };
         if ptr.is_null() { ENOMEM } else { 0 }
@@ -936,7 +936,7 @@ pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
         platform::ERRNO.set(EAGAIN);
     }
 
-    return r;
+    r
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ptsname.html>.
@@ -944,10 +944,10 @@ pub unsafe extern "C" fn posix_openpt(flags: c_int) -> c_int {
 pub unsafe extern "C" fn ptsname(fd: c_int) -> *mut c_char {
     const PTS_BUFFER_LEN: usize = 9 + mem::size_of::<c_int>() * 3 + 1;
     static mut PTS_BUFFER: [c_char; PTS_BUFFER_LEN] = [0; PTS_BUFFER_LEN];
-    if unsafe { ptsname_r(fd, &raw mut PTS_BUFFER as *mut _, PTS_BUFFER_LEN) } != 0 {
+    if unsafe { ptsname_r(fd, (&raw mut PTS_BUFFER).cast(), PTS_BUFFER_LEN) } != 0 {
         ptr::null_mut()
     } else {
-        &raw mut PTS_BUFFER as *mut _
+        (&raw mut PTS_BUFFER).cast()
     }
 }
 
@@ -993,7 +993,7 @@ unsafe fn __ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int {
     let mut pty = 0;
     let err = platform::ERRNO.get();
 
-    if unsafe { ioctl(fd, TIOCGPTN, &mut pty as *mut _ as *mut c_void) } == 0 {
+    if unsafe { ioctl(fd, TIOCGPTN, ptr::from_mut(&mut pty).cast::<c_void>()) } == 0 {
         let name = format!("/dev/pts/{}", pty);
         let len = name.len();
         if len > buflen {
@@ -1063,7 +1063,7 @@ pub unsafe extern "C" fn qsort(
         if nel > 0 {
             // XXX: maybe try to do mergesort/timsort first and fallback to introsort if memory
             //      allocation fails?  not sure what is ideal
-            unsafe { sort::introsort(base as *mut c_char, nel, width, comp) };
+            unsafe { sort::introsort(base.cast::<c_char>(), nel, width, comp) };
         }
     }
 }
@@ -1169,7 +1169,7 @@ pub unsafe extern "C" fn random() -> c_long {
 
     /* Both branches of this function result in a "u31", which will
      * always fit in a c_long. */
-    c_long::try_from(k).unwrap()
+    c_long::from(k)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/realloc.html>.
@@ -1200,12 +1200,12 @@ pub unsafe extern "C" fn reallocarray(ptr: *mut c_void, m: size_t, n: size_t) ->
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn realpath(pathname: *const c_char, resolved: *mut c_char) -> *mut c_char {
     let ptr = if resolved.is_null() {
-        (unsafe { malloc(limits::PATH_MAX) }) as *mut c_char
+        (unsafe { malloc(limits::PATH_MAX) }).cast::<c_char>()
     } else {
         resolved
     };
 
-    let out = unsafe { slice::from_raw_parts_mut(ptr as *mut u8, limits::PATH_MAX) };
+    let out = unsafe { slice::from_raw_parts_mut(ptr.cast::<u8>(), limits::PATH_MAX) };
     {
         let file = match File::open(unsafe { CStr::from_ptr(pathname) }, O_PATH | O_CLOEXEC) {
             Ok(file) => file,
@@ -1257,7 +1257,7 @@ pub unsafe extern "C" fn seed48(seed16v: *mut c_ushort) -> *mut c_ushort {
     unsafe { BUFFER = (*xsubi).into() };
     *xsubi = seed16v_ref.into();
     params.reset();
-    &raw mut BUFFER as *mut _
+    (&raw mut BUFFER).cast()
 }
 
 unsafe fn copy_kv(
@@ -1298,14 +1298,14 @@ pub unsafe extern "C" fn setenv(
         } else {
             // Reuse platform::environ slot, but allocate a new pointer.
             let ptr = unsafe { platform::alloc(key_len as usize + 1 + value_len as usize + 1) }
-                as *mut c_char;
+                .cast::<c_char>();
             unsafe { copy_kv(ptr, key, value, key_len, value_len) };
             unsafe { platform::environ.add(i).write(ptr) };
         }
     } else {
         // Expand platform::environ and allocate a new pointer.
         let ptr = unsafe { platform::alloc(key_len as usize + 1 + value_len as usize + 1) }
-            as *mut c_char;
+            .cast::<c_char>();
         unsafe { copy_kv(ptr, key, value, key_len, value_len) };
         unsafe { put_new_env(ptr) };
     }
@@ -1389,7 +1389,7 @@ pub unsafe fn detect_base(s: *const c_char) -> Option<(c_int, isize)> {
             let second = unsafe { *s.offset(1) } as u8;
             if second == b'X' || second == b'x' {
                 Some((16, 2))
-            } else if second >= b'0' && second <= b'7' {
+            } else if (b'0'..=b'7').contains(&second) {
                 Some((8, 1))
             } else {
                 // in this case, the prefix (0) is going to be the number
@@ -1467,7 +1467,7 @@ pub unsafe fn convert_integer(s: *const c_char, base: c_int) -> Option<(c_ulong,
                 num = res;
             } else {
                 platform::ERRNO.set(ERANGE);
-                num = c_ulong::max_value();
+                num = c_ulong::MAX;
                 overflowed = true;
             }
 
@@ -1497,15 +1497,7 @@ pub unsafe extern "C" fn strtof(s: *const c_char, endptr: *mut *mut c_char) -> c
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtol.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtol(s: *const c_char, endptr: *mut *mut c_char, base: c_int) -> c_long {
-    strto_impl!(
-        c_long,
-        true,
-        c_long::max_value(),
-        c_long::min_value(),
-        s,
-        endptr,
-        base
-    )
+    strto_impl!(c_long, true, c_long::MAX, c_long::MIN, s, endptr, base)
 }
 
 // TODO: strtold(), when long double is available
@@ -1520,8 +1512,8 @@ pub unsafe extern "C" fn strtoll(
     strto_impl!(
         c_longlong,
         true,
-        c_longlong::max_value(),
-        c_longlong::min_value(),
+        c_longlong::MAX,
+        c_longlong::MIN,
         s,
         endptr,
         base
@@ -1535,15 +1527,7 @@ pub unsafe extern "C" fn strtoul(
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> c_ulong {
-    strto_impl!(
-        c_ulong,
-        false,
-        c_ulong::max_value(),
-        c_ulong::min_value(),
-        s,
-        endptr,
-        base
-    )
+    strto_impl!(c_ulong, false, c_ulong::MAX, c_ulong::MIN, s, endptr, base)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtoul.html>.
@@ -1556,8 +1540,8 @@ pub unsafe extern "C" fn strtoull(
     strto_impl!(
         c_ulonglong,
         false,
-        c_ulonglong::max_value(),
-        c_ulonglong::min_value(),
+        c_ulonglong::MAX,
+        c_ulonglong::MIN,
         s,
         endptr,
         base
@@ -1572,7 +1556,7 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
 
     // handle shell detection on command == NULL
     if command.is_null() {
-        let status = unsafe { system("exit 0\0".as_ptr() as *const c_char) };
+        let status = unsafe { system(c"exit 0".as_ptr().cast::<c_char>()) };
         if status == 0 {
             return 1;
         } else {
@@ -1582,18 +1566,13 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
 
     let child_pid = unsafe { unistd::fork() };
     if child_pid == 0 {
-        let command_nonnull = command as *const u8;
+        let command_nonnull = command.cast::<c_char>();
 
-        let shell = "/bin/sh\0".as_ptr();
+        let shell = c"/bin/sh".as_ptr();
 
-        let args = [
-            "sh\0".as_ptr(),
-            "-c\0".as_ptr(),
-            command_nonnull,
-            ptr::null(),
-        ];
+        let args = [c"sh".as_ptr(), c"-c".as_ptr(), command_nonnull, ptr::null()];
 
-        unsafe { unistd::execv(shell as *const c_char, args.as_ptr() as *const *mut c_char) };
+        unsafe { unistd::execv(shell.cast::<c_char>(), args.as_ptr().cast::<*mut c_char>()) };
 
         unsafe { exit(127) };
 
@@ -1626,7 +1605,13 @@ pub extern "C" fn ttyslot() -> c_int {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn unlockpt(fildes: c_int) -> c_int {
     let mut u: c_int = 0;
-    unsafe { ioctl(fildes, TIOCSPTLCK, &mut u as *mut i32 as *mut c_void) }
+    unsafe {
+        ioctl(
+            fildes,
+            TIOCSPTLCK,
+            ptr::from_mut::<i32>(&mut u).cast::<c_void>(),
+        )
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/unsetenv.html>.
