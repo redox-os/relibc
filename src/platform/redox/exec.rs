@@ -124,13 +124,27 @@ pub fn execve(
     }
 
     // Count arguments for `exec` which is different from the interpreter's args
+    //
+    // When there's an interpreter, we skip the original `argv[0]` and replace it with the script
+    // path (`arg0`).
     match arg_env {
         ArgEnv::C { argv, .. } => unsafe {
-            while !(*argv.add(len)).is_null() {
-                len += 1;
+            let mut count = 0;
+            let ptr = if interpreter_path.is_some() && !(*argv).is_null() {
+                argv.add(1)
+            } else {
+                argv
+            };
+
+            while !(*ptr.add(count)).is_null() {
+                count += 1;
             }
+            len += count;
         },
-        ArgEnv::Parsed { args, .. } => len = args.len(),
+        ArgEnv::Parsed { args, .. } => {
+            let skip = if interpreter_path.is_some() { 1 } else { 0 };
+            len += args.len().saturating_sub(skip);
+        }
     }
     let mut args: Vec<&[u8]> = Vec::with_capacity(len);
 
@@ -154,6 +168,13 @@ pub fn execve(
     let (args, envs): (Vec<_>, Vec<_>) = match arg_env {
         ArgEnv::C { mut argv, mut envp } => unsafe {
             // Arguments
+            if interpreter_path.is_some() {
+                args.push(arg0);
+                if !(*argv).is_null() {
+                    argv = argv.add(1);
+                }
+            }
+
             while !argv.read().is_null() {
                 let arg = argv.read();
 
@@ -182,8 +203,12 @@ pub fn execve(
             args: new_args,
             envs,
         } => {
-            let prev_size: usize = args.iter().map(|a| a.len()).sum();
-            args.extend(new_args);
+            if interpreter_path.is_some() {
+                args.push(arg0);
+                args.extend(new_args.iter().skip(1));
+            } else {
+                args.extend(new_args);
+            }
             (args, Vec::from(envs))
         }
     };
@@ -343,21 +368,29 @@ where
         args_offset.map(NonZeroUsize::get),
         args_offset_u64.map(NonZeroU64::get),
     ) {
-        let len = offset - interp_offset - 1;
-        let len_u64 = offset_u64 - interp_offset_u64 - 1;
+        let len = offset - interp_offset;
+        let len_u64 = offset_u64 - interp_offset_u64;
         let mut args = Vec::with_capacity(len);
 
-        // Eat initial whitespace
-        reader.consume(1);
         reader
             .take(len_u64)
             .read_to_end(&mut args)
             .map_err(|_| Error::new(E2BIG))?;
+
         // Eat '\n'
         reader.consume(1);
 
-        let args = CString::new(args).map_err(|_| Error::new(ENOEXEC))?;
-        Some(args)
+        let mut arg_start = 0;
+        while arg_start < args.len() && (args[arg_start] == b' ' || args[arg_start] == b'\t') {
+            arg_start += 1;
+        }
+
+        if arg_start < args.len() {
+            let args = CString::new(&args[arg_start..]).map_err(|_| Error::new(ENOEXEC))?;
+            Some(args)
+        } else {
+            None
+        }
     } else {
         None
     };
