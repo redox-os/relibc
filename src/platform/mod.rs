@@ -84,7 +84,7 @@ pub trait WriteByte: fmt::Write {
     fn write_u8(&mut self, byte: u8) -> fmt::Result;
 }
 
-impl<'a, W: WriteByte> WriteByte for &'a mut W {
+impl<W: WriteByte> WriteByte for &mut W {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
         (**self).write_u8(byte)
     }
