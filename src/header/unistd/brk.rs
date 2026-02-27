@@ -54,5 +54,5 @@ pub unsafe extern "C" fn sbrk(incr: intptr_t) -> *mut c_void {
         }
     }
 
-    old_brk as *mut c_void
+    old_brk.cast::<c_void>()
 }
