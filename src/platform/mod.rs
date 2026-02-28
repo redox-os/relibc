@@ -359,7 +359,7 @@ pub unsafe fn init_inner(auxvs: Box<[[usize; 2]]>) {
     redox_rt::sys::this_proc_call(
         &mut [],
         syscall::CallFlags::empty(),
-        &[redox_rt::protocol::ProcCall::SyncSigPctl as u64],
+        &[redox_protocols::protocol::ProcCall::SyncSigPctl as u64],
     )
     .expect("failed to sync signal pctl");
 

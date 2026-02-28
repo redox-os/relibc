@@ -3,10 +3,10 @@ use core::cell::SyncUnsafeCell;
 use crate::{
     Tcb,
     proc::{FdGuard, FdGuardUpper, ForkArgs, fork_inner},
-    protocol::{ProcCall, RtSigInfo},
     signal::{PosixStackt, RtSigarea, SigStack, get_sigaltstack, inner_c},
 };
 use core::{mem::offset_of, ptr::NonNull, sync::atomic::Ordering};
+use redox_protocols::protocol::{ProcCall, RtSigInfo};
 use syscall::{data::*, error::*};
 
 use super::ForkScratchpad;

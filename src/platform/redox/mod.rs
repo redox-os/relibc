@@ -5,9 +5,9 @@ use core::{
     ptr, slice, str,
 };
 use object::bytes_of_slice_mut;
+use redox_protocols::protocol::{WaitFlags, wifstopped};
 use redox_rt::{
     RtTcb,
-    protocol::{WaitFlags, wifstopped},
     sys::{Resugid, WaitpidTarget},
 };
 use syscall::{
