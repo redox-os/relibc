@@ -49,7 +49,7 @@ pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
     let mut ps: mbstate_t = mbstate_t;
     let mut wc: wchar_t = 0;
     let saved_errno = platform::ERRNO.get();
-    let status = unsafe { mbrtowc(&mut wc, ptr::from_ref::<c_char>(&c), 1, &mut ps) };
+    let status = unsafe { mbrtowc(&raw mut wc, ptr::from_ref::<c_char>(&c), 1, &raw mut ps) };
     if status == usize::MAX || status == usize::MAX - 1 {
         platform::ERRNO.set(saved_errno);
         return WEOF;
@@ -101,7 +101,7 @@ pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
 
     unsafe {
         mbrtowc(
-            &mut wc,
+            &raw mut wc,
             buf.as_ptr().cast::<c_char>(),
             encoded_length,
             ptr::null_mut(),
@@ -140,8 +140,8 @@ pub unsafe extern "C" fn fputwc(wc: wchar_t, stream: *mut FILE) -> wint_t {
 
     let amount = unsafe { wcrtomb(bytes.as_mut_ptr(), wc, &raw mut INTERNAL) };
 
-    for i in 0..amount {
-        unsafe { fputc(c_int::from(bytes[i]), &mut *stream) };
+    for b in bytes.iter().take(amount) {
+        unsafe { fputc(c_int::from(*b), &raw mut *stream) };
     }
 
     wc as wint_t
@@ -253,7 +253,7 @@ pub unsafe extern "C" fn mbsnrtowcs(
     while (dst_ptr.is_null() || dst_offset < dst_len) && src_offset < src_len {
         let ps_copy = unsafe { *ps };
         let mut wc: wchar_t = 0;
-        let amount = unsafe { mbrtowc(&mut wc, src.add(src_offset), src_len - src_offset, ps) };
+        let amount = unsafe { mbrtowc(&raw mut wc, src.add(src_offset), src_len - src_offset, ps) };
 
         // Stop in the event a decoding error occured.
         if amount == -1isize as usize {
@@ -305,13 +305,13 @@ pub unsafe extern "C" fn mbsrtowcs(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/putwc.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn putwc(wc: wchar_t, stream: *mut FILE) -> wint_t {
-    unsafe { fputwc(wc, &mut *stream) }
+    unsafe { fputwc(wc, &raw mut *stream) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/putwchar.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn putwchar(wc: wchar_t) -> wint_t {
-    unsafe { fputwc(wc, &mut *stdout) }
+    unsafe { fputwc(wc, &raw mut *stdout) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vswscanf.html>.
@@ -358,7 +358,7 @@ pub unsafe extern "C" fn ungetwc(wc: wint_t, stream: &mut FILE) -> wint_t {
     If we called ungetc in the non-reversed order, we would get [167, 195]
     */
     for i in 0..amount {
-        unsafe { ungetc(c_int::from(bytes[amount - 1 - i]), &mut *stream) };
+        unsafe { ungetc(c_int::from(bytes[amount - 1 - i]), &raw mut *stream) };
     }
 
     wc
@@ -392,13 +392,13 @@ pub unsafe extern "C" fn fwprintf(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfwprintf.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vwprintf(format: *const wchar_t, arg: va_list) -> c_int {
-    unsafe { vfwprintf(&mut *stdout, format, arg) }
+    unsafe { vfwprintf(&raw mut *stdout, format, arg) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fwprintf.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wprintf(format: *const wchar_t, mut __valist: ...) -> c_int {
-    unsafe { vfwprintf(&mut *stdout, format, __valist.as_va_list()) }
+    unsafe { vfwprintf(&raw mut *stdout, format, __valist.as_va_list()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfwprintf.html>.
@@ -478,7 +478,7 @@ pub unsafe extern "C" fn wcsrtombs(
 ) -> size_t {
     let mut mbs = mbstate_t {};
     if st.is_null() {
-        st = &mut mbs;
+        st = &raw mut mbs;
     }
     unsafe { wcsnrtombs(s, ws, size_t::MAX, n, st) }
 }
@@ -661,7 +661,7 @@ pub unsafe extern "C" fn wcsnrtombs(
     let mut mbs = mbstate_t {};
 
     if ps.is_null() {
-        ps = &mut mbs;
+        ps = &raw mut mbs;
     }
 
     while read < nwc {

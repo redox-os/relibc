@@ -112,15 +112,15 @@ pub unsafe extern "C" fn getopt_long(
                                     } else if *optstring == b':' as c_char {
                                         return c_int::from(b':');
                                     } else {
-                                        stdio::fputs((*argv).cast_const(), &mut *stdio::stderr);
+                                        stdio::fputs((*argv).cast_const(), &raw mut *stdio::stderr);
                                         stdio::fputs(
                                             c": option '--".as_ptr().cast(),
-                                            &mut *stdio::stderr,
+                                            &raw mut *stdio::stderr,
                                         );
-                                        stdio::fputs(current_arg, &mut *stdio::stderr);
+                                        stdio::fputs(current_arg, &raw mut *stdio::stderr);
                                         stdio::fputs(
                                             c"' requires an argument\n".as_ptr().cast(),
-                                            &mut *stdio::stderr,
+                                            &raw mut *stdio::stderr,
                                         );
                                         return c_int::from(b'?');
                                     }
@@ -160,10 +160,10 @@ unsafe fn parse_arg(
 
     let print_error = |desc: &[u8]| unsafe {
         // NOTE: we don't use fprintf to get around the usage of va_list
-        stdio::fputs((*argv).cast_const(), &mut *stdio::stderr);
-        stdio::fputs(desc.as_ptr().cast(), &mut *stdio::stderr);
-        stdio::fputc((*current_arg).into(), &mut *stdio::stderr);
-        stdio::fputc(b'\n'.into(), &mut *stdio::stderr);
+        stdio::fputs((*argv).cast_const(), &raw mut *stdio::stderr);
+        stdio::fputs(desc.as_ptr().cast(), &raw mut *stdio::stderr);
+        stdio::fputc((*current_arg).into(), &raw mut *stdio::stderr);
+        stdio::fputc(b'\n'.into(), &raw mut *stdio::stderr);
     };
 
     match unsafe { find_option(*current_arg, optstring) } {
