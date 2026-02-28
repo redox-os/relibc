@@ -7,6 +7,7 @@ use core::{
 use ioslice::IoSlice;
 use syscall::{
     CallFlags, EINVAL, ERESTART, TimeSpec,
+    data::StdFsCallMeta,
     error::{self, EINTR, ENODEV, ESRCH, Error, Result},
 };
 
@@ -14,11 +15,13 @@ use crate::{
     DYNAMIC_PROC_INFO, DynamicProcInfo, RtTcb, Tcb,
     arch::manually_enter_trampoline,
     proc::{FdGuard, FdGuardUpper},
-    protocol::{NsDup, ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags},
     read_proc_meta,
     signal::tmp_disable_signals,
 };
 use alloc::vec::Vec;
+use redox_protocols::protocol::{
+    NsDup, ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags,
+};
 
 #[inline]
 fn wrapper<T>(restart: bool, erestart: bool, mut f: impl FnMut() -> Result<T>) -> Result<T> {
@@ -385,7 +388,7 @@ pub fn getens() -> Result<usize> {
     read_proc_meta(crate::current_proc_fd()).map(|meta| meta.ens as usize)
 }
 pub fn get_proc_credentials(cap_fd: usize, target_pid: usize, buf: &mut [u8]) -> Result<usize> {
-    if buf.len() < size_of::<crate::protocol::ProcMeta>() {
+    if buf.len() < size_of::<redox_protocols::protocol::ProcMeta>() {
         return Err(Error::new(EINVAL));
     }
     proc_call(
@@ -514,4 +517,13 @@ pub fn register_scheme_to_ns(ns_fd: usize, name: &str, cap_fd: usize) -> Result<
     let cap_bytes = cap_fd.to_ne_bytes();
     ns_this_scheme.call_wo(&cap_bytes, CallFlags::FD, &[])?;
     Ok(())
+}
+pub fn std_fs_call_ro(fd: usize, payload: &mut [u8], metadata: &StdFsCallMeta) -> Result<usize> {
+    sys_call_ro(fd, payload, CallFlags::STD_FS, metadata)
+}
+pub fn std_fs_call_wo(fd: usize, payload: &[u8], metadata: &StdFsCallMeta) -> Result<usize> {
+    sys_call_wo(fd, payload, CallFlags::STD_FS, metadata)
+}
+pub fn std_fs_call_rw(fd: usize, payload: &mut [u8], metadata: &StdFsCallMeta) -> Result<usize> {
+    sys_call_rw(fd, payload, CallFlags::STD_FS, metadata)
 }

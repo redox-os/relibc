@@ -1,9 +1,7 @@
 use alloc::vec::Vec;
 use core::{cmp, mem, ptr, slice, str};
-use redox_rt::{
-    proc::FdGuard,
-    protocol::{FsCall, SocketCall},
-};
+use redox_protocols::protocol::{FsCall, SocketCall};
+use redox_rt::proc::FdGuard;
 use syscall::{self, flag::*};
 
 use super::{

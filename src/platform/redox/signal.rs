@@ -15,11 +15,9 @@ use crate::{
     },
 };
 use core::mem::offset_of;
-use redox_rt::{
-    protocol::ProcKillTarget,
-    signal::{
-        PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
-    },
+use redox_protocols::protocol::ProcKillTarget;
+use redox_rt::signal::{
+    PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
 };
 
 const _: () = {

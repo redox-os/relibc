@@ -5,9 +5,9 @@ use syscall::{data::*, error::*};
 use crate::{
     Tcb,
     proc::{FdGuard, FdGuardUpper, ForkArgs, fork_inner},
-    protocol::{ProcCall, RtSigInfo},
     signal::{PosixStackt, RtSigarea, SigStack, inner_c},
 };
+use redox_protocols::protocol::{ProcCall, RtSigInfo};
 
 use super::ForkScratchpad;
 
