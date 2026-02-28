@@ -227,7 +227,7 @@ macro_rules! strto_float_impl {
         let mut s = $s;
         let endptr = $endptr;
 
-        while ctype::isspace(unsafe{*s} as c_int) != 0 {
+        while ctype::isspace(c_int::from(unsafe{*s})) != 0 {
             s = unsafe{ s.offset(1)};
         }
 

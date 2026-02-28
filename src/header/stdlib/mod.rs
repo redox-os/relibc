@@ -187,7 +187,7 @@ macro_rules! dec_num_from_ascii {
     ($s:expr, $t:ty) => {{
         let mut s = $s;
         // Iterate past whitespace
-        while ctype::isspace(unsafe { *s } as c_int) != 0 {
+        while ctype::isspace(c_int::from(unsafe { *s })) != 0 {
             s = unsafe { s.offset(1) };
         }
 
@@ -206,7 +206,7 @@ macro_rules! dec_num_from_ascii {
         };
 
         let mut n: $t = 0;
-        while ctype::isdigit(unsafe { *s } as c_int) != 0 {
+        while ctype::isdigit(c_int::from(unsafe { *s })) != 0 {
             n = 10 * n - (unsafe { *s } as $t - 0x30);
             s = unsafe { s.offset(1) };
         }
@@ -368,7 +368,7 @@ pub unsafe extern "C" fn exit(status: c_int) -> ! {
     // Look for the neighbor functions in memory until the end
     let mut f = unsafe { &__fini_array_end } as *const _;
     #[allow(clippy::op_ref)]
-    while f > unsafe { &__fini_array_start } {
+    while f > &raw const __fini_array_start {
         f = unsafe { f.offset(-1) };
         (unsafe { *f })();
     }
@@ -719,7 +719,7 @@ pub unsafe extern "C" fn memalign(alignment: size_t, size: size_t) -> *mut c_voi
 pub unsafe extern "C" fn mblen(s: *const c_char, n: size_t) -> c_int {
     let mut wc: wchar_t = 0;
     let mut state: mbstate_t = mbstate_t {};
-    let result: usize = unsafe { mbrtowc(&mut wc, s, n, &mut state) };
+    let result: usize = unsafe { mbrtowc(&raw mut wc, s, n, &raw mut state) };
 
     if result == -1isize as usize {
         return -1;
@@ -735,14 +735,14 @@ pub unsafe extern "C" fn mblen(s: *const c_char, n: size_t) -> c_int {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mbstowcs(pwcs: *mut wchar_t, mut s: *const c_char, n: size_t) -> size_t {
     let mut state: mbstate_t = mbstate_t {};
-    unsafe { mbsrtowcs(pwcs, &mut s, n, &mut state) }
+    unsafe { mbsrtowcs(pwcs, &raw mut s, n, &raw mut state) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/mbtowc.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mbtowc(pwc: *mut wchar_t, s: *const c_char, n: size_t) -> c_int {
     let mut state: mbstate_t = mbstate_t {};
-    (unsafe { mbrtowc(pwc, s, n, &mut state) }) as c_int
+    (unsafe { mbrtowc(pwc, s, n, &raw mut state) }) as c_int
 }
 
 fn inner_mktemp<T, F>(name: *mut c_char, suffix_len: c_int, mut attempt: F) -> Option<T>
@@ -1682,14 +1682,14 @@ pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstombs(s: *mut c_char, mut pwcs: *const wchar_t, n: size_t) -> size_t {
     let mut state: mbstate_t = mbstate_t {};
-    unsafe { wcsrtombs(s, &mut pwcs, n, &mut state) }
+    unsafe { wcsrtombs(s, &raw mut pwcs, n, &raw mut state) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wctomb.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wctomb(s: *mut c_char, wc: wchar_t) -> c_int {
     let mut state: mbstate_t = mbstate_t {};
-    let result: usize = unsafe { wcrtomb(s, wc, &mut state) };
+    let result: usize = unsafe { wcrtomb(s, wc, &raw mut state) };
 
     if result == -1isize as usize {
         return -1;

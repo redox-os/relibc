@@ -327,10 +327,10 @@ pub unsafe extern "C" fn cuserid(s: *mut c_char) -> *mut c_char {
     unsafe {
         pwd::getpwuid_r(
             unistd::geteuid(),
-            &mut pwd,
+            &raw mut pwd,
             buf.as_mut_ptr(),
             buf.len(),
-            &mut pwdbuf,
+            &raw mut pwdbuf,
         )
     };
     if pwdbuf.is_null() {
@@ -438,7 +438,7 @@ pub unsafe extern "C" fn fgetc(stream: *mut FILE) -> c_int {
         return -1;
     }
 
-    unsafe { getc_unlocked(&mut *stream) }
+    unsafe { getc_unlocked(&raw mut *stream) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fgetpos.html>.
@@ -611,7 +611,7 @@ pub unsafe extern "C" fn fputc(c: c_int, stream: *mut FILE) -> c_int {
         return -1;
     }
 
-    unsafe { putc_unlocked(c, &mut *stream) }
+    unsafe { putc_unlocked(c, &raw mut *stream) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fputs.html>.
@@ -853,7 +853,7 @@ pub unsafe extern "C" fn fwrite(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getc(stream: *mut FILE) -> c_int {
     let mut stream = unsafe { (*stream).lock() };
-    unsafe { getc_unlocked(&mut *stream) }
+    unsafe { getc_unlocked(&raw mut *stream) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getchar.html>.
@@ -861,7 +861,7 @@ pub unsafe extern "C" fn getc(stream: *mut FILE) -> c_int {
 /// Get a single char from `stdin`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getchar() -> c_int {
-    unsafe { fgetc(&mut *stdin) }
+    unsafe { fgetc(&raw mut *stdin) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getc_unlocked.html>.
@@ -886,7 +886,7 @@ pub unsafe extern "C" fn getc_unlocked(stream: *mut FILE) -> c_int {
 /// Get a char from `stdin` without locking `stdin`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getchar_unlocked() -> c_int {
-    unsafe { getc_unlocked(&mut *stdin) }
+    unsafe { getc_unlocked(&raw mut *stdin) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/gets.html>.
@@ -897,7 +897,7 @@ pub unsafe extern "C" fn getchar_unlocked() -> c_int {
 /// Get a string from `stdin`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gets(s: *mut c_char) -> *mut c_char {
-    unsafe { fgets(s, c_int::MAX, &mut *stdin) }
+    unsafe { fgets(s, c_int::MAX, &raw mut *stdin) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/7908799/xsh/getw.html>.
@@ -1066,7 +1066,7 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn putc(c: c_int, stream: *mut FILE) -> c_int {
     let mut stream = unsafe { (*stream).lock() };
-    unsafe { putc_unlocked(c, &mut *stream) }
+    unsafe { putc_unlocked(c, &raw mut *stream) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/putchar.html>.
@@ -1074,7 +1074,7 @@ pub unsafe extern "C" fn putc(c: c_int, stream: *mut FILE) -> c_int {
 /// Put a character `c` into `stdout`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn putchar(c: c_int) -> c_int {
-    unsafe { fputc(c, &mut *stdout) }
+    unsafe { fputc(c, &raw mut *stdout) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getc_unlocked.html>.
@@ -1419,13 +1419,13 @@ pub unsafe extern "C" fn dprintf(fd: c_int, format: *const c_char, mut __valist:
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfprintf.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vprintf(format: *const c_char, ap: va_list) -> c_int {
-    unsafe { vfprintf(&mut *stdout, format, ap) }
+    unsafe { vfprintf(&raw mut *stdout, format, ap) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fprintf.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn printf(format: *const c_char, mut __valist: ...) -> c_int {
-    unsafe { vfprintf(&mut *stdout, format, __valist.as_va_list()) }
+    unsafe { vfprintf(&raw mut *stdout, format, __valist.as_va_list()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfprintf.html>.
@@ -1541,13 +1541,13 @@ pub unsafe extern "C" fn fscanf(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfscanf.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vscanf(format: *const c_char, ap: va_list) -> c_int {
-    unsafe { vfscanf(&mut *stdin, format, ap) }
+    unsafe { vfscanf(&raw mut *stdin, format, ap) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fscanf.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn scanf(format: *const c_char, mut __valist: ...) -> c_int {
-    unsafe { vfscanf(&mut *stdin, format, __valist.as_va_list()) }
+    unsafe { vfscanf(&raw mut *stdin, format, __valist.as_va_list()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/vfscanf.html>.
