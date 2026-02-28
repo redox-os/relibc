@@ -260,7 +260,7 @@ pub fn fexec_impl(
     let mut sp = STACK_TOP;
     let mut stack_page = Option::<MmapGuard>::None;
 
-    let mut push = |word: usize| {
+    let mut push = |word: usize| -> Result<()> {
         let old_page_no = sp / PAGE_SIZE;
         sp -= size_of::<usize>();
         let new_page_no = sp / PAGE_SIZE;
@@ -344,7 +344,7 @@ pub fn fexec_impl(
     let mut argc = 0;
 
     {
-        let mut append = |source_slice: &[u8]| {
+        let mut append = |source_slice: &[u8]| -> Result<usize> {
             // TODO
             let address = target_args_env_address + offset;
 
@@ -717,7 +717,7 @@ impl FileBufReader {
 }
 
 impl FileBufReader {
-    fn read_le_u64(&mut self) -> syscall::Result<Option<u64>> {
+    fn read_le_u64(&mut self) -> Result<Option<u64>> {
         if self.pos >= self.cap {
             debug_assert!(self.pos == self.cap);
             self.cap = crate::sys::posix_read(self.fd, &mut self.buf)?;
