@@ -36,9 +36,9 @@ pub static mut HOST_STAYOPEN: c_int = 0;
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endhostent() {
-    if unsafe { HOSTDB } >= 0 {
-        if let Ok(()) = Sys::close(unsafe { HOSTDB }) {}; // TODO handle error
-    }
+    if unsafe { HOSTDB } >= 0
+        && let Ok(()) = Sys::close(unsafe { HOSTDB })
+    {} // TODO handle error
     unsafe { HOSTDB = -1 };
 }
 
@@ -47,9 +47,8 @@ pub unsafe extern "C" fn sethostent(stayopen: c_int) {
     unsafe { HOST_STAYOPEN = stayopen };
     if unsafe { HOSTDB } < 0 {
         unsafe { HOSTDB = Sys::open(c"/etc/hosts".into(), O_RDONLY, 0).or_minus_one_errno() }
-    } else {
-        if Sys::lseek(unsafe { HOSTDB }, 0, SEEK_SET).is_ok() {}; // TODO handle error
-    }
+    } else if Sys::lseek(unsafe { HOSTDB }, 0, SEEK_SET).is_ok() {
+    } // TODO handle error
     unsafe { H_POS = 0 };
 }
 

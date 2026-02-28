@@ -285,10 +285,10 @@ pub unsafe extern "C" fn sighold(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
     unsafe { sigemptyset(pset.as_mut_ptr()) };
     let mut set = unsafe { pset.assume_init() };
-    if unsafe { sigaddset(&mut set, sig) } < 0 {
+    if unsafe { sigaddset(&raw mut set, sig) } < 0 {
         return -1;
     }
-    unsafe { sigprocmask(SIG_BLOCK, &set, ptr::null_mut()) }
+    unsafe { sigprocmask(SIG_BLOCK, &raw const set, ptr::null_mut()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
@@ -299,11 +299,11 @@ pub unsafe extern "C" fn sighold(sig: c_int) -> c_int {
 #[unsafe(no_mangle)]
 pub extern "C" fn sigignore(sig: c_int) -> c_int {
     let mut psa = mem::MaybeUninit::<sigaction>::uninit();
-    unsafe { sigemptyset(&mut (*psa.as_mut_ptr()).sa_mask) };
+    unsafe { sigemptyset(&raw mut (*psa.as_mut_ptr()).sa_mask) };
     let mut sa = unsafe { psa.assume_init() };
     sa.sa_handler = unsafe { mem::transmute(SIG_IGN) };
     sa.sa_flags = 0;
-    unsafe { sigaction(sig, &sa, ptr::null_mut()) }
+    unsafe { sigaction(sig, &raw const sa, ptr::null_mut()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/siginterrupt.html>.
@@ -320,7 +320,7 @@ pub extern "C" fn siginterrupt(sig: c_int, flag: c_int) -> c_int {
         sa.sa_flags |= SA_RESTART as c_int;
     }
 
-    unsafe { sigaction(sig, &sa, ptr::null_mut()) }
+    unsafe { sigaction(sig, &raw const sa, ptr::null_mut()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigismember.html>.
@@ -354,7 +354,7 @@ pub extern "C" fn signal(
         sa_mask: sigset_t::default(),
     };
     let mut old_sa = mem::MaybeUninit::uninit();
-    if unsafe { sigaction(sig, &sa, old_sa.as_mut_ptr()) } < 0 {
+    if unsafe { sigaction(sig, &raw const sa, old_sa.as_mut_ptr()) } < 0 {
         mem::forget(old_sa);
         return unsafe { mem::transmute(SIG_ERR) };
     }
@@ -371,10 +371,10 @@ pub unsafe extern "C" fn sigpause(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
     unsafe { sigprocmask(0, ptr::null_mut(), pset.as_mut_ptr()) };
     let mut set = unsafe { pset.assume_init() };
-    if unsafe { sigdelset(&mut set, sig) } == -1 {
+    if unsafe { sigdelset(&raw mut set, sig) } == -1 {
         return -1;
     }
-    unsafe { sigsuspend(&set) }
+    unsafe { sigsuspend(&raw const set) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/sigpending.html>.
@@ -429,10 +429,10 @@ pub unsafe extern "C" fn sigrelse(sig: c_int) -> c_int {
     let mut pset = mem::MaybeUninit::<sigset_t>::uninit();
     unsafe { sigemptyset(pset.as_mut_ptr()) };
     let mut set = unsafe { pset.assume_init() };
-    if unsafe { sigaddset(&mut set, sig) } < 0 {
+    if unsafe { sigaddset(&raw mut set, sig) } < 0 {
         return -1;
     }
-    unsafe { sigprocmask(SIG_UNBLOCK, &set, ptr::null_mut()) }
+    unsafe { sigprocmask(SIG_UNBLOCK, &raw const set, ptr::null_mut()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/sighold.html>.
@@ -451,7 +451,7 @@ pub unsafe extern "C" fn sigset(
     let sig_err: Option<extern "C" fn(c_int)> = unsafe { mem::transmute(SIG_ERR) };
     unsafe { sigemptyset(pset.as_mut_ptr()) };
     let mut set = unsafe { pset.assume_init() };
-    if unsafe { sigaddset(&mut set, sig) } < 0 {
+    if unsafe { sigaddset(&raw mut set, sig) } < 0 {
         return sig_err;
     } else {
         let is_equal = {
@@ -463,7 +463,7 @@ pub unsafe extern "C" fn sigset(
         };
         if is_equal {
             if unsafe { sigaction(sig, ptr::null_mut(), old_sa.as_mut_ptr()) } < 0
-                || unsafe { sigprocmask(SIG_BLOCK, &set, &mut set) } < 0
+                || unsafe { sigprocmask(SIG_BLOCK, &raw const set, &raw mut set) } < 0
             {
                 mem::forget(old_sa);
                 return sig_err;
@@ -475,16 +475,16 @@ pub unsafe extern "C" fn sigset(
                 sa_restorer: None, // set by platform if applicable
                 sa_mask: sigset_t::default(),
             };
-            unsafe { sigemptyset(&mut sa.sa_mask) };
-            if unsafe { sigaction(sig, &sa, old_sa.as_mut_ptr()) } < 0
-                || unsafe { sigprocmask(SIG_UNBLOCK, &set, &mut set) } < 0
+            unsafe { sigemptyset(&raw mut sa.sa_mask) };
+            if unsafe { sigaction(sig, &raw const sa, old_sa.as_mut_ptr()) } < 0
+                || unsafe { sigprocmask(SIG_UNBLOCK, &raw const set, &raw mut set) } < 0
             {
                 mem::forget(old_sa);
                 return sig_err;
             }
         }
     }
-    if unsafe { sigismember(&set, sig) } == 1 {
+    if unsafe { sigismember(&raw const set, sig) } == 1 {
         return sig_hold;
     }
     unsafe { old_sa.assume_init().sa_handler }
