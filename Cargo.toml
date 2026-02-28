@@ -105,14 +105,15 @@ features = ["elf", "read_core"]
 sc = "0.2.7"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-redox_syscall = "0.7"
+redox_syscall = "0.7.3"
 redox-rt = { path = "redox-rt" }
 redox-path = "0.3"
-redox_event = { version = "0.4.3", default-features = false, features = [
+redox_event = { version = "0.4.6", default-features = false, features = [
     "redox_syscall",
 ] }
 ioslice = { version = "0.6", default-features = false }
 redox-ioctl = { path = "redox-ioctl" }
+redox_protocols = { package = "libredox", version = "0.1.14", default-features = false, features = ["protocol"] }
 
 [features]
 # to enable trace level, take out this `no_trace`
