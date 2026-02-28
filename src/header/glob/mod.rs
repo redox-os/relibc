@@ -268,10 +268,8 @@ fn list_dir(
     // Restore the old errno
     platform::ERRNO.set(old_errno);
 
-    if errno != 0 {
-        if unsafe { errfunc(path.as_ptr(), errno) } != 0 || abort_on_error {
-            return Err(GLOB_ABORTED);
-        }
+    if errno != 0 && (unsafe { errfunc(path.as_ptr(), errno) } != 0 || abort_on_error) {
+        return Err(GLOB_ABORTED);
     }
 
     Ok(results)

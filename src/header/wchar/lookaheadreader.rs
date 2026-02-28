@@ -87,7 +87,7 @@ impl<'a> LookAheadFile<'a> {
         let mut wc: wchar_t = 0;
         unsafe {
             mbrtowc(
-                &mut wc,
+                &raw mut wc,
                 buf.as_ptr().cast::<c_char>(),
                 encoded_length,
                 ptr::null_mut(),

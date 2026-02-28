@@ -15,6 +15,7 @@ impl timespec {
     // TODO: Write test
 
     /// similar logic with timeradd
+    #[allow(clippy::should_implement_trait)] // not to confuse std::ops::Add
     pub fn add(base: timespec, interval: timespec) -> Option<timespec> {
         let delta_sec = base.tv_sec.checked_add(interval.tv_sec)?;
         let delta_nsec = base.tv_nsec.checked_add(interval.tv_nsec)?;
