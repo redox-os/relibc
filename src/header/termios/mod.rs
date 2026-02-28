@@ -71,13 +71,13 @@ pub struct termios {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcgetattr.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcgetattr(fd: c_int, out: *mut termios) -> c_int {
-    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TCGETS, out as *mut c_void) }
+    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TCGETS, out.cast::<c_void>()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcsetattr.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *const termios) -> c_int {
-    if act < 0 || act > 2 {
+    if !(0..=2).contains(&act) {
         platform::ERRNO.set(errno::EINVAL);
         return -1;
     }
@@ -89,7 +89,7 @@ pub unsafe extern "C" fn tcsetattr(fd: c_int, act: c_int, value: *const termios)
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcgetsid(fd: c_int) -> pid_t {
     let mut sid = 0;
-    if unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCGSID, (&raw mut sid) as *mut c_void) } < 0 {
+    if unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCGSID, (&raw mut sid).cast::<c_void>()) } < 0 {
         return -1;
     }
     sid
@@ -196,7 +196,7 @@ pub unsafe extern "C" fn tcflush(fd: c_int, queue: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcdrain.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcdrain(fd: c_int) -> c_int {
-    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, 1 as *mut _) }
+    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, core::ptr::dangling_mut()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcsendbreak.html>.
@@ -204,7 +204,7 @@ pub unsafe extern "C" fn tcdrain(fd: c_int) -> c_int {
 pub unsafe extern "C" fn tcsendbreak(fd: c_int, _dur: c_int) -> c_int {
     // non-zero duration is ignored by musl due to it being
     // implementation-defined. we do the same.
-    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, 0 as *mut _) }
+    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TCSBRK, core::ptr::null_mut()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcgetwinsize.html>.
@@ -216,7 +216,7 @@ pub unsafe extern "C" fn tcgetwinsize(fd: c_int, sws: *mut winsize) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcsetwinsize.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tcsetwinsize(fd: c_int, sws: *const winsize) -> c_int {
-    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCSWINSZ, (sws as *mut winsize).cast()) }
+    unsafe { sys_ioctl::ioctl(fd, sys_ioctl::TIOCSWINSZ, sws.cast_mut().cast()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/tcflow.html>.
