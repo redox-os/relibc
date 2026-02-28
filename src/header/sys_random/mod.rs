@@ -21,7 +21,7 @@ pub const GRND_RANDOM: c_uint = 2;
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getrandom(buf: *mut c_void, buflen: size_t, flags: c_uint) -> ssize_t {
     Sys::getrandom(
-        unsafe { slice::from_raw_parts_mut(buf as *mut u8, buflen as usize) },
+        unsafe { slice::from_raw_parts_mut(buf.cast::<u8>(), buflen) },
         flags,
     )
     .map(|read| read as ssize_t)
