@@ -153,7 +153,7 @@ macro_rules! strto_impl {
         let mut idx = 0;
 
         // skip any whitespace at the beginning of the string
-        while ctype::isspace(unsafe { *$s.offset(idx) } as c_int) != 0 {
+        while ctype::isspace(c_int::from(unsafe { *$s.offset(idx) })) != 0 {
             idx += 1;
         }
 
