@@ -105,7 +105,7 @@ features = ["elf", "read_core"]
 sc = "0.2.7"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-redox_syscall = { git = "https://gitlab.redox-os.org/Ibuki.O/syscall.git", branch = "enable-all-stdfscall" }
+redox_syscall = "0.7.3"
 redox-rt = { path = "redox-rt" }
 redox-path = "0.3"
 redox_event = { version = "0.4.3", default-features = false, features = [
@@ -113,7 +113,7 @@ redox_event = { version = "0.4.3", default-features = false, features = [
 ] }
 ioslice = { version = "0.6", default-features = false }
 redox-ioctl = { path = "redox-ioctl" }
-redox_protocols = { package = "libredox", git = "https://gitlab.redox-os.org/Ibuki.O/libredox.git", branch = "protocol", default-features = false, features = ["protocol"] }
+redox_protocols = { package = "libredox", version = "0.1.13", default-features = false, features = ["protocol"] }
 
 [features]
 # to enable trace level, take out this `no_trace`
@@ -131,4 +131,3 @@ panic = "abort"
 
 [patch.crates-io]
 cc-11 = { git = "https://github.com/tea/cc-rs", branch = "riscv-abi-arch-fix", package = "cc" }
-redox_syscall = { git = "https://gitlab.redox-os.org/Ibuki.O/syscall.git", branch = "enable-all-stdfscall" }

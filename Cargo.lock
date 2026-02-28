@@ -256,18 +256,9 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
 name = "libredox"
-version = "0.1.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d0b95e02c851351f877147b7deea7b1afb1df71b63aa5f8270716e0c5720616"
-dependencies = [
- "bitflags",
- "libc",
-]
-
-[[package]]
-name = "libredox"
 version = "0.1.13"
-source = "git+https://gitlab.redox-os.org/Ibuki.O/libredox.git?branch=protocol#180c4a5e845238e807d8c9a1c45ac3fd37c7cd52"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "062b52cd41eb8d929e81b592a47df833c33c15684933a9329440137a6d9f134c"
 dependencies = [
  "bitflags",
  "plain",
@@ -455,7 +446,7 @@ dependencies = [
  "generic-rt",
  "goblin",
  "ioslice",
- "libredox 0.1.13",
+ "libredox",
  "plain",
  "redox-path",
  "redox_syscall",
@@ -468,14 +459,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c30b73c93693667b5a8e6f54bddcc5a57449ef17c99f4b55c12d5bae4ab79e82"
 dependencies = [
  "bitflags",
- "libredox 0.1.12",
+ "libredox",
  "redox_syscall",
 ]
 
 [[package]]
 name = "redox_syscall"
 version = "0.7.3"
-source = "git+https://gitlab.redox-os.org/Ibuki.O/syscall.git?branch=enable-all-stdfscall#68b511f7a08471ee25e11019c4002924178c4f80"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ce70a74e890531977d37e532c34d45e9055d2409ed08ddba14529471ed0be16"
 dependencies = [
  "bitflags",
 ]
@@ -497,7 +489,7 @@ dependencies = [
  "ioslice",
  "libc",
  "libm",
- "libredox 0.1.13",
+ "libredox",
  "log",
  "md-5",
  "memchr",
