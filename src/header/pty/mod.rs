@@ -72,13 +72,13 @@ pub unsafe extern "C" fn forkpty(
     let mut set = signal::sigset_t::default();
     let mut oldset = signal::sigset_t::default();
 
-    if unsafe { openpty(&mut m, &mut s, name, tio, ws) } < 0 {
+    if unsafe { openpty(&raw mut m, &raw mut s, name, tio, ws) } < 0 {
         return -1;
     }
 
-    unsafe { signal::sigfillset(&mut set) };
-    unsafe { signal::pthread_sigmask(signal::SIG_BLOCK, &set, &mut oldset) };
-    unsafe { pthread::pthread_setcancelstate(pthread::PTHREAD_CANCEL_DISABLE, &mut cs) };
+    unsafe { signal::sigfillset(&raw mut set) };
+    unsafe { signal::pthread_sigmask(signal::SIG_BLOCK, &raw const set, &raw mut oldset) };
+    unsafe { pthread::pthread_setcancelstate(pthread::PTHREAD_CANCEL_DISABLE, &raw mut cs) };
 
     if unsafe { unistd::pipe2(p.as_mut_ptr(), fcntl::O_CLOEXEC) } != 0 {
         unistd::close(s);
@@ -99,7 +99,9 @@ pub unsafe extern "C" fn forkpty(
             }
             unistd::close(p[1]);
             unsafe { pthread::pthread_setcancelstate(cs, ptr::null_mut()) };
-            unsafe { signal::pthread_sigmask(signal::SIG_SETMASK, &oldset, ptr::null_mut()) };
+            unsafe {
+                signal::pthread_sigmask(signal::SIG_SETMASK, &raw const oldset, ptr::null_mut())
+            };
             return 0;
         }
 
@@ -115,7 +117,7 @@ pub unsafe extern "C" fn forkpty(
         } > 0
         {
             let mut status = 0;
-            unsafe { sys_wait::waitpid(pid, &mut status, 0) };
+            unsafe { sys_wait::waitpid(pid, &raw mut status, 0) };
             pid = -1;
             platform::ERRNO.set(ec);
         }
@@ -127,6 +129,6 @@ pub unsafe extern "C" fn forkpty(
         unistd::close(m);
     }
     unsafe { pthread::pthread_setcancelstate(cs, ptr::null_mut()) };
-    unsafe { signal::pthread_sigmask(signal::SIG_SETMASK, &oldset, ptr::null_mut()) };
+    unsafe { signal::pthread_sigmask(signal::SIG_SETMASK, &raw const oldset, ptr::null_mut()) };
     pid
 }
