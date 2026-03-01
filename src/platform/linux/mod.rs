@@ -598,6 +598,10 @@ impl Pal for Sys {
             .map(|fd| fd as c_int)
     }
 
+    fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
+        e_raw(unsafe { syscall!(OPENAT, dirfd, path.as_ptr(), oflag, mode) }).map(|fd| fd as c_int)
+    }
+
     fn pipe2(mut fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), flags) }).map(|_| ())
     }

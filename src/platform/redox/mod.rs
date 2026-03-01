@@ -995,6 +995,21 @@ impl Pal for Sys {
         Ok(libredox::open(path, oflag, effective_mode)? as c_int)
     }
 
+    fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
+        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
+
+        // POSIX states that umask should affect the following:
+        //
+        // open, openat, creat, mkdir, mkdirat,
+        // mkfifo, mkfifoat, mknod, mknodat,
+        // mq_open, and sem_open,
+        //
+        // all of which (the ones that exist thus far) currently call this function.
+        let effective_mode = mode & !(redox_rt::sys::get_umask() as mode_t);
+
+        Ok(libredox::openat(dirfd, path, oflag, effective_mode)? as c_int)
+    }
+
     fn pipe2(mut fds: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
         fds.write(extra::pipe2(flags as usize)?);
         Ok(())
