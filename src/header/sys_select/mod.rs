@@ -42,6 +42,7 @@ pub struct fd_set {
     pub fds_bits: bitset,
 }
 
+#[allow(clippy::needless_update)]
 pub fn select_epoll(
     nfds: c_int,
     readfds: Option<&mut fd_set>,
@@ -93,6 +94,7 @@ pub fn select_epoll(
             let mut event = epoll_event {
                 events,
                 data: epoll_data { fd },
+                ..Default::default() // clippy lint, _pad field on redox but not linux
             };
             if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &raw mut event) } < 0 {
                 if platform::ERRNO.get() == errno::EPERM {
