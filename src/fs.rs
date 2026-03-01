@@ -31,8 +31,20 @@ impl File {
             .map_err(Errno::sync)
     }
 
+    pub fn openat(dirfd: c_int, path: CStr, oflag: c_int) -> Result<Self, Errno> {
+        Sys::openat(dirfd, path, oflag, 0)
+            .map(Self::new)
+            .map_err(Errno::sync)
+    }
+
     pub fn create(path: CStr, oflag: c_int, mode: mode_t) -> Result<Self, Errno> {
         Sys::open(path, oflag | O_CREAT, mode)
+            .map(Self::new)
+            .map_err(Errno::sync)
+    }
+
+    pub fn createat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<Self, Errno> {
+        Sys::openat(dirfd, path, oflag | O_CREAT, mode)
             .map(Self::new)
             .map_err(Errno::sync)
     }

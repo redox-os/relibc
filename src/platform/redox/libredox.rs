@@ -32,6 +32,21 @@ pub fn open(path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
         .map(|f| f as usize)
 }
 
+pub fn openat(dirfd: c_int, path: &str, oflag: c_int, mode: mode_t) -> Result<usize> {
+    let usize_fd = super::path::openat(
+        dirfd,
+        path,
+        ((oflag as usize) & 0xFFFF_0000) | ((mode as usize) & 0xFFFF),
+    )?;
+
+    c_int::try_from(usize_fd)
+        .map_err(|_| {
+            let _ = syscall::close(usize_fd);
+            Error::new(EMFILE)
+        })
+        .map(|f| f as usize)
+}
+
 pub unsafe fn fstat(fd: usize, buf: *mut crate::header::sys_stat::stat) -> Result<()> {
     let mut redox_buf: syscall::Stat = Default::default();
     syscall::fstat(fd, &mut redox_buf)?;
