@@ -117,8 +117,8 @@ impl<L: LogSink> LogParams<L> {
                 fprintf(
                     stderr,
                     c"%s: %s".as_ptr(),
-                    self.ident.as_ptr() as *const c_char,
-                    buffer[prefix..].as_ptr() as *const c_char,
+                    self.ident.as_ptr().cast::<c_char>(),
+                    buffer[prefix..].as_ptr().cast::<c_char>(),
                 );
             }
         }

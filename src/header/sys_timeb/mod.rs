@@ -42,7 +42,7 @@ pub unsafe extern "C" fn ftime(tp: *mut timeb) -> c_int {
 
     // SAFETY: tv and tz are created above, and thus will coerce to valid
     // pointers.
-    if unsafe { gettimeofday(&mut tv, &mut tz) } < 0 {
+    if unsafe { gettimeofday(&raw mut tv, &raw mut tz) } < 0 {
         return -1;
     }
 
