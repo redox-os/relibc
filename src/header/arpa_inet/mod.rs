@@ -31,7 +31,7 @@ use crate::{
 pub unsafe extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
     let mut val: in_addr = in_addr { s_addr: 0 };
 
-    if unsafe { inet_aton(cp, &mut val) } > 0 {
+    if unsafe { inet_aton(cp, &raw mut val) } > 0 {
         val.s_addr
     } else {
         INADDR_NONE
