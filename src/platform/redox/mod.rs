@@ -28,8 +28,8 @@ use crate::{
     header::{
         bits_time::timespec,
         errno::{
-            EBADF, EBADFD, EBADR, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT,
-            ENOMEM, ENOSYS, EOPNOTSUPP, EPERM,
+            EBADF, EBADFD, EEXIST, EFAULT, EFBIG, EINTR, EINVAL, EIO, ENAMETOOLONG, ENOENT, ENOMEM,
+            ENOSYS, EOPNOTSUPP, EPERM,
         },
         fcntl::{
             self, AT_EMPTY_PATH, AT_FDCWD, AT_SYMLINK_NOFOLLOW, F_GETLK, F_OFD_GETLK, F_OFD_SETLK,
@@ -772,21 +772,13 @@ impl Pal for Sys {
     }
 
     fn mkdirat(dir_fd: c_int, path_name: CStr, mode: mode_t) -> Result<()> {
-        let mut dir_path_buf = [0; 4096];
-        let res = Sys::fpath(dir_fd, &mut dir_path_buf)?;
-
-        let dir_path = str::from_utf8(&dir_path_buf[..res as usize]).map_err(|_| Errno(EBADR))?;
-
-        let resource_path =
-            path::canonicalize_using_cwd(Some(&dir_path), &path_name.to_string_lossy())
-                // Since parent_dir_path is resolved by fpath, it is more likely that
-                // the problem was with path.
-                .ok_or(Errno(ENOENT))?;
-
-        Sys::mkdir(
-            CStr::borrow(&CString::new(resource_path.as_bytes()).unwrap()),
-            mode,
-        )
+        File::createat(
+            dir_fd,
+            path_name,
+            fcntl::O_DIRECTORY | fcntl::O_EXCL | fcntl::O_CLOEXEC,
+            0o777,
+        )?;
+        Ok(())
     }
 
     fn mkdir(path: CStr, mode: mode_t) -> Result<()> {
@@ -799,19 +791,11 @@ impl Pal for Sys {
     }
 
     fn mkfifoat(dir_fd: c_int, path_name: CStr, mode: mode_t) -> Result<()> {
-        let mut dir_path_buf = [0; 4096];
-        let res = Sys::fpath(dir_fd, &mut dir_path_buf)?;
-
-        let dir_path = str::from_utf8(&dir_path_buf[..res as usize]).map_err(|_| Errno(EBADR))?;
-
-        let resource_path =
-            path::canonicalize_using_cwd(Some(&dir_path), &path_name.to_string_lossy())
-                // Since parent_dir_path is resolved by fpath, it is more likely that
-                // the problem was with path.
-                .ok_or(Errno(ENOENT))?;
-        Sys::mkfifo(
-            CStr::borrow(&CString::new(resource_path.as_bytes()).unwrap()),
-            mode,
+        Sys::mknodat(
+            dir_fd,
+            path_name,
+            syscall::MODE_FIFO as mode_t | (mode & 0o777),
+            0,
         )
     }
 
@@ -820,22 +804,8 @@ impl Pal for Sys {
     }
 
     fn mknodat(dir_fd: c_int, path_name: CStr, mode: mode_t, dev: dev_t) -> Result<()> {
-        let mut dir_path_buf = [0; 4096];
-        let res = Sys::fpath(dir_fd, &mut dir_path_buf)?;
-
-        let dir_path = str::from_utf8(&dir_path_buf[..res as usize]).map_err(|_| Errno(EBADR))?;
-
-        let resource_path =
-            path::canonicalize_using_cwd(Some(&dir_path), &path_name.to_string_lossy())
-                // Since parent_dir_path is resolved by fpath, it is more likely that
-                // the problem was with path.
-                .ok_or(Errno(ENOENT))?;
-
-        Sys::mknod(
-            CStr::borrow(&CString::new(resource_path.as_bytes()).unwrap()),
-            mode,
-            dev,
-        )
+        File::createat(dir_fd, path_name, fcntl::O_CREAT | fcntl::O_CLOEXEC, mode)?;
+        Ok(())
     }
 
     fn mknod(path: CStr, mode: mode_t, dev: dev_t) -> Result<(), Errno> {
@@ -993,6 +963,21 @@ impl Pal for Sys {
         let effective_mode = mode & !(redox_rt::sys::get_umask() as mode_t);
 
         Ok(libredox::open(path, oflag, effective_mode)? as c_int)
+    }
+
+    fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
+        let path = path.to_str().map_err(|_| Errno(EINVAL))?;
+
+        // POSIX states that umask should affect the following:
+        //
+        // open, openat, creat, mkdir, mkdirat,
+        // mkfifo, mkfifoat, mknod, mknodat,
+        // mq_open, and sem_open,
+        //
+        // all of which (the ones that exist thus far) currently call this function.
+        let effective_mode = mode & !(redox_rt::sys::get_umask() as mode_t);
+
+        Ok(libredox::openat(dirfd, path, oflag, effective_mode)? as c_int)
     }
 
     fn pipe2(mut fds: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
@@ -1167,11 +1152,11 @@ impl Pal for Sys {
         }
 
         let new_path = new_path.to_str().map_err(|_| Errno(EINVAL))?;
-        let target = openat2_path(new_dir, new_path, 0)?;
         // Fail if the target exists with RENAME_NOREPLACE.
         if flags & RENAME_NOREPLACE != 0
             && let Ok(fd) =
-                libredox::open(&target, fcntl::O_PATH | fcntl::O_CLOEXEC, 0).map(FdGuard::new)
+                libredox::openat(new_dir, &new_path, fcntl::O_PATH | fcntl::O_CLOEXEC, 0)
+                    .map(FdGuard::new)
         {
             return Err(Errno(EEXIST));
         }
@@ -1180,6 +1165,7 @@ impl Pal for Sys {
         // oflags are the same as Sys::rename above.
         let source = openat2(old_dir, old_path, 0, fcntl::O_NOFOLLOW | fcntl::O_PATH)?;
 
+        let target = openat2_path(new_dir, new_path, 0)?;
         // I'm avoiding Sys::rename to avoid reallocating a CString from a String.
         syscall::frename(*source as usize, target)
             .map(|_| ())
