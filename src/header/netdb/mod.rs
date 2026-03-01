@@ -944,7 +944,7 @@ pub unsafe extern "C" fn getaddrinfo(
         unsafe {
             let mut indirect = res;
             while !(*indirect).is_null() {
-                indirect = &mut (**indirect).ai_next;
+                indirect = &raw mut (**indirect).ai_next;
             }
             *indirect = Box::into_raw(addrinfo)
         }
