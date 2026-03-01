@@ -93,7 +93,7 @@ pub fn chdir(path: &str) -> Result<()> {
     let mut cwd_guard = CWD.write();
     let (is_relative, path) = normalize_path(path).ok_or(Error::new(ENOENT))?;
     if is_relative {
-        let fd = current_dir()?
+        let fd = cwd_guard
             .as_ref()
             .unwrap()
             .fd
