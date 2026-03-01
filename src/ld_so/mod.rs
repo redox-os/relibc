@@ -13,7 +13,7 @@ use object::{
 
 use self::tcb::{Master, Tcb};
 use crate::{
-    header::sys_auxv::AT_NULL,
+    header::sys_auxv::{AT_NULL, AT_PHDR, AT_PHENT, AT_PHNUM},
     platform::{Pal, Sys},
     start::Stack,
 };
@@ -57,9 +57,9 @@ pub fn static_init(
         }
 
         match kind {
-            3 => phdr_opt = Some(value),
-            4 => phent_opt = Some(value),
-            5 => phnum_opt = Some(value),
+            AT_PHDR => phdr_opt = Some(value),
+            AT_PHENT => phent_opt = Some(value),
+            AT_PHNUM => phnum_opt = Some(value),
             _ => (),
         }
 
