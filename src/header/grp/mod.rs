@@ -541,7 +541,7 @@ pub unsafe extern "C" fn getgrouplist(
 pub unsafe extern "C" fn initgroups(user: *const c_char, gid: gid_t) -> c_int {
     let mut groups = [0; limits::NGROUPS_MAX];
     let mut count = groups.len() as c_int;
-    if unsafe { getgrouplist(user, gid, groups.as_mut_ptr(), &mut count) < 0 } {
+    if unsafe { getgrouplist(user, gid, groups.as_mut_ptr(), &raw mut count) < 0 } {
         return -1;
     }
     unsafe { unistd::setgroups(count as size_t, groups.as_ptr()) }

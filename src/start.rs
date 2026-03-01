@@ -236,7 +236,7 @@ pub unsafe extern "C" fn relibc_start_v1(
     {
         let mut f = unsafe { &__preinit_array_start } as *const _;
         #[allow(clippy::op_ref)]
-        while f < unsafe { &__preinit_array_end } {
+        while f < &raw const __preinit_array_end {
             (unsafe { *f })();
             f = unsafe { f.offset(1) };
         }
@@ -252,7 +252,7 @@ pub unsafe extern "C" fn relibc_start_v1(
     {
         let mut f = unsafe { &__init_array_start } as *const _;
         #[allow(clippy::op_ref)]
-        while f < unsafe { &__init_array_end } {
+        while f < &raw const __init_array_end {
             (unsafe { *f })();
             f = unsafe { f.offset(1) };
         }
