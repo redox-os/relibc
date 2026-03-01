@@ -85,10 +85,10 @@ pub const extern "C" fn LOG_MASK(p: c_int) -> c_int {
 pub extern "C" fn setlogmask(mask: c_int) -> c_int {
     let mut params = LOGGER.lock();
     let old = params.mask.bits();
-    if mask != 0 {
-        if let Some(mask) = params.mask.with_mask(mask) {
-            params.mask = mask;
-        }
+    if mask != 0
+        && let Some(mask) = params.mask.with_mask(mask)
+    {
+        params.mask = mask;
     }
     old
 }
@@ -110,9 +110,9 @@ pub unsafe extern "C" fn openlog(ident: *const c_char, opt: c_int, facility: c_i
     );
 
     // Ensure log is ready to write now instead of checking on the first message.
-    if conf.contains(logger::Config::NoDelay) {
-        if let Ok(()) = params.open_logger() {}; // TODO handle error
-    }
+    if conf.contains(logger::Config::NoDelay)
+        && let Ok(()) = params.open_logger()
+    {}; // TODO handle error
 }
 
 /// See <https://www.man7.org/linux/man-pages/man3/vsyslog.3.html>.

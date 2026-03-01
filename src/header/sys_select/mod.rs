@@ -71,53 +71,52 @@ pub fn select_epoll(
     for fd in 0..nfds {
         let mut events = 0;
 
-        if let Some(ref fd_set) = read_bitset {
-            if fd_set.contains(fd as usize) {
-                events |= EPOLLIN;
-            }
+        if let Some(ref fd_set) = read_bitset
+            && fd_set.contains(fd as usize)
+        {
+            events |= EPOLLIN;
         }
 
-        if let Some(ref fd_set) = write_bitset {
-            if fd_set.contains(fd as usize) {
-                events |= EPOLLOUT;
-            }
+        if let Some(ref fd_set) = write_bitset
+            && fd_set.contains(fd as usize)
+        {
+            events |= EPOLLOUT;
         }
 
-        if let Some(ref fd_set) = except_bitset {
-            if fd_set.contains(fd as usize) {
-                events |= EPOLLERR;
-            }
+        if let Some(ref fd_set) = except_bitset
+            && fd_set.contains(fd as usize)
+        {
+            events |= EPOLLERR;
         }
 
         if events > 0 {
             let mut event = epoll_event {
                 events,
                 data: epoll_data { fd },
-                ..Default::default()
             };
-            if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) } < 0 {
+            if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &raw mut event) } < 0 {
                 if platform::ERRNO.get() == errno::EPERM {
                     not_epoll += 1;
                 } else {
                     return -1;
                 }
             } else {
-                if let Some(ref mut fd_set) = read_bitset {
-                    if fd_set.contains(fd as usize) {
-                        fd_set.remove(fd as usize);
-                    }
+                if let Some(ref mut fd_set) = read_bitset
+                    && fd_set.contains(fd as usize)
+                {
+                    fd_set.remove(fd as usize);
                 }
 
-                if let Some(ref mut fd_set) = write_bitset {
-                    if fd_set.contains(fd as usize) {
-                        fd_set.remove(fd as usize);
-                    }
+                if let Some(ref mut fd_set) = write_bitset
+                    && fd_set.contains(fd as usize)
+                {
+                    fd_set.remove(fd as usize);
                 }
 
-                if let Some(ref mut fd_set) = except_bitset {
-                    if fd_set.contains(fd as usize) {
-                        fd_set.remove(fd as usize);
-                    }
+                if let Some(ref mut fd_set) = except_bitset
+                    && fd_set.contains(fd as usize)
+                {
+                    fd_set.remove(fd as usize);
                 }
             }
         }
@@ -153,23 +152,23 @@ pub fn select_epoll(
         let fd = unsafe { event.data.fd };
         // TODO: Error status when fd does not match?
         if fd >= 0 && fd < FD_SETSIZE as c_int {
-            if event.events & EPOLLIN > 0 {
-                if let Some(ref mut fd_set) = read_bitset {
-                    fd_set.insert(fd as usize);
-                    count += 1;
-                }
+            if event.events & EPOLLIN > 0
+                && let Some(ref mut fd_set) = read_bitset
+            {
+                fd_set.insert(fd as usize);
+                count += 1;
             }
-            if event.events & EPOLLOUT > 0 {
-                if let Some(ref mut fd_set) = write_bitset {
-                    fd_set.insert(fd as usize);
-                    count += 1;
-                }
+            if event.events & EPOLLOUT > 0
+                && let Some(ref mut fd_set) = write_bitset
+            {
+                fd_set.insert(fd as usize);
+                count += 1;
             }
-            if event.events & EPOLLERR > 0 {
-                if let Some(ref mut fd_set) = except_bitset {
-                    fd_set.insert(fd as usize);
-                    count += 1;
-                }
+            if event.events & EPOLLERR > 0
+                && let Some(ref mut fd_set) = except_bitset
+            {
+                fd_set.insert(fd as usize);
+                count += 1;
             }
         }
     }

@@ -73,10 +73,7 @@ impl Cond {
         let relative = match clock_id {
             // FUTEX expect monotonic clock
             CLOCK_MONOTONIC => timeout.clone(),
-            CLOCK_REALTIME => match timespec_realtime_to_monotonic(timeout.clone()) {
-                Ok(relative) => relative,
-                Err(err) => return Err(err),
-            },
+            CLOCK_REALTIME => timespec_realtime_to_monotonic(timeout.clone())?,
             _ => return Err(Errno(EINVAL)),
         };
 
