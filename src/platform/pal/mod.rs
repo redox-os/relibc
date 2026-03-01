@@ -222,6 +222,8 @@ pub trait Pal {
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
 
+    fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
+
     fn pipe2(fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()>;
 
     fn posix_fallocate(fd: c_int, offset: u64, length: NonZeroU64) -> Result<()>;
