@@ -16,6 +16,7 @@ unsafe impl<T: Send + Sync> Send for Waitval<T> {}
 unsafe impl<T: Send + Sync> Sync for Waitval<T> {}
 
 impl<T> Waitval<T> {
+    #[allow(clippy::new_without_default)]
     pub const fn new() -> Self {
         Self {
             state: AtomicUint::new(0),

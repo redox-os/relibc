@@ -14,6 +14,7 @@ use dlmalloc::DlmallocCApi;
 
 pub type Dlmalloc = DlmallocCApi<sys::System>;
 
+#[allow(clippy::declare_interior_mutable_const)]
 pub const NEWALLOCATOR: Allocator = Allocator::new();
 
 pub struct Allocator {
@@ -22,6 +23,7 @@ pub struct Allocator {
 }
 
 impl Allocator {
+    #[allow(clippy::new_without_default)]
     pub const fn new() -> Self {
         Allocator {
             inner: SyncUnsafeCell::new(Mutex::new(Dlmalloc::new(sys::System::new()))),

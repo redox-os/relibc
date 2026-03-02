@@ -127,17 +127,17 @@ pub unsafe extern "C" fn newlocale(mask: c_int, locale: *const c_char, base: loc
     if base != LC_GLOBAL_LOCALE {
         // borrowing here
         let base = base.cast_const().cast::<LocaleData>();
-        if let Ok(new_locale) = new_locale.as_mut() {
-            if let Some(base) = unsafe { base.as_ref() } {
-                // copy old values if not containing the mask
-                if (mask & LC_NUMERIC_MASK) == 0 {
-                    new_locale.copy_category(base, LC_NUMERIC);
-                }
-                if (mask & LC_MONETARY_MASK) == 0 {
-                    new_locale.copy_category(base, LC_MONETARY);
-                }
-                // TODO: other categories?
+        if let Ok(new_locale) = new_locale.as_mut()
+            && let Some(base) = unsafe { base.as_ref() }
+        {
+            // copy old values if not containing the mask
+            if (mask & LC_NUMERIC_MASK) == 0 {
+                new_locale.copy_category(base, LC_NUMERIC);
             }
+            if (mask & LC_MONETARY_MASK) == 0 {
+                new_locale.copy_category(base, LC_MONETARY);
+            }
+            // TODO: other categories?
         }
     }
     new_locale.or_errno_null_mut().cast()

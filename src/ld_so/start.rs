@@ -74,10 +74,10 @@ unsafe fn get_env(mut ptr: *const usize) -> (BTreeMap<String, String>, *const us
         let env = unsafe { *ptr };
         if let Ok(arg_str) = unsafe { CStr::from_ptr(env as *const c_char).to_str() } {
             let mut parts = arg_str.splitn(2, '=');
-            if let Some(key) = parts.next() {
-                if let Some(value) = parts.next() {
-                    envs.insert(key.to_owned(), value.to_owned());
-                }
+            if let Some(key) = parts.next()
+                && let Some(value) = parts.next()
+            {
+                envs.insert(key.to_owned(), value.to_owned());
             }
         }
         ptr = unsafe { ptr.add(1) };

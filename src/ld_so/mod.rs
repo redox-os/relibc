@@ -203,10 +203,10 @@ pub unsafe fn init(
 }
 
 pub unsafe fn fini() {
-    if let Some(tcb) = unsafe { Tcb::current() } {
-        if !tcb.linker_ptr.is_null() {
-            let linker = unsafe { (*tcb.linker_ptr).lock() };
-            linker.fini();
-        }
+    if let Some(tcb) = unsafe { Tcb::current() }
+        && !tcb.linker_ptr.is_null()
+    {
+        let linker = unsafe { (*tcb.linker_ptr).lock() };
+        linker.fini();
     }
 }

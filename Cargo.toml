@@ -22,7 +22,13 @@ exclude = ["tests", "dlmalloc-rs"]
 [workspace.lints.clippy]
 borrow_as_ptr = "deny"
 cast_lossless = "warn" # TODO review occurrences
+cast_possible_truncation = "allow" # TODO review occurrences
+cast_possible_wrap = "allow" # TODO review occurrences
+cast_precision_loss = "allow" # TODO review occurrences
 cast_ptr_alignment = "allow" # TODO review occurrences
+cast_sign_loss = "allow" # TODO review occurrences
+missing_errors_doc = "allow" # TODO review occurrences
+missing_panics_doc = "allow" # TODO review occurrences
 missing_safety_doc = "allow" # TODO review occurrences
 mut_from_ref = "warn" # TODO review occurrences
 precedence = "deny"
