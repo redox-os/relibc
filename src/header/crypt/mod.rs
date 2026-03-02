@@ -46,6 +46,7 @@ pub struct crypt_data {
 }
 
 impl crypt_data {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         crypt_data {
             initialized: 1,

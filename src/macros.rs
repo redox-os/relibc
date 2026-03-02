@@ -47,7 +47,7 @@ pub const ISSUE_URL: &str = "https://gitlab.redox-os.org/redox-os/relibc/-/issue
 macro_rules! todo_skip {
     ($issue:expr, $($arg:tt)*) => {
         if $issue != 0 {
-            log::info!("TODO ({}{}): {}", crate::macros::ISSUE_URL, $issue, format_args!($($arg)*))
+            log::info!("TODO ({}{}): {}", $crate::macros::ISSUE_URL, $issue, format_args!($($arg)*))
         } else {
             log::info!("TODO: {}", format_args!($($arg)*))
         }
@@ -59,7 +59,7 @@ macro_rules! todo_skip {
 macro_rules! todo_error {
     ($issue:expr, $err:expr, $($arg:tt)*) => {
         if $issue != 0 {
-            log::error!("TODO ({}{}): {}: {}", crate::macros::ISSUE_URL, $issue, format_args!($($arg)*), $err)
+            log::error!("TODO ({}{}): {}: {}", $crate::macros::ISSUE_URL, $issue, format_args!($($arg)*), $err)
         } else {
             log::error!("TODO: {}: {:?}", format_args!($($arg)*), $err)
         }
@@ -71,7 +71,7 @@ macro_rules! todo_error {
 macro_rules! todo_panic {
     ($issue:expr, $($arg:tt)*) => {
         if $issue != 0 {
-            todo!("{} ({}{})", format_args!($($arg)*), crate::macros::ISSUE_URL, $issue)
+            todo!("{} ({}{})", format_args!($($arg)*), $crate::macros::ISSUE_URL, $issue)
         } else {
             todo!("{}", format_args!($($arg)*))
         }

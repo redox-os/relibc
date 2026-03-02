@@ -84,28 +84,27 @@ impl<L: LogSink> LogParams<L> {
         unsafe { printf(&mut buffer, message, ap) };
         buffer.extend(b"\n\0");
 
-        if self.maybe_open_logger().is_ok() {
-            if self
+        if self.maybe_open_logger().is_ok()
+            && self
                 .writer
                 .as_mut()
                 .map(|w| w.writer().write_all(&buffer).is_err())
                 .unwrap_or(true)
+        {
+            // Try reopening the log file once and retrying as musl does.
+            if !self
+                .open_logger()
+                .is_ok()
+                .then(|| {
+                    self.writer
+                        .as_mut()
+                        .map(|w| w.writer().write_all(&buffer).is_ok())
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default()
+                && self.opt.contains(Config::Console)
             {
-                // Try reopening the log file once and retrying as musl does.
-                if !self
-                    .open_logger()
-                    .is_ok()
-                    .then(|| {
-                        self.writer
-                            .as_mut()
-                            .map(|w| w.writer().write_all(&buffer).is_ok())
-                            .unwrap_or_default()
-                    })
-                    .unwrap_or_default()
-                    && self.opt.contains(Config::Console)
-                {
-                    // TODO: Log error to /dev/console & Redox equivalent
-                }
+                // TODO: Log error to /dev/console & Redox equivalent
             }
         }
         if self.opt.contains(Config::PError) {

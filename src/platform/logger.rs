@@ -13,15 +13,15 @@ pub unsafe fn init() {
     #[cfg(feature = "no_trace")]
     let mut trace_warn = false;
     unsafe {
-        if let Some(env) = CStr::from_nullable_ptr(crate::header::stdlib::getenv(log_env)) {
-            if let Ok(level) = log::LevelFilter::from_str(env.to_str().unwrap_or("")) {
-                #[cfg(feature = "no_trace")]
-                if level == log::LevelFilter::Trace {
-                    trace_warn = true;
-                }
-
-                logger = logger.with_output(OutputBuilder::stderr().with_filter(level).build());
+        if let Some(env) = CStr::from_nullable_ptr(crate::header::stdlib::getenv(log_env))
+            && let Ok(level) = log::LevelFilter::from_str(env.to_str().unwrap_or(""))
+        {
+            #[cfg(feature = "no_trace")]
+            if level == log::LevelFilter::Trace {
+                trace_warn = true;
             }
+
+            logger = logger.with_output(OutputBuilder::stderr().with_filter(level).build());
         }
         if let Some(name) = CStr::from_nullable_ptr(crate::platform::program_invocation_short_name)
         {

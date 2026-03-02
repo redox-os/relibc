@@ -10,6 +10,7 @@ pub struct LinkerCallbacks {
 }
 
 impl LinkerCallbacks {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> LinkerCallbacks {
         LinkerCallbacks {
             unload: Box::new(unload),

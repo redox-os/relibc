@@ -96,10 +96,10 @@ fn alloc_init() {
         }
     }
     unsafe {
-        if let Some(tcb) = ld_so::tcb::Tcb::current() {
-            if !tcb.mspace.is_null() {
-                ALLOCATOR.set(tcb.mspace);
-            }
+        if let Some(tcb) = ld_so::tcb::Tcb::current()
+            && !tcb.mspace.is_null()
+        {
+            ALLOCATOR.set(tcb.mspace);
         }
     }
 }

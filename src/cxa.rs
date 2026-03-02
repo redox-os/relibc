@@ -58,12 +58,11 @@ pub unsafe extern "C" fn __cxa_finalize(dso: *mut c_void) {
     let dso_usize = dso as usize;
 
     for slot in funcs.iter_mut().rev() {
-        if let Some(entry) = slot.as_ref() {
-            if dso.is_null() || entry.dso == dso_usize {
-                if let Some(entry_to_run) = slot.take() {
-                    (entry_to_run.func)(entry_to_run.arg as *mut c_void);
-                }
-            }
+        if let Some(entry) = slot.as_ref()
+            && (dso.is_null() || entry.dso == dso_usize)
+            && let Some(entry_to_run) = slot.take()
+        {
+            (entry_to_run.func)(entry_to_run.arg as *mut c_void);
         }
     }
 
