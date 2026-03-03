@@ -1,4 +1,8 @@
-sys_includes = ["sys/types.h", "features.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dirent.h.html
+#
+# Spec quotations relating to includes:
+# - "The <dirent.h> header shall define the ino_t, reclen_t, size_t, and ssize_t types as described in <sys/types.h>."
+sys_includes = ["sys/types.h"]
 include_guard = "_RELIBC_DIRENT_H"
 language = "C"
 style = "Both"
