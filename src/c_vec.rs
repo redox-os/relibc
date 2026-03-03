@@ -29,6 +29,7 @@ pub struct CVec<T> {
     cap: usize,
 }
 impl<T> CVec<T> {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             ptr: NonNull::dangling(),

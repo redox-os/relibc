@@ -125,7 +125,7 @@ impl<'a, T> Deref for MutexGuard<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.content
+        self.content
     }
 }
 impl<'a, T> DerefMut for MutexGuard<'a, T> {
