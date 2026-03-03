@@ -2,8 +2,12 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/setjmp.h.html>.
 
-use core::{arch::global_asm, ffi::c_int};
+use core::arch::global_asm;
 
+#[cfg(target_arch = "aarch64")]
+use core::ffi::c_int;
+
+#[cfg(target_arch = "aarch64")]
 use crate::header::signal::sigsetjmp;
 
 macro_rules! platform_specific {
