@@ -60,7 +60,7 @@ pub unsafe extern "C" fn inet_aton(cp: *const c_char, inp: *mut in_addr) -> c_in
                 count += 1;
             }
         }
-        if count == 3 {
+        if count == 4 {
             four_parts_decimal_only = true;
         }
     } else if cp_cstr.len() == 4 {
