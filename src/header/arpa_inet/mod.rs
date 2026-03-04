@@ -41,8 +41,43 @@ pub unsafe extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/inet_aton.3.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_aton(cp: *const c_char, inp: *mut in_addr) -> c_int {
-    // TODO: octal/hex
-    unsafe { inet_pton(AF_INET, cp, inp.cast::<c_void>()) }
+    let cp_cstr = unsafe { CStr::from_ptr(cp) };
+    let mut four_parts_decimal_only = false;
+    if cp_cstr.contains(b'.') {
+        // 2, 3 or 4 part address
+        let parts = unsafe { str::from_utf8_unchecked(cp_cstr.to_bytes()).split('.') };
+        let mut count = 0;
+        for part in parts {
+            if let Some(hex_or_oct) = part.strip_prefix('0')
+                && part.len() > 1
+            {
+                match hex_or_oct.bytes().next() {
+                    Some(b'x' | b'X') => todo_skip!(0, "parsing hex values unimplemented"),
+                    // TODO: C2Y accept `0o` or `0O` as octal prefixes, C23 and below only use `0`
+                    _ => todo_skip!(0, "parsing octal values unimplemented"),
+                }
+            } else {
+                count += 1;
+            }
+        }
+        if count == 3 {
+            four_parts_decimal_only = true;
+        }
+    } else if cp_cstr.len() == 4 {
+        // 1 part address (32 bit value to be stored directly into address without byte rearrangement)
+        let s_addr_bytes: [u8; 4] = cp_cstr.to_bytes().try_into().expect("guaranteed 4 bytes");
+        unsafe {
+            (*inp.cast::<in_addr>()).s_addr = in_addr_t::from_ne_bytes(s_addr_bytes);
+        }
+        return 1; // successful
+    }
+    if four_parts_decimal_only {
+        unsafe { inet_pton(AF_INET, cp, inp.cast::<c_void>()) }
+    } else {
+        todo_skip!(0, "parsing 2 or more non-decimal values unimplemented");
+        // TODO convert octal and hexadecimal parts into decimal and feed into `inet_pton`
+        0 // indicates `cp` is an invalid string
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/7908799/xns/inet_lnaof.html>.
