@@ -52,6 +52,8 @@ Float madness:
 0.0001
 1E-05
 1.000000E-05
+001234.56
+001234.56
 
 Non-finite float madness:
 %e: inf -inf nan -nan

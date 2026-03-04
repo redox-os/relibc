@@ -65,6 +65,9 @@ int main(void) {
     printf("%G\n", 0.00001);
     printf("%E\n", 0.00001);
 
+    printf("%2$0*1$.*3$lf\n", 9, 1234.56, 2);
+    printf("%2$0*1$.*3$Lf\n", 9, 1234.56L, 2);
+
     double nonfinites[] = {INFINITY, -INFINITY, NAN, -NAN};
     char *float_formats[] = {"%e", "%E", "%f", "%F", "%g", "%G"};
     puts("\nNon-finite float madness:");
