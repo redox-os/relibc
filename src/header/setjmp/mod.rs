@@ -39,8 +39,8 @@ unsafe extern "C" {
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __relibc_unused_but_exist_to_avoid_linker_error_on_setjmp(arg: c_int) {
-    /// Workaround to https://www.openwall.com/lists/musl/2023/09/07/2
-    /// By keeping setjmp close to sigsetjmp in link time
+    // Workaround to https://www.openwall.com/lists/musl/2023/09/07/2
+    // By keeping setjmp close to sigsetjmp in link time
     let jb: *mut u64 = core::ptr::null_mut();
     unsafe {
         setjmp(jb);

@@ -15,12 +15,19 @@ use crate::{
     platform::{
         self,
         types::{
-            c_char, c_double, c_int, c_long, c_longlong, c_short, c_uchar, c_uint, c_ulong,
-            c_ulonglong, c_ushort, c_void, intmax_t, ptrdiff_t, size_t, ssize_t, uintmax_t,
-            wchar_t, wint_t,
+            c_char, c_double, c_int, c_long, c_longdouble, c_longlong, c_short, c_uchar, c_uint,
+            c_ulong, c_ulonglong, c_ushort, c_void, intmax_t, ptrdiff_t, size_t, ssize_t,
+            uintmax_t, wchar_t, wint_t,
         },
     },
 };
+
+#[allow(unused_doc_comments)]
+/// cbindgen:ignore
+unsafe extern "C" {
+    pub unsafe fn relibc_ldtod(x: *const c_longdouble) -> c_double;
+    pub unsafe fn relibc_dtold(x: c_double, out: *mut c_longdouble);
+}
 
 //  ____        _ _                 _       _
 // | __ )  ___ (_) | ___ _ __ _ __ | | __ _| |_ ___ _
@@ -76,6 +83,10 @@ impl Number {
         match arg {
             VaArg::c_char(i) => i as usize,
             VaArg::c_double(i) => i as usize,
+            #[cfg(target_pointer_width = "32")]
+            VaArg::c_longdouble(_) => 0 as usize,
+            #[cfg(target_pointer_width = "64")]
+            VaArg::c_longdouble(i) => i as usize,
             VaArg::c_int(i) => i as usize,
             VaArg::c_long(i) => i as usize,
             VaArg::c_longlong(i) => i as usize,
@@ -92,6 +103,7 @@ impl Number {
 pub(crate) enum VaArg {
     c_char(c_char),
     c_double(c_double),
+    c_longdouble(c_longdouble),
     c_int(c_int),
     c_long(c_long),
     c_longlong(c_longlong),
@@ -147,6 +159,11 @@ impl VaArg {
                 VaArg::ssize_t(unsafe { ap.arg::<ssize_t>() })
             }
 
+            (FmtKind::AnyNotation, IntKind::LongLong)
+            | (FmtKind::Decimal, IntKind::LongLong)
+            | (FmtKind::Scientific, IntKind::LongLong) => {
+                VaArg::c_longdouble(unsafe { VaArg::extract_longdouble(ap) })
+            }
             (FmtKind::AnyNotation, _) | (FmtKind::Decimal, _) | (FmtKind::Scientific, _) => {
                 VaArg::c_double(unsafe { ap.arg::<c_double>() })
             }
@@ -155,6 +172,69 @@ impl VaArg {
                 VaArg::pointer(unsafe { ap.arg::<*const c_void>() })
             }
         }
+    }
+    #[cfg(target_arch = "x86")]
+    unsafe fn extract_longdouble(ap: &mut core::ffi::VaList) -> c_longdouble {
+        todo_skip!(0, "long double in variadic printf is not supported");
+        [0, 0, 0]
+    }
+    #[cfg(target_arch = "x86_64")]
+    unsafe fn extract_longdouble(ap: &mut core::ffi::VaList) -> c_longdouble {
+        // https://refspecs.linuxfoundation.org/elf/x86_64-abi-0.95.pdf (long double)
+
+        // exactly same as core::ffi::VaListImpl but all variables exposed
+        #[repr(C)]
+        struct VaListImpl {
+            gp_offset: i32,
+            fp_offset: i32,
+            overflow_arg_area: *mut u8,
+            reg_save_area: *mut u8,
+        }
+
+        let ap_impl = unsafe {
+            // The double deconstruct is intended
+            let ptr_to_struct = *(ap as *mut core::ffi::VaList as *mut *mut VaListImpl);
+            &mut *ptr_to_struct
+        };
+
+        let ptr = ap_impl.overflow_arg_area as *const c_longdouble;
+        let val = unsafe { ptr.read() };
+
+        ap_impl.overflow_arg_area = unsafe { ap_impl.overflow_arg_area.add(16) };
+
+        val
+    }
+    #[cfg(target_arch = "aarch64")]
+    unsafe fn extract_longdouble(ap: &mut core::ffi::VaList) -> c_longdouble {
+        // https://c9x.me/compile/bib/abi-arm64.pdf (quad precision)
+
+        // exactly same as core::ffi::VaListImpl but all variables exposed
+        #[repr(C)]
+        struct VaListImpl {
+            stack: *mut u8,
+            gr_top: *mut u8,
+            vr_top: *mut u8,
+            gr_offs: i32,
+            vr_offs: i32,
+        }
+
+        let ap_impl: &mut VaListImpl = unsafe {
+            // The double deconstruct is intended
+            let ptr_to_struct = *(ap as *mut core::ffi::VaList as *mut *mut VaListImpl);
+            &mut *ptr_to_struct
+        };
+
+        let ptr = unsafe { ap_impl.vr_top.offset(ap_impl.vr_offs as isize) as *const c_longdouble };
+
+        ap_impl.vr_offs += 16;
+
+        unsafe { ptr.read() }
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    unsafe fn extract_longdouble(ap: &mut core::ffi::VaList) -> c_longdouble {
+        todo_skip!(0, "long double in variadic printf is not supported");
+        0u128
     }
     unsafe fn transmute(&self, fmtkind: FmtKind, intkind: IntKind) -> VaArg {
         // At this point, there are conflicting printf arguments. An
@@ -168,6 +248,7 @@ impl VaArg {
         union Untyped {
             c_char: c_char,
             c_double: c_double,
+            c_longdouble: c_longdouble,
             c_int: c_int,
             c_long: c_long,
             c_longlong: c_longlong,
@@ -181,6 +262,7 @@ impl VaArg {
         let untyped = match *self {
             VaArg::c_char(i) => Untyped { c_char: i },
             VaArg::c_double(i) => Untyped { c_double: i },
+            VaArg::c_longdouble(i) => Untyped { c_longdouble: i },
             VaArg::c_int(i) => Untyped { c_int: i },
             VaArg::c_long(i) => Untyped { c_long: i },
             VaArg::c_longlong(i) => Untyped { c_longlong: i },
@@ -223,6 +305,11 @@ impl VaArg {
                 VaArg::ssize_t(unsafe { untyped.ssize_t })
             }
 
+            (FmtKind::AnyNotation, IntKind::LongLong)
+            | (FmtKind::Decimal, IntKind::LongLong)
+            | (FmtKind::Scientific, IntKind::LongLong) => {
+                VaArg::c_longdouble(unsafe { untyped.c_longdouble })
+            }
             (FmtKind::AnyNotation, _) | (FmtKind::Decimal, _) | (FmtKind::Scientific, _) => {
                 VaArg::c_double(unsafe { untyped.c_double })
             }
@@ -596,7 +683,7 @@ impl<'a, T: c_str::Kind> Iterator for PrintfIter<'a, T> {
             'o' | 'u' | 'x' | 'X' => FmtKind::Unsigned,
             'b' | 'B' if T::IS_THIN_NOT_WIDE => FmtKind::Unsigned,
             'e' | 'E' => FmtKind::Scientific,
-            'f' | 'F' => FmtKind::Decimal,
+            'f' | 'F' | 'L' => FmtKind::Decimal,
             'g' | 'G' => FmtKind::AnyNotation,
             's' => FmtKind::String,
             'c' => FmtKind::Char,
@@ -752,6 +839,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                 } {
                     VaArg::c_char(i) => i.to_string(),
                     VaArg::c_double(i) => panic!("this should not be possible"),
+                    VaArg::c_longdouble(i) => panic!("this should not be possible"),
                     VaArg::c_int(i) => i.to_string(),
                     VaArg::c_long(i) => i.to_string(),
                     VaArg::c_longlong(i) => i.to_string(),
@@ -802,6 +890,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                 } {
                     VaArg::c_char(i) => fmt_int::<_, T>(fmt, i as c_uchar),
                     VaArg::c_double(i) => panic!("this should not be possible"),
+                    VaArg::c_longdouble(i) => panic!("this should not be possible"),
                     VaArg::c_int(i) => fmt_int::<_, T>(fmt, i as c_uint),
                     VaArg::c_long(i) => fmt_int::<_, T>(fmt, i as c_ulong),
                     VaArg::c_longlong(i) => fmt_int::<_, T>(fmt, i as c_ulonglong),
@@ -862,6 +951,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
                 } {
                     VaArg::c_double(i) => i,
+                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&i as *const c_longdouble) },
                     _ => panic!("this should not be possible"),
                 };
                 if float.is_finite() {
@@ -880,6 +970,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
                 } {
                     VaArg::c_double(i) => i,
+                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&i as *const c_longdouble) },
                     _ => panic!("this should not be possible"),
                 };
                 if float.is_finite() {
@@ -895,6 +986,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
                 } {
                     VaArg::c_double(i) => i,
+                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&i as *const c_longdouble) },
                     _ => panic!("this should not be possible"),
                 };
                 if float.is_finite() {
