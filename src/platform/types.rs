@@ -78,6 +78,17 @@ pub type clock_t = c_long;
 pub type clockid_t = c_int;
 pub type timer_t = *mut c_void;
 
+// A C long double is 96 bit in x86, 128 bit in other 64-bit targets
+// However, both in x86 and x86_64 is actually f80 padded which rust has no underlying support,
+//     while aarch64 (and possibly riscv64) support full f128 type but behind a feature gate.
+// Until rust supporting them, relibc will lose precision to get them working, plus:
+//     All read operation to this type must be converted from "relibc_ldtod".
+//     All write operation to this type must be converted with "relibc_dtold".
+#[cfg(target_pointer_width = "64")]
+pub type c_longdouble = u128;
+#[cfg(target_pointer_width = "32")]
+pub type c_longdouble = [u32; 3];
+
 pub use crate::header::bits_pthread::*;
 
 #[repr(C, align(16))]
