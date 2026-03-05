@@ -1119,7 +1119,7 @@ pub fn new_child_process(args: &ForkArgs<'_>) -> Result<NewChildProc> {
                 pid: 0,
                 euid: 0,
                 egid: 0,
-                ens: 1,
+                prio: !0, // Value is overwritten later
                 debug_name: {
                     let mut buf = [0; 32];
                     let src = b"[init]";

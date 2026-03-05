@@ -634,8 +634,13 @@ impl Pal for Sys {
     }
 
     fn getpriority(which: c_int, who: id_t) -> Result<c_int> {
-        todo_skip!(0, "getpriority({}, {}): not implemented", which, who);
-        Err(Errno(ENOSYS))
+        match redox_rt::sys::posix_getpriority(which, who as u32) {
+            Ok(kernel_prio) => {
+                let posix_prio = (kernel_prio as i32 * -1) + 40 as i32;
+                Ok(posix_prio)
+            }
+            Err(e) => Err(Errno(e.errno)),
+        }
     }
 
     fn getrandom(buf: &mut [u8], flags: c_uint) -> Result<usize> {
@@ -1197,15 +1202,13 @@ impl Pal for Sys {
     }
 
     fn setpriority(which: c_int, who: id_t, prio: c_int) -> Result<()> {
-        // TODO
-        todo_skip!(
-            0,
-            "setpriority({}, {}, {}): not implemented",
-            which,
-            who,
-            prio
-        );
-        Err(Errno(ENOSYS))
+        let clamped_prio = prio.clamp(-20, 19);
+        let kernel_prio = (20 + clamped_prio) as u32;
+
+        match redox_rt::sys::posix_setpriority(which, who as u32, kernel_prio) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(Errno(e.errno)),
+        }
     }
 
     fn setsid() -> Result<c_int> {

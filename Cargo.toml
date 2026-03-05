@@ -67,8 +67,8 @@ bitflags = "2"
 ioslice = { version = "0.6", default-features = false }
 plain = "0.2"
 redox-path = "0.3"
-redox_protocols = { package = "libredox", version = "0.1.14", default-features = false, features = ["protocol"] }
-redox_syscall = "0.7.3"
+redox_protocols = { package = "libredox", version = "0.1.16", default-features = false, features = ["protocol"] }
+redox_syscall = "0.7.4"
 
 [build-dependencies]
 cc = "1"
