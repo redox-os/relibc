@@ -1,4 +1,4 @@
-use crate::platform::types::*;
+use crate::platform::types::c_int;
 
 pub const O_RDONLY: c_int = 0x0001_0000;
 pub const O_WRONLY: c_int = 0x0002_0000;
@@ -32,3 +32,4 @@ pub const O_NDELAY: c_int = O_NONBLOCK;
 pub const AT_FDCWD: c_int = -100;
 pub const AT_SYMLINK_NOFOLLOW: c_int = 0x0200;
 pub const AT_EMPTY_PATH: c_int = 0x4000;
+pub const AT_REMOVEDIR: c_int = 0x200;

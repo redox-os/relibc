@@ -1,22 +1,20 @@
 // https://pubs.opengroup.org/onlinepubs/9699919799/functions/getline.html
 
-use alloc::{string::String, vec::Vec};
-use core::{fmt::Write, intrinsics::unlikely, ops::Deref, ptr};
+use alloc::vec::Vec;
+use core::{intrinsics::unlikely, ptr};
 
 use crate::{
     header::{
-        errno::{EINVAL, ENOMEM, ENOSPC, EOVERFLOW},
-        stdio,
+        errno::{EINVAL, ENOMEM, EOVERFLOW},
         stdio::FILE,
         stdlib,
     },
     io::BufRead,
-    platform,
-    platform::types::*,
+    platform::types::{c_char, c_int, c_void, size_t, ssize_t},
 };
 
 use crate::{
-    header::stdio::{F_EOF, F_ERR, default_stdout, feof, ferror},
+    header::stdio::{F_EOF, F_ERR, feof, ferror},
     platform::ERRNO,
 };
 
@@ -27,7 +25,7 @@ pub unsafe extern "C" fn getline(
     n: *mut size_t,
     stream: *mut FILE,
 ) -> ssize_t {
-    getdelim(lineptr, n, b'\n' as c_int, stream)
+    unsafe { getdelim(lineptr, n, c_int::from(b'\n'), stream) }
 }
 
 // One *could* read the standard as 'getdelim sets the stream error flag on *any* error, though
@@ -42,12 +40,12 @@ pub unsafe extern "C" fn getline(
 /// # Deviation from POSIX
 /// - **EINVAL is set on stream being NULL or delim not fitting into char** (POSIX allows UB)
 /// - **`*n` can contain invalid data.** The buffer size `n` is not read, instead realloc is called each time. That is in principle
-/// inefficent since the buffer is reallocated in memory for every call, but if `n` is by mistake
-/// bigger than the number of bytes allocated for the buffer, there can be no out-of-bounds write.
+///   inefficent since the buffer is reallocated in memory for every call, but if `n` is by mistake
+///   bigger than the number of bytes allocated for the buffer, there can be no out-of-bounds write.
 /// - On non-stream-related errors, the error indicator of the stream is *not* set. Posix states
-/// "If an error occurs, the error indicator for the stream shall be set, and the function shall
-/// return -1 and set errno to indicate the error." but in cases that produce EINVAL even glibc
-/// doesn't seem to set the error indicator, so we also don't.
+///   "If an error occurs, the error indicator for the stream shall be set, and the function shall
+///   return -1 and set errno to indicate the error." but in cases that produce EINVAL even glibc
+///   doesn't seem to set the error indicator, so we also don't.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getdelim(
     lineptr: *mut *mut c_char,
@@ -55,15 +53,17 @@ pub unsafe extern "C" fn getdelim(
     delim: c_int,
     stream: *mut FILE,
 ) -> ssize_t {
-    let (lineptr, n, stream) =
-        if let (Some(ptr), Some(n), Some(file)) = (lineptr.as_mut(), n.as_mut(), stream.as_mut()) {
-            (ptr, n, file)
-        } else {
-            ERRNO.set(EINVAL);
-            return -1 as ssize_t;
-        };
+    let (lineptr, n, stream) = if let (Some(ptr), Some(n), Some(file)) =
+        (unsafe { lineptr.as_mut() }, unsafe { n.as_mut() }, unsafe {
+            stream.as_mut()
+        }) {
+        (ptr, n, file)
+    } else {
+        ERRNO.set(EINVAL);
+        return -1 as ssize_t;
+    };
 
-    if feof(stream) != 0 || ferror(stream) != 0 {
+    if unsafe { feof(stream) } != 0 || unsafe { ferror(stream) } != 0 {
         return -1 as ssize_t;
     }
 
@@ -121,7 +121,7 @@ pub unsafe extern "C" fn getdelim(
         *n = count + 1;
         // The advantage in always realloc'ing is that even if the user supplies a wrong n, this
         // doesn't break
-        *lineptr = stdlib::realloc(*lineptr as *mut c_void, *n) as *mut c_char;
+        *lineptr = unsafe { stdlib::realloc((*lineptr).cast::<c_void>(), *n) }.cast::<c_char>();
         if unlikely(lineptr.is_null() && *n != 0usize) {
             // memory error; realloc returns NULL on alloc'ing 0 bytes
             ERRNO.set(ENOMEM);
@@ -129,10 +129,10 @@ pub unsafe extern "C" fn getdelim(
         }
 
         // Copy buf to lineptr
-        ptr::copy(buf.as_ptr(), *lineptr as *mut u8, count);
+        unsafe { ptr::copy(buf.as_ptr(), (*lineptr).cast::<u8>(), count) };
 
         // NUL terminate lineptr
-        *lineptr.offset(count as isize) = 0;
+        unsafe { *lineptr.add(count) = 0 };
 
         // TODO remove
         /*eprintln!(

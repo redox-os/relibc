@@ -10,25 +10,31 @@ use object::{
     },
 };
 
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+use super::tcb::Tcb;
 use super::{
     debug::{_r_debug, RTLDDebug},
     linker::{__plt_resolve_trampoline, GLOBAL_SCOPE, Resolve, Scope, Symbol},
     tcb::Master,
 };
 use crate::{
-    header::sys_mman,
+    header::{dl_tls::__tls_get_addr, sys_mman},
     platform::{Pal, Sys, types::c_void},
 };
 use alloc::{
+    boxed::Box,
     string::{String, ToString},
     sync::Arc,
     vec::Vec,
 };
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+use core::mem::offset_of;
 use core::{
     ffi::c_char,
     mem::size_of,
     ptr::{self, NonNull},
     slice,
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 pub const CHAR_BITS: usize = size_of::<c_char>() * 8;
@@ -59,6 +65,14 @@ mod shim {
 }
 
 pub use shim::*;
+
+// TODO: missing from the `object` crate
+pub const DT_RELRSZ: u32 = 35;
+pub const DT_RELR: u32 = 36;
+pub const DT_RELRENT: u32 = 37;
+
+/// Undefined Symbol Index
+pub const STN_UNDEF: SymbolIndex = SymbolIndex(0);
 
 enum HashTable<'a> {
     Gnu(GnuHashTable<'a, FileHeader>),
@@ -163,11 +177,11 @@ unsafe impl Send for Dynamic<'_> {}
 unsafe impl Sync for Dynamic<'_> {}
 
 #[derive(Debug)]
-struct Relocation {
-    offset: usize,
-    addend: Option<usize>,
-    sym: SymbolIndex,
-    kind: RelocationKind,
+pub(super) struct Relocation {
+    pub(super) offset: usize,
+    pub(super) addend: Option<usize>,
+    pub(super) sym: SymbolIndex,
+    pub(super) kind: RelocationKind,
 }
 
 #[cfg(target_pointer_width = "32")]
@@ -208,7 +222,7 @@ impl From<&Rel> for Relocation {
 
 // This is matched up to REL_* constants used by musl for ease of comparison
 #[allow(dead_code)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum RelocationKind {
     COPY,
     DTPMOD,
@@ -333,21 +347,24 @@ pub struct DSO {
     pub scope: spin::Once<Scope>,
     /// Position Independent Executable.
     pub pie: bool,
+
+    /// Whether this DSO *and* its dependencies have been successfully loaded.
+    is_ready: AtomicBool,
 }
 
 impl DSO {
-    pub fn new<'a>(
+    pub fn new(
         path: &str,
-        data: &'a [u8],
+        data: &[u8],
         base_addr: Option<usize>,
         dlopened: bool,
         id: usize,
         tls_module_id: usize,
         tls_offset: usize,
-    ) -> object::Result<(DSO, Option<Master>, Vec<ProgramHeader>)> {
-        let elf = ElfFile::parse(data).unwrap();
+    ) -> Result<(DSO, Option<Master>, Vec<ProgramHeader>), String> {
+        let elf = ElfFile::parse(data).map_err(|err| err.to_string())?;
         let (mmap, tcb_master, dynamic) =
-            DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset).unwrap();
+            DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset)?;
 
         let name = match dynamic.soname {
             Some(soname) => soname.to_string(),
@@ -379,9 +396,15 @@ impl DSO {
             pie: is_pie_enabled(&elf),
             dynamic,
             scope: spin::Once::new(),
+            is_ready: AtomicBool::new(false),
         };
 
         Ok((dso, tcb_master, elf.elf_program_headers().to_vec()))
+    }
+
+    #[inline]
+    pub fn mark_ready(&self) {
+        self.is_ready.store(true, Ordering::SeqCst);
     }
 
     #[inline]
@@ -457,9 +480,9 @@ impl DSO {
         data: &'a [u8],
         base_addr: Option<usize>,
         tls_offset: usize,
-    ) -> object::Result<(&'static [u8], Option<Master>, Dynamic<'static>)> {
+    ) -> Result<(&'static [u8], Option<Master>, Dynamic<'static>), String> {
         let endian = elf.endian();
-        trace!("# {}", path);
+        log::trace!("# {}", path);
         // data for struct LinkMap
         let mut l_ld = 0;
         // Calculate virtual memory bounds
@@ -476,7 +499,7 @@ impl DSO {
                         l_ld = ph.p_vaddr(endian);
                     }
                     elf::PT_LOAD => {
-                        trace!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
+                        log::trace!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
                         if let Some(ref mut bounds) = bounds_opt {
                             if vaddr < bounds.0 {
                                 bounds.0 = vaddr;
@@ -491,11 +514,9 @@ impl DSO {
                     _ => (),
                 }
             }
-            bounds_opt
-                .ok_or("Unable to find PT_LOAD section".to_string())
-                .unwrap()
+            bounds_opt.ok_or_else(|| "Unable to find PT_LOAD section".to_string())?
         };
-        trace!("  bounds {:#x}, {:#x}", bounds.0, bounds.1);
+        log::trace!("  bounds {:#x}, {:#x}", bounds.0, bounds.1);
         // Allocate memory
         let mmap = unsafe {
             if let Some(addr) = base_addr {
@@ -506,8 +527,8 @@ impl DSO {
                 };
                 _r_debug
                     .lock()
-                    .insert_first(addr, path, addr + l_ld as usize);
-                slice::from_raw_parts_mut(addr as *mut u8, size)
+                    .insert_first(addr + bounds.0, path, addr + l_ld as usize);
+                slice::from_raw_parts_mut((addr + bounds.0) as *mut u8, size)
             } else {
                 let (start, end) = bounds;
                 let size = end - start;
@@ -515,7 +536,7 @@ impl DSO {
                 if start != 0 {
                     flags |= sys_mman::MAP_FIXED_NOREPLACE;
                 }
-                trace!("  mmap({:#x}, {:x}, {:x})", start, size, flags);
+                log::trace!("  mmap({:#x}, {:x}, {:x})", start, size, flags);
                 let ptr = Sys::mmap(
                     start as *mut c_void,
                     size,
@@ -525,8 +546,7 @@ impl DSO {
                     -1,
                     0,
                 )
-                .map_err(|e| format!("failed to map {}. errno: {}", path, e.0))
-                .unwrap();
+                .map_err(|e| format!("failed to map {}. errno: {}", path, e.0))?;
 
                 if !(start as *mut c_void).is_null() {
                     assert_eq!(
@@ -534,12 +554,11 @@ impl DSO {
                         "mmap must always map on the destination we requested"
                     );
                 }
-                trace!("    = {:p}", ptr);
-                ptr::write_bytes(ptr as *mut u8, 0, size);
+                log::trace!("    = {:p}", ptr);
                 _r_debug
                     .lock()
                     .insert(ptr as usize, path, ptr as usize + l_ld as usize);
-                slice::from_raw_parts_mut(ptr as *mut u8, size)
+                slice::from_raw_parts_mut(ptr.cast::<u8>(), size)
             }
         };
 
@@ -549,10 +568,6 @@ impl DSO {
         // Copy data
         let mut dynamic = None;
         for ph in elf.elf_program_headers() {
-            let voff = ph.p_vaddr(endian) % ph.p_align(endian);
-            let vsize = ((ph.p_memsz(endian) + voff) as usize)
-                .next_multiple_of(ph.p_align(endian) as usize);
-
             match ph.p_type(endian) {
                 elf::PT_LOAD => {
                     if skip_load_segment_copy {
@@ -564,7 +579,7 @@ impl DSO {
                         let range = offset..(offset + size as usize);
                         match data.get(range.clone()) {
                             Some(some) => some,
-                            None => return Err(format!("failed to read {:x?}", range)).unwrap(),
+                            None => return Err(format!("failed to read {:x?}", range)),
                         }
                     };
 
@@ -579,15 +594,18 @@ impl DSO {
                         match mmap.get_mut(range.clone()) {
                             Some(some) => some,
                             None => {
-                                return Err(format!("failed to write {:x?}", range)).unwrap();
+                                return Err(format!("failed to write {:x?}", range));
                             }
                         }
                     };
-                    trace!(
+                    let _voff = ph.p_vaddr(endian) % ph.p_align(endian);
+                    let _vsize = ((ph.p_memsz(endian) + _voff) as usize)
+                        .next_multiple_of(ph.p_align(endian) as usize);
+                    log::trace!(
                         "  copy {:#x}, {:#x}: {:#x}, {:#x}",
-                        ph.p_vaddr(endian) - voff,
-                        vsize,
-                        voff,
+                        ph.p_vaddr(endian) - _voff,
+                        _vsize,
+                        _voff,
                         obj_data.len()
                     );
                     mmap_data.copy_from_slice(obj_data);
@@ -602,24 +620,32 @@ impl DSO {
                     };
                     tcb_master = Some(Master {
                         ptr,
-                        len: ph.p_filesz(endian) as usize,
-                        //TODO: TLS is aligned manually to 16 bytes for SSE instruction safety
-                        offset: tls_offset + vsize.next_multiple_of(16),
+                        image_size: ph.p_filesz(endian) as usize,
+                        segment_size: ph.p_memsz(endian) as usize,
+                        offset: tls_offset + ph.p_memsz(endian) as usize,
                     });
-                    trace!("  tcb master {:x?}", tcb_master);
+                    log::trace!("  tcb master {:x?}", tcb_master);
                 }
 
-                elf::PT_DYNAMIC => dynamic = Some((ph, ph.dynamic(endian, data).unwrap().unwrap())),
+                elf::PT_DYNAMIC => {
+                    let entries = ph
+                        .dynamic(endian, data)
+                        .map_err(|err| err.to_string())?
+                        .ok_or_else(|| "Unable to parse PT_DYNAMIC section".to_string())?;
+                    dynamic = Some((ph, entries));
+                }
                 _ => (),
             }
         }
 
-        let (parsed_dynamic, debug) =
-            Self::parse_dynamic(path, mmap, is_pie_enabled(elf), dynamic.unwrap())?;
+        let dynamic = dynamic.ok_or_else(|| "Unable to find PT_DYNAMIC section".to_string())?;
+
+        let (parsed_dynamic, debug) = Self::parse_dynamic(path, mmap, is_pie_enabled(elf), dynamic)
+            .map_err(|e| e.to_string())?;
 
         if let Some(i) = debug {
             // FIXME: cleanup
-            let (ph, _) = dynamic.unwrap();
+            let (ph, _) = dynamic;
             let vaddr = ph.p_vaddr(endian) as usize;
             let bytes: [u8; size_of::<Dyn>() / 2] =
                 ((&raw const _r_debug).cast::<*const RTLDDebug>() as usize).to_ne_bytes();
@@ -647,10 +673,6 @@ impl DSO {
         is_pie: bool,
         (_, entries): (&ProgramHeader, &[Dyn]),
     ) -> object::Result<(Dynamic<'a>, Option<usize>)> {
-        const DT_RELRSZ: u32 = 35;
-        const DT_RELR: u32 = 36;
-        const DT_RELRENT: u32 = 37;
-
         let mut runpath = None;
         let mut got = None;
         let mut needed = vec![];
@@ -740,7 +762,7 @@ impl DSO {
                 elf::DT_FINI_ARRAY if val != 0 => fini_array_ptr = Some(ptr.cast::<InitFn>()),
                 elf::DT_FINI_ARRAYSZ => fini_array_len = Some(val as usize / size_of::<InitFn>()),
 
-                elf::DT_SYMTAB => symtab_ptr = Some(ptr as *const Sym),
+                elf::DT_SYMTAB => symtab_ptr = Some(ptr.cast::<Sym>()),
                 elf::DT_SYMENT => {
                     assert_eq!(val as usize, size_of::<Sym>());
                 }
@@ -819,10 +841,56 @@ impl DSO {
         ))
     }
 
+    /// `TLSDESC` relocation being an extension to the original TLS ABI spec can
+    /// be present in either `.rela.plt` (handled in [`Self::static_relocate`])
+    /// or `.rela.dyn` (handled in [`Self::lazy_relocate`]) due to the lack of a
+    /// standard unfortunately.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `reloc.kind` is not `RelocationKind::TLSDESC`.
+    fn do_tlsdesc_reloc(&self, reloc: Relocation, ptr: *mut usize, global_scope: &Scope) {
+        assert!(reloc.kind == RelocationKind::TLSDESC);
+        let (sym, tls_module_id, tls_offset) = if reloc.sym != SymbolIndex(0) {
+            let sym_name = self.dynamic.symbol_name(reloc.sym).unwrap();
+            let (sym, _, obj) = resolve_sym(sym_name, &[global_scope, self.scope()]).unwrap();
+            (sym.value, obj.tls_module_id, obj.tls_offset)
+        } else {
+            (0, self.tls_module_id, self.tls_offset)
+        };
+
+        let resolver = unsafe { &mut *ptr };
+        let descriptor = unsafe { &mut *ptr.add(1) };
+
+        if self.dlopened {
+            #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+            {
+                unimplemented!("`TLSDESC` relocations are not yet implemented for riscv64 and x86");
+            }
+
+            let mut tls_index = crate::header::dl_tls::dl_tls_index {
+                ti_module: tls_module_id,
+                ti_offset: reloc.addend.unwrap_or_default(),
+            };
+
+            // Ensure the DTV entry is initialised.
+            unsafe { __tls_get_addr(&raw mut tls_index) };
+
+            *resolver = __tlsdesc_dynamic as *const () as usize;
+            *descriptor = Box::into_raw(Box::new(TlsDescriptor {
+                module_id: tls_module_id - 1,
+                addend: sym + reloc.addend.unwrap_or_default(),
+            })) as usize;
+        } else {
+            *resolver = __tlsdesc_static as *const () as usize;
+            *descriptor = sym + tls_offset + reloc.addend.unwrap_or_default();
+        }
+    }
+
     fn static_relocate(&self, global_scope: &Scope, reloc: Relocation) -> object::Result<()> {
         let b = self.mmap.as_ptr() as usize;
 
-        let (sym, my_sym) = if reloc.sym.0 > 0 {
+        let (sym, my_sym) = if reloc.sym != STN_UNDEF {
             let name = self.dynamic.symbol_name(reloc.sym).unwrap();
 
             let lookup_scopes = [global_scope, self.scope()];
@@ -840,11 +908,18 @@ impl DSO {
             (None, None)
         };
 
-        let (s, t, tls_id) = sym
+        let (s, tls_obj) = sym
             .as_ref()
-            .map(|(sym, obj)| (sym.as_ptr() as usize, obj.tls_offset, obj.tls_module_id))
-            //TODO: is self.tls_module_id the right fallback?
-            .unwrap_or((0, 0, self.tls_module_id));
+            .map(|(sym, obj)| (sym.as_ptr() as usize, obj.as_ref()))
+            // (1) According to the System V gABI (Chapter 4, "Relocation"): if
+            // the symbol index (`reloc.sym`) is undefined, the symbol value
+            // (`s`) is defined as 0.
+            //
+            // (2) According to Drepper's ELF Handling For Thread-Local Storage
+            // (Section 4.2, "Local Dynamic TLS Model"): a relocation with
+            // undefined symbol index implies a reference to the current module
+            // itself. Hence we resolve the object to `self`.
+            .unwrap_or((0, self));
 
         let ptr = if self.pie {
             (b + reloc.offset) as *mut u8
@@ -856,18 +931,18 @@ impl DSO {
             Some(some) => some,
             None => match reloc.kind {
                 RelocationKind::COPY | RelocationKind::GOT | RelocationKind::PLT => 0,
-                _ => unsafe { *(ptr as *mut usize) },
+                _ => unsafe { *ptr.cast::<usize>() },
             },
         };
 
-        //TODO: support different sizes?
+        // TODO: support different sizes?
         let set_usize = |value| unsafe {
-            *(ptr as *mut usize) = value;
+            *ptr.cast::<usize>() = value;
         };
 
         match reloc.kind {
-            RelocationKind::DTPMOD => set_usize(tls_id),
-            //TODO: Subtract DTP_OFFSET, which is 0x800 on riscv64, 0 on x86?
+            RelocationKind::DTPMOD => set_usize(tls_obj.tls_module_id),
+            // TODO: Subtract DTP_OFFSET, which is 0x800 on riscv64, 0 on x86?
             RelocationKind::DTPOFF => {
                 if reloc.sym.0 > 0 {
                     let (sym, _) = sym
@@ -883,13 +958,18 @@ impl DSO {
             RelocationKind::RELATIVE => set_usize(b + a),
             RelocationKind::SYMBOLIC => set_usize(s + a),
             RelocationKind::TPOFF => {
+                assert!(
+                    !tls_obj.dlopened,
+                    "The {{local/initial}}-exec access model is used for symbol '{}' in '{}', which requires a static TLS block. However, the definition in '{}' resides in the dynamic TLS block because the object was loaded via dlopen(2).",
+                    reloc.sym, self.name, tls_obj.name
+                );
                 if reloc.sym.0 > 0 {
                     let (sym, _) = sym
                         .as_ref()
                         .expect("RelocationKind::TPOFF called without valid symbol");
-                    set_usize((sym.value + a).wrapping_sub(t));
+                    set_usize((sym.value + a).wrapping_sub(tls_obj.tls_offset));
                 } else {
-                    set_usize(a.wrapping_sub(t));
+                    set_usize(a.wrapping_sub(tls_obj.tls_offset));
                 }
             }
             RelocationKind::IRELATIVE => unsafe {
@@ -911,6 +991,9 @@ impl DSO {
                 // SAFETY: Both the source and destination have the same size.
                 ptr::copy_nonoverlapping(sym.as_ptr() as *const u8, ptr, sym.size);
             },
+            RelocationKind::TLSDESC => {
+                self.do_tlsdesc_reloc(reloc, ptr.cast::<usize>(), global_scope)
+            }
             _ => unimplemented!("relocation type {:?}", reloc.kind),
         }
 
@@ -929,7 +1012,8 @@ impl DSO {
 
         unsafe {
             got.add(1).write(core::ptr::addr_of!(*self) as usize);
-            got.add(2).write(__plt_resolve_trampoline as usize);
+            got.add(2)
+                .write(__plt_resolve_trampoline as *const () as usize);
         }
 
         let relsz = if self.dynamic.explicit_addend {
@@ -977,6 +1061,13 @@ impl DSO {
                     }
                 }
 
+                (RelocationKind::TLSDESC, Resolve::Now) => {
+                    self.do_tlsdesc_reloc(reloc, ptr, global_scope);
+                }
+                (RelocationKind::TLSDESC, Resolve::Lazy) => {
+                    unreachable!("TLSDESC cannot be lazily resolved")
+                }
+
                 _ => {
                     unimplemented!(
                         "relocation type {:?} with resolve {:?}",
@@ -994,34 +1085,8 @@ impl DSO {
         let global_scope = GLOBAL_SCOPE.read();
         let base = self.mmap.as_ptr();
 
-        // Apply DT_RELR relative relocations.
-        let mut addr = ptr::null_mut();
-        for &entry in self.dynamic.relr {
-            if entry & 1 == 0 {
-                // An even entry sets up `addr` for subsequent odd entries.
-                unsafe {
-                    addr = base.add(entry) as *mut usize;
-                    *addr += base as usize;
-                    addr = addr.add(1);
-                }
-            } else {
-                // An odd entry indicates a bitmap describing at maximum 63
-                // (for 64-bit) or 31 (for 32-bit) locations following `addr`.
-                // Odd entries can be chained.
-                let mut entry = entry >> 1;
-                let mut i = 0;
-                while entry != 0 {
-                    if entry & 1 != 0 {
-                        unsafe {
-                            *addr.add(i) += base as usize;
-                        }
-                    }
-                    entry >>= 1;
-                    i += 1;
-                }
-
-                addr = unsafe { addr.add(CHAR_BITS * size_of::<Relr>() - 1) };
-            }
+        unsafe {
+            apply_relr(base, self.dynamic.relr);
         }
 
         self.dynamic
@@ -1058,7 +1123,7 @@ impl DSO {
                 } else {
                     vaddr as *const u8
                 };
-                trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
+                log::trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
                 Sys::mprotect(ptr as *mut c_void, vsize, prot).expect("[ld.so]: mprotect failed");
             }
         }
@@ -1069,7 +1134,11 @@ impl DSO {
 
 impl Drop for DSO {
     fn drop(&mut self) {
-        self.run_fini();
+        if self.is_ready.load(Ordering::SeqCst) {
+            // `run_fini` should not be called if we are being prematurely
+            // dropped (e.g. failed to satisfy dependencies).
+            self.run_fini();
+        }
         unsafe { Sys::munmap(self.mmap.as_ptr() as *mut c_void, self.mmap.len()).unwrap() };
     }
 }
@@ -1093,4 +1162,149 @@ pub fn resolve_sym<'a>(
     scopes: &[&'a Scope],
 ) -> Option<(Symbol<'a>, SymbolBinding, Arc<DSO>)> {
     scopes.iter().find_map(|scope| scope.get_sym(name))
+}
+
+#[repr(C)]
+struct TlsDescriptor {
+    module_id: usize,
+    addend: usize,
+}
+
+#[cfg(target_arch = "x86_64")]
+#[unsafe(naked)]
+unsafe extern "C" fn __tlsdesc_static() {
+    core::arch::naked_asm!("mov rax, [rax + 8]", "ret")
+}
+
+#[cfg(target_arch = "x86")]
+#[unsafe(naked)]
+unsafe extern "C" fn __tlsdesc_static() {
+    core::arch::naked_asm!("mov eax, [eax + 4]", "ret")
+}
+
+#[cfg(target_arch = "aarch64")]
+#[unsafe(naked)]
+unsafe extern "C" fn __tlsdesc_static() {
+    core::arch::naked_asm!("ldr x0, [x0, #8]", "ret")
+}
+
+#[cfg(target_arch = "riscv64")]
+#[unsafe(naked)]
+unsafe extern "C" fn __tlsdesc_static() {
+    core::arch::naked_asm!("ld a0, 8(a0)", "ret");
+}
+
+unsafe extern "C" {
+    fn __tlsdesc_dynamic();
+}
+
+#[cfg(target_arch = "x86_64")]
+core::arch::global_asm!(
+    "
+.global __tlsdesc_dynamic
+.hidden __tlsdesc_dynamic
+__tlsdesc_dynamic:
+    push rbx
+    push rcx
+
+    mov rax, [rax + 8] // TLS descriptor
+    mov rbx, [rax + {TLS_DESCRIPTOR_MODULE_ID_OFF}] // tls_descriptor.module_id
+    mov rcx, [rax + {TLS_DESCRIPTOR_ADDEND_OFF}] // tls_descriptor.addend
+    mov rax, qword ptr fs:[{DTV_PTR_OFF}] // tcb.dtv_ptr
+
+    // tcb.dtv_ptr[tls_descriptor.module_id] + tls_descriptor.addend
+    mov rax, [rax + rbx * 8]
+    add rax, rcx
+    sub rax, qword ptr fs:[{TCB_SELF_PTR_OFF}]
+
+    pop rcx
+    pop rbx
+
+    ret
+",
+    TLS_DESCRIPTOR_MODULE_ID_OFF = const offset_of!(TlsDescriptor, module_id),
+    TLS_DESCRIPTOR_ADDEND_OFF = const offset_of!(TlsDescriptor, addend),
+    DTV_PTR_OFF = const offset_of!(Tcb, dtv_ptr),
+    TCB_SELF_PTR_OFF = const offset_of!(Tcb, generic.tcb_ptr),
+);
+
+#[cfg(target_arch = "x86")]
+core::arch::global_asm!(
+    "
+.global __tlsdesc_dynamic
+.hidden __tlsdesc_dynamic
+__tlsdesc_dynamic:
+    ud2
+"
+);
+
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    "
+.global __tlsdesc_dynamic
+.hidden __tlsdesc_dynamic
+__tlsdesc_dynamic:
+    stp x1, x2, [sp, #-16]!
+
+    ldr x0, [x0, #8] // TLS descriptor
+
+    // x0 := tls_descriptor.module_id
+    // x1 := tls_descriptor.addend
+    ldp x0, x1, [x0]
+
+    mrs x2, tpidr_el0 // ABI ptr
+    ldr x2, [x2] // TCB ptr
+
+    sub x1, x1, x2 // tls_descriptor.addend -= tcb
+
+    ldr x2, [x2, {DTV_PTR_OFF}] // tcb.dtv_ptr
+    ldr x2, [x2, x0, lsl #3] // tcb.dtv_ptr[tls_descriptor.module_id]
+    add x0, x2, x1 // tcb.dtv_ptr[tls_descriptor.module_id] + tls_descriptor.addend
+
+    ldp x1, x2, [sp], #16
+    ret
+",
+    DTV_PTR_OFF = const offset_of!(Tcb, dtv_ptr),
+);
+
+#[cfg(target_arch = "riscv64")]
+core::arch::global_asm!(
+    "
+.global __tlsdesc_dynamic
+.hidden __tlsdesc_dynamic
+__tlsdesc_dynamic:
+    unimp
+"
+);
+
+/// Applies [`DT_RELR`] relative relocations.
+pub unsafe fn apply_relr(base: *const u8, relr: &[Relr]) {
+    let mut addr = ptr::null_mut();
+    for &entry in relr {
+        if entry & 1 == 0 {
+            // An even entry sets up `addr` for subsequent odd entries.
+            unsafe {
+                addr = base.add(entry) as *mut usize;
+                *addr += base as usize;
+                addr = addr.add(1);
+            }
+        } else {
+            // An odd entry indicates a bitmap describing at maximum 63
+            // (for 64-bit) or 31 (for 32-bit) locations following `addr`.
+            // Odd entries can be chained.
+            let mut entry = entry >> 1;
+            let mut i = 0;
+            while entry != 0 {
+                if entry & 1 != 0 {
+                    unsafe {
+                        *addr.add(i) += base as usize;
+                    }
+                }
+                entry >>= 1;
+                i += 1;
+            }
+
+            addr = unsafe { addr.add(CHAR_BITS * size_of::<Relr>() - 1) };
+        }
+    }
 }

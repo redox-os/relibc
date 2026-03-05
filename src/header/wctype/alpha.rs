@@ -2,7 +2,7 @@
 // Licensed under the MIT license
 // Copyright 2005-2020 Rich Felker, et al.
 
-use crate::platform::types::*;
+use crate::platform::types::c_uchar;
 
 pub fn is(wc: usize) -> c_uchar {
     if wc < 0x20000 {
@@ -11,7 +11,7 @@ pub fn is(wc: usize) -> c_uchar {
     if wc < 0x2fffe {
         return 1;
     }
-    return 0;
+    0
 }
 
 const table: [c_uchar; 3904] = [

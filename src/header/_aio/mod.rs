@@ -1,6 +1,6 @@
 use crate::{
-    header::{signal::sigevent, time::timespec},
-    platform::types::*,
+    header::{bits_time::timespec, signal::sigevent},
+    platform::types::{c_int, c_void},
 };
 
 pub struct aiocb {

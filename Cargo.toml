@@ -19,6 +19,49 @@ members = [
 ]
 exclude = ["tests", "dlmalloc-rs"]
 
+[workspace.lints.clippy]
+borrow_as_ptr = "deny"
+cast_lossless = "warn" # TODO review occurrences
+cast_possible_truncation = "allow" # TODO review occurrences
+cast_possible_wrap = "allow" # TODO review occurrences
+cast_precision_loss = "allow" # TODO review occurrences
+cast_ptr_alignment = "allow" # TODO review occurrences
+cast_sign_loss = "allow" # TODO review occurrences
+missing_errors_doc = "allow" # TODO review occurrences
+missing_panics_doc = "allow" # TODO review occurrences
+missing_safety_doc = "allow" # TODO review occurrences
+mut_from_ref = "warn" # TODO review occurrences
+precedence = "deny"
+ptr_as_ptr = "warn" # TODO review occurrences
+ptr_cast_constness = "warn" # TODO review occurrences
+ref_as_ptr = "warn" # TODO review occurrences
+upper_case_acronyms = "allow" # TODO review occurrences
+zero_ptr = "warn" # must allow on public constants due to cbindgen issue
+
+[workspace.lints.rust]
+dangling_pointers_from_temporaries = "deny"
+dead_code = "allow" # TODO review occuurences
+deprecated = "allow" # TODO review occuurences
+improper_ctypes_definitions = "deny"
+internal_features = "allow" # core_intrinsics and lang_items
+irrefutable_let_patterns = "deny"
+mismatched_lifetime_syntaxes = "deny"
+non_camel_case_types = "allow"
+non_snake_case = "allow" # TODO review occuurences
+non_upper_case_globals = "allow" # TODO review occuurences
+unexpected_cfgs = "deny"
+unpredictable_function_pointer_comparisons = "deny"
+unreachable_code = "allow" # TODO review occuurences
+unsafe_op_in_unsafe_fn = "deny"
+unused_imports = "deny"
+unused_must_use = "deny"
+unused_mut = "deny"
+unused_unsafe = "deny"
+unused_variables = "allow" # TODO review occurrences (too many for now)
+
+[lints]
+workspace = true
+
 [build-dependencies]
 cc = "1"
 
@@ -46,10 +89,10 @@ scrypt = { version = "0.11", default-features = false, features = ["simple"] }
 pbkdf2 = { version = "0.12", features = ["sha2"] }
 sha2 = { version = "0.10", default-features = false }
 generic-rt = { path = "generic-rt" }
-chrono-tz = {version = "0.10", default-features = false}
-chrono = {version = "0.4", default-features = false, features = ["alloc"]}
+chrono-tz = { version = "0.10", default-features = false }
+chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 libm = "0.2"
-object = { version = "0.36.7", git = "https://gitlab.redox-os.org/andypython/object", default-features = false, features = ["elf", "read_core"] }
+log = "0.4"
 spin = "0.9.8"
 argon2 = "0.5.3"
 
@@ -58,21 +101,33 @@ path = "dlmalloc-rs"
 default-features = false
 features = ["c_api"]
 
+[dependencies.object]
+version = "0.36.7"
+git = "https://gitlab.redox-os.org/andypython/object"
+default-features = false
+features = ["elf", "read_core"]
+
 [target.'cfg(target_os = "linux")'.dependencies]
-sc = "0.2.3"
+sc = "0.2.7"
 
 [target.'cfg(target_os = "redox")'.dependencies]
-redox_syscall = "0.5.13"
+redox_syscall = "0.7.3"
 redox-rt = { path = "redox-rt" }
 redox-path = "0.3"
-redox_event = { git = "https://gitlab.redox-os.org/redox-os/event.git", default-features = false, features = [
+redox_event = { version = "0.4.6", default-features = false, features = [
     "redox_syscall",
 ] }
+ioslice = { version = "0.6", default-features = false }
+redox-ioctl = { path = "redox-ioctl" }
+redox_protocols = { package = "libredox", version = "0.1.14", default-features = false, features = ["protocol"] }
 
 [features]
-default = ["check_against_libc_crate"]
-trace = []
+# to enable trace level, take out this `no_trace`
+default = ["check_against_libc_crate", "no_trace"]
 check_against_libc_crate = ["__libc_only_for_layout_checks"]
+no_trace = ["log/release_max_level_debug"]
+# for very verbose activity beyond trace level
+trace_tls = []
 
 [profile.dev]
 panic = "abort"
@@ -82,4 +137,3 @@ panic = "abort"
 
 [patch.crates-io]
 cc-11 = { git = "https://github.com/tea/cc-rs", branch = "riscv-abi-arch-fix", package = "cc" }
-redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall.git", branch = "master" }

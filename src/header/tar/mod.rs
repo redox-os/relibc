@@ -1,5 +1,6 @@
-//! tar.h implementation for Redox, following POSIX.1-1990 specification
-//!  and https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/tar.h.html
+//! `tar.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/tar.h.html>.
 
 use core::slice;
 
@@ -62,7 +63,7 @@ pub const TVERSLEN: usize = 2; // Length of the version string
 pub const XHDRTYPE: u8 = b'x'; // Extended header referring to the next file in the archive
 pub const XGLTYPE: u8 = b'g'; // Global extended header
 
-/// Reserved values for GNU tar extensions
+// Reserved values for GNU tar extensions
 // pub const GNUTYPE_DUMPDIR: u8 = b'D'; // Directory dump
 // pub const GNUTYPE_MULTIVOL: u8 = b'M'; // Multi-volume file
 // pub const GNUTYPE_LONGNAME: u8 = b'L'; // Long file name
@@ -141,7 +142,7 @@ impl TarHeader {
         let mut header_copy = *self;
         header_copy.chksum.fill(b' ');
         let bytes =
-            unsafe { slice::from_raw_parts(&header_copy as *const _ as *const u8, HEADER_SIZE) };
+            unsafe { slice::from_raw_parts((&raw const header_copy).cast::<u8>(), HEADER_SIZE) };
         bytes.iter().map(|&b| b as usize).sum()
     }
 }

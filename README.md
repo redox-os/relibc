@@ -1,8 +1,12 @@
 # Redox C Library (relibc)
 
-relibc is a portable POSIX C standard library written in Rust and is under heavy development.
+relibc is a portable C standard library written in Rust and is under heavy development, this library contain the following items:
 
-The motivation for this project is twofold: Reduce issues that the Redox developers were having with [newlib](https://sourceware.org/newlib/), and create a safer alternative to a C standard library written in C. It is mainly designed to be used under Redox, as an alternative to newlib, but it also supports Linux system calls via the [sc](https://crates.io/crates/sc) crate.
+- C, Linux, BSD functions and extensions
+- POSIX compatibility layer
+- Interfaces for system components
+
+The motivation for this project is twofold: Reduce issues that the Redox developers were having with [newlib](https://sourceware.org/newlib/), and create a more stable and safe alternative to C standard libraries written in C. It is mainly designed to be used under Redox, as an alternative to newlib, but it also supports Linux via the [sc](https://crates.io/crates/sc) crate.
 
 Currently Redox and Linux are supported.
 
@@ -104,44 +108,22 @@ Note: Do not edit `relibc` inside `prefix` folder! Do your work on `relibc` fold
 
 ## Tests
 
-This section explain how to build and run the tests.
+Relibc has a test suite that also runs every time a new commit get pushed. You can see `.gitlab-ci.yml` to see how it's being executed. That being said, `./check.sh` is the recommended way to run tests. Here's few examples:
 
-### Build
++ `./check.sh` - Run build, without running the test
++ `./check.sh --test` - Run all tests in x86_64 Redox using Redoxer
++ `./check.sh --test --host` - Run all tests in host (Linux)
++ `./check.sh --test --arch=aarch64` - Run all tests in specified arch
+  - Arch can be `x86_64`, `aarch64`, `i586`, or `riscv64gc`
++ `./check.sh --test=stdio/printf` - Run a single test
+  - Can be combined with `--host` or `--arch`
+  - Will run statically linked test in Linux, dynamically linked in Redox
 
-To build the tests run `make all` on the `tests` folder, it will store the executables at `tests/bins_static`
+Couple of notes:
 
-If you did changes to your tests, run `make clean all` to rebuild the executables.
-
-### Redox OS Testing
-
-To test on Redox do the following steps:
-
-- Add the `relibc-tests` recipe on your filesystem configuration at `config/your-cpu/your-config.toml` (generally `desktop.toml`)
-- Run the following commands to rebuild relibc with your changes, update the `relibc-tests` recipe and update your QEMU image:
-
-```sh
-touch relibc
-```
-
-```sh
-make prefix cr.relibc-tests image
-```
-
-- Run the tests
-
-```sh
-/usr/share/relibc-tests/bins_static/test-name
-```
-
-### Linux Testing
-
-Run `make test` on the relibc directory.
-
-If you want to run one test, run the following command:
-
-```sh
-tests/bins_static/test-name
-```
+- Relibc and its tests will rebuild if files changed, however switching between arch or host requires you to run `make clean`
+- Redoxer is needed to run tests for Redox. You can install it using `cargo install redoxer`
+- Tests can hangs, the test runner can anticipate this, assuming the kernel doesn't hang too.
 
 ## Issues
 
@@ -149,17 +131,22 @@ tests/bins_static/test-name
 
 The Makefile expects GNU compiler tools prefixed with the platform specifier, as would be present when you installed a cross compiler. Since you are building for your own platform, some Linux distributions (like Manjaro) don't install/symlink the prefixed executables.
 
-An easy fix would be to replace the corresponding lines in the Makefile, e.g.
+An easy fix would be to replace the corresponding lines in `config.mk`, e.g.
 
 ```diff
- ifeq ($(TARGET),x86_64-unknown-linux-gnu)
-        export CC=x86_64-linux-gnu-gcc
--       export LD=x86_64-linux-gnu-ld
--       export AR=x86_64-linux-gnu-ar
+ifeq ($(TARGET),x86_64-unknown-linux-gnu)
+-	export CC=x86_64-linux-gnu-gcc
+-	export LD=x86_64-linux-gnu-ld
+-	export AR=x86_64-linux-gnu-ar
+-	export NM=x86_64-linux-gnu-nm
++       export CC=gcc
 +       export LD=ld
 +       export AR=ar
-        export OBJCOPY=x86_64-linux-gnu-objcopy
- endif
++       export NM=nm
+	export OBJCOPY=objcopy
+	export CPPFLAGS=
+	LD_SO_PATH=lib/ld64.so.1
+endif
 ```
 
 ## Contributing
@@ -173,9 +160,10 @@ Before starting to contribute, read [this](CONTRIBUTING.md) document.
 
 ## Supported architectures
 
-- i686 (Intel/AMD)
+- i586 (Intel/AMD)
 - x86_64 (Intel/AMD)
-- Aarch64 (ARM64)
+- aarch64 (ARM64)
+- riscv64gc (RISC-V)
 
 ## Funding - _Unix-style Signals and Process Management_
 

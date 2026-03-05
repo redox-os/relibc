@@ -1,6 +1,6 @@
-//! glob implementation, following https://pubs.opengroup.org/onlinepubs/9699919799/functions/glob.html
-
-#![deny(unsafe_op_in_unsafe_fn)]
+//! `glob.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/glob.h.html>.
 
 use core::ptr;
 
@@ -9,12 +9,15 @@ use alloc::{boxed::Box, vec::Vec};
 use crate::{
     c_str::{CStr, CString},
     header::{
-        dirent::{DIR, closedir, opendir, readdir},
+        dirent::{closedir, opendir, readdir},
         errno::*,
         fnmatch::{FNM_NOESCAPE, FNM_PERIOD, fnmatch},
-        sys_stat::{S_IFDIR, S_IFLNK, S_IFMT, stat},
+        sys_stat::{S_IFDIR, S_IFMT, stat},
     },
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, c_uchar, c_void, size_t},
+    },
 };
 
 // Cause glob() to return on error
@@ -41,6 +44,7 @@ pub const GLOB_ABORTED: c_int = 2;
 // Pattern does not match any existing pathname, and GLOB_NOCHECK was not set
 pub const GLOB_NOMATCH: c_int = 3;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/glob.h.html>.
 #[derive(Debug)]
 #[repr(C)]
 pub struct glob_t {
@@ -52,6 +56,7 @@ pub struct glob_t {
     __opaque: *mut c_void, // Vec<*mut c_char>
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/glob.html>.
 #[linkage = "weak"] // GNU prefers its own glob e.g. in Make
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn glob(
@@ -75,7 +80,7 @@ pub unsafe extern "C" fn glob(
     }
 
     let base_path = unsafe {
-        CStr::from_bytes_with_nul_unchecked(if glob_expr.to_bytes().get(0) == Some(&b'/') {
+        CStr::from_bytes_with_nul_unchecked(if glob_expr.to_bytes().first() == Some(&b'/') {
             b"/\0"
         } else {
             b"\0"
@@ -120,7 +125,7 @@ pub unsafe extern "C" fn glob(
 
     let mut pathv: Box<Vec<*mut c_char>>;
     if flags & GLOB_APPEND == GLOB_APPEND {
-        pathv = unsafe { Box::from_raw((*pglob).__opaque as *mut _) };
+        pathv = unsafe { Box::from_raw((*pglob).__opaque.cast()) };
         pathv.pop(); // Remove NULL from end
     } else {
         pathv = Box::new(Vec::new());
@@ -139,26 +144,27 @@ pub unsafe extern "C" fn glob(
     pathv.push(ptr::null_mut());
 
     unsafe {
-        (*pglob).gl_pathv = pathv.as_ptr() as *mut *mut c_char;
-        (*pglob).__opaque = Box::into_raw(pathv) as *mut _;
+        (*pglob).gl_pathv = pathv.as_ptr().cast_mut();
+        (*pglob).__opaque = Box::into_raw(pathv).cast();
     }
 
     0
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/glob.html>.
 #[linkage = "weak"] // GNU prefers its own glob e.g. in Make
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn globfree(pglob: *mut glob_t) {
     // Retake ownership
     if unsafe { !(*pglob).__opaque.is_null() } {
-        let pathv: Box<Vec<*mut c_char>> = unsafe { Box::from_raw((*pglob).__opaque as *mut _) };
+        let pathv: Box<Vec<*mut c_char>> = unsafe { Box::from_raw((*pglob).__opaque.cast()) };
         for (idx, path) in pathv.into_iter().enumerate() {
             if unsafe { idx < (*pglob).gl_offs } {
                 continue;
             }
             if !path.is_null() {
                 unsafe {
-                    CString::from_raw(path);
+                    drop(CString::from_raw(path));
                 }
             }
         }
@@ -189,12 +195,12 @@ fn list_dir(
 
     let old_errno = platform::ERRNO.get();
     let mut results: Vec<DirEntry> = Vec::new();
-    let open_path = if path.to_bytes().len() == 0 {
+    let open_path = if path.to_bytes().is_empty() {
         unsafe { &CStr::from_bytes_with_nul_unchecked(b".\0") }
     } else {
         path
     };
-    let mut dir = unsafe { opendir(open_path.as_ptr()) };
+    let dir = unsafe { opendir(open_path.as_ptr()) };
 
     if dir.is_null() {
         let new_errno = platform::ERRNO.get();
@@ -235,13 +241,13 @@ fn list_dir(
 
                 let mut link_info = stat::default();
                 if stat(
-                    full_path.as_ptr() as *const c_char,
-                    &mut link_info as *mut _,
+                    full_path.as_ptr().cast::<c_char>(),
+                    ptr::from_mut(&mut link_info),
                 ) != 0
                 {
                     let errno = platform::ERRNO.get();
                     platform::ERRNO.set(old_errno);
-                    if errfunc(full_path.as_ptr() as *const c_char, errno) != 0 || abort_on_error {
+                    if errfunc(full_path.as_ptr().cast::<c_char>(), errno) != 0 || abort_on_error {
                         return Err(GLOB_ABORTED);
                     }
                 }
@@ -262,10 +268,8 @@ fn list_dir(
     // Restore the old errno
     platform::ERRNO.set(old_errno);
 
-    if errno != 0 {
-        if unsafe { errfunc(path.as_ptr(), errno) } != 0 || abort_on_error {
-            return Err(GLOB_ABORTED);
-        }
+    if errno != 0 && (unsafe { errfunc(path.as_ptr(), errno) } != 0 || abort_on_error) {
+        return Err(GLOB_ABORTED);
     }
 
     Ok(results)
@@ -282,14 +286,14 @@ fn inner_glob(
     // Remove any '/' chars at the start of the expression
     let glob_expr = {
         let mut expr = glob_expr.to_bytes_with_nul();
-        while expr.get(0) == Some(&b'/') {
+        while expr.first() == Some(&b'/') {
             expr = &expr[1..];
         }
         unsafe { CStr::from_bytes_with_nul_unchecked(expr) }
     };
 
     // Get the next section of the glob expression (up to non-escaped '/')
-    let mut glob_iter = glob_expr.to_bytes();
+    let glob_iter = glob_expr.to_bytes();
     let mut in_bracket = false;
     let mut escaped = false;
     let mut glob_consumed = 0;
@@ -347,7 +351,7 @@ fn inner_glob(
 
     for entry in list_dir(current_dir, errfunc, flags & GLOB_ERR == GLOB_ERR)? {
         // If we still have pattern to match ignore non-directories
-        if new_glob_expr.to_bytes().len() != 0 && !entry.is_dir {
+        if !new_glob_expr.to_bytes().is_empty() && !entry.is_dir {
             continue;
         }
 
@@ -367,7 +371,7 @@ fn inner_glob(
 
         if unsafe {
             fnmatch(
-                pattern.as_ptr() as *const c_char,
+                pattern.as_ptr().cast::<c_char>(),
                 entry.name.as_ptr(),
                 fnmatch_flags,
             )
@@ -383,15 +387,15 @@ fn inner_glob(
     }
 
     // It is an error if we don't find a directory when we expect one
-    if matches.len() == 0 && new_glob_expr.to_bytes().len() != 0 {
+    if matches.is_empty() && !new_glob_expr.to_bytes().is_empty() {
         let mut path = current_dir.to_bytes().to_vec();
         path.extend_from_slice(&pattern);
-        if unsafe { errfunc(path.as_ptr() as *const c_char, ENOENT) } != 0
+        if unsafe { errfunc(path.as_ptr().cast::<c_char>(), ENOENT) } != 0
             || flags & GLOB_ERR == GLOB_ERR
         {
             return Err(GLOB_ABORTED);
         }
     }
 
-    return Ok(matches);
+    Ok(matches)
 }

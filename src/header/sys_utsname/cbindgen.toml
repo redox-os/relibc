@@ -1,3 +1,6 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_utsname.h.html
+#
+# There are no spec quotations relating to includes
 include_guard = "_SYS_UTSNAME_H"
 language = "C"
 style = "Tag"

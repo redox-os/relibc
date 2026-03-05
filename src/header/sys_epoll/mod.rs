@@ -1,11 +1,16 @@
-//! sys/epoll.h implementation for Redox, following http://man7.org/linux/man-pages/man7/epoll.7.html
+//! `sys/epoll.h` implementation.
+//!
+//! Non-POSIX, see: <http://man7.org/linux/man-pages/man7/epoll.7.html>.
 
 use core::ptr;
 
 use crate::{
     error::ResultExt,
     header::signal::sigset_t,
-    platform::{PalEpoll, Sys, types::*},
+    platform::{
+        PalEpoll, Sys,
+        types::{c_int, c_void},
+    },
 };
 
 pub use self::sys::*;
@@ -80,7 +85,7 @@ pub unsafe extern "C" fn epoll_ctl(
     event: *mut epoll_event,
 ) -> c_int {
     trace_expr!(
-        Sys::epoll_ctl(epfd, op, fd, event)
+        unsafe { Sys::epoll_ctl(epfd, op, fd, event) }
             .map(|()| 0)
             .or_minus_one_errno(),
         "epoll_ctl({}, {}, {}, {:p})",
@@ -98,7 +103,7 @@ pub unsafe extern "C" fn epoll_wait(
     maxevents: c_int,
     timeout: c_int,
 ) -> c_int {
-    epoll_pwait(epfd, events, maxevents, timeout, ptr::null())
+    unsafe { epoll_pwait(epfd, events, maxevents, timeout, ptr::null()) }
 }
 
 #[unsafe(no_mangle)]
@@ -110,7 +115,7 @@ pub unsafe extern "C" fn epoll_pwait(
     sigmask: *const sigset_t,
 ) -> c_int {
     trace_expr!(
-        Sys::epoll_pwait(epfd, events, maxevents, timeout, sigmask)
+        unsafe { Sys::epoll_pwait(epfd, events, maxevents, timeout, sigmask) }
             .map(|e| e as c_int)
             .or_minus_one_errno(),
         "epoll_pwait({}, {:p}, {}, {}, {:p})",

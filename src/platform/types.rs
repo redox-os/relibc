@@ -1,7 +1,5 @@
 //! C data types for this platform.
 
-use core::i32;
-
 // Use repr(u8) as LLVM expects `void*` to be the same as `i8*` to help enable
 // more optimization opportunities around it recognizing things like
 // malloc/free.
@@ -63,12 +61,12 @@ pub type pid_t = c_int;
 pub type id_t = c_uint;
 pub type gid_t = c_int;
 pub type uid_t = c_int;
-pub type dev_t = c_long;
+pub type dev_t = c_ulonglong;
 pub type ino_t = c_ulonglong;
 pub type reclen_t = c_ushort;
 pub type nlink_t = c_ulong;
 pub type blksize_t = c_long;
-pub type blkcnt_t = c_ulong;
+pub type blkcnt_t = c_longlong;
 
 pub type fsblkcnt_t = c_ulong;
 pub type fsfilcnt_t = c_ulong;
@@ -80,7 +78,18 @@ pub type clock_t = c_long;
 pub type clockid_t = c_int;
 pub type timer_t = *mut c_void;
 
-pub use crate::header::{bits_pthread::*, bits_sched::*};
+// A C long double is 96 bit in x86, 128 bit in other 64-bit targets
+// However, both in x86 and x86_64 is actually f80 padded which rust has no underlying support,
+//     while aarch64 (and possibly riscv64) support full f128 type but behind a feature gate.
+// Until rust supporting them, relibc will lose precision to get them working, plus:
+//     All read operation to this type must be converted from "relibc_ldtod".
+//     All write operation to this type must be converted with "relibc_dtold".
+#[cfg(target_pointer_width = "64")]
+pub type c_longdouble = u128;
+#[cfg(target_pointer_width = "32")]
+pub type c_longdouble = [u32; 3];
+
+pub use crate::header::bits_pthread::*;
 
 #[repr(C, align(16))]
 pub struct max_align_t {

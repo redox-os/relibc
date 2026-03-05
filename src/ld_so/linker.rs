@@ -5,8 +5,10 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+use object::elf;
+#[cfg(not(target_arch = "x86"))]
 use object::{
-    NativeEndian, elf,
+    NativeEndian,
     read::elf::{Rela as _, Sym},
 };
 
@@ -16,6 +18,7 @@ use core::{
 };
 
 use crate::{
+    ALLOCATOR,
     c_str::{CStr, CString},
     error::Errno,
     header::{
@@ -23,21 +26,25 @@ use crate::{
         fcntl, sys_mman,
         unistd::F_OK,
     },
-    ld_so::dso::{SymbolBinding, resolve_sym},
+    ld_so::dso::SymbolBinding,
     out::Out,
     platform::{
         Pal, Sys,
-        types::{c_int, c_uint, c_void},
+        types::{c_int, c_void},
     },
     sync::rwlock::RwLock,
 };
+#[cfg(not(target_arch = "x86"))]
+use crate::{ld_so::dso::resolve_sym, platform::types::c_uint};
 
+#[cfg(not(target_arch = "x86"))]
+use super::dso::Rela;
 use super::{
     PATH_SEP,
     access::accessible,
     callbacks::LinkerCallbacks,
     debug::{_dl_debug_state, _r_debug, RTLDState},
-    dso::{DSO, ProgramHeader, Rela},
+    dso::{DSO, ProgramHeader},
     tcb::{Master, Tcb},
 };
 
@@ -344,7 +351,7 @@ bitflags::bitflags! {
 
 #[derive(Default)]
 pub struct Config {
-    debug_flags: DebugFlags,
+    pub debug_flags: DebugFlags,
     library_path: Option<String>,
     /// Resolve symbols at program startup.
     bind_now: bool,
@@ -433,9 +440,12 @@ impl Linker {
         scope: ScopeKind,
         noload: bool,
     ) -> Result<ObjectHandle> {
-        trace!(
+        log::trace!(
             "[ld.so] load_library(name={:?}, resolve={:#?}, scope={:#?}, noload={})",
-            name, resolve, scope, noload
+            name,
+            resolve,
+            scope,
+            noload
         );
 
         if noload && resolve == Resolve::Now {
@@ -519,7 +529,7 @@ impl Linker {
                     ti_offset: symbol.value,
                 };
 
-                unsafe { __tls_get_addr(&mut tls_index) }
+                unsafe { __tls_get_addr(&raw mut tls_index) }
             }
         })
     }
@@ -530,7 +540,7 @@ impl Linker {
             return;
         }
 
-        trace!(
+        log::trace!(
             "[ld.so] unloading {} (sc={}, wc={})",
             obj.name,
             Arc::strong_count(&obj),
@@ -698,8 +708,9 @@ impl Linker {
                 tcb.copy_masters().map_err(|_| DlError::Malformed)?;
                 tcb.activate(
                     #[cfg(target_os = "redox")]
-                    thr_fd,
+                    Some(thr_fd),
                 );
+                tcb.mspace = ALLOCATOR.get();
 
                 #[cfg(target_os = "redox")]
                 {
@@ -715,6 +726,7 @@ impl Linker {
         }
 
         for obj in new_objects.into_iter() {
+            obj.mark_ready();
             self.run_init(&obj);
             self.register_object(obj);
         }
@@ -758,10 +770,26 @@ impl Linker {
     ) -> Result<Arc<DSO>> {
         // fixme: double lookup slow
         if let Some(id) = self.name_to_object_id_map.get(name) {
-            if let Some(obj) = self.objects.get_mut(id) {
+            if let Some(obj) = self.objects.get(id) {
+                if let Some(scope) = dependent_scope {
+                    match scope_kind {
+                        ScopeKind::Local => scope.add(obj),
+                        ScopeKind::Global => GLOBAL_SCOPE.write().add(obj),
+                    }
+                } else if scope_kind == ScopeKind::Global {
+                    GLOBAL_SCOPE.write().add(obj);
+                }
                 return Ok(obj.clone());
             }
-        } else if let Some(obj) = new_objects.iter_mut().find(|o| o.name == name) {
+        } else if let Some(obj) = new_objects.iter().find(|o| o.name == name) {
+            if let Some(scope) = dependent_scope {
+                match scope_kind {
+                    ScopeKind::Local => scope.add(obj),
+                    ScopeKind::Global => GLOBAL_SCOPE.write().add(obj),
+                }
+            } else if scope_kind == ScopeKind::Global {
+                GLOBAL_SCOPE.write().add(obj);
+            }
             return Ok(obj.clone());
         }
 
@@ -777,7 +805,8 @@ impl Linker {
             dlopened,
             self.next_object_id,
             self.next_tls_module_id,
-            self.tls_size,
+            // Ensure TLS is aligned to 16 bytes for SSE
+            self.tls_size.next_multiple_of(16),
         )
         .map_err(|err| {
             if debug {
@@ -801,7 +830,7 @@ impl Linker {
 
         if let Some(master) = tcb_master {
             if !dlopened {
-                self.tls_size += master.offset; // => aligned ph.p_memsz
+                self.tls_size = master.offset; // => aligned ph.p_memsz
             }
 
             tcb_masters.push(master);
@@ -984,8 +1013,8 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
     } else {
         rela.r_offset(NativeEndian) as *mut u64
     };
-
-    trace!("@plt: {} -> *mut {:p}", name, ptr);
+    #[cfg(feature = "trace_tls")]
+    log::trace!("@plt: {} -> *mut {:p}", name, ptr);
 
     unsafe { *ptr = resolved as u64 }
     resolved

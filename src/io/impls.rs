@@ -13,7 +13,7 @@ use core::{cmp, fmt, mem};
 
 use crate::io::{self, Error, ErrorKind, Initializer, Seek, SeekFrom, Write, prelude::*};
 
-impl<'a, R: Read + ?Sized> Read for &'a mut R {
+impl<R: Read + ?Sized> Read for &mut R {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         (**self).read(buf)
@@ -21,16 +21,14 @@ impl<'a, R: Read + ?Sized> Read for &'a mut R {
 
     #[inline]
     unsafe fn initializer(&self) -> Initializer {
-        (**self).initializer()
+        unsafe { (**self).initializer() }
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> io::Result<usize> {
         (**self).read_to_end(buf)
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
         (**self).read_to_string(buf)
@@ -42,7 +40,7 @@ impl<'a, R: Read + ?Sized> Read for &'a mut R {
     }
 }
 
-impl<'a, W: Write + ?Sized> Write for &'a mut W {
+impl<W: Write + ?Sized> Write for &mut W {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         (**self).write(buf)
@@ -63,14 +61,14 @@ impl<'a, W: Write + ?Sized> Write for &'a mut W {
         (**self).write_fmt(fmt)
     }
 }
-impl<'a, S: Seek + ?Sized> Seek for &'a mut S {
+impl<S: Seek + ?Sized> Seek for &mut S {
     #[inline]
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         (**self).seek(pos)
     }
 }
 
-impl<'a, B: BufRead + ?Sized> BufRead for &'a mut B {
+impl<B: BufRead + ?Sized> BufRead for &mut B {
     #[inline]
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         (**self).fill_buf()
@@ -100,16 +98,14 @@ impl<R: Read + ?Sized> Read for Box<R> {
 
     #[inline]
     unsafe fn initializer(&self) -> Initializer {
-        (**self).initializer()
+        unsafe { (**self).initializer() }
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> io::Result<usize> {
         (**self).read_to_end(buf)
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
         (**self).read_to_string(buf)
@@ -179,7 +175,7 @@ impl<B: BufRead + ?Sized> BufRead for Box<B> {
 ///
 /// Note that reading updates the slice to point to the yet unread part.
 /// The slice will be empty when EOF is reached.
-impl<'a> Read for &'a [u8] {
+impl Read for &[u8] {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let amt = cmp::min(buf.len(), self.len());
@@ -200,7 +196,7 @@ impl<'a> Read for &'a [u8] {
 
     #[inline]
     unsafe fn initializer(&self) -> Initializer {
-        Initializer::nop()
+        unsafe { Initializer::nop() }
     }
 
     #[inline]
@@ -228,14 +224,14 @@ impl<'a> Read for &'a [u8] {
 
     #[inline]
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> io::Result<usize> {
-        buf.extend_from_slice(*self);
+        buf.extend_from_slice(self);
         let len = self.len();
         *self = &self[len..];
         Ok(len)
     }
 }
 
-impl<'a> BufRead for &'a [u8] {
+impl BufRead for &[u8] {
     #[inline]
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         Ok(*self)
@@ -252,11 +248,11 @@ impl<'a> BufRead for &'a [u8] {
 ///
 /// Note that writing updates the slice to point to the yet unwritten part.
 /// The slice will be empty when it has been completely overwritten.
-impl<'a> Write for &'a mut [u8] {
+impl Write for &mut [u8] {
     #[inline]
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
         let amt = cmp::min(data.len(), self.len());
-        let (a, b) = mem::replace(self, &mut []).split_at_mut(amt);
+        let (a, b) = mem::take(self).split_at_mut(amt);
         a.copy_from_slice(&data[..amt]);
         *self = b;
         Ok(amt)

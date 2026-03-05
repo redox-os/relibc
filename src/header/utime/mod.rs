@@ -5,14 +5,14 @@
 //! The `utime.h` header was marked obsolescent in the Open Group Base
 //! Specifications Issue 7, and removed in Issue 8.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::{
     c_str::CStr,
     error::ResultExt,
-    header::time::timespec,
-    platform::{Pal, Sys, types::*},
+    header::bits_time::timespec,
+    platform::{
+        Pal, Sys,
+        types::{c_char, c_int, time_t},
+    },
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/utime.h.html>.

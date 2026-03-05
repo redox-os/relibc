@@ -12,22 +12,21 @@ pub use self::allocator::*;
 
 mod allocator;
 
+pub mod logger;
+
 pub use self::pal::{Pal, PalEpoll, PalPtrace, PalSignal, PalSocket};
 
 mod pal;
 
 pub use self::sys::Sys;
 
-#[cfg(all(not(feature = "no_std"), target_os = "linux"))]
+#[cfg(target_os = "linux")]
 #[path = "linux/mod.rs"]
 pub(crate) mod sys;
 
-#[cfg(all(not(feature = "no_std"), target_os = "redox"))]
+#[cfg(target_os = "redox")]
 #[path = "redox/mod.rs"]
 pub(crate) mod sys;
-
-#[cfg(test)]
-mod test;
 
 pub use self::rlb::{Line, RawLineBuffer};
 pub mod rlb;
@@ -85,7 +84,7 @@ pub trait WriteByte: fmt::Write {
     fn write_u8(&mut self, byte: u8) -> fmt::Result;
 }
 
-impl<'a, W: WriteByte> WriteByte for &'a mut W {
+impl<W: WriteByte> WriteByte for &mut W {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
         (**self).write_u8(byte)
     }
@@ -109,14 +108,14 @@ impl FileWriter {
 
 impl fmt::Write for FileWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write(s.as_bytes());
+        if let Ok(()) = self.write(s.as_bytes()) {}; // TODO handle error
         Ok(())
     }
 }
 
 impl WriteByte for FileWriter {
     fn write_u8(&mut self, byte: u8) -> fmt::Result {
-        self.write(&[byte]);
+        if let Ok(()) = self.write(&[byte]) {}; // TODO handle error
         Ok(())
     }
 }
@@ -264,7 +263,7 @@ impl<T: Write> Write for CountingWriter<T> {
         res
     }
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        match self.inner.write_all(&buf) {
+        match self.inner.write_all(buf) {
             Ok(()) => (),
             Err(ref err) if err.kind() == io::ErrorKind::WriteZero => (),
             Err(err) => return Err(err),
@@ -281,18 +280,18 @@ impl<T: Write> Write for CountingWriter<T> {
 // get_auxv.
 
 #[cold]
-unsafe fn auxv_iter<'a>(ptr: *const usize) -> impl Iterator<Item = [usize; 2]> + 'a {
+pub unsafe fn auxv_iter<'a>(ptr: *const usize) -> impl Iterator<Item = [usize; 2]> + 'a {
     struct St(*const usize);
     impl Iterator for St {
         type Item = [usize; 2];
 
         fn next(&mut self) -> Option<Self::Item> {
             unsafe {
-                if self.0.read() == self::auxv_defs::AT_NULL {
+                if *self.0 == self::auxv_defs::AT_NULL {
                     return None;
                 }
-                let kind = self.0.read();
-                let value = self.0.add(1).read();
+                let kind = *self.0;
+                let value = *self.0.add(1);
                 self.0 = self.0.add(2);
 
                 Some([kind, value])
@@ -305,7 +304,7 @@ unsafe fn auxv_iter<'a>(ptr: *const usize) -> impl Iterator<Item = [usize; 2]> +
 #[cold]
 pub unsafe fn get_auxvs(ptr: *const usize) -> Box<[[usize; 2]]> {
     //traverse the stack and collect argument environment variables
-    let mut auxvs = auxv_iter(ptr).collect::<Vec<_>>();
+    let mut auxvs = unsafe { auxv_iter(ptr) }.collect::<Vec<_>>();
 
     auxvs.sort_unstable_by_key(|[kind, _]| *kind);
     auxvs.into_boxed_slice()
@@ -313,7 +312,8 @@ pub unsafe fn get_auxvs(ptr: *const usize) -> Box<[[usize; 2]]> {
 // TODO: Find an auxv replacement for Redox's execv protocol
 #[cold]
 pub unsafe fn get_auxv_raw(ptr: *const usize, requested_kind: usize) -> Option<usize> {
-    auxv_iter(ptr).find_map(|[kind, value]| Some(value).filter(|_| kind == requested_kind))
+    unsafe { auxv_iter(ptr) }
+        .find_map(|[kind, value]| Some(value).filter(|_| kind == requested_kind))
 }
 pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
     auxvs
@@ -327,41 +327,58 @@ pub fn get_auxv(auxvs: &[[usize; 2]], key: usize) -> Option<usize> {
 // SAFETY: Must only be called when only one thread exists.
 pub unsafe fn init(auxvs: Box<[[usize; 2]]>) {
     use self::auxv_defs::*;
-    use crate::header::sys_stat::S_ISVTX;
     use redox_rt::proc::FdGuard;
-    use syscall::MODE_PERM;
 
     let Some(proc_fd) = get_auxv(&auxvs, AT_REDOX_PROC_FD) else {
         panic!("Missing proc and thread fd!");
     };
-    redox_rt::initialize(FdGuard::new(proc_fd));
+    let Some(ns_fd) = get_auxv(&auxvs, AT_REDOX_NS_FD) else {
+        panic!("Missing namespace fd!");
+    };
+    unsafe {
+        redox_rt::initialize(
+            FdGuard::new(proc_fd).to_upper().unwrap(),
+            if ns_fd == usize::MAX {
+                None
+            } else {
+                Some(FdGuard::new(ns_fd).to_upper().unwrap())
+            },
+        );
+        init_inner(auxvs)
+    }
+}
+#[cold]
+#[cfg(target_os = "redox")]
+pub unsafe fn init_inner(auxvs: Box<[[usize; 2]]>) {
+    use self::auxv_defs::*;
+    use crate::header::sys_stat::S_ISVTX;
+    use redox_rt::proc::FdGuard;
+    use syscall::MODE_PERM;
 
     // TODO: Is it safe to assume setup_sighandler has been called at this point?
     redox_rt::sys::this_proc_call(
         &mut [],
         syscall::CallFlags::empty(),
-        &[redox_rt::protocol::ProcCall::SyncSigPctl as u64],
+        &[redox_protocols::protocol::ProcCall::SyncSigPctl as u64],
     )
     .expect("failed to sync signal pctl");
 
-    if let (Some(cwd_ptr), Some(cwd_len)) = (
+    if let (Some(cwd_ptr), Some(cwd_len), Some(cwd_fd)) = (
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_PTR),
         get_auxv(&auxvs, AT_REDOX_INITIAL_CWD_LEN),
+        get_auxv(&auxvs, AT_REDOX_CWD_FD),
     ) {
-        let cwd_bytes: &'static [u8] = core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len);
-        if let Ok(cwd) = core::str::from_utf8(cwd_bytes) {
-            self::sys::path::set_cwd_manual(cwd.into());
-        }
-    }
-
-    if let (Some(scheme_ptr), Some(scheme_len)) = (
-        get_auxv(&auxvs, AT_REDOX_INITIAL_DEFAULT_SCHEME_PTR),
-        get_auxv(&auxvs, AT_REDOX_INITIAL_DEFAULT_SCHEME_LEN),
-    ) {
-        let scheme_bytes: &'static [u8] =
-            unsafe { core::slice::from_raw_parts(scheme_ptr as *const u8, scheme_len) };
-        if let Ok(scheme) = core::str::from_utf8(scheme_bytes) {
-            self::sys::path::set_default_scheme_manual(scheme.into());
+        let cwd_bytes: &'static [u8] =
+            unsafe { core::slice::from_raw_parts(cwd_ptr as *const u8, cwd_len) };
+        if let (Ok(cwd_path), Some(cwd_fd)) = (
+            core::str::from_utf8(cwd_bytes),
+            (cwd_fd != usize::MAX).then(|| {
+                FdGuard::new(cwd_fd)
+                    .to_upper()
+                    .expect("failed to move cwd fd to upper table")
+            }),
+        ) {
+            self::sys::path::set_cwd_manual(cwd_path.into(), cwd_fd);
         }
     }
 

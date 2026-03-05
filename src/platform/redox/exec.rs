@@ -8,73 +8,49 @@ use crate::{
     fs::File,
     header::{limits::PATH_MAX, string::strlen},
     io::{BufReader, SeekFrom, prelude::*},
-    platform::{
-        sys::{S_ISGID, S_ISUID},
-        types::*,
-    },
+    platform::types::*,
 };
 
 use redox_rt::{
     RtTcb,
-    proc::{ExtraInfo, FdGuard, FexecResult, InterpOverride},
+    proc::{ExtraInfo, FdGuard, FdGuardUpper, FexecResult, InterpOverride},
     sys::Resugid,
 };
 use syscall::{data::Stat, error::*, flag::*};
 
 fn fexec_impl(
-    exec_file: FdGuard,
+    exec_file: FdGuardUpper,
     path: &[u8],
     args: &[&[u8]],
     envs: &[&[u8]],
-    total_args_envs_size: usize,
     extrainfo: &ExtraInfo,
     interp_override: Option<InterpOverride>,
 ) -> Result<Infallible> {
-    let memory = FdGuard::new(syscall::open("/scheme/memory", 0)?);
-
-    let addrspace_selection_fd = match redox_rt::proc::fexec_impl(
+    let FexecResult::Interp {
+        path,
+        interp_override: new_interp_override,
+    } = redox_rt::proc::fexec_impl(
         exec_file,
         &RtTcb::current().thread_fd(),
         redox_rt::current_proc_fd(),
-        &memory,
         path,
-        args.iter().rev(),
-        envs.iter().rev(),
-        total_args_envs_size,
+        args,
+        envs,
         extrainfo,
         interp_override,
-    )? {
-        FexecResult::Normal { addrspace_handle } => addrspace_handle,
-        FexecResult::Interp {
-            image_file,
-            path,
-            interp_override: new_interp_override,
-        } => {
-            drop(image_file);
-            drop(memory);
+    )?;
 
-            // According to elf(5), PT_INTERP requires that the interpreter path be
-            // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
-            let path_cstr = CStr::from_bytes_with_nul(&path).map_err(|_| Error::new(ENOEXEC))?;
+    // According to elf(5), PT_INTERP requires that the interpreter path be
+    // null-terminated. Violating this should therefore give the "format error" ENOEXEC.
+    let path_cstr = CStr::from_bytes_with_nul(&path).map_err(|_| Error::new(ENOEXEC))?;
 
-            return execve(
-                Executable::AtPath(path_cstr),
-                ArgEnv::Parsed {
-                    total_args_envs_size,
-                    args,
-                    envs,
-                },
-                Some(new_interp_override),
-            );
-        }
-    };
-    drop(memory);
-
-    // Dropping this FD will cause the address space switch.
-    drop(addrspace_selection_fd);
-
-    unreachable!();
+    return execve(
+        Executable::AtPath(path_cstr),
+        ArgEnv::Parsed { args, envs },
+        Some(new_interp_override),
+    );
 }
+
 pub enum ArgEnv<'a> {
     C {
         argv: *const *mut c_char,
@@ -83,7 +59,6 @@ pub enum ArgEnv<'a> {
     Parsed {
         args: &'a [&'a [u8]],
         envs: &'a [&'a [u8]],
-        total_args_envs_size: usize,
     },
 }
 
@@ -135,9 +110,6 @@ pub fn execve(
     }
 
     let cwd: Box<[u8]> = super::path::clone_cwd().unwrap_or_default().into();
-    let default_scheme: Box<[u8]> = super::path::clone_default_scheme()
-        .unwrap_or_else(|| Box::from("file"))
-        .into();
 
     // Path to interpreter binary and args if found
     let (interpreter_path, interpreter_args) = { parse_interpreter(&mut image_file)? };
@@ -152,13 +124,27 @@ pub fn execve(
     }
 
     // Count arguments for `exec` which is different from the interpreter's args
+    //
+    // When there's an interpreter, we skip the original `argv[0]` and replace it with the script
+    // path (`arg0`).
     match arg_env {
         ArgEnv::C { argv, .. } => unsafe {
-            while !(*argv.add(len)).is_null() {
-                len += 1;
+            let mut count = 0;
+            let ptr = if interpreter_path.is_some() && !(*argv).is_null() {
+                argv.add(1)
+            } else {
+                argv
+            };
+
+            while !(*ptr.add(count)).is_null() {
+                count += 1;
             }
+            len += count;
         },
-        ArgEnv::Parsed { args, .. } => len = args.len(),
+        ArgEnv::Parsed { args, .. } => {
+            let skip = if interpreter_path.is_some() { 1 } else { 0 };
+            len += args.len().saturating_sub(skip);
+        }
     }
     let mut args: Vec<&[u8]> = Vec::with_capacity(len);
 
@@ -179,17 +165,21 @@ pub fn execve(
             .map_err(|_| Error::new(EIO))?;
     }
 
-    let (total_args_envs_size, args, envs): (usize, Vec<_>, Vec<_>) = match arg_env {
+    let (args, envs): (Vec<_>, Vec<_>) = match arg_env {
         ArgEnv::C { mut argv, mut envp } => unsafe {
-            let mut args_envs_size_without_nul = 0;
-
             // Arguments
+            if interpreter_path.is_some() {
+                args.push(arg0);
+                if !(*argv).is_null() {
+                    argv = argv.add(1);
+                }
+            }
+
             while !argv.read().is_null() {
                 let arg = argv.read();
 
                 let len = strlen(arg);
                 args.push(core::slice::from_raw_parts(arg as *const u8, len));
-                args_envs_size_without_nul += len;
                 argv = argv.add(1);
             }
 
@@ -205,73 +195,48 @@ pub fn execve(
 
                 let len = strlen(env);
                 envs.push(core::slice::from_raw_parts(env as *const u8, len));
-                args_envs_size_without_nul += len;
                 envp = envp.add(1);
             }
-            (
-                args_envs_size_without_nul + args.len() + envs.len(),
-                args,
-                envs,
-            )
+            (args, envs)
         },
         ArgEnv::Parsed {
             args: new_args,
             envs,
-            total_args_envs_size,
         } => {
-            let prev_size: usize = args.iter().map(|a| a.len()).sum();
-            args.extend(new_args);
-            (total_args_envs_size + prev_size, args, Vec::from(envs))
+            if interpreter_path.is_some() {
+                args.push(arg0);
+                args.extend(new_args.iter().skip(1));
+            } else {
+                args.extend(new_args);
+            }
+            (args, Vec::from(envs))
         }
     };
 
-    // Close all O_CLOEXEC file descriptors. TODO: close_range?
-    {
-        // NOTE: This approach of implementing O_CLOEXEC will not work in multithreaded
-        // scenarios. While execve() is undefined according to POSIX if there exist sibling
-        // threads, it could still be allowed by keeping certain file descriptors and instead
-        // set the active file table.
-        let files_fd =
-            File::new(syscall::dup(**RtTcb::current().thread_fd(), b"filetable")? as c_int);
-        for line in BufReader::new(files_fd).lines() {
-            let line = match line {
-                Ok(l) => l,
-                Err(_) => break,
-            };
-            let fd = match line.parse::<usize>() {
-                Ok(f) => f,
-                Err(_) => continue,
-            };
-
-            let flags = syscall::fcntl(fd, F_GETFD, 0)?;
-
-            if flags & O_CLOEXEC == O_CLOEXEC {
-                let _ = syscall::close(fd);
-            }
-        }
-    }
-
     // TODO: Convert image_file to FdGuard earlier?
-    let exec_fd_guard = FdGuard::new(image_file.fd as usize);
+    let exec_fd_guard = FdGuard::new(image_file.fd as usize).to_upper().unwrap();
     core::mem::forget(image_file);
 
     let sigprocmask = redox_rt::signal::get_sigmask().unwrap();
 
     let extrainfo = ExtraInfo {
         cwd: Some(&cwd),
-        default_scheme: Some(&default_scheme),
         sigignmask: redox_rt::signal::get_sigignmask_to_inherit(),
         sigprocmask,
         umask: redox_rt::sys::get_umask(),
-        thr_fd: **RtTcb::current().thread_fd(),
-        proc_fd: **redox_rt::current_proc_fd(),
+        thr_fd: RtTcb::current().thread_fd().as_raw_fd(),
+        proc_fd: redox_rt::current_proc_fd().as_raw_fd(),
+        ns_fd: redox_rt::current_namespace_fd().ok(),
+        cwd_fd: super::path::current_dir()
+            .ok()
+            .map(|fd| fd.as_ref().unwrap().fd.as_raw_fd()),
     };
+
     fexec_impl(
         exec_fd_guard,
         arg0,
         &args,
         &envs,
-        total_args_envs_size,
         &extrainfo,
         interp_override,
     )
@@ -403,21 +368,29 @@ where
         args_offset.map(NonZeroUsize::get),
         args_offset_u64.map(NonZeroU64::get),
     ) {
-        let len = offset - interp_offset - 1;
-        let len_u64 = offset_u64 - interp_offset_u64 - 1;
+        let len = offset - interp_offset;
+        let len_u64 = offset_u64 - interp_offset_u64;
         let mut args = Vec::with_capacity(len);
 
-        // Eat initial whitespace
-        reader.consume(1);
         reader
             .take(len_u64)
             .read_to_end(&mut args)
             .map_err(|_| Error::new(E2BIG))?;
+
         // Eat '\n'
         reader.consume(1);
 
-        let args = CString::new(args).map_err(|_| Error::new(ENOEXEC))?;
-        Some(args)
+        let mut arg_start = 0;
+        while arg_start < args.len() && (args[arg_start] == b' ' || args[arg_start] == b'\t') {
+            arg_start += 1;
+        }
+
+        if arg_start < args.len() {
+            let args = CString::new(&args[arg_start..]).map_err(|_| Error::new(ENOEXEC))?;
+            Some(args)
+        } else {
+            None
+        }
     } else {
         None
     };

@@ -4,8 +4,12 @@ pub mod _aio;
 pub mod _fenv;
 pub mod arpa_inet;
 pub mod assert;
+#[path = "bits_locale-t/mod.rs"]
+pub mod bits_locale_t;
 pub mod bits_pthread;
-pub mod bits_sched;
+#[path = "bits_socklen-t/mod.rs"]
+pub mod bits_socklen_t;
+pub mod bits_time;
 // complex.h implemented in C
 // cpio.h implemented in C
 pub mod crypt;
@@ -29,6 +33,7 @@ pub mod getopt;
 pub mod glob;
 pub mod grp;
 // TODO: iconv.h
+pub mod ifaddrs;
 pub mod inttypes;
 // iso646.h implemented in C
 pub mod langinfo;

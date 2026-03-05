@@ -1,7 +1,7 @@
 use super::gen_salt;
 use alloc::string::{String, ToString};
 use base64ct::{Base64Bcrypt, Encoding};
-use core::{str, u32};
+use core::str;
 use pbkdf2::pbkdf2_hmac;
 use sha2::Sha256;
 
@@ -42,7 +42,7 @@ pub fn crypt_pbkdf2(passw: &str, setting: &str) -> Option<String> {
             return None;
         }
 
-        let actual_salt = if salt.len() > 0 {
+        let actual_salt = if !salt.is_empty() {
             salt.to_string()
         } else {
             gen_salt()?

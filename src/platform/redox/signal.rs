@@ -5,23 +5,19 @@ use super::{
 use crate::{
     error::{Errno, Result},
     header::{
+        bits_time::timespec,
         errno::{EINVAL, ENOSYS},
         signal::{
-            NSIG, SA_SIGINFO, SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SIGRTMIN,
-            SS_DISABLE, SS_ONSTACK, sigaction, siginfo_t, sigset_t, sigval, stack_t, ucontext_t,
+            SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SS_DISABLE, SS_ONSTACK,
+            sigaction, siginfo_t, sigset_t, sigval, stack_t, ucontext_t,
         },
         sys_time::{ITIMER_REAL, itimerval},
-        time::timespec,
     },
-    platform::ERRNO,
 };
-use core::mem::{self, offset_of};
-use redox_rt::{
-    proc::FdGuard,
-    protocol::ProcKillTarget,
-    signal::{
-        PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
-    },
+use core::mem::offset_of;
+use redox_protocols::protocol::ProcKillTarget;
+use redox_rt::signal::{
+    PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
 };
 
 const _: () = {
@@ -53,10 +49,10 @@ impl PalSignal for Sys {
             _ => return Err(Errno(EINVAL)),
         };
         // TODO: implement setitimer
-        // let fd = FdGuard::new(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC)?);
+        // let fd = FdGuard::new(redox_rt::sys::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC)?);
         // let count = syscall::read(*fd, &mut spec)?;
 
-        let mut spec = syscall::ITimerSpec::default();
+        let spec = syscall::ITimerSpec::default();
         out.it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
         out.it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
         out.it_value.tv_sec = spec.it_value.tv_sec as time_t;
@@ -86,18 +82,6 @@ impl PalSignal for Sys {
 
     fn raise(sig: c_int) -> Result<()> {
         // TODO: Bypass kernel?
-        const n_sig: c_int = NSIG as c_int;
-        const rt_min: c_int = SIGRTMIN as c_int;
-        const rt_max: c_int = SIGRTMIN as c_int;
-
-        match sig {
-            0..n_sig => {}
-            rt_min..=rt_max => {}
-            _ => {
-                return Err(Errno(EINVAL));
-            }
-        }
-
         unsafe { Self::rlct_kill(Self::current_os_tid(), sig as _) }
     }
 
@@ -105,7 +89,7 @@ impl PalSignal for Sys {
         // TODO: setitimer is no longer part of POSIX and should not be implemented in Redox
         // Change the platform-independent implementation to use POSIX timers.
         // For Redox, the timer should probably use "/scheme/time"
-        eprintln!("relibc: setitimer not implemented");
+        todo_skip!(0, "setitimer not implemented");
         Err(Errno(ENOSYS))
     }
 
@@ -125,7 +109,7 @@ impl PalSignal for Sys {
                 SigactionKind::Ignore
             } else {
                 SigactionKind::Handled {
-                    handler: if c_act.sa_flags & crate::header::signal::SA_SIGINFO as c_ulong != 0 {
+                    handler: if c_act.sa_flags & crate::header::signal::SA_SIGINFO as c_int != 0 {
                         SignalHandler {
                             sigaction: unsafe { core::mem::transmute(c_act.sa_handler) },
                         }
@@ -168,7 +152,7 @@ impl PalSignal for Sys {
                         unsafe { handler.handler }
                     },
                     sa_restorer: None,
-                    sa_flags: old_action.flags.bits().into(),
+                    sa_flags: old_action.flags.bits() as c_int,
                     sa_mask: old_action.mask,
                 },
             };
@@ -200,7 +184,7 @@ impl PalSignal for Sys {
             .transpose()?;
 
         let mut old = old_c.as_ref().map(|_| Sigaltstack::default());
-        redox_rt::signal::sigaltstack(new.as_ref(), old.as_mut())?;
+        (unsafe { redox_rt::signal::sigaltstack(new.as_ref(), old.as_mut()) })?;
 
         if let (Some(old_c_stack), Some(old)) = (old_c, old) {
             let c_stack = PosixStackt::from(old);
@@ -223,13 +207,19 @@ impl PalSignal for Sys {
         set: Option<&sigset_t>,
         oset: Option<&mut sigset_t>,
     ) -> Result<(), Errno> {
-        Ok(match how {
+        match how {
+            _ if set.is_none() => {
+                if let Some(oset) = oset {
+                    *oset = redox_rt::signal::get_sigmask()?;
+                }
+            }
             SIG_SETMASK => redox_rt::signal::set_sigmask(set.copied(), oset)?,
             SIG_BLOCK => redox_rt::signal::or_sigmask(set.copied(), oset)?,
             SIG_UNBLOCK => redox_rt::signal::andn_sigmask(set.copied(), oset)?,
 
             _ => return Err(Errno(EINVAL)),
-        })
+        }
+        Ok(())
     }
 
     fn sigsuspend(mask: &sigset_t) -> Errno {
@@ -243,7 +233,7 @@ impl PalSignal for Sys {
         set: &sigset_t,
         info_out: Option<&mut siginfo_t>,
         timeout: Option<&timespec>,
-    ) -> Result<(), Errno> {
+    ) -> Result<c_int, Errno> {
         // TODO: deadline-based API
         let timeout = timeout.map(|timeout| syscall::TimeSpec {
             tv_sec: timeout.tv_sec,
@@ -253,6 +243,6 @@ impl PalSignal for Sys {
         if let Some(out) = info_out {
             *out = info;
         }
-        Ok(())
+        Ok(info.si_signo)
     }
 }

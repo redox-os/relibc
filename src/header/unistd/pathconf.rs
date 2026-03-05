@@ -1,6 +1,9 @@
 use crate::{
     header::{errno, termios::_POSIX_VDISABLE},
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, c_long},
+    },
 };
 
 pub const _PC_LINK_MAX: c_int = 0;

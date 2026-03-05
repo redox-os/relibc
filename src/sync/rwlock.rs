@@ -1,11 +1,10 @@
 use core::{
     cell::UnsafeCell,
     fmt, ops,
-    ptr::NonNull,
     sync::atomic::{AtomicU32, Ordering},
 };
 
-use crate::{header::time::timespec, pthread::Pshared};
+use crate::{header::bits_time::timespec, pthread::Pshared};
 
 pub struct InnerRwLock {
     state: AtomicU32,

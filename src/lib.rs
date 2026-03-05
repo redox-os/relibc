@@ -7,37 +7,22 @@
 //! Currently, Linux and Redox syscall backends are supported.
 
 #![no_std]
-#![allow(warnings)]
-#![allow(non_camel_case_types)]
-#![allow(non_upper_case_globals)]
-#![allow(unused_variables)]
 #![feature(alloc_error_handler)]
 #![feature(allocator_api)]
-#![feature(asm_const)]
 #![feature(c_variadic)]
 #![feature(core_intrinsics)]
 #![feature(macro_derive)]
 #![feature(maybe_uninit_slice)]
 #![feature(lang_items)]
-#![feature(let_chains)]
 #![feature(linkage)]
 #![feature(pointer_is_aligned_to)]
 #![feature(ptr_as_uninit)]
-#![feature(slice_as_chunks)]
 #![feature(slice_ptr_get)]
 #![feature(stmt_expr_attributes)]
-#![feature(strict_provenance)]
 #![feature(sync_unsafe_cell)]
 #![feature(thread_local)]
 #![feature(vec_into_raw_parts)]
 #![feature(negative_impls)]
-#![allow(clippy::cast_lossless)]
-#![allow(clippy::cast_ptr_alignment)]
-#![allow(clippy::derive_hash_xor_eq)]
-#![allow(clippy::eval_order_dependence)]
-#![allow(clippy::mut_from_ref)]
-// TODO: fix these
-#![warn(unaligned_references)]
 
 #[macro_use]
 extern crate alloc;
@@ -72,7 +57,7 @@ pub mod raw_cell;
 pub mod start;
 pub mod sync;
 
-use crate::platform::{Allocator, NEWALLOCATOR, Pal, Sys};
+use crate::platform::{Allocator, NEWALLOCATOR};
 
 #[global_allocator]
 static ALLOCATOR: Allocator = NEWALLOCATOR;
@@ -84,7 +69,7 @@ pub extern "C" fn relibc_panic(pi: &::core::panic::PanicInfo) -> ! {
     let mut w = platform::FileWriter::new(2);
     let _ = w.write_fmt(format_args!("RELIBC PANIC: {}\n", pi));
 
-    Sys::exit(1);
+    core::intrinsics::abort();
 }
 
 #[cfg(not(test))]
@@ -102,8 +87,10 @@ pub extern "C" fn rust_eh_personality() {}
 #[cfg(not(test))]
 #[alloc_error_handler]
 #[linkage = "weak"]
+#[allow(improper_ctypes_definitions)]
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
+    // Layout not FFI-safe?
     use core::fmt::Write;
 
     let mut w = platform::FileWriter::new(2);
@@ -113,7 +100,7 @@ pub extern "C" fn rust_oom(layout: ::core::alloc::Layout) -> ! {
         layout.align()
     ));
 
-    Sys::exit(1);
+    core::intrinsics::abort();
 }
 
 #[cfg(not(test))]
@@ -126,5 +113,5 @@ pub extern "C" fn _Unwind_Resume() -> ! {
     let mut w = platform::FileWriter::new(2);
     let _ = w.write_str("_Unwind_Resume\n");
 
-    Sys::exit(1);
+    core::intrinsics::abort();
 }

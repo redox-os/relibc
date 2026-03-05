@@ -1,16 +1,14 @@
-// https://pubs.opengroup.org/onlinepubs/7908799/xsh/strptime.html
+// `strptime` implementation.
+//
+// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strptime.html>.
 
-use crate::{
-    header::{string::strlen, time::tm},
-    platform::types::size_t,
-};
-use alloc::{string::String, vec::Vec};
+use crate::header::time::tm;
+use alloc::string::String;
 use core::{
     ffi::{CStr, c_char, c_int, c_void},
-    mem::MaybeUninit,
     ptr,
     ptr::NonNull,
-    slice, str,
+    str,
 };
 
 /// For convenience, we define some helper constants for the C-locale.
@@ -50,13 +48,13 @@ pub unsafe extern "C" fn strptime(
     tm: *mut tm,
 ) -> *mut c_char {
     // Validate inputs
-    let buf_ptr = if let Some(ptr) = NonNull::new(buf as *const c_void as *mut c_void) {
+    let buf_ptr = if let Some(ptr) = NonNull::new(buf.cast::<c_void>().cast_mut()) {
         ptr
     } else {
         return ptr::null_mut();
     };
     //
-    let fmt_ptr = if let Some(ptr) = NonNull::new(format as *const c_void as *mut c_void) {
+    let fmt_ptr = if let Some(ptr) = NonNull::new(format.cast::<c_void>().cast_mut()) {
         ptr
     } else {
         return ptr::null_mut();
@@ -127,9 +125,7 @@ pub unsafe extern "C" fn strptime(
 
         // Handle known specifiers
         match final_spec {
-            ///////////////////////////
-            // Whitespace: %n or %t  //
-            ///////////////////////////
+            // Whitespace: %n or %t
             'n' | 't' => {
                 // Skip over any whitespace in the input
                 while index_in_input < input_str.len()
@@ -139,9 +135,7 @@ pub unsafe extern "C" fn strptime(
                 }
             }
 
-            ///////////////////////////
-            // Literal % => "%%"     //
-            ///////////////////////////
+            // Literal % => "%%"
             '%' => {
                 if index_in_input >= input_str.len()
                     || input_str.as_bytes()[index_in_input] as char != '%'
@@ -151,13 +145,11 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += 1;
             }
 
-            ///////////////////////////
-            // Day of Month: %d / %e //
-            ///////////////////////////
+            // Day of Month: %d / %e
             'd' | 'e' => {
                 // parse a 2-digit day (with or without leading zero)
                 let (val, len) = match parse_int(&input_str[index_in_input..], 2, false) {
-                    Some(v) => unsafe { v },
+                    Some(v) => v,
                     None => return ptr::null_mut(),
                 };
                 unsafe {
@@ -170,9 +162,7 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += len;
             }
 
-            ///////////////////////////
-            // Month: %m             //
-            ///////////////////////////
+            // Month: %m
             'm' => {
                 // parse a 2-digit month
                 let (val, len) = match parse_int(&input_str[index_in_input..], 2, false) {
@@ -189,9 +179,7 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += len;
             }
 
-            //////////////////////////////
-            // Year without century: %y //
-            //////////////////////////////
+            // Year without century: %y
             'y' => {
                 // parse a 2-digit year
                 let (val, len) = match parse_int(&input_str[index_in_input..], 2, false) {
@@ -207,9 +195,7 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += len;
             }
 
-            ///////////////////////////
-            // Year with century: %Y //
-            ///////////////////////////
+            // Year with century: %Y
             'Y' => {
                 // parse up to 4-digit (or more) year
                 // We allow more than 4 digits if needed
@@ -223,9 +209,7 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += len;
             }
 
-            ///////////////////////////
-            // Hour (00..23): %H     //
-            ///////////////////////////
+            // Hour (00..23): %H
             'H' => {
                 let (val, len) = match parse_int(&input_str[index_in_input..], 2, false) {
                     Some(v) => v,
@@ -240,15 +224,13 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += len;
             }
 
-            ///////////////////////////
-            // Hour (01..12): %I     //
-            ///////////////////////////
+            // Hour (01..12): %I
             'I' => {
                 let (val, len) = match parse_int(&input_str[index_in_input..], 2, false) {
                     Some(v) => v,
                     None => return ptr::null_mut(),
                 };
-                if val < 1 || val > 12 {
+                if !(1..=12).contains(&val) {
                     return ptr::null_mut();
                 }
                 unsafe {
@@ -258,9 +240,7 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += len;
             }
 
-            ///////////////////////////
-            // Minute (00..59): %M   //
-            ///////////////////////////
+            // Minute (00..59): %M
             'M' => {
                 let (val, len) = match parse_int(&input_str[index_in_input..], 2, false) {
                     Some(v) => v,
@@ -275,9 +255,7 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += len;
             }
 
-            ///////////////////////////
-            // Seconds (00..60): %S  //
-            ///////////////////////////
+            // Seconds (00..60): %S
             'S' => {
                 let (val, len) = match parse_int(&input_str[index_in_input..], 2, false) {
                     Some(v) => v,
@@ -292,9 +270,7 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += len;
             }
 
-            ///////////////////////////
-            // AM/PM: %p             //
-            ///////////////////////////
+            // AM/PM: %p
             'p' => {
                 // Parse either "AM" or "PM" (no case-sensitive)
                 // We'll read up to 2 or 3 letters from input ("AM", "PM")
@@ -321,9 +297,7 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += parsed_len;
             }
 
-            ///////////////////////////
-            // Weekday Name: %a/%A   //
-            ///////////////////////////
+            // Weekday Name: %a/%A
             'a' => {
                 // Abbreviated day name (Sun..Sat)
                 let leftover = &input_str[index_in_input..];
@@ -353,9 +327,7 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += parsed_len;
             }
 
-            ///////////////////////////
-            // Month Name: %b/%B/%h  //
-            ///////////////////////////
+            // Month Name: %b/%B/%h
             'b' | 'h' => {
                 // Abbreviated month name
                 let leftover = &input_str[index_in_input..];
@@ -385,16 +357,14 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += parsed_len;
             }
 
-            ///////////////////////////
-            // Day of year: %j       //
-            ///////////////////////////
+            // Day of year: %j
             'j' => {
                 // parse 3-digit day of year [001..366]
                 let (val, len) = match parse_int(&input_str[index_in_input..], 3, false) {
                     Some(v) => v,
                     None => return ptr::null_mut(),
                 };
-                if val < 1 || val > 366 {
+                if !(1..=366).contains(&val) {
                     return ptr::null_mut();
                 }
                 // store in tm_yday
@@ -404,9 +374,7 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += len;
             }
 
-            //////////////////////////////////
-            // Date shortcuts: %D, %F, etc. //
-            //////////////////////////////////
+            // Date shortcuts: %D, %F, etc.
             'D' => {
                 // Equivalent to "%m/%d/%y"
                 // We can do a mini strptime recursion or manually parse
@@ -440,27 +408,20 @@ pub unsafe extern "C" fn strptime(
                 index_in_input += used;
             }
 
-            //////////////////////////////////////////////////////////
-            // TODO : not implemented: %x, %X, %c, %r, %R, etc. //
-            //////////////////////////////////////////////////////////
+            // TODO : not implemented: %x, %X, %c, %r, %R, etc.
             // Hint : if you want to implement these, do similarly to %D / %F (or parse manually)
             'x' | 'X' | 'c' | 'r' | 'R' => {
                 // Return NULL if we don’t want to accept them :
                 return ptr::null_mut();
             }
 
-            ///////////////////////////
-            // Timezone: %Z or %z    //
-            ///////////////////////////
+            // Timezone: %Z or %z
             'Z' | 'z' => {
                 // Full/abbrev time zone name or numeric offset
                 // Implementation omitted. Real support is quite complicated.
                 return ptr::null_mut();
             }
 
-            //////////
-            // else //
-            //////////
             _ => {
                 // We do not recognize this specifier
                 return ptr::null_mut();
@@ -471,12 +432,10 @@ pub unsafe extern "C" fn strptime(
     // If we got here, parsing was successful. Return pointer to the
     // next unparsed character in `buf`.
     let ret_ptr = unsafe { buf.add(index_in_input) };
-    ret_ptr as *mut c_char
+    ret_ptr.cast_mut()
 }
 
-// -----------------------
 // Helper / Parsing Logic
-// -----------------------
 
 /// Parse an integer from the beginning of `input_str`.
 ///
@@ -485,16 +444,18 @@ pub unsafe extern "C" fn strptime(
 ///   (e.g., `%Y` can have more than 4 digits, but also might parse "2023" or "12345").
 fn parse_int(input: &str, width: usize, allow_variable: bool) -> Option<(i32, usize)> {
     let mut val = 0i32;
-    let mut chars = input.chars();
+    let chars = input.chars();
     let mut count = 0;
 
-    while let Some(c) = chars.next() {
+    for c in chars {
         if !c.is_ascii_digit() {
             break;
         }
 
         // Check for integer overflow
-        val = val.checked_mul(10)?.checked_add((c as u8 - b'0') as i32)?;
+        val = val
+            .checked_mul(10)?
+            .checked_add(i32::from(c as u8 - b'0'))?;
 
         count += 1;
         if count == width && !allow_variable {
@@ -525,11 +486,15 @@ fn parse_am_pm(s: &str) -> Option<(bool, usize)> {
 /// Parse a weekday name from `s`.
 /// - if `abbrev == true`, match short forms: "Mont".."Sun"
 /// - otherwise, match "Monday".."Sunday"
+///
 /// Return (weekday_index, length_consumed).
 fn parse_weekday(s: &str, abbrev: bool) -> Option<(usize, usize)> {
     let list = if abbrev { &SHORT_DAYS } else { &LONG_DAYS };
     for (i, name) in list.iter().enumerate() {
-        if s.len() >= name.len() && s[0..name.len()].eq_ignore_ascii_case(name) {
+        if s.len() >= name.len()
+            && s.get(0..name.len())
+                .is_some_and(|sub| sub.eq_ignore_ascii_case(name))
+        {
             return Some((i, name.len()));
         }
     }
@@ -539,11 +504,15 @@ fn parse_weekday(s: &str, abbrev: bool) -> Option<(usize, usize)> {
 /// Parse a month name from `s`.
 /// - If `abbrev == true`, match short forms: "Jan".."Dec"
 /// - Otherwise, match "January".."December"
+///
 /// Return (month_index, length_consumed).
 fn parse_month(s: &str, abbrev: bool) -> Option<(usize, usize)> {
     let list = if abbrev { &SHORT_MONTHS } else { &LONG_MONTHS };
     for (i, name) in list.iter().enumerate() {
-        if s.len() >= name.len() && s[0..name.len()].eq_ignore_ascii_case(name) {
+        if s.len() >= name.len()
+            && s.get(0..name.len())
+                .is_some_and(|sub| sub.eq_ignore_ascii_case(name))
+        {
             return Some((i, name.len()));
         }
     }
@@ -571,8 +540,8 @@ unsafe fn apply_subformat(input: &str, subfmt: &str, tm: *mut tm) -> Option<usiz
 
     let consumed_ptr = unsafe {
         strptime(
-            tmpbuf.as_ptr() as *const c_char,
-            tmpfmt.as_ptr() as *const c_char,
+            tmpbuf.as_ptr().cast::<c_char>(),
+            tmpfmt.as_ptr().cast::<c_char>(),
             tm,
         )
     };

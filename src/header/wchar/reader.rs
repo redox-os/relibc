@@ -2,7 +2,7 @@ use super::{FILE, SEEK_SET, fseek_locked, ftell_locked};
 use crate::{
     header::{
         errno::EILSEQ,
-        wchar::{MB_CUR_MAX, fgetwc, get_char_encoded_length, mbrtowc},
+        wchar::{MB_CUR_MAX, get_char_encoded_length, mbrtowc},
         wctype::WEOF,
     },
     io::Read,

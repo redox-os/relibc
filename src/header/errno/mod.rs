@@ -2,10 +2,10 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/errno.h.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
-use crate::platform::{self, types::*};
+use crate::platform::{
+    self,
+    types::{c_char, c_int},
+};
 
 //TODO: Consider removing, provided for compatibility with newlib
 #[unsafe(no_mangle)]
@@ -30,7 +30,7 @@ pub extern "C" fn __errno_location() -> *mut c_int {
 /// The `program_invocation_name` variable is a GNU extension.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __program_invocation_name() -> *mut *mut c_char {
-    unsafe { &raw mut platform::program_invocation_name }
+    &raw mut platform::program_invocation_name
 }
 
 /// Get the directory-less name used to invoke the program.
@@ -41,7 +41,7 @@ pub unsafe extern "C" fn __program_invocation_name() -> *mut *mut c_char {
 /// The `program_invocation_short_name` variable is a GNU extension.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __program_invocation_short_name() -> *mut *mut c_char {
-    unsafe { &raw mut platform::program_invocation_short_name }
+    &raw mut platform::program_invocation_short_name
 }
 
 pub const EPERM: c_int = 1; /* Operation not permitted */
@@ -178,7 +178,7 @@ pub const EOWNERDEAD: c_int = 130; /* Owner died */
 pub const ENOTRECOVERABLE: c_int = 131; /* State not recoverable */
 
 /// String representations for the respective `errno` values.
-pub const STR_ERROR: [&str; 132] = [
+pub(crate) const STR_ERROR: [&str; 132] = [
     "Success",
     "Operation not permitted",
     "No such file or directory",
@@ -314,7 +314,7 @@ pub const STR_ERROR: [&str; 132] = [
 ];
 
 /// Longest error message length
-pub const STRERROR_MAX: usize = {
+pub(crate) const STRERROR_MAX: usize = {
     // Number of digits of the max value of this platform's c_int
     let digits = {
         let mut len = 0;

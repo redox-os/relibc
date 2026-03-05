@@ -2,9 +2,6 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/strings.h.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::{
     arch,
     iter::{once, zip},
@@ -14,7 +11,7 @@ use core::{
 use crate::{
     header::{ctype, string},
     iter::NulTerminated,
-    platform::types::*,
+    platform::types::{c_char, c_int, c_long, c_longlong, c_void, size_t},
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/009695399/functions/bcmp.html>.
@@ -37,7 +34,7 @@ pub unsafe extern "C" fn bcmp(first: *const c_void, second: *const c_void, n: si
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn bcopy(src: *const c_void, dst: *mut c_void, n: size_t) {
     unsafe {
-        ptr::copy(src as *const u8, dst as *mut u8, n);
+        ptr::copy(src.cast::<u8>(), dst.cast::<u8>(), n);
     }
 }
 
@@ -50,7 +47,7 @@ pub unsafe extern "C" fn bcopy(src: *const c_void, dst: *mut c_void, n: size_t) 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn bzero(dst: *mut c_void, n: size_t) {
     unsafe {
-        ptr::write_bytes(dst as *mut u8, 0, n);
+        ptr::write_bytes(dst.cast::<u8>(), 0, n);
     }
 }
 
@@ -59,7 +56,7 @@ pub unsafe extern "C" fn bzero(dst: *mut c_void, n: size_t) {
 pub unsafe extern "C" fn explicit_bzero(s: *mut c_void, n: size_t) {
     for i in 0..n {
         unsafe {
-            *(s as *mut u8).add(i) = 0 as u8;
+            *s.cast::<u8>().add(i) = 0_u8;
         }
     }
     unsafe {
@@ -154,8 +151,7 @@ pub unsafe extern "C" fn strncasecmp(s1: *const c_char, s2: *const c_char, n: si
 
 /// Given two zipped `&c_char` iterators, either find the first comparison != 0, or return 0.
 fn inner_casecmp<'a>(iterator: impl Iterator<Item = (&'a c_char, &'a c_char)>) -> c_int {
-    let mut cmp_iter =
-        iterator.map(|(&c1, &c2)| ctype::tolower(c1.into()) - ctype::tolower(c2.into()));
+    let cmp_iter = iterator.map(|(&c1, &c2)| ctype::tolower(c1.into()) - ctype::tolower(c2.into()));
     let mut skip_iter = cmp_iter.skip_while(|&cmp| cmp == 0);
-    skip_iter.next().or(Some(0)).unwrap()
+    skip_iter.next().unwrap_or(0)
 }

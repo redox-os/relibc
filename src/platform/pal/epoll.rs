@@ -1,7 +1,7 @@
 use crate::{
-    error::{Errno, Result},
+    error::Result,
     header::{signal::sigset_t, sys_epoll::epoll_event},
-    platform::{Pal, types::*},
+    platform::{Pal, types::c_int},
 };
 
 pub trait PalEpoll: Pal {

@@ -1,4 +1,4 @@
-use crate::platform::types::*;
+use crate::platform::types::{c_double, c_float, c_uint, c_ulong};
 
 #[repr(C)]
 pub struct user_regs_struct {

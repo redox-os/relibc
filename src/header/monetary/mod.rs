@@ -1,17 +1,18 @@
-/// monetary.h implementation for Redox, following the POSIX standard.
-/// Following https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/monetary.h.html
-///
-/// We should provide a strfmon() implementation that formats a monetary value,
-/// according to the current locale (TODO).
-use alloc::string::{String, ToString};
-use core::{ffi::CStr, ptr, slice, str};
+//! `monetary.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/monetary.h.html>.
 
-use libm::{fabs, floor, pow, round, trunc};
+// We should provide a strfmon() implementation that formats a monetary value,
+// according to the current locale (TODO).
+
+use alloc::string::{String, ToString};
+use core::str;
+
+use libm::{fabs, pow, round, trunc};
 
 extern crate alloc;
 
 mod strfmon;
-#[deny(unsafe_op_in_unsafe_fn)]
 #[repr(C)]
 struct LocaleMonetaryInfo {
     int_curr_symbol: &'static str,

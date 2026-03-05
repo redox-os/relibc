@@ -1,19 +1,25 @@
-//! poll implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/poll.h.html
+//! `poll.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/poll.h.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
-use core::{mem, slice};
+use core::{mem, ptr, slice};
 
 use crate::{
-    error::ResultExt,
     fs::File,
-    header::sys_epoll::{
-        EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLNVAL, EPOLLOUT, EPOLLPRI,
-        EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, epoll_create1, epoll_ctl, epoll_data,
-        epoll_event, epoll_wait,
+    header::{
+        bits_time::timespec,
+        errno::EBADF,
+        signal::sigset_t,
+        sys_epoll::{
+            EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLNVAL, EPOLLOUT,
+            EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, epoll_create1, epoll_ctl,
+            epoll_data, epoll_event, epoll_pwait,
+        },
     },
-    platform::types::*,
+    platform::{
+        self,
+        types::{c_int, c_short, c_ulong},
+    },
 };
 
 pub const POLLIN: c_short = 0x001;
@@ -29,6 +35,7 @@ pub const POLLWRBAND: c_short = 0x200;
 
 pub type nfds_t = c_ulong;
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/poll.h.html>.
 #[repr(C)]
 pub struct pollfd {
     pub fd: c_int,
@@ -36,7 +43,7 @@ pub struct pollfd {
     pub revents: c_short,
 }
 
-pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
+pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) -> c_int {
     let event_map = [
         (POLLIN, EPOLLIN),
         (POLLPRI, EPOLLPRI),
@@ -58,12 +65,14 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
         File::new(epfd)
     };
 
+    let mut closed = 0;
     for i in 0..fds.len() {
-        let mut pfd = &mut fds[i];
+        let pfd = &mut fds[i];
 
-        // Ignore the entry with negative fd, set the revents to 0
+        pfd.revents = 0;
+
+        // Ignore the entry with negative fd
         if pfd.fd < 0 {
-            pfd.revents = 0;
             continue;
         }
 
@@ -79,15 +88,31 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
             }
         }
 
-        pfd.revents = 0;
-
-        if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &mut event) } < 0 {
-            return -1;
+        if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &raw mut event) } < 0 {
+            if platform::ERRNO.get() == EBADF {
+                pfd.revents |= POLLNVAL;
+                closed += 1;
+            } else {
+                return -1;
+            }
         }
     }
 
+    // Early exit if there are fds, and all are closed (revents = POLLNVAL)
+    if closed > 0 && closed == fds.len() {
+        return closed as i32;
+    }
+
     let mut events: [epoll_event; 32] = unsafe { mem::zeroed() };
-    let res = unsafe { epoll_wait(*ep, events.as_mut_ptr(), events.len() as c_int, timeout) };
+    let res = unsafe {
+        epoll_pwait(
+            *ep,
+            events.as_mut_ptr(),
+            events.len() as c_int,
+            timeout,
+            sigmask,
+        )
+    };
     if res < 0 {
         return -1;
     }
@@ -113,16 +138,54 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int) -> c_int {
     count
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/poll.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
     trace_expr!(
-        poll_epoll(
-            unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
-            timeout
-        ),
+        unsafe {
+            poll_epoll(
+                slice::from_raw_parts_mut(fds, nfds as usize),
+                timeout,
+                ptr::null_mut(),
+            )
+        },
         "poll({:p}, {}, {})",
         fds,
         nfds,
-        timeout
+        timeout,
+    )
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/ppoll.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ppoll(
+    fds: *mut pollfd,
+    nfds: nfds_t,
+    tmo_p: *const timespec,
+    sigmask: *const sigset_t,
+) -> c_int {
+    let timeout = if tmo_p.is_null() {
+        -1
+    } else {
+        let tmo = unsafe { &*tmo_p };
+        if tmo.tv_sec > (c_int::MAX / 1000) as _ {
+            c_int::MAX
+        } else {
+            ((tmo.tv_sec as c_int) * 1000) + ((tmo.tv_nsec as c_int) / 1000000)
+        }
+    };
+    trace_expr!(
+        unsafe {
+            poll_epoll(
+                slice::from_raw_parts_mut(fds, nfds as usize),
+                timeout,
+                sigmask,
+            )
+        },
+        "ppoll({:p}, {}, {:p}, {:p})",
+        fds,
+        nfds,
+        tmo_p,
+        sigmask
     )
 }

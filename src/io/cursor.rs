@@ -253,7 +253,7 @@ where
 
     #[inline]
     unsafe fn initializer(&self) -> Initializer {
-        Initializer::nop()
+        unsafe { Initializer::nop() }
     }
 }
 
@@ -316,7 +316,7 @@ fn vec_write(pos_mut: &mut u64, vec: &mut Vec<u8>, buf: &[u8]) -> io::Result<usi
     Ok(buf.len())
 }
 
-impl<'a> Write for Cursor<&'a mut [u8]> {
+impl Write for Cursor<&mut [u8]> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         slice_write(&mut self.pos, self.inner, buf)
@@ -326,7 +326,7 @@ impl<'a> Write for Cursor<&'a mut [u8]> {
     }
 }
 
-impl<'a> Write for Cursor<&'a mut Vec<u8>> {
+impl Write for Cursor<&mut Vec<u8>> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         vec_write(&mut self.pos, self.inner, buf)
     }

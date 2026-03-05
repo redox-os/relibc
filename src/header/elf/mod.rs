@@ -2,7 +2,7 @@
 //!
 //! Non-POSIX, see <https://www.man7.org/linux/man-pages/man5/elf.5.html>.
 
-use crate::platform::types::*;
+use crate::platform::types::{c_char, c_uchar, int32_t, int64_t, uint16_t, uint32_t, uint64_t};
 
 pub type Elf32_Half = uint16_t;
 pub type Elf64_Half = uint16_t;
@@ -77,7 +77,7 @@ pub const EI_MAG2: usize = 2;
 pub const ELFMAG2: c_char = 'L' as c_char;
 pub const EI_MAG3: usize = 3;
 pub const ELFMAG3: c_char = 'F' as c_char;
-pub const ELFMAG: &'static str = "\x7fELF";
+pub const ELFMAG: &str = "\x7fELF";
 pub const SELFMAG: usize = 4;
 pub const EI_CLASS: usize = 4;
 pub const ELFCLASSNONE: usize = 0;
@@ -774,8 +774,8 @@ pub struct Elf64_Nhdr {
     pub n_type: Elf64_Word,
 }
 
-pub const ELF_NOTE_SOLARIS: &'static str = "SUNW Solaris";
-pub const ELF_NOTE_GNU: &'static str = "GNU";
+pub const ELF_NOTE_SOLARIS: &str = "SUNW Solaris";
+pub const ELF_NOTE_GNU: &str = "GNU";
 
 pub const ELF_NOTE_PAGESIZE_HINT: usize = 1;
 

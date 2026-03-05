@@ -2,9 +2,6 @@
 //!
 //! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/crypt.3.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use ::scrypt::password_hash::{Salt, SaltString};
 use alloc::{
     ffi::CString,
@@ -16,7 +13,10 @@ use rand::{RngCore, SeedableRng, rngs::SmallRng};
 use crate::{
     c_str::CStr,
     header::{errno::EINVAL, stdlib::rand},
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int},
+    },
 };
 
 mod argon2;
@@ -32,7 +32,10 @@ use self::{
     md5::crypt_md5,
     pbkdf2::crypt_pbkdf2,
     scrypt::crypt_scrypt,
-    sha::{ShaType::*, crypt_sha},
+    sha::{
+        ShaType::{Sha256, Sha512},
+        crypt_sha,
+    },
 };
 
 /// See <https://www.man7.org/linux/man-pages/man3/crypt.3.html>.
@@ -43,6 +46,7 @@ pub struct crypt_data {
 }
 
 impl crypt_data {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         crypt_data {
             initialized: 1,
@@ -103,8 +107,8 @@ pub unsafe extern "C" fn crypt_r(
         let len = inner.len();
         if let Ok(ret) = CString::new(inner) {
             let ret_ptr = ret.into_raw();
-            let dst = unsafe { (*data).buff }.as_mut_ptr();
             unsafe {
+                let dst = (*data).buff.as_mut_ptr();
                 ptr::copy_nonoverlapping(ret_ptr, dst.cast(), len);
             }
             ret_ptr.cast()

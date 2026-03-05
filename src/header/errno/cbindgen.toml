@@ -1,3 +1,6 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/errno.h.html
+#
+# There are no spec quotations relating to includes
 sys_includes = ["bits/errno.h"]
 include_guard = "_RELIBC_ERRNO_H"
 language = "C"

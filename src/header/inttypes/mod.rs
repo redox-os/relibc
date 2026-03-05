@@ -2,11 +2,12 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/inttypes.h.html>.
 
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::{
     header::{ctype, errno::*, stdlib::*},
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, c_long, intmax_t, uintmax_t},
+    },
 };
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/imaxabs.html>.
@@ -38,17 +39,15 @@ pub unsafe extern "C" fn strtoimax(
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> intmax_t {
-    unsafe {
-        strto_impl!(
-            intmax_t,
-            false,
-            intmax_t::max_value(),
-            intmax_t::min_value(),
-            s,
-            endptr,
-            base
-        )
-    }
+    strto_impl!(
+        intmax_t,
+        false,
+        intmax_t::MAX,
+        intmax_t::MIN,
+        s,
+        endptr,
+        base
+    )
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtoimax.html>.
@@ -58,17 +57,15 @@ pub unsafe extern "C" fn strtoumax(
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> uintmax_t {
-    unsafe {
-        strto_impl!(
-            uintmax_t,
-            false,
-            uintmax_t::max_value(),
-            uintmax_t::min_value(),
-            s,
-            endptr,
-            base
-        )
-    }
+    strto_impl!(
+        uintmax_t,
+        false,
+        uintmax_t::MAX,
+        uintmax_t::MIN,
+        s,
+        endptr,
+        base
+    )
 }
 
 // wcstoimax(), wcstoumax() currently defined in header::wchar?

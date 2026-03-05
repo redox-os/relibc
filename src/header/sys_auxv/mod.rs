@@ -2,7 +2,7 @@
 //!
 //! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getauxval.3.html>.
 
-use crate::platform::types::*;
+use crate::platform::types::c_ulong;
 
 pub use crate::platform::auxv_defs::*;
 

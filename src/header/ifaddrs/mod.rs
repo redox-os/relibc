@@ -1,0 +1,44 @@
+//! `ifaddrs.h` implementation.
+//!
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getifaddrs.3.html>.
+
+use crate::{
+    header::{errno, stdlib, sys_socket::sockaddr},
+    platform::{
+        self,
+        types::{c_char, c_int, c_uint, c_void},
+    },
+};
+
+#[repr(C)]
+union ifaddrs_ifa_ifu {
+    ifu_broadaddr: *mut sockaddr,
+    ifu_dstaddr: *mut sockaddr,
+}
+
+#[repr(C)]
+pub struct ifaddrs {
+    ifa_next: *mut ifaddrs,
+    ifa_name: *mut c_char,
+    ifa_flags: c_uint,
+    ifa_addr: *mut sockaddr,
+    ifa_netmask: *mut sockaddr,
+    ifa_ifu: ifaddrs_ifa_ifu,
+    ifa_data: *mut c_void,
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn freeifaddrs(mut ifa: *mut ifaddrs) {
+    while !ifa.is_null() {
+        let next = unsafe { (*ifa).ifa_next };
+        unsafe { stdlib::free(ifa.cast()) };
+        ifa = next;
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn getifaddrs(ifap: *mut *mut ifaddrs) -> c_int {
+    //TODO: implement getifaddrs
+    platform::ERRNO.set(errno::ENOSYS);
+    -1
+}

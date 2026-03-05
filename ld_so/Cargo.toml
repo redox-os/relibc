@@ -7,3 +7,6 @@ edition = "2024"
 [lib]
 name = "ld_so"
 crate-type = ["staticlib"]
+
+[lints]
+workspace = true

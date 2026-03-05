@@ -1,24 +1,20 @@
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::{
     cell::SyncUnsafeCell,
-    convert::TryInto,
-    mem,
     ops::{Deref, DerefMut},
     pin::Pin,
     ptr,
     str::FromStr,
 };
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, string::String};
 
 use crate::{
     c_str::CStr,
     fs::File,
-    header::{errno, fcntl, string::strlen},
+    header::fcntl,
     io::{BufReader, Lines, prelude::*},
     platform,
-    platform::types::*,
+    platform::types::{c_char, c_int, c_long, c_ulong, size_t},
 };
 
 use super::errno::*;
@@ -149,8 +145,7 @@ fn parse_spwd(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedSpwd, Er
             MaybeAllocated::Borrowed(buf)
         }
         None => {
-            let mut vec = Vec::with_capacity(string_data_len);
-            vec.resize(string_data_len, 0);
+            let vec = vec![0; string_data_len];
             MaybeAllocated::Owned(Box::into_pin(vec.into_boxed_slice()))
         }
     };
@@ -163,8 +158,8 @@ fn parse_spwd(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedSpwd, Er
     pwd_slice[..sp_pwdp_str.len()].copy_from_slice(sp_pwdp_str.as_bytes());
     pwd_slice[sp_pwdp_str.len()] = 0;
 
-    let sp_namp = name_slice.as_mut_ptr() as *mut c_char;
-    let sp_pwdp = pwd_slice.as_mut_ptr() as *mut c_char;
+    let sp_namp = name_slice.as_mut_ptr().cast::<c_char>();
+    let sp_pwdp = pwd_slice.as_mut_ptr().cast::<c_char>();
 
     let reference = spwd {
         sp_namp,
@@ -190,10 +185,10 @@ pub unsafe extern "C" fn getspnam(name: *const c_char) -> *mut spwd {
 
     for line in BufReader::new(db).lines() {
         let Ok(line) = line else { continue };
-        if line.starts_with(c_name.to_str().unwrap_or("\0")) {
-            if let Ok(pwd) = parse_spwd(line, None) {
-                return pwd.into_global();
-            }
+        if line.starts_with(c_name.to_str().unwrap_or("\0"))
+            && let Ok(pwd) = parse_spwd(line, None)
+        {
+            return pwd.into_global();
         }
     }
     ptr::null_mut()
@@ -218,7 +213,7 @@ pub unsafe extern "C" fn getspnam_r(
         let Ok(line) = line else { continue };
         if line.starts_with(c_name) {
             let dest_buf = Some(DestBuffer {
-                ptr: buffer as *mut u8,
+                ptr: buffer.cast::<u8>(),
                 len: buflen,
             });
             return match parse_spwd(line, dest_buf) {
@@ -239,7 +234,7 @@ pub unsafe extern "C" fn getspnam_r(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setspent() {
-    let mut line_reader = unsafe { &mut *LINE_READER.get() };
+    let line_reader = unsafe { &mut *LINE_READER.get() };
     if let Ok(db) = File::open(SHADOW_FILE.into(), fcntl::O_RDONLY) {
         *line_reader = Some(BufReader::new(db).lines());
     }
@@ -260,12 +255,11 @@ pub unsafe extern "C" fn getspent() -> *mut spwd {
             setspent();
         }
     }
-    if let Some(lines) = line_reader {
-        if let Some(Ok(line)) = lines.next() {
-            if let Ok(sp) = parse_spwd(line, None) {
-                return sp.into_global();
-            }
-        }
+    if let Some(lines) = line_reader
+        && let Some(Ok(line)) = lines.next()
+        && let Ok(sp) = parse_spwd(line, None)
+    {
+        return sp.into_global();
     }
     ptr::null_mut()
 }

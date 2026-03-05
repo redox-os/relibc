@@ -1,105 +1,107 @@
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::{cmp, mem, ptr, slice, str};
-use redox_rt::{
-    proc::FdGuard,
-    protocol::{FsCall, SocketCall},
-};
+use redox_protocols::protocol::{FsCall, SocketCall};
+use redox_rt::proc::FdGuard;
 use syscall::{self, flag::*};
 
 use super::{
-    super::{ERRNO, Pal, PalSocket, types::*},
+    super::{Pal, PalSocket, types::*},
     Sys,
     path::dir_path_and_fd_path,
 };
 use crate::{
-    error::{Errno, Result, ResultExt},
+    error::{Errno, Result},
     header::{
         arpa_inet::inet_aton,
         errno::{
-            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EISCONN, EMSGSIZE, ENOMEM, ENOSYS, ENOTSOCK,
+            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EMSGSIZE, ENOMEM, ENOSYS, ENOTCONN, ENOTSOCK,
             EOPNOTSUPP, EPROTONOSUPPORT,
         },
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
+        sys_select::timeval,
         sys_socket::{
             CMSG_ALIGN, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE, cmsghdr,
             constants::*, msghdr, sa_family_t, sockaddr, socklen_t, ucred,
         },
-        sys_time::timeval,
         sys_uio::iovec,
         sys_un::sockaddr_un,
     },
 };
 
-macro_rules! bind_or_connect {
-    (bind $path:expr) => {
-        concat!("/", $path)
-    };
-    (connect $path:expr) => {
-        $path
-    };
-    ($mode:ident into, $socket:expr, $address:expr, $address_len:expr) => {{
-        let fd = bind_or_connect!($mode copy, $socket, $address, $address_len)?;
+unsafe fn bind_or_connect(
+    op: SocketCall,
+    socket: c_int,
+    address: *const sockaddr,
+    address_len: socklen_t,
+) -> Result<usize, Errno> {
+    if (address_len as usize) < mem::size_of::<sa_family_t>() {
+        return Err(Errno(EINVAL));
+    }
 
-        let _ = syscall::dup2(fd, $socket as usize, &[])?;
-        Result::<c_int, Errno>::Ok(0)
-    }};
-    ($mode:ident copy, $socket:expr, $address:expr, $address_len:expr) => {{
-        if ($address_len as usize) < mem::size_of::<sa_family_t>() {
-            return Err(Errno(EINVAL));
-        }
+    let path = match unsafe { (*address).sa_family } as c_int {
+        AF_INET => {
+            if (address_len as usize) != mem::size_of::<sockaddr_in>() {
+                return Err(Errno(EINVAL));
+            }
 
-        let path = match (*$address).sa_family as c_int {
-            AF_INET => {
-                if ($address_len as usize) != mem::size_of::<sockaddr_in>() {
-                    return Err(Errno(EINVAL));
-                }
-                let data = &*($address as *const sockaddr_in);
-                let addr = slice::from_raw_parts(
+            let data = unsafe { &*(address as *const sockaddr_in) };
+            let addr = unsafe {
+                slice::from_raw_parts(
                     &data.sin_addr.s_addr as *const _ as *const u8,
                     mem::size_of_val(&data.sin_addr.s_addr),
-                );
-                let port = in_port_t::from_be(data.sin_port);
-                let path = format!(
-                    bind_or_connect!($mode "{}.{}.{}.{}:{}"),
-                    addr[0],
-                    addr[1],
-                    addr[2],
-                    addr[3],
-                    port
-                );
+                )
+            };
+            let port = in_port_t::from_be(data.sin_port);
 
-                path
-            },
-            AF_UNIX => {
-                // NOTE: bind/connect with AF_UNIX were replaced with SYS_CALL.
-                eprintln!(
-                    "bind/connect with AF_UNIX were replaced with SYS_CALL."
-                );
-                return Err(Errno(EAFNOSUPPORT));
-            },
-            _ => {
-                return Err(Errno(EAFNOSUPPORT));
-            },
-        };
+            match op {
+                SocketCall::Bind => {
+                    format!("/{}.{}.{}.{}:{}", addr[0], addr[1], addr[2], addr[3], port)
+                }
+                SocketCall::Connect => {
+                    format!("{}.{}.{}.{}:{}", addr[0], addr[1], addr[2], addr[3], port)
+                }
+                _ => unreachable!(),
+            }
+        }
+        AF_UNIX => {
+            log::warn!("bind/connect with AF_UNIX were replaced with SYS_CALL.");
+            return Err(Errno(EAFNOSUPPORT));
+        }
+        _ => return Err(Errno(EAFNOSUPPORT)),
+    };
+    let fd = syscall::dup(socket as usize, path.as_bytes())?;
+    Ok(fd)
+}
 
-        // Duplicate the socket, and then duplicate the copy back to the original fd
-        syscall::dup($socket as usize, path.as_bytes())
-    }};
+pub unsafe fn bind_or_connect_into(
+    op: SocketCall,
+    socket: c_int,
+    address: *const sockaddr,
+    address_len: socklen_t,
+) -> Result<c_int, Errno> {
+    // Duplicate the socket, and then duplicate the copy back to the original fd
+    let fd = FdGuard::new(unsafe { bind_or_connect(op, socket, address, address_len) }?);
+    syscall::dup2(fd.as_raw_fd(), socket as usize, &[])?;
+    Ok(0)
 }
 
 unsafe fn inner_af_unix(buf: &[u8], address: *mut sockaddr, address_len: *mut socklen_t) {
-    let data = &mut *(address as *mut sockaddr_un);
+    let data = unsafe { &mut *(address as *mut sockaddr_un) };
 
     data.sun_family = AF_UNIX as c_ushort;
 
-    let path =
-        slice::from_raw_parts_mut(&mut data.sun_path as *mut _ as *mut u8, data.sun_path.len());
+    let path = unsafe {
+        slice::from_raw_parts_mut(&mut data.sun_path as *mut _ as *mut u8, data.sun_path.len())
+    };
 
     let len = cmp::min(path.len(), buf.len());
     path[..len].copy_from_slice(&buf[..len]);
+    if len < path.len() {
+        path[len] = 0;
+    }
 
-    *address_len = len as socklen_t;
+    unsafe { *address_len = len as socklen_t };
 }
 
 unsafe fn inner_af_inet(
@@ -126,41 +128,28 @@ unsafe fn inner_af_inet(
     // Make address be followed by a NUL-byte
     colon[0] = b'\0';
 
-    trace!("address: {:?}, port: {:?}", str::from_utf8(&raw_addr), port);
+    log::trace!("address: {:?}, port: {:?}", str::from_utf8(&raw_addr), port);
 
     let mut addr = in_addr::default();
     assert_eq!(
-        inet_aton(raw_addr.as_ptr() as *mut c_char, &mut addr),
+        unsafe { inet_aton(raw_addr.as_ptr() as *mut c_char, &mut addr) },
         1,
         "inet_aton might be broken, failed to parse netstack address"
     );
 
     let ret = sockaddr_in {
         sin_family: AF_INET as sa_family_t,
-        sin_port: port,
+        sin_port: in_port_t::to_be(port),
         sin_addr: addr,
 
         ..sockaddr_in::default()
     };
-    let len = cmp::min(*address_len as usize, mem::size_of_val(&ret));
+    let len = cmp::min(unsafe { *address_len } as usize, mem::size_of_val(&ret));
 
-    ptr::copy_nonoverlapping(&ret as *const _ as *const u8, address as *mut u8, len);
-    *address_len = len as socklen_t;
-}
-
-unsafe fn inner_get_name(
-    local: bool,
-    socket: c_int,
-    address: *mut sockaddr,
-    address_len: *mut socklen_t,
-) -> Result<()> {
-    // Format: [udp|tcp:]remote/local, chan:path
-    let mut buf = [0; 256];
-    let len = syscall::fpath(socket as usize, &mut buf)?;
-
-    inner_get_name_inner(local, address, address_len, &buf[..len])?;
-
-    Ok(())
+    unsafe {
+        ptr::copy_nonoverlapping(&ret as *const _ as *const u8, address as *mut u8, len);
+        *address_len = len as socklen_t;
+    }
 }
 
 unsafe fn inner_get_name_inner(
@@ -170,20 +159,20 @@ unsafe fn inner_get_name_inner(
     buf: &[u8],
 ) -> Result<()> {
     if buf.starts_with(b"tcp:") || buf.starts_with(b"udp:") {
-        inner_af_inet(local, &buf[4..], address, address_len);
+        unsafe { inner_af_inet(local, &buf[4..], address, address_len) };
     } else if buf.starts_with(b"/scheme/tcp/") || buf.starts_with(b"/scheme/udp/") {
-        inner_af_inet(local, &buf[12..], address, address_len);
+        unsafe { inner_af_inet(local, &buf[12..], address, address_len) };
     } else if buf.starts_with(b"chan:") {
-        inner_af_unix(&buf[5..], address, address_len);
+        unsafe { inner_af_unix(&buf[5..], address, address_len) };
     } else if buf.starts_with(b"/scheme/chan/") {
-        inner_af_unix(&buf[13..], address, address_len);
+        unsafe { inner_af_unix(&buf[13..], address, address_len) };
     } else if buf.starts_with(b"/scheme/uds_stream/") {
-        inner_af_unix(&buf[19..], address, address_len);
+        unsafe { inner_af_unix(&buf[19..], address, address_len) };
     } else if buf.starts_with(b"/scheme/uds_dgram/") {
-        inner_af_unix(&buf[18..], address, address_len);
+        unsafe { inner_af_unix(&buf[18..], address, address_len) };
     } else {
         // Socket doesn't belong to any scheme
-        trace!(
+        log::trace!(
             "socket {:?} doesn't match either tcp, udp or chan schemes",
             str::from_utf8(buf)
         );
@@ -253,12 +242,12 @@ unsafe fn serialize_ancillary_data_to_stream(
         return Err(Errno(EINVAL));
     }
 
-    let mut cmsg: *mut cmsghdr = CMSG_FIRSTHDR(msg);
+    let mut cmsg: *mut cmsghdr = unsafe { CMSG_FIRSTHDR(msg) };
     let mut cmsg_count = 0;
     while !cmsg.is_null() {
         cmsg_count += 1;
-        let current_cmsg = &*cmsg;
-        let min_cmsg_len = CMSG_ALIGN(mem::size_of::<cmsghdr>());
+        let current_cmsg = unsafe { &*cmsg };
+        let min_cmsg_len = unsafe { CMSG_ALIGN(mem::size_of::<cmsghdr>()) };
         if current_cmsg.cmsg_len < min_cmsg_len {
             return Err(Errno(EINVAL));
         }
@@ -275,14 +264,17 @@ unsafe fn serialize_ancillary_data_to_stream(
                 }
                 let fd_count = data_len / mem::size_of::<c_int>();
 
-                // Call syscall::sendfd for each fd.
                 if fd_count > 0 {
-                    let fds_ptr = CMSG_DATA(cmsg) as *const c_int;
-                    let fds_slice = slice::from_raw_parts(fds_ptr, fd_count);
-                    for &fd in fds_slice.iter() {
-                        let fd_to_send = FdGuard::new(syscall::dup(fd as usize, b"")?);
-                        syscall::sendfd(socket as usize, *fd_to_send as usize, 0, 0)?;
-                    }
+                    let fds_ptr = unsafe { CMSG_DATA(cmsg) } as *const c_int;
+                    let c_fds = unsafe { slice::from_raw_parts(fds_ptr, fd_count) };
+                    let fds_usize: Vec<usize> = c_fds.iter().map(|&fd| fd as usize).collect();
+                    let fds_slice = unsafe {
+                        slice::from_raw_parts(
+                            fds_usize.as_ptr() as *const u8,
+                            fds_usize.len() * mem::size_of::<usize>(),
+                        )
+                    };
+                    redox_rt::sys::sys_call_wo(socket as usize, &fds_slice, CallFlags::FD, &[])?;
                 }
 
                 // Serialize to ancillary_data_stream.
@@ -302,7 +294,7 @@ unsafe fn serialize_ancillary_data_to_stream(
                 return Err(Errno(EOPNOTSUPP));
             }
         }
-        cmsg = CMSG_NXTHDR(msg, cmsg);
+        cmsg = unsafe { CMSG_NXTHDR(msg, cmsg) };
     }
     Ok(())
 }
@@ -323,12 +315,14 @@ unsafe fn deserialize_name_from_stream(
         }
         if !mhdr.msg_name.is_null() && mhdr.msg_namelen > 0 {
             let name_buffer = &msg_stream[*cursor..*cursor + name_len];
-            inner_get_name_inner(
-                false,
-                mhdr.msg_name as *mut sockaddr,
-                &mut mhdr.msg_namelen,
-                name_buffer,
-            )?;
+            (unsafe {
+                inner_get_name_inner(
+                    false,
+                    mhdr.msg_name as *mut sockaddr,
+                    &mut mhdr.msg_namelen,
+                    name_buffer,
+                )
+            })?;
         }
         *cursor += name_len;
     } else {
@@ -398,10 +392,11 @@ unsafe fn deserialize_ancillary_data_from_stream(
     msg_stream: &[u8],
     cursor: &mut usize,
     cmsg_space_provided: usize,
+    flags: c_int,
 ) -> Result<()> {
     let mut current_cmsg_ptr_in_user_buf = if !mhdr.msg_control.is_null() && cmsg_space_provided > 0
     {
-        CMSG_FIRSTHDR(mhdr)
+        unsafe { CMSG_FIRSTHDR(mhdr) }
     } else {
         ptr::null_mut()
     };
@@ -444,10 +439,24 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 }
                 let fd_count = read_num::<usize>(&cmsg_data_from_stream)?;
 
-                for _ in 0..fd_count {
-                    // Call syscall::dup to duplicate the fd
-                    let new_fd = syscall::dup(socket as usize, b"recvfd")?;
-                    temp_posix_cmsg_data_buf.extend_from_slice(&(new_fd as c_int).to_le_bytes());
+                let mut fds_usize = vec![0usize; fd_count];
+
+                let fds_bytes = unsafe {
+                    slice::from_raw_parts_mut(
+                        fds_usize.as_mut_ptr() as *mut u8,
+                        fds_usize.len() * mem::size_of::<usize>(),
+                    )
+                };
+
+                let mut call_flags = CallFlags::FD;
+                if flags & MSG_CMSG_CLOEXEC == MSG_CMSG_CLOEXEC {
+                    call_flags |= CallFlags::FD_CLOEXEC;
+                }
+
+                redox_rt::sys::sys_call_ro(socket as usize, fds_bytes, call_flags, &[])?;
+
+                for fd in fds_usize {
+                    temp_posix_cmsg_data_buf.extend_from_slice(&(fd as c_int).to_le_bytes());
                 }
                 actual_posix_cmsg_data_len = temp_posix_cmsg_data_buf.len();
             }
@@ -478,27 +487,31 @@ unsafe fn deserialize_ancillary_data_from_stream(
             }
         }
 
-        let space_needed_for_posix_cmsg = CMSG_SPACE(actual_posix_cmsg_data_len as u32) as usize;
+        let space_needed_for_posix_cmsg =
+            unsafe { CMSG_SPACE(actual_posix_cmsg_data_len as u32) } as usize;
 
         if !current_cmsg_ptr_in_user_buf.is_null()
             && remaining_user_cmsg_buf_len >= space_needed_for_posix_cmsg
         {
-            let cmsg_ref = &mut *current_cmsg_ptr_in_user_buf;
-            cmsg_ref.cmsg_len = CMSG_LEN(actual_posix_cmsg_data_len as u32) as usize;
+            let cmsg_ref = unsafe { &mut *current_cmsg_ptr_in_user_buf };
+            cmsg_ref.cmsg_len = unsafe { CMSG_LEN(actual_posix_cmsg_data_len as u32) } as usize;
             cmsg_ref.cmsg_level = cmsg_level;
             cmsg_ref.cmsg_type = cmsg_type;
 
-            let data_ptr_in_user_cmsg = CMSG_DATA(cmsg_ref);
-            ptr::copy_nonoverlapping(
-                temp_posix_cmsg_data_buf.as_ptr(),
-                data_ptr_in_user_cmsg as *mut u8,
-                actual_posix_cmsg_data_len,
-            );
+            let data_ptr_in_user_cmsg = unsafe { CMSG_DATA(cmsg_ref) };
+            unsafe {
+                ptr::copy_nonoverlapping(
+                    temp_posix_cmsg_data_buf.as_ptr(),
+                    data_ptr_in_user_cmsg as *mut u8,
+                    actual_posix_cmsg_data_len,
+                )
+            };
 
-            let aligned_len_written = CMSG_ALIGN(cmsg_ref.cmsg_len);
+            let aligned_len_written = unsafe { CMSG_ALIGN(cmsg_ref.cmsg_len) };
             total_csmg_bytes_written_to_user_buf += aligned_len_written;
             remaining_user_cmsg_buf_len -= aligned_len_written;
-            current_cmsg_ptr_in_user_buf = CMSG_NXTHDR(mhdr, current_cmsg_ptr_in_user_buf);
+            current_cmsg_ptr_in_user_buf =
+                unsafe { CMSG_NXTHDR(mhdr, current_cmsg_ptr_in_user_buf) };
         } else {
             mhdr.msg_flags |= MSG_CTRUNC;
             break;
@@ -514,20 +527,23 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<c_int> {
-        let stream = syscall::dup(socket as usize, b"listen")? as c_int;
+        let stream = syscall::dup(socket as usize, b"listen")?;
         if address != ptr::null_mut() && address_len != ptr::null_mut() {
-            let _ = Self::getpeername(stream, address, address_len)?;
+            if let Err(err) = unsafe { Self::getpeername(stream as c_int, address, address_len) } {
+                let _ = syscall::close(stream);
+                return Err(err);
+            }
         }
-        Ok(stream)
+        Ok(stream as c_int)
     }
 
     unsafe fn bind(socket: c_int, address: *const sockaddr, address_len: socklen_t) -> Result<()> {
-        match (*address).sa_family as c_int {
+        match unsafe { (*address).sa_family } as c_int {
             AF_INET => {
-                bind_or_connect!(bind into, socket, address, address_len)?;
+                (unsafe { bind_or_connect_into(SocketCall::Bind, socket, address, address_len) })?;
             }
             AF_UNIX => {
-                let data = &*(address as *const sockaddr_un);
+                let data = unsafe { &*(address as *const sockaddr_un) };
 
                 // NOTE: It's UB to access data in given address that exceeds
                 // the given address length.
@@ -542,42 +558,44 @@ impl PalSocket for Sys {
                     // The maximum length of the address
                     maxlen,
                     // The first NUL byte, if any
-                    strnlen(&data.sun_path as *const _, maxlen as size_t),
+                    unsafe { strnlen(&data.sun_path as *const _, maxlen as size_t) },
                 );
 
-                let addr = slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len);
+                let addr =
+                    unsafe { slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len) };
                 let path = format!("{}", str::from_utf8(addr).unwrap());
-                trace!("path: {:?}", path);
+                log::trace!("bind(): path: {:?}", path);
 
-                let (dir_path, mut fd_path) = dir_path_and_fd_path(&path)?;
+                let (dir_path, fd_path) = dir_path_and_fd_path(&path)?;
 
-                redox_rt::sys::sys_call(
+                redox_rt::sys::sys_call_wo(
                     socket as usize,
-                    fd_path.as_bytes_mut(),
+                    fd_path.as_bytes(),
                     CallFlags::empty(),
                     &[SocketCall::Bind as u64],
                 )?;
 
                 let fs_bind_result = (|| -> Result<()> {
-                    let dirfd = FdGuard::new(syscall::open(
+                    let dirfd = FdGuard::open(
                         &dir_path,
                         syscall::O_RDONLY | syscall::O_DIRECTORY | syscall::O_CLOEXEC,
-                    )?);
+                    )?;
                     let fd_to_send = FdGuard::new(syscall::dup(socket as usize, &[])?);
-                    let _ = syscall::sendfd(*dirfd, *fd_to_send, 0, 0)?;
+                    syscall::sendfd(dirfd.as_raw_fd(), fd_to_send.as_raw_fd(), 0, 0)?;
                     Ok(())
                 })();
 
                 if let Err(original_error) = fs_bind_result {
-                    if let Err(unbind_error) = redox_rt::sys::sys_call(
+                    if let Err(unbind_error) = redox_rt::sys::sys_call_wo(
                         socket as usize,
-                        &mut [],
+                        &[],
                         CallFlags::empty(),
                         &[SocketCall::Unbind as u64],
                     ) {
-                        eprintln!(
-                            "bind: CRITICAL: failed to unbind socket after a failed transaction: {:?}",
-                            unbind_error
+                        todo_error!(
+                            0,
+                            unbind_error,
+                            "bind: CRITICAL: failed to unbind socket after a failed transaction"
                         );
                     }
 
@@ -597,10 +615,12 @@ impl PalSocket for Sys {
         address: *const sockaddr,
         address_len: socklen_t,
     ) -> Result<c_int> {
-        match (*address).sa_family as c_int {
-            AF_INET => bind_or_connect!(connect into, socket, address, address_len),
+        match unsafe { (*address).sa_family } as c_int {
+            AF_INET => unsafe {
+                bind_or_connect_into(SocketCall::Connect, socket, address, address_len)
+            },
             AF_UNIX => {
-                let data = &*(address as *const sockaddr_un);
+                let data = unsafe { &*(address as *const sockaddr_un) };
 
                 // NOTE: It's UB to access data in given address that exceeds
                 // the given address length.
@@ -615,32 +635,33 @@ impl PalSocket for Sys {
                     // The maximum length of the address
                     maxlen,
                     // The first NUL byte, if any
-                    strnlen(&data.sun_path as *const _, maxlen as size_t),
+                    unsafe { strnlen(&data.sun_path as *const _, maxlen as size_t) },
                 );
 
-                let addr = slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len);
-                let mut path = format!("{}", str::from_utf8(addr).unwrap());
-                trace!("path: {:?}", path);
+                let addr =
+                    unsafe { slice::from_raw_parts(&data.sun_path as *const _ as *const u8, len) };
+                let path = format!("{}", str::from_utf8(addr).unwrap());
+                log::trace!("connect(): path: {:?}", path);
 
                 let (_, fd_path) = dir_path_and_fd_path(&path)?;
 
                 let target_path = format!("/{fd_path}");
-                let socket_file_fd = FdGuard::new(syscall::open(&target_path, syscall::O_RDWR)?);
+                let socket_file_fd = FdGuard::open(&target_path, syscall::O_RDWR)?;
 
                 const TOKEN_BUF_SIZE: usize = 16;
 
                 let mut token_buf = [0u8; TOKEN_BUF_SIZE];
 
-                redox_rt::sys::sys_call(
-                    *socket_file_fd,
+                redox_rt::sys::sys_call_ro(
+                    socket_file_fd.as_raw_fd(),
                     &mut token_buf,
                     CallFlags::empty(),
                     &[FsCall::Connect as u64],
                 )?;
 
-                redox_rt::sys::sys_call(
+                redox_rt::sys::sys_call_wo(
                     socket as usize,
-                    &mut token_buf,
+                    &token_buf,
                     CallFlags::empty(),
                     &[SocketCall::Connect as u64],
                 )?;
@@ -655,7 +676,15 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<()> {
-        inner_get_name(false, socket, address, address_len)
+        let mut buf = [0; 256];
+        let len = redox_rt::sys::sys_call_ro(
+            socket as usize,
+            &mut buf,
+            CallFlags::empty(),
+            &[SocketCall::GetPeerName as u64],
+        )?;
+
+        unsafe { inner_get_name_inner(false, address, address_len, &buf[..len]) }
     }
 
     unsafe fn getsockname(
@@ -663,7 +692,10 @@ impl PalSocket for Sys {
         address: *mut sockaddr,
         address_len: *mut socklen_t,
     ) -> Result<()> {
-        inner_get_name(true, socket, address, address_len)
+        let mut buf = [0; 256];
+        let len = syscall::fpath(socket as usize, &mut buf)?;
+
+        unsafe { inner_get_name_inner(true, address, address_len, &buf[..len]) }
     }
 
     unsafe fn getsockopt(
@@ -671,14 +703,19 @@ impl PalSocket for Sys {
         level: c_int,
         option_name: c_int,
         option_value: *mut c_void,
-        option_len: *mut socklen_t,
+        option_len_ptr: *mut socklen_t,
     ) -> Result<()> {
+        if option_len_ptr.is_null() {
+            return Err(Errno(EFAULT));
+        }
+        let option_len = (unsafe { *option_len_ptr }) as usize;
+
         let option_c_int = || -> Result<&mut c_int> {
             if option_value.is_null() {
                 return Err(Errno(EFAULT));
             }
 
-            if (option_len as usize) < mem::size_of::<c_int>() {
+            if option_len < mem::size_of::<c_int>() {
                 return Err(Errno(EINVAL));
             }
 
@@ -690,27 +727,49 @@ impl PalSocket for Sys {
                 SO_DOMAIN => {
                     let option = option_c_int()?;
                     *option = socket_domain_type(socket)?.0;
+                    unsafe { *option_len_ptr = mem::size_of::<c_int>() as socklen_t };
                     return Ok(());
                 }
                 SO_ERROR => {
                     let option = option_c_int()?;
                     //TODO: Socket nonblock connection error
                     *option = 0;
+                    unsafe { *option_len_ptr = mem::size_of::<c_int>() as socklen_t };
                     return Ok(());
                 }
                 SO_TYPE => {
                     let option = option_c_int()?;
                     *option = socket_domain_type(socket)?.1;
+                    unsafe { *option_len_ptr = mem::size_of::<c_int>() as socklen_t };
                     return Ok(());
                 }
-                _ => (),
+                _ => {
+                    let metadata = [SocketCall::GetSockOpt as u64, option_name as u64];
+                    let payload =
+                        unsafe { slice::from_raw_parts_mut(option_value as *mut u8, option_len) };
+                    let call_flags = CallFlags::empty();
+                    unsafe {
+                        *option_len_ptr = redox_rt::sys::sys_call_ro(
+                            socket as usize,
+                            payload,
+                            CallFlags::empty(),
+                            &metadata,
+                        )? as socklen_t;
+                    }
+                    return Ok(());
+                }
             },
             _ => (),
         }
 
-        eprintln!(
+        todo_skip!(
+            0,
             "getsockopt({}, {}, {}, {:p}, {:p})",
-            socket, level, option_name, option_value, option_len
+            socket,
+            level,
+            option_name,
+            option_value,
+            option_len_ptr
         );
         Err(Errno(ENOSYS))
     }
@@ -729,15 +788,48 @@ impl PalSocket for Sys {
         address_len: *mut socklen_t,
     ) -> Result<usize> {
         if flags != 0 {
-            return Err(Errno(EOPNOTSUPP));
+            // Convert to recvmsg
+            let mut iov = iovec {
+                iov_base: buf,
+                iov_len: len,
+            };
+            let mut msg = msghdr {
+                msg_name: address as *mut c_void,
+                msg_namelen: if !address_len.is_null() {
+                    unsafe { *address_len }
+                } else {
+                    0
+                },
+                msg_iov: &mut iov,
+                msg_iovlen: 1,
+                msg_control: ptr::null_mut(),
+                msg_controllen: 0,
+                msg_flags: 0,
+            };
+            let count = unsafe { Self::recvmsg(socket, &mut msg, flags) }?;
+            if !address_len.is_null() {
+                unsafe { *address_len = msg.msg_namelen };
+            }
+            return Ok(count);
         }
-        if address == ptr::null_mut() || address_len == ptr::null_mut() {
-            Self::read(socket, slice::from_raw_parts_mut(buf as *mut u8, len))
+        if address.is_null() || address_len.is_null() {
+            Self::read(socket, unsafe {
+                slice::from_raw_parts_mut(buf as *mut u8, len)
+            })
         } else {
-            let fd = FdGuard::new(syscall::dup(socket as usize, b"listen")?);
-            Self::getpeername(*fd as c_int, address, address_len)?;
-
-            Self::read(*fd as c_int, slice::from_raw_parts_mut(buf as *mut u8, len))
+            // TODO: in UDS dgram getpeername on listener always return ENOTCONN,
+            // it probably the expected error on usual getpeername call, but not here.
+            if let Err(e) = unsafe { Self::getpeername(socket, address, address_len) } {
+                if e.0 != ENOTCONN {
+                    return Err(e);
+                }
+                let data = unsafe { &mut *(address as *mut sockaddr) };
+                data.sa_family = AF_UNSPEC as u16;
+                unsafe { *address_len = 0 };
+            }
+            Self::read(socket, unsafe {
+                slice::from_raw_parts_mut(buf as *mut u8, len)
+            })
         }
     }
 
@@ -745,7 +837,7 @@ impl PalSocket for Sys {
         if msg.is_null() {
             return Err(Errno(EINVAL));
         }
-        let mut mhdr = &mut *msg;
+        let mut mhdr = unsafe { &mut *msg };
         let iovs_slice: &[iovec] = if mhdr.msg_iov.is_null() || mhdr.msg_iovlen == 0 {
             &[]
         } else {
@@ -764,6 +856,7 @@ impl PalSocket for Sys {
             + mhdr.msg_namelen as usize     // name_buffer
             + mem::size_of::<usize>()       // payload_len
             + whole_iov_size                // payload_data_buffer
+            + mem::size_of::<usize>()       // control_len
             + mhdr.msg_controllen as usize // ancillary_stream_buffer
         };
         msg_stream
@@ -783,10 +876,10 @@ impl PalSocket for Sys {
             .copy_from_slice(&(mhdr.msg_controllen as usize).to_le_bytes());
 
         // Read the message stream.
-        let metadata = [SocketCall::RecvMsg as u64];
+        let metadata = [SocketCall::RecvMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
         let actual_read_len =
-            redox_rt::sys::sys_call(socket as usize, &mut msg_stream, call_flags, &metadata)?;
+            redox_rt::sys::sys_call_rw(socket as usize, &mut msg_stream, call_flags, &metadata)?;
         msg_stream.truncate(actual_read_len);
 
         cursor = 0;
@@ -794,29 +887,34 @@ impl PalSocket for Sys {
         mhdr.msg_flags = 0;
 
         // Read sender name.
-        deserialize_name_from_stream(&mut mhdr, &msg_stream, &mut cursor)?;
+        (unsafe { deserialize_name_from_stream(&mut mhdr, &msg_stream, &mut cursor) })?;
 
         // Read payload data.
-        let actual_payload_bytes_written_to_iov = deserialize_payload_from_stream(
-            &mut mhdr,
-            &msg_stream,
-            iovs_slice,
-            whole_iov_size,
-            &mut cursor,
-            0u8,
-        )?;
+        let actual_payload_bytes_written_to_iov = unsafe {
+            deserialize_payload_from_stream(
+                &mut mhdr,
+                &msg_stream,
+                iovs_slice,
+                whole_iov_size,
+                &mut cursor,
+                0u8,
+            )
+        }?;
 
         // Reconstruct the ancillary data in the user-provided buffer.
         let has_cmsg_buffer = !mhdr.msg_control.is_null() && cmsg_space_provided_by_user > 0;
         let has_ancillary_data = cursor < msg_stream.len();
         if has_cmsg_buffer && has_ancillary_data {
-            deserialize_ancillary_data_from_stream(
-                mhdr,
-                socket,
-                &msg_stream,
-                &mut cursor,
-                cmsg_space_provided_by_user as usize,
-            )?;
+            (unsafe {
+                deserialize_ancillary_data_from_stream(
+                    mhdr,
+                    socket,
+                    &msg_stream,
+                    &mut cursor,
+                    cmsg_space_provided_by_user as usize,
+                    flags,
+                )
+            })?;
         } else {
             mhdr.msg_controllen = 0; // No ancillary data
         }
@@ -827,7 +925,7 @@ impl PalSocket for Sys {
         if msg.is_null() {
             return Err(Errno(EINVAL));
         }
-        let mhdr = &*msg;
+        let mhdr = unsafe { &*msg };
 
         // Reserve space for the message stream.
         // [payload_len(usize)][payload_data_buffer]
@@ -851,18 +949,19 @@ impl PalSocket for Sys {
         // Write the message to the msg_stream.
         let mut actual_payload_bytes_serialized = 0;
         if !mhdr.msg_iov.is_null() && mhdr.msg_iovlen > 0 {
-            actual_payload_bytes_serialized =
-                serialize_payload_to_stream(&mut msg_stream, &iovs_slice, whole_iov_size)?;
+            actual_payload_bytes_serialized = unsafe {
+                serialize_payload_to_stream(&mut msg_stream, &iovs_slice, whole_iov_size)
+            }?;
         }
         // Process Control Messages from msghdr and serialize them.
         if mhdr.msg_controllen > 0 {
-            serialize_ancillary_data_to_stream(msg, mhdr, socket, &mut msg_stream)?;
+            (unsafe { serialize_ancillary_data_to_stream(msg, mhdr, socket, &mut msg_stream) })?;
         }
 
         // Send the message stream.
-        let metadata = [SocketCall::SendMsg as u64];
+        let metadata = [SocketCall::SendMsg as u64, flags as u64];
         let call_flags = CallFlags::empty();
-        let written = redox_rt::sys::sys_call(
+        let written = redox_rt::sys::sys_call_rw(
             socket as usize,
             msg_stream.as_mut_slice(),
             call_flags,
@@ -881,13 +980,33 @@ impl PalSocket for Sys {
         dest_len: socklen_t,
     ) -> Result<usize> {
         if flags != 0 {
-            return Err(Errno(EOPNOTSUPP));
+            // Convert to sendmsg
+            let mut iov = iovec {
+                iov_base: buf as *mut c_void,
+                iov_len: len,
+            };
+            let msg = msghdr {
+                msg_name: dest_addr as *mut c_void,
+                msg_namelen: dest_len,
+                msg_iov: &mut iov,
+                msg_iovlen: 1,
+                msg_control: ptr::null_mut(),
+                msg_controllen: 0,
+                msg_flags: 0,
+            };
+            return unsafe { Self::sendmsg(socket, &msg, flags) };
         }
         if dest_addr == ptr::null() || dest_len == 0 {
-            Self::write(socket, slice::from_raw_parts(buf as *const u8, len))
+            Self::write(socket, unsafe {
+                slice::from_raw_parts(buf as *const u8, len)
+            })
         } else {
-            let fd = FdGuard::new(bind_or_connect!(connect copy, socket, dest_addr, dest_len)?);
-            Self::write(*fd as c_int, slice::from_raw_parts(buf as *const u8, len))
+            let fd = FdGuard::new(unsafe {
+                bind_or_connect(SocketCall::Connect, socket, dest_addr, dest_len)
+            }?);
+            Self::write(fd.as_c_fd().unwrap(), unsafe {
+                slice::from_raw_parts(buf as *const u8, len)
+            })
         }
     }
 
@@ -920,7 +1039,7 @@ impl PalSocket for Sys {
                 tv_nsec,
             };
 
-            Self::write(*fd as c_int, &timespec)?;
+            Self::write(fd.as_c_fd().unwrap(), &timespec)?;
             Ok(())
         };
 
@@ -928,12 +1047,13 @@ impl PalSocket for Sys {
             SOL_SOCKET => match option_name {
                 SO_RCVTIMEO => return set_timeout(b"read_timeout"),
                 SO_SNDTIMEO => return set_timeout(b"write_timeout"),
-                SO_PASSCRED => {
+                _ => {
                     let metadata = [SocketCall::SetSockOpt as u64, option_name as u64];
-                    let payload =
-                        slice::from_raw_parts_mut(option_value as *mut u8, option_len as usize);
+                    let payload = unsafe {
+                        slice::from_raw_parts_mut(option_value as *mut u8, option_len as usize)
+                    };
                     let call_flags = CallFlags::empty();
-                    redox_rt::sys::sys_call(
+                    redox_rt::sys::sys_call_rw(
                         socket as usize,
                         payload,
                         CallFlags::empty(),
@@ -941,21 +1061,26 @@ impl PalSocket for Sys {
                     )?;
                     return Ok(());
                 }
-                _ => (),
             },
             _ => (),
         }
 
-        eprintln!(
+        todo_skip!(
+            0,
             "setsockopt({}, {}, {}, {:p}, {}) - unknown option",
-            socket, level, option_name, option_value, option_len
+            socket,
+            level,
+            option_name,
+            option_value,
+            option_len
         );
         Ok(())
     }
 
     fn shutdown(socket: c_int, how: c_int) -> Result<()> {
-        eprintln!("shutdown({}, {})", socket, how);
-        Err(Errno(ENOSYS))
+        let metadata = [SocketCall::Shutdown as u64, how as u64];
+        redox_rt::sys::sys_call_wo(socket as usize, &[], CallFlags::empty(), &metadata)?;
+        Ok(())
     }
 
     unsafe fn socket(domain: c_int, kind: c_int, protocol: c_int) -> Result<c_int> {
@@ -972,12 +1097,14 @@ impl PalSocket for Sys {
         // The tcp: and udp: schemes allow using no path,
         // and later specifying one using `dup`.
         Ok(match (domain, kind) {
-            (AF_INET, SOCK_STREAM) => syscall::open("/scheme/tcp", flags)? as c_int,
-            (AF_INET, SOCK_DGRAM) => syscall::open("/scheme/udp", flags)? as c_int,
+            (AF_INET, SOCK_STREAM) => redox_rt::sys::open("/scheme/tcp", flags)? as c_int,
+            (AF_INET, SOCK_DGRAM) => redox_rt::sys::open("/scheme/udp", flags)? as c_int,
             (AF_UNIX, SOCK_STREAM) => {
-                syscall::open("/scheme/uds_stream", flags | O_CREAT)? as c_int
+                redox_rt::sys::open("/scheme/uds_stream", flags | O_CREAT)? as c_int
             }
-            (AF_UNIX, SOCK_DGRAM) => syscall::open("/scheme/uds_dgram", flags | O_CREAT)? as c_int,
+            (AF_UNIX, SOCK_DGRAM) => {
+                redox_rt::sys::open("/scheme/uds_dgram", flags | O_CREAT)? as c_int
+            }
             _ => return Err(Errno(EPROTONOSUPPORT)),
         })
     }
@@ -987,35 +1114,35 @@ impl PalSocket for Sys {
 
         match (domain, kind) {
             (AF_UNIX, SOCK_STREAM) => {
-                let listener = FdGuard::new(syscall::open("/scheme/uds_stream", flags | O_CREAT)?);
+                let listener = FdGuard::open("/scheme/uds_stream", flags | O_CREAT)?;
 
                 // For now, uds_stream: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
                 // nonblocking.
 
-                let mut fd0 = FdGuard::new(syscall::dup(*listener, b"connect")?);
-
-                let mut fd1 = FdGuard::new(syscall::dup(*listener, b"listen")?);
+                let fd0 = listener.dup(b"connect")?;
+                let fd1 = listener.dup(b"listen")?;
 
                 sv[0] = fd0.take() as c_int;
                 sv[1] = fd1.take() as c_int;
                 Ok(())
             }
             (AF_UNIX, SOCK_DGRAM) => {
-                let listener = FdGuard::new(syscall::open("/scheme/uds_dgram", flags | O_CREAT)?);
+                let listener = FdGuard::open("/scheme/uds_dgram", flags | O_CREAT)?;
 
                 // For now, uds_dgram: lets connects be instant, and instead blocks
                 // on any I/O performed. So we don't need to mark this as
                 // nonblocking.
 
-                let mut fd0 = FdGuard::new(syscall::dup(*listener, b"connect")?);
+                let fd0 = listener.dup(b"connect")?;
 
                 sv[0] = fd0.take() as c_int;
                 sv[1] = listener.take() as c_int;
                 Ok(())
             }
-            _ => unsafe {
-                eprintln!(
+            _ => {
+                todo_skip!(
+                    0,
                     "socketpair({}, {}, {}, {:p})",
                     domain,
                     kind,
@@ -1023,7 +1150,7 @@ impl PalSocket for Sys {
                     sv.as_mut_ptr()
                 );
                 Err(Errno(EPROTONOSUPPORT))
-            },
+            }
         }
     }
 }

@@ -39,7 +39,7 @@ impl<'a, T: ?Sized> Out<'a, T> {
             assert!(!ptr.is_null());
         }
         Self {
-            ptr: NonNull::new_unchecked(ptr),
+            ptr: unsafe { NonNull::new_unchecked(ptr) },
             _marker: PhantomData,
         }
     }
@@ -94,7 +94,7 @@ impl<'a, T> Out<'a, [T]> {
         } else {
             ptr
         };
-        Self::nonnull(core::slice::from_raw_parts_mut(ptr, len))
+        unsafe { Self::nonnull(core::ptr::slice_from_raw_parts_mut(ptr, len)) }
     }
     pub fn len(&self) -> usize {
         self.ptr.as_ptr().len()
@@ -163,12 +163,12 @@ impl<'a, T> Out<'a, [T]> {
         l
     }
     // TODO: better API, impl RangeBounds, also fn get(usize) -> Out<T>
-    pub fn subslice<'b>(&'b mut self, start: usize, end: usize) -> Out<[T]> {
+    pub fn subslice<'b>(&'b mut self, start: usize, end: usize) -> Out<'b, [T]> {
         assert!(start <= end);
         assert!(end <= self.len());
         unsafe { Self::from_raw_parts(self.as_mut_ptr().as_mut_ptr().add(start), end - start) }
     }
-    pub fn index<'b>(&'b mut self, i: usize) -> Out<T> {
+    pub fn index<'b>(&'b mut self, i: usize) -> Out<'b, T> {
         assert!(i <= self.len());
         unsafe { Out::nonnull(self.as_mut_ptr().as_mut_ptr().add(i)) }
     }
@@ -226,7 +226,7 @@ pub unsafe trait OutProject {}
 
 impl<'a, T: ?Sized> Out<'a, T> {
     pub unsafe fn with_lifetime_of<'b, U: ?Sized>(mut self, u: &'b U) -> Out<'b, T> {
-        Out::nonnull(self.as_mut_ptr())
+        unsafe { Out::nonnull(self.as_mut_ptr()) }
     }
 }
 

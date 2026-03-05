@@ -1,6 +1,4 @@
-ifndef TARGET
-	export TARGET:=$(shell rustc -Z unstable-options --print target-spec-json | grep llvm-target | cut -d '"' -f4)
-endif
+include config.mk
 
 CARGO?=cargo
 CARGO_TEST?=$(CARGO)
@@ -8,6 +6,8 @@ CARGO_COMMON_FLAGS=-Z build-std=core,alloc,compiler_builtins
 CARGOFLAGS?=$(CARGO_COMMON_FLAGS)
 CC_WRAPPER?=
 RUSTCFLAGS?=
+LINKFLAGS?=-lgcc
+TESTBIN?=
 export OBJCOPY?=objcopy
 
 export CARGO_TARGET_DIR?=$(shell pwd)/target
@@ -23,69 +23,9 @@ HEADERS_UNPARSED=$(shell find src/header -mindepth 1 -maxdepth 1 -type d -not -n
 HEADERS_DEPS=$(shell find src/header -type f \( -name "cbindgen.toml" -o -name "*.rs" \))
 #HEADERS=$(patsubst %,%.h,$(subst _,/,$(HEADERS_UNPARSED)))
 
-ifeq ($(TARGET),aarch64-unknown-linux-gnu)
-	export CC=aarch64-linux-gnu-gcc
-	export LD=aarch64-linux-gnu-ld
-	export AR=aarch64-linux-gnu-ar
-	export NM=aarch64-linux-gnu-nm
-	export OBJCOPY=aarch64-linux-gnu-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/ld.so.1
-endif
-
-ifeq ($(TARGET),aarch64-unknown-redox)
-	export CC=aarch64-unknown-redox-gcc
-	export LD=aarch64-unknown-redox-ld
-	export AR=aarch64-unknown-redox-ar
-	export NM=aarch64-unknown-redox-nm
-	export OBJCOPY=aarch64-unknown-redox-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/ld.so.1
-endif
-
-ifeq ($(TARGET),i686-unknown-redox)
-	export CC=i686-unknown-redox-gcc
-	export LD=i686-unknown-redox-ld
-	export AR=i686-unknown-redox-ar
-	export NM=i686-unknown-redox-nm
-	export OBJCOPY=i686-unknown-redox-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/libc.so.1
-endif
-
-ifeq ($(TARGET),x86_64-unknown-linux-gnu)
-	export CC=x86_64-linux-gnu-gcc
-	export LD=x86_64-linux-gnu-ld
-	export AR=x86_64-linux-gnu-ar
-	export NM=x86_64-linux-gnu-nm
-	export OBJCOPY=objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/ld64.so.1
-endif
-
-ifeq ($(TARGET),x86_64-unknown-redox)
-	export CC=x86_64-unknown-redox-gcc
-	export LD=x86_64-unknown-redox-ld
-	export AR=x86_64-unknown-redox-ar
-	export NM=x86_64-unknown-redox-nm
-	export OBJCOPY=x86_64-unknown-redox-objcopy
-	export CPPFLAGS=
-	LD_SO_PATH=lib/ld64.so.1
-endif
-
-ifeq ($(TARGET),riscv64gc-unknown-redox)
-	export CC=riscv64-unknown-redox-gcc
-	export LD=riscv64-unknown-redox-ld
-	export AR=riscv64-unknown-redox-ar
-	export NM=riscv64-unknown-redox-nm
-	export OBJCOPY=riscv64-unknown-redox-objcopy
-	export CPPFLAGS=-march=rv64gc -mabi=lp64d
-	LD_SO_PATH=lib/ld.so.1
-endif
-
 SRC=\
 	Cargo.* \
-	$(shell find src -type f)
+	$(shell find src/ redox-rt/src/ ld_so/src/ redox-ioctl/src/ include/ -type f)
 
 BUILTINS_VERSION=0.1.70
 
@@ -95,20 +35,20 @@ all: | headers libs
 
 headers: $(HEADERS_DEPS)
 	rm -rf $(TARGET_HEADERS)
-	mkdir -pv $(TARGET_HEADERS)
-	cp -rv include/* $(TARGET_HEADERS)
-	cp -v "openlibm/include"/*.h $(TARGET_HEADERS)
-	cp -v "openlibm/src"/*.h $(TARGET_HEADERS)
-	set -e ; \
+	mkdir -p $(TARGET_HEADERS)
+	cp -r include/* $(TARGET_HEADERS)
+	cp "openlibm/include"/*.h $(TARGET_HEADERS)
+	cp "openlibm/src"/*.h $(TARGET_HEADERS)
+	@set -e ; \
 	for header in $(HEADERS_UNPARSED); do \
-		echo "Header $$header"; \
+		echo -e "\033[0;36;49mWriting Header $$header\033[0m"; \
 		if test -f "src/header/$$header/cbindgen.toml"; then \
 			out=`echo "$$header" | sed 's/_/\//g'`; \
 			out="$(TARGET_HEADERS)/$$out.h"; \
 			cat "src/header/$$header/cbindgen.toml" cbindgen.globdefs.toml \
 				 | cbindgen "src/header/$$header/mod.rs" --config=/dev/stdin --output "$$out"; \
 		fi \
-	done
+	done; echo -e "\033[0;36;49mAll headers written\033[0m";
 
 clean:
 	$(CARGO) clean
@@ -161,18 +101,24 @@ submodules:
 	git submodule update --init --recursive
 
 sysroot:
+	@mkdir -p $@
+
+.PHONY: sysroot/$(TARGET)
+sysroot/$(TARGET): | sysroot
 	rm -rf $@
 	rm -rf $@.partial
 	mkdir -p $@.partial
-	$(MAKE) install DESTDIR=$@.partial
+	$(MAKE) install DESTDIR=$(shell pwd)/$@.partial
 	mv $@.partial $@
 	touch $@
 
-test: sysroot
+test: sysroot/$(TARGET)
 	# TODO: Fix SIGILL when running cargo test
 	# $(CARGO_TEST) test
 	$(MAKE) -C tests run
-	$(MAKE) -C tests verify
+
+test-once: sysroot/$(TARGET)
+	$(MAKE) -C tests run-once TESTBIN=$(TESTBIN)
 
 
 $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
@@ -184,12 +130,14 @@ $(BUILD)/$(PROFILE)/libc.so: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/l
 		-Wl,--allow-multiple-definition \
 		-Wl,--whole-archive $^ -Wl,--no-whole-archive \
 		-Wl,-soname,libc.so.6 \
-		-lgcc \
+		$(LINKFLAGS) \
 		-o $@
 
-# Debug targets
+$(BUILD)/$(PROFILE)/ld_so: $(BUILD)/$(PROFILE)/ld_so.o $(BUILD)/$(PROFILE)/crti.o $(BUILD)/$(PROFILE)/libc.a $(BUILD)/$(PROFILE)/crtn.o
+	# TODO: merge ld.so with libc.so: --dynamic-list=dynamic-list-file
+	$(LD) --shared -Bsymbolic --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections $^ -o $@
 
-$(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.a
+$(BUILD)/$(PROFILE)/libc.a: $(BUILD)/$(PROFILE)/librelibc.a $(BUILD)/openlibm/libopenlibm.a
 	echo "create $@" > "$@.mri"
 	for lib in $^; do\
 		echo "addlib $$lib" >> "$@.mri"; \
@@ -197,6 +145,8 @@ $(BUILD)/debug/libc.a: $(BUILD)/debug/librelibc.a $(BUILD)/openlibm/libopenlibm.
 	echo "save" >> "$@.mri"
 	echo "end" >> "$@.mri"
 	$(AR) -M < "$@.mri"
+
+# Debug targets
 
 $(BUILD)/debug/librelibc.a: $(SRC)
 	$(CARGO) rustc $(CARGOFLAGS) -- --emit link=$@ -g -C debug-assertions=no $(RUSTCFLAGS)
@@ -220,24 +170,12 @@ $(BUILD)/debug/ld_so.o: $(SRC)
 	$(CARGO) rustc --manifest-path ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort -g -C debug-assertions=no $(RUSTCFLAGS)
 	touch $@
 
-$(BUILD)/debug/ld_so: $(BUILD)/debug/ld_so.o $(BUILD)/debug/crti.o $(BUILD)/debug/libc.a $(BUILD)/debug/crtn.o
-	$(LD) --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections $^ -o $@
-
 # Release targets
-
-$(BUILD)/release/libc.a: $(BUILD)/release/librelibc.a $(BUILD)/openlibm/libopenlibm.a
-	echo "create $@" > "$@.mri"
-	for lib in $^; do\
-		echo "addlib $$lib" >> "$@.mri"; \
-	done
-	echo "save" >> "$@.mri"
-	echo "end" >> "$@.mri"
-	$(AR) -M < "$@.mri"
 
 $(BUILD)/release/librelibc.a: $(SRC)
 	$(CARGO) rustc --release $(CARGOFLAGS) -- --emit link=$@ $(RUSTCFLAGS)
-	# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
-	# use some cbindgen hook, specify them manually, or grep for #[unsafe(no_mangle)].
+	@# TODO: Better to only allow a certain whitelisted set of symbols? Perhaps
+	@# use some cbindgen hook, specify them manually, or grep for #[unsafe(no_mangle)].
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"
 	./stripcore.sh "$@"
 	touch $@
@@ -258,9 +196,6 @@ $(BUILD)/release/ld_so.o: $(SRC)
 	$(CARGO) rustc --release --manifest-path ld_so/Cargo.toml $(CARGOFLAGS) -- --emit obj=$@ -C panic=abort $(RUSTCFLAGS)
 	touch $@
 
-$(BUILD)/release/ld_so: $(BUILD)/release/ld_so.o $(BUILD)/release/crti.o $(BUILD)/release/libc.a $(BUILD)/release/crtn.o
-	$(LD) --no-relax -T ld_so/ld_script/$(TARGET).ld --allow-multiple-definition --gc-sections $^ -o $@
-
 # Other targets
 
 $(BUILD)/openlibm: openlibm
@@ -270,6 +205,6 @@ $(BUILD)/openlibm: openlibm
 	mv $@.partial $@
 	touch $@
 
-$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/release/librelibc.a
-	$(MAKE) AR=$(AR) CC="$(CC_WRAPPER) $(CC)" LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
+$(BUILD)/openlibm/libopenlibm.a: $(BUILD)/openlibm $(BUILD)/$(PROFILE)/librelibc.a
+	$(MAKE) -s AR=$(AR) CC="$(CC_WRAPPER) $(CC)" LD=$(LD) CPPFLAGS="$(CPPFLAGS) -fno-stack-protector -I$(shell pwd)/include -I$(TARGET_HEADERS)" -C $< libopenlibm.a
 	./renamesyms.sh "$@" "$(BUILD)/release/deps/"

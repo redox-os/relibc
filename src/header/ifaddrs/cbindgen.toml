@@ -1,0 +1,16 @@
+sys_includes = ["features.h", "netinet/in.h", "sys/socket.h"]
+include_guard = "_RELIBC_IFADDRS_H"
+language = "C"
+style = "Tag"
+no_includes = true
+cpp_compat = true
+trailer = """
+#define ifa_broadaddr ifa_ifu.ifu_broadaddr
+#define ifa_dstaddr ifa_ifu.ifu_dstaddr
+"""
+
+[export.rename]
+"sockaddr" = "struct sockaddr"
+
+[enum]
+prefix_with_name = true

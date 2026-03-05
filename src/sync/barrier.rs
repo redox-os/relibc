@@ -40,7 +40,7 @@ impl Barrier {
         if guard.count == self.original_count.get() {
             guard.gen_id = guard.gen_id.wrapping_add(1);
             guard.count = 0;
-            self.cvar.broadcast();
+            if let Ok(()) = self.cvar.broadcast() {}; // TODO handle error
 
             drop(guard);
 

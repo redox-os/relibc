@@ -1,6 +1,14 @@
-//! setjmp implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/setjmp.h.html
+//! `setjmp.h` implementation.
+//!
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/setjmp.h.html>.
 
 use core::arch::global_asm;
+
+#[cfg(target_arch = "aarch64")]
+use core::ffi::c_int;
+
+#[cfg(target_arch = "aarch64")]
+use crate::header::signal::sigsetjmp;
 
 macro_rules! platform_specific {
     ($($rust_arch:expr,$c_arch:expr,$ext:expr;)+) => {
@@ -22,6 +30,20 @@ platform_specific! {
 
 //Each platform has different sizes for sigjmp_buf, currently only x86_64 is supported
 unsafe extern "C" {
+    /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/setjmp.html>.
     pub fn setjmp(jb: *mut u64) -> i32;
+    /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/longjmp.html>.
     pub fn longjmp(jb: *mut u64, ret: i32);
+}
+
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __relibc_unused_but_exist_to_avoid_linker_error_on_setjmp(arg: c_int) {
+    // Workaround to https://www.openwall.com/lists/musl/2023/09/07/2
+    // By keeping setjmp close to sigsetjmp in link time
+    let jb: *mut u64 = core::ptr::null_mut();
+    unsafe {
+        setjmp(jb);
+        sigsetjmp(jb, arg);
+    }
 }

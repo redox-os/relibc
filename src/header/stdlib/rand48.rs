@@ -1,7 +1,7 @@
 //! Helper functions for pseudorandom number generation using LCG, see https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/functions/drand48.html
 
 use crate::{
-    platform::types::*,
+    platform::types::{c_double, c_long, c_ushort},
     sync::{
         Mutex, MutexGuard,
         rwlock::{self, RwLock},
@@ -17,11 +17,11 @@ impl From<&[c_ushort; 3]> for U48 {
     fn from(value: &[c_ushort; 3]) -> Self {
         /* Cast via u16 to ensure we get only the lower 16 bits of each
          * element, as specified by POSIX. */
-        Self {
-            0: u64::from(value[0] as u16)
+        Self(
+            u64::from(value[0] as u16)
                 | (u64::from(value[1] as u16) << 16)
                 | (u64::from(value[2] as u16) << 32),
-        }
+        )
     }
 }
 
@@ -36,7 +36,7 @@ impl TryFrom<u64> for U48 {
 
     fn try_from(value: u64) -> Result<Self, u64> {
         if value < 0x1_0000_0000_0000 {
-            Ok(Self { 0: value })
+            Ok(Self(value))
         } else {
             Err(value)
         }

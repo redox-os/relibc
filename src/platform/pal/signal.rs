@@ -2,9 +2,9 @@ use super::super::{Pal, types::*};
 use crate::{
     error::{Errno, Result},
     header::{
+        bits_time::timespec,
         signal::{sigaction, siginfo_t, sigset_t, sigval, stack_t},
         sys_time::itimerval,
-        time::timespec,
     },
 };
 
@@ -35,5 +35,5 @@ pub trait PalSignal: Pal {
         set: &sigset_t,
         sig: Option<&mut siginfo_t>,
         tp: Option<&timespec>,
-    ) -> Result<()>;
+    ) -> Result<c_int>;
 }

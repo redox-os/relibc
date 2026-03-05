@@ -4,7 +4,7 @@
 "target_os=redox" = "__redox__"
 "target_os=linux" = "__linux__"
 "target_pointer_width=64" = "__LP64__"
-"target_pointer_width=32" = "__LP32__"
+"target_pointer_width=32" = "__ILP32__"
 "target_arch=x86" = "__i386__"
 "target_arch=x86_64" = "__x86_64__"
 "target_arch=aarch64" = "__aarch64__"

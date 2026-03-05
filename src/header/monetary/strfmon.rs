@@ -2,16 +2,18 @@ use crate::platform::types::c_char;
 
 use super::{DEFAULT_MONETARY, FormatFlags, LocaleMonetaryInfo, apply_grouping};
 use alloc::string::{String, ToString};
-use core::{ffi::CStr, ptr, result, slice, str};
-use libm::{fabs, floor, pow, round, trunc};
+use core::{ffi::CStr, slice};
+use libm::{fabs, pow, round, trunc};
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strfmon.html>.
+///
 /// The `strfmon()` function formats a monetary value according to the format string `format`
 /// and writes the result to the character array `s` of size `maxsize`.
 /// The format string can contain plain characters and format specifiers.
 ///
 /// Returns:
 /// - The number of characters written (excluding the null terminator), or -1 if
-/// an error occurs (e.g., invalid input, buffer overflow)
+///   an error occurs (e.g., invalid input, buffer overflow)
 pub unsafe extern "C" fn strfmon(
     s: *mut c_char,        // Output buffer
     maxsize: usize,        // Maximum size of the buffer
@@ -30,7 +32,7 @@ pub unsafe extern "C" fn strfmon(
     };
 
     // Create a mutable slice for the output buffer
-    let buffer = unsafe { slice::from_raw_parts_mut(s as *mut u8, maxsize) };
+    let buffer = unsafe { slice::from_raw_parts_mut(s.cast::<u8>(), maxsize) };
     let mut pos = 0;
     let mut format_chars = format_str.chars().peekable();
 
@@ -300,15 +302,15 @@ fn format_monetary(
     // 14) checks if the user specified a total field width
     //     - if the final result is shorter, we padd it
     //     - if `left_justify` is true, padd on the right otherwise padd on the left
-    if let Some(width) = flags.field_width {
-        if result.len() < width {
-            let padding = " ".repeat(width - result.len());
-            result = if flags.left_justify {
-                result + &padding
-            } else {
-                padding + &result
-            };
-        }
+    if let Some(width) = flags.field_width
+        && result.len() < width
+    {
+        let padding = " ".repeat(width - result.len());
+        result = if flags.left_justify {
+            result + &padding
+        } else {
+            padding + &result
+        };
     }
 
     // 15) write the final string to the buffer

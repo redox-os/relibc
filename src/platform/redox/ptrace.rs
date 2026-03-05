@@ -4,26 +4,37 @@
 //! we are NOT going to bend our API for the sake of
 //! compatibility. So, this module will be a hellhole.
 
-use super::super::{ERRNO, Pal, PalPtrace, PalSignal, Sys, types::*};
+use super::super::{ERRNO, PalPtrace, Sys, types::*};
+#[cfg(target_arch = "x86_64")]
+use super::super::{Pal, PalSignal};
+#[allow(unused_imports)]
 #[cfg(target_arch = "aarch64")]
-use crate::header::arch_aarch64_user::user_regs_struct;
+use crate::header::arch_aarch64_user::user_regs_struct; // unused
 #[cfg(target_arch = "x86_64")]
 use crate::header::arch_x64_user::user_regs_struct;
+#[allow(unused_imports)]
 use crate::{
     c_str::{CStr, CString},
     error::Errno,
     fs::File,
     header::{
         errno::{self as errnoh, EIO},
-        fcntl, signal, sys_ptrace,
+        fcntl,
     },
-    io::{self, prelude::*},
+    io,
     raw_cell::RawCell,
     sync::Mutex,
 };
+#[cfg(target_arch = "x86_64")]
+use crate::{
+    header::{signal, sys_ptrace},
+    io::prelude::*,
+};
 
 use alloc::collections::{BTreeMap, btree_map::Entry};
+#[cfg(target_arch = "x86_64")]
 use core::mem;
+#[cfg(target_arch = "x86_64")]
 use syscall;
 
 pub struct Session {
@@ -161,7 +172,7 @@ unsafe fn inner_ptrace(
         | sys_ptrace::PTRACE_SYSCALL
         | sys_ptrace::PTRACE_SYSEMU
         | sys_ptrace::PTRACE_SYSEMU_SINGLESTEP => {
-            Sys::kill(pid, signal::SIGCONT as _);
+            if let Ok(()) = Sys::kill(pid, signal::SIGCONT as _) {}; // TODO handle error
 
             // TODO: Translate errors
             let syscall = syscall::PTRACE_STOP_PRE_SYSCALL | syscall::PTRACE_STOP_POST_SYSCALL;
@@ -270,13 +281,14 @@ fn inner_ptrace(
 }
 
 impl PalPtrace for Sys {
+    #[allow(unused_unsafe)] // keeping inner unsafe fails x86_64, removing fails riscv cross-build
     unsafe fn ptrace(
         request: c_int,
         pid: pid_t,
         addr: *mut c_void,
         data: *mut c_void,
     ) -> Result<c_int, Errno> {
-        inner_ptrace(request, pid, addr, data)
+        unsafe { inner_ptrace(request, pid, addr, data) }
             .map_err(|err| Errno(err.raw_os_error().unwrap_or(EIO)))
     }
 }

@@ -93,6 +93,7 @@ impl<R: Read> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
+    #[allow(clippy::uninit_vec)] // buffer initialized after set_len
     pub fn with_capacity(cap: usize, inner: R) -> BufReader<R> {
         unsafe {
             let mut buffer = Vec::with_capacity(cap);
@@ -142,13 +143,11 @@ impl<R: Seek> BufReader<R> {
                 self.pos = new_pos as usize;
                 return Ok(());
             }
-        } else {
-            if let Some(new_pos) = pos.checked_add(offset as u64) {
-                if new_pos <= self.cap as u64 {
-                    self.pos = new_pos as usize;
-                    return Ok(());
-                }
-            }
+        } else if let Some(new_pos) = pos.checked_add(offset as u64)
+            && new_pos <= self.cap as u64
+        {
+            self.pos = new_pos as usize;
+            return Ok(());
         }
         self.seek(SeekFrom::Current(offset)).map(|_| ())
     }
@@ -172,7 +171,7 @@ impl<R: Read> Read for BufReader<R> {
 
     // we can't skip unconditionally because of the large buffer case in read.
     unsafe fn initializer(&self) -> Initializer {
-        self.inner.initializer()
+        unsafe { self.inner.initializer() }
     }
 }
 

@@ -1,10 +1,11 @@
-//! ptrace compatibility layer for Redox OS
+//! `ptrace.h` implementation.
+//!
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man2/ptrace.2.html>.
 
 use crate::{
     error::ResultExt,
-    platform::{PalPtrace, Sys, types::*},
+    platform::{PalPtrace, Sys, types::c_int},
 };
-use core::ffi::VaList;
 
 pub const PTRACE_TRACEME: c_int = 0;
 pub const PTRACE_PEEKTEXT: c_int = 1;
@@ -28,5 +29,6 @@ pub const PTRACE_SYSEMU_SINGLESTEP: c_int = 32;
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ptrace(request: c_int, mut __valist: ...) -> c_int {
     // Musl also just grabs the arguments from the varargs...
-    Sys::ptrace(request, __valist.arg(), __valist.arg(), __valist.arg()).or_minus_one_errno()
+    unsafe { Sys::ptrace(request, __valist.arg(), __valist.arg(), __valist.arg()) }
+        .or_minus_one_errno()
 }

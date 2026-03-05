@@ -1,9 +1,4 @@
-use crate::{
-    error::{Errno, Result},
-    fs::File,
-    header::fcntl,
-    io::BufWriter,
-};
+use crate::{error::Result, fs::File, header::fcntl, io::BufWriter};
 
 use super::logger::LogSink;
 

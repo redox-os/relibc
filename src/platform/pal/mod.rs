@@ -1,16 +1,21 @@
+use core::num::NonZeroU64;
+
 use super::types::*;
 use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
+        bits_time::timespec,
         signal::sigevent,
         sys_resource::{rlimit, rusage},
+        sys_select::timeval,
         sys_stat::stat,
         sys_statvfs::statvfs,
-        sys_time::{timeval, timezone},
+        sys_time::timezone,
         sys_utsname::utsname,
-        time::{itimerspec, timespec},
+        time::itimerspec,
     },
+    ld_so::tcb::OsSpecific,
     out::Out,
     pthread,
 };
@@ -34,8 +39,6 @@ pub trait Pal {
     unsafe fn brk(addr: *mut c_void) -> Result<*mut c_void>;
 
     fn chdir(path: CStr) -> Result<()>;
-
-    fn set_default_scheme(scheme: CStr) -> Result<(), Errno>;
 
     fn chmod(path: CStr, mode: mode_t) -> Result<()>;
 
@@ -170,7 +173,11 @@ pub trait Pal {
 
     fn lseek(fildes: c_int, offset: off_t, whence: c_int) -> Result<off_t>;
 
+    fn mkdirat(fildes: c_int, path: CStr, mode: mode_t) -> Result<()>;
+
     fn mkdir(path: CStr, mode: mode_t) -> Result<()>;
+
+    fn mkfifoat(dir_fd: c_int, path: CStr, mode: mode_t) -> Result<()>;
 
     fn mkfifo(path: CStr, mode: mode_t) -> Result<()>;
 
@@ -215,11 +222,18 @@ pub trait Pal {
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
 
+    fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
+
     fn pipe2(fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()>;
+
+    fn posix_fallocate(fd: c_int, offset: u64, length: NonZeroU64) -> Result<()>;
 
     fn posix_getdents(fildes: c_int, buf: &mut [u8]) -> Result<usize>;
 
-    unsafe fn rlct_clone(stack: *mut usize) -> Result<pthread::OsTid, Errno>;
+    unsafe fn rlct_clone(
+        stack: *mut usize,
+        os_specific: &mut OsSpecific,
+    ) -> Result<pthread::OsTid, Errno>;
     unsafe fn rlct_kill(os_tid: pthread::OsTid, signal: usize) -> Result<()>;
 
     fn current_os_tid() -> pthread::OsTid;
@@ -232,6 +246,14 @@ pub trait Pal {
     fn readlinkat(dirfd: c_int, pathname: CStr, out: &mut [u8]) -> Result<usize>;
 
     fn rename(old: CStr, new: CStr) -> Result<()>;
+    fn renameat(old_dir: c_int, old_path: CStr, new_dir: c_int, new_path: CStr) -> Result<()>;
+    fn renameat2(
+        old_dir: c_int,
+        old_path: CStr,
+        new_dir: c_int,
+        new_path: CStr,
+        flags: c_uint,
+    ) -> Result<()>;
 
     fn rmdir(path: CStr) -> Result<()>;
 

@@ -12,7 +12,7 @@ use crate::{
     raw_cell::RawCell,
 };
 
-use crate::platform::types::*;
+use crate::platform::types::c_char;
 
 fn getpass_rs(prompt: CStr, passbuff: &mut [u8]) -> Result<*mut c_char, io::Error> {
     let mut f = File::open(c"/dev/tty".into(), O_RDWR | O_CLOEXEC)?;
@@ -20,7 +20,7 @@ fn getpass_rs(prompt: CStr, passbuff: &mut [u8]) -> Result<*mut c_char, io::Erro
     let mut term = termios::termios::default();
 
     unsafe {
-        termios::tcgetattr(f.fd, &mut term as *mut termios::termios);
+        termios::tcgetattr(f.fd, &raw mut term);
     }
 
     let old_term = term.clone();
@@ -31,34 +31,28 @@ fn getpass_rs(prompt: CStr, passbuff: &mut [u8]) -> Result<*mut c_char, io::Erro
     term.c_lflag |= termios::ICANON as u32;
 
     unsafe {
-        termios::tcsetattr(f.fd, termios::TCSAFLUSH, &term as *const termios::termios);
+        termios::tcsetattr(f.fd, termios::TCSAFLUSH, &raw const term);
     }
 
-    f.write(&prompt.to_bytes())?;
+    f.write(prompt.to_bytes())?;
     f.flush()?;
 
     let mut len = f.read(passbuff)?;
 
-    if len > 0 {
-        if passbuff[len - 1] == b'\n' || passbuff.len() == len {
-            len -= 1;
-        }
+    if len > 0 && passbuff[len - 1] == b'\n' || passbuff.len() == len {
+        len -= 1;
     }
 
     passbuff[len] = 0;
 
     unsafe {
-        termios::tcsetattr(
-            f.fd,
-            termios::TCSAFLUSH,
-            &old_term as *const termios::termios,
-        );
+        termios::tcsetattr(f.fd, termios::TCSAFLUSH, &raw const old_term);
     }
 
     f.write(b"\n")?;
     f.flush()?;
 
-    Ok(passbuff.as_mut_ptr() as *mut c_char)
+    Ok(passbuff.as_mut_ptr().cast::<c_char>())
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/7908799/xsh/getpass.html>.
