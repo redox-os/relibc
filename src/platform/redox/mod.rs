@@ -611,10 +611,52 @@ impl Pal for Sys {
         redox_rt::sys::posix_getresugid().rgid as gid_t
     }
 
-    fn getgroups(list: Out<[gid_t]>) -> Result<c_int> {
-        // TODO
-        todo_skip!(0, "getgroups({}, {:p}): not implemented", list.len(), list);
-        Err(Errno(ENOSYS))
+    fn getgroups(mut list: Out<[gid_t]>) -> Result<c_int> {
+        // FIXME: this operation doesn't scale when group/passwd file grows
+
+        let uid = Self::geteuid();
+        let pwd = crate::header::pwd::getpwuid(uid);
+
+        if pwd.is_null() {
+            return Err(Errno(ENOENT));
+        }
+
+        let username = unsafe { CStr::from_ptr((*pwd).pw_name) };
+        let username = username.to_bytes_with_nul();
+        let mut count = 0;
+
+        unsafe {
+            use crate::header::grp;
+            grp::setgrent();
+
+            while let Some(grp) = grp::getgrent().as_ref() {
+                let mut i = 0;
+                let mut found = false;
+
+                while !(*grp.gr_mem.offset(i)).is_null() {
+                    let member = CStr::from_ptr(*grp.gr_mem.offset(i));
+                    if member.to_bytes_with_nul() == username {
+                        found = true;
+                        break;
+                    }
+                    i += 1;
+                }
+
+                if found {
+                    if !list.is_empty() && (count as usize) < list.len() {
+                        list.index(count).write(grp.gr_gid);
+                    }
+                    count += 1;
+                }
+            }
+            grp::endgrent();
+        }
+
+        if !list.is_empty() && (count as usize) > list.len() {
+            return Err(Errno(EINVAL));
+        }
+
+        Ok(count as i32)
     }
 
     fn getpagesize() -> usize {
