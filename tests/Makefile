@@ -305,6 +305,7 @@ VARIED_NAMES=\
 	pthread/timeout \
 	pthread/tls \
 	grp/getgrouplist \
+	grp/getgroups \
 	grp/getgrgid_r \
 	grp/getgrnam_r \
 	grp/gr_iter \
