@@ -362,6 +362,8 @@ impl PosixLocaleDef {
     /// parse e.g. `-1` -> None, `1` -> Some(1)
     fn parse_int(val: &str) -> Option<c_char> {
         let r = val.trim().parse::<c_char>().ok();
+        // c_char is u8 on aarch64 and riscv64 so comparison is useless
+        #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
         if r.is_some_and(|i| i < 0) {
             return None;
         }
