@@ -1,3 +1,9 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_stat.h.html
+#
+# Spec quotations relating to includes:
+# - "The <sys/stat.h> header shall define the blkcnt_t, blksize_t, dev_t, ino_t, mode_t, nlink_t, uid_t, gid_t, off_t, and time_t types as described in <sys/types.h>."
+# - "The <sys/stat.h> header shall define the timespec structure as described in <time.h>. Times shall be given in seconds since the Epoch."
+# - "Inclusion of the <sys/stat.h> header may make visible all symbols from the <time.h> header."
 sys_includes = ["sys/types.h"]
 include_guard = "_SYS_STAT_H"
 after_includes = """
