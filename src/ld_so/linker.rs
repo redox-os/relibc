@@ -561,10 +561,10 @@ impl Linker {
 
             let _ = self.objects.remove(&obj.id).unwrap();
             for dep in obj.dependencies() {
-                if let Some(name) = self.name_to_object_id_map.get(*dep) {
-                    if let Some(object_name) = self.objects.get(name) {
-                        self.unload(ObjectHandle::new(object_name.clone()));
-                    }
+                if let Some(name) = self.name_to_object_id_map.get(*dep)
+                    && let Some(object_name) = self.objects.get(name)
+                {
+                    self.unload(ObjectHandle::new(object_name.clone()));
                 }
             }
             self.name_to_object_id_map.remove(&obj.name);

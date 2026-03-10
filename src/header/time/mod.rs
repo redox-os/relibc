@@ -480,7 +480,7 @@ pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
         (*tm).tm_wday = dt.weekday().num_days_from_sunday() as _;
         (*tm).tm_yday = dt.ordinal0() as _; // day of year starting at 0
         (*tm).tm_isdst = dt.offset().dst_offset().num_hours() as _;
-        (*tm).tm_gmtoff = dt.offset().fix().local_minus_utc() as _;
+        (*tm).tm_gmtoff = dt.offset().fix().local_minus_utc().into();
         (*tm).tm_zone = tz_name.into_raw().cast();
     }
 
@@ -714,7 +714,7 @@ unsafe fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
     let offset = local_time.offset();
     t.tm_isdst = offset.dst_offset().num_hours() as _;
     // Get the UTC offset in seconds
-    t.tm_gmtoff = offset.fix().local_minus_utc() as _;
+    t.tm_gmtoff = offset.fix().local_minus_utc().into();
 
     let tm_zone = {
         let mut timezone_names = TIMEZONE_NAMES.lock();
