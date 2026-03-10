@@ -429,10 +429,9 @@ unsafe fn deserialize_ancillary_data_from_stream(
         let cmsg_data_from_stream = &msg_stream[*cursor..*cursor + cmsg_data_len_in_stream];
         *cursor += cmsg_data_len_in_stream;
 
-        let mut actual_posix_cmsg_data_len: usize = 0;
         let mut temp_posix_cmsg_data_buf: Vec<u8> = Vec::new();
 
-        match (cmsg_level, cmsg_type) {
+        let actual_posix_cmsg_data_len = match (cmsg_level, cmsg_type) {
             (SOL_SOCKET, SCM_RIGHTS) => {
                 if cmsg_data_len_in_stream != mem::size_of::<usize>() {
                     return Err(Errno(EINVAL));
@@ -458,7 +457,7 @@ unsafe fn deserialize_ancillary_data_from_stream(
                 for fd in fds_usize {
                     temp_posix_cmsg_data_buf.extend_from_slice(&(fd as c_int).to_le_bytes());
                 }
-                actual_posix_cmsg_data_len = temp_posix_cmsg_data_buf.len();
+                temp_posix_cmsg_data_buf.len()
             }
             (SOL_SOCKET, SCM_CREDENTIALS) => {
                 if cmsg_data_len_in_stream
@@ -480,12 +479,12 @@ unsafe fn deserialize_ancillary_data_from_stream(
                         mem::size_of::<ucred>(),
                     )
                 });
-                actual_posix_cmsg_data_len = temp_posix_cmsg_data_buf.len();
+                temp_posix_cmsg_data_buf.len()
             }
             _ => {
                 return Err(Errno(EINVAL));
             }
-        }
+        };
 
         let space_needed_for_posix_cmsg =
             unsafe { CMSG_SPACE(actual_posix_cmsg_data_len as u32) } as usize;
