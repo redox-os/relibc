@@ -951,7 +951,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
                 } {
                     VaArg::c_double(i) => i,
-                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&i as *const c_longdouble) },
+                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&raw const i) },
                     _ => panic!("this should not be possible"),
                 };
                 if float.is_finite() {
@@ -970,7 +970,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
                 } {
                     VaArg::c_double(i) => i,
-                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&i as *const c_longdouble) },
+                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&raw const i) },
                     _ => panic!("this should not be possible"),
                 };
                 if float.is_finite() {
@@ -986,7 +986,7 @@ pub(crate) unsafe fn inner_printf<T: c_str::Kind>(
                     varargs.get(index, &mut ap, Some((arg.fmtkind, arg.intkind)))
                 } {
                     VaArg::c_double(i) => i,
-                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&i as *const c_longdouble) },
+                    VaArg::c_longdouble(i) => unsafe { relibc_ldtod(&raw const i) },
                     _ => panic!("this should not be possible"),
                 };
                 if float.is_finite() {
