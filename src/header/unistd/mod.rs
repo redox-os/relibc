@@ -1160,9 +1160,13 @@ pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
 #[deprecated]
 #[unsafe(no_mangle)]
 pub extern "C" fn usleep(useconds: useconds_t) -> c_int {
+    #[cfg(not(target_arch = "x86"))]
+    let tv_nsec = c_long::from((useconds % 1_000_000) * 1000);
+    #[cfg(target_arch = "x86")]
+    let tv_nsec = ((useconds % 1_000_000) * 1000) as c_long;
     let rqtp = timespec {
         tv_sec: time_t::from(useconds / 1_000_000),
-        tv_nsec: ((useconds % 1_000_000) * 1000) as c_long,
+        tv_nsec,
     };
     let rmtp = ptr::null_mut();
     unsafe { Sys::nanosleep(&raw const rqtp, rmtp) }
