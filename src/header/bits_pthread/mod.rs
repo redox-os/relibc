@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
 
-use crate::platform::types::*;
+use crate::platform::types::{c_int, c_uchar, c_ulong, c_void, size_t};
 
 // XXX: https://github.com/eqrion/cbindgen/issues/685
 //
