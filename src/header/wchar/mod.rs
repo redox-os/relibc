@@ -875,9 +875,27 @@ macro_rules! strtou_impl {
         {
             let new = result.checked_mul(base as $type).and_then(|result| {
                 if $negative {
-                    result.checked_sub(digit as $type)
+                    #[cfg(target_arch = "x86")]
+                    {
+                        result.checked_sub(
+                            $type::try_from(digit).expect("single digit never overflows"),
+                        )
+                    }
+                    #[cfg(not(target_arch = "x86"))]
+                    {
+                        result.checked_sub($type::from(digit))
+                    }
                 } else {
-                    result.checked_add(digit as $type)
+                    #[cfg(target_arch = "x86")]
+                    {
+                        result.checked_add(
+                            $type::try_from(digit).expect("single digit never overflows"),
+                        )
+                    }
+                    #[cfg(not(target_arch = "x86"))]
+                    {
+                        result.checked_add($type::from(digit))
+                    }
                 }
             });
             result = match new {
