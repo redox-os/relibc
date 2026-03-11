@@ -1,6 +1,9 @@
 sys_includes = ["stddef.h", "stdint.h", "sys/types.h", "sys/uio.h"]
 include_guard = "_SYS_SOCKET_H"
-trailer = "#include <bits/sys/socket.h>"
+after_includes = """
+#include <bits/sys/socket.h>
+#include <bits/socklen-t.h> // for socklen_t
+"""
 language = "C"
 style = "Tag"
 no_includes = true

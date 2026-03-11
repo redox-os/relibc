@@ -1,7 +1,13 @@
 use crate::{
     error::Result,
-    header::sys_socket::{msghdr, sockaddr, socklen_t},
-    platform::{Pal, types::*},
+    header::{
+        bits_socklen_t::socklen_t,
+        sys_socket::{msghdr, sockaddr},
+    },
+    platform::{
+        Pal,
+        types::{c_int, c_void, size_t},
+    },
 };
 
 pub trait PalSocket: Pal {

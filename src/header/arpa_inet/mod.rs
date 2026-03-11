@@ -10,9 +10,10 @@ use core::{
 use crate::{
     c_str::CStr,
     header::{
+        bits_socklen_t::socklen_t,
         errno::{EAFNOSUPPORT, ENOSPC},
         netinet_in::{INADDR_NONE, in_addr, in_addr_t, ntohl},
-        sys_socket::{constants::AF_INET, socklen_t},
+        sys_socket::constants::AF_INET,
     },
     platform::{
         self,
