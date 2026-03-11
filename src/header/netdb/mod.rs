@@ -13,12 +13,13 @@ use crate::{
     error::ResultExt,
     header::{
         arpa_inet::inet_aton,
+        bits_socklen_t::socklen_t,
         errno::*,
         fcntl::O_RDONLY,
         netinet_in::{htons, in_addr, ntohl, sockaddr_in, sockaddr_in6},
         stdlib::atoi,
         strings::strcasecmp,
-        sys_socket::{constants::AF_INET, sa_family_t, sockaddr, socklen_t},
+        sys_socket::{constants::AF_INET, sa_family_t, sockaddr},
         unistd::SEEK_SET,
     },
     platform::{

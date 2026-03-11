@@ -10,13 +10,14 @@ use crate::{
 };
 
 use crate::header::{
+    bits_socklen_t::socklen_t,
     bits_time::timespec,
     errno::*,
     netinet_in::{IPPROTO_UDP, htons, in_addr, sockaddr_in},
     sys_socket::{
         self,
         constants::{AF_INET, SOCK_DGRAM},
-        sockaddr, socklen_t,
+        sockaddr,
     },
     time,
 };
