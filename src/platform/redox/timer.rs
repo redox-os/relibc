@@ -86,7 +86,7 @@ pub(crate) fn timer_update_wake_time(timer_st: &mut timer_internal_t) -> Result<
     } else {
         let mut now = timespec::default();
         Sys::clock_gettime(timer_st.clockid, Out::from_mut(&mut now))?;
-        let next_time = match timespec::add(now, timer_st.next_wake_time.it_interval) {
+        let next_time = match timespec::add(now, timer_st.next_wake_time.it_interval.clone()) {
             Some(a) => a,
             None => timespec::default(),
         };
