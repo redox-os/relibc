@@ -216,7 +216,7 @@ pub unsafe extern "C" fn inet_pton(af: c_int, src: *const c_char, dst: *mut c_vo
         for i in 0..4 {
             if let Some(n) = octets
                 .next()
-                .filter(|x| x.len() > 3)
+                .filter(|x| !x.len() > 3)
                 .and_then(|x| u8::from_str(x).ok())
             {
                 s_addr[i] = n;
