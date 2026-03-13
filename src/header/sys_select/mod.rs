@@ -132,7 +132,12 @@ pub fn select_epoll(
         match timeout {
             Some(timeout) => {
                 //TODO: Check for overflow
-                ((timeout.tv_sec as c_int) * 1000) + ((timeout.tv_usec as c_int) / 1000)
+                let sec_ms = (timeout.tv_sec as c_int).checked_mul(1000);
+                let usec_ms = (timeout.tv_usec as c_int) / 1000;
+                match sec_ms.and_then(|s| s.checked_add(usec_ms)) {
+                    Some(s) => s as c_int,
+                    None => c_int::MAX,
+                }
             }
             None => -1,
         }
