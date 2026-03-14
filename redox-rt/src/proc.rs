@@ -5,7 +5,7 @@ use crate::{
     arch::*,
     auxv_defs::*,
     read_proc_meta,
-    sys::{open, proc_call, thread_call},
+    sys::{fstat, open, proc_call, thread_call},
 };
 use redox_protocols::protocol::{ProcCall, ThreadCall};
 
@@ -798,7 +798,7 @@ impl<const UPPER: bool> FdGuard<UPPER> {
 
     #[inline]
     pub fn fstat(&self, stat: &mut syscall::Stat) -> Result<usize> {
-        syscall::fstat(self.fd, stat)
+        fstat(self.fd, stat)
     }
 
     #[inline]

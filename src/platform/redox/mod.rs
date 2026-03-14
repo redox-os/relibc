@@ -13,7 +13,7 @@ use redox_rt::{
 use syscall::{
     self, EILSEQ, ESRCH, Error, MODE_PERM, StdFsCallKind, StdFsCallMeta,
     data::{Map, TimeSpec as redox_timespec},
-    dirent::{DirentHeader, DirentKind},
+    dirent::DirentHeader,
 };
 
 use self::{
@@ -270,7 +270,7 @@ impl Pal for Sys {
     }
 
     fn fchmod(fd: c_int, mode: mode_t) -> Result<()> {
-        syscall::fchmod(fd as usize, mode as u16)?;
+        libredox::fchmod(fd as usize, mode as u16)?;
         Ok(())
     }
 
@@ -283,12 +283,12 @@ impl Pal for Sys {
             .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
             .ok_or(Errno(ENOENT))?;
         let file = openat2(dirfd, path, flags, 0)?;
-        syscall::fchmod(*file as usize, mode as u16)?;
+        libredox::fchmod(*file as usize, mode as u16)?;
         Ok(())
     }
 
     fn fchown(fd: c_int, owner: uid_t, group: gid_t) -> Result<()> {
-        syscall::fchown(fd as usize, owner as u32, group as u32)?;
+        libredox::fchown(fd as usize, owner as u32, group as u32)?;
         Ok(())
     }
 
@@ -484,12 +484,12 @@ impl Pal for Sys {
     }
 
     fn fsync(fd: c_int) -> Result<()> {
-        syscall::fsync(fd as usize)?;
+        libredox::fsync(fd as usize)?;
         Ok(())
     }
 
     fn ftruncate(fd: c_int, len: off_t) -> Result<()> {
-        syscall::ftruncate(fd as usize, len as usize)?;
+        libredox::ftruncate(fd as usize, len as usize)?;
         Ok(())
     }
 
@@ -523,63 +523,7 @@ impl Pal for Sys {
     }
 
     fn getdents(fd: c_int, buf: &mut [u8], opaque: u64) -> Result<usize> {
-        //println!("GETDENTS {} into ({:p}+{})", fd, buf.as_ptr(), buf.len());
-
-        const HEADER_SIZE: usize = size_of::<DirentHeader>();
-
-        // Use syscall if it exists.
-        match unsafe {
-            syscall::syscall5(
-                syscall::SYS_GETDENTS,
-                fd as usize,
-                buf.as_mut_ptr() as usize,
-                buf.len(),
-                HEADER_SIZE,
-                opaque as usize,
-            )
-        } {
-            Err(Error {
-                errno: EOPNOTSUPP | ENOSYS,
-            }) => (),
-            other => {
-                //println!("REAL GETDENTS {:?}", other);
-                return Ok(other?);
-            }
-        }
-
-        // Otherwise, for legacy schemes, assume the buffer is pre-arranged (all schemes do this in
-        // practice), and just read the name. If multiple names appear, pretend it didn't happen
-        // and just use the first entry.
-
-        let (header, name) = buf.split_at_mut(size_of::<DirentHeader>());
-
-        let bytes_read = Sys::pread(fd, name, opaque as i64)? as usize;
-        if bytes_read == 0 {
-            return Ok(0);
-        }
-
-        let (name_len, advance) = match name[..bytes_read].iter().position(|c| *c == b'\n') {
-            Some(idx) => (idx, idx + 1),
-
-            // Insufficient space for NUL byte, or entire entry was not read. Indicate we need a
-            // larger buffer.
-            None if bytes_read == name.len() => return Err(Errno(EINVAL)),
-
-            None => (bytes_read, name.len()),
-        };
-        name[name_len] = b'\0';
-
-        let record_len = u16::try_from(size_of::<DirentHeader>() + name_len + 1)
-            .map_err(|_| Error::new(ENAMETOOLONG))?;
-        header.copy_from_slice(&DirentHeader {
-            inode: 0,
-            next_opaque_id: opaque + advance as u64,
-            record_len,
-            kind: DirentKind::Unspecified as u8,
-        });
-        //println!("EMULATED GETDENTS");
-
-        Ok(record_len.into())
+        Ok(libredox::getdents(fd as usize, buf, opaque)?)
     }
 
     fn dir_seek(_fd: c_int, _off: u64) -> Result<()> {
@@ -1041,17 +985,18 @@ impl Pal for Sys {
         let length = length.get();
         let total_offset = offset.checked_add(length).ok_or(Errno(EFBIG))?;
 
-        let mut stat = syscall::Stat::default();
-        syscall::fstat(fd as usize, &mut stat)?;
+        let mut stat: stat = unsafe { mem::zeroed() };
+        unsafe { libredox::fstat(fd as usize, &mut stat)? };
+        let st_size = stat.st_size as u64;
         // The difference between total_offset and the file size is the number of bytes to
         // allocate. So, if it's negative then the file is already large enough and we don't
         // need to do any extra work.
         if let Some(total_len) = total_offset
-            .checked_sub(stat.st_size)
-            .and_then(|diff| stat.st_size.checked_add(diff))
+            .checked_sub(st_size)
+            .and_then(|diff| st_size.checked_add(diff))
         {
             let total_len: usize = total_len.try_into().map_err(|_| Errno(EFBIG))?;
-            syscall::ftruncate(fd as usize, total_len)?;
+            libredox::ftruncate(fd as usize, total_len)?;
         }
 
         Ok(())

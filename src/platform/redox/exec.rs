@@ -94,7 +94,7 @@ pub fn execve(
     // executable memory.
 
     let mut stat = Stat::default();
-    syscall::fstat(*image_file as usize, &mut stat)?;
+    redox_rt::sys::fstat(*image_file as usize, &mut stat)?;
     let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
 
     let mode = if ruid == stat.st_uid {
