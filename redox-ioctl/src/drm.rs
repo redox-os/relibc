@@ -11,7 +11,7 @@ pub use drm_sys::{
     drm_mode_cursor2, drm_mode_destroy_dumb, drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_get_blob,
     drm_mode_get_connector, drm_mode_get_encoder, drm_mode_get_plane, drm_mode_get_plane_res,
     drm_mode_get_property, drm_mode_map_dumb, drm_mode_modeinfo, drm_mode_obj_get_properties,
-    drm_mode_property_enum, drm_set_client_cap, drm_version,
+    drm_mode_property_enum, drm_set_client_cap, drm_version, drm_mode_set_plane
 };
 
 pub const VERSION: u64 = 0;
@@ -232,6 +232,24 @@ define_ioctl_data! {
         gamma_size: u32,
         count_format_types: u32,
         format_type_ptr: u64 [array<u32, count_format_types>],
+    }
+}
+
+pub const MODE_SET_PLANE: u64 = 0xB7;
+define_ioctl_data! {
+    struct drm_mode_set_plane, DrmModeSetPlane {
+        plane_id: u32,
+        crtc_id: u32,
+        fb_id: u32,
+        flags: u32,
+        crtc_x: i32,
+        crtc_y: i32,
+        crtc_w: u32,
+        crtc_h: u32,
+        src_x: u32,
+        src_y: u32,
+        src_h: u32,
+        src_w: u32,
     }
 }
 
