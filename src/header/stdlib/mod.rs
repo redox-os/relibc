@@ -4,8 +4,8 @@
 
 use core::{convert::TryFrom, intrinsics, iter, mem, ptr, slice};
 use rand::{
-    Rng, SeedableRng,
-    distributions::{Alphanumeric, Distribution, Uniform},
+    RngExt, SeedableRng,
+    distr::{Alphanumeric, Distribution, Uniform},
 };
 use rand_jitter::JitterRng;
 use rand_xorshift::XorShiftRng;
@@ -66,7 +66,7 @@ static mut RNG: Option<XorShiftRng> = None;
 static RNG_SAMPLER: Once<Uniform<c_int>> = Once::new();
 
 fn rng_sampler() -> &'static Uniform<c_int> {
-    RNG_SAMPLER.call_once(|| Uniform::new_inclusive(0, RAND_MAX))
+    RNG_SAMPLER.call_once(|| Uniform::new_inclusive(0, RAND_MAX).expect("within bounds"))
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/_Exit.html>.

@@ -8,7 +8,7 @@ use alloc::{
     string::{String, ToString},
 };
 use core::ptr;
-use rand::{RngCore, SeedableRng, rngs::SmallRng};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 use crate::{
     c_str::CStr,
