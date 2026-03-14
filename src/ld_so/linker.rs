@@ -754,7 +754,8 @@ impl Linker {
     ///
     /// If a dependency has already been loaded, it is *not* added to the scope
     /// nor to `new_objects`.
-    fn load_objects_recursive<'a>(
+    #[allow(clippy::too_many_arguments)]
+    fn load_objects_recursive(
         &mut self,
         name: &str,
         parent_runpath: &Option<String>,

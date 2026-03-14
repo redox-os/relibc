@@ -206,7 +206,7 @@ pub unsafe extern "C" fn relibc_ld_so_start(
     } else {
         let ph = phdrs
             .iter()
-            .find(|ph| ph.p_type(NativeEndian) == PT_DYNAMIC as u32)
+            .find(|ph| ph.p_type(NativeEndian) == PT_DYNAMIC)
             .unwrap();
         unsafe { dynamic.byte_sub(ph.p_vaddr(NativeEndian) as usize) as usize }
     };
@@ -266,11 +266,8 @@ pub unsafe extern "C" fn relibc_ld_so_start(
         for reloc in relocs {
             let reloc: Relocation = reloc.into();
             let ptr = (reloc.offset + self_base) as *mut usize;
-            match reloc.kind {
-                RelocationKind::RELATIVE => {
-                    unsafe { *ptr = self_base + reloc.addend.unwrap_or_default() };
-                }
-                _ => {}
+            if reloc.kind == RelocationKind::RELATIVE {
+                unsafe { *ptr = self_base + reloc.addend.unwrap_or_default() };
             }
         }
     }
