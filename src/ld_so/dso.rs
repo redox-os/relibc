@@ -37,7 +37,7 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-pub const CHAR_BITS: usize = size_of::<c_char>() * 8;
+pub const CHAR_BITS: usize = c_char::BITS as usize;
 pub type Relr = usize;
 
 #[cfg(target_pointer_width = "32")]
@@ -432,7 +432,7 @@ impl DSO {
         let (_, sym) = self.dynamic.hash_table.find(
             name,
             None,
-            &self.dynamic.symbols,
+            self.dynamic.symbols,
             self.dynamic.dynstrtab,
             &VersionTable::default(),
         )?;
