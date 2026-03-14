@@ -229,5 +229,3 @@ impl<'a, T: ?Sized> Out<'a, T> {
         unsafe { Out::nonnull(self.as_mut_ptr()) }
     }
 }
-
-// TODO: unit tests
