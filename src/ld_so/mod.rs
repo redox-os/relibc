@@ -101,11 +101,11 @@ pub fn static_init(
         let page_size = Sys::getpagesize();
         let voff = p_vaddr % page_size;
         // let vaddr = ph.p_vaddr as usize - voff;
-        let vsize = ((p_memsz + voff + page_size - 1) / page_size) * page_size;
+        let vsize = (p_memsz + voff).div_ceil(page_size) * page_size;
 
         if p_type == elf::PT_TLS {
             let valign = if p_align > 0 {
-                ((p_memsz + (p_align - 1)) / p_align) * p_align
+                p_memsz.div_ceil(p_align) * p_align
             } else {
                 p_memsz
             };
