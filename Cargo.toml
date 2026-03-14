@@ -70,10 +70,9 @@ bitflags = "2"
 cbitset = "0.2"
 posix-regex = { version = "0.1.4", features = ["no_std"] }
 
-# TODO: For some reason, rand_jitter hasn't been updated to use the latest rand_core
-rand = { version = "0.8", default-features = false, features = ["small_rng"] }
-rand_xorshift = "0.3"
-rand_jitter = "0.4"
+rand = { version = "0.10", default-features = false }
+rand_xorshift = "0.5"
+rand_jitter = "0.6"
 
 memchr = { version = "2.2.0", default-features = false }
 plain = "0.2"
