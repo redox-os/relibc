@@ -1,10 +1,14 @@
-use core::{slice, str};
+use core::{mem, slice, str};
 
 use alloc::vec::Vec;
 use ioslice::IoSlice;
 use redox_protocols::protocol::{ProcKillTarget, SocketCall, WaitFlags};
-use redox_rt::sys::{WaitpidTarget, posix_read, posix_write};
-use syscall::{EMFILE, Error, Result};
+use redox_rt::sys::{WaitpidTarget, posix_read, posix_write, std_fs_call_ro, std_fs_call_wo};
+use syscall::{
+    EMFILE, ENAMETOOLONG, ENOSYS, EOPNOTSUPP, Error, Result, StdFsCallKind,
+    data::StdFsCallMeta,
+    dirent::{DirentHeader, DirentKind},
+};
 
 use crate::{
     header::{
@@ -46,84 +50,30 @@ pub fn openat(dirfd: c_int, path: &str, oflag: c_int, mode: mode_t) -> Result<us
         })
         .map(|f| f as usize)
 }
-
-pub unsafe fn fstat(fd: usize, buf: *mut crate::header::sys_stat::stat) -> Result<()> {
-    let mut redox_buf: syscall::Stat = Default::default();
-    syscall::fstat(fd, &mut redox_buf)?;
-
-    if let Some(buf) = unsafe { buf.as_mut() } {
-        buf.st_dev = redox_buf.st_dev as dev_t;
-        buf.st_ino = redox_buf.st_ino as ino_t;
-        buf.st_nlink = redox_buf.st_nlink as nlink_t;
-        buf.st_mode = redox_buf.st_mode as mode_t;
-        buf.st_uid = redox_buf.st_uid as uid_t;
-        buf.st_gid = redox_buf.st_gid as gid_t;
-        // TODO st_rdev
-        buf.st_rdev = 0;
-        buf.st_size = redox_buf.st_size as off_t;
-        buf.st_blksize = redox_buf.st_blksize as blksize_t;
-        buf.st_blocks = redox_buf.st_blocks as blkcnt_t;
-        buf.st_atim = timespec {
-            tv_sec: redox_buf.st_atime as time_t,
-            tv_nsec: redox_buf.st_atime_nsec as c_long,
-        };
-        buf.st_mtim = timespec {
-            tv_sec: redox_buf.st_mtime as time_t,
-            tv_nsec: redox_buf.st_mtime_nsec as c_long,
-        };
-        buf.st_ctim = timespec {
-            tv_sec: redox_buf.st_ctime as time_t,
-            tv_nsec: redox_buf.st_ctime_nsec as c_long,
-        };
-    }
+pub fn fchmod(fd: usize, new_mode: u16) -> Result<()> {
+    std_fs_call_wo(
+        fd,
+        &[],
+        &StdFsCallMeta::new(StdFsCallKind::Fchmod, new_mode as u64, 0),
+    )?;
     Ok(())
 }
-pub unsafe fn fstatvfs(
-    fd: usize,
-    buf: *mut crate::header::sys_statvfs::statvfs,
-) -> syscall::Result<()> {
-    let mut kbuf: syscall::StatVfs = Default::default();
-    syscall::fstatvfs(fd, &mut kbuf)?;
-
-    if !buf.is_null() {
-        unsafe {
-            (*buf).f_bsize = kbuf.f_bsize as c_ulong;
-            (*buf).f_frsize = kbuf.f_bsize as c_ulong;
-            (*buf).f_blocks = kbuf.f_blocks as c_ulong;
-            (*buf).f_bfree = kbuf.f_bfree as c_ulong;
-            (*buf).f_bavail = kbuf.f_bavail as c_ulong;
-            //TODO
-            (*buf).f_files = 0;
-            (*buf).f_ffree = 0;
-            (*buf).f_favail = 0;
-            (*buf).f_fsid = 0;
-            (*buf).f_flag = 0;
-            (*buf).f_namemax = 0;
-        }
-    }
+pub fn fchown(fd: usize, new_uid: u32, new_gid: u32) -> Result<()> {
+    /* std_fs_call
+    Error::mux(std_fs_call_wo(
+        fd,
+        &[],
+        &StdFsCallMeta::new(
+            StdFsCallKind::Fchmod,
+            (new_uid as u64) | ((new_gid as u64) << 32),
+            0,
+        ),
+    ))
+    */
+    syscall::fchown(fd, new_uid, new_gid)?;
     Ok(())
 }
-pub unsafe fn futimens(fd: usize, times: *const timespec) -> syscall::Result<()> {
-    let times = if times.is_null() {
-        // null means set to current time using special UTIME_NOW value (tv_sec is ignored in that case)
-        [
-            syscall::TimeSpec {
-                tv_sec: 0,
-                tv_nsec: UTIME_NOW as c_int,
-            },
-            syscall::TimeSpec {
-                tv_sec: 0,
-                tv_nsec: UTIME_NOW as c_int,
-            },
-        ]
-    } else {
-        unsafe { times.cast::<[timespec; 2]>().read() }.map(|ts| syscall::TimeSpec::from(&ts))
-    };
-    syscall::futimens(fd as usize, &times)?;
-    Ok(())
-}
-/* std_fs_call
-pub fn std_fs_call_getdents(fd: usize, buf: &mut [u8], opaque: u64) -> Result<usize> {
+pub fn getdents(fd: usize, buf: &mut [u8], opaque: u64) -> Result<usize> {
     //println!("GETDENTS {} into ({:p}+{})", fd, buf.as_ptr(), buf.len());
 
     const HEADER_SIZE: usize = mem::size_of::<DirentHeader>();
@@ -177,13 +127,9 @@ pub fn std_fs_call_getdents(fd: usize, buf: &mut [u8], opaque: u64) -> Result<us
 
     Ok(record_len.into())
 }
-pub unsafe fn std_fs_call_fstat(fd: usize, buf: *mut crate::header::sys_stat::stat) -> Result<()> {
+pub unsafe fn fstat(fd: usize, buf: *mut crate::header::sys_stat::stat) -> Result<()> {
     let mut redox_buf: syscall::Stat = Default::default();
-    std_fs_call_ro(
-        fd,
-        &mut redox_buf,
-        &StdFsCallMeta::new(StdFsCallKind::Fstat, 0, 0),
-    )?;
+    redox_rt::sys::fstat(fd, &mut redox_buf)?;
 
     if let Some(buf) = unsafe { buf.as_mut() } {
         buf.st_dev = redox_buf.st_dev as dev_t;
@@ -212,10 +158,7 @@ pub unsafe fn std_fs_call_fstat(fd: usize, buf: *mut crate::header::sys_stat::st
     }
     Ok(())
 }
-pub unsafe fn std_fs_call_fstatvfs(
-    fd: usize,
-    buf: *mut crate::header::sys_statvfs::statvfs,
-) -> Result<()> {
+pub unsafe fn fstatvfs(fd: usize, buf: *mut crate::header::sys_statvfs::statvfs) -> Result<()> {
     let mut kbuf: syscall::StatVfs = Default::default();
     std_fs_call_ro(
         fd,
@@ -241,7 +184,19 @@ pub unsafe fn std_fs_call_fstatvfs(
     }
     Ok(())
 }
-pub unsafe fn std_fs_call_futimens(fd: usize, times: *const timespec) -> Result<()> {
+pub fn fsync(fd: usize) -> Result<()> {
+    std_fs_call_wo(fd, &[], &StdFsCallMeta::new(StdFsCallKind::Fsync, 0, 0))?;
+    Ok(())
+}
+pub fn ftruncate(fd: usize, len: usize) -> Result<()> {
+    std_fs_call_wo(
+        fd,
+        &[],
+        &StdFsCallMeta::new(StdFsCallKind::Ftruncate, len as u64, 0),
+    )?;
+    Ok(())
+}
+pub unsafe fn futimens(fd: usize, times: *const timespec) -> Result<()> {
     let times = if times.is_null() {
         // null means set to current time using special UTIME_NOW value (tv_sec is ignored in that case)
         [
@@ -270,7 +225,6 @@ pub unsafe fn std_fs_call_futimens(fd: usize, times: *const timespec) -> Result<
     )?;
     Ok(())
 }
-*/
 pub fn clock_gettime(clock: usize, mut tp: Out<timespec>) -> Result<()> {
     let mut redox_tp = syscall::TimeSpec::default();
     syscall::clock_gettime(clock as usize, &mut redox_tp)?;
@@ -344,29 +298,11 @@ pub unsafe extern "C" fn redox_write_v1(
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fchmod_v1(fd: usize, new_mode: u16) -> RawResult {
-    /* std_fs_call
-    Error::mux(std_fs_call_wo(
-        fd,
-        &[],
-        &StdFsCallMeta::new(StdFsCallKind::Fchmod, new_mode as u64, 0),
-    ))
-    */
-    Error::mux(syscall::fchmod(fd, new_mode))
+    Error::mux(fchmod(fd, new_mode).map(|()| 0))
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fchown_v1(fd: usize, new_uid: u32, new_gid: u32) -> RawResult {
-    /* std_fs_call
-    Error::mux(std_fs_call_wo(
-        fd,
-        &[],
-        &StdFsCallMeta::new(
-            StdFsCallKind::Fchmod,
-            (new_uid as u64) | ((new_gid as u64) << 32),
-            0,
-        ),
-    ))
-    */
-    Error::mux(syscall::fchown(fd, new_uid, new_gid))
+    Error::mux(fchown(fd, new_uid, new_gid).map(|()| 0))
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_getdents_v0(
@@ -400,37 +336,16 @@ pub unsafe extern "C" fn redox_fstatvfs_v1(
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fsync_v1(fd: usize) -> RawResult {
-    /* std_fs_call
-    Error::mux(std_fs_call_wo(
-        fd,
-        &[],
-        &StdFsCallMeta::new(StdFsCallKind::Fsync, 0, 0),
-    ))
-    */
-    Error::mux(syscall::fsync(fd))
+    Error::mux(fsync(fd).map(|()| 0))
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_fdatasync_v1(fd: usize) -> RawResult {
-    /* std_fs_call
-    Error::mux(std_fs_call_wo(
-        fd,
-        &[],
-        &StdFsCallMeta::new(StdFsCallKind::Fsync, 0, 0),
-    ))
-    */
     // TODO
-    Error::mux(syscall::fsync(fd))
+    Error::mux(fsync(fd).map(|()| 0))
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_ftruncate_v0(fd: usize, len: usize) -> RawResult {
-    /* std_fs_call
-    Error::mux(std_fs_call_wo(
-        fd,
-        &[],
-        &StdFsCallMeta::new(StdFsCallKind::Ftruncate, len as u64, 0),
-    ))
-    */
-    Error::mux(syscall::ftruncate(fd as usize, len as usize))
+    Error::mux(ftruncate(fd, len).map(|()| 0))
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redox_futimens_v1(fd: usize, times: *const timespec) -> RawResult {
