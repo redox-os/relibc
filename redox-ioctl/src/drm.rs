@@ -7,11 +7,11 @@ use core::{
 
 pub use drm_sys::{
     __kernel_size_t, DRM_PROP_NAME_LEN, drm_get_cap, drm_mode_card_res,
-    drm_mode_connector_set_property, drm_mode_create_dumb, drm_mode_crtc, drm_mode_destroy_dumb,
-    drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_get_blob, drm_mode_get_connector,
-    drm_mode_get_encoder, drm_mode_get_plane, drm_mode_get_plane_res, drm_mode_get_property,
-    drm_mode_map_dumb, drm_mode_modeinfo, drm_mode_obj_get_properties, drm_mode_property_enum,
-    drm_set_client_cap, drm_version,
+    drm_mode_connector_set_property, drm_mode_create_dumb, drm_mode_crtc, drm_mode_cursor,
+    drm_mode_cursor2, drm_mode_destroy_dumb, drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_get_blob,
+    drm_mode_get_connector, drm_mode_get_encoder, drm_mode_get_plane, drm_mode_get_plane_res,
+    drm_mode_get_property, drm_mode_map_dumb, drm_mode_modeinfo, drm_mode_obj_get_properties,
+    drm_mode_property_enum, drm_set_client_cap, drm_version,
 };
 
 pub const VERSION: u64 = 0;
@@ -66,6 +66,7 @@ define_ioctl_data! {
 }
 
 pub const MODE_GET_CRTC: u64 = 0xA1;
+pub const MODE_SET_CRTC: u64 = 0xA2;
 define_ioctl_data! {
     struct drm_mode_crtc, DrmModeCrtc {
         set_connectors_ptr: u64 [array<u32, count_connectors>],
@@ -77,6 +78,19 @@ define_ioctl_data! {
         gamma_size: u32,
         mode_valid: u32,
         mode: drm_mode_modeinfo,
+    }
+}
+
+pub const MODE_CURSOR: u64 = 0xA3;
+define_ioctl_data! {
+    struct drm_mode_cursor, DrmModeCursor {
+        flags: u32,
+        crtc_id: u32,
+        x: i32,
+        y:i32,
+        width:u32,
+        height:u32,
+        handle:u32,
     }
 }
 
@@ -229,6 +243,21 @@ define_ioctl_data! {
         count_props: u32,
         obj_id: u32,
         obj_type: u32,
+    }
+}
+
+pub const MODE_CURSOR2: u64 = 0xBB;
+define_ioctl_data! {
+    struct drm_mode_cursor2, DrmModeCursor2 {
+        flags: u32,
+        crtc_id: u32,
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+        handle: u32,
+        hot_x: i32,
+        hot_y: i32,
     }
 }
 
