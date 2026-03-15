@@ -1463,15 +1463,24 @@ impl Pal for Sys {
             Ok(())
         };
 
+        // The file format is currently as follows:
+        // <sysname>\n e.g. "Redox"
+        // <release>\n e.g. "0.9.0"
+        // <machine>\n e.g. "x86_64"
+        // <version>\n e.g. "yyyy-mm-ddThh:mm:ssZ"
+
+        // A future file format might add the domainname.
+
+        // nodename is handled above with /etc/hostname, and the domainname is
+        // currently zeroed out.
+
         read_line(sysname.as_slice_mut().cast_slice_to::<u8>())?;
         read_line(release.as_slice_mut().cast_slice_to::<u8>())?;
         read_line(machine.as_slice_mut().cast_slice_to::<u8>())?;
+        read_line(version.as_slice_mut().cast_slice_to::<u8>())?;
 
-        // Version is not provided
-        version.as_slice_mut().zero();
-
-        // Redox doesn't provide domainname in sys:uname
-        //read_line(domainname.as_slice_mut())?;
+        // Redox doesn't provide domainname in uname scheme
+        //read_line(domainname.as_slice_mut().cast_slice_to::<u8>())?;
         domainname.as_slice_mut().zero();
 
         Ok(())
