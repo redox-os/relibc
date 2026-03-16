@@ -107,6 +107,10 @@ pub(super) unsafe fn ioctl(fd: c_int, func: u8, buf: IoctlBuffer) -> Result<c_in
         0xAD => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd>(buf, MODE_GET_FB) },
         0xAE => unsafe { dev.read_write_ioctl::<drm_mode_fb_cmd>(buf, MODE_ADD_FB) },
         0xAF => unsafe { dev.read_write_ioctl::<standin_for_uint>(buf, MODE_RM_FB) },
+        0xB0 => unsafe {
+            dev.read_write_ioctl::<drm_mode_crtc_page_flip_target>(buf, MODE_PAGE_FLIP)
+        },
+        0xB1 => unsafe { dev.read_write_ioctl::<drm_mode_fb_dirty_cmd>(buf, MODE_DIRTYFB) },
         0xB2 => unsafe { dev.read_write_ioctl::<drm_mode_create_dumb>(buf, MODE_CREATE_DUMB) },
         0xB3 => unsafe { dev.read_write_ioctl::<drm_mode_map_dumb>(buf, MODE_MAP_DUMB) },
         0xB4 => unsafe { dev.read_write_ioctl::<drm_mode_destroy_dumb>(buf, MODE_DESTROY_DUMB) },
