@@ -217,12 +217,12 @@ pub struct UnsafeStringReader(pub *const u8);
 impl Read for UnsafeStringReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         unsafe {
-            for i in 0..buf.len() {
+            for (i, inner) in buf.iter_mut().enumerate() {
                 if *self.0 == 0 {
                     return Ok(i);
                 }
 
-                buf[i] = *self.0;
+                *inner = *self.0;
                 self.0 = self.0.offset(1);
             }
             Ok(buf.len())
