@@ -482,9 +482,9 @@ pub unsafe extern "C" fn getcwd(mut buf: *mut c_char, mut size: size_t) -> *mut 
             .expect("no nul-byte in getcwd string")
             + 1;
         let heap_buf = unsafe { platform::alloc(len).cast::<c_char>() };
-        for i in 0..len {
+        for (i, inner) in stack_buf.iter().enumerate().take(len) {
             unsafe {
-                *heap_buf.add(i) = stack_buf[i];
+                *heap_buf.add(i) = *inner;
             }
         }
         heap_buf
@@ -1217,8 +1217,8 @@ unsafe fn with_argv(
     };
     out[0].write(arg0);
 
-    for i in 1..argc {
-        out[i].write(unsafe { va.arg::<*const c_char>() });
+    for inner in out.iter_mut().take(argc).skip(1) {
+        (*inner).write(unsafe { va.arg::<*const c_char>() });
     }
     out[argc].write(core::ptr::null());
     // NULL
