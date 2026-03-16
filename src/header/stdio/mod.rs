@@ -140,8 +140,8 @@ pub struct FILE {
 impl Read for FILE {
     fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
         let unget_read_size = cmp::min(out.len(), self.unget.len());
-        for i in 0..unget_read_size {
-            out[i] = self.unget.pop().unwrap();
+        for inner in out.iter_mut().take(unget_read_size) {
+            *inner = self.unget.pop().unwrap();
         }
         if unget_read_size != 0 {
             return Ok(unget_read_size);
