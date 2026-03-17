@@ -16,7 +16,7 @@ pub type in_port_t = u16;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html>.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct in_addr {
     pub s_addr: in_addr_t,
 }
