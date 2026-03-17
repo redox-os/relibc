@@ -3,10 +3,10 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/inttypes.h.html>.
 
 use crate::{
-    header::{ctype, errno::*, stdlib::*},
+    header::{ctype::{self, isspace}, errno::*, stdlib::*},
     platform::{
         self,
-        types::{c_char, c_int, c_long, intmax_t, uintmax_t},
+        types::{c_char, c_int, c_long, intmax_t, uintmax_t, wchar_t},
     },
 };
 
@@ -68,4 +68,32 @@ pub unsafe extern "C" fn strtoumax(
     )
 }
 
-// wcstoimax(), wcstoumax() currently defined in header::wchar?
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoimax.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wcstoimax(
+    mut ptr: *const wchar_t,
+    end: *mut *mut wchar_t,
+    base: c_int,
+) -> intmax_t {
+    skipws!(ptr);
+    let result = strto_impl!(intmax_t, ptr, base);
+    if !end.is_null() {
+        unsafe { *end = ptr.cast_mut() };
+    }
+    result
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoimax.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wcstoumax(
+    mut ptr: *const wchar_t,
+    end: *mut *mut wchar_t,
+    base: c_int,
+) -> uintmax_t {
+    skipws!(ptr);
+    let result = strtou_impl!(uintmax_t, ptr, base);
+    if !end.is_null() {
+        unsafe { *end = ptr.cast_mut() };
+    }
+    result
+}

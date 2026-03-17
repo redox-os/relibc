@@ -21,7 +21,7 @@ use crate::{
         self, ERRNO,
         types::{
             c_char, c_double, c_int, c_long, c_longlong, c_uchar, c_ulong, c_ulonglong, c_void,
-            intmax_t, size_t, uintmax_t, wchar_t, wint_t,
+            size_t, wchar_t, wint_t,
         },
     },
 };
@@ -867,21 +867,6 @@ pub unsafe extern "C" fn wcstoll(
     result
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoimax.html>.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn wcstoimax(
-    mut ptr: *const wchar_t,
-    end: *mut *mut wchar_t,
-    base: c_int,
-) -> intmax_t {
-    skipws!(ptr);
-    let result = strto_impl!(intmax_t, ptr, base);
-    if !end.is_null() {
-        unsafe { *end = ptr.cast_mut() };
-    }
-    result
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoul.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstoul(
@@ -906,21 +891,6 @@ pub unsafe extern "C" fn wcstoull(
 ) -> c_ulonglong {
     skipws!(ptr);
     let result = strtou_impl!(c_ulonglong, ptr, base);
-    if !end.is_null() {
-        unsafe { *end = ptr.cast_mut() };
-    }
-    result
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoimax.html>.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn wcstoumax(
-    mut ptr: *const wchar_t,
-    end: *mut *mut wchar_t,
-    base: c_int,
-) -> uintmax_t {
-    skipws!(ptr);
-    let result = strtou_impl!(uintmax_t, ptr, base);
     if !end.is_null() {
         unsafe { *end = ptr.cast_mut() };
     }
