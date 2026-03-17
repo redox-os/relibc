@@ -77,6 +77,7 @@ macro_rules! assert_equal_size(
 
             // Fail at compile-time if alignments differ.
             let a = [0_u8; core::mem::align_of::<$export>()];
+            #[allow(clippy::useless_transmute)]
             let b: [u8; core::mem::align_of::<Wrapped>()] = core::mem::transmute(a);
         };
         // TODO: Turn into a macro?
