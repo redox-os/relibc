@@ -1,4 +1,11 @@
-sys_includes = ["stdint.h", "wchar.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/inttypes.h.html
+#
+# Spec quotations relating to includes:
+# - "The <inttypes.h> header shall include the <stdint.h> header."
+# - "wchar_t As described in <stddef.h>."
+#
+# bits/wchar.h brings in both stdint.h and stddef.h
+sys_includes = ["bits/wchar.h"]
 include_guard = "_RELIBC_INTTYPES_H"
 trailer = "#include <bits/inttypes.h>"
 language = "C"
