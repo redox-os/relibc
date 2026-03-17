@@ -296,6 +296,7 @@ pub unsafe extern "C" fn sighold(sig: c_int) -> c_int {
 /// Present in issue 7. Removed in issue 8.
 ///
 /// Use of this function is unspecified in a multi-threaded process.
+#[allow(clippy::missing_transmute_annotations)]
 #[unsafe(no_mangle)]
 pub extern "C" fn sigignore(sig: c_int) -> c_int {
     let mut psa = mem::MaybeUninit::<sigaction>::uninit();
@@ -342,6 +343,7 @@ pub unsafe extern "C" fn sigismember(set: *const sigset_t, signo: c_int) -> c_in
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/signal.html>.
+#[allow(clippy::missing_transmute_annotations)]
 #[unsafe(no_mangle)]
 pub extern "C" fn signal(
     sig: c_int,
