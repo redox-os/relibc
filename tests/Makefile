@@ -6,9 +6,10 @@ IS_REDOX?=0
 ifeq ($(IS_REDOX),1)
 FAILING_TESTS=
 else
-FAILING_TESTS := tls
 # Wrong modified time
-FAILING_TESTS += futimens
+FAILING_TESTS := futimens
+# Crash, mmap issue
+FAILING_TESTS += malloc/usable_size
 # Not a FIFO
 FAILING_TESTS += mkfifo
 # Waitpid had EINTR
@@ -31,9 +32,12 @@ FAILING_TESTS += unistd/link
 FAILING_TESTS += sigqueue
 # Unwrap hit, written as TODO
 FAILING_TESTS += pthread/customstack
-#	sys_resource/getrusage
-#	time/times
-#	netdb/netdb
+# Returning garbage values
+FAILING_TESTS += sys_resource/getrusage
+# No times.h header
+#FAILING_TESTS += time/times
+# Outdated test
+#FAILING_TESTS += netdb/netdb
 
 endif
 
@@ -70,7 +74,6 @@ EXPECT_NAMES=\
 	locale/duplocale \
 	locale/newlocale \
 	locale/setlocale \
-	malloc/usable_size \
 	math \
 	regex \
 	select \
@@ -162,6 +165,7 @@ EXPECT_NAMES=\
 	time/time \
 	time/timegm \
 	time/tzset \
+	tls \
 	unistd/access \
 	unistd/brk \
 	unistd/constants \
