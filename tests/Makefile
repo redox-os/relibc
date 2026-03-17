@@ -6,31 +6,31 @@ IS_REDOX?=0
 ifeq ($(IS_REDOX),1)
 FAILING_TESTS=
 else
-FAILING_TESTS=tls \
+FAILING_TESTS := tls
 # Wrong modified time
-	futimens \
+FAILING_TESTS += futimens
 # Not a FIFO
-	mkfifo \
+FAILING_TESTS += mkfifo
 # Waitpid had EINTR
-	sigchld \
+FAILING_TESTS += sigchld
 # not triggering ERANGE 
-	stdlib/ptsname \
+FAILING_TESTS += stdlib/ptsname
 # Hang
-	sys_epoll/epollet \
+FAILING_TESTS += sys_epoll/epollet
 # Kernel hit todo!
-	sys_mman/fmap \
+FAILING_TESTS += sys_mman/fmap
 # Hang
-	sys_socket/unixpeername \
+FAILING_TESTS += sys_socket/unixpeername
 # Task failed successfully?
-	signals/pthread_kill-child \
+FAILING_TESTS += signals/pthread_kill-child
 # Got EBADF
-	unistd/isatty \
+FAILING_TESTS += unistd/isatty
 # Got EINVAL
-	unistd/link \
+FAILING_TESTS += unistd/link
 # Signal kept unmasked
-	sigqueue \
+FAILING_TESTS += sigqueue
 # Unwrap hit, written as TODO
-	pthread/customstack
+FAILING_TESTS += pthread/customstack
 #	sys_resource/getrusage
 #	time/times
 #	netdb/netdb
