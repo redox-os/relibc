@@ -21,7 +21,7 @@ use crate::{
         self, ERRNO,
         types::{
             c_char, c_double, c_int, c_long, c_longlong, c_uchar, c_ulong, c_ulonglong, c_void,
-            intmax_t, size_t, uintmax_t, wchar_t, wint_t,
+            size_t, wchar_t, wint_t,
         },
     },
 };
@@ -759,14 +759,6 @@ pub unsafe extern "C" fn wcsstr(ws1: *const wchar_t, ws2: *const wchar_t) -> *mu
     }
 }
 
-macro_rules! skipws {
-    ($ptr:expr) => {
-        while isspace(unsafe { *$ptr }) != 0 {
-            $ptr = unsafe { $ptr.add(1) };
-        }
-    };
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstod.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstod(mut ptr: *const wchar_t, end: *mut *mut wchar_t) -> c_double {
@@ -845,82 +837,6 @@ pub unsafe extern "C" fn wcstok(
     wcs
 }
 
-macro_rules! strtou_impl {
-    ($type:ident, $ptr:expr, $base:expr) => {
-        strtou_impl!($type, $ptr, $base, false)
-    };
-    ($type:ident, $ptr:expr, $base:expr, $negative:expr) => {{
-        let mut base = $base;
-
-        if (base == 16 || base == 0)
-            && unsafe { *$ptr } == '0' as wchar_t
-            && (unsafe { *$ptr.add(1) } == 'x' as wchar_t
-                || unsafe { *$ptr.add(1) } == 'X' as wchar_t)
-        {
-            $ptr = unsafe { $ptr.add(2) };
-            base = 16;
-        }
-
-        if base == 0 {
-            base = if unsafe { *$ptr } == '0' as wchar_t {
-                8
-            } else {
-                10
-            };
-        };
-
-        let mut result: $type = 0;
-        while let Some(digit) =
-            char::from_u32(unsafe { *$ptr } as u32).and_then(|c| c.to_digit(base as u32))
-        {
-            let new = result.checked_mul(base as $type).and_then(|result| {
-                if $negative {
-                    #[cfg(target_arch = "x86")]
-                    {
-                        result.checked_sub(
-                            $type::try_from(digit).expect("single digit never overflows"),
-                        )
-                    }
-                    #[cfg(not(target_arch = "x86"))]
-                    {
-                        result.checked_sub($type::from(digit))
-                    }
-                } else {
-                    #[cfg(target_arch = "x86")]
-                    {
-                        result.checked_add(
-                            $type::try_from(digit).expect("single digit never overflows"),
-                        )
-                    }
-                    #[cfg(not(target_arch = "x86"))]
-                    {
-                        result.checked_add($type::from(digit))
-                    }
-                }
-            });
-            result = match new {
-                Some(new) => new,
-                None => {
-                    platform::ERRNO.set(ERANGE);
-                    return !0;
-                }
-            };
-
-            $ptr = unsafe { $ptr.add(1) };
-        }
-        result
-    }};
-}
-macro_rules! strto_impl {
-    ($type:ident, $ptr:expr, $base:expr) => {{
-        let negative = unsafe { *$ptr } == '-' as wchar_t;
-        if negative {
-            $ptr = unsafe { $ptr.add(1) };
-        }
-        strtou_impl!($type, $ptr, $base, negative)
-    }};
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstol.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstol(
@@ -951,21 +867,6 @@ pub unsafe extern "C" fn wcstoll(
     result
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoimax.html>.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn wcstoimax(
-    mut ptr: *const wchar_t,
-    end: *mut *mut wchar_t,
-    base: c_int,
-) -> intmax_t {
-    skipws!(ptr);
-    let result = strto_impl!(intmax_t, ptr, base);
-    if !end.is_null() {
-        unsafe { *end = ptr.cast_mut() };
-    }
-    result
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoul.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstoul(
@@ -990,21 +891,6 @@ pub unsafe extern "C" fn wcstoull(
 ) -> c_ulonglong {
     skipws!(ptr);
     let result = strtou_impl!(c_ulonglong, ptr, base);
-    if !end.is_null() {
-        unsafe { *end = ptr.cast_mut() };
-    }
-    result
-}
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoimax.html>.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn wcstoumax(
-    mut ptr: *const wchar_t,
-    end: *mut *mut wchar_t,
-    base: c_int,
-) -> uintmax_t {
-    skipws!(ptr);
-    let result = strtou_impl!(uintmax_t, ptr, base);
     if !end.is_null() {
         unsafe { *end = ptr.cast_mut() };
     }
