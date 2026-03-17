@@ -343,6 +343,7 @@ pub unsafe extern "C" fn scandir(
                 (*namelist).cast::<c_void>(),
                 len as size_t,
                 mem::size_of::<*mut dirent>(),
+                #[allow(clippy::missing_transmute_annotations)] // too verbose
                 mem::transmute(compare),
             )
         };
