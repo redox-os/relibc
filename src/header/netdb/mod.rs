@@ -239,7 +239,7 @@ pub unsafe extern "C" fn gethostbyaddr(
         H_ERRNO.set(NO_RECOVERY);
         return ptr::null_mut();
     }
-    let addr: in_addr = unsafe { *(v as *mut in_addr) };
+    let addr: in_addr = unsafe { (*(v as *mut in_addr)).clone() };
 
     // check the hosts file first
     let mut p: *mut hostent;
@@ -277,7 +277,7 @@ pub unsafe extern "C" fn gethostbyaddr(
     host_aliases.push(ptr::null_mut());
     unsafe { HOST_ALIASES.unsafe_set(Some(_host_aliases)) };
 
-    match lookup_addr(addr).map(|host_names| host_names.into_iter().next()) {
+    match lookup_addr(addr.clone()).map(|host_names| host_names.into_iter().next()) {
         Ok(Some(host_name)) => {
             unsafe { _HOST_ADDR_LIST = addr.s_addr.to_ne_bytes() };
             unsafe {
