@@ -1,3 +1,7 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/regex.h.html
+#
+# Spec quotations relating to includes:
+# - "The <regex.h> header shall define the size_t type as described in <sys/types.h>."
 sys_includes = ["sys/types.h"]
 include_guard = "_RELIBC_REGEX_H"
 language = "C"
