@@ -118,7 +118,85 @@ macro_rules! trace_expr {
 }
 
 #[macro_export]
+macro_rules! skipws {
+    ($ptr:expr) => {
+        while isspace(unsafe { *$ptr }) != 0 {
+            $ptr = unsafe { $ptr.add(1) };
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! strtou_impl {
+    ($type:ident, $ptr:expr, $base:expr) => {
+        strtou_impl!($type, $ptr, $base, false)
+    };
+    ($type:ident, $ptr:expr, $base:expr, $negative:expr) => {{
+        let mut base = $base;
+
+        if (base == 16 || base == 0)
+            && unsafe { *$ptr } == '0' as wchar_t
+            && (unsafe { *$ptr.add(1) } == 'x' as wchar_t
+                || unsafe { *$ptr.add(1) } == 'X' as wchar_t)
+        {
+            $ptr = unsafe { $ptr.add(2) };
+            base = 16;
+        }
+
+        if base == 0 {
+            base = if unsafe { *$ptr } == '0' as wchar_t {
+                8
+            } else {
+                10
+            };
+        };
+
+        let mut result: $type = 0;
+        while let Some(digit) =
+            char::from_u32(unsafe { *$ptr } as u32).and_then(|c| c.to_digit(base as u32))
+        {
+            let new = result.checked_mul(base as $type).and_then(|result| {
+                if $negative {
+                    #[cfg(target_arch = "x86")]
+                    {
+                        result.checked_sub(
+                            $type::try_from(digit).expect("single digit never overflows"),
+                        )
+                    }
+                    #[cfg(not(target_arch = "x86"))]
+                    {
+                        result.checked_sub($type::from(digit))
+                    }
+                } else {
+                    #[cfg(target_arch = "x86")]
+                    {
+                        result.checked_add(
+                            $type::try_from(digit).expect("single digit never overflows"),
+                        )
+                    }
+                    #[cfg(not(target_arch = "x86"))]
+                    {
+                        result.checked_add($type::from(digit))
+                    }
+                }
+            });
+            result = match new {
+                Some(new) => new,
+                None => {
+                    platform::ERRNO.set(ERANGE);
+                    return !0;
+                }
+            };
+
+            $ptr = unsafe { $ptr.add(1) };
+        }
+        result
+    }};
+}
+
+#[macro_export]
 macro_rules! strto_impl {
+    // this variant is used by inttypes and stdlib
     (
         $rettype:ty, $signed:expr, $maxval:expr, $minval:expr, $s:ident, $endptr:ident, $base:ident
     ) => {{
@@ -218,6 +296,14 @@ macro_rules! strto_impl {
         set_endptr(idx);
 
         num
+    }};
+    // this variant is used by wchar (also wcstoimax and wcstoumax from inttypes)
+    ($type:ident, $ptr:expr, $base:expr) => {{
+        let negative = unsafe { *$ptr } == '-' as wchar_t;
+        if negative {
+            $ptr = unsafe { $ptr.add(1) };
+        }
+        strtou_impl!($type, $ptr, $base, negative)
     }};
 }
 
