@@ -3,7 +3,11 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/inttypes.h.html>.
 
 use crate::{
-    header::{ctype::{self, isspace}, errno::*, stdlib::*},
+    header::{
+        ctype::{self, isspace},
+        errno::*,
+        stdlib::*,
+    },
     platform::{
         self,
         types::{c_char, c_int, c_long, intmax_t, uintmax_t, wchar_t},
