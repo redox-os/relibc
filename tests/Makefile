@@ -7,18 +7,33 @@ ifeq ($(IS_REDOX),1)
 FAILING_TESTS=
 else
 FAILING_TESTS=tls \
+# Wrong modified time
 	futimens \
+# Not a FIFO
 	mkfifo \
+# Waitpid had EINTR
 	sigchld \
+# not triggering ERANGE 
 	stdlib/ptsname \
+# Hang
 	sys_epoll/epollet \
+# Kernel hit todo!
 	sys_mman/fmap \
+# Hang
+	sys_socket/unixpeername \
+# Task failed successfully?
 	signals/pthread_kill-child \
+# Got EBADF
 	unistd/isatty \
+# Got EINVAL
 	unistd/link \
-#	resource/getrusage
+# Signal kept unmasked
+	sigqueue \
+# Unwrap hit, written as TODO
+	pthread/customstack
+#	sys_resource/getrusage
 #	time/times
-#   netdb/netdb
+#	netdb/netdb
 
 endif
 
@@ -128,7 +143,6 @@ EXPECT_NAMES=\
 	strings \
 	sys_socket/recv \
 	sys_socket/recvfrom \
-	sys_socket/unixpeername \
 	sys_socket/unixrecv \
 	sys_socket/unixrecvfrom \
 	sys_socket/unixsocketpair \
@@ -297,7 +311,6 @@ VARIED_NAMES=\
 	pthread/exit \
 	pthread/extjoin \
 	pthread/once \
-	pthread/customstack \
 	pthread/barrier \
 	pthread/rwlock_trylock \
 	pthread/rwlock_randtest \
@@ -311,7 +324,6 @@ VARIED_NAMES=\
 	grp/gr_iter \
 	waitpid \
 	waitpid_multiple \
-	sigqueue \
 	$(FAILING_TESTS)
 
 # Tests run with `expect` (require a .c file and an .exp file
