@@ -279,9 +279,23 @@ impl Pal for Sys {
         if MASK & flags != 0 {
             return Err(Errno(EOPNOTSUPP));
         }
-        let path = path
+        let mut path = path
             .and_then(|cs| str::from_utf8(cs.to_bytes()).ok())
             .ok_or(Errno(ENOENT))?;
+
+        if path.is_empty() {
+            if flags & AT_EMPTY_PATH == AT_EMPTY_PATH {
+                if dirfd == AT_FDCWD {
+                    path = ".";
+                } else {
+                    return Sys::fchmod(dirfd, mode);
+                }
+            } else {
+                // If the path is empty but `AT_EMPTY_PATH` is **not** set, bail out.
+                return Err(Errno(ENOENT));
+            }
+        }
+
         let file = openat2(dirfd, path, flags, 0)?;
         libredox::fchmod(*file as usize, mode as u16)?;
         Ok(())
