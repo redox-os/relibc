@@ -38,14 +38,6 @@ pub const ITIMER_VIRTUAL: c_int = 1;
 #[deprecated]
 pub const ITIMER_PROF: c_int = 2;
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_time.h.html>.
-///
-/// TODO: specified for `sys/select.h` in modern POSIX?
-#[repr(C)]
-pub struct fd_set {
-    pub fds_bits: [c_long; 16usize],
-}
-
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_time.h.html>.
 ///
 /// # Deprecation
