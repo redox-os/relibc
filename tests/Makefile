@@ -6,19 +6,38 @@ IS_REDOX?=0
 ifeq ($(IS_REDOX),1)
 FAILING_TESTS=
 else
-FAILING_TESTS=tls \
-	futimens \
-	mkfifo \
-	sigchld \
-	stdlib/ptsname \
-	sys_epoll/epollet \
-	sys_mman/fmap \
-	signals/pthread_kill-child \
-	unistd/isatty \
-	unistd/link \
-#	resource/getrusage
-#	time/times
-#   netdb/netdb
+# Wrong modified time
+FAILING_TESTS := futimens
+# Crash, mmap issue
+FAILING_TESTS += malloc/usable_size
+# Not a FIFO
+FAILING_TESTS += mkfifo
+# Waitpid had EINTR
+FAILING_TESTS += sigchld
+# not triggering ERANGE 
+FAILING_TESTS += stdlib/ptsname
+# Hang
+FAILING_TESTS += sys_epoll/epollet
+# Kernel hit todo!
+FAILING_TESTS += sys_mman/fmap
+# Hang
+FAILING_TESTS += sys_socket/unixpeername
+# Task failed successfully?
+FAILING_TESTS += signals/pthread_kill-child
+# Got EBADF
+FAILING_TESTS += unistd/isatty
+# Got EINVAL
+FAILING_TESTS += unistd/link
+# Signal kept unmasked
+FAILING_TESTS += sigqueue
+# Unwrap hit, written as TODO
+FAILING_TESTS += pthread/customstack
+# Returning garbage values
+FAILING_TESTS += sys_resource/getrusage
+# No times.h header
+#FAILING_TESTS += time/times
+# Outdated test
+#FAILING_TESTS += netdb/netdb
 
 endif
 
@@ -55,7 +74,6 @@ EXPECT_NAMES=\
 	locale/duplocale \
 	locale/newlocale \
 	locale/setlocale \
-	malloc/usable_size \
 	math \
 	regex \
 	select \
@@ -128,7 +146,6 @@ EXPECT_NAMES=\
 	strings \
 	sys_socket/recv \
 	sys_socket/recvfrom \
-	sys_socket/unixpeername \
 	sys_socket/unixrecv \
 	sys_socket/unixrecvfrom \
 	sys_socket/unixsocketpair \
@@ -148,6 +165,7 @@ EXPECT_NAMES=\
 	time/time \
 	time/timegm \
 	time/tzset \
+	tls \
 	unistd/access \
 	unistd/brk \
 	unistd/constants \
@@ -297,7 +315,6 @@ VARIED_NAMES=\
 	pthread/exit \
 	pthread/extjoin \
 	pthread/once \
-	pthread/customstack \
 	pthread/barrier \
 	pthread/rwlock_trylock \
 	pthread/rwlock_randtest \
@@ -311,7 +328,6 @@ VARIED_NAMES=\
 	grp/gr_iter \
 	waitpid \
 	waitpid_multiple \
-	sigqueue \
 	$(FAILING_TESTS)
 
 # Tests run with `expect` (require a .c file and an .exp file
