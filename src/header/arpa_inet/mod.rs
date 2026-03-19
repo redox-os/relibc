@@ -7,6 +7,8 @@ use core::{
     str::{self, FromStr},
 };
 
+use alloc::string::ToString;
+
 use crate::{
     c_str::CStr,
     header::{
@@ -43,41 +45,139 @@ pub unsafe extern "C" fn inet_addr(cp: *const c_char) -> in_addr_t {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn inet_aton(cp: *const c_char, inp: *mut in_addr) -> c_int {
     let cp_cstr = unsafe { CStr::from_ptr(cp) };
-    let mut four_parts_decimal_only = false;
     if cp_cstr.contains(b'.') {
         // 2, 3 or 4 part address
-        let parts = unsafe { str::from_utf8_unchecked(cp_cstr.to_bytes()).split('.') };
-        let mut count = 0;
-        for part in parts {
-            if let Some(hex_or_oct) = part.strip_prefix('0')
-                && part.len() > 1
-            {
-                match hex_or_oct.bytes().next() {
-                    Some(b'x' | b'X') => todo_skip!(0, "parsing hex values unimplemented"),
-                    // TODO: C2Y accept `0o` or `0O` as octal prefixes, C23 and below only use `0`
-                    _ => todo_skip!(0, "parsing octal values unimplemented"),
+        let mut parts = unsafe { str::from_utf8_unchecked(cp_cstr.to_bytes()).split('.') };
+        if let (_, Some(amount)) = parts.size_hint()
+            && let Some(first) = parts.next()
+            // 1st part always represents a single u8 (leftmost byte)
+            && let Some((first_num, first_notation)) = part_to_num_with_notation(first)
+            // 2nd part guaranteed to be present
+            && let Some(second) = parts.next()
+        {
+            match amount {
+                // 2nd part = 24bit value defines 3 rightmost bytes
+                2 => {
+                    todo_skip!(0, "parsing 24bit value as 3 rightmost bytes unimplemented");
+                    0 // TODO: remove and implement above
                 }
-            } else {
-                count += 1;
+                // 2nd part = 2nd byte, 3rd part = 16bit value defines 2 rightmost bytes
+                3 => {
+                    todo_skip!(0, "parsing 16bit value as 2 rightmost bytes unimplemented");
+                    0 // TODO: remove and implement above
+                }
+                // each part = 1 byte of address
+                4 => {
+                    if let Some((second_num, second_notation)) = part_to_num_with_notation(second)
+                        && let Some(third) = parts.next()
+                        && let Some((third_num, third_notation)) = part_to_num_with_notation(third)
+                        && let Some(fourth) = parts.next()
+                        && let Some((fourth_num, fourth_notation)) =
+                            part_to_num_with_notation(fourth)
+                    {
+                        match (
+                            first_notation,
+                            second_notation,
+                            third_notation,
+                            fourth_notation,
+                        ) {
+                            (
+                                NumNotation::Decimal,
+                                NumNotation::Decimal,
+                                NumNotation::Decimal,
+                                NumNotation::Decimal,
+                            ) => unsafe { inet_pton(AF_INET, cp, inp.cast::<c_void>()) },
+                            _ => {
+                                let mut all = first_num.to_string();
+                                all.push('.');
+                                all.push_str(&second_num.to_string());
+                                all.push('.');
+                                all.push_str(&third_num.to_string());
+                                all.push('.');
+                                all.push_str(&fourth_num.to_string());
+                                all.push('\0');
+                                let all = all.into_bytes();
+                                let new_cp_cstr =
+                                    unsafe { CStr::from_bytes_with_nul_unchecked(&all) };
+                                unsafe {
+                                    inet_pton(AF_INET, new_cp_cstr.as_ptr(), inp.cast::<c_void>())
+                                }
+                            }
+                        }
+                    } else {
+                        0 // indicates `cp` is an invalid string
+                    }
+                }
+                _ => 0, // indicates `cp` is an invalid string
             }
-        }
-        if count == 4 {
-            four_parts_decimal_only = true;
+        } else {
+            0 // indicates `cp` is an invalid string
         }
     } else if cp_cstr.len() == 4 {
         // 1 part address (32 bit value to be stored directly into address without byte rearrangement)
         let s_addr_bytes: [u8; 4] = cp_cstr.to_bytes().try_into().expect("guaranteed 4 bytes");
         unsafe {
-            (*inp.cast::<in_addr>()).s_addr = in_addr_t::from_ne_bytes(s_addr_bytes);
+            (*inp).s_addr = in_addr_t::from_ne_bytes(s_addr_bytes);
         }
-        return 1; // successful
-    }
-    if four_parts_decimal_only {
-        unsafe { inet_pton(AF_INET, cp, inp.cast::<c_void>()) }
+        1 // successful
     } else {
-        todo_skip!(0, "parsing 2 or more non-decimal values unimplemented");
-        // TODO convert octal and hexadecimal parts into decimal and feed into `inet_pton`
         0 // indicates `cp` is an invalid string
+    }
+}
+
+enum NumNotation {
+    Octal,
+    Decimal,
+    Hexadecimal,
+}
+
+// Parses the input into u8 but indicates the original notation
+// Returns None for parsing failure
+fn part_to_num_with_notation(input: &str) -> Option<(u8, NumNotation)> {
+    if let Some(hex_or_oct) = input.strip_prefix('0')
+        && input.len() > 1
+    {
+        let mut num = 0;
+        match hex_or_oct.bytes().next() {
+            Some(b'x' | b'X') => {
+                let (_, hex) = input.split_at(2);
+                let bytes = hex.bytes().rev();
+                for (i, byte) in bytes.enumerate() {
+                    let i = u8::try_from(i).expect("never more than 3 digits");
+                    let byte = match byte {
+                        b'f' | b'F' => 15,
+                        b'e' | b'E' => 14,
+                        b'd' | b'D' => 13,
+                        b'c' | b'C' => 12,
+                        b'b' | b'B' => 11,
+                        b'a' | b'A' => 10,
+                        _ => str::from_utf8(&[byte])
+                            .expect("already checked")
+                            .parse::<u8>()
+                            .expect("only numbers possible"),
+                    };
+                    num += if i == 0 { byte } else { byte * (16 * i) };
+                }
+                Some((num, NumNotation::Hexadecimal))
+            }
+            // TODO: C2Y accept `0o` or `0O` as octal prefixes, C23 and below only use `0`
+            _ => {
+                let bytes = hex_or_oct.bytes().rev();
+                for (i, byte) in bytes.enumerate() {
+                    let i = u8::try_from(i).expect("never more than 3 digits");
+                    let byte = str::from_utf8(&[byte])
+                        .expect("already checked")
+                        .parse::<u8>()
+                        .expect("octal always within 0 to 7");
+                    num += if i == 0 { byte } else { byte * (8 * i) };
+                }
+                Some((num, NumNotation::Octal))
+            }
+        }
+    } else if let Ok(num) = input.parse::<u8>() {
+        Some((num, NumNotation::Decimal))
+    } else {
+        None
     }
 }
 
