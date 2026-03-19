@@ -66,15 +66,14 @@ struct FormatFlags {
 /// Formats a monetary value according to the current locale.
 fn apply_grouping(int_str: &str, monetary: &LocaleMonetaryInfo) -> String {
     let mut grouped = String::with_capacity(int_str.len() * 2);
-    let mut count = 0;
     let mut group_idx = 0;
     let current_grouping = &monetary.mon_grouping;
     let separator = monetary.mon_thousands_sep;
 
-    for c in int_str.chars() {
+    for (count, c) in int_str.chars().enumerate() {
         if count > 0 {
             let current_group = current_grouping[group_idx.min(current_grouping.len() - 1)];
-            if current_group > 0 && count % current_group == 0 {
+            if current_group > 0 && (count as u8).is_multiple_of(current_group) {
                 grouped.push_str(separator);
                 if group_idx + 1 < current_grouping.len() {
                     group_idx += 1;
@@ -82,7 +81,6 @@ fn apply_grouping(int_str: &str, monetary: &LocaleMonetaryInfo) -> String {
             }
         }
         grouped.push(c);
-        count += 1;
     }
 
     grouped
