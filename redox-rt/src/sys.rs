@@ -110,6 +110,37 @@ pub fn posix_getppid() -> u32 {
     this_proc_call(&mut [], CallFlags::empty(), &[ProcCall::Getppid as u64]).expect("cannot fail")
         as u32
 }
+
+#[inline]
+pub fn posix_setpriority(which: i32, who: u32, prio: u32) -> Result<(), syscall::Error> {
+    if which != 0 {
+        return Err(syscall::Error::new(syscall::EINVAL)); // TODO: Add support for PRIO_PGRP and PRIO_PROCESS
+    }
+
+    this_proc_call(
+        &mut [],
+        CallFlags::empty(),
+        &[ProcCall::SetPriority as u64, who as u64, prio as u64],
+    )?;
+
+    Ok(())
+}
+
+#[inline]
+pub fn posix_getpriority(which: i32, who: u32) -> Result<u32, syscall::Error> {
+    if which != 0 {
+        return Err(syscall::Error::new(syscall::EINVAL));
+    }
+
+    let res = this_proc_call(
+        &mut [],
+        CallFlags::empty(),
+        &[ProcCall::GetPriority as u64, who as u64],
+    )?;
+
+    Ok(res as u32)
+}
+
 #[inline]
 pub unsafe fn sys_futex_wait(addr: *mut u32, val: u32, deadline: Option<&TimeSpec>) -> Result<()> {
     wrapper(true, false, || {
