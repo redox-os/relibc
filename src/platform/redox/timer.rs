@@ -9,7 +9,7 @@ use crate::{
         time::timer_internal_t,
     },
     out::Out,
-    platform::{Pal, Sys, sys::event, types::c_void},
+    platform::{Pal, PalSignal, Sys, sys::event, types::c_void},
 };
 use core::{
     mem::{MaybeUninit, size_of},
@@ -42,9 +42,14 @@ pub extern "C" fn timer_routine(arg: *mut c_void) -> *mut c_void {
                 fun(timer_st.evp.sigev_value);
             }
         } else if timer_st.evp.sigev_notify == SIGEV_SIGNAL {
-            if unsafe { Sys::rlct_kill(timer_st.caller_thread, timer_st.evp.sigev_signo as _) }
-                .is_err()
-            {
+            // process_pid != 0 => process-wide delivery (used by alarm())
+            // process_pid == 0 => thread-specific delivery (used by timer_create)
+            let result = if timer_st.process_pid != 0 {
+                Sys::kill(timer_st.process_pid, timer_st.evp.sigev_signo)
+            } else {
+                unsafe { Sys::rlct_kill(timer_st.caller_thread, timer_st.evp.sigev_signo as _) }
+            };
+            if result.is_err() {
                 break;
             }
         }
