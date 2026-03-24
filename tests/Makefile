@@ -16,12 +16,26 @@ all: $(BINS)
 clean:
 	rm -rf $(BUILD)/bins_* $(BUILD)/gen $(BUILD)/target
 
-build: $(BUILD)/bins_verify/relibc-tests $(BINS) $(EXPECT_BINS) $(EXPECT_INPUT_BINS) support_build $(BUILD)/expected
+build: $(BUILD)/bins_verify/relibc-tests $(BINS) $(EXPECT_BINS) $(EXPECT_INPUT_BINS) support_build
 
-# "run" and "run-once" does not copy "expected" so the test runner will not pick outdated "expected" file
-support_build: $(BUILD)/Makefile $(BUILD)/Makefile.tests.mk $(BUILD)/example_dir
+support_build: $(BUILD)/expected \
+	$(BUILD)/Makefile \
+	$(BUILD)/Makefile.tests.mk \
+	$(BUILD)/example_dir \
+	$(BUILD)/select.c \
+	$(BUILD)/stdlib/realpath.c \
+	$(BUILD)/stdio/fread.in \
+	$(BUILD)/stdio/fscanf_offby1.c \
+	$(BUILD)/stdio/fscanf.c \
+	$(BUILD)/stdio/stdio.in \
+	$(BUILD)/stdio/getline.in \
+	$(BUILD)/stdio/ungetc_ftell.c \
+	$(BUILD)/sys_stat/stat.c \
+	$(BUILD)/unistd/link.c \
+	$(BUILD)/wchar/fgetwc.in \
+	$(BUILD)/wchar/ungetwc.in
 
-run: $(BUILD)/bins_verify/relibc-tests $(BINS) $(EXPECT_BINS) $(EXPECT_INPUT_BINS) support_build
+run: build
 	$(MAKE) run -C $(BUILD)
 
 run-once: $(BUILD)/bins_verify/relibc-tests $(BUILD)/$(TESTBIN) support_build
@@ -45,6 +59,14 @@ $(BUILD)/expected: expected
 $(BUILD)/example_dir: example_dir
 	rm -rf "$@"
 	cp -a "$<" $(BUILD)/
+
+$(BUILD)/%.in: %.in
+	@mkdir -p "$$(dirname "$@")"
+	cp "$*.in" "$@"
+
+$(BUILD)/%.c: %.c
+	@mkdir -p "$$(dirname "$@")"
+	cp "$*.c" "$@"
 
 FLAGS=\
 	-std=c11 \

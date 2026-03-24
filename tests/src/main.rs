@@ -10,7 +10,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-fn find_expected_dir() -> Result<PathBuf, String> {
+fn find_expected_dir() -> Option<PathBuf> {
     let mut current_dir = env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|parent| parent.to_path_buf()))
@@ -26,7 +26,16 @@ fn find_expected_dir() -> Result<PathBuf, String> {
         }
     }
 
-    found_expected_dir.ok_or_else(|| "Could not find 'expected' directory".to_string())
+    if found_expected_dir.is_none() {
+        if let Ok(cwd) = env::current_dir() {
+            let check = cwd.join("expected");
+            if check.is_dir() {
+                found_expected_dir = Some(check);
+            }
+        }
+    }
+
+    found_expected_dir
 }
 
 fn expected(
@@ -233,7 +242,7 @@ fn main() {
                 };
 
                 if !status_only {
-                    let Ok(expected_dir) = &expected_dir else {
+                    let Some(expected_dir) = &expected_dir else {
                         eprintln!("Expected directory not found");
                         process::exit(1);
                     };
