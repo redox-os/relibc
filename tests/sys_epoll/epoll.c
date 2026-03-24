@@ -33,7 +33,7 @@ int reader(int fd) {
         return 1;
     }
 
-    int nfds_n1 = epoll_wait(epollfd, events, -1, -1);
+    int nfds_n1 = epoll_wait(epollfd, events, 8, -1);
     if (nfds_n1 != -1 || errno != EINVAL) {
         perror("epoll_wait");
         return 1;

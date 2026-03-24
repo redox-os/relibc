@@ -22,8 +22,10 @@ int main() {
     unsigned int       ui_max = UINT_MAX;
     unsigned long      ul_max = ULONG_MAX;
     unsigned long long ull_max = ULLONG_MAX;
+#ifndef __GLIBC__
     int long_bit = LONG_BIT;
     int word_bit = WORD_BIT;
+#endif
 
     printf("CHAR      : [%d, %d]\n", c_min, c_max);
     printf("SCHAR     : [%d, %d]\n", sc_min, sc_max);
@@ -37,8 +39,10 @@ int main() {
     printf("UINT_MAX   : %u\n", ui_max);
     printf("ULONG_MAX  : %lu\n", ul_max);
     printf("ULLONG_MAX : %llu\n\n", ull_max);
+#ifndef __GLIBC__
     printf("LONG_BIT : %d\n", long_bit);
     printf("WORD_BIT : %d\n", word_bit);
+#endif
 
     return 0;
 }

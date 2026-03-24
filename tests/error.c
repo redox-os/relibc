@@ -8,6 +8,8 @@
 
 #include "test_helpers.h"
 
+// does not compile with glibc
+#ifndef __GLIBC__
 int main(void) {
     chdir("nonexistent");
     int err = errno;
@@ -50,3 +52,9 @@ int main(void) {
 
     return EXIT_SUCCESS;
 }
+
+#else
+int main(void) {
+    exit(0);
+}
+#endif
