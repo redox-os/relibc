@@ -3,36 +3,73 @@
 use std::{
     env, fs,
     io::{self, Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{self, Command, ExitStatus, Stdio},
     sync::mpsc,
     thread,
     time::{Duration, Instant},
 };
 
-fn expected(bin: &str, kind: &str, generated: &[u8], status: ExitStatus) -> Result<(), String> {
-    let mut expected_file = PathBuf::from(format!("expected/{}.{}", bin, kind));
-    if !expected_file.exists() {
-        expected_file = PathBuf::from(format!(
-            "expected/{}.{}",
-            bin.replace("bins_static", "").replace("bins_dynamic", ""),
-            kind
-        ));
+fn find_expected_dir() -> Result<PathBuf, String> {
+    let mut current_dir = env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|parent| parent.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."));
+
+    let mut found_expected_dir = None;
+
+    while current_dir.pop() {
+        let check = current_dir.join("expected");
+        if check.is_dir() {
+            found_expected_dir = Some(check);
+            break;
+        }
     }
 
-    let expected = match fs::read(&expected_file) {
-        Ok(ok) => ok,
-        Err(err) => {
+    found_expected_dir.ok_or_else(|| "Could not find 'expected' directory".to_string())
+}
+
+fn expected(
+    expected_dir: &Path,
+    bin: &str,
+    kind: &str,
+    generated: &[u8],
+    status: ExitStatus,
+) -> Result<(), String> {
+    let expect_file = Path::new(bin).with_added_extension(kind);
+    let components: Vec<_> = expect_file
+        .components()
+        .filter_map(|c| c.as_os_str().to_str())
+        .rev()
+        .collect();
+
+    let mut expected_file = None;
+    for i in 0..components.len() {
+        let sub_path: Vec<_> = components[0..=i]
+            .iter()
+            .rev()
+            .map(|s| s.to_string())
+            .collect();
+
+        let check_file = expected_dir.join(sub_path.join("/"));
+        if check_file.is_file() {
+            expected_file = Some(fs::read(check_file));
+            break;
+        }
+    }
+
+    let expect_name = components.first().unwrap();
+    let expected = match expected_file {
+        Some(Ok(ok)) => ok,
+        Some(Err(err)) => {
+            return Err(format!("{} failed to read {}: {}", bin, expect_name, err));
+        }
+        None => {
             if kind == "stderr" {
                 // missing stderr file, assume test expect none emitted
                 vec![]
             } else {
-                return Err(format!(
-                    "{} failed to read {}: {}",
-                    bin,
-                    expected_file.display(),
-                    err
-                ));
+                return Err(format!("{} expected file not found: {}", bin, expect_name));
             }
         }
     };
@@ -75,6 +112,7 @@ fn main() {
     let slowtime = Duration::from_secs(1);
     let bins: Vec<String> = env::args().skip(1).collect();
     let single_test = bins.len() == 1;
+    let expected_dir = find_expected_dir();
 
     for bin in bins {
         let status_only = bin.starts_with(STATUS_ONLY);
@@ -116,12 +154,8 @@ fn main() {
                 failures.push(failure);
                 break;
             }
-            // A pretty rare hang on pthread/barrier which also stops this loop :(
-            // https://gitlab.redox-os.org/redox-os/relibc/-/issues/238
-            if &bin == "./bins_dynamic/pthread/barrier"
-                || &bin == "./bins_dynamic/pthread/once"
-                || start_time.elapsed() > slowtime
-            {
+
+            if start_time.elapsed() > slowtime {
                 println!("# waiting {}ms", start_time.elapsed().as_millis());
             }
 
@@ -199,11 +233,20 @@ fn main() {
                 };
 
                 if !status_only {
-                    if let Err(failure) = expected(&bin, "stdout", &stdout, exit_status) {
+                    let Ok(expected_dir) = &expected_dir else {
+                        eprintln!("Expected directory not found");
+                        process::exit(1);
+                    };
+
+                    if let Err(failure) =
+                        expected(expected_dir, &bin, "stdout", &stdout, exit_status)
+                    {
                         println!("{}", failure);
                         failures.push(failure);
                     }
-                    if let Err(failure) = expected(&bin, "stderr", &stderr, exit_status) {
+                    if let Err(failure) =
+                        expected(expected_dir, &bin, "stderr", &stderr, exit_status)
+                    {
                         println!("{}", failure);
                         failures.push(failure);
                     }
