@@ -103,7 +103,7 @@ run_redoxer() {
     if [ "$IS_HOST" -eq 0 ]; then
         redoxer toolchain || { echo -e "${RED}Fail: redoxer toolchain for: $target.${NC}" && exit 1; }
         export CARGO_TEST="redoxer"
-        export TEST_RUNNER="redoxer exec --folder ../sysroot/$TARGET/:/usr --folder . --"
+        export TEST_RUNNER="redoxer exec --folder ../../sysroot/$TARGET/:/usr --folder . --"
 # TODO: Identify hang issue with pthread/barrier and pthread/once tests in multi core to get rid of this limit
         export REDOXER_QEMU_ARGS="-smp 1"
 
