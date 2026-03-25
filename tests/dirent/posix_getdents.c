@@ -10,6 +10,7 @@
 
 #define BUFFER_SIZE 4096
 
+#ifndef __GLIBC__
 void read_and_print_directory(int fd) {
     char buffer[BUFFER_SIZE];
     long nread;
@@ -44,3 +45,9 @@ int main(void) {
 
     close(fd);
 }
+#else
+
+int main(void) {
+    // glibc doesn't support posix_getdents & O_DIRECTORY
+}
+#endif

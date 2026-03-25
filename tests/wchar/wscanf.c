@@ -1,6 +1,10 @@
 /* swscanf example */
 #include <wchar.h>
 #include <stdio.h>
+// TODO: remove glibc?
+#ifdef __GLIBC__
+#include <stdarg.h>
+#endif
 
 #include "test_helpers.h"
 

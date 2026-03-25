@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-
 #include <fcntl.h>
 #include <limits.h>
 #include <stdbool.h>

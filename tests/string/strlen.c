@@ -48,6 +48,8 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
+// no strnlen_s on glibc
+#ifndef __GLIBC__
     dest1_len = strnlen_s(dest1, 6);
     printf("%d\n", dest1_len);
     if(dest1_len != 6) {
@@ -68,6 +70,7 @@ int main(void) {
         puts("strnlen_s(NULL, 100) failed");
         exit(EXIT_FAILURE);
     }
+#endif
 
     return 0;
 }

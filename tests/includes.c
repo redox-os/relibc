@@ -9,13 +9,15 @@
 
 #include <arpa/inet.h>
 #include <assert.h>
+#ifndef __GLIBC__
 #include <bits/locale-t.h>
 #include <bits/pthread.h>
+#include <dl-tls.h>
+#endif
 #include <crypt.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <dlfcn.h>
-#include <dl-tls.h>
 #include <elf.h>
 #include <endian.h>
 #include <err.h>
