@@ -21,6 +21,8 @@ pub trait PalSignal: Pal {
 
     fn setitimer(which: c_int, new: &itimerval, old: Option<&mut itimerval>) -> Result<()>;
 
+    fn alarm(seconds: c_uint) -> c_uint;
+
     fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> Result<()>;
 
     unsafe fn sigaltstack(ss: Option<&stack_t>, old_ss: Option<&mut stack_t>) -> Result<()>;

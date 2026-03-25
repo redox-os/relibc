@@ -167,6 +167,7 @@ EXPECT_NAMES=\
 	time/tzset \
 	tls \
 	unistd/access \
+	unistd/alarm \
 	unistd/brk \
 	unistd/constants \
 	unistd/confstr \
