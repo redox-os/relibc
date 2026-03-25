@@ -1,0 +1,19 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/arpa_inet.h.html
+#
+# The arpa/inet header should define the following functions:
+# - htonl
+# - htons
+# - ntohl
+# - ntohs
+#
+# They are also meant to be available in the netinet/in header.
+# The arpa/inet and netinet/in headers both say that they may include each other which creates a cycle.
+# To break the cycle we include netinet/in in the arpa/inet header and split out the above functions.
+#
+# include inttypes.h to get uint16_t and uint32_t
+sys_includes = ["inttypes.h"]
+include_guard = "_RELIBC_BITS_ARPAINET_H"
+language = "C"
+style = "Tag"
+no_includes = true
+cpp_compat = true
