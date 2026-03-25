@@ -278,6 +278,10 @@ impl PalSignal for Sys {
 /// Accepts a full timespec so sub-second timers (ualarm) can reuse this later.
 /// Returns the number of seconds remaining on the previous alarm (rounded up),
 /// or 0 if there was no previous alarm.
+///
+/// TODO: This implementation does not survive `exec()`. POSIX requires that a
+/// pending alarm be preserved across exec (the timer continues counting down
+/// in the new process image as i understand).
 fn alarm_timespec(duration: timespec) -> c_uint {
     let mut guard = ALARM_TIMER.lock();
 
