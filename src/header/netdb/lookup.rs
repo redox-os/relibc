@@ -10,7 +10,7 @@ use crate::{
 };
 
 use crate::header::{
-    arpa_inet::htons,
+    bits_arpainet::htons,
     bits_socklen_t::socklen_t,
     bits_time::timespec,
     errno::*,

@@ -1,4 +1,24 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/netinet_in.h.html
+#
+# Spec quotations relating to includes:
+# - "The <netinet/in.h> header shall define in_port_t Equivalent to the type uint16_t as described in <inttypes.h>."
+# - "The <netinet/in.h> header shall define in_addr_t Equivalent to the type uint32_t as described in <inttypes.h>."
+# - "The <netinet/in.h> header shall define the sa_family_t type as described in <sys/socket.h>."
+# - "The <netinet/in.h> header shall define the uint8_t and uint32_t types as described in <inttypes.h>."
+# - "Inclusion of the <netinet/in.h> header may also make visible all symbols from <inttypes.h> and <sys/socket.h>."
+# - "The htonl(), htons(), ntohl(), and ntohs() functions shall be available as described in <arpa/inet.h>."
+# - "Inclusion of the <netinet/in.h> header may also make visible all symbols from <arpa/inet.h>."
+#
+# Possible cycle between arpa/inet.h and netinet/in.h solved by:
+# - including netinet/in.h in arpa/inet.h
+# - splitting out functions (htonl, htons, ntohl, ntohs) into bits/arpainet.h
+#
+# sys/types.h needed for c_int and c_char
+# bits/arpainet.h brings in inttypes.h
 sys_includes = ["sys/types.h", "sys/socket.h"]
+after_includes = """
+#include <bits/arpainet.h> // for htonl, htons, ntohl, ntohs
+"""
 include_guard = "_NETINET_IN_H"
 trailer = "#include <bits/netinet/in.h>"
 language = "C"
