@@ -12,7 +12,8 @@ use crate::{
     c_str::{CStr, CString},
     error::ResultExt,
     header::{
-        arpa_inet::{htons, inet_aton, ntohl},
+        arpa_inet::inet_aton,
+        bits_arpainet::{htons, ntohl},
         bits_socklen_t::socklen_t,
         errno::*,
         fcntl::O_RDONLY,
