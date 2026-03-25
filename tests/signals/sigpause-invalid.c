@@ -1,5 +1,3 @@
-#define _XOPEN_SOURCE 700
-
 #include "../test_helpers.h"
 #include <assert.h>
 #include <pthread.h>

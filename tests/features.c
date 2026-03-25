@@ -1,18 +1,25 @@
 // These tests are primarily to ensure the macros compile without 
 // causing any funny business.
+// TODO: does not compile with glibc
 
 #include <features.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 
+#ifndef __GLIBC__
 __deprecated
+#endif
 static void legacy(void) {}
 
+#ifndef __GLIBC__
 __deprecatedNote("Sometimes deletes user's home (oops); use foobar")
+#endif
 static void legacy_notes(void) {}
 
+#ifndef __GLIBC__
 __nodiscard
+#endif
 static uint8_t the_answer(void) {
     return 42;
 }
