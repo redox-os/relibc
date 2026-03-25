@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-// Exported in bits file
+// Exported from cbindgen
 // const RUSAGE_SELF: c_int = 0;
 // const RUSAGE_CHILDREN: c_int = -1;
 // const RUSAGE_BOTH: c_int = -2;
