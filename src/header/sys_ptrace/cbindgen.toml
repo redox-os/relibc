@@ -2,7 +2,6 @@ sys_includes = []
 include_guard = "_SYS_PTRACE_H"
 language = "C"
 style = "Tag"
-trailer = "#include <bits/sys/ptrace.h>"
 
 [enum]
 prefix_with_name = true
