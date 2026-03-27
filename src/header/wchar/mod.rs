@@ -57,9 +57,8 @@ pub unsafe extern "C" fn btowc(c: c_int) -> wint_t {
     wc as wint_t
 }
 
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fgetwc.html>.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
+// not in POSIX.
+pub unsafe fn fgetwc_unlocked(stream: *mut FILE) -> wint_t {
     // TODO: Process locale
     let mut buf: [c_uchar; MB_CUR_MAX as usize] = [0; MB_CUR_MAX as usize];
     let mut encoded_length = 0;
@@ -67,20 +66,12 @@ pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
     let mut wc: wchar_t = 0;
 
     loop {
-        let nread = unsafe {
-            fread(
-                buf[bytes_read..bytes_read + 1]
-                    .as_mut_ptr()
-                    .cast::<c_void>(),
-                1,
-                1,
-                stream,
-            )
-        };
-
-        if nread != 1 {
-            ERRNO.set(EILSEQ);
-            return WEOF;
+        unsafe {
+            let ret = getc_unlocked(stream);
+            if ret == EOF {
+                return WEOF;
+            }
+            *buf.as_mut_ptr().add(bytes_read) = ret as c_uchar;
         }
 
         bytes_read += 1;
@@ -89,6 +80,9 @@ pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
             encoded_length = if let Some(el) = get_char_encoded_length(buf[0]) {
                 el
             } else {
+                unsafe {
+                    (*stream).flags |= F_ERR;
+                }
                 ERRNO.set(EILSEQ);
                 return WEOF;
             };
@@ -111,24 +105,36 @@ pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
     wc as wint_t
 }
 
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fgetwc.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fgetwc(stream: *mut FILE) -> wint_t {
+    let mut stream = unsafe { (*stream).lock() };
+    unsafe { fgetwc_unlocked(&raw mut *stream) }
+}
+
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fgetws.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fgetws(ws: *mut wchar_t, n: c_int, stream: *mut FILE) -> *mut wchar_t {
-    //TODO: lock
     let mut i = 0;
+    let mut stream = unsafe { (*stream).lock() };
     while ((i + 1) as c_int) < n {
-        let wc = unsafe { fgetwc(stream) };
+        let wc = unsafe { fgetwc_unlocked(&raw mut *stream) };
         if wc == WEOF {
-            return ptr::null_mut();
+            break;
         }
         unsafe { *ws.add(i) = wc as wchar_t };
         i += 1;
+        if wc as wchar_t == '\n' as wchar_t {
+            break;
+        }
     }
-    while (i as c_int) < n {
-        unsafe { *ws.add(i) = 0 };
-        i += 1;
-    }
-    ws
+    // NUL-terminate result
+    unsafe { *ws.add(i) = 0 };
+    return if i == 0 || unsafe { ferror(&raw mut *stream) != 0 } {
+        core::ptr::null_mut()
+    } else {
+        ws
+    };
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fputwc.html>.
