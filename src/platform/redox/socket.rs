@@ -307,15 +307,14 @@ unsafe fn deserialize_name_from_stream(
 ) -> Result<()> {
     // Read name_len from stream
     let name_len_in_stream = read_num::<usize>(&msg_stream[*cursor..])?;
-    let name_len = cmp::min(name_len_in_stream, mhdr.msg_namelen as usize);
     *cursor += mem::size_of::<usize>();
 
-    if name_len > 0 {
-        if *cursor + name_len > msg_stream.len() {
+    if name_len_in_stream > 0 {
+        if *cursor + name_len_in_stream > msg_stream.len() {
             return Err(Errno(EMSGSIZE));
         }
         if !mhdr.msg_name.is_null() && mhdr.msg_namelen > 0 {
-            let name_buffer = &msg_stream[*cursor..*cursor + name_len];
+            let name_buffer = &msg_stream[*cursor..*cursor + name_len_in_stream];
             (unsafe {
                 inner_get_name_inner(
                     false,
@@ -325,7 +324,7 @@ unsafe fn deserialize_name_from_stream(
                 )
             })?;
         }
-        *cursor += name_len;
+        *cursor += name_len_in_stream;
     } else {
         // If name_len is 0, set msg_namelen to 0
         mhdr.msg_namelen = 0;
@@ -837,12 +836,13 @@ impl PalSocket for Sys {
         // [payload_len(usize)][payload_data_buffer]
         // [ancillary_stream_buffer]
         let expected_stream_size = {
-            mem::size_of::<usize>()         // name_len
+            64
+            + mem::size_of::<usize>()       // name_len
             + mhdr.msg_namelen as usize     // name_buffer
             + mem::size_of::<usize>()       // payload_len
             + whole_iov_size                // payload_data_buffer
             + mem::size_of::<usize>()       // control_len
-            + mhdr.msg_controllen as usize // ancillary_stream_buffer
+            + mhdr.msg_controllen as usize  // ancillary_stream_buffer
         };
         msg_stream
             .try_reserve_exact(expected_stream_size)
