@@ -1,4 +1,6 @@
 sys_includes = ["sys/socket.h", "netinet/in.h", "features.h"]
+# addrinfo requires sockaddr which requires sa_family_t
+after_includes = "#include <bits/sa_family-t.h> // for sa_family_t"
 include_guard = "_RELIBC_NETDB_H"
 trailer = "#include <bits/netdb.h>"
 language = "C"
