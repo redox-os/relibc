@@ -12,6 +12,7 @@
 #ifndef __GLIBC__
 #include <bits/locale-t.h>
 #include <bits/pthread.h>
+#include <bits/sa_family-t.h>
 #include <dl-tls.h>
 #endif
 #include <crypt.h>
