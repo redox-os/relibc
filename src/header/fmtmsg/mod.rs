@@ -1,3 +1,10 @@
+//! `fmtmsg.h` implementation.
+//! 
+//! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fmtmsg.h.html>.
+//! Ported from Musl.
+//! 
+//! See <https://github.com/kraj/musl/blob/kraj/master/src/misc/fmtmsg.c>
+
 use crate::{
     header::{
         fcntl::open,
@@ -29,6 +36,7 @@ pub const O_WRONLY: c_int = 01;
  */
 unsafe fn strcolcmp(mut lstr: *const c_char, mut bstr: *const c_char) -> c_int {
     unsafe {
+        // We already know lstr and bstr are non-null
         while *lstr != 0 && *bstr != 0 && (*lstr == *bstr) {
             lstr = lstr.add(1);
             bstr = bstr.add(1);
@@ -40,6 +48,7 @@ unsafe fn strcolcmp(mut lstr: *const c_char, mut bstr: *const c_char) -> c_int {
         }
     }
 }
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fmtmsg.h.html>
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fmtmsg(
     classification: c_long,
