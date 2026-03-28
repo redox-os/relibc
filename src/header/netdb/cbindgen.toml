@@ -1,6 +1,9 @@
 sys_includes = ["sys/socket.h", "netinet/in.h", "features.h"]
 include_guard = "_RELIBC_NETDB_H"
-trailer = "#include <bits/netdb.h>"
+trailer = """
+#define h_errno (*__h_errno_location())
+# define        h_addr  h_addr_list[0] /* Address, for backward compatibility.*/
+"""
 language = "C"
 style = "Tag"
 no_includes = true
