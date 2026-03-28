@@ -6,7 +6,7 @@ use core::{mem, ptr};
 
 use crate::{
     error::ResultExt,
-    header::{bits_socklen_t::socklen_t, sys_uio::iovec},
+    header::{bits_sa_family_t::sa_family_t, bits_socklen_t::socklen_t, sys_uio::iovec},
     platform::{
         PalSocket, Sys,
         types::{
@@ -16,8 +16,6 @@ use crate::{
 };
 
 pub mod constants;
-
-pub type sa_family_t = u16;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
 #[repr(C)]

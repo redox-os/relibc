@@ -5,7 +5,7 @@
 #![allow(non_camel_case_types)]
 
 use crate::{
-    header::sys_socket::{sa_family_t, sockaddr_storage},
+    header::{bits_sa_family_t::sa_family_t, sys_socket::sockaddr_storage},
     platform::types::{c_char, c_int},
 };
 

@@ -15,9 +15,10 @@
 #
 # sys/types.h needed for c_int and c_char
 # bits/arpainet.h brings in inttypes.h
-sys_includes = ["sys/types.h", "sys/socket.h"]
+sys_includes = ["sys/types.h"]
 after_includes = """
 #include <bits/arpainet.h> // for htonl, htons, ntohl, ntohs
+#include <bits/sa_family-t.h> // for sa_family_t
 """
 include_guard = "_NETINET_IN_H"
 trailer = """

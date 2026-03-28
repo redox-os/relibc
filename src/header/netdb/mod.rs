@@ -14,13 +14,14 @@ use crate::{
     header::{
         arpa_inet::inet_aton,
         bits_arpainet::{htons, ntohl},
+        bits_sa_family_t::sa_family_t,
         bits_socklen_t::socklen_t,
         errno::*,
         fcntl::O_RDONLY,
         netinet_in::{in_addr, sockaddr_in, sockaddr_in6},
         stdlib::atoi,
         strings::strcasecmp,
-        sys_socket::{constants::AF_INET, sa_family_t, sockaddr},
+        sys_socket::{constants::AF_INET, sockaddr},
         unistd::SEEK_SET,
     },
     platform::{

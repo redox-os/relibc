@@ -8,6 +8,8 @@ pub mod bits_arpainet;
 #[path = "bits_locale-t/mod.rs"]
 pub mod bits_locale_t;
 pub mod bits_pthread;
+#[path = "bits_sa_family-t/mod.rs"]
+pub mod bits_sa_family_t;
 #[path = "bits_socklen-t/mod.rs"]
 pub mod bits_socklen_t;
 pub mod bits_time;

@@ -1,4 +1,8 @@
-sys_includes = ["sys/socket.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_un.h.html
+#
+# Spec quotations relating to includes:
+# - "The <sys/un.h> header shall define the sa_family_t type as described in <sys/socket.h>."
+sys_includes = ["bits/sa_family-t.h"]
 include_guard = "_SYS_UN_H"
 language = "C"
 style = "Tag"
