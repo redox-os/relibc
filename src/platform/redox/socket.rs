@@ -15,8 +15,8 @@ use crate::{
         arpa_inet::inet_aton,
         bits_socklen_t::socklen_t,
         errno::{
-            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EMSGSIZE, ENOMEM, ENOSYS, ENOTSOCK,
-            EOPNOTSUPP, EPROTONOSUPPORT,
+            EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EMSGSIZE, ENOMEM, ENOSYS, ENOTSOCK, EOPNOTSUPP,
+            EPROTONOSUPPORT,
         },
         netinet_in::{in_addr, in_port_t, sockaddr_in},
         string::strnlen,
