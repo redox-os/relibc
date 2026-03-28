@@ -130,8 +130,9 @@ redox_protocols.workspace = true
 
 [features]
 # to enable trace level, take out this `no_trace`
-default = ["check_against_libc_crate", "no_trace"]
+default = ["check_against_libc_crate", "ld_so_cache", "no_trace"]
 check_against_libc_crate = ["__libc_only_for_layout_checks"]
+ld_so_cache = []
 no_trace = ["log/release_max_level_debug"]
 # for very verbose activity beyond trace level
 trace_tls = []
