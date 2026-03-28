@@ -44,4 +44,5 @@ int main(void) {
     test("[a!][a!]", "ab", 0);
     test("hello[/+]world", "hello/world", FNM_PATHNAME);
     test("hello world", "HELLO WORLD", 0);
+    test("********************a", "xxxxxxxxxxxxxxxxxxxxb", 0);
 }
