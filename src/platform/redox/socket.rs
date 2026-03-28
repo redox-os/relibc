@@ -837,13 +837,13 @@ impl PalSocket for Sys {
         // [payload_len(usize)][payload_data_buffer]
         // [ancillary_stream_buffer]
         let expected_stream_size = {
-            64                              //reserve extra space for the scheme path
-            + mem::size_of::<usize>()       // name_len
-            + mhdr.msg_namelen as usize     // name_buffer
-            + mem::size_of::<usize>()       // payload_len
-            + whole_iov_size                // payload_data_buffer
-            + mem::size_of::<usize>()       // control_len
-            + mhdr.msg_controllen as usize  // ancillary_stream_buffer
+            64                             //reserve extra space for the scheme path
+            + mem::size_of::<usize>()      // name_len
+            + mhdr.msg_namelen as usize    // name_buffer
+            + mem::size_of::<usize>()      // payload_len
+            + whole_iov_size               // payload_data_buffer
+            + mem::size_of::<usize>()      // control_len
+            + mhdr.msg_controllen as usize // ancillary_stream_buffer
         };
         msg_stream
             .try_reserve_exact(expected_stream_size)
