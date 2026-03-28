@@ -55,6 +55,7 @@ pub struct cmsghdr {
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 // FIXME: CheckVsLibcCrate
+/// cbindgen:ignore
 pub struct ucred {
     pub pid: pid_t,
     pub uid: uid_t,
@@ -73,8 +74,10 @@ pub struct sockaddr {
 }
 
 // Max size of [`sockaddr_storage`]
+/// cbindgen:ignore
 const _SS_MAXSIZE: usize = 128;
 // Align to pointer width
+/// cbindgen:ignore
 const _SS_PADDING: usize = _SS_MAXSIZE - mem::size_of::<sa_family_t>() - mem::size_of::<usize>();
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_socket.h.html>.
@@ -86,6 +89,8 @@ const _SS_PADDING: usize = _SS_MAXSIZE - mem::size_of::<sa_family_t>() - mem::si
 /// * [`usize`] is used because it's the width of a pointer for a given platform
 /// * The order of the fields is important because the bytes in the padding will be cast to and
 ///   from protocol structs in C
+///
+/// cbindgen:ignore
 #[repr(C)]
 //#[derive(CheckVsLibcCrate)] FIXME: can't ignore private fields yet
 pub struct sockaddr_storage {
@@ -94,16 +99,19 @@ pub struct sockaddr_storage {
     __ss_align: usize,
 }
 
-// These must match C macros in include/bits/sys/socket.h {
+// These must match C macros in src/headers/sys_socket/cbindgen.toml {
+/// cbindgen:ignore
 pub unsafe extern "C" fn __CMSG_LEN(cmsg: *const cmsghdr) -> ssize_t {
     ((unsafe { (*cmsg).cmsg_len as size_t } + mem::size_of::<c_long>() - 1)
         & !(mem::size_of::<c_long>() - 1)) as ssize_t
 }
 
+/// cbindgen:ignore
 pub unsafe extern "C" fn __CMSG_NEXT(cmsg: *const cmsghdr) -> *mut c_uchar {
     unsafe { (cmsg as *mut c_uchar).offset(__CMSG_LEN(cmsg)) }
 }
 
+/// cbindgen:ignore
 pub unsafe extern "C" fn __MHDR_END(mhdr: *const msghdr) -> *mut c_uchar {
     unsafe { ((*mhdr).msg_control.cast::<c_uchar>()).add((*mhdr).msg_controllen) }
 }
@@ -162,7 +170,7 @@ pub unsafe extern "C" fn CMSG_SPACE(len: c_uint) -> c_uint {
 pub unsafe extern "C" fn CMSG_LEN(length: c_uint) -> c_uint {
     (unsafe { CMSG_ALIGN(mem::size_of::<cmsghdr>()) } + length as usize) as c_uint
 }
-// } These must match C macros in include/bits/sys/socket.h
+// } These must match C macros in src/headers/sys_socket/cbindgen.toml
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/accept.html>.
 #[unsafe(no_mangle)]
