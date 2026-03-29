@@ -43,6 +43,7 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
     }
 
     let mut leading = true;
+    let mut need_collapsing = false;
 
     let mut builder = TreeBuilder::default();
     builder.start_internal(Token::Root, Range(1, Some(1)));
@@ -54,6 +55,12 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
 
         let c = unsafe { *pattern };
         pattern = unsafe { pattern.offset(1) };
+
+        match (c == b'*', need_collapsing) {
+            (true, true) => continue,
+            (true, false) => need_collapsing = true,
+            (false, _) => need_collapsing = false,
+        }
 
         let (token, range) = match c {
             b'\\' if flags & FNM_NOESCAPE == FNM_NOESCAPE => {
