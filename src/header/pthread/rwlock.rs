@@ -2,7 +2,7 @@ use super::*;
 
 use crate::header::errno::{EBUSY, EINVAL};
 
-use crate::{error::ResultExt, header::time::CLOCK_REALTIME, pthread::Pshared};
+use crate::{header::time::CLOCK_REALTIME, pthread::Pshared};
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_init(
@@ -23,10 +23,10 @@ pub unsafe extern "C" fn pthread_rwlock_init(
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_rdlock(rwlock: *mut pthread_rwlock_t) -> c_int {
-    unsafe { get(rwlock) }
-        .acquire_read_lock(None)
-        .map(|_| 0)
-        .or_minus_one_errno()
+    match unsafe { get(rwlock) }.acquire_read_lock(None) {
+        Ok(()) => 0,
+        Err(e) => e.0,
+    }
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_clockrdlock(
@@ -34,20 +34,20 @@ pub unsafe extern "C" fn pthread_rwlock_clockrdlock(
     clock_id: clockid_t,
     abstime: *const timespec,
 ) -> c_int {
-    unsafe { get(rwlock) }
-        .acquire_read_lock(Some((unsafe { &*abstime }, clock_id)))
-        .map(|_| 0)
-        .or_minus_one_errno()
+    match unsafe { get(rwlock) }.acquire_read_lock(Some((unsafe { &*abstime }, clock_id))) {
+        Ok(()) => 0,
+        Err(e) => e.0,
+    }
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_timedrdlock(
     rwlock: *mut pthread_rwlock_t,
     abstime: *const timespec,
 ) -> c_int {
-    unsafe { get(rwlock) }
-        .acquire_read_lock(Some((unsafe { &*abstime }, CLOCK_REALTIME)))
-        .map(|_| 0)
-        .or_minus_one_errno()
+    match unsafe { get(rwlock) }.acquire_read_lock(Some((unsafe { &*abstime }, CLOCK_REALTIME))) {
+        Ok(()) => 0,
+        Err(e) => e.0,
+    }
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_clockwrlock(
@@ -55,20 +55,20 @@ pub unsafe extern "C" fn pthread_rwlock_clockwrlock(
     clock_id: clockid_t,
     abstime: *const timespec,
 ) -> c_int {
-    unsafe { get(rwlock) }
-        .acquire_write_lock(Some((unsafe { &*abstime }, clock_id)))
-        .map(|_| 0)
-        .or_minus_one_errno()
+    match unsafe { get(rwlock) }.acquire_write_lock(Some((unsafe { &*abstime }, clock_id))) {
+        Ok(()) => 0,
+        Err(e) => e.0,
+    }
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_timedwrlock(
     rwlock: *mut pthread_rwlock_t,
     abstime: *const timespec,
 ) -> c_int {
-    unsafe { get(rwlock) }
-        .acquire_write_lock(Some((unsafe { &*abstime }, CLOCK_REALTIME)))
-        .map(|_| 0)
-        .or_minus_one_errno()
+    match unsafe { get(rwlock) }.acquire_write_lock(Some((unsafe { &*abstime }, CLOCK_REALTIME))) {
+        Ok(()) => 0,
+        Err(e) => e.0,
+    }
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_tryrdlock(rwlock: *mut pthread_rwlock_t) -> c_int {
@@ -92,10 +92,10 @@ pub unsafe extern "C" fn pthread_rwlock_unlock(rwlock: *mut pthread_rwlock_t) ->
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pthread_rwlock_wrlock(rwlock: *mut pthread_rwlock_t) -> c_int {
-    unsafe { get(rwlock) }
-        .acquire_write_lock(None)
-        .map(|_| 0)
-        .or_minus_one_errno()
+    match unsafe { get(rwlock) }.acquire_write_lock(None) {
+        Ok(()) => 0,
+        Err(e) => e.0,
+    }
 }
 
 #[unsafe(no_mangle)]

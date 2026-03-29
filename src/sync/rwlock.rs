@@ -8,7 +8,7 @@ use crate::{
     error::{Errno, Result},
     header::{
         bits_time::timespec,
-        errno::EINVAL,
+        errno::{EINVAL, ETIMEDOUT},
         time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec_realtime_to_monotonic},
     },
     platform::types::clockid_t,
@@ -77,7 +77,10 @@ impl InnerRwLock {
                     waiting_wr = expected & WAITING_WR;
 
                     if actual & COUNT_MASK > 0 {
-                        let _ = crate::sync::futex_wait(&self.state, expected, relative.as_ref());
+                        match crate::sync::futex_wait(&self.state, expected, relative.as_ref()) {
+                            super::FutexWaitResult::TimedOut => return Err(Errno(ETIMEDOUT)),
+                            _ => {}
+                        }
                     } else {
                         // We must avoid blocking indefinitely in our `futex_wait()`, in this case
                         // where it's possible that `self.state == expected` but our futex might
@@ -93,9 +96,11 @@ impl InnerRwLock {
     }
     pub fn acquire_read_lock(&self, deadline: Option<(&timespec, clockid_t)>) -> Result<(), Errno> {
         let relative = Self::translate_timeout(deadline)?;
-        // TODO: timeout
         while let Err(old) = self.try_acquire_read_lock() {
-            crate::sync::futex_wait(&self.state, old, relative.as_ref());
+            match crate::sync::futex_wait(&self.state, old, relative.as_ref()) {
+                super::FutexWaitResult::TimedOut => return Err(Errno(ETIMEDOUT)),
+                _ => {}
+            }
         }
 
         Ok(())
