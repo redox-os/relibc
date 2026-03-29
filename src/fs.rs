@@ -9,6 +9,7 @@ use crate::{
     platform::{Pal, Sys, types::*},
 };
 use core::ops::Deref;
+use syscall::Stat;
 
 pub struct File {
     pub fd: c_int,
@@ -55,6 +56,12 @@ impl File {
 
     pub fn set_len(&self, size: u64) -> Result<(), Errno> {
         Sys::ftruncate(self.fd, size as off_t).map_err(Errno::sync)
+    }
+
+    pub fn fstat(&self) -> Result<Stat, syscall::Error> {
+        let mut stat = Stat::default();
+        redox_rt::sys::fstat(self.fd as usize, &mut stat)?;
+        Ok(stat)
     }
 
     pub fn try_clone(&self) -> io::Result<Self> {

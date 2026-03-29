@@ -74,12 +74,47 @@ pub fn execve(
 ) -> Result<Infallible> {
     // NOTE: We must omit O_CLOEXEC and close manually, otherwise it will be closed before we
     // have even read it!
-    let (mut image_file, arg0) = match exec {
-        Executable::AtPath(path) => (
-            File::open(path, O_RDONLY as c_int).map_err(|_| Error::new(ENOENT))?,
-            path.to_bytes(),
-        ),
-        Executable::InFd { file, arg0 } => (file, arg0),
+    let (mut image_file, stat, arg0) = match exec {
+        Executable::AtPath(path) => {
+            let Ok(src_fd) = File::open(path, O_RDONLY as c_int) else {
+                return Err(Error::new(ENOENT));
+            };
+
+            let Ok(src_stat) = src_fd.fstat() else {
+                return Err(Error::new(ENOENT));
+            };
+
+            #[cfg(feature = "ld_so_cache")]
+            let src_fd = {
+                let mtime_sec = src_stat.st_mtime;
+                let mtime_nsec = src_stat.st_mtime_nsec;
+
+                let safe_path = path.to_str().unwrap_or("").replace('/', "_");
+                let shm_path_owned = format!(
+                    "/scheme/shm/ld.so.cache.{}.{}.{}\0",
+                    safe_path, mtime_sec, mtime_nsec
+                );
+                let shm_path =
+                    unsafe { CStr::from_bytes_with_nul_unchecked(shm_path_owned.as_bytes()) };
+
+                let mut file_opt = None;
+                if let Ok(shm_fd) = File::open(shm_path, O_RDONLY as c_int) {
+                    if let Ok(shm_stat) = shm_fd.fstat()
+                        && shm_stat.st_size > 0
+                    {
+                        file_opt = Some(shm_fd);
+                    }
+                }
+                file_opt.unwrap_or(src_fd)
+            };
+
+            (src_fd, src_stat, path.to_bytes())
+        }
+        Executable::InFd { file, arg0 } => {
+            let mut stat = Stat::default();
+            redox_rt::sys::fstat(*file as usize, &mut stat)?;
+            (file, stat, arg0)
+        }
     };
 
     // With execve now being implemented in userspace, we need to check ourselves that this
@@ -93,8 +128,6 @@ pub fn execve(
     // TODO: At some point we might have capabilities limiting the ability to allocate
     // executable memory.
 
-    let mut stat = Stat::default();
-    redox_rt::sys::fstat(*image_file as usize, &mut stat)?;
     let Resugid { ruid, rgid, .. } = redox_rt::sys::posix_getresugid();
 
     let mode = if ruid == stat.st_uid {
