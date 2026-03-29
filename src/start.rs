@@ -44,10 +44,12 @@ unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut
     use crate::header::string::strlen;
 
     let mut vec = Vec::with_capacity(len + 1);
+    let mut lengths = Vec::with_capacity(len);
     let mut size = 0;
     for i in 0..len {
         let item = unsafe { *array.add(i) };
-        size += unsafe { strlen(item) } + 1;
+        lengths.push(unsafe { strlen(item) } + 1);
+        size += lengths[i];
     }
 
     // Programs unfortunately rely on the strings being contiguous in memory. For example:
@@ -58,7 +60,7 @@ unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut
     for i in 0..len {
         let dest_buf = unsafe { buf.add(offset) };
         let item = unsafe { *array.add(i) };
-        let len = unsafe { strlen(item) } + 1;
+        let len = lengths[i];
 
         unsafe {
             ptr::copy_nonoverlapping(item, dest_buf, len);
