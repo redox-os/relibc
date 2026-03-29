@@ -80,9 +80,8 @@ pub fn execve(
                 return Err(Error::new(ENOENT));
             };
 
-            let Ok(src_stat) = src_fd.fstat() else {
-                return Err(Error::new(ENOENT));
-            };
+            let mut src_stat = Stat::default();
+            redox_rt::sys::fstat(*src_fd as usize, &mut src_stat)?;
 
             #[cfg(feature = "ld_so_cache")]
             let src_fd = {

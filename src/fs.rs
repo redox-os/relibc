@@ -3,13 +3,14 @@ use crate::{
     error::{Errno, ResultExt},
     header::{
         fcntl::O_CREAT,
+        sys_stat::stat,
         unistd::{SEEK_CUR, SEEK_END, SEEK_SET},
     },
     io,
+    out::Out,
     platform::{Pal, Sys, types::*},
 };
 use core::ops::Deref;
-use syscall::Stat;
 
 pub struct File {
     pub fd: c_int,
@@ -58,10 +59,10 @@ impl File {
         Sys::ftruncate(self.fd, size as off_t).map_err(Errno::sync)
     }
 
-    pub fn fstat(&self) -> Result<Stat, syscall::Error> {
-        let mut stat = Stat::default();
-        redox_rt::sys::fstat(self.fd as usize, &mut stat)?;
-        Ok(stat)
+    pub fn fstat(&self) -> Result<stat, Errno> {
+        let mut file_st = stat::default();
+        Sys::fstat(self.fd, Out::from_mut(&mut file_st)).map_err(Errno::sync)?;
+        Ok(file_st)
     }
 
     pub fn try_clone(&self) -> io::Result<Self> {
