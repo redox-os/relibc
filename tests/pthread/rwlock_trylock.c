@@ -4,8 +4,9 @@
 #include <assert.h>
 #include <pthread.h>
 #include <errno.h>
+#include <time.h>
 
-// Same test logic as test_rwlock_try_write in rustc/library/std/sync/rwlock/tests.rs
+// Adapted from test_rwlock_try_write in rustc/library/std/sync/rwlock/tests.rs
 
 int main(void) {
   int status;
@@ -31,10 +32,24 @@ int main(void) {
   ERROR_IF(pthread_rwlock_rdlock, status, != 0);
 
   status = pthread_rwlock_trywrlock(&rwlock);
-  assert(status == EBUSY);
+  UNEXP_IF(pthread_rwlock_trywrlock, status, != EBUSY);
+
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_nsec += 200 * 1000000;
+  status = pthread_rwlock_timedwrlock(&rwlock, &ts);
+  UNEXP_IF(pthread_rwlock_timedwrlock, status, != ETIMEDOUT);
 
   status = pthread_rwlock_unlock(&rwlock);
   ERROR_IF(pthread_rwlock_unlock, status, != 0);
+
+  status = pthread_rwlock_trywrlock(&rwlock);
+  ERROR_IF(pthread_rwlock_rdlock, status, != 0);
+
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_nsec += 200 * 1000000;
+  status = pthread_rwlock_timedrdlock(&rwlock, &ts);
+  UNEXP_IF(pthread_rwlock_timedrdlock, status, != ETIMEDOUT);
 
   status = pthread_rwlock_destroy(&rwlock);
   ERROR_IF(pthread_rwlock_destroy, status, != 0);
