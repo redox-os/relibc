@@ -1,6 +1,13 @@
 sys_includes = ["features.h", "stddef.h"]
 include_guard = "_RELIBC_MALLOC_H"
-trailer = "#include <bits/malloc.h>"
+trailer = """
+void *calloc(size_t nelem, size_t elsize);
+void free(void *ptr);
+void *malloc(size_t size);
+void *memalign(size_t alignment, size_t size);
+void *realloc(void *ptr, size_t size);
+void *valloc(size_t size);
+"""
 language = "C"
 style = "Type"
 no_includes = true
