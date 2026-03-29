@@ -4,10 +4,9 @@
 # - "The <inttypes.h> header shall include the <stdint.h> header."
 # - "wchar_t As described in <stddef.h>."
 #
-# bits/wchar.h brings in both stdint.h and stddef.h
-sys_includes = ["bits/wchar.h"]
+# wchar.h brings in both stdint.h and stddef.h
+sys_includes = ["wchar.h"]
 include_guard = "_RELIBC_INTTYPES_H"
-trailer = "#include <bits/inttypes.h>"
 language = "C"
 style = "Type"
 no_includes = true
