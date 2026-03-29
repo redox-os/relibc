@@ -312,9 +312,10 @@ fn stage2(
     // Setup TCB for ourselves.
     unsafe {
         #[cfg(target_os = "redox")]
-        let thr_fd =
-            crate::platform::get_auxv_raw(sp.auxv().cast(), redox_rt::auxv_defs::AT_REDOX_THR_FD)
-                .expect_notls("no thread fd present");
+        let auxv = sp.auxv().cast();
+        #[cfg(target_os = "redox")]
+        let thr_fd = crate::platform::get_auxv_raw(auxv, redox_rt::auxv_defs::AT_REDOX_THR_FD)
+            .expect_notls("no thread fd present");
 
         let tcb = Tcb::new(0).expect_notls("[ld.so]: failed to allocate bootstrap TCB");
         tcb.activate(
@@ -327,22 +328,17 @@ fn stage2(
         );
         #[cfg(target_os = "redox")]
         {
-            let proc_fd = crate::platform::get_auxv_raw(
-                sp.auxv().cast(),
-                redox_rt::auxv_defs::AT_REDOX_PROC_FD,
-            )
-            .expect_notls("no proc fd present");
+            let proc_fd =
+                crate::platform::get_auxv_raw(auxv, redox_rt::auxv_defs::AT_REDOX_PROC_FD)
+                    .expect_notls("no proc fd present");
 
-            let ns_fd = crate::platform::get_auxv_raw(
-                sp.auxv().cast(),
-                redox_rt::auxv_defs::AT_REDOX_NS_FD,
-            )
-            .filter(|&fd| fd != usize::MAX)
-            .map(|fd| {
-                redox_rt::proc::FdGuard::new(fd)
-                    .to_upper()
-                    .expect_notls("failed to move ns fd to upper table")
-            });
+            let ns_fd = crate::platform::get_auxv_raw(auxv, redox_rt::auxv_defs::AT_REDOX_NS_FD)
+                .filter(|&fd| fd != usize::MAX)
+                .map(|fd| {
+                    redox_rt::proc::FdGuard::new(fd)
+                        .to_upper()
+                        .expect_notls("failed to move ns fd to upper table")
+                });
 
             redox_rt::initialize(
                 redox_rt::proc::FdGuard::new(proc_fd)
@@ -387,12 +383,6 @@ fn stage2(
     // we might need global lock for this kind of stuff
     _r_debug.lock().r_ldbase = self_base;
 
-    // TODO: Fix memory leak, although minimal.
-    #[cfg(target_os = "redox")]
-    unsafe {
-        crate::platform::init_inner(auxv.clone());
-    }
-
     let name_or_path = if is_manual {
         // ld.so is run directly by user and not via execve() or similar systemcall
         println!("argv: {:#?}", argv);
@@ -408,6 +398,12 @@ fn stage2(
     } else {
         argv[0].to_string()
     };
+
+    // TODO: Fix memory leak, although minimal.
+    #[cfg(target_os = "redox")]
+    unsafe {
+        crate::platform::init_inner(auxv);
+    }
 
     let (path, _name) = match resolve_path_name(&name_or_path, &envs) {
         Some((p, n)) => (p, n),
