@@ -6,7 +6,7 @@ use core::{
 use super::{
     super::{
         PalSignal,
-        types::{c_int, pid_t},
+        types::{c_int, c_uint, pid_t, time_t},
     },
     Sys, e_raw,
 };
@@ -15,8 +15,10 @@ use crate::{
     header::{
         bits_time::timespec,
         signal::{SA_RESTORER, SI_QUEUE, sigaction, siginfo_t, sigset_t, sigval, stack_t},
-        sys_time::itimerval,
+        sys_select::timeval,
+        sys_time::{self, itimerval},
     },
+    platform,
 };
 
 impl PalSignal for Sys {
@@ -66,6 +68,26 @@ impl PalSignal for Sys {
             )
         })?;
         Ok(())
+    }
+
+    /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alarm.html>.
+    fn alarm(seconds: c_uint) -> c_uint {
+        let timer = itimerval {
+            it_value: timeval {
+                tv_sec: time_t::from(seconds),
+                tv_usec: 0,
+            },
+            ..Default::default()
+        };
+        let mut otimer = itimerval::default();
+        let errno_backup = platform::ERRNO.get();
+        let secs = if Self::setitimer(sys_time::ITIMER_REAL, &timer, Some(&mut otimer)).is_err() {
+            0
+        } else {
+            otimer.it_value.tv_sec as c_uint + if otimer.it_value.tv_usec > 0 { 1 } else { 0 }
+        };
+        platform::ERRNO.set(errno_backup);
+        secs
     }
 
     fn sigaction(

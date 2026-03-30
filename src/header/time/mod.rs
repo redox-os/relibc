@@ -66,6 +66,9 @@ pub(crate) struct timer_internal_t {
     pub caller_thread: crate::pthread::OsTid,
     // relibc handles it_interval, not the kernel
     pub next_wake_time: itimerspec,
+    // When non-zero, timer_routine delivers SIGALRM via kill(process_pid, sig)
+    // instead of rlct_kill (thread-specific). Used by alarm().
+    pub process_pid: platform::types::pid_t,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.

@@ -159,6 +159,7 @@ EXPECT_NAMES=\
 	time/timegm \
 	time/tzset \
 	unistd/access \
+	unistd/alarm \
 	unistd/constants \
 	unistd/confstr \
 	unistd/dup \
