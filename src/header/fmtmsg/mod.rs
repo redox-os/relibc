@@ -28,7 +28,7 @@ pub const MM_PRINT: c_long = 256;
 // c_long because classification is a c_long
 pub const MM_CONSOLE: c_long = 512;
 pub const MM_NOCON: c_int = 4;
-pub const O_WRONLY: c_int = 01;
+pub const O_WRONLY: c_int = 0x01;
 
 /*
  * If lstr is the first part of bstr, check that the next char in bstr
