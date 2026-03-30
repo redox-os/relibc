@@ -156,5 +156,8 @@ pub unsafe extern "C" fn fmtmsg(
     if ret & (MM_NOCON | MM_NOMSG) == (MM_NOCON | MM_NOMSG) {
         ret = MM_NOTOK;
     }
+    unsafe { 
+        pthread_setcancelstate(cs, 0 as _);
+    }
     ret
 }
