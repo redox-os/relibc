@@ -4,6 +4,9 @@
 # - "The <sys/uio.h> header shall define the ssize_t and size_t types as described in <sys/types.h>."
 sys_includes = ["sys/types.h"]
 include_guard = "_SYS_UIO_H"
+after_includes = """
+#include <bits/iovec.h> // for iovec
+"""
 language = "C"
 style = "Tag"
 no_includes = true
