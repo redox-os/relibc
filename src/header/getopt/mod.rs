@@ -1,6 +1,6 @@
-//! `getopt` implementation.
+//! `getopt.h` implementation.
 //!
-//! See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getopt.html>.
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 
 use crate::{
     header::{
@@ -13,10 +13,14 @@ use core::ptr;
 
 static mut CURRENT_OPT: *mut c_char = ptr::null_mut();
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 pub const no_argument: c_int = 0;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 pub const required_argument: c_int = 1;
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 pub const optional_argument: c_int = 2;
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 #[repr(C)]
 pub struct option {
     name: *const c_char,
@@ -25,9 +29,7 @@ pub struct option {
     val: c_int,
 }
 
-/// See <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
-///
-/// Non-POSIX.
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getopt.3.html>.
 ///
 /// Functions the same as `getopt` but also accepts long options.
 #[unsafe(no_mangle)]
