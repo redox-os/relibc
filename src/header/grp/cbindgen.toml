@@ -1,4 +1,8 @@
-sys_includes = ["sys/types.h", "stdint.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/grp.h.html
+#
+# Spec quotations relating to includes:
+# - "The <grp.h> header shall define the gid_t and size_t types as described in <sys/types.h>."
+sys_includes = ["sys/types.h"]
 include_guard = "_RELIBC_GRP_H"
 language = "C"
 style = "Tag"
