@@ -23,6 +23,10 @@ use crate::{
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
 ///
+/// Note that the `timeval` struct was specified for
+/// [`sys/time.h`](crate::header::sys_time) in the Open Group Base
+/// Specifications Issue 7 and prior, see
+/// <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_time.h.html>.
 #[repr(C)]
 #[derive(Default)]
 pub struct timeval {
