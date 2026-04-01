@@ -13,6 +13,7 @@ use crate::{
     error::{Errno, Result},
     header::{
         arpa_inet::inet_aton,
+        bits_iovec::iovec,
         bits_socklen_t::socklen_t,
         errno::{
             EAFNOSUPPORT, EDOM, EFAULT, EINVAL, EMSGSIZE, ENOMEM, ENOSYS, ENOTSOCK, EOPNOTSUPP,
@@ -25,7 +26,6 @@ use crate::{
             CMSG_ALIGN, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE, cmsghdr,
             constants::*, msghdr, sa_family_t, sockaddr, ucred,
         },
-        sys_uio::iovec,
         sys_un::sockaddr_un,
     },
 };
