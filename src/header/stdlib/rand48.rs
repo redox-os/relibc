@@ -1,4 +1,4 @@
-//! Helper functions for pseudorandom number generation using LCG, see https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/functions/drand48.html
+//! Helper functions for pseudorandom number generation using LCG, see <https://pubs.opengroup.org/onlinepubs/9799919799/functions/drand48.html>.
 
 use crate::{
     platform::types::{c_double, c_long, c_ushort},
