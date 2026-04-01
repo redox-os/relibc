@@ -1,3 +1,7 @@
+//! `shadow.h` implementation.
+//!
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getspnam.3.html>.
+
 use core::{
     cell::SyncUnsafeCell,
     ops::{Deref, DerefMut},
@@ -76,6 +80,7 @@ static mut SHADOW: spwd = spwd {
 
 static LINE_READER: SyncUnsafeCell<Option<Lines<BufReader<File>>>> = SyncUnsafeCell::new(None);
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getspnam.3.html>.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct spwd {
@@ -176,6 +181,7 @@ fn parse_spwd(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedSpwd, Er
     Ok(OwnedSpwd { buffer, reference })
 }
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getspnam.3.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getspnam(name: *const c_char) -> *mut spwd {
     let Ok(db) = File::open(SHADOW_FILE.into(), fcntl::O_RDONLY) else {
@@ -194,6 +200,7 @@ pub unsafe extern "C" fn getspnam(name: *const c_char) -> *mut spwd {
     ptr::null_mut()
 }
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getspnam.3.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getspnam_r(
     name: *const c_char,
@@ -232,6 +239,7 @@ pub unsafe extern "C" fn getspnam_r(
     ENOENT
 }
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getspnam.3.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setspent() {
     let line_reader = unsafe { &mut *LINE_READER.get() };
@@ -240,6 +248,7 @@ pub unsafe extern "C" fn setspent() {
     }
 }
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getspnam.3.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn endspent() {
     unsafe {
@@ -247,6 +256,7 @@ pub unsafe extern "C" fn endspent() {
     }
 }
 
+/// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getspnam.3.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn getspent() -> *mut spwd {
     let line_reader = unsafe { &mut *LINE_READER.get() };
