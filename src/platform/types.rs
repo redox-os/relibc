@@ -3,6 +3,7 @@
 // Use repr(u8) as LLVM expects `void*` to be the same as `i8*` to help enable
 // more optimization opportunities around it recognizing things like
 // malloc/free.
+/// The `void` type in C.
 #[repr(u8)]
 pub enum c_void {
     // Two dummy variants so the #[repr] attribute can be used.
@@ -21,15 +22,25 @@ pub type uint16_t = u16;
 pub type uint32_t = u32;
 pub type uint64_t = u64;
 
+/// The `signed char` type in C.
 pub type c_schar = i8;
+/// The `unsigned char` type in C.
 pub type c_uchar = u8;
+/// The `short` type in C.
 pub type c_short = i16;
+/// The `unsigned short` type in C.
 pub type c_ushort = u16;
+/// The `int` type in C.
 pub type c_int = i32;
+/// The `unsigned int` type in C.
 pub type c_uint = u32;
+/// The `float` type in C.
 pub type c_float = f32;
+/// The `double` type in C.
 pub type c_double = f64;
+/// The `long long` type in C.
 pub type c_longlong = i64;
+/// The `unsigned long long` type in C.
 pub type c_ulonglong = u64;
 pub type intmax_t = i64;
 pub type uintmax_t = u64;
@@ -40,13 +51,18 @@ pub type intptr_t = isize;
 pub type uintptr_t = usize;
 pub type ssize_t = isize;
 
+/// The `char` type in C.
 pub type c_char = core::ffi::c_char;
+/// The `long` type in C.
 #[cfg(target_pointer_width = "32")]
 pub type c_long = i32;
+/// The `unsigned long` type in C.
 #[cfg(target_pointer_width = "32")]
 pub type c_ulong = u32;
+/// The `long` type in C.
 #[cfg(target_pointer_width = "64")]
 pub type c_long = i64;
+/// The `unsigned long` type in C.
 #[cfg(target_pointer_width = "64")]
 pub type c_ulong = u64;
 
@@ -84,8 +100,10 @@ pub type timer_t = *mut c_void;
 // Until rust supporting them, relibc will lose precision to get them working, plus:
 //     All read operation to this type must be converted from "relibc_ldtod".
 //     All write operation to this type must be converted with "relibc_dtold".
+/// The `long double` type in C.
 #[cfg(target_pointer_width = "64")]
 pub type c_longdouble = u128;
+/// The `long double` type in C.
 #[cfg(target_pointer_width = "32")]
 pub type c_longdouble = [u32; 3];
 
