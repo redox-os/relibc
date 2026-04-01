@@ -1298,6 +1298,7 @@ impl Pal for Sys {
             timer_st.next_wake_time = itimerspec::default();
             timer_st.thread = ptr::null_mut();
             timer_st.caller_thread = caller_thread;
+            timer_st.process_pid = 0;
             timer_buf
         };
 
