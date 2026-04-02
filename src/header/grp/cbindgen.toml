@@ -6,6 +6,7 @@ sys_includes = ["sys/types.h"]
 include_guard = "_RELIBC_GRP_H"
 language = "C"
 style = "Tag"
+usize_is_size_t = true
 no_includes = true
 cpp_compat = true
 
