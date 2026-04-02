@@ -8,7 +8,7 @@
 //! and `musl`.
 //!
 //! The functions come in sets of three. Each of them print the program binary name (the last path
-//! segment of arg[0]) and an optional user message along with these differences:
+//! segment of `argv[0]`) and an optional user message along with these differences:
 //! * No suffix: Prints an error message for ERRNO based on [`strerror`]
 //! * `c` suffix: Prints an error message for an arbitrary error code
 //! * `x` suffix: Does not print an error code

@@ -48,7 +48,7 @@ pub struct Dl_info_t {
     dli_saddr: *mut c_void,
 }
 
-/// alias as per spec update: https://www.austingroupbugs.net/view.php?id=1847
+/// alias as per spec update: <https://www.austingroupbugs.net/view.php?id=1847>
 pub type Dl_info = Dl_info_t;
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/dladdr.html>.

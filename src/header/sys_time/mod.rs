@@ -3,7 +3,7 @@
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_time.h.html>.
 //!
 //! Note that since the Open Group Base Specifications Issue 8, the
-//! [`timeval`](crate::header::sys_select::timeval) struct has been moved to
+//! [`timeval`] struct has been moved to
 //! the [`sys/select.h`](crate::header::sys_select) header.
 
 use crate::{
