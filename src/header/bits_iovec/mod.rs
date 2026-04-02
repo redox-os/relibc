@@ -33,3 +33,6 @@ pub unsafe fn scatter(iovs: &[iovec], vec: Vec<u8>) {
         i += slice.len();
     }
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cbindgen_alias_iovec(_: iovec) {}
