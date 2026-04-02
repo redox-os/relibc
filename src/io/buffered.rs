@@ -206,9 +206,9 @@ impl<R: Seek> Seek for BufReader<R> {
     /// `.into_inner()` immediately after a seek yields the underlying reader
     /// at the same position.
     ///
-    /// To seek without discarding the internal buffer, use [`Seek::seek_relative`].
+    /// To seek without discarding the internal buffer, use [`seek_relative`](crate::io::BufReader::seek_relative).
     ///
-    /// See [`std::io::Seek`] for more details.
+    /// See [`std::io::Seek`](https://doc.rust-lang.org/std/io/trait.Seek.html) for more details.
     ///
     /// Note: In the edge case where you're seeking with `SeekFrom::Current(n)`
     /// where `n` minus the internal buffer length overflows an `i64`, two
