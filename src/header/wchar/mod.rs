@@ -130,11 +130,11 @@ pub unsafe extern "C" fn fgetws(ws: *mut wchar_t, n: c_int, stream: *mut FILE) -
     }
     // NUL-terminate result
     unsafe { *ws.add(i) = 0 };
-    return if i == 0 || unsafe { ferror(&raw mut *stream) != 0 } {
+    if i == 0 || unsafe { ferror(&raw mut *stream) != 0 } {
         core::ptr::null_mut()
     } else {
         ws
-    };
+    }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/fputwc.html>.
