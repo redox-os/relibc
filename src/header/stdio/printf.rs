@@ -610,9 +610,8 @@ impl<'a, T: c_str::Kind> Iterator for PrintfIter<'a, T> {
         self.format = first_percent.split_first().expect("must be %").1;
 
         let mut peekahead = self.format;
-        let index = pop_index(&mut peekahead).map(|i| {
+        let index = pop_index(&mut peekahead).inspect(|i| {
             self.format = peekahead;
-            i
         });
 
         // Flags:
