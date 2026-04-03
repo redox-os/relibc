@@ -28,7 +28,11 @@ pub const MM_PRINT: c_long = 256;
 // c_long because classification is a c_long
 pub const MM_CONSOLE: c_long = 512;
 pub const MM_NOCON: c_int = 4;
-pub const O_WRONLY: c_int = 0x01;
+#[cfg(target_os = "linux")]
+pub const O_WRONLY: c_int = 0x0001;
+#[cfg(target_os = "redox")]
+//Take from `src/header/fcntl/redox.rs`
+pub const O_WRONLY: c_int = 0x0002_0000;
 
 /*
  * If lstr is the first part of bstr, check that the next char in bstr
