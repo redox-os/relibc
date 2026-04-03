@@ -2,14 +2,15 @@
 
 use alloc::{boxed::Box, vec::Vec};
 use core::{intrinsics, ptr};
+
+#[cfg(target_os = "redox")]
 use generic_rt::ExpectTlsFree;
 
 use crate::{
     ALLOCATOR,
     header::{libgen, stdio, stdlib},
-    ld_so::{self, linker::Linker, tcb::Tcb},
+    ld_so::{self, linker::Linker},
     platform::{self, Pal, Sys, get_auxvs, types::*},
-    raw_cell::RawCell,
     sync::mutex::Mutex,
 };
 
@@ -21,7 +22,7 @@ pub struct Stack {
 
 impl Stack {
     pub fn argv(&self) -> *const *const c_char {
-        &self.argv0 as *const _
+        ptr::from_ref(&self.argv0)
     }
 
     pub fn envp(&self) -> *const *const c_char {
@@ -34,25 +35,39 @@ impl Stack {
             while !(*envp).is_null() {
                 envp = envp.add(1);
             }
-            envp.add(1) as *const (usize, usize)
+            envp.add(1).cast::<(usize, usize)>()
         }
     }
 }
 
 unsafe fn copy_string_array(array: *const *const c_char, len: usize) -> Vec<*mut c_char> {
+    use crate::header::string::strlen;
+
     let mut vec = Vec::with_capacity(len + 1);
+    let mut lengths = Vec::with_capacity(len);
+    let mut size = 0;
     for i in 0..len {
-        let item = *array.add(i);
-        let mut len = 0;
-        while *item.add(len) != 0 {
-            len += 1;
+        let item = unsafe { *array.add(i) };
+        lengths.push(unsafe { strlen(item) } + 1);
+        size += lengths[i];
+    }
+
+    // Programs unfortunately rely on the strings being contiguous in memory. For example:
+    // https://github.com/libuv/libuv/blob/12d0dd48e3c6baf1e2f0d9f85f11f0ef58285d6f/src/unix/proctitle.c#L87
+    let mut offset = 0;
+    let buf = unsafe { platform::alloc(size).cast::<c_char>() };
+
+    for i in 0..len {
+        let dest_buf = unsafe { buf.add(offset) };
+        let item = unsafe { *array.add(i) };
+        let len = lengths[i];
+
+        unsafe {
+            ptr::copy_nonoverlapping(item, dest_buf, len);
         }
 
-        let buf = platform::alloc(len + 1) as *mut c_char;
-        for i in 0..=len {
-            *buf.add(i) = *item.add(i);
-        }
-        vec.push(buf);
+        vec.push(dest_buf);
+        offset += len;
     }
     vec.push(ptr::null_mut());
     vec
@@ -83,10 +98,10 @@ fn alloc_init() {
         }
     }
     unsafe {
-        if let Some(tcb) = ld_so::tcb::Tcb::current() {
-            if !tcb.mspace.is_null() {
-                ALLOCATOR.get().write(tcb.mspace.read());
-            }
+        if let Some(tcb) = ld_so::tcb::Tcb::current()
+            && !tcb.mspace.is_null()
+        {
+            ALLOCATOR.set(tcb.mspace);
         }
     }
 }
@@ -117,6 +132,7 @@ extern "C" fn init_array() {
         init_complete = true
     }
 }
+
 fn io_init() {
     unsafe {
         // Initialize stdin/stdout/stderr.
@@ -147,30 +163,36 @@ pub unsafe extern "C" fn relibc_start_v1(
     }
 
     // Ensure correct host system before executing more system calls
-    relibc_verify_host();
+    unsafe { relibc_verify_host() };
 
     #[cfg(target_os = "redox")]
     let thr_fd = redox_rt::proc::FdGuard::new(
-        crate::platform::get_auxv_raw(sp.auxv().cast(), redox_rt::auxv_defs::AT_REDOX_THR_FD)
-            .expect_notls("no thread fd present"),
+        unsafe {
+            crate::platform::get_auxv_raw(sp.auxv().cast(), redox_rt::auxv_defs::AT_REDOX_THR_FD)
+        }
+        .expect_notls("no thread fd present"),
     )
     .to_upper()
     .expect_notls("failed to move thread fd to upper table");
 
     // Initialize TLS, if necessary
-    ld_so::init(
-        sp,
-        #[cfg(target_os = "redox")]
-        thr_fd,
-    );
+    unsafe {
+        ld_so::init(
+            sp,
+            #[cfg(target_os = "redox")]
+            thr_fd,
+        )
+    };
 
     // Set up the right allocator...
     // if any memory rust based memory allocation happen before this step .. we are doomed.
     alloc_init();
 
-    if let Some(tcb) = ld_so::tcb::Tcb::current() {
+    if let Some(tcb) = unsafe { ld_so::tcb::Tcb::current() } {
         // Update TCB mspace
-        tcb.mspace = ALLOCATOR.get();
+        if tcb.mspace.is_null() {
+            tcb.mspace = ALLOCATOR.get();
+        }
 
         // Set linker pointer if necessary
         if tcb.linker_ptr.is_null() {
@@ -186,60 +208,60 @@ pub unsafe extern "C" fn relibc_start_v1(
     // Set up argc and argv
     let argc = sp.argc;
     let argv = sp.argv();
-    platform::inner_argv.unsafe_set(copy_string_array(argv, argc as usize));
-    platform::argv = platform::inner_argv.unsafe_mut().as_mut_ptr();
+    unsafe { platform::inner_argv.unsafe_set(copy_string_array(argv, argc as usize)) };
+    unsafe { platform::argv = platform::inner_argv.unsafe_mut().as_mut_ptr() };
     // Special code for program_invocation_name and program_invocation_short_name
-    if let Some(arg) = platform::inner_argv.unsafe_ref().get(0) {
-        platform::program_invocation_name = *arg;
-        platform::program_invocation_short_name = libgen::basename(*arg);
+    if let Some(arg) = unsafe { platform::inner_argv.unsafe_ref() }.first() {
+        unsafe { platform::program_invocation_name = *arg };
+        unsafe { platform::program_invocation_short_name = libgen::basename(*arg) };
     }
     // We check for NULL here since ld.so might already have initialized it for us, and we don't
     // want to overwrite it if constructors in .init_array of dependency libraries have called
     // setenv.
-    if platform::environ.is_null() {
+    if unsafe { platform::environ }.is_null() {
         // Set up envp
         let envp = sp.envp();
         let mut len = 0;
-        while !(*envp.add(len)).is_null() {
+        while !(unsafe { *envp.add(len) }).is_null() {
             len += 1;
         }
-        platform::OUR_ENVIRON.unsafe_set(copy_string_array(envp, len));
-        platform::environ = platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr();
+        unsafe { platform::OUR_ENVIRON.unsafe_set(copy_string_array(envp, len)) };
+        unsafe { platform::environ = platform::OUR_ENVIRON.unsafe_mut().as_mut_ptr() };
     }
 
-    let auxvs = get_auxvs(sp.auxv().cast());
-    crate::platform::init(auxvs);
-
+    let auxvs = unsafe { get_auxvs(sp.auxv().cast()) };
+    unsafe { crate::platform::init(auxvs) };
     init_array();
+    unsafe { crate::platform::logger::init() };
 
     // Run preinit array
     {
-        let mut f = &__preinit_array_start as *const _;
+        let mut f = unsafe { &__preinit_array_start } as *const _;
         #[allow(clippy::op_ref)]
-        while f < &__preinit_array_end {
-            (*f)();
-            f = f.offset(1);
+        while f < &raw const __preinit_array_end {
+            (unsafe { *f })();
+            f = unsafe { f.offset(1) };
         }
     }
 
     // Call init section
     #[cfg(not(target_arch = "riscv64"))] // risc-v uses arrays exclusively
     {
-        _init();
+        unsafe { _init() };
     }
 
     // Run init array
     {
-        let mut f = &__init_array_start as *const _;
+        let mut f = unsafe { &__init_array_start } as *const _;
         #[allow(clippy::op_ref)]
-        while f < &__init_array_end {
-            (*f)();
-            f = f.offset(1);
+        while f < &raw const __init_array_end {
+            (unsafe { *f })();
+            f = unsafe { f.offset(1) };
         }
     }
 
     // not argv or envp, because programs like bash try to modify this *const* pointer :|
-    stdlib::exit(main(argc, platform::argv, platform::environ));
+    unsafe { stdlib::exit(main(argc, platform::argv, platform::environ)) };
 
     unreachable!();
 }

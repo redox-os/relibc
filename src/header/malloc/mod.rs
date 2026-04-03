@@ -5,7 +5,7 @@
 use crate::{
     header::errno::ENOMEM,
     platform::{
-        self, ERRNO, Pal, Sys,
+        self, Pal, Sys,
         types::{c_void, size_t},
     },
 };
@@ -28,7 +28,7 @@ pub unsafe extern "C" fn pvalloc(size: size_t) -> *mut c_void {
 
     match num_pages.checked_mul(page_size) {
         Some(alloc_size) => {
-            let ptr = platform::alloc_align(alloc_size, page_size);
+            let ptr = unsafe { platform::alloc_align(alloc_size, page_size) };
             if ptr.is_null() {
                 platform::ERRNO.set(ENOMEM);
             }
@@ -44,5 +44,5 @@ pub unsafe extern "C" fn pvalloc(size: size_t) -> *mut c_void {
 /// See <https://man7.org/linux/man-pages/man3/malloc_usable_size.3.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn malloc_usable_size(ptr: *mut c_void) -> size_t {
-    platform::alloc_usable_size(ptr)
+    unsafe { platform::alloc_usable_size(ptr) }
 }

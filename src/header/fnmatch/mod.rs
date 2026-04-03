@@ -2,8 +2,6 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fnmatch.h.html>.
 
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use alloc::{borrow::Cow, vec::Vec};
 use core::slice;
 
@@ -45,6 +43,7 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
     }
 
     let mut leading = true;
+    let mut need_collapsing = false;
 
     let mut builder = TreeBuilder::default();
     builder.start_internal(Token::Root, Range(1, Some(1)));
@@ -56,6 +55,12 @@ unsafe fn tokenize(mut pattern: *const u8, flags: c_int) -> Tree {
 
         let c = unsafe { *pattern };
         pattern = unsafe { pattern.offset(1) };
+
+        match (c == b'*', need_collapsing) {
+            (true, true) => continue,
+            (true, false) => need_collapsing = true,
+            (false, _) => need_collapsing = false,
+        }
 
         let (token, range) = match c {
             b'\\' if flags & FNM_NOESCAPE == FNM_NOESCAPE => {
@@ -138,9 +143,9 @@ pub unsafe extern "C" fn fnmatch(
     while unsafe { *input.offset(len) != 0 } {
         len += 1;
     }
-    let input = unsafe { slice::from_raw_parts(input as *const u8, len as usize) };
+    let input = unsafe { slice::from_raw_parts(input.cast::<u8>(), len as usize) };
 
-    let tokens = unsafe { tokenize(pattern as *const u8, flags) };
+    let tokens = unsafe { tokenize(pattern.cast::<u8>(), flags) };
 
     if PosixRegex::new(Cow::Owned(tokens))
         .case_insensitive(flags & FNM_CASEFOLD == FNM_CASEFOLD)

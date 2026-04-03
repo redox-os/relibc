@@ -4,11 +4,10 @@ use super::{
 };
 
 use crate::{
-    error::{Errno, ResultExt},
+    error::Errno,
     fs::File,
     header::{errno::*, fcntl::*, signal::sigset_t, sys_epoll::*},
     io::prelude::*,
-    platform,
 };
 use core::{mem, slice};
 use syscall::{
@@ -27,12 +26,11 @@ fn epoll_to_event_flags(epoll: c_uint) -> syscall::EventFlags {
         event_flags |= syscall::EventFlags::EVENT_WRITE;
     }
 
-    /*TODO: support more EPOLL flags
+    /*TODO: support more EPOLL flags  */
     let unsupported = !(EPOLLIN | EPOLLOUT);
     if epoll & unsupported != 0 {
-        eprintln!("epoll unsupported flags 0x{:X}", epoll & unsupported);
+        log::trace!("epoll unsupported flags 0x{:X}", epoll & unsupported);
     }
-    */
 
     event_flags
 }
@@ -144,7 +142,7 @@ impl PalEpoll for Sys {
             callback()
         } else {
             // Allowset is inverse of sigset mask
-            let allowset = !*sigset;
+            let allowset = !unsafe { *sigset };
             redox_rt::signal::callback_or_signal_async(allowset, callback)
         }?;
 

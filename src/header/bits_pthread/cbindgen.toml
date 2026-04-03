@@ -1,4 +1,4 @@
-sys_includes = ["bits/sched.h"]
+sys_includes = []
 include_guard = "_RELIBC_BITS_PTHREAD_H"
 language = "C"
 style = "type"
@@ -29,7 +29,6 @@ after_includes = """
 """
 
 [export.rename]
-"sched_param" = "struct sched_param"
 "AtomicInt" = "int"
 "AtomicUint" = "unsigned"
 

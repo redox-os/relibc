@@ -3,9 +3,10 @@
 use crate::{
     error::Errno,
     header::{
-        errno::{EINVAL, ENOMEM, ETIMEDOUT},
+        bits_time::timespec,
+        errno::{EINVAL, ETIMEDOUT},
         pthread::*,
-        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec, timespec_realtime_to_monotonic},
+        time::{CLOCK_MONOTONIC, CLOCK_REALTIME, timespec_realtime_to_monotonic},
     },
     platform::types::clockid_t,
 };
@@ -72,10 +73,7 @@ impl Cond {
         let relative = match clock_id {
             // FUTEX expect monotonic clock
             CLOCK_MONOTONIC => timeout.clone(),
-            CLOCK_REALTIME => match timespec_realtime_to_monotonic(timeout.clone()) {
-                Ok(relative) => relative,
-                Err(err) => return Err(err),
-            },
+            CLOCK_REALTIME => timespec_realtime_to_monotonic(timeout.clone())?,
             _ => return Err(Errno(EINVAL)),
         };
 

@@ -2,15 +2,12 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/poll.h.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::{mem, ptr, slice};
 
 use crate::{
-    error::ResultExt,
     fs::File,
     header::{
+        bits_time::timespec,
         errno::EBADF,
         signal::sigset_t,
         sys_epoll::{
@@ -18,7 +15,6 @@ use crate::{
             EPOLLPRI, EPOLLRDBAND, EPOLLRDNORM, EPOLLWRBAND, EPOLLWRNORM, epoll_create1, epoll_ctl,
             epoll_data, epoll_event, epoll_pwait,
         },
-        time::timespec,
     },
     platform::{
         self,
@@ -47,7 +43,7 @@ pub struct pollfd {
     pub revents: c_short,
 }
 
-pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) -> c_int {
+pub unsafe fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) -> c_int {
     let event_map = [
         (POLLIN, EPOLLIN),
         (POLLPRI, EPOLLPRI),
@@ -70,8 +66,8 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) 
     };
 
     let mut closed = 0;
-    for i in 0..fds.len() {
-        let mut pfd = &mut fds[i];
+    for (i, fd) in fds.iter_mut().enumerate() {
+        let pfd = fd;
 
         pfd.revents = 0;
 
@@ -92,7 +88,7 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) 
             }
         }
 
-        if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &mut event) } < 0 {
+        if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, pfd.fd, &raw mut event) } < 0 {
             if platform::ERRNO.get() == EBADF {
                 pfd.revents |= POLLNVAL;
                 closed += 1;
@@ -146,11 +142,13 @@ pub fn poll_epoll(fds: &mut [pollfd], timeout: c_int, sigmask: *const sigset_t) 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn poll(fds: *mut pollfd, nfds: nfds_t, timeout: c_int) -> c_int {
     trace_expr!(
-        poll_epoll(
-            unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
-            timeout,
-            ptr::null_mut()
-        ),
+        unsafe {
+            poll_epoll(
+                slice::from_raw_parts_mut(fds, nfds as usize),
+                timeout,
+                ptr::null_mut(),
+            )
+        },
         "poll({:p}, {}, {})",
         fds,
         nfds,
@@ -170,15 +168,20 @@ pub unsafe extern "C" fn ppoll(
         -1
     } else {
         let tmo = unsafe { &*tmo_p };
-        //TODO: handle overflow
-        ((tmo.tv_sec as c_int) * 1000) + ((tmo.tv_nsec as c_int) / 1000000)
+        if tmo.tv_sec > (c_int::MAX / 1000) as _ {
+            c_int::MAX
+        } else {
+            ((tmo.tv_sec as c_int) * 1000) + ((tmo.tv_nsec as c_int) / 1000000)
+        }
     };
     trace_expr!(
-        poll_epoll(
-            unsafe { slice::from_raw_parts_mut(fds, nfds as usize) },
-            timeout,
-            sigmask
-        ),
+        unsafe {
+            poll_epoll(
+                slice::from_raw_parts_mut(fds, nfds as usize),
+                timeout,
+                sigmask,
+            )
+        },
         "ppoll({:p}, {}, {:p}, {:p})",
         fds,
         nfds,

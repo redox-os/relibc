@@ -1,5 +1,9 @@
 #include <sys/types.h>
 #include <wchar.h>
+// TODO: remove glibc?
+#ifdef __GLIBC__
+#include <stdio.h>
+#endif
 
 void attempt(wchar_t *s) {
     wchar_t *end;

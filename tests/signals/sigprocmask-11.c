@@ -1,6 +1,4 @@
 
-#define _XOPEN_SOURCE 600
-
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>

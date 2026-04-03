@@ -2,13 +2,15 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/inttypes.h.html>.
 
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::{
-    header::{ctype, errno::*, stdlib::*},
+    header::{
+        ctype::{self, isspace},
+        errno::*,
+        stdlib::*,
+    },
     platform::{
         self,
-        types::{c_char, c_int, c_long, intmax_t, uintmax_t},
+        types::{c_char, c_int, c_long, intmax_t, uintmax_t, wchar_t},
     },
 };
 
@@ -41,17 +43,15 @@ pub unsafe extern "C" fn strtoimax(
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> intmax_t {
-    unsafe {
-        strto_impl!(
-            intmax_t,
-            false,
-            intmax_t::max_value(),
-            intmax_t::min_value(),
-            s,
-            endptr,
-            base
-        )
-    }
+    strto_impl!(
+        intmax_t,
+        false,
+        intmax_t::MAX,
+        intmax_t::MIN,
+        s,
+        endptr,
+        base
+    )
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strtoimax.html>.
@@ -61,17 +61,43 @@ pub unsafe extern "C" fn strtoumax(
     endptr: *mut *mut c_char,
     base: c_int,
 ) -> uintmax_t {
-    unsafe {
-        strto_impl!(
-            uintmax_t,
-            false,
-            uintmax_t::max_value(),
-            uintmax_t::min_value(),
-            s,
-            endptr,
-            base
-        )
-    }
+    strto_impl!(
+        uintmax_t,
+        false,
+        uintmax_t::MAX,
+        uintmax_t::MIN,
+        s,
+        endptr,
+        base
+    )
 }
 
-// wcstoimax(), wcstoumax() currently defined in header::wchar?
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoimax.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wcstoimax(
+    mut ptr: *const wchar_t,
+    end: *mut *mut wchar_t,
+    base: c_int,
+) -> intmax_t {
+    skipws!(ptr);
+    let result = strto_impl!(intmax_t, ptr, base);
+    if !end.is_null() {
+        unsafe { *end = ptr.cast_mut() };
+    }
+    result
+}
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/wcstoimax.html>.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wcstoumax(
+    mut ptr: *const wchar_t,
+    end: *mut *mut wchar_t,
+    base: c_int,
+) -> uintmax_t {
+    skipws!(ptr);
+    let result = strtou_impl!(uintmax_t, ptr, base);
+    if !end.is_null() {
+        unsafe { *end = ptr.cast_mut() };
+    }
+    result
+}

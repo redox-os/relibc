@@ -14,10 +14,25 @@ use crate::{
             EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLLERR, EPOLLIN, EPOLLOUT, epoll_create1, epoll_ctl,
             epoll_data, epoll_event, epoll_wait,
         },
-        sys_time::timeval,
     },
-    platform::{self, types::c_int},
+    platform::{
+        self,
+        types::{c_int, suseconds_t, time_t},
+    },
 };
+
+/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_select.h.html>.
+///
+/// Note that the `timeval` struct was specified for
+/// [`sys/time.h`](crate::header::sys_time) in the Open Group Base
+/// Specifications Issue 7 and prior, see
+/// <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_time.h.html>.
+#[repr(C)]
+#[derive(Default)]
+pub struct timeval {
+    pub tv_sec: time_t,
+    pub tv_usec: suseconds_t,
+}
 
 // fd_set is also defined in C because cbindgen is incompatible with mem::size_of booo
 
@@ -31,6 +46,7 @@ pub struct fd_set {
     pub fds_bits: bitset,
 }
 
+#[allow(clippy::needless_update)]
 pub fn select_epoll(
     nfds: c_int,
     readfds: Option<&mut fd_set>,
@@ -60,53 +76,53 @@ pub fn select_epoll(
     for fd in 0..nfds {
         let mut events = 0;
 
-        if let Some(ref fd_set) = read_bitset {
-            if fd_set.contains(fd as usize) {
-                events |= EPOLLIN;
-            }
+        if let Some(ref fd_set) = read_bitset
+            && fd_set.contains(fd as usize)
+        {
+            events |= EPOLLIN;
         }
 
-        if let Some(ref fd_set) = write_bitset {
-            if fd_set.contains(fd as usize) {
-                events |= EPOLLOUT;
-            }
+        if let Some(ref fd_set) = write_bitset
+            && fd_set.contains(fd as usize)
+        {
+            events |= EPOLLOUT;
         }
 
-        if let Some(ref fd_set) = except_bitset {
-            if fd_set.contains(fd as usize) {
-                events |= EPOLLERR;
-            }
+        if let Some(ref fd_set) = except_bitset
+            && fd_set.contains(fd as usize)
+        {
+            events |= EPOLLERR;
         }
 
         if events > 0 {
             let mut event = epoll_event {
                 events,
                 data: epoll_data { fd },
-                ..Default::default()
+                ..Default::default() // clippy lint, _pad field on redox but not linux
             };
-            if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &mut event) } < 0 {
+            if unsafe { epoll_ctl(*ep, EPOLL_CTL_ADD, fd, &raw mut event) } < 0 {
                 if platform::ERRNO.get() == errno::EPERM {
                     not_epoll += 1;
                 } else {
                     return -1;
                 }
             } else {
-                if let Some(ref mut fd_set) = read_bitset {
-                    if fd_set.contains(fd as usize) {
-                        fd_set.remove(fd as usize);
-                    }
+                if let Some(ref mut fd_set) = read_bitset
+                    && fd_set.contains(fd as usize)
+                {
+                    fd_set.remove(fd as usize);
                 }
 
-                if let Some(ref mut fd_set) = write_bitset {
-                    if fd_set.contains(fd as usize) {
-                        fd_set.remove(fd as usize);
-                    }
+                if let Some(ref mut fd_set) = write_bitset
+                    && fd_set.contains(fd as usize)
+                {
+                    fd_set.remove(fd as usize);
                 }
 
-                if let Some(ref mut fd_set) = except_bitset {
-                    if fd_set.contains(fd as usize) {
-                        fd_set.remove(fd as usize);
-                    }
+                if let Some(ref mut fd_set) = except_bitset
+                    && fd_set.contains(fd as usize)
+                {
+                    fd_set.remove(fd as usize);
                 }
             }
         }
@@ -119,8 +135,12 @@ pub fn select_epoll(
     } else {
         match timeout {
             Some(timeout) => {
-                //TODO: Check for overflow
-                ((timeout.tv_sec as c_int) * 1000) + ((timeout.tv_usec as c_int) / 1000)
+                let sec_ms = (timeout.tv_sec as c_int).checked_mul(1000);
+                let usec_ms = (timeout.tv_usec as c_int) / 1000;
+                match sec_ms.and_then(|s| s.checked_add(usec_ms)) {
+                    Some(s) => s as c_int,
+                    None => c_int::MAX,
+                }
             }
             None => -1,
         }
@@ -142,23 +162,23 @@ pub fn select_epoll(
         let fd = unsafe { event.data.fd };
         // TODO: Error status when fd does not match?
         if fd >= 0 && fd < FD_SETSIZE as c_int {
-            if event.events & EPOLLIN > 0 {
-                if let Some(ref mut fd_set) = read_bitset {
-                    fd_set.insert(fd as usize);
-                    count += 1;
-                }
+            if event.events & EPOLLIN > 0
+                && let Some(ref mut fd_set) = read_bitset
+            {
+                fd_set.insert(fd as usize);
+                count += 1;
             }
-            if event.events & EPOLLOUT > 0 {
-                if let Some(ref mut fd_set) = write_bitset {
-                    fd_set.insert(fd as usize);
-                    count += 1;
-                }
+            if event.events & EPOLLOUT > 0
+                && let Some(ref mut fd_set) = write_bitset
+            {
+                fd_set.insert(fd as usize);
+                count += 1;
             }
-            if event.events & EPOLLERR > 0 {
-                if let Some(ref mut fd_set) = except_bitset {
-                    fd_set.insert(fd as usize);
-                    count += 1;
-                }
+            if event.events & EPOLLERR > 0
+                && let Some(ref mut fd_set) = except_bitset
+            {
+                fd_set.insert(fd as usize);
+                count += 1;
             }
         }
     }
@@ -180,22 +200,22 @@ pub unsafe extern "C" fn select(
             if readfds.is_null() {
                 None
             } else {
-                Some(&mut *readfds)
+                Some(unsafe { &mut *readfds })
             },
             if writefds.is_null() {
                 None
             } else {
-                Some(&mut *writefds)
+                Some(unsafe { &mut *writefds })
             },
             if exceptfds.is_null() {
                 None
             } else {
-                Some(&mut *exceptfds)
+                Some(unsafe { &mut *exceptfds })
             },
             if timeout.is_null() {
                 None
             } else {
-                Some(&mut *timeout)
+                Some(unsafe { &mut *timeout })
             }
         ),
         "select({}, {:p}, {:p}, {:p}, {:p})",

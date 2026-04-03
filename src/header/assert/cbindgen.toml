@@ -1,3 +1,8 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/assert.h.html
+#
+# There are no spec quotations relating to includes
+#
+# features.h included for Rust never type (no return)
 sys_includes = ["features.h"]
 include_guard = "_RELIBC_ASSERT_H"
 trailer = "#include <bits/assert.h>"

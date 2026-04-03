@@ -1,5 +1,3 @@
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
@@ -52,7 +50,7 @@ pub struct Tcb {
     pub generic: GenericTcb<OsSpecific>,
     /// Pointer to a list of initial TLS data
     pub masters_ptr: *mut Master,
-    /// Size of the masters list in bytes (multiple of mem::size_of::<Master>())
+    /// Size of the masters list in bytes (multiple of `mem::size_of::<Master>()`)
     pub masters_len: usize,
     /// Index of last copied Master
     pub num_copied_masters: usize,
@@ -85,7 +83,7 @@ impl Tcb {
         let page_size = Sys::getpagesize();
         let (_abi_page, tls, tcb_page) = Self::os_new(size.next_multiple_of(page_size))?;
 
-        let tcb_ptr = tcb_page.as_mut_ptr() as *mut Self;
+        let tcb_ptr = tcb_page.as_mut_ptr().cast::<Self>();
         ptr::write(
             tcb_ptr,
             Self {
@@ -153,36 +151,36 @@ impl Tcb {
     /// Copy data from masters
     pub unsafe fn copy_masters(&mut self) -> Result<(), DlError> {
         //TODO: Complain if masters or tls exist without the other
-        if let Some(tls) = unsafe { self.tls() } {
-            if let Some(masters) = self.masters() {
-                for master in masters
-                    .iter()
-                    .skip(self.num_copied_masters)
-                    .filter(|master| master.image_size != 0)
-                {
-                    let range = if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
-                        // x86{_64} TLS layout is backwards
-                        self.tls_len - master.offset
-                            ..self.tls_len - master.offset + master.image_size
-                    } else {
-                        master.offset..master.offset + master.image_size
-                    };
-                    if let Some(tls_data) = tls.get_mut(range) {
-                        let data = unsafe { master.data() };
-                        trace!(
-                            "tls master: {:p}, {:#x}: {:p}, {:#x}",
-                            data.as_ptr(),
-                            data.len(),
-                            tls_data.as_mut_ptr(),
-                            tls_data.len()
-                        );
-                        tls_data.copy_from_slice(data);
-                    } else {
-                        return Err(DlError::Malformed);
-                    }
+        if let Some(tls) = unsafe { self.tls() }
+            && let Some(masters) = self.masters()
+        {
+            for master in masters
+                .iter()
+                .skip(self.num_copied_masters)
+                .filter(|master| master.image_size != 0)
+            {
+                let range = if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
+                    // x86{_64} TLS layout is backwards
+                    self.tls_len - master.offset..self.tls_len - master.offset + master.image_size
+                } else {
+                    master.offset..master.offset + master.image_size
+                };
+                if let Some(tls_data) = tls.get_mut(range) {
+                    let data = unsafe { master.data() };
+                    #[cfg(feature = "trace_tls")]
+                    log::trace!(
+                        "tls master: {:p}, {:#x}: {:p}, {:#x}",
+                        data.as_ptr(),
+                        data.len(),
+                        tls_data.as_mut_ptr(),
+                        tls_data.len()
+                    );
+                    tls_data.copy_from_slice(data);
+                } else {
+                    return Err(DlError::Malformed);
                 }
-                self.num_copied_masters = masters.len();
             }
+            self.num_copied_masters = masters.len();
         }
 
         Ok(())
@@ -279,8 +277,8 @@ impl Tcb {
         )
         .map_err(|_| DlError::Oom)?;
 
-        ptr::write_bytes(ptr as *mut u8, 0, size);
-        Ok(slice::from_raw_parts_mut(ptr as *mut u8, size))
+        ptr::write_bytes(ptr.cast::<u8>(), 0, size);
+        Ok(slice::from_raw_parts_mut(ptr.cast::<u8>(), size))
     }
 
     /// OS specific code to create a new TLS and TCB - Linux and Redox

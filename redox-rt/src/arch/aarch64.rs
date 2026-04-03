@@ -3,11 +3,11 @@ use core::{cell::SyncUnsafeCell, mem::offset_of, ptr::NonNull};
 use syscall::{data::*, error::*};
 
 use crate::{
-    RtTcb, Tcb,
+    Tcb,
     proc::{FdGuard, FdGuardUpper, ForkArgs, fork_inner},
-    protocol::{ProcCall, RtSigInfo},
-    signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, inner_c},
+    signal::{PosixStackt, RtSigarea, SigStack, inner_c},
 };
+use redox_protocols::protocol::{ProcCall, RtSigInfo};
 
 use super::ForkScratchpad;
 
@@ -94,14 +94,16 @@ unsafe extern "C" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) -> usiz
 unsafe extern "C" fn child_hook(scratchpad: &ForkScratchpad) {
     //let _ = syscall::write(1, alloc::format!("CUR{cur_filetable_fd}PROC{new_proc_fd}THR{new_thr_fd}\n").as_bytes());
     let _ = syscall::close(scratchpad.cur_filetable_fd);
-    crate::child_hook_common(crate::ChildHookCommonArgs {
-        new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
-        new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
-            None
-        } else {
-            Some(FdGuard::new(scratchpad.new_proc_fd))
-        },
-    });
+    unsafe {
+        crate::child_hook_common(crate::ChildHookCommonArgs {
+            new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
+            new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
+                None
+            } else {
+                Some(FdGuard::new(scratchpad.new_proc_fd))
+            },
+        })
+    };
 }
 
 asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
@@ -449,19 +451,22 @@ pub fn current_sp() -> usize {
 }
 
 pub unsafe fn manually_enter_trampoline() {
-    let ctl = &Tcb::current().unwrap().os_specific.control;
+    let ctl = unsafe { &Tcb::current().unwrap().os_specific.control };
 
     ctl.saved_archdep_reg.set(0);
     let ip_location = &ctl.saved_ip as *const _ as usize;
 
-    core::arch::asm!("
-        bl 2f
-        b 3f
-    2:
-        str lr, [x0]
-        b __relibc_internal_sigentry
-    3:
-    ", inout("x0") ip_location => _, out("lr") _);
+    unsafe {
+        core::arch::asm!("
+                bl 2f
+                b 3f
+            2:
+                str lr, [x0]
+                b __relibc_internal_sigentry
+            3:
+            ",
+            inout("x0") ip_location => _, out("lr") _);
+    }
 }
 
 pub unsafe fn arch_pre(stack: &mut SigStack, os: &mut SigArea) -> PosixStackt {
@@ -470,6 +475,11 @@ pub unsafe fn arch_pre(stack: &mut SigStack, os: &mut SigArea) -> PosixStackt {
         size: 0,                   // TODO
         flags: 0,                  // TODO
     }
+}
+pub fn arch_ret_to_sig(stack: &mut SigStack, control: &Sigcontrol) {
+    let orig_pc = core::mem::replace(&mut stack.regs.pc, __relibc_internal_sigentry as usize);
+    control.saved_ip.set(orig_pc);
+    control.saved_archdep_reg.set(stack.regs.x0);
 }
 pub(crate) static PROC_FD: SyncUnsafeCell<usize> = SyncUnsafeCell::new(usize::MAX);
 static PROC_CALL: [usize; 1] = [ProcCall::Sigdeq as usize];

@@ -2,7 +2,7 @@ use super::gen_salt;
 use crate::platform::types::{c_uchar, c_uint};
 use alloc::string::{String, ToString};
 use base64ct::{Base64Bcrypt, Encoding};
-use core::{str, u32};
+use core::str;
 use scrypt::{Params, scrypt};
 
 /// Map for encoding and decoding
@@ -29,14 +29,12 @@ fn dencode_uint(value: &str) -> Option<c_uint> {
         return None;
     }
 
-    let result = value
+    value
         .chars()
         .enumerate()
         .try_fold(0 as c_uint, |acc, (i, c)| {
             acc.checked_add((to_digit(c, 30)? as c_uint) << (i * 6))
-        });
-
-    Some(result?)
+        })
 }
 
 /// Reads settings for password encryption
@@ -54,7 +52,7 @@ fn read_setting(setting: &str) -> Option<(c_uchar, c_uint, c_uint, String)> {
     let p = dencode_uint(&setting[6..11])?;
 
     let salt = &setting[11..];
-    let actual_salt = if salt.len() > 0 {
+    let actual_salt = if !salt.is_empty() {
         salt.to_string()
     } else {
         gen_salt()?

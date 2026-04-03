@@ -5,8 +5,10 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+use object::elf;
+#[cfg(not(target_arch = "x86"))]
 use object::{
-    NativeEndian, elf,
+    NativeEndian,
     read::elf::{Rela as _, Sym},
 };
 
@@ -16,6 +18,7 @@ use core::{
 };
 
 use crate::{
+    ALLOCATOR,
     c_str::{CStr, CString},
     error::Errno,
     header::{
@@ -23,21 +26,29 @@ use crate::{
         fcntl, sys_mman,
         unistd::F_OK,
     },
-    ld_so::dso::{SymbolBinding, resolve_sym},
+    ld_so::dso::SymbolBinding,
     out::Out,
     platform::{
         Pal, Sys,
-        types::{c_int, c_uint, c_void},
+        types::{c_int, c_void},
     },
     sync::rwlock::RwLock,
 };
 
+#[cfg(feature = "ld_so_cache")]
+use crate::header::sys_stat::stat;
+
+#[cfg(not(target_arch = "x86"))]
+use crate::{ld_so::dso::resolve_sym, platform::types::c_uint};
+
+#[cfg(not(target_arch = "x86"))]
+use super::dso::Rela;
 use super::{
     PATH_SEP,
     access::accessible,
     callbacks::LinkerCallbacks,
     debug::{_dl_debug_state, _r_debug, RTLDState},
-    dso::{DSO, ProgramHeader, Rela},
+    dso::{DSO, ProgramHeader},
     tcb::{Master, Tcb},
 };
 
@@ -90,7 +101,10 @@ impl MmapFile {
         let mut stat = crate::header::sys_stat::stat::default();
         Sys::fstat(fd, Out::from_mut(&mut stat))?;
 
-        let size = stat.st_size as usize;
+        Self::from_fd(fd, stat.st_size as usize)
+    }
+
+    fn from_fd(fd: i32, size: usize) -> core::result::Result<Self, Errno> {
         let ptr = unsafe {
             Sys::mmap(
                 ptr::null_mut(),
@@ -105,8 +119,27 @@ impl MmapFile {
         Ok(Self { fd, ptr, size })
     }
 
+    fn anonymous(size: usize) -> core::result::Result<Self, Errno> {
+        let ptr = unsafe {
+            Sys::mmap(
+                ptr::null_mut(),
+                size,
+                sys_mman::PROT_READ | sys_mman::PROT_WRITE,
+                sys_mman::MAP_PRIVATE | sys_mman::MAP_ANONYMOUS,
+                -1,
+                0,
+            )
+        }?;
+
+        Ok(Self { fd: -1, ptr, size })
+    }
+
     fn data(&self) -> &[u8] {
         unsafe { core::slice::from_raw_parts(self.ptr.cast::<u8>(), self.size) }
+    }
+
+    fn as_mut_slice(&self) -> &mut [u8] {
+        unsafe { core::slice::from_raw_parts_mut(self.ptr.cast::<u8>(), self.size) }
     }
 }
 
@@ -114,7 +147,9 @@ impl Drop for MmapFile {
     fn drop(&mut self) {
         unsafe {
             Sys::munmap(self.ptr, self.size).unwrap();
-            Sys::close(self.fd).unwrap();
+            if self.fd != -1 {
+                Sys::close(self.fd).unwrap();
+            }
         }
     }
 }
@@ -344,7 +379,7 @@ bitflags::bitflags! {
 
 #[derive(Default)]
 pub struct Config {
-    debug_flags: DebugFlags,
+    pub debug_flags: DebugFlags,
     library_path: Option<String>,
     /// Resolve symbols at program startup.
     bind_now: bool,
@@ -433,9 +468,12 @@ impl Linker {
         scope: ScopeKind,
         noload: bool,
     ) -> Result<ObjectHandle> {
-        trace!(
+        log::trace!(
             "[ld.so] load_library(name={:?}, resolve={:#?}, scope={:#?}, noload={})",
-            name, resolve, scope, noload
+            name,
+            resolve,
+            scope,
+            noload
         );
 
         if noload && resolve == Resolve::Now {
@@ -519,7 +557,7 @@ impl Linker {
                     ti_offset: symbol.value,
                 };
 
-                unsafe { __tls_get_addr(&mut tls_index) }
+                unsafe { __tls_get_addr(&raw mut tls_index) }
             }
         })
     }
@@ -530,7 +568,7 @@ impl Linker {
             return;
         }
 
-        trace!(
+        log::trace!(
             "[ld.so] unloading {} (sc={}, wc={})",
             obj.name,
             Arc::strong_count(&obj),
@@ -551,12 +589,11 @@ impl Linker {
 
             let _ = self.objects.remove(&obj.id).unwrap();
             for dep in obj.dependencies() {
-                self.unload(ObjectHandle::new(
-                    self.objects
-                        .get(self.name_to_object_id_map.get(*dep).unwrap())
-                        .unwrap()
-                        .clone(),
-                ));
+                if let Some(name) = self.name_to_object_id_map.get(*dep)
+                    && let Some(object_name) = self.objects.get(name)
+                {
+                    self.unload(ObjectHandle::new(object_name.clone()));
+                }
             }
             self.name_to_object_id_map.remove(&obj.name);
             assert!(Arc::strong_count(&obj) == 1);
@@ -700,6 +737,7 @@ impl Linker {
                     #[cfg(target_os = "redox")]
                     Some(thr_fd),
                 );
+                tcb.mspace = ALLOCATOR.get();
 
                 #[cfg(target_os = "redox")]
                 {
@@ -744,7 +782,8 @@ impl Linker {
     ///
     /// If a dependency has already been loaded, it is *not* added to the scope
     /// nor to `new_objects`.
-    fn load_objects_recursive<'a>(
+    #[allow(clippy::too_many_arguments)]
+    fn load_objects_recursive(
         &mut self,
         name: &str,
         parent_runpath: &Option<String>,
@@ -921,14 +960,93 @@ impl Linker {
             DlError::NotFound
         })?;
 
-        let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
-        let file = MmapFile::open(CStr::borrow(&path_c), flags).map_err(|err| {
-            if debug {
-                eprintln!("[ld.so]: failed to open '{}': {}", path, err)
+        // TODO: Caches may silently fail within multiple users (try to leverage capabilities?)
+        // TODO: No way to specify weak cache or pruning the cache manually
+
+        #[cfg(feature = "ld_so_cache")]
+        let file = {
+            let mut mtime_sec = 0;
+            let mut mtime_nsec = 0;
+            let mut source_size = 0;
+
+            let src_fd = Sys::open(CStr::borrow(&path_c), fcntl::O_RDONLY | fcntl::O_CLOEXEC, 0)
+                .map_err(|err| {
+                    if debug {
+                        eprintln!("[ld.so]: failed to open '{}': {}", path, err)
+                    }
+                    DlError::NotFound
+                })?;
+            let mut st = stat::default();
+            if Sys::fstat(src_fd, Out::from_mut(&mut st)).is_ok() {
+                mtime_sec = st.st_mtim.tv_sec;
+                mtime_nsec = st.st_mtim.tv_nsec;
+                source_size = st.st_size as usize;
             }
 
-            DlError::NotFound
-        })?;
+            let shm_path_str = format!(
+                "/scheme/shm/ld.so.cache.{}.{}.{}\0",
+                path.replace('/', "_"),
+                mtime_sec,
+                mtime_nsec
+            );
+            let shm_path = unsafe { CStr::from_bytes_with_nul_unchecked(shm_path_str.as_bytes()) };
+
+            let mut shm_exists = false;
+
+            if let Ok(shm_fd) = Sys::open(shm_path, fcntl::O_RDONLY, 0) {
+                let mut shm_stat = stat::default();
+                if Sys::fstat(shm_fd, Out::from_mut(&mut shm_stat)).is_ok() {
+                    shm_exists = true;
+                    if shm_stat.st_size > 0 {
+                        if let Ok(mmap_file) = MmapFile::anonymous(source_size) {
+                            let mut offset = 0;
+                            let buf = mmap_file.as_mut_slice();
+                            while offset < source_size {
+                                match Sys::read(shm_fd, &mut buf[offset..]) {
+                                    Ok(0) | Err(_) => break,
+                                    Ok(n) => offset += n,
+                                }
+                            }
+                            let _ = Sys::close(shm_fd);
+                            return Ok(mmap_file);
+                        }
+                        let _ = Sys::close(shm_fd);
+                    }
+                }
+                let _ = Sys::close(shm_fd);
+            }
+
+            let file = MmapFile::from_fd(src_fd, source_size).map_err(|err| {
+                if debug {
+                    eprintln!("[ld.so]: failed to map '{}': {}", path, err)
+                }
+                DlError::NotFound
+            })?;
+
+            if !shm_exists {
+                let _ = Sys::open(shm_path, fcntl::O_CREAT | fcntl::O_RDWR, 0o600)
+                    .map(|fd| Sys::close(fd));
+            } else {
+                if let Ok(shm_fd) = Sys::open(shm_path, fcntl::O_RDWR, 0o600) {
+                    let _ = Sys::ftruncate(shm_fd, source_size as i64);
+                    let _ = Sys::write(shm_fd, file.data());
+                    let _ = Sys::close(shm_fd);
+                }
+            }
+
+            file
+        };
+        #[cfg(not(feature = "ld_so_cache"))]
+        let file = {
+            let flags = fcntl::O_RDONLY | fcntl::O_CLOEXEC;
+            MmapFile::open(CStr::borrow(&path_c), flags).map_err(|err| {
+                if debug {
+                    eprintln!("[ld.so]: failed to open '{}': {}", path, err)
+                }
+
+                DlError::NotFound
+            })?
+        };
 
         Ok(file)
     }
@@ -1002,8 +1120,8 @@ extern "C" fn __plt_resolve_inner(obj: *const DSO, relocation_index: c_uint) -> 
     } else {
         rela.r_offset(NativeEndian) as *mut u64
     };
-
-    trace!("@plt: {} -> *mut {:p}", name, ptr);
+    #[cfg(feature = "trace_tls")]
+    log::trace!("@plt: {} -> *mut {:p}", name, ptr);
 
     unsafe { *ptr = resolved as u64 }
     resolved

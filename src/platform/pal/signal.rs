@@ -2,9 +2,9 @@ use super::super::{Pal, types::*};
 use crate::{
     error::{Errno, Result},
     header::{
+        bits_time::timespec,
         signal::{sigaction, siginfo_t, sigset_t, sigval, stack_t},
         sys_time::itimerval,
-        time::timespec,
     },
 };
 
@@ -21,6 +21,8 @@ pub trait PalSignal: Pal {
 
     fn setitimer(which: c_int, new: &itimerval, old: Option<&mut itimerval>) -> Result<()>;
 
+    fn alarm(seconds: c_uint) -> c_uint;
+
     fn sigaction(sig: c_int, act: Option<&sigaction>, oact: Option<&mut sigaction>) -> Result<()>;
 
     unsafe fn sigaltstack(ss: Option<&stack_t>, old_ss: Option<&mut stack_t>) -> Result<()>;
@@ -35,5 +37,5 @@ pub trait PalSignal: Pal {
         set: &sigset_t,
         sig: Option<&mut siginfo_t>,
         tp: Option<&timespec>,
-    ) -> Result<()>;
+    ) -> Result<c_int>;
 }

@@ -4,8 +4,14 @@ pub mod _aio;
 pub mod _fenv;
 pub mod arpa_inet;
 pub mod assert;
+pub mod bits_arpainet;
+pub mod bits_iovec;
+#[path = "bits_locale-t/mod.rs"]
+pub mod bits_locale_t;
 pub mod bits_pthread;
-pub mod bits_sched;
+#[path = "bits_socklen-t/mod.rs"]
+pub mod bits_socklen_t;
+pub mod bits_time;
 // complex.h implemented in C
 // cpio.h implemented in C
 pub mod crypt;
@@ -38,7 +44,8 @@ pub mod libgen;
 pub mod limits;
 pub mod locale;
 pub mod malloc;
-// math.h implemented in C
+// pub mod math; // TODO unfinished, uncomment when ready to export
+// math.h implemented in C // TODO replace openlibm with rust libm as above
 pub mod monetary;
 // TODO: mqueue.h
 // TODO: ndbm.h

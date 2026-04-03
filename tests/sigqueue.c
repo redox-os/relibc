@@ -100,6 +100,7 @@ int main(void)
     struct timespec t = (struct timespec){.tv_sec = 1, .tv_nsec = 200000000};
     status = sigtimedwait(&set, &info, &t);
     ERROR_IF(sigtimedwait, status, == -1);
+    assert(status == THE_SIG);
     validate(THE_SIG, &info);
     assert(num == 0); // ensure no signal handler ran
 

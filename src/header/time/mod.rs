@@ -5,37 +5,29 @@
 use crate::{
     c_str::{CStr, CString},
     error::{Errno, ResultExt},
-    fs::File,
     header::{
+        bits_time::timespec,
         errno::{EFAULT, ENOMEM, EOVERFLOW, ETIMEDOUT},
-        fcntl::O_RDONLY,
         signal::sigevent,
         stdlib::getenv,
         unistd::readlink,
     },
-    io::Read,
     out::Out,
     platform::{
         self, Pal, Sys,
         types::{
-            c_char, c_double, c_int, c_long, c_ulong, clock_t, clockid_t, pid_t, pthread_t, size_t,
-            time_t, timer_t,
+            c_char, c_double, c_int, c_long, clock_t, clockid_t, pid_t, size_t, time_t, timer_t,
         },
     },
     sync::{Mutex, MutexGuard},
 };
-use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
+use alloc::collections::BTreeSet;
 use chrono::{
-    DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, ParseError, TimeZone,
-    Timelike, Utc, format::ParseErrorKind, offset::MappedLocalTime,
+    DateTime, Datelike, FixedOffset, NaiveDate, NaiveDateTime, Offset, TimeZone, Timelike, Utc,
+    offset::MappedLocalTime,
 };
 use chrono_tz::{OffsetComponents, OffsetName, Tz};
-use core::{
-    cell::OnceCell,
-    convert::{TryFrom, TryInto},
-    fmt::Debug,
-    mem, ptr,
-};
+use core::{cell::OnceCell, convert::TryFrom, mem, ptr};
 
 pub use self::constants::*;
 
@@ -48,72 +40,8 @@ pub use strptime::strptime;
 const YEARS_PER_ERA: time_t = 400;
 const DAYS_PER_ERA: time_t = 146097;
 const SECS_PER_DAY: time_t = 24 * 60 * 60;
-const NANOSECONDS: c_long = 1_000_000_000;
+pub(crate) const NANOSECONDS: c_long = 1_000_000_000;
 const UTC_STR: &core::ffi::CStr = c"UTC";
-
-/// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
-#[repr(C)]
-#[derive(Clone, Copy, Default, Debug)]
-pub struct timespec {
-    pub tv_sec: time_t,
-    pub tv_nsec: c_long,
-}
-
-impl timespec {
-    // TODO: Write test
-
-    /// similar logic with timeradd
-    pub fn add(base: timespec, interval: timespec) -> Option<timespec> {
-        let Some(delta_sec) = base.tv_sec.checked_add(interval.tv_sec) else {
-            return None;
-        };
-        let Some(delta_nsec) = base.tv_nsec.checked_add(interval.tv_nsec) else {
-            return None;
-        };
-
-        if delta_sec < 0 || delta_nsec < 0 {
-            return None;
-        }
-
-        Some(Self {
-            tv_sec: delta_sec + (delta_nsec / NANOSECONDS) as time_t,
-            tv_nsec: delta_nsec % NANOSECONDS,
-        })
-    }
-    /// similar logic with timersub
-    pub fn subtract(later: timespec, earlier: timespec) -> Option<timespec> {
-        let Some(delta_sec) = later.tv_sec.checked_sub(earlier.tv_sec) else {
-            return None;
-        };
-        let Some(delta_nsec) = later.tv_nsec.checked_sub(earlier.tv_nsec) else {
-            return None;
-        };
-
-        let time = if delta_nsec < 0 {
-            let roundup_sec = -delta_nsec / NANOSECONDS + 1;
-            timespec {
-                tv_sec: delta_sec - (roundup_sec as time_t),
-                tv_nsec: roundup_sec * NANOSECONDS - delta_nsec,
-            }
-        } else {
-            timespec {
-                tv_sec: delta_sec + (delta_nsec / NANOSECONDS) as time_t,
-                tv_nsec: delta_nsec % NANOSECONDS,
-            }
-        };
-
-        if time.tv_sec < 0 {
-            // https://man7.org/linux/man-pages/man2/settimeofday.2.html
-            // caller should return EINVAL
-            return None;
-        }
-
-        Some(time)
-    }
-    pub fn is_default(&self) -> bool {
-        return self.tv_nsec == 0 && self.tv_sec == 0;
-    }
-}
 
 #[cfg(target_os = "redox")]
 impl<'a> From<&'a timespec> for syscall::TimeSpec {
@@ -134,10 +62,13 @@ pub(crate) struct timer_internal_t {
     pub timerfd: usize,
     pub eventfd: usize,
     pub evp: sigevent,
-    pub thread: pthread_t,
+    pub thread: platform::types::pthread_t,
     pub caller_thread: crate::pthread::OsTid,
     // relibc handles it_interval, not the kernel
     pub next_wake_time: itimerspec,
+    // When non-zero, timer_routine delivers SIGALRM via kill(process_pid, sig)
+    // instead of rlct_kill (thread-specific). Used by alarm().
+    pub process_pid: platform::types::pid_t,
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/time.h.html>.
@@ -210,7 +141,7 @@ pub struct itimerspec {
 #[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
-    asctime_r(timeptr, &raw mut ASCTIME as *mut _)
+    unsafe { asctime_r(timeptr, (&raw mut ASCTIME).cast()) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/asctime.html>.
@@ -221,13 +152,13 @@ pub unsafe extern "C" fn asctime(timeptr: *const tm) -> *mut c_char {
 #[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_char {
-    let tm_sec = (*tm).tm_sec;
-    let tm_min = (*tm).tm_min;
-    let tm_hour = (*tm).tm_hour;
-    let tm_mday = (*tm).tm_mday;
-    let tm_mon = (*tm).tm_mon;
-    let tm_year = (*tm).tm_year;
-    let tm_wday = (*tm).tm_wday;
+    let tm_sec = unsafe { (*tm).tm_sec };
+    let tm_min = unsafe { (*tm).tm_min };
+    let tm_hour = unsafe { (*tm).tm_hour };
+    let tm_mday = unsafe { (*tm).tm_mday };
+    let tm_mon = unsafe { (*tm).tm_mon };
+    let tm_year = unsafe { (*tm).tm_year };
+    let tm_wday = unsafe { (*tm).tm_wday };
 
     /* Panic when we run into undefined behavior.
      *
@@ -259,17 +190,16 @@ pub unsafe extern "C" fn asctime_r(tm: *const tm, buf: *mut c_char) -> *mut c_ch
      * message for all fields. */
     const OUT_OF_RANGE_MESSAGE: &str = "tm member out of range";
 
-    assert!(0 <= tm_sec && tm_sec <= 99, "{}", OUT_OF_RANGE_MESSAGE);
-    assert!(0 <= tm_min && tm_min <= 99, "{}", OUT_OF_RANGE_MESSAGE);
-    assert!(0 <= tm_hour && tm_hour <= 99, "{}", OUT_OF_RANGE_MESSAGE);
-    assert!(-99 <= tm_mday && tm_mday <= 999, "{}", OUT_OF_RANGE_MESSAGE);
-    assert!(0 <= tm_mon && tm_mon <= 11, "{}", OUT_OF_RANGE_MESSAGE);
+    assert!((0..=99).contains(&tm_sec), "{OUT_OF_RANGE_MESSAGE}");
+    assert!((0..=99).contains(&tm_min), "{OUT_OF_RANGE_MESSAGE}");
+    assert!((0..=99).contains(&tm_hour), "{OUT_OF_RANGE_MESSAGE}");
+    assert!((-99..=999).contains(&tm_mday), "{OUT_OF_RANGE_MESSAGE}");
+    assert!((0..=11).contains(&tm_mon), "{OUT_OF_RANGE_MESSAGE}");
     assert!(
-        -999 - 1900 <= tm_year && tm_year <= 9999 - 1900,
-        "{}",
-        OUT_OF_RANGE_MESSAGE
+        (-999 - 1900..=9999 - 1900).contains(&tm_year),
+        "{OUT_OF_RANGE_MESSAGE}"
     );
-    assert!(0 <= tm_wday && tm_wday <= 6, "{}", OUT_OF_RANGE_MESSAGE);
+    assert!((0..=6).contains(&tm_wday), "{OUT_OF_RANGE_MESSAGE}");
 
     // At this point, we can safely use the values as given.
     let write_result = core::fmt::write(
@@ -308,10 +238,7 @@ pub extern "C" fn clock() -> clock_t {
 
     let clocks =
         ts.tv_sec * CLOCKS_PER_SEC as i64 + (ts.tv_nsec / (1_000_000_000 / CLOCKS_PER_SEC)) as i64;
-    match clock_t::try_from(clocks) {
-        Ok(ok) => ok,
-        Err(_err) => -1,
-    }
+    clock_t::try_from(clocks).unwrap_or(-1)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getcpuclockid.html>.
@@ -323,7 +250,7 @@ pub extern "C" fn clock_getcpuclockid(pid: pid_t, clock_id: *mut clockid_t) -> c
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getres.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn clock_getres(clock_id: clockid_t, res: *mut timespec) -> c_int {
-    Sys::clock_getres(clock_id, Out::nullable(res))
+    Sys::clock_getres(clock_id, unsafe { Out::nullable(res) })
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -331,7 +258,7 @@ pub unsafe extern "C" fn clock_getres(clock_id: clockid_t, res: *mut timespec) -
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getres.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn clock_gettime(clock_id: clockid_t, tp: *mut timespec) -> c_int {
-    Sys::clock_gettime(clock_id, Out::nonnull(tp))
+    Sys::clock_gettime(clock_id, unsafe { Out::nonnull(tp) })
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -350,7 +277,7 @@ pub extern "C" fn clock_nanosleep(
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/clock_getres.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn clock_settime(clock_id: clockid_t, tp: *const timespec) -> c_int {
-    Sys::clock_settime(clock_id, tp)
+    unsafe { Sys::clock_settime(clock_id, tp) }
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -363,7 +290,7 @@ pub unsafe extern "C" fn clock_settime(clock_id: clockid_t, tp: *const timespec)
 #[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ctime(clock: *const time_t) -> *mut c_char {
-    asctime(localtime(clock))
+    unsafe { asctime(localtime(clock)) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9699919799/functions/ctime.html>.
@@ -376,8 +303,8 @@ pub unsafe extern "C" fn ctime(clock: *const time_t) -> *mut c_char {
 pub unsafe extern "C" fn ctime_r(clock: *const time_t, buf: *mut c_char) -> *mut c_char {
     // Using MaybeUninit<tm> seems to cause a panic during the build process
     let mut tm1 = blank_tm();
-    localtime_r(clock, &mut tm1);
-    asctime_r(&tm1, buf)
+    unsafe { localtime_r(clock, &raw mut tm1) };
+    unsafe { asctime_r(&raw const tm1, buf) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/difftime.html>.
@@ -395,20 +322,20 @@ pub unsafe extern "C" fn getdate(string: *const c_char) -> *const tm {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gmtime.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gmtime(timer: *const time_t) -> *mut tm {
-    gmtime_r(timer, &raw mut TM)
+    unsafe { gmtime_r(timer, &raw mut TM) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/gmtime.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gmtime_r(clock: *const time_t, result: *mut tm) -> *mut tm {
-    let _ = get_localtime(*clock, result);
+    let _ = get_localtime(unsafe { *clock }, result);
     result
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/localtime.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn localtime(clock: *const time_t) -> *mut tm {
-    localtime_r(clock, &raw mut TM)
+    unsafe { localtime_r(clock, &raw mut TM) }
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/localtime.html>.
@@ -416,8 +343,8 @@ pub unsafe extern "C" fn localtime(clock: *const time_t) -> *mut tm {
 pub unsafe extern "C" fn localtime_r(clock: *const time_t, t: *mut tm) -> *mut tm {
     let mut lock = TIMEZONE_LOCK.lock();
     clear_timezone(&mut lock);
-    if let (Some(std_time), dst_time) = get_localtime(*clock, t) {
-        set_timezone(&mut lock, &std_time, dst_time);
+    if let (Some(std_time), dst_time) = get_localtime(unsafe { *clock }, t) {
+        unsafe { set_timezone(&mut lock, &std_time, dst_time) };
     }
     t
 }
@@ -428,12 +355,12 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     let mut lock = TIMEZONE_LOCK.lock();
     clear_timezone(&mut lock);
 
-    let year = (*timeptr).tm_year + 1900;
-    let month = ((*timeptr).tm_mon + 1) as _;
-    let day = (*timeptr).tm_mday as _;
-    let hour = (*timeptr).tm_hour as _;
-    let minute = (*timeptr).tm_min as _;
-    let second = (*timeptr).tm_sec as _;
+    let year = unsafe { (*timeptr).tm_year } + 1900;
+    let month = (unsafe { (*timeptr).tm_mon } + 1) as _;
+    let day = unsafe { (*timeptr).tm_mday } as _;
+    let hour = unsafe { (*timeptr).tm_hour } as _;
+    let minute = unsafe { (*timeptr).tm_min } as _;
+    let second = unsafe { (*timeptr).tm_sec } as _;
 
     let naive_local = match NaiveDate::from_ymd_opt(year, month, day)
         .and_then(|date| date.and_hms_opt(hour, minute, second))
@@ -445,7 +372,7 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
         }
     };
 
-    let offset = get_offset((*timeptr).tm_gmtoff).unwrap();
+    let offset = get_offset(unsafe { (*timeptr).tm_gmtoff }).unwrap();
     let tz = time_zone();
     // Create DateTime<FixedOffset>
     let datetime = match offset.from_local_datetime(&naive_local) {
@@ -460,16 +387,17 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
     let tz_datetime = datetime.with_timezone(&tz);
     let timestamp = tz_datetime.timestamp();
 
-    ptr::write(timeptr, datetime_to_tm(&tz_datetime));
+    unsafe { ptr::write(timeptr, datetime_to_tm(&tz_datetime)) };
 
     // Convert UTC time to local time
-    if let (std_time, dst_time) = match tz.timestamp_opt(timestamp, 0) {
+    let (std_time, dst_time) = match tz.timestamp_opt(timestamp, 0) {
         MappedLocalTime::Single(t) => (t, None),
         // This variant contains the two possible results, in the order (earliest, latest).
         MappedLocalTime::Ambiguous(t1, t2) => (t2, Some(t1)),
         MappedLocalTime::None => return timestamp,
-    } {
-        set_timezone(&mut lock, &std_time, dst_time);
+    };
+    {
+        unsafe { set_timezone(&mut lock, &std_time, dst_time) };
     }
 
     timestamp
@@ -478,7 +406,9 @@ pub unsafe extern "C" fn mktime(timeptr: *mut tm) -> time_t {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/nanosleep.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> c_int {
-    Sys::nanosleep(rqtp, rmtp).map(|()| 0).or_minus_one_errno()
+    unsafe { Sys::nanosleep(rqtp, rmtp) }
+        .map(|()| 0)
+        .or_minus_one_errno()
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/strftime.html>.
@@ -489,11 +419,13 @@ pub unsafe extern "C" fn strftime(
     format: *const c_char,
     timeptr: *const tm,
 ) -> size_t {
-    let ret = strftime::strftime(
-        &mut platform::StringWriter(s as *mut u8, maxsize),
-        format,
-        timeptr,
-    );
+    let ret = unsafe {
+        strftime::strftime(
+            &mut platform::StringWriter(s.cast::<u8>(), maxsize),
+            format,
+            timeptr,
+        )
+    };
     if ret < maxsize { ret } else { 0 }
 }
 
@@ -508,9 +440,9 @@ pub unsafe extern "C" fn strftime(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
     let mut ts = timespec::default();
-    Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut ts));
+    if Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut ts)).is_ok() {}; // TODO what to do if Err?
     if !tloc.is_null() {
-        *tloc = ts.tv_sec
+        unsafe { *tloc = ts.tv_sec }
     };
     ts.tv_sec
 }
@@ -518,17 +450,19 @@ pub unsafe extern "C" fn time(tloc: *mut time_t) -> time_t {
 /// Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/timegm.3.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
-    let tm_val = &mut *tm;
+    let tm_val = unsafe { &mut *tm };
     let dt = match convert_tm_generic(&Utc, tm_val) {
         Some(dt) => dt,
         None => return -1,
     };
 
-    (*tm).tm_wday = dt.weekday().num_days_from_sunday() as _;
-    (*tm).tm_yday = dt.ordinal0() as _; // day of year starting at 0
-    (*tm).tm_isdst = 0; // UTC does not use DST
-    (*tm).tm_gmtoff = 0; // UTC offset is zero
-    (*tm).tm_zone = UTC_STR.as_ptr() as *const c_char;
+    unsafe {
+        (*tm).tm_wday = dt.weekday().num_days_from_sunday() as _;
+        (*tm).tm_yday = dt.ordinal0() as _; // day of year starting at 0
+        (*tm).tm_isdst = 0; // UTC does not use DST
+        (*tm).tm_gmtoff = 0; // UTC offset is zero
+        (*tm).tm_zone = UTC_STR.as_ptr().cast::<c_char>();
+    }
 
     dt.timestamp()
 }
@@ -537,7 +471,7 @@ pub unsafe extern "C" fn timegm(tm: *mut tm) -> time_t {
 #[deprecated]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
-    let tm_val = &mut *tm;
+    let tm_val = unsafe { &mut *tm };
     let tz = time_zone();
     let dt = match convert_tm_generic(&tz, tm_val) {
         Some(dt) => dt,
@@ -545,11 +479,13 @@ pub unsafe extern "C" fn timelocal(tm: *mut tm) -> time_t {
     };
 
     let tz_name = CString::new(tz.name()).unwrap();
-    (*tm).tm_wday = dt.weekday().num_days_from_sunday() as _;
-    (*tm).tm_yday = dt.ordinal0() as _; // day of year starting at 0
-    (*tm).tm_isdst = dt.offset().dst_offset().num_hours() as _;
-    (*tm).tm_gmtoff = dt.offset().fix().local_minus_utc() as _;
-    (*tm).tm_zone = tz_name.into_raw().cast();
+    unsafe {
+        (*tm).tm_wday = dt.weekday().num_days_from_sunday() as _;
+        (*tm).tm_yday = dt.ordinal0() as _; // day of year starting at 0
+        (*tm).tm_isdst = dt.offset().dst_offset().num_hours() as _;
+        (*tm).tm_gmtoff = dt.offset().fix().local_minus_utc().into();
+        (*tm).tm_zone = tz_name.into_raw().cast();
+    }
 
     dt.timestamp()
 }
@@ -565,7 +501,7 @@ pub unsafe extern "C" fn timer_create(
         return Err(Errno(EFAULT)).or_minus_one_errno();
     }
     let (evp, timerid) = unsafe { (&*evp, Out::nonnull(timerid)) };
-    Sys::timer_create(clock_id, &evp, timerid)
+    Sys::timer_create(clock_id, evp, timerid)
         .map(|()| 0)
         .or_minus_one_errno()
 }
@@ -642,7 +578,7 @@ pub unsafe extern "C" fn timespec_getres(res: *mut timespec, base: c_int) -> c_i
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tzset() {
     let mut lock = TIMEZONE_LOCK.lock();
-    unsafe { clear_timezone(&mut lock) };
+    clear_timezone(&mut lock);
 
     let tz = time_zone();
     let datetime = now();
@@ -653,7 +589,7 @@ pub unsafe extern "C" fn tzset() {
         MappedLocalTime::None => return,
     };
 
-    set_timezone(&mut lock, &std_time, dst_time)
+    unsafe { set_timezone(&mut lock, &std_time, dst_time) }
 }
 
 fn convert_tm_generic<Tz: TimeZone>(tz: &Tz, tm_val: &tm) -> Option<DateTime<Tz>> {
@@ -708,10 +644,10 @@ fn get_system_time_zone<'a>() -> Option<&'a str> {
 
     let path = unsafe { CStr::from_ptr(buffer.as_mut_ptr().cast()) };
 
-    if let Ok(tz_name) = path.to_str() {
-        if let Some(stripped) = tz_name.strip_prefix(prefix) {
-            return Some(stripped);
-        }
+    if let Ok(tz_name) = path.to_str()
+        && let Some(stripped) = tz_name.strip_prefix(prefix)
+    {
+        return Some(stripped);
     }
 
     None
@@ -719,11 +655,11 @@ fn get_system_time_zone<'a>() -> Option<&'a str> {
 
 fn get_current_time_zone<'a>() -> &'a str {
     // Check the `TZ` environment variable
-    let tz_env = unsafe { getenv(c"TZ".as_ptr() as _) };
-    if !tz_env.is_null() {
-        if let Ok(tz) = unsafe { CStr::from_ptr(tz_env) }.to_str() {
-            return tz;
-        }
+    let tz_env = unsafe { getenv(c"TZ".as_ptr().cast()) };
+    if !tz_env.is_null()
+        && let Ok(tz) = unsafe { CStr::from_ptr(tz_env) }.to_str()
+    {
+        return tz;
     }
 
     // Fallback to the system's default time zone
@@ -743,9 +679,7 @@ fn time_zone() -> Tz {
 #[inline(always)]
 fn now() -> NaiveDateTime {
     let mut now = timespec::default();
-    unsafe {
-        Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut now));
-    }
+    if Sys::clock_gettime(CLOCK_REALTIME, Out::from_mut(&mut now)).is_ok() {}; // TODO what to do if Err?
     NaiveDateTime::from_timestamp(now.tv_sec, now.tv_nsec as _)
 }
 
@@ -767,7 +701,7 @@ fn get_localtime(clock: time_t, t: *mut tm) -> (Option<DateTime<Tz>>, Option<Dat
 
 unsafe fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
     let tz = local_time.timezone().name();
-    let tz = tz.strip_prefix("Etc/").or(Some(tz)).unwrap();
+    let tz = tz.strip_prefix("Etc/").unwrap_or(tz);
 
     let mut t = blank_tm();
     // Populate the `tm` structure
@@ -783,7 +717,7 @@ unsafe fn datetime_to_tm(local_time: &DateTime<Tz>) -> tm {
     let offset = local_time.offset();
     t.tm_isdst = offset.dst_offset().num_hours() as _;
     // Get the UTC offset in seconds
-    t.tm_gmtoff = offset.fix().local_minus_utc() as _;
+    t.tm_gmtoff = offset.fix().local_minus_utc().into();
 
     let tm_zone = {
         let mut timezone_names = TIMEZONE_NAMES.lock();
@@ -805,23 +739,29 @@ unsafe fn set_timezone(
     let ut_offset = std.offset();
 
     guard.0 = Some(CString::new(ut_offset.abbreviation().expect("Wrong timezone")).unwrap());
-    tzname.0[0] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
+    unsafe {
+        tzname.0[0] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
+    }
 
     match dst {
         Some(dst) => {
             guard.1 =
                 Some(CString::new(dst.offset().abbreviation().expect("Wrong timezone")).unwrap());
-            tzname.0[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
-            daylight = 1;
+            unsafe {
+                tzname.0[1] = guard.1.as_ref().unwrap().as_ptr().cast_mut();
+            }
+            unsafe { daylight = 1 };
         }
         None => {
             guard.1 = None;
-            tzname.0[1] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
-            daylight = 0;
+            unsafe {
+                tzname.0[1] = guard.0.as_ref().unwrap().as_ptr().cast_mut();
+            }
+            unsafe { daylight = 0 };
         }
     }
 
-    timezone = -c_long::from(ut_offset.fix().local_minus_utc());
+    unsafe { timezone = -c_long::from(ut_offset.fix().local_minus_utc()) };
 }
 
 #[inline(always)]
@@ -851,9 +791,9 @@ const fn blank_tm() -> tm {
 
 pub(crate) fn timespec_realtime_to_monotonic(abstime: timespec) -> Result<timespec, Errno> {
     let mut realtime = timespec::default();
-    unsafe { clock_gettime(CLOCK_REALTIME, &mut realtime) };
+    unsafe { clock_gettime(CLOCK_REALTIME, &raw mut realtime) };
     let mut monotonic = timespec::default();
-    unsafe { clock_gettime(CLOCK_MONOTONIC, &mut monotonic) };
+    unsafe { clock_gettime(CLOCK_MONOTONIC, &raw mut monotonic) };
     let Some(delta) = timespec::subtract(abstime, realtime) else {
         return Err(Errno(ETIMEDOUT));
     };

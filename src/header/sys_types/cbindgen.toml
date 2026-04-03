@@ -1,11 +1,17 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_types.h.html
+#
+# There are no spec quotations relating to includes
+#
+# - sys/types_internal.h are fundamental C types (which includes stddef.h)
+# - bits/pthread.h is separate for convenience
+# - features.h saves importing separately for any header that imports sys/types.h
+#
 # no default C includes - they cause recursive dependencies and do weird stuff
 no_includes = true
 sys_includes = [
     # Import most necessary, internal types first
     "sys/types_internal.h",
 
-    "stddef.h",
-    "sys/select.h",
     "bits/pthread.h",
     "features.h",
 ]

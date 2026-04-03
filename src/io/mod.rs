@@ -365,7 +365,7 @@ fn read_to_end_with_reservation<R: Read + ?Sized>(
     let start_len = buf.len();
     let mut g = Guard {
         len: buf.len(),
-        buf: buf,
+        buf,
     };
     let ret;
     loop {
@@ -916,10 +916,7 @@ pub trait Read {
     where
         Self: Sized,
     {
-        Take {
-            inner: self,
-            limit: limit,
-        }
+        Take { inner: self, limit }
     }
 }
 
@@ -1383,7 +1380,7 @@ impl<T: Read, U: Read> Read for Chain<T, U> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         if !self.done_first {
             match self.first.read(buf)? {
-                0 if buf.len() != 0 => {
+                0 if !buf.is_empty() => {
                     self.done_first = true;
                 }
                 n => return Ok(n),
@@ -1393,11 +1390,11 @@ impl<T: Read, U: Read> Read for Chain<T, U> {
     }
 
     unsafe fn initializer(&self) -> Initializer {
-        let initializer = self.first.initializer();
+        let initializer = unsafe { self.first.initializer() };
         if initializer.should_initialize() {
             initializer
         } else {
-            self.second.initializer()
+            unsafe { self.second.initializer() }
         }
     }
 }
@@ -1406,7 +1403,7 @@ impl<T: BufRead, U: BufRead> BufRead for Chain<T, U> {
     fn fill_buf(&mut self) -> Result<&[u8]> {
         if !self.done_first {
             match self.first.fill_buf()? {
-                buf if buf.len() == 0 => {
+                [] => {
                     self.done_first = true;
                 }
                 buf => return Ok(buf),
@@ -1586,7 +1583,7 @@ impl<T: Read> Read for Take<T> {
     }
 
     unsafe fn initializer(&self) -> Initializer {
-        self.inner.initializer()
+        unsafe { self.inner.initializer() }
     }
 
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize> {

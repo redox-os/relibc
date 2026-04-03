@@ -9,8 +9,6 @@
 #include "signals_list.h"
 #include "../test_helpers.h"
 
-#define _XOPEN_SOURCE 700
-
 volatile sig_atomic_t handler_called = 0;
 
 void sig_handler(int signo)

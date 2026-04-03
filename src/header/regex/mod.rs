@@ -7,7 +7,7 @@ use crate::{
     platform::types::{c_char, c_int, c_void, size_t},
 };
 use alloc::{borrow::Cow, boxed::Box};
-use core::{mem, ptr, slice};
+use core::{ptr, slice};
 use posix_regex::{PosixRegex, PosixRegexBuilder, compile::Error as CompileError, tree::Tree};
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/regex.h.html>.
@@ -35,6 +35,7 @@ pub const REG_NOSUB: c_int = 4;
 pub const REG_NEWLINE: c_int = 8;
 pub const REG_NOTBOL: c_int = 16;
 pub const REG_NOTEOL: c_int = 32;
+pub const REG_MINIMAL: c_int = 64;
 
 pub const REG_NOMATCH: c_int = 1;
 pub const REG_BADPAT: c_int = 2;
@@ -55,20 +56,22 @@ pub const REG_BADRPT: c_int = 14;
 #[unsafe(no_mangle)]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: c_int) -> c_int {
-    let pat = slice::from_raw_parts(pat as *const u8, strlen(pat));
+    let pat = unsafe { slice::from_raw_parts(pat.cast::<u8>(), strlen(pat)) };
     let res = PosixRegexBuilder::new(pat)
         .with_default_classes()
         .extended(cflags & REG_EXTENDED == REG_EXTENDED)
         .compile_tokens();
 
     match res {
-        Ok(mut branches) => {
+        Ok(branches) => {
             let re_nsub = PosixRegex::new(Cow::Borrowed(&branches)).count_groups();
-            *out = regex_t {
-                ptr: Box::into_raw(Box::new(branches)) as *mut c_void,
+            unsafe {
+                *out = regex_t {
+                    ptr: Box::into_raw(Box::new(branches)).cast::<c_void>(),
 
-                cflags,
-                re_nsub,
+                    cflags,
+                    re_nsub,
+                }
             };
             0
         }
@@ -87,7 +90,7 @@ pub unsafe extern "C" fn regcomp(out: *mut regex_t, pat: *const c_char, cflags: 
 #[unsafe(no_mangle)]
 #[linkage = "weak"] // redefined in GIT
 pub unsafe extern "C" fn regfree(regex: *mut regex_t) {
-    Box::from_raw((*regex).ptr);
+    unsafe { drop(Box::from_raw((*regex).ptr)) };
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/regexec.html>.
@@ -100,16 +103,16 @@ pub unsafe extern "C" fn regexec(
     pmatch: *mut regmatch_t,
     eflags: c_int,
 ) -> c_int {
-    let regex = &*regex;
+    let regex = unsafe { &*regex };
 
     // Allow specifying a compiler argument to the executor and viceversa
     // because why not?
     let flags = regex.cflags | eflags;
 
-    let input = slice::from_raw_parts(input as *const u8, strlen(input));
-    let branches = &*(regex.ptr as *mut Tree);
+    let input = unsafe { slice::from_raw_parts(input.cast::<u8>(), strlen(input)) };
+    let branches = unsafe { &*(regex.ptr.cast::<Tree>()) };
 
-    let matches = PosixRegex::new(Cow::Borrowed(&branches))
+    let matches = PosixRegex::new(Cow::Borrowed(branches))
         .case_insensitive(flags & REG_ICASE == REG_ICASE)
         .newline(flags & REG_NEWLINE == REG_NEWLINE)
         .no_start(flags & REG_NOTBOL == REG_NOTBOL)
@@ -121,9 +124,11 @@ pub unsafe extern "C" fn regexec(
 
         for i in 0..nmatch {
             let (start, end) = first.get(i).and_then(|&range| range).unwrap_or((!0, !0));
-            *pmatch.add(i) = regmatch_t {
-                rm_so: start,
-                rm_eo: end,
+            unsafe {
+                *pmatch.add(i) = regmatch_t {
+                    rm_so: start,
+                    rm_eo: end,
+                }
             };
         }
     }
@@ -160,11 +165,7 @@ pub extern "C" fn regerror(
     };
 
     unsafe {
-        ptr::copy_nonoverlapping(
-            string.as_ptr(),
-            out as *mut u8,
-            string.len().min(max as usize),
-        );
+        ptr::copy_nonoverlapping(string.as_ptr(), out.cast::<u8>(), string.len().min(max));
     }
 
     string.len()

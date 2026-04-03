@@ -10,6 +10,8 @@ macro_rules! platform_specific {
             #[cfg(target_arch = $rust_arch)]
             global_asm!(include_str!(concat!("impl/", $c_arch, "/setjmp.", $ext)));
             #[cfg(target_arch = $rust_arch)]
+            global_asm!(include_str!(concat!("impl/", $c_arch, "/sigsetjmp.", $ext)));
+            #[cfg(target_arch = $rust_arch)]
             global_asm!(include_str!(concat!("impl/", $c_arch, "/longjmp.", $ext)));
         )+
     }

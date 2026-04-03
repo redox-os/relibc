@@ -3,11 +3,10 @@ use core::{cell::SyncUnsafeCell, mem::offset_of, ptr::NonNull, sync::atomic::Ord
 use syscall::*;
 
 use crate::{
-    RtTcb,
     proc::{FdGuard, FdGuardUpper, ForkArgs, fork_inner},
-    protocol::{ProcCall, RtSigInfo},
     signal::{PROC_CONTROL_STRUCT, PosixStackt, RtSigarea, SigStack, inner_fastcall},
 };
+use redox_protocols::protocol::{ProcCall, RtSigInfo};
 
 use super::ForkScratchpad;
 
@@ -78,14 +77,16 @@ unsafe extern "fastcall" fn fork_impl(args: &ForkArgs, initial_rsp: *mut usize) 
 // TODO: duplicate code with x86_64
 unsafe extern "cdecl" fn child_hook(scratchpad: ForkScratchpad) {
     let _ = syscall::close(scratchpad.cur_filetable_fd);
-    crate::child_hook_common(crate::ChildHookCommonArgs {
-        new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
-        new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
-            None
-        } else {
-            Some(FdGuard::new(scratchpad.new_proc_fd))
-        },
-    });
+    unsafe {
+        crate::child_hook_common(crate::ChildHookCommonArgs {
+            new_thr_fd: FdGuard::new(scratchpad.new_thr_fd),
+            new_proc_fd: if scratchpad.new_proc_fd == usize::MAX {
+                None
+            } else {
+                Some(FdGuard::new(scratchpad.new_proc_fd))
+            },
+        })
+    };
 }
 
 asmfunction!(__relibc_internal_fork_wrapper (usize) -> usize: ["
@@ -356,8 +357,8 @@ unsafe extern "C" {
 pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt {
     if stack.regs.eip == __relibc_internal_sigentry_crit_first as usize {
         let stack_ptr = stack.regs.esp as *const usize;
-        stack.regs.esp = stack_ptr.read();
-        stack.regs.eip = stack_ptr.sub(1).read();
+        stack.regs.esp = unsafe { stack_ptr.read() };
+        stack.regs.eip = unsafe { stack_ptr.sub(1).read() };
     } else if stack.regs.eip == __relibc_internal_sigentry_crit_second as usize
         || stack.regs.eip == __relibc_internal_sigentry_crit_third as usize
     {
@@ -369,26 +370,33 @@ pub unsafe fn arch_pre(stack: &mut SigStack, area: &mut SigArea) -> PosixStackt 
         flags: 0, // TODO
     }
 }
+pub fn arch_ret_to_sig(stack: &mut SigStack, control: &Sigcontrol) {
+    let orig_eip = core::mem::replace(&mut stack.regs.eip, __relibc_internal_sigentry as usize);
+    control.saved_ip.set(orig_eip);
+    control.saved_archdep_reg.set(stack.regs.eflags);
+}
 #[unsafe(no_mangle)]
 pub unsafe fn manually_enter_trampoline() {
-    let c = &crate::Tcb::current().unwrap().os_specific.control;
+    let c = unsafe { &crate::Tcb::current().unwrap().os_specific.control };
     c.control_flags.store(
         c.control_flags.load(Ordering::Relaxed) | syscall::flag::INHIBIT_DELIVERY.bits(),
         Ordering::Release,
     );
     c.saved_archdep_reg.set(0); // TODO: Just reset DF on x86?
 
-    core::arch::asm!("
-        call 2f
-        jmp 3f
-    2:
-        pop dword ptr gs:[{tcb_sc_off} + {sc_saved_eip}]
-        jmp __relibc_internal_sigentry
-    3:
-    ",
-        tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
-        sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
-    );
+    unsafe {
+        core::arch::asm!("
+                call 2f
+                jmp 3f
+            2:
+                pop dword ptr gs:[{tcb_sc_off} + {sc_saved_eip}]
+                jmp __relibc_internal_sigentry
+            3:
+            ",
+            tcb_sc_off = const offset_of!(crate::Tcb, os_specific) + offset_of!(RtSigarea, control),
+            sc_saved_eip = const offset_of!(Sigcontrol, saved_ip),
+        );
+    }
 }
 /// Get current stack pointer, weak granularity guarantees.
 pub fn current_sp() -> usize {

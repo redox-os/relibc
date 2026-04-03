@@ -1,29 +1,30 @@
-use core::{arch::asm, num::NonZeroU64, ptr};
-
-use super::{ERRNO, Pal, types::*};
 #[cfg(target_arch = "x86_64")]
-use crate::ld_so::tcb::OsSpecific;
+use core::arch::asm;
+
+use super::{Pal, types::*};
 use crate::{
     c_str::CStr,
     header::{
         dirent::dirent,
-        errno::{EINVAL, EIO, EOPNOTSUPP},
-        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW},
+        errno::{EINVAL, EIO},
+        fcntl::{AT_EMPTY_PATH, AT_FDCWD, AT_REMOVEDIR},
         signal::{SIGCHLD, sigevent},
         sys_resource::{rlimit, rusage},
+        sys_select::timeval,
         sys_stat::{S_IFIFO, stat},
         sys_statvfs::statvfs,
-        sys_time::{timeval, timezone},
+        sys_time::timezone,
         time::itimerspec,
         unistd::{SEEK_CUR, SEEK_SET},
     },
-    io::Write,
+    ld_so::tcb::OsSpecific,
     out::Out,
 };
+use core::{num::NonZeroU64, ptr};
 // use header::sys_times::tms;
 use crate::{
     error::{Errno, Result},
-    header::{sys_utsname::utsname, time::timespec},
+    header::{bits_time::timespec, sys_utsname::utsname},
 };
 
 mod epoll;
@@ -159,7 +160,7 @@ impl Pal for Sys {
         envp: *const *mut c_char,
     ) -> Result<()> {
         let empty = b"\0";
-        let empty_ptr = empty.as_ptr() as *const c_char;
+        let empty_ptr = empty.as_ptr().cast::<c_char>();
         e_raw(syscall!(
             EXECVEAT,
             fildes,
@@ -217,7 +218,7 @@ impl Pal for Sys {
 
     fn fstat(fildes: c_int, mut buf: Out<stat>) -> Result<()> {
         let empty = b"\0";
-        let empty_ptr = empty.as_ptr() as *const c_char;
+        let empty_ptr = empty.as_ptr().cast::<c_char>();
         e_raw(unsafe {
             syscall!(
                 NEWFSTATAT,
@@ -247,7 +248,7 @@ impl Pal for Sys {
         let buf = buf.as_mut_ptr();
 
         let mut kbuf = linux_statfs::default();
-        let kbuf_ptr = &mut kbuf as *mut linux_statfs;
+        let kbuf_ptr = &raw mut kbuf;
         e_raw(unsafe { syscall!(FSTATFS, fildes, kbuf_ptr) })?;
 
         if !buf.is_null() {
@@ -295,7 +296,7 @@ impl Pal for Sys {
 
     #[inline]
     unsafe fn futex_wait(addr: *mut u32, val: u32, deadline: Option<&timespec>) -> Result<()> {
-        let deadline = deadline.map_or(0, |d| d as *const _ as usize);
+        let deadline = deadline.map_or(0, |d| ptr::from_ref(d) as usize);
         e_raw(unsafe {
             syscall!(
                 FUTEX, addr,       // uaddr
@@ -344,7 +345,7 @@ impl Pal for Sys {
     }
     unsafe fn dent_reclen_offset(this_dent: &[u8], offset: usize) -> Option<(u16, u64)> {
         let dent = this_dent.as_ptr().cast::<dirent>();
-        Some(((*dent).d_reclen, (*dent).d_off as u64))
+        Some((unsafe { (*dent).d_reclen }, unsafe { (*dent).d_off } as u64))
     }
 
     fn getegid() -> gid_t {
@@ -480,7 +481,7 @@ impl Pal for Sys {
                 path.as_ptr(),
                 owner as u32,
                 group as u32,
-                AT_SYMLINK_NOFOLLOW
+                crate::header::fcntl::AT_SYMLINK_NOFOLLOW
             )
         })
         .map(|_| ())
@@ -516,7 +517,7 @@ impl Pal for Sys {
         // Note: dev_t is c_long (i64) and __kernel_dev_t is u32; So we need to cast it
         //       and check for overflow
         let k_dev: c_uint = dev as c_uint;
-        if k_dev as dev_t != dev {
+        if dev_t::from(k_dev) != dev {
             return Err(Errno(EINVAL));
         }
 
@@ -597,6 +598,10 @@ impl Pal for Sys {
             .map(|fd| fd as c_int)
     }
 
+    fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int> {
+        e_raw(unsafe { syscall!(OPENAT, dirfd, path.as_ptr(), oflag, mode) }).map(|fd| fd as c_int)
+    }
+
     fn pipe2(mut fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()> {
         e_raw(unsafe { syscall!(PIPE2, fildes.as_mut_ptr(), flags) }).map(|_| ())
     }
@@ -639,52 +644,54 @@ impl Pal for Sys {
     ) -> Result<crate::pthread::OsTid> {
         let flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
         let pid;
-        asm!("
-            # Call clone syscall
-            syscall
+        unsafe {
+            asm!("
+                # Call clone syscall
+                syscall
 
-            # Check if child or parent
-            test rax, rax
-            jnz 2f
+                # Check if child or parent
+                test rax, rax
+                jnz 2f
 
-            # Load registers
-            pop rax
-            pop rdi
-            pop rsi
-            pop rdx
-            pop rcx
-            pop r8
-            pop r9
+                # Load registers
+                pop rax
+                pop rdi
+                pop rsi
+                pop rdx
+                pop rcx
+                pop r8
+                pop r9
 
-            # Call entry point
-            call rax
+                # Call entry point
+                call rax
 
-            # Exit
-            mov rax, 60
-            xor rdi, rdi
-            syscall
+                # Exit
+                mov rax, 60
+                xor rdi, rdi
+                syscall
 
-            # Invalid instruction on failure to exit
-            ud2
+                # Invalid instruction on failure to exit
+                ud2
 
-            # Return PID if parent
-            2:
-            ",
-            inout("rax") SYS_CLONE => pid,
-            inout("rdi") flags => _,
-            inout("rsi") stack => _,
-            inout("rdx") 0 => _,
-            inout("r10") 0 => _,
-            inout("r8") 0 => _,
-            //TODO: out("rbx") _,
-            out("rcx") _,
-            out("r9") _,
-            out("r11") _,
-            out("r12") _,
-            out("r13") _,
-            out("r14") _,
-            out("r15") _,
-        );
+                # Return PID if parent
+                2:
+                ",
+                inout("rax") SYS_CLONE => pid,
+                inout("rdi") flags => _,
+                inout("rsi") stack => _,
+                inout("rdx") 0 => _,
+                inout("r10") 0 => _,
+                inout("r8") 0 => _,
+                //TODO: out("rbx") _,
+                out("rcx") _,
+                out("r9") _,
+                out("r11") _,
+                out("r12") _,
+                out("r13") _,
+                out("r14") _,
+                out("r15") _,
+            );
+        }
         let tid = e_raw(pid)?;
 
         Ok(crate::pthread::OsTid { thread_id: tid })
@@ -842,7 +849,7 @@ impl Pal for Sys {
         timerid: timer_t,
         flags: c_int,
         value: &itimerspec,
-        mut ovalue: Option<Out<itimerspec>>,
+        ovalue: Option<Out<itimerspec>>,
     ) -> Result<()> {
         e_raw(unsafe {
             syscall!(

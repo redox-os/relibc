@@ -2,18 +2,14 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/grp.h.html>.
 
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::{
     cell::SyncUnsafeCell,
-    convert::{TryFrom, TryInto},
+    convert::TryInto,
     mem::{self, MaybeUninit},
     num::ParseIntError,
     ops::{Deref, DerefMut},
     pin::Pin,
-    primitive::str,
     ptr, slice,
-    str::Matches,
 };
 
 use alloc::{
@@ -22,14 +18,12 @@ use alloc::{
 };
 
 use crate::{
-    c_str::CStr,
     fs::File,
     header::{errno, fcntl, limits, string::strlen, unistd},
     io,
     io::{BufReader, Lines, prelude::*},
     platform,
     platform::types::{c_char, c_int, c_void, gid_t, size_t},
-    sync::Mutex,
 };
 
 use super::{errno::*, string::strncmp};
@@ -135,9 +129,9 @@ fn split(buf: &mut [u8]) -> Option<group> {
 
     // We moved the gid to the beginning of the byte buffer so we can do this.
     let mut parts = buf[mem::size_of::<gid_t>()..].split_mut(|&c| c == b'\0');
-    let gr_name = parts.next()?.as_mut_ptr() as *mut c_char;
-    let gr_passwd = parts.next()?.as_mut_ptr() as *mut c_char;
-    let gr_mem = parts.next()?.as_mut_ptr() as *mut usize;
+    let gr_name = parts.next()?.as_mut_ptr().cast::<c_char>();
+    let gr_passwd = parts.next()?.as_mut_ptr().cast::<c_char>();
+    let gr_mem = parts.next()?.as_mut_ptr().cast::<usize>();
 
     // Adjust gr_mem address by buffer base address
     // TODO: max group members length?
@@ -155,12 +149,12 @@ fn split(buf: &mut [u8]) -> Option<group> {
         gr_name,
         gr_passwd,
         gr_gid,
-        gr_mem: gr_mem as *mut *mut c_char,
+        gr_mem: gr_mem.cast::<*mut c_char>(),
     })
 }
 
 fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Error> {
-    let mut buffer = line.to_owned().into_bytes();
+    let buffer = line.to_owned().into_bytes();
 
     let mut buffer = buffer
         .into_iter()
@@ -169,16 +163,15 @@ fn parse_grp(line: String, destbuf: Option<DestBuffer>) -> Result<OwnedGrp, Erro
         .collect::<Vec<_>>();
     let mut buffer = buffer.split_mut(|i| *i == b'\0');
 
-    let mut gr_gid: gid_t = 0;
     let strings = {
         let mut vec: Vec<u8> = Vec::new();
 
         let gr_name = buffer.next().ok_or(Error::EOF)?.to_vec();
         let gr_passwd = buffer.next().ok_or(Error::EOF)?.to_vec();
-        gr_gid = String::from_utf8(buffer.next().ok_or(Error::EOF)?.to_vec())
-            .map_err(|err| Error::FromUtf8Error(err))?
+        let gr_gid = String::from_utf8(buffer.next().ok_or(Error::EOF)?.to_vec())
+            .map_err(Error::FromUtf8Error)?
             .parse::<gid_t>()
-            .map_err(|err| Error::ParseIntError(err))?;
+            .map_err(Error::ParseIntError)?;
 
         // Place the gid at the beginning of the byte buffer to make getting it back out again later, much faster.
 
@@ -334,7 +327,7 @@ pub unsafe extern "C" fn getgrgid_r(
         let grp = match parse_grp(
             line,
             Some(DestBuffer {
-                ptr: buffer as *mut u8,
+                ptr: buffer.cast::<u8>(),
                 len: buflen,
             }),
         ) {
@@ -387,10 +380,10 @@ pub unsafe extern "C" fn getgrnam_r(
 
     for line in BufReader::new(db).lines() {
         let Ok(line) = line else { return EINVAL };
-        let Ok(mut grp) = parse_grp(
+        let Ok(grp) = parse_grp(
             line,
             Some(DestBuffer {
-                ptr: buffer as *mut u8,
+                ptr: buffer.cast::<u8>(),
                 len: buflen,
             }),
         ) else {
@@ -402,7 +395,7 @@ pub unsafe extern "C" fn getgrnam_r(
                 grp.reference.gr_name,
                 name,
                 strlen(grp.reference.gr_name).min(strlen(name)),
-            ) > 0
+            ) == 0
         } {
             unsafe {
                 *result_buf = grp.reference;
@@ -463,7 +456,7 @@ pub unsafe extern "C" fn endgrent() {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/endgrent.html>.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn setgrent() {
-    let mut line_reader = unsafe { &mut *LINE_READER.get() };
+    let line_reader = unsafe { &mut *LINE_READER.get() };
     let Ok(db) = File::open(GROUP_FILE.into(), fcntl::O_RDONLY) else {
         return;
     };
@@ -481,7 +474,7 @@ pub unsafe extern "C" fn getgrouplist(
     groups: *mut gid_t,
     ngroups: *mut c_int,
 ) -> c_int {
-    let mut grps = unsafe {
+    let grps = unsafe {
         slice::from_raw_parts_mut(groups.cast::<MaybeUninit<gid_t>>(), ngroups.read() as usize)
     };
 
@@ -515,7 +508,7 @@ pub unsafe extern "C" fn getgrouplist(
             .map(|i| i.trim())
             .collect::<Vec<_>>();
 
-        if !members.iter().any(|i| *i == user) {
+        if !members.contains(&user) {
             continue;
         }
 
@@ -548,7 +541,7 @@ pub unsafe extern "C" fn getgrouplist(
 pub unsafe extern "C" fn initgroups(user: *const c_char, gid: gid_t) -> c_int {
     let mut groups = [0; limits::NGROUPS_MAX];
     let mut count = groups.len() as c_int;
-    if unsafe { getgrouplist(user, gid, groups.as_mut_ptr(), &mut count) < 0 } {
+    if unsafe { getgrouplist(user, gid, groups.as_mut_ptr(), &raw mut count) < 0 } {
         return -1;
     }
     unsafe { unistd::setgroups(count as size_t, groups.as_ptr()) }

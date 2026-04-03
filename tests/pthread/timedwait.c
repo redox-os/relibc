@@ -78,7 +78,7 @@ int main() {
     test_timeout_case();
     // TODO: "rlct_clone not implemented for aarch64 yet"
 #if defined(__linux__) && defined(__aarch64__)
-    printf("test_success_case skipped")
+    printf("test_success_case skipped");
 #else
     test_success_case();
 #endif

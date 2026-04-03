@@ -1,5 +1,3 @@
-use core::arch::global_asm;
-
 use redox_rt::signal::SiginfoAbi;
 
 use super::{siginfo_t, sigset_t, stack_t};

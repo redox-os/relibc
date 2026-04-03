@@ -1,3 +1,6 @@
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/dlfcn.h.html
+#
+# There are no spec quotations relating to includes
 sys_includes = []
 include_guard = "_RELIBC_DLFCN_H"
 language = "C"

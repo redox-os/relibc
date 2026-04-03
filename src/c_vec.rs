@@ -29,6 +29,7 @@ pub struct CVec<T> {
     cap: usize,
 }
 impl<T> CVec<T> {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             ptr: NonNull::dangling(),
@@ -37,7 +38,7 @@ impl<T> CVec<T> {
         }
     }
     fn check_bounds(i: usize) -> Result<usize, AllocError> {
-        if i > core::isize::MAX as usize {
+        if i > isize::MAX as usize {
             Err(AllocError)
         } else {
             Ok(i)
@@ -53,7 +54,7 @@ impl<T> CVec<T> {
             return Ok(Self::new());
         }
         let size = Self::check_mul(cap, mem::size_of::<T>())?;
-        let ptr = NonNull::new(unsafe { platform::alloc(size) as *mut T }).ok_or(AllocError)?;
+        let ptr = NonNull::new(unsafe { platform::alloc(size).cast::<T>() }).ok_or(AllocError)?;
         Ok(Self { ptr, len: 0, cap })
     }
     unsafe fn resize(&mut self, cap: usize) -> Result<(), AllocError> {
@@ -61,21 +62,23 @@ impl<T> CVec<T> {
         let ptr = if cap == 0 {
             NonNull::dangling()
         } else if self.cap > 0 {
-            NonNull::new(platform::realloc(self.ptr.as_ptr() as *mut c_void, size) as *mut T)
-                .ok_or(AllocError)?
+            NonNull::new(
+                unsafe { platform::realloc(self.ptr.as_ptr().cast::<c_void>(), size) }.cast::<T>(),
+            )
+            .ok_or(AllocError)?
         } else {
-            NonNull::new((platform::alloc(size)) as *mut T).ok_or(AllocError)?
+            NonNull::new((unsafe { platform::alloc(size) }).cast::<T>()).ok_or(AllocError)?
         };
         self.ptr = ptr;
         self.cap = cap;
         Ok(())
     }
     unsafe fn drop_range(&mut self, start: usize, end: usize) {
-        let mut start = self.ptr.as_ptr().add(start);
-        let end = self.ptr.as_ptr().add(end);
+        let mut start = unsafe { self.ptr.as_ptr().add(start) };
+        let end = unsafe { self.ptr.as_ptr().add(end) };
         while start < end {
-            ptr::drop_in_place(start);
-            start = start.add(1);
+            unsafe { ptr::drop_in_place(start) };
+            start = unsafe { start.add(1) };
         }
     }
 
@@ -88,7 +91,7 @@ impl<T> CVec<T> {
             .ok_or(AllocError)
             .and_then(Self::check_bounds)?;
         if required_len > self.cap {
-            let new_cap = cmp::min(required_len.next_power_of_two(), core::isize::MAX as usize);
+            let new_cap = cmp::min(required_len.next_power_of_two(), isize::MAX as usize);
             unsafe {
                 self.resize(new_cap)?;
             }

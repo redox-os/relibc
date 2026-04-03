@@ -4,8 +4,6 @@ use core::{
     sync::atomic::{AtomicU32 as AtomicUint, Ordering},
 };
 
-use super::*;
-
 /// An unsafe "one thread to one thread" synchronization primitive. Used for and modeled after
 /// pthread_join only, at the moment.
 #[derive(Debug)]
@@ -18,6 +16,7 @@ unsafe impl<T: Send + Sync> Send for Waitval<T> {}
 unsafe impl<T: Send + Sync> Sync for Waitval<T> {}
 
 impl<T> Waitval<T> {
+    #[allow(clippy::new_without_default)]
     pub const fn new() -> Self {
         Self {
             state: AtomicUint::new(0),

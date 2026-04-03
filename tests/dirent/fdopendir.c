@@ -117,6 +117,8 @@ int main(void) {
         continue;
     }
 
+// fdclosedir is a BSD extension
+#ifndef __GLIBC__
     // fdclosedir returns ownership of the original fd.
     int returned_fd = fdclosedir(iter);
     // Internally, both closedir and fdclosedir consume the boxed DIR.
@@ -133,6 +135,7 @@ int main(void) {
         fputs("fdclosedir shouldn't have closed the fd\n", stderr);
         goto closedirfd;
     }
+#endif
 
     status = EXIT_SUCCESS;
 closediriter:

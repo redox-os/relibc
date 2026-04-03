@@ -5,13 +5,15 @@ use crate::{
     c_str::CStr,
     error::{Errno, Result},
     header::{
+        bits_time::timespec,
         signal::sigevent,
         sys_resource::{rlimit, rusage},
+        sys_select::timeval,
         sys_stat::stat,
         sys_statvfs::statvfs,
-        sys_time::{timeval, timezone},
+        sys_time::timezone,
         sys_utsname::utsname,
-        time::{itimerspec, timespec},
+        time::itimerspec,
     },
     ld_so::tcb::OsSpecific,
     out::Out,
@@ -219,6 +221,8 @@ pub trait Pal {
     unsafe fn nanosleep(rqtp: *const timespec, rmtp: *mut timespec) -> Result<()>;
 
     fn open(path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
+
+    fn openat(dirfd: c_int, path: CStr, oflag: c_int, mode: mode_t) -> Result<c_int>;
 
     fn pipe2(fildes: Out<[c_int; 2]>, flags: c_int) -> Result<()>;
 

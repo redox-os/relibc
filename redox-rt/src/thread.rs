@@ -7,8 +7,7 @@ use crate::{RtTcb, arch::*, proc::*, signal::tmp_disable_signals, static_proc_in
 /// Spawns a new context sharing the same address space as the current one (i.e. a new thread).
 pub unsafe fn rlct_clone_impl(stack: *mut usize, tcb: &RtTcb) -> Result<usize> {
     let proc_info = static_proc_info();
-    assert!(proc_info.has_proc_fd);
-    let cur_proc_fd = unsafe { proc_info.proc_fd.assume_init_ref() };
+    let cur_proc_fd = proc_info.proc_fd.as_ref().unwrap();
 
     let cur_thr_fd = RtTcb::current().thread_fd();
     let new_thr_fd = cur_proc_fd.dup(b"new-thread")?.to_upper().unwrap();

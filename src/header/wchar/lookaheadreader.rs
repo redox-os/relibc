@@ -2,7 +2,7 @@ use super::{FILE, SEEK_SET, fseek_locked, ftell_locked};
 use crate::{
     header::{
         errno::EILSEQ,
-        wchar::{MB_CUR_MAX, fgetwc, get_char_encoded_length, mbrtowc},
+        wchar::{MB_CUR_MAX, get_char_encoded_length, mbrtowc},
         wctype::WEOF,
     },
     io::Read,
@@ -87,8 +87,8 @@ impl<'a> LookAheadFile<'a> {
         let mut wc: wchar_t = 0;
         unsafe {
             mbrtowc(
-                &mut wc,
-                buf.as_ptr() as *const c_char,
+                &raw mut wc,
+                buf.as_ptr().cast::<c_char>(),
                 encoded_length,
                 ptr::null_mut(),
             );

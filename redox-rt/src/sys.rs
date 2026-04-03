@@ -1,20 +1,26 @@
 use core::{
-    mem::size_of,
+    mem::{replace, size_of},
     ptr::addr_of,
     sync::atomic::{AtomicU32, Ordering},
 };
 
+use ioslice::IoSlice;
 use syscall::{
-    CallFlags, EINVAL, ERESTART, TimeSpec,
-    error::{self, EINTR, Error, Result},
+    CallFlags, EINVAL, ERESTART, StdFsCallKind, TimeSpec,
+    data::StdFsCallMeta,
+    error::{self, EINTR, ENODEV, ESRCH, Error, Result},
 };
 
 use crate::{
     DYNAMIC_PROC_INFO, DynamicProcInfo, RtTcb, Tcb,
     arch::manually_enter_trampoline,
-    protocol::{ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags},
+    proc::{FdGuard, FdGuardUpper},
     read_proc_meta,
     signal::tmp_disable_signals,
+};
+use alloc::vec::Vec;
+use redox_protocols::protocol::{
+    NsDup, ProcCall, ProcKillTarget, RtSigInfo, ThreadCall, WaitFlags,
 };
 
 #[inline]
@@ -37,31 +43,6 @@ fn wrapper<T>(restart: bool, erestart: bool, mut f: impl FnMut() -> Result<T>) -
         }
 
         return res;
-    }
-}
-pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
-    let redox_path = redox_path::RedoxPath::from_absolute(path.as_ref())
-        .expect("path must be canonicalized beforehand");
-    let (scheme, reference) = redox_path.as_parts().unwrap();
-    let root_path = if scheme.as_ref().is_empty() {
-        alloc::string::String::from(":")
-    } else {
-        alloc::format!("/scheme/{}", scheme)
-    };
-    // TODO: Temporary workaround to remove unlink and rmdir
-    let root_fd = crate::proc::FdGuard::open(
-        &root_path,
-        syscall::O_DIRECTORY | syscall::O_RDONLY | syscall::O_CLOEXEC,
-    )?;
-    let path = reference.as_ref();
-    unsafe {
-        syscall::syscall4(
-            syscall::SYS_UNLINKAT,
-            root_fd.as_raw_fd(),
-            path.as_ptr() as usize,
-            path.len(),
-            flags,
-        )
     }
 }
 // TODO: uninitialized memory?
@@ -92,6 +73,13 @@ pub fn posix_kill(target: ProcKillTarget, sig: usize) -> Result<()> {
 }
 #[inline]
 pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
+    let target = ProcKillTarget::from_raw(pid);
+    if !matches!(target, ProcKillTarget::SingleProc(_)) {
+        return Err(Error::new(ESRCH));
+    }
+    if sig <= 32 {
+        return posix_kill(target, sig);
+    }
     let mut siginf = RtSigInfo {
         arg,
         code: -1, // TODO: SI_QUEUE constant
@@ -107,7 +95,7 @@ pub fn posix_sigqueue(pid: usize, sig: usize, arg: usize) -> Result<()> {
     }) {
         Ok(_)
         | Err(Error {
-            errno: error::EINTR,
+            errno: error::ERESTART,
         }) => Ok(()),
         Err(error) => Err(error),
     }
@@ -152,9 +140,10 @@ pub unsafe fn sys_futex_wake(addr: *mut u32, num: u32) -> Result<u32> {
     }
     .map(|awoken| awoken as u32)
 }
-pub fn sys_call(
+unsafe fn raw_sys_call(
     fd: usize,
-    payload: &mut [u8],
+    payload_ptr: *const u8,
+    len: usize,
     flags: CallFlags,
     metadata: &[u64],
 ) -> Result<usize> {
@@ -162,12 +151,63 @@ pub fn sys_call(
         syscall::syscall5(
             syscall::SYS_CALL,
             fd,
-            payload.as_mut_ptr() as usize,
-            payload.len(),
+            payload_ptr as usize,
+            len,
             metadata.len() | flags.bits(),
             metadata.as_ptr() as usize,
         )
     }
+}
+pub fn sys_call_ro(
+    fd: usize,
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
+    unsafe {
+        raw_sys_call(
+            fd,
+            payload.as_mut_ptr(),
+            payload.len(),
+            flags | CallFlags::READ,
+            metadata,
+        )
+    }
+}
+pub fn sys_call_wo(fd: usize, payload: &[u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
+    unsafe {
+        raw_sys_call(
+            fd,
+            payload.as_ptr(),
+            payload.len(),
+            flags | CallFlags::WRITE,
+            metadata,
+        )
+    }
+}
+pub fn sys_call_rw(
+    fd: usize,
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
+    unsafe {
+        raw_sys_call(
+            fd,
+            payload.as_mut_ptr(),
+            payload.len(),
+            flags | CallFlags::READ | CallFlags::WRITE,
+            metadata,
+        )
+    }
+}
+pub fn sys_call(
+    fd: usize,
+    payload: &mut [u8],
+    flags: CallFlags,
+    metadata: &[u64],
+) -> Result<usize> {
+    unsafe { raw_sys_call(fd, payload.as_mut_ptr(), payload.len(), flags, metadata) }
 }
 pub fn this_proc_call(payload: &mut [u8], flags: CallFlags, metadata: &[u64]) -> Result<usize> {
     proc_call(
@@ -348,7 +388,7 @@ pub fn getens() -> Result<usize> {
     read_proc_meta(crate::current_proc_fd()).map(|meta| meta.ens as usize)
 }
 pub fn get_proc_credentials(cap_fd: usize, target_pid: usize, buf: &mut [u8]) -> Result<usize> {
-    if buf.len() < size_of::<crate::protocol::ProcMeta>() {
+    if buf.len() < size_of::<redox_protocols::protocol::ProcMeta>() {
         return Err(Error::new(EINVAL));
     }
     proc_call(
@@ -367,14 +407,6 @@ pub fn posix_exit(status: i32) -> ! {
     .expect("failed to call proc mgr with Exit");
     let _ = syscall::write(1, b"redox-rt: ProcCall::Exit FAILED, abort()ing!\n");
     core::intrinsics::abort();
-}
-pub fn setrens(rns: usize, ens: usize) -> Result<()> {
-    this_proc_call(
-        &mut [],
-        CallFlags::empty(),
-        &[ProcCall::Setrens as u64, rns as u64, ens as u64],
-    )?;
-    Ok(())
 }
 pub fn posix_getpgid(pid: usize) -> Result<usize> {
     this_proc_call(
@@ -408,4 +440,93 @@ pub fn posix_setsid() -> Result<u32> {
 pub fn posix_nanosleep(rqtp: &TimeSpec, rmtp: &mut TimeSpec) -> Result<()> {
     wrapper(false, false, || syscall::nanosleep(rqtp, rmtp))?;
     Ok(())
+}
+pub fn setns(fd: usize) -> Option<FdGuardUpper> {
+    let mut info = DYNAMIC_PROC_INFO.lock();
+    let new_fd_guard = FdGuard::new(fd).to_upper().unwrap();
+    let old_fd_guard = replace(&mut info.ns_fd, Some(new_fd_guard));
+    old_fd_guard
+}
+pub fn getns() -> Result<usize> {
+    let cur_ns = crate::current_namespace_fd()?;
+    if cur_ns == usize::MAX {
+        Err(Error::new(ENODEV))
+    } else {
+        Ok(cur_ns)
+    }
+}
+pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
+    let path = path.as_ref();
+    let fcntl_flags = flags & syscall::O_FCNTL_MASK;
+    unsafe {
+        syscall::syscall5(
+            syscall::SYS_OPENAT,
+            crate::current_namespace_fd()?,
+            path.as_ptr() as usize,
+            path.len(),
+            flags,
+            fcntl_flags,
+        )
+    }
+}
+pub fn openat<T: AsRef<str>>(
+    fd: usize,
+    path: T,
+    flags: usize,
+    fcntl_flags: usize,
+) -> Result<usize> {
+    let path = path.as_ref();
+    unsafe {
+        syscall::syscall5(
+            syscall::SYS_OPENAT,
+            fd,
+            path.as_ptr() as usize,
+            path.len(),
+            flags,
+            fcntl_flags,
+        )
+    }
+}
+pub fn unlink<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
+    let path = path.as_ref();
+    unsafe {
+        syscall::syscall4(
+            syscall::SYS_UNLINKAT,
+            crate::current_namespace_fd()?,
+            path.as_ptr() as usize,
+            path.len(),
+            flags,
+        )
+    }
+}
+pub fn mkns(names: &[IoSlice]) -> Result<FdGuardUpper> {
+    let mut buf = Vec::from((NsDup::ForkNs as usize).to_ne_bytes());
+    for name in names {
+        let name_bytes = name.as_slice();
+        let len = name_bytes.len();
+        let _scheme_name = core::str::from_utf8(name_bytes).map_err(|_| Error::new(EINVAL))?;
+        buf.extend_from_slice(&len.to_ne_bytes());
+        buf.extend_from_slice(name_bytes);
+    }
+    FdGuard::new(syscall::dup(crate::current_namespace_fd()?, &buf)?).to_upper()
+}
+pub fn register_scheme_to_ns(ns_fd: usize, name: &str, cap_fd: usize) -> Result<()> {
+    let mut buf = alloc::vec::Vec::from((NsDup::IssueRegister as usize).to_ne_bytes());
+    buf.extend_from_slice(name.as_bytes());
+    let ns_this_scheme = FdGuard::new(syscall::dup(ns_fd, &buf)?);
+    let cap_bytes = cap_fd.to_ne_bytes();
+    ns_this_scheme.call_wo(&cap_bytes, CallFlags::FD, &[])?;
+    Ok(())
+}
+pub fn std_fs_call_ro(fd: usize, payload: &mut [u8], metadata: &StdFsCallMeta) -> Result<usize> {
+    sys_call_ro(fd, payload, CallFlags::STD_FS, metadata)
+}
+pub fn std_fs_call_wo(fd: usize, payload: &[u8], metadata: &StdFsCallMeta) -> Result<usize> {
+    sys_call_wo(fd, payload, CallFlags::STD_FS, metadata)
+}
+pub fn std_fs_call_rw(fd: usize, payload: &mut [u8], metadata: &StdFsCallMeta) -> Result<usize> {
+    sys_call_rw(fd, payload, CallFlags::STD_FS, metadata)
+}
+pub fn fstat(fd: usize, stat: &mut syscall::Stat) -> Result<usize> {
+    std_fs_call_ro(fd, stat, &StdFsCallMeta::new(StdFsCallKind::Fstat, 0, 0))
 }

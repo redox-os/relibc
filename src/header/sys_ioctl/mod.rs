@@ -1,6 +1,6 @@
 //! ioctl implementation for linux
 
-use crate::platform::types::*;
+use crate::platform::types::{c_char, c_ushort};
 
 // This is used from sgtty
 #[repr(C)]

@@ -54,7 +54,7 @@ impl LogSink for LogFile {
         if unsafe {
             connect(
                 log_fd,
-                &raw const log_addr as *const sockaddr,
+                (&raw const log_addr).cast::<sockaddr>(),
                 size_of::<sockaddr_un>() as u32,
             ) < 0
         } {

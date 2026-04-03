@@ -1,4 +1,4 @@
-use crate::platform::types::*;
+use crate::platform::types::c_int;
 
 pub const SOCK_STREAM: c_int = 1;
 pub const SOCK_DGRAM: c_int = 2;
@@ -50,6 +50,7 @@ pub const MSG_PEEK: c_int = 2;
 pub const MSG_TRUNC: c_int = 32;
 pub const MSG_DONTWAIT: c_int = 64;
 pub const MSG_WAITALL: c_int = 256;
+pub const MSG_CMSG_CLOEXEC: c_int = 0x40000000;
 
 pub const IP_ADD_SOURCE_MEMBERSHIP: c_int = 70;
 pub const IP_DROP_SOURCE_MEMBERSHIP: c_int = 71;

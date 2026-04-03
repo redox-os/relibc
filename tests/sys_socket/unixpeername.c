@@ -24,6 +24,7 @@ void print_sockaddr(char *ctx, struct sockaddr *addr, socklen_t len) {
 int main(void)
 {
     int status;
+    // TODO: in linux the sockname shown exactly like this string, not the case with redox.
     const char* socket_path = "unixpeername.sock";
     unlink(socket_path);
 
@@ -38,6 +39,7 @@ int main(void)
     status = bind(listen_fd, saddr, addr_len);
     ERROR_IF(bind, status, == -1);
 
+    // TODO: If this commented out, connect() should error with connection refused
     status = listen(listen_fd, 1);
     ERROR_IF(listen, status, == -1);
 

@@ -7,3 +7,5 @@ sysroot/
 *.swp
 *.swo
 /.vim
+.vscode/
+

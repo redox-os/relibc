@@ -1,7 +1,7 @@
-//! Helper functions for pseudorandom number generation using LCG, see https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/functions/drand48.html
+//! Helper functions for pseudorandom number generation using LCG, see <https://pubs.opengroup.org/onlinepubs/9799919799/functions/drand48.html>.
 
 use crate::{
-    platform::types::*,
+    platform::types::{c_double, c_long, c_ushort},
     sync::{
         Mutex, MutexGuard,
         rwlock::{self, RwLock},
@@ -15,13 +15,9 @@ pub struct U48(u64);
 
 impl From<&[c_ushort; 3]> for U48 {
     fn from(value: &[c_ushort; 3]) -> Self {
-        /* Cast via u16 to ensure we get only the lower 16 bits of each
+        /* c_ushort is u16 so we get only the lower 16 bits of each
          * element, as specified by POSIX. */
-        Self {
-            0: u64::from(value[0] as u16)
-                | (u64::from(value[1] as u16) << 16)
-                | (u64::from(value[2] as u16) << 32),
-        }
+        Self(u64::from(value[0]) | (u64::from(value[1]) << 16) | (u64::from(value[2]) << 32))
     }
 }
 
@@ -36,7 +32,7 @@ impl TryFrom<u64> for U48 {
 
     fn try_from(value: u64) -> Result<Self, u64> {
         if value < 0x1_0000_0000_0000 {
-            Ok(Self { 0: value })
+            Ok(Self(value))
         } else {
             Err(value)
         }
@@ -52,10 +48,9 @@ impl From<U48> for u64 {
 impl From<U48> for [c_ushort; 3] {
     fn from(value: U48) -> Self {
         [
-            // "as u16" in case c_ushort is larger than u16
-            (value.0 as u16).into(),
-            ((value.0 >> 16) as u16).into(),
-            ((value.0 >> 32) as u16).into(),
+            (value.0 as u16),
+            ((value.0 >> 16) as u16),
+            ((value.0 >> 32) as u16),
         ]
     }
 }
@@ -105,7 +100,7 @@ impl Params {
     /// For use in lcong48().
     pub fn set(&mut self, a: &[c_ushort; 3], c: c_ushort) {
         self.a = a.into();
-        self.c = c as u16; // Per POSIX, discard higher bits in case unsigned short is larger than u16
+        self.c = c;
     }
 
     pub fn step(&self, xsubi: U48) -> U48 {

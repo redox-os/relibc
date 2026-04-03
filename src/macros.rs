@@ -7,7 +7,8 @@ macro_rules! print {
     }};
 }
 
-/// Print with new line to stdout
+/// Print with new line to stdout.
+/// Deprecated, consider using log::info instead
 #[macro_export]
 macro_rules! println {
     () => {
@@ -27,7 +28,8 @@ macro_rules! eprint {
     }};
 }
 
-/// Print with new line to stderr
+/// Print with new line to stderr.
+/// Deprecated, consider using log::info instead
 #[macro_export]
 macro_rules! eprintln {
     () => {
@@ -38,54 +40,46 @@ macro_rules! eprintln {
     };
 }
 
-/// Lifted from libstd
+pub const ISSUE_URL: &str = "https://gitlab.redox-os.org/redox-os/relibc/-/issues/";
+
+// Skippable todo!(issue, fmt)
 #[macro_export]
-macro_rules! dbg {
-    // NOTE: We cannot use `concat!` to make a static string as a format argument
-    // of `eprintln!` because `file!` could contain a `{` or
-    // `$val` expression could be a block (`{ .. }`), in which case the `eprintln!`
-    // will be malformed.
-    () => {
-        eprintln!("[{}:{}:{}]", file!(), line!(), column!());
-    };
-    ($val:expr) => {
-        // Use of `match` here is intentional because it affects the lifetimes
-        // of temporaries - https://stackoverflow.com/a/48732525/1063961
-        match $val {
-            tmp => {
-                eprintln!(
-                    "[{}:{}:{}] {} = {:#?}",
-                    file!(),
-                    line!(),
-                    column!(),
-                    stringify!($val),
-                    &tmp
-                );
-                tmp
-            }
+macro_rules! todo_skip {
+    ($issue:expr, $($arg:tt)*) => {
+        if $issue != 0 {
+            log::info!("TODO ({}{}): {}", $crate::macros::ISSUE_URL, $issue, format_args!($($arg)*))
+        } else {
+            log::info!("TODO: {}", format_args!($($arg)*))
         }
     };
-    ($($val:expr),+ $(,)?) => {
-        ($(dbg!($val)),+,)
+}
+
+// Recoverable error todo!(issue, fmt, err)
+#[macro_export]
+macro_rules! todo_error {
+    ($issue:expr, $err:expr, $($arg:tt)*) => {
+        if $issue != 0 {
+            log::error!("TODO ({}{}): {}: {}", $crate::macros::ISSUE_URL, $issue, format_args!($($arg)*), $err)
+        } else {
+            log::error!("TODO: {}: {:?}", format_args!($($arg)*), $err)
+        }
+    };
+}
+
+// Unrecoverable error todo!(issue, fmt)
+#[macro_export]
+macro_rules! todo_panic {
+    ($issue:expr, $($arg:tt)*) => {
+        if $issue != 0 {
+            todo!("{} ({}{})", format_args!($($arg)*), $crate::macros::ISSUE_URL, $issue)
+        } else {
+            todo!("{}", format_args!($($arg)*))
+        }
     };
 }
 
 #[macro_export]
-#[cfg(not(feature = "trace"))]
-macro_rules! trace {
-    ($($arg:tt)*) => {};
-}
-
-#[macro_export]
-#[cfg(feature = "trace")]
-macro_rules! trace {
-    ($($arg:tt)*) => ({
-        eprintln!($($arg)*);
-    });
-}
-
-#[macro_export]
-#[cfg(not(feature = "trace"))]
+#[cfg(feature = "no_trace")]
 macro_rules! trace_expr {
     ($expr:expr, $($arg:tt)*) => {
         $expr
@@ -93,13 +87,13 @@ macro_rules! trace_expr {
 }
 
 #[macro_export]
-#[cfg(feature = "trace")]
+#[cfg(not(feature = "no_trace"))]
 macro_rules! trace_expr {
     ($expr:expr, $($arg:tt)*) => ({
         use $crate::header::errno::STR_ERROR;
         use $crate::platform;
 
-        trace!("{}", format_args!($($arg)*));
+        log::trace!("{}", format_args!($($arg)*));
 
         let trace_old_errno = platform::ERRNO.get();
         platform::ERRNO.set(0);
@@ -117,14 +111,92 @@ macro_rules! trace_expr {
             "Unknown error"
         };
 
-        trace!("{} = {} ({}, {})", format_args!($($arg)*), ret, trace_errno, trace_strerror);
+        log::trace!("{} = {} ({}, {})", format_args!($($arg)*), ret, trace_errno, trace_strerror);
 
         ret
     });
 }
 
 #[macro_export]
+macro_rules! skipws {
+    ($ptr:expr) => {
+        while isspace(unsafe { *$ptr }) != 0 {
+            $ptr = unsafe { $ptr.add(1) };
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! strtou_impl {
+    ($type:ident, $ptr:expr, $base:expr) => {
+        strtou_impl!($type, $ptr, $base, false)
+    };
+    ($type:ident, $ptr:expr, $base:expr, $negative:expr) => {{
+        let mut base = $base;
+
+        if (base == 16 || base == 0)
+            && unsafe { *$ptr } == '0' as wchar_t
+            && (unsafe { *$ptr.add(1) } == 'x' as wchar_t
+                || unsafe { *$ptr.add(1) } == 'X' as wchar_t)
+        {
+            $ptr = unsafe { $ptr.add(2) };
+            base = 16;
+        }
+
+        if base == 0 {
+            base = if unsafe { *$ptr } == '0' as wchar_t {
+                8
+            } else {
+                10
+            };
+        };
+
+        let mut result: $type = 0;
+        while let Some(digit) =
+            char::from_u32(unsafe { *$ptr } as u32).and_then(|c| c.to_digit(base as u32))
+        {
+            let new = result.checked_mul(base as $type).and_then(|result| {
+                if $negative {
+                    #[cfg(target_arch = "x86")]
+                    {
+                        result.checked_sub(
+                            $type::try_from(digit).expect("single digit never overflows"),
+                        )
+                    }
+                    #[cfg(not(target_arch = "x86"))]
+                    {
+                        result.checked_sub($type::from(digit))
+                    }
+                } else {
+                    #[cfg(target_arch = "x86")]
+                    {
+                        result.checked_add(
+                            $type::try_from(digit).expect("single digit never overflows"),
+                        )
+                    }
+                    #[cfg(not(target_arch = "x86"))]
+                    {
+                        result.checked_add($type::from(digit))
+                    }
+                }
+            });
+            result = match new {
+                Some(new) => new,
+                None => {
+                    platform::ERRNO.set(ERANGE);
+                    return !0;
+                }
+            };
+
+            $ptr = unsafe { $ptr.add(1) };
+        }
+        result
+    }};
+}
+
+#[macro_export]
 macro_rules! strto_impl {
+    // this variant is used by inttypes and stdlib
     (
         $rettype:ty, $signed:expr, $maxval:expr, $minval:expr, $s:ident, $endptr:ident, $base:ident
     ) => {{
@@ -139,7 +211,9 @@ macro_rules! strto_impl {
                 // const input but mut output, yet the man page says
                 // "stores the address of the first invalid character in *endptr"
                 // so obviously it doesn't want us to clone it.
-                *$endptr = $s.offset(idx) as *mut _;
+                unsafe {
+                    *$endptr = $s.offset(idx).cast_mut();
+                }
             }
         };
 
@@ -149,7 +223,7 @@ macro_rules! strto_impl {
         };
 
         // only valid bases are 2 through 36
-        if $base != 0 && ($base < 2 || $base > 36) {
+        if $base != 0 && !(2..=36).contains(&$base) {
             invalid_input();
             return 0;
         }
@@ -157,12 +231,12 @@ macro_rules! strto_impl {
         let mut idx = 0;
 
         // skip any whitespace at the beginning of the string
-        while ctype::isspace(*$s.offset(idx) as c_int) != 0 {
+        while ctype::isspace(c_int::from(unsafe { *$s.offset(idx) })) != 0 {
             idx += 1;
         }
 
         // check for +/-
-        let positive = match is_positive(*$s.offset(idx)) {
+        let positive = match is_positive(unsafe { *$s.offset(idx) }) {
             Some((pos, i)) => {
                 idx += i;
                 pos
@@ -174,15 +248,15 @@ macro_rules! strto_impl {
         };
 
         // convert the string to a number
-        let num_str = $s.offset(idx);
+        let num_str = unsafe { $s.offset(idx) };
         let res = match $base {
-            0 => detect_base(num_str).and_then(|($base, i)| {
+            0 => unsafe { detect_base(num_str) }.and_then(|($base, i)| {
                 idx += i;
-                convert_integer(num_str.offset(i), $base)
+                unsafe { convert_integer(num_str.offset(i), $base) }
             }),
-            8 => convert_octal(num_str),
-            16 => convert_hex(num_str),
-            _ => convert_integer(num_str, $base),
+            8 => unsafe { convert_octal(num_str) },
+            16 => unsafe { convert_hex(num_str) },
+            _ => unsafe { convert_integer(num_str, $base) },
         };
 
         // check for error parsing octal/hex prefix
@@ -223,6 +297,14 @@ macro_rules! strto_impl {
 
         num
     }};
+    // this variant is used by wchar (also wcstoimax and wcstoumax from inttypes)
+    ($type:ident, $ptr:expr, $base:expr) => {{
+        let negative = unsafe { *$ptr } == '-' as wchar_t;
+        if negative {
+            $ptr = unsafe { $ptr.add(1) };
+        }
+        strtou_impl!($type, $ptr, $base, negative)
+    }};
 }
 
 #[macro_export]
@@ -231,86 +313,86 @@ macro_rules! strto_float_impl {
         let mut s = $s;
         let endptr = $endptr;
 
-        while ctype::isspace(*s as c_int) != 0 {
-            s = s.offset(1);
+        while ctype::isspace(c_int::from(unsafe{*s})) != 0 {
+            s = unsafe{ s.offset(1)};
         }
 
         let mut result: $type = 0.0;
         let mut exponent: Option<$type> = None;
         let mut radix = 10;
 
-        let result_sign = match *s as u8 {
+        let result_sign = match unsafe{*s} as u8 {
             b'-' => {
-                s = s.offset(1);
+                s = unsafe{s.offset(1)};
                 -1.0
             }
             b'+' => {
-                s = s.offset(1);
+                s = unsafe{s.offset(1)};
                 1.0
             }
             _ => 1.0,
         };
 
-        let rust_s = CStr::from_ptr(s).to_string_lossy();
+        let rust_s = unsafe{CStr::from_ptr(s)}.to_string_lossy();
 
         // detect NaN, Inf
         if rust_s.to_lowercase().starts_with("inf") {
             result = $type::INFINITY;
-            s = s.offset(3);
+            s = unsafe{s.offset(3)};
         } else if rust_s.to_lowercase().starts_with("nan") {
             // we cannot signal negative NaN in LLVM backed languages
             // https://github.com/rust-lang/rust/issues/73328 , https://github.com/rust-lang/rust/issues/81261
             result = $type::NAN;
-            s = s.offset(3);
+            s = unsafe{s.offset(3)};
         } else {
-            if *s as u8 == b'0' && *s.offset(1) as u8 == b'x' {
-                s = s.offset(2);
+            if unsafe{*s} as u8 == b'0' && unsafe{*s.offset(1)} as u8 == b'x' {
+                s = unsafe{s.offset(2)};
                 radix = 16;
             }
 
-            while let Some(digit) = (*s as u8 as char).to_digit(radix) {
+            while let Some(digit) = (unsafe{*s} as u8 as char).to_digit(radix) {
                 result *= radix as $type;
                 result += digit as $type;
-                s = s.offset(1);
+                s = unsafe{s.offset(1)};
             }
 
-            if *s as u8 == b'.' {
-                s = s.offset(1);
+            if unsafe{*s} as u8 == b'.' {
+                s = unsafe{s.offset(1)};
 
                 let mut i = 1.0;
-                while let Some(digit) = (*s as u8 as char).to_digit(radix) {
+                while let Some(digit) = (unsafe{*s} as u8 as char).to_digit(radix) {
                     i *= radix as $type;
                     result += digit as $type / i;
-                    s = s.offset(1);
+                    s = unsafe{s.offset(1)};
                 }
             }
 
             let s_before_exponent = s;
 
-            exponent = match (*s as u8, radix) {
+            exponent = match (unsafe{*s} as u8, radix) {
                 (b'e' | b'E', 10) | (b'p' | b'P', 16) => {
-                    s = s.offset(1);
+                    s = unsafe{s.offset(1)};
 
-                    let is_exponent_positive = match *s as u8 {
+                    let is_exponent_positive = match unsafe{*s} as u8 {
                         b'-' => {
-                            s = s.offset(1);
+                            s = unsafe{s.offset(1)};
                             false
                         }
                         b'+' => {
-                            s = s.offset(1);
+                            s = unsafe{s.offset(1)};
                             true
                         }
                         _ => true,
                     };
 
                     // Exponent digits are always in base 10.
-                    if (*s as u8 as char).is_digit(10) {
+                    if (unsafe{*s} as u8 as char).is_digit(10) {
                         let mut exponent_value = 0;
 
-                        while let Some(digit) = (*s as u8 as char).to_digit(10) {
+                        while let Some(digit) = (unsafe{*s} as u8 as char).to_digit(10) {
                             exponent_value *= 10;
                             exponent_value += digit;
-                            s = s.offset(1);
+                            s = unsafe{s.offset(1)};
                         }
 
                         let exponent_base = match radix {
@@ -339,7 +421,7 @@ macro_rules! strto_float_impl {
             // const input but mut output, yet the man page says
             // "stores the address of the first invalid character in *endptr"
             // so obviously it doesn't want us to clone it.
-            *endptr = s as *mut _;
+            unsafe{*endptr = s.cast_mut()};
         }
 
         if let Some(exponent) = exponent {

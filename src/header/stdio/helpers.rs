@@ -1,18 +1,23 @@
 use alloc::boxed::Box;
 
-use super::{Buffer, FILE, constants::*};
+use super::{
+    Buffer, FILE,
+    constants::{BUFSIZ, F_APP, F_NORD, F_NOWR},
+};
 use crate::{
     c_str::CStr,
     error::Errno,
     fs::File,
     header::{
-        errno::{self, EINVAL},
-        fcntl::*,
+        errno::EINVAL,
+        fcntl::{
+            F_GETFL, F_SETFD, F_SETFL, FD_CLOEXEC, O_APPEND, O_CLOEXEC, O_CREAT, O_EXCL, O_RDONLY,
+            O_RDWR, O_TRUNC, O_WRONLY, fcntl,
+        },
         pthread,
     },
     io::BufWriter,
-    platform::{self, types::*},
-    sync::Mutex,
+    platform::types::{c_int, c_ulonglong},
 };
 use alloc::vec::Vec;
 
@@ -70,7 +75,7 @@ pub fn _fdopen(fd: c_int, mode: CStr) -> Result<Box<FILE>, Errno> {
 
     let file = File::new(fd);
     let writer = Box::new(BufWriter::new(unsafe { file.get_ref() }));
-    let mut mutex_attr = pthread::RlctMutexAttr {
+    let mutex_attr = pthread::RlctMutexAttr {
         ty: pthread::PTHREAD_MUTEX_RECURSIVE,
         ..Default::default()
     };

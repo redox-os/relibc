@@ -6,9 +6,16 @@
 
 #include <pthread.h>
 
+// TODO: glibc requires arg to be not const, but not relibc
+#ifndef __GLIBC__
 const char *msg1 = "first";
 const char *msg2 = "second";
 const char *msg3 = "third";
+#else
+char *msg1 = "first";
+char *msg2 = "second";
+char *msg3 = "third";
+#endif
 
 void cleanup1(void *arg) {
     printf("Running %s cleanup callback\n", (const char *)arg);

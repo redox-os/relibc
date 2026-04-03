@@ -10,10 +10,12 @@ use object::{
     },
 };
 
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+use super::tcb::Tcb;
 use super::{
     debug::{_r_debug, RTLDDebug},
     linker::{__plt_resolve_trampoline, GLOBAL_SCOPE, Resolve, Scope, Symbol},
-    tcb::{Master, Tcb},
+    tcb::Master,
 };
 use crate::{
     header::{dl_tls::__tls_get_addr, sys_mman},
@@ -25,15 +27,17 @@ use alloc::{
     sync::Arc,
     vec::Vec,
 };
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+use core::mem::offset_of;
 use core::{
     ffi::c_char,
-    mem::{offset_of, size_of},
+    mem::size_of,
     ptr::{self, NonNull},
     slice,
     sync::atomic::{AtomicBool, Ordering},
 };
 
-pub const CHAR_BITS: usize = size_of::<c_char>() * 8;
+pub const CHAR_BITS: usize = c_char::BITS as usize;
 pub type Relr = usize;
 
 #[cfg(target_pointer_width = "32")]
@@ -61,6 +65,11 @@ mod shim {
 }
 
 pub use shim::*;
+
+// TODO: missing from the `object` crate
+pub const DT_RELRSZ: u32 = 35;
+pub const DT_RELR: u32 = 36;
+pub const DT_RELRENT: u32 = 37;
 
 /// Undefined Symbol Index
 pub const STN_UNDEF: SymbolIndex = SymbolIndex(0);
@@ -168,11 +177,11 @@ unsafe impl Send for Dynamic<'_> {}
 unsafe impl Sync for Dynamic<'_> {}
 
 #[derive(Debug)]
-struct Relocation {
-    offset: usize,
-    addend: Option<usize>,
-    sym: SymbolIndex,
-    kind: RelocationKind,
+pub(super) struct Relocation {
+    pub(super) offset: usize,
+    pub(super) addend: Option<usize>,
+    pub(super) sym: SymbolIndex,
+    pub(super) kind: RelocationKind,
 }
 
 #[cfg(target_pointer_width = "32")]
@@ -344,18 +353,18 @@ pub struct DSO {
 }
 
 impl DSO {
-    pub fn new<'a>(
+    pub fn new(
         path: &str,
-        data: &'a [u8],
+        data: &[u8],
         base_addr: Option<usize>,
         dlopened: bool,
         id: usize,
         tls_module_id: usize,
         tls_offset: usize,
-    ) -> object::Result<(DSO, Option<Master>, Vec<ProgramHeader>)> {
-        let elf = ElfFile::parse(data).unwrap();
+    ) -> Result<(DSO, Option<Master>, Vec<ProgramHeader>), String> {
+        let elf = ElfFile::parse(data).map_err(|err| err.to_string())?;
         let (mmap, tcb_master, dynamic) =
-            DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset).unwrap();
+            DSO::mmap_and_copy(path, &elf, data, base_addr, tls_offset)?;
 
         let name = match dynamic.soname {
             Some(soname) => soname.to_string(),
@@ -423,7 +432,7 @@ impl DSO {
         let (_, sym) = self.dynamic.hash_table.find(
             name,
             None,
-            &self.dynamic.symbols,
+            self.dynamic.symbols,
             self.dynamic.dynstrtab,
             &VersionTable::default(),
         )?;
@@ -471,9 +480,9 @@ impl DSO {
         data: &'a [u8],
         base_addr: Option<usize>,
         tls_offset: usize,
-    ) -> object::Result<(&'static [u8], Option<Master>, Dynamic<'static>)> {
+    ) -> Result<(&'static [u8], Option<Master>, Dynamic<'static>), String> {
         let endian = elf.endian();
-        trace!("# {}", path);
+        log::trace!("# {}", path);
         // data for struct LinkMap
         let mut l_ld = 0;
         // Calculate virtual memory bounds
@@ -490,7 +499,7 @@ impl DSO {
                         l_ld = ph.p_vaddr(endian);
                     }
                     elf::PT_LOAD => {
-                        trace!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
+                        log::trace!("  load {:#x}, {:#x}: {:x?}", vaddr, vsize, ph);
                         if let Some(ref mut bounds) = bounds_opt {
                             if vaddr < bounds.0 {
                                 bounds.0 = vaddr;
@@ -505,11 +514,9 @@ impl DSO {
                     _ => (),
                 }
             }
-            bounds_opt
-                .ok_or("Unable to find PT_LOAD section".to_string())
-                .unwrap()
+            bounds_opt.ok_or_else(|| "Unable to find PT_LOAD section".to_string())?
         };
-        trace!("  bounds {:#x}, {:#x}", bounds.0, bounds.1);
+        log::trace!("  bounds {:#x}, {:#x}", bounds.0, bounds.1);
         // Allocate memory
         let mmap = unsafe {
             if let Some(addr) = base_addr {
@@ -520,8 +527,8 @@ impl DSO {
                 };
                 _r_debug
                     .lock()
-                    .insert_first(addr, path, addr + l_ld as usize);
-                slice::from_raw_parts_mut(addr as *mut u8, size)
+                    .insert_first(addr + bounds.0, path, addr + l_ld as usize);
+                slice::from_raw_parts_mut((addr + bounds.0) as *mut u8, size)
             } else {
                 let (start, end) = bounds;
                 let size = end - start;
@@ -529,7 +536,7 @@ impl DSO {
                 if start != 0 {
                     flags |= sys_mman::MAP_FIXED_NOREPLACE;
                 }
-                trace!("  mmap({:#x}, {:x}, {:x})", start, size, flags);
+                log::trace!("  mmap({:#x}, {:x}, {:x})", start, size, flags);
                 let ptr = Sys::mmap(
                     start as *mut c_void,
                     size,
@@ -539,8 +546,7 @@ impl DSO {
                     -1,
                     0,
                 )
-                .map_err(|e| format!("failed to map {}. errno: {}", path, e.0))
-                .unwrap();
+                .map_err(|e| format!("failed to map {}. errno: {}", path, e.0))?;
 
                 if !(start as *mut c_void).is_null() {
                     assert_eq!(
@@ -548,12 +554,11 @@ impl DSO {
                         "mmap must always map on the destination we requested"
                     );
                 }
-                trace!("    = {:p}", ptr);
-                ptr::write_bytes(ptr as *mut u8, 0, size);
+                log::trace!("    = {:p}", ptr);
                 _r_debug
                     .lock()
                     .insert(ptr as usize, path, ptr as usize + l_ld as usize);
-                slice::from_raw_parts_mut(ptr as *mut u8, size)
+                slice::from_raw_parts_mut(ptr.cast::<u8>(), size)
             }
         };
 
@@ -574,7 +579,7 @@ impl DSO {
                         let range = offset..(offset + size as usize);
                         match data.get(range.clone()) {
                             Some(some) => some,
-                            None => return Err(format!("failed to read {:x?}", range)).unwrap(),
+                            None => return Err(format!("failed to read {:x?}", range)),
                         }
                     };
 
@@ -589,14 +594,14 @@ impl DSO {
                         match mmap.get_mut(range.clone()) {
                             Some(some) => some,
                             None => {
-                                return Err(format!("failed to write {:x?}", range)).unwrap();
+                                return Err(format!("failed to write {:x?}", range));
                             }
                         }
                     };
                     let _voff = ph.p_vaddr(endian) % ph.p_align(endian);
                     let _vsize = ((ph.p_memsz(endian) + _voff) as usize)
                         .next_multiple_of(ph.p_align(endian) as usize);
-                    trace!(
+                    log::trace!(
                         "  copy {:#x}, {:#x}: {:#x}, {:#x}",
                         ph.p_vaddr(endian) - _voff,
                         _vsize,
@@ -619,20 +624,28 @@ impl DSO {
                         segment_size: ph.p_memsz(endian) as usize,
                         offset: tls_offset + ph.p_memsz(endian) as usize,
                     });
-                    trace!("  tcb master {:x?}", tcb_master);
+                    log::trace!("  tcb master {:x?}", tcb_master);
                 }
 
-                elf::PT_DYNAMIC => dynamic = Some((ph, ph.dynamic(endian, data).unwrap().unwrap())),
+                elf::PT_DYNAMIC => {
+                    let entries = ph
+                        .dynamic(endian, data)
+                        .map_err(|err| err.to_string())?
+                        .ok_or_else(|| "Unable to parse PT_DYNAMIC section".to_string())?;
+                    dynamic = Some((ph, entries));
+                }
                 _ => (),
             }
         }
 
-        let (parsed_dynamic, debug) =
-            Self::parse_dynamic(path, mmap, is_pie_enabled(elf), dynamic.unwrap())?;
+        let dynamic = dynamic.ok_or_else(|| "Unable to find PT_DYNAMIC section".to_string())?;
+
+        let (parsed_dynamic, debug) = Self::parse_dynamic(path, mmap, is_pie_enabled(elf), dynamic)
+            .map_err(|e| e.to_string())?;
 
         if let Some(i) = debug {
             // FIXME: cleanup
-            let (ph, _) = dynamic.unwrap();
+            let (ph, _) = dynamic;
             let vaddr = ph.p_vaddr(endian) as usize;
             let bytes: [u8; size_of::<Dyn>() / 2] =
                 ((&raw const _r_debug).cast::<*const RTLDDebug>() as usize).to_ne_bytes();
@@ -660,10 +673,6 @@ impl DSO {
         is_pie: bool,
         (_, entries): (&ProgramHeader, &[Dyn]),
     ) -> object::Result<(Dynamic<'a>, Option<usize>)> {
-        const DT_RELRSZ: u32 = 35;
-        const DT_RELR: u32 = 36;
-        const DT_RELRENT: u32 = 37;
-
         let mut runpath = None;
         let mut got = None;
         let mut needed = vec![];
@@ -753,7 +762,7 @@ impl DSO {
                 elf::DT_FINI_ARRAY if val != 0 => fini_array_ptr = Some(ptr.cast::<InitFn>()),
                 elf::DT_FINI_ARRAYSZ => fini_array_len = Some(val as usize / size_of::<InitFn>()),
 
-                elf::DT_SYMTAB => symtab_ptr = Some(ptr as *const Sym),
+                elf::DT_SYMTAB => symtab_ptr = Some(ptr.cast::<Sym>()),
                 elf::DT_SYMENT => {
                     assert_eq!(val as usize, size_of::<Sym>());
                 }
@@ -865,7 +874,7 @@ impl DSO {
             };
 
             // Ensure the DTV entry is initialised.
-            unsafe { __tls_get_addr(&mut tls_index) };
+            unsafe { __tls_get_addr(&raw mut tls_index) };
 
             *resolver = __tlsdesc_dynamic as *const () as usize;
             *descriptor = Box::into_raw(Box::new(TlsDescriptor {
@@ -922,13 +931,13 @@ impl DSO {
             Some(some) => some,
             None => match reloc.kind {
                 RelocationKind::COPY | RelocationKind::GOT | RelocationKind::PLT => 0,
-                _ => unsafe { *(ptr as *mut usize) },
+                _ => unsafe { *ptr.cast::<usize>() },
             },
         };
 
         // TODO: support different sizes?
         let set_usize = |value| unsafe {
-            *(ptr as *mut usize) = value;
+            *ptr.cast::<usize>() = value;
         };
 
         match reloc.kind {
@@ -1076,34 +1085,8 @@ impl DSO {
         let global_scope = GLOBAL_SCOPE.read();
         let base = self.mmap.as_ptr();
 
-        // Apply DT_RELR relative relocations.
-        let mut addr = ptr::null_mut();
-        for &entry in self.dynamic.relr {
-            if entry & 1 == 0 {
-                // An even entry sets up `addr` for subsequent odd entries.
-                unsafe {
-                    addr = base.add(entry) as *mut usize;
-                    *addr += base as usize;
-                    addr = addr.add(1);
-                }
-            } else {
-                // An odd entry indicates a bitmap describing at maximum 63
-                // (for 64-bit) or 31 (for 32-bit) locations following `addr`.
-                // Odd entries can be chained.
-                let mut entry = entry >> 1;
-                let mut i = 0;
-                while entry != 0 {
-                    if entry & 1 != 0 {
-                        unsafe {
-                            *addr.add(i) += base as usize;
-                        }
-                    }
-                    entry >>= 1;
-                    i += 1;
-                }
-
-                addr = unsafe { addr.add(CHAR_BITS * size_of::<Relr>() - 1) };
-            }
+        unsafe {
+            apply_relr(base, self.dynamic.relr);
         }
 
         self.dynamic
@@ -1140,7 +1123,7 @@ impl DSO {
                 } else {
                     vaddr as *const u8
                 };
-                trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
+                log::trace!("  prot {:#x}, {:#x}: {:p}, {:#x}", vaddr, vsize, ptr, prot);
                 Sys::mprotect(ptr as *mut c_void, vsize, prot).expect("[ld.so]: mprotect failed");
             }
         }
@@ -1293,3 +1276,35 @@ __tlsdesc_dynamic:
     unimp
 "
 );
+
+/// Applies [`DT_RELR`] relative relocations.
+pub unsafe fn apply_relr(base: *const u8, relr: &[Relr]) {
+    let mut addr = ptr::null_mut();
+    for &entry in relr {
+        if entry & 1 == 0 {
+            // An even entry sets up `addr` for subsequent odd entries.
+            unsafe {
+                addr = base.add(entry) as *mut usize;
+                *addr += base as usize;
+                addr = addr.add(1);
+            }
+        } else {
+            // An odd entry indicates a bitmap describing at maximum 63
+            // (for 64-bit) or 31 (for 32-bit) locations following `addr`.
+            // Odd entries can be chained.
+            let mut entry = entry >> 1;
+            let mut i = 0;
+            while entry != 0 {
+                if entry & 1 != 0 {
+                    unsafe {
+                        *addr.add(i) += base as usize;
+                    }
+                }
+                entry >>= 1;
+                i += 1;
+            }
+
+            addr = unsafe { addr.add(CHAR_BITS * size_of::<Relr>() - 1) };
+        }
+    }
+}

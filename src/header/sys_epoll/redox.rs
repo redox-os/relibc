@@ -1,4 +1,4 @@
-use crate::platform::types::*;
+use crate::platform::types::{c_int, c_uint};
 
 pub const EPOLL_CLOEXEC: c_int = 0x0100_0000;
 

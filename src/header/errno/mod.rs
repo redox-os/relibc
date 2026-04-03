@@ -2,9 +2,6 @@
 //!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/errno.h.html>.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use crate::platform::{
     self,
     types::{c_char, c_int},
@@ -33,7 +30,7 @@ pub extern "C" fn __errno_location() -> *mut c_int {
 /// The `program_invocation_name` variable is a GNU extension.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __program_invocation_name() -> *mut *mut c_char {
-    unsafe { &raw mut platform::program_invocation_name }
+    &raw mut platform::program_invocation_name
 }
 
 /// Get the directory-less name used to invoke the program.
@@ -44,7 +41,7 @@ pub unsafe extern "C" fn __program_invocation_name() -> *mut *mut c_char {
 /// The `program_invocation_short_name` variable is a GNU extension.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __program_invocation_short_name() -> *mut *mut c_char {
-    unsafe { &raw mut platform::program_invocation_short_name }
+    &raw mut platform::program_invocation_short_name
 }
 
 pub const EPERM: c_int = 1; /* Operation not permitted */

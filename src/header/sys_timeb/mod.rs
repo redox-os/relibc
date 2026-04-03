@@ -7,13 +7,13 @@
 //! Specifications Issue 6, and the entire `sys/timeb.h` header was removed in
 //! Issue 7.
 
-// TODO: set this for entire crate when possible
-#![deny(unsafe_op_in_unsafe_fn)]
-
 use core::ptr::NonNull;
 
 use crate::{
-    header::sys_time::{gettimeofday, timeval, timezone},
+    header::{
+        sys_select::timeval,
+        sys_time::{gettimeofday, timezone},
+    },
     platform::types::{c_int, c_short, c_ushort, time_t},
 };
 
@@ -42,7 +42,7 @@ pub unsafe extern "C" fn ftime(tp: *mut timeb) -> c_int {
 
     // SAFETY: tv and tz are created above, and thus will coerce to valid
     // pointers.
-    if unsafe { gettimeofday(&mut tv, &mut tz) } < 0 {
+    if unsafe { gettimeofday(&raw mut tv, &raw mut tz) } < 0 {
         return -1;
     }
 

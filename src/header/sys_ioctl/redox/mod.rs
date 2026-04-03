@@ -4,11 +4,11 @@ use syscall;
 
 use crate::{
     error::{Errno, Result, ResultExt},
-    header::{
-        errno::{self, EINVAL},
-        fcntl, termios,
+    header::{errno::EINVAL, fcntl, termios},
+    platform::{
+        Pal, Sys,
+        types::{c_int, c_ulong, c_ulonglong, c_void, pid_t},
     },
-    platform::{self, Pal, Sys, types::*},
 };
 
 use super::winsize;
@@ -111,7 +111,7 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
     match request {
         FIONBIO => {
             let mut flags = Sys::fcntl(fd, fcntl::F_GETFL, 0)?;
-            flags = if *(out as *mut c_int) == 0 {
+            flags = if unsafe { *(out as *mut c_int) } == 0 {
                 flags & !fcntl::O_NONBLOCK
             } else {
                 flags | fcntl::O_NONBLOCK
@@ -119,12 +119,12 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
             Sys::fcntl(fd, fcntl::F_SETFL, flags as c_ulonglong)?;
         }
         TCGETS => {
-            let termios = &mut *(out as *mut termios::termios);
+            let termios = unsafe { &mut *(out as *mut termios::termios) };
             dup_read(fd, "termios", termios)?;
         }
         // TODO: give these different behaviors
         TCSETS | TCSETSW | TCSETSF => {
-            let termios = &*(out as *const termios::termios);
+            let termios = unsafe { &*(out as *const termios::termios) };
             dup_write(fd, "termios", termios)?;
         }
         TCFLSH => {
@@ -132,38 +132,38 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
             dup_write(fd, "flush", &queue)?;
         }
         TIOCSCTTY => {
-            eprintln!("TODO: ioctl TIOCSCTTY");
+            todo_skip!(0, "ioctl TIOCSCTTY");
         }
         TIOCGPGRP => {
-            let pgrp = &mut *(out as *mut pid_t);
+            let pgrp = unsafe { &mut *(out as *mut pid_t) };
             dup_read(fd, "pgrp", pgrp)?;
         }
         TIOCSPGRP => {
-            let pgrp = &*(out as *const pid_t);
+            let pgrp = unsafe { &*(out as *const pid_t) };
             dup_write(fd, "pgrp", pgrp)?;
         }
         TIOCGWINSZ => {
-            let winsize = &mut *(out as *mut winsize);
+            let winsize = unsafe { &mut *(out as *mut winsize) };
             dup_read(fd, "winsize", winsize)?;
         }
         TIOCSWINSZ => {
-            let winsize = &*(out as *const winsize);
+            let winsize = unsafe { &*(out as *const winsize) };
             dup_write(fd, "winsize", winsize)?;
         }
         TIOCGPTLCK => {
-            eprintln!("TODO: ioctl TIOCGPTLCK");
+            todo_skip!(0, "ioctl TIOCGPTLCK");
         }
         TIOCSPTLCK => {
-            eprintln!("TODO: ioctl TIOCSPTLCK");
+            todo_skip!(0, "ioctl TIOCSPTLCK");
         }
         TCSBRK => {
-            eprintln!("TODO: ioctl TCSBRK");
+            todo_skip!(0, "ioctl TCSBRK");
         }
         TCXONC => {
-            eprintln!("TODO: ioctl TCXONC");
+            todo_skip!(0, "ioctl TCXONC");
         }
         SIOCATMARK => {
-            eprintln!("TODO: ioctl SIOCATMARK");
+            todo_skip!(0, "ioctl SIOCATMARK");
         }
         _ => {
             // See https://docs.kernel.org/userspace-api/ioctl/ioctl-decoding.html for details
@@ -179,7 +179,7 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
                         0b11 => IoctlBuffer::ReadWrite(out, size),
                         _ => IoctlBuffer::None,
                     };
-                    return drm::ioctl(fd, func, buf);
+                    return unsafe { drm::ioctl(fd, func, buf) };
                 }
                 _ => {
                     return Err(Errno(EINVAL));
@@ -192,5 +192,5 @@ unsafe fn ioctl_inner(fd: c_int, request: c_ulong, out: *mut c_void) -> Result<c
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ioctl(fd: c_int, request: c_ulong, out: *mut c_void) -> c_int {
-    ioctl_inner(fd, request, out).or_minus_one_errno()
+    unsafe { ioctl_inner(fd, request, out) }.or_minus_one_errno()
 }

@@ -4,14 +4,16 @@ use core::{
     ffi::{c_char, c_int, c_uint},
     iter, mem, slice,
 };
+use drm_sys::drm_clip_rect;
 
 pub use drm_sys::{
     __kernel_size_t, DRM_PROP_NAME_LEN, drm_get_cap, drm_mode_card_res,
-    drm_mode_connector_set_property, drm_mode_create_dumb, drm_mode_crtc, drm_mode_destroy_dumb,
-    drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_get_blob, drm_mode_get_connector,
-    drm_mode_get_encoder, drm_mode_get_plane, drm_mode_get_plane_res, drm_mode_get_property,
-    drm_mode_map_dumb, drm_mode_modeinfo, drm_mode_obj_get_properties, drm_mode_property_enum,
-    drm_set_client_cap, drm_version,
+    drm_mode_connector_set_property, drm_mode_create_dumb, drm_mode_crtc,
+    drm_mode_crtc_page_flip_target, drm_mode_cursor, drm_mode_cursor2, drm_mode_destroy_dumb,
+    drm_mode_fb_cmd, drm_mode_fb_cmd2, drm_mode_fb_dirty_cmd, drm_mode_get_blob,
+    drm_mode_get_connector, drm_mode_get_encoder, drm_mode_get_plane, drm_mode_get_plane_res,
+    drm_mode_get_property, drm_mode_map_dumb, drm_mode_modeinfo, drm_mode_obj_get_properties,
+    drm_mode_property_enum, drm_mode_set_plane, drm_set_client_cap, drm_version,
 };
 
 pub const VERSION: u64 = 0;
@@ -66,6 +68,7 @@ define_ioctl_data! {
 }
 
 pub const MODE_GET_CRTC: u64 = 0xA1;
+pub const MODE_SET_CRTC: u64 = 0xA2;
 define_ioctl_data! {
     struct drm_mode_crtc, DrmModeCrtc {
         set_connectors_ptr: u64 [array<u32, count_connectors>],
@@ -77,6 +80,19 @@ define_ioctl_data! {
         gamma_size: u32,
         mode_valid: u32,
         mode: drm_mode_modeinfo,
+    }
+}
+
+pub const MODE_CURSOR: u64 = 0xA3;
+define_ioctl_data! {
+    struct drm_mode_cursor, DrmModeCursor {
+        flags: u32,
+        crtc_id: u32,
+        x: i32,
+        y:i32,
+        width:u32,
+        height:u32,
+        handle:u32,
     }
 }
 
@@ -171,6 +187,28 @@ pub struct standin_for_uint {
     pub inner: c_uint,
 }
 
+pub const MODE_PAGE_FLIP: u64 = 0xB0;
+define_ioctl_data! {
+    struct drm_mode_crtc_page_flip_target, DrmModeCrtcPageFlipTarget {
+        crtc_id: u32,
+        fb_id: u32,
+        flags: u32,
+        sequence: u32,
+        user_data: u64,
+    }
+}
+
+pub const MODE_DIRTYFB: u64 = 0xB1;
+define_ioctl_data! {
+    struct drm_mode_fb_dirty_cmd, DrmModeFbDirtyCmd {
+        fb_id: u32,
+        flags: u32,
+        color: u32,
+        num_clips: u32,
+        clips_ptr: u64 [array<drm_clip_rect, num_clips>],
+    }
+}
+
 pub const MODE_CREATE_DUMB: u64 = 0xB2;
 define_ioctl_data! {
     struct drm_mode_create_dumb, DrmModeCreateDumb {
@@ -221,6 +259,24 @@ define_ioctl_data! {
     }
 }
 
+pub const MODE_SET_PLANE: u64 = 0xB7;
+define_ioctl_data! {
+    struct drm_mode_set_plane, DrmModeSetPlane {
+        plane_id: u32,
+        crtc_id: u32,
+        fb_id: u32,
+        flags: u32,
+        crtc_x: i32,
+        crtc_y: i32,
+        crtc_w: u32,
+        crtc_h: u32,
+        src_x: u32,
+        src_y: u32,
+        src_h: u32,
+        src_w: u32,
+    }
+}
+
 pub const MODE_OBJ_GET_PROPERTIES: u64 = 0xB9;
 define_ioctl_data! {
     struct drm_mode_obj_get_properties, DrmModeObjGetProperties {
@@ -229,6 +285,21 @@ define_ioctl_data! {
         count_props: u32,
         obj_id: u32,
         obj_type: u32,
+    }
+}
+
+pub const MODE_CURSOR2: u64 = 0xBB;
+define_ioctl_data! {
+    struct drm_mode_cursor2, DrmModeCursor2 {
+        flags: u32,
+        crtc_id: u32,
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+        handle: u32,
+        hot_x: i32,
+        hot_y: i32,
     }
 }
 

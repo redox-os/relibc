@@ -1,5 +1,3 @@
-#define _GNU_SOURCE // Linux for CI
-
 #include <assert.h>
 #include <fcntl.h>
 #include <limits.h>

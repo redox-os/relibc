@@ -1,4 +1,4 @@
-use crate::platform::types::*;
+use crate::platform::types::c_int;
 
 pub const O_RDONLY: c_int = 0x0001_0000;
 pub const O_WRONLY: c_int = 0x0002_0000;

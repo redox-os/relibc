@@ -1,4 +1,4 @@
-use crate::platform::types::*;
+use crate::platform::types::{c_int, c_uint, int32_t, off_t};
 
 pub const EOF: c_int = -1;
 pub const BUFSIZ: c_int = 1024;
@@ -41,7 +41,7 @@ pub const L_tmpnam: c_int = 7;
 // 36^6 (26 letters + 10 digits) is larger than i32::MAX, so just set to that
 // for now
 pub const TMP_MAX: int32_t = 2_147_483_647;
-// XXX: defined manually in bits/stdio.h as well because cbindgen can't handle
+// XXX: defined manually in cbindgen as well because it can't handle
 //      string constants in any form AFAICT
 pub const P_tmpdir: &[u8; 5] = b"/tmp\0";
 

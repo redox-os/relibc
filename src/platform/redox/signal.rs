@@ -5,24 +5,35 @@ use super::{
 use crate::{
     error::{Errno, Result},
     header::{
+        bits_time::timespec,
         errno::{EINVAL, ENOSYS},
         signal::{
-            NSIG, SA_SIGINFO, SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SIGRTMIN,
-            SS_DISABLE, SS_ONSTACK, sigaction, siginfo_t, sigset_t, sigval, stack_t, ucontext_t,
+            SIG_BLOCK, SIG_DFL, SIG_IGN, SIG_SETMASK, SIG_UNBLOCK, SIGALRM, SIGEV_SIGNAL,
+            SS_DISABLE, SS_ONSTACK, sigaction, sigevent, siginfo_t, sigset_t, sigval, stack_t,
+            ucontext_t,
         },
         sys_time::{ITIMER_REAL, itimerval},
-        time::timespec,
+        time::{itimerspec, timer_internal_t},
     },
-    platform::ERRNO,
+    out::Out,
+    sync::Mutex,
 };
-use core::mem::{self, offset_of};
-use redox_rt::{
-    proc::FdGuard,
-    protocol::ProcKillTarget,
-    signal::{
-        PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
-    },
+use core::mem::offset_of;
+use redox_protocols::protocol::ProcKillTarget;
+use redox_rt::signal::{
+    PosixStackt, SigStack, Sigaction, SigactionFlags, SigactionKind, Sigaltstack, SignalHandler,
 };
+
+/// Wrapper for timer_t that implements Send (the timer_t pointer is a process-
+/// wide mmap'd allocation that outlives any single thread).
+struct AlarmTimer(timer_t);
+// SAFETY: The timer_t pointer refers to an mmap'd timer_internal_t that is
+// only accessed under the ALARM_TIMER mutex lock.
+unsafe impl Send for AlarmTimer {}
+
+/// Process-global singleton timer used by alarm(). Protected by a mutex to
+/// ensure only one alarm is active at a time (POSIX requirement).
+static ALARM_TIMER: Mutex<Option<AlarmTimer>> = Mutex::new(None);
 
 const _: () = {
     #[track_caller]
@@ -53,10 +64,10 @@ impl PalSignal for Sys {
             _ => return Err(Errno(EINVAL)),
         };
         // TODO: implement setitimer
-        // let fd = FdGuard::new(syscall::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC)?);
+        // let fd = FdGuard::new(redox_rt::sys::open(path, syscall::O_RDONLY | syscall::O_CLOEXEC)?);
         // let count = syscall::read(*fd, &mut spec)?;
 
-        let mut spec = syscall::ITimerSpec::default();
+        let spec = syscall::ITimerSpec::default();
         out.it_interval.tv_sec = spec.it_interval.tv_sec as time_t;
         out.it_interval.tv_usec = spec.it_interval.tv_nsec / 1000;
         out.it_value.tv_sec = spec.it_value.tv_sec as time_t;
@@ -86,18 +97,6 @@ impl PalSignal for Sys {
 
     fn raise(sig: c_int) -> Result<()> {
         // TODO: Bypass kernel?
-        const n_sig: c_int = NSIG as c_int;
-        const rt_min: c_int = SIGRTMIN as c_int;
-        const rt_max: c_int = SIGRTMIN as c_int;
-
-        match sig {
-            0..n_sig => {}
-            rt_min..=rt_max => {}
-            _ => {
-                return Err(Errno(EINVAL));
-            }
-        }
-
         unsafe { Self::rlct_kill(Self::current_os_tid(), sig as _) }
     }
 
@@ -105,7 +104,7 @@ impl PalSignal for Sys {
         // TODO: setitimer is no longer part of POSIX and should not be implemented in Redox
         // Change the platform-independent implementation to use POSIX timers.
         // For Redox, the timer should probably use "/scheme/time"
-        eprintln!("relibc: setitimer not implemented");
+        todo_skip!(0, "setitimer not implemented");
         Err(Errno(ENOSYS))
     }
 
@@ -125,7 +124,7 @@ impl PalSignal for Sys {
                 SigactionKind::Ignore
             } else {
                 SigactionKind::Handled {
-                    handler: if c_act.sa_flags & crate::header::signal::SA_SIGINFO as c_ulong != 0 {
+                    handler: if c_act.sa_flags & crate::header::signal::SA_SIGINFO as c_int != 0 {
                         SignalHandler {
                             sigaction: unsafe { core::mem::transmute(c_act.sa_handler) },
                         }
@@ -168,7 +167,7 @@ impl PalSignal for Sys {
                         unsafe { handler.handler }
                     },
                     sa_restorer: None,
-                    sa_flags: old_action.flags.bits().into(),
+                    sa_flags: old_action.flags.bits() as c_int,
                     sa_mask: old_action.mask,
                 },
             };
@@ -200,7 +199,7 @@ impl PalSignal for Sys {
             .transpose()?;
 
         let mut old = old_c.as_ref().map(|_| Sigaltstack::default());
-        redox_rt::signal::sigaltstack(new.as_ref(), old.as_mut())?;
+        (unsafe { redox_rt::signal::sigaltstack(new.as_ref(), old.as_mut()) })?;
 
         if let (Some(old_c_stack), Some(old)) = (old_c, old) {
             let c_stack = PosixStackt::from(old);
@@ -223,13 +222,19 @@ impl PalSignal for Sys {
         set: Option<&sigset_t>,
         oset: Option<&mut sigset_t>,
     ) -> Result<(), Errno> {
-        Ok(match how {
+        match how {
+            _ if set.is_none() => {
+                if let Some(oset) = oset {
+                    *oset = redox_rt::signal::get_sigmask()?;
+                }
+            }
             SIG_SETMASK => redox_rt::signal::set_sigmask(set.copied(), oset)?,
             SIG_BLOCK => redox_rt::signal::or_sigmask(set.copied(), oset)?,
             SIG_UNBLOCK => redox_rt::signal::andn_sigmask(set.copied(), oset)?,
 
             _ => return Err(Errno(EINVAL)),
-        })
+        }
+        Ok(())
     }
 
     fn sigsuspend(mask: &sigset_t) -> Errno {
@@ -243,7 +248,7 @@ impl PalSignal for Sys {
         set: &sigset_t,
         info_out: Option<&mut siginfo_t>,
         timeout: Option<&timespec>,
-    ) -> Result<(), Errno> {
+    ) -> Result<c_int, Errno> {
         // TODO: deadline-based API
         let timeout = timeout.map(|timeout| syscall::TimeSpec {
             tv_sec: timeout.tv_sec,
@@ -253,6 +258,102 @@ impl PalSignal for Sys {
         if let Some(out) = info_out {
             *out = info;
         }
-        Ok(())
+        Ok(info.si_signo)
     }
+
+    /// Thread-based alarm() that Recycles the existing POSIX timer machinery
+    /// (timerfd + eventfd + pthread) with process-level signal delivery.
+    ///
+    /// Internally works with a timespec to allow sub-second timers in the
+    /// future (e.g. ualarm) as i've been asked, though the public API only exposes whole seconds.
+    fn alarm(seconds: c_uint) -> c_uint {
+        alarm_timespec(timespec {
+            tv_sec: seconds as time_t,
+            tv_nsec: 0,
+        })
+    }
+}
+
+/// Internal helper that arms/disarms the process-global alarm timer.
+/// Accepts a full timespec so sub-second timers (ualarm) can reuse this later.
+/// Returns the number of seconds remaining on the previous alarm (rounded up),
+/// or 0 if there was no previous alarm.
+///
+/// TODO: This implementation does not survive `exec()`. POSIX requires that a
+/// pending alarm be preserved across exec (the timer continues counting down
+/// in the new process image as i understand).
+fn alarm_timespec(duration: timespec) -> c_uint {
+    let mut guard = ALARM_TIMER.lock();
+
+    // Determine remaining time on any existing alarm
+    let remaining = if let Some(ref alarm) = *guard {
+        let mut cur = itimerspec::default();
+        if Sys::timer_gettime(alarm.0, Out::from_mut(&mut cur)).is_ok() {
+            let secs = cur.it_value.tv_sec as c_uint;
+            if cur.it_value.tv_nsec > 0 {
+                secs + 1 // POSIX: round up
+            } else {
+                secs
+            }
+        } else {
+            0
+        }
+    } else {
+        0
+    };
+
+    let disarm = duration.tv_sec == 0 && duration.tv_nsec == 0;
+
+    if disarm {
+        // alarm(0): cancel any pending alarm
+        if let Some(ref alarm) = *guard {
+            let zero = itimerspec::default();
+            let _ = Sys::timer_settime(alarm.0, 0, &zero, None);
+        }
+        return remaining;
+    }
+
+    // Lazily create the singleton timer if it doesn't exist yet
+    if guard.is_none() {
+        let evp = sigevent {
+            sigev_value: sigval {
+                sival_ptr: core::ptr::null_mut(),
+            },
+            sigev_signo: SIGALRM as c_int,
+            sigev_notify: SIGEV_SIGNAL,
+            sigev_notify_function: None,
+            sigev_notify_attributes: core::ptr::null_mut(),
+        };
+
+        let mut timer_id: timer_t = core::ptr::null_mut();
+        if Sys::timer_create(
+            crate::header::time::CLOCK_REALTIME,
+            &evp,
+            Out::from_mut(&mut timer_id),
+        )
+        .is_err()
+        {
+            return remaining;
+        }
+
+        // Enable process-wide signal delivery instead of thread-specific
+        let timer_st = unsafe { &mut *(timer_id as *mut timer_internal_t) };
+        timer_st.process_pid = Sys::getpid();
+
+        *guard = Some(AlarmTimer(timer_id));
+    }
+
+    let timer_id = guard
+        .as_ref()
+        .expect("alarm timer must exist after lazy init")
+        .0;
+
+    // Arm the timer as a one-shot (no interval)
+    let spec = itimerspec {
+        it_value: duration,
+        it_interval: timespec::default(),
+    };
+    let _ = Sys::timer_settime(timer_id, 0, &spec, None);
+
+    remaining
 }

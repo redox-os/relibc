@@ -3,8 +3,8 @@
 #include <stddef.h>
 
 typedef long blksize_t;
-typedef long dev_t;
-typedef unsigned long ino_t;
+typedef unsigned long long dev_t;
+typedef unsigned long long ino_t;
 typedef unsigned short reclen_t;
 typedef int gid_t;
 typedef int uid_t;
@@ -20,7 +20,7 @@ typedef int suseconds_t;
 typedef long clock_t;
 typedef int clockid_t;
 typedef void* timer_t;
-typedef unsigned long int blkcnt_t;
+typedef long long blkcnt_t;
 
 typedef unsigned long int fsblkcnt_t;
 typedef unsigned long int fsfilcnt_t;

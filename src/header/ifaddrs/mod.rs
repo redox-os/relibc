@@ -1,10 +1,13 @@
-//! `ifaddrs.h` implementation
-
-use core::ptr;
+//! `ifaddrs.h` implementation.
+//!
+//! Non-POSIX, see <https://www.man7.org/linux/man-pages/man3/getifaddrs.3.html>.
 
 use crate::{
     header::{errno, stdlib, sys_socket::sockaddr},
-    platform::{self, types::*},
+    platform::{
+        self,
+        types::{c_char, c_int, c_uint, c_void},
+    },
 };
 
 #[repr(C)]
@@ -27,8 +30,8 @@ pub struct ifaddrs {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn freeifaddrs(mut ifa: *mut ifaddrs) {
     while !ifa.is_null() {
-        let next = (*ifa).ifa_next;
-        stdlib::free(ifa.cast());
+        let next = unsafe { (*ifa).ifa_next };
+        unsafe { stdlib::free(ifa.cast()) };
         ifa = next;
     }
 }

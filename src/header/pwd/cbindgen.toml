@@ -1,4 +1,8 @@
-sys_includes = ["stddef.h", "sys/types.h"]
+# POSIX header spec: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/pwd.h.html
+#
+# Spec quotations relating to includes:
+# - "The <pwd.h> header shall define the gid_t, uid_t, and size_t types as described in <sys/types.h>."
+sys_includes = ["sys/types.h"]
 include_guard = "_RELIBC_PWD_H"
 language = "C"
 style = "Tag"
