@@ -9,7 +9,7 @@ __sigsetjmp:
 
 	mov eax, dword ptr [esp + 4]
 	pop [eax + 24]
-	mov dword ptr [eax * 8 + 28], ebx
+	mov dword ptr [eax + 8 + 28], ebx
 	mov ebx, eax
 
 .hidden ___setjmp
@@ -17,8 +17,8 @@ __sigsetjmp:
 
 	push [ebx + 24]
 	mov dword ptr [esp + 4], ebx
-	mov dword ptr [esp + 4], eax
-	mov ebx, dword ptr [ebx * 8 + 28]
+	mov dword ptr [esp + 8], eax
+	mov ebx, dword ptr [ebx + 8 + 28]
 
 .hidden __sigsetjmp_tail
 	jmp __sigsetjmp_tail
