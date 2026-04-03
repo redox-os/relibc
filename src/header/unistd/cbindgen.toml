@@ -1,7 +1,20 @@
 sys_includes = ["stddef.h", "stdint.h", "sys/types.h", "features.h"]
 include_guard = "_RELIBC_UNISTD_H"
 trailer = """
-#include <bits/unistd.h>
+#define _POSIX_VERSION 200809L
+#define _POSIX_BARRIERS 202405L
+#define _POSIX_MONOTONIC_CLOCK 200112L
+#define _POSIX_REALTIME_SIGNALS 202405L
+#define _POSIX_SEMAPHORES 200112L
+#define _POSIX_SHELL 1
+#define _POSIX_SHARED_MEMORY_OBJECTS 200112L
+#define _POSIX_THREADS 202405L
+#define _POSIX_THREAD_ATTR_STACKADDR 202405L
+#define _POSIX_THREAD_ATTR_STACKSIZE 202405L
+#define _POSIX_TIMEOUTS 202405L
+#define _POSIX_TIMERS 202405L
+#define _XOPEN_SHM 1
+#define _XOPEN_VERSION 700L
 """
 language = "C"
 style = "Tag"
