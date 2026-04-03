@@ -1,8 +1,8 @@
 //! `fmtmsg.h` implementation.
-//! 
+//!
 //! See <https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/fmtmsg.h.html>.
 //! Ported from Musl.
-//! 
+//!
 //! See <https://github.com/kraj/musl/blob/kraj/master/src/misc/fmtmsg.c>
 
 use crate::{
@@ -160,7 +160,7 @@ pub unsafe extern "C" fn fmtmsg(
     if ret & (MM_NOCON | MM_NOMSG) == (MM_NOCON | MM_NOMSG) {
         ret = MM_NOTOK;
     }
-    unsafe { 
+    unsafe {
         pthread_setcancelstate(cs, 0 as _);
     }
     ret
