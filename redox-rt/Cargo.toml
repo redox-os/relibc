@@ -25,3 +25,7 @@ default = ["proc"]
 
 [lints]
 workspace = true
+
+[patch.crates-io]
+redox_syscall = { path = "../../../redox_syscall" }
+libredox = { path = "../../../libredox" }
