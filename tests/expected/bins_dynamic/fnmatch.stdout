@@ -29,3 +29,4 @@ Should fail:
 "[a!][a!]" doesn't match "ab"
 "hello[/+]world" doesn't match "hello/world"
 "hello world" doesn't match "HELLO WORLD"
+"********************a" doesn't match "xxxxxxxxxxxxxxxxxxxxb"

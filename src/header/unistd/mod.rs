@@ -24,7 +24,7 @@ use crate::{
     },
     out::Out,
     platform::{
-        self, ERRNO, Pal, Sys,
+        self, ERRNO, Pal, PalSignal, Sys,
         types::{
             c_char, c_int, c_long, c_short, c_uint, c_ulonglong, c_void, gid_t, off_t, pid_t,
             size_t, ssize_t, suseconds_t, time_t, uid_t, useconds_t,
@@ -137,28 +137,7 @@ pub unsafe extern "C" fn access(path: *const c_char, mode: c_int) -> c_int {
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/alarm.html>.
 #[unsafe(no_mangle)]
 pub extern "C" fn alarm(seconds: c_uint) -> c_uint {
-    // TODO setitimer is unimplemented on Redox and obsolete
-    let timer = sys_time::itimerval {
-        it_value: timeval {
-            tv_sec: time_t::from(seconds),
-            tv_usec: 0,
-        },
-        ..Default::default()
-    };
-    let mut otimer = sys_time::itimerval::default();
-
-    let errno_backup = platform::ERRNO.get();
-    let secs =
-        if unsafe { sys_time::setitimer(sys_time::ITIMER_REAL, &raw const timer, &raw mut otimer) }
-            < 0
-        {
-            0
-        } else {
-            otimer.it_value.tv_sec as c_uint + if otimer.it_value.tv_usec > 0 { 1 } else { 0 }
-        };
-    platform::ERRNO.set(errno_backup);
-
-    secs
+    Sys::alarm(seconds)
 }
 
 /// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/chdir.html>.

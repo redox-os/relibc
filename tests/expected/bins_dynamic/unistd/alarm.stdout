@@ -1,0 +1,4 @@
+alarm(0) baseline: ok
+alarm(1) fires: ok
+alarm(0) cancel: ok
+alarm re-arm returns remaining: ok

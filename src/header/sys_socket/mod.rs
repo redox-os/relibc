@@ -6,7 +6,7 @@ use core::{mem, ptr};
 
 use crate::{
     error::ResultExt,
-    header::{bits_socklen_t::socklen_t, sys_uio::iovec},
+    header::{bits_iovec::iovec, bits_socklen_t::socklen_t},
     platform::{
         PalSocket, Sys,
         types::{

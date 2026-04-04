@@ -1,4 +1,4 @@
-// https://pubs.opengroup.org/onlinepubs/9699919799/functions/getline.html
+// See <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getline.html>.
 
 use alloc::vec::Vec;
 use core::{intrinsics::unlikely, ptr};
@@ -31,7 +31,7 @@ pub unsafe extern "C" fn getline(
 // One *could* read the standard as 'getdelim sets the stream error flag on *any* error, though
 // since glibc doesn't seem to do this, I won't either
 
-/// https://pubs.opengroup.org/onlinepubs/9699919799/functions/getline.html
+/// <https://pubs.opengroup.org/onlinepubs/9799919799/functions/getline.html>
 ///
 /// # Safety
 /// - `lineptr, *lineptr, `n`, `stream` pointers must be valid and have to be aligned.

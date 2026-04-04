@@ -1,4 +1,4 @@
-//! Helper functions for random() and friends, see https://pubs.opengroup.org/onlinepubs/7908799/xsh/initstate.html
+//! Helper functions for random() and friends, see <https://pubs.opengroup.org/onlinepubs/9799919799/functions/initstate.html>.
 // Ported from musl's implementation (src/prng/random.c)
 
 use crate::{
