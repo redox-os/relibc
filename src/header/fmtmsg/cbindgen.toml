@@ -1,10 +1,4 @@
-sys_includes = ["fcntl.h", 
-    "unistd.h",
-    "stdio.h",
-    "string.h",
-    "stdlib.h",
-    "pthread.h",
-]
+sys_includes = []
 include_guard = "_RELIBC_FMTMSG_H"
 language = "C"
 style = "Tag"
