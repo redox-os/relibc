@@ -1024,14 +1024,11 @@ impl Linker {
             })?;
 
             if !shm_exists {
-                let _ = Sys::open(shm_path, fcntl::O_CREAT | fcntl::O_RDWR, 0o600)
-                    .map(|fd| Sys::close(fd));
-            } else {
-                if let Ok(shm_fd) = Sys::open(shm_path, fcntl::O_RDWR, 0o600) {
-                    let _ = Sys::ftruncate(shm_fd, source_size as i64);
-                    let _ = Sys::write(shm_fd, file.data());
-                    let _ = Sys::close(shm_fd);
-                }
+                let _ = Sys::open(shm_path, fcntl::O_CREAT | fcntl::O_RDWR, 0o600).map(Sys::close);
+            } else if let Ok(shm_fd) = Sys::open(shm_path, fcntl::O_RDWR, 0o600) {
+                let _ = Sys::ftruncate(shm_fd, source_size as i64);
+                let _ = Sys::write(shm_fd, file.data());
+                let _ = Sys::close(shm_fd);
             }
 
             file
