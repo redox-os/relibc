@@ -14,6 +14,8 @@ int main() {
     if (mm_ok != 0) {
         return -1;
     }
+    // Thats return 0 in glibc but return 4 in musl
+    // So we expect 4 here
     int mm_nocon = fmtmsg(MM_PRINT | MM_CONSOLE, "XSI:cat", MM_ERROR, "illegal option",
     "refer to cat in user's reference manual", "XSI:cat:001");
     if (mm_nocon != MM_NOCON) {
