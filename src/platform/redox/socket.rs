@@ -78,7 +78,7 @@ unsafe fn bind_or_connect(
                 format!("0.0.0.0:0")
             }
             _ => unreachable!(),
-        }
+        },
         _ => return Err(Errno(EAFNOSUPPORT)),
     };
     let fd = syscall::dup(socket as usize, path.as_bytes())?;
@@ -679,7 +679,7 @@ impl PalSocket for Sys {
             }
             AF_UNSPEC => unsafe {
                 bind_or_connect_into(SocketCall::Connect, socket, address, address_len)
-            }
+            },
             _ => Err(Errno(EAFNOSUPPORT)),
         }
     }
