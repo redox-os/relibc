@@ -69,12 +69,15 @@ unsafe fn bind_or_connect(
             log::warn!("bind/connect with AF_UNIX were replaced with SYS_CALL.");
             return Err(Errno(EAFNOSUPPORT));
         }
-        AF_UNSPEC => {
-            match op {
-                SocketCall::Connect => format!(""),
-                SocketCall::Bind => return Err(Errno(EAFNOSUPPORT)),
-                _ => unreachable!(),
+        AF_UNSPEC => match op {
+            SocketCall::Bind => {
+                //bind is not a valid socket call for AF_UNSPEC
+                return Err(Errno(EAFNOSUPPORT));
             }
+            SocketCall::Connect => {
+                format!("{}.{}.{}.{}:{}", 0, 0, 0, 0, 0)
+            }
+            _ => unreachable!(),
         }
         _ => return Err(Errno(EAFNOSUPPORT)),
     };
