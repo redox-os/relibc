@@ -75,7 +75,7 @@ unsafe fn bind_or_connect(
                 return Err(Errno(EAFNOSUPPORT));
             }
             SocketCall::Connect => {
-                "0.0.0.0:0".to_string()
+                format!("0.0.0.0:0")
             }
             _ => unreachable!(),
         }
