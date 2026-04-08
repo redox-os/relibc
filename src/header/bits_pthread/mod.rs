@@ -8,56 +8,67 @@ use crate::platform::types::{c_int, c_uchar, c_ulong, c_void, size_t};
 // expanding macros! Instead, we rely on checking that the lengths are correct, when these headers
 // are parsed in the regular compilation phase.
 
+/// The `pthread_attr_t` type provided in [`sys/types.h`](crate::header::sys_types).
 #[repr(C)]
 pub union pthread_attr_t {
     __relibc_internal_size: [c_uchar; 32],
     __relibc_internal_align: size_t,
 }
+/// The `pthread_rwlockattr_t` type provided in [`sys/types.h`](crate::header::sys_types).
 #[repr(C)]
 pub union pthread_rwlockattr_t {
     __relibc_internal_size: [c_uchar; 1],
     __relibc_internal_align: c_uchar,
 }
+/// The `pthread_rwlock_t` type provided in [`sys/types.h`](crate::header::sys_types).
 #[repr(C)]
 pub union pthread_rwlock_t {
     __relibc_internal_size: [c_uchar; 4],
     __relibc_internal_align: c_int,
 }
+/// The `pthread_barrier_t` type provided in [`sys/types.h`](crate::header::sys_types).
 #[repr(C)]
 pub union pthread_barrier_t {
     __relibc_internal_size: [c_uchar; 24],
     __relibc_internal_align: c_int,
 }
+/// The `pthread_barrierattr_t` type provided in [`sys/types.h`](crate::header::sys_types).
 #[repr(C)]
 pub union pthread_barrierattr_t {
     __relibc_internal_size: [c_uchar; 4],
     __relibc_internal_align: c_int,
 }
+/// The `pthread_mutex_t` type provided in [`sys/types.h`](crate::header::sys_types).
 #[repr(C)]
 pub union pthread_mutex_t {
     __relibc_internal_size: [c_uchar; 12],
     __relibc_internal_align: c_int,
 }
+/// The `pthread_mutexattr_t` type provided in [`sys/types.h`](crate::header::sys_types).
 #[repr(C)]
 pub union pthread_mutexattr_t {
     __relibc_internal_size: [c_uchar; 20],
     __relibc_internal_align: c_int,
 }
+/// The `pthread_cond_t` type provided in [`sys/types.h`](crate::header::sys_types).
 #[repr(C)]
 pub union pthread_cond_t {
     __relibc_internal_size: [c_uchar; 8],
     __relibc_internal_align: c_int,
 }
+/// The `pthread_condattr_t` type provided in [`sys/types.h`](crate::header::sys_types).
 #[repr(C)]
 pub union pthread_condattr_t {
     __relibc_internal_size: [c_uchar; 8],
     __relibc_internal_align: c_int,
 }
+/// The `pthread_spinlock_t` type provided in [`sys/types.h`](crate::header::sys_types).
 #[repr(C)]
 pub union pthread_spinlock_t {
     __relibc_internal_size: [c_uchar; 4],
     __relibc_internal_align: c_int,
 }
+/// The `pthread_once_t` type provided in [`sys/types.h`](crate::header::sys_types).
 #[repr(C)]
 pub union pthread_once_t {
     __relibc_internal_size: [c_uchar; 4],
@@ -106,5 +117,7 @@ assert_equal_size!(pthread_condattr_t, RlctCondAttr);
 assert_equal_size!(pthread_spinlock_t, RlctSpinlock);
 assert_equal_size!(pthread_once_t, RlctOnce);
 
+/// The `pthread_t` type provided in [`sys/types.h`](crate::header::sys_types).
 pub type pthread_t = *mut c_void;
+/// The `pthread_key_t` type provided in [`sys/types.h`](crate::header::sys_types).
 pub type pthread_key_t = c_ulong;
