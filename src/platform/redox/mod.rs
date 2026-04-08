@@ -102,7 +102,7 @@ macro_rules! path_from_c_str {
 
 static CLONE_LOCK: RwLock<()> = RwLock::new(());
 
-/// Redox syscall implementation of the platform abstraction layer.
+/// Redox syscall implementation of [`Pal`].
 pub struct Sys;
 
 impl Pal for Sys {
