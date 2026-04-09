@@ -7,12 +7,6 @@ struct sockaddr_storage {
 	unsigned long __ss_align;
 };
 
-struct ucred {
-	pid_t pid;
-	uid_t uid;
-	gid_t gid;
-};
-
 // These definitions were taken from musl, license MIT {
 #define __CMSG_LEN(cmsg) (((cmsg)->cmsg_len + sizeof(long) - 1) & ~(long)(sizeof(long) - 1))
 #define __CMSG_NEXT(cmsg) ((unsigned char *)(cmsg) + __CMSG_LEN(cmsg))
